@@ -40,6 +40,22 @@ FEATURE_NAMES = (
     "home_indicator",
 )
 
+FG_ATTEMPT_FEATURE_NAMES = (
+    "fg_attempts_per_game",
+    "opp_fg_attempts_allowed_per_game",
+    "off_plays_per_game",
+    "off_success_rate",
+    "opp_def_success_rate_allowed",
+    "off_turnover_rate",
+    "opp_takeaway_rate",
+    "off_sack_rate_allowed",
+    "opp_def_sack_rate",
+    "home_indicator",
+)
+
+FG_MODEL_DIRECT_MADE = "DIRECT_MADE_POISSON_V1"
+FG_MODEL_ATTEMPT_RATE_X_PRIOR_MAKE = "ATTEMPT_RATE_X_PRIOR_MAKE_RATE_V1"
+
 ALPHA_GRID = (0.1, 1.0, 10.0, 100.0)
 SIGMA_GRID = (0.0, 0.10, 0.20, 0.30)
 
@@ -63,6 +79,7 @@ class PoissonRidge:
 class ScoreCountFit:
     td_model: PoissonRidge
     fg_model: PoissonRidge
+    fg_model_kind: str
     shared_sigma: float
     def_st_td_rate: float
     safety_rate: float
@@ -95,12 +112,18 @@ def child_seed(game_id: str, *, root_seed: int = ROOT_SEED_UINT64) -> int:
     return int.from_bytes(digest[:8], "big", signed=False)
 
 
-def _matrix(rows: Sequence[Mapping[str, Any]]) -> np.ndarray:
+def _matrix(
+    rows: Sequence[Mapping[str, Any]],
+    feature_names: Sequence[str] = FEATURE_NAMES,
+) -> np.ndarray:
     if not rows:
         raise ScoreCountsError("TRAINING_ROWS_REQUIRED")
+    names = tuple(str(name) for name in feature_names)
+    if names not in {FEATURE_NAMES, FG_ATTEMPT_FEATURE_NAMES}:
+        raise ScoreCountsError("FEATURE_IDENTITY_MISMATCH")
     out = []
     for idx, row in enumerate(rows):
-        vals = [_finite(row.get(name), f"row[{idx}].{name}") for name in FEATURE_NAMES]
+        vals = [_finite(row.get(name), f"row[{idx}].{name}") for name in names]
         out.append(vals)
     return np.asarray(out, dtype=float)
 
@@ -135,12 +158,14 @@ def fit_poisson_ridge(
     *,
     target: str,
     alpha: float,
+    feature_names: Sequence[str] = FEATURE_NAMES,
     max_iter: int = 100,
     tol: float = 1e-10,
 ) -> PoissonRidge:
     if alpha < 0:
         raise ScoreCountsError("ALPHA_NONNEGATIVE_REQUIRED")
-    x_raw = _matrix(rows)
+    names = tuple(str(name) for name in feature_names)
+    x_raw = _matrix(rows, names)
     y = _target(rows, target)
     x, mean, scale = _standardize(x_raw)
     design = np.column_stack([np.ones(x.shape[0]), x])
@@ -170,7 +195,7 @@ def fit_poisson_ridge(
     return PoissonRidge(
         target=target,
         alpha=float(alpha),
-        feature_names=FEATURE_NAMES,
+        feature_names=names,
         mean=tuple(float(v) for v in mean),
         scale=tuple(float(v) for v in scale),
         intercept=float(beta[0]),
@@ -179,9 +204,10 @@ def fit_poisson_ridge(
 
 
 def predict_mean(model: PoissonRidge, row: Mapping[str, Any]) -> float:
-    if tuple(model.feature_names) != FEATURE_NAMES:
+    names = tuple(model.feature_names)
+    if names not in {FEATURE_NAMES, FG_ATTEMPT_FEATURE_NAMES}:
         raise ScoreCountsError("FEATURE_IDENTITY_MISMATCH")
-    x = np.asarray([_finite(row.get(name), name) for name in FEATURE_NAMES], dtype=float)
+    x = np.asarray([_finite(row.get(name), name) for name in names], dtype=float)
     mean = np.asarray(model.mean, dtype=float)
     scale = np.asarray(model.scale, dtype=float)
     beta = np.asarray(model.coefficients, dtype=float)
@@ -201,6 +227,7 @@ def choose_alpha(
     *,
     target: str,
     alphas: Sequence[float] = ALPHA_GRID,
+    feature_names: Sequence[str] = FEATURE_NAMES,
 ) -> tuple[float, dict[float, float]]:
     seasons = sorted({_season(row, idx) for idx, row in enumerate(rows)})
     if len(seasons) < 3:
@@ -213,7 +240,9 @@ def choose_alpha(
             continue
         y = _target(valid, target)
         for alpha in scores:
-            model = fit_poisson_ridge(train, target=target, alpha=alpha)
+            model = fit_poisson_ridge(
+                train, target=target, alpha=alpha, feature_names=feature_names
+            )
             mu = np.asarray([predict_mean(model, row) for row in valid], dtype=float)
             scores[alpha].append(_poisson_deviance(y, mu))
     means = {
@@ -251,6 +280,7 @@ def fit_core(
     conversion_probabilities: Sequence[float],
     source_manifest_sha256: str,
     code_identity: str,
+    attempt_number: int = 1,
 ) -> ScoreCountFit:
     if shared_sigma not in SIGMA_GRID:
         raise ScoreCountsError("SHARED_SIGMA_NOT_FROZEN_GRID")
@@ -269,10 +299,27 @@ def fit_core(
         raise ScoreCountsError("RARE_SCORE_RATE_NEGATIVE")
 
     td_alpha, _ = choose_alpha(rows, target="offense_touchdowns")
-    fg_alpha, _ = choose_alpha(rows, target="made_field_goals")
+    if int(attempt_number) == 2:
+        fg_alpha, _ = choose_alpha(
+            rows,
+            target="field_goal_attempts",
+            feature_names=FG_ATTEMPT_FEATURE_NAMES,
+        )
+        fg_model = fit_poisson_ridge(
+            rows,
+            target="field_goal_attempts",
+            alpha=fg_alpha,
+            feature_names=FG_ATTEMPT_FEATURE_NAMES,
+        )
+        fg_model_kind = FG_MODEL_ATTEMPT_RATE_X_PRIOR_MAKE
+    else:
+        fg_alpha, _ = choose_alpha(rows, target="made_field_goals")
+        fg_model = fit_poisson_ridge(rows, target="made_field_goals", alpha=fg_alpha)
+        fg_model_kind = FG_MODEL_DIRECT_MADE
     return ScoreCountFit(
         td_model=fit_poisson_ridge(rows, target="offense_touchdowns", alpha=td_alpha),
-        fg_model=fit_poisson_ridge(rows, target="made_field_goals", alpha=fg_alpha),
+        fg_model=fg_model,
+        fg_model_kind=fg_model_kind,
         shared_sigma=float(shared_sigma),
         def_st_td_rate=dst,
         safety_rate=safety,
@@ -280,6 +327,18 @@ def fit_core(
         source_manifest_sha256=digest,
         code_identity=code,
     )
+
+
+def predict_field_goal_mean(fit: ScoreCountFit, row: Mapping[str, Any]) -> float:
+    base = predict_mean(fit.fg_model, row)
+    if fit.fg_model_kind == FG_MODEL_DIRECT_MADE:
+        return base
+    if fit.fg_model_kind != FG_MODEL_ATTEMPT_RATE_X_PRIOR_MAKE:
+        raise ScoreCountsError("FG_MODEL_KIND_INVALID")
+    make_rate = _finite(row.get("fg_make_rate_shrunk"), "fg_make_rate_shrunk")
+    if not 0.0 <= make_rate <= 1.0:
+        raise ScoreCountsError("FG_MAKE_RATE_OUT_OF_RANGE")
+    return float(base * make_rate)
 
 
 def _team_rate_override(
@@ -347,8 +406,8 @@ def simulate_game(
 
     home_td_lambda = predict_mean(fit.td_model, home_row)
     away_td_lambda = predict_mean(fit.td_model, away_row)
-    home_fg_lambda = predict_mean(fit.fg_model, home_row)
-    away_fg_lambda = predict_mean(fit.fg_model, away_row)
+    home_fg_lambda = predict_field_goal_mean(fit, home_row)
+    away_fg_lambda = predict_field_goal_mean(fit, away_row)
 
     sigma = float(fit.shared_sigma)
     if sigma == 0.0:
