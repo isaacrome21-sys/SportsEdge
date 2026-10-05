@@ -1803,10 +1803,16 @@
       "merge_sha": "bed6a642b272e66d77011ff5001a32a2709252dc",
       "pr": 1591,
       "note": "CFB governed bakeoff null-control workflow/test clean-port. Governance/evaluation plumbing only; no candidate formula, Model_P, pricing, promotion, staking, release, OFFICIAL, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_37CB9927_PR_1596",
+      "merge_sha": "37cb99274dafe339b3c88fe04049f871220c8625",
+      "pr": 1596,
+      "note": "MLB validated m30 F5 and NRFI/YRFI production upgrade. Exact twice-confirmed m30 prior implementation; reconciliation records provenance only and creates no additional pricing, promotion, staking, release, OFFICIAL, or untouched-readout authority."
     }
   ],
-  "inventory_block_reason": "Current main through merge bed6a642 / PR #1591 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge 37cb9927 / PR #1596 registered for reconciliation provenance. Reconciliation grants no additional model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "bed6a642b272e66d77011ff5001a32a2709252dc",
+  "reconciled_through_sha": "37cb99274dafe339b3c88fe04049f871220c8625",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
