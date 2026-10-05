@@ -164,6 +164,84 @@ def _game_pairs(rows: Sequence[Mapping[str, Any]]) -> dict[str, tuple[Mapping[st
     return out
 
 
+def _poisson_deviance(y: np.ndarray, mu: np.ndarray) -> float:
+    if y.size == 0 or y.shape != mu.shape:
+        raise ScoreCountArtifactError("DEVELOPMENT_DEVIANCE_SHAPE")
+    safe_mu = np.clip(mu.astype(float), 1e-12, None)
+    term = np.where(y > 0, y * np.log(y / safe_mu) - (y - safe_mu), safe_mu)
+    return float(2.0 * np.mean(term))
+
+
+def _development_count_gate(
+    rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Frozen Attempt-1 historical gate, entirely market-blind."""
+    target_results: dict[str, Any] = {}
+    all_pass = True
+    for target in ("offense_touchdowns", "made_field_goals"):
+        folds = []
+        pooled_y: list[float] = []
+        pooled_candidate: list[float] = []
+        pooled_baseline: list[float] = []
+        wins = 0
+        for validation_season in SIGMA_VALIDATION_SEASONS:
+            train = [row for row in rows if int(row["season"]) < validation_season]
+            valid = [row for row in rows if int(row["season"]) == validation_season]
+            train_seasons = sorted({int(row["season"]) for row in train})
+            if len(train_seasons) < 3 or not valid:
+                raise ScoreCountArtifactError(f"DEVELOPMENT_GATE_FOLD_INCOMPLETE:{target}:{validation_season}")
+            alpha, _ = choose_alpha(train, target=target, alphas=ALPHA_GRID)
+            model = fit_poisson_ridge(train, target=target, alpha=alpha)
+            y = np.asarray([_finite(row.get(target), target) for row in valid], dtype=float)
+            candidate = np.asarray([predict_mean(model, row) for row in valid], dtype=float)
+            train_y = np.asarray([_finite(row.get(target), target) for row in train], dtype=float)
+            baseline_mean = max(float(np.mean(train_y)), 1e-12)
+            baseline = np.full_like(y, baseline_mean, dtype=float)
+            candidate_dev = _poisson_deviance(y, candidate)
+            baseline_dev = _poisson_deviance(y, baseline)
+            won = candidate_dev < baseline_dev
+            wins += int(won)
+            folds.append({
+                "validation_season": validation_season,
+                "training_seasons": train_seasons,
+                "n_team_rows": len(valid),
+                "selected_alpha": alpha,
+                "candidate_poisson_deviance": candidate_dev,
+                "intercept_baseline_poisson_deviance": baseline_dev,
+                "fold_win": won,
+            })
+            pooled_y.extend(float(v) for v in y)
+            pooled_candidate.extend(float(v) for v in candidate)
+            pooled_baseline.extend(float(v) for v in baseline)
+
+        y_all = np.asarray(pooled_y, dtype=float)
+        candidate_all = np.asarray(pooled_candidate, dtype=float)
+        baseline_all = np.asarray(pooled_baseline, dtype=float)
+        candidate_dev = _poisson_deviance(y_all, candidate_all)
+        baseline_dev = _poisson_deviance(y_all, baseline_all)
+        passed = bool(candidate_dev < baseline_dev and wins >= 3)
+        all_pass = all_pass and passed
+        target_results[target] = {
+            "pooled_candidate_poisson_deviance": candidate_dev,
+            "pooled_intercept_baseline_poisson_deviance": baseline_dev,
+            "pooled_improvement": baseline_dev - candidate_dev,
+            "fold_wins": wins,
+            "folds_total": len(SIGMA_VALIDATION_SEASONS),
+            "minimum_fold_wins": 3,
+            "pass": passed,
+            "folds": folds,
+        }
+    return {
+        "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G1_DEVELOPMENT_GATE_V1",
+        "validation_seasons": list(SIGMA_VALIDATION_SEASONS),
+        "baseline": "TRAINING_FOLD_INTERCEPT_ONLY_POISSON_MEAN",
+        "all_targets_must_pass": True,
+        "targets": target_results,
+        "pass": bool(all_pass),
+        "market_data_used": False,
+    }
+
+
 def _select_shared_sigma(
     rows: Sequence[Mapping[str, Any]],
 ) -> tuple[float, dict[str, Any]]:
@@ -264,6 +342,7 @@ def build_attempt_fit_artifact(
     materialized = [dict(row) for row in rows]
     if sorted({int(row["season"]) for row in materialized}) != list(DEVELOPMENT_SEASONS):
         raise ScoreCountArtifactError("DEVELOPMENT_SEASONS_EXACT_REQUIRED")
+    development_gate = _development_count_gate(materialized)
     sigma, sigma_diag = _select_shared_sigma(materialized)
     dst, safety, conversions = _league_priors(materialized)
     td_alpha, td_cv = choose_alpha(materialized, target="offense_touchdowns", alphas=ALPHA_GRID)
@@ -282,7 +361,7 @@ def build_attempt_fit_artifact(
     game_count = len(_game_pairs(materialized))
     payload: dict[str, Any] = {
         "schema": FIT_SCHEMA,
-        "status": "DEVELOPMENT_ATTEMPT_FIT_RESEARCH_ONLY",
+        "status": "DEVELOPMENT_ATTEMPT_PASS" if development_gate["pass"] else "DEVELOPMENT_ATTEMPT_FAIL",
         "candidate_family": "NFL_SCORE_COUNTS_G1",
         "attempt_number": int(attempt_number),
         "development_seasons": list(DEVELOPMENT_SEASONS),
@@ -297,6 +376,7 @@ def build_attempt_fit_artifact(
             "root_seed_uint64": str(ROOT_SEED_UINT64),
             "scored_paths_per_game": 50000,
         },
+        "development_gate": development_gate,
         "selection": {
             "alpha_grid": list(ALPHA_GRID),
             "td_alpha": td_alpha,
