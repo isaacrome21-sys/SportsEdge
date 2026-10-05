@@ -7,7 +7,7 @@
   "runner": "scripts/run_nfl_score_counts_attempt.py",
   "source_contract": "config/research/nfl_score_counts_g1_source_contract_v1.json",
   "prereg_addendum": "config/research/nfl_score_counts_g1_prereg_addendum_v2.json",
-  "reason": "The connected GitHub capability cannot initiate a new workflow_dispatch. This hash-reviewed one-shot main-push marker is the governed execution bridge.",
+  "reason": "Implementation retry after run 37333803086 failed during training-row materialization before any model fit or development-gate evaluation.",
   "rules": {
     "trigger_only_when_this_marker_lands_on_main": true,
     "attempt_1_only": true,
@@ -23,5 +23,12 @@
     "promotion": false,
     "staking": false,
     "official": false
+  },
+  "implementation_retry": {
+    "prior_run_id": 37333803086,
+    "failure_receipt": "config/research/nfl_score_counts_attempt1_prefit_failure_v1.json",
+    "prior_attempt_consumed": false,
+    "fix": "OBSERVED_METRIC_DENOMINATORS_FOR_VALID_SCRIMMAGE_ROWS_WITH_MISSING_EPA",
+    "retry_nonce": "2026-10-05T15:39Z"
   }
 }
