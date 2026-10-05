@@ -71,6 +71,17 @@ jobs:
                --observed-at "$OBSERVED" --issue "$ISSUE" > intake.out; then
             cat intake.out >> "$GITHUB_OUTPUT"
           else
+            intake_status=$?
+            if [ "$intake_status" -eq 3 ]; then
+              echo "research_complete=true" >> "$GITHUB_OUTPUT"
+              cat intake.out
+              exit 0
+            fi
+            if [ "$intake_status" -eq 4 ]; then
+              { echo "The research run failed. No card was run:"; echo; echo '```'; cat intake_error.txt; echo '```'; } > comment.md
+              gh issue comment "$ISSUE" --body-file comment.md
+              exit 1
+            fi
             { echo "Couldn't read these lines, so no card was run:"; echo; echo '```'; cat intake_error.txt; echo '```';
               echo; echo "Edit the issue to fix them and it will rerun."; } > comment.md
             gh issue comment "$ISSUE" --body-file comment.md
@@ -78,12 +89,14 @@ jobs:
           fi
 
       - name: Run SportsEdge engines
+        if: steps.intake.outputs.research_complete != 'true'
         run: |
           started=$(date +%s)
           PYTHONPATH=.runtime-deps:. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.intake.outputs.path }}" --run-date "${{ steps.intake.outputs.slate }}" --max-age-minutes 60 --output artifacts/manual_mlb_snapshot_card.json
           echo "mlb_engine_seconds=$(( $(date +%s) - started ))"
 
       - name: Render PRE-CONTEXT result and reply now
+        if: steps.intake.outputs.research_complete != 'true'
         run: |
           PYTHONPATH=.runtime-deps:. python scripts/render_mlb_myspari_card.py \
             --engine-output artifacts/manual_mlb_snapshot_card.json \
@@ -93,6 +106,7 @@ jobs:
           gh issue comment "$ISSUE" --body-file artifacts/mlb_myspari/card.md
 
       - name: Retrieve pregame context and post final card
+        if: steps.intake.outputs.research_complete != 'true'
         continue-on-error: true
         timeout-minutes: 5
         run: |
@@ -105,7 +119,7 @@ jobs:
           gh issue comment "$ISSUE" --body-file artifacts/mlb_myspari_ctx/card.md
 
       - name: Report engine failure on the issue
-        if: failure() && steps.intake.outcome == 'success'
+        if: failure() && steps.intake.outcome == 'success' && steps.intake.outputs.research_complete != 'true'
         run: |
           gh issue comment "$ISSUE" --body "The card run failed after intake. Run log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
