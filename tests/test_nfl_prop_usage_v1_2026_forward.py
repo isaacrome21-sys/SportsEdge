@@ -82,4 +82,5 @@ def test_selector_keeps_latest_decision_and_optional_close():
     assert selected["close"]["observed_at"] == "2026-10-09T00:10:00+00:00"
     assert selected["validation_row_eligible"] is True
     assert selected["clv_row_eligible"] is True
-    assert not any(out["authority"].values())
+    assert out["authority"]["research_only"] is True
+    assert not any(v for k, v in out["authority"].items() if k != "research_only")
