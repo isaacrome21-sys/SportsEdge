@@ -19,8 +19,6 @@ from statistics import fmean
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from sportsedge.mlb_empirical_bayes import posterior_settlement_mass
-
 API = "https://statsapi.mlb.com/api/v1"
 SEASONS = (2023, 2024, 2025)
 TUNE = 2024
@@ -203,6 +201,24 @@ def blend(a: dict[int, float], b: dict[int, float]) -> dict[int, float]:
     return out
 
 
+def settlement_posterior(
+    *, over_mass: float, under_mass: float, push_mass: float,
+    effective_n: float, has_push: bool,
+) -> dict[str, float]:
+    """Exact Jeffreys settlement posterior used by the current F5 readout."""
+    masses = {"over": float(over_mass), "under": float(under_mass), "push": float(push_mass)}
+    if abs(sum(masses.values()) - 1.0) > 1e-9:
+        raise ValueError("SETTLEMENT_MASS")
+    names = ("over", "under", "push") if has_push else ("over", "under")
+    if not has_push and abs(masses["push"]) > 1e-12:
+        raise ValueError("NON_PUSH_MARKET_HAS_PUSH")
+    denom = float(effective_n) + 0.5 * len(names)
+    out = {name: (0.5 + float(effective_n) * masses[name]) / denom for name in names}
+    if not has_push:
+        out["push"] = 0.0
+    return out
+
+
 def f5_metrics(
     away: dict[int, float],
     home: dict[int, float],
@@ -226,14 +242,14 @@ def f5_metrics(
             if ar + hr > 4.5:
                 p_over45 += p
 
-    state = posterior_settlement_mass(
+    state = settlement_posterior(
         over_mass=p_away,
         under_mass=p_home,
         push_mass=p_tie,
         effective_n=float(effective_n),
         has_push=True,
     )
-    total45 = posterior_settlement_mass(
+    total45 = settlement_posterior(
         over_mass=p_over45,
         under_mass=1.0 - p_over45,
         push_mass=0.0,
@@ -244,11 +260,11 @@ def f5_metrics(
     return {
         "nll": -math.log(max(EPS, observed)),
         "state_brier": (
-            (state["p_over"]-y[0])**2
-            + (state["p_push"]-y[1])**2
-            + (state["p_under"]-y[2])**2
+            (state["over"]-y[0])**2
+            + (state["push"]-y[1])**2
+            + (state["under"]-y[2])**2
         ),
-        "total45_brier": (total45["p_over"]-int(ar_obs+hr_obs > 4.5))**2,
+        "total45_brier": (total45["over"]-int(ar_obs+hr_obs > 4.5))**2,
     }
 
 
