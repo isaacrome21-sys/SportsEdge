@@ -1,0 +1,120 @@
+{
+  "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G1_ATTEMPT2_FG_ADDENDUM_V1",
+  "status": "FROZEN_BEFORE_ATTEMPT2_IMPLEMENTATION_OR_HISTORICAL_SCORING",
+  "frozen_date": "2026-10-05",
+  "candidate_family": "NFL_SCORE_COUNTS_G1",
+  "attempt_accounting": {
+    "max_materially_distinct_attempts": 3,
+    "attempts_consumed_before_this_spec": 1,
+    "attempts_remaining_before_this_spec": 2,
+    "this_spec_if_evaluated_consumes_attempt": 2,
+    "thresholds_unchanged": true,
+    "attempt1_result_preserved": true
+  },
+  "attempt1_binding": {
+    "workflow_run_id": 37336963800,
+    "workflow_artifact_id": 11358403155,
+    "workflow_artifact_zip_sha256": "c9497c34982928f811506367d363bf0fa9e588a55e060a1a250f03d1d384cbad",
+    "fit_json_file_sha256": "0e79578490ee9b315c38dc1ee5fa68acd0a70b39d499a7ee81fa65dc0441d9fd",
+    "fit_artifact_payload_sha256": "882861e89602432aa8622f78e89fc84c30602c0e7f079235dad73f3980526520",
+    "source_manifest_sha256": "5394e39892436a63816f5d3b499250c7764875f385646c71ed851e560db8187b",
+    "code_identity": "d34d6f6d836a1223c06ba26376cb77993b012f7a4e32174c6073fc87fb2b8660",
+    "prereg_addendum_v2_sha256": "cf5f3435a211fc6d821ae6497bfa1f1ff0072d9f2bcefc879cb37f6417865890",
+    "missing_epa_policy_sha256": "1c756b821668d5bd0fbbc0552506aff1a04bebe8e3f7d697168e25456b688bd2",
+    "training_games": 1967,
+    "training_team_rows": 3934,
+    "status": "DEVELOPMENT_ATTEMPT_FAIL",
+    "touchdown_gate": {
+      "fold_wins": 5,
+      "folds_total": 5,
+      "pooled_candidate_poisson_deviance": 0.8640739939949063,
+      "pooled_intercept_baseline_poisson_deviance": 0.9429609486409716,
+      "pooled_improvement": 0.07888695464606532,
+      "pass": true
+    },
+    "field_goal_gate": {
+      "fold_wins": 0,
+      "folds_total": 5,
+      "pooled_candidate_poisson_deviance": 1.055867197708652,
+      "pooled_intercept_baseline_poisson_deviance": 1.0488367803645573,
+      "pooled_improvement": -0.007030417344094708,
+      "pass": false
+    }
+  },
+  "reason_for_attempt2": {
+    "observed_failure": "ATTEMPT1_DIRECT_MADE_FIELD_GOAL_MODEL_LOST_ALL_FIVE_VALIDATION_SEASONS",
+    "attempt1_selected_fg_alpha_each_gate_fold": 100.0,
+    "football_hypothesis": "Made field goals are the product of field-goal opportunity volume and conversion probability. A direct made-count model mixes those processes and can erase stable opportunity signal.",
+    "scope": "FIELD_GOAL_COMPONENT_ONLY",
+    "touchdown_component_changed": false
+  },
+  "attempt2_field_goal_specification": {
+    "decomposition": "EXPECTED_MADE_FIELD_GOALS = PREDICTED_FIELD_GOAL_ATTEMPTS * STRICTLY_PRIOR_SHRUNK_TEAM_FG_MAKE_RATE",
+    "field_goal_attempt_definition": "ANY_PBP_ROW_WITH_NONEMPTY_FIELD_GOAL_RESULT",
+    "made_field_goal_definition": "FIELD_GOAL_RESULT_IN_MADE_OR_GOOD",
+    "attempt_model": {
+      "family": "L2_REGULARIZED_POISSON_GLM_LOG_LINK",
+      "target": "FIELD_GOAL_ATTEMPTS",
+      "feature_names": [
+        "fg_attempts_per_game",
+        "opp_fg_attempts_allowed_per_game",
+        "off_plays_per_game",
+        "off_success_rate",
+        "opp_def_success_rate_allowed",
+        "off_turnover_rate",
+        "opp_takeaway_rate",
+        "off_sack_rate_allowed",
+        "opp_def_sack_rate",
+        "home_indicator"
+      ],
+      "standardization": "TRAINING_FOLD_ONLY",
+      "alpha_grid": [0.1, 1.0, 10.0, 100.0],
+      "alpha_selection": "EXPANDING_SEASON_CV_ON_FIELD_GOAL_ATTEMPT_POISSON_DEVIANCE",
+      "market_data_used": false
+    },
+    "make_rate": {
+      "family": "STRICTLY_PRIOR_EMPIRICAL_BAYES_TEAM_RATE",
+      "league_rate": "ALL_STRICTLY_PRIOR_COMPLETED_TEAM_FIELD_GOAL_ATTEMPTS",
+      "team_rate_formula": "(TEAM_MADE_FG + 25*LEAGUE_FG_MAKE_RATE)/(TEAM_FG_ATTEMPTS + 25)",
+      "prior_strength_attempts": 25,
+      "target_game_events_forbidden": true,
+      "opponent_or_market_conversion_adjustment": false
+    },
+    "development_gate": {
+      "evaluation_target": "MADE_FIELD_GOALS",
+      "validation_seasons": [2021, 2022, 2023, 2024, 2025],
+      "baseline": "TRAINING_FOLD_INTERCEPT_ONLY_POISSON_MEAN_OF_MADE_FIELD_GOALS",
+      "pooled_candidate_deviance_must_be_lower_than_baseline": true,
+      "minimum_fold_wins": 3,
+      "all_targets_must_pass": true,
+      "touchdown_gate_recomputed_with_unchanged_attempt1_spec": true
+    },
+    "shared_sigma": {
+      "selection_rule_unchanged": true,
+      "field_goal_mean_input": "ATTEMPT2_EXPECTED_MADE_FIELD_GOALS",
+      "candidate_sigma_grid": [0.0, 0.1, 0.2, 0.3]
+    }
+  },
+  "preserved_contract": {
+    "touchdown_model_specification": "UNCHANGED_FROM_ATTEMPT1",
+    "touchdown_features": "UNCHANGED_FROM_ATTEMPT1",
+    "development_seasons": [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025],
+    "source_bytes": "SAME_FROZEN_SOURCE_CONTRACT",
+    "missing_epa_policy": "UNCHANGED",
+    "market_inputs_forbidden": true,
+    "prospective_gate_thresholds": "UNCHANGED",
+    "paths_per_game": 50000,
+    "rng_identity": "UNCHANGED",
+    "first_fresh_forward_week": 5,
+    "backfill_allowed": false
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "game_market_pricing": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "backfill": false
+  }
+}
