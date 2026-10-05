@@ -8,6 +8,15 @@ on:
         required: true
   issues:
     types: [opened]
+  pull_request:
+    paths:
+      - 'scripts/run_nfl_v2k_attempt4.py'
+      - 'sportsedge/sports/nfl/v2k_attempt4_market_residual.py'
+      - 'sportsedge/sports/nfl/v2k_attempt4_validation.py'
+      - 'sportsedge/sports/nfl/NFL_V2K_DEVELOPMENT_EXPOSURE_V3.json'
+      - 'sportsedge/sports/nfl/NFL_V2K_DEVELOPMENT_VALIDATION_PREATTEMPT_V4.json'
+      - 'tests/test_nfl_v2k_attempt4*.py'
+      - '.github/workflows/nfl-v2k-attempt4-development-validation.yml'
 
 permissions:
   contents: read
