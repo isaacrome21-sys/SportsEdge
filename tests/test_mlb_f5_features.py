@@ -1,6 +1,6 @@
 import json
 import unittest
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlparse
 
 from sportsedge.mlb_f5_features import MLBF5HistorySource
@@ -101,15 +101,46 @@ class MLBF5FeatureTests(unittest.TestCase):
         ))
         return {"dates": [{"games": games}]}
 
+    def _league_payload(self):
+        games = []
+        for index in range(100):
+            day = (index % 18) + 1
+            games.append(_game(
+                8000 + index,
+                f"2026-08-{day:02d}",
+                100 + (index % 15),
+                200 + (index % 15),
+                [index % 3, 0, 1, 0, 0],
+                [0, (index + 1) % 2, 0, 1, 0],
+            ))
+        # Same-day/future poison must never enter a target-date 2026-08-20 prior.
+        games.append(_game(
+            9999, "2026-08-20", 301, 302,
+            [9, 9, 9, 9, 9], [9, 9, 9, 9, 9],
+        ))
+        return {"dates": [{"games": games}]}
+
+    def _opener(self, seen_urls=None, direct_shape=False):
+        def opener(req, timeout=15):
+            if seen_urls is not None:
+                seen_urls.append(req.full_url)
+            query = parse_qs(urlparse(req.full_url).query)
+            payload = self._payload() if "teamId" in query else self._league_payload()
+            if direct_shape:
+                for block in payload["dates"]:
+                    for game in block["games"]:
+                        for inning in game["linescore"]["innings"]:
+                            teams = inning.pop("teams")
+                            inning["away"] = teams["away"]
+                            inning["home"] = teams["home"]
+            return _Response(payload)
+        return opener
+
     def test_history_uses_actual_innings_one_through_five_only(self):
         seen_urls = []
 
-        def opener(req, timeout=15):
-            seen_urls.append(req.full_url)
-            return _Response(self._payload())
-
         source = MLBF5HistorySource(
-            opener=opener,
+            opener=self._opener(seen_urls),
             retrieved_at=datetime(2026, 8, 20, 12, tzinfo=timezone.utc),
         )
         rows = source.team_rows(team_id=10, target_date=date(2026, 8, 20))
@@ -120,14 +151,44 @@ class MLBF5FeatureTests(unittest.TestCase):
         self.assertNotIn(3000, {row["game_pk"] for row in rows})
         query = parse_qs(urlparse(seen_urls[0]).query)
         self.assertEqual(query["hydrate"], ["linescore"])
+        self.assertNotIn("gameType", query)
+        self.assertEqual(query["startDate"], [
+            (date(2026, 8, 20) - timedelta(days=240)).isoformat()
+        ])
         self.assertEqual(query["endDate"], ["2026-08-19"])
+        self.assertEqual([url for url in seen_urls if "teamId=" not in url], [])
+
+    def test_matchup_preserves_live_team_window_and_uses_regular_370_day_league_prior(self):
+        seen_urls = []
+        source = MLBF5HistorySource(
+            opener=self._opener(seen_urls),
+            retrieved_at=datetime(2026, 8, 20, 12, tzinfo=timezone.utc),
+        )
+        source.matchup_features(
+            away_team_id=10,
+            home_team_id=20,
+            target_date=date(2026, 8, 20),
+        )
+        team_urls = [url for url in seen_urls if "teamId=" in url]
+        league_urls = [url for url in seen_urls if "teamId=" not in url]
+        self.assertEqual(len(team_urls), 2)
+        self.assertEqual(len(league_urls), 1)
+        for url in team_urls:
+            query = parse_qs(urlparse(url).query)
+            self.assertNotIn("gameType", query)
+            self.assertEqual(query["startDate"], [
+                (date(2026, 8, 20) - timedelta(days=240)).isoformat()
+            ])
+        league_query = parse_qs(urlparse(league_urls[0]).query)
+        self.assertEqual(league_query["gameType"], ["R"])
+        self.assertEqual(league_query["startDate"], [
+            (date(2026, 8, 20) - timedelta(days=370)).isoformat()
+        ])
+        self.assertEqual(league_query["endDate"], ["2026-08-19"])
 
     def test_matchup_feature_hash_binds_actual_prior_rows(self):
-        def opener(req, timeout=15):
-            return _Response(self._payload())
-
         source = MLBF5HistorySource(
-            opener=opener,
+            opener=self._opener(),
             retrieved_at=datetime(2026, 8, 20, 12, tzinfo=timezone.utc),
         )
         feature = source.matchup_features(
@@ -143,18 +204,16 @@ class MLBF5FeatureTests(unittest.TestCase):
         self.assertEqual(feature["features"]["away_first_inning_runs_for"], [1] * 10)
         self.assertEqual(feature["features"]["home_first_inning_runs_for"], [0] * 10)
         self.assertLess(max(feature["features"]["away_f5_runs_for"]), 15)
+        self.assertEqual(feature["features"]["league_prior_strength"], 30)
+        self.assertGreaterEqual(feature["features"]["league_prior_halves"], 200)
+        self.assertAlmostEqual(sum(feature["features"]["league_f5_pmf"].values()), 1.0, places=12)
+        self.assertGreaterEqual(feature["features"]["league_first_inning_scoreless_rate"], 0.0)
+        self.assertLessEqual(feature["features"]["league_first_inning_scoreless_rate"], 1.0)
+        self.assertEqual(len(feature["league_prior_source_hash"]), 64)
 
     def test_current_statsapi_direct_inning_shape_is_accepted(self):
-        payload = self._payload()
-        for block in payload["dates"]:
-            for game in block["games"]:
-                for inning in game["linescore"]["innings"]:
-                    teams = inning.pop("teams")
-                    inning["away"] = teams["away"]
-                    inning["home"] = teams["home"]
-
         source = MLBF5HistorySource(
-            opener=lambda req, timeout=15: _Response(payload),
+            opener=self._opener(direct_shape=True),
             retrieved_at=datetime(2026, 8, 20, 12, tzinfo=timezone.utc),
         )
         feature = source.matchup_features(
