@@ -264,7 +264,7 @@ def build_canonical_feature_row(
     if market in GAME_MARKETS:
         live_state = _live_game_state(game)
         live_state_hash = _content_sha(live_state)
-        if market.startswith("F5_"):
+        if market.startswith("F5_") or market in {"NRFI", "YRFI"}:
             f5 = f5_source or MLBF5HistorySource(opener=source.opener, retrieved_at=source.retrieved_at)
             built = f5.matchup_features(
                 away_team_id=int(game.away_team_id),
@@ -273,7 +273,11 @@ def build_canonical_feature_row(
             )
             row = {
                 **base,
-                "source": "MLB_STATSAPI_STRICTLY_PRIOR_ACTUAL_F5_INNINGS",
+                "source": (
+                    "MLB_STATSAPI_STRICTLY_PRIOR_ACTUAL_FIRST_INNING"
+                    if market in {"NRFI", "YRFI"}
+                    else "MLB_STATSAPI_STRICTLY_PRIOR_ACTUAL_F5_INNINGS"
+                ),
                 "f5_feature_version": built["feature_version"],
                 "live_game_state_hash": live_state_hash,
                 "feature_source_hash": _content_sha({
