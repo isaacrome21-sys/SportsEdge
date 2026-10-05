@@ -439,6 +439,11 @@
     "config/research/nfl_score_counts_attempt2_dispatch_v1.json": "NFL_SCORE_COUNTS_G1_ATTEMPT2_EXECUTION_MARKER_RESEARCH_ONLY_NO_BETTING_AUTHORITY",
     ".github/workflows/nfl-score-counts-attempt2-main-trigger.yml": "NFL_SCORE_COUNTS_G1_ONE_SHOT_MAIN_PUSH_ATTEMPT2_EXECUTION_BRIDGE_RESEARCH_ONLY",
     "tests/test_nfl_score_counts_attempt2_main_trigger.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_ATTEMPT2_PREREG_TRIGGER_NO_RUNTIME_AUTHORITY",
+    "config/research/nfl_score_counts_g1_attempt2_result_v1.json": "NFL_SCORE_COUNTS_G1_ATTEMPT2_FAILED_RESULT_RECORD_RESEARCH_ONLY_NO_BETTING_AUTHORITY",
+    "config/research/nfl_score_counts_g1_attempt3_fg_prereg_v1.json": "NFL_SCORE_COUNTS_G1_FINAL_ATTEMPT3_FG_PREREG_RESEARCH_ONLY_NO_BETTING_AUTHORITY",
+    "tests/test_nfl_score_counts_attempt3_prereg.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_ATTEMPT3_PREREG_NO_RUNTIME_AUTHORITY",
+    ".github/workflows/nfl-score-counts-attempt3-main-trigger.yml": "NFL_SCORE_COUNTS_G1_FINAL_ATTEMPT3_ONE_SHOT_MAIN_TRIGGER_WORKFLOW_RESEARCH_ONLY_NO_BETTING_AUTHORITY",
+    "tests/test_nfl_score_counts_attempt3_main_trigger.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_ATTEMPT3_MAIN_TRIGGER_NO_RUNTIME_AUTHORITY",
     "sportsedge/sports/nfl/score_counts_market_bridge.py": "NFL_SCORE_COUNTS_G1_RESEARCH_GAME_MARKET_DERIVATION_FROM_FROZEN_JOINT_DISTRIBUTION_NO_PROMOTION_OR_OFFICIAL_AUTHORITY",
     "tests/test_nfl_score_counts_market_bridge.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_GAME_MARKET_BRIDGE_NO_RUNTIME_AUTHORITY"
   },

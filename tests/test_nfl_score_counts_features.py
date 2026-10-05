@@ -7,9 +7,12 @@ import pytest
 
 from sportsedge.sports.nfl.score_counts_features import (
     CONVERSION_PRIOR_TDS,
+    DECAY,
+    FG_MAKE_PRIOR_ATTEMPTS,
     ScoreCountFeatureError,
     TeamGame,
     _conversion_override,
+    _field_goal_make_override,
     aggregate_game_pbp,
     build_score_count_forward_rows,
     build_score_count_training_rows,
@@ -135,7 +138,7 @@ def feature_view(row):
     excluded = {
         "game_id", "season", "week", "game_start_ts", "team", "opponent",
         "starting_qb_id", "starting_qb_prior_dropbacks",
-        "offense_touchdowns", "made_field_goals", "def_st_touchdowns",
+        "offense_touchdowns", "made_field_goals", "field_goal_attempts", "def_st_touchdowns",
         "safeties", "pat_made", "two_point_made", "no_conversion",
         "feature_digest", "prediction_at",
     }
@@ -212,6 +215,7 @@ def test_scoring_event_labels_classify_offense_return_safety_and_conversions():
     assert h["def_st_touchdowns"] == 1
     assert a["safeties"] == 1
     assert h["made_field_goals"] == 1
+    assert h["field_goal_attempts"] == 1
     assert h["pat_made"] == 1
     assert a["two_point_made"] == 1
     assert h["no_conversion"] == 1
@@ -451,3 +455,88 @@ def test_frozen_pit_ne_completion_keeps_factual_dropback():
     assert teams[("2019_01_PIT_NE", "PIT")].pass_epa_n == 0
     assert qbs[("2019_01_PIT_NE", "00-0022924")].dropbacks == 1
     assert qbs[("2019_01_PIT_NE", "00-0022924")].epa_n == 0
+
+
+
+def test_field_goal_attempts_count_made_missed_and_blocked():
+    rows = [
+        {
+            "game_id": "g1", "play_id": "1",
+            "posteam": "H", "defteam": "A",
+            "field_goal_result": "made",
+        },
+        {
+            "game_id": "g1", "play_id": "2",
+            "posteam": "H", "defteam": "A",
+            "field_goal_result": "missed",
+        },
+        {
+            "game_id": "g1", "play_id": "3",
+            "posteam": "H", "defteam": "A",
+            "field_goal_result": "blocked",
+        },
+    ]
+    teams, _ = aggregate_game_pbp(rows)
+    home = teams[("g1", "H")]
+    away = teams[("g1", "A")]
+    assert home.field_goal_attempts == 3
+    assert home.made_field_goals == 1
+    assert away.field_goal_attempts_allowed == 3
+    assert away.field_goals_allowed == 1
+
+
+def test_unknown_nonempty_field_goal_result_fails_closed():
+    with pytest.raises(ScoreCountFeatureError, match="FIELD_GOAL_RESULT_INVALID"):
+        aggregate_game_pbp([{
+            "game_id": "g1", "play_id": "1",
+            "posteam": "H", "defteam": "A",
+            "field_goal_result": "unknown",
+        }])
+
+
+def test_field_goal_make_rate_uses_frozen_decay_and_league_prior():
+    team = [
+        TeamGame(made_field_goals=1, field_goal_attempts=1),
+        TeamGame(made_field_goals=0, field_goal_attempts=1),
+    ]
+    league = [
+        TeamGame(made_field_goals=1, field_goal_attempts=2)
+        for _ in range(10)
+    ]
+    got = _field_goal_make_override(
+        team_history=team,
+        all_completed_team_games=league,
+    )
+    weighted_makes = DECAY * 1.0 + 1.0 * 0.0
+    weighted_attempts = DECAY * 1.0 + 1.0 * 1.0
+    expected = (
+        weighted_makes + FG_MAKE_PRIOR_ATTEMPTS * 0.5
+    ) / (
+        weighted_attempts + FG_MAKE_PRIOR_ATTEMPTS
+    )
+    assert got["fg_make_rate_shrunk"] == pytest.approx(expected)
+
+
+def test_training_and_forward_rows_include_attempt3_pregame_features():
+    history = rows_for()
+    row = by_game_team(history, "g5", "H")
+    assert "fg_attempts_per_game" in row
+    assert "opp_fg_attempts_allowed_per_game" in row
+    assert 0.0 <= row["fg_make_rate_shrunk"] <= 1.0
+    assert "field_goal_attempts" in row
+
+    sched = schedule(n=6)
+    target_start = datetime.fromisoformat(sched[-1]["game_start_ts"])
+    forward = build_score_count_forward_rows(
+        schedule_rows=sched,
+        pbp_rows=pbp(n=5),
+        depth_rows=depth(n=6),
+        target_game_ids=["g6"],
+        as_of=target_start - timedelta(days=1),
+        seasons=[2020],
+    )
+    assert len(forward) == 2
+    assert all("field_goal_attempts" not in x for x in forward)
+    assert all("fg_attempts_per_game" in x for x in forward)
+    assert all("opp_fg_attempts_allowed_per_game" in x for x in forward)
+    assert all("fg_make_rate_shrunk" in x for x in forward)
