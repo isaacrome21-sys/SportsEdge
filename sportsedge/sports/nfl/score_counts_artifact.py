@@ -506,18 +506,28 @@ def build_forward_prediction(
     prediction_at: Any,
     source_manifest_sha256: str,
     code_identity: str,
+    serving_compatibility_sha256: str | None = None,
     paths: int = 50000,
 ) -> dict[str, Any]:
     if int(paths) != 50000:
         raise ScoreCountArtifactError("FORWARD_PATH_COUNT_MUST_EQUAL_50000")
+    if (
+        fit_artifact.get("status") != "DEVELOPMENT_ATTEMPT_PASS"
+        or not bool((fit_artifact.get("development_gate") or {}).get("pass"))
+    ):
+        raise ScoreCountArtifactError("FORWARD_REQUIRES_PASSED_DEVELOPMENT_ARTIFACT")
     stamp = _utc(prediction_at, "prediction_at")
     fit = fit_from_artifact(fit_artifact)
-    source_sha = _sha(source_manifest_sha256, "source_manifest_sha256")
-    if source_sha != fit.source_manifest_sha256:
-        raise ScoreCountArtifactError("FORWARD_SOURCE_MANIFEST_MISMATCH")
-    code = str(code_identity or "").strip()
-    if not code or code != fit.code_identity:
-        raise ScoreCountArtifactError("FORWARD_CODE_IDENTITY_MISMATCH")
+    forward_source_sha = _sha(source_manifest_sha256, "source_manifest_sha256")
+    serving_code = str(code_identity or "").strip()
+    if not serving_code:
+        raise ScoreCountArtifactError("SERVING_CODE_IDENTITY_REQUIRED")
+    compatibility_sha = None
+    if serving_code != fit.code_identity:
+        compatibility_sha = _sha(
+            serving_compatibility_sha256,
+            "serving_compatibility_sha256",
+        )
 
     materialized = [dict(row) for row in rows]
     for row in materialized:
@@ -593,8 +603,13 @@ def build_forward_prediction(
         "status": "FROZEN_PREGAME_RESEARCH_PREDICTION",
         "candidate_family": "NFL_SCORE_COUNTS_G1",
         "fit_artifact_sha256": str(fit_artifact["artifact_sha256"]),
-        "source_manifest_sha256": source_sha,
-        "code_identity": code,
+        "training_source_manifest_sha256": fit.source_manifest_sha256,
+        "forward_source_manifest_sha256": forward_source_sha,
+        "source_manifest_sha256": forward_source_sha,
+        "fit_code_identity": fit.code_identity,
+        "serving_code_identity": serving_code,
+        "code_identity": serving_code,
+        "serving_compatibility_sha256": compatibility_sha,
         "prediction_at": stamp.isoformat(),
         "games": out_games,
         "market_data_present": False,
