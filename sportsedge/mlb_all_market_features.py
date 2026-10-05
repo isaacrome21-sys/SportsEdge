@@ -298,10 +298,16 @@ class MLBAllMarketHistorySource(MLBGenericHistorySource):
             row = _base(self, game_pk=game_pk, market=market, entity_id=entity_id)
             if team_id is not None:
                 row["team_id"] = int(team_id)
-            row["features"] = {
-                "history_pool": self.hitter_joint_history(player_id=int(player_id), target_date=target_date)
-            }
-            row["joint_feature_version"] = "mlb_hitter_joint_history_v1"
+            pool = self.hitter_joint_history(player_id=int(player_id), target_date=target_date)
+            row["features"] = {"history_pool": pool}
+            prior_pool = self.hitter_joint_prior_history(
+                player_id=int(player_id), target_date=target_date
+            )
+            if prior_pool:
+                row["features"]["prior_pool"] = prior_pool
+                row["joint_feature_version"] = "mlb_hitter_joint_history_long_prior_v1"
+            else:
+                row["joint_feature_version"] = "mlb_hitter_joint_history_v1"
             return _seal(row)
 
         if market == "TEAM_TOTALS":
