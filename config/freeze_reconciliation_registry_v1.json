@@ -1815,10 +1815,16 @@
       "merge_sha": "f71b5036f279c276b326e7b7f5d712e04e76ecf1",
       "pr": 1594,
       "note": "NFL V2K frozen market-anchored Attempt-4 preregistration and execution surface merge. Reconciliation records provenance only and creates no Model_P, pricing, promotion, staking, release, OFFICIAL, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_E02495CD_PR_1608",
+      "merge_sha": "e02495cd54ecb60b1bfc549aabecb6e5820f315c",
+      "pr": 1608,
+      "note": "NFL V2K final market-calibration Attempt-5 frozen execution surface merged to main. Reconciliation records provenance only; the later canonical scored execution failed and creates no Model_P, pricing, promotion, staking, release, OFFICIAL, validation, or untouched-readout authority."
     }
   ],
-  "inventory_block_reason": "Current main through merge f71b5036 / PR #1594 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge e02495cd / PR #1608 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "f71b5036f279c276b326e7b7f5d712e04e76ecf1",
+  "reconciled_through_sha": "e02495cd54ecb60b1bfc549aabecb6e5820f315c",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
