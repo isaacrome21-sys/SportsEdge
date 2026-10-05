@@ -91,6 +91,7 @@ def _states(
     side: str,
     expected_total: float,
     pass_td_share: float | None = None,
+    include_tds: bool = False,
 ) -> list[dict[str, Any]]:
     if side not in {"home", "away"}:
         raise ScoreCountPropBridgeError("TEAM_SIDE_INVALID")
@@ -104,8 +105,10 @@ def _states(
             "pass_multiplier": pace,
             "rush_multiplier": pace,
         }
-        td_key = f"{side}_team_tds"
-        if td_key in path:
+        if include_tds:
+            td_key = f"{side}_team_tds"
+            if td_key not in path:
+                raise ScoreCountPropBridgeError("DIRECT_TD_PATH_REQUIRED")
             if pass_td_share is None:
                 raise ScoreCountPropBridgeError("PASS_TD_SHARE_REQUIRED_FOR_TD_PROPS")
             share = _num(pass_td_share, "pass_td_share")
@@ -210,6 +213,7 @@ def price_score_count_props_from_paths(
                 side=side,
                 expected_total=expected_total,
                 pass_td_share=model.get("pass_td_share") if use_scoring else None,
+                include_tds=use_scoring,
             )
             if use_scoring:
                 team_paths[side] = simulate_coherent_team_scoring_paths(
