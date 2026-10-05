@@ -67,24 +67,27 @@ jobs:
             tests/test_cfb_sportsdataverse_venue_source.py \
             tests/test_cfb_sportsdataverse_training_materializer.py
 
-      - name: Assert attempt budget remains untouched
+      - name: Verify completed selection accounting without consuming attempts
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
           p=json.loads(Path('config/cfb_sportsdataverse_candidate_prereg_v1.json').read_text())
           g=p['governance']
-          assert g['attempts_consumed']==0
-          assert g['evaluation_performed'] is False
+          from sportsedge.sports.cfb.sdv_selection_record import verify_completed_selection
+          verify_completed_selection()
+          assert g['attempts_consumed']==4
+          assert g['evaluation_performed'] is True
           assert g['model_p_created'] is False
           assert g['promotion_authority'] is False
           assert g['official_authority'] is False
-          print('CFB_SDV_ZERO_ATTEMPT_CONTRACT_OK')
+          print('CFB_SDV_COMPLETED_SELECTION_ACCOUNTING_OK')
           PY
 
   materialize:
     name: Materialize public SDV training rows
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    # Selection is complete: never overwrite its historical training bundle.
+    if: false
     needs: contract
     runs-on: ubuntu-24.04
     timeout-minutes: 120
