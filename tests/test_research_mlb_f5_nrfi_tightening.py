@@ -41,9 +41,22 @@ class F5NRFITighteningResearchTests(unittest.TestCase):
         self.assertEqual(base.get(2, 0.0), 0.0)
 
     def test_f5_exact_score_metric_rewards_observed_support(self):
-        weak = R.f5_metrics({0: 1.0}, {0: 1.0}, 2, 1)
-        strong = R.f5_metrics({2: 0.8, 0: 0.2}, {1: 0.8, 0: 0.2}, 2, 1)
+        weak = R.f5_metrics({0: 1.0}, {0: 1.0}, 2, 1, effective_n=10)
+        strong = R.f5_metrics({2: 0.8, 0: 0.2}, {1: 0.8, 0: 0.2}, 2, 1, effective_n=10)
         self.assertLess(strong["nll"], weak["nll"])
+
+    def test_f5_market_guards_use_production_jeffreys_readout(self):
+        metrics = R.f5_metrics({1: 1.0}, {0: 1.0}, 1, 0, effective_n=10)
+        # Raw W/T/L would be (1, 0, 0). Production applies Dirichlet Jeffreys
+        # smoothing over away-win/home-win/push before a market probability is emitted.
+        p_win = 10.5 / 11.5
+        p_other = 0.5 / 11.5
+        expected_state_brier = (p_win - 1.0) ** 2 + p_other ** 2 + p_other ** 2
+        # O4.5 is a two-category non-push readout: raw over=0, under=1.
+        p_over45 = 0.5 / 11.0
+        expected_total_brier = p_over45 ** 2
+        self.assertAlmostEqual(metrics["state_brier"], expected_state_brier, places=12)
+        self.assertAlmostEqual(metrics["total45_brier"], expected_total_brier, places=12)
 
     def test_direct_nrfi_is_probability_and_complementable(self):
         start = date(2026, 9, 1)
