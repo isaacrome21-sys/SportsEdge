@@ -1,0 +1,105 @@
+{
+  "schema": "NFL_V2K_DEVELOPMENT_EXPOSURE_V4",
+  "status": "ATTEMPT4_CONSUMED_ATTEMPT5_PREREGISTERED",
+  "max_development_attempts": 5,
+  "development_budget_units_used": 4,
+  "development_budget_units_remaining": 1,
+  "untouched_readout_allowed": false,
+  "authority": {
+    "model_p": false,
+    "pricing": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "untouched_readout": false
+  },
+  "exposures": [
+    {
+      "budget_unit": 1,
+      "candidate_family": "NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G1",
+      "evidence_role": "REUSED_RESEARCH_HISTORY_NOT_FINAL_HOLDOUT",
+      "source": {
+        "pr": 1534,
+        "comment_id": 5981843976
+      },
+      "accounting": {
+        "consumes_development_budget": true
+      }
+    },
+    {
+      "budget_unit": 2,
+      "candidate_family": "NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G2",
+      "evidence_role": "CANONICAL_ATTEMPT2_DEVELOPMENT_READOUT",
+      "source": {
+        "workflow_run_id": 37239231204,
+        "artifact_id": 11316753318,
+        "artifact_digest": "sha256:c3bea7f623d0292b285ebbc063f7d8cee556619022b35e681e4addc487d6c6bd",
+        "issue": 1539,
+        "result_comment_id": 5985299453
+      },
+      "accounting": {
+        "consumes_development_budget": true,
+        "result": "FAIL"
+      }
+    },
+    {
+      "budget_unit": 3,
+      "candidate_family": "NFL_V2K_CONTEXT_SKELETON_LOGRATIO_G3",
+      "evidence_role": "CANONICAL_ATTEMPT3_DEVELOPMENT_READOUT",
+      "source": {
+        "workflow_run_id": 37252842295,
+        "artifact_id": 11322188844,
+        "artifact_digest": "sha256:93c1c457f66bc8d5eb486ecc7b404ef6fd22203d371deab7b7a41923e3bb3472",
+        "code_sha": "303545e3ca1d4ec1217c721dd5208bab6128947d"
+      },
+      "accounting": {
+        "consumes_development_budget": true,
+        "result": "FAIL"
+      },
+      "diagnostics": {
+        "spread_fold_wins": 0,
+        "spread_fold_total": 3,
+        "total_fold_wins": 0,
+        "total_fold_total": 3,
+        "spread_calibration_max_deviation": 0.2556950689378533,
+        "total_calibration_max_deviation": 0.1390605404240941,
+        "signed_key_mass_rmse": 0.021496987010989947
+      }
+    },
+    {
+      "budget_unit": 4,
+      "candidate_family": "NFL_MARKET_ANCHORED_TEAM_RESIDUAL_G4",
+      "evidence_role": "CANONICAL_ATTEMPT4_DEVELOPMENT_READOUT",
+      "source": {
+        "workflow_run_id": 37295150106,
+        "artifact_id": 11338236868,
+        "artifact_digest": "sha256:23556dcf170a26d855e6281fbaa0a86328be944415f7d5e4d5479185b2d9704f",
+        "code_sha": "f71b5036f279c276b326e7b7f5d712e04e76ecf1",
+        "issue": 1603
+      },
+      "accounting": {
+        "consumes_development_budget": true,
+        "result": "FAIL"
+      },
+      "diagnostics": {
+        "evaluated_rows": 2127,
+        "spread_fold_wins": 2,
+        "spread_fold_total": 5,
+        "spread_baseline_log_loss": 0.6926994212469693,
+        "spread_candidate_log_loss": 0.6935159993159602,
+        "spread_calibration_max_deviation": 0.023078946320530314,
+        "total_fold_wins": 2,
+        "total_fold_total": 5,
+        "total_baseline_log_loss": 0.6927381111477684,
+        "total_candidate_log_loss": 0.6927375672464999,
+        "total_calibration_max_deviation": 0.015291500446246609
+      }
+    }
+  ],
+  "policy": {
+    "max_development_attempts": 5,
+    "threshold_tuning_after_readout_forbidden": true,
+    "materially_different_successor_requires_preregistration": true,
+    "no_relabel_as_untouched": true
+  }
+}
