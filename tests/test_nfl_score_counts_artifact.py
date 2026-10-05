@@ -15,6 +15,8 @@ from sportsedge.sports.nfl.score_counts_g1 import (
     FEATURE_NAMES,
     FG_ATTEMPT2_ALPHA_GRID,
     FG_ATTEMPT2_FEATURE_NAMES,
+    FG_ATTEMPT3_ALPHA_GRID,
+    FG_ATTEMPT3_FEATURE_NAMES,
     predict_mean,
 )
 
@@ -44,6 +46,12 @@ def team_row(season: int, game: int, home: bool) -> dict:
     strength = (season - 2018) * 0.08 + game * 0.11 + (0.25 if home else 0.0)
     row["offense_touchdowns"] = int(max(0, round(1.4 + strength % 2.8)))
     row["made_field_goals"] = int(max(0, round(0.8 + (strength * 1.7) % 2.2)))
+    row["field_goal_attempts"] = row["made_field_goals"] + int(
+        (season + game + int(home)) % 3 != 0
+    )
+    row["fg_attempts_per_game"] = 1.7 + 0.04 * game + (0.08 if home else 0.0)
+    row["opp_fg_attempts_allowed_per_game"] = 1.8 + 0.03 * game - (0.05 if home else 0.0)
+    row["fg_make_rate_shrunk"] = 0.82 + 0.002 * (season - 2018)
     row["def_st_touchdowns"] = int((season + game + int(home)) % 19 == 0)
     row["safeties"] = int((season + 2 * game + int(home)) % 47 == 0)
     total_td = row["offense_touchdowns"] + row["def_st_touchdowns"]
@@ -77,7 +85,7 @@ def forward_rows() -> list[dict]:
     for home in (True, False):
         row = team_row(2025, 5, home)
         for key in (
-            "offense_touchdowns", "made_field_goals", "def_st_touchdowns",
+            "offense_touchdowns", "made_field_goals", "field_goal_attempts", "def_st_touchdowns",
             "safeties", "pat_made", "two_point_made", "no_conversion",
         ):
             row.pop(key, None)
@@ -241,3 +249,39 @@ def test_attempt2_changes_only_fg_mean_specification():
     fit = fit_from_artifact(art)
     assert fit.td_model.feature_names == FEATURE_NAMES
     assert fit.fg_model.feature_names == FG_ATTEMPT2_FEATURE_NAMES
+
+
+
+def test_attempt3_uses_opportunity_target_but_scores_made_field_goals():
+    rows = development_rows()
+    attempt2 = build_attempt_fit_artifact(
+        rows,
+        attempt_number=2,
+        source_manifest_sha256=SOURCE,
+        code_identity=CODE,
+        prereg_addendum_sha256=PREREG,
+    )
+    attempt3 = build_attempt_fit_artifact(
+        rows,
+        attempt_number=3,
+        source_manifest_sha256=SOURCE,
+        code_identity=CODE,
+        prereg_addendum_sha256=PREREG,
+    )
+    assert attempt3["fit"]["td_model"] == attempt2["fit"]["td_model"]
+    assert attempt3["fit"]["fg_model"]["target"] == "field_goal_attempts"
+    assert attempt3["fit"]["fg_model"]["feature_names"] == list(
+        FG_ATTEMPT3_FEATURE_NAMES
+    )
+    assert attempt3["selection"]["fg_model_target"] == "field_goal_attempts"
+    assert attempt3["selection"]["fg_alpha_grid"] == list(FG_ATTEMPT3_ALPHA_GRID)
+    fg_gate = attempt3["development_gate"]["targets"]["made_field_goals"]
+    assert fg_gate["folds_total"] == 5
+    assert all(
+        fold["model_target"] == "field_goal_attempts"
+        for fold in fg_gate["folds"]
+    )
+    loaded = fit_from_artifact(attempt3)
+    assert loaded.td_model.feature_names == FEATURE_NAMES
+    assert loaded.fg_model.target == "field_goal_attempts"
+    assert loaded.fg_model.feature_names == FG_ATTEMPT3_FEATURE_NAMES
