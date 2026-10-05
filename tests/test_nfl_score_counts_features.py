@@ -135,7 +135,8 @@ def feature_view(row):
     excluded = {
         "game_id", "season", "week", "game_start_ts", "team", "opponent",
         "starting_qb_id", "starting_qb_prior_dropbacks",
-        "offense_touchdowns", "made_field_goals", "def_st_touchdowns",
+        "offense_touchdowns", "made_field_goals", "field_goal_attempts",
+        "def_st_touchdowns",
         "safeties", "pat_made", "two_point_made", "no_conversion",
         "feature_digest", "prediction_at",
     }
@@ -153,6 +154,9 @@ def test_first_eligible_game_uses_only_four_prior_games():
     assert g5h["conversion_pat_p"] == pytest.approx(0.5)
     assert g5h["conversion_two_p"] == pytest.approx(0.5)
     assert g5h["conversion_no_p"] == pytest.approx(0.0)
+    assert g5h["fg_attempts_per_game"] == pytest.approx(1.0)
+    assert g5h["opp_fg_attempts_allowed_per_game"] == pytest.approx(1.0)
+    assert g5h["fg_make_rate_shrunk"] == pytest.approx(1.0)
 
 
 def test_target_game_pbp_cannot_change_its_own_features_but_changes_next_game():
@@ -212,6 +216,7 @@ def test_scoring_event_labels_classify_offense_return_safety_and_conversions():
     assert h["def_st_touchdowns"] == 1
     assert a["safeties"] == 1
     assert h["made_field_goals"] == 1
+    assert h["field_goal_attempts"] == 1
     assert h["pat_made"] == 1
     assert a["two_point_made"] == 1
     assert h["no_conversion"] == 1
@@ -451,3 +456,34 @@ def test_frozen_pit_ne_completion_keeps_factual_dropback():
     assert teams[("2019_01_PIT_NE", "PIT")].pass_epa_n == 0
     assert qbs[("2019_01_PIT_NE", "00-0022924")].dropbacks == 1
     assert qbs[("2019_01_PIT_NE", "00-0022924")].epa_n == 0
+
+
+def test_attempt2_field_goal_opportunity_counts_misses_and_shrinks_make_rate():
+    custom = pbp(n=5)
+    custom.append({
+        "game_id": "g4", "play_id": "499",
+        "posteam": "H", "defteam": "A",
+        "field_goal_result": "missed",
+    })
+    out = build_score_count_training_rows(
+        schedule_rows=schedule(n=5),
+        pbp_rows=custom,
+        depth_rows=depth(n=5),
+        seasons=[2020],
+    )
+    h = by_game_team(out, "g5", "H")
+    # Four prior H games contain five attempts: four makes and one miss.
+    assert h["fg_attempts_per_game"] > h["made_fg_per_game"]
+    assert h["fg_make_rate_shrunk"] < 1.0
+    assert 0.0 <= h["fg_make_rate_shrunk"] <= 1.0
+
+    teams, _ = aggregate_game_pbp([
+        {"game_id": "x", "play_id": "1", "posteam": "H", "defteam": "A",
+         "field_goal_result": "missed"},
+        {"game_id": "x", "play_id": "2", "posteam": "H", "defteam": "A",
+         "field_goal_result": "made"},
+    ])
+    assert teams[("x", "H")].field_goal_attempts == 2
+    assert teams[("x", "H")].made_field_goals == 1
+    assert teams[("x", "A")].field_goal_attempts_allowed == 2
+    assert teams[("x", "A")].field_goals_allowed == 1
