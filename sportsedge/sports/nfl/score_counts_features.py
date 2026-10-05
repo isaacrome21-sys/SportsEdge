@@ -131,7 +131,15 @@ def _flag(value: Any) -> bool:
         return False
     if isinstance(value, (int, float)):
         return float(value) != 0.0
-    return str(value).strip().lower() in {"1", "true", "t", "yes", "y"}
+    raw = str(value).strip().lower()
+    if raw in {"true", "t", "yes", "y"}:
+        return True
+    if raw in {"false", "f", "no", "n"}:
+        return False
+    try:
+        return float(raw) != 0.0
+    except ValueError:
+        return False
 
 
 def _aware(value: Any, field: str) -> datetime:
