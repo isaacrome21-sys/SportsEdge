@@ -5,6 +5,8 @@ import pytest
 
 from sportsedge.sports.nfl.score_counts_g1 import (
     FEATURE_NAMES,
+    FG_ATTEMPT2_ALPHA_GRID,
+    FG_ATTEMPT2_FEATURE_NAMES,
     ROOT_SEED_UINT64,
     ScoreCountsError,
     child_seed,
@@ -183,3 +185,31 @@ def test_partial_or_invalid_team_conversion_override_fails_closed():
     home["conversion_pat_p"] = 0.9
     with pytest.raises(ScoreCountsError, match="TEAM_CONVERSION_OVERRIDE_INCOMPLETE"):
         simulate_game(model, game_id="BAD-CONV", home_row=home, away_row=away, paths=100, seed=4)
+
+
+def test_attempt2_fg_subset_is_supported_without_changing_td_identity():
+    rows = training_rows()
+    fg_alpha = FG_ATTEMPT2_ALPHA_GRID[-1]
+    model = fit_poisson_ridge(
+        rows,
+        target="made_field_goals",
+        alpha=fg_alpha,
+        feature_names=FG_ATTEMPT2_FEATURE_NAMES,
+    )
+    assert model.feature_names == FG_ATTEMPT2_FEATURE_NAMES
+    assert model.alpha == fg_alpha
+    assert predict_mean(model, rows[0]) > 0
+
+    fitted = fit_core(
+        rows,
+        shared_sigma=0.10,
+        def_st_td_rate=0.08,
+        safety_rate=0.015,
+        conversion_probabilities=(0.92, 0.05, 0.03),
+        source_manifest_sha256="a" * 64,
+        code_identity="attempt2-subset-test",
+        fg_feature_names=FG_ATTEMPT2_FEATURE_NAMES,
+        fg_alphas=FG_ATTEMPT2_ALPHA_GRID,
+    )
+    assert fitted.td_model.feature_names == FEATURE_NAMES
+    assert fitted.fg_model.feature_names == FG_ATTEMPT2_FEATURE_NAMES
