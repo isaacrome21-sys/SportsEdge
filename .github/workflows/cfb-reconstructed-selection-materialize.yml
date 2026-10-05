@@ -23,6 +23,7 @@ on:
       - 'config/cfb_dispersion_only_prereg_v1.json'
       - 'scripts/preflight_cfb_reconstructed_selection.py'
       - 'scripts/acquire_cfb_reconstructed_selection.py'
+      - 'scripts/warm_cfb_reconstructed_selection_cache.py'
       - 'scripts/materialize_cfb_reconstructed_selection.py'
       - 'scripts/build_cfb_selected_candidate_artifact.py'
       - 'sportsedge/sports/cfb/reconstructed_selection.py'
@@ -37,6 +38,7 @@ on:
       - 'tests/test_cfb_dispersion_only_prereg_v1.py'
       - 'tests/test_cfb_reconstructed_selection_preflight.py'
       - 'tests/test_cfb_reconstructed_selection_acquisition.py'
+      - 'tests/test_cfb_reconstructed_selection_cache_warm.py'
       - 'tests/test_cfb_reconstructed_selection_materializer.py'
       - 'tests/test_cfb_selected_candidate_artifact_builder.py'
       - '.github/workflows/cfb-reconstructed-selection-materialize.yml'
@@ -67,6 +69,7 @@ jobs:
           python -m py_compile \
             scripts/preflight_cfb_reconstructed_selection.py \
             scripts/acquire_cfb_reconstructed_selection.py \
+            scripts/warm_cfb_reconstructed_selection_cache.py \
             scripts/materialize_cfb_reconstructed_selection.py \
             sportsedge/sports/cfb/reconstructed_selection.py \
             sportsedge/sports/cfb/candidate_bakeoff_v2.py \
@@ -82,6 +85,7 @@ jobs:
           python -m unittest \
             tests.test_cfb_reconstructed_selection_preflight \
             tests.test_cfb_reconstructed_selection_acquisition \
+            tests.test_cfb_reconstructed_selection_cache_warm \
             tests.test_cfb_reconstructed_selection_materializer \
             tests.test_cfb_candidate_bakeoff_v2 \
             tests.test_cfb_candidate_bakeoff_v3 \
@@ -144,10 +148,11 @@ jobs:
           mkdir -p artifacts/cfb
           python scripts/preflight_cfb_reconstructed_selection.py \
             --private-out "$RUNNER_TEMP/cfb_cfbd_private_preflight.json" \
+            --private-cache-root "$RUNNER_TEMP/cfb_reconstructed_cache/cfbd" \
             --public-out artifacts/cfb/cfbd_reconstructed_selection_preflight_public.json
 
       - name: Record fail-closed blocked acquisition state
-        if: steps.preflight.outputs.state != 'VERIFIED_BEFORE_FIRST_REPLAY_CALL'
+        if: steps.preflight.outputs.state != 'VERIFIED_BEFORE_FIRST_REPLAY_CALL' && steps.preflight.outputs.state != 'VERIFIED_PARTIAL_CACHE_WARM_ONLY'
         shell: bash
         run: |
           set -euo pipefail
@@ -178,6 +183,16 @@ jobs:
           print(json.dumps(report, sort_keys=True))
           PY
 
+      - name: Warm verified reconstructed source cache within frozen reserve
+        if: steps.preflight.outputs.state == 'VERIFIED_PARTIAL_CACHE_WARM_ONLY'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/warm_cfb_reconstructed_selection_cache.py \
+            --private-preflight "$RUNNER_TEMP/cfb_cfbd_private_preflight.json" \
+            --private-cache-root "$RUNNER_TEMP/cfb_reconstructed_cache" \
+            --public-attestation-out artifacts/cfb/cfb_reconstructed_cache_warm_public.json
+
       - name: Acquire reconstructed inputs into runner-private cache
         if: steps.preflight.outputs.state == 'VERIFIED_BEFORE_FIRST_REPLAY_CALL'
         shell: bash
@@ -190,7 +205,7 @@ jobs:
             --public-attestation-out artifacts/cfb/cfb_reconstructed_acquisition_public.json
 
       - name: Save verified reconstructed source cache
-        if: always() && steps.preflight.outputs.state == 'VERIFIED_BEFORE_FIRST_REPLAY_CALL'
+        if: always() && (steps.preflight.outputs.state == 'VERIFIED_BEFORE_FIRST_REPLAY_CALL' || steps.preflight.outputs.state == 'VERIFIED_PARTIAL_CACHE_WARM_ONLY')
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: ${{ runner.temp }}/cfb_reconstructed_cache
@@ -281,6 +296,7 @@ jobs:
           paths = [
               Path('artifacts/cfb/cfbd_reconstructed_selection_preflight_public.json'),
               Path('artifacts/cfb/cfb_reconstructed_acquisition_public.json'),
+              Path('artifacts/cfb/cfb_reconstructed_cache_warm_public.json'),
               Path('artifacts/cfb/acquisition_manifest.json'),
               Path('artifacts/cfb/selection_bundle_manifest.json'),
               Path('artifacts/cfb/candidate_bakeoff_result.json'),
@@ -351,6 +367,7 @@ jobs:
           path: |
             artifacts/cfb/cfbd_reconstructed_selection_preflight_public.json
             artifacts/cfb/cfb_reconstructed_acquisition_public.json
+            artifacts/cfb/cfb_reconstructed_cache_warm_public.json
             artifacts/cfb/acquisition_manifest.json
             artifacts/cfb/selection_bundle_manifest.json
             artifacts/cfb/reconstructed_source_manifest.json

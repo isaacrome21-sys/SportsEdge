@@ -91,7 +91,12 @@ def _weather_transport(config: Mapping[str, Any]) -> tuple[str, bool]:
     return contract, ready
 
 
-def evaluate_account(info: Mapping[str, Any], config: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+def evaluate_account(
+    info: Mapping[str, Any],
+    config: Mapping[str, Any],
+    *,
+    verified_cache_hits: int = 0,
+) -> tuple[dict[str, Any], dict[str, Any]]:
     blockers: list[str] = []
     try:
         patron_level = int(info["patronLevel"])
@@ -120,13 +125,21 @@ def evaluate_account(info: Mapping[str, Any], config: Mapping[str, Any]) -> tupl
         blockers.append("CFB_RECONSTRUCTED_WEATHER_TRANSPORT_CONTRACT_INVALID")
 
     plan = config.get("planned_new_calls_upper_bound") or {}
-    planned = int(plan.get("total", -1))
+    planned_total = int(plan.get("total", -1))
     reserve = int(config.get("retry_reserve_calls", -1))
-    if planned < 0 or reserve < 0:
+    if planned_total < 0 or reserve < 0:
         raise CFBProviderPreflightError("CFB_CFBD_PREFLIGHT_BUDGET_INVALID")
+    try:
+        cache_hits = int(verified_cache_hits)
+    except (TypeError, ValueError) as exc:
+        raise CFBProviderPreflightError("CFB_CFBD_PREFLIGHT_CACHE_HITS_INVALID") from exc
+    if cache_hits < 0 or cache_hits > planned_total:
+        raise CFBProviderPreflightError("CFB_CFBD_PREFLIGHT_CACHE_HITS_INVALID")
+    planned = planned_total - cache_hits
     call_plan_fits = remaining >= planned + reserve
+    cache_warm_new_calls = min(planned, max(0, remaining - reserve))
     advanced_only = int(plan.get("advanced_metrics", -1))
-    if advanced_only < 0 or advanced_only > planned:
+    if advanced_only < 0 or advanced_only > planned_total:
         raise CFBProviderPreflightError("CFB_CFBD_PREFLIGHT_ADVANCED_BUDGET_INVALID")
     capacity_bands = {
         "advanced_metrics_only": remaining >= advanced_only,
@@ -147,19 +160,38 @@ def evaluate_account(info: Mapping[str, Any], config: Mapping[str, Any]) -> tupl
         "reserve_30": remaining >= planned + 30,
         "reserve_40": remaining >= planned + 40,
         "reserve_50": remaining >= planned + 50,
+        "verified_cache_reuse_present": cache_hits > 0,
+        "partial_cache_warm_available": cache_warm_new_calls > 0 and not call_plan_fits,
     }
     if not call_plan_fits:
         blockers.append("CFBD_REPLAY_PLAN_EXCEEDS_REMAINING_QUOTA")
 
-    ready = not blockers
+    non_quota_blockers = [
+        blocker for blocker in blockers
+        if blocker != "CFBD_REPLAY_PLAN_EXCEEDS_REMAINING_QUOTA"
+    ]
+    if not blockers:
+        status = "VERIFIED_BEFORE_FIRST_REPLAY_CALL"
+    elif (
+        not non_quota_blockers
+        and cache_warm_new_calls > 0
+        and planned > 0
+    ):
+        status = "VERIFIED_PARTIAL_CACHE_WARM_ONLY"
+    else:
+        status = "BLOCKED_PROVIDER_PREFLIGHT"
+
     private_report = {
         "schema_version": "CFB_CFBD_PROVIDER_PREFLIGHT_V1",
-        "status": "VERIFIED_BEFORE_FIRST_REPLAY_CALL" if ready else "BLOCKED_PROVIDER_PREFLIGHT",
+        "status": status,
         "active_cfbd_tier": tier_label,
         "patron_level": patron_level,
         "monthly_quota": monthly_quota,
         "remaining_quota": remaining,
+        "planned_total_calls": planned_total,
+        "verified_cache_hits": cache_hits,
         "planned_new_calls": planned,
+        "cache_warm_new_calls": cache_warm_new_calls,
         "retry_reserve_calls": reserve,
         "cfbd_weather_entitled": patron_level >= 1,
         "cfbd_weather_required_for_selection": False,
@@ -183,6 +215,8 @@ def evaluate_account(info: Mapping[str, Any], config: Mapping[str, Any]) -> tupl
         "weather_source_contract": weather_contract,
         "weather_transport_ready": weather_transport_ready,
         "call_plan_fits": call_plan_fits,
+        "verified_cache_reuse_present": cache_hits > 0,
+        "partial_cache_warm_available": cache_warm_new_calls > 0 and not call_plan_fits,
         "capacity_bands": capacity_bands,
         "historical_replay_calls_performed": 0,
         "blockers": blockers,
@@ -191,10 +225,16 @@ def evaluate_account(info: Mapping[str, Any], config: Mapping[str, Any]) -> tupl
     return private_report, public_report
 
 
-def run(api_key: str, *, config: Mapping[str, Any] | None = None, opener: Callable = urlopen):
+def run(
+    api_key: str,
+    *,
+    config: Mapping[str, Any] | None = None,
+    opener: Callable = urlopen,
+    verified_cache_hits: int = 0,
+):
     cfg = dict(config or _load_config())
     info = fetch_account_info(api_key, opener=opener)
-    return evaluate_account(info, cfg)
+    return evaluate_account(info, cfg, verified_cache_hits=verified_cache_hits)
 
 
 def _write_outputs(report: Mapping[str, Any]) -> None:
@@ -211,9 +251,29 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--private-out", type=Path)
     parser.add_argument("--public-out", type=Path, required=True)
+    parser.add_argument("--private-cache-root", type=Path)
     args = parser.parse_args(argv)
     try:
-        private, public = run(os.environ.get("CFBD_API_KEY", ""))
+        verified_cache_hits = 0
+        if args.private_cache_root is not None:
+            from scripts.acquire_cfb_reconstructed_selection import (
+                _load_verified_cache,
+                build_request_plan,
+            )
+            cfg = _load_config()
+            for item in build_request_plan(cfg):
+                if _load_verified_cache(
+                    cache_root=args.private_cache_root,
+                    query_sha=str(item["query_sha256"]),
+                ) is not None:
+                    verified_cache_hits += 1
+            private, public = run(
+                os.environ.get("CFBD_API_KEY", ""),
+                config=cfg,
+                verified_cache_hits=verified_cache_hits,
+            )
+        else:
+            private, public = run(os.environ.get("CFBD_API_KEY", ""))
     except CFBProviderPreflightError as exc:
         private = None
         public = {
@@ -226,6 +286,8 @@ def main(argv: list[str] | None = None) -> int:
             "weather_source_contract": EXPECTED_WEATHER_CONTRACT,
             "weather_transport_ready": False,
             "call_plan_fits": False,
+            "verified_cache_reuse_present": False,
+            "partial_cache_warm_available": False,
             "historical_replay_calls_performed": 0,
             "blockers": [str(exc)],
             "authority": _zero_authority(),
