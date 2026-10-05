@@ -490,7 +490,7 @@
     }
   ],
   "run_nonce": "retry-signed-yards-6",
-  "rerun_token": "signed-yardage-fix-v4",
+  "rerun_token": "signed-yardage-syntax-fixed-v5",
   "official_inactives_source": "NFL.com Week 4 Monday night inactives, published 2026-10-05 18:49 ET",
   "official_inactives": [
     "Cooper Rush",
