@@ -7,6 +7,7 @@ from .f5_distribution import (
     F5_DISTRIBUTION_VERSION,
     F5_MARKETS,
     F5Distribution,
+    LEAGUE_PRIOR_STRENGTH,
     build_f5_distribution,
     read_f5_probability,
 )
@@ -19,9 +20,16 @@ class SharedF5EngineError(ValueError):
     pass
 
 
+def _production_builder(features: Mapping[str, Any]) -> F5Distribution:
+    return build_f5_distribution(
+        features,
+        league_prior_strength=LEAGUE_PRIOR_STRENGTH,
+    )
+
+
 def build_shared_f5_engine_session(
     *,
-    builder: Callable[[Mapping[str, Any]], F5Distribution] = build_f5_distribution,
+    builder: Callable[[Mapping[str, Any]], F5Distribution] = _production_builder,
 ) -> Callable[[Mapping[str, Any]], dict[str, Any]]:
     cache: dict[str, F5Distribution] = {}
 
@@ -44,6 +52,7 @@ def build_shared_f5_engine_session(
             "game_id": game_id,
             "feature_source_hash": feature_source_hash,
             "features": dict(features),
+            "league_prior_strength": LEAGUE_PRIOR_STRENGTH,
         }
         model_input_hash = canonical_json_sha256(stochastic_identity)
         distribution = cache.get(model_input_hash)
@@ -71,7 +80,7 @@ def build_shared_f5_engine_session(
             "readout_sha256": readout.readout_sha256,
             "readout_version": readout.readout_version,
             "engine_version": F5_DISTRIBUTION_VERSION,
-            "seed_policy": "analytic_empirical_f5_state",
+            "seed_policy": "analytic_empirical_f5_state_m30_league_prior",
             "mc_paths": 0,
         }
 
