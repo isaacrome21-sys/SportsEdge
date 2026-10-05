@@ -18,6 +18,8 @@ from sportsedge.mlb_resolve import build_bound_input  # noqa: E402
 from sportsedge.mlb_source import fetch_schedule  # noqa: E402
 
 CHICAGO = ZoneInfo("America/Chicago")
+RESEARCH_COMPLETE = 3  # Successful research; deliberately do not run a lines card.
+RESEARCH_FAILED = 4
 
 # Phone-issue research hooks (same pattern as the CFB {"backtest": ...} board):
 # a fenced body whose first line is "RESEARCH <name>" runs a pre-registered
@@ -67,11 +69,13 @@ def run_research(name: str, issue: str) -> int:
             raise RuntimeError((proc.stderr or proc.stdout)[-3000:])
         subprocess.run(["gh", "issue", "comment", str(issue), "--body-file", str(out_dir / "report.md")], check=True)
         msg = f"RESEARCH_DIRECTIVE_DONE {name}: report posted above. This was a research run, not a lines board."
+        print(msg)
+        return RESEARCH_COMPLETE
     except Exception:  # surface the failure on the issue instead of a silent red job
         msg = f"RESEARCH_DIRECTIVE_FAILED {name}:\n{traceback.format_exc()[-3000:]}"
     Path("intake_error.txt").write_text(msg, encoding="utf-8")
     print(msg, file=sys.stderr)
-    return 2
+    return RESEARCH_FAILED
 
 
 def main() -> int:
