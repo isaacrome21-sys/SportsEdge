@@ -123,3 +123,71 @@ def test_home_pitcher_bridge_binds_home_team_identity():
 
     assert source.calls[0]["team_id"] == 20
     assert row["team_id"] == 20
+
+
+class _F5Source:
+    def matchup_features(self, **kwargs):
+        return {
+            "feature_version": "mlb_f5_actual_innings_v3_m30_league_prior",
+            "feature_source_hash": "b" * 64,
+            "features": {
+                "away_f5_runs_for": [1] * 10,
+                "away_f5_runs_against": [2] * 10,
+                "home_f5_runs_for": [2] * 10,
+                "home_f5_runs_against": [1] * 10,
+                "away_first_inning_runs_for": [0] * 10,
+                "away_first_inning_runs_against": [0] * 10,
+                "home_first_inning_runs_for": [0] * 10,
+                "home_first_inning_runs_against": [0] * 10,
+                "league_f5_pmf": {"0": 0.2, "1": 0.3, "2": 0.3, "3": 0.2},
+                "league_first_inning_scoreless_rate": 0.72,
+                "league_prior_halves": 1000,
+                "league_prior_strength": 30,
+            },
+        }
+
+
+def _game_market_quote(market, *, side, line=0.5):
+    return {
+        "game_id": "777",
+        "period": "F5" if market.startswith("F5_") else "FG",
+        "market": market,
+        "entity_id": "777",
+        "line": line,
+        "side": side,
+        "american_odds": -110,
+        "book_key": "draftkings",
+        "sportsbook": "DraftKings",
+        "is_alternate": False,
+        "raw_market_name": market,
+        "retrieved_at": "2026-10-04T22:59:00+00:00",
+        "ttl_seconds": 300,
+        "offer_id": market + "-x",
+    }
+
+
+def test_game_market_bridge_preserves_m30_league_prior_for_f5_and_nrfi():
+    source = ContextSource()
+    f5 = _F5Source()
+    f5_row = build_canonical_feature_row(
+        game=_game(),
+        quote=_game_market_quote("F5_TOTALS", side="OVER", line=4.5),
+        source=source,
+        target_date=date(2026, 10, 4),
+        f5_source=f5,
+    )
+    nrfi_row = build_canonical_feature_row(
+        game=_game(),
+        quote=_game_market_quote("NRFI", side="YES", line=0.5),
+        source=source,
+        target_date=date(2026, 10, 4),
+        f5_source=f5,
+    )
+
+    for row in (f5_row, nrfi_row):
+        assert row["features"]["league_prior_strength"] == 30
+        assert row["features"]["league_prior_halves"] == 1000
+        assert row["features"]["league_first_inning_scoreless_rate"] == 0.72
+        assert row["features"]["league_f5_pmf"]["2"] == 0.3
+    assert f5_row["source"] == "MLB_STATSAPI_STRICTLY_PRIOR_ACTUAL_F5_INNINGS"
+    assert nrfi_row["source"] == "MLB_STATSAPI_STRICTLY_PRIOR_ACTUAL_FIRST_INNING"
