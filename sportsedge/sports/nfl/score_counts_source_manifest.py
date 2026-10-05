@@ -153,14 +153,35 @@ def build_score_count_source_manifest(
     if missing:
         raise ScoreCountSourceError("REQUIRED_SOURCE_MISSING:" + ",".join(missing))
 
+    detailed = [observed[name] for name in sorted(observed)]
+    content_receipts = [
+        {
+            "name": row["name"],
+            "fetch_uri": row["fetch_uri"],
+            "origin_uri": row["origin_uri"],
+            "season_scope": row["season_scope"],
+            "byte_sha256": row["byte_sha256"],
+            "parser_code_sha256": row["parser_code_sha256"],
+        }
+        for row in detailed
+    ]
+    content_identity = {
+        "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G1_SOURCE_CONTENT_IDENTITY_V1",
+        "candidate_family": "NFL_SCORE_COUNTS_G1",
+        "contract_payload_sha256": contract_payload_sha256(cfg),
+        "parser_code_sha256": parser_sha,
+        "seasons": [int(s) for s in seasons],
+        "receipts": content_receipts,
+    }
     payload: dict[str, Any] = {
         "schema": SCHEMA,
         "status": "EXACT_FROZEN_BYTES_VERIFIED_BEFORE_PARSE",
         "candidate_family": "NFL_SCORE_COUNTS_G1",
         "contract_payload_sha256": contract_payload_sha256(cfg),
+        "content_manifest_sha256": sha256(_canonical(content_identity)).hexdigest(),
         "parser_code_sha256": parser_sha,
         "seasons": [int(s) for s in seasons],
-        "receipts": [observed[name] for name in sorted(observed)],
+        "receipts": detailed,
         "authority": {
             "research_only": True,
             "creates_model_p": False,
