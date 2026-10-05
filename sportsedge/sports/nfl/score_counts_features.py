@@ -29,6 +29,7 @@ QB_PSEUDO_DROPBACKS = 100.0
 QB_MIN_PRIOR_DROPBACKS = 20
 RARE_SCORE_PRIOR_GAMES = 25.0
 TEAM_CONVERSION_MIN_TDS = 50
+CONVERSION_PRIOR_TDS = 25.0
 
 FORBIDDEN_KEYS = (
     "odds", "price", "sportsbook", "market", "spread_line", "total_line",
@@ -433,7 +434,14 @@ def _conversion_override(
 
     team_counts = counts(team_history)
     team_total = sum(team_counts)
-    probs = tuple(v / team_total for v in team_counts) if team_total >= TEAM_CONVERSION_MIN_TDS else league_probs
+    if team_total >= TEAM_CONVERSION_MIN_TDS:
+        probs = tuple(
+            (team_counts[idx] + CONVERSION_PRIOR_TDS * league_probs[idx])
+            / (team_total + CONVERSION_PRIOR_TDS)
+            for idx in range(3)
+        )
+    else:
+        probs = league_probs
     if abs(sum(probs) - 1.0) > 1e-9:
         raise ScoreCountFeatureError("CONVERSION_PROBABILITY_MASS_INVALID")
     return {
@@ -671,6 +679,7 @@ def build_score_count_forward_rows(
 
 
 __all__ = [
+    "CONVERSION_PRIOR_TDS",
     "DECAY",
     "LOOKBACK_GAMES",
     "QB_MIN_PRIOR_DROPBACKS",
