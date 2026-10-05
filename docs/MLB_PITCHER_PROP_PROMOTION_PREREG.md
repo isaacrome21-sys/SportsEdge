@@ -1,8 +1,6 @@
-# MLB backlog E: can pitcher props leave the LEAN tier? — pre-registration (v2, 2026-10-04)
+# MLB backlog E: can pitcher props leave the LEAN tier? — pre-registration (v3, 2026-10-05)
 
-Tracking: #1482 (backlog item E). Written and committed **before** any graded result was
-seen: no outcome has been joined to any archived quote, and no model price has been
-computed for any archived quote. **v2 was amended before any outcome/price join** solely because PR #1542 landed the validated announced-lineup K production adjustment after v1 was written. No archived result was inspected between v1 and v2. The runner will print the SHA-256 of this file so the result comment is bound to this exact protocol.
+Tracking: #1482 (backlog item E). Written and committed **before** any graded result was\nseen: no outcome has been joined to any archived quote, and no model price has been\ncomputed for any archived quote. **v3 was amended before the one allowed final look** after a code audit found that replaying current-game lineup/umpire context from the postgame StatsAPI would leak information. No archived outcome, model-vs-market score, or ROI was inspected. The amendment binds those optional current-game context fields to immutable `data`-branch snapshots captured at decision time. **v2 was amended before any outcome/price join** solely because PR #1542 landed the validated announced-lineup K production adjustment after v1 was written. No archived result was inspected between v1 and v2. The runner will print the SHA-256 of this file so the result comment is bound to this exact protocol.
 
 ## Question
 Pitcher props (PITCHER_K, PITCHER_BB, PITCHER_ER, PITCHER_HITS_ALLOWED) are capped at LEAN
@@ -50,6 +48,18 @@ One unit = (provider event, pitcher, market). Built as follows, in order:
    research implementations for every shipped adjustment it exercises.
    History is regular-season only (`gameType=R`), as in production today, so a
    postseason unit is priced from regular-season starts.
+5. **Decision-time context proof (v3 amendment, frozen before the final look):** for
+   PITCHER_K and PITCHER_BB, current-game lineup/plate-umpire state may not be fetched
+   retrospectively from the finished-game StatsAPI. The runner must use the immutable
+   `data:runtime/mlb-context/runs/**/game_<gamePk>.json` archive and select the latest
+   snapshot with `retrieved_at <= quote observed_at` and age <= **20 minutes**. If the
+   snapshot says PRESENT, use the exact archived batting order or umpire assignment. If
+   it says ABSENT, use the same production fallback that was available then (K retains
+   opp-K without lineup-K; BB retains own-history pricing without umpire-BB). If no fresh
+   snapshot exists, or a PRESENT snapshot is structurally incomplete, drop the unit and
+   count it as PIT context unproven. Prior-game boxscores/officials remain valid inputs
+   because those games were completed before the target date. No future context snapshot
+   may be used to infer what was known at the quote time.
 
 ## Prices
 - Market fair probability: two-way multiplicative de-vig of the two quotes,
