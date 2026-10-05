@@ -30,6 +30,7 @@
         "scripts/run_nfl_v2k_attempt5.py",
         "sportsedge/sports/nfl/NFL_V2K_DEVELOPMENT_EXPOSURE_V3.json",
         "sportsedge/sports/nfl/NFL_V2K_DEVELOPMENT_EXPOSURE_V4.json",
+        "sportsedge/sports/nfl/NFL_V2K_DEVELOPMENT_FINAL_V1.json",
         "sportsedge/sports/nfl/NFL_V2K_DEVELOPMENT_VALIDATION_PREATTEMPT_V4.json",
         "sportsedge/sports/nfl/NFL_V2K_DEVELOPMENT_VALIDATION_PREATTEMPT_V5.json",
         "sportsedge/sports/nfl/attempt9_inference.py",
@@ -47,7 +48,8 @@
         "tests/test_nfl_v2k_attempt2_dispatch_bridge.py",
         "tests/test_nfl_v2k_attempt2_source_manifest_adapter.py",
         "tests/test_nfl_v2k_attempt4_market_residual.py",
-        "tests/test_nfl_v2k_attempt5_market_calibration.py"
+        "tests/test_nfl_v2k_attempt5_market_calibration.py",
+        "tests/test_nfl_v2k_development_finality.py"
       ],
       "coverage_prefixes": [
         "sportsedge/sports/nfl/m2_v2j_",
