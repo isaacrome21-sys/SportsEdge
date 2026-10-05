@@ -1,0 +1,131 @@
+{
+  "schema": "NFL_V2K_DEVELOPMENT_VALIDATION_PREATTEMPT_V5",
+  "status": "FROZEN_ATTEMPT5_READY_FOR_DEVELOPMENT_VALIDATION",
+  "candidate_family": "NFL_MARKET_CALIBRATION_LINE_G5",
+  "purpose": "Final governed development candidate. Test whether a low-dimensional, training-only calibration of the paired two-way no-vig market probability using only posted line level improves repeatable spread and total probability forecasts. No drive simulation and no recursive team-result state.",
+  "predecessor": {
+    "workflow_run_id": 37295150106,
+    "artifact_id": 11338236868,
+    "verdict": "ATTEMPT4_FAIL"
+  },
+  "source_binding": {
+    "source_freeze_path": "config/nfl_promotion_source_freeze_v1.json",
+    "source_manifest_sha256": "b7ff10325b69dd140e8c9d40971475595871e43f8d5a3c2ed2d9ffa8774c0723",
+    "schedule_only_for_candidate": true,
+    "market_fields_used": [
+      "spread_line",
+      "total_line",
+      "home_spread_odds",
+      "away_spread_odds",
+      "over_odds",
+      "under_odds"
+    ],
+    "team_result_state_used": false,
+    "drive_data_used": false,
+    "game_outcomes_used_only_for_prior_season_parameter_selection_and_test_scoring": true,
+    "schedule_seasons": [
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ]
+  },
+  "fold_plan": {
+    "policy": "EXPANDING_SEASON_OUTER_FOLDS_WITH_TRAINING_ONLY_CALIBRATION_SELECTION",
+    "test_seasons": [
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "same_or_future_test_season_outcome_leakage_forbidden": true
+  },
+  "architecture": {
+    "baseline": "TWO_WAY_NO_VIG_MARKET_PROBABILITY",
+    "probability_model": {
+      "formula": "sigmoid(logit(no_vig_market_p) + intercept + line_beta*bounded_line_feature)",
+      "identity_candidate": {
+        "intercept": 0,
+        "line_beta": 0
+      },
+      "intercept_grid": [
+        -0.12,
+        -0.08,
+        -0.04,
+        0,
+        0.04,
+        0.08,
+        0.12
+      ],
+      "line_beta_grid": [
+        -0.24,
+        -0.16,
+        -0.08,
+        0,
+        0.08,
+        0.16,
+        0.24
+      ],
+      "spread_line_feature": "clip(spread_line/7.0,-2,2)",
+      "total_line_feature": "clip((total_line-44.0)/10.0,-2,2)",
+      "parameter_selection": "LOWEST_PRIOR_SEASONS_LOG_LOSS_THEN_LOWEST_TOTAL_ABSOLUTE_COMPLEXITY",
+      "team_identity_features_forbidden": true,
+      "recursive_team_state_forbidden": true,
+      "post_result_retuning_forbidden": true
+    },
+    "downstream_joint_score_mapping": {
+      "status": "FROZEN_BEFORE_ATTEMPT5_READOUT",
+      "fair_spread_center": "spread_line + 13.5*logit(calibrated_home_cover_probability)",
+      "fair_total_center": "total_line + 13.0*logit(calibrated_over_probability)",
+      "team_score_means": "home=(fair_total+fair_spread)/2; away=(fair_total-fair_spread)/2",
+      "negative_team_mean_policy": "FAIL_CLOSED",
+      "post_result_remapping_forbidden": true
+    }
+  },
+  "acceptance": {
+    "predictive": {
+      "markets": [
+        "spread",
+        "total"
+      ],
+      "metric": "LOG_LOSS_VS_NO_VIG_MARKET_BASELINE",
+      "minimum_fold_win_rate": 0.65,
+      "overall_log_loss_must_be_strictly_lower": true,
+      "calibration_max_nonempty_bin_deviation": 0.05
+    },
+    "conjunctive": true
+  },
+  "attempt_budget": {
+    "max_development_attempts": 5,
+    "development_budget_units_used_before_attempt5": 4,
+    "development_budget_units_remaining_before_attempt5": 1,
+    "this_artifact_consumes_attempt": false,
+    "attempt5_scoring_allowed": true,
+    "no_additional_attempts_after_scored_execution": true
+  },
+  "implementation_identity": {
+    "status": "FROZEN",
+    "core_path": "sportsedge/sports/nfl/v2k_attempt5_market_calibration.py",
+    "core_git_blob_sha1": "caff8dfbc079e44b530fcc81521ef31707aeb426",
+    "validation_path": "sportsedge/sports/nfl/v2k_attempt5_validation.py",
+    "validation_git_blob_sha1": "ede06ea52cf770b341d3da2cd4a38b3c55987bf5",
+    "runner_path": "scripts/run_nfl_v2k_attempt5.py",
+    "runner_git_blob_sha1": "f5ad81afe51f5c6f9ffc151cb14d859a1f6f28fa"
+  },
+  "authority": {
+    "research_contract": true,
+    "development_validation_execution": true,
+    "model_p": false,
+    "pricing": false,
+    "promotion": false,
+    "staking": false,
+    "production_release": false,
+    "official": false,
+    "untouched_readout": false
+  }
+}
