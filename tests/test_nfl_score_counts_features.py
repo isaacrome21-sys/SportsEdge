@@ -6,7 +6,10 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from sportsedge.sports.nfl.score_counts_features import (
+    CONVERSION_PRIOR_TDS,
     ScoreCountFeatureError,
+    TeamGame,
+    _conversion_override,
     aggregate_game_pbp,
     build_score_count_forward_rows,
     build_score_count_training_rows,
@@ -316,3 +319,16 @@ def test_modern_forward_depth_snapshot_after_asof_cannot_be_used():
     )
     assert len(out) == 2
     assert {row["starting_qb_id"] for row in out} == {"QB-H", "QB-A"}
+
+
+def test_team_conversion_mix_uses_frozen_league_centered_prior():
+    home_history = [TeamGame(offense_touchdowns=1, pat_made=1) for _ in range(50)]
+    away_history = [TeamGame(offense_touchdowns=1, two_point_made=1) for _ in range(50)]
+    all_history = home_history + away_history
+    got = _conversion_override(team_history=home_history, all_completed_team_games=all_history)
+    expected_pat = (50.0 + CONVERSION_PRIOR_TDS * 0.5) / (50.0 + CONVERSION_PRIOR_TDS)
+    expected_two = (0.0 + CONVERSION_PRIOR_TDS * 0.5) / (50.0 + CONVERSION_PRIOR_TDS)
+    assert got["conversion_pat_p"] == pytest.approx(expected_pat)
+    assert got["conversion_two_p"] == pytest.approx(expected_two)
+    assert got["conversion_no_p"] == pytest.approx(0.0)
+    assert sum(got.values()) == pytest.approx(1.0)
