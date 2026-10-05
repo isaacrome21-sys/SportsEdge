@@ -359,3 +359,13 @@ def test_noncontiguous_game_rows_fail_closed_for_streaming_contract():
     bad = [*g1[:2], *g2, *g1[2:]]
     with pytest.raises(ScoreCountFeatureError, match="PBP_GAME_ROWS_NOT_CONTIGUOUS"):
         aggregate_game_pbp(bad)
+
+
+def test_csv_numeric_string_flags_are_parsed_as_boolean_indicators():
+    from sportsedge.sports.nfl.score_counts_features import _flag
+
+    assert _flag("1.0") is True
+    assert _flag("1") is True
+    assert _flag("0.0") is False
+    assert _flag("0") is False
+    assert _flag("") is False
