@@ -198,7 +198,7 @@ def price_pitcher_market(model_input:Mapping[str,Any])->dict[str,Any]:
         p,p_push,meta,identity_features=_price_prior_fallback(features,line,side,market);meta["weighted"]=True
     else:
         pool=_normalize_pool(features.get("history_pool"),"history_pool");weights=_weights(features.get("history_weights"),len(pool),"history_weights");prior_pool=None;prior_weights=None
-        if features.get("prior_pool") is not None:
+        if market in {"PITCHER_ER","PITCHER_HITS_ALLOWED","PITCHER_HITS_WALKS_ER"} and features.get("prior_pool") is not None:
             prior_pool=_normalize_pool(features.get("prior_pool"),"prior_pool",minimum=5);prior_weights=_weights(features.get("prior_weights"),len(prior_pool),"prior_weights")
         p,p_push,meta=_price_values([_value(r,market) for r in pool],weights,line,side,market,prior_values=None if prior_pool is None else [_value(r,market) for r in prior_pool],prior_weights=prior_weights);meta["weighted"]=features.get("history_weights") is not None;identity_features={"history_pool":pool,"history_weights":weights,"prior_pool":prior_pool,"prior_weights":prior_weights}
     digest=_sha({"engine":ENGINE_VERSION,"game_id":model_input.get("game_id"),"entity_id":model_input.get("entity_id"),"feature_source_hash":model_input.get("feature_source_hash"),"features":identity_features})
