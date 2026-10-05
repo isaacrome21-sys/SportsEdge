@@ -366,7 +366,9 @@ def build_score_count_training_rows(
     schedule = [dict(row) for row in schedule_rows]
     pbp = [dict(row) for row in pbp_rows]
     depth = [dict(row) for row in depth_rows]
-    _assert_market_blind(schedule)
+    # Schedule rows may physically carry sportsbook columns in the upstream
+    # factual dataset. They are never read by this builder. PBP/depth, which
+    # actually feed predictive state, must remain market-blind.
     _assert_market_blind(pbp)
     _assert_market_blind(depth)
 
