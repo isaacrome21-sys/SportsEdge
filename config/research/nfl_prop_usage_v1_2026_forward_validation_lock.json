@@ -1,0 +1,111 @@
+{
+  "schema": "SPORTSEDGE_NFL_PROP_USAGE_V1_2026_FORWARD_VALIDATION_LOCK",
+  "status": "FROZEN_BEFORE_FORWARD_WEEK5_EVIDENCE",
+  "frozen_date": "2026-10-05",
+  "candidate_identity": {
+    "family": "NFL_PROP_USAGE_V1",
+    "fit_head_sha": "dfe1914d6c5b70e727c17273dabd0bb033dc816d",
+    "fit_workflow_run_id": 36962280655,
+    "fit_workflow_artifact_id": 11208336341,
+    "fit_workflow_artifact_digest": "sha256:4eb92be476a88b795f849e7f14d95258131e42c40f30dfce19d2bb373b613cf3",
+    "fit_artifact_sha256": "ef38c7101da0977f27b71a7cbbe40321149ee2e0fda3bb8371f04d8423c9c555",
+    "attempt9_runtime_binding_sha256": "3ebce8f1ae0ec2efeffb4d145b898af9919d755a6028519ad98e41b5fb683ed0",
+    "refit_allowed": false,
+    "retune_allowed": false
+  },
+  "prior_window_disposition": {
+    "season": 2025,
+    "status": "SPENT_TECHNICAL_FAILURE_NO_RESULT",
+    "canonical_workflow_run_id": 36976714292,
+    "canonical_workflow_artifact_id": 11213747098,
+    "retry_allowed": false
+  },
+  "forward_window": {
+    "season": 2026,
+    "season_type": "REG",
+    "first_eligible_week": 5,
+    "last_eligible_week": 18,
+    "first_eligible_kickoff_utc": "2026-10-09T00:15:00Z",
+    "first_eligible_matchup": "TB_AT_DAL",
+    "evidence_clock_starts_only_after_this_lock_is_merged_to_main": true,
+    "prelock_rows_admissible": false,
+    "weeks_1_through_4_admissible": false,
+    "backfill_allowed": false
+  },
+  "markets": {
+    "passing_yards": {
+      "positions": ["QB"],
+      "provider_market": "player_pass_yds"
+    },
+    "rushing_yards": {
+      "positions": ["QB", "RB", "FB", "WR"],
+      "provider_market": "player_rush_yds"
+    },
+    "receiving_yards": {
+      "positions": ["RB", "FB", "WR", "TE"],
+      "provider_market": "player_reception_yds"
+    }
+  },
+  "decision_snapshot": {
+    "book": "draftkings",
+    "paired_over_under_required": true,
+    "line_must_match_pair": true,
+    "snapshot_window_minutes_before_kickoff": {
+      "exclusive_min": 15,
+      "inclusive_max": 75
+    },
+    "selection_rule": "LATEST_ADMISSIBLE_SNAPSHOT_AT_OR_BEFORE_T_MINUS_15_MINUTES",
+    "snapshot_after_kickoff_forbidden": true,
+    "market_price_as_model_feature": false
+  },
+  "close_snapshot": {
+    "book": "draftkings",
+    "paired_over_under_required": true,
+    "line_must_match_pair": true,
+    "snapshot_window_minutes_before_kickoff": {
+      "exclusive_min": 0,
+      "inclusive_max": 15
+    },
+    "selection_rule": "LATEST_ADMISSIBLE_SNAPSHOT_BEFORE_KICKOFF",
+    "missing_close": "EXCLUDE_FROM_CLV_ONLY_KEEP_VALIDATION_ROW_IF_DECISION_SNAPSHOT_EXISTS"
+  },
+  "pit_player_eligibility": {
+    "official_or_timestamped_prekick_active_status_required": true,
+    "latest_depth_snapshot_at_or_before_decision_required": true,
+    "qb_rule": "UNIQUE_POS_RANK_1_QB",
+    "skill_rule": "PLAYER_PRESENT_IN_LATEST_PIT_DEPTH_SNAPSHOT",
+    "minimum_same_season_prior_player_appearances": 3,
+    "missing_or_ambiguous_context": "ZERO_MODEL_ROW"
+  },
+  "probability": {
+    "projection_built_before_market_line": true,
+    "family": "NORMAL_QUANTITY_RESIDUAL_FROM_FROZEN_FIT_ARTIFACT",
+    "integer_line_behavior": "FAIL_CLOSED",
+    "observed_over": "ACTUAL_STRICTLY_GREATER_THAN_LINE"
+  },
+  "validation_gates": {
+    "calibration_metric": "ABS_MEAN_P_OVER_MINUS_OBSERVED_OVER_RATE",
+    "calibration_max": 0.06,
+    "required_scopes": ["passing_yards", "rushing_yards", "receiving_yards", "pooled"],
+    "brier_rule": "CANDIDATE_POOLED_BRIER_LE_FROZEN_DEVELOPMENT_POSITION_MARKET_BASELINE_POOLED_BRIER",
+    "zero_rows_when_pit_eligibility_missing": true,
+    "all_must_pass": true,
+    "evaluation_timing": "AFTER_WEEK_18_WINDOW_CLOSE_ONLY",
+    "minimum_n_gate": null,
+    "minimum_n_note": "No sample floor is added after the original V1 prelock; report counts and fail closed on any missing required scope."
+  },
+  "promotion_evidence": {
+    "separate_from_validation": true,
+    "decision_and_close_rows_may_feed_forward_clv_only_when_bound_to_active_policy": true,
+    "validation_pass_does_not_create_official_authority": true
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "truth_gate": false,
+    "official": false,
+    "promotion": false,
+    "staking": false,
+    "backfill": false
+  }
+}
