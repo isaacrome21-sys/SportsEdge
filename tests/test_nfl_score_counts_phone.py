@@ -131,7 +131,7 @@ def test_game_markets_are_priced_from_frozen_score_count_distribution():
 def test_prediction_must_exist_before_quote_binding():
     with pytest.raises(
         UnifiedNflPhoneError,
-        match="SCORE_COUNT_PREDICTION_AFTER_QUOTE_BINDING",
+        match="SCORE_COUNT_PREDICTION_NOT_BEFORE_QUOTE_BINDING",
     ):
         build_score_count_phone_card(
             ticket(observed_at="2026-10-05T14:59:59+00:00"),
@@ -201,3 +201,15 @@ def test_prop_rows_delegate_to_score_count_prop_bridge(monkeypatch):
     assert all(row["status"] == "PRICED" for row in out["rows"])
     assert {row["player"] for row in out["rows"]} == {"B_WR"}
     assert out["pricing_policy"]["prop_game_context_source"] == "NFL_SCORE_COUNTS_G1_SCORE_PATHS"
+
+
+def test_prediction_at_same_instant_as_quote_is_rejected():
+    with pytest.raises(
+        UnifiedNflPhoneError,
+        match="SCORE_COUNT_PREDICTION_NOT_BEFORE_QUOTE_BINDING",
+    ):
+        build_score_count_phone_card(
+            ticket(observed_at="2026-10-05T15:00:00+00:00"),
+            prediction=prediction(prediction_at="2026-10-05T15:00:00+00:00"),
+            schedule_games=schedule(),
+        )
