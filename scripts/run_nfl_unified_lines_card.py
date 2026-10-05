@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from datetime import datetime, timezone
 
 from sportsedge.nfl_unified_phone import build_unified_phone_card
 from sportsedge.nfl_scoring_composition_artifact import load_prior_file
@@ -127,6 +128,14 @@ def main() -> int:
 
     scoring_prior = load_prior_file(args.scoring_prior) if args.scoring_prior else None
 
+    # Model sources are acquired after the pasted quote snapshot. Preserve the
+    # exact quote timestamp separately and use the actual post-fetch timestamp
+    # for PIT role/injury filtering.
+    quote_observed_at = ticket.get("observed_at")
+    ticket = dict(ticket)
+    ticket["quote_observed_at"] = quote_observed_at
+    ticket["observed_at"] = datetime.now(timezone.utc).isoformat()
+
     payload = build_unified_phone_card(
         ticket,
         history=history,
@@ -141,6 +150,8 @@ def main() -> int:
     )
     payload["source_status"] = source_status
     payload["schedule_source_sha256"] = plan.get("schedule_source_sha256")
+    payload["quote_observed_at"] = quote_observed_at
+    payload["model_observed_at"] = ticket["observed_at"]
 
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
