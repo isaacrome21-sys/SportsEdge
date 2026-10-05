@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import json
 from urllib.parse import parse_qs, urlparse
 import unittest
@@ -59,6 +59,11 @@ class MLBGenericF5FeatureTests(unittest.TestCase):
         malformed = _game(9999, 11, 9, 9)
         malformed["linescore"]["innings"] = malformed["linescore"]["innings"][:4]
         self.payload = {"dates": [{"games": list(reversed(valid + [malformed]))}]}
+        league_games = [
+            _game(12000 + i, (i % 13) + 1, i % 4, (i + 1) % 3)
+            for i in range(100)
+        ]
+        self.league_payload = {"dates": [{"games": league_games}]}
         self.urls: list[str] = []
 
         def opener(request, timeout=0):
@@ -68,10 +73,21 @@ class MLBGenericF5FeatureTests(unittest.TestCase):
             self.assertEqual(parsed.path, "/api/v1/schedule")
             query = parse_qs(parsed.query)
             self.assertEqual(query["hydrate"], ["linescore"])
-            self.assertEqual(query["gameType"], ["R"])
             self.assertEqual(query["endDate"], ["2026-09-13"])
-            self.assertIn(query["teamId"], (["101"], ["202"]))
-            return _Response(self.payload)
+            if "teamId" in query:
+                self.assertNotIn("gameType", query)
+                self.assertEqual(
+                    query["startDate"],
+                    [(date(2026, 9, 14) - timedelta(days=240)).isoformat()],
+                )
+                self.assertIn(query["teamId"], (["101"], ["202"]))
+                return _Response(self.payload)
+            self.assertEqual(query["gameType"], ["R"])
+            self.assertEqual(
+                query["startDate"],
+                [(date(2026, 9, 14) - timedelta(days=370)).isoformat()],
+            )
+            return _Response(self.league_payload)
 
         self.source = MLBGenericHistorySource(
             opener=opener,
@@ -97,7 +113,12 @@ class MLBGenericF5FeatureTests(unittest.TestCase):
         self.assertNotIn("f5_away_mean_runs", row)
         self.assertNotIn("f5_home_mean_runs", row)
         self.assertEqual(row["source"], "MLB_STATSAPI_STRICT_PRIOR_F5_LINESCORE")
-        self.assertEqual(len(self.urls), 2)
+        self.assertEqual(row["league_prior_strength"], 30)
+        self.assertEqual(row["league_prior_halves"], 200)
+        self.assertAlmostEqual(sum(row["league_f5_pmf"].values()), 1.0, places=12)
+        self.assertEqual(len(row["f5_feature_source_hash"]), 64)
+        self.assertEqual(len(row["league_prior_source_hash"]), 64)
+        self.assertEqual(len(self.urls), 3)
 
         distribution = build_f5_distribution(row)
         self.assertEqual(distribution.away_history_games, 10)
