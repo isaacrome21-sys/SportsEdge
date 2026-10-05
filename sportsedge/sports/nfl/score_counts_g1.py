@@ -48,6 +48,14 @@ FG_ATTEMPT2_FEATURE_NAMES = (
     "home_indicator",
 )
 FG_ATTEMPT2_ALPHA_GRID = (0.1, 1.0, 10.0, 100.0, 1000.0)
+FG_ATTEMPT3_FEATURE_NAMES = (
+    "fg_attempts_per_game",
+    "opp_fg_attempts_allowed_per_game",
+    "off_plays_per_game",
+    "off_turnover_rate",
+    "home_indicator",
+)
+FG_ATTEMPT3_ALPHA_GRID = (0.1, 1.0, 10.0, 100.0, 1000.0)
 SIGMA_GRID = (0.0, 0.10, 0.20, 0.30)
 
 
@@ -106,7 +114,8 @@ def _validated_feature_names(feature_names: Sequence[str]) -> tuple[str, ...]:
     names = tuple(str(name) for name in feature_names)
     if not names or len(set(names)) != len(names):
         raise ScoreCountsError("FEATURE_IDENTITY_MISMATCH")
-    if any(name not in FEATURE_NAMES for name in names):
+    allowed = set(FEATURE_NAMES) | set(FG_ATTEMPT3_FEATURE_NAMES)
+    if any(name not in allowed for name in names):
         raise ScoreCountsError("FEATURE_IDENTITY_MISMATCH")
     return names
 
@@ -211,6 +220,21 @@ def predict_mean(model: PoissonRidge, row: Mapping[str, Any]) -> float:
     return float(exp(max(-20.0, min(20.0, eta))))
 
 
+def predict_made_field_goal_mean(
+    model: PoissonRidge,
+    row: Mapping[str, Any],
+) -> float:
+    base = predict_mean(model, row)
+    if model.target == "made_field_goals":
+        return base
+    if model.target == "field_goal_attempts":
+        rate = _finite(row.get("fg_make_rate_shrunk"), "fg_make_rate_shrunk")
+        if not 0.0 <= rate <= 1.0:
+            raise ScoreCountsError("FG_MAKE_RATE_OUT_OF_RANGE")
+        return float(base * rate)
+    raise ScoreCountsError(f"FG_MODEL_TARGET_UNSUPPORTED:{model.target}")
+
+
 def _season(row: Mapping[str, Any], idx: int) -> int:
     value = _finite(row.get("season"), f"row[{idx}].season")
     if abs(value - round(value)) > 1e-9:
@@ -278,6 +302,7 @@ def fit_core(
     code_identity: str,
     fg_feature_names: Sequence[str] = FEATURE_NAMES,
     fg_alphas: Sequence[float] = ALPHA_GRID,
+    fg_target: str = "made_field_goals",
 ) -> ScoreCountFit:
     if shared_sigma not in SIGMA_GRID:
         raise ScoreCountsError("SHARED_SIGMA_NOT_FROZEN_GRID")
@@ -299,7 +324,7 @@ def fit_core(
     fg_names = _validated_feature_names(fg_feature_names)
     fg_alpha, _ = choose_alpha(
         rows,
-        target="made_field_goals",
+        target=fg_target,
         alphas=fg_alphas,
         feature_names=fg_names,
     )
@@ -307,7 +332,7 @@ def fit_core(
         td_model=fit_poisson_ridge(rows, target="offense_touchdowns", alpha=td_alpha),
         fg_model=fit_poisson_ridge(
             rows,
-            target="made_field_goals",
+            target=fg_target,
             alpha=fg_alpha,
             feature_names=fg_names,
         ),
@@ -385,8 +410,10 @@ def simulate_game(
 
     home_td_lambda = predict_mean(fit.td_model, home_row)
     away_td_lambda = predict_mean(fit.td_model, away_row)
-    home_fg_lambda = predict_mean(fit.fg_model, home_row)
-    away_fg_lambda = predict_mean(fit.fg_model, away_row)
+    home_fg_model_lambda = predict_mean(fit.fg_model, home_row)
+    away_fg_model_lambda = predict_mean(fit.fg_model, away_row)
+    home_fg_lambda = predict_made_field_goal_mean(fit.fg_model, home_row)
+    away_fg_lambda = predict_made_field_goal_mean(fit.fg_model, away_row)
 
     sigma = float(fit.shared_sigma)
     if sigma == 0.0:
@@ -444,6 +471,9 @@ def simulate_game(
             "away_off_td_lambda": away_td_lambda,
             "home_fg_lambda": home_fg_lambda,
             "away_fg_lambda": away_fg_lambda,
+            "home_fg_model_lambda": home_fg_model_lambda,
+            "away_fg_model_lambda": away_fg_model_lambda,
+            "fg_model_target": fit.fg_model.target,
             "shared_sigma": sigma,
             "home_def_st_td_rate": home_def_st_rate,
             "away_def_st_td_rate": away_def_st_rate,
@@ -536,6 +566,8 @@ __all__ = [
     "FEATURE_NAMES",
     "FG_ATTEMPT2_ALPHA_GRID",
     "FG_ATTEMPT2_FEATURE_NAMES",
+    "FG_ATTEMPT3_ALPHA_GRID",
+    "FG_ATTEMPT3_FEATURE_NAMES",
     "ROOT_SEED_LITERAL",
     "ROOT_SEED_UINT64",
     "SCHEMA",
@@ -550,5 +582,6 @@ __all__ = [
     "fit_poisson_ridge",
     "market_probability",
     "predict_mean",
+    "predict_made_field_goal_mean",
     "simulate_game",
 ]
