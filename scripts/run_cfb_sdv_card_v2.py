@@ -36,6 +36,13 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from sportsedge.sports.cfb.market_anchored_spread import (
+    VERSION as ANCHORED_SPREAD_VERSION,
+    adjusted_home_margin,
+    forward_track_eligible,
+    load_frozen_fit,
+)
+
 # Bakeoff run 37093707442: per-team joint home/away score RMSE.
 TEAM_SCORE_RMSE = 12.018
 # Margin and total sigma assuming independent home/away residuals.
@@ -79,7 +86,7 @@ def pair_key(market: str, side: str, line):
     return (market, float(line))
 
 
-def price_game(game_id, home: float, away: float, quotes: list, validated=None) -> list:
+def price_game(game_id, home: float, away: float, quotes: list, validated=None, spread_context=None) -> list:
     validated = VALIDATED_MARKETS if validated is None else frozenset(validated)
     norm = []
     for q in quotes:
@@ -94,7 +101,11 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None) 
         raw = implied(odds)
         grp = groups[pair_key(market, side, line)]
         fair = raw / sum(grp) if len(grp) == 2 else None
-        p = model_prob(market, side, line, home, away)
+        model_home, model_away = home, away
+        if market == "SPREAD" and isinstance(spread_context, dict):
+            model_home = float(spread_context["home_mean"])
+            model_away = float(spread_context["away_mean"])
+        p = model_prob(market, side, line, model_home, model_away)
         edge = p - (fair if fair is not None else raw)
         out.append({
             "game_id": game_id,
@@ -112,6 +123,15 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None) 
             "reason": ("EDGE_CLEARS_FLOOR" if EDGE_FLOOR <= edge <= EDGE_CAP
                        else "EDGE_TOO_LARGE_SUSPECT" if edge > EDGE_CAP else "BELOW_FLOOR"),
         })
+        if market == "SPREAD" and isinstance(spread_context, dict):
+            out[-1].update({
+                "raw_model_home_margin": round(float(spread_context["raw_model_home_margin"]), 4),
+                "market_home_margin": round(float(spread_context["market_home_margin"]), 4),
+                "adjusted_home_margin": round(float(spread_context["adjusted_home_margin"]), 4),
+                "anchor_adjustment_points": round(float(spread_context["anchor_adjustment_points"]), 4),
+                "anchor_forward_track_eligible": bool(spread_context["forward_track_eligible"]),
+                "anchor_version": ANCHORED_SPREAD_VERSION,
+            })
     # Same-game guard: one team-outcome bet (ML or spread) and one total per game.
     for fam in (("MONEYLINE", "SPREAD"), ("TOTAL",)):
         bets = [r for r in out if r["market"] in fam and r["bet_status"] == "BET"]
@@ -122,6 +142,12 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None) 
     for r in out:
         if r["bet_status"] == "BET" and r["market"] not in validated:
             r["bet_status"], r["reason"] = "LEAN", "MODEL_EDGE_NOT_VALIDATED_VS_CLOSE"
+        if r["market"] == "SPREAD" and isinstance(spread_context, dict):
+            if not bool(spread_context["forward_track_eligible"]):
+                if r["bet_status"] == "LEAN":
+                    r["bet_status"], r["reason"] = "PASS", "ANCHOR_ADJUSTMENT_BELOW_FORWARD_THRESHOLD"
+            elif r["bet_status"] == "LEAN":
+                r["reason"] = "MARKET_ANCHORED_SPREAD_FORWARD_TRACK"
     return out
 
 
@@ -259,6 +285,55 @@ def market_implied_scores(quotes: list):
     if hl is None or tot is None:
         return None
     return (tot - hl) / 2.0, (tot + hl) / 2.0
+
+
+def paired_market_home_margin(quotes: list):
+    """Return the paired market-implied home margin, or None on an incomplete/drifting pair."""
+    values = []
+    sides = set()
+    for q in quotes:
+        if str(q.get("market") or "").upper() != "SPREAD" or q.get("line") is None:
+            continue
+        side = str(q.get("side") or "").upper()
+        if side not in {"HOME", "AWAY"}:
+            continue
+        line = float(q["line"])
+        values.append(-line if side == "HOME" else line)
+        sides.add(side)
+    if sides != {"HOME", "AWAY"} or len(values) != 2:
+        return None
+    if abs(values[0] - values[1]) > 1e-9:
+        return None
+    return 0.5 * (values[0] + values[1])
+
+
+def anchored_spread_context(home: float, away: float, quotes: list, fit=None):
+    market_margin = paired_market_home_margin(quotes)
+    if market_margin is None:
+        return None
+    frozen = load_frozen_fit() if fit is None else dict(fit)
+    raw_margin = float(home) - float(away)
+    adjusted = adjusted_home_margin(
+        raw_model_home_margin=raw_margin,
+        market_home_margin=market_margin,
+        intercept=float(frozen["intercept"]),
+        weight=float(frozen["weight"]),
+    )
+    total = float(home) + float(away)
+    return {
+        "raw_model_home_margin": raw_margin,
+        "market_home_margin": market_margin,
+        "adjusted_home_margin": adjusted,
+        "anchor_adjustment_points": adjusted - market_margin,
+        "forward_track_eligible": forward_track_eligible(
+            adjusted_margin=adjusted,
+            market_home_margin=market_margin,
+        ),
+        "home_mean": 0.5 * (total + adjusted),
+        "away_mean": 0.5 * (total - adjusted),
+        "fit_n": int(frozen["n"]),
+        "version": ANCHORED_SPREAD_VERSION,
+    }
 
 
 def market_only_rows(board: list, reason: str) -> list:
@@ -468,7 +543,12 @@ def main() -> int:
         if not projection_sane(home, away, row.get("quotes") or []):
             print(f"SKIPPED CFB_SDV_PROJECTION_INSANE {row.get('away_team')} @ {row.get('home_team')} {away:.1f}-{home:.1f}")
             continue
-        priced = price_game(row["game_id"], home, away, row.get("quotes") or [])
+        quotes = row.get("quotes") or []
+        spread_context = anchored_spread_context(home, away, quotes)
+        priced = price_game(
+            row["game_id"], home, away, quotes,
+            spread_context=spread_context,
+        )
         for r in priced:
             r["matchup"] = f"{row.get('away_team')} @ {row.get('home_team')}"
         results.extend(priced or [{"game_id": row["game_id"], "bet_status": "PASS", "reason": "NO_QUOTES"}])
@@ -481,6 +561,14 @@ def main() -> int:
         "edge_floor": EDGE_FLOOR,
         "sportsbook_api_used": False,
         "validated_markets": sorted(VALIDATED_MARKETS),
+        "market_anchored_spread": {
+            "version": ANCHORED_SPREAD_VERSION,
+            "fit_status": "FROZEN_FORWARD_TRACKING_READY",
+            "tracking_issue": 1602,
+            "minimum_absolute_adjustment_points": 0.5,
+            "historical_evidence_role": "DEVELOPMENT_ONLY_ALREADY_TOUCHED",
+            "forward_validated": False,
+        },
         "model_status": "MARKET_ONLY:" + fallback if fallback else "MODEL",
         "bets": sum(r.get("bet_status") == "BET" for r in results),
         "leans": sum(r.get("bet_status") == "LEAN" for r in results),
