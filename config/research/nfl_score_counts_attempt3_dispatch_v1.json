@@ -1,0 +1,35 @@
+{
+  "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G1_ATTEMPT3_DISPATCH_V1",
+  "status": "ARMED_SINGLE_MAIN_PUSH",
+  "candidate_family": "NFL_SCORE_COUNTS_G1",
+  "attempt_number": 3,
+  "confirmation": "CONSUME_SCORE_COUNTS_ATTEMPT_3",
+  "runner": "scripts/run_nfl_score_counts_attempt.py",
+  "source_contract": "config/research/nfl_score_counts_g1_source_contract_v1.json",
+  "prereg": "config/research/nfl_score_counts_g1_attempt3_fg_prereg_v1.json",
+  "prereg_sha256": "0de00c1ca2ad186cfb508899189db8fac05eea27eb35c3ed6be0f171347fb96c",
+  "attempt_2_result": "config/research/nfl_score_counts_g1_attempt2_result_v1.json",
+  "attempt_2_result_sha256": "4a158dd504eef5931d79e6303dc4fd02285800e4e5c7585a9e71dcbda799dc42",
+  "code_identity": "eb1e7315d0c8e3748a8c9f79f2037bbf3144d9c97508cf6347454c6bea4f1670",
+  "reason": "One-shot protected-main execution bridge for the frozen final Attempt 3 field-goal opportunity x conversion challenger.",
+  "rules": {
+    "trigger_only_when_this_marker_lands_on_main": true,
+    "attempt_3_only": true,
+    "attempt_1_result_preserved": true,
+    "attempt_2_result_preserved": true,
+    "thresholds_unchanged": true,
+    "no_fourth_attempt": true,
+    "backfill": false,
+    "market_data_for_model_fit": false,
+    "source_substitution": false,
+    "requires_exact_confirmation_token": true
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "pricing": false,
+    "promotion": false,
+    "staking": false,
+    "official": false
+  }
+}
