@@ -88,6 +88,14 @@ def fetch_nflverse_injuries(*, season: int, opener: Callable = urlopen) -> tuple
         raise NFLContextError("NFLVERSE injury CSV empty")
     columns = set(rows[0])
     missing = REQUIRED_COLUMNS - columns
+    # Current nflverse injury snapshots no longer expose per-row date_modified.
+    # For a live pre-kickoff fetch, the byte-retrieval timestamp is a conservative
+    # observation timestamp for every row in that immutable snapshot.
+    if missing == {"date_modified"}:
+        retrieved_at = datetime.now(timezone.utc).isoformat()
+        for row in rows:
+            row["date_modified"] = retrieved_at
+        missing = set()
     if missing:
         raise NFLContextError("NFLVERSE injury schema unsupported:" + ",".join(sorted(missing)))
     return rows, uri, sha256(raw).hexdigest()
