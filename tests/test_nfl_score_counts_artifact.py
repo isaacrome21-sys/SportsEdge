@@ -147,6 +147,17 @@ def test_forward_prediction_is_deterministic_market_blind_and_50k_paths():
     assert game["paths"] == 50000
     assert sum(row[2] for row in game["joint_score_distribution"]) == 50000
     assert len(game["joint_score_distribution_sha256"]) == 64
+    assert sum(row[4] for row in game["joint_score_td_distribution"]) == 50000
+    assert len(game["joint_score_td_distribution_sha256"]) == 64
+    marginal = {}
+    for home, away, home_tds, away_tds, count in game["joint_score_td_distribution"]:
+        assert home_tds >= 0 and away_tds >= 0
+        marginal[(home, away)] = marginal.get((home, away), 0) + count
+    expected = {
+        (home, away): count
+        for home, away, count in game["joint_score_distribution"]
+    }
+    assert marginal == expected
 
 
 def test_forward_outcome_or_market_data_fails_closed():

@@ -1,0 +1,44 @@
+{
+  "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G1_DIRECT_TD_PATHS_V1",
+  "status": "FROZEN_BEFORE_IMPLEMENTATION",
+  "frozen_date": "2026-10-05",
+  "candidate_family": "NFL_SCORE_COUNTS_G1",
+  "purpose": "Preserve touchdown-count components already generated inside each score-count simulation path so touchdown player props can use the same coherent game paths as ML, spread, total, and team totals.",
+  "attempt_budget": {
+    "consumes_development_attempt": false,
+    "reason": "No fitted mean model, feature set, target, source data, alpha selection, shared sigma selection, RNG, scoring formula, or development gate changes. This retains existing latent simulation outputs that were previously discarded."
+  },
+  "preserved_math": {
+    "touchdown_generation": "UNCHANGED",
+    "field_goal_generation": "UNCHANGED",
+    "rare_score_generation": "UNCHANGED",
+    "conversion_generation": "UNCHANGED",
+    "shared_latent": "UNCHANGED",
+    "rng_root_and_child_seed": "UNCHANGED",
+    "paths_per_game": 50000,
+    "final_score_formula": "UNCHANGED",
+    "joint_score_distribution": "MUST_BE_BYTE_EQUIVALENT_MARGINAL_OF_ENRICHED_DISTRIBUTION",
+    "game_market_probabilities": "MUST_BE_UNCHANGED"
+  },
+  "new_forward_fields": {
+    "joint_score_td_distribution": "[home_score, away_score, home_team_tds, away_team_tds, count]",
+    "joint_score_td_distribution_sha256": "SHA256_CANONICAL_JSON",
+    "path_mass": 50000,
+    "marginal_consistency": "REQUIRED_EXACTLY_AGAINST_EXISTING_JOINT_SCORE_DISTRIBUTION"
+  },
+  "prop_behavior": {
+    "td_props": "USE_DIRECT_TEAM_TD_COUNTS_WHEN_PRESENT",
+    "legacy_score_only_artifact": "MAY_USE_EXISTING_SCORING_COMPOSITION_PRIOR_FALLBACK",
+    "non_td_props": "UNCHANGED_SCORE_PATH_PACE_COUPLING",
+    "pass_td_share": "STILL_REQUIRED_FROM_EXISTING_TEAM_ROLE_MODEL"
+  },
+  "market_data_used": false,
+  "backfill": false,
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "promotion": false,
+    "staking": false,
+    "official": false
+  }
+}
