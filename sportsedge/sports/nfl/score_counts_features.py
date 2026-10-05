@@ -14,7 +14,7 @@ from typing import Any, Iterable, Mapping, Sequence
 from zoneinfo import ZoneInfo
 
 from sportsedge.sports.nfl.m2_history_features import select_starting_qb
-from sportsedge.sports.nfl.score_counts_g1 import FEATURE_NAMES, ScoreCountsError
+from sportsedge.sports.nfl.score_counts_g1 import FEATURE_NAMES, ScoreCountsError, empirical_bayes_rate
 
 _EASTERN = ZoneInfo("America/New_York")
 TEAM_ALIASES = {"LA": "LAR", "WSH": "WAS", "OAK": "LV", "SD": "LAC", "STL": "LAR"}
@@ -320,6 +320,81 @@ def _qb_prior(
     return float(epa), float(cpoe), int(dropbacks)
 
 
+def _rare_and_conversion_context(
+    *,
+    team: str,
+    team_prior: Sequence[TeamGame],
+    league_prior: Sequence[TeamGame],
+) -> dict[str, float]:
+    """Build strictly-prior rare-score and conversion rates for one team.
+
+    Rare score rates use empirical-Bayes shrinkage toward the prior league
+    per-team-game rate with 25 pseudo-games. Conversion composition uses a
+    team-specific empirical rate only after 50 prior touchdown conversion
+    opportunities; otherwise it uses the strictly-prior league composition.
+    """
+    if not team_prior or not league_prior:
+        raise ScoreCountFeatureError(f"RARE_CONTEXT_HISTORY_REQUIRED:{team}")
+
+    league_games = float(len(league_prior))
+    league_dst = sum(float(r.def_st_touchdowns) for r in league_prior) / league_games
+    league_safety = sum(float(r.safeties) for r in league_prior) / league_games
+    if not 0.0 <= league_dst <= 1.0:
+        raise ScoreCountFeatureError("LEAGUE_DEF_ST_TD_RATE_OUT_OF_RANGE")
+    if not 0.0 <= league_safety <= 1.0:
+        raise ScoreCountFeatureError("LEAGUE_SAFETY_RATE_OUT_OF_RANGE")
+
+    team_games = float(len(team_prior))
+    dst = empirical_bayes_rate(
+        events=sum(float(r.def_st_touchdowns) for r in team_prior),
+        exposure=team_games,
+        league_rate=league_dst,
+        prior_exposure=25.0,
+    )
+    safety = empirical_bayes_rate(
+        events=sum(float(r.safeties) for r in team_prior),
+        exposure=team_games,
+        league_rate=league_safety,
+        prior_exposure=25.0,
+    )
+
+    def conversion_counts(rows: Sequence[TeamGame]) -> tuple[float, float, float]:
+        td = sum(float(r.offense_touchdowns + r.def_st_touchdowns) for r in rows)
+        pat = sum(float(r.pat_made) for r in rows)
+        two = sum(float(r.two_point_made) for r in rows)
+        no = max(0.0, td - pat - two)
+        return pat, two, no
+
+    league_pat, league_two, league_no = conversion_counts(league_prior)
+    league_total = league_pat + league_two + league_no
+    if league_total <= 0:
+        raise ScoreCountFeatureError("LEAGUE_CONVERSION_HISTORY_REQUIRED")
+    league_probs = (
+        league_pat / league_total,
+        league_two / league_total,
+        league_no / league_total,
+    )
+
+    team_pat, team_two, team_no = conversion_counts(team_prior)
+    team_total = team_pat + team_two + team_no
+    if team_total >= 50.0:
+        conversion = (
+            team_pat / team_total,
+            team_two / team_total,
+            team_no / team_total,
+        )
+    else:
+        conversion = league_probs
+
+    return {
+        "def_st_td_rate": float(dst),
+        "safety_rate": float(safety),
+        "conversion_pat_p": float(conversion[0]),
+        "conversion_two_p": float(conversion[1]),
+        "conversion_no_p": float(conversion[2]),
+    }
+
+
 def _flatten(
     *,
     own: Mapping[str, float],
@@ -393,6 +468,7 @@ def build_score_count_training_rows(
     team_game, game_qbs = aggregate_game_pbp(pbp)
     pbp_game_ids = {gid for gid, _team_id in team_game}
     history: dict[str, deque[TeamGame]] = defaultdict(lambda: deque(maxlen=LOOKBACK_GAMES))
+    all_history: dict[str, list[TeamGame]] = defaultdict(list)
     completed_ids: set[str] = set()
     out: list[dict[str, Any]] = []
 
@@ -423,9 +499,20 @@ def build_score_count_training_rows(
             except (ValueError, ScoreCountFeatureError):
                 h_qb = a_qb = ""
             if h_qb and a_qb:
-                for team_id, opponent, home_flag, own, opp, label, qb_id, qb_epa, qb_cpoe, qb_db in (
-                    (home, away, True, h_own, a_own, h_label, h_qb, h_qb_epa, h_qb_cpoe, h_qb_db),
-                    (away, home, False, a_own, h_own, a_label, a_qb, a_qb_epa, a_qb_cpoe, a_qb_db),
+                league_prior = [
+                    item
+                    for team_rows in all_history.values()
+                    for item in team_rows
+                ]
+                h_rare = _rare_and_conversion_context(
+                    team=home, team_prior=all_history[home], league_prior=league_prior
+                )
+                a_rare = _rare_and_conversion_context(
+                    team=away, team_prior=all_history[away], league_prior=league_prior
+                )
+                for team_id, opponent, home_flag, own, opp, label, qb_id, qb_epa, qb_cpoe, qb_db, rare in (
+                    (home, away, True, h_own, a_own, h_label, h_qb, h_qb_epa, h_qb_cpoe, h_qb_db, h_rare),
+                    (away, home, False, a_own, h_own, a_label, a_qb, a_qb_epa, a_qb_cpoe, a_qb_db, a_rare),
                 ):
                     features = _flatten(
                         own=own, opponent=opp, qb_epa=qb_epa, qb_cpoe=qb_cpoe, home=home_flag
@@ -440,6 +527,7 @@ def build_score_count_training_rows(
                         "starting_qb_id": qb_id,
                         "starting_qb_prior_dropbacks": qb_db,
                         **features,
+                        **rare,
                         "offense_touchdowns": int(label.offense_touchdowns),
                         "made_field_goals": int(label.made_field_goals),
                         "def_st_touchdowns": int(label.def_st_touchdowns),
@@ -452,6 +540,8 @@ def build_score_count_training_rows(
         # State update occurs only after feature construction and label emission.
         history[home].append(h_label)
         history[away].append(a_label)
+        all_history[home].append(h_label)
+        all_history[away].append(a_label)
         completed_ids.add(gid)
 
     return out
