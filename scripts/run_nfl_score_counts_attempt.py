@@ -140,7 +140,13 @@ def acquire_sources(contract: dict, root: Path, parser_sha: str) -> tuple[list[d
     return receipts, schedule_path, pbp_paths, depth_paths
 
 
-def run_attempt(*, attempt_number: int, confirm: str, output_dir: Path) -> dict:
+def run_attempt(
+    *,
+    attempt_number: int,
+    confirm: str,
+    output_dir: Path,
+    source_root: Path | None = None,
+) -> dict:
     expected_confirm = f"CONSUME_SCORE_COUNTS_ATTEMPT_{attempt_number}"
     if confirm != expected_confirm:
         raise RuntimeError(f"ATTEMPT_CONFIRMATION_REQUIRED:{expected_confirm}")
@@ -148,7 +154,12 @@ def run_attempt(*, attempt_number: int, confirm: str, output_dir: Path) -> dict:
         raise RuntimeError("ATTEMPT_NUMBER_OUT_OF_FROZEN_BUDGET")
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    source_root = output_dir / "sources"
+    if source_root is None:
+        temp_base = Path(os.environ.get("RUNNER_TEMP") or "/tmp")
+        source_root = temp_base / f"nfl_score_counts_attempt_{attempt_number}_sources"
+    source_root.mkdir(parents=True, exist_ok=True)
+    if output_dir.resolve() == source_root.resolve() or output_dir.resolve() in source_root.resolve().parents:
+        raise RuntimeError("SOURCE_ROOT_MUST_BE_OUTSIDE_ARTIFACT_OUTPUT")
     parser_sha = code_identity()
     contract = load_source_contract()
 
@@ -236,6 +247,7 @@ def main() -> int:
     ap.add_argument("--attempt-number", type=int, required=True)
     ap.add_argument("--confirm", required=True)
     ap.add_argument("--output-dir", type=Path)
+    ap.add_argument("--source-root", type=Path)
     args = ap.parse_args()
     out = args.output_dir or Path(
         f"artifacts/football/score_counts/attempt_{args.attempt_number}"
@@ -244,6 +256,7 @@ def main() -> int:
         attempt_number=args.attempt_number,
         confirm=args.confirm,
         output_dir=out,
+        source_root=args.source_root,
     )
     print(json.dumps(summary, sort_keys=True))
     return 0
