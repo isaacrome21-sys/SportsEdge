@@ -180,26 +180,40 @@ def _scrimmage_flags(row: Mapping[str, Any]) -> tuple[bool, bool, bool]:
 def aggregate_game_pbp(
     pbp_rows: Iterable[Mapping[str, Any]],
 ) -> tuple[dict[tuple[str, str], TeamGame], dict[tuple[str, str], QBGame]]:
-    """Aggregate factual PBP into game/team labels and QB game stats."""
-    rows = [dict(row) for row in pbp_rows]
-    _assert_market_blind(rows)
+    """Stream factual PBP into compact game/team labels and QB game stats.
+
+    The frozen nflverse seasonal PBP assets are required to be contiguous by
+    game. Enforcing that order lets the parser retain only the current game's
+    play IDs instead of millions of historical play identities in memory.
+    """
     teams: dict[tuple[str, str], TeamGame] = {}
     qbs: dict[tuple[str, str], QBGame] = {}
-    seen_plays: set[tuple[str, str]] = set()
+    closed_games: set[str] = set()
+    current_gid: str | None = None
+    current_play_ids: set[str] = set()
 
     def stat(gid: str, team: str) -> TeamGame:
         if not team:
             raise ScoreCountFeatureError(f"TEAM_ID_REQUIRED:{gid}")
         return teams.setdefault((gid, team), TeamGame())
 
-    for row in rows:
+    for raw in pbp_rows:
+        row = dict(raw)
+        _assert_market_blind(row)
         gid = _game_id(row)
+        if gid != current_gid:
+            if gid in closed_games:
+                raise ScoreCountFeatureError(f"PBP_GAME_ROWS_NOT_CONTIGUOUS:{gid}")
+            if current_gid is not None:
+                closed_games.add(current_gid)
+            current_gid = gid
+            current_play_ids = set()
+
         play_id = str(row.get("play_id") or "").strip()
         if play_id:
-            key = (gid, play_id)
-            if key in seen_plays:
+            if play_id in current_play_ids:
                 raise ScoreCountFeatureError(f"DUPLICATE_PLAY:{gid}:{play_id}")
-            seen_plays.add(key)
+            current_play_ids.add(play_id)
 
         offense = _team(row.get("posteam") or row.get("possession_team"))
         defense = _team(row.get("defteam"))
@@ -286,7 +300,6 @@ def aggregate_game_pbp(
             stat(gid, defense).safeties += 1
 
     return teams, qbs
-
 
 def _rate(num: float, den: float) -> float:
     return float(num / den) if den > 0 else 0.0
@@ -520,13 +533,11 @@ def _build_rows(
     as_of: datetime | None,
 ) -> list[dict[str, Any]]:
     schedule = [dict(row) for row in schedule_rows]
-    pbp = [dict(row) for row in pbp_rows]
     depth = [dict(row) for row in depth_rows]
-    _assert_market_blind(pbp)
     _assert_market_blind(depth)
 
     games = _prepare_schedule(schedule, seasons)
-    team_game, game_qbs = aggregate_game_pbp(pbp)
+    team_game, game_qbs = aggregate_game_pbp(pbp_rows)
     pbp_game_ids = {gid for gid, _team_id in team_game}
     targets = set(target_game_ids or ())
 
