@@ -20,6 +20,8 @@ from sportsedge.sports.nfl.score_counts_g1 import (
     FEATURE_NAMES,
     FG_ATTEMPT2_ALPHA_GRID,
     FG_ATTEMPT2_FEATURE_NAMES,
+    FG_ATTEMPT3_ALPHA_GRID,
+    FG_ATTEMPT3_FEATURE_NAMES,
     ROOT_SEED_LITERAL,
     ROOT_SEED_UINT64,
     SIGMA_GRID,
@@ -145,7 +147,9 @@ def fit_from_artifact(artifact: Mapping[str, Any]) -> ScoreCountFit:
         raise ScoreCountArtifactError("FIT_CONVERSION_PROBABILITIES_INVALID")
     attempt_number = int(artifact.get("attempt_number", 1))
     fg_feature_names = (
-        FG_ATTEMPT2_FEATURE_NAMES if attempt_number == 2 else FEATURE_NAMES
+        FG_ATTEMPT2_FEATURE_NAMES if attempt_number == 2
+        else FG_ATTEMPT3_FEATURE_NAMES if attempt_number == 3
+        else FEATURE_NAMES
     )
     return ScoreCountFit(
         td_model=_poisson_from_dict(
@@ -191,6 +195,8 @@ def _attempt_fg_spec(attempt_number: int) -> tuple[tuple[str, ...], tuple[float,
     attempt = int(attempt_number)
     if attempt == 2:
         return FG_ATTEMPT2_FEATURE_NAMES, FG_ATTEMPT2_ALPHA_GRID
+    if attempt == 3:
+        return FG_ATTEMPT3_FEATURE_NAMES, FG_ATTEMPT3_ALPHA_GRID
     return FEATURE_NAMES, ALPHA_GRID
 
 
