@@ -33,6 +33,7 @@ from sportsedge.sports.nfl.score_counts_source_projection import project_pbp_row
 DEVELOPMENT_SEASONS = tuple(range(2018, 2026))
 IDENTITY_PATHS = (
     "config/research/nfl_score_counts_g1_missing_epa_addendum_v3.json",
+    "config/research/nfl_score_counts_g1_attempt2_fg_prereg_v1.json",
     "sportsedge/sports/nfl/score_counts_source_projection.py",
     "sportsedge/sports/nfl/score_counts_features.py",
     "sportsedge/sports/nfl/m2_history_features.py",
@@ -41,7 +42,10 @@ IDENTITY_PATHS = (
     "sportsedge/sports/nfl/score_counts_source_manifest.py",
     "scripts/run_nfl_score_counts_attempt.py",
 )
-PREREG_ADDENDUM = Path("config/research/nfl_score_counts_g1_prereg_addendum_v2.json")
+PREREG_BY_ATTEMPT = {
+    1: Path("config/research/nfl_score_counts_g1_prereg_addendum_v2.json"),
+    2: Path("config/research/nfl_score_counts_g1_attempt2_fg_prereg_v1.json"),
+}
 
 
 def sha256_file(path: Path) -> str:
@@ -161,6 +165,9 @@ def run_attempt(
     source_root.mkdir(parents=True, exist_ok=True)
     if output_dir.resolve() == source_root.resolve() or output_dir.resolve() in source_root.resolve().parents:
         raise RuntimeError("SOURCE_ROOT_MUST_BE_OUTSIDE_ARTIFACT_OUTPUT")
+    prereg_path = PREREG_BY_ATTEMPT.get(attempt_number)
+    if prereg_path is None:
+        raise RuntimeError(f"ATTEMPT_PREREG_REQUIRED:{attempt_number}")
     parser_sha = code_identity()
     contract = load_source_contract()
 
@@ -191,7 +198,7 @@ def run_attempt(
     if not training_rows:
         raise RuntimeError("NFL_SCORE_COUNTS_TRAINING_ROWS_EMPTY")
 
-    prereg_sha = sha256_file(PREREG_ADDENDUM)
+    prereg_sha = sha256_file(prereg_path)
     artifact = build_attempt_fit_artifact(
         training_rows,
         attempt_number=attempt_number,
@@ -204,6 +211,8 @@ def run_attempt(
         "code_identity": parser_sha,
         "missing_epa_policy_sha256": sha256_file(Path("config/research/nfl_score_counts_g1_missing_epa_addendum_v3.json")),
         "training_row_count": len(training_rows),
+        "prereg_path": prereg_path.as_posix(),
+        "prereg_sha256": prereg_sha,
         "market_projection_applied": True,
         "attempt_consumed": True,
         "authority": {
@@ -234,6 +243,8 @@ def run_attempt(
         "code_identity": parser_sha,
         "missing_epa_policy_sha256": sha256_file(Path("config/research/nfl_score_counts_g1_missing_epa_addendum_v3.json")),
         "training_row_count": len(training_rows),
+        "prereg_path": prereg_path.as_posix(),
+        "prereg_sha256": prereg_sha,
         "development_gate_pass": bool(artifact["development_gate"]["pass"]),
         "attempt_consumed": True,
         "market_data_used": False,
