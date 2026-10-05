@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
+from .unified_auto_roles import build_unified_team_models_from_nflverse
 from .unified_run_it import run_unified_nfl_run_it
 
 SCHEMA = "SPORTSEDGE_NFL_MARKET_CONTEXT_PROP_RUN_IT_V1"
@@ -108,4 +109,72 @@ def run_market_context_props(
     return out
 
 
-__all__ = ["MarketContextPropError", "SCHEMA", "run_market_context_props"]
+def run_market_context_props_from_nflverse(
+    *,
+    game_id: str,
+    home_team: str,
+    away_team: str,
+    kickoff: Any,
+    observed_at: Any,
+    source_binding: Mapping[str, Any],
+    player_rows: Sequence[Mapping[str, Any]],
+    depth_rows: Sequence[Mapping[str, Any]],
+    depth_source_uri: str,
+    depth_source_sha256: str,
+    home_spread: float,
+    game_total: float,
+    prop_quotes: Sequence[Mapping[str, Any]] = (),
+    td_quotes: Sequence[Mapping[str, Any]] = (),
+    qualification_snapshots: Sequence[Mapping[str, Any]] = (),
+    scoring_prior: Any = None,
+    as_of: Any,
+    executable_book: str = "draftkings",
+    n_sims: int = 20000,
+    seed: int = 21,
+) -> dict[str, Any]:
+    """PIT nflverse roles/depth -> market-context player model in one call."""
+    assembled = build_unified_team_models_from_nflverse(
+        game_id=game_id,
+        kickoff=kickoff,
+        observed_at=observed_at,
+        source_binding=source_binding,
+        player_rows=player_rows,
+        depth_rows=depth_rows,
+        depth_source_uri=depth_source_uri,
+        depth_source_sha256=depth_source_sha256,
+        as_of=as_of,
+        home_team=home_team,
+        away_team=away_team,
+    )
+    out = run_market_context_props(
+        game_id=game_id,
+        home_team=home_team,
+        away_team=away_team,
+        home_spread=home_spread,
+        game_total=game_total,
+        prop_quotes=prop_quotes,
+        td_quotes=td_quotes,
+        qualification_snapshots=qualification_snapshots,
+        home_model=assembled["home_model"],
+        away_model=assembled["away_model"],
+        scoring_prior=scoring_prior,
+        as_of=as_of,
+        executable_book=executable_book,
+        n_sims=n_sims,
+        seed=seed,
+    )
+    out["auto_roles"] = {
+        "status": assembled["status"],
+        "starter_qb_id_by_team": assembled["starter_qb_id_by_team"],
+        "depth_snapshot_asof_by_team": assembled["depth_snapshot_asof_by_team"],
+        "provenance": assembled["provenance"],
+    }
+    return out
+
+
+__all__ = [
+    "MarketContextPropError",
+    "SCHEMA",
+    "run_market_context_props",
+    "run_market_context_props_from_nflverse",
+]
