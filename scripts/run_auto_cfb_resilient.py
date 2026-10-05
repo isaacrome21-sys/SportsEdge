@@ -27,6 +27,9 @@ FAMILY = "PRIOR_CURRENT_BLEND"
 RIDGE_ALPHA = 300.0
 RESIDUAL_SIGMA = 12.018
 MARKET_KEYS = ("quotes", "american_odds", "odds", "price", "spread", "spread_line", "total", "total_line")
+SIDE_MARKETS = {"MONEYLINE", "ML", "H2H", "SPREAD"}
+TOTAL_MARKETS = {"TOTAL", "TOTALS"}
+COMPLEMENT = {"HOME": "AWAY", "AWAY": "HOME", "OVER": "UNDER", "UNDER": "OVER"}
 
 
 def _american_implied(odds: float) -> float:
@@ -99,6 +102,65 @@ def _quote_count(rows: list) -> int:
         elif row.get("american_odds") is not None:
             count += 1
     return count
+
+
+def _expand_supplied_complements(quotes: list) -> list:
+    """Price the other side of a user-supplied line. Do not invent odds."""
+    seen = set()
+    expanded = []
+    for quote in quotes:
+        market = str(quote.get("market") or "MONEYLINE").upper()
+        side = str(quote.get("side") or "").upper()
+        line = quote.get("line", quote.get("point"))
+        key = (market, side, line)
+        if key not in seen:
+            seen.add(key)
+            expanded.append(quote)
+        other = COMPLEMENT.get(side)
+        if other and (market, other, line) not in seen:
+            seen.add((market, other, line))
+            expanded.append({
+                "market": market,
+                "side": other,
+                "line": line,
+                "point": line,
+                "american_odds": None,
+                "complement_of_supplied_line": True,
+            })
+    return expanded
+
+
+def _summary(results: list) -> dict:
+    def market(row: dict) -> str:
+        return str(row.get("market") or "").upper()
+
+    side_rows = sum(market(row) in SIDE_MARKETS for row in results)
+    total_rows = sum(market(row) in TOTAL_MARKETS for row in results)
+    prop_rows = sum(
+        bool(market(row)) and market(row) not in SIDE_MARKETS and market(row) not in TOTAL_MARKETS
+        for row in results
+    )
+    groups: dict[tuple, set] = {}
+    priced: dict[tuple, set] = {}
+    for row in results:
+        key = (row.get("game_id"), market(row), row.get("line"))
+        groups.setdefault(key, set()).add(str(row.get("side") or "").upper())
+        if row.get("model_p") is not None:
+            priced.setdefault(key, set()).add(str(row.get("side") or "").upper())
+    both_sides = bool(groups) and all(
+        COMPLEMENT.get(side) in priced.get(key, set())
+        for key, sides in groups.items()
+        for side in sides
+        if COMPLEMENT.get(side)
+    )
+    return {
+        "both_sides": both_sides,
+        "side_rows": side_rows,
+        "total_rows": total_rows,
+        "prop_rows": prop_rows,
+        "catalog_complete": both_sides,
+        "invented_lines": False,
+    }
 
 
 def _attach_live(rows: list, *, season: int | None, week: int | None, asof: str | None) -> tuple[list, list]:
@@ -193,7 +255,8 @@ def build_card(rows: list, *, model, source_failures: list | None = None) -> dic
         quotes = list(row.get("quotes") or [])
         if not quotes and row.get("american_odds") is not None:
             quotes = [row]
-        quote_rows += len(quotes)
+        quote_rows += len([quote for quote in quotes if not quote.get("complement_of_supplied_line")])
+        quotes = _expand_supplied_complements(quotes)
         home = away = None
         score_error = None
         if row.get("home_prior_metrics") and row.get("home_current_metrics"):
@@ -242,9 +305,11 @@ def build_card(rows: list, *, model, source_failures: list | None = None) -> dic
                 "bet_status": "BET" if is_bet else "NO_BET",
                 "reason": "EDGE_POSITIVE" if is_bet else ("NO_EDGE" if model_p is not None else (score_error or "MODEL_P_UNAVAILABLE")),
                 "score_error": score_error,
+                "complement_of_supplied_line": bool(quote.get("complement_of_supplied_line")),
             })
     bets = [row for row in results if row.get("bet_status") == "BET"]
     blocked = quote_rows == 0
+    summary = _summary(results)
     return {
         "schema_version": "CFB_LIVE_CARD_V1",
         "status": "BLOCKED_NO_ODDS" if blocked else "SUCCESS",
@@ -256,6 +321,7 @@ def build_card(rows: list, *, model, source_failures: list | None = None) -> dic
         "bakeoff_run": BAKEOFF_RUN,
         "results": results,
         "bets": bets,
+        "summary": summary,
         "source_failures": list(source_failures or []),
         "funnel": {
             "odds_rows_fetched": quote_rows,
@@ -275,6 +341,7 @@ def build_card(rows: list, *, model, source_failures: list | None = None) -> dic
             "truth_gate": False,
             "official_model_p": False,
             "blocker": "CFB_RECONSTRUCTED_TRAINING_AND_SELECTION_NOT_COMPLETE",
+            "selected_family_bound_for_card_emit": True,
         },
     }
 
