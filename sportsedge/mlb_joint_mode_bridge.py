@@ -232,12 +232,33 @@ def build_canonical_feature_row(
             raise MLBJointModeBridgeError("pitcher entity_id must be MLB player id") from exc
         if pid not in {game.away_probable_pitcher_id, game.home_probable_pitcher_id}:
             raise MLBJointModeBridgeError("NON_PROBABLE_PITCHER")
-        built = build_pitcher_joint_features(source, pitcher_id=pid, target_date=target_date)
+        team_id = (
+            int(game.away_team_id)
+            if pid == int(game.away_probable_pitcher_id)
+            else int(game.home_team_id)
+        )
+        # Route the canonical single-pitcher path through the native feature
+        # builder. This is where the validated opponent-K + announced-lineup-K,
+        # opponent-outs, umpire-BB, and few-start fallback lanes are attached.
+        # The prior bridge called build_pitcher_joint_features() directly and
+        # silently discarded all of those production context payloads.
+        built = source.feature_row(
+            game_pk=int(game.game_pk),
+            market=market,
+            entity_id=entity_id,
+            target_date=target_date,
+            away_team_id=int(game.away_team_id),
+            home_team_id=int(game.home_team_id),
+            player_id=pid,
+            team_id=team_id,
+        )
         return {
             **base,
-            "joint_feature_version": built["feature_version"],
-            "feature_source_hash": built["feature_source_hash"],
-            "features": {"history_pool": built["history_pool"]},
+            **dict(built),
+            "team_id": team_id,
+            "feature_source_hash": built.get(
+                "feature_source_hash", built.get("source_subset_hash")
+            ),
         }
 
     if market in GAME_MARKETS:
