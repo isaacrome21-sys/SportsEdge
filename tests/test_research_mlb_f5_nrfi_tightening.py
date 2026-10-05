@@ -5,6 +5,7 @@ from pathlib import Path
 import unittest
 
 from scripts import intake_mlb_lines_issue as INTAKE
+from sportsedge.mlb_empirical_bayes import posterior_settlement_mass as PRODUCTION_SETTLEMENT
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
@@ -44,6 +45,19 @@ class F5NRFITighteningResearchTests(unittest.TestCase):
         weak = R.f5_metrics({0: 1.0}, {0: 1.0}, 2, 1, effective_n=10)
         strong = R.f5_metrics({2: 0.8, 0: 0.2}, {1: 0.8, 0: 0.2}, 2, 1, effective_n=10)
         self.assertLess(strong["nll"], weak["nll"])
+
+    def test_research_settlement_helper_matches_production(self):
+        research = R.settlement_posterior(
+            over_mass=0.63, under_mass=0.22, push_mass=0.15,
+            effective_n=17.0, has_push=True,
+        )
+        production = PRODUCTION_SETTLEMENT(
+            over_mass=0.63, under_mass=0.22, push_mass=0.15,
+            effective_n=17.0, has_push=True,
+        )
+        self.assertAlmostEqual(research["over"], production["p_over"], places=12)
+        self.assertAlmostEqual(research["under"], production["p_under"], places=12)
+        self.assertAlmostEqual(research["push"], production["p_push"], places=12)
 
     def test_f5_market_guards_use_production_jeffreys_readout(self):
         metrics = R.f5_metrics({1: 1.0}, {0: 1.0}, 1, 0, effective_n=10)
