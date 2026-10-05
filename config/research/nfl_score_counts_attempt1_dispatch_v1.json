@@ -1,0 +1,27 @@
+{
+  "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G1_ATTEMPT1_DISPATCH_V1",
+  "status": "ARMED_SINGLE_MAIN_PUSH",
+  "candidate_family": "NFL_SCORE_COUNTS_G1",
+  "attempt_number": 1,
+  "confirmation": "CONSUME_SCORE_COUNTS_ATTEMPT_1",
+  "runner": "scripts/run_nfl_score_counts_attempt.py",
+  "source_contract": "config/research/nfl_score_counts_g1_source_contract_v1.json",
+  "prereg_addendum": "config/research/nfl_score_counts_g1_prereg_addendum_v2.json",
+  "reason": "The connected GitHub capability cannot initiate a new workflow_dispatch. This hash-reviewed one-shot main-push marker is the governed execution bridge.",
+  "rules": {
+    "trigger_only_when_this_marker_lands_on_main": true,
+    "attempt_1_only": true,
+    "backfill": false,
+    "market_data_for_model_fit": false,
+    "source_substitution": false,
+    "requires_exact_confirmation_token": true
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "pricing": false,
+    "promotion": false,
+    "staking": false,
+    "official": false
+  }
+}

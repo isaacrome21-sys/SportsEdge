@@ -430,7 +430,10 @@
     ".github/workflows/nfl-score-counts-source-preflight.yml": "NFL_SCORE_COUNTS_G1_SOURCE_PREFLIGHT_WORKFLOW_ZERO_AUTHORITY_NO_ATTEMPT",
     "scripts/run_nfl_score_counts_attempt.py": "NFL_SCORE_COUNTS_G1_GOVERNED_DEVELOPMENT_ATTEMPT_RUNNER_NO_BETTING_AUTHORITY",
     "tests/test_run_nfl_score_counts_attempt.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_ATTEMPT_RUNNER_NO_RUNTIME_AUTHORITY",
-    ".github/workflows/nfl-score-counts-attempt.yml": "NFL_SCORE_COUNTS_G1_EXPLICIT_ATTEMPT_DISPATCH_WORKFLOW_NO_BETTING_AUTHORITY"
+    ".github/workflows/nfl-score-counts-attempt.yml": "NFL_SCORE_COUNTS_G1_EXPLICIT_ATTEMPT_DISPATCH_WORKFLOW_NO_BETTING_AUTHORITY",
+    "config/research/nfl_score_counts_attempt1_dispatch_v1.json": "NFL_SCORE_COUNTS_G1_ATTEMPT1_EXECUTION_MARKER_RESEARCH_ONLY_NO_BETTING_AUTHORITY",
+    ".github/workflows/nfl-score-counts-attempt1-main-trigger.yml": "NFL_SCORE_COUNTS_G1_ONE_SHOT_MAIN_PUSH_ATTEMPT1_EXECUTION_BRIDGE_RESEARCH_ONLY",
+    "tests/test_nfl_score_counts_attempt1_main_trigger.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_ATTEMPT1_TRIGGER_NO_RUNTIME_AUTHORITY"
   },
   "inventory_completion_claim": {
     "status": "HOSTED_AUDIT_ZERO_UNMAPPED",
