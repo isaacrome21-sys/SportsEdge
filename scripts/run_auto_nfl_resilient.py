@@ -185,13 +185,20 @@ def build_card(rows: list, *, history_path: str | None = None) -> dict:
             quote_rows += 1
             market = str(quote.get("market") or quote.get("provider_market") or "moneyline").strip().lower()
             side = str(quote.get("side") or quote.get("selection") or "").upper()
-            model_p = quote.get("model_p", row.get("model_p"))
+            supplied_model_p = quote.get("model_p", row.get("model_p"))
+            model_p = supplied_model_p
             if model_p is None and margin_total is not None and market in GAME_MARKETS:
                 model_p = _side_probability(margin_total[0], margin_total[1], quote, spread_sigma, total_sigma)
+            baseline_only = (
+                supplied_model_p is None
+                and forecast_source.get(key) == "ATTEMPT9_INTERCEPT_BASELINE"
+                and model_p is not None
+            )
             odds = quote.get("american_odds", quote.get("price_american"))
-            edge = None
+            raw_edge = None
             if model_p is not None and odds is not None:
-                edge = float(model_p) - _american_implied(float(odds))
+                raw_edge = float(model_p) - _american_implied(float(odds))
+            edge = None if baseline_only else raw_edge
             is_bet = model_p is not None and edge is not None and edge > 0
             result = {
                 "game_id": row.get("game_id") or quote.get("game_id") or key,
@@ -204,8 +211,13 @@ def build_card(rows: list, *, history_path: str | None = None) -> dict:
                 "opposite_odds": quote.get("opposite_odds"),
                 "model_p": None if model_p is None else float(model_p),
                 "edge": edge,
-                "bet_status": "BET" if is_bet else "NO_BET",
-                "reason": "EDGE_POSITIVE" if is_bet else ("NO_EDGE" if model_p is not None else "MODEL_P_UNAVAILABLE"),
+                "research_edge": raw_edge if baseline_only else None,
+                "bet_status": "TRACK" if baseline_only else ("BET" if is_bet else "NO_BET"),
+                "reason": (
+                    "INTERCEPT_BASELINE_ONLY"
+                    if baseline_only
+                    else ("EDGE_POSITIVE" if is_bet else ("NO_EDGE" if model_p is not None else "MODEL_P_UNAVAILABLE"))
+                ),
                 "forecast_source": forecast_source.get(key),
                 "official_eligible": False,
             }
