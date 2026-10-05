@@ -176,7 +176,7 @@ def _model_input(*, game, quote, feature, require_confirmed_lineup: bool):
         out["team_side"] = _team_side(game, entity_id)
     if market == "HOME_RUNS":
         out["expected_count"] = feature.get("expected_count")
-    elif market in F5_MARKETS or market == "FIRST_HOME_RUN":
+    elif market in F5_MARKETS or market in {"NRFI", "YRFI", "FIRST_HOME_RUN"}:
         payload = feature.get("features")
         if not isinstance(payload, Mapping):
             raise ValueError(f"{market} state feature payload missing")
