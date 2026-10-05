@@ -33,6 +33,7 @@ from sportsedge.sports.nfl.score_counts_source_projection import project_pbp_row
 DEVELOPMENT_SEASONS = tuple(range(2018, 2026))
 IDENTITY_PATHS = (
     "config/research/nfl_score_counts_g1_missing_epa_addendum_v3.json",
+    "config/research/nfl_score_counts_g1_attempt2_fg_addendum_v1.json",
     "sportsedge/sports/nfl/score_counts_source_projection.py",
     "sportsedge/sports/nfl/score_counts_features.py",
     "sportsedge/sports/nfl/m2_history_features.py",
@@ -42,6 +43,13 @@ IDENTITY_PATHS = (
     "scripts/run_nfl_score_counts_attempt.py",
 )
 PREREG_ADDENDUM = Path("config/research/nfl_score_counts_g1_prereg_addendum_v2.json")
+ATTEMPT2_PREREG_ADDENDUM = Path(
+    "config/research/nfl_score_counts_g1_attempt2_fg_addendum_v1.json"
+)
+
+
+def attempt_prereg_path(attempt_number: int) -> Path:
+    return ATTEMPT2_PREREG_ADDENDUM if int(attempt_number) == 2 else PREREG_ADDENDUM
 
 
 def sha256_file(path: Path) -> str:
@@ -191,7 +199,8 @@ def run_attempt(
     if not training_rows:
         raise RuntimeError("NFL_SCORE_COUNTS_TRAINING_ROWS_EMPTY")
 
-    prereg_sha = sha256_file(PREREG_ADDENDUM)
+    prereg_path = attempt_prereg_path(attempt_number)
+    prereg_sha = sha256_file(prereg_path)
     artifact = build_attempt_fit_artifact(
         training_rows,
         attempt_number=attempt_number,
@@ -203,6 +212,8 @@ def run_attempt(
         "confirmation": expected_confirm,
         "code_identity": parser_sha,
         "missing_epa_policy_sha256": sha256_file(Path("config/research/nfl_score_counts_g1_missing_epa_addendum_v3.json")),
+        "attempt_prereg_path": str(prereg_path),
+        "attempt_prereg_sha256": prereg_sha,
         "training_row_count": len(training_rows),
         "market_projection_applied": True,
         "attempt_consumed": True,
@@ -233,6 +244,8 @@ def run_attempt(
         "source_manifest_sha256": manifest["manifest_sha256"],
         "code_identity": parser_sha,
         "missing_epa_policy_sha256": sha256_file(Path("config/research/nfl_score_counts_g1_missing_epa_addendum_v3.json")),
+        "attempt_prereg_path": str(prereg_path),
+        "attempt_prereg_sha256": prereg_sha,
         "training_row_count": len(training_rows),
         "development_gate_pass": bool(artifact["development_gate"]["pass"]),
         "attempt_consumed": True,
