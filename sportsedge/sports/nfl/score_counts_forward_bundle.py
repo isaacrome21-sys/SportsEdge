@@ -47,6 +47,7 @@ def verify_forward_receipts(
     out = []
     names = set()
     roles = {"schedule": 0, "pbp": 0, "depth": 0}
+    coverage = {"pbp": set(), "depth": set()}
     for raw in sources:
         if not isinstance(raw, Mapping):
             raise ScoreCountForwardError("FORWARD_SOURCE_OBJECT_REQUIRED")
@@ -71,16 +72,32 @@ def verify_forward_receipts(
         source_identifier = str(raw.get("source_identifier") or "").strip()
         if not source_identifier:
             raise ScoreCountForwardError(f"FORWARD_SOURCE_IDENTIFIER_REQUIRED:{name}")
+        scope_raw = raw.get("season_scope")
+        if not isinstance(scope_raw, Sequence) or isinstance(scope_raw, (str, bytes)):
+            raise ScoreCountForwardError(f"FORWARD_SOURCE_SEASON_SCOPE_REQUIRED:{name}")
+        scope = [int(v) for v in scope_raw]
+        if not scope or scope != sorted(set(scope)):
+            raise ScoreCountForwardError(f"FORWARD_SOURCE_SEASON_SCOPE_INVALID:{name}")
+        if role in coverage:
+            overlap = coverage[role].intersection(scope)
+            if overlap:
+                raise ScoreCountForwardError(f"FORWARD_SOURCE_SEASON_OVERLAP:{role}")
+            coverage[role].update(scope)
         out.append({
             "name": name,
             "role": role,
             "source_identifier": source_identifier,
             "retrieved_at_utc": retrieved.isoformat(),
+            "season_scope": scope,
             "byte_sha256": expected,
             "parser_code_sha256": parser,
         })
     if roles["schedule"] != 1 or not roles["pbp"] or not roles["depth"]:
         raise ScoreCountForwardError("FORWARD_SOURCE_ROLES_INCOMPLETE")
+    required = set(range(2018, 2027))
+    for role in ("pbp", "depth"):
+        if coverage[role] != required:
+            raise ScoreCountForwardError(f"FORWARD_SOURCE_SEASON_COVERAGE_REQUIRED:{role}")
     core = {
         "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G1_FORWARD_SOURCE_MANIFEST_V1",
         "candidate_family": "NFL_SCORE_COUNTS_G1",
