@@ -143,3 +143,85 @@ def test_pitcher_bb_engine_matches_frozen_research_math():
     research = U.posterior_over(mass, float(len(history)))
     idx = next(i for i, threshold in enumerate(U.THRESH["bb"]) if float(threshold) == line)
     assert got == pytest.approx(float(research[idx]), abs=1e-12, rel=0)
+
+
+def _context_payload(ts, *, lineup="PRESENT", umpire="PRESENT"):
+    rows = []
+    if lineup == "PRESENT":
+        for side, team in (("AWAY", 1), ("HOME", 2)):
+            for slot in range(1, 10):
+                rows.append({
+                    "team_id": str(team), "player_id": str(team * 100 + slot),
+                    "batting_order": slot, "starter_status": "CONFIRMED_STARTER",
+                    "side": side, "retrieved_at": ts,
+                })
+    return {
+        "game_id": "99",
+        "retrieved_at": ts,
+        "source_states": {"confirmed_lineup": lineup, "plate_umpire": umpire},
+        "lineups": rows,
+        "umpire": {
+            "home_plate_umpire_id": 777 if umpire == "PRESENT" else None,
+            "home_plate_umpire_name": "Test Ump" if umpire == "PRESENT" else None,
+        },
+    }
+
+
+def test_choose_pit_context_never_uses_future_or_stale_snapshot():
+    observed = datetime(2026, 10, 1, 23, 30, tzinfo=timezone.utc)
+    fresh = _context_payload("2026-10-01T23:20:00+00:00")
+    future = _context_payload("2026-10-01T23:31:00+00:00")
+    stale = _context_payload("2026-10-01T23:00:00+00:00")
+    got = R.choose_pit_context(
+        [("stale", stale), ("fresh", fresh), ("future", future)], observed_at=observed
+    )
+    assert got["path"] == "fresh"
+    assert R.choose_pit_context([("stale", stale), ("future", future)], observed_at=observed) is None
+
+
+def test_pit_lineup_binding_uses_archived_current_order_only():
+    payload = _context_payload("2026-10-01T23:20:00+00:00")
+    proof = {"path": "ctx", "retrieved_at": payload["retrieved_at"], "payload": payload}
+    class Source:
+        def _lineup_boxscore(self, pk):
+            return {"orders": {9: (901, 902)}}
+    src = Source()
+    R.bind_pit_context(src, game_pk=99, market="PITCHER_K", proof=proof)
+    assert src._lineup_boxscore(99)["orders"][1] == tuple(range(101, 110))
+    assert src._lineup_boxscore(12)["orders"] == {9: (901, 902)}
+
+
+def test_pit_absent_context_forces_production_fallback():
+    payload = _context_payload("2026-10-01T23:20:00+00:00", lineup="ABSENT", umpire="ABSENT")
+    proof = {"path": "ctx", "retrieved_at": payload["retrieved_at"], "payload": payload}
+    class Source:
+        def _lineup_boxscore(self, pk):
+            raise AssertionError("live current-game lineup must not be fetched")
+        def plate_umpire(self, *, game_pk, target_date):
+            raise AssertionError("live current-game umpire must not be fetched")
+    k = Source()
+    R.bind_pit_context(k, game_pk=99, market="PITCHER_K", proof=proof)
+    assert k._lineup_boxscore(99) == {"orders": {}}
+    bb = Source()
+    R.bind_pit_context(bb, game_pk=99, market="PITCHER_BB", proof=proof)
+    assert bb.plate_umpire(game_pk=99, target_date=datetime(2026, 10, 1).date()) is None
+
+
+def test_pit_present_umpire_uses_archived_assignment():
+    payload = _context_payload("2026-10-01T23:20:00+00:00")
+    proof = {"path": "ctx", "retrieved_at": payload["retrieved_at"], "payload": payload}
+    class Source:
+        def plate_umpire(self, *, game_pk, target_date):
+            return {"umpire_id": 999, "umpire_name": "Leaked Final"}
+    src = Source()
+    R.bind_pit_context(src, game_pk=99, market="PITCHER_BB", proof=proof)
+    got = src.plate_umpire(game_pk=99, target_date=datetime(2026, 10, 1).date())
+    assert got["umpire_id"] == 777
+    assert got["umpire_name"] == "Test Ump"
+
+
+def test_pit_context_path_regex_matches_real_archive_path():
+    path = "runtime/mlb-context/runs/37267617765/2026-10-05/game_849834.json"
+    match = R.CONTEXT_PATH_RE.match(path)
+    assert match is not None
+    assert match.group(1) == "849834"
