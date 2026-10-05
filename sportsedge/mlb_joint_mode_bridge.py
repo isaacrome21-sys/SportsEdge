@@ -125,6 +125,29 @@ def build_canonical_feature_row(
         "source": "MLB_STATSAPI_STRICTLY_PRIOR_JOINT_FEATURES",
     }
 
+    if market == "HOME_RUNS":
+        # Preserve the measured legacy HR baseline when live matchup context is
+        # genuinely unavailable. Canonical live cards with a mapped venue and
+        # opposing probable starter continue into the joint whole-game hitter
+        # distribution below.
+        team_id = _batter_team(game, entity_id)
+        opposing_missing = (
+            game.home_probable_pitcher_id is None
+            if team_id == int(game.away_team_id)
+            else game.away_probable_pitcher_id is None
+        )
+        if game.venue_id is None or opposing_missing:
+            return source.feature_row(
+                game_pk=int(game.game_pk),
+                market=market,
+                entity_id=entity_id,
+                target_date=target_date,
+                away_team_id=int(game.away_team_id),
+                home_team_id=int(game.home_team_id),
+                player_id=int(entity_id),
+                team_id=team_id,
+            )
+
     if market == "FIRST_HOME_RUN":
         team_id = _batter_team(game, entity_id)
         built = build_first_hr_features(source, game=game, target_date=target_date)
