@@ -45,6 +45,18 @@ jobs:
             --input "${{ steps.input.outputs.path }}" \
             --history .cache/nfl-history/nflverse_games.json \
             --output artifacts/attempt9_game_card.json
+      - name: Diagnose current nflverse source headers
+        run: |
+          python - <<'PY'
+          from urllib.request import Request, urlopen
+          for label, url in [
+              ("stats2026", "https://github.com/nflverse/nflverse-data/releases/download/stats_player/stats_player_week_2026.csv"),
+              ("injuries2026", "https://github.com/nflverse/nflverse-data/releases/download/injuries/injuries_2026.csv"),
+          ]:
+              with urlopen(Request(url, headers={"User-Agent":"SportsEdge/1.0"}), timeout=30) as r:
+                  first = r.readline().decode("utf-8-sig").strip()
+              print(label + "_HEADER=" + first)
+          PY
       - name: Run unified full-board research engine
         run: |
           python scripts/run_nfl_unified_lines_card.py \
