@@ -31,6 +31,7 @@ from sportsedge.mlb_source import fetch_boxscore, fetch_schedule, parse_game_sta
 from sportsedge.pitcher_joint_engine import price_pitcher_market
 
 PREREG = Path("docs/MLB_PITCHER_PROP_PROMOTION_PREREG.md")
+PIT_CONTEXT_AMENDMENT = Path("docs/MLB_PITCHER_PROP_PROMOTION_PIT_CONTEXT_AMENDMENT.md")
 MARKETS = ("PITCHER_K", "PITCHER_BB", "PITCHER_ER", "PITCHER_HITS_ALLOWED")
 STAT_KEY = {
     "PITCHER_K": "strikeOuts",
@@ -559,6 +560,7 @@ def market_metrics(rows: list[dict]) -> dict:
 def render_report(result: dict) -> str:
     lines = ["## MLB pitcher-prop promotion final look", ""]
     lines.append(f"Pre-registration SHA-256: `{result['prereg_sha256']}`.")
+    lines.append(f"PIT-context amendment SHA-256: `{result['pit_context_amendment_sha256']}`.")
     lines.append("One-look study; no model fitting or threshold tuning is performed here.")
     lines.append("")
     lines.append("| market | units | flagged | ΔLL 98.75% CI | ROI 98.75% CI | decision |")
@@ -627,6 +629,7 @@ def run_final(*, out_dir: Path, cache_dir: Path) -> dict:
     result = {
         "schema": "MLB_PITCHER_PROP_PROMOTION_FINAL_LOOK_V1",
         "prereg_sha256": _sha256(PREREG),
+        "pit_context_amendment_sha256": _sha256(PIT_CONTEXT_AMENDMENT),
         "postseason_cutoff_utc": cutoff.isoformat(),
         "bootstrap": {"reps": BOOT_REPS, "seed": BOOT_SEED, "ci_level": CI_LEVEL, "cluster": "pitcher_id"},
         "drops": drops,
