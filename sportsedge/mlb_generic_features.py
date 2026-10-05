@@ -708,12 +708,21 @@ class MLBGenericHistorySource:
             base["event_probability"] = 0.0 if game_hr <= 0 else min(1.0, max(0.0, (player_hr / game_hr) * (1.0 - exp(-game_hr))))
         elif market in GAME_MARKETS:
             if market in F5_MARKETS:
-                away_history = self._team_f5_history(team_id=away_team_id, target_date=target_date)
-                home_history = self._team_f5_history(team_id=home_team_id, target_date=target_date)
-                base["away_f5_runs_for"] = [row[0] for row in away_history]
-                base["away_f5_runs_against"] = [row[1] for row in away_history]
-                base["home_f5_runs_for"] = [row[0] for row in home_history]
-                base["home_f5_runs_against"] = [row[1] for row in home_history]
+                # One canonical F5/first-inning source owns the validated live
+                # 240-day team history plus the separate 370-day regular-season
+                # m30 league prior. Do not duplicate those semantics here.
+                from .mlb_f5_features import MLBF5HistorySource
+                matchup = MLBF5HistorySource(
+                    opener=self.opener,
+                    retrieved_at=self.retrieved_at,
+                ).matchup_features(
+                    away_team_id=int(away_team_id),
+                    home_team_id=int(home_team_id),
+                    target_date=target_date,
+                )
+                base.update(dict(matchup["features"]))
+                base["f5_feature_source_hash"] = str(matchup["feature_source_hash"])
+                base["league_prior_source_hash"] = str(matchup["league_prior_source_hash"])
                 base["source"] = "MLB_STATSAPI_STRICT_PRIOR_F5_LINESCORE"
             else:
                 away_runs, home_runs, _ = self.team_means(away_team_id=away_team_id, home_team_id=home_team_id, target_date=target_date)
