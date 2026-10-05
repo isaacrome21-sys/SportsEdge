@@ -12,10 +12,11 @@ from dataclasses import dataclass
 from math import isfinite
 from typing import Any, Mapping, Sequence
 
+from .mlb_empirical_bayes import posterior_settlement_mass
 from .source_lineage import canonical_json_sha256
 
 F5_DISTRIBUTION_VERSION = "mlb_f5_empirical_state_v1_candidate"
-F5_READOUT_VERSION = "mlb_f5_readout_v1"
+F5_READOUT_VERSION = "mlb_f5_readout_v2_jeffreys"
 F5_MARKETS = frozenset({"F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS"})
 MIN_HISTORY_GAMES = 10
 
@@ -217,6 +218,28 @@ def read_f5_probability(
 
     if probability < -1e-12 or push_probability < -1e-12 or probability + push_probability > 1.0 + 1e-9:
         raise F5DistributionError("F5 readout probability mass invalid")
+
+    # The score state is built from only 10-30 prior games per club. Stabilize
+    # each settlement read-out so a sparse empirical state cannot manufacture
+    # near-certainty. The selected side is treated as the "over" category and
+    # its complement as "under"; this keeps opposite sides exactly coherent.
+    push_possible = (
+        market == "F5_MONEYLINE"
+        or (resolved_line is not None and float(resolved_line).is_integer())
+    )
+    raw_probability = float(probability)
+    raw_push_probability = float(push_probability)
+    loss_probability = max(0.0, 1.0 - raw_probability - raw_push_probability)
+    posterior = posterior_settlement_mass(
+        over_mass=raw_probability,
+        under_mass=loss_probability,
+        push_mass=raw_push_probability,
+        effective_n=float(min(distribution.away_history_games, distribution.home_history_games)),
+        has_push=push_possible,
+    )
+    probability = float(posterior["p_over"])
+    push_probability = float(posterior["p_push"])
+
     readout_sha = canonical_json_sha256({
         "version": F5_READOUT_VERSION,
         "distribution_sha256": distribution.distribution_sha256,
@@ -226,6 +249,10 @@ def read_f5_probability(
         "team_side": str(team_side or "").upper() or None,
         "probability": float(probability),
         "push_probability": float(push_probability),
+        "raw_probability": raw_probability,
+        "raw_push_probability": raw_push_probability,
+        "posterior_prior": posterior["prior"],
+        "effective_history_games": float(min(distribution.away_history_games, distribution.home_history_games)),
     })
     return F5Readout(
         market=market,
