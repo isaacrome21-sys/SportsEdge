@@ -1,0 +1,98 @@
+{
+  "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G1_ATTEMPT3_FG_OPPORTUNITY_PREREG_V1",
+  "status": "FROZEN_BEFORE_ATTEMPT_2_RESULT_AND_BEFORE_ATTEMPT_3_IMPLEMENTATION_OR_SCORING",
+  "frozen_date": "2026-10-05",
+  "candidate_family": "NFL_SCORE_COUNTS_G1",
+  "attempt_number": 3,
+  "activation_condition": "ONLY_IF_GOVERNED_ATTEMPT_2_COMPLETES_AND_FAILS_THE_UNCHANGED_DEVELOPMENT_GATE",
+  "pre_result_freeze": {
+    "attempt_2_result_known_when_frozen": false,
+    "attempt_2_main_sha": "1e7482f0ce140dfef30f9da9761cbd66d4187a68",
+    "attempt_2_prereg": "config/research/nfl_score_counts_g1_attempt2_fg_prereg_v1.json",
+    "attempt_2_workflow_run_id": 37346097842,
+    "reason": "Freeze the final fallback before observing Attempt 2 so the final development attempt cannot be chosen by outcome fishing."
+  },
+  "attempt_budget": {
+    "maximum": 3,
+    "attempt_1_consumed": true,
+    "attempt_2_in_progress_at_freeze": true,
+    "attempt_3_may_be_consumed_only_if_attempt_2_fails": true
+  },
+  "reason": {
+    "football_hypothesis": "Made field goals combine opportunity volume and conversion probability. Directly modeling made counts can obscure stable opportunity signal, so the final fallback separates field-goal attempts from conversion.",
+    "change_scope": "FIELD_GOAL_COMPONENT_ONLY",
+    "touchdown_model_change": false,
+    "market_data_used_to_choose_change": false,
+    "sportsbook_data_allowed": false
+  },
+  "field_goal_attempt_3_spec": {
+    "decomposition": "EXPECTED_MADE_FIELD_GOALS = EXPECTED_FIELD_GOAL_ATTEMPTS * STRICTLY_PRIOR_SHRUNK_TEAM_MAKE_RATE",
+    "field_goal_attempt_definition": "ANY_PBP_ROW_WITH_NONEMPTY_FIELD_GOAL_RESULT",
+    "made_field_goal_definition": "FIELD_GOAL_RESULT_IN_MADE_OR_GOOD",
+    "attempt_model": {
+      "family": "L2_REGULARIZED_POISSON_GLM_LOG_LINK",
+      "target": "FIELD_GOAL_ATTEMPTS",
+      "feature_names": [
+        "fg_attempts_per_game",
+        "opp_fg_attempts_allowed_per_game",
+        "off_plays_per_game",
+        "off_success_rate",
+        "opp_def_success_rate_allowed",
+        "off_turnover_rate",
+        "opp_takeaway_rate",
+        "off_sack_rate_allowed",
+        "opp_def_sack_rate",
+        "home_indicator"
+      ],
+      "standardization": "TRAINING_FOLD_ONLY",
+      "alpha_grid": [0.1, 1.0, 10.0, 100.0],
+      "alpha_selection": "EXPANDING_SEASON_CV_ON_FIELD_GOAL_ATTEMPT_POISSON_DEVIANCE",
+      "no_feature_search_after_scoring": true
+    },
+    "make_rate": {
+      "family": "STRICTLY_PRIOR_EMPIRICAL_BAYES_TEAM_RATE",
+      "formula": "(TEAM_MADE_FG + 25*LEAGUE_FG_MAKE_RATE)/(TEAM_FG_ATTEMPTS + 25)",
+      "prior_strength_attempts": 25,
+      "league_rate_source": "ALL_STRICTLY_PRIOR_COMPLETED_TEAM_FIELD_GOAL_ATTEMPTS",
+      "target_game_events_forbidden": true,
+      "market_conversion_adjustment": false
+    }
+  },
+  "development_gate": {
+    "evaluation_target": "MADE_FIELD_GOALS",
+    "validation_seasons": [2021, 2022, 2023, 2024, 2025],
+    "baseline": "TRAINING_FOLD_INTERCEPT_ONLY_POISSON_MEAN_OF_MADE_FIELD_GOALS",
+    "pooled_candidate_deviance_must_be_lower_than_baseline": true,
+    "minimum_fold_wins": 3,
+    "all_targets_must_pass": true,
+    "touchdown_gate_and_specification": "UNCHANGED_FROM_ATTEMPTS_1_AND_2"
+  },
+  "preserved_components": {
+    "development_seasons": [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025],
+    "source_bytes": "UNCHANGED_SHA_BOUND_CONTRACT",
+    "missing_epa_policy": "UNCHANGED",
+    "touchdown_model": "UNCHANGED",
+    "rare_scores": "UNCHANGED",
+    "conversion_model": "UNCHANGED",
+    "shared_sigma_grid_and_selection_rule": "UNCHANGED",
+    "rng": "UNCHANGED",
+    "paths_per_game": 50000,
+    "prospective_gate": "UNCHANGED",
+    "backfill": false
+  },
+  "execution_rules": {
+    "do_not_implement_or_score_attempt_3_if_attempt_2_passes": true,
+    "if_attempt_2_fails_preserve_its_artifact_before_attempt_3_implementation": true,
+    "attempt_3_prereg_must_land_on_protected_main_before_attempt_3_scoring": true,
+    "attempt_3_requires_separate_exact_confirmation_token": "CONSUME_SCORE_COUNTS_ATTEMPT_3"
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "pricing": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "backfill": false
+  }
+}
