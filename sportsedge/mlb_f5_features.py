@@ -20,12 +20,16 @@ from urllib.request import urlopen
 from .mlb_generic_features import _read_json
 from .source_lineage import canonical_json_sha256
 
-F5_FEATURE_VERSION = "mlb_f5_actual_innings_v2_first_inning"
+F5_FEATURE_VERSION = "mlb_f5_actual_innings_v3_league_prior_m30"
 WIN_CREDIT_PATH_FEATURE_VERSION = "mlb_win_credit_score_path_v1"
 MIN_HISTORY_GAMES = 10
 HISTORY_WINDOW_GAMES = 30
 WIN_CREDIT_HISTORY_WINDOW_GAMES = 60
-LOOKBACK_DAYS = 240
+WIN_CREDIT_LOOKBACK_DAYS = 240
+F5_LOOKBACK_DAYS = 370
+MIN_LEAGUE_HALVES = 200
+LEAGUE_PRIOR_STRENGTH = 30
+LEAGUE_CHUNK_DAYS = 90
 
 
 class MLBF5FeatureError(ValueError):
@@ -286,16 +290,20 @@ class MLBF5HistorySource:
         self.retrieved_at = (retrieved_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
         self._cache: dict[tuple[int, date], tuple[dict[str, Any], ...]] = {}
         self._payload_cache: dict[tuple[int, date], Mapping[str, Any]] = {}
+        self._credit_payload_cache: dict[tuple[int, date], Mapping[str, Any]] = {}
         self._credit_cache: dict[tuple[int, date], tuple[dict[str, Any], ...]] = {}
+        self._league_payload_cache: dict[date, tuple[Mapping[str, Any], ...]] = {}
+        self._league_prior_cache: dict[date, dict[str, Any]] = {}
 
     def _schedule_payload(self, *, team_id: int, target_date: date) -> Mapping[str, Any]:
         key = (int(team_id), target_date)
         if key not in self._payload_cache:
             end = target_date - timedelta(days=1)
-            start = target_date - timedelta(days=LOOKBACK_DAYS)
+            start = target_date - timedelta(days=F5_LOOKBACK_DAYS)
             query = urlencode({
                 "sportId": 1,
                 "teamId": int(team_id),
+                "gameType": "R",
                 "startDate": start.isoformat(),
                 "endDate": end.isoformat(),
                 "hydrate": "linescore",
@@ -304,6 +312,48 @@ class MLBF5HistorySource:
                 f"https://statsapi.mlb.com/api/v1/schedule?{query}", opener=self.opener
             )
         return self._payload_cache[key]
+
+    def _credit_schedule_payload(self, *, team_id: int, target_date: date) -> Mapping[str, Any]:
+        """Preserve the pre-m30 pitcher-win source window independently."""
+        key = (int(team_id), target_date)
+        if key not in self._credit_payload_cache:
+            end = target_date - timedelta(days=1)
+            start = target_date - timedelta(days=WIN_CREDIT_LOOKBACK_DAYS)
+            query = urlencode({
+                "sportId": 1,
+                "teamId": int(team_id),
+                "startDate": start.isoformat(),
+                "endDate": end.isoformat(),
+                "hydrate": "linescore",
+            })
+            self._credit_payload_cache[key] = _read_json(
+                f"https://statsapi.mlb.com/api/v1/schedule?{query}", opener=self.opener
+            )
+        return self._credit_payload_cache[key]
+
+    def _league_schedule_payloads(self, *, target_date: date) -> tuple[Mapping[str, Any], ...]:
+        """Fetch the held-out 370-day REG league window in bounded chunks."""
+        if target_date in self._league_payload_cache:
+            return self._league_payload_cache[target_date]
+        start = target_date - timedelta(days=F5_LOOKBACK_DAYS)
+        end = target_date - timedelta(days=1)
+        cursor = start
+        payloads: list[Mapping[str, Any]] = []
+        while cursor <= end:
+            chunk_end = min(end, cursor + timedelta(days=LEAGUE_CHUNK_DAYS - 1))
+            query = urlencode({
+                "sportId": 1,
+                "gameType": "R",
+                "startDate": cursor.isoformat(),
+                "endDate": chunk_end.isoformat(),
+                "hydrate": "linescore",
+            })
+            payloads.append(_read_json(
+                f"https://statsapi.mlb.com/api/v1/schedule?{query}", opener=self.opener
+            ))
+            cursor = chunk_end + timedelta(days=1)
+        self._league_payload_cache[target_date] = tuple(payloads)
+        return self._league_payload_cache[target_date]
 
     @staticmethod
     def _games(payload: Mapping[str, Any]):
@@ -371,7 +421,7 @@ class MLBF5HistorySource:
         key = (int(team_id), target_date)
         if key in self._credit_cache:
             return self._credit_cache[key]
-        payload = self._schedule_payload(team_id=int(team_id), target_date=target_date)
+        payload = self._credit_schedule_payload(team_id=int(team_id), target_date=target_date)
         rows: list[dict[str, Any]] = []
         for game in self._games(payload):
             game_date = _game_date(game)
@@ -455,6 +505,51 @@ class MLBF5HistorySource:
             "paths": paths,
         }
 
+    def league_prior_features(self, *, target_date: date) -> dict[str, Any]:
+        """Held-out-selected m30 prior from all strictly-prior REG half-games."""
+        cached = self._league_prior_cache.get(target_date)
+        if cached is not None:
+            return dict(cached)
+        f5_runs: list[int] = []
+        first_zero: list[int] = []
+        seen: set[int] = set()
+        for payload in self._league_schedule_payloads(target_date=target_date):
+            for game in self._games(payload):
+                game_date = _game_date(game)
+                if game_date is None or game_date >= target_date:
+                    continue
+                status = game.get("status")
+                abstract = str((status or {}).get("abstractGameState") or "") if isinstance(status, Mapping) else ""
+                if abstract.lower() != "final":
+                    continue
+                try:
+                    game_pk = int(game.get("gamePk"))
+                except (TypeError, ValueError):
+                    continue
+                if game_pk in seen:
+                    continue
+                score = _first_five_score(game)
+                first = _first_inning_score(game)
+                if score is None or first is None:
+                    continue
+                seen.add(game_pk)
+                f5_runs.extend((int(score[0]), int(score[1])))
+                first_zero.extend((int(first[0] == 0), int(first[1] == 0)))
+        if len(f5_runs) < MIN_LEAGUE_HALVES:
+            raise MLBF5FeatureError(
+                f"league prior insufficient {len(f5_runs)}<{MIN_LEAGUE_HALVES}"
+            )
+        prior = {
+            "league_f5_runs": list(f5_runs),
+            "league_first_inning_zero_rate": float(sum(first_zero) / len(first_zero)),
+            "league_half_innings": len(f5_runs),
+            "league_prior_strength": LEAGUE_PRIOR_STRENGTH,
+            "league_lookback_days": F5_LOOKBACK_DAYS,
+            "league_game_type": "R",
+        }
+        self._league_prior_cache[target_date] = dict(prior)
+        return prior
+
     def matchup_features(self, *, away_team_id: int, home_team_id: int, target_date: date) -> dict[str, Any]:
         away_rows = self.team_rows(team_id=int(away_team_id), target_date=target_date)[-HISTORY_WINDOW_GAMES:]
         home_rows = self.team_rows(team_id=int(home_team_id), target_date=target_date)[-HISTORY_WINDOW_GAMES:]
@@ -462,6 +557,7 @@ class MLBF5HistorySource:
             raise MLBF5FeatureError(f"away F5 history insufficient {len(away_rows)}<{MIN_HISTORY_GAMES}")
         if len(home_rows) < MIN_HISTORY_GAMES:
             raise MLBF5FeatureError(f"home F5 history insufficient {len(home_rows)}<{MIN_HISTORY_GAMES}")
+        league = self.league_prior_features(target_date=target_date)
         feature_payload = {
             "away_f5_runs_for": [int(row["runs_for"]) for row in away_rows],
             "away_f5_runs_against": [int(row["runs_against"]) for row in away_rows],
@@ -471,6 +567,7 @@ class MLBF5HistorySource:
             "away_first_inning_runs_against": [int(row["first_inning_runs_against"]) for row in away_rows],
             "home_first_inning_runs_for": [int(row["first_inning_runs_for"]) for row in home_rows],
             "home_first_inning_runs_against": [int(row["first_inning_runs_against"]) for row in home_rows],
+            **league,
         }
         identity = {
             "feature_version": F5_FEATURE_VERSION,
@@ -479,6 +576,7 @@ class MLBF5HistorySource:
             "home_team_id": int(home_team_id),
             "away_rows": list(away_rows),
             "home_rows": list(home_rows),
+            "league_prior": league,
             "retrieved_at": self.retrieved_at.isoformat(),
         }
         return {
@@ -486,5 +584,6 @@ class MLBF5HistorySource:
             "feature_source_hash": canonical_json_sha256(identity),
             "away_history_games": len(away_rows),
             "home_history_games": len(home_rows),
+            "league_half_innings": int(league["league_half_innings"]),
             "features": feature_payload,
         }
