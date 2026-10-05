@@ -1,0 +1,108 @@
+name: nfl-prop-usage-v1-2025-one-look
+
+on:
+  push:
+    branches:
+      - 'nfl/prop-usage-v1-2025-one-look'
+    paths:
+      - 'scripts/validate_nfl_prop_usage_v1_2025.py'
+      - 'tests/test_nfl_prop_usage_v1_2025_validation.py'
+      - '.github/workflows/nfl-prop-usage-v1-2025-one-look.yml'
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: \${{ github.token }}
+    steps:
+      - name: Checkout exact validation code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12.14'
+
+      - name: Install frozen validation dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          numpy==2.5.3 pandas==2.3.3 pyarrow==21.0.0
+          requests==2.32.5 pyreadr==0.5.3 pytest==9.1.1
+
+      - name: Compile and unit-test before source access
+        run: |
+          python -m py_compile scripts/validate_nfl_prop_usage_v1_2025.py
+          python -m pytest -q tests/test_nfl_prop_usage_v1_2025_validation.py
+
+      - name: Download exact frozen 2021-2024 fit artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/nfl_prop_usage_v1/frozen_fit
+          gh run download 36962280655 \
+            --repo "\${GITHUB_REPOSITORY}" \
+            --name "nfl-prop-usage-v1-fit-dfe1914d6c5b70e727c17273dabd0bb033dc816d" \
+            --dir artifacts/nfl_prop_usage_v1/frozen_fit
+          test -f artifacts/nfl_prop_usage_v1/frozen_fit/nfl_prop_usage_v1_fit.json
+
+      - name: Assert exact frozen fit identity before 2025 access
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from sportsedge.research.nfl_prop_usage_v1_fit import validate_artifact
+          p=Path("artifacts/nfl_prop_usage_v1/frozen_fit/nfl_prop_usage_v1_fit.json")
+          a=json.loads(p.read_text())
+          validate_artifact(a)
+          assert a["artifact_sha256"] == "ef38c7101da0977f27b71a7cbbe40321149ee2e0fda3bb8371f04d8423c9c555"
+          assert a["attempt9_artifact_sha256"] == "3ebce8f1ae0ec2efeffb4d145b898af9919d755a6028519ad98e41b5fb683ed0"
+          assert a["development_seasons"] == [2021, 2022, 2023, 2024]
+          assert a["validation_season_accessed"] is False
+          print("NFL_PROP_V1_FROZEN_FIT_IDENTITY_OK")
+          PY
+
+      - name: Consume the single 2025 validation look
+        run: >-
+          python scripts/validate_nfl_prop_usage_v1_2025.py
+          --fit-artifact artifacts/nfl_prop_usage_v1/frozen_fit/nfl_prop_usage_v1_fit.json
+          --out artifacts/nfl_prop_usage_v1/validation_2025.json
+          --rows-out artifacts/nfl_prop_usage_v1/validation_2025_rows.json
+
+      - name: Assert one-look finality and zero authority
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path("artifacts/nfl_prop_usage_v1/validation_2025.json").read_text())
+          assert r["validation_window_spent"] is True
+          assert r["second_look_allowed"] is False
+          assert r["post_result_retune_allowed"] is False
+          assert r["status"] in {
+              "PASS_RESEARCH_ELIGIBLE_FOR_SEPARATE_PROMOTION_PR",
+              "FAIL_RESEARCH_WINDOW_SPENT",
+          }
+          assert not any(v for k,v in r["authority"].items() if k != "research_only")
+          assert r["authority"]["research_only"] is True
+          print(json.dumps({
+              "status": r["status"],
+              "row_count": r["row_count"],
+              "scopes": r["scopes"],
+              "gates": r["gates"],
+              "rows_sha256": r["rows_sha256"],
+          }, sort_keys=True))
+          PY
+
+      - name: Upload immutable one-look result
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-prop-usage-v1-2025-one-look-\${{ github.sha }}
+          path: |
+            artifacts/nfl_prop_usage_v1/validation_2025.json
+            artifacts/nfl_prop_usage_v1/validation_2025_rows.json
+          if-no-files-found: error
+          retention-days: 90
