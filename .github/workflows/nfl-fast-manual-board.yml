@@ -1,0 +1,85 @@
+name: nfl-fast-manual-board
+
+on:
+  push:
+    branches:
+      - 'run/nfl-fast-*'
+    paths:
+      - 'manual_inputs/nfl_fast/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nfl-fast-manual-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install runtime dependency
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
+      - name: Resolve exactly one board
+        id: input
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t FILES < <(git diff-tree --no-commit-id --name-only -r HEAD -- 'manual_inputs/nfl_fast/*.json')
+          [[ ${#FILES[@]} -eq 1 ]] || { echo "NFL_FAST_EXACTLY_ONE_INPUT_REQUIRED count=${#FILES[@]}" >&2; exit 1; }
+          echo "path=${FILES[0]}" >> "$GITHUB_OUTPUT"
+      - name: Fetch strictly-prior NFL history
+        run: |
+          mkdir -p .cache/nfl-history artifacts
+          python scripts/fetch_nflverse_games.py --output .cache/nfl-history/nflverse_games.json
+      - name: Run Attempt-9 game card
+        run: |
+          python scripts/run_nfl_lines_card.py \
+            --input "${{ steps.input.outputs.path }}" \
+            --history .cache/nfl-history/nflverse_games.json \
+            --output artifacts/attempt9_game_card.json
+      - name: Run unified full-board research engine
+        run: |
+          python scripts/run_nfl_unified_lines_card.py \
+            --input "${{ steps.input.outputs.path }}" \
+            --history .cache/nfl-history/nflverse_games.json \
+            --output artifacts/unified_full_card.json \
+            --n-sims 50000 \
+            --seed 21
+      - name: Print compact results
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for name in ("attempt9_game_card.json","unified_full_card.json"):
+              p=Path("artifacts")/name
+              if not p.exists():
+                  print(name, "MISSING")
+                  continue
+              x=json.loads(p.read_text())
+              print("==",name,"==")
+              print("source_status",x.get("source_status"))
+              print("selected_rows",json.dumps(x.get("selected_rows") or [], separators=(",",":")))
+              print("games",len(x.get("games") or []))
+              for g in x.get("games") or []:
+                  print("GAME",g.get("away"),g.get("home"))
+                  print("picks",json.dumps(g.get("picks") or [], separators=(",",":")))
+                  print("leans",json.dumps(g.get("leans") or [], separators=(",",":")))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: nfl-fast-atl-no-${{ github.sha }}
+          path: |
+            artifacts/
+            ${{ steps.input.outputs.path }}
+          if-no-files-found: warn
+          retention-days: 14
