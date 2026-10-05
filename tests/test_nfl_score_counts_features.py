@@ -332,3 +332,30 @@ def test_team_conversion_mix_uses_frozen_league_centered_prior():
     assert got["conversion_two_p"] == pytest.approx(expected_two)
     assert got["conversion_no_p"] == pytest.approx(0.0)
     assert sum(got.values()) == pytest.approx(1.0)
+
+
+def test_pbp_aggregation_is_single_pass_streamable():
+    class OnePass:
+        def __init__(self, rows):
+            self.rows = rows
+            self.used = False
+        def __iter__(self):
+            if self.used:
+                raise AssertionError("PBP iterator consumed more than once")
+            self.used = True
+            yield from self.rows
+
+    source = OnePass(pbp(n=2))
+    teams, qbs = aggregate_game_pbp(source)
+    assert ("g1", "H") in teams
+    assert ("g2", "A") in teams
+    assert ("g1", "QB-H") in qbs
+
+
+def test_noncontiguous_game_rows_fail_closed_for_streaming_contract():
+    rows = pbp(n=2)
+    g1 = [row for row in rows if row["game_id"] == "g1"]
+    g2 = [row for row in rows if row["game_id"] == "g2"]
+    bad = [*g1[:2], *g2, *g1[2:]]
+    with pytest.raises(ScoreCountFeatureError, match="PBP_GAME_ROWS_NOT_CONTIGUOUS"):
+        aggregate_game_pbp(bad)
