@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
+import random
 import sys
 import time
 from collections import defaultdict
@@ -178,13 +178,38 @@ def _mean(rows, candidate, metric):
     return fmean(float(row[candidate][metric]) for row in rows)
 
 
+def bootstrap(rows, selected, baseline, metric):
+    by_date = defaultdict(list)
+    for row in rows:
+        by_date[row["date"]].append(row[selected][metric] - row[baseline][metric])
+    keys = sorted(by_date)
+    sums = {key: sum(by_date[key]) for key in keys}
+    counts = {key: len(by_date[key]) for key in keys}
+    point = sum(sums.values()) / sum(counts.values())
+    rng = random.Random(BOOT_SEED)
+    values = []
+    for _ in range(BOOT_REPS):
+        total = 0.0
+        n = 0
+        for _j in keys:
+            key = keys[rng.randrange(len(keys))]
+            total += sums[key]
+            n += counts[key]
+        values.append(total / n)
+    return {
+        "diff": point,
+        "lo": R.quantile(values, 0.025),
+        "hi": R.quantile(values, 0.975),
+    }
+
+
 def summarize(f5_rows, nrfi_rows):
     if min(len(f5_rows), len(nrfi_rows)) < MIN_TEST_GAMES:
         raise RuntimeError(
             f"INSUFFICIENT_2026_GAMES:f5={len(f5_rows)}:nrfi={len(nrfi_rows)}"
         )
 
-    fboot = R.bootstrap(f5_rows, CAND_F5, BASE_F5, "nll")
+    fboot = bootstrap(f5_rows, CAND_F5, BASE_F5, "nll")
     f5 = {
         "n": len(f5_rows),
         "production": {
@@ -211,7 +236,7 @@ def summarize(f5_rows, nrfi_rows):
         and f5["total45_brier_ok"]
     )
 
-    nboot = R.bootstrap(nrfi_rows, CAND_NRFI, BASE_NRFI, "logloss")
+    nboot = bootstrap(nrfi_rows, CAND_NRFI, BASE_NRFI, "logloss")
     nrfi = {
         "n": len(nrfi_rows),
         "production": {
