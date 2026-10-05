@@ -4,6 +4,8 @@ from datetime import date, timedelta
 from pathlib import Path
 import unittest
 
+from scripts import intake_mlb_lines_issue as INTAKE
+
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
     "research_mlb_f5_nrfi_tightening",
@@ -28,6 +30,9 @@ def row(day, *, runs_for=4, runs_against=4, i1_for=0, i1_against=0, f5_for=2, f5
 
 
 class F5NRFITighteningResearchTests(unittest.TestCase):
+    def test_research_directive_is_registered(self):
+        self.assertEqual(INTAKE.research_directive("RESEARCH f5_nrfi_tightening"), "f5_nrfi_tightening")
+
     def test_smoothing_adds_league_support_and_conserves_mass(self):
         got = R.smoothed_pmf([0, 0, 1, 1], {0: 0.5, 1: 0.25, 2: 0.25}, 5)
         self.assertAlmostEqual(sum(got.values()), 1.0, places=12)
