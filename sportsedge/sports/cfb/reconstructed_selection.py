@@ -25,6 +25,7 @@ from .source import CFBGame, CFBTeamMetrics
 
 CFB_RECONSTRUCTED_SELECTION_MATERIALIZER_VERSION = "CFB_RECONSTRUCTED_SELECTION_V1"
 RECONSTRUCTED_PROVENANCE = "RECONSTRUCTED_HISTORICAL_NOT_PIT"
+WEATHER_MISSING_SOURCE = "WEATHER_MISSING"
 
 _BANNED_GAME_KEYS = {
     "spread", "spread_line", "total", "total_line", "line", "price",
@@ -203,15 +204,26 @@ def _weather(game: CFBGame, raw: Mapping[str, Any]) -> dict[str, Any]:
         raw.get("retrieved_at_utc"),
         f"CFB_RECONSTRUCTED_WEATHER_RETRIEVAL_INVALID:{game.game_id}",
     )
+    out = deepcopy(dict(raw))
+    out["source"] = source
+    out["retrieved_at_utc"] = retrieved
+    out["provenance_class"] = RECONSTRUCTED_PROVENANCE
+
+    # Explicit null-weather path: never coerce None → 0 / 70 / False.
+    if source == WEATHER_MISSING_SOURCE or raw.get("weather_missing") is True:
+        out["weather_missing"] = True
+        out["weather_status"] = WEATHER_MISSING_SOURCE
+        out["gameIndoors"] = None
+        out["windSpeed"] = None
+        out["temperature"] = None
+        return out
+
     indoors = raw.get("game_indoor", raw.get("gameIndoors"))
     if type(indoors) is not bool:
         raise CFBReconstructedSelectionError(
             f"CFB_RECONSTRUCTED_WEATHER_INDOOR_INVALID:{game.game_id}"
         )
-    out = deepcopy(dict(raw))
-    out["source"] = source
-    out["retrieved_at_utc"] = retrieved
-    out["provenance_class"] = RECONSTRUCTED_PROVENANCE
+    out["weather_missing"] = False
     # Deliberately DO NOT compare retrieval time to an old kickoff.  Doing so would
     # either reject all current-provider reconstructions or tempt a false PIT claim.
     return out
@@ -256,6 +268,7 @@ def materialize_reconstructed_selection_rows(
                 index, team=game.away_team, season=game.season, week=game.week
             )
 
+        weather = _weather(game, weather_raw)
         output.append(
             {
                 "game_id": game.game_id,
@@ -264,7 +277,7 @@ def materialize_reconstructed_selection_rows(
                 "neutral_site": game.neutral_site,
                 "home_metrics": home_metric.to_dict(),
                 "away_metrics": away_metric.to_dict(),
-                "weather": _weather(game, weather_raw),
+                "weather": weather,
                 "home_score": _score(raw.get("home_score"), "home_score"),
                 "away_score": _score(raw.get("away_score"), "away_score"),
                 **({
@@ -273,6 +286,7 @@ def materialize_reconstructed_selection_rows(
                 } if raw.get("regulation_home_score") is not None and raw.get("regulation_away_score") is not None else {}),
                 "provenance_class": RECONSTRUCTED_PROVENANCE,
                 "historical_pit_created": False,
+                "weather_missing": bool(weather.get("weather_missing")),
             }
         )
 
@@ -312,6 +326,9 @@ def build_selection_bundle_manifest(
         raise CFBReconstructedSelectionError("CFB_RECONSTRUCTED_2026_OUTCOME_PROHIBITED")
 
     _assert_market_blind(rows, "selection_rows")
+    weather_missing_ids = sorted(
+        str(row["game_id"]) for row in rows if row.get("weather_missing") is True
+    )
     return {
         "schema": "CFB_RECONSTRUCTED_SELECTION_BUNDLE_V1",
         "status": "READY_FOR_CANDIDATE_EVALUATION",
@@ -328,6 +345,8 @@ def build_selection_bundle_manifest(
         "weather_provenance_class": RECONSTRUCTED_PROVENANCE,
         "weather_source_contract": weather_source_contract,
         "selection_row_count": len(rows),
+        "weather_missing_count": len(weather_missing_ids),
+        "weather_missing_game_ids": weather_missing_ids,
         "selection_rows_sha256": canonical_sha256(rows),
         "source_manifest_sha256": canonical_sha256(source_manifest),
         "predictive_code_manifest_sha256": predictive_code_manifest_sha256.lower(),
@@ -347,6 +366,7 @@ def build_selection_bundle_manifest(
 __all__ = [
     "CFB_RECONSTRUCTED_SELECTION_MATERIALIZER_VERSION",
     "RECONSTRUCTED_PROVENANCE",
+    "WEATHER_MISSING_SOURCE",
     "CFBReconstructedSelectionError",
     "canonical_sha256",
     "materialize_reconstructed_selection_rows",
