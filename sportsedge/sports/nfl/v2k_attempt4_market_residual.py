@@ -110,6 +110,20 @@ def candidate_probability(base_probability: float, signal: float, *, beta: float
     return _clip_probability(_sigmoid(_logit(base_probability) + float(beta) * float(signal) / float(scale)))
 
 
+def fair_market_center(
+    *, line: float, base_probability: float, signal: float, beta: float, scale: float
+) -> float:
+    """Map the frozen probability overlay back to a fair point center.
+
+    Under the same logistic scale used by candidate_probability,
+    P(X > line) = sigmoid((center-line)/scale), so the adjusted center is
+    line + scale*logit(base_probability) + beta*signal.
+    """
+    if scale <= 0:
+        raise Attempt4ResidualError("ATTEMPT4_SIGNAL_SCALE_INVALID")
+    return float(line) + float(scale) * _logit(float(base_probability)) + float(beta) * float(signal)
+
+
 def _sort_key(game: Mapping[str, Any]) -> tuple[int, int, str]:
     try:
         season = int(game["season"])
@@ -325,6 +339,7 @@ __all__ = [
     "Attempt4ResidualError",
     "build_residual_rows",
     "candidate_probability",
+    "fair_market_center",
     "choose_beta",
     "evaluate_fold",
     "calibration",
