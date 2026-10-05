@@ -282,6 +282,36 @@ def fit_core(
     )
 
 
+def _team_rate_override(
+    row: Mapping[str, Any],
+    key: str,
+    fallback: float,
+) -> float:
+    value = row.get(key)
+    if value in (None, ""):
+        return float(fallback)
+    out = _finite(value, key)
+    if out < 0:
+        raise ScoreCountsError(f"{key}:NEGATIVE")
+    return out
+
+
+def _team_conversion_override(
+    row: Mapping[str, Any],
+    fallback: tuple[float, float, float],
+) -> tuple[float, float, float]:
+    keys = ("conversion_pat_p", "conversion_two_p", "conversion_no_p")
+    supplied = [row.get(key) not in (None, "") for key in keys]
+    if not any(supplied):
+        return fallback
+    if not all(supplied):
+        raise ScoreCountsError("TEAM_CONVERSION_OVERRIDE_INCOMPLETE")
+    probs = tuple(_finite(row.get(key), key) for key in keys)
+    if any(v < 0 for v in probs) or abs(sum(probs) - 1.0) > 1e-9:
+        raise ScoreCountsError("TEAM_CONVERSION_OVERRIDE_INVALID")
+    return probs
+
+
 def _conversions(
     rng: np.random.Generator,
     touchdowns: np.ndarray,
@@ -331,15 +361,22 @@ def simulate_game(
     home_fg = rng.poisson(home_fg_lambda * latent)
     away_fg = rng.poisson(away_fg_lambda * latent)
 
-    home_dst = rng.poisson(fit.def_st_td_rate, size=paths)
-    away_dst = rng.poisson(fit.def_st_td_rate, size=paths)
-    home_safety = rng.poisson(fit.safety_rate, size=paths)
-    away_safety = rng.poisson(fit.safety_rate, size=paths)
+    home_def_st_rate = _team_rate_override(home_row, "def_st_td_rate", fit.def_st_td_rate)
+    away_def_st_rate = _team_rate_override(away_row, "def_st_td_rate", fit.def_st_td_rate)
+    home_safety_rate = _team_rate_override(home_row, "safety_rate", fit.safety_rate)
+    away_safety_rate = _team_rate_override(away_row, "safety_rate", fit.safety_rate)
+    home_conversions = _team_conversion_override(home_row, fit.conversion_probabilities)
+    away_conversions = _team_conversion_override(away_row, fit.conversion_probabilities)
+
+    home_dst = rng.poisson(home_def_st_rate, size=paths)
+    away_dst = rng.poisson(away_def_st_rate, size=paths)
+    home_safety = rng.poisson(home_safety_rate, size=paths)
+    away_safety = rng.poisson(away_safety_rate, size=paths)
 
     home_td = home_off_td + home_dst
     away_td = away_off_td + away_dst
-    home_pat, home_two = _conversions(rng, home_td, fit.conversion_probabilities)
-    away_pat, away_two = _conversions(rng, away_td, fit.conversion_probabilities)
+    home_pat, home_two = _conversions(rng, home_td, home_conversions)
+    away_pat, away_two = _conversions(rng, away_td, away_conversions)
 
     home_score = 6 * home_td + home_pat + 2 * home_two + 3 * home_fg + 2 * home_safety
     away_score = 6 * away_td + away_pat + 2 * away_two + 3 * away_fg + 2 * away_safety
@@ -368,6 +405,12 @@ def simulate_game(
             "home_fg_lambda": home_fg_lambda,
             "away_fg_lambda": away_fg_lambda,
             "shared_sigma": sigma,
+            "home_def_st_td_rate": home_def_st_rate,
+            "away_def_st_td_rate": away_def_st_rate,
+            "home_safety_rate": home_safety_rate,
+            "away_safety_rate": away_safety_rate,
+            "home_conversion_probabilities": home_conversions,
+            "away_conversion_probabilities": away_conversions,
         },
         "authority": {
             "research_only": True,
