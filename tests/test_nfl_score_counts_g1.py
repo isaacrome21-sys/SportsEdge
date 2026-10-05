@@ -149,3 +149,37 @@ def test_fit_rejects_invalid_source_identity_and_sigma():
             source_manifest_sha256="short",
             code_identity="x",
         )
+
+
+def test_team_specific_rare_score_and_conversion_overrides_are_used():
+    model = fit()
+    home = row(2022, 0.4, home=True, td=0, fg=0)
+    away = row(2022, 0.4, home=False, td=0, fg=0)
+    home.update({
+        "def_st_td_rate": 0.0,
+        "safety_rate": 0.0,
+        "conversion_pat_p": 1.0,
+        "conversion_two_p": 0.0,
+        "conversion_no_p": 0.0,
+    })
+    away.update({
+        "def_st_td_rate": 0.4,
+        "safety_rate": 0.1,
+        "conversion_pat_p": 0.0,
+        "conversion_two_p": 1.0,
+        "conversion_no_p": 0.0,
+    })
+    out = simulate_game(model, game_id="TEAM-OVERRIDE", home_row=home, away_row=away, paths=10000, seed=71)
+    assert out["model"]["home_def_st_td_rate"] == 0.0
+    assert out["model"]["away_def_st_td_rate"] == pytest.approx(0.4)
+    assert out["model"]["home_conversion_probabilities"] == (1.0, 0.0, 0.0)
+    assert out["model"]["away_conversion_probabilities"] == (0.0, 1.0, 0.0)
+
+
+def test_partial_or_invalid_team_conversion_override_fails_closed():
+    model = fit()
+    home = row(2022, 0.1, home=True, td=0, fg=0)
+    away = row(2022, 0.1, home=False, td=0, fg=0)
+    home["conversion_pat_p"] = 0.9
+    with pytest.raises(ScoreCountsError, match="TEAM_CONVERSION_OVERRIDE_INCOMPLETE"):
+        simulate_game(model, game_id="BAD-CONV", home_row=home, away_row=away, paths=100, seed=4)
