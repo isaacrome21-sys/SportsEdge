@@ -19,6 +19,14 @@ class ManualMlbHistoryCacheWorkflowTests(unittest.TestCase):
         self.assertIn("steps.history-cache-key.outputs.run_date", text)
         self.assertIn("hashFiles('sportsedge/mlb_history_cache.py', 'sportsedge/mlb_all_market_features.py', 'sportsedge/mlb_generic_features.py')", text)
 
+    def test_priced_card_is_uploaded_before_optional_context(self):
+        text = WORKFLOW.read_text(encoding="utf-8")
+        priced = text.index("- name: Upload fast priced card")
+        context = text.index("- name: Retrieve pregame context")
+        self.assertLess(priced, context)
+        self.assertIn("name: manual-mlb-fast-priced-card", text)
+        self.assertIn("compression-level: 0", text)
+
 
 if __name__ == "__main__":
     unittest.main()
