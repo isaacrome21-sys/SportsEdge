@@ -36,7 +36,7 @@ def _int(value: Any, field: str) -> int:
     return out
 
 
-def _prediction_game(prediction: Mapping[str, Any], game_id: str) -> dict[str, Any]:
+def score_count_prediction_game(prediction: Mapping[str, Any], game_id: str) -> dict[str, Any]:
     if prediction.get("schema") != PREDICTION_SCHEMA:
         raise ScoreCountMarketBridgeError("SCORE_COUNT_PREDICTION_SCHEMA_INVALID")
     games = prediction.get("games")
@@ -127,7 +127,7 @@ def price_score_count_game_markets(
     game_id: str,
     requests: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
-    game = _prediction_game(prediction, game_id)
+    game = score_count_prediction_game(prediction, game_id)
     grid = score_count_grid(game)
     rows: list[dict[str, Any]] = []
     for request in requests:
@@ -168,6 +168,7 @@ __all__ = [
     "SCHEMA",
     "ScoreCountMarketBridgeError",
     "price_score_count_game_markets",
+    "score_count_prediction_game",
     "score_count_grid",
     "score_count_paths",
 ]
