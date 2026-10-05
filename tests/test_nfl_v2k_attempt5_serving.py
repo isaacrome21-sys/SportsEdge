@@ -9,6 +9,7 @@ from sportsedge.sports.nfl.v2k_attempt5_serving import (
 def _result(verdict="ATTEMPT5_PASS"):
     return {
         "schema": "NFL_V2K_ATTEMPT5_DEVELOPMENT_VALIDATION_V1",
+        "candidate_family": "NFL_MARKET_CALIBRATION_LINE_G5",
         "verdict": verdict,
         "attempt_consumed": True,
         "development_budget_exhausted_after_run": True,
@@ -65,3 +66,17 @@ def test_nonidentity_parameters_move_centers():
     out = centers_from_market(result, _market())
     assert out["fair_margin"] > 3.0
     assert out["fair_total"] < 44.0
+
+
+def test_wrong_candidate_family_cannot_serve():
+    result = _result()
+    result["candidate_family"] = "SOMETHING_ELSE"
+    with pytest.raises(Attempt5ServingError, match="CANDIDATE_FAMILY_INVALID"):
+        centers_from_market(result, _market())
+
+
+def test_fair_scale_drift_cannot_serve():
+    result = _result()
+    result["live_parameters"]["fair_spread_scale"] = 99.0
+    with pytest.raises(Attempt5ServingError, match="FAIR_SPREAD_SCALE_DRIFT"):
+        centers_from_market(result, _market())
