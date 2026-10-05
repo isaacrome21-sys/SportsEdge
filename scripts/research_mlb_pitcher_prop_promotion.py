@@ -52,7 +52,7 @@ WS_START = "2026-10-20"
 WS_END_SCAN = "2026-11-15"
 API = "https://statsapi.mlb.com/api/v1"
 PIT_CONTEXT_MAX_AGE_SECONDS = 20 * 60
-CONTEXT_PATH_RE = re.compile(r"^runtime/mlb-context/runs/[^/]+/[^/]+/game_(\\d+)\\.json$")
+CONTEXT_PATH_RE = re.compile(r"^runtime/mlb-context/runs/[^/]+/[^/]+/game_(\d+)\.json$")
 
 
 def _get_json(url: str) -> dict:
