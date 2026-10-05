@@ -52,6 +52,7 @@ def skill(name, position, targets, catch_rate, ypr, carries, ypc):
 def team(prefix):
     return {
         "qb": qb(f"{prefix}_QB"),
+        "pass_td_share": 0.65,
         "skill_players": [
             skill(f"{prefix}_RB", "RB", 5.0, 0.75, 8.0, 15.0, 4.3),
             skill(f"{prefix}_WR", "WR", 9.0, 0.67, 12.0, 0.2, 4.0),
@@ -121,3 +122,47 @@ def test_missing_team_model_blocks_only_that_team_requests():
     )
     assert out["prop_markets"][0]["status"] == "NO_MODEL"
     assert "TEAM_MODEL_REQUIRED" in out["prop_markets"][0]["reason"]
+
+
+def test_direct_team_td_paths_price_td_props_without_second_prior():
+    rows = paths(240)
+    for idx, row in enumerate(rows):
+        row["home_team_tds"] = 3 if idx % 2 == 0 else 2
+        row["away_team_tds"] = 2 if idx % 3 else 3
+    out = price_score_count_props_from_paths(
+        game_id="G",
+        score_paths=rows,
+        prop_requests=[
+            {"team": "home", "player": "H_QB", "market": "pass_tds", "selection": "over", "line": 1.5},
+            {"team": "home", "player": "H_WR", "market": "anytime_tds", "selection": "over", "line": 0.5},
+        ],
+        home_model=team("H"),
+        away_model=team("A"),
+        scoring_prior=None,
+        seed=13,
+    )
+    assert [row["status"] for row in out["prop_markets"]] == [
+        "PRICED_RESEARCH",
+        "PRICED_RESEARCH",
+    ]
+
+
+def test_partial_direct_td_paths_fail_closed_for_td_only():
+    rows = paths(40)
+    rows[0]["home_team_tds"] = 2
+    rows[0]["away_team_tds"] = 2
+    out = price_score_count_props_from_paths(
+        game_id="G",
+        score_paths=rows,
+        prop_requests=[
+            {"team": "home", "player": "H_QB", "market": "pass_tds", "selection": "over", "line": 1.5},
+            {"team": "home", "player": "H_QB", "market": "passing_yards", "selection": "over", "line": 225.5},
+        ],
+        home_model=team("H"),
+        away_model=team("A"),
+        seed=7,
+    )
+    td, yards = out["prop_markets"]
+    assert td["status"] == "NO_MODEL"
+    assert td["reason"] == "DIRECT_TD_PATHS_INCOMPLETE"
+    assert yards["status"] == "PRICED_RESEARCH"
