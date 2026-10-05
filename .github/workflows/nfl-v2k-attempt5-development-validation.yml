@@ -1,6 +1,15 @@
 name: nfl-v2k-attempt5-development-validation
 
 on:
+  pull_request:
+    paths:
+      - 'scripts/run_nfl_v2k_attempt5.py'
+      - 'sportsedge/sports/nfl/v2k_attempt5_market_calibration.py'
+      - 'sportsedge/sports/nfl/v2k_attempt5_validation.py'
+      - 'sportsedge/sports/nfl/NFL_V2K_DEVELOPMENT_EXPOSURE_V4.json'
+      - 'sportsedge/sports/nfl/NFL_V2K_DEVELOPMENT_VALIDATION_PREATTEMPT_V5.json'
+      - 'tests/test_nfl_v2k_attempt5_market_calibration.py'
+      - '.github/workflows/nfl-v2k-attempt5-development-validation.yml'
   workflow_dispatch:
     inputs:
       confirm:
