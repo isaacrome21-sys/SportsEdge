@@ -100,10 +100,19 @@ def fetch_nflverse_player_stats(
             raise NFLContextError(f"NFLVERSE player-stats CSV invalid:{season}") from exc
         if not season_rows:
             raise NFLContextError(f"NFLVERSE player-stats CSV empty:{season}")
-        required = {"player_id", "player_name", "position", "recent_team", "season", "week", "season_type"}
+        required = {"player_id", "player_name", "position", "season", "week", "season_type"}
         missing = required - set(season_rows[0])
-        if missing:
-            raise NFLContextError("NFLVERSE player-stats schema unsupported:" + ",".join(sorted(missing)))
+        columns = set(season_rows[0])
+        if missing or not ({"recent_team", "team"} & columns):
+            detail = sorted(missing | (set() if {"recent_team", "team"} & columns else {"recent_team|team"}))
+            raise NFLContextError("NFLVERSE player-stats schema unsupported:" + ",".join(detail))
+        # nflverse 2026 renamed recent_team -> team and interceptions -> passing_interceptions.
+        # Normalize the live transport schema into the frozen role-model contract.
+        for row in season_rows:
+            if row.get("recent_team") in (None, "") and row.get("team") not in (None, ""):
+                row["recent_team"] = row.get("team")
+            if row.get("interceptions") in (None, "") and row.get("passing_interceptions") not in (None, ""):
+                row["interceptions"] = row.get("passing_interceptions")
         rows.extend(season_rows)
         receipts.append({"season": str(season), "source_uri": uri, "raw_sha256": sha256(raw).hexdigest()})
     return rows, receipts
