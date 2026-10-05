@@ -55,10 +55,13 @@ class TestCFBReconstructedSelectionPreflight(unittest.TestCase):
         self.assertTrue(public["weather_transport_ready"])
         self.assertEqual(private["historical_replay_calls_performed"], 0)
 
-    def test_remaining_quota_must_cover_plan_and_retry_reserve(self):
-        private, _ = evaluate_account({"patronLevel": 1, "remainingCalls": 249}, CONFIG)
+    def test_remaining_quota_below_full_plan_can_only_warm_cache(self):
+        private, public = evaluate_account({"patronLevel": 1, "remainingCalls": 249}, CONFIG)
         self.assertIn("CFBD_REPLAY_PLAN_EXCEEDS_REMAINING_QUOTA", private["blockers"])
-        self.assertEqual(private["status"], "BLOCKED_PROVIDER_PREFLIGHT")
+        self.assertEqual(private["status"], "VERIFIED_PARTIAL_CACHE_WARM_ONLY")
+        self.assertEqual(private["cache_warm_new_calls"], 199)
+        self.assertFalse(public["call_plan_fits"])
+        self.assertTrue(public["partial_cache_warm_available"])
 
     def test_exact_plan_plus_reserve_is_admissible(self):
         private, _ = evaluate_account({"patronLevel": 1, "remainingCalls": 250}, CONFIG)
@@ -84,8 +87,46 @@ class TestCFBReconstructedSelectionPreflight(unittest.TestCase):
             "reserve_30": False,
             "reserve_40": False,
             "reserve_50": False,
+            "verified_cache_reuse_present": False,
+            "partial_cache_warm_available": True,
         })
         self.assertNotIn("remaining_quota", public)
+
+
+    def test_partial_cache_warm_preserves_frozen_retry_reserve(self):
+        private, public = evaluate_account({"patronLevel": 1, "remainingCalls": 79}, CONFIG)
+        self.assertEqual(private["status"], "VERIFIED_PARTIAL_CACHE_WARM_ONLY")
+        self.assertEqual(private["planned_total_calls"], 200)
+        self.assertEqual(private["verified_cache_hits"], 0)
+        self.assertEqual(private["planned_new_calls"], 200)
+        self.assertEqual(private["cache_warm_new_calls"], 29)
+        self.assertEqual(private["retry_reserve_calls"], 50)
+        self.assertFalse(public["call_plan_fits"])
+        self.assertTrue(public["partial_cache_warm_available"])
+
+    def test_verified_cache_hits_reduce_only_network_call_budget(self):
+        private, public = evaluate_account(
+            {"patronLevel": 1, "remainingCalls": 100},
+            CONFIG,
+            verified_cache_hits=150,
+        )
+        self.assertEqual(private["status"], "VERIFIED_BEFORE_FIRST_REPLAY_CALL")
+        self.assertEqual(private["planned_total_calls"], 200)
+        self.assertEqual(private["verified_cache_hits"], 150)
+        self.assertEqual(private["planned_new_calls"], 50)
+        self.assertEqual(private["cache_warm_new_calls"], 50)
+        self.assertTrue(public["call_plan_fits"])
+        self.assertTrue(public["verified_cache_reuse_present"])
+        self.assertFalse(public["partial_cache_warm_available"])
+        self.assertNotIn("verified_cache_hits", public)
+
+    def test_invalid_verified_cache_hit_count_fails_closed(self):
+        with self.assertRaisesRegex(Exception, "CACHE_HITS_INVALID"):
+            evaluate_account(
+                {"patronLevel": 1, "remainingCalls": 5000},
+                CONFIG,
+                verified_cache_hits=201,
+            )
 
     def test_invalid_weather_transport_fails_closed(self):
         bad = {**CONFIG, "weather_reconstruction": {**CONFIG["weather_reconstruction"], "archive_model": "best_match"}}
