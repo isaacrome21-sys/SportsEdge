@@ -245,3 +245,23 @@ def test_football_phone_card_lists_catalog_when_engine_payload_has_no_board():
     assert "Truth Gate" not in text
     assert "model_p" not in text
     assert "Price needed" in text
+
+
+def test_mlb_snapshot_payload_keeps_both_sides_of_quoted_props():
+    from scripts.run_manual_mlb_snapshot import attach_mlb_both_sides
+
+    payload = attach_mlb_both_sides({
+        "results": [
+            {"market": "HITS", "game_id": "1", "entity_id": "batter", "side": "OVER", "line": 1.5, "model_p": 0.56, "american_odds": -115, "opposite_odds": -105},
+            {"market": "PITCHER_K", "game_id": "1", "entity_id": "pitcher", "side": "UNDER", "line": 5.5, "model_p": 0.48, "american_odds": -110},
+        ],
+        "blocked": [],
+    })
+    board = payload["full_board"]
+    hits = {row["side"] for row in board["rows"] if row["market"] == "HITS" and row["entity_id"] == "batter"}
+    strikeouts = {row["side"] for row in board["rows"] if row["market"] == "PITCHER_K" and row["entity_id"] == "pitcher"}
+    assert hits == {"OVER", "UNDER"}
+    assert strikeouts == {"OVER", "UNDER"}
+    assert payload["summary"]["both_sides"] is True
+    assert payload["summary"]["catalog_complete"] is True
+    assert payload["summary"]["official_bets"] if False else payload["full_board"]["summary"]["official_bets"] == 0

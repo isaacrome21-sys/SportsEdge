@@ -80,14 +80,15 @@ def _prior_rows(snapshot_path: str | None, extra: str | None) -> list[dict]:
 
 
 def both_side_board_section(payload: dict) -> str:
-    """List both sides of every prop, side, and total. Missing quotes stay blocked."""
+    """List both sides of every quoted prop, side, and total, plus unquoted catalog families."""
     board = payload.get("full_board") or payload.get("all_props_side_totals") or {}
     rows = list(board.get("rows") or [])
     if not rows:
         from sportsedge.mlb_full_board import catalog_complete, emit_all_props_side_totals
 
-        source = payload.get("results") or payload.get("rows") or []
-        board = emit_all_props_side_totals([row for row in source if isinstance(row, dict)])
+        source = [row for row in (payload.get("results") or payload.get("rows") or []) if isinstance(row, dict)]
+        source.extend(row for row in (payload.get("blocked") or []) if isinstance(row, dict))
+        board = emit_all_props_side_totals(source)
         rows = list(board.get("rows") or [])
         payload["full_board"] = board
         summary = dict(payload.get("summary") or {})
@@ -98,23 +99,26 @@ def both_side_board_section(payload: dict) -> str:
         summary["catalog_complete"] = catalog_complete(board["summary"])
         payload["summary"] = summary
     summary = board.get("summary") or payload.get("summary") or {}
+    quoted = [row for row in rows if row.get("reason") != "NO_QUOTE_OR_ENGINE_ROW"]
+    missing = [row for row in rows if row.get("reason") == "NO_QUOTE_OR_ENGINE_ROW"]
     lines = [
         "",
         "All props, sides, and totals",
         f"both_sides={summary.get('both_sides')} catalog_complete={payload.get('summary', {}).get('catalog_complete')} "
         f"sides={summary.get('side_rows')} totals={summary.get('total_rows')} props={summary.get('prop_rows')}",
-        "Both sides are listed. A missing quote is BLOCKED, not omitted. Complements are priced only from a supplied opposite quote.",
+        "Quoted markets list both sides. A missing quote is BLOCKED, not omitted. Complements are priced only from a supplied opposite quote.",
         "",
-        "| lane | market | side | line | odds | score / 100 | note |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| lane | market | entity | side | line | odds | score / 100 | note |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
-    rows.sort(key=lambda row: (str(row.get("lane") or ""), str(row.get("market") or ""), str(row.get("entity_id") or ""), str(row.get("side") or "")))
-    for row in rows:
+    quoted.sort(key=lambda row: (str(row.get("lane") or ""), str(row.get("market") or ""), str(row.get("entity_id") or ""), str(row.get("side") or "")))
+    for row in quoted:
         model_p = row.get("model_p")
         lines.append(
-            "| {lane} | {market} | {side} | {line} | {odds} | {score} | {note} |".format(
+            "| {lane} | {market} | {entity} | {side} | {line} | {odds} | {score} | {note} |".format(
                 lane=row.get("lane") or "",
                 market=row.get("market") or "",
+                entity=row.get("entity_id") or "",
                 side=row.get("side") or "",
                 line="" if row.get("line") is None else row.get("line"),
                 odds="" if row.get("american_odds") is None else row.get("american_odds"),
@@ -122,6 +126,14 @@ def both_side_board_section(payload: dict) -> str:
                 note="Price needed" if row.get("american_odds") is None else "Cannot evaluate yet" if model_p is None else "Research estimate",
             )
         )
+    if not quoted:
+        lines.append("| | | | | | | | No quoted props, sides, or totals |")
+    missing_markets = sorted({str(row.get("market") or "") for row in missing})
+    if missing_markets:
+        lines += [
+            "",
+            "Unquoted catalog families (both sides BLOCKED, Price needed, not omitted): " + ", ".join(missing_markets),
+        ]
     return "\n".join(lines) + "\n"
 
 

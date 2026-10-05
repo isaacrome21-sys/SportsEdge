@@ -43,6 +43,61 @@ def _history_rows(raw: object) -> list:
     return []
 
 
+
+def _board_rows_from_games(games: list) -> list[dict]:
+    """Expand phone markets into both offered sides. Does not invent a missing price."""
+    rows = []
+    prop_alias = {"anytime_tds": "anytime_td", "anytime_td": "anytime_td"}
+    for game in games:
+        game_id = f"{game.get('away')}@{game.get('home')}"
+        for raw in game.get("markets") or []:
+            market = str(raw.get("market") or "").strip()
+            if not market:
+                continue
+            surface = prop_alias.get(market, market)
+            over_price = raw.get("away_or_over_price")
+            under_price = raw.get("home_or_under_price")
+            if market in {"moneyline", "spread"}:
+                sides = (("AWAY", over_price), ("HOME", under_price))
+            else:
+                sides = (("OVER", over_price), ("UNDER", under_price))
+            if market in {"anytime_td", "anytime_tds"}:
+                sides = (("YES", over_price), ("NO", under_price))
+            for side, price in sides:
+                if price in (None, ""):
+                    continue
+                rows.append({
+                    "game_id": game_id,
+                    "market": surface,
+                    "provider_market": surface,
+                    "side": side,
+                    "selection": side,
+                    "line": raw.get("line"),
+                    "american_odds": price,
+                    "entity_id": raw.get("player") or raw.get("team"),
+                    "team_side": raw.get("team"),
+                    "player": raw.get("player"),
+                    "reason": "QUOTED_PHONE_SIDE",
+                })
+    return rows
+
+
+def attach_nfl_phone_board(payload: dict) -> dict:
+    """Attach both sides of every prop, side, and total. Presentation only."""
+    from sportsedge.football_full_board import board_from_machine_results, catalog_complete
+
+    board = board_from_machine_results("NFL", _board_rows_from_games(payload.get("games") or []))
+    payload["full_board"] = board
+    summary = dict(payload.get("summary") or {})
+    summary["both_sides"] = board["summary"]["both_sides"]
+    summary["side_rows"] = board["summary"]["side_rows"]
+    summary["total_rows"] = board["summary"]["total_rows"]
+    summary["prop_rows"] = board["summary"]["prop_rows"]
+    summary["catalog_complete"] = catalog_complete(board["summary"])
+    payload["summary"] = summary
+    return payload
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", required=True)
@@ -148,6 +203,7 @@ def main() -> int:
         ),
         "authority_footer": "NOT Model_P / NOT Truth Gate / NOT OFFICIAL",
     }
+    payload = attach_nfl_phone_board(payload)
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return 0

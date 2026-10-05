@@ -373,6 +373,39 @@ def build_rows(board: list, season: int, week: int, asof, fit_path=None):
     return rows
 
 
+
+def attach_cfb_both_sides(payload: dict) -> dict:
+    """List both sides of quoted CFB markets plus the prop/side/total catalog.
+
+    Does not change bet_status. Missing quotes stay BLOCKED. Not official.
+    """
+    from sportsedge.football_full_board import board_from_machine_results, catalog_complete
+
+    rows = []
+    for raw in payload.get("results") or []:
+        if not isinstance(raw, dict) or not raw.get("market"):
+            continue
+        rows.append({
+            "game_id": raw.get("game_id") or raw.get("matchup"),
+            "market": str(raw.get("market") or "").lower(),
+            "side": raw.get("side"),
+            "selection": raw.get("side"),
+            "line": raw.get("line"),
+            "american_odds": raw.get("american_odds"),
+            "model_p": raw.get("model_p"),
+            "entity_id": raw.get("entity_id") or raw.get("player"),
+            "reason": raw.get("reason") or "QUOTED_PHONE_SIDE",
+        })
+    board = board_from_machine_results("CFB", rows)
+    payload["full_board"] = board
+    payload["both_sides"] = board["summary"]["both_sides"]
+    payload["catalog_complete"] = catalog_complete(board["summary"])
+    payload["side_rows"] = board["summary"]["side_rows"]
+    payload["total_rows"] = board["summary"]["total_rows"]
+    payload["prop_rows"] = board["summary"]["prop_rows"]
+    return payload
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--board-json", required=True)
@@ -453,6 +486,7 @@ def main() -> int:
         "leans": sum(r.get("bet_status") == "LEAN" for r in results),
         "results": sorted(results, key=lambda r: -(r.get("edge") or -9)),
     }
+    payload = attach_cfb_both_sides(payload)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     # Visible in the phone comment (lines containing CFB_SDV_ are echoed).

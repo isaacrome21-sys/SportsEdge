@@ -39,6 +39,57 @@ def _track_note(row: dict) -> str | None:
     return None
 
 
+def both_side_section(engine: dict) -> str:
+    """Quoted both sides, then unquoted catalog families. Not a bet list."""
+    board = engine.get("full_board") or {}
+    rows = list(board.get("rows") or [])
+    if not rows:
+        from sportsedge.football_full_board import board_from_machine_results, catalog_complete
+        from scripts.run_nfl_lines_card import _board_rows_from_games
+
+        board = board_from_machine_results("NFL", _board_rows_from_games(engine.get("games") or []))
+        engine["full_board"] = board
+        summary = dict(engine.get("summary") or {})
+        summary["both_sides"] = board["summary"]["both_sides"]
+        summary["catalog_complete"] = catalog_complete(board["summary"])
+        summary["side_rows"] = board["summary"]["side_rows"]
+        summary["total_rows"] = board["summary"]["total_rows"]
+        summary["prop_rows"] = board["summary"]["prop_rows"]
+        engine["summary"] = summary
+        rows = list(board.get("rows") or [])
+    summary = board.get("summary") or engine.get("summary") or {}
+    quoted = [row for row in rows if row.get("reason") != "NO_QUOTE_OR_ENGINE_ROW"]
+    missing = sorted({str(row.get("market") or "") for row in rows if row.get("reason") == "NO_QUOTE_OR_ENGINE_ROW"})
+    lines = [
+        "",
+        "All props, sides, and totals",
+        f"both_sides={summary.get('both_sides')} catalog_complete={summary.get('catalog_complete')} "
+        f"sides={summary.get('side_rows')} totals={summary.get('total_rows')} props={summary.get('prop_rows')}",
+        "TRACK ONLY. Both offered sides are listed. A missing quote is BLOCKED, not omitted. Not a bet.",
+        "",
+        "| game | market | entity | side | line | odds | note |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    quoted.sort(key=lambda row: (str(row.get("game_id") or ""), str(row.get("market") or ""), str(row.get("entity_id") or ""), str(row.get("selection") or row.get("side") or "")))
+    for row in quoted:
+        lines.append(
+            "| {game} | {market} | {entity} | {side} | {line} | {odds} | {note} |".format(
+                game=row.get("game_id") or "",
+                market=row.get("market") or "",
+                entity=row.get("entity_id") or "",
+                side=row.get("selection") or row.get("side") or "",
+                line="" if row.get("line") is None else row.get("line"),
+                odds="" if row.get("american_odds") is None else row.get("american_odds"),
+                note="Price needed" if row.get("american_odds") is None else "TRACK ONLY",
+            )
+        )
+    if not quoted:
+        lines.append("| | | | | | | No quoted props, sides, or totals |")
+    if missing:
+        lines += ["", "Unquoted catalog families (both sides BLOCKED, not omitted): " + ", ".join(missing)]
+    return "\n".join(lines) + "\n"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--engine-output", required=True)
@@ -83,6 +134,7 @@ def main() -> int:
     if any(g.get("leans") for g in engine.get("games") or []):
         lines.append("Leans: Attempt 9 totals hit 49.7% out of sample vs closing lines (breakeven 52.4%). Track only.")
     lines.append(FOOTER)
+    lines.append(both_side_section(engine))
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
     (out / "card.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
