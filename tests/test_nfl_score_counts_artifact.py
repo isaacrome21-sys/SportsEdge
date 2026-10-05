@@ -188,7 +188,9 @@ def test_uninformative_model_fails_strict_development_gate():
         for name in FEATURE_NAMES:
             if name != "home_indicator":
                 row[name] = 0.0
-        row["home_indicator"] = 0.0
+        # Preserve the factual home/away identity required by the joint-score
+        # covariance layer. Zero only predictive features; the constant labels
+        # still make this deliberately uninformative for the strict dev gate.
         row["offense_touchdowns"] = 2
         row["made_field_goals"] = 1
     art = build_attempt_fit_artifact(
