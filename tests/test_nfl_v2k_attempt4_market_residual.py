@@ -2,6 +2,7 @@ from sportsedge.sports.nfl import v2k_attempt4_validation as V4
 from sportsedge.sports.nfl.v2k_attempt4_market_residual import (
     build_residual_rows,
     candidate_probability,
+    fair_market_center,
     choose_beta,
 )
 
@@ -28,6 +29,20 @@ def _game(game_id, season, week, home, away, hs, as_, spread=3.0, total=44.0, od
 
 def test_zero_signal_is_exact_market_baseline():
     assert abs(candidate_probability(0.53, 0.0, beta=2.0, scale=13.5) - 0.53) < 1e-12
+
+
+def test_fair_center_is_exact_inverse_of_probability_overlay():
+    line = 3.5
+    base = 0.54
+    signal = 2.25
+    beta = 0.5
+    scale = 13.5
+    p = candidate_probability(base, signal, beta=beta, scale=scale)
+    center = fair_market_center(
+        line=line, base_probability=base, signal=signal, beta=beta, scale=scale
+    )
+    reconstructed = 1.0 / (1.0 + __import__("math").exp(-(center - line) / scale))
+    assert abs(reconstructed - p) < 1e-12
 
 
 def test_same_week_results_cannot_leak_into_other_same_week_forecasts():
