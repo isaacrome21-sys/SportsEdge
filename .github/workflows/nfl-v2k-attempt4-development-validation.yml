@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: nfl-v2k-attempt4-${{ github.event_name }}-${{ github.ref }}
+  group: nfl-v2k-attempt4-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
@@ -31,8 +31,9 @@ jobs:
 
   evaluate:
     if: >-
+      github.actor == github.repository_owner && github.ref == 'refs/heads/main' && (
       (github.event_name == 'workflow_dispatch' && inputs.confirm == 'CONSUME_ATTEMPT_4' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'issues' && github.event.issue.body == 'CONSUME_ATTEMPT_4')
+      (github.event_name == 'issues' && github.event.issue.body == 'CONSUME_ATTEMPT_4'))
     needs: contract
     runs-on: ubuntu-latest
     timeout-minutes: 30
