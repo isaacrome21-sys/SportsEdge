@@ -41,6 +41,13 @@ FEATURE_NAMES = (
 )
 
 ALPHA_GRID = (0.1, 1.0, 10.0, 100.0)
+FG_ATTEMPT2_FEATURE_NAMES = (
+    "made_fg_per_game",
+    "opp_fg_allowed_per_game",
+    "off_plays_per_game",
+    "home_indicator",
+)
+FG_ATTEMPT2_ALPHA_GRID = (0.1, 1.0, 10.0, 100.0, 1000.0)
 SIGMA_GRID = (0.0, 0.10, 0.20, 0.30)
 
 
@@ -95,12 +102,26 @@ def child_seed(game_id: str, *, root_seed: int = ROOT_SEED_UINT64) -> int:
     return int.from_bytes(digest[:8], "big", signed=False)
 
 
-def _matrix(rows: Sequence[Mapping[str, Any]]) -> np.ndarray:
+def _validated_feature_names(feature_names: Sequence[str]) -> tuple[str, ...]:
+    names = tuple(str(name) for name in feature_names)
+    if not names or len(set(names)) != len(names):
+        raise ScoreCountsError("FEATURE_IDENTITY_MISMATCH")
+    if any(name not in FEATURE_NAMES for name in names):
+        raise ScoreCountsError("FEATURE_IDENTITY_MISMATCH")
+    return names
+
+
+def _matrix(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    feature_names: Sequence[str] = FEATURE_NAMES,
+) -> np.ndarray:
     if not rows:
         raise ScoreCountsError("TRAINING_ROWS_REQUIRED")
+    names = _validated_feature_names(feature_names)
     out = []
     for idx, row in enumerate(rows):
-        vals = [_finite(row.get(name), f"row[{idx}].{name}") for name in FEATURE_NAMES]
+        vals = [_finite(row.get(name), f"row[{idx}].{name}") for name in names]
         out.append(vals)
     return np.asarray(out, dtype=float)
 
@@ -135,12 +156,14 @@ def fit_poisson_ridge(
     *,
     target: str,
     alpha: float,
+    feature_names: Sequence[str] = FEATURE_NAMES,
     max_iter: int = 100,
     tol: float = 1e-10,
 ) -> PoissonRidge:
     if alpha < 0:
         raise ScoreCountsError("ALPHA_NONNEGATIVE_REQUIRED")
-    x_raw = _matrix(rows)
+    names = _validated_feature_names(feature_names)
+    x_raw = _matrix(rows, feature_names=names)
     y = _target(rows, target)
     x, mean, scale = _standardize(x_raw)
     design = np.column_stack([np.ones(x.shape[0]), x])
@@ -170,7 +193,7 @@ def fit_poisson_ridge(
     return PoissonRidge(
         target=target,
         alpha=float(alpha),
-        feature_names=FEATURE_NAMES,
+        feature_names=names,
         mean=tuple(float(v) for v in mean),
         scale=tuple(float(v) for v in scale),
         intercept=float(beta[0]),
@@ -179,9 +202,8 @@ def fit_poisson_ridge(
 
 
 def predict_mean(model: PoissonRidge, row: Mapping[str, Any]) -> float:
-    if tuple(model.feature_names) != FEATURE_NAMES:
-        raise ScoreCountsError("FEATURE_IDENTITY_MISMATCH")
-    x = np.asarray([_finite(row.get(name), name) for name in FEATURE_NAMES], dtype=float)
+    names = _validated_feature_names(model.feature_names)
+    x = np.asarray([_finite(row.get(name), name) for name in names], dtype=float)
     mean = np.asarray(model.mean, dtype=float)
     scale = np.asarray(model.scale, dtype=float)
     beta = np.asarray(model.coefficients, dtype=float)
@@ -201,6 +223,7 @@ def choose_alpha(
     *,
     target: str,
     alphas: Sequence[float] = ALPHA_GRID,
+    feature_names: Sequence[str] = FEATURE_NAMES,
 ) -> tuple[float, dict[float, float]]:
     seasons = sorted({_season(row, idx) for idx, row in enumerate(rows)})
     if len(seasons) < 3:
@@ -213,7 +236,9 @@ def choose_alpha(
             continue
         y = _target(valid, target)
         for alpha in scores:
-            model = fit_poisson_ridge(train, target=target, alpha=alpha)
+            model = fit_poisson_ridge(
+                train, target=target, alpha=alpha, feature_names=feature_names
+            )
             mu = np.asarray([predict_mean(model, row) for row in valid], dtype=float)
             scores[alpha].append(_poisson_deviance(y, mu))
     means = {
@@ -251,6 +276,8 @@ def fit_core(
     conversion_probabilities: Sequence[float],
     source_manifest_sha256: str,
     code_identity: str,
+    fg_feature_names: Sequence[str] = FEATURE_NAMES,
+    fg_alphas: Sequence[float] = ALPHA_GRID,
 ) -> ScoreCountFit:
     if shared_sigma not in SIGMA_GRID:
         raise ScoreCountsError("SHARED_SIGMA_NOT_FROZEN_GRID")
@@ -269,10 +296,21 @@ def fit_core(
         raise ScoreCountsError("RARE_SCORE_RATE_NEGATIVE")
 
     td_alpha, _ = choose_alpha(rows, target="offense_touchdowns")
-    fg_alpha, _ = choose_alpha(rows, target="made_field_goals")
+    fg_names = _validated_feature_names(fg_feature_names)
+    fg_alpha, _ = choose_alpha(
+        rows,
+        target="made_field_goals",
+        alphas=fg_alphas,
+        feature_names=fg_names,
+    )
     return ScoreCountFit(
         td_model=fit_poisson_ridge(rows, target="offense_touchdowns", alpha=td_alpha),
-        fg_model=fit_poisson_ridge(rows, target="made_field_goals", alpha=fg_alpha),
+        fg_model=fit_poisson_ridge(
+            rows,
+            target="made_field_goals",
+            alpha=fg_alpha,
+            feature_names=fg_names,
+        ),
         shared_sigma=float(shared_sigma),
         def_st_td_rate=dst,
         safety_rate=safety,
@@ -494,6 +532,8 @@ def market_probability(
 __all__ = [
     "ALPHA_GRID",
     "FEATURE_NAMES",
+    "FG_ATTEMPT2_ALPHA_GRID",
+    "FG_ATTEMPT2_FEATURE_NAMES",
     "ROOT_SEED_LITERAL",
     "ROOT_SEED_UINT64",
     "SCHEMA",

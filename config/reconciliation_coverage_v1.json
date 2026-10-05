@@ -434,7 +434,11 @@
     "config/research/nfl_score_counts_attempt1_dispatch_v1.json": "NFL_SCORE_COUNTS_G1_ATTEMPT1_EXECUTION_MARKER_RESEARCH_ONLY_NO_BETTING_AUTHORITY",
     ".github/workflows/nfl-score-counts-attempt1-main-trigger.yml": "NFL_SCORE_COUNTS_G1_ONE_SHOT_MAIN_PUSH_ATTEMPT1_EXECUTION_BRIDGE_RESEARCH_ONLY",
     "tests/test_nfl_score_counts_attempt1_main_trigger.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_ATTEMPT1_TRIGGER_NO_RUNTIME_AUTHORITY",
-    "config/research/nfl_score_counts_g1_missing_epa_addendum_v3.json": "NFL_SCORE_COUNTS_G1_APPROVED_PREFIT_MISSING_EPA_POLICY_NO_BETTING_AUTHORITY"
+    "config/research/nfl_score_counts_g1_missing_epa_addendum_v3.json": "NFL_SCORE_COUNTS_G1_APPROVED_PREFIT_MISSING_EPA_POLICY_NO_BETTING_AUTHORITY",
+    "config/research/nfl_score_counts_g1_attempt2_fg_prereg_v1.json": "NFL_SCORE_COUNTS_G1_ATTEMPT2_FG_PREREG_RESEARCH_ONLY_NO_BETTING_AUTHORITY",
+    "config/research/nfl_score_counts_attempt2_dispatch_v1.json": "NFL_SCORE_COUNTS_G1_ATTEMPT2_EXECUTION_MARKER_RESEARCH_ONLY_NO_BETTING_AUTHORITY",
+    ".github/workflows/nfl-score-counts-attempt2-main-trigger.yml": "NFL_SCORE_COUNTS_G1_ONE_SHOT_MAIN_PUSH_ATTEMPT2_EXECUTION_BRIDGE_RESEARCH_ONLY",
+    "tests/test_nfl_score_counts_attempt2_main_trigger.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_ATTEMPT2_PREREG_TRIGGER_NO_RUNTIME_AUTHORITY"
   },
   "inventory_completion_claim": {
     "status": "HOSTED_AUDIT_ZERO_UNMAPPED",
