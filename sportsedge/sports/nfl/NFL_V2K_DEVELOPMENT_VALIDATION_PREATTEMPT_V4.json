@@ -64,7 +64,16 @@
       "beta_selection": "LOWEST_PRIOR_SEASONS_LOG_LOSS_TIE_LOWEST_ABS_BETA_THEN_NUMERIC",
       "post_result_retuning_forbidden": true
     },
-    "market_role": "BASELINE_ANCHOR_NOT_TARGET_LEAKAGE"
+    "market_role": "BASELINE_ANCHOR_NOT_TARGET_LEAKAGE",
+    "downstream_joint_score_mapping": {
+      "status": "FROZEN_BEFORE_ATTEMPT4_READOUT",
+      "fair_spread_center": "spread_line + spread_scale*logit(no_vig_home_cover_p) + spread_beta*spread_signal",
+      "fair_total_center": "total_line + total_scale*logit(no_vig_over_p) + total_beta*total_signal",
+      "team_score_means": "home=(fair_total+fair_spread)/2; away=(fair_total-fair_spread)/2",
+      "purpose": "If Attempt 4 passes, these centers can feed the existing discrete joint-score/team-total/QB-RB-WR research surface without inventing a post-result mapping.",
+      "negative_team_mean_policy": "FAIL_CLOSED",
+      "post_result_remapping_forbidden": true
+    }
   },
   "acceptance": {
     "predictive": {
@@ -89,9 +98,9 @@
   "implementation_identity": {
     "status": "FROZEN",
     "core_path": "sportsedge/sports/nfl/v2k_attempt4_market_residual.py",
-    "core_git_blob_sha1": "ebe0c3eaf91f2973e017689e38068350443e30b0",
+    "core_git_blob_sha1": "21dfad78975e12d8315deb185138cdba31aa430c",
     "validation_path": "sportsedge/sports/nfl/v2k_attempt4_validation.py",
-    "validation_git_blob_sha1": "9b5b84ecbd412d1bea3f7d8a9906bed438bfd97b",
+    "validation_git_blob_sha1": "a041aca26bf2df2831774a9613dc9c8c9355ae04",
     "runner_path": "scripts/run_nfl_v2k_attempt4.py",
     "runner_git_blob_sha1": "5596ee39878c8dfdb2a61bba40c22359814b051c"
   },
