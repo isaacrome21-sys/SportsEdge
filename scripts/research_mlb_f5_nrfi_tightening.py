@@ -31,10 +31,8 @@ MIN_TEAM_HISTORY = 10
 MIN_LEAGUE_HALVES = 200
 MIN_TEST_GAMES = 1000
 F5_STRENGTHS = (0, 5, 15, 30)
-NRFI_STRENGTHS = (0, 5, 15, 30)
-NRFI_BASE = "production_nb"
-FIRST_INNING_SHARE = 0.118
-FIRST_INNING_R = 0.35
+NRFI_STRENGTHS = (5, 15, 30)
+NRFI_BASE = "production_empirical_jeffreys"
 BOOT_REPS = 2000
 BOOT_SEED = 20261004
 EPS = 1e-12
@@ -225,13 +223,9 @@ def f5_metrics(away: dict[int, float], home: dict[int, float], ar_obs: int, hr_o
     }
 
 
-def nb_zero(mean_runs: float) -> float:
-    half_mean = mean_runs * FIRST_INNING_SHARE
-    return (FIRST_INNING_R / (FIRST_INNING_R + half_mean)) ** FIRST_INNING_R
-
-
 def shrink_zero(values: list[int], league_zero: float, strength: int) -> float:
-    return (sum(values) + strength * league_zero) / (len(values) + strength)
+    """Jeffreys production baseline plus optional strictly-prior league pseudo-games."""
+    return (sum(values) + 0.5 + strength * league_zero) / (len(values) + 1.0 + strength)
 
 
 def direct_nrfi(away: list[dict], home: list[dict], league_zero: float, strength: int) -> float:
@@ -284,9 +278,7 @@ def evaluate(games: list[dict]):
         f5_rows.append(frow)
 
         y = int(g["away_i1"] == 0 and g["home_i1"] == 0)
-        away_mean = fmean(r["runs_for"] for r in away)
-        home_mean = fmean(r["runs_for"] for r in home)
-        p = nb_zero(away_mean) * nb_zero(home_mean)
+        p = direct_nrfi(away, home, league_zero, 0)
         nrow = {
             "date": g["day"].isoformat(), "season": season, "nrfi": y,
             NRFI_BASE: {"p": p, "logloss": logloss(p, y), "brier": (p-y)**2},
