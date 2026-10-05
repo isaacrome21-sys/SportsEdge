@@ -369,3 +369,71 @@ def test_csv_numeric_string_flags_are_parsed_as_boolean_indicators():
     assert _flag("0.0") is False
     assert _flag("0") is False
     assert _flag("") is False
+
+
+def test_frozen_pit_ne_comment_is_not_a_scrimmage_play_after_projection():
+    from sportsedge.sports.nfl.score_counts_source_projection import project_pbp_row
+
+    row = project_pbp_row({
+        "game_id": "2019_01_PIT_NE", "play_id": "4225",
+        "posteam": "PIT", "defteam": "NE", "play_type_nfl": "COMMENT",
+        "pass": "1", "rush": "0", "qb_dropback": "", "epa": "",
+        "spread_line": -5.5,
+    })
+    assert "spread_line" not in row
+    assert aggregate_game_pbp([row]) == ({}, {})
+
+
+def test_missing_epa_retains_counts_without_diluting_observed_rates():
+    from sportsedge.sports.nfl.score_counts_features import _team_features, _qb_prior
+    observed = _pass("g1", 1, "H", "A", "QB-H", 2.0)
+    missing = _pass("g1", 2, "H", "A", "QB-H", "", td=True, td_team="H")
+    missing.update(sack=1, interception=1, success=0)
+    teams, qbs = aggregate_game_pbp([observed, missing])
+    off, defense = teams[("g1", "H")], teams[("g1", "A")]
+    assert (off.off_plays, off.pass_dropbacks, off.offense_touchdowns) == (2, 2, 1)
+    assert (off.sacks_allowed, off.turnovers) == (1, 1)
+    assert (off.off_epa_n, off.pass_epa_n, off.off_success) == (1, 1, 1)
+    assert (defense.def_plays, defense.def_epa_n, defense.def_pass_epa_n) == (2, 1, 1)
+    features = _team_features([off] * 4)
+    assert features["off_epa_per_play"] == pytest.approx(2.0)
+    assert features["off_success_rate"] == pytest.approx(1.0)
+    assert features["off_plays_per_game"] == pytest.approx(2.0)
+    assert features["off_sack_rate_allowed"] == pytest.approx(0.5)
+    qb = qbs[("g1", "QB-H")]
+    assert (qb.dropbacks, qb.epa_n, qb.epa_sum) == (2, 1, 2.0)
+    history = {(f"g{i}", "QB-H"): qb for i in range(10)}
+    epa, _, count = _qb_prior(player_id="QB-H", prior_game_ids={f"g{i}" for i in range(10)}, game_qbs=history)
+    assert epa == pytest.approx(2.0)
+    assert count == 20
+
+
+def test_missing_epa_does_not_relax_identity_checks():
+    row = _pass("g1", 1, "", "A", "QB-H", "")
+    with pytest.raises(ScoreCountFeatureError, match="SCRIMMAGE_IDENTITY_OR_EPA_MISSING"):
+        aggregate_game_pbp([row])
+
+
+def test_missing_rush_epa_uses_separate_denominator():
+    base = {"game_id": "g1", "posteam": "H", "defteam": "A", "rush": 1}
+    teams, _ = aggregate_game_pbp([
+        {**base, "play_id": "1", "epa": 3.0},
+        {**base, "play_id": "2", "epa": ""},
+    ])
+    assert teams[("g1", "H")].rush_attempts == 2
+    assert teams[("g1", "H")].rush_epa_n == 1
+    assert teams[("g1", "A")].def_rush_epa_n == 1
+
+
+def test_missing_epa_policy_is_bound_to_attempt_identity_and_parent_bytes():
+    import hashlib
+    import json
+    from pathlib import Path
+    from scripts.run_nfl_score_counts_attempt import IDENTITY_PATHS
+    path = "config/research/nfl_score_counts_g1_missing_epa_addendum_v3.json"
+    assert path in IDENTITY_PATHS
+    policy = json.loads(Path(path).read_text())
+    for parent, digest in policy["parents_sha256"].items():
+        assert hashlib.sha256(Path(parent).read_bytes()).hexdigest() == digest
+    assert policy["attempt_accounting"]["next_attempt"] == 1
+    assert policy["attempt_accounting"]["changes_model_inputs"] is True

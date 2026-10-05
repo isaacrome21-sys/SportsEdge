@@ -14,6 +14,7 @@ PBP_ALLOWED_FIELDS = (
     "game_id",
     "nflverse_game_id",
     "play_id",
+    "play_type_nfl",
     "no_play",
     "two_point_attempt",
     "qb_kneel",

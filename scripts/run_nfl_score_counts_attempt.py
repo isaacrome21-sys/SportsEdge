@@ -32,6 +32,7 @@ from sportsedge.sports.nfl.score_counts_source_projection import project_pbp_row
 
 DEVELOPMENT_SEASONS = tuple(range(2018, 2026))
 IDENTITY_PATHS = (
+    "config/research/nfl_score_counts_g1_missing_epa_addendum_v3.json",
     "sportsedge/sports/nfl/score_counts_source_projection.py",
     "sportsedge/sports/nfl/score_counts_features.py",
     "sportsedge/sports/nfl/m2_history_features.py",
@@ -201,6 +202,7 @@ def run_attempt(
     artifact["runner"] = {
         "confirmation": expected_confirm,
         "code_identity": parser_sha,
+        "missing_epa_policy_sha256": sha256_file(Path("config/research/nfl_score_counts_g1_missing_epa_addendum_v3.json")),
         "training_row_count": len(training_rows),
         "market_projection_applied": True,
         "attempt_consumed": True,
@@ -230,6 +232,7 @@ def run_attempt(
         "artifact_sha256": artifact["artifact_sha256"],
         "source_manifest_sha256": manifest["manifest_sha256"],
         "code_identity": parser_sha,
+        "missing_epa_policy_sha256": sha256_file(Path("config/research/nfl_score_counts_g1_missing_epa_addendum_v3.json")),
         "training_row_count": len(training_rows),
         "development_gate_pass": bool(artifact["development_gate"]["pass"]),
         "attempt_consumed": True,

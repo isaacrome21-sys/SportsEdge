@@ -23,5 +23,12 @@
     "promotion": false,
     "staking": false,
     "official": false
+  },
+  "retry": {
+    "previous_run": 37333803086,
+    "previous_run_reached_fit": false,
+    "policy": "config/research/nfl_score_counts_g1_missing_epa_addendum_v3.json",
+    "approved_at": "2026-10-05T15:46:49Z",
+    "attempt_number_unchanged": 1
   }
 }
