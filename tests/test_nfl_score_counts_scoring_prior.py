@@ -60,14 +60,12 @@ def test_schedule_score_mismatch_fails_closed():
         )
 
 
-def test_explicit_nonfinal_game_exclusion_removes_suspended_game():
-    rows = build_scoring_composition_rows(
-        schedule_rows=schedule(gid="2022_17_BUF_CIN"),
-        pbp_rows=pbp(gid="2022_17_BUF_CIN"),
-        seasons=[2025],
-        conservative_completion_lag_hours=24,
-        excluded_game_ids=["2022_17_BUF_CIN"],
-    )
-    # The only PBP game was explicitly excluded, so fail closed instead of
-    # silently producing an empty prior.
-    assert rows == []
+def test_explicit_nonfinal_game_exclusion_fails_closed_if_nothing_remains():
+    with pytest.raises(ScoreCountScoringPriorError, match="ROWS_EMPTY"):
+        build_scoring_composition_rows(
+            schedule_rows=schedule(gid="2022_17_BUF_CIN"),
+            pbp_rows=pbp(gid="2022_17_BUF_CIN"),
+            seasons=[2025],
+            conservative_completion_lag_hours=24,
+            excluded_game_ids=["2022_17_BUF_CIN"],
+        )
