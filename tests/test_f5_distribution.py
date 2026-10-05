@@ -62,6 +62,18 @@ class F5DistributionTests(unittest.TestCase):
             places=12,
         )
 
+    def test_sparse_empirical_certainty_is_shrunk(self):
+        zero = {key: [0] * 10 for key in FEATURES}
+        distribution = build_f5_distribution(zero)
+        home = read_f5_probability(distribution, market="F5_MONEYLINE", side="HOME")
+        total_over = read_f5_probability(
+            distribution, market="F5_TOTALS", line=0.5, side="OVER"
+        )
+        self.assertGreater(home.probability, 0.0)
+        self.assertLess(home.push_probability, 1.0)
+        self.assertGreater(total_over.probability, 0.0)
+        self.assertLess(total_over.probability, 0.10)
+
     def test_history_floor_fails_closed(self):
         bad = dict(FEATURES)
         bad["away_f5_runs_for"] = [1] * 9
