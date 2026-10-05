@@ -218,6 +218,7 @@
         "docs/MLB_OPP_OUTS_CONTEXT_PREREG.md",
         "docs/MLB_PITCHER_PRIOR_FALLBACK_PREREG.md",
         "docs/MLB_PITCHER_PROP_PROMOTION_PREREG.md",
+        "docs/MLB_PITCHER_PROP_PROMOTION_PIT_CONTEXT_AMENDMENT.md",
         "docs/MLB_RUN_IT_PREGAME.md",
         "docs/MLB_UMPIRE_CONTEXT_PREREG.md",
         "docs/MLB_V8_RUN_IT_SCHEMA_2026-09-03.json",
