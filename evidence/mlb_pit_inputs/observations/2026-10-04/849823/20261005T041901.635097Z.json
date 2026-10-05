@@ -1,0 +1,160 @@
+{
+  "away_lineup": [
+    {
+      "player_id": 686948,
+      "sequence": 0,
+      "slot": 1
+    },
+    {
+      "player_id": 660670,
+      "sequence": 0,
+      "slot": 2
+    },
+    {
+      "player_id": 621566,
+      "sequence": 0,
+      "slot": 3
+    },
+    {
+      "player_id": 645277,
+      "sequence": 0,
+      "slot": 4
+    },
+    {
+      "player_id": 671739,
+      "sequence": 0,
+      "slot": 5
+    },
+    {
+      "player_id": 643289,
+      "sequence": 0,
+      "slot": 6
+    },
+    {
+      "player_id": 669221,
+      "sequence": 0,
+      "slot": 7
+    },
+    {
+      "player_id": 642133,
+      "sequence": 1,
+      "slot": 7
+    },
+    {
+      "player_id": 676551,
+      "sequence": 2,
+      "slot": 7
+    },
+    {
+      "player_id": 663586,
+      "sequence": 0,
+      "slot": 8
+    },
+    {
+      "player_id": 657041,
+      "sequence": 0,
+      "slot": 9
+    },
+    {
+      "player_id": 573262,
+      "sequence": 1,
+      "slot": 9
+    }
+  ],
+  "away_lineup_primary_slots": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "away_probable_pitcher_id": 678061,
+  "away_team_id": 144,
+  "boxscore_blob": "artifacts/mlb_pit_inputs/raw/boxscore/f6ec3e6aa5620ce19ff9b920c51cd9632cb762c5bd5a405a36bf0a2f89db7c7d.json",
+  "boxscore_source_sha256": "f6ec3e6aa5620ce19ff9b920c51cd9632cb762c5bd5a405a36bf0a2f89db7c7d",
+  "game_pk": 849823,
+  "game_status": "Final",
+  "home_lineup": [
+    {
+      "player_id": 605141,
+      "sequence": 0,
+      "slot": 1
+    },
+    {
+      "player_id": 660271,
+      "sequence": 0,
+      "slot": 2
+    },
+    {
+      "player_id": 669257,
+      "sequence": 0,
+      "slot": 3
+    },
+    {
+      "player_id": 518692,
+      "sequence": 0,
+      "slot": 4
+    },
+    {
+      "player_id": 606192,
+      "sequence": 0,
+      "slot": 5
+    },
+    {
+      "player_id": 663656,
+      "sequence": 0,
+      "slot": 6
+    },
+    {
+      "player_id": 681624,
+      "sequence": 0,
+      "slot": 7
+    },
+    {
+      "player_id": 500743,
+      "sequence": 0,
+      "slot": 8
+    },
+    {
+      "player_id": 571970,
+      "sequence": 1,
+      "slot": 8
+    },
+    {
+      "player_id": 669242,
+      "sequence": 0,
+      "slot": 9
+    },
+    {
+      "player_id": 800543,
+      "sequence": 1,
+      "slot": 9
+    }
+  ],
+  "home_lineup_primary_slots": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "home_probable_pitcher_id": 605483,
+  "home_team_id": 119,
+  "model_p_authority": false,
+  "observed_at_utc": "2026-10-05T04:19:01.635097+00:00",
+  "promotion_authority": false,
+  "retroactive_point_in_time_claim": false,
+  "schedule_blob": "artifacts/mlb_pit_inputs/raw/schedule/48f29bdce982739dbf3bb439d389f2305630b356133a7a5d680e3be569068d21.json",
+  "schedule_source_sha256": "48f29bdce982739dbf3bb439d389f2305630b356133a7a5d680e3be569068d21",
+  "scheduled_start_utc": "2026-10-05T00:00:00Z",
+  "schema": "SPORTSEDGE_MLB_PIT_LINEUP_STARTER_OBSERVATION_V1",
+  "slate_date": "2026-10-04"
+}
