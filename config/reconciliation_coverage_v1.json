@@ -40,6 +40,7 @@
         "sportsedge/sports/nfl/candidate_release.py",
         "sportsedge/sports/nfl/discrete_v2.py",
         "sportsedge/sports/nfl/discrete_v2_fit.py",
+        "sportsedge/nfl_unified_phone.py",
         "sportsedge/sports/nfl/unified_market_engine.py",
         "sportsedge/sports/nfl/unified_run_it.py",
         "sportsedge/sports/nfl/v2k_attempt5_market_calibration.py",
@@ -47,7 +48,8 @@
         "tests/test_nfl_v2k_attempt2_dispatch_bridge.py",
         "tests/test_nfl_v2k_attempt2_source_manifest_adapter.py",
         "tests/test_nfl_v2k_attempt4_market_residual.py",
-        "tests/test_nfl_v2k_attempt5_market_calibration.py"
+        "tests/test_nfl_v2k_attempt5_market_calibration.py",
+        "tests/test_nfl_unified_phone.py"
       ],
       "coverage_prefixes": [
         "sportsedge/sports/nfl/m2_v2j_",
@@ -385,6 +387,7 @@
     "sportsedge/sports/nba/integrated_engine.py": "NBA_NO_ACTIVE_BUNDLE",
     "sportsedge/sports/nba/sportsdataverse_training_source.py": "NBA_NO_ACTIVE_BUNDLE",
     "sportsedge/sports/nfl/defensive_context.py": "NFL_RUNTIME_CONTEXT_NO_ACTIVE_MODEL_BUNDLE",
+    "sportsedge/sports/nfl/market_context_props.py": "NFL_RESEARCH_PLAYER_CONTEXT_ADAPTER_NO_ACTIVE_BUNDLE",
     "sportsedge/sports/nfl/team_totals.py": "NFL_RUNTIME_MARKET_SURFACE_NO_ACTIVE_BUNDLE",
     "sportsedge/sports/nfl/venue_contract.py": "NFL_RUNTIME_CONTEXT_NO_ACTIVE_MODEL_BUNDLE",
     "sportsedge/sports/nhl/official_pbp_source.py": "NHL_NO_ACTIVE_BUNDLE",

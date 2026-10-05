@@ -162,7 +162,7 @@ def test_intake_supports_full_game_team_total_and_player_prop_board():
     assert rows[5].player == "Derrick Henry"
 
 
-def test_unified_phone_card_prices_ml_spread_total_team_total_and_qb_rb_wr_props():
+def test_unified_phone_card_disables_game_edges_but_prices_qb_rb_wr_props():
     out = build_unified_phone_card(
         full_board(),
         history=history(),
@@ -177,24 +177,28 @@ def test_unified_phone_card_prices_ml_spread_total_team_total_and_qb_rb_wr_props
     assert out["schema"] == "SPORTSEDGE_NFL_UNIFIED_PHONE_CARD_V1"
     assert len(out["games"]) == 1
     game = out["games"][0]
-    assert game["forecast"] == {"margin": 3.0, "total": 46.0}
+    assert game["forecast"]["margin"] == 3.5
+    assert game["forecast"]["total"] == 47.5
+    assert game["forecast"]["source"] == "SPORTSBOOK_MARKET_CENTER_CONTEXT_ONLY"
+    assert game["market_context"]["home_spread"] == -3.5
     rows = game["rows"]
     assert len(rows) == 16
     assert {row["market"] for row in rows} == {
         "moneyline", "spread", "total", "team_total",
         "passing_yards", "rushing_yards", "receiving_yards", "receptions",
     }
-    assert all(row["status"] == "PRICED" for row in rows)
-    assert all(0.0 <= row["estimate_p"] <= 1.0 for row in rows)
-    assert all(0.0 <= row["push_p"] <= 1.0 for row in rows)
-    assert all(row["score_label"] == "SPORTSEDGE_QUALIFICATION_ROLE_SCORE_V1" for row in rows)
-    spread = [row for row in rows if row["market"] == "spread"]
-    assert spread[0]["line"] == 3.5
-    assert spread[1]["line"] == -3.5
-    assert spread[0]["push_p"] == 0.0
-    assert spread[1]["push_p"] == 0.0
-    assert spread[0]["estimate_p"] + spread[1]["estimate_p"] == pytest.approx(1.0)
+    game_rows = [row for row in rows if row["market"] in {"moneyline", "spread", "total", "team_total"}]
+    prop_rows = [row for row in rows if row["market"] not in {"moneyline", "spread", "total", "team_total"}]
+    assert all(row["status"] == "NO_MODEL" for row in game_rows)
+    assert all(row["reason"] == "V2K_DEVELOPMENT_BUDGET_EXHAUSTED_NO_PASS" for row in game_rows)
+    assert all(row["selected"] is False for row in game_rows)
+    assert all(row["status"] == "PRICED" for row in prop_rows)
+    assert all(0.0 <= row["estimate_p"] <= 1.0 for row in prop_rows)
+    assert all(0.0 <= row["push_p"] <= 1.0 for row in prop_rows)
+    assert all(row["score_label"] == "SPORTSEDGE_QUALIFICATION_ROLE_SCORE_V1" for row in prop_rows)
+    assert game["engine"]["game_market_edge_disabled"] is True
     assert game["engine"]["workload_coupling"]["lead_trail_pass_rush_adjustment"] is False
+    assert out["pricing_policy"]["game_markets_disabled"] is True
 
 
 def test_score_is_qualification_only_when_price_changes():
@@ -218,26 +222,29 @@ def test_score_is_qualification_only_when_price_changes():
     assert [row["ev_per_dollar"] for row in a_prop] != [row["ev_per_dollar"] for row in b_prop]
 
 
-def test_price_ceiling_blocks_straight_card_but_preserves_model_probability():
+def test_price_ceiling_blocks_research_prop_card_but_preserves_probability():
     board = full_board()
-    board["games"][0]["markets"][0]["home_or_under_price"] = -180
+    board["games"][0]["markets"][4]["away_or_over_price"] = -180
+    board["games"][0]["markets"][4]["home_or_under_price"] = +150
     out = build_unified_phone_card(
         board, history=history(), schedule_games=schedule(), depth_rows=depth(),
         player_rows=player_stats(), injury_source_ready=True, runtime=runtime(), n_sims=300, seed=12,
     )
-    home_ml = next(
+    passing_over = next(
         row for row in out["rows"]
-        if row["market"] == "moneyline" and row["selection"] == "BAL"
+        if row["market"] == "passing_yards" and row["side_index"] == 0
     )
-    assert 0.0 <= home_ml["estimate_p"] <= 1.0
-    assert home_ml["card_eligible"] is False
-    assert home_ml["card_reason"] == "PRICE_ABOVE_STRAIGHT_CEILING"
+    assert 0.0 <= passing_over["estimate_p"] <= 1.0
+    assert passing_over["card_eligible"] is False
+    assert passing_over["card_reason"] == "PRICE_ABOVE_STRAIGHT_CEILING"
 
 
 def test_td_prop_is_explicit_no_model_until_scoring_prior_is_bound():
     board = ticket(
         """
         Chiefs @ Ravens
+        Spread +3.5 -110 -110
+        Total 47.5 -110 -110
         Prop "Derrick Henry" ATTD 0.5 -125 +105
         """
     )
@@ -245,9 +252,10 @@ def test_td_prop_is_explicit_no_model_until_scoring_prior_is_bound():
         board, history=history(), schedule_games=schedule(), depth_rows=depth(),
         player_rows=player_stats(), injury_source_ready=True, runtime=runtime(), n_sims=250, seed=4,
     )
-    assert len(out["rows"]) == 2
-    assert all(row["status"] == "NO_MODEL" for row in out["rows"])
-    assert all("SCORING_COMPOSITION_PRIOR_REQUIRED" in row["reason"] for row in out["rows"])
+    props = [row for row in out["rows"] if row["market"] == "anytime_tds"]
+    assert len(props) == 2
+    assert all(row["status"] == "NO_MODEL" for row in props)
+    assert all("SCORING_COMPOSITION_PRIOR_REQUIRED" in row["reason"] for row in props)
 
 
 def test_out_player_prop_fails_exact_player_match_without_poisoning_game_markets():
@@ -258,6 +266,7 @@ def test_out_player_prop_fails_exact_player_match_without_poisoning_game_markets
     board = ticket(
         """
         Chiefs @ Ravens
+        Spread +3.5 -110 -110
         Total 47.5 -110 -110
         Prop "Zay Flowers" RecYards 72.5 -110 -110
         """
@@ -269,7 +278,8 @@ def test_out_player_prop_fails_exact_player_match_without_poisoning_game_markets
     )
     totals = [row for row in out["rows"] if row["market"] == "total"]
     props = [row for row in out["rows"] if row["market"] == "receiving_yards"]
-    assert all(row["status"] == "PRICED" for row in totals)
+    assert all(row["status"] == "NO_MODEL" for row in totals)
+    assert all(row["reason"] == "V2K_DEVELOPMENT_BUDGET_EXHAUSTED_NO_PASS" for row in totals)
     assert all(row["status"] == "NO_MODEL" for row in props)
     assert all("PROP_PLAYER_EXACT_MATCH_REQUIRED" in row["reason"] for row in props)
 
@@ -278,6 +288,7 @@ def test_live_prop_board_fails_closed_when_injury_source_is_not_ready():
     board = ticket(
         """
         Chiefs @ Ravens
+        Spread +3.5 -110 -110
         Total 47.5 -110 -110
         Prop "Lamar Jackson" PassYards 249.5 -110 -110
         """
@@ -289,6 +300,44 @@ def test_live_prop_board_fails_closed_when_injury_source_is_not_ready():
     )
     totals = [row for row in out["rows"] if row["market"] == "total"]
     props = [row for row in out["rows"] if row["market"] == "passing_yards"]
-    assert all(row["status"] == "PRICED" for row in totals)
+    assert all(row["status"] == "NO_MODEL" for row in totals)
+    assert all(row["reason"] == "V2K_DEVELOPMENT_BUDGET_EXHAUSTED_NO_PASS" for row in totals)
     assert all(row["status"] == "NO_MODEL" for row in props)
     assert all(row["reason"] == "INJURY_SOURCE_REQUIRED_FOR_LIVE_PROPS" for row in props)
+
+
+def test_market_context_phone_ignores_attempt9_runtime():
+    a = build_unified_phone_card(
+        full_board(), history=history(), schedule_games=schedule(), depth_rows=depth(),
+        player_rows=player_stats(), injury_source_ready=True, runtime=runtime(), n_sims=300, seed=33,
+    )
+    wild = runtime()
+    wild["runtime"]["targets"]["margin"]["intercept"] = -99.0
+    wild["runtime"]["targets"]["total"]["intercept"] = 180.0
+    b = build_unified_phone_card(
+        full_board(), history=[], schedule_games=schedule(), depth_rows=depth(),
+        player_rows=player_stats(), injury_source_ready=True, runtime=wild, n_sims=300, seed=33,
+    )
+    a_props = [(r["market"], r["selection"], r.get("estimate_p")) for r in a["rows"] if r["status"] == "PRICED"]
+    b_props = [(r["market"], r["selection"], r.get("estimate_p")) for r in b["rows"] if r["status"] == "PRICED"]
+    assert a_props == b_props
+    assert a["games"][0]["forecast"]["margin"] == 3.5
+    assert b["games"][0]["forecast"]["margin"] == 3.5
+
+
+def test_prop_card_requires_posted_spread_and_total_context():
+    board = ticket(
+        """
+        Chiefs @ Ravens
+        Prop "Lamar Jackson" PassYards 249.5 -110 -110
+        """
+    )
+    out = build_unified_phone_card(
+        board, history=[], schedule_games=schedule(), depth_rows=depth(),
+        player_rows=player_stats(), injury_source_ready=True, runtime=runtime(),
+        n_sims=200, seed=2,
+    )
+    props = [row for row in out["rows"] if row["market"] == "passing_yards"]
+    assert len(props) == 2
+    assert all(row["status"] == "NO_MODEL" for row in props)
+    assert all(row["reason"] == "MARKET_CONTEXT_SPREAD_TOTAL_REQUIRED" for row in props)
