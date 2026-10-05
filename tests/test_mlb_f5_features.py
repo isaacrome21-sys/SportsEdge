@@ -120,7 +120,9 @@ class MLBF5FeatureTests(unittest.TestCase):
         self.assertNotIn(3000, {row["game_pk"] for row in rows})
         query = parse_qs(urlparse(seen_urls[0]).query)
         self.assertEqual(query["hydrate"], ["linescore"])
+        self.assertEqual(query["gameType"], ["R"])
         self.assertEqual(query["endDate"], ["2026-08-19"])
+        self.assertEqual(query["startDate"], ["2025-08-15"])
 
     def test_matchup_feature_hash_binds_actual_prior_rows(self):
         def opener(req, timeout=15):
@@ -130,6 +132,14 @@ class MLBF5FeatureTests(unittest.TestCase):
             opener=opener,
             retrieved_at=datetime(2026, 8, 20, 12, tzinfo=timezone.utc),
         )
+        source.league_prior_features = lambda *, target_date: {
+            "league_f5_runs": [0, 1, 2, 3] * 60,
+            "league_first_inning_zero_rate": 0.72,
+            "league_half_innings": 240,
+            "league_prior_strength": 30,
+            "league_lookback_days": 370,
+            "league_game_type": "R",
+        }
         feature = source.matchup_features(
             away_team_id=10,
             home_team_id=20,
@@ -143,6 +153,9 @@ class MLBF5FeatureTests(unittest.TestCase):
         self.assertEqual(feature["features"]["away_first_inning_runs_for"], [1] * 10)
         self.assertEqual(feature["features"]["home_first_inning_runs_for"], [0] * 10)
         self.assertLess(max(feature["features"]["away_f5_runs_for"]), 15)
+        self.assertEqual(feature["features"]["league_prior_strength"], 30)
+        self.assertEqual(feature["features"]["league_half_innings"], 240)
+        self.assertEqual(feature["features"]["league_first_inning_zero_rate"], 0.72)
 
     def test_current_statsapi_direct_inning_shape_is_accepted(self):
         payload = self._payload()
@@ -157,6 +170,14 @@ class MLBF5FeatureTests(unittest.TestCase):
             opener=lambda req, timeout=15: _Response(payload),
             retrieved_at=datetime(2026, 8, 20, 12, tzinfo=timezone.utc),
         )
+        source.league_prior_features = lambda *, target_date: {
+            "league_f5_runs": [0, 1, 2, 3] * 60,
+            "league_first_inning_zero_rate": 0.72,
+            "league_half_innings": 240,
+            "league_prior_strength": 30,
+            "league_lookback_days": 370,
+            "league_game_type": "R",
+        }
         feature = source.matchup_features(
             away_team_id=10,
             home_team_id=20,
@@ -165,6 +186,26 @@ class MLBF5FeatureTests(unittest.TestCase):
         self.assertEqual(feature["away_history_games"], 10)
         self.assertEqual(feature["features"]["away_first_inning_runs_for"], [1] * 10)
         self.assertEqual(feature["features"]["home_first_inning_runs_for"], [0] * 10)
+
+    def test_league_prior_uses_all_strictly_prior_half_games(self):
+        games = []
+        for index in range(100):
+            games.append(_game(
+                8000 + index,
+                "2026-08-01",
+                100 + (index % 10),
+                200 + (index % 10),
+                [index % 2, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0],
+            ))
+        source = MLBF5HistorySource(opener=lambda *args, **kwargs: None)
+        source._league_schedule_payloads = lambda *, target_date: ({"dates": [{"games": games}]},)
+        prior = source.league_prior_features(target_date=date(2026, 8, 20))
+        self.assertEqual(prior["league_half_innings"], 200)
+        self.assertEqual(len(prior["league_f5_runs"]), 200)
+        self.assertEqual(prior["league_prior_strength"], 30)
+        self.assertEqual(prior["league_game_type"], "R")
+        self.assertAlmostEqual(prior["league_first_inning_zero_rate"], 0.75, places=12)
 
     def test_home_tie_then_permanent_bottom_six_lead_requires_eighteen_outs(self):
         games = []
