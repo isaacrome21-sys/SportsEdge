@@ -65,6 +65,17 @@ def main() -> int:
     if rules.get("prior_build_consumes_score_count_attempt") is not False:
         raise SystemExit("NFL_SCORING_PRIOR_BUILD_ATTEMPT_AUTHORITY_INVALID")
 
+    source_contract_path = Path(cfg["source_contract_path"])
+    observed_blob = subprocess.check_output(
+        ["git", "rev-parse", f"HEAD:{source_contract_path.as_posix()}"],
+        text=True,
+    ).strip()
+    if observed_blob != str(cfg["source_contract_git_blob"]):
+        raise SystemExit(
+            f"NFL_SCORING_PRIOR_SOURCE_CONTRACT_BLOB_DRIFT:{observed_blob}:"
+            f"{cfg['source_contract_git_blob']}"
+        )
+
     contract = load_source_contract()
     seasons = tuple(int(v) for v in cfg["seasons"])
     root = args.source_root
