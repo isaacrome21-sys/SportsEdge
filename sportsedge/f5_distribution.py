@@ -15,10 +15,12 @@ from typing import Any, Mapping, Sequence
 from .mlb_empirical_bayes import posterior_settlement_mass
 from .source_lineage import canonical_json_sha256
 
-F5_DISTRIBUTION_VERSION = "mlb_f5_empirical_state_v1_candidate"
+F5_DISTRIBUTION_VERSION = "mlb_f5_empirical_state_v2_m30_league_prior"
 F5_READOUT_VERSION = "mlb_f5_readout_v2_jeffreys"
 F5_MARKETS = frozenset({"F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS"})
 MIN_HISTORY_GAMES = 10
+LEAGUE_PRIOR_STRENGTH = 30
+MIN_LEAGUE_HALVES = 200
 
 
 class F5DistributionError(ValueError):
@@ -75,6 +77,41 @@ def _empirical_pmf(values: tuple[int, ...]) -> dict[int, float]:
     return {key: count / n for key, count in counts.items()}
 
 
+def _league_pmf(value: Any) -> dict[int, float]:
+    if not isinstance(value, Mapping) or not value:
+        raise F5DistributionError("league_f5_pmf must be a non-empty mapping")
+    out: dict[int, float] = {}
+    total = 0.0
+    for raw_key, raw_p in value.items():
+        try:
+            key = int(raw_key)
+            probability = float(raw_p)
+        except (TypeError, ValueError) as exc:
+            raise F5DistributionError("league_f5_pmf contains invalid state") from exc
+        if key < 0 or not isfinite(probability) or probability < 0:
+            raise F5DistributionError("league_f5_pmf contains invalid probability")
+        out[key] = out.get(key, 0.0) + probability
+        total += probability
+    if abs(total - 1.0) > 1e-9:
+        raise F5DistributionError("league_f5_pmf does not conserve probability")
+    return out
+
+
+def _smoothed_pmf(values: tuple[int, ...], league: Mapping[int, float]) -> dict[int, float]:
+    counts: dict[int, float] = {}
+    for value in values:
+        counts[value] = counts.get(value, 0.0) + 1.0
+    keys = set(counts) | set(league)
+    denom = float(len(values) + LEAGUE_PRIOR_STRENGTH)
+    out = {
+        key: (counts.get(key, 0.0) + LEAGUE_PRIOR_STRENGTH * float(league.get(key, 0.0))) / denom
+        for key in keys
+    }
+    if abs(sum(out.values()) - 1.0) > 1e-12:
+        raise F5DistributionError("smoothed F5 marginal does not conserve probability")
+    return out
+
+
 def _blend(left: dict[int, float], right: dict[int, float]) -> dict[int, float]:
     keys = set(left) | set(right)
     out = {key: 0.5 * left.get(key, 0.0) + 0.5 * right.get(key, 0.0) for key in keys}
@@ -94,9 +131,21 @@ def build_f5_distribution(features: Mapping[str, Any]) -> F5Distribution:
         raise F5DistributionError("away F5 history arrays must align")
     if len(home_for) != len(home_against):
         raise F5DistributionError("home F5 history arrays must align")
+    try:
+        league_halves = int(features.get("league_prior_halves"))
+        league_strength = int(features.get("league_prior_strength"))
+    except (TypeError, ValueError) as exc:
+        raise F5DistributionError("league prior identity fields required") from exc
+    if league_halves < MIN_LEAGUE_HALVES:
+        raise F5DistributionError(
+            f"league prior requires at least {MIN_LEAGUE_HALVES} team-halves"
+        )
+    if league_strength != LEAGUE_PRIOR_STRENGTH:
+        raise F5DistributionError("league prior strength drift")
+    league = _league_pmf(features.get("league_f5_pmf"))
 
-    away_scoring = _blend(_empirical_pmf(away_for), _empirical_pmf(home_against))
-    home_scoring = _blend(_empirical_pmf(home_for), _empirical_pmf(away_against))
+    away_scoring = _blend(_smoothed_pmf(away_for, league), _smoothed_pmf(home_against, league))
+    home_scoring = _blend(_smoothed_pmf(home_for, league), _smoothed_pmf(away_against, league))
     joint: dict[str, float] = {}
     for away_runs, away_p in sorted(away_scoring.items()):
         for home_runs, home_p in sorted(home_scoring.items()):
@@ -106,7 +155,10 @@ def build_f5_distribution(features: Mapping[str, Any]) -> F5Distribution:
 
     digest = canonical_json_sha256({
         "version": F5_DISTRIBUTION_VERSION,
-        "blend_policy": "equal_offense_opponent_allowed_empirical_marginals",
+        "blend_policy": "equal_offense_opponent_allowed_m30_league_smoothed_marginals",
+        "league_prior_strength": LEAGUE_PRIOR_STRENGTH,
+        "league_prior_halves": league_halves,
+        "league_f5_pmf": {str(k): float(v) for k, v in sorted(league.items())},
         "joint_score_pmf": joint,
     })
     return F5Distribution(
