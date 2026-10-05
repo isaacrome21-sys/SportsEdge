@@ -214,6 +214,16 @@ jobs:
         if: steps.resolve.outputs.live == 'true'
         run: PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.resolve.outputs.path }}" --history-cache-dir .cache/mlb-history --run-date "${{ steps.resolve.outputs.run_date }}" --max-age-minutes "${{ github.event.inputs.max_age_minutes || '60' }}" --output artifacts/manual_mlb_snapshot_card.json
 
+      - name: Upload fast priced card
+        if: always() && hashFiles('artifacts/manual_mlb_snapshot_card.json') != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: manual-mlb-fast-priced-card
+          path: artifacts/manual_mlb_snapshot_card.json
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
       - name: Retrieve pregame context (Statcast, umpire, weather/roof, park, lineups)
         if: always() && hashFiles('artifacts/manual_mlb_snapshot_card.json') != ''
         continue-on-error: true
