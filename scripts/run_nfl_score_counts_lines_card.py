@@ -32,11 +32,38 @@ def _has_props(ticket: dict) -> bool:
     )
 
 
+def _game_only_ticket(ticket: dict) -> dict:
+    out = dict(ticket)
+    games = []
+    for raw_game in ticket.get("games") or []:
+        if not isinstance(raw_game, dict):
+            continue
+        game = dict(raw_game)
+        game["markets"] = [
+            dict(row)
+            for row in raw_game.get("markets") or []
+            if isinstance(row, dict) and not str(row.get("player") or "").strip()
+        ]
+        games.append(game)
+    out["games"] = games
+    return out
+
+
+def _write_payload(path: str | Path, payload: dict) -> None:
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n",
+        encoding="utf-8",
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", required=True)
     ap.add_argument("--prediction", required=True)
     ap.add_argument("--output", required=True)
+    ap.add_argument("--fast-game-output")
     ap.add_argument("--seed", type=int, default=21)
     ap.add_argument("--horizon-days", type=int, default=10)
     ap.add_argument("--scoring-prior")
@@ -71,6 +98,28 @@ def main() -> int:
         "injuries": "NOT_REQUIRED",
     }
     injury_source_ready = False
+
+    if args.fast_game_output:
+        fast_payload = build_score_count_phone_card(
+            _game_only_ticket(ticket),
+            prediction=prediction,
+            schedule_games=schedule_games,
+            depth_rows=(),
+            player_rows=(),
+            injury_rows=(),
+            injury_source_ready=False,
+            scoring_prior=None,
+            seed=int(args.seed),
+        )
+        fast_payload["source_status"] = {
+            "schedule": "AVAILABLE",
+            "depth": "NOT_REQUIRED_FOR_GAME_MARKETS",
+            "player_stats": "NOT_REQUIRED_FOR_GAME_MARKETS",
+            "injuries": "NOT_REQUIRED_FOR_GAME_MARKETS",
+        }
+        fast_payload["schedule_source_sha256"] = plan.get("schedule_source_sha256")
+        fast_payload["fast_game_markets_only"] = True
+        _write_payload(args.fast_game_output, fast_payload)
 
     if _has_props(ticket):
         if not seasons:
@@ -120,12 +169,7 @@ def main() -> int:
     payload["source_status"] = source_status
     payload["schedule_source_sha256"] = plan.get("schedule_source_sha256")
 
-    out = Path(args.output)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(
-        json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n",
-        encoding="utf-8",
-    )
+    _write_payload(args.output, payload)
     print(json.dumps({
         "status": "OK",
         "games": len(payload.get("games") or []),
