@@ -9,6 +9,7 @@ on:
       - sportsedge/manual_mlb_snapshot.py
       - sportsedge/mlb_all_market_features.py
       - tests/test_mlb_all_market_state_wiring.py
+      - tests/test_manual_mlb_all_market_source.py
       - sportsedge/engine_registry.py
       - sportsedge/generic_market_engine.py
       - sportsedge/quote_bridge.py
@@ -38,6 +39,7 @@ on:
       - sportsedge/manual_mlb_snapshot.py
       - sportsedge/mlb_all_market_features.py
       - tests/test_mlb_all_market_state_wiring.py
+      - tests/test_manual_mlb_all_market_source.py
       - sportsedge/engine_registry.py
       - sportsedge/generic_market_engine.py
       - sportsedge/quote_bridge.py
