@@ -30,3 +30,14 @@ def test_attempt_number_fails_outside_frozen_budget(tmp_path):
             confirm="CONSUME_SCORE_COUNTS_ATTEMPT_4",
             output_dir=tmp_path / "attempt",
         )
+
+
+def test_source_root_cannot_live_inside_uploaded_artifact_tree(tmp_path):
+    output = tmp_path / "artifact"
+    with pytest.raises(RuntimeError, match="SOURCE_ROOT_MUST_BE_OUTSIDE_ARTIFACT_OUTPUT"):
+        run_attempt(
+            attempt_number=1,
+            confirm="CONSUME_SCORE_COUNTS_ATTEMPT_1",
+            output_dir=output,
+            source_root=output / "sources",
+        )
