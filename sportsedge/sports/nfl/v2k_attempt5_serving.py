@@ -9,7 +9,12 @@ from __future__ import annotations
 from math import isfinite
 from typing import Any, Mapping
 
-from .v2k_attempt5_market_calibration import candidate_probability, fair_market_center
+from .v2k_attempt5_market_calibration import (
+    FAIR_SPREAD_SCALE,
+    FAIR_TOTAL_SCALE,
+    candidate_probability,
+    fair_market_center,
+)
 
 RESULT_SCHEMA = "NFL_V2K_ATTEMPT5_DEVELOPMENT_VALIDATION_V1"
 
@@ -49,6 +54,8 @@ def _novig(a: Any, b: Any, field: str) -> float:
 def validate_pass_result(result: Mapping[str, Any]) -> Mapping[str, Any]:
     if result.get("schema") != RESULT_SCHEMA:
         raise Attempt5ServingError("ATTEMPT5_RESULT_SCHEMA_INVALID")
+    if result.get("candidate_family") != "NFL_MARKET_CALIBRATION_LINE_G5":
+        raise Attempt5ServingError("ATTEMPT5_CANDIDATE_FAMILY_INVALID")
     if result.get("verdict") != "ATTEMPT5_PASS":
         raise Attempt5ServingError("ATTEMPT5_NOT_PASSED")
     if result.get("attempt_consumed") is not True:
@@ -58,6 +65,10 @@ def validate_pass_result(result: Mapping[str, Any]) -> Mapping[str, Any]:
     params = result.get("live_parameters")
     if not isinstance(params, Mapping):
         raise Attempt5ServingError("ATTEMPT5_LIVE_PARAMETERS_MISSING")
+    if _num(params.get("fair_spread_scale"), "fair_spread_scale") != FAIR_SPREAD_SCALE:
+        raise Attempt5ServingError("ATTEMPT5_FAIR_SPREAD_SCALE_DRIFT")
+    if _num(params.get("fair_total_scale"), "fair_total_scale") != FAIR_TOTAL_SCALE:
+        raise Attempt5ServingError("ATTEMPT5_FAIR_TOTAL_SCALE_DRIFT")
     return params
 
 
