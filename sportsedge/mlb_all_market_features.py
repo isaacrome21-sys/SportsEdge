@@ -393,10 +393,13 @@ class MLBAllMarketHistorySource(MLBGenericHistorySource):
             return _seal(row)
 
         if market in F5_MARKETS or market in {"NRFI", "YRFI"}:
-            inning_source = _StatsAPIF5ShapeAdapter(
-                opener=self.opener,
-                retrieved_at=self.retrieved_at,
-            )
+            inning_source = self.__dict__.get("_strict_prior_inning_source")
+            if inning_source is None:
+                inning_source = _StatsAPIF5ShapeAdapter(
+                    opener=self.opener,
+                    retrieved_at=self.retrieved_at,
+                )
+                self.__dict__["_strict_prior_inning_source"] = inning_source
             try:
                 matchup = inning_source.matchup_features(
                     away_team_id=int(away_team_id),
