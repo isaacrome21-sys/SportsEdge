@@ -10,7 +10,8 @@ from zoneinfo import ZoneInfo
 
 from .generic_card_pipeline import run_generic_card
 from .live_slate import LiveGame, TeamLineup
-from .mlb_generic_features import GAME_MARKETS, MLBGenericHistorySource
+from .mlb_all_market_features import MLBAllMarketHistorySource
+from .mlb_generic_features import GAME_MARKETS
 from .mlb_history_cache import MLBHistoryCachedOpener
 from .mlb_source import fetch_schedule, parse_game_start
 from .quote_bridge import validate_canonical_quote
@@ -78,7 +79,7 @@ def run_manual_mlb_snapshot(snapshot: Mapping[str, Any], *, opener=urlopen, regi
                     TeamLineup(g.away_id,"away",(),(),False), TeamLineup(g.home_id,"home",(),(),False),
                     g.game_number, g.double_header, g.venue_id, g.official_date, g.status)
     hist_opener = MLBHistoryCachedOpener(target_date=captured.astimezone(CT).date(), cache_dir=history_cache_dir, opener=opener)
-    hist = MLBGenericHistorySource(opener=hist_opener, retrieved_at=captured)
+    hist = MLBAllMarketHistorySource(opener=hist_opener, retrieved_at=captured)
     target_date = datetime.fromisoformat(str(g.official_date)).date() if g.official_date else captured.astimezone(CT).date()
     features, seen = [], set()
     for q in quotes:
