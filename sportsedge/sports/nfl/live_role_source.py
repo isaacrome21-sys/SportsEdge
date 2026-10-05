@@ -402,6 +402,44 @@ def build_live_team_model(
 
     team_weeks = _team_week_rows(prior, team=team_id, lookback_games=int(lookback_games))
     weighted_team = _weighted_rows(team_weeks, lookback_games=int(lookback_games), decay=float(decay))
+
+    # Distribution kernels require nonnegative efficiency means. A tiny-sample
+    # depth/residual player can legitimately have negative net receiving or
+    # rushing yardage in the PIT stats, which previously poisoned the entire
+    # team simulation. Repair only those impossible distribution means with the
+    # same team's strictly-prior weighted rate, and preserve an explicit audit
+    # marker on the affected player.
+    team_receiving_ypr = _weighted_rate(weighted_team, "receiving_yards", "receptions")
+    team_rush_ypa = _weighted_rate(weighted_team, "rushing_yards", "carries")
+
+    def repair_distribution_efficiency(player: dict[str, Any]) -> None:
+        role = player.get("role_prior")
+        if not isinstance(role, dict):
+            return
+        repairs: dict[str, dict[str, Any]] = {}
+        recv = float(role.get("receiving_yards_per_reception") or 0.0)
+        if recv < 0.0 and team_receiving_ypr > 0.0:
+            repairs["receiving_yards_per_reception"] = {
+                "from": recv,
+                "to": float(team_receiving_ypr),
+                "source": "PIT_TEAM_WEIGHTED_RATE_FALLBACK",
+            }
+            role["receiving_yards_per_reception"] = float(team_receiving_ypr)
+        rush = float(role.get("rush_yards_per_attempt") or 0.0)
+        if rush < 0.0 and team_rush_ypa >= 0.0:
+            repairs["rush_yards_per_attempt"] = {
+                "from": rush,
+                "to": float(team_rush_ypa),
+                "source": "PIT_TEAM_WEIGHTED_RATE_FALLBACK",
+            }
+            role["rush_yards_per_attempt"] = float(team_rush_ypa)
+        if repairs:
+            player["role_repairs"] = repairs
+
+    repair_distribution_efficiency(qb)
+    for skill in skills:
+        repair_distribution_efficiency(skill)
+
     team_pass_tds = sum(w * _number(row.get("passing_tds"), "passing_tds") for w, row in weighted_team)
     team_rush_tds = sum(w * _number(row.get("rushing_tds"), "rushing_tds") for w, row in weighted_team)
     td_total = team_pass_tds + team_rush_tds
@@ -462,6 +500,7 @@ def build_live_team_model(
             raise NFLContextError("selected TD shares exceed team mass")
         other["receiving_td_share"] = max(0.0, 1.0 - selected_recv) if team_recv_tds > 0 else 0.0
         other["rushing_td_share"] = max(0.0, 1.0 - selected_rush) if team_rush_tds > 0 else 0.0
+        repair_distribution_efficiency(other)
         skills.append(other)
 
     return {
