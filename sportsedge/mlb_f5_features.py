@@ -63,6 +63,18 @@ def _team_id(game: Mapping[str, Any], side: str) -> int | None:
     return value if value > 0 else None
 
 
+def _inning_teams(inning: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    """Accept both current StatsAPI direct away/home rows and legacy teams wrapper."""
+    teams = inning.get("teams")
+    if isinstance(teams, Mapping):
+        return teams
+    away = inning.get("away")
+    home = inning.get("home")
+    if isinstance(away, Mapping) and isinstance(home, Mapping):
+        return {"away": away, "home": home}
+    return None
+
+
 def _first_inning_score(game: Mapping[str, Any]) -> tuple[int, int] | None:
     """Return actual inning-one runs, never a full-game-rate proxy."""
     linescore = game.get("linescore")
@@ -80,8 +92,8 @@ def _first_inning_score(game: Mapping[str, Any]) -> tuple[int, int] | None:
             continue
         if num != 1:
             continue
-        teams = inning.get("teams")
-        if not isinstance(teams, Mapping):
+        teams = _inning_teams(inning)
+        if teams is None:
             return None
         away_row = teams.get("away")
         home_row = teams.get("home")
@@ -118,8 +130,8 @@ def _first_five_score(game: Mapping[str, Any]) -> tuple[int, int] | None:
     away = 0
     home = 0
     for num in range(1, 6):
-        teams = by_num[num].get("teams")
-        if not isinstance(teams, Mapping):
+        teams = _inning_teams(by_num[num])
+        if teams is None:
             return None
         away_row = teams.get("away")
         home_row = teams.get("home")
@@ -173,8 +185,8 @@ def _all_inning_runs(game: Mapping[str, Any]) -> tuple[tuple[int, int, int], ...
             num = int(inning.get("num"))
         except (TypeError, ValueError):
             continue
-        teams = inning.get("teams")
-        if num < 1 or not isinstance(teams, Mapping):
+        teams = _inning_teams(inning)
+        if num < 1 or teams is None:
             continue
         away_row = teams.get("away")
         home_row = teams.get("home")
