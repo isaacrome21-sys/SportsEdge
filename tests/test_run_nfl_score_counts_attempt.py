@@ -4,6 +4,7 @@ import pytest
 
 from scripts.run_nfl_score_counts_attempt import (
     IDENTITY_PATHS,
+    PREREG_BY_ATTEMPT,
     code_identity,
     run_attempt,
 )
@@ -40,4 +41,19 @@ def test_source_root_cannot_live_inside_uploaded_artifact_tree(tmp_path):
             confirm="CONSUME_SCORE_COUNTS_ATTEMPT_1",
             output_dir=output,
             source_root=output / "sources",
+        )
+
+
+def test_attempt2_prereg_is_bound_into_runner_identity():
+    path = "config/research/nfl_score_counts_g1_attempt2_fg_prereg_v1.json"
+    assert path in IDENTITY_PATHS
+    assert PREREG_BY_ATTEMPT[2] == Path(path)
+
+
+def test_attempt3_fails_closed_until_preregistered(tmp_path):
+    with pytest.raises(RuntimeError, match="ATTEMPT_PREREG_REQUIRED:3"):
+        run_attempt(
+            attempt_number=3,
+            confirm="CONSUME_SCORE_COUNTS_ATTEMPT_3",
+            output_dir=tmp_path / "attempt3",
         )
