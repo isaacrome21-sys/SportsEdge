@@ -1,0 +1,110 @@
+{
+  "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G1_PREREG_ADDENDUM_V2",
+  "status": "FROZEN_BEFORE_HISTORICAL_DEVELOPMENT_SCORING_OR_2026_WEEK5_FORWARD_PREDICTION",
+  "frozen_date": "2026-10-05",
+  "parent": {
+    "path": "config/research/nfl_score_counts_g1_prereg_v1.json",
+    "git_blob_sha1": "65f27bcc3ece8da6a4e642ee5b4e330525cd7a8a",
+    "merged_pr": 1649,
+    "relationship": "VERSIONED_CLARIFICATION_ONLY_PARENT_BYTES_UNCHANGED"
+  },
+  "reason": {
+    "issue": "The parent selected a mean-preserving shared lognormal sigma by joint score RMSE. Sigma changes variance/correlation but not expected score, so mean-score RMSE cannot identify sigma.",
+    "timing": "Corrected before any NFL_SCORE_COUNTS_G1 historical development score, attempt consumption, or 2026 Week-5 forward prediction.",
+    "results_used_to_choose_fix": false
+  },
+  "overrides": {
+    "shared_game_latent": {
+      "candidate_sigma_grid": [
+        0,
+        0.1,
+        0.2,
+        0.3
+      ],
+      "selection_data": "DEVELOPMENT_ONLY_EXPANDING_SEASON_OUT_OF_FOLD",
+      "minimum_prior_training_seasons": 3,
+      "validation_seasons": [
+        2021,
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "event_count_per_team": "OFFENSE_TOUCHDOWNS_PLUS_MADE_FIELD_GOALS",
+      "candidate_base_mean_per_team": "PREDICTED_OFFENSE_TD_LAMBDA_PLUS_PREDICTED_MADE_FG_LAMBDA",
+      "observed_residual_product": "(HOME_EVENT_COUNT-HOME_BASE_MEAN)*(AWAY_EVENT_COUNT-AWAY_BASE_MEAN)",
+      "implied_covariance": "HOME_BASE_MEAN*AWAY_BASE_MEAN*(exp(sigma^2)-1)",
+      "selection_metric": "MEAN_SQUARED_ERROR_OBSERVED_RESIDUAL_PRODUCT_VS_IMPLIED_COVARIANCE",
+      "tie_break": "LOWEST_SIGMA",
+      "market_data_used": false,
+      "score_results_used_only_as_scoring_counts": true
+    },
+    "rare_scores": {
+      "family": "TRAINING_ONLY_EMPIRICAL_BAYES_POISSON_EVENT_RATE",
+      "unit": "TEAM_GAME",
+      "league_rate": "STRICTLY_PRIOR_COMPLETED_TEAM_GAMES_ONLY",
+      "team_rate": "(TEAM_EVENTS + 25*LEAGUE_RATE)/(TEAM_GAMES + 25)",
+      "prior_exposure_team_games": 25,
+      "applies_to": [
+        "DEFENSIVE_SPECIAL_TEAMS_TOUCHDOWNS",
+        "SAFETIES"
+      ],
+      "forward_target_game_excluded": true
+    },
+    "conversion_model": {
+      "family": "LEAGUE_CENTERED_DIRICHLET_MULTINOMIAL_EMPIRICAL_BAYES",
+      "categories": [
+        "PAT_MADE",
+        "TWO_POINT_MADE",
+        "NO_CONVERSION"
+      ],
+      "league_probabilities": "STRICTLY_PRIOR_COMPLETED_TOUCHDOWNS_ONLY",
+      "team_specific_minimum_prior_touchdowns": 50,
+      "team_prior_strength_touchdowns": 25,
+      "team_posterior_mean": "(TEAM_CATEGORY_COUNT + 25*LEAGUE_CATEGORY_PROBABILITY)/(TEAM_PRIOR_TOUCHDOWNS + 25)",
+      "below_minimum_behavior": "USE_LEAGUE_PROBABILITIES",
+      "probability_mass_must_equal_one": true,
+      "forward_target_game_excluded": true
+    }
+  },
+  "preserved_parent_contract": {
+    "feature_allowlist_unchanged": true,
+    "sportsbook_inputs_forbidden": true,
+    "development_seasons": [
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "fresh_forward_first_week": 5,
+    "first_eligible_kickoff_utc": "2026-10-09T00:15:00Z",
+    "backfill_allowed": false,
+    "alpha_grid": [
+      0.1,
+      1,
+      10,
+      100
+    ],
+    "rng_root_seed_uint64_decimal": "16316594915016045197",
+    "paths_per_game": 50000,
+    "prospective_gate_unchanged": true,
+    "research_development_budget_max": 3
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "game_market_pricing": false,
+    "truth_gate": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "props": false,
+    "backfill": false,
+    "validation_attempt": false,
+    "forward_prediction": false
+  }
+}
