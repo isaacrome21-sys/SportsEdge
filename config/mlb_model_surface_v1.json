@@ -8,7 +8,7 @@
   "doctrine": "This artifact identifies the executable predictive methodology only. It does not create evidence, eligibility, calibration, a market probability, or OFFICIAL status.",
   "files": {
     "sportsedge/engine_registry.py": "260e6129b5a39e2f4cf36ee535c27b9520bb9e33",
-    "sportsedge/generic_market_engine.py": "0f7d47656dcc7406d2bd5f706c6a5cf8a2d920db",
+    "sportsedge/generic_market_engine.py": "bc966f42f70b0d3abbc33c50de8a827c81a34aaa",
     "sportsedge/shared_game_engine.py": "3c60d644703c637434eded508c71934de5aa9a00",
     "sportsedge/shared_f5_engine.py": "d1ea46d5701008fe1bf81f679591d85cbc7291bd",
     "sportsedge/hitter_joint_engine.py": "5e2afa848a0ba32e1835fb34426dd48ca526f0da",
