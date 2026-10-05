@@ -31,6 +31,7 @@ from sportsedge.mlb_source import fetch_boxscore, fetch_schedule, parse_game_sta
 from sportsedge.pitcher_joint_engine import price_pitcher_market
 
 PREREG = Path("docs/MLB_PITCHER_PROP_PROMOTION_PREREG.md")
+PIT_CONTEXT_AMENDMENT = Path("docs/MLB_PITCHER_PROP_PROMOTION_PIT_CONTEXT_AMENDMENT.md")
 MARKETS = ("PITCHER_K", "PITCHER_BB", "PITCHER_ER", "PITCHER_HITS_ALLOWED")
 STAT_KEY = {
     "PITCHER_K": "strikeOuts",
@@ -50,6 +51,8 @@ EASTERN = ZoneInfo("America/New_York")
 WS_START = "2026-10-20"
 WS_END_SCAN = "2026-11-15"
 API = "https://statsapi.mlb.com/api/v1"
+PIT_CONTEXT_MAX_AGE_SECONDS = 20 * 60
+CONTEXT_PATH_RE = re.compile(r"^runtime/mlb-context/runs/[^/]+/[^/]+/game_(\\d+)\\.json$")
 
 
 def _get_json(url: str) -> dict:
@@ -235,6 +238,139 @@ def _payloads_from_data():
         yield json.loads(raw)
 
 
+class PITContextError(RuntimeError):
+    pass
+
+
+def choose_pit_context(candidates, *, observed_at: datetime):
+    """Latest context snapshot at/before the quote, bounded by a frozen 20-minute age."""
+    observed = observed_at.astimezone(timezone.utc)
+    eligible = []
+    for path, payload in candidates:
+        if not isinstance(payload, dict):
+            continue
+        try:
+            captured = _parse_iso(payload.get("retrieved_at"))
+        except Exception:
+            continue
+        age = (observed - captured).total_seconds()
+        if 0 <= age <= PIT_CONTEXT_MAX_AGE_SECONDS:
+            eligible.append((captured, str(path), payload))
+    if not eligible:
+        return None
+    captured, path, payload = max(eligible, key=lambda row: (row[0], row[1]))
+    return {"path": path, "retrieved_at": captured.isoformat(), "payload": payload}
+
+
+class PITContextArchive:
+    """Read immutable pregame MLB context snapshots from the data branch."""
+
+    def __init__(self, paths_by_game):
+        self.paths_by_game = {int(k): tuple(v) for k, v in paths_by_game.items()}
+        self._payload_cache = {}
+
+    @classmethod
+    def from_data(cls):
+        raw = subprocess.check_output(
+            ["git", "ls-tree", "-r", "--name-only", "origin/data", "runtime/mlb-context/runs"],
+            text=True,
+        )
+        by_game = defaultdict(list)
+        for path in raw.splitlines():
+            match = CONTEXT_PATH_RE.match(path)
+            if match:
+                by_game[int(match.group(1))].append(path)
+        return cls(by_game)
+
+    def _load(self, path: str):
+        if path not in self._payload_cache:
+            raw = subprocess.check_output(["git", "show", f"origin/data:{path}"])
+            value = json.loads(raw)
+            if not isinstance(value, dict):
+                raise PITContextError("PIT_CONTEXT_NOT_OBJECT")
+            self._payload_cache[path] = value
+        return self._payload_cache[path]
+
+    def latest(self, *, game_pk: int, observed_at: datetime):
+        candidates = [(path, self._load(path)) for path in self.paths_by_game.get(int(game_pk), ())]
+        return choose_pit_context(candidates, observed_at=observed_at)
+
+
+def _context_lineup_orders(proof) -> dict[int, tuple[int, ...]]:
+    payload = proof["payload"]
+    state = str((payload.get("source_states") or {}).get("confirmed_lineup") or "").upper()
+    if state == "ABSENT":
+        return {}
+    if state != "PRESENT":
+        raise PITContextError("PIT_LINEUP_STATE_UNPROVEN")
+    grouped = defaultdict(list)
+    for row in payload.get("lineups") or []:
+        if not isinstance(row, dict) or str(row.get("starter_status") or "") != "CONFIRMED_STARTER":
+            continue
+        try:
+            grouped[int(row["team_id"])].append((int(row["batting_order"]), int(row["player_id"])))
+        except (KeyError, TypeError, ValueError):
+            raise PITContextError("PIT_LINEUP_ROW_INVALID")
+    orders = {}
+    for team_id, rows in grouped.items():
+        rows = sorted(rows)
+        if [slot for slot, _ in rows] == list(range(1, 10)) and len({pid for _, pid in rows}) == 9:
+            orders[team_id] = tuple(pid for _, pid in rows)
+    if len(orders) != 2:
+        raise PITContextError("PIT_LINEUP_PRESENT_BUT_INCOMPLETE")
+    return orders
+
+
+def _context_umpire(proof):
+    payload = proof["payload"]
+    state = str((payload.get("source_states") or {}).get("plate_umpire") or "").upper()
+    if state == "ABSENT":
+        return None
+    if state != "PRESENT":
+        raise PITContextError("PIT_UMPIRE_STATE_UNPROVEN")
+    row = payload.get("umpire") or {}
+    try:
+        umpire_id = int(row["home_plate_umpire_id"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise PITContextError("PIT_UMPIRE_PRESENT_BUT_INVALID") from exc
+    return {
+        "umpire_id": umpire_id,
+        "umpire_name": str(row.get("home_plate_umpire_name") or "").strip() or None,
+        "official_type": "Home Plate",
+    }
+
+
+def bind_pit_context(source, *, game_pk: int, market: str, proof):
+    """Force current-game optional context to the archived decision-time state."""
+    if proof is None:
+        raise PITContextError("PIT_CONTEXT_FRESH_SNAPSHOT_MISSING")
+    summary = {
+        "path": proof["path"],
+        "retrieved_at": proof["retrieved_at"],
+        "max_age_seconds": PIT_CONTEXT_MAX_AGE_SECONDS,
+        "confirmed_lineup": (proof["payload"].get("source_states") or {}).get("confirmed_lineup"),
+        "plate_umpire": (proof["payload"].get("source_states") or {}).get("plate_umpire"),
+    }
+    if market == "PITCHER_K":
+        orders = _context_lineup_orders(proof)
+        original = source._lineup_boxscore
+        def pit_lineup_boxscore(pk):
+            if int(pk) == int(game_pk):
+                return {"orders": orders}
+            return original(pk)
+        source._lineup_boxscore = pit_lineup_boxscore
+    elif market == "PITCHER_BB":
+        umpire = _context_umpire(proof)
+        original_umpire = source.plate_umpire
+        def pit_plate_umpire(*, game_pk: int, target_date: date):
+            if int(game_pk) == int(summary_game_pk):
+                return umpire
+            return original_umpire(game_pk=game_pk, target_date=target_date)
+        summary_game_pk = int(game_pk)
+        source.plate_umpire = pit_plate_umpire
+    return summary
+
+
 def _match_game(unit: dict, schedule) -> object | None:
     fp = _parse_iso(unit["first_pitch_at"])
     candidates = []
@@ -279,10 +415,15 @@ def _outcome_stat(person: dict, market: str) -> int:
     return int(value)
 
 
-def _model_probability(unit: dict, game, pitcher_id: int, team_id: int, *, cache_dir: Path) -> tuple[float, dict]:
+def _model_probability(unit: dict, game, pitcher_id: int, team_id: int, *, cache_dir: Path, pit_context=None) -> tuple[float, dict, dict | None]:
     target_date = datetime.fromisoformat(str(game.official_date)).date() if game.official_date else parse_game_start(game.game_date).date()
     opener = MLBHistoryCachedOpener(target_date=target_date, cache_dir=cache_dir)
     source = MLBAllMarketHistorySource(opener=opener, retrieved_at=_parse_iso(unit["observed_at"]))
+    context_proof = None
+    if unit["market"] in {"PITCHER_K", "PITCHER_BB"}:
+        context_proof = bind_pit_context(
+            source, game_pk=int(game.game_pk), market=unit["market"], proof=pit_context
+        )
     own = source.pitcher_joint_rows(player_id=pitcher_id, target_date=target_date)
     if len(own) < 5:
         raise MLBGenericFeatureError("PROMOTION_STUDY_REQUIRES_K_GE_5")
@@ -296,7 +437,7 @@ def _model_probability(unit: dict, game, pitcher_id: int, team_id: int, *, cache
         "line": float(unit["line"]), "side": "OVER", "feature_source_hash": feature.get("source_subset_hash"),
         "features": feature["features"],
     })
-    return float(result["model_p"]), feature
+    return float(result["model_p"]), feature, context_proof
 
 
 def _ll(p: float, y: int) -> float:
@@ -419,6 +560,7 @@ def market_metrics(rows: list[dict]) -> dict:
 def render_report(result: dict) -> str:
     lines = ["## MLB pitcher-prop promotion final look", ""]
     lines.append(f"Pre-registration SHA-256: `{result['prereg_sha256']}`.")
+    lines.append(f"PIT-context amendment SHA-256: `{result['pit_context_amendment_sha256']}`.")
     lines.append("One-look study; no model fitting or threshold tuning is performed here.")
     lines.append("")
     lines.append("| market | units | flagged | ΔLL 98.75% CI | ROI 98.75% CI | decision |")
@@ -443,6 +585,7 @@ def run_final(*, out_dir: Path, cache_dir: Path) -> dict:
     if cutoff is None:
         raise RuntimeError("POSTSEASON_NOT_COMPLETE_NO_LOOK")
     units, drops = select_units(_payloads_from_data(), cutoff=cutoff)
+    context_archive = PITContextArchive.from_data()
     schedule_cache = {}
     box_cache = {}
     graded = []
@@ -463,8 +606,22 @@ def run_final(*, out_dir: Path, cache_dir: Path) -> dict:
             continue
         pitcher_id, team_id, _side, person = starter
         try:
-            p, _feature = _model_probability(unit, game, pitcher_id, team_id, cache_dir=cache_dir)
-            graded.append(grade_unit(unit, game, pitcher_id, person, p))
+            pit_context = None
+            if unit["market"] in {"PITCHER_K", "PITCHER_BB"}:
+                pit_context = context_archive.latest(
+                    game_pk=int(game.game_pk), observed_at=_parse_iso(unit["observed_at"])
+                )
+            p, _feature, context_proof = _model_probability(
+                unit, game, pitcher_id, team_id, cache_dir=cache_dir, pit_context=pit_context
+            )
+            row = grade_unit(unit, game, pitcher_id, person, p)
+            if context_proof is not None:
+                row["pit_context_proof"] = context_proof
+            graded.append(row)
+        except PITContextError as exc:
+            key = "pit_context_unproven:" + str(exc)
+            drops[key] = drops.get(key, 0) + 1
+            continue
         except MLBGenericFeatureError:
             drops["production_path_blocked"] = drops.get("production_path_blocked", 0) + 1
             continue
@@ -472,6 +629,7 @@ def run_final(*, out_dir: Path, cache_dir: Path) -> dict:
     result = {
         "schema": "MLB_PITCHER_PROP_PROMOTION_FINAL_LOOK_V1",
         "prereg_sha256": _sha256(PREREG),
+        "pit_context_amendment_sha256": _sha256(PIT_CONTEXT_AMENDMENT),
         "postseason_cutoff_utc": cutoff.isoformat(),
         "bootstrap": {"reps": BOOT_REPS, "seed": BOOT_SEED, "ci_level": CI_LEVEL, "cluster": "pitcher_id"},
         "drops": drops,
