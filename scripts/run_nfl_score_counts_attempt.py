@@ -34,6 +34,7 @@ DEVELOPMENT_SEASONS = tuple(range(2018, 2026))
 IDENTITY_PATHS = (
     "config/research/nfl_score_counts_g1_missing_epa_addendum_v3.json",
     "config/research/nfl_score_counts_g1_attempt2_fg_prereg_v1.json",
+    "config/research/nfl_score_counts_g1_attempt3_fg_prereg_v1.json",
     "sportsedge/sports/nfl/score_counts_source_projection.py",
     "sportsedge/sports/nfl/score_counts_features.py",
     "sportsedge/sports/nfl/m2_history_features.py",
@@ -45,6 +46,7 @@ IDENTITY_PATHS = (
 PREREG_BY_ATTEMPT = {
     1: Path("config/research/nfl_score_counts_g1_prereg_addendum_v2.json"),
     2: Path("config/research/nfl_score_counts_g1_attempt2_fg_prereg_v1.json"),
+    3: Path("config/research/nfl_score_counts_g1_attempt3_fg_prereg_v1.json"),
 }
 
 

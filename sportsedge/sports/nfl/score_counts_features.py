@@ -71,6 +71,8 @@ class TeamGame:
     offensive_tds_allowed: int = 0
     made_field_goals: int = 0
     field_goals_allowed: int = 0
+    field_goal_attempts: int = 0
+    field_goal_attempts_allowed: int = 0
     def_st_touchdowns: int = 0
     safeties: int = 0
     pat_made: int = 0
@@ -307,9 +309,13 @@ def aggregate_game_pbp(
                 stat(gid, td_team).def_st_touchdowns += 1
 
         fg_result = str(row.get("field_goal_result") or "").strip().lower()
-        if fg_result in {"made", "good"}:
+        if fg_result in {"made", "good", "missed", "blocked"}:
             if not offense:
                 raise ScoreCountFeatureError(f"FG_TEAM_REQUIRED:{gid}:{play_id}")
+            stat(gid, offense).field_goal_attempts += 1
+            if defense:
+                stat(gid, defense).field_goal_attempts_allowed += 1
+        if fg_result in {"made", "good"}:
             stat(gid, offense).made_field_goals += 1
             if defense:
                 stat(gid, defense).field_goals_allowed += 1
@@ -363,6 +369,8 @@ def _team_features(history: Sequence[TeamGame]) -> dict[str, float]:
         "td_allowed_per_game": _weighted(history, lambda r: float(r.offensive_tds_allowed)),
         "made_fg_per_game": _weighted(history, lambda r: float(r.made_field_goals)),
         "fg_allowed_per_game": _weighted(history, lambda r: float(r.field_goals_allowed)),
+        "fg_attempts_per_game": _weighted(history, lambda r: float(r.field_goal_attempts)),
+        "fg_attempts_allowed_per_game": _weighted(history, lambda r: float(r.field_goal_attempts_allowed)),
         "off_turnover_rate": _weighted(history, lambda r: _rate(r.turnovers, r.off_plays)),
         "def_takeaway_rate": _weighted(history, lambda r: _rate(r.takeaways, r.def_plays)),
         "off_sack_rate_allowed": _weighted(history, lambda r: _rate(r.sacks_allowed, r.pass_dropbacks)),
@@ -422,6 +430,8 @@ def _flatten(
         "opp_td_allowed_per_game": opponent["td_allowed_per_game"],
         "made_fg_per_game": own["made_fg_per_game"],
         "opp_fg_allowed_per_game": opponent["fg_allowed_per_game"],
+        "fg_attempts_per_game": own["fg_attempts_per_game"],
+        "opp_fg_attempts_allowed_per_game": opponent["fg_attempts_allowed_per_game"],
         "off_turnover_rate": own["off_turnover_rate"],
         "opp_takeaway_rate": opponent["def_takeaway_rate"],
         "off_sack_rate_allowed": own["off_sack_rate_allowed"],
@@ -430,7 +440,7 @@ def _flatten(
         "starting_qb_cpoe_shrunk": float(qb_cpoe),
         "home_indicator": 1.0 if home else 0.0,
     }
-    if set(row) != set(FEATURE_NAMES):
+    if set(row) != set((*FEATURE_NAMES, "fg_attempts_per_game", "opp_fg_attempts_allowed_per_game")):
         raise ScoreCountFeatureError("FROZEN_FEATURE_IDENTITY_MISMATCH")
     return row
 
@@ -504,6 +514,7 @@ def _feature_digest(row: Mapping[str, Any]) -> str:
         "game_id", "season", "week", "game_start_ts", "team", "opponent",
         "starting_qb_id", "starting_qb_prior_dropbacks",
         *FEATURE_NAMES,
+        "fg_attempts_per_game", "opp_fg_attempts_allowed_per_game",
         "def_st_td_rate", "safety_rate",
         "conversion_pat_p", "conversion_two_p", "conversion_no_p",
     )

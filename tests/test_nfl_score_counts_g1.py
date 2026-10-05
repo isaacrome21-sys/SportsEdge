@@ -213,3 +213,28 @@ def test_attempt2_fg_subset_is_supported_without_changing_td_identity():
     )
     assert fitted.td_model.feature_names == FEATURE_NAMES
     assert fitted.fg_model.feature_names == FG_ATTEMPT2_FEATURE_NAMES
+
+
+def test_attempt3_fg_features_are_allowed_without_changing_td_vector():
+    from sportsedge.sports.nfl.score_counts_g1 import (
+        FEATURE_NAMES,
+        FG_ATTEMPT3_FEATURE_NAMES,
+        fit_poisson_ridge,
+    )
+    rows = []
+    for i in range(8):
+        row = {name: float(i + 1) for name in FEATURE_NAMES}
+        row.update({
+            "fg_attempts_per_game": 2.0 + 0.1 * i,
+            "opp_fg_attempts_allowed_per_game": 2.2 + 0.05 * i,
+            "made_field_goals": i % 3,
+        })
+        rows.append(row)
+    fg = fit_poisson_ridge(
+        rows,
+        target="made_field_goals",
+        alpha=100.0,
+        feature_names=FG_ATTEMPT3_FEATURE_NAMES,
+    )
+    assert fg.feature_names == FG_ATTEMPT3_FEATURE_NAMES
+    assert "fg_attempts_per_game" not in FEATURE_NAMES

@@ -451,3 +451,30 @@ def test_frozen_pit_ne_completion_keeps_factual_dropback():
     assert teams[("2019_01_PIT_NE", "PIT")].pass_epa_n == 0
     assert qbs[("2019_01_PIT_NE", "00-0022924")].dropbacks == 1
     assert qbs[("2019_01_PIT_NE", "00-0022924")].epa_n == 0
+
+
+def test_field_goal_attempts_preserve_opportunity_separate_from_makes():
+    rows = [
+        {"game_id": "g1", "play_id": "1", "posteam": "H", "defteam": "A", "field_goal_result": "made"},
+        {"game_id": "g1", "play_id": "2", "posteam": "H", "defteam": "A", "field_goal_result": "missed"},
+        {"game_id": "g1", "play_id": "3", "posteam": "H", "defteam": "A", "field_goal_result": "blocked"},
+    ]
+    teams, _ = aggregate_game_pbp(rows)
+    home = teams[("g1", "H")]
+    away = teams[("g1", "A")]
+    assert home.field_goal_attempts == 3
+    assert home.made_field_goals == 1
+    assert away.field_goal_attempts_allowed == 3
+    assert away.field_goals_allowed == 1
+
+
+def test_training_rows_carry_pit_safe_fg_attempt_history():
+    custom = pbp()
+    custom.append({
+        "game_id": "g4", "play_id": "499",
+        "posteam": "H", "defteam": "A", "field_goal_result": "missed",
+    })
+    out = rows_for(pbp_rows=custom)
+    g5h = by_game_team(out, "g5", "H")
+    assert g5h["fg_attempts_per_game"] > g5h["made_fg_per_game"]
+    assert g5h["opp_fg_attempts_allowed_per_game"] >= g5h["opp_fg_allowed_per_game"]

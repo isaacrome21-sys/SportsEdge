@@ -1,0 +1,131 @@
+{
+  "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G1_ATTEMPT3_FG_PREREG_V1",
+  "status": "FROZEN_BEFORE_ATTEMPT_3_IMPLEMENTATION_OR_SCORING",
+  "frozen_date": "2026-10-05",
+  "candidate_family": "NFL_SCORE_COUNTS_G1",
+  "attempt_number": 3,
+  "attempt_budget": {
+    "maximum": 3,
+    "consumed_before_this_attempt": 2,
+    "remaining_before_this_attempt": 1,
+    "attempt_1_preserved": true,
+    "attempt_2_preserved": true,
+    "thresholds_unchanged": true
+  },
+  "attempt_2_evidence": {
+    "workflow_run_id": 37346097842,
+    "artifact_id": 11364065014,
+    "fit_artifact_sha256": "8fcfc6ade9acb88d27426a012e62a2020ca982148d17c443d1367697b16cca3b",
+    "source_manifest_sha256": "00841dca7d5671d6055d02eea90c21089633eb196eeeeca769a38f9abde4e5d4",
+    "team_rows": 3934,
+    "games": 1967,
+    "overall_status": "DEVELOPMENT_ATTEMPT_FAIL",
+    "touchdowns": {
+      "fold_wins": 5,
+      "folds_total": 5,
+      "pooled_candidate_deviance": 0.8640739939949063,
+      "pooled_baseline_deviance": 0.9429609486409716,
+      "status": "PASS"
+    },
+    "field_goals": {
+      "fold_wins": 2,
+      "folds_total": 5,
+      "pooled_candidate_deviance": 1.0487832615085937,
+      "pooled_baseline_deviance": 1.0488367803645573,
+      "status": "FAIL"
+    }
+  },
+  "reason": {
+    "diagnosis": "Attempt 2 reduced the FG model from 20 features to direct made-FG history, opponent FG allowance, play volume, and home indicator. It improved fold wins from 0/5 to 2/5 and pooled deviance from worse-than-baseline to marginally better, but still missed the frozen 3/5 gate. The remaining structural omission is field-goal opportunity: the row builder records made FGs but not attempted FGs, conflating opportunity creation with kick conversion.",
+    "change_scope": "FIELD_GOAL_MEAN_MODEL_ONLY",
+    "touchdown_model_change": false,
+    "market_data_used_to_choose_change": false,
+    "sportsbook_data_allowed": false
+  },
+  "field_goal_attempt_3_spec": {
+    "family": "L2_REGULARIZED_POISSON_GLM_LOG_LINK",
+    "target": "MADE_FIELD_GOALS",
+    "feature_names": [
+      "fg_attempts_per_game",
+      "opp_fg_attempts_allowed_per_game",
+      "made_fg_per_game",
+      "opp_fg_allowed_per_game",
+      "home_indicator"
+    ],
+    "feature_rationale": {
+      "fg_attempts_per_game": "direct PIT-safe offensive field-goal opportunity history",
+      "opp_fg_attempts_allowed_per_game": "direct PIT-safe opponent field-goal opportunity allowance history",
+      "made_fg_per_game": "conversion plus opportunity history retained from Attempt 2",
+      "opp_fg_allowed_per_game": "opponent made-FG allowance retained from Attempt 2",
+      "home_indicator": "frozen contextual home effect"
+    },
+    "lookback_decay_and_pit_builder": "UNCHANGED_FROM_PARENT_EXCEPT_RECORDING_FACTUAL_FG_ATTEMPTS",
+    "standardization": "TRAINING_FOLD_ONLY",
+    "alpha_grid": [
+      0.1,
+      1,
+      10,
+      100,
+      1000
+    ],
+    "alpha_selection": "EXPANDING_SEASON_CV_DEVELOPMENT_ONLY",
+    "metric": "MEAN_POISSON_DEVIANCE",
+    "validation_seasons": [
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "target_season_excluded_from_fit": true,
+    "no_feature_search_after_scoring": true
+  },
+  "preserved_components": {
+    "touchdown_feature_vector": "EXACT_PARENT_20_FEATURE_VECTOR",
+    "touchdown_alpha_grid": [
+      0.1,
+      1,
+      10,
+      100
+    ],
+    "touchdown_gate": "UNCHANGED",
+    "field_goal_gate": "UNCHANGED",
+    "all_targets_must_pass": true,
+    "minimum_fold_wins_each": 3,
+    "pooled_candidate_deviance_must_be_below_intercept_baseline": true,
+    "rare_scores": "UNCHANGED",
+    "conversion_model": "UNCHANGED",
+    "shared_sigma_grid": "UNCHANGED",
+    "development_seasons": [
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "source_bytes": "UNCHANGED_SHA_BOUND_CONTRACT",
+    "rng": "UNCHANGED",
+    "paths_per_game": 50000,
+    "backfill": false
+  },
+  "execution_rules": {
+    "implementation_must_bind_this_prereg_sha256": true,
+    "attempt_3_may_run_only_after_code_and_this_prereg_land_on_protected_main": true,
+    "attempt_3_consumed_on_completed_historical_evaluation": true,
+    "implementation_failure_before_fit_does_not_consume_attempt": true,
+    "if_attempt_3_fails": "PRESERVE_RESULT; ATTEMPT_BUDGET_EXHAUSTED; DO_NOT PROMOTE NFL_SCORE_COUNTS_G1",
+    "if_attempt_3_passes": "FREEZE_FIT THEN ENABLE EXISTING GAME MARKET AND PROP BRIDGES"
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "pricing": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "backfill": false
+  }
+}
