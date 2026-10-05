@@ -12,7 +12,7 @@
     "sportsedge/shared_game_engine.py": "3c60d644703c637434eded508c71934de5aa9a00",
     "sportsedge/shared_f5_engine.py": "d1ea46d5701008fe1bf81f679591d85cbc7291bd",
     "sportsedge/hitter_joint_engine.py": "0f578b591af85806ae692913bfe7a00c250c99f4",
-    "sportsedge/pitcher_joint_engine.py": "cb11f6c30077ba04788acaa8a561dcadb8bef8fa",
+    "sportsedge/pitcher_joint_engine.py": "98f0c2503e25c955968596c0e415cf8567a5a0af",
     "sportsedge/first_hr_order_engine.py": "a7d273a5b8d25b20d5863a74bb3e015bbe6490b4",
     "sportsedge/pitcher_record_win_engine.py": "9a477ea82daf28562e8d6e449acfbf42402e3f6d",
     "sportsedge/mlb_empirical_bayes.py": "3fe48bf0afcd82dd108dba3412df9fab0a2a4390",
