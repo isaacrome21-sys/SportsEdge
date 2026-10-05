@@ -1779,10 +1779,16 @@
       "merge_sha": "303545e3ca1d4ec1217c721dd5208bab6128947d",
       "pr": 1574,
       "note": "NFL V2K frozen Attempt-3 clean-port onto current main. The merge lands the frozen execution surface; reconciliation creates no Model_P, pricing, promotion, staking, release, or OFFICIAL authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_70AC6942_PR_1577",
+      "merge_sha": "70ac6942673f9720d9fa6ea838caffd561c8488f",
+      "pr": 1577,
+      "note": "MLB held-out F5 and NRFI/YRFI tightening research merge. Research/prereg/test surfaces only; no Model_P, pricing, promotion, staking, release, OFFICIAL, or untouched-readout authority."
     }
   ],
-  "inventory_block_reason": "Current main through merge 303545e3 / PR #1574 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge 70ac6942 / PR #1577 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "303545e3ca1d4ec1217c721dd5208bab6128947d",
+  "reconciled_through_sha": "70ac6942673f9720d9fa6ea838caffd561c8488f",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
