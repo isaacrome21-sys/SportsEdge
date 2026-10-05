@@ -1,0 +1,20 @@
+{
+  "policy_id": "NFL_2026_CONFIRMATION_PROVIDER_POLICY_V1",
+  "provider": "the_odds_api",
+  "sport_key": "americanfootball_nfl",
+  "bookmakers": ["draftkings"],
+  "request_profiles": {
+    "confirmation_fallback": {
+      "endpoint_scope": "sport_bulk",
+      "markets": ["spreads", "totals"],
+      "regions": ["us"],
+      "credits_per_call": 2
+    }
+  },
+  "provider_budget_path": "config/nfl_2026_provider_budget_v1.json",
+  "reserve_role": "reserve_owner",
+  "runtime_binding": {
+    "capture_config": "config/nfl_2026_capture.json",
+    "workflow": ".github/workflows/nfl-2026-line-capture.yml"
+  }
+}
