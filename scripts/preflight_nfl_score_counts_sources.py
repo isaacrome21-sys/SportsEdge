@@ -14,6 +14,8 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from sportsedge.sports.nfl.score_counts_source_projection import PBP_ALLOWED_FIELDS
+
 FORBIDDEN_TOKENS = (
     "odds", "price", "sportsbook", "market", "spread_line", "total_line",
     "closing", "opening", "implied", "vig", "handle", "tickets",
@@ -126,14 +128,23 @@ def inspect_contract(contract: dict, root: Path) -> dict:
 
     pbp_bad = sorted({c for row in rows if row["name"].startswith("pbp_") for c in row["forbidden_columns"]})
     depth_bad = sorted({c for row in rows if row["name"].startswith("depth_") for c in row["forbidden_columns"]})
+    if depth_bad:
+        status = "RAW_DEPTH_SCHEMA_FORBIDDEN_COLUMNS"
+    elif pbp_bad:
+        status = "PASS_WITH_EXPLICIT_MARKET_BLIND_PROJECTION"
+    else:
+        status = "PASS"
     return {
         "schema": SCHEMA,
         "candidate_family": "NFL_SCORE_COUNTS_G1",
-        "status": "PASS" if not pbp_bad and not depth_bad else "RAW_SCHEMA_REQUIRES_EXPLICIT_PROJECTION",
+        "status": status,
         "verified_exact_sources": len(rows),
         "pbp_forbidden_raw_columns": pbp_bad,
         "depth_forbidden_raw_columns": depth_bad,
         "raw_rows_directly_compatible_with_current_market_blind_guard": not (pbp_bad or depth_bad),
+        "pbp_projection_required": bool(pbp_bad),
+        "pbp_projection_allowlist": list(PBP_ALLOWED_FIELDS),
+        "pbp_projection_drops": pbp_bad,
         "attempt_consumed": False,
         "historical_scoring_performed": False,
         "model_fit_performed": False,
@@ -163,8 +174,8 @@ def main() -> int:
         "depth_forbidden_raw_columns": result["depth_forbidden_raw_columns"],
         "attempt_consumed": False,
     }, sort_keys=True))
-    if result["status"] != "PASS":
-        raise SystemExit("NFL_SCORE_COUNTS_SOURCE_SCHEMA_NOT_DIRECTLY_PARSER_COMPATIBLE")
+    if not str(result["status"]).startswith("PASS"):
+        raise SystemExit("NFL_SCORE_COUNTS_SOURCE_SCHEMA_NOT_PARSER_COMPATIBLE")
     return 0
 
 
