@@ -140,7 +140,31 @@ class MLBF5FeatureTests(unittest.TestCase):
         self.assertEqual(len(feature["feature_source_hash"]), 64)
         self.assertEqual(len(feature["features"]["away_f5_runs_for"]), 10)
         self.assertEqual(len(feature["features"]["home_f5_runs_for"]), 10)
+        self.assertEqual(feature["features"]["away_first_inning_runs_for"], [1] * 10)
+        self.assertEqual(feature["features"]["home_first_inning_runs_for"], [0] * 10)
         self.assertLess(max(feature["features"]["away_f5_runs_for"]), 15)
+
+    def test_current_statsapi_direct_inning_shape_is_accepted(self):
+        payload = self._payload()
+        for block in payload["dates"]:
+            for game in block["games"]:
+                for inning in game["linescore"]["innings"]:
+                    teams = inning.pop("teams")
+                    inning["away"] = teams["away"]
+                    inning["home"] = teams["home"]
+
+        source = MLBF5HistorySource(
+            opener=lambda req, timeout=15: _Response(payload),
+            retrieved_at=datetime(2026, 8, 20, 12, tzinfo=timezone.utc),
+        )
+        feature = source.matchup_features(
+            away_team_id=10,
+            home_team_id=20,
+            target_date=date(2026, 8, 20),
+        )
+        self.assertEqual(feature["away_history_games"], 10)
+        self.assertEqual(feature["features"]["away_first_inning_runs_for"], [1] * 10)
+        self.assertEqual(feature["features"]["home_first_inning_runs_for"], [0] * 10)
 
     def test_home_tie_then_permanent_bottom_six_lead_requires_eighteen_outs(self):
         games = []
