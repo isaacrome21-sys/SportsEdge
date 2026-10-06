@@ -535,5 +535,9 @@
     "official": false,
     "validation_attempt": false,
     "readout": false
+  },
+  "zero_authority_paths": {
+    ".github/workflows/mlb-pitcher-k-eval-attempt1-recovery-main-trigger.yml": "MLB_PITCHER_K_ATTEMPT1_PRE_EVALUATION_FAILURE_RECOVERY_WORKFLOW_RESEARCH_ONLY_ZERO_BETTING_AUTHORITY",
+    "config/research/mlb_pitcher_k_eval_attempt1_recovery_v1.json": "MLB_PITCHER_K_ATTEMPT1_PRE_EVALUATION_FAILURE_RECOVERY_MARKER_RESEARCH_ONLY_ZERO_BETTING_AUTHORITY"
   }
 }
