@@ -314,3 +314,132 @@ def test_prop_team_failure_does_not_invalidate_score_count_game_markets(monkeypa
     assert game["role_status"] == "NO_MODEL"
     assert game["engine"]["prop_board_status"] == "NO_MODEL"
 
+def test_single_team_quoted_props_do_not_require_unquoted_team_role_model(monkeypatch):
+    calls = []
+
+    def fake_live_team_model(**kwargs):
+        team_name = str(kwargs["team"])
+        calls.append(team_name)
+        if team_name == "B":
+            raise ValueError("B_ROLE_BROKEN")
+        return team(team_name)
+
+    def fake_prop_bridge(prediction, **kwargs):
+        assert kwargs["home_model"] is None
+        assert kwargs["away_model"] is not None
+        assert {row["team"] for row in kwargs["prop_requests"]} == {"away"}
+        return {
+            "prop_markets": [
+                {
+                    **req,
+                    "estimate_p": 0.60 if req["selection"] == "over" else 0.40,
+                    "loss_p": 0.40 if req["selection"] == "over" else 0.60,
+                    "push_p": 0.0,
+                    "conditional_win_probability": 0.60 if req["selection"] == "over" else 0.40,
+                    "fair_american": -150.0 if req["selection"] == "over" else 150.0,
+                    "status": "PRICED_RESEARCH",
+                }
+                for req in kwargs["prop_requests"]
+            ],
+            "prop_board_status": "AVAILABLE",
+            "prop_board_error": None,
+            "team_simulation_errors": {},
+        }
+
+    monkeypatch.setattr(
+        "sportsedge.nfl_score_counts_phone.build_live_team_model",
+        fake_live_team_model,
+    )
+    monkeypatch.setattr(
+        "sportsedge.nfl_score_counts_phone.price_score_count_prop_markets",
+        fake_prop_bridge,
+    )
+
+    board = {
+        "observed_at": "2026-10-05T16:00:00+00:00",
+        "games": [{
+            "away": "A",
+            "home": "B",
+            "markets": [{
+                "market": "receiving_yards",
+                "team": "A",
+                "player": "A_WR",
+                "line": 45.5,
+                "away_or_over_price": -110,
+                "home_or_under_price": -110,
+            }],
+        }],
+    }
+    out = build_score_count_phone_card(
+        board,
+        prediction=prediction(),
+        schedule_games=schedule(),
+        depth_rows=[{}],
+        player_rows=[{}],
+        injury_rows=[{}],
+        injury_source_ready=True,
+    )
+    assert calls == ["A"]
+    game = out["games"][0]
+    assert game["role_status"] == "AVAILABLE"
+    assert game["engine"]["role_model_errors_by_side"] == {}
+    props = [row for row in game["rows"] if row["market"] == "receiving_yards"]
+    assert len(props) == 2
+    assert all(row["status"] == "PRICED" for row in props)
+
+
+def test_two_team_quoted_props_fail_closed_when_one_requested_role_model_build_fails(monkeypatch):
+    def fake_live_team_model(**kwargs):
+        team_name = str(kwargs["team"])
+        if team_name == "B":
+            raise ValueError("B_ROLE_BROKEN")
+        return team(team_name)
+
+    monkeypatch.setattr(
+        "sportsedge.nfl_score_counts_phone.build_live_team_model",
+        fake_live_team_model,
+    )
+
+    board = {
+        "observed_at": "2026-10-05T16:00:00+00:00",
+        "games": [{
+            "away": "A",
+            "home": "B",
+            "markets": [
+                {
+                    "market": "receiving_yards",
+                    "team": "A",
+                    "player": "A_WR",
+                    "line": 45.5,
+                    "away_or_over_price": -110,
+                    "home_or_under_price": -110,
+                },
+                {
+                    "market": "receiving_yards",
+                    "team": "B",
+                    "player": "B_WR",
+                    "line": 45.5,
+                    "away_or_over_price": -110,
+                    "home_or_under_price": -110,
+                },
+            ],
+        }],
+    }
+    out = build_score_count_phone_card(
+        board,
+        prediction=prediction(),
+        schedule_games=schedule(),
+        depth_rows=[{}],
+        player_rows=[{}],
+        injury_rows=[{}],
+        injury_source_ready=True,
+    )
+    game = out["games"][0]
+    assert game["role_status"] == "NO_MODEL"
+    assert game["role_error"].startswith("GAME_PROP_ROLE_MODEL_INCOMPLETE:")
+    assert game["engine"]["role_model_errors_by_side"] == {"home": "B_ROLE_BROKEN"}
+    props = [row for row in game["rows"] if row["market"] == "receiving_yards"]
+    assert len(props) == 4
+    assert all(row["status"] == "NO_MODEL" for row in props)
+    assert all(row["reason"] == game["role_error"] for row in props)
+
