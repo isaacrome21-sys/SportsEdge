@@ -184,8 +184,8 @@ class CeilingAndLabelTests(unittest.TestCase):
 
     def test_final_markdown_has_one_card_with_core_and_prop_quick_views(self):
         payload = {"results": [
-            _row("MONEYLINE", "AWAY", 120, 0.56, fair=0.44, edge=0.12),
-            _row("MONEYLINE", "HOME", -142, 0.44, fair=0.56, edge=-0.12),
+            _row("MONEYLINE", "AWAY", 120, 0.50, fair=0.44, edge=0.06),
+            _row("MONEYLINE", "HOME", -142, 0.50, fair=0.56, edge=-0.06),
             {**_row("PITCHER_K", "OVER", 110, 0.60, line=5.5, entity="p1", fair=0.48, edge=0.12),
              "entity_name": "Pitcher One",
              "engine_version": "mlb_pitcher_joint_empirical_bayes_v3",
@@ -207,7 +207,7 @@ class CeilingAndLabelTests(unittest.TestCase):
              "empirical_evidence": {"sample_size": 30, "sample_unit": "games", "wins": 12, "pushes": 0,
                                     "weighted": False, "pool_sha256": "hitter"}},
         ]}
-        text = render_markdown(myspari_rows(payload), header="t")
+        text = render_markdown(myspari_rows(payload, names={"p1": "Pitcher One", "h1": "Hitter One"}), header="t")
         self.assertIn("## Core plays", text)
         self.assertIn("## Top pitcher-prop leans", text)
         self.assertIn("## Top hitter-prop leans", text)
