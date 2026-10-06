@@ -1,7 +1,12 @@
 from pathlib import Path
 import pytest
 
-from sportsedge.nfl_score_counts_phone import build_score_count_phone_card
+from sportsedge.nfl_score_counts_phone import (
+    _apply_prop_selection_policy,
+    _filter_current_starter_qb_history,
+    _prop_selection_diagnostics,
+    build_score_count_phone_card,
+)
 from scripts.run_nfl_score_counts_lines_card import _game_only_ticket
 from sportsedge.nfl_unified_phone import UnifiedNflPhoneError
 
@@ -242,3 +247,480 @@ def test_fast_game_output_precedes_prop_context_fetch():
     assert fast < props
     assert "fast_game_markets_only" in text
     assert "NOT_REQUIRED_FOR_GAME_MARKETS" in text
+
+def test_prop_team_failure_does_not_invalidate_score_count_game_markets(monkeypatch):
+    def fake_live_team_model(**kwargs):
+        return team(str(kwargs["team"]))
+
+    def fake_prop_bridge(prediction, **kwargs):
+        reqs = kwargs["prop_requests"]
+        reason = "GAME_PROP_SIMULATION_INCOMPLETE:home=TEAM_MODEL_REQUIRED"
+        return {
+            "prop_markets": [
+                {
+                    **req,
+                    "status": "NO_MODEL",
+                    "reason": reason,
+                }
+                for req in reqs
+            ],
+            "prop_board_status": "NO_MODEL",
+            "prop_board_error": reason,
+            "team_simulation_errors": {"home": "TEAM_MODEL_REQUIRED"},
+        }
+
+    monkeypatch.setattr(
+        "sportsedge.nfl_score_counts_phone.build_live_team_model",
+        fake_live_team_model,
+    )
+    monkeypatch.setattr(
+        "sportsedge.nfl_score_counts_phone.price_score_count_prop_markets",
+        fake_prop_bridge,
+    )
+
+    board = {
+        "observed_at": "2026-10-05T16:00:00+00:00",
+        "games": [{
+            "away": "A",
+            "home": "B",
+            "markets": [
+                {
+                    "market": "moneyline",
+                    "away_or_over_price": 110,
+                    "home_or_under_price": -130,
+                },
+                {
+                    "market": "receiving_yards",
+                    "player": "B_WR",
+                    "line": 64.5,
+                    "away_or_over_price": -105,
+                    "home_or_under_price": -115,
+                },
+            ],
+        }],
+    }
+    out = build_score_count_phone_card(
+        board,
+        prediction=prediction(),
+        schedule_games=schedule(),
+        depth_rows=[{}],
+        player_rows=[{}],
+        injury_rows=[{}],
+        injury_source_ready=True,
+    )
+    game = out["games"][0]
+    moneyline = [row for row in game["rows"] if row["market"] == "moneyline"]
+    props = [row for row in game["rows"] if row["market"] == "receiving_yards"]
+    assert len(moneyline) == 2
+    assert all(row["status"] == "PRICED" for row in moneyline)
+    assert len(props) == 2
+    assert all(row["status"] == "NO_MODEL" for row in props)
+    assert game["status"] == "PRICED_SCORE_COUNTS_RESEARCH"
+    assert game["role_status"] == "NO_MODEL"
+    assert game["engine"]["prop_board_status"] == "NO_MODEL"
+
+def test_single_team_quoted_props_do_not_require_unquoted_team_role_model(monkeypatch):
+    calls = []
+
+    def fake_live_team_model(**kwargs):
+        team_name = str(kwargs["team"])
+        calls.append(team_name)
+        if team_name == "B":
+            raise ValueError("B_ROLE_BROKEN")
+        return team(team_name)
+
+    def fake_prop_bridge(prediction, **kwargs):
+        assert kwargs["home_model"] is None
+        assert kwargs["away_model"] is not None
+        assert {row["team"] for row in kwargs["prop_requests"]} == {"away"}
+        return {
+            "prop_markets": [
+                {
+                    **req,
+                    "estimate_p": 0.60 if req["selection"] == "over" else 0.40,
+                    "loss_p": 0.40 if req["selection"] == "over" else 0.60,
+                    "push_p": 0.0,
+                    "conditional_win_probability": 0.60 if req["selection"] == "over" else 0.40,
+                    "fair_american": -150.0 if req["selection"] == "over" else 150.0,
+                    "status": "PRICED_RESEARCH",
+                }
+                for req in kwargs["prop_requests"]
+            ],
+            "prop_board_status": "AVAILABLE",
+            "prop_board_error": None,
+            "team_simulation_errors": {},
+        }
+
+    monkeypatch.setattr(
+        "sportsedge.nfl_score_counts_phone.build_live_team_model",
+        fake_live_team_model,
+    )
+    monkeypatch.setattr(
+        "sportsedge.nfl_score_counts_phone.price_score_count_prop_markets",
+        fake_prop_bridge,
+    )
+
+    board = {
+        "observed_at": "2026-10-05T16:00:00+00:00",
+        "games": [{
+            "away": "A",
+            "home": "B",
+            "markets": [{
+                "market": "receiving_yards",
+                "team": "A",
+                "player": "A_WR",
+                "line": 45.5,
+                "away_or_over_price": -110,
+                "home_or_under_price": -110,
+            }],
+        }],
+    }
+    out = build_score_count_phone_card(
+        board,
+        prediction=prediction(),
+        schedule_games=schedule(),
+        depth_rows=[{}],
+        player_rows=[{}],
+        injury_rows=[{}],
+        injury_source_ready=True,
+    )
+    assert calls == ["A"]
+    game = out["games"][0]
+    assert game["role_status"] == "AVAILABLE"
+    assert game["engine"]["role_model_errors_by_side"] == {}
+    props = [row for row in game["rows"] if row["market"] == "receiving_yards"]
+    assert len(props) == 2
+    assert all(row["status"] == "PRICED" for row in props)
+
+
+def test_two_team_quoted_props_fail_closed_when_one_requested_role_model_build_fails(monkeypatch):
+    def fake_live_team_model(**kwargs):
+        team_name = str(kwargs["team"])
+        if team_name == "B":
+            raise ValueError("B_ROLE_BROKEN")
+        return team(team_name)
+
+    monkeypatch.setattr(
+        "sportsedge.nfl_score_counts_phone.build_live_team_model",
+        fake_live_team_model,
+    )
+
+    board = {
+        "observed_at": "2026-10-05T16:00:00+00:00",
+        "games": [{
+            "away": "A",
+            "home": "B",
+            "markets": [
+                {
+                    "market": "receiving_yards",
+                    "team": "A",
+                    "player": "A_WR",
+                    "line": 45.5,
+                    "away_or_over_price": -110,
+                    "home_or_under_price": -110,
+                },
+                {
+                    "market": "receiving_yards",
+                    "team": "B",
+                    "player": "B_WR",
+                    "line": 45.5,
+                    "away_or_over_price": -110,
+                    "home_or_under_price": -110,
+                },
+            ],
+        }],
+    }
+    out = build_score_count_phone_card(
+        board,
+        prediction=prediction(),
+        schedule_games=schedule(),
+        depth_rows=[{}],
+        player_rows=[{}],
+        injury_rows=[{}],
+        injury_source_ready=True,
+    )
+    game = out["games"][0]
+    assert game["role_status"] == "NO_MODEL"
+    assert game["role_error"].startswith("GAME_PROP_ROLE_MODEL_INCOMPLETE:")
+    assert game["engine"]["role_model_errors_by_side"] == {"home": "B_ROLE_BROKEN"}
+    props = [row for row in game["rows"] if row["market"] == "receiving_yards"]
+    assert len(props) == 4
+    assert all(row["status"] == "NO_MODEL" for row in props)
+    assert all(row["reason"] == game["role_error"] for row in props)
+
+def test_score_count_prop_selection_trims_same_player_pass_volume_duplicates():
+    raw_game = {
+        "markets": [
+            {"player": "QB", "market": "pass_attempts"},
+            {"player": "QB", "market": "completions"},
+            {"player": "QB", "market": "passing_yards"},
+        ]
+    }
+    rows = [
+        {
+            "input_index": 0, "player": "QB", "market": "pass_attempts",
+            "status": "PRICED", "selected": True, "selection": "QB Under",
+            "ev_per_dollar": 0.08, "edge_probability_points": 0.08, "score_0_100": 88,
+        },
+        {
+            "input_index": 1, "player": "QB", "market": "completions",
+            "status": "PRICED", "selected": True, "selection": "QB Under",
+            "ev_per_dollar": 0.11, "edge_probability_points": 0.10, "score_0_100": 88,
+        },
+        {
+            "input_index": 2, "player": "QB", "market": "passing_yards",
+            "status": "PRICED", "selected": True, "selection": "QB Under",
+            "ev_per_dollar": 0.17, "edge_probability_points": 0.14, "score_0_100": 88,
+        },
+    ]
+    policy = _apply_prop_selection_policy(rows, raw_game)
+    kept = [row for row in rows if row.get("selected")]
+    assert len(kept) == 1
+    assert kept[0]["market"] == "passing_yards"
+    assert policy["candidate_pair_selections"] == 3
+    assert policy["served_prop_selections"] == 1
+    assert policy["forces_team_balance"] is False
+    assert policy["forces_over_under_balance"] is False
+
+
+def test_score_count_prop_selection_has_no_arbitrary_global_prop_count_cap():
+    specs = [
+        ("P0", "passing_yards"),
+        ("P1", "receiving_yards"),
+        ("P2", "rushing_yards"),
+        ("P3", "rush_attempts"),
+        ("P4", "pass_tds"),
+        ("P5", "anytime_tds"),
+        ("P6", "interceptions"),
+    ]
+    raw_game = {
+        "markets": [
+            {"player": player, "market": market}
+            for player, market in specs
+        ]
+    }
+    rows = [
+        {
+            "input_index": i, "player": player, "team": "away",
+            "market": market, "status": "PRICED", "selected": True,
+            "selection": f"{player} Under", "ev_per_dollar": 0.20 - i * 0.01,
+            "edge_probability_points": 0.20 - i * 0.01, "score_0_100": 88,
+        }
+        for i, (player, market) in enumerate(specs)
+    ]
+    policy = _apply_prop_selection_policy(rows, raw_game)
+    kept = [row for row in rows if row.get("selected")]
+    assert len(kept) == 7
+    assert policy["global_prop_count_cap"] is None
+    assert policy["suppressed"] == []
+    assert policy["forces_team_balance"] is False
+    assert policy["forces_over_under_balance"] is False
+
+
+def test_score_count_prop_selection_caps_same_team_offense_cluster_not_other_team():
+    raw_game = {
+        "markets": [
+            {"player": f"ATL{i}", "market": "receiving_yards"}
+            for i in range(4)
+        ] + [
+            {"player": "NO1", "market": "receiving_yards"},
+        ]
+    }
+    rows = [
+        {
+            "input_index": i, "player": f"ATL{i}", "team": "away",
+            "market": "receiving_yards", "status": "PRICED", "selected": True,
+            "selection": f"ATL{i} Under", "ev_per_dollar": 0.20 - i * 0.01,
+            "edge_probability_points": 0.20 - i * 0.01, "score_0_100": 88,
+        }
+        for i in range(4)
+    ] + [{
+        "input_index": 4, "player": "NO1", "team": "home",
+        "market": "receiving_yards", "status": "PRICED", "selected": False,
+        "selection": "NO1 Over", "ev_per_dollar": -0.03,
+        "edge_probability_points": -0.02, "score_0_100": 88,
+    }]
+    policy = _apply_prop_selection_policy(rows, raw_game)
+    kept = [row for row in rows if row.get("selected")]
+    assert len(kept) == 2
+    assert all(row["team"] == "away" for row in kept)
+    assert all(str(row["selection"]).endswith("Under") for row in kept)
+    suppressed = [
+        row for row in rows
+        if row.get("selection_suppressed_reason") == "CORRELATED_TEAM_OFFENSE_CLUSTER"
+    ]
+    assert len(suppressed) == 2
+    assert policy["forces_team_balance"] is False
+    assert policy["forces_over_under_balance"] is False
+
+
+def test_score_count_concentration_diagnostic_flags_review_but_does_not_change_selection():
+    raw_game = {
+        "markets": [
+            {"player": f"ATL{i}", "market": "receiving_yards"}
+            for i in range(6)
+        ] + [
+            {"player": "NO1", "market": "receiving_yards"},
+        ]
+    }
+    rows = [
+        {
+            "input_index": i, "player": f"ATL{i}", "team": "away",
+            "market": "receiving_yards", "status": "PRICED", "selected": True,
+            "selection": f"ATL{i} Under",
+        }
+        for i in range(6)
+    ] + [{
+        "input_index": 6, "player": "NO1", "team": "home",
+        "market": "receiving_yards", "status": "PRICED", "selected": False,
+        "selection": "NO1 Over",
+    }]
+    before = [row.get("selected") for row in rows]
+    diag = _prop_selection_diagnostics(rows, raw_game)
+    after = [row.get("selected") for row in rows]
+    assert before == after
+    assert diag["review_required"] is True
+    assert "ALL_SELECTED_PROPS_ONE_TEAM_WITH_TWO_TEAM_PRICING" in diag["alerts"]
+    assert "SELECTED_PROP_DIRECTION_CONCENTRATED_UNDER" in diag["alerts"]
+    assert diag["selection_changed_by_diagnostic"] is False
+
+def test_td_only_unavailable_market_does_not_require_live_role_models(monkeypatch):
+    calls = []
+
+    def fail_if_called(**kwargs):
+        calls.append(str(kwargs["team"]))
+        raise AssertionError("live role model should not be requested")
+
+    monkeypatch.setattr(
+        "sportsedge.nfl_score_counts_phone.build_live_team_model",
+        fail_if_called,
+    )
+
+    board = {
+        "observed_at": "2026-10-05T16:00:00+00:00",
+        "games": [{
+            "away": "A",
+            "home": "B",
+            "markets": [{
+                "market": "anytime_tds",
+                "team": "B",
+                "player": "B_WR",
+                "line": 0.5,
+                "away_or_over_price": -110,
+                "home_or_under_price": -110,
+            }],
+        }],
+    }
+    out = build_score_count_phone_card(
+        board,
+        prediction=prediction(),
+        schedule_games=schedule(),
+        injury_source_ready=False,
+    )
+    assert calls == []
+    game = out["games"][0]
+    props = [row for row in game["rows"] if row["market"] == "anytime_tds"]
+    assert len(props) == 2
+    assert all(row["status"] == "NO_MODEL" for row in props)
+    assert all(
+        row["reason"] == "SCORING_COMPOSITION_PRIOR_REQUIRED_FOR_TD_PROPS"
+        for row in props
+    )
+    assert game["role_status"] == "AVAILABLE"
+
+def test_score_count_qb_role_filter_removes_clear_backup_appearances_for_current_starter():
+    depth_rows = [{
+        "dt": "2026-10-05T12:00:00Z",
+        "team": "A",
+        "gsis_id": "q1",
+        "player_name": "Current Starter",
+        "pos_abb": "QB",
+        "pos_rank": 1,
+    }]
+    player_rows = [
+        {
+            "player_id": "q1", "position": "QB", "recent_team": "A",
+            "season": 2026, "week": 1, "season_type": "REG", "attempts": 2,
+        },
+        {
+            "player_id": "q2", "position": "QB", "recent_team": "A",
+            "season": 2026, "week": 1, "season_type": "REG", "attempts": 30,
+        },
+        {
+            "player_id": "q1", "position": "QB", "recent_team": "A",
+            "season": 2026, "week": 2, "season_type": "REG", "attempts": 28,
+        },
+        {
+            "player_id": "q2", "position": "QB", "recent_team": "A",
+            "season": 2026, "week": 2, "season_type": "REG", "attempts": 3,
+        },
+        {
+            "player_id": "q1", "position": "QB", "recent_team": "A",
+            "season": 2026, "week": 3, "season_type": "REG", "attempts": 31,
+        },
+    ]
+    filtered, audit = _filter_current_starter_qb_history(
+        team="A",
+        target_season=2026,
+        target_week=4,
+        observed_at=__import__("datetime").datetime.fromisoformat(
+            "2026-10-05T16:00:00+00:00"
+        ),
+        depth_rows=depth_rows,
+        player_rows=player_rows,
+    )
+    q1_weeks = [
+        int(row["week"]) for row in filtered
+        if row.get("player_id") == "q1"
+    ]
+    assert q1_weeks == [2, 3]
+    assert audit["status"] == "APPLIED"
+    assert audit["starter_qb_id"] == "q1"
+    assert audit["qualifying_games"] == 2
+    assert audit["removed_nonprimary_games"] == [{
+        "season": 2026,
+        "week": 1,
+        "team": "A",
+        "attempts": 2.0,
+        "team_qb_attempts": 32.0,
+    }]
+
+
+def test_score_count_qb_role_filter_refuses_to_overfit_one_primary_game():
+    depth_rows = [{
+        "dt": "2026-10-05T12:00:00Z",
+        "team": "A",
+        "gsis_id": "q1",
+        "player_name": "Current Starter",
+        "pos_abb": "QB",
+        "pos_rank": 1,
+    }]
+    player_rows = [
+        {
+            "player_id": "q1", "position": "QB", "recent_team": "A",
+            "season": 2026, "week": 1, "season_type": "REG", "attempts": 2,
+        },
+        {
+            "player_id": "q2", "position": "QB", "recent_team": "A",
+            "season": 2026, "week": 1, "season_type": "REG", "attempts": 30,
+        },
+        {
+            "player_id": "q1", "position": "QB", "recent_team": "A",
+            "season": 2026, "week": 2, "season_type": "REG", "attempts": 28,
+        },
+    ]
+    filtered, audit = _filter_current_starter_qb_history(
+        team="A",
+        target_season=2026,
+        target_week=3,
+        observed_at=__import__("datetime").datetime.fromisoformat(
+            "2026-10-05T16:00:00+00:00"
+        ),
+        depth_rows=depth_rows,
+        player_rows=player_rows,
+    )
+    assert filtered == player_rows
+    assert audit["status"] == "NOT_APPLIED"
+    assert audit["reason"] == "INSUFFICIENT_PRIMARY_QB_GAMES"
+    assert audit["qualifying_games"] == 1
+

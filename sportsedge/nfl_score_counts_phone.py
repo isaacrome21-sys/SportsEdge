@@ -30,8 +30,181 @@ from sportsedge.sports.nfl.score_counts_market_bridge import (
 from sportsedge.sports.nfl.score_counts_prop_bridge import (
     price_score_count_prop_markets,
 )
+from sportsedge.sports.nfl.unified_market_engine import TD_PROP_MARKETS
 
 SCHEMA = "SPORTSEDGE_NFL_SCORE_COUNTS_PHONE_CARD_V1"
+
+
+_TEAM_ALIASES = {"LA": "LAR", "WSH": "WAS"}
+
+
+def _team_code(value: Any) -> str:
+    raw = str(value or "").strip().upper()
+    return _TEAM_ALIASES.get(raw, raw)
+
+
+def _as_int(value: Any) -> int | None:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_float(value: Any) -> float:
+    try:
+        return float(value or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _filter_current_starter_qb_history(
+    *,
+    team: str,
+    target_season: int,
+    target_week: int,
+    observed_at,
+    depth_rows: Sequence[Mapping[str, Any]],
+    player_rows: Sequence[Mapping[str, Any]],
+    minimum_primary_games: int = 2,
+    primary_attempt_share: float = 0.50,
+) -> tuple[list[Mapping[str, Any]], dict[str, Any]]:
+    """Exclude clear backup/mop-up QB appearances from a current starter's role prior.
+
+    The live role source otherwise averages the starter's last eight stat rows,
+    even if some rows were tiny backup appearances. This PIT-only adapter keeps
+    games where the current starter owned at least half of that team's QB pass
+    attempts. It activates only with at least two qualifying prior games.
+    """
+    team_id = _team_code(team)
+    snapshots: list[tuple[Any, Mapping[str, Any]]] = []
+    for raw in depth_rows:
+        if _team_code(raw.get("team") or raw.get("club_code")) != team_id:
+            continue
+        if raw.get("dt") in (None, ""):
+            continue
+        try:
+            stamp = _utc(raw.get("dt"), "depth dt")
+        except Exception:
+            continue
+        if stamp <= observed_at:
+            snapshots.append((stamp, raw))
+    if not snapshots:
+        return list(player_rows), {
+            "status": "NOT_APPLIED",
+            "reason": "NO_PIT_DEPTH_SNAPSHOT",
+            "team": team_id,
+        }
+
+    latest = max(stamp for stamp, _ in snapshots)
+    qbs = []
+    for stamp, raw in snapshots:
+        if stamp != latest:
+            continue
+        position = str(raw.get("pos_abb") or raw.get("position") or "").strip().upper()
+        rank = _as_int(raw.get("pos_rank"))
+        pid = str(raw.get("gsis_id") or raw.get("player_id") or "").strip()
+        if position in {"QB", "QUARTERBACK"} and rank == 1 and pid:
+            qbs.append(pid)
+    qbs = sorted(set(qbs))
+    if len(qbs) != 1:
+        return list(player_rows), {
+            "status": "NOT_APPLIED",
+            "reason": "STARTING_QB_NOT_UNIQUE",
+            "team": team_id,
+            "candidate_ids": qbs,
+        }
+    starter_id = qbs[0]
+
+    prior_rows: list[Mapping[str, Any]] = []
+    for raw in player_rows:
+        season = _as_int(raw.get("season"))
+        week = _as_int(raw.get("week"))
+        if season is None or week is None:
+            continue
+        if str(raw.get("season_type") or "REG").strip().upper() != "REG":
+            continue
+        if season > target_season or (season == target_season and week >= target_week):
+            continue
+        prior_rows.append(raw)
+
+    team_qb_attempts: dict[tuple[str, int, int], float] = {}
+    for raw in prior_rows:
+        position = str(raw.get("position") or "").strip().upper()
+        if position not in {"QB", "QUARTERBACK"}:
+            continue
+        season = _as_int(raw.get("season"))
+        week = _as_int(raw.get("week"))
+        recent_team = _team_code(raw.get("recent_team") or raw.get("team"))
+        if season is None or week is None or not recent_team:
+            continue
+        key = (recent_team, season, week)
+        team_qb_attempts[key] = team_qb_attempts.get(key, 0.0) + max(
+            0.0, _as_float(raw.get("attempts"))
+        )
+
+    primary_keys: set[tuple[str, int, int]] = set()
+    starter_prior_rows = []
+    for raw in prior_rows:
+        pid = str(raw.get("player_id") or raw.get("gsis_id") or "").strip()
+        if pid != starter_id:
+            continue
+        season = _as_int(raw.get("season"))
+        week = _as_int(raw.get("week"))
+        recent_team = _team_code(raw.get("recent_team") or raw.get("team"))
+        if season is None or week is None or not recent_team:
+            continue
+        key = (recent_team, season, week)
+        total = team_qb_attempts.get(key, 0.0)
+        attempts = max(0.0, _as_float(raw.get("attempts")))
+        starter_prior_rows.append((key, attempts, total))
+        if total > 0 and attempts / total >= float(primary_attempt_share):
+            primary_keys.add(key)
+
+    if len(primary_keys) < int(minimum_primary_games):
+        return list(player_rows), {
+            "status": "NOT_APPLIED",
+            "reason": "INSUFFICIENT_PRIMARY_QB_GAMES",
+            "team": team_id,
+            "starter_qb_id": starter_id,
+            "qualifying_games": len(primary_keys),
+            "minimum_primary_games": int(minimum_primary_games),
+        }
+
+    filtered: list[Mapping[str, Any]] = []
+    removed: list[dict[str, Any]] = []
+    for raw in player_rows:
+        pid = str(raw.get("player_id") or raw.get("gsis_id") or "").strip()
+        season = _as_int(raw.get("season"))
+        week = _as_int(raw.get("week"))
+        is_prior = (
+            season is not None and week is not None
+            and (season < target_season or (season == target_season and week < target_week))
+            and str(raw.get("season_type") or "REG").strip().upper() == "REG"
+        )
+        if pid != starter_id or not is_prior:
+            filtered.append(raw)
+            continue
+        recent_team = _team_code(raw.get("recent_team") or raw.get("team"))
+        key = (recent_team, season, week)
+        if key in primary_keys:
+            filtered.append(raw)
+            continue
+        removed.append({
+            "season": season,
+            "week": week,
+            "team": recent_team,
+            "attempts": _as_float(raw.get("attempts")),
+            "team_qb_attempts": team_qb_attempts.get(key, 0.0),
+        })
+
+    return filtered, {
+        "status": "APPLIED",
+        "team": team_id,
+        "starter_qb_id": starter_id,
+        "primary_attempt_share": float(primary_attempt_share),
+        "qualifying_games": len(primary_keys),
+        "removed_nonprimary_games": removed,
+    }
 
 
 def _prediction_identity(
@@ -88,6 +261,185 @@ def _meta(
     }
 
 
+_PROP_FAMILY = {
+    "pass_attempts": "PASS_VOLUME",
+    "completions": "PASS_VOLUME",
+    "passing_yards": "PASS_VOLUME",
+    "receptions": "RECEIVING_VOLUME",
+    "receiving_yards": "RECEIVING_VOLUME",
+    "rush_attempts": "RUSH_VOLUME",
+    "rushing_yards": "RUSH_VOLUME",
+    "rush_receiving_yards": "COMBINED_YARDS",
+    "pass_tds": "PASS_SCORING",
+    "interceptions": "TURNOVERS",
+    "receiving_tds": "TD_SCORING",
+    "rushing_tds": "TD_SCORING",
+    "anytime_tds": "TD_SCORING",
+}
+_PROP_FAMILY_CONFLICTS = {
+    "PASS_VOLUME": {"PASS_VOLUME"},
+    "RECEIVING_VOLUME": {"RECEIVING_VOLUME", "COMBINED_YARDS"},
+    "RUSH_VOLUME": {"RUSH_VOLUME", "COMBINED_YARDS"},
+    "COMBINED_YARDS": {"RECEIVING_VOLUME", "RUSH_VOLUME", "COMBINED_YARDS"},
+    "PASS_SCORING": {"PASS_SCORING"},
+    "TURNOVERS": {"TURNOVERS"},
+    "TD_SCORING": {"TD_SCORING"},
+}
+_MAX_SELECTED_PROP_FAMILIES_PER_PLAYER = 2
+_MAX_SELECTED_TEAM_CLUSTER_EXPRESSIONS = 2
+_PROP_TEAM_CLUSTER = {
+    "PASS_VOLUME": "PASS_OFFENSE",
+    "RECEIVING_VOLUME": "PASS_OFFENSE",
+    "COMBINED_YARDS": "PASS_OFFENSE",
+    "RUSH_VOLUME": "RUSH_OFFENSE",
+    "PASS_SCORING": "SCORING",
+    "TD_SCORING": "SCORING",
+    "TURNOVERS": "TURNOVERS",
+}
+
+
+def _selection_rank(row: Mapping[str, Any]) -> tuple[float, float, float, int]:
+    return (
+        float(row.get("ev_per_dollar") or float("-inf")),
+        float(row.get("edge_probability_points") or float("-inf")),
+        float(row.get("score_0_100") or float("-inf")),
+        -int(row.get("input_index") or 0),
+    )
+
+
+def _apply_prop_selection_policy(
+    rows: list[dict[str, Any]],
+    raw_game: Mapping[str, Any],
+) -> dict[str, Any]:
+    prop_indexes = {
+        i for i, raw in enumerate(raw_game.get("markets") or [])
+        if isinstance(raw, Mapping) and str(raw.get("player") or "").strip()
+    }
+    candidates = [
+        row for row in rows
+        if row.get("selected")
+        and int(row.get("input_index", -1)) in prop_indexes
+        and str(row.get("player") or "").strip()
+    ]
+    for row in candidates:
+        row["pair_selected"] = True
+
+    used_families: dict[str, set[str]] = {}
+    player_kept: dict[str, int] = {}
+    team_cluster_kept: dict[tuple[str, str], int] = {}
+    kept = 0
+    suppressed: list[dict[str, str]] = []
+    for row in sorted(candidates, key=_selection_rank, reverse=True):
+        player = str(row.get("player") or "").strip()
+        market = str(row.get("market") or "").strip().lower()
+        family = _PROP_FAMILY.get(market, market.upper() or "OTHER")
+        conflicts = _PROP_FAMILY_CONFLICTS.get(family, {family})
+        prior = used_families.setdefault(player, set())
+        team = str(row.get("team") or "").strip().lower()
+        cluster = _PROP_TEAM_CLUSTER.get(family, family)
+        cluster_key = (team, cluster)
+
+        reason = None
+        if prior.intersection(conflicts):
+            reason = "CORRELATED_PLAYER_FAMILY"
+        elif player_kept.get(player, 0) >= _MAX_SELECTED_PROP_FAMILIES_PER_PLAYER:
+            reason = "PLAYER_PROP_EXPOSURE_CAP"
+        elif (
+            team in {"home", "away"}
+            and team_cluster_kept.get(cluster_key, 0)
+            >= _MAX_SELECTED_TEAM_CLUSTER_EXPRESSIONS
+        ):
+            reason = "CORRELATED_TEAM_OFFENSE_CLUSTER"
+
+        if reason is not None:
+            row["selected"] = False
+            row["selection_suppressed_reason"] = reason
+            suppressed.append({
+                "player": player,
+                "market": market,
+                "reason": reason,
+            })
+            continue
+
+        kept += 1
+        player_kept[player] = player_kept.get(player, 0) + 1
+        prior.add(family)
+        if team in {"home", "away"}:
+            team_cluster_kept[cluster_key] = team_cluster_kept.get(cluster_key, 0) + 1
+
+    return {
+        "candidate_pair_selections": len(candidates),
+        "served_prop_selections": kept,
+        "max_prop_families_per_player": _MAX_SELECTED_PROP_FAMILIES_PER_PLAYER,
+        "max_team_cluster_expressions": _MAX_SELECTED_TEAM_CLUSTER_EXPRESSIONS,
+        "global_prop_count_cap": None,
+        "forces_team_balance": False,
+        "forces_over_under_balance": False,
+        "suppressed": suppressed,
+    }
+
+
+def _prop_selection_diagnostics(
+    rows: Sequence[Mapping[str, Any]],
+    raw_game: Mapping[str, Any],
+) -> dict[str, Any]:
+    prop_indexes = {
+        i for i, raw in enumerate(raw_game.get("markets") or [])
+        if isinstance(raw, Mapping) and str(raw.get("player") or "").strip()
+    }
+    priced = [
+        row for row in rows
+        if int(row.get("input_index", -1)) in prop_indexes
+        and row.get("status") == "PRICED"
+    ]
+    pair_selected = [
+        row for row in priced
+        if row.get("pair_selected", row.get("selected", False))
+    ]
+    served_selected = [row for row in priced if row.get("selected")]
+
+    teams = {
+        str(row.get("team") or "").strip().lower()
+        for row in priced
+        if str(row.get("team") or "").strip().lower() in {"home", "away"}
+    }
+    selected_teams = {
+        str(row.get("team") or "").strip().lower()
+        for row in pair_selected
+        if str(row.get("team") or "").strip().lower() in {"home", "away"}
+    }
+    direction_counts = {"OVER": 0, "UNDER": 0}
+    for row in pair_selected:
+        value = str(row.get("selection") or "").strip().lower()
+        if value.endswith(" over") or value == "over":
+            direction_counts["OVER"] += 1
+        elif value.endswith(" under") or value == "under":
+            direction_counts["UNDER"] += 1
+
+    alerts: list[str] = []
+    n_selected = len(pair_selected)
+    if len(teams) >= 2 and n_selected >= 4 and len(selected_teams) == 1:
+        alerts.append("ALL_SELECTED_PROPS_ONE_TEAM_WITH_TWO_TEAM_PRICING")
+    if n_selected >= 6:
+        if direction_counts["UNDER"] / n_selected >= 0.80:
+            alerts.append("SELECTED_PROP_DIRECTION_CONCENTRATED_UNDER")
+        if direction_counts["OVER"] / n_selected >= 0.80:
+            alerts.append("SELECTED_PROP_DIRECTION_CONCENTRATED_OVER")
+
+    return {
+        "priced_prop_rows": len(priced),
+        "pair_selected_prop_rows": n_selected,
+        "served_selected_prop_rows": len(served_selected),
+        "selected_prop_rows": n_selected,
+        "priced_sides": sorted(teams),
+        "selected_sides": sorted(selected_teams),
+        "selected_direction_counts": direction_counts,
+        "alerts": alerts,
+        "review_required": bool(alerts),
+        "selection_changed_by_diagnostic": False,
+    }
+
+
 def build_score_count_phone_card(
     ticket: Mapping[str, Any],
     *,
@@ -129,34 +481,77 @@ def build_score_count_phone_card(
 
         markets = [row for row in raw_game.get("markets") or [] if isinstance(row, Mapping)]
         prop_inputs = [row for row in markets if str(row.get("player") or "").strip()]
+        td_prop_path_ready = (
+            prediction_game.get("joint_score_td_distribution") is not None
+            or scoring_prior is not None
+        )
+        modelable_prop_inputs = [
+            row for row in prop_inputs
+            if str(row.get("market") or "").strip().lower() not in TD_PROP_MARKETS
+            or td_prop_path_ready
+        ]
         home_model = away_model = None
         role_error: str | None = None
-        if prop_inputs and not injury_source_ready:
+        role_errors_by_side: dict[str, str] = {}
+        qb_role_filters_by_side: dict[str, dict[str, Any]] = {}
+        hinted_teams = {
+            str(row.get("team") or "").strip().upper()
+            for row in modelable_prop_inputs
+            if str(row.get("team") or "").strip().upper() in {home, away}
+        }
+        every_prop_hinted = bool(modelable_prop_inputs) and all(
+            str(row.get("team") or "").strip().upper() in {home, away}
+            for row in modelable_prop_inputs
+        )
+        requested_model_sides = (
+            hinted_teams
+            if every_prop_hinted
+            else ({home, away} if modelable_prop_inputs else set())
+        )
+
+        if modelable_prop_inputs and not injury_source_ready:
             role_error = "INJURY_SOURCE_REQUIRED_FOR_LIVE_PROPS"
-        elif prop_inputs:
-            try:
-                home_model = build_live_team_model(
-                    team=home,
-                    target_season=int(schedule["season"]),
-                    target_week=int(schedule["week"]),
-                    kickoff=kickoff,
-                    observed_at=observed,
-                    depth_rows=depth_rows,
-                    player_rows=player_rows,
-                    injury_rows=injury_rows,
+        elif modelable_prop_inputs:
+            for side_name, team_name in (("home", home), ("away", away)):
+                if team_name not in requested_model_sides:
+                    continue
+                try:
+                    team_player_rows, qb_role_filter = _filter_current_starter_qb_history(
+                        team=team_name,
+                        target_season=int(schedule["season"]),
+                        target_week=int(schedule["week"]),
+                        observed_at=observed,
+                        depth_rows=depth_rows,
+                        player_rows=player_rows,
+                    )
+                    qb_role_filters_by_side[side_name] = qb_role_filter
+                    model = build_live_team_model(
+                        team=team_name,
+                        target_season=int(schedule["season"]),
+                        target_week=int(schedule["week"]),
+                        kickoff=kickoff,
+                        observed_at=observed,
+                        depth_rows=depth_rows,
+                        player_rows=team_player_rows,
+                        injury_rows=injury_rows,
+                    )
+                    if side_name == "home":
+                        home_model = model
+                    else:
+                        away_model = model
+                except Exception as exc:
+                    role_errors_by_side[side_name] = str(exc)
+
+            needs_two_team_roles = (
+                not every_prop_hinted
+                or hinted_teams == {home, away}
+            )
+            if role_errors_by_side and needs_two_team_roles:
+                detail = ";".join(
+                    f"{side}={role_errors_by_side[side]}"
+                    for side in sorted(role_errors_by_side)
                 )
-                away_model = build_live_team_model(
-                    team=away,
-                    target_season=int(schedule["season"]),
-                    target_week=int(schedule["week"]),
-                    kickoff=kickoff,
-                    observed_at=observed,
-                    depth_rows=depth_rows,
-                    player_rows=player_rows,
-                    injury_rows=injury_rows,
-                )
-            except Exception as exc:
-                role_error = str(exc)
+                role_error = f"GAME_PROP_ROLE_MODEL_INCOMPLETE:{detail}"
 
         game_requests: list[dict[str, Any]] = []
         prop_requests: list[dict[str, Any]] = []
@@ -235,7 +630,7 @@ def build_score_count_phone_card(
             player = str(raw.get("player") or "").strip()
             if player:
                 line = float(raw["line"])
-                if role_error is not None or home_model is None or away_model is None:
+                if market in TD_PROP_MARKETS and not td_prop_path_ready:
                     for side_index, label in enumerate(("Over", "Under")):
                         prop_meta.append({
                             **_meta(
@@ -244,7 +639,38 @@ def build_score_count_phone_card(
                                 price=prices[side_index], no_vig_p=no_vig[side_index],
                                 raw=raw_text, market=market, player=player,
                             ),
-                            "synthetic_no_model_reason": role_error or "LIVE_ROLE_MODEL_REQUIRED",
+                            "synthetic_no_model_reason": "SCORING_COMPOSITION_PRIOR_REQUIRED_FOR_TD_PROPS",
+                        })
+                    continue
+                if role_error is not None:
+                    for side_index, label in enumerate(("Over", "Under")):
+                        prop_meta.append({
+                            **_meta(
+                                pair_id=pair_id, input_index=input_index, side_index=side_index,
+                                selection=f"{player} {label}", line=line,
+                                price=prices[side_index], no_vig_p=no_vig[side_index],
+                                raw=raw_text, market=market, player=player,
+                            ),
+                            "synthetic_no_model_reason": role_error,
+                        })
+                    continue
+                team_hint = str(raw.get("team") or "").strip().upper()
+                hinted_side = (
+                    "home" if team_hint == home
+                    else "away" if team_hint == away
+                    else None
+                )
+                if hinted_side in role_errors_by_side:
+                    reason = f"TEAM_ROLE_MODEL_UNAVAILABLE:{hinted_side}:{role_errors_by_side[hinted_side]}"
+                    for side_index, label in enumerate(("Over", "Under")):
+                        prop_meta.append({
+                            **_meta(
+                                pair_id=pair_id, input_index=input_index, side_index=side_index,
+                                selection=f"{player} {label}", line=line,
+                                price=prices[side_index], no_vig_p=no_vig[side_index],
+                                raw=raw_text, market=market, player=player,
+                            ),
+                            "synthetic_no_model_reason": reason,
                         })
                     continue
                 try:
@@ -297,6 +723,12 @@ def build_score_count_phone_card(
             scoring_prior=scoring_prior,
             seed=int(seed) + game_index,
         ) if prop_requests else {"prop_markets": []}
+        engine_prop_error = (
+            str(prop_engine.get("prop_board_error") or "").strip()
+            if prop_requests
+            else ""
+        )
+        effective_role_error = role_error or engine_prop_error or None
 
         rows: list[dict[str, Any]] = []
         for engine_row, meta in zip(game_engine["game_markets"], game_meta):
@@ -347,6 +779,8 @@ def build_score_count_phone_card(
             ))
 
         _mark_pair_selections(rows)
+        prop_selection_policy = _apply_prop_selection_policy(rows, raw_game)
+        prop_selection_diagnostics = _prop_selection_diagnostics(rows, raw_game)
         rows.sort(key=lambda row: (int(row["input_index"]), int(row["side_index"])))
         means = prediction_game.get("means") or {}
         games_out.append({
@@ -368,9 +802,16 @@ def build_score_count_phone_card(
                 "joint_score_td_distribution_sha256": prediction_game.get("joint_score_td_distribution_sha256"),
                 "paths": prediction_game.get("paths"),
                 "market_data_used_to_create_distribution": False,
+                "prop_board_status": prop_engine.get("prop_board_status"),
+                "prop_board_error": prop_engine.get("prop_board_error"),
+                "team_simulation_errors": prop_engine.get("team_simulation_errors") or {},
+                "role_model_errors_by_side": dict(sorted(role_errors_by_side.items())),
+                "qb_role_filters_by_side": dict(sorted(qb_role_filters_by_side.items())),
             },
-            "role_status": "AVAILABLE" if not role_error and (not prop_inputs or home_model is not None) else "NO_MODEL",
-            "role_error": role_error,
+            "role_status": "AVAILABLE" if not effective_role_error else "NO_MODEL",
+            "role_error": effective_role_error,
+            "prop_selection_policy": prop_selection_policy,
+            "prop_selection_diagnostics": prop_selection_diagnostics,
             "rows": rows,
             "status": "PRICED_SCORE_COUNTS_RESEARCH",
         })
@@ -386,6 +827,10 @@ def build_score_count_phone_card(
         "games": games_out,
         "rows": all_rows,
         "selected_rows": [row for row in all_rows if row.get("selected")],
+        "prop_card_review_required": any(
+            bool(game.get("prop_selection_diagnostics", {}).get("review_required"))
+            for game in games_out
+        ),
         "pricing_policy": {
             "two_sided_quotes_required": True,
             "ev_floor": EV_FLOOR,
@@ -395,6 +840,18 @@ def build_score_count_phone_card(
             "game_markets_disabled": False,
             "model_distribution_must_predate_quote_binding": True,
             "prop_game_context_source": "NFL_SCORE_COUNTS_G1_SCORE_PATHS",
+            "partial_team_simulation_fails_board": True,
+            "correlated_player_prop_expressions_are_trimmed": True,
+            "forces_team_balance": False,
+            "forces_over_under_balance": False,
+        },
+        "presentation_policy": {
+            "market_probability_field": "market_no_vig_p",
+            "model_probability_field": "estimate_p",
+            "score_field": "score_0_100",
+            "score_label_field": "score_label",
+            "kickoff_field": "games[].kickoff",
+            "team_records": "OMIT_UNLESS_EXPLICITLY_SOURCED",
         },
         "authority": {
             "research_only": True,
