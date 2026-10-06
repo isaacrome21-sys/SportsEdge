@@ -203,8 +203,17 @@ _PROP_FAMILY_CONFLICTS = {
     "TURNOVERS": {"TURNOVERS"},
     "TD_SCORING": {"TD_SCORING"},
 }
-_MAX_SELECTED_PLAYER_PROPS_PER_GAME = 6
 _MAX_SELECTED_PROP_FAMILIES_PER_PLAYER = 2
+_MAX_SELECTED_TEAM_CLUSTER_EXPRESSIONS = 2
+_PROP_TEAM_CLUSTER = {
+    "PASS_VOLUME": "PASS_OFFENSE",
+    "RECEIVING_VOLUME": "PASS_OFFENSE",
+    "COMBINED_YARDS": "PASS_OFFENSE",
+    "RUSH_VOLUME": "RUSH_OFFENSE",
+    "PASS_SCORING": "SCORING",
+    "TD_SCORING": "SCORING",
+    "TURNOVERS": "TURNOVERS",
+}
 
 
 def _selection_rank(row: dict) -> tuple[float, float, float, int]:
@@ -239,6 +248,7 @@ def _apply_correlation_selection_policy(game: dict, raw_game: dict) -> dict:
 
     used_families: dict[str, set[str]] = {}
     player_kept: dict[str, int] = {}
+    team_cluster_kept: dict[tuple[str, str], int] = {}
     kept = 0
     suppressed: list[dict[str, str]] = []
 
@@ -248,14 +258,21 @@ def _apply_correlation_selection_policy(game: dict, raw_game: dict) -> dict:
         family = _PROP_FAMILY.get(market, market.upper() or "OTHER")
         conflicts = _PROP_FAMILY_CONFLICTS.get(family, {family})
         prior = used_families.setdefault(player, set())
+        team = str(row.get("team") or "").strip().lower()
+        cluster = _PROP_TEAM_CLUSTER.get(family, family)
+        cluster_key = (team, cluster)
 
         reason = None
         if prior.intersection(conflicts):
             reason = "CORRELATED_PLAYER_FAMILY"
         elif player_kept.get(player, 0) >= _MAX_SELECTED_PROP_FAMILIES_PER_PLAYER:
             reason = "PLAYER_PROP_EXPOSURE_CAP"
-        elif kept >= _MAX_SELECTED_PLAYER_PROPS_PER_GAME:
-            reason = "PROP_CARD_DISPLAY_CAP"
+        elif (
+            team in {"home", "away"}
+            and team_cluster_kept.get(cluster_key, 0)
+            >= _MAX_SELECTED_TEAM_CLUSTER_EXPRESSIONS
+        ):
+            reason = "CORRELATED_TEAM_OFFENSE_CLUSTER"
 
         if reason is not None:
             row["selected"] = False
@@ -270,12 +287,15 @@ def _apply_correlation_selection_policy(game: dict, raw_game: dict) -> dict:
         kept += 1
         player_kept[player] = player_kept.get(player, 0) + 1
         prior.add(family)
+        if team in {"home", "away"}:
+            team_cluster_kept[cluster_key] = team_cluster_kept.get(cluster_key, 0) + 1
 
     return {
         "candidate_pair_selections": len(candidates),
         "served_prop_selections": kept,
-        "max_player_props_per_game": _MAX_SELECTED_PLAYER_PROPS_PER_GAME,
         "max_prop_families_per_player": _MAX_SELECTED_PROP_FAMILIES_PER_PLAYER,
+        "max_team_cluster_expressions": _MAX_SELECTED_TEAM_CLUSTER_EXPRESSIONS,
+        "global_prop_count_cap": None,
         "forces_team_balance": False,
         "forces_over_under_balance": False,
         "suppressed": suppressed,
