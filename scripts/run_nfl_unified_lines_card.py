@@ -34,44 +34,40 @@ def _has_props(ticket: dict) -> bool:
     )
 
 
-_SIGNED_YARDAGE_FIELDS = ("passing_yards", "rushing_yards", "receiving_yards")
-
-
 def _adapt_signed_yardage_for_nonnegative_v1(
     player_rows: list[dict],
 ) -> tuple[list[dict], list[dict]]:
-    """Compatibility-copy signed source yards for the frozen nonnegative V1 kernel.
+    """Narrow compatibility copy for frozen V1 receiving efficiency.
 
-    The raw/source rows remain untouched. A negative weekly yardage numerator is
-    set to zero only in the in-memory copy passed into the frozen role builder,
-    which prevents a one-opportunity negative sample from invalidating a whole
-    team. Every adaptation is emitted in the artifact.
+    Preserve all signed source stats. In the in-memory model copy only, adapt a
+    negative receiving-yard numerator when it comes from a 1-2 reception
+    micro-sample. That fixes the CJ Donaldson shape without globally flooring
+    passing/rushing yardage or larger receiving samples. Larger anomalies remain
+    untouched and can still fail closed.
     """
     out: list[dict] = []
     receipts: list[dict] = []
     for raw in player_rows:
         row = dict(raw)
-        for field in _SIGNED_YARDAGE_FIELDS:
-            value = row.get(field)
-            if value in (None, "") or isinstance(value, bool):
-                continue
-            try:
-                numeric = float(value)
-            except (TypeError, ValueError):
-                continue
-            if numeric >= 0:
-                continue
-            row[field] = 0.0
+        try:
+            receptions = float(row.get("receptions") or 0.0)
+            receiving_yards = float(row.get("receiving_yards") or 0.0)
+        except (TypeError, ValueError):
+            out.append(row)
+            continue
+        if receiving_yards < 0 and 0 < receptions <= 2:
+            row["receiving_yards"] = 0.0
             receipts.append({
                 "player_id": str(row.get("player_id") or row.get("gsis_id") or ""),
                 "player_name": str(row.get("player_name") or ""),
                 "season": row.get("season"),
                 "week": row.get("week"),
                 "team": str(row.get("recent_team") or row.get("team") or ""),
-                "field": field,
-                "source_value": numeric,
+                "field": "receiving_yards",
+                "receptions": receptions,
+                "source_value": receiving_yards,
                 "model_input_value": 0.0,
-                "reason": "FROZEN_V1_NONNEGATIVE_EFFICIENCY_COMPATIBILITY",
+                "reason": "FROZEN_V1_NEGATIVE_RECEIVING_MICRO_SAMPLE_COMPATIBILITY",
             })
         out.append(row)
     return out, receipts
