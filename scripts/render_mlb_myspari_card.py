@@ -108,26 +108,25 @@ def both_side_board_section(payload: dict) -> str:
         f"sides={summary.get('side_rows')} totals={summary.get('total_rows')} props={summary.get('prop_rows')}",
         "Quoted markets list both sides. A missing quote is BLOCKED, not omitted. Complements are priced only from a supplied opposite quote.",
         "",
-        "| lane | market | entity | side | line | odds | score / 100 | note |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| lane | market | entity | side | line | odds | note |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     quoted.sort(key=lambda row: (str(row.get("lane") or ""), str(row.get("market") or ""), str(row.get("entity_id") or ""), str(row.get("side") or "")))
     for row in quoted:
         model_p = row.get("model_p")
         lines.append(
-            "| {lane} | {market} | {entity} | {side} | {line} | {odds} | {score} | {note} |".format(
+            "| {lane} | {market} | {entity} | {side} | {line} | {odds} | {note} |".format(
                 lane=row.get("lane") or "",
                 market=row.get("market") or "",
                 entity=row.get("entity_id") or "",
                 side=row.get("side") or "",
                 line="" if row.get("line") is None else row.get("line"),
                 odds="" if row.get("american_odds") is None else row.get("american_odds"),
-                score="—" if row.get("score") is None else row["score"],
                 note="Price needed" if row.get("american_odds") is None else "Cannot evaluate yet" if model_p is None else "Research estimate",
             )
         )
     if not quoted:
-        lines.append("| | | | | | | | No quoted props, sides, or totals |")
+        lines.append("| | | | | | | No quoted props, sides, or totals |")
     missing_markets = sorted({str(row.get("market") or "") for row in missing})
     if missing_markets:
         lines += [

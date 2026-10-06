@@ -175,6 +175,13 @@ class CeilingAndLabelTests(unittest.TestCase):
         self.assertIn("Win p ex-push", text)
         self.assertIn("| 10.0% |", text)  # the integer-total push mass is shown, not hidden
 
+    def test_final_markdown_omits_internal_qualification_score(self):
+        rows = myspari_rows(PAYLOAD)
+        self.assertTrue(any(row.get("confidence_score") for row in rows))
+        text = render_markdown(rows, header="t")
+        self.assertNotIn("| Score |", text)
+        self.assertIn("internal qualification score", text)
+
     def test_input_board_note_names_the_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             engine = Path(tmp) / "engine.json"
