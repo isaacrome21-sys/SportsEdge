@@ -6,12 +6,13 @@ without using sportsbook lines to create either model distribution.
 """
 from __future__ import annotations
 
+from copy import deepcopy
 from math import isfinite
 from typing import Any, Mapping, Sequence
 
 from sportsedge.nfl_coherent_team_props import simulate_team_on_game_paths
 from sportsedge.nfl_coherent_team_scoring import simulate_coherent_team_scoring_paths
-from sportsedge.nfl_prop_shared_sim import NflPropSimulationError
+from sportsedge.nfl_prop_shared_sim import NflPropSimulationError, stabilized_role
 from sportsedge.nfl_score_td_composition import (
     NflScoreTdCompositionError,
     attach_team_tds_to_score_paths,
@@ -76,6 +77,73 @@ def _team_contract(team_model: Mapping[str, Any] | None) -> tuple[Mapping[str, A
     if qb_name in names or len(names) != len(set(names)):
         raise ScoreCountPropBridgeError("TEAM_PLAYER_IDENTITY_DUPLICATE")
     return qb, skill_rows
+
+
+def _regularize_nonpositive_receiving_efficiency(
+    team_model: Mapping[str, Any] | None,
+) -> tuple[Mapping[str, Any] | None, list[dict[str, Any]]]:
+    """Shrink impossible forward receiving-efficiency means to the team pool.
+
+    Tiny historical samples can legitimately contain a negative yards/reception
+    observation.  That is valid source data, but using a negative value as a
+    forward Gamma mean either crashes the team or silently turns future catches
+    into zero yards.  For the score-count challenger only, replace nonpositive
+    stabilized receiver YPR with the catch-weighted positive team pool.  No
+    sportsbook input is used.
+    """
+    if not isinstance(team_model, Mapping):
+        return team_model, []
+    model = deepcopy(dict(team_model))
+    skills = model.get("skill_players")
+    if not isinstance(skills, Sequence) or isinstance(skills, (str, bytes, bytearray)):
+        return model, []
+
+    rows = [row for row in skills if isinstance(row, Mapping)]
+    positive: list[tuple[float, float]] = []
+    stabilized: dict[str, tuple[float, float]] = {}
+    for row in rows:
+        role = stabilized_role(row)
+        player = _name(row)
+        ypr = _num(role["receiving_yards_per_reception"], f"{player}:receiving_yards_per_reception")
+        catches = max(0.0, _num(role["targets"], f"{player}:targets")) * max(
+            0.0, _num(role["catch_rate"], f"{player}:catch_rate")
+        )
+        stabilized[player] = (ypr, catches)
+        if ypr > 0:
+            positive.append((ypr, max(catches, 1e-6)))
+
+    if not positive:
+        return model, []
+
+    denom = sum(weight for _, weight in positive)
+    fallback = sum(value * weight for value, weight in positive) / denom
+    if not isfinite(fallback) or fallback <= 0:
+        return model, []
+
+    adjusted: list[dict[str, Any]] = []
+    audit: list[dict[str, Any]] = []
+    for raw in rows:
+        row = deepcopy(dict(raw))
+        player = _name(row)
+        ypr, catches = stabilized[player]
+        if ypr <= 0:
+            prior = dict(row.get("role_prior") or {})
+            trailing = dict(row.get("trailing") or {})
+            prior["receiving_yards_per_reception"] = fallback
+            if "receiving_yards_per_reception" in trailing:
+                trailing["receiving_yards_per_reception"] = fallback
+            row["role_prior"] = prior
+            row["trailing"] = trailing
+            audit.append({
+                "player": player,
+                "observed_stabilized_ypr": ypr,
+                "expected_catches_weight": catches,
+                "replacement_ypr": fallback,
+                "method": "CATCH_WEIGHTED_POSITIVE_TEAM_POOL",
+            })
+        adjusted.append(row)
+    model["skill_players"] = adjusted
+    return model, audit
 
 
 def _pace(path_total: float, expected_total: float) -> float:
@@ -199,6 +267,8 @@ def price_score_count_props_from_paths(
     team_paths: dict[str, list[dict[str, Any]]] = {}
     team_scoring: dict[str, bool] = {}
     team_errors: dict[str, str] = {}
+    team_models: dict[str, Mapping[str, Any] | None] = {}
+    efficiency_regularization: dict[str, list[dict[str, Any]]] = {}
     for side, model, needs_td, side_seed in (
         ("home", home_model, home_needs_td, int(seed) ^ 0x484F4D45),
         ("away", away_model, away_needs_td, int(seed) ^ 0x41574159),
@@ -206,6 +276,9 @@ def price_score_count_props_from_paths(
         if not any(str(row.get("team") or "").strip().lower() == side for row in requests):
             continue
         try:
+            model, regularization = _regularize_nonpositive_receiving_efficiency(model)
+            team_models[side] = model
+            efficiency_regularization[side] = regularization
             qb, skills = _team_contract(model)
             use_scoring = bool(needs_td and td_error is None)
             states = _states(
@@ -268,7 +341,9 @@ def price_score_count_props_from_paths(
             rows.append({**base, "status": "NO_MODEL", "reason": team_errors[side]})
             continue
         try:
-            model = home_model if side == "home" else away_model
+            model = team_models.get(side)
+            if model is None:
+                model = home_model if side == "home" else away_model
             qb, _skills = _team_contract(model)
             draws = _find_draws(
                 team_paths[side],
@@ -303,6 +378,11 @@ def price_score_count_props_from_paths(
         ),
         "prop_board_error": prop_board_error,
         "team_simulation_errors": dict(sorted(team_errors.items())),
+        "receiving_efficiency_regularization": {
+            side: rows
+            for side, rows in sorted(efficiency_regularization.items())
+            if rows
+        },
         "market_data_used_to_create_score_distribution": False,
         "authority": {
             "research_only": True,
