@@ -1,0 +1,88 @@
+{
+  "schema": "MLB_PITCHER_K_PROBABILITY_PREREG_V1",
+  "status": "FROZEN_BEFORE_CANDIDATE_SCORING",
+  "market": "PITCHER_K",
+  "candidate_family": "RIDGE_LOGIT_K_RATE_BETA_BINOMIAL_V1",
+  "input_schema": "MLB_PITCHER_K_SKILL_BOUND_CANDIDATE_V1",
+  "authority": {
+    "model_p": false,
+    "truth_gate": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "bettor_facing_release": false
+  },
+  "data": {
+    "game_type": "R",
+    "training_seasons": [2023],
+    "validation_seasons": [2024],
+    "candidate_test_seasons": [2025],
+    "candidate_test_is_broader_promotion_evidence": false,
+    "min_prior_starts": 5,
+    "max_prior_starts": 10,
+    "statcast_window_days": 30,
+    "statcast_end_date_policy": "OFFICIAL_GAME_DATE_EXCLUSIVE",
+    "same_day_and_future_rows_forbidden": true,
+    "sportsbook_prices_forbidden_from_fit": true,
+    "market_consensus_forbidden_from_fit": true
+  },
+  "features": [
+    "recent_mean_batters_faced",
+    "recent_mean_k_per_batter_faced",
+    "recent_mean_pitches_per_batter_faced",
+    "opponent_target_rel",
+    "lineup_target_deviation_or_1",
+    "whiff_rate",
+    "chase_rate",
+    "pitcher_hand_R"
+  ],
+  "formula": {
+    "rate_model": "BINOMIAL_LOGIT_RIDGE",
+    "rate_target": "REALIZED_STRIKEOUTS_OF_REALIZED_BATTERS_FACED",
+    "training_weight": "REALIZED_BATTERS_FACED",
+    "standardization": "TRAINING_ONLY_MEAN_AND_SCALE",
+    "ridge_alpha_grid": [0.1, 1.0, 10.0, 100.0],
+    "alpha_selection": "LOWEST_2024_MEAN_RPS_TIE_LARGER_ALPHA",
+    "refit_after_selection": "REFIT_2023_2024_ONLY",
+    "projected_batters_faced": "ROUND_RECENT_MEAN_BATTERS_FACED",
+    "projected_batters_faced_valid_range": [1, 50],
+    "count_distribution": "BETA_BINOMIAL",
+    "concentration_grid": [20.0, 50.0, 100.0, 200.0, 1000000000.0],
+    "concentration_selection": "LOWEST_2024_MEAN_RPS_TIE_LARGER_CONCENTRATION",
+    "half_lines": [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5, 15.5, 16.5, 17.5, 18.5, 19.5]
+  },
+  "incumbent": {
+    "engine": "sportsedge.pitcher_joint_engine",
+    "market": "PITCHER_K",
+    "opponent_k_beta": 1.0,
+    "lineup_k_W": 200.0,
+    "lineup_k_gamma": 0.5,
+    "same_strictly_prior_history_required": true
+  },
+  "evaluation": {
+    "primary_metric": "MEAN_RPS_HALF_LINES_0_5_TO_19_5",
+    "secondary_metrics": ["TYPICAL_LINE_LOG_LOSS", "TYPICAL_LINE_ECE", "COUNT_MAE"],
+    "typical_lines": [3.5, 4.5, 5.5, 6.5],
+    "min_candidate_test_starts": 500,
+    "bootstrap": {
+      "unit": "PITCHER_ID",
+      "reps": 2000,
+      "seed": 20261006,
+      "ci": 0.95
+    },
+    "development_pass_rule": [
+      "CANDIDATE_RPS_MINUS_INCUMBENT_RPS_CI_HIGH_LT_0",
+      "CANDIDATE_TYPICAL_LINE_ECE_LTE_INCUMBENT_PLUS_0_005",
+      "CANDIDATE_TYPICAL_LINE_LOG_LOSS_LTE_INCUMBENT"
+    ],
+    "on_pass": "RESEARCH_CANDIDATE_MAY_PROCEED_TO_SEPARATE_FORWARD_RELEASE_PROTOCOL",
+    "on_fail": "KEEP_INCUMBENT_AND_RECORD_FAILURE_NO_POST_HOC_RETUNE"
+  },
+  "prohibitions": [
+    "NO_2025_PARAMETER_TUNING",
+    "NO_SPORTSBOOK_PRICE_FEATURES",
+    "NO_POST_OUTCOME_FORMULA_EDIT_WITHOUT_NEW_CANDIDATE_ID",
+    "NO_MODEL_P_OR_OFFICIAL_AUTHORITY_FROM_THIS_PREREG",
+    "NO_BACKFILL_AS_FORWARD_EVIDENCE"
+  ]
+}
