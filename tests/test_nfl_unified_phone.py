@@ -400,6 +400,7 @@ def test_runner_safety_voids_entire_two_team_prop_board_when_one_team_has_no_val
                 },
             ],
             "engine": {},
+            "status": "PRICED_RESEARCH_PROPS_GAME_EDGE_DISABLED",
             "role_status": "AVAILABLE",
             "role_error": None,
         }],
@@ -409,6 +410,8 @@ def test_runner_safety_voids_entire_two_team_prop_board_when_one_team_has_no_val
     out = _apply_prop_board_safety(payload, ticket)
     game = out["games"][0]
     assert game["role_status"] == "NO_MODEL"
+    assert game["prop_status"] == "NO_MODEL_PROP_BOARD_INCOMPLETE"
+    assert game["status"] == "PRICED_RESEARCH_PROPS_GAME_EDGE_DISABLED"
     assert game["engine"]["prop_board_status"] == "NO_MODEL"
     assert game["engine"]["prop_board_error"].startswith("GAME_PROP_SIMULATION_INCOMPLETE:NO=")
     assert out["selected_rows"] == []
