@@ -1,0 +1,50 @@
+name: mlb-pitcher-k-historical-materialize
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/mlb-pitcher-k-materialize-action-v1
+    paths:
+      - ".github/workflows/mlb-pitcher-k-historical-materialize.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install runtime dependencies
+        run: python -m pip install --upgrade pip && python -m pip install requests
+      - name: Materialize frozen 2023-2025 pitcher-K rows
+        run: |
+          mkdir -p artifacts/mlb/pitcher_k
+          python scripts/materialize_mlb_pitcher_k_evaluation_rows.py \
+            --output artifacts/mlb/pitcher_k/evaluation_rows.json \
+            --cache-dir artifacts/mlb/pitcher_k/cache
+      - name: Assert data-only authority
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("artifacts/mlb/pitcher_k/evaluation_rows.json")
+          data=json.loads(p.read_text())
+          assert data.get("evaluation_consumed") is False
+          assert data.get("promotion_authority") is False
+          assert data.get("materialization_sha256")
+          assert int(data.get("row_count", 0)) > 0
+          print({"row_count": data.get("row_count"), "sha256": data.get("materialization_sha256"), "evaluation_consumed": data.get("evaluation_consumed")})
+          PY
+      - name: Upload materialization artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlb-pitcher-k-historical-materialization
+          path: artifacts/mlb/pitcher_k/evaluation_rows.json
+          if-no-files-found: error
+          retention-days: 30
