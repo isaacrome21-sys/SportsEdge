@@ -12,6 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sportsedge.mlb_run_it_pregame import acquire_mlb_run_it_pregame
+from sportsedge.mlb_context_forward_capture import capture_training_row
 from sportsedge.statcast_daily_source import StatcastSourceError, fetch_daily_statcast
 
 
@@ -73,6 +74,7 @@ def main(argv=None, *, acquire=acquire_mlb_run_it_pregame):
     ap = argparse.ArgumentParser()
     ap.add_argument("--engine-output", default="artifacts/manual_mlb_snapshot_card.json")
     ap.add_argument("--out-dir", default="artifacts/mlb_context")
+    ap.add_argument("--capture-dir", default="artifacts/mlb_context_forward", help="Forward-only PIT context evidence output")
     ap.add_argument(
         "--workers",
         type=int,
@@ -86,6 +88,8 @@ def main(argv=None, *, acquire=acquire_mlb_run_it_pregame):
     payload = json.loads(Path(args.engine_output).read_text())
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
+    capture_out = Path(args.capture_dir)
+    capture_out.mkdir(parents=True, exist_ok=True)
     pks = game_pks(payload)
     failures = []
     if acquire is acquire_mlb_run_it_pregame and pks:
@@ -111,6 +115,18 @@ def main(argv=None, *, acquire=acquire_mlb_run_it_pregame):
             failures.append(failure)
             continue
         (out / f"{pk}.json").write_text(json.dumps(bundle, indent=2, default=str))
+        first_pitch = bundle.get("first_pitch_utc") or bundle.get("game_start_utc")
+        game_date = str(bundle.get("game_date") or (str(first_pitch)[:10] if first_pitch else ""))
+        captured_at = str(bundle.get("as_of_utc") or bundle.get("as_of") or "")
+        if first_pitch and captured_at:
+            try:
+                evidence = capture_training_row(bundle, game_date=game_date, first_pitch_utc=str(first_pitch), captured_at_utc=captured_at)
+                (capture_out / f"{pk}.json").write_text(json.dumps(evidence, indent=2, default=str))
+                print(f"{pk}: forward context evidence {evidence['capture_sha256'][:12]}")
+            except ValueError as exc:
+                failures.append(f"Game {pk}: context evidence NOT CAPTURED ({exc})")
+        else:
+            failures.append(f"Game {pk}: context evidence NOT CAPTURED (missing first-pitch/as-of timestamp)")
         print(f"{pk}: {bundle.get('status')} {str(bundle.get('payload_sha256'))[:12]}")
 
     (out / "failures.json").write_text(json.dumps(failures, indent=2))
