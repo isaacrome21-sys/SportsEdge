@@ -179,6 +179,109 @@ def _normalize_ticket_prop_players(ticket: dict, depth_rows: list[dict]) -> tupl
     return normalized, bindings
 
 
+_PROP_FAMILY = {
+    "pass_attempts": "PASS_VOLUME",
+    "completions": "PASS_VOLUME",
+    "passing_yards": "PASS_VOLUME",
+    "receptions": "RECEIVING_VOLUME",
+    "receiving_yards": "RECEIVING_VOLUME",
+    "rush_attempts": "RUSH_VOLUME",
+    "rushing_yards": "RUSH_VOLUME",
+    "rush_receiving_yards": "COMBINED_YARDS",
+    "pass_tds": "PASS_SCORING",
+    "interceptions": "TURNOVERS",
+    "receiving_tds": "TD_SCORING",
+    "rushing_tds": "TD_SCORING",
+    "anytime_tds": "TD_SCORING",
+}
+_PROP_FAMILY_CONFLICTS = {
+    "PASS_VOLUME": {"PASS_VOLUME"},
+    "RECEIVING_VOLUME": {"RECEIVING_VOLUME", "COMBINED_YARDS"},
+    "RUSH_VOLUME": {"RUSH_VOLUME", "COMBINED_YARDS"},
+    "COMBINED_YARDS": {"RECEIVING_VOLUME", "RUSH_VOLUME", "COMBINED_YARDS"},
+    "PASS_SCORING": {"PASS_SCORING"},
+    "TURNOVERS": {"TURNOVERS"},
+    "TD_SCORING": {"TD_SCORING"},
+}
+_MAX_SELECTED_PLAYER_PROPS_PER_GAME = 6
+_MAX_SELECTED_PROP_FAMILIES_PER_PLAYER = 2
+
+
+def _selection_rank(row: dict) -> tuple[float, float, float, int]:
+    return (
+        float(row.get("ev_per_dollar") or float("-inf")),
+        float(row.get("edge_probability_points") or float("-inf")),
+        float(row.get("score_0_100") or float("-inf")),
+        -int(row.get("input_index") or 0),
+    )
+
+
+def _apply_correlation_selection_policy(game: dict, raw_game: dict) -> dict:
+    """Trim the served card, never the underlying model probabilities.
+
+    Pair-level selection can nominate several highly correlated expressions of
+    the same player thesis (for example QB attempts, completions and pass yards).
+    Keep the strongest expression per player/family and cap the phone card at six
+    player props.  This deliberately does NOT force team or over/under balance.
+    """
+    prop_indexes = {
+        i for i, raw in enumerate(raw_game.get("markets") or [])
+        if isinstance(raw, dict) and str(raw.get("player") or "").strip()
+    }
+    candidates = [
+        row for row in game.get("rows") or []
+        if row.get("selected")
+        and int(row.get("input_index", -1)) in prop_indexes
+        and str(row.get("player") or "").strip()
+    ]
+    for row in candidates:
+        row["pair_selected"] = True
+
+    used_families: dict[str, set[str]] = {}
+    player_kept: dict[str, int] = {}
+    kept = 0
+    suppressed: list[dict[str, str]] = []
+
+    for row in sorted(candidates, key=_selection_rank, reverse=True):
+        player = str(row.get("player") or "").strip()
+        market = str(row.get("market") or "").strip().lower()
+        family = _PROP_FAMILY.get(market, market.upper() or "OTHER")
+        conflicts = _PROP_FAMILY_CONFLICTS.get(family, {family})
+        prior = used_families.setdefault(player, set())
+
+        reason = None
+        if prior.intersection(conflicts):
+            reason = "CORRELATED_PLAYER_FAMILY"
+        elif player_kept.get(player, 0) >= _MAX_SELECTED_PROP_FAMILIES_PER_PLAYER:
+            reason = "PLAYER_PROP_EXPOSURE_CAP"
+        elif kept >= _MAX_SELECTED_PLAYER_PROPS_PER_GAME:
+            reason = "PROP_CARD_DISPLAY_CAP"
+
+        if reason is not None:
+            row["selected"] = False
+            row["selection_suppressed_reason"] = reason
+            suppressed.append({
+                "player": player,
+                "market": market,
+                "reason": reason,
+            })
+            continue
+
+        kept += 1
+        player_kept[player] = player_kept.get(player, 0) + 1
+        prior.add(family)
+
+    return {
+        "candidate_pair_selections": len(candidates),
+        "served_prop_selections": kept,
+        "max_player_props_per_game": _MAX_SELECTED_PLAYER_PROPS_PER_GAME,
+        "max_prop_families_per_player": _MAX_SELECTED_PROP_FAMILIES_PER_PLAYER,
+        "forces_team_balance": False,
+        "forces_over_under_balance": False,
+        "suppressed": suppressed,
+    }
+
+
 def _prop_selection_diagnostics(game: dict, raw_game: dict) -> dict:
     prop_indexes = {
         i for i, raw in enumerate(raw_game.get("markets") or [])
@@ -236,6 +339,7 @@ def _prop_selection_diagnostics(game: dict, raw_game: dict) -> dict:
         "selected_team_counts": dict(sorted(selected_team_counts.items())),
         "selected_direction_counts": dict(sorted(selected_direction_counts.items())),
         "alerts": alerts,
+        "review_required": bool(alerts),
         "selection_changed_by_diagnostic": False,
     }
 
@@ -327,11 +431,16 @@ def _apply_prop_board_safety(payload: dict, ticket: dict) -> dict:
             engine["degraded_requested_teams"] = dict(sorted(degraded_teams.items()))
             game["prop_status"] = "AVAILABLE"
 
+        game["prop_selection_policy"] = _apply_correlation_selection_policy(game, raw_game)
         game["prop_selection_diagnostics"] = _prop_selection_diagnostics(game, raw_game)
 
     all_rows = [row for game in games for row in game.get("rows") or []]
     out["rows"] = all_rows
     out["selected_rows"] = [row for row in all_rows if row.get("selected")]
+    out["prop_card_review_required"] = any(
+        bool(game.get("prop_selection_diagnostics", {}).get("review_required"))
+        for game in games
+    )
     out["prop_board_safety_policy"] = {
         "team_simulation_failure_invalidates_two_team_board": True,
         "individual_player_or_market_no_model_does_not_invalidate_opposite_team": True,
