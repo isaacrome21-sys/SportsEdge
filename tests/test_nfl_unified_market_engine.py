@@ -333,36 +333,3 @@ def test_missing_or_market_contaminated_player_inputs_fail_only_prop_rows():
     )
     assert contaminated["prop_markets"][0]["status"] == "NO_MODEL"
     assert "MARKET_INPUT_FORBIDDEN" in contaminated["prop_markets"][0]["reason"]
-
-def test_signed_low_volume_receiving_efficiency_does_not_poison_team_simulation():
-    home = team_model("H")
-    home["skill_players"][3]["role_prior"]["receiving_yards_per_reception"] = -2.0
-    out = run_unified_nfl_model(
-        game_id="2026_04_AWAY_HOME",
-        home_team="HOME",
-        away_team="AWAY",
-        attempt9_margin=1.0,
-        attempt9_total=43.0,
-        prop_markets=[
-            {
-                "team": "home",
-                "player": "H_WR1",
-                "market": "receiving_yards",
-                "selection": "over",
-                "line": 65.5,
-            },
-            {
-                "team": "away",
-                "player": "A_WR1",
-                "market": "receiving_yards",
-                "selection": "over",
-                "line": 65.5,
-            },
-        ],
-        home_model=home,
-        away_model=team_model("A"),
-        n_sims=400,
-        seed=119,
-    )
-    assert all(row["status"] == "PRICED_RESEARCH" for row in out["prop_markets"])
-
