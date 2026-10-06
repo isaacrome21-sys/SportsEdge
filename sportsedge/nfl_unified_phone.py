@@ -88,8 +88,34 @@ def _match_schedule(
     return matches[0]
 
 
+_NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
+
+
+def _name_tokens(value: Any) -> list[str]:
+    text_value = str(value or "").casefold()
+    for mark in (".", ",", "-", "'", "’"):
+        text_value = text_value.replace(mark, " ")
+    tokens = text_value.split()
+    while tokens and tokens[-1] in _NAME_SUFFIXES:
+        tokens.pop()
+    return tokens
+
+
 def _name_key(value: Any) -> str:
-    return " ".join(str(value or "").strip().lower().split())
+    return " ".join(_name_tokens(value))
+
+
+def _name_alias_match(left: Any, right: Any) -> bool:
+    a = _name_tokens(left)
+    b = _name_tokens(right)
+    if a == b:
+        return True
+    if len(a) >= 2 and len(b) >= 2 and a[-1] == b[-1]:
+        first_a, first_b = a[0], b[0]
+        return min(len(first_a), len(first_b)) >= 4 and (
+            first_a.startswith(first_b) or first_b.startswith(first_a)
+        )
+    return False
 
 
 def _market_context(markets: Sequence[Mapping[str, Any]]) -> tuple[dict[str, float] | None, str | None]:
@@ -120,7 +146,6 @@ def _find_player(
     home_model: Mapping[str, Any],
     away_model: Mapping[str, Any],
 ) -> tuple[str, str, str]:
-    needle = _name_key(player)
     hits: list[tuple[str, str, str]] = []
     for side, model in (("home", home_model), ("away", away_model)):
         qb = model.get("qb") if isinstance(model, Mapping) else None
@@ -134,7 +159,7 @@ def _find_player(
             canonical = str(row.get("player") or "").strip()
             if not canonical or canonical.endswith("_OTHER"):
                 continue
-            if _name_key(canonical) == needle:
+            if _name_alias_match(canonical, player):
                 hits.append((side, canonical, str(row.get("position") or "").upper()))
     if len(hits) != 1:
         raise UnifiedNflPhoneError(f"PROP_PLAYER_EXACT_MATCH_REQUIRED:{player}:matches={len(hits)}")
