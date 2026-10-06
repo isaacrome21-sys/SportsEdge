@@ -1,3 +1,0 @@
-triggered_at=2026-09-12T03:31:00Z
-reason=corrected SPORTSEDGE_ODDSAPI_KEY mapping
-promotion_authority=false
