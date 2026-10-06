@@ -18,6 +18,7 @@ from sportsedge.sports.nfl.auto_slate import discover_nfl_auto_games
 from sportsedge.sports.nfl.context_autopull import NFLContextError
 from sportsedge.sports.nfl.full_auto import fetch_nflverse_depth_charts
 from sportsedge.sports.nfl.injury_report_source import fetch_nflverse_injuries
+from sportsedge.sports.nfl.live_role_source import build_live_team_model
 from sportsedge.sports.nfl.live_role_source import fetch_nflverse_player_stats
 
 
@@ -153,6 +154,84 @@ def _role_v2_active_ids(
             raise SystemExit(f"NFL_ROLE_V2_ACTIVE_DEPTH_EMPTY:{team}")
         active[team] = ids
     return active, snapshots
+
+
+def _role_v2_model_diagnostics(
+    *,
+    ticket: dict,
+    schedule_games: list[dict],
+    depth_rows: list[dict],
+    player_rows: list[dict],
+    injury_rows: list[dict],
+) -> list[dict]:
+    observed = _utc(ticket.get("observed_at"), "observed_at")
+    out: list[dict] = []
+    for raw_game in ticket.get("games") or []:
+        away = str(raw_game.get("away") or "").strip().upper()
+        home = str(raw_game.get("home") or "").strip().upper()
+        schedule = _match_schedule(
+            schedule_games,
+            away=away,
+            home=home,
+            observed_at=observed,
+        )
+        game_diag = {
+            "game_id": schedule["game_id"],
+            "away": away,
+            "home": home,
+            "teams": {},
+        }
+        for team in (away, home):
+            model = build_live_team_model(
+                team=team,
+                target_season=int(schedule["season"]),
+                target_week=int(schedule["week"]),
+                kickoff=schedule["kickoff"],
+                observed_at=ticket["observed_at"],
+                depth_rows=depth_rows,
+                player_rows=player_rows,
+                injury_rows=injury_rows,
+            )
+            skills = [dict(row) for row in model.get("skill_players") or []]
+            weights = {
+                str(row.get("player") or ""): (
+                    float((row.get("role_prior") or {}).get("targets") or 0.0)
+                    * float((row.get("role_prior") or {}).get("catch_rate") or 0.0)
+                )
+                for row in skills
+            }
+            total_weight = sum(weights.values())
+            other_weight = sum(
+                weight for name, weight in weights.items()
+                if name.endswith("_OTHER")
+            )
+            game_diag["teams"][team] = {
+                "qb": {
+                    "player": model["qb"].get("player"),
+                    "pass_attempts": (model["qb"].get("role_prior") or {}).get("pass_attempts"),
+                    "completion_rate": (model["qb"].get("role_prior") or {}).get("completion_rate"),
+                    "pit_sample_games": model["qb"].get("pit_sample_games"),
+                },
+                "receivers": [
+                    {
+                        "player": row.get("player"),
+                        "position": row.get("position"),
+                        "targets": (row.get("role_prior") or {}).get("targets"),
+                        "catch_rate": (row.get("role_prior") or {}).get("catch_rate"),
+                        "receiving_yards_per_reception": (
+                            row.get("role_prior") or {}
+                        ).get("receiving_yards_per_reception"),
+                        "pit_sample_games": row.get("pit_sample_games"),
+                        "catch_allocation_weight": weights.get(str(row.get("player") or ""), 0.0),
+                    }
+                    for row in skills
+                ],
+                "synthetic_other_catch_weight_share": (
+                    other_weight / total_weight if total_weight > 0 else 0.0
+                ),
+            }
+        out.append(game_diag)
+    return out
 
 
 def _filter_role_v2_current_team_history(
@@ -649,6 +728,13 @@ def main() -> int:
         target_season=role_v2_season,
         target_week=role_v2_week,
     )
+    role_v2_diagnostics = _role_v2_model_diagnostics(
+        ticket=ticket,
+        schedule_games=schedule_games,
+        depth_rows=depth_rows,
+        player_rows=player_rows,
+        injury_rows=injury_rows,
+    )
     ticket, alias_bindings = _normalize_ticket_prop_players(ticket, depth_rows)
 
     payload = build_unified_phone_card(
@@ -680,6 +766,7 @@ def main() -> int:
             team: len(ids) for team, ids in sorted(role_v2_active.items())
         },
         "stale_or_unavailable_current_team_history_removed": role_v2_roster_receipts,
+        "role_diagnostics": role_v2_diagnostics,
         "market_data_used": False,
         "research_only": True,
     }
