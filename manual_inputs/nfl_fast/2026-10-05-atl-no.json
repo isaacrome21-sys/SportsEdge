@@ -490,7 +490,7 @@
     }
   ],
   "run_nonce": "fast20k-8",
-  "rerun_token": "no-team-efficiency-repair-fast5k-v8",
+  "rerun_token": "current-season-role-window-v9",
   "official_inactives_source": "NFL.com Week 4 Monday night inactives, published 2026-10-05 18:49 ET",
   "official_inactives": [
     "Cooper Rush",
@@ -506,5 +506,7 @@
     "Kaden Elliss",
     "Noah Fant",
     "Carl Granderson"
-  ]
+  ],
+  "role_lookback_games": 3,
+  "role_decay": 1
 }
