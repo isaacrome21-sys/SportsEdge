@@ -31,6 +31,7 @@ from .mlb_starter_effect import (
     starter_run_effect,
 )
 from .pitcher_record_win_engine import build_pitcher_record_win_features
+from .mlb_context_model_features import attach_context_features
 
 JOINT_HITTER_COMBO_MARKETS = frozenset({
     "HITS_RUNS_STOLEN_BASES",
@@ -291,6 +292,7 @@ class MLBAllMarketHistorySource(MLBGenericHistorySource):
         team_id: int | None = None,
         away_pitcher_id: int | None = None,
         home_pitcher_id: int | None = None,
+        pregame_context: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         if market in JOINT_HITTER_COMBO_MARKETS:
             if player_id is None:
@@ -329,6 +331,8 @@ class MLBAllMarketHistorySource(MLBGenericHistorySource):
             row["run_mean_components"] = components
             row["source"] = _RUN_BLEND_SOURCE
             self._attach_starter_effects(row, away_pitcher_id=away_pitcher_id, home_pitcher_id=home_pitcher_id, target_date=target_date)
+            if pregame_context is not None:
+                row = attach_context_features(row, pregame_context)
             return _seal(row)
 
         if market in _PRODUCTION_RUN_BLEND_MARKETS:
@@ -344,6 +348,8 @@ class MLBAllMarketHistorySource(MLBGenericHistorySource):
             row["run_mean_components"] = components
             row["source"] = _RUN_BLEND_SOURCE
             self._attach_starter_effects(row, away_pitcher_id=away_pitcher_id, home_pitcher_id=home_pitcher_id, target_date=target_date)
+            if pregame_context is not None:
+                row = attach_context_features(row, pregame_context)
             return _seal(row)
 
         if market in EITHER_PITCHER_MARKETS:
