@@ -1,3 +1,4 @@
+import pytest
 import json
 import os
 import textwrap
@@ -267,7 +268,7 @@ def test_extreme_model_market_disagreement_is_review_not_actionable():
     out = apply_market_sanity_guard(rows)
     assert out[0]["estimate_p"] == 0.70
     assert out[0]["market_p"] == 0.43
-    assert out[0]["model_market_gap"] == 0.27
+    assert out[0]["model_market_gap"] == pytest.approx(0.27)
     assert out[0]["scored_status"] == "REVIEW"
     assert "EXTREME_MODEL_MARKET_DISAGREEMENT_REVIEW" in out[0]["presentation_reason_codes"]
 
