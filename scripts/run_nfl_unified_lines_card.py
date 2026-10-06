@@ -12,7 +12,7 @@ from copy import deepcopy
 import json
 from pathlib import Path
 
-from sportsedge.nfl_unified_phone import build_unified_phone_card
+from sportsedge.nfl_unified_phone import _match_schedule, _utc, build_unified_phone_card
 from sportsedge.nfl_scoring_composition_artifact import load_prior_file
 from sportsedge.sports.nfl.auto_slate import discover_nfl_auto_games
 from sportsedge.sports.nfl.context_autopull import NFLContextError
@@ -73,6 +73,211 @@ def _sanitize_signed_yardage_rows(player_rows: list[dict]) -> tuple[list[dict], 
             row[field] = 0.0
         out.append(row)
     return out, receipts
+
+
+ROLE_V2_MIN_CURRENT_GAMES = 4
+ROLE_V2_PRIOR_ANCHOR_GAMES = 1
+_ROLE_V2_TEAM_ALIASES = {"LA": "LAR", "WSH": "WAS"}
+
+
+def _role_v2_team(value) -> str:
+    raw = str(value or "").strip().upper()
+    return _ROLE_V2_TEAM_ALIASES.get(raw, raw)
+
+
+def _role_v2_active_ids(
+    *,
+    ticket: dict,
+    depth_rows: list[dict],
+    injury_rows: list[dict],
+    target_season: int,
+    target_week: int,
+) -> tuple[dict[str, set[str]], dict[str, str]]:
+    observed = _utc(ticket.get("observed_at"), "observed_at")
+    teams = {
+        _role_v2_team(raw_game.get(key))
+        for raw_game in ticket.get("games") or []
+        for key in ("away", "home")
+        if _role_v2_team(raw_game.get(key))
+    }
+    active: dict[str, set[str]] = {}
+    snapshots: dict[str, str] = {}
+    for team in sorted(teams):
+        eligible: list[tuple[object, dict]] = []
+        for raw in depth_rows:
+            if _role_v2_team(raw.get("team") or raw.get("club_code")) != team:
+                continue
+            if raw.get("dt") in (None, ""):
+                continue
+            stamp = _utc(raw.get("dt"), "depth dt")
+            if stamp <= observed:
+                eligible.append((stamp, dict(raw)))
+        if not eligible:
+            raise SystemExit(f"NFL_ROLE_V2_DEPTH_SNAPSHOT_MISSING:{team}")
+        latest = max(stamp for stamp, _ in eligible)
+        snapshot = [row for stamp, row in eligible if stamp == latest]
+        snapshots[team] = latest.isoformat()
+
+        status_by_id: dict[str, tuple[object, str]] = {}
+        for raw in injury_rows:
+            if _role_v2_team(raw.get("team")) != team:
+                continue
+            try:
+                season = int(float(raw.get("season")))
+                week = int(float(raw.get("week")))
+            except (TypeError, ValueError):
+                continue
+            if season != int(target_season) or week != int(target_week):
+                continue
+            pid = str(raw.get("gsis_id") or raw.get("player_id") or "").strip()
+            if not pid or raw.get("date_modified") in (None, ""):
+                continue
+            stamp = _utc(raw.get("date_modified"), "injury date_modified")
+            if stamp > observed:
+                continue
+            status = str(raw.get("report_status") or "").strip().upper() or "MISSING"
+            prior = status_by_id.get(pid)
+            if prior is None or stamp > prior[0]:
+                status_by_id[pid] = (stamp, status)
+
+        ids: set[str] = set()
+        for row in snapshot:
+            pid = str(row.get("gsis_id") or row.get("player_id") or "").strip()
+            if not pid:
+                continue
+            status = status_by_id.get(pid, (None, "MISSING"))[1]
+            if status in {"OUT", "INACTIVE"}:
+                continue
+            ids.add(pid)
+        if not ids:
+            raise SystemExit(f"NFL_ROLE_V2_ACTIVE_DEPTH_EMPTY:{team}")
+        active[team] = ids
+    return active, snapshots
+
+
+def _filter_role_v2_current_team_history(
+    player_rows: list[dict],
+    *,
+    active_ids_by_team: dict[str, set[str]],
+) -> tuple[list[dict], list[dict]]:
+    """Keep current-team usage mass only for players on the current active depth chart.
+
+    Historical rows from a player's former team remain available to estimate that
+    player's own role after a trade.  What is removed is stale usage credited to
+    the current team by players who are no longer active there, preventing those
+    departed/OUT players from silently becoming the synthetic OTHER receiver.
+    """
+    out: list[dict] = []
+    removed: dict[tuple[str, str, str], int] = {}
+    for raw in player_rows:
+        row = dict(raw)
+        team = _role_v2_team(row.get("recent_team") or row.get("team"))
+        pid = str(row.get("player_id") or row.get("gsis_id") or "").strip()
+        if team in active_ids_by_team and pid and pid not in active_ids_by_team[team]:
+            key = (team, pid, str(row.get("player_name") or ""))
+            removed[key] = removed.get(key, 0) + 1
+            continue
+        out.append(row)
+    receipts = [
+        {
+            "team": team,
+            "player_id": pid,
+            "player_name": name,
+            "rows_removed": count,
+            "reason": "NOT_ON_CURRENT_ACTIVE_DEPTH_SNAPSHOT",
+        }
+        for (team, pid, name), count in sorted(removed.items())
+    ]
+    return out, receipts
+
+
+def _ticket_target_season_week(ticket: dict, schedule_games: list[dict]) -> tuple[int, int]:
+    observed = _utc(ticket.get("observed_at"), "observed_at")
+    targets: set[tuple[int, int]] = set()
+    for raw_game in ticket.get("games") or []:
+        away = str(raw_game.get("away") or "").strip().upper()
+        home = str(raw_game.get("home") or "").strip().upper()
+        matched = _match_schedule(
+            schedule_games,
+            away=away,
+            home=home,
+            observed_at=observed,
+        )
+        targets.add((int(matched["season"]), int(matched["week"])))
+    if len(targets) != 1:
+        raise SystemExit("NFL_ROLE_V2_SINGLE_SEASON_WEEK_REQUIRED")
+    return next(iter(targets))
+
+
+def _apply_role_v2_recency(
+    player_rows: list[dict],
+    *,
+    target_season: int,
+    target_week: int,
+) -> tuple[list[dict], list[dict]]:
+    """Early-season recency candidate: 4+ current games dominate stale prior roles.
+
+    For a player with at least four strictly-prior games in the target season,
+    retain all current-season rows plus only the single most recent older row as
+    a prior anchor. Players with fewer than four current games keep the existing
+    source history unchanged. The rule is player-local and market-blind.
+    """
+    grouped: dict[str, list[dict]] = {}
+    passthrough: list[dict] = []
+    for raw in player_rows:
+        row = dict(raw)
+        pid = str(row.get("player_id") or row.get("gsis_id") or "").strip()
+        if not pid:
+            passthrough.append(row)
+            continue
+        grouped.setdefault(pid, []).append(row)
+
+    kept: list[dict] = list(passthrough)
+    receipts: list[dict] = []
+    for pid, rows in grouped.items():
+        def sw(row: dict) -> tuple[int, int]:
+            try:
+                return int(float(row.get("season"))), int(float(row.get("week")))
+            except (TypeError, ValueError):
+                return (-1, -1)
+
+        ordered = sorted(rows, key=sw)
+        current = [
+            row for row in ordered
+            if sw(row)[0] == int(target_season) and 0 < sw(row)[1] < int(target_week)
+            and str(row.get("season_type") or "REG").strip().upper() == "REG"
+        ]
+        current_weeks = sorted({sw(row)[1] for row in current})
+        if len(current_weeks) < ROLE_V2_MIN_CURRENT_GAMES:
+            kept.extend(ordered)
+            continue
+
+        older = [
+            row for row in ordered
+            if sw(row)[0] < int(target_season)
+            and str(row.get("season_type") or "REG").strip().upper() == "REG"
+        ]
+        anchors = older[-ROLE_V2_PRIOR_ANCHOR_GAMES:] if ROLE_V2_PRIOR_ANCHOR_GAMES else []
+        chosen_ids = {id(row) for row in current + anchors}
+        # Rows are copies, so identity is safe within this local list.
+        selected = current + anchors
+        kept.extend(selected)
+        receipts.append({
+            "player_id": pid,
+            "player_name": str((current[-1] if current else ordered[-1]).get("player_name") or ""),
+            "current_season_games": len(current_weeks),
+            "prior_anchor_games": len(anchors),
+            "source_rows_before": len(ordered),
+            "source_rows_after": len(selected),
+            "mode": "CURRENT_SEASON_PLUS_ONE_PRIOR_ANCHOR",
+        })
+
+    kept.sort(key=lambda row: (
+        int(float(row.get("season") or -1)) if str(row.get("season") or "").replace(".", "", 1).isdigit() else -1,
+        int(float(row.get("week") or -1)) if str(row.get("week") or "").replace(".", "", 1).isdigit() else -1,
+        str(row.get("player_id") or row.get("gsis_id") or ""),
+    ))
+    return kept, sorted(receipts, key=lambda row: row["player_id"])
 
 
 _NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
@@ -536,6 +741,23 @@ def main() -> int:
     scoring_prior = load_prior_file(args.scoring_prior) if args.scoring_prior else None
 
     player_rows, signed_yardage_receipts = _sanitize_signed_yardage_rows(player_rows)
+    role_v2_season, role_v2_week = _ticket_target_season_week(ticket, schedule_games)
+    role_v2_active, role_v2_depth_snapshots = _role_v2_active_ids(
+        ticket=ticket,
+        depth_rows=depth_rows,
+        injury_rows=injury_rows,
+        target_season=role_v2_season,
+        target_week=role_v2_week,
+    )
+    player_rows, role_v2_roster_receipts = _filter_role_v2_current_team_history(
+        player_rows,
+        active_ids_by_team=role_v2_active,
+    )
+    player_rows, role_v2_receipts = _apply_role_v2_recency(
+        player_rows,
+        target_season=role_v2_season,
+        target_week=role_v2_week,
+    )
     ticket, alias_bindings = _normalize_ticket_prop_players(ticket, depth_rows)
 
     payload = build_unified_phone_card(
@@ -555,6 +777,21 @@ def main() -> int:
     payload["schedule_source_sha256"] = plan.get("schedule_source_sha256")
     payload["player_alias_bindings"] = alias_bindings
     payload["signed_yardage_adaptations"] = signed_yardage_receipts
+    payload["role_model_candidate"] = {
+        "family": "NFL_MARKET_CONTEXT_PROP_V2_RECENCY",
+        "target_season": role_v2_season,
+        "target_week": role_v2_week,
+        "min_current_games": ROLE_V2_MIN_CURRENT_GAMES,
+        "prior_anchor_games": ROLE_V2_PRIOR_ANCHOR_GAMES,
+        "player_receipts": role_v2_receipts,
+        "depth_snapshot_asof_by_team": role_v2_depth_snapshots,
+        "active_depth_player_count_by_team": {
+            team: len(ids) for team, ids in sorted(role_v2_active.items())
+        },
+        "stale_or_unavailable_current_team_history_removed": role_v2_roster_receipts,
+        "market_data_used": False,
+        "research_only": True,
+    }
 
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
