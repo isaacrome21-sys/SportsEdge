@@ -386,6 +386,23 @@ class MLBGenericHistorySource:
         """Last <=10 strictly-prior regular-season starts, without a minimum-size gate."""
         return [row for row, _, _ in self._pitcher_start_rows(player_id=player_id, target_date=target_date)]
 
+    def pitcher_k_workload_candidate(self, *, player_id: int, target_date: date) -> dict[str, Any]:
+        """Research-only workload bundle from the same strictly-prior pitching game logs."""
+        from .mlb_pitcher_k_workload_candidate import (
+            PitcherKWorkloadCandidateError,
+            build_workload_bundle,
+        )
+
+        rows = self.player_rows(player_id=player_id, group="pitching", target_date=target_date)
+        starts = [
+            row for row in rows
+            if _number(row["stat"].get("gamesStarted", 0), "gamesStarted") >= 1
+        ][-10:]
+        try:
+            return build_workload_bundle(starts)
+        except PitcherKWorkloadCandidateError as exc:
+            raise MLBGenericFeatureError(f"pitcher_k_workload_candidate:{exc}") from exc
+
     def pitcher_joint_prior_rows(self, *, player_id: int, target_date: date) -> list[dict[str, int]]:
         """Starts 11-30 back, never overlapping the recent <=10-start likelihood pool."""
         rows = self.player_rows(player_id=player_id, group="pitching", target_date=target_date)
