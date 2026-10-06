@@ -747,27 +747,36 @@ def test_correlation_policy_keeps_only_strongest_same_player_pass_volume_express
     assert policy["served_prop_selections"] == 1
 
 
-def test_correlation_policy_caps_phone_card_at_six_independent_props_by_strength():
+def test_correlation_policy_has_no_arbitrary_global_prop_count_cap():
+    specs = [
+        ("P0", "passing_yards"),
+        ("P1", "receiving_yards"),
+        ("P2", "rushing_yards"),
+        ("P3", "rush_attempts"),
+        ("P4", "pass_tds"),
+        ("P5", "anytime_tds"),
+        ("P6", "interceptions"),
+    ]
     ticket = {
         "games": [{
             "away": "ATL",
             "home": "NO",
             "markets": [
-                {"player": f"ATL Player {i}", "market": "receiving_yards"}
-                for i in range(7)
+                {"player": player, "market": market}
+                for player, market in specs
             ],
         }]
     }
     rows = [
         {
-            "input_index": i, "team": "away", "player": f"ATL Player {i}",
-            "market": "receiving_yards", "status": "PRICED", "selected": True,
-            "selection": f"ATL Player {i} Under",
+            "input_index": i, "team": "away", "player": player,
+            "market": market, "status": "PRICED", "selected": True,
+            "selection": f"{player} Under",
             "ev_per_dollar": 0.20 - i * 0.01,
             "edge_probability_points": 0.20 - i * 0.01,
             "score_0_100": 88,
         }
-        for i in range(7)
+        for i, (player, market) in enumerate(specs)
     ]
     payload = {
         "games": [{
@@ -777,14 +786,11 @@ def test_correlation_policy_caps_phone_card_at_six_independent_props_by_strength
         "rows": [], "selected_rows": [],
     }
     out = _apply_prop_board_safety(payload, ticket)
-    assert len(out["selected_rows"]) == 6
-    assert {row["player"] for row in out["selected_rows"]} == {
-        f"ATL Player {i}" for i in range(6)
-    }
-    suppressed = [row for row in out["rows"] if not row.get("selected")]
-    assert len(suppressed) == 1
-    assert suppressed[0]["player"] == "ATL Player 6"
-    assert suppressed[0]["selection_suppressed_reason"] == "PROP_CARD_DISPLAY_CAP"
+    assert len(out["selected_rows"]) == 7
+    policy = out["games"][0]["prop_selection_policy"]
+    assert policy["global_prop_count_cap"] is None
+    assert policy["served_prop_selections"] == 7
+    assert policy["suppressed"] == []
 
 
 def test_correlation_policy_never_forces_opposite_team_or_opposite_direction():
@@ -823,9 +829,14 @@ def test_correlation_policy_never_forces_opposite_team_or_opposite_direction():
         "rows": [], "selected_rows": [],
     }
     out = _apply_prop_board_safety(payload, ticket)
-    assert len(out["selected_rows"]) == 4
+    assert len(out["selected_rows"]) == 2
     assert all(row["team"] == "away" for row in out["selected_rows"])
     assert all(str(row["selection"]).endswith("Under") for row in out["selected_rows"])
+    suppressed = [
+        row for row in out["rows"]
+        if row.get("selection_suppressed_reason") == "CORRELATED_TEAM_OFFENSE_CLUSTER"
+    ]
+    assert len(suppressed) == 2
     policy = out["games"][0]["prop_selection_policy"]
     assert policy["forces_team_balance"] is False
     assert policy["forces_over_under_balance"] is False
