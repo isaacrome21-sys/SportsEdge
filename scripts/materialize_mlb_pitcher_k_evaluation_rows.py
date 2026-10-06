@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import date
+import hashlib
 import json
 from pathlib import Path
 
@@ -60,13 +61,16 @@ def main() -> int:
         )
 
     payload = combine_seasons(results)
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    payload["materialization_sha256"] = hashlib.sha256(canonical).hexdigest()
+    payload["evaluation_consumed"] = False
     destination = Path(args.output)
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(
         json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n",
         encoding="utf-8",
     )
-    print(json.dumps({"row_count": payload["row_count"], "output": str(destination)}, sort_keys=True))
+    print(json.dumps({"row_count": payload["row_count"], "output": str(destination), "materialization_sha256": payload["materialization_sha256"], "evaluation_consumed": False}, sort_keys=True))
     return 0
 
 
