@@ -520,6 +520,12 @@ def build_unified_phone_card(
             n_sims=int(n_sims),
             seed=int(seed) + game_index,
         )
+        engine_prop_error = (
+            str(engine.get("prop_board_error") or "").strip()
+            if prop_inputs
+            else ""
+        )
+        effective_role_error = role_error or engine_prop_error or None
 
         rows: list[dict[str, Any]] = []
         for meta in game_meta:
@@ -575,9 +581,12 @@ def build_unified_phone_card(
                 "workload_coupling": engine["workload_coupling"],
                 "authority": engine["authority"],
                 "game_market_edge_disabled": True,
+                "prop_board_status": engine.get("prop_board_status"),
+                "prop_board_error": engine.get("prop_board_error"),
+                "team_simulation_errors": engine.get("team_simulation_errors") or {},
             },
-            "role_status": "AVAILABLE" if not role_error and (not prop_inputs or home_model is not None) else "NO_MODEL",
-            "role_error": role_error,
+            "role_status": "AVAILABLE" if not effective_role_error and (not prop_inputs or home_model is not None) else "NO_MODEL",
+            "role_error": effective_role_error,
             "rows": rows,
             "status": "PRICED_RESEARCH_PROPS_GAME_EDGE_DISABLED",
         })
