@@ -467,8 +467,8 @@ def render_markdown(rows: Sequence[Mapping[str, Any]], *, header: str, notes: Se
         return "—" if v is None else f"{100 * float(v):.1f}%"
 
     lines = [f"# {header}", "", f"_{LABEL}_", "",
-             "| # | Game | Pick | Odds | Win p | Push p | Win p ex-push | Fair | Edge | EV/$ | Score | Status |",
-             "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+             "| # | Game | Pick | Odds | Win p | Push p | Win p ex-push | Fair | Edge | EV/$ | Status |",
+             "|---|---|---|---|---|---|---|---|---|---|---|"]
     for i, r in enumerate(rows, 1):
         fair = r.get("fair_odds")
         ev = r.get("ev_per_dollar")
@@ -492,11 +492,11 @@ def render_markdown(rows: Sequence[Mapping[str, Any]], *, header: str, notes: Se
         lines.append(
             f"| {i} | {r.get('game_id')} | {_selection(r)} | {odds_text} | {win_text} | "
             f"{push_text} | {pct(r.get('model_p'))} | {fair_text} | {pct(r.get('edge'))} | "
-            f"{ev_text} | {r.get('confidence_score', 0)} | {status_text} |"
+            f"{ev_text} | {status_text} |"
         )
     lines += ["", "_Win p = engine win probability; Push p = refund probability; Win p ex-push = Win p / (1 − Push p), "
               "the basis for Fair odds and Edge against the two-way no-vig price. EV/$ uses Win p with pushes refunded. "
-              "Score is qualification-only (simulation sufficiency, quote freshness, push-mass quality); price, edge, EV and probability magnitude do not add Score points._"]
+              "The internal qualification score is retained in the JSON/audit artifact but intentionally omitted from the final card._"]
     blocked = [r for r in rows if r.get("scored_status") in {"BLOCKED", "NO_MODEL"}]
     if blocked:
         lines += ["", "## Engine did not price / not card-eligible", "_Includes stale or incomplete market pairs plus empirical estimates withheld by the presentation support guard; raw engine output is preserved in JSON._"]

@@ -83,20 +83,26 @@ jobs:
           PYTHONPATH=.runtime-deps:. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.intake.outputs.path }}" --run-date "${{ steps.intake.outputs.slate }}" --max-age-minutes 60 --output artifacts/manual_mlb_snapshot_card.json
           echo "mlb_engine_seconds=$(( $(date +%s) - started ))"
 
-      - name: Render PRE-CONTEXT result and reply now
+      - name: Render PRE-CONTEXT audit artifact
         run: |
+          # Keep the fast pre-context render for audit/debugging, but do not post it.
+          # The user-facing issue receives one context-bound final card only.
           PYTHONPATH=.runtime-deps:. python scripts/render_mlb_myspari_card.py \
             --engine-output artifacts/manual_mlb_snapshot_card.json \
             --snapshot "${{ steps.intake.outputs.path }}" \
             --pre-context \
             --out-dir artifacts/mlb_myspari
-          gh issue comment "$ISSUE" --body-file artifacts/mlb_myspari/card.md
 
-      - name: Retrieve pregame context and post final card
-        continue-on-error: true
+      - name: Retrieve pregame context and post unified final card
         timeout-minutes: 5
         run: |
-          PYTHONPATH=.runtime-deps:. python scripts/acquire_mlb_card_context.py --engine-output artifacts/manual_mlb_snapshot_card.json --out-dir artifacts/mlb_context --workers 6
+          # Context is best-effort by lane. If a public source is unavailable, the
+          # final card still renders and reports the missing lane instead of forcing
+          # manual re-entry of Statcast/lineups/weather/etc.
+          timeout 240s env PYTHONPATH=.runtime-deps:. python scripts/acquire_mlb_card_context.py \
+            --engine-output artifacts/manual_mlb_snapshot_card.json \
+            --out-dir artifacts/mlb_context \
+            --workers 6 || true
           PYTHONPATH=.runtime-deps:. python scripts/render_mlb_myspari_card.py \
             --engine-output artifacts/manual_mlb_snapshot_card.json \
             --snapshot "${{ steps.intake.outputs.path }}" \
