@@ -12,7 +12,7 @@ from typing import Any, Mapping, Sequence
 
 from sportsedge.nfl_coherent_team_props import simulate_team_on_game_paths
 from sportsedge.nfl_coherent_team_scoring import simulate_coherent_team_scoring_paths
-from sportsedge.nfl_prop_shared_sim import NflPropSimulationError, stabilized_role
+from sportsedge.nfl_prop_shared_sim import NflPropSimulationError
 from sportsedge.nfl_score_td_composition import (
     NflScoreTdCompositionError,
     attach_team_tds_to_score_paths,
@@ -79,17 +79,32 @@ def _team_contract(team_model: Mapping[str, Any] | None) -> tuple[Mapping[str, A
     return qb, skill_rows
 
 
+def _stabilized_volume_value(row: Mapping[str, Any], key: str) -> float:
+    """Mirror the frozen V1 volume shrinkage for one field, permitting signed YPR."""
+    prior = row.get("role_prior")
+    trailing = row.get("trailing") or {}
+    if not isinstance(prior, Mapping) or not isinstance(trailing, Mapping):
+        raise ScoreCountPropBridgeError("ROLE_OBJECT_REQUIRED")
+    if key not in prior:
+        raise ScoreCountPropBridgeError(f"ROLE_PRIOR_MISSING:{key}")
+    p = _num(prior[key], key)
+    o = p if key not in trailing else _num(trailing[key], key)
+    n = max(0.0, _num(row.get("sample_size", 0), "sample_size"))
+    strength = 8.0
+    return (strength * p + n * o) / (strength + n)
+
+
 def _regularize_nonpositive_receiving_efficiency(
     team_model: Mapping[str, Any] | None,
 ) -> tuple[Mapping[str, Any] | None, list[dict[str, Any]]]:
-    """Shrink impossible forward receiving-efficiency means to the team pool.
+    """Repair only isolated nonpositive receiver YPR before frozen shared V1 runs.
 
-    Tiny historical samples can legitimately contain a negative yards/reception
-    observation.  That is valid source data, but using a negative value as a
-    forward Gamma mean either crashes the team or silently turns future catches
-    into zero yards.  For the score-count challenger only, replace nonpositive
-    stabilized receiver YPR with the catch-weighted positive team pool.  No
-    sportsbook input is used.
+    The source/model payload is copied.  Signed receiving efficiency is evaluated
+    with the same volume shrinkage as the frozen shared role layer, but no global
+    shared-model contract is changed.  If at least one receiver has a positive
+    expectation, isolated nonpositive receivers inherit the catch-weighted
+    positive team pool.  If the whole pool is unusable, no value is invented and
+    the downstream team simulation still fails closed.
     """
     if not isinstance(team_model, Mapping):
         return team_model, []
@@ -102,12 +117,13 @@ def _regularize_nonpositive_receiving_efficiency(
     positive: list[tuple[float, float]] = []
     stabilized: dict[str, tuple[float, float]] = {}
     for row in rows:
-        role = stabilized_role(row)
         player = _name(row)
-        ypr = _num(role["receiving_yards_per_reception"], f"{player}:receiving_yards_per_reception")
-        catches = max(0.0, _num(role["targets"], f"{player}:targets")) * max(
-            0.0, _num(role["catch_rate"], f"{player}:catch_rate")
-        )
+        ypr = _stabilized_volume_value(row, "receiving_yards_per_reception")
+        targets = max(0.0, _stabilized_volume_value(row, "targets"))
+        catch_rate = _stabilized_volume_value(row, "catch_rate")
+        if catch_rate < 0 or catch_rate > 1:
+            raise ScoreCountPropBridgeError(f"ROLE_VALUE_INVALID:catch_rate:{player}")
+        catches = targets * catch_rate
         stabilized[player] = (ypr, catches)
         if ypr > 0:
             positive.append((ypr, max(catches, 1e-6)))
