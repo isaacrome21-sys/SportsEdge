@@ -466,7 +466,51 @@ def render_markdown(rows: Sequence[Mapping[str, Any]], *, header: str, notes: Se
     def pct(v):
         return "—" if v is None else f"{100 * float(v):.1f}%"
 
-    lines = [f"# {header}", "", f"_{LABEL}_", "",
+    def quick_rank(row: Mapping[str, Any]) -> tuple[float, float]:
+        ev = _f(row.get("ev_per_dollar"))
+        edge = _f(row.get("edge"))
+        return (ev if ev is not None else float("-inf"),
+                edge if edge is not None else float("-inf"))
+
+    def quick_table(title: str, picked: Sequence[Mapping[str, Any]]) -> list[str]:
+        if not picked:
+            return []
+        out = ["", f"## {title}", "",
+               "| Pick | Odds | Win p ex-push | Fair | Edge | EV/$ | Status |",
+               "|---|---:|---:|---:|---:|---:|---|"]
+        for r in picked:
+            odds = _f(r.get("american_odds"))
+            fair = r.get("fair_odds")
+            ev = r.get("ev_per_dollar")
+            out.append(
+                f"| {_selection(r)} | "
+                f"{'—' if odds is None else f'{int(odds):+d}'} | "
+                f"{pct(r.get('model_p'))} | "
+                f"{'—' if fair is None else f'{int(fair):+d}'} | "
+                f"{pct(r.get('edge'))} | "
+                f"{'—' if ev is None else f'{float(ev):+.3f}'} | "
+                f"{r.get('scored_status')} |"
+            )
+        return out
+
+    core = sorted(
+        [r for r in rows if r.get("scored_status") == "ACTIONABLE" and not is_empirical(r)],
+        key=quick_rank, reverse=True,
+    )
+    pitcher = sorted(
+        [r for r in rows if r.get("scored_status") == "LEAN" and str(r.get("market") or "").startswith("PITCHER_")],
+        key=quick_rank, reverse=True,
+    )[:6]
+    hitter = sorted(
+        [r for r in rows if r.get("scored_status") == "LEAN" and str(r.get("engine_version") or "").startswith("mlb_hitter_joint_empirical_")],
+        key=quick_rank, reverse=True,
+    )[:6]
+
+    lines = [f"# {header}", "", f"_{LABEL}_"]
+    lines += quick_table("Core plays", core)
+    lines += quick_table("Top pitcher-prop leans", pitcher)
+    lines += quick_table("Top hitter-prop leans", hitter)
+    lines += ["", "## Full board", "",
              "| # | Game | Pick | Odds | Win p | Push p | Win p ex-push | Fair | Edge | EV/$ | Status |",
              "|---|---|---|---|---|---|---|---|---|---|---|"]
     for i, r in enumerate(rows, 1):
