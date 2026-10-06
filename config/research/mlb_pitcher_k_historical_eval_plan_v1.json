@@ -1,0 +1,43 @@
+{
+  "schema": "MLB_PITCHER_K_HISTORICAL_EVAL_PLAN_V1",
+  "status": "FROZEN_BEFORE_FIRST_HISTORICAL_ROW_MATERIALIZATION",
+  "candidate_family": "RIDGE_LOGIT_K_RATE_BETA_BINOMIAL_V1",
+  "seasons": {"training": 2023, "validation": 2024, "candidate_test": 2025},
+  "sampling": {
+    "months": [6, 7, 8, 9],
+    "days_of_month": [1, 6, 11, 16, 21, 26],
+    "game_type": "R",
+    "completed_games_only": true,
+    "both_actual_starting_pitchers": true,
+    "selection_depends_on_outcomes": false,
+    "stop_early": false
+  },
+  "eligibility": {
+    "minimum_prior_starts": 5,
+    "maximum_prior_starts": 10,
+    "statcast_window_days": 30,
+    "statcast_query_end": "TARGET_DATE_EXCLUSIVE",
+    "require_whiff_rate": true,
+    "require_chase_rate": true,
+    "require_pitcher_hand": true,
+    "require_opponent_k_component": true,
+    "lineup_k_policy": "USE_RECONSTRUCTED_ACTUAL_STARTING_ORDER_WHEN_COMPLETE_ELSE_VALIDATED_OPP_K_FALLBACK",
+    "same_day_or_future_statcast_forbidden": true
+  },
+  "evaluation": {
+    "minimum_candidate_test_starts": 500,
+    "candidate_test_one_look": true,
+    "candidate_test_is_broader_promotion_evidence": false,
+    "sportsbook_prices_forbidden": true,
+    "market_consensus_forbidden": true
+  },
+  "authority": {
+    "model_p": false, "truth_gate": false, "promotion": false,
+    "staking": false, "official": false, "bettor_facing_release": false
+  },
+  "prohibitions": [
+    "NO_POST_OUTCOME_DATE_SELECTION", "NO_2025_PARAMETER_TUNING",
+    "NO_SPORTSBOOK_PRICE_FEATURES", "NO_FORWARD_EVIDENCE_CLAIM_FROM_HISTORICAL_RECONSTRUCTION",
+    "NO_MODEL_P_OR_CARD_PROMOTION_FROM_THIS_RUN"
+  ]
+}
