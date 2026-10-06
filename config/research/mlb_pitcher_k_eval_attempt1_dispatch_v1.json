@@ -1,0 +1,32 @@
+{
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_EVAL_ATTEMPT1_DISPATCH_V1",
+  "status": "ARMED_SINGLE_MAIN_PUSH",
+  "candidate_family": "RIDGE_LOGIT_K_RATE_BETA_BINOMIAL_V1",
+  "attempt_number": 1,
+  "confirmation": "CONSUME_MLB_PITCHER_K_EVAL_ATTEMPT_1",
+  "materializer": "scripts/materialize_mlb_pitcher_k_evaluation_rows.py",
+  "evaluator": "sportsedge.mlb_pitcher_k_evaluation_runner.run_file",
+  "prereg": "config/research/mlb_pitcher_k_probability_prereg_v1.json",
+  "rules": {
+    "trigger_only_when_this_marker_lands_on_main": true,
+    "attempt_1_only": true,
+    "candidate_specific_historical_test": true,
+    "historical_backfill_is_not_forward_evidence": true,
+    "forward_evidence": false,
+    "model_p": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "no_post_readout_tuning": true,
+    "no_sportsbook_price_as_model_feature": true
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "truth_gate": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "bettor_facing_release": false
+  }
+}
