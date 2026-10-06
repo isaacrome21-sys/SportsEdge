@@ -7,6 +7,7 @@ import pytest
 from sportsedge.nfl_lines_intake import parse_nfl_lines, tickets_to_dict
 from sportsedge.nfl_unified_phone import build_unified_phone_card
 from scripts.run_nfl_unified_lines_card import (
+    _adapt_signed_yardage_for_nonnegative_v1,
     _apply_prop_board_safety,
     _name_alias_match,
     _normalize_ticket_prop_players,
@@ -800,4 +801,43 @@ def test_correlation_policy_never_forces_opposite_team_or_opposite_direction():
     policy = out["games"][0]["prop_selection_policy"]
     assert policy["forces_team_balance"] is False
     assert policy["forces_over_under_balance"] is False
+
+def test_runner_signed_yardage_compatibility_copy_is_narrow_and_audited():
+    source = [
+        {
+            "player_id": "cj",
+            "player_name": "CJ Donaldson",
+            "season": "2026",
+            "week": "3",
+            "recent_team": "NO",
+            "receptions": "1",
+            "receiving_yards": "-2",
+            "rushing_yards": "11",
+            "passing_yards": "0",
+        },
+        {
+            "player_id": "ok",
+            "player_name": "Healthy",
+            "season": "2026",
+            "week": "3",
+            "recent_team": "ATL",
+            "receiving_yards": "22",
+        },
+    ]
+    adapted, receipts = _adapt_signed_yardage_for_nonnegative_v1(source)
+    assert source[0]["receiving_yards"] == "-2"
+    assert adapted[0]["receiving_yards"] == 0.0
+    assert adapted[0]["rushing_yards"] == "11"
+    assert adapted[1]["receiving_yards"] == "22"
+    assert receipts == [{
+        "player_id": "cj",
+        "player_name": "CJ Donaldson",
+        "season": "2026",
+        "week": "3",
+        "team": "NO",
+        "field": "receiving_yards",
+        "source_value": -2.0,
+        "model_input_value": 0.0,
+        "reason": "FROZEN_V1_NONNEGATIVE_EFFICIENCY_COMPATIBILITY",
+    }]
 
