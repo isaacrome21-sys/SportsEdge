@@ -121,7 +121,7 @@ class BlockedCardTest(unittest.TestCase):
 
 
 class LiveWeekCacheTest(unittest.TestCase):
-    def _game(self):
+    def _game(self, *, weather=None):
         from sportsedge.sports.cfb.source import CFBGame
         return CFBGame(
             game_id="g1",
@@ -131,6 +131,7 @@ class LiveWeekCacheTest(unittest.TestCase):
             home_team="Home",
             away_team="Away",
             neutral_site=False,
+            weather=weather,
         )
 
     def test_future_capture_is_rejected(self):
@@ -175,7 +176,7 @@ class LiveWeekCacheTest(unittest.TestCase):
         self.assertNotIn("total", encoded)
 
     def test_build_rows_cache_hit_skips_cfbd_fetches(self):
-        game = self._game()
+        game = self._game(weather={"wind_speed": 17.0, "temperature": 55.0, "game_indoor": False})
         snaps = {
             "Home": {"prior": {k: 0.0 for k in card.TEAM_KEYS}, "current": {k: 0.0 for k in card.TEAM_KEYS}},
             "Away": {"prior": {k: 0.0 for k in card.TEAM_KEYS}, "current": {k: 0.0 for k in card.TEAM_KEYS}},
@@ -189,12 +190,14 @@ class LiveWeekCacheTest(unittest.TestCase):
              patch("sportsedge.sports.cfb.source.fetch_cfbd_games", side_effect=AssertionError("games fetch must be skipped")), \
              patch("sportsedge.sports.cfb.source.fetch_cfbd_weather", side_effect=AssertionError("weather fetch must be skipped")), \
              patch("sportsedge.sports.cfb.candidate_live_source.fetch_cfbd_candidate_metric_snapshots", side_effect=AssertionError("metrics fetch must be skipped")), \
-             patch("sportsedge.sports.cfb.source.attach_weather", side_effect=lambda games, weather: games), \
+             patch("sportsedge.sports.cfb.source.attach_weather", side_effect=AssertionError("cached weather must be reused exactly")), \
              patch("sportsedge.sports.cfb.candidate_live_source.attach_candidate_snapshots_to_game_row", side_effect=lambda base, **_: base):
             rows = card.build_rows(board, 2026, 6, "2026-10-06T15:00:00Z", fit_path="unused")
 
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["game_id"], "g1")
+        self.assertEqual(rows[0]["weather"]["wind_speed"], 17.0)
+        self.assertEqual(rows[0]["weather"]["temperature"], 55.0)
 
 
 
