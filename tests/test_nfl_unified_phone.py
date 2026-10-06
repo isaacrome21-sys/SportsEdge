@@ -644,3 +644,50 @@ def test_runner_signed_yardage_adapter_is_narrow_and_audited():
         "reason": "NONNEGATIVE_PROP_EFFICIENCY_SUPPORT",
     }]
 
+def test_selection_concentration_is_flagged_but_never_rebalanced():
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": f"ATL {i}", "market": "receiving_yards"}
+                for i in range(6)
+            ] + [
+                {"player": "NO 1", "market": "receiving_yards"},
+            ],
+        }]
+    }
+    rows = []
+    for i in range(6):
+        rows.append({
+            "input_index": i,
+            "team": "away",
+            "status": "PRICED",
+            "selected": True,
+            "selection": f"ATL {i} Under",
+        })
+    rows.append({
+        "input_index": 6,
+        "team": "home",
+        "status": "PRICED",
+        "selected": False,
+        "selection": "NO 1 Over",
+    })
+    payload = {
+        "games": [{
+            "rows": rows,
+            "engine": {},
+            "status": "PRICED_RESEARCH_PROPS_GAME_EDGE_DISABLED",
+            "role_status": "AVAILABLE",
+            "role_error": None,
+        }],
+        "rows": [],
+        "selected_rows": [],
+    }
+    out = _apply_prop_board_safety(payload, ticket)
+    diag = out["games"][0]["prop_selection_diagnostics"]
+    assert "ALL_SELECTED_PROPS_ONE_TEAM_WITH_TWO_TEAM_PRICING" in diag["alerts"]
+    assert "SELECTED_PROP_DIRECTION_CONCENTRATED_UNDER" in diag["alerts"]
+    assert diag["selection_changed_by_diagnostic"] is False
+    assert len(out["selected_rows"]) == 6
+
