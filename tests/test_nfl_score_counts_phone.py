@@ -1,7 +1,11 @@
 from pathlib import Path
 import pytest
 
-from sportsedge.nfl_score_counts_phone import build_score_count_phone_card
+from sportsedge.nfl_score_counts_phone import (
+    _apply_prop_selection_policy,
+    _prop_selection_diagnostics,
+    build_score_count_phone_card,
+)
 from scripts.run_nfl_score_counts_lines_card import _game_only_ticket
 from sportsedge.nfl_unified_phone import UnifiedNflPhoneError
 
@@ -442,4 +446,97 @@ def test_two_team_quoted_props_fail_closed_when_one_requested_role_model_build_f
     assert len(props) == 4
     assert all(row["status"] == "NO_MODEL" for row in props)
     assert all(row["reason"] == game["role_error"] for row in props)
+
+def test_score_count_prop_selection_trims_same_player_pass_volume_duplicates():
+    raw_game = {
+        "markets": [
+            {"player": "QB", "market": "pass_attempts"},
+            {"player": "QB", "market": "completions"},
+            {"player": "QB", "market": "passing_yards"},
+        ]
+    }
+    rows = [
+        {
+            "input_index": 0, "player": "QB", "market": "pass_attempts",
+            "status": "PRICED", "selected": True, "selection": "QB Under",
+            "ev_per_dollar": 0.08, "edge_probability_points": 0.08, "score_0_100": 88,
+        },
+        {
+            "input_index": 1, "player": "QB", "market": "completions",
+            "status": "PRICED", "selected": True, "selection": "QB Under",
+            "ev_per_dollar": 0.11, "edge_probability_points": 0.10, "score_0_100": 88,
+        },
+        {
+            "input_index": 2, "player": "QB", "market": "passing_yards",
+            "status": "PRICED", "selected": True, "selection": "QB Under",
+            "ev_per_dollar": 0.17, "edge_probability_points": 0.14, "score_0_100": 88,
+        },
+    ]
+    policy = _apply_prop_selection_policy(rows, raw_game)
+    kept = [row for row in rows if row.get("selected")]
+    assert len(kept) == 1
+    assert kept[0]["market"] == "passing_yards"
+    assert policy["candidate_pair_selections"] == 3
+    assert policy["served_prop_selections"] == 1
+    assert policy["forces_team_balance"] is False
+    assert policy["forces_over_under_balance"] is False
+
+
+def test_score_count_prop_selection_caps_six_independent_props_without_rebalancing():
+    raw_game = {
+        "markets": [
+            {"player": f"P{i}", "market": "receiving_yards"}
+            for i in range(7)
+        ]
+    }
+    rows = [
+        {
+            "input_index": i, "player": f"P{i}", "team": "away",
+            "market": "receiving_yards", "status": "PRICED", "selected": True,
+            "selection": f"P{i} Under", "ev_per_dollar": 0.20 - i * 0.01,
+            "edge_probability_points": 0.20 - i * 0.01, "score_0_100": 88,
+        }
+        for i in range(7)
+    ]
+    policy = _apply_prop_selection_policy(rows, raw_game)
+    kept = [row for row in rows if row.get("selected")]
+    assert len(kept) == 6
+    assert all(row["team"] == "away" for row in kept)
+    assert all(str(row["selection"]).endswith("Under") for row in kept)
+    suppressed = [row for row in rows if not row.get("selected")]
+    assert len(suppressed) == 1
+    assert suppressed[0]["selection_suppressed_reason"] == "PROP_CARD_DISPLAY_CAP"
+    assert policy["forces_team_balance"] is False
+    assert policy["forces_over_under_balance"] is False
+
+
+def test_score_count_concentration_diagnostic_flags_review_but_does_not_change_selection():
+    raw_game = {
+        "markets": [
+            {"player": f"ATL{i}", "market": "receiving_yards"}
+            for i in range(6)
+        ] + [
+            {"player": "NO1", "market": "receiving_yards"},
+        ]
+    }
+    rows = [
+        {
+            "input_index": i, "player": f"ATL{i}", "team": "away",
+            "market": "receiving_yards", "status": "PRICED", "selected": True,
+            "selection": f"ATL{i} Under",
+        }
+        for i in range(6)
+    ] + [{
+        "input_index": 6, "player": "NO1", "team": "home",
+        "market": "receiving_yards", "status": "PRICED", "selected": False,
+        "selection": "NO1 Over",
+    }]
+    before = [row.get("selected") for row in rows]
+    diag = _prop_selection_diagnostics(rows, raw_game)
+    after = [row.get("selected") for row in rows]
+    assert before == after
+    assert diag["review_required"] is True
+    assert "ALL_SELECTED_PROPS_ONE_TEAM_WITH_TWO_TEAM_PRICING" in diag["alerts"]
+    assert "SELECTED_PROP_DIRECTION_CONCENTRATED_UNDER" in diag["alerts"]
+    assert diag["selection_changed_by_diagnostic"] is False
 
