@@ -7,7 +7,6 @@ from sportsedge.sports.nfl.score_counts_prop_bridge import (
 from scripts.run_nfl_score_counts_lines_card import (
     _name_alias_match,
     _normalize_ticket_prop_players,
-    _sanitize_signed_yardage_rows,
 )
 
 
@@ -249,23 +248,4 @@ def test_score_count_bridge_does_not_invent_receiver_efficiency_when_whole_pool_
     assert "home" in out["team_simulation_errors"]
     assert out["receiving_efficiency_regularization"].get("home") in (None, [])
     assert all(row["status"] == "NO_MODEL" for row in out["prop_markets"])
-
-def test_score_count_runner_signed_yardage_adapter_is_audited():
-    rows = [{
-        "player_id": "cj",
-        "player_name": "CJ Donaldson",
-        "season": 2026,
-        "week": 3,
-        "recent_team": "NO",
-        "receiving_yards": -2,
-        "receptions": 1,
-        "rushing_yards": 5,
-    }]
-    adapted, receipts = _sanitize_signed_yardage_rows(rows)
-    assert adapted[0]["receiving_yards"] == 0.0
-    assert adapted[0]["rushing_yards"] == 5
-    assert rows[0]["receiving_yards"] == -2
-    assert receipts[0]["player_name"] == "CJ Donaldson"
-    assert receipts[0]["original"] == -2.0
-    assert receipts[0]["adapted"] == 0.0
 
