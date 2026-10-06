@@ -8,6 +8,7 @@ two-sided prices after the model run.
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 import json
 from pathlib import Path
 
@@ -31,6 +32,152 @@ def _has_props(ticket: dict) -> bool:
         for row in game.get("markets") or []
         if isinstance(row, dict)
     )
+
+
+_NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
+_GAME_MARKETS = frozenset({"moneyline", "spread", "total", "team_total"})
+
+
+def _name_tokens(value) -> list[str]:
+    text = str(value or "").casefold()
+    for mark in (".", ",", "-", "'", "’"):
+        text = text.replace(mark, " ")
+    tokens = text.split()
+    while tokens and tokens[-1] in _NAME_SUFFIXES:
+        tokens.pop()
+    return tokens
+
+
+def _name_alias_match(left, right) -> bool:
+    a = _name_tokens(left)
+    b = _name_tokens(right)
+    if a == b:
+        return True
+    if len(a) >= 2 and len(b) >= 2 and a[-1] == b[-1]:
+        first_a, first_b = a[0], b[0]
+        return min(len(first_a), len(first_b)) >= 4 and (
+            first_a.startswith(first_b) or first_b.startswith(first_a)
+        )
+    return False
+
+
+def _normalize_ticket_prop_players(ticket: dict, depth_rows: list[dict]) -> tuple[dict, list[dict]]:
+    """Bind narrow sportsbook/depth-chart name aliases before the frozen V1 card."""
+    normalized = deepcopy(ticket)
+    bindings: list[dict] = []
+    for game in normalized.get("games") or []:
+        away = str(game.get("away") or "").strip().upper()
+        home = str(game.get("home") or "").strip().upper()
+        teams = {away, home}
+        candidates = sorted({
+            (
+                str(row.get("team") or row.get("club_code") or "").strip().upper(),
+                str(row.get("player_name") or "").strip(),
+            )
+            for row in depth_rows
+            if str(row.get("team") or row.get("club_code") or "").strip().upper() in teams
+            and str(row.get("player_name") or "").strip()
+        })
+        for raw in game.get("markets") or []:
+            if not isinstance(raw, dict):
+                continue
+            player = str(raw.get("player") or "").strip()
+            if not player:
+                continue
+            hits = [(team, name) for team, name in candidates if _name_alias_match(name, player)]
+            if len(hits) != 1:
+                continue
+            team, canonical = hits[0]
+            raw["player"] = canonical
+            raw["team"] = team
+            if canonical != player:
+                bindings.append({
+                    "game": f"{away}@{home}",
+                    "input": player,
+                    "canonical": canonical,
+                    "team": team,
+                })
+    return normalized, bindings
+
+
+def _apply_prop_board_safety(payload: dict, ticket: dict) -> dict:
+    """Presentation/serving guard: never emit a mechanically one-sided prop card."""
+    out = deepcopy(payload)
+    games = out.get("games") or []
+    ticket_games = ticket.get("games") or []
+    for game_index, game in enumerate(games):
+        if game_index >= len(ticket_games):
+            continue
+        raw_game = ticket_games[game_index]
+        away = str(raw_game.get("away") or "").strip().upper()
+        home = str(raw_game.get("home") or "").strip().upper()
+        prop_indexes_by_team: dict[str, set[int]] = {}
+        all_prop_indexes: set[int] = set()
+        for input_index, raw in enumerate(raw_game.get("markets") or []):
+            if not isinstance(raw, dict) or not str(raw.get("player") or "").strip():
+                continue
+            all_prop_indexes.add(input_index)
+            team = str(raw.get("team") or "").strip().upper()
+            if team in {away, home}:
+                prop_indexes_by_team.setdefault(team, set()).add(input_index)
+
+        rows = game.get("rows") or []
+        failed_teams: list[str] = []
+        if len(prop_indexes_by_team) >= 2:
+            for team, indexes in sorted(prop_indexes_by_team.items()):
+                team_rows = [
+                    row for row in rows
+                    if int(row.get("input_index", -1)) in indexes
+                ]
+                if not any(row.get("status") == "PRICED" for row in team_rows):
+                    failed_teams.append(team)
+
+        engine = game.setdefault("engine", {})
+        if failed_teams:
+            detail = ",".join(failed_teams)
+            reason = f"GAME_PROP_SIMULATION_INCOMPLETE:{detail}=NO_PRICED_PROP_ROWS"
+            for row in rows:
+                if int(row.get("input_index", -1)) not in all_prop_indexes:
+                    continue
+                row["status"] = "NO_MODEL"
+                row["reason"] = reason
+                row["selected"] = False
+                row["card_eligible"] = False
+                row["card_reason"] = reason
+                for key in (
+                    "estimate_p", "push_p", "loss_p", "conditional_win_probability",
+                    "fair_american", "edge_probability_points", "ev_per_dollar",
+                    "score_0_100", "score_label",
+                ):
+                    row.pop(key, None)
+            engine["prop_board_status"] = "NO_MODEL"
+            engine["prop_board_error"] = reason
+            engine["failed_requested_teams"] = failed_teams
+            game["role_status"] = "NO_MODEL"
+            game["role_error"] = reason
+            game["status"] = "NO_MODEL_PROP_BOARD_INCOMPLETE"
+        elif len(prop_indexes_by_team) >= 2:
+            engine["prop_board_status"] = "AVAILABLE"
+            engine["prop_board_error"] = None
+            engine["failed_requested_teams"] = []
+
+    all_rows = [row for game in games for row in game.get("rows") or []]
+    out["rows"] = all_rows
+    out["selected_rows"] = [row for row in all_rows if row.get("selected")]
+    out["prop_board_safety_policy"] = {
+        "two_sided_requested_teams_must_both_price": True,
+        "failure_status": "NO_MODEL",
+        "failure_reason_prefix": "GAME_PROP_SIMULATION_INCOMPLETE",
+    }
+    out["presentation_policy"] = {
+        "market_probability_field": "market_no_vig_p",
+        "model_probability_field": "estimate_p",
+        "score_field": "score_0_100",
+        "score_label_field": "score_label",
+        "kickoff_field": "games[].kickoff",
+        "team_records": "OMIT_UNLESS_EXPLICITLY_SOURCED",
+    }
+    return out
 
 
 def main() -> int:
@@ -109,6 +256,8 @@ def main() -> int:
 
     scoring_prior = load_prior_file(args.scoring_prior) if args.scoring_prior else None
 
+    ticket, alias_bindings = _normalize_ticket_prop_players(ticket, depth_rows)
+
     payload = build_unified_phone_card(
         ticket,
         history=history,
@@ -121,8 +270,10 @@ def main() -> int:
         n_sims=int(args.n_sims),
         seed=int(args.seed),
     )
+    payload = _apply_prop_board_safety(payload, ticket)
     payload["source_status"] = source_status
     payload["schedule_source_sha256"] = plan.get("schedule_source_sha256")
+    payload["player_alias_bindings"] = alias_bindings
 
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
