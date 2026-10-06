@@ -251,6 +251,34 @@
         "reason": "POST_08A12425_MAIN_MOVEMENT_CHANGED_MANIFEST_COVERED_SPORTSEDGE_DFS_AND_TEST_DFS_BYTES; PRIOR_MLB_DFS_EVIDENCE_FREEZE_INVALIDATED; REVOKED_FAIL_CLOSED_NO_AUTHORITY"
       },
       "freeze_sha": "7a92455f081ee52a454b2c49ff798d902a3ace68"
+    },
+    {
+      "bundle_id": "NFL_LOCATION_SYMMETRIC_G1_RESEARCH_FREEZE_V1",
+      "freeze_sha": "9e54c9bf741cd3f1374d526a4117a7197a4d6704",
+      "coverage_paths": [
+        "config/research/nfl_location_symmetric_g1_prereg_v1.json",
+        "sportsedge/sports/nfl/location_symmetric_g1.py",
+        "sportsedge/sports/nfl/location_symmetric_g1_validation.py"
+      ],
+      "coverage_prefixes": [],
+      "disposition": null,
+      "identity": {
+        "schema": "NFL_LOCATION_SYMMETRIC_G1_RESEARCH_FREEZE_IDENTITY_V1",
+        "source_pull_request": 1742,
+        "bound_commit": "9e54c9bf741cd3f1374d526a4117a7197a4d6704",
+        "candidate_family": "NFL_LOCATION_SYMMETRIC_RIDGE_G1",
+        "preregistration_commit": "4704520acbb5165a60f456dbbe4886b5e393e023",
+        "prior_v2k_attempt_budget_reused": false,
+        "authority": {
+          "model_p": false,
+          "truth_gate": false,
+          "promotion": false,
+          "staking": false,
+          "official": false,
+          "bettor_facing_release": false
+        },
+        "note": "Fresh zero-authority research binding for the preregistered symmetric NFL margin/total location challenger. Does not alter or revive M2/V2K failures and does not authorize historical or prospective betting use."
+      }
     }
   ],
   "deltas": [
