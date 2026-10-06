@@ -16,6 +16,7 @@ def test_attempt3_recovery_marker_reuses_original_authorization_without_new_atte
     assert x["confirmation"] == "CONSUME_SCORE_COUNTS_ATTEMPT_3"
     assert x["original_dispatch_sha256"] == sha256_file(ORIGINAL)
     assert x["reason"] == "ORIGINAL_DISPATCH_MERGED_BEFORE_TRIGGER_WORKFLOW_EXISTED"
+    assert x["recovery_trigger_merge_sha"] == "a247793da209bae03deab1caa81d33df9f10095e"
     assert x["rules"]["original_authorization_preserved"] is True
     assert x["rules"]["recovery_is_not_a_new_attempt"] is True
     assert x["rules"]["thresholds_unchanged"] is True
