@@ -242,3 +242,75 @@ def test_fast_game_output_precedes_prop_context_fetch():
     assert fast < props
     assert "fast_game_markets_only" in text
     assert "NOT_REQUIRED_FOR_GAME_MARKETS" in text
+
+def test_prop_team_failure_does_not_invalidate_score_count_game_markets(monkeypatch):
+    def fake_live_team_model(**kwargs):
+        return team(str(kwargs["team"]))
+
+    def fake_prop_bridge(prediction, **kwargs):
+        reqs = kwargs["prop_requests"]
+        reason = "GAME_PROP_SIMULATION_INCOMPLETE:home=TEAM_MODEL_REQUIRED"
+        return {
+            "prop_markets": [
+                {
+                    **req,
+                    "status": "NO_MODEL",
+                    "reason": reason,
+                }
+                for req in reqs
+            ],
+            "prop_board_status": "NO_MODEL",
+            "prop_board_error": reason,
+            "team_simulation_errors": {"home": "TEAM_MODEL_REQUIRED"},
+        }
+
+    monkeypatch.setattr(
+        "sportsedge.nfl_score_counts_phone.build_live_team_model",
+        fake_live_team_model,
+    )
+    monkeypatch.setattr(
+        "sportsedge.nfl_score_counts_phone.price_score_count_prop_markets",
+        fake_prop_bridge,
+    )
+
+    board = {
+        "observed_at": "2026-10-05T16:00:00+00:00",
+        "games": [{
+            "away": "A",
+            "home": "B",
+            "markets": [
+                {
+                    "market": "moneyline",
+                    "away_or_over_price": 110,
+                    "home_or_under_price": -130,
+                },
+                {
+                    "market": "receiving_yards",
+                    "player": "B_WR",
+                    "line": 64.5,
+                    "away_or_over_price": -105,
+                    "home_or_under_price": -115,
+                },
+            ],
+        }],
+    }
+    out = build_score_count_phone_card(
+        board,
+        prediction=prediction(),
+        schedule_games=schedule(),
+        depth_rows=[{}],
+        player_rows=[{}],
+        injury_rows=[{}],
+        injury_source_ready=True,
+    )
+    game = out["games"][0]
+    moneyline = [row for row in game["rows"] if row["market"] == "moneyline"]
+    props = [row for row in game["rows"] if row["market"] == "receiving_yards"]
+    assert len(moneyline) == 2
+    assert all(row["status"] == "PRICED" for row in moneyline)
+    assert len(props) == 2
+    assert all(row["status"] == "NO_MODEL" for row in props)
+    assert game["status"] == "PRICED_SCORE_COUNTS_RESEARCH"
+    assert game["role_status"] == "NO_MODEL"
+    assert game["engine"]["prop_board_status"] == "NO_MODEL"
+
