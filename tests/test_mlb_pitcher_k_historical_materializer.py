@@ -56,6 +56,35 @@ def test_schedule_missing_probable_pitcher_fails_closed_by_omission():
     assert [x.pitcher_id for x in got] == [501]
 
 
+def test_schedule_identical_duplicate_game_is_deduped_by_pitcher_start_identity():
+    payload = _schedule()
+    duplicate = {
+        "date": "2025-06-01",
+        "games": [dict(payload["dates"][0]["games"][0])],
+    }
+    payload["dates"].append(duplicate)
+    got = targets_from_schedule(payload, season=2025)
+    assert [(x.game_id, x.pitcher_id) for x in got] == [(777, 501), (777, 601)]
+
+
+def test_schedule_conflicting_duplicate_pitcher_start_fails_closed():
+    payload = _schedule()
+    game = payload["dates"][0]["games"][0]
+    conflict = {
+        **game,
+        "teams": {
+            "away": {
+                "team": {"id": 99},
+                "probablePitcher": {"id": 501},
+            },
+            "home": game["teams"]["home"],
+        },
+    }
+    payload["dates"].append({"date": "2025-06-01", "games": [conflict]})
+    with pytest.raises(PitcherKHistoricalMaterializerError, match="conflicting duplicate"):
+        targets_from_schedule(payload, season=2025)
+
+
 def test_local_statcast_window_excludes_target_date_and_future_rows():
     rows = {
         501: [
