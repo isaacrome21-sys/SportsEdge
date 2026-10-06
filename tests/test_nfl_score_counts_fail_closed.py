@@ -4,6 +4,10 @@ from sportsedge.nfl_prop_shared_sim import stabilized_role
 from sportsedge.sports.nfl.score_counts_prop_bridge import (
     price_score_count_props_from_paths,
 )
+from scripts.run_nfl_score_counts_lines_card import (
+    _name_alias_match,
+    _normalize_ticket_prop_players,
+)
 
 
 def _role(ypr: float = 8.0) -> dict:
@@ -128,4 +132,32 @@ def test_individual_bad_player_row_does_not_void_healthy_opposite_team():
     assert out["prop_board_status"] == "AVAILABLE"
     assert out["prop_board_error"] is None
     assert out["team_simulation_errors"] == {}
+
+def test_score_count_runner_normalizes_pitts_and_branch_aliases_without_affecting_other_rows():
+    assert _name_alias_match("Kyle Pitts Sr.", "Kyle Pitts")
+    assert _name_alias_match("Zachariah Branch", "Zach Branch")
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": "Kyle Pitts", "market": "receptions"},
+                {"player": "Zach Branch", "market": "receiving_yards"},
+                {"market": "total", "line": 44.5},
+            ],
+        }]
+    }
+    depth = [
+        {"team": "ATL", "player_name": "Kyle Pitts Sr."},
+        {"team": "ATL", "player_name": "Zachariah Branch"},
+        {"team": "NO", "player_name": "Chris Olave"},
+    ]
+    normalized, bindings = _normalize_ticket_prop_players(ticket, depth)
+    props = normalized["games"][0]["markets"]
+    assert props[0]["player"] == "Kyle Pitts Sr."
+    assert props[0]["team"] == "ATL"
+    assert props[1]["player"] == "Zachariah Branch"
+    assert props[1]["team"] == "ATL"
+    assert props[2] == {"market": "total", "line": 44.5}
+    assert len(bindings) == 2
 
