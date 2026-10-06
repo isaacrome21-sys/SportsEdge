@@ -6,6 +6,7 @@ on:
     # Feature snapshot only. Does not unpark MLB official.
     - cron: "15 15 * * *"
   push:
+    branches: [main]
     paths:
       - 'sportsedge/statcast_daily_source.py'
       - 'scripts/refresh_statcast_daily.py'
@@ -21,6 +22,7 @@ concurrency:
 
 jobs:
   refresh:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -68,6 +70,31 @@ jobs:
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit 0
+      - name: Record merged-main provenance
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          DAY="$(date -u +%F)"
+          mkdir -p "artifacts/statcast/$DAY"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          day = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).date().isoformat()
+          payload = {
+              "schema": "SPORTSEDGE_STATCAST_MAIN_PROVENANCE_V1",
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "event_name": os.environ["GITHUB_EVENT_NAME"],
+              "ref": os.environ["GITHUB_REF"],
+              "head_sha": os.environ["GITHUB_SHA"],
+              "head_branch": "main",
+              "eligible_for_forward_evaluation": True,
+          }
+          path = Path("artifacts/statcast") / day / "provenance.json"
+          path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          PY
+
       - name: Persist immutable Statcast evidence to data branch
         if: always()
         shell: bash

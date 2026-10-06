@@ -51,6 +51,7 @@ jobs:
           tests.test_mlb_all_market_state_wiring
           tests.test_manual_mlb_all_market_source
           tests.test_intake_mlb_lines_file
+          tests.test_print_mlb_fast_game_markets
 
       - name: Resolve exactly one supplied lines file
         id: resolve
@@ -133,6 +134,13 @@ jobs:
           echo "FAST_MLB_CARD_END"
           cat artifacts/mlb_myspari_fast/card.md >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Print actionable game bets first
+        run: |
+          PYTHONPATH=. python scripts/print_mlb_fast_game_markets.py \
+            --card-json artifacts/mlb_myspari_fast/card.json \
+            | tee artifacts/mlb_fast_game_bets.txt
+          cat artifacts/mlb_fast_game_bets.txt >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload fast result
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -140,5 +148,6 @@ jobs:
           path: |
             artifacts/manual_mlb_fast.json
             artifacts/mlb_myspari_fast/
+            artifacts/mlb_fast_game_bets.txt
           if-no-files-found: error
           retention-days: 14
