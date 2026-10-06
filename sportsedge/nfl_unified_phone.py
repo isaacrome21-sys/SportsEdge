@@ -288,6 +288,10 @@ def build_unified_phone_card(
     observed = _utc(ticket.get("observed_at"), "observed_at")
     _ = history  # retained for CLI/backward compatibility; failed game model is not consumed.
     _ = runtime
+    role_lookback_games = int(ticket.get("role_lookback_games") or 8)
+    role_decay = float(ticket.get("role_decay") or 0.85)
+    if role_lookback_games <= 0 or not (0.0 < role_decay <= 1.0):
+        raise UnifiedNflPhoneError("ROLE_WINDOW_INVALID")
     games_out: list[dict[str, Any]] = []
 
     for game_index, game in enumerate(ticket.get("games") or []):
@@ -340,6 +344,8 @@ def build_unified_phone_card(
                     depth_rows=depth_rows,
                     player_rows=player_rows,
                     injury_rows=injury_rows,
+                    lookback_games=role_lookback_games,
+                    decay=role_decay,
                 )
                 away_model = build_live_team_model(
                     team=away,
@@ -350,6 +356,8 @@ def build_unified_phone_card(
                     depth_rows=depth_rows,
                     player_rows=player_rows,
                     injury_rows=injury_rows,
+                    lookback_games=role_lookback_games,
+                    decay=role_decay,
                 )
             except Exception as exc:
                 role_error = str(exc)
@@ -565,6 +573,10 @@ def build_unified_phone_card(
         "games": games_out,
         "rows": all_rows,
         "selected_rows": [row for row in all_rows if row.get("selected")],
+        "role_window": {
+            "lookback_games": role_lookback_games,
+            "decay": role_decay,
+        },
         "pricing_policy": {
             "two_sided_quotes_required": True,
             "ev_floor": EV_FLOOR,
