@@ -1,0 +1,116 @@
+{
+  "schema": "MLB_PITCHER_K_SKILL_FORMULA_PREREG_V1",
+  "status": "FROZEN_BEFORE_SKILL_CANDIDATE_OUTCOME_EVALUATION",
+  "market": "PITCHER_K",
+  "input_schema": "MLB_PITCHER_K_SKILL_BOUND_CANDIDATE_V1",
+  "formula_id": "MLB_PITCHER_K_SKILL_POISSON_V1",
+  "authority": {
+    "model_p": false,
+    "truth_gate": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "bettor_facing_release": false
+  },
+  "formula": {
+    "distribution": "POISSON_COUNT",
+    "support_tail_policy": "EXACT_POISSON_CDF; evaluation thresholds are 0.5..19.5; no integer-line pricing in this candidate",
+    "log_mean": "log(recent_mean_batters_faced * recent_mean_k_per_batter_faced) + log(opponent_factor) + log(lineup_factor) + intercept + beta_whiff*z_whiff + beta_chase*z_chase",
+    "opponent_factor": "target_rel / geometric_mean(history_rel); opponent beta fixed at 1.0",
+    "lineup_factor": "(target_deviation / geometric_mean(history_deviation)) ** 0.5 when validated lineup component exists, otherwise 1.0",
+    "skill_standardization": "z=(rate-development_mean)/development_std; means/stds are development-only fit parameters",
+    "pitcher_hand_role": "CALIBRATION_SLICE_ONLY_NOT_PREDICTOR",
+    "learned_parameters": [
+      "intercept",
+      "beta_whiff",
+      "beta_chase",
+      "whiff_mean",
+      "whiff_std",
+      "chase_mean",
+      "chase_std"
+    ],
+    "no_default_coefficients": true
+  },
+  "development_fit": {
+    "seasons": [
+      2024,
+      2025
+    ],
+    "game_type": "R",
+    "source_policy": "strictly-prior game logs plus date-bounded Baseball Savant Statcast reconstruction; sportsbook prices excluded",
+    "minimum_prior_starts": 5,
+    "maximum_prior_starts": 10,
+    "optimizer": "deterministic Poisson GLM IRLS",
+    "design_columns": [
+      "intercept",
+      "z_whiff",
+      "z_chase"
+    ],
+    "fixed_offset_terms": [
+      "recent workload K expectation",
+      "validated opponent-K factor",
+      "validated lineup-K factor when present"
+    ],
+    "initialization": [
+      0,
+      0,
+      0
+    ],
+    "convergence_tolerance": 1e-10,
+    "max_iterations": 100,
+    "failure_policy": "FAIL_CLOSED_NO_FIT_ARTIFACT",
+    "outcome_use": "development K counts only; no forward-evaluation outcomes"
+  },
+  "untouched_evaluation": {
+    "mode": "FORWARD_ONLY_NO_BACKFILL",
+    "start_condition": "first eligible MLB start after the frozen development-fit artifact is merged to main and a main-provenance Statcast snapshot is available",
+    "thresholds": [
+      0.5,
+      1.5,
+      2.5,
+      3.5,
+      4.5,
+      5.5,
+      6.5,
+      7.5,
+      8.5,
+      9.5,
+      10.5,
+      11.5,
+      12.5,
+      13.5,
+      14.5,
+      15.5,
+      16.5,
+      17.5,
+      18.5,
+      19.5
+    ],
+    "typical_calibration_lines": [
+      3.5,
+      4.5,
+      5.5,
+      6.5
+    ],
+    "baseline": "current shipped PITCHER_K price from pitcher_joint_engine at the same PIT timestamp",
+    "minimum_graded_starts": 150,
+    "minimum_unique_pitchers": 30,
+    "bootstrap_clusters": "pitcher_id",
+    "bootstrap_reps": 2000,
+    "bootstrap_seed": 20261006,
+    "primary_metric": "mean ranked probability score across frozen thresholds; candidate minus baseline",
+    "pass_rules": [
+      "95% pitcher-cluster bootstrap upper CI of candidate-minus-baseline RPS < 0",
+      "candidate typical-line ECE <= baseline typical-line ECE + 0.005",
+      "minimum_graded_starts >= 150",
+      "minimum_unique_pitchers >= 30"
+    ],
+    "market_promotion": "NOT_GRANTED; a separate price/ROI promotion gate remains required"
+  },
+  "prohibitions": [
+    "no evaluation-row backfill",
+    "no sportsbook price as a model feature or fit target",
+    "no coefficient tuning after first forward readout",
+    "no Model_P, staking, OFFICIAL, or bettor-facing authority from this preregistration"
+  ]
+}
