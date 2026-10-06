@@ -297,6 +297,12 @@ def build_score_count_phone_card(
             scoring_prior=scoring_prior,
             seed=int(seed) + game_index,
         ) if prop_requests else {"prop_markets": []}
+        engine_prop_error = (
+            str(prop_engine.get("prop_board_error") or "").strip()
+            if prop_requests
+            else ""
+        )
+        effective_role_error = role_error or engine_prop_error or None
 
         rows: list[dict[str, Any]] = []
         for engine_row, meta in zip(game_engine["game_markets"], game_meta):
@@ -368,9 +374,12 @@ def build_score_count_phone_card(
                 "joint_score_td_distribution_sha256": prediction_game.get("joint_score_td_distribution_sha256"),
                 "paths": prediction_game.get("paths"),
                 "market_data_used_to_create_distribution": False,
+                "prop_board_status": prop_engine.get("prop_board_status"),
+                "prop_board_error": prop_engine.get("prop_board_error"),
+                "team_simulation_errors": prop_engine.get("team_simulation_errors") or {},
             },
-            "role_status": "AVAILABLE" if not role_error and (not prop_inputs or home_model is not None) else "NO_MODEL",
-            "role_error": role_error,
+            "role_status": "AVAILABLE" if not effective_role_error and (not prop_inputs or home_model is not None) else "NO_MODEL",
+            "role_error": effective_role_error,
             "rows": rows,
             "status": "PRICED_SCORE_COUNTS_RESEARCH",
         })
@@ -395,6 +404,15 @@ def build_score_count_phone_card(
             "game_markets_disabled": False,
             "model_distribution_must_predate_quote_binding": True,
             "prop_game_context_source": "NFL_SCORE_COUNTS_G1_SCORE_PATHS",
+            "partial_team_simulation_fails_board": True,
+        },
+        "presentation_policy": {
+            "market_probability_field": "market_no_vig_p",
+            "model_probability_field": "estimate_p",
+            "score_field": "score_0_100",
+            "score_label_field": "score_label",
+            "kickoff_field": "games[].kickoff",
+            "team_records": "OMIT_UNLESS_EXPLICITLY_SOURCED",
         },
         "authority": {
             "research_only": True,

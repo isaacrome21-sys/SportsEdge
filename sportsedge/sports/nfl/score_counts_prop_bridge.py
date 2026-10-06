@@ -233,6 +233,16 @@ def price_score_count_props_from_paths(
         ) as exc:
             team_errors[side] = str(exc)
 
+    # A two-team player-prop board is one simulation product. If either
+    # requested team cannot be simulated, do not let the surviving side create
+    # a mechanically one-sided card.
+    prop_board_error: str | None = None
+    if team_errors:
+        detail = ";".join(
+            f"{side}={team_errors[side]}" for side in sorted(team_errors)
+        )
+        prop_board_error = f"GAME_PROP_SIMULATION_INCOMPLETE:{detail}"
+
     rows: list[dict[str, Any]] = []
     for request in requests:
         side = str(request.get("team") or "").strip().lower()
@@ -247,6 +257,9 @@ def price_score_count_props_from_paths(
         }
         if side not in {"home", "away"}:
             rows.append({**base, "status": "NO_MODEL", "reason": "PROP_TEAM_SIDE_REQUIRED"})
+            continue
+        if prop_board_error is not None:
+            rows.append({**base, "status": "NO_MODEL", "reason": prop_board_error})
             continue
         if market in TD_PROP_MARKETS and td_error is not None:
             rows.append({**base, "status": "NO_MODEL", "reason": td_error})
@@ -281,6 +294,15 @@ def price_score_count_props_from_paths(
         "score_path_count": len(score_paths),
         "expected_total_from_score_paths": expected_total,
         "prop_markets": rows,
+        "prop_board_status": (
+            "NOT_REQUIRED"
+            if not requests
+            else "NO_MODEL"
+            if prop_board_error is not None
+            else "AVAILABLE"
+        ),
+        "prop_board_error": prop_board_error,
+        "team_simulation_errors": dict(sorted(team_errors.items())),
         "market_data_used_to_create_score_distribution": False,
         "authority": {
             "research_only": True,
