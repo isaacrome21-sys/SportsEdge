@@ -38,25 +38,56 @@ def _has_props(ticket: dict) -> bool:
 def _adapt_signed_yardage_for_nonnegative_v1(
     player_rows: list[dict],
 ) -> tuple[list[dict], list[dict]]:
-    """Narrow compatibility copy for frozen V1 receiving efficiency.
+    """Narrow compatibility copy for a frozen V1 low-volume receiving edge case.
 
-    Preserve all signed source stats. In the in-memory model copy only, adapt a
-    negative receiving-yard numerator when it comes from a 1-2 reception
-    micro-sample. That fixes the CJ Donaldson shape without globally flooring
-    passing/rushing yardage or larger receiving samples. Larger anomalies remain
-    untouched and can still fail closed.
+    Source rows remain unchanged.  A negative receiving-yard row is adapted only
+    when that player's entire supplied NFL history is itself a 1-2 reception
+    micro-sample with negative aggregate receiving yards.  A normal receiver who
+    merely had one negative catch in an otherwise useful history is untouched.
     """
+    aggregate: dict[str, dict[str, float]] = {}
+    for raw in player_rows:
+        key = str(
+            raw.get("player_id")
+            or raw.get("gsis_id")
+            or raw.get("player_name")
+            or ""
+        ).strip()
+        if not key:
+            continue
+        try:
+            receptions = float(raw.get("receptions") or 0.0)
+            receiving_yards = float(raw.get("receiving_yards") or 0.0)
+        except (TypeError, ValueError):
+            continue
+        bucket = aggregate.setdefault(key, {"receptions": 0.0, "receiving_yards": 0.0})
+        bucket["receptions"] += max(0.0, receptions)
+        bucket["receiving_yards"] += receiving_yards
+
+    micro_players = {
+        key
+        for key, totals in aggregate.items()
+        if 0 < totals["receptions"] <= 2
+        and totals["receiving_yards"] < 0
+    }
+
     out: list[dict] = []
     receipts: list[dict] = []
     for raw in player_rows:
         row = dict(raw)
+        key = str(
+            row.get("player_id")
+            or row.get("gsis_id")
+            or row.get("player_name")
+            or ""
+        ).strip()
         try:
-            receptions = float(row.get("receptions") or 0.0)
             receiving_yards = float(row.get("receiving_yards") or 0.0)
         except (TypeError, ValueError):
             out.append(row)
             continue
-        if receiving_yards < 0 and 0 < receptions <= 2:
+        if key in micro_players and receiving_yards < 0:
+            totals = aggregate[key]
             row["receiving_yards"] = 0.0
             receipts.append({
                 "player_id": str(row.get("player_id") or row.get("gsis_id") or ""),
@@ -65,7 +96,8 @@ def _adapt_signed_yardage_for_nonnegative_v1(
                 "week": row.get("week"),
                 "team": str(row.get("recent_team") or row.get("team") or ""),
                 "field": "receiving_yards",
-                "receptions": receptions,
+                "aggregate_receptions": totals["receptions"],
+                "aggregate_receiving_yards": totals["receiving_yards"],
                 "source_value": receiving_yards,
                 "model_input_value": 0.0,
                 "reason": "FROZEN_V1_NEGATIVE_RECEIVING_MICRO_SAMPLE_COMPATIBILITY",
