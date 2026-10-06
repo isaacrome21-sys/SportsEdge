@@ -9,7 +9,7 @@ from sportsedge.sports.nfl.score_counts_prop_bridge import (
 def _role(ypr: float = 8.0) -> dict:
     return {
         "player": "WR",
-        "sample_size": 1,
+        "sample_size": 0,
         "role_prior": {
             "pass_attempts": 30,
             "completion_rate": 0.65,
@@ -20,17 +20,16 @@ def _role(ypr: float = 8.0) -> dict:
             "rush_yards_per_attempt": 4.2,
             "targets": 6,
             "catch_rate": 0.65,
-            "receiving_yards_per_reception": 8.0,
+            "receiving_yards_per_reception": ypr,
         },
-        "trailing": {"receiving_yards_per_reception": ypr},
+        "trailing": {},
         "context": {"source": "role"},
     }
 
 
 def test_signed_receiving_efficiency_does_not_invalidate_role():
     role = stabilized_role(_role(-2.0))
-    assert role["receiving_yards_per_reception"] < 8.0
-    assert role["receiving_yards_per_reception"] != 0.0
+    assert role["receiving_yards_per_reception"] == -2.0
 
 
 def test_either_team_simulation_failure_fails_score_count_prop_board():
