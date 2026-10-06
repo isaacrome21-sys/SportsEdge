@@ -101,7 +101,12 @@ def test_combined_artifact_requires_exact_frozen_seasons_and_zero_authority():
                 "eligible_row_count": 1,
                 "excluded_row_count": 0,
                 "exclusions": {},
-                "rows": [{"season": season}],
+                "rows": [{
+                    "season": season,
+                    "target_date": f"{season}-06-01",
+                    "game_id": season,
+                    "pitcher_id": str(season),
+                }],
             }
         )
     got = combine_seasons(parts)
@@ -210,7 +215,14 @@ def test_materialize_target_rejects_equal_count_different_start_identity():
             return prior
 
         def _opp_k_payload(self, **kwargs):
-            return ({"opponent_team_id": 20, "target_rel": 1.0}, None)
+            return ({
+                "market": "PITCHER_K",
+                "beta": 1.0,
+                "target_rel": 1.0,
+                "history_rel": [1.0] * 5,
+                "opponent_team_id": 20,
+                "validated_in": "#1509",
+            }, None)
 
         def pitcher_joint_history(self, **kwargs):
             return [x[0] for x in aligned]
