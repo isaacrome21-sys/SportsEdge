@@ -2447,19 +2447,6 @@
     },
     {
       "game_id": "Los Angeles Dodgers@Atlanta Braves",
-      "market_type": "FIRST_INNING_TOTAL",
-      "side": "OVER",
-      "line": 1.5,
-      "price": 370,
-      "paired_side": "UNDER",
-      "paired_price": -525,
-      "book": "draftkings",
-      "observed_at": "2026-10-06T11:57:39-05:00",
-      "first_pitch_at": "2026-10-06T17:00:00-05:00",
-      "source": "MANUAL"
-    },
-    {
-      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "TEAM_TOTAL",
       "side": "OVER",
       "line": 3.5,
