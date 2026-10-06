@@ -289,11 +289,11 @@ def validate_nfl_location_symmetric_g1(
         "location_gate_pass": overall_pass,
         "discrete_v2_distribution_gate_eligible": overall_pass,
         "authority": {
-            "research_only": true,
-            "model_p": false,
-            "promotion": false,
-            "staking": false,
-            "official": false,
+            "research_only": True,
+            "model_p": False,
+            "promotion": False,
+            "staking": False,
+            "official": False,
         },
     }
 
