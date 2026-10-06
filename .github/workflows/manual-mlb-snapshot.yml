@@ -226,7 +226,7 @@ jobs:
       - name: Retrieve pregame context (Statcast, umpire, weather/roof, park, lineups)
         if: always() && hashFiles('artifacts/manual_mlb_snapshot_card.json') != ''
         continue-on-error: true
-        run: PYTHONPATH=. python scripts/acquire_mlb_card_context.py --engine-output artifacts/manual_mlb_snapshot_card.json --out-dir artifacts/mlb_context
+        run: PYTHONPATH=. python scripts/acquire_mlb_card_context.py --engine-output artifacts/manual_mlb_snapshot_card.json --out-dir artifacts/mlb_context --workers 4
 
       - name: Render MySpariEdge-style card from SportsEdge engine output
         if: always() && hashFiles('artifacts/manual_mlb_snapshot_card.json') != ''
