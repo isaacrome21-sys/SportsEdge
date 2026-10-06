@@ -112,8 +112,17 @@ _PROP_FAMILY_CONFLICTS = {
     "TURNOVERS": {"TURNOVERS"},
     "TD_SCORING": {"TD_SCORING"},
 }
-_MAX_SELECTED_PLAYER_PROPS_PER_GAME = 6
 _MAX_SELECTED_PROP_FAMILIES_PER_PLAYER = 2
+_MAX_SELECTED_TEAM_CLUSTER_EXPRESSIONS = 2
+_PROP_TEAM_CLUSTER = {
+    "PASS_VOLUME": "PASS_OFFENSE",
+    "RECEIVING_VOLUME": "PASS_OFFENSE",
+    "COMBINED_YARDS": "PASS_OFFENSE",
+    "RUSH_VOLUME": "RUSH_OFFENSE",
+    "PASS_SCORING": "SCORING",
+    "TD_SCORING": "SCORING",
+    "TURNOVERS": "TURNOVERS",
+}
 
 
 def _selection_rank(row: Mapping[str, Any]) -> tuple[float, float, float, int]:
@@ -144,6 +153,7 @@ def _apply_prop_selection_policy(
 
     used_families: dict[str, set[str]] = {}
     player_kept: dict[str, int] = {}
+    team_cluster_kept: dict[tuple[str, str], int] = {}
     kept = 0
     suppressed: list[dict[str, str]] = []
     for row in sorted(candidates, key=_selection_rank, reverse=True):
@@ -152,14 +162,21 @@ def _apply_prop_selection_policy(
         family = _PROP_FAMILY.get(market, market.upper() or "OTHER")
         conflicts = _PROP_FAMILY_CONFLICTS.get(family, {family})
         prior = used_families.setdefault(player, set())
+        team = str(row.get("team") or "").strip().lower()
+        cluster = _PROP_TEAM_CLUSTER.get(family, family)
+        cluster_key = (team, cluster)
 
         reason = None
         if prior.intersection(conflicts):
             reason = "CORRELATED_PLAYER_FAMILY"
         elif player_kept.get(player, 0) >= _MAX_SELECTED_PROP_FAMILIES_PER_PLAYER:
             reason = "PLAYER_PROP_EXPOSURE_CAP"
-        elif kept >= _MAX_SELECTED_PLAYER_PROPS_PER_GAME:
-            reason = "PROP_CARD_DISPLAY_CAP"
+        elif (
+            team in {"home", "away"}
+            and team_cluster_kept.get(cluster_key, 0)
+            >= _MAX_SELECTED_TEAM_CLUSTER_EXPRESSIONS
+        ):
+            reason = "CORRELATED_TEAM_OFFENSE_CLUSTER"
 
         if reason is not None:
             row["selected"] = False
@@ -174,12 +191,15 @@ def _apply_prop_selection_policy(
         kept += 1
         player_kept[player] = player_kept.get(player, 0) + 1
         prior.add(family)
+        if team in {"home", "away"}:
+            team_cluster_kept[cluster_key] = team_cluster_kept.get(cluster_key, 0) + 1
 
     return {
         "candidate_pair_selections": len(candidates),
         "served_prop_selections": kept,
-        "max_player_props_per_game": _MAX_SELECTED_PLAYER_PROPS_PER_GAME,
         "max_prop_families_per_player": _MAX_SELECTED_PROP_FAMILIES_PER_PLAYER,
+        "max_team_cluster_expressions": _MAX_SELECTED_TEAM_CLUSTER_EXPRESSIONS,
+        "global_prop_count_cap": None,
         "forces_team_balance": False,
         "forces_over_under_balance": False,
         "suppressed": suppressed,
@@ -199,7 +219,11 @@ def _prop_selection_diagnostics(
         if int(row.get("input_index", -1)) in prop_indexes
         and row.get("status") == "PRICED"
     ]
-    selected = [row for row in priced if row.get("selected")]
+    pair_selected = [
+        row for row in priced
+        if row.get("pair_selected", row.get("selected", False))
+    ]
+    served_selected = [row for row in priced if row.get("selected")]
 
     teams = {
         str(row.get("team") or "").strip().lower()
@@ -208,11 +232,11 @@ def _prop_selection_diagnostics(
     }
     selected_teams = {
         str(row.get("team") or "").strip().lower()
-        for row in selected
+        for row in pair_selected
         if str(row.get("team") or "").strip().lower() in {"home", "away"}
     }
     direction_counts = {"OVER": 0, "UNDER": 0}
-    for row in selected:
+    for row in pair_selected:
         value = str(row.get("selection") or "").strip().lower()
         if value.endswith(" over") or value == "over":
             direction_counts["OVER"] += 1
@@ -220,7 +244,7 @@ def _prop_selection_diagnostics(
             direction_counts["UNDER"] += 1
 
     alerts: list[str] = []
-    n_selected = len(selected)
+    n_selected = len(pair_selected)
     if len(teams) >= 2 and n_selected >= 4 and len(selected_teams) == 1:
         alerts.append("ALL_SELECTED_PROPS_ONE_TEAM_WITH_TWO_TEAM_PRICING")
     if n_selected >= 6:
@@ -231,6 +255,8 @@ def _prop_selection_diagnostics(
 
     return {
         "priced_prop_rows": len(priced),
+        "pair_selected_prop_rows": n_selected,
+        "served_selected_prop_rows": len(served_selected),
         "selected_prop_rows": n_selected,
         "priced_sides": sorted(teams),
         "selected_sides": sorted(selected_teams),
