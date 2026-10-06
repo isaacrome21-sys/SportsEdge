@@ -608,6 +608,14 @@ def build_unified_phone_card(
             "game_markets_disabled": True,
             "prop_game_context_source": "SPORTSBOOK_MARKET_CENTER_CONTEXT_ONLY",
         },
+        "presentation_policy": {
+            "market_probability_field": "market_no_vig_p",
+            "model_probability_field": "estimate_p",
+            "score_field": "score_0_100",
+            "score_label_field": "score_label",
+            "kickoff_field": "games[].kickoff",
+            "team_records": "OMIT_UNLESS_EXPLICITLY_SOURCED",
+        },
         "authority": {
             "research_only": True,
             "not_truth_gate": True,
