@@ -122,16 +122,20 @@ jobs:
             --max-age-minutes 180 \
             --output artifacts/manual_mlb_fast.json
 
-      - name: Render fast plays-only card
+      - name: Retrieve pregame context
+        continue-on-error: true
+        run: PYTHONPATH=. python scripts/acquire_mlb_card_context.py --engine-output artifacts/manual_mlb_fast.json --out-dir artifacts/mlb_context --workers 4
+
+      - name: Render final context-bound card
         run: |
           PYTHONPATH=. python scripts/render_mlb_myspari_card.py \
             --engine-output artifacts/manual_mlb_fast.json \
             --snapshot "${{ steps.normalize.outputs.path }}" \
-            --pre-context \
+            --context-dir artifacts/mlb_context \
             --out-dir artifacts/mlb_myspari_fast
-          echo "FAST_MLB_CARD_BEGIN"
+          echo "FINAL_MLB_CARD_BEGIN"
           cat artifacts/mlb_myspari_fast/card.md
-          echo "FAST_MLB_CARD_END"
+          echo "FINAL_MLB_CARD_END"
           cat artifacts/mlb_myspari_fast/card.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Print actionable game bets first
@@ -148,6 +152,7 @@ jobs:
           path: |
             artifacts/manual_mlb_fast.json
             artifacts/mlb_myspari_fast/
+            artifacts/mlb_context/
             artifacts/mlb_fast_game_bets.txt
           if-no-files-found: error
           retention-days: 14
