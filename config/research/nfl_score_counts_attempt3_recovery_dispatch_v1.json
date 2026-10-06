@@ -1,0 +1,28 @@
+{
+  "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G1_ATTEMPT3_RECOVERY_DISPATCH_V1",
+  "status": "ARMED_RECOVERY_MAIN_PUSH",
+  "candidate_family": "NFL_SCORE_COUNTS_G1",
+  "attempt_number": 3,
+  "confirmation": "CONSUME_SCORE_COUNTS_ATTEMPT_3",
+  "original_dispatch": "config/research/nfl_score_counts_attempt3_dispatch_v1.json",
+  "original_dispatch_sha256": "373d0fce3f14d6beeeec6fb6a45a6bc9bb6ae75db2185088a63969836b15e51a",
+  "reason": "ORIGINAL_DISPATCH_MERGED_BEFORE_TRIGGER_WORKFLOW_EXISTED",
+  "rules": {
+    "original_authorization_preserved": true,
+    "recovery_is_not_a_new_attempt": true,
+    "thresholds_unchanged": true,
+    "no_fourth_attempt": true,
+    "backfill": false,
+    "market_data_for_model_fit": false,
+    "source_substitution": false
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "pricing": false,
+    "promotion": false,
+    "staking": false,
+    "official": false
+  },
+  "recovery_trigger_merge_sha": "a247793da209bae03deab1caa81d33df9f10095e"
+}
