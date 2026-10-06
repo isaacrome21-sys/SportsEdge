@@ -7,6 +7,7 @@ from __future__ import annotations
 from hashlib import sha256
 import json
 from typing import Any, Mapping
+from .mlb_context_eligibility import context_eligibility
 
 SCHEMA_VERSION = "mlb_context_model_features_v1"
 PUBLIC_LANES = ("starters", "lineups", "injuries_scratches", "umpire", "statcast", "park_venue", "weather_roof", "bullpen_workload")
@@ -77,6 +78,21 @@ def context_model_features(bundle: Mapping[str, Any]) -> dict[str, Any]:
         "home_bullpen_pitches_48h": _number(home_bp, "bullpen_pitches_48h"),
         "injury_lane_status": injuries.get("status"),
     }
+    eligibility = context_eligibility(bundle)
+    # Preserve raw values for audit, but expose only governed eligible values to model code.
+    gated = dict(features)
+    if not eligibility["lanes"]["lineups"]:
+        gated["away_lineup_confirmed"] = None
+        gated["home_lineup_confirmed"] = None
+    if not eligibility["lanes"]["umpire"]:
+        gated["umpire_sample_games"] = None
+    if not eligibility["lanes"]["weather"]:
+        gated["temperature_f"] = None
+        gated["wind_mph"] = None
+        gated["precip_probability_pct"] = None
+    if not eligibility["lanes"]["bullpen_full_game"]:
+        for key in ("away_bullpen_pitches_24h","away_bullpen_pitches_48h","home_bullpen_pitches_24h","home_bullpen_pitches_48h"):
+            gated[key] = None
     payload = {
         "schema_version": SCHEMA_VERSION,
         "game_pk": bundle.get("game_pk"),
@@ -84,7 +100,8 @@ def context_model_features(bundle: Mapping[str, Any]) -> dict[str, Any]:
         "source_bundle_sha256": bundle.get("payload_sha256"),
         "price_blind": True,
         "lane_status": {lane: _mapping(bundle.get(lane)).get("status", "MISSING") for lane in PUBLIC_LANES},
-        "features": features,
+        "features": gated,
+        "eligibility": eligibility,
     }
     payload["feature_sha256"] = _digest(payload)
     return payload
