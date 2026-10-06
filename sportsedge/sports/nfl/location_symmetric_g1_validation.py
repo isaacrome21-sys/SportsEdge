@@ -283,7 +283,7 @@ def validate_nfl_location_symmetric_g1(
         "outer_test_seasons": list(OUTER_TEST_SEASONS),
         "baseline_model_id": "nfl_m2_ridge_v1",
         "baseline_ridge_alpha": float(baseline_alpha),
-        "market_fields_used_as_model_inputs": false,
+        "market_fields_used_as_model_inputs": False,
         "folds": fold_reports,
         "summary": target_summary,
         "location_gate_pass": overall_pass,
