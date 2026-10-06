@@ -35,6 +35,178 @@ from sportsedge.sports.nfl.unified_market_engine import TD_PROP_MARKETS
 SCHEMA = "SPORTSEDGE_NFL_SCORE_COUNTS_PHONE_CARD_V1"
 
 
+_TEAM_ALIASES = {"LA": "LAR", "WSH": "WAS"}
+
+
+def _team_code(value: Any) -> str:
+    raw = str(value or "").strip().upper()
+    return _TEAM_ALIASES.get(raw, raw)
+
+
+def _as_int(value: Any) -> int | None:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_float(value: Any) -> float:
+    try:
+        return float(value or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _filter_current_starter_qb_history(
+    *,
+    team: str,
+    target_season: int,
+    target_week: int,
+    observed_at,
+    depth_rows: Sequence[Mapping[str, Any]],
+    player_rows: Sequence[Mapping[str, Any]],
+    minimum_primary_games: int = 2,
+    primary_attempt_share: float = 0.50,
+) -> tuple[list[Mapping[str, Any]], dict[str, Any]]:
+    """Exclude clear backup/mop-up QB appearances from a current starter's role prior.
+
+    The live role source otherwise averages the starter's last eight stat rows,
+    even if some rows were tiny backup appearances. This PIT-only adapter keeps
+    games where the current starter owned at least half of that team's QB pass
+    attempts. It activates only with at least two qualifying prior games.
+    """
+    team_id = _team_code(team)
+    snapshots: list[tuple[Any, Mapping[str, Any]]] = []
+    for raw in depth_rows:
+        if _team_code(raw.get("team") or raw.get("club_code")) != team_id:
+            continue
+        if raw.get("dt") in (None, ""):
+            continue
+        try:
+            stamp = _utc(raw.get("dt"), "depth dt")
+        except Exception:
+            continue
+        if stamp <= observed_at:
+            snapshots.append((stamp, raw))
+    if not snapshots:
+        return list(player_rows), {
+            "status": "NOT_APPLIED",
+            "reason": "NO_PIT_DEPTH_SNAPSHOT",
+            "team": team_id,
+        }
+
+    latest = max(stamp for stamp, _ in snapshots)
+    qbs = []
+    for stamp, raw in snapshots:
+        if stamp != latest:
+            continue
+        position = str(raw.get("pos_abb") or raw.get("position") or "").strip().upper()
+        rank = _as_int(raw.get("pos_rank"))
+        pid = str(raw.get("gsis_id") or raw.get("player_id") or "").strip()
+        if position in {"QB", "QUARTERBACK"} and rank == 1 and pid:
+            qbs.append(pid)
+    qbs = sorted(set(qbs))
+    if len(qbs) != 1:
+        return list(player_rows), {
+            "status": "NOT_APPLIED",
+            "reason": "STARTING_QB_NOT_UNIQUE",
+            "team": team_id,
+            "candidate_ids": qbs,
+        }
+    starter_id = qbs[0]
+
+    prior_rows: list[Mapping[str, Any]] = []
+    for raw in player_rows:
+        season = _as_int(raw.get("season"))
+        week = _as_int(raw.get("week"))
+        if season is None or week is None:
+            continue
+        if str(raw.get("season_type") or "REG").strip().upper() != "REG":
+            continue
+        if season > target_season or (season == target_season and week >= target_week):
+            continue
+        prior_rows.append(raw)
+
+    team_qb_attempts: dict[tuple[str, int, int], float] = {}
+    for raw in prior_rows:
+        position = str(raw.get("position") or "").strip().upper()
+        if position not in {"QB", "QUARTERBACK"}:
+            continue
+        season = _as_int(raw.get("season"))
+        week = _as_int(raw.get("week"))
+        recent_team = _team_code(raw.get("recent_team") or raw.get("team"))
+        if season is None or week is None or not recent_team:
+            continue
+        key = (recent_team, season, week)
+        team_qb_attempts[key] = team_qb_attempts.get(key, 0.0) + max(
+            0.0, _as_float(raw.get("attempts"))
+        )
+
+    primary_keys: set[tuple[str, int, int]] = set()
+    starter_prior_rows = []
+    for raw in prior_rows:
+        pid = str(raw.get("player_id") or raw.get("gsis_id") or "").strip()
+        if pid != starter_id:
+            continue
+        season = _as_int(raw.get("season"))
+        week = _as_int(raw.get("week"))
+        recent_team = _team_code(raw.get("recent_team") or raw.get("team"))
+        if season is None or week is None or not recent_team:
+            continue
+        key = (recent_team, season, week)
+        total = team_qb_attempts.get(key, 0.0)
+        attempts = max(0.0, _as_float(raw.get("attempts")))
+        starter_prior_rows.append((key, attempts, total))
+        if total > 0 and attempts / total >= float(primary_attempt_share):
+            primary_keys.add(key)
+
+    if len(primary_keys) < int(minimum_primary_games):
+        return list(player_rows), {
+            "status": "NOT_APPLIED",
+            "reason": "INSUFFICIENT_PRIMARY_QB_GAMES",
+            "team": team_id,
+            "starter_qb_id": starter_id,
+            "qualifying_games": len(primary_keys),
+            "minimum_primary_games": int(minimum_primary_games),
+        }
+
+    filtered: list[Mapping[str, Any]] = []
+    removed: list[dict[str, Any]] = []
+    for raw in player_rows:
+        pid = str(raw.get("player_id") or raw.get("gsis_id") or "").strip()
+        season = _as_int(raw.get("season"))
+        week = _as_int(raw.get("week"))
+        is_prior = (
+            season is not None and week is not None
+            and (season < target_season or (season == target_season and week < target_week))
+            and str(raw.get("season_type") or "REG").strip().upper() == "REG"
+        )
+        if pid != starter_id or not is_prior:
+            filtered.append(raw)
+            continue
+        recent_team = _team_code(raw.get("recent_team") or raw.get("team"))
+        key = (recent_team, season, week)
+        if key in primary_keys:
+            filtered.append(raw)
+            continue
+        removed.append({
+            "season": season,
+            "week": week,
+            "team": recent_team,
+            "attempts": _as_float(raw.get("attempts")),
+            "team_qb_attempts": team_qb_attempts.get(key, 0.0),
+        })
+
+    return filtered, {
+        "status": "APPLIED",
+        "team": team_id,
+        "starter_qb_id": starter_id,
+        "primary_attempt_share": float(primary_attempt_share),
+        "qualifying_games": len(primary_keys),
+        "removed_nonprimary_games": removed,
+    }
+
+
 def _prediction_identity(
     prediction: Mapping[str, Any],
     *,
@@ -321,6 +493,7 @@ def build_score_count_phone_card(
         home_model = away_model = None
         role_error: str | None = None
         role_errors_by_side: dict[str, str] = {}
+        qb_role_filters_by_side: dict[str, dict[str, Any]] = {}
         hinted_teams = {
             str(row.get("team") or "").strip().upper()
             for row in modelable_prop_inputs
@@ -343,6 +516,15 @@ def build_score_count_phone_card(
                 if team_name not in requested_model_sides:
                     continue
                 try:
+                    team_player_rows, qb_role_filter = _filter_current_starter_qb_history(
+                        team=team_name,
+                        target_season=int(schedule["season"]),
+                        target_week=int(schedule["week"]),
+                        observed_at=observed,
+                        depth_rows=depth_rows,
+                        player_rows=player_rows,
+                    )
+                    qb_role_filters_by_side[side_name] = qb_role_filter
                     model = build_live_team_model(
                         team=team_name,
                         target_season=int(schedule["season"]),
@@ -350,7 +532,7 @@ def build_score_count_phone_card(
                         kickoff=kickoff,
                         observed_at=observed,
                         depth_rows=depth_rows,
-                        player_rows=player_rows,
+                        player_rows=team_player_rows,
                         injury_rows=injury_rows,
                     )
                     if side_name == "home":
@@ -624,6 +806,7 @@ def build_score_count_phone_card(
                 "prop_board_error": prop_engine.get("prop_board_error"),
                 "team_simulation_errors": prop_engine.get("team_simulation_errors") or {},
                 "role_model_errors_by_side": dict(sorted(role_errors_by_side.items())),
+                "qb_role_filters_by_side": dict(sorted(qb_role_filters_by_side.items())),
             },
             "role_status": "AVAILABLE" if not effective_role_error else "NO_MODEL",
             "role_error": effective_role_error,
