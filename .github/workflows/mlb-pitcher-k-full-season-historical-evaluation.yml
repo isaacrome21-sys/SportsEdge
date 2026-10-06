@@ -1,0 +1,101 @@
+name: mlb-pitcher-k-full-season-historical-evaluation
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: mlb-pitcher-k-full-season-evaluation-v1
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    if: >-
+      github.actor == github.repository_owner &&
+      github.event.issue.title == '[MLB RESEARCH] pitcher-K full-season historical evaluation v1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ISSUE: ${{ github.event.issue.number }}
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12.13'
+
+      - name: Install frozen research runtime
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
+
+      - name: Require exact one-look directive
+        env:
+          BODY: ${{ github.event.issue.body }}
+        run: |
+          python - << 'PY'
+          import os
+          body = (os.environ.get("BODY") or "").strip()
+          allowed = {
+              "RUN_PITCHER_K_FULL_SEASON_EVAL_V1",
+              "```text\nRUN_PITCHER_K_FULL_SEASON_EVAL_V1\n```",
+              "```\nRUN_PITCHER_K_FULL_SEASON_EVAL_V1\n```",
+          }
+          if body not in allowed:
+              raise SystemExit("PITCHER_K_FULL_SEASON_EVAL_DIRECTIVE_MISMATCH")
+          PY
+
+      - name: Enforce unique one-look trigger
+        env:
+          TRIGGER_TITLE: '[MLB RESEARCH] pitcher-K full-season historical evaluation v1'
+        run: |
+          set -euo pipefail
+          count="$(gh api -X GET search/issues -f q="repo:$GITHUB_REPOSITORY is:issue in:title \"$TRIGGER_TITLE\"" --jq '.total_count')"
+          if [ "$count" != "1" ]; then
+            echo "PITCHER_K_FULL_SEASON_ONE_LOOK_TRIGGER_COUNT=$count"
+            exit 1
+          fi
+
+      - name: Restore immutable historical transport cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: .cache/mlb-pitcher-k-history
+          key: mlb-pitcher-k-full-season-history-v1-${{ runner.os }}
+
+      - name: Materialize frozen 2023-2025 PIT rows
+        run: |
+          python scripts/materialize_mlb_pitcher_k_evaluation_rows.py \
+            --output artifacts/mlb_pitcher_k_full_season_eval/materialized_rows.json \
+            --cache-dir .cache/mlb-pitcher-k-history \
+            --statcast-chunk-days 45
+
+      - name: Consume candidate test exactly once
+        run: |
+          python scripts/run_mlb_pitcher_k_full_season_evaluation.py \
+            --rows artifacts/mlb_pitcher_k_full_season_eval/materialized_rows.json \
+            --out-dir artifacts/mlb_pitcher_k_full_season_eval \
+            --consume-candidate-test
+
+      - name: Post research-only readout
+        if: success()
+        run: gh issue comment "$ISSUE" --body-file artifacts/mlb_pitcher_k_full_season_eval/report.md
+
+      - name: Report fail-closed runner failure
+        if: failure()
+        run: |
+          gh issue comment "$ISSUE" --body "The frozen full-season pitcher-K historical evaluation did not complete, so no candidate-test decision is being claimed. Run log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Upload research artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mlb-pitcher-k-full-season-evaluation-v1-${{ github.run_id }}
+          path: artifacts/mlb_pitcher_k_full_season_eval/**
+          if-no-files-found: warn
+          retention-days: 90
