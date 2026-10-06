@@ -35,6 +35,42 @@ def _has_props(ticket: dict) -> bool:
 
 
 _NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
+
+# Only failures produced while building/simulating a whole team should suppress
+# the opposite side.  A single alias miss, unsupported market, or missing TD
+# prior remains local to that player/market.
+_TEAM_FATAL_REASON_PREFIXES = (
+    "ROLE_VALUE_INVALID:",
+    "TEAM_MODEL_REQUIRED",
+    "TEAM_QB_REQUIRED",
+    "TEAM_SKILL_PLAYERS_REQUIRED",
+    "TEAM_SKILL_PLAYER_OBJECT_REQUIRED",
+    "TEAM_PLAYER_IDENTITY_DUPLICATE",
+    "RECEIVER_WEIGHT_REQUIRED",
+    "RECEIVING_YARD_WEIGHT_REQUIRED",
+    "CONTEXT_SCRIPT_MULTIPLIER_CONFLICT",
+    "SCRIPT_SOURCE_REQUIRED",
+    "SCRIPT_MULTIPLIER_REQUIRED:",
+    "SCRIPT_MULTIPLIER_OUT_OF_RANGE:",
+    "PASSING_YARDS_NEGATIVE",
+)
+
+
+def _team_fatal_reason(team_rows: list[dict]) -> str | None:
+    """Identify a repeated team-simulation crash, not an individual row miss."""
+    if not team_rows or any(row.get("status") == "PRICED" for row in team_rows):
+        return None
+    reasons = {
+        str(row.get("reason") or "").strip()
+        for row in team_rows
+        if str(row.get("reason") or "").strip()
+    }
+    if len(reasons) != 1:
+        return None
+    reason = next(iter(reasons))
+    return reason if reason.startswith(_TEAM_FATAL_REASON_PREFIXES) else None
+
+
 def _name_tokens(value) -> list[str]:
     text = str(value or "").casefold()
     for mark in (".", ",", "-", "'", "’"):
@@ -130,20 +166,30 @@ def _apply_prop_board_safety(payload: dict, ticket: dict) -> dict:
             if team in {away, home}:
                 prop_indexes_by_team.setdefault(team, set()).add(input_index)
 
-        failed_teams: list[str] = []
+        failed_teams: dict[str, str] = {}
+        degraded_teams: dict[str, list[str]] = {}
         if len(prop_indexes_by_team) >= 2:
             for team, indexes in sorted(prop_indexes_by_team.items()):
                 team_rows = [
                     row for row in rows
                     if int(row.get("input_index", -1)) in indexes
                 ]
-                if not any(row.get("status") == "PRICED" for row in team_rows):
-                    failed_teams.append(team)
+                fatal = _team_fatal_reason(team_rows)
+                if fatal is not None:
+                    failed_teams[team] = fatal
+                elif not any(row.get("status") == "PRICED" for row in team_rows):
+                    degraded_teams[team] = sorted({
+                        str(row.get("reason") or "NO_MODEL")
+                        for row in team_rows
+                    })
 
         engine = game.setdefault("engine", {})
         if failed_teams:
-            detail = ",".join(failed_teams)
-            reason = f"GAME_PROP_SIMULATION_INCOMPLETE:{detail}=NO_PRICED_PROP_ROWS"
+            detail = ";".join(
+                f"{team}={failed_teams[team]}"
+                for team in sorted(failed_teams)
+            )
+            reason = f"GAME_PROP_SIMULATION_INCOMPLETE:{detail}"
             for row in rows:
                 if int(row.get("input_index", -1)) not in all_prop_indexes:
                     continue
@@ -160,7 +206,9 @@ def _apply_prop_board_safety(payload: dict, ticket: dict) -> dict:
                     row.pop(key, None)
             engine["prop_board_status"] = "NO_MODEL"
             engine["prop_board_error"] = reason
-            engine["failed_requested_teams"] = failed_teams
+            engine["failed_requested_teams"] = sorted(failed_teams)
+            engine["team_simulation_errors"] = dict(sorted(failed_teams.items()))
+            engine["degraded_requested_teams"] = dict(sorted(degraded_teams.items()))
             game["role_status"] = "NO_MODEL"
             game["role_error"] = reason
             game["status"] = "NO_MODEL_PROP_BOARD_INCOMPLETE"
@@ -168,12 +216,16 @@ def _apply_prop_board_safety(payload: dict, ticket: dict) -> dict:
             engine["prop_board_status"] = "AVAILABLE"
             engine["prop_board_error"] = None
             engine["failed_requested_teams"] = []
+            engine["team_simulation_errors"] = {}
+            engine["degraded_requested_teams"] = dict(sorted(degraded_teams.items()))
 
     all_rows = [row for game in games for row in game.get("rows") or []]
     out["rows"] = all_rows
     out["selected_rows"] = [row for row in all_rows if row.get("selected")]
     out["prop_board_safety_policy"] = {
-        "two_sided_requested_teams_must_both_price": True,
+        "team_simulation_failure_invalidates_two_team_board": True,
+        "individual_player_or_market_no_model_does_not_invalidate_opposite_team": True,
+        "single_team_quote_board_allowed": True,
         "failure_status": "NO_MODEL",
         "failure_reason_prefix": "GAME_PROP_SIMULATION_INCOMPLETE",
     }
