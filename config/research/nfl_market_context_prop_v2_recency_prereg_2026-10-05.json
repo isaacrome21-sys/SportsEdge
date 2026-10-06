@@ -69,5 +69,13 @@
     "staking": false,
     "official": false,
     "backfill": false
+  },
+  "roster_residual_rule": {
+    "latest_depth_snapshot_at_or_before_observed_at_required": true,
+    "out_or_inactive_excluded_from_active_depth_set": true,
+    "current_team_history_for_players_not_on_active_depth_snapshot": "REMOVE_BEFORE_ROLE_BUILD",
+    "former_team_history_for_current_active_player": "PRESERVE_FOR_PLAYER_ROLE_ESTIMATION",
+    "purpose": "PREVENT_DEPARTED_OR_UNAVAILABLE_PLAYERS_FROM_SILENTLY_STEALING_SYNTHETIC_OTHER_TARGET_AND_RECEPTION_MASS",
+    "market_blind": true
   }
 }
