@@ -341,3 +341,97 @@ def test_prop_card_requires_posted_spread_and_total_context():
     assert len(props) == 2
     assert all(row["status"] == "NO_MODEL" for row in props)
     assert all(row["reason"] == "MARKET_CONTEXT_SPREAD_TOTAL_REQUIRED" for row in props)
+
+def test_player_alias_normalization_accepts_generational_suffix_on_roster():
+    board = ticket(
+        """
+        Chiefs @ Ravens
+        Spread +3.5 -110 -110
+        Total 47.5 -110 -110
+        Prop "Travis Kelce" Receptions 5.5 -110 -110
+        """
+    )
+    rows = copy.deepcopy(depth())
+    for row in rows:
+        if row.get("gsis_id") == "kelce":
+            row["player_name"] = "Travis Kelce Sr."
+
+    out = build_unified_phone_card(
+        board,
+        history=history(),
+        schedule_games=schedule(),
+        depth_rows=rows,
+        player_rows=player_stats(),
+        injury_source_ready=True,
+        runtime=runtime(),
+        n_sims=300,
+        seed=61,
+    )
+    props = [row for row in out["rows"] if row["market"] == "receptions"]
+    assert len(props) == 2
+    assert all(row["status"] == "PRICED" for row in props)
+    assert {row["player"] for row in props} == {"Travis Kelce Sr."}
+
+
+def test_two_team_prop_board_fails_closed_if_either_team_simulation_fails():
+    board = ticket(
+        """
+        Chiefs @ Ravens
+        Spread +3.5 -110 -110
+        Total 47.5 -110 -110
+        Prop "Zay Flowers" RecYards 72.5 -110 -110
+        Prop "Xavier Worthy" RecYards 65.5 -110 -110
+        """
+    )
+    stats = copy.deepcopy(player_stats())
+    for row in stats:
+        if row.get("recent_team") == "BAL" and row.get("position") in {"RB", "WR", "TE"}:
+            row["receiving_yards"] = 0
+
+    out = build_unified_phone_card(
+        board,
+        history=history(),
+        schedule_games=schedule(),
+        depth_rows=depth(),
+        player_rows=stats,
+        injury_source_ready=True,
+        runtime=runtime(),
+        n_sims=300,
+        seed=62,
+    )
+    props = [
+        row for row in out["rows"]
+        if row["market"] == "receiving_yards"
+    ]
+    assert len(props) == 4
+    assert all(row["status"] == "NO_MODEL" for row in props)
+    assert out["selected_rows"] == []
+    game = out["games"][0]
+    assert game["role_status"] == "NO_MODEL"
+    assert game["engine"]["prop_board_status"] == "NO_MODEL"
+    assert game["engine"]["prop_board_error"].startswith(
+        "GAME_PROP_SIMULATION_INCOMPLETE:home="
+    )
+    assert "home" in game["engine"]["team_simulation_errors"]
+
+
+def test_phone_artifact_declares_graphic_field_contract():
+    out = build_unified_phone_card(
+        full_board(),
+        history=history(),
+        schedule_games=schedule(),
+        depth_rows=depth(),
+        player_rows=player_stats(),
+        injury_source_ready=True,
+        runtime=runtime(),
+        n_sims=250,
+        seed=63,
+    )
+    policy = out["presentation_policy"]
+    assert policy["market_probability_field"] == "market_no_vig_p"
+    assert policy["model_probability_field"] == "estimate_p"
+    assert policy["score_field"] == "score_0_100"
+    assert policy["score_label_field"] == "score_label"
+    assert policy["kickoff_field"] == "games[].kickoff"
+    assert policy["team_records"] == "OMIT_UNLESS_EXPLICITLY_SOURCED"
+
