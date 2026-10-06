@@ -458,3 +458,105 @@ def test_runner_graphic_contract_uses_artifact_native_fields():
     assert policy["kickoff_field"] == "games[].kickoff"
     assert policy["team_records"] == "OMIT_UNLESS_EXPLICITLY_SOURCED"
 
+def test_runner_safety_does_not_void_game_for_individual_player_match_failure():
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": "ATL WR", "market": "receiving_yards"},
+                {"player": "NO Mystery", "market": "receiving_yards"},
+            ],
+        }]
+    }
+    payload = {
+        "games": [{
+            "rows": [
+                {
+                    "input_index": 0, "team": "away", "status": "PRICED",
+                    "selected": True, "estimate_p": 0.61, "score_0_100": 88,
+                },
+                {
+                    "input_index": 1, "team": "home", "status": "NO_MODEL",
+                    "selected": False,
+                    "reason": "PROP_PLAYER_EXACT_MATCH_REQUIRED:NO Mystery:matches=0",
+                },
+            ],
+            "engine": {},
+            "role_status": "AVAILABLE",
+            "role_error": None,
+        }],
+        "rows": [],
+        "selected_rows": [],
+    }
+    out = _apply_prop_board_safety(payload, ticket)
+    game = out["games"][0]
+    assert game["role_status"] == "AVAILABLE"
+    assert game["engine"]["prop_board_status"] == "AVAILABLE"
+    assert game["engine"]["failed_requested_teams"] == []
+    assert "NO" in game["engine"]["degraded_requested_teams"]
+    assert out["selected_rows"][0]["input_index"] == 0
+    assert out["selected_rows"][0]["score_0_100"] == 88
+
+
+def test_runner_safety_does_not_void_game_for_market_specific_td_prior_gap():
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": "ATL WR", "market": "receiving_yards"},
+                {"player": "NO TE", "market": "anytime_td"},
+            ],
+        }]
+    }
+    payload = {
+        "games": [{
+            "rows": [
+                {"input_index": 0, "team": "away", "status": "PRICED", "selected": True},
+                {
+                    "input_index": 1, "team": "home", "status": "NO_MODEL",
+                    "selected": False,
+                    "reason": "SCORING_COMPOSITION_PRIOR_REQUIRED_FOR_TD_PROPS",
+                },
+            ],
+            "engine": {},
+            "role_status": "AVAILABLE",
+            "role_error": None,
+        }],
+        "rows": [],
+        "selected_rows": [],
+    }
+    out = _apply_prop_board_safety(payload, ticket)
+    assert out["games"][0]["role_status"] == "AVAILABLE"
+    assert out["games"][0]["engine"]["prop_board_status"] == "AVAILABLE"
+    assert len(out["selected_rows"]) == 1
+
+
+def test_runner_safety_allows_single_team_quoted_prop_board():
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": "ATL WR", "market": "receiving_yards"},
+            ],
+        }]
+    }
+    payload = {
+        "games": [{
+            "rows": [
+                {"input_index": 0, "team": "away", "status": "PRICED", "selected": True},
+            ],
+            "engine": {},
+            "role_status": "AVAILABLE",
+            "role_error": None,
+        }],
+        "rows": [],
+        "selected_rows": [],
+    }
+    out = _apply_prop_board_safety(payload, ticket)
+    assert out["games"][0]["role_status"] == "AVAILABLE"
+    assert len(out["selected_rows"]) == 1
+    assert out["prop_board_safety_policy"]["single_team_quote_board_allowed"] is True
+
