@@ -9,6 +9,7 @@ from sportsedge.nfl_unified_phone import build_unified_phone_card
 from scripts.run_nfl_unified_lines_card import (
     _adapt_signed_yardage_for_nonnegative_v1,
     _apply_prop_board_safety,
+    _filter_current_starter_qb_history,
     _name_alias_match,
     _normalize_ticket_prop_players,
 )
@@ -844,3 +845,95 @@ def test_runner_signed_yardage_compatibility_copy_is_micro_sample_only():
         "model_input_value": 0.0,
         "reason": "FROZEN_V1_NEGATIVE_RECEIVING_MICRO_SAMPLE_COMPATIBILITY",
     }]
+
+def test_unified_runner_qb_role_filter_removes_clear_backup_appearances_only_after_two_primary_games():
+    depth_rows = [{
+        "dt": "2026-10-05T12:00:00Z",
+        "team": "ATL",
+        "gsis_id": "q1",
+        "player_name": "Current Starter",
+        "pos_abb": "QB",
+        "pos_rank": 1,
+    }]
+    player_rows = [
+        {
+            "player_id": "q1", "position": "QB", "recent_team": "ATL",
+            "season": 2026, "week": 1, "season_type": "REG", "attempts": 2,
+        },
+        {
+            "player_id": "q2", "position": "QB", "recent_team": "ATL",
+            "season": 2026, "week": 1, "season_type": "REG", "attempts": 30,
+        },
+        {
+            "player_id": "q1", "position": "QB", "recent_team": "ATL",
+            "season": 2026, "week": 2, "season_type": "REG", "attempts": 28,
+        },
+        {
+            "player_id": "q2", "position": "QB", "recent_team": "ATL",
+            "season": 2026, "week": 2, "season_type": "REG", "attempts": 3,
+        },
+        {
+            "player_id": "q1", "position": "QB", "recent_team": "ATL",
+            "season": 2026, "week": 3, "season_type": "REG", "attempts": 31,
+        },
+    ]
+    filtered, audit = _filter_current_starter_qb_history(
+        team="ATL",
+        target_season=2026,
+        target_week=4,
+        observed_at="2026-10-05T16:00:00+00:00",
+        depth_rows=depth_rows,
+        player_rows=player_rows,
+    )
+    q1_weeks = [
+        int(row["week"]) for row in filtered
+        if row.get("player_id") == "q1"
+    ]
+    assert q1_weeks == [2, 3]
+    assert audit["status"] == "APPLIED"
+    assert audit["starter_qb_id"] == "q1"
+    assert audit["qualifying_games"] == 2
+    assert audit["removed_nonprimary_games"] == [{
+        "season": 2026,
+        "week": 1,
+        "team": "ATL",
+        "attempts": 2.0,
+        "team_qb_attempts": 32.0,
+    }]
+
+
+def test_unified_runner_qb_role_filter_keeps_prior_when_only_one_primary_game():
+    depth_rows = [{
+        "dt": "2026-10-05T12:00:00Z",
+        "team": "ATL",
+        "gsis_id": "q1",
+        "player_name": "Current Starter",
+        "pos_abb": "QB",
+        "pos_rank": 1,
+    }]
+    player_rows = [
+        {
+            "player_id": "q1", "position": "QB", "recent_team": "ATL",
+            "season": 2026, "week": 1, "season_type": "REG", "attempts": 2,
+        },
+        {
+            "player_id": "q2", "position": "QB", "recent_team": "ATL",
+            "season": 2026, "week": 1, "season_type": "REG", "attempts": 30,
+        },
+        {
+            "player_id": "q1", "position": "QB", "recent_team": "ATL",
+            "season": 2026, "week": 2, "season_type": "REG", "attempts": 28,
+        },
+    ]
+    filtered, audit = _filter_current_starter_qb_history(
+        team="ATL",
+        target_season=2026,
+        target_week=3,
+        observed_at="2026-10-05T16:00:00+00:00",
+        depth_rows=depth_rows,
+        player_rows=player_rows,
+    )
+    assert filtered == player_rows
+    assert audit["status"] == "NOT_APPLIED"
+    assert audit["reason"] == "INSUFFICIENT_PRIMARY_QB_GAMES"
+
