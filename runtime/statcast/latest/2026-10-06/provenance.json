@@ -1,0 +1,9 @@
+{
+  "eligible_for_forward_evaluation": true,
+  "event_name": "push",
+  "head_branch": "main",
+  "head_sha": "339e2ed4dbdd01b27cb0eefa0a3c2ff6ccafa43e",
+  "ref": "refs/heads/main",
+  "run_id": "37452408460",
+  "schema": "SPORTSEDGE_STATCAST_MAIN_PROVENANCE_V1"
+}
