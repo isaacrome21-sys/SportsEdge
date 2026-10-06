@@ -78,6 +78,13 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _cache_once(cache: dict, key, loader):
+    """Return a cached value without eagerly executing the loader on cache hits."""
+    if key not in cache:
+        cache[key] = loader()
+    return cache[key]
+
+
 def _person(value: str) -> str:
     decomposed = unicodedata.normalize("NFKD", str(value or ""))
     folded = "".join(c for c in decomposed if not unicodedata.combining(c))
@@ -591,7 +598,11 @@ def run_final(*, out_dir: Path, cache_dir: Path) -> dict:
     graded = []
     for unit in units:
         day = _parse_iso(unit["first_pitch_at"]).astimezone(EASTERN).date().isoformat()
-        schedule = schedule_cache.setdefault(day, fetch_schedule(day, now=_parse_iso(unit["observed_at"])))
+        schedule = _cache_once(
+            schedule_cache,
+            day,
+            lambda: fetch_schedule(day, now=_parse_iso(unit["observed_at"])),
+        )
         game = _match_game(unit, schedule)
         if game is None:
             drops["game_identity_unresolved"] = drops.get("game_identity_unresolved", 0) + 1
@@ -599,7 +610,11 @@ def run_final(*, out_dir: Path, cache_dir: Path) -> dict:
         if str(game.status).lower() != "final":
             drops["game_not_final"] = drops.get("game_not_final", 0) + 1
             continue
-        box = box_cache.setdefault(int(game.game_pk), fetch_boxscore(int(game.game_pk)))
+        box = _cache_once(
+            box_cache,
+            int(game.game_pk),
+            lambda: fetch_boxscore(int(game.game_pk)),
+        )
         starter = _starter_identity(box, game, unit["entity_name_normalized"])
         if starter is None:
             drops["starter_identity_unresolved"] = drops.get("starter_identity_unresolved", 0) + 1
