@@ -108,8 +108,18 @@ def feature_vector(candidate: Mapping[str, Any]) -> tuple[float, ...]:
         _positive(skill.get("chase_rate"), "skill.chase_rate"),
         1.0 if hand == "R" else 0.0,
     )
-    if values[1] >= 1 or values[5] >= 1 or values[6] >= 1:
-        raise PitcherKProbabilityCandidateError("rate features must be in (0,1)")
+    # Empirical K/BF, whiff, and chase rates are standardized numeric predictors.
+    # A complete sparse sample (for example 1 chase on 1 out-of-zone pitch) is a
+    # valid rate of exactly 1.0. The frozen formula does not logit-transform these
+    # features. Reject only non-positive, above-one, non-finite, or incomplete rates.
+    empirical_rates = (
+        ("recent_mean_k_per_batter_faced", values[1]),
+        ("whiff_rate", values[5]),
+        ("chase_rate", values[6]),
+    )
+    for name, rate in empirical_rates:
+        if rate > 1:
+            raise PitcherKProbabilityCandidateError(f"{name} must be in (0,1]")
     return tuple(float(v) for v in values)
 
 
