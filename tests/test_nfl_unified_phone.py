@@ -10,6 +10,7 @@ from scripts.run_nfl_unified_lines_card import (
     _apply_prop_board_safety,
     _name_alias_match,
     _normalize_ticket_prop_players,
+    _sanitize_signed_yardage_rows,
 )
 
 
@@ -603,4 +604,43 @@ def test_runner_safety_still_catches_team_crash_when_same_team_has_a_local_alias
         "GAME_PROP_SIMULATION_INCOMPLETE:NO=ROLE_VALUE_INVALID:"
     )
     assert out["selected_rows"] == []
+
+def test_runner_signed_yardage_adapter_is_narrow_and_audited():
+    rows = [
+        {
+            "player_id": "cj",
+            "player_name": "CJ Donaldson",
+            "season": "2026",
+            "week": "3",
+            "recent_team": "NO",
+            "receptions": "1",
+            "receiving_yards": "-2",
+            "rushing_yards": "11",
+            "passing_yards": "0",
+        },
+        {
+            "player_id": "ok",
+            "player_name": "Healthy Player",
+            "season": "2026",
+            "week": "3",
+            "recent_team": "ATL",
+            "receiving_yards": "22",
+        },
+    ]
+    adapted, receipts = _sanitize_signed_yardage_rows(rows)
+    assert adapted[0]["receiving_yards"] == 0.0
+    assert adapted[0]["rushing_yards"] == "11"
+    assert adapted[1]["receiving_yards"] == "22"
+    assert rows[0]["receiving_yards"] == "-2"
+    assert receipts == [{
+        "player_id": "cj",
+        "player_name": "CJ Donaldson",
+        "season": "2026",
+        "week": "3",
+        "team": "NO",
+        "field": "receiving_yards",
+        "original": -2.0,
+        "adapted": 0.0,
+        "reason": "NONNEGATIVE_PROP_EFFICIENCY_SUPPORT",
+    }]
 
