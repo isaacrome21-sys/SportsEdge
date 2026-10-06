@@ -1,16 +1,18 @@
 {
   "schema": "NHL_PUBLIC_BASELINE_VALIDATION_PROTOCOL_V1",
   "status": "FROZEN_BEFORE_FIRST_REAL_DATA_EVALUATION",
-  "note": "Implementation existed before this protocol file was committed, but no real historical validation result has been consumed on this branch. This protocol binds the first real-data evaluation and is not represented as a pre-implementation preregistration.",
+  "note": "Restates and operationally binds the earlier NHL_PUBLIC_BASELINE_VALIDATION_PREREG_V1 before the first real-data evaluation. It does not widen or replace the preregistered window.",
   "candidate": "sportsedge/sports/nhl/public_baseline.py::NHLPublicBaselineArtifact",
   "source": "official NHL completed-game boxscore receipts",
-  "allowed_game_types": [2],
+  "allowed_game_types": [
+    2
+  ],
   "fit_window": {
     "end_exclusive": "2025-07-01T00:00:00+00:00"
   },
   "validation_window": {
-    "start_inclusive": "2025-07-01T00:00:00+00:00",
-    "end_exclusive": "2026-07-01T00:00:00+00:00"
+    "start_inclusive": "2025-10-01T00:00:00+00:00",
+    "end_exclusive": "2026-05-01T00:00:00+00:00"
   },
   "metrics": [
     "team_goal_mae",
@@ -29,5 +31,6 @@
     "promotion": false,
     "staking": false,
     "official": false
-  }
+  },
+  "preregistration": "config/research/nhl_public_baseline_validation_prereg_v1.json"
 }
