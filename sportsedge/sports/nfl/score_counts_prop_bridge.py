@@ -212,6 +212,14 @@ def _needs_td(requests: Sequence[Mapping[str, Any]], side: str) -> bool:
     )
 
 
+def _needs_non_td(requests: Sequence[Mapping[str, Any]], side: str) -> bool:
+    return any(
+        str(row.get("team") or "").strip().lower() == side
+        and str(row.get("market") or "").strip().lower() not in TD_PROP_MARKETS
+        for row in requests
+    )
+
+
 def _find_draws(
     team_paths: Sequence[Mapping[str, Any]],
     *,
@@ -290,6 +298,10 @@ def price_score_count_props_from_paths(
         ("away", away_model, away_needs_td, int(seed) ^ 0x41574159),
     ):
         if not any(str(row.get("team") or "").strip().lower() == side for row in requests):
+            continue
+        if needs_td and td_error is not None and not _needs_non_td(requests, side):
+            # Every request for this side is already locally unpriceable for a
+            # TD-path prerequisite. Do not manufacture a broader team failure.
             continue
         try:
             model, regularization = _regularize_nonpositive_receiving_efficiency(model)
