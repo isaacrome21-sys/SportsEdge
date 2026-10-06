@@ -689,5 +689,144 @@ def test_selection_concentration_is_flagged_but_never_rebalanced():
     assert "ALL_SELECTED_PROPS_ONE_TEAM_WITH_TWO_TEAM_PRICING" in diag["alerts"]
     assert "SELECTED_PROP_DIRECTION_CONCENTRATED_UNDER" in diag["alerts"]
     assert diag["selection_changed_by_diagnostic"] is False
+    assert diag["review_required"] is True
+    assert out["prop_card_review_required"] is True
+    assert out["games"][0]["prop_selection_policy"]["forces_team_balance"] is False
+    assert out["games"][0]["prop_selection_policy"]["forces_over_under_balance"] is False
     assert len(out["selected_rows"]) == 6
+
+def test_correlation_policy_keeps_only_strongest_same_player_pass_volume_expression():
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": "Michael Penix Jr.", "market": "pass_attempts"},
+                {"player": "Michael Penix Jr.", "market": "completions"},
+                {"player": "Michael Penix Jr.", "market": "passing_yards"},
+            ],
+        }]
+    }
+    rows = [
+        {
+            "input_index": 0, "team": "away", "player": "Michael Penix Jr.",
+            "market": "pass_attempts", "status": "PRICED", "selected": True,
+            "selection": "Michael Penix Jr. Under", "ev_per_dollar": 0.08,
+            "edge_probability_points": 0.08, "score_0_100": 88,
+        },
+        {
+            "input_index": 1, "team": "away", "player": "Michael Penix Jr.",
+            "market": "completions", "status": "PRICED", "selected": True,
+            "selection": "Michael Penix Jr. Under", "ev_per_dollar": 0.12,
+            "edge_probability_points": 0.10, "score_0_100": 88,
+        },
+        {
+            "input_index": 2, "team": "away", "player": "Michael Penix Jr.",
+            "market": "passing_yards", "status": "PRICED", "selected": True,
+            "selection": "Michael Penix Jr. Under", "ev_per_dollar": 0.18,
+            "edge_probability_points": 0.15, "score_0_100": 88,
+        },
+    ]
+    payload = {
+        "games": [{
+            "rows": rows, "engine": {}, "role_status": "AVAILABLE",
+            "role_error": None,
+        }],
+        "rows": [], "selected_rows": [],
+    }
+    out = _apply_prop_board_safety(payload, ticket)
+    selected = out["selected_rows"]
+    assert len(selected) == 1
+    assert selected[0]["market"] == "passing_yards"
+    suppressed = [row for row in out["rows"] if not row.get("selected")]
+    assert {row["selection_suppressed_reason"] for row in suppressed} == {
+        "CORRELATED_PLAYER_FAMILY"
+    }
+    policy = out["games"][0]["prop_selection_policy"]
+    assert policy["candidate_pair_selections"] == 3
+    assert policy["served_prop_selections"] == 1
+
+
+def test_correlation_policy_caps_phone_card_at_six_independent_props_by_strength():
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": f"ATL Player {i}", "market": "receiving_yards"}
+                for i in range(7)
+            ],
+        }]
+    }
+    rows = [
+        {
+            "input_index": i, "team": "away", "player": f"ATL Player {i}",
+            "market": "receiving_yards", "status": "PRICED", "selected": True,
+            "selection": f"ATL Player {i} Under",
+            "ev_per_dollar": 0.20 - i * 0.01,
+            "edge_probability_points": 0.20 - i * 0.01,
+            "score_0_100": 88,
+        }
+        for i in range(7)
+    ]
+    payload = {
+        "games": [{
+            "rows": rows, "engine": {}, "role_status": "AVAILABLE",
+            "role_error": None,
+        }],
+        "rows": [], "selected_rows": [],
+    }
+    out = _apply_prop_board_safety(payload, ticket)
+    assert len(out["selected_rows"]) == 6
+    assert {row["player"] for row in out["selected_rows"]} == {
+        f"ATL Player {i}" for i in range(6)
+    }
+    suppressed = [row for row in out["rows"] if not row.get("selected")]
+    assert len(suppressed) == 1
+    assert suppressed[0]["player"] == "ATL Player 6"
+    assert suppressed[0]["selection_suppressed_reason"] == "PROP_CARD_DISPLAY_CAP"
+
+
+def test_correlation_policy_never_forces_opposite_team_or_opposite_direction():
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": f"ATL {i}", "market": "receiving_yards"}
+                for i in range(4)
+            ] + [
+                {"player": "NO 1", "market": "receiving_yards"},
+            ],
+        }]
+    }
+    rows = [
+        {
+            "input_index": i, "team": "away", "player": f"ATL {i}",
+            "market": "receiving_yards", "status": "PRICED", "selected": True,
+            "selection": f"ATL {i} Under", "ev_per_dollar": 0.10 + i * 0.01,
+            "edge_probability_points": 0.08 + i * 0.01, "score_0_100": 88,
+        }
+        for i in range(4)
+    ]
+    rows.append({
+        "input_index": 4, "team": "home", "player": "NO 1",
+        "market": "receiving_yards", "status": "PRICED", "selected": False,
+        "selection": "NO 1 Over", "ev_per_dollar": -0.04,
+        "edge_probability_points": -0.03, "score_0_100": 88,
+    })
+    payload = {
+        "games": [{
+            "rows": rows, "engine": {}, "role_status": "AVAILABLE",
+            "role_error": None,
+        }],
+        "rows": [], "selected_rows": [],
+    }
+    out = _apply_prop_board_safety(payload, ticket)
+    assert len(out["selected_rows"]) == 4
+    assert all(row["team"] == "away" for row in out["selected_rows"])
+    assert all(str(row["selection"]).endswith("Under") for row in out["selected_rows"])
+    policy = out["games"][0]["prop_selection_policy"]
+    assert policy["forces_team_balance"] is False
+    assert policy["forces_over_under_balance"] is False
 
