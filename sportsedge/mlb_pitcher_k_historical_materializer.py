@@ -82,7 +82,7 @@ def targets_from_schedule(payload: Mapping[str, Any], *, season: int) -> list[Pi
     """
     if int(season) not in FROZEN_SEASONS:
         raise PitcherKHistoricalMaterializerError("season outside frozen split")
-    out: list[PitcherKTarget] = []
+    by_identity: dict[tuple[int, int], PitcherKTarget] = {}
     for block in payload.get("dates") or []:
         if not isinstance(block, Mapping):
             continue
