@@ -127,8 +127,23 @@ def targets_from_schedule(payload: Mapping[str, Any], *, season: int) -> list[Pi
                         home_team_id=int(home_id),
                     )
                 )
-    out.sort(key=lambda x: (x.target_date, x.game_id, x.pitcher_id))
-    return out
+    # StatsAPI can repeat the same final game in multiple schedule blocks after
+    # postponement/reschedule bookkeeping. Collapse only identical target
+    # identities; conflicting duplicates fail closed.
+    deduped: dict[tuple[int, int, int], PitcherKTarget] = {}
+    for target in out:
+        key = (target.season, target.game_id, target.pitcher_id)
+        prior = deduped.get(key)
+        if prior is None:
+            deduped[key] = target
+            continue
+        if prior != target:
+            raise PitcherKHistoricalMaterializerError(
+                f"conflicting duplicate schedule target:{target.season}:{target.game_id}:{target.pitcher_id}"
+            )
+    result = list(deduped.values())
+    result.sort(key=lambda x: (x.target_date, x.game_id, x.pitcher_id))
+    return result
 
 
 def fetch_season_schedule(
@@ -426,10 +441,32 @@ def combine_seasons(results: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
                 "exclusions": dict(item.get("exclusions") or {}),
             }
         )
+    # Final defense against duplicated upstream schedule identities. Exact
+    # duplicate rows are source duplication and may be collapsed. If two rows
+    # share an identity but differ in any byte-relevant field, fail closed
+    # instead of choosing one.
+    unique: dict[tuple[int, int, str], dict[str, Any]] = {}
+    duplicate_rows_collapsed = 0
+    for row in rows:
+        key = (int(row["season"]), int(row["game_id"]), str(row["pitcher_id"]))
+        prior = unique.get(key)
+        if prior is None:
+            unique[key] = row
+            continue
+        left = json.dumps(prior, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        right = json.dumps(row, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        if left != right:
+            raise PitcherKHistoricalMaterializerError(
+                f"conflicting duplicate evaluation row:{key[0]}:{key[1]}:{key[2]}"
+            )
+        duplicate_rows_collapsed += 1
+    rows = list(unique.values())
+    rows.sort(key=lambda row: (int(row["season"]), str(row["target_date"]), int(row["game_id"]), str(row["pitcher_id"])))
     return {
         "schema": "MLB_PITCHER_K_HISTORICAL_EVALUATION_ROWS_V1",
         "seasons": list(FROZEN_SEASONS),
         "row_count": len(rows),
+        "duplicate_rows_collapsed": duplicate_rows_collapsed,
         "season_receipts": receipts,
         "rows": rows,
         "historical_reconstruction": True,
