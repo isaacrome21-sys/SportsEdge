@@ -476,19 +476,21 @@ def build_rows(board: list, season: int, week: int, asof, fit_path=None):
             cache_hit = False
 
     if cache_hit:
-        weather = {}
+        # Cached games are already weather-attached from the original PIT run.
+        # Reuse those exact market-blind inputs instead of replacing real weather
+        # with a later neutral fallback.
+        games = raw_games
     else:
         try:
             weather = fetch_cfbd_weather(season=season, week=week, cfbd_api_key=key)
         except Exception as exc:  # CFBD weather is a paid tier; free keys get 401
             print("WEATHER_NEUTRAL_FALLBACK", type(exc).__name__, str(exc)[:120])
             weather = {}
-    # Missing weather -> training-mean wind/temp, outdoor: zero standardized weather effect.
-    neutral = {"game_indoor": False, "wind_speed": 6.89, "temperature": 64.6, "fallback": "TRAINING_MEAN"}
-    games = attach_weather(raw_games, {g.game_id: weather.get(g.game_id) or neutral for g in raw_games})
-    if not cache_hit:
+        # Missing weather -> training-mean wind/temp, outdoor: zero standardized weather effect.
+        neutral = {"game_indoor": False, "wind_speed": 6.89, "temperature": 64.6, "fallback": "TRAINING_MEAN"}
+        games = attach_weather(raw_games, {g.game_id: weather.get(g.game_id) or neutral for g in raw_games})
         snaps = fetch_cfbd_candidate_metric_snapshots(season=season, week=week, cfbd_api_key=key, now=now)
-        _save_live_week_cache(season, week, now, raw_games, snaps)
+        _save_live_week_cache(season, week, now, games, snaps)
     for line in moment_match(snaps, training_moments(fit_path)):
         print("MOMENT_MATCH side=%s %s live_mean=%s live_sd=%s -> train_mean=%s train_sd=%s" % line)
     rows = []
