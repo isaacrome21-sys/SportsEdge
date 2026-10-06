@@ -456,11 +456,16 @@ def run_unified_nfl_model(
 
     team_paths: dict[str, list[dict[str, Any]]] = {}
     team_errors: dict[str, str] = {}
+    requested_prop_sides = {
+        str(request.get("team") or "").strip().lower()
+        for request in prop_requests
+        if str(request.get("team") or "").strip().lower() in {"home", "away"}
+    }
     for side, model, needs_td, side_seed in (
         ("home", home_model, home_needs_td, int(seed) ^ 0x484F4D45),
         ("away", away_model, away_needs_td, int(seed) ^ 0x41574159),
     ):
-        if not any(str(request.get("team") or "").lower() == side for request in prop_requests):
+        if side not in requested_prop_sides:
             continue
         if needs_td and td_path_error is not None:
             # Non-TD props for this team can still be produced from the same score
@@ -480,6 +485,18 @@ def run_unified_nfl_model(
         except (UnifiedNflModelError, NflPropSimulationError, KeyError, TypeError, ValueError) as exc:
             team_errors[side] = str(exc)
 
+    # A two-team player-prop board is one simulation product.  If either
+    # requested team cannot be simulated, do not let the surviving side create
+    # a mechanically one-sided card.  Preserve the side-specific error for
+    # audit, but fail the whole prop board closed.
+    prop_board_error: str | None = None
+    if team_errors:
+        detail = ";".join(
+            f"{side}={team_errors[side]}"
+            for side in sorted(team_errors)
+        )
+        prop_board_error = f"GAME_PROP_SIMULATION_INCOMPLETE:{detail}"
+
     prop_rows: list[dict[str, Any]] = []
     for request in prop_requests:
         side = str(request.get("team") or "").strip().lower()
@@ -494,6 +511,9 @@ def run_unified_nfl_model(
         }
         if side not in {"home", "away"}:
             prop_rows.append({**base, "status": "NO_MODEL", "reason": "PROP_TEAM_SIDE_REQUIRED"})
+            continue
+        if prop_board_error is not None:
+            prop_rows.append({**base, "status": "NO_MODEL", "reason": prop_board_error})
             continue
         if market in TD_PROP_MARKETS and td_path_error is not None:
             prop_rows.append({**base, "status": "NO_MODEL", "reason": td_path_error})
@@ -539,6 +559,15 @@ def run_unified_nfl_model(
         },
         "game_markets": game_rows,
         "prop_markets": prop_rows,
+        "prop_board_status": (
+            "NOT_REQUIRED"
+            if not prop_requests
+            else "NO_MODEL"
+            if prop_board_error is not None
+            else "AVAILABLE"
+        ),
+        "prop_board_error": prop_board_error,
+        "team_simulation_errors": dict(sorted(team_errors.items())),
         "authority": {
             "research_only": True,
             "creates_model_p": False,
