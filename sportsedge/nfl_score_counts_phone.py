@@ -88,6 +88,159 @@ def _meta(
     }
 
 
+_PROP_FAMILY = {
+    "pass_attempts": "PASS_VOLUME",
+    "completions": "PASS_VOLUME",
+    "passing_yards": "PASS_VOLUME",
+    "receptions": "RECEIVING_VOLUME",
+    "receiving_yards": "RECEIVING_VOLUME",
+    "rush_attempts": "RUSH_VOLUME",
+    "rushing_yards": "RUSH_VOLUME",
+    "rush_receiving_yards": "COMBINED_YARDS",
+    "pass_tds": "PASS_SCORING",
+    "interceptions": "TURNOVERS",
+    "receiving_tds": "TD_SCORING",
+    "rushing_tds": "TD_SCORING",
+    "anytime_tds": "TD_SCORING",
+}
+_PROP_FAMILY_CONFLICTS = {
+    "PASS_VOLUME": {"PASS_VOLUME"},
+    "RECEIVING_VOLUME": {"RECEIVING_VOLUME", "COMBINED_YARDS"},
+    "RUSH_VOLUME": {"RUSH_VOLUME", "COMBINED_YARDS"},
+    "COMBINED_YARDS": {"RECEIVING_VOLUME", "RUSH_VOLUME", "COMBINED_YARDS"},
+    "PASS_SCORING": {"PASS_SCORING"},
+    "TURNOVERS": {"TURNOVERS"},
+    "TD_SCORING": {"TD_SCORING"},
+}
+_MAX_SELECTED_PLAYER_PROPS_PER_GAME = 6
+_MAX_SELECTED_PROP_FAMILIES_PER_PLAYER = 2
+
+
+def _selection_rank(row: Mapping[str, Any]) -> tuple[float, float, float, int]:
+    return (
+        float(row.get("ev_per_dollar") or float("-inf")),
+        float(row.get("edge_probability_points") or float("-inf")),
+        float(row.get("score_0_100") or float("-inf")),
+        -int(row.get("input_index") or 0),
+    )
+
+
+def _apply_prop_selection_policy(
+    rows: list[dict[str, Any]],
+    raw_game: Mapping[str, Any],
+) -> dict[str, Any]:
+    prop_indexes = {
+        i for i, raw in enumerate(raw_game.get("markets") or [])
+        if isinstance(raw, Mapping) and str(raw.get("player") or "").strip()
+    }
+    candidates = [
+        row for row in rows
+        if row.get("selected")
+        and int(row.get("input_index", -1)) in prop_indexes
+        and str(row.get("player") or "").strip()
+    ]
+    for row in candidates:
+        row["pair_selected"] = True
+
+    used_families: dict[str, set[str]] = {}
+    player_kept: dict[str, int] = {}
+    kept = 0
+    suppressed: list[dict[str, str]] = []
+    for row in sorted(candidates, key=_selection_rank, reverse=True):
+        player = str(row.get("player") or "").strip()
+        market = str(row.get("market") or "").strip().lower()
+        family = _PROP_FAMILY.get(market, market.upper() or "OTHER")
+        conflicts = _PROP_FAMILY_CONFLICTS.get(family, {family})
+        prior = used_families.setdefault(player, set())
+
+        reason = None
+        if prior.intersection(conflicts):
+            reason = "CORRELATED_PLAYER_FAMILY"
+        elif player_kept.get(player, 0) >= _MAX_SELECTED_PROP_FAMILIES_PER_PLAYER:
+            reason = "PLAYER_PROP_EXPOSURE_CAP"
+        elif kept >= _MAX_SELECTED_PLAYER_PROPS_PER_GAME:
+            reason = "PROP_CARD_DISPLAY_CAP"
+
+        if reason is not None:
+            row["selected"] = False
+            row["selection_suppressed_reason"] = reason
+            suppressed.append({
+                "player": player,
+                "market": market,
+                "reason": reason,
+            })
+            continue
+
+        kept += 1
+        player_kept[player] = player_kept.get(player, 0) + 1
+        prior.add(family)
+
+    return {
+        "candidate_pair_selections": len(candidates),
+        "served_prop_selections": kept,
+        "max_player_props_per_game": _MAX_SELECTED_PLAYER_PROPS_PER_GAME,
+        "max_prop_families_per_player": _MAX_SELECTED_PROP_FAMILIES_PER_PLAYER,
+        "forces_team_balance": False,
+        "forces_over_under_balance": False,
+        "suppressed": suppressed,
+    }
+
+
+def _prop_selection_diagnostics(
+    rows: Sequence[Mapping[str, Any]],
+    raw_game: Mapping[str, Any],
+) -> dict[str, Any]:
+    prop_indexes = {
+        i for i, raw in enumerate(raw_game.get("markets") or [])
+        if isinstance(raw, Mapping) and str(raw.get("player") or "").strip()
+    }
+    priced = [
+        row for row in rows
+        if int(row.get("input_index", -1)) in prop_indexes
+        and row.get("status") == "PRICED"
+    ]
+    selected = [row for row in priced if row.get("selected")]
+
+    teams = {
+        str(row.get("team") or "").strip().lower()
+        for row in priced
+        if str(row.get("team") or "").strip().lower() in {"home", "away"}
+    }
+    selected_teams = {
+        str(row.get("team") or "").strip().lower()
+        for row in selected
+        if str(row.get("team") or "").strip().lower() in {"home", "away"}
+    }
+    direction_counts = {"OVER": 0, "UNDER": 0}
+    for row in selected:
+        value = str(row.get("selection") or "").strip().lower()
+        if value.endswith(" over") or value == "over":
+            direction_counts["OVER"] += 1
+        elif value.endswith(" under") or value == "under":
+            direction_counts["UNDER"] += 1
+
+    alerts: list[str] = []
+    n_selected = len(selected)
+    if len(teams) >= 2 and n_selected >= 4 and len(selected_teams) == 1:
+        alerts.append("ALL_SELECTED_PROPS_ONE_TEAM_WITH_TWO_TEAM_PRICING")
+    if n_selected >= 6:
+        if direction_counts["UNDER"] / n_selected >= 0.80:
+            alerts.append("SELECTED_PROP_DIRECTION_CONCENTRATED_UNDER")
+        if direction_counts["OVER"] / n_selected >= 0.80:
+            alerts.append("SELECTED_PROP_DIRECTION_CONCENTRATED_OVER")
+
+    return {
+        "priced_prop_rows": len(priced),
+        "selected_prop_rows": n_selected,
+        "priced_sides": sorted(teams),
+        "selected_sides": sorted(selected_teams),
+        "selected_direction_counts": direction_counts,
+        "alerts": alerts,
+        "review_required": bool(alerts),
+        "selection_changed_by_diagnostic": False,
+    }
+
+
 def build_score_count_phone_card(
     ticket: Mapping[str, Any],
     *,
@@ -396,6 +549,8 @@ def build_score_count_phone_card(
             ))
 
         _mark_pair_selections(rows)
+        prop_selection_policy = _apply_prop_selection_policy(rows, raw_game)
+        prop_selection_diagnostics = _prop_selection_diagnostics(rows, raw_game)
         rows.sort(key=lambda row: (int(row["input_index"]), int(row["side_index"])))
         means = prediction_game.get("means") or {}
         games_out.append({
@@ -424,6 +579,8 @@ def build_score_count_phone_card(
             },
             "role_status": "AVAILABLE" if not effective_role_error else "NO_MODEL",
             "role_error": effective_role_error,
+            "prop_selection_policy": prop_selection_policy,
+            "prop_selection_diagnostics": prop_selection_diagnostics,
             "rows": rows,
             "status": "PRICED_SCORE_COUNTS_RESEARCH",
         })
@@ -439,6 +596,10 @@ def build_score_count_phone_card(
         "games": games_out,
         "rows": all_rows,
         "selected_rows": [row for row in all_rows if row.get("selected")],
+        "prop_card_review_required": any(
+            bool(game.get("prop_selection_diagnostics", {}).get("review_required"))
+            for game in games_out
+        ),
         "pricing_policy": {
             "two_sided_quotes_required": True,
             "ev_floor": EV_FLOOR,
@@ -449,6 +610,9 @@ def build_score_count_phone_card(
             "model_distribution_must_predate_quote_binding": True,
             "prop_game_context_source": "NFL_SCORE_COUNTS_G1_SCORE_PATHS",
             "partial_team_simulation_fails_board": True,
+            "correlated_player_prop_expressions_are_trimmed": True,
+            "forces_team_balance": False,
+            "forces_over_under_balance": False,
         },
         "presentation_policy": {
             "market_probability_field": "market_no_vig_p",
