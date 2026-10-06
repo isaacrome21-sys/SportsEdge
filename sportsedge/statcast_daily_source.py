@@ -23,6 +23,22 @@ BASE = "https://baseballsavant.mlb.com/statcast_search/csv"
 SOURCE = "BASEBALL_SAVANT_STATCAST"
 DEFAULT_TTL_SECONDS = 36 * 60 * 60
 HARD_HIT_MPH = 95.0
+SWING_DESCRIPTIONS = frozenset({
+    "swinging_strike",
+    "swinging_strike_blocked",
+    "missed_bunt",
+    "foul",
+    "foul_tip",
+    "foul_bunt",
+    "bunt_foul_tip",
+    "hit_into_play",
+})
+WHIFF_DESCRIPTIONS = frozenset({
+    "swinging_strike",
+    "swinging_strike_blocked",
+    "missed_bunt",
+})
+OUT_OF_ZONE_CODES = frozenset({11, 12, 13, 14})
 # Baseball Savant game_date is a local MLB game date, not a UTC date. Pacific time
 # is the latest regular MLB venue timezone, so using its current calendar date as
 # the exclusive upper bound fail-closes current-day games across all MLB venues.
@@ -123,6 +139,11 @@ def _new_acc() -> dict[str, Any]:
         "release_speed_sum": 0.0,
         "release_speed_n": 0,
         "max_release_speed": None,
+        "swings": 0,
+        "whiffs": 0,
+        "out_of_zone_pitches": 0,
+        "chases": 0,
+        "pitcher_hands": set(),
         "vs_l_pa": 0,
         "vs_r_pa": 0,
         "latest_game_date": None,
@@ -185,6 +206,17 @@ def _finish(entity_id: int, acc: dict[str, Any], *, role: str, retrieved_at: dat
         "vs_l_pa": int(acc["vs_l_pa"]),
         "vs_r_pa": int(acc["vs_r_pa"]),
     }
+    if role == "PITCHER":
+        hands = sorted(acc["pitcher_hands"])
+        row.update({
+            "swings": int(acc["swings"]),
+            "whiffs": int(acc["whiffs"]),
+            "whiff_rate": rate(int(acc["whiffs"]), int(acc["swings"])),
+            "out_of_zone_pitches": int(acc["out_of_zone_pitches"]),
+            "chases": int(acc["chases"]),
+            "chase_rate": rate(int(acc["chases"]), int(acc["out_of_zone_pitches"])),
+            "pitcher_hand": hands[0] if len(hands) == 1 else None,
+        })
     return row
 
 
@@ -198,6 +230,8 @@ def aggregate_statcast(rows: Iterable[dict[str, str]], *, start_date: date, end_
         if batter is None or pitcher is None:
             continue
         event = str(row.get("events") or "").strip()
+        description = str(row.get("description") or "").strip().lower()
+        zone = _to_int(row.get("zone"))
         game_date = str(row.get("game_date") or "").strip() or None
         terminal = _terminal_event(row)
         stand = str(row.get("stand") or "").upper().strip()
@@ -252,11 +286,23 @@ def aggregate_statcast(rows: Iterable[dict[str, str]], *, start_date: date, end_
             if xslg is not None:
                 acc["xslg_sum"] += xslg
                 acc["xslg_n"] += 1
-            if role == "PITCHER" and release_speed is not None:
-                acc["release_speed_sum"] += release_speed
-                acc["release_speed_n"] += 1
-                current_max = acc["max_release_speed"]
-                acc["max_release_speed"] = release_speed if current_max is None else max(current_max, release_speed)
+            if role == "PITCHER":
+                if p_throws in {"L", "R"}:
+                    acc["pitcher_hands"].add(p_throws)
+                is_swing = description in SWING_DESCRIPTIONS
+                if is_swing:
+                    acc["swings"] += 1
+                if description in WHIFF_DESCRIPTIONS:
+                    acc["whiffs"] += 1
+                if zone in OUT_OF_ZONE_CODES:
+                    acc["out_of_zone_pitches"] += 1
+                    if is_swing:
+                        acc["chases"] += 1
+                if release_speed is not None:
+                    acc["release_speed_sum"] += release_speed
+                    acc["release_speed_n"] += 1
+                    current_max = acc["max_release_speed"]
+                    acc["max_release_speed"] = release_speed if current_max is None else max(current_max, release_speed)
 
     batter_rows = [_finish(k, v, role="BATTER", retrieved_at=retrieved_at, start_date=start_date, end_date=end_date) for k, v in batters.items()]
     pitcher_rows = [_finish(k, v, role="PITCHER", retrieved_at=retrieved_at, start_date=start_date, end_date=end_date) for k, v in pitchers.items()]

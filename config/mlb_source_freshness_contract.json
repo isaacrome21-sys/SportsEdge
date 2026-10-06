@@ -21,7 +21,7 @@
     "durable_truth_source": "data_branch",
     "run_logs_are_not_acceptance_evidence": true,
     "required_non_empty_artifacts": {
-      "statcast-daily-refresh": ["manifest.json", "batters.json", "pitchers.json"],
+      "statcast-daily-refresh": ["manifest.json", "batters.json", "pitchers.json", "provenance.json"],
       "mlb-game-context-refresh": ["manifest.json", "game_*.json"]
     },
     "promotion_rule": "collector is production-proven only after two consecutive successful executions each produce non-empty durable artifacts on the data branch and each manifest reports PASS"
