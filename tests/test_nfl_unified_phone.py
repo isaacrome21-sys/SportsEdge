@@ -5,7 +5,7 @@ import copy
 import pytest
 
 from sportsedge.nfl_lines_intake import parse_nfl_lines, tickets_to_dict
-from sportsedge.nfl_unified_phone import build_unified_phone_card
+from sportsedge.nfl_unified_phone import _name_alias_match, build_unified_phone_card
 
 
 def runtime():
@@ -434,4 +434,36 @@ def test_phone_artifact_declares_graphic_field_contract():
     assert policy["score_label_field"] == "score_label"
     assert policy["kickoff_field"] == "games[].kickoff"
     assert policy["team_records"] == "OMIT_UNLESS_EXPLICITLY_SOURCED"
+
+def test_player_alias_normalization_accepts_first_name_expansion():
+    assert _name_alias_match("Zachariah Branch", "Zach Branch")
+    assert _name_alias_match("Kyle Pitts Sr.", "Kyle Pitts")
+
+
+def test_two_team_quoted_prop_board_prices_both_teams_when_both_simulations_are_valid():
+    board = ticket(
+        """
+        Chiefs @ Ravens
+        Spread +3.5 -110 -110
+        Total 47.5 -110 -110
+        Prop "Zay Flowers" RecYards 72.5 -110 -110
+        Prop "Xavier Worthy" RecYards 65.5 -110 -110
+        """
+    )
+    out = build_unified_phone_card(
+        board,
+        history=history(),
+        schedule_games=schedule(),
+        depth_rows=depth(),
+        player_rows=player_stats(),
+        injury_source_ready=True,
+        runtime=runtime(),
+        n_sims=300,
+        seed=64,
+    )
+    props = [row for row in out["rows"] if row["market"] == "receiving_yards"]
+    assert len(props) == 4
+    assert all(row["status"] == "PRICED" for row in props)
+    assert out["games"][0]["engine"]["prop_board_status"] == "AVAILABLE"
+    assert {row["team"] for row in props} == {"home", "away"}
 
