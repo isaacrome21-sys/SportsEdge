@@ -246,7 +246,7 @@ def test_materialize_target_rejects_equal_count_different_start_identity():
                     "window_end": "2025-06-01",
                 },
                 {
-                    "schema": "MLB_PITCHER_K_PROVENANCE_V1",
+                    "schema": "MLB_PITCHER_K_HISTORICAL_STATCAST_PROVENANCE_V1",
                     "source": "BASEBALL_SAVANT_STATCAST",
                     "mode": "HISTORICAL_RECONSTRUCTION",
                     "target_date": "2025-06-01",
