@@ -97,6 +97,7 @@ def test_historical_binding_is_explicitly_not_forward_evidence():
     assert got["historical_reconstruction"] is True
     assert got["forward_evidence_eligible"] is False
     assert got["model_p_eligible"] is False
+    assert got["components"]["pitcher_skill"]["entity_id"] == "501"
     assert got["components"]["pitcher_skill"]["provenance"]["backfill"] is True
 
 
@@ -141,3 +142,21 @@ def test_row_prices_incumbent_with_shipped_engine_and_stays_research_only():
     assert row["forward_evidence_eligible"] is False
     assert row["promotion_authority"] is False
     assert "model_p" not in row
+
+
+def test_evaluation_row_rejects_cross_pitcher_skill_binding():
+    candidate = bind_historical_statcast_skill(
+        _composite(), pitcher_context=_context(), provenance=_receipt(),
+        target_date=date(2025, 6, 1),
+    )
+    with pytest.raises(PitcherKHistoricalRowError, match="pitcher identity mismatch"):
+        build_historical_evaluation_row(
+            season=2025,
+            target_date=date(2025, 6, 1),
+            game_id=777001,
+            pitcher_id=502,
+            candidate=candidate,
+            history_pool=_history(),
+            realized_strikeouts=7,
+            realized_batters_faced=25,
+        )
