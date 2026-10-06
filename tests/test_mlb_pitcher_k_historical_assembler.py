@@ -52,3 +52,65 @@ def test_assembler_rejects_nonfrozen_season_before_fetch():
             realized_strikeouts=8, realized_batters_faced=25,
         )
     source.player_rows.assert_not_called()
+
+
+def test_assembler_uses_validated_lineup_fallback_and_correct_statcast_identity(monkeypatch):
+    source = Mock()
+    source.opener = object()
+    source.player_rows.return_value = [_raw_start(i) for i in range(1, 6)]
+    joint = {
+        "strikeouts": 6, "outs": 18, "earned_runs": 1,
+        "hits_allowed": 4, "walks_allowed": 1,
+    }
+    source._pitcher_start_rows_pk.return_value = [
+        (dict(joint), date(2025, 5, i), 2, 100 + i) for i in range(1, 6)
+    ]
+    source._opp_k_payload.return_value = ({
+        "market": "PITCHER_K",
+        "beta": 1.0,
+        "target_rel": 1.05,
+        "history_rel": [1.0] * 5,
+        "opponent_team_id": 2,
+        "validated_in": "#1509",
+    }, None)
+
+    observed = {}
+    def fake_acquire(**kwargs):
+        observed["acquire"] = kwargs
+        return ({
+            "entity_id": "7", "swings": 100, "whiffs": 25, "whiff_rate": 0.25,
+            "out_of_zone_pitches": 80, "chases": 24, "chase_rate": 0.30,
+            "pitcher_hand": "R", "window_start": "2025-05-03",
+            "window_end": "2025-06-01",
+        }, {
+            "schema": "MLB_PITCHER_K_HISTORICAL_STATCAST_PROVENANCE_V1",
+            "mode": "HISTORICAL_RECONSTRUCTION",
+            "target_date": "2025-06-01",
+            "query_end_exclusive": "2025-06-01",
+            "historical_reconstruction": True,
+            "backfill": True,
+            "forward_evidence_eligible": False,
+            "promotion_authority": False,
+            "same_day_rows_included": False,
+            "future_rows_included": False,
+        })
+    monkeypatch.setattr(A, "acquire_historical_statcast_pitcher", fake_acquire)
+    monkeypatch.setattr(A, "bind_historical_statcast_skill", lambda candidate, **_: {
+        **candidate,
+        "schema": "MLB_PITCHER_K_SKILL_BOUND_CANDIDATE_V1",
+        "historical_reconstruction": True,
+        "forward_evidence_eligible": False,
+        "components": {**candidate["components"], "pitcher_skill": {"entity_id": "7"}},
+    })
+    monkeypatch.setattr(A, "build_historical_evaluation_row", lambda **kwargs: kwargs["candidate"])
+
+    got = A.assemble_historical_pitcher_k_row(
+        source=source, season=2025, target_date=date(2025, 6, 1),
+        game_id=200, pitcher_id=7, pitcher_team_id=1,
+        away_team_id=1, home_team_id=2,
+        realized_strikeouts=8, realized_batters_faced=25,
+    )
+    source._lineup_k_payload.assert_not_called()
+    assert got["components"]["lineup_k"] is None
+    assert observed["acquire"]["pitcher_id"] == 7
+    assert "entity_id" not in observed["acquire"]
