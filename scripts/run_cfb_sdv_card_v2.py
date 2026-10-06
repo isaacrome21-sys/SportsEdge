@@ -28,6 +28,7 @@ import argparse
 import json
 import os
 import sys
+from dataclasses import asdict
 from datetime import datetime, timezone
 from math import erf, sqrt
 from pathlib import Path
@@ -273,6 +274,64 @@ def projection_sane(home: float, away: float, quotes: list) -> bool:
     return True
 
 
+def _live_cache_name(season: int, week: int) -> str:
+    return f"live_{int(season)}_w{int(week)}"
+
+
+def _load_live_week_cache(season: int, week: int, now: datetime, *, load_cache=None):
+    """Load a trusted same-week market-blind bundle captured no later than now."""
+    if load_cache is None:
+        from sportsedge.sports.cfb.cfbd_issue_cache import load_cache as _load_cache
+        load_cache = _load_cache
+    from sportsedge.sports.cfb.source import CFBGame
+
+    name = _live_cache_name(season, week)
+    item = load_cache().get(name)
+    if not isinstance(item, dict):
+        return None
+    if item.get("schema") != "CFB_LIVE_WEEK_CACHE_V1":
+        return None
+    try:
+        if int(item.get("season")) != int(season) or int(item.get("week")) != int(week):
+            return None
+        captured = datetime.fromisoformat(str(item["captured_at"]).replace("Z", "+00:00"))
+        if captured.tzinfo is None or captured.utcoffset() is None:
+            return None
+        captured = captured.astimezone(timezone.utc)
+        if captured > now.astimezone(timezone.utc):
+            return None
+        games_payload = item.get("games")
+        snapshots = item.get("snapshots")
+        if not isinstance(games_payload, list) or not games_payload or not isinstance(snapshots, dict) or not snapshots:
+            return None
+        games = [CFBGame(**dict(row)) for row in games_payload if isinstance(row, dict)]
+        if not games:
+            return None
+    except Exception:
+        return None
+    print(f"CFB_SDV_LIVE_CACHE_HIT {name} captured_at={captured.isoformat()} games={len(games)} teams={len(snapshots)}")
+    return games, snapshots
+
+
+def _save_live_week_cache(season: int, week: int, now: datetime, games, snapshots, *, save_item=None) -> bool:
+    """Persist only market-blind games and candidate snapshots; never sportsbook quotes."""
+    if save_item is None:
+        from sportsedge.sports.cfb.cfbd_issue_cache import save_item as _save_item
+        save_item = _save_item
+    name = _live_cache_name(season, week)
+    payload = {
+        "schema": "CFB_LIVE_WEEK_CACHE_V1",
+        "season": int(season),
+        "week": int(week),
+        "captured_at": now.astimezone(timezone.utc).isoformat(),
+        "games": [asdict(game) for game in games],
+        "snapshots": snapshots,
+    }
+    ok = bool(save_item(name, payload))
+    if ok:
+        print(f"CFB_SDV_LIVE_CACHE_SAVED {name}")
+    return ok
+
 def market_implied_scores(quotes: list):
     """(home, away) points implied by the quoted spread and total; None if either is missing."""
     hl = tot = None
@@ -389,7 +448,13 @@ def build_rows(board: list, season: int, week: int, asof, fit_path=None):
                 pass
         return n
 
-    raw_games = fetch_cfbd_games(season=season, week=week, cfbd_api_key=key)
+    cached = _load_live_week_cache(season, week, now)
+    cache_hit = cached is not None
+    if cache_hit:
+        raw_games, snaps = cached
+    else:
+        raw_games = fetch_cfbd_games(season=season, week=week, cfbd_api_key=key)
+
     if count_hits(raw_games) == 0:
         best = (0, week, raw_games)
         for w in range(1, 17):
@@ -408,15 +473,24 @@ def build_rows(board: list, season: int, week: int, asof, fit_path=None):
         else:
             print(f"WEEK_AUTO_CORRECTED {week} -> {best[1]} ({best[0]} games matched)")
             week, raw_games = best[1], best[2]
-    try:
-        weather = fetch_cfbd_weather(season=season, week=week, cfbd_api_key=key)
-    except Exception as exc:  # CFBD weather is a paid tier; free keys get 401
-        print("WEATHER_NEUTRAL_FALLBACK", type(exc).__name__, str(exc)[:120])
-        weather = {}
-    # Missing weather -> training-mean wind/temp, outdoor: zero standardized weather effect.
-    neutral = {"game_indoor": False, "wind_speed": 6.89, "temperature": 64.6, "fallback": "TRAINING_MEAN"}
-    games = attach_weather(raw_games, {g.game_id: weather.get(g.game_id) or neutral for g in raw_games})
-    snaps = fetch_cfbd_candidate_metric_snapshots(season=season, week=week, cfbd_api_key=key, now=now)
+            cache_hit = False
+
+    if cache_hit:
+        # Cached games are already weather-attached from the original PIT run.
+        # Reuse those exact market-blind inputs instead of replacing real weather
+        # with a later neutral fallback.
+        games = raw_games
+    else:
+        try:
+            weather = fetch_cfbd_weather(season=season, week=week, cfbd_api_key=key)
+        except Exception as exc:  # CFBD weather is a paid tier; free keys get 401
+            print("WEATHER_NEUTRAL_FALLBACK", type(exc).__name__, str(exc)[:120])
+            weather = {}
+        # Missing weather -> training-mean wind/temp, outdoor: zero standardized weather effect.
+        neutral = {"game_indoor": False, "wind_speed": 6.89, "temperature": 64.6, "fallback": "TRAINING_MEAN"}
+        games = attach_weather(raw_games, {g.game_id: weather.get(g.game_id) or neutral for g in raw_games})
+        snaps = fetch_cfbd_candidate_metric_snapshots(season=season, week=week, cfbd_api_key=key, now=now)
+        _save_live_week_cache(season, week, now, games, snaps)
     for line in moment_match(snaps, training_moments(fit_path)):
         print("MOMENT_MATCH side=%s %s live_mean=%s live_sd=%s -> train_mean=%s train_sd=%s" % line)
     rows = []

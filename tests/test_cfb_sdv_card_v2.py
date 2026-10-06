@@ -1,6 +1,8 @@
 import importlib.util
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 _spec = importlib.util.spec_from_file_location(
     "cfb_sdv_card_v2",
@@ -116,6 +118,87 @@ class BlockedCardTest(unittest.TestCase):
         self.assertEqual(len(leans), 1)
         self.assertEqual(leans[0]["reason"], "MODEL_EDGE_NOT_VALIDATED_VS_CLOSE")
         self.assertEqual(card.VALIDATED_MARKETS, frozenset())
+
+
+class LiveWeekCacheTest(unittest.TestCase):
+    def _game(self, *, weather=None):
+        from sportsedge.sports.cfb.source import CFBGame
+        return CFBGame(
+            game_id="g1",
+            season=2026,
+            week=6,
+            start_ts="2026-10-10T16:00:00Z",
+            home_team="Home",
+            away_team="Away",
+            neutral_site=False,
+            weather=weather,
+        )
+
+    def test_future_capture_is_rejected(self):
+        game = self._game()
+        payload = {
+            "schema": "CFB_LIVE_WEEK_CACHE_V1",
+            "season": 2026,
+            "week": 6,
+            "captured_at": "2026-10-06T15:01:00+00:00",
+            "games": [game.__dict__],
+            "snapshots": {"Home": {"prior": {}, "current": {}}},
+        }
+        got = card._load_live_week_cache(
+            2026,
+            6,
+            datetime(2026, 10, 6, 15, 0, tzinfo=timezone.utc),
+            load_cache=lambda: {"live_2026_w6": payload},
+        )
+        self.assertIsNone(got)
+
+    def test_saved_bundle_is_market_blind(self):
+        captured = {}
+        def save(name, payload):
+            captured["name"] = name
+            captured["payload"] = payload
+            return True
+
+        ok = card._save_live_week_cache(
+            2026,
+            6,
+            datetime(2026, 10, 6, 15, 0, tzinfo=timezone.utc),
+            [self._game()],
+            {"Home": {"prior": {"off_ppa_rush": 0.1}, "current": {"off_ppa_rush": 0.2}}},
+            save_item=save,
+        )
+        self.assertTrue(ok)
+        self.assertEqual(captured["name"], "live_2026_w6")
+        encoded = __import__("json").dumps(captured["payload"], sort_keys=True).lower()
+        self.assertNotIn("quote", encoded)
+        self.assertNotIn("odds", encoded)
+        self.assertNotIn("spread", encoded)
+        self.assertNotIn("total", encoded)
+
+    def test_build_rows_cache_hit_skips_cfbd_fetches(self):
+        game = self._game(weather={"wind_speed": 17.0, "temperature": 55.0, "game_indoor": False})
+        snaps = {
+            "Home": {"prior": {k: 0.0 for k in card.TEAM_KEYS}, "current": {k: 0.0 for k in card.TEAM_KEYS}},
+            "Away": {"prior": {k: 0.0 for k in card.TEAM_KEYS}, "current": {k: 0.0 for k in card.TEAM_KEYS}},
+        }
+        board = [{"game_id": "g1", "quotes": []}]
+
+        with patch.dict("os.environ", {"CFBD_API_KEY": "test"}, clear=False), \
+             patch.object(card, "_load_live_week_cache", return_value=([game], snaps)), \
+             patch.object(card, "training_moments", return_value={k: (0.0, 1.0) for k in card.TEAM_KEYS}), \
+             patch.object(card, "moment_match", return_value=[]), \
+             patch("sportsedge.sports.cfb.source.fetch_cfbd_games", side_effect=AssertionError("games fetch must be skipped")), \
+             patch("sportsedge.sports.cfb.source.fetch_cfbd_weather", side_effect=AssertionError("weather fetch must be skipped")), \
+             patch("sportsedge.sports.cfb.candidate_live_source.fetch_cfbd_candidate_metric_snapshots", side_effect=AssertionError("metrics fetch must be skipped")), \
+             patch("sportsedge.sports.cfb.source.attach_weather", side_effect=AssertionError("cached weather must be reused exactly")), \
+             patch("sportsedge.sports.cfb.candidate_live_source.attach_candidate_snapshots_to_game_row", side_effect=lambda base, **_: base):
+            rows = card.build_rows(board, 2026, 6, "2026-10-06T15:00:00Z", fit_path="unused")
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["game_id"], "g1")
+        self.assertEqual(rows[0]["weather"]["wind_speed"], 17.0)
+        self.assertEqual(rows[0]["weather"]["temperature"], 55.0)
+
 
 
 class MarketOnlyFallbackTest(unittest.TestCase):
