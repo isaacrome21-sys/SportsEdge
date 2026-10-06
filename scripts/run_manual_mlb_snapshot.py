@@ -8,6 +8,7 @@ from pathlib import Path
 from sportsedge.canonical_manual_mlb import CanonicalManualMLBError, run_canonical_manual_mlb
 from sportsedge.manual_mlb_snapshot import run_manual_mlb_snapshot
 from sportsedge.manual_quote_live import partition_live_rows, validate_live_rows
+from sportsedge.mlb_history_cache import MLBHistoryCachedOpener
 from sportsedge.mlb_schedule_filter import filter_schedule_to_game_pk
 from sportsedge.mlb_source import GameSnapshot
 from sportsedge.runtime import parse_timestamp
@@ -41,14 +42,41 @@ def _empty_payload() -> dict:
     }
 
 
-def _price_game(game_rows, *, history_cache_dir: str, schedule: list[GameSnapshot] | None):
+def _price_game(
+    game_rows,
+    *,
+    history_cache_dir: str,
+    schedule: list[GameSnapshot] | None,
+    history_opener: MLBHistoryCachedOpener | None = None,
+):
     if schedule is None:
-        return run_canonical_manual_mlb(game_rows, history_cache_dir=history_cache_dir, schedule=None)
+        return run_canonical_manual_mlb(
+            game_rows,
+            history_cache_dir=history_cache_dir,
+            schedule=None,
+            history_opener=history_opener,
+        )
     game_pk = game_rows[0].get("game_pk") if game_rows else None
     if game_pk in (None, ""):
         raise CanonicalManualMLBError("GAME_UNBOUND")
     scoped = filter_schedule_to_game_pk(schedule, game_pk)
-    return run_canonical_manual_mlb(game_rows, history_cache_dir=history_cache_dir, schedule=scoped)
+    return run_canonical_manual_mlb(
+        game_rows,
+        history_cache_dir=history_cache_dir,
+        schedule=scoped,
+        history_opener=history_opener,
+    )
+
+
+def _history_observation_date(game_rows):
+    observed = []
+    for row in game_rows:
+        if not isinstance(row, dict) or not row.get("observed_at"):
+            raise CanonicalManualMLBError("MANUAL_OBSERVED_AT_MISSING")
+        observed.append(parse_timestamp(row["observed_at"]).astimezone(timezone.utc))
+    if not observed:
+        raise CanonicalManualMLBError("MANUAL_ROWS_EMPTY")
+    return max(observed).date()
 
 
 def _run_canonical_rows(rows, *, history_cache_dir: str, schedule: list[GameSnapshot] | None = None):
@@ -59,9 +87,23 @@ def _run_canonical_rows(rows, *, history_cache_dir: str, schedule: list[GameSnap
     results = []
     blocked: list[dict] = []
     last_ok = None
+    history_openers: dict[object, MLBHistoryCachedOpener] = {}
     for game_id, game_rows in grouped.items():
         try:
-            payload = _price_game(game_rows, history_cache_dir=history_cache_dir, schedule=schedule)
+            observed_date = _history_observation_date(game_rows)
+            history_opener = history_openers.get(observed_date)
+            if history_opener is None:
+                history_opener = MLBHistoryCachedOpener(
+                    target_date=observed_date,
+                    cache_dir=history_cache_dir,
+                )
+                history_openers[observed_date] = history_opener
+            payload = _price_game(
+                game_rows,
+                history_cache_dir=history_cache_dir,
+                schedule=schedule,
+                history_opener=history_opener,
+            )
         except (CanonicalManualMLBError, ValueError) as exc:
             blocked.append({"game_id": game_id, "reason": str(exc)})
             continue

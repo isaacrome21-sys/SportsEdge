@@ -228,7 +228,8 @@ def _pair(row: ManualQuote, market: str, entity_id: str, *, resolved_game_id: st
 
 def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlopen, registry_path="config/deployments.json",
                              edge_floor_config_path="config/truth_gate_floors.json", kelly_multiplier=0.25,
-                             history_cache_dir: str|Path|None=None, schedule: Iterable[GameSnapshot] | None = None) -> dict[str, Any]:
+                             history_cache_dir: str|Path|None=None, schedule: Iterable[GameSnapshot] | None = None,
+                             history_opener: MLBHistoryCachedOpener | None = None) -> dict[str, Any]:
     raw = list(rows)
     if not raw: raise CanonicalManualMLBError("manual rows must be non-empty")
     parsed = [validate_manual_quote(r) for r in raw]
@@ -244,7 +245,12 @@ def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlope
                     TeamLineup(g.away_id,"away",away_projected,(),False),TeamLineup(g.home_id,"home",home_projected,(),False),
                     g.game_number,g.double_header,g.venue_id,g.official_date,g.status)
     captured = max(r.observed_at for r in parsed).astimezone(timezone.utc)
-    hist = MLBAllMarketHistorySource(opener=MLBHistoryCachedOpener(target_date=captured.date(),cache_dir=history_cache_dir,opener=opener), retrieved_at=captured)
+    cached_history_opener = history_opener or MLBHistoryCachedOpener(
+        target_date=captured.date(), cache_dir=history_cache_dir, opener=opener
+    )
+    if cached_history_opener.target_date != captured.date():
+        raise CanonicalManualMLBError("HISTORY_OPENER_TARGET_DATE_MISMATCH")
+    hist = MLBAllMarketHistorySource(opener=cached_history_opener, retrieved_at=captured)
     target_date = datetime.fromisoformat(str(g.official_date)).date() if g.official_date else captured.date()
     quotes, features, resolutions, seen = [], [], [], set()
     blocked_subject_rows: list[dict[str, Any]] = []
