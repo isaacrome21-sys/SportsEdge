@@ -1,6 +1,6 @@
 # MLB pitcher-K workload candidate v1
 
-Status: **research only — not deployed, not Model_P input**.
+Status: **research only — not deployed and not eligible for production probability input**.
 
 This is the first implementation step under the pitcher-K refinement frozen in
 `config/research/mlb_card_postmortem_refinement_v1.json`. It does not choose a
