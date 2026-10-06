@@ -182,6 +182,40 @@ class CeilingAndLabelTests(unittest.TestCase):
         self.assertNotIn("| Score |", text)
         self.assertIn("internal qualification score", text)
 
+    def test_final_markdown_has_one_card_with_core_and_prop_quick_views(self):
+        payload = {"results": [
+            _row("MONEYLINE", "AWAY", 120, 0.50, fair=0.44, edge=0.06),
+            _row("MONEYLINE", "HOME", -142, 0.50, fair=0.56, edge=-0.06),
+            {**_row("PITCHER_K", "OVER", 110, 0.60, line=5.5, entity="p1", fair=0.48, edge=0.12),
+             "entity_name": "Pitcher One",
+             "engine_version": "mlb_pitcher_joint_empirical_bayes_v3",
+             "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 6, "pushes": 0,
+                                    "weighted": False, "pool_sha256": "pitcher"}},
+            {**_row("PITCHER_K", "UNDER", -130, 0.40, line=5.5, entity="p1", fair=0.52, edge=-0.12),
+             "entity_name": "Pitcher One",
+             "engine_version": "mlb_pitcher_joint_empirical_bayes_v3",
+             "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 4, "pushes": 0,
+                                    "weighted": False, "pool_sha256": "pitcher"}},
+            {**_row("HITS", "OVER", 110, 0.60, line=0.5, entity="h1", fair=0.48, edge=0.12),
+             "entity_name": "Hitter One",
+             "engine_version": "mlb_hitter_joint_empirical_bayes_v6_long_window_prior",
+             "empirical_evidence": {"sample_size": 30, "sample_unit": "games", "wins": 18, "pushes": 0,
+                                    "weighted": False, "pool_sha256": "hitter"}},
+            {**_row("HITS", "UNDER", -130, 0.40, line=0.5, entity="h1", fair=0.52, edge=-0.12),
+             "entity_name": "Hitter One",
+             "engine_version": "mlb_hitter_joint_empirical_bayes_v6_long_window_prior",
+             "empirical_evidence": {"sample_size": 30, "sample_unit": "games", "wins": 12, "pushes": 0,
+                                    "weighted": False, "pool_sha256": "hitter"}},
+        ]}
+        text = render_markdown(myspari_rows(payload, names={"p1": "Pitcher One", "h1": "Hitter One"}), header="t")
+        self.assertIn("## Core plays", text)
+        self.assertIn("## Top pitcher-prop leans", text)
+        self.assertIn("## Top hitter-prop leans", text)
+        self.assertIn("## Full board", text)
+        self.assertIn("Pitcher One", text)
+        self.assertIn("Hitter One", text)
+        self.assertNotIn("| Score |", text)
+
     def test_input_board_note_names_the_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             engine = Path(tmp) / "engine.json"
