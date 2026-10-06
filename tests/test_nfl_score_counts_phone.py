@@ -482,30 +482,73 @@ def test_score_count_prop_selection_trims_same_player_pass_volume_duplicates():
     assert policy["forces_over_under_balance"] is False
 
 
-def test_score_count_prop_selection_caps_six_independent_props_without_rebalancing():
+def test_score_count_prop_selection_has_no_arbitrary_global_prop_count_cap():
+    specs = [
+        ("P0", "passing_yards"),
+        ("P1", "receiving_yards"),
+        ("P2", "rushing_yards"),
+        ("P3", "rush_attempts"),
+        ("P4", "pass_tds"),
+        ("P5", "anytime_tds"),
+        ("P6", "interceptions"),
+    ]
     raw_game = {
         "markets": [
-            {"player": f"P{i}", "market": "receiving_yards"}
-            for i in range(7)
+            {"player": player, "market": market}
+            for player, market in specs
         ]
     }
     rows = [
         {
-            "input_index": i, "player": f"P{i}", "team": "away",
-            "market": "receiving_yards", "status": "PRICED", "selected": True,
-            "selection": f"P{i} Under", "ev_per_dollar": 0.20 - i * 0.01,
+            "input_index": i, "player": player, "team": "away",
+            "market": market, "status": "PRICED", "selected": True,
+            "selection": f"{player} Under", "ev_per_dollar": 0.20 - i * 0.01,
             "edge_probability_points": 0.20 - i * 0.01, "score_0_100": 88,
         }
-        for i in range(7)
+        for i, (player, market) in enumerate(specs)
     ]
     policy = _apply_prop_selection_policy(rows, raw_game)
     kept = [row for row in rows if row.get("selected")]
-    assert len(kept) == 6
+    assert len(kept) == 7
+    assert policy["global_prop_count_cap"] is None
+    assert policy["suppressed"] == []
+    assert policy["forces_team_balance"] is False
+    assert policy["forces_over_under_balance"] is False
+
+
+def test_score_count_prop_selection_caps_same_team_offense_cluster_not_other_team():
+    raw_game = {
+        "markets": [
+            {"player": f"ATL{i}", "market": "receiving_yards"}
+            for i in range(4)
+        ] + [
+            {"player": "NO1", "market": "receiving_yards"},
+        ]
+    }
+    rows = [
+        {
+            "input_index": i, "player": f"ATL{i}", "team": "away",
+            "market": "receiving_yards", "status": "PRICED", "selected": True,
+            "selection": f"ATL{i} Under", "ev_per_dollar": 0.20 - i * 0.01,
+            "edge_probability_points": 0.20 - i * 0.01, "score_0_100": 88,
+        }
+        for i in range(4)
+    ] + [{
+        "input_index": 4, "player": "NO1", "team": "home",
+        "market": "receiving_yards", "status": "PRICED", "selected": False,
+        "selection": "NO1 Over", "ev_per_dollar": -0.03,
+        "edge_probability_points": -0.02, "score_0_100": 88,
+    }]
+    policy = _apply_prop_selection_policy(rows, raw_game)
+    kept = [row for row in rows if row.get("selected")]
+    assert len(kept) == 2
     assert all(row["team"] == "away" for row in kept)
     assert all(str(row["selection"]).endswith("Under") for row in kept)
-    suppressed = [row for row in rows if not row.get("selected")]
-    assert len(suppressed) == 1
-    assert suppressed[0]["selection_suppressed_reason"] == "PROP_CARD_DISPLAY_CAP"
+    suppressed = [
+        row for row in rows
+        if row.get("selection_suppressed_reason") == "CORRELATED_TEAM_OFFENSE_CLUSTER"
+    ]
+    assert len(suppressed) == 2
     assert policy["forces_team_balance"] is False
     assert policy["forces_over_under_balance"] is False
 
