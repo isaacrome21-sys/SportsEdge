@@ -1,0 +1,64 @@
+{
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_EVAL_ATTEMPT1_RECOVERY_V1",
+  "status": "ARMED_SINGLE_RECOVERY_MAIN_PUSH",
+  "candidate_family": "RIDGE_LOGIT_K_RATE_BETA_BINOMIAL_V1",
+  "attempt_number": 1,
+  "recovery_number": 1,
+  "confirmation": "RECOVER_MLB_PITCHER_K_EVAL_ATTEMPT_1_AFTER_PRE_EVALUATION_DUPLICATE_FAILURE",
+  "prior_run": {
+    "workflow_run_id": 37510907585,
+    "code_head_sha": "da832d1284dbc791bbe3d169ed93b4fda1d03f54",
+    "conclusion": "failure",
+    "failure_stage": "PRE_EVALUATION_ROW_VALIDATION",
+    "failure_reason": "DUPLICATE_SEASON_GAME_PITCHER_ROW",
+    "candidate_scored": false,
+    "evaluation_runner_entered": true,
+    "candidate_probability_evaluator_called": false,
+    "materialized_rows": 7269,
+    "eligible_rows_by_season": {
+      "2023": 2321,
+      "2024": 2426,
+      "2025": 2522
+    },
+    "duplicate_identities": 37,
+    "extra_duplicate_rows": 38,
+    "uploaded_artifact_id": 11434899435,
+    "uploaded_artifact_zip_sha256": "f4abbd39949717b0c9f5d4c224e4a389edce0d80284110d708591ff99de2ac2d"
+  },
+  "repair_contract": {
+    "duplicate_identity_normalization_only": true,
+    "conflicting_duplicates_fail_closed": true,
+    "ordered_prior_start_identity_alignment_required": true,
+    "model_formula_changed": false,
+    "hyperparameter_grid_changed": false,
+    "season_split_changed": false,
+    "evaluation_thresholds_changed": false,
+    "sportsbook_inputs_changed": false,
+    "no_post_readout_tuning": true
+  },
+  "materializer": "scripts/materialize_mlb_pitcher_k_evaluation_rows.py",
+  "evaluator": "sportsedge.mlb_pitcher_k_evaluation_runner.run_file",
+  "prereg": "config/research/mlb_pitcher_k_probability_prereg_v1.json",
+  "rules": {
+    "trigger_only_when_this_marker_lands_on_main": true,
+    "attempt_1_recovery_only": true,
+    "candidate_specific_historical_test": true,
+    "historical_backfill_is_not_forward_evidence": true,
+    "require_no_existing_attempt1_data_receipt": true,
+    "forward_evidence": false,
+    "model_p": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "no_sportsbook_price_as_model_feature": true
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "truth_gate": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "bettor_facing_release": false
+  }
+}
