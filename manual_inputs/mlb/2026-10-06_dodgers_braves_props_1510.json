@@ -1,0 +1,47 @@
+{
+  "capture_note": "Current DraftKings paired pitcher props captured from DraftKings Network/RotoWire public DK feeds around 2026-10-06 15:10 CT.",
+  "rows": [
+    {
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
+      "market_type": "PITCHER_K",
+      "side": "OVER",
+      "line": 7.5,
+      "price": 109,
+      "paired_side": "UNDER",
+      "paired_price": -141,
+      "book": "draftkings",
+      "observed_at": "2026-10-06T15:10:00-05:00",
+      "first_pitch_at": "2026-10-06T17:00:00-05:00",
+      "source": "MANUAL",
+      "subject_name": "Chris Sale"
+    },
+    {
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
+      "market_type": "PITCHER_OUTS",
+      "side": "OVER",
+      "line": 18.5,
+      "price": 153,
+      "paired_side": "UNDER",
+      "paired_price": -206,
+      "book": "draftkings",
+      "observed_at": "2026-10-06T15:10:00-05:00",
+      "first_pitch_at": "2026-10-06T17:00:00-05:00",
+      "source": "MANUAL",
+      "subject_name": "Chris Sale"
+    },
+    {
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
+      "market_type": "PITCHER_K",
+      "side": "OVER",
+      "line": 6.5,
+      "price": 117,
+      "paired_side": "UNDER",
+      "paired_price": -138,
+      "book": "draftkings",
+      "observed_at": "2026-10-06T15:10:00-05:00",
+      "first_pitch_at": "2026-10-06T17:00:00-05:00",
+      "source": "MANUAL",
+      "subject_name": "Yoshinobu Yamamoto"
+    }
+  ]
+}
