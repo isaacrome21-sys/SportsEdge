@@ -802,7 +802,7 @@ def test_correlation_policy_never_forces_opposite_team_or_opposite_direction():
     assert policy["forces_team_balance"] is False
     assert policy["forces_over_under_balance"] is False
 
-def test_runner_signed_yardage_compatibility_copy_is_narrow_and_audited():
+def test_runner_signed_yardage_compatibility_copy_is_micro_sample_only():
     source = [
         {
             "player_id": "cj",
@@ -812,23 +812,26 @@ def test_runner_signed_yardage_compatibility_copy_is_narrow_and_audited():
             "recent_team": "NO",
             "receptions": "1",
             "receiving_yards": "-2",
-            "rushing_yards": "11",
-            "passing_yards": "0",
+            "rushing_yards": "-3",
+            "passing_yards": "-1",
         },
         {
-            "player_id": "ok",
-            "player_name": "Healthy",
+            "player_id": "large",
+            "player_name": "Large Negative Sample",
             "season": "2026",
             "week": "3",
-            "recent_team": "ATL",
-            "receiving_yards": "22",
+            "recent_team": "NO",
+            "receptions": "5",
+            "receiving_yards": "-4",
+            "rushing_yards": "11",
         },
     ]
     adapted, receipts = _adapt_signed_yardage_for_nonnegative_v1(source)
     assert source[0]["receiving_yards"] == "-2"
     assert adapted[0]["receiving_yards"] == 0.0
-    assert adapted[0]["rushing_yards"] == "11"
-    assert adapted[1]["receiving_yards"] == "22"
+    assert adapted[0]["rushing_yards"] == "-3"
+    assert adapted[0]["passing_yards"] == "-1"
+    assert adapted[1]["receiving_yards"] == "-4"
     assert receipts == [{
         "player_id": "cj",
         "player_name": "CJ Donaldson",
@@ -836,8 +839,8 @@ def test_runner_signed_yardage_compatibility_copy_is_narrow_and_audited():
         "week": "3",
         "team": "NO",
         "field": "receiving_yards",
+        "receptions": 1.0,
         "source_value": -2.0,
         "model_input_value": 0.0,
-        "reason": "FROZEN_V1_NONNEGATIVE_EFFICIENCY_COMPATIBILITY",
+        "reason": "FROZEN_V1_NEGATIVE_RECEIVING_MICRO_SAMPLE_COMPATIBILITY",
     }]
-
