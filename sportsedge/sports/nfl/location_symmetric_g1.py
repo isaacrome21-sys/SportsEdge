@@ -290,13 +290,34 @@ class NFLSymmetricLocationG1:
     total_alpha: float
     train_seasons: tuple[int, ...]
 
+    @staticmethod
+    def _raw_space_intercept(
+        coefficients: tuple[float, ...],
+        means: tuple[float, ...],
+        scales: tuple[float, ...],
+    ) -> float:
+        beta = np.asarray(coefficients[1:], dtype=float)
+        mu = np.asarray(means, dtype=float)
+        sigma = np.asarray(scales, dtype=float)
+        return float(coefficients[0] - np.sum(beta * mu / sigma))
+
     @property
     def margin_intercept(self) -> float:
-        return float(self.margin_coefficients[0])
+        """Raw-space home-field constant when every differential feature is zero."""
+        return self._raw_space_intercept(
+            self.margin_coefficients,
+            self.margin_feature_means,
+            self.margin_feature_scales,
+        )
 
     @property
     def total_intercept(self) -> float:
-        return float(self.total_coefficients[0])
+        """Raw-space total constant when every symmetric feature is zero."""
+        return self._raw_space_intercept(
+            self.total_coefficients,
+            self.total_feature_means,
+            self.total_feature_scales,
+        )
 
     def predict(self, row: Mapping[str, Any]) -> tuple[float, float]:
         margin_fit = _ComponentFit(
