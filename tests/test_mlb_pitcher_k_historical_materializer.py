@@ -144,7 +144,7 @@ def test_materialize_target_rejects_equal_count_different_start_identity(monkeyp
         def player_rows(self, **kwargs):
             return prior
         def _opp_k_payload(self, **kwargs):
-            return ({"opponent_team_id": 20, "target_rel": 1.0}, None)
+            return ({"market": "PITCHER_K", "opponent_team_id": 20, "target_rel": 1.0}, None)
         def pitcher_joint_history(self, **kwargs):
             return [x[0] for x in aligned]
         def _pitcher_start_rows_pk(self, **kwargs):
