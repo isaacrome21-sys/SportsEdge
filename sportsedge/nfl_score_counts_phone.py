@@ -131,32 +131,45 @@ def build_score_count_phone_card(
         prop_inputs = [row for row in markets if str(row.get("player") or "").strip()]
         home_model = away_model = None
         role_error: str | None = None
+        role_errors_by_side: dict[str, str] = {}
+        hinted_teams = {
+            str(row.get("team") or "").strip().upper()
+            for row in prop_inputs
+            if str(row.get("team") or "").strip().upper() in {home, away}
+        }
+        every_prop_hinted = bool(prop_inputs) and all(
+            str(row.get("team") or "").strip().upper() in {home, away}
+            for row in prop_inputs
+        )
+        requested_model_sides = (
+            hinted_teams
+            if every_prop_hinted
+            else ({home, away} if prop_inputs else set())
+        )
+
         if prop_inputs and not injury_source_ready:
             role_error = "INJURY_SOURCE_REQUIRED_FOR_LIVE_PROPS"
         elif prop_inputs:
-            try:
-                home_model = build_live_team_model(
-                    team=home,
-                    target_season=int(schedule["season"]),
-                    target_week=int(schedule["week"]),
-                    kickoff=kickoff,
-                    observed_at=observed,
-                    depth_rows=depth_rows,
-                    player_rows=player_rows,
-                    injury_rows=injury_rows,
-                )
-                away_model = build_live_team_model(
-                    team=away,
-                    target_season=int(schedule["season"]),
-                    target_week=int(schedule["week"]),
-                    kickoff=kickoff,
-                    observed_at=observed,
-                    depth_rows=depth_rows,
-                    player_rows=player_rows,
-                    injury_rows=injury_rows,
-                )
-            except Exception as exc:
-                role_error = str(exc)
+            for side_name, team_name in (("home", home), ("away", away)):
+                if team_name not in requested_model_sides:
+                    continue
+                try:
+                    model = build_live_team_model(
+                        team=team_name,
+                        target_season=int(schedule["season"]),
+                        target_week=int(schedule["week"]),
+                        kickoff=kickoff,
+                        observed_at=observed,
+                        depth_rows=depth_rows,
+                        player_rows=player_rows,
+                        injury_rows=injury_rows,
+                    )
+                    if side_name == "home":
+                        home_model = model
+                    else:
+                        away_model = model
+                except Exception as exc:
+                    role_errors_by_side[side_name] = str(exc)
 
         game_requests: list[dict[str, Any]] = []
         prop_requests: list[dict[str, Any]] = []
@@ -235,7 +248,7 @@ def build_score_count_phone_card(
             player = str(raw.get("player") or "").strip()
             if player:
                 line = float(raw["line"])
-                if role_error is not None or home_model is None or away_model is None:
+                if role_error is not None:
                     for side_index, label in enumerate(("Over", "Under")):
                         prop_meta.append({
                             **_meta(
@@ -244,7 +257,26 @@ def build_score_count_phone_card(
                                 price=prices[side_index], no_vig_p=no_vig[side_index],
                                 raw=raw_text, market=market, player=player,
                             ),
-                            "synthetic_no_model_reason": role_error or "LIVE_ROLE_MODEL_REQUIRED",
+                            "synthetic_no_model_reason": role_error,
+                        })
+                    continue
+                team_hint = str(raw.get("team") or "").strip().upper()
+                hinted_side = (
+                    "home" if team_hint == home
+                    else "away" if team_hint == away
+                    else None
+                )
+                if hinted_side in role_errors_by_side:
+                    reason = f"TEAM_ROLE_MODEL_UNAVAILABLE:{hinted_side}:{role_errors_by_side[hinted_side]}"
+                    for side_index, label in enumerate(("Over", "Under")):
+                        prop_meta.append({
+                            **_meta(
+                                pair_id=pair_id, input_index=input_index, side_index=side_index,
+                                selection=f"{player} {label}", line=line,
+                                price=prices[side_index], no_vig_p=no_vig[side_index],
+                                raw=raw_text, market=market, player=player,
+                            ),
+                            "synthetic_no_model_reason": reason,
                         })
                     continue
                 try:
@@ -377,8 +409,9 @@ def build_score_count_phone_card(
                 "prop_board_status": prop_engine.get("prop_board_status"),
                 "prop_board_error": prop_engine.get("prop_board_error"),
                 "team_simulation_errors": prop_engine.get("team_simulation_errors") or {},
+                "role_model_errors_by_side": dict(sorted(role_errors_by_side.items())),
             },
-            "role_status": "AVAILABLE" if not effective_role_error and (not prop_inputs or home_model is not None) else "NO_MODEL",
+            "role_status": "AVAILABLE" if not effective_role_error else "NO_MODEL",
             "role_error": effective_role_error,
             "rows": rows,
             "status": "PRICED_SCORE_COUNTS_RESEARCH",
