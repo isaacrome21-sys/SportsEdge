@@ -381,8 +381,8 @@ def test_runner_safety_voids_entire_two_team_prop_board_when_one_team_has_no_val
             "away": "ATL",
             "home": "NO",
             "markets": [
-                {"player": "ATL WR", "team": "ATL", "market": "receiving_yards"},
-                {"player": "NO WR", "team": "NO", "market": "receiving_yards"},
+                {"player": "ATL WR", "market": "receiving_yards"},
+                {"player": "NO WR", "market": "receiving_yards"},
             ],
         }]
     }
@@ -390,12 +390,13 @@ def test_runner_safety_voids_entire_two_team_prop_board_when_one_team_has_no_val
         "games": [{
             "rows": [
                 {
-                    "input_index": 0, "market": "receiving_yards", "status": "PRICED",
-                    "selected": True, "estimate_p": 0.70, "score_0_100": 88,
+                    "input_index": 0, "market": "receiving_yards", "team": "away",
+                    "status": "PRICED", "selected": True, "estimate_p": 0.70, "score_0_100": 88,
                 },
                 {
-                    "input_index": 1, "market": "receiving_yards", "status": "NO_MODEL",
-                    "selected": False, "reason": "ROLE_VALUE_INVALID:receiving_yards_per_reception",
+                    "input_index": 1, "market": "receiving_yards", "team": "home",
+                    "status": "NO_MODEL", "selected": False,
+                    "reason": "ROLE_VALUE_INVALID:receiving_yards_per_reception",
                 },
             ],
             "engine": {},
@@ -422,16 +423,16 @@ def test_runner_safety_keeps_two_team_board_when_both_requested_teams_price():
             "away": "ATL",
             "home": "NO",
             "markets": [
-                {"player": "ATL WR", "team": "ATL", "market": "receiving_yards"},
-                {"player": "NO WR", "team": "NO", "market": "receiving_yards"},
+                {"player": "ATL WR", "market": "receiving_yards"},
+                {"player": "NO WR", "market": "receiving_yards"},
             ],
         }]
     }
     payload = {
         "games": [{
             "rows": [
-                {"input_index": 0, "status": "PRICED", "selected": True},
-                {"input_index": 1, "status": "PRICED", "selected": False},
+                {"input_index": 0, "team": "away", "status": "PRICED", "selected": True},
+                {"input_index": 1, "team": "home", "status": "PRICED", "selected": False},
             ],
             "engine": {},
             "role_status": "AVAILABLE",
