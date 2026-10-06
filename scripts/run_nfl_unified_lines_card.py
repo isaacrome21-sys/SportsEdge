@@ -229,9 +229,9 @@ def _apply_correlation_selection_policy(game: dict, raw_game: dict) -> dict:
     """Trim the served card, never the underlying model probabilities.
 
     Pair-level selection can nominate several highly correlated expressions of
-    the same player thesis (for example QB attempts, completions and pass yards).
-    Keep the strongest expression per player/family and cap the phone card at six
-    player props.  This deliberately does NOT force team or over/under balance.
+    the same player or team-offense thesis. Keep the strongest expressions within
+    those correlation clusters. There is no arbitrary global prop-count cap, and
+    this deliberately does NOT force team or over/under balance.
     """
     prop_indexes = {
         i for i, raw in enumerate(raw_game.get("markets") or [])
@@ -312,7 +312,11 @@ def _prop_selection_diagnostics(game: dict, raw_game: dict) -> dict:
         if int(row.get("input_index", -1)) in prop_indexes
     ]
     priced = [row for row in rows if row.get("status") == "PRICED"]
-    selected = [row for row in priced if row.get("selected")]
+    pair_selected = [
+        row for row in priced
+        if row.get("pair_selected", row.get("selected", False))
+    ]
+    served_selected = [row for row in priced if row.get("selected")]
     home = str(raw_game.get("home") or "").strip().upper()
     away = str(raw_game.get("away") or "").strip().upper()
 
@@ -331,14 +335,14 @@ def _prop_selection_diagnostics(game: dict, raw_game: dict) -> dict:
     priced_teams = sorted({team_code(row) for row in priced if team_code(row) != "UNKNOWN"})
     selected_team_counts: dict[str, int] = {}
     selected_direction_counts: dict[str, int] = {}
-    for row in selected:
+    for row in pair_selected:
         team = team_code(row)
         selected_team_counts[team] = selected_team_counts.get(team, 0) + 1
         side = direction(row)
         selected_direction_counts[side] = selected_direction_counts.get(side, 0) + 1
 
     alerts: list[str] = []
-    n_selected = len(selected)
+    n_selected = len(pair_selected)
     if len(priced_teams) >= 2 and n_selected >= 4 and len({
         team for team, count in selected_team_counts.items()
         if team != "UNKNOWN" and count > 0
@@ -354,6 +358,8 @@ def _prop_selection_diagnostics(game: dict, raw_game: dict) -> dict:
 
     return {
         "priced_prop_rows": len(priced),
+        "pair_selected_prop_rows": n_selected,
+        "served_selected_prop_rows": len(served_selected),
         "selected_prop_rows": n_selected,
         "priced_teams": priced_teams,
         "selected_team_counts": dict(sorted(selected_team_counts.items())),
