@@ -108,3 +108,20 @@ def test_combined_artifact_requires_exact_frozen_seasons_and_zero_authority():
     assert got["row_count"] == 3
     assert got["forward_evidence_eligible"] is False
     assert not any(got["authority"].values())
+
+
+def test_schedule_exact_duplicate_game_entries_collapse_to_one_target_per_pitcher():
+    payload = _schedule()
+    duplicate = deepcopy(payload["dates"][0]["games"][0])
+    payload["dates"][0]["games"].append(duplicate)
+    got = targets_from_schedule(payload, season=2025)
+    assert [(x.game_id, x.pitcher_id) for x in got] == [(777, 501), (777, 601)]
+
+
+def test_schedule_conflicting_duplicate_identity_fails_closed():
+    payload = _schedule()
+    duplicate = deepcopy(payload["dates"][0]["games"][0])
+    duplicate["teams"]["away"]["team"]["id"] = 11
+    payload["dates"][0]["games"].append(duplicate)
+    with pytest.raises(PitcherKHistoricalMaterializerError, match="conflicting duplicate schedule target"):
+        targets_from_schedule(payload, season=2025)

@@ -28,5 +28,26 @@
     "staking": false,
     "official": false,
     "bettor_facing_release": false
+  },
+  "execution_retry": {
+    "retry_number": 1,
+    "prior_workflow_run_id": 37510907585,
+    "prior_failure_stage": "PRE_EVALUATION_ROW_VALIDATION",
+    "prior_failure_reason": "DUPLICATE_SEASON_GAME_PITCHER_ROW",
+    "candidate_scored": false,
+    "frozen_candidate_evaluator_called": false,
+    "model_formula_changed": false,
+    "hyperparameter_grid_changed": false,
+    "season_split_changed": false,
+    "eligibility_rule_changed": false,
+    "duplicate_identity_normalization_only": true,
+    "prior_materialized_rows": 7269,
+    "prior_eligible_rows_by_season": {
+      "2023": 2321,
+      "2024": 2426,
+      "2025": 2522
+    },
+    "prior_duplicate_identities": 37,
+    "prior_extra_duplicate_rows": 38
   }
-}
+}\n

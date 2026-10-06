@@ -115,20 +115,30 @@ def targets_from_schedule(payload: Mapping[str, Any], *, season: int) -> list[Pi
                 pitcher_id = _int((side.get("probablePitcher") or {}).get("id"))
                 if pitcher_id is None:
                     continue
-                out.append(
-                    PitcherKTarget(
-                        season=int(season),
-                        target_date=target_date,
-                        game_id=int(game_id),
-                        pitcher_id=int(pitcher_id),
-                        team_id=int(team_id),
-                        opponent_id=int(opponent_id),
-                        away_team_id=int(away_id),
-                        home_team_id=int(home_id),
-                    )
+                target = PitcherKTarget(
+                    season=int(season),
+                    target_date=target_date,
+                    game_id=int(game_id),
+                    pitcher_id=int(pitcher_id),
+                    team_id=int(team_id),
+                    opponent_id=int(opponent_id),
+                    away_team_id=int(away_id),
+                    home_team_id=int(home_id),
                 )
-    out.sort(key=lambda x: (x.target_date, x.game_id, x.pitcher_id))
-    return out
+                identity = (target.game_id, target.pitcher_id)
+                previous = by_identity.get(identity)
+                if previous is not None:
+                    if previous != target:
+                        raise PitcherKHistoricalMaterializerError(
+                            "conflicting duplicate schedule target:"
+                            f"{season}:{target.game_id}:{target.pitcher_id}"
+                        )
+                    continue
+                by_identity[identity] = target
+    return sorted(
+        by_identity.values(),
+        key=lambda x: (x.target_date, x.game_id, x.pitcher_id),
+    )
 
 
 def fetch_season_schedule(
