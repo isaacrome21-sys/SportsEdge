@@ -134,3 +134,17 @@ def test_incomplete_or_deployable_candidate_fails_closed():
     bad["model_p_eligible"] = True
     with pytest.raises(PitcherKProbabilityCandidateError, match="deployable"):
         feature_vector(bad)
+
+
+def test_rate_features_reject_closed_interval_boundaries():
+    for field in ("whiff_rate", "chase_rate"):
+        for value in (0.0, 1.0):
+            bad = _candidate()
+            bad["components"]["pitcher_skill"][field] = value
+            with pytest.raises(PitcherKProbabilityCandidateError):
+                feature_vector(bad)
+
+    for value in (0.0, 1.0):
+        bad = _candidate(kbf=value)
+        with pytest.raises(PitcherKProbabilityCandidateError):
+            feature_vector(bad)
