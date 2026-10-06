@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 from copy import deepcopy
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 
@@ -71,6 +72,190 @@ def _adapt_signed_yardage_for_nonnegative_v1(
             })
         out.append(row)
     return out, receipts
+
+
+_TEAM_ALIASES = {"LA": "LAR", "WSH": "WAS"}
+
+
+def _team_code(value) -> str:
+    raw = str(value or "").strip().upper()
+    return _TEAM_ALIASES.get(raw, raw)
+
+
+def _utc(value):
+    out = value if isinstance(value, datetime) else datetime.fromisoformat(
+        str(value).replace("Z", "+00:00")
+    )
+    if out.tzinfo is None or out.utcoffset() is None:
+        raise ValueError("AWARE_TIMESTAMP_REQUIRED")
+    return out.astimezone(timezone.utc)
+
+
+def _filter_current_starter_qb_history(
+    *,
+    team: str,
+    target_season: int,
+    target_week: int,
+    observed_at,
+    depth_rows: list[dict],
+    player_rows: list[dict],
+    minimum_primary_games: int = 2,
+    primary_attempt_share: float = 0.50,
+) -> tuple[list[dict], dict]:
+    """Remove clear backup/mop-up appearances from the current starter's role prior.
+
+    The frozen V1 live-role builder averages a current starter's last stat rows
+    without knowing whether he was the primary QB in each game.  This PIT-only
+    serving adapter keeps a current starter's prior game only when he owned at
+    least half of his team's QB pass attempts.  It activates only after at least
+    two qualifying primary-QB games, so one start cannot erase the broader prior.
+    """
+    team_id = _team_code(team)
+    seen = _utc(observed_at)
+    eligible_depth: list[tuple[datetime, dict]] = []
+    for raw in depth_rows:
+        if _team_code(raw.get("team") or raw.get("club_code")) != team_id:
+            continue
+        stamp_raw = raw.get("dt")
+        if stamp_raw in (None, ""):
+            continue
+        try:
+            stamp = _utc(stamp_raw)
+        except (TypeError, ValueError):
+            continue
+        if stamp <= seen:
+            eligible_depth.append((stamp, raw))
+    if not eligible_depth:
+        return list(player_rows), {
+            "status": "NOT_APPLIED",
+            "reason": "NO_PIT_DEPTH_SNAPSHOT",
+            "team": team_id,
+        }
+
+    latest = max(stamp for stamp, _ in eligible_depth)
+    starter_ids: list[str] = []
+    for stamp, raw in eligible_depth:
+        if stamp != latest:
+            continue
+        position = str(raw.get("pos_abb") or raw.get("position") or "").strip().upper()
+        try:
+            rank = int(float(raw.get("pos_rank")))
+        except (TypeError, ValueError):
+            rank = None
+        pid = str(raw.get("gsis_id") or raw.get("player_id") or "").strip()
+        if position in {"QB", "QUARTERBACK"} and rank == 1 and pid:
+            starter_ids.append(pid)
+    starter_ids = sorted(set(starter_ids))
+    if len(starter_ids) != 1:
+        return list(player_rows), {
+            "status": "NOT_APPLIED",
+            "reason": "STARTING_QB_NOT_UNIQUE",
+            "team": team_id,
+            "candidate_ids": starter_ids,
+        }
+    starter_id = starter_ids[0]
+
+    prior_rows: list[dict] = []
+    for raw in player_rows:
+        try:
+            season = int(float(raw.get("season")))
+            week = int(float(raw.get("week")))
+        except (TypeError, ValueError):
+            continue
+        if str(raw.get("season_type") or "REG").strip().upper() != "REG":
+            continue
+        if season > int(target_season) or (
+            season == int(target_season) and week >= int(target_week)
+        ):
+            continue
+        prior_rows.append(raw)
+
+    team_qb_attempts: dict[tuple[str, int, int], float] = {}
+    for raw in prior_rows:
+        position = str(raw.get("position") or "").strip().upper()
+        if position not in {"QB", "QUARTERBACK"}:
+            continue
+        try:
+            season = int(float(raw.get("season")))
+            week = int(float(raw.get("week")))
+            attempts = max(0.0, float(raw.get("attempts") or 0.0))
+        except (TypeError, ValueError):
+            continue
+        recent_team = _team_code(raw.get("recent_team") or raw.get("team"))
+        if not recent_team:
+            continue
+        key = (recent_team, season, week)
+        team_qb_attempts[key] = team_qb_attempts.get(key, 0.0) + attempts
+
+    primary_keys: set[tuple[str, int, int]] = set()
+    for raw in prior_rows:
+        pid = str(raw.get("player_id") or raw.get("gsis_id") or "").strip()
+        if pid != starter_id:
+            continue
+        try:
+            season = int(float(raw.get("season")))
+            week = int(float(raw.get("week")))
+            attempts = max(0.0, float(raw.get("attempts") or 0.0))
+        except (TypeError, ValueError):
+            continue
+        recent_team = _team_code(raw.get("recent_team") or raw.get("team"))
+        key = (recent_team, season, week)
+        total = team_qb_attempts.get(key, 0.0)
+        if total > 0 and attempts / total >= float(primary_attempt_share):
+            primary_keys.add(key)
+
+    if len(primary_keys) < int(minimum_primary_games):
+        return list(player_rows), {
+            "status": "NOT_APPLIED",
+            "reason": "INSUFFICIENT_PRIMARY_QB_GAMES",
+            "team": team_id,
+            "starter_qb_id": starter_id,
+            "qualifying_games": len(primary_keys),
+            "minimum_primary_games": int(minimum_primary_games),
+        }
+
+    filtered: list[dict] = []
+    removed: list[dict] = []
+    for raw in player_rows:
+        pid = str(raw.get("player_id") or raw.get("gsis_id") or "").strip()
+        try:
+            season = int(float(raw.get("season")))
+            week = int(float(raw.get("week")))
+        except (TypeError, ValueError):
+            filtered.append(raw)
+            continue
+        is_prior = (
+            season < int(target_season)
+            or (season == int(target_season) and week < int(target_week))
+        ) and str(raw.get("season_type") or "REG").strip().upper() == "REG"
+        if pid != starter_id or not is_prior:
+            filtered.append(raw)
+            continue
+        recent_team = _team_code(raw.get("recent_team") or raw.get("team"))
+        key = (recent_team, season, week)
+        if key in primary_keys:
+            filtered.append(raw)
+            continue
+        try:
+            attempts = max(0.0, float(raw.get("attempts") or 0.0))
+        except (TypeError, ValueError):
+            attempts = 0.0
+        removed.append({
+            "season": season,
+            "week": week,
+            "team": recent_team,
+            "attempts": attempts,
+            "team_qb_attempts": team_qb_attempts.get(key, 0.0),
+        })
+
+    return filtered, {
+        "status": "APPLIED",
+        "team": team_id,
+        "starter_qb_id": starter_id,
+        "primary_attempt_share": float(primary_attempt_share),
+        "qualifying_games": len(primary_keys),
+        "removed_nonprimary_games": removed,
+    }
 
 
 _NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
@@ -559,6 +744,31 @@ def main() -> int:
 
     scoring_prior = load_prior_file(args.scoring_prior) if args.scoring_prior else None
 
+    qb_role_filters: list[dict] = []
+    for raw_game in ticket.get("games") or []:
+        if not isinstance(raw_game, dict):
+            continue
+        away = _team_code(raw_game.get("away"))
+        home = _team_code(raw_game.get("home"))
+        schedule_matches = [
+            row for row in schedule_games
+            if _team_code(row.get("away_team_id") or row.get("away") or row.get("away_team")) == away
+            and _team_code(row.get("home_team_id") or row.get("home") or row.get("home_team")) == home
+        ]
+        if len(schedule_matches) != 1:
+            continue
+        schedule = schedule_matches[0]
+        for team_name in (away, home):
+            player_rows, audit = _filter_current_starter_qb_history(
+                team=team_name,
+                target_season=int(schedule["season"]),
+                target_week=int(schedule["week"]),
+                observed_at=observed_at,
+                depth_rows=depth_rows,
+                player_rows=player_rows,
+            )
+            qb_role_filters.append(audit)
+
     player_rows, signed_yardage_adaptations = _adapt_signed_yardage_for_nonnegative_v1(
         player_rows
     )
@@ -580,6 +790,7 @@ def main() -> int:
     payload["source_status"] = source_status
     payload["schedule_source_sha256"] = plan.get("schedule_source_sha256")
     payload["player_alias_bindings"] = alias_bindings
+    payload["qb_role_filters"] = qb_role_filters
     payload["signed_yardage_adaptations"] = signed_yardage_adaptations
 
     out = Path(args.output)
