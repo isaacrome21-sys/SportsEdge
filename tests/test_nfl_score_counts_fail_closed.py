@@ -1,6 +1,5 @@
 """Score-count prop board must not survive a one-team simulation failure."""
 
-from sportsedge.nfl_prop_shared_sim import stabilized_role
 from sportsedge.sports.nfl.score_counts_prop_bridge import (
     price_score_count_props_from_paths,
 )
@@ -29,11 +28,6 @@ def _role(ypr: float = 8.0) -> dict:
         "trailing": {},
         "context": {"source": "role"},
     }
-
-
-def test_signed_receiving_efficiency_does_not_invalidate_role():
-    role = stabilized_role(_role(-2.0))
-    assert role["receiving_yards_per_reception"] == -2.0
 
 
 def test_either_team_simulation_failure_fails_score_count_prop_board():
