@@ -279,6 +279,46 @@
         },
         "note": "Fresh zero-authority research binding for the preregistered symmetric NFL margin/total location challenger. Does not alter or revive M2/V2K failures and does not authorize historical or prospective betting use."
       }
+    },
+    {
+      "bundle_id": "NFL_LOCATION_SYMMETRIC_G1_READOUT_EXECUTION_FREEZE_V1",
+      "freeze_sha": "4c62a0fb16126ce26755a2a3d168cc8992b91e56",
+      "coverage_paths": [
+        "config/research/nfl_location_symmetric_g1_readout_execution_v1.json",
+        "scripts/run_nfl_location_symmetric_g1_readout.py",
+        ".github/workflows/nfl-location-symmetric-g1-readout.yml"
+      ],
+      "coverage_prefixes": [],
+      "disposition": null,
+      "identity": {
+        "schema": "NFL_LOCATION_SYMMETRIC_G1_READOUT_EXECUTION_FREEZE_IDENTITY_V1",
+        "bound_commit": "4c62a0fb16126ce26755a2a3d168cc8992b91e56",
+        "candidate_family": "NFL_LOCATION_SYMMETRIC_RIDGE_G1",
+        "source_contract": "config/nfl_promotion_source_freeze_v1.json",
+        "source_seasons": [
+          2016,
+          2017,
+          2018,
+          2019,
+          2020,
+          2021,
+          2022,
+          2023,
+          2024,
+          2025
+        ],
+        "first_real_readout_trigger": "PUSH_TO_MAIN_ONLY",
+        "pull_request_real_readout": false,
+        "authority": {
+          "model_p": false,
+          "truth_gate": false,
+          "promotion": false,
+          "staking": false,
+          "official": false,
+          "bettor_facing_release": false
+        },
+        "note": "Freezes the execution/source surface for the first real reused-history NFL G1 readout. PR events can test the contract but cannot execute the historical readout."
+      }
     }
   ],
   "deltas": [
