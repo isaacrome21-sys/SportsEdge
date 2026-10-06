@@ -115,3 +115,92 @@ def test_run_requires_explicit_candidate_test_consumption(tmp_path: Path):
             out_dir=tmp_path / "out",
             consume_candidate_test=False,
         )
+
+
+class _FakeSource:
+    def player_rows(self, *, player_id, group, target_date):
+        assert int(player_id) == 501
+        assert group == "pitching"
+        return [
+            {
+                "date": date(2025, 5, 1 + i),
+                "stat": {
+                    "gamesStarted": 1,
+                    "battersFaced": 24 + (i % 2),
+                    "numberOfPitches": 92 + i,
+                    "strikeOuts": 5 + (i % 3),
+                    "inningsPitched": "6.0",
+                },
+            }
+            for i in range(5)
+        ]
+
+    def feature_row(self, **kwargs):
+        assert kwargs["market"] == "PITCHER_K"
+        return {
+            "features": {
+                "history_pool": [
+                    {
+                        "strikeouts": 5 + i,
+                        "outs": 18,
+                        "earned_runs": 2,
+                        "hits_allowed": 5,
+                        "walks_allowed": 2,
+                    }
+                    for i in range(5)
+                ],
+                "opp_k_adjustment": {
+                    "market": "PITCHER_K",
+                    "beta": 1.0,
+                    "target_rel": 1.03,
+                    "history_rel": [0.98, 1.01, 1.00, 1.02, 0.99],
+                    "opponent_team_id": 777,
+                    "validated_in": "#1509",
+                    "lineup_k_adjustment": {
+                        "W": 200.0,
+                        "gamma": 0.5,
+                        "target_deviation": 1.02,
+                        "history_deviation": [0.99, 1.00, 1.01, 0.98, 1.02],
+                        "validated_in": "#1540",
+                    },
+                },
+            }
+        }
+
+
+def test_candidate_runner_binds_workload_opp_lineup_and_statcast_contract():
+    snapshot = {
+        "source": "BASEBALL_SAVANT_STATCAST",
+        "window_start": "2025-05-02",
+        "window_end": "2025-06-01",
+        "retrieved_at": "2026-10-06T18:00:00+00:00",
+        "raw_pitch_rows": 1000,
+        "pitcher_rows": [{
+            "entity_id": "501",
+            "swings": 200,
+            "whiffs": 60,
+            "whiff_rate": 0.30,
+            "out_of_zone_pitches": 180,
+            "chases": 54,
+            "chase_rate": 0.30,
+            "pitcher_hand": "R",
+        }],
+    }
+    candidate, history = R._candidate_for_starter(
+        source=_FakeSource(),
+        snapshot=snapshot,
+        target_date=date(2025, 6, 1),
+        game_pk=123,
+        away_team_id=10,
+        home_team_id=20,
+        pitcher_id=501,
+        team_id=10,
+    )
+    assert candidate["evaluation_ready"] is True
+    assert candidate["source_complete"] is True
+    assert candidate["components"]["pitcher_skill"]["whiff_rate"] == 0.30
+    assert candidate["components"]["opponent_k"]["validated_in"] == "#1509"
+    assert candidate["components"]["lineup_k"]["validated_in"] == "#1540"
+    assert len(history) == 5
+    assert candidate["model_p_eligible"] is False
+    assert candidate["forward_evidence_eligible"] is False
