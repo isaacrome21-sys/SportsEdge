@@ -1,0 +1,83 @@
+{
+  "capture_note": "DraftKings lines transcribed from VegasInsider live MLB odds board at SportsEdge intake around 2026-10-06 15:00 CT; sportsbook first-seen timestamp not claimed.",
+  "rows": [
+    {
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
+      "market_type": "MONEYLINE",
+      "side": "AWAY",
+      "line": 0,
+      "price": -108,
+      "paired_side": "HOME",
+      "paired_price": -111,
+      "book": "draftkings",
+      "observed_at": "2026-10-06T15:00:49-05:00",
+      "first_pitch_at": "2026-10-06T17:00:00-05:00",
+      "source": "MANUAL"
+    },
+    {
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
+      "market_type": "RUN_LINE",
+      "side": "AWAY",
+      "line": -1.5,
+      "price": 161,
+      "paired_side": "HOME",
+      "paired_price": -196,
+      "book": "draftkings",
+      "observed_at": "2026-10-06T15:00:49-05:00",
+      "first_pitch_at": "2026-10-06T17:00:00-05:00",
+      "source": "MANUAL"
+    },
+    {
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
+      "market_type": "GAME_TOTAL",
+      "side": "OVER",
+      "line": 6,
+      "price": -115,
+      "paired_side": "UNDER",
+      "paired_price": -104,
+      "book": "draftkings",
+      "observed_at": "2026-10-06T15:00:49-05:00",
+      "first_pitch_at": "2026-10-06T17:00:00-05:00",
+      "source": "MANUAL"
+    },
+    {
+      "game_id": "Milwaukee Brewers@San Diego Padres",
+      "market_type": "MONEYLINE",
+      "side": "AWAY",
+      "line": 0,
+      "price": 113,
+      "paired_side": "HOME",
+      "paired_price": -136,
+      "book": "draftkings",
+      "observed_at": "2026-10-06T15:00:49-05:00",
+      "first_pitch_at": "2026-10-06T20:30:00-05:00",
+      "source": "MANUAL"
+    },
+    {
+      "game_id": "Milwaukee Brewers@San Diego Padres",
+      "market_type": "RUN_LINE",
+      "side": "AWAY",
+      "line": 1.5,
+      "price": -201,
+      "paired_side": "HOME",
+      "paired_price": 164,
+      "book": "draftkings",
+      "observed_at": "2026-10-06T15:00:49-05:00",
+      "first_pitch_at": "2026-10-06T20:30:00-05:00",
+      "source": "MANUAL"
+    },
+    {
+      "game_id": "Milwaukee Brewers@San Diego Padres",
+      "market_type": "GAME_TOTAL",
+      "side": "OVER",
+      "line": 7,
+      "price": -117,
+      "paired_side": "UNDER",
+      "paired_price": -103,
+      "book": "draftkings",
+      "observed_at": "2026-10-06T15:00:49-05:00",
+      "first_pitch_at": "2026-10-06T20:30:00-05:00",
+      "source": "MANUAL"
+    }
+  ]
+}
