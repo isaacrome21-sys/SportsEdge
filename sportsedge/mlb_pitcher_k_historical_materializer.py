@@ -83,6 +83,7 @@ def targets_from_schedule(payload: Mapping[str, Any], *, season: int) -> list[Pi
     if int(season) not in FROZEN_SEASONS:
         raise PitcherKHistoricalMaterializerError("season outside frozen split")
     out: list[PitcherKTarget] = []
+    seen: dict[tuple[int, int, int], PitcherKTarget] = {}
     for block in payload.get("dates") or []:
         if not isinstance(block, Mapping):
             continue
@@ -115,18 +116,29 @@ def targets_from_schedule(payload: Mapping[str, Any], *, season: int) -> list[Pi
                 pitcher_id = _int((side.get("probablePitcher") or {}).get("id"))
                 if pitcher_id is None:
                     continue
-                out.append(
-                    PitcherKTarget(
-                        season=int(season),
-                        target_date=target_date,
-                        game_id=int(game_id),
-                        pitcher_id=int(pitcher_id),
-                        team_id=int(team_id),
-                        opponent_id=int(opponent_id),
-                        away_team_id=int(away_id),
-                        home_team_id=int(home_id),
-                    )
+                target = PitcherKTarget(
+                    season=int(season),
+                    target_date=target_date,
+                    game_id=int(game_id),
+                    pitcher_id=int(pitcher_id),
+                    team_id=int(team_id),
+                    opponent_id=int(opponent_id),
+                    away_team_id=int(away_id),
+                    home_team_id=int(home_id),
                 )
+                identity = (target.season, target.game_id, target.pitcher_id)
+                prior = seen.get(identity)
+                if prior is None:
+                    seen[identity] = target
+                    out.append(target)
+                elif prior != target:
+                    raise PitcherKHistoricalMaterializerError(
+                        "conflicting duplicate season/game/pitcher target"
+                    )
+                # StatsAPI can repeat an identical completed game record in a
+                # season schedule payload (for example around rescheduled or
+                # suspended-game bookkeeping). Identical target identity is
+                # transport duplication, not a second pitcher start.
     out.sort(key=lambda x: (x.target_date, x.game_id, x.pitcher_id))
     return out
 
