@@ -1921,10 +1921,214 @@
       "merge_sha": "dca0906393cd0479bdd0907bf42219f486fd3bc1",
       "pr": 1668,
       "note": "NFL_SCORE_COUNTS_G1 PIT-safe historical/forward feature builder merged. Frozen team/QB transforms and leakage guards only; no historical scoring, attempt consumption, forward prediction, Model_P, pricing, promotion, staking, OFFICIAL, or backfill authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_46500F7B_PR_1673",
+      "merge_sha": "46500f7b8f74b2b3bb5d6ab1475252a8f93f4e57",
+      "pr": 1673,
+      "note": "Main advance: Governance: reconcile main through NFL score-count sources and PIT features (#1673). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_D8B72FF6_PR_1674",
+      "merge_sha": "d8b72ff6cda6261f8c69e53ad12668400867cf16",
+      "pr": 1674,
+      "note": "Main advance: Merge pull request #1674 from isaacrome21-sys/nfl/score-counts-g1-fit-forward-main-v4. Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_AA9A9010_PR_1676",
+      "merge_sha": "aa9a9010c3d71c044583a0a736f474392cc138ef",
+      "pr": 1676,
+      "note": "Main advance: Merge pull request #1676 from isaacrome21-sys/nfl/score-counts-g1-source-preflight-main-v4. Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_EB586D80_PR_1679",
+      "merge_sha": "eb586d80f22215859cf834214bdd68337323e086",
+      "pr": 1679,
+      "note": "Main advance: Merge pull request #1679 from isaacrome21-sys/nfl/score-counts-csv-flag-parser-fix. Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_33BF98E9_PR_1680",
+      "merge_sha": "33bf98e9f907d706d8e25a80dc534b9863b2c01f",
+      "pr": 1680,
+      "note": "Main advance: Merge pull request #1680 from isaacrome21-sys/nfl/score-counts-g1-attempt-runner-main-v3. Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_E7568DD4_PR_1683",
+      "merge_sha": "e7568dd4de319cb0f1ab957cf06471296aa1af8e",
+      "pr": 1683,
+      "note": "Main advance: Merge pull request #1683 from isaacrome21-sys/nfl/score-counts-g1-attempt1-main-trigger-v1. Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_BF01144E_PR_1686",
+      "merge_sha": "bf01144e90b953f6e6e606e8825d0298c8a7c1a8",
+      "pr": 1686,
+      "note": "Main advance: Merge pull request #1686 from isaacrome21-sys/nfl/score-counts-comment-row-diagnostic. Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_1E7482F0_PR_1689",
+      "merge_sha": "1e7482f0ce140dfef30f9da9761cbd66d4187a68",
+      "pr": 1689,
+      "note": "Main advance: NFL score counts: preregister and execute FG-only Attempt 2 (#1689). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_5666D618_PR_1701",
+      "merge_sha": "5666d618f3cfacad944b33903d97e372fc273a9b",
+      "pr": 1701,
+      "note": "Main advance: NFL score counts: freeze final FG Attempt 3 prereg (#1701). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_5851A178_PR_1703",
+      "merge_sha": "5851a1783ca92ca54497704d7422f82e1c14ee63",
+      "pr": 1703,
+      "note": "Main advance: NFL score counts: implement final FG Attempt 3 (#1703). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_CD2CA00C_PR_1707",
+      "merge_sha": "cd2ca00c2d54e44991121667519020bdce8e19d4",
+      "pr": 1707,
+      "note": "Main advance: MLB: wire validated F5/NRFI state into manual all-market cards (#1707). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_044A2531_PR_1712",
+      "merge_sha": "044a2531164f0776b17021f55a9f35c12de34937",
+      "pr": 1712,
+      "note": "Main advance: MLB: fall back to regression fixture on code-only snapshot pushes (#1712). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_0D22BFE2_PR_1708",
+      "merge_sha": "0d22bfe228d4bd6ac7095866bd14c3159177f8f6",
+      "pr": 1708,
+      "note": "Main advance: CFB: add inert reconstructed four-family evaluation dispatch bridge (#1708). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_175A4E57_PR_1706",
+      "merge_sha": "175a4e57dc902d75c4106a344965e1aa49ac47a5",
+      "pr": 1706,
+      "note": "Main advance: NFL score counts: arm one-shot final Attempt 3 execution (#1706). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_C5E8BF0E_PR_1713",
+      "merge_sha": "c5e8bf0e4f12fb2ea4ff142fc59c57060b7c8238",
+      "pr": 1713,
+      "note": "Main advance: CFB: resume reconstructed acquisition through verified cache (#1713). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_F52576E2_PR_1715",
+      "merge_sha": "f52576e217ef312d2c8425cf6ba3e98944b687dd",
+      "pr": 1715,
+      "note": "Main advance: CFB: request quota-safe reconstructed cache warm (#1715). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_B54A4E24_PR_1714",
+      "merge_sha": "b54a4e24796d4c4496d5d5259ffc5c46bd886d0c",
+      "pr": 1714,
+      "note": "Main advance: MLB: speed manual RUN IT with history reuse and early priced-card output (#1714). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_9EFD1C63_PR_1716",
+      "merge_sha": "9efd1c632d9e38f950703230c40d0691657b7115",
+      "pr": 1716,
+      "note": "Main advance: MLB: add fast lines-to-card runtime (#1716). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_3DAFD858_PR_1717",
+      "merge_sha": "3dafd8588a680d39224e14de9664094eb0960b26",
+      "pr": 1717,
+      "note": "Main advance: MLB: accept phone-text lines in fast runtime (#1717). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_E4365A3B_PR_0",
+      "merge_sha": "e4365a3bd1020ffcb9d9643c6bb5ede9014c7016",
+      "pr": 0,
+      "note": "Main advance: Run MLB SportsEdge — Yankees at Rays 2026-10-05. Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_A247793D_PR_1723",
+      "merge_sha": "a247793da209bae03deab1caa81d33df9f10095e",
+      "pr": 1723,
+      "note": "Main advance: NFL score counts: restore inert Attempt-3 recovery trigger (#1723). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_81091D19_PR_1724",
+      "merge_sha": "81091d1947355ea079ee8501bff919932f629184",
+      "pr": 1724,
+      "note": "Main advance: NFL score counts: arm Attempt-3 recovery dispatch (#1724). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_DE8687C1_PR_1726",
+      "merge_sha": "de8687c1d9d4e2e74e47782b3bd1dee8e9b7e6cf",
+      "pr": 1726,
+      "note": "Main advance: MLB card: add calibration sanity gate and preregister postmortem refinements (#1726). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_81B67832_PR_1727",
+      "merge_sha": "81b678329fc8e953b38280d3a35ff3be23a3e72b",
+      "pr": 1727,
+      "note": "Main advance: MLB pitcher-prop final look: make archive fetch caches truly lazy (#1727). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_4BD9BDB0_PR_1728",
+      "merge_sha": "4bd9bdb00ec801fb2ad5eece123d13f9e8b085ef",
+      "pr": 1728,
+      "note": "Main advance: MLB manual RUN IT: parallelize optional context retrieval (#1728). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_A4AD7EB4_PR_1729",
+      "merge_sha": "a4ad7eb4376b9c94066a8f6a8cc4c880a3fdad95",
+      "pr": 1729,
+      "note": "Main advance: MLB research: freeze pitcher-K workload candidate bundle (#1729). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_799EF455_PR_1730",
+      "merge_sha": "799ef455dbe22b1d162253ca8fb306bd6a780115",
+      "pr": 1730,
+      "note": "Main advance: MLB manual RUN IT: share history opener across same-date games (#1730). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_F5B9961A_PR_1731",
+      "merge_sha": "f5b9961a5c6da80a5a08b664bc455f83d27882ff",
+      "pr": 1731,
+      "note": "Main advance: MLB research: reuse existing history source for pitcher-K workload candidate (#1731). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_6A895D53_PR_1733",
+      "merge_sha": "6a895d534afe2a5d2d00b0804af779c07f11cb8e",
+      "pr": 1733,
+      "note": "Main advance: CFB cache: accept explicit live-week item names (#1733). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_8E3EC25E_PR_1734",
+      "merge_sha": "8e3ec25ee63e564c1cf1be73d9f3bde15a3080c4",
+      "pr": 1734,
+      "note": "Main advance: MLB research: bind pitcher-K composite candidate (#1734). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_4A88CEBF_PR_1735",
+      "merge_sha": "4a88cebf8d00d9d24d56e6f5bbd22babe614ffc9",
+      "pr": 1735,
+      "note": "Main advance: MLB fast RUN IT: emit actionable game markets before prop context (#1735). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_339E2ED4_PR_1737",
+      "merge_sha": "339e2ed4dbdd01b27cb0eefa0a3c2ff6ccafa43e",
+      "pr": 1737,
+      "note": "Main advance: MLB research: persist pitcher whiff chase and hand observations (#1737). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_3C948023_PR_1740",
+      "merge_sha": "3c948023b54f3fd24a004c7bfda63cf325dfb24a",
+      "pr": 1740,
+      "note": "Main advance: CFB RUN IT: reconcile PIT-safe live-week cache onto current main (#1740). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_1FDC7F8C_PR_1742",
+      "merge_sha": "1fdc7f8c72667f4b57baa6a177409db1d52dc737",
+      "pr": 1742,
+      "note": "Main advance: NFL research: symmetric margin/total location challenger G1 (#1742). Registered for bundle-by-bundle replay; reconciliation only and grants no Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
     }
   ],
   "inventory_block_reason": "Current main through merge dca09063 / PR #1668 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "dca0906393cd0479bdd0907bf42219f486fd3bc1",
+  "reconciled_through_sha": "1fdc7f8c72667f4b57baa6a177409db1d52dc737",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }

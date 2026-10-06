@@ -1,9 +1,0 @@
-{
-  "schema": "SPORTSEDGE_NFL_PLAYER_OUTCOME_G1_ATTEMPT_LEDGER_V1",
-  "generation": "NFL_PLAYER_OUTCOME_G1",
-  "maximum_attempts": 6,
-  "evaluated_attempts": [],
-  "next_attempt": 1,
-  "rule": "An attempt is spent only when a historical or prospective evaluation result is produced. Contract tests and deterministic fixtures do not consume an attempt.",
-  "authority": "RESEARCH_ONLY"
-}

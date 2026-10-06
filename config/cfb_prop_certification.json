@@ -1,6 +1,0 @@
-{
-  "schema_version": "FOOTBALL_PROP_CERTIFICATION_V2",
-  "sport": "CFB",
-  "markets": {},
-  "note": "No CFB player-prop market is certified yet. A PASS market requires an immutable OFFICIAL attestation from the active Promotion Evidence Policy, bound to the exact frozen model artifact, lane, market definition, policy SHA256, and genuine forward-evidence SHA256."
-}
