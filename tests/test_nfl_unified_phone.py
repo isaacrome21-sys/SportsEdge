@@ -6,6 +6,13 @@ import pytest
 
 from sportsedge.nfl_lines_intake import parse_nfl_lines, tickets_to_dict
 from sportsedge.nfl_unified_phone import build_unified_phone_card
+from scripts.run_nfl_unified_lines_card import (
+    _adapt_signed_yardage_for_nonnegative_v1,
+    _apply_prop_board_safety,
+    _filter_current_starter_qb_history,
+    _name_alias_match,
+    _normalize_ticket_prop_players,
+)
 
 
 def runtime():
@@ -341,3 +348,602 @@ def test_prop_card_requires_posted_spread_and_total_context():
     assert len(props) == 2
     assert all(row["status"] == "NO_MODEL" for row in props)
     assert all(row["reason"] == "MARKET_CONTEXT_SPREAD_TOTAL_REQUIRED" for row in props)
+
+def test_runner_alias_normalization_accepts_suffix_and_first_name_expansion():
+    assert _name_alias_match("Kyle Pitts Sr.", "Kyle Pitts")
+    assert _name_alias_match("Zachariah Branch", "Zach Branch")
+
+    board = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": "Kyle Pitts", "market": "receptions"},
+                {"player": "Zach Branch", "market": "receiving_yards"},
+            ],
+        }]
+    }
+    rows = [
+        {"team": "ATL", "player_name": "Kyle Pitts Sr."},
+        {"team": "ATL", "player_name": "Zachariah Branch"},
+        {"team": "NO", "player_name": "Chris Olave"},
+    ]
+    normalized, bindings = _normalize_ticket_prop_players(board, rows)
+    props = normalized["games"][0]["markets"]
+    assert props[0]["player"] == "Kyle Pitts Sr."
+    assert props[0]["team"] == "ATL"
+    assert props[1]["player"] == "Zachariah Branch"
+    assert props[1]["team"] == "ATL"
+    assert len(bindings) == 2
+
+
+def test_runner_safety_voids_entire_two_team_prop_board_when_one_team_has_no_valid_rows():
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": "ATL WR", "market": "receiving_yards"},
+                {"player": "NO WR", "market": "receiving_yards"},
+            ],
+        }]
+    }
+    payload = {
+        "games": [{
+            "rows": [
+                {
+                    "input_index": 0, "market": "receiving_yards", "team": "away",
+                    "status": "PRICED", "selected": True, "estimate_p": 0.70, "score_0_100": 88,
+                },
+                {
+                    "input_index": 1, "market": "receiving_yards", "team": "home",
+                    "status": "NO_MODEL", "selected": False,
+                    "reason": "ROLE_VALUE_INVALID:receiving_yards_per_reception",
+                },
+            ],
+            "engine": {},
+            "status": "PRICED_RESEARCH_PROPS_GAME_EDGE_DISABLED",
+            "role_status": "AVAILABLE",
+            "role_error": None,
+        }],
+        "rows": [],
+        "selected_rows": [{"input_index": 0}],
+    }
+    out = _apply_prop_board_safety(payload, ticket)
+    game = out["games"][0]
+    assert game["role_status"] == "NO_MODEL"
+    assert game["prop_status"] == "NO_MODEL_PROP_BOARD_INCOMPLETE"
+    assert game["status"] == "PRICED_RESEARCH_PROPS_GAME_EDGE_DISABLED"
+    assert game["engine"]["prop_board_status"] == "NO_MODEL"
+    assert game["engine"]["prop_board_error"].startswith("GAME_PROP_SIMULATION_INCOMPLETE:NO=")
+    assert out["selected_rows"] == []
+    assert all(row["status"] == "NO_MODEL" for row in game["rows"])
+    assert all(row["selected"] is False for row in game["rows"])
+    assert all("score_0_100" not in row for row in game["rows"])
+
+
+def test_runner_safety_keeps_two_team_board_when_both_requested_teams_price():
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": "ATL WR", "market": "receiving_yards"},
+                {"player": "NO WR", "market": "receiving_yards"},
+            ],
+        }]
+    }
+    payload = {
+        "games": [{
+            "rows": [
+                {"input_index": 0, "team": "away", "status": "PRICED", "selected": True},
+                {"input_index": 1, "team": "home", "status": "PRICED", "selected": False},
+            ],
+            "engine": {},
+            "role_status": "AVAILABLE",
+            "role_error": None,
+        }],
+        "rows": [],
+        "selected_rows": [],
+    }
+    out = _apply_prop_board_safety(payload, ticket)
+    game = out["games"][0]
+    assert game["engine"]["prop_board_status"] == "AVAILABLE"
+    assert game["role_status"] == "AVAILABLE"
+    assert len(out["selected_rows"]) == 1
+
+
+def test_runner_graphic_contract_uses_artifact_native_fields():
+    out = _apply_prop_board_safety({"games": [], "rows": [], "selected_rows": []}, {"games": []})
+    policy = out["presentation_policy"]
+    assert policy["market_probability_field"] == "market_no_vig_p"
+    assert policy["model_probability_field"] == "estimate_p"
+    assert policy["score_field"] == "score_0_100"
+    assert policy["score_label_field"] == "score_label"
+    assert policy["kickoff_field"] == "games[].kickoff"
+    assert policy["team_records"] == "OMIT_UNLESS_EXPLICITLY_SOURCED"
+
+def test_runner_safety_does_not_void_game_for_individual_player_match_failure():
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": "ATL WR", "market": "receiving_yards"},
+                {"player": "NO Mystery", "market": "receiving_yards"},
+            ],
+        }]
+    }
+    payload = {
+        "games": [{
+            "rows": [
+                {
+                    "input_index": 0, "team": "away", "status": "PRICED",
+                    "selected": True, "estimate_p": 0.61, "score_0_100": 88,
+                },
+                {
+                    "input_index": 1, "team": "home", "status": "NO_MODEL",
+                    "selected": False,
+                    "reason": "PROP_PLAYER_EXACT_MATCH_REQUIRED:NO Mystery:matches=0",
+                },
+            ],
+            "engine": {},
+            "role_status": "AVAILABLE",
+            "role_error": None,
+        }],
+        "rows": [],
+        "selected_rows": [],
+    }
+    out = _apply_prop_board_safety(payload, ticket)
+    game = out["games"][0]
+    assert game["role_status"] == "AVAILABLE"
+    assert game["engine"]["prop_board_status"] == "AVAILABLE"
+    assert game["engine"]["failed_requested_teams"] == []
+    assert "NO" in game["engine"]["degraded_requested_teams"]
+    assert out["selected_rows"][0]["input_index"] == 0
+    assert out["selected_rows"][0]["score_0_100"] == 88
+
+
+def test_runner_safety_does_not_void_game_for_market_specific_td_prior_gap():
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": "ATL WR", "market": "receiving_yards"},
+                {"player": "NO TE", "market": "anytime_td"},
+            ],
+        }]
+    }
+    payload = {
+        "games": [{
+            "rows": [
+                {"input_index": 0, "team": "away", "status": "PRICED", "selected": True},
+                {
+                    "input_index": 1, "team": "home", "status": "NO_MODEL",
+                    "selected": False,
+                    "reason": "SCORING_COMPOSITION_PRIOR_REQUIRED_FOR_TD_PROPS",
+                },
+            ],
+            "engine": {},
+            "role_status": "AVAILABLE",
+            "role_error": None,
+        }],
+        "rows": [],
+        "selected_rows": [],
+    }
+    out = _apply_prop_board_safety(payload, ticket)
+    assert out["games"][0]["role_status"] == "AVAILABLE"
+    assert out["games"][0]["engine"]["prop_board_status"] == "AVAILABLE"
+    assert len(out["selected_rows"]) == 1
+
+
+def test_runner_safety_allows_single_team_quoted_prop_board():
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": "ATL WR", "market": "receiving_yards"},
+            ],
+        }]
+    }
+    payload = {
+        "games": [{
+            "rows": [
+                {"input_index": 0, "team": "away", "status": "PRICED", "selected": True},
+            ],
+            "engine": {},
+            "role_status": "AVAILABLE",
+            "role_error": None,
+        }],
+        "rows": [],
+        "selected_rows": [],
+    }
+    out = _apply_prop_board_safety(payload, ticket)
+    assert out["games"][0]["role_status"] == "AVAILABLE"
+    assert len(out["selected_rows"]) == 1
+    assert out["prop_board_safety_policy"]["single_team_quote_board_allowed"] is True
+
+def test_runner_safety_still_catches_team_crash_when_same_team_has_a_local_alias_miss():
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": "ATL WR", "market": "receiving_yards"},
+                {"player": "NO WR", "market": "receiving_yards"},
+                {"player": "NO Mystery", "market": "receptions"},
+            ],
+        }]
+    }
+    payload = {
+        "games": [{
+            "rows": [
+                {"input_index": 0, "team": "away", "status": "PRICED", "selected": True},
+                {
+                    "input_index": 1, "team": "home", "status": "NO_MODEL",
+                    "selected": False, "reason": "ROLE_VALUE_INVALID:receiving_yards_per_reception",
+                },
+                {
+                    "input_index": 2, "team": "home", "status": "NO_MODEL",
+                    "selected": False,
+                    "reason": "PROP_PLAYER_EXACT_MATCH_REQUIRED:NO Mystery:matches=0",
+                },
+            ],
+            "engine": {},
+            "role_status": "AVAILABLE",
+            "role_error": None,
+        }],
+        "rows": [],
+        "selected_rows": [],
+    }
+    out = _apply_prop_board_safety(payload, ticket)
+    game = out["games"][0]
+    assert game["role_status"] == "NO_MODEL"
+    assert game["engine"]["prop_board_error"].startswith(
+        "GAME_PROP_SIMULATION_INCOMPLETE:NO=ROLE_VALUE_INVALID:"
+    )
+    assert out["selected_rows"] == []
+
+def test_selection_concentration_is_flagged_but_never_rebalanced():
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": f"ATL {i}", "market": "receiving_yards"}
+                for i in range(6)
+            ] + [
+                {"player": "NO 1", "market": "receiving_yards"},
+            ],
+        }]
+    }
+    rows = []
+    for i in range(6):
+        rows.append({
+            "input_index": i,
+            "team": "away",
+            "status": "PRICED",
+            "selected": True,
+            "selection": f"ATL {i} Under",
+        })
+    rows.append({
+        "input_index": 6,
+        "team": "home",
+        "status": "PRICED",
+        "selected": False,
+        "selection": "NO 1 Over",
+    })
+    payload = {
+        "games": [{
+            "rows": rows,
+            "engine": {},
+            "status": "PRICED_RESEARCH_PROPS_GAME_EDGE_DISABLED",
+            "role_status": "AVAILABLE",
+            "role_error": None,
+        }],
+        "rows": [],
+        "selected_rows": [],
+    }
+    out = _apply_prop_board_safety(payload, ticket)
+    diag = out["games"][0]["prop_selection_diagnostics"]
+    assert "ALL_SELECTED_PROPS_ONE_TEAM_WITH_TWO_TEAM_PRICING" in diag["alerts"]
+    assert "SELECTED_PROP_DIRECTION_CONCENTRATED_UNDER" in diag["alerts"]
+    assert diag["selection_changed_by_diagnostic"] is False
+    assert diag["review_required"] is True
+    assert out["prop_card_review_required"] is True
+    assert out["games"][0]["prop_selection_policy"]["forces_team_balance"] is False
+    assert out["games"][0]["prop_selection_policy"]["forces_over_under_balance"] is False
+    assert len(out["selected_rows"]) == 6
+
+def test_correlation_policy_keeps_only_strongest_same_player_pass_volume_expression():
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": "Michael Penix Jr.", "market": "pass_attempts"},
+                {"player": "Michael Penix Jr.", "market": "completions"},
+                {"player": "Michael Penix Jr.", "market": "passing_yards"},
+            ],
+        }]
+    }
+    rows = [
+        {
+            "input_index": 0, "team": "away", "player": "Michael Penix Jr.",
+            "market": "pass_attempts", "status": "PRICED", "selected": True,
+            "selection": "Michael Penix Jr. Under", "ev_per_dollar": 0.08,
+            "edge_probability_points": 0.08, "score_0_100": 88,
+        },
+        {
+            "input_index": 1, "team": "away", "player": "Michael Penix Jr.",
+            "market": "completions", "status": "PRICED", "selected": True,
+            "selection": "Michael Penix Jr. Under", "ev_per_dollar": 0.12,
+            "edge_probability_points": 0.10, "score_0_100": 88,
+        },
+        {
+            "input_index": 2, "team": "away", "player": "Michael Penix Jr.",
+            "market": "passing_yards", "status": "PRICED", "selected": True,
+            "selection": "Michael Penix Jr. Under", "ev_per_dollar": 0.18,
+            "edge_probability_points": 0.15, "score_0_100": 88,
+        },
+    ]
+    payload = {
+        "games": [{
+            "rows": rows, "engine": {}, "role_status": "AVAILABLE",
+            "role_error": None,
+        }],
+        "rows": [], "selected_rows": [],
+    }
+    out = _apply_prop_board_safety(payload, ticket)
+    selected = out["selected_rows"]
+    assert len(selected) == 1
+    assert selected[0]["market"] == "passing_yards"
+    suppressed = [row for row in out["rows"] if not row.get("selected")]
+    assert {row["selection_suppressed_reason"] for row in suppressed} == {
+        "CORRELATED_PLAYER_FAMILY"
+    }
+    policy = out["games"][0]["prop_selection_policy"]
+    assert policy["candidate_pair_selections"] == 3
+    assert policy["served_prop_selections"] == 1
+
+
+def test_correlation_policy_has_no_arbitrary_global_prop_count_cap():
+    specs = [
+        ("P0", "passing_yards"),
+        ("P1", "receiving_yards"),
+        ("P2", "rushing_yards"),
+        ("P3", "rush_attempts"),
+        ("P4", "pass_tds"),
+        ("P5", "anytime_tds"),
+        ("P6", "interceptions"),
+    ]
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": player, "market": market}
+                for player, market in specs
+            ],
+        }]
+    }
+    rows = [
+        {
+            "input_index": i, "team": "away", "player": player,
+            "market": market, "status": "PRICED", "selected": True,
+            "selection": f"{player} Under",
+            "ev_per_dollar": 0.20 - i * 0.01,
+            "edge_probability_points": 0.20 - i * 0.01,
+            "score_0_100": 88,
+        }
+        for i, (player, market) in enumerate(specs)
+    ]
+    payload = {
+        "games": [{
+            "rows": rows, "engine": {}, "role_status": "AVAILABLE",
+            "role_error": None,
+        }],
+        "rows": [], "selected_rows": [],
+    }
+    out = _apply_prop_board_safety(payload, ticket)
+    assert len(out["selected_rows"]) == 7
+    policy = out["games"][0]["prop_selection_policy"]
+    assert policy["global_prop_count_cap"] is None
+    assert policy["served_prop_selections"] == 7
+    assert policy["suppressed"] == []
+
+
+def test_correlation_policy_never_forces_opposite_team_or_opposite_direction():
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": f"ATL {i}", "market": "receiving_yards"}
+                for i in range(4)
+            ] + [
+                {"player": "NO 1", "market": "receiving_yards"},
+            ],
+        }]
+    }
+    rows = [
+        {
+            "input_index": i, "team": "away", "player": f"ATL {i}",
+            "market": "receiving_yards", "status": "PRICED", "selected": True,
+            "selection": f"ATL {i} Under", "ev_per_dollar": 0.10 + i * 0.01,
+            "edge_probability_points": 0.08 + i * 0.01, "score_0_100": 88,
+        }
+        for i in range(4)
+    ]
+    rows.append({
+        "input_index": 4, "team": "home", "player": "NO 1",
+        "market": "receiving_yards", "status": "PRICED", "selected": False,
+        "selection": "NO 1 Over", "ev_per_dollar": -0.04,
+        "edge_probability_points": -0.03, "score_0_100": 88,
+    })
+    payload = {
+        "games": [{
+            "rows": rows, "engine": {}, "role_status": "AVAILABLE",
+            "role_error": None,
+        }],
+        "rows": [], "selected_rows": [],
+    }
+    out = _apply_prop_board_safety(payload, ticket)
+    assert len(out["selected_rows"]) == 2
+    assert all(row["team"] == "away" for row in out["selected_rows"])
+    assert all(str(row["selection"]).endswith("Under") for row in out["selected_rows"])
+    suppressed = [
+        row for row in out["rows"]
+        if row.get("selection_suppressed_reason") == "CORRELATED_TEAM_OFFENSE_CLUSTER"
+    ]
+    assert len(suppressed) == 2
+    policy = out["games"][0]["prop_selection_policy"]
+    assert policy["forces_team_balance"] is False
+    assert policy["forces_over_under_balance"] is False
+
+def test_runner_signed_yardage_compatibility_copy_is_aggregate_micro_sample_only():
+    source = [
+        {
+            "player_id": "cj",
+            "player_name": "CJ Donaldson",
+            "season": "2026",
+            "week": "3",
+            "recent_team": "NO",
+            "receptions": "1",
+            "receiving_yards": "-2",
+            "rushing_yards": "-3",
+            "passing_yards": "-1",
+        },
+        {
+            "player_id": "normal",
+            "player_name": "Normal Receiver",
+            "season": "2026",
+            "week": "2",
+            "recent_team": "NO",
+            "receptions": "1",
+            "receiving_yards": "-4",
+        },
+        {
+            "player_id": "normal",
+            "player_name": "Normal Receiver",
+            "season": "2026",
+            "week": "3",
+            "recent_team": "NO",
+            "receptions": "5",
+            "receiving_yards": "55",
+        },
+    ]
+    adapted, receipts = _adapt_signed_yardage_for_nonnegative_v1(source)
+    assert source[0]["receiving_yards"] == "-2"
+    assert adapted[0]["receiving_yards"] == 0.0
+    assert adapted[0]["rushing_yards"] == "-3"
+    assert adapted[0]["passing_yards"] == "-1"
+    assert adapted[1]["receiving_yards"] == "-4"
+    assert adapted[2]["receiving_yards"] == "55"
+    assert receipts == [{
+        "player_id": "cj",
+        "player_name": "CJ Donaldson",
+        "season": "2026",
+        "week": "3",
+        "team": "NO",
+        "field": "receiving_yards",
+        "aggregate_receptions": 1.0,
+        "aggregate_receiving_yards": -2.0,
+        "source_value": -2.0,
+        "model_input_value": 0.0,
+        "reason": "FROZEN_V1_NEGATIVE_RECEIVING_MICRO_SAMPLE_COMPATIBILITY",
+    }]
+
+def test_unified_runner_qb_role_filter_removes_clear_backup_appearances_only_after_two_primary_games():
+    depth_rows = [{
+        "dt": "2026-10-05T12:00:00Z",
+        "team": "ATL",
+        "gsis_id": "q1",
+        "player_name": "Current Starter",
+        "pos_abb": "QB",
+        "pos_rank": 1,
+    }]
+    player_rows = [
+        {
+            "player_id": "q1", "position": "QB", "recent_team": "ATL",
+            "season": 2026, "week": 1, "season_type": "REG", "attempts": 2,
+        },
+        {
+            "player_id": "q2", "position": "QB", "recent_team": "ATL",
+            "season": 2026, "week": 1, "season_type": "REG", "attempts": 30,
+        },
+        {
+            "player_id": "q1", "position": "QB", "recent_team": "ATL",
+            "season": 2026, "week": 2, "season_type": "REG", "attempts": 28,
+        },
+        {
+            "player_id": "q2", "position": "QB", "recent_team": "ATL",
+            "season": 2026, "week": 2, "season_type": "REG", "attempts": 3,
+        },
+        {
+            "player_id": "q1", "position": "QB", "recent_team": "ATL",
+            "season": 2026, "week": 3, "season_type": "REG", "attempts": 31,
+        },
+    ]
+    filtered, audit = _filter_current_starter_qb_history(
+        team="ATL",
+        target_season=2026,
+        target_week=4,
+        observed_at="2026-10-05T16:00:00+00:00",
+        depth_rows=depth_rows,
+        player_rows=player_rows,
+    )
+    q1_weeks = [
+        int(row["week"]) for row in filtered
+        if row.get("player_id") == "q1"
+    ]
+    assert q1_weeks == [2, 3]
+    assert audit["status"] == "APPLIED"
+    assert audit["starter_qb_id"] == "q1"
+    assert audit["qualifying_games"] == 2
+    assert audit["removed_nonprimary_games"] == [{
+        "season": 2026,
+        "week": 1,
+        "team": "ATL",
+        "attempts": 2.0,
+        "team_qb_attempts": 32.0,
+    }]
+
+
+def test_unified_runner_qb_role_filter_keeps_prior_when_only_one_primary_game():
+    depth_rows = [{
+        "dt": "2026-10-05T12:00:00Z",
+        "team": "ATL",
+        "gsis_id": "q1",
+        "player_name": "Current Starter",
+        "pos_abb": "QB",
+        "pos_rank": 1,
+    }]
+    player_rows = [
+        {
+            "player_id": "q1", "position": "QB", "recent_team": "ATL",
+            "season": 2026, "week": 1, "season_type": "REG", "attempts": 2,
+        },
+        {
+            "player_id": "q2", "position": "QB", "recent_team": "ATL",
+            "season": 2026, "week": 1, "season_type": "REG", "attempts": 30,
+        },
+        {
+            "player_id": "q1", "position": "QB", "recent_team": "ATL",
+            "season": 2026, "week": 2, "season_type": "REG", "attempts": 28,
+        },
+    ]
+    filtered, audit = _filter_current_starter_qb_history(
+        team="ATL",
+        target_season=2026,
+        target_week=3,
+        observed_at="2026-10-05T16:00:00+00:00",
+        depth_rows=depth_rows,
+        player_rows=player_rows,
+    )
+    assert filtered == player_rows
+    assert audit["status"] == "NOT_APPLIED"
+    assert audit["reason"] == "INSUFFICIENT_PRIMARY_QB_GAMES"
+
