@@ -226,6 +226,10 @@ def incumbent_p_over(
     if not isinstance(opponent, Mapping):
         raise PitcherKHistoricalRowError("opponent-K component required")
     adjustment = deepcopy(dict(opponent))
+    # The shipped opponent-K engine validates the market identity inside the
+    # adjustment payload, not just on the outer quote row. Preserve that exact
+    # production contract for the historical incumbent comparator.
+    adjustment["market"] = "PITCHER_K"
     lineup = components.get("lineup_k")
     if lineup is not None:
         if not isinstance(lineup, Mapping):
