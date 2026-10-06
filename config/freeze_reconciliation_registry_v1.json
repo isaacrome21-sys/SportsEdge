@@ -251,6 +251,31 @@
         "reason": "POST_08A12425_MAIN_MOVEMENT_CHANGED_MANIFEST_COVERED_SPORTSEDGE_DFS_AND_TEST_DFS_BYTES; PRIOR_MLB_DFS_EVIDENCE_FREEZE_INVALIDATED; REVOKED_FAIL_CLOSED_NO_AUTHORITY"
       },
       "freeze_sha": "7a92455f081ee52a454b2c49ff798d902a3ace68"
+    },
+    {
+      "bundle_id": "NFL_PROP_SERVING_RUNTIME_RECONCILED_1741_V1",
+      "freeze_sha": "c82402ce2919fe105f0bff7137d08f83c754f1eb",
+      "coverage_paths": [
+        "scripts/run_nfl_unified_lines_card.py"
+      ],
+      "coverage_prefixes": [],
+      "disposition": null,
+      "identity": {
+        "schema": "NFL_PROP_SERVING_RUNTIME_FREEZE_IDENTITY_V1",
+        "source_pull_request": 1741,
+        "reconciled_serving_commit": "c82402ce2919fe105f0bff7137d08f83c754f1eb",
+        "bound_path": "scripts/run_nfl_unified_lines_card.py",
+        "prior_freeze_reused": false,
+        "authority": {
+          "model_p": false,
+          "truth_gate": false,
+          "promotion": false,
+          "staking": false,
+          "official": false,
+          "validation_attempt": false
+        },
+        "note": "Fresh governance binding for the current-main reconciled NFL prop serving runtime. Does not reuse NFL_PROP_MODEL_FREEZE_V1 or any prior freeze hash. Grants no model, evidence, or promotion authority."
+      }
     }
   ],
   "deltas": [
@@ -1562,7 +1587,7 @@
       "delta_id": "MAIN_ADVANCE_242C9CD7_PR_1510",
       "merge_sha": "242c9cd71f3a6264712f7fe8918be40b93b3668e",
       "pr": 1510,
-      "note": "NBA: v2 rest/back-to-back backtest (pre-registered) — no market validated (#1510). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+      "note": "NBA: v2 rest/back-to-back backtest (pre-registered) \u2014 no market validated (#1510). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
     },
     {
       "delta_id": "MAIN_ADVANCE_CE310364_PR_1476",
