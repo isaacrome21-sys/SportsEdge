@@ -73,20 +73,17 @@ def assemble_historical_pitcher_k_row(
     if opp_k is None:
         raise PitcherKHistoricalAssemblerError(f"opponent-K context unavailable: {why}")
 
-    lineup_k, _ = source._lineup_k_payload(
-        game_pk=int(game_id),
-        player_id=int(pitcher_id),
-        target_date=target_date,
-        opponent_id=int(opp_k["opponent_team_id"]),
-    )
+    # Historical final boxscores do not prove the target lineup was available
+    # pregame. Preserve the validated lineup-K fallback rather than leaking a
+    # postgame lineup reconstruction into the candidate test.
     composite = build_composite_candidate(
         workload=workload,
         opp_k_adjustment=opp_k,
-        lineup_k_adjustment=lineup_k,
+        lineup_k_adjustment=None,
     )
 
     pitcher_context, provenance = acquire_historical_statcast_pitcher(
-        entity_id=str(int(pitcher_id)),
+        pitcher_id=int(pitcher_id),
         target_date=target_date,
         opener=source.opener,
     )
