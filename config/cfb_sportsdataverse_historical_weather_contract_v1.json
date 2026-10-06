@@ -95,6 +95,16 @@
         ],
         "purpose": "RESOLVE_PINNED_CFBD_EXPORT_MISSING_REFERENCED_HISTORICAL_CFB_VENUE"
       }
+    ],
+    "alias_policy": "EXPLICIT_HASH_BOUND_PINNED_PHYSICAL_VENUE_ID_REMAP_NO_OVERRIDE",
+    "aliases": [
+      {
+        "venue_id": 2031,
+        "source_venue_id": 218,
+        "expected_source_name": "FIU Stadium",
+        "name": "Pitbull Stadium",
+        "purpose": "BIND_MODERN_SCHEDULE_VENUE_ID_TO_SAME_PINNED_PHYSICAL_VENUE"
+      }
     ]
   }
 }
