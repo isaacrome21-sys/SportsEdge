@@ -243,3 +243,37 @@ def test_score_count_bridge_does_not_invent_receiver_efficiency_when_whole_pool_
     assert out["receiving_efficiency_regularization"].get("home") in (None, [])
     assert all(row["status"] == "NO_MODEL" for row in out["prop_markets"])
 
+def test_missing_td_prerequisite_stays_local_and_does_not_poison_other_team():
+    paths = [{"home_score": 20, "away_score": 24} for _ in range(80)]
+    out = price_score_count_props_from_paths(
+        game_id="G",
+        score_paths=paths,
+        prop_requests=[
+            {
+                "team": "home",
+                "player": "NO_WR",
+                "market": "anytime_tds",
+                "selection": "over",
+                "line": 0.5,
+            },
+            {
+                "team": "away",
+                "player": "ATL_WR",
+                "market": "receiving_yards",
+                "selection": "over",
+                "line": 40.5,
+            },
+        ],
+        home_model=None,
+        away_model=_team("ATL"),
+        scoring_prior=None,
+        seed=13,
+    )
+    home_td, away_recv = out["prop_markets"]
+    assert home_td["status"] == "NO_MODEL"
+    assert home_td["reason"] == "SCORING_COMPOSITION_PRIOR_REQUIRED_FOR_TD_PROPS"
+    assert away_recv["status"] == "PRICED_RESEARCH"
+    assert out["prop_board_status"] == "AVAILABLE"
+    assert out["prop_board_error"] is None
+    assert out["team_simulation_errors"] == {}
+
