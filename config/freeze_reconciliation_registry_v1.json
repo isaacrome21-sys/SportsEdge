@@ -251,6 +251,35 @@
         "reason": "POST_08A12425_MAIN_MOVEMENT_CHANGED_MANIFEST_COVERED_SPORTSEDGE_DFS_AND_TEST_DFS_BYTES; PRIOR_MLB_DFS_EVIDENCE_FREEZE_INVALIDATED; REVOKED_FAIL_CLOSED_NO_AUTHORITY"
       },
       "freeze_sha": "7a92455f081ee52a454b2c49ff798d902a3ace68"
+    },
+    {
+      "bundle_id": "NHL_PUBLIC_BASELINE_VALIDATION_RESEARCH_FREEZE_V1",
+      "freeze_sha": "42cede78e9a03f72f2ac9d32e7c3f42f81e82b27",
+      "coverage_paths": [
+        "config/research/nhl_public_baseline_validation_prereg_v1.json",
+        "config/research/nhl_public_baseline_validation_protocol_v1.json",
+        "sportsedge/sports/nhl/public_baseline_validation.py",
+        "scripts/validate_nhl_public_baseline.py"
+      ],
+      "coverage_prefixes": [],
+      "disposition": null,
+      "identity": {
+        "schema": "NHL_PUBLIC_BASELINE_VALIDATION_RESEARCH_FREEZE_IDENTITY_V1",
+        "source_pull_request": 1744,
+        "bound_commit": "42cede78e9a03f72f2ac9d32e7c3f42f81e82b27",
+        "candidate_family": "NHL_PUBLIC_BOXSCORE_BASELINE_V1",
+        "earlier_preregistration_preserved": true,
+        "validation_window": "2025-10-01T00:00:00+00:00..2026-05-01T00:00:00+00:00",
+        "authority": {
+          "model_p": false,
+          "truth_gate": false,
+          "promotion": false,
+          "staking": false,
+          "official": false,
+          "bettor_facing_release": false
+        },
+        "note": "Zero-authority research binding for the preregistered official-boxscore NHL baseline validation. Historical receipts remain retrospective development data; VALIDATED_BET_MARKETS remains empty."
+      }
     }
   ],
   "deltas": [
