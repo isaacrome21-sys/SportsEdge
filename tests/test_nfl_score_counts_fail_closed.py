@@ -161,3 +161,91 @@ def test_score_count_runner_normalizes_pitts_and_branch_aliases_without_affectin
     assert props[2] == {"market": "total", "line": 44.5}
     assert len(bindings) == 2
 
+def test_score_count_bridge_regularizes_single_negative_receiver_without_killing_team():
+    home = _team("NO")
+    home["skill_players"].append({
+        "player": "NO_NEG",
+        "position": "RB",
+        "role_prior": {
+            "pass_attempts": 0,
+            "completion_rate": 0,
+            "pass_yards_per_completion": 0,
+            "pass_td_rate": 0,
+            "interception_rate": 0,
+            "rush_attempts": 1,
+            "rush_yards_per_attempt": 3.0,
+            "targets": 1,
+            "catch_rate": 1.0,
+            "receiving_yards_per_reception": -2.0,
+        },
+        "trailing": {},
+        "sample_size": 0,
+        "context": {"source": "role"},
+    })
+    paths = [{"home_score": 23, "away_score": 20} for _ in range(300)]
+    out = price_score_count_props_from_paths(
+        game_id="G",
+        score_paths=paths,
+        prop_requests=[
+            {
+                "team": "home",
+                "player": "NO_NEG",
+                "market": "receiving_yards",
+                "selection": "over",
+                "line": 0.5,
+            },
+            {
+                "team": "away",
+                "player": "ATL_WR",
+                "market": "receiving_yards",
+                "selection": "over",
+                "line": 40.5,
+            },
+        ],
+        home_model=home,
+        away_model=_team("ATL"),
+        seed=11,
+    )
+    assert out["prop_board_status"] == "AVAILABLE"
+    assert out["team_simulation_errors"] == {}
+    assert all(row["status"] == "PRICED_RESEARCH" for row in out["prop_markets"])
+    audit = out["receiving_efficiency_regularization"]["home"]
+    assert len(audit) == 1
+    assert audit[0]["player"] == "NO_NEG"
+    assert audit[0]["observed_stabilized_ypr"] == -2.0
+    assert audit[0]["replacement_ypr"] > 0
+
+
+def test_score_count_bridge_does_not_invent_receiver_efficiency_when_whole_pool_is_nonpositive():
+    home = _team("NO")
+    for row in home["skill_players"]:
+        row["role_prior"]["receiving_yards_per_reception"] = -2.0
+    paths = [{"home_score": 20, "away_score": 17} for _ in range(20)]
+    out = price_score_count_props_from_paths(
+        game_id="G",
+        score_paths=paths,
+        prop_requests=[
+            {
+                "team": "home",
+                "player": "NO_WR",
+                "market": "receiving_yards",
+                "selection": "under",
+                "line": 40.5,
+            },
+            {
+                "team": "away",
+                "player": "ATL_WR",
+                "market": "receiving_yards",
+                "selection": "over",
+                "line": 40.5,
+            },
+        ],
+        home_model=home,
+        away_model=_team("ATL"),
+        seed=12,
+    )
+    assert out["prop_board_status"] == "NO_MODEL"
+    assert "home" in out["team_simulation_errors"]
+    assert out["receiving_efficiency_regularization"].get("home") in (None, [])
+    assert all(row["status"] == "NO_MODEL" for row in out["prop_markets"])
+
