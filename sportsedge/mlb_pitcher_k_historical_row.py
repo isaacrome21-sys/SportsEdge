@@ -163,6 +163,10 @@ def bind_historical_statcast_skill(
     if provenance.get("same_day_rows_included") is not False or provenance.get("future_rows_included") is not False:
         raise PitcherKHistoricalRowError("same-day/future Statcast rows forbidden")
 
+    entity_id = str(pitcher_context.get("entity_id") or "").strip()
+    if not entity_id.isdigit():
+        raise PitcherKHistoricalRowError("pitcher context entity_id required")
+
     whiff_rate = _rate(pitcher_context.get("whiff_rate"), "whiff_rate")
     chase_rate = _rate(pitcher_context.get("chase_rate"), "chase_rate")
     swings = _positive_int(pitcher_context.get("swings"), "swings")
@@ -186,6 +190,7 @@ def bind_historical_statcast_skill(
     out["components"] = deepcopy(dict(candidate.get("components") or {}))
     out["components"]["pitcher_skill"] = {
         "source": "BASEBALL_SAVANT_STATCAST_30D",
+        "entity_id": entity_id,
         "whiff_rate": whiff_rate,
         "chase_rate": chase_rate,
         "swings": swings,
@@ -272,6 +277,11 @@ def build_historical_evaluation_row(
         raise PitcherKHistoricalRowError("historical candidate required")
     if candidate.get("forward_evidence_eligible") is not False:
         raise PitcherKHistoricalRowError("historical row cannot be forward evidence")
+    pitcher_skill = (candidate.get("components") or {}).get("pitcher_skill")
+    if not isinstance(pitcher_skill, Mapping):
+        raise PitcherKHistoricalRowError("pitcher skill component required")
+    if str(pitcher_skill.get("entity_id") or "") != str(int(pitcher_id)):
+        raise PitcherKHistoricalRowError("pitcher identity mismatch")
     k = int(realized_strikeouts)
     bf = int(realized_batters_faced)
     if bf <= 0 or k < 0 or k > bf:
