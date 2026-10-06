@@ -171,6 +171,17 @@ def build_score_count_phone_card(
                 except Exception as exc:
                     role_errors_by_side[side_name] = str(exc)
 
+            needs_two_team_roles = (
+                not every_prop_hinted
+                or hinted_teams == {home, away}
+            )
+            if role_errors_by_side and needs_two_team_roles:
+                detail = ";".join(
+                    f"{side}={role_errors_by_side[side]}"
+                    for side in sorted(role_errors_by_side)
+                )
+                role_error = f"GAME_PROP_ROLE_MODEL_INCOMPLETE:{detail}"
+
         game_requests: list[dict[str, Any]] = []
         prop_requests: list[dict[str, Any]] = []
         game_meta: list[dict[str, Any]] = []
