@@ -30,6 +30,7 @@ from sportsedge.sports.nfl.score_counts_market_bridge import (
 from sportsedge.sports.nfl.score_counts_prop_bridge import (
     price_score_count_prop_markets,
 )
+from sportsedge.sports.nfl.unified_market_engine import TD_PROP_MARKETS
 
 SCHEMA = "SPORTSEDGE_NFL_SCORE_COUNTS_PHONE_CARD_V1"
 
@@ -308,27 +309,36 @@ def build_score_count_phone_card(
 
         markets = [row for row in raw_game.get("markets") or [] if isinstance(row, Mapping)]
         prop_inputs = [row for row in markets if str(row.get("player") or "").strip()]
+        td_prop_path_ready = (
+            prediction_game.get("joint_score_td_distribution") is not None
+            or scoring_prior is not None
+        )
+        modelable_prop_inputs = [
+            row for row in prop_inputs
+            if str(row.get("market") or "").strip().lower() not in TD_PROP_MARKETS
+            or td_prop_path_ready
+        ]
         home_model = away_model = None
         role_error: str | None = None
         role_errors_by_side: dict[str, str] = {}
         hinted_teams = {
             str(row.get("team") or "").strip().upper()
-            for row in prop_inputs
+            for row in modelable_prop_inputs
             if str(row.get("team") or "").strip().upper() in {home, away}
         }
-        every_prop_hinted = bool(prop_inputs) and all(
+        every_prop_hinted = bool(modelable_prop_inputs) and all(
             str(row.get("team") or "").strip().upper() in {home, away}
-            for row in prop_inputs
+            for row in modelable_prop_inputs
         )
         requested_model_sides = (
             hinted_teams
             if every_prop_hinted
-            else ({home, away} if prop_inputs else set())
+            else ({home, away} if modelable_prop_inputs else set())
         )
 
-        if prop_inputs and not injury_source_ready:
+        if modelable_prop_inputs and not injury_source_ready:
             role_error = "INJURY_SOURCE_REQUIRED_FOR_LIVE_PROPS"
-        elif prop_inputs:
+        elif modelable_prop_inputs:
             for side_name, team_name in (("home", home), ("away", away)):
                 if team_name not in requested_model_sides:
                     continue
@@ -438,6 +448,18 @@ def build_score_count_phone_card(
             player = str(raw.get("player") or "").strip()
             if player:
                 line = float(raw["line"])
+                if market in TD_PROP_MARKETS and not td_prop_path_ready:
+                    for side_index, label in enumerate(("Over", "Under")):
+                        prop_meta.append({
+                            **_meta(
+                                pair_id=pair_id, input_index=input_index, side_index=side_index,
+                                selection=f"{player} {label}", line=line,
+                                price=prices[side_index], no_vig_p=no_vig[side_index],
+                                raw=raw_text, market=market, player=player,
+                            ),
+                            "synthetic_no_model_reason": "SCORING_COMPOSITION_PRIOR_REQUIRED_FOR_TD_PROPS",
+                        })
+                    continue
                 if role_error is not None:
                     for side_index, label in enumerate(("Over", "Under")):
                         prop_meta.append({
