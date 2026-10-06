@@ -29,6 +29,11 @@ class ManualMlbHistoryCacheWorkflowTests(unittest.TestCase):
         self.assertIn("name: manual-mlb-fast-priced-card", text)
         self.assertIn("compression-level: 0", text)
 
+    def test_optional_context_uses_bounded_parallel_workers(self):
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("scripts/acquire_mlb_card_context.py", text)
+        self.assertIn("--workers 4", text)
+
     def test_code_push_fallback_is_preserved(self):
         text = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("use_regression_fixture()", text)
