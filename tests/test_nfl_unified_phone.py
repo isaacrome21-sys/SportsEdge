@@ -12,6 +12,7 @@ from scripts.run_nfl_unified_lines_card import (
     _filter_role_v2_current_team_history,
     _name_alias_match,
     _normalize_ticket_prop_players,
+    _role_v2_model_diagnostics,
     _sanitize_signed_yardage_rows,
 )
 
@@ -833,4 +834,24 @@ def test_role_v2_inactive_player_history_cannot_steal_current_other_usage_mass()
     )
     assert [row["player_id"] for row in filtered] == ["starter"]
     assert receipts[0]["player_id"] == "out"
+
+def test_role_v2_diagnostics_expose_named_roles_and_other_mass():
+    diag = _role_v2_model_diagnostics(
+        ticket=full_board(),
+        schedule_games=schedule(),
+        depth_rows=depth(),
+        player_rows=player_stats(),
+        injury_rows=[],
+    )
+    assert len(diag) == 1
+    game = diag[0]
+    assert game["game_id"] == "2026_04_KC_BAL"
+    assert set(game["teams"]) == {"KC", "BAL"}
+    assert game["teams"]["KC"]["qb"]["player"] == "Patrick Mahomes"
+    assert game["teams"]["BAL"]["qb"]["player"] == "Lamar Jackson"
+    assert game["teams"]["KC"]["synthetic_other_catch_weight_share"] == 0.0
+    assert all(
+        "catch_allocation_weight" in row
+        for row in game["teams"]["KC"]["receivers"]
+    )
 
