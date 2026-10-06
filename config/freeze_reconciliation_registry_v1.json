@@ -251,6 +251,22 @@
         "reason": "POST_08A12425_MAIN_MOVEMENT_CHANGED_MANIFEST_COVERED_SPORTSEDGE_DFS_AND_TEST_DFS_BYTES; PRIOR_MLB_DFS_EVIDENCE_FREEZE_INVALIDATED; REVOKED_FAIL_CLOSED_NO_AUTHORITY"
       },
       "freeze_sha": "7a92455f081ee52a454b2c49ff798d902a3ace68"
+    },
+    {
+      "bundle_id": "NFL_PROP_SERVING_RUNTIME_FREEZE_V1",
+      "freeze_sha": "8324ee0f8ef1344072dad34b6bee0f4d51684af7",
+      "coverage_paths": [
+        "scripts/run_nfl_unified_lines_card.py",
+        "tests/test_nfl_unified_phone.py"
+      ],
+      "disposition": null,
+      "scope": "NFL_PROP_SERVING_INPUT_NORMALIZATION_BOARD_SAFETY_AND_PRESENTATION_ONLY",
+      "predictive_model_surface": false,
+      "promotion_authority": false,
+      "truth_gate_authority": false,
+      "staking_authority": false,
+      "official_authority": false,
+      "relationship_to_nfl_prop_model_freeze": "SEPARATE_RUNTIME_SURFACE_DOES_NOT_MODIFY_NFL_PROP_MODEL_FREEZE_V1_BYTES"
     }
   ],
   "deltas": [
