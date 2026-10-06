@@ -246,5 +246,50 @@ class InputResolutionTests(unittest.TestCase):
         self.assertIn("path=manual_inputs/mlb/2026-09-29_full.json", output)
 
 
+class MarketSanityGuardTests(unittest.TestCase):
+    def test_extreme_model_market_disagreement_is_review_not_actionable(self):
+        from sportsedge.mlb_myspari_own_model import apply_market_sanity_guard
+
+        rows = [{
+            "game_id": "A@B",
+            "market": "PITCHER_K",
+            "entity_id": "p1",
+            "side": "UNDER",
+            "line": 4.5,
+            "status": "ACTIONABLE",
+            "scored_status": "ACTIONABLE",
+            "estimate_p": 0.70,
+            "market_p": 0.43,
+            "presentation_reason_codes": (),
+        }]
+        out = apply_market_sanity_guard(rows)
+        self.assertEqual(out[0]["estimate_p"], 0.70)
+        self.assertEqual(out[0]["market_p"], 0.43)
+        self.assertAlmostEqual(out[0]["model_market_gap"], 0.27, places=9)
+        self.assertEqual(out[0]["scored_status"], "REVIEW")
+        self.assertIn("EXTREME_MODEL_MARKET_DISAGREEMENT_REVIEW", out[0]["presentation_reason_codes"])
+
+    def test_supported_extreme_model_market_disagreement_keeps_probability_untouched(self):
+        from sportsedge.mlb_myspari_own_model import apply_market_sanity_guard
+
+        rows = [{
+            "game_id": "A@B",
+            "market": "PITCHER_K",
+            "entity_id": "p1",
+            "side": "OVER",
+            "line": 6.5,
+            "status": "ACTIONABLE",
+            "scored_status": "ACTIONABLE",
+            "estimate_p": 0.72,
+            "market_p": 0.50,
+            "market_disagreement_supported": True,
+        }]
+        out = apply_market_sanity_guard(rows)
+        self.assertEqual(out[0]["scored_status"], "ACTIONABLE")
+        self.assertEqual(out[0]["estimate_p"], 0.72)
+        self.assertEqual(out[0]["market_p"], 0.50)
+
+
 if __name__ == "__main__":
     unittest.main()
+

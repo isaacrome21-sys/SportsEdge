@@ -1,0 +1,50 @@
+{
+  "schema": "SPORTSEDGE_MLB_CARD_POSTMORTEM_REFINEMENT_V1",
+  "status": "PREREGISTERED_NOT_VALIDATED",
+  "purpose": "Forward-safe card qualification refinements identified after the 2026-10-05 NYY-TB card; no outcome backfitting.",
+  "frozen_changes": {
+    "market_disagreement_review": {
+      "threshold_pp": 15,
+      "action": "REVIEW_NOT_ACTIONABLE",
+      "market_cannot_modify_estimate_p": true,
+      "override_requires": "independent preregistered model-side diagnostic"
+    },
+    "correlated_team_outcomes": {
+      "policy": "ONE_TEAM_OUTCOME_EXPRESSION_PER_GAME",
+      "existing_guard": "apply_same_game_guard"
+    },
+    "score_semantics": {
+      "policy": "SCORE_B_REMAINS_QUALIFICATION_ONLY",
+      "probability_edge_ev_do_not_add_points": true
+    },
+    "pitcher_k_next_candidate": {
+      "status": "RESEARCH_ONLY",
+      "components": [
+        "expected_batters_faced",
+        "opponent_k_probability",
+        "pitcher_whiff_chase",
+        "handedness",
+        "confirmed_projected_lineup",
+        "starter_leash"
+      ],
+      "rule": "Must validate on untouched PIT data before production use."
+    },
+    "team_total_tail_next_candidate": {
+      "status": "RESEARCH_ONLY",
+      "components": [
+        "starter_removal",
+        "bullpen_transition",
+        "defense_error_tail",
+        "sequencing_variance",
+        "overdispersion"
+      ],
+      "rule": "Must validate on untouched PIT data before production use."
+    }
+  },
+  "prohibited": [
+    "changing probabilities to agree with market",
+    "using 2026-10-05 outcome to fit parameters",
+    "backfilling a winning card",
+    "forcing team or over-under balance"
+  ]
+}
