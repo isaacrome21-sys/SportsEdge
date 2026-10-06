@@ -91,3 +91,5 @@ jobs:
             artifacts/mil_sd_prop_card/
           if-no-files-found: error
           retention-days: 14
+
+# rerun_stamp: 2026-10-06T15:47:00-05:00
