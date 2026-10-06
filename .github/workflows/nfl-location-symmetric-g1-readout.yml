@@ -1,0 +1,101 @@
+name: nfl-location-symmetric-g1-real-readout
+
+on:
+  pull_request:
+    paths:
+      - 'config/research/nfl_location_symmetric_g1_readout_execution_v1.json'
+      - 'scripts/run_nfl_location_symmetric_g1_readout.py'
+      - 'tests/test_nfl_location_symmetric_g1_readout_contract.py'
+      - '.github/workflows/nfl-location-symmetric-g1-readout.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'config/research/nfl_location_symmetric_g1_readout_execution_v1.json'
+      - 'scripts/run_nfl_location_symmetric_g1_readout.py'
+      - 'tests/test_nfl_location_symmetric_g1_readout_contract.py'
+      - '.github/workflows/nfl-location-symmetric-g1-readout.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+      - name: Install test dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-test.txt
+      - name: Compile and lock the G1 readout contract
+        run: |
+          python -m py_compile scripts/run_nfl_location_symmetric_g1_readout.py
+          python -m unittest             tests.test_nfl_location_symmetric_g1             tests.test_nfl_location_symmetric_g1_readout_contract
+
+  real_readout:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      READOUT_GIT_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.READOUT_GIT_SHA }}
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+      - name: Install runtime dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-test.txt
+      - name: Materialize exact frozen NFL production-M2 sources
+        run: >-
+          python scripts/materialize_nfl_frozen_sources.py
+          --source-contract config/nfl_promotion_source_freeze_v1.json
+          --output-root artifacts/football/sources
+          --attestation-out artifacts/football/nfl_g1_source_materialization_attestation.json
+      - name: Run first real reused-history G1 readout
+        env:
+          TZ: UTC
+        run: >-
+          python scripts/run_nfl_location_symmetric_g1_readout.py
+          --schedule-file artifacts/football/sources/games.csv
+          --pbp-dir artifacts/football/sources/pbp
+          --participation-dir artifacts/football/sources/participation
+          --depth-dir artifacts/football/sources/depth
+          --stadium-file artifacts/football/sources/team_stadiums.csv
+          --starter-override-file artifacts/football/sources/nfl_historical_starter_overrides.json
+          --git-sha "$READOUT_GIT_SHA"
+          --start-season 2016
+          --end-season 2025
+          --output artifacts/football/nfl_location_symmetric_g1_readout.json
+      - name: Enforce research-only readout receipt
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('artifacts/football/nfl_location_symmetric_g1_readout.json')
+          r=json.loads(p.read_text())
+          assert r['schema']=='NFL_LOCATION_SYMMETRIC_G1_REAL_READOUT_V1'
+          assert r['evidence_role']=='REUSED_RESEARCH_HISTORY_NOT_UNTOUCHED_PROMOTION_EVIDENCE'
+          assert r['history_row_count'] > 0
+          assert not any(v for k,v in r['authority'].items() if k != 'research_only')
+          assert r['authority']['research_only'] is True
+          print(json.dumps({
+              'status': r['location_validation']['status'],
+              'location_gate_pass': r['location_validation']['location_gate_pass'],
+              'history_row_count': r['history_row_count'],
+              'source_manifest_sha256': r['source_manifest_sha256'],
+          }, sort_keys=True))
+          PY
+      - name: Upload G1 readout
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-location-symmetric-g1-readout-${{ env.READOUT_GIT_SHA }}
+          path: |
+            artifacts/football/nfl_location_symmetric_g1_readout.json
+            artifacts/football/nfl_g1_source_materialization_attestation.json
+          if-no-files-found: error
+          retention-days: 90
