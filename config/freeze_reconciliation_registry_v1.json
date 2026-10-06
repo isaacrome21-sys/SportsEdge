@@ -279,6 +279,32 @@
         },
         "note": "Fresh zero-authority research binding for the preregistered symmetric NFL margin/total location challenger. Does not alter or revive M2/V2K failures and does not authorize historical or prospective betting use."
       }
+    },
+    {
+      "bundle_id": "NFL_PROP_SERVING_RUNTIME_POST_G1_RECONCILED_V1",
+      "freeze_sha": "62eae93969c1b7d239249433845670927e2104e6",
+      "coverage_paths": [
+        "scripts/run_nfl_unified_lines_card.py"
+      ],
+      "coverage_prefixes": [],
+      "disposition": null,
+      "identity": {
+        "schema": "NFL_PROP_SERVING_RUNTIME_FREEZE_IDENTITY_V1",
+        "source_pull_request": 1751,
+        "reconciled_serving_commit": "62eae93969c1b7d239249433845670927e2104e6",
+        "bound_path": "scripts/run_nfl_unified_lines_card.py",
+        "prior_freeze_reused": false,
+        "nfl_location_g1_authority_inherited": false,
+        "authority": {
+          "model_p": false,
+          "truth_gate": false,
+          "promotion": false,
+          "staking": false,
+          "official": false,
+          "validation_attempt": false
+        },
+        "note": "Fresh zero-authority serving-runtime binding after NFL_LOCATION_SYMMETRIC_RIDGE_G1 merged. Preserves the G1 registry entry and grants no game-market or promotion authority."
+      }
     }
   ],
   "deltas": [
