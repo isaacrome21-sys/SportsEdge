@@ -9,6 +9,7 @@ from sportsedge.nfl_unified_phone import build_unified_phone_card
 from scripts.run_nfl_unified_lines_card import (
     _apply_prop_board_safety,
     _apply_role_v2_recency,
+    _filter_role_v2_current_team_history,
     _name_alias_match,
     _normalize_ticket_prop_players,
     _sanitize_signed_yardage_rows,
@@ -764,4 +765,72 @@ def test_role_v2_does_not_force_recency_mode_before_four_current_games():
     )
     assert len(filtered) == 4
     assert receipts == []
+
+def test_role_v2_removes_departed_player_current_team_history_from_other_bucket_mass():
+    rows = [
+        {
+            "player_id": "active",
+            "player_name": "Active WR",
+            "recent_team": "ATL",
+            "season": 2026,
+            "week": 4,
+            "targets": 8,
+        },
+        {
+            "player_id": "departed",
+            "player_name": "Departed WR",
+            "recent_team": "ATL",
+            "season": 2025,
+            "week": 17,
+            "targets": 9,
+        },
+        {
+            "player_id": "active",
+            "player_name": "Active WR",
+            "recent_team": "OLD",
+            "season": 2025,
+            "week": 17,
+            "targets": 7,
+        },
+    ]
+    filtered, receipts = _filter_role_v2_current_team_history(
+        rows,
+        active_ids_by_team={"ATL": {"active"}},
+    )
+    assert {(row["player_id"], row["recent_team"]) for row in filtered} == {
+        ("active", "ATL"),
+        ("active", "OLD"),
+    }
+    assert receipts == [{
+        "team": "ATL",
+        "player_id": "departed",
+        "player_name": "Departed WR",
+        "rows_removed": 1,
+        "reason": "NOT_ON_CURRENT_ACTIVE_DEPTH_SNAPSHOT",
+    }]
+
+
+def test_role_v2_inactive_player_history_cannot_steal_current_other_usage_mass():
+    rows = [
+        {
+            "player_id": "starter",
+            "player_name": "Starter TE",
+            "recent_team": "NO",
+            "season": 2026,
+            "week": 4,
+        },
+        {
+            "player_id": "out",
+            "player_name": "Out TE",
+            "recent_team": "NO",
+            "season": 2026,
+            "week": 4,
+        },
+    ]
+    filtered, receipts = _filter_role_v2_current_team_history(
+        rows,
+        active_ids_by_team={"NO": {"starter"}},
+    )
+    assert [row["player_id"] for row in filtered] == ["starter"]
+    assert receipts[0]["player_id"] == "out"
 
