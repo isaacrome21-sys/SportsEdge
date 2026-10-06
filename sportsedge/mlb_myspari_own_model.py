@@ -197,7 +197,9 @@ def myspari_rows(payload: Mapping[str, Any], *, quote_age_seconds: float = 0.0,
 
     # Real same-game selection sees LEAN rows as non-actionable, so they cannot
     # knock an ACTIONABLE side/total (or any other core play) off the card.
-    return build_mlb_scored_card(\n        apply_market_sanity_guard(apply_same_game_guard(scored))\n    )\n
+    return build_mlb_scored_card(
+        apply_market_sanity_guard(apply_same_game_guard(scored))
+    )
 
 # --- Same-game guard --------------------------------------------------------
 # Presentation-only: never changes a probability. It blocks exact contract
