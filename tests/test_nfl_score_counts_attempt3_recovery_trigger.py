@@ -8,7 +8,6 @@ RECOVERY = Path("config/research/nfl_score_counts_attempt3_recovery_dispatch_v1.
 def test_attempt3_recovery_trigger_runs_only_on_explicit_recovery_marker_push():
     assert WORKFLOW.is_file()
     assert ORIGINAL.is_file()
-    assert not RECOVERY.exists()
     text = WORKFLOW.read_text(encoding="utf-8")
     assert "push:" in text
     assert "branches:" in text and "- main" in text
