@@ -28,5 +28,20 @@
     "staking": false,
     "official": false,
     "bettor_facing_release": false
+  },
+  "execution_revision": 2,
+  "retry": {
+    "prior_run_id": 37510907585,
+    "prior_run_head_sha": "da832d1284dbc791bbe3d169ed93b4fda1d03f54",
+    "prior_rows_file_sha256": "73a45f532599a57b8072dfb0c7647664115ec35496de94367f806dff1c3b71ba",
+    "prior_materialized_row_count": 7269,
+    "duplicate_identity_groups": 37,
+    "duplicate_extra_rows": 38,
+    "all_duplicate_copies_byte_identical": true,
+    "failure_stage": "PRE_EVALUATION_ROW_IDENTITY_VALIDATION",
+    "candidate_metrics_computed": false,
+    "model_parameters_changed": false,
+    "evaluation_thresholds_changed": false,
+    "repair_scope": "DEDUPLICATE_EXACT_IDENTICAL_HISTORICAL_IDENTITIES_ONLY"
   }
 }
