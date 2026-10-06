@@ -44,6 +44,22 @@ def test_price_helpers_and_devig():
     assert not R.is_half_line(5.0)
 
 
+def test_cache_once_does_not_eagerly_reload_on_cache_hit():
+    calls = []
+    cache = {}
+
+    def loader():
+        calls.append("load")
+        return {"value": 7}
+
+    first = R._cache_once(cache, "game", loader)
+    second = R._cache_once(cache, "game", loader)
+
+    assert first == {"value": 7}
+    assert second is first
+    assert calls == ["load"]
+
+
 def test_select_units_keeps_last_snapshot_that_is_actually_two_sided():
     p1 = _payload("2026-10-04T20:00:00+00:00", [
         _quote("OVER", -110, captured="2026-10-04T20:00:00+00:00"),
