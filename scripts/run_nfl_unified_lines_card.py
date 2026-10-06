@@ -57,7 +57,7 @@ _TEAM_FATAL_REASON_PREFIXES = (
 
 
 def _team_fatal_reason(team_rows: list[dict]) -> str | None:
-    """Identify a repeated team-simulation crash, not an individual row miss."""
+    """Identify a team-simulation crash while ignoring unrelated row-local misses."""
     if not team_rows or any(row.get("status") == "PRICED" for row in team_rows):
         return None
     reasons = {
@@ -65,10 +65,15 @@ def _team_fatal_reason(team_rows: list[dict]) -> str | None:
         for row in team_rows
         if str(row.get("reason") or "").strip()
     }
-    if len(reasons) != 1:
+    fatal = sorted(
+        reason for reason in reasons
+        if reason.startswith(_TEAM_FATAL_REASON_PREFIXES)
+    )
+    if not fatal:
         return None
-    reason = next(iter(reasons))
-    return reason if reason.startswith(_TEAM_FATAL_REASON_PREFIXES) else None
+    if len(fatal) == 1:
+        return fatal[0]
+    return "MULTIPLE_TEAM_SIMULATION_ERRORS:" + "|".join(fatal)
 
 
 def _name_tokens(value) -> list[str]:
