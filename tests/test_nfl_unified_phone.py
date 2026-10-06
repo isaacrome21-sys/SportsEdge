@@ -8,6 +8,7 @@ from sportsedge.nfl_lines_intake import parse_nfl_lines, tickets_to_dict
 from sportsedge.nfl_unified_phone import build_unified_phone_card
 from scripts.run_nfl_unified_lines_card import (
     _apply_prop_board_safety,
+    _apply_role_v2_recency,
     _name_alias_match,
     _normalize_ticket_prop_players,
     _sanitize_signed_yardage_rows,
@@ -690,4 +691,77 @@ def test_selection_concentration_is_flagged_but_never_rebalanced():
     assert "SELECTED_PROP_DIRECTION_CONCENTRATED_UNDER" in diag["alerts"]
     assert diag["selection_changed_by_diagnostic"] is False
     assert len(out["selected_rows"]) == 6
+
+def test_role_v2_uses_current_season_plus_one_prior_anchor_after_four_games():
+    rows = []
+    for week in range(13, 18):
+        rows.append({
+            "player_id": "p",
+            "player_name": "Player",
+            "season": 2025,
+            "week": week,
+            "season_type": "REG",
+            "targets": 4,
+        })
+    for week, targets in enumerate((9, 10, 11, 12), start=1):
+        rows.append({
+            "player_id": "p",
+            "player_name": "Player",
+            "season": 2026,
+            "week": week,
+            "season_type": "REG",
+            "targets": targets,
+        })
+
+    filtered, receipts = _apply_role_v2_recency(
+        rows,
+        target_season=2026,
+        target_week=5,
+    )
+    player = [row for row in filtered if row["player_id"] == "p"]
+    assert [(int(row["season"]), int(row["week"])) for row in player] == [
+        (2025, 17),
+        (2026, 1),
+        (2026, 2),
+        (2026, 3),
+        (2026, 4),
+    ]
+    assert receipts == [{
+        "player_id": "p",
+        "player_name": "Player",
+        "current_season_games": 4,
+        "prior_anchor_games": 1,
+        "source_rows_before": 9,
+        "source_rows_after": 5,
+        "mode": "CURRENT_SEASON_PLUS_ONE_PRIOR_ANCHOR",
+    }]
+
+
+def test_role_v2_does_not_force_recency_mode_before_four_current_games():
+    rows = [
+        {
+            "player_id": "p",
+            "player_name": "Player",
+            "season": 2025,
+            "week": 17,
+            "season_type": "REG",
+        },
+        *[
+            {
+                "player_id": "p",
+                "player_name": "Player",
+                "season": 2026,
+                "week": week,
+                "season_type": "REG",
+            }
+            for week in (1, 2, 3)
+        ],
+    ]
+    filtered, receipts = _apply_role_v2_recency(
+        rows,
+        target_season=2026,
+        target_week=4,
+    )
+    assert len(filtered) == 4
+    assert receipts == []
 
