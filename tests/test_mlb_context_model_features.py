@@ -46,3 +46,17 @@ def test_attach_preserves_existing_model_fields():
     assert out["pregame_context_price_blind"] is True
     assert out["pregame_context_version"] == "mlb_context_model_features_v1"
 
+
+def test_ineligible_live_context_is_neutralized_before_model():
+    bundle = _bundle()
+    bundle["lineups"]["complete_by_side"]["home"] = False
+    bundle["umpire"]["home_plate_games"] = 5
+    bundle["weather_roof"]["roof_state"] = "closed"
+    out = context_model_features(bundle)
+    assert out["features"]["away_lineup_confirmed"] is None
+    assert out["features"]["home_lineup_confirmed"] is None
+    assert out["features"]["umpire_sample_games"] is None
+    assert out["features"]["temperature_f"] is None
+    assert out["features"]["wind_mph"] is None
+    assert out["eligibility"]["roof_closed"] is True
+
