@@ -1,0 +1,60 @@
+name: manual-mlb-lad-atl-1609
+
+on:
+  push:
+    branches:
+      - 'run/mlb-lad-atl-20261006-1609'
+    paths:
+      - '.github/workflows/manual-mlb-lad-atl-1609.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  run-card:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install runtime dependency
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
+      - name: Price fresh LAD-ATL board
+        run: >-
+          python scripts/run_manual_mlb_snapshot.py
+          --input manual_inputs/mlb/2026-10-06_dodgers_braves_dk_1609.json
+          --history-cache-dir .cache/mlb-history
+          --run-date 2026-10-06
+          --max-age-minutes 60
+          --output artifacts/lad_atl_1609.json
+      - name: Acquire live pregame context
+        run: >-
+          python scripts/acquire_mlb_card_context.py
+          --engine-output artifacts/lad_atl_1609.json
+          --out-dir artifacts/lad_atl_1609_context
+      - name: Render SportsEdge card
+        run: >-
+          python scripts/render_mlb_myspari_card.py
+          --engine-output artifacts/lad_atl_1609.json
+          --snapshot manual_inputs/mlb/2026-10-06_dodgers_braves_dk_1609.json
+          --context-dir artifacts/lad_atl_1609_context
+          --out-dir artifacts/lad_atl_1609_card
+      - name: Print final card
+        run: |
+          echo "FINAL_CARD_BEGIN"
+          cat artifacts/lad_atl_1609_card/card.md
+          echo "FINAL_CARD_END"
+      - name: Upload result
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lad-atl-1609-${{ github.sha }}
+          path: |
+            artifacts/lad_atl_1609.json
+            artifacts/lad_atl_1609_context/
+            artifacts/lad_atl_1609_card/
+          if-no-files-found: error
+          retention-days: 14
