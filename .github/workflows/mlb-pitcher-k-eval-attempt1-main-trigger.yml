@@ -1,0 +1,158 @@
+name: mlb-pitcher-k-eval-attempt1-main-trigger
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'config/research/mlb_pitcher_k_eval_attempt1_dispatch_v1.json'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mlb-pitcher-k-eval-attempt-1-main-trigger
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Install frozen runtime dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-test.txt
+
+      - name: Validate one-shot MLB pitcher-K Attempt-1 marker
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("config/research/mlb_pitcher_k_eval_attempt1_dispatch_v1.json")
+          x = json.loads(p.read_text(encoding="utf-8"))
+          assert x["schema"] == "SPORTSEDGE_MLB_PITCHER_K_EVAL_ATTEMPT1_DISPATCH_V1"
+          assert x["status"] == "ARMED_SINGLE_MAIN_PUSH"
+          assert x["candidate_family"] == "RIDGE_LOGIT_K_RATE_BETA_BINOMIAL_V1"
+          assert x["attempt_number"] == 1
+          assert x["confirmation"] == "CONSUME_MLB_PITCHER_K_EVAL_ATTEMPT_1"
+          assert x["rules"]["trigger_only_when_this_marker_lands_on_main"] is True
+          assert x["rules"]["candidate_specific_historical_test"] is True
+          assert x["rules"]["historical_backfill_is_not_forward_evidence"] is True
+          assert x["rules"]["forward_evidence"] is False
+          assert x["rules"]["model_p"] is False
+          assert x["rules"]["promotion"] is False
+          assert x["rules"]["staking"] is False
+          assert x["rules"]["official"] is False
+          assert x["rules"]["no_post_readout_tuning"] is True
+          assert x["rules"]["no_sportsbook_price_as_model_feature"] is True
+          assert not any(v for k, v in x["authority"].items() if k != "research_only")
+          print("mlb_pitcher_k_attempt1_marker=PASS")
+          PY
+
+      - name: Materialize frozen 2023-2025 historical rows
+        run: |
+          mkdir -p artifacts/mlb/pitcher_k/attempt_1
+          PYTHONPATH=. python scripts/materialize_mlb_pitcher_k_evaluation_rows.py \
+            --output artifacts/mlb/pitcher_k/attempt_1/rows.json \
+            --cache-dir .cache/mlb-pitcher-k-history \
+            --statcast-chunk-days 45
+
+      - name: Evaluate frozen candidate exactly once
+        run: |
+          PYTHONPATH=. python - <<'PY'
+          import json
+          from pathlib import Path
+          from sportsedge.mlb_pitcher_k_evaluation_runner import run_file
+          src = Path("artifacts/mlb/pitcher_k/attempt_1/rows.json")
+          dst = Path("artifacts/mlb/pitcher_k/attempt_1/evaluation.json")
+          out = run_file(src, dst)
+          summary = {
+              "row_count": out["row_count"],
+              "rows_sha256": out["rows_sha256"],
+              "artifact_sha256": out["artifact_sha256"],
+              "passes_development_gate": out["evaluation"]["passes_development_gate"],
+              "blockers": out["evaluation"]["blockers"],
+              "metrics": out["evaluation"]["metrics"],
+              "authority": out["authority"],
+          }
+          Path("artifacts/mlb/pitcher_k/attempt_1/summary.json").write_text(
+              json.dumps(summary, sort_keys=True, indent=2, allow_nan=False) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(summary, sort_keys=True))
+          PY
+
+      - name: Upload immutable evaluation artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mlb-pitcher-k-eval-attempt-1-${{ github.sha }}
+          path: artifacts/mlb/pitcher_k/attempt_1/
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Persist completed evaluation to data branch
+        if: success()
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: data
+          path: data-branch
+          persist-credentials: true
+
+      - name: Commit immutable Attempt-1 readout
+        if: success()
+        env:
+          CODE_HEAD_SHA: ${{ github.sha }}
+          WORKFLOW_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          DEST="data-branch/evidence/mlb_pitcher_k/attempt_1"
+          mkdir -p "$DEST"
+          cp artifacts/mlb/pitcher_k/attempt_1/rows.json "$DEST/rows.json"
+          cp artifacts/mlb/pitcher_k/attempt_1/evaluation.json "$DEST/evaluation.json"
+          cp artifacts/mlb/pitcher_k/attempt_1/summary.json "$DEST/summary.json"
+          CODE_HEAD_SHA="$CODE_HEAD_SHA" WORKFLOW_RUN_ID="$WORKFLOW_RUN_ID" DEST="$DEST" python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          root = Path(os.environ["DEST"])
+          receipt = {
+              "schema": "SPORTSEDGE_MLB_PITCHER_K_EVAL_ATTEMPT1_RECEIPT_V1",
+              "attempt_number": 1,
+              "code_head_sha": os.environ["CODE_HEAD_SHA"],
+              "workflow_run_id": int(os.environ["WORKFLOW_RUN_ID"]),
+              "rows_sha256": hashlib.sha256((root / "rows.json").read_bytes()).hexdigest(),
+              "evaluation_sha256": hashlib.sha256((root / "evaluation.json").read_bytes()).hexdigest(),
+              "summary_sha256": hashlib.sha256((root / "summary.json").read_bytes()).hexdigest(),
+              "historical_reconstruction": True,
+              "forward_evidence_eligible": False,
+              "promotion_authority": False,
+              "model_p_authority": False,
+              "official_authority": False,
+          }
+          (root / "receipt.json").write_text(
+              json.dumps(receipt, sort_keys=True, separators=(",", ":")) + "\n",
+              encoding="utf-8",
+          )
+          PY
+          cd data-branch
+          git config user.name "sportsedge-data-bot"
+          git config user.email "sportsedge-data-bot@users.noreply.github.com"
+          git add evidence/mlb_pitcher_k/attempt_1
+          if git diff --cached --quiet; then
+            echo "Attempt-1 readout already durable; refusing duplicate mutation."
+            exit 0
+          fi
+          if git ls-tree -r --name-only HEAD evidence/mlb_pitcher_k/attempt_1 | grep -q .; then
+            echo "ATTEMPT_1_ALREADY_EXISTS_ON_DATA_BRANCH"
+            exit 3
+          fi
+          git commit -m "evidence: persist MLB pitcher-K evaluation Attempt 1"
+          git push origin HEAD:data
