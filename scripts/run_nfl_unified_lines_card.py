@@ -12,7 +12,7 @@ from copy import deepcopy
 import json
 from pathlib import Path
 
-from sportsedge.nfl_unified_phone import build_unified_phone_card
+from sportsedge.nfl_unified_phone import _match_schedule, _utc, build_unified_phone_card
 from sportsedge.nfl_scoring_composition_artifact import load_prior_file
 from sportsedge.sports.nfl.auto_slate import discover_nfl_auto_games
 from sportsedge.sports.nfl.context_autopull import NFLContextError
@@ -73,6 +73,99 @@ def _sanitize_signed_yardage_rows(player_rows: list[dict]) -> tuple[list[dict], 
             row[field] = 0.0
         out.append(row)
     return out, receipts
+
+
+ROLE_V2_MIN_CURRENT_GAMES = 4
+ROLE_V2_PRIOR_ANCHOR_GAMES = 1
+
+
+def _ticket_target_season_week(ticket: dict, schedule_games: list[dict]) -> tuple[int, int]:
+    observed = _utc(ticket.get("observed_at"), "observed_at")
+    targets: set[tuple[int, int]] = set()
+    for raw_game in ticket.get("games") or []:
+        away = str(raw_game.get("away") or "").strip().upper()
+        home = str(raw_game.get("home") or "").strip().upper()
+        matched = _match_schedule(
+            schedule_games,
+            away=away,
+            home=home,
+            observed_at=observed,
+        )
+        targets.add((int(matched["season"]), int(matched["week"])))
+    if len(targets) != 1:
+        raise SystemExit("NFL_ROLE_V2_SINGLE_SEASON_WEEK_REQUIRED")
+    return next(iter(targets))
+
+
+def _apply_role_v2_recency(
+    player_rows: list[dict],
+    *,
+    target_season: int,
+    target_week: int,
+) -> tuple[list[dict], list[dict]]:
+    """Early-season recency candidate: 4+ current games dominate stale prior roles.
+
+    For a player with at least four strictly-prior games in the target season,
+    retain all current-season rows plus only the single most recent older row as
+    a prior anchor. Players with fewer than four current games keep the existing
+    source history unchanged. The rule is player-local and market-blind.
+    """
+    grouped: dict[str, list[dict]] = {}
+    passthrough: list[dict] = []
+    for raw in player_rows:
+        row = dict(raw)
+        pid = str(row.get("player_id") or row.get("gsis_id") or "").strip()
+        if not pid:
+            passthrough.append(row)
+            continue
+        grouped.setdefault(pid, []).append(row)
+
+    kept: list[dict] = list(passthrough)
+    receipts: list[dict] = []
+    for pid, rows in grouped.items():
+        def sw(row: dict) -> tuple[int, int]:
+            try:
+                return int(float(row.get("season"))), int(float(row.get("week")))
+            except (TypeError, ValueError):
+                return (-1, -1)
+
+        ordered = sorted(rows, key=sw)
+        current = [
+            row for row in ordered
+            if sw(row)[0] == int(target_season) and 0 < sw(row)[1] < int(target_week)
+            and str(row.get("season_type") or "REG").strip().upper() == "REG"
+        ]
+        current_weeks = sorted({sw(row)[1] for row in current})
+        if len(current_weeks) < ROLE_V2_MIN_CURRENT_GAMES:
+            kept.extend(ordered)
+            continue
+
+        older = [
+            row for row in ordered
+            if sw(row)[0] < int(target_season)
+            and str(row.get("season_type") or "REG").strip().upper() == "REG"
+        ]
+        anchors = older[-ROLE_V2_PRIOR_ANCHOR_GAMES:] if ROLE_V2_PRIOR_ANCHOR_GAMES else []
+        chosen_ids = {id(row) for row in current + anchors}
+        # Rows are copies, so identity is safe within this local list.
+        selected = current + anchors
+        kept.extend(selected)
+        receipts.append({
+            "player_id": pid,
+            "player_name": str((current[-1] if current else ordered[-1]).get("player_name") or ""),
+            "current_season_games": len(current_weeks),
+            "prior_anchor_games": len(anchors),
+            "source_rows_before": len(ordered),
+            "source_rows_after": len(selected),
+            "mode": "CURRENT_SEASON_PLUS_ONE_PRIOR_ANCHOR",
+        })
+
+    kept.sort(key=lambda row: (
+        int(float(row.get("season") or -1)) if str(row.get("season") or "").replace(".", "", 1).isdigit() else -1,
+        int(float(row.get("week") or -1)) if str(row.get("week") or "").replace(".", "", 1).isdigit() else -1,
+        str(row.get("player_id") or row.get("gsis_id") or ""),
+    ))
+    return kept, sorted(receipts, key=lambda row: row["player_id"])
 
 
 _NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
@@ -427,6 +520,12 @@ def main() -> int:
     scoring_prior = load_prior_file(args.scoring_prior) if args.scoring_prior else None
 
     player_rows, signed_yardage_receipts = _sanitize_signed_yardage_rows(player_rows)
+    role_v2_season, role_v2_week = _ticket_target_season_week(ticket, schedule_games)
+    player_rows, role_v2_receipts = _apply_role_v2_recency(
+        player_rows,
+        target_season=role_v2_season,
+        target_week=role_v2_week,
+    )
     ticket, alias_bindings = _normalize_ticket_prop_players(ticket, depth_rows)
 
     payload = build_unified_phone_card(
@@ -446,6 +545,16 @@ def main() -> int:
     payload["schedule_source_sha256"] = plan.get("schedule_source_sha256")
     payload["player_alias_bindings"] = alias_bindings
     payload["signed_yardage_adaptations"] = signed_yardage_receipts
+    payload["role_model_candidate"] = {
+        "family": "NFL_MARKET_CONTEXT_PROP_V2_RECENCY",
+        "target_season": role_v2_season,
+        "target_week": role_v2_week,
+        "min_current_games": ROLE_V2_MIN_CURRENT_GAMES,
+        "prior_anchor_games": ROLE_V2_PRIOR_ANCHOR_GAMES,
+        "player_receipts": role_v2_receipts,
+        "market_data_used": False,
+        "research_only": True,
+    }
 
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
