@@ -1,0 +1,73 @@
+{
+  "schema": "SPORTSEDGE_NFL_MARKET_CONTEXT_PROP_V2_RECENCY_PREREG_V1",
+  "status": "FROZEN_BEFORE_2026_WEEK5_FORWARD_EVIDENCE",
+  "frozen_date": "2026-10-05",
+  "candidate_family": "NFL_MARKET_CONTEXT_PROP_V2_RECENCY",
+  "purpose": "Reduce stale previous-season workload influence in early-season NFL player roles without using sportsbook prop lines or prices as predictive inputs.",
+  "role_recency_rule": {
+    "strictly_prior_rows_only": true,
+    "target_season_regular_games_required": 4,
+    "when_threshold_met": "KEEP_ALL_STRICTLY_PRIOR_TARGET_SEASON_ROWS_PLUS_ONE_MOST_RECENT_OLDER_REGULAR_SEASON_ROW",
+    "older_anchor_games": 1,
+    "when_threshold_not_met": "PRESERVE_EXISTING_SOURCE_HISTORY",
+    "player_local": true,
+    "market_blind": true,
+    "postkickoff_rows_forbidden": true
+  },
+  "signed_yardage_support": {
+    "applies_before_frozen_v1_role_builder": true,
+    "fields": [
+      "passing_yards",
+      "rushing_yards",
+      "receiving_yards"
+    ],
+    "negative_weekly_yardage_numerator": "FLOOR_TO_ZERO_WITH_EXPLICIT_AUDIT_RECEIPT",
+    "volume_and_count_fields_unchanged": true,
+    "reason": "CURRENT_COHERENT_PASSING_AND_RECEIVING_SIMULATOR_HAS_NONNEGATIVE_YARDAGE_SUPPORT"
+  },
+  "game_environment": {
+    "source": "SPORTSBOOK_MARKET_CENTER_CONTEXT_ONLY",
+    "creates_game_market_edge": false,
+    "spread_or_total_price_as_prop_feature": false
+  },
+  "selection_safety": {
+    "team_simulation_failure_invalidates_two_team_prop_board": true,
+    "individual_player_or_market_no_model_does_not_invalidate_opposite_team": true,
+    "single_team_quote_board_allowed": true,
+    "one_team_or_direction_concentration_is_diagnostic_only": true,
+    "forced_team_balance": false,
+    "forced_over_under_balance": false
+  },
+  "forward_window": {
+    "season": 2026,
+    "first_eligible_week": 5,
+    "last_eligible_week": 18,
+    "backfill_allowed": false
+  },
+  "validation": {
+    "per_market_independent": true,
+    "minimum_decision_rows_per_market": 100,
+    "calibration_metric": "ABS_MEAN_P_OVER_MINUS_OBSERVED_OVER_RATE",
+    "calibration_max": 0.06,
+    "candidate_brier_must_be_lte_devigged_market_brier": true,
+    "candidate_log_loss_must_be_lte_devigged_market_log_loss": true,
+    "missing_sample_behavior": "MARKET_STAYS_RESEARCH_NO_MODEL",
+    "no_market_can_borrow_another_markets_sample": true,
+    "no_parameter_retuning_after_first_forward_readout": true
+  },
+  "presentation": {
+    "market_probability_field": "market_no_vig_p",
+    "model_probability_field": "estimate_p",
+    "score_field": "score_0_100",
+    "team_records": "OMIT_UNLESS_EXPLICITLY_SOURCED"
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "game_market_edge": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "backfill": false
+  }
+}
