@@ -35,9 +35,6 @@ def _has_props(ticket: dict) -> bool:
 
 
 _NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
-_GAME_MARKETS = frozenset({"moneyline", "spread", "total", "team_total"})
-
-
 def _name_tokens(value) -> list[str]:
     text = str(value or "").casefold()
     for mark in (".", ",", "-", "'", "’"):
@@ -111,6 +108,7 @@ def _apply_prop_board_safety(payload: dict, ticket: dict) -> dict:
         raw_game = ticket_games[game_index]
         away = str(raw_game.get("away") or "").strip().upper()
         home = str(raw_game.get("home") or "").strip().upper()
+        rows = game.get("rows") or []
         prop_indexes_by_team: dict[str, set[int]] = {}
         all_prop_indexes: set[int] = set()
         for input_index, raw in enumerate(raw_game.get("markets") or []):
@@ -118,10 +116,20 @@ def _apply_prop_board_safety(payload: dict, ticket: dict) -> dict:
                 continue
             all_prop_indexes.add(input_index)
             team = str(raw.get("team") or "").strip().upper()
+            if team not in {away, home}:
+                engine_sides = {
+                    str(row.get("team") or "").strip().lower()
+                    for row in rows
+                    if int(row.get("input_index", -1)) == input_index
+                    and str(row.get("team") or "").strip().lower() in {"home", "away"}
+                }
+                if engine_sides == {"home"}:
+                    team = home
+                elif engine_sides == {"away"}:
+                    team = away
             if team in {away, home}:
                 prop_indexes_by_team.setdefault(team, set()).add(input_index)
 
-        rows = game.get("rows") or []
         failed_teams: list[str] = []
         if len(prop_indexes_by_team) >= 2:
             for team, indexes in sorted(prop_indexes_by_team.items()):
