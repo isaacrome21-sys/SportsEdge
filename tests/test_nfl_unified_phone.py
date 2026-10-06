@@ -560,3 +560,44 @@ def test_runner_safety_allows_single_team_quoted_prop_board():
     assert len(out["selected_rows"]) == 1
     assert out["prop_board_safety_policy"]["single_team_quote_board_allowed"] is True
 
+def test_runner_safety_still_catches_team_crash_when_same_team_has_a_local_alias_miss():
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": "ATL WR", "market": "receiving_yards"},
+                {"player": "NO WR", "market": "receiving_yards"},
+                {"player": "NO Mystery", "market": "receptions"},
+            ],
+        }]
+    }
+    payload = {
+        "games": [{
+            "rows": [
+                {"input_index": 0, "team": "away", "status": "PRICED", "selected": True},
+                {
+                    "input_index": 1, "team": "home", "status": "NO_MODEL",
+                    "selected": False, "reason": "ROLE_VALUE_INVALID:receiving_yards_per_reception",
+                },
+                {
+                    "input_index": 2, "team": "home", "status": "NO_MODEL",
+                    "selected": False,
+                    "reason": "PROP_PLAYER_EXACT_MATCH_REQUIRED:NO Mystery:matches=0",
+                },
+            ],
+            "engine": {},
+            "role_status": "AVAILABLE",
+            "role_error": None,
+        }],
+        "rows": [],
+        "selected_rows": [],
+    }
+    out = _apply_prop_board_safety(payload, ticket)
+    game = out["games"][0]
+    assert game["role_status"] == "NO_MODEL"
+    assert game["engine"]["prop_board_error"].startswith(
+        "GAME_PROP_SIMULATION_INCOMPLETE:NO=ROLE_VALUE_INVALID:"
+    )
+    assert out["selected_rows"] == []
+
