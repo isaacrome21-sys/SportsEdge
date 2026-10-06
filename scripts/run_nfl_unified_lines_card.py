@@ -216,13 +216,14 @@ def _apply_prop_board_safety(payload: dict, ticket: dict) -> dict:
             engine["degraded_requested_teams"] = dict(sorted(degraded_teams.items()))
             game["role_status"] = "NO_MODEL"
             game["role_error"] = reason
-            game["status"] = "NO_MODEL_PROP_BOARD_INCOMPLETE"
+            game["prop_status"] = "NO_MODEL_PROP_BOARD_INCOMPLETE"
         elif len(prop_indexes_by_team) >= 2:
             engine["prop_board_status"] = "AVAILABLE"
             engine["prop_board_error"] = None
             engine["failed_requested_teams"] = []
             engine["team_simulation_errors"] = {}
             engine["degraded_requested_teams"] = dict(sorted(degraded_teams.items()))
+            game["prop_status"] = "AVAILABLE"
 
     all_rows = [row for game in games for row in game.get("rows") or []]
     out["rows"] = all_rows
