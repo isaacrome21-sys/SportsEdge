@@ -33,6 +33,47 @@ def _has_props(ticket: dict) -> bool:
     )
 
 
+_SIGNED_YARDAGE_FIELDS = ("passing_yards", "rushing_yards", "receiving_yards")
+
+
+def _sanitize_signed_yardage_rows(player_rows: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Adapt rare negative weekly yardage totals to nonnegative V1 efficiency support.
+
+    Volume/count fields are untouched.  Only a negative yardage numerator is
+    floored at zero because the current coherent passing/receiving simulator
+    cannot allocate negative completed-pass yardage.  Every edit is emitted as
+    an audit receipt so this is never a silent source rewrite.
+    """
+    out: list[dict] = []
+    receipts: list[dict] = []
+    for raw in player_rows:
+        row = dict(raw)
+        for field in _SIGNED_YARDAGE_FIELDS:
+            value = row.get(field)
+            if value in (None, "") or isinstance(value, bool):
+                continue
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError):
+                continue
+            if numeric >= 0:
+                continue
+            receipts.append({
+                "player_id": str(row.get("player_id") or row.get("gsis_id") or ""),
+                "player_name": str(row.get("player_name") or ""),
+                "season": row.get("season"),
+                "week": row.get("week"),
+                "team": str(row.get("recent_team") or row.get("team") or ""),
+                "field": field,
+                "original": numeric,
+                "adapted": 0.0,
+                "reason": "NONNEGATIVE_PROP_EFFICIENCY_SUPPORT",
+            })
+            row[field] = 0.0
+        out.append(row)
+    return out, receipts
+
+
 _NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
 
 
@@ -220,6 +261,7 @@ def main() -> int:
                 injury_source_ready = True
 
     scoring_prior = load_prior_file(args.scoring_prior) if args.scoring_prior else None
+    player_rows, signed_yardage_receipts = _sanitize_signed_yardage_rows(player_rows)
     ticket, alias_bindings = _normalize_ticket_prop_players(ticket, depth_rows)
     payload = build_score_count_phone_card(
         ticket,
@@ -235,6 +277,7 @@ def main() -> int:
     payload["source_status"] = source_status
     payload["schedule_source_sha256"] = plan.get("schedule_source_sha256")
     payload["player_alias_bindings"] = alias_bindings
+    payload["signed_yardage_adaptations"] = signed_yardage_receipts
 
     _write_payload(args.output, payload)
     print(json.dumps({
