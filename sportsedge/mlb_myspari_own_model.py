@@ -197,8 +197,7 @@ def myspari_rows(payload: Mapping[str, Any], *, quote_age_seconds: float = 0.0,
 
     # Real same-game selection sees LEAN rows as non-actionable, so they cannot
     # knock an ACTIONABLE side/total (or any other core play) off the card.
-    return build_mlb_scored_card(apply_same_game_guard(scored))
-
+    return build_mlb_scored_card(\n        apply_market_sanity_guard(apply_same_game_guard(scored))\n    )\n
 
 # --- Same-game guard --------------------------------------------------------
 # Presentation-only: never changes a probability. It blocks exact contract
@@ -209,6 +208,8 @@ SCRIPT_CONFLICT_REASON = "SAME_GAME_DIRECT_CONFLICT"
 SAME_SIDE_STACK_REASON = "SAME_SIDE_STACK"
 OPPOSITE_TEAM_OUTCOME_REASON = "OPPOSITE_TEAM_OUTCOME_CONFLICT"
 TEAM_SCORING_CONFLICT_REASON = "SAME_TEAM_SCORING_CONFLICT"
+EXTREME_MARKET_DISAGREEMENT_REASON = "EXTREME_MODEL_MARKET_DISAGREEMENT_REVIEW"
+MAX_UNEXPLAINED_MARKET_GAP = 0.15
 _HIGH_RUNS_OVER = frozenset({
     "TOTALS", "TEAM_TOTALS", "F5_TOTALS", "F5_TEAM_TOTALS",
     "PITCHER_HITS_ALLOWED", "PITCHER_ER", "PITCHER_BB", "PITCHER_HITS_WALKS_ER",
@@ -367,6 +368,34 @@ def _same_team_scoring_conflict(left: Mapping[str, Any], right: Mapping[str, Any
     if rm in _TEAM_SCORING_MARKETS and (lm in _PITCHER_RUN_ALLOWANCE_MARKETS or lm in _PITCHER_RUN_SUPPRESSION_MARKETS):
         return ls == _other_team(rs)
     return False
+
+
+def apply_market_sanity_guard(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Withhold unexplained extreme model/market disagreements from ACTIONABLE.
+
+    Market probability never creates or moves estimate_p. It only demands
+    review when the independently generated estimate is far from the paired
+    market and no preregistered model-side diagnostic supports the divergence.
+    """
+    for row in rows:
+        if not _is_actionable(row):
+            continue
+        estimate = _f(row.get("estimate_p"))
+        market = _f(row.get("market_p"))
+        if estimate is None or market is None:
+            continue
+        gap = abs(estimate - market)
+        row["model_market_gap"] = gap
+        if gap <= MAX_UNEXPLAINED_MARKET_GAP:
+            continue
+        if row.get("market_disagreement_supported") is True:
+            continue
+        row["status"] = "REVIEW"
+        row["scored_status"] = "REVIEW"
+        codes = tuple(row.get("presentation_reason_codes") or ())
+        if EXTREME_MARKET_DISAGREEMENT_REASON not in codes:
+            row["presentation_reason_codes"] = codes + (EXTREME_MARKET_DISAGREEMENT_REASON,)
+    return rows
 
 
 def apply_same_game_guard(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
