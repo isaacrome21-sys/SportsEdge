@@ -34,6 +34,49 @@ def _has_props(ticket: dict) -> bool:
     )
 
 
+_SIGNED_YARDAGE_FIELDS = ("passing_yards", "rushing_yards", "receiving_yards")
+
+
+def _adapt_signed_yardage_for_nonnegative_v1(
+    player_rows: list[dict],
+) -> tuple[list[dict], list[dict]]:
+    """Compatibility-copy signed source yards for the frozen nonnegative V1 kernel.
+
+    The raw/source rows remain untouched. A negative weekly yardage numerator is
+    set to zero only in the in-memory copy passed into the frozen role builder,
+    which prevents a one-opportunity negative sample from invalidating a whole
+    team. Every adaptation is emitted in the artifact.
+    """
+    out: list[dict] = []
+    receipts: list[dict] = []
+    for raw in player_rows:
+        row = dict(raw)
+        for field in _SIGNED_YARDAGE_FIELDS:
+            value = row.get(field)
+            if value in (None, "") or isinstance(value, bool):
+                continue
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError):
+                continue
+            if numeric >= 0:
+                continue
+            row[field] = 0.0
+            receipts.append({
+                "player_id": str(row.get("player_id") or row.get("gsis_id") or ""),
+                "player_name": str(row.get("player_name") or ""),
+                "season": row.get("season"),
+                "week": row.get("week"),
+                "team": str(row.get("recent_team") or row.get("team") or ""),
+                "field": field,
+                "source_value": numeric,
+                "model_input_value": 0.0,
+                "reason": "FROZEN_V1_NONNEGATIVE_EFFICIENCY_COMPATIBILITY",
+            })
+        out.append(row)
+    return out, receipts
+
+
 _NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
 
 # Only failures produced while building/simulating a whole team should suppress
@@ -520,6 +563,9 @@ def main() -> int:
 
     scoring_prior = load_prior_file(args.scoring_prior) if args.scoring_prior else None
 
+    player_rows, signed_yardage_adaptations = _adapt_signed_yardage_for_nonnegative_v1(
+        player_rows
+    )
     ticket, alias_bindings = _normalize_ticket_prop_players(ticket, depth_rows)
 
     payload = build_unified_phone_card(
@@ -538,6 +584,7 @@ def main() -> int:
     payload["source_status"] = source_status
     payload["schedule_source_sha256"] = plan.get("schedule_source_sha256")
     payload["player_alias_bindings"] = alias_bindings
+    payload["signed_yardage_adaptations"] = signed_yardage_adaptations
 
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
