@@ -8,6 +8,7 @@ from sportsedge.mlb_pitcher_k_historical_materializer import (
     PitcherKTarget,
     _Pitch,
     combine_seasons,
+    materialize_target,
     targets_from_schedule,
 )
 
@@ -108,3 +109,62 @@ def test_combined_artifact_requires_exact_frozen_seasons_and_zero_authority():
     assert got["row_count"] == 3
     assert got["forward_evidence_eligible"] is False
     assert not any(got["authority"].values())
+
+
+def test_materialize_target_rejects_equal_count_different_start_identity(monkeypatch):
+    target = PitcherKTarget(
+        season=2025,
+        target_date=date(2025, 6, 1),
+        game_id=777,
+        pitcher_id=501,
+        team_id=10,
+        opponent_id=20,
+        away_team_id=10,
+        home_team_id=20,
+    )
+    prior = []
+    aligned = []
+    for i in range(5):
+        d = date(2025, 5, 1 + i)
+        stat = {
+            "gamesStarted": 1,
+            "inningsPitched": "6.0",
+            "strikeOuts": 6,
+            "earnedRuns": 2,
+            "hits": 5,
+            "baseOnBalls": 2,
+            "battersFaced": 24,
+            "numberOfPitches": 90,
+        }
+        prior.append({"date": d, "game_pk": 100 + i, "opponent_id": 20, "stat": stat})
+        aligned.append(({"strikeouts": 6, "outs": 18, "earned_runs": 2, "hits_allowed": 5, "walks_allowed": 2}, d, 20, 100 + i))
+    aligned[-1] = (aligned[-1][0], aligned[-1][1], aligned[-1][2], 999)
+
+    class Source:
+        def player_rows(self, **kwargs):
+            return prior
+        def _opp_k_payload(self, **kwargs):
+            return ({"opponent_team_id": 20, "target_rel": 1.0}, None)
+        def pitcher_joint_history(self, **kwargs):
+            return [x[0] for x in aligned]
+        def _pitcher_start_rows_pk(self, **kwargs):
+            return aligned
+
+    class Archive:
+        def pitcher_context(self, **kwargs):
+            return (
+                {"entity_id": "501", "swings": 10, "whiffs": 3, "whiff_rate": 0.3,
+                 "out_of_zone_pitches": 10, "chases": 3, "chase_rate": 0.3,
+                 "pitcher_hand": "R", "window_start": "2025-05-03", "window_end": "2025-06-01"},
+                {"schema": "MLB_PITCHER_K_PROVENANCE_V1", "source": "BASEBALL_SAVANT_STATCAST",
+                 "mode": "HISTORICAL_RECONSTRUCTION", "target_date": "2025-06-01",
+                 "window_start": "2025-05-03", "query_end_exclusive": "2025-06-01",
+                 "retrieved_at": "2026-10-06T00:00:00+00:00", "raw_pitch_rows": 30,
+                 "raw_pitch_rows_scope": "TARGET_PITCHER_WINDOW", "same_day_rows_included": False,
+                 "future_rows_included": False, "historical_reconstruction": True, "backfill": True,
+                 "forward_evidence_eligible": False, "promotion_authority": False,
+                 "evaluation_use": "FROZEN_CANDIDATE_TEST"},
+            )
+
+    with pytest.raises(PitcherKHistoricalMaterializerError, match="identity mismatch"):
+        materialize_target(Source(), Archive(), target)
