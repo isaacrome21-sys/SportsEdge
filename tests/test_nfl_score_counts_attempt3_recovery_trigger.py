@@ -5,7 +5,7 @@ ORIGINAL = Path("config/research/nfl_score_counts_attempt3_dispatch_v1.json")
 RECOVERY = Path("config/research/nfl_score_counts_attempt3_recovery_dispatch_v1.json")
 
 
-def test_attempt3_recovery_trigger_is_inert_until_recovery_marker_lands():
+def test_attempt3_recovery_trigger_runs_only_on_explicit_recovery_marker_push():
     assert WORKFLOW.is_file()
     assert ORIGINAL.is_file()
     assert not RECOVERY.exists()
