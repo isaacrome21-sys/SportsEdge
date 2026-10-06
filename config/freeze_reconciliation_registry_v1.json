@@ -1921,10 +1921,16 @@
       "merge_sha": "dca0906393cd0479bdd0907bf42219f486fd3bc1",
       "pr": 1668,
       "note": "NFL_SCORE_COUNTS_G1 PIT-safe historical/forward feature builder merged. Frozen team/QB transforms and leakage guards only; no historical scoring, attempt consumption, forward prediction, Model_P, pricing, promotion, staking, OFFICIAL, or backfill authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_1FDC7F8C_PR_1742",
+      "merge_sha": "1fdc7f8c72667f4b57baa6a177409db1d52dc737",
+      "pr": 1742,
+      "note": "NFL_LOCATION_SYMMETRIC_RIDGE_G1 research-only candidate merged after fully green current-main checks. Registers the new research bundle and main movement only; no historical readout, Model_P, Truth Gate, promotion, staking, OFFICIAL, bettor-facing release, or validation authority is created by reconciliation."
     }
   ],
-  "inventory_block_reason": "Current main through merge dca09063 / PR #1668 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge 1fdc7f8c / PR #1742 registered for reconciliation provenance. NFL G1 remains research-only with no scored historical readout or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "dca0906393cd0479bdd0907bf42219f486fd3bc1",
+  "reconciled_through_sha": "1fdc7f8c72667f4b57baa6a177409db1d52dc737",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
