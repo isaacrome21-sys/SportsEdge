@@ -6,7 +6,7 @@ repo contents, and the CFBD free tier rate-limits (HTTP 429). Each cached item
 
     CFBCACHE <name> <base64(gzip(json))>
 
-e.g. ``lines_2019``, ``talent_2021``, ``returning_2021``, ``sp_2020``.
+e.g. ``lines_2019``, ``talent_2021``, ``returning_2021``, ``sp_2020`` or ``live_2026_w5``.
 Loading reads every comment once via ``gh api``; only missing items are fetched
 from CFBD, with a per-run call budget, a pause between calls, and an immediate
 stop on the first 429 so the monthly quota is not burned.
@@ -32,7 +32,12 @@ from typing import Any, Callable
 ROOT = Path(__file__).resolve().parents[3]
 CACHE_ISSUE_FILE = ROOT / "config" / "cfb_history_cache_issue.json"
 MARKER = "CFBCACHE"
-_ITEM_RE = re.compile(rf"^{MARKER} ([a-z_]+_\d{{4}}) ([A-Za-z0-9+/=]+)\s*$", re.M)
+_HISTORY_ITEM_NAME = r"[a-z_]+_\d{4}"
+_LIVE_WEEK_ITEM_NAME = r"live_\d{4}_w(?:[1-9]|1[0-9]|2[0-9])"
+_ITEM_RE = re.compile(
+    rf"^{MARKER} ((?:{_HISTORY_ITEM_NAME}|{_LIVE_WEEK_ITEM_NAME})) ([A-Za-z0-9+/=]+)\s*$",
+    re.M,
+)
 TRUSTED_AUTHORS = {"github-actions[bot]", "isaacrome21-sys"}
 PROVIDER_ORDER = ("consensus", "Bovada", "DraftKings", "ESPN Bet", "William Hill (New Jersey)", "teamrankings", "numberfire")
 

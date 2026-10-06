@@ -48,3 +48,16 @@ def test_ensure_respects_budget():
     cache = cc.ensure(cc.history_names(), "k", cache={}, budget=2, fetch=fetch,
                       save=lambda n, d: None, sleep=lambda s: None)
     assert len(cache) == 2
+
+
+
+def test_live_week_bundle_name_roundtrip_and_name_scope():
+    payload = {"schema": "CFB_LIVE_WEEK_CACHE_V1", "season": 2026, "week": 5, "games": [], "snapshots": {}}
+    body = cc.encode_item("live_2026_w5", payload)
+    assert cc.decode_bodies([body])["live_2026_w5"] == payload
+
+    invalid = cc.encode_item("live_2026_week5", payload)
+    assert "live_2026_week5" not in cc.decode_bodies([invalid])
+
+    invalid_week = cc.encode_item("live_2026_w99", payload)
+    assert "live_2026_w99" not in cc.decode_bodies([invalid_week])
