@@ -88,34 +88,8 @@ def _match_schedule(
     return matches[0]
 
 
-_NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
-
-
-def _name_tokens(value: Any) -> list[str]:
-    text_value = str(value or "").casefold()
-    for mark in (".", ",", "-", "'", "’"):
-        text_value = text_value.replace(mark, " ")
-    tokens = text_value.split()
-    while tokens and tokens[-1] in _NAME_SUFFIXES:
-        tokens.pop()
-    return tokens
-
-
 def _name_key(value: Any) -> str:
-    return " ".join(_name_tokens(value))
-
-
-def _name_alias_match(left: Any, right: Any) -> bool:
-    a = _name_tokens(left)
-    b = _name_tokens(right)
-    if a == b:
-        return True
-    if len(a) >= 2 and len(b) >= 2 and a[-1] == b[-1]:
-        first_a, first_b = a[0], b[0]
-        return min(len(first_a), len(first_b)) >= 4 and (
-            first_a.startswith(first_b) or first_b.startswith(first_a)
-        )
-    return False
+    return " ".join(str(value or "").strip().lower().split())
 
 
 def _market_context(markets: Sequence[Mapping[str, Any]]) -> tuple[dict[str, float] | None, str | None]:
@@ -146,6 +120,7 @@ def _find_player(
     home_model: Mapping[str, Any],
     away_model: Mapping[str, Any],
 ) -> tuple[str, str, str]:
+    needle = _name_key(player)
     hits: list[tuple[str, str, str]] = []
     for side, model in (("home", home_model), ("away", away_model)):
         qb = model.get("qb") if isinstance(model, Mapping) else None
@@ -159,7 +134,7 @@ def _find_player(
             canonical = str(row.get("player") or "").strip()
             if not canonical or canonical.endswith("_OTHER"):
                 continue
-            if _name_alias_match(canonical, player):
+            if _name_key(canonical) == needle:
                 hits.append((side, canonical, str(row.get("position") or "").upper()))
     if len(hits) != 1:
         raise UnifiedNflPhoneError(f"PROP_PLAYER_EXACT_MATCH_REQUIRED:{player}:matches={len(hits)}")
@@ -520,12 +495,6 @@ def build_unified_phone_card(
             n_sims=int(n_sims),
             seed=int(seed) + game_index,
         )
-        engine_prop_error = (
-            str(engine.get("prop_board_error") or "").strip()
-            if prop_inputs
-            else ""
-        )
-        effective_role_error = role_error or engine_prop_error or None
 
         rows: list[dict[str, Any]] = []
         for meta in game_meta:
@@ -581,12 +550,9 @@ def build_unified_phone_card(
                 "workload_coupling": engine["workload_coupling"],
                 "authority": engine["authority"],
                 "game_market_edge_disabled": True,
-                "prop_board_status": engine.get("prop_board_status"),
-                "prop_board_error": engine.get("prop_board_error"),
-                "team_simulation_errors": engine.get("team_simulation_errors") or {},
             },
-            "role_status": "AVAILABLE" if not effective_role_error and (not prop_inputs or home_model is not None) else "NO_MODEL",
-            "role_error": effective_role_error,
+            "role_status": "AVAILABLE" if not role_error and (not prop_inputs or home_model is not None) else "NO_MODEL",
+            "role_error": role_error,
             "rows": rows,
             "status": "PRICED_RESEARCH_PROPS_GAME_EDGE_DISABLED",
         })
@@ -607,14 +573,6 @@ def build_unified_phone_card(
             "live_props_require_injury_source": True,
             "game_markets_disabled": True,
             "prop_game_context_source": "SPORTSBOOK_MARKET_CENTER_CONTEXT_ONLY",
-        },
-        "presentation_policy": {
-            "market_probability_field": "market_no_vig_p",
-            "model_probability_field": "estimate_p",
-            "score_field": "score_0_100",
-            "score_label_field": "score_label",
-            "kickoff_field": "games[].kickoff",
-            "team_records": "OMIT_UNLESS_EXPLICITLY_SOURCED",
         },
         "authority": {
             "research_only": True,
