@@ -20,3 +20,18 @@ do not create or modify Model_P, do not choose any weight or probability
 formula, and do not promote a card row. The composite pitcher-K candidate stays
 evaluation-closed until these observations are durably captured and bound under
 an untouched PIT evaluation protocol.
+
+
+## Forward-evidence provenance guard
+
+Durable Statcast evidence is eligible for the later untouched evaluation only
+when the persisted run contains `provenance.json` proving
+`ref = refs/heads/main`, `head_branch = main`, and
+`eligible_for_forward_evaluation = true`.
+
+Run `37449141740` is explicitly **ineligible** for evaluation evidence. It was
+triggered by a push to `research/mlb-pitcher-k-statcast-skill-source-v1` at
+head `84e33e7ae1f1ea9f970f7458e9a974eb5eafd7ec` before the source change was
+merged. The immutable data-branch snapshot is not deleted or rewritten; it is
+simply excluded. A post-merge main run must create the first eligible skill
+snapshot.
