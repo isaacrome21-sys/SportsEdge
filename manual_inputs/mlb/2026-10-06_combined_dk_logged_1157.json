@@ -2236,7 +2236,7 @@
       "subject_name": "Jackson Merrill"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "MONEYLINE",
       "side": "AWAY",
       "line": 0,
@@ -2249,7 +2249,7 @@
       "source": "MANUAL"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "RUN_LINE",
       "side": "AWAY",
       "line": -1.5,
@@ -2262,7 +2262,7 @@
       "source": "MANUAL"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "RUN_LINE",
       "side": "AWAY",
       "line": -1,
@@ -2275,7 +2275,7 @@
       "source": "MANUAL"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "GAME_TOTAL",
       "side": "OVER",
       "line": 6.5,
@@ -2288,7 +2288,7 @@
       "source": "MANUAL"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "GAME_TOTAL",
       "side": "OVER",
       "line": 6,
@@ -2301,7 +2301,7 @@
       "source": "MANUAL"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "FIRST_FIVE_MONEYLINE",
       "side": "AWAY",
       "line": 0,
@@ -2314,7 +2314,7 @@
       "source": "MANUAL"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "FIRST_FIVE_TEAM_TOTAL",
       "side": "OVER",
       "line": 1.5,
@@ -2328,7 +2328,7 @@
       "team_side": "AWAY"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "FIRST_FIVE_TEAM_TOTAL",
       "side": "OVER",
       "line": 1.5,
@@ -2342,7 +2342,7 @@
       "team_side": "HOME"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "FIRST_FIVE_RUN_LINE",
       "side": "AWAY",
       "line": -1.5,
@@ -2355,7 +2355,7 @@
       "source": "MANUAL"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "FIRST_FIVE_RUN_LINE",
       "side": "AWAY",
       "line": -0.5,
@@ -2368,7 +2368,7 @@
       "source": "MANUAL"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "FIRST_FIVE_RUN_LINE",
       "side": "AWAY",
       "line": 0.5,
@@ -2381,7 +2381,7 @@
       "source": "MANUAL"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "FIRST_FIVE_RUN_LINE",
       "side": "AWAY",
       "line": 1.5,
@@ -2394,7 +2394,7 @@
       "source": "MANUAL"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "FIRST_FIVE_TOTAL",
       "side": "OVER",
       "line": 2.5,
@@ -2407,7 +2407,7 @@
       "source": "MANUAL"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "FIRST_FIVE_TOTAL",
       "side": "OVER",
       "line": 3.5,
@@ -2420,7 +2420,7 @@
       "source": "MANUAL"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "FIRST_FIVE_TOTAL",
       "side": "OVER",
       "line": 4.5,
@@ -2433,7 +2433,7 @@
       "source": "MANUAL"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "FIRST_INNING_TOTAL",
       "side": "OVER",
       "line": 0.5,
@@ -2446,7 +2446,7 @@
       "source": "MANUAL"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "FIRST_INNING_TOTAL",
       "side": "OVER",
       "line": 1.5,
@@ -2459,7 +2459,7 @@
       "source": "MANUAL"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "TEAM_TOTAL",
       "side": "OVER",
       "line": 3.5,
@@ -2473,7 +2473,7 @@
       "team_side": "AWAY"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "TEAM_TOTAL",
       "side": "OVER",
       "line": 2.5,
@@ -2487,7 +2487,7 @@
       "team_side": "HOME"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "TEAM_TOTAL",
       "side": "OVER",
       "line": 2.5,
@@ -2501,7 +2501,7 @@
       "team_side": "AWAY"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "TEAM_TOTAL",
       "side": "OVER",
       "line": 3.5,
@@ -2515,7 +2515,7 @@
       "team_side": "HOME"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "PITCHER_K",
       "side": "OVER",
       "line": 7.5,
@@ -2529,7 +2529,7 @@
       "subject_name": "Chris Sale"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "PITCHER_K",
       "side": "OVER",
       "line": 6.5,
@@ -2543,7 +2543,7 @@
       "subject_name": "Yoshinobu Yamamoto"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "PITCHER_OUTS",
       "side": "OVER",
       "line": 18.5,
@@ -2557,7 +2557,7 @@
       "subject_name": "Chris Sale"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "PITCHER_OUTS",
       "side": "OVER",
       "line": 17.5,
@@ -2571,7 +2571,7 @@
       "subject_name": "Yoshinobu Yamamoto"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "PITCHER_HITS_ALLOWED",
       "side": "OVER",
       "line": 4.5,
@@ -2585,7 +2585,7 @@
       "subject_name": "Chris Sale"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "PITCHER_HITS_ALLOWED",
       "side": "OVER",
       "line": 4.5,
@@ -2599,7 +2599,7 @@
       "subject_name": "Yoshinobu Yamamoto"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "PITCHER_ER",
       "side": "OVER",
       "line": 1.5,
@@ -2613,7 +2613,7 @@
       "subject_name": "Chris Sale"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "PITCHER_ER",
       "side": "OVER",
       "line": 1.5,
@@ -2627,7 +2627,7 @@
       "subject_name": "Yoshinobu Yamamoto"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "PITCHER_BB",
       "side": "OVER",
       "line": 1.5,
@@ -2641,7 +2641,7 @@
       "subject_name": "Chris Sale"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "PITCHER_BB",
       "side": "OVER",
       "line": 1.5,
@@ -2655,7 +2655,7 @@
       "subject_name": "Yoshinobu Yamamoto"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "PITCHER_HITS_WALKS_ER",
       "side": "OVER",
       "line": 7.5,
@@ -2669,7 +2669,7 @@
       "subject_name": "Chris Sale"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "PITCHER_HITS_WALKS_ER",
       "side": "OVER",
       "line": 7.5,
@@ -2683,7 +2683,7 @@
       "subject_name": "Yoshinobu Yamamoto"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS",
       "side": "OVER",
       "line": 0.5,
@@ -2697,7 +2697,7 @@
       "subject_name": "Mookie Betts"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS",
       "side": "OVER",
       "line": 0.5,
@@ -2711,7 +2711,7 @@
       "subject_name": "Michael Harris II"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS",
       "side": "OVER",
       "line": 0.5,
@@ -2725,7 +2725,7 @@
       "subject_name": "Drake Baldwin"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS",
       "side": "OVER",
       "line": 0.5,
@@ -2739,7 +2739,7 @@
       "subject_name": "Mauricio Dubón"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS",
       "side": "OVER",
       "line": 0.5,
@@ -2753,7 +2753,7 @@
       "subject_name": "Ronald Acuña Jr."
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS",
       "side": "OVER",
       "line": 0.5,
@@ -2767,7 +2767,7 @@
       "subject_name": "Freddie Freeman"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS",
       "side": "OVER",
       "line": 0.5,
@@ -2781,7 +2781,7 @@
       "subject_name": "Shohei Ohtani"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS",
       "side": "OVER",
       "line": 0.5,
@@ -2795,7 +2795,7 @@
       "subject_name": "Matt Olson"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS",
       "side": "OVER",
       "line": 0.5,
@@ -2809,7 +2809,7 @@
       "subject_name": "Kyle Tucker"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS",
       "side": "OVER",
       "line": 0.5,
@@ -2823,7 +2823,7 @@
       "subject_name": "Will Smith"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS",
       "side": "OVER",
       "line": 0.5,
@@ -2837,7 +2837,7 @@
       "subject_name": "Andy Pages"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS",
       "side": "OVER",
       "line": 0.5,
@@ -2851,7 +2851,7 @@
       "subject_name": "Teoscar Hernández"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS",
       "side": "OVER",
       "line": 0.5,
@@ -2865,7 +2865,7 @@
       "subject_name": "Tommy Edman"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS",
       "side": "OVER",
       "line": 0.5,
@@ -2879,7 +2879,7 @@
       "subject_name": "Ozzie Albies"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS",
       "side": "OVER",
       "line": 0.5,
@@ -2893,7 +2893,7 @@
       "subject_name": "Austin Riley"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS",
       "side": "OVER",
       "line": 0.5,
@@ -2907,7 +2907,7 @@
       "subject_name": "Max Muncy"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS",
       "side": "OVER",
       "line": 0.5,
@@ -2921,7 +2921,7 @@
       "subject_name": "Sean Murphy"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS",
       "side": "OVER",
       "line": 0.5,
@@ -2935,7 +2935,7 @@
       "subject_name": "Mike Yastrzemski"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS_RUNS_RBIS",
       "side": "OVER",
       "line": 1.5,
@@ -2949,7 +2949,7 @@
       "subject_name": "Mookie Betts"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS_RUNS_RBIS",
       "side": "OVER",
       "line": 1.5,
@@ -2963,7 +2963,7 @@
       "subject_name": "Michael Harris II"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS_RUNS_RBIS",
       "side": "OVER",
       "line": 1.5,
@@ -2977,7 +2977,7 @@
       "subject_name": "Drake Baldwin"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS_RUNS_RBIS",
       "side": "OVER",
       "line": 1.5,
@@ -2991,7 +2991,7 @@
       "subject_name": "Ronald Acuña Jr."
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS_RUNS_RBIS",
       "side": "OVER",
       "line": 1.5,
@@ -3005,7 +3005,7 @@
       "subject_name": "Mauricio Dubón"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS_RUNS_RBIS",
       "side": "OVER",
       "line": 1.5,
@@ -3019,7 +3019,7 @@
       "subject_name": "Shohei Ohtani"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS_RUNS_RBIS",
       "side": "OVER",
       "line": 1.5,
@@ -3033,7 +3033,7 @@
       "subject_name": "Freddie Freeman"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS_RUNS_RBIS",
       "side": "OVER",
       "line": 1.5,
@@ -3047,7 +3047,7 @@
       "subject_name": "Will Smith"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS_RUNS_RBIS",
       "side": "OVER",
       "line": 1.5,
@@ -3061,7 +3061,7 @@
       "subject_name": "Matt Olson"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS_RUNS_RBIS",
       "side": "OVER",
       "line": 1.5,
@@ -3075,7 +3075,7 @@
       "subject_name": "Teoscar Hernández"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS_RUNS_RBIS",
       "side": "OVER",
       "line": 1.5,
@@ -3089,7 +3089,7 @@
       "subject_name": "Kyle Tucker"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS_RUNS_RBIS",
       "side": "OVER",
       "line": 1.5,
@@ -3103,7 +3103,7 @@
       "subject_name": "Andy Pages"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS_RUNS_RBIS",
       "side": "OVER",
       "line": 0.5,
@@ -3117,7 +3117,7 @@
       "subject_name": "Tommy Edman"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS_RUNS_RBIS",
       "side": "OVER",
       "line": 0.5,
@@ -3131,7 +3131,7 @@
       "subject_name": "Ozzie Albies"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS_RUNS_RBIS",
       "side": "OVER",
       "line": 0.5,
@@ -3145,7 +3145,7 @@
       "subject_name": "Max Muncy"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS_RUNS_RBIS",
       "side": "OVER",
       "line": 0.5,
@@ -3159,7 +3159,7 @@
       "subject_name": "Austin Riley"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS_RUNS_RBIS",
       "side": "OVER",
       "line": 0.5,
@@ -3173,7 +3173,7 @@
       "subject_name": "Mike Yastrzemski"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "HITS_RUNS_RBIS",
       "side": "OVER",
       "line": 0.5,
@@ -3187,7 +3187,7 @@
       "subject_name": "Sean Murphy"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "RUNS",
       "side": "OVER",
       "line": 0.5,
@@ -3201,7 +3201,7 @@
       "subject_name": "Mookie Betts"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "RUNS",
       "side": "OVER",
       "line": 0.5,
@@ -3215,7 +3215,7 @@
       "subject_name": "Ronald Acuña Jr."
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "RUNS",
       "side": "OVER",
       "line": 0.5,
@@ -3229,7 +3229,7 @@
       "subject_name": "Shohei Ohtani"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "RUNS",
       "side": "OVER",
       "line": 0.5,
@@ -3243,7 +3243,7 @@
       "subject_name": "Drake Baldwin"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "RUNS",
       "side": "OVER",
       "line": 0.5,
@@ -3257,7 +3257,7 @@
       "subject_name": "Matt Olson"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "RUNS",
       "side": "OVER",
       "line": 0.5,
@@ -3271,7 +3271,7 @@
       "subject_name": "Will Smith"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "RUNS",
       "side": "OVER",
       "line": 0.5,
@@ -3285,7 +3285,7 @@
       "subject_name": "Freddie Freeman"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "RUNS",
       "side": "OVER",
       "line": 0.5,
@@ -3299,7 +3299,7 @@
       "subject_name": "Teoscar Hernández"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "RUNS",
       "side": "OVER",
       "line": 0.5,
@@ -3313,7 +3313,7 @@
       "subject_name": "Kyle Tucker"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "RUNS",
       "side": "OVER",
       "line": 0.5,
@@ -3327,7 +3327,7 @@
       "subject_name": "Michael Harris II"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "RUNS",
       "side": "OVER",
       "line": 0.5,
@@ -3341,7 +3341,7 @@
       "subject_name": "Andy Pages"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "RUNS",
       "side": "OVER",
       "line": 0.5,
@@ -3355,7 +3355,7 @@
       "subject_name": "Max Muncy"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "RUNS",
       "side": "OVER",
       "line": 0.5,
@@ -3369,7 +3369,7 @@
       "subject_name": "Mauricio Dubón"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "RUNS",
       "side": "OVER",
       "line": 0.5,
@@ -3383,7 +3383,7 @@
       "subject_name": "Tommy Edman"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "RUNS",
       "side": "OVER",
       "line": 0.5,
@@ -3397,7 +3397,7 @@
       "subject_name": "Austin Riley"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "RUNS",
       "side": "OVER",
       "line": 0.5,
@@ -3411,7 +3411,7 @@
       "subject_name": "Ozzie Albies"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "RUNS",
       "side": "OVER",
       "line": 0.5,
@@ -3425,7 +3425,7 @@
       "subject_name": "Sean Murphy"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "RUNS",
       "side": "OVER",
       "line": 0.5,
@@ -3439,7 +3439,7 @@
       "subject_name": "Mike Yastrzemski"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "SINGLES",
       "side": "OVER",
       "line": 0.5,
@@ -3453,7 +3453,7 @@
       "subject_name": "Mauricio Dubón"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "SINGLES",
       "side": "OVER",
       "line": 0.5,
@@ -3467,7 +3467,7 @@
       "subject_name": "Mookie Betts"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "SINGLES",
       "side": "OVER",
       "line": 0.5,
@@ -3481,7 +3481,7 @@
       "subject_name": "Michael Harris II"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "SINGLES",
       "side": "OVER",
       "line": 0.5,
@@ -3495,7 +3495,7 @@
       "subject_name": "Drake Baldwin"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "SINGLES",
       "side": "OVER",
       "line": 0.5,
@@ -3509,7 +3509,7 @@
       "subject_name": "Freddie Freeman"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "SINGLES",
       "side": "OVER",
       "line": 0.5,
@@ -3523,7 +3523,7 @@
       "subject_name": "Ronald Acuña Jr."
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "SINGLES",
       "side": "OVER",
       "line": 0.5,
@@ -3537,7 +3537,7 @@
       "subject_name": "Kyle Tucker"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "SINGLES",
       "side": "OVER",
       "line": 0.5,
@@ -3551,7 +3551,7 @@
       "subject_name": "Will Smith"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "SINGLES",
       "side": "OVER",
       "line": 0.5,
@@ -3565,7 +3565,7 @@
       "subject_name": "Matt Olson"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "SINGLES",
       "side": "OVER",
       "line": 0.5,
@@ -3579,7 +3579,7 @@
       "subject_name": "Teoscar Hernández"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "SINGLES",
       "side": "OVER",
       "line": 0.5,
@@ -3593,7 +3593,7 @@
       "subject_name": "Shohei Ohtani"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "SINGLES",
       "side": "OVER",
       "line": 0.5,
@@ -3607,7 +3607,7 @@
       "subject_name": "Andy Pages"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "SINGLES",
       "side": "OVER",
       "line": 0.5,
@@ -3621,7 +3621,7 @@
       "subject_name": "Tommy Edman"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "SINGLES",
       "side": "OVER",
       "line": 0.5,
@@ -3635,7 +3635,7 @@
       "subject_name": "Ozzie Albies"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "SINGLES",
       "side": "OVER",
       "line": 0.5,
@@ -3649,7 +3649,7 @@
       "subject_name": "Sean Murphy"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "SINGLES",
       "side": "OVER",
       "line": 0.5,
@@ -3663,7 +3663,7 @@
       "subject_name": "Austin Riley"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "SINGLES",
       "side": "OVER",
       "line": 0.5,
@@ -3677,7 +3677,7 @@
       "subject_name": "Max Muncy"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "SINGLES",
       "side": "OVER",
       "line": 0.5,
@@ -3691,7 +3691,7 @@
       "subject_name": "Mike Yastrzemski"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "DOUBLES",
       "side": "OVER",
       "line": 0.5,
@@ -3705,7 +3705,7 @@
       "subject_name": "Mookie Betts"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "DOUBLES",
       "side": "OVER",
       "line": 0.5,
@@ -3719,7 +3719,7 @@
       "subject_name": "Will Smith"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "DOUBLES",
       "side": "OVER",
       "line": 0.5,
@@ -3733,7 +3733,7 @@
       "subject_name": "Mauricio Dubón"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "DOUBLES",
       "side": "OVER",
       "line": 0.5,
@@ -3747,7 +3747,7 @@
       "subject_name": "Shohei Ohtani"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "DOUBLES",
       "side": "OVER",
       "line": 0.5,
@@ -3761,7 +3761,7 @@
       "subject_name": "Kyle Tucker"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "DOUBLES",
       "side": "OVER",
       "line": 0.5,
@@ -3775,7 +3775,7 @@
       "subject_name": "Michael Harris II"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "DOUBLES",
       "side": "OVER",
       "line": 0.5,
@@ -3789,7 +3789,7 @@
       "subject_name": "Andy Pages"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "DOUBLES",
       "side": "OVER",
       "line": 0.5,
@@ -3803,7 +3803,7 @@
       "subject_name": "Freddie Freeman"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "DOUBLES",
       "side": "OVER",
       "line": 0.5,
@@ -3817,7 +3817,7 @@
       "subject_name": "Teoscar Hernández"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "DOUBLES",
       "side": "OVER",
       "line": 0.5,
@@ -3831,7 +3831,7 @@
       "subject_name": "Drake Baldwin"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "DOUBLES",
       "side": "OVER",
       "line": 0.5,
@@ -3845,7 +3845,7 @@
       "subject_name": "Ronald Acuña Jr."
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "DOUBLES",
       "side": "OVER",
       "line": 0.5,
@@ -3859,7 +3859,7 @@
       "subject_name": "Tommy Edman"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "DOUBLES",
       "side": "OVER",
       "line": 0.5,
@@ -3873,7 +3873,7 @@
       "subject_name": "Matt Olson"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "DOUBLES",
       "side": "OVER",
       "line": 0.5,
@@ -3887,7 +3887,7 @@
       "subject_name": "Max Muncy"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "DOUBLES",
       "side": "OVER",
       "line": 0.5,
@@ -3901,7 +3901,7 @@
       "subject_name": "Ozzie Albies"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "DOUBLES",
       "side": "OVER",
       "line": 0.5,
@@ -3915,7 +3915,7 @@
       "subject_name": "Austin Riley"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "DOUBLES",
       "side": "OVER",
       "line": 0.5,
@@ -3929,7 +3929,7 @@
       "subject_name": "Mike Yastrzemski"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "DOUBLES",
       "side": "OVER",
       "line": 0.5,
@@ -3943,7 +3943,7 @@
       "subject_name": "Sean Murphy"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "WALKS",
       "side": "OVER",
       "line": 0.5,
@@ -3957,7 +3957,7 @@
       "subject_name": "Shohei Ohtani"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "WALKS",
       "side": "OVER",
       "line": 0.5,
@@ -3971,7 +3971,7 @@
       "subject_name": "Will Smith"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "WALKS",
       "side": "OVER",
       "line": 0.5,
@@ -3985,7 +3985,7 @@
       "subject_name": "Ronald Acuña Jr."
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "WALKS",
       "side": "OVER",
       "line": 0.5,
@@ -3999,7 +3999,7 @@
       "subject_name": "Mookie Betts"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "WALKS",
       "side": "OVER",
       "line": 0.5,
@@ -4013,7 +4013,7 @@
       "subject_name": "Matt Olson"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "WALKS",
       "side": "OVER",
       "line": 0.5,
@@ -4027,7 +4027,7 @@
       "subject_name": "Kyle Tucker"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "WALKS",
       "side": "OVER",
       "line": 0.5,
@@ -4041,7 +4041,7 @@
       "subject_name": "Max Muncy"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "WALKS",
       "side": "OVER",
       "line": 0.5,
@@ -4055,7 +4055,7 @@
       "subject_name": "Freddie Freeman"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "WALKS",
       "side": "OVER",
       "line": 0.5,
@@ -4069,7 +4069,7 @@
       "subject_name": "Drake Baldwin"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "WALKS",
       "side": "OVER",
       "line": 0.5,
@@ -4083,7 +4083,7 @@
       "subject_name": "Andy Pages"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "WALKS",
       "side": "OVER",
       "line": 0.5,
@@ -4097,7 +4097,7 @@
       "subject_name": "Mauricio Dubón"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "WALKS",
       "side": "OVER",
       "line": 0.5,
@@ -4111,7 +4111,7 @@
       "subject_name": "Ozzie Albies"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "WALKS",
       "side": "OVER",
       "line": 0.5,
@@ -4125,7 +4125,7 @@
       "subject_name": "Austin Riley"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "WALKS",
       "side": "OVER",
       "line": 0.5,
@@ -4139,7 +4139,7 @@
       "subject_name": "Teoscar Hernández"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "WALKS",
       "side": "OVER",
       "line": 0.5,
@@ -4153,7 +4153,7 @@
       "subject_name": "Mike Yastrzemski"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "WALKS",
       "side": "OVER",
       "line": 0.5,
@@ -4167,7 +4167,7 @@
       "subject_name": "Sean Murphy"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "WALKS",
       "side": "OVER",
       "line": 0.5,
@@ -4181,7 +4181,7 @@
       "subject_name": "Tommy Edman"
     },
     {
-      "game_id": "LA Dodgers@ATL Braves",
+      "game_id": "Los Angeles Dodgers@Atlanta Braves",
       "market_type": "WALKS",
       "side": "OVER",
       "line": 0.5,
