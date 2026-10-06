@@ -6,6 +6,11 @@ import pytest
 
 from sportsedge.nfl_lines_intake import parse_nfl_lines, tickets_to_dict
 from sportsedge.nfl_unified_phone import build_unified_phone_card
+from scripts.run_nfl_unified_lines_card import (
+    _apply_prop_board_safety,
+    _name_alias_match,
+    _normalize_ticket_prop_players,
+)
 
 
 def runtime():
@@ -341,3 +346,114 @@ def test_prop_card_requires_posted_spread_and_total_context():
     assert len(props) == 2
     assert all(row["status"] == "NO_MODEL" for row in props)
     assert all(row["reason"] == "MARKET_CONTEXT_SPREAD_TOTAL_REQUIRED" for row in props)
+
+def test_runner_alias_normalization_accepts_suffix_and_first_name_expansion():
+    assert _name_alias_match("Kyle Pitts Sr.", "Kyle Pitts")
+    assert _name_alias_match("Zachariah Branch", "Zach Branch")
+
+    board = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": "Kyle Pitts", "market": "receptions"},
+                {"player": "Zach Branch", "market": "receiving_yards"},
+            ],
+        }]
+    }
+    rows = [
+        {"team": "ATL", "player_name": "Kyle Pitts Sr."},
+        {"team": "ATL", "player_name": "Zachariah Branch"},
+        {"team": "NO", "player_name": "Chris Olave"},
+    ]
+    normalized, bindings = _normalize_ticket_prop_players(board, rows)
+    props = normalized["games"][0]["markets"]
+    assert props[0]["player"] == "Kyle Pitts Sr."
+    assert props[0]["team"] == "ATL"
+    assert props[1]["player"] == "Zachariah Branch"
+    assert props[1]["team"] == "ATL"
+    assert len(bindings) == 2
+
+
+def test_runner_safety_voids_entire_two_team_prop_board_when_one_team_has_no_valid_rows():
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": "ATL WR", "team": "ATL", "market": "receiving_yards"},
+                {"player": "NO WR", "team": "NO", "market": "receiving_yards"},
+            ],
+        }]
+    }
+    payload = {
+        "games": [{
+            "rows": [
+                {
+                    "input_index": 0, "market": "receiving_yards", "status": "PRICED",
+                    "selected": True, "estimate_p": 0.70, "score_0_100": 88,
+                },
+                {
+                    "input_index": 1, "market": "receiving_yards", "status": "NO_MODEL",
+                    "selected": False, "reason": "ROLE_VALUE_INVALID:receiving_yards_per_reception",
+                },
+            ],
+            "engine": {},
+            "role_status": "AVAILABLE",
+            "role_error": None,
+        }],
+        "rows": [],
+        "selected_rows": [{"input_index": 0}],
+    }
+    out = _apply_prop_board_safety(payload, ticket)
+    game = out["games"][0]
+    assert game["role_status"] == "NO_MODEL"
+    assert game["engine"]["prop_board_status"] == "NO_MODEL"
+    assert game["engine"]["prop_board_error"].startswith("GAME_PROP_SIMULATION_INCOMPLETE:NO=")
+    assert out["selected_rows"] == []
+    assert all(row["status"] == "NO_MODEL" for row in game["rows"])
+    assert all(row["selected"] is False for row in game["rows"])
+    assert all("score_0_100" not in row for row in game["rows"])
+
+
+def test_runner_safety_keeps_two_team_board_when_both_requested_teams_price():
+    ticket = {
+        "games": [{
+            "away": "ATL",
+            "home": "NO",
+            "markets": [
+                {"player": "ATL WR", "team": "ATL", "market": "receiving_yards"},
+                {"player": "NO WR", "team": "NO", "market": "receiving_yards"},
+            ],
+        }]
+    }
+    payload = {
+        "games": [{
+            "rows": [
+                {"input_index": 0, "status": "PRICED", "selected": True},
+                {"input_index": 1, "status": "PRICED", "selected": False},
+            ],
+            "engine": {},
+            "role_status": "AVAILABLE",
+            "role_error": None,
+        }],
+        "rows": [],
+        "selected_rows": [],
+    }
+    out = _apply_prop_board_safety(payload, ticket)
+    game = out["games"][0]
+    assert game["engine"]["prop_board_status"] == "AVAILABLE"
+    assert game["role_status"] == "AVAILABLE"
+    assert len(out["selected_rows"]) == 1
+
+
+def test_runner_graphic_contract_uses_artifact_native_fields():
+    out = _apply_prop_board_safety({"games": [], "rows": [], "selected_rows": []}, {"games": []})
+    policy = out["presentation_policy"]
+    assert policy["market_probability_field"] == "market_no_vig_p"
+    assert policy["model_probability_field"] == "estimate_p"
+    assert policy["score_field"] == "score_0_100"
+    assert policy["score_label_field"] == "score_label"
+    assert policy["kickoff_field"] == "games[].kickoff"
+    assert policy["team_records"] == "OMIT_UNLESS_EXPLICITLY_SOURCED"
+
