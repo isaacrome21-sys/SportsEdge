@@ -120,6 +120,7 @@ jobs:
             --history-cache-dir .cache/mlb-history \
             --run-date "${{ steps.resolve.outputs.run_date }}" \
             --max-age-minutes 60 \
+            --allow-stale \
             --output artifacts/manual_mlb_fast.json
 
       - name: Render fast plays-only card
