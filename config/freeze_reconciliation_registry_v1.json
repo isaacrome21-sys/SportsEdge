@@ -251,6 +251,33 @@
         "reason": "POST_08A12425_MAIN_MOVEMENT_CHANGED_MANIFEST_COVERED_SPORTSEDGE_DFS_AND_TEST_DFS_BYTES; PRIOR_MLB_DFS_EVIDENCE_FREEZE_INVALIDATED; REVOKED_FAIL_CLOSED_NO_AUTHORITY"
       },
       "freeze_sha": "7a92455f081ee52a454b2c49ff798d902a3ace68"
+    },
+    {
+      "bundle_id": "NBA_LOCATION_SYMMETRIC_G1_RESEARCH_FREEZE_V1",
+      "freeze_sha": "3ae116916be9e0082ac910a1493ce3c6e508916d",
+      "coverage_paths": [
+        "config/research/nba_location_symmetric_g1_prereg_v1.json",
+        "sportsedge/sports/nba/location_symmetric_g1.py",
+        "sportsedge/sports/nba/location_symmetric_g1_validation.py"
+      ],
+      "coverage_prefixes": [],
+      "disposition": null,
+      "identity": {
+        "schema": "NBA_LOCATION_SYMMETRIC_G1_RESEARCH_FREEZE_IDENTITY_V1",
+        "source_pull_request": 1743,
+        "bound_commit": "3ae116916be9e0082ac910a1493ce3c6e508916d",
+        "candidate_family": "NBA_LOCATION_SYMMETRIC_RIDGE_G1",
+        "prior_failed_ratings_backtests_reused_as_authority": false,
+        "authority": {
+          "model_p": false,
+          "truth_gate": false,
+          "promotion": false,
+          "staking": false,
+          "official": false,
+          "bettor_facing_release": false
+        },
+        "note": "Fresh zero-authority research binding for the PIT-safe symmetric NBA margin/total location challenger. Existing LEAN-only bettor card and failed ratings backtests remain unchanged."
+      }
     }
   ],
   "deltas": [
