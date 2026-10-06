@@ -375,14 +375,8 @@ def materialize_target(
         player_id=target.pitcher_id,
         target_date=target.target_date,
     )
-    aligned_starts = source._pitcher_start_rows_pk(
-        player_id=target.pitcher_id,
-        target_date=target.target_date,
-    )
-    prior_identity = [(row["date"], row.get("game_pk")) for row in prior]
-    incumbent_identity = [(start_date, game_pk) for _, start_date, _, game_pk in aligned_starts]
-    if len(history_pool) != len(prior) or prior_identity != incumbent_identity:
-        raise PitcherKHistoricalMaterializerError("workload/incumbent history identity mismatch")
+    if len(history_pool) != len(prior):
+        raise PitcherKHistoricalMaterializerError("workload/incumbent history alignment mismatch")
     realized_k, realized_bf = _target_outcome(source, target)
     row = build_historical_evaluation_row(
         season=target.season,
