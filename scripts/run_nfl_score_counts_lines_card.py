@@ -7,6 +7,7 @@ observed_at timestamp. Quotes are bound only after that frozen distribution.
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 import json
 from pathlib import Path
 
@@ -30,6 +31,70 @@ def _has_props(ticket: dict) -> bool:
         for row in game.get("markets") or []
         if isinstance(row, dict)
     )
+
+
+_NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
+
+
+def _name_tokens(value) -> list[str]:
+    text = str(value or "").casefold()
+    for mark in (".", ",", "-", "'", "’"):
+        text = text.replace(mark, " ")
+    tokens = text.split()
+    while tokens and tokens[-1] in _NAME_SUFFIXES:
+        tokens.pop()
+    return tokens
+
+
+def _name_alias_match(left, right) -> bool:
+    a = _name_tokens(left)
+    b = _name_tokens(right)
+    if a == b:
+        return True
+    if len(a) >= 2 and len(b) >= 2 and a[-1] == b[-1]:
+        first_a, first_b = a[0], b[0]
+        return min(len(first_a), len(first_b)) >= 4 and (
+            first_a.startswith(first_b) or first_b.startswith(first_a)
+        )
+    return False
+
+
+def _normalize_ticket_prop_players(ticket: dict, depth_rows: list[dict]) -> tuple[dict, list[dict]]:
+    normalized = deepcopy(ticket)
+    bindings: list[dict] = []
+    for game in normalized.get("games") or []:
+        away = str(game.get("away") or "").strip().upper()
+        home = str(game.get("home") or "").strip().upper()
+        teams = {away, home}
+        candidates = sorted({
+            (
+                str(row.get("team") or row.get("club_code") or "").strip().upper(),
+                str(row.get("player_name") or "").strip(),
+            )
+            for row in depth_rows
+            if str(row.get("team") or row.get("club_code") or "").strip().upper() in teams
+            and str(row.get("player_name") or "").strip()
+        })
+        for raw in game.get("markets") or []:
+            if not isinstance(raw, dict):
+                continue
+            player = str(raw.get("player") or "").strip()
+            if not player:
+                continue
+            hits = [(team, name) for team, name in candidates if _name_alias_match(name, player)]
+            if len(hits) != 1:
+                continue
+            team, canonical = hits[0]
+            raw["player"] = canonical
+            raw["team"] = team
+            if canonical != player:
+                bindings.append({
+                    "game": f"{away}@{home}",
+                    "input": player,
+                    "canonical": canonical,
+                    "team": team,
+                })
+    return normalized, bindings
 
 
 def _game_only_ticket(ticket: dict) -> dict:
@@ -155,6 +220,7 @@ def main() -> int:
                 injury_source_ready = True
 
     scoring_prior = load_prior_file(args.scoring_prior) if args.scoring_prior else None
+    ticket, alias_bindings = _normalize_ticket_prop_players(ticket, depth_rows)
     payload = build_score_count_phone_card(
         ticket,
         prediction=prediction,
@@ -168,6 +234,7 @@ def main() -> int:
     )
     payload["source_status"] = source_status
     payload["schedule_source_sha256"] = plan.get("schedule_source_sha256")
+    payload["player_alias_bindings"] = alias_bindings
 
     _write_payload(args.output, payload)
     print(json.dumps({
