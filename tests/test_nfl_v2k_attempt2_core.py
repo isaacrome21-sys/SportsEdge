@@ -238,3 +238,29 @@ def test_attempt2_evaluate_emits_moneyline_and_team_total_diagnostics():
     assert out["game_rows"][0]["sim_mean_home_score"]==20.0
     assert out["game_rows"][0]["sim_mean_away_score"]==18.0
 
+def test_attempt2_source_binding_resolves_hashes_from_canonical_freeze(tmp_path, monkeypatch):
+    from sportsedge.sports.nfl import v2k_attempt2_validation as v
+
+    contract=v.a1._load_json(v.CONTRACT_PATH)
+    source=v.a1._load_json(v.ROOT/contract["source_binding"]["source_freeze_path"])
+    pbp=tmp_path/"pbp"
+    pbp.mkdir()
+    for season in contract["source_binding"]["pbp_seasons"]:
+        (pbp/f"play_by_play_{season}.csv.gz").write_bytes(b"fixture")
+    schedule=tmp_path/"games.csv"
+    schedule.write_bytes(b"fixture")
+
+    expected_pbp=source["seasonal_sources"]["pbp"]["expected_sha256_by_season"]
+    expected_schedule=source["sources"]["schedule"]["expected_sha256"]
+    def fake_sha(path):
+        if path.name=="games.csv":
+            return expected_schedule
+        season=path.name.removeprefix("play_by_play_").removesuffix(".csv.gz")
+        return expected_pbp[season]
+
+    monkeypatch.setattr(v,"sha256_file",fake_sha)
+    out=v.verify_sources(pbp,schedule,contract)
+    assert out["source_manifest_sha256"]==contract["source_binding"]["source_manifest_sha256"]
+    assert set(out["pbp_sha256_by_season"])=={str(x) for x in contract["source_binding"]["pbp_seasons"]}
+    assert out["schedule_sha256"]==expected_schedule
+

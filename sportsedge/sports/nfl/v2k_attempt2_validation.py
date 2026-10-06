@@ -26,7 +26,48 @@ RESULT_SCHEMA="NFL_V2K_ATTEMPT2_DEVELOPMENT_VALIDATION_V1"
 sha256_file=a1.sha256_file
 git_blob_sha1=a1.git_blob_sha1
 read_csv=a1.read_csv
-verify_sources=a1.verify_sources
+def verify_sources(pbp_dir: Path, schedule_path: Path, contract: Mapping) -> dict:
+    """Verify Attempt-2 sources through the canonical frozen source contract.
+
+    Attempt 2 binds one immutable source-manifest identity plus an explicit season
+    list.  The per-season hashes live in the canonical source-freeze contract and
+    are deliberately not duplicated into the Attempt-2 preregistration.
+    """
+    binding=contract.get("source_binding") or {}
+    source_rel=str(binding.get("source_freeze_path") or "")
+    manifest_sha=str(binding.get("source_manifest_sha256") or "")
+    seasons=binding.get("pbp_seasons") or []
+    if not source_rel or not manifest_sha or not seasons:
+        raise SystemExit("V2K_ATTEMPT2_SOURCE_BINDING_INCOMPLETE")
+    source=a1._load_json(ROOT/source_rel)
+    frozen_manifest=str((source.get("frozen_from_evidence") or {}).get("source_manifest_sha256") or "")
+    if frozen_manifest!=manifest_sha:
+        raise SystemExit("V2K_ATTEMPT2_SOURCE_MANIFEST_IDENTITY_MISMATCH")
+    expected_all=((source.get("seasonal_sources") or {}).get("pbp") or {}).get("expected_sha256_by_season") or {}
+    actual={}
+    for raw_season in seasons:
+        season=str(int(raw_season))
+        expected=str(expected_all.get(season) or "")
+        if not expected:
+            raise SystemExit(f"V2K_ATTEMPT2_PBP_FREEZE_MISSING:{season}")
+        pbp_path=pbp_dir/f"play_by_play_{season}.csv.gz"
+        if not pbp_path.exists():
+            raise SystemExit(f"V2K_PBP_MISSING:{season}")
+        observed=sha256_file(pbp_path)
+        if observed!=expected:
+            raise SystemExit(f"V2K_PBP_SHA_MISMATCH:{season}")
+        actual[season]=observed
+    expected_schedule=str(((source.get("sources") or {}).get("schedule") or {}).get("expected_sha256") or "")
+    if not expected_schedule:
+        raise SystemExit("V2K_ATTEMPT2_SCHEDULE_FREEZE_MISSING")
+    sched_sha=sha256_file(schedule_path)
+    if sched_sha!=expected_schedule:
+        raise SystemExit("V2K_SCHEDULE_SHA_MISMATCH")
+    return {
+        "source_manifest_sha256":manifest_sha,
+        "pbp_sha256_by_season":actual,
+        "schedule_sha256":sched_sha,
+    }
 load_schedule=a1.load_schedule
 schedule_identity=a1.schedule_identity
 pbp_game_drive_records=a1.pbp_game_drive_records
