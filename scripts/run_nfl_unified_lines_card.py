@@ -179,6 +179,67 @@ def _normalize_ticket_prop_players(ticket: dict, depth_rows: list[dict]) -> tupl
     return normalized, bindings
 
 
+def _prop_selection_diagnostics(game: dict, raw_game: dict) -> dict:
+    prop_indexes = {
+        i for i, raw in enumerate(raw_game.get("markets") or [])
+        if isinstance(raw, dict) and str(raw.get("player") or "").strip()
+    }
+    rows = [
+        row for row in game.get("rows") or []
+        if int(row.get("input_index", -1)) in prop_indexes
+    ]
+    priced = [row for row in rows if row.get("status") == "PRICED"]
+    selected = [row for row in priced if row.get("selected")]
+    home = str(raw_game.get("home") or "").strip().upper()
+    away = str(raw_game.get("away") or "").strip().upper()
+
+    def team_code(row: dict) -> str:
+        side = str(row.get("team") or "").strip().lower()
+        return home if side == "home" else away if side == "away" else "UNKNOWN"
+
+    def direction(row: dict) -> str:
+        value = str(row.get("selection") or row.get("display_selection") or "").strip().lower()
+        if value.endswith(" under") or value == "under":
+            return "UNDER"
+        if value.endswith(" over") or value == "over":
+            return "OVER"
+        return "OTHER"
+
+    priced_teams = sorted({team_code(row) for row in priced if team_code(row) != "UNKNOWN"})
+    selected_team_counts: dict[str, int] = {}
+    selected_direction_counts: dict[str, int] = {}
+    for row in selected:
+        team = team_code(row)
+        selected_team_counts[team] = selected_team_counts.get(team, 0) + 1
+        side = direction(row)
+        selected_direction_counts[side] = selected_direction_counts.get(side, 0) + 1
+
+    alerts: list[str] = []
+    n_selected = len(selected)
+    if len(priced_teams) >= 2 and n_selected >= 4 and len({
+        team for team, count in selected_team_counts.items()
+        if team != "UNKNOWN" and count > 0
+    }) == 1:
+        alerts.append("ALL_SELECTED_PROPS_ONE_TEAM_WITH_TWO_TEAM_PRICING")
+    if n_selected >= 6:
+        unders = selected_direction_counts.get("UNDER", 0)
+        overs = selected_direction_counts.get("OVER", 0)
+        if unders / n_selected >= 0.80:
+            alerts.append("SELECTED_PROP_DIRECTION_CONCENTRATED_UNDER")
+        if overs / n_selected >= 0.80:
+            alerts.append("SELECTED_PROP_DIRECTION_CONCENTRATED_OVER")
+
+    return {
+        "priced_prop_rows": len(priced),
+        "selected_prop_rows": n_selected,
+        "priced_teams": priced_teams,
+        "selected_team_counts": dict(sorted(selected_team_counts.items())),
+        "selected_direction_counts": dict(sorted(selected_direction_counts.items())),
+        "alerts": alerts,
+        "selection_changed_by_diagnostic": False,
+    }
+
+
 def _apply_prop_board_safety(payload: dict, ticket: dict) -> dict:
     """Presentation/serving guard: never emit a mechanically one-sided prop card."""
     out = deepcopy(payload)
@@ -265,6 +326,8 @@ def _apply_prop_board_safety(payload: dict, ticket: dict) -> dict:
             engine["team_simulation_errors"] = {}
             engine["degraded_requested_teams"] = dict(sorted(degraded_teams.items()))
             game["prop_status"] = "AVAILABLE"
+
+        game["prop_selection_diagnostics"] = _prop_selection_diagnostics(game, raw_game)
 
     all_rows = [row for game in games for row in game.get("rows") or []]
     out["rows"] = all_rows
