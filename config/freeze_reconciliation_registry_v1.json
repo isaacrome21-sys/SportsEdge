@@ -267,7 +267,7 @@
         "source_pull_request": 1743,
         "bound_commit": "3ae116916be9e0082ac910a1493ce3c6e508916d",
         "candidate_family": "NBA_LOCATION_SYMMETRIC_RIDGE_G1",
-        "prior_failed_ratings_backtests_reused_as_authority": false,
+        "prior_failed_ratings_models_reused_as_authority": false,
         "authority": {
           "model_p": false,
           "truth_gate": false,
@@ -276,7 +276,7 @@
           "official": false,
           "bettor_facing_release": false
         },
-        "note": "Fresh zero-authority research binding for the PIT-safe symmetric NBA margin/total location challenger. Existing LEAN-only bettor card and failed ratings backtests remain unchanged."
+        "note": "Fresh zero-authority research binding for the preregistered symmetric NBA margin/total location challenger. Existing NBA LEAN-only card authority is unchanged."
       }
     }
   ],
