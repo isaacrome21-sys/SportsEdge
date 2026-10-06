@@ -23,5 +23,6 @@
     "promotion": false,
     "staking": false,
     "official": false
-  }
+  },
+  "recovery_trigger_merge_sha": "a247793da209bae03deab1caa81d33df9f10095e"
 }
