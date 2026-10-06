@@ -583,3 +583,47 @@ def test_score_count_concentration_diagnostic_flags_review_but_does_not_change_s
     assert "SELECTED_PROP_DIRECTION_CONCENTRATED_UNDER" in diag["alerts"]
     assert diag["selection_changed_by_diagnostic"] is False
 
+def test_td_only_unavailable_market_does_not_require_live_role_models(monkeypatch):
+    calls = []
+
+    def fail_if_called(**kwargs):
+        calls.append(str(kwargs["team"]))
+        raise AssertionError("live role model should not be requested")
+
+    monkeypatch.setattr(
+        "sportsedge.nfl_score_counts_phone.build_live_team_model",
+        fail_if_called,
+    )
+
+    board = {
+        "observed_at": "2026-10-05T16:00:00+00:00",
+        "games": [{
+            "away": "A",
+            "home": "B",
+            "markets": [{
+                "market": "anytime_tds",
+                "team": "B",
+                "player": "B_WR",
+                "line": 0.5,
+                "away_or_over_price": -110,
+                "home_or_under_price": -110,
+            }],
+        }],
+    }
+    out = build_score_count_phone_card(
+        board,
+        prediction=prediction(),
+        schedule_games=schedule(),
+        injury_source_ready=False,
+    )
+    assert calls == []
+    game = out["games"][0]
+    props = [row for row in game["rows"] if row["market"] == "anytime_tds"]
+    assert len(props) == 2
+    assert all(row["status"] == "NO_MODEL" for row in props)
+    assert all(
+        row["reason"] == "SCORING_COMPOSITION_PRIOR_REQUIRED_FOR_TD_PROPS"
+        for row in props
+    )
+    assert game["role_status"] == "AVAILABLE"
+
