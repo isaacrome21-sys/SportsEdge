@@ -134,3 +134,32 @@ def test_incomplete_or_deployable_candidate_fails_closed():
     bad["model_p_eligible"] = True
     with pytest.raises(PitcherKProbabilityCandidateError, match="deployable"):
         feature_vector(bad)
+
+
+def test_empirical_rate_features_accept_closed_upper_boundary():
+    """1.0 is a valid complete empirical rate, not a feature-level logit input."""
+    accepted = _candidate(whiff=1.0, chase=1.0, kbf=1.0)
+    values = feature_vector(accepted)
+    assert values[1] == 1.0
+    assert values[5] == 1.0
+    assert values[6] == 1.0
+
+
+def test_empirical_rate_features_reject_invalid_boundaries():
+    for field in ("whiff_rate", "chase_rate"):
+        for value in (0.0, -0.01, 1.000001):
+            bad = _candidate()
+            bad["components"]["pitcher_skill"][field] = value
+            with pytest.raises(PitcherKProbabilityCandidateError):
+                feature_vector(bad)
+    for value in (0.0, -0.01, 1.000001):
+        bad = _candidate(kbf=value)
+        with pytest.raises(PitcherKProbabilityCandidateError):
+            feature_vector(bad)
+
+
+def test_empirical_rate_features_do_not_clip_invalid_values():
+    bad = _candidate()
+    bad["components"]["pitcher_skill"]["chase_rate"] = 1.5
+    with pytest.raises(PitcherKProbabilityCandidateError, match=r"chase_rate must be in \(0,1\]"):
+        feature_vector(bad)
