@@ -61,6 +61,9 @@ def _build_consistency_card(results: list[dict[str, Any]]) -> dict[str, Any]:
             "raw_edge_points": row.get("raw_edge_points"),
             "ev_per_dollar": row.get("ev_per_dollar"),
             "simulation_id": row.get("simulation_id"),
+            "probability_source": row.get("probability_source"),
+            "probability_identity": row.get("probability_identity"),
+            "engine_version": row.get("engine_version"),
         }
         if market in PITCHER_MARKETS:
             decision.update({
@@ -120,7 +123,7 @@ def run(input_path: Path, *, game_id: str, simulations: int = 100000) -> dict[st
     payload["selected_row_count"] = len(selected["rows"])
     payload["card"] = _build_consistency_card(payload["results"])
     payload["display_policy"] = {
-        "probability_source": "score-compatible joint research path set",
+        "probability_source": "game score paths and separately identified canonical pitcher marginals",
         "probabilities_modified_by_card_guard": False,
         "same_game_primary_limit": 1,
         "pitcher_props": "PASS_UNTIL_TEMPORAL_DEPENDENCE_VALIDATION",

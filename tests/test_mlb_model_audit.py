@@ -14,6 +14,14 @@ from sportsedge.mlb_joint_card_coupled_research import simulate_score_compatible
 
 
 class TestMLBModelAudit(unittest.TestCase):
+    def test_economics_validates_mass_and_preserves_push_refunds(self):
+        result = runner.economics(win_p=.6, push_p=.2, odds=100)
+        self.assertAlmostEqual(result['ev_per_dollar'], .4)
+        self.assertAlmostEqual(result['settled_research_p'], .75)
+        for win, push, odds in ((.9, .2, 100), (float('nan'), 0, 100), (.5, -.1, 100), (.5, 0, 0)):
+            with self.assertRaises(ValueError):
+                runner.economics(win_p=win, push_p=push, odds=odds)
+
     def test_missing_or_invalid_pitcher_counts_are_not_zero(self):
         valid = dict(inningsPitched='5.2', strikeOuts=5, earnedRuns=0, hits=4, baseOnBalls=1)
         self.assertEqual(_pitcher_pool([{'stat': valid}])[0]['outs'], 17)
@@ -88,6 +96,44 @@ class TestMLBModelAudit(unittest.TestCase):
                  patch.object(runner, 'simulate_score_compatible_joint_card', wraps=simulate_score_compatible_joint_card) as sim:
                 runner.run(path, simulations=1000)
                 self.assertEqual(sim.call_args.kwargs['feature_source_hash'], 'game-context-only')
+
+    def test_standalone_pitcher_prices_use_canonical_context_not_conditioning(self):
+        snapshot = json.loads(Path('manual_inputs/mlb/2026-10-07_rays_yankees_supplied.json').read_text())
+        quote = next(row for row in snapshot['rows'] if row['market_type'] == 'PITCHER_K')
+        snapshot['rows'] = [quote]
+        game = SimpleNamespace(game_pk=1, official_date='2026-10-07', away_id=2, home_id=3,
+                               away_name='Away', home_name='Home')
+        context = {'games': [dict(game_id=quote['game_id'], adjusted_means=dict(away_mean_runs=3, home_mean_runs=3),
+                    feature_source_hash='context', context_as_of_utc='2026-10-07T22:30:00+00:00')]}
+        pool = [dict(strikeouts=8, outs=18, earned_runs=0, hits_allowed=3, walks_allowed=1),
+                dict(strikeouts=1, outs=3, earned_runs=8, hits_allowed=8, walks_allowed=3)] * 3
+        built = {'features': {'history_pool': pool, 'opp_k_adjustment': {
+            'market': 'PITCHER_K', 'beta': 1, 'target_rel': .5, 'history_rel': [1] * 6,
+        }}, 'feature_source_hash': 'pitcher-context'}
+        history = unittest.mock.Mock()
+        history.feature_row.return_value = built
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'input.json'
+            path.write_text(json.dumps(snapshot))
+            with patch.object(runner, 'run_context_adjusted', return_value=context), \
+                 patch.object(runner, '_resolve_game', return_value=game), \
+                 patch.object(runner, '_resolve_subject', return_value=('10', 2)), \
+                 patch.object(runner, 'MLBAllMarketHistorySource', return_value=history), \
+                 patch.object(runner, 'build_pitcher_joint_features', return_value={'history_pool': pool, 'feature_source_hash': 'raw'}):
+                out = runner.run(path, simulations=5000)
+        self.assertEqual(history.feature_row.call_count, 1)
+        for row in out['results']:
+            self.assertEqual(row['probability_source'], 'CANONICAL_PITCHER_MARGINAL')
+            self.assertIsNone(row['simulation_id'])
+            self.assertIsNone(row['score_distribution_sha256'])
+            self.assertEqual(row['mc_paths'], 0)
+            self.assertIn('opp_k_adjustment', row['probability_meta'])
+            self.assertNotEqual(row['research_p'], row['score_conditioned_diagnostic']['research_p'])
+            expected = runner.price_pitcher_market({**built, 'game_id': '1', 'entity_id': '10',
+                'market': 'PITCHER_K', 'side': row['side'], 'line': row['line']})
+            self.assertEqual(row['research_p'], expected['model_p'])
+            self.assertAlmostEqual(row['ev_per_dollar'], runner.economics(
+                win_p=expected['model_p'], push_p=expected['push_p'], odds=row['american_odds'])['ev_per_dollar'])
 
 
 if __name__ == '__main__':

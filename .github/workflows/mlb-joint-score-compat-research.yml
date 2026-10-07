@@ -33,4 +33,7 @@ jobs:
         run: >-
           PYTHONPATH=. python -m unittest
           tests.test_mlb_joint_card_research
-          tests.test_mlb_joint_card_coupled_research -v
+          tests.test_mlb_joint_card_coupled_research
+          tests.test_mlb_model_audit
+          tests.test_mlb_context_adjusted_research
+          tests.test_mlb_score_compatible_card_final -v
