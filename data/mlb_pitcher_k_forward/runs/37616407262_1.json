@@ -1,0 +1,48 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "blocked_count": 4,
+  "blockers": [
+    {
+      "entity_name": "Tyler Glasnow",
+      "observed_at": "2026-10-07T11:46:26.642576+00:00",
+      "provider_event_id": "34786231",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    },
+    {
+      "entity_name": "Tyler Mahle",
+      "observed_at": "2026-10-07T11:46:26.642576+00:00",
+      "provider_event_id": "34786231",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    },
+    {
+      "entity_name": "Max Fried",
+      "observed_at": "2026-10-07T11:46:27.745879+00:00",
+      "provider_event_id": "34783364",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    },
+    {
+      "entity_name": "Nick Martinez",
+      "observed_at": "2026-10-07T11:46:27.745879+00:00",
+      "provider_event_id": "34783364",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    }
+  ],
+  "eligible_quote_units": 4,
+  "observed_at_utc": "2026-10-07T11:47:37.858352+00:00",
+  "predictions_created": 0,
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-07/props_20261007T114629.255682Z.json",
+  "run_attempt": "1",
+  "run_id": "37616407262",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_RUN_V1",
+  "selection_drops": {
+    "selected_units": 16
+  },
+  "settlements_created": 0,
+  "status": "OK",
+  "summary_sha256": "e7413886b765b1b7b78b28c553dca6adadbcd5c80a265e29fb3fd50b5abf2316"
+}
