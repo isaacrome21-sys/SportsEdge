@@ -1,0 +1,68 @@
+{
+  "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G1_ATTEMPT3_RESULT_V1",
+  "status": "DEVELOPMENT_ATTEMPT_FAIL",
+  "recorded_date": "2026-10-05",
+  "candidate_family": "NFL_SCORE_COUNTS_G1",
+  "attempt_number": 3,
+  "attempt_consumed": true,
+  "workflow_run_id": 37381125793,
+  "workflow_head_sha": "175a4e57dc902d75c4106a344965e1aa49ac47a5",
+  "artifact_id": 11378891102,
+  "artifact_archive_sha256": "2a147d0b4f497cdddbf08a0958cbe635f5c4356e003826738d2902620ebba37c",
+  "fit_file_sha256": "6267e4ef44aba5b799a492ea4bd9cf3ac30fac4cedb2a72e0de0a9535e9cbba6",
+  "fit_artifact_sha256": "f7b6237f343fb036c86152502c20f770125c9e627cdf1c3b755ffce97389a306",
+  "artifact_self_digest_verified": true,
+  "source_manifest_sha256": "82f9d65a783f890efc0ed22f4d26a3d9958189226c43ba5d7a4e8454cfad6e1c",
+  "code_identity": "eb1e7315d0c8e3748a8c9f79f2037bbf3144d9c97508cf6347454c6bea4f1670",
+  "prereg_sha256": "0de00c1ca2ad186cfb508899189db8fac05eea27eb35c3ed6be0f171347fb96c",
+  "training_row_count": 3934,
+  "development_gate": {
+    "pass": false,
+    "all_targets_must_pass": true,
+    "minimum_fold_wins_each": 3,
+    "offense_touchdowns": {
+      "pass": true,
+      "fold_wins": 5,
+      "folds_total": 5,
+      "pooled_candidate_poisson_deviance": 0.8640739939949063,
+      "pooled_intercept_baseline_poisson_deviance": 0.9429609486409716,
+      "pooled_improvement_absolute": 0.07888695464606532
+    },
+    "made_field_goals": {
+      "pass": false,
+      "fold_wins": 2,
+      "folds_total": 5,
+      "pooled_candidate_poisson_deviance": 1.0479251623575745,
+      "pooled_intercept_baseline_poisson_deviance": 1.0488367803645573,
+      "pooled_improvement_absolute": 0.0009116180069828062,
+      "pooled_improvement_fraction": 0.0008691705173286769,
+      "winning_validation_seasons": [2021, 2025],
+      "losing_validation_seasons": [2022, 2023, 2024]
+    }
+  },
+  "attempt_accounting": {
+    "maximum": 3,
+    "consumed_after_attempt": 3,
+    "remaining_after_attempt": 0,
+    "next_attempt": null,
+    "candidate_family_exhausted": true
+  },
+  "rules": {
+    "attempt_1_result_preserved": true,
+    "attempt_2_result_preserved": true,
+    "thresholds_unchanged": true,
+    "no_fourth_attempt": true,
+    "backfill": false,
+    "market_data_for_model_fit": false,
+    "source_substitution": false
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "pricing": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "backfill": false
+  }
+}
