@@ -133,9 +133,6 @@ def parse_card_rows(body: str) -> list[CardRow]:
             raise ValueError(f"invalid card row: {line}") from exc
     if not rows:
         raise ValueError("final card contains no ACTIONABLE or LEAN rows")
-    game_pks = {row.game_pk for row in rows}
-    if len(game_pks) != 1:
-        raise ValueError(f"card spans multiple game_pks: {sorted(game_pks)}")
     return rows
 
 
@@ -525,10 +522,15 @@ def upsert_ledger(
     ]
     other_rows: list[dict[str, str]] = []
     prior: dict[str, str] | None = None
+    target_game_pk = str(main[0].row.game_pk if main else "")
     if path.exists():
         with path.open(newline="", encoding="utf-8") as handle:
             for row in csv.DictReader(handle):
-                if row.get("issue_number") == str(issue_number):
+                same_key = (
+                    row.get("issue_number") == str(issue_number)
+                    and row.get("game_pk") == target_game_pk
+                )
+                if same_key:
                     prior = row
                 else:
                     other_rows.append(row)
@@ -543,7 +545,11 @@ def upsert_ledger(
 
     other_rows.append(candidate)
     other_rows.sort(
-        key=lambda row: (row.get("date", ""), int(row.get("issue_number") or 0))
+        key=lambda row: (
+            row.get("date", ""),
+            int(row.get("issue_number") or 0),
+            int(row.get("game_pk") or 0),
+        )
     )
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
@@ -559,6 +565,7 @@ def grade_issue(
     ledger_path: Path = DEFAULT_LEDGER,
     comments: list[dict[str, Any]] | None = None,
     feed: dict[str, Any] | None = None,
+    feeds: dict[int, dict[str, Any]] | None = None,
     post_comment: bool = True,
     force_comment: bool = False,
 ) -> str:
@@ -579,19 +586,50 @@ def grade_issue(
         if str(exc) == "final card contains no ACTIONABLE or LEAN rows":
             return "SKIP_NO_GRADEABLE_ROWS"
         raise
-    game_pk = rows[0].game_pk
-    feed = feed or fetch_statsapi(game_pk)
-    if not is_final(feed):
+    game_pks = sorted({row.game_pk for row in rows})
+    if feed is not None and feeds is not None:
+        raise ValueError("provide feed or feeds, not both")
+    if feed is not None and len(game_pks) != 1:
+        raise ValueError("single feed cannot settle a multi-game card")
+
+    feed_by_game: dict[int, dict[str, Any]] = {}
+    if feeds is not None:
+        missing = [game_pk for game_pk in game_pks if game_pk not in feeds]
+        if missing:
+            raise ValueError(f"missing feeds for game_pks: {missing}")
+        feed_by_game = {game_pk: feeds[game_pk] for game_pk in game_pks}
+    elif feed is not None:
+        feed_by_game[game_pks[0]] = feed
+    else:
+        feed_by_game = {game_pk: fetch_statsapi(game_pk) for game_pk in game_pks}
+
+    if any(not is_final(feed_by_game[game_pk]) for game_pk in game_pks):
         return "SKIP_NOT_FINAL"
 
-    main = [
-        settle_actionable(row, feed) for row in rows if row.status == "ACTIONABLE"
-    ]
-    leans = [settle_lean(row, feed) for row in rows if row.status == "LEAN"]
-    body = render_comment(issue_number, feed, main, leans)
-    if main:
-        upsert_ledger(ledger_path, issue_number, feed, main)
+    rendered_games: list[str] = []
+    for index, game_pk in enumerate(game_pks):
+        game_feed = feed_by_game[game_pk]
+        game_rows = [row for row in rows if row.game_pk == game_pk]
+        main = [
+            settle_actionable(row, game_feed)
+            for row in game_rows
+            if row.status == "ACTIONABLE"
+        ]
+        leans = [
+            settle_lean(row, game_feed)
+            for row in game_rows
+            if row.status == "LEAN"
+        ]
+        rendered = render_comment(issue_number, game_feed, main, leans)
+        if index:
+            marker_line = GRADE_MARKER.format(issue=issue_number) + "\n"
+            if rendered.startswith(marker_line):
+                rendered = rendered[len(marker_line):]
+        rendered_games.append(rendered)
+        if main:
+            upsert_ledger(ledger_path, issue_number, game_feed, main)
 
+    body = "\n\n---\n\n".join(rendered_games)
     marker = GRADE_MARKER.format(issue=issue_number)
     already_commented = any(
         marker in str(comment.get("body") or "") for comment in comments
