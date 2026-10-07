@@ -522,7 +522,12 @@ def grade_issue(
     except NoFinalCard:
         return "SKIP_NO_FINAL_CARD"
 
-    rows = parse_card_rows(card)
+    try:
+        rows = parse_card_rows(card)
+    except ValueError as exc:
+        if str(exc) == "final card contains no ACTIONABLE or LEAN rows":
+            return "SKIP_NO_GRADEABLE_ROWS"
+        raise
     game_pk = rows[0].game_pk
     feed = feed or fetch_statsapi(game_pk)
     if not is_final(feed):
