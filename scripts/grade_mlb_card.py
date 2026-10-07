@@ -537,11 +537,9 @@ def grade_issue(
         settle_actionable(row, feed) for row in rows if row.status == "ACTIONABLE"
     ]
     leans = [settle_lean(row, feed) for row in rows if row.status == "LEAN"]
-    if not main:
-        raise ValueError("final card has no ACTIONABLE rows")
-
     body = render_comment(issue_number, feed, main, leans)
-    upsert_ledger(ledger_path, issue_number, feed, main)
+    if main:
+        upsert_ledger(ledger_path, issue_number, feed, main)
 
     marker = GRADE_MARKER.format(issue=issue_number)
     already_commented = any(
