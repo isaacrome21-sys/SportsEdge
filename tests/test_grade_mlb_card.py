@@ -232,6 +232,37 @@ def test_ledger_upsert_is_idempotent_for_same_settlement(tmp_path: Path):
     assert rerun[0]["graded_at_utc"] == "2000-01-01T00:00:00+00:00"
 
 
+def test_pitcher_record_win_lean_uses_official_decision():
+    game = feed("Away", "Home", 4, 2, [(1, 0)])
+    away_box = game["liveData"]["boxscore"]["teams"]["away"]
+    away_box["pitchers"] = [30]
+    away_box["players"] = {
+        "ID30": {
+            "person": {"id": 30, "fullName": "Tyler Mahle"},
+            "stats": {"pitching": {"strikeOuts": 5, "inningsPitched": "6.0"}},
+        },
+    }
+    game["liveData"]["decisions"] = {
+        "winner": {"id": 30, "fullName": "Tyler Mahle"}
+    }
+    yes = parse_card_rows(
+        card(7, [("Tyler Mahle Pitcher Record Win Yes 0", 340, "LEAN")])
+    )[0]
+    no = parse_card_rows(
+        card(7, [("Tyler Mahle Pitcher Record Win No 0", -120, "LEAN")])
+    )[0]
+    assert settle_lean(yes, game).result == "W"
+    assert settle_lean(no, game).result == "L"
+
+
+def test_unknown_lean_market_is_unresolved_not_fatal():
+    game = feed("Away", "Home", 1, 0, [(1, 0)])
+    row = parse_card_rows(card(7, [("Player Future Market Yes 0", 100, "LEAN")]))[0]
+    settled = settle_lean(row, game)
+    assert settled.result == "UNRESOLVED"
+    assert settled.units == 0.0
+
+
 def test_multigame_card_grades_per_game_and_keeps_distinct_ledger_rows(tmp_path: Path):
     body_lines = card(1, [("Moneyline Away", 100, "ACTIONABLE")]).splitlines()
     body_lines.append(
