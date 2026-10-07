@@ -23,7 +23,8 @@
     "predictions_are_create_only": true,
     "settlements_are_create_only": true,
     "historical_reconstruction_counts_as_forward_validation": false,
-    "selection_for_judged_unit": "LAST_PROSPECTIVELY_CAPTURED_PAIRED_PRE_FIRST_PITCH_PREDICTION_PER_GAME_PITCHER"
+    "selection_for_judged_unit": "LAST_PROSPECTIVELY_CAPTURED_PAIRED_PRE_FIRST_PITCH_PREDICTION_PER_GAME_PITCHER",
+    "statcast_max_age_seconds": 129600
   },
   "evaluation": {
     "minimum_graded_units": 150,
