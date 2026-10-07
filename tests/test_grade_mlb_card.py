@@ -1,7 +1,7 @@
 import csv
 from pathlib import Path
 
-from scripts.grade_mlb_card import grade_issue, parse_card_rows, settle_actionable
+from scripts.grade_mlb_card import grade_issue, parse_card_rows, settle_actionable, settle_lean
 
 
 def feed(away_name, home_name, away_runs, home_runs, innings):
@@ -167,6 +167,49 @@ def test_lean_props_grade_separately_and_nonstarters_void(tmp_path: Path):
         ledger_rows = list(csv.DictReader(handle))
     assert ledger_rows[0]["wins"] == "1"
     assert ledger_rows[0]["losses"] == "0"
+
+
+def test_extended_batter_lean_prop_families():
+    game = feed("Away", "Home", 1, 0, [(1, 0)])
+    away_box = game["liveData"]["boxscore"]["teams"]["away"]
+    away_box["players"] = {
+        "ID10": {
+            "person": {"id": 10, "fullName": "Fernando Tatis Jr."},
+            "battingOrder": "100",
+            "stats": {
+                "batting": {
+                    "hits": 3,
+                    "doubles": 1,
+                    "triples": 0,
+                    "homeRuns": 1,
+                    "totalBases": 7,
+                    "rbi": 2,
+                    "runs": 2,
+                    "baseOnBalls": 1,
+                    "strikeOuts": 1,
+                    "stolenBases": 1,
+                }
+            },
+        }
+    }
+    cases = [
+        ("Fernando Tatis Jr. Singles Over 0.5", "W"),
+        ("Fernando Tatis Jr. Doubles Over 0.5", "W"),
+        ("Fernando Tatis Jr. Triples Under 0.5", "W"),
+        ("Fernando Tatis Jr. Home Runs Over 0.5", "W"),
+        ("Fernando Tatis Jr. Runs Over 1.5", "W"),
+        ("Fernando Tatis Jr. Stolen Bases Over 0.5", "W"),
+        ("Fernando Tatis Jr. Batter K Over 0.5", "W"),
+        ("Fernando Tatis Jr. Extra Base Hits Over 1.5", "W"),
+        ("Fernando Tatis Jr. Hits Runs Rbis Over 6.5", "W"),
+        ("Fernando Tatis Jr. Hits Runs Stolen Bases Over 5.5", "W"),
+        ("Fernando Tatis Jr. Runs Rbis Over 3.5", "W"),
+        ("Fernando Tatis Jr. Hits Stolen Bases Over 3.5", "W"),
+        ("Fernando Tatis Jr. Hits Walks Stolen Bases Over 4.5", "W"),
+    ]
+    for pick, expected in cases:
+        row = parse_card_rows(card(7, [(pick, -110, "LEAN")]))[0]
+        assert settle_lean(row, game).result == expected, pick
 
 
 def test_ledger_upsert_is_idempotent_for_same_settlement(tmp_path: Path):
