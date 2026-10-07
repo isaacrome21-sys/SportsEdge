@@ -1,0 +1,33 @@
+name: mlb-pitcher-window-bakeoff
+on:
+  pull_request:
+    paths:
+      - scripts/eval_mlb_pitcher_window_blend.py
+      - tests/test_mlb_pitcher_window_blend.py
+      - .github/workflows/mlb-pitcher-window-bakeoff.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test-and-evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Run chronological-leakage and shrinkage tests
+        run: PYTHONPATH=. python -m unittest tests.test_mlb_pitcher_window_blend -v
+      - name: Score actual Fried and Martinez strict-prior 2025-26 starts
+        run: >-
+          PYTHONPATH=. python scripts/eval_mlb_pitcher_window_blend.py
+          --target-date 2026-10-07
+          --output artifacts/mlb_pitcher_window_bakeoff_20261007.json
+      - name: Upload pre-registered research artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mlb-pitcher-window-bakeoff-20261007
+          path: artifacts/mlb_pitcher_window_bakeoff_20261007.json
+          if-no-files-found: warn
+          retention-days: 14
