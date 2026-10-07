@@ -6,7 +6,10 @@ on:
       - 'config/research/mlb_pitcher_k_forward_validation_v1.json'
       - 'sportsedge/mlb_pitcher_k_forward_validation.py'
       - 'scripts/capture_mlb_pitcher_k_forward.py'
+      - 'scripts/finalize_mlb_pitcher_k_forward.py'
+      - 'sportsedge/mlb_pitcher_k_forward_readout.py'
       - 'tests/test_mlb_pitcher_k_forward_validation.py'
+      - 'tests/test_mlb_pitcher_k_forward_readout.py'
       - '.github/workflows/mlb-pitcher-k-forward-validation.yml'
   workflow_run:
     workflows:
@@ -38,9 +41,14 @@ jobs:
         run: |
           python -m py_compile \
             sportsedge/mlb_pitcher_k_forward_validation.py \
-            scripts/capture_mlb_pitcher_k_forward.py
-      - name: Test frozen fit and receipt contracts
-        run: python -m pytest -q tests/test_mlb_pitcher_k_forward_validation.py
+            sportsedge/mlb_pitcher_k_forward_readout.py \
+            scripts/capture_mlb_pitcher_k_forward.py \
+            scripts/finalize_mlb_pitcher_k_forward.py
+      - name: Test frozen fit, receipt, and one-look readout contracts
+        run: >-
+          python -m pytest -q
+          tests/test_mlb_pitcher_k_forward_validation.py
+          tests/test_mlb_pitcher_k_forward_readout.py
 
   capture-and-settle:
     needs: contract
@@ -69,6 +77,8 @@ jobs:
           python scripts/capture_mlb_pitcher_k_forward.py
           --output-root data/mlb_pitcher_k_forward
           --cache-dir .cache/mlb-pitcher-k-forward
+      - name: Finalize one-look readout only when the frozen minimum is reached
+        run: python scripts/finalize_mlb_pitcher_k_forward.py --root data/mlb_pitcher_k_forward
       - name: Persist create-only forward receipts
         run: |
           python scripts/persist_forward_evidence_data_branch.py \
