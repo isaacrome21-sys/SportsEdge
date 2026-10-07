@@ -99,6 +99,24 @@ def _official_date(live_payload: Mapping[str, Any]) -> str | None:
     return str(value) if value else None
 
 
+def _first_pitch_utc(live_payload: Mapping[str, Any]) -> str | None:
+    game_data = live_payload.get("gameData") or {}
+    if not isinstance(game_data, Mapping):
+        return None
+    dt = game_data.get("datetime") or {}
+    raw = dt.get("dateTime") if isinstance(dt, Mapping) else None
+    if not raw:
+        return None
+    value = str(raw).strip()
+    try:
+        parsed = datetime.fromisoformat(value[:-1] + "+00:00" if value.endswith("Z") else value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(timezone.utc).isoformat()
+
+
 def _probable_pitchers(live_payload: Mapping[str, Any]) -> dict[str, dict[str, Any] | None]:
     game_data = live_payload.get("gameData") or {}
     probable = game_data.get("probablePitchers") if isinstance(game_data, Mapping) else {}
@@ -240,6 +258,7 @@ def acquire_mlb_run_it_pregame(
         "game_pk": int(game_pk),
         "as_of_utc": as_of.astimezone(timezone.utc).isoformat(),
         "official_date": day,
+        "first_pitch_utc": _first_pitch_utc(live),
         "source": SOURCE,
         "starters": starters,
         "lineups": lineup_lane,
