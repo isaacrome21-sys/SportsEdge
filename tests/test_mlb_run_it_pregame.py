@@ -129,6 +129,7 @@ def test_bundle_resolves_cli_import_and_keeps_all_context_out_of_model_p():
         }],
     )
 
+    assert bundle["first_pitch_utc"] == "2026-09-22T23:10:00+00:00"
     assert bundle["model_p_eligible"] is False
     assert bundle["starters"]["model_p_eligible"] is False
     assert bundle["lineups"]["model_p_eligible"] is False

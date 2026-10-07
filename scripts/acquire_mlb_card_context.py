@@ -12,6 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sportsedge.mlb_run_it_pregame import acquire_mlb_run_it_pregame
+from sportsedge.mlb_context_forward_capture import capture_training_row
 from sportsedge.statcast_daily_source import StatcastSourceError, fetch_daily_statcast
 
 
@@ -74,6 +75,11 @@ def main(argv=None, *, acquire=acquire_mlb_run_it_pregame):
     ap.add_argument("--engine-output", default="artifacts/manual_mlb_snapshot_card.json")
     ap.add_argument("--out-dir", default="artifacts/mlb_context")
     ap.add_argument(
+        "--capture-dir",
+        default="artifacts/mlb_context_forward",
+        help="Append-only forward PIT context evidence output",
+    )
+    ap.add_argument(
         "--workers",
         type=int,
         default=1,
@@ -86,8 +92,11 @@ def main(argv=None, *, acquire=acquire_mlb_run_it_pregame):
     payload = json.loads(Path(args.engine_output).read_text())
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
+    capture_out = Path(args.capture_dir)
+    capture_out.mkdir(parents=True, exist_ok=True)
     pks = game_pks(payload)
     failures = []
+    capture_failures = []
     if acquire is acquire_mlb_run_it_pregame and pks:
         snapshot, statcast_error = shared_statcast_snapshot()
         if snapshot is not None:
@@ -111,10 +120,38 @@ def main(argv=None, *, acquire=acquire_mlb_run_it_pregame):
             failures.append(failure)
             continue
         (out / f"{pk}.json").write_text(json.dumps(bundle, indent=2, default=str))
+        first_pitch = bundle.get("first_pitch_utc")
+        game_date = str(bundle.get("official_date") or (str(first_pitch)[:10] if first_pitch else ""))
+        captured_at = str(bundle.get("as_of_utc") or "")
+        if first_pitch and captured_at:
+            try:
+                evidence = capture_training_row(
+                    bundle,
+                    game_date=game_date,
+                    first_pitch_utc=str(first_pitch),
+                    captured_at_utc=captured_at,
+                )
+                capture_path = capture_out / f"{pk}_{evidence['capture_sha256']}.json"
+                if not capture_path.exists():
+                    capture_path.write_text(json.dumps(evidence, indent=2, default=str))
+                print(f"{pk}: forward context evidence {evidence['capture_sha256'][:12]}")
+            except ValueError as exc:
+                capture_failures.append(
+                    f"Game {pk}: context evidence NOT CAPTURED ({exc})"
+                )
+        else:
+            capture_failures.append(
+                f"Game {pk}: context evidence NOT CAPTURED (missing first-pitch/as-of timestamp)"
+            )
         print(f"{pk}: {bundle.get('status')} {str(bundle.get('payload_sha256'))[:12]}")
 
     (out / "failures.json").write_text(json.dumps(failures, indent=2))
+    (capture_out / "failures.json").write_text(
+        json.dumps(capture_failures, indent=2)
+    )
     for failure in failures:
+        print(failure)
+    for failure in capture_failures:
         print(failure)
     return 0
 
