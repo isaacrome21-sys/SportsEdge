@@ -210,6 +210,22 @@ def test_non_final_game_is_skipped_without_ledger(tmp_path: Path):
     assert not path.exists()
 
 
+def test_final_card_without_actionable_or_lean_rows_is_skipped(tmp_path: Path):
+    path = tmp_path / "mlb_ledger.csv"
+    body = card(1, [("Moneyline Away", 100, "BLOCKED")])
+    assert (
+        grade_issue(
+            1807,
+            comments=[{"body": body}],
+            feed=feed("Away", "Home", 1, 0, [(1, 0)]),
+            ledger_path=path,
+            post_comment=False,
+        )
+        == "SKIP_NO_GRADEABLE_ROWS"
+    )
+    assert not path.exists()
+
+
 def test_issue_without_final_card_is_skipped(tmp_path: Path):
     path = tmp_path / "mlb_ledger.csv"
     assert (
