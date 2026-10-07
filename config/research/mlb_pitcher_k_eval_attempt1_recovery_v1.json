@@ -60,5 +60,19 @@
     "staking": false,
     "official": false,
     "bettor_facing_release": false
+  },
+  "rearm_after_rate_boundary_repair": {
+    "boundary_repair_pr": 1806,
+    "boundary_repair_main_sha": "04efa44469835206cea8a755af1da3da80cb0d4b",
+    "prior_recovery_run_id": 37520270801,
+    "prior_recovery_head_sha": "f5ca5f25f39e1a402e8752568b7c0401ff5ed5cc",
+    "prior_recovery_failure_step": "Evaluate frozen candidate for Attempt-1 recovery",
+    "persist_skipped": true,
+    "candidate_metrics_computed": false,
+    "model_formula_changed": false,
+    "hyperparameter_grid_changed": false,
+    "season_split_changed": false,
+    "evaluation_thresholds_changed": false,
+    "repair_scope": "ACCEPT_EMPIRICAL_RATE_FEATURES_IN_OPEN_CLOSED_UNIT_INTERVAL_ONLY"
   }
 }
