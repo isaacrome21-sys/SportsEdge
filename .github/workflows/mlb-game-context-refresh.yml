@@ -5,6 +5,9 @@ on:
   schedule:
     - cron: '8,23,38,53 15-23 * * *'
     - cron: '8,23,38,53 0-5 * * *'
+    # Cover the hourly prop PIT archive at :17 during the previously dark 06-14 UTC window.
+    # A :08 context snapshot stays within the frozen 20-minute forward-evidence freshness limit.
+    - cron: '8 6-14 * * *'
   push:
     paths:
       - 'sportsedge/mlb_game_context_source.py'
