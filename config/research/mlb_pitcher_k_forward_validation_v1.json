@@ -1,0 +1,57 @@
+{
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_VALIDATION_V1",
+  "status": "FROZEN_BEFORE_FIRST_PROSPECTIVE_PREDICTION",
+  "market": "PITCHER_K",
+  "candidate_freeze": {
+    "path": "config/research/mlb_pitcher_k_attempt1_passed_fit_freeze_v1.json",
+    "fit_sha256": "70a31ff9b995a2d54df87feb2d51e2518fa9cd8593bf6c047970e08557b6ecea",
+    "evaluation_run_id": 37603403636
+  },
+  "evidence": {
+    "sportsbook": "draftkings_direct",
+    "quote_archive": "runtime/mlb-prop-pit",
+    "context_archive": "runtime/mlb-context/runs",
+    "statcast_archive": "runtime/statcast/runs",
+    "market": "PITCHER_K",
+    "main_line_only": true,
+    "two_sided_same_half_line_required": true,
+    "alternate_lines_allowed": false,
+    "quote_must_precede_first_pitch": true,
+    "context_must_be_at_or_before_quote": true,
+    "context_max_age_seconds": 1200,
+    "statcast_snapshot_must_be_at_or_before_quote": true,
+    "predictions_are_create_only": true,
+    "settlements_are_create_only": true,
+    "historical_reconstruction_counts_as_forward_validation": false,
+    "selection_for_judged_unit": "LAST_PROSPECTIVELY_CAPTURED_PAIRED_PRE_FIRST_PITCH_PREDICTION_PER_GAME_PITCHER"
+  },
+  "evaluation": {
+    "minimum_graded_units": 150,
+    "primary_metric": "MEAN_LOG_LOSS_CANDIDATE_MINUS_DEVIGGED_MARKET_FAIR",
+    "bootstrap": {
+      "cluster": "pitcher_id",
+      "reps": 2000,
+      "seed": 20261007,
+      "ci": 0.95
+    },
+    "pass_rule": [
+      "GRADED_UNITS_GTE_150",
+      "CANDIDATE_MINUS_MARKET_LOG_LOSS_CI_HIGH_LT_0",
+      "CANDIDATE_BRIER_LTE_MARKET_BRIER"
+    ],
+    "no_interim_parameter_tuning": true
+  },
+  "runtime": {
+    "trigger": "SUCCESSFUL_MAIN_MLB_PROP_PIT_ARCHIVE_WORKFLOW_RUN",
+    "current_candidate_builder": "EXISTING_PIT_SAFE_WORKLOAD_OPPONENT_K_LINEUP_K_STATCAST_BINDING",
+    "retraining": false,
+    "parameter_edits": false,
+    "future_context_backfill": false
+  },
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "production_activation": false,
+    "promotion": false,
+    "official": false
+  }
+}
