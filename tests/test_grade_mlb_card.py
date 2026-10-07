@@ -210,6 +210,46 @@ def test_non_final_game_is_skipped_without_ledger(tmp_path: Path):
     assert not path.exists()
 
 
+def test_lean_only_final_card_grades_without_main_ledger(tmp_path: Path):
+    body = card(7, [("Starter Pitcher Pitcher K Over 4.5", 120, "LEAN")])
+    game = feed("Away", "Home", 1, 0, [(1, 0)])
+    away_box = game["liveData"]["boxscore"]["teams"]["away"]
+    away_box["pitchers"] = [30]
+    away_box["players"] = {
+        "ID30": {
+            "person": {"id": 30, "fullName": "Starter Pitcher"},
+            "stats": {"pitching": {"strikeOuts": 6, "inningsPitched": "5.0"}},
+        },
+    }
+    path = tmp_path / "mlb_ledger.csv"
+    rendered = grade_issue(
+        88,
+        comments=[{"body": body}],
+        feed=game,
+        ledger_path=path,
+        post_comment=False,
+    )
+    assert "**Record:** 0-0-0 · **Net:** +0.00u" in rendered
+    assert "Starter Pitcher Pitcher K Over 4.5 | +120 | W | +1.20u" in rendered
+    assert not path.exists()
+
+
+def test_final_card_without_actionable_or_lean_rows_is_skipped(tmp_path: Path):
+    path = tmp_path / "mlb_ledger.csv"
+    body = card(1, [("Moneyline Away", 100, "BLOCKED")])
+    assert (
+        grade_issue(
+            1807,
+            comments=[{"body": body}],
+            feed=feed("Away", "Home", 1, 0, [(1, 0)]),
+            ledger_path=path,
+            post_comment=False,
+        )
+        == "SKIP_NO_GRADEABLE_ROWS"
+    )
+    assert not path.exists()
+
+
 def test_issue_without_final_card_is_skipped(tmp_path: Path):
     path = tmp_path / "mlb_ledger.csv"
     assert (

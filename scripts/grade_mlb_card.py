@@ -522,7 +522,12 @@ def grade_issue(
     except NoFinalCard:
         return "SKIP_NO_FINAL_CARD"
 
-    rows = parse_card_rows(card)
+    try:
+        rows = parse_card_rows(card)
+    except ValueError as exc:
+        if str(exc) == "final card contains no ACTIONABLE or LEAN rows":
+            return "SKIP_NO_GRADEABLE_ROWS"
+        raise
     game_pk = rows[0].game_pk
     feed = feed or fetch_statsapi(game_pk)
     if not is_final(feed):
@@ -532,11 +537,9 @@ def grade_issue(
         settle_actionable(row, feed) for row in rows if row.status == "ACTIONABLE"
     ]
     leans = [settle_lean(row, feed) for row in rows if row.status == "LEAN"]
-    if not main:
-        raise ValueError("final card has no ACTIONABLE rows")
-
     body = render_comment(issue_number, feed, main, leans)
-    upsert_ledger(ledger_path, issue_number, feed, main)
+    if main:
+        upsert_ledger(ledger_path, issue_number, feed, main)
 
     marker = GRADE_MARKER.format(issue=issue_number)
     already_commented = any(
