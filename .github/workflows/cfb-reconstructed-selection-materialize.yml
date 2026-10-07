@@ -5,6 +5,10 @@ on:
   # materialize-only lane even when they do not expose Actions workflow_dispatch.
   repository_dispatch:
     types: [cfb_reconstructed_materialize]
+  push:
+    branches: [main]
+    paths:
+      - '.github/trigger-cfb-reconstructed-materialize-v2'
   workflow_dispatch:
     inputs:
       evaluation_mode:
@@ -112,7 +116,7 @@ jobs:
     concurrency:
       group: cfb-reconstructed-selection-materialize
       cancel-in-progress: false
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.event_name == 'push'
     needs: contract
     runs-on: ubuntu-latest
     timeout-minutes: 60
