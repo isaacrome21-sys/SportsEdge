@@ -1,0 +1,97 @@
+{
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_ATTEMPT1_PASSED_FIT_FREEZE_V1",
+  "status": "FROZEN_AFTER_DEVELOPMENT_PASS_FORWARD_VALIDATION_PENDING",
+  "market": "PITCHER_K",
+  "candidate_family": "RIDGE_LOGIT_K_RATE_BETA_BINOMIAL_V1",
+  "provenance": {
+    "evaluation_run_id": 37603403636,
+    "evaluation_code_head_sha": "245c285426db53215a6837720b80e302fcef530b",
+    "data_branch_evidence_commit": "26a1e4829e2d143a529e05dec2f48ee3ed6100bd",
+    "workflow_artifact_id": 11474209201,
+    "evaluation_artifact_sha256": "6983af6aa5d3792b48f51431f918f7ce0613066eca7531bb6d40eb8fc95a536a",
+    "evaluation_sha256": "1699a243bcb0754c5b3020cf6a170cb94044e8ffeb3fa5461f2a6f9e6069c3f4",
+    "summary_sha256": "3917dfd9ae10e558c300c2b102f40990d8380f65ceefdff0a905ccb8e1b754c3",
+    "rows_sha256": "a4c5fe44ddfc985ad83fa187febf84912807476c589200875701323902e84443"
+  },
+  "development_readout": {
+    "passes_development_gate": true,
+    "blockers": [],
+    "candidate_test_season": 2025,
+    "candidate_test_rows": 2510,
+    "candidate_mean_rps": 0.06369860324820355,
+    "incumbent_mean_rps": 0.06738604030147184,
+    "candidate_minus_incumbent_rps_ci": {
+      "value": -0.0036874370532682926,
+      "lo": -0.004313509360467404,
+      "hi": -0.0030853235244457647,
+      "clusters": 236,
+      "reps": 2000,
+      "seed": 20261006
+    },
+    "candidate_typical_line_log_loss": 0.5861002392534086,
+    "incumbent_typical_line_log_loss": 0.5983992323990426,
+    "candidate_typical_line_ece": 0.011825227485733697,
+    "incumbent_typical_line_ece": 0.02650464241824465,
+    "candidate_count_mae": 1.817684726067448
+  },
+  "final_fit": {
+    "fit_sha256": "70a31ff9b995a2d54df87feb2d51e2518fa9cd8593bf6c047970e08557b6ecea",
+    "ridge_alpha": 100,
+    "concentration": 100,
+    "training_rows": 4721,
+    "training_batters_faced": 106681,
+    "feature_names": [
+      "recent_mean_batters_faced",
+      "recent_mean_k_per_batter_faced",
+      "recent_mean_pitches_per_batter_faced",
+      "opponent_target_rel",
+      "lineup_target_deviation_or_1",
+      "whiff_rate",
+      "chase_rate",
+      "pitcher_hand_R"
+    ],
+    "coefficients": [
+      -1.2570864335944483,
+      0.020393036062911582,
+      0.16105651118431955,
+      0.023219495469671905,
+      0.11419159952164329,
+      0,
+      0.0272882282647315,
+      0.011767122050667489,
+      -0.002711466015270007
+    ],
+    "means": [
+      22.644657440749388,
+      0.22504257504058497,
+      3.916967298814922,
+      0.9993119729378618,
+      1,
+      0.22742625672527145,
+      0.2906133274729929,
+      0.7223045964837959
+    ],
+    "scales": [
+      2.6106852848466806,
+      0.05099440453704657,
+      0.19366348392525898,
+      0.08478003752229105,
+      1,
+      0.0834090247492099,
+      0.07867856445579023,
+      0.4478623297199482
+    ]
+  },
+  "next_step": {
+    "state": "FORWARD_VALIDATION_PENDING",
+    "retraining_before_forward_validation": false,
+    "parameter_edits_before_forward_validation": false,
+    "retrospective_rows_count_as_forward_validation": false,
+    "prospective_timestamped_predictions_required": true,
+    "immutable_receipts_required": true
+  },
+  "authority": {
+    "development_result_only": true,
+    "production_activation": false
+  }
+}
