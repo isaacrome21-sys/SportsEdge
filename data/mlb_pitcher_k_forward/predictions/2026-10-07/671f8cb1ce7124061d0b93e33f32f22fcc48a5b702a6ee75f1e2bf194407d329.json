@@ -1,0 +1,47 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "candidate_p_over": 0.5998171453345765,
+  "candidate_p_push": 0.0,
+  "candidate_p_under": 0.4001828546654235,
+  "context_proof": {
+    "confirmed_lineup": "ABSENT",
+    "max_age_seconds": 1200,
+    "path": "runtime/mlb-context/runs/37577753551/2026-10-07/game_849822.json",
+    "plate_umpire": "ABSENT",
+    "retrieved_at": "2026-10-07T11:49:10.593832+00:00"
+  },
+  "entity_name": "Tyler Mahle",
+  "evaluation_run_id": 37603403636,
+  "first_pitch_at_utc": "2026-10-07T22:10:00+00:00",
+  "fit_sha256": "70a31ff9b995a2d54df87feb2d51e2518fa9cd8593bf6c047970e08557b6ecea",
+  "game_pk": 849822,
+  "line": 4.5,
+  "market": "PITCHER_K",
+  "market_fair_p_over": 0.41384499623777277,
+  "observed_at_utc": "2026-10-07T11:49:51.201235+00:00",
+  "over_odds": 128,
+  "pitcher_id": 641816,
+  "pitcher_team_id": 144,
+  "predicted_k_per_batter_faced": 0.2167955623887571,
+  "projected_batters_faced": 24,
+  "provider_event_id": "34786231",
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-07/props_20261007T114954.285955Z.json",
+  "receipt_sha256": "671f8cb1ce7124061d0b93e33f32f22fcc48a5b702a6ee75f1e2bf194407d329",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_PREDICTION_V1",
+  "statcast_proof": {
+    "head_sha": "f5ca5f25f39e1a402e8752568b7c0401ff5ed5cc",
+    "manifest_path": "runtime/statcast/runs/37525834187/2026-10-06/manifest.json",
+    "pitcher_row_sha256": "5efeae4f3dd46e8c0561cef6f53f426152880d7aaf7bd77476d1aa638dbc3c2c",
+    "pitchers_path": "runtime/statcast/runs/37525834187/2026-10-06/pitchers.json",
+    "provenance_path": "runtime/statcast/runs/37525834187/2026-10-06/provenance.json",
+    "retrieved_at": "2026-10-06T20:22:27.342026+00:00",
+    "run_id": "37525834187"
+  },
+  "status": "CAPTURED_PROSPECTIVE",
+  "under_odds": -164
+}
