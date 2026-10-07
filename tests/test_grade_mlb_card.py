@@ -232,6 +232,36 @@ def test_ledger_upsert_is_idempotent_for_same_settlement(tmp_path: Path):
     assert rerun[0]["graded_at_utc"] == "2000-01-01T00:00:00+00:00"
 
 
+def test_multigame_card_grades_per_game_and_keeps_distinct_ledger_rows(tmp_path: Path):
+    body_lines = card(1, [("Moneyline Away", 100, "ACTIONABLE")]).splitlines()
+    body_lines.append(
+        "| 2 | 2 | Moneyline Home | +100 | 50% | 0% | 50% | +100 | 0% | 0 | 100 | ACTIONABLE |"
+    )
+    body = "\n".join(body_lines)
+    feeds = {
+        1: feed("Away One", "Home One", 2, 1, [(1, 0), (1, 1)]),
+        2: feed("Away Two", "Home Two", 1, 3, [(0, 1), (1, 2)]),
+    }
+    path = tmp_path / "mlb_ledger.csv"
+    rendered = grade_issue(
+        1460,
+        comments=[{"body": body}],
+        feeds=feeds,
+        ledger_path=path,
+        post_comment=False,
+    )
+    assert "Away One @ Home One (2-1)" in rendered
+    assert "Away Two @ Home Two (1-3)" in rendered
+    assert rendered.count("<!-- sportsedge-mlb-auto-grade:v1 issue=1460 -->") == 1
+    with path.open(newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert [(row["issue_number"], row["game_pk"]) for row in rows] == [
+        ("1460", "1"),
+        ("1460", "2"),
+    ]
+    assert [row["wins"] for row in rows] == ["1", "1"]
+
+
 def test_non_final_game_is_skipped_without_ledger(tmp_path: Path):
     body = card(1, [("Moneyline Away", 100, "ACTIONABLE")])
     game = feed("Away", "Home", 0, 0, [])
