@@ -6,6 +6,7 @@ from scripts.run_nfl_score_counts_attempt import code_identity, sha256_file
 MARKER = Path("config/research/nfl_score_counts_attempt3_dispatch_v1.json")
 PREREG = Path("config/research/nfl_score_counts_g1_attempt3_fg_prereg_v1.json")
 ATTEMPT2 = Path("config/research/nfl_score_counts_g1_attempt2_result_v1.json")
+ATTEMPT3_RESULT = Path("config/research/nfl_score_counts_g1_attempt3_result_v1.json")
 
 
 def test_attempt3_dispatch_marker_is_exact_hash_bound_and_research_only():
@@ -17,7 +18,17 @@ def test_attempt3_dispatch_marker_is_exact_hash_bound_and_research_only():
     assert x["confirmation"] == "CONSUME_SCORE_COUNTS_ATTEMPT_3"
     assert x["prereg_sha256"] == sha256_file(PREREG)
     assert x["attempt_2_result_sha256"] == sha256_file(ATTEMPT2)
-    assert x["code_identity"] == code_identity()
+    if ATTEMPT3_RESULT.exists():
+        result = json.loads(ATTEMPT3_RESULT.read_text(encoding="utf-8"))
+        assert result["status"] == "DEVELOPMENT_ATTEMPT_FAIL"
+        assert result["attempt_consumed"] is True
+        assert result["attempt_number"] == 3
+        assert result["code_identity"] == x["code_identity"]
+        assert result["prereg_sha256"] == x["prereg_sha256"]
+        assert result["attempt_accounting"]["remaining_after_attempt"] == 0
+        assert result["rules"]["no_fourth_attempt"] is True
+    else:
+        assert x["code_identity"] == code_identity()
     assert x["rules"]["attempt_1_result_preserved"] is True
     assert x["rules"]["attempt_2_result_preserved"] is True
     assert x["rules"]["thresholds_unchanged"] is True
