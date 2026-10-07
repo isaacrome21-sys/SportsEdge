@@ -1,0 +1,51 @@
+{
+  "schema": "NHL_PUBLIC_BASELINE_VALIDATION_PREREG_V1",
+  "status": "FROZEN_BEFORE_IMPLEMENTATION",
+  "candidate_family": "NHL_PUBLIC_BOXSCORE_BASELINE_V1",
+  "purpose": "Chronologically validate the existing official-boxscore public baseline before it can replace the hard-coded NHL_RATE_V1_OFFICIAL_STANDIN research owner.",
+  "source_contract": {
+    "collector": "scripts/collect_nhl_official_boxscores.py",
+    "feature_builder": "sportsedge/sports/nhl/public_baseline.py",
+    "sportsbook_fields_used": false,
+    "historical_receipts_are_development_only": true,
+    "retroactive_pit_claims_forbidden": true
+  },
+  "fit_window": {
+    "target_start_before": "2025-07-01T00:00:00+00:00"
+  },
+  "validation_window": {
+    "target_start_on_or_after": "2025-10-01T00:00:00+00:00",
+    "target_start_before": "2026-05-01T00:00:00+00:00",
+    "role": "REUSED_RETROSPECTIVE_DEVELOPMENT_HOLDOUT_NOT_FORWARD_BETTING_EVIDENCE"
+  },
+  "model": {
+    "artifact": "NHLPublicBaselineArtifact",
+    "ridge": 1.0,
+    "target": "log(regulation_goals+0.5)",
+    "features": [
+      "offense_reg_gf_per_game",
+      "opponent_reg_ga_per_game",
+      "shot_share",
+      "special_teams_delta",
+      "shooting_pct",
+      "opponent_save_pct",
+      "rest_delta_days",
+      "home_ice"
+    ]
+  },
+  "metrics": [
+    "team_goal_mae",
+    "team_goal_rmse",
+    "poisson_negative_log_likelihood",
+    "mean_predicted_regulation_goals",
+    "mean_actual_regulation_goals"
+  ],
+  "promotion_boundary": {
+    "passing_retrospective_validation_may_create_research_owner": true,
+    "model_p": false,
+    "truth_gate": false,
+    "staking": false,
+    "official": false,
+    "forward_validation_still_required": true
+  }
+}
