@@ -270,16 +270,28 @@ def _box_players(feed: dict[str, Any]) -> list[dict[str, Any]]:
 def _parse_prop_pick(pick: str) -> tuple[str, str, str, float]:
     # Longest market names first so player names remain unambiguous.
     markets = [
+        "Hits Walks Stolen Bases",
+        "Hits Runs Stolen Bases",
         "Pitcher Hits Walks Er",
         "Pitcher Hits Allowed",
         "Hits Runs Rbis",
+        "Hits Stolen Bases",
+        "Extra Base Hits",
+        "Stolen Bases",
         "Total Bases",
         "Pitcher Outs",
         "Pitcher K",
         "Pitcher Er",
         "Pitcher Bb",
+        "Home Runs",
         "Batter Bb",
+        "Batter K",
+        "Runs Rbis",
+        "Singles",
+        "Doubles",
+        "Triples",
         "Rbi",
+        "Runs",
         "Hits",
     ]
     for market in markets:
@@ -313,18 +325,57 @@ def _prop_value(player: dict[str, Any], market: str) -> float:
     pitching = stats.get("pitching") or {}
     if market == "hits":
         return float(batting.get("hits") or 0)
+    if market == "home runs":
+        return float(batting.get("homeRuns") or 0)
     if market == "total bases":
         return float(batting.get("totalBases") or 0)
     if market == "rbi":
         return float(batting.get("rbi") or 0)
+    if market == "runs":
+        return float(batting.get("runs") or 0)
+    if market == "stolen bases":
+        return float(batting.get("stolenBases") or 0)
+    if market == "batter bb":
+        return float(batting.get("baseOnBalls") or 0)
+    if market == "batter k":
+        return float(batting.get("strikeOuts") or 0)
+    if market in {"singles", "doubles", "triples", "extra base hits"}:
+        hits = int(batting.get("hits") or 0)
+        doubles = int(batting.get("doubles") or 0)
+        triples = int(batting.get("triples") or 0)
+        home_runs = int(batting.get("homeRuns") or 0)
+        singles = hits - doubles - triples - home_runs
+        if singles < 0:
+            raise ValueError("invalid batter hit-type accounting")
+        if market == "singles":
+            return float(singles)
+        if market == "doubles":
+            return float(doubles)
+        if market == "triples":
+            return float(triples)
+        return float(doubles + triples + home_runs)
     if market == "hits runs rbis":
         return float(
             (batting.get("hits") or 0)
             + (batting.get("runs") or 0)
             + (batting.get("rbi") or 0)
         )
-    if market == "batter bb":
-        return float(batting.get("baseOnBalls") or 0)
+    if market == "hits runs stolen bases":
+        return float(
+            (batting.get("hits") or 0)
+            + (batting.get("runs") or 0)
+            + (batting.get("stolenBases") or 0)
+        )
+    if market == "runs rbis":
+        return float((batting.get("runs") or 0) + (batting.get("rbi") or 0))
+    if market == "hits stolen bases":
+        return float((batting.get("hits") or 0) + (batting.get("stolenBases") or 0))
+    if market == "hits walks stolen bases":
+        return float(
+            (batting.get("hits") or 0)
+            + (batting.get("baseOnBalls") or 0)
+            + (batting.get("stolenBases") or 0)
+        )
     if market == "pitcher k":
         return float(pitching.get("strikeOuts") or 0)
     if market == "pitcher hits allowed":
