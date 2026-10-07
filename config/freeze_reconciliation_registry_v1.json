@@ -279,6 +279,33 @@
         },
         "note": "Fresh zero-authority research binding for the preregistered symmetric NFL margin/total location challenger. Does not alter or revive M2/V2K failures and does not authorize historical or prospective betting use."
       }
+    },
+    {
+      "bundle_id": "NBA_LOCATION_SYMMETRIC_G1_RESEARCH_FREEZE_V1",
+      "freeze_sha": "b4ee573b391a86aadc091f24d5f7f82a38a4e199",
+      "coverage_paths": [
+        "config/research/nba_location_symmetric_g1_prereg_v1.json",
+        "sportsedge/sports/nba/location_symmetric_g1.py",
+        "sportsedge/sports/nba/location_symmetric_g1_validation.py"
+      ],
+      "coverage_prefixes": [],
+      "disposition": null,
+      "identity": {
+        "schema": "NBA_LOCATION_SYMMETRIC_G1_RESEARCH_FREEZE_IDENTITY_V1",
+        "source_pull_request": 1751,
+        "bound_commit": "b4ee573b391a86aadc091f24d5f7f82a38a4e199",
+        "candidate_family": "NBA_LOCATION_SYMMETRIC_RIDGE_G1",
+        "prior_failed_ratings_backtests_reused_as_authority": false,
+        "authority": {
+          "model_p": false,
+          "truth_gate": false,
+          "promotion": false,
+          "staking": false,
+          "official": false,
+          "bettor_facing_release": false
+        },
+        "note": "Current-main zero-authority research binding for the PIT-safe symmetric NBA margin/total location challenger. Existing LEAN-only bettor card remains unchanged."
+      }
     }
   ],
   "deltas": [
