@@ -39,7 +39,7 @@ from .v7_distribution import (
     _resolve_extras,
 )
 
-JOINT_COUPLED_RESEARCH_VERSION = "mlb_game_pitcher_score_compatible_paths_research_v2"
+JOINT_COUPLED_RESEARCH_VERSION = "mlb_game_pitcher_score_compatible_paths_research_v3_audit"
 PITCHER_COUPLING = "same_path_score_compatible_whole_start_bootstrap_v2"
 
 
@@ -172,12 +172,15 @@ def simulate_score_compatible_joint_card(
         "pitcher_pool_sha256": pool_hashes,
         "pitcher_team_sides": pitcher_sides,
         "pitcher_coupling": PITCHER_COUPLING,
+        "shared_game_sigma": float(shared_game_sigma),
+        "team_sigma": float(team_sigma),
+        "extra_half_inning_mean": float(extra_half_inning_mean),
     }
     simulation_id = canonical_json_sha256(simulation_identity)
     pitcher_rngs = {
         pid: candidate_rng(canonical_json_sha256({
             "joint_engine": JOINT_COUPLED_RESEARCH_VERSION,
-            "simulation_id": simulation_id,
+            "score_build_hash": score_build_hash,
             "pitcher_id": pid,
             "team_side": pitcher_sides[pid],
             "pool_sha256": pool_hashes[pid],
@@ -313,6 +316,24 @@ def simulate_score_compatible_joint_card(
             "score_distribution_sha256": score_distribution_sha256,
             "joint_research_version": JOINT_COUPLED_RESEARCH_VERSION,
         })
+        if row["market"] in PITCHER_MARKETS:
+            pid = str(row["pitcher_id"])
+            pool = normalized_pools[pid]
+            raw_settlements = [
+                _settle(row, away=0, home=0, pitchers={pid: start})
+                for start in pool
+            ]
+            raw_win = sum(value > 0 for value in raw_settlements) / len(pool)
+            result["pitcher_conditioning_audit"] = {
+                "prior_start_count": len(pool),
+                "unconditioned_empirical_win_p": raw_win,
+                "unconditioned_empirical_push_p": sum(value == 0 for value in raw_settlements) / len(pool),
+                "conditioning_win_p_delta": result["research_p"] - raw_win,
+                "independent_observations": len(pool),
+                "simulations_are_not_observations": True,
+                "postseason_workload_adjusted": False,
+                "fitted_pitcher_k_model_used": False,
+            }
         results.append(result)
 
     return {

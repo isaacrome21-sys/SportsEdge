@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Run the research-only score-compatible MLB game/pitcher joint lane.
+"""Run research game paths with canonical standalone pitcher marginals.
 
 The script starts from a canonical manual-input snapshot. Context-adjusted game
 run means are produced by the existing research lane, pitcher pools are built from
 strictly-prior StatsAPI starts, and supported full-game + pitcher markets are then
-priced from one deterministic path set.
+priced with explicit per-row engine provenance. Score-conditioned pitcher values
+are diagnostics only; they are not used for standalone pitcher EV.
 
 Nothing here emits Model_P or grants Truth Gate/official status.
 """
@@ -22,6 +23,7 @@ from sportsedge.manual_quote import validate_manual_quote
 from sportsedge.mlb_all_market_features import MLBAllMarketHistorySource
 from sportsedge.mlb_joint_card_coupled_research import simulate_score_compatible_joint_card
 from sportsedge.mlb_joint_features import build_pitcher_joint_features
+from sportsedge.pitcher_joint_engine import price_pitcher_market
 from sportsedge.source_lineage import canonical_json_sha256
 
 MARKET_MAP = {
@@ -103,6 +105,7 @@ def run(input_path: Path, *, simulations: int = 100000) -> dict[str, Any]:
         pitcher_feature_hashes: dict[str, str] = {}
         pitcher_team_sides: dict[str, str] = {}
         pitcher_names: dict[str, str] = {}
+        pitcher_inputs: dict[tuple[str, str], dict[str, Any]] = {}
         selections: list[dict[str, Any]] = []
         presentation: dict[str, dict[str, Any]] = {}
 
@@ -144,6 +147,14 @@ def run(input_path: Path, *, simulations: int = 100000) -> dict[str, Any]:
                     )
                     pitcher_pools[pitcher_id] = [dict(item) for item in features["history_pool"]]
                     pitcher_feature_hashes[pitcher_id] = str(features["feature_source_hash"])
+                input_key = (pitcher_id, market)
+                if input_key not in pitcher_inputs:
+                    pitcher_inputs[input_key] = history.feature_row(
+                        game_pk=int(resolved.game_pk), market=market, entity_id=pitcher_id,
+                        target_date=target_date, away_team_id=int(resolved.away_id),
+                        home_team_id=int(resolved.home_id), player_id=int(pitcher_id),
+                        team_id=int(subject_team_id),
+                    )
 
             for side_index, (side, price, line) in enumerate(_paired(row)):
                 sid = _selection_id(
@@ -188,7 +199,8 @@ def run(input_path: Path, *, simulations: int = 100000) -> dict[str, Any]:
             game_id=str(resolved.game_pk),
             away_mean_runs=float(adjusted["away_mean_runs"]),
             home_mean_runs=float(adjusted["home_mean_runs"]),
-            feature_source_hash=joint_feature_hash,
+            # Pitcher quote membership/history must not reseed game scores.
+            feature_source_hash=context_feature_hash,
             selections=selections,
             pitcher_pools=pitcher_pools,
             pitcher_team_sides=pitcher_team_sides,
@@ -198,6 +210,32 @@ def run(input_path: Path, *, simulations: int = 100000) -> dict[str, Any]:
         for result in joint["results"]:
             sid = str(result["selection_id"])
             meta = presentation[sid]
+            diagnostic = None
+            probability_source = "SCORE_COMPATIBLE_GAME_PATHS"
+            engine_version = joint["joint_research_version"]
+            probability_identity = result["simulation_id"]
+            probability_meta = None
+            if meta["engine_market"] in PITCHER_MARKETS:
+                # Standalone props must not use the ER-conditioned bootstrap:
+                # resampling good starts changes K/outs as well as earned runs.
+                diagnostic = dict(result)
+                built = pitcher_inputs[(meta["pitcher_id"], meta["engine_market"])]
+                priced = price_pitcher_market({
+                    **built, "game_id": str(resolved.game_pk),
+                    "market": meta["engine_market"], "entity_id": meta["pitcher_id"],
+                    "side": meta["side"], "line": meta["line"],
+                    "feature_source_hash": built.get("feature_source_hash") or built.get("source_subset_hash"),
+                })
+                result = {
+                    **result, "research_p": priced["model_p"], "push_p": priced["push_p"],
+                    "loss_p": 1.0 - priced["model_p"] - priced["push_p"],
+                    "simulation_id": None, "score_distribution_sha256": None,
+                    "mc_paths": priced["mc_paths"],
+                }
+                probability_source = "CANONICAL_PITCHER_MARGINAL"
+                engine_version = priced["engine_version"]
+                probability_identity = priced["model_input_hash"]
+                probability_meta = priced["meta"]
             econ = economics(
                 win_p=float(result["research_p"]),
                 push_p=float(result["push_p"]),
@@ -208,6 +246,14 @@ def run(input_path: Path, *, simulations: int = 100000) -> dict[str, Any]:
                 "research_p": float(result["research_p"]),
                 "push_p": float(result["push_p"]),
                 "loss_p": float(result["loss_p"]),
+                "pitcher_conditioning_audit": result.get("pitcher_conditioning_audit"),
+                "score_conditioned_diagnostic": diagnostic,
+                "probability_source": probability_source,
+                "probability_identity": probability_identity,
+                "engine_version": engine_version,
+                "probability_meta": probability_meta,
+                "same_game_joint_eligible": False,
+                "postseason_workload_adjusted": False if diagnostic is not None else None,
                 **econ,
                 "simulation_id": result["simulation_id"],
                 "score_distribution_sha256": result["score_distribution_sha256"],
@@ -244,8 +290,8 @@ def run(input_path: Path, *, simulations: int = 100000) -> dict[str, Any]:
         row["game_pk"], row["market_type"], str(row.get("entity_id")), row["side"], row["line"]
     ))
     return {
-        "schema_version": 2,
-        "run_type": "MLB_CONTEXT_ADJUSTED_SCORE_COMPATIBLE_JOINT_CARD_RESEARCH",
+        "schema_version": 3,
+        "run_type": "MLB_GAME_PATHS_AND_CANONICAL_PITCHER_MARGINALS_RESEARCH",
         "label": "NOT_MODEL_P",
         "truth_gate": False,
         "official": False,
