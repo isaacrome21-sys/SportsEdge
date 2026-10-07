@@ -1,0 +1,65 @@
+{
+  "schema": "NBA_LOCATION_SYMMETRIC_G1_PREREG_V1",
+  "status": "FROZEN_BEFORE_IMPLEMENTATION",
+  "candidate_family": "NBA_LOCATION_SYMMETRIC_RIDGE_G1",
+  "purpose": "Test whether structurally symmetric, lower-dimensional location regression improves the existing PIT-safe NBA pace/efficiency baseline without consuming sportsbook lines as model inputs.",
+  "source_contract": {
+    "row_type": "sportsedge.sports.nba.training.NBATrainingRow",
+    "sportsdataverse_materializer": "sportsedge/sports/nba/sportsdataverse_training_source.py",
+    "feature_as_of_strictly_before_tipoff": true,
+    "market_fields_forbidden": true
+  },
+  "targets": {
+    "margin": "home_points-away_points",
+    "total": "home_points+away_points"
+  },
+  "representation": {
+    "margin": {
+      "features": [
+        "home_offensive_rating-away_offensive_rating",
+        "away_defensive_rating-home_defensive_rating",
+        "expected_possessions/100 * matchup_rating_difference"
+      ],
+      "swap_rule": "all non-intercept margin features negate when home and away are swapped"
+    },
+    "total": {
+      "features": [
+        "expected_possessions",
+        "matchup_efficiency_sum",
+        "expected_possessions/100 * matchup_efficiency_sum"
+      ],
+      "swap_rule": "all total features are invariant when home and away are swapped"
+    }
+  },
+  "fit": {
+    "family": "SEPARATE_STANDARDIZED_L2_RIDGE",
+    "alpha_grid": [0.1, 1.0, 10.0, 100.0, 1000.0],
+    "margin_total_penalties_selected_independently": true,
+    "selection": "TRAINING_ONLY_EXPANDING_SEASON_CV_LOWEST_RMSE_TIE_STRONGER_REGULARIZATION",
+    "intercept_penalized": false
+  },
+  "development": {
+    "historical_role": "REUSED_RESEARCH_HISTORY_NOT_UNTOUCHED_PROMOTION_EVIDENCE",
+    "season_end_year_rule": "tipoff Jul-Dec maps to next calendar year; Jan-Jun maps to current calendar year",
+    "target_outer_test_seasons": [2021, 2022, 2023, 2024, 2025],
+    "baseline": "NBA_PACE_EFFICIENCY_BASELINE_V1",
+    "metrics": ["RMSE", "MAE"],
+    "pass_rule": "margin and total each require majority fold wins plus lower aggregate RMSE and MAE than baseline"
+  },
+  "distribution_handoff": {
+    "shared_engine": "sportsedge/sports/nba/simulation.py",
+    "expected_possessions_source": "NBATrainingRow.expected_possessions",
+    "team_points": {
+      "home": "(total_mu+margin_mu)/2",
+      "away": "(total_mu-margin_mu)/2"
+    },
+    "nonpositive_team_points": "FAIL_CLOSED"
+  },
+  "authority": {
+    "research_only": true,
+    "model_p": false,
+    "promotion": false,
+    "staking": false,
+    "official": false
+  }
+}
