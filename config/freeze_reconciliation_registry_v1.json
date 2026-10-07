@@ -2154,10 +2154,172 @@
       "merge_sha": "1fdc7f8c72667f4b57baa6a177409db1d52dc737",
       "pr": 1742,
       "note": "First-parent main advance registered during reconciliation catch-up. Source commit: NFL research: symmetric margin/total location challenger G1 (#1742). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_3EAFBFBB_PR_1758",
+      "merge_sha": "3eafbfbba7744839b676ec87016925c63ee6dc19",
+      "pr": 1758,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: Governance: reconcile freeze registry through current main (#1758). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_C7128DFE_PR_1750",
+      "merge_sha": "c7128dfe68158a603b5ce01e6ebb23fd232f3432",
+      "pr": 1750,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB research: reconcile pitcher-K skill binding after governance catch-up (#1750). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_C105014C_PR_1763",
+      "merge_sha": "c105014c9a57fdba9df48959e3ed2d2f41f58ee6",
+      "pr": 1763,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB research: freeze pitcher-K probability/evaluation candidate (#1763). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_3750DB00_PR_1766",
+      "merge_sha": "3750db00ee5b4a08076db93f332e13c09d156824",
+      "pr": 1766,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB research: implement frozen pitcher-K probability candidate (#1766). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_BD15FAD2_PR_1769",
+      "merge_sha": "bd15fad29651ecb9033153aacea49ef1ecd41e49",
+      "pr": 1769,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB research: add frozen pitcher-K candidate evaluator (#1769). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_796E3C39_DIRECT",
+      "merge_sha": "796e3c39d97c6de1172f10c682c0f131a1af7a9a",
+      "pr": 0,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: mlb: unify phone flow to one final context card. This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_873B35EF_PR_1773",
+      "merge_sha": "873b35eff919c7d0dd984105f88c248a819542ff",
+      "pr": 1773,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB research: PIT-safe historical pitcher-K rows (#1773). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_10204CC2_PR_1774",
+      "merge_sha": "10204cc2bdfb71e90f0972b8cef9331744bc585c",
+      "pr": 1774,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB: add fail-closed frozen pitcher-K evaluation runner (#1774). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_8A3ABF9F_PR_1775",
+      "merge_sha": "8a3abf9fceac3373df544edf5498dfa155667cfe",
+      "pr": 1775,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB: assemble PIT-safe historical pitcher-K evaluation rows (#1775). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_6054A306_PR_1782",
+      "merge_sha": "6054a3060ed13cfdc67af8be19a0e771cbae1a30",
+      "pr": 1782,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB: bulk materialize frozen pitcher-K historical rows (#1782). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_862D5255_PR_1776",
+      "merge_sha": "862d52558d29b11cd1546dce59e33d650d4692bf",
+      "pr": 1776,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB research: materialize PIT-safe pitcher-K evaluation rows (#1776). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_DA832D12_DIRECT",
+      "merge_sha": "da832d1284dbc791bbe3d169ed93b4fda1d03f54",
+      "pr": 0,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB research: arm pitcher-K evaluation Attempt 1. This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_5373790F_PR_1786",
+      "merge_sha": "5373790f7b0cd3856a3c29445856c89981fa7500",
+      "pr": 1786,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB: attest pitcher-K materialization integrity (#1786). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_674A65BF_PR_1787",
+      "merge_sha": "674a65bfa8ab0648996caf916696dca35f33e765",
+      "pr": 1787,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB card: unified core + pitcher + hitter final-card view on current main (#1787). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_8CAFEDA3_PR_1795",
+      "merge_sha": "8cafeda35ba8715509aaf7450ed386752915feef",
+      "pr": 1795,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB: consolidate pitcher-K Attempt-1 materialization integrity repair (#1795). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_EDE82B40_PR_1794",
+      "merge_sha": "ede82b4051cbaba7187710e4ca5e1006bcdb931e",
+      "pr": 1794,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB research: re-arm pitcher-K Attempt 1 after identity repair (#1794). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_6BD95521_PR_1801",
+      "merge_sha": "6bd9552173a3688282ef8de35e799202363519c0",
+      "pr": 1801,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB: feed public pregame context into model feature surface (#1801). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_F5CA5F25_PR_1803",
+      "merge_sha": "f5ca5f25f39e1a402e8752568b7c0401ff5ed5cc",
+      "pr": 1803,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB research: recover pitcher-K Attempt 1 on current main (#1803). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_04EFA444_PR_1806",
+      "merge_sha": "04efa44469835206cea8a755af1da3da80cb0d4b",
+      "pr": 1806,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB pitcher K: accept empirical rate features in (0,1] (#1806). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_245C2854_PR_1808",
+      "merge_sha": "245c285426db53215a6837720b80e302fcef530b",
+      "pr": 1808,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB research: re-arm pitcher-K Attempt 1 after rate-boundary repair (#1808). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_1DBC10AE_PR_1809",
+      "merge_sha": "1dbc10ae2d7e4c8c085ed862b4c616c97e700232",
+      "pr": 1809,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB research: freeze passed pitcher-K Attempt 1 fit (#1809). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_A87201B9_PR_1810",
+      "merge_sha": "a87201b9061daa0f4b397f68a15843f1020981dd",
+      "pr": 1810,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB research: arm prospective pitcher-K forward validation (#1810). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_CFFC2325_PR_1812",
+      "merge_sha": "cffc2325573f9f0112ec6e01fb621582d8246a8a",
+      "pr": 1812,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB research: finish pitcher-K prospective one-look readout (#1812). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_84FB59A2_PR_1814",
+      "merge_sha": "84fb59a25aa5cbabe5e2db38d5aa64e3e6805ba4",
+      "pr": 1814,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: CFB ops: guarded reconstructed materialization trigger (#1814). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_EEA43C88_PR_1818",
+      "merge_sha": "eea43c885553d493fbb27f98037bbf7c318ac63c",
+      "pr": 1818,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: NBA ops: add lines issue workflow (#1818). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_8755848E_PR_1824",
+      "merge_sha": "8755848eff0dcbbf54f89b1dcbcc0fc331ba151b",
+      "pr": 1824,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: MLB context: cover every hourly prop PIT window (#1824). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_4D57D581_PR_1816",
+      "merge_sha": "4d57d5810dba4746be4b3eabf1a17105804ece0a",
+      "pr": 1816,
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: NHL research: public baseline validation on current main v3 (#1816). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
     }
   ],
   "inventory_block_reason": "Current main through merge dca09063 / PR #1668 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "1fdc7f8c72667f4b57baa6a177409db1d52dc737",
+  "reconciled_through_sha": "4d57d5810dba4746be4b3eabf1a17105804ece0a",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
