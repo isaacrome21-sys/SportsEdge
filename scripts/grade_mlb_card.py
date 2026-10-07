@@ -202,9 +202,17 @@ def settle_actionable(row: CardRow, feed: dict[str, Any]) -> SettledRow:
             if match:
                 result = _compare(away + home, match.group(1), float(match.group(2)))
             else:
-                result = _settle_team_or_first_inning(
-                    pick, low, names, away, home, feed
-                )
+                try:
+                    result = _settle_team_or_first_inning(
+                        pick, low, names, away, home, feed
+                    )
+                except ValueError as exc:
+                    if not str(exc).startswith("unsupported ACTIONABLE market:"):
+                        raise
+                    settled = settle_lean(row, feed)
+                    if settled.result == "UNRESOLVED":
+                        raise ValueError(f"unsupported ACTIONABLE market: {pick}") from exc
+                    return settled
     return SettledRow(row=row, result=result, units=_units(result, row.price))
 
 
@@ -218,11 +226,22 @@ def _settle_team_or_first_inning(
 ) -> str:
     for side in ("away", "home"):
         team = names[side]
-        pattern = rf"{re.escape(team.lower())} (?:f5 )?team totals (over|under) (\d+(?:\.\d+)?)"
-        match = re.fullmatch(pattern, low)
-        if match:
-            value = away if side == "away" else home
-            return _compare(value, match.group(1), float(match.group(2)))
+        team_id = str(
+            feed.get("gameData", {})
+            .get("teams", {})
+            .get(side, {})
+            .get("id")
+            or ""
+        ).strip()
+        aliases = [team.lower()]
+        if team_id:
+            aliases.append(team_id.lower())
+        for alias in aliases:
+            pattern = rf"{re.escape(alias)} (?:f5 )?team totals (over|under) (\d+(?:\.\d+)?)"
+            match = re.fullmatch(pattern, low)
+            if match:
+                value = away if side == "away" else home
+                return _compare(value, match.group(1), float(match.group(2)))
 
     first_inning_runs = _runs(feed, "away", 1) + _runs(feed, "home", 1)
     has_run = first_inning_runs > 0

@@ -123,6 +123,66 @@ def test_f5_run_line_and_first_inning_markets():
     assert settle_actionable(rows[2], game).result == "L"
 
 
+def test_legacy_numeric_team_totals_and_actionable_pitcher_props():
+    game = feed(
+        "Chicago Cubs",
+        "San Diego Padres",
+        5,
+        3,
+        [(1, 0), (0, 1), (2, 0), (0, 1), (0, 0), (2, 1)],
+    )
+    game["gameData"]["teams"]["away"]["id"] = 112
+    game["gameData"]["teams"]["home"]["id"] = 135
+    away_box = game["liveData"]["boxscore"]["teams"]["away"]
+    away_box["pitchers"] = [30]
+    away_box["players"] = {
+        "ID30": {
+            "person": {"id": 30, "fullName": "Matthew Boyd"},
+            "stats": {
+                "pitching": {
+                    "strikeOuts": 5,
+                    "hits": 4,
+                    "earnedRuns": 1,
+                    "baseOnBalls": 2,
+                    "inningsPitched": "6.0",
+                }
+            },
+        },
+    }
+    game["liveData"]["decisions"] = {
+        "winner": {"id": 30, "fullName": "Matthew Boyd"}
+    }
+    rows = parse_card_rows(
+        card(
+            849843,
+            [
+                ("112 Team Totals Over 3.5", -115, "ACTIONABLE"),
+                ("135 Team Totals Under 3.5", -125, "ACTIONABLE"),
+                ("112 F5 Team Totals Over 1.5", -125, "ACTIONABLE"),
+                ("Matthew Boyd Pitcher K Over 4.5", 111, "ACTIONABLE"),
+                ("Matthew Boyd Pitcher Hits Allowed Under 4.5", 117, "ACTIONABLE"),
+                ("Matthew Boyd Pitcher Record Win Yes 0", 363, "ACTIONABLE"),
+            ],
+        )
+    )
+    assert [settle_actionable(row, game).result for row in rows] == [
+        "W", "W", "W", "W", "W", "W"
+    ]
+
+
+def test_unknown_actionable_market_remains_fatal():
+    game = feed("Away", "Home", 1, 0, [(1, 0)])
+    row = parse_card_rows(
+        card(7, [("Player Future Market Yes 0", 100, "ACTIONABLE")])
+    )[0]
+    try:
+        settle_actionable(row, game)
+    except ValueError as exc:
+        assert str(exc).startswith("unsupported ACTIONABLE market:")
+    else:
+        raise AssertionError("unknown ACTIONABLE market must fail closed")
+
+
 def test_lean_props_grade_separately_and_nonstarters_void(tmp_path: Path):
     body = card(
         7,
