@@ -1,0 +1,35 @@
+{
+  "version": "NHL_PROP_FORWARD_VALIDATION_V1",
+  "status": "PREREGISTERED_NOT_STARTED",
+  "declared_at_utc": "2026-10-01T11:51:00Z",
+  "window": {
+    "start_date": "2026-10-08",
+    "end_date": "2026-11-30"
+  },
+  "markets": {
+    "PLAYER_SHOTS": {
+      "evaluation_lines": [1.5, 2.5, 3.5, 4.5],
+      "minimum_confirmed_rows": 200
+    },
+    "GOALIE_SAVES": {
+      "evaluation_lines": [21.5, 23.5, 25.5, 27.5, 29.5],
+      "minimum_confirmed_rows": 80
+    }
+  },
+  "primary_population": "CONFIRMED",
+  "projected_rows": "REPORT_ONLY",
+  "gates": {
+    "candidate_brier_not_worse_than_baseline": true,
+    "max_ece": 0.05,
+    "max_absolute_calibration_gap": 0.04
+  },
+  "evidence_rules": {
+    "prediction_must_precede_start": true,
+    "settlement_must_follow_start": true,
+    "unique_prediction_key": ["market", "game_id", "subject_id", "line"],
+    "no_backfill": true,
+    "paired_baseline_required": true,
+    "source_sha256_required": true
+  },
+  "authority": "RESEARCH_ONLY_NO_AUTO_PROMOTION"
+}
