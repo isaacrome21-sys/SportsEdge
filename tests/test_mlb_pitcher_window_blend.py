@@ -33,7 +33,7 @@ class PitcherWindowBakeoffTest(unittest.TestCase):
         starts=self.starts()
         starts[16]["date"]=starts[15]["date"]
         result=evaluate(starts)
-        self.assertNotIn(starts[16]["date"],[r["date"] for r in result["records"]])
+        self.assertEqual(sum(r["date"] == starts[16]["date"] for r in result["records"]), sum(len(v) for v in MARKET_LINES.values()))
         self.assertTrue(all(r["training_last_date"]<r["date"] for r in result["records"]))
 
     def test_reject_unsorted(self):
