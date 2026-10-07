@@ -395,7 +395,44 @@ def _prop_value(player: dict[str, Any], market: str) -> float:
 
 
 def settle_lean(row: CardRow, feed: dict[str, Any]) -> SettledRow:
-    player_name, market, direction, line = _parse_prop_pick(row.pick)
+    record_win = re.fullmatch(
+        r"(.+?) Pitcher Record Win (Yes|No)(?: 0(?:\.0+)?)?",
+        row.pick,
+        re.I,
+    )
+    if record_win:
+        player_name = record_win.group(1)
+        side = record_win.group(2).lower()
+        matches = [
+            player
+            for player in _box_players(feed)
+            if _norm_name(str((player.get("person") or {}).get("fullName") or ""))
+            == _norm_name(player_name)
+        ]
+        if len(matches) != 1 or not _is_starter(matches[0], "pitcher record win"):
+            return SettledRow(row=row, result="VOID", units=0.0)
+        winner = (feed.get("liveData", {}).get("decisions", {}) or {}).get("winner") or {}
+        winner_id = winner.get("id")
+        player_id = (matches[0].get("person") or {}).get("id")
+        if winner_id is None and not str(winner.get("fullName") or "").strip():
+            return SettledRow(row=row, result="UNRESOLVED", units=0.0)
+        won = (
+            winner_id is not None
+            and player_id is not None
+            and int(winner_id) == int(player_id)
+        ) or (
+            _norm_name(str(winner.get("fullName") or ""))
+            == _norm_name(player_name)
+        )
+        result = "W" if (won == (side == "yes")) else "L"
+        return SettledRow(row=row, result=result, units=_units(result, row.price))
+
+    try:
+        player_name, market, direction, line = _parse_prop_pick(row.pick)
+    except ValueError as exc:
+        if str(exc).startswith("unsupported LEAN prop:"):
+            return SettledRow(row=row, result="UNRESOLVED", units=0.0)
+        raise
     matches = [
         player
         for player in _box_players(feed)
@@ -457,10 +494,12 @@ def render_comment(
         lean_losses = sum(row.result == "L" for row in leans)
         lean_pushes = sum(row.result == "P" for row in leans)
         lean_voids = sum(row.result == "VOID" for row in leans)
+        lean_unresolved = sum(row.result == "UNRESOLVED" for row in leans)
         lean_net = sum(row.units for row in leans)
         lines += [
             "",
-            f"LEAN record: {lean_wins}-{lean_losses}-{lean_pushes}, {lean_voids} void · "
+            f"LEAN record: {lean_wins}-{lean_losses}-{lean_pushes}, "
+            f"{lean_voids} void, {lean_unresolved} unresolved · "
             f"net {lean_net:+.2f}u (not main ledger).",
         ]
     lines += [
