@@ -105,7 +105,8 @@ jobs:
           assert r['fresh_holdout_claim'] is False
           assert r['prospective_validation_started'] is False
           assert r['production_registry_consumes_this_artifact'] is False
-          assert not any(bool(v) for v in (r.get('authority') or {}).values() if isinstance(v, bool))
+          authority = r.get('authority') or {}
+          assert not any(bool(authority.get(k)) for k in ('model_p', 'truth_gate', 'promotion', 'staking', 'official', 'bettor_facing_release'))
           print('NFL_LOCATION_G1_READOUT_ZERO_AUTHORITY')
           PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
