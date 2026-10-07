@@ -1,4 +1,6 @@
 import csv
+
+import scripts.grade_mlb_card as grader
 from pathlib import Path
 
 from scripts.grade_mlb_card import grade_issue, parse_card_rows, settle_actionable, settle_lean
@@ -410,6 +412,41 @@ def test_final_card_without_actionable_or_lean_rows_is_skipped(tmp_path: Path):
             post_comment=False,
         )
         == "SKIP_NO_GRADEABLE_ROWS"
+    )
+    assert not path.exists()
+
+
+def test_fetch_statsapi_retries_transient_5xx(monkeypatch):
+    calls = []
+
+    def fake_request(url, **kwargs):
+        calls.append(url)
+        if len(calls) < 3:
+            raise RuntimeError(f"HTTP 500 for {url}: transient")
+        return {"ok": True}
+
+    monkeypatch.setattr(grader, "_request_json", fake_request)
+    monkeypatch.setattr(grader.time, "sleep", lambda _: None)
+    assert grader.fetch_statsapi(849830) == {"ok": True}
+    assert len(calls) == 3
+
+
+def test_grade_issue_skips_unavailable_statsapi_without_ledger(tmp_path: Path, monkeypatch):
+    body = card(849830, [("Moneyline Away", 100, "ACTIONABLE")])
+    path = tmp_path / "mlb_ledger.csv"
+
+    def unavailable(game_pk):
+        raise RuntimeError(f"MLB_STATSAPI_UNAVAILABLE:{game_pk}:HTTP 500")
+
+    monkeypatch.setattr(grader, "fetch_statsapi", unavailable)
+    assert (
+        grade_issue(
+            1498,
+            comments=[{"body": body}],
+            ledger_path=path,
+            post_comment=False,
+        )
+        == "SKIP_SOURCE_UNAVAILABLE:849830"
     )
     assert not path.exists()
 
