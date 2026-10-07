@@ -279,6 +279,35 @@
         },
         "note": "Fresh zero-authority research binding for the preregistered symmetric NFL margin/total location challenger. Does not alter or revive M2/V2K failures and does not authorize historical or prospective betting use."
       }
+    },
+    {
+      "bundle_id": "NHL_PUBLIC_BASELINE_VALIDATION_RESEARCH_FREEZE_V1",
+      "freeze_sha": "2443c438453e22c47cbb3b39e86cd114b86c98ed",
+      "coverage_paths": [
+        "config/research/nhl_public_baseline_validation_prereg_v1.json",
+        "config/research/nhl_public_baseline_validation_protocol_v1.json",
+        "sportsedge/sports/nhl/public_baseline_validation.py",
+        "scripts/validate_nhl_public_baseline.py"
+      ],
+      "coverage_prefixes": [],
+      "disposition": null,
+      "identity": {
+        "schema": "NHL_PUBLIC_BASELINE_VALIDATION_RESEARCH_FREEZE_IDENTITY_V1",
+        "source_pull_request": 1752,
+        "bound_commit": "2443c438453e22c47cbb3b39e86cd114b86c98ed",
+        "candidate_family": "NHL_PUBLIC_BOXSCORE_BASELINE_V1",
+        "earlier_preregistration_preserved": true,
+        "validation_window": "2025-10-01T00:00:00+00:00..2026-05-01T00:00:00+00:00",
+        "authority": {
+          "model_p": false,
+          "truth_gate": false,
+          "promotion": false,
+          "staking": false,
+          "official": false,
+          "bettor_facing_release": false
+        },
+        "note": "Current-main zero-authority binding for preregistered NHL public-boxscore validation. Historical receipts remain retrospective development only; validated bet markets remain empty."
+      }
     }
   ],
   "deltas": [
