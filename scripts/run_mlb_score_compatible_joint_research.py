@@ -121,7 +121,7 @@ def run(input_path: Path, *, simulations: int = 100000) -> dict[str, Any]:
                 else:
                     raise ValueError("TEAM_TOTALS requires team_side")
             elif market in PITCHER_MARKETS:
-                subject_id, subject_team_id = _resolve_subject(row)
+                subject_id, subject_team_id = _resolve_subject(row, game=resolved)
                 if not subject_id:
                     raise ValueError(f"could not resolve pitcher {row.subject_name or row.subject_id}")
                 if subject_team_id == resolved.away_id:
