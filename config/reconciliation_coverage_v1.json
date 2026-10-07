@@ -479,7 +479,10 @@
     "tests/test_cfb_materialize_push_bridge.py": "TEST_ONLY_CFB_RECONSTRUCTED_MATERIALIZE_PUSH_BRIDGE_NO_RUNTIME_AUTHORITY",
     ".github/workflows/nba-lines-issue.yml": "NBA_LINES_ISSUE_TRANSPORT_AND_PRESENTATION_ONLY_NO_ACTIVE_BUNDLE_NO_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
     "config/research/nfl_score_counts_g1_attempt3_result_v1.json": "NFL_SCORE_COUNTS_G1_FINAL_ATTEMPT3_FAILED_RESULT_RECORD_RESEARCH_ONLY_NO_BETTING_AUTHORITY",
-    "tests/test_nfl_score_counts_attempt3_result.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_FINAL_ATTEMPT3_RESULT_NO_RUNTIME_AUTHORITY"
+    "tests/test_nfl_score_counts_attempt3_result.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_FINAL_ATTEMPT3_RESULT_NO_RUNTIME_AUTHORITY",
+    "scripts/run_nfl_location_symmetric_g1_validation.py": "NFL_LOCATION_SYMMETRIC_G1_REUSED_HISTORY_READOUT_RUNNER_ZERO_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
+    ".github/workflows/nfl-location-symmetric-g1-readout.yml": "NFL_LOCATION_SYMMETRIC_G1_EXACT_MAIN_DEVELOPMENT_READOUT_WORKFLOW_ZERO_BETTING_AUTHORITY",
+    "tests/test_nfl_location_symmetric_g1_readout_workflow.py": "TEST_ONLY_NFL_LOCATION_SYMMETRIC_G1_READOUT_BOUNDARY_NO_RUNTIME_AUTHORITY"
   },
   "inventory_completion_claim": {
     "status": "HOSTED_AUDIT_ZERO_UNMAPPED",
