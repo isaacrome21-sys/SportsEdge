@@ -30,7 +30,7 @@ import json
 
 from .mlb_generic_features import MLBGenericFeatureError, MLBGenericHistorySource, _outs_from_ip
 
-RESEARCH_VERSION = "mlb_context_adjusted_runs_research_v1"
+RESEARCH_VERSION = "mlb_context_adjusted_runs_research_v2_complete_starts"
 TEMPERATURE_RULE_VERSION = "koch_panorska_2013_midpoint_v0"
 COLD_RUNS = 8.95
 WARM_RUNS = 10.08
@@ -168,11 +168,11 @@ def recent_starter_profile(
             if float(stat.get("gamesStarted", 0) or 0) < 1:
                 continue
             outs = float(_outs_from_ip(stat.get("inningsPitched")))
-            er = float(stat.get("earnedRuns", 0) or 0)
+            er = float(stat.get("earnedRuns"))
         except (TypeError, ValueError, MLBGenericFeatureError):
-            continue
-        if outs <= 0 or er < 0 or not isfinite(outs) or not isfinite(er):
-            continue
+            return StarterProfile(int(player_id), len(starts), None, None, "INVALID_PRIOR_START")
+        if outs < 0 or er < 0 or not isfinite(outs) or not isfinite(er) or not er.is_integer():
+            return StarterProfile(int(player_id), len(starts), None, None, "INVALID_PRIOR_START")
         starts.append((outs, er))
     starts = starts[-window:]
     if len(starts) < minimum:

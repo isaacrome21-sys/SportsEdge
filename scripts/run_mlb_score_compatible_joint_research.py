@@ -188,7 +188,8 @@ def run(input_path: Path, *, simulations: int = 100000) -> dict[str, Any]:
             game_id=str(resolved.game_pk),
             away_mean_runs=float(adjusted["away_mean_runs"]),
             home_mean_runs=float(adjusted["home_mean_runs"]),
-            feature_source_hash=joint_feature_hash,
+            # Pitcher quote membership/history must not reseed game scores.
+            feature_source_hash=context_feature_hash,
             selections=selections,
             pitcher_pools=pitcher_pools,
             pitcher_team_sides=pitcher_team_sides,
@@ -208,6 +209,7 @@ def run(input_path: Path, *, simulations: int = 100000) -> dict[str, Any]:
                 "research_p": float(result["research_p"]),
                 "push_p": float(result["push_p"]),
                 "loss_p": float(result["loss_p"]),
+                "pitcher_conditioning_audit": result.get("pitcher_conditioning_audit"),
                 **econ,
                 "simulation_id": result["simulation_id"],
                 "score_distribution_sha256": result["score_distribution_sha256"],
