@@ -282,7 +282,7 @@
     },
     {
       "bundle_id": "NBA_LOCATION_SYMMETRIC_G1_RESEARCH_FREEZE_V1",
-      "freeze_sha": "a14f7fb7168e47480a9392d21330c6f8acb8f417",
+      "freeze_sha": "72f2ee6716e90e09d106924c77bab75695f251c3",
       "coverage_paths": [
         "config/research/nba_location_symmetric_g1_prereg_v1.json",
         "sportsedge/sports/nba/location_symmetric_g1.py",
@@ -293,7 +293,7 @@
       "identity": {
         "schema": "NBA_LOCATION_SYMMETRIC_G1_RESEARCH_FREEZE_IDENTITY_V1",
         "source_pull_request": 1815,
-        "bound_commit": "a14f7fb7168e47480a9392d21330c6f8acb8f417",
+        "bound_commit": "72f2ee6716e90e09d106924c77bab75695f251c3",
         "candidate_family": "NBA_LOCATION_SYMMETRIC_RIDGE_G1",
         "authority": {
           "model_p": false,
@@ -303,7 +303,7 @@
           "official": false,
           "bettor_facing_release": false
         },
-        "note": "Current-main zero-authority research binding. Existing NBA LEAN-only card authority remains unchanged."
+        "note": "Rebound after latest-main merge; binds the exact parent commit containing the preregistered NBA symmetric G1 candidate bytes. Zero betting authority."
       }
     }
   ],
