@@ -1,0 +1,30 @@
+{
+  "games_observed": 4,
+  "observations": [
+    {
+      "boxscore_source_sha256": "60c18e7ad1f2f3a8351f5d5b17ae72e22a14da473ed3580703e17870bcfaf87e",
+      "game_pk": 849833,
+      "path": "artifacts/mlb_pit_inputs/observations/2026-10-07/849833/20261007T210334.244611Z.json"
+    },
+    {
+      "boxscore_source_sha256": "59bb3d23a1f53c6c0888521ae2d9a94c5ad088d67b446824c36eaba3b0258bb7",
+      "game_pk": 849822,
+      "path": "artifacts/mlb_pit_inputs/observations/2026-10-07/849822/20261007T210334.244611Z.json"
+    },
+    {
+      "boxscore_source_sha256": "4e2348005007b7667b05ae0f44a421d2796d987a823bf66192b227221e548896",
+      "game_pk": 849838,
+      "path": "artifacts/mlb_pit_inputs/observations/2026-10-07/849838/20261007T210334.244611Z.json"
+    },
+    {
+      "boxscore_source_sha256": "d1aa54f765099087139860b4f0bce156eb60a20b401f2d132826e9203609a48b",
+      "game_pk": 849827,
+      "path": "artifacts/mlb_pit_inputs/observations/2026-10-07/849827/20261007T210334.244611Z.json"
+    }
+  ],
+  "observed_at_utc": "2026-10-07T21:03:34.244611+00:00",
+  "promotion_authority": false,
+  "schedule_source_sha256": "b840be57ffc13b3b9b8e106f4db218fc4bb8b692507e2d42cf8933890d43473a",
+  "schema": "SPORTSEDGE_MLB_PIT_LINEUP_STARTER_CAPTURE_V1",
+  "slate_date": "2026-10-07"
+}
