@@ -13,6 +13,7 @@ import csv
 import json
 import os
 import re
+import time
 import unicodedata
 import urllib.error
 import urllib.request
@@ -94,7 +95,27 @@ def post_github_comment(repo: str, issue_number: int, body: str, token: str) -> 
 
 
 def fetch_statsapi(game_pk: int) -> dict[str, Any]:
-    return _request_json(f"https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live")
+    url = f"https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
+    last_error: BaseException | None = None
+    for attempt in range(1, 4):
+        try:
+            return _request_json(url)
+        except RuntimeError as exc:
+            last_error = exc
+            retryable = any(
+                f"HTTP {code} " in str(exc)
+                for code in (500, 502, 503, 504)
+            )
+            if not retryable or attempt == 3:
+                break
+        except urllib.error.URLError as exc:  # pragma: no cover - network diagnostic
+            last_error = exc
+            if attempt == 3:
+                break
+        time.sleep(attempt)
+    raise RuntimeError(
+        f"MLB_STATSAPI_UNAVAILABLE:{game_pk}:{last_error}"
+    ) from last_error
 
 
 def find_final_card_comment(comments: Iterable[dict[str, Any]]) -> str:
@@ -659,7 +680,11 @@ def grade_issue(
     elif feed is not None:
         feed_by_game[game_pks[0]] = feed
     else:
-        feed_by_game = {game_pk: fetch_statsapi(game_pk) for game_pk in game_pks}
+        for game_pk in game_pks:
+            try:
+                feed_by_game[game_pk] = fetch_statsapi(game_pk)
+            except RuntimeError:
+                return f"SKIP_SOURCE_UNAVAILABLE:{game_pk}"
 
     if any(not is_final(feed_by_game[game_pk]) for game_pk in game_pks):
         return "SKIP_NOT_FINAL"
