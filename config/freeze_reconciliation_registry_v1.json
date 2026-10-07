@@ -282,7 +282,7 @@
     },
     {
       "bundle_id": "NHL_PUBLIC_BASELINE_VALIDATION_RESEARCH_FREEZE_V1",
-      "freeze_sha": "be3ac232811e4a613f011772ddd84aa339a94bb2",
+      "freeze_sha": "378a6386d8d6945416e7c46094cbb2c5aeea112c",
       "coverage_paths": [
         "config/research/nhl_public_baseline_validation_prereg_v1.json",
         "config/research/nhl_public_baseline_validation_protocol_v1.json",
@@ -294,7 +294,7 @@
       "identity": {
         "schema": "NHL_PUBLIC_BASELINE_VALIDATION_RESEARCH_FREEZE_IDENTITY_V1",
         "source_pull_request": 1816,
-        "bound_commit": "be3ac232811e4a613f011772ddd84aa339a94bb2",
+        "bound_commit": "378a6386d8d6945416e7c46094cbb2c5aeea112c",
         "candidate_family": "NHL_PUBLIC_BOXSCORE_BASELINE_V1",
         "standin_owner_promoted": false,
         "retroactive_pit_claim": false,
@@ -306,7 +306,7 @@
           "official": false,
           "bettor_facing_release": false
         },
-        "note": "Current-main zero-authority binding for official-boxscore NHL baseline validation. Forward validation remains required."
+        "note": "Rebound after latest-main merge; binds the exact parent commit containing the NHL public-baseline validation candidate bytes. Forward validation remains required and authority stays zero."
       }
     }
   ],
