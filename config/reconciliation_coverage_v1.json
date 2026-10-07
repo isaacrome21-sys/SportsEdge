@@ -474,7 +474,9 @@
     ".github/workflows/mlb-pitcher-k-eval-attempt1-recovery-main-trigger.yml": "MLB_PITCHER_K_ATTEMPT1_PRE_EVALUATION_TECHNICAL_RECOVERY_WORKFLOW_ZERO_BETTING_AUTHORITY",
     "config/research/mlb_pitcher_k_eval_attempt1_recovery_v1.json": "MLB_PITCHER_K_ATTEMPT1_PRE_EVALUATION_TECHNICAL_RECOVERY_MARKER_ZERO_BETTING_AUTHORITY",
     "config/research/mlb_pitcher_k_attempt1_passed_fit_freeze_v1.json": "MLB_PITCHER_K_DEVELOPMENT_PASSED_FIT_FREEZE_FORWARD_VALIDATION_PENDING_ZERO_PRODUCTION_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
-    "config/research/mlb_pitcher_k_forward_validation_v1.json": "MLB_PITCHER_K_PROSPECTIVE_FORWARD_VALIDATION_PREREG_ZERO_PRODUCTION_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY"
+    "config/research/mlb_pitcher_k_forward_validation_v1.json": "MLB_PITCHER_K_PROSPECTIVE_FORWARD_VALIDATION_PREREG_ZERO_PRODUCTION_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
+    "config/research/nfl_score_counts_g1_attempt3_result_v1.json": "NFL_SCORE_COUNTS_G1_FINAL_ATTEMPT3_FAILED_RESULT_RECORD_RESEARCH_ONLY_NO_BETTING_AUTHORITY",
+    "tests/test_nfl_score_counts_attempt3_result.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_FINAL_ATTEMPT3_RESULT_NO_RUNTIME_AUTHORITY"
   },
   "inventory_completion_claim": {
     "status": "HOSTED_AUDIT_ZERO_UNMAPPED",
