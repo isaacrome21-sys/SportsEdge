@@ -19,7 +19,7 @@
     "sportsedge/mlb_lineup_k_context.py": "75f30be0967f946acde0e47ce2f20a116af5653e",
     "sportsedge/mlb_lineup_k_context_research.py": "6ecdc785c777a3c13aab7fdc2ee1c4b408ec3269",
     "sportsedge/mlb_opp_k_context_research.py": "20df1497b9dfeda5843cceb1d9b769c11203591e",
-    "sportsedge/mlb_generic_features.py": "3f9822de0e405eb7801520158cbbd8f86e50b69e",
+    "sportsedge/mlb_generic_features.py": "d85e303334d7a31f7bfc818a4d743a63fbb9c1e6",
     "sportsedge/mlb_all_market_features.py": "0315ed6802b2c9d5a80d618b95c31db1494e11f8",
     "sportsedge/mlb_joint_features.py": "7993124f890188864e2fee38d3b08da9590d94a4",
     "sportsedge/f5_distribution.py": "843f573f6132fe96b709495b1c5c6acf8778469c",

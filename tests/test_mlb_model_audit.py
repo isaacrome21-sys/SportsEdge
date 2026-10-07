@@ -10,6 +10,7 @@ from unittest.mock import patch
 from scripts import run_mlb_score_compatible_joint_research as runner
 from sportsedge.mlb_context_adjusted_research import recent_starter_profile
 from sportsedge.mlb_joint_features import _pitcher_pool, MLBJointFeatureError
+from sportsedge.mlb_generic_features import MLBGenericHistorySource, MLBGenericFeatureError
 from sportsedge.mlb_joint_card_coupled_research import simulate_score_compatible_joint_card
 
 
@@ -47,6 +48,18 @@ class TestMLBModelAudit(unittest.TestCase):
         result = recent_starter_profile(history=history, player_id=1, target_date=date(2026, 10, 7))
         self.assertEqual(result.status, 'INVALID_PRIOR_START')
         self.assertIsNone(result.er_per_9)
+
+    def test_native_pitcher_source_rejects_missing_counts(self):
+        source = MLBGenericHistorySource()
+        stat = dict(gamesStarted=1, inningsPitched='5.0', strikeOuts=4, earnedRuns=2, hits=4, baseOnBalls=1)
+        for field in ('strikeOuts', 'earnedRuns', 'hits', 'baseOnBalls'):
+            incomplete = dict(stat)
+            del incomplete[field]
+            rows = [{'date': date(2026, 9, 1), 'stat': incomplete}]
+            with patch.object(source, 'player_rows', return_value=rows):
+                for method in (source.pitcher_joint_rows, source.pitcher_joint_prior_rows):
+                    with self.assertRaises(MLBGenericFeatureError):
+                        method(player_id=1, target_date=date(2026, 10, 7))
 
     def _simulate(self, extra=False, **kwargs):
         pool = [dict(strikeouts=8, outs=18, earned_runs=0, hits_allowed=3, walks_allowed=1),
