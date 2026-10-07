@@ -1,0 +1,118 @@
+name: nfl-location-symmetric-g1-readout
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/run_nfl_location_symmetric_g1_validation.py'
+      - 'sportsedge/sports/nfl/location_symmetric_g1.py'
+      - 'sportsedge/sports/nfl/location_symmetric_g1_validation.py'
+      - 'config/research/nfl_location_symmetric_g1_prereg_v1.json'
+      - 'tests/test_nfl_location_symmetric_g1_readout_workflow.py'
+      - '.github/workflows/nfl-location-symmetric-g1-readout.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/run_nfl_location_symmetric_g1_validation.py'
+      - 'sportsedge/sports/nfl/location_symmetric_g1.py'
+      - 'sportsedge/sports/nfl/location_symmetric_g1_validation.py'
+      - 'config/research/nfl_location_symmetric_g1_prereg_v1.json'
+      - '.github/workflows/nfl-location-symmetric-g1-readout.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check -r requirements-test.txt
+      - name: Compile and test G1 readout surface
+        run: |
+          python -m py_compile             sportsedge/sports/nfl/location_symmetric_g1.py             sportsedge/sports/nfl/location_symmetric_g1_validation.py             scripts/run_nfl_location_symmetric_g1_validation.py
+          python -m unittest             tests.test_nfl_location_symmetric_g1             tests.test_nfl_location_symmetric_g1_readout_workflow -v
+
+  development-readout:
+    if: github.event_name != 'pull_request'
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      EVIDENCE_GIT_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EVIDENCE_GIT_SHA }}
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check -r requirements-test.txt
+      - name: Freeze exact public NFL inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/football/sources/{pbp,participation,depth}
+          fetch_source() {
+            curl --fail --location --silent --show-error               --retry 5 --retry-delay 2 --retry-all-errors               --connect-timeout 30 "$1" -o "$2"
+          }
+          fetch_source             'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv'             artifacts/football/sources/games.csv
+          fetch_source             'https://raw.githubusercontent.com/greerreNFL/Stadiums/efa9543af50b01424754219fa0e4f3c7044ff198/data/team_stadiums.csv'             artifacts/football/sources/team_stadiums.csv
+          for season in $(seq 2016 2025); do
+            fetch_source               "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_${season}.csv.gz"               "artifacts/football/sources/pbp/play_by_play_${season}.csv.gz"
+            fetch_source               "https://github.com/nflverse/nflverse-data/releases/download/pbp_participation/pbp_participation_${season}.csv"               "artifacts/football/sources/participation/pbp_participation_${season}.csv"
+            fetch_source               "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_${season}.csv"               "artifacts/football/sources/depth/depth_charts_${season}.csv"
+          done
+      - name: Build exact-main source manifest
+        run: >-
+          python scripts/run_nfl_production_validation.py
+          --schedule-file artifacts/football/sources/games.csv
+          --pbp-dir artifacts/football/sources/pbp
+          --participation-dir artifacts/football/sources/participation
+          --depth-dir artifacts/football/sources/depth
+          --stadium-file artifacts/football/sources/team_stadiums.csv
+          --git-sha "$EVIDENCE_GIT_SHA"
+          --start-season 2016 --end-season 2025
+          --neutral-site-policy exclude_from_evaluation
+          --out artifacts/football/nfl_production_validation.json
+          --manifest-out artifacts/football/nfl_source_manifest.json
+          --model-out artifacts/football/nfl_m2_model.json
+      - name: Consume G1 reused-history development readout
+        run: >-
+          python scripts/run_nfl_location_symmetric_g1_validation.py
+          --schedule-file artifacts/football/sources/games.csv
+          --pbp-dir artifacts/football/sources/pbp
+          --participation-dir artifacts/football/sources/participation
+          --depth-dir artifacts/football/sources/depth
+          --stadium-file artifacts/football/sources/team_stadiums.csv
+          --source-manifest artifacts/football/nfl_source_manifest.json
+          --git-sha "$EVIDENCE_GIT_SHA"
+          --start-season 2016 --end-season 2025
+          --neutral-site-policy exclude_from_evaluation
+          --out artifacts/football/nfl_location_symmetric_g1_readout.json
+      - name: Enforce zero authority
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('artifacts/football/nfl_location_symmetric_g1_readout.json').read_text())
+          assert r['code_git_sha'] == __import__('os').environ['EVIDENCE_GIT_SHA'].lower()
+          assert r['evidence_role'] == 'REUSED_RESEARCH_HISTORY_NOT_UNTOUCHED_PROMOTION_EVIDENCE'
+          assert r['fresh_holdout_claim'] is False
+          assert r['prospective_validation_started'] is False
+          assert r['production_registry_consumes_this_artifact'] is False
+          assert not any(bool(v) for v in (r.get('authority') or {}).values() if isinstance(v, bool))
+          print('NFL_LOCATION_G1_READOUT_ZERO_AUTHORITY')
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-location-symmetric-g1-readout-${{ env.EVIDENCE_GIT_SHA }}
+          path: |
+            artifacts/football/nfl_location_symmetric_g1_readout.json
+            artifacts/football/nfl_source_manifest.json
+          if-no-files-found: error
+          retention-days: 30
