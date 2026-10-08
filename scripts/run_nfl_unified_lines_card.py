@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from sportsedge.nfl_unified_phone import build_unified_phone_card
@@ -31,6 +32,15 @@ def _has_props(ticket: dict) -> bool:
         for row in game.get("markets") or []
         if isinstance(row, dict)
     )
+
+
+def _fetch_season_source(fetcher, seasons: list[int]) -> list[dict]:
+    """All-or-nothing source-family read with deterministic season ordering."""
+    result: list[dict] = []
+    for season in seasons:
+        rows, _uri, _digest = fetcher(season=season)
+        result.extend(rows)
+    return result
 
 
 def main() -> int:
@@ -80,32 +90,35 @@ def main() -> int:
             source_status["player_stats"] = "MISSING:NO_SCHEDULE_SEASON"
             source_status["injuries"] = "MISSING:NO_SCHEDULE_SEASON"
         else:
-            for season in seasons:
+            # Independent immutable nflverse source reads; preserve sorted season
+            # order and wait for all providers before constructing the card.
+            # Each provider fetches its own seasons serially, avoiding a burst
+            # of concurrent requests against the same source family.
+            stat_seasons = sorted({season for s in seasons for season in (s - 1, s)})
+            with ThreadPoolExecutor(max_workers=3) as pool:
+                depth_future = pool.submit(_fetch_season_source, fetch_nflverse_depth_charts, seasons)
+                stats_future = pool.submit(fetch_nflverse_player_stats, seasons=stat_seasons)
+                injury_future = pool.submit(_fetch_season_source, fetch_nflverse_injuries, seasons)
+                # Do not pass partially acquired multi-season context to pricing.
                 try:
-                    rows, _uri, _digest = fetch_nflverse_depth_charts(season=season)
-                    depth_rows.extend(rows)
+                    depth_rows = depth_future.result()
                     source_status["depth"] = "AVAILABLE"
                 except NFLContextError as exc:
+                    depth_rows = []
                     source_status["depth"] = f"MISSING:{exc}"
-
-            stat_seasons = sorted({season for s in seasons for season in (s - 1, s)})
-            try:
-                player_rows, _receipts = fetch_nflverse_player_stats(seasons=stat_seasons)
-                source_status["player_stats"] = "AVAILABLE"
-            except NFLContextError as exc:
-                source_status["player_stats"] = f"MISSING:{exc}"
-
-            injury_ok = True
-            for season in seasons:
                 try:
-                    rows, _uri, _digest = fetch_nflverse_injuries(season=season)
-                    injury_rows.extend(rows)
+                    player_rows, _receipts = stats_future.result()
+                    source_status["player_stats"] = "AVAILABLE"
                 except NFLContextError as exc:
-                    injury_ok = False
+                    player_rows = []
+                    source_status["player_stats"] = f"MISSING:{exc}"
+                try:
+                    injury_rows = injury_future.result()
+                    source_status["injuries"] = "AVAILABLE"
+                    injury_source_ready = True
+                except NFLContextError as exc:
+                    injury_rows = []
                     source_status["injuries"] = f"MISSING:{exc}"
-            if injury_ok:
-                source_status["injuries"] = "AVAILABLE"
-                injury_source_ready = True
 
     scoring_prior = load_prior_file(args.scoring_prior) if args.scoring_prior else None
 
