@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from hashlib import sha256
 import json
 from math import exp, isfinite, log
+from re import fullmatch
 from typing import Any, Mapping
 
 from .mlb_generic_features import _outs_from_ip
@@ -59,6 +60,10 @@ def build_prediction(*, game: GameSnapshot, pitcher_id: int, team_side: str,
                      market: str, line: float, feature: Mapping[str, Any],
                      captured_at: datetime, schedule_sha256: str) -> dict[str, Any]:
     observed=_utc(captured_at)
+    # A schedule obtained after the claimed capture cannot establish the
+    # pitcher or matchup that was known at that point in time.
+    if _utc(game.retrieved_at) > observed:
+        raise ProspectiveShadowError("SCHEDULE_FETCH_AFTER_CAPTURE")
     scheduled=parse_game_start(game.game_date)
     if game.status!="Preview" or observed >= scheduled:
         raise ProspectiveShadowError("NOT_STRICTLY_PREGAME")
@@ -95,9 +100,10 @@ def build_prediction(*, game: GameSnapshot, pitcher_id: int, team_side: str,
         raise ProspectiveShadowError("FEATURE_OPPONENT_IDENTITY_MISMATCH")
     retrieved=_utc(feature.get("retrieved_at"))
     if retrieved > observed: raise ProspectiveShadowError("FEATURE_FETCH_AFTER_CAPTURE")
-    if len(str(feature.get("source_subset_hash") or ""))!=64:
+    if not isinstance(feature.get("source_subset_hash"),str) or not fullmatch(r"[0-9a-fA-F]{64}",feature["source_subset_hash"]):
         raise ProspectiveShadowError("FEATURE_SOURCE_HASH_MISSING")
-    if len(str(schedule_sha256))!=64: raise ProspectiveShadowError("SCHEDULE_SOURCE_HASH_MISSING")
+    if not isinstance(schedule_sha256,str) or not fullmatch(r"[0-9a-fA-F]{64}",schedule_sha256):
+        raise ProspectiveShadowError("SCHEDULE_SOURCE_HASH_MISSING")
     priced=price_pitcher_market({"market":market,"side":"OVER","line":float(line),
         "game_id":str(game.game_pk),"entity_id":str(pitcher_id),
         "feature_source_hash":feature["source_subset_hash"],"features":features})
