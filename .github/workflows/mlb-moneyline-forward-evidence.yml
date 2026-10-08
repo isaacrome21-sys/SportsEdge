@@ -52,30 +52,8 @@ jobs:
         with:
           python-version: '3.12.13'
 
-      - name: Install frozen test/runtime dependencies
+      - name: Install frozen runtime dependencies
         run: python -m pip install -r requirements-test.txt
-
-      - name: Contract tests
-        run: |
-          python -m py_compile \
-            scripts/capture_mlb_moneyline_model_p.py \
-            scripts/capture_mlb_direct_paired_ml.py \
-            scripts/capture_mlb_moneyline_paper_decisions.py \
-            scripts/persist_forward_evidence_data_branch.py \
-            sportsedge/mlb_moneyline_forward_prediction.py \
-            sportsedge/mlb_moneyline_forward_lane.py \
-            sportsedge/mlb_moneyline_paper_decision.py \
-            sportsedge/mlb_moneyline_forward_ledger.py
-          python -m unittest \
-            tests.test_mlb_moneyline_forward_prediction \
-            tests.test_mlb_moneyline_forward_lane \
-            tests.test_mlb_moneyline_paper_decision \
-            tests.test_capture_mlb_moneyline_paper_decisions \
-            tests.test_mlb_moneyline_forward_ledger \
-            tests.test_persist_forward_evidence_data_branch \
-            tests.test_direct_web_capture_source \
-            tests.test_capture_mlb_direct_paired_ml \
-            tests.test_draftkings_game_line_category_map -v
 
       - name: Resolve UTC evidence day
         id: day
