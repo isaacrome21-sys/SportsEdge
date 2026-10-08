@@ -3,6 +3,47 @@
   "bundle_inventory_complete": false,
   "bundles": [
     {
+      "bundle_id": "MLB_POSTSEASON_OUTS_TEMPORAL_HOLDOUT_RESEARCH_FREEZE_V1",
+      "freeze_sha": "e6e44e2800f220e88cfe9277c7beeb3b38a7e38a",
+      "coverage_paths": [
+        ".github/workflows/mlb-postseason-outs-holdout-recalibration.yml",
+        "scripts/eval_mlb_postseason_outs_intercept.py",
+        "tests/test_mlb_postseason_outs_intercept.py"
+      ],
+      "coverage_prefixes": [],
+      "disposition": null,
+      "identity": {
+        "schema": "MLB_POSTSEASON_OUTS_TEMPORAL_HOLDOUT_RESEARCH_FREEZE_IDENTITY_V1",
+        "candidate_family": "ONE_PARAM_LOGIT_OFFSET_EARLIER_POSTSEASON_YEARS_ONLY",
+        "train_holdout_folds": [
+          {
+            "train": [
+              2023
+            ],
+            "test": 2024
+          },
+          {
+            "train": [
+              2023,
+              2024
+            ],
+            "test": 2025
+          }
+        ],
+        "bound_commit": "e6e44e2800f220e88cfe9277c7beeb3b38a",
+        "source_pre_experiment_commit": true,
+        "authority": {
+          "model_p": false,
+          "truth_gate": false,
+          "promotion": false,
+          "staking": false,
+          "official": false,
+          "bettor_facing_release": false
+        },
+        "note": "Complete candidate code and fixed chronological folds committed before CI evaluation. Historical intercept research is not prospective workload prediction and never changes live prop release."
+      }
+    },
+    {
       "bundle_id": "MLB_POSTSEASON_STARTER_WORKLOAD_RESEARCH_FREEZE_V1",
       "freeze_sha": "4c3b1341aa5577551760c75eee6399614d1ea3f3",
       "coverage_paths": [
