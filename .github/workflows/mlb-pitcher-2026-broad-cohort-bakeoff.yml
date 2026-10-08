@@ -1,0 +1,38 @@
+name: mlb-pitcher-2026-broad-cohort-bakeoff
+on:
+  pull_request:
+    paths:
+      - scripts/eval_mlb_pitcher_2026_cohort.py
+      - tests/test_mlb_pitcher_2026_cohort.py
+      - .github/workflows/mlb-pitcher-2026-broad-cohort-bakeoff.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  broad-cohort-evaluation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install runtime dependencies
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
+      - name: Test cohort selection, data splitting, and no leakage
+        run: PYTHONPATH=. python -m unittest tests.test_mlb_pitcher_2026_cohort -v
+      - name: Fetch preselected 2025 IP leader cohort and score 2026 holdouts
+        run: >-
+          PYTHONPATH=. python scripts/eval_mlb_pitcher_2026_cohort.py
+          --target-date 2026-10-07
+          --cohort-size 30
+          --workers 5
+          --output artifacts/mlb_pitcher_2026_cohort_bakeoff.json
+      - name: Upload research evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mlb-pitcher-2026-cohort-bakeoff
+          path: artifacts/mlb_pitcher_2026_cohort_bakeoff.json
+          if-no-files-found: warn
+          retention-days: 14
