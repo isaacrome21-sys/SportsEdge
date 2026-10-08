@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import urlencode
+from urllib.request import urlopen
 
 from sportsedge.mlb_generic_features import MLBGenericHistorySource, _read_json
 from sportsedge.source_lineage import canonical_json_sha256
@@ -68,7 +69,7 @@ def run(target_date: date, *, cohort_size: int = COHORT_SIZE, workers: int = 5) 
         raise ValueError("Expected an explicitly frozen 2026 holdout target")
     query=urlencode({"leaderCategories":"inningsPitched","statGroup":"pitching",
                      "season":COHORT_SEASON,"sportId":1,"gameType":"R","limit":cohort_size})
-    raw=_read_json(f"https://statsapi.mlb.com/api/v1/stats/leaders?{query}")
+    raw=_read_json(f"https://statsapi.mlb.com/api/v1/stats/leaders?{query}", opener=urlopen)
     leaders=select_2025_leaders(raw,cohort_size)
     identity=canonical_json_sha256({"selection_rule":"2025_IP_LEADERS",
                                     "season":COHORT_SEASON,"pitchers":leaders})
