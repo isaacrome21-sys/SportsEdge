@@ -18,20 +18,75 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
-      - name: Independently verify proposed corrective merge restores original registered boundary
+      - name: Verify exact G1 frozen-byte correction without research authority
         run: |
           PYTHONPATH=. python - <<'PY'
           import json
+          import subprocess
           from pathlib import Path
           from sportsedge.governance.reconciliation_content_identity import boundary_matches
+
+          def git(*args):
+              return subprocess.check_output(["git", *args], text=True).strip()
+
           repo = Path.cwd()
           registry = json.loads((repo / "config/freeze_reconciliation_registry_v1.json").read_text())
+          policy = json.loads((repo / "config/freeze_reconciliation_policy_v1.json").read_text())
           anchor = registry["reconciled_through_sha"]
-          ok, proof = boundary_matches(
-              repo, registry=registry, registered_ref=anchor, current_ref="HEAD"
+          target = "sportsedge/sports/nfl/location_symmetric_g1_validation.py"
+          expected_blob = "9ff802f2db6b474f7daf11b1cb0558e5d96bdd69"
+          allowed_changes = {
+              ".github/workflows/mlb-boundary-restore-preflight.yml",
+              ".github/workflows/nfl-location-symmetric-g1-readout.yml",
+              "config/reconciliation_coverage_v1.json",
+              "scripts/run_nfl_location_symmetric_g1_validation.py",
+              "sportsedge/sports/nfl/location_g1_distribution_validation.py",
+              target,
+          }
+
+          # The locked main boundary must be intact before any corrective PR
+          # can be considered; the PR may change only the audited six files.
+          base_ok, base_proof = boundary_matches(
+              repo, registry=registry, registered_ref=anchor, current_ref="origin/main"
           )
-          print(json.dumps(proof, sort_keys=True))
-          if not ok:
-              raise SystemExit("CORRECTIVE_PR_TREE_STILL_DIVERGED_FROM_LOCKED_BOUNDARY")
-          print("CORRECTIVE_TREE_RESTORES_LOCKED_GOVERNED_SURFACE_IDENTITY")
+          print(json.dumps({"base": base_proof}, sort_keys=True))
+          if not base_ok:
+              raise SystemExit("NFL_G1_REPAIR_BASE_MAIN_BOUNDARY_DRIFT")
+          changed = set(git("diff", "--name-only", "origin/main", "HEAD").splitlines())
+          if changed != allowed_changes:
+              raise SystemExit("NFL_G1_REPAIR_UNEXPECTED_CHANGED_PATHS:" + repr(sorted(changed ^ allowed_changes)))
+          if any(policy.get("authority", {}).values()):
+              raise SystemExit("NFL_G1_REPAIR_AUTHORITY_ESCALATION")
+          matched = [b for b in registry["bundles"] if b["bundle_id"] == "NFL_LOCATION_SYMMETRIC_G1_RESEARCH_FREEZE_V1"]
+          if len(matched) != 1:
+              raise SystemExit("NFL_G1_REPAIR_FROZEN_BUNDLE_MISSING")
+          frozen = matched[0]
+          disposition = frozen.get("disposition") or {}
+          if disposition.get("state") != "REVOKED" or disposition.get("prior_forward_clock_invalidated") is not True:
+              raise SystemExit("NFL_G1_REPAIR_REVOKED_CLOCK_MUST_STAY_INVALID")
+          if git("rev-parse", f"{frozen['freeze_sha']}:{target}") != expected_blob:
+              raise SystemExit("NFL_G1_REPAIR_ORIGINAL_FROZEN_BLOB_MISMATCH")
+          if git("rev-parse", f"HEAD:{target}") != expected_blob:
+              raise SystemExit("NFL_G1_REPAIR_VALIDATOR_NOT_RESTORED")
+
+          # Every *other* governed file and inventory stays byte-identical to
+          # the registered boundary. The one known, revoked drift is corrected
+          # to the immutable frozen blob rather than silently made authoritative.
+          def governed_paths(ref):
+              paths = set(git("ls-tree", "-r", "--name-only", ref).splitlines())
+              out = set()
+              for bundle in registry["bundles"]:
+                  exact = set(bundle.get("coverage_paths") or ())
+                  prefixes = tuple(bundle.get("coverage_prefixes") or ())
+                  out.update(p for p in paths if p in exact or p.startswith(prefixes))
+              return out
+          anchored = governed_paths(anchor)
+          proposed = governed_paths("HEAD")
+          if anchored != proposed:
+              raise SystemExit("NFL_G1_REPAIR_GOVERNED_INVENTORY_DRIFT")
+          for p in sorted(anchored - {target}):
+              if git("rev-parse", f"{anchor}:{p}") != git("rev-parse", f"HEAD:{p}"):
+                  raise SystemExit("NFL_G1_REPAIR_UNEXPECTED_GOVERNED_BLOB_CHANGE:" + p)
+          print("NFL_G1_EXACT_FROZEN_BLOB_RESTORED_REVOKED_CLOCK_UNCHANGED")
+          print("REVALIDATION_REQUIRED_NO_BETTING_AUTHORITY")
           PY
