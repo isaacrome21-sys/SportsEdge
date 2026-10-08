@@ -32,7 +32,7 @@ from scripts.run_nfl_production_validation import (
 )
 from scripts.run_nfl_v2_candidate_validation import _assert_source, _verified_manifest
 from sportsedge.sports.nfl.history import normalize_nfl_rows, parse_schedule_csv
-from sportsedge.sports.nfl.location_symmetric_g1_validation import (
+from sportsedge.sports.nfl.location_g1_distribution_validation import (
     validate_nfl_location_symmetric_g1,
 )
 from sportsedge.sports.nfl.m2_history_features import fit_nfl_prior_decay_curves
