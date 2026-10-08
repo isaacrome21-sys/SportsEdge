@@ -129,6 +129,7 @@
         "scripts/materialize_cfb_reconstructed_selection.py",
         "scripts/materialize_cfb_sportsdataverse_training.py",
         "scripts/pack_cfb_participation_snapshot.py",
+        "scripts/replay_cfb_sdv_null_control.py",
         "scripts/run_auto_cfb_resilient.py",
         "scripts/run_cfb_candidate_bakeoff.py",
         "scripts/run_cfb_game_model_candidate.py",
@@ -158,7 +159,8 @@
         "sportsedge/sports/cfb/sportsdataverse_manifest.py",
         "sportsedge/sports/cfb/sportsdataverse_prereg_hash.py",
         "tests/test_cfb_market_anchored_spread.py",
-        "tests/test_cfb_sdv_card_v2.py"
+        "tests/test_cfb_sdv_card_v2.py",
+        "tests/test_cfb_sdv_null_replay.py"
       ],
       "coverage_prefixes": []
     },
