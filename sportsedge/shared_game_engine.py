@@ -108,6 +108,17 @@ def build_shared_game_engine_session(
         game_id = str(model_input.get("game_id", ""))
         if not game_id:
             raise SharedGameEngineError("game_id required")
+        # The legacy aggregate V7/V8 score path does not represent empty-base
+        # postseason extra innings or full walk-off home-run scoring. Never
+        # silently price an explicitly postseason-labelled game here.
+        rules_mode = model_input.get("rules_mode")
+        if rules_mode is not None:
+            if rules_mode not in {"REGULAR_SEASON", "POSTSEASON"}:
+                raise SharedGameEngineError("MLB_GAME_RULES_MODE_INVALID")
+            if rules_mode == "POSTSEASON":
+                raise SharedGameEngineError(
+                    "MLB_POSTSEASON_LEGACY_SCORE_ENGINE_UNVALIDATED_USE_JOINT_PATH_RESEARCH"
+                )
         away_mean = _finite_positive(model_input.get("away_mean_runs"), "away_mean_runs")
         home_mean = _finite_positive(model_input.get("home_mean_runs"), "home_mean_runs")
         simulations = _simulation_count(

@@ -19,6 +19,21 @@ from sportsedge.v7_distribution import (
 
 
 class GenericMarketEngineTests(unittest.TestCase):
+    def test_explicit_postseason_refuses_legacy_score_pricing(self):
+        with self.assertRaisesRegex(ValueError, "POSTSEASON_LEGACY_SCORE_ENGINE_UNVALIDATED"):
+            generic_market_engine_adapter({
+                "game_id": "ALDS_GAME4", "market": "MONEYLINE",
+                "rules_mode": "POSTSEASON", "side": "HOME",
+                "line": 0.0, "away_mean_runs": 4.0, "home_mean_runs": 4.0,
+            })
+
+    def test_invalid_rules_mode_refused_even_for_first_inning_market(self):
+        with self.assertRaisesRegex(ValueError, "MLB_GAME_RULES_MODE_INVALID"):
+            generic_market_engine_adapter({
+                "game_id": "invalid", "market": "NRFI",
+                "rules_mode": "UNSPECIFIED", "side": "YES",
+            })
+
     def test_registry_covers_every_expanded_runtime_market(self):
         registry = engine_registry()
         expected = set(GAME_MARKETS) | set(BINARY_MARKETS) | set(HITTER_MARKETS) | set(PITCHER_MARKETS)
