@@ -59,3 +59,27 @@ def test_game_type_source_disagreement_is_blocked():
     game, quote, feature = _make(bound_type="R", game_type="D")
     with pytest.raises(ValueError, match="MLB_GAME_TYPE_SOURCE_CONFLICT"):
         _model_input(game=game, quote=quote, feature=feature, require_confirmed_lineup=True)
+
+
+def test_statsapi_postseason_type_flows_to_live_card_and_blocks():
+    from datetime import datetime, timezone
+    from sportsedge.mlb_source import parse_schedule
+    from sportsedge.live_slate import make_live_game
+
+    payload = {"dates": [{"date": "2026-10-08", "games": [{
+        "gamePk": 123, "gameDate": "2026-10-09T00:00:00Z",
+        "gameType": "D", "status": {"abstractGameState": "Preview"},
+        "teams": {
+            "away": {"team": {"id": 114, "name": "Cleveland Guardians"}},
+            "home": {"team": {"id": 145, "name": "Chicago White Sox"}},
+        },
+    }]}]}
+    schedule = parse_schedule(payload, datetime(2026, 10, 8, 23, 0, tzinfo=timezone.utc))
+    assert schedule[0].game_type == "D"
+    away = [{"player_id": 100 + i, "slot": i} for i in range(1, 10)]
+    home = [{"player_id": 200 + i, "slot": i} for i in range(1, 10)]
+    game = make_live_game(schedule[0], away, home)
+    assert game.game_type == "D"
+    _, quote, feature = _make()
+    with pytest.raises(ValueError, match="POSTSEASON_LEGACY_SCORE_ENGINE_UNVALIDATED"):
+        _model_input(game=game, quote=quote, feature=feature, require_confirmed_lineup=True)
