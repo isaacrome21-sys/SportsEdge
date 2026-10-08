@@ -25,6 +25,24 @@ class DistributionReadoutTests(unittest.TestCase):
         self.assertEqual(out['signed_key_mass']['-7']['predicted'], .1)
         self.assertFalse(out['promotion_authority'])
 
+    def test_frozen_grid_shape_is_validated_once_and_reused(self):
+        grid = [[0.] * 8 for _ in range(8)]
+        grid[7][0] = 1.
+        verified = {"shape": "validated-test-fixture"}
+        with patch(
+            'sportsedge.sports.nfl.location_g1_distribution_readout.load_freeze',
+            return_value=verified,
+        ) as load, patch(
+            'sportsedge.sports.nfl.location_g1_distribution_readout.score_grid',
+            return_value=grid,
+        ) as score:
+            out = distribution_readout([row(), row(game_id="two")])
+        load.assert_called_once_with()
+        self.assertEqual(score.call_count, 2)
+        self.assertTrue(all(call.kwargs["freeze"] is verified for call in score.call_args_list))
+        self.assertEqual(out["n"], 2)
+        self.assertEqual(out["moneyline"]["conditional_non_tie_brier"], 0.)
+
     def test_real_grid_and_missing_lines(self):
         out = distribution_readout([row(spread_line=None, total_line=None)])
         self.assertEqual(out['markets']['spread']['n'], 0)
