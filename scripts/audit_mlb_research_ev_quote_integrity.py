@@ -137,7 +137,10 @@ def audit(card: Mapping[str,Any], quotes: Mapping[str,Any]) -> dict[str,Any]:
             (row["paired_side"],row["paired_price"],row["side"],row["price"]),
         ):
             american_profit(price);american_profit(other_price)
-            item={**row,"side":side,"price":price}
+            side_line=float(row["line"])
+            if str(row["market_type"])=="RUN_LINE" and side!=str(row["side"]):
+                side_line=-side_line
+            item={**row,"side":side,"price":price,"line":side_line}
             identity=key(item,is_card=False)
             if identity in index:raise ValueError("Duplicate paired quote")
             index[identity]=(item,{"side":other_side,"price":other_price},observed,pitch)
