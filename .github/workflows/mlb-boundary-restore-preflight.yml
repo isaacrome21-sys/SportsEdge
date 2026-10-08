@@ -1,8 +1,10 @@
-name: mlb-boundary-restore-preflight
+name: governance-boundary-restore-preflight
 on:
   pull_request:
     paths:
       - config/freeze_reconciliation_registry_v1.json
+      - sportsedge/sports/nfl/location_symmetric_g1_validation.py
+      - sportsedge/sports/nfl/location_g1_distribution_validation.py
       - .github/workflows/mlb-boundary-restore-preflight.yml
 permissions:
   contents: read
