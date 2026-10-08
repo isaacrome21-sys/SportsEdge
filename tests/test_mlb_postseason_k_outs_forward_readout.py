@@ -5,8 +5,9 @@ from pathlib import Path
 
 from sportsedge.mlb_postseason_k_outs_forward_shadow import MARKET_LINES,_sha
 from sportsedge.mlb_postseason_k_outs_forward_readout import (
-    ShadowReadoutError,readout,MIN_COMPLETE_STARTS,MIN_INDEPENDENT_GAMES,
+    ShadowReadoutError,readout,game_cluster_bootstrap,MIN_COMPLETE_STARTS,MIN_INDEPENDENT_GAMES,
 )
+from random import Random
 
 
 def create_fixture(root:Path,n_games=30,starters=2):
@@ -105,6 +106,83 @@ class MLBProspectiveReadoutTests(unittest.TestCase):
             file.write_text(json.dumps(p))
             with self.assertRaises(ShadowReadoutError):
                 readout(root/"predictions",root/"settlements")
+
+
+
+    def _rewrite(self, path, **changes):
+        row=json.loads(path.read_text())
+        row.update(changes)
+        row["receipt_sha256"]=_sha({k:v for k,v in row.items() if k!="receipt_sha256"})
+        path.write_text(json.dumps(row))
+
+    def test_bootstrap_matches_threshold_weighted_brier_not_game_means(self):
+        rows=[]
+        for game, deltas in ((1, [0.0]), (2, [1.0, 1.0, 1.0])):
+            for delta in deltas:
+                rows.append({"game_pk":game,"shadow_brier":delta,"baseline_brier":0.0})
+        # Pad to the independent-game floor with equal one-row clusters so the
+        # unequal pair still moves the threshold-weighted mean away from the
+        # mean of game means.
+        for game in range(3, 26):
+            rows.append({"game_pk":game,"shadow_brier":0.0,"baseline_brier":0.0})
+        reported=sum(r["shadow_brier"]-r["baseline_brier"] for r in rows)/len(rows)
+        clusters={}
+        for r in rows:
+            clusters.setdefault(r["game_pk"], []).append(r["shadow_brier"]-r["baseline_brier"])
+        game_mean=sum(sum(v)/len(v) for v in clusters.values())/len(clusters)
+        self.assertNotEqual(reported, game_mean)
+        rng=Random(2026)
+        keys=sorted(clusters)
+        sums=[(sum(clusters[k]), len(clusters[k])) for k in keys]
+        n=len(sums)
+        expected=[]
+        for _ in range(2000):
+            total=count=0
+            for _pick in range(n):
+                s,c=sums[rng.randrange(n)]
+                total+=s; count+=c
+            expected.append(total/count)
+        expected.sort()
+        self.assertEqual(
+            game_cluster_bootstrap(rows, seed=2026),
+            [expected[int(.025*len(expected))], expected[int(.975*len(expected))]],
+        )
+
+    def test_contradictory_settlement_counts_are_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td); create_fixture(root,1,1)
+            files=sorted((root/"settlements").glob("*_PITCHER_K_*.json"))
+            self._rewrite(files[1], actual_count=9, actual_over=True)
+            with self.assertRaises(ShadowReadoutError) as caught:
+                readout(root/"predictions", root/"settlements")
+            self.assertIn("CONTRADICTORY_SETTLEMENT_COUNT", str(caught.exception))
+
+    def test_fractional_boolean_and_string_counts_are_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td); create_fixture(root,1,1)
+            target=next((root/"settlements").glob("*_PITCHER_K_*.json"))
+            for bad in (4.5, True, "3"):
+                self._rewrite(target, actual_count=bad, actual_over=True)
+                with self.assertRaises(ShadowReadoutError) as caught:
+                    readout(root/"predictions", root/"settlements")
+                self.assertIn("NONINTEGER_FINAL_COUNT", str(caught.exception))
+
+    def test_nonfinite_and_malformed_settlement_brier_are_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td); create_fixture(root,1,1)
+            target=next((root/"settlements").glob("*.json"))
+            for bad in ("0.2", True):
+                self._rewrite(target, baseline_brier=bad)
+                with self.assertRaises(ShadowReadoutError) as caught:
+                    readout(root/"predictions", root/"settlements")
+                self.assertIn("MALFORMED_SETTLEMENT_BRIER", str(caught.exception))
+            for bad in (float("nan"), float("inf")):
+                row=json.loads(target.read_text())
+                row["baseline_brier"]=bad
+                target.write_text(json.dumps(row, allow_nan=True))
+                with self.assertRaises(ShadowReadoutError) as caught:
+                    readout(root/"predictions", root/"settlements")
+                self.assertIn("NONFINITE_SETTLEMENT_BRIER", str(caught.exception))
 
 
 if __name__=="__main__":
