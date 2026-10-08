@@ -28,6 +28,7 @@
         "scripts/run_nfl_v2k_attempt2.py",
         "scripts/run_nfl_v2k_attempt4.py",
         "scripts/run_nfl_v2k_attempt5.py",
+        "sportsedge/nfl_unified_phone.py",
         "sportsedge/sports/nfl/NFL_V2K_DEVELOPMENT_EXPOSURE_V3.json",
         "sportsedge/sports/nfl/NFL_V2K_DEVELOPMENT_EXPOSURE_V4.json",
         "sportsedge/sports/nfl/NFL_V2K_DEVELOPMENT_VALIDATION_PREATTEMPT_V4.json",
@@ -40,16 +41,17 @@
         "sportsedge/sports/nfl/candidate_release.py",
         "sportsedge/sports/nfl/discrete_v2.py",
         "sportsedge/sports/nfl/discrete_v2_fit.py",
-        "sportsedge/nfl_unified_phone.py",
+        "sportsedge/sports/nfl/location_g1_market_bridge.py",
         "sportsedge/sports/nfl/unified_market_engine.py",
         "sportsedge/sports/nfl/unified_run_it.py",
         "sportsedge/sports/nfl/v2k_attempt5_market_calibration.py",
         "sportsedge/sports/nfl/v2k_attempt5_validation.py",
+        "tests/test_location_g1_market_bridge_integration.py",
+        "tests/test_nfl_unified_phone.py",
         "tests/test_nfl_v2k_attempt2_dispatch_bridge.py",
         "tests/test_nfl_v2k_attempt2_source_manifest_adapter.py",
         "tests/test_nfl_v2k_attempt4_market_residual.py",
-        "tests/test_nfl_v2k_attempt5_market_calibration.py",
-        "tests/test_nfl_unified_phone.py"
+        "tests/test_nfl_v2k_attempt5_market_calibration.py"
       ],
       "coverage_prefixes": [
         "sportsedge/sports/nfl/m2_v2j_",
