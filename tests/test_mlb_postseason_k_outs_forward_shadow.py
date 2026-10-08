@@ -34,6 +34,15 @@ def feature(market):
 
 
 class PostseasonForwardShadowTests(unittest.TestCase):
+    def test_schedule_snapshot_must_precede_capture(self):
+        from dataclasses import replace
+        snapshot = replace(game(), retrieved_at="2026-10-09T23:30:00+00:00")
+        with self.assertRaisesRegex(ProspectiveShadowError, "SCHEDULE_FETCH_AFTER_CAPTURE"):
+            build_prediction(game=snapshot, pitcher_id=111, team_side="away",
+                market="PITCHER_K", line=2.5, feature=feature("PITCHER_K"),
+                captured_at=datetime(2026,10,9,23,0,tzinfo=timezone.utc),
+                schedule_sha256="b"*64)
+
     def test_wrong_feature_entity_team_or_opponent_never_reaches_pricer(self):
         from unittest.mock import patch
         for field,value,reason in (("entity_id","222","PITCHER"),
