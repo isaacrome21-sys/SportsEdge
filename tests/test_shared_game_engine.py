@@ -20,6 +20,31 @@ from sportsedge.v7_distribution import (
 
 
 class SharedGameEngineStage1Tests(unittest.TestCase):
+    def test_explicit_postseason_is_blocked_before_simulation(self):
+        def unexpected_simulator(**kwargs):
+            self.fail("legacy postseason scoring must not be simulated")
+
+        engine = build_shared_game_engine_session(
+            simulator=unexpected_simulator,
+            _minimum_simulations_for_test=1000,
+        )
+        with self.assertRaisesRegex(SharedGameEngineError, "POSTSEASON_LEGACY_SCORE_ENGINE_UNVALIDATED"):
+            engine({
+                "game_id": "ALDS_GAME4",
+                "market": "MONEYLINE",
+                "side": "HOME",
+                "line": 0.0,
+                "rules_mode": "POSTSEASON",
+                "away_mean_runs": 4.1,
+                "home_mean_runs": 4.6,
+                "simulations": 1000,
+            })
+
+    def test_invalid_explicit_rules_mode_fails_closed(self):
+        engine = build_shared_game_engine_session()
+        with self.assertRaisesRegex(SharedGameEngineError, "MLB_GAME_RULES_MODE_INVALID"):
+            engine({"game_id": "invalid", "market": "MONEYLINE", "rules_mode": "UNKNOWN"})
+
     def base_input(self):
         return {
             "game_id": "777",
