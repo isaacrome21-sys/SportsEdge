@@ -26,7 +26,7 @@ def feature(market):
          "target_rel":1.0,"history_rel":[1.0]*10,
          "opponent_team_id":200,
          "index":"obidx" if market=="PITCHER_OUTS" else "kidx"}
-    return {"game_pk":12345,"market":market,
+    return {"game_pk":12345,"market":market,"entity_id":"111","team_id":100,
             "retrieved_at":"2026-10-09T22:00:00+00:00",
             "source_subset_hash":"a"*64,
             "features":{"history_pool":rows,
@@ -34,6 +34,34 @@ def feature(market):
 
 
 class PostseasonForwardShadowTests(unittest.TestCase):
+    def test_wrong_feature_entity_team_or_opponent_never_reaches_pricer(self):
+        from unittest.mock import patch
+        for field,value,reason in (("entity_id","222","PITCHER"),
+                                   ("team_id",200,"TEAM"),
+                                   ("opponent_team_id",100,"OPPONENT")):
+            receipt=feature("PITCHER_K")
+            target=receipt["features"]["opp_k_adjustment"] if field=="opponent_team_id" else receipt
+            target[field]=value
+            with patch("sportsedge.mlb_postseason_k_outs_forward_shadow.price_pitcher_market") as price:
+                with self.assertRaisesRegex(ProspectiveShadowError,f"FEATURE_{reason}_IDENTITY_MISMATCH"):
+                    build_prediction(game=game(),pitcher_id=111,team_side="away",
+                        market="PITCHER_K",line=2.5,feature=receipt,
+                        captured_at=datetime(2026,10,9,23,0,tzinfo=timezone.utc),schedule_sha256="b"*64)
+                price.assert_not_called()
+
+    def test_few_start_fallback_is_explicitly_outside_postseason_baseline(self):
+        from unittest.mock import patch
+        for market,line in (("PITCHER_K",2.5),("PITCHER_OUTS",12.5)):
+            receipt=feature(market)
+            receipt["features"]={"history_pool":[receipt["features"]["history_pool"][0]],
+                                  "prior_fallback":{"pool":"league_short"}}
+            with patch("sportsedge.mlb_postseason_k_outs_forward_shadow.price_pitcher_market") as price:
+                with self.assertRaisesRegex(ProspectiveShadowError,"FEW_STARTS_PRIOR_FALLBACK:own_starts=1"):
+                    build_prediction(game=game(),pitcher_id=111,team_side="away",
+                        market=market,line=line,feature=receipt,
+                        captured_at=datetime(2026,10,9,23,0,tzinfo=timezone.utc),schedule_sha256="b"*64)
+                price.assert_not_called()
+
     def make(self, market="PITCHER_OUTS", line=12.5):
         return build_prediction(
             game=game(), pitcher_id=111, team_side="away",
