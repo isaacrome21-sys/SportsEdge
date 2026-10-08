@@ -219,6 +219,17 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         raise GenericMarketEngineError("game adapter received non-game market")
     if market in FAIL_CLOSED_MARKETS:
         raise GenericMarketEngineError(f"{market}_STATE_MODEL_REBUILD_REQUIRED")
+    # The aggregate legacy score engine is not a postseason rules simulator.
+    # Explicit postseason contexts must use the separate research joint-path
+    # lane and must not receive apparently validated game probabilities.
+    rules_mode = model_input.get("rules_mode")
+    if rules_mode is not None:
+        if rules_mode not in {"REGULAR_SEASON", "POSTSEASON"}:
+            raise GenericMarketEngineError("MLB_GAME_RULES_MODE_INVALID")
+        if rules_mode == "POSTSEASON":
+            raise GenericMarketEngineError(
+                "MLB_POSTSEASON_LEGACY_SCORE_ENGINE_UNVALIDATED_USE_JOINT_PATH_RESEARCH"
+            )
 
     if market in {"NRFI", "YRFI"}:
         # Canonical joint/auto rows carry actual strictly-prior inning-one state.
