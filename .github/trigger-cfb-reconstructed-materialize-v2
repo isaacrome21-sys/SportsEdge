@@ -1,8 +1,8 @@
-CFB_RECONSTRUCTED_MATERIALIZE_REQUEST_V13
+CFB_RECONSTRUCTED_MATERIALIZE_REQUEST_V16
 requested_mode=MATERIALIZE_ONLY
-requested_utc=2026-10-07
-requested_reason=workflow_now_on_main_fire_guarded_materialization
+requested_utc=2026-10-08
+requested_reason=reconciled_main_guarded_provider_preflight_and_input_materialization
 no_evaluation_attempt=true
 no_backfill=true
 venue_skip=VENUE_UNRESOLVED_NO_PLACEHOLDER
-request_nonce=20261007Tv13
+request_nonce=20261008Tv16
