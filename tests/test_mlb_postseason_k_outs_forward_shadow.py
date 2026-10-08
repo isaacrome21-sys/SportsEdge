@@ -34,6 +34,13 @@ def feature(market):
 
 
 class PostseasonForwardShadowTests(unittest.TestCase):
+    def test_nonhex_schedule_digest_is_rejected(self):
+        with self.assertRaisesRegex(ProspectiveShadowError, "SCHEDULE_SOURCE_HASH_MISSING"):
+            build_prediction(game=game(), pitcher_id=111, team_side="away",
+                market="PITCHER_K", line=2.5, feature=feature("PITCHER_K"),
+                captured_at=datetime(2026,10,9,23,0,tzinfo=timezone.utc),
+                schedule_sha256="q"*64)
+
     def test_schedule_snapshot_must_precede_capture(self):
         from dataclasses import replace
         snapshot = replace(game(), retrieved_at="2026-10-09T23:30:00+00:00")
