@@ -106,8 +106,8 @@ jobs:
           assert r['prospective_validation_started'] is False
           assert r['production_registry_consumes_this_artifact'] is False
           authority = r.get('authority') or {}
-          assert r.get('research_only') is True
           assert isinstance(authority, dict)
+          assert authority.get('research_only') is True
           assert not any(bool(v) for k, v in authority.items() if k != 'research_only')
           print('NFL_LOCATION_G1_READOUT_ZERO_AUTHORITY')
           PY
