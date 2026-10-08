@@ -261,7 +261,12 @@
         "sportsedge/sports/nfl/location_symmetric_g1_validation.py"
       ],
       "coverage_prefixes": [],
-      "disposition": null,
+      "disposition": {
+        "state": "REVOKED",
+        "revoked_at": "2026-10-08T22:14:48Z",
+        "prior_forward_clock_invalidated": true,
+        "reason": "POST_4D57D581_FIRST_PARENT_RECONCILIATION: #1875 changed frozen NFL location G1 validation bytes; prospective/frozen-bundle authority invalidated pending a verified corrective restoration/refreeze; no promotion or betting authority."
+      },
       "identity": {
         "schema": "NFL_LOCATION_SYMMETRIC_G1_RESEARCH_FREEZE_IDENTITY_V1",
         "source_pull_request": 1742,
@@ -2316,10 +2321,238 @@
       "merge_sha": "4d57d5810dba4746be4b3eabf1a17105804ece0a",
       "pr": 1816,
       "note": "First-parent main advance registered during reconciliation catch-up. Source commit: NHL research: public baseline validation on current main v3 (#1816). This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_7ED4D627_PR_1828",
+      "merge_sha": "7ed4d6270169d8c9b5c33f09e08ef06d62104de3",
+      "pr": 1828,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: Merge pull request #1828 from isaacrome21-sys/fix/freeze-reconciliation-catchup-20261007-v1. Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_982410DE_PR_1829",
+      "merge_sha": "982410def434577606638c593ff2fdd6e476e9fd",
+      "pr": 1829,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: CFB ops: request guarded reconstructed materialization on reconciled main (#1829). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_86EBAA88_PR_1830",
+      "merge_sha": "86ebaa88ecb012ca3a588d0e837a833d29b6a0cc",
+      "pr": 1830,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: NFL governance: freeze terminal score-count Attempt 3 result (#1830). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_5CDC9178_PR_1831",
+      "merge_sha": "5cdc9178000361fa407e550ce1cd98ce8f772537",
+      "pr": 1831,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: NFL research: run symmetric location G1 reused-history readout (#1831). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_1355EA0C_PR_1833",
+      "merge_sha": "1355ea0cdb6e650e31ae1af9777f12fc9272d3e7",
+      "pr": 1833,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB ops: make empty and lean-only final cards grade safely (#1833). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_C5DA0BFD_PR_1834",
+      "merge_sha": "c5da0bfd71bbd8a57a0a4c2059f46cdfd3f413fc",
+      "pr": 1834,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB ops: align auto grader with full simple prop surface (#1834). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_1C810139_PR_1835",
+      "merge_sha": "1c810139b3a065ebec7bfee53e3ed9e358f0eb0a",
+      "pr": 1835,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB ops: grade multi-game final cards without ledger collisions (#1835). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_94FE0EF7_PR_1836",
+      "merge_sha": "94fe0ef79e434af4434cd8689a04f2f2602139eb",
+      "pr": 1836,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB: clean-port governed context evidence and validated serving seam (#1836). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_4E6B9727_PR_1838",
+      "merge_sha": "4e6b9727cdc6c65816d47b6fd4a97e8e48b4f011",
+      "pr": 1838,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB ops: settle pitcher-win leans and isolate unsupported research markets (#1838). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_660B311C_PR_1839",
+      "merge_sha": "660b311ccb35d8b90edba0756c07a9d86cf18c16",
+      "pr": 1839,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB ops: settle legacy ACTIONABLE player props and numeric team totals (#1839). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_D7E8F41A_PR_1840",
+      "merge_sha": "d7e8f41a8a4217a432fa972d0862cb65bb4f7c82",
+      "pr": 1840,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB ops: make auto-grade resilient to transient StatsAPI failures (#1840). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_7A1A11B4_PR_1841",
+      "merge_sha": "7a1a11b4bfa6ccdc0c65cc6bee4625121421b450",
+      "pr": 1841,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: ledger: record finalized MLB card grades (#1841). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_6F785724_PR_1843",
+      "merge_sha": "6f78572453cb1231e883fefd2618e608447f7e57",
+      "pr": 1843,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: Fix named pitcher resolution in MLB joint card (#1843). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_E92A5CC6_PR_1844",
+      "merge_sha": "e92a5cc69aa74ba26b70ec8a7793c65366f025bd",
+      "pr": 1844,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: Run Rays-Yankees October 7 SportsEdge joint research card (#1844). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_E60A79EF_PR_1845",
+      "merge_sha": "e60a79ef0459885a0e579da1b383fb3fd93e717d",
+      "pr": 1845,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: Repair MLB pitcher pricing, history bias and simulation identities (#1845). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_97300383_PR_1846",
+      "merge_sha": "97300383a38cfb6d2721e33e93877251ace624ab",
+      "pr": 1846,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: Rerun Rays Yankees using canonical standalone pitcher marginal engine with audit (#1846). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_5D5AFBC6_PR_1847",
+      "merge_sha": "5d5afbc63302e7031ef5ec2fda1a34520903d64c",
+      "pr": 1847,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB: fail-closed pitcher-prop fragility audit and sample-size diagnostics (#1847). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_DCA1B0D0_PR_1848",
+      "merge_sha": "dca1b0d0644dc086d5fc87629e08a8dcdd11d439",
+      "pr": 1848,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB pitcher props: walk-forward bakeoff of 10-start vs capped 30-start priors (#1848). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_F5D40121_PR_1849",
+      "merge_sha": "f5d40121464c5c696f8c435dede7179b717c7847",
+      "pr": 1849,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB pitcher props: preregister 2025 IP leaders for broader 2026 holdout bakeoff (#1849). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_C2054154_PR_1850",
+      "merge_sha": "c205415454f40410aae578217bd4529373eba4ac",
+      "pr": 1850,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB: 2026 opponent-adjusted pitcher K/outs baseline vs long-prior bakeoff (#1850). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_09F545A9_PR_1851",
+      "merge_sha": "09f545a97efc6daaa9e6fdf081adbfa5d76bf987",
+      "pr": 1851,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB: audit actual 2023–2025 postseason starter workload vs PIT regular-season predictions (#1851). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_4C821F35_PR_1851",
+      "merge_sha": "4c821f3541b74907157cea4fa6ead68cce25df9b",
+      "pr": 1851,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: Corrective rollback: restore registered freeze boundary after #1851 (#1854). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_71064D76_PR_1855",
+      "merge_sha": "71064d766e84eb2f0768f6e52a5dfdaffab6cdd8",
+      "pr": 1855,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB: historical postseason K+outs recalibration with untouched 2024/2025 holdouts (#1855). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_3B8054E1_PR_1857",
+      "merge_sha": "3b8054e1e404409f7e87b7ffeb5b1c6bfb04b534",
+      "pr": 1857,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB: audit extreme EV, paired quote identities and push settlement (current main) (#1857). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_00CB6380_PR_1858",
+      "merge_sha": "00cb6380e0b78352c12d29c5a6c886b7c656a095",
+      "pr": 1858,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB: capture/settle strictly pregame 2026 postseason K and outs shadow probabilities (#1858). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_F1FD41F0_PR_1859",
+      "merge_sha": "f1fd41f0df5ef8ca8c52670b9dfb6dd5881fa6e1",
+      "pr": 1859,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB: game-clustered, create-only 2026 postseason pitcher forward readout (#1859). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_9D384D72_PR_1860",
+      "merge_sha": "9d384d72f7ae564b5f2fcb72a6bccffec58d9db8",
+      "pr": 1860,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB: align pitcher settlement integrity with reported Brier (#1860). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_49FE3F6B_PR_1861",
+      "merge_sha": "49fe3f6bc2a98638b1ce4a7171e0c7935d821a0d",
+      "pr": 1861,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: Reduce MLB prop forward artifact duplication; retain immutable data-branch evidence (#1861). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_213D7996_PR_1862",
+      "merge_sha": "213d7996b1fbb501994301c8532242c83fbe09c2",
+      "pr": 1862,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB forward evidence: remove test suite from time-critical capture heartbeat (#1862). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_3AC371E3_PR_1842",
+      "merge_sha": "3ac371e3aa8b577b026b2a1973bcae23b4ea15ab",
+      "pr": 1842,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: NFL G1: repair zero-authority readout assertion (#1842). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_4D4368BB_PR_1863",
+      "merge_sha": "4d4368bb77bcd2bb7c70e1d42d75411cd855c1de",
+      "pr": 1863,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: fix(nfl): validate research_only in G1 authority payload (#1863). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_275F8D65_PR_1864",
+      "merge_sha": "275f8d65c9c328363907f863ed28c461ad5510da",
+      "pr": 1864,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: fix(mlb): remove blocking ten-minute capture bridge; retain cron and one-shot fallback (#1864). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_B109FA4A_PR_1866",
+      "merge_sha": "b109fa4a83f77eeaa1645c8256e43eab0c1e9ea4",
+      "pr": 1866,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB: explain missing opponent context in postseason pitcher shadow without bypass (#1866). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_761046C3_PR_1865",
+      "merge_sha": "761046c3604cda1dcdb05329b6786577f3a1ee70",
+      "pr": 1865,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: Merge pull request #1865 from isaacrome21-sys/research/nfl-g1-market-bridge-research-only-v1. Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_7688D374_PR_1868",
+      "merge_sha": "7688d374a2693ee7e4be2b2b0ac2ba5ea50b4729",
+      "pr": 1868,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: Merge pull request #1868 from isaacrome21-sys/fix/cfb-resumable-null-replay-v1. Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_D237CE13_PR_1872",
+      "merge_sha": "d237ce13ef982d6ae45ce1e1d54d473181ccdfb1",
+      "pr": 1872,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: Fix NFL lines issue runner missing NumPy runtime import (#1872). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_AC26845E_PR_1874",
+      "merge_sha": "ac26845ebb594b2973ae56fdd7f7953cdde03938",
+      "pr": 1874,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB: clean-port postseason pitcher identity safeguards onto current main (#1874). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_59BEAFAA_PR_1875",
+      "merge_sha": "59beafaa62b7f241ef89af44de7e1f449e8371a8",
+      "pr": 1875,
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: NFL: current-main G1 probability diagnostics clean port (#1875). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
     }
   ],
   "inventory_block_reason": "Current main through merge dca09063 / PR #1668 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "4d57d5810dba4746be4b3eabf1a17105804ece0a",
+  "reconciled_through_sha": "59beafaa62b7f241ef89af44de7e1f449e8371a8",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
