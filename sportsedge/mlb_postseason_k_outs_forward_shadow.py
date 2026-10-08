@@ -138,13 +138,19 @@ def settle_prediction(*, game: GameSnapshot, prediction: Mapping[str,Any],
         raw=((team.get("players") or {}).get("ID"+str(pid)) or {}).get("stats") or {}
         stats=raw.get("pitching") or {}
         if prediction["market"]=="PITCHER_OUTS":
-            if stats.get("inningsPitched") is None: raise ProspectiveShadowError("MISSING_REALIZED_OUTS")
-            actual=int(_outs_from_ip(stats["inningsPitched"]))
+            raw_ip=stats.get("inningsPitched")
+            if raw_ip is None: raise ProspectiveShadowError("MISSING_REALIZED_OUTS")
+            if isinstance(raw_ip,bool): raise ProspectiveShadowError("NONINTEGER_OUTS")
+            parsed=_outs_from_ip(raw_ip)
+            if not isfinite(parsed) or parsed!=int(parsed):
+                raise ProspectiveShadowError("NONINTEGER_OUTS")
+            actual=int(parsed)
         elif prediction["market"]=="PITCHER_K":
             value=stats.get("strikeOuts")
             if value is None:raise ProspectiveShadowError("MISSING_REALIZED_STRIKEOUTS")
-            actual=int(value)
-            if float(value)!=actual:raise ProspectiveShadowError("NONINTEGER_STRIKEOUTS")
+            if isinstance(value,bool) or not isinstance(value,int):
+                raise ProspectiveShadowError("NONINTEGER_STRIKEOUTS")
+            actual=value
         else: raise ProspectiveShadowError("UNKNOWN_MARKET")
         if actual<0 or (prediction["market"]=="PITCHER_OUTS" and actual>27):
             raise ProspectiveShadowError("UNPHYSICAL_PITCHER_STAT")

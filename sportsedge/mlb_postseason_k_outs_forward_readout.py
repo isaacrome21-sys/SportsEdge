@@ -69,17 +69,47 @@ def _summarize(rows:list[dict[str,Any]])->dict[str,Any]:
         "delta_log_loss":mean(r["shadow_log_loss"]-r["baseline_log_loss"] for r in rows),
     }
 
+def _integer_final_count(value:Any,market:str)->int:
+    # bool is an int subclass; float/str must not be truncated or coerced.
+    if isinstance(value,bool) or not isinstance(value,int):
+        raise ShadowReadoutError("NONINTEGER_FINAL_COUNT")
+    if value<0 or (market=="PITCHER_OUTS" and value>27):
+        raise ShadowReadoutError("UNPHYSICAL_FINAL_COUNT")
+    return value
+
+def _recorded_brier(value:Any)->float:
+    if isinstance(value,bool) or not isinstance(value,(int,float)):
+        raise ShadowReadoutError("MALFORMED_SETTLEMENT_BRIER")
+    score=float(value)
+    if not isfinite(score):
+        raise ShadowReadoutError("NONFINITE_SETTLEMENT_BRIER")
+    return score
+
 def game_cluster_bootstrap(rows:list[dict[str,Any]],seed:int)->list[float]:
+    """Resample games, then score the same threshold-weighted mean the readout reports.
+
+    A mean of per-game means does not match delta_brier when a game contributes
+    more thresholds (two starters, or a partial market grid). Cluster sums and
+    counts keep that statistic and avoid rebuilding a mean() over every draw.
+    """
     groups=defaultdict(list)
     for r in rows:
         groups[r["game_pk"]].append(r["shadow_brier"]-r["baseline_brier"])
-    group_values=[mean(groups[k]) for k in sorted(groups)]
-    if len(group_values)<MIN_INDEPENDENT_GAMES:
+    clusters=[(sum(groups[k]),len(groups[k])) for k in sorted(groups)]
+    if len(clusters)<MIN_INDEPENDENT_GAMES:
         raise ShadowReadoutError("NOT_ENOUGH_INDEPENDENT_GAME_CLUSTERS")
     rng=Random(seed)
-    n=len(group_values)
-    draws=sorted(mean(group_values[rng.randrange(n)] for _ in range(n))
-                 for _ in range(BOOTSTRAP_DRAWS))
+    n=len(clusters)
+    draws=[]
+    for _ in range(BOOTSTRAP_DRAWS):
+        total=0.0
+        count=0
+        for _pick in range(n):
+            cluster_sum,cluster_count=clusters[rng.randrange(n)]
+            total+=cluster_sum
+            count+=cluster_count
+        draws.append(total/count)
+    draws.sort()
     return [draws[int(.025*len(draws))],draws[int(.975*len(draws))]]
 
 def readout(predictions_dir:Path,settlements_dir:Path)->dict[str,Any]:
@@ -103,6 +133,10 @@ def readout(predictions_dir:Path,settlements_dir:Path)->dict[str,Any]:
 
     settlements={}
     for path in sorted(settlements_dir.glob("*.json")):
+        loaded=json.loads(path.read_text(encoding="utf8"))
+        if isinstance(loaded,dict) and loaded.get("status")=="GRADED":
+            _recorded_brier(loaded.get("baseline_brier"))
+            _recorded_brier(loaded.get("shadow_brier"))
         row=_read(path)
         if row.get("schema")!="mlb_postseason_k_outs_2026_shadow_settlement_v1":
             raise ShadowReadoutError("INVALID_SETTLEMENT_SCHEMA")
@@ -121,6 +155,7 @@ def readout(predictions_dir:Path,settlements_dir:Path)->dict[str,Any]:
 
     by_start=defaultdict(dict)
     invalid_groups=set()
+    settlement_counts={}
     graded_count=0
     for identity,pred in predictions.items():
         group=(identity[0],identity[1])
@@ -128,16 +163,21 @@ def readout(predictions_dir:Path,settlements_dir:Path)->dict[str,Any]:
         if not settled or settled["status"]!="GRADED":
             invalid_groups.add(group)
             continue
-        count=int(settled["actual_count"])
-        if count<0 or (identity[2]=="PITCHER_OUTS" and count>27):
-            raise ShadowReadoutError("UNPHYSICAL_FINAL_COUNT")
+        count=_integer_final_count(settled.get("actual_count"),identity[2])
+        count_key=(identity[0],identity[1],identity[2])
+        prior_count=settlement_counts.get(count_key)
+        if prior_count is not None and prior_count!=count:
+            raise ShadowReadoutError("CONTRADICTORY_SETTLEMENT_COUNT")
+        settlement_counts[count_key]=count
         outcome=int(count>identity[3])
         if settled.get("actual_over") is not bool(outcome):
             raise ShadowReadoutError("FINAL_OUTCOME_MISMATCH")
         b=float(pred["baseline_opponent_adjusted_p_over"])
         c=float(pred["postseason_shadow_research_p_over"])
         bb=(b-outcome)**2; cc=(c-outcome)**2
-        if abs(float(settled["baseline_brier"])-bb)>1e-9 or abs(float(settled["shadow_brier"])-cc)>1e-9:
+        recorded_baseline=_recorded_brier(settled.get("baseline_brier"))
+        recorded_shadow=_recorded_brier(settled.get("shadow_brier"))
+        if abs(recorded_baseline-bb)>1e-9 or abs(recorded_shadow-cc)>1e-9:
             raise ShadowReadoutError("SETTLEMENT_SCORE_TAMPERING")
         graded_count+=1
         by_start[group][(identity[2],identity[3])]={

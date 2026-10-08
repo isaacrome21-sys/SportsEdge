@@ -146,13 +146,22 @@ def game_cluster_interval(rows: Sequence[Mapping[str, Any]], source: str,
         adjusted = shifted(row[source], offset)
         y = row["outcome"]
         grouped[row["game_pk"]].append((adjusted-y)**2-(original-y)**2)
-    means = [mean(v) for _,v in sorted(grouped.items())]
-    if len(means) < 25:
+    clusters = [(sum(v), len(v)) for _, v in sorted(grouped.items())]
+    if len(clusters) < 25:
         raise ValueError("Not enough independent postseason games")
     random = Random(seed)
-    boot = sorted(mean(means[random.randrange(len(means))] for _ in means)
-                  for _ in range(BOOTSTRAP_DRAWS))
-    return [boot[int(0.025*len(boot))],boot[int(0.975*len(boot))]]
+    boot = []
+    n = len(clusters)
+    for _ in range(BOOTSTRAP_DRAWS):
+        total = 0.0
+        count = 0
+        for _pick in range(n):
+            cluster_sum, cluster_count = clusters[random.randrange(n)]
+            total += cluster_sum
+            count += cluster_count
+        boot.append(total / count)
+    boot.sort()
+    return [boot[int(0.025*len(boot))], boot[int(0.975*len(boot))]]
 
 
 def evaluate(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
