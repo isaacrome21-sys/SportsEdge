@@ -79,6 +79,27 @@ class PostseasonForwardShadowTests(unittest.TestCase):
                 captured_at=datetime(2026,10,9,23,0,tzinfo=timezone.utc),
                 schedule_sha256="b"*64)
 
+    def test_missing_opponent_context_reports_existing_source_reason_without_pricing(self):
+        for market, line, reason_key in (
+            ("PITCHER_K", 2.5, "opp_k_unadjusted"),
+            ("PITCHER_OUTS", 12.5, "opp_outs_unadjusted"),
+        ):
+            receipt=feature(market)
+            receipt["features"].pop(
+                "opp_k_adjustment" if market=="PITCHER_K" else "opp_outs_adjustment"
+            )
+            receipt[reason_key]="SOURCE_CONTEXT_UNAVAILABLE"
+            with self.assertRaisesRegex(
+                ProspectiveShadowError,
+                "OPPONENT_CONTEXT_MISSING:SOURCE_CONTEXT_UNAVAILABLE",
+            ):
+                build_prediction(
+                    game=game(), pitcher_id=111, team_side="away",
+                    market=market, line=line, feature=receipt,
+                    captured_at=datetime(2026,10,9,23,0,tzinfo=timezone.utc),
+                    schedule_sha256="b"*64,
+                )
+
     def test_actual_start_pitcher_outs_and_k_settle_separately(self):
         official={"teams":{"away":{"pitchers":[111,333],
             "players":{"ID111":{"stats":{"pitching":{
