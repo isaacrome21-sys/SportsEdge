@@ -42,6 +42,7 @@
         "sportsedge/sports/nfl/discrete_v2.py",
         "sportsedge/sports/nfl/discrete_v2_fit.py",
         "sportsedge/sports/nfl/location_g1_distribution_readout.py",
+        "sportsedge/sports/nfl/location_g1_distribution_validation.py",
         "sportsedge/sports/nfl/location_g1_market_bridge.py",
         "sportsedge/sports/nfl/unified_market_engine.py",
         "sportsedge/sports/nfl/unified_run_it.py",
