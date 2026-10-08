@@ -2549,10 +2549,40 @@
       "merge_sha": "59beafaa62b7f241ef89af44de7e1f449e8371a8",
       "pr": 1875,
       "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: NFL: current-main G1 probability diagnostics clean port (#1875). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_35775703_PR_1880",
+      "merge_sha": "35775703fb3ee578d0acde967c4790a3b376914d",
+      "pr": 1880,
+      "note": "Verified first-parent main advance after registered 59beafaa boundary. Governance first-parent reconciliation of 38 post-boundary commits; original G1 research bundle revoked, no forward clock authority. Provenance-only reconciliation; no backfill, Model_P, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_CDA0665B_PR_1882",
+      "merge_sha": "cda0665bcbb9367c8b30171b4ce8c0b82b02fb7a",
+      "pr": 1882,
+      "note": "Verified first-parent main advance after registered 59beafaa boundary. Guarded CFB materialization only; no model selection or betting authority. Provenance-only reconciliation; no backfill, Model_P, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_E8E0DC4B_PR_1884",
+      "merge_sha": "e8e0dc4bb8b21d6f0eabff37fff2f6c2dff052ac",
+      "pr": 1884,
+      "note": "Verified first-parent main advance after registered 59beafaa boundary. MLB prospective source-time and SHA integrity checks; no forecast or authority changes. Provenance-only reconciliation; no backfill, Model_P, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_7D970E18_PR_1887",
+      "merge_sha": "7d970e183689588276bd941b4fc596094dae75ea",
+      "pr": 1887,
+      "note": "Verified first-parent main advance after registered 59beafaa boundary. MLB legacy postseason mode rejection and regression tests; preserves missing postseason validation. Provenance-only reconciliation; no backfill, Model_P, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_B1308CAF_PR_1886",
+      "merge_sha": "b1308caf6442b5ff60cac9ad949324fedb5b33d2",
+      "pr": 1886,
+      "note": "Verified first-parent main advance after registered 59beafaa boundary. NFL G1 exact historical validator-byte restoration; revoked disposition and invalidated prior forward clock remain unchanged; independent revalidation required. Provenance-only reconciliation; no backfill, Model_P, promotion, staking, or official betting authority."
     }
   ],
   "inventory_block_reason": "Current main through merge dca09063 / PR #1668 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "59beafaa62b7f241ef89af44de7e1f449e8371a8",
+  "reconciled_through_sha": "b1308caf6442b5ff60cac9ad949324fedb5b33d2",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
