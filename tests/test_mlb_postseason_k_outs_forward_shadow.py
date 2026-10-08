@@ -110,6 +110,29 @@ class PostseasonForwardShadowTests(unittest.TestCase):
                 settled_at=datetime(2026,10,10,5,0,tzinfo=timezone.utc),
                 final_source_sha256="c"*64)
 
+
+    def test_runner_does_not_backfill_and_missing_is_create_only(self):
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from scripts.run_mlb_postseason_k_outs_forward_shadow import run
+        final=game("Final")
+        def schedule(day,captured):
+            if day=="2026-10-09":
+                return [final],"d"*64
+            return [],"d"*64
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            at=datetime(2026,10,10,5,0,tzinfo=timezone.utc)
+            with patch("scripts.run_mlb_postseason_k_outs_forward_shadow.games_for_day",side_effect=schedule):
+                first=run(output_root=root,now=at)
+                second=run(output_root=root,now=at.replace(minute=5))
+            self.assertEqual(first["missed"],1)
+            self.assertEqual(first["predictions_created"],0)
+            self.assertEqual(second["missed"],0)
+            self.assertEqual(second["existing"],1)
+            self.assertFalse((root/"predictions").exists())
+
     def test_offset_is_only_descriptive_shadow(self):
         self.assertAlmostEqual(postseason_shadow_p(.773,"PITCHER_OUTS"),.541,places=2)
 
