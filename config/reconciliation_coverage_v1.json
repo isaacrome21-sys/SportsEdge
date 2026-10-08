@@ -3,6 +3,7 @@
   "bundle_extensions": {
     "NFL_V2J_V2K_GOVERNANCE_FREEZE_V1": {
       "coverage_paths": [
+        ".github/workflows/mlb-boundary-restore-preflight.yml",
         ".github/workflows/nfl-attempt9-model-p-contract.yml",
         ".github/workflows/nfl-v2k-attempt2-dispatch-bridge.yml",
         ".github/workflows/nfl-v2k-attempt4-development-validation.yml",
