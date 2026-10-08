@@ -74,7 +74,11 @@ def build_prediction(*, game: GameSnapshot, pitcher_id: int, team_side: str,
     adj="opp_k_adjustment" if market=="PITCHER_K" else "opp_outs_adjustment"
     features=feature.get("features")
     if not isinstance(features,Mapping) or not isinstance(features.get(adj),Mapping):
-        raise ProspectiveShadowError("OPPONENT_CONTEXT_MISSING")
+        # Keep the hard block; include only the upstream fail-closed reason
+        # already present in the PIT feature receipt. Never synthesize context.
+        reason_key="opp_k_unadjusted" if market=="PITCHER_K" else "opp_outs_unadjusted"
+        detail=str(feature.get(reason_key) or "UNSPECIFIED").splitlines()[0][:120]
+        raise ProspectiveShadowError(f"OPPONENT_CONTEXT_MISSING:{detail}")
     retrieved=_utc(feature.get("retrieved_at"))
     if retrieved > observed: raise ProspectiveShadowError("FEATURE_FETCH_AFTER_CAPTURE")
     if len(str(feature.get("source_subset_hash") or ""))!=64:
