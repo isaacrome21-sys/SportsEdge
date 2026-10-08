@@ -186,7 +186,15 @@ def simulate_game_distribution(
     first_inning_dispersion_r: Any = DEFAULT_FIRST_INNING_DISPERSION_R,
     extra_half_inning_mean: Any = DEFAULT_EXTRA_HALF_INNING_MEAN,
     team_dispersion_r: Any | None = None,
+    rules_mode: str = "REGULAR_SEASON",
 ) -> GameDistribution:
+    # This aggregate-run model cannot represent postseason extra-inning base
+    # states or multi-run walk-off home runs. Refuse explicit postseason
+    # requests instead of selling an invalid game-price distribution.
+    if rules_mode not in {"REGULAR_SEASON", "POSTSEASON"}:
+        raise V7DistributionError("V7_RULES_MODE_INVALID")
+    if rules_mode == "POSTSEASON":
+        raise V7DistributionError("V7_POSTSEASON_REQUIRES_INNING_LEVEL_JOINT_PATHS")
     away_mean = _finite_positive(away_mean_runs, "away_mean_runs")
     home_mean = _finite_positive(home_mean_runs, "home_mean_runs")
     total = _finite_positive(total_line, "total_line", allow_zero=True)
