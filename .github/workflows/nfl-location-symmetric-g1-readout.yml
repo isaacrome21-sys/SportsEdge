@@ -8,6 +8,7 @@ on:
       - 'sportsedge/sports/nfl/location_symmetric_g1.py'
       - 'sportsedge/sports/nfl/location_symmetric_g1_validation.py'
       - 'sportsedge/sports/nfl/location_g1_distribution_readout.py'
+      - 'sportsedge/sports/nfl/location_g1_distribution_validation.py'
       - 'config/research/nfl_location_symmetric_g1_prereg_v1.json'
       - 'tests/test_nfl_location_symmetric_g1_readout_workflow.py'
       - '.github/workflows/nfl-location-symmetric-g1-readout.yml'
@@ -18,6 +19,7 @@ on:
       - 'sportsedge/sports/nfl/location_symmetric_g1.py'
       - 'sportsedge/sports/nfl/location_symmetric_g1_validation.py'
       - 'sportsedge/sports/nfl/location_g1_distribution_readout.py'
+      - 'sportsedge/sports/nfl/location_g1_distribution_validation.py'
       - 'config/research/nfl_location_symmetric_g1_prereg_v1.json'
       - '.github/workflows/nfl-location-symmetric-g1-readout.yml'
 
