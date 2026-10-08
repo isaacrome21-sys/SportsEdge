@@ -102,6 +102,7 @@ def validate_nfl_location_symmetric_g1(
     *,
     alpha_grid: Sequence[float] = DEFAULT_ALPHA_GRID,
     baseline_alpha: float = BASELINE_RIDGE_ALPHA,
+    include_distribution: bool = False,
 ) -> dict[str, Any]:
     """Run the preregistered five reused-history outer folds."""
     data = [
@@ -117,6 +118,7 @@ def validate_nfl_location_symmetric_g1(
             + ",".join(str(season) for season in sorted(missing))
         )
 
+    distribution_rows = []
     fold_reports: list[dict[str, Any]] = []
     aggregate: dict[str, dict[str, list[float]]] = {
         target: {
@@ -170,6 +172,12 @@ def validate_nfl_location_symmetric_g1(
         actual_total: list[float] = []
         for row in test_rows:
             cand_margin, cand_total = candidate.predict(row)
+            if include_distribution:
+                distribution_rows.append({
+                    **{key: row.get(key) for key in ("game_id", "season", "home_score", "away_score", "spread_line", "total_line")},
+                    "train_seasons": list(candidate.train_seasons),
+                    "predicted_margin": cand_margin, "predicted_total": cand_total,
+                })
             base_margin, base_total = baseline.predict(row)
             candidate_margin.append(cand_margin)
             candidate_total.append(cand_total)
@@ -270,7 +278,12 @@ def validate_nfl_location_symmetric_g1(
         target_summary["margin"]["passed"]
         and target_summary["total"]["passed"]
     )
+    distribution = None
+    if include_distribution and overall_pass:
+        from .location_g1_distribution_readout import distribution_readout
+        distribution = distribution_readout(distribution_rows)
     return {
+        "distribution_diagnostics": distribution,
         "schema": SCHEMA,
         "candidate_family": CANDIDATE_FAMILY,
         "model_id": MODEL_ID,

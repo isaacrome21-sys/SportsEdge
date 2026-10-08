@@ -140,7 +140,7 @@ def main() -> int:
     if not history_rows:
         raise SystemExit("NFL_LOCATION_G1_HISTORY_ROWS_EMPTY")
 
-    report = validate_nfl_location_symmetric_g1(history_rows)
+    report = validate_nfl_location_symmetric_g1(history_rows, include_distribution=True)
     report.update(
         {
             "code_git_sha": git_sha,

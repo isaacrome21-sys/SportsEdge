@@ -7,6 +7,7 @@ on:
       - 'scripts/run_nfl_location_symmetric_g1_validation.py'
       - 'sportsedge/sports/nfl/location_symmetric_g1.py'
       - 'sportsedge/sports/nfl/location_symmetric_g1_validation.py'
+      - 'sportsedge/sports/nfl/location_g1_distribution_readout.py'
       - 'config/research/nfl_location_symmetric_g1_prereg_v1.json'
       - 'tests/test_nfl_location_symmetric_g1_readout_workflow.py'
       - '.github/workflows/nfl-location-symmetric-g1-readout.yml'
@@ -16,6 +17,7 @@ on:
       - 'scripts/run_nfl_location_symmetric_g1_validation.py'
       - 'sportsedge/sports/nfl/location_symmetric_g1.py'
       - 'sportsedge/sports/nfl/location_symmetric_g1_validation.py'
+      - 'sportsedge/sports/nfl/location_g1_distribution_readout.py'
       - 'config/research/nfl_location_symmetric_g1_prereg_v1.json'
       - '.github/workflows/nfl-location-symmetric-g1-readout.yml'
 
@@ -35,7 +37,7 @@ jobs:
       - name: Compile and test G1 readout surface
         run: |
           python -m py_compile             sportsedge/sports/nfl/location_symmetric_g1.py             sportsedge/sports/nfl/location_symmetric_g1_validation.py             scripts/run_nfl_location_symmetric_g1_validation.py
-          python -m unittest             tests.test_nfl_location_symmetric_g1             tests.test_nfl_location_symmetric_g1_readout_workflow -v
+          python -m unittest             tests.test_nfl_location_symmetric_g1             tests.test_nfl_location_symmetric_g1_readout_workflow             tests.test_nfl_g1_distribution_readout -v
 
   development-readout:
     if: github.event_name != 'pull_request'
