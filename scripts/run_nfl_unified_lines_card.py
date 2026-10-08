@@ -8,6 +8,8 @@ two-sided prices after the model run.
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 
@@ -31,6 +33,671 @@ def _has_props(ticket: dict) -> bool:
         for row in game.get("markets") or []
         if isinstance(row, dict)
     )
+
+
+def _adapt_signed_yardage_for_nonnegative_v1(
+    player_rows: list[dict],
+) -> tuple[list[dict], list[dict]]:
+    """Narrow compatibility copy for a frozen V1 low-volume receiving edge case.
+
+    Source rows remain unchanged.  A negative receiving-yard row is adapted only
+    when that player's entire supplied NFL history is itself a 1-2 reception
+    micro-sample with negative aggregate receiving yards.  A normal receiver who
+    merely had one negative catch in an otherwise useful history is untouched.
+    """
+    aggregate: dict[str, dict[str, float]] = {}
+    for raw in player_rows:
+        key = str(
+            raw.get("player_id")
+            or raw.get("gsis_id")
+            or raw.get("player_name")
+            or ""
+        ).strip()
+        if not key:
+            continue
+        try:
+            receptions = float(raw.get("receptions") or 0.0)
+            receiving_yards = float(raw.get("receiving_yards") or 0.0)
+        except (TypeError, ValueError):
+            continue
+        bucket = aggregate.setdefault(key, {"receptions": 0.0, "receiving_yards": 0.0})
+        bucket["receptions"] += max(0.0, receptions)
+        bucket["receiving_yards"] += receiving_yards
+
+    micro_players = {
+        key
+        for key, totals in aggregate.items()
+        if 0 < totals["receptions"] <= 2
+        and totals["receiving_yards"] < 0
+    }
+
+    out: list[dict] = []
+    receipts: list[dict] = []
+    for raw in player_rows:
+        row = dict(raw)
+        key = str(
+            row.get("player_id")
+            or row.get("gsis_id")
+            or row.get("player_name")
+            or ""
+        ).strip()
+        try:
+            receiving_yards = float(row.get("receiving_yards") or 0.0)
+        except (TypeError, ValueError):
+            out.append(row)
+            continue
+        if key in micro_players and receiving_yards < 0:
+            totals = aggregate[key]
+            row["receiving_yards"] = 0.0
+            receipts.append({
+                "player_id": str(row.get("player_id") or row.get("gsis_id") or ""),
+                "player_name": str(row.get("player_name") or ""),
+                "season": row.get("season"),
+                "week": row.get("week"),
+                "team": str(row.get("recent_team") or row.get("team") or ""),
+                "field": "receiving_yards",
+                "aggregate_receptions": totals["receptions"],
+                "aggregate_receiving_yards": totals["receiving_yards"],
+                "source_value": receiving_yards,
+                "model_input_value": 0.0,
+                "reason": "FROZEN_V1_NEGATIVE_RECEIVING_MICRO_SAMPLE_COMPATIBILITY",
+            })
+        out.append(row)
+    return out, receipts
+
+
+_TEAM_ALIASES = {"LA": "LAR", "WSH": "WAS"}
+
+
+def _team_code(value) -> str:
+    raw = str(value or "").strip().upper()
+    return _TEAM_ALIASES.get(raw, raw)
+
+
+def _utc(value):
+    out = value if isinstance(value, datetime) else datetime.fromisoformat(
+        str(value).replace("Z", "+00:00")
+    )
+    if out.tzinfo is None or out.utcoffset() is None:
+        raise ValueError("AWARE_TIMESTAMP_REQUIRED")
+    return out.astimezone(timezone.utc)
+
+
+def _filter_current_starter_qb_history(
+    *,
+    team: str,
+    target_season: int,
+    target_week: int,
+    observed_at,
+    depth_rows: list[dict],
+    player_rows: list[dict],
+    minimum_primary_games: int = 2,
+    primary_attempt_share: float = 0.50,
+) -> tuple[list[dict], dict]:
+    """Remove clear backup/mop-up appearances from the current starter's role prior.
+
+    The frozen V1 live-role builder averages a current starter's last stat rows
+    without knowing whether he was the primary QB in each game.  This PIT-only
+    serving adapter keeps a current starter's prior game only when he owned at
+    least half of his team's QB pass attempts.  It activates only after at least
+    two qualifying primary-QB games, so one start cannot erase the broader prior.
+    """
+    team_id = _team_code(team)
+    seen = _utc(observed_at)
+    eligible_depth: list[tuple[datetime, dict]] = []
+    for raw in depth_rows:
+        if _team_code(raw.get("team") or raw.get("club_code")) != team_id:
+            continue
+        stamp_raw = raw.get("dt")
+        if stamp_raw in (None, ""):
+            continue
+        try:
+            stamp = _utc(stamp_raw)
+        except (TypeError, ValueError):
+            continue
+        if stamp <= seen:
+            eligible_depth.append((stamp, raw))
+    if not eligible_depth:
+        return list(player_rows), {
+            "status": "NOT_APPLIED",
+            "reason": "NO_PIT_DEPTH_SNAPSHOT",
+            "team": team_id,
+        }
+
+    latest = max(stamp for stamp, _ in eligible_depth)
+    starter_ids: list[str] = []
+    for stamp, raw in eligible_depth:
+        if stamp != latest:
+            continue
+        position = str(raw.get("pos_abb") or raw.get("position") or "").strip().upper()
+        try:
+            rank = int(float(raw.get("pos_rank")))
+        except (TypeError, ValueError):
+            rank = None
+        pid = str(raw.get("gsis_id") or raw.get("player_id") or "").strip()
+        if position in {"QB", "QUARTERBACK"} and rank == 1 and pid:
+            starter_ids.append(pid)
+    starter_ids = sorted(set(starter_ids))
+    if len(starter_ids) != 1:
+        return list(player_rows), {
+            "status": "NOT_APPLIED",
+            "reason": "STARTING_QB_NOT_UNIQUE",
+            "team": team_id,
+            "candidate_ids": starter_ids,
+        }
+    starter_id = starter_ids[0]
+
+    prior_rows: list[dict] = []
+    for raw in player_rows:
+        try:
+            season = int(float(raw.get("season")))
+            week = int(float(raw.get("week")))
+        except (TypeError, ValueError):
+            continue
+        if str(raw.get("season_type") or "REG").strip().upper() != "REG":
+            continue
+        if season > int(target_season) or (
+            season == int(target_season) and week >= int(target_week)
+        ):
+            continue
+        prior_rows.append(raw)
+
+    team_qb_attempts: dict[tuple[str, int, int], float] = {}
+    for raw in prior_rows:
+        position = str(raw.get("position") or "").strip().upper()
+        if position not in {"QB", "QUARTERBACK"}:
+            continue
+        try:
+            season = int(float(raw.get("season")))
+            week = int(float(raw.get("week")))
+            attempts = max(0.0, float(raw.get("attempts") or 0.0))
+        except (TypeError, ValueError):
+            continue
+        recent_team = _team_code(raw.get("recent_team") or raw.get("team"))
+        if not recent_team:
+            continue
+        key = (recent_team, season, week)
+        team_qb_attempts[key] = team_qb_attempts.get(key, 0.0) + attempts
+
+    primary_keys: set[tuple[str, int, int]] = set()
+    for raw in prior_rows:
+        pid = str(raw.get("player_id") or raw.get("gsis_id") or "").strip()
+        if pid != starter_id:
+            continue
+        try:
+            season = int(float(raw.get("season")))
+            week = int(float(raw.get("week")))
+            attempts = max(0.0, float(raw.get("attempts") or 0.0))
+        except (TypeError, ValueError):
+            continue
+        recent_team = _team_code(raw.get("recent_team") or raw.get("team"))
+        key = (recent_team, season, week)
+        total = team_qb_attempts.get(key, 0.0)
+        if total > 0 and attempts / total >= float(primary_attempt_share):
+            primary_keys.add(key)
+
+    if len(primary_keys) < int(minimum_primary_games):
+        return list(player_rows), {
+            "status": "NOT_APPLIED",
+            "reason": "INSUFFICIENT_PRIMARY_QB_GAMES",
+            "team": team_id,
+            "starter_qb_id": starter_id,
+            "qualifying_games": len(primary_keys),
+            "minimum_primary_games": int(minimum_primary_games),
+        }
+
+    filtered: list[dict] = []
+    removed: list[dict] = []
+    for raw in player_rows:
+        pid = str(raw.get("player_id") or raw.get("gsis_id") or "").strip()
+        try:
+            season = int(float(raw.get("season")))
+            week = int(float(raw.get("week")))
+        except (TypeError, ValueError):
+            filtered.append(raw)
+            continue
+        is_prior = (
+            season < int(target_season)
+            or (season == int(target_season) and week < int(target_week))
+        ) and str(raw.get("season_type") or "REG").strip().upper() == "REG"
+        if pid != starter_id or not is_prior:
+            filtered.append(raw)
+            continue
+        recent_team = _team_code(raw.get("recent_team") or raw.get("team"))
+        key = (recent_team, season, week)
+        if key in primary_keys:
+            filtered.append(raw)
+            continue
+        try:
+            attempts = max(0.0, float(raw.get("attempts") or 0.0))
+        except (TypeError, ValueError):
+            attempts = 0.0
+        removed.append({
+            "season": season,
+            "week": week,
+            "team": recent_team,
+            "attempts": attempts,
+            "team_qb_attempts": team_qb_attempts.get(key, 0.0),
+        })
+
+    return filtered, {
+        "status": "APPLIED",
+        "team": team_id,
+        "starter_qb_id": starter_id,
+        "primary_attempt_share": float(primary_attempt_share),
+        "qualifying_games": len(primary_keys),
+        "removed_nonprimary_games": removed,
+    }
+
+
+_NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
+
+# Only failures produced while building/simulating a whole team should suppress
+# the opposite side.  A single alias miss, unsupported market, or missing TD
+# prior remains local to that player/market.
+_TEAM_FATAL_REASON_PREFIXES = (
+    "ROLE_VALUE_INVALID:",
+    "TEAM_MODEL_REQUIRED",
+    "TEAM_QB_REQUIRED",
+    "TEAM_SKILL_PLAYERS_REQUIRED",
+    "TEAM_SKILL_PLAYER_OBJECT_REQUIRED",
+    "TEAM_PLAYER_IDENTITY_DUPLICATE",
+    "RECEIVER_WEIGHT_REQUIRED",
+    "RECEIVING_YARD_WEIGHT_REQUIRED",
+    "CONTEXT_SCRIPT_MULTIPLIER_CONFLICT",
+    "SCRIPT_SOURCE_REQUIRED",
+    "SCRIPT_MULTIPLIER_REQUIRED:",
+    "SCRIPT_MULTIPLIER_OUT_OF_RANGE:",
+    "PASSING_YARDS_NEGATIVE",
+)
+
+
+def _team_fatal_reason(team_rows: list[dict]) -> str | None:
+    """Identify a team-simulation crash while ignoring unrelated row-local misses."""
+    if not team_rows or any(row.get("status") == "PRICED" for row in team_rows):
+        return None
+    reasons = {
+        str(row.get("reason") or "").strip()
+        for row in team_rows
+        if str(row.get("reason") or "").strip()
+    }
+    fatal = sorted(
+        reason for reason in reasons
+        if reason.startswith(_TEAM_FATAL_REASON_PREFIXES)
+    )
+    if not fatal:
+        return None
+    if len(fatal) == 1:
+        return fatal[0]
+    return "MULTIPLE_TEAM_SIMULATION_ERRORS:" + "|".join(fatal)
+
+
+def _name_tokens(value) -> list[str]:
+    text = str(value or "").casefold()
+    for mark in (".", ",", "-", "'", "’"):
+        text = text.replace(mark, " ")
+    tokens = text.split()
+    while tokens and tokens[-1] in _NAME_SUFFIXES:
+        tokens.pop()
+    return tokens
+
+
+def _name_alias_match(left, right) -> bool:
+    a = _name_tokens(left)
+    b = _name_tokens(right)
+    if a == b:
+        return True
+    if len(a) >= 2 and len(b) >= 2 and a[-1] == b[-1]:
+        first_a, first_b = a[0], b[0]
+        return min(len(first_a), len(first_b)) >= 4 and (
+            first_a.startswith(first_b) or first_b.startswith(first_a)
+        )
+    return False
+
+
+def _normalize_ticket_prop_players(ticket: dict, depth_rows: list[dict]) -> tuple[dict, list[dict]]:
+    """Bind narrow sportsbook/depth-chart name aliases before the frozen V1 card."""
+    normalized = deepcopy(ticket)
+    bindings: list[dict] = []
+    for game in normalized.get("games") or []:
+        away = str(game.get("away") or "").strip().upper()
+        home = str(game.get("home") or "").strip().upper()
+        teams = {away, home}
+        candidates = sorted({
+            (
+                str(row.get("team") or row.get("club_code") or "").strip().upper(),
+                str(row.get("player_name") or "").strip(),
+            )
+            for row in depth_rows
+            if str(row.get("team") or row.get("club_code") or "").strip().upper() in teams
+            and str(row.get("player_name") or "").strip()
+        })
+        for raw in game.get("markets") or []:
+            if not isinstance(raw, dict):
+                continue
+            player = str(raw.get("player") or "").strip()
+            if not player:
+                continue
+            hits = [(team, name) for team, name in candidates if _name_alias_match(name, player)]
+            if len(hits) != 1:
+                continue
+            team, canonical = hits[0]
+            raw["player"] = canonical
+            raw["team"] = team
+            if canonical != player:
+                bindings.append({
+                    "game": f"{away}@{home}",
+                    "input": player,
+                    "canonical": canonical,
+                    "team": team,
+                })
+    return normalized, bindings
+
+
+_PROP_FAMILY = {
+    "pass_attempts": "PASS_VOLUME",
+    "completions": "PASS_VOLUME",
+    "passing_yards": "PASS_VOLUME",
+    "receptions": "RECEIVING_VOLUME",
+    "receiving_yards": "RECEIVING_VOLUME",
+    "rush_attempts": "RUSH_VOLUME",
+    "rushing_yards": "RUSH_VOLUME",
+    "rush_receiving_yards": "COMBINED_YARDS",
+    "pass_tds": "PASS_SCORING",
+    "interceptions": "TURNOVERS",
+    "receiving_tds": "TD_SCORING",
+    "rushing_tds": "TD_SCORING",
+    "anytime_tds": "TD_SCORING",
+}
+_PROP_FAMILY_CONFLICTS = {
+    "PASS_VOLUME": {"PASS_VOLUME"},
+    "RECEIVING_VOLUME": {"RECEIVING_VOLUME", "COMBINED_YARDS"},
+    "RUSH_VOLUME": {"RUSH_VOLUME", "COMBINED_YARDS"},
+    "COMBINED_YARDS": {"RECEIVING_VOLUME", "RUSH_VOLUME", "COMBINED_YARDS"},
+    "PASS_SCORING": {"PASS_SCORING"},
+    "TURNOVERS": {"TURNOVERS"},
+    "TD_SCORING": {"TD_SCORING"},
+}
+_MAX_SELECTED_PROP_FAMILIES_PER_PLAYER = 2
+_MAX_SELECTED_TEAM_CLUSTER_EXPRESSIONS = 2
+_PROP_TEAM_CLUSTER = {
+    "PASS_VOLUME": "PASS_OFFENSE",
+    "RECEIVING_VOLUME": "PASS_OFFENSE",
+    "COMBINED_YARDS": "PASS_OFFENSE",
+    "RUSH_VOLUME": "RUSH_OFFENSE",
+    "PASS_SCORING": "SCORING",
+    "TD_SCORING": "SCORING",
+    "TURNOVERS": "TURNOVERS",
+}
+
+
+def _selection_rank(row: dict) -> tuple[float, float, float, int]:
+    return (
+        float(row.get("ev_per_dollar") or float("-inf")),
+        float(row.get("edge_probability_points") or float("-inf")),
+        float(row.get("score_0_100") or float("-inf")),
+        -int(row.get("input_index") or 0),
+    )
+
+
+def _apply_correlation_selection_policy(game: dict, raw_game: dict) -> dict:
+    """Trim the served card, never the underlying model probabilities.
+
+    Pair-level selection can nominate several highly correlated expressions of
+    the same player or team-offense thesis. Keep the strongest expressions within
+    those correlation clusters. There is no arbitrary global prop-count cap, and
+    this deliberately does NOT force team or over/under balance.
+    """
+    prop_indexes = {
+        i for i, raw in enumerate(raw_game.get("markets") or [])
+        if isinstance(raw, dict) and str(raw.get("player") or "").strip()
+    }
+    candidates = [
+        row for row in game.get("rows") or []
+        if row.get("selected")
+        and int(row.get("input_index", -1)) in prop_indexes
+        and str(row.get("player") or "").strip()
+    ]
+    for row in candidates:
+        row["pair_selected"] = True
+
+    used_families: dict[str, set[str]] = {}
+    player_kept: dict[str, int] = {}
+    team_cluster_kept: dict[tuple[str, str], int] = {}
+    kept = 0
+    suppressed: list[dict[str, str]] = []
+
+    for row in sorted(candidates, key=_selection_rank, reverse=True):
+        player = str(row.get("player") or "").strip()
+        market = str(row.get("market") or "").strip().lower()
+        family = _PROP_FAMILY.get(market, market.upper() or "OTHER")
+        conflicts = _PROP_FAMILY_CONFLICTS.get(family, {family})
+        prior = used_families.setdefault(player, set())
+        team = str(row.get("team") or "").strip().lower()
+        cluster = _PROP_TEAM_CLUSTER.get(family, family)
+        cluster_key = (team, cluster)
+
+        reason = None
+        if prior.intersection(conflicts):
+            reason = "CORRELATED_PLAYER_FAMILY"
+        elif player_kept.get(player, 0) >= _MAX_SELECTED_PROP_FAMILIES_PER_PLAYER:
+            reason = "PLAYER_PROP_EXPOSURE_CAP"
+        elif (
+            team in {"home", "away"}
+            and team_cluster_kept.get(cluster_key, 0)
+            >= _MAX_SELECTED_TEAM_CLUSTER_EXPRESSIONS
+        ):
+            reason = "CORRELATED_TEAM_OFFENSE_CLUSTER"
+
+        if reason is not None:
+            row["selected"] = False
+            row["selection_suppressed_reason"] = reason
+            suppressed.append({
+                "player": player,
+                "market": market,
+                "reason": reason,
+            })
+            continue
+
+        kept += 1
+        player_kept[player] = player_kept.get(player, 0) + 1
+        prior.add(family)
+        if team in {"home", "away"}:
+            team_cluster_kept[cluster_key] = team_cluster_kept.get(cluster_key, 0) + 1
+
+    return {
+        "candidate_pair_selections": len(candidates),
+        "served_prop_selections": kept,
+        "max_prop_families_per_player": _MAX_SELECTED_PROP_FAMILIES_PER_PLAYER,
+        "max_team_cluster_expressions": _MAX_SELECTED_TEAM_CLUSTER_EXPRESSIONS,
+        "global_prop_count_cap": None,
+        "forces_team_balance": False,
+        "forces_over_under_balance": False,
+        "suppressed": suppressed,
+    }
+
+
+def _prop_selection_diagnostics(game: dict, raw_game: dict) -> dict:
+    prop_indexes = {
+        i for i, raw in enumerate(raw_game.get("markets") or [])
+        if isinstance(raw, dict) and str(raw.get("player") or "").strip()
+    }
+    rows = [
+        row for row in game.get("rows") or []
+        if int(row.get("input_index", -1)) in prop_indexes
+    ]
+    priced = [row for row in rows if row.get("status") == "PRICED"]
+    pair_selected = [
+        row for row in priced
+        if row.get("pair_selected", row.get("selected", False))
+    ]
+    served_selected = [row for row in priced if row.get("selected")]
+    home = str(raw_game.get("home") or "").strip().upper()
+    away = str(raw_game.get("away") or "").strip().upper()
+
+    def team_code(row: dict) -> str:
+        side = str(row.get("team") or "").strip().lower()
+        return home if side == "home" else away if side == "away" else "UNKNOWN"
+
+    def direction(row: dict) -> str:
+        value = str(row.get("selection") or row.get("display_selection") or "").strip().lower()
+        if value.endswith(" under") or value == "under":
+            return "UNDER"
+        if value.endswith(" over") or value == "over":
+            return "OVER"
+        return "OTHER"
+
+    priced_teams = sorted({team_code(row) for row in priced if team_code(row) != "UNKNOWN"})
+    selected_team_counts: dict[str, int] = {}
+    selected_direction_counts: dict[str, int] = {}
+    for row in pair_selected:
+        team = team_code(row)
+        selected_team_counts[team] = selected_team_counts.get(team, 0) + 1
+        side = direction(row)
+        selected_direction_counts[side] = selected_direction_counts.get(side, 0) + 1
+
+    alerts: list[str] = []
+    n_selected = len(pair_selected)
+    if len(priced_teams) >= 2 and n_selected >= 4 and len({
+        team for team, count in selected_team_counts.items()
+        if team != "UNKNOWN" and count > 0
+    }) == 1:
+        alerts.append("ALL_SELECTED_PROPS_ONE_TEAM_WITH_TWO_TEAM_PRICING")
+    if n_selected >= 6:
+        unders = selected_direction_counts.get("UNDER", 0)
+        overs = selected_direction_counts.get("OVER", 0)
+        if unders / n_selected >= 0.80:
+            alerts.append("SELECTED_PROP_DIRECTION_CONCENTRATED_UNDER")
+        if overs / n_selected >= 0.80:
+            alerts.append("SELECTED_PROP_DIRECTION_CONCENTRATED_OVER")
+
+    return {
+        "priced_prop_rows": len(priced),
+        "pair_selected_prop_rows": n_selected,
+        "served_selected_prop_rows": len(served_selected),
+        "selected_prop_rows": n_selected,
+        "priced_teams": priced_teams,
+        "selected_team_counts": dict(sorted(selected_team_counts.items())),
+        "selected_direction_counts": dict(sorted(selected_direction_counts.items())),
+        "alerts": alerts,
+        "review_required": bool(alerts),
+        "selection_changed_by_diagnostic": False,
+    }
+
+
+def _apply_prop_board_safety(payload: dict, ticket: dict) -> dict:
+    """Presentation/serving guard: never emit a mechanically one-sided prop card."""
+    out = deepcopy(payload)
+    games = out.get("games") or []
+    ticket_games = ticket.get("games") or []
+    for game_index, game in enumerate(games):
+        if game_index >= len(ticket_games):
+            continue
+        raw_game = ticket_games[game_index]
+        away = str(raw_game.get("away") or "").strip().upper()
+        home = str(raw_game.get("home") or "").strip().upper()
+        rows = game.get("rows") or []
+        prop_indexes_by_team: dict[str, set[int]] = {}
+        all_prop_indexes: set[int] = set()
+        for input_index, raw in enumerate(raw_game.get("markets") or []):
+            if not isinstance(raw, dict) or not str(raw.get("player") or "").strip():
+                continue
+            all_prop_indexes.add(input_index)
+            team = str(raw.get("team") or "").strip().upper()
+            if team not in {away, home}:
+                engine_sides = {
+                    str(row.get("team") or "").strip().lower()
+                    for row in rows
+                    if int(row.get("input_index", -1)) == input_index
+                    and str(row.get("team") or "").strip().lower() in {"home", "away"}
+                }
+                if engine_sides == {"home"}:
+                    team = home
+                elif engine_sides == {"away"}:
+                    team = away
+            if team in {away, home}:
+                prop_indexes_by_team.setdefault(team, set()).add(input_index)
+
+        failed_teams: dict[str, str] = {}
+        degraded_teams: dict[str, list[str]] = {}
+        if len(prop_indexes_by_team) >= 2:
+            for team, indexes in sorted(prop_indexes_by_team.items()):
+                team_rows = [
+                    row for row in rows
+                    if int(row.get("input_index", -1)) in indexes
+                ]
+                fatal = _team_fatal_reason(team_rows)
+                if fatal is not None:
+                    failed_teams[team] = fatal
+                elif not any(row.get("status") == "PRICED" for row in team_rows):
+                    degraded_teams[team] = sorted({
+                        str(row.get("reason") or "NO_MODEL")
+                        for row in team_rows
+                    })
+
+        engine = game.setdefault("engine", {})
+        if failed_teams:
+            detail = ";".join(
+                f"{team}={failed_teams[team]}"
+                for team in sorted(failed_teams)
+            )
+            reason = f"GAME_PROP_SIMULATION_INCOMPLETE:{detail}"
+            for row in rows:
+                if int(row.get("input_index", -1)) not in all_prop_indexes:
+                    continue
+                row["status"] = "NO_MODEL"
+                row["reason"] = reason
+                row["selected"] = False
+                row["card_eligible"] = False
+                row["card_reason"] = reason
+                for key in (
+                    "estimate_p", "push_p", "loss_p", "conditional_win_probability",
+                    "fair_american", "edge_probability_points", "ev_per_dollar",
+                    "score_0_100", "score_label",
+                ):
+                    row.pop(key, None)
+            engine["prop_board_status"] = "NO_MODEL"
+            engine["prop_board_error"] = reason
+            engine["failed_requested_teams"] = sorted(failed_teams)
+            engine["team_simulation_errors"] = dict(sorted(failed_teams.items()))
+            engine["degraded_requested_teams"] = dict(sorted(degraded_teams.items()))
+            game["role_status"] = "NO_MODEL"
+            game["role_error"] = reason
+            game["prop_status"] = "NO_MODEL_PROP_BOARD_INCOMPLETE"
+        elif len(prop_indexes_by_team) >= 2:
+            engine["prop_board_status"] = "AVAILABLE"
+            engine["prop_board_error"] = None
+            engine["failed_requested_teams"] = []
+            engine["team_simulation_errors"] = {}
+            engine["degraded_requested_teams"] = dict(sorted(degraded_teams.items()))
+            game["prop_status"] = "AVAILABLE"
+
+        game["prop_selection_policy"] = _apply_correlation_selection_policy(game, raw_game)
+        game["prop_selection_diagnostics"] = _prop_selection_diagnostics(game, raw_game)
+
+    all_rows = [row for game in games for row in game.get("rows") or []]
+    out["rows"] = all_rows
+    out["selected_rows"] = [row for row in all_rows if row.get("selected")]
+    out["prop_card_review_required"] = any(
+        bool(game.get("prop_selection_diagnostics", {}).get("review_required"))
+        for game in games
+    )
+    out["prop_board_safety_policy"] = {
+        "team_simulation_failure_invalidates_two_team_board": True,
+        "individual_player_or_market_no_model_does_not_invalidate_opposite_team": True,
+        "single_team_quote_board_allowed": True,
+        "failure_status": "NO_MODEL",
+        "failure_reason_prefix": "GAME_PROP_SIMULATION_INCOMPLETE",
+    }
+    out["presentation_policy"] = {
+        "market_probability_field": "market_no_vig_p",
+        "model_probability_field": "estimate_p",
+        "score_field": "score_0_100",
+        "score_label_field": "score_label",
+        "kickoff_field": "games[].kickoff",
+        "team_records": "OMIT_UNLESS_EXPLICITLY_SOURCED",
+    }
+    return out
 
 
 def main() -> int:
@@ -109,6 +776,36 @@ def main() -> int:
 
     scoring_prior = load_prior_file(args.scoring_prior) if args.scoring_prior else None
 
+    qb_role_filters: list[dict] = []
+    for raw_game in ticket.get("games") or []:
+        if not isinstance(raw_game, dict):
+            continue
+        away = _team_code(raw_game.get("away"))
+        home = _team_code(raw_game.get("home"))
+        schedule_matches = [
+            row for row in schedule_games
+            if _team_code(row.get("away_team_id") or row.get("away") or row.get("away_team")) == away
+            and _team_code(row.get("home_team_id") or row.get("home") or row.get("home_team")) == home
+        ]
+        if len(schedule_matches) != 1:
+            continue
+        schedule = schedule_matches[0]
+        for team_name in (away, home):
+            player_rows, audit = _filter_current_starter_qb_history(
+                team=team_name,
+                target_season=int(schedule["season"]),
+                target_week=int(schedule["week"]),
+                observed_at=observed_at,
+                depth_rows=depth_rows,
+                player_rows=player_rows,
+            )
+            qb_role_filters.append(audit)
+
+    player_rows, signed_yardage_adaptations = _adapt_signed_yardage_for_nonnegative_v1(
+        player_rows
+    )
+    ticket, alias_bindings = _normalize_ticket_prop_players(ticket, depth_rows)
+
     payload = build_unified_phone_card(
         ticket,
         history=history,
@@ -121,8 +818,12 @@ def main() -> int:
         n_sims=int(args.n_sims),
         seed=int(args.seed),
     )
+    payload = _apply_prop_board_safety(payload, ticket)
     payload["source_status"] = source_status
     payload["schedule_source_sha256"] = plan.get("schedule_source_sha256")
+    payload["player_alias_bindings"] = alias_bindings
+    payload["qb_role_filters"] = qb_role_filters
+    payload["signed_yardage_adaptations"] = signed_yardage_adaptations
 
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
