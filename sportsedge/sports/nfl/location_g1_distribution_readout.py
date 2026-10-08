@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from math import isfinite, log
-from .discrete_v2 import MEAN_CEILING, MEAN_FLOOR, score_grid
+from .discrete_v2 import MEAN_CEILING, MEAN_FLOOR, load_freeze, score_grid
 from .location_symmetric_g1 import team_means_from_location
 
 
@@ -44,6 +44,11 @@ def distribution_readout(rows):
     keys = {m: {"mass": [], "actual": 0} for m in (-7, -3, 3, 7)}
     ties = 0
     identities = set()
+    # Validate the frozen score shape once per readout, then reuse those exact
+    # immutable-in-practice bytes for every held-out game. This avoids one
+    # filesystem read, JSON parse and SHA check per game without caching
+    # across invocations or changing any probability calculation.
+    frozen_shape = load_freeze()
     for row in data:
         identity = (row["season"], row["game_id"])
         if identity in identities:
@@ -57,7 +62,7 @@ def distribution_readout(rows):
         means = team_means_from_location(row["predicted_margin"], row["predicted_total"])
         if any(not MEAN_FLOOR <= v <= MEAN_CEILING for v in means.values()):
             raise ValueError("NFL_G1_DISTRIBUTION_MEAN_OUTSIDE_FROZEN_GRID")
-        grid = score_grid(means["mean_home"], means["mean_away"])
+        grid = score_grid(means["mean_home"], means["mean_away"], freeze=frozen_shape)
         cells = [(h, a, p) for h, line in enumerate(grid) for a, p in enumerate(line)]
         if any(not isfinite(p) or p < 0 for _, _, p in cells) or abs(sum(p for _, _, p in cells) - 1) > 1e-9:
             raise ValueError("NFL_G1_DISTRIBUTION_GRID_INVALID")
