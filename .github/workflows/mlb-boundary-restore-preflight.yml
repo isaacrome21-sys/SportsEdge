@@ -3,7 +3,6 @@ on:
   pull_request:
     paths:
       - config/freeze_reconciliation_registry_v1.json
-      - scripts/audit_mlb_postseason_starter_workload.py
       - .github/workflows/mlb-boundary-restore-preflight.yml
 permissions:
   contents: read
