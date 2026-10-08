@@ -55,6 +55,9 @@ jobs:
       - name: Install frozen test/runtime dependencies
         run: python -m pip install -r requirements-test.txt
 
+      - name: Install frozen runtime dependencies
+        run: python -m pip install -r requirements-test.txt
+
       - name: Resolve UTC evidence day
         id: day
         shell: bash
