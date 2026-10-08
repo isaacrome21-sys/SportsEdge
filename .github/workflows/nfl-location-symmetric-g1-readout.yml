@@ -106,7 +106,9 @@ jobs:
           assert r['prospective_validation_started'] is False
           assert r['production_registry_consumes_this_artifact'] is False
           authority = r.get('authority') or {}
-          assert not any(bool(authority.get(k)) for k in ('model_p', 'truth_gate', 'promotion', 'staking', 'official', 'bettor_facing_release'))
+          assert r.get('research_only') is True
+          assert isinstance(authority, dict)
+          assert not any(bool(v) for k, v in authority.items() if k != 'research_only')
           print('NFL_LOCATION_G1_READOUT_ZERO_AUTHORITY')
           PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
