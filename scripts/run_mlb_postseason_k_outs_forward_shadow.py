@@ -124,7 +124,10 @@ def run(*, output_root:Path=EVIDENCE_ROOT, now:datetime|None=None)->dict[str,Any
                     receipt={"status":"MISSED_NO_EARLIER_PREGAME_MODEL_RECEIPT",
                              "research_only":True,"game_pk":game.game_pk,
                              "observed_at_utc":began.isoformat()}
-                    if create_only(path,receipt)=="CREATED":summary["missed"]+=1
+                    if path.exists():
+                        summary["existing"]+=1
+                    elif create_only(path,receipt)=="CREATED":
+                        summary["missed"]+=1
                     continue
                 try:
                     box=fetch_boxscore(game.game_pk)
