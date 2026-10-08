@@ -31,6 +31,8 @@ from .mlb_starter_effect import (
     starter_run_effect,
 )
 from .pitcher_record_win_engine import build_pitcher_record_win_features
+from .mlb_context_model_features import context_model_features
+from .mlb_context_run_adjustment import apply_validated_run_adjustment
 
 JOINT_HITTER_COMBO_MARKETS = frozenset({
     "HITS_RUNS_STOLEN_BASES",
@@ -278,6 +280,39 @@ class MLBAllMarketHistorySource(MLBGenericHistorySource):
             "defense_blend_home_mean_runs": blend_home,
         }
 
+    def _attach_context_adjustment(
+        self,
+        row: dict[str, Any],
+        *,
+        pregame_context: Mapping[str, Any] | None,
+        context_artifact: Mapping[str, Any] | None,
+    ) -> None:
+        if pregame_context is None:
+            if context_artifact is not None:
+                raise MLBGenericFeatureError(
+                    "validated context artifact requires pregame_context"
+                )
+            return
+        context = context_model_features(pregame_context)
+        row["pregame_context"] = context["features"]
+        row["pregame_context_version"] = context["schema_version"]
+        row["pregame_context_sha256"] = context["feature_sha256"]
+        row["pregame_context_price_blind"] = True
+        away, home, metadata = apply_validated_run_adjustment(
+            float(row["away_mean_runs"]),
+            float(row["home_mean_runs"]),
+            context,
+            context_artifact,
+        )
+        row["away_mean_runs"] = away
+        row["home_mean_runs"] = home
+        row["context_run_adjustment"] = metadata
+        if metadata.get("status") == "CONTEXT_ADJUSTED":
+            row["run_mean_version"] = (
+                f"{row.get('run_mean_version', PRODUCTION_RUN_MEAN_VERSION)}"
+                "+mlb_context_run_adjustment_artifact_v1"
+            )
+
     def feature_row(
         self,
         *,
@@ -291,6 +326,8 @@ class MLBAllMarketHistorySource(MLBGenericHistorySource):
         team_id: int | None = None,
         away_pitcher_id: int | None = None,
         home_pitcher_id: int | None = None,
+        pregame_context: Mapping[str, Any] | None = None,
+        context_artifact: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         if market in JOINT_HITTER_COMBO_MARKETS:
             if player_id is None:
@@ -329,6 +366,11 @@ class MLBAllMarketHistorySource(MLBGenericHistorySource):
             row["run_mean_components"] = components
             row["source"] = _RUN_BLEND_SOURCE
             self._attach_starter_effects(row, away_pitcher_id=away_pitcher_id, home_pitcher_id=home_pitcher_id, target_date=target_date)
+            self._attach_context_adjustment(
+                row,
+                pregame_context=pregame_context,
+                context_artifact=context_artifact,
+            )
             return _seal(row)
 
         if market in _PRODUCTION_RUN_BLEND_MARKETS:
@@ -344,6 +386,11 @@ class MLBAllMarketHistorySource(MLBGenericHistorySource):
             row["run_mean_components"] = components
             row["source"] = _RUN_BLEND_SOURCE
             self._attach_starter_effects(row, away_pitcher_id=away_pitcher_id, home_pitcher_id=home_pitcher_id, target_date=target_date)
+            self._attach_context_adjustment(
+                row,
+                pregame_context=pregame_context,
+                context_artifact=context_artifact,
+            )
             return _seal(row)
 
         if market in EITHER_PITCHER_MARKETS:

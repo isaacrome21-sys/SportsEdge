@@ -13,6 +13,7 @@ import csv
 import json
 import os
 import re
+import time
 import unicodedata
 import urllib.error
 import urllib.request
@@ -94,7 +95,27 @@ def post_github_comment(repo: str, issue_number: int, body: str, token: str) -> 
 
 
 def fetch_statsapi(game_pk: int) -> dict[str, Any]:
-    return _request_json(f"https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live")
+    url = f"https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
+    last_error: BaseException | None = None
+    for attempt in range(1, 4):
+        try:
+            return _request_json(url)
+        except RuntimeError as exc:
+            last_error = exc
+            retryable = any(
+                f"HTTP {code} " in str(exc)
+                for code in (500, 502, 503, 504)
+            )
+            if not retryable or attempt == 3:
+                break
+        except urllib.error.URLError as exc:  # pragma: no cover - network diagnostic
+            last_error = exc
+            if attempt == 3:
+                break
+        time.sleep(attempt)
+    raise RuntimeError(
+        f"MLB_STATSAPI_UNAVAILABLE:{game_pk}:{last_error}"
+    ) from last_error
 
 
 def find_final_card_comment(comments: Iterable[dict[str, Any]]) -> str:
@@ -133,9 +154,6 @@ def parse_card_rows(body: str) -> list[CardRow]:
             raise ValueError(f"invalid card row: {line}") from exc
     if not rows:
         raise ValueError("final card contains no ACTIONABLE or LEAN rows")
-    game_pks = {row.game_pk for row in rows}
-    if len(game_pks) != 1:
-        raise ValueError(f"card spans multiple game_pks: {sorted(game_pks)}")
     return rows
 
 
@@ -205,9 +223,17 @@ def settle_actionable(row: CardRow, feed: dict[str, Any]) -> SettledRow:
             if match:
                 result = _compare(away + home, match.group(1), float(match.group(2)))
             else:
-                result = _settle_team_or_first_inning(
-                    pick, low, names, away, home, feed
-                )
+                try:
+                    result = _settle_team_or_first_inning(
+                        pick, low, names, away, home, feed
+                    )
+                except ValueError as exc:
+                    if not str(exc).startswith("unsupported ACTIONABLE market:"):
+                        raise
+                    settled = settle_lean(row, feed)
+                    if settled.result == "UNRESOLVED":
+                        raise ValueError(f"unsupported ACTIONABLE market: {pick}") from exc
+                    return settled
     return SettledRow(row=row, result=result, units=_units(result, row.price))
 
 
@@ -221,11 +247,22 @@ def _settle_team_or_first_inning(
 ) -> str:
     for side in ("away", "home"):
         team = names[side]
-        pattern = rf"{re.escape(team.lower())} (?:f5 )?team totals (over|under) (\d+(?:\.\d+)?)"
-        match = re.fullmatch(pattern, low)
-        if match:
-            value = away if side == "away" else home
-            return _compare(value, match.group(1), float(match.group(2)))
+        team_id = str(
+            feed.get("gameData", {})
+            .get("teams", {})
+            .get(side, {})
+            .get("id")
+            or ""
+        ).strip()
+        aliases = [team.lower()]
+        if team_id:
+            aliases.append(team_id.lower())
+        for alias in aliases:
+            pattern = rf"{re.escape(alias)} (?:f5 )?team totals (over|under) (\d+(?:\.\d+)?)"
+            match = re.fullmatch(pattern, low)
+            if match:
+                value = away if side == "away" else home
+                return _compare(value, match.group(1), float(match.group(2)))
 
     first_inning_runs = _runs(feed, "away", 1) + _runs(feed, "home", 1)
     has_run = first_inning_runs > 0
@@ -270,16 +307,28 @@ def _box_players(feed: dict[str, Any]) -> list[dict[str, Any]]:
 def _parse_prop_pick(pick: str) -> tuple[str, str, str, float]:
     # Longest market names first so player names remain unambiguous.
     markets = [
+        "Hits Walks Stolen Bases",
+        "Hits Runs Stolen Bases",
         "Pitcher Hits Walks Er",
         "Pitcher Hits Allowed",
         "Hits Runs Rbis",
+        "Hits Stolen Bases",
+        "Extra Base Hits",
+        "Stolen Bases",
         "Total Bases",
         "Pitcher Outs",
         "Pitcher K",
         "Pitcher Er",
         "Pitcher Bb",
+        "Home Runs",
         "Batter Bb",
+        "Batter K",
+        "Runs Rbis",
+        "Singles",
+        "Doubles",
+        "Triples",
         "Rbi",
+        "Runs",
         "Hits",
     ]
     for market in markets:
@@ -313,18 +362,57 @@ def _prop_value(player: dict[str, Any], market: str) -> float:
     pitching = stats.get("pitching") or {}
     if market == "hits":
         return float(batting.get("hits") or 0)
+    if market == "home runs":
+        return float(batting.get("homeRuns") or 0)
     if market == "total bases":
         return float(batting.get("totalBases") or 0)
     if market == "rbi":
         return float(batting.get("rbi") or 0)
+    if market == "runs":
+        return float(batting.get("runs") or 0)
+    if market == "stolen bases":
+        return float(batting.get("stolenBases") or 0)
+    if market == "batter bb":
+        return float(batting.get("baseOnBalls") or 0)
+    if market == "batter k":
+        return float(batting.get("strikeOuts") or 0)
+    if market in {"singles", "doubles", "triples", "extra base hits"}:
+        hits = int(batting.get("hits") or 0)
+        doubles = int(batting.get("doubles") or 0)
+        triples = int(batting.get("triples") or 0)
+        home_runs = int(batting.get("homeRuns") or 0)
+        singles = hits - doubles - triples - home_runs
+        if singles < 0:
+            raise ValueError("invalid batter hit-type accounting")
+        if market == "singles":
+            return float(singles)
+        if market == "doubles":
+            return float(doubles)
+        if market == "triples":
+            return float(triples)
+        return float(doubles + triples + home_runs)
     if market == "hits runs rbis":
         return float(
             (batting.get("hits") or 0)
             + (batting.get("runs") or 0)
             + (batting.get("rbi") or 0)
         )
-    if market == "batter bb":
-        return float(batting.get("baseOnBalls") or 0)
+    if market == "hits runs stolen bases":
+        return float(
+            (batting.get("hits") or 0)
+            + (batting.get("runs") or 0)
+            + (batting.get("stolenBases") or 0)
+        )
+    if market == "runs rbis":
+        return float((batting.get("runs") or 0) + (batting.get("rbi") or 0))
+    if market == "hits stolen bases":
+        return float((batting.get("hits") or 0) + (batting.get("stolenBases") or 0))
+    if market == "hits walks stolen bases":
+        return float(
+            (batting.get("hits") or 0)
+            + (batting.get("baseOnBalls") or 0)
+            + (batting.get("stolenBases") or 0)
+        )
     if market == "pitcher k":
         return float(pitching.get("strikeOuts") or 0)
     if market == "pitcher hits allowed":
@@ -347,7 +435,44 @@ def _prop_value(player: dict[str, Any], market: str) -> float:
 
 
 def settle_lean(row: CardRow, feed: dict[str, Any]) -> SettledRow:
-    player_name, market, direction, line = _parse_prop_pick(row.pick)
+    record_win = re.fullmatch(
+        r"(.+?) Pitcher Record Win (Yes|No)(?: 0(?:\.0+)?)?",
+        row.pick,
+        re.I,
+    )
+    if record_win:
+        player_name = record_win.group(1)
+        side = record_win.group(2).lower()
+        matches = [
+            player
+            for player in _box_players(feed)
+            if _norm_name(str((player.get("person") or {}).get("fullName") or ""))
+            == _norm_name(player_name)
+        ]
+        if len(matches) != 1 or not _is_starter(matches[0], "pitcher record win"):
+            return SettledRow(row=row, result="VOID", units=0.0)
+        winner = (feed.get("liveData", {}).get("decisions", {}) or {}).get("winner") or {}
+        winner_id = winner.get("id")
+        player_id = (matches[0].get("person") or {}).get("id")
+        if winner_id is None and not str(winner.get("fullName") or "").strip():
+            return SettledRow(row=row, result="UNRESOLVED", units=0.0)
+        won = (
+            winner_id is not None
+            and player_id is not None
+            and int(winner_id) == int(player_id)
+        ) or (
+            _norm_name(str(winner.get("fullName") or ""))
+            == _norm_name(player_name)
+        )
+        result = "W" if (won == (side == "yes")) else "L"
+        return SettledRow(row=row, result=result, units=_units(result, row.price))
+
+    try:
+        player_name, market, direction, line = _parse_prop_pick(row.pick)
+    except ValueError as exc:
+        if str(exc).startswith("unsupported LEAN prop:"):
+            return SettledRow(row=row, result="UNRESOLVED", units=0.0)
+        raise
     matches = [
         player
         for player in _box_players(feed)
@@ -409,10 +534,12 @@ def render_comment(
         lean_losses = sum(row.result == "L" for row in leans)
         lean_pushes = sum(row.result == "P" for row in leans)
         lean_voids = sum(row.result == "VOID" for row in leans)
+        lean_unresolved = sum(row.result == "UNRESOLVED" for row in leans)
         lean_net = sum(row.units for row in leans)
         lines += [
             "",
-            f"LEAN record: {lean_wins}-{lean_losses}-{lean_pushes}, {lean_voids} void · "
+            f"LEAN record: {lean_wins}-{lean_losses}-{lean_pushes}, "
+            f"{lean_voids} void, {lean_unresolved} unresolved · "
             f"net {lean_net:+.2f}u (not main ledger).",
         ]
     lines += [
@@ -474,10 +601,15 @@ def upsert_ledger(
     ]
     other_rows: list[dict[str, str]] = []
     prior: dict[str, str] | None = None
+    target_game_pk = str(main[0].row.game_pk if main else "")
     if path.exists():
         with path.open(newline="", encoding="utf-8") as handle:
             for row in csv.DictReader(handle):
-                if row.get("issue_number") == str(issue_number):
+                same_key = (
+                    row.get("issue_number") == str(issue_number)
+                    and row.get("game_pk") == target_game_pk
+                )
+                if same_key:
                     prior = row
                 else:
                     other_rows.append(row)
@@ -492,7 +624,11 @@ def upsert_ledger(
 
     other_rows.append(candidate)
     other_rows.sort(
-        key=lambda row: (row.get("date", ""), int(row.get("issue_number") or 0))
+        key=lambda row: (
+            row.get("date", ""),
+            int(row.get("issue_number") or 0),
+            int(row.get("game_pk") or 0),
+        )
     )
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
@@ -508,6 +644,7 @@ def grade_issue(
     ledger_path: Path = DEFAULT_LEDGER,
     comments: list[dict[str, Any]] | None = None,
     feed: dict[str, Any] | None = None,
+    feeds: dict[int, dict[str, Any]] | None = None,
     post_comment: bool = True,
     force_comment: bool = False,
 ) -> str:
@@ -522,22 +659,60 @@ def grade_issue(
     except NoFinalCard:
         return "SKIP_NO_FINAL_CARD"
 
-    rows = parse_card_rows(card)
-    game_pk = rows[0].game_pk
-    feed = feed or fetch_statsapi(game_pk)
-    if not is_final(feed):
+    try:
+        rows = parse_card_rows(card)
+    except ValueError as exc:
+        if str(exc) == "final card contains no ACTIONABLE or LEAN rows":
+            return "SKIP_NO_GRADEABLE_ROWS"
+        raise
+    game_pks = sorted({row.game_pk for row in rows})
+    if feed is not None and feeds is not None:
+        raise ValueError("provide feed or feeds, not both")
+    if feed is not None and len(game_pks) != 1:
+        raise ValueError("single feed cannot settle a multi-game card")
+
+    feed_by_game: dict[int, dict[str, Any]] = {}
+    if feeds is not None:
+        missing = [game_pk for game_pk in game_pks if game_pk not in feeds]
+        if missing:
+            raise ValueError(f"missing feeds for game_pks: {missing}")
+        feed_by_game = {game_pk: feeds[game_pk] for game_pk in game_pks}
+    elif feed is not None:
+        feed_by_game[game_pks[0]] = feed
+    else:
+        for game_pk in game_pks:
+            try:
+                feed_by_game[game_pk] = fetch_statsapi(game_pk)
+            except RuntimeError:
+                return f"SKIP_SOURCE_UNAVAILABLE:{game_pk}"
+
+    if any(not is_final(feed_by_game[game_pk]) for game_pk in game_pks):
         return "SKIP_NOT_FINAL"
 
-    main = [
-        settle_actionable(row, feed) for row in rows if row.status == "ACTIONABLE"
-    ]
-    leans = [settle_lean(row, feed) for row in rows if row.status == "LEAN"]
-    if not main:
-        raise ValueError("final card has no ACTIONABLE rows")
+    rendered_games: list[str] = []
+    for index, game_pk in enumerate(game_pks):
+        game_feed = feed_by_game[game_pk]
+        game_rows = [row for row in rows if row.game_pk == game_pk]
+        main = [
+            settle_actionable(row, game_feed)
+            for row in game_rows
+            if row.status == "ACTIONABLE"
+        ]
+        leans = [
+            settle_lean(row, game_feed)
+            for row in game_rows
+            if row.status == "LEAN"
+        ]
+        rendered = render_comment(issue_number, game_feed, main, leans)
+        if index:
+            marker_line = GRADE_MARKER.format(issue=issue_number) + "\n"
+            if rendered.startswith(marker_line):
+                rendered = rendered[len(marker_line):]
+        rendered_games.append(rendered)
+        if main:
+            upsert_ledger(ledger_path, issue_number, game_feed, main)
 
-    body = render_comment(issue_number, feed, main, leans)
-    upsert_ledger(ledger_path, issue_number, feed, main)
-
+    body = "\n\n---\n\n".join(rendered_games)
     marker = GRADE_MARKER.format(issue=issue_number)
     already_commented = any(
         marker in str(comment.get("body") or "") for comment in comments

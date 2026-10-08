@@ -398,12 +398,12 @@ class MLBGenericHistorySource:
                 outs = int(_outs_from_ip(s.get("inningsPitched")))
             except Exception:
                 continue
-            ks = _nonnegative_integer(s.get("strikeOuts", 0))
-            er = _nonnegative_integer(s.get("earnedRuns", 0))
-            hits = _nonnegative_integer(s.get("hits", 0))
-            walks = _nonnegative_integer(s.get("baseOnBalls", 0))
+            ks = _nonnegative_integer(s.get("strikeOuts"))
+            er = _nonnegative_integer(s.get("earnedRuns"))
+            hits = _nonnegative_integer(s.get("hits"))
+            walks = _nonnegative_integer(s.get("baseOnBalls"))
             if None in {ks, er, hits, walks} or not 0 <= outs <= 27:
-                continue
+                raise MLBGenericFeatureError("pitcher:joint: incomplete or invalid prior start")
             starts.append({
                 "strikeouts": ks,
                 "outs": outs,
@@ -430,12 +430,12 @@ class MLBGenericHistorySource:
                 outs = int(_outs_from_ip(s.get("inningsPitched")))
             except Exception:
                 continue
-            ks = _nonnegative_integer(s.get("strikeOuts", 0))
-            er = _nonnegative_integer(s.get("earnedRuns", 0))
-            hits = _nonnegative_integer(s.get("hits", 0))
-            walks = _nonnegative_integer(s.get("baseOnBalls", 0))
+            ks = _nonnegative_integer(s.get("strikeOuts"))
+            er = _nonnegative_integer(s.get("earnedRuns"))
+            hits = _nonnegative_integer(s.get("hits"))
+            walks = _nonnegative_integer(s.get("baseOnBalls"))
             if None in {ks, er, hits, walks} or not 0 <= outs <= 27:
-                continue
+                raise MLBGenericFeatureError("pitcher:joint: incomplete or invalid prior start")
             out.append(({"strikeouts": ks, "outs": outs, "earned_runs": er, "hits_allowed": hits, "walks_allowed": walks},
                         row["date"], row.get("opponent_id"), row.get("game_pk")))
         return out[-10:]

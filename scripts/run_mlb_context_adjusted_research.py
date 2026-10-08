@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
+from math import isfinite
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -38,6 +39,12 @@ def american_decimal(odds: int) -> float:
 
 
 def economics(*, win_p: float, push_p: float, odds: int) -> dict[str, float]:
+    if not all(isfinite(float(p)) and 0 <= float(p) <= 1 for p in (win_p, push_p)):
+        raise ValueError("win/push probabilities must be finite values in [0,1]")
+    if float(win_p) + float(push_p) > 1.0 + 1e-12:
+        raise ValueError("win/push probability mass exceeds one")
+    if isinstance(odds, bool) or not isfinite(float(odds)) or int(odds) != odds or abs(odds) < 100:
+        raise ValueError("American odds must be an integer with absolute value >= 100")
     dec = american_decimal(int(odds))
     loss_p = max(0.0, 1.0 - float(win_p) - float(push_p))
     ev = float(win_p) * (dec - 1.0) - loss_p

@@ -1,0 +1,44 @@
+name: mlb-historical-manual-quote-ev-integrity
+on:
+  pull_request:
+    paths:
+      - scripts/audit_mlb_research_ev_quote_integrity.py
+      - tests/test_mlb_research_ev_quote_integrity.py
+      - .github/workflows/mlb-historical-manual-quote-ev-integrity.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  audit-research-ev:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Test paired quote EV computation, push settlement and negative cases
+        run: PYTHONPATH=. python -m unittest tests.test_mlb_research_ev_quote_integrity -v
+      - name: Retrieve canonical pitcher marginal research output from original runner
+        run: >-
+          gh run download 37701606386
+          --repo isaacrome21-sys/SportsEdge
+          --name mlb-rays-yankees-20261007-canonical-marginals-rerun
+          --dir artifacts/
+      - name: Verify 34 priced sides against original manual quote and return research warnings
+        run: >-
+          PYTHONPATH=. python scripts/audit_mlb_research_ev_quote_integrity.py
+          --card artifacts/mlb_rays_yankees_20261007_canonical_marginals_rerun.json
+          --quotes manual_inputs/mlb/2026-10-07_rays_yankees_supplied.json
+          --output artifacts/mlb_research_ev_quote_integrity_20261007.json
+      - name: Upload non-actionable diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mlb-extreme-ev-quote-integrity-research
+          path: artifacts/mlb_research_ev_quote_integrity_20261007.json
+          if-no-files-found: warn
+          retention-days: 14
