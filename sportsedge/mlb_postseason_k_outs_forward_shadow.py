@@ -71,14 +71,28 @@ def build_prediction(*, game: GameSnapshot, pitcher_id: int, team_side: str,
         raise ProspectiveShadowError("NOT_FIXED_RESEARCH_THRESHOLD")
     if feature.get("market")!=market or int(feature.get("game_pk") or 0)!=int(game.game_pk):
         raise ProspectiveShadowError("FEATURE_GAME_MARKET_IDENTITY_MISMATCH")
+    if str(feature.get("entity_id") or "") != str(pitcher_id):
+        raise ProspectiveShadowError("FEATURE_PITCHER_IDENTITY_MISMATCH")
+    expected_team=game.away_id if team_side=="away" else game.home_id
+    if feature.get("team_id") != expected_team:
+        raise ProspectiveShadowError("FEATURE_TEAM_IDENTITY_MISMATCH")
     adj="opp_k_adjustment" if market=="PITCHER_K" else "opp_outs_adjustment"
     features=feature.get("features")
+    if isinstance(features,Mapping) and isinstance(features.get("prior_fallback"),Mapping):
+        pool=features.get("history_pool")
+        starts=len(pool) if isinstance(pool,list) else "UNKNOWN"
+        raise ProspectiveShadowError(
+            f"POSTSEASON_BASELINE_UNSUPPORTED:FEW_STARTS_PRIOR_FALLBACK:own_starts={starts}"
+        )
     if not isinstance(features,Mapping) or not isinstance(features.get(adj),Mapping):
         # Keep the hard block; include only the upstream fail-closed reason
         # already present in the PIT feature receipt. Never synthesize context.
         reason_key="opp_k_unadjusted" if market=="PITCHER_K" else "opp_outs_unadjusted"
         detail=str(feature.get(reason_key) or "UNSPECIFIED").splitlines()[0][:120]
         raise ProspectiveShadowError(f"OPPONENT_CONTEXT_MISSING:{detail}")
+    expected_opponent=game.home_id if team_side=="away" else game.away_id
+    if features[adj].get("opponent_team_id") != expected_opponent:
+        raise ProspectiveShadowError("FEATURE_OPPONENT_IDENTITY_MISMATCH")
     retrieved=_utc(feature.get("retrieved_at"))
     if retrieved > observed: raise ProspectiveShadowError("FEATURE_FETCH_AFTER_CAPTURE")
     if len(str(feature.get("source_subset_hash") or ""))!=64:
