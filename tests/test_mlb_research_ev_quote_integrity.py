@@ -37,6 +37,23 @@ class MLBResearchQuoteEVIntegrityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             audit(card,quotes)
 
+
+    def test_run_line_pair_must_flip_handicap_sign(self):
+        card, quotes = self.example()
+        q=quotes["rows"][0]
+        q.update({"market_type":"RUN_LINE","side":"AWAY","line":1.5,
+                  "price":-157,"paired_side":"HOME","paired_price":130})
+        away,home=card["results"]
+        away.update({"market_type":"RUN_LINE","side":"AWAY","line":1.5,
+                     "american_odds":-157,"research_p":.55,"push_p":0.0,
+                     "loss_p":.45,"ev_per_dollar":.55*american_profit(-157)-.45})
+        home.update({"market_type":"RUN_LINE","side":"HOME","line":-1.5,
+                     "american_odds":130,"research_p":.45,"push_p":0.0,
+                     "loss_p":.55,"ev_per_dollar":.45*american_profit(130)-.55})
+        report=audit(card,quotes)
+        self.assertEqual(report["priced_sides"],2)
+        self.assertEqual(report["rows"][1]["line"],-1.5)
+
     def test_quote_price_mismatch_fails(self):
         card,quotes=self.example()
         card["results"][0]["american_odds"]=-120
