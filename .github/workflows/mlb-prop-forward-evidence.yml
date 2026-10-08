@@ -128,7 +128,6 @@ jobs:
           path: |
             mlb_prop_forward_result.json
             mlb_prop_forward_persistence.json
-            data/mlb_prop_forward/${{ steps.day.outputs.date }}/**
           if-no-files-found: warn
           retention-days: 90
 
