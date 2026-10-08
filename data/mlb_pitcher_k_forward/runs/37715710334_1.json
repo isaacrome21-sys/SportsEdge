@@ -1,0 +1,42 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "blocked_count": 3,
+  "blockers": [
+    {
+      "entity_name": "Robert Gasser",
+      "observed_at": "2026-10-08T01:59:51.647860+00:00",
+      "provider_event_id": "34786237",
+      "reason": "ForwardCaptureBlocked:GAME_NOT_PREVIEW:Live"
+    },
+    {
+      "entity_name": "Walker Buehler",
+      "observed_at": "2026-10-08T01:59:51.647860+00:00",
+      "provider_event_id": "34786237",
+      "reason": "ForwardCaptureBlocked:GAME_NOT_PREVIEW:Live"
+    },
+    {
+      "entity_name": "Parker Messick",
+      "observed_at": "2026-10-08T01:59:53.733018+00:00",
+      "provider_event_id": "34793502",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    }
+  ],
+  "eligible_quote_units": 3,
+  "observed_at_utc": "2026-10-08T02:01:09.519960+00:00",
+  "predictions_created": 0,
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-08/props_20261008T015954.256952Z.json",
+  "run_attempt": "1",
+  "run_id": "37715710334",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_RUN_V1",
+  "selection_drops": {
+    "selected_units": 12
+  },
+  "settlements_created": 2,
+  "status": "OK",
+  "summary_sha256": "6dbec9fbcc51466d1956cf861d80073121f2fe7e0558b57ee3ee019ae9554e45"
+}
