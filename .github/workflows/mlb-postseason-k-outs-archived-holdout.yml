@@ -1,0 +1,43 @@
+name: mlb-postseason-k-outs-archived-holdout
+on:
+  pull_request:
+    paths:
+      - scripts/eval_mlb_postseason_k_outs_calibration.py
+      - tests/test_mlb_postseason_k_outs_calibration.py
+      - .github/workflows/mlb-postseason-k-outs-archived-holdout.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  validate-historical-k-outs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Test chronological K and outs calibration
+        run: PYTHONPATH=. python -m unittest tests.test_mlb_postseason_k_outs_calibration -v
+      - name: Retrieve locked, original official postseason research artifact
+        run: >-
+          gh run download 37707010690
+          --repo isaacrome21-sys/SportsEdge
+          --name mlb-postseason-starter-workload-2023-2025
+          --dir artifacts/
+      - name: Verify historical artifact identity and execute 2024/2025 untouched holdouts
+        run: >-
+          PYTHONPATH=. python scripts/eval_mlb_postseason_k_outs_calibration.py
+          --input artifacts/mlb_postseason_starter_workload_2023_2025.json
+          --output artifacts/mlb_postseason_k_outs_calibration_2024_2025.json
+      - name: Upload no-promotion scored research output
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mlb-postseason-k-outs-calibration-2024-2025
+          path: artifacts/mlb_postseason_k_outs_calibration_2024_2025.json
+          if-no-files-found: warn
+          retention-days: 14
