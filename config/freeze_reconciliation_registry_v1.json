@@ -3,6 +3,38 @@
   "bundle_inventory_complete": false,
   "bundles": [
     {
+      "bundle_id": "MLB_POSTSEASON_STARTER_WORKLOAD_RESEARCH_FREEZE_V1",
+      "freeze_sha": "4c3b1341aa5577551760c75eee6399614d1ea3f3",
+      "coverage_paths": [
+        ".github/workflows/mlb-postseason-starter-workload-audit.yml",
+        "scripts/audit_mlb_postseason_starter_workload.py",
+        "tests/test_mlb_postseason_starter_workload.py"
+      ],
+      "coverage_prefixes": [],
+      "disposition": null,
+      "identity": {
+        "schema": "MLB_POSTSEASON_STARTER_WORKLOAD_RESEARCH_FREEZE_IDENTITY_V1",
+        "source_pull_request": 1851,
+        "bound_commit": "4c3b1341aa5577551760c75eee6399614d1ea3f3",
+        "candidate_family": "DESCRIPTIVE_POSTSEASON_STARTER_WORKLOAD_AUDIT_V1",
+        "evaluation_seasons": [
+          2023,
+          2024,
+          2025
+        ],
+        "freeze_timing": "PR_HEAD_BEFORE_INITIAL_CI_RESEARCH_RUN",
+        "authority": {
+          "model_p": false,
+          "truth_gate": false,
+          "promotion": false,
+          "staking": false,
+          "official": false,
+          "bettor_facing_release": false
+        },
+        "note": "Exact research-only provenance binding for official postseason boxscore audit. Does not grant prospective PIT performance, postseason-adjusted Model_P, bet-card release or model promotion."
+      }
+    },
+    {
       "bundle_id": "NFL_V2J_V2K_GOVERNANCE_FREEZE_V1",
       "coverage_paths": [
         ".github/workflows/nfl-v2-nested-diagnostic.yml",
