@@ -14,7 +14,7 @@ from math import exp, sqrt
 from statistics import fmean
 from typing import Any, Mapping, Sequence
 
-from .mlb_generic_features import MLBGenericHistorySource, _number, _outs_from_ip
+from .mlb_generic_features import MLBGenericHistorySource, _number, _outs_from_ip, _nonnegative_integer
 from .mlb_total_bases_features import park_factor_for_venue
 
 FEATURE_VERSION = "mlb_joint_features_v6_long_window_prior"
@@ -87,13 +87,15 @@ def _pitcher_pool(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, int]]:
     pool: list[dict[str, int]] = []
     for row in rows:
         s = row["stat"]
-        vals = {
-            "strikeouts": int(_number(s.get("strikeOuts", 0), "strikeOuts")),
-            "outs": int(_outs_from_ip(s.get("inningsPitched"))),
-            "earned_runs": int(_number(s.get("earnedRuns", 0), "earnedRuns")),
-            "hits_allowed": int(_number(s.get("hits", 0), "hits")),
-            "walks_allowed": int(_number(s.get("baseOnBalls", 0), "baseOnBalls")),
-        }
+        vals = {"outs": int(_outs_from_ip(s.get("inningsPitched")))}
+        for field, source_field in {
+            "strikeouts": "strikeOuts", "earned_runs": "earnedRuns",
+            "hits_allowed": "hits", "walks_allowed": "baseOnBalls",
+        }.items():
+            value = _nonnegative_integer(s.get(source_field))
+            if value is None:
+                raise MLBJointFeatureError(f"historical {source_field} missing or invalid")
+            vals[field] = value
         if not 0 <= vals["outs"] <= 27:
             raise MLBJointFeatureError("historical outs outside [0,27]")
         pool.append(vals)
