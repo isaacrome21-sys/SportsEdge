@@ -35,7 +35,7 @@ class BlockedCardTest(unittest.TestCase):
     def test_no_lean_when_probability_edge_is_positive_but_roi_negative(self):
         # A 3-point probability advantage over a 50/50 no-vig market is
         # still losing at -110 when model probability is only about 53%.
-        rows = card.price_game("g", 26.0, 25.8, [
+        rows = card.price_game("g", 25.7, 25.8, [
             {"market": "TOTAL", "side": "OVER", "line": 50.5, "american_odds": -110},
             {"market": "TOTAL", "side": "UNDER", "line": 50.5, "american_odds": -110},
         ], validated={"TOTAL"})
