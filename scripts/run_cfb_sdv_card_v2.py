@@ -436,6 +436,7 @@ def market_only_rows(board: list, reason: str) -> list:
                 "matchup": matchup,
                 "model_p": r["market_p"],
                 "edge": 0.0,
+                "expected_roi": None,  # no model probability: ROI cannot be estimated
                 "home_mean": round(home, 2) if home == home else home,
                 "away_mean": round(away, 2) if away == away else away,
                 "bet_status": "TRACK",
