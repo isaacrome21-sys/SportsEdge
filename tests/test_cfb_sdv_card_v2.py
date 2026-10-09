@@ -33,6 +33,37 @@ class BlockedCardTest(unittest.TestCase):
         self.assertEqual(rows[0]["devig"], "PAIRED_PROPORTIONAL")
         self.assertAlmostEqual(rows[0]["model_p"] + rows[1]["model_p"], 1.0, places=3)
 
+    def test_duplicate_same_side_quotes_cannot_create_fake_devig(self):
+        rows = card.price_game("g", 32.0, 21.0, [
+            {"market": "TOTAL", "side": "OVER", "line": 50.5, "american_odds": -110},
+            {"market": "TOTAL", "side": "OVER", "line": 50.5, "american_odds": -115},
+        ], validated={"TOTAL"})
+        self.assertTrue(all(r["devig"] == "UNPAIRED_RAW_IMPLIED" for r in rows))
+        self.assertTrue(all(r["bet_status"] == "TRACK" for r in rows))
+        self.assertTrue(all(r["reason"] == "UNPAIRED_MARKET_NO_DEVIG" for r in rows))
+
+    def test_unpaired_moneyline_cannot_emit_bet_or_lean(self):
+        rows = card.price_game("g", 42.0, 14.0, [
+            {"market": "MONEYLINE", "side": "HOME", "american_odds": 150},
+        ], validated={"MONEYLINE"})
+        self.assertEqual(rows[0]["bet_status"], "TRACK")
+        self.assertEqual(rows[0]["reason"], "UNPAIRED_MARKET_NO_DEVIG")
+
+    def test_unpaired_spread_cannot_emit_bet_or_lean(self):
+        rows = card.price_game("g", 34.0, 20.0, [
+            {"market": "SPREAD", "side": "HOME", "line": -6.5, "american_odds": -110},
+        ], validated={"SPREAD"})
+        self.assertEqual(rows[0]["bet_status"], "TRACK")
+        self.assertEqual(rows[0]["reason"], "UNPAIRED_MARKET_NO_DEVIG")
+
+    def test_opposing_total_quotes_still_pair(self):
+        rows = card.price_game("g", 28.0, 24.0, [
+            {"market": "TOTAL", "side": "OVER", "line": 51.5, "american_odds": -110},
+            {"market": "TOTAL", "side": "UNDER", "line": 51.5, "american_odds": -110},
+        ])
+        self.assertTrue(all(r["devig"] == "PAIRED_PROPORTIONAL" for r in rows))
+        self.assertAlmostEqual(sum(r["market_p"] for r in rows), 1.0, places=3)
+
     def test_total_symmetry(self):
         rows = card.price_game("g", 30.0, 22.5, [
             {"market": "TOTAL", "side": "OVER", "line": 52.5, "american_odds": -110},
@@ -174,26 +205,6 @@ class LiveWeekCacheTest(unittest.TestCase):
         self.assertNotIn("odds", encoded)
         self.assertNotIn("spread", encoded)
         self.assertNotIn("total", encoded)
-
-    def test_build_rows_cache_hit_works_without_api_key(self):
-        game = self._game(weather={"wind_speed": 9.0, "temperature": 60.0})
-        snaps = {
-            team: {"prior": {k: 0.0 for k in card.TEAM_KEYS},
-                   "current": {k: 0.0 for k in card.TEAM_KEYS}}
-            for team in ("Home", "Away")
-        }
-        board = [{"game_id": "g1", "quotes": []}]
-        with patch.dict("os.environ", {}, clear=True), \
-             patch.object(card, "_load_live_week_cache", return_value=([game], snaps)), \
-             patch.object(card, "training_moments", return_value={k: (0.0, 1.0) for k in card.TEAM_KEYS}), \
-             patch.object(card, "moment_match", return_value=[]), \
-             patch("sportsedge.sports.cfb.source.fetch_cfbd_games", side_effect=AssertionError("no fetch")), \
-             patch("sportsedge.sports.cfb.source.fetch_cfbd_weather", side_effect=AssertionError("no weather fetch")), \
-             patch("sportsedge.sports.cfb.candidate_live_source.fetch_cfbd_candidate_metric_snapshots", side_effect=AssertionError("no metric fetch")), \
-             patch("sportsedge.sports.cfb.candidate_live_source.attach_candidate_snapshots_to_game_row", side_effect=lambda base, **_: base):
-            rows = card.build_rows(board, 2026, 6, "2026-10-06T15:00:00Z", fit_path="unused")
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["game_id"], "g1")
 
     def test_build_rows_cache_hit_skips_cfbd_fetches(self):
         game = self._game(weather={"wind_speed": 17.0, "temperature": 55.0, "game_indoor": False})
