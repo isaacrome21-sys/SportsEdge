@@ -13,7 +13,7 @@ def render_markdown(payload: dict) -> str:
         f"family={payload.get('family')} alpha={payload.get('ridge_alpha')} sigma={payload.get('residual_sigma')} bakeoff={payload.get('bakeoff_run')}",
         f"run_status={payload.get('run_status')} bets={((payload.get('funnel') or {}).get('bets_emitted'))}",
         "",
-        "A row with model_p and positive edge is a bet. No-edge is a successful slate. NOT Truth Gate / NOT OFFICIAL.",
+        "Positive calculated edge is not sufficient for a bet: only a BET status is actionable. LEAN is unvalidated, TRACK is market-only/unpaired, and PASS is rejected. NOT Truth Gate / NOT OFFICIAL.",
         "",
         "| game | market | side | odds | model_p | edge | status |",
         "| --- | --- | --- | --- | --- | --- | --- |",
