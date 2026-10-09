@@ -24,6 +24,14 @@ class BlockedCardTest(unittest.TestCase):
         self.assertEqual(len(bets), 1)
         self.assertTrue(any(r["reason"] == "SAME_GAME_GUARD" for r in rows))
 
+    def test_expected_roi_uses_actual_quote_not_devig_probability(self):
+        rows = card.price_game("g", 28.0, 24.0, [
+            {"market": "MONEYLINE", "side": "HOME", "american_odds": -110},
+            {"market": "MONEYLINE", "side": "AWAY", "american_odds": -110},
+        ], validated={"MONEYLINE"})
+        for row in rows:
+            self.assertAlmostEqual(row["expected_roi"], round(row["model_p"] * (1 + 100 / 110) - 1, 4), delta=0.0002)
+
     def test_paired_devig_sums_to_one(self):
         rows = card.price_game("g", 28.0, 24.0, [
             {"market": "SPREAD", "side": "HOME", "line": -3.5, "american_odds": -110},
