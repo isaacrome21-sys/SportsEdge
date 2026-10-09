@@ -18,11 +18,13 @@ PUBLIC_PROOF_SCHEMA = "CFB_RECONSTRUCTED_ACQUISITION_READINESS_PUBLIC_V1"
 def _positive_int(value: object) -> int | None:
     if isinstance(value, bool):
         return None
-    try:
-        out = int(value)
-    except (TypeError, ValueError):
+    # Quota and season fields must be exact integers.  int(1.9) silently
+    # truncates, and int("1e2") is not an acceptable manifest count.
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9]+", value):
         return None
-    return out if out >= 0 else None
+    return int(value)
 
 
 def _nonempty(value: object) -> bool:
