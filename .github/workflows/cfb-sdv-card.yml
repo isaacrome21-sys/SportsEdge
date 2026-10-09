@@ -1,6 +1,10 @@
 name: cfb-sdv-card
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - config/cfb_friday_2026_10_09_board.json
   workflow_dispatch:
     inputs:
       board_json:
@@ -44,7 +48,7 @@ jobs:
       - name: Test card invariants
         run: python -m unittest tests.test_cfb_sdv_card_v2 -v
       - name: Price board
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         env:
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
           GH_TOKEN: ${{ github.token }}  # gh api reads/writes CFBD issue cache
@@ -55,6 +59,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            BOARD_JSON="$(cat config/cfb_friday_2026_10_09_board.json)"
+            INPUT_SEASON=2026
+            INPUT_WEEK=6
+            INPUT_ASOF=""
+          fi
           args=(--board-json "$BOARD_JSON" --season "$INPUT_SEASON" --week "$INPUT_WEEK")
           [ -z "$INPUT_ASOF" ] || args+=(--asof "$INPUT_ASOF")
           python scripts/run_cfb_sdv_card_v2.py "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
