@@ -33,6 +33,30 @@ class BlockedCardTest(unittest.TestCase):
         self.assertEqual(rows[0]["devig"], "PAIRED_PROPORTIONAL")
         self.assertAlmostEqual(rows[0]["model_p"] + rows[1]["model_p"], 1.0, places=3)
 
+    def test_duplicate_same_side_quotes_cannot_create_fake_devig(self):
+        rows = card.price_game("g", 32.0, 21.0, [
+            {"market": "TOTAL", "side": "OVER", "line": 50.5, "american_odds": -110},
+            {"market": "TOTAL", "side": "OVER", "line": 50.5, "american_odds": -115},
+        ], validated={"TOTAL"})
+        self.assertTrue(all(r["devig"] == "UNPAIRED_RAW_IMPLIED" for r in rows))
+        self.assertTrue(all(r["bet_status"] == "TRACK" for r in rows))
+        self.assertTrue(all(r["reason"] == "UNPAIRED_MARKET_NO_DEVIG" for r in rows))
+
+    def test_unpaired_spread_cannot_emit_bet_or_lean(self):
+        rows = card.price_game("g", 34.0, 20.0, [
+            {"market": "SPREAD", "side": "HOME", "line": -6.5, "american_odds": -110},
+        ], validated={"SPREAD"})
+        self.assertEqual(rows[0]["bet_status"], "TRACK")
+        self.assertEqual(rows[0]["reason"], "UNPAIRED_MARKET_NO_DEVIG")
+
+    def test_opposing_total_quotes_still_pair(self):
+        rows = card.price_game("g", 28.0, 24.0, [
+            {"market": "TOTAL", "side": "OVER", "line": 51.5, "american_odds": -110},
+            {"market": "TOTAL", "side": "UNDER", "line": 51.5, "american_odds": -110},
+        ])
+        self.assertTrue(all(r["devig"] == "PAIRED_PROPORTIONAL" for r in rows))
+        self.assertAlmostEqual(sum(r["market_p"] for r in rows), 1.0, places=3)
+
     def test_total_symmetry(self):
         rows = card.price_game("g", 30.0, 22.5, [
             {"market": "TOTAL", "side": "OVER", "line": 52.5, "american_odds": -110},
