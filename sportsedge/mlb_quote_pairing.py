@@ -102,13 +102,20 @@ def _group_key(row: Mapping[str,Any]) -> tuple:
     still decide whether a quote receives opposite_odds.
     """
     market=_norm_market(row)
+    line_key=_line_key(row, market)
+    # Malformed, nonnumeric lines may contain unhashable Python values.
+    # Group all such lines in one fallback bucket so indexing cannot
+    # change the authoritative _is_complement equality semantics
+    # (including set == frozenset). Valid numeric lines remain indexed.
+    if line_key and line_key[0] == "raw":
+        line_key=("raw-unparsed",)
     return (
         str(row.get("game_id")),
         market,
         str(row.get("entity_id") or ""),
         _book(row),
         _period(row),
-        _line_key(row, market),
+        line_key,
     )
 
 
