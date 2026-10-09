@@ -39,6 +39,17 @@ class BlockedCardTest(unittest.TestCase):
         self.assertTrue(rows)
         self.assertTrue(all(row["bet_status"] == "TRACK" and row["expected_roi"] is None for row in rows))
 
+    def test_positive_devig_edge_with_negative_roi_is_not_a_bet(self):
+        rows = card.price_game("g", 25.0, 24.0, [
+            {"market": "MONEYLINE", "side": "HOME", "american_odds": -110},
+            {"market": "MONEYLINE", "side": "AWAY", "american_odds": -110},
+        ], validated={"MONEYLINE"})
+        home = next(row for row in rows if row["side"] == "HOME")
+        self.assertGreater(home["edge"], 0.02)
+        self.assertLessEqual(home["expected_roi"], 0)
+        self.assertEqual(home["bet_status"], "PASS")
+        self.assertEqual(home["reason"], "NON_POSITIVE_EXPECTED_ROI")
+
     def test_paired_devig_sums_to_one(self):
         rows = card.price_game("g", 28.0, 24.0, [
             {"market": "SPREAD", "side": "HOME", "line": -3.5, "american_odds": -110},
