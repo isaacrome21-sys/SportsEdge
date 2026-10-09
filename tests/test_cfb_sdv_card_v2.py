@@ -32,6 +32,13 @@ class BlockedCardTest(unittest.TestCase):
         for row in rows:
             self.assertAlmostEqual(row["expected_roi"], round(row["model_p"] * (1 + 100 / 110) - 1, 4), delta=0.0002)
 
+    def test_market_only_fallback_does_not_claim_model_roi(self):
+        board = [{"away": "Away", "home": "Home", "ml": [-110, -110],
+                  "spread": [-3.5, -110, -110], "total": [48.5, -110, -110]}]
+        rows = card.market_only_rows(board, "CFBD_KEY_MISSING")
+        self.assertTrue(rows)
+        self.assertTrue(all(row["bet_status"] == "TRACK" and row["expected_roi"] is None for row in rows))
+
     def test_paired_devig_sums_to_one(self):
         rows = card.price_game("g", 28.0, 24.0, [
             {"market": "SPREAD", "side": "HOME", "line": -3.5, "american_odds": -110},
@@ -213,6 +220,26 @@ class LiveWeekCacheTest(unittest.TestCase):
         self.assertNotIn("odds", encoded)
         self.assertNotIn("spread", encoded)
         self.assertNotIn("total", encoded)
+
+    def test_build_rows_cache_hit_works_without_api_key(self):
+        game = self._game(weather={"wind_speed": 9.0, "temperature": 60.0})
+        snaps = {
+            team: {"prior": {k: 0.0 for k in card.TEAM_KEYS},
+                   "current": {k: 0.0 for k in card.TEAM_KEYS}}
+            for team in ("Home", "Away")
+        }
+        board = [{"game_id": "g1", "quotes": []}]
+        with patch.dict("os.environ", {}, clear=True), \
+             patch.object(card, "_load_live_week_cache", return_value=([game], snaps)), \
+             patch.object(card, "training_moments", return_value={k: (0.0, 1.0) for k in card.TEAM_KEYS}), \
+             patch.object(card, "moment_match", return_value=[]), \
+             patch("sportsedge.sports.cfb.source.fetch_cfbd_games", side_effect=AssertionError("no fetch")), \
+             patch("sportsedge.sports.cfb.source.fetch_cfbd_weather", side_effect=AssertionError("no weather fetch")), \
+             patch("sportsedge.sports.cfb.candidate_live_source.fetch_cfbd_candidate_metric_snapshots", side_effect=AssertionError("no metric fetch")), \
+             patch("sportsedge.sports.cfb.candidate_live_source.attach_candidate_snapshots_to_game_row", side_effect=lambda base, **_: base):
+            rows = card.build_rows(board, 2026, 6, "2026-10-06T15:00:00Z", fit_path="unused")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["game_id"], "g1")
 
     def test_build_rows_cache_hit_skips_cfbd_fetches(self):
         game = self._game(weather={"wind_speed": 17.0, "temperature": 55.0, "game_indoor": False})
