@@ -10,6 +10,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
+import os
 from math import isfinite
 from typing import Any, Callable, Iterable, Mapping
 from urllib.parse import urlencode
@@ -136,6 +137,18 @@ def _json_get(
     """
     req = Request(url, headers=dict(headers or {}))
     attempts = max(1, int(max_attempts))
+    # Live phone cards need a bounded response even during CFBD quota exhaustion.
+    # Unset everywhere else: existing research and historical retry semantics remain.
+    budget_setting = os.environ.get("CFB_SDV_MAX_RETRY_SLEEP_SECONDS")
+    retry_wait_budget = None
+    if budget_setting is not None:
+        try:
+            retry_wait_budget = float(budget_setting)
+        except (TypeError, ValueError) as exc:
+            raise CFBSourceError("CFB_SDV_RETRY_BUDGET_INVALID") from exc
+        if not isfinite(retry_wait_budget) or retry_wait_budget < 0:
+            raise CFBSourceError("CFB_SDV_RETRY_BUDGET_INVALID")
+    total_retry_sleep = 0.0
     for attempt in range(attempts):
         try:
             with opener(req, timeout=20) as response:
@@ -166,7 +179,10 @@ def _json_get(
                     delay = min(max(0.0, delay), 120.0)
                 else:
                     delay = float(min(8, 2 ** attempt))
+                if code == 429 and retry_wait_budget is not None and total_retry_sleep + delay > retry_wait_budget:
+                    raise CFBSourceError("SOURCE_FETCH_FAILED:429_RETRY_BUDGET_EXHAUSTED") from exc
                 sleeper(delay)
+                total_retry_sleep += delay
                 continue
             raise CFBSourceError(
                 f"SOURCE_FETCH_FAILED:{type(exc).__name__}:{exc}"
