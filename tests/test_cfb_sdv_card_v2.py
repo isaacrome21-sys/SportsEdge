@@ -42,6 +42,13 @@ class BlockedCardTest(unittest.TestCase):
         self.assertTrue(all(r["bet_status"] == "TRACK" for r in rows))
         self.assertTrue(all(r["reason"] == "UNPAIRED_MARKET_NO_DEVIG" for r in rows))
 
+    def test_unpaired_moneyline_cannot_emit_bet_or_lean(self):
+        rows = card.price_game("g", 42.0, 14.0, [
+            {"market": "MONEYLINE", "side": "HOME", "american_odds": 150},
+        ], validated={"MONEYLINE"})
+        self.assertEqual(rows[0]["bet_status"], "TRACK")
+        self.assertEqual(rows[0]["reason"], "UNPAIRED_MARKET_NO_DEVIG")
+
     def test_unpaired_spread_cannot_emit_bet_or_lean(self):
         rows = card.price_game("g", 34.0, 20.0, [
             {"market": "SPREAD", "side": "HOME", "line": -6.5, "american_odds": -110},
