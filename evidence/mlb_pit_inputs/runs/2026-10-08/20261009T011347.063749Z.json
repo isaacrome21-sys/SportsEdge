@@ -1,0 +1,15 @@
+{
+  "games_observed": 1,
+  "observations": [
+    {
+      "boxscore_source_sha256": "cc47060dd2a90201e8c799d1fb272df2104855f5dacb9a66d54c22c9abe0a2bf",
+      "game_pk": 849832,
+      "path": "artifacts/mlb_pit_inputs/observations/2026-10-08/849832/20261009T011347.063749Z.json"
+    }
+  ],
+  "observed_at_utc": "2026-10-09T01:13:47.063749+00:00",
+  "promotion_authority": false,
+  "schedule_source_sha256": "e3600f52825091960701c26337290da22c5c8fc6ddd25614e46eed625440b6b2",
+  "schema": "SPORTSEDGE_MLB_PIT_LINEUP_STARTER_CAPTURE_V1",
+  "slate_date": "2026-10-08"
+}
