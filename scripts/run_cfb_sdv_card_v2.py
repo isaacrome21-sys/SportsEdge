@@ -117,6 +117,8 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
             model_away = float(spread_context["away_mean"])
         p = model_prob(market, side, line, model_home, model_away)
         edge = p - (fair if fair is not None else raw)
+        expected_roi = p * (1.0 + (odds / 100.0 if odds > 0 else 100.0 / abs(odds))) - 1.0
+        clears = EDGE_FLOOR <= edge <= EDGE_CAP and expected_roi > 0.0
         out.append({
             "game_id": game_id,
             "market": market,
@@ -129,9 +131,10 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
             "market_p": round(fair if fair is not None else raw, 4),
             "devig": "PAIRED_PROPORTIONAL" if fair is not None else "UNPAIRED_RAW_IMPLIED",
             "edge": round(edge, 4),
-            "expected_roi": round(p * (1.0 + (odds / 100.0 if odds > 0 else 100.0 / abs(odds))) - 1.0, 4),
-            "bet_status": "BET" if EDGE_FLOOR <= edge <= EDGE_CAP else "PASS",
-            "reason": ("EDGE_CLEARS_FLOOR" if EDGE_FLOOR <= edge <= EDGE_CAP
+            "expected_roi": round(expected_roi, 4),
+            "bet_status": "BET" if clears else "PASS",
+            "reason": ("EDGE_CLEARS_FLOOR" if clears
+                       else "NONPOSITIVE_EXPECTED_ROI" if expected_roi <= 0.0
                        else "EDGE_TOO_LARGE_SUSPECT" if edge > EDGE_CAP else "BELOW_FLOOR"),
         })
         if market == "SPREAD" and isinstance(spread_context, dict):
