@@ -24,6 +24,17 @@ class BlockedCardTest(unittest.TestCase):
         self.assertEqual(len(bets), 1)
         self.assertTrue(any(r["reason"] == "SAME_GAME_GUARD" for r in rows))
 
+    def test_probability_edge_does_not_promote_negative_roi(self):
+        rows = card.price_game("g", 26.0, 25.0, [
+            {"market": "MONEYLINE", "side": "HOME", "american_odds": -110},
+            {"market": "MONEYLINE", "side": "AWAY", "american_odds": -110},
+        ], validated={"MONEYLINE"})
+        home = next(r for r in rows if r["side"] == "HOME")
+        self.assertGreaterEqual(home["edge"], card.EDGE_FLOOR)
+        self.assertLessEqual(home["expected_roi"], 0)
+        self.assertEqual(home["bet_status"], "PASS")
+        self.assertEqual(home["reason"], "NONPOSITIVE_EXPECTED_ROI")
+
     def test_expected_roi_uses_actual_quote_not_devig_probability(self):
         rows = card.price_game("g", 28.0, 24.0, [
             {"market": "MONEYLINE", "side": "HOME", "american_odds": -110},
