@@ -1,0 +1,15 @@
+{
+  "authority_footer": "NOT Model_P / NOT Truth Gate / NOT OFFICIAL",
+  "capture_kind": "FINAL",
+  "detail": "NFL_SCHEDULE_COVERAGE_MISMATCH:{\"actual\":{},\"expected\":{\"2026-10-09T00:15:00Z\":1},\"kind\":\"FINAL\"}",
+  "evidence_semantics": "ABSENCE_MARKER_ONLY_NOT_MARKET_DATA",
+  "expected_kickoffs": {
+    "2026-10-09T00:15:00Z": 1
+  },
+  "no_backfill": true,
+  "observed_missing_at_utc": "2026-10-09T00:00:00Z",
+  "reason": "SCHEDULE_COVERAGE_MISMATCH",
+  "source": "DRAFTKINGS_DIRECT_WEB_ONLY",
+  "status": "MISSED_OR_BLOCKED",
+  "week": 5
+}
