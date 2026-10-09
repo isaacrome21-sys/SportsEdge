@@ -27,6 +27,7 @@ on:
 
 permissions:
   contents: read
+  issues: write  # permit trusted live-week CFBD cache issue comments
 
 jobs:
   card:
@@ -46,6 +47,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         env:
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+          GH_TOKEN: ${{ github.token }}  # gh api reads/writes CFBD issue cache
           BOARD_JSON: ${{ inputs.board_json }}
           INPUT_SEASON: ${{ inputs.season }}
           INPUT_WEEK: ${{ inputs.week }}
