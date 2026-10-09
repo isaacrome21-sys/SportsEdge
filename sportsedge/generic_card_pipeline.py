@@ -84,9 +84,9 @@ def _feature_index(rows):
     return out
 
 
-def _quote_key(quote: Mapping[str, Any]) -> tuple[str, str, str, str, str, str, bool]:
+def _quote_key(quote: Mapping[str, Any]) -> tuple[str, str, str, str, str, str, str, bool]:
     return (
-        str(quote["game_id"]), str(quote["market"]), str(quote["entity_id"]),
+        str(quote["game_id"]), str(quote["period"]), str(quote["market"]), str(quote["entity_id"]),
         repr(quote["line"]), str(quote["side"]), str(quote["book_key"]), bool(quote["is_alternate"]),
     )
 
