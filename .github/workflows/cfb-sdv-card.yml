@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - config/cfb_friday_2026_10_09_board.json
+      - .github/workflows/cfb-sdv-card.yml
   workflow_dispatch:
     inputs:
       board_json:
@@ -69,7 +70,7 @@ jobs:
           [ -z "$INPUT_ASOF" ] || args+=(--asof "$INPUT_ASOF")
           python scripts/run_cfb_sdv_card_v2.py "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Upload card
-        if: always() && github.event_name == 'workflow_dispatch'
+        if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: cfb-sdv-card
