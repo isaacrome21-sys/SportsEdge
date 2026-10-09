@@ -96,12 +96,21 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
         norm.append((market, side, q.get("line"), float(q["american_odds"])))
     groups = {}
     for market, side, line, odds in norm:
-        groups.setdefault(pair_key(market, side, line), []).append(implied(odds))
+        groups.setdefault(pair_key(market, side, line), []).append((side, implied(odds)))
     out = []
     for market, side, line, odds in norm:
         raw = implied(odds)
         grp = groups[pair_key(market, side, line)]
-        fair = raw / sum(grp) if len(grp) == 2 else None
+        # Two quotes do not constitute a market pair unless they are opposing
+        # selections. Duplicate HOME or OVER quotes must never be de-vigged.
+        opposite = {
+            "MONEYLINE": {"HOME", "AWAY"},
+            "SPREAD": {"HOME", "AWAY"},
+            "TOTAL": {"OVER", "UNDER"},
+        }.get(market)
+        paired = (opposite is not None and len(grp) == 2
+                  and {selection for selection, _ in grp} == opposite)
+        fair = raw / sum(prob for _, prob in grp) if paired else None
         model_home, model_away = home, away
         if market == "SPREAD" and isinstance(spread_context, dict):
             model_home = float(spread_context["home_mean"])
@@ -133,6 +142,11 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
                 "anchor_forward_track_eligible": bool(spread_context["forward_track_eligible"]),
                 "anchor_version": ANCHORED_SPREAD_VERSION,
             })
+    # Unpaired markets are useful for tracking but cannot establish a
+    # no-vig price or a defensible market edge.
+    for r in out:
+        if r["devig"] != "PAIRED_PROPORTIONAL":
+            r["bet_status"], r["reason"] = "TRACK", "UNPAIRED_MARKET_NO_DEVIG"
     # Same-game guard: one team-outcome bet (ML or spread) and one total per game.
     for fam in (("MONEYLINE", "SPREAD"), ("TOTAL",)):
         bets = [r for r in out if r["market"] in fam and r["bet_status"] == "BET"]
@@ -435,6 +449,8 @@ def build_rows(board: list, season: int, week: int, asof, fit_path=None):
     from sportsedge.sports.cfb.source import attach_weather, fetch_cfbd_games, fetch_cfbd_weather
 
     key = os.environ.get("CFBD_API_KEY") or os.environ.get("SPORTSEDGE_CFBD_API_KEY") or ""
+    if not key:
+        raise SystemExit("CFB_SDV_CFBD_API_KEY_REQUIRED")
     now = datetime.fromisoformat(asof.replace("Z", "+00:00")) if asof else datetime.now(timezone.utc)
     def count_hits(games_):
         n = 0
@@ -451,13 +467,9 @@ def build_rows(board: list, season: int, week: int, asof, fit_path=None):
     if cache_hit:
         raw_games, snaps = cached
     else:
-        if not key:
-            raise SystemExit("CFB_SDV_CFBD_API_KEY_REQUIRED")
         raw_games = fetch_cfbd_games(season=season, week=week, cfbd_api_key=key)
 
     if count_hits(raw_games) == 0:
-        if not key:
-            raise SystemExit("CFB_SDV_CACHED_WEEK_NO_MATCH_AND_API_KEY_REQUIRED")
         best = (0, week, raw_games)
         for w in range(1, 17):
             if w == week:
