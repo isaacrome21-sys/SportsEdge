@@ -433,6 +433,7 @@ def market_only_rows(board: list, reason: str) -> list:
                 "matchup": matchup,
                 "model_p": r["market_p"],
                 "edge": 0.0,
+                "expected_roi": None,  # No model-derived expected return on market-only fallback.
                 "home_mean": round(home, 2) if home == home else home,
                 "away_mean": round(away, 2) if away == away else away,
                 "bet_status": "TRACK",
@@ -450,8 +451,6 @@ def build_rows(board: list, season: int, week: int, asof, fit_path=None):
     from sportsedge.sports.cfb.source import attach_weather, fetch_cfbd_games, fetch_cfbd_weather
 
     key = os.environ.get("CFBD_API_KEY") or os.environ.get("SPORTSEDGE_CFBD_API_KEY") or ""
-    if not key:
-        raise SystemExit("CFB_SDV_CFBD_API_KEY_REQUIRED")
     now = datetime.fromisoformat(asof.replace("Z", "+00:00")) if asof else datetime.now(timezone.utc)
     def count_hits(games_):
         n = 0
@@ -468,9 +467,13 @@ def build_rows(board: list, season: int, week: int, asof, fit_path=None):
     if cache_hit:
         raw_games, snaps = cached
     else:
+        if not key:
+            raise SystemExit("CFB_SDV_CFBD_API_KEY_REQUIRED")
         raw_games = fetch_cfbd_games(season=season, week=week, cfbd_api_key=key)
 
     if count_hits(raw_games) == 0:
+        if not key:
+            raise SystemExit("CFB_SDV_CACHED_WEEK_NO_MATCH_AND_API_KEY_REQUIRED")
         best = (0, week, raw_games)
         for w in range(1, 17):
             if w == week:
