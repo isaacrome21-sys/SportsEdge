@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - config/cfb_friday_2026_10_09_board.json
+      - .github/workflows/cfb-sdv-card.yml
   workflow_dispatch:
     inputs:
       board_json:
