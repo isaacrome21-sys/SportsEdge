@@ -129,6 +129,7 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
             "market_p": round(fair if fair is not None else raw, 4),
             "devig": "PAIRED_PROPORTIONAL" if fair is not None else "UNPAIRED_RAW_IMPLIED",
             "edge": round(edge, 4),
+            "expected_roi": round(p * (1.0 + (odds / 100.0 if odds > 0 else 100.0 / abs(odds))) - 1.0, 4),
             "bet_status": "BET" if EDGE_FLOOR <= edge <= EDGE_CAP else "PASS",
             "reason": ("EDGE_CLEARS_FLOOR" if EDGE_FLOOR <= edge <= EDGE_CAP
                        else "EDGE_TOO_LARGE_SUSPECT" if edge > EDGE_CAP else "BELOW_FLOOR"),
