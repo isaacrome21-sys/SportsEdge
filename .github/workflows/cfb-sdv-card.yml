@@ -57,6 +57,7 @@ jobs:
           INPUT_SEASON: ${{ inputs.season }}
           INPUT_WEEK: ${{ inputs.week }}
           INPUT_ASOF: ${{ inputs.asof }}
+          CFB_SDV_MAX_RETRY_SLEEP_SECONDS: "45"
         shell: bash
         run: |
           set -euo pipefail

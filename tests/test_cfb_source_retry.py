@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 from urllib.error import HTTPError
 
 from sportsedge.sports.cfb.source import CFBSourceError, _json_get
@@ -95,6 +96,25 @@ class CFBSourceRetryTests(unittest.TestCase):
 
         self.assertEqual(payload, {"ok": True})
         self.assertEqual(delays, [15.0, 30.0, 60.0])
+
+    def test_live_card_429_budget_fast_fails_but_preserves_retry(self):
+        delays = []
+        calls = []
+
+        def opener(req, timeout=20):
+            calls.append(req.full_url)
+            raise HTTPError(req.full_url, 429, "Too Many Requests", {}, None)
+
+        with patch.dict("os.environ", {"CFB_SDV_MAX_RETRY_SLEEP_SECONDS": "20"}):
+            with self.assertRaisesRegex(CFBSourceError, "429_RETRY_BUDGET_EXHAUSTED"):
+                _json_get(
+                    "https://example.test/cfb",
+                    headers={},
+                    opener=opener,
+                    sleeper=delays.append,
+                )
+        self.assertEqual(delays, [15.0])
+        self.assertEqual(len(calls), 2)
 
     def test_nonretryable_http_error_still_fails_closed(self):
         delays = []
