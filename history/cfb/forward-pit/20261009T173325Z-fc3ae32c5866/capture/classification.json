@@ -1,0 +1,66 @@
+{
+  "asset_count": 4,
+  "assets": [
+    {
+      "asset_id": 624865395,
+      "asset_name": "adv_drives_2026.csv",
+      "cache_relative_path": "adv_drives/2026/adv_drives_2026.csv",
+      "content_sha256": "212bd769266c3d4fc19d7026b6f92c70c52d0a1eb35ec6a3694787037cec7929",
+      "dataset": "adv_drives",
+      "manifest_sha256": "43202a58b523e592879aaf758730f7c50f0c7d836f905e237ea1b768d0f3bba7",
+      "release_id": 334089439,
+      "release_tag": "espn_cfb_adv_drives",
+      "season": 2026,
+      "source_retrieved_at": "2026-10-09T17:33:25.372743+00:00"
+    },
+    {
+      "asset_id": 624866932,
+      "asset_name": "adv_situational_2026.csv",
+      "cache_relative_path": "adv_situational/2026/adv_situational_2026.csv",
+      "content_sha256": "b793bf66d5f64c64d1e1620c348b8117d858174d574c125d863bd003e6b9966f",
+      "dataset": "adv_situational",
+      "manifest_sha256": "a0ae8507d9f3bfba306fccd233affabbd3b05a0e6b59083b5f6dc7a4ad677ed5",
+      "release_id": 334089566,
+      "release_tag": "espn_cfb_adv_situational",
+      "season": 2026,
+      "source_retrieved_at": "2026-10-09T17:33:24.498329+00:00"
+    },
+    {
+      "asset_id": 624856326,
+      "asset_name": "adv_team_2026.csv",
+      "cache_relative_path": "adv_team/2026/adv_team_2026.csv",
+      "content_sha256": "9b828b0b84bf74abba5b622ef12ba42e80e42f4571242a6f8d3dde49cd8792da",
+      "dataset": "adv_team",
+      "manifest_sha256": "76beeac9bcf122158a3700c65309b184487cf2a55fdaefc4ca73c043e1ad33eb",
+      "release_id": 334089410,
+      "release_tag": "espn_cfb_adv_team",
+      "season": 2026,
+      "source_retrieved_at": "2026-10-09T17:33:23.645717+00:00"
+    },
+    {
+      "asset_id": 622298645,
+      "asset_name": "cfb_schedule_2026.csv",
+      "cache_relative_path": "schedules/2026/cfb_schedule_2026.csv",
+      "content_sha256": "e86957575db306655dfe6e17cf3a818b5fc49514f8dbaef268b659ba6453385c",
+      "dataset": "schedules",
+      "manifest_sha256": "f029cb2ca8c2c83a6a15be1ce8abe37a38bbc15166159abb65a44c43459fbbbc",
+      "release_id": 101941072,
+      "release_tag": "espn_cfb_schedules",
+      "season": 2026,
+      "source_retrieved_at": "2026-10-09T17:33:22.749459+00:00"
+    }
+  ],
+  "capture_git_sha": "fc3ae32c586624264b2fc5d6a91d740d46e937a9",
+  "captured_at_utc": "2026-10-09T17:33:25.481977Z",
+  "eligibility_changed": false,
+  "market_data_in_predictive_capture": false,
+  "model_p_created": false,
+  "pit_classification": "FORWARD_SOURCE_SNAPSHOT_FROM_RETRIEVAL_TIME_ONLY",
+  "point_in_time_from_capture_forward": true,
+  "promotion_evidence": false,
+  "retroactive_point_in_time_claim": false,
+  "schema_version": 1,
+  "season": 2026,
+  "sport": "CFB",
+  "usage_rule": "These bytes may support future PIT feature reconstruction only for decisions whose as-of time is at or after this capture. They provide no PIT proof for earlier games."
+}
