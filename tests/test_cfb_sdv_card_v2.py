@@ -183,13 +183,13 @@ class LiveWeekCacheTest(unittest.TestCase):
             for team in ("Home", "Away")
         }
         board = [{"game_id": "g1", "quotes": []}]
-        with patch.dict("os.environ", {}, clear=True), \\
-             patch.object(card, "_load_live_week_cache", return_value=([game], snaps)), \\
-             patch.object(card, "training_moments", return_value={k: (0.0, 1.0) for k in card.TEAM_KEYS}), \\
-             patch.object(card, "moment_match", return_value=[]), \\
-             patch("sportsedge.sports.cfb.source.fetch_cfbd_games", side_effect=AssertionError("no fetch")), \\
-             patch("sportsedge.sports.cfb.source.fetch_cfbd_weather", side_effect=AssertionError("no weather fetch")), \\
-             patch("sportsedge.sports.cfb.candidate_live_source.fetch_cfbd_candidate_metric_snapshots", side_effect=AssertionError("no metric fetch")), \\
+        with patch.dict("os.environ", {}, clear=True), \
+             patch.object(card, "_load_live_week_cache", return_value=([game], snaps)), \
+             patch.object(card, "training_moments", return_value={k: (0.0, 1.0) for k in card.TEAM_KEYS}), \
+             patch.object(card, "moment_match", return_value=[]), \
+             patch("sportsedge.sports.cfb.source.fetch_cfbd_games", side_effect=AssertionError("no fetch")), \
+             patch("sportsedge.sports.cfb.source.fetch_cfbd_weather", side_effect=AssertionError("no weather fetch")), \
+             patch("sportsedge.sports.cfb.candidate_live_source.fetch_cfbd_candidate_metric_snapshots", side_effect=AssertionError("no metric fetch")), \
              patch("sportsedge.sports.cfb.candidate_live_source.attach_candidate_snapshots_to_game_row", side_effect=lambda base, **_: base):
             rows = card.build_rows(board, 2026, 6, "2026-10-06T15:00:00Z", fit_path="unused")
         self.assertEqual(len(rows), 1)
