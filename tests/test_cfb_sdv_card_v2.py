@@ -290,6 +290,7 @@ class MarketOnlyFallbackTest(unittest.TestCase):
         self.assertEqual(len(rows), 8)
         self.assertTrue(all(r["bet_status"] == "TRACK" and r["edge"] == 0.0 for r in rows))
         self.assertTrue(all(r["model_p"] == r["market_p"] for r in rows))
+        self.assertTrue(all(r["expected_roi"] is None for r in rows))
         self.assertEqual(rows[0]["matchup"], "Michigan @ Minnesota")
 
 
