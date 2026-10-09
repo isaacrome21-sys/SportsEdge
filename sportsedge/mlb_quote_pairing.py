@@ -91,30 +91,57 @@ def _is_complement(a: Mapping[str,Any], b: Mapping[str,Any]) -> bool:
     return _OPPOSITES.get(sa) == sb
 
 
+def _period(row: Mapping[str,Any]) -> str:
+    return str(row.get("period") or "").strip().upper()
+
+
+def _group_key(row: Mapping[str,Any]) -> tuple:
+    """Equality bucket for the fields pair validation already requires, plus period.
+
+    Period is a search partition only. Complement, skew, and unique-match rules
+    still decide whether a quote receives opposite_odds.
+    """
+    market=_norm_market(row)
+    return (
+        str(row.get("game_id")),
+        market,
+        str(row.get("entity_id") or ""),
+        _book(row),
+        _period(row),
+        _line_key(row, market),
+    )
+
+
 def pair_opposite_odds(rows: Sequence[Any]) -> list[dict[str,Any]]:
     material=[]
     for raw in rows:
         row=dict(raw) if isinstance(raw,Mapping) else dict(vars(raw))
         material.append(row)
+    groups: dict[tuple, list[int]] = {}
     for i,row in enumerate(material):
-        market=_norm_market(row)
-        if market in N_WAY_MARKETS or row.get("opposite_odds") is not None:
-            continue
-        stamp=_retrieved_at(row)
-        if stamp is None:
-            continue
-        matches=[]
-        for j,other in enumerate(material):
-            if i==j:
+        groups.setdefault(_group_key(row), []).append(i)
+    for indexes in groups.values():
+        for i in indexes:
+            row=material[i]
+            market=_norm_market(row)
+            if market in N_WAY_MARKETS or row.get("opposite_odds") is not None:
                 continue
-            if not _is_complement(row, other):
+            stamp=_retrieved_at(row)
+            if stamp is None:
                 continue
-            if other.get("american_odds") is None:
-                continue
-            other_stamp=_retrieved_at(other)
-            if other_stamp is None or abs((other_stamp-stamp).total_seconds())>MAX_PAIRED_SKEW_SECONDS:
-                continue
-            matches.append(other)
-        if len(matches)==1:
-            row["opposite_odds"]=matches[0]["american_odds"]
+            matches=[]
+            for j in indexes:
+                if i==j:
+                    continue
+                other=material[j]
+                if not _is_complement(row, other):
+                    continue
+                if other.get("american_odds") is None:
+                    continue
+                other_stamp=_retrieved_at(other)
+                if other_stamp is None or abs((other_stamp-stamp).total_seconds())>MAX_PAIRED_SKEW_SECONDS:
+                    continue
+                matches.append(other)
+            if len(matches)==1:
+                row["opposite_odds"]=matches[0]["american_odds"]
     return material
