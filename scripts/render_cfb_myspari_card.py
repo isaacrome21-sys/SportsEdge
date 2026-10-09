@@ -15,23 +15,24 @@ def render_markdown(payload: dict) -> str:
         "",
         "Positive calculated edge is not sufficient for a bet: only a BET status is actionable. LEAN is unvalidated, TRACK is market-only/unpaired, and PASS is rejected. NOT Truth Gate / NOT OFFICIAL.",
         "",
-        "| game | market | side | odds | model_p | edge | status |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| game | market | side | odds | model_p | prob_edge | expected_roi | status |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in payload.get("results") or []:
         lines.append(
-            "| {game} | {market} | {side} | {odds} | {model_p} | {edge} | {status} |".format(
+            "| {game} | {market} | {side} | {odds} | {model_p} | {edge} | {roi} | {status} |".format(
                 game=row.get("game_id") or "",
                 market=row.get("market") or "",
                 side=row.get("side") or "",
                 odds=row.get("american_odds"),
                 model_p=None if row.get("model_p") is None else round(float(row["model_p"]), 4),
                 edge=None if row.get("edge") is None else round(float(row["edge"]), 4),
+                roi="n/a" if row.get("expected_roi") is None else f"{100 * float(row['expected_roi']):+.2f}%",
                 status=row.get("bet_status"),
             )
         )
     if not payload.get("results"):
-        lines.append("|  |  |  |  |  |  | no rows |")
+        lines.append("|  |  |  |  |  |  |  | no rows |")
     lines.append("")
     lines.append("Lines are user-supplied. Zero quotes is the only infrastructure block.")
     return "\n".join(lines) + "\n"
