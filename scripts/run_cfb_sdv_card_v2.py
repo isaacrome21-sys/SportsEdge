@@ -148,6 +148,11 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
     for r in out:
         if r["devig"] != "PAIRED_PROPORTIONAL":
             r["bet_status"], r["reason"] = "TRACK", "UNPAIRED_MARKET_NO_DEVIG"
+    # A no-vig probability advantage can still lose money after the book margin.
+    # Never surface a BET or LEAN without positive stake-based expected return.
+    for r in out:
+        if r["bet_status"] == "BET" and r["expected_roi"] <= 0:
+            r["bet_status"], r["reason"] = "PASS", "NON_POSITIVE_EXPECTED_ROI"
     # Same-game guard: one team-outcome bet (ML or spread) and one total per game.
     for fam in (("MONEYLINE", "SPREAD"), ("TOTAL",)):
         bets = [r for r in out if r["market"] in fam and r["bet_status"] == "BET"]
