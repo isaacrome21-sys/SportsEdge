@@ -2,10 +2,6 @@
   {
     "away": "Florida State",
     "home": "Louisville",
-    "ml": [
-      154,
-      -185
-    ],
     "spread": [
       4,
       -110,
@@ -20,10 +16,6 @@
   {
     "away": "Iowa",
     "home": "Washington",
-    "ml": [
-      124,
-      -148
-    ],
     "spread": [
       2.5,
       -102,
@@ -38,10 +30,6 @@
   {
     "away": "Wyoming",
     "home": "San Jose State",
-    "ml": [
-      154,
-      -185
-    ],
     "spread": [
       4.5,
       -115,
@@ -56,10 +44,6 @@
   {
     "away": "Washington State",
     "home": "Utah State",
-    "ml": [
-      154,
-      -185
-    ],
     "spread": [
       3.5,
       -110,
@@ -74,10 +58,6 @@
   {
     "away": "Iowa State",
     "home": "BYU",
-    "ml": [
-      350,
-      -455
-    ],
     "spread": [
       11.5,
       -110,
