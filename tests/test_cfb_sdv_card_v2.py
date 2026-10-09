@@ -32,6 +32,22 @@ class BlockedCardTest(unittest.TestCase):
         for row in rows:
             self.assertAlmostEqual(row["expected_roi"], round(row["model_p"] * (1 + 100 / 110) - 1, 4), delta=0.0002)
 
+    def test_phone_card_shows_roi_separately_and_na_when_missing(self):
+        spec = importlib.util.spec_from_file_location(
+            "cfb_phone_renderer", Path(__file__).resolve().parents[1] / "scripts" / "render_cfb_myspari_card.py"
+        )
+        renderer = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(renderer)
+        result = renderer.render_markdown({"results": [
+            {"game_id": "g1", "market": "TOTAL", "side": "OVER", "american_odds": -110,
+             "model_p": 0.55, "edge": 0.05, "expected_roi": 0.05, "bet_status": "LEAN"},
+            {"game_id": "g2", "market": "SPREAD", "side": "HOME", "american_odds": -110,
+             "model_p": None, "edge": 0.0, "expected_roi": None, "bet_status": "TRACK"},
+        ]})
+        self.assertIn("prob_edge | expected_roi", result)
+        self.assertIn("+5.00%", result)
+        self.assertIn("n/a", result)
+
     def test_market_only_fallback_does_not_claim_model_roi(self):
         board = [{"away": "Away", "home": "Home", "ml": [-110, -110],
                   "spread": [-3.5, -110, -110], "total": [48.5, -110, -110]}]
