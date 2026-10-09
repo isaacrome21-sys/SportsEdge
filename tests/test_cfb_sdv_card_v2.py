@@ -294,5 +294,27 @@ class MarketOnlyFallbackTest(unittest.TestCase):
         self.assertEqual(rows[0]["matchup"], "Michigan @ Minnesota")
 
 
+
+class KickoffCutoffTest(unittest.TestCase):
+    def test_timezone_and_start_boundary(self):
+        now = datetime(2026, 10, 9, 23, 0, tzinfo=timezone.utc)
+        self.assertFalse(card.pre_kickoff("2026-10-09T23:00:00Z", now))
+        self.assertFalse(card.pre_kickoff("2026-10-09T22:59:59+00:00", now))
+        self.assertTrue(card.pre_kickoff("2026-10-10T01:00:00+00:00", now))
+        self.assertFalse(card.pre_kickoff("2026-10-10T01:00:00", now))
+        self.assertFalse(card.pre_kickoff("bad", now))
+
+    def test_market_only_excludes_started_games(self):
+        board = [
+            {"away": "Started", "home": "Host", "start_ts": "2026-10-09T23:00:00Z",
+             "spread": [3.5, -110, -110], "total": [52.5, -110, -110]},
+            {"away": "Future", "home": "Host", "start_ts": "2026-10-10T01:00:00Z",
+             "spread": [3.5, -110, -110], "total": [52.5, -110, -110]},
+        ]
+        rows = card.market_only_rows(board, "CFBD_RATE_LIMITED", asof="2026-10-09T23:15:00Z")
+        self.assertEqual(len(rows), 4)
+        self.assertTrue(all(r["matchup"] == "Future @ Host" for r in rows))
+        self.assertTrue(all(r["bet_status"] == "TRACK" for r in rows))
+
 if __name__ == "__main__":
     unittest.main()

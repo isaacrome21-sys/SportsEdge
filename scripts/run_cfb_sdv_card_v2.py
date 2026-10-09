@@ -413,16 +413,40 @@ def anchored_spread_context(home: float, away: float, quotes: list, fit=None):
     }
 
 
-def market_only_rows(board: list, reason: str) -> list:
+def pre_kickoff(start_ts: str, now: datetime) -> bool:
+    """A source-supplied kickoff must be strictly in the future to price pregame.
+
+    Refuse missing, malformed, or timezone-naive kickoff data rather than risk
+    suggesting a wager for a game already underway.
+    """
+    try:
+        kickoff = datetime.fromisoformat(str(start_ts).replace("Z", "+00:00"))
+        return bool(
+            kickoff.tzinfo is not None and kickoff.utcoffset() is not None
+            and now.tzinfo is not None and now.utcoffset() is not None
+            and kickoff.astimezone(timezone.utc) > now.astimezone(timezone.utc)
+        )
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
+def market_only_rows(board: list, reason: str, *, asof: str | None = None) -> list:
     """Card rows when the model's data source (CFBD) is down: de-vigged market only.
 
     model_p is set to the no-vig market price, so edge is 0 and nothing is a bet
     or a lean. Every row is TRACK. This keeps the phone card working (prices,
     fair odds, market-implied scores) instead of posting a traceback.
     """
+    now = (datetime.fromisoformat(asof.replace("Z", "+00:00")) if asof
+           else datetime.now(timezone.utc))
     out = []
     for i, row in enumerate(board):
         row = expand_compact(row)
+        # Market-only fallback has no CFBD kickoff; honor a verified board
+        # timestamp when supplied, and never price started rows.
+        if row.get("start_ts") is not None and not pre_kickoff(row["start_ts"], now):
+            print("SKIPPED CFB_SDV_KICKED_OFF_MARKET_ONLY", row.get("away"), "@", row.get("home"))
+            continue
         quotes = row.get("quotes") or []
         if not quotes:
             continue
@@ -522,6 +546,9 @@ def build_rows(board: list, season: int, week: int, asof, fit_path=None):
             game = resolve_game(row, games)
         except SystemExit as exc:
             unresolved.append(str(exc))
+            continue
+        if not pre_kickoff(game.start_ts, now):
+            unresolved.append(f"CFB_SDV_KICKED_OFF:{game.away_team} @ {game.home_team}:{game.start_ts}")
             continue
         base = {
             "game_id": game.game_id,
@@ -625,7 +652,7 @@ def main() -> int:
         print(f"CFB_SDV_MARKET_ONLY model data unavailable ({fallback}: {msg[:160]}); "
               "card shows no-vig market prices and market-implied scores only, 0 bets, 0 leans")
         game_rows = []
-        results = market_only_rows(board, fallback)
+        results = market_only_rows(board, fallback, asof=args.asof)
         if not results:
             raise
     for row in game_rows:
