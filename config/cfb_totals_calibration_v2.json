@@ -1,0 +1,9 @@
+{
+  "schema": "CFB_TOTALS_CALIBRATION_V2",
+  "frozen_at": "2026-10-10",
+  "method": "OLS intercept + scale on chronological walk-forward, final fit on 2022-2025 only (strictly prior seasons for evaluation)",
+  "intercept": 8.2652,
+  "scale": 0.8142,
+  "train_seasons": "2022-2025",
+  "notes": "Wins walk-forward on 2023-2025 gap and MAE vs v1. Applied after raw projection before pricing. Margin preserved. No market inputs."
+}

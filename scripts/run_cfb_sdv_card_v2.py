@@ -37,6 +37,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from sportsedge.sports.cfb.totals_calibration import (
+    load_totals_calibration,
+    apply_totals_calibration,
+)
 from sportsedge.sports.cfb.market_anchored_spread import (
     VERSION as ANCHORED_SPREAD_VERSION,
     adjusted_home_margin,
@@ -828,15 +832,19 @@ def main() -> int:
     for row in game_rows:
         try:
             blind = {k: v for k, v in row.items() if k != "quotes"}  # model is market-blind
-            home, away = score_selected_game(model, blind)
+            raw_home, raw_away = score_selected_game(model, blind)
         except Exception as exc:
             print("SKIPPED CFB_SDV_SCORE_FAILED", row.get("away_team"), "@", row.get("home_team"), exc)
             continue
+        # Apply frozen totals calibration after raw projection, before pricing.
+        # Margin path (spread/ML) is untouched; only the total mean is adjusted.
+        cal = load_totals_calibration()
+        home, away = apply_totals_calibration(raw_home, raw_away, cal)
         if not projection_sane(home, away, row.get("quotes") or []):
             print(f"SKIPPED CFB_SDV_PROJECTION_INSANE {row.get('away_team')} @ {row.get('home_team')} {away:.1f}-{home:.1f}")
             continue
         quotes = row.get("quotes") or []
-        spread_context = anchored_spread_context(home, away, quotes)
+        spread_context = anchored_spread_context(raw_home, raw_away, quotes)  # use raw for margin path
         priced = price_game(
             row["game_id"], home, away, quotes,
             spread_context=spread_context,
@@ -845,10 +853,17 @@ def main() -> int:
             r["matchup"] = f"{row.get('away_team')} @ {row.get('home_team')}"
             r["start_ts"] = row.get("start_ts")
         results.extend(priced or [{"game_id": row["game_id"], "bet_status": "PASS", "reason": "NO_QUOTES"}])
+    cal = load_totals_calibration()
     payload = {
         "schema": "CFB_SDV_CARD_V2",
         "scored_at_utc": datetime.now(timezone.utc).isoformat(),
         "family": "PRIOR_CURRENT_BLEND",
+        "totals_calibration": {
+            "schema": cal["schema"],
+            "sha256": cal["sha256"],
+            "intercept": cal["intercept"],
+            "scale": cal["scale"],
+        },
         "bakeoff_run": 37093707442,
         "team_score_rmse": TEAM_SCORE_RMSE,
         "combined_sigma": round(COMBINED_SIGMA, 4),

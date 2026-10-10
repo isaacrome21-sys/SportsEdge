@@ -123,6 +123,8 @@
         "config/cfb_sportsdataverse_candidate_prereg_v1.json",
         "config/cfb_sportsdataverse_historical_weather_contract_v1.json",
         "config/cfb_sportsdataverse_source_contract_v1.json",
+        "config/cfb_totals_calibration_v1.json",
+        "config/cfb_totals_calibration_v2.json",
         "docs/cfb_selected_candidate_runtime_gap.md",
         "docs/cfb_train_freeze_status_20260918.md",
         "scripts/acquire_cfb_reconstructed_selection.py",
@@ -163,9 +165,11 @@
         "sportsedge/sports/cfb/sportsdataverse_history.py",
         "sportsedge/sports/cfb/sportsdataverse_manifest.py",
         "sportsedge/sports/cfb/sportsdataverse_prereg_hash.py",
+        "sportsedge/sports/cfb/totals_calibration.py",
         "tests/test_cfb_market_anchored_spread.py",
         "tests/test_cfb_sdv_card_v2.py",
-        "tests/test_cfb_sdv_null_replay.py"
+        "tests/test_cfb_sdv_null_replay.py",
+        "tests/test_cfb_totals_calibration.py"
       ],
       "coverage_prefixes": []
     },

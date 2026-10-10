@@ -77,8 +77,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
-            # One-time next-slate research board; never alter the archived Friday quotes.
+          if [ "$GITHUB_EVENT_NAME" = "push" ] || [ "$BOARD_JSON" = "USE_COMMITTED" ]; then
+            # Prefer the committed Saturday board when requested or on push.
             BOARD_JSON="$(cat config/cfb_saturday_2026_10_10_board.json)"
             INPUT_SEASON=2026
             INPUT_WEEK=6
