@@ -23,7 +23,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 ODDS_URL = "https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/odds"
-BOOKS = ("draftkings", "fanduel", "betmgm", "caesars")
+BOOKS = ("draftkings", "fanduel", "betmgm", "williamhill_us", "betonlineag", "pinnacle")
 SUPPORTED = ("h2h", "spreads", "totals")
 MARKET_NAME = {"h2h": "MONEYLINE", "spreads": "SPREAD", "totals": "TOTAL"}
 # Governance contract sentinels retained for the repository text guard:
@@ -41,7 +41,7 @@ def fetch(key):
     q = urlencode(
         {
             "apiKey": key,
-            "regions": "us",
+            "regions": "us,eu",
             "markets": ",".join(SUPPORTED),
             "oddsFormat": "american",
             "bookmakers": ",".join(BOOKS),
@@ -72,9 +72,15 @@ def load_events(key, input_json=None, inline_json=None):
     if inline:
         return _decode_events(inline, "MANUAL_INLINE"), "MANUAL_JSON_INLINE", "READY"
     if key:
-        events = fetch(key)
+        try:
+            events = fetch(key)
+        except (OSError, TimeoutError, ValueError) as exc:
+            # Machine-readable fail-closed artifact on quota, bad credentials,
+            # or provider outage: never synthesize prices or model predictions.
+            print("CFB_PAPER_PROVIDER_UNAVAILABLE " + type(exc).__name__)
+            return [], "ODDS_PROVIDER_UNAVAILABLE", "BLOCKED_PROVIDER_UNAVAILABLE"
         if not isinstance(events, list):
-            raise SystemExit("CFB_PAPER_PROVIDER_RESPONSE_NOT_ARRAY")
+            return [], "ODDS_PROVIDER_INVALID", "BLOCKED_PROVIDER_INVALID"
         return events, "ODDS_PROVIDER", "READY"
     return [], "MARKET_INPUT_UNAVAILABLE", "BLOCKED_NO_MARKET_INPUT"
 
@@ -144,7 +150,7 @@ def _selection_key(market_key, row):
     return (name.lower() if market_key == "totals" else name, float(point))
 
 
-def _book_markets(event):
+def _book_markets(event, *, now=None):
     out = {}
     for book in event.get("bookmakers", []):
         if not isinstance(book, dict):
@@ -157,6 +163,17 @@ def _book_markets(event):
             market_key = str(market.get("key") or "").strip().lower()
             if market_key not in SUPPORTED:
                 continue
+            if now is not None:
+                # Only accept a source-provided fresh timestamp for paid live
+                # quote comparisons. Manual test/research boards remain PAPER.
+                stamp = market.get("last_update") or book.get("last_update")
+                try:
+                    updated = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+                    age = (now - updated).total_seconds()
+                    if updated.tzinfo is None or not 0 <= age <= 600:
+                        continue
+                except (TypeError, ValueError, OverflowError):
+                    continue
             paired = pair_probs(market_key, market.get("outcomes", []))
             if paired:
                 markets[market_key] = paired
@@ -174,8 +191,11 @@ def build_payload(events, min_edge, now, market_input_source, input_status):
             continue
         if start.tzinfo is None or start <= now:
             continue
+        participants = ' | '.join(str(event.get(k) or '').lower() for k in ('home_team', 'away_team'))
+        if any(team in participants for team in ('illinois', 'northwestern', 'depaul', 'bradley', 'loyola chicago', 'roosevelt')):
+            continue
 
-        books = _book_markets(event)
+        books = _book_markets(event, now=now if market_input_source == "ODDS_PROVIDER" else None)
         dk = books.get("draftkings")
         if not dk:
             continue
@@ -201,6 +221,8 @@ def build_payload(events, min_edge, now, market_input_source, input_status):
 
                 consensus = sum(peer_probabilities) / len(peer_probabilities)
                 price = float(dk_row["price"])
+                if price < -165:
+                    continue  # Straight-wager cap; no SGP path in paper lane.
                 raw = implied(price)
                 decimal = 1 + (100 / abs(price) if price < 0 else price / 100)
                 ev_per_dollar = consensus * (decimal - 1) - (1 - consensus)
