@@ -1,0 +1,1745 @@
+[
+  {
+    "home": "West Virginia",
+    "away": "Arizona",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": -175
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": 145
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": -3.5,
+        "american_odds": -112
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": 3.5,
+        "american_odds": -108
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 60.5,
+        "american_odds": -115
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 60.5,
+        "american_odds": -105
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Nebraska",
+    "away": "Indiana",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": -340
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": 270
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": -8.5,
+        "american_odds": -108
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": 8.5,
+        "american_odds": -112
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 48.5,
+        "american_odds": -105
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 48.5,
+        "american_odds": -115
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Oklahoma State",
+    "away": "UCF",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 350
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -455
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 10.5,
+        "american_odds": -108
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -10.5,
+        "american_odds": -112
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 53.5,
+        "american_odds": -112
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 53.5,
+        "american_odds": -108
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Missouri",
+    "away": "Texas A&M",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 150
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -180
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 3.5,
+        "american_odds": -115
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -3.5,
+        "american_odds": -105
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 49.5,
+        "american_odds": -110
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 49.5,
+        "american_odds": -110
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Pittsburgh",
+    "away": "North Carolina",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 154
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -185
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 3.5,
+        "american_odds": -108
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -3.5,
+        "american_odds": -112
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 47.5,
+        "american_odds": -102
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 47.5,
+        "american_odds": -118
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "NC State",
+    "away": "Wake Forest",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": -166
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": 140
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": -3.5,
+        "american_odds": 100
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": 3.5,
+        "american_odds": -120
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 57.5,
+        "american_odds": -110
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 57.5,
+        "american_odds": -110
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Army",
+    "away": "Tulane",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 140
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -166
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 3.5,
+        "american_odds": -112
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -3.5,
+        "american_odds": -108
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 48.5,
+        "american_odds": -105
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 48.5,
+        "american_odds": -115
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Florida",
+    "away": "South Carolina",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 360
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -470
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 10.5,
+        "american_odds": -105
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -10.5,
+        "american_odds": -115
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 58.5,
+        "american_odds": -115
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 58.5,
+        "american_odds": -105
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Appalachian State",
+    "away": "Old Dominion",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 295
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -375
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 10,
+        "american_odds": -112
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -10,
+        "american_odds": -108
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 47.5,
+        "american_odds": -108
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 47.5,
+        "american_odds": -112
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "East Carolina",
+    "away": "Rice",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 300
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -380
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 10,
+        "american_odds": -110
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -10,
+        "american_odds": -110
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 46.5,
+        "american_odds": -110
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 46.5,
+        "american_odds": -110
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "UMass",
+    "away": "Miami OH",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": -198
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": 164
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": -4.5,
+        "american_odds": -112
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": 4.5,
+        "american_odds": -108
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 44.5,
+        "american_odds": -110
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 44.5,
+        "american_odds": -110
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Oklahoma",
+    "away": "Texas",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": -310
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": 250
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": -7.5,
+        "american_odds": -105
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": 7.5,
+        "american_odds": -115
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 39.5,
+        "american_odds": -105
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 39.5,
+        "american_odds": -115
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Vanderbilt",
+    "away": "Ole Miss",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": -355
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": 280
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": -9.5,
+        "american_odds": -112
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": 9.5,
+        "american_odds": -108
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 54.5,
+        "american_odds": -108
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 54.5,
+        "american_odds": -112
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Oregon",
+    "away": "UCLA",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 320
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -410
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 10.5,
+        "american_odds": -112
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -10.5,
+        "american_odds": -108
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 57.5,
+        "american_odds": -115
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 57.5,
+        "american_odds": -105
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Kansas State",
+    "away": "Houston",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 114
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -135
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 2.5,
+        "american_odds": -110
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -2.5,
+        "american_odds": -110
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 54.5,
+        "american_odds": -118
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 54.5,
+        "american_odds": -102
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "California",
+    "away": "Virginia Tech",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": -375
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": 295
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": -10,
+        "american_odds": -110
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": 10,
+        "american_odds": -110
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 53.5,
+        "american_odds": -108
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 53.5,
+        "american_odds": -112
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Georgia Tech",
+    "away": "Duke",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": -245
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": 200
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": -6.5,
+        "american_odds": -115
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": 6.5,
+        "american_odds": -105
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 44.5,
+        "american_odds": -105
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 44.5,
+        "american_odds": -115
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "North Texas",
+    "away": "Charlotte",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 1700
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -4500
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 28.5,
+        "american_odds": -108
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -28.5,
+        "american_odds": -112
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 58.5,
+        "american_odds": -105
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 58.5,
+        "american_odds": -115
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Western Michigan",
+    "away": "Kent State",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 440
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -600
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 14,
+        "american_odds": -112
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -14,
+        "american_odds": -108
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 43.5,
+        "american_odds": -110
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 43.5,
+        "american_odds": -110
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Toledo",
+    "away": "Buffalo",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 700
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -1100
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 18.5,
+        "american_odds": -108
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -18.5,
+        "american_odds": -112
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 55.5,
+        "american_odds": -105
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 55.5,
+        "american_odds": -115
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Notre Dame",
+    "away": "Stanford",
+    "quotes": [
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 39.5,
+        "american_odds": -108
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -39.5,
+        "american_odds": -112
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 54.5,
+        "american_odds": -110
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 54.5,
+        "american_odds": -110
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Navy",
+    "away": "Tulsa",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 102
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -122
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 1.5,
+        "american_odds": -105
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -1.5,
+        "american_odds": -115
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 48.5,
+        "american_odds": -108
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 48.5,
+        "american_odds": -112
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Ohio",
+    "away": "Central Michigan",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 110
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -130
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 2.5,
+        "american_odds": -118
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -2.5,
+        "american_odds": -102
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 46.5,
+        "american_odds": -108
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 46.5,
+        "american_odds": -112
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Akron",
+    "away": "Eastern Michigan",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": -218
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": 180
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": -5.5,
+        "american_odds": -110
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": 5.5,
+        "american_odds": -110
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 51.5,
+        "american_odds": -115
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 51.5,
+        "american_odds": -105
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Temple",
+    "away": "UConn",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 150
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -180
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 3.5,
+        "american_odds": -108
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -3.5,
+        "american_odds": -112
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 54.5,
+        "american_odds": -115
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 54.5,
+        "american_odds": -105
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Arkansas",
+    "away": "Tennessee",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": -550
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": 410
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": -13.5,
+        "american_odds": -115
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": 13.5,
+        "american_odds": -105
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 51.5,
+        "american_odds": -105
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 51.5,
+        "american_odds": -115
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Ohio State",
+    "away": "Maryland",
+    "quotes": [
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 33.5,
+        "american_odds": -112
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -33.5,
+        "american_odds": -108
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 56.5,
+        "american_odds": -110
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 56.5,
+        "american_odds": -110
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Oregon State",
+    "away": "San Diego State",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 525
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -750
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 16.5,
+        "american_odds": -112
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -16.5,
+        "american_odds": -108
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 52.5,
+        "american_odds": -110
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 52.5,
+        "american_odds": -110
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Kentucky",
+    "away": "LSU",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": -345
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": 275
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": -8.5,
+        "american_odds": -112
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": 8.5,
+        "american_odds": -108
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 50.5,
+        "american_odds": -115
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 50.5,
+        "american_odds": -105
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Marshall",
+    "away": "Coastal Carolina",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 154
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -185
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 4,
+        "american_odds": -108
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -4,
+        "american_odds": -112
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 58.5,
+        "american_odds": -108
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 58.5,
+        "american_odds": -112
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Memphis",
+    "away": "UAB",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 455
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -625
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 14.5,
+        "american_odds": -108
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -14.5,
+        "american_odds": -112
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 53.5,
+        "american_odds": -115
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 53.5,
+        "american_odds": -105
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "UTEP",
+    "away": "Nevada",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": -375
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": 295
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": -9.5,
+        "american_odds": -115
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": 9.5,
+        "american_odds": -105
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 49.5,
+        "american_odds": -105
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 49.5,
+        "american_odds": -115
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Alabama",
+    "away": "Georgia",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 105
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -125
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 2.5,
+        "american_odds": -115
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -2.5,
+        "american_odds": -105
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 51.5,
+        "american_odds": -108
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 51.5,
+        "american_odds": -112
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Penn State",
+    "away": "USC",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 102
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -122
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 1.5,
+        "american_odds": -108
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -1.5,
+        "american_odds": -112
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 54.5,
+        "american_odds": -112
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 54.5,
+        "american_odds": -108
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Georgia Southern",
+    "away": "James Madison",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": -310
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": 250
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": -7.5,
+        "american_odds": -105
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": 7.5,
+        "american_odds": -115
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 51.5,
+        "american_odds": -110
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 51.5,
+        "american_odds": -110
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Virginia",
+    "away": "Syracuse",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 340
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -440
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 11.5,
+        "american_odds": -110
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -11.5,
+        "american_odds": -110
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 49.5,
+        "american_odds": -110
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 49.5,
+        "american_odds": -110
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Louisiana Tech",
+    "away": "Louisiana",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 130
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -155
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 3,
+        "american_odds": -108
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -3,
+        "american_odds": -112
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 48.5,
+        "american_odds": -102
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 48.5,
+        "american_odds": -118
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Utah",
+    "away": "Kansas",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 500
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -700
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 15.5,
+        "american_odds": -110
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -15.5,
+        "american_odds": -110
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 51.5,
+        "american_odds": -105
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 51.5,
+        "american_odds": -115
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Purdue",
+    "away": "Minnesota",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": -142
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": 120
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": -2.5,
+        "american_odds": -115
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": 2.5,
+        "american_odds": -105
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 50.5,
+        "american_odds": -108
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 50.5,
+        "american_odds": -112
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Fresno State",
+    "away": "Boise State",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": -258
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": 210
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": -7,
+        "american_odds": -110
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": 7,
+        "american_odds": -110
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 48.5,
+        "american_odds": -110
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 48.5,
+        "american_odds": -110
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "home": "Arizona State",
+    "away": "Hawaii",
+    "quotes": [
+      {
+        "market": "MONEYLINE",
+        "side": "AWAY",
+        "american_odds": 900
+      },
+      {
+        "market": "MONEYLINE",
+        "side": "HOME",
+        "american_odds": -1600
+      },
+      {
+        "market": "SPREAD",
+        "side": "AWAY",
+        "line": 21,
+        "american_odds": -112
+      },
+      {
+        "market": "SPREAD",
+        "side": "HOME",
+        "line": -21,
+        "american_odds": -108
+      },
+      {
+        "market": "TOTAL",
+        "side": "OVER",
+        "line": 50.5,
+        "american_odds": -115
+      },
+      {
+        "market": "TOTAL",
+        "side": "UNDER",
+        "line": 50.5,
+        "american_odds": -105
+      }
+    ],
+    "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED",
+    "quote_captured_at": "2026-10-10T09:54:14Z",
+    "book_quote_receipt_verified": false
+  }
+]
