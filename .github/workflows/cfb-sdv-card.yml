@@ -24,6 +24,10 @@ on:
         description: "Optional ISO timestamp; blank = now"
         required: false
         type: string
+      reference_books_json:
+        description: "Optional independently supplied timestamped 2+ bookmaker pairs for research-only price comparison"
+        required: false
+        type: string
   pull_request:
     paths:
       - scripts/run_cfb_sdv_card_v2.py
@@ -46,8 +50,8 @@ jobs:
         with:
           python-version-file: '.python-version'
       - run: python -m pip install --disable-pip-version-check -r requirements-test.txt
-      - name: Test card invariants
-        run: python -m unittest tests.test_cfb_sdv_card_v2 -v
+      - name: Test card invariants and independent market-consensus invariants
+        run: python -m unittest tests.test_cfb_sdv_card_v2 tests.test_cfb_independent_consensus -v
       - name: Capture public SportsDataverse native CFB inputs
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         shell: bash
@@ -86,6 +90,18 @@ jobs:
         run: |
           python -m unittest tests.test_cfb_sdv_total_bias_audit -v
           python scripts/audit_cfb_sdv_total_bias.py --card artifacts/run_it/cfb_sdv_card.json --output artifacts/run_it/cfb_sdv_total_bias_audit.json | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Independently compare target DK price to external books (research only)
+        if: github.event_name == 'workflow_dispatch' && inputs.reference_books_json != ''
+        env:
+          REFERENCE_BOOKS_JSON: ${{ inputs.reference_books_json }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$REFERENCE_BOOKS_JSON" > "$RUNNER_TEMP/cfb_reference_books.json"
+          python scripts/research_cfb_independent_consensus.py \
+            --card artifacts/run_it/cfb_sdv_card.json \
+            --reference-books "$RUNNER_TEMP/cfb_reference_books.json" \
+            --output artifacts/run_it/cfb_sdv_independent_consensus.json | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Upload captured public source evidence
         if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -102,5 +118,6 @@ jobs:
           path: |
             artifacts/run_it/cfb_sdv_card.json
             artifacts/run_it/cfb_sdv_total_bias_audit.json
+            artifacts/run_it/cfb_sdv_independent_consensus.json
           if-no-files-found: warn
           retention-days: 14
