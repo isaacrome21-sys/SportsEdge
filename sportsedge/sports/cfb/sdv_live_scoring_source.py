@@ -238,7 +238,13 @@ def build_live_rows(board, *, directory, now, expand_compact, normalize_name):
         home_id, away_id = _team_id(game["home_id"]), _team_id(game["away_id"])
         current = current_cache[week]
         if any(tid not in current or tid not in prior_by_id for tid in (home_id, away_id)):
-            raise SDVLiveError(f"CFB_SDV_LIVE_MISSING_SNAPSHOT:{away}@{home}")
+            # An incomplete FCS/opponent history makes THIS game ineligible,
+            # not every independently supported FBS game on the same board.
+            # Fail closed per game: never impute missing team snapshots or
+            # turn the full card into a market-only fallthrough.
+            reason = f"CFB_SDV_LIVE_MISSING_SNAPSHOT:{away}@{home}"
+            print("SKIPPED", reason)
+            continue
         hp, ap = prior_by_id[home_id], prior_by_id[away_id]
         hc, ac = current[home_id], current[away_id]
         # The frozen prior/current blend expects both snapshots and the native
