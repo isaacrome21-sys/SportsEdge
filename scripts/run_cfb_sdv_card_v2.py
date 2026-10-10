@@ -660,7 +660,7 @@ def attach_cfb_both_sides(payload: dict) -> dict:
     return payload
 
 
-PROBATION_POLICY_PATH = ROOT / "config" / "cfb_probation_policy_v2.json"
+PROBATION_POLICY_PATH = ROOT / "config" / "cfb_probation_policy_v3.json"
 
 
 def _slate_total_bias_signal(payload: dict) -> str:
@@ -675,6 +675,19 @@ def _slate_total_bias_signal(payload: dict) -> str:
     except Exception as exc:
         print("CFB_SDV_PROBATION_BIAS_AUDIT_UNAVAILABLE", type(exc).__name__, str(exc)[:120])
         return "UNAVAILABLE"
+
+
+def _sharp_ev(r: dict):
+    """EV of the DK price against a sharp-book no-vig fair probability; None if absent."""
+    try:
+        fp = float(r["sharp_fair_p"])
+        a = float(r["american_odds"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not 0.0 < fp < 1.0 or a == 0:
+        return None
+    dec = 1.0 + (a / 100.0 if a > 0 else 100.0 / -a)
+    return fp * dec - 1.0
 
 
 def apply_probation(payload: dict, policy_path: Path = PROBATION_POLICY_PATH) -> dict:
@@ -703,6 +716,12 @@ def apply_probation(payload: dict, policy_path: Path = PROBATION_POLICY_PATH) ->
             reason = "TOTAL_BIAS_AUDIT_UNAVAILABLE"
         elif r.get("market") == "TOTAL" and r.get("side") == blocked_total_side:
             reason = "TOTAL_IN_DIRECTION_OF_SLATE_BIAS:" + signal
+        elif float(r.get("edge") or 0) > float(policy.get("max_model_edge", 1.0)):
+            reason = "MODEL_EDGE_ABOVE_SANITY_CAP"
+        elif "min_sharp_ev" in policy and _sharp_ev(r) is None:
+            reason = "NO_SHARP_REFERENCE"
+        elif "min_sharp_ev" in policy and _sharp_ev(r) < float(policy["min_sharp_ev"]):
+            reason = "DK_PRICE_DOES_NOT_BEAT_SHARP_FAIR"
         elif r.get("devig") != "PAIRED_PROPORTIONAL" or float(r.get("american_odds") or 0) < -165:
             reason = "PRICE_OR_PAIRING_INVALID"
         r["probation"] = False
@@ -731,6 +750,7 @@ def apply_probation(payload: dict, policy_path: Path = PROBATION_POLICY_PATH) ->
         "policy_sha256": hashlib.sha256(raw).hexdigest(),
         "stake_units": float(policy["stake_units"]),
         "slate_total_bias_signal": signal,
+        "sharp_reference_required": "min_sharp_ev" in policy,
         "count": len(chosen),
         "max_probation_per_slate": slate_cap,
         "max_probation_per_market": {k: int(v) for k, v in market_caps.items()},
