@@ -44,6 +44,75 @@ def _history_rows(raw: object) -> list:
 
 
 
+QB_PROP_MARKETS = frozenset({"passing_yards", "pass_yards", "pass_attempts", "completions", "pass_tds", "interceptions"})
+
+
+def _last_start_qb(history: list, team: str, asof: date) -> dict | None:
+    """Most recent strictly-prior nflverse game for `team` with a listed starting QB."""
+    best = None
+    for g in history:
+        day = str(g.get("date") or "")[:10]
+        if not day or day >= asof.isoformat():
+            continue
+        if g.get("home") == team:
+            qb = g.get("home_qb")
+        elif g.get("away") == team:
+            qb = g.get("away_qb")
+        else:
+            continue
+        if qb and (best is None or day > best["date"]):
+            best = {"qb": str(qb), "date": day}
+    return best
+
+
+def _name_key(name: str) -> str:
+    parts = [p for p in str(name).replace(".", " ").split() if p]
+    return parts[-1].lower() if parts else ""
+
+
+def game_context(game: dict, history: list, asof: date, feat: dict, forecast: dict | None) -> dict:
+    """Facts behind the card, only from data this run actually retrieved.
+
+    Sources: nflverse games history (scores, listed starting QBs) and the
+    pasted DK lines. Injuries/inactives are NOT retrieved, so they are never shown.
+    """
+    home, away = str(game["home"]), str(game["away"])
+    ctx: dict = {"sources": []}
+    if history:
+        ctx["sources"].append("nflverse games")
+    if feat.get("ok") and forecast is not None:
+        f = feat["features"]
+        ctx["projection"] = {
+            "total": round(float(forecast["total"]), 1),
+            "home_margin": round(float(forecast["margin"]), 1),
+            "home_pf": round(float(f["home_points_for"]), 1),
+            "home_pa": round(float(f["home_points_against"]), 1),
+            "away_pf": round(float(f["away_points_for"]), 1),
+            "away_pa": round(float(f["away_points_against"]), 1),
+            "home_games": feat.get("home_prior_games"),
+            "away_games": feat.get("away_prior_games"),
+        }
+    qbs = {}
+    for team in (away, home):
+        last = _last_start_qb(history, team, asof) if history else None
+        if last:
+            qbs[team] = last
+    if qbs:
+        ctx["last_start_qb"] = qbs
+    prop_qbs = sorted({
+        str(m["player"]) for m in game.get("markets") or []
+        if m.get("player") and str(m.get("market")) in QB_PROP_MARKETS
+    })
+    if prop_qbs:
+        ctx["dk_qb_props"] = prop_qbs
+        if qbs:
+            known = {_name_key(v["qb"]) for v in qbs.values()}
+            unmatched = [n for n in prop_qbs if _name_key(n) not in known]
+            if unmatched:
+                ctx["qb_change_flag"] = unmatched
+    return ctx
+
+
 def _board_rows_from_games(games: list) -> list[dict]:
     """Expand phone markets into both offered sides. Does not invent a missing price."""
     rows = []
@@ -66,13 +135,17 @@ def _board_rows_from_games(games: list) -> list[dict]:
             for side, price in sides:
                 if price in (None, ""):
                     continue
+                line = raw.get("line")
+                # Phone spread lines are quoted from the away side; the home side is the mirror.
+                if market == "spread" and side == "HOME" and line is not None:
+                    line = -float(line)
                 rows.append({
                     "game_id": game_id,
                     "market": surface,
                     "provider_market": surface,
                     "side": side,
                     "selection": side,
-                    "line": raw.get("line"),
+                    "line": line,
                     "american_odds": price,
                     "entity_id": raw.get("player") or raw.get("team"),
                     "team_side": raw.get("team"),
@@ -191,7 +264,8 @@ def main() -> int:
                     leans.append(pick)
                 row = {**raw, "no_model": None, "pick": None, "lean": pick}
             markets.append(row)
-        games_out.append({**game, "markets": markets, "picks": picks, "leans": leans, "features": feat})
+        context = game_context(game, history, asof, feat, forecast)
+        games_out.append({**game, "markets": markets, "picks": picks, "leans": leans, "features": feat, "context": context})
     payload = {
         "sport": "NFL",
         "context_bound": False,
@@ -201,6 +275,7 @@ def main() -> int:
             "No bets: no NFL market on this card has beaten breakeven out of sample yet. "
             "Leans are tracking-only, not bets."
         ),
+        # Machine-only governance tag; the phone card never prints it.
         "authority_footer": "NOT Model_P / NOT Truth Gate / NOT OFFICIAL",
     }
     payload = attach_nfl_phone_board(payload)

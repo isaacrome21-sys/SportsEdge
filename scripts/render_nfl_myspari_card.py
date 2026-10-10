@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
-"""Render the NFL phone card. PRE-CONTEXT heading until context is bound."""
+"""Render the NFL phone card: picks/leans with prices and edges, plus retrieved reasons."""
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
 import json
 
-from sportsedge.nfl_attempt9_live_forecast import market_eligibility
-from sportsedge.sports.nfl.attempt9_model_p import model_probability
-from sportsedge.nfl_attempt9_live_forecast import load_model_p
-
-PRE_CONTEXT = "PRE-CONTEXT · NOT FINAL"
-FOOTER = "NOT Model_P / NOT Truth Gate / NOT OFFICIAL"
+from sportsedge.nfl_attempt9_live_forecast import (
+    NO_MODEL_HISTORY,
+    NO_MODEL_INTEGER,
+    NO_MODEL_MARKET,
+    NO_MODEL_MONEYLINE,
+    NO_MODEL_SPREAD,
+    market_eligibility,
+)
 # research_notes/nfl_team_total_prop_backtest_20261003.md
 TEAM_TOTAL_NOTE = (
     "TRACK ONLY (not a bet): team totals tested, no edge "
@@ -40,7 +42,7 @@ def _track_note(row: dict) -> str | None:
 
 
 def both_side_section(engine: dict) -> str:
-    """Quoted both sides, then unquoted catalog families. Not a bet list."""
+    """Quoted both sides (collapsed for phones), then unquoted catalog families. Not a bet list."""
     board = engine.get("full_board") or {}
     rows = list(board.get("rows") or [])
     if not rows:
@@ -57,36 +59,166 @@ def both_side_section(engine: dict) -> str:
         summary["prop_rows"] = board["summary"]["prop_rows"]
         engine["summary"] = summary
         rows = list(board.get("rows") or [])
-    summary = board.get("summary") or engine.get("summary") or {}
-    quoted = [row for row in rows if row.get("reason") != "NO_QUOTE_OR_ENGINE_ROW"]
-    missing = sorted({str(row.get("market") or "") for row in rows if row.get("reason") == "NO_QUOTE_OR_ENGINE_ROW"})
+    # Only rows tied to a pasted game. Game-less catalog placeholders are named in one line below.
+    quoted = [row for row in rows if row.get("game_id") and row.get("reason") != "NO_QUOTE_OR_ENGINE_ROW"]
+    priced = [row for row in quoted if row.get("american_odds") is not None]
+    unpriced = [row for row in quoted if row.get("american_odds") is None]
+    missing = sorted({
+        str(row.get("market") or "") for row in rows
+        if not row.get("game_id") or row.get("reason") == "NO_QUOTE_OR_ENGINE_ROW"
+    } - {str(row.get("market") or "") for row in priced})
     lines = [
         "",
-        "All props, sides, and totals",
-        f"both_sides={summary.get('both_sides')} catalog_complete={summary.get('catalog_complete')} "
-        f"sides={summary.get('side_rows')} totals={summary.get('total_rows')} props={summary.get('prop_rows')}",
-        "TRACK ONLY. Both offered sides are listed. A missing quote is BLOCKED, not omitted. Not a bet.",
+        f"<details><summary>Both sides of every pasted line ({len(priced)} rows, track only)</summary>",
         "",
-        "| game | market | entity | side | line | odds | note |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| game | market | player/team | side | line | odds |",
+        "| --- | --- | --- | --- | --- | --- |",
     ]
-    quoted.sort(key=lambda row: (str(row.get("game_id") or ""), str(row.get("market") or ""), str(row.get("entity_id") or ""), str(row.get("selection") or row.get("side") or "")))
-    for row in quoted:
+    priced.sort(key=lambda row: (str(row.get("game_id") or ""), str(row.get("market") or ""), str(row.get("entity_id") or ""), str(row.get("selection") or row.get("side") or "")))
+    for row in priced:
         lines.append(
-            "| {game} | {market} | {entity} | {side} | {line} | {odds} | {note} |".format(
+            "| {game} | {market} | {entity} | {side} | {line} | {odds} |".format(
                 game=row.get("game_id") or "",
                 market=row.get("market") or "",
                 entity=row.get("entity_id") or "",
                 side=row.get("selection") or row.get("side") or "",
                 line="" if row.get("line") is None else row.get("line"),
-                odds="" if row.get("american_odds") is None else row.get("american_odds"),
-                note="Price needed" if row.get("american_odds") is None else "TRACK ONLY",
+                odds=fmt_price(row.get("american_odds")),
             )
         )
-    if not quoted:
-        lines.append("| | | | | | | No quoted props, sides, or totals |")
+    if not priced:
+        lines.append("| | | | | | No quoted props, sides, or totals |")
+    if unpriced:
+        lines += ["", f"{len(unpriced)} opposite side(s) had no price in the paste, so they are blocked."]
     if missing:
-        lines += ["", "Unquoted catalog families (both sides BLOCKED, not omitted): " + ", ".join(missing)]
+        lines += ["", "Not pasted (blocked, not priced): " + ", ".join(m for m in missing if m)]
+    lines += ["", "</details>"]
+    return "\n".join(lines) + "\n"
+
+
+NO_MODEL_TEXT = {
+    NO_MODEL_MONEYLINE: "no pick: no moneyline model yet",
+    NO_MODEL_SPREAD: "no pick: spreads held until a margin model is validated",
+    NO_MODEL_INTEGER: "no pick: whole-number line needs a push model",
+    NO_MODEL_HISTORY: "no pick: not enough prior games for one team",
+    NO_MODEL_MARKET: "no pick: market not modeled",
+}
+
+
+def _plain_reason(code: str) -> str:
+    return NO_MODEL_TEXT.get(str(code), str(code))
+
+
+def _market_label(row: dict, away: str, home: str) -> str:
+    market = str(row.get("market") or "")
+    a = fmt_price(row.get("away_or_over_price"))
+    h = fmt_price(row.get("home_or_under_price"))
+    line = row.get("line")
+    if market == "moneyline":
+        return f"ML {away} {a} / {home} {h}"
+    if market == "spread" and line is not None:
+        ln = float(line)
+        return f"Spread {away} {ln:+g} {a} / {home} {-ln:+g} {h}"
+    if market == "total" and line is not None:
+        return f"Total {float(line):g} o{a} / u{h}"
+    return str(row.get("raw") or market)
+
+
+def why_lines(game: dict) -> list[str]:
+    """Reasons behind the card. Only facts this run actually retrieved; nothing else is printed."""
+    ctx = game.get("context") or {}
+    away, home = str(game.get("away")), str(game.get("home"))
+    out: list[str] = []
+    proj = ctx.get("projection")
+    if proj:
+        margin = float(proj["home_margin"])
+        fav = home if margin >= 0 else away
+        out.append(f"- Model (Attempt 9): total {proj['total']:g}, {fav} by {abs(margin):g}")
+        out.append(
+            f"- Recent scoring, weighted last 10: {away} {proj['away_pf']:g} for / {proj['away_pa']:g} against; "
+            f"{home} {proj['home_pf']:g} / {proj['home_pa']:g}"
+        )
+    qbs = ctx.get("last_start_qb") or {}
+    if qbs:
+        parts = [f"{team} {qbs[team]['qb']} ({qbs[team]['date'][5:]})" for team in (away, home) if team in qbs]
+        out.append("- Last listed starting QB (nflverse): " + "; ".join(parts))
+    if ctx.get("qb_change_flag"):
+        out.append(
+            "- QB check: DK has passing props for " + ", ".join(ctx["qb_change_flag"])
+            + ", who was not either team's last starter. Possible QB change; confirm before using any lean."
+        )
+    if out:
+        out.insert(0, "Why (from " + ", ".join(ctx.get("sources") or ["retrieved data"]) + "):")
+        out.append("- Injuries/inactives: not checked by this card.")
+    return out
+
+
+def render(engine: dict) -> str:
+    games = engine.get("games") or []
+    title = " · ".join(f"{g.get('away')} @ {g.get('home')}" for g in games[:3])
+    if len(games) > 3:
+        title += f" +{len(games) - 3} more"
+    lines = [f"**NFL card** — {title or 'no games'}", ""]
+    if not any(g.get("picks") for g in games) and engine.get("empty_reason"):
+        lines += [str(engine["empty_reason"]), ""]
+    for game in games:
+        away, home = str(game.get("away")), str(game.get("home"))
+        lines.append(f"### {away} @ {home}")
+        picks_out: list[str] = []
+        other: list[str] = []
+        team_totals: list[str] = []
+        props: list[str] = []
+        for row in game.get("markets") or []:
+            label = _market_label(row, away, home)
+            note = _track_note(row)
+            if note == PROP_NOTE:
+                props.append(f"  - {label}")
+                continue
+            if note == TEAM_TOTAL_NOTE:
+                team_totals.append(f"  - {label}")
+                continue
+            reason = row.get("no_model") or market_eligibility(row.get("market"), row.get("line"))
+            if reason:
+                other.append(f"- {label}: {_plain_reason(reason)}")
+                continue
+            pick = row.get("pick")
+            lean = row.get("lean")
+            if pick:
+                picks_out.append(
+                    f"- **BET** {pick['selection']} {pick.get('line', '')} @ {fmt_price(pick['price_american'])}"
+                    f" · EV {pick.get('ev_per_dollar', 0) * 100:+.1f}%"
+                    f" · edge {pick.get('edge_probability_points', 0) * 100:+.1f} pts vs no-vig"
+                )
+            elif lean:
+                picks_out.append(
+                    f"- LEAN (no proven edge, not a bet): {lean['selection']} {lean.get('line', '')} @ {fmt_price(lean['price_american'])}"
+                    f" · model EV {lean.get('ev_per_dollar', 0) * 100:+.1f}%"
+                    f" · edge {lean.get('edge_probability_points', 0) * 100:+.1f} pts vs no-vig"
+                )
+            else:
+                other.append(f"- {label}: no lean (model edge under 2% EV)")
+        lines += picks_out + other
+        if team_totals:
+            lines.append(f"- Team totals ({len(team_totals)}): {TEAM_TOTAL_NOTE}")
+            lines += team_totals
+        if props:
+            lines += [
+                "",
+                f"<details><summary>Props ({len(props)}): TRACK ONLY (not a bet)</summary>",
+                "",
+                f"{PROP_NOTE}",
+                "",
+                *props,
+                "",
+                "</details>",
+            ]
+        why = why_lines(game)
+        if why:
+            lines += [""] + why
+        lines.append("")
+    if any(g.get("leans") for g in games):
+        lines.append("Leans: Attempt 9 totals hit 49.7% out of sample vs closing lines (breakeven 52.4%). Track only.")
+    lines.append(both_side_section(engine))
     return "\n".join(lines) + "\n"
 
 
@@ -94,50 +226,13 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--engine-output", required=True)
     ap.add_argument("--snapshot", required=True)
-    ap.add_argument("--pre-context", action="store_true")
+    ap.add_argument("--pre-context", action="store_true", help="kept for workflow compatibility; no effect on wording")
     ap.add_argument("--out-dir", required=True)
     args = ap.parse_args()
     engine = json.loads(Path(args.engine_output).read_text(encoding="utf-8"))
-    heading = PRE_CONTEXT if args.pre_context or not engine.get("context_bound") else "card"
-    lines = [f"NFL — {heading}", ""]
-    for game in engine.get("games") or []:
-        lines.append(f"{game.get('away')} @ {game.get('home')}")
-        for row in game.get("markets") or []:
-            reason = row.get("no_model") or market_eligibility(row.get("market"), row.get("line"))
-            note = _track_note(row)
-            if note:
-                lines.append(f"- {row.get('raw') or row.get('market')}: {note}")
-                continue
-            if reason:
-                lines.append(f"- {row.get('raw') or row.get('market')}: {reason}")
-                continue
-            pick = row.get("pick")
-            lean = row.get("lean")
-            if not pick and lean:
-                lines.append(
-                    f"- LEAN (no proven edge, not a bet): {lean['selection']} {lean.get('line', '')} @ {fmt_price(lean['price_american'])}"
-                    f"  model EV {lean.get('ev_per_dollar', 0):+.3f}"
-                )
-                continue
-            if not pick:
-                lines.append(f"- {row.get('market')}: no pick")
-                continue
-            lines.append(
-                f"- {pick['selection']} {pick.get('line', '')} @ {fmt_price(pick['price_american'])}"
-                f"  Score-B {pick.get('score_0_100', '—')}"
-                f"  EV {pick.get('ev_per_dollar', 0):+.3f}"
-            )
-        lines.append("")
-    if not any(g.get("picks") for g in engine.get("games") or []):
-        if engine.get("empty_reason"):
-            lines.append(str(engine["empty_reason"]))
-    if any(g.get("leans") for g in engine.get("games") or []):
-        lines.append("Leans: Attempt 9 totals hit 49.7% out of sample vs closing lines (breakeven 52.4%). Track only.")
-    lines.append(FOOTER)
-    lines.append(both_side_section(engine))
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    (out / "card.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (out / "card.md").write_text(render(engine), encoding="utf-8")
     return 0
 
 
