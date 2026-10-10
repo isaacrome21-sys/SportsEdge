@@ -60,5 +60,45 @@ class TotalsOffsetResearchTest(unittest.TestCase):
                 rows, train_through=(2026, 4), holdout_from=(2026, 5))
 
 
+
+    def test_claimed_pregame_capture_requires_vintage_identity(self):
+        rows = sample()
+        rows[0]["evidence_role"] = "CAPTURED_PREGAME_RESEARCH"
+        with self.assertRaisesRegex(ValueError, "TIMESTAMP_INVALID"):
+            evaluate_chronological(
+                rows, train_through=(2026, 4), holdout_from=(2026, 5))
+        rows[0].update({
+            "prediction_captured_at": "2026-09-11T18:00:00Z",
+            "kickoff_at": "2026-09-11T17:00:00Z",
+            "settled_at": "2026-09-12T05:00:00Z",
+            "source_sha256": "a" * 64,
+        })
+        with self.assertRaisesRegex(ValueError, "CAPTURE_NOT_PREGAME"):
+            evaluate_chronological(
+                rows, train_through=(2026, 4), holdout_from=(2026, 5))
+        rows[0]["prediction_captured_at"] = "2026-09-11T16:00:00Z"
+        rows[0]["source_sha256"] = "not-a-sha"
+        with self.assertRaisesRegex(ValueError, "SOURCE_HASH_REQUIRED"):
+            evaluate_chronological(
+                rows, train_through=(2026, 4), holdout_from=(2026, 5))
+        rows[0]["source_sha256"] = "a" * 64
+        out = evaluate_chronological(
+            rows, train_through=(2026, 4), holdout_from=(2026, 5))
+        self.assertIn("CAPTURED_PREGAME_RESEARCH", out["evidence_roles"])
+
+    def test_naive_timestamps_rejected_as_unproven_vintage(self):
+        rows = sample()
+        rows[0].update({
+            "evidence_role": "CAPTURED_PREGAME_RESEARCH",
+            "prediction_captured_at": "2026-09-11T16:00:00",
+            "kickoff_at": "2026-09-11T17:00:00Z",
+            "settled_at": "2026-09-12T05:00:00Z",
+            "source_sha256": "b" * 64,
+        })
+        with self.assertRaisesRegex(ValueError, "TIMESTAMP_INVALID"):
+            evaluate_chronological(
+                rows, train_through=(2026, 4), holdout_from=(2026, 5))
+
+
 if __name__ == "__main__":
     unittest.main()
