@@ -66,3 +66,49 @@ def test_parse_events_and_fetch_chunks():
     games, errors = fetch_results(date(2026, 10, 20), fetch=lambda u: (urls.append(u), ev)[1])
     assert len(games) == 1 and not errors
     assert "dates=20251001-20251031" in urls[0] and "20261019" in urls[-1]
+
+
+def test_free_text_notes_are_ignored_but_typos_fail_closed():
+    body = "Smoke test only. Synthetic quotes.\n" + BODY + "\nNotes: do not count as forward evidence.\n"
+    assert [(g.away, g.home) for g in parse_lines(body)] == [("BOS", "NYK"), ("GSW", "LAL")]
+    with pytest.raises(NBALinesError):
+        parse_lines("Celtics @ Knicks\nSprad +3.5 -110 -110")
+
+
+def test_fetch_falls_back_to_per_day_after_http_400():
+    from datetime import date
+    from scripts.run_nba_lines_issue import FetchError
+
+    day_ev = lambda d: {"events": [
+        {"id": d, "date": f"{d[:4]}-{d[4:6]}-{d[6:]}T00:00Z", "season": {"year": 2026, "type": 2},
+         "competitions": [{"status": {"type": {"completed": True}}, "competitors": [
+             {"homeAway": "home", "score": "110", "team": {"abbreviation": "NY"}},
+             {"homeAway": "away", "score": "100", "team": {"abbreviation": "BOS"}}]}]}]}
+    urls = []
+
+    def fetch(u):
+        urls.append(u)
+        q = u.split("dates=")[1].split("&")[0]
+        if "-" in q:
+            raise FetchError("ESPN_FETCH_FAILED:HTTP 400", client=True)
+        return day_ev(q)
+
+    games, errors = fetch_results(date(2026, 10, 10), fetch=fetch)
+    assert not errors
+    day_urls = [u for u in urls if "-" not in u.split("dates=")[1]]
+    days = {u.split("dates=")[1] for u in day_urls}
+    assert "20251001" in days and "20261009" in days and "20261010" not in days
+    assert not any(d[4:6] in ("07", "08", "09") and d[:4] == "2026" for d in days)
+    assert len(games) == len(days) == len(day_urls)
+    assert sum("-" in u.split("dates=")[1] for u in urls) == 1  # one range attempt, then per-day
+
+
+def test_fetch_server_errors_skip_month_without_fallback():
+    from datetime import date
+    from scripts.run_nba_lines_issue import FetchError
+
+    def fetch(u):
+        raise FetchError("ESPN_FETCH_FAILED:URLError:timeout")
+
+    games, errors = fetch_results(date(2026, 10, 10), fetch=fetch)
+    assert games == [] and len(errors) == 13
