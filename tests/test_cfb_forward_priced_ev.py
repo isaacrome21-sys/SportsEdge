@@ -135,6 +135,16 @@ class ForwardPricedEVTest(unittest.TestCase):
         self.assertTrue(all(r["illinois_college_excluded"] for r in report["results"]))
         self.assertEqual(report["shadow_candidates"], 0)
 
+    def test_market_only_fallback_is_safe_empty_research(self):
+        source = card()
+        source["model_status"] = "MARKET_ONLY:CFBD_RATE_LIMITED"
+        snapshot = export_snapshot(source, original_card_sha256=HASH)
+        report = evaluate(snapshot)
+        self.assertEqual(report["shadow_candidates"], 0)
+        self.assertEqual(report["paired_market_count"], 0)
+        self.assertEqual(report["status"], "NO_PREGAME_MODEL_ROWS_OR_MARKET_ONLY")
+        self.assertFalse(report["bets_enabled"])
+
     def test_model_provenance_and_chronology_fail_closed(self):
         source = snap()
         source["games"][0]["scored_at"] = "2026-10-10T03:00:00Z"
