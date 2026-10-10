@@ -62,10 +62,33 @@ def test_expected_bookmaker_keys_are_provider_supported():
     assert "betonlineag" in BOOKS
     assert "caesars" not in BOOKS
 
-def test_failed_provider_does_not_fabricate_paper_edges():
+def test_key_never_enables_provider_access():
     from scripts.run_cfb_paper_market import load_events
-    with patch("scripts.run_cfb_paper_market.fetch", side_effect=TimeoutError("fake")):
-        rows, source, status = load_events("fake-test-key")
+    with patch('urllib.request.urlopen', side_effect=AssertionError('network forbidden')):
+        rows, source, status = load_events('ignored-test-key')
     assert rows == []
-    assert source == "ODDS_PROVIDER_UNAVAILABLE"
-    assert status == "BLOCKED_PROVIDER_UNAVAILABLE"
+    assert source == 'MARKET_INPUT_UNAVAILABLE'
+    assert status == 'BLOCKED_NO_MARKET_INPUT'
+
+
+def test_workflow_uses_supplied_prices_only():
+    from pathlib import Path
+    workflow = Path('.github/workflows/cfb-paper-market-card.yml').read_text()
+    assert 'secrets.' not in workflow
+    assert '  push:' not in workflow
+    assert 'required: true' in workflow
+    assert 'CFB_SCAN_BLOCKED:' in workflow
+    assert 'if: always()' in workflow
+
+
+def test_coverage_distinguishes_blocked_scan_and_rejected_selections():
+    blocked = build_payload([], .02, NOW, 'MARKET_INPUT_UNAVAILABLE', 'BLOCKED_NO_MARKET_INPUT')
+    assert blocked['coverage']['scan_completed'] is False
+    assert blocked['coverage']['events_received'] == 0
+    good = build_payload([event()], .02, NOW, 'ODDS_PROVIDER', 'READY')
+    assert good['coverage']['games_with_usable_draftkings'] == 1
+    assert good['coverage']['draftkings_selections'] == 2
+    assert good['coverage']['candidate_count'] == 1
+    assert good['coverage']['straight_price_cap'] == 1
+    stale = build_payload([event(updated='2026-10-09T01:00:00Z')], .02, NOW, 'ODDS_PROVIDER', 'READY')
+    assert stale['coverage']['no_usable_draftkings_market'] == 1
