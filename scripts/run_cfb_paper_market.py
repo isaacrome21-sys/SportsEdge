@@ -144,7 +144,7 @@ def _selection_key(market_key, row):
     return (name.lower() if market_key == "totals" else name, float(point))
 
 
-def _book_markets(event):
+def _book_markets(event, *, now=None):
     out = {}
     for book in event.get("bookmakers", []):
         if not isinstance(book, dict):
@@ -157,6 +157,17 @@ def _book_markets(event):
             market_key = str(market.get("key") or "").strip().lower()
             if market_key not in SUPPORTED:
                 continue
+            if now is not None:
+                # Only accept a source-provided fresh timestamp for paid live
+                # quote comparisons. Manual test/research boards remain PAPER.
+                stamp = market.get("last_update") or book.get("last_update")
+                try:
+                    updated = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+                    age = (now - updated).total_seconds()
+                    if updated.tzinfo is None or not 0 <= age <= 600:
+                        continue
+                except (TypeError, ValueError, OverflowError):
+                    continue
             paired = pair_probs(market_key, market.get("outcomes", []))
             if paired:
                 markets[market_key] = paired
@@ -178,7 +189,7 @@ def build_payload(events, min_edge, now, market_input_source, input_status):
         if any(team in participants for team in ('illinois', 'northwestern', 'depaul', 'bradley', 'loyola chicago', 'roosevelt')):
             continue
 
-        books = _book_markets(event)
+        books = _book_markets(event, now=now if market_input_source == "ODDS_PROVIDER" else None)
         dk = books.get("draftkings")
         if not dk:
             continue
