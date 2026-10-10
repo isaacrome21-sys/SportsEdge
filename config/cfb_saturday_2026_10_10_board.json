@@ -136,12 +136,12 @@
     "book_quote_receipt_verified": false
   },
   {
-    "away": "Oklahoma",
-    "home": "Texas",
+    "away": "Texas",
+    "home": "Oklahoma",
     "spread": [
-      7.5,
-      -115,
-      -105
+      -7.5,
+      -105,
+      -115
     ],
     "total": [
       39.5,
@@ -150,7 +150,8 @@
     ],
     "start_ts": "2026-10-10T19:30:00Z",
     "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
-    "book_quote_receipt_verified": false
+    "book_quote_receipt_verified": false,
+    "neutral_field_home_team_source": "SCHEDULE_TEXAS_AT_OKLAHOMA_NEUTRAL_SITE"
   },
   {
     "away": "UCLA",
