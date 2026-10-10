@@ -72,6 +72,9 @@ def _pair_valid(quote, quotes):
 
 def _select_pre_result(game):
     """Decide hypothetical positions using only originally captured fields."""
+    # Illinois college selections are excluded from straight-bet research cards.
+    if "illinois" in str(game.get("matchup") or "").lower():
+        return []
     quotes = game.get("quoted_selections") or []
     if not isinstance(quotes, list):
         raise ValueError("CFB_VALUE_QUOTES_NOT_LIST")
@@ -89,7 +92,20 @@ def _select_pre_result(game):
             edge = p - fair
             odds = _float(quote.get("american_odds"), "american_odds")
             payout = _profit_multiplier(odds)
-            roi = p * (1.0 + payout) - 1.0
+            push_raw = quote.get("model_push_p_unvalidated")
+            push = (_float(push_raw, "model_push_p") if push_raw is not None else None)
+            line = _float(quote.get("line"), "line")
+            whole = abs(line - round(line)) < 1e-8
+            if push is not None and not 0 <= push < 1:
+                raise ValueError("CFB_VALUE_PUSH_INVALID")
+            if not whole and push not in (None, 0, 0.0):
+                raise ValueError("CFB_VALUE_HALF_POINT_PUSH_INVALID")
+            if (quote.get("model_prob_basis") == "CONDITIONAL_WIN_GIVEN_NO_PUSH"
+                    and push is None):
+                raise ValueError("CFB_VALUE_PUSH_BASIS_MISSING")
+            # Model p is conditional on not pushing; ROI is UNconditional.
+            roi_conditional = p * (1.0 + payout) - 1.0
+            roi = (1.0 - push) * roi_conditional if push is not None else roi_conditional
             if not 0 <= p <= 1 or not 0 <= fair <= 1:
                 raise ValueError("CFB_VALUE_PROBABILITY_OUT_OF_RANGE")
             if abs(roi - _float(quote.get("expected_roi_unvalidated"), "expected_roi")) > 0.0005:
@@ -97,6 +113,10 @@ def _select_pre_result(game):
             if (quote.get("devig") != "PAIRED_PROPORTIONAL"
                     or quote.get("quote_evidence") != "UNATTESTED_MANUAL_BOARD"
                     or quote.get("original_status") != "LEAN"):
+                continue
+            # Older whole-point forecasts never estimated push mass. Do not
+            # backfill those probabilities from a later code version.
+            if whole and push is None:
                 continue
             if not _pair_valid(quote, quotes):
                 raise ValueError("CFB_VALUE_PAIR_INVALID")
@@ -190,6 +210,7 @@ def evaluate(snapshots, settlements):
                     "odds": quote["american_odds"],
                     "model_p_unvalidated": quote["model_p"],
                     "forecast_expected_roi": quote["expected_roi_unvalidated"],
+                    "model_push_p_unvalidated": quote.get("model_push_p_unvalidated"),
                     "result": "WIN" if win > 0 else "LOSS" if win < 0 else "PUSH",
                     "unit_return": round(profit, 6),
                 })
