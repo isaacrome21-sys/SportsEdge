@@ -41,12 +41,15 @@ RESEARCH_DIRECTIVES = {
     "pitcher_prop_promotion": ["scripts/research_mlb_pitcher_prop_promotion.py"],
     "postseason_prop_bias": ["scripts/research_mlb_postseason_prop_bias.py"],
     "postseason_prop_bias_ext": ["scripts/research_mlb_postseason_prop_bias_ext.py"],
+    # 2027 prep (#1482): frozen OPP-K / OPP-OUTS / UMP-BB configs scored on held-out 2026.
+    "context_lane_stability_2026": ["scripts/research_mlb_context_lane_stability_2026.py"],
 }
 
 RESEARCH_TIMEOUT_SECONDS = {
     "f5_nrfi_tightening": 15 * 60,
     "f5_nrfi_production_parity": 20 * 60,
     "pitcher_prop_promotion": 50 * 60,
+    "context_lane_stability_2026": 30 * 60,
 }
 
 
