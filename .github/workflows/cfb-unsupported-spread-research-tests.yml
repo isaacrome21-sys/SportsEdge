@@ -1,0 +1,50 @@
+name: cfb-unsupported-spread-research-tests
+
+on:
+  push:
+    branches: [chatgpt/cfb/spread-unsupported-tracker-v1]
+    paths:
+      - scripts/grade_cfb_unsupported_spreads.py
+      - scripts/cfb_spread_anchor_test_harness.py
+      - tests/test_grade_cfb_unsupported_spreads.py
+      - tests/test_cfb_spread_anchor_test_harness.py
+      - ledger/cfb_unsupported_spreads/**
+      - .github/workflows/cfb-unsupported-spread-research-tests.yml
+  pull_request:
+    paths:
+      - scripts/grade_cfb_unsupported_spreads.py
+      - scripts/cfb_spread_anchor_test_harness.py
+      - tests/test_grade_cfb_unsupported_spreads.py
+      - tests/test_cfb_spread_anchor_test_harness.py
+      - ledger/cfb_unsupported_spreads/**
+      - .github/workflows/cfb-unsupported-spread-research-tests.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify-research-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Grade original contract and test unchanged anchor functions
+        run: python -m unittest tests.test_grade_cfb_unsupported_spreads tests.test_cfb_spread_anchor_test_harness -v
+      - name: Produce pending-only initial report
+        run: |
+          python scripts/grade_cfb_unsupported_spreads.py \
+            --ledger ledger/cfb_unsupported_spreads/2026-10-10-opening.json \
+            --closes ledger/cfb_unsupported_spreads/2026-10-10-closes.json \
+            --results ledger/cfb_unsupported_spreads/2026-10-10-results.json \
+            --output artifacts/cfb/2026-10-10-unsupported-spread-report.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cfb-unsupported-spread-grader-check
+          path: artifacts/cfb/2026-10-10-unsupported-spread-report.json
+          if-no-files-found: error
+          retention-days: 30
