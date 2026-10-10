@@ -81,6 +81,14 @@ jobs:
           args=(--board-json "$BOARD_JSON" --season "$INPUT_SEASON" --week "$INPUT_WEEK")
           [ -z "$INPUT_ASOF" ] || args+=(--asof "$INPUT_ASOF")
           python scripts/run_cfb_sdv_card_v2.py "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload captured public source evidence
+        if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cfb-sdv-live-source-evidence
+          path: ${{ runner.temp }}/cfb-sdv-live/
+          if-no-files-found: warn
+          retention-days: 7
       - name: Upload card
         if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
