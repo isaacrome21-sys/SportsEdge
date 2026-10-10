@@ -54,6 +54,8 @@ EDGE_CAP = 0.12
 # Markets where this model beat 52.4% out of sample vs closing lines. None yet (#1471, #1476):
 # the SDV efficiency model and preseason 247 talent (2016-2025 LOSO, 52.3% vs close) both failed.
 VALIDATED_MARKETS: frozenset = frozenset()
+# Markets priced off the market-anchored home margin when a paired spread exists.
+ANCHORED_MARGIN_MARKETS = frozenset({"SPREAD", "MONEYLINE"})
 
 
 def phi(x: float) -> float:
@@ -142,7 +144,10 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
                   and {selection for selection, _ in grp} == opposite)
         fair = raw / sum(prob for _, prob in grp) if paired else None
         model_home, model_away = home, away
-        if market == "SPREAD" and isinstance(spread_context, dict):
+        # Moneyline and spread are the same margin question: price both off the
+        # one market-anchored margin so a game cannot show "no spread edge" and
+        # a large moneyline edge from two different margins.
+        if market in ANCHORED_MARGIN_MARKETS and isinstance(spread_context, dict):
             model_home = float(spread_context["home_mean"])
             model_away = float(spread_context["away_mean"])
         p = model_prob(market, side, line, model_home, model_away)
@@ -175,7 +180,7 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
                        else "NONPOSITIVE_EXPECTED_ROI" if EDGE_FLOOR <= edge <= EDGE_CAP and expected_roi <= 0.0
                        else "EDGE_TOO_LARGE_SUSPECT" if edge > EDGE_CAP else "BELOW_FLOOR"),
         })
-        if market == "SPREAD" and isinstance(spread_context, dict):
+        if market in ANCHORED_MARGIN_MARKETS and isinstance(spread_context, dict):
             out[-1].update({
                 "raw_model_home_margin": round(float(spread_context["raw_model_home_margin"]), 4),
                 "market_home_margin": round(float(spread_context["market_home_margin"]), 4),
@@ -204,7 +209,7 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
     for r in out:
         if r["bet_status"] == "BET" and r["market"] not in validated:
             r["bet_status"], r["reason"] = "LEAN", "MODEL_EDGE_NOT_VALIDATED_VS_CLOSE"
-        if r["market"] == "SPREAD" and isinstance(spread_context, dict):
+        if r["market"] in ANCHORED_MARGIN_MARKETS and isinstance(spread_context, dict):
             if not bool(spread_context["forward_track_eligible"]):
                 if r["bet_status"] == "LEAN":
                     r["bet_status"], r["reason"] = "PASS", "ANCHOR_ADJUSTMENT_BELOW_FORWARD_THRESHOLD"
@@ -217,6 +222,8 @@ ALIASES = {
     "mississippi": "ole miss", "umass": "massachusetts", "miami oh": "miami (oh)",
     "uconn": "connecticut", "north dakota st": "north dakota state",
     "nc state": "nc state", "usf": "south florida", "fiu": "florida international",
+    # SportsDataverse 2026 schedule spellings (Saturday 2026-10-10 misses).
+    "hawai i": "hawaii", "app state": "appalachian state",
 }
 
 
@@ -649,6 +656,100 @@ def attach_cfb_both_sides(payload: dict) -> dict:
     return payload
 
 
+PROBATION_POLICY_PATH = ROOT / "config" / "cfb_probation_policy_v1.json"
+
+
+def _slate_total_bias_signal(payload: dict) -> str:
+    """Directional slate bias from the existing totals audit; UNAVAILABLE if it cannot run."""
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "cfb_total_bias_audit", ROOT / "scripts" / "audit_cfb_sdv_total_bias.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return str(mod.audit(payload).get("directional_bias_signal") or "NONE")
+    except Exception as exc:
+        print("CFB_SDV_PROBATION_BIAS_AUDIT_UNAVAILABLE", type(exc).__name__, str(exc)[:120])
+        return "UNAVAILABLE"
+
+
+def apply_probation(payload: dict, policy_path: Path = PROBATION_POLICY_PATH) -> dict:
+    """Mark a capped subset of LEAN rows for 0.25u probation tracking.
+
+    Overlay only: bet_status stays LEAN so forward grading is unchanged, and
+    nothing becomes BET/OFFICIAL. Totals in the direction of a detected slate
+    bias are excluded; if the bias audit cannot run, totals are excluded.
+    """
+    import hashlib
+    raw = Path(policy_path).read_bytes()
+    policy = json.loads(raw)
+    status = str(payload.get("model_status") or "")
+    signal = _slate_total_bias_signal(payload)
+    blocked_total_side = {"MODEL_HIGH": "OVER", "MODEL_LOW": "UNDER"}.get(signal)
+    eligible = []
+    for r in payload.get("results") or []:
+        if r.get("bet_status") != "LEAN":
+            continue
+        reason = None
+        if status.startswith("MARKET_ONLY") or status not in {"MODEL", "MODEL_SDV_PUBLIC_LIVE_UNVALIDATED"}:
+            reason = "MODEL_UNAVAILABLE"
+        elif r.get("market") not in policy["eligible_markets"]:
+            reason = "MARKET_NOT_ELIGIBLE"
+        elif r.get("market") == "TOTAL" and signal == "UNAVAILABLE":
+            reason = "TOTAL_BIAS_AUDIT_UNAVAILABLE"
+        elif r.get("market") == "TOTAL" and r.get("side") == blocked_total_side:
+            reason = "TOTAL_IN_DIRECTION_OF_SLATE_BIAS:" + signal
+        elif r.get("devig") != "PAIRED_PROPORTIONAL" or float(r.get("american_odds") or 0) < -165:
+            reason = "PRICE_OR_PAIRING_INVALID"
+        r["probation"] = False
+        if reason:
+            r["probation_block_reason"] = reason
+        else:
+            eligible.append(r)
+    eligible.sort(key=lambda r: (-float(r.get("edge") or 0), -float(r.get("expected_roi") or 0)))
+    cap = int(policy["max_probation_per_slate"])
+    for i, r in enumerate(eligible):
+        if i < cap:
+            r["probation"] = True
+            r["stake_units"] = float(policy["stake_units"])
+        else:
+            r["probation_block_reason"] = "SLATE_CAP"
+    chosen = [r for r in eligible[:cap]]
+    payload["probation"] = {
+        "policy": policy["schema"],
+        "policy_sha256": hashlib.sha256(raw).hexdigest(),
+        "stake_units": float(policy["stake_units"]),
+        "slate_total_bias_signal": signal,
+        "count": len(chosen),
+        "official": False,
+        "validated": False,
+    }
+    return payload
+
+
+def _auto_capture_sdv_live(directory: Path, *, capture=None) -> Path | None:
+    """Phone-issue path: capture the same public SportsDataverse bundle the
+    push workflow captures, so issue cards do not depend on rate-limited CFBD.
+
+    All-or-nothing via fetch_cfb_sdv_live.capture; any failure returns None and
+    the existing CFBD fallback path runs unchanged.
+    """
+    try:
+        if capture is None:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location(
+                "cfb_sdv_fetch", ROOT / "scripts" / "fetch_cfb_sdv_live.py")
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            capture = mod.capture
+        capture(directory)
+        return directory if Path(directory).is_dir() else None
+    except Exception as exc:
+        print("CFB_SDV_PUBLIC_AUTO_CAPTURE_FAILED", type(exc).__name__, str(exc)[:160],
+              "; canonical CFBD fallback remains enabled")
+        return None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--board-json", required=True)
@@ -687,6 +788,8 @@ def main() -> int:
     if not isinstance(board, list) or not board:
         raise SystemExit("CFB_SDV_BOARD_ARRAY_REQUIRED")
     model = load_selected_sdv_fit(args.fit)
+    if args.sdv_live_dir is None and os.environ.get("GITHUB_EVENT_NAME") == "issues":
+        args.sdv_live_dir = _auto_capture_sdv_live(ROOT / "artifacts" / "run_it" / "cfb-sdv-live")
     results = []
     fallback = None
     live_source_provenance = None
@@ -768,6 +871,7 @@ def main() -> int:
         "results": sorted(results, key=lambda r: -(r.get("edge") or -9)),
     }
     payload = attach_cfb_both_sides(payload)
+    payload = apply_probation(payload)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     # Visible in the phone comment (lines containing CFB_SDV_ are echoed).
@@ -779,6 +883,16 @@ def main() -> int:
         ln = "" if r["line"] in (None, "") else (f" {float(r['line']):+g}" if r["market"] == "SPREAD" else f" {float(r['line']):g}")
         print(f"CFB_SDV_LEAN {r['matchup']}: {r['market'].title()} {r['side'].title()}{ln} {r['american_odds']:+.0f} "
               f"model {r['model_p']*100:.1f}% vs mkt {r['market_p']*100:.1f}% ({r['edge']*100:+.1f}%)")
+    prob = payload.get("probation") or {}
+    print(f"CFB_SDV_PROBATION {prob.get('count', 0)} plays at {prob.get('stake_units')}u "
+          f"(slate totals bias: {prob.get('slate_total_bias_signal')}); probation = small-stake forward evidence, "
+          "not validated, not OFFICIAL")
+    for r in payload["results"]:
+        if r.get("probation"):
+            ln = "" if r["line"] in (None, "") else (f" {float(r['line']):+g}" if r["market"] == "SPREAD" else f" {float(r['line']):g}")
+            print(f"CFB_SDV_PROBATION_PLAY {r['matchup']}: {r['market'].title()} {r['side'].title()}{ln} "
+                  f"{r['american_odds']:+.0f} {r['stake_units']}u model {r['model_p']*100:.1f}% vs mkt "
+                  f"{r['market_p']*100:.1f}% ({r['edge']*100:+.1f}%)")
     for r in payload["results"]:
         if "edge" in r:
             print(f"{r['bet_status']:4s} {r['matchup']:45s} {r['market']:9s} {r['side']:5s} {str(r['line'] or ''):6s} "
