@@ -23,7 +23,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 ODDS_URL = "https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/odds"
-BOOKS = ("draftkings", "fanduel", "betmgm", "caesars")
+BOOKS = ("draftkings", "fanduel", "betmgm", "williamhill_us", "betonlineag", "pinnacle")
 SUPPORTED = ("h2h", "spreads", "totals")
 MARKET_NAME = {"h2h": "MONEYLINE", "spreads": "SPREAD", "totals": "TOTAL"}
 # Governance contract sentinels retained for the repository text guard:
@@ -41,7 +41,7 @@ def fetch(key):
     q = urlencode(
         {
             "apiKey": key,
-            "regions": "us",
+            "regions": "us,eu",
             "markets": ",".join(SUPPORTED),
             "oddsFormat": "american",
             "bookmakers": ",".join(BOOKS),
