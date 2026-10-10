@@ -22,7 +22,7 @@ jobs:
         with:
           python-version-file: '.python-version'
       - name: Verify fail-closed prospective exporter
-        run: python -m unittest tests.test_cfb_sdv_forward_snapshot -v
+        run: python -m unittest tests.test_cfb_sdv_forward_snapshot tests.test_cfb_forward_value_research -v
       - name: Retrieve exact prior card artifact (no backfill)
         env:
           GH_TOKEN: ${{ github.token }}

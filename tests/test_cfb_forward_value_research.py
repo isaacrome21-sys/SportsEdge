@@ -104,5 +104,69 @@ class ForwardValueResearchTest(unittest.TestCase):
             evaluate([fixture()], [r])
 
 
+
+    def test_integer_total_uses_archived_push_mass_and_settles_as_push(self):
+        from tests.test_cfb_sdv_forward_snapshot import card
+        inp = card()
+        inp["results"].append({
+            "game_id": "123", "matchup": "Away @ Home",
+            "market": "TOTAL", "side": "UNDER", "line": 48.0,
+            "home_mean": 28, "away_mean": 22, "start_ts": "2026-10-10T01:00:00Z"
+        })
+        for row in inp["results"]:
+            if row["market"] == "TOTAL":
+                row["line"] = 48.0
+            recommended = row["side"] in {"HOME", "OVER"}
+            row.update({
+                "american_odds": -110,
+                "model_p": 0.57 if recommended else 0.43,
+                "market_p": 0.5,
+                "model_push_p": 0.03 if row["market"] == "TOTAL" else 0.0,
+                "devig": "PAIRED_PROPORTIONAL",
+                "bet_status": "LEAN" if recommended else "PASS",
+            })
+        snap = export_snapshot(inp, original_card_sha256=SHA)
+        total = [q for q in snap["games"][0]["quoted_selections"]
+                 if q["market"] == "TOTAL" and q["side"] == "OVER"][0]
+        expected = (1-.03) * (.57 * (1 + 100/110) - 1)
+        self.assertAlmostEqual(total["expected_roi_unvalidated"], expected, places=5)
+        report = evaluate([snap], [result(home=28, away=20)])
+        self.assertEqual(report["markets"]["TOTAL"]["pushes"], 1)
+        self.assertEqual(report["markets"]["TOTAL"]["realized_roi_per_unit"], 0.0)
+        self.assertEqual(report["markets"]["TOTAL"]["records"][0]["model_push_p_unvalidated"], .03)
+        self.assertFalse(report["positive_ev_proven"])
+
+    def test_legacy_integer_total_without_push_mass_cannot_look_profitable(self):
+        snap = fixture()
+        for q in snap["games"][0]["quoted_selections"]:
+            if q["market"] == "TOTAL":
+                q["line"] = 48.0
+        report = evaluate([snap], [result(home=28, away=20)])
+        self.assertEqual(report["markets"]["TOTAL"]["settled_count"], 0)
+        self.assertEqual(report["markets"]["SPREAD"]["settled_count"], 1)
+
+    def test_illinois_college_excluded_from_forward_shadow(self):
+        snap = fixture()
+        snap["games"][0]["matchup"] = "Northern Illinois @ Home"
+        report = evaluate([snap], [result()])
+        self.assertEqual(report["markets"]["TOTAL"]["settled_count"], 0)
+        self.assertEqual(report["markets"]["SPREAD"]["settled_count"], 0)
+
+    def test_negative_push_mass_and_missing_conditional_basis_rejected(self):
+        inp = card()
+        inp["results"][0]["model_push_p"] = -0.1
+        inp["results"][0].update({
+            "american_odds": -110, "model_p": .55, "market_p": .5,
+            "devig": "PAIRED_PROPORTIONAL", "bet_status": "LEAN"
+        })
+        with self.assertRaisesRegex(ValueError, "QUOTE_PUSH_INVALID"):
+            export_snapshot(inp, original_card_sha256=SHA)
+        snap = fixture()
+        q = snap["games"][0]["quoted_selections"][0]
+        q["model_prob_basis"] = "CONDITIONAL_WIN_GIVEN_NO_PUSH"
+        with self.assertRaisesRegex(ValueError, "PUSH_BASIS_MISSING"):
+            evaluate([snap], [result()])
+
+
 if __name__ == "__main__":
     unittest.main()

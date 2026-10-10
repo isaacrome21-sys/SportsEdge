@@ -72,12 +72,25 @@ def export_quoted_selections(selections: list[dict]) -> list[dict]:
             raise ValueError("CFB_FORWARD_QUOTE_PROBABILITY_INVALID")
         if row.get("bet_status") == "BET":
             raise ValueError("CFB_FORWARD_QUOTE_BET_STATUS_INVALID")
+        push_raw = row.get("model_push_p")
+        push = _number(push_raw, "model_push_p") if push_raw is not None else None
+        if push is not None and not 0 <= push < 1:
+            raise ValueError("CFB_FORWARD_QUOTE_PUSH_INVALID")
+        if push is not None and line is not None and abs(line - round(line)) > 1e-8 and push > 1e-8:
+            raise ValueError("CFB_FORWARD_QUOTE_HALF_POINT_PUSH_INVALID")
+        profit = (odds / 100 if odds > 0 else 100 / -odds)
+        roi_conditional = p * (1.0 + profit) - 1.0
+        roi = (1.0 - push) * roi_conditional if push is not None else roi_conditional
         out.append({
             "market": market, "side": side, "line": line,
             "american_odds": odds, "model_p": p, "market_p": fair,
             "model_edge": round(p - fair, 6),
-            "expected_roi_unvalidated": round(
-                p * (1 + (odds / 100 if odds > 0 else 100 / -odds)) - 1, 6),
+            "expected_roi_unvalidated": round(roi, 6),
+            "model_push_p_unvalidated": push,
+            "model_prob_basis": (
+                "CONDITIONAL_WIN_GIVEN_NO_PUSH" if push is not None else
+                "LEGACY_MODEL_P_PUSH_MASS_UNAVAILABLE"
+            ),
             "devig": row.get("devig"),
             "original_status": row.get("bet_status"),
             "quote_evidence": "UNATTESTED_MANUAL_BOARD",
