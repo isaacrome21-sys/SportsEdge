@@ -1,0 +1,92 @@
+name: cfb-saturday-full-fbs-board
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/fetch_cfb_dk_public_full_slate.py'
+      - 'tests/test_cfb_dk_public_full_slate.py'
+      - '.github/workflows/cfb-saturday-full-fbs-board.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/fetch_cfb_dk_public_full_slate.py'
+      - 'tests/test_cfb_dk_public_full_slate.py'
+      - '.github/workflows/cfb-saturday-full-fbs-board.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  full-board:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+      - name: Install pinned test and public data dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-test.txt
+      - name: Verify full-slate paired quote integrity
+        run: python -m unittest tests.test_cfb_dk_public_full_slate -v
+      - name: Capture all public Saturday DK paired odds and 46-game inventory
+        run: |
+          set -euo pipefail
+          python scripts/fetch_cfb_dk_public_full_slate.py \
+            --board-output artifacts/run_it/cfb_saturday_full_public_board.json \
+            --audit-output artifacts/run_it/cfb_saturday_full_capture_audit.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path("artifacts/run_it/cfb_saturday_full_capture_audit.json").read_text())
+          assert p["scheduled_fbs_games"] == 46
+          assert p["scorable_games_with_both_pairs"] >= 30
+          assert p["positive_ev_proven"] is False
+          print("Saturday inventory %s; research price pairs %s; none certified" %
+                (p["scheduled_fbs_games"], p["scorable_games_with_both_pairs"]))
+          PY
+      - name: Capture public SportsDataverse inputs for model scoring
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -uo pipefail
+          if python scripts/fetch_cfb_sdv_live.py --output-dir "$RUNNER_TEMP/cfb-sdv-live"; then
+            echo "CFB_PUBLIC_NATIVE_SNAPSHOT_CAPTURED"
+          else
+            echo "CFB_PUBLIC_NATIVE_UNAVAILABLE; existing fail-closed CFBD path may run"
+          fi
+      - name: Score full Saturday card before game kickoffs
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        env:
+          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          CFB_SDV_PUBLIC_LIVE_DIR: ${{ runner.temp }}/cfb-sdv-live
+          CFB_SDV_MAX_RETRY_SLEEP_SECONDS: '30'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/run_cfb_sdv_card_v2.py \
+            --board-json "$(cat artifacts/run_it/cfb_saturday_full_public_board.json)" \
+            --season 2026 --week 6 \
+            --output artifacts/run_it/cfb_saturday_full_scored_card.json \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+          python scripts/audit_cfb_sdv_total_bias.py \
+            --card artifacts/run_it/cfb_saturday_full_scored_card.json \
+            --output artifacts/run_it/cfb_saturday_full_bias_audit.json \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload full Saturday slate, original prices and resulting model research
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cfb-saturday-full-fbs-research
+          path: |
+            artifacts/run_it/cfb_saturday_full_public_board.json
+            artifacts/run_it/cfb_saturday_full_capture_audit.json
+            artifacts/run_it/cfb_saturday_full_scored_card.json
+            artifacts/run_it/cfb_saturday_full_bias_audit.json
+          retention-days: 14
+          if-no-files-found: warn
