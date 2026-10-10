@@ -43,13 +43,19 @@ def parse_espn_betting_totals(raw: bytes, *, season: int):
     """
     reader = csv.DictReader(io.StringIO(raw.decode("utf-8-sig")))
     fields = set(reader.fieldnames or ())
-    needed = {"game_id", "over_under"}
+    needed = {"game_id", "over_under", "odds_source"}
     if not needed.issubset(fields):
         raise ValueError("CFB_ESPN_TOTAL_REFERENCE_COLUMNS_MISSING:"
                          + ",".join(sorted(needed-fields)) + ":"
                          + ",".join(sorted(fields)))
     out={}
     for row in reader:
+        # Exclude synthetic defaults and offline injected bookmaker fields.
+        # Only ESPN provider-resolved historical totals are useful references.
+        if str(row.get("odds_source") or "").strip().lower() not in {
+            "summary_pickcenter", "core_odds_api"
+        }:
+            continue
         if row.get("season") and int(float(row["season"])) != season:
             raise ValueError("CFB_ESPN_TOTAL_REFERENCE_SEASON_MISMATCH")
         gid=str(row.get("game_id") or "").strip()
