@@ -9,10 +9,21 @@ from __future__ import annotations
 import argparse
 import json
 from math import isfinite, sqrt
+from datetime import datetime, timezone
 from pathlib import Path
 
 SCHEMA = "CFB_TOTAL_OFFSET_CHRONO_RESEARCH_V1"
 DATA_ROLES = {"RECONSTRUCTED_DEVELOPMENT", "CAPTURED_PREGAME_RESEARCH"}
+
+
+def _utc_timestamp(value, field):
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if dt.tzinfo is None or dt.utcoffset() is None:
+            raise ValueError("timezone required")
+        return dt.astimezone(timezone.utc)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("CFB_TOTAL_OFFSET_TIMESTAMP_INVALID:" + field) from exc
 
 
 def _number(value, field):
@@ -45,6 +56,15 @@ def _parse(rows):
         role = row.get("evidence_role")
         if role not in DATA_ROLES:
             raise ValueError("CFB_TOTAL_OFFSET_EVIDENCE_ROLE_REQUIRED")
+        if role == "CAPTURED_PREGAME_RESEARCH":
+            prediction_time = _utc_timestamp(row.get("prediction_captured_at"), "prediction_captured_at")
+            kickoff_time = _utc_timestamp(row.get("kickoff_at"), "kickoff_at")
+            settled_time = _utc_timestamp(row.get("settled_at"), "settled_at")
+            if not prediction_time < kickoff_time < settled_time:
+                raise ValueError("CFB_TOTAL_OFFSET_CAPTURE_NOT_PREGAME")
+            source_sha256 = str(row.get("source_sha256") or "")
+            if len(source_sha256) != 64 or any(c not in "0123456789abcdef" for c in source_sha256):
+                raise ValueError("CFB_TOTAL_OFFSET_SOURCE_HASH_REQUIRED")
         model = _number(row.get("model_total"), "model_total")
         actual = _number(row.get("actual_total"), "actual_total")
         if not 0 <= model <= 150 or not 0 <= actual <= 200:
