@@ -12,10 +12,14 @@ creates official wagers.
 from __future__ import annotations
 
 import argparse
+import csv
+import hashlib
+import io
 import json
 import math
 from collections import defaultdict
 from pathlib import Path
+from urllib.request import Request, urlopen
 
 PRIMARY_THRESHOLD = 2.0   # frozen before evaluation
 BREAKEVEN_MINUS_110 = 110.0 / 210.0
@@ -24,6 +28,59 @@ RIDGE_ALPHA = 300.0
 PRIOR_GAMES = 4
 FIRST_RESIDUAL_VALIDATION = 2021
 PROVENANCE = "RECONSTRUCTED_HISTORICAL_NOT_PIT"
+ESPN_BETTING_ARCHIVE = (
+    "https://github.com/sportsdataverse/sportsdataverse-data/"
+    "releases/download/espn_cfb_betting/betting_{year}.csv"
+)
+
+
+def parse_espn_betting_totals(raw: bytes, *, season: int):
+    """Parse strictly evaluation-only, retrospective ESPN total reference rows.
+
+    ESPN release rows are not documented executable closing prices; never
+    label them as such, never attach them to training features, and never
+    promote picks on the basis of these research-only historical numbers.
+    """
+    reader = csv.DictReader(io.StringIO(raw.decode("utf-8-sig")))
+    fields = set(reader.fieldnames or ())
+    needed = {"game_id", "over_under"}
+    if not needed.issubset(fields):
+        raise ValueError("CFB_ESPN_TOTAL_REFERENCE_COLUMNS_MISSING:"
+                         + ",".join(sorted(needed-fields)) + ":"
+                         + ",".join(sorted(fields)))
+    out={}
+    for row in reader:
+        if row.get("season") and int(float(row["season"])) != season:
+            raise ValueError("CFB_ESPN_TOTAL_REFERENCE_SEASON_MISMATCH")
+        gid=str(row.get("game_id") or "").strip()
+        value=_valid(row.get("over_under"))
+        if not gid or value is None:
+            continue
+        if not 10 <= value <= 120:
+            continue
+        if gid in out:
+            raise ValueError("CFB_ESPN_TOTAL_REFERENCE_DUPLICATE_GAME:" + gid)
+        out[gid]={"total":value}
+    return out
+
+
+def fetch_espn_historical_totals(*, opener=urlopen):
+    """Acquire after model predictions; refs stay outside predictive rows."""
+    all_lines={}
+    hashes={}
+    for year in range(2016,2026):
+        url=ESPN_BETTING_ARCHIVE.format(year=year)
+        with opener(Request(url,headers={"User-Agent":"SportsEdge-HistoricalResearch/1"}),
+                    timeout=35) as response:
+            raw=response.read()
+        digest=hashlib.sha256(raw).hexdigest()
+        parsed=parse_espn_betting_totals(raw,season=year)
+        hashes[str(year)]={"sha256":digest,"count":len(parsed),"url":url}
+        for gid,row in parsed.items():
+            if gid in all_lines:
+                raise ValueError("CFB_ESPN_TOTAL_REFERENCE_CROSS_SEASON_DUPLICATE")
+            all_lines[gid]=row
+    return all_lines,hashes
 
 
 def _valid(value):
@@ -208,6 +265,8 @@ def main(argv=None):
     from scripts import backtest_cfb_sdv_vs_lines as bt
     rows=bt.load_rows(args.rows)
     preds=chronological_predictions(rows)
+    source="HISTORICAL_EXPLICIT_INPUT"
+    source_receipts={}
     if args.lines:
         market=json.loads(Path(args.lines).read_text(encoding="utf-8"))
     else:
@@ -216,6 +275,15 @@ def main(argv=None):
         market={}
         for year in range(2016,2026):
             market.update(cache.get(f"lines_{year}") or {})
+        # Mirror-backed #1475 cache has genuine spreads, but may contain no
+        # historical totals. Never interpret all-null totals as a failed model.
+        available_totals=sum(_valid(m.get("total")) is not None
+                             for m in market.values() if isinstance(m,dict))
+        if available_totals == 0:
+            market, source_receipts=fetch_espn_historical_totals()
+            source="SPORTSDATAVERSE_ESPN_BETTING_RETROSPECTIVE_NOT_VERIFIED_CLOSE"
+        else:
+            source="CFBD_HISTORICAL_TOTAL_CACHE"
     # A missing cache or non-matching game-id namespace cannot count as a
     # negative historical evaluation. Emit source identity diagnostics.
     prediction_ids=set(preds)
@@ -231,6 +299,9 @@ def main(argv=None):
     },sort_keys=True))
     paired=paired_rows(preds,market)
     report=walkforward(paired)
+    report["market_reference"]=source
+    report["market_asset_sha256"]=source_receipts
+    report["historical_betting_snapshot_is_executable"]=False
     report["source_summary"]={"historical_rows":len(rows),"chrono_predictions":len(preds),
                               "paired_closing_games":len(paired)}
     args.output.parent.mkdir(parents=True,exist_ok=True)
