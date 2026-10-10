@@ -2605,10 +2605,262 @@
       "merge_sha": "b1308caf6442b5ff60cac9ad949324fedb5b33d2",
       "pr": 1886,
       "note": "Verified first-parent main advance after registered 59beafaa boundary. NFL G1 exact historical validator-byte restoration; revoked disposition and invalidated prior forward clock remain unchanged; independent revalidation required. Provenance-only reconciliation; no backfill, Model_P, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_FC3AE32C_PR_1892",
+      "merge_sha": "fc3ae32c586624264b2fc5d6a91d740d46e937a9",
+      "pr": 1892,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: Governance: reconcile exact post-G1 first-parent ancestry without reviving revoked research clock (#1892). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_E2E5F9A5_PR_1895",
+      "merge_sha": "e2e5f9a5d37697a3830045628c51907e9bad4da3",
+      "pr": 1895,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: fail closed on fractional acquisition quota and season counts (#1895). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_4067CEAA_PR_1897",
+      "merge_sha": "4067ceaab347aafab4ce94e8edec7da57e5e7e78",
+      "pr": 1897,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB RUN IT: allow verified live-week cache reuse without CFBD credentials (#1897). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_B1F69CDD_PR_1898",
+      "merge_sha": "b1f69cdd8f80cae73081903c49a1e0ffb05fb8c0",
+      "pr": 1898,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: land quote-pair integrity on current main after cache-scoring merge (#1898). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_101647E8_PR_1900",
+      "merge_sha": "101647e83bd0f5707f8ef75dd6c3cc8e751ef86e",
+      "pr": 1900,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: restore PIT cache-first execution lost in pricing merge (#1900). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_692F9380_PR_1902",
+      "merge_sha": "692f9380fba0900560e9b44e5dbaf3ba0b45160c",
+      "pr": 1902,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: reject negative-ROI sides and totals despite positive no-vig edge (#1902). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_797A6235_PR_1903",
+      "merge_sha": "797a6235e7a47576a982e3097da4b79e14fd54e4",
+      "pr": 1903,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: suppress expected ROI on market-only fallback cards (#1903). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_7932E0F4_PR_1904",
+      "merge_sha": "7932e0f41b4f34abc8503356b71c7971a3865d0b",
+      "pr": 1904,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: allow scoring workflow to persist trusted live-week issue cache (#1904). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_18C40C52_PR_1905",
+      "merge_sha": "18c40c52b2858befa295906f671782e5d1554c63",
+      "pr": 1905,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: automatically execute Friday side/total scoring from paired odds board (#1905). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_6AD09C90_PR_1906",
+      "merge_sha": "6ad09c903858766273f3825e6408bffe7e754525",
+      "pr": 1906,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: rerun Friday scorer and upload artifacts on push (#1906). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_3A4C94BD_PR_1907",
+      "merge_sha": "3a4c94bd09dd5706e74fbff3cab35335688d3ef7",
+      "pr": 1907,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: exclude kicked-off games from Friday scoring and fallback cards (#1907). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_72A9513C_PR_1908",
+      "merge_sha": "72a9513ce805ec5f81a451ba883d9ffc3528fa05",
+      "pr": 1908,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: bound 429 retry delay for live side/total cards (#1908). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_EBD9525F_PR_1909",
+      "merge_sha": "ebd9525f61ea1a1ede746fa3c791eb7e17f22fa4",
+      "pr": 1909,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: MLB: port quote pairing index and integrity tests onto current main (#1909). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_E0E24F06_PR_1911",
+      "merge_sha": "e0e24f06881051ce9392813d3a93206defdcf080",
+      "pr": 1911,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: score 2026 sides and totals from prospective public SportsDataverse native data (#1911). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_27443543_PR_1913",
+      "merge_sha": "27443543cc243cdb426b12d5a919fff1fe01a37e",
+      "pr": 1913,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: keep scoring valid games when one SDV matchup cannot resolve (#1913). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_F85CB331_PR_1914",
+      "merge_sha": "f85cb331484afe6744828118da04b1a9ba5d3574",
+      "pr": 1914,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: audit systematic over-total disagreement in prospective SDV model cards (#1914). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_53FF8691_PR_1912",
+      "merge_sha": "53ff8691cb827d6db05f8e25c1e1fd2fb5f18439",
+      "pr": 1912,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: enforce -165 straight odds ceiling before game selection (#1912). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_1D5511F2_PR_1916",
+      "merge_sha": "1d5511f2f72d44903c6128e0f75a0a68cc12ddee",
+      "pr": 1916,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB totals: reconcile chronological offset shadow research onto main (#1916). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_BB4989D0_PR_1917",
+      "merge_sha": "bb4989d05e9e05938293833f3a9782b14ce10672",
+      "pr": 1917,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB sides/totals: timestamp pregame forecasts and preserve forward snapshots (#1917). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_0CA25AE0_PR_1918",
+      "merge_sha": "0ca25ae07732dfaa92e2a2438f1d99c322fb9fda",
+      "pr": 1918,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: block legacy SDV OFFICIAL_BET without calibration evidence (#1918). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_75FBC73C_PR_1922",
+      "merge_sha": "75fbc73c068f8f8e68a08d891fb0e9553bff3229",
+      "pr": 1922,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB sides/totals: rebase forward quoted-value research onto current main (#1922). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_2B462399_PR_1925",
+      "merge_sha": "2b46239909e3ae8ac0f45565b900768baace5655",
+      "pr": 1925,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: unify live push-adjusted EV with pregame quote archive and forward grading (#1925). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_2892282E_PR_1929",
+      "merge_sha": "2892282e72ed3a3331521d100afdec683b72f213",
+      "pr": 1929,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: reconcile independent multi-book comparison with push-aware pricing (#1929). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_6A390EA6_PR_1926",
+      "merge_sha": "6a390ea63dfc2a790d688b532d994051620b36ac",
+      "pr": 1926,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: keep chronological spread research current with protected main (#1926). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_BB7AC344_PR_1933",
+      "merge_sha": "bb7ac344154ffd085443fae2597a4b6556a98fee",
+      "pr": 1933,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: exclude FCS game missing native SDV snapshots so remaining Saturday slate can model-score (#1933). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_27D35C86_PR_1935",
+      "merge_sha": "27d35c867d882ebf60feb738b8f766a2f2c54a99",
+      "pr": 1935,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: retain valid model rows when unsupported target misses native snapshots (#1935). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_053513AD_PR_1927",
+      "merge_sha": "053513ad2f73d90f03ef233d50c6acf69cf54b7f",
+      "pr": 1927,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: chronological totals residual validation with honest negative signal (#1927). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_3D912E56_PR_1941",
+      "merge_sha": "3d912e564304826389c7b4d8100fb1c64399df54",
+      "pr": 1941,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: NBA card: per-day ESPN fallback after HTTP 400; ignore free-text note lines (#1941). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_1DEE5CE7_PR_1942",
+      "merge_sha": "1dee5ce7035b331ccd2eac102feef7a5f9fdef2a",
+      "pr": 1942,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: MLB: pre-register few-starts fallback extension to BB/H/ER (research only) (#1942). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_A3C319BE_PR_1940",
+      "merge_sha": "a3c319bec835c85734ba332ee7aca655468b1fd8",
+      "pr": 1940,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: match Texas-Oklahoma neutral-site schedule and preserve team-attached spreads (#1940). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_41239B82_PR_1938",
+      "merge_sha": "41239b82bfa3b1bb6505287c16228c6362d4c583",
+      "pr": 1938,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB Saturday: capture 46-game schedule and price all valid non-Illinois FBS games (#1938). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_96882540_PR_1944",
+      "merge_sha": "9688254014d603d54ff5a2cf9194d84eb05fe34f",
+      "pr": 1944,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: MLB: wire few-starts fallback for PITCHER_BB / HITS_ALLOWED / ER (validated #1943, fail-closed until pool committed) (#1944). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_15FD2371_PR_1945",
+      "merge_sha": "15fd237189f98272e721674cafe88f22cafe61fb",
+      "pr": 1945,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: add slate-level sign test to totals-bias audit (#1945). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_5F9EDA6A_PR_1948",
+      "merge_sha": "5f9eda6a1749120bfd183c35005e5600bb720d36",
+      "pr": 1948,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: MLB: commit frozen 2025 BB/H/ER prior pool (turns on #1943 few-starts fallback) (#1948). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_3AF46B2D_PR_1947",
+      "merge_sha": "3af46b2d2e4c2b3536a07b0c89736b783d7e163e",
+      "pr": 1947,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB card: anchor moneyline to spread margin; SDV name aliases; issue-path SDV capture (#1947). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_49A10F60_PR_1949",
+      "merge_sha": "49a10f60f5c569faf815c5936cf891ea37384fd7",
+      "pr": 1949,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: 0.25u probation tier for bias-guarded leans + full 43-game Saturday board (#1949). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_0BC95AD5_PR_1891",
+      "merge_sha": "0bc95ad5705dafc471c89b0375c8cd7a8e4d9f4d",
+      "pr": 1891,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: MLB: reject postseason metadata at canonical card intake, preserve frozen model bytes (#1891). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_77D4F1E9_PR_1910",
+      "merge_sha": "77d4f1e99f9fa57d600d1fa465d27e7738737572",
+      "pr": 1910,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: NFL: expose existing distribution diagnostics in G1 execution log (#1910). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_B56C7717_PR_1939",
+      "merge_sha": "b56c7717e72bbbe65c5aa912c473952d8d729e82",
+      "pr": 1939,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: run existing The Odds API DK vs multi-book paper card on main push (#1939). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_840E43FC_PR_1952",
+      "merge_sha": "840e43fcde61e33e2e7fc9cb1ef63e340a00c4b7",
+      "pr": 1952,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB auto: accept documented DraftKings board_json and surface scoring failures (#1952). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_4EBB5D27_PR_1955",
+      "merge_sha": "4ebb5d270fe09f2cd16fddae7135a7cb5c604d54",
+      "pr": 1955,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: frozen totals calibration v2 wired into SDV card (#1955). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_DE9FB32E_PR_1953",
+      "merge_sha": "de9fb32ebf65ce2b6cb6ef86f2af337bd36e7dd8",
+      "pr": 1953,
+      "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: probation policy v2 (8/slate, 5/market) + spread-lane diagnosis (#1953). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
     }
   ],
   "inventory_block_reason": "Current main through merge dca09063 / PR #1668 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "b1308caf6442b5ff60cac9ad949324fedb5b33d2",
+  "reconciled_through_sha": "de9fb32ebf65ce2b6cb6ef86f2af337bd36e7dd8",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
