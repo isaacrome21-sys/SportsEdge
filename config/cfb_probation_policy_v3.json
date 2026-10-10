@@ -1,0 +1,33 @@
+{
+  "schema": "CFB_PROBATION_POLICY_V3",
+  "frozen_at": "2026-10-10",
+  "purpose": "Sharp-reference probation (OddsJam/Monahan-style +EV). The SDV model may only confirm direction; a play needs the DraftKings price to beat a sharp-book (Pinnacle/Circa) two-sided no-vig fair price. Totals removed after 2026-10-10 early-window failure (model totals off by 10-22 pts). Not validation, not OFFICIAL.",
+  "stake_units": 0.25,
+  "max_probation_per_slate": 5,
+  "eligible_markets": [
+    "SPREAD",
+    "MONEYLINE"
+  ],
+  "requires": [
+    "bet_status == LEAN (already cleared edge floor/cap, positive push-aware ROI, paired devig, -165 cap, same-game guard)",
+    "model_status == MODEL_SDV_PUBLIC_LIVE_UNVALIDATED or MODEL (never market-only fallback)",
+    "market is SPREAD or MONEYLINE (TOTAL removed in v3)",
+    "model edge <= max_model_edge (bigger model edges are treated as a model defect, not value)",
+    "row carries sharp_fair_p from a fresh two-sided sharp-book quote on the same line, and sharp_fair_p * decimal(DK price) - 1 >= min_sharp_ev; missing sharp reference = no probation",
+    "SPREAD/MONEYLINE rows use the market-anchored margin and passed its forward-track threshold"
+  ],
+  "ranking": "edge descending; ties by expected_roi; max 5 per slate; max 5 spreads and 3 moneylines",
+  "promotion_rule": "Review after 100 graded probation bets: promote a market to standard stakes only if mean no-vig CLV > 0 with t >= 2.0; ROI is a sanity check only.",
+  "kill_rule": "After 50 graded bets in a market, stop that market if mean no-vig CLV < 0 with t <= -1.5, or after 100 graded bets if mean CLV <= 0.",
+  "never": [
+    "relabel probation as BET/OFFICIAL",
+    "change thresholds after seeing results without a new policy version",
+    "backfill probation rows after kickoff"
+  ],
+  "max_probation_per_market": {
+    "SPREAD": 5,
+    "MONEYLINE": 3
+  },
+  "max_model_edge": 0.08,
+  "min_sharp_ev": 0.02
+}
