@@ -183,7 +183,7 @@ class PublicSDVLiveTest(unittest.TestCase):
             {"home": "Unsupported Home", "away": "Unsupported Away", "quotes": []},
             {"home": "Home", "away": "Away", "quotes": []},
         ]
-        with patch.object(sdv, "_read_bundle", return_value=(self.data, original)), \\
+        with patch.object(sdv, "_read_bundle", return_value=(self.data, original)), \
              patch.object(sdv, "build_prior_season_fallback_snapshots",
                           return_value=[snapshot(1), snapshot(2)]):
             rows, receipt = sdv.build_live_rows(
@@ -209,7 +209,7 @@ class PublicSDVLiveTest(unittest.TestCase):
             "home_team": "Unsupported Home", "away_team": "Unsupported Away",
         }
         self.data[(2026, "cfb_schedules")].append(unavailable)
-        with patch.object(sdv, "_read_bundle", return_value=(self.data, {})), \\
+        with patch.object(sdv, "_read_bundle", return_value=(self.data, {})), \
              patch.object(sdv, "build_prior_season_fallback_snapshots",
                           return_value=[snapshot(1), snapshot(2)]):
             with self.assertRaisesRegex(sdv.SDVLiveError, "NO_RESOLVED_GAMES"):
