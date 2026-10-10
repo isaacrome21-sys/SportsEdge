@@ -116,6 +116,7 @@ def screen(events,*,asof,stale_seconds=MAX_AGE_SECONDS,min_return=MIN_LOCKED_RET
     matches=[]
     excluded_count=0
     stale_count=0
+    pushable_contracts_skipped=0
     for event in events:
         if not isinstance(event,dict):continue
         home=str(event.get("home_team") or "")
@@ -154,6 +155,13 @@ def screen(events,*,asof,stale_seconds=MAX_AGE_SECONDS,min_return=MIN_LOCKED_RET
                         offers[ix]={**rec,"book":key,"side":side,
                                     "quote_updated_at":updated.isoformat()}
         for ident in sorted({entry[1] for entry in offers},key=str):
+            # Whole-number CFB spreads/totals push when the exact score lands
+            # on the threshold. Both opposing bets then refund stakes, so an
+            # advertised positive LOCKED return would be false in that state.
+            # Restrict guaranteed-return candidates to non-pushable contracts.
+            if ident[0] in {"SPREAD", "TOTAL"} and float(ident[1]).is_integer():
+                pushable_contracts_skipped+=1
+                continue
             dk_side=[x for (bk,k,_),x in offers.items()
                      if bk=="draftkings" and k==ident and x is not None]
             peers=[x for (bk,k,_),x in offers.items()
@@ -188,6 +196,7 @@ def screen(events,*,asof,stale_seconds=MAX_AGE_SECONDS,min_return=MIN_LOCKED_RET
         "schema":SCHEMA,"asof":now.isoformat(),"input_event_count":len(events),
         "excluded_illinois_events":excluded_count,
         "stale_offer_count":stale_count,
+        "whole_point_push_contracts_skipped":pushable_contracts_skipped,
         "theoretical_pair_count":len(matches),
         "status":"POTENTIAL_CROSSBOOK_PRICING" if matches else "NO_FRESH_ARBITRAGE_IDENTIFIED",
         "candidates":sorted(matches,key=lambda x:-x["theoretical_locked_return_pct"]),
