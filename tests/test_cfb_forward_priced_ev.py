@@ -95,8 +95,8 @@ class ForwardPricedEVTest(unittest.TestCase):
         self.assertEqual(grade["settled_shadow_net_units"], 0)
 
     def test_nonpositive_price_ev_not_salvaged_by_devig_edge(self):
-        # Book fair = .5, model p= .53: +3pp "edge" but at -110 ROI < 0.
-        p = .53
+        # Book fair = .5, model p=.522: +2.2pp edge but at -110 ROI < 0.
+        p = .522
         self.assertGreater(p - .5, .02)
         self.assertLess(p * payout(-110) - (1 - p), 0)
         self.assertAlmostEqual(raw_implied(-110), 110 / 210)
