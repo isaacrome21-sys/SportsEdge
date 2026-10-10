@@ -41,6 +41,25 @@ class CFBExactArbTest(unittest.TestCase):
             opp["draftkings_leg"]["suggested_stake_per_100"]+
             opp["other_book_leg"]["suggested_stake_per_100"],100,places=2)
 
+    def test_whole_point_total_cannot_claim_guaranteed_positive_return(self):
+        # 46 exact game points voids both OVER 46 and UNDER 46. The return
+        # on that outcome is 0%, not the advertised +2.5% arbitrage profit.
+        result=screen([evt(kind="totals",line=46.0)],asof=ASOF)
+        self.assertEqual(result["theoretical_pair_count"],0)
+        self.assertEqual(result["whole_point_push_contracts_skipped"],1)
+        self.assertEqual(result["candidates"],[])
+
+    def test_whole_point_spread_cannot_claim_guaranteed_positive_return(self):
+        result=screen([evt(kind="spreads",line=3.0)],asof=ASOF)
+        self.assertEqual(result["theoretical_pair_count"],0)
+        self.assertEqual(result["whole_point_push_contracts_skipped"],1)
+        self.assertFalse(result["authority"]["validated_positive_ev_wagers"])
+
+    def test_half_point_spread_remains_a_candidate_without_push(self):
+        result=screen([evt(kind="spreads",line=3.5)],asof=ASOF)
+        self.assertEqual(result["theoretical_pair_count"],1)
+        self.assertEqual(result["whole_point_push_contracts_skipped"],0)
+
     def test_same_book_alone_cannot_create_arb(self):
         event=evt()
         event["bookmakers"]=event["bookmakers"][:1]
