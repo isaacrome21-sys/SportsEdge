@@ -784,6 +784,27 @@ def _auto_capture_sdv_live(directory: Path, *, capture=None) -> Path | None:
         return None
 
 
+def _load_sharp_events() -> list:
+    """Optional Odds API events for the sharp reference; any failure -> [] (fail closed)."""
+    if os.environ.get("CFB_SHARP_FETCH") != "1":
+        return []
+    key = (os.environ.get("ODDS_API_KEY") or os.environ.get("SPORTSEDGE_ODDS_API_KEY") or "").strip()
+    if not key:
+        print("CFB_SDV_SHARP_FETCH_SKIPPED no odds key")
+        return []
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("cfb_paper", ROOT / "scripts" / "run_cfb_paper_market.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        events, source, status = mod.load_events(key)
+        print("CFB_SDV_SHARP_FETCH", source, status, len(events))
+        return events if status == "READY" else []
+    except Exception as exc:
+        print("CFB_SDV_SHARP_FETCH_FAILED", type(exc).__name__, str(exc)[:120])
+        return []
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--board-json", required=True)
@@ -916,6 +937,12 @@ def main() -> int:
         "results": sorted(results, key=lambda r: -(r.get("edge") or -9)),
     }
     payload = attach_cfb_both_sides(payload)
+    # OddsJam-style reference: other books' no-vig on the same line (board "peers",
+    # plus The Odds API when CFB_SHARP_FETCH=1 and a key exists). No reference -> no probation.
+    from sportsedge.sports.cfb.sharp_reference import attach_sharp_reference
+    n_sharp = attach_sharp_reference(payload["results"], board, _load_sharp_events())
+    payload["sharp_reference_rows"] = n_sharp
+    print(f"CFB_SDV_SHARP_REFERENCE rows={n_sharp} (Pinnacle no-vig, else >=2-book consensus, exact line only)")
     payload = apply_probation(payload)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -937,7 +964,7 @@ def main() -> int:
             ln = "" if r["line"] in (None, "") else (f" {float(r['line']):+g}" if r["market"] == "SPREAD" else f" {float(r['line']):g}")
             print(f"CFB_SDV_PROBATION_PLAY {r['matchup']}: {r['market'].title()} {r['side'].title()}{ln} "
                   f"{r['american_odds']:+.0f} {r['stake_units']}u model {r['model_p']*100:.1f}% vs mkt "
-                  f"{r['market_p']*100:.1f}% ({r['edge']*100:+.1f}%)")
+                  f"{r['market_p']*100:.1f}% ({r['edge']*100:+.1f}%) sharp {(r.get('sharp_fair_p') or 0)*100:.1f}% {r.get('sharp_method')}")
     for r in payload["results"]:
         if "edge" in r:
             print(f"{r['bet_status']:4s} {r['matchup']:45s} {r['market']:9s} {r['side']:5s} {str(r['line'] or ''):6s} "
