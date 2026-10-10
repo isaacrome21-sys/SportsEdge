@@ -174,6 +174,9 @@ def build_payload(events, min_edge, now, market_input_source, input_status):
             continue
         if start.tzinfo is None or start <= now:
             continue
+        participants = ' | '.join(str(event.get(k) or '').lower() for k in ('home_team', 'away_team'))
+        if any(team in participants for team in ('illinois', 'northwestern', 'depaul', 'bradley', 'loyola chicago', 'roosevelt')):
+            continue
 
         books = _book_markets(event)
         dk = books.get("draftkings")
@@ -201,6 +204,8 @@ def build_payload(events, min_edge, now, market_input_source, input_status):
 
                 consensus = sum(peer_probabilities) / len(peer_probabilities)
                 price = float(dk_row["price"])
+                if price < -165:
+                    continue  # Straight-wager cap; no SGP path in paper lane.
                 raw = implied(price)
                 decimal = 1 + (100 / abs(price) if price < 0 else price / 100)
                 ev_per_dollar = consensus * (decimal - 1) - (1 - consensus)
