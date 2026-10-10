@@ -216,6 +216,19 @@ def main(argv=None):
         market={}
         for year in range(2016,2026):
             market.update(cache.get(f"lines_{year}") or {})
+    # A missing cache or non-matching game-id namespace cannot count as a
+    # negative historical evaluation. Emit source identity diagnostics.
+    prediction_ids=set(preds)
+    close_ids=set(market)
+    matched_ids=prediction_ids & close_ids
+    print("CFB_TOTAL_JOIN_DIAGNOSTIC",json.dumps({
+        "market_id_count":len(close_ids),
+        "prediction_id_count":len(prediction_ids),
+        "exact_id_overlap":len(matched_ids),
+        "sample_prediction_ids":sorted(prediction_ids)[:4],
+        "sample_market_ids":sorted(close_ids)[:4],
+        "cache_issue":1475,
+    },sort_keys=True))
     paired=paired_rows(preds,market)
     report=walkforward(paired)
     report["source_summary"]={"historical_rows":len(rows),"chrono_predictions":len(preds),
