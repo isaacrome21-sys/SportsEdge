@@ -68,6 +68,28 @@ class TotalsBiasAuditTest(unittest.TestCase):
         self.assertEqual(out["games_with_paired_totals"], 0)
         self.assertFalse(out["research_review_required"])
 
+    def test_sign_test_flags_slate_skew_when_one_game_is_near_line(self):
+        # 10 of 13 above the line (one-sided p ~= 0.046), not all beyond 5 pts.
+        gaps = [14.1, 14.3, 11.7, 7.5, 5.5, 4.1, 1.5, 1.9, 0.9, 0.6, -2.6, -0.3, -0.2]
+        out = audit(card(gaps, anomalous=False))
+        self.assertEqual(out["model_above_market"], 10)
+        self.assertLess(out["sign_test_p_model_high"], 0.05)
+        self.assertEqual(out["directional_bias_signal"], "MODEL_HIGH")
+        self.assertFalse(out["research_review_required"])
+        self.assertFalse(out["authority"]["bets_created"])
+
+    def test_sign_test_needs_minimum_games(self):
+        out = audit(card([1, 2, 3, 4, -1], anomalous=False))
+        self.assertEqual(out["directional_bias_signal"], "NONE")
+
+    def test_balanced_slate_not_flagged_by_sign_test(self):
+        out = audit(card([3, -3, 2, -2, 4, -4, 1, -1, 2, -2], anomalous=False))
+        self.assertEqual(out["directional_bias_signal"], "NONE")
+
+    def test_sign_test_flags_model_low(self):
+        out = audit(card([-2, -3, -1, -4, -2, -6, -1, -3, -2], anomalous=False))
+        self.assertEqual(out["directional_bias_signal"], "MODEL_LOW")
+
     def test_duplicates_fail_closed(self):
         source = card([7, 8, 9])
         source["results"].append(dict(source["results"][0]))

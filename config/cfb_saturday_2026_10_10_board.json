@@ -1,224 +1,45 @@
 [
-  {
-    "away": "Indiana",
-    "home": "Nebraska",
-    "spread": [
-      -7.5,
-      -115,
-      -105
-    ],
-    "total": [
-      47.5,
-      -118,
-      -102
-    ],
-    "start_ts": "2026-10-10T16:00:00Z",
-    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
-    "book_quote_receipt_verified": false
-  },
-  {
-    "away": "Texas A&M",
-    "home": "Missouri",
-    "spread": [
-      3.5,
-      -110,
-      -110
-    ],
-    "total": [
-      49.5,
-      -105,
-      -115
-    ],
-    "start_ts": "2026-10-10T16:00:00Z",
-    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
-    "book_quote_receipt_verified": false
-  },
-  {
-    "away": "North Carolina",
-    "home": "Pittsburgh",
-    "spread": [
-      3.5,
-      -108,
-      -112
-    ],
-    "total": [
-      47.5,
-      -102,
-      -118
-    ],
-    "start_ts": "2026-10-10T16:00:00Z",
-    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
-    "book_quote_receipt_verified": false
-  },
-  {
-    "away": "UCF",
-    "home": "Oklahoma State",
-    "spread": [
-      10.5,
-      -108,
-      -112
-    ],
-    "total": [
-      53.5,
-      -112,
-      -108
-    ],
-    "start_ts": "2026-10-10T16:00:00Z",
-    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
-    "book_quote_receipt_verified": false
-  },
-  {
-    "away": "Arizona",
-    "home": "West Virginia",
-    "spread": [
-      -3.5,
-      -108,
-      -112
-    ],
-    "total": [
-      60.5,
-      -115,
-      -105
-    ],
-    "start_ts": "2026-10-10T16:00:00Z",
-    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
-    "book_quote_receipt_verified": false
-  },
-  {
-    "away": "Wake Forest",
-    "home": "NC State",
-    "spread": [
-      -3.5,
-      100,
-      -120
-    ],
-    "total": [
-      58.5,
-      -110,
-      -110
-    ],
-    "start_ts": "2026-10-10T16:00:00Z",
-    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
-    "book_quote_receipt_verified": false
-  },
-  {
-    "away": "Tulane",
-    "home": "Army",
-    "spread": [
-      3.5,
-      -112,
-      -108
-    ],
-    "total": [
-      48.5,
-      -105,
-      -115
-    ],
-    "start_ts": "2026-10-10T16:00:00Z",
-    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
-    "book_quote_receipt_verified": false
-  },
-  {
-    "away": "South Carolina",
-    "home": "Florida",
-    "spread": [
-      10.5,
-      -105,
-      -115
-    ],
-    "total": [
-      58.5,
-      -115,
-      -105
-    ],
-    "start_ts": "2026-10-10T16:45:00Z",
-    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
-    "book_quote_receipt_verified": false
-  },
-  {
-    "away": "Texas",
-    "home": "Oklahoma",
-    "spread": [
-      -7.5,
-      -105,
-      -115
-    ],
-    "total": [
-      39.5,
-      -105,
-      -115
-    ],
-    "start_ts": "2026-10-10T19:30:00Z",
-    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
-    "book_quote_receipt_verified": false,
-    "neutral_field_home_team_source": "SCHEDULE_TEXAS_AT_OKLAHOMA_NEUTRAL_SITE"
-  },
-  {
-    "away": "UCLA",
-    "home": "Oregon",
-    "spread": [
-      10.5,
-      -112,
-      -108
-    ],
-    "total": [
-      58.5,
-      -105,
-      -115
-    ],
-    "start_ts": "2026-10-10T19:30:00Z",
-    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
-    "book_quote_receipt_verified": false
-  },
-  {
-    "away": "Ole Miss",
-    "home": "Vanderbilt",
-    "spread": [
-      -9.5,
-      -112,
-      -108
-    ],
-    "total": [
-      54.5,
-      -108,
-      -112
-    ],
-    "start_ts": "2026-10-10T19:30:00Z",
-    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
-    "book_quote_receipt_verified": false
-  },
-  {
-    "away": "Georgia",
-    "home": "Alabama",
-    "spread": [
-      1.5,
-      -108,
-      -112
-    ],
-    "total": [
-      51.5,
-      -105,
-      -115
-    ],
-    "start_ts": "2026-10-10T23:30:00Z",
-    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
-    "book_quote_receipt_verified": false
-  },
-  {
-    "away": "USC",
-    "home": "Penn State",
-    "spread": [
-      1.5,
-      -108,
-      -112
-    ],
-    "total": [
-      54.5,
-      -112,
-      -108
-    ],
-    "start_ts": "2026-10-10T23:30:00Z",
-    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
-    "book_quote_receipt_verified": false
-  }
+  {"away": "Arizona", "home": "West Virginia", "spread": [-3.5, -112, -108], "total": [60.5, -115, -105], "start_ts": "2026-10-10T16:00:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [-175, 145], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Indiana", "home": "Nebraska", "spread": [-8.5, -108, -112], "total": [48.5, -105, -115], "start_ts": "2026-10-10T16:00:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [-340, 270], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "UCF", "home": "Oklahoma State", "spread": [10.5, -108, -112], "total": [53.5, -112, -108], "start_ts": "2026-10-10T16:00:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [350, -455], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Texas A&M", "home": "Missouri", "spread": [3.5, -115, -105], "total": [49.5, -110, -110], "start_ts": "2026-10-10T16:00:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [150, -180], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "North Carolina", "home": "Pittsburgh", "spread": [3.5, -108, -112], "total": [47.5, -102, -118], "start_ts": "2026-10-10T16:00:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [154, -185], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Wake Forest", "home": "NC State", "spread": [-3.5, 100, -120], "total": [57.5, -110, -110], "start_ts": "2026-10-10T16:00:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [-166, 140], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Sacramento State", "home": "Bowling Green", "spread": [8.5, -112, -108], "total": [43.5, -115, -105], "start_ts": "2026-10-10T16:00:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [260, -325], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Tulane", "home": "Army", "spread": [3.5, -112, -108], "total": [48.5, -105, -115], "start_ts": "2026-10-10T16:00:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [140, -166], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "South Carolina", "home": "Florida", "spread": [10.5, -105, -115], "total": [58.5, -115, -105], "start_ts": "2026-10-10T16:45:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [360, -470], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Old Dominion", "home": "Appalachian State", "spread": [10.0, -112, -108], "total": [47.5, -108, -112], "start_ts": "2026-10-10T17:00:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [295, -375], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Rice", "home": "East Carolina", "spread": [10.0, -110, -110], "total": [46.5, -110, -110], "start_ts": "2026-10-10T17:00:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [300, -380], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Miami OH", "home": "UMass", "spread": [-4.5, -112, -108], "total": [44.5, -110, -110], "start_ts": "2026-10-10T18:00:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [-198, 164], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Texas", "home": "Oklahoma", "spread": [-7.5, -105, -115], "total": [39.5, -105, -115], "start_ts": "2026-10-10T19:30:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [-310, 250], "neutral_field_home_team_source": "SCHEDULE_TEXAS_AT_OKLAHOMA_NEUTRAL_SITE", "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Ole Miss", "home": "Vanderbilt", "spread": [-9.5, -112, -108], "total": [54.5, -108, -112], "start_ts": "2026-10-10T19:30:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [-355, 280], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "UCLA", "home": "Oregon", "spread": [10.5, -112, -108], "total": [57.5, -115, -105], "start_ts": "2026-10-10T19:30:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [320, -410], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Houston", "home": "Kansas State", "spread": [2.5, -110, -110], "total": [54.5, -118, -102], "start_ts": "2026-10-10T19:30:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [114, -135], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Virginia Tech", "home": "California", "spread": [-10.0, -110, -110], "total": [53.5, -108, -112], "start_ts": "2026-10-10T19:30:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [-375, 295], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Duke", "home": "Georgia Tech", "spread": [-6.5, -115, -105], "total": [44.5, -105, -115], "start_ts": "2026-10-10T19:30:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [-245, 200], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Charlotte", "home": "North Texas", "spread": [28.5, -108, -112], "total": [58.5, -105, -115], "start_ts": "2026-10-10T19:30:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [1700, -4500], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Kent State", "home": "Western Michigan", "spread": [14.0, -112, -108], "total": [43.5, -110, -110], "start_ts": "2026-10-10T19:30:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [440, -600], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Buffalo", "home": "Toledo", "spread": [18.5, -108, -112], "total": [55.5, -105, -115], "start_ts": "2026-10-10T19:30:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [700, -1100], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Stanford", "home": "Notre Dame", "spread": [39.5, -108, -112], "total": [54.5, -110, -110], "start_ts": "2026-10-10T19:30:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Tulsa", "home": "Navy", "spread": [1.5, -105, -115], "total": [48.5, -108, -112], "start_ts": "2026-10-10T19:30:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [102, -122], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Central Michigan", "home": "Ohio", "spread": [2.5, -118, -102], "total": [46.5, -108, -112], "start_ts": "2026-10-10T19:30:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [110, -130], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Eastern Michigan", "home": "Akron", "spread": [-5.5, -110, -110], "total": [51.5, -115, -105], "start_ts": "2026-10-10T19:30:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [-218, 180], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "UConn", "home": "Temple", "spread": [3.5, -108, -112], "total": [54.5, -115, -105], "start_ts": "2026-10-10T19:45:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [150, -180], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Tennessee", "home": "Arkansas", "spread": [-13.5, -115, -105], "total": [51.5, -105, -115], "start_ts": "2026-10-10T20:15:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [-550, 410], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Maryland", "home": "Ohio State", "spread": [33.5, -112, -108], "total": [56.5, -110, -110], "start_ts": "2026-10-10T20:15:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "San Diego State", "home": "Oregon State", "spread": [16.5, -112, -108], "total": [52.5, -110, -110], "start_ts": "2026-10-10T22:00:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [525, -750], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "LSU", "home": "Kentucky", "spread": [-8.5, -112, -108], "total": [50.5, -115, -105], "start_ts": "2026-10-10T23:00:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [-345, 275], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Coastal Carolina", "home": "Marshall", "spread": [4.0, -108, -112], "total": [58.5, -108, -112], "start_ts": "2026-10-10T23:00:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [154, -185], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "UAB", "home": "Memphis", "spread": [14.5, -108, -112], "total": [53.5, -115, -105], "start_ts": "2026-10-10T23:00:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [455, -625], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "North Dakota State", "home": "UNLV", "spread": [-2.5, -112, -108], "total": [47.5, -115, -105], "start_ts": "2026-10-10T23:00:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [-135, 114], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Nevada", "home": "UTEP", "spread": [-9.5, -115, -105], "total": [49.5, -105, -115], "start_ts": "2026-10-10T23:00:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [-375, 295], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Georgia", "home": "Alabama", "spread": [2.5, -115, -105], "total": [51.5, -108, -112], "start_ts": "2026-10-10T23:30:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [105, -125], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "USC", "home": "Penn State", "spread": [1.5, -108, -112], "total": [54.5, -112, -108], "start_ts": "2026-10-10T23:30:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [102, -122], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "James Madison", "home": "Georgia Southern", "spread": [-7.5, -105, -115], "total": [51.5, -110, -110], "start_ts": "2026-10-10T23:30:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [-310, 250], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Syracuse", "home": "Virginia", "spread": [11.5, -110, -110], "total": [49.5, -110, -110], "start_ts": "2026-10-10T23:30:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [340, -440], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Louisiana", "home": "Louisiana Tech", "spread": [3.0, -108, -112], "total": [48.5, -102, -118], "start_ts": "2026-10-10T23:30:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [130, -155], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Kansas", "home": "Utah", "spread": [15.5, -110, -110], "total": [51.5, -105, -115], "start_ts": "2026-10-11T00:00:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [500, -700], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Minnesota", "home": "Purdue", "spread": [-2.5, -115, -105], "total": [50.5, -108, -112], "start_ts": "2026-10-11T00:00:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [-142, 120], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Boise State", "home": "Fresno State", "spread": [-7.0, -110, -110], "total": [48.5, -110, -110], "start_ts": "2026-10-11T02:30:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [-258, 210], "quote_captured_at": "2026-10-10T09:54:14Z"},
+  {"away": "Hawaii", "home": "Arizona State", "spread": [21.0, -112, -108], "total": [50.5, -115, -105], "start_ts": "2026-10-11T02:30:00Z", "quote_source": "DK_SPORTSBOOK_APP_SCREENSHOT_UNVERIFIED", "book_quote_receipt_verified": false, "ml": [900, -1600], "quote_captured_at": "2026-10-10T09:54:14Z"}
 ]

@@ -1,0 +1,22 @@
+{
+  "schema": "CFB_PROBATION_POLICY_V1",
+  "frozen_at": "2026-10-10",
+  "purpose": "Small-stake forward evidence for CFB leans. Not validation, not OFFICIAL, not Model_P certification.",
+  "stake_units": 0.25,
+  "max_probation_per_slate": 5,
+  "eligible_markets": ["SPREAD", "TOTAL", "MONEYLINE"],
+  "requires": [
+    "bet_status == LEAN (already cleared edge floor/cap, positive push-aware ROI, paired devig, -165 cap, same-game guard)",
+    "model_status == MODEL_SDV_PUBLIC_LIVE_UNVALIDATED or MODEL (never market-only fallback)",
+    "TOTAL side is not in the direction of the slate's detected model total bias (audit_cfb_sdv_total_bias)",
+    "SPREAD/MONEYLINE rows use the market-anchored margin and passed its forward-track threshold"
+  ],
+  "ranking": "edge descending; ties by expected_roi",
+  "promotion_rule": "Review after 100 graded probation bets: promote a market to standard stakes only if mean no-vig CLV > 0 with t >= 2.0; ROI is a sanity check only.",
+  "kill_rule": "After 50 graded bets in a market, stop that market if mean no-vig CLV < 0 with t <= -1.5, or after 100 graded bets if mean CLV <= 0.",
+  "never": [
+    "relabel probation as BET/OFFICIAL",
+    "change thresholds after seeing results without a new policy version",
+    "backfill probation rows after kickoff"
+  ]
+}

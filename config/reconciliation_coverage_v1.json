@@ -115,6 +115,7 @@
         "config/cfb_dispersion_only_prereg_v1.json",
         "config/cfb_market_anchored_spread_challenger_v1.json",
         "config/cfb_market_anchored_spread_fit_v1.json",
+        "config/cfb_probation_policy_v1.json",
         "config/cfb_sdv_completed_selection_v1.json",
         "config/cfb_sdv_materialize_request_v1.json",
         "config/cfb_sdv_prior_current_blend_fit_v1.json",
