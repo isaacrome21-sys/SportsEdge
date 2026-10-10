@@ -22,7 +22,7 @@ jobs:
         with:
           python-version-file: '.python-version'
       - name: Verify fail-closed prospective exporter
-        run: python -m unittest tests.test_cfb_sdv_forward_snapshot -v
+        run: python -m unittest tests.test_cfb_sdv_forward_snapshot tests.test_cfb_forward_priced_ev -v
       - name: Retrieve exact prior card artifact (no backfill)
         env:
           GH_TOKEN: ${{ github.token }}
@@ -52,11 +52,29 @@ jobs:
           assert p["source_run_independently_attested"] is False
           assert p["sportsbook_price_receipt_verified"] is False
           PY
+      - name: Lock pre-settlement two-sided price shadow (no wagers)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/research_cfb_forward_priced_ev.py \
+            --snapshot artifacts/cfb/cfb_sdv_forward_snapshot.json \
+            --output artifacts/cfb/cfb_sdv_forward_priced_shadow.json | tee -a "$GITHUB_STEP_SUMMARY"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path("artifacts/cfb/cfb_sdv_forward_priced_shadow.json").read_text())
+          assert p["bets_enabled"] is False
+          assert p["real_positive_ev_proven"] is False
+          assert p["decision_quotes_independently_verified"] is False
+          assert p["settled_shadow_candidates"] == 0
+          PY
       - name: Preserve forward forecast snapshots
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: cfb-sdv-forward-snapshot-${{ github.event.workflow_run.id }}
-          path: artifacts/cfb/cfb_sdv_forward_snapshot.json
+          path: |
+            artifacts/cfb/cfb_sdv_forward_snapshot.json
+            artifacts/cfb/cfb_sdv_forward_priced_shadow.json
           if-no-files-found: warn
           retention-days: 90
