@@ -72,9 +72,15 @@ def load_events(key, input_json=None, inline_json=None):
     if inline:
         return _decode_events(inline, "MANUAL_INLINE"), "MANUAL_JSON_INLINE", "READY"
     if key:
-        events = fetch(key)
+        try:
+            events = fetch(key)
+        except (OSError, TimeoutError, ValueError) as exc:
+            # Machine-readable fail-closed artifact on quota, bad credentials,
+            # or provider outage: never synthesize prices or model predictions.
+            print("CFB_PAPER_PROVIDER_UNAVAILABLE " + type(exc).__name__)
+            return [], "ODDS_PROVIDER_UNAVAILABLE", "BLOCKED_PROVIDER_UNAVAILABLE"
         if not isinstance(events, list):
-            raise SystemExit("CFB_PAPER_PROVIDER_RESPONSE_NOT_ARRAY")
+            return [], "ODDS_PROVIDER_INVALID", "BLOCKED_PROVIDER_INVALID"
         return events, "ODDS_PROVIDER", "READY"
     return [], "MARKET_INPUT_UNAVAILABLE", "BLOCKED_NO_MARKET_INPUT"
 
