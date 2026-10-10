@@ -167,6 +167,59 @@ class PublicSDVLiveTest(unittest.TestCase):
             )
         self.assertEqual([row["game_id"] for row in rows], ["102"])
 
+    def test_one_target_with_missing_native_snapshots_does_not_destroy_valid_slate(self):
+        unsupported = {
+            **game(108, week=7, start="2026-10-10T02:00:00Z", completed="FALSE"),
+            "home_id": "3", "away_id": "4",
+            "home_team": "Unsupported Home", "away_team": "Unsupported Away",
+        }
+        self.data[(2026, "cfb_schedules")].append(unsupported)
+        original = {
+            "capture_time": self.now.isoformat(),
+            "source_contract": sdv.LIVE_CONTRACT,
+            "file_sha256": {"immutable": "a" * 64},
+        }
+        board = [
+            {"home": "Unsupported Home", "away": "Unsupported Away", "quotes": []},
+            {"home": "Home", "away": "Away", "quotes": []},
+        ]
+        with patch.object(sdv, "_read_bundle", return_value=(self.data, original)), \\
+             patch.object(sdv, "build_prior_season_fallback_snapshots",
+                          return_value=[snapshot(1), snapshot(2)]):
+            rows, receipt = sdv.build_live_rows(
+                board, directory="unused", now=self.now,
+                expand_compact=lambda r: r,
+                normalize_name=lambda s: str(s).strip().lower(),
+            )
+        self.assertEqual([row["game_id"] for row in rows], ["102"])
+        self.assertEqual(receipt["skipped_missing_target_snapshot_count"], 1)
+        self.assertEqual(
+            receipt["skipped_missing_target_snapshot_games"][0],
+            {"game_id": "108", "home_team": "Unsupported Home",
+             "away_team": "Unsupported Away",
+             "reason": "MISSING_NATIVE_PRIOR_OR_CURRENT_TEAM_SNAPSHOT"},
+        )
+        self.assertEqual(receipt["file_sha256"], original["file_sha256"])
+        self.assertNotIn("skipped_missing_target_snapshot_count", original)
+
+    def test_every_target_without_snapshots_still_fails_closed(self):
+        unavailable = {
+            **game(109, week=7, start="2026-10-10T02:00:00Z", completed="FALSE"),
+            "home_id": "3", "away_id": "4",
+            "home_team": "Unsupported Home", "away_team": "Unsupported Away",
+        }
+        self.data[(2026, "cfb_schedules")].append(unavailable)
+        with patch.object(sdv, "_read_bundle", return_value=(self.data, {})), \\
+             patch.object(sdv, "build_prior_season_fallback_snapshots",
+                          return_value=[snapshot(1), snapshot(2)]):
+            with self.assertRaisesRegex(sdv.SDVLiveError, "NO_RESOLVED_GAMES"):
+                sdv.build_live_rows(
+                    [{"home": "Unsupported Home", "away": "Unsupported Away", "quotes": []}],
+                    directory="unused", now=self.now,
+                    expand_compact=lambda r: r,
+                    normalize_name=lambda s: str(s).strip().lower(),
+                )
+
     def test_receipt_cannot_be_reused_for_past_asof(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
