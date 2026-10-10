@@ -92,6 +92,10 @@ class BlockedCardTest(unittest.TestCase):
         ])
         self.assertAlmostEqual(rows[0]["model_p"], 0.5, places=3)
 
+    def test_unicode_accent_team_identity_normalizes_consistently(self):
+        self.assertEqual(card._n("San José State"), card._n("San Jose State"))
+        self.assertEqual(card._n("Hawaiʻi"), card._n("Hawaii"))
+
     def test_compact_expand_and_resolve(self):
         from types import SimpleNamespace as G
         row = card.expand_compact({"away": "Mississippi", "home": "Alabama",
