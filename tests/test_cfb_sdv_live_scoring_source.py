@@ -64,6 +64,9 @@ class PublicSDVLiveTest(unittest.TestCase):
             (2026, "adv_drives"): [*rows, *future_rows],
         }
 
+        for name in sdv.DATASETS:
+            self.data[(2025, name)] = []
+
     def test_prior_week_excludes_current_game_even_if_rows_present(self):
         snaps = sdv._current_snapshots(
             self.data, season=2026, target_week=7, now=self.now
@@ -120,13 +123,30 @@ class PublicSDVLiveTest(unittest.TestCase):
         with patch.object(sdv, "_read_bundle", return_value=(self.data, {})), \
              patch.object(sdv, "build_prior_season_fallback_snapshots",
                           return_value=[snapshot(1), snapshot(2)]):
-            with self.assertRaisesRegex(sdv.SDVLiveError, "MATCH_NOT_UNIQUE"):
+            with self.assertRaisesRegex(sdv.SDVLiveError, "NO_RESOLVED_GAMES"):
                 sdv.build_live_rows(
                     [{"home": "Home", "away": "Away", "quotes": []}],
                     directory="unused", now=self.now,
                     expand_compact=lambda r: r,
                     normalize_name=lambda s: str(s).strip().lower(),
                 )
+
+
+    def test_started_game_does_not_block_remaining_board(self):
+        started = game(103, week=7, start="2026-10-09T22:00:00Z", completed="FALSE")
+        started.update(home_team="Started Home", away_team="Started Away")
+        self.data[(2026, "cfb_schedules")].append(started)
+        with patch.object(sdv, "_read_bundle", return_value=(self.data, {})), \
+             patch.object(sdv, "build_prior_season_fallback_snapshots",
+                          return_value=[snapshot(1), snapshot(2)]):
+            rows, _ = sdv.build_live_rows(
+                [{"home": "Started Home", "away": "Started Away", "quotes": []},
+                 {"home": "Home", "away": "Away", "quotes": []}],
+                directory="unused", now=self.now,
+                expand_compact=lambda r: r,
+                normalize_name=lambda s: str(s).strip().lower(),
+            )
+        self.assertEqual([r["game_id"] for r in rows], ["102"])
 
     def test_receipt_cannot_be_reused_for_past_asof(self):
         with tempfile.TemporaryDirectory() as folder:

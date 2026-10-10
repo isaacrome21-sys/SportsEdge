@@ -217,13 +217,15 @@ def build_live_rows(board, *, directory, now, expand_compact, normalize_name):
             if int(g["season"]) == 2026 and
             normalize_name(g.get("home_team", "")) == home and
             normalize_name(g.get("away_team", "")) == away and
-            _utc(g["start_date"]) > now and
             str(g.get("season_type", "")).lower() in {"regular", "2"} and
             _boolean(g.get("fbs_game"))
         ]
         if len(matches) != 1:
             raise SDVLiveError(f"CFB_SDV_LIVE_MATCH_NOT_UNIQUE:{away}@{home}:{len(matches)}")
         game = matches[0]
+        if _utc(game["start_date"]) <= now:
+            print(f"CFB_SDV_PUBLIC_SKIPPED_STARTED:{away}@{home}")
+            continue
         week = int(game["week"])
         if week < 2:
             raise SDVLiveError("CFB_SDV_LIVE_WEEK_OUT_OF_RANGE")
