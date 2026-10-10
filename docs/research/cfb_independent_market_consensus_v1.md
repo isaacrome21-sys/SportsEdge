@@ -63,3 +63,20 @@ Important:
 For actual wagering authority, historical leakage-resistant out-of-sample
 performance, executable quote receipts, unbiased forward CLV and net return
 evidence are still required. A multi-book discrepancy is only a candidate.
+
+## Saturday October 10, 2026 provisional board
+
+`config/cfb_saturday_2026_10_10_board.json` contains 14 **pregame**
+pair-matched spreads and totals manually transcribed on October 9 from the
+public DraftKings Network [CFB betting-splits pages](https://dknetwork.draftkings.com/draftkings-sportsbook-betting-splits/).
+They are **not** independently book-receipted, nor guaranteed to match an
+Illinois account at execution. Only use as a working research board.
+User-supplied, freshly verified local DraftKings screenshots should supersede
+these preliminary prices before treating any quoted line as actionable.
+
+The merged `cfb-sdv-card` main-push runner chooses this new board instead of
+replaying archived Friday quotes, preserving the original Friday artifact.
+It still applies the ordinary pre-kickoff, model-source, calibration,
+large-edge suspicion and no-authority checks. No Illinois college teams are
+included. When the model is unavailable, the card is market-only without
+invented model edges.
