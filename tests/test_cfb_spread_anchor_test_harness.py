@@ -41,6 +41,12 @@ class SpreadAnchorOOSTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"CLUSTERS"):
             clustered_slope_ci(samples(range(2021,2023)))
     def test_market_anchor_acceptance_requires_ci_and_rmse(self):
-        self.assertFalse(passes_feature_acceptance(evaluate(samples())))
-        self.assertTrue(passes_feature_acceptance(evaluate(samples(slope=.4))))
+        null=samples()
+        for row in null:
+            row["y"]=float(row["season"]%3)
+        self.assertFalse(passes_feature_acceptance(evaluate(null)))
+        signal=samples(slope=.4)
+        for row in signal:
+            row["y"]=.4*row["x"]+float(row["season"]%3)
+        self.assertTrue(passes_feature_acceptance(evaluate(signal)))
 if __name__=="__main__": unittest.main()
