@@ -125,9 +125,14 @@ class ForwardPricedEVTest(unittest.TestCase):
     def test_minus_165_cap_and_illinois_restriction(self):
         source = card()
         for r in source["results"]:
-            r["american_odds"] = -166
+            r["american_odds"] = -166 if r["side"] == "OVER" else 130
+            r["away_mean"] = 28.5
         report = evaluate(export_snapshot(source, original_card_sha256=HASH))
-        self.assertFalse(any(r["shadow_rule_eligible"] for r in report["results"]))
+        over = next(r for r in report["results"] if r["side"] == "OVER")
+        self.assertGreater(over["theoretical_roi_unvalidated"], 0)
+        self.assertGreater(over["model_vs_novig_edge_pp"], 2)
+        self.assertLessEqual(over["model_vs_novig_edge_pp"], 12)
+        self.assertFalse(over["shadow_rule_eligible"])
         source = card()
         for r in source["results"]:
             r["matchup"] = "Northern Illinois @ Home"
@@ -158,6 +163,32 @@ class ForwardPricedEVTest(unittest.TestCase):
         source["bets_enabled"] = True
         with self.assertRaisesRegex(ValueError, "AUTHORITY_INVALID"):
             evaluate(source)
+
+    def test_archived_anchored_spread_is_scored_consistently(self):
+        source = card()
+        source["results"] = [
+            {
+                "game_id": "123", "matchup": "Away @ Home",
+                "market": "SPREAD", "side": side,
+                "line": -3.5 if side == "HOME" else 3.5,
+                "american_odds": -110, "model_p": .55 if side == "HOME" else .45,
+                "devig": "PAIRED_PROPORTIONAL",
+                "home_mean": 27.0, "away_mean": 25.0,
+                "adjusted_home_margin": 6.0,
+                "start_ts": "2026-10-10T02:00:00Z",
+                "bet_status": "PASS", "reason": "RESEARCH",
+            } for side in ("HOME", "AWAY")
+        ]
+        snapshot = export_snapshot(source, original_card_sha256=HASH)
+        report = evaluate(snapshot)
+        self.assertEqual(len(report["results"]), 2)
+        home = next(r for r in report["results"] if r["side"] == "HOME")
+        self.assertEqual(home["spread_projection_basis"], "MARKET_ANCHORED_ORIGINAL")
+        self.assertGreater(home["model_win_p_unvalidated"], .55)
+        corrupt = copy.deepcopy(snapshot)
+        corrupt["games"][0]["paired_decision_quotes"][1]["spread_anchor_margin_original"] = 3
+        with self.assertRaisesRegex(ValueError, "SPREAD_ANCHOR_PAIR_MISMATCH"):
+            evaluate(corrupt)
 
     def test_original_market_side_and_total_symmetry(self):
         w, l, p = outcome_probs(52, 17, "TOTAL", "OVER", 49.5)
