@@ -1,3 +1,4 @@
+import gzip
 import unittest
 
 from scripts.research_cfb_total_chronological import (
@@ -8,6 +9,7 @@ from scripts.research_cfb_total_chronological import (
     fit_residual,
     paired_rows,
     parse_espn_betting_totals,
+    parse_pinned_book_totals,
     walkforward,
 )
 
@@ -102,6 +104,22 @@ class HistoricalCFBTotalResidualTest(unittest.TestCase):
         )
         self.assertEqual(parse_espn_betting_totals(raw,season=2025),
                          {"3":{"total":51.5}})
+
+    def test_pinned_book_mirror_uses_totals_only_and_median_per_book(self):
+        blob=(
+            b"game_id,market_type,abbr,lines,opening_lines,book\n"
+            b"12,spread,AAA,-7.5,-6.5,A\n"
+            b"12,total,AAA,46.5,46,A\n"
+            b"12,total,BBB,46.5,46,A\n"
+            b"12,total,AAA,47.5,47,B\n"
+            b"13,total,AAA,52.5,,C\n"
+        )
+        rows=parse_pinned_book_totals(gzip.compress(blob))
+        self.assertEqual(rows,{"12":{"total":47.0},"13":{"total":52.5}})
+
+    def test_pinned_mirror_rejects_unknown_schema(self):
+        with self.assertRaisesRegex(ValueError,"SCHEMA_INVALID"):
+            parse_pinned_book_totals(b"game_id,book,lines\n1,A,52.5\n")
 
     def test_never_passes_when_historical_coverage_insufficient(self):
         report=walkforward(sample(2025,20))
