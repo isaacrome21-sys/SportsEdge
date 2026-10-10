@@ -313,6 +313,32 @@
         },
         "note": "Rebound after latest-main merge; binds the exact parent commit containing the NHL public-baseline validation candidate bytes. Forward validation remains required and authority stays zero."
       }
+    },
+    {
+      "bundle_id": "NBA_LOCATION_SYMMETRIC_G1_RESEARCH_FREEZE_V1",
+      "freeze_sha": "fee90b3757c77b1e59acbef69107f6f9a5bc3edb",
+      "coverage_paths": [
+        "config/research/nba_location_symmetric_g1_prereg_v1.json",
+        "sportsedge/sports/nba/location_symmetric_g1.py",
+        "sportsedge/sports/nba/location_symmetric_g1_validation.py"
+      ],
+      "coverage_prefixes": [],
+      "disposition": null,
+      "identity": {
+        "schema": "NBA_LOCATION_SYMMETRIC_G1_RESEARCH_FREEZE_IDENTITY_V1",
+        "source_pull_request": 1832,
+        "bound_commit": "fee90b3757c77b1e59acbef69107f6f9a5bc3edb",
+        "candidate_family": "NBA_LOCATION_SYMMETRIC_RIDGE_G1",
+        "authority": {
+          "model_p": false,
+          "truth_gate": false,
+          "promotion": false,
+          "staking": false,
+          "official": false,
+          "bettor_facing_release": false
+        },
+        "note": "Fresh reconciled-main binding for the preregistered NBA symmetric G1 candidate bytes. Reused-history evaluation remains research-only; no betting authority."
+      }
     }
   ],
   "deltas": [
