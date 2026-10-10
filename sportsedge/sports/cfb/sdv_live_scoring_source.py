@@ -225,7 +225,8 @@ def build_live_rows(board, *, directory, now, expand_compact, normalize_name):
             continue
         matches = [g for g in matches if _utc(g["start_date"]) > now]
         if len(matches) != 1:
-            raise SDVLiveError(f"CFB_SDV_LIVE_MATCH_NOT_UNIQUE:{away}@{home}:{len(matches)}")
+            print(f"SKIPPED CFB_SDV_LIVE_MATCH_NOT_UNIQUE:{away}@{home}:{len(matches)}")
+            continue
         game = matches[0]
         week = int(game["week"])
         if week < 2:

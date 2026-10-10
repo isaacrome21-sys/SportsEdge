@@ -179,7 +179,9 @@ ALIASES = {
 
 def _raw(name: str) -> str:
     import re
-    t = re.sub(r"[^a-z0-9() ]", " ", str(name).lower())
+    import unicodedata
+    ascii_name = unicodedata.normalize("NFKD", str(name)).encode("ascii", "ignore").decode("ascii")
+    t = re.sub(r"[^a-z0-9() ]", " ", ascii_name.lower())
     return " ".join(t.split())
 
 

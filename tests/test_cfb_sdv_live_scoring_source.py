@@ -148,6 +148,25 @@ class PublicSDVLiveTest(unittest.TestCase):
             )
         self.assertEqual([r["game_id"] for r in rows], ["102"])
 
+    def test_unmatched_game_is_skipped_without_blocking_other_games(self):
+        self.data[(2026, "cfb_schedules")].append(
+            {**game(107, week=7, start="2026-10-10T02:00:00Z", completed="FALSE"),
+             "home_team": "Other Host", "away_team": "Other Away"}
+        )
+        for name in ("adv_team", "adv_situational", "adv_drives", "cfb_schedules"):
+            self.data[(2025, name)] = []
+        with patch.object(sdv, "_read_bundle", return_value=(self.data, {})), \
+             patch.object(sdv, "build_prior_season_fallback_snapshots",
+                          return_value=[snapshot(1), snapshot(2)]):
+            rows, _ = sdv.build_live_rows(
+                [{"home": "Missing", "away": "Unknown", "quotes": []},
+                 {"home": "Home", "away": "Away", "quotes": []}],
+                directory="unused", now=self.now,
+                expand_compact=lambda r: r,
+                normalize_name=lambda s: str(s).strip().lower(),
+            )
+        self.assertEqual([row["game_id"] for row in rows], ["102"])
+
     def test_receipt_cannot_be_reused_for_past_asof(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
