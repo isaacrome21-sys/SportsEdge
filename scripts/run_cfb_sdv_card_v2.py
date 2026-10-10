@@ -562,6 +562,7 @@ def build_rows(board: list, season: int, week: int, asof, fit_path=None):
             "home_team": game.home_team,
             "away_team": game.away_team,
             "neutral_site": bool(game.neutral_site),
+            "start_ts": game.start_ts,
             "weather": dict(game.weather or {}),
             "quotes": row.get("quotes") or [],
         }
@@ -701,9 +702,11 @@ def main() -> int:
         )
         for r in priced:
             r["matchup"] = f"{row.get('away_team')} @ {row.get('home_team')}"
+            r["start_ts"] = row.get("start_ts")
         results.extend(priced or [{"game_id": row["game_id"], "bet_status": "PASS", "reason": "NO_QUOTES"}])
     payload = {
         "schema": "CFB_SDV_CARD_V2",
+        "scored_at_utc": datetime.now(timezone.utc).isoformat(),
         "family": "PRIOR_CURRENT_BLEND",
         "bakeoff_run": 37093707442,
         "team_score_rmse": TEAM_SCORE_RMSE,
