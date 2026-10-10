@@ -50,6 +50,7 @@ class LiveGame:
     venue_id: int | None = None
     official_date: str | None = None
     status: str = "UNKNOWN"
+    game_type: str | None = None
 
 
 def lineup_from_rows(team_id: int, side: str, rows: Iterable[Mapping[str, Any]]) -> TeamLineup:
@@ -92,6 +93,7 @@ def make_live_game(snapshot: GameSnapshot, away_rows: Iterable[Mapping[str, Any]
         venue_id=snapshot.venue_id,
         official_date=snapshot.official_date,
         status=snapshot.status,
+        game_type=getattr(snapshot, "game_type", None),
     )
 
 
