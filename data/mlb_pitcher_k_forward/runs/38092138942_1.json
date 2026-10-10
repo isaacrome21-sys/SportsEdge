@@ -1,0 +1,48 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "blocked_count": 4,
+  "blockers": [
+    {
+      "entity_name": "Gavin Williams",
+      "observed_at": "2026-10-10T22:37:22.775275+00:00",
+      "provider_event_id": "34800399",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    },
+    {
+      "entity_name": "Sean Burke",
+      "observed_at": "2026-10-10T22:37:22.775275+00:00",
+      "provider_event_id": "34800399",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    },
+    {
+      "entity_name": "Jacob Misiorowski",
+      "observed_at": "2026-10-10T22:37:24.615800+00:00",
+      "provider_event_id": "34795376",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    },
+    {
+      "entity_name": "Tarik Skubal",
+      "observed_at": "2026-10-10T22:37:24.615800+00:00",
+      "provider_event_id": "34795376",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    }
+  ],
+  "eligible_quote_units": 4,
+  "observed_at_utc": "2026-10-10T22:38:39.308169+00:00",
+  "predictions_created": 0,
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-10/props_20261010T223726.053085Z.json",
+  "run_attempt": "1",
+  "run_id": "38092138942",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_RUN_V1",
+  "selection_drops": {
+    "selected_units": 16
+  },
+  "settlements_created": 0,
+  "status": "OK",
+  "summary_sha256": "b0448e4e29385ec75dd8feb106f675840d20968a5d5b9988ca89b422ecf71e84"
+}
