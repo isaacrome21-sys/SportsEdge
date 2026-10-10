@@ -82,6 +82,11 @@ def _locked_decision_quotes(selections):
                 "line": None if market == "MONEYLINE" else _number(x.get("line"), "quoted_line"),
                 "american_odds": odds,
                 "model_p_original_unvalidated": model_p,
+                "spread_anchor_margin_original": (
+                    _number(x["adjusted_home_margin"], "adjusted_home_margin")
+                    if market == "SPREAD" and x.get("adjusted_home_margin") is not None
+                    else None
+                ),
                 "original_card_bet_status": str(x.get("bet_status") or ""),
                 "original_card_reason": str(x.get("reason") or ""),
             })
