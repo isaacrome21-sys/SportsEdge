@@ -25,6 +25,16 @@ BATTER_GENERIC_MARKETS = frozenset(HITTER_MARKETS | {"FIRST_HOME_RUN"})
 PITCHER_GENERIC_MARKETS = frozenset(PITCHER_MARKETS | {"PITCHER_RECORD_WIN"})
 TEAM_TOTAL_MARKETS = frozenset({"TEAM_TOTALS", "F5_TEAM_TOTALS"})
 DECISION_STATUSES = frozenset({"MODEL_CANDIDATE", "BET", "OFFICIAL_BET", "PASS"})
+POSTSEASON_GAME_TYPES = frozenset({"F", "D", "L", "W", "P"})
+# Pre-registered bias check (#1967, result #1968, 2022-2025 postseason starts): the
+# regular-season production price overstated the over at the typical lines by
+# +0.117 (K) and +0.208 (outs); all three guard rules passed. These markets are
+# blocked (both sides) for postseason games. model_p and regular-season rows are
+# unchanged; only a later pre-registered check that passes may lift this.
+POSTSEASON_BIASED_PITCHER_MARKETS = {
+    "PITCHER_K": "MLB_POSTSEASON_PITCHER_K_BIASED (#1968)",
+    "PITCHER_OUTS": "MLB_POSTSEASON_PITCHER_OUTS_BIASED (#1968)",
+}
 
 
 @dataclass(frozen=True)
@@ -155,6 +165,12 @@ def _model_input(*, game, quote, feature, require_confirmed_lineup: bool):
         raise ValueError("feature entity identity mismatch")
     if str(feature.get("market")) != market:
         raise ValueError("feature market mismatch")
+
+    if market in POSTSEASON_BIASED_PITCHER_MARKETS:
+        # Fail closed: any postseason signal from the feature row or the bound game blocks.
+        types = {feature.get("game_type"), feature.get("gameType"), getattr(game, "game_type", None)}
+        if feature.get("rules_mode") == "POSTSEASON" or types & POSTSEASON_GAME_TYPES:
+            raise ValueError(POSTSEASON_BIASED_PITCHER_MARKETS[market])
 
     # Guard the canonical card intake, *not* the frozen pricing engine bytes.
     # MLB StatsAPI describes postseason game types as F/D/L/W/P. Any explicit
