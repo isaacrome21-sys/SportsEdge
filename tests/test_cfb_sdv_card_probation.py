@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 _spec = importlib.util.spec_from_file_location("cfb_card_v2_probation", ROOT / "scripts" / "run_cfb_sdv_card_v2.py")
 card = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(card)
+V2 = ROOT / "config" / "cfb_probation_policy_v2.json"  # legacy v2 behaviour stays pinned here; v3 has its own test
 
 
 def row(matchup, market, side, edge, status="LEAN", odds=-110, devig="PAIRED_PROPORTIONAL"):
@@ -23,7 +24,7 @@ def payload(rows, status="MODEL_SDV_PUBLIC_LIVE_UNVALIDATED"):
 class ProbationTest(unittest.TestCase):
     def run_with(self, p, signal):
         with mock.patch.object(card, "_slate_total_bias_signal", return_value=signal):
-            return card.apply_probation(p)
+            return card.apply_probation(p, V2)
 
     def test_high_bias_blocks_overs_keeps_unders(self):
         p = self.run_with(payload([row("A @ B", "TOTAL", "OVER", .10), row("C @ D", "TOTAL", "UNDER", .05)]), "MODEL_HIGH")
@@ -89,7 +90,7 @@ class ProbationTest(unittest.TestCase):
         self.assertEqual(len(p["probation"]["policy_sha256"]), 64)
         self.assertEqual(p["probation"]["policy"], "CFB_PROBATION_POLICY_V2")
         import hashlib
-        self.assertEqual(p["probation"]["policy_sha256"], hashlib.sha256(card.PROBATION_POLICY_PATH.read_bytes()).hexdigest())
+        self.assertEqual(p["probation"]["policy_sha256"], hashlib.sha256(V2.read_bytes()).hexdigest())
 
     def test_v2_keeps_v1_kill_and_promotion_rules(self):
         import json
@@ -108,7 +109,7 @@ class ProbationTest(unittest.TestCase):
                              "home_mean": 26.0, "away_mean": 26.0, "edge": e, "expected_roi": e,
                              "bet_status": "LEAN" if side == "OVER" else "PASS", "american_odds": -110,
                              "devig": "PAIRED_PROPORTIONAL", "reason": "X"})
-        p = card.apply_probation(payload(rows))
+        p = card.apply_probation(payload(rows), V2)
         self.assertEqual(p["probation"]["slate_total_bias_signal"], "MODEL_HIGH")
         self.assertEqual(p["probation"]["count"], 0)
 
