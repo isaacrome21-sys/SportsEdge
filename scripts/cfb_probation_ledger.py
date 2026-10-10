@@ -115,7 +115,7 @@ def record(card: dict, *, card_sha256: str, recorded_at: datetime) -> dict:
 
 # ---------------------------------------------------------------- grade
 def load_final_scores(schedule_csv_gz: Path) -> dict:
-    """(away_norm, home_norm) -> (away_points, home_points) for completed games."""
+    """Exact (game_id, away, home) identity -> final points; no name-only joins."""
     out = {}
     with gzip.open(schedule_csv_gz, "rt", encoding="utf-8") as fh:
         for row in csv.DictReader(fh):
@@ -125,7 +125,13 @@ def load_final_scores(schedule_csv_gz: Path) -> dict:
                 ap, hp = float(row["away_points"]), float(row["home_points"])
             except (TypeError, ValueError, KeyError):
                 continue
-            out[(_norm(row["away_team"]), _norm(row["home_team"]))] = (ap, hp)
+            game_id = str(row.get("game_id", "")).strip()
+            if not game_id or not all(math.isfinite(x) and x >= 0 and x.is_integer() for x in (ap, hp)):
+                raise ValueError("CFB_LEDGER_FINAL_SCORE_INVALID")
+            key = (game_id, _norm(row["away_team"]), _norm(row["home_team"]))
+            if key in out and out[key] != (ap, hp):
+                raise ValueError("CFB_LEDGER_FINAL_SCORE_CONFLICT")
+            out[key] = (ap, hp)
     return out
 
 
@@ -177,11 +183,11 @@ def _closing_quote(play: dict, closing_board: list):
 def grade(ledger: dict, scores: dict, closing_board: list | None = None) -> dict:
     for p in ledger["plays"]:
         if p["result"] is None:
-            key = (_norm(p["away"]), _norm(p["home"]))
+            key = (str(p["game_id"]), _norm(p["away"]), _norm(p["home"]))
             pts = scores.get(key)
             flipped = False
             if pts is None:
-                pts = scores.get((key[1], key[0]))
+                pts = scores.get((key[0], key[2], key[1]))
                 flipped = pts is not None
             if pts is not None:
                 away_pts, home_pts = (pts[1], pts[0]) if flipped else pts
@@ -222,7 +228,7 @@ def summarize(ledgers: list, policy: dict | None = None) -> dict:
     out = {}
     for market, plays in sorted(by_market.items()):
         graded = [p for p in plays if p["result"] in {"WIN", "LOSS", "PUSH"}]
-        clvs = [p["clv_novig_pp"] for p in plays if p["clv_status"] == "EXACT_CONTRACT"]
+        clvs = [p["clv_novig_pp"] for p in graded if p["clv_status"] == "EXACT_CONTRACT"]
         staked = sum(p["stake_units"] for p in graded if p["result"] != "PUSH")
         units = sum(p["units"] for p in graded)
         mean_clv = sum(clvs) / len(clvs) if clvs else None
@@ -230,7 +236,7 @@ def summarize(ledgers: list, policy: dict | None = None) -> dict:
         decision = "CONTINUE"
         if len(graded) >= 50 and mean_clv is not None and mean_clv < 0 and t is not None and t <= -1.5:
             decision = "KILL"
-        elif len(graded) >= 100 and (mean_clv is None or mean_clv <= 0):
+        elif len(graded) >= 100 and mean_clv is not None and mean_clv <= 0:
             decision = "KILL"
         elif len(graded) >= 100 and mean_clv is not None and mean_clv > 0 and t is not None and t >= 2.0:
             decision = "PROMOTION_REVIEW"

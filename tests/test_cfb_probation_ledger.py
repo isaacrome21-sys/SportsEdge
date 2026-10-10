@@ -30,10 +30,10 @@ def row(market="TOTAL", side="UNDER", line=53.5, odds=-108, start="2026-10-10T16
 
 def schedule(path, games):
     with gzip.open(path, "wt", encoding="utf-8", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=["away_team", "home_team", "away_points", "home_points", "completed"])
+        w = csv.DictWriter(fh, fieldnames=["game_id", "away_team", "home_team", "away_points", "home_points", "completed"])
         w.writeheader()
         for a, h, ap, hp, done in games:
-            w.writerow({"away_team": a, "home_team": h, "away_points": ap, "home_points": hp, "completed": done})
+            w.writerow({"game_id": "1", "away_team": a, "home_team": h, "away_points": ap, "home_points": hp, "completed": done})
 
 
 class RecordTest(unittest.TestCase):
@@ -101,6 +101,18 @@ class GradeTest(unittest.TestCase):
             L.grade(led, L.load_final_scores(path))
         self.assertIsNone(led["plays"][0]["result"])
 
+    def test_other_meeting_does_not_settle(self):
+        led = L.record(card([row()]), card_sha256="b" * 64, recorded_at=NOW)
+        L.grade(led, {("other-game", "ucf", "oklahoma state"): (20, 27)})
+        self.assertIsNone(led["plays"][0]["result"])
+
+    def test_invalid_final_score_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "s.csv.gz"
+            schedule(path, [("UCF", "Oklahoma State", "nan", 27, "true")])
+            with self.assertRaisesRegex(ValueError, "FINAL_SCORE_INVALID"):
+                L.load_final_scores(path)
+
     def test_spread_close_handles_flipped_board(self):
         led = L.record(card([row(market="SPREAD", side="AWAY", line=10.5)]), card_sha256="b" * 64, recorded_at=NOW)
         close = [{"away": "Oklahoma State", "home": "UCF", "spread": [-10.5, -120, 100]}]
@@ -123,6 +135,21 @@ class SummaryTest(unittest.TestCase):
         s = L.summarize([{"plays": self.plays(100, 1.0)}])
         self.assertEqual(s["markets"]["TOTAL"]["decision"], "PROMOTION_REVIEW")
         self.assertFalse(s["official"])
+
+    def test_missing_clv_is_not_negative_evidence(self):
+        plays = self.plays(100, 1.0)
+        for p in plays:
+            p.update(clv_status="PENDING", clv_novig_pp=None)
+        result = L.summarize([{"plays": plays}])["markets"]["TOTAL"]
+        self.assertEqual(result["decision"], "CONTINUE")
+        self.assertEqual(result["clv_n"], 0)
+
+    def test_ungraded_clv_does_not_promote(self):
+        plays = self.plays(100, 1.0)
+        for p in plays:
+            p.update(result=None, units=None)
+        result = L.summarize([{"plays": plays}])["markets"]["TOTAL"]
+        self.assertEqual(result["clv_n"], 0)
 
     def test_small_sample_continues(self):
         s = L.summarize([{"plays": self.plays(10, -2.0, "LOSS")}])

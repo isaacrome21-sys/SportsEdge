@@ -1,0 +1,97 @@
+name: cfb-probation-settlement
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cfb-probation-settlement.yml'
+      - 'ledger/cfb_probation/**'
+      - 'scripts/cfb_probation_ledger.py'
+  schedule:
+    - cron: '43 * * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cfb-probation-settlement
+  cancel-in-progress: false
+
+jobs:
+  settle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: .
+      EVIDENCE_PATH: data/cfb_probation_settlement/${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Test settlement contract
+        run: python -m unittest tests.test_cfb_probation_ledger -v
+      - name: Grade immutable pregame ledgers using final scores
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          from urllib.request import Request, urlopen
+          from scripts.cfb_probation_ledger import grade, load_final_scores, summarize
+
+          dest = Path(os.environ['EVIDENCE_PATH'])
+          dest.mkdir(parents=True)
+          policy_path = Path('config/cfb_probation_policy_v1.json')
+          policy_hash = hashlib.sha256(policy_path.read_bytes()).hexdigest()
+          ledgers = []
+          sources = []
+          scores = {}
+          for path in sorted(Path('ledger/cfb_probation').glob('*.json')):
+              ledger = json.loads(path.read_text())
+              if ledger['policy_sha256'] != policy_hash:
+                  raise ValueError('CFB_LEDGER_POLICY_HASH_MISMATCH')
+              for play in ledger['plays']:
+                  year = datetime.fromisoformat(play['start_ts']).year
+                  if year not in scores:
+                      name = f'cfb_schedules_{year}.csv.gz'
+                      url = f'https://github.com/sportsdataverse/sportsdataverse-data/releases/download/cfb_schedules/{name}'
+                      with urlopen(Request(url, headers={'User-Agent': 'SportsEdge-CFB-Settlement/1'}), timeout=45) as response:
+                          blob = response.read()
+                      raw = dest / name
+                      raw.write_bytes(blob)
+                      scores[year] = load_final_scores(raw)
+                      sources.append({'url': url, 'sha256': hashlib.sha256(blob).hexdigest()})
+              combined = {key: value for season in scores.values() for key, value in season.items()}
+              grade(ledger, combined)
+              (dest / path.name).write_text(json.dumps(ledger, indent=2) + '\n')
+              ledgers.append(ledger)
+          policy = json.loads(policy_path.read_text())
+          policy['_sha256'] = policy_hash
+          (dest / 'summary.json').write_text(json.dumps(summarize(ledgers, policy), indent=2) + '\n')
+          (dest / 'receipt.json').write_text(json.dumps({
+              'retrieved_at_utc': datetime.now(timezone.utc).isoformat(),
+              'code_sha': os.environ['GITHUB_SHA'], 'sources': sources,
+              'closing_lines_supplied': False, 'official': False,
+          }, indent=2) + '\n')
+          PY
+      - name: Persist settlement snapshot without changing pregame records
+        run: >-
+          python scripts/persist_forward_evidence_data_branch.py
+          --path "$EVIDENCE_PATH" --branch data
+          --worktree "$RUNNER_TEMP/cfb-probation-data"
+          --message "evidence(cfb): persist probation settlement snapshot"
+      - name: Upload settlement receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cfb-probation-settlement-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.EVIDENCE_PATH }}
+          if-no-files-found: error
+          retention-days: 90
