@@ -1,0 +1,83 @@
+matchup,side,line,american_odds,raw_model_home_margin,market_home_margin,adjusted_home_margin,edge_pct,push_aware_roi_pct,push_probability_pct,paired_devig,edge_floor_2pct,roi_positive,price_cap_minus165,anchor_forward_0p5,same_game_guard,drop_reason
+Arizona @ West Virginia,AWAY,-3.5,-112,-12.5014,-3.5,-3.2381,-1.05,-6.52,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Arizona @ West Virginia,HOME,3.5,-108,-12.5014,-3.5,-3.2381,1.05,-2.52,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Boise State @ Fresno State,AWAY,-7.0,-110,-0.0265,-7.0,-7.2681,0.64,-3.24,2.347,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Boise State @ Fresno State,HOME,7.0,-110,-0.0265,-7.0,-7.2681,-0.64,-5.64,2.347,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Buffalo @ Toledo,AWAY,18.5,-108,24.3934,18.5,18.2677,0.98,-2.65,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Buffalo @ Toledo,HOME,-18.5,-112,24.3934,18.5,18.2677,-0.98,-6.39,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Central Michigan @ Ohio,AWAY,2.5,-118,6.5623,2.5,2.3285,-1.33,-6.88,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Central Michigan @ Ohio,HOME,-2.5,-102,6.5623,2.5,2.3285,1.33,-1.78,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Charlotte @ North Texas,AWAY,28.5,-108,26.279,28.5,28.5369,0.35,-3.87,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Charlotte @ North Texas,HOME,-28.5,-112,26.279,28.5,28.5369,-0.35,-5.19,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Coastal Carolina @ Marshall,AWAY,4.0,-108,8.3496,4.0,3.8189,0.87,-2.8,2.347,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Coastal Carolina @ Marshall,HOME,-4.0,-112,8.3496,4.0,3.8189,-0.87,-6.04,2.347,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Duke @ Georgia Tech,AWAY,-6.5,-115,-2.6307,-6.5,-6.6651,-0.7,-5.8,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Duke @ Georgia Tech,HOME,6.5,-105,-2.6307,-6.5,-6.6651,0.7,-3.14,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Eastern Michigan @ Akron,AWAY,-5.5,-110,-1.5788,-5.5,-5.6668,0.39,-3.8,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Eastern Michigan @ Akron,HOME,5.5,-110,-1.5788,-5.5,-5.6668,-0.39,-5.29,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Georgia @ Alabama,AWAY,2.5,-115,4.6575,2.5,2.3917,-0.83,-6.05,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Georgia @ Alabama,HOME,-2.5,-105,4.6575,2.5,2.3917,0.83,-2.88,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Hawai'i @ Arizona State,AWAY,21.0,-112,2.9373,21.0,21.5625,-1.78,-7.73,2.346,True,False,False,True,True,NOT_REACHED,BELOW_FLOOR
+Hawai'i @ Arizona State,HOME,-21.0,-108,2.9373,21.0,21.5625,1.78,-1.08,2.346,True,False,False,True,True,NOT_REACHED,BELOW_FLOOR
+Houston @ Kansas State,AWAY,2.5,-110,-0.9181,2.5,2.5766,-0.18,-4.89,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Houston @ Kansas State,HOME,-2.5,-110,-0.9181,2.5,2.5766,0.18,-4.2,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Indiana @ Nebraska,AWAY,-8.5,-108,-5.2922,-8.5,-8.6432,0.77,-3.06,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Indiana @ Nebraska,HOME,8.5,-112,-5.2922,-8.5,-8.6432,-0.77,-5.99,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+James Madison @ Georgia Southern,AWAY,-7.5,-105,-17.1363,-7.5,-7.2171,0.42,-3.68,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+James Madison @ Georgia Southern,HOME,7.5,-115,-17.1363,-7.5,-7.2171,-0.42,-5.28,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Kansas @ Utah,AWAY,15.5,-110,15.6103,15.5,15.4596,0.09,-4.36,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Kansas @ Utah,HOME,-15.5,-110,15.6103,15.5,15.4596,-0.09,-4.73,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Kent State @ Western Michigan,AWAY,14.0,-112,14.6512,14.0,13.9416,-0.29,-4.97,2.347,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Kent State @ Western Michigan,HOME,-14.0,-108,14.6512,14.0,13.9416,0.29,-3.88,2.347,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+LSU @ Kentucky,AWAY,-8.5,-112,-3.0726,-8.5,-8.7168,0.08,-4.39,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+LSU @ Kentucky,HOME,8.5,-108,-3.0726,-8.5,-8.7168,-0.08,-4.68,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Louisiana @ Louisiana Tech,AWAY,3.0,-108,-4.0457,3.0,3.197,-0.04,-4.51,2.347,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Louisiana @ Louisiana Tech,HOME,-3.0,-112,-4.0457,3.0,3.197,0.04,-4.36,2.347,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Maryland @ Ohio State,AWAY,33.5,-112,34.8381,33.5,33.4188,-0.24,-5.0,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Maryland @ Ohio State,HOME,-33.5,-108,34.8381,33.5,33.4188,0.24,-4.07,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Miami (OH) @ Massachusetts,AWAY,-4.5,-112,-2.8752,-4.5,-4.5907,-0.22,-4.95,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Miami (OH) @ Massachusetts,HOME,4.5,-108,-2.8752,-4.5,-4.5907,0.22,-4.11,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Minnesota @ Purdue,AWAY,-2.5,-115,-3.4903,-2.5,-2.5039,-1.07,-6.5,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Minnesota @ Purdue,HOME,2.5,-105,-3.4903,-2.5,-2.5039,1.07,-2.4,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Nevada @ UTEP,AWAY,-9.5,-115,-9.1431,-9.5,-9.5486,-0.97,-6.31,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Nevada @ UTEP,HOME,9.5,-105,-9.1431,-9.5,-9.5486,0.97,-2.6,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+North Carolina @ Pittsburgh,AWAY,3.5,-108,13.9194,3.5,3.1176,1.33,-1.98,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+North Carolina @ Pittsburgh,HOME,-3.5,-112,13.9194,3.5,3.1176,-1.33,-7.06,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Old Dominion @ App State,AWAY,10.0,-112,-0.0905,10.0,10.298,-1.15,-6.55,2.347,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Old Dominion @ App State,HOME,-10.0,-108,-0.0905,10.0,10.298,1.15,-2.27,2.347,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Ole Miss @ Vanderbilt,AWAY,-9.5,-112,2.8404,-9.5,-9.9461,0.61,-3.38,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Ole Miss @ Vanderbilt,HOME,9.5,-108,2.8404,-9.5,-9.9461,-0.61,-5.72,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Rice @ East Carolina,AWAY,10.0,-110,17.3485,10.0,9.7195,0.67,-3.18,2.347,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Rice @ East Carolina,HOME,-10.0,-110,17.3485,10.0,9.7195,-0.67,-5.7,2.347,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+San Diego State @ Oregon State,AWAY,16.5,-112,10.1018,16.5,16.6755,-0.84,-6.14,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+San Diego State @ Oregon State,HOME,-16.5,-108,10.1018,16.5,16.6755,0.84,-2.91,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+South Carolina @ Florida,AWAY,10.5,-105,1.7099,10.5,10.7548,0.49,-3.55,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+South Carolina @ Florida,HOME,-10.5,-115,1.7099,10.5,10.7548,-0.49,-5.4,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Stanford @ Notre Dame,AWAY,39.5,-108,36.0803,39.5,39.5767,0.25,-4.05,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Stanford @ Notre Dame,HOME,-39.5,-112,36.0803,39.5,39.5767,-0.25,-5.02,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Syracuse @ Virginia,AWAY,11.5,-110,16.0514,11.5,11.3122,0.44,-3.7,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Syracuse @ Virginia,HOME,-11.5,-110,16.0514,11.5,11.3122,-0.44,-5.39,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Tennessee @ Arkansas,AWAY,-13.5,-115,-7.7811,-13.5,-13.7265,-0.55,-5.53,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Tennessee @ Arkansas,HOME,13.5,-105,-7.7811,-13.5,-13.7265,0.55,-3.42,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Texas @ Oklahoma,AWAY,-7.5,-105,2.4014,-7.5,-7.8652,1.94,-0.71,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Texas @ Oklahoma,HOME,7.5,-115,2.4014,-7.5,-7.8652,-1.94,-8.12,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Texas A&M @ Missouri,AWAY,3.5,-115,5.0834,3.5,3.4107,-0.87,-6.13,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Texas A&M @ Missouri,HOME,-3.5,-105,5.0834,3.5,3.4107,0.87,-2.79,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Tulane @ Army,AWAY,3.5,-112,3.0708,3.5,3.4775,-0.38,-5.26,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Tulane @ Army,HOME,-3.5,-108,3.0708,3.5,3.4775,0.38,-3.81,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Tulsa @ Navy,AWAY,1.5,-105,10.2367,1.5,1.1734,1.85,-0.88,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Tulsa @ Navy,HOME,-1.5,-115,10.2367,1.5,1.1734,-1.85,-7.95,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+UAB @ Memphis,AWAY,14.5,-108,12.4092,14.5,14.5326,0.36,-3.85,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+UAB @ Memphis,HOME,-14.5,-112,12.4092,14.5,14.5326,-0.36,-5.21,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+UCF @ Oklahoma State,AWAY,10.5,-108,1.7202,10.5,10.7545,-0.16,-4.85,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+UCF @ Oklahoma State,HOME,-10.5,-112,1.7202,10.5,10.7545,0.16,-4.23,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+UCLA @ Oregon,AWAY,10.5,-112,12.0019,10.5,10.4134,-0.23,-4.97,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+UCLA @ Oregon,HOME,-10.5,-108,12.0019,10.5,10.4134,0.23,-4.1,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+UConn @ Temple,AWAY,3.5,-108,1.6091,3.5,3.526,0.37,-3.82,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+UConn @ Temple,HOME,-3.5,-112,1.6091,3.5,3.526,-0.37,-5.24,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+USC @ Penn State,AWAY,1.5,-108,4.9776,1.5,1.3479,0.79,-3.02,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+USC @ Penn State,HOME,-1.5,-112,4.9776,1.5,1.3479,-0.79,-6.03,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Virginia Tech @ California,AWAY,-10.0,-110,-3.7086,-10.0,-10.2455,0.59,-3.34,2.347,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Virginia Tech @ California,HOME,10.0,-110,-3.7086,-10.0,-10.2455,-0.59,-5.54,2.347,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Wake Forest @ NC State,AWAY,-3.5,100,-8.3544,-3.5,-3.3757,1.88,-0.58,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
+Wake Forest @ NC State,HOME,3.5,-120,-8.3544,-3.5,-3.3757,-1.88,-7.8,0.0,True,False,False,True,False,NOT_REACHED,BELOW_FLOOR
