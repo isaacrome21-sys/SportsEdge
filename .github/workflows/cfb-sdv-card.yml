@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - config/cfb_friday_2026_10_09_board.json
+      - config/cfb_saturday_2026_10_10_board.json
       - .github/workflows/cfb-sdv-card.yml
   workflow_dispatch:
     inputs:
@@ -77,7 +78,8 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
-            BOARD_JSON="$(cat config/cfb_friday_2026_10_09_board.json)"
+            # One-time next-slate research board; never alter the archived Friday quotes.
+            BOARD_JSON="$(cat config/cfb_saturday_2026_10_10_board.json)"
             INPUT_SEASON=2026
             INPUT_WEEK=6
             INPUT_ASOF=""
