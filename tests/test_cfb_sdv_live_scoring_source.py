@@ -167,6 +167,39 @@ class PublicSDVLiveTest(unittest.TestCase):
             )
         self.assertEqual([row["game_id"] for row in rows], ["102"])
 
+    def test_missing_fcs_team_snapshot_skips_only_affected_game(self):
+        missing = game(103, week=7, start="2026-10-10T01:00:00Z", completed="FALSE")
+        missing.update(home_id="1", away_id="997",
+                       home_team="Bowling Green", away_team="Sacramento State")
+        self.data[(2026, "cfb_schedules")].append(missing)
+        with patch.object(sdv, "_read_bundle", return_value=(self.data, {})), \
+             patch.object(sdv, "build_prior_season_fallback_snapshots",
+                          return_value=[snapshot(1), snapshot(2)]):
+            rows, _ = sdv.build_live_rows(
+                [{"home": "Bowling Green", "away": "Sacramento State", "quotes": []},
+                 {"home": "Home", "away": "Away", "quotes": []}],
+                directory="unused", now=self.now,
+                expand_compact=lambda r: r,
+                normalize_name=lambda s: str(s).strip().lower(),
+            )
+        self.assertEqual([row["game_id"] for row in rows], ["102"])
+
+    def test_only_missing_snapshot_games_still_fail_closed(self):
+        missing = game(103, week=7, start="2026-10-10T01:00:00Z", completed="FALSE")
+        missing.update(home_id="1", away_id="997",
+                       home_team="Bowling Green", away_team="Sacramento State")
+        self.data[(2026, "cfb_schedules")].append(missing)
+        with patch.object(sdv, "_read_bundle", return_value=(self.data, {})), \
+             patch.object(sdv, "build_prior_season_fallback_snapshots",
+                          return_value=[snapshot(1), snapshot(2)]):
+            with self.assertRaisesRegex(sdv.SDVLiveError, "NO_RESOLVED_GAMES"):
+                sdv.build_live_rows(
+                    [{"home": "Bowling Green", "away": "Sacramento State", "quotes": []}],
+                    directory="unused", now=self.now,
+                    expand_compact=lambda r: r,
+                    normalize_name=lambda s: str(s).strip().lower(),
+                )
+
     def test_receipt_cannot_be_reused_for_past_asof(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
