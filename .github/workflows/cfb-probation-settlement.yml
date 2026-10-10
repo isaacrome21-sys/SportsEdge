@@ -8,8 +8,10 @@ on:
       - '.github/workflows/cfb-probation-settlement.yml'
       - 'ledger/cfb_probation/**'
       - 'scripts/cfb_probation_ledger.py'
-  schedule:
-    - cron: '43 * * * *'
+  # Follow the approved hourly settlement timer; do not add a new cron.
+  workflow_run:
+    workflows: ["mlb-moneyline-forward-settlement"]
+    types: [completed]
 
 permissions:
   contents: write
