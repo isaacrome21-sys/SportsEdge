@@ -25,7 +25,10 @@ class SpreadAnchorOOSTests(unittest.TestCase):
         self.assertEqual(first["folds"][-2],changed["folds"][-2])
         self.assertTrue(all(f["max_train_season"]<f["season"] for f in first["folds"]))
     def test_recovers_known_margin_signal(self):
-        report=evaluate(samples(slope=.2))
+        data=samples(slope=.2)
+        # Known-slope fixture must have zero within-season noise/x covariance.
+        for r in data: r["y"]=.2*r["x"]+float(r["season"]%3)
+        report=evaluate(data)
         self.assertAlmostEqual(report["heldout_residual_weight_diagnostic"]["weight"],.2,delta=.03)
         self.assertFalse(report["ci_includes_zero"])
     def test_null_signal_retains_off(self):
