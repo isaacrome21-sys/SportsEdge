@@ -60,8 +60,9 @@ def _side_probability(home: float, away: float, quote: dict) -> float | None:
         line = quote.get("line", quote.get("point"))
         if line is None or side not in {"HOME", "AWAY"}:
             return None
-        cover = _phi((margin + float(line)) / RESIDUAL_SIGMA)
-        return cover if side == "HOME" else 1.0 - cover
+        # Manual screenshot quotes carry the selected side's line, not a shared home line.
+        # HOME -3.5 and AWAY +3.5 are complementary at the same matchup.
+        return _phi(((margin if side == "HOME" else -margin) + float(line)) / RESIDUAL_SIGMA)
     if market in {"TOTAL", "TOTALS"}:
         line = quote.get("line", quote.get("point"))
         if line is None or side not in {"OVER", "UNDER"}:
@@ -101,6 +102,59 @@ def _quote_count(rows: list) -> int:
     return count
 
 
+def _group_manual_quotes(rows: list, *, games: list, alias_index: dict) -> dict[str, list]:
+    """Bind user-entered DK quotes to CFBD games without using any sportsbook API.
+
+    Each spread quote's line applies to its OWN side (HOME -3.5, AWAY +3.5).
+    Unknown teams or malformed quotes fail closed instead of silently yielding
+    an empty card.  The previous adapter incorrectly expected Odds API-shaped
+    events with nested bookmakers rather than the documented manual board.
+    """
+    from sportsedge.sports.cfb.source import bind_provider_team
+
+    by_matchup = {(g.home_team, g.away_team): g for g in games}
+    grouped: dict[str, list] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("CFB_AUTO_BOARD_GAME_NOT_OBJECT")
+        home = bind_provider_team(str(row.get("home_team") or row.get("home") or ""), alias_index)
+        away = bind_provider_team(str(row.get("away_team") or row.get("away") or ""), alias_index)
+        game = by_matchup.get((home, away))
+        if game is None:
+            raise ValueError(f"CFB_AUTO_MATCHUP_UNRESOLVED:{away}@{home}")
+        raw_quotes = row.get("quotes")
+        if not isinstance(raw_quotes, list):
+            raw_quotes = [row] if row.get("american_odds") is not None else []
+        if not raw_quotes:
+            raise ValueError(f"CFB_AUTO_GAME_HAS_NO_QUOTES:{away}@{home}")
+        for quote in raw_quotes:
+            if not isinstance(quote, dict):
+                raise ValueError("CFB_AUTO_QUOTE_NOT_OBJECT")
+            market = str(quote.get("market") or "").upper()
+            market = {"ML": "MONEYLINE", "H2H": "MONEYLINE", "TOTALS": "TOTAL"}.get(market, market)
+            side = str(quote.get("side") or "").upper()
+            allowed = {"SPREAD": {"HOME", "AWAY"}, "TOTAL": {"OVER", "UNDER"},
+                       "MONEYLINE": {"HOME", "AWAY"}}
+            if market not in allowed or side not in allowed[market]:
+                raise ValueError(f"CFB_AUTO_MARKET_SIDE_INVALID:{market}/{side}")
+            odds = quote.get("american_odds")
+            if odds is None:
+                raise ValueError("CFB_AUTO_AMERICAN_ODDS_REQUIRED")
+            odds = float(odds)
+            if -100 < odds < 100:
+                raise ValueError("CFB_AUTO_INVALID_AMERICAN_ODDS")
+            line = quote.get("line", quote.get("point"))
+            if market != "MONEYLINE" and line is None:
+                raise ValueError(f"CFB_AUTO_LINE_REQUIRED:{market}")
+            grouped.setdefault(game.game_id, []).append({
+                "game_id": game.game_id, "market": market, "side": side,
+                "line": 0.0 if market == "MONEYLINE" else float(line),
+                "american_odds": odds, "book_key": "draftkings",
+                "sportsbook": "DraftKings",
+            })
+    return grouped
+
+
 def _attach_live(rows: list, *, season: int | None, week: int | None, asof: str | None) -> tuple[list, list]:
     """Attach CFBD dual snapshots when the board is not already training-shaped. No Odds API."""
     if rows and all(isinstance(row, dict) and row.get("home_prior_metrics") and row.get("home_current_metrics") for row in rows):
@@ -115,7 +169,6 @@ def _attach_live(rows: list, *, season: int | None, week: int | None, asof: str 
         fetch_cfbd_games,
         fetch_cfbd_teams,
         fetch_cfbd_weather,
-        parse_the_odds_api_quotes,
     )
     key = str(os.environ.get("SPORTSEDGE_CFBD_API_KEY") or os.environ.get("CFBD_API_KEY") or "").strip()
     failures = []
@@ -145,20 +198,14 @@ def _attach_live(rows: list, *, season: int | None, week: int | None, asof: str 
             fetch_cfbd_games(season=season_i, week=week_i, cfbd_api_key=key),
             fetch_cfbd_weather(season=season_i, week=week_i, cfbd_api_key=key),
         )
-        quotes = parse_the_odds_api_quotes(
-            rows,
-            games=games,
-            alias_index=build_team_alias_index(team_rows),
-            bookmakers=("draftkings",),
+        by_game = _group_manual_quotes(
+            rows, games=games, alias_index=build_team_alias_index(team_rows),
         )
         snaps = fetch_cfbd_candidate_metric_snapshots(season=season_i, week=week_i, cfbd_api_key=key, now=now)
     except Exception as exc:
         failures.append({"stage": "CFBD", "reason": f"{type(exc).__name__}: {exc}"})
         return rows, failures
-    by_game: dict[str, list] = {}
     game_map = {game.game_id: game for game in games}
-    for quote in quotes:
-        by_game.setdefault(quote.game_id, []).append(quote.to_dict())
     built = []
     for game_id, quote_rows in by_game.items():
         game = game_map[game_id]
@@ -245,10 +292,12 @@ def build_card(rows: list, *, model, source_failures: list | None = None) -> dic
             })
     bets = [row for row in results if row.get("bet_status") == "BET"]
     blocked = quote_rows == 0
+    unpriced = not blocked and not any(row.get("model_p") is not None for row in results)
+    run_status = "BLOCKED_NO_ODDS" if blocked else "BLOCKED_MODEL_UNAVAILABLE" if unpriced else "READY"
     return {
         "schema_version": "CFB_LIVE_CARD_V1",
-        "status": "BLOCKED_NO_ODDS" if blocked else "SUCCESS",
-        "run_status": "BLOCKED_NO_ODDS" if blocked else "READY",
+        "status": "SUCCESS" if run_status == "READY" else run_status,
+        "run_status": run_status,
         "market_input_source": "MANUAL_SCREENSHOT_BOARD",
         "family": FAMILY,
         "ridge_alpha": RIDGE_ALPHA,
@@ -262,8 +311,11 @@ def build_card(rows: list, *, model, source_failures: list | None = None) -> dic
             "model_priced": sum(row.get("model_p") is not None for row in results),
             "edge_positive": len(bets),
             "bets_emitted": len(bets),
-            "pipeline_health": "BROKEN" if blocked else "OK",
-            "pipeline_health_reason": "NO_ODDS_ROWS_REACHED_PRICING" if blocked else "OK",
+            "pipeline_health": "BROKEN" if blocked or unpriced else "OK",
+            "pipeline_health_reason": (
+                "NO_ODDS_ROWS_REACHED_PRICING" if blocked
+                else "CFB_AUTO_NO_MODEL_PRICED" if unpriced else "OK"
+            ),
         },
         "governance": {
             "sportsbook_api_used": False,
@@ -312,7 +364,7 @@ def main() -> int:
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"run_status": payload["run_status"], "bets": payload["funnel"]["bets_emitted"], "quotes": payload["funnel"]["odds_rows_fetched"], "output": args.output}))
-    return 2 if payload["run_status"] == "BLOCKED_NO_ODDS" else 0
+    return 0 if payload["run_status"] == "READY" else 2
 
 
 if __name__ == "__main__":
