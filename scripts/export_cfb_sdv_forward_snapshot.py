@@ -41,6 +41,53 @@ def _number(value, field):
     return v
 
 
+
+def _locked_decision_quotes(selections):
+    """Retain paired original-card prices without fabricating sportsbook provenance."""
+    groups = {}
+    expected = {"MONEYLINE": {"HOME", "AWAY"},
+                "SPREAD": {"HOME", "AWAY"},
+                "TOTAL": {"OVER", "UNDER"}}
+    for row in selections:
+        market, side = row.get("market"), row.get("side")
+        if market not in expected or side not in expected[market]:
+            continue
+        line = row.get("line")
+        if market == "MONEYLINE":
+            key = ("MONEYLINE", None)
+        elif market == "TOTAL":
+            key = ("TOTAL", _number(line, "total_line"))
+        else:
+            val = _number(line, "spread_line")
+            key = ("SPREAD", -val if side == "HOME" else val)
+        groups.setdefault(key, []).append(row)
+    quotes = []
+    for key, pair in sorted(groups.items(), key=lambda k: (k[0][0], k[0][1] or 0)):
+        market = key[0]
+        if len(pair) != 2 or {x.get("side") for x in pair} != expected[market]:
+            continue
+        if any(x.get("devig") != "PAIRED_PROPORTIONAL" for x in pair):
+            continue
+        entries = []
+        for x in sorted(pair, key=lambda x: x["side"]):
+            odds = _number(x.get("american_odds"), "american_odds")
+            model_p = _number(x.get("model_p"), "model_p")
+            if not (odds <= -100 or odds >= 100) or odds < -10000 or odds > 10000:
+                raise ValueError("CFB_FORWARD_QUOTE_ODDS_INVALID")
+            if not 0 <= model_p <= 1:
+                raise ValueError("CFB_FORWARD_MODEL_PROB_INVALID")
+            entries.append({
+                "market": market,
+                "side": x["side"],
+                "line": None if market == "MONEYLINE" else _number(x.get("line"), "quoted_line"),
+                "american_odds": odds,
+                "model_p_original_unvalidated": model_p,
+                "original_card_bet_status": str(x.get("bet_status") or ""),
+                "original_card_reason": str(x.get("reason") or ""),
+            })
+        quotes.extend(entries)
+    return quotes
+
 def export_snapshot(card: dict, *, original_card_sha256: str):
     if not isinstance(card, dict) or card.get("schema") != "CFB_SDV_CARD_V2":
         raise ValueError("CFB_FORWARD_CARD_SCHEMA_INVALID")
@@ -59,6 +106,7 @@ def export_snapshot(card: dict, *, original_card_sha256: str):
         "evidence_role": "PROSPECTIVE_RESEARCH_MODEL_FORECAST_NOT_VALIDATED",
         "source_run_independently_attested": False,
         "sportsbook_price_receipt_verified": False,
+        "paired_decision_quotes_retained": True,
         "closing_lines_joined": False,
         "settled_outcomes_joined": False,
         "positive_ev_proven": False,
@@ -139,6 +187,11 @@ def export_snapshot(card: dict, *, original_card_sha256: str):
             "source_capture_at": source_time.isoformat(),
             "scored_at": score_time.isoformat(),
             "source_contract": SOURCE_CONTRACT,
+            "paired_decision_quotes": _locked_decision_quotes(selections),
+            "quote_source_card_sha256": original_card_sha256,
+            "decision_quote_captured_at_independently": None,
+            "decision_book_verified": False,
+            "decision_quote_evidence_grade": "CARD_ROWS_ONLY_NOT_INDEPENDENT_SPORTSBOOK_RECEIPT",
         })
     base.update({
         "status": "PREGAME_MODEL_SNAPSHOTS_UNVALIDATED" if games else "NO_PREGAME_MODEL_ROWS",
