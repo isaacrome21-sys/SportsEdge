@@ -120,13 +120,68 @@ def run(starts: list[X.XStart]) -> tuple[dict, str]:
     return result, "\n".join(L) + "\n"
 
 
+EXT_FIELDS = {"outs": "outs", "strikeouts": "k", "walks": "bb", "hits": "h", "earned_runs": "er"}
+
+
+def build_ext_pool_artifact(starts: list[X.XStart], season: int) -> dict:
+    """Frozen league_short pool for ``season`` with outs/K/BB/H/ER counts (used for season+1 games).
+
+    Same definition as the base ``build_pool_artifact`` (#1497): starts in ``season`` made
+    when the pitcher had <5 strictly-earlier starts in seasons season-1..season.
+    """
+    window = R.prior_window_counts(starts)
+    short = [s for s in starts if s.season == season and len(window.get(s, ())) < R.MIN_PRODUCTION_STARTS]
+    if len(short) < 100:
+        raise RuntimeError(f"league_short pool for {season} too small: {len(short)}")
+    counts: dict[str, dict[str, int]] = {}
+    for name, attr in EXT_FIELDS.items():
+        table: dict[str, int] = {}
+        for s in short:
+            v = str(getattr(s, attr))
+            table[v] = table.get(v, 0) + 1
+        counts[name] = {k: table[k] for k in sorted(table, key=int)}
+    return {
+        "schema": "MLB_PITCHER_PRIOR_POOL_EXT_V1", "pool": "league_short", "season": int(season),
+        "definition": "regular-season starts in `season` made when the pitcher had <5 prior starts in seasons season-1..season (production window)",
+        "starts": len(short), "counts": counts,
+        "source": "MLB StatsAPI people/{id}/stats gameLog group=pitching gameType=R",
+        "built_by": "scripts/research_mlb_pitcher_prior_fallback_ext.py --emit-pool",
+        "validation": "#1943 (pre-registration sha256 " + X.prereg_sha256() + ")",
+    }
+
+
+def base_cross_check(artifact: dict, config_dir: Path = ROOT / "config") -> str:
+    """Compare outs/K counts with the committed base artifact (must be the same pool)."""
+    base_path = config_dir / f"mlb_pitcher_prior_league_short_{artifact['season']}.json"
+    if not base_path.exists():
+        return f"NO BASE ARTIFACT ({base_path.name} missing) — do not commit"
+    base = json.loads(base_path.read_text())
+    same = all(base["counts"][k] == artifact["counts"][k] for k in ("outs", "strikeouts")) and base.get("starts") == artifact["starts"]
+    return (f"MATCHES {base_path.name} ({artifact['starts']} starts, identical outs/K counts)" if same
+            else f"MISMATCH vs {base_path.name} (base {base.get('starts')} starts, ext {artifact['starts']}) — do not commit")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--cache", type=Path, default=Path(".cache/mlb-prior-ext-research"))
     ap.add_argument("--out-dir", type=Path, default=Path("artifacts/mlb_prior_ext_research"))
     ap.add_argument("--workers", type=int, default=16)
+    ap.add_argument("--emit-pool", type=int, help="build the frozen league_short BB/H/ER prior artifact for this season")
     args = ap.parse_args(argv)
     t0 = time.time()
+    if args.emit_pool:
+        season = args.emit_pool
+        artifact = build_ext_pool_artifact(fetch_starts(args.cache, args.workers, seasons=(season - 1, season)), season)
+        text = json.dumps(artifact, indent=2) + "\n"
+        args.out_dir.mkdir(parents=True, exist_ok=True)
+        (args.out_dir / f"mlb_pitcher_prior_league_short_ext_{season}.json").write_text(text)
+        md = (f"## MLB few-starts prior pool artifact, BB/H/ER extension ({season})\n\n"
+              f"Base cross-check: **{base_cross_check(artifact)}**.\n\n"
+              f"Commit as `config/mlb_pitcher_prior_league_short_ext_{season}.json` (used for {season + 1} games). "
+              "Research output only; nothing is priced until committed.\n\n```json\n" + text + "```\n")
+        (args.out_dir / "report.md").write_text(md)
+        print(md)
+        return 0
     result, md = run(fetch_starts(args.cache, args.workers))
     md += f"\n_runtime {time.time() - t0:.0f}s_\n"
     args.out_dir.mkdir(parents=True, exist_ok=True)
