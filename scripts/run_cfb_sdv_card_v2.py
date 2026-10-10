@@ -656,7 +656,7 @@ def attach_cfb_both_sides(payload: dict) -> dict:
     return payload
 
 
-PROBATION_POLICY_PATH = ROOT / "config" / "cfb_probation_policy_v1.json"
+PROBATION_POLICY_PATH = ROOT / "config" / "cfb_probation_policy_v2.json"
 
 
 def _slate_total_bias_signal(payload: dict) -> str:
@@ -707,14 +707,21 @@ def apply_probation(payload: dict, policy_path: Path = PROBATION_POLICY_PATH) ->
         else:
             eligible.append(r)
     eligible.sort(key=lambda r: (-float(r.get("edge") or 0), -float(r.get("expected_roi") or 0)))
-    cap = int(policy["max_probation_per_slate"])
-    for i, r in enumerate(eligible):
-        if i < cap:
+    slate_cap = int(policy["max_probation_per_slate"])
+    market_caps = policy["max_probation_per_market"]
+    market_counts = {}
+    chosen = []
+    for r in eligible:
+        market = str(r["market"])
+        if len(chosen) >= slate_cap:
+            r["probation_block_reason"] = "SLATE_CAP"
+        elif market_counts.get(market, 0) >= int(market_caps[market]):
+            r["probation_block_reason"] = "MARKET_TYPE_CAP"
+        else:
             r["probation"] = True
             r["stake_units"] = float(policy["stake_units"])
-        else:
-            r["probation_block_reason"] = "SLATE_CAP"
-    chosen = [r for r in eligible[:cap]]
+            chosen.append(r)
+            market_counts[market] = market_counts.get(market, 0) + 1
     payload["probation"] = {
         "policy": policy["schema"],
         "policy_sha256": hashlib.sha256(raw).hexdigest(),
