@@ -1,0 +1,45 @@
+{
+  "schema": "CFB_SPREAD_FEATURES_PREREG_V1",
+  "status": "FROZEN",
+  "frozen_at": "2026-10-10",
+  "goal": "Add point-in-time, market-blind features that improve out-of-sample prediction of the closing spread residual.",
+  "protocol": {
+    "train_seasons": [
+      2016,
+      2017,
+      2018,
+      2019,
+      2020
+    ],
+    "holdout_seasons": [
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "max_attempts": 10,
+    "evaluation": "chronological walk-forward within holdout; no future data",
+    "market_blind": true,
+    "point_in_time": true
+  },
+  "success_criteria": {
+    "anchor_test": "Same as ChatGPT #1954: weight on the feature residual > 0 with 95% season-clustered CI entirely above 0",
+    "rmse": "Holdout RMSE of (feature-augmented prediction) strictly below RMSE of closing spread alone",
+    "both_required": true
+  },
+  "features": [
+    "qb_status: starter continuity, injured/backup-QB flag, backup career EPA/play",
+    "returning_production: offense/defense % returning (CFBD)",
+    "talent: 247 composite team talent and difference",
+    "transfer_portal: net incoming transfer rating",
+    "coaching_change: first-year HC/OC/DC flags",
+    "schedule_spot: rest days, travel miles, time-zone change, off a bye"
+  ],
+  "rules": [
+    "Nothing reaches the card until success criteria are met.",
+    "Report every attempt with its metrics.",
+    "Do not merge until the protocol succeeds or the attempt budget is exhausted."
+  ],
+  "sha256": "8a60c89d2dbced78952c6edce298e10517aefb4ade3f0181f43b3cfb0b947d34"
+}
