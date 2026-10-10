@@ -21,6 +21,7 @@ jobs:
     timeout-minutes: 10
     env:
       ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+      SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
       CFB_PAPER_BOARD_JSON: ${{ inputs.board_json }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -38,7 +39,16 @@ jobs:
               assert p['candidates'] == []
           print('CFB_PAPER_CARD_ZERO_AUTHORITY input_status='+p['input_status']+' candidates='+str(len(p['candidates'])))
           PY
+      - name: Surface unavailable input as a blocked scan
+        run: |
+          python - <<'PYTHON'
+          import json
+          p = json.load(open('artifacts/cfb/cfb_paper_market_card.json'))
+          if p['input_status'] != 'READY':
+              raise SystemExit('CFB_SCAN_BLOCKED:' + p['input_status'] + ': no slate was scanned')
+          PYTHON
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
         with:
           name: cfb-paper-market-card
           path: artifacts/cfb/cfb_paper_market_card.json

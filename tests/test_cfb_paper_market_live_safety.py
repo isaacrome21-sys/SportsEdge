@@ -69,3 +69,25 @@ def test_failed_provider_does_not_fabricate_paper_edges():
     assert rows == []
     assert source == "ODDS_PROVIDER_UNAVAILABLE"
     assert status == "BLOCKED_PROVIDER_UNAVAILABLE"
+
+
+def test_workflow_binds_supported_key_alias_and_surfaces_blocked_input():
+    from pathlib import Path
+    workflow = Path('.github/workflows/cfb-paper-market-card.yml').read_text()
+    assert 'SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}' in workflow
+    assert "if p['input_status'] != 'READY':" in workflow
+    assert 'CFB_SCAN_BLOCKED:' in workflow
+    assert 'if: always()' in workflow
+
+
+def test_coverage_distinguishes_blocked_scan_and_rejected_selections():
+    blocked = build_payload([], .02, NOW, 'MARKET_INPUT_UNAVAILABLE', 'BLOCKED_NO_MARKET_INPUT')
+    assert blocked['coverage']['scan_completed'] is False
+    assert blocked['coverage']['events_received'] == 0
+    good = build_payload([event()], .02, NOW, 'ODDS_PROVIDER', 'READY')
+    assert good['coverage']['games_with_usable_draftkings'] == 1
+    assert good['coverage']['draftkings_selections'] == 2
+    assert good['coverage']['candidate_count'] == 1
+    assert good['coverage']['straight_price_cap'] == 1
+    stale = build_payload([event(updated='2026-10-09T01:00:00Z')], .02, NOW, 'ODDS_PROVIDER', 'READY')
+    assert stale['coverage']['no_usable_draftkings_market'] == 1

@@ -14,6 +14,7 @@ converted, interpolated, or treated as equivalent.
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import json
 import os
 from datetime import datetime, timezone
@@ -184,27 +185,35 @@ def _book_markets(event, *, now=None):
 
 def build_payload(events, min_edge, now, market_input_source, input_status):
     candidates = []
+    counts = Counter(events_received=len(events))
     for event in events:
         try:
             start = datetime.fromisoformat(str(event["commence_time"]).replace("Z", "+00:00"))
         except (KeyError, TypeError, ValueError):
+            counts["invalid_kickoff"] += 1
             continue
         if start.tzinfo is None or start <= now:
+            counts["started_or_naive_kickoff"] += 1
             continue
         participants = ' | '.join(str(event.get(k) or '').lower() for k in ('home_team', 'away_team'))
         if any(team in participants for team in ('illinois', 'northwestern', 'depaul', 'bradley', 'loyola chicago', 'roosevelt')):
+            counts['illinois_games_excluded'] += 1
             continue
 
         books = _book_markets(event, now=now if market_input_source == "ODDS_PROVIDER" else None)
         dk = books.get("draftkings")
         if not dk:
+            counts["no_usable_draftkings_market"] += 1
             continue
+        counts["games_with_usable_draftkings"] += 1
 
         for market_key in SUPPORTED:
             dk_rows = dk.get(market_key)
             if not dk_rows:
+                counts["missing_draftkings_market"] += 1
                 continue
             for dk_row in dk_rows:
+                counts["draftkings_selections"] += 1
                 selection_key = _selection_key(market_key, dk_row)
                 peer_probabilities = []
                 peer_books = []
@@ -217,17 +226,21 @@ def build_payload(events, min_edge, now, market_input_source, input_status):
                             peer_books.append(peer_key)
                             break
                 if len(peer_probabilities) < 2:
+                    counts["fewer_than_two_exact_line_peers"] += 1
                     continue
+                counts["selections_with_two_exact_line_peers"] += 1
 
                 consensus = sum(peer_probabilities) / len(peer_probabilities)
                 price = float(dk_row["price"])
                 if price < -165:
+                    counts["straight_price_cap"] += 1
                     continue  # Straight-wager cap; no SGP path in paper lane.
                 raw = implied(price)
                 decimal = 1 + (100 / abs(price) if price < 0 else price / 100)
                 ev_per_dollar = consensus * (decimal - 1) - (1 - consensus)
                 edge = consensus - raw
                 if edge < float(min_edge) or ev_per_dollar <= 0:
+                    counts["below_edge_floor_or_nonpositive_ev"] += 1
                     continue
 
                 side = str(dk_row["name"])
@@ -274,6 +287,8 @@ def build_payload(events, min_edge, now, market_input_source, input_status):
         "markets": ["MONEYLINE", "SPREAD", "TOTAL"],
         "min_edge": min_edge,
         "candidates": candidates,
+        "coverage": {**dict(counts), "candidate_count": len(candidates),
+                     "scan_completed": input_status == "READY"},
         "authority": {
             "model_p": False,
             "truth_gate": False,
@@ -313,6 +328,7 @@ def main():
                 "input_status": input_status,
                 "market_input_source": source,
                 "candidate_count": len(payload["candidates"]),
+                "coverage": payload["coverage"],
                 "markets": payload["markets"],
                 "output": str(out),
             },
