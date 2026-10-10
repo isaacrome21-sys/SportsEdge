@@ -41,6 +41,63 @@ def _number(value, field):
     return v
 
 
+def export_quoted_selections(selections: list[dict]) -> list[dict]:
+    """Preserve the pregame card's actual quoted lines for later research.
+
+    Card quotes are not independently book-attested. Capturing them alongside
+    forecasts avoids reconstructing an attractive price after the result.
+    """
+    opposing = {"MONEYLINE": {"HOME", "AWAY"},
+                "SPREAD": {"HOME", "AWAY"},
+                "TOTAL": {"OVER", "UNDER"}}
+    out = []
+    for row in selections:
+        market = row["market"]
+        side = str(row.get("side") or "")
+        if market not in opposing or side not in opposing[market]:
+            raise ValueError("CFB_FORWARD_QUOTE_SIDE_INVALID")
+        # Synthetic unit-test cards without quoted prices still export score
+        # forecasts, but cannot contribute to any market/ROI evaluation.
+        if row.get("american_odds") is None:
+            continue
+        odds = _number(row["american_odds"], "american_odds")
+        if -100 < odds < 100:
+            raise ValueError("CFB_FORWARD_QUOTE_ODDS_INVALID")
+        line = None if market == "MONEYLINE" else _number(row.get("line"), "line")
+        if market == "TOTAL" and not 0 < line <= 150:
+            raise ValueError("CFB_FORWARD_QUOTE_TOTAL_INVALID")
+        p = _number(row.get("model_p"), "model_p")
+        fair = _number(row.get("market_p"), "market_p")
+        if not 0 <= p <= 1 or not 0 <= fair <= 1:
+            raise ValueError("CFB_FORWARD_QUOTE_PROBABILITY_INVALID")
+        if row.get("bet_status") == "BET":
+            raise ValueError("CFB_FORWARD_QUOTE_BET_STATUS_INVALID")
+        out.append({
+            "market": market, "side": side, "line": line,
+            "american_odds": odds, "model_p": p, "market_p": fair,
+            "model_edge": round(p - fair, 6),
+            "expected_roi_unvalidated": round(
+                p * (1 + (odds / 100 if odds > 0 else 100 / -odds)) - 1, 6),
+            "devig": row.get("devig"),
+            "original_status": row.get("bet_status"),
+            "quote_evidence": "UNATTESTED_MANUAL_BOARD",
+            "betting_authority": False,
+        })
+    # Paired prices are necessary for a no-vig edge. Recheck the exact
+    # opposite selections instead of trusting a string in the source card.
+    for quote in out:
+        if quote["devig"] != "PAIRED_PROPORTIONAL":
+            continue
+        mates = [other for other in out if other["market"] == quote["market"]
+                 and other["side"] != quote["side"] and
+                 ((quote["market"] == "MONEYLINE" and other["line"] is None)
+                  or (quote["market"] == "TOTAL" and other["line"] == quote["line"])
+                  or (quote["market"] == "SPREAD" and other["line"] == -quote["line"]))]
+        if (len(mates) != 1 or {mates[0]["side"], quote["side"]} != opposing[quote["market"]]):
+            raise ValueError("CFB_FORWARD_QUOTE_PAIRED_IDENTITY_INVALID")
+    return out
+
+
 def export_snapshot(card: dict, *, original_card_sha256: str):
     if not isinstance(card, dict) or card.get("schema") != "CFB_SDV_CARD_V2":
         raise ValueError("CFB_FORWARD_CARD_SCHEMA_INVALID")
@@ -139,6 +196,8 @@ def export_snapshot(card: dict, *, original_card_sha256: str):
             "source_capture_at": source_time.isoformat(),
             "scored_at": score_time.isoformat(),
             "source_contract": SOURCE_CONTRACT,
+            "quoted_selections": export_quoted_selections(selections),
+            "price_receipt_independently_verified": False,
         })
     base.update({
         "status": "PREGAME_MODEL_SNAPSHOTS_UNVALIDATED" if games else "NO_PREGAME_MODEL_ROWS",
