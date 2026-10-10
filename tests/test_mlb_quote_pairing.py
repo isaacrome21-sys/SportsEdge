@@ -56,3 +56,33 @@ def test_run_line_pairs_opposite_signed_lines_on_team_sides():
     ]
     out=pair_opposite_odds(rows)
     assert out[0]["opposite_odds"]==-105 and out[1]["opposite_odds"]==-115
+
+
+def test_period_partitions_do_not_cross_pair():
+    rows=[
+        _row("OVER",-110,period="FULL"),
+        _row("UNDER",-105,period="F5",retrieved_at=T10),
+    ]
+    out=pair_opposite_odds(rows)
+    assert "opposite_odds" not in out[0] and "opposite_odds" not in out[1]
+    same=pair_opposite_odds([
+        _row("OVER",-110,period="FULL"),
+        _row("UNDER",-105,period="FULL",retrieved_at=T10),
+    ])
+    assert same[0]["opposite_odds"]==-105 and same[1]["opposite_odds"]==-110
+
+
+def test_indexed_lookup_matches_unique_opposite_inside_group_only():
+    rows=[
+        _row("OVER",-110,entity="batter-a"),
+        _row("UNDER",-105,entity="batter-a",retrieved_at=T10),
+        _row("UNDER",-120,entity="batter-b",retrieved_at=T10),
+        _row("OVER",-110,book="fd"),
+        _row("UNDER",-108,book="fd",retrieved_at=T10),
+    ]
+    out=pair_opposite_odds(rows)
+    assert out[0]["opposite_odds"]==-105
+    assert out[1]["opposite_odds"]==-110
+    assert "opposite_odds" not in out[2]
+    assert out[3]["opposite_odds"]==-108
+    assert out[4]["opposite_odds"]==-110
