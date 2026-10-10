@@ -37,6 +37,7 @@ RESEARCH_DIRECTIVES = {
     "f5_nrfi_production_parity": ["scripts/research_mlb_f5_nrfi_production_parity.py"],
     "pitcher_prop_promotion": ["scripts/research_mlb_pitcher_prop_promotion.py"],
     "postseason_prop_bias": ["scripts/research_mlb_postseason_prop_bias.py"],
+    "postseason_prop_bias_ext": ["scripts/research_mlb_postseason_prop_bias_ext.py"],
 }
 
 RESEARCH_TIMEOUT_SECONDS = {
