@@ -3,7 +3,7 @@
 Intercept + scale applied to the model's projected total after the raw
 score means (or after MC distribution mean) and before pricing. Margin
 (spread/ML) path is left unchanged. Coefficients are frozen in
-config/cfb_totals_calibration_v1.json; the file SHA is stamped on every card.
+config/cfb_totals_calibration_v2.json (v1 retained in git); the file SHA is stamped on every card.
 No market data enters Model_P.
 """
 from __future__ import annotations
@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Mapping, Tuple
 
 ROOT = Path(__file__).resolve().parents[3]
-CAL_PATH = ROOT / "config" / "cfb_totals_calibration_v1.json"
+CAL_PATH = ROOT / "config" / "cfb_totals_calibration_v2.json"
 
 _CACHE: dict | None = None
 
@@ -27,7 +27,7 @@ def load_totals_calibration() -> dict:
     raw = CAL_PATH.read_bytes()
     sha = hashlib.sha256(raw).hexdigest()
     data = json.loads(raw)
-    if data.get("schema") != "CFB_TOTALS_CALIBRATION_V1":
+    if data.get("schema") not in ("CFB_TOTALS_CALIBRATION_V1", "CFB_TOTALS_CALIBRATION_V2"):
         raise ValueError("CFB_TOTALS_CALIBRATION_SCHEMA_INVALID")
     data = dict(data)
     data["sha256"] = sha
