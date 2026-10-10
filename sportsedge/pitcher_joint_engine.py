@@ -59,13 +59,15 @@ def _price_values(values:Sequence[int],weights:Sequence[float],line:float,side:s
     post=_posterior(combined_over,combined_under,combined_push,combined_n,line,market);meta={"raw_empirical_p":over if side=="OVER" else under,"raw_push_p":push,"effective_history_starts":float(n_eff),"posterior_prior":post["prior"]}
     if prior_meta is not None:meta["long_window_prior"]=prior_meta
     return (post["p_over"] if side=="OVER" else post["p_under"]),post["p_push"],meta
-_FALLBACK_STAT={"PITCHER_OUTS":"outs","PITCHER_K":"strikeouts"}
+_FALLBACK_STAT={"PITCHER_OUTS":"outs","PITCHER_K":"strikeouts","PITCHER_BB":"walks","PITCHER_HITS_ALLOWED":"hits","PITCHER_ER":"earned_runs"}
+_FALLBACK_LINE_CAP={"PITCHER_BB":10,"PITCHER_HITS_ALLOWED":15,"PITCHER_ER":12}
 def _price_prior_fallback(features:Mapping[str,Any],line:float,side:str,market:str)->tuple[float,float,dict[str,Any],dict[str,Any]]:
-    """Validated few-starts fallback (#1495): own k in 1..4 blended with m prior pseudo-starts, n = k + m."""
+    """Validated few-starts fallback (#1495 Outs/K, #1943 BB/H/ER): own k in 1..4 blended with m prior pseudo-starts, n = k + m."""
     fb=features.get("prior_fallback")
     if not isinstance(fb,Mapping):raise PitcherJointEngineError("prior_fallback must be object")
     if market not in _FALLBACK_STAT or fb.get("market")!=market:raise PitcherJointEngineError(f"PRIOR_FALLBACK_NOT_VALIDATED_FOR_{market}")
     if float(line).is_integer():raise PitcherJointEngineError("PRIOR_FALLBACK_HALF_LINES_ONLY")
+    if market in _FALLBACK_LINE_CAP and line>_FALLBACK_LINE_CAP[market]:raise PitcherJointEngineError("PRIOR_FALLBACK_LINE_OUTSIDE_VALIDATED_RANGE")
     if features.get("history_weights") is not None:raise PitcherJointEngineError("prior_fallback does not accept history_weights")
     pool=_normalize_pool(features.get("history_pool"),"history_pool",minimum=1)
     if len(pool)>4:raise PitcherJointEngineError("prior_fallback requires 1..4 own starts")
