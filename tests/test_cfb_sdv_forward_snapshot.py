@@ -43,6 +43,38 @@ class ForwardSnapshotTest(unittest.TestCase):
         self.assertFalse(out["sportsbook_price_receipt_verified"])
         self.assertFalse(out["bets_enabled"])
 
+    def test_pregame_quote_prices_are_preserved_without_betting_authority(self):
+        inp = card()
+        for row in inp["results"]:
+            row.update({"american_odds": -110, "model_p": 0.57,
+                        "market_p": 0.5, "devig": "PAIRED_PROPORTIONAL",
+                        "bet_status": "LEAN"})
+        inp["results"][2]["devig"] = "UNPAIRED_RAW_IMPLIED"
+        quote_rows = export_snapshot(inp, original_card_sha256=HASH)["games"][0]["quoted_selections"]
+        self.assertEqual(len(quote_rows), 3)
+        self.assertEqual(quote_rows[0]["american_odds"], -110)
+        self.assertEqual(quote_rows[0]["quote_evidence"], "UNATTESTED_MANUAL_BOARD")
+        self.assertFalse(quote_rows[0]["betting_authority"])
+
+    def test_forged_opposing_quote_pair_is_rejected(self):
+        inp = card()
+        inp["results"] = [inp["results"][0]]
+        inp["results"][0].update({"american_odds": -110, "model_p": 0.57,
+                                  "market_p": 0.50, "devig": "PAIRED_PROPORTIONAL"})
+        with self.assertRaisesRegex(ValueError, "CFB_FORWARD_QUOTE_PAIRED_IDENTITY_INVALID"):
+            export_snapshot(inp, original_card_sha256=HASH)
+
+    def test_invalid_quote_price_or_probability_rejected(self):
+        inp = card()
+        inp["results"][0].update({"american_odds": -50, "model_p": 0.5,
+                                  "market_p": 0.5, "devig": "UNPAIRED_RAW_IMPLIED"})
+        with self.assertRaisesRegex(ValueError, "CFB_FORWARD_QUOTE_ODDS_INVALID"):
+            export_snapshot(inp, original_card_sha256=HASH)
+        inp["results"][0]["american_odds"] = -110
+        inp["results"][0]["model_p"] = 1.5
+        with self.assertRaisesRegex(ValueError, "CFB_FORWARD_QUOTE_PROBABILITY_INVALID"):
+            export_snapshot(inp, original_card_sha256=HASH)
+
     def test_kicked_off_prediction_is_not_backfilled(self):
         inp = card()
         inp["scored_at_utc"] = "2026-10-10T01:00:00Z"
