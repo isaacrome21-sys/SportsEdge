@@ -125,7 +125,19 @@ def evaluate(snapshot, outcomes=None):
     if snapshot.get("bets_enabled") is not False or snapshot.get("positive_ev_proven") is not False:
         raise ValueError("CFB_FORWARD_EVAL_SNAPSHOT_AUTHORITY_INVALID")
     if snapshot.get("source_model_status") != "MODEL_SDV_PUBLIC_LIVE_UNVALIDATED":
-        raise ValueError("CFB_FORWARD_EVAL_NATIVE_MODEL_REQUIRED")
+        if snapshot.get("games") != []:
+            raise ValueError("CFB_FORWARD_EVAL_NATIVE_MODEL_REQUIRED")
+        return {
+            "schema": SCHEMA, "source_snapshot_schema": MODEL_SNAPSHOT,
+            "source_card_sha256": snapshot.get("source_card_sha256"),
+            "paired_market_count": 0, "shadow_candidates": 0,
+            "settled_shadow_candidates": 0, "settled_shadow_net_units": 0.0,
+            "settled_shadow_roi": None,
+            "decision_quotes_independently_verified": False,
+            "real_positive_ev_proven": False, "bets_enabled": False,
+            "staking_authority": False, "results": [],
+            "status": "NO_PREGAME_MODEL_ROWS_OR_MARKET_ONLY",
+        }
     if snapshot.get("paired_decision_quotes_retained") is not True:
         raise ValueError("CFB_FORWARD_EVAL_DECISION_QUOTES_MISSING")
     sigma = finite(snapshot.get("combined_sigma"), "sigma")
