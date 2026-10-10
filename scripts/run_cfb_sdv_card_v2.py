@@ -54,6 +54,8 @@ EDGE_CAP = 0.12
 # Markets where this model beat 52.4% out of sample vs closing lines. None yet (#1471, #1476):
 # the SDV efficiency model and preseason 247 talent (2016-2025 LOSO, 52.3% vs close) both failed.
 VALIDATED_MARKETS: frozenset = frozenset()
+# Markets priced off the market-anchored home margin when a paired spread exists.
+ANCHORED_MARGIN_MARKETS = frozenset({"SPREAD", "MONEYLINE"})
 
 
 def phi(x: float) -> float:
@@ -142,7 +144,10 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
                   and {selection for selection, _ in grp} == opposite)
         fair = raw / sum(prob for _, prob in grp) if paired else None
         model_home, model_away = home, away
-        if market == "SPREAD" and isinstance(spread_context, dict):
+        # Moneyline and spread are the same margin question: price both off the
+        # one market-anchored margin so a game cannot show "no spread edge" and
+        # a large moneyline edge from two different margins.
+        if market in ANCHORED_MARGIN_MARKETS and isinstance(spread_context, dict):
             model_home = float(spread_context["home_mean"])
             model_away = float(spread_context["away_mean"])
         p = model_prob(market, side, line, model_home, model_away)
@@ -175,7 +180,7 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
                        else "NONPOSITIVE_EXPECTED_ROI" if EDGE_FLOOR <= edge <= EDGE_CAP and expected_roi <= 0.0
                        else "EDGE_TOO_LARGE_SUSPECT" if edge > EDGE_CAP else "BELOW_FLOOR"),
         })
-        if market == "SPREAD" and isinstance(spread_context, dict):
+        if market in ANCHORED_MARGIN_MARKETS and isinstance(spread_context, dict):
             out[-1].update({
                 "raw_model_home_margin": round(float(spread_context["raw_model_home_margin"]), 4),
                 "market_home_margin": round(float(spread_context["market_home_margin"]), 4),
@@ -204,7 +209,7 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
     for r in out:
         if r["bet_status"] == "BET" and r["market"] not in validated:
             r["bet_status"], r["reason"] = "LEAN", "MODEL_EDGE_NOT_VALIDATED_VS_CLOSE"
-        if r["market"] == "SPREAD" and isinstance(spread_context, dict):
+        if r["market"] in ANCHORED_MARGIN_MARKETS and isinstance(spread_context, dict):
             if not bool(spread_context["forward_track_eligible"]):
                 if r["bet_status"] == "LEAN":
                     r["bet_status"], r["reason"] = "PASS", "ANCHOR_ADJUSTMENT_BELOW_FORWARD_THRESHOLD"
@@ -217,6 +222,8 @@ ALIASES = {
     "mississippi": "ole miss", "umass": "massachusetts", "miami oh": "miami (oh)",
     "uconn": "connecticut", "north dakota st": "north dakota state",
     "nc state": "nc state", "usf": "south florida", "fiu": "florida international",
+    # SportsDataverse 2026 schedule spellings (Saturday 2026-10-10 misses).
+    "hawai i": "hawaii", "app state": "appalachian state",
 }
 
 
@@ -649,6 +656,29 @@ def attach_cfb_both_sides(payload: dict) -> dict:
     return payload
 
 
+def _auto_capture_sdv_live(directory: Path, *, capture=None) -> Path | None:
+    """Phone-issue path: capture the same public SportsDataverse bundle the
+    push workflow captures, so issue cards do not depend on rate-limited CFBD.
+
+    All-or-nothing via fetch_cfb_sdv_live.capture; any failure returns None and
+    the existing CFBD fallback path runs unchanged.
+    """
+    try:
+        if capture is None:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location(
+                "cfb_sdv_fetch", ROOT / "scripts" / "fetch_cfb_sdv_live.py")
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            capture = mod.capture
+        capture(directory)
+        return directory if Path(directory).is_dir() else None
+    except Exception as exc:
+        print("CFB_SDV_PUBLIC_AUTO_CAPTURE_FAILED", type(exc).__name__, str(exc)[:160],
+              "; canonical CFBD fallback remains enabled")
+        return None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--board-json", required=True)
@@ -687,6 +717,8 @@ def main() -> int:
     if not isinstance(board, list) or not board:
         raise SystemExit("CFB_SDV_BOARD_ARRAY_REQUIRED")
     model = load_selected_sdv_fit(args.fit)
+    if args.sdv_live_dir is None and os.environ.get("GITHUB_EVENT_NAME") == "issues":
+        args.sdv_live_dir = _auto_capture_sdv_live(ROOT / "artifacts" / "run_it" / "cfb-sdv-live")
     results = []
     fallback = None
     live_source_provenance = None
