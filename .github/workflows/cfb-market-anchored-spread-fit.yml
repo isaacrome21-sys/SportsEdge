@@ -1,16 +1,9 @@
 name: cfb-market-anchored-spread-fit
 
 on:
+  # Required CFB check: every PR needs a terminal check result, including
+  # research-only changes. Path filters left checks permanently "expected".
   pull_request:
-    paths:
-      - 'config/cfb_market_anchored_spread_challenger_v1.json'
-      - 'config/cfb_market_anchored_spread_fit_v1.json'
-      - 'sportsedge/sports/cfb/market_anchored_spread.py'
-      - 'scripts/fit_cfb_market_anchored_spread.py'
-      - 'scripts/run_cfb_sdv_card_v2.py'
-      - 'tests/test_cfb_market_anchored_spread.py'
-      - 'tests/test_cfb_sdv_card_v2.py'
-      - '.github/workflows/cfb-market-anchored-spread-fit.yml'
   workflow_dispatch:
 
 permissions:
