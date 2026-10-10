@@ -29,11 +29,9 @@ on:
         description: "Optional independently supplied timestamped 2+ bookmaker pairs for research-only price comparison"
         required: false
         type: string
+  # Required CFB check: every PR needs a terminal check result, including
+  # research-only changes. Path filters left checks permanently "expected".
   pull_request:
-    paths:
-      - scripts/run_cfb_sdv_card_v2.py
-      - tests/test_cfb_sdv_card_v2.py
-      - .github/workflows/cfb-sdv-card.yml
 
 permissions:
   contents: read
