@@ -62,20 +62,21 @@ def test_expected_bookmaker_keys_are_provider_supported():
     assert "betonlineag" in BOOKS
     assert "caesars" not in BOOKS
 
-def test_failed_provider_does_not_fabricate_paper_edges():
+def test_key_never_enables_provider_access():
     from scripts.run_cfb_paper_market import load_events
-    with patch("scripts.run_cfb_paper_market.fetch", side_effect=TimeoutError("fake")):
-        rows, source, status = load_events("fake-test-key")
+    with patch('urllib.request.urlopen', side_effect=AssertionError('network forbidden')):
+        rows, source, status = load_events('ignored-test-key')
     assert rows == []
-    assert source == "ODDS_PROVIDER_UNAVAILABLE"
-    assert status == "BLOCKED_PROVIDER_UNAVAILABLE"
+    assert source == 'MARKET_INPUT_UNAVAILABLE'
+    assert status == 'BLOCKED_NO_MARKET_INPUT'
 
 
-def test_workflow_binds_supported_key_alias_and_surfaces_blocked_input():
+def test_workflow_uses_supplied_prices_only():
     from pathlib import Path
     workflow = Path('.github/workflows/cfb-paper-market-card.yml').read_text()
-    assert 'SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}' in workflow
-    assert "if p['input_status'] != 'READY':" in workflow
+    assert 'secrets.' not in workflow
+    assert '  push:' not in workflow
+    assert 'required: true' in workflow
     assert 'CFB_SCAN_BLOCKED:' in workflow
     assert 'if: always()' in workflow
 

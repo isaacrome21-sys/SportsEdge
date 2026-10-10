@@ -1,27 +1,21 @@
 name: cfb paper market card
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/cfb-paper-market-card.yml
   workflow_dispatch:
     inputs:
       board_json:
-        description: Optional manual cross-book market board JSON; leave blank to use configured provider
-        required: false
+        description: Required public-page or screenshot cross-book board JSON; no sportsbook API
+        required: true
         type: string
 permissions:
   contents: read
 jobs:
   paper-card:
     concurrency:
-      group: sportsedge-paid-odds-api
+      group: cfb-public-board-comparison
       cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
-      SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
       CFB_PAPER_BOARD_JSON: ${{ inputs.board_json }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262

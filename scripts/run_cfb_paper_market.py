@@ -20,10 +20,7 @@ import os
 from datetime import datetime, timezone
 from math import isfinite
 from pathlib import Path
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
 
-ODDS_URL = "https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/odds"
 BOOKS = ("draftkings", "fanduel", "betmgm", "williamhill_us", "betonlineag", "pinnacle")
 SUPPORTED = ("h2h", "spreads", "totals")
 MARKET_NAME = {"h2h": "MONEYLINE", "spreads": "SPREAD", "totals": "TOTAL"}
@@ -36,20 +33,6 @@ def implied(a):
     if not isfinite(a) or (-100.0 < a < 100.0):
         raise ValueError("CFB_PAPER_AMERICAN_ODDS_INVALID")
     return 100 / (100 + a) if a > 0 else (-a) / ((-a) + 100)
-
-
-def fetch(key):
-    q = urlencode(
-        {
-            "apiKey": key,
-            "regions": "us,eu",
-            "markets": ",".join(SUPPORTED),
-            "oddsFormat": "american",
-            "bookmakers": ",".join(BOOKS),
-        }
-    )
-    with urlopen(Request(ODDS_URL + "?" + q), timeout=30) as r:
-        return json.loads(r.read().decode())
 
 
 def _decode_events(raw, source):
@@ -72,17 +55,7 @@ def load_events(key, input_json=None, inline_json=None):
     inline = (inline_json or "").strip()
     if inline:
         return _decode_events(inline, "MANUAL_INLINE"), "MANUAL_JSON_INLINE", "READY"
-    if key:
-        try:
-            events = fetch(key)
-        except (OSError, TimeoutError, ValueError) as exc:
-            # Machine-readable fail-closed artifact on quota, bad credentials,
-            # or provider outage: never synthesize prices or model predictions.
-            print("CFB_PAPER_PROVIDER_UNAVAILABLE " + type(exc).__name__)
-            return [], "ODDS_PROVIDER_UNAVAILABLE", "BLOCKED_PROVIDER_UNAVAILABLE"
-        if not isinstance(events, list):
-            return [], "ODDS_PROVIDER_INVALID", "BLOCKED_PROVIDER_INVALID"
-        return events, "ODDS_PROVIDER", "READY"
+    # Key retained only for call compatibility; supplied prices only, no provider calls.
     return [], "MARKET_INPUT_UNAVAILABLE", "BLOCKED_NO_MARKET_INPUT"
 
 
@@ -312,10 +285,9 @@ def main():
     )
     args = ap.parse_args()
 
-    key = (os.getenv("ODDS_API_KEY") or os.getenv("SPORTSEDGE_ODDS_API_KEY") or "").strip()
     inline_json = os.getenv("CFB_PAPER_BOARD_JSON", "")
     now = datetime.now(timezone.utc)
-    events, source, input_status = load_events(key, args.input_json, inline_json)
+    events, source, input_status = load_events("", args.input_json, inline_json)
     payload = build_payload(events, args.min_edge, now, source, input_status)
 
     out = Path(args.output)
