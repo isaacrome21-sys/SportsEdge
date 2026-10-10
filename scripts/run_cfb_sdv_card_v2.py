@@ -609,6 +609,8 @@ def main() -> int:
     ap.add_argument("--season", type=int, required=True)
     ap.add_argument("--week", type=int, required=True)
     ap.add_argument("--asof")
+    ap.add_argument("--sdv-live-dir", type=Path,
+                    default=Path(os.environ.get("CFB_SDV_PUBLIC_LIVE_DIR", "")) if os.environ.get("CFB_SDV_PUBLIC_LIVE_DIR") else None)
     ap.add_argument("--fit", type=Path, default=ROOT / "config/cfb_sdv_prior_current_blend_fit_v1.json")
     ap.add_argument("--output", type=Path, default=Path("artifacts/run_it/cfb_sdv_card.json"))
     args = ap.parse_args()
@@ -641,8 +643,27 @@ def main() -> int:
     model = load_selected_sdv_fit(args.fit)
     results = []
     fallback = None
+    live_source_provenance = None
+    game_rows = None
+    # Prefer native SportsDataverse 2026 assets when a complete, captured
+    # SHA-verified bundle is available; never transform them as CFBD metrics.
+    if args.sdv_live_dir is not None and args.sdv_live_dir.is_dir():
+        try:
+            from sportsedge.sports.cfb.sdv_live_scoring_source import build_live_rows
+            asof_dt = (datetime.fromisoformat(args.asof.replace("Z", "+00:00"))
+                       if args.asof else datetime.now(timezone.utc))
+            game_rows, live_source_provenance = build_live_rows(
+                board, directory=args.sdv_live_dir, now=asof_dt,
+                expand_compact=expand_compact, normalize_name=_n,
+            )
+            print("CFB_SDV_PUBLIC_LIVE_MODEL_ROWS", len(game_rows),
+                  "contract=" + live_source_provenance["source_contract"])
+        except Exception as exc:
+            print("CFB_SDV_PUBLIC_LIVE_UNAVAILABLE",
+                  type(exc).__name__, str(exc)[:180])
     try:
-        game_rows = build_rows(board, args.season, args.week, args.asof, args.fit)
+        if game_rows is None:
+            game_rows = build_rows(board, args.season, args.week, args.asof, args.fit)
     except (Exception, SystemExit) as exc:  # CFBD quota/outage or unresolvable names
         msg = str(exc)
         fallback = ("CFBD_RATE_LIMITED" if "429" in msg else
@@ -691,7 +712,9 @@ def main() -> int:
             "historical_evidence_role": "DEVELOPMENT_ONLY_ALREADY_TOUCHED",
             "forward_validated": False,
         },
-        "model_status": "MARKET_ONLY:" + fallback if fallback else "MODEL",
+        "model_status": ("MARKET_ONLY:" + fallback if fallback else
+                         "MODEL_SDV_PUBLIC_LIVE_UNVALIDATED" if live_source_provenance else "MODEL"),
+        "live_source_provenance": live_source_provenance,
         "bets": sum(r.get("bet_status") == "BET" for r in results),
         "leans": sum(r.get("bet_status") == "LEAN" for r in results),
         "results": sorted(results, key=lambda r: -(r.get("edge") or -9)),
