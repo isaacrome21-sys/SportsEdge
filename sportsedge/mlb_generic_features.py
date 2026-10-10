@@ -662,12 +662,13 @@ class MLBGenericHistorySource:
                         else:
                             base["ump_bb_unadjusted"] = why
                 except MLBGenericFeatureError:
-                    # Validated few-starts fallback (#1482/#1495): PITCHER_OUTS/PITCHER_K with
-                    # 1..4 own starts, shrunk toward the frozen prior-season league_short pool.
-                    # Anything else (k=0, other markets, no shipped prior) stays BLOCKED.
+                    # Validated few-starts fallback (#1482): PITCHER_OUTS/PITCHER_K (#1495) and
+                    # PITCHER_BB/HITS_ALLOWED/ER (#1943) with 1..4 own starts, shrunk toward the
+                    # frozen prior-season league_short pool. Anything else (k=0, H+W+ER,
+                    # EITHER_PITCHER, no shipped prior) stays BLOCKED.
                     from .mlb_pitcher_prior import FALLBACK_MARKETS, MAX_OWN_STARTS, MIN_OWN_STARTS, PitcherPriorError, fallback_features, prior_for
                     try:
-                        prior = prior_for(target_date) if market in FALLBACK_MARKETS else None
+                        prior = prior_for(target_date, market=market) if market in FALLBACK_MARKETS else None
                     except (PitcherPriorError, ValueError, KeyError) as exc:
                         raise MLBGenericFeatureError(f"pitcher:prior_fallback: invalid prior artifact: {exc}") from exc
                     if prior is None:

@@ -64,18 +64,48 @@ def implied(odds: float) -> float:
     return abs(odds) / (abs(odds) + 100.0) if odds < 0 else 100.0 / (odds + 100.0)
 
 
-def model_prob(market: str, side: str, line, home: float, away: float) -> float:
+def model_distribution(market: str, side: str, line, home: float, away: float):
+    """Approximate unconditional win/loss/push probabilities.
+
+    College scores/margins are integer-valued: an integer spread/total can
+    push. Integrate a continuity-corrected Normal mass over exact integers.
+    This fixes the payoff identity, NOT the unvalidated score distribution.
+    """
     margin, total = home - away, home + away
     if market == "MONEYLINE":
+        if side not in {"HOME", "AWAY"}:
+            raise ValueError("CFB_SDV_MONEYLINE_SIDE_INVALID")
         p_home = phi(margin / COMBINED_SIGMA)
-        return p_home if side == "HOME" else 1.0 - p_home
+        win = p_home if side == "HOME" else 1.0 - p_home
+        return win, 1.0 - win, 0.0
     if market == "SPREAD":
-        m = margin if side == "HOME" else -margin
-        return phi((m + float(line)) / COMBINED_SIGMA)
-    if market == "TOTAL":
-        p_over = 1.0 - phi((float(line) - total) / COMBINED_SIGMA)
-        return p_over if side == "OVER" else 1.0 - p_over
-    raise ValueError("CFB_SDV_MARKET_UNSUPPORTED:" + market)
+        if side not in {"HOME", "AWAY"}:
+            raise ValueError("CFB_SDV_SPREAD_SIDE_INVALID")
+        center = (margin if side == "HOME" else -margin) + float(line)
+    elif market == "TOTAL":
+        if side not in {"OVER", "UNDER"}:
+            raise ValueError("CFB_SDV_TOTAL_SIDE_INVALID")
+        center = (total - float(line)) if side == "OVER" else (float(line) - total)
+    else:
+        raise ValueError("CFB_SDV_MARKET_UNSUPPORTED:" + market)
+    line = float(line)
+    if abs(2 * line - round(2 * line)) > 1e-8:
+        raise ValueError("CFB_SDV_LINE_MUST_BE_WHOLE_OR_HALF")
+    if abs(line - round(line)) < 1e-8:
+        win = phi((center - .5) / COMBINED_SIGMA)
+        lose = phi((-center - .5) / COMBINED_SIGMA)
+        push = max(0.0, 1.0 - win - lose)
+    else:
+        win = phi(center / COMBINED_SIGMA)
+        lose = 1.0 - win
+        push = 0.0
+    return win, lose, push
+
+
+def model_prob(market: str, side: str, line, home: float, away: float) -> float:
+    """Conditional win probability for comparison with push-voided odds."""
+    win, lose, _push = model_distribution(market, side, line, home, away)
+    return win / (win + lose)
 
 
 def pair_key(market: str, side: str, line):
@@ -116,8 +146,12 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
             model_home = float(spread_context["home_mean"])
             model_away = float(spread_context["away_mean"])
         p = model_prob(market, side, line, model_home, model_away)
+        _win, _lose, push = model_distribution(market, side, line, model_home, model_away)
         edge = p - (fair if fair is not None else raw)
-        expected_roi = p * (1.0 + (odds / 100.0 if odds > 0 else 100.0 / abs(odds))) - 1.0
+        profit = odds / 100.0 if odds > 0 else 100.0 / abs(odds)
+        # Win and loss are unconditional; a push returns the stake.
+        # Use the conditional P(win|not push) for no-vig comparisons.
+        expected_roi = (1.0 - push) * (p * profit - (1.0 - p))
         qualifies = EDGE_FLOOR <= edge <= EDGE_CAP and expected_roi > 0.0
         out.append({
             "game_id": game_id,
@@ -128,6 +162,10 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
             "home_mean": round(home, 2),
             "away_mean": round(away, 2),
             "model_p": round(p, 4),
+            "model_win_p": round(p * (1.0 - push), 6),
+            "model_loss_p": round((1.0 - p) * (1.0 - push), 6),
+            "model_push_p": round(push, 6),
+            "model_prob_basis": "CONDITIONAL_WIN_GIVEN_NO_PUSH",
             "market_p": round(fair if fair is not None else raw, 4),
             "devig": "PAIRED_PROPORTIONAL" if fair is not None else "UNPAIRED_RAW_IMPLIED",
             "edge": round(edge, 4),
@@ -151,6 +189,11 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
     for r in out:
         if r["devig"] != "PAIRED_PROPORTIONAL":
             r["bet_status"], r["reason"] = "TRACK", "UNPAIRED_MARKET_NO_DEVIG"
+    # Apply the straight-price cap before selecting a same-game winner.
+    # An expensive moneyline must not suppress an otherwise playable spread.
+    for r in out:
+        if r["american_odds"] < -165 and r["bet_status"] == "BET":
+            r["bet_status"], r["reason"] = "PASS", "STRAIGHT_PRICE_CAP_MINUS_165"
     # Same-game guard: one team-outcome bet (ML or spread) and one total per game.
     for fam in (("MONEYLINE", "SPREAD"), ("TOTAL",)):
         bets = [r for r in out if r["market"] in fam and r["bet_status"] == "BET"]
@@ -557,6 +600,7 @@ def build_rows(board: list, season: int, week: int, asof, fit_path=None):
             "home_team": game.home_team,
             "away_team": game.away_team,
             "neutral_site": bool(game.neutral_site),
+            "start_ts": game.start_ts,
             "weather": dict(game.weather or {}),
             "quotes": row.get("quotes") or [],
         }
@@ -696,9 +740,11 @@ def main() -> int:
         )
         for r in priced:
             r["matchup"] = f"{row.get('away_team')} @ {row.get('home_team')}"
+            r["start_ts"] = row.get("start_ts")
         results.extend(priced or [{"game_id": row["game_id"], "bet_status": "PASS", "reason": "NO_QUOTES"}])
     payload = {
         "schema": "CFB_SDV_CARD_V2",
+        "scored_at_utc": datetime.now(timezone.utc).isoformat(),
         "family": "PRIOR_CURRENT_BLEND",
         "bakeoff_run": 37093707442,
         "team_score_rmse": TEAM_SCORE_RMSE,

@@ -9,11 +9,24 @@ from __future__ import annotations
 
 import argparse
 import json
+from math import comb
 from pathlib import Path
 
 SCHEMA = "CFB_SDV_TOTAL_BIAS_AUDIT_V1"
 MIN_GAMES = 3
 MIN_POINT_GAP = 5.0
+# Second, slate-level trigger: a one-sided binomial sign test on the direction of
+# every model-minus-market total gap. The all-games-beyond-5-points rule above
+# is switched off by a single game near the line; a sign test is not.
+SIGN_TEST_MIN_GAMES = 8
+SIGN_TEST_ALPHA = 0.05
+
+
+def sign_test_p(k: int, n: int) -> float:
+    """One-sided P(X >= k) for X ~ Binomial(n, 0.5)."""
+    if n <= 0:
+        return 1.0
+    return sum(comb(n, i) for i in range(k, n + 1)) / 2 ** n
 
 
 def audit(payload):
@@ -55,6 +68,13 @@ def audit(payload):
     over = sum(r["model_minus_market_points"] >= MIN_POINT_GAP for r in rows)
     under = sum(r["model_minus_market_points"] <= -MIN_POINT_GAP for r in rows)
     directional_skew = (n >= MIN_GAMES and (over == n or under == n))
+    above = sum(r["model_minus_market_points"] > 0 for r in rows)
+    below = sum(r["model_minus_market_points"] < 0 for r in rows)
+    signed = above + below  # exact ties carry no direction
+    p_high = sign_test_p(above, signed)
+    p_low = sign_test_p(below, signed)
+    sign_high = signed >= SIGN_TEST_MIN_GAMES and p_high < SIGN_TEST_ALPHA
+    sign_low = signed >= SIGN_TEST_MIN_GAMES and p_low < SIGN_TEST_ALPHA
     all_anomalous = (n >= MIN_GAMES and all(
         r["reason"] == "EDGE_TOO_LARGE_SUSPECT" and r["underlying_status"] == "PASS"
         for r in rows
@@ -70,8 +90,12 @@ def audit(payload):
         "mean_model_minus_market_points": round(
             sum(r["model_minus_market_points"] for r in rows) / n, 2
         ) if n else None,
-        "directional_bias_signal": "MODEL_HIGH" if directional_skew and over == n else (
-            "MODEL_LOW" if directional_skew and under == n else "NONE"
+        "model_above_market": above,
+        "model_below_market": below,
+        "sign_test_p_model_high": round(p_high, 4),
+        "sign_test_p_model_low": round(p_low, 4),
+        "directional_bias_signal": "MODEL_HIGH" if (directional_skew and over == n) or sign_high else (
+            "MODEL_LOW" if (directional_skew and under == n) or sign_low else "NONE"
         ),
         "all_large_edges_rejected": all_anomalous,
         "research_review_required": bool(directional_skew and all_anomalous),
@@ -96,6 +120,8 @@ def main():
     print(f"CFB_SDV_TOTAL_BIAS_AUDIT games={report['games_with_paired_totals']} "
           f"signal={report['directional_bias_signal']} "
           f"mean_gap={report['mean_model_minus_market_points']} "
+          f"above={report['model_above_market']}/{report['games_with_paired_totals']} "
+          f"sign_p={report['sign_test_p_model_high']} "
           f"review={report['research_review_required']}")
 
 
