@@ -57,6 +57,55 @@ class RunAutoCfbResilientTest(unittest.TestCase):
         self.assertEqual(no_edge["results"][0]["reason"], "NO_EDGE")
         self.assertEqual(no_edge["funnel"]["bets_emitted"], 0)
 
+    def test_documented_manual_json_binds_and_prices_side_lines(self):
+        from types import SimpleNamespace
+        from scripts.run_auto_cfb_resilient import _group_manual_quotes, _side_probability
+
+        games = [SimpleNamespace(game_id="g-pitt", home_team="Pittsburgh", away_team="North Carolina")]
+        aliases = {"pittsburgh": "Pittsburgh", "north carolina": "North Carolina"}
+        manual_board = [{
+            "home": "Pittsburgh", "away": "North Carolina", "quotes": [
+                {"market": "SPREAD", "side": "HOME", "line": -3.5, "american_odds": -110},
+                {"market": "SPREAD", "side": "AWAY", "line": 3.5, "american_odds": -110},
+                {"market": "TOTAL", "side": "OVER", "line": 47.5, "american_odds": -110},
+                {"market": "TOTAL", "side": "UNDER", "line": 47.5, "american_odds": -110},
+            ],
+        }]
+        grouped = _group_manual_quotes(manual_board, games=games, alias_index=aliases)
+        quotes = grouped["g-pitt"]
+        self.assertEqual(len(quotes), 4)
+        self.assertTrue(all(q["book_key"] == "draftkings" for q in quotes))
+        home_p = _side_probability(27, 23, quotes[0])
+        away_p = _side_probability(27, 23, quotes[1])
+        self.assertAlmostEqual(home_p + away_p, 1.0, places=10)
+        self.assertAlmostEqual(
+            _side_probability(27, 23, quotes[2]) +
+            _side_probability(27, 23, quotes[3]), 1.0, places=10,
+        )
+
+    def test_unmatched_manual_game_fails_closed(self):
+        from types import SimpleNamespace
+        from scripts.run_auto_cfb_resilient import _group_manual_quotes
+        with self.assertRaisesRegex(ValueError, "MATCHUP_UNRESOLVED"):
+            _group_manual_quotes(
+                [{"home": "Pittsburgh", "away": "Wrong", "quotes": [
+                    {"market": "TOTAL", "side": "OVER", "line": 48.5, "american_odds": -110},
+                ]}],
+                games=[SimpleNamespace(game_id="g-pitt", home_team="Pittsburgh", away_team="Wrong Else")],
+                alias_index={"pittsburgh": "Pittsburgh", "wrong": "Wrong"},
+            )
+
+    def test_unpriced_quotes_block_instead_of_returning_empty_ready_card(self):
+        from scripts.run_auto_cfb_resilient import build_card
+        row = _row(-110)
+        row.pop("home_prior_metrics")
+        row.pop("home_current_metrics")
+        card = build_card([row], model=None)
+        self.assertEqual(card["run_status"], "BLOCKED_MODEL_UNAVAILABLE")
+        self.assertEqual(card["funnel"]["model_priced"], 0)
+        self.assertEqual(card["funnel"]["pipeline_health"], "BROKEN")
+
+
     def test_zero_quotes_is_the_only_infrastructure_block(self):
         env = dict(os.environ)
         env["CFB_MANUAL_BOARD_JSON"] = "[]"

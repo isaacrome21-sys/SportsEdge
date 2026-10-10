@@ -107,9 +107,13 @@ jobs:
           quotes = int(funnel.get("odds_rows_fetched") or 0)
           if quotes == 0 or card.get("run_status") == "BLOCKED_NO_ODDS":
               raise SystemExit("CFB_AUTO_ZERO_QUOTES")
+          if card.get("run_status") != "READY":
+              raise SystemExit("CFB_AUTO_MODEL_UNAVAILABLE")
           rows = card.get("results") or []
           if not rows:
               raise SystemExit("CFB_AUTO_NO_MARKET_ROWS")
+          if any(row.get("model_p") is None for row in rows):
+              raise SystemExit("CFB_AUTO_UNPRICED_MARKET_ROW")
           bets = [
               row for row in rows
               if row.get("model_p") is not None and row.get("edge") is not None and float(row["edge"]) > 0
@@ -123,11 +127,10 @@ jobs:
               f"rows={len(rows)} bets={len(bets)} run_status={card['run_status']} "
               "market_source=MANUAL_SCREENSHOT_BOARD"
           )
-          summary = card.get("summary") or {}
-          if summary.get("both_sides") is not True or summary.get("catalog_complete") is not True:
-              raise SystemExit("CFB_AUTO_PROP_SIDE_TOTAL_INCOMPLETE")
-          if int(summary.get("prop_rows") or 0) < 40 or int(summary.get("side_rows") or 0) < 16 or int(summary.get("total_rows") or 0) < 10:
-              raise SystemExit("CFB_AUTO_PROP_SIDE_TOTAL_COVERAGE")
+          # Coverage is measured against the manual quotes supplied, not an
+          # invented 40-prop/16-side/10-total threshold for a two-game input.
+          if int(funnel.get("model_priced") or 0) != len(rows):
+              raise SystemExit("CFB_AUTO_MODEL_PRICED_COUNT_MISMATCH")
           PY
 
       - name: Render CFB phone card
@@ -140,7 +143,7 @@ jobs:
         run: python scripts/render_football_board_card.py --engine-output "$CARD_PATH" --out-dir artifacts/cfb_myspari
 
       - name: Upload CFB auto card
-        if: github.event_name == 'workflow_dispatch'
+        if: always() && github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: cfb-auto-card
