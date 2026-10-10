@@ -26,14 +26,18 @@ PITCHER_GENERIC_MARKETS = frozenset(PITCHER_MARKETS | {"PITCHER_RECORD_WIN"})
 TEAM_TOTAL_MARKETS = frozenset({"TEAM_TOTALS", "F5_TEAM_TOTALS"})
 DECISION_STATUSES = frozenset({"MODEL_CANDIDATE", "BET", "OFFICIAL_BET", "PASS"})
 POSTSEASON_GAME_TYPES = frozenset({"F", "D", "L", "W", "P"})
-# Pre-registered bias check (#1967, result #1968, 2022-2025 postseason starts): the
-# regular-season production price overstated the over at the typical lines by
-# +0.117 (K) and +0.208 (outs); all three guard rules passed. These markets are
-# blocked (both sides) for postseason games. model_p and regular-season rows are
-# unchanged; only a later pre-registered check that passes may lift this.
+# Pre-registered bias checks on 2022-2025 postseason starts: the regular-season
+# production price overstated the over at the typical lines by +0.117 (K) and
+# +0.208 (outs) (#1967, result #1968), and by +0.064 (hits allowed) and +0.034
+# (H+W+ER) (#1972, result #1973); all three guard rules passed for each. BB and ER
+# failed the rules in #1973 and are not blocked. These markets are blocked (both
+# sides) for postseason games. model_p and regular-season rows are unchanged; only
+# a later pre-registered check that passes may lift this.
 POSTSEASON_BIASED_PITCHER_MARKETS = {
     "PITCHER_K": "MLB_POSTSEASON_PITCHER_K_BIASED (#1968)",
     "PITCHER_OUTS": "MLB_POSTSEASON_PITCHER_OUTS_BIASED (#1968)",
+    "PITCHER_HITS_ALLOWED": "MLB_POSTSEASON_PITCHER_HITS_ALLOWED_BIASED (#1973)",
+    "PITCHER_HITS_WALKS_ER": "MLB_POSTSEASON_PITCHER_HITS_WALKS_ER_BIASED (#1973)",
 }
 
 
