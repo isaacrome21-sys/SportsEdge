@@ -54,7 +54,7 @@ def _num(value):
 
 def _odds(value):
     x = _num(value)
-    if x == 0 or -100 < x < 100:
+    if x == 0 or -100 < x < 100 or abs(x) > 100000:
         raise ValueError("CONSENSUS_AMERICAN_ODDS_INVALID")
     return x
 
@@ -166,6 +166,11 @@ def evaluate(card, references, *, max_age_seconds=MAX_AGE_SECONDS):
             result["status"] = "ILLINOIS_COLLEGE_EXCLUDED"
         elif offered < -165:
             result["status"] = "PRICE_CAP_MINUS_165"
+        elif key[1] in {"SPREAD", "TOTAL"} and _num(row.get("line")).is_integer():
+            # Vig-adjusted prices imply conditional action probability. Without
+            # independently calibrated push mass, a whole-point quote cannot
+            # be assigned a correct per-unit ROI.
+            result["status"] = "WHOLE_POINT_PUSH_PROBABILITY_UNMODELED"
         elif len(refs) < MIN_REFERENCE_BOOKS:
             result["status"] = "INSUFFICIENT_INDEPENDENT_BOOKS"
         else:
