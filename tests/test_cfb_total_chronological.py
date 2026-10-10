@@ -7,6 +7,7 @@ from scripts.research_cfb_total_chronological import (
     evaluate_season,
     fit_residual,
     paired_rows,
+    parse_espn_betting_totals,
     walkforward,
 )
 
@@ -69,6 +70,28 @@ class HistoricalCFBTotalResidualTest(unittest.TestCase):
         self.assertEqual(len(joined),1)
         self.assertEqual(joined[0]["game_id"],"a")
         self.assertEqual(joined[0]["realized_total"],45.0)
+
+    def test_espn_totals_evaluation_only_parser(self):
+        raw = (
+            b"game_id,season,over_under,game_spread,odds_source\n"
+            b"4001,2025,44.5,-3.5,ESPN\n"
+            b"4002,2025,,1.5,ESPN\n"
+            b"4003,2025,54.5,0,ESPN\n"
+        )
+        parsed=parse_espn_betting_totals(raw,season=2025)
+        self.assertEqual(parsed,{"4001":{"total":44.5},"4003":{"total":54.5}})
+        self.assertNotIn("game_spread",parsed["4001"])
+
+    def test_espn_missing_total_column_rejected(self):
+        with self.assertRaisesRegex(ValueError,"COLUMNS_MISSING"):
+            parse_espn_betting_totals(b"game_id,season,game_spread\n1,2025,-7.5\n",
+                                      season=2025)
+
+    def test_espn_duplicate_market_rows_fail_closed(self):
+        with self.assertRaisesRegex(ValueError,"DUPLICATE_GAME"):
+            parse_espn_betting_totals(
+                b"game_id,season,over_under\n1,2025,50\n1,2025,50\n",
+                season=2025)
 
     def test_never_passes_when_historical_coverage_insufficient(self):
         report=walkforward(sample(2025,20))
