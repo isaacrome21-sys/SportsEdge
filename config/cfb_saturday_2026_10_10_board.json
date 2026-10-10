@@ -119,23 +119,6 @@
     "book_quote_receipt_verified": false
   },
   {
-    "away": "Sacramento State",
-    "home": "Bowling Green",
-    "spread": [
-      8.5,
-      -112,
-      -108
-    ],
-    "total": [
-      43.5,
-      -115,
-      -105
-    ],
-    "start_ts": "2026-10-10T16:00:00Z",
-    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
-    "book_quote_receipt_verified": false
-  },
-  {
     "away": "South Carolina",
     "home": "Florida",
     "spread": [
