@@ -42,6 +42,7 @@ class GameSnapshot:
     venue_id: int | None = None
     official_date: str | None = None
     detailed_status: str | None = None
+    game_type: str | None = None
 
 
 @dataclass(frozen=True)
@@ -232,6 +233,9 @@ def parse_schedule(payload: dict[str, Any], retrieved_at: datetime) -> list[Game
             abstract_status = status_obj.get("abstractGameState")
             if abstract_status not in {"Preview", "Live", "Final"}:
                 raise MLBSourceError("GAME_STATE_MISSING_OR_INVALID")
+            game_type = game.get("gameType")
+            if game_type is not None and (type(game_type) is not str or not game_type or len(game_type) > 2):
+                raise MLBSourceError("GAME_TYPE_INVALID")
             detailed_status = status_obj.get("detailedState")
             if detailed_status is not None:
                 detailed_status = str(detailed_status)
@@ -256,6 +260,7 @@ def parse_schedule(payload: dict[str, Any], retrieved_at: datetime) -> list[Game
                 game_number=game_number, double_header=double_header,
                 venue_id=venue_id, official_date=official_date,
                 detailed_status=detailed_status,
+                game_type=game_type,
             ))
     out.sort(key=lambda g: (parse_game_start(g.game_date), g.game_pk))
     return out

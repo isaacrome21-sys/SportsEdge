@@ -156,6 +156,30 @@ def _model_input(*, game, quote, feature, require_confirmed_lineup: bool):
     if str(feature.get("market")) != market:
         raise ValueError("feature market mismatch")
 
+    # Guard the canonical card intake, *not* the frozen pricing engine bytes.
+    # MLB StatsAPI describes postseason game types as F/D/L/W/P. Any explicit
+    # playoff identity makes the legacy aggregate score model ineligible.
+    # Legacy fixture rows with no game-type metadata retain their old path,
+    # but absence is not evidence that a game was regular-season.
+    if market in GAME_MARKETS:
+        rules_mode = feature.get("rules_mode")
+        game_type = feature.get("game_type", feature.get("gameType"))
+        bound_type = getattr(game, "game_type", None)
+        if game_type is not None and bound_type is not None and game_type != bound_type:
+            raise ValueError("MLB_GAME_TYPE_SOURCE_CONFLICT")
+        game_type = game_type if game_type is not None else bound_type
+        if rules_mode is not None and (type(rules_mode) is not str or rules_mode not in {"REGULAR_SEASON", "POSTSEASON"}):
+            raise ValueError("MLB_GAME_RULES_MODE_INVALID")
+        if game_type is not None:
+            if type(game_type) is not str or game_type not in {"R", "F", "D", "L", "W", "P"}:
+                raise ValueError("MLB_GAME_TYPE_INVALID")
+            inferred = "REGULAR_SEASON" if game_type == "R" else "POSTSEASON"
+            if rules_mode is not None and rules_mode != inferred:
+                raise ValueError("MLB_GAME_RULES_MODE_CONFLICT")
+            rules_mode = inferred
+        if rules_mode == "POSTSEASON":
+            raise ValueError("MLB_POSTSEASON_LEGACY_SCORE_ENGINE_UNVALIDATED")
+
     # Reuse the canonical validated assemblers for the legacy single-market engines.
     # This prevents the unified path from constructing a weaker/shadow Model_Input
     # than the standalone path. Rows without those explicit feature contracts stay
