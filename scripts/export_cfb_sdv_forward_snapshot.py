@@ -107,6 +107,8 @@ def export_snapshot(card: dict, *, original_card_sha256: str):
         "source_run_independently_attested": False,
         "sportsbook_price_receipt_verified": False,
         "paired_decision_quotes_retained": True,
+        "combined_sigma": (_number(card["combined_sigma"], "combined_sigma")
+                           if card.get("combined_sigma") is not None else None),
         "closing_lines_joined": False,
         "settled_outcomes_joined": False,
         "positive_ev_proven": False,
