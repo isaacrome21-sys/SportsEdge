@@ -19,6 +19,12 @@ on:
         description: "Optional timezone-aware ISO timestamp. Blank uses runner UTC now."
         required: false
         type: string
+  push:
+    branches:
+      - run/cfb-auto-saturday-20261010
+    paths:
+      - .github/workflows/cfb-auto.yml
+      - config/cfb_saturday_2026_10_10_manual_quotes.json
   pull_request:
     paths:
       - scripts/run_auto_cfb_resilient.py
@@ -52,12 +58,12 @@ jobs:
         run: python -m pip install --disable-pip-version-check -r requirements-test.txt
 
       - name: Test selected PRIOR_CURRENT_BLEND card emit
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
         run: python -m unittest tests.test_run_auto_cfb_resilient -v
 
       - name: Run selected PRIOR_CURRENT_BLEND card against screenshot-supplied lines
         id: run
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         env:
           INPUT_SEASON: ${{ inputs.season }}
           INPUT_WEEK: ${{ inputs.week }}
@@ -68,6 +74,11 @@ jobs:
           mkdir -p artifacts/run_it artifacts/cfb_myspari
           card="artifacts/live_cfb_card.json"
           args=(--output "$card")
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            export CFB_MANUAL_BOARD_JSON="$(cat config/cfb_saturday_2026_10_10_manual_quotes.json)"
+            INPUT_SEASON=2026
+            INPUT_WEEK=6
+          fi
           [ -z "$INPUT_SEASON" ] || args+=(--season "$INPUT_SEASON")
           [ -z "$INPUT_WEEK" ] || args+=(--week "$INPUT_WEEK")
           [ -z "$INPUT_ASOF" ] || args+=(--asof "$INPUT_ASOF")
@@ -80,7 +91,7 @@ jobs:
           echo "card_path=$card" >> "$GITHUB_OUTPUT"
 
       - name: Assert manual-line card contract
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         env:
           CARD_PATH: ${{ steps.run.outputs.card_path }}
         run: |
@@ -134,7 +145,7 @@ jobs:
           PY
 
       - name: Render CFB phone card
-        if: github.event_name == 'workflow_dispatch' && hashFiles('artifacts/live_cfb_card.json') != ''
+        if: github.event_name != 'pull_request' && hashFiles('artifacts/live_cfb_card.json') != ''
         run: python scripts/render_cfb_myspari_card.py --engine-output artifacts/live_cfb_card.json --out-dir artifacts/cfb_myspari
       - name: Render CFB both-side board
         if: always() && steps.run.outputs.card_path != ''
@@ -143,7 +154,7 @@ jobs:
         run: python scripts/render_football_board_card.py --engine-output "$CARD_PATH" --out-dir artifacts/cfb_myspari
 
       - name: Upload CFB auto card
-        if: always() && github.event_name == 'workflow_dispatch'
+        if: always() && github.event_name != 'pull_request'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: cfb-auto-card
