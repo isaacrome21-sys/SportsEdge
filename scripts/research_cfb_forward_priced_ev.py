@@ -162,6 +162,8 @@ def evaluate(snapshot, outcomes=None):
             raise ValueError("CFB_FORWARD_EVAL_FALSE_BOOK_ATTESTATION")
         if game.get("quote_source_card_sha256") != snapshot.get("source_card_sha256"):
             raise ValueError("CFB_FORWARD_EVAL_SOURCE_CARD_HASH_MISMATCH")
+        illinois_disallowed = any(t in str(game.get("matchup") or "").lower()
+                                 for t in ILLINOIS_TEAMS)
         raw_quotes = game.get("paired_decision_quotes") or []
         groups = {}
         for q in raw_quotes:
@@ -202,7 +204,7 @@ def evaluate(snapshot, outcomes=None):
                 edge = conditional_p - fair if conditional_p is not None else None
                 ev = win * payout(odds) - lose
                 allowed = (edge is not None and FLOOR <= edge <= CAP and ev > 0
-                           and odds >= MIN_ODDS)
+                           and odds >= MIN_ODDS and not illinois_disallowed)
                 score = _result(market, q["side"], line, hp, ap) if final else None
                 selections.append({
                     "game_id": gid, "matchup": game.get("matchup"),
@@ -215,6 +217,7 @@ def evaluate(snapshot, outcomes=None):
                     "model_vs_novig_edge_pp": round(edge * 100, 3),
                     "theoretical_roi_unvalidated": round(ev, 6),
                     "shadow_rule_eligible": bool(allowed),
+                    "illinois_college_excluded": bool(illinois_disallowed),
                     "settled": final is not None,
                     "result": ("WIN" if score == 1 else "LOSS" if score == -1
                                else "PUSH" if score == 0 else "PENDING"),
