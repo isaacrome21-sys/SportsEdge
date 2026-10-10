@@ -1,0 +1,11 @@
+{
+  "schema": "CFB_TOTALS_CALIBRATION_V1",
+  "frozen_at": "2026-10-10",
+  "method": "OLS intercept + scale on chronological walk-forward projected total vs realized total, final fit on all pre-2026 games",
+  "intercept": 4.5249,
+  "scale": 0.8944,
+  "train_n": 6301,
+  "mean_raw_model_total": 56.56,
+  "mean_realized_total": 55.11,
+  "notes": "Applied as calibrated_total = intercept + scale * raw_projected_total; scores shifted equally to preserve margin. No market inputs in Model_P."
+}

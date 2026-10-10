@@ -313,6 +313,32 @@
         },
         "note": "Rebound after latest-main merge; binds the exact parent commit containing the NHL public-baseline validation candidate bytes. Forward validation remains required and authority stays zero."
       }
+    },
+    {
+      "bundle_id": "CFB_PROBATION_POLICY_V2_EXACT_IDENTITY",
+      "freeze_sha": "d2918279160ce3eafeb7c2d61a95dad6cdaca14a",
+      "coverage_paths": [
+        "config/cfb_probation_policy_v2.json"
+      ],
+      "coverage_prefixes": [],
+      "disposition": null,
+      "identity": {
+        "schema": "CFB_PROBATION_POLICY_V2_IDENTITY_V1",
+        "source_pull_request": 1953,
+        "bound_commit": "d2918279160ce3eafeb7c2d61a95dad6cdaca14a",
+        "policy_schema": "CFB_PROBATION_POLICY_V2",
+        "prior_policy_preserved": true,
+        "retroactive_pit_claim": false,
+        "authority": {
+          "model_p": false,
+          "truth_gate": false,
+          "promotion": false,
+          "official": false,
+          "standard_staking": false,
+          "probation_overlay_only": true
+        },
+        "note": "Exact-path inventory registration for new small-stake probation overlay (8 slate/5 market); not model validation, promotion, official release, or retroactive evidence. Pending separate user review before merge."
+      }
     }
   ],
   "deltas": [

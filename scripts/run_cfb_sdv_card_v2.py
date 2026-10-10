@@ -37,6 +37,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from sportsedge.sports.cfb.totals_calibration import (
+    load_totals_calibration,
+    apply_totals_calibration,
+)
 from sportsedge.sports.cfb.market_anchored_spread import (
     VERSION as ANCHORED_SPREAD_VERSION,
     adjusted_home_margin,
@@ -656,7 +660,7 @@ def attach_cfb_both_sides(payload: dict) -> dict:
     return payload
 
 
-PROBATION_POLICY_PATH = ROOT / "config" / "cfb_probation_policy_v1.json"
+PROBATION_POLICY_PATH = ROOT / "config" / "cfb_probation_policy_v2.json"
 
 
 def _slate_total_bias_signal(payload: dict) -> str:
@@ -707,20 +711,30 @@ def apply_probation(payload: dict, policy_path: Path = PROBATION_POLICY_PATH) ->
         else:
             eligible.append(r)
     eligible.sort(key=lambda r: (-float(r.get("edge") or 0), -float(r.get("expected_roi") or 0)))
-    cap = int(policy["max_probation_per_slate"])
-    for i, r in enumerate(eligible):
-        if i < cap:
+    slate_cap = int(policy["max_probation_per_slate"])
+    market_caps = policy["max_probation_per_market"]
+    market_counts = {}
+    chosen = []
+    for r in eligible:
+        market = str(r["market"])
+        if len(chosen) >= slate_cap:
+            r["probation_block_reason"] = "SLATE_CAP"
+        elif market_counts.get(market, 0) >= int(market_caps[market]):
+            r["probation_block_reason"] = "MARKET_TYPE_CAP"
+        else:
             r["probation"] = True
             r["stake_units"] = float(policy["stake_units"])
-        else:
-            r["probation_block_reason"] = "SLATE_CAP"
-    chosen = [r for r in eligible[:cap]]
+            chosen.append(r)
+            market_counts[market] = market_counts.get(market, 0) + 1
     payload["probation"] = {
         "policy": policy["schema"],
         "policy_sha256": hashlib.sha256(raw).hexdigest(),
         "stake_units": float(policy["stake_units"]),
         "slate_total_bias_signal": signal,
         "count": len(chosen),
+        "max_probation_per_slate": slate_cap,
+        "max_probation_per_market": {k: int(v) for k, v in market_caps.items()},
+        "counts_by_market": {k: market_counts.get(k, 0) for k in market_caps},
         "official": False,
         "validated": False,
     }
@@ -828,15 +842,19 @@ def main() -> int:
     for row in game_rows:
         try:
             blind = {k: v for k, v in row.items() if k != "quotes"}  # model is market-blind
-            home, away = score_selected_game(model, blind)
+            raw_home, raw_away = score_selected_game(model, blind)
         except Exception as exc:
             print("SKIPPED CFB_SDV_SCORE_FAILED", row.get("away_team"), "@", row.get("home_team"), exc)
             continue
+        # Apply frozen totals calibration after raw projection, before pricing.
+        # Margin path (spread/ML) is untouched; only the total mean is adjusted.
+        cal = load_totals_calibration()
+        home, away = apply_totals_calibration(raw_home, raw_away, cal)
         if not projection_sane(home, away, row.get("quotes") or []):
             print(f"SKIPPED CFB_SDV_PROJECTION_INSANE {row.get('away_team')} @ {row.get('home_team')} {away:.1f}-{home:.1f}")
             continue
         quotes = row.get("quotes") or []
-        spread_context = anchored_spread_context(home, away, quotes)
+        spread_context = anchored_spread_context(raw_home, raw_away, quotes)  # use raw for margin path
         priced = price_game(
             row["game_id"], home, away, quotes,
             spread_context=spread_context,
@@ -845,10 +863,17 @@ def main() -> int:
             r["matchup"] = f"{row.get('away_team')} @ {row.get('home_team')}"
             r["start_ts"] = row.get("start_ts")
         results.extend(priced or [{"game_id": row["game_id"], "bet_status": "PASS", "reason": "NO_QUOTES"}])
+    cal = load_totals_calibration()
     payload = {
         "schema": "CFB_SDV_CARD_V2",
         "scored_at_utc": datetime.now(timezone.utc).isoformat(),
         "family": "PRIOR_CURRENT_BLEND",
+        "totals_calibration": {
+            "schema": cal["schema"],
+            "sha256": cal["sha256"],
+            "intercept": cal["intercept"],
+            "scale": cal["scale"],
+        },
         "bakeoff_run": 37093707442,
         "team_score_rmse": TEAM_SCORE_RMSE,
         "combined_sigma": round(COMBINED_SIGMA, 4),
