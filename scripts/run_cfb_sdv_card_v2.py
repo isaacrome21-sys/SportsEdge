@@ -151,6 +151,11 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
     for r in out:
         if r["devig"] != "PAIRED_PROPORTIONAL":
             r["bet_status"], r["reason"] = "TRACK", "UNPAIRED_MARKET_NO_DEVIG"
+    # Apply the straight-price cap before selecting a same-game winner.
+    # An expensive moneyline must not suppress an otherwise playable spread.
+    for r in out:
+        if r["american_odds"] < -165 and r["bet_status"] == "BET":
+            r["bet_status"], r["reason"] = "PASS", "STRAIGHT_PRICE_CAP_MINUS_165"
     # Same-game guard: one team-outcome bet (ML or spread) and one total per game.
     for fam in (("MONEYLINE", "SPREAD"), ("TOTAL",)):
         bets = [r for r in out if r["market"] in fam and r["bet_status"] == "BET"]

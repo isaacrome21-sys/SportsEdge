@@ -320,5 +320,37 @@ class KickoffCutoffTest(unittest.TestCase):
         self.assertTrue(all(r["matchup"] == "Future @ Host" for r in rows))
         self.assertTrue(all(r["bet_status"] == "TRACK" for r in rows))
 
+
+class StraightPriceCapTest(unittest.TestCase):
+    def test_expensive_moneyline_does_not_suppress_playable_spread(self):
+        quotes = [
+            {"market": "MONEYLINE", "side": "HOME", "american_odds": -180},
+            {"market": "MONEYLINE", "side": "AWAY", "american_odds": 150},
+            {"market": "SPREAD", "side": "HOME", "line": -3.5, "american_odds": -110},
+            {"market": "SPREAD", "side": "AWAY", "line": 3.5, "american_odds": -110},
+        ]
+        def probability(market, side, *args):
+            home_p = 0.72 if market == "MONEYLINE" else 0.57
+            return home_p if side == "HOME" else 1.0 - home_p
+        with patch.object(card, "model_prob", side_effect=probability):
+            rows = card.price_game("g", 28, 24, quotes, validated={"MONEYLINE", "SPREAD"})
+        home_ml = next(r for r in rows if r["market"] == "MONEYLINE" and r["side"] == "HOME")
+        home_spread = next(r for r in rows if r["market"] == "SPREAD" and r["side"] == "HOME")
+        self.assertEqual(home_ml["reason"], "STRAIGHT_PRICE_CAP_MINUS_165")
+        self.assertEqual(home_ml["bet_status"], "PASS")
+        self.assertEqual(home_spread["bet_status"], "BET")
+
+    def test_cap_boundary_and_unvalidated_lean(self):
+        for odds in (-165, -166):
+            for validated in ({"MONEYLINE"}, set()):
+                quotes = [
+                    {"market": "MONEYLINE", "side": "HOME", "american_odds": odds},
+                    {"market": "MONEYLINE", "side": "AWAY", "american_odds": 145},
+                ]
+                with patch.object(card, "model_prob", side_effect=[0.68, 0.32]):
+                    rows = card.price_game("g", 28, 24, quotes, validated=validated)
+                expected = ("BET" if validated else "LEAN") if odds == -165 else "PASS"
+                self.assertEqual(rows[0]["bet_status"], expected)
+
 if __name__ == "__main__":
     unittest.main()
