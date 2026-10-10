@@ -48,7 +48,7 @@ class ForwardValueResearchTest(unittest.TestCase):
         self.assertFalse(report["bets_enabled"])
 
     def test_spread_push_and_total_loss(self):
-        report = evaluate([fixture()], [result(home=24, away=27)])
+        report = evaluate([fixture()], [result(home=17, away=24)])
         self.assertEqual(report["markets"]["SPREAD"]["losses"], 1)
         self.assertEqual(report["markets"]["TOTAL"]["losses"], 1)
 
