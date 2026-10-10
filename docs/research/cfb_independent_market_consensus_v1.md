@@ -49,6 +49,7 @@ Important:
   someone manually typed it. Refresh and verify offers before any wager.
 - Reference probabilities are **equal weighted**, not empirically calibrated.
   Books disagreeing by more than 12 percentage points cannot pass.
+- Whole-integer spread/total lines are marked `WHOLE_POINT_PUSH_PROBABILITY_UNMODELED` instead of reporting misleading per-unit ROI without separately calibrated push mass.
 - Research status `SHADOW_PRICE_DISLOCATION` requires +2 percentage points
   of offered-price break-even probability, positive indicative payout EV,
   available same-contract multi-book comparison, pregame timestamp, a
