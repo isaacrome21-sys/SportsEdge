@@ -209,7 +209,18 @@ def evaluate(snapshot, outcomes=None):
             for q, raw in zip(pair, implied):
                 odds = finite(q["american_odds"], "odds")
                 line = None if market == "MONEYLINE" else finite(q["line"], "line")
-                mu = total if market == "TOTAL" else margin
+                anchor_margin = q.get("spread_anchor_margin_original")
+                if market == "SPREAD":
+                    anchors = [x.get("spread_anchor_margin_original") for x in pair]
+                    if any(a is None for a in anchors) != all(a is None for a in anchors):
+                        raise ValueError("CFB_FORWARD_EVAL_SPREAD_ANCHOR_PAIR_MISMATCH")
+                    if all(a is not None for a in anchors):
+                        if abs(finite(anchors[0], "spread_anchor") -
+                               finite(anchors[1], "spread_anchor")) > .001:
+                            raise ValueError("CFB_FORWARD_EVAL_SPREAD_ANCHOR_PAIR_MISMATCH")
+                mu = (total if market == "TOTAL" else
+                      finite(anchor_margin, "spread_anchor") if market == "SPREAD" and
+                      anchor_margin is not None else margin)
                 win, lose, push = outcome_probs(mu, sigma, market, q["side"], line)
                 conditional_p = win / (win + lose) if win + lose > 0 else None
                 fair = raw / denom
@@ -221,6 +232,9 @@ def evaluate(snapshot, outcomes=None):
                 selections.append({
                     "game_id": gid, "matchup": game.get("matchup"),
                     "market": market, "side": q["side"], "line": line, "american_odds": odds,
+                    "spread_projection_basis": ("MARKET_ANCHORED_ORIGINAL"
+                         if market == "SPREAD" and anchor_margin is not None
+                         else "FROZEN_RAW_SCORES"),
                     "no_vig_market_p": round(fair, 6),
                     "model_win_p_unvalidated": round(win, 6),
                     "model_loss_p_unvalidated": round(lose, 6),
