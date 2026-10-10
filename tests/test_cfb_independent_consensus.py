@@ -73,6 +73,21 @@ class ConsensusTest(unittest.TestCase):
         self.assertEqual(evaluate(card(), inp)["results"][0]["status"],
                          "REFERENCE_DISAGREEMENT")
 
+    def test_whole_point_quote_requires_push_model_not_false_roi(self):
+        c = card(line=-3.0)
+        ref = references()
+        for book in ref["books"]:
+            for q in book["quotes"]:
+                q["line"] = -3.0 if q["side"] == "HOME" else 3.0
+        r = evaluate(c, ref)["results"][0]
+        self.assertEqual(r["paired_reference_books"], 2)
+        self.assertEqual(r["status"], "WHOLE_POINT_PUSH_PROBABILITY_UNMODELED")
+        self.assertIsNone(r["consensus_expected_roi"])
+
+    def test_impossibly_large_prices_rejected(self):
+        with self.assertRaisesRegex(ValueError, "AMERICAN_ODDS_INVALID"):
+            evaluate(card(offered=100001), references())
+
     def test_price_cap_excludes_straight(self):
         r = evaluate(card(offered=-180), references())["results"][0]
         self.assertEqual(r["status"], "PRICE_CAP_MINUS_165")
