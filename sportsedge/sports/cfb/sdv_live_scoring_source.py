@@ -206,6 +206,7 @@ def build_live_rows(board, *, directory, now, expand_compact, normalize_name):
     prior_by_id = {snap.team_id: snap for snap in prior_snaps}
     results = []
     current_cache = {}
+    skipped_missing_target_snapshots = []
     for raw in board:
         selection = expand_compact(raw)
         home = normalize_name(selection.get("home", ""))
@@ -238,7 +239,18 @@ def build_live_rows(board, *, directory, now, expand_compact, normalize_name):
         home_id, away_id = _team_id(game["home_id"]), _team_id(game["away_id"])
         current = current_cache[week]
         if any(tid not in current or tid not in prior_by_id for tid in (home_id, away_id)):
-            raise SDVLiveError(f"CFB_SDV_LIVE_MISSING_SNAPSHOT:{away}@{home}")
+            # This *target* game lacks genuine prior/current team features.
+            # Fail this game closed, not every unrelated otherwise-complete
+            # game in the same captured board. Source-wide provenance, PIT,
+            # and prior-game coverage violations still raise above.
+            skipped_missing_target_snapshots.append({
+                "game_id": str(game["game_id"]),
+                "home_team": str(game["home_team"]),
+                "away_team": str(game["away_team"]),
+                "reason": "MISSING_NATIVE_PRIOR_OR_CURRENT_TEAM_SNAPSHOT",
+            })
+            print(f"SKIPPED CFB_SDV_LIVE_MISSING_SNAPSHOT:{away}@{home}")
+            continue
         hp, ap = prior_by_id[home_id], prior_by_id[away_id]
         hc, ac = current[home_id], current[away_id]
         # The frozen prior/current blend expects both snapshots and the native
@@ -264,4 +276,7 @@ def build_live_rows(board, *, directory, now, expand_compact, normalize_name):
         results.append(row)
     if not results:
         raise SDVLiveError("CFB_SDV_LIVE_NO_RESOLVED_GAMES")
+    provenance = dict(provenance)
+    provenance["skipped_missing_target_snapshot_games"] = skipped_missing_target_snapshots
+    provenance["skipped_missing_target_snapshot_count"] = len(skipped_missing_target_snapshots)
     return results, provenance
