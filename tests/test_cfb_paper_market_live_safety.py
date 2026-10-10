@@ -1,5 +1,5 @@
 """Guard one-time CFB live book comparison: freshness, policy, and no staking."""
-import copy
+from unittest.mock import patch
 from datetime import datetime, timezone
 
 from scripts.run_cfb_paper_market import BOOKS, build_payload
@@ -61,3 +61,11 @@ def test_expected_bookmaker_keys_are_provider_supported():
     assert "pinnacle" in BOOKS
     assert "betonlineag" in BOOKS
     assert "caesars" not in BOOKS
+
+def test_failed_provider_does_not_fabricate_paper_edges():
+    from scripts.run_cfb_paper_market import load_events
+    with patch("scripts.run_cfb_paper_market.fetch", side_effect=TimeoutError("fake")):
+        rows, source, status = load_events("fake-test-key")
+    assert rows == []
+    assert source == "ODDS_PROVIDER_UNAVAILABLE"
+    assert status == "BLOCKED_PROVIDER_UNAVAILABLE"
