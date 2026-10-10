@@ -13,10 +13,12 @@ from __future__ import annotations
 
 import argparse
 import csv
+import gzip
 import hashlib
 import io
 import json
 import math
+import statistics
 from collections import defaultdict
 from pathlib import Path
 from urllib.request import Request, urlopen
@@ -68,6 +70,46 @@ def parse_espn_betting_totals(raw: bytes, *, season: int):
             raise ValueError("CFB_ESPN_TOTAL_REFERENCE_DUPLICATE_GAME:" + gid)
         out[gid]={"total":value}
     return out
+
+
+def parse_pinned_book_totals(raw: bytes):
+    """Read closing-like line field on only TOTAL market rows from pinned mirror.
+
+    The mirror contains individual book records (not source-timestamped
+    executable DK offers). A deterministic median per game prevents one
+    provider's duplicate row from dominating. Market fields are evaluation
+    labels only and are never passed into the score-model feature vector.
+    """
+    payload = gzip.decompress(raw) if raw.startswith(bytes((31,139))) else raw
+    reader = csv.DictReader(io.StringIO(payload.decode("utf-8-sig")))
+    required={"game_id","market_type","book","lines"}
+    if not required.issubset(set(reader.fieldnames or ())):
+        raise ValueError("CFB_TOTAL_PINNED_MIRROR_SCHEMA_INVALID")
+    books=defaultdict(lambda:defaultdict(list))
+    for row in reader:
+        if str(row.get("market_type","")).strip().lower() != "total":
+            continue
+        gid=str(row.get("game_id") or "").strip()
+        book=str(row.get("book") or "").strip()
+        price=_valid(row.get("lines"))
+        if not gid or not book or price is None or not 10 <= price <= 120:
+            continue
+        books[gid][book].append(price)
+    out={}
+    for gid, group in books.items():
+        provider_medians=[statistics.median(values) for values in group.values()]
+        out[gid]={"total":statistics.median(provider_medians)}
+    return out
+
+
+def fetch_pinned_book_totals(*, opener=urlopen):
+    from sportsedge.sports.cfb.public_mirror import LINES_URL
+    with opener(Request(LINES_URL,headers={"User-Agent":"SportsEdge-HistoricalResearch/1"}),
+                timeout=90) as response:
+        raw=response.read()
+    digest=hashlib.sha256(raw).hexdigest()
+    return parse_pinned_book_totals(raw), {"sha256":digest,
+            "url":LINES_URL,"provider":"PUBLIC_BOOK_MEDIAN_NOT_VERIFIED_CLOSE"}
 
 
 def fetch_espn_historical_totals(*, opener=urlopen):
@@ -286,8 +328,22 @@ def main(argv=None):
         available_totals=sum(_valid(m.get("total")) is not None
                              for m in market.values() if isinstance(m,dict))
         if available_totals == 0:
-            market, source_receipts=fetch_espn_historical_totals()
-            source="SPORTSDATAVERSE_ESPN_BETTING_RETROSPECTIVE_NOT_VERIFIED_CLOSE"
+            # Fixed before looking at realized totals: choose the pinned mirror
+            # if it matches >=1000 model game identities. Otherwise take ESPN's
+            # historical *provider-resolved* total field, excluding defaults.
+            # Neither source is a guaranteed executable DK close.
+            mirror, mirror_receipt=fetch_pinned_book_totals()
+            overlap=sum(1 for gid in preds if gid in mirror)
+            print("CFB_PINNED_TOTALS_COVERAGE",json.dumps({
+                "games":len(mirror),"prediction_overlap":overlap,
+                "source_sha256":mirror_receipt["sha256"]},sort_keys=True))
+            if overlap >= 1000:
+                market=mirror
+                source_receipts={"pinned_mirror":mirror_receipt}
+                source="PINNED_PUBLIC_BOOK_MEDIAN_HISTORICAL_UNVERIFIED_CLOSE"
+            else:
+                market, source_receipts=fetch_espn_historical_totals()
+                source="SPORTSDATAVERSE_ESPN_BETTING_RETROSPECTIVE_NOT_VERIFIED_CLOSE"
         else:
             source="CFBD_HISTORICAL_TOTAL_CACHE"
     # A missing cache or non-matching game-id namespace cannot count as a
