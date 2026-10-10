@@ -23,6 +23,11 @@ import unicodedata
 
 SHARP_BOOKS = ("pinnacle", "circa", "bookmaker")
 MIN_CONSENSUS_BOOKS = 2
+OTHER_SCHOOL_SUFFIXES = frozenset({
+    "state", "st", "ohio", "oh", "tech", "a", "am", "international", "southern", "atlantic",
+    "monroe", "lafayette", "martin", "christian", "el", "san", "poly", "mountain", "central",
+    "north", "south", "east", "west", "northern", "eastern", "western", "baptist", "intl",
+})
 
 
 def _implied(a: float) -> float:
@@ -58,8 +63,9 @@ def same_team(a: str, b: str) -> bool:
     if not long_.startswith(short + " "):
         return False
     rest = long_[len(short) + 1:].split()
-    # Reject 'state'/'ohio'/'tech' style suffixes that name a different school.
-    return bool(rest) and rest[0] not in {"state", "st", "ohio", "oh", "tech", "a", "international", "southern"}
+    # Reject suffixes that name a different school (Florida vs Florida Atlantic,
+    # Louisiana vs Louisiana Monroe, Texas vs Texas A&M / UTEP / UTSA spellings).
+    return bool(rest) and rest[0] not in OTHER_SCHOOL_SUFFIXES
 
 
 def peer_fair_probs(peer: dict):
