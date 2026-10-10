@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 35
     env:
       PYTHONPATH: .
-      GH_TOKEN: \${{ github.token }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
@@ -41,7 +41,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: cfb-total-chronological-\${{ github.sha }}
+          name: cfb-total-chronological-${{ github.sha }}
           path: artifacts/cfb/cfb_total_chronological_research.json
           if-no-files-found: warn
           retention-days: 60
