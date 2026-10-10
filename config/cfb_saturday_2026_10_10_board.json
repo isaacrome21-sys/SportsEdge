@@ -1,0 +1,224 @@
+[
+  {
+    "away": "Indiana",
+    "home": "Nebraska",
+    "spread": [
+      -7.5,
+      -115,
+      -105
+    ],
+    "total": [
+      47.5,
+      -118,
+      -102
+    ],
+    "start_ts": "2026-10-10T16:00:00Z",
+    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "away": "Texas A&M",
+    "home": "Missouri",
+    "spread": [
+      3.5,
+      -110,
+      -110
+    ],
+    "total": [
+      49.5,
+      -105,
+      -115
+    ],
+    "start_ts": "2026-10-10T16:00:00Z",
+    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "away": "North Carolina",
+    "home": "Pittsburgh",
+    "spread": [
+      3.5,
+      -108,
+      -112
+    ],
+    "total": [
+      47.5,
+      -102,
+      -118
+    ],
+    "start_ts": "2026-10-10T16:00:00Z",
+    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "away": "UCF",
+    "home": "Oklahoma State",
+    "spread": [
+      10.5,
+      -108,
+      -112
+    ],
+    "total": [
+      53.5,
+      -112,
+      -108
+    ],
+    "start_ts": "2026-10-10T16:00:00Z",
+    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "away": "Arizona",
+    "home": "West Virginia",
+    "spread": [
+      -3.5,
+      -108,
+      -112
+    ],
+    "total": [
+      60.5,
+      -115,
+      -105
+    ],
+    "start_ts": "2026-10-10T16:00:00Z",
+    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "away": "Wake Forest",
+    "home": "NC State",
+    "spread": [
+      -3.5,
+      100,
+      -120
+    ],
+    "total": [
+      58.5,
+      -110,
+      -110
+    ],
+    "start_ts": "2026-10-10T16:00:00Z",
+    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "away": "Tulane",
+    "home": "Army",
+    "spread": [
+      3.5,
+      -112,
+      -108
+    ],
+    "total": [
+      48.5,
+      -105,
+      -115
+    ],
+    "start_ts": "2026-10-10T16:00:00Z",
+    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "away": "South Carolina",
+    "home": "Florida",
+    "spread": [
+      10.5,
+      -105,
+      -115
+    ],
+    "total": [
+      58.5,
+      -115,
+      -105
+    ],
+    "start_ts": "2026-10-10T16:45:00Z",
+    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "away": "Texas",
+    "home": "Oklahoma",
+    "spread": [
+      -7.5,
+      -105,
+      -115
+    ],
+    "total": [
+      39.5,
+      -105,
+      -115
+    ],
+    "start_ts": "2026-10-10T19:30:00Z",
+    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
+    "book_quote_receipt_verified": false,
+    "neutral_field_home_team_source": "SCHEDULE_TEXAS_AT_OKLAHOMA_NEUTRAL_SITE"
+  },
+  {
+    "away": "UCLA",
+    "home": "Oregon",
+    "spread": [
+      10.5,
+      -112,
+      -108
+    ],
+    "total": [
+      58.5,
+      -105,
+      -115
+    ],
+    "start_ts": "2026-10-10T19:30:00Z",
+    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "away": "Ole Miss",
+    "home": "Vanderbilt",
+    "spread": [
+      -9.5,
+      -112,
+      -108
+    ],
+    "total": [
+      54.5,
+      -108,
+      -112
+    ],
+    "start_ts": "2026-10-10T19:30:00Z",
+    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "away": "Georgia",
+    "home": "Alabama",
+    "spread": [
+      1.5,
+      -108,
+      -112
+    ],
+    "total": [
+      51.5,
+      -105,
+      -115
+    ],
+    "start_ts": "2026-10-10T23:30:00Z",
+    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
+    "book_quote_receipt_verified": false
+  },
+  {
+    "away": "USC",
+    "home": "Penn State",
+    "spread": [
+      1.5,
+      -108,
+      -112
+    ],
+    "total": [
+      54.5,
+      -112,
+      -108
+    ],
+    "start_ts": "2026-10-10T23:30:00Z",
+    "quote_source": "DK_NETWORK_PUBLIC_SPLITS_PRELIMINARY_UNVERIFIED",
+    "book_quote_receipt_verified": false
+  }
+]

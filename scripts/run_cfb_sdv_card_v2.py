@@ -64,18 +64,48 @@ def implied(odds: float) -> float:
     return abs(odds) / (abs(odds) + 100.0) if odds < 0 else 100.0 / (odds + 100.0)
 
 
-def model_prob(market: str, side: str, line, home: float, away: float) -> float:
+def model_distribution(market: str, side: str, line, home: float, away: float):
+    """Approximate unconditional win/loss/push probabilities.
+
+    College scores/margins are integer-valued: an integer spread/total can
+    push. Integrate a continuity-corrected Normal mass over exact integers.
+    This fixes the payoff identity, NOT the unvalidated score distribution.
+    """
     margin, total = home - away, home + away
     if market == "MONEYLINE":
+        if side not in {"HOME", "AWAY"}:
+            raise ValueError("CFB_SDV_MONEYLINE_SIDE_INVALID")
         p_home = phi(margin / COMBINED_SIGMA)
-        return p_home if side == "HOME" else 1.0 - p_home
+        win = p_home if side == "HOME" else 1.0 - p_home
+        return win, 1.0 - win, 0.0
     if market == "SPREAD":
-        m = margin if side == "HOME" else -margin
-        return phi((m + float(line)) / COMBINED_SIGMA)
-    if market == "TOTAL":
-        p_over = 1.0 - phi((float(line) - total) / COMBINED_SIGMA)
-        return p_over if side == "OVER" else 1.0 - p_over
-    raise ValueError("CFB_SDV_MARKET_UNSUPPORTED:" + market)
+        if side not in {"HOME", "AWAY"}:
+            raise ValueError("CFB_SDV_SPREAD_SIDE_INVALID")
+        center = (margin if side == "HOME" else -margin) + float(line)
+    elif market == "TOTAL":
+        if side not in {"OVER", "UNDER"}:
+            raise ValueError("CFB_SDV_TOTAL_SIDE_INVALID")
+        center = (total - float(line)) if side == "OVER" else (float(line) - total)
+    else:
+        raise ValueError("CFB_SDV_MARKET_UNSUPPORTED:" + market)
+    line = float(line)
+    if abs(2 * line - round(2 * line)) > 1e-8:
+        raise ValueError("CFB_SDV_LINE_MUST_BE_WHOLE_OR_HALF")
+    if abs(line - round(line)) < 1e-8:
+        win = phi((center - .5) / COMBINED_SIGMA)
+        lose = phi((-center - .5) / COMBINED_SIGMA)
+        push = max(0.0, 1.0 - win - lose)
+    else:
+        win = phi(center / COMBINED_SIGMA)
+        lose = 1.0 - win
+        push = 0.0
+    return win, lose, push
+
+
+def model_prob(market: str, side: str, line, home: float, away: float) -> float:
+    """Conditional win probability for comparison with push-voided odds."""
+    win, lose, _push = model_distribution(market, side, line, home, away)
+    return win / (win + lose)
 
 
 def pair_key(market: str, side: str, line):
@@ -96,18 +126,33 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
         norm.append((market, side, q.get("line"), float(q["american_odds"])))
     groups = {}
     for market, side, line, odds in norm:
-        groups.setdefault(pair_key(market, side, line), []).append(implied(odds))
+        groups.setdefault(pair_key(market, side, line), []).append((side, implied(odds)))
     out = []
     for market, side, line, odds in norm:
         raw = implied(odds)
         grp = groups[pair_key(market, side, line)]
-        fair = raw / sum(grp) if len(grp) == 2 else None
+        # Two quotes do not constitute a market pair unless they are opposing
+        # selections. Duplicate HOME or OVER quotes must never be de-vigged.
+        opposite = {
+            "MONEYLINE": {"HOME", "AWAY"},
+            "SPREAD": {"HOME", "AWAY"},
+            "TOTAL": {"OVER", "UNDER"},
+        }.get(market)
+        paired = (opposite is not None and len(grp) == 2
+                  and {selection for selection, _ in grp} == opposite)
+        fair = raw / sum(prob for _, prob in grp) if paired else None
         model_home, model_away = home, away
         if market == "SPREAD" and isinstance(spread_context, dict):
             model_home = float(spread_context["home_mean"])
             model_away = float(spread_context["away_mean"])
         p = model_prob(market, side, line, model_home, model_away)
+        _win, _lose, push = model_distribution(market, side, line, model_home, model_away)
         edge = p - (fair if fair is not None else raw)
+        profit = odds / 100.0 if odds > 0 else 100.0 / abs(odds)
+        # Win and loss are unconditional; a push returns the stake.
+        # Use the conditional P(win|not push) for no-vig comparisons.
+        expected_roi = (1.0 - push) * (p * profit - (1.0 - p))
+        qualifies = EDGE_FLOOR <= edge <= EDGE_CAP and expected_roi > 0.0
         out.append({
             "game_id": game_id,
             "market": market,
@@ -117,11 +162,17 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
             "home_mean": round(home, 2),
             "away_mean": round(away, 2),
             "model_p": round(p, 4),
+            "model_win_p": round(p * (1.0 - push), 6),
+            "model_loss_p": round((1.0 - p) * (1.0 - push), 6),
+            "model_push_p": round(push, 6),
+            "model_prob_basis": "CONDITIONAL_WIN_GIVEN_NO_PUSH",
             "market_p": round(fair if fair is not None else raw, 4),
             "devig": "PAIRED_PROPORTIONAL" if fair is not None else "UNPAIRED_RAW_IMPLIED",
             "edge": round(edge, 4),
-            "bet_status": "BET" if EDGE_FLOOR <= edge <= EDGE_CAP else "PASS",
-            "reason": ("EDGE_CLEARS_FLOOR" if EDGE_FLOOR <= edge <= EDGE_CAP
+            "expected_roi": round(expected_roi, 4),
+            "bet_status": "BET" if qualifies else "PASS",
+            "reason": ("EDGE_CLEARS_FLOOR_AND_POSITIVE_ROI" if qualifies
+                       else "NONPOSITIVE_EXPECTED_ROI" if EDGE_FLOOR <= edge <= EDGE_CAP and expected_roi <= 0.0
                        else "EDGE_TOO_LARGE_SUSPECT" if edge > EDGE_CAP else "BELOW_FLOOR"),
         })
         if market == "SPREAD" and isinstance(spread_context, dict):
@@ -133,6 +184,16 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
                 "anchor_forward_track_eligible": bool(spread_context["forward_track_eligible"]),
                 "anchor_version": ANCHORED_SPREAD_VERSION,
             })
+    # Unpaired markets are useful for tracking but cannot establish a
+    # no-vig price or a defensible market edge.
+    for r in out:
+        if r["devig"] != "PAIRED_PROPORTIONAL":
+            r["bet_status"], r["reason"] = "TRACK", "UNPAIRED_MARKET_NO_DEVIG"
+    # Apply the straight-price cap before selecting a same-game winner.
+    # An expensive moneyline must not suppress an otherwise playable spread.
+    for r in out:
+        if r["american_odds"] < -165 and r["bet_status"] == "BET":
+            r["bet_status"], r["reason"] = "PASS", "STRAIGHT_PRICE_CAP_MINUS_165"
     # Same-game guard: one team-outcome bet (ML or spread) and one total per game.
     for fam in (("MONEYLINE", "SPREAD"), ("TOTAL",)):
         bets = [r for r in out if r["market"] in fam and r["bet_status"] == "BET"]
@@ -161,7 +222,9 @@ ALIASES = {
 
 def _raw(name: str) -> str:
     import re
-    t = re.sub(r"[^a-z0-9() ]", " ", str(name).lower())
+    import unicodedata
+    ascii_name = unicodedata.normalize("NFKD", str(name)).encode("ascii", "ignore").decode("ascii")
+    t = re.sub(r"[^a-z0-9() ]", " ", ascii_name.lower())
     return " ".join(t.split())
 
 
@@ -395,16 +458,40 @@ def anchored_spread_context(home: float, away: float, quotes: list, fit=None):
     }
 
 
-def market_only_rows(board: list, reason: str) -> list:
+def pre_kickoff(start_ts: str, now: datetime) -> bool:
+    """A source-supplied kickoff must be strictly in the future to price pregame.
+
+    Refuse missing, malformed, or timezone-naive kickoff data rather than risk
+    suggesting a wager for a game already underway.
+    """
+    try:
+        kickoff = datetime.fromisoformat(str(start_ts).replace("Z", "+00:00"))
+        return bool(
+            kickoff.tzinfo is not None and kickoff.utcoffset() is not None
+            and now.tzinfo is not None and now.utcoffset() is not None
+            and kickoff.astimezone(timezone.utc) > now.astimezone(timezone.utc)
+        )
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
+def market_only_rows(board: list, reason: str, *, asof: str | None = None) -> list:
     """Card rows when the model's data source (CFBD) is down: de-vigged market only.
 
     model_p is set to the no-vig market price, so edge is 0 and nothing is a bet
     or a lean. Every row is TRACK. This keeps the phone card working (prices,
     fair odds, market-implied scores) instead of posting a traceback.
     """
+    now = (datetime.fromisoformat(asof.replace("Z", "+00:00")) if asof
+           else datetime.now(timezone.utc))
     out = []
     for i, row in enumerate(board):
         row = expand_compact(row)
+        # Market-only fallback has no CFBD kickoff; honor a verified board
+        # timestamp when supplied, and never price started rows.
+        if row.get("start_ts") is not None and not pre_kickoff(row["start_ts"], now):
+            print("SKIPPED CFB_SDV_KICKED_OFF_MARKET_ONLY", row.get("away"), "@", row.get("home"))
+            continue
         quotes = row.get("quotes") or []
         if not quotes:
             continue
@@ -418,6 +505,7 @@ def market_only_rows(board: list, reason: str) -> list:
                 "matchup": matchup,
                 "model_p": r["market_p"],
                 "edge": 0.0,
+                "expected_roi": None,  # no model probability: ROI cannot be estimated
                 "home_mean": round(home, 2) if home == home else home,
                 "away_mean": round(away, 2) if away == away else away,
                 "bet_status": "TRACK",
@@ -435,8 +523,6 @@ def build_rows(board: list, season: int, week: int, asof, fit_path=None):
     from sportsedge.sports.cfb.source import attach_weather, fetch_cfbd_games, fetch_cfbd_weather
 
     key = os.environ.get("CFBD_API_KEY") or os.environ.get("SPORTSEDGE_CFBD_API_KEY") or ""
-    if not key:
-        raise SystemExit("CFB_SDV_CFBD_API_KEY_REQUIRED")
     now = datetime.fromisoformat(asof.replace("Z", "+00:00")) if asof else datetime.now(timezone.utc)
     def count_hits(games_):
         n = 0
@@ -453,9 +539,13 @@ def build_rows(board: list, season: int, week: int, asof, fit_path=None):
     if cache_hit:
         raw_games, snaps = cached
     else:
+        if not key:
+            raise SystemExit("CFB_SDV_CFBD_API_KEY_REQUIRED")
         raw_games = fetch_cfbd_games(season=season, week=week, cfbd_api_key=key)
 
     if count_hits(raw_games) == 0:
+        if not key:
+            raise SystemExit("CFB_SDV_CACHED_WEEK_NO_MATCH_AND_API_KEY_REQUIRED")
         best = (0, week, raw_games)
         for w in range(1, 17):
             if w == week:
@@ -502,11 +592,15 @@ def build_rows(board: list, season: int, week: int, asof, fit_path=None):
         except SystemExit as exc:
             unresolved.append(str(exc))
             continue
+        if not pre_kickoff(game.start_ts, now):
+            unresolved.append(f"CFB_SDV_KICKED_OFF:{game.away_team} @ {game.home_team}:{game.start_ts}")
+            continue
         base = {
             "game_id": game.game_id,
             "home_team": game.home_team,
             "away_team": game.away_team,
             "neutral_site": bool(game.neutral_site),
+            "start_ts": game.start_ts,
             "weather": dict(game.weather or {}),
             "quotes": row.get("quotes") or [],
         }
@@ -561,6 +655,8 @@ def main() -> int:
     ap.add_argument("--season", type=int, required=True)
     ap.add_argument("--week", type=int, required=True)
     ap.add_argument("--asof")
+    ap.add_argument("--sdv-live-dir", type=Path,
+                    default=Path(os.environ.get("CFB_SDV_PUBLIC_LIVE_DIR", "")) if os.environ.get("CFB_SDV_PUBLIC_LIVE_DIR") else None)
     ap.add_argument("--fit", type=Path, default=ROOT / "config/cfb_sdv_prior_current_blend_fit_v1.json")
     ap.add_argument("--output", type=Path, default=Path("artifacts/run_it/cfb_sdv_card.json"))
     args = ap.parse_args()
@@ -593,8 +689,27 @@ def main() -> int:
     model = load_selected_sdv_fit(args.fit)
     results = []
     fallback = None
+    live_source_provenance = None
+    game_rows = None
+    # Prefer native SportsDataverse 2026 assets when a complete, captured
+    # SHA-verified bundle is available; never transform them as CFBD metrics.
+    if args.sdv_live_dir is not None and args.sdv_live_dir.is_dir():
+        try:
+            from sportsedge.sports.cfb.sdv_live_scoring_source import build_live_rows
+            asof_dt = (datetime.fromisoformat(args.asof.replace("Z", "+00:00"))
+                       if args.asof else datetime.now(timezone.utc))
+            game_rows, live_source_provenance = build_live_rows(
+                board, directory=args.sdv_live_dir, now=asof_dt,
+                expand_compact=expand_compact, normalize_name=_n,
+            )
+            print("CFB_SDV_PUBLIC_LIVE_MODEL_ROWS", len(game_rows),
+                  "contract=" + live_source_provenance["source_contract"])
+        except Exception as exc:
+            print("CFB_SDV_PUBLIC_LIVE_UNAVAILABLE",
+                  type(exc).__name__, str(exc)[:180])
     try:
-        game_rows = build_rows(board, args.season, args.week, args.asof, args.fit)
+        if game_rows is None:
+            game_rows = build_rows(board, args.season, args.week, args.asof, args.fit)
     except (Exception, SystemExit) as exc:  # CFBD quota/outage or unresolvable names
         msg = str(exc)
         fallback = ("CFBD_RATE_LIMITED" if "429" in msg else
@@ -604,7 +719,7 @@ def main() -> int:
         print(f"CFB_SDV_MARKET_ONLY model data unavailable ({fallback}: {msg[:160]}); "
               "card shows no-vig market prices and market-implied scores only, 0 bets, 0 leans")
         game_rows = []
-        results = market_only_rows(board, fallback)
+        results = market_only_rows(board, fallback, asof=args.asof)
         if not results:
             raise
     for row in game_rows:
@@ -625,9 +740,11 @@ def main() -> int:
         )
         for r in priced:
             r["matchup"] = f"{row.get('away_team')} @ {row.get('home_team')}"
+            r["start_ts"] = row.get("start_ts")
         results.extend(priced or [{"game_id": row["game_id"], "bet_status": "PASS", "reason": "NO_QUOTES"}])
     payload = {
         "schema": "CFB_SDV_CARD_V2",
+        "scored_at_utc": datetime.now(timezone.utc).isoformat(),
         "family": "PRIOR_CURRENT_BLEND",
         "bakeoff_run": 37093707442,
         "team_score_rmse": TEAM_SCORE_RMSE,
@@ -643,7 +760,9 @@ def main() -> int:
             "historical_evidence_role": "DEVELOPMENT_ONLY_ALREADY_TOUCHED",
             "forward_validated": False,
         },
-        "model_status": "MARKET_ONLY:" + fallback if fallback else "MODEL",
+        "model_status": ("MARKET_ONLY:" + fallback if fallback else
+                         "MODEL_SDV_PUBLIC_LIVE_UNVALIDATED" if live_source_provenance else "MODEL"),
+        "live_source_provenance": live_source_provenance,
         "bets": sum(r.get("bet_status") == "BET" for r in results),
         "leans": sum(r.get("bet_status") == "LEAN" for r in results),
         "results": sorted(results, key=lambda r: -(r.get("edge") or -9)),

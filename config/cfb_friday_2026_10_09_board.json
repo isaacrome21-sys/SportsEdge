@@ -1,0 +1,77 @@
+[
+  {
+    "away": "Florida State",
+    "home": "Louisville",
+    "spread": [
+      4,
+      -110,
+      -110
+    ],
+    "total": [
+      59.5,
+      -112,
+      -108
+    ],
+    "start_ts": "2026-10-09T23:00:00Z"
+  },
+  {
+    "away": "Iowa",
+    "home": "Washington",
+    "spread": [
+      2.5,
+      -102,
+      -118
+    ],
+    "total": [
+      40.5,
+      -118,
+      -102
+    ],
+    "start_ts": "2026-10-10T01:00:00Z"
+  },
+  {
+    "away": "Wyoming",
+    "home": "San Jose State",
+    "spread": [
+      4.5,
+      -115,
+      -105
+    ],
+    "total": [
+      42.5,
+      -108,
+      -112
+    ],
+    "start_ts": "2026-10-10T01:00:00Z"
+  },
+  {
+    "away": "Washington State",
+    "home": "Utah State",
+    "spread": [
+      3.5,
+      -110,
+      -110
+    ],
+    "total": [
+      43.5,
+      -115,
+      -105
+    ],
+    "start_ts": "2026-10-10T01:00:00Z"
+  },
+  {
+    "away": "Iowa State",
+    "home": "BYU",
+    "spread": [
+      11.5,
+      -110,
+      -110
+    ],
+    "total": [
+      46.5,
+      -110,
+      -110
+    ],
+    "start_ts": "2026-10-10T02:15:00Z"
+  }
+]

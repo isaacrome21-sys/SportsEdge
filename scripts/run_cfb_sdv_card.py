@@ -108,8 +108,8 @@ def main() -> int:
                 "away_mean": away,
                 "model_p": p,
                 "edge": edge,
-                "bet_status": "OFFICIAL_BET" if edge > 0 else "BLOCKED",
-                "reason": "EDGE_POSITIVE" if edge > 0 else "NO_EDGE",
+                "bet_status": "BLOCKED",
+                "reason": "LEGACY_UNCALIBRATED_PROBABILITY_NO_BETTING_AUTHORITY",
             })
     payload = {
         "schema": "CFB_SDV_CARD_V1",

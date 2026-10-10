@@ -24,6 +24,27 @@ class BlockedCardTest(unittest.TestCase):
         self.assertEqual(len(bets), 1)
         self.assertTrue(any(r["reason"] == "SAME_GAME_GUARD" for r in rows))
 
+    def test_expected_roi_uses_actual_quote_not_devig_probability(self):
+        rows = card.price_game("g", 28.0, 24.0, [
+            {"market": "MONEYLINE", "side": "HOME", "american_odds": -110},
+            {"market": "MONEYLINE", "side": "AWAY", "american_odds": -110},
+        ], validated={"MONEYLINE"})
+        for row in rows:
+            self.assertAlmostEqual(row["expected_roi"], round(row["model_p"] * (1 + 100 / 110) - 1, 4), delta=0.0002)
+
+    def test_no_lean_when_probability_edge_is_positive_but_roi_negative(self):
+        # A 3-point probability advantage over a 50/50 no-vig market is
+        # still losing at -110 when model probability is only about 53%.
+        rows = card.price_game("g", 25.7, 25.8, [
+            {"market": "TOTAL", "side": "OVER", "line": 50.5, "american_odds": -110},
+            {"market": "TOTAL", "side": "UNDER", "line": 50.5, "american_odds": -110},
+        ], validated={"TOTAL"})
+        over = next(r for r in rows if r["side"] == "OVER")
+        self.assertGreater(over["edge"], 0.02)
+        self.assertLessEqual(over["expected_roi"], 0.0)
+        self.assertEqual(over["bet_status"], "PASS")
+        self.assertEqual(over["reason"], "NONPOSITIVE_EXPECTED_ROI")
+
     def test_paired_devig_sums_to_one(self):
         rows = card.price_game("g", 28.0, 24.0, [
             {"market": "SPREAD", "side": "HOME", "line": -3.5, "american_odds": -110},
@@ -33,12 +54,47 @@ class BlockedCardTest(unittest.TestCase):
         self.assertEqual(rows[0]["devig"], "PAIRED_PROPORTIONAL")
         self.assertAlmostEqual(rows[0]["model_p"] + rows[1]["model_p"], 1.0, places=3)
 
+    def test_duplicate_same_side_quotes_cannot_create_fake_devig(self):
+        rows = card.price_game("g", 32.0, 21.0, [
+            {"market": "TOTAL", "side": "OVER", "line": 50.5, "american_odds": -110},
+            {"market": "TOTAL", "side": "OVER", "line": 50.5, "american_odds": -115},
+        ], validated={"TOTAL"})
+        self.assertTrue(all(r["devig"] == "UNPAIRED_RAW_IMPLIED" for r in rows))
+        self.assertTrue(all(r["bet_status"] == "TRACK" for r in rows))
+        self.assertTrue(all(r["reason"] == "UNPAIRED_MARKET_NO_DEVIG" for r in rows))
+
+    def test_unpaired_moneyline_cannot_emit_bet_or_lean(self):
+        rows = card.price_game("g", 42.0, 14.0, [
+            {"market": "MONEYLINE", "side": "HOME", "american_odds": 150},
+        ], validated={"MONEYLINE"})
+        self.assertEqual(rows[0]["bet_status"], "TRACK")
+        self.assertEqual(rows[0]["reason"], "UNPAIRED_MARKET_NO_DEVIG")
+
+    def test_unpaired_spread_cannot_emit_bet_or_lean(self):
+        rows = card.price_game("g", 34.0, 20.0, [
+            {"market": "SPREAD", "side": "HOME", "line": -6.5, "american_odds": -110},
+        ], validated={"SPREAD"})
+        self.assertEqual(rows[0]["bet_status"], "TRACK")
+        self.assertEqual(rows[0]["reason"], "UNPAIRED_MARKET_NO_DEVIG")
+
+    def test_opposing_total_quotes_still_pair(self):
+        rows = card.price_game("g", 28.0, 24.0, [
+            {"market": "TOTAL", "side": "OVER", "line": 51.5, "american_odds": -110},
+            {"market": "TOTAL", "side": "UNDER", "line": 51.5, "american_odds": -110},
+        ])
+        self.assertTrue(all(r["devig"] == "PAIRED_PROPORTIONAL" for r in rows))
+        self.assertAlmostEqual(sum(r["market_p"] for r in rows), 1.0, places=3)
+
     def test_total_symmetry(self):
         rows = card.price_game("g", 30.0, 22.5, [
             {"market": "TOTAL", "side": "OVER", "line": 52.5, "american_odds": -110},
             {"market": "TOTAL", "side": "UNDER", "line": 52.5, "american_odds": -110},
         ])
         self.assertAlmostEqual(rows[0]["model_p"], 0.5, places=3)
+
+    def test_unicode_accent_team_identity_normalizes_consistently(self):
+        self.assertEqual(card._n("San José State"), card._n("San Jose State"))
+        self.assertEqual(card._n("Hawaiʻi"), card._n("Hawaii"))
 
     def test_compact_expand_and_resolve(self):
         from types import SimpleNamespace as G
@@ -175,6 +231,26 @@ class LiveWeekCacheTest(unittest.TestCase):
         self.assertNotIn("spread", encoded)
         self.assertNotIn("total", encoded)
 
+    def test_build_rows_cache_hit_works_without_api_key(self):
+        game = self._game(weather={"wind_speed": 9.0, "temperature": 60.0})
+        snaps = {
+            team: {"prior": {k: 0.0 for k in card.TEAM_KEYS},
+                   "current": {k: 0.0 for k in card.TEAM_KEYS}}
+            for team in ("Home", "Away")
+        }
+        board = [{"game_id": "g1", "quotes": []}]
+        with patch.dict("os.environ", {}, clear=True), \
+             patch.object(card, "_load_live_week_cache", return_value=([game], snaps)), \
+             patch.object(card, "training_moments", return_value={k: (0.0, 1.0) for k in card.TEAM_KEYS}), \
+             patch.object(card, "moment_match", return_value=[]), \
+             patch("sportsedge.sports.cfb.source.fetch_cfbd_games", side_effect=AssertionError("no fetch")), \
+             patch("sportsedge.sports.cfb.source.fetch_cfbd_weather", side_effect=AssertionError("no weather fetch")), \
+             patch("sportsedge.sports.cfb.candidate_live_source.fetch_cfbd_candidate_metric_snapshots", side_effect=AssertionError("no metric fetch")), \
+             patch("sportsedge.sports.cfb.candidate_live_source.attach_candidate_snapshots_to_game_row", side_effect=lambda base, **_: base):
+            rows = card.build_rows(board, 2026, 6, "2026-10-06T15:00:00Z", fit_path="unused")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["game_id"], "g1")
+
     def test_build_rows_cache_hit_skips_cfbd_fetches(self):
         game = self._game(weather={"wind_speed": 17.0, "temperature": 55.0, "game_indoor": False})
         snaps = {
@@ -218,8 +294,63 @@ class MarketOnlyFallbackTest(unittest.TestCase):
         self.assertEqual(len(rows), 8)
         self.assertTrue(all(r["bet_status"] == "TRACK" and r["edge"] == 0.0 for r in rows))
         self.assertTrue(all(r["model_p"] == r["market_p"] for r in rows))
+        self.assertTrue(all(r["expected_roi"] is None for r in rows))
         self.assertEqual(rows[0]["matchup"], "Michigan @ Minnesota")
 
+
+
+class KickoffCutoffTest(unittest.TestCase):
+    def test_timezone_and_start_boundary(self):
+        now = datetime(2026, 10, 9, 23, 0, tzinfo=timezone.utc)
+        self.assertFalse(card.pre_kickoff("2026-10-09T23:00:00Z", now))
+        self.assertFalse(card.pre_kickoff("2026-10-09T22:59:59+00:00", now))
+        self.assertTrue(card.pre_kickoff("2026-10-10T01:00:00+00:00", now))
+        self.assertFalse(card.pre_kickoff("2026-10-10T01:00:00", now))
+        self.assertFalse(card.pre_kickoff("bad", now))
+
+    def test_market_only_excludes_started_games(self):
+        board = [
+            {"away": "Started", "home": "Host", "start_ts": "2026-10-09T23:00:00Z",
+             "spread": [3.5, -110, -110], "total": [52.5, -110, -110]},
+            {"away": "Future", "home": "Host", "start_ts": "2026-10-10T01:00:00Z",
+             "spread": [3.5, -110, -110], "total": [52.5, -110, -110]},
+        ]
+        rows = card.market_only_rows(board, "CFBD_RATE_LIMITED", asof="2026-10-09T23:15:00Z")
+        self.assertEqual(len(rows), 4)
+        self.assertTrue(all(r["matchup"] == "Future @ Host" for r in rows))
+        self.assertTrue(all(r["bet_status"] == "TRACK" for r in rows))
+
+
+class StraightPriceCapTest(unittest.TestCase):
+    def test_expensive_moneyline_does_not_suppress_playable_spread(self):
+        quotes = [
+            {"market": "MONEYLINE", "side": "HOME", "american_odds": -180},
+            {"market": "MONEYLINE", "side": "AWAY", "american_odds": 150},
+            {"market": "SPREAD", "side": "HOME", "line": -3.5, "american_odds": -110},
+            {"market": "SPREAD", "side": "AWAY", "line": 3.5, "american_odds": -110},
+        ]
+        def probability(market, side, *args):
+            home_p = 0.72 if market == "MONEYLINE" else 0.57
+            return home_p if side == "HOME" else 1.0 - home_p
+        with patch.object(card, "model_prob", side_effect=probability):
+            rows = card.price_game("g", 28, 24, quotes, validated={"MONEYLINE", "SPREAD"})
+        home_ml = next(r for r in rows if r["market"] == "MONEYLINE" and r["side"] == "HOME")
+        home_spread = next(r for r in rows if r["market"] == "SPREAD" and r["side"] == "HOME")
+        self.assertEqual(home_ml["reason"], "STRAIGHT_PRICE_CAP_MINUS_165")
+        self.assertEqual(home_ml["bet_status"], "PASS")
+        self.assertEqual(home_spread["bet_status"], "BET")
+
+    def test_cap_boundary_and_unvalidated_lean(self):
+        for odds in (-165, -166):
+            for validated in ({"MONEYLINE"}, set()):
+                quotes = [
+                    {"market": "MONEYLINE", "side": "HOME", "american_odds": odds},
+                    {"market": "MONEYLINE", "side": "AWAY", "american_odds": 145},
+                ]
+                with patch.object(card, "model_prob", side_effect=[0.68, 0.32]):
+                    rows = card.price_game("g", 28, 24, quotes, validated=validated)
+                expected = ("BET" if validated else "LEAN") if odds == -165 else "PASS"
+                self.assertEqual(rows[0]["bet_status"], expected)
 
 if __name__ == "__main__":
     unittest.main()

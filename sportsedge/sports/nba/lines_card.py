@@ -123,6 +123,9 @@ def _line(tok: str, raw: str) -> float:
         raise NBALinesError(f"NBA_LINE_INVALID:{raw}") from exc
 
 
+_PRICE_RE = re.compile(r"(?<![\w.])[+\-−–]?\d{3,4}(?![\w.])|\beven\b", re.I)
+
+
 def parse_lines(body: str) -> list[Game]:
     if "### Lines" in body:
         body = body.split("### Lines", 1)[1].split("\n### ", 1)[0]
@@ -139,6 +142,8 @@ def parse_lines(body: str) -> list[Game]:
             games.append(cur)
             continue
         if cur is None:
+            if not _PRICE_RE.search(line):
+                continue  # leading free-text note
             raise NBALinesError(f"NBA_MARKET_BEFORE_GAME:{line}")
         parts = line.replace(",", " ").split()
         kind = parts[0].lower()
@@ -154,6 +159,10 @@ def parse_lines(body: str) -> list[Game]:
             if len(parts) != 4:
                 raise NBALinesError(f"NBA_ONE_SIDED_OR_MALFORMED:{line}")
             cur.markets.append(Market("TOTAL", _line(parts[1], line), _american(parts[2], line), _american(parts[3], line), line))
+        elif not _PRICE_RE.search(line):
+            # Free-text note (no American price on the line) -- e.g. "Smoke test only."
+            # Market lines always carry prices, so a mistyped market still fails closed.
+            continue
         else:
             raise NBALinesError(f"NBA_UNRECOGNIZED:{line}")
     if not games:
@@ -260,7 +269,7 @@ def render(games: list[Game], ratings: NBARatings, *, observed: str, results_not
         bm, bt = blended(g, m, t)
         out.append(f"Raw model: {fav} by {abs(m):.1f}, total {t:.1f} "
                    f"(games rated: {g.away} {ratings.games.get(g.away, 0)}, {g.home} {ratings.games.get(g.home, 0)}). "
-                   f"Priced from market-anchored fair: {g.home} {bm:+.1f}, total {bt:.1f}.")
+                   f"Priced from market-anchored fair: {g.home if bm >= 0 else g.away} by {abs(bm):.1f}, total {bt:.1f}.")
         out.append("")
         out.append("| Side | DK | Fair % | No-vig % | Edge | EV | Call |")
         out.append("|---|---|---|---|---|---|---|")
