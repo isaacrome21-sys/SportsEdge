@@ -60,18 +60,45 @@ class ProbationTest(unittest.TestCase):
         p = self.run_with(payload(rows), "NONE")
         self.assertEqual(p["probation"]["count"], 0)
 
-    def test_slate_cap_keeps_top_edges(self):
-        rows = [row(f"G{i} @ H{i}", "SPREAD", "HOME", .02 + i / 100) for i in range(8)]
+    def test_per_market_cap_does_not_let_totals_fill_all_eight_slots(self):
+        rows = ([row(f"Total{i} @ Home{i}", "TOTAL", "UNDER", .30 - i / 100) for i in range(10)]
+                + [row(f"Spread{i} @ Away{i}", "SPREAD", "HOME", .15 - i / 100) for i in range(6)])
         p = self.run_with(payload(rows), "NONE")
-        chosen = sorted(r["edge"] for r in p["results"] if r["probation"])
-        self.assertEqual(len(chosen), 5)
-        self.assertEqual(chosen[0], round(.02 + 3 / 100, 10))
+        chosen = [r for r in p["results"] if r["probation"]]
+        self.assertEqual(len(chosen), 8)
+        self.assertEqual(sum(r["market"] == "TOTAL" for r in chosen), 5)
+        self.assertEqual(sum(r["market"] == "SPREAD" for r in chosen), 3)
+        self.assertEqual(p["probation"]["counts_by_market"]["TOTAL"], 5)
+        self.assertEqual(p["probation"]["max_probation_per_slate"], 8)
+        self.assertEqual(p["probation"]["max_probation_per_market"]["TOTAL"], 5)
+        self.assertTrue(any(r.get("probation_block_reason") == "MARKET_TYPE_CAP" for r in p["results"]))
+        self.assertTrue(all(r["bet_status"] == "LEAN" for r in chosen))
+
+    def test_slate_cap_keeps_top_edges_across_markets(self):
+        rows = ([row(f"Spread{i} @ A{i}", "SPREAD", "HOME", .09 - i / 100) for i in range(4)]
+                + [row(f"Total{i} @ B{i}", "TOTAL", "UNDER", .12 - i / 100) for i in range(4)]
+                + [row(f"Money{i} @ C{i}", "MONEYLINE", "HOME", .04 - i / 100) for i in range(4)])
+        p = self.run_with(payload(rows), "NONE")
+        self.assertEqual(sum(bool(r["probation"]) for r in p["results"]), 8)
         self.assertTrue(any(r.get("probation_block_reason") == "SLATE_CAP" for r in p["results"]))
+        self.assertTrue(all(r.get("stake_units") == .25 for r in p["results"] if r["probation"]))
+        self.assertFalse(p["probation"]["official"])
 
     def test_policy_hash_recorded(self):
         p = self.run_with(payload([]), "NONE")
         self.assertEqual(len(p["probation"]["policy_sha256"]), 64)
-        self.assertEqual(p["probation"]["policy"], "CFB_PROBATION_POLICY_V1")
+        self.assertEqual(p["probation"]["policy"], "CFB_PROBATION_POLICY_V2")
+        import hashlib
+        self.assertEqual(p["probation"]["policy_sha256"], hashlib.sha256(card.PROBATION_POLICY_PATH.read_bytes()).hexdigest())
+
+    def test_v2_keeps_v1_kill_and_promotion_rules(self):
+        import json
+        old = json.loads((ROOT / "config/cfb_probation_policy_v1.json").read_text())
+        new = json.loads((ROOT / "config/cfb_probation_policy_v2.json").read_text())
+        self.assertEqual(new["kill_rule"], old["kill_rule"])
+        self.assertEqual(new["promotion_rule"], old["promotion_rule"])
+        self.assertEqual(new["stake_units"], old["stake_units"])
+        self.assertEqual(new["never"], old["never"])
 
     def test_real_audit_wiring(self):
         rows = []
