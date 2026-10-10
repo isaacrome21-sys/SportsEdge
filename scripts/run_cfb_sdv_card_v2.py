@@ -728,6 +728,9 @@ def apply_probation(payload: dict, policy_path: Path = PROBATION_POLICY_PATH) ->
         "stake_units": float(policy["stake_units"]),
         "slate_total_bias_signal": signal,
         "count": len(chosen),
+        "max_probation_per_slate": slate_cap,
+        "max_probation_per_market": {k: int(v) for k, v in market_caps.items()},
+        "counts_by_market": {k: market_counts.get(k, 0) for k in market_caps},
         "official": False,
         "validated": False,
     }
