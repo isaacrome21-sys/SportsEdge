@@ -171,6 +171,7 @@ def main() -> int:
                 "location_gate_pass": report["location_gate_pass"],
                 "margin": report["summary"]["margin"],
                 "total": report["summary"]["total"],
+                "distribution_diagnostics": report.get("distribution_diagnostics"),
                 "production_registry_consumes_this_artifact": False,
             },
             sort_keys=True,
