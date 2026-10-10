@@ -68,8 +68,8 @@ class ConsensusTest(unittest.TestCase):
 
     def test_disagreement_blocks_shadows(self):
         inp = references()
-        inp["books"][1]["quotes"][0]["american_odds"] = 130
-        inp["books"][1]["quotes"][1]["american_odds"] = -180
+        inp["books"][1]["quotes"][0]["american_odds"] = 190
+        inp["books"][1]["quotes"][1]["american_odds"] = -250
         self.assertEqual(evaluate(card(), inp)["results"][0]["status"],
                          "REFERENCE_DISAGREEMENT")
 
