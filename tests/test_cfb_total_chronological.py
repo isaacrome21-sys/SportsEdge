@@ -74,9 +74,9 @@ class HistoricalCFBTotalResidualTest(unittest.TestCase):
     def test_espn_totals_evaluation_only_parser(self):
         raw = (
             b"game_id,season,over_under,game_spread,odds_source\n"
-            b"4001,2025,44.5,-3.5,ESPN\n"
-            b"4002,2025,,1.5,ESPN\n"
-            b"4003,2025,54.5,0,ESPN\n"
+            b"4001,2025,44.5,-3.5,summary_pickcenter\n"
+            b"4002,2025,,1.5,core_odds_api\n"
+            b"4003,2025,54.5,0,core_odds_api\n"
         )
         parsed=parse_espn_betting_totals(raw,season=2025)
         self.assertEqual(parsed,{"4001":{"total":44.5},"4003":{"total":54.5}})
@@ -90,8 +90,18 @@ class HistoricalCFBTotalResidualTest(unittest.TestCase):
     def test_espn_duplicate_market_rows_fail_closed(self):
         with self.assertRaisesRegex(ValueError,"DUPLICATE_GAME"):
             parse_espn_betting_totals(
-                b"game_id,season,over_under\n1,2025,50\n1,2025,50\n",
+                b"game_id,season,over_under,odds_source\n1,2025,50,summary_pickcenter\n1,2025,50,core_odds_api\n",
                 season=2025)
+
+    def test_provider_default_or_injected_fallback_excluded(self):
+        raw=(
+            b"game_id,season,over_under,odds_source\n"
+            b"1,2025,50,default\n"
+            b"2,2025,44.5,injected\n"
+            b"3,2025,51.5,summary_pickcenter\n"
+        )
+        self.assertEqual(parse_espn_betting_totals(raw,season=2025),
+                         {"3":{"total":51.5}})
 
     def test_never_passes_when_historical_coverage_insufficient(self):
         report=walkforward(sample(2025,20))
