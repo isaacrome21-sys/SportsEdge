@@ -81,6 +81,11 @@ jobs:
           args=(--board-json "$BOARD_JSON" --season "$INPUT_SEASON" --week "$INPUT_WEEK")
           [ -z "$INPUT_ASOF" ] || args+=(--asof "$INPUT_ASOF")
           python scripts/run_cfb_sdv_card_v2.py "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Audit directional total disagreement
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+        run: |
+          python -m unittest tests.test_cfb_sdv_total_bias_audit -v
+          python scripts/audit_cfb_sdv_total_bias.py --card artifacts/run_it/cfb_sdv_card.json --output artifacts/run_it/cfb_sdv_total_bias_audit.json | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Upload captured public source evidence
         if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -94,6 +99,8 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: cfb-sdv-card
-          path: artifacts/run_it/cfb_sdv_card.json
+          path: |
+            artifacts/run_it/cfb_sdv_card.json
+            artifacts/run_it/cfb_sdv_total_bias_audit.json
           if-no-files-found: warn
           retention-days: 14
