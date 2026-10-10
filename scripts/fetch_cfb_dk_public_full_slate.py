@@ -153,6 +153,10 @@ def compile_full_slate(pages, *, captured_at_utc=None, min_eligible_paired=30):
     if len(EXPECTED_MATCHUPS) != 46 or len(set(EXPECTED_MATCHUPS)) != 46:
         raise ValueError("CFB_SCHEDULE_INVENTORY_INVALID")
     captured = captured_at_utc or datetime.now(timezone.utc).isoformat()
+    capture_dt = datetime.fromisoformat(str(captured).replace("Z", "+00:00"))
+    if capture_dt.tzinfo is None or capture_dt.utcoffset() is None:
+        raise ValueError("CFB_PUBLIC_CAPTURE_TIMESTAMP_REQUIRED")
+    capture_dt = capture_dt.astimezone(timezone.utc)
     observed = {}
     for page, html in sorted(pages.items()):
         for row in parse_public_html(html, page=page):
@@ -176,6 +180,7 @@ def compile_full_slate(pages, *, captured_at_utc=None, min_eligible_paired=30):
                   "FCS_NATIVE_MODEL_SNAPSHOT_UNAVAILABLE" if (away, home) in NATIVE_FCS_GAPS else
                   "MISSING_PUBLIC_DK_MATCHUP" if row is None else
                   "CONFLICTING_PUBLIC_PAGE_QUOTES" if row.get("ambiguous_pagination") else
+                  "KICKED_OFF_NO_RETROSPECTIVE_PRICE" if datetime.fromisoformat(row["start_ts"]) <= capture_dt else
                   "MISSING_PAIRED_SPREAD_OR_TOTAL" if not row.get("spread") or not row.get("total") else
                   "PREGAME_UNVERIFIED_PUBLIC_QUOTES")
         item = {"away": away, "home": home, "status": reason,
