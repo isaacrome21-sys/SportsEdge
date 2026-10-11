@@ -174,7 +174,14 @@ class PublicContext:
         return matching[0] if len(matching) == 1 else None
 
     def schedule(self, sport, team, kickoff):
-        url = f"{ESPN}/{LEAGUES[sport]}/teams/{team['id']}/schedule?season={kickoff.year}"
+        # NBA plays a split-year season named for its ending year. Football
+        # postseason in Jan/Feb belongs to the preceding fall's season.
+        season = kickoff.year
+        if sport == "NBA" and kickoff.month >= 9:
+            season += 1
+        elif sport in {"NFL", "CFB"} and kickoff.month <= 2:
+            season -= 1
+        url = f"{ESPN}/{LEAGUES[sport]}/teams/{team['id']}/schedule?season={season}"
         schedule = self.fetch(url) or {}
         completed = []
         for event in schedule.get("events") or []:
