@@ -457,3 +457,91 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+def run_it_market_anchored(
+    quotes: Sequence[Mapping[str, Any]],
+    raw_game_forecasts: Mapping[str, Mapping[str, Any]],
+    *,
+    as_of: datetime | str,
+) -> dict[str, Any]:
+    """Independent NFL game-level residual *research* rail for RUN IT.
+
+    Use only when a market-blind game model supplied raw margin and total.
+    The existing run_it() path accepting externally sourced estimate_p or
+    independently sampled score paths remains unchanged for compatibility.
+    This bridge cannot promote Model_P or make an OFFICIAL recommendation.
+    """
+    from sportsedge.sports.nfl.market_anchored_residual import (
+        ResidualQuoteError, price_game,
+    )
+
+    now = _timestamp(as_of, "AS_OF_INVALID")
+    normalized = [normalize_quote(q) for q in quotes]
+    for q in normalized:
+        _validate_quote_time(q, as_of=now)
+        opposite = find_pair(q, normalized)
+        if opposite is None:
+            raise NflRunItError(f"PAIRED_PRICE_REQUIRED:{_pair_key(q)}")
+        market_no_vig_probability(q, opposite)  # Includes <=30-second two-side skew.
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for q in normalized:
+        grouped.setdefault((q["game_id"], q["book"]), []).append(q)
+    results: list[dict[str, Any]] = []
+    for (game_id, book), group in sorted(grouped.items()):
+        forecast = raw_game_forecasts.get(game_id)
+        if not isinstance(forecast, Mapping):
+            raise NflRunItError(f"RESIDUAL_RAW_GAME_FORECAST_REQUIRED:{game_id}")
+        home, away = group[0]["home"], group[0]["away"]
+        if any(q["home"] != home or q["away"] != away for q in group):
+            raise NflRunItError("RESIDUAL_TEAM_IDENTITY_MISMATCH")
+        markets = []
+        for market in ("spread", "total", "moneyline"):
+            pairs = [q for q in group if q["market"] == market]
+            if not pairs:
+                continue
+            if len(pairs) != 2:
+                raise NflRunItError(f"PAIRED_PRICE_REQUIRED:{market}")
+            if market == "total":
+                first = next((q for q in pairs if q["selection"] == "OVER"), None)
+                second = next((q for q in pairs if q["selection"] == "UNDER"), None)
+            else:
+                first = next((q for q in pairs if q["selection"] == away), None)
+                second = next((q for q in pairs if q["selection"] == home), None)
+            if first is None or second is None:
+                raise NflRunItError(f"PAIRED_PRICE_REQUIRED:{market}")
+            if market == "spread" and (first["line"] is None or second["line"] is None
+                                       or abs(first["line"] + second["line"]) > 1e-9):
+                raise NflRunItError("RESIDUAL_SPREAD_MIRROR_REQUIRED")
+            if market == "total" and (first["line"] is None or second["line"] is None
+                                      or first["line"] != second["line"]):
+                raise NflRunItError("RESIDUAL_TOTAL_MATCH_REQUIRED")
+            markets.append({
+                "market": market,
+                "line": first["line"],
+                "away_or_over_price": first["price_american"],
+                "home_or_under_price": second["price_american"],
+                "quote_retrieved_at": min(first["retrieved_at"], second["retrieved_at"]).isoformat(),
+            })
+        try:
+            priced = price_game({
+                "home": home, "away": away,
+                "commence_time": forecast.get("commence_time"),
+                "markets": markets,
+            }, raw_model_margin=forecast.get("margin"),
+               raw_model_total=forecast.get("total"), as_of=now)
+        except ResidualQuoteError as exc:
+            raise NflRunItError(f"RESIDUAL_RESEARCH_INPUT_BLOCKED:{exc}") from exc
+        results.append({
+            "game_id": game_id, "book": book,
+            "market_anchored_research_prices": priced,
+            "status": "RESEARCH_ONLY", "eligible_as_bet": False,
+            "forward_clv_status": "PENDING",
+        })
+    return {
+        "schema": "NFL_RUN_IT_MARKET_ANCHORED_RESIDUAL_RESEARCH_V1",
+        "sport": "NFL", "games": results,
+        "validated_markets": [], "picks": [],
+        "research_only": True, "promotion_authority": False,
+        "official_authority": False, "staking_authority": False,
+        "devig_method": DEVIG_METHOD, "forward_clv_status": "PENDING",
+    }
