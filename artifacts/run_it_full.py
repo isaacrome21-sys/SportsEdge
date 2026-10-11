@@ -2,8 +2,11 @@
 """Free four-sport research with a truthful per-selection factor checklist.
 
 Game ML/spread/total estimates delegate to the existing UNVALIDATED free_models
-engine. No player-prop pricing is fabricated; unsupported factors do not enter
-the price. All network calls are to existing free ESPN/Open-Meteo endpoints.
+engine. Player/pitcher props call the real research_model_adapters only when
+the required verified history or simulation inputs are present on the row.
+Missing provenance yields an explicit NO_MODEL_OR_MARKET research row — never
+a league-prior probability and never a silent drop. All network calls are to
+existing free ESPN/Open-Meteo endpoints.
 """
 from __future__ import annotations
 import argparse
@@ -14,6 +17,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from artifacts import free_models as engine
+from sportsedge import research_model_adapters as adapters
 
 FIELDS = (
     "team_quality", "injuries", "rest_travel", "home_park", "weather",
@@ -23,6 +27,75 @@ FIELDS = (
 UNWIRED = "NOT_WIRED"
 MISSING = "MISSING_UNVERIFIED"
 HEURISTIC = "HEURISTIC_NOT_VALIDATED"
+
+
+def _is_prop_market(market: str) -> bool:
+    m = str(market or "").upper().strip()
+    m = {"MONEYLINE": "ML", "H2H": "ML", "RUN_LINE": "SPREAD",
+         "GAME_TOTAL": "TOTAL", "TOTALS": "TOTAL"}.get(m, m)
+    return m not in {"ML", "SPREAD", "TOTAL"}
+
+
+def _try_real_adapter(row: dict, now_iso: str) -> dict | None:
+    """Call the real adapter when the required provenance fields are present.
+
+    Returns a research row (PRICED_RESEARCH or NO_MODEL_OR_MARKET) or None if
+    this is a game market that should go through free_models.
+    """
+    market = str(row.get("market") or "").upper().strip()
+    if not _is_prop_market(market):
+        return None
+    sport = str(row.get("sport") or "").upper().strip()
+    game_id = str(row.get("game_id") or row.get("game") or "")
+    player_id = row.get("player_id")
+    side = str(row.get("side") or "").upper().strip()
+    line = row.get("line")
+    home = row.get("home") or row.get("home_team")
+    away = row.get("away") or row.get("away_team")
+    kickoff = row.get("kickoff_utc") or row.get("start_utc")
+    source_as_of = row.get("source_as_of_utc")
+    as_of = row.get("as_of_utc") or now_iso
+
+    # MLB pitcher path
+    if sport == "MLB" and market.startswith("PITCHER_"):
+        features = row.get("features") or {}
+        prior_times = row.get("prior_start_times_utc") or []
+        starter_ok = row.get("starting_pitcher_verified") is True
+        rows = adapters.mlb_pitcher_to_bridge_rows(
+            game_id=game_id, player_id=str(player_id or ""),
+            market=market, side=side, line=line,
+            features=features, prior_start_times_utc=prior_times,
+            source_as_of_utc=str(source_as_of or ""),
+            as_of_utc=str(as_of), kickoff_utc=str(kickoff or ""),
+            starting_pitcher_verified=starter_ok,
+            home_team=str(home or ""), away_team=str(away or ""),
+        )
+        return rows[0] if rows else None
+
+    # NFL/CFB player path
+    if sport in {"NFL", "CFB"} and (market.startswith("PLAYER_") or row.get("stat")):
+        paths = row.get("paths") or []
+        stat = row.get("stat") or market.replace("PLAYER_", "", 1)
+        verified = row.get("market_blind_simulation_verified") is True
+        rows = adapters.football_player_stat_to_bridge_rows(
+            sport=sport, game_id=game_id, player_id=str(player_id or ""),
+            stat=stat, line=line, side=side, paths=paths,
+            source_as_of_utc=str(source_as_of or ""),
+            as_of_utc=str(as_of), kickoff_utc=str(kickoff or ""),
+            home_team=str(home or ""), away_team=str(away or ""),
+            market_blind_simulation_verified=verified,
+        )
+        return rows[0] if rows else None
+
+    # Team / first-inning / other props with no real engine yet
+    return {
+        "sport": sport, "game_id": game_id, "market": market,
+        "selection": side, "player_id": player_id,
+        "status": "NO_MODEL_OR_MARKET",
+        "reason": "NO_REAL_ENGINE_FOR_MARKET_MISSING_VERIFIED_INPUTS",
+        "research_only": True, "official_authority": False,
+        "model_p_authority": False, "staking_authority": False,
+    }
 
 
 def audit_row(source, result):
@@ -36,7 +109,7 @@ def audit_row(source, result):
     has = bool(context) and result.get("status") not in (
         "BLOCKED_INVALID", "BLOCKED_STARTED", "BLOCKED_CONTEXT_UNVERIFIED",
         "BLOCKED_KICKOFF_UNVERIFIED", "BLOCKED_IL_COLLEGE",
-        "BLOCKED_UNPAIRED_ML",
+        "BLOCKED_UNPAIRED_ML", "NO_MODEL_OR_MARKET",
     )
     out = {f: {"status": UNWIRED, "detail": "No independently priced input wired"} for f in FIELDS}
     history = (has and "NO_FETCH_MANUAL_MODE" not in n
@@ -83,23 +156,77 @@ def audit_row(source, result):
     }
     out["sport_specific"] = {"status": "PARTIAL_HEURISTIC" if has else MISSING,
                               "detail": sport_specific.get(sport, "Unsupported sport")}
-    if market not in ("ML", "SPREAD", "TOTAL"):
-        out["player_props"] = {"status": "UNSUPPORTED_NO_PROP_MODEL",
-                               "detail": "Free model cannot price player props or assign reliable EV"}
+    if _is_prop_market(market):
+        status = result.get("status")
+        if status == "PRICED_RESEARCH":
+            out["player_props"] = {
+                "status": "REAL_ENGINE_ADAPTER",
+                "detail": "Priced via research_model_adapters from verified engine inputs",
+            }
+        else:
+            out["player_props"] = {
+                "status": "NO_MODEL_OR_MARKET",
+                "detail": result.get("reason") or "Missing verified player history or simulation paths; no probability assigned",
+            }
     else:
         out["player_props"] = {"status": "NOT_APPLICABLE", "detail": "Game-level market"}
     return out
 
 
 def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
-    card = engine.run(payload, now=now, getter=getter,
-                      auto_context=auto_context, min_ev=min_ev)
     rows = payload if isinstance(payload, list) else payload.get("lines")
     if not isinstance(rows, list):
         raise ValueError("LINES_MUST_BE_LIST")
-    evaluated = card.get("evaluated_rows") or []
-    if len(evaluated) != len(rows):
-        raise ValueError("EVALUATED_ROWS_REQUIRED_TO_AVOID_FALSE_FACTOR_COVERAGE")
+    from datetime import datetime, timezone
+    now_iso = (now or datetime.now(timezone.utc)).isoformat()
+
+    # Split: game markets go through free_models; props go through adapters
+    game_rows = []
+    prop_results = []  # (index, result)
+    for i, row in enumerate(rows):
+        if not isinstance(row, dict):
+            game_rows.append(row)
+            continue
+        adapted = _try_real_adapter(row, now_iso)
+        if adapted is not None:
+            prop_results.append((i, adapted))
+        else:
+            game_rows.append(row)
+
+    # Run free engine only on game markets
+    if game_rows:
+        game_payload = {"lines": game_rows} if isinstance(payload, dict) else game_rows
+        if isinstance(payload, dict):
+            game_payload = dict(payload)
+            game_payload["lines"] = game_rows
+        card = engine.run(game_payload, now=now, getter=getter,
+                          auto_context=auto_context, min_ev=min_ev)
+        game_evaluated = card.get("evaluated_rows") or []
+    else:
+        card = {"evaluated_rows": [], "research_only": True}
+        game_evaluated = []
+
+    # Reassemble full evaluated list in original order
+    evaluated = [None] * len(rows)
+    g_idx = 0
+    for i, row in enumerate(rows):
+        if any(pi == i for pi, _ in prop_results):
+            continue
+        if g_idx < len(game_evaluated):
+            evaluated[i] = game_evaluated[g_idx]
+            g_idx += 1
+    for i, result in prop_results:
+        evaluated[i] = result
+    # Fill any gaps (should not happen)
+    for i, ev in enumerate(evaluated):
+        if ev is None:
+            evaluated[i] = {
+                "status": "NO_MODEL_OR_MARKET",
+                "reason": "INTERNAL_SPLIT_MISMATCH",
+                "research_only": True,
+            }
+    card["evaluated_rows"] = evaluated
+
     default_sport = payload.get("sport") if isinstance(payload, dict) else None
     audit = []
     totals = Counter()
