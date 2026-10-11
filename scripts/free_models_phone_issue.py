@@ -66,6 +66,8 @@ def render_card(card, *, run_url="", intake_at=""):
     if card.get("schema") != "SPORTSEDGE_FREE_RESEARCH_CARD_V1":
         raise IntakeError("INVALID_FREE_RESEARCH_CARD_SCHEMA")
     rows = card.get("edges") or []
+    projections = card.get("independent_candidates") or []
+    watchlist = card.get("independent_watchlist") or []
     summary = card.get("summary") or {}
     counts = summary.get("status_counts") or {}
     lines = [
@@ -77,6 +79,39 @@ def render_card(card, *, run_url="", intake_at=""):
         "",
         f"Run snapshot: {safe(card.get('as_of_utc'))} · Issue last updated: {safe(intake_at)}",
         f"Input rows: {int(summary.get('rows', 0))} · Research candidates at estimated EV ≥ {100*float(card.get('min_ev',0.02)):.1f}%: **{len(rows)}**",
+        "",
+        "**Projection-first research candidates (independent, UNVALIDATED)**",
+        "Same-book DK no-vig is a reference, not independent sharp-market confirmation.",
+        f"Raw model EV ≥ {100*float(card.get('min_ev',0.02)):.1f}% and straight price ≥ −165: **{len(projections)}**",
+        "",
+        "| Game | Selection | DK | Model p | DK no-vig p | Edge (pp) | Raw EV |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for row in projections[:12]:
+        estimate = row["independent_projection"]
+        lines.append(
+            f"| {safe(row['game'])} | **{safe(row['selection'])}** | "
+            f"{fmt_price(row['odds_american'])} | {float(estimate['estimate_p'])*100:.1f}% | "
+            f"{float(estimate['market_no_vig_p'])*100:.1f}% | "
+            f"{float(estimate['edge_vs_dk_no_vig_pp']):+.1f} | "
+            f"{fmt_percent(estimate['ev_per_dollar'])} |"
+        )
+    if not projections:
+        lines.append("| — | No qualifying independent research candidates on this board | — | — | — | — | — |")
+    lines += ["", "**Projection watchlist (not qualifying):**"]
+    for row in watchlist[:8]:
+        estimate = row["independent_projection"]
+        lines.append(
+            f"- {safe(row['game'])} · {safe(row['selection'])}: "
+            f"model {float(estimate['estimate_p'])*100:.1f}%, raw EV "
+            f"{fmt_percent(estimate['ev_per_dollar'])}, "
+            f"pair={safe(estimate.get('paired_market_status'),60)}"
+        )
+    if not watchlist:
+        lines.append("- No additional priced model rows")
+    lines += [
+        "",
+        "**Conservative book-anchored research candidates (15% unfitted residual)**",
         "",
         "| Game | Research selection | DK | Estimate | Estimated EV |",
         "| --- | --- | ---: | ---: | ---: |",
