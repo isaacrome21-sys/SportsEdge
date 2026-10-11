@@ -12,6 +12,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 import json
 import re
+import unicodedata
 
 ROOT = "https://statsapi.mlb.com/api/v1"
 
@@ -31,7 +32,10 @@ def _clock(value, name):
 
 
 def _norm(value):
-    return " ".join(re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).split())
+    # Player names can have MLB accent marks while DK renders ASCII.
+    latin = unicodedata.normalize("NFKD", str(value or ""))
+    folded = "".join(ch for ch in latin if not unicodedata.combining(ch))
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", folded.lower()).split())
 
 
 def _int(value, name):
@@ -115,48 +119,58 @@ class MLBBatterPublicSource:
         if kickoff <= now:
             raise MissingMLBBatterHistory("STARTED_GAME_REQUIRES_VERIFIED_LIVE_PROP_ENGINE")
 
-        # Resolve player ID via people search (public, no odds).
-        search_url = ROOT + "/people/search?" + urlencode({"names": player_name, "sportIds": "1"})
-        search = self._fetch(search_url)
-        people = (search or {}).get("people") or []
-        matches = [p for p in people if _norm(p.get("fullName")) == _norm(player_name)]
-        if len(matches) != 1:
-            raise MissingMLBBatterHistory("PLAYER_NOT_UNIQUELY_RESOLVED_FROM_PUBLIC_SEARCH")
-        ident = _int(matches[0].get("id"), "MLB_BATTER_ID")
-
-        # Independently verify team membership and today's starting batting
-        # order from official game boxscore, never the odds issue. Pre-game
-        # boxscores may legitimately lack a published lineup.
+        # Prefer the official *fixture-specific* boxscore roster over
+        # unrestricted MLB name search. Will Smith and Max Muncy are shared
+        # names; choose an ID only when the verified game's roster makes the
+        # identity unique. This is source identity, never user-claimed status.
         boxscore_url = ROOT + f"/game/{game['gamePk']}/boxscore"
         box = self._fetch(boxscore_url)
-        side = None
-        for spot in ("away", "home"):
-            expected = away if spot == "away" else home
-            team_meta = ((game.get("teams") or {}).get(spot) or {}).get("team") or {}
-            if _norm(team_meta.get("name")) != _norm(expected):
-                raise MissingMLBBatterHistory("GAME_TEAM_MISMATCH")
-        roster_sides = []
-        starter = False
+        lineup_people = []
         if isinstance(box, dict) and isinstance(box.get("teams"), dict):
             for spot in ("away", "home"):
+                expected = away if spot == "away" else home
+                team_meta = ((game.get("teams") or {}).get(spot) or {}).get("team") or {}
+                if _norm(team_meta.get("name")) != _norm(expected):
+                    raise MissingMLBBatterHistory("GAME_TEAM_MISMATCH")
                 players = (box["teams"].get(spot) or {}).get("players") or {}
                 if not isinstance(players, dict):
                     continue
-                selected = players.get("ID" + str(ident))
-                if isinstance(selected, dict):
-                    roster_sides.append(spot)
-                    order = selected.get("battingOrder")
-                    if isinstance(order, str) and order.isdigit() and int(order) >= 100:
-                        starter = True
-        if len(roster_sides) > 1:
-            raise MissingMLBBatterHistory("PLAYER_TEAM_IDENTITY_AMBIGUOUS")
-        if len(roster_sides) == 1:
-            # Verify it is an expected team in this game, not a roster
-            # scrape from a different fixture.
-            side = roster_sides[0]
-        elif box is not None:
-            # Missing in a pregame boxscore is UNKNOWN, not a definite OUT.
-            starter = False
+                for key, player in players.items():
+                    if not isinstance(player, dict):
+                        continue
+                    person = player.get("person") or {}
+                    full = str(person.get("fullName") or "")
+                    if _norm(full) != _norm(player_name):
+                        continue
+                    ident_candidate = _int(person.get("id"), "MLB_BOXSCORE_PLAYER_ID")
+                    if str(key) != "ID" + str(ident_candidate):
+                        raise MissingMLBBatterHistory("BOXSCORE_PLAYER_ID_CONFLICT")
+                    order = player.get("battingOrder")
+                    starting = isinstance(order, str) and order.isdigit() and int(order) >= 100
+                    lineup_people.append((ident_candidate, full, spot, starting))
+        unique_ids = {x[0] for x in lineup_people}
+        if len(unique_ids) > 1:
+            raise MissingMLBBatterHistory("PLAYER_NAME_AMBIGUOUS_IN_VERIFIED_GAME")
+        if len(unique_ids) == 1:
+            ident, resolved_name, _side, starter = lineup_people[0]
+            if len(lineup_people) != 1:
+                raise MissingMLBBatterHistory("PLAYER_DUPLICATE_IN_VERIFIED_GAME")
+            lineup_verified = bool(starter)
+        else:
+            # If MLB hasn't published a roster, allow an unambiguous player
+            # search only for historical research. Lineup stays UNCONFIRMED
+            # even if the owner screenshot asserts otherwise.
+            search_url = ROOT + "/people/search?" + urlencode({
+                "names": player_name, "sportIds": "1"})
+            search = self._fetch(search_url)
+            people = (search or {}).get("people") or []
+            matches = [p for p in people
+                       if isinstance(p, dict) and _norm(p.get("fullName")) == _norm(player_name)]
+            if len(matches) != 1:
+                raise MissingMLBBatterHistory("PLAYER_NOT_UNIQUELY_RESOLVED_FROM_PUBLIC_SEARCH")
+            ident = _int(matches[0].get("id"), "MLB_BATTER_ID")
+            resolved_name = matches[0]["fullName"]
+            lineup_verified = False
 
         season = kickoff.year
         url = ROOT + f"/people/{ident}/stats?" + urlencode({
@@ -212,13 +226,13 @@ class MLBBatterPublicSource:
                  for day, _, _ in latest]
         return {
             "game_id": str(game["gamePk"]), "batter_id": str(ident),
-            "batter_name": matches[0]["fullName"], "home_team": home,
+            "batter_name": resolved_name, "home_team": home,
             "away_team": away,
             "kickoff_utc": kickoff.isoformat(), "source_as_of_utc": now.isoformat(),
             "prior_game_times_utc": dates,
             "features": {"pa_history": [stats for _, _, stats in latest]},
-            "lineup_verified": bool(starter and len(roster_sides) == 1),
-            "lineup_status": ("PUBLIC_BOXSCORE_STARTER_VERIFIED" if starter and len(roster_sides) == 1
+            "lineup_verified": lineup_verified,
+            "lineup_status": ("PUBLIC_BOXSCORE_STARTER_VERIFIED" if lineup_verified
                               else "PUBLIC_BOXSCORE_LINEUP_NOT_VERIFIED"),
             "boxscore_endpoint": boxscore_url,
             "source_endpoint": url,
