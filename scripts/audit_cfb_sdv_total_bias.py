@@ -38,7 +38,7 @@ def audit(payload):
     over_by_matchup = {}
     for row in payload["results"]:
         if (row.get("market") != "TOTAL" or row.get("side") != "OVER" or
-                row.get("devig") != "PAIRED_PROPORTIONAL"):
+                row.get("devig") not in {"PAIRED_POWER_V1", "PAIRED_PROPORTIONAL"}):
             continue
         matchup = str(row.get("matchup") or row.get("game_id") or "")
         if not matchup:
