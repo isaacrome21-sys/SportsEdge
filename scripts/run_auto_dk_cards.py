@@ -84,9 +84,46 @@ def run_nfl(raw, out, now):
         markdown,reason=call(["scripts/render_nfl_myspari_card.py",
                "--engine-output",card,"--snapshot",intake,"--pre-context",
                "--out-dir",md_dir],timeout=60)
-        cards.append({"date":day,"state":"READY","json":str(card),
-                      "md":str(md_dir/"card.md") if markdown else None,
-                      "png":image_card(card,"NFL",out/("nfl_"+day+".png"))})
+        entry={"date":day,"state":"READY","json":str(card),
+               "md":str(md_dir/"card.md") if markdown else None,
+               "png":image_card(card,"NFL",out/("nfl_"+day+".png"))}
+        props=out/("nfl_prop_ticket_"+day+".json")
+        if props.is_file():
+            try:
+                prop_ticket=json.loads(props.read_text(encoding="utf-8"))
+                # Only games with actual paired player offers run the expensive
+                # research sim; the verified game-line card is already written.
+                targeted=[g for g in prop_ticket.get("games") or []
+                          if any(m.get("player") for m in g.get("markets") or [])]
+                if targeted and ok and history.is_file():
+                    prop_ticket["games"]=targeted
+                    targeted_file=out/("nfl_prop_target_"+day+".json")
+                    targeted_file.write_text(json.dumps(prop_ticket,indent=2)+"\n")
+                    prop_card=out/("nfl_prop_research_"+day+".json")
+                    success,why=call(["scripts/run_nfl_unified_lines_card.py",
+                        "--input",targeted_file,"--history",history,
+                        "--output",prop_card,"--n-sims","20000"],timeout=240)
+                    if success and prop_card.is_file():
+                        row=json.loads(prop_card.read_text(encoding="utf-8"))
+                        entry["props"]={"status":"RESEARCH_ONLY",
+                                        "json":str(prop_card),
+                                        "paired_quotes":sum(len([m for m in g.get("markets") or []
+                                            if m.get("player")]) for g in targeted),
+                                        "priced_model_rows":sum(1 for r in row.get("rows") or []
+                                           if r.get("status")=="PRICED"),
+                                        "selected_research_rows":len(row.get("selected_rows") or []),
+                                        "source_status":row.get("source_status")}
+                    else:
+                        entry["props"]={"status":"MODEL_UNAVAILABLE","reason":why[:550]}
+                elif targeted:
+                    entry["props"]={"status":"MODEL_UNAVAILABLE",
+                                    "reason":"PIT_NFLVERSE_HISTORY_REQUIRED"}
+                else:
+                    entry["props"]={"status":"NO_PAIRED_DK_PROPS"}
+            except (OSError,TypeError,ValueError,KeyError) as exc:
+                entry["props"]={"status":"PROP_RESEARCH_INVALID",
+                                "reason":type(exc).__name__}
+        cards.append(entry)
     return {"status":"READY" if any(x["state"]=="READY" for x in cards) else "MODEL_UNAVAILABLE",
             "history":"NFLVERSE" if ok else "MISSING",
             "cards":cards}

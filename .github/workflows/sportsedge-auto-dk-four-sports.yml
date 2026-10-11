@@ -16,6 +16,7 @@ on:
       - 'scripts/run_auto_dk_cards.py'
       - 'scripts/render_auto_dk_phone_summary.py'
       - 'scripts/render_sportsedge_png.py'
+      - 'scripts/collect_nfl_auto_props.py'
       - 'scripts/fallback_nfl_direct_dk.py'
       - '.github/workflows/sportsedge-auto-dk-four-sports.yml'
   pull_request:
@@ -24,6 +25,8 @@ on:
       - 'tests/test_auto_dk_phone_summary.py'
       - 'scripts/render_sportsedge_png.py'
       - 'tests/test_sportsedge_png.py'
+      - 'scripts/collect_nfl_auto_props.py'
+      - 'tests/test_nfl_auto_props.py'
       - 'scripts/fallback_nfl_direct_dk.py'
       - 'tests/test_nfl_direct_fallback.py'
       - 'scripts/collect_auto_dk_four_sports.py'
@@ -59,7 +62,7 @@ jobs:
         run: |
           python -m unittest tests.test_auto_dk_four_sports -v
           python -m pip install --disable-pip-version-check pytest==9.1.1 Pillow==12.3.0
-          python -m pytest -q tests/test_auto_dk_phone_summary.py tests/test_sportsedge_png.py tests/test_nfl_direct_fallback.py
+          python -m pytest -q tests/test_auto_dk_phone_summary.py tests/test_sportsedge_png.py tests/test_nfl_auto_props.py tests/test_nfl_direct_fallback.py
   auto:
     if: github.repository_owner == 'isaacrome21-sys' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -100,12 +103,20 @@ jobs:
           fi
           python scripts/collect_auto_dk_four_sports.py --sports "${requested[@]}" --reserve 76
           cat artifacts/auto_dk/summary.md >> "$GITHUB_STEP_SUMMARY"
-      - name: Free direct DraftKings game-board fallback when API feed is unavailable
+      - name: Free direct DK fallback on empty NFL API board only
         continue-on-error: true
         timeout-minutes: 3
         run: |
           if [ -f artifacts/auto_dk/nfl_odds.json ]; then
             python scripts/fallback_nfl_direct_dk.py --odds-dir artifacts/auto_dk
+          fi
+      - name: Capture paired NFL player props with independent per-event quota guards
+        if: ${{ always() && github.event_name != 'pull_request' }}
+        continue-on-error: true
+        timeout-minutes: 5
+        run: |
+          if [ -f artifacts/auto_dk/nfl_odds.json ]; then
+            python scripts/collect_nfl_auto_props.py --game-odds artifacts/auto_dk/nfl_odds.json --out-dir artifacts/auto_dk_cards --max-games 2
           fi
       - name: Free CFB public pregame capture
         if: env.NFL_ONLY != 'true'

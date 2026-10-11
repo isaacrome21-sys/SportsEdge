@@ -106,9 +106,9 @@ def row_text(r):
     else:
         threshold=f" {float(line):g}"
     label=f"{r.get('matchup') or 'MATCHUP MISSING'} — {market} {r.get('side') or 'SIDE MISSING'}{threshold}"
-    time_label=("DK intake stamp" if r.get("quote_timestamp_source")=="INTAKE_STAMPED"
-                else "DK quote")
-    pit=(f" · kickoff {_ct(r.get('kickoff_utc'))} · {time_label} {_ct(r.get('quote_observed_at'))}"
+    quote_label=("DK intake stamp" if r.get("quote_timestamp_source")=="INTAKE_STAMPED"
+                 else "DK quote")
+    pit=(f" · kickoff {_ct(r.get('kickoff_utc'))} · {quote_label} {_ct(r.get('quote_observed_at'))}"
          if r.get("kickoff_utc") else "")
     return (f"- **{label}** · DK {price(r['price'])} · "
             f"estimate {pct(r['estimate_p'])} · edge {pct(r['edge'],True)} · "
@@ -191,6 +191,38 @@ def render(root: Path, run_url: str, *, as_of_date: str | None = None,
             if not dates:
                 lines.append("No priced NFL candidates on any captured date.")
                 lines.append("")
+            lines.extend(["**NFL player props — research-only paired DK offers**",
+                          "These are not backtest-qualified bets; availability depends on PIT player roles and verified game identity."])
+            found_any=False
+            for item in cards:
+                prop=item.get("props") or {}
+                state=str(prop.get("status") or "NOT_CAPTURED")
+                if state!="RESEARCH_ONLY":
+                    if state not in {"NOT_CAPTURED","NO_PAIRED_DK_PROPS"}:
+                        lines.append(f"- {item.get('date','DATE MISSING')}: {state} · {prop.get('reason') or 'SOURCE_UNAVAILABLE'}")
+                    continue
+                candidate=root/Path(prop.get("json") or "").name
+                if not candidate.is_file():
+                    lines.append("- Missing research artifact (not priced)")
+                    continue
+                prop_card=json.loads(candidate.read_text(encoding="utf-8"))
+                chosen=[r for r in prop_card.get("selected_rows") or [] if
+                        r.get("status")=="PRICED" and
+                        r.get("price_american") is not None and
+                        r.get("estimate_p") is not None and
+                        r.get("ev_per_dollar") is not None and
+                        r.get("edge_probability_points") is not None]
+                chosen.sort(key=lambda r:(-float(r["ev_per_dollar"]),-float(r["edge_probability_points"]),
+                                          str(r.get("player")),str(r.get("market"))))
+                for r in chosen[:4]:
+                    found_any=True
+                    lines.append(f"- {r.get('player') or 'PLAYER MISSING'} {r.get('market') or 'MARKET MISSING'} "
+                        f"{r.get('selection') or 'SIDE MISSING'} {r.get('line') if r.get('line') is not None else 'MISSING'} · "
+                        f"DK {price(r.get('price_american'))} · estimate {pct(r.get('estimate_p'))} · "
+                        f"edge {pct(r.get('edge_probability_points'),True)} · EV {pct(r.get('ev_per_dollar'),True)} · RESEARCH ONLY")
+            if not found_any:
+                lines.append("No supported priced research prop candidates.")
+            lines.append("")
         else:
             for role,title in (("BEST","Best Plays"),("LEAN","Top Leans")):
                 lines.append(f"**{title}**")
