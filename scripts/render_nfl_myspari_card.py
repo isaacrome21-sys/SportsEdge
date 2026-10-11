@@ -113,6 +113,7 @@ NO_MODEL_TEXT = {
     NO_MODEL_INTEGER: "no pick: whole-number line needs a push model",
     NO_MODEL_HISTORY: "no pick: not enough prior games for one team",
     NO_MODEL_MARKET: "no pick: market not modeled",
+    "NO_MODEL:RESIDUAL_RESEARCH_ONLY": "no supported bet: only residual research fair pricing is available",
 }
 
 
@@ -179,6 +180,45 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
     for game in games:
         away, home = str(game.get("away")), str(game.get("home"))
         lines.append(f"### {away} @ {home}")
+        # Research residuals are the only displayed model-derived NFL prices.
+        # Legacy raw Attempt-9 calibrated EV is not printed or ranked.
+        residual = game.get("residual_research")
+        if residual and residual.get("status") == "RESEARCH_ONLY":
+            center = residual["center"]
+            lines.append(
+                f"- Market anchor: total {center['market_total']:g}; "
+                f"residual fair {center['total']:.1f} | "
+                f"home margin market {center['market_margin']:+g}, fair {center['margin']:+.1f} "
+                "(research only; no forward CLV proof)"
+            )
+            if residual.get("forward_track_signal"):
+                candidates=[]
+                for rm in residual.get("markets") or []:
+                    for side in rm.get("sides") or []:
+                        ev=side.get("ev_per_dollar")
+                        edge=side.get("edge_probability_points")
+                        american=side.get("price_american")
+                        if (ev is not None and edge is not None and american is not None
+                                and float(ev) >= .02 and float(edge) > 0
+                                and int(american) >= -165):
+                            selection=side["selection"]
+                            if rm["market"] == "total":
+                                label=f"{selection.title()} {side['line']:g}"
+                            elif rm["market"] == "spread":
+                                label=f"{home if selection == 'home' else away} {side['line']:+g}"
+                            else:
+                                label=f"{home if selection == 'home' else away} ML"
+                            candidates.append((float(ev), label, side))
+                for _, label, side in sorted(candidates,reverse=True)[:4]:
+                    lines.append(
+                        f"- RESIDUAL LEAN (not a bet): {label} @ {fmt_price(side['price_american'])} "
+                        f"· conditional fair {side['conditional_win_probability']*100:.1f}% "
+                        f"· edge {side['edge_probability_points']*100:+.1f} pts vs POWER_V1 "
+                        f"· research EV {side['ev_per_dollar']*100:+.1f}%"
+                    )
+        else:
+            lines.append("- Residual research blocked: " + str(
+                game.get("residual_status") or "NO_PAIRED_FRESH_MARKET_CONTEXT"))
         picks_out: list[str] = []
         other: list[str] = []
         team_totals: list[str] = []
