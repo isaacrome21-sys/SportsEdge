@@ -84,20 +84,21 @@ def render_card(card, *, run_url="", intake_at=""):
         "Same-book DK no-vig is a reference, not independent sharp-market confirmation.",
         f"Raw model EV ≥ {100*float(card.get('min_ev',0.02)):.1f}% and straight price ≥ −165: **{len(projections)}**",
         "",
-        "| Game | Selection | DK | Model p | DK no-vig p | Edge (pp) | Raw EV |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
+        "| Game | Selection | DK | Model p | Model fair | DK no-vig p | Edge (pp) | Raw EV |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for row in projections[:12]:
         estimate = row["independent_projection"]
         lines.append(
             f"| {safe(row['game'])} | **{safe(row['selection'])}** | "
             f"{fmt_price(row['odds_american'])} | {float(estimate['estimate_p'])*100:.1f}% | "
+            f"{fmt_price(estimate['fair_american']) if estimate.get('fair_american') is not None else '—'} | "
             f"{float(estimate['market_no_vig_p'])*100:.1f}% | "
             f"{float(estimate['edge_vs_dk_no_vig_pp']):+.1f} | "
             f"{fmt_percent(estimate['ev_per_dollar'])} |"
         )
     if not projections:
-        lines.append("| — | No qualifying independent research candidates on this board | — | — | — | — | — |")
+        lines.append("| — | No qualifying independent research candidates on this board | — | — | — | — | — | — |")
     lines += ["", "**Projection watchlist (not qualifying):**"]
     for row in watchlist[:8]:
         estimate = row["independent_projection"]
