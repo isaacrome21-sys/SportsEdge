@@ -140,6 +140,7 @@ class PublicContext:
         self.getter = getter or self._live_get
         self.cache = {}
         self.receipts = []
+        self._injury_result_cache = {}
 
     @staticmethod
     def _live_get(url):
@@ -219,35 +220,52 @@ class PublicContext:
                 continue
         return sorted(completed, reverse=True)[:5]
 
+    @staticmethod
+    def _injury_group_id(group):
+        """Match only a documented ESPN team ID, never fuzzy athlete text."""
+        if not isinstance(group, dict):
+            return None
+        nested_team = group.get("team")
+        if isinstance(nested_team, dict) and nested_team.get("id") is not None:
+            return str(nested_team["id"])
+        # ESPN live NFL league feed on 2026-10-11:
+        # injuries: [{displayName: ..., id: <TEAM_ID>, injuries: [...]}].
+        if isinstance(group.get("injuries"), list) and group.get("id") is not None:
+            return str(group["id"])
+        return None
+
     def injury_points(self, sport, team):
-        """Parse ESPN team or league injury groups; unknown is not healthy."""
+        """Verify team-group identity and return cautious heuristic injuries."""
         if sport == "MLB":
             return 0.0, "NOT_APPLICABLE"
-        url = f"{ESPN}/{LEAGUES[sport]}/teams/{team['id']}/injuries"
+        target_id = str(team["id"])
+        key = (sport, target_id)
+        if key in self._injury_result_cache:
+            return self._injury_result_cache[key]
+        url = f"{ESPN}/{LEAGUES[sport]}/teams/{target_id}/injuries"
         data = self.fetch(url)
         candidates = None
         if isinstance(data, dict) and isinstance(data.get("injuries"), list):
             groups = data["injuries"]
-            # Some team reports contain grouped teams, others flat players.
-            if groups and isinstance(groups[0], dict) and "team" in groups[0]:
-                matching = [group for group in groups
-                            if str((group.get("team") or {}).get("id")) == str(team["id"])]
-                if len(matching) == 1 and isinstance(matching[0].get("injuries"), list):
-                    candidates = matching[0]["injuries"]
+            # Single-team payload uses a flat injuries list. A grouped payload
+            # requires exactly one group with matching team ID.
+            grouped = any(isinstance(g, dict) and isinstance(g.get("injuries"), list)
+                          for g in groups)
+            if grouped:
+                matches = [g for g in groups if self._injury_group_id(g) == target_id]
+                if len(matches) == 1:
+                    candidates = matches[0]["injuries"]
             else:
                 candidates = groups
+        league = None
         if candidates is None:
-            # League-wide schema is injuries:[{team:{id},injuries:[...]}].
-            # A team absent from the result stays UNKNOWN, never "no injuries".
             league = self.fetch(f"{ESPN}/{LEAGUES[sport]}/injuries")
             if isinstance(league, dict) and isinstance(league.get("injuries"), list):
-                matching = [group for group in league["injuries"] if isinstance(group, dict)
-                            and str((group.get("team") or {}).get("id")) == str(team["id"])]
-                if len(matching) == 1 and isinstance(matching[0].get("injuries"), list):
-                    candidates = matching[0]["injuries"]
+                matches = [group for group in league["injuries"]
+                           if self._injury_group_id(group) == target_id]
+                if len(matches) == 1:
+                    candidates = matches[0]["injuries"]
         if candidates is None:
-            # Distinguish HTTP 200 from usable injury data. Emit ONLY schema
-            # names, list counts and IDs; never log private account data.
             def _shape(response):
                 if not isinstance(response, dict):
                     return "NOT_OBJECT"
@@ -257,16 +275,16 @@ class PublicContext:
                     return "KEYS=" + keys + ";INJURIES=NOT_LIST"
                 first = groups[0] if groups else {}
                 first_keys = ",".join(sorted(str(k) for k in first)[:8]) if isinstance(first, dict) else "NOT_OBJECT"
-                # Use schema only, no athlete names or raw injury payload.
-                ids = [str((g.get("team") or {}).get("id") or "")[:12]
-                       for g in groups[:6] if isinstance(g, dict)
-                       and isinstance(g.get("team"), dict)]
+                ids = [self._injury_group_id(g) or "" for g in groups[:6]]
                 return f"KEYS={keys};N={len(groups)};FIRST_KEYS={first_keys};SAMPLE_TEAM_IDS={','.join(ids)}"
-            shape = "TEAM[" + _shape(data) + "];LEAGUE[" + _shape(locals().get("league")) + "]"
-            self.receipts.append({"source": f"{ESPN}/{LEAGUES[sport]}/injuries",
-                                  "status": "UNUSABLE_SCHEMA", "reason": shape,
-                                  "team_id": str(team["id"])[:20]})
-            return 0.0, "MISSING_OR_UNRECOGNIZED_SOURCE"
+            self.receipts.append({
+                "source": f"{ESPN}/{LEAGUES[sport]}/injuries",
+                "status": "UNUSABLE_SCHEMA",
+                "reason": "TEAM[" + _shape(data) + "];LEAGUE[" + _shape(league) + "]",
+                "team_id": target_id[:20]})
+            result = (0.0, "MISSING_OR_UNRECOGNIZED_SOURCE")
+            self._injury_result_cache[key] = result
+            return result
         seen = set()
         loss = 0.0
         for row in candidates:
@@ -287,12 +305,18 @@ class PublicContext:
             seen.add(ident)
             position = athlete.get("position") or {}
             position = position.get("abbreviation") if isinstance(position, dict) else position
-            if sport == "NFL" and str(position).upper() == "QB":
-                loss += 1.5
-            else:
-                loss += 0.3 if sport == "NBA" else 0.15
-        return (-round(min(loss, 2.5), 3),
-                f"HEURISTIC_OUT_DOUBTFUL_REPORTED_{len(seen)}_UNKNOWN_COMPLETENESS")
+            loss += 1.5 if sport == "NFL" and str(position).upper() == "QB" else (
+                0.3 if sport == "NBA" else 0.15)
+        self.receipts.append({
+            "source": f"{ESPN}/{LEAGUES[sport]}/injuries",
+            "status": "STRUCTURE_VERIFIED",
+            "team_id": target_id[:20],
+            "injury_rows_reported": len(candidates),
+            "note": "REPORTED_INJURIES_NOT_COMPLETE_ROSTER_HEALTH"})
+        result = (-round(min(loss, 2.5), 3),
+                  f"HEURISTIC_OUT_DOUBTFUL_REPORTED_{len(seen)}_UNKNOWN_COMPLETENESS")
+        self._injury_result_cache[key] = result
+        return result
 
     def fixture(self, sport, away, home, kickoff):
         """Bind competition/venue with BOTH teams and a unique start time."""
