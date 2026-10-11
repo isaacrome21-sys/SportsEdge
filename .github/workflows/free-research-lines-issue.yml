@@ -1,0 +1,61 @@
+name: free-research-lines-issue
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: free-research-lines-issue-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  research-card:
+    if: github.actor == github.repository_owner && startsWith(github.event.issue.title, '[FREE RUN IT]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      PYTHONPATH: .
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Read user-supplied JSON lines, no odds lookup
+        run: |
+          python scripts/free_models_phone_issue.py --mode parse \
+            --event-json "$GITHUB_EVENT_PATH" --output artifacts/free_research_issue/lines.json
+      - name: Run four-sport free public context and research pricing
+        run: |
+          python free_models.py --lines artifacts/free_research_issue/lines.json \
+            --output artifacts/free_research_issue/card.json > /dev/null
+      - name: Render phone card with explicit missing-data explanations
+        run: |
+          python scripts/free_models_phone_issue.py --mode render \
+            --event-json "$GITHUB_EVENT_PATH" --card artifacts/free_research_issue/card.json \
+            --output artifacts/free_research_issue/card.md \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+      - name: Reply to phone issue
+        run: gh issue comment "$ISSUE_NUMBER" --body-file artifacts/free_research_issue/card.md
+      - name: Explain any intake, public-source or model failure
+        if: failure()
+        run: |
+          printf '%s\n' \
+            'SportsEdge FREE RUN IT did not complete. No bet or probability was manufactured.' \
+            'Check that the issue contains exactly one JSON code block with sport, lines, side, market and DK odds.' \
+            'The run log explains the exact error:' \
+            "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            > free_research_failed.md
+          gh issue comment "$ISSUE_NUMBER" --body-file free_research_failed.md
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: free-research-issue-${{ github.event.issue.number }}
+          path: artifacts/free_research_issue/
+          if-no-files-found: warn
+          retention-days: 30

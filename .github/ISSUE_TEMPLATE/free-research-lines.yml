@@ -1,0 +1,27 @@
+name: Free research RUN IT (NFL / CFB / NBA / MLB)
+description: Paste game lines and receive free, unvalidated research probabilities and edge estimates as an issue comment.
+title: "[FREE RUN IT] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Research only.** These estimated edges have not been proved profitable.
+        Paste a JSON object with a `lines` array. For a single sport you can
+        put `sport` at the top. Each market needs a selection and DraftKings odds.
+        Moneylines need `opposite_odds`; game totals/spreads need `line`.
+        A future kickoff can be provided, but public fixture verification is
+        still required. No paid odds APIs will be called.
+
+        Example (replace these illustration-only prices with actual live DK lines):
+
+            {"sport":"NFL","lines":[{"game":"Away Team @ Home Team",
+              "market":"TOTAL","side":"UNDER","line":44.5,"odds":-110}]}
+  - type: textarea
+    id: lines_json
+    attributes:
+      label: Lines (JSON)
+      description: One JSON object with all your games, or an array of line objects with sport on each row.
+      render: json
+      placeholder: '{"sport":"NFL","lines":[{"game":"Away Team @ Home Team","market":"TOTAL","side":"UNDER","line":44.5,"odds":-110}]}'
+    validations:
+      required: true
