@@ -111,6 +111,29 @@ class ResidualMarketResearchTests(unittest.TestCase):
         self.assertFalse(any(row["ev"]==0.9 for row in rows))
         self.assertFalse(any(row["price"] is None for row in rows))
 
+    def test_run_it_research_entry_point_keeps_pairing_and_never_emits_bet(self):
+        from sportsedge.nfl_run_it import run_it_residual_research, NflRunItError
+        def quote(market, selection, line, price):
+            return {"game_id":"2026_05_AWAY_HOME","home":"HOME","away":"AWAY",
+                    "market":market,"selection":selection,"line":line,
+                    "book":"draftkings","retrieved_at":OBS,"price_american":price}
+        quotes=[
+            quote("moneyline","AWAY",None,135),quote("moneyline","HOME",None,-155),
+            quote("spread","AWAY",3.5,-110),quote("spread","HOME",-3.5,-110),
+            quote("total","OVER",44.5,-110),quote("total","UNDER",44.5,-110),
+        ]
+        raw={"2026_05_AWAY_HOME":{"margin":13.5,"total":65.5,"family":"G1_RESEARCH"}}
+        kickoff={"2026_05_AWAY_HOME":KICK}
+        out=run_it_residual_research(quotes,raw,kickoff,as_of=NOW)
+        self.assertEqual(out["validated_markets"],[])
+        self.assertFalse(out["authority"]["official"])
+        self.assertNotIn("picks",out)
+        center=out["games"][0]["research"]["center"]
+        self.assertLess(center["total"],50.0)
+        self.assertGreater(center["total"],44.5)
+        with self.assertRaises(NflRunItError):
+            run_it_residual_research(quotes[:-1],raw,kickoff,as_of=NOW)
+
     def test_no_lookahead_after_kickoff(self):
         with self.assertRaises(NFLResidualError):
             price_game_from_pairs(raw_margin=3.5,raw_total=44.5,
