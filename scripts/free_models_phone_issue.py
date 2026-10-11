@@ -168,12 +168,21 @@ def render_card(card, *, run_url="", intake_at=""):
         lines.append(f"- Row {int(d.get('input_index',0))+1}: {safe(d.get('status'))} · {safe(d.get('reason'),170)}")
     receipts = card.get("source_receipts") or []
     fetched = sum(r.get("status") == "FETCHED_AT_RUNTIME" for r in receipts)
+    public_pitchers = [r for r in receipts
+                       if r.get("status") == "PUBLIC_MLB_PRIOR_STARTS_VERIFIED"]
     missing = sum(r.get("status") == "UNAVAILABLE" for r in receipts)
     malformed = [r for r in receipts if r.get("status") == "UNUSABLE_SCHEMA"]
-    lines += ["", f"Free context: {fetched} retrieved, {missing} unavailable, "
-              f"{len(malformed)} unusable-schema reports. No paid odds calls.",
+    lines += ["", f"Free context: {fetched} ESPN/weather retrievals, "
+              f"{len(public_pitchers)} verified public MLB pitcher-log inputs, "
+              f"{missing} unavailable, {len(malformed)} unusable-schema reports. "
+              "No paid odds calls.",
               "Full model card and source receipts are available in the workflow artifact.",
               f"GitHub Actions run: {safe(run_url, 300)}"]
+    for p in public_pitchers[:8]:
+        lines.append("- Public MLB pitcher ID " + safe(p.get("pitcher_id"),24) +
+                     ": " + safe(p.get("prior_starts"),8) +
+                     " prior starts; starter status " +
+                     safe(p.get("starter"),60))
     for item in malformed[:4]:
         lines.append("- Unusable public injury source for team ID " +
                      safe(item.get("team_id"), 20) + ": " +
