@@ -266,5 +266,68 @@ class AutoModelBridgeTests(unittest.TestCase):
             mlb_auto_snapshot([row],NOW,fetch_schedule=lambda d:schedule,build_bound_input=bad)
 
 
+class AutoMlbPngGuardTests(unittest.TestCase):
+    """The MLB phone PNG never draws from raw engine rows or a NOT FINAL card."""
+
+    RAW_BET={"results":[{"game_id":"A@B","market":"MONEYLINE","side":"AWAY",
+        "american_odds":-240,"model_p":0.75,"bet_status":"BET"}]}
+
+    def _run(self, temp, render_ok, phase):
+        import scripts.run_auto_dk_cards as r
+        out=Path(temp)
+        drawn=[]
+        def fake_call(command,**kwargs):
+            script=str(command[0])
+            if script.endswith("run_manual_mlb_snapshot.py"):
+                target=Path(command[command.index("--output")+1])
+                target.write_text(json.dumps(self.RAW_BET))
+                return True,""
+            if script.endswith("render_mlb_myspari_card.py"):
+                if not render_ok:
+                    return False,"render failed"
+                folder=Path(command[command.index("--out-dir")+1])
+                folder.mkdir(parents=True,exist_ok=True)
+                (folder/"card.md").write_text("card")
+                (folder/"card.json").write_text(json.dumps({"phase":phase,"rows":[]}))
+                return True,""
+            raise AssertionError("unexpected call "+script)
+        saved=(r.call,r.image_card,r.mlb_auto_snapshot)
+        r.call=fake_call
+        r.image_card=lambda card,sport,path:(drawn.append(Path(card)) or "READY")
+        r.mlb_auto_snapshot=lambda games,now:{"rows":[]}
+        try:
+            result=r.run_mlb({"games":[{"slate_ct":"2026-10-11"}]},out,NOW)
+        finally:
+            r.call,r.image_card,r.mlb_auto_snapshot=saved
+        return result["cards"][0]["png"],drawn,out
+
+    def test_pre_context_card_png_is_withheld(self):
+        with TemporaryDirectory() as t:
+            png,drawn,_=self._run(t,True,"PRE_CONTEXT_NOT_FINAL")
+        self.assertEqual(png,"PNG_WITHHELD_PRE_CONTEXT_NOT_FINAL")
+        self.assertEqual(drawn,[])
+
+    def test_failed_guarded_render_never_falls_back_to_raw_engine_json(self):
+        with TemporaryDirectory() as t:
+            png,drawn,_=self._run(t,False,None)
+        self.assertEqual(png,"PNG_WITHHELD_NO_GUARDED_MLB_CARD")
+        self.assertEqual(drawn,[])
+
+    def test_final_card_png_draws_guarded_card_only(self):
+        with TemporaryDirectory() as t:
+            png,drawn,out=self._run(t,True,"CONTEXT_BOUND_CARD")
+            self.assertEqual(png,"READY")
+            self.assertEqual(drawn,[out/"mlb_render"/"card.json"])
+            self.assertNotIn(out/"mlb_auto_card.json",drawn)
+
+    def test_malformed_guarded_card_is_withheld(self):
+        from scripts.run_auto_dk_cards import mlb_png_source
+        with TemporaryDirectory() as t:
+            (Path(t)/"card.json").write_text("{not json")
+            self.assertEqual(mlb_png_source(t,True),(None,"PNG_WITHHELD_NO_GUARDED_MLB_CARD"))
+            (Path(t)/"card.json").write_text(json.dumps({"phase":"CARD"}))
+            self.assertEqual(mlb_png_source(t,True),(None,"PNG_WITHHELD_NO_GUARDED_MLB_CARD"))
+
+
 if __name__=="__main__":
     unittest.main()

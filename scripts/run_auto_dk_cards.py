@@ -25,6 +25,13 @@ from scripts.collect_auto_dk_four_sports import cfb_compact, mlb_line_text, nfl_
 CT=ZoneInfo("America/Chicago")
 ROOT=Path(__file__).resolve().parents[1]
 
+# MLB phone PNG may only draw from the guarded card that render_mlb_myspari_card
+# writes (2% EV floor, -165 cap, pitcher-prop LEAN-max, same-game guard), and
+# only once that card is final. The raw engine JSON is never a PNG source.
+MLB_PNG_FINAL_PHASES=frozenset({"CONTEXT_BOUND_CARD","CARD"})
+MLB_PNG_NO_GUARDED_CARD="PNG_WITHHELD_NO_GUARDED_MLB_CARD"
+MLB_PNG_PRE_CONTEXT="PNG_WITHHELD_PRE_CONTEXT_NOT_FINAL"
+
 
 def call(command, *, timeout=180, env=None):
     try:
@@ -44,6 +51,28 @@ def image_card(card, sport, path):
     ok,details=call(["scripts/render_sportsedge_png.py","--card",card,
                       "--sport",sport,"--output",path],timeout=40)
     return "READY" if ok else "PNG_UNAVAILABLE:"+details[:120]
+
+
+def mlb_png_source(render_dir, rendered_ok):
+    """Return (guarded card path, None) or (None, withheld reason) for the MLB PNG.
+
+    The raw engine output lacks every presentation guard, so a BET row there
+    would be drawn as BEST and MODEL_CANDIDATE rows would vanish. A
+    PRE-CONTEXT render is NOT FINAL: its text card lists no plays, so the PNG
+    must not show BEST/LEAN tiles from it either.
+    """
+    if not rendered_ok:
+        return None,MLB_PNG_NO_GUARDED_CARD
+    path=Path(render_dir)/"card.json"
+    try:
+        payload=json.loads(path.read_text(encoding="utf-8"))
+    except (OSError,ValueError):
+        return None,MLB_PNG_NO_GUARDED_CARD
+    if not isinstance(payload,dict) or not isinstance(payload.get("rows"),list):
+        return None,MLB_PNG_NO_GUARDED_CARD
+    if payload.get("phase") not in MLB_PNG_FINAL_PHASES:
+        return None,MLB_PNG_PRE_CONTEXT
+    return path,None
 
 
 def week_candidate(start: str):
@@ -312,9 +341,11 @@ def run_mlb(raw,out,now):
     md_ok,_=call(["scripts/render_mlb_myspari_card.py",
                   "--engine-output",card,"--snapshot",path,"--pre-context",
                   "--out-dir",md],timeout=45)
+    png_card,withheld=mlb_png_source(md,md_ok)
+    png=image_card(png_card,"MLB",out/"mlb.png") if png_card is not None else withheld
     return {"status":"READY","cards":[{"date":date,"state":"READY","json":str(card),
            "md":str(md/"card.md") if md_ok else None,
-           "png":image_card(card,"MLB",out/"mlb.png")}]}
+           "png":png}]}
 
 
 def main():
