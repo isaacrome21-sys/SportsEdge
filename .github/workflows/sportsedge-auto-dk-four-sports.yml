@@ -11,6 +11,7 @@ on:
     paths:
       - 'scripts/collect_auto_dk_four_sports.py'
       - 'scripts/run_auto_dk_cards.py'
+      - 'scripts/render_auto_dk_phone_summary.py'
       - '.github/workflows/sportsedge-auto-dk-four-sports.yml'
   pull_request:
     paths:
@@ -79,6 +80,9 @@ jobs:
           set -euo pipefail
           if [[ -n "${SELECTED_SPORTS:-}" ]]; then
             read -ra requested <<< "$SELECTED_SPORTS"
+          elif [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            # One follow-up refresh from merged code: protect football priority.
+            requested=(NFL CFB)
           else
             requested=(NFL CFB MLB NBA)
           fi
