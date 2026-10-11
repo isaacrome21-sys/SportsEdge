@@ -59,6 +59,19 @@ def _key(row):
     sport = str(row.get("sport") or "").upper()
     if sport not in SPORTS:
         raise ResearchQuoteError("SPORT_UNSUPPORTED")
+    if sport == "CFB":
+        # Illinois college betting restrictions also apply to player props.
+        # Exact team aliases reuse the central free-model disallow list.
+        from artifacts.free_models import IL_COLLEGE_NAMES
+        home = str(row.get("home_team") or "").strip()
+        away = str(row.get("away_team") or "").strip()
+        if not home or not away:
+            raise ResearchQuoteError("CFB_TEAMS_REQUIRED_FOR_ILLINOIS_FILTER")
+        def normalized(name):
+            return " ".join("".join(c.lower() if c.isalnum() else " "
+                                    for c in name).split())
+        if normalized(home) in IL_COLLEGE_NAMES or normalized(away) in IL_COLLEGE_NAMES:
+            raise ResearchQuoteError("ILLINOIS_COLLEGE_EXCLUDED")
     game = str(row.get("game_id") or "").strip()
     if not game:
         raise ResearchQuoteError("GAME_ID_REQUIRED")
@@ -69,7 +82,7 @@ def _key(row):
     if market not in GAME_MARKETS and not player:
         raise ResearchQuoteError("PROP_PLAYER_ID_REQUIRED")
     line = None if row.get("line") is None else _num(row["line"], "LINE")
-    if market in {"ML", "MONEYLINE", "NRFI", "YRFI"}:
+    if market in {"ML", "MONEYLINE", "F5_ML", "NRFI", "YRFI"}:
         if line is not None:
             raise ResearchQuoteError("LINE_MUST_BE_NULL")
     elif line is None:
