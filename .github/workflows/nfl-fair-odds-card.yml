@@ -1,0 +1,40 @@
+name: nfl-fair-odds-card
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  contents: read
+  issues: write
+
+# Share the paid Odds API serialization group with the frozen 2026 captures.
+concurrency:
+  group: sportsedge-paid-odds-api
+  cancel-in-progress: false
+
+jobs:
+  fair-odds:
+    if: github.actor == github.repository_owner && (contains(github.event.issue.labels.*.name, 'nfl-lines') || startsWith(github.event.issue.title, '[NFL LINES]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ISSUE: ${{ github.event.issue.number }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: DK vs no-vig fair price
+        env:
+          SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+          SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+          SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+          SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python scripts/run_nfl_fair_odds_card.py --out artifacts/nfl_fair_odds.md
+          gh issue comment "$ISSUE" --body-file artifacts/nfl_fair_odds.md
