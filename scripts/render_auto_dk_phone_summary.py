@@ -13,6 +13,21 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 
+def _utc(value):
+    try:
+        t=datetime.fromisoformat(str(value).replace("Z","+00:00"))
+        if t.tzinfo is None or t.utcoffset() is None:
+            return None
+        return t.astimezone(timezone.utc)
+    except (TypeError,ValueError,OverflowError):
+        return None
+
+
+def _ct(value):
+    t=_utc(value)
+    return t.astimezone(ZoneInfo("America/Chicago")).strftime("%a %b %-d %-I:%M %p CT") if t else "MISSING"
+
+
 def pct(value, signed=False):
     if value is None:
         return "MISSING"
@@ -48,6 +63,8 @@ def candidates(sport, payload):
                         "line":r.get("line"),"price":r.get("price_american"),
                         "estimate_p":r.get("estimate_p"),"edge":r.get("edge_probability_points"),
                         "ev":r.get("ev_per_dollar"),"score":r.get("score_0_100"),
+                        "kickoff_utc":game.get("commence_time"),
+                        "quote_observed_at":market.get("quote_retrieved_at"),
                         "reason":r.get("lean_reason") or r.get("reason") or "MISSING"
                     })
     elif sport=="CFB":
@@ -88,15 +105,23 @@ def row_text(r):
     else:
         threshold=f" {float(line):g}"
     label=f"{r.get('matchup') or 'MATCHUP MISSING'} — {market} {r.get('side') or 'SIDE MISSING'}{threshold}"
+    pit=(f" · kickoff {_ct(r.get('kickoff_utc'))} · DK quote {_ct(r.get('quote_observed_at'))}"
+         if r.get("kickoff_utc") else "")
     return (f"- **{label}** · DK {price(r['price'])} · "
             f"estimate {pct(r['estimate_p'])} · edge {pct(r['edge'],True)} · "
-            f"EV {pct(r['ev'],True)} · {str(r['reason'])}")
+            f"EV {pct(r['ev'],True)}{pit} · {str(r['reason'])}")
 
 
-def render(root: Path, run_url: str, *, as_of_date: str | None = None):
-    as_of_date = as_of_date or datetime.now(ZoneInfo("America/Chicago")).date().isoformat()
+def render(root: Path, run_url: str, *, as_of_date: str | None = None,
+           asof: datetime | None = None):
+    now=asof or datetime.now(timezone.utc)
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("PREGAME_SNAPSHOT_REQUIRES_TIMEZONE")
+    now=now.astimezone(timezone.utc)
+    as_of_date = as_of_date or now.astimezone(ZoneInfo("America/Chicago")).date().isoformat()
     summary=json.loads((root/"summary.json").read_text(encoding="utf-8"))
     lines=["## SportsEdge AUTO — ranked NFL / CFB","",
+           f"Snapshot captured {_ct(now.isoformat())}. Not continuously live; game starts invalidate pregame prices.","",
            "Prices: captured DraftKings offers. Probabilities: existing SportsEdge engines.",
            "**EV and edge are model estimates, not a guarantee of profitability.**",""]
     for sport in ("NFL","CFB"):
@@ -121,7 +146,12 @@ def render(root: Path, run_url: str, *, as_of_date: str | None = None):
             if sport=="NFL":
                 for row in found:
                     row["slate_date"]=item.get("date")
-            picked.extend(found)
+                    kickoff=_utc(row.get("kickoff_utc"))
+                    if kickoff is None or kickoff <= now:
+                        continue
+                    picked.append(row)
+            else:
+                picked.extend(found)
         if sport=="CFB":
             lines.append("CFB model still requires out-of-sample validation; candidates are tracking only until then.")
             lines.append(f"Matched SDV games: {sum(int(x.get('priced_rows',0)) for x in cards)} modeled market rows; "
@@ -153,7 +183,7 @@ def render(root: Path, run_url: str, *, as_of_date: str | None = None):
                     if view:
                         lines.extend(row_text(r) for r in view)
                     else:
-                        lines.append("None with supported model pricing." if role=="BEST" else "No modeled leans.")
+                        lines.append("None with supported pregame pricing." if role=="BEST" else "No upcoming modeled leans.")
                     lines.append("")
             if not dates:
                 lines.append("No priced NFL candidates on any captured date.")
