@@ -83,7 +83,7 @@ class NflCardLeanTests(unittest.TestCase):
 
     def test_plus_money_quote_still_prints_with_plus_sign(self):
         _, md = self._run()
-        self.assertIn("u+100", md)
+        self.assertIn("Under 60.5 @ +100", md)
 
     def test_absolute_total_outlier_shrinks_instead_of_large_model_ev(self):
         engine, _ = self._run(total={"market": "total", "line": 20.5, "away_or_over_price": 100,
