@@ -599,6 +599,35 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
     # game-location departures toward the posted market threshold; 15% is an
     # unfitted RESEARCH prior, not a learned edge. Do not move an unknown line.
     raw_margin, raw_total = home_mean-away_mean, home_mean+away_mean
+    # The model's own score means MUST be captured before sportsbook
+    # anchoring. This is a simple unvalidated league/form/injury heuristic,
+    # not a proven independent model or a validated wagering probability.
+    raw_win, raw_push = model_probability(
+        sport, market, side, line, home_mean, away_mean)
+    raw_loss = bounded(1 - raw_win - raw_push, 0, 1)
+    raw_ev = raw_win * (dec - 1) - raw_loss
+    raw_conditional = (raw_win / (raw_win + raw_loss)
+                       if raw_win + raw_loss > 0 else None)
+    raw_fair = None
+    if raw_conditional is not None and 0 < raw_conditional < 1:
+        raw_fair = (-100 * raw_conditional / (1 - raw_conditional)
+                    if raw_conditional >= 0.5
+                    else 100 * (1 - raw_conditional) / raw_conditional)
+    independent = {
+        "family": "FREE_TEAM_SCORE_HEURISTIC_UNVALIDATED",
+        "home_mean": round(home_mean, 3),
+        "away_mean": round(away_mean, 3),
+        "projected_total": round(raw_total, 3),
+        "projected_home_margin": round(raw_margin, 3),
+        "estimate_p": round(raw_win, 6),
+        "loss_p": round(raw_loss, 6),
+        "push_p": round(raw_push, 6),
+        "fair_american": round(raw_fair) if raw_fair is not None else None,
+        "ev_per_dollar": round(raw_ev, 6),
+        "uses_sportsbook_price_in_projection": False,
+        "not_wagering_authority": True,
+        "validated_vs_close": False,
+    }
     anchor = {"status": "MARKET_ANCHORED_UNVALIDATED", "weight": 0.15}
     if market == "TOTAL":
         anchored_total = line + 0.15 * (raw_total-line)
@@ -647,7 +676,9 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
             "edge_over_break_even_pp": round(100 * (win - breakeven), 3),
             "ev_per_dollar": round(ev, 6), "home_mean": round(home_mean, 3),
             "away_mean": round(away_mean, 3), "context": context, "context_notes": notes,
-            "context_quality": "HEURISTIC_UNVALIDATED", "market_anchor": anchor,
+            "context_quality": "HEURISTIC_UNVALIDATED",
+            "independent_projection": independent,
+            "market_anchor": anchor,
             "model_validation": "NOT_PROVEN_VS_CLOSE", "research_only": True,
             "model_p_authority": False, "official_authority": False,
             "staking_authority": False, "sharp_reference_compared": False}
