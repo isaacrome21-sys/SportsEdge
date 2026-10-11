@@ -119,6 +119,10 @@
     "claim_limit": "Repository ancestry proves the evaluation gate was installed before the prereg freeze. Absence of any pre-gate exploratory evaluation is not yet independently proven, so FROZEN_BEFORE_FIRST_EVALUATION is not accepted as a self-authenticating chronology claim."
   },
   "exact_exemptions": {
+    "config/nfl_market_residual_research_v1.json": "EXACT_RESEARCH_ONLY_UNFITTED_NFL_RESIDUAL_PRICING_COEFFICIENTS_NO_FROZEN_MODEL_OR_PROMOTION_AUTHORITY",
+    "sportsedge/sports/nfl/market_residual_research.py": "EXACT_RESEARCH_ONLY_NFL_MARKET_ANCHORED_PRICE_ADAPTER_NO_MODEL_P_PROMOTION_OR_STAKING_AUTHORITY",
+    "sportsedge/sports/nfl/residual_unified_adapter.py": "EXACT_RESEARCH_ONLY_SIDE_CAR_NFL_JOINT_SCORE_INPUT_ADAPTER_FROZEN_UNIFIED_ENGINE_UNCHANGED",
+    "docs/research/nfl_market_residual_pricing_20261011.md": "EXACT_RESEARCH_ONLY_NFL_RESIDUAL_DEVELOPMENT_AND_FORWARD_CLV_BOUNDARY_NOTE_NO_PROMOTION_AUTHORITY",
     "config/freeze_reconciliation_policy_v1.json": "RECONCILIATION_CONTROL_PLANE",
     "config/freeze_reconciliation_registry_v1.json": "RECONCILIATION_CONTROL_PLANE",
     "config/freeze_inventory_policy_v1.json": "RECONCILIATION_CONTROL_PLANE",
