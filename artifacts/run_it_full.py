@@ -14,6 +14,8 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from artifacts import free_models as engine
+from sportsedge.mlb_phone_pitcher_pricing import phone_pitcher_rows, blocked
+from datetime import datetime, timezone
 
 FIELDS = (
     "team_quality", "injuries", "rest_travel", "home_park", "weather",
@@ -84,45 +86,143 @@ def audit_row(source, result):
     out["sport_specific"] = {"status": "PARTIAL_HEURISTIC" if has else MISSING,
                               "detail": sport_specific.get(sport, "Unsupported sport")}
     if market not in ("ML", "SPREAD", "TOTAL"):
-        out["player_props"] = {"status": "UNSUPPORTED_NO_PROP_MODEL",
-                               "detail": "Free model cannot price player props or assign reliable EV"}
+        if result.get("source") == "FREE_MLB_STATSAPI_GAMELOG" and result.get("status") != "NO_MODEL_OR_MARKET":
+            out["player_props"] = {
+                "status": "REAL_PITCHER_HISTORY_MODEL_UNVALIDATED",
+                "detail": "Verified prior MLB StatsAPI pitcher starts priced by the real empirical-Bayes joint engine; scheduled probable starter is not confirmed; not validated vs closes",
+            }
+        else:
+            out["player_props"] = {"status": "NO_MODEL_OR_MARKET",
+                                   "detail": result.get("reason") or "Required real player-level history or simulated paths unavailable; no probability assigned"}
     else:
         out["player_props"] = {"status": "NOT_APPLICABLE", "detail": "Game-level market"}
     return out
 
 
 def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
-    card = engine.run(payload, now=now, getter=getter,
-                      auto_context=auto_context, min_ev=min_ev)
+    """Separate real game and pitcher models, preserving original row order.
+
+    Issues are UNTRUSTED odds intake: NEVER use submitted features,
+    probabilities, starter/participation verification flags or simulation paths.
+    The only trusted pitcher data comes from free public MLB endpoints.
+    """
     rows = payload if isinstance(payload, list) else payload.get("lines")
     if not isinstance(rows, list):
         raise ValueError("LINES_MUST_BE_LIST")
-    evaluated = card.get("evaluated_rows") or []
-    if len(evaluated) != len(rows):
-        raise ValueError("EVALUATED_ROWS_REQUIRED_TO_AVOID_FALSE_FACTOR_COVERAGE")
+    clock = now or datetime.now(timezone.utc)
+    if clock.tzinfo is None or clock.utcoffset() is None:
+        raise ValueError("MODEL_NOW_TIMEZONE_REQUIRED")
     default_sport = payload.get("sport") if isinstance(payload, dict) else None
-    audit = []
-    totals = Counter()
-    for i, (row, result) in enumerate(zip(rows, evaluated)):
-        source = dict(row) if isinstance(row, dict) else {}
+    game_indices, games, prop_indices, props = [], [], [], []
+    for i, raw in enumerate(rows):
+        if not isinstance(raw, dict):
+            raise ValueError("LINE_MUST_BE_OBJECT")
+        line = dict(raw)
+        line["sport"] = str(line.get("sport") or default_sport or "").upper()
+        market = str(line.get("market") or "").upper().strip()
+        market = {"MONEYLINE":"ML","H2H":"ML","RUN_LINE":"SPREAD",
+                  "GAME_TOTAL":"TOTAL","TOTALS":"TOTAL"}.get(market,market)
+        if market in {"ML","SPREAD","TOTAL"}:
+            game_indices.append(i)
+            games.append(line)
+        else:
+            prop_indices.append(i)
+            props.append(line)
+
+    if games:
+        card = engine.run({"lines":games},now=clock,getter=getter,
+                          auto_context=auto_context,min_ev=min_ev)
+        priced_games = card.get("evaluated_rows") or []
+        if len(priced_games) != len(games):
+            raise ValueError("GAME_EVALUATED_ROWS_INCOMPLETE")
+        for local, original in enumerate(game_indices):
+            priced_games[local]["input_index"] = original
+    else:
+        priced_games = []
+        card = {
+            "schema":"SPORTSEDGE_FREE_RESEARCH_CARD_V1",
+            "as_of_utc":clock.astimezone(timezone.utc).isoformat(),
+            "min_ev":min_ev, "edges":[],
+            "independent_candidates":[], "independent_watchlist":[],
+            "diagnostics":[], "source_receipts":[],
+            "summary":{"rows":0,"edges":0,"status_counts":{}},
+            "research_only":True,
+            "authority":{"research_only":True,"official":False,
+                         "model_p":False,"staking":False},
+        }
+    pitcher_pos, pitcher_input = [], []
+    others = {}
+    for local, line in enumerate(props):
+        market = str(line.get("market") or "").upper()
+        if line["sport"] == "MLB" and market.startswith("PITCHER_"):
+            pitcher_pos.append(local)
+            pitcher_input.append(line)
+        else:
+            others[local] = blocked(line,"NO_VERIFIED_MODEL_FOR_THIS_MARKET")
+    pitcher_results, receipts = phone_pitcher_rows(
+        pitcher_input,now=clock,getter=getter if auto_context else (lambda url: None))
+    if len(pitcher_results) != len(pitcher_input):
+        raise ValueError("PITCHER_RESULT_COUNT_MISMATCH")
+    modeled_props = [None]*len(props)
+    for local, result in zip(pitcher_pos,pitcher_results):
+        modeled_props[local] = result
+    for local, result in others.items():
+        modeled_props[local] = result
+    if any(r is None for r in modeled_props):
+        raise ValueError("PROP_RESULT_COUNT_MISMATCH")
+
+    evaluated = [None]*len(rows)
+    for i, result in zip(game_indices,priced_games):
+        evaluated[i] = result
+    for i, result in zip(prop_indices,modeled_props):
+        result["input_index"] = i
+        evaluated[i] = result
+    if any(r is None for r in evaluated):
+        raise ValueError("EVALUATED_ROWS_REQUIRED_TO_AVOID_FALSE_FACTOR_COVERAGE")
+    card["evaluated_rows"] = evaluated
+    card.setdefault("summary",{})
+    card["summary"]["rows"] = len(rows)
+    card["summary"]["status_counts"] = dict(sorted(Counter(
+        r.get("status") or "MISSING_STATUS" for r in evaluated).items()))
+    card["prop_candidates"] = sorted(
+        [r for r in modeled_props if r.get("status")=="RESEARCH_CANDIDATE_NOT_VALIDATED"],
+        key=lambda r:-r["ev_per_dollar"])
+    card["prop_watchlist"] = sorted(
+        [r for r in modeled_props if r.get("status","").startswith("WATCH_")],
+        key=lambda r:-r.get("ev_per_dollar",-1))
+    card["prop_unpriced"] = [r for r in modeled_props if r.get("status")=="NO_MODEL_OR_MARKET"]
+    card["source_receipts"] = list(card.get("source_receipts") or []) + receipts
+    card["prop_model_status"] = {
+        "engine":"MLB_PITCHER_JOINT_EMPIRICAL_BAYES",
+        "free_public_history":True,
+        "model_vs_close_validated":False,
+        "phone_odds_freshness_required":True,
+        "no_generic_player_prior":True,
+        "unsupported_player_markets_blocked":len(card["prop_unpriced"]),
+    }
+
+    audit, totals = [], Counter()
+    for i, (source,result) in enumerate(zip(rows,evaluated)):
+        source = dict(source)
         if not source.get("sport") and default_sport:
             source["sport"] = default_sport
-        factors = audit_row(source, result)
+        factors = audit_row(source,result)
         totals.update(v["status"] for v in factors.values())
-        audit.append({"input_index": i, "status": result.get("status"),
-                      "sport": source.get("sport"), "market": source.get("market"),
-                      "factors": factors})
+        audit.append({"input_index":i, "status":result.get("status"),
+                      "sport":source.get("sport"),"market":source.get("market"),
+                      "factors":factors})
     card["factor_coverage"] = {
-        "schema": "SPORTSEDGE_FACTOR_COVERAGE_V1",
-        "coverage_is_not_validation": True,
-        "by_input_index": audit,
-        "status_counts": dict(sorted(totals.items())),
-        "advanced_metrics": {
-            "statcast": UNWIRED, "next_gen": UNWIRED, "coaching": UNWIRED,
-            "travel": UNWIRED, "player_props": UNWIRED,
+        "schema":"SPORTSEDGE_FACTOR_COVERAGE_V1",
+        "coverage_is_not_validation":True,
+        "by_input_index":audit,
+        "status_counts":dict(sorted(totals.items())),
+        "advanced_metrics":{
+            "statcast":UNWIRED,"next_gen":UNWIRED,"coaching":UNWIRED,
+            "travel":UNWIRED,"player_props":
+            "MLB_PITCHER_PRIOR_STARTS_ONLY_OTHERS_UNWIRED",
         },
     }
-    card["runner"] = "RUN_IT_FULL_FREE_RESEARCH_ONLY_V1"
+    card["runner"]="RUN_IT_FULL_REAL_MLB_PITCHER_PREGAME_V2"
     return card
 
 
