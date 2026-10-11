@@ -1,7 +1,6 @@
 name: Free research RUN IT (NFL / CFB / NBA / MLB)
 description: Paste game lines and receive free, unvalidated research probabilities and edge estimates as an issue comment.
 title: "[FREE RUN IT] "
-labels: ["free-run-it"]
 body:
   - type: markdown
     attributes:
