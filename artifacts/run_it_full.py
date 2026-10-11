@@ -131,6 +131,23 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         market = str(line.get("market") or "").upper().strip()
         market = {"MONEYLINE":"ML","H2H":"ML","RUN_LINE":"SPREAD",
                   "GAME_TOTAL":"TOTAL","TOTALS":"TOTAL"}.get(market,market)
+        if line["sport"] in {"NFL", "CFB"}:
+            market = {
+                "PASS_YARDS":"PLAYER_PASSING_YARDS",
+                "PASSING_YARDS":"PLAYER_PASSING_YARDS",
+                "PASS_TDS":"PLAYER_PASS_TDS",
+                "PASSING_TDS":"PLAYER_PASSING_TDS",
+                "PASS_ATTEMPTS":"PLAYER_PASS_ATTEMPTS",
+                "COMPLETIONS":"PLAYER_COMPLETIONS",
+                "INTERCEPTIONS":"PLAYER_INTERCEPTIONS",
+                "RUSH_YARDS":"PLAYER_RUSHING_YARDS",
+                "RUSHING_YARDS":"PLAYER_RUSHING_YARDS",
+                "RUSH_ATTEMPTS":"PLAYER_RUSH_ATTEMPTS",
+                "RECEIVING_YARDS":"PLAYER_RECEIVING_YARDS",
+                "REC_YARDS":"PLAYER_RECEIVING_YARDS",
+                "RECEPTIONS":"PLAYER_RECEPTIONS",
+            }.get(market,market)
+            line["market"] = market
         if market in {"ML","SPREAD","TOTAL"}:
             game_indices.append(i)
             games.append(line)
