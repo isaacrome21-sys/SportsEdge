@@ -34,7 +34,9 @@ def mock_public(*, lineup=True, past_games=10, pa=4, total_bases=True,
         if path.endswith("/boxscore"):
             return {"teams":{"away":{"players":{
                 ("ID"+ID if include_game else "ID999999"): {
-                    "person":{"id":int(ID)}, **({"battingOrder":"100"} if lineup else {})
+                    "person":{"id":int(ID) if include_game else 999999,
+                              "fullName":player_name if include_game else "Someone Else"},
+                    **({"battingOrder":"100"} if lineup else {})
                 }
             }},"home":{"players":{}}}}
         if "/people/" in path and path.endswith("/stats"):
