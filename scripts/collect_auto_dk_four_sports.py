@@ -289,13 +289,33 @@ def fetch(sport,key,opener=urlopen):
         return value
 
 
-def collect(sports,out_dir,now,reserve,provider_fetch=fetch,quota_probe=probe_quota):
+def discover_active_sports(key, opener=urlopen):
+    """The provider's free /sports listing avoids paid calls during offseasons.
+
+    Return None on failure: the per-sport quota guard remains authoritative.
+    """
+    try:
+        req=Request(API+"/?"+urlencode({"apiKey":key}),
+                    headers={"Accept":"application/json","User-Agent":"SportsEdge-ActiveSports/1"})
+        with opener(req,timeout=20) as response:
+            payload=json.loads(response.read().decode("utf-8"))
+        if not isinstance(payload,list):
+            return None
+        return {str(x["key"]) for x in payload if isinstance(x,dict) and x.get("active") is True and x.get("key")}
+    except (OSError,ValueError,TypeError,KeyError):
+        return None
+
+
+def collect(sports,out_dir,now,reserve,provider_fetch=fetch,quota_probe=probe_quota,active_sports=None):
     """A snapshot per sport. Never send a paid request below existing reserve."""
     out_dir.mkdir(parents=True,exist_ok=True)
     snapshots={}
     keys=configured_keys()
     for sport in sports:
-        quota=quota_probe(keys,minimum_remaining=reserve+CREDIT_COST)
+        active = active_sports is None or SPORTS[sport] in active_sports
+        quota = (quota_probe(keys,minimum_remaining=reserve+CREDIT_COST)
+                 if active else {"state":"BLOCKED","reason":"SPORT_INACTIVE",
+                                 "max_remaining":None,"ready_key_slots":[]})
         record={"sport":sport,"captured_at_utc":now.isoformat(),
                 "source":"THE_ODDS_API_V4","requested_markets":list(MARKETS),
                 "cost_budget_credits":CREDIT_COST,
@@ -349,7 +369,10 @@ def main():
     args=ap.parse_args()
     if args.reserve < DEFAULT_RESERVE:
         raise SystemExit("FROZEN_NFL_CONFIRMATION_RESERVE_CANNOT_DECREASE")
-    snapshots=collect(args.sports,args.out_dir,datetime.now(timezone.utc),args.reserve)
+    keys=configured_keys()
+    active=discover_active_sports(keys[0][1]) if keys else None
+    snapshots=collect(args.sports,args.out_dir,datetime.now(timezone.utc),
+                      args.reserve,active_sports=active)
     print(json.dumps({s:{"status":r["status"],"games":len(r["games"]),
                          "reason":r["reason"]} for s,r in snapshots.items()}))
     return 0
