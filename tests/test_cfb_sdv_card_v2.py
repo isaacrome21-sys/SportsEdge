@@ -51,7 +51,7 @@ class BlockedCardTest(unittest.TestCase):
             {"market": "SPREAD", "side": "AWAY", "line": 3.5, "american_odds": -110},
         ])
         self.assertAlmostEqual(rows[0]["market_p"] + rows[1]["market_p"], 1.0, places=3)
-        self.assertEqual(rows[0]["devig"], "PAIRED_PROPORTIONAL")
+        self.assertEqual(rows[0]["devig"], "PAIRED_POWER_V1")
         self.assertAlmostEqual(rows[0]["model_p"] + rows[1]["model_p"], 1.0, places=3)
 
     def test_duplicate_same_side_quotes_cannot_create_fake_devig(self):
@@ -82,8 +82,37 @@ class BlockedCardTest(unittest.TestCase):
             {"market": "TOTAL", "side": "OVER", "line": 51.5, "american_odds": -110},
             {"market": "TOTAL", "side": "UNDER", "line": 51.5, "american_odds": -110},
         ])
-        self.assertTrue(all(r["devig"] == "PAIRED_PROPORTIONAL" for r in rows))
+        self.assertTrue(all(r["devig"] == "PAIRED_POWER_V1" for r in rows))
         self.assertAlmostEqual(sum(r["market_p"] for r in rows), 1.0, places=3)
+
+    def test_power_v1_differs_from_multiplicative_on_asymmetric_pairs(self):
+        from sports.common.ev_math import devig, american_to_decimal
+        quotes = [
+            {"market": "MONEYLINE", "side": "HOME", "american_odds": -120},
+            {"market": "MONEYLINE", "side": "AWAY", "american_odds": +110},
+        ]
+        rows = card.price_game("g", 27, 24, quotes)
+        expected = devig([american_to_decimal(-120), american_to_decimal(110)])
+        self.assertEqual(rows[0]["devig"], "PAIRED_POWER_V1")
+        self.assertAlmostEqual(rows[0]["market_p"], expected[0], places=4)
+
+    def test_longshot_sensitivity_fails_closed_and_no_derived_market_p(self):
+        rows = card.price_game("g", 27, 24, [
+            {"market": "MONEYLINE", "side": "HOME", "american_odds": -900},
+            {"market": "MONEYLINE", "side": "AWAY", "american_odds": 500},
+        ])
+        self.assertTrue(all(r["bet_status"] == "BLOCKED" for r in rows))
+        self.assertTrue(all(r["reason"] == "DEVIG_METHOD_SENSITIVITY" for r in rows))
+        self.assertTrue(all(r["market_p"] is None and r["edge"] is None for r in rows))
+
+    def test_unpaired_market_is_missing_not_raw_implied_fair(self):
+        rows = card.price_game("g", 27, 24, [
+            {"market": "TOTAL", "side": "OVER", "line": 52.5, "american_odds": -110}
+        ])
+        self.assertEqual(rows[0]["bet_status"], "TRACK")
+        self.assertIsNone(rows[0]["market_p"])
+        self.assertIsNone(rows[0]["edge"])
+        self.assertIsNone(rows[0]["expected_roi"])
 
     def test_total_symmetry(self):
         rows = card.price_game("g", 30.0, 22.5, [
@@ -292,8 +321,8 @@ class MarketOnlyFallbackTest(unittest.TestCase):
             {"away": "A", "home": "B", "ml": [-150, 130]},
         ], "CFBD_RATE_LIMITED")
         self.assertEqual(len(rows), 8)
-        self.assertTrue(all(r["bet_status"] == "TRACK" and r["edge"] == 0.0 for r in rows))
-        self.assertTrue(all(r["model_p"] == r["market_p"] for r in rows))
+        self.assertTrue(all(r["bet_status"] == "TRACK" and r["edge"] is None for r in rows))
+        self.assertTrue(all(r["model_p"] is None and r.get("estimate_p") is None for r in rows))
         self.assertTrue(all(r["expected_roi"] is None for r in rows))
         self.assertEqual(rows[0]["matchup"], "Michigan @ Minnesota")
 
