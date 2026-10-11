@@ -113,6 +113,8 @@ NO_MODEL_TEXT = {
     NO_MODEL_INTEGER: "no pick: whole-number line needs a push model",
     NO_MODEL_HISTORY: "no pick: not enough prior games for one team",
     NO_MODEL_MARKET: "no pick: market not modeled",
+    "NO_MODEL:RESIDUAL_QUOTES_OR_HISTORY_UNAVAILABLE": "no research price: fresh paired lines, future kickoff and prior history required",
+    "NO_MODEL:PAIRED_RESIDUAL_PRICE_UNAVAILABLE": "no research price: both sides and market anchor required",
 }
 
 
@@ -192,7 +194,7 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
             if note == TEAM_TOTAL_NOTE:
                 team_totals.append(f"  - {label}")
                 continue
-            reason = row.get("no_model") or market_eligibility(row.get("market"), row.get("line"))
+            reason = row.get("no_model") if row.get("residual_mode") else (row.get("no_model") or market_eligibility(row.get("market"), row.get("line")))
             if reason:
                 other.append(f"- {label}: {_plain_reason(reason)}")
                 continue
@@ -207,8 +209,8 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
             elif lean:
                 picks_out.append(
                     f"- LEAN (no proven edge, not a bet): {lean['selection']} {lean.get('line', '')} @ {fmt_price(lean['price_american'])}"
-                    f" · model EV {lean.get('ev_per_dollar', 0) * 100:+.1f}%"
-                    f" · edge {lean.get('edge_probability_points', 0) * 100:+.1f} pts vs no-vig"
+                    f" · residual research EV {lean.get('ev_per_dollar', 0) * 100:+.1f}%"
+                    f" · edge {lean.get('edge_probability_points', 0) * 100:+.1f} pts vs paired no-vig"
                 )
             elif row.get("lean_block") == "NO_LEAN:THIN_CALIBRATION":
                 other.append(f"- {label}: no lean (model too far from the line; too few past games to price it)")
@@ -238,7 +240,11 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
             lines += [""] + why
         lines.append("")
     if any(g.get("leans") for g in games):
-        lines.append("Leans: Attempt 9 totals hit 49.7% out of sample vs closing lines (breakeven 52.4%). Track only.")
+        lines.append("Residual pricing: market-anchored research priors (0.15, zero intercept), "
+                     "frozen joint-score grid, paired POWER_V1 no-vig. "
+                     "No historical residual validation or positive forward CLV; track only.")
+    if engine.get("residual_research_policy"):
+        lines.append("Residual adjustments are NOT proven Model_P, OFFICIAL selections, or staking authority.")
     lines.append(both_side_section(engine))
     lines.append(snapshot_marker(engine, observed_at))
     return "\n".join(lines) + "\n"
