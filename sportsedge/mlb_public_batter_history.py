@@ -41,7 +41,7 @@ def _int(value, name):
         n = int(value)
     except (ValueError, TypeError, OverflowError) as exc:
         raise MissingMLBBatterHistory(name + "_INVALID") from exc
-    if n < 0:
+    if n < 0 or str(n) != str(value).strip():
         raise MissingMLBBatterHistory(name + "_INVALID")
     return n
 
@@ -116,7 +116,7 @@ class MLBBatterPublicSource:
             raise MissingMLBBatterHistory("STARTED_GAME_REQUIRES_VERIFIED_LIVE_PROP_ENGINE")
 
         # Resolve player ID via people search (public, no odds).
-        search_url = ROOT + "/people/search?" + urlencode({"names": player_name, "sportId": "1"})
+        search_url = ROOT + "/people/search?" + urlencode({"names": player_name, "sportIds": "1"})
         search = self._fetch(search_url)
         people = (search or {}).get("people") or []
         matches = [p for p in people if _norm(p.get("fullName")) == _norm(player_name)]
@@ -175,7 +175,7 @@ class MLBBatterPublicSource:
         for row in splits:
             try:
                 data_row = row["stat"]
-                pa = _int(data_row.get("plateAppearances", 0), "PLATE_APPEARANCES")
+                pa = _int(data_row["plateAppearances"], "PLATE_APPEARANCES")
                 if pa < 1:
                     continue
                 game_id = _int((row.get("game") or {})["gamePk"], "HISTORY_GAME_PK")
@@ -183,12 +183,12 @@ class MLBBatterPublicSource:
                 if when >= now.date() or when >= kickoff.date():
                     continue
                 stats = {
-                    "hits": _int(data_row.get("hits", 0), "HITS"),
-                    "total_bases": _int(data_row.get("totalBases", 0), "TOTAL_BASES"),
-                    "rbi": _int(data_row.get("rbi", 0), "RBI"),
-                    "runs": _int(data_row.get("runs", 0), "RUNS"),
-                    "home_runs": _int(data_row.get("homeRuns", 0), "HOME_RUNS"),
-                    "stolen_bases": _int(data_row.get("stolenBases", 0), "STOLEN_BASES"),
+                    "hits": _int(data_row["hits"], "HITS"),
+                    "total_bases": _int(data_row["totalBases"], "TOTAL_BASES"),
+                    "rbi": _int(data_row["rbi"], "RBI"),
+                    "runs": _int(data_row["runs"], "RUNS"),
+                    "home_runs": _int(data_row["homeRuns"], "HOME_RUNS"),
+                    "stolen_bases": _int(data_row["stolenBases"], "STOLEN_BASES"),
                     "plate_appearances": pa,
                 }
                 hist.append((when, game_id, stats))
