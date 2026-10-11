@@ -21,6 +21,8 @@ def public_response(url, *, names=True, matching_team=True, games=5,
                 {"homeAway":"home","team":{"id":"14","displayName":home}},
                 {"homeAway":"away","team":{"id":"02","displayName":away}},
             ]}]}]}
+    if path.endswith("/roster"):
+        return None  # Legacy fake source has no team-roster feed; try old team-bound search.
     if path.endswith("/search/v2"):
         return {"results":[{"contents":[{"player":{
             "id":"777","displayName":"Example Receiver",
@@ -141,3 +143,56 @@ def test_kickoff_started_does_not_reuse_pregame_player_history():
         getter=public_response)
     assert len(c["prop_unpriced"])==2
     assert all("STARTED_GAME" in x["reason"] for x in c["prop_unpriced"])
+
+
+def test_football_roster_resolves_exact_player_without_global_search_team_id():
+    for sport in ("NFL", "CFB"):
+        called = []
+        def roster_getter(url):
+            called.append(url)
+            path = urlparse(url).path
+            if path.endswith("/teams/02/roster"):
+                return {"team": {"id": "02"},
+                        "athletes": [{"position": "Wide Receiver", "items": [
+                            {"id": "777", "displayName": "Example Receiver"},
+                            {"id": "888", "displayName": "Other Receiver"},
+                        ]}]}
+            if path.endswith("/teams/14/roster"):
+                return {"team": {"id": "14"}, "athletes": []}
+            if path.endswith("/search/v2"):
+                raise AssertionError("Roster identity should not rely on search")
+            return public_response(url)
+        c = run(sport, getter=roster_getter)
+        assert len(c["prop_watchlist"]) == 2
+        assert not c["prop_unpriced"]
+        assert any("/roster" in url for url in called)
+        assert all("/search/v2" not in url for url in called)
+
+
+def test_same_name_on_both_matchup_rosters_is_ambiguous_not_priced():
+    def duplicated(url):
+        path = urlparse(url).path
+        if path.endswith("/teams/02/roster") or path.endswith("/teams/14/roster"):
+            return {"athletes": [{"items": [{
+                "id": "777" if "/02/" in path else "999",
+                "displayName": "Example Receiver"}]}]}
+        return public_response(url)
+    for sport in ("NFL", "CFB"):
+        c = run(sport, getter=duplicated)
+        assert len(c["prop_unpriced"]) == 2
+        assert "PLAYER_DUPLICATE_MATCHUP_ROSTERS" in c["prop_unpriced"][0]["reason"]
+
+
+def test_roster_claiming_wrong_team_does_not_override_fixture():
+    def wrong_team(url):
+        path = urlparse(url).path
+        if path.endswith("/teams/02/roster"):
+            return {"team": {"id": "02"}, "athletes": [{"items": [{
+                "id": "777", "displayName": "Example Receiver",
+                "team": {"id": "999"}}]}]}
+        if path.endswith("/teams/14/roster"):
+            return {"athletes": []}
+        return public_response(url, matching_team=False)
+    c = run("NFL", getter=wrong_team)
+    assert len(c["prop_unpriced"]) == 2
+    assert "PLAYER_NOT_UNIQUELY_RESOLVED" in c["prop_unpriced"][0]["reason"]
