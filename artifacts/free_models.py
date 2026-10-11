@@ -391,7 +391,7 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
             # --no-fetch remains an explicit manual-only research mode.
             return {"status": "BLOCKED_CONTEXT_UNVERIFIED",
                     "game": f"{away} @ {home}", "sport": sport,
-                    "reason": "FREE_CONTEXT_FIXTURE_NOT_VERIFIED",
+                    "reason": "FREE_CONTEXT_FIXTURE_NOT_VERIFIED:" + ",".join(notes),
                     "context_notes": notes, "research_only": True}
     # Manual values override heuristics, including an explicit zero; reject extremes.
     overrides = row.get("context") or {}
