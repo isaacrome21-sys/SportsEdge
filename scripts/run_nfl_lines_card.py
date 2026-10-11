@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 import json
 
@@ -16,7 +16,7 @@ from sportsedge.nfl_attempt9_live_forecast import (
     recency_features,
 )
 from sportsedge.nfl_run_it_scoring import qualification_role_score
-from sportsedge.sports.nfl.attempt9_model_p import model_probability
+from sportsedge.sports.nfl.market_residual_research import NFLResidualError, price_game_from_pairs
 from sportsedge.truth_gate import american_to_decimal
 
 
@@ -220,114 +220,46 @@ def main() -> int:
     for game in ticket.get("games") or []:
         feat = recency_features(history, home=str(game["home"]), away=str(game["away"]), asof=asof) if history else {"ok": False, "reason": "NO_MODEL:INSUFFICIENT_PRIOR_GAMES"}
         forecast = raw_forecasts(runtime, feat["vector"]) if feat.get("ok") else None
+        # Never publish absolute-model probabilities as actionable NFL edges.
+        # The sole game price path is market-anchored, two-sided, fresh and
+        # research-only; existing raw score forecasts remain context only.
         markets = []
         picks = []
         leans = []
         for raw in game.get("markets") or []:
-            blocked = market_eligibility(raw["market"], raw.get("line"))
-            if blocked:
-                markets.append({**raw, "no_model": blocked})
-                continue
-            if not feat.get("ok"):
-                markets.append({**raw, "no_model": feat["reason"]})
-                continue
-            assert forecast is not None
-            pred = forecast["margin"] if raw["market"] == "spread" else forecast["total"]
-            line = float(raw["line"])
-            home_line = -line if raw["market"] == "spread" else line
-            home_or_over = model_probability(
-                artifact,
-                market=raw["market"],
-                raw_prediction=pred,
-                line=home_line,
-                selection="home" if raw["market"] == "spread" else "over",
-            )
-            away_or_under = model_probability(
-                artifact,
-                market=raw["market"],
-                raw_prediction=pred,
-                line=home_line,
-                selection="away" if raw["market"] == "spread" else "under",
-            )
-            no_vig = devig([
-                american_to_decimal(raw["away_or_over_price"]),
-                american_to_decimal(raw["home_or_under_price"]),
-            ])
-            candidates = [
-                {
-                    "selection": game["away"] if raw["market"] == "spread" else "Over",
-                    "line": line,
-                    "price_american": raw["away_or_over_price"],
-                    "estimate_p": float(away_or_under["model_p"] if raw["market"] == "spread" else home_or_over["model_p"]),
-                    "market_no_vig_p": float(no_vig[0]),
-                },
-                {
-                    "selection": game["home"] if raw["market"] == "spread" else "Under",
-                    "line": -line if raw["market"] == "spread" else line,
-                    "price_american": raw["home_or_under_price"],
-                    "estimate_p": float(home_or_over["model_p"] if raw["market"] == "spread" else away_or_under["model_p"]),
-                    "market_no_vig_p": float(no_vig[1]),
-                },
-            ]
-            # Guards (card-side): the calibrated probability must sit on a block
-            # with real history behind it, and the lean must point the same way
-            # as the projection (no Under when the model total is above the line).
-            raw_home_or_over = float(home_or_over["raw_threshold_probability"])
-            block_weight = _calibration_block_weight(artifact, raw["market"], raw_home_or_over)
-            candidates[0]["projection_agrees"] = (
-                raw_home_or_over < 0.5 if raw["market"] == "spread" else raw_home_or_over > 0.5
-            )
-            candidates[1]["projection_agrees"] = (
-                raw_home_or_over > 0.5 if raw["market"] == "spread" else raw_home_or_over < 0.5
-            )
-            lean_block = None
-            qualified = []
-            for cand in candidates:
-                ev = _ev(cand["estimate_p"], cand["price_american"])
-                if ev < 0.02:
-                    continue
-                if block_weight < MIN_CALIBRATION_BLOCK_WEIGHT:
-                    lean_block = LEAN_BLOCK_THIN
-                    continue
-                if not cand["projection_agrees"]:
-                    lean_block = lean_block or LEAN_BLOCK_DIRECTION
-                    continue
-                cand["ev_per_dollar"] = ev
-                cand["edge_probability_points"] = cand["estimate_p"] - cand["market_no_vig_p"]
-                cand["score_0_100"] = qualification_role_score({
-                    "model_ready": True,
-                    "pit_safe": True,
-                    "role_stable": True,
-                    "usage_supported": False,
-                    "matchup_supported": True,
-                    "injury_context_ready": False,
-                    "shared_simulation_ready": False,
-                    "market_binding_ready": True,
-                })
-                qualified.append(cand)
-            pick = max(qualified, key=lambda c: (c["ev_per_dollar"], c["edge_probability_points"])) if qualified else None
-            if raw["market"] in BET_PROVEN_MARKETS:
-                row = {**raw, "no_model": None, "pick": pick, "lean": None}
-                if pick:
-                    picks.append(pick)
-            else:
-                if pick:
-                    pick = {**pick, "lean_only": True, "lean_reason": LEAN_REASON.get(raw["market"], DEFAULT_LEAN_REASON)}
-                    leans.append(pick)
-                row = {**raw, "no_model": None, "pick": None, "lean": pick}
-            if not pick and lean_block:
-                row["lean_block"] = lean_block
-            markets.append(row)
+            markets.append({**raw,
+                            "no_model": "NO_MODEL:RESIDUAL_RESEARCH_ONLY"
+                            if raw.get("market") in {"moneyline","spread","total"}
+                            else (market_eligibility(raw["market"],raw.get("line"))
+                                  or "NO_MODEL:MARKET_NOT_ON_RESIDUAL_CARD"),
+                            "pick":None, "lean":None})
+        research = None
+        residual_error = "NO_MODEL:INSUFFICIENT_PRIOR_GAMES"
+        if feat.get("ok") and forecast is not None:
+            try:
+                research = price_game_from_pairs(
+                    raw_margin=forecast["margin"],raw_total=forecast["total"],
+                    markets=game.get("markets") or [],
+                    observed_at=ticket.get("observed_at"),
+                    as_of=datetime.now(timezone.utc),
+                    kickoff_at=game.get("commence_time"),
+                    model_family="ATTEMPT9_RAW",
+                )
+                residual_error = None
+            except (NFLResidualError, ValueError, TypeError, KeyError) as exc:
+                residual_error = "NO_MODEL:RESIDUAL_" + str(exc)[:150]
         context = game_context(game, history, asof, feat, forecast)
-        games_out.append({**game, "markets": markets, "picks": picks, "leans": leans, "features": feat, "context": context})
+        games_out.append({**game, "markets":markets, "picks":picks, "leans":leans,
+                          "features":feat, "context":context,
+                          "residual_research":research,
+                          "residual_status":residual_error or "RESEARCH_ONLY"})
     payload = {
         "sport": "NFL",
         "context_bound": False,
         "games": games_out,
         "bet_proven_markets": sorted(BET_PROVEN_MARKETS),
         "empty_reason": None if any(g["picks"] for g in games_out) else (
-            "No bets: no NFL market on this card has beaten breakeven out of sample yet. "
-            "Leans are tracking-only, not bets."
+            "No bets: NFL market-anchored residual prices are research only; forward CLV not yet positive."
         ),
         # Machine-only governance tag; the phone card never prints it.
         "authority_footer": "NOT Model_P / NOT Truth Gate / NOT OFFICIAL",
