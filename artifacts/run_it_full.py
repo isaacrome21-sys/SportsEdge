@@ -39,7 +39,9 @@ def audit_row(source, result):
         "BLOCKED_UNPAIRED_ML",
     )
     out = {f: {"status": UNWIRED, "detail": "No independently priced input wired"} for f in FIELDS}
-    history = has and not any(x in n for x in ("HISTORY_MISSING", "TEAM_IDENTITY_UNMATCHED"))
+    history = (has and "NO_FETCH_MANUAL_MODE" not in n
+               and "HOME_HISTORY_COUNT:" in n and "AWAY_HISTORY_COUNT:" in n
+               and not any(x in n for x in ("HISTORY_MISSING", "TEAM_IDENTITY_UNMATCHED")))
     out["team_quality"] = {"status": HEURISTIC if history else MISSING,
                            "detail": "Bounded prior-five-game scoring-margin proxy" if history else "Missing independently verified two-team history"}
     if sport in ("NFL", "CFB", "NBA"):
@@ -49,7 +51,14 @@ def audit_row(source, result):
                            "Injury data unavailable/unrecognized for at least one team; do not interpret zero as healthy"}
     else:
         out["injuries"]["detail"] = "MLB roster/injury impact is not modeled"
-    out["rest_travel"]["detail"] = "No auto rest, flight distance, timezone or fatigue model; NBA rest_adj manual-only"
+    if has and "HOME_REST_DAYS:" in n and "AWAY_REST_DAYS:" in n:
+        out["rest_travel"] = {
+            "status": "SCHEDULE_REST_OBSERVED_NO_PRICE_EFFECT",
+            "detail": "Last-game-to-kickoff days for both teams verified from completed ESPN schedule; "
+                      "travel/fatigue model and calibrated rest adjustment not wired",
+        }
+    else:
+        out["rest_travel"]["detail"] = "No verified schedule rest for both teams or calibrated travel/fatigue pricing; NBA rest_adj manual-only"
     out["home_park"] = {"status": "LEAGUE_BASELINE_ONLY" if has else MISSING,
                         "detail": "Static home advantage; no verified park-specific coefficients"}
     if sport in ("NFL", "CFB", "MLB"):
