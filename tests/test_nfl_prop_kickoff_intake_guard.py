@@ -63,3 +63,10 @@ def test_multiple_games_bad_second_event_fails_entire_ticket():
     })
     with pytest.raises(UnifiedNflPhoneError, match="QUOTE_KICKOFF_INDEPENDENT_SCHEDULE_MISMATCH"):
         _validate_auto_prop_kickoffs(ticket, SCHEDULE)
+
+
+def test_auto_phone_status_distinguishes_bad_quote_from_model_outage():
+    from scripts.run_auto_dk_cards import _nfl_prop_failure_status
+    assert _nfl_prop_failure_status("QUOTE_KICKOFF_INDEPENDENT_SCHEDULE_MISMATCH:KC@BAL") == "QUOTE_EVENT_REJECTED"
+    assert _nfl_prop_failure_status("quote_kickoff:AWARE_TIMESTAMP_REQUIRED") == "QUOTE_EVENT_REJECTED"
+    assert _nfl_prop_failure_status("PIT_NFLVERSE_HISTORY_REQUIRED") == "MODEL_UNAVAILABLE"
