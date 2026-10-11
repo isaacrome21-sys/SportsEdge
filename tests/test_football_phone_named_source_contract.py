@@ -29,11 +29,24 @@ def public_response(url, *, names=True, matching_team=True, games=5,
             "team":{"id":"02" if matching_team else "999"}
         }}]}]}
     if path.endswith("/gamelog"):
-        return {**({"names":["receivingYards","receptions","rushingYards"]} if names else {}),
-            "events":[{"id":str(401999100+i),
-                "date":f"2026-09-{i+1:02d}T12:00:00Z",
-                "stats":[str(70 if i < 3 else 20),"6","0"]}
-            for i in range(games)]}
+        # Real ESPN gamelog shape (verified live 2026-10-11): top-level
+        # `names` aligns with per-event stat arrays; per-event metadata
+        # (id, gameDate) lives in `events` as a dict keyed by eventId; stat
+        # arrays live under seasonTypes -> categories -> events.
+        payload = {}
+        if names:
+            payload["names"] = ["receivingYards", "receptions", "rushingYards"]
+        events = {}
+        cat_events = []
+        for i in range(games):
+            eid = str(401999100 + i)
+            events[eid] = {"id": eid,
+                           "gameDate": f"2026-09-{i+1:02d}T12:00:00Z"}
+            cat_events.append({"eventId": eid,
+                               "stats": [str(70 if i < 3 else 20), "6", "0"]})
+        payload["events"] = events
+        payload["seasonTypes"] = [{"categories": [{"events": cat_events}]}]
+        return payload
     raise AssertionError("Unexpected public URL "+url)
 
 

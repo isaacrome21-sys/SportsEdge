@@ -127,6 +127,65 @@ class NFLPlayerPublicSource:
             raise MissingNFLHistory("PLAYER_NOT_UNIQUELY_RESOLVED_FROM_ESPN_SEARCH")
         return matches[0]
 
+    def _season_games(self, data, now, kickoff):
+        """Parse one season's gamelog payload into ([(date, id, stats)], invalid).
+
+        Real ESPN gamelog shape (verified live 2026-10-11): top-level
+        `names` aligns with per-event stat arrays; per-event metadata
+        (id, gameDate) lives in `events` as a dict keyed by eventId; stat
+        arrays live under seasonTypes -> categories -> events as
+        {eventId, stats[]}.
+        """
+        names = data.get("names")
+        if (not isinstance(names, list) or not names
+                or not all(isinstance(n, str) and n for n in names)):
+            return [], 1
+        events_meta = data.get("events")
+        if not isinstance(events_meta, dict):
+            return [], 1
+        stat_arrays = {}
+        for season in data.get("seasonTypes") or []:
+            if not isinstance(season, dict):
+                continue
+            for category in season.get("categories") or []:
+                if not isinstance(category, dict):
+                    continue
+                for ev in category.get("events") or []:
+                    if not isinstance(ev, dict):
+                        continue
+                    eid = str(ev.get("eventId") or "")
+                    stats = ev.get("stats")
+                    if eid and isinstance(stats, list) and eid not in stat_arrays:
+                        stat_arrays[eid] = stats
+        hist = []
+        invalid_schema = 0
+        for eid, meta in events_meta.items():
+            if not isinstance(meta, dict):
+                invalid_schema += 1
+                continue
+            stats = stat_arrays.get(str(eid))
+            if not isinstance(stats, list) or len(stats) != len(names):
+                # Names/stat-array misaligned or absent: skip the game rather
+                # than invent values (fail-closed).
+                invalid_schema += 1
+                continue
+            event = {"id": str(eid), "date": meta.get("gameDate"),
+                     "stats": stats}
+            try:
+                event_date = _clock(event.get("date"), "GAMELOG_DATE")
+                if event_date >= now or event_date >= kickoff:
+                    continue
+                event_id = str(event.get("id") or "").strip()
+                if not event_id:
+                    raise MissingNFLHistory("PRIOR_GAME_ID_UNVERIFIED")
+                actual = decode_football_event(data, event)
+                hist.append((event_date, event_id, actual))
+            except (FootballGamelogSchemaError, ValueError, TypeError,
+                    KeyError, MissingNFLHistory):
+                invalid_schema += 1
+                continue
+        return hist, invalid_schema
+
     def prior_games(self, *, away, home, player_name, owner_kickoff,
                     as_of, max_games=12):
         """Return actual prior game box-score stats for a named NFL player."""
@@ -147,32 +206,27 @@ class NFLPlayerPublicSource:
         if not athlete_id:
             raise MissingNFLHistory("ATHLETE_ID_MISSING")
 
-        url = f"{ESPN_GAMELOG}/{athlete_id}/gamelog"
-        data = self._fetch(url)
-        if not isinstance(data, dict):
-            raise MissingNFLHistory("NFL_GAMELOG_UNAVAILABLE")
-
-        # ESPN gamelog returns categories + events with stats arrays.
-        # We extract the most recent completed games before kickoff.
-        events = data.get("events") or []
-        if not isinstance(events, list):
-            raise MissingNFLHistory("ESPN_GAMELOG_EVENTS_NOT_LIST")
+        # A single in-progress season rarely holds 5+ completed games, so
+        # collect across the current and two prior seasons. Every game is
+        # real, verified, same-player history; seasons are tried newest first
+        # and we stop once max_games is reached.
+        season0 = kickoff.year if kickoff.month >= 7 else kickoff.year - 1
         hist = []
         invalid_schema = 0
-        for event in events:
-            try:
-                event_date = _clock(event.get("date"), "GAMELOG_DATE")
-                if event_date >= now or event_date >= kickoff:
-                    continue
-                event_id = str(event.get("id") or "").strip()
-                if not event_id:
-                    raise MissingNFLHistory("PRIOR_GAME_ID_UNVERIFIED")
-                actual = decode_football_event(data, event)
-                hist.append((event_date, event_id, actual))
-            except (FootballGamelogSchemaError, ValueError, TypeError,
-                    KeyError, MissingNFLHistory):
-                invalid_schema += 1
+        fetched_any = False
+        for season in (season0, season0 - 1, season0 - 2):
+            url = f"{ESPN_GAMELOG}/{athlete_id}/gamelog?season={season}"
+            data = self._fetch(url)
+            if not isinstance(data, dict):
                 continue
+            fetched_any = True
+            entries, invalid = self._season_games(data, now, kickoff)
+            hist.extend(entries)
+            invalid_schema += invalid
+            if len(hist) >= max_games:
+                break
+        if not fetched_any:
+            raise MissingNFLHistory("NFL_GAMELOG_UNAVAILABLE")
 
         hist.sort(key=lambda x: x[0], reverse=True)
         latest = []
