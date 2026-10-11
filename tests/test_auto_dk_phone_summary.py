@@ -166,3 +166,55 @@ def test_research_prop_surface_only_displays_real_selected_model_rows():
         assert "EV +11.0%" in result
         assert "Another RB Over" not in result
         assert "RESEARCH ONLY" in result
+
+
+def test_nfl_market_radar_uses_existing_fresh_exact_peer_context_only():
+    """No API calls; no unpaired, two-soft-book, stale or started-game flags."""
+    with TemporaryDirectory() as temp:
+        art=Path(temp)
+        root=art/"auto_dk_cards"
+        quotes=art/"auto_dk"
+        root.mkdir()
+        quotes.mkdir()
+        observed="2026-10-11T17:01:00Z"
+        def row(away,home,start,observed_at,method,books,fair,price=-102):
+            return {"away":away,"home":home,"commence_time":start,
+                "markets":{"totals":{"line":54.5,"over":-118,"under":price,
+                                      "observed_at":observed_at}},
+                "reference":{"totals":{"method":method,"books":books,
+                                        "fair":fair}}}
+        valid=row("DET","ARI","2026-10-11T20:25:00Z",observed,
+                  "PINNACLE_POWER_V1",["pinnacle"],[.46,.54])
+        invalid_two=row("SF","SEA","2026-10-11T20:25:00Z",observed,
+                  "MULTIBOOK_MEDIAN_POWER_V1",["betmgm","fanduel"],[.46,.54])
+        expired=row("BUF","LAR","2026-10-12T00:00:00Z","2026-10-11T16:30:00Z",
+                  "PINNACLE_POWER_V1",["pinnacle"],[.46,.54])
+        started=row("PHI","JAX","2026-10-11T13:30:00Z",observed,
+                  "PINNACLE_POWER_V1",["pinnacle"],[.46,.54])
+        (quotes/"nfl_odds.json").write_text(json.dumps({
+            "status":"READY","games":[valid,invalid_two,expired,started]}))
+        scan,err=card.nfl_market_price_radar(root,datetime(2026,10,11,17,2,tzinfo=timezone.utc))
+        assert err is None
+        assert len(scan)==1
+        assert scan[0]["matchup"]=="DET @ ARI"
+        assert scan[0]["selection"]=="Under 54.5"
+        assert scan[0]["price"]==-102
+        assert 0.06 < scan[0]["ev"] < 0.07
+
+
+def test_nfl_market_radar_rejects_failing_price_and_requires_three_peers():
+    with TemporaryDirectory() as temp:
+        root=Path(temp)/"auto_dk_cards"
+        q=root.parent/"auto_dk"
+        root.mkdir()
+        q.mkdir()
+        (q/"nfl_odds.json").write_text(json.dumps({"status":"READY","games":[{
+            "away":"DET","home":"ARI","commence_time":"2026-10-11T20:25:00Z",
+            "markets":{"totals":{"line":54.5,"over":-102,"under":-200,
+                "observed_at":"2026-10-11T17:01:00Z"}},
+            "reference":{"totals":{"method":"MULTIBOOK_MEDIAN_POWER_V1",
+                "books":["fanduel","betmgm","betrivers"],"fair":[0.5,0.5]}}
+        }]}))
+        scan,err=card.nfl_market_price_radar(root,datetime(2026,10,11,17,2,tzinfo=timezone.utc))
+        assert err is None
+        assert scan==[]  # -200 cap and negative price EV
