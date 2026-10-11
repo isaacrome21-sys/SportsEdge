@@ -67,11 +67,22 @@ jobs:
           p = Path("artifacts/run_it/cfb_sdv_card.json")
           if p.exists():
               card = json.loads(p.read_text())
-              rows = [r for r in card["results"] if "edge" in r]
+              rows = list(card.get("results") or [])
+              def fmt_prob(p, *, signed=False):
+                  if p is None:
+                      return "MISSING"
+                  return f"{float(p)*100:+.1f}%" if signed else f"{float(p)*100:.1f}%"
               def fmt(r):
-                  ln = "" if r["line"] in (None, "") else (f" {r['line']:+g}" if r["market"] == "SPREAD" else f" {r['line']:g}")
-                  return (f"| {r['matchup']} | {r['market'].title()} {r['side'].title()}{ln} | {r['american_odds']:+.0f} | "
-                          f"{r['model_p']*100:.1f}% | {r['market_p']*100:.1f}% | {r['edge']*100:+.1f}% | {r['bet_status']} |")
+                  line = r.get("line")
+                  ln = "" if line is None or line == "" else (
+                      f" {float(line):+g}" if r.get("market") == "SPREAD" else f" {float(line):g}")
+                  odds = r.get("american_odds")
+                  price = f"{float(odds):+.0f}" if odds is not None else "MISSING"
+                  return (f"| {r.get('matchup') or r.get('game_id') or 'MISSING'} | "
+                          f"{str(r.get('market') or 'MISSING').title()} {str(r.get('side') or 'MISSING').title()}{ln} | "
+                          f"{price} | {fmt_prob(r.get('model_p'))} | "
+                          f"{fmt_prob(r.get('market_p'))} | {fmt_prob(r.get('edge'), signed=True)} | "
+                          f"{r.get('bet_status') or 'TRACK'} |")
               hdr = ["| Game | Pick | Odds | Model | Market | Edge | Status |", "|---|---|---|---|---|---|---|"]
               bets = [r for r in rows if r["bet_status"] == "BET"]
               lines += [f"**{len(bets)} bets** (edge >= {card['edge_floor']*100:.0f}% vs no-vig; same-game guard keeps one team-outcome and one total). Both sides of every prop, side, and total are listed below.", ""]
@@ -87,7 +98,7 @@ jobs:
               missing = sorted({str(r.get("market") or "") for r in board.get("rows") or [] if r.get("reason") == "NO_QUOTE_OR_ENGINE_ROW"})
               lines += ["", "All props, sides, and totals",
                         f"both_sides={card.get('both_sides')} catalog_complete={card.get('catalog_complete')} sides={summary.get('side_rows')} totals={summary.get('total_rows')} props={summary.get('prop_rows')}",
-                        "Quoted markets list both sides. A missing quote is BLOCKED, not omitted. Not official.",
+                        "Quoted markets list both sides. MISSING probability or EV is never imputed. A missing opposite quote is not priced.",
                         "",
                         "| game | market | side | line | odds | note |",
                         "| --- | --- | --- | --- | --- | --- |"]
