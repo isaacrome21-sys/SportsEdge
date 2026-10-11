@@ -141,5 +141,24 @@ class NflCardLeanTests(unittest.TestCase):
         self.assertNotIn("starting QB", md)
 
 
+class NflHistoryTeamAliasTests(unittest.TestCase):
+    def test_nflverse_la_rams_code_maps_to_intake_lar(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        try:
+            import run_nfl_lines_card as card
+        finally:
+            sys.path.pop(0)
+        rows = card._history_rows({"games": [
+            {"date": "2026-10-04", "home": "LA", "away": "SF", "hs": 20, "as": 17, "home_qb": "Matthew Stafford"},
+            {"date": "2026-10-04", "home": "LAC", "away": "OAK", "hs": 24, "as": 10},
+        ]})
+        self.assertEqual(rows[0]["home"], "LAR")
+        self.assertEqual(rows[0]["away"], "SF")
+        self.assertEqual(rows[1]["home"], "LAC")
+        self.assertEqual(rows[1]["away"], "LV")
+        from datetime import date
+        self.assertEqual(card._last_start_qb(rows, "LAR", date(2026, 10, 11))["qb"], "Matthew Stafford")
+
+
 if __name__ == "__main__":
     unittest.main()
