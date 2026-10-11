@@ -14,6 +14,7 @@ from sportsedge.sports.nfl.location_symmetric_g1 import (
     CANDIDATE_FAMILY, MODEL_ID, NFLSymmetricLocationG1, team_means_from_location,
 )
 from sportsedge.sports.nfl.m2 import NFL_M2_FEATURE_CONTRACT, _assert_market_blind
+from sportsedge.nfl_run_it import run_it_market_anchored
 from sportsedge.sports.nfl.unified_market_engine import (
     UnifiedNflModelError, run_unified_nfl_model,
 )
@@ -51,6 +52,7 @@ def run_location_g1_research_market_bridge(
     home_team: str,
     away_team: str,
     game_markets: Sequence[Mapping[str, Any]] = (),
+    paired_game_quotes: Sequence[Mapping[str, Any]] | None = None,
     prop_markets: Sequence[Mapping[str, Any]] = (),
     home_model: Mapping[str, Any] | None = None,
     away_model: Mapping[str, Any] | None = None,
@@ -100,14 +102,31 @@ def run_location_g1_research_market_bridge(
                 raise UnifiedNflModelError("LOCATION_G1_GAME_START_MISMATCH")
 
     margin, total = model.predict(game_features)
-    means = team_means_from_location(margin, total)
+    # An M2/G1 raw score is not a sportsbook fair line. Only a complete
+    # paired, pregame quote can anchor its residual for economic research.
+    research_rows = []
+    fair_margin, fair_total = margin, total
+    if paired_game_quotes is not None:
+        anchored = run_it_market_anchored(
+            paired_game_quotes,
+            {game_id: {"margin": margin, "total": total,
+                       "commence_time": kickoff.isoformat()}},
+            as_of=observed,
+        )
+        if len(anchored["games"]) != 1:
+            raise UnifiedNflModelError("LOCATION_G1_ONE_PAIRED_BOOK_REQUIRED")
+        research_rows = anchored["games"][0]["market_anchored_research_prices"]
+        fair_margin = float(research_rows[0]["fair_margin"])
+        fair_total = float(research_rows[0]["fair_total"])
+    means = team_means_from_location(fair_margin, fair_total)
     if any(not MEAN_FLOOR <= mean <= MEAN_CEILING for mean in means.values()):
         raise UnifiedNflModelError("LOCATION_G1_OUTSIDE_FROZEN_GRID_MEAN_BOUNDS")
 
     out = run_unified_nfl_model(
         game_id=game_id, home_team=home_team, away_team=away_team,
-        attempt9_margin=margin, attempt9_total=total,
-        game_markets=game_markets, prop_markets=prop_markets,
+        attempt9_margin=fair_margin, attempt9_total=fair_total,
+        game_markets=() if paired_game_quotes is not None else game_markets,
+        prop_markets=prop_markets,
         home_model=home_model, away_model=away_model,
         scoring_prior=scoring_prior, n_sims=n_sims, seed=seed,
     )
@@ -116,6 +135,12 @@ def run_location_g1_research_market_bridge(
         for key, expected in means.items()
     ):
         raise UnifiedNflModelError("LOCATION_G1_GRID_MEANS_CHANGED")
+    out["market_anchored_residual_research"] = {
+        "priced_rows": research_rows,
+        "validated_markets": [], "forward_clv_proven": False,
+        "promotion_authority": False, "official_authority": False,
+        "fair_margin": fair_margin, "fair_total": fair_total,
+    }
     out["attempt9_raw"] = None
     out["location_g1_raw"] = {
         "margin": margin, "total": total,
