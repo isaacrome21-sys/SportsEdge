@@ -357,33 +357,74 @@ class PublicContext:
             state = address.get("state")
             if not city:
                 return 0.0, "VENUE_LOCATION_MISSING"
-            # Open-Meteo accepts "City, State" qualifiers and countryCode.
-            # Never silently select a city when state matching is ambiguous.
-            name = city + (", " + state if state else "")
-            q = urlencode({"name": name, "countryCode": "US", "count": 10,
-                           "language": "en", "format": "json"})
-            results = (self.fetch(GEO + "?" + q) or {}).get("results") or []
-            matches = [r for r in results if self.key(r.get("name")) == self.key(city) and
-                       (not state or self.key(r.get("admin1")) == self.key(state) or
-                        self.key(r.get("admin1_code")) == self.key(state))]
-            # Prefer unique exact match. If multiple city+state hits, take the highest-population
-            # (Open-Meteo returns population) rather than failing the whole weather factor.
-            if len(matches) > 1:
-                matches = sorted(matches, key=lambda r: r.get("population") or 0, reverse=True)[:1]
-            if len(matches) != 1:
-                # Fallback: query by venue fullName when available (more specific for stadiums).
-                full = (venue.get("fullName") or "").strip()
-                if full and full.lower() != city.lower():
-                    q2 = urlencode({"name": full, "countryCode": "US", "count": 5,
-                                    "language": "en", "format": "json"})
-                    results2 = (self.fetch(GEO + "?" + q2) or {}).get("results") or []
-                    matches = [r for r in results2 if self.key(r.get("name")) == self.key(full) or
-                               self.key(city) in self.key(r.get("name", ""))]
-                    if len(matches) > 1:
-                        matches = sorted(matches, key=lambda r: r.get("population") or 0, reverse=True)[:1]
-            if len(matches) != 1:
+            # Open-Meteo geocodes CITIES or postal codes, not necessarily
+            # stadium names. Always bind candidates back to ESPN's venue
+            # city/state before accepting a forecast location.
+            def same_state(candidate):
+                if not state:
+                    return True
+                return (self.key(candidate.get("admin1", "")) == self.key(state) or
+                        self.key(candidate.get("admin1_code", "")) == self.key(state))
+
+            def verified_coordinates(candidate):
+                if not isinstance(candidate, dict):
+                    return False
+                country = candidate.get("country_code")
+                if country and str(country).upper() != "US":
+                    return False
+                if not same_state(candidate):
+                    return False
+                try:
+                    lat = numeric(candidate["latitude"], "venue_latitude")
+                    lon = numeric(candidate["longitude"], "venue_longitude")
+                except (ValueError, KeyError, TypeError):
+                    return False
+                return -90 <= lat <= 90 and -180 <= lon <= 180
+
+            def choose(candidates, expected_name):
+                matching = [r for r in candidates if verified_coordinates(r) and
+                            self.key(r.get("name", "")) == self.key(expected_name)]
+                if len(matching) == 1:
+                    return matching[0]
+                if len(matching) > 1:
+                    # Population breaks exact-city AND exact-state ties only.
+                    # Missing or tied populations remain ambiguous.
+                    populated = []
+                    for r in matching:
+                        try:
+                            count = numeric(r["population"], "population")
+                            if count > 0:
+                                populated.append((count, r))
+                        except (KeyError, TypeError, ValueError):
+                            pass
+                    if populated:
+                        top = max(p for p, _ in populated)
+                        winners = [r for p, r in populated if p == top]
+                        if len(winners) == 1:
+                            return winners[0]
+                return None
+
+            def geocode(search, count=100):
+                query = urlencode({"name": search, "countryCode": "US",
+                                   "count": count, "language": "en", "format": "json"})
+                return (self.fetch(GEO + "?" + query) or {}).get("results") or []
+
+            search = city + (", " + state if state else "")
+            chosen = choose(geocode(search), city)
+            if chosen is None and state:
+                # Retry less restrictive city-only search but still require
+                # exact ESPN state and US jurisdiction for every candidate.
+                chosen = choose(geocode(city), city)
+            if chosen is None:
+                # A stadium name is not generally a valid city geocode query.
+                # Accept this fallback ONLY for an exact venue name with a
+                # state match, never by an unrelated city's prefix.
+                full = str(venue.get("fullName") or "").strip()
+                if full and self.key(full) not in {self.key(city), self.key(search)}:
+                    chosen = choose(geocode(full, count=100), full)
+            if chosen is None:
                 return 0.0, "VENUE_GEOCODE_AMBIGUOUS"
-            latitude, longitude = matches[0].get("latitude"), matches[0].get("longitude")
+            latitude, longitude = chosen["latitude"], chosen["longitude"]
         if latitude is None or longitude is None:
             return 0.0, "VENUE_COORDS_MISSING"
         query = urlencode({"latitude": latitude, "longitude": longitude,
@@ -502,66 +543,117 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
             # An owner-provided clock is not independent evidence that we
             # actually obtained the advertised free matchup context.
             # --no-fetch remains an explicit manual-only research mode.
-            return {"status": "BLOCKED_CONTEXT_UNVERIFIED", "sport": sport,
-                    "game": f"{away} @ {home}", "reason": ",".join(notes)[:180]}
+            return {"status": "BLOCKED_CONTEXT_UNVERIFIED",
+                    "game": f"{away} @ {home}", "sport": sport,
+                    "reason": "FREE_CONTEXT_FIXTURE_NOT_VERIFIED:" + ",".join(notes),
+                    "context_notes": notes, "research_only": True}
+    # Manual values override heuristics, including an explicit zero; reject extremes.
+    overrides = row.get("context") or {}
+    for key in context:
+        val = overrides.get(key, row.get(key))
+        if val is not None:
+            n = numeric(val, key)
+            if abs(n) > 15:
+                raise ValueError("CONTEXT_ADJUSTMENT_UNBOUNDED:" + key)
+            context[key] = n
     if kickoff is None or kickoff <= now:
-        return {"status": "BLOCKED_KICKOFF_UNVERIFIED", "sport": sport,
-                "game": f"{away} @ {home}", "reason": ",".join(notes)[:180]}
-    # Bounded heuristic priors only. No claim that these are calibrated edges.
-    home_mean = PRIORS[sport][0] + context.get("home_rating", 0) + context.get("home_injury_pts", 0) + context.get("home_form", 0)
-    away_mean = PRIORS[sport][0] + context.get("away_rating", 0) + context.get("away_injury_pts", 0) + context.get("away_form", 0)
+        return {"status": "BLOCKED_KICKOFF_UNVERIFIED", "game": f"{away} @ {home}", "sport": sport,
+                "context_notes": notes}
+    base, _, _, hfa = PRIORS[sport]
+    home_mean = base + hfa/2 + context["home_rating"]
+    away_mean = base - hfa/2 + context["away_rating"]
     if sport == "MLB":
-        home_mean += context.get("home_pitcher_adj", 0)
-        away_mean += context.get("away_pitcher_adj", 0)
-    total_adj = context.get("weather_total_adj", 0) or context.get("rest_adj", 0)
-    home_mean = bounded(home_mean + total_adj / 2, 0.1, 200)
-    away_mean = bounded(away_mean + total_adj / 2, 0.1, 200)
+        home_mean += context["home_pitcher_adj"]
+        away_mean += context["away_pitcher_adj"]
+    else:
+        home_mean += context["home_injury_pts"] + context["home_form"]
+        away_mean += context["away_injury_pts"] + context["away_form"]
+        if sport == "NBA":
+            home_mean += context["rest_adj"] / 2
+            away_mean -= context["rest_adj"] / 2
+    if "weather_total_adj" in context:
+        home_mean += context["weather_total_adj"] / 2
+        away_mean += context["weather_total_adj"] / 2
+    if min(home_mean, away_mean) < 0.2:
+        raise ValueError("IMPLAUSIBLE_SCORE_MEAN")
+    # A raw league-score baseline is NOT an executable fair price. Shrink
+    # game-location departures toward the posted market threshold; 15% is an
+    # unfitted RESEARCH prior, not a learned edge. Do not move an unknown line.
+    raw_margin, raw_total = home_mean-away_mean, home_mean+away_mean
+    anchor = {"status": "MARKET_ANCHORED_UNVALIDATED", "weight": 0.15}
+    if market == "TOTAL":
+        anchored_total = line + 0.15 * (raw_total-line)
+        shift = (anchored_total-raw_total)/2
+        home_mean += shift
+        away_mean += shift
+        anchor.update(market_total=line, raw_total=raw_total, fair_total=anchored_total)
+    elif market == "SPREAD":
+        market_home_margin = -line if side == "HOME" else line
+        anchored_margin = market_home_margin + 0.15*(raw_margin-market_home_margin)
+        shift = (anchored_margin-raw_margin)/2
+        home_mean += shift
+        away_mean -= shift
+        anchor.update(market_home_margin=market_home_margin, raw_margin=raw_margin,
+                      fair_home_margin=anchored_margin)
+    else:
+        # A one-sided ML price contains vig. Without the opposite price we
+        # cannot infer the bookmaker's no-vig baseline. Reject, don't invent.
+        opposite = row.get("opposite_odds")
+        if opposite is None:
+            return {"status": "BLOCKED_UNPAIRED_ML", "game": f"{away} @ {home}", "sport": sport}
+        opposite_dec = odds_decimal(opposite)
+        p1, p2 = 1/dec, 1/opposite_dec
+        anchor.update(market_no_vig_p=p1/(p1+p2))
     win, push = model_probability(sport, market, side, line, home_mean, away_mean)
-    # Market-anchored residual: blend 15% of model vs supplied line (unfitted).
-    # This is research scaffolding, not a fitted edge.
-    if market != "ML" and line is not None:
-        implied = 0.5  # rough; true implied from odds handled below
-        residual = (win - 0.5) * 0.15
-        win = bounded(0.5 + residual, 0.02, 0.98)
-    # EV vs supplied American odds (research only).
-    decimal = dec
-    ev = win * (decimal - 1) - (1 - win - push)
-    status = "RESEARCH_EDGE" if ev >= min_ev else "NO_EDGE"
-    return {
-        "status": status,
-        "sport": sport,
-        "game": f"{away} @ {home}",
-        "market": market,
-        "side": side,
-        "line": line,
-        "odds": price,
-        "model_win": round(win, 4),
-        "model_push": round(push, 4),
-        "ev_per_dollar": round(ev, 4),
-        "context": context,
-        "context_notes": notes,
-        "market_anchor": True,
-        "research_only": True,
-    }
+    if market == "ML":
+        win = bounded(anchor["market_no_vig_p"] + 0.15*(win-anchor["market_no_vig_p"]), 0, 1)
+    loss = bounded(1 - win - push, 0, 1)
+    ev = win * (dec - 1) - loss
+    breakeven = (1 - push) / dec  # effective win-probability threshold with push refund
+    selection = ("OVER" if side == "OVER" else "UNDER") if market == "TOTAL" else home if side == "HOME" else away
+    if market == "SPREAD":
+        selection += f" {line:+g}"
+    elif market == "TOTAL":
+        selection += f" {line:g}"
+    else:
+        selection += " ML"
+    status = "RESEARCH_EDGE" if ev >= min_ev and price >= -165 else "BELOW_THRESHOLD"
+    if price < -165:
+        status = "PRICE_CAP"
+    return {"schema": "SPORTSEDGE_FREE_RESEARCH_V1", "status": status, "sport": sport,
+            "game": f"{away} @ {home}", "selection": selection, "market": market,
+            "odds_american": int(price), "line": line, "kickoff_utc": kickoff.isoformat(),
+            "estimate_p": round(win, 6), "push_p": round(push, 6),
+            "loss_p": round(loss, 6), "book_break_even_p": round(breakeven, 6),
+            "edge_over_break_even_pp": round(100 * (win - breakeven), 3),
+            "ev_per_dollar": round(ev, 6), "home_mean": round(home_mean, 3),
+            "away_mean": round(away_mean, 3), "context": context, "context_notes": notes,
+            "context_quality": "HEURISTIC_UNVALIDATED", "market_anchor": anchor,
+            "model_validation": "NOT_PROVEN_VS_CLOSE", "research_only": True,
+            "model_p_authority": False, "official_authority": False,
+            "staking_authority": False, "sharp_reference_compared": False}
 
 
 def run(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
-    if now is None:
-        now = datetime.now(timezone.utc)
-    provider = PublicContext(now, getter)
-    rows = payload if isinstance(payload, list) else payload.get("lines") or []
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("AS_OF_TIMEZONE_REQUIRED")
+    now = now.astimezone(timezone.utc)
+    rows = payload if isinstance(payload, list) else payload.get("lines") if isinstance(payload, dict) else None
     if not isinstance(rows, list):
         raise ValueError("LINES_MUST_BE_LIST")
+    provider = PublicContext(now, getter=getter)
+    # A single-sport ticket may declare its sport once at the root.
+    # Do not guess a sport from a team name or an ambiguous matchup.
     ticket_sport = payload.get("sport") if isinstance(payload, dict) else None
     all_rows = []
     for i, row in enumerate(rows):
-        if not isinstance(row, dict):
-            all_rows.append({"status": "BLOCKED_INVALID", "reason": "ROW_NOT_OBJECT", "input_index": i})
-            continue
-        bound_row = dict(row)
-        if not bound_row.get("sport") and ticket_sport is not None:
-            bound_row["sport"] = ticket_sport
         try:
+            if not isinstance(row, dict):
+                raise ValueError("LINE_MUST_BE_OBJECT")
+            bound_row = dict(row)
+            if not bound_row.get("sport") and ticket_sport is not None:
+                bound_row["sport"] = ticket_sport
             result = calculate(bound_row, provider, now, auto_context=auto_context, min_ev=min_ev)
         except (ValueError, TypeError, KeyError, AttributeError) as exc:
             result = {"status": "BLOCKED_INVALID", "reason": str(exc)[:140]}
