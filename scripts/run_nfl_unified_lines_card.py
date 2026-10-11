@@ -9,7 +9,13 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import date
 from pathlib import Path
+
+from sportsedge.nfl_attempt9_live_forecast import load_runtime, raw_forecasts, recency_features
+from sportsedge.sports.nfl.market_anchored_residual import ResidualQuoteError, price_game
+from scripts.run_nfl_lines_card import _history_rows
+
 
 from sportsedge.nfl_unified_phone import build_unified_phone_card
 from sportsedge.nfl_scoring_composition_artifact import load_prior_file
@@ -31,6 +37,47 @@ def _has_props(ticket: dict) -> bool:
         for row in game.get("markets") or []
         if isinstance(row, dict)
     )
+
+
+
+def attach_residual_game_research(payload: dict, ticket: dict, history: object) -> dict:
+    """Sidecar only; frozen unified prop/grid runtime and game disabled status stay unchanged.
+
+    The only available independent game prediction for this lane is the
+    strictly-prior Attempt-9 forecaster. No invented M2 score forecast.
+    The shared residual adapter also accepts independent frozen M2 raw margin/
+    total when callers supply them through run_it_market_anchored().
+    """
+    as_of = str(ticket.get("observed_at") or "")
+    try:
+        slate = date.fromisoformat(str(ticket.get("slate") or as_of[:10]))
+    except (TypeError, ValueError):
+        for row in payload.get("games") or []:
+            row["residual_research_error"] = "SLATE_ASOF_REQUIRED"
+        return payload
+    prior = _history_rows(history)
+    runtime = load_runtime()
+    for input_game, output_game in zip(ticket.get("games") or [], payload.get("games") or []):
+        features = recency_features(
+            prior, home=str(input_game["home"]), away=str(input_game["away"]), asof=slate
+        ) if prior else {"ok": False, "reason": "PIT_HISTORY_REQUIRED"}
+        if not features.get("ok"):
+            output_game["residual_research_error"] = str(features.get("reason"))
+            continue
+        raw = raw_forecasts(runtime, features["vector"])
+        try:
+            output_game["residual_game_prices"] = price_game(
+                input_game, raw_model_margin=raw["margin"],
+                raw_model_total=raw["total"], as_of=as_of,
+            )
+            output_game["residual_research_source"] = "ATTEMPT9_INDEPENDENT_PRIOR_SIDECAR"
+        except ResidualQuoteError as exc:
+            output_game["residual_research_error"] = str(exc)
+    payload["residual_research_authority"] = {
+        "research_only": True, "validated_markets": [], "promotion": False,
+        "official": False, "staking": False, "forward_clv_proven": False,
+    }
+    return payload
 
 
 def main() -> int:
@@ -121,6 +168,7 @@ def main() -> int:
         n_sims=int(args.n_sims),
         seed=int(args.seed),
     )
+    payload = attach_residual_game_research(payload, ticket, history)
     payload["source_status"] = source_status
     payload["schedule_source_sha256"] = plan.get("schedule_source_sha256")
 

@@ -132,3 +132,30 @@ def test_opaque_nested_mapping_fails_closed():
     kwargs["game_features"]["home_features"]["hidden"] = MappingProxyType({"sportsbook_odds": -110})
     with pytest.raises(ValueError, match="OPAQUE_FEATURE_MAPPING_PROHIBITED"):
         run_location_g1_research_market_bridge(**kwargs)
+
+
+def test_g1_optional_paired_quotes_anchor_mean_location_and_disable_absolute_game_edges():
+    kwargs = _kwargs()
+    stamp = "2026-10-08T12:00:00Z"
+    base = {"game_id": kwargs["game_id"], "home": "HOME", "away": "AWAY",
+            "book": "draftkings", "retrieved_at": stamp}
+    kwargs["paired_game_quotes"] = [
+        {**base, "market": "moneyline", "selection": "AWAY", "price_american": 145},
+        {**base, "market": "moneyline", "selection": "HOME", "price_american": -170},
+        {**base, "market": "spread", "selection": "AWAY", "line": 7.5, "price_american": -110},
+        {**base, "market": "spread", "selection": "HOME", "line": -7.5, "price_american": -110},
+        {**base, "market": "total", "selection": "OVER", "line": 56.5, "price_american": -110},
+        {**base, "market": "total", "selection": "UNDER", "line": 56.5, "price_american": -110},
+    ]
+    out = run_location_g1_research_market_bridge(**kwargs)
+    fair = out["market_anchored_residual_research"]
+    assert fair["fair_margin"] == pytest.approx(7.5 + 0.15 * (3 - 7.5))
+    assert fair["fair_total"] == pytest.approx(56.5 + 0.15 * (45 - 56.5))
+    assert out["score_means"]["mean_home"] == pytest.approx((fair["fair_total"] + fair["fair_margin"]) / 2)
+    assert out["score_means"]["mean_away"] == pytest.approx((fair["fair_total"] - fair["fair_margin"]) / 2)
+    assert len(fair["priced_rows"]) == 6
+    assert out["game_markets"] == []
+    assert fair["validated_markets"] == []
+    assert fair["official_authority"] is False
+    assert fair["promotion_authority"] is False
+    assert out["location_g1_raw"]["margin"] == pytest.approx(3.0)

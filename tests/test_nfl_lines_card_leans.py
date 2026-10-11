@@ -23,12 +23,14 @@ def _history() -> list[dict]:
 
 
 def _ticket(total: dict | None = None) -> dict:
-    return {
+    ticket = {
         "slate": "2026-09-20",
+        "observed_at": "2026-09-20T16:00:00Z",
         "games": [
             {
                 "home": "BAL",
                 "away": "KC",
+                "commence_time": "2026-09-20T18:00:00Z",
                 "markets": [
                     {"market": "spread", "line": 3.5, "away_or_over_price": -110, "home_or_under_price": -110, "raw": "Spread +3.5 -110 -110"},
                     # High total so the frozen model is guaranteed to like the under, on a
@@ -42,6 +44,10 @@ def _ticket(total: dict | None = None) -> dict:
             }
         ],
     }
+    for g in ticket["games"]:
+        for market in g["markets"]:
+            market["quote_retrieved_at"] = ticket["observed_at"]
+    return ticket
 
 
 class NflCardLeanTests(unittest.TestCase):
@@ -63,65 +69,66 @@ class NflCardLeanTests(unittest.TestCase):
             )
             return json.loads((t / "card.json").read_text()), (t / "out" / "card.md").read_text()
 
-    def test_total_is_lean_not_pick(self):
+    def test_total_is_research_only_not_pick(self):
         engine, md = self._run()
         self.assertEqual(engine["bet_proven_markets"], [])
+        self.assertEqual(engine["validated_markets"], [])
         game = engine["games"][0]
         self.assertEqual(game["picks"], [])
-        total = [m for m in game["markets"] if m["market"] == "total"][0]
-        self.assertIsNone(total["pick"])
-        self.assertIsNotNone(total["lean"])
-        self.assertTrue(total["lean"]["lean_only"])
-        self.assertEqual(total["lean"]["selection"], "Under")
-        self.assertTrue(total["lean"]["projection_agrees"])
-        self.assertIn("LEAN (no proven edge, not a bet): Under 60.5", md)
-        self.assertIn("No bets", md)
-        self.assertNotIn("Score-B", md)
+        self.assertIsNone(game["residual_research_error"])
+        self.assertEqual({r["market"] for r in game["residual_research_prices"]},
+                         {"moneyline", "spread", "total"} - {"moneyline"})
+        self.assertTrue(all(r["eligible_as_bet"] is False for r in game["residual_research_prices"]))
+        self.assertIn("Residual adjustments", md)
 
-    def test_plus_money_shows_plus_sign(self):
+    def test_plus_money_quote_still_prints_with_plus_sign(self):
         _, md = self._run()
         self.assertIn("Under 60.5 @ +100", md)
 
-    def test_thin_calibration_tail_never_prints_a_lean(self):
-        # Model total ~25 pts over the line lands on a weight-1 isotonic block
-        # (mean 1.0); before the guard this printed a ~+100% "model EV" lean.
-        engine, md = self._run(total={"market": "total", "line": 20.5, "away_or_over_price": 100,
-                                      "home_or_under_price": -120, "raw": "Total 20.5 +100 -120"})
-        total = [m for m in engine["games"][0]["markets"] if m["market"] == "total"][0]
-        self.assertIsNone(total["lean"])
-        self.assertEqual(total["lean_block"], "NO_LEAN:THIN_CALIBRATION")
-        self.assertNotIn("LEAN (", md)
-        self.assertIn("too few past games to price it", md)
+    def test_absolute_total_outlier_shrinks_instead_of_large_model_ev(self):
+        engine, _ = self._run(total={"market": "total", "line": 20.5, "away_or_over_price": 100,
+                                     "home_or_under_price": -120, "raw": "Total 20.5 +100 -120"})
+        game = engine["games"][0]
+        total = [m for m in game["markets"] if m["market"] == "total"][0]
+        self.assertIsNone(total["pick"])
+        self.assertIsNone(game["residual_research_error"])
+        expected = 20.5 + 0.15 * (game["context"]["projection"]["total"] - 20.5)
+        self.assertAlmostEqual(total["residual_research_prices"][0]["fair_total"], expected, delta=0.015)
+        self.assertTrue(all(0 <= p["estimate_p"] < 1 for p in total["residual_research_prices"]))
 
-    def test_price_only_under_is_not_a_lean_when_projection_is_over(self):
-        # Week 6 DEN @ LAC: model total 42.1 > 41.5, yet Under @ -105 printed as a
-        # lean because the flat calibration gives every near-line game Under ~0.5.
+    def test_near_market_total_does_not_promote_price_only_under(self):
         from datetime import date
         from math import floor
         from sportsedge.nfl_attempt9_live_forecast import load_runtime, raw_forecasts, recency_features
         feat = recency_features(_history(), home="BAL", away="KC", asof=date(2026, 9, 20))
         pred = float(raw_forecasts(load_runtime(), feat["vector"])["total"])
-        line = floor(pred - 0.5) + 0.5  # nearest half-point line below the projection
-        self.assertTrue(0 < pred - line <= 1.0)
-        engine, md = self._run(total={"market": "total", "line": line, "away_or_over_price": -130,
-                                      "home_or_under_price": 110, "raw": f"Total {line} -130 +110"})
-        total = [m for m in engine["games"][0]["markets"] if m["market"] == "total"][0]
+        line = floor(pred - 0.5) + 0.5
+        engine, _ = self._run(total={"market": "total", "line": line, "away_or_over_price": -130,
+                                     "home_or_under_price": 110, "raw": f"Total {line} -130 +110"})
+        game = engine["games"][0]
+        total = [m for m in game["markets"] if m["market"] == "total"][0]
+        self.assertIsNone(total["pick"])
+        self.assertTrue(all(x["status"] == "RESEARCH_ONLY" for x in total["residual_research_prices"]))
+        self.assertLess(abs(total["residual_research_adjustment"]), 0.5)
         self.assertIsNone(total["lean"])
-        self.assertEqual(total["lean_block"], "NO_LEAN:PROJECTION_DISAGREES")
-        self.assertNotIn("LEAN (", md)
-        self.assertIn("the model total points the other way", md)
 
-    def test_spread_still_held(self):
+    def test_spread_only_research_no_promotion(self):
         engine, md = self._run()
         spread = [m for m in engine["games"][0]["markets"] if m["market"] == "spread"][0]
-        self.assertTrue(spread["no_model"].startswith("NO_MODEL"))
-        self.assertIn("Spread KC +3.5 -110 / BAL -3.5 -110: no pick: spreads held", md)
-        self.assertNotIn("NO_MODEL:", md)
+        self.assertIsNone(spread["pick"])
+        self.assertEqual(len(spread["residual_research_prices"]), 2)
+        self.assertIn("Residual adjustments", md)
+        self.assertNotIn("**BET**", md)
 
-    def test_card_has_no_official_or_truth_gate_wording(self):
-        _, md = self._run()
-        for banned in ("OFFICIAL", "Truth Gate", "Model_P", "PRE-CONTEXT", "NOT FINAL"):
-            self.assertNotIn(banned, md)
+    def test_card_does_not_grant_any_official_authority(self):
+        engine, md = self._run()
+        self.assertEqual(engine["bet_proven_markets"], [])
+        self.assertEqual(engine["validated_markets"], [])
+        self.assertTrue(all(not p.get("eligible_as_bet", True)
+                            for game in engine["games"]
+                            for p in game["residual_research_prices"]))
+        self.assertNotIn("**BET**", md)
+        self.assertIn("NOT proven", md)
 
     def test_home_spread_side_is_mirrored_in_both_sides_table(self):
         engine, md = self._run()
