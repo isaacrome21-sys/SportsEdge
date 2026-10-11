@@ -35,6 +35,24 @@ def _ev(estimate_p: float, price: int) -> float:
     return estimate_p * dec - 1.0
 
 
+# The frozen Attempt 9 isotonic calibration has singleton tail blocks
+# (weight 1, mean 1.0). A raw probability that lands there would print an
+# absurd ~100% "model EV". Leans need a calibration block with at least this
+# many historical games behind it. Card-side guard only; the artifact is frozen.
+MIN_CALIBRATION_BLOCK_WEIGHT = 20
+LEAN_BLOCK_THIN = "NO_LEAN:THIN_CALIBRATION"
+LEAN_BLOCK_DIRECTION = "NO_LEAN:PROJECTION_DISAGREES"
+
+
+def _calibration_block_weight(artifact: dict, market: str, raw_p: float) -> int:
+    """Weight of the isotonic block apply_isotonic_blocks() picks for raw_p."""
+    blocks = list(artifact["markets"][market]["calibration_blocks"])
+    for block in blocks:
+        if float(raw_p) <= float(block["hi"]):
+            return int(block["weight"])
+    return int(blocks[-1]["weight"])
+
+
 # nflverse uses "LA" for the Rams (and old franchise codes for relocated teams),
 # while the DK intake emits "LAR". Map history to intake codes so every team
 # finds its own games. Codes only; no score or line changes.
@@ -251,10 +269,28 @@ def main() -> int:
                     "market_no_vig_p": float(no_vig[1]),
                 },
             ]
+            # Guards (card-side): the calibrated probability must sit on a block
+            # with real history behind it, and the lean must point the same way
+            # as the projection (no Under when the model total is above the line).
+            raw_home_or_over = float(home_or_over["raw_threshold_probability"])
+            block_weight = _calibration_block_weight(artifact, raw["market"], raw_home_or_over)
+            candidates[0]["projection_agrees"] = (
+                raw_home_or_over < 0.5 if raw["market"] == "spread" else raw_home_or_over > 0.5
+            )
+            candidates[1]["projection_agrees"] = (
+                raw_home_or_over > 0.5 if raw["market"] == "spread" else raw_home_or_over < 0.5
+            )
+            lean_block = None
             qualified = []
             for cand in candidates:
                 ev = _ev(cand["estimate_p"], cand["price_american"])
                 if ev < 0.02:
+                    continue
+                if block_weight < MIN_CALIBRATION_BLOCK_WEIGHT:
+                    lean_block = LEAN_BLOCK_THIN
+                    continue
+                if not cand["projection_agrees"]:
+                    lean_block = lean_block or LEAN_BLOCK_DIRECTION
                     continue
                 cand["ev_per_dollar"] = ev
                 cand["edge_probability_points"] = cand["estimate_p"] - cand["market_no_vig_p"]
@@ -279,6 +315,8 @@ def main() -> int:
                     pick = {**pick, "lean_only": True, "lean_reason": LEAN_REASON.get(raw["market"], DEFAULT_LEAN_REASON)}
                     leans.append(pick)
                 row = {**raw, "no_model": None, "pick": None, "lean": pick}
+            if not pick and lean_block:
+                row["lean_block"] = lean_block
             markets.append(row)
         context = game_context(game, history, asof, feat, forecast)
         games_out.append({**game, "markets": markets, "picks": picks, "leans": leans, "features": feat, "context": context})
