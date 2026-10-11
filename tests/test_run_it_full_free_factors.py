@@ -178,3 +178,28 @@ def test_only_valid_game_lines_can_receive_model_edge_while_props_always_block()
                     now=NOW,auto_context=False)
     assert all(x["market"] in {"TOTAL", "SPREAD", "ML"} for x in r["edges"])
     assert r["evaluated_rows"][1]["status"]=="BLOCKED_INVALID"
+
+
+def test_injury_schema_probe_logs_only_shape_when_unusable():
+    from artifacts import free_models as base
+    def getter(url):
+        if "/teams/2/injuries" in url:
+            return {}
+        return {"injuries":[
+            {"team":{"id":"55","displayName":"Not Target"}, "injuries":[
+                {"athlete":{"fullName":"PRIVATE_TEST_NAME"},"status":"Out"}]}]}
+    provider=base.PublicContext(NOW,getter=getter)
+    impact,status=provider.injury_points("NFL",{"id":"2"})
+    assert impact == 0.0
+    assert status == "MISSING_OR_UNRECOGNIZED_SOURCE"
+    bad=[r for r in provider.receipts if r["status"]=="UNUSABLE_SCHEMA"]
+    assert len(bad)==1
+    assert "TEAM[KEYS=" in bad[0]["reason"]
+    assert "SAMPLE_TEAM_IDS=55" in bad[0]["reason"]
+    assert "PRIVATE_TEST_NAME" not in str(bad)
+    from scripts.free_models_phone_issue import render_card
+    card=full.run_full({"lines":[row()]},now=NOW,auto_context=False)
+    card["source_receipts"]=provider.receipts
+    result=render_card(card)
+    assert "1 unusable-schema reports" in result
+    assert "team ID 2" in result
