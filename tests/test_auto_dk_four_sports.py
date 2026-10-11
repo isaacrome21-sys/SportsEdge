@@ -102,6 +102,34 @@ class AutoOddsTests(unittest.TestCase):
             self.assertTrue(all(v["games"]==[] and v["status"]=="UNAVAILABLE" for v in res.values()))
             self.assertIn("INSUFFICIENT_REMAINING_CREDITS",(Path(temp)/"summary.md").read_text())
 
+    def test_nfl_cfb_always_first_even_when_dispatch_reversed(self):
+        self.assertEqual(m.prioritize_sports(["NBA","MLB","CFB","NFL"]),
+                         ["NFL","CFB","MLB","NBA"])
+        self.assertEqual(m.prioritize_sports(["NBA","CFB"]),["CFB","NBA"])
+
+    def test_lower_priority_spend_preserves_next_football_poll(self):
+        with TemporaryDirectory() as temp:
+            invoked=[]
+            def capture(sport,key):
+                invoked.append(sport)
+                return [event(sport)]
+            def guarded(keys,minimum_remaining):
+                return {"state":"READY" if minimum_remaining <= 82 else "BLOCKED",
+                        "reason":"RESERVE_SATISFIED" if minimum_remaining <= 82 else "INSUFFICIENT_REMAINING_CREDITS",
+                        "max_remaining":82,
+                        "ready_key_slots":["SPORTSEDGE_ODDS_API_KEY"] if minimum_remaining <= 82 else []}
+            orig=m.configured_keys
+            m.configured_keys=lambda:[("SPORTSEDGE_ODDS_API_KEY","dummy")]
+            try:
+                out=m.collect(["NBA","MLB","CFB","NFL"],Path(temp),NOW,76,
+                              provider_fetch=capture,quota_probe=guarded)
+            finally:
+                m.configured_keys=orig
+            self.assertEqual(invoked,["NFL","CFB"])
+            self.assertEqual(list(out),["NFL","CFB","MLB","NBA"])
+            self.assertEqual(out["MLB"]["status"],"UNAVAILABLE")
+            self.assertEqual(out["NBA"]["status"],"UNAVAILABLE")
+
     def test_free_active_sport_filter_saves_paid_calls(self):
         with TemporaryDirectory() as temp:
             def forbidden(*args,**kwargs):
