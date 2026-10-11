@@ -40,6 +40,16 @@ class NFLEmpiricalError(ValueError):
     pass
 
 
+# Count fields that cannot be negative in a verified box score. Yardage
+# fields are intentionally excluded: real rushing/receiving lines can be
+# negative (e.g. losses on carries), and rejecting them would fail-closed
+# on legitimate verified history.
+_NONNEGATIVE_FIELDS = frozenset({
+    "passing_tds", "pass_attempts", "completions", "interceptions",
+    "rush_attempts", "receptions",
+})
+
+
 def price_nfl_player_market(
     *, market: str, side: str, line: float,
     game_history: Sequence[Mapping[str, Any]],
@@ -71,7 +81,7 @@ def price_nfl_player_market(
             v = float(raw)
         except (TypeError, ValueError) as exc:
             raise NFLEmpiricalError(f"GAME_HISTORY[{i}].{field}_INVALID") from exc
-        if v < 0:
+        if field in _NONNEGATIVE_FIELDS and v < 0:
             raise NFLEmpiricalError(f"GAME_HISTORY[{i}].{field}_NEGATIVE")
         values.append(v)
     if len(values) < 5:

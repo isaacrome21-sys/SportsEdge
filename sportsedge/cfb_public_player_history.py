@@ -1,9 +1,11 @@
 """Independent public CFB player game-log history from free ESPN endpoints.
 
 Mirrors the NFL collector. Resolves player by display name, fetches college
-football gamelog, returns prior completed games. No odds, no trusted features.
-Requires unique pregame fixture and at least 4 prior games (CFB samples are
-smaller). Research only.
+football gamelog, returns prior completed games with normalized traditional
+box-score stats (passing_yards, passing_tds, pass_attempts, completions,
+interceptions, rushing_yards, rush_attempts, receiving_yards, receptions).
+No odds, no trusted features. Requires unique pregame fixture and at least 4
+prior games (CFB samples are smaller). Research only.
 """
 from __future__ import annotations
 
@@ -16,6 +18,19 @@ import re
 ESPN_SEARCH = "https://site.web.api.espn.com/apis/search/v2"
 ESPN_GAMELOG = "https://site.web.api.espn.com/apis/common/v3/sports/football/college-football/athletes"
 ESPN_SCOREBOARD = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard"
+
+# ESPN gamelog `names` -> normalized box-score field consumed by the pricer.
+_ESPN_STAT_TO_FIELD = {
+    "passingYards": "passing_yards",
+    "passingTouchdowns": "passing_tds",
+    "passingAttempts": "pass_attempts",
+    "completions": "completions",
+    "interceptions": "interceptions",
+    "rushingYards": "rushing_yards",
+    "rushingAttempts": "rush_attempts",
+    "receivingYards": "receiving_yards",
+    "receptions": "receptions",
+}
 
 
 class MissingCFBHistory(ValueError):
@@ -34,6 +49,31 @@ def _clock(value, name):
 
 def _norm(value):
     return " ".join(re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).split())
+
+
+def _stat_number(value):
+    """Parse an ESPN stat cell; return None when absent or non-numeric."""
+    if value is None:
+        return None
+    try:
+        return float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _normalize_player_stats(named):
+    """Extract normalized fields from an ESPN name->value stat mapping.
+
+    Only fields present with numeric values are emitted. Missing fields are
+    omitted so the empirical pricer fails closed instead of imputing.
+    """
+    out = {}
+    for espn_name, field in _ESPN_STAT_TO_FIELD.items():
+        if espn_name in named:
+            v = _stat_number(named.get(espn_name))
+            if v is not None:
+                out[field] = v
+    return out
 
 
 def public_json(url):
@@ -102,9 +142,24 @@ class CFBPlayerPublicSource:
         items = ((data or {}).get("results") or [{}])[0].get("contents") or []
         matches = []
         for item in items:
-            athlete = (item.get("player") or {})
-            if _norm(athlete.get("displayName") or athlete.get("fullName")) == _norm(player_name):
-                matches.append(athlete)
+            if not isinstance(item, dict):
+                continue
+            # Real ESPN contents carry displayName/uid directly; tolerate a
+            # nested "player" wrapper if a future shape introduces one.
+            node = item.get("player") if isinstance(item.get("player"), dict) else item
+            if _norm(node.get("displayName") or node.get("fullName")) != _norm(player_name):
+                continue
+            athlete_id = ""
+            uid = str(node.get("uid") or "")
+            m = re.search(r"a:(\d+)", uid)
+            if m:
+                athlete_id = m.group(1)
+            elif str(node.get("id") or "").isdigit():
+                athlete_id = str(node.get("id"))
+            if not athlete_id:
+                continue
+            matches.append({"id": athlete_id,
+                            "displayName": node.get("displayName") or player_name})
         if len(matches) != 1:
             raise MissingCFBHistory("PLAYER_NOT_UNIQUELY_RESOLVED_FROM_ESPN_SEARCH")
         return matches[0]
@@ -128,19 +183,54 @@ class CFBPlayerPublicSource:
         if not isinstance(data, dict):
             raise MissingCFBHistory("CFB_GAMELOG_UNAVAILABLE")
 
-        events = data.get("events") or []
-        hist = []
-        for event in events:
-            try:
-                event_date = _clock(event.get("date"), "GAMELOG_DATE")
-                if event_date >= now or event_date >= kickoff:
+        # ESPN gamelog shape: top-level `names` aligns with each event's stat
+        # array; per-event metadata lives in `events` (dict keyed by eventId);
+        # stat arrays live under seasonTypes -> categories -> events.
+        names = data.get("names") or []
+        if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
+            raise MissingCFBHistory("CFB_GAMELOG_STAT_NAMES_MISSING")
+        events_meta = data.get("events") or {}
+        if not isinstance(events_meta, dict):
+            raise MissingCFBHistory("CFB_GAMELOG_EVENTS_MALFORMED")
+        stat_arrays = {}
+        for season in data.get("seasonTypes") or []:
+            if not isinstance(season, dict):
+                continue
+            for category in season.get("categories") or []:
+                if not isinstance(category, dict):
                     continue
-                hist.append((event_date, str(event.get("id") or ""), {
-                    "raw_stats": event.get("stats") or [],
-                    "opponent": (event.get("opponent") or {}).get("abbreviation"),
-                }))
+                for ev in category.get("events") or []:
+                    if not isinstance(ev, dict):
+                        continue
+                    eid = str(ev.get("eventId") or "")
+                    stats = ev.get("stats")
+                    if eid and isinstance(stats, list) and eid not in stat_arrays:
+                        stat_arrays[eid] = stats
+
+        hist = []
+        for eid, meta in events_meta.items():
+            if not isinstance(meta, dict):
+                continue
+            stats = stat_arrays.get(str(eid)) or stat_arrays.get(str(meta.get("id") or ""))
+            if not isinstance(stats, list) or len(stats) != len(names):
+                # Names and stat array misaligned or absent: skip the game
+                # rather than invent values (fail-closed).
+                continue
+            try:
+                event_date = _clock(meta.get("gameDate"), "GAMELOG_DATE")
             except (ValueError, TypeError, MissingCFBHistory):
                 continue
+            if event_date >= now or event_date >= kickoff:
+                continue
+            named = {name: value for name, value in zip(names, stats)}
+            normalized = _normalize_player_stats(named)
+            opponent = meta.get("opponent")
+            hist.append((event_date, str(eid), {
+                "opponent": (opponent.get("abbreviation")
+                             if isinstance(opponent, dict) else None),
+                "result": meta.get("gameResult"),
+                **normalized,
+            }))
 
         hist.sort(key=lambda x: x[0], reverse=True)
         latest = hist[:max_games]
