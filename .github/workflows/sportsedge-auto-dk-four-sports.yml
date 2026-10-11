@@ -4,6 +4,12 @@ name: sportsedge-auto-dk-four-sports
 on:
   schedule:
     - cron: '17 10 * * *'
+  pull_request:
+    paths:
+      - 'scripts/collect_auto_dk_four_sports.py'
+      - 'scripts/run_auto_dk_cards.py'
+      - 'tests/test_auto_dk_four_sports.py'
+      - '.github/workflows/sportsedge-auto-dk-four-sports.yml'
   workflow_dispatch:
     inputs:
       sports:
@@ -21,8 +27,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  tests:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+      - run: python -m unittest tests.test_auto_dk_four_sports -v
   auto:
-    if: github.repository_owner == 'isaacrome21-sys'
+    if: github.repository_owner == 'isaacrome21-sys' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
