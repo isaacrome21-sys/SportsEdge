@@ -80,7 +80,7 @@ class FairOddsTests(unittest.TestCase):
             _book("draftkings", h2h=[("Jacksonville Jaguars", -350), ("Philadelphia Eagles", 310)],
                   spreads=[("Jacksonville Jaguars", -105, -7.5), ("Philadelphia Eagles", -115, 7.5)]),
             _book("pinnacle", h2h=[("Jacksonville Jaguars", -400), ("Philadelphia Eagles", 330)],
-                  spreads=[("Jacksonville Jaguars", -125, -7.5), ("Philadelphia Eagles", 112, 7.5)]),
+                  spreads=[("Jacksonville Jaguars", -116, -7.5), ("Philadelphia Eagles", 104, 7.5)]),
         ])
         md = fo.render_card(fo.upcoming([e], NOW), fetched_at=NOW)
         self.assertIn("PHI @ JAX", md)
@@ -89,6 +89,19 @@ class FairOddsTests(unittest.TestCase):
         self.assertIn("not a proven bet", md)
         for banned in ("OFFICIAL", "Truth Gate", "Model_P"):
             self.assertNotIn(banned, md)
+
+    def test_far_off_price_is_flagged_verify_and_logged_for_clv(self):
+        e = _event([
+            _book("draftkings", spreads=[("Jacksonville Jaguars", +120, -7.5), ("Philadelphia Eagles", -150, 7.5)]),
+            _book("pinnacle", spreads=[("Jacksonville Jaguars", -110, -7.5), ("Philadelphia Eagles", -110, 7.5)]),
+        ])
+        md = fo.render_card(fo.upcoming([e], NOW), fetched_at=NOW)
+        self.assertIn("⚠️ JAX -7.5 @ +120", md)
+        self.assertIn("verify", md)
+        log = json.loads(md.split("<!-- sportsedge-clv-log ")[1].split(" -->")[0])
+        self.assertEqual(len(log), 1)
+        self.assertTrue(log[0]["stale"])
+        self.assertEqual(log[0]["point"], -7.5)
 
     def test_started_games_are_dropped(self):
         e = _event([_book("draftkings", h2h=[("Jacksonville Jaguars", -350), ("Philadelphia Eagles", 310)])],

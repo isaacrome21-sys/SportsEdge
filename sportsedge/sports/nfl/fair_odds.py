@@ -12,6 +12,7 @@ price comparison, not a backtest-proven bet.
 """
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 from statistics import median
 from typing import Any, Iterable, Mapping
@@ -28,6 +29,8 @@ BOOKMAKERS = (
 MARKETS = ("h2h", "spreads", "totals")
 MIN_CONSENSUS_BOOKS = 3
 EV_FLAG = 0.01
+# A DK price this far above fair is usually stale or a typo, not free money.
+STALE_EV = 0.05
 
 _FULL_TO_ABBR = {names[0]: abbr for abbr, names in NFL_TEAMS.items()}
 
@@ -168,6 +171,7 @@ def render_card(events: list[Mapping[str, Any]], *, fetched_at: datetime) -> str
     ]
     flagged: list[str] = []
     body: list[str] = []
+    clv_log: list[dict] = []
     for e in events:
         home, away = str(e.get("home_team")), str(e.get("away_team"))
         rows = price_event(e)
@@ -180,12 +184,23 @@ def render_card(events: list[Mapping[str, Any]], *, fetched_at: datetime) -> str
             if r["ev"] is None:
                 body.append(f"- {label} @ {_fmt_price(r['dk_price'])} · fair: {r['source']}")
                 continue
-            mark = "✅" if r["ev"] >= EV_FLAG else ("·" if r["ev"] >= 0 else "❌")
+            stale = r["ev"] >= STALE_EV
+            mark = "⚠️" if stale else ("✅" if r["ev"] >= EV_FLAG else ("·" if r["ev"] >= 0 else "❌"))
             text = (f"{label} @ {_fmt_price(r['dk_price'])} · fair {_fmt_price(r['fair_price'])} "
                     f"({r['source']}) · EV {r['ev'] * 100:+.1f}%")
+            if stale:
+                text += " · verify: DK is far off every other price (stale or typo?)"
             body.append(f"- {mark} {text}")
             if r["ev"] >= EV_FLAG:
-                flagged.append(f"- {team_abbr(away)} @ {team_abbr(home)}: {text}")
+                flagged.append(f"- {mark} {team_abbr(away)} @ {team_abbr(home)}: {text}")
+                clv_log.append({
+                    "event_id": e.get("id"), "commence": e.get("commence_time"),
+                    "home": team_abbr(home), "away": team_abbr(away),
+                    "market": r["market"], "side": r["side"], "point": r["point"],
+                    "dk_price": r["dk_price"], "fair_p": round(r["fair_p"], 4),
+                    "ev": round(r["ev"], 4), "source": r["source"], "stale": stale,
+                    "flagged_at": fetched_at.isoformat(),
+                })
         body.append("")
     if not body:
         lines.append("No upcoming NFL games with DraftKings prices were returned.")
@@ -197,6 +212,9 @@ def render_card(events: list[Mapping[str, Any]], *, fetched_at: datetime) -> str
     lines.append("")
     lines.extend(body)
     lines.append("</details>")
+    # Machine-readable record of every flag, graded later against the closing line (CLV).
+    lines.append("")
+    lines.append("<!-- sportsedge-clv-log " + json.dumps(clv_log, separators=(",", ":")) + " -->")
     return "\n".join(lines) + "\n"
 
 
