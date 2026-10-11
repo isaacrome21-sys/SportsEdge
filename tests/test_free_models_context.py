@@ -193,3 +193,14 @@ def test_northwestern_state_not_confused_with_illinois_northwestern():
                             "market":"spread","side":"away","line":7.5,
                             "odds":-110,"kickoff":START},provider,NOW,auto_context=False)
     assert result["status"]!="BLOCKED_IL_COLLEGE"
+
+
+def test_ticket_level_sport_defaults_only_missing_per_row_sport():
+    a = line(commence_time=START)
+    a.pop("sport")
+    result = model.run({"sport": "NFL", "lines": [a]},
+                       now=NOW, auto_context=False)
+    assert result["summary"]["rows"] == 1
+    assert not result["summary"]["status_counts"].get("BLOCKED_INVALID")
+    invalid = model.run({"lines": [a]}, now=NOW, auto_context=False)
+    assert invalid["summary"]["status_counts"]["BLOCKED_INVALID"] == 1
