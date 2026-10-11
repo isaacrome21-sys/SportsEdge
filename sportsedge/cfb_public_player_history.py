@@ -13,6 +13,7 @@ from urllib.request import Request, urlopen
 import json
 import re
 from .football_gamelog_decode import decode_football_event, FootballGamelogSchemaError
+from .football_roster_lookup import lookup_matchup_roster_player, FootballRosterAmbiguity
 
 ESPN_SEARCH = "https://site.web.api.espn.com/apis/search/v2"
 ESPN_GAMELOG = "https://site.web.api.espn.com/apis/common/v3/sports/football/college-football/athletes"
@@ -98,6 +99,16 @@ class CFBPlayerPublicSource:
         return next(iter(unique.values()))
 
     def _resolve_athlete(self, player_name, allowed_team_ids):
+        # Resolve exact identity against the two independently verified fixture
+        # teams first. ESPN global search often omits current team identifiers.
+        try:
+            roster_player = lookup_matchup_roster_player(
+                self._fetch, league="college-football",
+                team_ids=allowed_team_ids, player_name=player_name)
+        except FootballRosterAmbiguity as exc:
+            raise MissingCFBHistory(str(exc)) from exc
+        if roster_player is not None:
+            return roster_player
         url = ESPN_SEARCH + "?" + urlencode({"query": player_name, "limit": "10", "type": "player"})
         data = self._fetch(url)
         items = ((data or {}).get("results") or [{}])[0].get("contents") or []
