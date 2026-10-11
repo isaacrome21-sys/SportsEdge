@@ -10,8 +10,16 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from datetime import datetime, timezone, date
 
 from sportsedge.nfl_unified_phone import build_unified_phone_card
+from sportsedge.nfl_attempt9_live_forecast import (
+    load_runtime, raw_forecasts, recency_features,
+)
+from sportsedge.sports.nfl.market_residual_research import (
+    NFLResidualError, price_game_from_pairs,
+)
+from scripts.run_nfl_lines_card import _history_rows
 from sportsedge.nfl_scoring_composition_artifact import load_prior_file
 from sportsedge.sports.nfl.auto_slate import discover_nfl_auto_games
 from sportsedge.sports.nfl.context_autopull import NFLContextError
@@ -121,6 +129,46 @@ def main() -> int:
         n_sims=int(args.n_sims),
         seed=int(args.seed),
     )
+    # Only add an independent game-price research sidecar. The pinned unified
+    # player-role/scoring implementation stays byte-identical and its disabled
+    # game-market authority is NOT changed.
+    historical = _history_rows(history)
+    raw_runtime = load_runtime()
+    residual_games = []
+    now = datetime.now(timezone.utc)
+    for index, source_game in enumerate(ticket.get("games") or []):
+        result = {"status":"NO_MODEL", "reason":"RESIDUAL_INDEPENDENT_MODEL_UNAVAILABLE"}
+        try:
+            schedule_game = payload["games"][index]
+            kickoff = datetime.fromisoformat(
+                str(schedule_game["kickoff"]).replace("Z","+00:00"))
+            if kickoff.tzinfo is None:
+                raise NFLResidualError("KICKOFF_TIMEZONE_MISSING")
+            features = recency_features(
+                historical,home=str(source_game["home"]),away=str(source_game["away"]),
+                asof=kickoff.date(),
+            )
+            if not features.get("ok"):
+                raise NFLResidualError(str(features.get("reason")))
+            independent = raw_forecasts(raw_runtime,features["vector"])
+            priced = price_game_from_pairs(
+                raw_margin=independent["margin"],raw_total=independent["total"],
+                markets=source_game.get("markets") or [],
+                observed_at=ticket.get("observed_at"),
+                as_of=now,kickoff_at=kickoff,
+                model_family="ATTEMPT9_RAW_UNIFIED_SIDECAR",
+            )
+            result = {"status":"RESEARCH_ONLY","research":priced}
+        except (NFLResidualError,ValueError,TypeError,KeyError,IndexError) as exc:
+            result = {"status":"NO_MODEL","reason":str(exc)[:180]}
+        residual_games.append(result)
+        if index < len(payload.get("games") or []):
+            payload["games"][index]["residual_pricing"] = result
+    payload["residual_research_games"] = residual_games
+    payload["residual_pricing_authority"] = {
+        "research_only":True,"model_p":False,
+        "official":False,"promotion":False,"staking":False,
+    }
     payload["source_status"] = source_status
     payload["schedule_source_sha256"] = plan.get("schedule_source_sha256")
 
