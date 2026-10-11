@@ -1,0 +1,28 @@
+{
+  "schema": "NFL_MARKET_RESIDUAL_RESEARCH_V1",
+  "status": "PREDECLARED_RESEARCH_ONLY_NOT_FITTED",
+  "coefficient_origin": "CONSERVATIVE_PREDECLARED_START_NO_HISTORICAL_FIT",
+  "margin": {
+    "intercept": 0,
+    "weight": 0.1
+  },
+  "total": {
+    "intercept": 0,
+    "weight": 0.1
+  },
+  "forward_min_abs_adjustment_points": 0.5,
+  "max_quote_age_seconds": 600,
+  "no_vig_method": "POWER_V1",
+  "historical_residual_fit": "NOT_PERFORMED",
+  "historical_evidence_is_forward_clv": false,
+  "forward_clv_positive": false,
+  "validated_markets": [],
+  "authority": {
+    "research_only": true,
+    "model_p": false,
+    "truth_gate": false,
+    "official": false,
+    "promotion": false,
+    "staking": false
+  }
+}
