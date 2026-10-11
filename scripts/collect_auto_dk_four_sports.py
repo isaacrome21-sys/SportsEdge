@@ -181,6 +181,7 @@ def events_to_board(sport, events, now):
             continue
         markets={}
         peer_info={}
+        peer_books={}
         for market in MARKETS:
             dk=paired(ev,books["draftkings"],market,now)
             if dk is None:
@@ -188,6 +189,15 @@ def events_to_board(sport, events, now):
             markets[market]=dk
             peers=[p for bk,b in books.items() if bk!="draftkings"
                    for p in [paired(ev,b,market,now)] if p is not None]
+            for peer in peers:
+                target = peer_books.setdefault(peer["book"],{"book":peer["book"]})
+                if market=="h2h":
+                    target["ml"]=[peer["away"],peer["home"]]
+                elif market=="spreads":
+                    target["spread"]=[peer["line"],peer["away"],peer["home"]]
+                elif market=="totals":
+                    target["total"]=[peer["line"],peer["over"],peer["under"]]
+                target["observed_at"]=peer["observed_at"]
             peer_info[market]=_fair_context(dk,peers,market)
         if not markets:
             continue
@@ -197,6 +207,7 @@ def events_to_board(sport, events, now):
             "commence_time":start.isoformat(),
             "slate_ct":start.astimezone(CHICAGO).date().isoformat(),
             "markets":markets,"reference":peer_info,
+            "peer_books":sorted(peer_books.values(),key=lambda x:x["book"]),
             "estimate_p":None,
         })
     games.sort(key=lambda x:(x["commence_time"],str(x["provider_event_id"])))
@@ -240,7 +251,9 @@ def cfb_compact(games):
         row={"away":g["away"],"home":g["home"],
              "start_ts":g["commence_time"],
              "quote_source":"THE_ODDS_API_DK_AUTO",
-             "book_quote_receipt_verified":True}
+             "book_quote_receipt_verified":True,
+             "peers":g.get("peer_books") or [],
+             "quote_captured_at":next(iter(g["markets"].values()))["observed_at"]}
         if "h2h" in m: row["ml"]=[m["h2h"]["away"],m["h2h"]["home"]]
         if "spreads" in m: row["spread"]=[m["spreads"]["line"],m["spreads"]["away"],m["spreads"]["home"]]
         if "totals" in m: row["total"]=[m["totals"]["line"],m["totals"]["over"],m["totals"]["under"]]
