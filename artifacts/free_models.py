@@ -750,6 +750,22 @@ def _paired_book_context(rows, evaluated, index):
         projected["paired_market_status"] = "MULTIPLE_CONTRADICTORY_PAIRS"
         return
     if market == "ML":
+        # Validate both quotations, not just this row. If an existing
+        # opposite ticket row carries a contradictory opposite_odds field,
+        # neither side gets a fabricated two-sided no-vig comparison.
+        if len(compatible) == 1:
+            partner = rows[compatible[0]["input_index"]]
+            reverse = partner.get("opposite_odds")
+            if reverse is not None:
+                try:
+                    reverse_dec = odds_decimal(reverse)
+                    quoted_dec = odds_decimal(result["odds_american"])
+                except (ValueError, TypeError):
+                    projected["paired_market_status"] = "OPPOSITE_ML_INVALID"
+                    return
+                if abs(reverse_dec - quoted_dec) > 1e-12:
+                    projected["paired_market_status"] = "OPPOSITE_ML_CONFLICT"
+                    return
         opposite = row.get("opposite_odds")
         if opposite is not None:
             try:
