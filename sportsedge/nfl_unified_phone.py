@@ -64,12 +64,7 @@ def _match_schedule(
     away: str,
     home: str,
     observed_at: datetime,
-    quoted_kickoff: Any = None,
 ) -> dict[str, Any]:
-    # AUTO quotes carry a provider event clock; require it to agree with
-    # the independent nflverse schedule. Legacy manual tickets without an
-    # event clock retain the existing distinct-opponent/unique-match rule.
-    expected = _utc(quoted_kickoff, "quote_kickoff") if quoted_kickoff is not None else None
     matches = []
     for row in schedule_games:
         try:
@@ -77,8 +72,7 @@ def _match_schedule(
             kick = _utc(kickoff, "kickoff")
         except UnifiedNflPhoneError:
             continue
-        if (row_away == away and row_home == home and kick > observed_at
-                and (expected is None or abs((kick-expected).total_seconds())<=900)):
+        if row_away == away and row_home == home and kick > observed_at:
             matches.append({
                 "game_id": game_id,
                 "away": row_away,
@@ -306,7 +300,6 @@ def build_unified_phone_card(
             away=away,
             home=home,
             observed_at=observed,
-            quoted_kickoff=game.get("commence_time"),
         )
         kickoff = _utc(schedule["kickoff"], "kickoff")
 
