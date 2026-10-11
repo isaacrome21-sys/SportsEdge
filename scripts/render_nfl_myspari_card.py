@@ -217,8 +217,8 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
                         f"· research EV {side['ev_per_dollar']*100:+.1f}%"
                     )
         else:
-            lines.append("- Residual research blocked: " + str(
-                game.get("residual_status") or "NO_PAIRED_FRESH_MARKET_CONTEXT"))
+            status = str(game.get("residual_status") or "NO_PAIRED_FRESH_MARKET_CONTEXT")
+            lines.append("- Residual research blocked: " + status.removeprefix("NO_MODEL:"))
         picks_out: list[str] = []
         other: list[str] = []
         team_totals: list[str] = []
