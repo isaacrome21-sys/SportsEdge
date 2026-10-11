@@ -1,9 +1,11 @@
 """Provenance-checked adapters from actual MLB/NFL/CFB engines to DK research bridge.
 
-Only *computed* probabilities from the existing MLB pitcher joint engine or
-attributed football simulation are admitted. This module never reads a betting
-price or substitutes league Poisson player priors. No OFFICIAL, Model_P, staking
-or authority. No betting market is priced from unsupported inputs.
+Only *computed* probabilities from the existing MLB pitcher joint engine,
+attributed football simulation, or a verified batter plate-appearance history
+are admitted. This module never reads a betting price or substitutes league
+Poisson player priors. No OFFICIAL, Model_P, staking or authority. No betting
+market is priced from unsupported inputs. Statcast and Next Gen features are
+not yet wired; they remain NOT_WIRED until a verified public source is added.
 """
 from __future__ import annotations
 
@@ -169,6 +171,39 @@ def mlb_pitcher_to_bridge_rows(
             player_id=player_id, line=line,
             home_team=home_team, away_team=away_team)]
     except (PitcherJointEngineError, ValueError, KeyError, TypeError, OverflowError) as exc:
+        return _blocked("MLB", game_id, market, side, player_id, exc)
+
+
+def mlb_batter_to_bridge_rows(
+    *, game_id: str, player_id: str, market: str, side: str, line: float,
+    features: Mapping[str, Any], prior_pa_times_utc: Sequence[str],
+    source_as_of_utc: str, as_of_utc: str, kickoff_utc: str,
+    lineup_verified: bool, home_team: str, away_team: str,
+) -> list[dict]:
+    """Fail-closed batter path. Requires verified plate-appearance history.
+
+    No league Poisson prior is substituted. Statcast features are not yet
+    consumed; a future collector must supply them under the same provenance
+    rules. Returns NO_MODEL_OR_MARKET until a real batter engine is wired.
+    """
+    try:
+        if lineup_verified is not True:
+            raise ValueError("LINEUP_UNVERIFIED")
+        model_time, game_time = _guard_time(
+            kickoff_utc=kickoff_utc, as_of_utc=as_of_utc,
+            source_as_of_utc=source_as_of_utc)
+        history = (features or {}).get("pa_history") if isinstance(features, Mapping) else None
+        if not isinstance(history, (list, tuple)) or len(history) < 20:
+            raise ValueError("TWENTY_PRIOR_PLATE_APPEARANCES_REQUIRED")
+        if not isinstance(prior_pa_times_utc, (list, tuple)) or len(prior_pa_times_utc) != len(history):
+            raise ValueError("TIMESTAMP_EACH_PRIOR_PA_REQUIRED")
+        source_time = _timestamp(source_as_of_utc, "SOURCE_AS_OF")
+        past = [_timestamp(t, "PRIOR_PA") for t in prior_pa_times_utc]
+        if len(set(past)) != len(past) or not all(t < source_time for t in past):
+            raise ValueError("HISTORY_LEAK_OR_DUPLICATE_PA")
+        # Real batter engine is not yet implemented. Fail closed.
+        raise ValueError("BATTER_ENGINE_NOT_YET_WIRED_STATCAST_REQUIRED")
+    except (ValueError, TypeError, KeyError) as exc:
         return _blocked("MLB", game_id, market, side, player_id, exc)
 
 
