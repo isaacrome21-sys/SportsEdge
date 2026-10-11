@@ -123,6 +123,41 @@ def render_card(card, *, run_url="", intake_at=""):
                      f"{fmt_percent(row['ev_per_dollar'])} |")
     if not rows:
         lines.append("| — | No eligible research candidates at supplied prices | — | — | — |")
+    # The game-only free runner is not the full prop-model card.
+    # Keep the visible source/status receipts for each unpriced input.
+    prop_picks = card.get("prop_candidates") or []
+    prop_watch = card.get("prop_watchlist") or []
+    prop_missing = card.get("prop_unpriced") or []
+    lines += [
+        "",
+        "**Real MLB pitcher-model research (free prior starts; unvalidated)**",
+        f"Current-price research candidates: **{len(prop_picks)}** · "
+        f"Stale/price-cap/below-threshold watchlist: **{len(prop_watch)}** · "
+        f"No real model or missing data: **{len(prop_missing)}**",
+        "StatsAPI probable starter is not a confirmed lineup. No generic league-only prop probability is substituted.",
+        "",
+        "| Pitcher / market | DK | Model p | DK no-vig p | Edge pp | Hypothetical EV | Quote |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | --- |",
+    ]
+    for r in (prop_picks + prop_watch)[:24]:
+        lines.append(
+            f"| {safe(r.get('player_name'))} {safe(r.get('market'))} "
+            f"{safe(r.get('selection'))} {safe(r.get('line'))} | "
+            f"{fmt_price(r['dk_odds'])} | "
+            f"{float(r['model_probability'])*100:.1f}% | "
+            f"{float(r['dk_no_vig_p'])*100:.1f}% | "
+            f"{float(r['edge_pp']):+.1f} | "
+            f"{fmt_percent(r['ev_per_dollar'])} | "
+            f"{safe(r.get('quote_status'),50)} |"
+        )
+    if not prop_picks and not prop_watch:
+        lines.append("| — | — | — | — | — | — | No pitcher props met verified model/paired quote requirements |")
+    for r in prop_missing[:16]:
+        lines.append("- No prop model: " + safe(r.get("player_name") or r.get("player_id") or r.get("market")) +
+                     " " + safe(r.get("market")) + " " + safe(r.get("selection")) +
+                     " — " + safe(r.get("reason"),150))
+    if len(prop_missing) > 16:
+        lines.append(f"- Plus {len(prop_missing)-16} further unpriced selections in the artifact.")
     lines += ["", "**Rejected or unpriced:**"]
     excluded = [(k,v) for k,v in sorted(counts.items()) if k != "RESEARCH_EDGE"]
     if excluded:
