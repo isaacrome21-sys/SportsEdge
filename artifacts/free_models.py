@@ -407,7 +407,37 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
         away_mean += context["weather_total_adj"] / 2
     if min(home_mean, away_mean) < 0.2:
         raise ValueError("IMPLAUSIBLE_SCORE_MEAN")
+    # A raw league-score baseline is NOT an executable fair price. Shrink
+    # game-location departures toward the posted market threshold; 15% is an
+    # unfitted RESEARCH prior, not a learned edge. Do not move an unknown line.
+    raw_margin, raw_total = home_mean-away_mean, home_mean+away_mean
+    anchor = {"status": "MARKET_ANCHORED_UNVALIDATED", "weight": 0.15}
+    if market == "TOTAL":
+        anchored_total = line + 0.15 * (raw_total-line)
+        shift = (anchored_total-raw_total)/2
+        home_mean += shift
+        away_mean += shift
+        anchor.update(market_total=line, raw_total=raw_total, fair_total=anchored_total)
+    elif market == "SPREAD":
+        market_home_margin = -line if side == "HOME" else line
+        anchored_margin = market_home_margin + 0.15*(raw_margin-market_home_margin)
+        shift = (anchored_margin-raw_margin)/2
+        home_mean += shift
+        away_mean -= shift
+        anchor.update(market_home_margin=market_home_margin, raw_margin=raw_margin,
+                      fair_home_margin=anchored_margin)
+    else:
+        # A one-sided ML price contains vig. Without the opposite price we
+        # cannot infer the bookmaker's no-vig baseline. Reject, don't invent.
+        opposite = row.get("opposite_odds")
+        if opposite is None:
+            return {"status": "BLOCKED_UNPAIRED_ML", "game": f"{away} @ {home}", "sport": sport}
+        opposite_dec = odds_decimal(opposite)
+        p1, p2 = 1/dec, 1/opposite_dec
+        anchor.update(market_no_vig_p=p1/(p1+p2))
     win, push = model_probability(sport, market, side, line, home_mean, away_mean)
+    if market == "ML":
+        win = bounded(anchor["market_no_vig_p"] + 0.15*(win-anchor["market_no_vig_p"]), 0, 1)
     loss = bounded(1 - win - push, 0, 1)
     ev = win * (dec - 1) - loss
     breakeven = 1 / dec
@@ -429,7 +459,7 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
             "edge_over_break_even_pp": round(100 * (win - breakeven), 3),
             "ev_per_dollar": round(ev, 6), "home_mean": round(home_mean, 3),
             "away_mean": round(away_mean, 3), "context": context, "context_notes": notes,
-            "context_quality": "HEURISTIC_UNVALIDATED",
+            "context_quality": "HEURISTIC_UNVALIDATED", "market_anchor": anchor,
             "model_validation": "NOT_PROVEN_VS_CLOSE", "research_only": True,
             "model_p_authority": False, "official_authority": False,
             "staking_authority": False, "sharp_reference_compared": False}
