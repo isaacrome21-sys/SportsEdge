@@ -106,5 +106,49 @@ class NflMarketAnchoredResidualTests(unittest.TestCase):
         self.assertTrue(all(x["forward_clv_status"] == "PENDING" for x in row))
 
 
+class NflResidualEntrypointTests(unittest.TestCase):
+    def test_run_it_bridge_prices_three_game_markets_without_authority(self):
+        from sportsedge.nfl_run_it import run_it_market_anchored
+        stamp = NOW.isoformat()
+        base = {"game_id": "2026_06_KC_BAL", "away": "KC",
+                "home": "BAL", "book": "draftkings", "retrieved_at": stamp}
+        quotes = [
+            {**base, "market": "moneyline", "selection": "KC", "line": None, "price_american": 150},
+            {**base, "market": "moneyline", "selection": "BAL", "line": None, "price_american": -180},
+            {**base, "market": "spread", "selection": "KC", "line": 3.5, "price_american": -110},
+            {**base, "market": "spread", "selection": "BAL", "line": -3.5, "price_american": -110},
+            {**base, "market": "total", "selection": "OVER", "line": 50.5, "price_american": -110},
+            {**base, "market": "total", "selection": "UNDER", "line": 50.5, "price_american": -110},
+        ]
+        raw = {"2026_06_KC_BAL": {"margin": 3.5, "total": 50.5,
+               "commence_time": (NOW + timedelta(hours=3)).isoformat()}}
+        card = run_it_market_anchored(quotes, raw, as_of=NOW)
+        self.assertEqual(card["picks"], [])
+        self.assertEqual(card["validated_markets"], [])
+        self.assertFalse(card["promotion_authority"])
+        self.assertEqual(len(card["games"][0]["market_anchored_research_prices"]), 6)
+        self.assertTrue(all(abs(x["edge_probability_points"]) < 1e-9
+                            for x in card["games"][0]["market_anchored_research_prices"]))
+
+    def test_unified_cli_research_sidecar_preserves_frozen_game_market_disable(self):
+        from scripts.run_nfl_unified_lines_card import attach_residual_game_research
+        prior = []
+        for i in range(1, 8):
+            prior.extend([
+                {"date": f"2026-10-{i:02d}", "home": "KC", "away": "LV",
+                 "hs": 24, "as": 14},
+                {"date": f"2026-10-{i:02d}", "home": "BAL", "away": "CIN",
+                 "hs": 28, "as": 17},
+            ])
+        ticket = {"observed_at": NOW.isoformat(), "slate": "2026-10-11",
+                  "games": [game()]}
+        payload = {"games": [{"engine": {"game_market_edge_disabled": True}}]}
+        result = attach_residual_game_research(payload, ticket, prior)
+        self.assertTrue(result["games"][0]["engine"]["game_market_edge_disabled"])
+        self.assertEqual(len(result["games"][0]["residual_game_prices"]), 6)
+        self.assertEqual(result["residual_research_authority"]["validated_markets"], [])
+        self.assertFalse(result["residual_research_authority"]["official"])
+
+
 if __name__ == "__main__":
     unittest.main()
