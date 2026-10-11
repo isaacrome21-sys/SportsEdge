@@ -341,3 +341,22 @@ def test_prop_card_requires_posted_spread_and_total_context():
     assert len(props) == 2
     assert all(row["status"] == "NO_MODEL" for row in props)
     assert all(row["reason"] == "MARKET_CONTEXT_SPREAD_TOTAL_REQUIRED" for row in props)
+
+
+def test_auto_prop_market_clock_must_agree_with_independent_schedule():
+    from datetime import datetime,timezone
+    from sportsedge.nfl_unified_phone import _match_schedule, UnifiedNflPhoneError
+    asof=datetime(2026,10,1,19,0,tzinfo=timezone.utc)
+    source=schedule()
+    near=_match_schedule(source,away="KC",home="BAL",observed_at=asof,
+                          quoted_kickoff="2026-10-04T17:07:00Z")
+    assert near["game_id"]=="2026_04_KC_BAL"
+    with pytest.raises(UnifiedNflPhoneError,match="SCHEDULE_MATCH_REQUIRED"):
+        _match_schedule(source,away="KC",home="BAL",observed_at=asof,
+                        quoted_kickoff="2026-10-04T18:00:00Z")
+    with pytest.raises(UnifiedNflPhoneError,match="quote_kickoff:AWARE_TIMESTAMP_REQUIRED"):
+        _match_schedule(source,away="KC",home="BAL",observed_at=asof,
+                        quoted_kickoff="2026-10-04T17:00:00")
+    # Legacy operator tickets without a provider kickoff keep the existing
+    # unique matchup rule, instead of synthesizing a clock for them.
+    assert _match_schedule(source,away="KC",home="BAL",observed_at=asof)["game_id"]=="2026_04_KC_BAL"
