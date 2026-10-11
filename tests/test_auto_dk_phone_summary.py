@@ -64,3 +64,27 @@ def test_phone_issue_summary_includes_actual_dk_rows_and_missing_notice():
         assert "out-of-sample validation" in result
         assert "unmatched games: 1" in result
         assert "/actions/runs/123" in result
+
+def test_nfl_today_and_thursday_are_separate_date_sections():
+    with TemporaryDirectory() as temp:
+        root=Path(temp)
+        (root/"summary.json").write_text(json.dumps({
+          "NFL":{"status":"READY","cards":[
+            {"json":"nfl_sunday.json","date":"2026-10-11","state":"READY"},
+            {"json":"nfl_thursday.json","date":"2026-10-15","state":"READY"}
+          ]},"CFB":{"status":"NO_DK_GAMES","cards":[]}
+        }))
+        def simple_card(a,b,ev):
+            return {"games":[{"away":a,"home":b,"markets":[{"market":"total","lean":{
+                "selection":"Under","line":54.5,"price_american":-105,
+                "estimate_p":.54,"edge_probability_points":.04,
+                "ev_per_dollar":ev,"lean_reason":"TRACK_ONLY"}}]}]}
+        (root/"nfl_sunday.json").write_text(json.dumps(simple_card("DET","ARI",.048)))
+        (root/"nfl_thursday.json").write_text(json.dumps(simple_card("BUF","LAR",.10)))
+        result=card.render(root,"https://example.com",as_of_date="2026-10-11")
+        a=result.index("NFL slate: Sun Oct 11 · TODAY")
+        b=result.index("NFL slate: Thu Oct 15 · UPCOMING")
+        assert a<b
+        assert "DET @ ARI" in result[a:b]
+        assert "BUF @ LAR" not in result[a:b]
+        assert "BUF @ LAR" in result[b:]
