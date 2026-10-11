@@ -11,7 +11,7 @@ _spec.loader.exec_module(card)
 V2 = ROOT / "config" / "cfb_probation_policy_v2.json"  # legacy v2 behaviour stays pinned here; v3 has its own test
 
 
-def row(matchup, market, side, edge, status="LEAN", odds=-110, devig="PAIRED_PROPORTIONAL"):
+def row(matchup, market, side, edge, status="LEAN", odds=-110, devig="PAIRED_POWER_V1"):
     return {"matchup": matchup, "market": market, "side": side, "line": 50.5, "edge": edge,
             "expected_roi": edge, "bet_status": status, "american_odds": odds, "devig": devig,
             "model_p": 0.5 + edge, "market_p": 0.5}
@@ -108,7 +108,7 @@ class ProbationTest(unittest.TestCase):
                 rows.append({"matchup": f"G{i} @ H{i}", "market": "TOTAL", "side": side, "line": 45.5,
                              "home_mean": 26.0, "away_mean": 26.0, "edge": e, "expected_roi": e,
                              "bet_status": "LEAN" if side == "OVER" else "PASS", "american_odds": -110,
-                             "devig": "PAIRED_PROPORTIONAL", "reason": "X"})
+                             "devig": "PAIRED_POWER_V1", "reason": "X"})
         p = card.apply_probation(payload(rows), V2)
         self.assertEqual(p["probation"]["slate_total_bias_signal"], "MODEL_HIGH")
         self.assertEqual(p["probation"]["count"], 0)

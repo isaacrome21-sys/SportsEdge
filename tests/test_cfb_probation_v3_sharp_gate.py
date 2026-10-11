@@ -13,7 +13,7 @@ _spec.loader.exec_module(card)
 
 def row(market, side, edge, sharp=None, odds=-110):
     r = {"matchup": f"{market}{side}{edge}", "market": market, "side": side, "line": -3.5, "edge": edge,
-         "expected_roi": edge, "bet_status": "LEAN", "american_odds": odds, "devig": "PAIRED_PROPORTIONAL"}
+         "expected_roi": edge, "bet_status": "LEAN", "american_odds": odds, "devig": "PAIRED_POWER_V1"}
     if sharp is not None:
         r["sharp_fair_p"] = sharp
     return r
