@@ -4,6 +4,14 @@ name: sportsedge-auto-dk-four-sports
 on:
   schedule:
     - cron: '17 10 * * *'
+  # Immediately run one guarded live capture when this workflow merges to main;
+  # avoid repeated paid API calls from unrelated repository commits.
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/collect_auto_dk_four_sports.py'
+      - 'scripts/run_auto_dk_cards.py'
+      - '.github/workflows/sportsedge-auto-dk-four-sports.yml'
   pull_request:
     paths:
       - 'scripts/collect_auto_dk_four_sports.py'
