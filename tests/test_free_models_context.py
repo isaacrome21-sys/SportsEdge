@@ -158,3 +158,20 @@ def test_winter_football_and_fall_nba_use_correct_season_year():
     ):
         provider.schedule(sport, {"id": "123"}, model.dt(stamp))
         assert suffix in urls[-1]
+
+
+def test_explicit_kickoff_missing_verified_fixture_never_reports_edge():
+    # Regression: an input kickoff is not evidence ESPN supplied free context.
+    r = model.run({"lines": [line(commence_time=START)]},
+                  now=NOW, getter=lambda _: {})
+    assert not r["edges"]
+    assert r["summary"]["status_counts"]["BLOCKED_CONTEXT_UNVERIFIED"] == 1
+    assert "UNIQUE_FUTURE_ESPN_FIXTURE_MISSING" in r["diagnostics"][0]["reason"]
+
+
+def test_manual_no_fetch_still_allows_explicit_valid_pregame_clock():
+    # No-fetch is deliberate, and must remain labeled unvalidated research.
+    r = model.run({"lines": [line(commence_time=START)]},
+                  now=NOW, auto_context=False)
+    assert r["summary"]["status_counts"].get("BLOCKED_CONTEXT_UNVERIFIED", 0) == 0
+    assert r["summary"]["rows"] == 1
