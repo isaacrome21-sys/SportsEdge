@@ -101,6 +101,26 @@ def render_card(card, *, run_url="", intake_at=""):
     lines += ["", f"Free context: {fetched} retrieved, {missing} unavailable. No paid odds calls.",
               "Full model card and source receipts are available in the workflow artifact.",
               f"GitHub Actions run: {safe(run_url, 300)}"]
+    factor_report = card.get("factor_coverage")
+    if factor_report:
+        if factor_report.get("schema") != "SPORTSEDGE_FACTOR_COVERAGE_V1":
+            raise IntakeError("UNRECOGNIZED_FACTOR_COVERAGE_SCHEMA")
+        by_idx = {r["input_index"]: r["factors"]
+                  for r in factor_report.get("by_input_index") or []}
+        lines += ["", "**Factor verification — measured vs missing**",
+                  "Factor presence does not prove predictive value. Missing factors never mean zero impact."]
+        stats = factor_report.get("status_counts") or {}
+        lines.append("All input rows (factor-status counts): " +
+                     ", ".join(f"{safe(k)}={int(v)}" for k,v in sorted(stats.items())))
+        for row in rows[:8]:
+            coverage = by_idx.get(row.get("input_index"), {})
+            unavailable = [name for name, value in coverage.items()
+                           if value.get("status") in ("NOT_WIRED", "MISSING_UNVERIFIED")]
+            if unavailable:
+                lines.append(f"- {safe(row.get('selection'))}: "
+                             f"missing/not modeled: {safe(', '.join(unavailable),240)}")
+        lines.append("Statcast, Next Gen, lineup/usage, coaching, refs/umpires and "
+                     "travel are not independently priced by this free runner.")
     return "\n".join(lines) + "\n"
 
 def main(argv=None):
