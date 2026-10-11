@@ -177,6 +177,43 @@ class NflResidualEntrypointTests(unittest.TestCase):
         self.assertEqual(result["residual_research_authority"]["validated_markets"], [])
         self.assertFalse(result["residual_research_authority"]["official"])
 
+    def test_unified_residual_sidecar_uses_frozen_grid_with_adjusted_means(self):
+        from sportsedge.sports.nfl.unified_residual_research import run_unified_residual_research
+        base = {"game_id": "2026_06_KC_BAL", "home": "BAL", "away": "KC",
+                "book": "draftkings", "retrieved_at": NOW.isoformat()}
+        quotes = [
+            {**base, "market": "moneyline", "selection": "KC", "price_american": 150},
+            {**base, "market": "moneyline", "selection": "BAL", "price_american": -180},
+            {**base, "market": "spread", "selection": "KC", "line": 3.5, "price_american": -110},
+            {**base, "market": "spread", "selection": "BAL", "line": -3.5, "price_american": -110},
+            {**base, "market": "total", "selection": "OVER", "line": 50.5, "price_american": -110},
+            {**base, "market": "total", "selection": "UNDER", "line": 50.5, "price_american": -110},
+        ]
+        out = run_unified_residual_research(
+            game_id="2026_06_KC_BAL", home_team="BAL", away_team="KC",
+            raw_margin=13.5, raw_total=65.5, paired_game_quotes=quotes,
+            game_start_ts=(NOW + timedelta(hours=3)).isoformat(),
+            as_of=NOW.isoformat(), n_sims=120, seed=11)
+        fair_margin = 3.5 + 0.15 * (13.5 - 3.5)
+        fair_total = 50.5 + 0.15 * (65.5 - 50.5)
+        self.assertAlmostEqual(out["score_means"]["mean_home"], (fair_total + fair_margin) / 2)
+        self.assertAlmostEqual(out["score_means"]["mean_away"], (fair_total - fair_margin) / 2)
+        self.assertEqual(len(out["game_markets"]), 6)
+        self.assertEqual(out["picks"], [])
+        self.assertEqual(out["validated_markets"], [])
+        self.assertFalse(out["authority"]["promotion_authority"])
+        self.assertTrue(all(r["status"] == "RESEARCH_ONLY" for r in out["game_markets"]))
+
+    def test_unified_residual_sidecar_requires_paired_quotes(self):
+        from sportsedge.sports.nfl.unified_residual_research import (
+            UnifiedResidualResearchError, run_unified_residual_research)
+        with self.assertRaisesRegex(UnifiedResidualResearchError, "PAIRED_GAME_QUOTES_REQUIRED"):
+            run_unified_residual_research(
+                game_id="x", home_team="BAL", away_team="KC",
+                raw_margin=10, raw_total=48, paired_game_quotes=[],
+                game_start_ts=(NOW + timedelta(hours=3)).isoformat(),
+                as_of=NOW.isoformat())
+
 
 if __name__ == "__main__":
     unittest.main()
