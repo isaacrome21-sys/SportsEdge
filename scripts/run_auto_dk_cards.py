@@ -96,7 +96,19 @@ def _cfb_school_matches(book_name: str, schedule_name: str) -> bool:
     """
     clean=lambda text: " ".join(re.sub(r"[^a-z0-9 ]"," ",str(text).casefold()).split())
     book,school=clean(book_name),clean(schedule_name)
-    return bool(school and (book==school or book.startswith(school+" ")))
+    if not school: return False
+    if book==school: return True
+    if not book.startswith(school+" "): return False
+    suffix=book[len(school)+1:].split()
+    # A different school's name must not be confused for a mascot
+    # (Florida State vs Florida; Delaware State vs Delaware).
+    other_school_words={"state","tech","atlantic","international","southern",
+        "northern","eastern","western","central","north","south","east","west",
+        "ohio","poly","a","am","monroe","lafayette","el","san"}
+    if suffix and suffix[0] in other_school_words:
+        # SportsDataverse lists Sam Houston State as Sam Houston.
+        return school=="sam houston" and suffix[0]=="state"
+    return True
 
 
 def bind_cfb_sdv_games(games: list, directory: Path, now: datetime):
