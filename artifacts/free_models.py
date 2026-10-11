@@ -599,6 +599,35 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
     # game-location departures toward the posted market threshold; 15% is an
     # unfitted RESEARCH prior, not a learned edge. Do not move an unknown line.
     raw_margin, raw_total = home_mean-away_mean, home_mean+away_mean
+    # The model's own score means MUST be captured before sportsbook
+    # anchoring. This is a simple unvalidated league/form/injury heuristic,
+    # not a proven independent model or a validated wagering probability.
+    raw_win, raw_push = model_probability(
+        sport, market, side, line, home_mean, away_mean)
+    raw_loss = bounded(1 - raw_win - raw_push, 0, 1)
+    raw_ev = raw_win * (dec - 1) - raw_loss
+    raw_conditional = (raw_win / (raw_win + raw_loss)
+                       if raw_win + raw_loss > 0 else None)
+    raw_fair = None
+    if raw_conditional is not None and 0 < raw_conditional < 1:
+        raw_fair = (-100 * raw_conditional / (1 - raw_conditional)
+                    if raw_conditional >= 0.5
+                    else 100 * (1 - raw_conditional) / raw_conditional)
+    independent = {
+        "family": "FREE_TEAM_SCORE_HEURISTIC_UNVALIDATED",
+        "home_mean": round(home_mean, 3),
+        "away_mean": round(away_mean, 3),
+        "projected_total": round(raw_total, 3),
+        "projected_home_margin": round(raw_margin, 3),
+        "estimate_p": round(raw_win, 6),
+        "loss_p": round(raw_loss, 6),
+        "push_p": round(raw_push, 6),
+        "fair_american": round(raw_fair) if raw_fair is not None else None,
+        "ev_per_dollar": round(raw_ev, 6),
+        "uses_sportsbook_price_in_projection": False,
+        "not_wagering_authority": True,
+        "validated_vs_close": False,
+    }
     anchor = {"status": "MARKET_ANCHORED_UNVALIDATED", "weight": 0.15}
     if market == "TOTAL":
         anchored_total = line + 0.15 * (raw_total-line)
@@ -647,10 +676,134 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
             "edge_over_break_even_pp": round(100 * (win - breakeven), 3),
             "ev_per_dollar": round(ev, 6), "home_mean": round(home_mean, 3),
             "away_mean": round(away_mean, 3), "context": context, "context_notes": notes,
-            "context_quality": "HEURISTIC_UNVALIDATED", "market_anchor": anchor,
+            "context_quality": "HEURISTIC_UNVALIDATED",
+            "independent_projection": independent,
+            "market_anchor": anchor,
             "model_validation": "NOT_PROVEN_VS_CLOSE", "research_only": True,
             "model_p_authority": False, "official_authority": False,
             "staking_authority": False, "sharp_reference_compared": False}
+
+
+
+def _pair_side(input_row, result):
+    """Identify the selected bookmaker side; team names are exact normalized aliases."""
+    market = result.get("market")
+    side = str(input_row.get("side") or input_row.get("selection") or "").strip()
+    key = PublicContext.key
+    if market == "TOTAL":
+        return side.upper() if side.upper() in ("OVER", "UNDER") else None
+    game = str(result.get("game") or "")
+    if " @ " not in game:
+        return None
+    away, home = game.split(" @ ", 1)
+    if side.upper() in ("HOME", "AWAY"):
+        return side.upper()
+    return "HOME" if key(side) == key(home) else "AWAY" if key(side) == key(away) else None
+
+
+def _paired_book_context(rows, evaluated, index):
+    """Find EXACT other-side prices within the same supplied sportsbook ticket.
+
+    These are same-book, contemporaneous-as-supplied no-vig market comparisons.
+    They are NOT Pinnacle, independent market evidence, or validated model p.
+    """
+    result = evaluated[index]
+    projected = result.get("independent_projection")
+    if not isinstance(projected, dict):
+        return
+    row = rows[index]
+    market = result["market"]
+    side = _pair_side(row, result)
+    expected_opposite = {"OVER": "UNDER", "UNDER": "OVER",
+                         "HOME": "AWAY", "AWAY": "HOME"}.get(side)
+    if expected_opposite is None:
+        projected["paired_market_status"] = "SIDE_UNRESOLVED"
+        return
+    def book(x):
+        name = str(x.get("book") or x.get("sportsbook") or "draftkings").strip().casefold()
+        return "draftkings" if name in ("dk", "draftkings") else name
+    def same_market(other, other_row):
+        if other is result or other.get("independent_projection") is None:
+            return False
+        if (other.get("game"),other.get("sport"),other.get("market"),
+            other.get("kickoff_utc")) != (
+            result.get("game"),result.get("sport"),market,result.get("kickoff_utc")):
+            return False
+        if book(other_row) != book(row):
+            return False
+        if _pair_side(other_row, other) != expected_opposite:
+            return False
+        if market == "TOTAL":
+            return other.get("line") == result.get("line")
+        if market == "SPREAD":
+            try:
+                return abs(float(other["line"]) + float(result["line"])) < 1e-9
+            except (ValueError, TypeError, KeyError):
+                return False
+        return market == "ML"
+    compatible = [other for i,other in enumerate(evaluated)
+                  if i != index and isinstance(rows[i], dict) and same_market(other,rows[i])]
+    partner_price = None
+    if len(compatible) == 1:
+        partner_price = compatible[0]["odds_american"]
+    elif len(compatible) > 1:
+        projected["paired_market_status"] = "MULTIPLE_CONTRADICTORY_PAIRS"
+        return
+    if market == "ML":
+        # Validate both quotations, not just this row. If an existing
+        # opposite ticket row carries a contradictory opposite_odds field,
+        # neither side gets a fabricated two-sided no-vig comparison.
+        if len(compatible) == 1:
+            partner = rows[compatible[0]["input_index"]]
+            reverse = partner.get("opposite_odds")
+            if reverse is not None:
+                try:
+                    reverse_dec = odds_decimal(reverse)
+                    quoted_dec = odds_decimal(result["odds_american"])
+                except (ValueError, TypeError):
+                    projected["paired_market_status"] = "OPPOSITE_ML_INVALID"
+                    return
+                if abs(reverse_dec - quoted_dec) > 1e-12:
+                    projected["paired_market_status"] = "OPPOSITE_ML_CONFLICT"
+                    return
+        opposite = row.get("opposite_odds")
+        if opposite is not None:
+            try:
+                opposite = int(numeric(opposite,"opposite_odds"))
+            except (ValueError,TypeError):
+                projected["paired_market_status"] = "OPPOSITE_ML_INVALID"
+                return
+            if partner_price is not None and int(partner_price) != opposite:
+                projected["paired_market_status"] = "OPPOSITE_ML_CONFLICT"
+                return
+            partner_price = opposite
+    if partner_price is None:
+        projected["paired_market_status"] = "MISSING_EXACT_OPPOSITE_DK_PRICE"
+        return
+    if book(row) != "draftkings":
+        projected["paired_market_status"] = "NOT_DRAFTKINGS_PAIR"
+        return
+    # Optional quotes are assumed same screenshot unless an explicit
+    # timestamp proves they differ; never compare known mismatched captures.
+    input_time = row.get("quote_captured_at")
+    matching_time = None
+    if len(compatible) == 1:
+        matching_time = rows[compatible[0]["input_index"]].get("quote_captured_at")
+    if input_time and matching_time and str(input_time) != str(matching_time):
+        projected["paired_market_status"] = "MISMATCHED_QUOTE_TIMESTAMPS"
+        return
+    try:
+        p1 = 1.0 / odds_decimal(result["odds_american"])
+        p2 = 1.0 / odds_decimal(partner_price)
+    except (ValueError,TypeError,KeyError):
+        projected["paired_market_status"] = "PAIRED_PRICE_INVALID"
+        return
+    fair = p1/(p1+p2)
+    projected["market_no_vig_p"] = round(fair,6)
+    projected["edge_vs_dk_no_vig_pp"] = round(100*(projected["estimate_p"]-fair),3)
+    projected["paired_market_status"] = "EXACT_DK_TWO_SIDED_NO_VIG_RESEARCH"
+    projected["reference_is_independent_sharp_market"] = False
+
 
 
 def run(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
@@ -678,12 +831,41 @@ def run(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
             result = {"status": "BLOCKED_INVALID", "reason": str(exc)[:140]}
         result["input_index"] = i
         all_rows.append(result)
+    # Keep independent projections available even when an optional 15%
+    # book-anchored research view has zero qualifying candidates. Exact
+    # paired DK no-vig is a benchmark, not a predictive feature.
+    for i, result in enumerate(all_rows):
+        if isinstance(rows[i], dict):
+            _paired_book_context(rows, all_rows, i)
+    independent = []
+    watchlist = []
+    for row in all_rows:
+        projection = row.get("independent_projection")
+        if not isinstance(projection, dict):
+            continue
+        if projection.get("paired_market_status") != "EXACT_DK_TWO_SIDED_NO_VIG_RESEARCH":
+            watchlist.append(row)
+            continue
+        if row.get("odds_american", -999) < -165:
+            watchlist.append(row)
+            continue
+        if projection.get("ev_per_dollar", -1) >= min_ev:
+            independent.append(row)
+        else:
+            watchlist.append(row)
+    independent.sort(key=lambda r: (-r["independent_projection"]["ev_per_dollar"],
+                                    r["game"],r["selection"]))
+    watchlist.sort(key=lambda r: (-r["independent_projection"]["ev_per_dollar"],
+                                  r["game"],r["selection"]))
     edges = [r for r in all_rows if r["status"] == "RESEARCH_EDGE"]
     edges.sort(key=lambda r: (-r["ev_per_dollar"], r["game"], r["selection"]))
     return {"schema": "SPORTSEDGE_FREE_RESEARCH_CARD_V1", "as_of_utc": now.isoformat(),
             "authority": {"research_only": True, "official": False, "model_p": False,
                           "truth_gate": False, "staking": False},
             "min_ev": min_ev, "edges": edges,
+            "independent_candidates": independent,
+            "independent_watchlist": watchlist,
+            "research_projection_note": "Unvalidated independent league-score heuristic; DK is a paired same-book no-vig benchmark, not sharp market verification.",
             # Keep the complete graded, source-annotated rows for reproducible
             # factor coverage and honest diagnostics even when below threshold.
             "evaluated_rows": all_rows,
