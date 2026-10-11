@@ -2,8 +2,10 @@
 """Free four-sport research with a truthful per-selection factor checklist.
 
 Game ML/spread/total estimates delegate to the existing UNVALIDATED free_models
-engine. No player-prop pricing is fabricated; unsupported factors do not enter
-the price. All network calls are to existing free ESPN/Open-Meteo endpoints.
+engine. MLB pitcher props use verified public StatsAPI. Team totals and first
+half markets reuse the same free_models means. CFB player props use free ESPN
+gamelogs. NFL player props, Statcast, and Next Gen remain on other branches or
+unpriced. Issues are untrusted odds intake.
 """
 from __future__ import annotations
 import argparse
@@ -15,6 +17,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from artifacts import free_models as engine
 from sportsedge.mlb_phone_pitcher_pricing import phone_pitcher_rows, blocked
+from sportsedge.team_half_pricing import price_team_or_half
+from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
 from datetime import datetime, timezone
 
 FIELDS = (
@@ -25,6 +29,11 @@ FIELDS = (
 UNWIRED = "NOT_WIRED"
 MISSING = "MISSING_UNVERIFIED"
 HEURISTIC = "HEURISTIC_NOT_VALIDATED"
+
+TEAM_HALF_MARKETS = frozenset({
+    "TEAM_TOTAL", "TEAM_TOTAL_POINTS", "TOTAL_1H", "FIRST_HALF_TOTAL",
+    "SPREAD_1H", "FIRST_HALF_SPREAD", "ML_1H", "FIRST_HALF_ML",
+})
 
 
 def audit_row(source, result):
@@ -38,7 +47,7 @@ def audit_row(source, result):
     has = bool(context) and result.get("status") not in (
         "BLOCKED_INVALID", "BLOCKED_STARTED", "BLOCKED_CONTEXT_UNVERIFIED",
         "BLOCKED_KICKOFF_UNVERIFIED", "BLOCKED_IL_COLLEGE",
-        "BLOCKED_UNPAIRED_ML",
+        "BLOCKED_UNPAIRED_ML", "NO_MODEL_OR_MARKET",
     )
     out = {f: {"status": UNWIRED, "detail": "No independently priced input wired"} for f in FIELDS}
     history = (has and "NO_FETCH_MANUAL_MODE" not in n
@@ -86,25 +95,32 @@ def audit_row(source, result):
     out["sport_specific"] = {"status": "PARTIAL_HEURISTIC" if has else MISSING,
                               "detail": sport_specific.get(sport, "Unsupported sport")}
     if market not in ("ML", "SPREAD", "TOTAL"):
-        if result.get("source") == "FREE_MLB_STATSAPI_GAMELOG" and result.get("status") != "NO_MODEL_OR_MARKET":
+        src = result.get("source") or ""
+        if src in {"FREE_MLB_STATSAPI_GAMELOG", "FREE_ESPN_CFB_GAMELOG"} and result.get("status") != "NO_MODEL_OR_MARKET":
             out["player_props"] = {
-                "status": "REAL_PITCHER_HISTORY_MODEL_UNVALIDATED",
-                "detail": "Verified prior MLB StatsAPI pitcher starts priced by the real empirical-Bayes joint engine; scheduled probable starter is not confirmed; not validated vs closes",
+                "status": "REAL_PUBLIC_HISTORY_MODEL_UNVALIDATED",
+                "detail": "Verified prior public game logs priced by real empirical engine; not validated vs closes",
+            }
+        elif result.get("model_source") == "free_models_means_team_half_v1" and result.get("status") == "PRICED_RESEARCH":
+            out["player_props"] = {
+                "status": "NOT_APPLICABLE",
+                "detail": "Team/half market priced from free_models means",
             }
         else:
-            out["player_props"] = {"status": "NO_MODEL_OR_MARKET",
-                                   "detail": result.get("reason") or "Required real player-level history or simulated paths unavailable; no probability assigned"}
+            out["player_props"] = {
+                "status": "NO_MODEL_OR_MARKET",
+                "detail": result.get("reason") or "Required real player-level history or simulated paths unavailable; no probability assigned",
+            }
     else:
         out["player_props"] = {"status": "NOT_APPLICABLE", "detail": "Game-level market"}
     return out
 
 
 def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
-    """Separate real game and pitcher models, preserving original row order.
+    """Separate real game, pitcher, team/half, and CFB player models.
 
-    Issues are UNTRUSTED odds intake: NEVER use submitted features,
-    probabilities, starter/participation verification flags or simulation paths.
-    The only trusted pitcher data comes from free public MLB endpoints.
+    Issues are UNTRUSTED odds intake. Trusted data comes only from free public
+    MLB and ESPN endpoints.
     """
     rows = payload if isinstance(payload, list) else payload.get("lines")
     if not isinstance(rows, list):
@@ -151,20 +167,42 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
                          "model_p":False,"staking":False},
         }
     pitcher_pos, pitcher_input = [], []
+    cfb_pos, cfb_input = [], []
+    team_half_pos, team_half_input = [], []
     others = {}
     for local, line in enumerate(props):
         market = str(line.get("market") or "").upper()
         if line["sport"] == "MLB" and market.startswith("PITCHER_"):
             pitcher_pos.append(local)
             pitcher_input.append(line)
+        elif line["sport"] == "CFB" and market.startswith("PLAYER_"):
+            cfb_pos.append(local)
+            cfb_input.append(line)
+        elif market in TEAM_HALF_MARKETS:
+            team_half_pos.append(local)
+            team_half_input.append(line)
         else:
-            others[local] = blocked(line,"NO_VERIFIED_MODEL_FOR_THIS_MARKET")
-    pitcher_results, receipts = phone_pitcher_rows(
-        pitcher_input,now=clock,getter=getter if auto_context else (lambda url: None))
+            others[local] = blocked(line, "NO_VERIFIED_MODEL_FOR_THIS_MARKET")
+    pitcher_results, pitcher_receipts = phone_pitcher_rows(
+        pitcher_input, now=clock, getter=getter if auto_context else (lambda url: None))
+    cfb_results, cfb_receipts = phone_cfb_player_rows(
+        cfb_input, now=clock, getter=getter if auto_context else (lambda url: None))
+    team_half_results = [
+        price_team_or_half(line, now=clock, getter=getter if auto_context else None)
+        for line in team_half_input
+    ]
     if len(pitcher_results) != len(pitcher_input):
         raise ValueError("PITCHER_RESULT_COUNT_MISMATCH")
+    if len(cfb_results) != len(cfb_input):
+        raise ValueError("CFB_PLAYER_RESULT_COUNT_MISMATCH")
+    if len(team_half_results) != len(team_half_input):
+        raise ValueError("TEAM_HALF_RESULT_COUNT_MISMATCH")
     modeled_props = [None]*len(props)
-    for local, result in zip(pitcher_pos,pitcher_results):
+    for local, result in zip(pitcher_pos, pitcher_results):
+        modeled_props[local] = result
+    for local, result in zip(cfb_pos, cfb_results):
+        modeled_props[local] = result
+    for local, result in zip(team_half_pos, team_half_results):
         modeled_props[local] = result
     for local, result in others.items():
         modeled_props[local] = result
@@ -172,9 +210,9 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         raise ValueError("PROP_RESULT_COUNT_MISMATCH")
 
     evaluated = [None]*len(rows)
-    for i, result in zip(game_indices,priced_games):
+    for i, result in zip(game_indices, priced_games):
         evaluated[i] = result
-    for i, result in zip(prop_indices,modeled_props):
+    for i, result in zip(prop_indices, modeled_props):
         result["input_index"] = i
         evaluated[i] = result
     if any(r is None for r in evaluated):
@@ -191,14 +229,18 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         [r for r in modeled_props if r.get("status","").startswith("WATCH_")],
         key=lambda r:-r.get("ev_per_dollar",-1))
     card["prop_unpriced"] = [r for r in modeled_props if r.get("status")=="NO_MODEL_OR_MARKET"]
-    card["source_receipts"] = list(card.get("source_receipts") or []) + receipts
+    card["source_receipts"] = list(card.get("source_receipts") or []) + pitcher_receipts + cfb_receipts
     card["prop_model_status"] = {
-        "engine":"MLB_PITCHER_JOINT_EMPIRICAL_BAYES",
+        "pitcher_engine":"MLB_PITCHER_JOINT_EMPIRICAL_BAYES",
+        "team_half_engine":"FREE_MODELS_MEANS_TEAM_HALF",
+        "cfb_player_engine":"CFB_PLAYER_EMPIRICAL_ESPN_GAMELOG",
         "free_public_history":True,
         "model_vs_close_validated":False,
         "phone_odds_freshness_required":True,
         "no_generic_player_prior":True,
         "unsupported_player_markets_blocked":len(card["prop_unpriced"]),
+        "next_gen":"NOT_WIRED",
+        "statcast":"NOT_WIRED",
     }
 
     audit, totals = [], Counter()
@@ -219,10 +261,10 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         "advanced_metrics":{
             "statcast":UNWIRED,"next_gen":UNWIRED,"coaching":UNWIRED,
             "travel":UNWIRED,"player_props":
-            "MLB_PITCHER_PRIOR_STARTS_ONLY_OTHERS_UNWIRED",
+            "MLB_PITCHER_CFB_PLAYER_TEAM_HALF_OTHERS_UNWIRED",
         },
     }
-    card["runner"]="RUN_IT_FULL_REAL_MLB_PITCHER_PREGAME_V2"
+    card["runner"]="RUN_IT_FULL_TEAM_HALF_CFB_PLAYER_V1"
     return card
 
 
