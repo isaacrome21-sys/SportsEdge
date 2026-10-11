@@ -36,6 +36,9 @@ API = "https://api.the-odds-api.com/v4/sports"
 MAX_MARKET_AGE_SECONDS = 600
 # Preserve the existing NFL-confirmation quota reservation on shared keys.
 DEFAULT_RESERVE = 76
+# Preserve at least one future NFL and CFB 3-market poll before optional MLB/NBA.
+FOOTBALL_PRIORITY_BUFFER = 2 * len(MARKETS)
+SPORT_PRIORITY = ("NFL", "CFB", "MLB", "NBA")
 CREDIT_COST = len(MARKETS)  # One group of <=10 named bookmakers.
 IL_TEAMS = (
     "illinois fighting", "illinois state", "southern illinois",
@@ -306,14 +309,23 @@ def discover_active_sports(key, opener=urlopen):
         return None
 
 
+def prioritize_sports(sports):
+    """Football goes first even when a phone dispatch lists other sports first."""
+    selected = set(sports)
+    return [name for name in SPORT_PRIORITY if name in selected]
+
+
 def collect(sports,out_dir,now,reserve,provider_fetch=fetch,quota_probe=probe_quota,active_sports=None):
-    """A snapshot per sport. Never send a paid request below existing reserve."""
+    """A snapshot per sport. Preserve NFL/CFB future credit capacity."""
     out_dir.mkdir(parents=True,exist_ok=True)
     snapshots={}
     keys=configured_keys()
-    for sport in sports:
+    for sport in prioritize_sports(sports):
         active = active_sports is None or SPORTS[sport] in active_sports
-        quota = (quota_probe(keys,minimum_remaining=reserve+CREDIT_COST)
+        # Lower-priority sports cannot consume the minimum credits required
+        # for another round of NFL+CFB even if the provider reports both active.
+        minimum = reserve + CREDIT_COST + (FOOTBALL_PRIORITY_BUFFER if sport in {"MLB", "NBA"} else 0)
+        quota = (quota_probe(keys,minimum_remaining=minimum)
                  if active else {"state":"BLOCKED","reason":"SPORT_INACTIVE",
                                  "max_remaining":None,"ready_key_slots":[]})
         record={"sport":sport,"captured_at_utc":now.isoformat(),
