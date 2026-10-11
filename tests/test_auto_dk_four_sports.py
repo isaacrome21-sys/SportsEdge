@@ -134,5 +134,50 @@ class AutoOddsTests(unittest.TestCase):
         self.assertIn("RL +7.5 -110 -110",lines)
 
 
+class AutoModelBridgeTests(unittest.TestCase):
+    def test_cfb_week_is_anchored_to_competition_saturday(self):
+        from scripts.run_auto_dk_cards import week_candidate
+        self.assertEqual(week_candidate("2026-10-10T19:30:00+00:00"),(2026,6))
+        self.assertEqual(week_candidate("2026-10-16T23:30:00+00:00"),(2026,7))
+        self.assertIsNone(week_candidate("2027-10-16T23:30:00+00:00"))
+
+    def test_mlb_adapter_uses_provider_timestamp_not_fake_intake(self):
+        from dataclasses import make_dataclass
+        from scripts.run_auto_dk_cards import mlb_auto_snapshot
+        game_cls=make_dataclass("FakeGame",[
+            ("away_name",str),("home_name",str),("game_pk",int),("game_date",str)])
+        schedule=[game_cls("Away Team","Home Team",123,"2026-10-11T19:00:00Z")]
+        game={
+            "away":"Away Team","home":"Home Team","slate_ct":"2026-10-11",
+            "markets":{"h2h":{"away":120,"home":-135,"observed_at":"2026-10-11T11:59:15+00:00"}}
+        }
+        def source(text,observed_at,schedule):
+            self.assertIn("ML 120 -135",text)
+            return {"rows":[{
+                "game_id":"Away Team@Home Team","market_type":"MONEYLINE",
+                "line":0.0,"price":120,"paired_price":-135,
+                "observed_at":observed_at,"first_pitch_at":"2026-10-11T19:00:00Z"
+            }]}
+        result=mlb_auto_snapshot([game],NOW,fetch_schedule=lambda d:schedule,build_bound_input=source)
+        row=result["rows"][0]
+        self.assertEqual(row["observed_at"],"2026-10-11T11:59:15+00:00")
+        self.assertEqual(row["timestamp_source"],"PROVIDED")
+        self.assertEqual(row["quote_origin"],"ODDS_API_DK_AUTO")
+
+    def test_mlb_adapter_rejects_quote_price_drift(self):
+        from dataclasses import make_dataclass
+        from scripts.run_auto_dk_cards import mlb_auto_snapshot
+        game_cls=make_dataclass("FakeGame",[
+            ("away_name",str),("home_name",str),("game_pk",int),("game_date",str)])
+        schedule=[game_cls("Away Team","Home Team",123,"2026-10-11T19:00:00Z")]
+        row={"away":"Away Team","home":"Home Team","slate_ct":"2026-10-11",
+             "markets":{"h2h":{"away":120,"home":-135,"observed_at":NOW.isoformat()}}}
+        def bad(*args,**kwargs):
+            return {"rows":[{"game_id":"Away Team@Home Team","market_type":"MONEYLINE",
+                "line":0.0,"price":115,"paired_price":-135,"first_pitch_at":"2026-10-11T19:00:00Z"}]}
+        with self.assertRaisesRegex(ValueError,"MLB_AUTO_PROVENANCE_ODDS_MISMATCH"):
+            mlb_auto_snapshot([row],NOW,fetch_schedule=lambda d:schedule,build_bound_input=bad)
+
+
 if __name__=="__main__":
     unittest.main()
