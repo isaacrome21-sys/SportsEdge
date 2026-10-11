@@ -40,9 +40,9 @@ def test_prop_models_fail_closed_but_leave_traceable_factor_audit():
     r=full.run_full({"lines":[row(market="PLAYER_PASS_YARDS")]},
                     now=NOW, auto_context=False)
     assert not r["edges"]
-    assert r["summary"]["status_counts"]["BLOCKED_INVALID"]==1
+    assert r["summary"]["status_counts"]["NO_MODEL_OR_MARKET"]==1
     a=r["factor_coverage"]["by_input_index"][0]
-    assert a["factors"]["player_props"]["status"]=="UNSUPPORTED_NO_PROP_MODEL"
+    assert a["factors"]["player_props"]["status"]=="NO_MODEL_OR_MARKET"
     assert a["factors"]["market_context"]["status"]=="MISSING_UNVERIFIED"
 
 
@@ -177,7 +177,7 @@ def test_only_valid_game_lines_can_receive_model_edge_while_props_always_block()
     r=full.run_full({"lines":[row(),row(market="PASSING_YARDS",side="OVER",line=250.5)]},
                     now=NOW,auto_context=False)
     assert all(x["market"] in {"TOTAL", "SPREAD", "ML"} for x in r["edges"])
-    assert r["evaluated_rows"][1]["status"]=="BLOCKED_INVALID"
+    assert r["evaluated_rows"][1]["status"]=="NO_MODEL_OR_MARKET"
 
 
 def test_injury_schema_probe_logs_only_shape_when_unusable():
