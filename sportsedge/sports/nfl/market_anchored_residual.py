@@ -174,7 +174,8 @@ def _contract_prob(grid: list[list[float]], market: str, side: int, line: float 
 
 
 def price_game(game: Mapping[str, Any], *, raw_model_margin: Any, raw_model_total: Any,
-               as_of: Any, policy: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
+               as_of: Any, policy: Mapping[str, Any] | None = None,
+               score_grid_factory=None) -> list[dict[str, Any]]:
     """All offered game-level pairs, conditional fair probability, and push-aware EV.
 
     Exact zero residual => zero price edge against no-vig book probabilities.
@@ -216,8 +217,9 @@ def price_game(game: Mapping[str, Any], *, raw_model_margin: Any, raw_model_tota
     if not all(0.5 <= value <= 70 for value in means.values()):
         raise ResidualQuoteError("MARKET_MEANS_OUT_OF_GRID_RANGE")
     freeze = load_freeze()
-    baseline = score_grid(means["mean_home"], means["mean_away"], freeze)
-    residual = score_grid(anchor["mean_home"], anchor["mean_away"], freeze)
+    grid_factory = score_grid_factory or (lambda home, away: score_grid(home, away, freeze))
+    baseline = grid_factory(means["mean_home"], means["mean_away"])
+    residual = grid_factory(anchor["mean_home"], anchor["mean_away"])
     rows = []
     for key in MARKETS:
         if key not in markets:

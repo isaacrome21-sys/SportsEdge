@@ -432,31 +432,24 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(description="NFL sides/totals RUN IT card")
     parser.add_argument("--quotes", required=True)
-    parser.add_argument("--estimates", default=None)
-    parser.add_argument("--simulations", default=None)
-    parser.add_argument("--edge-floor", type=float, default=DEFAULT_EDGE_FLOOR)
+    parser.add_argument("--raw-game-forecasts", required=True,
+                        help="JSON game_id -> margin, total, commence_time; research only")
     parser.add_argument("--as-of", default=None)
     parser.add_argument("--json-out", default=None)
     args = parser.parse_args(argv)
 
     quotes = json.loads(Path(args.quotes).read_text(encoding="utf-8"))
-    estimates = json.loads(Path(args.estimates).read_text(encoding="utf-8")) if args.estimates else []
-    simulations = json.loads(Path(args.simulations).read_text(encoding="utf-8")) if args.simulations else None
-    card = run_it(
-        quotes,
-        estimates,
-        edge_floor=args.edge_floor,
-        simulations=simulations,
-        as_of=args.as_of,
+    forecasts = json.loads(Path(args.raw_game_forecasts).read_text(encoding="utf-8"))
+    card = run_it_market_anchored(
+        quotes, forecasts,
+        as_of=args.as_of or datetime.now(timezone.utc),
     )
-    print(card.render())
+    print(json.dumps(card, indent=2))
     if args.json_out:
-        Path(args.json_out).write_text(json.dumps(card.to_dict(), indent=2) + "\n", encoding="utf-8")
+        Path(args.json_out).write_text(json.dumps(card, indent=2) + "\n", encoding="utf-8")
     return 0
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
 
 def run_it_market_anchored(
     quotes: Sequence[Mapping[str, Any]],
@@ -545,3 +538,7 @@ def run_it_market_anchored(
         "official_authority": False, "staking_authority": False,
         "devig_method": DEVIG_METHOD, "forward_clv_status": "PENDING",
     }
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
