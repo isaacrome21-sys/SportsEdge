@@ -506,12 +506,18 @@ def run(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
     if not isinstance(rows, list):
         raise ValueError("LINES_MUST_BE_LIST")
     provider = PublicContext(now, getter=getter)
+    # A single-sport ticket may declare its sport once at the root.
+    # Do not guess a sport from a team name or an ambiguous matchup.
+    ticket_sport = payload.get("sport") if isinstance(payload, dict) else None
     all_rows = []
     for i, row in enumerate(rows):
         try:
             if not isinstance(row, dict):
                 raise ValueError("LINE_MUST_BE_OBJECT")
-            result = calculate(row, provider, now, auto_context=auto_context, min_ev=min_ev)
+            bound_row = dict(row)
+            if not bound_row.get("sport") and ticket_sport is not None:
+                bound_row["sport"] = ticket_sport
+            result = calculate(bound_row, provider, now, auto_context=auto_context, min_ev=min_ev)
         except (ValueError, TypeError, KeyError, AttributeError) as exc:
             result = {"status": "BLOCKED_INVALID", "reason": str(exc)[:140]}
         result["input_index"] = i
