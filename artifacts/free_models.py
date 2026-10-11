@@ -49,6 +49,22 @@ ESPN = "https://site.api.espn.com/apis/site/v2/sports"
 OPEN_METEO = "https://api.open-meteo.com/v1/forecast"
 GEO = "https://geocoding-api.open-meteo.com/v1/search"
 
+US_STATES = {
+    "AL":"Alabama", "AK":"Alaska", "AZ":"Arizona", "AR":"Arkansas",
+    "CA":"California", "CO":"Colorado", "CT":"Connecticut", "DE":"Delaware",
+    "DC":"District of Columbia", "FL":"Florida", "GA":"Georgia", "HI":"Hawaii",
+    "ID":"Idaho", "IL":"Illinois", "IN":"Indiana", "IA":"Iowa",
+    "KS":"Kansas", "KY":"Kentucky", "LA":"Louisiana", "ME":"Maine",
+    "MD":"Maryland", "MA":"Massachusetts", "MI":"Michigan", "MN":"Minnesota",
+    "MS":"Mississippi", "MO":"Missouri", "MT":"Montana", "NE":"Nebraska",
+    "NV":"Nevada", "NH":"New Hampshire", "NJ":"New Jersey", "NM":"New Mexico",
+    "NY":"New York", "NC":"North Carolina", "ND":"North Dakota", "OH":"Ohio",
+    "OK":"Oklahoma", "OR":"Oregon", "PA":"Pennsylvania", "RI":"Rhode Island",
+    "SC":"South Carolina", "SD":"South Dakota", "TN":"Tennessee", "TX":"Texas",
+    "UT":"Utah", "VT":"Vermont", "VA":"Virginia", "WA":"Washington",
+    "WV":"West Virginia", "WI":"Wisconsin", "WY":"Wyoming",
+}
+
 
 def dt(value):
     try:
@@ -359,12 +375,15 @@ class PublicContext:
                 return 0.0, "VENUE_LOCATION_MISSING"
             # Open-Meteo geocodes CITIES or postal codes, not necessarily
             # stadium names. Always bind candidates back to ESPN's venue
-            # city/state before accepting a forecast location.
+            # city/state before accepting a forecast location. ESPN may use
+            # 'AZ' while the geocoder returns 'Arizona'.
+            state_full = US_STATES.get(str(state).strip().upper(), state) if state else None
             def same_state(candidate):
-                if not state:
+                if not state_full:
                     return True
-                return (self.key(candidate.get("admin1", "")) == self.key(state) or
-                        self.key(candidate.get("admin1_code", "")) == self.key(state))
+                return (self.key(candidate.get("admin1", "")) == self.key(state_full) or
+                        self.key(candidate.get("admin1_code", "")) == self.key(state) or
+                        self.key(candidate.get("admin1", "")) == self.key(state))
 
             def verified_coordinates(candidate):
                 if not isinstance(candidate, dict):
@@ -397,7 +416,7 @@ class PublicContext:
                                 populated.append((count, r))
                         except (KeyError, TypeError, ValueError):
                             pass
-                    if populated:
+                    if len(populated) == len(matching):
                         top = max(p for p, _ in populated)
                         winners = [r for p, r in populated if p == top]
                         if len(winners) == 1:
@@ -409,7 +428,7 @@ class PublicContext:
                                    "count": count, "language": "en", "format": "json"})
                 return (self.fetch(GEO + "?" + query) or {}).get("results") or []
 
-            search = city + (", " + state if state else "")
+            search = city + (", " + state_full if state_full else "")
             chosen = choose(geocode(search), city)
             if chosen is None and state:
                 # Retry less restrictive city-only search but still require
