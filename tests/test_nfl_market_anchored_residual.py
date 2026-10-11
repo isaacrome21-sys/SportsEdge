@@ -38,6 +38,34 @@ def game(*, spread=3.5, total=50.5, ml=True, timestamp=None):
 
 
 class NflMarketAnchoredResidualTests(unittest.TestCase):
+    def test_supplied_policy_cannot_bypass_authority_or_freshness(self):
+        for field, value in (("validated_markets", ["total"]),
+                             ("max_quote_age_seconds", 600)):
+            cfg = load_frozen_policy()
+            cfg[field] = value
+            with self.subTest(field=field), self.assertRaises(ResidualQuoteError):
+                price_game(game(), raw_model_margin=3.5, raw_model_total=50.5,
+                           as_of=NOW, policy=cfg)
+        cfg = load_frozen_policy()
+        cfg["coefficients"]["total"]["weight"] = 1.0
+        with self.assertRaises(ResidualQuoteError):
+            anchor_prediction(raw_model_margin=3.5, raw_model_total=70,
+                              market_margin=3.5, market_total=50.5, policy=cfg)
+
+    def test_intercept_is_part_of_residual_not_cancelled_by_baseline(self):
+        cfg = load_frozen_policy()
+        cfg["coefficients"]["total"]["intercept"] = 0.5
+        rows = price_game(game(), raw_model_margin=3.5, raw_model_total=50.5,
+                          as_of=NOW, policy=cfg)
+        over = next(r for r in rows if r["selection"] == "Over")
+        self.assertGreater(over["edge_probability_points"], 0)
+
+    def test_cross_market_anchor_clock_skew_fails_closed(self):
+        ticket = game()
+        ticket["markets"][0]["quote_retrieved_at"] = (NOW-timedelta(seconds=60)).isoformat()
+        with self.assertRaisesRegex(ResidualQuoteError, "SKEW"):
+            price_game(ticket, raw_model_margin=3.5, raw_model_total=50.5, as_of=NOW)
+
     def test_precommitted_small_coefficients_and_no_authority(self):
         cfg = load_frozen_policy()
         for name in ("margin", "total"):
