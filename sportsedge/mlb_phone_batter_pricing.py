@@ -94,8 +94,14 @@ def phone_batter_rows(rows, *, now=None, getter=None):
         judged = price_three_sport_research([p], quotes, as_of=now_utc)["rows"][0]
         judged["line"] = line
         judged["player_name"] = verified["batter_name"]
-        judged["lineup_status"] = "NOT_CONFIRMED_FROM_GAMELOG"
+        judged["lineup_status"] = verified["lineup_status"]
         judged["prior_game_count"] = verified["prior_game_count"]
+        judged["prior_plate_appearances"] = verified["prior_plate_appearances"]
+        # Historical game rates do not guarantee today's playing time. Never
+        # surface a current-price research candidate without an independently
+        # verified official starting batting order.
+        if not verified["lineup_verified"] and judged.get("status") == "RESEARCH_CANDIDATE_NOT_VALIDATED":
+            judged["status"] = "WATCH_LINEUP_NOT_CONFIRMED"
         judged["source"] = "FREE_MLB_STATSAPI_BATTER_GAMELOG"
         judged["source_game_id"] = verified["game_id"]
         outputs.append(judged)
@@ -104,5 +110,6 @@ def phone_batter_rows(rows, *, now=None, getter=None):
         "status": "PUBLIC_MLB_PRIOR_BATTER_GAMES_VERIFIED",
         "batter_id": d["batter_id"],
         "prior_games": d["prior_game_count"],
-        "lineup": "NOT_CONFIRMED",
+        "prior_plate_appearances": d["prior_plate_appearances"],
+        "lineup": d["lineup_status"],
     } for d in cache.values() if isinstance(d, dict)]
