@@ -174,11 +174,59 @@ class AutoOddsTests(unittest.TestCase):
 
 
 class AutoModelBridgeTests(unittest.TestCase):
-    def test_cfb_week_is_anchored_to_competition_saturday(self):
-        from scripts.run_auto_dk_cards import week_candidate
-        self.assertEqual(week_candidate("2026-10-10T19:30:00+00:00"),(2026,6))
-        self.assertEqual(week_candidate("2026-10-16T23:30:00+00:00"),(2026,7))
-        self.assertIsNone(week_candidate("2027-10-16T23:30:00+00:00"))
+    def _sdv_fixture(self, directory):
+        import csv, gzip
+        folder=Path(directory)
+        source=folder/"cfb_schedules_2026.csv.gz"
+        with gzip.open(source,"wt",encoding="utf-8",newline="") as fh:
+            writer=csv.DictWriter(fh,fieldnames=["game_id","season","week","season_type",
+                 "start_date","completed","fbs_game","away_team","home_team"])
+            writer.writeheader()
+            writer.writerow({"game_id":"espn771","season":"2026","week":"7",
+                 "season_type":"regular","start_date":"2026-10-13T23:00:00Z",
+                 "completed":"false","fbs_game":"true",
+                 "away_team":"Delaware","home_team":"Middle Tennessee"})
+            writer.writerow({"game_id":"espn772","season":"2026","week":"7",
+                 "season_type":"regular","start_date":"2026-10-13T23:00:00Z",
+                 "completed":"false","fbs_game":"true",
+                 "away_team":"Delaware State","home_team":"Middle Tennessee"})
+        (folder/"receipt.json").write_text('{"schema":"fixture"}')
+        return source
+
+    def test_cfb_provider_team_labels_bind_actual_sdv_week_not_calendar_guess(self):
+        from scripts.run_auto_dk_cards import bind_cfb_sdv_games
+        with TemporaryDirectory() as t:
+            self._sdv_fixture(t)
+            game={"away":"Delaware Blue Hens","home":"Middle Tennessee Blue Raiders",
+                  "commence_time":"2026-10-13T23:00:00Z","markets":{}}
+            grouped,missing=bind_cfb_sdv_games([game],Path(t),NOW)
+            self.assertEqual(set(grouped),{(2026,7)})
+            self.assertEqual(len(grouped[(2026,7)]),1)
+            self.assertEqual(grouped[(2026,7)][0]["away"],"Delaware")
+            self.assertEqual(grouped[(2026,7)][0]["home"],"Middle Tennessee")
+            self.assertEqual(grouped[(2026,7)][0]["schedule_game_id"],"espn771")
+            self.assertEqual(missing,[])
+
+    def test_cfb_kickoff_disagreement_blocks_without_guessing_week(self):
+        from scripts.run_auto_dk_cards import bind_cfb_sdv_games
+        with TemporaryDirectory() as t:
+            self._sdv_fixture(t)
+            game={"away":"Delaware Blue Hens","home":"Middle Tennessee Blue Raiders",
+                  "commence_time":"2026-10-13T20:00:00Z","markets":{}}
+            grouped,missing=bind_cfb_sdv_games([game],Path(t),NOW)
+            self.assertEqual(grouped,{})
+            self.assertEqual(missing[0]["reason"],"SDV_GAME_IDENTITY_OR_KICKOFF_NOT_UNIQUE")
+
+    def test_cfb_opposing_school_mismatch_fails_closed(self):
+        from scripts.run_auto_dk_cards import bind_cfb_sdv_games
+        with TemporaryDirectory() as t:
+            self._sdv_fixture(t)
+            game={"away":"Delaware State Hornets","home":"Middle Tennessee Blue Raiders",
+                  "commence_time":"2026-10-13T23:00:00Z","markets":{}}
+            grouped,missing=bind_cfb_sdv_games([game],Path(t),NOW)
+            self.assertEqual(grouped[(2026,7)][0]["away"],"Delaware State")
+            self.assertEqual(grouped[(2026,7)][0]["schedule_game_id"],"espn772")
+            self.assertEqual(missing,[])
 
     def test_mlb_adapter_uses_provider_timestamp_not_fake_intake(self):
         from dataclasses import make_dataclass
