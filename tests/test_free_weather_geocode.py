@@ -24,7 +24,7 @@ def run_with(geocodes, *, city="Phoenix", state="Arizona", full="Example Stadium
         if "geocoding-api.open-meteo.com" in url:
             name=parse_qs(urlparse(url).query)["name"][0]
             return {"results":geocodes.get(name, [])}
-        if "api.open-meteo.com" in url:
+        if urlparse(u).hostname == "api.open-meteo.com"rl:
             return {"hourly":{"time":["2026-10-11T20:00"],
                               "wind_speed_10m":[19],
                               "precipitation_probability":[10]}}
@@ -45,7 +45,7 @@ def test_exact_city_state_prefers_unique_largest_population():
     c=result("Phoenix","New York",999999999,40.0)
     value,status,calls=run_with({"Phoenix, Arizona":[a,b,c]})
     assert value==-0.8 and status=="HEURISTIC_FORECAST_NOT_CALIBRATED"
-    forecasts=[u for u in calls if "api.open-meteo.com" in u]
+    forecasts=[u for u in calls if urlparse(u).hostname == "api.open-meteo.com"]
     assert len(forecasts)==1
     assert parse_qs(urlparse(forecasts[0]).query)["latitude"]==["33.5"]
 
@@ -61,7 +61,7 @@ def test_wrong_state_higher_population_never_overrides_verified_state():
     value,status,calls=run_with({"Phoenix, Arizona":[
         result("Phoenix","Texas",999999999,29.0),result("Phoenix","Arizona",5000,33.3)]})
     assert value==-0.8
-    forecasts=[u for u in calls if "api.open-meteo.com" in u]
+    forecasts=[u for u in calls if urlparse(u).hostname == "api.open-meteo.com"]
     assert parse_qs(urlparse(forecasts[0]).query)["latitude"]==["33.3"]
 
 
@@ -83,7 +83,7 @@ def test_population_tie_retries_exact_stadium_name_with_valid_state():
         "Phoenix, Arizona":[a,b],"Phoenix":[a,b],"Example Stadium":[stadium]})
     assert value==-0.8
     assert status.startswith("HEURISTIC")
-    forecasts=[u for u in calls if "api.open-meteo.com" in u]
+    forecasts=[u for u in calls if urlparse(u).hostname == "api.open-meteo.com"]
     assert parse_qs(urlparse(forecasts[0]).query)["latitude"]==["33.8"]
 
 
@@ -96,7 +96,7 @@ def test_stadium_name_fallback_never_matches_unrelated_city_or_state():
                            result("Elsewhere","Arizona",2000000,33.9)]})
     assert value==0.0
     assert status=="VENUE_GEOCODE_AMBIGUOUS"
-    assert not any("api.open-meteo.com" in u for u in calls)
+    assert not any(urlparse(u).hostname == "api.open-meteo.com" for u in calls)
 
 
 def test_unknown_population_leaves_multiple_exact_places_ambiguous():
@@ -105,7 +105,7 @@ def test_unknown_population_leaves_multiple_exact_places_ambiguous():
     value,status,calls=run_with({
         "Phoenix, Arizona":[a,b],"Phoenix":[a,b],"Example Stadium":[]})
     assert value==0.0 and status=="VENUE_GEOCODE_AMBIGUOUS"
-    assert not any("api.open-meteo.com" in u for u in calls)
+    assert not any(urlparse(u).hostname == "api.open-meteo.com" for u in calls)
 
 
 def test_indoor_and_unsafe_roof_status_never_geocode_or_apply_wind():
@@ -128,4 +128,4 @@ def test_unknown_espn_state_never_chooses_highest_population_in_another_state():
         result("Phoenix","Arizona",3000000,33.4),
         result("Phoenix","Oregon",5000000,42.0)]},state=None,full="")
     assert value==0.0 and status=="VENUE_GEOCODE_AMBIGUOUS"
-    assert not any("api.open-meteo.com" in u for u in calls)
+    assert not any(urlparse(u).hostname == "api.open-meteo.com" for u in calls)
