@@ -121,3 +121,11 @@ def test_forecast_missing_keeps_explicit_weather_failure():
         return {"hourly":{"time":[]}}
     provider=model.PublicContext(NOW,getter=getter)
     assert provider.weather("NFL",venue(),KICKOFF)==(0.0,"FORECAST_UNAVAILABLE")
+
+
+def test_unknown_espn_state_never_chooses_highest_population_in_another_state():
+    value,status,calls=run_with({"Phoenix":[
+        result("Phoenix","Arizona",3000000,33.4),
+        result("Phoenix","Oregon",5000000,42.0)]},state=None,full="")
+    assert value==0.0 and status=="VENUE_GEOCODE_AMBIGUOUS"
+    assert not any("api.open-meteo.com" in u for u in calls)
