@@ -255,6 +255,7 @@ def main() -> int:
                           "residual_status":residual_error or "RESEARCH_ONLY"})
     payload = {
         "sport": "NFL",
+        "residual_pricing_enabled": True,
         "context_bound": False,
         "games": games_out,
         "bet_proven_markets": sorted(BET_PROVEN_MARKETS),
