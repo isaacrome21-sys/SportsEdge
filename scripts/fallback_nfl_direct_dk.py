@@ -52,28 +52,37 @@ def convert(transport:dict, rows:list,now:datetime):
             raise ValueError("DK_DIRECT_DUPLICATE_GAME_IDENTITY")
         seen.add(identity)
         spread,total=r.get("spread") or {},r.get("total") or {}
-        if spread.get("status")!="OK" or total.get("status")!="OK":
-            continue
-        try:
-            ap,hp=float(spread["away_point"]),float(spread["home_point"])
-            t=float(total["point"])
-        except (TypeError,ValueError,KeyError):
-            continue
-        if not (-100<ap<100 and abs(ap+hp)<1e-9 and 0<t<150):
-            continue
-        a,b=good_price(spread.get("away_price")),good_price(spread.get("home_price"))
-        o,u=good_price(total.get("over_price")),good_price(total.get("under_price"))
-        if any(v is None for v in (a,b,o,u)):
-            continue
         observed=received.isoformat()
         stamp={"observed_at":observed,"timestamp_source":"INTAKE_STAMPED",
                "book_last_update":None,"provider":"DRAFTKINGS_DIRECT_WEB_V1"}
+        markets={}
+        # Preserve whichever two-sided market was actually captured. A
+        # one-sided spread must never suppress an independently valid total,
+        # and vice versa; no missing opposing price may be manufactured.
+        if spread.get("status")=="OK":
+            try:
+                ap,hp=float(spread["away_point"]),float(spread["home_point"])
+                a,b=good_price(spread.get("away_price")),good_price(spread.get("home_price"))
+                if (-100<ap<100 and abs(ap+hp)<1e-9
+                        and a is not None and b is not None):
+                    markets["spreads"]={"line":ap,"away":a,"home":b,**stamp}
+            except (ValueError,TypeError,KeyError,OverflowError):
+                pass
+        if total.get("status")=="OK":
+            try:
+                t=float(total["point"])
+                o,u=good_price(total.get("over_price")),good_price(total.get("under_price"))
+                if 0<t<150 and o is not None and u is not None:
+                    markets["totals"]={"line":t,"over":o,"under":u,**stamp}
+            except (ValueError,TypeError,KeyError,OverflowError):
+                pass
+        if not markets:
+            continue
         games.append({
             "provider_event_id":str(r["event_id"]), "away":r["away_team"],
             "home":r["home_team"],"commence_time":start.isoformat(),
             "slate_ct":start.astimezone(CENTRAL).date().isoformat(),
-            "markets":{"spreads":{"line":ap,"away":a,"home":b,**stamp},
-                       "totals":{"line":t,"over":o,"under":u,**stamp}},
+            "markets":markets,
             "reference":{},"peer_books":[],"estimate_p":None
         })
     games.sort(key=lambda x:(x["commence_time"],x["provider_event_id"]))

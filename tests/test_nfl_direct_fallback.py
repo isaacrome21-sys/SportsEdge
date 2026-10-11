@@ -41,9 +41,15 @@ def test_convert_only_paired_source_with_intake_stamped_receipt():
 def test_missing_side_mismatch_started_stale_and_duplicate_fail_closed():
     r=rows()
     r[0]["spread"]["home_point"]=-2.5
-    assert m.convert(transport(),r,NOW)==[]
+    partial=m.convert(transport(),r,NOW)
+    assert len(partial)==1 and set(partial[0]["markets"])=={"totals"}
     r=rows()
     r[0]["total"]["status"]="ONE_SIDED"
+    partial=m.convert(transport(),r,NOW)
+    assert len(partial)==1 and set(partial[0]["markets"])=={"spreads"}
+    r=rows()
+    r[0]["total"]["status"]="ONE_SIDED"
+    r[0]["spread"]["status"]="ONE_SIDED"
     assert m.convert(transport(),r,NOW)==[]
     r=rows()
     r[0]["commence_time"]=(NOW-timedelta(minutes=1)).isoformat()
@@ -101,3 +107,20 @@ def test_ticket_and_phone_metadata_keep_direct_intake_status():
     display=row_text(x[0])
     assert "DK intake stamp" in display
     assert "DK quote" not in display
+
+
+def test_partial_fallback_quote_ticket_is_still_two_sided_and_no_synthetic_market():
+    from scripts.collect_auto_dk_four_sports import nfl_tickets
+    r=rows()
+    r[0]["spread"]["status"]="LINE_MISMATCH"
+    events=m.convert(transport(),r,NOW)
+    assert len(events)==1
+    ticket=nfl_tickets(events,NOW,source=m.SOURCE_CLASS)["2026-10-11"]
+    assert len(ticket["games"])==1
+    assert len(ticket["games"][0]["markets"])==1
+    offered=ticket["games"][0]["markets"][0]
+    assert offered["market"]=="total"
+    assert offered["away_or_over_price"]==-108
+    assert offered["home_or_under_price"]==-112
+    assert offered["quote_timestamp_source"]=="INTAKE_STAMPED"
+    assert all(row["market"]!="spread" for row in ticket["games"][0]["markets"])
