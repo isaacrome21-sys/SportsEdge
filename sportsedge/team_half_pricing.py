@@ -55,6 +55,14 @@ def _scoring(sport, home, away, kickoff, now, provider):
     start = engine.dt(kickoff)
     if start is None or start <= now:
         raise ValueError("PREGAME_UNIQUE_KICKOFF_REQUIRED")
+    # Bind the derived market to the independently verified fixture
+    # competition ID, never an owner-provided JSON "game_id".
+    fixture = provider.fixture(sport, away, home, start)
+    if fixture is None or not isinstance(fixture[1], dict):
+        raise ValueError("UNIQUE_PUBLIC_MATCHUP_REQUIRED")
+    event_id = str(fixture[1].get("id") or "").strip()
+    if not event_id:
+        raise ValueError("PUBLIC_ESPN_GAME_ID_UNVERIFIED")
     # Do not pass caller-controlled context, venue coordinates or ESPN IDs.
     ctx, verified_start, notes = engine.context_for(sport,away,home,start,provider,{})
     if verified_start is None or verified_start <= now:
@@ -85,7 +93,7 @@ def _scoring(sport, home, away, kickoff, now, provider):
     am += ctx.get("weather_total_adj",0)/2
     if not min(hm,am) > .2:
         raise ValueError("IMPLAUSIBLE_SCORE_MEAN")
-    return hm,am,sd_total,sd_margin,verified_start,notes
+    return hm,am,sd_total,sd_margin,verified_start,notes,event_id
 
 
 def _normal_outcome(mean,sd,side,line,*,spread=False):
@@ -120,7 +128,7 @@ def _poisson_outcome(mean,side,line):
 
 
 def _estimate(row,scored,now):
-    hm,am,sd_t,sd_m,verified,notes=scored
+    hm,am,sd_t,sd_m,verified,notes,game_id=scored
     sport=str(row["sport"]).upper()
     market=str(row["market"]).upper()
     side=str(row.get("side") or row.get("selection") or "").upper()
@@ -162,7 +170,7 @@ def _estimate(row,scored,now):
     if not 0<p<1 or not 0<=push<1 or p+push>=1:
         raise ValueError("DERIVATIVE_PROBABILITY_NOT_CALIBRATED_OR_DEGENERATE")
     model={
-        "sport":sport,"game_id":str(row.get("game_id") or ""),
+        "sport":sport,"game_id":game_id,
         "market":market,"selection":side,"line":line,
         "estimate_p":p,"push_p":push,
         "status":"PRICED_RESEARCH","market_blind":True,
@@ -194,7 +202,7 @@ def price_team_half_rows(rows:Sequence[Mapping],*,now=None,getter=None):
              str(row.get("home") or ""),str(row.get("kickoff") or row.get("commence_time") or ""))
         if key not in cache:
             try:
-                cache[key]=_scoring(*key,now,provider)
+                cache[key]=_scoring(key[0], key[2], key[1], key[3], now, provider)
             except (KeyError,TypeError,ValueError,AttributeError) as exc:
                 cache[key]=str(exc)
         scored=cache[key]
@@ -202,12 +210,6 @@ def price_team_half_rows(rows:Sequence[Mapping],*,now=None,getter=None):
             result.append(_fail(row,scored));continue
         try:
             model=_estimate(row,scored,now)
-            # Bind to the independently verified game ID, not arbitrary input.
-            # PublicContext.fixture does not expose an ESPN ID in context_for.
-            # Explicit event/game ID must be independently verified before
-            # a no-vig quote can be attached. Without it, do not price.
-            if not str(row.get("game_id") or "").strip():
-                raise ValueError("INDEPENDENT_VERIFIED_ESPN_GAME_ID_REQUIRED")
             # Line- and team-specific bookmaker quote identity. HOME vs
             # AWAY team totals at the same threshold can never cross-pair.
             quotes=[]
