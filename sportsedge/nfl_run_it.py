@@ -425,6 +425,81 @@ def run_it(
     )
 
 
+
+def run_it_residual_research(
+    quotes: Sequence[Mapping[str, Any]],
+    raw_locations: Mapping[str, Mapping[str, Any]],
+    kickoff_by_game: Mapping[str, Any],
+    *,
+    as_of: datetime | str,
+    executable_book: str = "draftkings",
+) -> dict[str, Any]:
+    """Build the research-only NFL game card from a residual pricing adapter.
+
+    This deliberately does NOT call run_it()/return CardPick entries. The
+    existing scored/bettor lane is unchanged; its external estimate_p inputs
+    are not silently relabeled as independently originated residual models.
+    """
+    from collections import defaultdict
+    from sportsedge.sports.nfl.market_residual_research import price_game_from_pairs
+    now = _timestamp(as_of,"AS_OF_INVALID")
+    groups = defaultdict(list)
+    for raw in quotes:
+        quote = normalize_quote(raw)
+        if quote["book"] != executable_book:
+            continue
+        _validate_quote_time(quote,as_of=now)
+        groups[quote["game_id"]].append(quote)
+    results=[]
+    for game_id, rows in sorted(groups.items()):
+        if game_id not in raw_locations or game_id not in kickoff_by_game:
+            raise NflRunItError(f"RESIDUAL_INDEPENDENT_MODEL_AND_KICKOFF_REQUIRED:{game_id}")
+        markets=[]
+        for market in ("moneyline","spread","total"):
+            pair=[q for q in rows if q["market"]==market]
+            if not pair:
+                continue
+            if len(pair)!=2 or not _is_complement(pair[0],pair[1]):
+                raise NflRunItError(f"PAIRED_PRICE_REQUIRED:{game_id}:{market}")
+            if abs((pair[0]["retrieved_at"]-pair[1]["retrieved_at"]).total_seconds())>MAX_QUOTE_SKEW_SECONDS:
+                raise NflRunItError("PAIRED_QUOTE_TIME_SKEW")
+            away=pair[0]["away"]
+            home=pair[0]["home"]
+            if any(q["away"]!=away or q["home"]!=home for q in pair):
+                raise NflRunItError("PAIRED_GAME_IDENTITY_CONFLICT")
+            side_names=("OVER","UNDER") if market=="total" else (away,home)
+            side_rows={q["selection"]:q for q in pair}
+            if set(side_rows)!=set(side_names):
+                raise NflRunItError("PAIRED_GAME_SELECTION_CONFLICT")
+            a,b=(side_rows[name] for name in side_names)
+            line=(a["line"] if market=="total" else
+                  None if market=="moneyline" else a["line"])
+            if market=="spread" and (line is None or b["line"] is None or
+                abs(float(a["line"])+float(b["line"]))>1e-9):
+                raise NflRunItError("PAIRED_SPREAD_MIRROR_REQUIRED")
+            if market=="total" and a["line"]!=b["line"]:
+                raise NflRunItError("PAIRED_TOTAL_LINE_CONFLICT")
+            markets.append({
+                "market":market,"line":line,
+                "away_or_over_price":a["price_american"],
+                "home_or_under_price":b["price_american"],
+                "quote_retrieved_at":min(a["retrieved_at"],b["retrieved_at"]).isoformat(),
+            })
+        loc=raw_locations[game_id]
+        observed=max(q["retrieved_at"] for q in rows)
+        fair=price_game_from_pairs(
+            raw_margin=loc.get("margin"),raw_total=loc.get("total"),
+            markets=markets,observed_at=observed,as_of=now,
+            kickoff_at=kickoff_by_game[game_id],
+            model_family=str(loc.get("family") or "INDEPENDENT_NFL_RAW"),
+        )
+        results.append({"game_id":game_id,"research":fair})
+    return {"schema":"NFL_RUN_IT_RESIDUAL_RESEARCH_V1",
+            "games":results,"validated_markets":[],
+            "authority":{"research_only":True,"model_p":False,
+                         "official":False,"promotion":False,"staking":False}}
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     import argparse
     import json
