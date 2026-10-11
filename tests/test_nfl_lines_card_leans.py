@@ -63,60 +63,58 @@ class NflCardLeanTests(unittest.TestCase):
             )
             return json.loads((t / "card.json").read_text()), (t / "out" / "card.md").read_text()
 
-    def test_total_is_lean_not_pick(self):
+    def test_unstamped_manual_quotes_fail_closed_without_absolute_model_leans(self):
         engine, md = self._run()
         self.assertEqual(engine["bet_proven_markets"], [])
+        self.assertTrue(engine["residual_pricing_enabled"])
         game = engine["games"][0]
         self.assertEqual(game["picks"], [])
+        self.assertEqual(game["leans"], [])
+        self.assertIsNone(game["residual_research"])
+        self.assertIn("NO_MODEL:RESIDUAL_", game["residual_status"])
         total = [m for m in game["markets"] if m["market"] == "total"][0]
         self.assertIsNone(total["pick"])
-        self.assertIsNotNone(total["lean"])
-        self.assertTrue(total["lean"]["lean_only"])
-        self.assertEqual(total["lean"]["selection"], "Under")
-        self.assertTrue(total["lean"]["projection_agrees"])
-        self.assertIn("LEAN (no proven edge, not a bet): Under 60.5", md)
-        self.assertIn("No bets", md)
-        self.assertNotIn("Score-B", md)
-
-    def test_plus_money_shows_plus_sign(self):
-        _, md = self._run()
-        self.assertIn("Under 60.5 @ +100", md)
-
-    def test_thin_calibration_tail_never_prints_a_lean(self):
-        # Model total ~25 pts over the line lands on a weight-1 isotonic block
-        # (mean 1.0); before the guard this printed a ~+100% "model EV" lean.
-        engine, md = self._run(total={"market": "total", "line": 20.5, "away_or_over_price": 100,
-                                      "home_or_under_price": -120, "raw": "Total 20.5 +100 -120"})
-        total = [m for m in engine["games"][0]["markets"] if m["market"] == "total"][0]
         self.assertIsNone(total["lean"])
-        self.assertEqual(total["lean_block"], "NO_LEAN:THIN_CALIBRATION")
-        self.assertNotIn("LEAN (", md)
-        self.assertIn("too few past games to price it", md)
+        self.assertIn("research", md.lower())
+        self.assertNotIn("model EV", md)
 
-    def test_price_only_under_is_not_a_lean_when_projection_is_over(self):
-        # Week 6 DEN @ LAC: model total 42.1 > 41.5, yet Under @ -105 printed as a
-        # lean because the flat calibration gives every near-line game Under ~0.5.
+    def test_plus_money_keeps_original_quoted_price_without_promotion(self):
+        _, md = self._run()
+        self.assertIn("u+100", md)
+        self.assertNotIn("BET", md)
+
+    def test_extreme_absolute_total_never_surfaces_fabricated_ev(self):
+        engine, md = self._run(total={"market": "total", "line": 20.5,
+                                      "away_or_over_price": 100,
+                                      "home_or_under_price": -120,
+                                      "raw": "Total 20.5 +100 -120"})
+        game = engine["games"][0]
+        total = [m for m in game["markets"] if m["market"] == "total"][0]
+        self.assertIsNone(total["lean"])
+        self.assertIsNone(total["pick"])
+        self.assertNotIn("model EV", md)
+
+    def test_legacy_directional_price_signal_never_survives_residual_conversion(self):
         from datetime import date
         from math import floor
         from sportsedge.nfl_attempt9_live_forecast import load_runtime, raw_forecasts, recency_features
-        feat = recency_features(_history(), home="BAL", away="KC", asof=date(2026, 9, 20))
-        pred = float(raw_forecasts(load_runtime(), feat["vector"])["total"])
-        line = floor(pred - 0.5) + 0.5  # nearest half-point line below the projection
+        feat = recency_features(_history(),home="BAL",away="KC",asof=date(2026,9,20))
+        pred = float(raw_forecasts(load_runtime(),feat["vector"])["total"])
+        line = floor(pred - 0.5) + 0.5
         self.assertTrue(0 < pred - line <= 1.0)
-        engine, md = self._run(total={"market": "total", "line": line, "away_or_over_price": -130,
-                                      "home_or_under_price": 110, "raw": f"Total {line} -130 +110"})
-        total = [m for m in engine["games"][0]["markets"] if m["market"] == "total"][0]
+        engine, md = self._run(total={"market":"total","line":line,
+                         "away_or_over_price":-130,"home_or_under_price":110,
+                         "raw":f"Total {line} -130 +110"})
+        total=[m for m in engine["games"][0]["markets"] if m["market"]=="total"][0]
         self.assertIsNone(total["lean"])
-        self.assertEqual(total["lean_block"], "NO_LEAN:PROJECTION_DISAGREES")
-        self.assertNotIn("LEAN (", md)
-        self.assertIn("the model total points the other way", md)
+        self.assertNotIn("model EV",md)
 
-    def test_spread_still_held(self):
+    def test_spread_requires_residual_paired_context(self):
         engine, md = self._run()
-        spread = [m for m in engine["games"][0]["markets"] if m["market"] == "spread"][0]
+        spread = [m for m in engine["games"][0]["markets"] if m["market"]=="spread"][0]
         self.assertTrue(spread["no_model"].startswith("NO_MODEL"))
-        self.assertIn("Spread KC +3.5 -110 / BAL -3.5 -110: no pick: spreads held", md)
-        self.assertNotIn("NO_MODEL:", md)
+        self.assertIn("Spread KC +3.5 -110 / BAL -3.5 -110",md)
+        self.assertNotIn("NO_MODEL:",md)
 
     def test_card_has_no_official_or_truth_gate_wording(self):
         _, md = self._run()
