@@ -1,0 +1,33 @@
+{
+  "schema": "SPORTSEDGE_NFL_MARKET_ANCHORED_RESIDUAL_POLICY_V1",
+  "status": "PRECOMMITTED_RESEARCH_PRIOR_NOT_HISTORICALLY_FITTED",
+  "coefficients": {
+    "margin": {
+      "intercept": 0,
+      "weight": 0.15
+    },
+    "total": {
+      "intercept": 0,
+      "weight": 0.15
+    }
+  },
+  "forward_track_min_abs_adjustment_points": 0.5,
+  "min_edge_probability_points": 0.02,
+  "min_ev_per_dollar": 0.02,
+  "max_quote_age_seconds": 180,
+  "max_skew_seconds": 30,
+  "validated_markets": [],
+  "evidence_role": "RESEARCH_ONLY_UNFITTED_PRIOR",
+  "validation": {
+    "requires_forward_positive_clv": true,
+    "may_use_dev_data_as_forward_proof": false,
+    "season_based_walk_forward_required_for_refit": true
+  },
+  "authority": {
+    "model_p": false,
+    "truth_gate": false,
+    "promotion": false,
+    "official": false,
+    "staking": false
+  }
+}
