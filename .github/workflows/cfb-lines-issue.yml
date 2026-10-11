@@ -116,4 +116,25 @@ jobs:
               lines += ["", "Run failed:", "```", log[-3000:], "```"]
           Path("comment.md").write_text("\n".join(lines))
           PY
+          # Use the already-written model output; PNG rendering adds no forecasts.
+          if [[ -s artifacts/run_it/cfb_sdv_card.json ]]; then
+            if python scripts/render_sportsedge_png.py --sport CFB \
+              --card artifacts/run_it/cfb_sdv_card.json \
+              --output artifacts/cfb_myspari/card.png; then
+              printf '\n**Phone PNG:** [Download the card artifact](https://github.com/%s/actions/runs/%s) (open Artifacts → CFB issue card).\n' "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" >> comment.md
+            else
+              echo "CFB_PNG_RENDER_UNAVAILABLE; text card remains usable."
+            fi
+          fi
           gh issue comment "$ISSUE" --body-file comment.md
+      - name: Upload phone card and PNG
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cfb-lines-issue-${{ github.event.issue.number }}
+          path: |
+            artifacts/run_it/cfb_sdv_card.json
+            artifacts/cfb_myspari/card.png
+            comment.md
+          if-no-files-found: warn
+          retention-days: 14
