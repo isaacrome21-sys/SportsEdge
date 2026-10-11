@@ -162,3 +162,19 @@ def test_manual_mode_not_promoted_to_observed_team_history():
     c=result["factor_coverage"]["by_input_index"][0]["factors"]
     assert c["team_quality"]["status"]=="MISSING_UNVERIFIED"
     assert c["recent_form"]["status"]=="MISSING_UNVERIFIED"
+
+
+def test_phone_card_reports_unwired_factors_instead_of_calling_them_checked():
+    from scripts.free_models_phone_issue import render_card
+    card=full.run_full({"lines":[row()]}, now=NOW, auto_context=False)
+    text=render_card(card,run_url="https://github.com/owner/repo/actions/runs/1")
+    assert "Factor verification" in text
+    assert "missing/not modeled" in text
+    assert "Statcast, Next Gen" in text
+
+
+def test_only_valid_game_lines_can_receive_model_edge_while_props_always_block():
+    r=full.run_full({"lines":[row(),row(market="PASSING_YARDS",side="OVER",line=250.5)]},
+                    now=NOW,auto_context=False)
+    assert all(x["market"] in {"TOTAL", "SPREAD", "ML"} for x in r["edges"])
+    assert r["evaluated_rows"][1]["status"]=="BLOCKED_INVALID"
