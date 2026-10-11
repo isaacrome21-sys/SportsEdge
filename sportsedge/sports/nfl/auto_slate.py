@@ -59,6 +59,7 @@ def discover_nfl_auto_games(
     lower = pit + timedelta(minutes=min_lead_minutes)
     upper = pit + timedelta(minutes=horizon_minutes)
     discovered: list[dict[str, Any]] = []
+    undated: list[dict[str, str]] = []
     seen: set[str] = set()
     for row in rows:
         game_type = str(row.get("game_type") or "REG").strip().upper()
@@ -67,7 +68,21 @@ def discover_nfl_auto_games(
         game_id = str(row.get("game_id") or "").strip()
         if not game_id:
             continue
-        kickoff = _kickoff(row)
+        # nflverse's historic CSV can contain unscheduled placeholders and
+        # records without a kickoff. Neither an ancient game nor a missing
+        # clock may crash today's otherwise sound pregame prop card.
+        try:
+            season = int(float(row["season"]))
+        except (KeyError, ValueError, TypeError):
+            undated.append({"game_id":game_id,"reason":"SCHEDULE_SEASON_UNAVAILABLE"})
+            continue
+        if abs(season-pit.year)>1:
+            continue
+        try:
+            kickoff = _kickoff(row)
+        except NFLContextError as exc:
+            undated.append({"game_id":game_id,"reason":str(exc)})
+            continue
         if not lower <= kickoff <= upper:
             continue
         if game_id in seen:
@@ -97,6 +112,7 @@ def discover_nfl_auto_games(
         "horizon_minutes": horizon_minutes,
         "game_types": sorted(allowed),
         "schedule_source_sha256": schedule_sha,
+        "unadmitted_schedule_games": undated,
         "games": discovered,
     }
 
