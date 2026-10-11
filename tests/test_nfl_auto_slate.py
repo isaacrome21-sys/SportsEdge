@@ -170,3 +170,27 @@ def test_auto_slate_end_to_end_adds_pit_personnel_without_promotion():
     assert personnel["payload"]["missing_team_ids"] == []
     assert bundle["model_p_eligible"] is False
     assert bundle["truth_gate_eligible"] is False
+
+
+def test_live_schedule_does_not_crash_on_legacy_missing_clock_or_tbd():
+    # Actual nflverse games.csv contains historic and future rows. Neither an
+    # unrelated legacy record nor an unstartable fixture is a valid pregame.
+    csv_rows="\n".join([
+        "game_id,season,game_type,week,gameday,gametime,away_team,home_team",
+        "1999_01_TBD,1999,REG,1,1999-09-01,,CHI,GB",
+        "2026_06_TBD,2026,REG,6,2026-10-11,,PHI,JAX",
+        "2026_06_CIN_MIA,2026,REG,6,2026-10-11,13:00,CIN,MIA",
+    ])+"\n"
+
+    def fake_opener(req,timeout=20):
+        return _Response(csv_rows.encode("utf-8"))
+
+    plan=discover_nfl_auto_games(
+        as_of=datetime(2026,10,11,15,30,tzinfo=timezone.utc),
+        horizon_minutes=6*60,opener=fake_opener)
+    assert [x["game_id"] for x in plan["games"]]==["2026_06_CIN_MIA"]
+    rejected=plan["unadmitted_schedule_games"]
+    assert len(rejected)==1
+    assert rejected[0]["game_id"]=="2026_06_TBD"
+    assert "kickoff missing" in rejected[0]["reason"]
+    assert not any(x["game_id"]=="1999_01_TBD" for x in rejected)
