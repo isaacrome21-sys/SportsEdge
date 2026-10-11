@@ -53,3 +53,28 @@ def test_ranking_is_ev_then_edge_and_score_never_controls_rank():
     ]}
     out=png.as_rows(card,"MLB")
     assert [r["side"] for r in out]==["OVER","UNDER"]
+
+
+def test_multigame_png_shows_actual_lean_matchup_never_first_game_false_context():
+    from unittest.mock import patch
+    captured=[]
+    original=png.text_fit
+    def record(draw,x,y,raw,maximum,*,fill,face):
+        captured.append(str(raw))
+        return original(draw,x,y,raw,maximum,fill=fill,face=face)
+    payload={"games":[
+        {"away":"CHI","home":"GB","context":{"starters":"FIRST GAME QB ONLY"},"markets":[]},
+        {"away":"DET","home":"ARI","markets":[{"market":"total","lean":{
+          "selection":"Under","line":54.5,"price_american":-102,
+          "estimate_p":.529,"edge_probability_points":.048,
+          "ev_per_dollar":.048,"lean_reason":"UNVALIDATED"}}]}
+    ]}
+    with TemporaryDirectory() as temp,patch.object(png,"text_fit",side_effect=record),patch.object(png,"mascot") as logos:
+        target=Path(temp)/"slate.png"
+        result=png.render(payload,"NFL",target,Path(temp))
+        assert result["leans"]==1
+        assert target.is_file()
+        assert "NFL MULTI-GAME SLATE" in captured
+        assert any("#1  DET @ ARI" in t for t in captured)
+        assert not any("FIRST GAME QB ONLY" in t for t in captured)
+        logos.assert_not_called()
