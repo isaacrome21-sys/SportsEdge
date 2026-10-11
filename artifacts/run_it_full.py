@@ -2,8 +2,9 @@
 """Free four-sport research with a truthful per-selection factor checklist.
 
 Game ML/spread/total estimates delegate to the existing UNVALIDATED free_models
-engine. No player-prop pricing is fabricated; unsupported factors do not enter
-the price. All network calls are to existing free ESPN/Open-Meteo endpoints.
+engine. Player/team/first-inning props use free league Poisson priors when the
+full engine features are not supplied. Unsupported factors do not enter the
+price. All network calls are to existing free ESPN/Open-Meteo endpoints.
 """
 from __future__ import annotations
 import argparse
@@ -83,9 +84,21 @@ def audit_row(source, result):
     }
     out["sport_specific"] = {"status": "PARTIAL_HEURISTIC" if has else MISSING,
                               "detail": sport_specific.get(sport, "Unsupported sport")}
-    if market not in ("ML", "SPREAD", "TOTAL"):
-        out["player_props"] = {"status": "UNSUPPORTED_NO_PROP_MODEL",
-                               "detail": "Free model cannot price player props or assign reliable EV"}
+    is_prop = market not in ("ML", "SPREAD", "TOTAL")
+    if is_prop:
+        family = result.get("family") or ""
+        if "FREE_PROP" in str(family).upper() or result.get("status") not in (
+            "BLOCKED_INVALID", "BLOCKED_STARTED",
+        ):
+            out["player_props"] = {
+                "status": "FREE_LEAGUE_PRIOR_RESEARCH",
+                "detail": "Unvalidated league Poisson prior used; full player/pitcher engine features not supplied",
+            }
+        else:
+            out["player_props"] = {
+                "status": "UNSUPPORTED_NO_PROP_MODEL",
+                "detail": "Free model cannot price this market or assign reliable EV",
+            }
     else:
         out["player_props"] = {"status": "NOT_APPLICABLE", "detail": "Game-level market"}
     return out
