@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+from datetime import date
 from pathlib import Path
 import json
+import os
 
 from sportsedge.nfl_attempt9_live_forecast import (
     NO_MODEL_HISTORY,
@@ -13,6 +15,15 @@ from sportsedge.nfl_attempt9_live_forecast import (
     NO_MODEL_MONEYLINE,
     NO_MODEL_SPREAD,
     market_eligibility,
+)
+from sportsedge.nfl_card_game_info import (
+    attach_game_info,
+    fetch_issue_comments,
+    first_card_lines,
+    game_info_lines,
+    load_history,
+    movement_lines,
+    snapshot_marker,
 )
 # research_notes/nfl_team_total_prop_backtest_20261003.md
 TEAM_TOTAL_NOTE = (
@@ -149,11 +160,15 @@ def why_lines(game: dict) -> list[str]:
         )
     if out:
         out.insert(0, "Why (from " + ", ".join(ctx.get("sources") or ["retrieved data"]) + "):")
-        out.append("- Injuries/inactives: not checked by this card.")
+        inj = (ctx.get("game_info") or {}).get("injuries")
+        if inj is None:
+            out.append("- Injuries/inactives: not checked by this card.")
+        else:
+            out.append("- Injuries: ESPN injury report above. Final inactives come out ~90 min before kickoff and are not checked.")
     return out
 
 
-def render(engine: dict) -> str:
+def render(engine: dict, first_card: dict | None = None, observed_at: str | None = None) -> str:
     games = engine.get("games") or []
     title = " · ".join(f"{g.get('away')} @ {g.get('home')}" for g in games[:3])
     if len(games) > 3:
@@ -202,6 +217,8 @@ def render(engine: dict) -> str:
             else:
                 other.append(f"- {label}: no lean (model edge under 2% EV)")
         lines += picks_out + other
+        lines += movement_lines(first_card, engine, away, home)
+        lines += game_info_lines(game)
         if team_totals:
             lines.append(f"- Team totals ({len(team_totals)}): {TEAM_TOTAL_NOTE}")
             lines += team_totals
@@ -223,6 +240,7 @@ def render(engine: dict) -> str:
     if any(g.get("leans") for g in games):
         lines.append("Leans: Attempt 9 totals hit 49.7% out of sample vs closing lines (breakeven 52.4%). Track only.")
     lines.append(both_side_section(engine))
+    lines.append(snapshot_marker(engine, observed_at))
     return "\n".join(lines) + "\n"
 
 
@@ -236,7 +254,26 @@ def main() -> int:
     engine = json.loads(Path(args.engine_output).read_text(encoding="utf-8"))
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    (out / "card.md").write_text(render(engine), encoding="utf-8")
+    first_card = None
+    repo, issue = os.environ.get("GITHUB_REPOSITORY"), os.environ.get("ISSUE")
+    if repo and issue:
+        try:
+            first_card = first_card_lines(fetch_issue_comments(repo, issue))
+        except Exception:  # noqa: BLE001 - display-only; the card must still post
+            first_card = None
+    try:
+        snapshot = json.loads(Path(args.snapshot).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        snapshot = {}
+    observed_at = snapshot.get("observed_at") if isinstance(snapshot, dict) else None
+    try:
+        asof = date.fromisoformat(str(snapshot.get("slate")))
+    except (AttributeError, TypeError, ValueError):
+        asof = date.today()
+    # Game info runs only for a real issue run (ISSUE is set by the workflow, not by tests).
+    history = load_history(os.environ.get("NFL_HISTORY_PATH", ".cache/nfl-history/nflverse_games.json"))
+    attach_game_info(engine.get("games") or [], history, asof, fetch_espn=bool(issue))
+    (out / "card.md").write_text(render(engine, first_card, observed_at), encoding="utf-8")
     return 0
 
 
