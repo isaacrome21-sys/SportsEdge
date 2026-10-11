@@ -405,7 +405,7 @@ class PublicContext:
                             self.key(r.get("name", "")) == self.key(expected_name)]
                 if len(matching) == 1:
                     return matching[0]
-                if len(matching) > 1:
+                if len(matching) > 1 and state_full:
                     # Population breaks exact-city AND exact-state ties only.
                     # Missing or tied populations remain ambiguous.
                     populated = []
