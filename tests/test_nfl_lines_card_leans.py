@@ -22,7 +22,7 @@ def _history() -> list[dict]:
     return games
 
 
-def _ticket() -> dict:
+def _ticket(total: dict | None = None) -> dict:
     return {
         "slate": "2026-09-20",
         "games": [
@@ -31,8 +31,9 @@ def _ticket() -> dict:
                 "away": "KC",
                 "markets": [
                     {"market": "spread", "line": 3.5, "away_or_over_price": -110, "home_or_under_price": -110, "raw": "Spread +3.5 -110 -110"},
-                    # Absurdly low total so the frozen model is guaranteed to like the over.
-                    {"market": "total", "line": 20.5, "away_or_over_price": 100, "home_or_under_price": -120, "raw": "Total 20.5 +100 -120"},
+                    # High total so the frozen model is guaranteed to like the under, on a
+                    # calibration block with real history behind it.
+                    total or {"market": "total", "line": 60.5, "away_or_over_price": -120, "home_or_under_price": 100, "raw": "Total 60.5 -120 +100"},
                     {"market": "team_total", "line": 10.5, "away_or_over_price": -110, "home_or_under_price": -110,
                      "raw": "TeamTotal Ravens 10.5 -110 -110", "team": "BAL", "player": None},
                     {"market": "pass_yards", "line": 245.5, "away_or_over_price": -110, "home_or_under_price": -110,
@@ -44,10 +45,10 @@ def _ticket() -> dict:
 
 
 class NflCardLeanTests(unittest.TestCase):
-    def _run(self, history: list[dict] | None = None) -> tuple[dict, str]:
+    def _run(self, history: list[dict] | None = None, total: dict | None = None) -> tuple[dict, str]:
         with tempfile.TemporaryDirectory() as tmp:
             t = Path(tmp)
-            (t / "ticket.json").write_text(json.dumps(_ticket()), encoding="utf-8")
+            (t / "ticket.json").write_text(json.dumps(_ticket(total)), encoding="utf-8")
             (t / "hist.json").write_text(json.dumps(_history() if history is None else history), encoding="utf-8")
             env = {"PYTHONPATH": str(ROOT)}
             subprocess.run(
@@ -71,28 +72,44 @@ class NflCardLeanTests(unittest.TestCase):
         self.assertIsNone(total["pick"])
         self.assertIsNotNone(total["lean"])
         self.assertTrue(total["lean"]["lean_only"])
-        self.assertEqual(total["lean"]["selection"], "Over")
-        self.assertIn("LEAN (no proven edge, not a bet): Over 20.5", md)
+        self.assertEqual(total["lean"]["selection"], "Under")
+        self.assertTrue(total["lean"]["projection_agrees"])
+        self.assertIn("LEAN (no proven edge, not a bet): Under 60.5", md)
         self.assertIn("No bets", md)
         self.assertNotIn("Score-B", md)
 
     def test_plus_money_shows_plus_sign(self):
         _, md = self._run()
-        self.assertIn("Over 20.5 @ +100", md)
+        self.assertIn("Under 60.5 @ +100", md)
 
-    def test_team_total_and_prop_are_track_only(self):
-        engine, md = self._run()
-        game = engine["games"][0]
-        self.assertEqual(game["picks"], [])
-        for m in game["markets"]:
-            if m["market"] in {"team_total", "pass_yards"}:
-                self.assertIsNone(m.get("pick"))
-                self.assertTrue(m["no_model"].startswith("NO_MODEL"))
-        self.assertIn("Team totals (1): TRACK ONLY (not a bet): team totals tested, no edge", md)
-        self.assertIn("TeamTotal Ravens 10.5 -110 -110", md)
-        self.assertIn("Props (1): TRACK ONLY (not a bet)", md)
-        self.assertIn("no free historical prop closing lines", md)
-        self.assertIn('Prop "Lamar Jackson" PassYards 245.5 -110 -110', md)
+    def test_thin_calibration_tail_never_prints_a_lean(self):
+        # Model total ~25 pts over the line lands on a weight-1 isotonic block
+        # (mean 1.0); before the guard this printed a ~+100% "model EV" lean.
+        engine, md = self._run(total={"market": "total", "line": 20.5, "away_or_over_price": 100,
+                                      "home_or_under_price": -120, "raw": "Total 20.5 +100 -120"})
+        total = [m for m in engine["games"][0]["markets"] if m["market"] == "total"][0]
+        self.assertIsNone(total["lean"])
+        self.assertEqual(total["lean_block"], "NO_LEAN:THIN_CALIBRATION")
+        self.assertNotIn("LEAN (", md)
+        self.assertIn("too few past games to price it", md)
+
+    def test_price_only_under_is_not_a_lean_when_projection_is_over(self):
+        # Week 6 DEN @ LAC: model total 42.1 > 41.5, yet Under @ -105 printed as a
+        # lean because the flat calibration gives every near-line game Under ~0.5.
+        from datetime import date
+        from math import floor
+        from sportsedge.nfl_attempt9_live_forecast import load_runtime, raw_forecasts, recency_features
+        feat = recency_features(_history(), home="BAL", away="KC", asof=date(2026, 9, 20))
+        pred = float(raw_forecasts(load_runtime(), feat["vector"])["total"])
+        line = floor(pred - 0.5) + 0.5  # nearest half-point line below the projection
+        self.assertTrue(0 < pred - line <= 1.0)
+        engine, md = self._run(total={"market": "total", "line": line, "away_or_over_price": -130,
+                                      "home_or_under_price": 110, "raw": f"Total {line} -130 +110"})
+        total = [m for m in engine["games"][0]["markets"] if m["market"] == "total"][0]
+        self.assertIsNone(total["lean"])
+        self.assertEqual(total["lean_block"], "NO_LEAN:PROJECTION_DISAGREES")
+        self.assertNotIn("LEAN (", md)
+        self.assertIn("the model total points the other way", md)
 
     def test_spread_still_held(self):
         engine, md = self._run()
