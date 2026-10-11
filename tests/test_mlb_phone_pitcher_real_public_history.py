@@ -93,7 +93,7 @@ def test_priced_paired_pitcher_rows_reach_true_shared_research_bridge():
         assert r["official_authority"] is False
     assert "REAL_PITCHER_HISTORY_MODEL_UNVALIDATED" in str(card["factor_coverage"])
     text=render_card(card)
-    assert "Real MLB pitcher-model research" in text
+    assert "MLB pitcher + batter history research" in text
     assert "Jacob Misiorowski" in text
     assert "OVER 7.5" in text
     assert "1 verified public MLB pitcher-log inputs" in text
