@@ -184,13 +184,13 @@ def test_nfl_market_radar_uses_existing_fresh_exact_peer_context_only():
                 "reference":{"totals":{"method":method,"books":books,
                                         "fair":fair}}}
         valid=row("DET","ARI","2026-10-11T20:25:00Z",observed,
-                  "PINNACLE_POWER_V1",["pinnacle"],[.46,.54])
+                  "PINNACLE_POWER_V1",["pinnacle"],[.475,.525])
         invalid_two=row("SF","SEA","2026-10-11T20:25:00Z",observed,
                   "MULTIBOOK_MEDIAN_POWER_V1",["betmgm","fanduel"],[.46,.54])
         expired=row("BUF","LAR","2026-10-12T00:00:00Z","2026-10-11T16:30:00Z",
-                  "PINNACLE_POWER_V1",["pinnacle"],[.46,.54])
+                  "PINNACLE_POWER_V1",["pinnacle"],[.475,.525])
         started=row("PHI","JAX","2026-10-11T13:30:00Z",observed,
-                  "PINNACLE_POWER_V1",["pinnacle"],[.46,.54])
+                  "PINNACLE_POWER_V1",["pinnacle"],[.475,.525])
         (quotes/"nfl_odds.json").write_text(json.dumps({
             "status":"READY","games":[valid,invalid_two,expired,started]}))
         scan,err=card.nfl_market_price_radar(root,datetime(2026,10,11,17,2,tzinfo=timezone.utc))
@@ -199,7 +199,7 @@ def test_nfl_market_radar_uses_existing_fresh_exact_peer_context_only():
         assert scan[0]["matchup"]=="DET @ ARI"
         assert scan[0]["selection"]=="Under 54.5"
         assert scan[0]["price"]==-102
-        assert 0.06 < scan[0]["ev"] < 0.07
+        assert 0.03 < scan[0]["ev"] < 0.05
 
 
 def test_nfl_market_radar_rejects_failing_price_and_requires_three_peers():
