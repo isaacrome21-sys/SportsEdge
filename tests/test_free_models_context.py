@@ -92,7 +92,7 @@ def test_manual_override_and_push_aware_ev():
 
 def test_ml_mlb_poisson_and_price_cap():
     score = model.calculate({'sport':'MLB','away':'A','home':'B','market':'ML',
-                             'side':'HOME','odds':-180,'kickoff':START},
+                             'side':'HOME','odds':-180,'opposite_odds':+155,'kickoff':START},
                             model.PublicContext(NOW),NOW,auto_context=False)
     assert score['status'] == 'PRICE_CAP'
     assert 0 < score['estimate_p'] < 1
@@ -119,3 +119,18 @@ def test_normalized_sides_do_not_reverse_spread_sign():
         'market':'spread','side':'away','line':2.5,'odds':-110,'kickoff':START},
         model.PublicContext(NOW),NOW,auto_context=False)
     assert abs(home['estimate_p']+away['estimate_p']-1) < 1e-5
+
+
+def test_one_sided_moneyline_fails_closed_without_no_vig_anchor():
+    value = model.calculate({'sport':'NFL','away':'DET','home':'ARI',
+        'market':'ML','side':'HOME','odds':-110,'kickoff':START},
+        model.PublicContext(NOW), NOW, auto_context=False)
+    assert value['status'] == 'BLOCKED_UNPAIRED_ML'
+
+
+def test_extreme_raw_total_is_market_anchored_not_massive_fake_edge():
+    value = model.calculate(line(line=68.5,commence_time=START),
+        model.PublicContext(NOW),NOW,auto_context=False)
+    assert value['market_anchor']['fair_total'] > 60
+    assert value['market_anchor']['fair_total'] < 68.5
+    assert value['estimate_p'] < 0.65
