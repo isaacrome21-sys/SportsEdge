@@ -50,7 +50,7 @@ def test_exact_pair_and_one_sided_rejection_and_no_model():
     good,bad=m.parse_pairs(event(),NOW)
     assert len(good)==2
     assert {r["market"] for r in good}=={"passing_yards","receptions"}
-    assert "ONE_SIDED" in " ".join(bad)
+    assert "UNPAIRED_OR_DUPLICATE" in " ".join(bad)
     assert good[0]["away_or_over_price"]==-110
     assert good[0]["home_or_under_price"]==-120
     assert all("estimate_p" not in r for r in good)
