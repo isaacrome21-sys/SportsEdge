@@ -1,6 +1,7 @@
 """Daily phone summary only publishes real market/model artifact values."""
 import importlib.util
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -46,7 +47,7 @@ def test_phone_issue_summary_includes_actual_dk_rows_and_missing_notice():
                    "priced_rows":12}],"unmatched_games":1}
         }))
         (root/"nfl_card.json").write_text(json.dumps({"games":[
-          {"away":"CHI","home":"GB","markets":[{"market":"total","lean":{
+          {"away":"CHI","home":"GB","commence_time":"2026-10-11T17:00:00Z","markets":[{"market":"total","quote_retrieved_at":"2026-10-11T13:59:00Z","lean":{
             "selection":"Under","line":47.5,"price_american":-108,
             "estimate_p":.55,"edge_probability_points":.06,"ev_per_dollar":.07,
             "lean_reason":"LEAN_ONLY:NO_PROVEN_EDGE"}}]}]}))
@@ -55,10 +56,13 @@ def test_phone_issue_summary_includes_actual_dk_rows_and_missing_notice():
            "side":"AWAY","line":4.5,"american_odds":-110,
            "model_p":.56,"edge":.04,"expected_roi":.066,
            "reason":"MODEL_EDGE_NOT_VALIDATED_VS_CLOSE"}]}))
-        result=card.render(root,"https://github.com/example/repo/actions/runs/123")
+        result=card.render(root,"https://github.com/example/repo/actions/runs/123",
+                           asof=datetime(2026,10,11,14,0,tzinfo=timezone.utc))
         assert "NFL · READY" in result
         assert "CFB · MODEL_READY" in result
         assert "Under 47.5" in result
+        assert "kickoff Sun Oct 11 12:00 PM CT" in result
+        assert "DK quote Sun Oct 11 8:59 AM CT" in result
         assert "edge +6.0%" in result
         assert "estimate 56.0%" in result
         assert "out-of-sample validation" in result
@@ -74,17 +78,60 @@ def test_nfl_today_and_thursday_are_separate_date_sections():
             {"json":"nfl_thursday.json","date":"2026-10-15","state":"READY"}
           ]},"CFB":{"status":"NO_DK_GAMES","cards":[]}
         }))
-        def simple_card(a,b,ev):
-            return {"games":[{"away":a,"home":b,"markets":[{"market":"total","lean":{
+        def simple_card(a,b,ev,kickoff):
+            return {"games":[{"away":a,"home":b,"commence_time":kickoff,"markets":[{"market":"total","lean":{
                 "selection":"Under","line":54.5,"price_american":-105,
                 "estimate_p":.54,"edge_probability_points":.04,
                 "ev_per_dollar":ev,"lean_reason":"TRACK_ONLY"}}]}]}
-        (root/"nfl_sunday.json").write_text(json.dumps(simple_card("DET","ARI",.048)))
-        (root/"nfl_thursday.json").write_text(json.dumps(simple_card("BUF","LAR",.10)))
-        result=card.render(root,"https://example.com",as_of_date="2026-10-11")
+        (root/"nfl_sunday.json").write_text(json.dumps(simple_card("DET","ARI",.048,"2026-10-11T20:25:00Z")))
+        (root/"nfl_thursday.json").write_text(json.dumps(simple_card("BUF","LAR",.10,"2026-10-15T22:00:00Z")))
+        result=card.render(root,"https://example.com",as_of_date="2026-10-11",
+                           asof=datetime(2026,10,11,14,0,tzinfo=timezone.utc))
         a=result.index("NFL slate: Sun Oct 11 · TODAY")
         b=result.index("NFL slate: Thu Oct 15 · UPCOMING")
         assert a<b
         assert "DET @ ARI" in result[a:b]
         assert "BUF @ LAR" not in result[a:b]
         assert "BUF @ LAR" in result[b:]
+
+
+def test_nfl_london_game_started_is_not_a_pregame_candidate():
+    with TemporaryDirectory() as temp:
+        root=Path(temp)
+        (root/"summary.json").write_text(json.dumps({
+          "NFL":{"status":"READY","cards":[{"json":"nfl.json","date":"2026-10-11","state":"READY"}]},
+          "CFB":{"status":"NO_DK_GAMES","cards":[]}
+        }))
+        def game(away,home,kickoff,side):
+            return {"away":away,"home":home,"commence_time":kickoff,
+                    "markets":[{"market":"total","quote_retrieved_at":"2026-10-11T13:00:00Z",
+                       "lean":{"selection":side,"line":42.5,"price_american":-110,
+                       "estimate_p":.55,"edge_probability_points":.05,
+                       "ev_per_dollar":.05,"lean_reason":"RESEARCH_ONLY"}}]}
+        (root/"nfl.json").write_text(json.dumps({"games":[
+          game("PHI","JAX","2026-10-11T13:30:00Z","Over"),
+          game("CIN","MIA","2026-10-11T17:00:00Z","Under")
+        ]}))
+        output=card.render(root,"https://example.com",as_of_date="2026-10-11",
+            asof=datetime(2026,10,11,14,0,tzinfo=timezone.utc))
+        assert "PHI @ JAX" not in output
+        assert "CIN @ MIA" in output
+        assert "game starts invalidate pregame prices" in output
+
+
+def test_unknown_kickoff_not_listed_as_pregame_pick():
+    with TemporaryDirectory() as temp:
+        root=Path(temp)
+        (root/"summary.json").write_text(json.dumps({
+          "NFL":{"status":"READY","cards":[{"json":"nfl.json","date":"2026-10-11","state":"READY"}]},
+          "CFB":{"status":"NO_DK_GAMES","cards":[]}
+        }))
+        (root/"nfl.json").write_text(json.dumps({"games":[
+           {"away":"CIN","home":"MIA","markets":[{"market":"total","lean":{
+                "selection":"Under","line":43.5,"price_american":-105,
+                "estimate_p":.53,"edge_probability_points":.04,"ev_per_dollar":.033}}]}
+        ]}))
+        out=card.render(root,"https://example.com",as_of_date="2026-10-11",
+             asof=datetime(2026,10,11,14,0,tzinfo=timezone.utc))
+        assert "CIN @ MIA" not in out
+        assert "No priced NFL candidates" in out
