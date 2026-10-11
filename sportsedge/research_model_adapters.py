@@ -16,7 +16,15 @@ import json
 from sportsedge.pitcher_joint_engine import (
     price_pitcher_market, PitcherJointEngineError, PITCHER_MARKETS, ENGINE_VERSION,
 )
-from sportsedge.core.simulate.player_markets import derive_player_stat_market
+def derive_player_stat_market(*args, **kwargs):
+    """Load optional football simulation dependencies only on football calls.
+
+    The phone free MLB pitcher workflow deliberately has no numpy dependency.
+    This wrapper remains patchable in football adapter regression tests.
+    """
+    from sportsedge.core.simulate.player_markets import derive_player_stat_market as derive
+    return derive(*args, **kwargs)
+
 
 
 def _timestamp(value: Any, field: str) -> datetime:
