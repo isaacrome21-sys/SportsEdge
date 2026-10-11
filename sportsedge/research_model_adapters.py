@@ -195,6 +195,13 @@ def mlb_batter_to_bridge_rows(
         history = (features or {}).get("pa_history") if isinstance(features, Mapping) else None
         if not isinstance(history, (list, tuple)) or len(history) < 10:
             raise ValueError("TEN_PRIOR_GAMES_REQUIRED")
+        try:
+            total_pa = sum(_num(item["plate_appearances"], "PRIOR_PLATE_APPEARANCES")
+                           for item in history)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("VERIFIED_PRIOR_PLATE_APPEARANCES_REQUIRED") from exc
+        if total_pa < 20:
+            raise ValueError("TWENTY_PRIOR_PLATE_APPEARANCES_REQUIRED")
         if not isinstance(prior_game_times_utc, (list, tuple)) or len(prior_game_times_utc) != len(history):
             raise ValueError("TIMESTAMP_EACH_PRIOR_GAME_REQUIRED")
         source_time = _timestamp(source_as_of_utc, "SOURCE_AS_OF")
