@@ -78,6 +78,39 @@ class ResidualMarketResearchTests(unittest.TestCase):
         self.assertEqual(card["validated_markets"],[])
         self.assertEqual(card["authority"]["staking"],False)
 
+    def test_unified_adapter_feeds_anchor_means_into_frozen_joint_score_grid(self):
+        from sportsedge.sports.nfl.residual_unified_adapter import run_residual_unified_research
+        out = run_residual_unified_research(
+            game_id="2026_05_AWAY_HOME",home_team="HOME",away_team="AWAY",
+            raw_margin=10.0,raw_total=66.5,paired_markets=markets(),
+            observed_at=OBS,as_of=NOW,kickoff_at=KICK,n_sims=80,seed=7,
+        )
+        center=out["residual"]["center"]
+        self.assertLess(abs(center["total"]-44.5),3.0)
+        self.assertAlmostEqual(out["engine"]["score_means"]["mean_home"],center["home_mean"])
+        self.assertAlmostEqual(out["engine"]["score_means"]["mean_away"],center["away_mean"])
+        self.assertEqual(out["engine"]["score_distribution"]["sampled_paths"],80)
+        self.assertTrue(out["authority"]["research_only"])
+        self.assertFalse(out["authority"]["promotion"])
+
+    def test_auto_renderer_never_promotes_legacy_absolute_model_leans(self):
+        from scripts.render_auto_dk_phone_summary import candidates
+        residual=price_game_from_pairs(raw_margin=3.5,raw_total=55.5,
+            markets=markets(),observed_at=OBS,as_of=NOW,kickoff_at=KICK)
+        payload={"residual_pricing_enabled":True,"games":[{
+            "away":"AWAY","home":"HOME","commence_time":KICK,
+            "residual_research":residual,
+            "markets":[{"market":"total","lean":{
+                "selection":"Over","line":44.5,"price_american":-110,
+                "estimate_p":0.99,"edge_probability_points":0.49,
+                "ev_per_dollar":0.9}}],
+        }]}
+        rows=candidates("NFL",payload)
+        self.assertTrue(all(row["role"]=="LEAN" for row in rows))
+        self.assertTrue(all(row["reason"].startswith("RESIDUAL_RESEARCH_ONLY") for row in rows))
+        self.assertFalse(any(row["ev"]==0.9 for row in rows))
+        self.assertFalse(any(row["price"] is None for row in rows))
+
     def test_no_lookahead_after_kickoff(self):
         with self.assertRaises(NFLResidualError):
             price_game_from_pairs(raw_margin=3.5,raw_total=44.5,
