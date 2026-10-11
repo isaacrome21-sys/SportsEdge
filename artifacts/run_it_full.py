@@ -18,6 +18,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from artifacts import free_models as engine
 from sportsedge.mlb_phone_pitcher_pricing import phone_pitcher_rows, blocked
 from sportsedge.mlb_phone_batter_pricing import phone_batter_rows
+from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
+from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
 from datetime import datetime, timezone
 
 FIELDS = (
@@ -90,7 +92,8 @@ def audit_row(source, result):
                               "detail": sport_specific.get(sport, "Unsupported sport")}
     if market not in ("ML", "SPREAD", "TOTAL"):
         src = result.get("source") or ""
-        if src in {"FREE_MLB_STATSAPI_GAMELOG", "FREE_MLB_STATSAPI_BATTER_GAMELOG"} and result.get("status") != "NO_MODEL_OR_MARKET":
+        if src in {"FREE_MLB_STATSAPI_GAMELOG", "FREE_MLB_STATSAPI_BATTER_GAMELOG",
+                   "FREE_ESPN_NFL_GAMELOG", "FREE_ESPN_CFB_GAMELOG"} and result.get("status") != "NO_MODEL_OR_MARKET":
             out["player_props"] = {
                 "status": "REAL_PUBLIC_HISTORY_MODEL_UNVALIDATED",
                 "detail": "Verified prior MLB StatsAPI game logs priced by real empirical engine; not validated vs closes",
@@ -128,6 +131,23 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         market = str(line.get("market") or "").upper().strip()
         market = {"MONEYLINE":"ML","H2H":"ML","RUN_LINE":"SPREAD",
                   "GAME_TOTAL":"TOTAL","TOTALS":"TOTAL"}.get(market,market)
+        if line["sport"] in {"NFL", "CFB"}:
+            market = {
+                "PASS_YARDS":"PLAYER_PASSING_YARDS",
+                "PASSING_YARDS":"PLAYER_PASSING_YARDS",
+                "PASS_TDS":"PLAYER_PASS_TDS",
+                "PASSING_TDS":"PLAYER_PASSING_TDS",
+                "PASS_ATTEMPTS":"PLAYER_PASS_ATTEMPTS",
+                "COMPLETIONS":"PLAYER_COMPLETIONS",
+                "INTERCEPTIONS":"PLAYER_INTERCEPTIONS",
+                "RUSH_YARDS":"PLAYER_RUSHING_YARDS",
+                "RUSHING_YARDS":"PLAYER_RUSHING_YARDS",
+                "RUSH_ATTEMPTS":"PLAYER_RUSH_ATTEMPTS",
+                "RECEIVING_YARDS":"PLAYER_RECEIVING_YARDS",
+                "REC_YARDS":"PLAYER_RECEIVING_YARDS",
+                "RECEPTIONS":"PLAYER_RECEPTIONS",
+            }.get(market,market)
+            line["market"] = market
         if market in {"ML","SPREAD","TOTAL"}:
             game_indices.append(i)
             games.append(line)
@@ -158,6 +178,8 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         }
     pitcher_pos, pitcher_input = [], []
     batter_pos, batter_input = [], []
+    nfl_pos, nfl_input = [], []
+    cfb_pos, cfb_input = [], []
     others = {}
     for local, line in enumerate(props):
         market = str(line.get("market") or "").upper()
@@ -167,12 +189,24 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         elif line["sport"] == "MLB" and market.startswith("BATTER_"):
             batter_pos.append(local)
             batter_input.append(line)
+        elif line["sport"] == "NFL" and market.startswith("PLAYER_"):
+            nfl_pos.append(local)
+            nfl_input.append(line)
+        elif line["sport"] == "CFB" and market.startswith("PLAYER_"):
+            cfb_pos.append(local)
+            cfb_input.append(line)
         else:
             others[local] = blocked(line, "NO_VERIFIED_MODEL_FOR_THIS_MARKET")
     pitcher_results, pitcher_receipts = phone_pitcher_rows(
         pitcher_input, now=clock, getter=getter if auto_context else (lambda url: None))
     batter_results, batter_receipts = phone_batter_rows(
         batter_input, now=clock, getter=getter if auto_context else (lambda url: None))
+    nfl_results, nfl_receipts = phone_nfl_player_rows(
+        nfl_input, now=clock, getter=getter if auto_context else (lambda url: None))
+    cfb_results, cfb_receipts = phone_cfb_player_rows(
+        cfb_input, now=clock, getter=getter if auto_context else (lambda url: None))
+    if len(nfl_results) != len(nfl_input) or len(cfb_results) != len(cfb_input):
+        raise ValueError("FOOTBALL_RESULT_COUNT_MISMATCH")
     if len(pitcher_results) != len(pitcher_input):
         raise ValueError("PITCHER_RESULT_COUNT_MISMATCH")
     if len(batter_results) != len(batter_input):
@@ -181,6 +215,10 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
     for local, result in zip(pitcher_pos, pitcher_results):
         modeled_props[local] = result
     for local, result in zip(batter_pos, batter_results):
+        modeled_props[local] = result
+    for local, result in zip(nfl_pos, nfl_results):
+        modeled_props[local] = result
+    for local, result in zip(cfb_pos, cfb_results):
         modeled_props[local] = result
     for local, result in others.items():
         modeled_props[local] = result
@@ -207,10 +245,14 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         [r for r in modeled_props if r.get("status","").startswith("WATCH_")],
         key=lambda r:-r.get("ev_per_dollar",-1))
     card["prop_unpriced"] = [r for r in modeled_props if r.get("status")=="NO_MODEL_OR_MARKET"]
-    card["source_receipts"] = list(card.get("source_receipts") or []) + pitcher_receipts + batter_receipts
+    card["source_receipts"] = (list(card.get("source_receipts") or [])
+                              + pitcher_receipts + batter_receipts
+                              + nfl_receipts + cfb_receipts)
     card["prop_model_status"] = {
         "pitcher_engine":"MLB_PITCHER_JOINT_EMPIRICAL_BAYES",
         "batter_engine":"MLB_BATTER_EMPIRICAL_GAMELOG",
+        "nfl_player_engine":"ESPN_NAMED_HISTORICAL_GAMELOG_WATCH_ONLY",
+        "cfb_player_engine":"ESPN_NAMED_HISTORICAL_GAMELOG_WATCH_ONLY",
         "free_public_history":True,
         "model_vs_close_validated":False,
         "phone_odds_freshness_required":True,
@@ -218,7 +260,7 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         "unsupported_player_markets_blocked":len(card["prop_unpriced"]),
         "statcast":"NOT_WIRED",
         "next_gen":"NOT_WIRED",
-        "nfl_cfb_player":"NOT_WIRED",
+        "nfl_cfb_player":"ESPN_NAMED_GAMES_ONLY_PARTICIPATION_NOT_VERIFIED",
     }
 
     audit, totals = [], Counter()
@@ -239,10 +281,10 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         "advanced_metrics":{
             "statcast":UNWIRED,"next_gen":UNWIRED,"coaching":UNWIRED,
             "travel":UNWIRED,"player_props":
-            "MLB_PITCHER_AND_BATTER_PUBLIC_HISTORY_OTHERS_UNWIRED",
+            "MLB_PITCHER_BATTER_AND_ESPN_NAMED_FOOTBALL_HISTORY_UNVALIDATED",
         },
     }
-    card["runner"]="RUN_IT_FULL_REAL_MLB_PITCHER_BATTER_PREGAME_V1"
+    card["runner"]="RUN_IT_FULL_MLB_AND_NAMED_FOOTBALL_PLAYER_HISTORIES_V1"
     return card
 
 

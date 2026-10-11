@@ -173,11 +173,15 @@ def render_card(card, *, run_url="", intake_at=""):
                        if r.get("status") == "PUBLIC_MLB_PRIOR_STARTS_VERIFIED"]
     public_batters = [r for r in receipts
                       if r.get("status") == "PUBLIC_MLB_PRIOR_BATTER_GAMES_VERIFIED"]
+    public_football = [r for r in receipts
+                       if r.get("status") in {"PUBLIC_NFL_PRIOR_GAMES_VERIFIED",
+                                             "PUBLIC_CFB_PRIOR_GAMES_VERIFIED"}]
     missing = sum(r.get("status") == "UNAVAILABLE" for r in receipts)
     malformed = [r for r in receipts if r.get("status") == "UNUSABLE_SCHEMA"]
     lines += ["", f"Free context: {fetched} ESPN/weather retrievals, "
               f"{len(public_pitchers)} verified public MLB pitcher-log inputs, "
               f"{len(public_batters)} verified public MLB batter-log inputs, "
+              f"{len(public_football)} verified ESPN football named-stat histories, "
               f"{missing} unavailable, {len(malformed)} unusable-schema reports. "
               "No paid odds calls.",
               "Full model card and source receipts are available in the workflow artifact.",
@@ -192,6 +196,12 @@ def render_card(card, *, run_url="", intake_at=""):
                      ": " + safe(p.get("prior_games"),8) +
                      " prior games / " + safe(p.get("prior_plate_appearances"),8) +
                      " plate appearances; lineup " + safe(p.get("lineup"),80))
+    for p in public_football[:20]:
+        lines.append("- ESPN football player " + safe(p.get("player_id"),24) +
+                     ": " + safe(p.get("prior_games"),8) +
+                     " named-stat prior games; fields " +
+                     safe(",".join(p.get("stat_fields") or []),100) +
+                     "; participation NOT_VERIFIED; research WATCH only")
     for item in malformed[:4]:
         lines.append("- Unusable public injury source for team ID " +
                      safe(item.get("team_id"), 20) + ": " +

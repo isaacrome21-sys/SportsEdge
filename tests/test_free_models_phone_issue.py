@@ -62,7 +62,7 @@ def test_card_render_shows_candidate_and_rejection_diagnostics():
     text=phone.render_card(card,run_url="https://github.com/example/actions/runs/1")
     assert "B -3.5" in text and "5.0%" in text
     assert "BLOCKED_CONTEXT_UNVERIFIED" in text
-    assert "1 ESPN/weather retrievals, 0 verified public MLB pitcher-log inputs, 0 verified public MLB batter-log inputs, 1 unavailable" in text
+    assert "1 ESPN/weather retrievals, 0 verified public MLB pitcher-log inputs, 0 verified public MLB batter-log inputs, 0 verified ESPN football named-stat histories, 1 unavailable" in text
     assert "not proven +EV" in text
 
 def test_truncated_input_and_dangerous_json_rejected():
