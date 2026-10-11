@@ -149,7 +149,11 @@ def ticket_with_props(board,report,now):
                     continue
             if len(matches)!=1:continue
             row=accepted.get(str(matches[0].get("provider_event_id")))
-            if row:
+            # The source event key alone is never identity: the current ticket
+            # must match BOTH teams and kickoff from the admission receipt.
+            if (row and row.get("away")==matches[0].get("away")
+                    and row.get("home")==matches[0].get("home")
+                    and row.get("commence_time")==matches[0].get("commence_time")):
                 game["markets"].extend(dict(p) for p in row["pairs"])
         ticket["source"]="ODDS_API_DK_BASE_PLUS_OPTIONAL_PAIRED_PROPS"
     return tickets
