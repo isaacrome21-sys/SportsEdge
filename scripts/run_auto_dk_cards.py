@@ -13,6 +13,9 @@ import os
 import subprocess
 import sys
 from collections import defaultdict
+import csv
+import gzip
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -85,35 +88,102 @@ def run_nfl(raw, out, now):
             "cards":cards}
 
 
+def _cfb_school_matches(book_name: str, schedule_name: str) -> bool:
+    """Match a sportsbook mascot-qualified label ONLY to its schedule school.
+
+    The independent kickoff, opponent and unique-game tests in
+    bind_cfb_sdv_games are mandatory. A partial home-only match is insufficient.
+    """
+    clean=lambda text: " ".join(re.sub(r"[^a-z0-9 ]"," ",str(text).casefold()).split())
+    book,school=clean(book_name),clean(schedule_name)
+    return bool(school and (book==school or book.startswith(school+" ")))
+
+
+def bind_cfb_sdv_games(games: list, directory: Path, now: datetime):
+    """Bind DK events to 2026 SDV schedule with both teams and exact kickoff.
+
+    No inferred week numbers. The downstream SDV loader separately verifies
+    the full SHA-pinned source receipt and prior-week feature provenance.
+    """
+    target=directory/"cfb_schedules_2026.csv.gz"
+    if not target.is_file() or not (directory/"receipt.json").is_file():
+        return {},[{"matchup":g.get("away","")+" @ "+g.get("home",""),
+                    "reason":"SDV_SCHEDULE_UNAVAILABLE"} for g in games]
+    with gzip.open(target,"rt",encoding="utf-8-sig",newline="") as fh:
+        schedule=list(csv.DictReader(fh))
+    groups=defaultdict(list)
+    missing=[]
+    for game in games:
+        start=datetime.fromisoformat(game["commence_time"].replace("Z","+00:00")).astimezone(timezone.utc)
+        eligible=[]
+        for row in schedule:
+            if row.get("season")!="2026" or row.get("season_type","").lower() not in {"regular","2"}:
+                continue
+            if str(row.get("fbs_game")).lower() not in {"true","1"}:
+                continue
+            if str(row.get("completed")).lower() in {"true","1"}:
+                continue
+            try:
+                when=datetime.fromisoformat(row["start_date"].replace("Z","+00:00")).astimezone(timezone.utc)
+            except (KeyError,ValueError):
+                continue
+            if when<=now or abs((when-start).total_seconds())>900:
+                continue
+            if _cfb_school_matches(game["away"],row["away_team"]) and _cfb_school_matches(game["home"],row["home_team"]):
+                eligible.append((row,when))
+        if len(eligible)!=1:
+            missing.append({"matchup":game["away"]+" @ "+game["home"],
+                            "reason":"SDV_GAME_IDENTITY_OR_KICKOFF_NOT_UNIQUE",
+                            "matching_schedule_games":len(eligible)})
+            continue
+        row,when=eligible[0]
+        # Pass the provider's numeric game week and school identity to the
+        # selected SDV engine. The DK paired quotes and peer lines are unchanged.
+        adapted=dict(game,away=row["away_team"],home=row["home_team"],
+                     commence_time=when.isoformat(),
+                     schedule_game_id=row["game_id"],
+                     source_game_name=game["away"]+" @ "+game["home"])
+        groups[(int(row["season"]),int(row["week"]))].append(adapted)
+    return dict(groups),missing
+
+
 def run_cfb(raw, out, now):
-    by_week=defaultdict(list)
-    for game in raw.get("games") or []:
-        key=week_candidate(game["commence_time"])
-        if key is not None:
-            by_week[key].append(game)
+    directory=out/"cfb_public"
+    try:
+        by_week,unmatched=bind_cfb_sdv_games(raw.get("games") or [],directory,now)
+    except (OSError,ValueError,TypeError) as exc:
+        return {"status":"SDV_BINDING_UNAVAILABLE","reason":type(exc).__name__,
+                "cards":[],"unmatched_games":len(raw.get("games") or [])}
+    (out/"cfb_unmatched_games.json").write_text(json.dumps(unmatched,indent=2)+"\n")
     if not by_week:
-        return {"status":"NO_DK_GAMES","cards":[]}
+        # Save the paired DK odds in the collection artifact; do not guess an
+        # ESPN competition week just to claim a scored game.
+        return {"status":"DK_QUOTES_ONLY_NO_SDV_MATCH","cards":[],
+                "unmatched_games":len(unmatched)}
     out_cards=[]
     for (season,week),games in sorted(by_week.items()):
         board=cfb_compact(games)
         card=out/f"cfb_{season}_w{week}_card.json"
         cmd=["scripts/run_cfb_sdv_card_v2.py","--board-json",json.dumps(board),
              "--season",season,"--week",week,"--asof",now.isoformat(),
-             "--output",card]
+             "--sdv-live-dir",directory,"--output",card]
         env=os.environ.copy()
-        env["CFB_SHARP_FETCH"]="0" # No second charged request; peers are included.
+        env["CFB_SHARP_FETCH"]="0" # Peer quotes are included; no second paid fetch.
         env["CFB_SDV_MAX_RETRY_SLEEP_SECONDS"]="10"
-        if (out/"cfb_public").is_dir():
-            cmd+=["--sdv-live-dir",out/"cfb_public"]
         success,reason=call(cmd,timeout=300,env=env)
         if success:
-            out_cards.append({"season":season,"week":week,"state":"READY",
+            payload=json.loads(card.read_text(encoding="utf-8"))
+            state="MODEL_READY" if payload.get("model_status","").startswith("MODEL") else "QUOTES_ONLY_MODEL_UNAVAILABLE"
+            out_cards.append({"season":season,"week":week,"state":state,
+                              "model_status":payload.get("model_status"),
+                              "priced_rows":sum(r.get("model_p") is not None for r in payload.get("results") or []),
                               "json":str(card),"png":image_card(card,"CFB",out/f"cfb_w{week}.png")})
         else:
             out_cards.append({"season":season,"week":week,"state":"MODEL_UNAVAILABLE",
-                              "reason":reason[:300]})
-    return {"status":"READY" if any(x["state"]=="READY" for x in out_cards) else "MODEL_UNAVAILABLE",
-            "cards":out_cards}
+                              "reason":reason[:500]})
+    status=("MODEL_READY" if any(x["state"]=="MODEL_READY" for x in out_cards)
+            else "QUOTES_ONLY_MODEL_UNAVAILABLE")
+    return {"status":status,"cards":out_cards,"unmatched_games":len(unmatched)}
 
 
 def mlb_auto_snapshot(games,now,*,fetch_schedule=None,build_bound_input=None):
