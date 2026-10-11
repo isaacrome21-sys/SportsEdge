@@ -98,9 +98,15 @@ def render_card(card, *, run_url="", intake_at=""):
     receipts = card.get("source_receipts") or []
     fetched = sum(r.get("status") == "FETCHED_AT_RUNTIME" for r in receipts)
     missing = sum(r.get("status") == "UNAVAILABLE" for r in receipts)
-    lines += ["", f"Free context: {fetched} retrieved, {missing} unavailable. No paid odds calls.",
+    malformed = [r for r in receipts if r.get("status") == "UNUSABLE_SCHEMA"]
+    lines += ["", f"Free context: {fetched} retrieved, {missing} unavailable, "
+              f"{len(malformed)} unusable-schema reports. No paid odds calls.",
               "Full model card and source receipts are available in the workflow artifact.",
               f"GitHub Actions run: {safe(run_url, 300)}"]
+    for item in malformed[:4]:
+        lines.append("- Unusable public injury source for team ID " +
+                     safe(item.get("team_id"), 20) + ": " +
+                     safe(item.get("reason"), 300))
     factor_report = card.get("factor_coverage")
     if factor_report:
         if factor_report.get("schema") != "SPORTSEDGE_FACTOR_COVERAGE_V1":
