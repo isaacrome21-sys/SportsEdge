@@ -440,7 +440,7 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
         win = bounded(anchor["market_no_vig_p"] + 0.15*(win-anchor["market_no_vig_p"]), 0, 1)
     loss = bounded(1 - win - push, 0, 1)
     ev = win * (dec - 1) - loss
-    breakeven = 1 / dec
+    breakeven = (1 - push) / dec  # effective win-probability threshold with push refund
     selection = ("OVER" if side == "OVER" else "UNDER") if market == "TOTAL" else home if side == "HOME" else away
     if market == "SPREAD":
         selection += f" {line:+g}"
