@@ -124,6 +124,40 @@ class MLBBatterPublicSource:
             raise MissingMLBBatterHistory("PLAYER_NOT_UNIQUELY_RESOLVED_FROM_PUBLIC_SEARCH")
         ident = _int(matches[0].get("id"), "MLB_BATTER_ID")
 
+        # Independently verify team membership and today's starting batting
+        # order from official game boxscore, never the odds issue. Pre-game
+        # boxscores may legitimately lack a published lineup.
+        boxscore_url = ROOT + f"/game/{game['gamePk']}/boxscore"
+        box = self._fetch(boxscore_url)
+        side = None
+        for spot in ("away", "home"):
+            expected = away if spot == "away" else home
+            team_meta = ((game.get("teams") or {}).get(spot) or {}).get("team") or {}
+            if _norm(team_meta.get("name")) != _norm(expected):
+                raise MissingMLBBatterHistory("GAME_TEAM_MISMATCH")
+        roster_sides = []
+        starter = False
+        if isinstance(box, dict) and isinstance(box.get("teams"), dict):
+            for spot in ("away", "home"):
+                players = (box["teams"].get(spot) or {}).get("players") or {}
+                if not isinstance(players, dict):
+                    continue
+                selected = players.get("ID" + str(ident))
+                if isinstance(selected, dict):
+                    roster_sides.append(spot)
+                    order = selected.get("battingOrder")
+                    if isinstance(order, str) and order.isdigit() and int(order) >= 100:
+                        starter = True
+        if len(roster_sides) > 1:
+            raise MissingMLBBatterHistory("PLAYER_TEAM_IDENTITY_AMBIGUOUS")
+        if len(roster_sides) == 1:
+            # Verify it is an expected team in this game, not a roster
+            # scrape from a different fixture.
+            side = roster_sides[0]
+        elif box is not None:
+            # Missing in a pregame boxscore is UNKNOWN, not a definite OUT.
+            starter = False
+
         season = kickoff.year
         url = ROOT + f"/people/{ident}/stats?" + urlencode({
             "stats": "gameLog", "group": "hitting", "season": str(season),
@@ -172,6 +206,8 @@ class MLBBatterPublicSource:
                 break
         if len(latest) < 10:
             raise MissingMLBBatterHistory("FEWER_THAN_TEN_VERIFIED_PRIOR_GAMES")
+        if sum(stats["plate_appearances"] for _, _, stats in latest) < 20:
+            raise MissingMLBBatterHistory("FEWER_THAN_TWENTY_PRIOR_PLATE_APPEARANCES")
         dates = [datetime.combine(day, datetime.min.time(), timezone.utc).isoformat()
                  for day, _, _ in latest]
         return {
@@ -181,7 +217,11 @@ class MLBBatterPublicSource:
             "kickoff_utc": kickoff.isoformat(), "source_as_of_utc": now.isoformat(),
             "prior_game_times_utc": dates,
             "features": {"pa_history": [stats for _, _, stats in latest]},
-            "lineup_verified": False,  # game log does not confirm today's lineup
+            "lineup_verified": bool(starter and len(roster_sides) == 1),
+            "lineup_status": ("PUBLIC_BOXSCORE_STARTER_VERIFIED" if starter and len(roster_sides) == 1
+                              else "PUBLIC_BOXSCORE_LINEUP_NOT_VERIFIED"),
+            "boxscore_endpoint": boxscore_url,
             "source_endpoint": url,
             "prior_game_count": len(latest),
+            "prior_plate_appearances": sum(stats["plate_appearances"] for _, _, stats in latest),
         }
