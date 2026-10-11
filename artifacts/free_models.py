@@ -220,31 +220,59 @@ class PublicContext:
         return sorted(completed, reverse=True)[:5]
 
     def injury_points(self, sport, team):
+        """Parse ESPN team or league injury groups; unknown is not healthy."""
         if sport == "MLB":
             return 0.0, "NOT_APPLICABLE"
         url = f"{ESPN}/{LEAGUES[sport]}/teams/{team['id']}/injuries"
         data = self.fetch(url)
-        if data is None:
-            return 0.0, "MISSING_SOURCE"
-        if "injuries" not in data:
-            return 0.0, "UNRECOGNIZED_SOURCE_FORMAT"
+        candidates = None
+        if isinstance(data, dict) and isinstance(data.get("injuries"), list):
+            groups = data["injuries"]
+            # Some team reports contain grouped teams, others flat players.
+            if groups and isinstance(groups[0], dict) and "team" in groups[0]:
+                matching = [group for group in groups
+                            if str((group.get("team") or {}).get("id")) == str(team["id"])]
+                if len(matching) == 1 and isinstance(matching[0].get("injuries"), list):
+                    candidates = matching[0]["injuries"]
+            else:
+                candidates = groups
+        if candidates is None:
+            # League-wide schema is injuries:[{team:{id},injuries:[...]}].
+            # A team absent from the result stays UNKNOWN, never "no injuries".
+            league = self.fetch(f"{ESPN}/{LEAGUES[sport]}/injuries")
+            if isinstance(league, dict) and isinstance(league.get("injuries"), list):
+                matching = [group for group in league["injuries"] if isinstance(group, dict)
+                            and str((group.get("team") or {}).get("id")) == str(team["id"])]
+                if len(matching) == 1 and isinstance(matching[0].get("injuries"), list):
+                    candidates = matching[0]["injuries"]
+        if candidates is None:
+            return 0.0, "MISSING_OR_UNRECOGNIZED_SOURCE"
         seen = set()
         loss = 0.0
-        for row in data.get("injuries") or []:
-            status = str(row.get("status") or row.get("type", {}).get("name") or "").lower()
+        for row in candidates:
+            if not isinstance(row, dict):
+                continue
+            raw = row.get("status") or ""
+            if isinstance(raw, dict):
+                raw = raw.get("name") or raw.get("description") or ""
+            status = str(raw).strip().lower()
             if status not in {"out", "doubtful"}:
                 continue
             athlete = row.get("athlete") or {}
-            ident = str(athlete.get("id") or athlete.get("displayName") or "")
+            if not isinstance(athlete, dict):
+                continue
+            ident = str(athlete.get("id") or athlete.get("fullName") or athlete.get("displayName") or "")
             if not ident or ident in seen:
                 continue
             seen.add(ident)
-            position = str((athlete.get("position") or {}).get("abbreviation") or "").upper()
-            if sport == "NFL" and position == "QB":
+            position = athlete.get("position") or {}
+            position = position.get("abbreviation") if isinstance(position, dict) else position
+            if sport == "NFL" and str(position).upper() == "QB":
                 loss += 1.5
             else:
                 loss += 0.3 if sport == "NBA" else 0.15
-        return -round(min(loss, 2.5), 3), "HEURISTIC_OUT_DOUBTFUL_NOT_CALIBRATED"
+        return (-round(min(loss, 2.5), 3),
+                f"HEURISTIC_OUT_DOUBTFUL_REPORTED_{len(seen)}_UNKNOWN_COMPLETENESS")
 
     def fixture(self, sport, away, home, kickoff):
         """Bind competition/venue with BOTH teams and a unique start time."""
@@ -285,7 +313,11 @@ class PublicContext:
             state = address.get("state")
             if not city:
                 return 0.0, "VENUE_LOCATION_MISSING"
-            q = urlencode({"name": city, "count": 10, "language": "en", "format": "json"})
+            # Open-Meteo accepts "City, State" qualifiers and countryCode.
+            # Never silently select a city when state matching is ambiguous.
+            name = city + (", " + state if state else "")
+            q = urlencode({"name": name, "countryCode": "US", "count": 10,
+                           "language": "en", "format": "json"})
             results = (self.fetch(GEO + "?" + q) or {}).get("results") or []
             matches = [r for r in results if self.key(r.get("name")) == self.key(city) and
                        (not state or self.key(r.get("admin1")) == self.key(state) or
@@ -334,6 +366,11 @@ def context_for(sport, away, home, start, provider, row):
             continue
         sample = provider.schedule(sport, team, kickoff)
         if sample:
+            days_rest = (kickoff - sample[0][0]).total_seconds() / 86400
+            if 0 < days_rest < 40:
+                # Context only until a rest coefficient is trained vs closes.
+                notes.append(prefix.upper() + "_REST_DAYS:" + str(round(days_rest, 2)))
+            notes.append(prefix.upper() + "_HISTORY_COUNT:" + str(len(sample)))
             margins = [pf - pa for _, pf, pa in sample]
             cap = 5 if sport == "NBA" else (0.7 if sport == "MLB" else 3)
             out[f"{prefix}_rating"] = round(bounded(sum(margins) / len(margins) * 0.12, -cap, cap), 3)
@@ -395,7 +432,7 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
     dec = odds_decimal(row.get("odds", row.get("price")))
     price = numeric(row.get("odds", row.get("price")), "odds")
     context = {k: 0.0 for k in CONTEXT_KEYS[sport]}
-    notes = []
+    notes = [] if auto_context else ["NO_FETCH_MANUAL_MODE_NO_PUBLIC_CONTEXT"]
     kickoff = original_start
     if auto_context:
         inferred, verified_start, notes = context_for(sport, away, home, original_start, provider, row)
