@@ -86,6 +86,7 @@ def test_priced_paired_pitcher_rows_reach_true_shared_research_bridge():
         assert r["source"]=="FREE_MLB_STATSAPI_GAMELOG"
         assert r["model_source"].startswith("mlb_pitcher_joint:")
         assert r["prior_start_count"]==7
+        assert r["line"]==7.5
         assert r["quote_status"]=="RECENT_CAPTURED_QUOTE"
         assert 0<r["dk_no_vig_p"]<1
         assert 0<r["model_probability"]<1
@@ -94,6 +95,9 @@ def test_priced_paired_pitcher_rows_reach_true_shared_research_bridge():
     text=render_card(card)
     assert "Real MLB pitcher-model research" in text
     assert "Jacob Misiorowski" in text
+    assert "OVER 7.5" in text
+    assert "1 verified public MLB pitcher-log inputs" in text
+    assert "probable" in text.lower()
     assert "DK no-vig p" in text
 
 

@@ -98,6 +98,9 @@ def phone_pitcher_rows(rows, *, now=None, getter=None):
                 "quote_captured_at": another.get("quote_captured_at"),
             })
         judged = price_three_sport_research([p],quotes,as_of=now_utc)["rows"][0]
+        # The generic bridge returns pricing fields but does not echo the
+        # market threshold. Preserve the independently matched quoted line.
+        judged["line"] = line
         judged["player_name"] = verified["pitcher_name"]
         judged["pitcher_status"] = "PROBABLE_STARTER_ONLY_NOT_CONFIRMED"
         judged["prior_start_count"] = verified["prior_start_count"]
