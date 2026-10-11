@@ -50,7 +50,50 @@ def price(value):
 
 def candidates(sport, payload):
     rows=[]
-    if sport=="NFL":
+    if sport=="NFL" and payload.get("residual_pricing_enabled"):
+        # All AUTO NFL prices now come from the separately declared residual
+        # research adapter. Legacy calibrated absolute-model leans are NOT
+        # displayed in this lane, even if a historical artifact contains them.
+        for game in payload.get("games") or []:
+            research=game.get("residual_research")
+            if not isinstance(research,dict) or research.get("status")!="RESEARCH_ONLY":
+                continue
+            if research.get("validated_markets") != [] or not research.get("forward_track_signal"):
+                continue
+            for market in research.get("markets") or []:
+                for side in market.get("sides") or []:
+                    try:
+                        ev=float(side["ev_per_dollar"])
+                        edge=float(side["edge_probability_points"])
+                        american=int(side["price_american"])
+                    except (KeyError,TypeError,ValueError,OverflowError):
+                        continue
+                    # The existing +2% floor and -165 straight-price ceiling
+                    # are unchanged. Forward CLV remains required for BEST.
+                    if ev < 0.02 or edge <= 0 or american < -165:
+                        continue
+                    selection=str(side.get("selection") or "").lower()
+                    if market.get("market")=="moneyline":
+                        display=(game.get(selection) or selection)+" ML"
+                    elif market.get("market")=="spread":
+                        display=(game.get(selection) or selection)
+                    elif market.get("market")=="total":
+                        display=selection.title()
+                    else:
+                        continue
+                    rows.append({
+                        "role":"LEAN",
+                        "matchup":f"{game.get('away','?')} @ {game.get('home','?')}",
+                        "market":market["market"], "side":display,
+                        "line":side.get("line"),"price":american,
+                        "estimate_p":side.get("conditional_win_probability"),
+                        "edge":edge,"ev":ev,"score":None,
+                        "kickoff_utc":game.get("commence_time"),
+                        "quote_observed_at":market.get("quote_retrieved_at"),
+                        "quote_timestamp_source":"PROVIDER_LAST_UPDATE",
+                        "reason":"RESIDUAL_RESEARCH_ONLY:PREDECLARED_SHRINKAGE_NOT_FORWARD_CLV",
+                    })
+    elif sport=="NFL":
         for game in payload.get("games") or []:
             for market in game.get("markets") or []:
                 for field,label in (("pick","BEST"),("lean","LEAN")):
@@ -162,6 +205,7 @@ def render(root: Path, run_url: str, *, as_of_date: str | None = None,
         lines.append("Model status: "+", ".join(sorted(set(statuses))) if statuses else "Model status: MISSING")
         lines.append("")
         if sport=="NFL":
+            lines.append("Market-anchored residual prices are RESEARCH ONLY. No NFL market has positive forward CLV proof; these are not qualified wagers.")
             # A Sunday phone card must not mix Thursday's future NFL slate into
             # its ranked Sunday leans. Every displayed row keeps its game date.
             dates=sorted({r.get("slate_date") for r in picked if r.get("slate_date")})
