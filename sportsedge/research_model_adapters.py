@@ -1,9 +1,11 @@
 """Provenance-checked adapters from actual MLB/NFL/CFB engines to DK research bridge.
 
-Only *computed* probabilities from the existing MLB pitcher joint engine or
-attributed football simulation are admitted. This module never reads a betting
-price or substitutes league Poisson player priors. No OFFICIAL, Model_P, staking
-or authority. No betting market is priced from unsupported inputs.
+Only *computed* probabilities from the existing MLB pitcher joint engine,
+empirical batter game-log pricer, or attributed football simulation are
+admitted. This module never reads a betting price or substitutes league
+Poisson player priors. No OFFICIAL, Model_P, staking or authority. No betting
+market is priced from unsupported inputs. Statcast and Next Gen remain
+unwired.
 """
 from __future__ import annotations
 
@@ -16,6 +18,7 @@ import json
 from sportsedge.pitcher_joint_engine import (
     price_pitcher_market, PitcherJointEngineError, PITCHER_MARKETS, ENGINE_VERSION,
 )
+from sportsedge.mlb_batter_empirical import price_batter_market, BatterEmpiricalError
 def derive_player_stat_market(*args, **kwargs):
     """Load optional football simulation dependencies only on football calls.
 
@@ -169,6 +172,54 @@ def mlb_pitcher_to_bridge_rows(
             player_id=player_id, line=line,
             home_team=home_team, away_team=away_team)]
     except (PitcherJointEngineError, ValueError, KeyError, TypeError, OverflowError) as exc:
+        return _blocked("MLB", game_id, market, side, player_id, exc)
+
+
+def mlb_batter_to_bridge_rows(
+    *, game_id: str, player_id: str, market: str, side: str, line: float,
+    features: Mapping[str, Any], prior_game_times_utc: Sequence[str],
+    source_as_of_utc: str, as_of_utc: str, kickoff_utc: str,
+    home_team: str, away_team: str,
+) -> list[dict]:
+    """Empirical batter result from verified prior game logs.
+
+    An independent public StatsAPI collector must populate *features* and
+    matching prior_game_times_utc. Lineup confirmation is not required for
+    the research pricer (game log does not prove today's lineup). No league
+    prior. Statcast not yet consumed.
+    """
+    try:
+        model_time, game_time = _guard_time(
+            kickoff_utc=kickoff_utc, as_of_utc=as_of_utc,
+            source_as_of_utc=source_as_of_utc)
+        history = (features or {}).get("pa_history") if isinstance(features, Mapping) else None
+        if not isinstance(history, (list, tuple)) or len(history) < 10:
+            raise ValueError("TEN_PRIOR_GAMES_REQUIRED")
+        try:
+            total_pa = sum(_num(item["plate_appearances"], "PRIOR_PLATE_APPEARANCES")
+                           for item in history)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("VERIFIED_PRIOR_PLATE_APPEARANCES_REQUIRED") from exc
+        if total_pa < 20:
+            raise ValueError("TWENTY_PRIOR_PLATE_APPEARANCES_REQUIRED")
+        if not isinstance(prior_game_times_utc, (list, tuple)) or len(prior_game_times_utc) != len(history):
+            raise ValueError("TIMESTAMP_EACH_PRIOR_GAME_REQUIRED")
+        source_time = _timestamp(source_as_of_utc, "SOURCE_AS_OF")
+        past = [_timestamp(t, "PRIOR_GAME") for t in prior_game_times_utc]
+        if len(set(past)) != len(past) or not all(t < source_time for t in past):
+            raise ValueError("HISTORY_LEAK_OR_DUPLICATE_GAME")
+        outcome = price_batter_market(
+            market=market, side=side, line=line, pa_history=history)
+        return [_outcome(
+            sport="MLB", game_id=game_id, market=market.upper(), selection=side,
+            p=outcome["model_p"], push=outcome["push_p"],
+            as_of_utc=model_time, kickoff_utc=game_time,
+            model_source=outcome["engine"],
+            model_input_hash=_digest({"features": features, "prior_game_times_utc": list(prior_game_times_utc),
+                                      "source_as_of_utc": source_as_of_utc}),
+            player_id=player_id, line=line,
+            home_team=home_team, away_team=away_team)]
+    except (BatterEmpiricalError, ValueError, KeyError, TypeError) as exc:
         return _blocked("MLB", game_id, market, side, player_id, exc)
 
 

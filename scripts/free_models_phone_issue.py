@@ -130,13 +130,13 @@ def render_card(card, *, run_url="", intake_at=""):
     prop_missing = card.get("prop_unpriced") or []
     lines += [
         "",
-        "**Real MLB pitcher-model research (free prior starts; unvalidated)**",
+        "**MLB pitcher + batter history research (free prior games; unvalidated)**",
         f"Current-price research candidates: **{len(prop_picks)}** · "
         f"Stale/price-cap/below-threshold watchlist: **{len(prop_watch)}** · "
         f"No real model or missing data: **{len(prop_missing)}**",
-        "StatsAPI probable starter is not a confirmed lineup. No generic league-only prop probability is substituted.",
+        "Pitcher probable starters and batter starting lineups require separate verification. Unconfirmed batters remain watch-only; no generic league priors.",
         "",
-        "| Pitcher / market | DK | Model p | DK no-vig p | Edge pp | Hypothetical EV | Quote |",
+        "| Player / market | DK | Model p | DK no-vig p | Edge pp | Hypothetical EV | Quote |",
         "| --- | ---: | ---: | ---: | ---: | ---: | --- |",
     ]
     for r in (prop_picks + prop_watch)[:24]:
@@ -148,10 +148,11 @@ def render_card(card, *, run_url="", intake_at=""):
             f"{float(r['dk_no_vig_p'])*100:.1f}% | "
             f"{float(r['edge_pp']):+.1f} | "
             f"{fmt_percent(r['ev_per_dollar'])} | "
-            f"{safe(r.get('quote_status'),50)} |"
+            f"{safe(r.get('quote_status'),50)}"
+            f"{' / LINEUP_UNCONFIRMED' if r.get('lineup_status') == 'PUBLIC_BOXSCORE_LINEUP_NOT_VERIFIED' else ''} |"
         )
     if not prop_picks and not prop_watch:
-        lines.append("| — | — | — | — | — | — | No pitcher props met verified model/paired quote requirements |")
+        lines.append("| — | — | — | — | — | — | No player props met verified model/paired quote requirements |")
     for r in prop_missing[:16]:
         lines.append("- No prop model: " + safe(r.get("player_name") or r.get("player_id") or r.get("market")) +
                      " " + safe(r.get("market")) + " " + safe(r.get("selection")) +
@@ -170,10 +171,13 @@ def render_card(card, *, run_url="", intake_at=""):
     fetched = sum(r.get("status") == "FETCHED_AT_RUNTIME" for r in receipts)
     public_pitchers = [r for r in receipts
                        if r.get("status") == "PUBLIC_MLB_PRIOR_STARTS_VERIFIED"]
+    public_batters = [r for r in receipts
+                      if r.get("status") == "PUBLIC_MLB_PRIOR_BATTER_GAMES_VERIFIED"]
     missing = sum(r.get("status") == "UNAVAILABLE" for r in receipts)
     malformed = [r for r in receipts if r.get("status") == "UNUSABLE_SCHEMA"]
     lines += ["", f"Free context: {fetched} ESPN/weather retrievals, "
               f"{len(public_pitchers)} verified public MLB pitcher-log inputs, "
+              f"{len(public_batters)} verified public MLB batter-log inputs, "
               f"{missing} unavailable, {len(malformed)} unusable-schema reports. "
               "No paid odds calls.",
               "Full model card and source receipts are available in the workflow artifact.",
@@ -183,6 +187,11 @@ def render_card(card, *, run_url="", intake_at=""):
                      ": " + safe(p.get("prior_starts"),8) +
                      " prior starts; starter status " +
                      safe(p.get("starter"),60))
+    for p in public_batters[:16]:
+        lines.append("- Public MLB batter ID " + safe(p.get("batter_id"),24) +
+                     ": " + safe(p.get("prior_games"),8) +
+                     " prior games / " + safe(p.get("prior_plate_appearances"),8) +
+                     " plate appearances; lineup " + safe(p.get("lineup"),80))
     for item in malformed[:4]:
         lines.append("- Unusable public injury source for team ID " +
                      safe(item.get("team_id"), 20) + ": " +
