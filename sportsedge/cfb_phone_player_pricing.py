@@ -94,6 +94,7 @@ def phone_cfb_player_rows(rows, *, now=None, getter=None):
                 continue
             quotes.append({
                 "sport": "CFB", "game_id": verified["game_id"],
+                "home_team": home, "away_team": away,
                 "market": market, "line": line,
                 "selection": str(another.get("side") or another.get("selection") or "").upper(),
                 "player_id": verified["player_id"],
