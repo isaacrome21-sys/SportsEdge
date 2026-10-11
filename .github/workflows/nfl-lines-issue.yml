@@ -66,13 +66,18 @@ jobs:
           input_path=$(awk -F= '/^path=/{print $2}' intake.out)
           mkdir -p .cache/nfl-history artifacts
           if [[ ! -s .cache/nfl-history/nflverse_games.json ]]; then
-            PYTHONPATH=. python scripts/fetch_nflverse_games.py --output .cache/nfl-history/nflverse_games.json
+            if ! PYTHONPATH=. python scripts/fetch_nflverse_games.py --output .cache/nfl-history/nflverse_games.json; then
+              echo "NFL_HISTORY_FETCH_UNAVAILABLE: the DK quote board will still render; model features remain MISSING."
+            fi
           fi
 
-          PYTHONPATH=. python scripts/run_nfl_lines_card.py \
-            --input "$input_path" \
-            --history .cache/nfl-history/nflverse_games.json \
-            --output artifacts/nfl_phone_card.json
+          # No synthetic games or scoring history. If the public source is
+          # unavailable, run the existing model in its NO_MODEL/no-history mode.
+          nfl_args=(--input "$input_path" --output artifacts/nfl_phone_card.json)
+          if [[ -s .cache/nfl-history/nflverse_games.json ]]; then
+            nfl_args+=(--history .cache/nfl-history/nflverse_games.json)
+          fi
+          PYTHONPATH=. python scripts/run_nfl_lines_card.py "${nfl_args[@]}"
           PYTHONPATH=. python scripts/render_nfl_myspari_card.py \
             --engine-output artifacts/nfl_phone_card.json \
             --snapshot "$input_path" \
