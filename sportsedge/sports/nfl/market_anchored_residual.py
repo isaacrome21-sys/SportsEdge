@@ -70,6 +70,12 @@ def load_frozen_policy(path: Path | None = None) -> dict[str, Any]:
         cfg = json.loads((path or POLICY_PATH).read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise ResidualQuoteError("RESIDUAL_POLICY_UNAVAILABLE") from exc
+    return validate_policy(cfg)
+
+
+def validate_policy(cfg: Mapping[str, Any]) -> dict[str, Any]:
+    if not isinstance(cfg, Mapping):
+        raise ResidualQuoteError("RESIDUAL_POLICY_IDENTITY")
     if cfg.get("schema") != SCHEMA or cfg.get("status") != "PRECOMMITTED_RESEARCH_PRIOR_NOT_HISTORICALLY_FITTED":
         raise ResidualQuoteError("RESIDUAL_POLICY_IDENTITY")
     if cfg.get("evidence_role") != "RESEARCH_ONLY_UNFITTED_PRIOR" or cfg.get("validated_markets") != []:
@@ -89,9 +95,9 @@ def load_frozen_policy(path: Path | None = None) -> dict[str, Any]:
         raise ResidualQuoteError("RESIDUAL_EDGE_FLOOR_LOWERED")
     if _finite(cfg.get("min_ev_per_dollar"), "ev_floor") < 0.02:
         raise ResidualQuoteError("RESIDUAL_EV_FLOOR_LOWERED")
-    if int(_finite(cfg.get("max_quote_age_seconds"), "quote_ttl")) > 180:
+    if not 0 < _finite(cfg.get("max_quote_age_seconds"), "quote_ttl") <= 180:
         raise ResidualQuoteError("RESIDUAL_TTL_LOOSENED")
-    if int(_finite(cfg.get("max_skew_seconds"), "quote_skew")) > 30:
+    if not 0 <= _finite(cfg.get("max_skew_seconds"), "quote_skew") <= 30:
         raise ResidualQuoteError("RESIDUAL_SKEW_LOOSENED")
     rules = cfg.get("validation") or {}
     if (rules.get("requires_forward_positive_clv") is not True
@@ -104,7 +110,7 @@ def load_frozen_policy(path: Path | None = None) -> dict[str, Any]:
 def anchor_prediction(*, raw_model_margin: Any, raw_model_total: Any,
                       market_margin: Any, market_total: Any,
                       policy: Mapping[str, Any] | None = None) -> dict[str, float]:
-    cfg = policy if policy is not None else load_frozen_policy()
+    cfg = validate_policy(policy) if policy is not None else load_frozen_policy()
     raw_margin = _finite(raw_model_margin, "raw_model_margin")
     raw_total = _finite(raw_model_total, "raw_model_total")
     market_home_margin = _finite(market_margin, "market_margin")
@@ -174,13 +180,15 @@ def price_game(game: Mapping[str, Any], *, raw_model_margin: Any, raw_model_tota
     Exact zero residual => zero price edge against no-vig book probabilities.
     This remains explicitly research-only regardless of EV, until forward CLV.
     """
-    cfg = policy if policy is not None else load_frozen_policy()
+    cfg = validate_policy(policy) if policy is not None else load_frozen_policy()
     now = _clock(as_of, "AS_OF")
     kickoff = _clock(game.get("commence_time"), "KICKOFF")
     if kickoff <= now:
         raise ResidualQuoteError("KICKOFF_STARTED")
     markets: dict[str, Mapping[str, Any]] = {}
     for row in game.get("markets") or []:
+        if not isinstance(row, Mapping):
+            raise ResidualQuoteError("MARKET_NOT_OBJECT")
         key = str(row.get("market") or "").lower()
         if key not in MARKETS:
             continue
@@ -192,6 +200,9 @@ def price_game(game: Mapping[str, Any], *, raw_model_margin: Any, raw_model_tota
     ttl = int(cfg["max_quote_age_seconds"])
     skew = int(cfg["max_skew_seconds"])
     pairs = {k: _pair(v, as_of=now, ttl=ttl, skew=skew) for k, v in markets.items()}
+    clocks = [_clock(v["quote_retrieved_at"], "QUOTE_TIMESTAMP") for v in markets.values()]
+    if (max(clocks) - min(clocks)).total_seconds() > skew:
+        raise ResidualQuoteError("ANCHOR_QUOTE_TIME_SKEW")
     spread = _finite(markets["spread"].get("line"), "MARKET_SPREAD")
     total = _finite(markets["total"].get("line"), "MARKET_TOTAL")
     if total <= 0:
@@ -200,8 +211,10 @@ def price_game(game: Mapping[str, Any], *, raw_model_margin: Any, raw_model_tota
         raise ResidualQuoteError("MONEYLINE_LINE_INVALID")
     anchor = anchor_prediction(raw_model_margin=raw_model_margin, raw_model_total=raw_model_total,
                                market_margin=spread, market_total=total, policy=cfg)
-    means = anchor_prediction(raw_model_margin=spread, raw_model_total=total,
-                              market_margin=spread, market_total=total, policy=cfg)
+    # The baseline is the posted market, with no model intercept applied.
+    means = {"mean_home": (total + spread) / 2, "mean_away": (total - spread) / 2}
+    if not all(0.5 <= value <= 70 for value in means.values()):
+        raise ResidualQuoteError("MARKET_MEANS_OUT_OF_GRID_RANGE")
     freeze = load_freeze()
     baseline = score_grid(means["mean_home"], means["mean_away"], freeze)
     residual = score_grid(anchor["mean_home"], anchor["mean_away"], freeze)
