@@ -246,6 +246,23 @@ class PublicContext:
                 if len(matching) == 1 and isinstance(matching[0].get("injuries"), list):
                     candidates = matching[0]["injuries"]
         if candidates is None:
+            # Distinguish HTTP 200 from usable injury data. Emit ONLY schema
+            # names, list counts and IDs; never log private account data.
+            def _shape(response):
+                if not isinstance(response, dict):
+                    return "NOT_OBJECT"
+                keys = ",".join(sorted(str(k) for k in response)[:8])
+                groups = response.get("injuries")
+                if not isinstance(groups, list):
+                    return "KEYS=" + keys + ";INJURIES=NOT_LIST"
+                first = groups[0] if groups else {}
+                first_keys = ",".join(sorted(str(k) for k in first)[:8]) if isinstance(first, dict) else "NOT_OBJECT"
+                # Use schema only, no athlete names or raw injury payload.
+                return f"KEYS={keys};N={len(groups)};FIRST_KEYS={first_keys}"
+            shape = "TEAM[" + _shape(data) + "];LEAGUE[" + _shape(locals().get("league")) + "]"
+            self.receipts.append({"source": f"{ESPN}/{LEAGUES[sport]}/injuries",
+                                  "status": "UNUSABLE_SCHEMA", "reason": shape,
+                                  "team_id": str(team["id"])[:20]})
             return 0.0, "MISSING_OR_UNRECOGNIZED_SOURCE"
         seen = set()
         loss = 0.0
