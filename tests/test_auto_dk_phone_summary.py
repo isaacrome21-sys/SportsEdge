@@ -135,3 +135,34 @@ def test_unknown_kickoff_not_listed_as_pregame_pick():
              asof=datetime(2026,10,11,14,0,tzinfo=timezone.utc))
         assert "CIN @ MIA" not in out
         assert "No priced NFL candidates" in out
+
+
+def test_research_prop_surface_only_displays_real_selected_model_rows():
+    from datetime import datetime,timezone
+    with TemporaryDirectory() as temp:
+        root=Path(temp)
+        (root/"summary.json").write_text(json.dumps({
+          "NFL":{"status":"READY","cards":[
+             {"date":"2026-10-11","json":"nfl.json","state":"READY",
+              "props":{"status":"RESEARCH_ONLY","json":"nfl_prop.json"}}]},
+          "CFB":{"status":"NO_DK_GAMES","cards":[]}
+        }))
+        (root/"nfl.json").write_text(json.dumps({"games":[
+           {"away":"CIN","home":"MIA","commence_time":"2026-10-11T17:00:00Z","markets":[]}
+        ]}))
+        (root/"nfl_prop.json").write_text(json.dumps({"selected_rows":[
+           {"status":"PRICED","player":"Sample RB","market":"rushing_yards",
+            "selection":"Sample RB Over","line":61.5,"price_american":-110,
+            "estimate_p":.58,"edge_probability_points":.06,"ev_per_dollar":.11},
+           {"status":"NO_MODEL","player":"Another RB","market":"rushing_yards",
+            "selection":"Another RB Over","line":41.5,"price_american":-110,
+            "estimate_p":None,"edge_probability_points":None,"ev_per_dollar":None}
+        ]}))
+        result=card.render(root,"https://github.com/example",
+                           asof=datetime(2026,10,11,15,10,tzinfo=timezone.utc),
+                           as_of_date="2026-10-11")
+        assert "Sample RB rushing_yards" in result
+        assert "estimate 58.0%" in result
+        assert "EV +11.0%" in result
+        assert "Another RB Over" not in result
+        assert "RESEARCH ONLY" in result
