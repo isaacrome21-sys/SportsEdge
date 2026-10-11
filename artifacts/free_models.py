@@ -528,6 +528,9 @@ def run(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
             "authority": {"research_only": True, "official": False, "model_p": False,
                           "truth_gate": False, "staking": False},
             "min_ev": min_ev, "edges": edges,
+            # Keep the complete graded, source-annotated rows for reproducible
+            # factor coverage and honest diagnostics even when below threshold.
+            "evaluated_rows": all_rows,
             "summary": {"rows": len(rows), "edges": len(edges),
                         "status_counts": dict(sorted(Counter(r["status"] for r in all_rows).items()))},
             "diagnostics": [{"input_index": r["input_index"], "status": r["status"],
