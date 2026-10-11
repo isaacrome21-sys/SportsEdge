@@ -32,6 +32,19 @@ CONTEXT_KEYS = {"NFL": ("home_rating", "away_rating", "home_injury_pts",
                         "away_injury_pts", "home_form", "away_form", "rest_adj"),
                 "MLB": ("home_rating", "away_rating", "home_pitcher_adj",
                         "away_pitcher_adj", "weather_total_adj")}
+# Illinois-resident CFB exclusion (market/availability logic, NOT model skill).
+# Exact normalized school aliases avoid confusing Northwestern (IL) with
+# Northwestern State (Louisiana). Add only unambiguous labels.
+IL_COLLEGE_NAMES = frozenset({
+    "illinois", "illinois fighting illini", "university of illinois",
+    "illinois state", "illinois state redbirds",
+    "northern illinois", "northern illinois huskies",
+    "southern illinois", "southern illinois salukis",
+    "western illinois", "western illinois leathernecks",
+    "eastern illinois", "eastern illinois panthers",
+    "northwestern", "northwestern wildcats",
+    "loyola chicago", "uic flames", "illinois chicago",
+})
 ESPN = "https://site.api.espn.com/apis/site/v2/sports"
 OPEN_METEO = "https://api.open-meteo.com/v1/forecast"
 GEO = "https://geocoding-api.open-meteo.com/v1/search"
@@ -358,6 +371,10 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
             away, home = (s.strip() for s in game.split(" @ ", 1))
     if not away or not home or away == home:
         raise ValueError("AWAY_HOME_REQUIRED")
+    if sport == "CFB" and any(PublicContext.key(name) in IL_COLLEGE_NAMES
+                               for name in (away, home)):
+        return {"status": "BLOCKED_IL_COLLEGE", "sport": sport,
+                "game": f"{away} @ {home}", "reason": "IL_COLLEGE_EXCLUDED"}
     side_raw = str(row.get("side") or row.get("selection") or "").strip()
     side = {"OVER": "OVER", "UNDER": "UNDER", "HOME": "HOME", "AWAY": "AWAY"}.get(side_raw.upper())
     if not side:
