@@ -3,10 +3,10 @@
 
 Game ML/spread/total estimates delegate to the existing UNVALIDATED free_models
 engine. MLB pitcher props use verified public StatsAPI starts. MLB batter props
-use verified public StatsAPI game logs and an empirical pricer. NFL player props
-use verified public ESPN gamelogs and an empirical pricer. CFB player props,
-team totals, halves, Statcast, and Next Gen remain unpriced until verified
-collectors exist.
+use verified public StatsAPI game logs and an empirical pricer. NFL and CFB
+player props use verified public ESPN gamelogs and empirical pricers. Team
+totals and first-half markets reuse the same free_models means. Statcast and
+Next Gen remain unpriced until verified collectors exist.
 Issues are untrusted odds intake.
 """
 from __future__ import annotations
@@ -21,6 +21,8 @@ from artifacts import free_models as engine
 from sportsedge.mlb_phone_pitcher_pricing import phone_pitcher_rows, blocked
 from sportsedge.mlb_phone_batter_pricing import phone_batter_rows
 from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
+from sportsedge.team_half_pricing import price_team_or_half
+from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
 from datetime import datetime, timezone
 
 FIELDS = (
@@ -31,6 +33,11 @@ FIELDS = (
 UNWIRED = "NOT_WIRED"
 MISSING = "MISSING_UNVERIFIED"
 HEURISTIC = "HEURISTIC_NOT_VALIDATED"
+
+TEAM_HALF_MARKETS = frozenset({
+    "TEAM_TOTAL", "TEAM_TOTAL_POINTS", "TOTAL_1H", "FIRST_HALF_TOTAL",
+    "SPREAD_1H", "FIRST_HALF_SPREAD", "ML_1H", "FIRST_HALF_ML",
+})
 
 
 def audit_row(source, result):
@@ -93,10 +100,15 @@ def audit_row(source, result):
                               "detail": sport_specific.get(sport, "Unsupported sport")}
     if market not in ("ML", "SPREAD", "TOTAL"):
         src = result.get("source") or ""
-        if src in {"FREE_MLB_STATSAPI_GAMELOG", "FREE_MLB_STATSAPI_BATTER_GAMELOG", "FREE_ESPN_NFL_GAMELOG"} and result.get("status") != "NO_MODEL_OR_MARKET":
+        if src in {"FREE_MLB_STATSAPI_GAMELOG", "FREE_MLB_STATSAPI_BATTER_GAMELOG", "FREE_ESPN_NFL_GAMELOG", "FREE_ESPN_CFB_GAMELOG"} and result.get("status") != "NO_MODEL_OR_MARKET":
             out["player_props"] = {
                 "status": "REAL_PUBLIC_HISTORY_MODEL_UNVALIDATED",
                 "detail": "Verified prior public game logs priced by real empirical engine; not validated vs closes",
+            }
+        elif result.get("model_source") == "free_models_means_team_half_v1" and result.get("status") == "PRICED_RESEARCH":
+            out["player_props"] = {
+                "status": "NOT_APPLICABLE",
+                "detail": "Team/half market priced from free_models means",
             }
         else:
             out["player_props"] = {
@@ -109,7 +121,7 @@ def audit_row(source, result):
 
 
 def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
-    """Separate real game, pitcher, batter, and NFL player models, preserving original row order.
+    """Separate real game, pitcher, batter, NFL player, CFB player, and team/half models, preserving original row order.
 
     Issues are UNTRUSTED odds intake: NEVER use submitted features,
     probabilities, starter/participation verification flags or simulation paths.
@@ -162,6 +174,8 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
     pitcher_pos, pitcher_input = [], []
     batter_pos, batter_input = [], []
     nfl_pos, nfl_input = [], []
+    cfb_pos, cfb_input = [], []
+    team_half_pos, team_half_input = [], []
     others = {}
     for local, line in enumerate(props):
         market = str(line.get("market") or "").upper()
@@ -174,6 +188,12 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         elif line["sport"] == "NFL" and market.startswith("PLAYER_"):
             nfl_pos.append(local)
             nfl_input.append(line)
+        elif line["sport"] == "CFB" and market.startswith("PLAYER_"):
+            cfb_pos.append(local)
+            cfb_input.append(line)
+        elif market in TEAM_HALF_MARKETS:
+            team_half_pos.append(local)
+            team_half_input.append(line)
         else:
             others[local] = blocked(line, "NO_VERIFIED_MODEL_FOR_THIS_MARKET")
     pitcher_results, pitcher_receipts = phone_pitcher_rows(
@@ -182,18 +202,32 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         batter_input, now=clock, getter=getter if auto_context else (lambda url: None))
     nfl_results, nfl_receipts = phone_nfl_player_rows(
         nfl_input, now=clock, getter=getter if auto_context else (lambda url: None))
+    cfb_results, cfb_receipts = phone_cfb_player_rows(
+        cfb_input, now=clock, getter=getter if auto_context else (lambda url: None))
+    team_half_results = [
+        price_team_or_half(line, now=clock, getter=getter if auto_context else None)
+        for line in team_half_input
+    ]
     if len(pitcher_results) != len(pitcher_input):
         raise ValueError("PITCHER_RESULT_COUNT_MISMATCH")
     if len(batter_results) != len(batter_input):
         raise ValueError("BATTER_RESULT_COUNT_MISMATCH")
     if len(nfl_results) != len(nfl_input):
         raise ValueError("NFL_PLAYER_RESULT_COUNT_MISMATCH")
+    if len(cfb_results) != len(cfb_input):
+        raise ValueError("CFB_PLAYER_RESULT_COUNT_MISMATCH")
+    if len(team_half_results) != len(team_half_input):
+        raise ValueError("TEAM_HALF_RESULT_COUNT_MISMATCH")
     modeled_props = [None]*len(props)
     for local, result in zip(pitcher_pos, pitcher_results):
         modeled_props[local] = result
     for local, result in zip(batter_pos, batter_results):
         modeled_props[local] = result
     for local, result in zip(nfl_pos, nfl_results):
+        modeled_props[local] = result
+    for local, result in zip(cfb_pos, cfb_results):
+        modeled_props[local] = result
+    for local, result in zip(team_half_pos, team_half_results):
         modeled_props[local] = result
     for local, result in others.items():
         modeled_props[local] = result
@@ -220,11 +254,13 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         [r for r in modeled_props if r.get("status","").startswith("WATCH_")],
         key=lambda r:-r.get("ev_per_dollar",-1))
     card["prop_unpriced"] = [r for r in modeled_props if r.get("status")=="NO_MODEL_OR_MARKET"]
-    card["source_receipts"] = list(card.get("source_receipts") or []) + pitcher_receipts + batter_receipts + nfl_receipts
+    card["source_receipts"] = list(card.get("source_receipts") or []) + pitcher_receipts + batter_receipts + nfl_receipts + cfb_receipts
     card["prop_model_status"] = {
         "pitcher_engine":"MLB_PITCHER_JOINT_EMPIRICAL_BAYES",
         "batter_engine":"MLB_BATTER_EMPIRICAL_GAMELOG",
         "nfl_player_engine":"NFL_PLAYER_EMPIRICAL_ESPN_GAMELOG",
+        "team_half_engine":"FREE_MODELS_MEANS_TEAM_HALF",
+        "cfb_player_engine":"CFB_PLAYER_EMPIRICAL_ESPN_GAMELOG",
         "free_public_history":True,
         "model_vs_close_validated":False,
         "phone_odds_freshness_required":True,
@@ -232,8 +268,6 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         "unsupported_player_markets_blocked":len(card["prop_unpriced"]),
         "statcast":"NOT_WIRED",
         "next_gen":"NOT_WIRED",
-        "cfb_player":"NOT_WIRED",
-        "team_totals_halves":"NOT_WIRED",
     }
 
     audit, totals = [], Counter()
@@ -254,10 +288,10 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         "advanced_metrics":{
             "statcast":UNWIRED,"next_gen":UNWIRED,"coaching":UNWIRED,
             "travel":UNWIRED,"player_props":
-            "MLB_PITCHER_AND_BATTER_AND_NFL_PLAYER_PUBLIC_HISTORY_OTHERS_UNWIRED",
+            "MLB_PITCHER_AND_BATTER_AND_NFL_AND_CFB_PLAYER_AND_TEAM_HALF_PUBLIC_HISTORY_OTHERS_UNWIRED",
         },
     }
-    card["runner"]="RUN_IT_FULL_REAL_MLB_PITCHER_BATTER_NFL_PLAYER_PREGAME_V1"
+    card["runner"]="RUN_IT_FULL_REAL_MLB_PITCHER_BATTER_NFL_CFB_PLAYER_TEAM_HALF_PREGAME_V1"
     return card
 
 
