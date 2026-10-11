@@ -16,7 +16,9 @@ from sportsedge.nfl_attempt9_live_forecast import (
     recency_features,
 )
 from sportsedge.nfl_run_it_scoring import qualification_role_score
-from sportsedge.sports.nfl.attempt9_model_p import model_probability
+from sportsedge.sports.nfl.market_anchored_residual import (
+    ResidualQuoteError, load_frozen_policy, price_game,
+)
 from sportsedge.truth_gate import american_to_decimal
 
 
@@ -214,120 +216,86 @@ def main() -> int:
     ticket = json.loads(Path(args.input).read_text(encoding="utf-8"))
     history = _history_rows(json.loads(Path(args.history).read_text(encoding="utf-8")) if args.history else [])
     runtime = load_runtime()
-    artifact = load_model_p()
+    residual_policy = load_frozen_policy()
     asof = date.fromisoformat(str(ticket.get("slate") or date.today().isoformat()))
     games_out = []
     for game in ticket.get("games") or []:
         feat = recency_features(history, home=str(game["home"]), away=str(game["away"]), asof=asof) if history else {"ok": False, "reason": "NO_MODEL:INSUFFICIENT_PRIOR_GAMES"}
         forecast = raw_forecasts(runtime, feat["vector"]) if feat.get("ok") else None
         markets = []
-        picks = []
+        picks = []  # No validated game market. Research rows never promote.
         leans = []
+        residual_rows = []
+        residual_error = None
+        if feat.get("ok") and forecast is not None:
+            try:
+                residual_rows = price_game(
+                    game, raw_model_margin=forecast["margin"],
+                    raw_model_total=forecast["total"],
+                    as_of=ticket.get("observed_at"),
+                    policy=residual_policy,
+                )
+            except ResidualQuoteError as exc:
+                residual_error = str(exc)
+        else:
+            residual_error = str(feat.get("reason") or "NO_PRIOR_MODEL_HISTORY")
+
         for raw in game.get("markets") or []:
-            blocked = market_eligibility(raw["market"], raw.get("line"))
-            if blocked:
-                markets.append({**raw, "no_model": blocked})
+            key = str(raw.get("market") or "").lower()
+            if key not in {"moneyline", "spread", "total"}:
+                markets.append({**raw, "no_model": market_eligibility(key, raw.get("line"))})
                 continue
-            if not feat.get("ok"):
-                markets.append({**raw, "no_model": feat["reason"]})
+            if residual_error is not None:
+                markets.append({**raw, "no_model": "NO_MODEL:RESIDUAL_QUOTES_OR_HISTORY_UNAVAILABLE",
+                                "residual_research_error": residual_error})
                 continue
-            assert forecast is not None
-            pred = forecast["margin"] if raw["market"] == "spread" else forecast["total"]
-            line = float(raw["line"])
-            home_line = -line if raw["market"] == "spread" else line
-            home_or_over = model_probability(
-                artifact,
-                market=raw["market"],
-                raw_prediction=pred,
-                line=home_line,
-                selection="home" if raw["market"] == "spread" else "over",
-            )
-            away_or_under = model_probability(
-                artifact,
-                market=raw["market"],
-                raw_prediction=pred,
-                line=home_line,
-                selection="away" if raw["market"] == "spread" else "under",
-            )
-            no_vig = devig([
-                american_to_decimal(raw["away_or_over_price"]),
-                american_to_decimal(raw["home_or_under_price"]),
-            ])
-            candidates = [
-                {
-                    "selection": game["away"] if raw["market"] == "spread" else "Over",
-                    "line": line,
-                    "price_american": raw["away_or_over_price"],
-                    "estimate_p": float(away_or_under["model_p"] if raw["market"] == "spread" else home_or_over["model_p"]),
-                    "market_no_vig_p": float(no_vig[0]),
-                },
-                {
-                    "selection": game["home"] if raw["market"] == "spread" else "Under",
-                    "line": -line if raw["market"] == "spread" else line,
-                    "price_american": raw["home_or_under_price"],
-                    "estimate_p": float(home_or_over["model_p"] if raw["market"] == "spread" else away_or_under["model_p"]),
-                    "market_no_vig_p": float(no_vig[1]),
-                },
+            choices = [x for x in residual_rows if x["market"] == key]
+            if len(choices) != 2:
+                markets.append({**raw, "no_model": "NO_MODEL:PAIRED_RESIDUAL_PRICE_UNAVAILABLE"})
+                continue
+            # Existing floors remain 2pp probability edge AND 2% net EV.
+            # Additional point threshold blocks trivial residual displacement.
+            adjustment = (choices[0]["fair_total"] - float(raw["line"])
+                          if key == "total" else
+                          choices[0]["fair_margin"] - float(next(
+                              m["line"] for m in game["markets"] if m["market"] == "spread")))
+            qualified = [
+                x for x in choices if
+                x["edge_probability_points"] > float(residual_policy["min_edge_probability_points"])
+                and x["ev_per_dollar"] > float(residual_policy["min_ev_per_dollar"])
+                and x["price_american"] >= -165
+                and abs(adjustment) >= float(residual_policy["forward_track_min_abs_adjustment_points"])
             ]
-            # Guards (card-side): the calibrated probability must sit on a block
-            # with real history behind it, and the lean must point the same way
-            # as the projection (no Under when the model total is above the line).
-            raw_home_or_over = float(home_or_over["raw_threshold_probability"])
-            block_weight = _calibration_block_weight(artifact, raw["market"], raw_home_or_over)
-            candidates[0]["projection_agrees"] = (
-                raw_home_or_over < 0.5 if raw["market"] == "spread" else raw_home_or_over > 0.5
-            )
-            candidates[1]["projection_agrees"] = (
-                raw_home_or_over > 0.5 if raw["market"] == "spread" else raw_home_or_over < 0.5
-            )
-            lean_block = None
-            qualified = []
-            for cand in candidates:
-                ev = _ev(cand["estimate_p"], cand["price_american"])
-                if ev < 0.02:
-                    continue
-                if block_weight < MIN_CALIBRATION_BLOCK_WEIGHT:
-                    lean_block = LEAN_BLOCK_THIN
-                    continue
-                if not cand["projection_agrees"]:
-                    lean_block = lean_block or LEAN_BLOCK_DIRECTION
-                    continue
-                cand["ev_per_dollar"] = ev
-                cand["edge_probability_points"] = cand["estimate_p"] - cand["market_no_vig_p"]
-                cand["score_0_100"] = qualification_role_score({
-                    "model_ready": True,
-                    "pit_safe": True,
-                    "role_stable": True,
-                    "usage_supported": False,
-                    "matchup_supported": True,
-                    "injury_context_ready": False,
-                    "shared_simulation_ready": False,
-                    "market_binding_ready": True,
-                })
-                qualified.append(cand)
-            pick = max(qualified, key=lambda c: (c["ev_per_dollar"], c["edge_probability_points"])) if qualified else None
-            if raw["market"] in BET_PROVEN_MARKETS:
-                row = {**raw, "no_model": None, "pick": pick, "lean": None}
-                if pick:
-                    picks.append(pick)
-            else:
-                if pick:
-                    pick = {**pick, "lean_only": True, "lean_reason": LEAN_REASON.get(raw["market"], DEFAULT_LEAN_REASON)}
-                    leans.append(pick)
-                row = {**raw, "no_model": None, "pick": None, "lean": pick}
-            if not pick and lean_block:
-                row["lean_block"] = lean_block
-            markets.append(row)
+            lean = max(qualified, key=lambda x: (x["ev_per_dollar"], x["edge_probability_points"])) if qualified else None
+            if lean:
+                lean = {**lean, "lean_only": True,
+                        "lean_reason": "RESEARCH_ONLY:MARKET_ANCHORED_RESIDUAL_FORWARD_CLV_PENDING",
+                        "score_0_100": qualification_role_score({
+                            "model_ready": True, "pit_safe": True, "role_stable": True,
+                            "usage_supported": False, "matchup_supported": True,
+                            "injury_context_ready": False, "shared_simulation_ready": True,
+                            "market_binding_ready": True,
+                        })}
+                leans.append(lean)
+            markets.append({**raw, "no_model": None, "pick": None, "lean": lean,
+                            "residual_mode": True,
+                            "residual_research_prices": choices,
+                            "residual_research_adjustment": adjustment})
         context = game_context(game, history, asof, feat, forecast)
-        games_out.append({**game, "markets": markets, "picks": picks, "leans": leans, "features": feat, "context": context})
+        games_out.append({**game, "markets": markets, "picks": picks, "leans": leans,
+                          "residual_research_prices": residual_rows,
+                          "residual_research_error": residual_error,
+                          "features": feat, "context": context})
     payload = {
         "sport": "NFL",
         "context_bound": False,
         "games": games_out,
         "bet_proven_markets": sorted(BET_PROVEN_MARKETS),
+        "residual_research_policy": "PRECOMMITTED_RESEARCH_PRIOR_NOT_HISTORICALLY_FITTED",
+        "validated_markets": [],
         "empty_reason": None if any(g["picks"] for g in games_out) else (
-            "No bets: no NFL market on this card has beaten breakeven out of sample yet. "
-            "Leans are tracking-only, not bets."
+            "No qualified bets: residual market-anchored prices are RESEARCH ONLY. "
+            "Forward CLV evidence is pending; leans are not validated bets."
         ),
         # Machine-only governance tag; the phone card never prints it.
         "authority_footer": "NOT Model_P / NOT Truth Gate / NOT OFFICIAL",
