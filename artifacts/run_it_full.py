@@ -2,8 +2,10 @@
 """Free four-sport research with a truthful per-selection factor checklist.
 
 Game ML/spread/total estimates delegate to the existing UNVALIDATED free_models
-engine. No player-prop pricing is fabricated; unsupported factors do not enter
-the price. All network calls are to existing free ESPN/Open-Meteo endpoints.
+engine. MLB pitcher props use verified public StatsAPI history. MLB batter and
+NFL/CFB player props call research_model_adapters only when verified inputs are
+present; otherwise they return explicit NO_MODEL_OR_MARKET. Statcast and Next
+Gen remain NOT_WIRED. Issues are untrusted odds intake.
 """
 from __future__ import annotations
 import argparse
@@ -15,6 +17,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from artifacts import free_models as engine
 from sportsedge.mlb_phone_pitcher_pricing import phone_pitcher_rows, blocked
+from sportsedge import research_model_adapters as adapters
 from datetime import datetime, timezone
 
 FIELDS = (
@@ -38,7 +41,7 @@ def audit_row(source, result):
     has = bool(context) and result.get("status") not in (
         "BLOCKED_INVALID", "BLOCKED_STARTED", "BLOCKED_CONTEXT_UNVERIFIED",
         "BLOCKED_KICKOFF_UNVERIFIED", "BLOCKED_IL_COLLEGE",
-        "BLOCKED_UNPAIRED_ML",
+        "BLOCKED_UNPAIRED_ML", "NO_MODEL_OR_MARKET",
     )
     out = {f: {"status": UNWIRED, "detail": "No independently priced input wired"} for f in FIELDS}
     history = (has and "NO_FETCH_MANUAL_MODE" not in n
@@ -86,17 +89,63 @@ def audit_row(source, result):
     out["sport_specific"] = {"status": "PARTIAL_HEURISTIC" if has else MISSING,
                               "detail": sport_specific.get(sport, "Unsupported sport")}
     if market not in ("ML", "SPREAD", "TOTAL"):
-        if result.get("source") == "FREE_MLB_STATSAPI_GAMELOG" and result.get("status") != "NO_MODEL_OR_MARKET":
+        status = result.get("status")
+        if status == "PRICED_RESEARCH" or (result.get("source") == "FREE_MLB_STATSAPI_GAMELOG" and status != "NO_MODEL_OR_MARKET"):
             out["player_props"] = {
-                "status": "REAL_PITCHER_HISTORY_MODEL_UNVALIDATED",
-                "detail": "Verified prior MLB StatsAPI pitcher starts priced by the real empirical-Bayes joint engine; scheduled probable starter is not confirmed; not validated vs closes",
+                "status": "REAL_ENGINE_ADAPTER",
+                "detail": "Priced from verified engine inputs via research_model_adapters or public StatsAPI pitcher history",
             }
         else:
-            out["player_props"] = {"status": "NO_MODEL_OR_MARKET",
-                                   "detail": result.get("reason") or "Required real player-level history or simulated paths unavailable; no probability assigned"}
+            out["player_props"] = {
+                "status": "NO_MODEL_OR_MARKET",
+                "detail": result.get("reason") or "Missing verified player history, lineup, or simulation paths; no probability assigned",
+            }
     else:
         out["player_props"] = {"status": "NOT_APPLICABLE", "detail": "Game-level market"}
     return out
+
+
+def _route_prop(line: dict, now_iso: str) -> dict:
+    """Route a prop row. Phone issues are untrusted, so only public pitcher
+    history is currently trusted. Batter and football paths fail closed until
+    a verified collector supplies the required inputs.
+    """
+    sport = str(line.get("sport") or "").upper()
+    market = str(line.get("market") or "").upper()
+    game_id = str(line.get("game_id") or line.get("game") or "")
+    player_id = line.get("player_id")
+    side = str(line.get("side") or "").upper()
+    line_val = line.get("line")
+    home = line.get("home") or line.get("home_team") or ""
+    away = line.get("away") or line.get("away_team") or ""
+    kickoff = line.get("kickoff_utc") or line.get("start_utc") or ""
+    source_as_of = line.get("source_as_of_utc") or ""
+    as_of = line.get("as_of_utc") or now_iso
+
+    if sport == "MLB" and market.startswith("BATTER_"):
+        rows = adapters.mlb_batter_to_bridge_rows(
+            game_id=game_id, player_id=str(player_id or ""),
+            market=market, side=side, line=line_val,
+            features=line.get("features") or {},
+            prior_pa_times_utc=line.get("prior_pa_times_utc") or [],
+            source_as_of_utc=str(source_as_of), as_of_utc=str(as_of),
+            kickoff_utc=str(kickoff), lineup_verified=False,
+            home_team=str(home), away_team=str(away),
+        )
+        return rows[0] if rows else blocked(line, "BATTER_ADAPTER_EMPTY")
+
+    if sport in {"NFL", "CFB"} and (market.startswith("PLAYER_") or line.get("stat")):
+        rows = adapters.football_player_stat_to_bridge_rows(
+            sport=sport, game_id=game_id, player_id=str(player_id or ""),
+            stat=line.get("stat") or market.replace("PLAYER_", "", 1),
+            line=line_val, side=side, paths=[],
+            source_as_of_utc=str(source_as_of), as_of_utc=str(as_of),
+            kickoff_utc=str(kickoff), home_team=str(home), away_team=str(away),
+            market_blind_simulation_verified=False,
+        )
+        return rows[0] if rows else blocked(line, "FOOTBALL_ADAPTER_EMPTY")
+
+    return blocked(line, "NO_VERIFIED_MODEL_FOR_THIS_MARKET")
 
 
 def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
@@ -105,6 +154,7 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
     Issues are UNTRUSTED odds intake: NEVER use submitted features,
     probabilities, starter/participation verification flags or simulation paths.
     The only trusted pitcher data comes from free public MLB endpoints.
+    Batter and football props are routed through fail-closed adapters.
     """
     rows = payload if isinstance(payload, list) else payload.get("lines")
     if not isinstance(rows, list):
@@ -112,6 +162,7 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
     clock = now or datetime.now(timezone.utc)
     if clock.tzinfo is None or clock.utcoffset() is None:
         raise ValueError("MODEL_NOW_TIMEZONE_REQUIRED")
+    now_iso = clock.isoformat()
     default_sport = payload.get("sport") if isinstance(payload, dict) else None
     game_indices, games, prop_indices, props = [], [], [], []
     for i, raw in enumerate(rows):
@@ -158,7 +209,7 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
             pitcher_pos.append(local)
             pitcher_input.append(line)
         else:
-            others[local] = blocked(line,"NO_VERIFIED_MODEL_FOR_THIS_MARKET")
+            others[local] = _route_prop(line, now_iso)
     pitcher_results, receipts = phone_pitcher_rows(
         pitcher_input,now=clock,getter=getter if auto_context else (lambda url: None))
     if len(pitcher_results) != len(pitcher_input):
@@ -199,6 +250,8 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         "phone_odds_freshness_required":True,
         "no_generic_player_prior":True,
         "unsupported_player_markets_blocked":len(card["prop_unpriced"]),
+        "batter_adapter":"FAIL_CLOSED_UNTIL_STATCAST_PA_HISTORY",
+        "football_adapter":"FAIL_CLOSED_UNTIL_ATTRIBUTED_PATHS",
     }
 
     audit, totals = [], Counter()
@@ -219,7 +272,7 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         "advanced_metrics":{
             "statcast":UNWIRED,"next_gen":UNWIRED,"coaching":UNWIRED,
             "travel":UNWIRED,"player_props":
-            "MLB_PITCHER_PRIOR_STARTS_ONLY_OTHERS_UNWIRED",
+            "MLB_PITCHER_LIVE_BATTER_FOOTBALL_FAIL_CLOSED",
         },
     }
     card["runner"]="RUN_IT_FULL_REAL_MLB_PITCHER_PREGAME_V2"
