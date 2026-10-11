@@ -323,12 +323,21 @@ def run_unified_nfl_run_it(
         if len(candidates) == 1:
             kickoff = next(iter(candidates))
     if game_quotes:
+        # Explicit executable book: never accidentally use a sorted first
+        # peer-book's prices as the executable DraftKings market.
+        dk_quotes = [q for q in game_quotes
+                     if str(q.get("book") or q.get("book_key") or "").casefold() ==
+                        str(executable_book).casefold()]
+        if not dk_quotes:
+            raise UnifiedNflRunItError("EXECUTABLE_PAIRED_GAME_BOOK_REQUIRED")
         residual_card = run_it_market_anchored(
-            game_quotes,
+            dk_quotes,
             {game_id: {"margin": attempt9_margin, "total": attempt9_total,
                        "commence_time": kickoff}},
             as_of=as_of,
         )
+        if len(residual_card["games"]) != 1:
+            raise UnifiedNflRunItError("EXECUTABLE_GAME_BOOK_NOT_UNIQUE")
         priced = residual_card["games"][0]["market_anchored_research_prices"]
         fair_margin = float(priced[0]["fair_margin"])
         fair_total = float(priced[0]["fair_total"])
@@ -345,7 +354,9 @@ def run_unified_nfl_run_it(
         away_team=away_team,
         attempt9_margin=fair_margin,
         attempt9_total=fair_total,
-        game_markets=game_requests,
+        # Disable raw absolute-probability game prices; game research prices
+        # are reconstructed from paired no-vig + joint-grid residual only.
+        game_markets=() if game_quotes else game_requests,
         prop_markets=[*prop_requests, *td_requests],
         home_model=home_model,
         away_model=away_model,
@@ -353,6 +364,20 @@ def run_unified_nfl_run_it(
         n_sims=n_sims,
         seed=seed,
     )
+
+    if residual_card is not None:
+        # Present game rows with the same engine shape while preserving the
+        # anchored fair probability and push mass. These rows are never bets.
+        model["game_markets"] = [{
+            **row,
+            "selection": ("away" if row["selection"] == away_team else
+                          "home" if row["selection"] == home_team else
+                          str(row["selection"]).lower()),
+            "loss_p": 1.0 - row["estimate_p"] - row["push_p"],
+            "conditional_win_probability": row["conditional_fair_p"],
+            "status": "PRICED_RESEARCH",
+            "eligible_as_bet": False,
+        } for row in priced]
 
     # Existing game RUN IT intentionally requires explicit score paths for
     # integer spreads/totals. Re-sample the same frozen grid with the exact same
