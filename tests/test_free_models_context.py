@@ -142,3 +142,19 @@ def test_integer_push_uses_effective_breakeven_probability():
     raw = 1 / model.odds_decimal(-102)
     assert value['book_break_even_p'] < raw
     assert abs(value['book_break_even_p'] - (1-value['push_p'])*raw) < 1e-5
+
+
+def test_winter_football_and_fall_nba_use_correct_season_year():
+    urls = []
+    def get(url):
+        urls.append(url)
+        return {"events": []}
+    provider = model.PublicContext(NOW, getter=get)
+    for sport, stamp, suffix in (
+        ("NBA", "2026-10-22T01:00:00Z", "season=2027"),
+        ("NFL", "2027-01-10T21:00:00Z", "season=2026"),
+        ("CFB", "2027-01-10T21:00:00Z", "season=2026"),
+        ("MLB", "2026-10-11T21:00:00Z", "season=2026"),
+    ):
+        provider.schedule(sport, {"id": "123"}, model.dt(stamp))
+        assert suffix in urls[-1]
