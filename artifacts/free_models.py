@@ -258,7 +258,10 @@ class PublicContext:
                 first = groups[0] if groups else {}
                 first_keys = ",".join(sorted(str(k) for k in first)[:8]) if isinstance(first, dict) else "NOT_OBJECT"
                 # Use schema only, no athlete names or raw injury payload.
-                return f"KEYS={keys};N={len(groups)};FIRST_KEYS={first_keys}"
+                ids = [str((g.get("team") or {}).get("id") or "")[:12]
+                       for g in groups[:6] if isinstance(g, dict)
+                       and isinstance(g.get("team"), dict)]
+                return f"KEYS={keys};N={len(groups)};FIRST_KEYS={first_keys};SAMPLE_TEAM_IDS={','.join(ids)}"
             shape = "TEAM[" + _shape(data) + "];LEAGUE[" + _shape(locals().get("league")) + "]"
             self.receipts.append({"source": f"{ESPN}/{LEAGUES[sport]}/injuries",
                                   "status": "UNUSABLE_SCHEMA", "reason": shape,
