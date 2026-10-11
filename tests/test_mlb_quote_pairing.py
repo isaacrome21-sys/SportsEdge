@@ -86,3 +86,31 @@ def test_indexed_lookup_matches_unique_opposite_inside_group_only():
     assert "opposite_odds" not in out[2]
     assert out[3]["opposite_odds"]==-108
     assert out[4]["opposite_odds"]==-110
+
+
+def test_run_line_same_signed_handicaps_never_pair_even_when_team_ids_differ():
+    rows = [
+        _row("LAD", -115, market="RUN_LINE", line=-1.5, home="LAD", away="SDP"),
+        _row("SDP", -105, market="RUN_LINE", line=-1.5, home="LAD", away="SDP", retrieved_at=T10),
+    ]
+    out = pair_opposite_odds(rows)
+    assert all("opposite_odds" not in r for r in out)
+
+
+def test_moneyline_arbitrary_selection_ids_without_team_identity_do_not_pair():
+    rows = [
+        _row("NYY", -150, market="MONEYLINE", line=None),
+        _row("BOS", 130, market="MONEYLINE", line=None, retrieved_at=T10),
+    ]
+    out = pair_opposite_odds(rows)
+    assert all("opposite_odds" not in r for r in out)
+
+
+def test_run_line_opposite_signed_home_away_labels_pair():
+    rows = [
+        _row("HOME", -115, market="RUN_LINE", line=-1.5),
+        _row("AWAY", -105, market="RUN_LINE", line=1.5, retrieved_at=T10),
+    ]
+    out = pair_opposite_odds(rows)
+    assert out[0]["opposite_odds"] == -105
+    assert out[1]["opposite_odds"] == -115

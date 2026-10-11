@@ -68,9 +68,9 @@ def _team_pair(a: Mapping[str,Any], b: Mapping[str,Any]) -> bool:
     if len(homes)==1 and len(aways)==1:
         home=next(iter(homes)); away=next(iter(aways))
         return {sa, sb} == {home, away}
-    # Last resort for team markets only: two distinct non-total sides.
-    reserved=set(_OPPOSITES) | {"OVER","UNDER","YES","NO"}
-    return sa not in reserved and sb not in reserved
+    # Without an identified home/away pair, two arbitrary selection labels
+    # cannot safely be treated as opposite MLB teams. Fail closed.
+    return False
 
 
 def _is_complement(a: Mapping[str,Any], b: Mapping[str,Any]) -> bool:
@@ -83,6 +83,18 @@ def _is_complement(a: Mapping[str,Any], b: Mapping[str,Any]) -> bool:
         return False
     if _line_key(a, market) != _line_key(b, market):
         return False
+    if market in TEAM_MARKETS - {"MONEYLINE", "ML"}:
+        # Run lines MUST use opposite signed handicaps. Matching only their
+        # absolute value previously allowed -1.5/-1.5 fake pairs.
+        try:
+            line_a, line_b = float(a["line"]), float(b["line"])
+            from math import isfinite
+            if not (isfinite(line_a) and isfinite(line_b)):
+                return False
+            if abs(line_a + line_b) > 1e-9:
+                return False
+        except (KeyError, ValueError, TypeError):
+            return False
     if str(a.get("entity_id") or "") != str(b.get("entity_id") or ""):
         return False
     sa, sb = _side(a), _side(b)
