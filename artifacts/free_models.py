@@ -49,6 +49,22 @@ ESPN = "https://site.api.espn.com/apis/site/v2/sports"
 OPEN_METEO = "https://api.open-meteo.com/v1/forecast"
 GEO = "https://geocoding-api.open-meteo.com/v1/search"
 
+US_STATES = {
+    "AL":"Alabama", "AK":"Alaska", "AZ":"Arizona", "AR":"Arkansas",
+    "CA":"California", "CO":"Colorado", "CT":"Connecticut", "DE":"Delaware",
+    "DC":"District of Columbia", "FL":"Florida", "GA":"Georgia", "HI":"Hawaii",
+    "ID":"Idaho", "IL":"Illinois", "IN":"Indiana", "IA":"Iowa",
+    "KS":"Kansas", "KY":"Kentucky", "LA":"Louisiana", "ME":"Maine",
+    "MD":"Maryland", "MA":"Massachusetts", "MI":"Michigan", "MN":"Minnesota",
+    "MS":"Mississippi", "MO":"Missouri", "MT":"Montana", "NE":"Nebraska",
+    "NV":"Nevada", "NH":"New Hampshire", "NJ":"New Jersey", "NM":"New Mexico",
+    "NY":"New York", "NC":"North Carolina", "ND":"North Dakota", "OH":"Ohio",
+    "OK":"Oklahoma", "OR":"Oregon", "PA":"Pennsylvania", "RI":"Rhode Island",
+    "SC":"South Carolina", "SD":"South Dakota", "TN":"Tennessee", "TX":"Texas",
+    "UT":"Utah", "VT":"Vermont", "VA":"Virginia", "WA":"Washington",
+    "WV":"West Virginia", "WI":"Wisconsin", "WY":"Wyoming",
+}
+
 
 def dt(value):
     try:
@@ -357,18 +373,77 @@ class PublicContext:
             state = address.get("state")
             if not city:
                 return 0.0, "VENUE_LOCATION_MISSING"
-            # Open-Meteo accepts "City, State" qualifiers and countryCode.
-            # Never silently select a city when state matching is ambiguous.
-            name = city + (", " + state if state else "")
-            q = urlencode({"name": name, "countryCode": "US", "count": 10,
-                           "language": "en", "format": "json"})
-            results = (self.fetch(GEO + "?" + q) or {}).get("results") or []
-            matches = [r for r in results if self.key(r.get("name")) == self.key(city) and
-                       (not state or self.key(r.get("admin1")) == self.key(state) or
-                        self.key(r.get("admin1_code")) == self.key(state))]
-            if len(matches) != 1:
+            # Open-Meteo geocodes CITIES or postal codes, not necessarily
+            # stadium names. Always bind candidates back to ESPN's venue
+            # city/state before accepting a forecast location. ESPN may use
+            # 'AZ' while the geocoder returns 'Arizona'.
+            state_full = US_STATES.get(str(state).strip().upper(), state) if state else None
+            def same_state(candidate):
+                if not state_full:
+                    return True
+                return (self.key(candidate.get("admin1", "")) == self.key(state_full) or
+                        self.key(candidate.get("admin1_code", "")) == self.key(state) or
+                        self.key(candidate.get("admin1", "")) == self.key(state))
+
+            def verified_coordinates(candidate):
+                if not isinstance(candidate, dict):
+                    return False
+                country = candidate.get("country_code")
+                if country and str(country).upper() != "US":
+                    return False
+                if not same_state(candidate):
+                    return False
+                try:
+                    lat = numeric(candidate["latitude"], "venue_latitude")
+                    lon = numeric(candidate["longitude"], "venue_longitude")
+                except (ValueError, KeyError, TypeError):
+                    return False
+                return -90 <= lat <= 90 and -180 <= lon <= 180
+
+            def choose(candidates, expected_name):
+                matching = [r for r in candidates if verified_coordinates(r) and
+                            self.key(r.get("name", "")) == self.key(expected_name)]
+                if len(matching) == 1:
+                    return matching[0]
+                if len(matching) > 1 and state_full:
+                    # Population breaks exact-city AND exact-state ties only.
+                    # Missing or tied populations remain ambiguous.
+                    populated = []
+                    for r in matching:
+                        try:
+                            count = numeric(r["population"], "population")
+                            if count > 0:
+                                populated.append((count, r))
+                        except (KeyError, TypeError, ValueError):
+                            pass
+                    if len(populated) == len(matching):
+                        top = max(p for p, _ in populated)
+                        winners = [r for p, r in populated if p == top]
+                        if len(winners) == 1:
+                            return winners[0]
+                return None
+
+            def geocode(search, count=100):
+                query = urlencode({"name": search, "countryCode": "US",
+                                   "count": count, "language": "en", "format": "json"})
+                return (self.fetch(GEO + "?" + query) or {}).get("results") or []
+
+            search = city + (", " + state_full if state_full else "")
+            chosen = choose(geocode(search), city)
+            if chosen is None and state:
+                # Retry less restrictive city-only search but still require
+                # exact ESPN state and US jurisdiction for every candidate.
+                chosen = choose(geocode(city), city)
+            if chosen is None:
+                # A stadium name is not generally a valid city geocode query.
+                # Accept this fallback ONLY for an exact venue name with a
+                # state match, never by an unrelated city's prefix.
+                full = str(venue.get("fullName") or "").strip()
+                if full and self.key(full) not in {self.key(city), self.key(search)}:
+                    chosen = choose(geocode(full, count=100), full)
+            if chosen is None:
                 return 0.0, "VENUE_GEOCODE_AMBIGUOUS"
-            latitude, longitude = matches[0].get("latitude"), matches[0].get("longitude")
+            latitude, longitude = chosen["latitude"], chosen["longitude"]
         if latitude is None or longitude is None:
             return 0.0, "VENUE_COORDS_MISSING"
         query = urlencode({"latitude": latitude, "longitude": longitude,
