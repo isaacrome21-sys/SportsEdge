@@ -105,3 +105,15 @@ def test_same_kickoff_wrong_team_never_injects_prop():
     tickets=m.ticket_with_props(broken,report,NOW)
     assert len(tickets["2026-10-11"]["games"][0]["markets"])==3
     assert all(not r.get("player") for r in tickets["2026-10-11"]["games"][0]["markets"])
+
+
+def test_direct_dk_event_ids_never_consume_odds_api_prop_quota():
+    board=base()
+    board["source"]="DRAFTKINGS_DIRECT_WEB_V1"
+    def forbidden(*args,**kwargs):
+        raise AssertionError("PROVIDER_PROPS_MUST_NOT_REQUEST_DIRECT_DK_EVENT_ID")
+    report=m.collect(board,NOW,key_slots=[("SPORTSEDGE_ODDS_API_KEY","mock")],
+        preflight=forbidden,fetch=forbidden)
+    assert report["status"]=="SKIPPED_DIRECT_DK_EVENT_IDS"
+    assert report["max_paid_credits"]==0
+    assert report["events"]==[]

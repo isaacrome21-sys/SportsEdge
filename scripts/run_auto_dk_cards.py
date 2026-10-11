@@ -63,7 +63,8 @@ def week_candidate(start: str):
 
 def run_nfl(raw, out, now):
     cards=[]
-    days=nfl_tickets(raw.get("games") or [],now)
+    days=nfl_tickets(raw.get("games") or [],now,
+                     source=raw.get("source") or "ODDS_API_DK_AUTO")
     if not days:
         return {"status":"NO_DK_GAMES","cards":[]}
     history=out/"nflverse_history.json"

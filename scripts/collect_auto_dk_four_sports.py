@@ -217,7 +217,7 @@ def events_to_board(sport, events, now):
     return games
 
 
-def nfl_tickets(games, captured_at):
+def nfl_tickets(games, captured_at, *, source="ODDS_API_DK_AUTO"):
     from sportsedge.nfl_team_aliases import resolve_team, NflTeamAliasError
     per_day={}
     for g in games:
@@ -236,14 +236,15 @@ def nfl_tickets(games, captured_at):
                        "home_or_under_price":row["under"] if is_total else row["home"],
                        "raw":"THE_ODDS_API_DK_TWO_SIDED",
                        "team":None,"player":None,
-                       "quote_retrieved_at":row["observed_at"]})
+                       "quote_retrieved_at":row["observed_at"],
+                       "quote_timestamp_source":row.get("timestamp_source","PROVIDER_LAST_UPDATE")})
         if not mk:
             continue
         per_day.setdefault(g["slate_ct"],[]).append({
             "away":away,"home":home,"header":away+" @ "+home,"markets":mk,
             "commence_time":g["commence_time"]})
     return {d:{"sport":"NFL","slate":d,"observed_at":captured_at.isoformat(),
-               "source":"ODDS_API_DK_AUTO","games":games}
+               "source":source,"games":games}
             for d,games in per_day.items()}
 
 
