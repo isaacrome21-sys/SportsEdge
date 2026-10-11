@@ -203,3 +203,48 @@ def test_injury_schema_probe_logs_only_shape_when_unusable():
     result=render_card(card)
     assert "1 unusable-schema reports" in result
     assert "team ID 2" in result
+
+
+def test_live_2026_espn_top_level_group_ids_resolve_correct_team_and_cache():
+    from artifacts import free_models as base
+    urls=[]
+    def getter(url):
+        urls.append(url)
+        if "/teams/14/injuries" in url or "/teams/2/injuries" in url:
+            return {}  # observed team-specific endpoint
+        if url.endswith("/football/nfl/injuries"):
+            return {"season":{"year":2026}, "injuries":[
+                {"displayName":"Los Angeles Rams","id":"14","injuries":[
+                    {"status":"Out","athlete":{"id":"ramsQB","position":{"abbreviation":"QB"}}},
+                    {"status":"Questionable","athlete":{"id":"ramsTE"}}]},
+                {"displayName":"Buffalo Bills","id":"2","injuries":[
+                    {"status":"Doubtful","athlete":{"id":"billsWR","position":{"abbreviation":"WR"}}}]}]}
+        raise AssertionError(url)
+    provider=base.PublicContext(NOW,getter=getter)
+    value_rams,status_rams=provider.injury_points("NFL",{"id":"14"})
+    value_bills,status_bills=provider.injury_points("NFL",{"id":"2"})
+    assert value_rams==-1.5
+    assert value_bills==-0.15
+    assert "REPORTED_1" in status_rams and "REPORTED_1" in status_bills
+    assert provider.injury_points("NFL",{"id":"14"}) == (value_rams,status_rams)
+    assert len(urls)==3  # two team URLs and one cached league-wide URL
+    good=[r for r in provider.receipts if r.get("status")=="STRUCTURE_VERIFIED"]
+    assert len(good)==2
+    assert {r["team_id"] for r in good}=={"2","14"}
+    assert not [r for r in provider.receipts if r.get("status")=="UNUSABLE_SCHEMA"]
+
+
+def test_live_group_id_requires_exact_match_and_never_assigns_other_team_injury():
+    from artifacts import free_models as base
+    def getter(url):
+        if "/teams/" in url and "/injuries" in url:
+            return {}
+        return {"injuries":[{"id":"14","displayName":"Los Angeles Rams","injuries":[
+            {"status":"Out","athlete":{"id":"p","position":{"abbreviation":"QB"}}}]}]}
+    provider=base.PublicContext(NOW,getter=getter)
+    val,status=provider.injury_points("NFL",{"id":"2"})
+    assert val==0.0 and status=="MISSING_OR_UNRECOGNIZED_SOURCE"
+    bad=[x for x in provider.receipts if x.get("status")=="UNUSABLE_SCHEMA"]
+    assert len(bad)==1 and "SAMPLE_TEAM_IDS=14" in bad[0]["reason"]
+    provider.injury_points("NFL",{"id":"2"})
+    assert len([x for x in provider.receipts if x.get("status")=="UNUSABLE_SCHEMA"])==1
