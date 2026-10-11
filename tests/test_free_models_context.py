@@ -175,3 +175,21 @@ def test_manual_no_fetch_still_allows_explicit_valid_pregame_clock():
                   now=NOW, auto_context=False)
     assert r["summary"]["status_counts"].get("BLOCKED_CONTEXT_UNVERIFIED", 0) == 0
     assert r["summary"]["rows"] == 1
+
+
+def test_illinois_college_game_blocked_without_context_network():
+    payload={"lines":[{"sport":"CFB", "away":"Illinois Fighting Illini",
+                       "home":"Purdue Boilermakers", "market":"spread",
+                       "side":"away", "line":3.5, "odds":-110,
+                       "kickoff":START}]}
+    card=model.run(payload,now=NOW,getter=lambda _: (_ for _ in ()).throw(AssertionError("FETCH_FORBIDDEN")))
+    assert card["edges"]==[]
+    assert card["summary"]["status_counts"]["BLOCKED_IL_COLLEGE"]==1
+
+
+def test_northwestern_state_not_confused_with_illinois_northwestern():
+    provider=model.PublicContext(NOW)
+    result=model.calculate({"sport":"CFB","away":"Northwestern State","home":"Louisiana",
+                            "market":"spread","side":"away","line":7.5,
+                            "odds":-110,"kickoff":START},provider,NOW,auto_context=False)
+    assert result["status"]!="BLOCKED_IL_COLLEGE"
