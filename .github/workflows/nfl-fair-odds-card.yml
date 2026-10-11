@@ -1,8 +1,9 @@
 name: nfl-fair-odds-card
 
+# DK prices come from owner issue intake; the paid/reference-odds job is
+# explicitly opt-in so ordinary daily cards never consume Odds API credits.
 on:
-  issues:
-    types: [opened, edited]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,12 +16,12 @@ concurrency:
 
 jobs:
   fair-odds:
-    if: github.actor == github.repository_owner && (contains(github.event.issue.labels.*.name, 'nfl-lines') || startsWith(github.event.issue.title, '[NFL LINES]'))
+    if: github.actor == github.repository_owner
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      ISSUE: ${{ github.event.issue.number }}
+      ISSUE: ""
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -37,4 +38,4 @@ jobs:
         run: |
           set -euo pipefail
           PYTHONPATH=. python scripts/run_nfl_fair_odds_card.py --out artifacts/nfl_fair_odds.md
-          gh issue comment "$ISSUE" --body-file artifacts/nfl_fair_odds.md
+          cat artifacts/nfl_fair_odds.md >> "$GITHUB_STEP_SUMMARY"
