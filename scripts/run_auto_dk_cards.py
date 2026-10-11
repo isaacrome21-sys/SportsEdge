@@ -32,7 +32,10 @@ def call(command, *, timeout=180, env=None):
                          capture_output=True,text=True,timeout=timeout,env=env)
     except (OSError,subprocess.TimeoutExpired) as exc:
         return False, type(exc).__name__
-    return p.returncode==0,(p.stderr or p.stdout)[-2500:]
+    diagnostics=(p.stdout or "")+"\n"+(p.stderr or "")
+    if len(diagnostics)>20000:
+        diagnostics=diagnostics[:6000]+"\n...TRUNCATED...\n"+diagnostics[-14000:]
+    return p.returncode==0,diagnostics
 
 
 def image_card(card, sport, path):
@@ -183,6 +186,7 @@ def run_cfb(raw, out, now):
         env["CFB_SHARP_FETCH"]="0" # Peer quotes are included; no second paid fetch.
         env["CFB_SDV_MAX_RETRY_SLEEP_SECONDS"]="10"
         success,reason=call(cmd,timeout=300,env=env)
+        (out/f"cfb_{season}_w{week}_diagnostics.log").write_text(reason,encoding="utf-8")
         if success:
             payload=json.loads(card.read_text(encoding="utf-8"))
             state="MODEL_READY" if payload.get("model_status","").startswith("MODEL") else "QUOTES_ONLY_MODEL_UNAVAILABLE"
