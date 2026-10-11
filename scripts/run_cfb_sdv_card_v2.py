@@ -33,6 +33,8 @@ from datetime import datetime, timezone
 from math import erf, sqrt
 from pathlib import Path
 
+from sports.common.ev_math import EVError, american_to_decimal, devig
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -132,7 +134,7 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
         norm.append((market, side, q.get("line"), float(q["american_odds"])))
     groups = {}
     for market, side, line, odds in norm:
-        groups.setdefault(pair_key(market, side, line), []).append((side, implied(odds)))
+        groups.setdefault(pair_key(market, side, line), []).append((side, odds))
     out = []
     for market, side, line, odds in norm:
         raw = implied(odds)
@@ -146,7 +148,18 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
         }.get(market)
         paired = (opposite is not None and len(grp) == 2
                   and {selection for selection, _ in grp} == opposite)
-        fair = raw / sum(prob for _, prob in grp) if paired else None
+        # POWER_V1, strictly on two opposing quotes from the same supplied
+        # market. Never synthesize market_p from one quote or cherry-pick a
+        # devig method when longshot sensitivity exceeds one percentage point.
+        fair = None
+        devig_error = None
+        if paired:
+            try:
+                probs = devig([american_to_decimal(price) for _, price in grp],
+                              trigger_american=400, max_spread_pp=1.0)
+                fair = next(pfair for (which, _), pfair in zip(grp, probs) if which == side)
+            except EVError as exc:
+                devig_error = exc.code
         model_home, model_away = home, away
         # Moneyline and spread are the same margin question: price both off the
         # one market-anchored margin so a game cannot show "no spread edge" and
@@ -156,12 +169,13 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
             model_away = float(spread_context["away_mean"])
         p = model_prob(market, side, line, model_home, model_away)
         _win, _lose, push = model_distribution(market, side, line, model_home, model_away)
-        edge = p - (fair if fair is not None else raw)
+        edge = p - fair if fair is not None else None
         profit = odds / 100.0 if odds > 0 else 100.0 / abs(odds)
-        # Win and loss are unconditional; a push returns the stake.
-        # Use the conditional P(win|not push) for no-vig comparisons.
-        expected_roi = (1.0 - push) * (p * profit - (1.0 - p))
-        qualifies = EDGE_FLOOR <= edge <= EDGE_CAP and expected_roi > 0.0
+        # Win/loss are unconditional; a push returns the stake. Do not
+        # publish EV as priced without both market sides.
+        expected_roi = (1.0 - push) * (p * profit - (1.0 - p)) if fair is not None else None
+        qualifies = (edge is not None and EDGE_FLOOR <= edge <= EDGE_CAP
+                     and expected_roi is not None and expected_roi > 0.0)
         out.append({
             "game_id": game_id,
             "market": market,
@@ -175,12 +189,16 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
             "model_loss_p": round((1.0 - p) * (1.0 - push), 6),
             "model_push_p": round(push, 6),
             "model_prob_basis": "CONDITIONAL_WIN_GIVEN_NO_PUSH",
-            "market_p": round(fair if fair is not None else raw, 4),
-            "devig": "PAIRED_PROPORTIONAL" if fair is not None else "UNPAIRED_RAW_IMPLIED",
-            "edge": round(edge, 4),
-            "expected_roi": round(expected_roi, 4),
+            "market_p": round(fair, 4) if fair is not None else None,
+            "raw_implied_p": round(raw, 4),
+            "devig": ("PAIRED_POWER_V1" if fair is not None
+                      else "DEVIG_METHOD_SENSITIVITY" if devig_error == "DEVIG_METHOD_SENSITIVITY"
+                      else "UNPAIRED_RAW_IMPLIED" if not paired else "DEVIG_INVALID_PRICE"),
+            "edge": round(edge, 4) if edge is not None else None,
+            "expected_roi": round(expected_roi, 4) if expected_roi is not None else None,
             "bet_status": "BET" if qualifies else "PASS",
             "reason": ("EDGE_CLEARS_FLOOR_AND_POSITIVE_ROI" if qualifies
+                       else "NO_PAIRED_PRICE" if fair is None
                        else "NONPOSITIVE_EXPECTED_ROI" if EDGE_FLOOR <= edge <= EDGE_CAP and expected_roi <= 0.0
                        else "EDGE_TOO_LARGE_SUSPECT" if edge > EDGE_CAP else "BELOW_FLOOR"),
         })
@@ -196,7 +214,11 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
     # Unpaired markets are useful for tracking but cannot establish a
     # no-vig price or a defensible market edge.
     for r in out:
-        if r["devig"] != "PAIRED_PROPORTIONAL":
+        if r["devig"] == "DEVIG_METHOD_SENSITIVITY":
+            r["bet_status"], r["reason"] = "BLOCKED", "DEVIG_METHOD_SENSITIVITY"
+        elif r["devig"] == "DEVIG_INVALID_PRICE":
+            r["bet_status"], r["reason"] = "BLOCKED", "DEVIG_INVALID_PRICE"
+        elif r["devig"] != "PAIRED_POWER_V1":
             r["bet_status"], r["reason"] = "TRACK", "UNPAIRED_MARKET_NO_DEVIG"
     # Apply the straight-price cap before selecting a same-game winner.
     # An expensive moneyline must not suppress an otherwise playable spread.
@@ -206,7 +228,7 @@ def price_game(game_id, home: float, away: float, quotes: list, validated=None, 
     # Same-game guard: one team-outcome bet (ML or spread) and one total per game.
     for fam in (("MONEYLINE", "SPREAD"), ("TOTAL",)):
         bets = [r for r in out if r["market"] in fam and r["bet_status"] == "BET"]
-        bets.sort(key=lambda r: -r["edge"])
+        bets.sort(key=lambda r: (-r["expected_roi"], -r["edge"], r["market"], r["side"]))
         for r in bets[1:]:
             r["bet_status"], r["reason"] = "PASS", "SAME_GAME_GUARD"
     # Never call an unvalidated model edge a bet.
@@ -489,8 +511,8 @@ def pre_kickoff(start_ts: str, now: datetime) -> bool:
 def market_only_rows(board: list, reason: str, *, asof: str | None = None) -> list:
     """Card rows when the model's data source (CFBD) is down: de-vigged market only.
 
-    model_p is set to the no-vig market price, so edge is 0 and nothing is a bet
-    or a lean. Every row is TRACK. This keeps the phone card working (prices,
+    model_p/estimate_p and EV are MISSING, never inferred from market odds.
+    Every row is TRACK. This keeps the phone card working (prices,
     fair odds, market-implied scores) instead of posting a traceback.
     """
     now = (datetime.fromisoformat(asof.replace("Z", "+00:00")) if asof
@@ -514,8 +536,13 @@ def market_only_rows(board: list, reason: str, *, asof: str | None = None) -> li
         for r in priced:
             r.update({
                 "matchup": matchup,
-                "model_p": r["market_p"],
-                "edge": 0.0,
+                "model_p": None,
+                "estimate_p": None,
+                "model_win_p": None,
+                "model_loss_p": None,
+                "model_push_p": None,
+                "model_prob_basis": "NO_ENGINE_MARKET_ONLY",
+                "edge": None,
                 "expected_roi": None,  # no model probability: ROI cannot be estimated
                 "home_mean": round(home, 2) if home == home else home,
                 "away_mean": round(away, 2) if away == away else away,
@@ -722,14 +749,14 @@ def apply_probation(payload: dict, policy_path: Path = PROBATION_POLICY_PATH) ->
             reason = "NO_SHARP_REFERENCE"
         elif "min_sharp_ev" in policy and _sharp_ev(r) < float(policy["min_sharp_ev"]):
             reason = "DK_PRICE_DOES_NOT_BEAT_SHARP_FAIR"
-        elif r.get("devig") != "PAIRED_PROPORTIONAL" or float(r.get("american_odds") or 0) < -165:
+        elif r.get("devig") != "PAIRED_POWER_V1" or float(r.get("american_odds") or 0) < -165:
             reason = "PRICE_OR_PAIRING_INVALID"
         r["probation"] = False
         if reason:
             r["probation_block_reason"] = reason
         else:
             eligible.append(r)
-    eligible.sort(key=lambda r: (-float(r.get("edge") or 0), -float(r.get("expected_roi") or 0)))
+    eligible.sort(key=lambda r: (-float(r.get("expected_roi") or 0), -float(r.get("edge") or 0), str(r.get("matchup") or ""), str(r.get("side") or "")))
     slate_cap = int(policy["max_probation_per_slate"])
     market_caps = policy["max_probation_per_market"]
     market_counts = {}
@@ -966,9 +993,12 @@ def main() -> int:
                   f"{r['american_odds']:+.0f} {r['stake_units']}u model {r['model_p']*100:.1f}% vs mkt "
                   f"{r['market_p']*100:.1f}% ({r['edge']*100:+.1f}%) sharp {(r.get('sharp_fair_p') or 0)*100:.1f}% {r.get('sharp_method')}")
     for r in payload["results"]:
-        if "edge" in r:
+        if r.get("model_p") is not None and r.get("market_p") is not None and r.get("edge") is not None:
             print(f"{r['bet_status']:4s} {r['matchup']:45s} {r['market']:9s} {r['side']:5s} {str(r['line'] or ''):6s} "
                   f"{r['american_odds']:+6.0f}  model {r['model_p']*1:.3f}  mkt {r['market_p']:.3f}  edge {r['edge']:+.3f}")
+        else:
+            print(f"{r['bet_status']:4s} {r['matchup']:45s} {r['market']:9s} {r['side']:5s} "
+                  f"{r['american_odds']:+6.0f} model MISSING, paired fair/EV unavailable")
     return 0
 
 
