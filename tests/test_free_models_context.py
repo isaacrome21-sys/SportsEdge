@@ -134,3 +134,11 @@ def test_extreme_raw_total_is_market_anchored_not_massive_fake_edge():
     assert value['market_anchor']['fair_total'] > 60
     assert value['market_anchor']['fair_total'] < 68.5
     assert value['estimate_p'] < 0.65
+
+
+def test_integer_push_uses_effective_breakeven_probability():
+    value = model.calculate(line(line=54,commence_time=START),
+        model.PublicContext(NOW), NOW, auto_context=False)
+    raw = 1 / model.odds_decimal(-102)
+    assert value['book_break_even_p'] < raw
+    assert abs(value['book_break_even_p'] - (1-value['push_p'])*raw) < 1e-5
