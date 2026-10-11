@@ -16,8 +16,7 @@ from dataclasses import asdict
 from typing import Any, Mapping, Sequence
 
 from sportsedge.nfl_prop_run_it_score_b import PROP_FAMILIES, run_prop_board
-from sportsedge.nfl_run_it import normalize_quote, run_it_market_anchored
-from sportsedge.sports.nfl.market_anchored_residual import ResidualQuoteError, anchor_prediction
+from sportsedge.nfl_run_it import normalize_quote
 from sportsedge.nfl_run_it_scored import run_it_scored
 from sportsedge.nfl_td_run_it_score_b import run_td_board
 from sportsedge.sports.nfl.discrete_v2 import load_freeze, means_from_attempt9, score_grid
@@ -279,7 +278,6 @@ def run_unified_nfl_run_it(
     attempt9_margin: float,
     attempt9_total: float,
     game_quotes: Sequence[Mapping[str, Any]],
-    game_start_ts: Any = None,
     prop_quotes: Sequence[Mapping[str, Any]] = (),
     td_quotes: Sequence[Mapping[str, Any]] = (),
     qualification_snapshots: Sequence[Mapping[str, Any]] = (),
@@ -312,51 +310,13 @@ def run_unified_nfl_run_it(
         away_team=away_team,
     )
 
-    # Game-market quotes MUST be paired, fresh, pre-kickoff, and supply the
-    # market-centred margin+total before any joint score paths are simulated.
-    # Research pricing uses the relative grid shift, never the absolute grid p.
-    kickoff = game_start_ts
-    if kickoff is None:
-        candidates = {str(q.get("kickoff_at"))
-                      for q in qualification_snapshots
-                      if q.get("game_id") == game_id and q.get("kickoff_at")}
-        if len(candidates) == 1:
-            kickoff = next(iter(candidates))
-    if game_quotes:
-        # Explicit executable book: never accidentally use a sorted first
-        # peer-book's prices as the executable DraftKings market.
-        dk_quotes = [q for q in game_quotes
-                     if str(q.get("book") or q.get("book_key") or "").casefold() ==
-                        str(executable_book).casefold()]
-        if not dk_quotes:
-            raise UnifiedNflRunItError("EXECUTABLE_PAIRED_GAME_BOOK_REQUIRED")
-        residual_card = run_it_market_anchored(
-            dk_quotes,
-            {game_id: {"margin": attempt9_margin, "total": attempt9_total,
-                       "commence_time": kickoff}},
-            as_of=as_of,
-        )
-        if len(residual_card["games"]) != 1:
-            raise UnifiedNflRunItError("EXECUTABLE_GAME_BOOK_NOT_UNIQUE")
-        priced = residual_card["games"][0]["market_anchored_research_prices"]
-        fair_margin = float(priced[0]["fair_margin"])
-        fair_total = float(priced[0]["fair_total"])
-    else:
-        # No complete market => no game-market pricing. Prop-only caller can
-        # still use its existing market-blind workload model.
-        residual_card = None
-        fair_margin = float(attempt9_margin)
-        fair_total = float(attempt9_total)
-
     model = run_unified_nfl_model(
         game_id=game_id,
         home_team=home_team,
         away_team=away_team,
-        attempt9_margin=fair_margin,
-        attempt9_total=fair_total,
-        # Disable raw absolute-probability game prices; game research prices
-        # are reconstructed from paired no-vig + joint-grid residual only.
-        game_markets=() if game_quotes else game_requests,
+        attempt9_margin=attempt9_margin,
+        attempt9_total=attempt9_total,
+        game_markets=game_requests,
         prop_markets=[*prop_requests, *td_requests],
         home_model=home_model,
         away_model=away_model,
@@ -365,40 +325,28 @@ def run_unified_nfl_run_it(
         seed=seed,
     )
 
-    if residual_card is not None:
-        # Present game rows with the same engine shape while preserving the
-        # anchored fair probability and push mass. These rows are never bets.
-        model["game_markets"] = [{
-            **row,
-            "selection": ("away" if row["selection"] == away_team else
-                          "home" if row["selection"] == home_team else
-                          str(row["selection"]).lower()),
-            "loss_p": 1.0 - row["estimate_p"] - row["push_p"],
-            "conditional_win_probability": row["conditional_fair_p"],
-            "status": "PRICED_RESEARCH",
-            "eligible_as_bet": False,
-        } for row in priced]
-
     # Existing game RUN IT intentionally requires explicit score paths for
     # integer spreads/totals. Re-sample the same frozen grid with the exact same
     # seed so this is the same model distribution, not a second model.
     freeze = load_freeze()
-    means = means_from_attempt9(fair_margin, fair_total)
+    means = means_from_attempt9(float(attempt9_margin), float(attempt9_total))
     grid = score_grid(means["mean_home"], means["mean_away"], freeze)
     score_paths = sample_score_paths(grid, n_sims=n_sims, seed=seed)
 
-    # Keep the model's coherent score paths available to prop workloads, but
-    # DO NOT send absolute frozen-grid game p into the legacy selection rail.
-    # The independent research rows below are market-relative and have no
-    # BET / Score B / staking or promotion authority.
-    game_card = run_it_scored([], [], [], as_of=as_of, edge_floor=edge_floor)
-    game_card_payload = game_card.to_dict()
-    game_card_payload["residual_research_rows"] = (
-        residual_card["games"][0]["market_anchored_research_prices"]
-        if residual_card is not None else []
+    game_estimates = _game_estimates(
+        game_id=game_id,
+        home_team=home_team,
+        away_team=away_team,
+        rows=model["game_markets"],
     )
-    game_card_payload["validated_markets"] = []
-    game_card_payload["research_only"] = True
+    game_card = run_it_scored(
+        game_quotes,
+        game_estimates,
+        qualification_snapshots,
+        simulations={game_id: score_paths},
+        as_of=as_of,
+        edge_floor=edge_floor,
+    )
 
     prop_estimates, prop_blocks = _ordinary_prop_estimates(
         game_id=game_id,
@@ -428,17 +376,10 @@ def run_unified_nfl_run_it(
         "schema": SCHEMA,
         "game_id": game_id,
         "model": model,
-        "game_card": game_card_payload,
+        "game_card": game_card.to_dict(),
         "prop_board": [asdict(row) for row in prop_board],
         "td_board": [asdict(row) for row in td_board],
         "model_blocks": [*prop_blocks, *td_blocks],
-        "market_anchored_residual": {
-            "fair_margin": fair_margin,
-            "fair_total": fair_total,
-            "game_prices": game_card_payload["residual_research_rows"],
-            "forward_clv_proven": False,
-            "validated_markets": [],
-        },
         "authority": {
             "research_only": True,
             "creates_model_p": False,
@@ -497,7 +438,6 @@ def run_unified_nfl_run_it_from_nflverse(
         attempt9_margin=attempt9_margin,
         attempt9_total=attempt9_total,
         game_quotes=game_quotes,
-        game_start_ts=kickoff,
         prop_quotes=prop_quotes,
         td_quotes=td_quotes,
         qualification_snapshots=qualification_snapshots,
