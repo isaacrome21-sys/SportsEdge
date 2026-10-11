@@ -103,4 +103,5 @@ def test_same_kickoff_wrong_team_never_injects_prop():
     broken=base()
     broken["games"][0]["home"]="New York Jets"
     tickets=m.ticket_with_props(broken,report,NOW)
-    assert all("player" not in r for r in tickets["2026-10-11"]["games"][0]["markets"])
+    assert len(tickets["2026-10-11"]["games"][0]["markets"])==3
+    assert all(not r.get("player") for r in tickets["2026-10-11"]["games"][0]["markets"])
