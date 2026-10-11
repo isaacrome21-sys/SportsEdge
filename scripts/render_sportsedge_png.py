@@ -150,11 +150,14 @@ def tile(draw, r, left, top, number, *, best):
         symbol(draw, left+16, top+18, GOLD)
     else:
         draw.ellipse((left+23,top+32,left+42,top+51),fill=CYAN)
-    draw.text((left+67,top+14), f"#{number}  {r.get('market') or 'MARKET MISSING'}", fill=accent, font=font(24,bold=True))
+    text_fit(draw,left+67,top+14, f"#{number}  {r.get('matchup') or 'MATCHUP MISSING'}",
+             570,fill=accent,face=font(24,bold=True))
     selection = val(r, "selection", "side") or "SELECTION MISSING"
     player = val(r, "player", "subject_name")
     name = f"{player} · {selection}" if player else selection
-    text_fit(draw, left+22,top+61, f"{name}  {r.get('line') if r.get('line') is not None else ''}",
+    market = str(r.get("market") or "MARKET MISSING")
+    text_fit(draw, left+22,top+61,
+             f"{market}: {name}  {r.get('line') if r.get('line') is not None else ''}",
              475, fill=WHITE, face=font(25,bold=True))
     draw.text((left+518,top+62),fmt_odds(r.get("price")),fill=GOLD,font=font(24,bold=True))
     draw.line((left+22,top+107,left+633,top+107),fill="#2D4562",width=2)
@@ -181,20 +184,28 @@ def render(payload, sport, output: Path, mascots: Path):
     d.rectangle((0,0,W,11),fill=CYAN)
     d.text((45,37),"SPORTSEDGE",fill=WHITE,font=font(57,bold=True))
     d.text((48,105),f"{sport}   |   BEST PLAYS  /  TOP LEANS",fill=CYAN,font=font(22,bold=True))
-    matchup = payload.get("matchup")
-    if not matchup and isinstance(payload.get("games"),list) and payload["games"]:
-        g=payload["games"][0];matchup=f"{g.get('away','?')} @ {g.get('home','?')}"
-    if not matchup and rows:
-        matchup=rows[0].get("matchup")
-    text_fit(d,48,153,matchup or "SLATE",800,fill=WHITE,face=font(31,bold=True))
-    g = (payload.get("games") or [{}])[0] if isinstance(payload.get("games"),list) else {}
-    away,home = g.get("away"),g.get("home")
-    if not (away and home) and matchup and " @ " in matchup:
-        away,home=str(matchup).split(" @ ",1)
-    mascot(d,image,1138,26,away,mascots)
-    mascot(d,image,1266,26,home,mascots)
-    context = g.get("context") if isinstance(g,dict) else {}
-    context = context or payload.get("context") or {}
+    games = payload.get("games") if isinstance(payload.get("games"),list) else []
+    matchups = sorted({str(row.get("matchup") or "") for row in rows if row.get("matchup")})
+    # The first game is NOT the whole NFL slate. Its context and mascots
+    # must never imply that every tile belongs to that matchup.
+    multi = len(games)>1 or len(matchups)>1
+    if multi:
+        headline = f"{sport} MULTI-GAME SLATE"
+    elif games:
+        headline = f"{games[0].get('away','?')} @ {games[0].get('home','?')}"
+    elif len(matchups)==1:
+        headline = matchups[0]
+    else:
+        headline = payload.get("matchup") or f"{sport} SLATE"
+    text_fit(d,48,153,headline,870,fill=WHITE,face=font(31,bold=True))
+    g = games[0] if len(games)==1 else {}
+    if not multi:
+        away,home=g.get("away"),g.get("home")
+        if not (away and home) and " @ " in headline:
+            away,home=str(headline).split(" @ ",1)
+        mascot(d,image,1138,26,away,mascots)
+        mascot(d,image,1266,26,home,mascots)
+    context = (g.get("context") if isinstance(g,dict) else {}) or payload.get("context") or {}
     info = context.get("game_info") or {}
     d.rounded_rectangle((44,218,1395,293),radius=15,fill=PANEL,outline="#284562",width=2)
     strip = [
@@ -227,7 +238,7 @@ def render(payload, sport, output: Path, mascots: Path):
     if not leans:
         d.text((750,421),"NO MODELED LEANS",fill=SOFT,font=font(26,bold=True))
     d.line((44,1400,1395,1400),fill="#375A74",width=3)
-    d.text((48,1418),"SOURCE: PROVIDED DK LINES + ENGINE ARTIFACT  |  MISSING IS NOT ZERO",fill=SOFT,font=font(18,bold=True))
+    d.text((48,1418),"SOURCE: SPORTSEDGE ENGINE CARD  |  MISSING IS NOT ZERO",fill=SOFT,font=font(18,bold=True))
     d.text((48,1455),"ORDER: EXPECTED VALUE > EDGE > IDENTITY   |   SCORE = DISPLAY ONLY",fill=SOFT,font=font(17))
     d.text((48,1491),"No imported logo, context, statistic, or probability is fabricated.",fill=SOFT,font=font(17))
     output.parent.mkdir(parents=True,exist_ok=True)
