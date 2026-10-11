@@ -1,6 +1,7 @@
 """Daily phone summary only publishes real market/model artifact values."""
 import importlib.util
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -46,17 +47,20 @@ def test_phone_issue_summary_includes_actual_dk_rows_and_missing_notice():
                    "priced_rows":12}],"unmatched_games":1}
         }))
         (root/"nfl_card.json").write_text(json.dumps({"games":[
-          {"away":"CHI","home":"GB","markets":[{"market":"total","lean":{
+          {"away":"CHI","home":"GB","commence_time":"2026-10-11T17:00:00Z","markets":[{"market":"total","quote_retrieved_at":"2026-10-11T13:59:00Z","lean":{
             "selection":"Under","line":47.5,"price_american":-108,
             "estimate_p":.55,"edge_probability_points":.06,"ev_per_dollar":.07,
             "lean_reason":"LEAN_ONLY:NO_PROVEN_EDGE"}}]}]}))
         (root/"cfb_card.json").write_text(json.dumps({"results":[
-          {"bet_status":"LEAN","matchup":"Texas @ Oklahoma","market":"SPREAD",
+          {"bet_status":"LEAN","matchup":"Texas @ Oklahoma","start_ts":"2026-10-15T22:00:00Z","market":"SPREAD",
            "side":"AWAY","line":4.5,"american_odds":-110,
            "model_p":.56,"edge":.04,"expected_roi":.066,
            "reason":"MODEL_EDGE_NOT_VALIDATED_VS_CLOSE"}]}))
-        result=card.render(root,"https://github.com/example/repo/actions/runs/123")
+        result=card.render(root,"https://github.com/example/repo/actions/runs/123",
+                           asof=datetime(2026,10,11,14,0,tzinfo=timezone.utc))
         assert "NFL · READY" in result
+        assert "kickoff Sun Oct 11 · 12:00 PM CT" in result
+        assert "quote Sun Oct 11 · 8:59 AM CT" in result
         assert "CFB · MODEL_READY" in result
         assert "Under 47.5" in result
         assert "edge +6.0%" in result
@@ -64,3 +68,47 @@ def test_phone_issue_summary_includes_actual_dk_rows_and_missing_notice():
         assert "out-of-sample validation" in result
         assert "unmatched games: 1" in result
         assert "/actions/runs/123" in result
+
+
+def test_started_nfl_games_never_show_up_as_pregame_leans():
+    with TemporaryDirectory() as temp:
+        root=Path(temp)
+        (root/"summary.json").write_text(json.dumps({
+           "NFL":{"status":"READY","cards":[{"json":"nfl.json","state":"READY"}]},
+           "CFB":{"status":"NO_DK_GAMES","cards":[]}
+        }))
+        (root/"nfl.json").write_text(json.dumps({"games":[
+           {"away":"PHI","home":"JAX","commence_time":"2026-10-11T13:30:00Z",
+            "markets":[{"market":"total","quote_retrieved_at":"2026-10-11T13:05:00Z",
+                "lean":{"selection":"Over","line":41.5,"price_american":-110,
+                "estimate_p":0.55,"edge_probability_points":0.05,
+                "ev_per_dollar":0.05,"lean_reason":"RESEARCH_ONLY"}}]},
+           {"away":"CIN","home":"MIA","commence_time":"2026-10-11T17:00:00Z",
+            "markets":[{"market":"total","quote_retrieved_at":"2026-10-11T13:59:00Z",
+                "lean":{"selection":"Under","line":43.5,"price_american":-105,
+                "estimate_p":0.53,"edge_probability_points":0.04,
+                "ev_per_dollar":0.033,"lean_reason":"RESEARCH_ONLY"}}]}
+        ]}))
+        text=card.render(root,"https://github.com/example/run",
+                         asof=datetime(2026,10,11,14,0,tzinfo=timezone.utc))
+        assert "PHI @ JAX" not in text
+        assert "CIN @ MIA" in text
+        assert "not a continuously updated live odds feed" in text
+
+
+def test_missing_nfl_kickoff_blocks_pregame_recommendation():
+    with TemporaryDirectory() as temp:
+        root=Path(temp)
+        (root/"summary.json").write_text(json.dumps({
+           "NFL":{"status":"READY","cards":[{"json":"nfl.json","state":"READY"}]},
+           "CFB":{"status":"NO_DK_GAMES","cards":[]}
+        }))
+        (root/"nfl.json").write_text(json.dumps({"games":[
+           {"away":"CIN","home":"MIA","markets":[{"market":"total","lean":{
+                "selection":"Under","line":43.5,"price_american":-105,
+                "estimate_p":0.53,"edge_probability_points":0.04,"ev_per_dollar":0.033}}]}
+        ]}))
+        text=card.render(root,"https://github.com/example/run",
+                         asof=datetime(2026,10,11,14,0,tzinfo=timezone.utc))
+        assert "CIN @ MIA" not in text
+        assert "No upcoming modeled leans." in text
