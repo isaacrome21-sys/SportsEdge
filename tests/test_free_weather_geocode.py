@@ -24,7 +24,7 @@ def run_with(geocodes, *, city="Phoenix", state="Arizona", full="Example Stadium
         if "geocoding-api.open-meteo.com" in url:
             name=parse_qs(urlparse(url).query)["name"][0]
             return {"results":geocodes.get(name, [])}
-        if urlparse(u).hostname == "api.open-meteo.com"rl:
+        if urlparse(url).hostname == "api.open-meteo.com":
             return {"hourly":{"time":["2026-10-11T20:00"],
                               "wind_speed_10m":[19],
                               "precipitation_probability":[10]}}
