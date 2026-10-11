@@ -90,7 +90,7 @@ def test_verified_starting_batter_uses_real_public_history_and_dual_dk():
     assert over["lineup_status"] == "PUBLIC_BOXSCORE_STARTER_VERIFIED"
     assert over["research_only"] is True
     assert over["official_authority"] is False
-    assert "Statcast" in str(c["factor_coverage"]["advanced_metrics"])
+    assert c["factor_coverage"]["advanced_metrics"]["statcast"] == "NOT_WIRED"
     md=render_card(c)
     assert "MLB pitcher + batter history research" in md
     assert "Mookie Betts" in md
