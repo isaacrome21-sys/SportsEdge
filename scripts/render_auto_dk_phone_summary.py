@@ -10,6 +10,7 @@ import argparse
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 
 def pct(value, signed=False):
@@ -92,7 +93,8 @@ def row_text(r):
             f"EV {pct(r['ev'],True)} · {str(r['reason'])}")
 
 
-def render(root: Path, run_url: str):
+def render(root: Path, run_url: str, *, as_of_date: str | None = None):
+    as_of_date = as_of_date or datetime.now(ZoneInfo("America/Chicago")).date().isoformat()
     summary=json.loads((root/"summary.json").read_text(encoding="utf-8"))
     lines=["## SportsEdge AUTO — ranked NFL / CFB","",
            "Prices: captured DraftKings offers. Probabilities: existing SportsEdge engines.",
@@ -115,21 +117,56 @@ def render(root: Path, run_url: str):
                 continue
             payload=json.loads(source.read_text(encoding="utf-8"))
             statuses.append(str(item.get("model_status") or item.get("state") or "MISSING"))
-            picked.extend(candidates(sport,payload))
+            found=candidates(sport,payload)
+            if sport=="NFL":
+                for row in found:
+                    row["slate_date"]=item.get("date")
+            picked.extend(found)
         if sport=="CFB":
             lines.append("CFB model still requires out-of-sample validation; candidates are tracking only until then.")
             lines.append(f"Matched SDV games: {sum(int(x.get('priced_rows',0)) for x in cards)} modeled market rows; "
                          f"unmatched games: {state.get('unmatched_games','MISSING')}.")
         lines.append("Model status: "+", ".join(sorted(set(statuses))) if statuses else "Model status: MISSING")
         lines.append("")
-        for role,title in (("BEST","Best Plays"),("LEAN","Top Leans")):
-            lines.append(f"**{title}**")
-            view=[r for r in picked if r["role"]==role][:5]
-            if view:
-                lines.extend(row_text(r) for r in view)
-            else:
-                lines.append("None with supported model pricing." if role=="BEST" else "No modeled leans.")
-            lines.append("")
+        if sport=="NFL":
+            # A Sunday phone card must not mix Thursday's future NFL slate into
+            # its ranked Sunday leans. Every displayed row keeps its game date.
+            dates=sorted({r.get("slate_date") for r in picked if r.get("slate_date")})
+            if not dates and picked:
+                dates=["MISSING"]
+            for date in dates:
+                if date=="MISSING":
+                    label="Date MISSING — check source artifact"
+                else:
+                    try:
+                        dt=datetime.fromisoformat(date)
+                        label=f"{dt.strftime('%a %b')} {dt.day}"
+                    except ValueError:
+                        label=str(date)
+                    label+=(" · TODAY" if date==as_of_date else
+                            " · UPCOMING" if date>as_of_date else " · PAST")
+                lines.append(f"**NFL slate: {label}**")
+                group=[r for r in picked if (r.get("slate_date") or "MISSING")==date]
+                for role,title in (("BEST","Best Plays"),("LEAN","Top Leans")):
+                    lines.append(f"**{title}**")
+                    view=[r for r in group if r["role"]==role][:5]
+                    if view:
+                        lines.extend(row_text(r) for r in view)
+                    else:
+                        lines.append("None with supported model pricing." if role=="BEST" else "No modeled leans.")
+                    lines.append("")
+            if not dates:
+                lines.append("No priced NFL candidates on any captured date.")
+                lines.append("")
+        else:
+            for role,title in (("BEST","Best Plays"),("LEAN","Top Leans")):
+                lines.append(f"**{title}**")
+                view=[r for r in picked if r["role"]==role][:5]
+                if view:
+                    lines.extend(row_text(r) for r in view)
+                else:
+                    lines.append("None with supported model pricing." if role=="BEST" else "No modeled leans.")
+                lines.append("")
     lines.extend(["**Open the run for the full quotes, cards and PNG images (when available):**",run_url,"",
                   "Unavailable data stays MISSING. A directional lean is not a verified betting edge."])
     return "\n".join(lines)+"\n"
