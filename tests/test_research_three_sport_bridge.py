@@ -8,6 +8,7 @@ FUTURE = "2026-10-12T03:00:00Z"
 def model(sport="MLB", market="PITCHER_K", line=5.5, player="123",
           selection="OVER", **other):
     row = {"sport": sport, "game_id": "test-game", "market": market,
+           "home_team": "Minnesota Golden Gophers", "away_team": "Michigan Wolverines",
            "player_id": player, "line": line, "selection": selection,
            "estimate_p": .61, "push_p": 0,
            "status": "PRICED_RESEARCH", "model_source": "TEST_INDEPENDENT_SOURCE",
@@ -20,6 +21,7 @@ def model(sport="MLB", market="PITCHER_K", line=5.5, player="123",
 def quote(sport="MLB", market="PITCHER_K", line=5.5, player="123",
           selection="OVER", odds=-110, captured="2026-10-11T20:29:30Z", **other):
     row = {"sport": sport, "game_id": "test-game", "market": market,
+           "home_team": "Minnesota Golden Gophers", "away_team": "Michigan Wolverines",
            "player_id": player, "line": line, "selection": selection,
            "odds": odds, "book": "draftkings", "quote_captured_at": captured}
     row.update(other)
@@ -126,3 +128,21 @@ def test_non_model_probability_and_market_contamination_fail_closed():
 def test_unrelated_books_do_not_create_draftkings_pair():
     row = run(u=quote(selection="UNDER", book="fanduel"))
     assert row["status"] == "NO_MODEL_OR_MARKET"
+
+
+def test_illinois_college_is_blocked_for_game_and_player_props():
+    for market, player in (("PASSING_YARDS","qb-123"), ("SPREAD","")):
+        m = model(sport="CFB",market=market,player=player,away_team="Illinois Fighting Illini")
+        q1 = quote(sport="CFB",market=market,player=player,away_team="Illinois Fighting Illini")
+        q2 = quote(sport="CFB",market=market,player=player,away_team="Illinois Fighting Illini",
+                   selection="UNDER" if player else "AWAY")
+        result = run(m=m,o=q1,u=q2)
+        assert result["status"] == "NO_MODEL_OR_MARKET"
+        assert "ILLINOIS_COLLEGE_EXCLUDED" in result["reason"]
+
+
+def test_f5_moneyline_does_not_require_threshold():
+    m = model(sport="MLB",market="F5_ML",player="",line=None,selection="HOME")
+    q1 = quote(sport="MLB",market="F5_ML",player="",line=None,selection="HOME")
+    q2 = quote(sport="MLB",market="F5_ML",player="",line=None,selection="AWAY")
+    assert run(m=m,o=q1,u=q2)["status"] == "RESEARCH_CANDIDATE_NOT_VALIDATED"
