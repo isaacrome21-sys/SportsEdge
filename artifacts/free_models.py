@@ -479,19 +479,29 @@ class PublicContext:
         """Public ESPN coach record heuristic. Flagged, not validated."""
         if sport not in {"NFL", "CFB", "NBA", "MLB"}:
             return 0.0, "NOT_APPLICABLE"
-        # ESPN public coach list is season-scoped; use a lightweight team-level proxy.
-        # Real coach identity tracking requires additional endpoints not yet wired.
-        return 0.0, "HEURISTIC_NOT_VALIDATED"
+        # Attempt season coaches endpoint; fall back to flagged zero if schema fails.
+        try:
+            season = self.now.year
+            url = f"{ESPN}/{LEAGUES[sport]}/seasons/{season}/coaches?limit=50"
+            data = self.fetch(url) or {}
+            coaches = data.get("items") or data.get("coaches") or []
+            # Lightweight: no identity match yet, so stay flagged.
+            return 0.0, "HEURISTIC_NOT_VALIDATED"
+        except Exception:
+            return 0.0, "HEURISTIC_NOT_VALIDATED"
 
-    def matchup_adjustment(self, sport, home, away):
+    def matchup_adjustment(self, sport, home_form, away_form):
         """Recent form differential as matchup proxy. Flagged, not validated."""
-        # Form is already computed in context_for; this is an explicit alias.
-        return 0.0, "HEURISTIC_NOT_VALIDATED"
+        try:
+            diff = (home_form or 0.0) - (away_form or 0.0)
+            return round(bounded(diff * 0.5, -1.5, 1.5), 3), "HEURISTIC_NOT_VALIDATED"
+        except Exception:
+            return 0.0, "HEURISTIC_NOT_VALIDATED"
 
     def prop_probability(self, sport, player_name, stat, line, side="OVER"):
         """Research prop probability from recent game log. Not calibrated."""
-        # Placeholder until ESPN athlete gamelog is fully wired.
-        # Returns explicit unsupported status so the audit cannot confuse it with a model.
+        # ESPN athlete gamelog is public but not fully wired for identity + stat mapping.
+        # Return explicit status so the audit cannot confuse a missing model with a price.
         return None, "UNSUPPORTED_NO_CALIBRATED_PROP_MODEL"
 
 
@@ -533,6 +543,14 @@ def context_for(sport, away, home, start, provider, row):
                             latitude=row.get("venue_latitude"), longitude=row.get("venue_longitude"))
         out["weather_total_adj"] = weather
         notes.append("WEATHER:" + status)
+    # Research matchup from form differential (flagged).
+    if "home_form" in out and "away_form" in out:
+        adj, status = provider.matchup_adjustment(sport, out.get("home_form"), out.get("away_form"))
+        out["matchup_adj"] = adj
+        notes.append("MATCHUP:" + status)
+    # Coaching remains flagged until identity + record wiring is complete.
+    notes.append("COACHING:HEURISTIC_NOT_VALIDATED")
+    notes.append("PLAYER_PROPS:UNSUPPORTED_NO_CALIBRATED_PROP_MODEL")
     return out, kickoff, notes
 
 
