@@ -86,6 +86,13 @@ def same_event(source,target):
 
 def collect(board,now,*,key_slots=None,preflight=probe_quota,fetch=request_event,max_games=MAX_GAMES):
     if not 0<=max_games<=MAX_GAMES:raise ValueError("MAX_PROP_GAMES_OUT_OF_RANGE")
+    # Direct DK IDs are NOT Odds API event IDs. Never spend paid API credits
+    # requesting a provider event using a different source's identifier.
+    if board.get("source")=="DRAFTKINGS_DIRECT_WEB_V1":
+        return {"schema":"SPORTSEDGE_NFL_AUTO_PROP_CAPTURE_V1",
+                "status":"SKIPPED_DIRECT_DK_EVENT_IDS",
+                "model_p":None,"estimate_p":None,
+                "captured_at":now.isoformat(),"max_paid_credits":0,"events":[]}
     eligible=[]
     for game in board.get("games") or []:
         start=iso_time(game.get("commence_time"))

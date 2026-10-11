@@ -65,6 +65,7 @@ def candidates(sport, payload):
                         "ev":r.get("ev_per_dollar"),"score":r.get("score_0_100"),
                         "kickoff_utc":game.get("commence_time"),
                         "quote_observed_at":market.get("quote_retrieved_at"),
+                        "quote_timestamp_source":market.get("quote_timestamp_source"),
                         "reason":r.get("lean_reason") or r.get("reason") or "MISSING"
                     })
     elif sport=="CFB":
@@ -105,7 +106,9 @@ def row_text(r):
     else:
         threshold=f" {float(line):g}"
     label=f"{r.get('matchup') or 'MATCHUP MISSING'} — {market} {r.get('side') or 'SIDE MISSING'}{threshold}"
-    pit=(f" · kickoff {_ct(r.get('kickoff_utc'))} · DK quote {_ct(r.get('quote_observed_at'))}"
+    quote_label=("DK intake stamp" if r.get("quote_timestamp_source")=="INTAKE_STAMPED"
+                 else "DK quote")
+    pit=(f" · kickoff {_ct(r.get('kickoff_utc'))} · {quote_label} {_ct(r.get('quote_observed_at'))}"
          if r.get("kickoff_utc") else "")
     return (f"- **{label}** · DK {price(r['price'])} · "
             f"estimate {pct(r['estimate_p'])} · edge {pct(r['edge'],True)} · "
