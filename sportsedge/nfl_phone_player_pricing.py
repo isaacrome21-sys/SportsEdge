@@ -110,10 +110,20 @@ def phone_nfl_player_rows(rows, *, now=None, getter=None):
         judged["prior_game_count"] = verified["prior_game_count"]
         judged["source"] = "FREE_ESPN_NFL_GAMELOG"
         judged["source_game_id"] = verified["game_id"]
+        judged["stats_schema"] = "ESPN_EXPLICIT_NAMES_ONLY"
+        judged["participation_status"] = "STARTING_ROLE_NOT_VERIFIED_FROM_GAMELOG"
+        # Prior-game stats do not verify expected snaps/targets or active role.
+        # A small-sample historical estimate may appear on the watchlist,
+        # but cannot be treated as a current-price research candidate.
+        if judged.get("status") == "RESEARCH_CANDIDATE_NOT_VALIDATED":
+            judged["status"] = "WATCH_PLAYER_PARTICIPATION_UNVERIFIED"
         outputs.append(judged)
     return outputs, [{
         "source": d["source_endpoint"],
         "status": "PUBLIC_NFL_PRIOR_GAMES_VERIFIED",
         "player_id": d["player_id"],
         "prior_games": d["prior_game_count"],
+        "stat_fields": d["explicit_stat_fields"],
+        "schema_rejected_prior_events": d["schema_rejected_prior_events"],
+        "participation": "NOT_VERIFIED",
     } for d in cache.values() if isinstance(d, dict)]
