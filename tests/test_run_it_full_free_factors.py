@@ -62,3 +62,103 @@ def test_top_level_sport_and_two_rows_have_matching_audits():
     r=full.run_full({"sport":"NFL","lines":[x,y]},now=NOW,auto_context=False)
     assert len(r["evaluated_rows"])==len(r["factor_coverage"]["by_input_index"])==2
     assert all(a["sport"]=="NFL" for a in r["factor_coverage"]["by_input_index"])
+
+
+def test_espn_league_group_injury_fallback_is_not_misread():
+    from artifacts import free_models as base
+    urls = []
+    def get(url):
+        urls.append(url)
+        if "/teams/2/injuries" in url:
+            return {"team": {"id": "2"}}  # team endpoint returned unrecognized shape
+        if url.endswith("/football/nfl/injuries"):
+            return {"injuries": [
+                {"team":{"id":"2"}, "injuries":[
+                    {"athlete":{"fullName":"QB Example","position":{"abbreviation":"QB"}},"status":"Out"},
+                    {"athlete":{"fullName":"RB Example","position":{"abbreviation":"RB"}},"status":"Doubtful"},
+                    {"athlete":{"fullName":"TE Example"},"status":"Questionable"}
+                ]},
+                {"team":{"id":"1"}, "injuries":[]}
+            ]}
+        raise AssertionError("unexpected URL " + url)
+    provider=base.PublicContext(NOW,getter=get)
+    impact,status=provider.injury_points("NFL",{"id":"2"})
+    assert impact==-1.65
+    assert "REPORTED_2" in status
+    assert len(urls)==2
+
+
+def test_unrecognized_injury_feed_does_not_mean_zero_injuries():
+    from artifacts import free_models as base
+    provider=base.PublicContext(NOW,getter=lambda _: {})
+    impact,status=provider.injury_points("NFL",{"id":"2"})
+    assert impact==0
+    assert status=="MISSING_OR_UNRECOGNIZED_SOURCE"
+
+
+def test_open_meteo_qualifies_venue_by_state_and_rejects_wrong_city():
+    from artifacts import free_models as base
+    from urllib.parse import parse_qs, urlparse
+    seen = []
+    def get(url):
+        seen.append(url)
+        if "geocoding-api" in url:
+            q=parse_qs(urlparse(url).query)
+            assert q["name"]==["Phoenix, Arizona"]
+            assert q["countryCode"]==["US"]
+            return {"results":[
+                {"name":"Phoenix","admin1":"Arizona","latitude":33.4,"longitude":-112.1}]}
+        if "api.open-meteo.com" in url:
+            return {"hourly":{"time":["2026-10-11T20:00"],
+                    "wind_speed_10m":[19],"precipitation_probability":[10]}}
+        raise AssertionError("unexpected URL " + url)
+    provider=base.PublicContext(NOW,getter=get)
+    impact,status=provider.weather("NFL",{"venue":{"indoor":False,"address":{
+        "city":"Phoenix","state":"Arizona"}}},base.dt(KICKOFF))
+    assert impact == -0.8
+    assert status.startswith("HEURISTIC_FORECAST")
+    assert len(seen)==2
+
+
+def test_fixture_verified_rest_does_not_invent_pricing_effect():
+    from artifacts import free_models as base
+    def getter(url):
+        if "scoreboard?" in url:
+            return {"events":[{"id":"today","date":KICKOFF,
+                "competitions":[{"venue":{"indoor":True},
+                    "competitors":[
+                        {"homeAway":"away","team":{"id":"1","displayName":"Detroit Lions"}},
+                        {"homeAway":"home","team":{"id":"2","displayName":"Arizona Cardinals"}}
+                    ]}]}]}
+        if "/teams?limit=" in url:
+            return {"sports":[{"leagues":[{"teams":[
+                {"team":{"id":"1","displayName":"Detroit Lions"}},
+                {"team":{"id":"2","displayName":"Arizona Cardinals"}}
+            ]}]}]}
+        if "/schedule?" in url:
+            team_id="1" if "/teams/1/" in url else "2"
+            enemy="2" if team_id=="1" else "1"
+            return {"events":[{"date":"2026-10-04T20:25:00Z",
+                "status":{"type":{"completed":True}},
+                "competitions":[{"competitors":[
+                    {"team":{"id":team_id},"score":"24"},
+                    {"team":{"id":enemy},"score":"18"}
+                ]}]}]}
+        if "/injuries" in url:
+            return {"injuries":[]}
+        raise AssertionError(url)
+    result=full.run_full({"lines":[row()]},now=NOW,getter=getter)
+    assert result["summary"]["rows"]==1
+    a=result["factor_coverage"]["by_input_index"][0]["factors"]
+    assert a["team_quality"]["status"]=="HEURISTIC_NOT_VALIDATED"
+    assert a["rest_travel"]["status"]=="SCHEDULE_REST_OBSERVED_NO_PRICE_EFFECT"
+    assert a["weather"]["status"]=="VERIFIED_INDOOR"
+    assert a["injuries"]["status"]=="HEURISTIC_NOT_VALIDATED"
+    assert all(abs(x["context"]["home_rating"])<10 for x in result["evaluated_rows"])
+
+
+def test_manual_mode_not_promoted_to_observed_team_history():
+    result=full.run_full({"lines":[row()]},now=NOW,auto_context=False)
+    c=result["factor_coverage"]["by_input_index"][0]["factors"]
+    assert c["team_quality"]["status"]=="MISSING_UNVERIFIED"
+    assert c["recent_form"]["status"]=="MISSING_UNVERIFIED"
