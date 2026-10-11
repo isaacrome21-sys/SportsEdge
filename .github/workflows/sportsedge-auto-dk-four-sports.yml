@@ -17,6 +17,7 @@ on:
       - 'scripts/render_auto_dk_phone_summary.py'
       - 'scripts/render_sportsedge_png.py'
       - 'scripts/collect_nfl_auto_props.py'
+      - 'sportsedge/sports/nfl/auto_slate.py'
       - '.github/workflows/sportsedge-auto-dk-four-sports.yml'
   pull_request:
     paths:
@@ -26,6 +27,8 @@ on:
       - 'tests/test_sportsedge_png.py'
       - 'scripts/collect_nfl_auto_props.py'
       - 'tests/test_nfl_auto_props.py'
+      - 'sportsedge/sports/nfl/auto_slate.py'
+      - 'tests/test_nfl_auto_slate.py'
       - 'scripts/collect_auto_dk_four_sports.py'
       - 'scripts/run_auto_dk_cards.py'
       - 'tests/test_auto_dk_four_sports.py'
