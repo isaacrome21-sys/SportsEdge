@@ -78,6 +78,13 @@ jobs:
             --snapshot "$input_path" \
             --pre-context \
             --out-dir artifacts/nfl_myspari
+          # Presentation only: never let PNG failure suppress the text card.
+          if PYTHONPATH=. python scripts/render_sportsedge_png.py \
+            --sport NFL --card artifacts/nfl_phone_card.json --output artifacts/nfl_myspari/card.png; then
+            printf '\n**Phone PNG:** [Download the card artifact](https://github.com/%s/actions/runs/%s) (open Artifacts → NFL issue card).\n' "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" >> artifacts/nfl_myspari/card.md
+          else
+            echo "NFL_PNG_RENDER_UNAVAILABLE; text card remains usable."
+          fi
           gh issue comment "$ISSUE" --body-file artifacts/nfl_myspari/card.md
           echo "phone_card_seconds=$(( $(date +%s) - started ))"
       - name: Report engine failure
