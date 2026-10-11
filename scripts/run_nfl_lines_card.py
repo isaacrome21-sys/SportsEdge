@@ -35,12 +35,28 @@ def _ev(estimate_p: float, price: int) -> float:
     return estimate_p * dec - 1.0
 
 
+# nflverse uses "LA" for the Rams (and old franchise codes for relocated teams),
+# while the DK intake emits "LAR". Map history to intake codes so every team
+# finds its own games. Codes only; no score or line changes.
+HISTORY_TEAM_ALIASES = {"LA": "LAR", "STL": "LAR", "SD": "LAC", "OAK": "LV", "WSH": "WAS"}
+
+
+def _normalize_team(code: object) -> object:
+    return HISTORY_TEAM_ALIASES.get(str(code), code) if code is not None else code
+
+
 def _history_rows(raw: object) -> list:
     if isinstance(raw, list):
-        return raw
-    if isinstance(raw, dict) and isinstance(raw.get("games"), list):
-        return raw["games"]
-    return []
+        rows = raw
+    elif isinstance(raw, dict) and isinstance(raw.get("games"), list):
+        rows = raw["games"]
+    else:
+        return []
+    return [
+        {**g, "home": _normalize_team(g.get("home")), "away": _normalize_team(g.get("away"))}
+        if isinstance(g, dict) else g
+        for g in rows
+    ]
 
 
 
