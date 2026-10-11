@@ -30,9 +30,9 @@ jobs:
         run: |
           python scripts/free_models_phone_issue.py --mode parse \
             --event-json "$GITHUB_EVENT_PATH" --output artifacts/free_research_issue/lines.json
-      - name: Run four-sport free public context and research pricing
+      - name: Run free context pricing with truthful per-factor coverage
         run: |
-          python free_models.py --lines artifacts/free_research_issue/lines.json \
+          python artifacts/run_it_full.py --lines artifacts/free_research_issue/lines.json \
             --output artifacts/free_research_issue/card.json > /dev/null
       - name: Render phone card with explicit missing-data explanations
         run: |
