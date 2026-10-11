@@ -102,6 +102,17 @@ class AutoOddsTests(unittest.TestCase):
             self.assertTrue(all(v["games"]==[] and v["status"]=="UNAVAILABLE" for v in res.values()))
             self.assertIn("INSUFFICIENT_REMAINING_CREDITS",(Path(temp)/"summary.md").read_text())
 
+    def test_free_active_sport_filter_saves_paid_calls(self):
+        with TemporaryDirectory() as temp:
+            def forbidden(*args,**kwargs):
+                raise AssertionError("inactive league must not consume provider calls")
+            result=m.collect(("NBA",),Path(temp),NOW,76,
+                             provider_fetch=forbidden,quota_probe=forbidden,
+                             active_sports={"americanfootball_nfl"})
+            self.assertEqual(result["NBA"]["status"],"UNAVAILABLE")
+            self.assertEqual(result["NBA"]["reason"],"SPORT_INACTIVE")
+            self.assertEqual(result["NBA"]["games"],[])
+
     def test_provider_failure_does_not_zero_fill_model(self):
         with TemporaryDirectory() as temp:
             def boom(*args):
