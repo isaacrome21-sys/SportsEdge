@@ -195,6 +195,10 @@ def render(engine: dict) -> str:
                     f" · model EV {lean.get('ev_per_dollar', 0) * 100:+.1f}%"
                     f" · edge {lean.get('edge_probability_points', 0) * 100:+.1f} pts vs no-vig"
                 )
+            elif row.get("lean_block") == "NO_LEAN:THIN_CALIBRATION":
+                other.append(f"- {label}: no lean (model too far from the line; too few past games to price it)")
+            elif row.get("lean_block") == "NO_LEAN:PROJECTION_DISAGREES":
+                other.append(f"- {label}: no lean (price-only edge; the model total points the other way)")
             else:
                 other.append(f"- {label}: no lean (model edge under 2% EV)")
         lines += picks_out + other
