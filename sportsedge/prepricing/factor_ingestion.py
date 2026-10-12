@@ -147,6 +147,8 @@ BLOCK_FIXTURE_UNVERIFIED = "BLOCKED_PREPRICING_FIXTURE_UNVERIFIED"
 BLOCK_TEAMS_UNRESOLVED = "BLOCKED_PREPRICING_TEAMS_UNRESOLVED"
 BLOCK_QB_IDENTITY_UNVERIFIED = "BLOCKED_PREPRICING_QB_IDENTITY_UNVERIFIED"
 BLOCK_PITCHER_UNCONFIRMED = "BLOCKED_PREPRICING_PITCHER_UNCONFIRMED"
+BLOCK_NFL_TEAM_HISTORY_UNVERIFIED = "BLOCKED_PREPRICING_NFL_TEAM_HISTORY_UNVERIFIED"
+NFL_MIN_VERIFIED_PRIOR_GAMES = 4
 
 PRE_PITCH_STATES = {"Scheduled", "Pre-Game", "Warmup"}
 
@@ -492,6 +494,32 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
                 "block_detail": block_detail, "adjustments": adjustments,
                 "factors": factors, "receipts": receipts}
 
+    # An ESPN event verifies identity, not the strength of either offense.
+    # The separate game engine uses prior completed schedules to derive
+    # team-specific strength and form. Requiring four verified prior games
+    # avoids silently pricing both teams from the identical NFL league prior.
+    # This check is per team, not inferred from a successfully loaded fixture.
+    if sport == "NFL":
+        verified_counts = {}
+        for side, team in (("HOME", home_team), ("AWAY", away_team)):
+            verified_counts[side] = len(provider.schedule("NFL", team, kickoff))
+        if any(n < NFL_MIN_VERIFIED_PRIOR_GAMES for n in verified_counts.values()):
+            detail = ("NFL_VERIFIED_PRIOR_GAMES_REQUIRED:"
+                      + ",".join(f"{s}={n}" for s, n in sorted(verified_counts.items()))
+                      + f";MIN={NFL_MIN_VERIFIED_PRIOR_GAMES}")
+            factors.append(_factor("team_strength_ratings", MISSING,
+                                   "ESPN_TEAM_SCHEDULE", detail))
+            if enforce_blocks:
+                blocked = True
+                block_reason = BLOCK_NFL_TEAM_HISTORY_UNVERIFIED
+                block_detail = detail
+        else:
+            factors.append(_factor(
+                "team_strength_ratings", USED, "ESPN_TEAM_SCHEDULE",
+                "NFL_BOTH_TEAMS_VERIFIED_PRIOR_GAMES:"
+                + ",".join(f"{s}={n}" for s, n in sorted(verified_counts.items()))
+                + ";UNVALIDATED_HEURISTIC_NOT_MARKET_EDGE"))
+
     # -- 1. injuries / QB-participation (canonical free_models path) -------
     if sport in {"NFL", "CFB", "NBA"}:
         for side, team, ctx_key in (("HOME", home_team, "home_injury_pts"),
@@ -639,9 +667,10 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
             "TRAVEL_DISTANCE_NOT_WIRED"))
 
     # -- engine-owned / backlog factors: stated honestly --------------------
-    factors.append(_factor("team_strength_ratings", USED, "FREE_MODELS_ENGINE",
-                           "HEURISTIC_NOT_VALIDATED: bounded prior-five-game "
-                           "scoring-margin proxy + static HFA"))
+    if sport != "NFL":
+        factors.append(_factor("team_strength_ratings", USED, "FREE_MODELS_ENGINE",
+                               "HEURISTIC_NOT_VALIDATED: bounded prior-five-game "
+                               "scoring-margin proxy + static HFA"))
     factors.append(_factor("recent_form", USED, "FREE_MODELS_ENGINE",
                            "HEURISTIC_NOT_VALIDATED: short prior-game scoring trend; "
                            "MLB form subsumed into rating"))
