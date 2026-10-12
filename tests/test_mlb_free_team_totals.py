@@ -80,8 +80,10 @@ class MLBTeamTotalsResearchTests(unittest.TestCase):
                          ["HOME", "HOME", "AWAY", "AWAY"])
         home = priced[0]["independent_projection"]
         away = priced[2]["independent_projection"]
-        self.assertNotEqual(home.get("paired_market_no_vig_p"),
-                            away.get("paired_market_no_vig_p"))
+        self.assertEqual(home.get("paired_market_status"), "EXACT_DK_TWO_SIDED_NO_VIG_RESEARCH")
+        self.assertEqual(away.get("paired_market_status"), "EXACT_DK_TWO_SIDED_NO_VIG_RESEARCH")
+        self.assertNotEqual(home.get("market_no_vig_p"),
+                            away.get("market_no_vig_p"))
 
     def test_bad_team_ambiguous_total_and_stale_quote_fail_closed(self):
         getter = FakeGetter(mlb_mapping())
