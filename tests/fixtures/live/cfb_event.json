@@ -1,0 +1,46 @@
+{
+ "id": "401856826",
+ "name": "Iowa State Cyclones at BYU Cougars",
+ "date": "2026-10-10T02:30Z",
+ "competitions": [
+  {
+   "status": {
+    "clock": 0.0,
+    "displayClock": "0:00",
+    "period": 4,
+    "type": {
+     "id": "3",
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "description": "Final",
+     "detail": "Final",
+     "shortDetail": "Final"
+    }
+   },
+   "competitors": [
+    {
+     "homeAway": "home",
+     "score": "24",
+     "team": {
+      "id": "252",
+      "displayName": "BYU Cougars",
+      "shortDisplayName": "BYU",
+      "abbreviation": "BYU"
+     }
+    },
+    {
+     "homeAway": "away",
+     "score": "10",
+     "team": {
+      "id": "66",
+      "displayName": "Iowa State Cyclones",
+      "shortDisplayName": "Iowa State",
+      "abbreviation": "ISU"
+     }
+    }
+   ],
+   "situation": null
+  }
+ ]
+}
