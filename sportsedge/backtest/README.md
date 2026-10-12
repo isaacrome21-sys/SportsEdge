@@ -256,3 +256,26 @@ The summary is a JSON-serializable record
 blocked:{n,pct,by_reason:{code:n}}, research_only: True}` — store one per
 run to track the actionable share over time. Append it to a factor report
 with `report.to_markdown(verdict, actionability=summary)`.
+
+
+## Strict paired MLB RUN IT evidence screen (October 2026)
+
+The generic harness (merged #2044) and market-baseline readers (#2058) are not
+proof that the live RUN IT model beats historical markets. Market baselines
+without documented pre-first-pitch capture timestamps are insufficient for
+strict validation, and the retrospective StatsAPI probablePitcher field does
+not establish historical pregame starter-announcement time.
+
+Run `python scripts/audit_mlb_paired_oos.py --input PATH --output PATH` with
+genuinely archived independent pregame feature and two-sided closing-quote
+receipts. The standalone `strict_paired_oos.evaluate` module computes paired
+Brier/log-loss differences and series-block confidence intervals against
+both the existing model and a same-game/same-line no-vig book baseline.
+All rows must carry explicit market quote timestamps before first pitch,
+training cutoff, feature availability, frozen model source SHA, and settled
+outcome. Missing rows, duplicate keys, ambiguous books, pushes without a
+push-aware distribution, or insufficient games are BLOCKED, not dropped.
+The default sample requires 300 distinct games and 20 series blocks.
+An apparent improvement remains FORECAST_IMPROVEMENT_RESEARCH_ONLY, NEVER
+validated real-money profitability or authorization to promote a feature.
+The sealed July-August 2024 bullpen holdout is not queried.
