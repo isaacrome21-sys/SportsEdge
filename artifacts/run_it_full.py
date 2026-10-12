@@ -224,7 +224,8 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         stages = stage_games(
             games, now=clock,
             getter=getter if auto_context else (lambda url: None),
-            enforce_blocks=auto_context)
+            enforce_blocks=auto_context,
+            as_of=as_of, historical=historical)
         # Build separate prepricing_adjustments objects (not merged into context)
         prepricing_by_index = {}
         game_results = [None] * len(games)
