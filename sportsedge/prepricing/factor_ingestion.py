@@ -350,8 +350,15 @@ def mlb_pitcher_adjustments(fetch, *, game_date, home, away, season,
     # not by an inferred UTC calendar day. Deduplicate repeated gamePk.
     from datetime import timedelta
     games_by_pk = {}
-    for offset in (-1, 0, 1):
-        for candidate in fetch_probable_pitchers(fetch, game_date + timedelta(days=offset)):
+    offsets = (-1, 0, 1) if kickoff is not None else (0,)
+    for offset in offsets:
+        # Missing adjacent-date payloads are unavailable, not fabricated
+        # empty games. The canonical provider.fetch records source failures.
+        try:
+            candidates = fetch_probable_pitchers(fetch, game_date + timedelta(days=offset))
+        except (OSError, TimeoutError, ValueError, TypeError):
+            continue
+        for candidate in candidates:
             if candidate.get("gamePk"):
                 games_by_pk[str(candidate["gamePk"])] = candidate
     game = match_scheduled_game(list(games_by_pk.values()), home, away, kickoff)
