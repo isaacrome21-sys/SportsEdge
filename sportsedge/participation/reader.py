@@ -73,10 +73,26 @@ class AsOfReader:
         self.archive = archive
         self._cache: dict[str, list[ParticipationRecord]] = {}
 
-    def _records(self, signal_type: str) -> list[ParticipationRecord]:
-        if signal_type not in self._cache:
-            self._cache[signal_type] = self.archive.current_records(signal_type)
-        return self._cache[signal_type]
+    def _records(self, signal_type: str, as_of=None) -> list[ParticipationRecord]:
+        # Corrections must not rewrite answers to historical as-of queries.
+        # A revision cannot displace its predecessor before its actual
+        # capture, even when a cadence-based availability bound is earlier.
+        records = self.archive.load_records(signal_type)
+        if as_of is None:
+            superseded = {r.supersedes_record_id for r in records
+                          if r.supersedes_record_id}
+            return [r for r in records if r.record_id not in superseded]
+        cutoff = _ts(as_of)
+        visible_revisions = {
+            r.supersedes_record_id for r in records
+            if r.supersedes_record_id and _ts(r.captured_at_utc) <= cutoff
+        }
+        return [
+            r for r in records
+            if r.record_id not in visible_revisions
+            and (not r.supersedes_record_id
+                 or _ts(r.captured_at_utc) <= cutoff)
+        ]
 
     @staticmethod
     def _answer(record, reason=None):
@@ -88,7 +104,7 @@ class AsOfReader:
     def _player_week_lookup(self, signal_type, gsis_id, season, week, as_of):
         cands = [
             r
-            for r in self._records(signal_type)
+            for r in self._records(signal_type, as_of)
             if r.gsis_id == gsis_id and r.season == season and r.week == week
         ]
         if not cands:
@@ -121,7 +137,7 @@ class AsOfReader:
         as_of = _ts(as_of)
         cands = [
             r
-            for r in self._records(SIGNAL_ROSTER_STATUS)
+            for r in self._records(SIGNAL_ROSTER_STATUS, as_of)
             if r.gsis_id == gsis_id
             and r.season == season
             and r.week is not None
@@ -139,7 +155,7 @@ class AsOfReader:
         as_of = _ts(as_of)
         cands = [
             r
-            for r in self._records(SIGNAL_DEPTH_CHART)
+            for r in self._records(SIGNAL_DEPTH_CHART, as_of)
             if r.team == team
             and r.season == season
             and r.week is not None
@@ -179,7 +195,7 @@ class AsOfReader:
         as_of = _ts(as_of)
         cands = [
             r
-            for r in self._records(SIGNAL_SNAP_ACTUAL)
+            for r in self._records(SIGNAL_SNAP_ACTUAL, as_of)
             if r.team == team
             and r.season == season
             and r.week is not None
@@ -211,7 +227,7 @@ class AsOfReader:
         as_of = _ts(as_of)
         cands = [
             r
-            for r in self._records(signal_type)
+            for r in self._records(signal_type, as_of)
             if r.gsis_id == gsis_id and r.game_id == game_id and _available(r, as_of)
         ]
         if not cands:
