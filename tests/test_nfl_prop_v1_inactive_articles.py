@@ -1,10 +1,18 @@
-from bs4 import BeautifulSoup
+try:
+    from bs4 import BeautifulSoup
+    from scripts.audit_nfl_2025_prekick_inactive_articles import (
+        _article_url,
+        article_timestamps,
+        parse_games,
+    )
+    HAS_BS4 = True
+except ImportError:
+    HAS_BS4 = False
+    BeautifulSoup = None
 
-from scripts.audit_nfl_2025_prekick_inactive_articles import (
-    _article_url,
-    article_timestamps,
-    parse_games,
-)
+import pytest
+
+pytestmark = pytest.mark.skipif(not HAS_BS4, reason="bs4 not available in this environment")
 
 
 def soup(html: str) -> BeautifulSoup:
