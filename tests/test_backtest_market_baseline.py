@@ -471,8 +471,12 @@ class TestAdversarialRedTeam(unittest.TestCase):
         with self.assertRaises(mb.BaselineError) as ctx:
             src.assert_min_season_games("2024", 200)
         self.assertIn("BASELINE_SEASON_COVERAGE_SHORT", str(ctx.exception))
-        # a genuinely full file passes
-        full = mb.NflverseBaseline("/tmp/nfl_games.csv").load()
+        # a genuinely full file passes (skip if absent)
+        import os as _os
+        _full_path = "/tmp/nfl_games.csv"
+        if not _os.path.exists(_full_path):
+            self.skipTest("full nfl_games.csv not present")
+        full = mb.NflverseBaseline(_full_path).load()
         full.assert_min_season_games("2024", 280)
 
     def test_season_counts_reported_in_coverage(self):
