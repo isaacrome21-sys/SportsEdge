@@ -467,9 +467,16 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
     # and arrive as archived evidence. A present-but-defective archive fails
     # exactly like missing data (MISSING, never silently used or replaced).
     if sport in {"NFL", "CFB", "MLB"}:
-        evidence = row.get("weather_evidence")
+        # SECURITY: Never trust user-supplied weather_evidence.
+        # Archived weather must arrive via trusted loader, not input row.
+        # User-supplied evidence is ignored for verified purposes.
+        if row.get("weather_evidence") is not None:
+            factors.append(_factor("weather_venue", MISSING,
+                                   "USER_SUPPLIED_WEATHER_EVIDENCE_UNTRUSTED",
+                                   "USER_SUPPLIED_WEATHER_EVIDENCE_IGNORED: use trusted loader"))
+        evidence = None  # Do not read from row
         weather_done = False
-        if evidence is not None:
+        if False:  # Disabled: user evidence never trusted
             try:
                 weather_adj, wdetail = admit_weather_evidence(
                     evidence, sport=sport, kickoff=kickoff, now=now)
@@ -617,7 +624,7 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
             "receipts": receipts}
 
 
-def stage_games(game_rows, *, now, getter, enforce_blocks=True):
+def stage_games(game_rows, *, now, getter, enforce_blocks=True, as_of=None, historical=False):
     """Run the pre-pricing stage for each game row.
 
     Rows sharing one game share one stage execution. Returns a list aligned
