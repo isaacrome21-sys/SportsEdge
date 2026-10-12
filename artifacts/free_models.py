@@ -502,7 +502,12 @@ class PublicContext:
         # is closed for this particular game. American Family Field has a
         # retractable roof; its state requires independent game-day evidence.
         venue_key = self.key(venue.get("fullName") or venue.get("name") or "")
-        if sport == "MLB" and venue_key in {"american family field", "miller park"}:
+        if sport == "MLB" and venue_key in {
+            "american family field", "miller park", "chase field",
+            "globe life field", "loandepot park", "marlins park",
+            "minute maid park", "daikin park", "rogers centre",
+            "t mobile park",
+        }:
             return 0.0, "RETRACTABLE_ROOF_STATE_UNVERIFIED"
         if venue.get("indoor") is True:
             return 0.0, "INDOOR_VERIFIED"
