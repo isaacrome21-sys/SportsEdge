@@ -7,6 +7,7 @@ and asserts the gate rejects it out-of-sample.
 
 No network. Research only.
 """
+import hashlib
 import importlib.util
 import math
 import random
@@ -141,7 +142,10 @@ def _synthetic_fixtures(n=240, seed=7, planted_corr=False):
         kickoff = base + timedelta(days=i)
         # True home win prob varies smoothly; outcomes drawn from it.
         p_true = 0.55 + 0.15 * math.sin(i / 12.0)
-        noise = (hash(f"synth-{i:04d}") % 2) * 2 - 1  # +-1, iid per fixture
+        # NOTE: built-in hash() is salted per process (PYTHONHASHSEED); use a
+        # stable digest so the suite is deterministic (flakiness fix
+        # 2026-10-11: these gate tests passed/failed at random across runs).
+        noise = (hashlib.md5(f"synth-{i:04d}".encode()).digest()[0] % 2) * 2 - 1
         p = p_true
         if planted_corr and i < 80:
             # Planted spurious correlation ONLY in the initial training
