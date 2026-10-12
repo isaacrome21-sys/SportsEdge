@@ -260,6 +260,21 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             priced[pos]["prepricing_adjustments"] = prepricing_by_index[gpos]
             game_results[gpos] = priced[pos]
         priced_games = game_results
+        # Option 3: Prepricing audit for transparency (separate from user context audit)
+        card["prepricing_factor_audit"] = {
+            "schema": "SPORTSEDGE_PREPRICING_FACTOR_AUDIT_V1",
+            "market_odds_as_features": "REJECTED_METHOD_NEVER_PRICED",
+            "by_input_index": [
+                {
+                    "input_index": game_indices[gpos],
+                    "blocked": prepricing_by_index.get(gpos) is None,
+                    "adjustments": prepricing_by_index.get(gpos, {}).get("adjustments", {}),
+                    "verification_status": prepricing_by_index.get(gpos, {}).get("verification_status", "NOT_APPLICABLE"),
+                    "factors": prepricing_by_index.get(gpos, {}).get("factors", []),
+                }
+                for gpos in range(len(games))
+            ],
+        }
     else:
         priced_games = []
         card = {
