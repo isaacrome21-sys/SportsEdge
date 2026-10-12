@@ -407,6 +407,52 @@ class PublicContext:
         return (-round(min(loss, 2.5), 3),
                 f"HEURISTIC_OUT_DOUBTFUL_REPORTED_{len(seen)}_UNKNOWN_COMPLETENESS")
 
+    def _mlb_statsapi_fixture(self, away, home, kickoff):
+        """MLB-only independent schedule fallback when ESPN omits a fixture.
+
+        The source must contain exactly one future gamePk matching both teams,
+        the provided kickoff within 15 minutes, and a pregame status. An odds
+        board or claimed ESPN event ID is never treated as source evidence.
+        A minimal venue intentionally leaves weather unknown, not verified.
+        """
+        if kickoff is None:
+            return None
+        found = {}
+        for offset in (-1, 0, 1):
+            game_date = (kickoff + timedelta(days=offset)).date().isoformat()
+            url = ("https://statsapi.mlb.com/api/v1/schedule?" +
+                   urlencode({"sportId": "1", "date": game_date,
+                              "hydrate": "team,probablePitcher"}))
+            response = self.fetch(url) or {}
+            for day in response.get("dates") or []:
+                if not isinstance(day, dict):
+                    continue
+                for game in day.get("games") or []:
+                    if not isinstance(game, dict):
+                        continue
+                    teams = game.get("teams") or {}
+                    home_team = (teams.get("home") or {}).get("team") or {}
+                    away_team = (teams.get("away") or {}).get("team") or {}
+                    if not (self.team_matches(home_team, home)
+                            and self.team_matches(away_team, away)):
+                        continue
+                    game_pk = game.get("gamePk")
+                    start = dt(game.get("gameDate"))
+                    if not game_pk or start is None or start <= self.now:
+                        continue
+                    if abs((start - kickoff).total_seconds()) > 900:
+                        continue
+                    status = (game.get("status") or {}).get("detailedState")
+                    if status not in {"Scheduled", "Pre-Game", "Warmup"}:
+                        continue
+                    # The MLB schedule establishes fixture identity only;
+                    # it does not attest a roof state or weather forecast.
+                    found[str(game_pk)] = (
+                        start, {"venue": {},
+                                "source": "MLB_STATSAPI_SCHEDULE_VERIFIED",
+                                "game_pk": game_pk})
+        return next(iter(found.values())) if len(found) == 1 else None
+
     def fixture(self, sport, away, home, kickoff):
         """Bind competition/venue with BOTH teams and a unique start time."""
         days = [kickoff.date() + timedelta(days=i) for i in (-1, 0, 1)] if kickoff else [
@@ -430,7 +476,11 @@ class PublicContext:
                         self.team_matches(away_cs[0].get("team") or {}, away)):
                     continue
                 games[str(ev.get("id"))] = (event_start, comp)
-        return next(iter(games.values())) if len(games) == 1 else None
+        if len(games) == 1:
+            return next(iter(games.values()))
+        if sport == "MLB" and kickoff is not None and not games:
+            return self._mlb_statsapi_fixture(away, home, kickoff)
+        return None
 
     def weather(self, sport, comp, kickoff, latitude=None, longitude=None):
         if sport not in {"NFL", "CFB", "MLB"}:
