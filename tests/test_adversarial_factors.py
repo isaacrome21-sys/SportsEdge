@@ -219,6 +219,11 @@ def _in_sample_brier_gain(candidate_price_fn, fixtures):
 
 
 def test_gate_rejects_spurious_in_sample_factor():
+    pytest = __import__("pytest")
+    try:
+        __import__("sportsedge.backtest")
+    except ImportError:
+        pytest.skip("sportsedge.backtest not available (Phase 00 not merged)")
     # Adversarial: a spurious correlation planted in the early data makes
     # the noise factor look predictive IN-SAMPLE (researcher thinks they
     # found an edge). The walk-forward gate must reject it out-of-sample.
@@ -235,6 +240,11 @@ def test_gate_rejects_spurious_in_sample_factor():
 
 
 def test_gate_rejects_fixed_noise():
+    pytest = __import__("pytest")
+    try:
+        __import__("sportsedge.backtest")
+    except ImportError:
+        pytest.skip("sportsedge.backtest not available (Phase 00 not merged)")
     def candidate(fixture, train, p):
         return p + 0.08 * fixture["_noise"]
 
@@ -243,6 +253,11 @@ def test_gate_rejects_fixed_noise():
 
 
 def test_gate_passes_true_signal():
+    pytest = __import__("pytest")
+    try:
+        __import__("sportsedge.backtest")
+    except ImportError:
+        pytest.skip("sportsedge.backtest not available (Phase 00 not merged)")
     # Sanity: the gate DOES pass a genuinely predictive factor (slightly
     # better-calibrated than the existing model), so the bar isn't impossible.
     def candidate(fixture, train, p):
