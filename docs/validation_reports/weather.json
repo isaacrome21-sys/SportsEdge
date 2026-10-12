@@ -1,0 +1,24 @@
+{
+  "factor": "weather",
+  "n_fixtures": 1186,
+  "n_splits": 77,
+  "verdict": "FAIL",
+  "reasons": [
+    "BRIER_NOT_IMPROVED: candidate 0.2321 vs existing 0.2320"
+  ],
+  "existing": {
+    "n": 11575,
+    "brier": 0.23198809494919717,
+    "log_loss": 0.7119759540409192,
+    "mean_p": 0.38783340470055544,
+    "base_rate": 0.4797840172786177
+  },
+  "candidate": {
+    "n": 11575,
+    "brier": 0.23211862759640034,
+    "log_loss": 0.7092708970888012,
+    "mean_p": 0.39275089808600616,
+    "base_rate": 0.4826781857451404
+  },
+  "research_only": true
+}
