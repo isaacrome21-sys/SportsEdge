@@ -133,9 +133,21 @@ def poisson(lam, max_k=38):
     return [v / t for v in arr]
 
 
-def model_probability(sport, market, side, line, home_mean, away_mean):
+def model_probability(sport, market, side, line, home_mean, away_mean, *, team_side=None):
     """Return win, push, loss; account for pushes on integer lines."""
     if sport == "MLB":
+        if market == "TEAM_TOTAL":
+            if team_side not in {"HOME", "AWAY"} or side not in {"OVER", "UNDER"}:
+                raise ValueError("TEAM_TOTAL_IDENTITY_OR_SIDE_INVALID")
+            dist = poisson(home_mean if team_side == "HOME" else away_mean)
+            win = push = 0.0
+            for runs, probability in enumerate(dist):
+                target = runs - line if side == "OVER" else line - runs
+                if target > 1e-9:
+                    win += probability
+                elif abs(target) <= 1e-9:
+                    push += probability
+            return bounded(win, 0, 1), bounded(push, 0, 1)
         a, b = poisson(home_mean), poisson(away_mean)
         win = push = 0.0
         for h, ph in enumerate(a):
@@ -713,8 +725,9 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
         raise ValueError("UNSUPPORTED_SPORT")
     market = str(row.get("market") or "").upper().strip()
     market = {"MONEYLINE": "ML", "H2H": "ML", "RUN_LINE": "SPREAD",
-              "GAME_TOTAL": "TOTAL", "TOTALS": "TOTAL"}.get(market, market)
-    if market not in {"ML", "SPREAD", "TOTAL"}:
+              "GAME_TOTAL": "TOTAL", "TOTALS": "TOTAL",
+              "TEAM_TOTALS": "TEAM_TOTAL"}.get(market, market)
+    if market not in {"ML", "SPREAD", "TOTAL", "TEAM_TOTAL"}:
         raise ValueError("UNSUPPORTED_MARKET_NO_PROP_MODEL")
     away = str(row.get("away") or "").strip()
     home = str(row.get("home") or "").strip()
@@ -734,11 +747,28 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
         # Must identify either exact team; substring similarity is unsafe.
         norm = PublicContext.key
         side = "HOME" if norm(side_raw) == norm(home) else "AWAY" if norm(side_raw) == norm(away) else None
-    if side not in ({"OVER", "UNDER"} if market == "TOTAL" else {"HOME", "AWAY"}):
+    if side not in ({"OVER", "UNDER"} if market in {"TOTAL", "TEAM_TOTAL"} else {"HOME", "AWAY"}):
         raise ValueError("SIDE_MARKET_MISMATCH")
+    team_side = None
+    team_name = None
+    if market == "TEAM_TOTAL":
+        if sport != "MLB":
+            raise ValueError("TEAM_TOTAL_ONLY_MLB_RESEARCH_SUPPORTED")
+        team_text = str(row.get("team") or row.get("team_side") or "").strip()
+        team_key = PublicContext.key(team_text)
+        if not team_key:
+            raise ValueError("TEAM_TOTAL_TEAM_REQUIRED")
+        if team_key in {"HOME", PublicContext.key(home)}:
+            team_side, team_name = "HOME", home
+        elif team_key in {"AWAY", PublicContext.key(away)}:
+            team_side, team_name = "AWAY", away
+        else:
+            raise ValueError("TEAM_TOTAL_TEAM_NOT_IN_GAME")
     line = None if market == "ML" else numeric(row.get("line"), "line")
     if market == "TOTAL" and line <= 0:
         raise ValueError("TOTAL_LINE_INVALID")
+    if market == "TEAM_TOTAL" and (line < 0.5 or abs(2 * line - round(2 * line)) > 1e-9):
+        raise ValueError("TEAM_TOTAL_LINE_MUST_BE_POSITIVE_WHOLE_OR_HALF")
     original_start = dt(row.get("commence_time") or row.get("kickoff"))
     if row.get("commence_time") or row.get("kickoff"):
         if original_start is None:
@@ -852,7 +882,7 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
     # in the probability. This is a simple unvalidated league/form/injury
     # heuristic, not a proven independent model or validated probability. ----
     a_win, a_push = model_probability(
-        sport, market, side, line, home_mean, away_mean)
+        sport, market, side, line, home_mean, away_mean, team_side=team_side)
     lane_a = _lane_view(
         LANE_A, a_win, a_push, home_mean, away_mean, dec,
         raw_total, raw_margin,
@@ -870,7 +900,12 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
               "hypothesis": "UNVALIDATED_OUT_OF_SAMPLE_REQUIRED"}
     b_home_mean, b_away_mean = home_mean, away_mean
     lane_b_blocked = None
-    if market == "TOTAL":
+    if market == "TEAM_TOTAL":
+        # A standalone team-total threshold cannot anchor means independently
+        # of a paired, coherently priced team-total market. Lane A remains
+        # visible; Lane B has no researched/validated anchoring rule.
+        lane_b_blocked = "BLOCKED_TEAM_TOTAL_ANCHOR_UNAVAILABLE"
+    elif market == "TOTAL":
         anchored_total = line + ANCHOR_WEIGHT * (raw_total - line)
         shift = (anchored_total - raw_total) / 2
         b_home_mean += shift
@@ -899,7 +934,7 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
             anchor.update(market_no_vig_p=p1 / (p1 + p2))
     if lane_b_blocked is None:
         b_win, b_push = model_probability(
-            sport, market, side, line, b_home_mean, b_away_mean)
+            sport, market, side, line, b_home_mean, b_away_mean, team_side=team_side)
         if market == "ML":
             b_win = bounded(anchor["market_no_vig_p"]
                             + ANCHOR_WEIGHT * (b_win - anchor["market_no_vig_p"]),
@@ -927,10 +962,14 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
     primary = lane_a if lane == "A" else lane_b
     pricing_lane = primary["lane"]
     selection = ("OVER" if side == "OVER" else "UNDER") if market == "TOTAL" else home if side == "HOME" else away
+    if market == "TEAM_TOTAL":
+        selection = f"{team_name} {side} {line:g} TT"
     if market == "SPREAD":
         selection += f" {line:+g}"
     elif market == "TOTAL":
         selection += f" {line:g}"
+    elif market == "TEAM_TOTAL":
+        pass  # Complete selection already identifies team, side, line and period
     else:
         selection += " ML"
     reason = None
@@ -949,6 +988,7 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
         status = "BELOW_THRESHOLD"
     result = {"schema": "SPORTSEDGE_FREE_RESEARCH_V1", "status": status, "sport": sport,
             "game": f"{away} @ {home}", "selection": selection, "market": market,
+            "team_side": team_side, "team": team_name,
             "odds_american": int(price), "line": line, "kickoff_utc": kickoff.isoformat(),
             "pricing_lane": pricing_lane,
             "pricing_lanes": {"lane_a_independent": lane_a,
