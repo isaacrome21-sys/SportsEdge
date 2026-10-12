@@ -290,31 +290,34 @@ class WeatherEvidenceTests(unittest.TestCase):
         return ev
 
     def test_archived_weather_evidence_used(self):
+        # SECURITY: User-supplied weather_evidence in the row is NOT trusted.
+        # Archived weather must arrive via trusted loader, not input row.
+        # This test verifies user evidence is ignored.
         getter = FakeGetter(nfl_mapping())
         row = nfl_row(weather_evidence=self.evidence())
         (stage,) = fi.stage_games([row], now=NOW, getter=getter)
         self.assertFalse(stage["blocked"])
-        self.assertEqual(stage["adjustments"]["weather_total_adj"], -1.2)
-        wx = factor_status(stage, "weather_venue")[0]
-        self.assertEqual(wx[0], "USED")
-        self.assertEqual(wx[1], "ARCHIVED_WEATHER_EVIDENCE")
-        self.assertIn("KEYED_APIS_NEVER_CALLED_DIRECTLY", wx[2])
-        # Archive is authoritative: no live geocode/forecast fetch attempted.
-        self.assertFalse(any("open-meteo" in c or "geocoding-api" in c
-                             for c in getter.calls))
+        # User-supplied evidence is marked MISSING (not USED)
+        # Note: live Open-Meteo path may still provide weather_total_adj separately
+        wx_factors = [f for f in stage["factors"] if f["factor"] == "weather_venue"]
+        user_evidence_factors = [f for f in wx_factors
+                                 if "USER_SUPPLIED" in f.get("source", "")]
+        self.assertTrue(len(user_evidence_factors) > 0)
+        self.assertTrue(all(f["status"] == "MISSING" for f in user_evidence_factors))
 
     def test_stale_archive_rejected_like_missing(self):
+        # SECURITY: User-supplied weather evidence is never trusted,
+        # regardless of staleness. Marked MISSING.
         getter = FakeGetter(nfl_mapping())
         row = nfl_row(weather_evidence=self.evidence(
             retrieved_at_utc="2026-10-09T00:00:00Z"))
         (stage,) = fi.stage_games([row], now=NOW, getter=getter)
-        wx = factor_status(stage, "weather_venue")[0]
-        self.assertEqual(wx[0], "MISSING")
-        self.assertIn("WEATHER_ARCHIVE_REJECTED:ARCHIVE_STALE", wx[2])
-        # Never silently used, never silently replaced by the live path.
-        self.assertNotIn("weather_total_adj", stage["adjustments"])
-        self.assertFalse(any("open-meteo" in c or "geocoding-api" in c
-                             for c in getter.calls))
+        # User-supplied evidence is marked MISSING (not USED)
+        wx_factors = [f for f in stage["factors"] if f["factor"] == "weather_venue"]
+        user_evidence_factors = [f for f in wx_factors
+                                 if "USER_SUPPLIED" in f.get("source", "")]
+        self.assertTrue(len(user_evidence_factors) > 0)
+        self.assertTrue(all(f["status"] == "MISSING" for f in user_evidence_factors))
 
     def test_evidence_contract_and_binding_rejected(self):
         for bad in ({"contract": "WRONG_CONTRACT"},
