@@ -203,8 +203,19 @@ class MLBBatterPublicSource:
                     "runs": _int(data_row["runs"], "RUNS"),
                     "home_runs": _int(data_row["homeRuns"], "HOME_RUNS"),
                     "stolen_bases": _int(data_row["stolenBases"], "STOLEN_BASES"),
+                    # All newly modeled count fields are REQUIRED. Unknown
+                    # observations must not silently become zero outcomes.
+                    "walks": _int(data_row["baseOnBalls"], "WALKS"),
+                    "strikeouts": _int(data_row["strikeOuts"], "STRIKEOUTS"),
+                    "doubles": _int(data_row["doubles"], "DOUBLES"),
+                    "triples": _int(data_row["triples"], "TRIPLES"),
                     "plate_appearances": pa,
                 }
+                singles = stats["hits"] - stats["doubles"] - stats["triples"] - stats["home_runs"]
+                if singles < 0:
+                    raise MissingMLBBatterHistory("INCONSISTENT_EXTRA_BASE_HIT_COUNTS")
+                stats["singles"] = singles
+                stats["hits_runs_rbis"] = stats["hits"] + stats["runs"] + stats["rbi"]
                 hist.append((when, game_id, stats))
             except (ValueError, KeyError, TypeError, MissingMLBBatterHistory):
                 continue
