@@ -139,3 +139,43 @@ def test_inactive_visible_only_from_capture(tmp_path):
     assert early["status"] == "UNAVAILABLE"
     late = reader.inactive_for(GSIS, "G9", "2026-10-04T16:00:00Z")
     assert late["status"] == "OK"
+
+
+def test_superseding_correction_never_rewrites_prior_as_of(tmp_path):
+    arc = ParticipationArchive(tmp_path)
+    first_id = arc.append_record(_designation(captured="2026-10-01T12:00:00Z"))
+    corrected = _designation(captured="2026-10-06T12:00:00Z")
+    corrected.payload["designation"] = "Out"
+    corrected.supersedes_record_id = first_id
+    arc.append_record(corrected)
+    reader = AsOfReader(arc)
+    old = reader.designation_for(GSIS, 2026, 5, "2026-10-03T12:00:00Z")
+    assert old["status"] == "OK"
+    assert old["record"].payload["designation"] == "Questionable"
+    new = reader.designation_for(GSIS, 2026, 5, "2026-10-07T12:00:00Z")
+    assert new["status"] == "OK"
+    assert new["record"].payload["designation"] == "Out"
+
+
+def test_forward_revision_only_becomes_visible_at_capture(tmp_path):
+    from copy import deepcopy
+    first = ParticipationRecord(
+        signal_type=SIGNAL_INACTIVE, source_signal="S7", season=2026, week=5,
+        team="BUF", captured_at_utc="2026-10-04T15:30:00Z",
+        available_from_utc="2026-10-04T15:30:00Z",
+        availability_class=AVAIL_FORWARD_ONLY,
+        availability_basis=BASIS_CAPTURE_TIMESTAMP, timing_evidence="PER_RECORD_TIMESTAMP",
+        permitted_uses=[USE_PREGAME_FEATURE], source_name="test",
+        game_id="G9", kickoff_utc="2026-10-04T17:00:00Z",
+        gsis_id=GSIS, payload={"inactive": False})
+    arc = ParticipationArchive(tmp_path)
+    original_id = arc.append_record(first)
+    later = deepcopy(first)
+    later.captured_at_utc = later.available_from_utc = "2026-10-04T16:00:00Z"
+    later.payload = {"inactive": True}
+    later.record_id = None
+    later.supersedes_record_id = original_id
+    arc.append_record(later)
+    reader = AsOfReader(arc)
+    assert reader.inactive_for(GSIS, "G9", "2026-10-04T15:45:00Z")["record"].payload["inactive"] is False
+    assert reader.inactive_for(GSIS, "G9", "2026-10-04T16:15:00Z")["record"].payload["inactive"] is True
