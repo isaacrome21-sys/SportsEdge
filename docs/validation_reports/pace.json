@@ -1,0 +1,25 @@
+{
+  "factor": "pace",
+  "n_fixtures": 282,
+  "n_splits": 9,
+  "verdict": "FAIL",
+  "reasons": [
+    "BRIER_NOT_IMPROVED: candidate 0.2488 vs existing 0.2430",
+    "LOG_LOSS_NOT_IMPROVED: candidate 0.6961 vs existing 0.6952"
+  ],
+  "existing": {
+    "n": 373,
+    "brier": 0.24300700664890432,
+    "log_loss": 0.695247659558466,
+    "mean_p": 0.48522773735144586,
+    "base_rate": 0.5281501340482574
+  },
+  "candidate": {
+    "n": 373,
+    "brier": 0.24880596664829188,
+    "log_loss": 0.6961220630683114,
+    "mean_p": 0.4930552368043954,
+    "base_rate": 0.5361930294906166
+  },
+  "research_only": true
+}

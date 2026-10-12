@@ -1,0 +1,24 @@
+{
+  "factor": "keynums_nfl",
+  "n_fixtures": 563,
+  "n_splits": 32,
+  "verdict": "CONDITIONAL_PASS",
+  "reasons": [
+    "MARKET_BASELINE_MISSING: no archived market prices; the market-baseline leg of Isaac's bar could not be checked. Do not promote on this verdict alone."
+  ],
+  "existing": {
+    "n": 3984,
+    "brier": 0.11661046555042467,
+    "log_loss": 0.46308903622865366,
+    "mean_p": 0.027899907849100125,
+    "base_rate": 0.12274096385542169
+  },
+  "candidate": {
+    "n": 3984,
+    "brier": 0.10960648355340963,
+    "log_loss": 0.38549021464175587,
+    "mean_p": 0.07084970392455006,
+    "base_rate": 0.12274096385542169
+  },
+  "research_only": true
+}
