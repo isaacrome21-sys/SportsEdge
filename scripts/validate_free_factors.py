@@ -14,8 +14,10 @@ on chronological walk-forward splits, scored by Brier + log-loss, vs the
 market baseline slot (MISSING: no Odds API by Isaac's choice -> best
 achievable verdict is CONDITIONAL_PASS, never presented as validated).
 
-Subcommands: park | rest | travel | weather | keynums | pitcher | bullpen
-             rotation | qb_oracle | all
+Subcommands: park | rest | travel | weather | weather_interaction |
+             weather_interaction_legacy | keynums | pitcher | bullpen |
+             rotation | qb_oracle | srs | venue_hfa | pace | turnovers | fip |
+             epa | time_decay | all
 Research only. No betting authority.
 """
 from __future__ import annotations
@@ -30,11 +32,18 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlencode
 
-# Harness from cwd.
-sys.path.insert(0, os.getcwd())
+# Harness location: cwd when run per the documented invocation
+# (cwd=~/workspace/sportsedge-backtest); SPORTSEDGE_BACKTEST_DIR overrides
+# for test contexts where cwd is the factor worktree.
+_harness_dir = os.environ.get("SPORTSEDGE_BACKTEST_DIR", os.getcwd())
+sys.path.insert(0, _harness_dir)
 from sportsedge.backtest import outcomes, splits, runner, report  # noqa: E402
 
-WORKTREE = Path("/home/hatch/workspace/sportsedge-freefactors")
+# Stacked branches (e.g. feat/umpire-weather-20261011 on feat/free-factors-20261011)
+# point this at their own worktree; default keeps the Phase 2 path.
+WORKTREE = Path(os.environ.get(
+    "SPORTSEDGE_FACTOR_WORKTREE",
+    "/home/hatch/workspace/sportsedge-freefactors"))
 CACHE = Path("/tmp/sportsedge-ff-cache")
 REPORTS = WORKTREE / "docs" / "validation_reports"
 
@@ -419,21 +428,73 @@ def mlb_venue_info(venue_id: int) -> dict | None:
 
 
 def era5_venue_month(lat: float, lon: float, year: int, month: int) -> dict | None:
-    """ERA5 hourly weather for a venue-month (one cached call per venue-month)."""
-    key = f"era5m_{lat:.2f}_{lon:.2f}_{year}_{month:02d}"
+    """ERA5 hourly weather for a venue-month (one cached call per venue-month).
+
+    NOTE (2026-10-11): the ERA5 archive does not serve
+    precipitation_probability (all nulls -- verified); it is dropped from the
+    request and the harness validates the wind leg only, passing
+    precip_probability_pct=None. The production forecast path (Open-Meteo
+    forecast API) does provide precipitation_probability, so the declared
+    precip thresholds are unaffected in production -- they are simply not
+    exercised by this harness run. Cache key bumped (era5w2_) so the old
+    all-null-precip payloads are never read.
+    """
+    key = f"era5w2_{lat:.2f}_{lon:.2f}_{year}_{month:02d}"
     start = date(year, month, 1)
     end = (date(year, month + 1, 1) - timedelta(days=1) if month < 12
            else date(year, 12, 31))
     url = ("https://archive-api.open-meteo.com/v1/archive?" + urlencode({
         "latitude": lat, "longitude": lon,
         "start_date": start.isoformat(), "end_date": end.isoformat(),
-        "hourly": "wind_speed_10m,wind_direction_10m,precipitation_probability",
+        "hourly": "wind_speed_10m,wind_direction_10m",
         "wind_speed_unit": "mph", "timezone": "UTC"}))
     data = cached_json(key, url)
     return (data or {}).get("hourly")
 
 
-def pitcher_gamelog(pid: int, season: int) -> list[dict]:
+def _era5_best_hour_index(times: list, ko: datetime) -> int | None:
+    """Index of the hourly timestamp nearest kickoff (within 90 min).
+
+    ERA5 returns naive ISO times when timezone=UTC is requested; the request
+    is UTC so naive times are treated as UTC. (Bug fix 2026-10-11: naive-vs-
+    aware subtraction raised TypeError, which is why the weather runner never
+    completed.)
+    """
+    best, best_dt = None, None
+    for i, t in enumerate(times or []):
+        try:
+            th = datetime.fromisoformat(str(t).replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if th.tzinfo is None:
+            th = th.replace(tzinfo=timezone.utc)
+        d = abs((th - ko).total_seconds())
+        if best is None or d < best:
+            best, best_dt = d, i
+    if best is None or best > 5400:
+        return None
+    return best_dt
+
+
+def era5_temp_humidity_venue_month(lat: float, lon: float, year: int,
+                                   month: int) -> dict | None:
+    """ERA5 hourly temperature/humidity for a venue-month.
+
+    Separate cache key from era5_venue_month (wind/precip) so adding the
+    weather-interaction runner never invalidates the existing cache.
+    Free, keyless, no signup.
+    """
+    key = f"era5t_{lat:.2f}_{lon:.2f}_{year}_{month:02d}"
+    start = date(year, month, 1)
+    end = (date(year, month + 1, 1) - timedelta(days=1) if month < 12
+           else date(year, 12, 31))
+    url = ("https://archive-api.open-meteo.com/v1/archive?" + urlencode({
+        "latitude": lat, "longitude": lon,
+        "start_date": start.isoformat(), "end_date": end.isoformat(),
+        "hourly": "temperature_2m,relative_humidity_2m",
+        "temperature_unit": "fahrenheit", "timezone": "UTC"}))
+    data = cached_json(key, url)
+    return (data or {}).get("hourly")
     key = f"mlb_plog_{pid}_{season}"
     url = (f"https://statsapi.mlb.com/api/v1/people/{pid}/stats?"
            + urlencode({"stats": "gameLog", "season": season, "group": "pitching"}))
@@ -638,9 +699,23 @@ def run_travel():
                           min_train=150, test_size=60)
 
 
-def run_weather():
+def _run_weather(name: str, apply_interaction: bool, base: str = "thresholds"):
+    """Shared MLB weather harness.
+
+    apply_interaction=False: the original weather run — existing =
+    legacy production heuristic, candidate = declared wind/precip
+    thresholds (ff.weather_total_adjustment).
+    apply_interaction=True, base="thresholds": existing = declared
+    thresholds, candidate = thresholds + temp/humidity x park interaction
+    (ff.weather_interaction_adjustment, MLB branch). Gates the interaction
+    vs the thresholds it was designed to stack on.
+    apply_interaction=True, base="legacy": existing = legacy production
+    heuristic, candidate = legacy + temp/humidity x park interaction. The
+    production-relevant wiring gate, since the declared thresholds FAILED
+    vs the legacy heuristic (weather.json, 2026-10-11).
+    """
     fixtures = mlb_fixtures(2025, [6, 7, 8])
-    print(f"weather: {len(fixtures)} MLB fixtures (Jun-Aug 2025)")
+    print(f"{name}: {len(fixtures)} MLB fixtures (Jun-Aug 2025)")
     venue_cache: dict[int, dict | None] = {}
 
     def venue(fid_vid):
@@ -649,36 +724,51 @@ def run_weather():
         return venue_cache[fid_vid]
 
     def hour_weather(v, ko):
-        """(wind, wdir, precip) at kickoff hour from ERA5, or None."""
+        """(wind, wdir, precip) at kickoff hour from ERA5, or None.
+
+        precip is always None: ERA5 archive has no precipitation_probability
+        (verified all-nulls 2026-10-11) -- the harness exercises the wind leg
+        only.
+        """
         if not v or v.get("lat") is None:
             return None
         hourly = era5_venue_month(v["lat"], v["lon"], ko.year, ko.month)
         if not hourly:
             return None
-        times = hourly.get("time") or []
-        best, best_dt = None, None
-        for i, t in enumerate(times):
-            try:
-                th = datetime.fromisoformat(t.replace("Z", "+00:00"))
-            except ValueError:
-                continue
-            d = abs((th - ko).total_seconds())
-            if best is None or d < best:
-                best, best_dt = d, i
-        if best is None or best > 5400:
+        i = _era5_best_hour_index(hourly.get("time"), ko)
+        if i is None:
             return None
-        i = best_dt
         try:
             return (float(hourly["wind_speed_10m"][i]),
-                    float(hourly["wind_direction_10m"][i]),
-                    float(hourly["precipitation_probability"][i]))
+                    float(hourly["wind_direction_10m"][i]), None)
+        except (KeyError, TypeError, IndexError, ValueError):
+            return None
+
+    def hour_temp_humidity(v, ko):
+        """(temp_f, humidity_pct) at kickoff hour from ERA5, or None."""
+        if not v or v.get("lat") is None:
+            return None
+        hourly = era5_temp_humidity_venue_month(v["lat"], v["lon"],
+                                                ko.year, ko.month)
+        if not hourly:
+            return None
+        i = _era5_best_hour_index(hourly.get("time"), ko)
+        if i is None:
+            return None
+        try:
+            return (float(hourly["temperature_2m"][i]),
+                    float(hourly["relative_humidity_2m"][i]))
         except (KeyError, TypeError, IndexError, ValueError):
             return None
 
     def old_heuristic(wind, precip):
-        """Current production weather heuristic (the gate's existing leg)."""
+        """Legacy production weather heuristic (the gate's existing leg).
+
+        precip may be None (ERA5 archive has no precipitation_probability) --
+        the precip leg is then skipped, not invented.
+        """
         impact = (0.8 if wind >= 18 else 0.4 if wind >= 13 else 0.0)
-        impact += 0.4 if precip >= 70 else 0.0
+        impact += 0.4 if (precip is not None and precip >= 70) else 0.0
         return -round(impact * 0.3, 3)
 
     # StatsAPI fieldInfo.roofType is unreliable (Tropicana reports "Open");
@@ -695,25 +785,75 @@ def run_weather():
         if hw is None:
             return hm, am, None
         wind, wdir, precip = hw
-        if model_name != "candidate":
-            # existing = current production heuristic
-            adj = old_heuristic(wind, precip)
+        if not apply_interaction:
+            if model_name != "candidate":
+                # existing = legacy production heuristic
+                adj = old_heuristic(wind, precip)
+                return hm + adj / 2, am + adj / 2, None
+            if v.get("azimuth") is None:
+                return hm, am, None
+            adj, status, _ = ff.weather_total_adjustment(
+                sport="MLB", wind_speed_mph=wind, wind_from_degrees=wdir,
+                field_azimuth_degrees=v["azimuth"],
+                precip_probability_pct=precip, indoor=(v.get("roof") == "closed"))
+            if status not in ("WEATHER_THRESHOLDS_VERIFIED_APPLIED",
+                              "WEATHER_CALM_NO_EFFECT"):
+                return hm, am, None
             return hm + adj / 2, am + adj / 2, None
-        if v.get("azimuth") is None:
-            return hm, am, None
-        adj, status, _ = ff.weather_total_adjustment(
-            sport="MLB", wind_speed_mph=wind, wind_from_degrees=wdir,
-            field_azimuth_degrees=v["azimuth"],
-            precip_probability_pct=precip, indoor=(v.get("roof") == "closed"))
-        if status not in ("WEATHER_THRESHOLDS_VERIFIED_APPLIED",
-                          "WEATHER_CALM_NO_EFFECT"):
-            return hm, am, None
-        return hm + adj / 2, am + adj / 2, None
+        # Interaction runs: both legs share the base; the candidate adds the
+        # temp/humidity x park interaction on top.
+        if base == "legacy":
+            badj = old_heuristic(wind, precip)
+            hm, am = hm + badj / 2, am + badj / 2
+        else:
+            if v.get("azimuth") is None:
+                return hm, am, None
+            adj, status, _ = ff.weather_total_adjustment(
+                sport="MLB", wind_speed_mph=wind, wind_from_degrees=wdir,
+                field_azimuth_degrees=v["azimuth"],
+                precip_probability_pct=precip,
+                indoor=(v.get("roof") == "closed"))
+            if status not in ("WEATHER_THRESHOLDS_VERIFIED_APPLIED",
+                              "WEATHER_CALM_NO_EFFECT"):
+                return hm, am, None
+            hm, am = hm + adj / 2, am + adj / 2
+        if model_name == "candidate":
+            th = hour_temp_humidity(v, ko)
+            if th is not None:
+                pf, pf_status, _ = ff.park_factor_for(
+                    fixture.get("home_team"), ko.year)
+                iadj, istatus, _ = ff.weather_interaction_adjustment(
+                    sport="MLB", temp_f=th[0], humidity_pct=th[1],
+                    park_factor=(pf if pf_status == "PARK_FACTOR_VERIFIED"
+                                 else None),
+                    indoor=(v.get("roof") == "closed"))
+                if istatus == "WEATHER_INTERACTION_VERIFIED":
+                    hm, am = hm + iadj / 2, am + iadj / 2
+        return hm, am, None
 
     price_fn = price_fn_factory("MLB", ["TOTAL"], adjust)
-    return run_evaluation("weather", fixtures, price_fn,
+    return run_evaluation(name, fixtures, price_fn,
                           min_train=300, test_size=150,
                           embargo_days=0, step=7)
+
+
+def run_weather():
+    return _run_weather("weather", apply_interaction=False)
+
+
+def run_weather_interaction():
+    """Gate the declared temp/humidity x park interaction vs the declared
+    thresholds it was designed to stack on."""
+    return _run_weather("weather_interaction", apply_interaction=True,
+                        base="thresholds")
+
+
+def run_weather_interaction_legacy():
+    """Gate the declared temp/humidity x park interaction vs the legacy
+    production heuristic -- the production-relevant wiring gate, since the
+    declared thresholds FAILED vs legacy (weather.json, 2026-10-11)."""
+    return _run_weather("weather_interaction_legacy", apply_interaction=True,
+                        base="legacy")
 
 
 def run_keynums():
@@ -1313,7 +1453,9 @@ def run_time_decay():
 
 RUNNERS = {
     "park": run_park, "rest": run_rest, "travel": run_travel,
-    "weather": run_weather, "keynums": run_keynums, "pitcher": run_pitcher,
+    "weather": run_weather, "weather_interaction": run_weather_interaction,
+    "weather_interaction_legacy": run_weather_interaction_legacy,
+    "keynums": run_keynums, "pitcher": run_pitcher,
     "bullpen": run_bullpen, "rotation": run_rotation, "qb_oracle": run_qb_oracle,
     "srs": run_srs, "venue_hfa": run_venue_hfa, "pace": run_pace,
     "turnovers": run_turnovers, "fip": run_fip,

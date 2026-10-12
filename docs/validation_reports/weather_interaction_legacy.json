@@ -1,0 +1,24 @@
+{
+  "factor": "weather_interaction_legacy",
+  "n_fixtures": 1186,
+  "n_splits": 77,
+  "verdict": "CONDITIONAL_PASS",
+  "reasons": [
+    "MARKET_BASELINE_MISSING: no archived market prices; the market-baseline leg of Isaac's bar could not be checked. Do not promote on this verdict alone."
+  ],
+  "existing": {
+    "n": 11575,
+    "brier": 0.23198809494919717,
+    "log_loss": 0.7119759540409192,
+    "mean_p": 0.38783340470055544,
+    "base_rate": 0.4797840172786177
+  },
+  "candidate": {
+    "n": 11575,
+    "brier": 0.23124751910000324,
+    "log_loss": 0.6984611381781618,
+    "mean_p": 0.43239471400127016,
+    "base_rate": 0.47239740820734344
+  },
+  "research_only": true
+}

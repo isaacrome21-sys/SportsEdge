@@ -30,7 +30,9 @@ per run.
 | platoon_split (MLB) | — | — | — | NOT_RUN (Carty regressed: RHB 2200 PA / LHB 1000 PA) | NO |
 | rest (NFL) | 5976 | 0.24673 → 0.24645 | 0.69355 → 0.69341 | **CONDITIONAL_PASS** | YES (rest_margin_adj wired) |
 | travel (NFL) | 5976 | 0.24673 → 0.24661 | 0.69355 → 0.69315 | **CONDITIONAL_PASS** | interface defined; venue extraction pending |
-| weather_thresholds (MLB) | — | — | — | NOT_RUN | — |
+| weather_thresholds (MLB) | 11575 | 0.2320 → 0.2321 | 0.7120 → 0.7093 | **FAIL** (Brier not improved vs legacy heuristic; wind leg only — ERA5 archive has no precipitation_probability) | NO |
+| weather_interaction (MLB, vs thresholds) | 11575 | 0.2321 → 0.2315 | 0.7093 → 0.6951 | **CONDITIONAL_PASS** (temp/humidity × park improves on the declared thresholds) | NO (stacks on a failed base; see legacy gate) |
+| weather_interaction_legacy (MLB, vs legacy) | 11575 | 0.2320 → 0.2312 | 0.7120 → 0.6985 | **CONDITIONAL_PASS** (temp/humidity leg improves on the legacy heuristic; market baseline missing) | YES (labeled: MLB temp/humidity only; xpark leg + NFL leg + thresholds NOT wired) |
 | starting_pitcher (ERA) | — | — | — | NOT_RUN | — |
 | starting_pitcher (FIP) | — | — | — | NOT_RUN | — |
 | bullpen_workload | — | — | — | NOT_RUN | — |
@@ -67,6 +69,29 @@ per run.
 
 ### mlb_umpire / backups_depth
 - NOT_WIRED by design; reasons in `sportsedge/free_factors.py`.
+- 2026-10-11: umpscorecards.com probed (`docs/umpscorecards_probe.md`) — the
+  frontend data path is Patreon-gated, no keyless stable API. Plus MLB's 2026
+  ABS challenge system structurally shrinks the umpire effect. Documented and
+  stopped; no further investment until the harness proves a residual.
+
+### weather (2026-10-11, MySportsWeather calibration)
+- Declared wind/precip thresholds (8/12 mph out/in buckets, ±0.25/±0.50 runs)
+  FAIL vs the legacy production heuristic on MLB Jun–Aug 2025 totals
+  (Brier 0.2320→0.2321, LL 0.7120→0.7093) → NOT wired. Two pre-existing
+  script bugs fixed to get here: ERA5 naive-vs-aware datetime crash, and
+  ERA5 archive serving all-null `precipitation_probability` (harness now
+  validates the wind leg only; production forecast path unaffected).
+- Temp/humidity × park interaction (+0.025 runs/°F from 70°F, ×1.25 humid
+  heat, ×park factor): CONDITIONAL_PASS vs the declared thresholds
+  (Brier 0.2321→0.2315, LL 0.7093→0.6951) — but it stacks on a failed base,
+  so the production-relevant gate is `weather_interaction_legacy`
+  (legacy + interaction vs legacy).
+- Calibration decisions from their published reads: football stays wind-only
+  (no cold coefficient — "cold overrated"); no Wrigley-specific wind
+  multiplier invented (park-factor scaling is the declared approximation).
+- Limits: Jun–Aug window barely exercises sub-70°F; park multiplier
+  fail-closed off for 2025 (table is 2022–2024); NFL wind × pass-rate
+  interaction still NOT_RUN.
 
 ## Guardrail compliance
 - Market-blind: no odds used as features in any run. Baseline slot MISSING.
