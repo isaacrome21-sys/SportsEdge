@@ -1,0 +1,103 @@
+{
+ "2024-06-01": [
+  {
+   "gameView": {
+    "startDate": "2024-06-01T17:10:00+00:00",
+    "awayTeam": {
+     "fullName": "Chicago Cubs"
+    },
+    "homeTeam": {
+     "fullName": "Cincinnati Reds"
+    },
+    "awayTeamScore": 4,
+    "homeTeamScore": 2
+   },
+   "odds": {
+    "moneyline": [
+     {
+      "sportsbook": "draftkings",
+      "openingLine": {
+       "homeOdds": -130,
+       "awayOdds": 110
+      },
+      "currentLine": {
+       "homeOdds": -140,
+       "awayOdds": 120
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "2024-06-02": [
+  {
+   "gameView": {
+    "startDate": "2024-06-02T17:10:00+00:00",
+    "awayTeam": {
+     "fullName": "Texas Rangers"
+    },
+    "homeTeam": {
+     "fullName": "Miami Marlins"
+    },
+    "awayTeamScore": 3,
+    "homeTeamScore": 3
+   },
+   "odds": {
+    "moneyline": [
+     {
+      "sportsbook": "fanduel",
+      "openingLine": {
+       "homeOdds": -110,
+       "awayOdds": -110
+      },
+      "currentLine": {
+       "homeOdds": -110,
+       "awayOdds": -110
+      }
+     },
+     {
+      "sportsbook": "caesars",
+      "openingLine": {
+       "homeOdds": 800,
+       "awayOdds": -1200
+      },
+      "currentLine": {
+       "homeOdds": 800,
+       "awayOdds": -1200
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "2024-06-03": [
+  {
+   "gameView": {
+    "startDate": "2024-07-15T17:10:00+00:00",
+    "awayTeam": {
+     "fullName": "Boston Red Sox"
+    },
+    "homeTeam": {
+     "fullName": "New York Yankees"
+    },
+    "awayTeamScore": 1,
+    "homeTeamScore": 5
+   },
+   "odds": {
+    "moneyline": [
+     {
+      "sportsbook": "draftkings",
+      "openingLine": {
+       "homeOdds": -150,
+       "awayOdds": 130
+      },
+      "currentLine": {
+       "homeOdds": -155,
+       "awayOdds": 135
+      }
+     }
+    ]
+   }
+  }
+ ]
+}
