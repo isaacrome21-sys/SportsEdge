@@ -18,6 +18,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from artifacts import free_models as engine
 from sportsedge.mlb_phone_pitcher_pricing import phone_pitcher_rows, blocked
 from sportsedge.mlb_phone_batter_pricing import phone_batter_rows
+from sportsedge.mlb_phone_first_inning_pricing import (
+    phone_first_inning_rows, FIRST_INNING_PHONE_MARKETS)
 from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
 from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
 from datetime import datetime, timezone
@@ -93,6 +95,7 @@ def audit_row(source, result):
     if market not in ("ML", "SPREAD", "TOTAL"):
         src = result.get("source") or ""
         if src in {"FREE_MLB_STATSAPI_GAMELOG", "FREE_MLB_STATSAPI_BATTER_GAMELOG",
+                   "FREE_MLB_STATSAPI_LINESCORE",
                    "FREE_ESPN_NFL_GAMELOG", "FREE_ESPN_CFB_GAMELOG"} and result.get("status") != "NO_MODEL_OR_MARKET":
             out["player_props"] = {
                 "status": "REAL_PUBLIC_HISTORY_MODEL_UNVALIDATED",
@@ -178,6 +181,7 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         }
     pitcher_pos, pitcher_input = [], []
     batter_pos, batter_input = [], []
+    first_pos, first_input = [], []
     nfl_pos, nfl_input = [], []
     cfb_pos, cfb_input = [], []
     others = {}
@@ -189,6 +193,9 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         elif line["sport"] == "MLB" and market.startswith("BATTER_"):
             batter_pos.append(local)
             batter_input.append(line)
+        elif line["sport"] == "MLB" and market in FIRST_INNING_PHONE_MARKETS:
+            first_pos.append(local)
+            first_input.append(line)
         elif line["sport"] == "NFL" and market.startswith("PLAYER_"):
             nfl_pos.append(local)
             nfl_input.append(line)
@@ -201,6 +208,8 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         pitcher_input, now=clock, getter=getter if auto_context else (lambda url: None))
     batter_results, batter_receipts = phone_batter_rows(
         batter_input, now=clock, getter=getter if auto_context else (lambda url: None))
+    first_results, first_receipts = phone_first_inning_rows(
+        first_input, now=clock, getter=getter if auto_context else (lambda url: None))
     nfl_results, nfl_receipts = phone_nfl_player_rows(
         nfl_input, now=clock, getter=getter if auto_context else (lambda url: None))
     cfb_results, cfb_receipts = phone_cfb_player_rows(
@@ -211,10 +220,14 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         raise ValueError("PITCHER_RESULT_COUNT_MISMATCH")
     if len(batter_results) != len(batter_input):
         raise ValueError("BATTER_RESULT_COUNT_MISMATCH")
+    if len(first_results) != len(first_input):
+        raise ValueError("FIRST_INNING_RESULT_COUNT_MISMATCH")
     modeled_props = [None]*len(props)
     for local, result in zip(pitcher_pos, pitcher_results):
         modeled_props[local] = result
     for local, result in zip(batter_pos, batter_results):
+        modeled_props[local] = result
+    for local, result in zip(first_pos, first_results):
         modeled_props[local] = result
     for local, result in zip(nfl_pos, nfl_results):
         modeled_props[local] = result
@@ -247,10 +260,12 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
     card["prop_unpriced"] = [r for r in modeled_props if r.get("status")=="NO_MODEL_OR_MARKET"]
     card["source_receipts"] = (list(card.get("source_receipts") or [])
                               + pitcher_receipts + batter_receipts
+                              + first_receipts
                               + nfl_receipts + cfb_receipts)
     card["prop_model_status"] = {
         "pitcher_engine":"MLB_PITCHER_JOINT_EMPIRICAL_BAYES",
         "batter_engine":"MLB_BATTER_EMPIRICAL_GAMELOG",
+        "first_inning_engine":"MLB_FIRST_INNING_TEAM_RATES_POISSON_JEFFREYS",
         "nfl_player_engine":"ESPN_NAMED_HISTORICAL_GAMELOG_WATCH_ONLY",
         "cfb_player_engine":"ESPN_NAMED_HISTORICAL_GAMELOG_WATCH_ONLY",
         "free_public_history":True,
