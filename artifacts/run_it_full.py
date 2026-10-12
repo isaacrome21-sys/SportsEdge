@@ -20,6 +20,7 @@ from sportsedge.mlb_phone_pitcher_pricing import phone_pitcher_rows, blocked
 from sportsedge.mlb_phone_batter_pricing import phone_batter_rows
 from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
 from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
+from sportsedge.prepricing.factor_ingestion import stage_games
 from datetime import datetime, timezone
 
 FIELDS = (
@@ -108,12 +109,39 @@ def audit_row(source, result):
     return out
 
 
+def _prepricing_blocked_row(line, stage, input_index):
+    """Fail-closed row for a game whose critical factor could not be verified."""
+    return {
+        "schema": "SPORTSEDGE_FREE_RESEARCH_V1",
+        "status": stage["block_reason"],
+        "sport": line.get("sport"),
+        "game": stage["game_label"],
+        "market": str(line.get("market") or "").upper(),
+        "reason": stage["block_detail"],
+        "research_only": True,
+        "prepricing_audit": {
+            "blocked": True,
+            "block_reason": stage["block_reason"],
+            "block_detail": stage["block_detail"],
+            "factors": stage["factors"],
+        },
+        "input_index": input_index,
+    }
+
+
 def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
     """Separate real game, pitcher, and batter models, preserving original row order.
 
     Issues are UNTRUSTED odds intake: NEVER use submitted features,
     probabilities, starter/participation verification flags or simulation paths.
     Trusted data comes only from free public MLB endpoints.
+
+    Before ANY game market is priced, the pre-pricing factor-ingestion stage
+    (sportsedge.prepricing) pulls verified injuries/QB-participation, weather,
+    MLB probable pitchers, and rest/travel, applies ONLY verified adjustments
+    to the means, and audits every factor per game. A missing critical factor
+    (QB identity for NFL/CFB, probable pitcher for MLB) downgrades that game's
+    markets to blocked with an explicit reason code -- never silently priced.
     """
     rows = payload if isinstance(payload, list) else payload.get("lines")
     if not isinstance(rows, list):
@@ -156,13 +184,74 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
             props.append(line)
 
     if games:
-        card = engine.run({"lines":games},now=clock,getter=getter,
-                          auto_context=auto_context,min_ev=min_ev)
-        priced_games = card.get("evaluated_rows") or []
-        if len(priced_games) != len(games):
+        # Pre-pricing factor-ingestion stage: verified pulls BEFORE pricing.
+        # Manual --no-fetch mode audits without blocking (explicit manual-only
+        # research path); the live path fail-closes on missing critical factors.
+        stages = stage_games(
+            games, now=clock,
+            getter=getter if auto_context else (lambda url: None),
+            enforce_blocks=auto_context)
+        clear_lines, clear_game_pos, clear_stages = [], [], []
+        game_results = [None] * len(games)
+        for gpos, (line, st) in enumerate(zip(games, stages)):
+            if st["blocked"]:
+                game_results[gpos] = _prepricing_blocked_row(
+                    line, st, game_indices[gpos])
+                continue
+            user_ctx = dict(line.get("context") or {})
+            merged = dict(st["adjustments"])
+            overridden = sorted(k for k in merged if k in user_ctx)
+            merged.update(user_ctx)  # explicit manual context wins; noted in audit
+            staged_line = dict(line)
+            staged_line["context"] = merged
+            st["manual_context_overrides"] = overridden
+            clear_lines.append(staged_line)
+            clear_game_pos.append(gpos)
+            clear_stages.append(st)
+        card = engine.run({"lines": clear_lines}, now=clock, getter=getter,
+                          auto_context=auto_context, min_ev=min_ev)
+        priced = card.get("evaluated_rows") or []
+        if len(priced) != len(clear_lines):
             raise ValueError("GAME_EVALUATED_ROWS_INCOMPLETE")
-        for local, original in enumerate(game_indices):
-            priced_games[local]["input_index"] = original
+        for pos, (gpos, st) in enumerate(zip(clear_game_pos, clear_stages)):
+            priced[pos]["input_index"] = game_indices[gpos]
+            priced[pos]["prepricing_stage"] = {
+                "blocked": False,
+                "adjustments": st["adjustments"],
+                "manual_context_overrides": st.get("manual_context_overrides", []),
+            }
+            game_results[gpos] = priced[pos]
+        priced_games = game_results
+        card["prepricing_factor_audit"] = {
+            "schema": "SPORTSEDGE_PREPRICING_FACTOR_AUDIT_V1",
+            "stage": "PREPRICING_FACTOR_INGESTION_V1",
+            "coverage_is_not_validation": True,
+            "market_odds_as_features": "REJECTED_METHOD_NEVER_PRICED",
+            "sourcing_rule": ("KEYED_APIS_NEVER_CALLED_DIRECTLY: odds/weather keys run "
+                              "Actions-side only; stage reads archived evidence plus "
+                              "free public endpoints (ESPN, MLB StatsAPI, Open-Meteo)"),
+            "by_input_index": [
+                {"input_index": game_indices[gpos],
+                 "game": st["game_label"], "sport": st["sport"],
+                 "kickoff_utc": st["kickoff_utc"],
+                 "blocked": st["blocked"], "block_reason": st["block_reason"],
+                 "block_detail": st["block_detail"],
+                 "adjustments": st["adjustments"],
+                 "manual_context_overrides": st.get("manual_context_overrides", []),
+                 "factors": st["factors"]}
+                for gpos, st in enumerate(stages)
+            ],
+        }
+        # Stage fetch receipts join the card's source receipts (deduped per game).
+        seen_receipt_lists = set()
+        stage_receipts = []
+        for st in stages:
+            if id(st["receipts"]) in seen_receipt_lists:
+                continue
+            seen_receipt_lists.add(id(st["receipts"]))
+            stage_receipts.extend(st["receipts"])
+        card["source_receipts"] = (list(card.get("source_receipts") or [])
+                                   + stage_receipts)
     else:
         priced_games = []
         card = {

@@ -25,13 +25,15 @@ PRIORS = {"NFL": (22.0, 13.5, 13.7, 1.5),
           "NBA": (113.0, 19.0, 12.5, 2.0),
           "MLB": (4.4, None, None, 0.20)}
 CONTEXT_KEYS = {"NFL": ("home_rating", "away_rating", "home_injury_pts",
-                        "away_injury_pts", "home_form", "away_form", "weather_total_adj"),
+                        "away_injury_pts", "home_form", "away_form", "weather_total_adj",
+                        "rest_diff_adj"),
                 "CFB": ("home_rating", "away_rating", "home_injury_pts",
-                        "away_injury_pts", "home_form", "away_form", "weather_total_adj"),
+                        "away_injury_pts", "home_form", "away_form", "weather_total_adj",
+                        "rest_diff_adj"),
                 "NBA": ("home_rating", "away_rating", "home_injury_pts",
                         "away_injury_pts", "home_form", "away_form", "rest_adj"),
                 "MLB": ("home_rating", "away_rating", "home_pitcher_adj",
-                        "away_pitcher_adj", "weather_total_adj")}
+                        "away_pitcher_adj", "weather_total_adj", "rest_diff_adj")}
 # Illinois-resident CFB exclusion (market/availability logic, NOT model skill).
 # Exact normalized school aliases avoid confusing Northwestern (IL) with
 # Northwestern State (Louisiana). Add only unambiguous labels.
@@ -78,6 +80,19 @@ def dt(value):
 
 def bounded(value, low, high):
     return max(low, min(high, value))
+
+
+def declared_weather_total_adj(wind_mph, precip_prob, sport):
+    """Declared uncalibrated weather scoring impact on the game total.
+
+    Research prior, NOT a learned edge: wind >= 18 mph -> -0.8, >= 13 ->
+    -0.4; precipitation probability >= 70% -> -0.4; MLB scaled 0.3.
+    Shared by the live provider.weather path and archived weather evidence
+    so the declared table cannot diverge between sources.
+    """
+    impact = (0.8 if wind_mph >= 18 else 0.4 if wind_mph >= 13 else 0.0)
+    impact += 0.4 if precip_prob >= 70 else 0.0
+    return -round(impact * (0.3 if sport == "MLB" else 1.0), 3)
 
 
 def numeric(value, name):
@@ -214,7 +229,12 @@ class PublicContext:
         url = f"{ESPN}/{LEAGUES[sport]}/teams/{team['id']}/schedule?season={season}"
         schedule = self.fetch(url) or {}
         completed = []
-        for event in schedule.get("events") or []:
+        events = schedule.get("events")
+        if not isinstance(events, list):
+            return []  # fail closed: unverified schedule is no schedule
+        for event in events:
+            if not isinstance(event, dict):
+                continue
             played = dt(event.get("date"))
             if played is None or played >= kickoff or played > self.now:
                 continue
@@ -250,12 +270,20 @@ class PublicContext:
             return str(group["id"])
         return None
 
-    def injury_points(self, sport, team):
-        """Verify team-group identity and return cautious heuristic injuries."""
+    def injury_rows(self, sport, team):
+        """Return verified team-scoped injury rows, or (None, status).
+
+        ("rows", "STRUCTURE_VERIFIED") when the ESPN injury payload binds to
+        exactly one team group; (None, "UNUSABLE_SCHEMA") when neither the
+        team nor league payload resolves; ([], "NOT_APPLICABLE") for MLB.
+        Same fetch path and receipts as injury_points; the pre-pricing
+        QB/participation check consumes these rows instead of a second,
+        divergent fetch path.
+        """
         if sport == "MLB":
-            return 0.0, "NOT_APPLICABLE"
+            return [], "NOT_APPLICABLE"
         target_id = str(team["id"])
-        key = (sport, target_id)
+        key = ("injury_rows", sport, target_id)
         if key in self._injury_result_cache:
             return self._injury_result_cache[key]
         url = f"{ESPN}/{LEAGUES[sport]}/teams/{target_id}/injuries"
@@ -298,9 +326,33 @@ class PublicContext:
                 "status": "UNUSABLE_SCHEMA",
                 "reason": "TEAM[" + _shape(data) + "];LEAGUE[" + _shape(league) + "]",
                 "team_id": target_id[:20]})
-            result = (0.0, "MISSING_OR_UNRECOGNIZED_SOURCE")
+            result = (None, "UNUSABLE_SCHEMA")
             self._injury_result_cache[key] = result
             return result
+        self.receipts.append({
+            "source": f"{ESPN}/{LEAGUES[sport]}/injuries",
+            "status": "STRUCTURE_VERIFIED",
+            "team_id": target_id[:20],
+            "injury_rows_reported": len(candidates),
+            "note": "REPORTED_INJURIES_NOT_COMPLETE_ROSTER_HEALTH"})
+        result = (candidates, "STRUCTURE_VERIFIED")
+        self._injury_result_cache[key] = result
+        return result
+
+    def injury_points(self, sport, team):
+        """Verify team-group identity and return cautious heuristic injuries.
+
+        Contract: (points, status); MLB -> (0.0, "NOT_APPLICABLE");
+        verified payload -> (-loss, "HEURISTIC_OUT_DOUBTFUL_REPORTED_{n}_UNKNOWN_COMPLETENESS");
+        unusable payload -> (0.0, "MISSING_OR_UNRECOGNIZED_SOURCE").
+        QB out/doubtful costs 1.5 (NFL), NBA 0.3 each, others 0.15, capped 2.5.
+        """
+        if sport == "MLB":
+            return 0.0, "NOT_APPLICABLE"
+        rows, status = self.injury_rows(sport, team)
+        if rows is None:
+            return 0.0, "MISSING_OR_UNRECOGNIZED_SOURCE"
+        candidates = rows
         seen = set()
         loss = 0.0
         for row in candidates:
@@ -323,16 +375,10 @@ class PublicContext:
             position = position.get("abbreviation") if isinstance(position, dict) else position
             loss += 1.5 if sport == "NFL" and str(position).upper() == "QB" else (
                 0.3 if sport == "NBA" else 0.15)
-        self.receipts.append({
-            "source": f"{ESPN}/{LEAGUES[sport]}/injuries",
-            "status": "STRUCTURE_VERIFIED",
-            "team_id": target_id[:20],
-            "injury_rows_reported": len(candidates),
-            "note": "REPORTED_INJURIES_NOT_COMPLETE_ROSTER_HEALTH"})
-        result = (-round(min(loss, 2.5), 3),
-                  f"HEURISTIC_OUT_DOUBTFUL_REPORTED_{len(seen)}_UNKNOWN_COMPLETENESS")
-        self._injury_result_cache[key] = result
-        return result
+        # Receipt already recorded by injury_rows (STRUCTURE_VERIFIED); the
+        # points heuristic keeps its original return contract.
+        return (-round(min(loss, 2.5), 3),
+                f"HEURISTIC_OUT_DOUBTFUL_REPORTED_{len(seen)}_UNKNOWN_COMPLETENESS")
 
     def fixture(self, sport, away, home, kickoff):
         """Bind competition/venue with BOTH teams and a unique start time."""
@@ -464,9 +510,8 @@ class PublicContext:
         except (KeyError, TypeError, IndexError, ValueError):
             return 0.0, "FORECAST_VARIABLE_MISSING"
         # Deliberately small unvalidated weather prior, no claim of profit.
-        impact = (0.8 if wind >= 18 else 0.4 if wind >= 13 else 0.0)
-        impact += 0.4 if rain >= 70 else 0.0
-        return -round(impact * (0.3 if sport == "MLB" else 1.0), 3), "HEURISTIC_FORECAST_NOT_CALIBRATED"
+        # Shared declared table: see declared_weather_total_adj.
+        return declared_weather_total_adj(wind, rain, sport), "HEURISTIC_FORECAST_NOT_CALIBRATED"
 
 
 def context_for(sport, away, home, start, provider, row):
@@ -593,6 +638,11 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
     if "weather_total_adj" in context:
         home_mean += context["weather_total_adj"] / 2
         away_mean += context["weather_total_adj"] / 2
+    if "rest_diff_adj" in context:
+        # Declared rest-differential prior (HEURISTIC, harness-gated):
+        # positive favors the home team, split symmetrically.
+        home_mean += context["rest_diff_adj"] / 2
+        away_mean -= context["rest_diff_adj"] / 2
     if min(home_mean, away_mean) < 0.2:
         raise ValueError("IMPLAUSIBLE_SCORE_MEAN")
     # A raw league-score baseline is NOT an executable fair price. Shrink
