@@ -20,6 +20,7 @@ from sportsedge.mlb_phone_pitcher_pricing import phone_pitcher_rows, blocked
 from sportsedge.mlb_phone_batter_pricing import phone_batter_rows
 from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
 from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
+from sportsedge.team_half_pricing import price_team_or_half
 from datetime import datetime, timezone
 
 FIELDS = (
@@ -36,7 +37,10 @@ def audit_row(source, result):
     sport = str(source.get("sport") or "").upper()
     market = str(source.get("market") or "").upper()
     market = {"MONEYLINE": "ML", "H2H": "ML", "RUN_LINE": "SPREAD",
-              "GAME_TOTAL": "TOTAL", "TOTALS": "TOTAL"}.get(market, market)
+              "GAME_TOTAL": "TOTAL", "TOTALS": "TOTAL",
+              "TEAM_TOTAL_POINTS": "TEAM_TOTAL",
+              "FIRST_HALF_TOTAL": "TOTAL_1H", "FIRST_HALF_SPREAD": "SPREAD_1H",
+              "FIRST_HALF_MONEYLINE": "ML_1H", "FIRST_HALF_ML": "ML_1H"}.get(market, market)
     context = result.get("context") or {}
     notes = [str(x).upper() for x in result.get("context_notes") or []]
     n = " ".join(notes)
@@ -92,7 +96,20 @@ def audit_row(source, result):
                               "detail": sport_specific.get(sport, "Unsupported sport")}
     if market not in ("ML", "SPREAD", "TOTAL"):
         src = result.get("source") or ""
-        if src in {"FREE_MLB_STATSAPI_GAMELOG", "FREE_MLB_STATSAPI_BATTER_GAMELOG",
+        if market in {"TEAM_TOTAL", "TOTAL_1H", "SPREAD_1H", "ML_1H"}:
+            if (result.get("status") == "PRICED_RESEARCH"
+                    and result.get("model_source") == "free_models_means_team_half_v1"):
+                out["player_props"] = {
+                    "status": "FREE_MODELS_MEANS_DECLARED_HALF_UNVALIDATED",
+                    "detail": "Same verified ESPN fixture and independent home/away score means as game ML/spread/total; "
+                              "first-half is a declared 0.50 scale, not fitted; not validated vs closes",
+                }
+            else:
+                out["player_props"] = {
+                    "status": "NO_MODEL_OR_MARKET",
+                    "detail": result.get("reason") or "Team-total/first-half pricing unavailable; no probability assigned",
+                }
+        elif src in {"FREE_MLB_STATSAPI_GAMELOG", "FREE_MLB_STATSAPI_BATTER_GAMELOG",
                    "FREE_ESPN_NFL_GAMELOG", "FREE_ESPN_CFB_GAMELOG"} and result.get("status") != "NO_MODEL_OR_MARKET":
             out["player_props"] = {
                 "status": "REAL_PUBLIC_HISTORY_MODEL_UNVALIDATED",
@@ -148,6 +165,16 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
                 "RECEPTIONS":"PLAYER_RECEPTIONS",
             }.get(market,market)
             line["market"] = market
+        # Team-total / first-half alias normalization (all sports). Canonical
+        # labels: TEAM_TOTAL, TOTAL_1H, SPREAD_1H, ML_1H.
+        market = {
+            "TEAM_TOTAL_POINTS": "TEAM_TOTAL",
+            "FIRST_HALF_TOTAL": "TOTAL_1H",
+            "FIRST_HALF_SPREAD": "SPREAD_1H",
+            "FIRST_HALF_MONEYLINE": "ML_1H",
+            "FIRST_HALF_ML": "ML_1H",
+        }.get(market, market)
+        line["market"] = market
         if market in {"ML","SPREAD","TOTAL"}:
             game_indices.append(i)
             games.append(line)
@@ -180,7 +207,9 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
     batter_pos, batter_input = [], []
     nfl_pos, nfl_input = [], []
     cfb_pos, cfb_input = [], []
+    teamhalf_pos, teamhalf_input = [], []
     others = {}
+    TEAM_HALF_MARKETS = {"TEAM_TOTAL", "TOTAL_1H", "SPREAD_1H", "ML_1H"}
     for local, line in enumerate(props):
         market = str(line.get("market") or "").upper()
         if line["sport"] == "MLB" and market.startswith("PITCHER_"):
@@ -195,6 +224,12 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         elif line["sport"] == "CFB" and market.startswith("PLAYER_"):
             cfb_pos.append(local)
             cfb_input.append(line)
+        elif market in TEAM_HALF_MARKETS:
+            # Team totals and first halves price from the same verified ESPN
+            # fixture and independent home/away score means as game
+            # ML/spread/total. First-half is a declared 0.50 scale, not fitted.
+            teamhalf_pos.append(local)
+            teamhalf_input.append(line)
         else:
             others[local] = blocked(line, "NO_VERIFIED_MODEL_FOR_THIS_MARKET")
     pitcher_results, pitcher_receipts = phone_pitcher_rows(
@@ -205,8 +240,15 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         nfl_input, now=clock, getter=getter if auto_context else (lambda url: None))
     cfb_results, cfb_receipts = phone_cfb_player_rows(
         cfb_input, now=clock, getter=getter if auto_context else (lambda url: None))
+    teamhalf_results = [
+        price_team_or_half(
+            row, now=clock, getter=getter if auto_context else (lambda url: None))
+        for row in teamhalf_input
+    ]
     if len(nfl_results) != len(nfl_input) or len(cfb_results) != len(cfb_input):
         raise ValueError("FOOTBALL_RESULT_COUNT_MISMATCH")
+    if len(teamhalf_results) != len(teamhalf_input):
+        raise ValueError("TEAM_HALF_RESULT_COUNT_MISMATCH")
     if len(pitcher_results) != len(pitcher_input):
         raise ValueError("PITCHER_RESULT_COUNT_MISMATCH")
     if len(batter_results) != len(batter_input):
@@ -219,6 +261,8 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
     for local, result in zip(nfl_pos, nfl_results):
         modeled_props[local] = result
     for local, result in zip(cfb_pos, cfb_results):
+        modeled_props[local] = result
+    for local, result in zip(teamhalf_pos, teamhalf_results):
         modeled_props[local] = result
     for local, result in others.items():
         modeled_props[local] = result
@@ -253,6 +297,7 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         "batter_engine":"MLB_BATTER_EMPIRICAL_GAMELOG",
         "nfl_player_engine":"ESPN_NAMED_HISTORICAL_GAMELOG_WATCH_ONLY",
         "cfb_player_engine":"ESPN_NAMED_HISTORICAL_GAMELOG_WATCH_ONLY",
+        "team_half_engine":"FREE_MODELS_MEANS_DECLARED_HALF_SCALE_UNVALIDATED",
         "free_public_history":True,
         "model_vs_close_validated":False,
         "phone_odds_freshness_required":True,
@@ -284,7 +329,7 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
             "MLB_PITCHER_BATTER_AND_ESPN_NAMED_FOOTBALL_HISTORY_UNVALIDATED",
         },
     }
-    card["runner"]="RUN_IT_FULL_MLB_AND_NAMED_FOOTBALL_PLAYER_HISTORIES_V1"
+    card["runner"]="RUN_IT_FULL_MLB_AND_NAMED_FOOTBALL_PLAYER_HISTORIES_TEAM_HALF_V1"
     return card
 
 
