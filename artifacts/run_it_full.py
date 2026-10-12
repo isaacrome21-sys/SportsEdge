@@ -21,6 +21,8 @@ from sportsedge.mlb_phone_batter_pricing import phone_batter_rows
 from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
 from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
 from sportsedge.prepricing.factor_ingestion import stage_games
+from sportsedge.uncertainty import attach_uncertainty, methodology_block
+from sportsedge.actionability import annotate_actionability
 from datetime import datetime, timezone
 
 FIELDS = (
@@ -323,6 +325,16 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
     if any(r is None for r in evaluated):
         raise ValueError("EVALUATED_ROWS_REQUIRED_TO_AVOID_FALSE_FACTOR_COVERAGE")
     card["evaluated_rows"] = evaluated
+    # Uncertainty bands + sample-size flags on every priced row, and the
+    # actionability breakdown in the summary: both are research-only
+    # visibility, never wagering authority. Annotations are in place on
+    # the same row objects the candidate/watchlist views filter, so every
+    # card view carries them.
+    uncertainty_counts = attach_uncertainty(evaluated)
+    card["uncertainty_methodology"] = methodology_block()
+    card["summary"] = dict(card.get("summary") or {})
+    card["summary"]["sample_flag_counts"] = uncertainty_counts
+    card["summary"]["actionability"] = annotate_actionability(evaluated)
     card.setdefault("summary",{})
     card["summary"]["rows"] = len(rows)
     card["summary"]["status_counts"] = dict(sorted(Counter(
