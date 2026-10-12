@@ -125,8 +125,8 @@ def _parse_ts(value: str | None) -> datetime | None:
     if text.endswith("Z"):
         text = text[:-1] + "+00:00"
     dt = datetime.fromisoformat(text)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+    if dt.tzinfo is None or dt.utcoffset() is None:
+        raise ValueError("TIMESTAMP_TIMEZONE_REQUIRED")
     return dt.astimezone(timezone.utc)
 
 
@@ -231,11 +231,12 @@ def validate_record(rec: ParticipationRecord) -> None:
             raise RecordValidationError(REJ_FORWARD_ONLY_HISTORICAL)
         if rec.availability_basis != BASIS_CAPTURE_TIMESTAMP:
             raise RecordValidationError(REJ_FORWARD_ONLY_HISTORICAL)
+        if not rec.game_id or not rec.kickoff_utc:
+            raise RecordValidationError("FORWARD_CAPTURE_REQUIRES_GAME_AND_KICKOFF")
         captured = _parse_ts(rec.captured_at_utc)
-        if rec.kickoff_utc is not None:
-            kickoff = _parse_ts(rec.kickoff_utc)
-            if kickoff is not None and captured is not None and captured > kickoff:
-                raise RecordValidationError(REJ_CAPTURE_AFTER_KICKOFF)
+        kickoff = _parse_ts(rec.kickoff_utc)
+        if kickoff is None or captured >= kickoff:
+            raise RecordValidationError(REJ_CAPTURE_AFTER_KICKOFF)
         # The capture timestamp IS the availability bound for these signals.
         if rec.available_from_utc != rec.captured_at_utc:
             raise RecordValidationError(
