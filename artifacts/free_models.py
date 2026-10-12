@@ -282,6 +282,11 @@ class PublicContext:
         """
         if sport == "MLB":
             return [], "NOT_APPLICABLE"
+        if self.historical:
+            # ESPN serves the CURRENT injury report only. There is no free
+            # as-of historical injury endpoint, so a historical repricing
+            # must not silently apply today's report to a past kickoff.
+            return [], "AS_OF_HISTORICAL_INJURIES_UNAVAILABLE"
         target_id = str(team["id"])
         key = ("injury_rows", sport, target_id)
         if key in self._injury_result_cache:

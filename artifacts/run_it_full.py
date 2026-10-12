@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 FIELDS = (
     "team_quality", "injuries", "rest_travel", "home_park", "weather",
     "recent_form", "matchups", "coaching", "key_numbers",
-    "market_context", "sport_specific", "player_props",
+    "market_context", "manual_context", "sport_specific", "player_props",
 )
 UNWIRED = "NOT_WIRED"
 MISSING = "MISSING_UNVERIFIED"
@@ -83,6 +83,40 @@ def audit_row(source, result):
                           "detail": "Integer push refund modeled; separate NFL 3/7 distribution not trained"}
     out["market_context"] = {"status": HEURISTIC if result.get("market_anchor") else MISSING,
                              "detail": "15% unfitted residual anchored to supplied DK line, no contemporaneous sharp reference"}
+    # Repair 2: the factor audit says which lane produced the row's numbers.
+    lane = str(result.get("pricing_lane") or "")
+    if lane == "LANE_A_INDEPENDENT":
+        out["market_context"] = {
+            "status": "NOT_USED_LANE_A_INDEPENDENT",
+            "detail": "Lane A (independent): the win probability used no market input; "
+                      "the anchored Lane B view is available separately as lane_b_anchored",
+        }
+    elif lane == "LANE_B_ANCHORED":
+        out["market_context"] = {
+            "status": "ANCHORED_UNVALIDATED_LANE_B",
+            "detail": "Lane B (anchored): Lane A shrunk 15% toward the supplied DK line; "
+                      "unfitted hypothesis, must prove out-of-sample",
+        }
+    # Repair 1: manual context overrides must be visible in the factor audit.
+    provenance = result.get("context_provenance") or {}
+    user_keys = sorted(k for k, v in provenance.items() if v == "USER_SUPPLIED_MANUAL")
+    if user_keys:
+        out["manual_context"] = {
+            "status": "USER_SUPPLIED_MANUAL",
+            "detail": "Explicit manual overrides applied to: " + ", ".join(user_keys)
+                      + ". Labeled, never silent; verified factors were not replaced without the flag.",
+        }
+    elif result.get("status") == "BLOCKED_MANUAL_CONTEXT_UNDECLARED":
+        out["manual_context"] = {
+            "status": "BLOCKED_UNDECLARED_OVERRIDE",
+            "detail": "Row carried manual context overrides without the explicit flag: "
+                      + str(result.get("reason") or ""),
+        }
+    else:
+        out["manual_context"] = {
+            "status": "VERIFIED_PUBLIC_ONLY",
+            "detail": "No manual context overrides; factors are verified-public or heuristic defaults",
+        }
     sport_specific = {
         "NFL": "Score approximation only; QB/trenches and Next Gen measures not wired",
         "CFB": "Score approximation only; talent/portal effects not wired",
@@ -129,19 +163,17 @@ def _prepricing_blocked_row(line, stage, input_index):
     }
 
 
-def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
+def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
+             auto_context=True, min_ev=0.02, lane="A", allow_manual_context=False):
     """Separate real game, pitcher, and batter models, preserving original row order.
 
     Issues are UNTRUSTED odds intake: NEVER use submitted features,
     probabilities, starter/participation verification flags or simulation paths.
     Trusted data comes only from free public MLB endpoints.
 
-    Before ANY game market is priced, the pre-pricing factor-ingestion stage
-    (sportsedge.prepricing) pulls verified injuries/QB-participation, weather,
-    MLB probable pitchers, and rest/travel, applies ONLY verified adjustments
-    to the means, and audits every factor per game. A missing critical factor
-    (QB identity for NFL/CFB, probable pitcher for MLB) downgrades that game's
-    markets to blocked with an explicit reason code -- never silently priced.
+    lane="A" (default) prices game rows market-blind; lane="B" explicitly
+    requests the anchored view. allow_manual_context=False (default) fails
+    closed on any manual context override in the intake rows.
     """
     rows = payload if isinstance(payload, list) else payload.get("lines")
     if not isinstance(rows, list):
@@ -208,8 +240,10 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
             clear_lines.append(staged_line)
             clear_game_pos.append(gpos)
             clear_stages.append(st)
-        card = engine.run({"lines": clear_lines}, now=clock, getter=getter,
-                          auto_context=auto_context, min_ev=min_ev)
+        # Contract repairs (#2045): pass through as_of, historical, lane, allow_manual_context
+        card = engine.run({"lines": clear_lines}, now=clock, as_of=as_of, historical=historical,
+                          getter=getter, auto_context=auto_context, min_ev=min_ev,
+                          lane=lane, allow_manual_context=allow_manual_context)
         priced = card.get("evaluated_rows") or []
         if len(priced) != len(clear_lines):
             raise ValueError("GAME_EVALUATED_ROWS_INCOMPLETE")
@@ -383,11 +417,20 @@ def main(argv=None):
     p.add_argument("--output", type=Path)
     p.add_argument("--no-fetch", action="store_true")
     p.add_argument("--min-ev", type=float, default=0.02)
+    p.add_argument("--lane", choices=["A", "B"], default="A",
+                   help="Primary pricing lane for game rows: A=independent (default), B=anchored")
+    p.add_argument("--allow-manual-context", action="store_true",
+                   help="Allow intake rows to override verified context factors (labeled in audit)")
+    p.add_argument("--as-of", help="Point-in-time clock (ISO-8601); defaults to now")
+    p.add_argument("--historical", action="store_true",
+                   help="Repricing history: refuse current-state sources that cannot be snapshotted as-of")
     args = p.parse_args(argv)
     if not 0 <= args.min_ev <= 0.15:
         p.error("min-ev must be between 0 and 0.15")
     card = run_full(json.loads(args.lines.read_text(encoding="utf-8")),
-                    auto_context=not args.no_fetch, min_ev=args.min_ev)
+                    auto_context=not args.no_fetch, min_ev=args.min_ev,
+                    lane=args.lane, allow_manual_context=args.allow_manual_context,
+                    as_of=args.as_of, historical=args.historical)
     rendered = json.dumps(card, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
