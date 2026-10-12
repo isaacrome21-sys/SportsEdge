@@ -213,8 +213,8 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "RECEPTIONS":"PLAYER_RECEPTIONS",
             }.get(market,market)
             line["market"] = market
-        if market in {"ML","SPREAD","TOTAL","TEAM_TOTALS"} and line["sport"] == "MLB" or (
-            market in {"ML","SPREAD","TOTAL"} and line["sport"] != "MLB"
+        if market in {"ML", "SPREAD", "TOTAL"} or (
+            line["sport"] == "MLB" and market == "TEAM_TOTALS"
         ):
             game_indices.append(i)
             games.append(line)
@@ -320,7 +320,10 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         if line["sport"] == "MLB" and market.startswith("PITCHER_"):
             pitcher_pos.append(local)
             pitcher_input.append(line)
-        elif line["sport"] == "MLB" and market.startswith("BATTER_"):
+        elif line["sport"] == "MLB" and (
+            market.startswith("BATTER_") or
+            market in {"SINGLES", "DOUBLES", "HITS_RUNS_RBIS", "H_R_RBI"}
+        ):
             batter_pos.append(local)
             batter_input.append(line)
         elif line["sport"] == "MLB" and market in FIRST_INNING_PHONE_MARKETS:
