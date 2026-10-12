@@ -38,6 +38,96 @@ def _norm(value):
     return " ".join(re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).split())
 
 
+def _gamelog_stats_lookup(data):
+    """Bind eventId -> stats from ESPN seasonTypes category entries.
+
+    Current ESPN gamelog shapes keep the event metadata separately from
+    category event stats. All raw stat lists still require the explicit
+    top-level `names` metadata for unambiguous field identity. Repeated
+    event IDs may be deduped only if the corresponding stats are identical.
+    """
+    lookup = {}
+    season_types = data.get("seasonTypes")
+    if season_types is None:
+        return lookup
+    if not isinstance(season_types, list):
+        raise MissingNFLHistory("ESPN_GAMELOG_SEASON_TYPES_NOT_LIST")
+    for season in season_types:
+        if not isinstance(season, dict):
+            raise MissingNFLHistory("ESPN_GAMELOG_SEASON_TYPE_NOT_OBJECT")
+        categories = season.get("categories")
+        if categories is None:
+            continue
+        if not isinstance(categories, list):
+            raise MissingNFLHistory("ESPN_GAMELOG_CATEGORIES_NOT_LIST")
+        for category in categories:
+            if not isinstance(category, dict):
+                raise MissingNFLHistory("ESPN_GAMELOG_CATEGORY_NOT_OBJECT")
+            cat_events = category.get("events")
+            if cat_events is None:
+                continue
+            if not isinstance(cat_events, list):
+                raise MissingNFLHistory("ESPN_GAMELOG_CATEGORY_EVENTS_NOT_LIST")
+            for entry in cat_events:
+                if not isinstance(entry, dict):
+                    raise MissingNFLHistory("ESPN_GAMELOG_CATEGORY_EVENT_NOT_OBJECT")
+                event_id = str(entry.get("eventId") or "").strip()
+                if not event_id or "stats" not in entry:
+                    continue
+                stats = entry["stats"]
+                if event_id in lookup:
+                    if lookup[event_id] != stats:
+                        raise MissingNFLHistory(
+                            "ESPN_GAMELOG_STATS_CONFLICT:" + event_id)
+                    continue
+                lookup[event_id] = stats
+    return lookup
+
+
+def _gamelog_events(data, stats_lookup):
+    """Normalize metadata maps and legacy event lists to named stat events.
+
+    A mapping-key / metadata-id conflict is counted as invalid, never
+    repaired by guessing. An event with no stats remains invalid; missing
+    values are not zero-filled.
+    """
+    raw = data.get("events")
+    if raw is None:
+        raw = []
+    events = []
+    rejected = 0
+    if isinstance(raw, dict):
+        for key, meta in raw.items():
+            if not isinstance(meta, dict):
+                rejected += 1
+                continue
+            event_id = str(key or "").strip()
+            meta_id = str(meta.get("id") or "").strip()
+            if meta_id and event_id and meta_id != event_id:
+                rejected += 1
+                continue
+            if not event_id:
+                event_id = meta_id
+            merged = dict(meta)
+            merged["id"] = event_id
+            if "stats" not in merged and event_id in stats_lookup:
+                merged["stats"] = stats_lookup[event_id]
+            events.append(merged)
+    elif isinstance(raw, list):
+        for meta in raw:
+            if not isinstance(meta, dict):
+                rejected += 1
+                continue
+            merged = dict(meta)
+            event_id = str(merged.get("id") or "").strip()
+            if "stats" not in merged and event_id and event_id in stats_lookup:
+                merged["stats"] = stats_lookup[event_id]
+            events.append(merged)
+    else:
+        raise MissingNFLHistory("ESPN_GAMELOG_EVENTS_NOT_LIST")
+    return events, rejected
+
+
 def public_json(url):
     try:
         request = Request(url, headers={"User-Agent": "SportsEdge-free-research/1.0",
@@ -152,16 +242,17 @@ class NFLPlayerPublicSource:
         if not isinstance(data, dict):
             raise MissingNFLHistory("NFL_GAMELOG_UNAVAILABLE")
 
-        # ESPN gamelog returns categories + events with stats arrays.
-        # We extract the most recent completed games before kickoff.
-        events = data.get("events") or []
-        if not isinstance(events, list):
-            raise MissingNFLHistory("ESPN_GAMELOG_EVENTS_NOT_LIST")
+        # ESPN may separate event metadata from category-level stats.
+        # Restore exact eventId binding before the named-stat decoder.
+        # The legacy list-of-events response remains supported.
+        stats_lookup = _gamelog_stats_lookup(data)
+        events, rejected = _gamelog_events(data, stats_lookup)
         hist = []
-        invalid_schema = 0
+        invalid_schema = rejected
         for event in events:
             try:
-                event_date = _clock(event.get("date"), "GAMELOG_DATE")
+                event_date = _clock(event.get("gameDate") or event.get("date"),
+                                    "GAMELOG_DATE")
                 if event_date >= now or event_date >= kickoff:
                     continue
                 event_id = str(event.get("id") or "").strip()
