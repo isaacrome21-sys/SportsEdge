@@ -37,7 +37,7 @@ def getter(url, *, starts=7, schedule_response=None):
     host=urlparse(url).hostname
     assert host=="statsapi.mlb.com",url
     if urlparse(url).path.endswith("/schedule"):
-        assert "probablePitcher" in parse_qs(urlparse(url).query)["hydrate"]
+        assert "probablePitcher" in parse_qs(urlparse(url).query)["hydrate"][0]
         return schedule() if schedule_response is None else schedule_response
     if "/people/" in url and "/stats" in url:
         q=parse_qs(urlparse(url).query)
