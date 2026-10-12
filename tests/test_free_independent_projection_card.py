@@ -21,7 +21,10 @@ KICKOFF="2026-10-12T01:15:00Z"
 
 def row(market="TOTAL",side="UNDER",line=54.5,odds=-105,**extra):
     base={"away":"Buffalo Bills","home":"Los Angeles Rams",
-          "market":market,"side":side,"odds":odds,"kickoff":KICKOFF}
+          "market":market,"side":side,"odds":odds,"kickoff":KICKOFF,
+          # Fresh capture so the centralized 180s freshness gate does not mask
+          # candidate assertions; override per-test where staleness is the point.
+          "quote_captured_at":"2026-10-11T12:59:00Z"}
     if line is not None:
         base["line"]=line
     base.update(extra)

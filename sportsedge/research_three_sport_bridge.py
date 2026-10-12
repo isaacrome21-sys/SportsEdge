@@ -12,6 +12,16 @@ from datetime import datetime, timezone
 from math import isfinite
 from typing import Mapping, Sequence
 
+from .quote_freshness import (
+    MAX_QUOTE_AGE_SECONDS,
+    QUOTE_FRESH,
+    QUOTE_FUTURE,
+    QUOTE_INVALID,
+    QUOTE_STALE,
+    QUOTE_UNVERIFIED,
+    check_quote_freshness,
+)
+
 SPORTS = frozenset({"NFL", "MLB", "CFB"})
 GAME_MARKETS = frozenset({
     "ML", "MONEYLINE", "SPREAD", "TOTAL", "TEAM_TOTAL",
@@ -19,7 +29,26 @@ GAME_MARKETS = frozenset({
 })
 ODDS_CAP = -165
 EV_MIN = 0.02
-MAX_AGE_SECONDS = 180
+# Legacy bound name kept for backward compatibility; the single source of
+# truth is sportsedge.quote_freshness.MAX_QUOTE_AGE_SECONDS.
+MAX_AGE_SECONDS = MAX_QUOTE_AGE_SECONDS
+
+
+def _bridge_quote_status(captured_at, *, now):
+    """Map the centralized freshness verdict onto this bridge's legacy labels.
+
+    Labels are unchanged (STALE_QUOTE / RECENT_CAPTURED_QUOTE /
+    UNVERIFIED_QUOTE_FRESHNESS) so downstream consumers keep working; the
+    classification now comes from the one centralized check.
+    """
+    code = check_quote_freshness(captured_at, now=now)["code"]
+    if code == QUOTE_FRESH:
+        return "RECENT_CAPTURED_QUOTE"
+    if code in (QUOTE_STALE, QUOTE_FUTURE):
+        return "STALE_QUOTE"
+    if code in (QUOTE_UNVERIFIED, QUOTE_INVALID):
+        return "UNVERIFIED_QUOTE_FRESHNESS"
+    raise ResearchQuoteError("QUOTE_FRESHNESS_CODE_UNRECOGNIZED:" + code)
 
 
 class ResearchQuoteError(ValueError):
@@ -174,12 +203,8 @@ def price_three_sport_research(model_rows: Sequence[Mapping], quotes: Sequence[M
             own, other = ours[0], others[0]
             if own[4] is not None and other[4] is not None and own[4] != other[4]:
                 raise ResearchQuoteError("PAIRED_QUOTES_CAPTURE_TIMES_CONFLICT")
-            if own[4] is None or other[4] is None:
-                freshness = "UNVERIFIED_QUOTE_FRESHNESS"
-            elif own[4] > now or (now - own[4]).total_seconds() > MAX_AGE_SECONDS:
-                freshness = "STALE_QUOTE"
-            else:
-                freshness = "RECENT_CAPTURED_QUOTE"
+            # One centralized freshness check; legacy bridge labels preserved.
+            freshness = _bridge_quote_status(own[4], now=now)
             kickoff = _time(model.get("kickoff_utc"), "KICKOFF")
             phase = str(model.get("phase") or "PREGAME").upper()
             if phase == "PREGAME" and kickoff <= now:

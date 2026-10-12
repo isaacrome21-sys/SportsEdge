@@ -50,7 +50,9 @@ def fixture_getter(url):
 
 def line(**kw):
     x = {'sport':'NFL','game':'Detroit Lions @ Arizona Cardinals',
-         'market':'total','side':'UNDER','line':54.5,'odds':-102}
+         'market':'total','side':'UNDER','line':54.5,'odds':-102,
+         # Fresh capture so quote-freshness gating does not mask pricing assertions.
+         'quote_captured_at':'2026-10-11T12:59:00Z'}
     x.update(kw)
     return x
 
@@ -78,21 +80,32 @@ def test_context_does_not_invent_missing_team_or_kickoff():
 
 
 def test_manual_override_and_push_aware_ev():
+    # Manual overrides are GATED: without the explicit flag they fail closed;
+    # with it they apply and are labeled USER_SUPPLIED_MANUAL in the audit.
+    blocked = model.run({'lines':[line(commence_time=START,context={'weather_total_adj':-3.0})]},
+                        now=NOW,auto_context=False)
+    assert blocked['summary']['status_counts']['BLOCKED_MANUAL_CONTEXT_UNDECLARED'] == 1
+    assert blocked['evaluated_rows'][0]['attempted_override_keys'] == ['context.weather_total_adj']
     x = model.run({'lines':[line(commence_time=START,context={'weather_total_adj':-3.0})]},
-                  now=NOW,auto_context=False)
+                  now=NOW,auto_context=False,allow_manual_context=True)
     obj = (x['edges'] or [])
     if obj:
         assert obj[0]['context']['weather_total_adj'] == -3.0
+        assert obj[0]['context_provenance']['weather_total_adj'] == 'USER_SUPPLIED_MANUAL'
+        assert 'OVERRIDE_USER_SUPPLIED:weather_total_adj' in obj[0]['context_notes']
     total = model.calculate(line(commence_time=START,line=54,context={'weather_total_adj':-3}),
-                            model.PublicContext(NOW),NOW,auto_context=False)
+                            model.PublicContext(NOW),NOW,auto_context=False,
+                            allow_manual_context=True)
     assert total['push_p'] > 0
     expected = total['estimate_p']*(100/102)-(1-total['estimate_p']-total['push_p'])
     assert abs(total['ev_per_dollar']-expected) < 1e-5
+    assert total['context_provenance']['weather_total_adj'] == 'USER_SUPPLIED_MANUAL'
 
 
 def test_ml_mlb_poisson_and_price_cap():
     score = model.calculate({'sport':'MLB','away':'A','home':'B','market':'ML',
-                             'side':'HOME','odds':-180,'opposite_odds':+155,'kickoff':START},
+                             'side':'HOME','odds':-180,'opposite_odds':+155,'kickoff':START,
+                             'quote_captured_at':'2026-10-11T12:59:00Z'},
                             model.PublicContext(NOW),NOW,auto_context=False)
     assert score['status'] == 'PRICE_CAP'
     assert 0 < score['estimate_p'] < 1
@@ -122,18 +135,36 @@ def test_normalized_sides_do_not_reverse_spread_sign():
 
 
 def test_one_sided_moneyline_fails_closed_without_no_vig_anchor():
+    # Lane A is market-blind: an unpaired ML still prices independently, with
+    # Lane B explicitly marked unavailable. An explicit Lane B request without
+    # the opposite price fails closed as before.
     value = model.calculate({'sport':'NFL','away':'DET','home':'ARI',
         'market':'ML','side':'HOME','odds':-110,'kickoff':START},
         model.PublicContext(NOW), NOW, auto_context=False)
-    assert value['status'] == 'BLOCKED_UNPAIRED_ML'
+    assert value['status'] != 'BLOCKED_UNPAIRED_ML'
+    assert value['pricing_lane'] == 'LANE_A_INDEPENDENT'
+    assert value['pricing_lanes']['lane_b_anchored']['status'] == 'LANE_B_UNAVAILABLE'
+    assert value['pricing_lanes']['lane_b_anchored']['reason'] == 'BLOCKED_UNPAIRED_ML'
+    anchored = model.calculate({'sport':'NFL','away':'DET','home':'ARI',
+        'market':'ML','side':'HOME','odds':-110,'kickoff':START},
+        model.PublicContext(NOW), NOW, auto_context=False, lane="B")
+    assert anchored['status'] == 'BLOCKED_UNPAIRED_ML'
 
 
 def test_extreme_raw_total_is_market_anchored_not_massive_fake_edge():
     value = model.calculate(line(line=68.5,commence_time=START),
         model.PublicContext(NOW),NOW,auto_context=False)
+    # Lane B (anchored) still damps the extreme line toward the market.
+    lane_b = value['pricing_lanes']['lane_b_anchored']
+    assert lane_b['lane'] == 'LANE_B_ANCHORED'
     assert value['market_anchor']['fair_total'] > 60
     assert value['market_anchor']['fair_total'] < 68.5
-    assert value['estimate_p'] < 0.65
+    assert lane_b['estimate_p'] < 0.65
+    # Lane A is labeled independent and does NOT see the market line.
+    lane_a = value['pricing_lanes']['lane_a_independent']
+    assert lane_a['lane'] == 'LANE_A_INDEPENDENT'
+    assert lane_a['uses_sportsbook_price_in_projection'] is False
+    assert value['pricing_lane'] == 'LANE_A_INDEPENDENT'
 
 
 def test_integer_push_uses_effective_breakeven_probability():
