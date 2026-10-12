@@ -541,13 +541,16 @@ class RunnerHookTests(unittest.TestCase):
         self.assertTrue(audit["blocked"])
         self.assertEqual(audit["adjustments"], {})
 
-    def test_manual_mode_audits_without_blocking(self):
+    def test_manual_mode_cannot_publish_nfl_run_it_probabilities(self):
         card = run_full({"lines": [nfl_row()]}, now=NOW, auto_context=False)
         row = card["evaluated_rows"][0]
-        # Existing manual-mode behavior preserved: priced, not downgraded.
-        self.assertIn(row["status"], ("RESEARCH_EDGE", "BELOW_THRESHOLD", "PRICE_CAP"))
+        # Explicit no-fetch experiments cannot publish a normal phone card.
+        self.assertEqual(row["status"], "BLOCKED_NFL_NO_VERIFIED_CONTEXT")
+        self.assertNotIn("estimate_p", row)
+        self.assertEqual(card["edges"], [])
+        self.assertEqual(card["independent_candidates"], [])
         entry = card["prepricing_factor_audit"]["by_input_index"][0]
-        self.assertFalse(entry["blocked"])
+        self.assertTrue(entry["blocked"])
         self.assertTrue(any(f["status"] == "MISSING" and "MANUAL_MODE" in f["reason"]
                             for f in entry["factors"]))
 
