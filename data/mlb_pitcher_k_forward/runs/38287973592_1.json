@@ -1,0 +1,48 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "blocked_count": 4,
+  "blockers": [
+    {
+      "entity_name": "Logan Henderson",
+      "observed_at": "2026-10-12T17:59:42.309207+00:00",
+      "provider_event_id": "34812526",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    },
+    {
+      "entity_name": "Yoshinobu Yamamoto",
+      "observed_at": "2026-10-12T17:59:42.309207+00:00",
+      "provider_event_id": "34812526",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    },
+    {
+      "entity_name": "Drew Rasmussen",
+      "observed_at": "2026-10-12T17:59:43.608632+00:00",
+      "provider_event_id": "34810347",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    },
+    {
+      "entity_name": "Foster Griffin",
+      "observed_at": "2026-10-12T17:59:43.608632+00:00",
+      "provider_event_id": "34810347",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    }
+  ],
+  "eligible_quote_units": 4,
+  "observed_at_utc": "2026-10-12T18:01:13.211842+00:00",
+  "predictions_created": 0,
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-12/props_20261012T175944.387410Z.json",
+  "run_attempt": "1",
+  "run_id": "38287973592",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_RUN_V1",
+  "selection_drops": {
+    "selected_units": 16
+  },
+  "settlements_created": 0,
+  "status": "OK",
+  "summary_sha256": "66f74ef762aad615efd008b53a46e000fdda2028f65d439c1010a1c715f637f5"
+}
