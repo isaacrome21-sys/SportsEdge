@@ -74,25 +74,35 @@ class AsOfReader:
         self._cache: dict[str, list[ParticipationRecord]] = {}
 
     def _records(self, signal_type: str, as_of=None) -> list[ParticipationRecord]:
-        # Corrections must not rewrite answers to historical as-of queries.
-        # A revision cannot displace its predecessor before its actual
-        # capture, even when a cadence-based availability bound is earlier.
+        """Resolve superseding corrections only when genuinely visible at as-of.
+
+        The original historical source may carry a named cadence-inferred
+        bound; that is not publication-time proof. A subsequently archived
+        correction must be both captured AND available by the query cutoff.
+        This prevents a newer record from hiding a still-valid older version
+        in retrospective as-of reads. Reload each query to see appended data.
+        """
         records = self.archive.load_records(signal_type)
         if as_of is None:
             superseded = {r.supersedes_record_id for r in records
                           if r.supersedes_record_id}
             return [r for r in records if r.record_id not in superseded]
         cutoff = _ts(as_of)
-        visible_revisions = {
-            r.supersedes_record_id for r in records
-            if r.supersedes_record_id and _ts(r.captured_at_utc) <= cutoff
-        }
-        return [
-            r for r in records
-            if r.record_id not in visible_revisions
-            and (not r.supersedes_record_id
-                 or _ts(r.captured_at_utc) <= cutoff)
-        ]
+        eligible = []
+        seen_ids = set()
+        for rec in records:
+            if not _available(rec, cutoff):
+                continue
+            if rec.supersedes_record_id:
+                if _ts(rec.captured_at_utc) > cutoff:
+                    continue
+                if rec.supersedes_record_id not in seen_ids:
+                    continue
+            eligible.append(rec)
+            seen_ids.add(rec.record_id)
+        superseded = {r.supersedes_record_id for r in eligible
+                      if r.supersedes_record_id}
+        return [r for r in eligible if r.record_id not in superseded]
 
     @staticmethod
     def _answer(record, reason=None):
@@ -102,17 +112,17 @@ class AsOfReader:
 
     # -- S3 / S4 ------------------------------------------------------------
     def _player_week_lookup(self, signal_type, gsis_id, season, week, as_of):
-        cands = [
-            r
-            for r in self._records(signal_type, as_of)
-            if r.gsis_id == gsis_id and r.season == season and r.week == week
-        ]
-        if not cands:
+        # Distinguish an absent source row from a row that exists but was not
+        # yet visible at the requested cutoff, preserving fail-closed reasons.
+        original = [r for r in self.archive.iter_records(signal_type)
+                    if r.gsis_id == gsis_id and r.season == season and r.week == week]
+        if not original:
             return self._answer(None, REJ_TEAM_WEEK_ABSENT)
-        avail = [r for r in cands if _available(r, as_of)]
-        if not avail:
+        visible = [r for r in self._records(signal_type, as_of)
+                   if r.gsis_id == gsis_id and r.season == season and r.week == week]
+        if not visible:
             return self._answer(None, REJ_NOT_YET_AVAILABLE)
-        return self._answer(avail[-1])
+        return self._answer(visible[-1])
 
     def designation_for(self, gsis_id: str, season: int, week: int, as_of) -> dict:
         """Final injury designation (S3) provable at ``as_of``."""
