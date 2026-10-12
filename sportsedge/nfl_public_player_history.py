@@ -3,7 +3,11 @@
 Resolves player by display name via ESPN search, fetches gamelog, and extracts
 prior completed games with traditional box-score stats (passing/rushing/
 receiving). No odds, no Next Gen tracking, no trusted caller features.
-Requires unique pregame fixture and at least 5 prior games. Research only.
+Requires unique pregame fixture and at least 5 prior games. When the
+current-season gamelog yields fewer than 5 verified priors, fill from up
+to two immediately preceding seasons for the same athlete. Every historical
+row remains subject to the same date, finality, and schema safeguards.
+Research only.
 """
 from __future__ import annotations
 
@@ -22,6 +26,11 @@ ESPN_SCOREBOARD = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/sc
 
 class MissingNFLHistory(ValueError):
     pass
+
+
+# Conservative five-hour completion safeguard, NOT proof that final stats
+# were published by the historical cutoff. No contemporaneous receipt exists.
+GAME_COMPLETION_WINDOW = timedelta(hours=5)
 
 
 def _clock(value, name):
@@ -110,6 +119,7 @@ def _gamelog_events(data, stats_lookup):
                 event_id = meta_id
             merged = dict(meta)
             merged["id"] = event_id
+            merged["_shape"] = "current"
             if "stats" not in merged and event_id in stats_lookup:
                 merged["stats"] = stats_lookup[event_id]
             events.append(merged)
@@ -119,6 +129,7 @@ def _gamelog_events(data, stats_lookup):
                 rejected += 1
                 continue
             merged = dict(meta)
+            merged["_shape"] = "legacy"
             event_id = str(merged.get("id") or "").strip()
             if "stats" not in merged and event_id and event_id in stats_lookup:
                 merged["stats"] = stats_lookup[event_id]
@@ -126,6 +137,104 @@ def _gamelog_events(data, stats_lookup):
     else:
         raise MissingNFLHistory("ESPN_GAMELOG_EVENTS_NOT_LIST")
     return events, rejected
+
+
+def _season_year_of(moment):
+    """The NFL season's nominal year, including January/February playoffs."""
+    return moment.year if moment.month >= 3 else moment.year - 1
+
+
+def _response_season_year(data):
+    """Use the season declared by ESPN when present."""
+    years = []
+    for season in data.get("seasonTypes") or []:
+        if not isinstance(season, dict):
+            continue
+        match = re.match(r"\s*((?:19|20)\d{2})\b",
+                         str(season.get("displayName") or ""))
+        if match:
+            years.append(int(match.group(1)))
+    return max(years) if years else None
+
+
+def _gamelog_event_types(data):
+    """Bind game event ID to regular/postseason, without inferring from dates."""
+    result = {}
+    for season in data.get("seasonTypes") or []:
+        if not isinstance(season, dict):
+            continue
+        label = str(season.get("displayName") or "").lower()
+        kind = ("postseason" if "postseason" in label else
+                "regular" if "regular" in label else "unknown")
+        for category in season.get("categories") or []:
+            if not isinstance(category, dict):
+                continue
+            for event in category.get("events") or []:
+                if isinstance(event, dict):
+                    event_id = str(event.get("eventId") or "").strip()
+                    if event_id:
+                        old = result.get(event_id)
+                        if old and old != kind:
+                            raise MissingNFLHistory(
+                                "ESPN_GAMELOG_SEASON_TYPE_CONFLICT:" + event_id)
+                        result[event_id] = kind
+    return result
+
+
+def _gamelog_history(data, *, now, kickoff, season_year):
+    """Return (games, schema rejection count, per-reason counts).
+
+    Records are dated, named and FINAL-safeguarded; no contemporaneous
+    historical publication-time receipts are available. The result plus
+    five-hour buffer is deliberately NOT historical visibility proof.
+    """
+    stats_lookup = _gamelog_stats_lookup(data)
+    event_types = _gamelog_event_types(data)
+    events, rejected = _gamelog_events(data, stats_lookup)
+    hist = []
+    reasons = {}
+    if rejected:
+        reasons["GAMEDAY_EVENT_METADATA_INVALID"] = rejected
+    for event in events:
+        try:
+            day = _clock(event.get("gameDate") or event.get("date"),
+                         "GAMELOG_DATE")
+            if day >= now or day >= kickoff:
+                continue
+            event_id = str(event.get("id") or "").strip()
+            if not event_id:
+                raise MissingNFLHistory("PRIOR_GAME_ID_UNVERIFIED")
+            if day + GAME_COMPLETION_WINDOW > now:
+                raise MissingNFLHistory(
+                    "GAME_NOT_CONFIRMED_FINAL_BEFORE_CUTOFF")
+            if event.get("_shape") == "current":
+                game_result = str(event.get("gameResult") or "").strip().upper()
+                if game_result not in {"W", "L", "T"}:
+                    raise MissingNFLHistory("PRIOR_GAME_RESULT_NOT_FINAL")
+            actual = decode_football_event(data, event)
+            hist.append((day, event_id, actual, season_year,
+                         event_types.get(event_id, "unknown")))
+        except (FootballGamelogSchemaError, ValueError, TypeError,
+                KeyError, MissingNFLHistory) as exc:
+            rejected += 1
+            reason = str(exc).split(":", 1)[0] or type(exc).__name__
+            reasons[reason] = reasons.get(reason, 0) + 1
+    return hist, rejected, reasons
+
+
+def _merge_season_history(base, extra):
+    """Deduplicate equal games and reject same-event conflicting statistics."""
+    seen = {entry[1]: entry[2] for entry in base}
+    out = list(base)
+    for entry in extra:
+        event_id, stats = entry[1], entry[2]
+        if event_id in seen:
+            if seen[event_id] != stats:
+                raise MissingNFLHistory("ESPN_GAMELOG_STATS_CONFLICT:" + event_id)
+            continue
+        seen[event_id] = stats
+        out.append(entry)
+    return out
 
 
 def public_json(url):
@@ -242,28 +351,30 @@ class NFLPlayerPublicSource:
         if not isinstance(data, dict):
             raise MissingNFLHistory("NFL_GAMELOG_UNAVAILABLE")
 
-        # ESPN may separate event metadata from category-level stats.
-        # Restore exact eventId binding before the named-stat decoder.
-        # The legacy list-of-events response remains supported.
-        stats_lookup = _gamelog_stats_lookup(data)
-        events, rejected = _gamelog_events(data, stats_lookup)
-        hist = []
-        invalid_schema = rejected
-        for event in events:
-            try:
-                event_date = _clock(event.get("gameDate") or event.get("date"),
-                                    "GAMELOG_DATE")
-                if event_date >= now or event_date >= kickoff:
+        # The current-season view is sufficient when it contains at least
+        # five verified games. Previous seasons are queried only if needed.
+        current_year = (_response_season_year(data) or
+                        _season_year_of(kickoff))
+        hist, invalid_schema, reject_reasons = _gamelog_history(
+            data, now=now, kickoff=kickoff, season_year=current_year)
+        prior_season_years = []
+        if len({entry[1] for entry in hist}) < 5:
+            for year in (current_year - 1, current_year - 2):
+                prior_season_years.append(year)
+                prior_data = self._fetch(f"{url}?season={year}")
+                if not isinstance(prior_data, dict):
+                    reject_reasons["PRIOR_SEASON_UNAVAILABLE"] = (
+                        reject_reasons.get("PRIOR_SEASON_UNAVAILABLE", 0) + 1)
                     continue
-                event_id = str(event.get("id") or "").strip()
-                if not event_id:
-                    raise MissingNFLHistory("PRIOR_GAME_ID_UNVERIFIED")
-                actual = decode_football_event(data, event)
-                hist.append((event_date, event_id, actual))
-            except (FootballGamelogSchemaError, ValueError, TypeError,
-                    KeyError, MissingNFLHistory):
-                invalid_schema += 1
-                continue
+                extra, rejected, reasons = _gamelog_history(
+                    prior_data, now=now, kickoff=kickoff,
+                    season_year=(_response_season_year(prior_data) or year))
+                invalid_schema += rejected
+                for reason, count in reasons.items():
+                    reject_reasons[reason] = reject_reasons.get(reason, 0) + count
+                hist = _merge_season_history(hist, extra)
+                if len({entry[1] for entry in hist}) >= 5:
+                    break
 
         hist.sort(key=lambda x: x[0], reverse=True)
         latest = []
@@ -278,7 +389,7 @@ class NFLPlayerPublicSource:
         if len(latest) < 5:
             raise MissingNFLHistory("FEWER_THAN_FIVE_VERIFIED_NAMED_PRIOR_GAMES")
 
-        dates = [d.isoformat() for d, _, _ in latest]
+        dates = [d.isoformat() for d, _, _, _, _ in latest]
         return {
             "game_id": str(game.get("id") or ""),
             "player_id": athlete_id,
@@ -288,9 +399,16 @@ class NFLPlayerPublicSource:
             "kickoff_utc": kickoff.isoformat(),
             "source_as_of_utc": now.isoformat(),
             "prior_game_times_utc": dates,
-            "features": {"game_history": [stats for _, _, stats in latest]},
+            "prior_game_seasons": [
+                f"{year}-{kind}" for _, _, _, year, kind in latest],
+            "prior_season_history_years": prior_season_years,
+            "history_finality_rule":
+                "RESULT_PLUS_FIVE_HOUR_SAFEGUARD_NO_CONTEMPORANEOUS_RECEIPT",
+            "features": {"game_history": [
+                stats for _, _, stats, _, _ in latest]},
             "explicit_stat_fields": sorted(set().union(*(set(x[2]) for x in latest))),
             "schema_rejected_prior_events": invalid_schema,
+            "schema_rejected_prior_reasons": dict(sorted(reject_reasons.items())),
             "source_endpoint": url,
             "prior_game_count": len(latest),
         }
