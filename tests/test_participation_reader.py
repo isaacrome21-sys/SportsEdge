@@ -179,3 +179,22 @@ def test_forward_revision_only_becomes_visible_at_capture(tmp_path):
     reader = AsOfReader(arc)
     assert reader.inactive_for(GSIS, "G9", "2026-10-04T15:45:00Z")["record"].payload["inactive"] is False
     assert reader.inactive_for(GSIS, "G9", "2026-10-04T16:15:00Z")["record"].payload["inactive"] is True
+
+
+
+def test_correction_captured_early_but_not_yet_available_retains_prior(tmp_path):
+    archive = ParticipationArchive(tmp_path)
+    old = _designation(bound="2026-10-02T04:59:59Z",
+                       captured="2026-10-01T12:00:00Z")
+    old_id = archive.append_record(old)
+    correction = _designation(bound="2026-10-05T04:59:59Z",
+                              captured="2026-10-03T12:00:00Z")
+    correction.payload = {"designation": "Out"}
+    correction.supersedes_record_id = old_id
+    new_id = archive.append_record(correction)
+    reader = AsOfReader(archive)
+    before = reader.designation_for(GSIS, 2026, 5, "2026-10-04T00:00:00Z")
+    assert before["status"] == "OK"
+    assert before["record"].record_id == old_id
+    after = reader.designation_for(GSIS, 2026, 5, "2026-10-06T00:00:00Z")
+    assert after["record"].record_id == new_id
