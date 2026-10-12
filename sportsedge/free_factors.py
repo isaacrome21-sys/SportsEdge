@@ -535,7 +535,12 @@ UMPIRE_NOT_WIRED_REASON = (
     "boxscores (officials[].officialType == 'Home Plate'), but MLB publishes "
     "no stable free pregame umpire-assignment feed; assignments are announced "
     "day-of via press release. Without a verifiable pregame source the factor "
-    "cannot enter pregame pricing. Fails closed by design.")
+    "cannot enter pregame pricing. Fails closed by design. "
+    "2026-10-11 probe (docs/umpscorecards_probe.md): umpscorecards.com's "
+    "frontend data path is Patreon-gated (no keyless API; 4-request probe, "
+    "fixture in tests/fixtures/umpscorecards_probe_20261011.json) -> still no "
+    "stable free source. ABS challenge system (2026) structurally shrinks the "
+    "umpire effect; factor stays MISSING until the harness proves a residual.")
 
 
 # ---------------------------------------------------------------------------
@@ -560,8 +565,13 @@ FACTOR_REGISTRY: dict[str, dict[str, Any]] = {
     "weather_thresholds": {
         "source": WEATHER_SOURCE,
         "wired": False,
-        "validation": "NOT_RUN",
-        "validation_note": "",
+        "validation": "FAIL",
+        "validation_note": ("2026-10-11: declared wind/precip thresholds FAIL "
+                            "vs legacy heuristic OOS (MLB Jun-Aug 2025 totals, "
+                            "n=11575; Brier 0.2320->0.2321, LL 0.7120->0.7093). "
+                            "NOT wired. Harness validated the wind leg only: "
+                            "ERA5 archive serves no precipitation_probability "
+                            "(verified all-nulls)."),
     },
     "key_numbers": {
         "source": KEY_NUMBER_SOURCE,
@@ -822,12 +832,23 @@ def ingest_weather(sport: str, wind_speed_mph, wind_from_degrees=None,
     """Declared weather total adjustment. Signature:
     ingest_weather(sport, wind_speed_mph, wind_from_degrees=None,
                    field_azimuth_degrees=None, precip_probability_pct=None,
-                   indoor=None) -> entry dict."""
+                   indoor=None) -> entry dict.
+
+    Harness verdict 2026-10-11: the declared wind/precip thresholds FAILED
+    vs the legacy production heuristic OOS (docs/validation_reports/
+    weather.json; Brier 0.2320->0.2321). WEATHER_THRESHOLDS_VALIDATED is
+    False -> this entry is AUDIT-ONLY until a future validation passes.
+    """
     adj, status, detail = weather_total_adjustment(
         sport=sport, wind_speed_mph=wind_speed_mph,
         wind_from_degrees=wind_from_degrees,
         field_azimuth_degrees=field_azimuth_degrees,
         precip_probability_pct=precip_probability_pct, indoor=indoor)
+    if not WEATHER_THRESHOLDS_VALIDATED:
+        detail += (" [NOT_WIRED: declared thresholds FAILED harness "
+                   "validation 2026-10-11 vs legacy heuristic; audit only]")
+        return _entry("weather_thresholds", "none", None, 0.0,
+                      status, detail, WEATHER_SOURCE, set())
     ok = {"WEATHER_THRESHOLDS_VERIFIED_APPLIED", "WEATHER_CALM_NO_EFFECT"}
     return _entry("weather_thresholds", "add" if status in ok else "none",
                   "TOTAL", adj if status in ok else 0.0,
@@ -1483,6 +1504,20 @@ FACTOR_REGISTRY["time_decay"] = {
 # Capped at +/-1.0 runs total. Sources: declared priors consistent with
 # published temperature/HR literature direction; coefficients are declared,
 # not fitted, and harness-gated.
+# Harness verdicts 2026-10-11 (docs/validation_reports/weather*.json):
+# - weather (declared wind/precip thresholds): FAIL vs the legacy production
+#   heuristic OOS (MLB Jun-Aug 2025 totals; Brier 0.2320->0.2321) ->
+#   WEATHER_THRESHOLDS_VALIDATED = False; ingest_weather stays audit-only.
+# - weather_interaction_legacy (temp/humidity x park stacked on the legacy
+#   heuristic): CONDITIONAL_PASS, MLB only (Brier 0.2320->0.2312, LL
+#   0.7120->0.6985). The xpark multiplier leg was fail-closed OFF in that
+#   run (2025 -> PARK_FACTOR_STALE), so it stays disabled until separately
+#   validated. NFL wind x pass rate: NOT_RUN -> not wired.
+WEATHER_THRESHOLDS_VALIDATED = False
+WEATHER_INTERACTION_VALIDATED_SPORTS = frozenset({"MLB"})
+WEATHER_INTERACTION_PARK_LEG_VALIDATED = False
+
+
 def weather_interaction_adjustment(*, sport: str, temp_f=None,
                                    humidity_pct=None, park_factor=None,
                                    pass_rate=None, base_wind_adj: float = 0.0,
@@ -1551,13 +1586,33 @@ def ingest_weather_interaction(sport: str, **kwargs) -> dict:
     """Weather interaction adjustment. Signature:
     ingest_weather_interaction(sport: str, temp_f=None, humidity_pct=None,
         park_factor=None, pass_rate=None, base_wind_adj=0.0, indoor=None)
-    -> entry dict."""
+    -> entry dict.
+
+    Harness-gated (2026-10-11): only the MLB temp/humidity leg earned
+    CONDITIONAL_PASS (weather_interaction_legacy). The xpark multiplier leg
+    and the NFL wind x pass-rate leg are NOT validated -> forced off /
+    audit-only here. Target is TOTAL to match the harness application
+    (total adjustment split evenly across both means).
+    """
+    sport_up = str(sport or "").upper()
+    if not WEATHER_INTERACTION_PARK_LEG_VALIDATED:
+        kwargs = dict(kwargs, park_factor=None)
     adj, status, detail = weather_interaction_adjustment(
         sport=sport, **kwargs)
+    validated = (status == "WEATHER_INTERACTION_VERIFIED"
+                 and sport_up in WEATHER_INTERACTION_VALIDATED_SPORTS)
+    if not validated:
+        detail += " [NOT_WIRED: interaction not harness-validated for " \
+                  f"{sport_up}; audit only]"
+        return _entry("weather_interactions", "none", None, 0.0,
+                      status, detail,
+                      "weather interaction terms (wind x passing, temp x park)",
+                      set())
     ok = {"WEATHER_INTERACTION_VERIFIED"}
-    return _entry("weather_interactions", "add" if status in ok else "none",
-                  None, adj, status, detail,
-                  "weather interaction terms (wind x passing, temp x park)", ok)
+    return _entry("weather_interactions", "add", "TOTAL", adj,
+                  status, detail,
+                  "weather interaction terms (temp/humidity, MLB; "
+                  "CONDITIONAL_PASS 2026-10-11, research-only)", ok)
 
 
 INGEST_ENTRY_POINTS["weather_interaction"] = (
@@ -1566,7 +1621,18 @@ INGEST_ENTRY_POINTS["weather_interaction"] = (
 FACTOR_REGISTRY["weather_interactions"] = {
     "source": ("declared interaction priors: NFL wind x pass rate "
                "(nflverse), MLB temp/humidity x park factor"),
-    "wired": False, "validation": "NOT_RUN", "validation_note": "",
+    "wired": True,
+    "validation": "CONDITIONAL_PASS",
+    "validation_note": ("2026-10-11: MLB temp/humidity leg (+0.025 runs/degF "
+                        "from 70F, humidity x1.25) CONDITIONAL_PASS stacked "
+                        "on the legacy heuristic "
+                        "(docs/validation_reports/weather_interaction_legacy.json: "
+                        "Brier 0.2320->0.2312, LL 0.7120->0.6985, n=11575). "
+                        "Wired LABELED via ingest_weather_interaction "
+                        "(target TOTAL, research-only). NOT wired: the xpark "
+                        "multiplier leg (fail-closed off in the run), the "
+                        "NFL wind x pass-rate leg (NOT_RUN), and the declared "
+                        "wind/precip thresholds (FAILED vs legacy)."),
 }
 
 
@@ -1771,13 +1837,16 @@ FACTOR_REGISTRY["platoon_split"] = {
 # deltas from Retrosheet (umpire IDs in info records), test stability
 # across seasons in walk-forward. Do not wire on reputation.
 FACTOR_REGISTRY["umpire_zone"] = {
-    "source": ("Retrosheet umpire IDs (info records); umpscorecards.com "
-               "assessed 2026-10-11: SvelteKit JS app, no keyless API found"),
+    "source": "Retrosheet umpire IDs (info records) — stability TBD",
     "wired": False, "validation": "NOT_WIRED",
     "validation_note": ("MISSING until proven stable OOS: umpire K/BB effects "
                         "must validate across seasons before wiring. "
-                        "CRITICAL: MLB ABS challenge system (2026) structurally "
-                        "shrinks the umpire effect; do not over-invest."),
+                        "2026-10-11: umpscorecards.com probed (see "
+                        "docs/umpscorecards_probe.md) -- frontend API is "
+                        "Patreon-gated, no keyless stable path; plus MLB's "
+                        "2026 ABS challenge system structurally shrinks the "
+                        "effect. No further investment until harness shows "
+                        "a residual."),
 }
 FACTOR_REGISTRY["catcher_framing"] = {
     "source": "TBD — stability TBD",
