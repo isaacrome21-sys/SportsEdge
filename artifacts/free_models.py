@@ -1313,6 +1313,9 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
         projection = row.get("independent_projection")
         if not isinstance(projection, dict):
             continue
+        if row.get("status") == "WATCH_NFL_NO_VERIFIED_CONTEXT":
+            watchlist.append(row)
+            continue
         # Repair 3: a stale quote cannot support a research candidate, even
         # when the model probability is strong. Watch-only, explicitly.
         if not quote_is_fresh(row.get("quote_freshness") or {}):
@@ -1336,6 +1339,8 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
     # card) can evaluate the anchored hypothesis separately from Lane A.
     lane_b_edges = []
     for r in all_rows:
+        if r.get("status") == "WATCH_NFL_NO_VERIFIED_CONTEXT":
+            continue
         lanes = r.get("pricing_lanes") or {}
         lane_b = lanes.get("lane_b_anchored") or {}
         if lane_b.get("status") == "LANE_B_UNAVAILABLE":
