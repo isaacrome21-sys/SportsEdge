@@ -1,0 +1,137 @@
+{
+ "id": "401872992",
+ "name": "San Francisco 49ers at Seattle Seahawks",
+ "date": "2026-10-11T20:25Z",
+ "status": {
+  "clock": 110.0,
+  "displayClock": "1:50",
+  "period": 4,
+  "type": {
+   "id": "2",
+   "name": "STATUS_IN_PROGRESS",
+   "state": "in",
+   "completed": false,
+   "description": "In Progress",
+   "detail": "1:50 - 4th Quarter",
+   "shortDetail": "1:50 - 4th"
+  }
+ },
+ "competitions": [
+  {
+   "status": {
+    "clock": 110.0,
+    "displayClock": "1:50",
+    "period": 4,
+    "type": {
+     "id": "2",
+     "name": "STATUS_IN_PROGRESS",
+     "state": "in",
+     "completed": false,
+     "description": "In Progress",
+     "detail": "1:50 - 4th Quarter",
+     "shortDetail": "1:50 - 4th"
+    },
+    "isTBDFlex": false
+   },
+   "competitors": [
+    {
+     "homeAway": "home",
+     "score": "29",
+     "team": {
+      "id": "26",
+      "displayName": "Seattle Seahawks",
+      "shortDisplayName": "Seahawks",
+      "abbreviation": "SEA"
+     }
+    },
+    {
+     "homeAway": "away",
+     "score": "32",
+     "team": {
+      "id": "25",
+      "displayName": "San Francisco 49ers",
+      "shortDisplayName": "49ers",
+      "abbreviation": "SF"
+     }
+    }
+   ],
+   "situation": {
+    "lastPlay": {
+     "id": "4018729924022",
+     "type": {
+      "id": "53",
+      "text": "Kickoff",
+      "abbreviation": "K"
+     },
+     "text": "E.Pineiro kicks 61 yards from SF 35 to SEA 4. R.Shaheed pushed ob at SEA 30 for 26 yards (J.Brown). ** Injury Update: SF-K.Kareem has returned to the game. PENALTY on SEA-A.Smith, Offensive Holding, 10 yards, enforced at SEA 25.",
+     "scoreValue": 0,
+     "team": {
+      "id": "26"
+     },
+     "probability": {
+      "tiePercentage": 0.0,
+      "homeWinPercentage": 0.1884,
+      "awayWinPercentage": 0.8116,
+      "secondsLeft": 0
+     },
+     "statYardage": -5,
+     "drive": {
+      "description": "0 plays, 0 yards, 0:00",
+      "start": {
+       "yardLine": 0,
+       "text": "SEA 0"
+      },
+      "timeElapsed": {
+       "displayValue": "0:00"
+      }
+     },
+     "start": {
+      "yardLine": 65,
+      "team": {
+       "id": "25"
+      }
+     },
+     "end": {
+      "yardLine": 15,
+      "team": {
+       "id": "26"
+      }
+     },
+     "athletesInvolved": [
+      {
+       "id": "4693644",
+       "fullName": "Ji'Ayir Brown",
+       "displayName": "Ji'Ayir Brown",
+       "shortName": "J. Brown",
+       "links": [
+        {
+         "rel": [
+          "playercard",
+          "desktop",
+          "athlete"
+         ],
+         "href": "https://www.espn.com/nfl/player/_/id/4693644/jiayir-brown"
+        }
+       ],
+       "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4693644.png",
+       "jersey": "27",
+       "position": "S",
+       "team": {
+        "id": "25"
+       }
+      }
+     ]
+    },
+    "down": 1,
+    "yardLine": 15,
+    "distance": 10,
+    "downDistanceText": "1st & 10 at SEA 15",
+    "shortDownDistanceText": "1st & 10",
+    "possessionText": "SEA 15",
+    "isRedZone": false,
+    "homeTimeouts": 2,
+    "awayTimeouts": 2
+   }
+  }
+ ]
+}
