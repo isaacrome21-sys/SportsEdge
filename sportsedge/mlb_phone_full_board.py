@@ -20,6 +20,11 @@ ALIASES = {
     "BATTER_RUNS": "RUNS", "BATTER_HRS": "HOME_RUNS",
     "BATTER_HOME_RUNS": "HOME_RUNS",
     "BATTER_STOLEN_BASES": "STOLEN_BASES",
+    "BATTER_BB": "BATTER_BB", "BATTER_WALKS": "BATTER_BB",
+    "BATTER_K": "BATTER_K", "BATTER_STRIKEOUTS": "BATTER_K",
+    "BATTER_SINGLES": "SINGLES", "BATTER_DOUBLES": "DOUBLES",
+    "HITS_RUNS_RBIS": "HITS_RUNS_RBIS", "H_R_RBI": "HITS_RUNS_RBIS",
+    "TEAM_TOTAL": "TEAM_TOTALS", "TEAM_TOTALS": "TEAM_TOTALS",
 }
 # These paths return research prices only when supplied exact inputs and
 # independently verified history. Declaring a market here cannot price it.
@@ -56,6 +61,11 @@ def phone_market_board(inputs: Sequence[Mapping[str, Any]],
         elif side.casefold() == away.casefold() and away:
             side = "AWAY"
         market, side = _market(original, side)
+        if market == "TEAM_TOTALS":
+            if side.endswith(" OVER"):
+                side = "OVER"
+            elif side.endswith(" UNDER"):
+                side = "UNDER"
         if market not in all_markets:
             continue
         status = str(result.get("status") or "")
@@ -69,7 +79,7 @@ def phone_market_board(inputs: Sequence[Mapping[str, Any]],
                        f"{away}@{home}:{source.get('commence_time') or source.get('kickoff')}",
             "entity_id": (source.get("player_name") or source.get("player") or
                           source.get("pitcher_name") or source.get("batter_name") or
-                          source.get("team") or "GAME"),
+                          result.get("team_totals_team") or source.get("team") or "GAME"),
             "side": side,
             "line": source.get("line"),
             "american_odds": quote,
