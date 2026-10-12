@@ -1,0 +1,538 @@
+{
+ "gameData": {
+  "game": {
+   "pk": 849831
+  },
+  "datetime": {
+   "officialDate": "2026-10-10"
+  },
+  "status": {
+   "detailedState": "Final"
+  },
+  "teams": {
+   "away": {
+    "id": 145
+   },
+   "home": {
+    "id": 114
+   }
+  }
+ },
+ "liveData": {
+  "plays": {
+   "allPlays": [
+    {
+     "matchup": {
+      "pitcher": {
+       "id": 668909,
+       "fullName": "Gavin Williams",
+       "link": "/api/v1/people/668909"
+      },
+      "batter": {
+       "id": 803011,
+       "fullName": "Sam Antonacci",
+       "link": "/api/v1/people/803011"
+      },
+      "batSide": {
+       "code": "L",
+       "description": "Left"
+      },
+      "pitchHand": {
+       "code": "R",
+       "description": "Right"
+      }
+     },
+     "about": {
+      "atBatIndex": 0,
+      "inning": 1
+     },
+     "playEvents": [
+      {
+       "isPitch": true,
+       "details": {
+        "call": {
+         "code": "B",
+         "description": "Ball"
+        },
+        "description": "Ball",
+        "code": "B",
+        "ballColor": "rgba(39, 161, 39, 1.0)",
+        "trailColor": "rgba(188, 0, 33, 1.0)",
+        "isInPlay": false,
+        "isStrike": false,
+        "isBall": true,
+        "type": {
+         "code": "FF",
+         "description": "Four-Seam Fastball"
+        },
+        "isOut": false,
+        "hasReview": false
+       },
+       "pitchData": {
+        "startSpeed": 97.8,
+        "endSpeed": 89.9,
+        "strikeZoneTop": 3.154,
+        "strikeZoneBottom": 1.592,
+        "strikeZoneWidth": 17.0,
+        "strikeZoneDepth": 8.5,
+        "coordinates": {
+         "aY": 30.559967022859443,
+         "aZ": -16.186520007059553,
+         "pfxX": -4.854629724884471,
+         "pfxZ": 7.749888431416638,
+         "pX": -0.18047368718363896,
+         "pZ": 3.770918290609431,
+         "vX0": 7.735942404421103,
+         "vY0": -142.23776333921234,
+         "vZ0": -3.5643511202855613,
+         "x": 123.88,
+         "y": 136.97,
+         "x0": -2.2962946413573033,
+         "y0": 50.00380434007273,
+         "z0": 6.0574630398725215,
+         "aX": -10.016464048874756
+        },
+        "breaks": {
+         "breakAngle": 26.4,
+         "breakLength": 3.6,
+         "breakY": 24.0,
+         "breakVertical": -14.9,
+         "breakVerticalInduced": 13.6,
+         "breakHorizontal": 7.3,
+         "spinRate": 2117,
+         "spinDirection": 213
+        },
+        "zone": 11,
+        "typeConfidence": 0.91,
+        "plateTime": 0.38410042924667964,
+        "extension": 6.893181003537471
+       }
+      },
+      {
+       "isPitch": true,
+       "details": {
+        "call": {
+         "code": "B",
+         "description": "Ball"
+        },
+        "description": "Ball",
+        "code": "B",
+        "ballColor": "rgba(39, 161, 39, 1.0)",
+        "trailColor": "rgba(153, 171, 0, 1.0)",
+        "isInPlay": false,
+        "isStrike": false,
+        "isBall": true,
+        "type": {
+         "code": "KC",
+         "description": "Knuckle Curve"
+        },
+        "isOut": false,
+        "hasReview": false
+       },
+       "pitchData": {
+        "startSpeed": 81.2,
+        "endSpeed": 74.4,
+        "strikeZoneTop": 3.154,
+        "strikeZoneBottom": 1.592,
+        "strikeZoneWidth": 17.0,
+        "strikeZoneDepth": 8.5,
+        "coordinates": {
+         "aY": 24.736521232177992,
+         "aZ": -44.7581623714285,
+         "pfxX": 4.3187013350905135,
+         "pfxZ": -9.001304120277736,
+         "pX": -1.2126937507528903,
+         "pZ": 2.756304647685027,
+         "vX0": 1.2622494150770898,
+         "vY0": -118.13064166789069,
+         "vZ0": 1.2369082724982339,
+         "x": 163.23,
+         "y": 164.36,
+         "x0": -2.316376936966531,
+         "y0": 50.00150331336273,
+         "z0": 6.374718609581846,
+         "aX": 6.038313478815097
+        },
+        "breaks": {
+         "breakAngle": 8.4,
+         "breakLength": 13.2,
+         "breakY": 24.0,
+         "breakVertical": -57.5,
+         "breakVerticalInduced": -15.6,
+         "breakHorizontal": -8.2,
+         "spinRate": 2352,
+         "spinDirection": 35
+        },
+        "zone": 11,
+        "typeConfidence": 0.9,
+        "plateTime": 0.46555113034540074,
+        "extension": 6.645302456869748
+       }
+      },
+      {
+       "isPitch": true,
+       "details": {
+        "call": {
+         "code": "X",
+         "description": "In play, out(s)"
+        },
+        "description": "In play, out(s)",
+        "code": "X",
+        "ballColor": "rgba(26, 86, 190, 1.0)",
+        "trailColor": "rgba(50, 0, 221, 1.0)",
+        "isInPlay": true,
+        "isStrike": false,
+        "isBall": false,
+        "type": {
+         "code": "SI",
+         "description": "Sinker"
+        },
+        "isOut": true,
+        "hasReview": false
+       },
+       "pitchData": {
+        "startSpeed": 97.7,
+        "endSpeed": 89.9,
+        "strikeZoneTop": 3.154,
+        "strikeZoneBottom": 1.592,
+        "strikeZoneWidth": 17.0,
+        "strikeZoneDepth": 8.5,
+        "coordinates": {
+         "aY": 30.9110202709983,
+         "aZ": -25.977558994409577,
+         "pfxX": -9.745959097972346,
+         "pfxZ": 3.0142102184143678,
+         "pX": -0.6577642771750583,
+         "pZ": 2.7921552180457523,
+         "vX0": 8.471813477145771,
+         "vY0": -142.1342993397739,
+         "vZ0": -3.6692512089976805,
+         "x": 142.07,
+         "y": 163.39,
+         "x0": -2.4027562575890213,
+         "y0": 50.005610050226686,
+         "z0": 5.739094225089427,
+         "aX": -20.053141798303876
+        },
+        "breaks": {
+         "breakAngle": 34.8,
+         "breakLength": 6.0,
+         "breakY": 24.0,
+         "breakVertical": -23.6,
+         "breakVerticalInduced": 4.9,
+         "breakHorizontal": 16.1,
+         "spinRate": 1839,
+         "spinDirection": 232
+        },
+        "zone": 1,
+        "typeConfidence": 1.0,
+        "plateTime": 0.3845553504822581,
+        "extension": 6.885764822541216
+       }
+      }
+     ]
+    },
+    {
+     "matchup": {
+      "pitcher": {
+       "id": 668909,
+       "fullName": "Gavin Williams",
+       "link": "/api/v1/people/668909"
+      },
+      "batter": {
+       "id": 691019,
+       "fullName": "Kyle Teel",
+       "link": "/api/v1/people/691019"
+      },
+      "batSide": {
+       "code": "L",
+       "description": "Left"
+      },
+      "pitchHand": {
+       "code": "R",
+       "description": "Right"
+      }
+     },
+     "about": {
+      "atBatIndex": 1,
+      "inning": 1
+     },
+     "playEvents": [
+      {
+       "isPitch": true,
+       "details": {
+        "call": {
+         "code": "C",
+         "description": "Called Strike"
+        },
+        "description": "Called Strike",
+        "code": "C",
+        "ballColor": "rgba(170, 21, 11, 1.0)",
+        "trailColor": "rgba(153, 171, 0, 1.0)",
+        "isInPlay": false,
+        "isStrike": true,
+        "isBall": false,
+        "type": {
+         "code": "KC",
+         "description": "Knuckle Curve"
+        },
+        "isOut": false,
+        "hasReview": false
+       },
+       "pitchData": {
+        "startSpeed": 81.9,
+        "endSpeed": 75.2,
+        "strikeZoneTop": 3.154,
+        "strikeZoneBottom": 1.592,
+        "strikeZoneWidth": 17.0,
+        "strikeZoneDepth": 8.5,
+        "coordinates": {
+         "aY": 24.634727263255172,
+         "aZ": -44.920108490091,
+         "pfxX": 4.6797394221947854,
+         "pfxZ": -8.937013213311445,
+         "pX": -0.6650172847547047,
+         "pZ": 2.8672670626441707,
+         "vX0": 2.3539712518697153,
+         "vY0": -119.16625001979703,
+         "vZ0": 1.0121583450990088,
+         "x": 142.35,
+         "y": 161.36,
+         "x0": -2.2761192588323675,
+         "y0": 50.0019536148925,
+         "z0": 6.521113172320272,
+         "aX": 6.674911147736928
+        },
+        "breaks": {
+         "breakAngle": 8.4,
+         "breakLength": 13.2,
+         "breakY": 24.0,
+         "breakVertical": -56.6,
+         "breakVerticalInduced": -15.6,
+         "breakHorizontal": -9.1,
+         "spinRate": 2384,
+         "spinDirection": 25
+        },
+        "zone": 1,
+        "typeConfidence": 0.9,
+        "plateTime": 0.4610671567422404,
+        "extension": 6.630930457062609
+       }
+      },
+      {
+       "isPitch": true,
+       "details": {
+        "call": {
+         "code": "S",
+         "description": "Swinging Strike"
+        },
+        "description": "Swinging Strike",
+        "code": "S",
+        "ballColor": "rgba(170, 21, 11, 1.0)",
+        "trailColor": "rgba(188, 0, 33, 1.0)",
+        "isInPlay": false,
+        "isStrike": true,
+        "isBall": false,
+        "type": {
+         "code": "FF",
+         "description": "Four-Seam Fastball"
+        },
+        "isOut": false,
+        "hasReview": false
+       },
+       "pitchData": {
+        "startSpeed": 99.6,
+        "endSpeed": 91.1,
+        "strikeZoneTop": 3.154,
+        "strikeZoneBottom": 1.592,
+        "strikeZoneWidth": 17.0,
+        "strikeZoneDepth": 8.5,
+        "coordinates": {
+         "aY": 33.298188650369596,
+         "aZ": -14.543008953025216,
+         "pfxX": -5.738162736196495,
+         "pfxZ": 8.29395735288073,
+         "pX": 0.22046878428394864,
+         "pZ": 3.3223145096760622,
+         "vX0": 8.944476399595574,
+         "vY0": -144.7568805030875,
+         "vZ0": -5.190625466602492,
+         "x": 108.6,
+         "y": 149.08,
+         "x0": -2.1617071919105966,
+         "y0": 50.00305528893541,
+         "z0": 6.026786556946128,
+         "aX": -12.19856102915275
+        },
+        "breaks": {
+         "breakAngle": 32.4,
+         "breakLength": 3.6,
+         "breakY": 24.0,
+         "breakVertical": -13.4,
+         "breakVerticalInduced": 14.2,
+         "breakHorizontal": 8.6,
+         "spinRate": 2303,
+         "spinDirection": 215
+        },
+        "zone": 2,
+        "typeConfidence": 0.92,
+        "plateTime": 0.37816797609047414,
+        "extension": 6.91310302620854
+       }
+      },
+      {
+       "isPitch": true,
+       "details": {
+        "call": {
+         "code": "T",
+         "description": "Foul Tip"
+        },
+        "description": "Foul Tip",
+        "code": "T",
+        "ballColor": "rgba(170, 21, 11, 1.0)",
+        "trailColor": "rgba(188, 0, 33, 1.0)",
+        "isInPlay": false,
+        "isStrike": true,
+        "isBall": false,
+        "type": {
+         "code": "FF",
+         "description": "Four-Seam Fastball"
+        },
+        "isOut": true,
+        "hasReview": false
+       },
+       "pitchData": {
+        "startSpeed": 99.5,
+        "endSpeed": 90.9,
+        "strikeZoneTop": 3.154,
+        "strikeZoneBottom": 1.592,
+        "strikeZoneWidth": 17.0,
+        "strikeZoneDepth": 8.5,
+        "coordinates": {
+         "aY": 33.53566575020938,
+         "aZ": -11.011189009214622,
+         "pfxX": -7.180199119033702,
+         "pfxZ": 10.009704778646544,
+         "pX": -0.04303020935637365,
+         "pZ": 2.0237857028830724,
+         "vX0": 8.801677392345146,
+         "vY0": -144.44962947142463,
+         "vZ0": -9.059125331308483,
+         "x": 118.64,
+         "y": 184.14,
+         "x0": -2.196153678480623,
+         "y0": 50.002495979165154,
+         "z0": 5.876991699221052,
+         "aX": -15.179627247707671
+        },
+        "breaks": {
+         "breakAngle": 45.6,
+         "breakLength": 3.6,
+         "breakY": 24.0,
+         "breakVertical": -11.3,
+         "breakVerticalInduced": 16.4,
+         "breakHorizontal": 11.3,
+         "spinRate": 2418,
+         "spinDirection": 219
+        },
+        "zone": 8,
+        "typeConfidence": 0.93,
+        "plateTime": 0.37913047328303184,
+        "extension": 7.016393836573247
+       }
+      }
+     ]
+    },
+    {
+     "matchup": {
+      "pitcher": {
+       "id": 668909,
+       "fullName": "Gavin Williams",
+       "link": "/api/v1/people/668909"
+      },
+      "batter": {
+       "id": 678246,
+       "fullName": "Miguel Vargas",
+       "link": "/api/v1/people/678246"
+      },
+      "batSide": {
+       "code": "R",
+       "description": "Right"
+      },
+      "pitchHand": {
+       "code": "R",
+       "description": "Right"
+      }
+     },
+     "about": {
+      "atBatIndex": 2,
+      "inning": 1
+     },
+     "playEvents": [
+      {
+       "isPitch": true,
+       "details": {
+        "call": {
+         "code": "X",
+         "description": "In play, out(s)"
+        },
+        "description": "In play, out(s)",
+        "code": "X",
+        "ballColor": "rgba(26, 86, 190, 1.0)",
+        "trailColor": "rgba(153, 171, 0, 1.0)",
+        "isInPlay": true,
+        "isStrike": false,
+        "isBall": false,
+        "type": {
+         "code": "KC",
+         "description": "Knuckle Curve"
+        },
+        "isOut": true,
+        "hasReview": false
+       },
+       "pitchData": {
+        "startSpeed": 83.6,
+        "endSpeed": 76.7,
+        "strikeZoneTop": 3.29,
+        "strikeZoneBottom": 1.66,
+        "strikeZoneWidth": 17.0,
+        "strikeZoneDepth": 8.5,
+        "coordinates": {
+         "aY": 25.97640413726012,
+         "aZ": -45.20135602295786,
+         "pfxX": 4.509211191662015,
+         "pfxZ": -8.786097964019728,
+         "pX": -0.07505008090000986,
+         "pZ": 2.3876578524582746,
+         "vX0": 3.610764138317779,
+         "vY0": -121.61292122922353,
+         "vZ0": -0.03279368816171857,
+         "x": 119.86,
+         "y": 174.31,
+         "x0": -2.1697739654075603,
+         "y0": 50.00135301577339,
+         "z0": 6.353652696181175,
+         "aX": 6.687480560786158
+        },
+        "breaks": {
+         "breakAngle": 9.6,
+         "breakLength": 12.0,
+         "breakY": 24.0,
+         "breakVertical": -55.1,
+         "breakVerticalInduced": -15.6,
+         "breakHorizontal": -9.1,
+         "spinRate": 2527,
+         "spinDirection": 26
+        },
+        "zone": 5,
+        "typeConfidence": 0.9,
+        "plateTime": 0.4520410342137251,
+        "extension": 6.758463896627219
+       }
+      }
+     ]
+    }
+   ]
+  }
+ }
+}
