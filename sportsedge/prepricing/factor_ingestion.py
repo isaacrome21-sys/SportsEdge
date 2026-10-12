@@ -260,18 +260,36 @@ def fetch_probable_pitchers(fetch, game_date):
     return games
 
 
-def match_scheduled_game(games, home, away):
-    """Bind exactly one scheduled game by exact team-abbreviation match."""
+def match_scheduled_game(games, home, away, kickoff=None):
+    """Require unique two-team identity and, when known, exact pregame time.
+
+    ESPN and StatsAPI sometimes use different club abbreviations; compare
+    independently sourced full names as well. Date alone never selects a
+    doubleheader or the adjacent UTC-date schedule.
+    """
     key = PublicContext.key
-    matches = []
+    def same(official, wanted):
+        if not isinstance(official, dict):
+            return False
+        abbreviation = key(official.get("abbreviation") or "")
+        name = key(wanted.get("name") or "")
+        return ((abbreviation and abbreviation == key(wanted.get("abbr") or "")) or
+                (name and key(official.get("name") or "") == name))
+    matches = {}
     for game in games:
+        if not isinstance(game, dict) or not game.get("gamePk"):
+            continue
         teams = game.get("teams") or {}
         gh = ((teams.get("home") or {}).get("team") or {})
         ga = ((teams.get("away") or {}).get("team") or {})
-        if (key(gh.get("abbreviation") or "") == key(home.get("abbr") or "") and
-                key(ga.get("abbreviation") or "") == key(away.get("abbr") or "")):
-            matches.append(game)
-    return matches[0] if len(matches) == 1 else None
+        if not (same(gh, home) and same(ga, away)):
+            continue
+        if kickoff is not None:
+            actual = dt(game.get("gameDate"))
+            if actual is None or abs((actual - kickoff).total_seconds()) > 900:
+                continue
+        matches[str(game["gamePk"])] = game
+    return next(iter(matches.values())) if len(matches) == 1 else None
 
 
 def fetch_pitcher_season_line(fetch, pitcher_id, season):
@@ -315,7 +333,7 @@ def starter_suppression_adjustment(era, ip, gs):
 
 
 def mlb_pitcher_adjustments(fetch, *, game_date, home, away, season,
-                            stats_fetch=None, allow_completed=False):
+                            stats_fetch=None, allow_completed=False, kickoff=None):
     """Verified probable-pitcher adjustments for one MLB game.
 
     Returns (adjustments, factors, blocked, block_detail). ``home``/``away``
@@ -327,8 +345,16 @@ def mlb_pitcher_adjustments(fetch, *, game_date, home, away, season,
     """
     stats_fetch = stats_fetch or fetch_pitcher_season_line
     factors = []
-    games = fetch_probable_pitchers(fetch, game_date)
-    game = match_scheduled_game(games, home, away)
+    # A 7 PM Central game may begin at 00:00 UTC on the NEXT date.
+    # Fetch the neighboring schedule dates and bind by the verified start,
+    # not by an inferred UTC calendar day. Deduplicate repeated gamePk.
+    from datetime import timedelta
+    games_by_pk = {}
+    for offset in (-1, 0, 1):
+        for candidate in fetch_probable_pitchers(fetch, game_date + timedelta(days=offset)):
+            if candidate.get("gamePk"):
+                games_by_pk[str(candidate["gamePk"])] = candidate
+    game = match_scheduled_game(list(games_by_pk.values()), home, away, kickoff)
     if game is None:
         reason = "NO_UNIQUE_STATSAPI_SCHEDULE_MATCH_FOR_TEAMS_ON_DATE"
         factors.append(_factor("starting_pitcher", MISSING,
@@ -545,7 +571,7 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
             provider.fetch, game_date=kickoff.date(),
             home={"abbr": home_abbr, "name": home_name},
             away={"abbr": away_abbr, "name": away_name},
-            season=kickoff.year)
+            season=kickoff.year, kickoff=kickoff)
         factors.extend(pfactors)
         if pblocked:
             adjustments = {k: v for k, v in adjustments.items()
