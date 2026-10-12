@@ -237,7 +237,8 @@ class PublicContext:
     def team_matches(cls, team, value):
         s = cls.key(value)
         return bool(s) and s in {cls.key(team.get(k, "")) for k in
-                     ("id", "displayName", "name", "shortDisplayName", "abbreviation", "location")}
+                     ("id", "displayName", "name", "shortDisplayName", "abbreviation", "location",
+                      "teamName", "clubName", "fileCode")}
 
     def identify(self, sport, name):
         matching = [t for t in self.teams(sport) if self.team_matches(t, name)]
@@ -414,6 +415,50 @@ class PublicContext:
         return (-round(min(loss, 2.5), 3),
                 f"HEURISTIC_OUT_DOUBTFUL_REPORTED_{len(seen)}_UNKNOWN_COMPLETENESS")
 
+    def _nfl_team_schedule_fixture(self, away, home, kickoff):
+        """Second public source path when ESPN's date scoreboard omits NFL.
+
+        Only an independently fetched HOME team schedule with a unique event,
+        both exact ESPN team IDs in the correct roles, a pregame time within
+        fifteen minutes, and a start later than the as-of clock can qualify.
+        No intake event IDs or odds are trusted as verification.
+        """
+        if kickoff is None:
+            return None
+        h = self.identify("NFL", home)
+        a = self.identify("NFL", away)
+        if h is None or a is None or str(h["id"]) == str(a["id"]):
+            return None
+        season = kickoff.year - (1 if kickoff.month <= 2 else 0)
+        url = f"{ESPN}/football/nfl/teams/{h['id']}/schedule?season={season}"
+        response = self.fetch(url) or {}
+        matched = {}
+        for ev in response.get("events") or []:
+            if not isinstance(ev, dict) or not ev.get("id"):
+                continue
+            start = dt(ev.get("date"))
+            if (start is None or start <= self.now or
+                    abs((start - kickoff).total_seconds()) > 900):
+                continue
+            competitions = ev.get("competitions") or []
+            if len(competitions) != 1 or not isinstance(competitions[0], dict):
+                continue
+            comp = competitions[0]
+            cs = comp.get("competitors") or []
+            hc = [x for x in cs if isinstance(x, dict) and x.get("homeAway") == "home"]
+            ac = [x for x in cs if isinstance(x, dict) and x.get("homeAway") == "away"]
+            if len(hc) != 1 or len(ac) != 1:
+                continue
+            if (str((hc[0].get("team") or {}).get("id")) != str(h["id"]) or
+                    str((ac[0].get("team") or {}).get("id")) != str(a["id"])):
+                continue
+            status = comp.get("status") or ev.get("status") or {}
+            state = (status.get("type") or {}) if isinstance(status, dict) else {}
+            if state.get("completed") is True or state.get("state") in {"in", "post"}:
+                continue
+            matched[str(ev["id"])] = (start, comp)
+        return next(iter(matched.values())) if len(matched) == 1 else None
+
     def _mlb_statsapi_fixture(self, away, home, kickoff):
         """MLB-only independent schedule fallback when ESPN omits a fixture.
 
@@ -487,6 +532,8 @@ class PublicContext:
             return next(iter(games.values()))
         if sport == "MLB" and kickoff is not None and not games:
             return self._mlb_statsapi_fixture(away, home, kickoff)
+        if sport == "NFL" and kickoff is not None and not games:
+            return self._nfl_team_schedule_fixture(away, home, kickoff)
         return None
 
     def weather(self, sport, comp, kickoff, latitude=None, longitude=None):
