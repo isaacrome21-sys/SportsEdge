@@ -32,6 +32,9 @@ ESPN_SCOREBOARD = {
     "cfb": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard",
 }
 MLB_SCHEDULE = "https://statsapi.mlb.com/api/v1/schedule"
+# MLB hydrated full-season schedules can exceed 8 MB late in the year.
+# Bound reads to avoid silent JSON truncation, while permitting these fixtures.
+_PUBLIC_JSON_MAX_BYTES = 32_000_000
 
 
 class OutcomeError(ValueError):
@@ -45,7 +48,11 @@ def _public_json(url):
         with urlopen(request, timeout=20) as response:
             if response.status != 200:
                 return None
-            data = json.loads(response.read(8_000_000))
+            payload = response.read(_PUBLIC_JSON_MAX_BYTES + 1)
+            if len(payload) > _PUBLIC_JSON_MAX_BYTES:
+                # Fail closed on oversized responses; never parse truncated JSON.
+                return None
+            data = json.loads(payload)
             return data if isinstance(data, dict) else None
     except (OSError, ValueError, TimeoutError, json.JSONDecodeError):
         return None
