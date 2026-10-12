@@ -31,6 +31,7 @@ def _record(**overrides):
         season=2026,
         week=5,
         team="BUF",
+        game_id="G9",
         captured_at_utc="2026-10-01T12:00:00Z",
         available_from_utc="2026-10-02T04:59:59Z",
         availability_class=AVAIL_HISTORICAL,
@@ -109,4 +110,39 @@ def test_snaps_as_training_target_pass():
 def test_historical_requires_bound():
     rec = _record(available_from_utc=None)
     with pytest.raises(RecordValidationError):
+        validate_record(rec)
+
+
+def _inactive():
+    return _record(signal_type=SIGNAL_INACTIVE, source_signal="S7",
+                   availability_class=AVAIL_FORWARD_ONLY,
+                   availability_basis=BASIS_CAPTURE_TIMESTAMP,
+                   captured_at_utc="2026-10-04T15:30:00Z",
+                   available_from_utc="2026-10-04T15:30:00Z",
+                   kickoff_utc="2026-10-04T17:00:00Z")
+
+
+def test_forward_capture_must_bind_game_and_kickoff():
+    rec = _inactive()
+    rec.game_id = None
+    with pytest.raises(RecordValidationError, match="FORWARD_CAPTURE_REQUIRES_GAME_AND_KICKOFF"):
+        validate_record(rec)
+    rec = _inactive()
+    rec.kickoff_utc = None
+    with pytest.raises(RecordValidationError, match="FORWARD_CAPTURE_REQUIRES_GAME_AND_KICKOFF"):
+        validate_record(rec)
+
+
+def test_forward_capture_at_kickoff_is_too_late():
+    rec = _inactive()
+    rec.captured_at_utc = rec.available_from_utc = rec.kickoff_utc
+    with pytest.raises(RecordValidationError, match="FORWARD_CAPTURE_AFTER_KICKOFF"):
+        validate_record(rec)
+
+
+def test_naive_timestamps_do_not_gain_implicit_utc():
+    rec = _inactive()
+    rec.captured_at_utc = "2026-10-04T15:30:00"
+    rec.available_from_utc = rec.captured_at_utc
+    with pytest.raises((ValueError, RecordValidationError), match="TIMESTAMP_TIMEZONE_REQUIRED"):
         validate_record(rec)
