@@ -1,0 +1,36 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "blocked_count": 2,
+  "blockers": [
+    {
+      "entity_name": "Drew Rasmussen",
+      "observed_at": "2026-10-12T00:36:28.152250+00:00",
+      "provider_event_id": "34810347",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    },
+    {
+      "entity_name": "Foster Griffin",
+      "observed_at": "2026-10-12T00:36:28.152250+00:00",
+      "provider_event_id": "34810347",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    }
+  ],
+  "eligible_quote_units": 2,
+  "observed_at_utc": "2026-10-12T00:37:49.800504+00:00",
+  "predictions_created": 0,
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-12/props_20261012T003628.887718Z.json",
+  "run_attempt": "1",
+  "run_id": "38188682436",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_RUN_V1",
+  "selection_drops": {
+    "selected_units": 8
+  },
+  "settlements_created": 0,
+  "status": "OK",
+  "summary_sha256": "39810cb134d8168923c8118db8b8c3c48fef1bc3f33ff63b9086693b8f509976"
+}
