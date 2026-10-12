@@ -225,7 +225,9 @@ def render_card(card, *, run_url="", intake_at=""):
         stats = factor_report.get("status_counts") or {}
         lines.append("All input rows (factor-status counts): " +
                      ", ".join(f"{safe(k)}={int(v)}" for k,v in sorted(stats.items())))
-        for row in rows[:8]:
+        # Report missing factors for blocked and watch rows too. Otherwise
+        # a zero-edge card hides the very missingness that caused suppression.
+        for row in (card.get("evaluated_rows") or [])[:8]:
             coverage = by_idx.get(row.get("input_index"), {})
             unavailable = [name for name, value in coverage.items()
                            if value.get("status") in ("NOT_WIRED", "MISSING_UNVERIFIED")]
