@@ -284,14 +284,15 @@ def test_edge_ev_and_validated_profit_are_three_distinct_fields():
         assert c["authority"]["validated_profitability"] is False
 
 
-def test_positive_ev_status_names_unvalidated_estimate():
-    # Fresh quote + model disagreement with the posted line -> positive EV
-    # status exists, but its name never claims a validated edge.
-    c = card([row(side="OVER", line=40.5)])  # model raw total ~44 >> line
-    positives = [r for r in c["evaluated_rows"]
-                 if r["status"] == "RESEARCH_POSITIVE_EV_UNVALIDATED"]
-    assert positives, "expected an unvalidated positive-EV estimate"
-    assert c["edges"] == positives
-    for r in positives:
-        assert r["research_only"] is True
-        assert r["model_validation"] == "NOT_PROVEN_VS_CLOSE"
+def test_positive_raw_ev_from_no_fetch_is_diagnostic_not_candidate():
+    # A league-prior projection can mathematically be +EV against a quote,
+    # but absent team-specific data it cannot be displayed as a wager idea.
+    c = card([row(side="OVER", line=40.5)])
+    assert not c["edges"]
+    assert not c["independent_candidates"]
+    assert not c["lane_b_edges"]
+    r = c["evaluated_rows"][0]
+    assert r["status"] == "WATCH_NFL_NO_VERIFIED_CONTEXT"
+    assert r["independent_projection"]["ev_per_dollar"] > 0
+    assert r["research_only"] is True
+    assert r["model_validation"] == "NOT_PROVEN_VS_CLOSE"

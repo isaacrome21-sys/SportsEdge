@@ -50,7 +50,12 @@ def test_total_two_side_no_vig_and_market_blind_projection():
     assert u["projected_total"]==o["projected_total"]
     assert u["projected_total"]!=under["market_anchor"]["fair_total"]
     assert u["fair_american"] is not None
-    assert any(r["selection"]=="UNDER 54.5" for r in c["independent_candidates"])
+    # No-fetch prices remain available to audit projection arithmetic, never
+    # ranked as game-specific betting opportunities.
+    assert c["independent_candidates"] == []
+    assert any(r["selection"]=="UNDER 54.5" for r in c["independent_watchlist"])
+    assert all(r["status"] == "WATCH_NFL_NO_VERIFIED_CONTEXT"
+               for r in c["evaluated_rows"])
     assert c["authority"]["official"] is False
 
 

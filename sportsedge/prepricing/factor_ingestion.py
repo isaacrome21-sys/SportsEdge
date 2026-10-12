@@ -147,6 +147,7 @@ BLOCK_FIXTURE_UNVERIFIED = "BLOCKED_PREPRICING_FIXTURE_UNVERIFIED"
 BLOCK_TEAMS_UNRESOLVED = "BLOCKED_PREPRICING_TEAMS_UNRESOLVED"
 BLOCK_QB_IDENTITY_UNVERIFIED = "BLOCKED_PREPRICING_QB_IDENTITY_UNVERIFIED"
 BLOCK_PITCHER_UNCONFIRMED = "BLOCKED_PREPRICING_PITCHER_UNCONFIRMED"
+BLOCK_NFL_TEAM_HISTORY = "BLOCKED_PREPRICING_NFL_TEAM_HISTORY_UNVERIFIED"
 
 PRE_PITCH_STATES = {"Scheduled", "Pre-Game", "Warmup"}
 
@@ -638,10 +639,27 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
             if _FREE_FACTORS_AVAILABLE else
             "TRAVEL_DISTANCE_NOT_WIRED"))
 
+    # A uniquely identified fixture and a structurally readable injuries feed
+    # do not establish team scoring strength. The phone runner must require
+    # a prior completed game for BOTH NFL teams before asking its generic
+    # score engine for a team-specific probability. Never promote a two-prior
+    # score estimate into an apparent 50%+ EV wager.
+    nfl_history_missing = sport == "NFL" and (home_rest is None or away_rest is None)
+    if nfl_history_missing and enforce_blocks:
+        blocked = True
+        block_reason = BLOCK_NFL_TEAM_HISTORY
+        missing_sides = [side for side, rest in (
+            ("HOME", home_rest), ("AWAY", away_rest)) if rest is None]
+        block_detail = "NFL_PRIOR_COMPLETED_GAME_HISTORY_REQUIRED:" + ",".join(missing_sides)
+
     # -- engine-owned / backlog factors: stated honestly --------------------
-    factors.append(_factor("team_strength_ratings", USED, "FREE_MODELS_ENGINE",
-                           "HEURISTIC_NOT_VALIDATED: bounded prior-five-game "
-                           "scoring-margin proxy + static HFA"))
+    factors.append(_factor(
+        "team_strength_ratings", MISSING if nfl_history_missing else USED,
+        "FREE_MODELS_ENGINE",
+        "NFL_TWO_TEAM_HISTORY_UNVERIFIED_NO_RATING_AUTHORITY"
+        if nfl_history_missing else
+        "HEURISTIC_NOT_VALIDATED: bounded prior-five-game "
+        "scoring-margin proxy + static HFA"))
     factors.append(_factor("recent_form", USED, "FREE_MODELS_ENGINE",
                            "HEURISTIC_NOT_VALIDATED: short prior-game scoring trend; "
                            "MLB form subsumed into rating"))

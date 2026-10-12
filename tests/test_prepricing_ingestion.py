@@ -544,8 +544,11 @@ class RunnerHookTests(unittest.TestCase):
     def test_manual_mode_audits_without_blocking(self):
         card = run_full({"lines": [nfl_row()]}, now=NOW, auto_context=False)
         row = card["evaluated_rows"][0]
-        # Existing manual-mode behavior preserved: priced, not downgraded.
-        self.assertIn(row["status"], ("RESEARCH_EDGE", "BELOW_THRESHOLD", "PRICE_CAP"))
+        # Explicit no-fetch may calculate a diagnostic model, but missing
+        # verified NFL team factors cannot qualify a current-game edge.
+        self.assertEqual(row["status"], "WATCH_NFL_NO_VERIFIED_CONTEXT")
+        self.assertEqual(card["edges"], [])
+        self.assertEqual(card["independent_candidates"], [])
         entry = card["prepricing_factor_audit"]["by_input_index"][0]
         self.assertFalse(entry["blocked"])
         self.assertTrue(any(f["status"] == "MISSING" and "MANUAL_MODE" in f["reason"]
