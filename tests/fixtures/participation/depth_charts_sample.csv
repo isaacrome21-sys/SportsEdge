@@ -1,0 +1,241 @@
+season,club_code,week,game_type,depth_team,last_name,first_name,football_name,formation,gsis_id,jersey_number,position,elias_id,depth_position,full_name
+2023,ARI,1.0,REG,1,Collier,Lawrence,L.J.,Defense,00-0035636,91,DE,COL214397,DE,L.J. Collier
+2023,ARI,1.0,REG,1,Froholdt,Hjalte,Hjalte,Offense,00-0035258,72,C,FRO242081,C,Hjalte Froholdt
+2023,ARI,1.0,REG,2,Colon,Trystan,Trystan,Offense,00-0035992,63,C,COL747687,C,Trystan Colon
+2023,ARI,1.0,REG,2,Beachum,Kelvin,Kelvin,Offense,00-0029316,68,T,BEA111513,RT,Kelvin Beachum
+2023,ARI,1.0,REG,2,McBride,Trey,Trey,Offense,00-0037744,85,TE,MCB743360,TE,Trey McBride
+2023,ARI,1.0,REG,3,Luketa,Jesse,Jesse,Defense,00-0037330,43,OLB,LUK662948,OLB,Jesse Luketa
+2023,ARI,1.0,REG,1,Collins,Zaven,Zaven,Defense,00-0036933,25,OLB,COL712276,OLB,Zaven Collins
+2023,ARI,1.0,REG,3,Ojulari,Jamiu,B.J.,Defense,00-0039155,18,OLB,OJU426541,OLB,B.J. Ojulari
+2023,ARI,1.0,REG,1,Clark,Kei'Trel,Kei'Trel,Defense,00-0038984,13,CB,CLA395333,CB,Kei'Trel Clark
+2023,ARI,1.0,REG,2,Hamilton,Antonio,Antonio,Defense,00-0032933,33,CB,HAM184824,CB,Antonio Hamilton
+2023,ARI,1.0,REG,1,Brewer,Aaron,Aaron,Special Teams,00-0028946,46,LS,BRE611741,LS,Aaron Brewer
+2023,ARI,1.0,REG,2,Stills,Dante,Dante,Defense,00-0038623,55,DE,STI401047,DE,Dante Stills
+2023,ARI,1.0,REG,1,Wilkinson,Elijah,Elijah,Offense,00-0033676,65,G,WIL099353,LG,Elijah Wilkinson
+2023,ARI,1.0,REG,2,Ismael,Keith,Keith,Offense,00-0036342,60,G,ISM022913,RG,Keith Ismael
+2023,ARI,1.0,REG,1,Johnson,Paris,Paris,Offense,00-0038540,70,T,JOH789993,RT,Paris Johnson
+2023,ARI,1.0,REG,3,Swaim,Geoffrey,Geoff,Offense,00-0032141,87,TE,SWA047065,TE,Geoff Swaim
+2023,ARI,1.0,REG,1,Moore,Rondale,Rondale,Offense,00-0036936,14,WR,MOO672093,WR,Rondale Moore
+2023,ARI,1.0,REG,1,Ledbetter,Jonathan,Jonathan,Defense,00-0035343,93,DE,LED300302,DE,Jonathan Ledbetter
+2023,ARI,1.0,REG,1,White,Kyzir,Kyzir,Defense,00-0034375,7,ILB,WHI315792,ILB,Kyzir White
+2023,ARI,1.0,REG,1,Woods,Josh,Josh,Defense,00-0034801,10,ILB,WOO516359,ILB,Josh Woods
+2023,ARI,1.0,REG,2,Pappoe,Owen,Owen,Defense,00-0038600,44,ILB,PAP723174,ILB,Owen Pappoe
+2023,ARI,1.0,REG,1,Wilson,Marco,Marco,Defense,00-0036884,19,CB,WIL749995,CB,Marco Wilson
+2023,ARI,1.0,REG,1,Prater,Matt,Matt,Special Teams,00-0023853,5,K,PRA143616,K,Matt Prater
+2023,ARI,1.0,REG,1,Cooney,Nolan,Nolan,Special Teams,00-0036539,16,P,COO465974,P,Nolan Cooney
+2023,ARI,1.0,REG,1,Cooney,Nolan,Nolan,Special Teams,00-0036539,16,P,COO465974,H,Nolan Cooney
+2023,ARI,1.0,REG,2,Tune,Clayton,Clayton,Offense,00-0038582,15,QB,TUN207645,QB,Clayton Tune
+2023,ARI,1.0,REG,2,Chachere,Andre,Andre,Defense,00-0034623,36,SS,CHA014180,S,Andre Chachere
+2023,ARI,1.0,REG,1,Conner,James,James,Offense,00-0033553,6,RB,CON461999,RB,James Conner
+2023,ARI,1.0,REG,2,Ingram,Keaontay,Keaontay,Offense,00-0037299,30,RB,ING566419,RB,Keaontay Ingram
+2023,ARI,1.0,REG,1,Dobbs,Robert,Joshua,Offense,00-0033949,5,QB,DOB302360,QB,Joshua Dobbs
+2023,ARI,1.0,REG,1,Brown,Marquise,Marquise,Offense,00-0035662,5,WR,BRO413218,WR,Marquise Brown
+2023,ARI,1.0,REG,1,Humphries,DeMarcus,D.J.,Offense,00-0032222,74,T,HUM728022,LT,D.J. Humphries
+2023,ARI,1.0,REG,2,O'Donnell,Carter,Carter,Offense,00-0035853,61,T,ODO534448,LT,Carter O'Donnell
+2023,ARI,1.0,REG,3,Barton,Jackson,Jackson,Offense,00-0035003,66,T,BAR782282,LT,Jackson Barton
+2023,ARI,1.0,REG,2,Manning,Ilm,Ilm,Offense,00-0038880,73,G,MAN491139,LG,Ilm Manning
+2023,ARI,1.0,REG,3,Higgins,Elijah,Elijah,Offense,00-0039041,84,TE,HIG138430,"
+    ",Elijah Higgins
+2023,ARI,1.0,REG,1,Wilson,Michael,Michael,Offense,00-0038559,14,WR,WIL752419,WR,Michael Wilson
+2023,ARI,1.0,REG,2,Strong,Kevin,Kevin,Defense,00-0035334,92,NT,STR637423,NT,Kevin Strong
+2023,ARI,1.0,REG,2,Watkins,Carlos,Carlos,Defense,00-0033563,94,DE,WAT180320,DE,Carlos Watkins
+2023,ARI,1.0,REG,1,Gardeck,Dennis,Dennis,Defense,00-0034473,45,OLB,GAR121450,OLB,Dennis Gardeck
+2023,ARI,1.0,REG,2,Barnes,Krystopher,Krys,Defense,00-0035961,51,ILB,BAR322104,ILB,Krys Barnes
+2023,ARI,1.0,REG,3,Turner,Ezekiel,Ezekiel,Defense,00-0034490,47,ILB,TUR304695,ILB,Ezekiel Turner
+2023,ARI,1.0,REG,2,Thomas,Cameron,Cameron,Defense,00-0037815,97,OLB,THO063745,OLB,Cameron Thomas
+2023,ARI,1.0,REG,3,Thomas,Starling,Starling,Defense,00-0038663,24,CB,THO443334,CB,Starling Thomas
+2023,ARI,1.0,REG,2,Matthew,Christian,Christian,Defense,00-0037747,46,CB,MAT476006,CB,Christian Matthew
+2023,ARI,1.0,REG,1,Thompson,Jalen,Jalen,Defense,00-0035705,34,FS,THO580436,S,Jalen Thompson
+2023,ARI,1.0,REG,1,Hernandez,William,Will,Offense,00-0034346,76,G,HER365408,RG,Will Hernandez
+2023,ARI,1.0,REG,1,Ertz,Zachary,Zach,Offense,00-0030061,86,TE,ERT800920,TE,Zach Ertz
+2023,ARI,1.0,REG,2,Dortch,Greg,Greg,Offense,00-0035500,4,WR,DOR793727,WR,Greg Dortch
+2023,ARI,1.0,REG,2,Pascal,Zachary,Zach,Offense,00-0033251,0,WR,PAS035497,WR,Zach Pascal
+2023,ARI,1.0,REG,1,Fotu,George,Leki,Defense,00-0036371,95,NT,FOT415291,NT,Leki Fotu
+2023,ARI,1.0,REG,2,Dimukeje,Victor,Victor,Defense,00-0036896,52,OLB,DIM738004,OLB,Victor Dimukeje
+2023,ARI,1.0,REG,3,Boyd,Kris,Kris,Defense,00-0035150,17,CB,BOY229979,CB,Kris Boyd
+2023,ARI,1.0,REG,2,Wallace,K'Von,K'Von,Defense,00-0036395,24,FS,WAL463687,S,K'Von Wallace
+2023,ARI,1.0,REG,1,Baker,Budda,Budda,Defense,00-0033890,3,SS,BAK070449,S,Budda Baker
+2023,ARI,1.0,REG,1,Dortch,Greg,Greg,Special Teams,00-0035500,4,WR,DOR793727,KR,Greg Dortch
+2023,ARI,1.0,REG,1,Dortch,Greg,Greg,Special Teams,00-0035500,4,WR,DOR793727,PR,Greg Dortch
+2023,ARI,1.0,REG,3,Demercado,Emari,Emari,Offense,00-0038705,31,RB,DEM317794,RB,Emari Demercado
+2023,ARI,2.0,REG,1,Collier,Lawrence,L.J.,Defense,00-0035636,91,DE,COL214397,DE,L.J. Collier
+2023,ARI,2.0,REG,1,Froholdt,Hjalte,Hjalte,Offense,00-0035258,72,C,FRO242081,C,Hjalte Froholdt
+2023,ARI,2.0,REG,2,Colon,Trystan,Trystan,Offense,00-0035992,63,C,COL747687,C,Trystan Colon
+2023,ARI,2.0,REG,2,Beachum,Kelvin,Kelvin,Offense,00-0029316,68,T,BEA111513,RT,Kelvin Beachum
+2023,ARI,2.0,REG,2,McBride,Trey,Trey,Offense,00-0037744,85,TE,MCB743360,TE,Trey McBride
+2023,ARI,2.0,REG,3,Luketa,Jesse,Jesse,Defense,00-0037330,43,OLB,LUK662948,OLB,Jesse Luketa
+2023,ARI,2.0,REG,1,Collins,Zaven,Zaven,Defense,00-0036933,25,OLB,COL712276,OLB,Zaven Collins
+2023,ARI,2.0,REG,3,Ojulari,Jamiu,B.J.,Defense,00-0039155,18,OLB,OJU426541,OLB,B.J. Ojulari
+2023,ARI,2.0,REG,1,Clark,Kei'Trel,Kei'Trel,Defense,00-0038984,13,CB,CLA395333,CB,Kei'Trel Clark
+2023,ARI,2.0,REG,2,Hamilton,Antonio,Antonio,Defense,00-0032933,33,CB,HAM184824,CB,Antonio Hamilton
+2023,ARI,2.0,REG,1,Brewer,Aaron,Aaron,Special Teams,00-0028946,46,LS,BRE611741,LS,Aaron Brewer
+2023,ARI,2.0,REG,2,Stills,Dante,Dante,Defense,00-0038623,55,DE,STI401047,DE,Dante Stills
+2023,ARI,2.0,REG,1,Wilkinson,Elijah,Elijah,Offense,00-0033676,65,G,WIL099353,LG,Elijah Wilkinson
+2023,ARI,2.0,REG,2,Ismael,Keith,Keith,Offense,00-0036342,60,G,ISM022913,RG,Keith Ismael
+2023,ARI,2.0,REG,1,Johnson,Paris,Paris,Offense,00-0038540,70,T,JOH789993,RT,Paris Johnson
+2023,ARI,2.0,REG,3,Swaim,Geoffrey,Geoff,Offense,00-0032141,87,TE,SWA047065,TE,Geoff Swaim
+2023,ARI,2.0,REG,1,Moore,Rondale,Rondale,Offense,00-0036936,14,WR,MOO672093,WR,Rondale Moore
+2023,ARI,2.0,REG,1,Ledbetter,Jonathan,Jonathan,Defense,00-0035343,93,DE,LED300302,DE,Jonathan Ledbetter
+2023,ARI,2.0,REG,1,White,Kyzir,Kyzir,Defense,00-0034375,7,ILB,WHI315792,ILB,Kyzir White
+2023,ARI,2.0,REG,1,Woods,Josh,Josh,Defense,00-0034801,10,ILB,WOO516359,ILB,Josh Woods
+2023,ARI,2.0,REG,2,Pappoe,Owen,Owen,Defense,00-0038600,44,ILB,PAP723174,ILB,Owen Pappoe
+2023,ARI,2.0,REG,1,Wilson,Marco,Marco,Defense,00-0036884,19,CB,WIL749995,CB,Marco Wilson
+2023,ARI,2.0,REG,1,Prater,Matt,Matt,Special Teams,00-0023853,5,K,PRA143616,K,Matt Prater
+2023,ARI,2.0,REG,1,Cooney,Nolan,Nolan,Special Teams,00-0036539,16,P,COO465974,P,Nolan Cooney
+2023,ARI,2.0,REG,1,Cooney,Nolan,Nolan,Special Teams,00-0036539,16,P,COO465974,H,Nolan Cooney
+2023,ARI,2.0,REG,2,Tune,Clayton,Clayton,Offense,00-0038582,15,QB,TUN207645,QB,Clayton Tune
+2023,ARI,2.0,REG,2,Chachere,Andre,Andre,Defense,00-0034623,36,SS,CHA014180,S,Andre Chachere
+2023,ARI,2.0,REG,1,Conner,James,James,Offense,00-0033553,6,RB,CON461999,RB,James Conner
+2023,ARI,2.0,REG,2,Ingram,Keaontay,Keaontay,Offense,00-0037299,30,RB,ING566419,RB,Keaontay Ingram
+2023,ARI,2.0,REG,1,Dobbs,Robert,Joshua,Offense,00-0033949,5,QB,DOB302360,QB,Joshua Dobbs
+2023,ARI,2.0,REG,1,Brown,Marquise,Marquise,Offense,00-0035662,5,WR,BRO413218,WR,Marquise Brown
+2023,ARI,2.0,REG,1,Humphries,DeMarcus,D.J.,Offense,00-0032222,74,T,HUM728022,LT,D.J. Humphries
+2023,ARI,2.0,REG,2,O'Donnell,Carter,Carter,Offense,00-0035853,61,T,ODO534448,LT,Carter O'Donnell
+2023,ARI,2.0,REG,3,Barton,Jackson,Jackson,Offense,00-0035003,66,T,BAR782282,LT,Jackson Barton
+2023,ARI,2.0,REG,2,Manning,Ilm,Ilm,Offense,00-0038880,73,G,MAN491139,LG,Ilm Manning
+2023,ARI,2.0,REG,3,Higgins,Elijah,Elijah,Offense,00-0039041,84,TE,HIG138430,"
+    ",Elijah Higgins
+2023,ARI,2.0,REG,1,Wilson,Michael,Michael,Offense,00-0038559,14,WR,WIL752419,WR,Michael Wilson
+2023,ARI,2.0,REG,2,Strong,Kevin,Kevin,Defense,00-0035334,92,NT,STR637423,NT,Kevin Strong
+2023,ARI,2.0,REG,2,Watkins,Carlos,Carlos,Defense,00-0033563,94,DE,WAT180320,DE,Carlos Watkins
+2023,ARI,2.0,REG,1,Gardeck,Dennis,Dennis,Defense,00-0034473,45,OLB,GAR121450,OLB,Dennis Gardeck
+2023,ARI,2.0,REG,2,Barnes,Krystopher,Krys,Defense,00-0035961,51,ILB,BAR322104,ILB,Krys Barnes
+2023,ARI,2.0,REG,3,Turner,Ezekiel,Ezekiel,Defense,00-0034490,47,ILB,TUR304695,ILB,Ezekiel Turner
+2023,ARI,2.0,REG,2,Thomas,Cameron,Cameron,Defense,00-0037815,97,OLB,THO063745,OLB,Cameron Thomas
+2023,ARI,2.0,REG,3,Thomas,Starling,Starling,Defense,00-0038663,24,CB,THO443334,CB,Starling Thomas
+2023,ARI,2.0,REG,2,Matthew,Christian,Christian,Defense,00-0037747,46,CB,MAT476006,CB,Christian Matthew
+2023,ARI,2.0,REG,1,Thompson,Jalen,Jalen,Defense,00-0035705,34,FS,THO580436,S,Jalen Thompson
+2023,ARI,2.0,REG,1,Hernandez,William,Will,Offense,00-0034346,76,G,HER365408,RG,Will Hernandez
+2023,ARI,2.0,REG,1,Ertz,Zachary,Zach,Offense,00-0030061,86,TE,ERT800920,TE,Zach Ertz
+2023,ARI,2.0,REG,2,Dortch,Greg,Greg,Offense,00-0035500,4,WR,DOR793727,WR,Greg Dortch
+2023,ARI,2.0,REG,2,Pascal,Zachary,Zach,Offense,00-0033251,0,WR,PAS035497,WR,Zach Pascal
+2023,ARI,2.0,REG,1,Fotu,George,Leki,Defense,00-0036371,95,NT,FOT415291,NT,Leki Fotu
+2023,ARI,2.0,REG,2,Dimukeje,Victor,Victor,Defense,00-0036896,52,OLB,DIM738004,OLB,Victor Dimukeje
+2023,ARI,2.0,REG,3,Boyd,Kris,Kris,Defense,00-0035150,17,CB,BOY229979,CB,Kris Boyd
+2023,ARI,2.0,REG,2,Wallace,K'Von,K'Von,Defense,00-0036395,24,FS,WAL463687,S,K'Von Wallace
+2023,ARI,2.0,REG,1,Baker,Budda,Budda,Defense,00-0033890,3,SS,BAK070449,S,Budda Baker
+2023,ARI,2.0,REG,1,Dortch,Greg,Greg,Special Teams,00-0035500,4,WR,DOR793727,KR,Greg Dortch
+2023,ARI,2.0,REG,1,Dortch,Greg,Greg,Special Teams,00-0035500,4,WR,DOR793727,PR,Greg Dortch
+2023,ARI,2.0,REG,3,Demercado,Emari,Emari,Offense,00-0038705,31,RB,DEM317794,RB,Emari Demercado
+2023,WAS,1.0,REG,1,Slye,Joey,Joey,Special Teams,00-0035192,19,K,SLY207645,K,Joey Slye
+2023,WAS,1.0,REG,2,Butler,Percy,Percy,Defense,00-0038100,35,FS,BUT505144,FS,Percy Butler
+2023,WAS,1.0,REG,2,Hudson,Khaleke,Khaleke,Defense,00-0036343,47,OLB,HUD448091,OLB,Khaleke Hudson
+2023,WAS,1.0,REG,1,Barton,Cody,Cody,Defense,00-0035672,55,MLB,BAR763281,MLB,Cody Barton
+2023,WAS,1.0,REG,2,Holmes,Christian,Christian,Defense,00-0037095,34,CB,HOL513870,CB,Christian Holmes
+2023,WAS,1.0,REG,1,Curl,Kamren,Kamren,Defense,00-0036349,3,SS,CUR156872,SS,Kamren Curl
+2023,WAS,1.0,REG,1,Way,Tress,Tress,Special Teams,00-0030140,10,P,WAY228645,P,Tress Way
+2023,WAS,1.0,REG,1,Way,Tress,Tress,Special Teams,00-0030140,10,P,WAY228645,H,Tress Way
+2023,WAS,1.0,REG,1,Leno,Charles,Charles,Offense,00-0031095,72,T,LEN389697,LT,Charles Leno
+2023,WAS,1.0,REG,1,Gates,Nicholas,Nick,Offense,00-0034445,63,C,GAT201316,C,Nick Gates
+2023,WAS,1.0,REG,2,Stromberg,Ricky,Ricky,Offense,00-0039008,53,C,STR605750,C,Ricky Stromberg
+2023,WAS,1.0,REG,3,Larsen,Tyler,Tyler,Offense,00-0030869,69,C,LAR424403,C,Tyler Larsen
+2023,WAS,1.0,REG,1,Wylie,Andrew,Andrew,Offense,00-0033831,71,T,WYL509323,RT,Andrew Wylie
+2023,WAS,1.0,REG,1,Thomas,Logan,Logan,Offense,00-0031260,82,TE,THO296280,TE,Logan Thomas
+2023,WAS,1.0,REG,1,Robinson,Brian,Brian,Offense,00-0037746,8,RB,ROB736177,RB,Brian Robinson
+2023,WAS,1.0,REG,2,Ridgeway,John,John,Defense,00-0037283,91,DT,RID334254,DT,John Ridgeway
+2023,WAS,1.0,REG,3,Bradley-King,William,William,Defense,00-0036664,56,DE,BRA251763,"
+    ",William Bradley-King
+2023,WAS,1.0,REG,1,St-Juste,Benjamin,Benjamin,Defense,00-0036625,25,CB,STJ615310,CB,Benjamin St-Juste
+2023,WAS,1.0,REG,1,Forbes,Emmanuel,Emmanuel,Defense,00-0039151,13,CB,FOR013942,CB,Emmanuel Forbes
+2023,WAS,1.0,REG,1,McLaurin,Terry,Terry,Offense,00-0035659,17,WR,MCL278328,WR,Terry McLaurin
+2023,WAS,1.0,REG,1,Sweat,Montez,Montez,Defense,00-0035647,98,DE,SWE034375,DE,Montez Sweat
+2023,WAS,1.0,REG,2,Scott,Trenton,Trenton,Offense,00-0034571,73,T,SCO718957,RT,Trenton Scott
+2023,WAS,1.0,REG,2,Bates,John,John,Offense,00-0036628,87,TE,BAT109191,TE,John Bates
+2023,WAS,1.0,REG,1,Dotson,Jahan,Jahan,Offense,00-0037741,1,WR,DOT282798,WR,Jahan Dotson
+2023,WAS,1.0,REG,2,Pringle,Byron,Byron,Offense,00-0034297,3,WR,PRI547217,WR,Byron Pringle
+2023,WAS,1.0,REG,1,Howell,Sam,Sam,Offense,00-0037077,6,QB,HOW692969,QB,Sam Howell
+2023,WAS,1.0,REG,2,Gibson,Antonio,Antonio,Offense,00-0036328,21,RB,GIB415285,RB,Antonio Gibson
+2023,WAS,1.0,REG,3,Rodriguez,Christopher,Chris,Offense,00-0038611,23,RB,ROD797090,RB,Chris Rodriguez
+2023,WAS,1.0,REG,1,Payne,Daron,Daron,Defense,00-0034333,94,DT,PAY281222,DT,Daron Payne
+2023,WAS,1.0,REG,1,Young,Chase,Chase,Defense,00-0036321,99,DE,YOU146550,DE,Chase Young
+2023,WAS,1.0,REG,2,Mayo,David,David,Defense,00-0031596,51,MLB,MAY646134,MLB,David Mayo
+2023,WAS,1.0,REG,1,Cheeseman,Camaron,Camaron,Special Teams,00-0036659,54,LS,CHE189637,LS,Camaron Cheeseman
+2023,WAS,1.0,REG,1,Gibson,Antonio,Antonio,Special Teams,00-0036328,21,RB,GIB415285,KR,Antonio Gibson
+2023,WAS,1.0,REG,2,Pringle,Byron,Byron,Special Teams,00-0034297,3,WR,PRI547217,KR,Byron Pringle
+2023,WAS,1.0,REG,1,Dotson,Jahan,Jahan,Special Teams,00-0037741,1,WR,DOT282798,PR,Jahan Dotson
+2023,WAS,1.0,REG,2,Paul,Chris,Chris,Offense,00-0037092,75,G,PAU076683,LG,Chris Paul
+2023,WAS,1.0,REG,1,Cosmi,Samuel,Samuel,Offense,00-0036618,76,G,COS196802,RG,Samuel Cosmi
+2023,WAS,1.0,REG,2,Paul,Chris,Chris,Offense,00-0037092,75,G,PAU076683,RG,Chris Paul
+2023,WAS,1.0,REG,1,Hodges,Curtis,Curtis,Offense,00-0037164,80,TE,HOD360710,"
+    ",Curtis Hodges
+2023,WAS,1.0,REG,2,Crowder,Jamison,Jamison,Offense,00-0031941,80,WR,CRO697273,WR,Jamison Crowder
+2023,WAS,1.0,REG,3,Tinsley,Mitchell,Mitchell,Offense,00-0038839,18,WR,TIN524900,WR,Mitchell Tinsley
+2023,WAS,1.0,REG,2,Brissett,Jacoby,Jacoby,Offense,00-0033119,14,QB,BRI516391,QB,Jacoby Brissett
+2023,WAS,1.0,REG,2,Toohill,Casey,Casey,Defense,00-0036403,99,DE,TOO260938,DE,Casey Toohill
+2023,WAS,1.0,REG,1,Allen,Jonathan,Jonathan,Defense,00-0033523,93,DT,ALL512725,DT,Jonathan Allen
+2023,WAS,1.0,REG,3,Henry,K.J.,K.J.,Defense,00-0038581,55,DE,HEN624398,DE,K.J. Henry
+2023,WAS,1.0,REG,1,Davis,Jamin,Jamin,Defense,00-0036614,52,OLB,DAV428592,OLB,Jamin Davis
+2023,WAS,1.0,REG,1,Fuller,Kendall,Kendall,Defense,00-0033084,29,CB,FUL342614,CB,Kendall Fuller
+2023,WAS,1.0,REG,2,Martin,Jartavius,Quan,Defense,00-0039149,20,CB,MAR645121,CB,Quan Martin
+2023,WAS,1.0,REG,2,Johnson,Danny,Danny,Defense,00-0034071,36,CB,JOH165289,CB,Danny Johnson
+2023,WAS,1.0,REG,2,Reaves,Jeremy,Jeremy,Defense,00-0034465,39,SS,REA664151,SS,Jeremy Reaves
+2023,WAS,1.0,REG,1,Forrest,Darrick,Darrick,Defense,00-0036638,22,FS,FOR485545,FS,Darrick Forrest
+2023,WAS,1.0,REG,2,Brown,Dyami,Dyami,Offense,00-0036626,2,WR,BRO408220,WR,Dyami Brown
+2023,WAS,1.0,REG,2,Lucas,Cornelius,Cornelius,Offense,00-0030725,78,T,LUC054659,LT,Cornelius Lucas
+2023,WAS,1.0,REG,1,Charles,Saahdiq,Saahdiq,Offense,00-0036334,53,G,CHA596597,LG,Saahdiq Charles
+2023,WAS,1.0,REG,3,Turner,Cole,Cole,Offense,00-0037078,85,TE,TUR239242,TE,Cole Turner
+2023,WAS,1.0,REG,1,Samuel,Curtis,Curtis,Offense,00-0033282,1,WR,SAM633285,WR,Curtis Samuel
+2023,WAS,1.0,REG,3,Jones,Gerald,Andre,Defense,00-0038635,50,DE,JON826252,DE,Andre Jones
+2023,WAS,1.0,REG,2,Anderson,Abdullah,Abdullah,Defense,00-0034587,92,DT,AND036084,DT,Abdullah Anderson
+2023,WAS,1.0,REG,2,Smith-Williams,James,James,Defense,00-0036351,50,DE,SMI841542,DE,James Smith-Williams
+2023,WAS,2.0,REG,2,Toohill,Casey,Casey,Defense,00-0036403,99,DE,TOO260938,DE,Casey Toohill
+2023,WAS,2.0,REG,1,Allen,Jonathan,Jonathan,Defense,00-0033523,93,DT,ALL512725,DT,Jonathan Allen
+2023,WAS,2.0,REG,3,Henry,K.J.,K.J.,Defense,00-0038581,55,DE,HEN624398,DE,K.J. Henry
+2023,WAS,2.0,REG,1,Davis,Jamin,Jamin,Defense,00-0036614,52,OLB,DAV428592,OLB,Jamin Davis
+2023,WAS,2.0,REG,1,Fuller,Kendall,Kendall,Defense,00-0033084,29,CB,FUL342614,CB,Kendall Fuller
+2023,WAS,2.0,REG,2,Martin,Jartavius,Quan,Defense,00-0039149,20,CB,MAR645121,CB,Quan Martin
+2023,WAS,2.0,REG,2,Johnson,Danny,Danny,Defense,00-0034071,36,CB,JOH165289,CB,Danny Johnson
+2023,WAS,2.0,REG,2,Reaves,Jeremy,Jeremy,Defense,00-0034465,39,SS,REA664151,SS,Jeremy Reaves
+2023,WAS,2.0,REG,1,Forrest,Darrick,Darrick,Defense,00-0036638,22,FS,FOR485545,FS,Darrick Forrest
+2023,WAS,2.0,REG,2,Brown,Dyami,Dyami,Offense,00-0036626,2,WR,BRO408220,WR,Dyami Brown
+2023,WAS,2.0,REG,2,Lucas,Cornelius,Cornelius,Offense,00-0030725,78,T,LUC054659,LT,Cornelius Lucas
+2023,WAS,2.0,REG,1,Charles,Saahdiq,Saahdiq,Offense,00-0036334,53,G,CHA596597,LG,Saahdiq Charles
+2023,WAS,2.0,REG,3,Turner,Cole,Cole,Offense,00-0037078,85,TE,TUR239242,TE,Cole Turner
+2023,WAS,2.0,REG,1,Samuel,Curtis,Curtis,Offense,00-0033282,1,WR,SAM633285,WR,Curtis Samuel
+2023,WAS,2.0,REG,3,Jones,Gerald,Andre,Defense,00-0038635,50,DE,JON826252,DE,Andre Jones
+2023,WAS,2.0,REG,2,Anderson,Abdullah,Abdullah,Defense,00-0034587,92,DT,AND036084,DT,Abdullah Anderson
+2023,WAS,2.0,REG,2,Smith-Williams,James,James,Defense,00-0036351,50,DE,SMI841542,DE,James Smith-Williams
+2023,WAS,2.0,REG,2,Hudson,Khaleke,Khaleke,Defense,00-0036343,47,OLB,HUD448091,OLB,Khaleke Hudson
+2023,WAS,2.0,REG,1,Barton,Cody,Cody,Defense,00-0035672,55,MLB,BAR763281,MLB,Cody Barton
+2023,WAS,2.0,REG,2,Holmes,Christian,Christian,Defense,00-0037095,34,CB,HOL513870,CB,Christian Holmes
+2023,WAS,2.0,REG,1,Curl,Kamren,Kamren,Defense,00-0036349,3,SS,CUR156872,SS,Kamren Curl
+2023,WAS,2.0,REG,1,Way,Tress,Tress,Special Teams,00-0030140,10,P,WAY228645,P,Tress Way
+2023,WAS,2.0,REG,1,Way,Tress,Tress,Special Teams,00-0030140,10,P,WAY228645,H,Tress Way
+2023,WAS,2.0,REG,1,Leno,Charles,Charles,Offense,00-0031095,72,T,LEN389697,LT,Charles Leno
+2023,WAS,2.0,REG,1,Gates,Nicholas,Nick,Offense,00-0034445,63,C,GAT201316,C,Nick Gates
+2023,WAS,2.0,REG,2,Stromberg,Ricky,Ricky,Offense,00-0039008,53,C,STR605750,C,Ricky Stromberg
+2023,WAS,2.0,REG,3,Larsen,Tyler,Tyler,Offense,00-0030869,69,C,LAR424403,C,Tyler Larsen
+2023,WAS,2.0,REG,1,Wylie,Andrew,Andrew,Offense,00-0033831,71,T,WYL509323,RT,Andrew Wylie
+2023,WAS,2.0,REG,1,Thomas,Logan,Logan,Offense,00-0031260,82,TE,THO296280,TE,Logan Thomas
+2023,WAS,2.0,REG,1,Robinson,Brian,Brian,Offense,00-0037746,8,RB,ROB736177,RB,Brian Robinson
+2023,WAS,2.0,REG,2,Ridgeway,John,John,Defense,00-0037283,91,DT,RID334254,DT,John Ridgeway
+2023,WAS,2.0,REG,3,Bradley-King,William,William,Defense,00-0036664,56,DE,BRA251763,"
+    ",William Bradley-King
+2023,WAS,2.0,REG,1,St-Juste,Benjamin,Benjamin,Defense,00-0036625,25,CB,STJ615310,CB,Benjamin St-Juste
+2023,WAS,2.0,REG,1,Forbes,Emmanuel,Emmanuel,Defense,00-0039151,13,CB,FOR013942,CB,Emmanuel Forbes
+2023,WAS,2.0,REG,1,Slye,Joey,Joey,Special Teams,00-0035192,19,K,SLY207645,K,Joey Slye
+2023,WAS,2.0,REG,2,Butler,Percy,Percy,Defense,00-0038100,35,FS,BUT505144,FS,Percy Butler
+2023,WAS,2.0,REG,1,McLaurin,Terry,Terry,Offense,00-0035659,17,WR,MCL278328,WR,Terry McLaurin
+2023,WAS,2.0,REG,1,Sweat,Montez,Montez,Defense,00-0035647,98,DE,SWE034375,DE,Montez Sweat
+2023,WAS,2.0,REG,2,Scott,Trenton,Trenton,Offense,00-0034571,73,T,SCO718957,RT,Trenton Scott
+2023,WAS,2.0,REG,2,Bates,John,John,Offense,00-0036628,87,TE,BAT109191,TE,John Bates
+2023,WAS,2.0,REG,1,Dotson,Jahan,Jahan,Offense,00-0037741,1,WR,DOT282798,WR,Jahan Dotson
+2023,WAS,2.0,REG,2,Pringle,Byron,Byron,Offense,00-0034297,3,WR,PRI547217,WR,Byron Pringle
+2023,WAS,2.0,REG,1,Howell,Sam,Sam,Offense,00-0037077,6,QB,HOW692969,QB,Sam Howell
+2023,WAS,2.0,REG,2,Gibson,Antonio,Antonio,Offense,00-0036328,21,RB,GIB415285,RB,Antonio Gibson
+2023,WAS,2.0,REG,3,Rodriguez,Christopher,Chris,Offense,00-0038611,23,RB,ROD797090,RB,Chris Rodriguez
+2023,WAS,2.0,REG,1,Payne,Daron,Daron,Defense,00-0034333,94,DT,PAY281222,DT,Daron Payne
+2023,WAS,2.0,REG,1,Young,Chase,Chase,Defense,00-0036321,99,DE,YOU146550,DE,Chase Young
+2023,WAS,2.0,REG,2,Mayo,David,David,Defense,00-0031596,51,MLB,MAY646134,MLB,David Mayo
+2023,WAS,2.0,REG,1,Cheeseman,Camaron,Camaron,Special Teams,00-0036659,54,LS,CHE189637,LS,Camaron Cheeseman
+2023,WAS,2.0,REG,1,Gibson,Antonio,Antonio,Special Teams,00-0036328,21,RB,GIB415285,KR,Antonio Gibson
+2023,WAS,2.0,REG,2,Pringle,Byron,Byron,Special Teams,00-0034297,3,WR,PRI547217,KR,Byron Pringle
+2023,WAS,2.0,REG,1,Dotson,Jahan,Jahan,Special Teams,00-0037741,1,WR,DOT282798,PR,Jahan Dotson
+2023,WAS,2.0,REG,2,Paul,Chris,Chris,Offense,00-0037092,75,G,PAU076683,LG,Chris Paul
+2023,WAS,2.0,REG,1,Cosmi,Samuel,Samuel,Offense,00-0036618,76,G,COS196802,RG,Samuel Cosmi
+2023,WAS,2.0,REG,2,Paul,Chris,Chris,Offense,00-0037092,75,G,PAU076683,RG,Chris Paul
+2023,WAS,2.0,REG,1,Hodges,Curtis,Curtis,Offense,00-0037164,80,TE,HOD360710,"
+    ",Curtis Hodges
+2023,WAS,2.0,REG,2,Crowder,Jamison,Jamison,Offense,00-0031941,80,WR,CRO697273,WR,Jamison Crowder
+2023,WAS,2.0,REG,3,Tinsley,Mitchell,Mitchell,Offense,00-0038839,18,WR,TIN524900,WR,Mitchell Tinsley
+2023,WAS,2.0,REG,2,Brissett,Jacoby,Jacoby,Offense,00-0033119,14,QB,BRI516391,QB,Jacoby Brissett
