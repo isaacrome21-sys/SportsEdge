@@ -361,7 +361,15 @@ class MlbPitcherTests(unittest.TestCase):
         self.assertIn("RETRACTABLE_ROOF_STATE_UNVERIFIED", wx[2])
         self.assertNotIn("weather_total_adj", adj)
         bullpen = factor_status(stage, "bullpen")[0]
-        self.assertEqual(bullpen[0], "NOT_WIRED")
+        # Collector import means audit-visible candidate capability only,
+        # not verified game data and never a newly applied pricing factor.
+        self.assertEqual(bullpen[0], "PENDING_VALIDATION")
+        self.assertIn("SOURCE_MODULE_AVAILABLE_NOT_GAME_VERIFIED", bullpen[2])
+        self.assertNotIn("bullpen_adj", adj)
+        statcast = factor_status(stage, "statcast")[0]
+        self.assertEqual(statcast[0], "PENDING_VALIDATION")
+        self.assertIn("SOURCE_MODULE_AVAILABLE_NOT_GAME_VERIFIED", statcast[2])
+        self.assertNotIn("statcast_adj", adj)
 
     def test_retractable_roof_espn_indoor_flag_does_not_claim_closed(self):
         provider = free_models.PublicContext(NOW, getter=FakeGetter(mlb_mapping()))
