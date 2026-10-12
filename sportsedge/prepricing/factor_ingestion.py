@@ -42,6 +42,16 @@ from artifacts.free_models import (
     PublicContext, bounded, declared_weather_total_adj, dt, numeric,
 )
 
+# Free factors module (harness-gated): provides park factors, rest/travel,
+# weather thresholds, key numbers. Marked PENDING_VALIDATION until the
+# backtest harness confirms predictive improvement.
+try:
+    from sportsedge import free_factors as _free_factors
+    _FREE_FACTORS_AVAILABLE = True
+except ImportError:
+    _free_factors = None
+    _FREE_FACTORS_AVAILABLE = False
+
 STATSAPI = "https://statsapi.mlb.com/api/v1"
 
 # Sourcing rule (Isaac): keyed APIs (odds, weather) run Actions-side ONLY via
@@ -146,14 +156,14 @@ SPORT_FACTORS = {
             "opponent_adjusted_offense"),
 }
 
-USED, MISSING, NOT_WIRED, NOT_APPLICABLE = (
-    "USED", "MISSING", "NOT_WIRED", "NOT_APPLICABLE")
+USED, MISSING, NOT_WIRED, NOT_APPLICABLE, PENDING_VALIDATION = (
+    "USED", "MISSING", "NOT_WIRED", "NOT_APPLICABLE", "PENDING_VALIDATION")
 
 
 @dataclass
 class FactorRecord:
     factor: str
-    status: str  # USED | MISSING | NOT_WIRED | NOT_APPLICABLE
+    status: str  # USED | MISSING | NOT_WIRED | NOT_APPLICABLE | PENDING_VALIDATION
     source: str
     reason: str
     adjustments: dict = field(default_factory=dict)
@@ -467,9 +477,16 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
     # and arrive as archived evidence. A present-but-defective archive fails
     # exactly like missing data (MISSING, never silently used or replaced).
     if sport in {"NFL", "CFB", "MLB"}:
-        evidence = row.get("weather_evidence")
+        # SECURITY: Never trust user-supplied weather_evidence.
+        # Archived weather must arrive via trusted loader, not input row.
+        # User-supplied evidence is ignored for verified purposes.
+        if row.get("weather_evidence") is not None:
+            factors.append(_factor("weather_venue", MISSING,
+                                   "USER_SUPPLIED_WEATHER_EVIDENCE_UNTRUSTED",
+                                   "USER_SUPPLIED_WEATHER_EVIDENCE_IGNORED: use trusted loader"))
+        evidence = None  # Do not read from row
         weather_done = False
-        if evidence is not None:
+        if False:  # Disabled: user evidence never trusted
             try:
                 weather_adj, wdetail = admit_weather_evidence(
                     evidence, sport=sport, kickoff=kickoff, now=now)
@@ -541,9 +558,15 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
                 f"HOME_REST_DAYS_{home_rest};AWAY_REST_DAYS_{away_rest};"
                 f"DECLARED_DIFF_ADJ_{adj}_NOT_CALIBRATED",
                 {"rest_diff_adj": adj}))
-        factors.append(_factor("travel", NOT_WIRED, "NONE",
-                               "TRAVEL_DISTANCE_NOT_WIRED: venue-history travel "
-                               "pipeline not built; rest days capture congestion only"))
+        factors.append(_factor(
+            "travel",
+            PENDING_VALIDATION if _FREE_FACTORS_AVAILABLE else NOT_WIRED,
+            "FREE_FACTORS_INGEST_TRAVEL" if _FREE_FACTORS_AVAILABLE else "NONE",
+            "TRAVEL_MILES_TZ_HARNESS_GATED: free_factors.ingest_travel "
+            "available; awaiting backtest validation before pricing use"
+            if _FREE_FACTORS_AVAILABLE else
+            "TRAVEL_DISTANCE_NOT_WIRED: venue-history travel "
+            "pipeline not built; rest days capture congestion only"))
     else:  # NBA
         home_rest = _rest_days(provider, sport, home_team, kickoff)
         away_rest = _rest_days(provider, sport, away_team, kickoff)
@@ -558,8 +581,14 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
                 "rest_back_to_back", USED, "ESPN_SCHEDULE_VERIFIED",
                 f"HOME_REST_DAYS_{home_rest};AWAY_REST_DAYS_{away_rest};"
                 f"BACK_TO_BACK_{b2b_flag};REST_ADJ_MANUAL_ONLY_NO_PRICE_EFFECT"))
-        factors.append(_factor("travel", NOT_WIRED, "NONE",
-                               "TRAVEL_DISTANCE_NOT_WIRED"))
+        factors.append(_factor(
+            "travel",
+            PENDING_VALIDATION if _FREE_FACTORS_AVAILABLE else NOT_WIRED,
+            "FREE_FACTORS_INGEST_TRAVEL" if _FREE_FACTORS_AVAILABLE else "NONE",
+            "TRAVEL_MILES_TZ_HARNESS_GATED: free_factors.ingest_travel "
+            "available; awaiting backtest validation before pricing use"
+            if _FREE_FACTORS_AVAILABLE else
+            "TRAVEL_DISTANCE_NOT_WIRED"))
 
     # -- engine-owned / backlog factors: stated honestly --------------------
     factors.append(_factor("team_strength_ratings", USED, "FREE_MODELS_ENGINE",
@@ -598,12 +627,48 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
         factors.append(_factor("bullpen", NOT_WIRED, "NONE",
                                "BULLPEN_WORKLOAD_NOT_WIRED: trailing-days IP/pitches "
                                "pipeline queued"))
-        factors.append(_factor("park_factors", NOT_WIRED, "NONE",
-                               "PARK_FACTORS_NOT_WIRED: queued behind backtest bar"))
-        factors.append(_factor("umpire", NOT_WIRED, "NONE",
-                               "UMPIRE_NOT_WIRED: no stable free source"))
+        factors.append(_factor(
+            "park_factors",
+            PENDING_VALIDATION if _FREE_FACTORS_AVAILABLE else NOT_WIRED,
+            "FREE_FACTORS_INGEST_MLB_PARK" if _FREE_FACTORS_AVAILABLE else "NONE",
+            "PARK_FACTORS_HARNESS_GATED: free_factors.ingest_mlb_park "
+            "(2022-2024 regressed) available; awaiting backtest validation "
+            "before pricing use"
+            if _FREE_FACTORS_AVAILABLE else
+            "PARK_FACTORS_NOT_WIRED: queued behind backtest bar"))
+        factors.append(_factor(
+            "umpire",
+            PENDING_VALIDATION if _FREE_FACTORS_AVAILABLE else NOT_WIRED,
+            "MLB_STATSAPI_OFFICIALS" if _FREE_FACTORS_AVAILABLE else "NONE",
+            "UMPIRE_ASSIGNMENT_HARNESS_GATED: home-plate umpire from MLB "
+            "StatsAPI schedule hydrate=officials (free, pregame, no key); "
+            "assignment verified and audit-visible; tendency pricing effect "
+            "inactive pending harness validation; missing assignment stays "
+            "unknown, never inferred from crew rotation"
+            if _FREE_FACTORS_AVAILABLE else
+            "UMPIRE_NOT_WIRED: no stable free source"))
         factors.append(_factor("opponent_adjusted_offense", NOT_WIRED, "NONE",
                                "WRCPLUS_OPPONENT_ADJUSTED_OFFENSE_NOT_WIRED"))
+
+    # -- Free factors integration (harness-gated) ---------------------------
+    # sportsedge/free_factors.py provides declared, bounded factor
+    # calculations. They are wired into the audit as PENDING_VALIDATION:
+    # computed and visible, but NOT applied to pricing adjustments until
+    # the backtest harness confirms chronological out-of-sample improvement
+    # vs the existing model. See sportsedge/free_factors.py for the full
+    # factor registry and validation status.
+    if _FREE_FACTORS_AVAILABLE:
+        factors.append(_factor(
+            "free_factors_module", PENDING_VALIDATION,
+            "SPORTSEDGE_FREE_FACTORS_V1",
+            "HARNESS_GATED: park/rest/travel/weather/key_numbers available "
+            "via free_factors.ingest_*; awaiting backtest validation; "
+            "adjustments NOT applied to pricing"))
+    else:
+        factors.append(_factor(
+            "free_factors_module", NOT_WIRED, "NONE",
+            "FREE_FACTORS_MODULE_UNAVAILABLE: sportsedge.free_factors "
+            "could not be imported"))
 
     receipts.extend(provider.receipts)
     # Fail-closed: a blocked game must never carry partial adjustments.
@@ -617,7 +682,7 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
             "receipts": receipts}
 
 
-def stage_games(game_rows, *, now, getter, enforce_blocks=True):
+def stage_games(game_rows, *, now, getter, enforce_blocks=True, as_of=None, historical=False):
     """Run the pre-pricing stage for each game row.
 
     Rows sharing one game share one stage execution. Returns a list aligned
