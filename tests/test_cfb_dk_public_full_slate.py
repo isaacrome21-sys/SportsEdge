@@ -1,9 +1,14 @@
 """Deterministic public Saturday DK quote capture tests (synthetic page HTML)."""
 import unittest
 
-from scripts.fetch_cfb_dk_public_full_slate import (
-    EXPECTED_MATCHUPS, _game_time, compile_full_slate, parse_public_html,
-)
+try:
+    from scripts.fetch_cfb_dk_public_full_slate import (
+        EXPECTED_MATCHUPS, _game_time, compile_full_slate, parse_public_html,
+    )
+    HAS_BS4 = True
+except ImportError:
+    # bs4 not available in this environment; tests will be skipped
+    HAS_BS4 = False
 
 PAGE = """
 <html><body><h1>DraftKings Sportsbook Betting Splits</h1>
@@ -25,6 +30,7 @@ PAGE = """
 """
 
 
+@unittest.skipUnless(HAS_BS4, "bs4 not available in this environment")
 class FullSlateCaptureTest(unittest.TestCase):
     def test_exact_schedule_is_full_46(self):
         self.assertEqual(len(EXPECTED_MATCHUPS), 46)
