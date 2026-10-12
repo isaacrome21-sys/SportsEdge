@@ -1,0 +1,4 @@
+game_id,season,game_type,week,gameday,away_team,home_team,spread_line,away_spread_odds,home_spread_odds,total_line,under_odds,over_odds,away_moneyline,home_moneyline
+1,2024,REG,1,2024-09-08,NE,CIN,7.5,-110,-110,42.5,-110,-110,300,-380
+2,2020,REG,1,2024-09-08,GB,CHI,3,-110,-110,44,-110,-110,140,-160
+3,2024,REG,1,2024-09-08,NE,CIN,9.5,-110,-110,42.5,-110,-110,300,-380

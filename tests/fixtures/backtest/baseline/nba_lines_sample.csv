@@ -1,0 +1,3 @@
+game_id,season,date,home_team,away_team,source,is_closing,spread_home,total_line,n_books,spread_home_dec,spread_away_dec,over_dec,under_dec,ml_source,home_dec,away_dec,p_home
+401656359,2023,2024-06-06,BOS,DAL,oddsapi_close,True,-6.5,217.5,12.0,,,,,,,,
+401766122,2024,2025-06-05,OKC,IND,oddsapi_close,True,-10.0,229.5,9.0,,,,,sbr_close,1.2,4.85,0.8016528925619835

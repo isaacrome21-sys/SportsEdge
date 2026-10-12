@@ -36,7 +36,27 @@ from .metrics import (
     summarize,
 )
 from .runner import RunnerError, run_backtest, compare_models
-from .report import ReportError, evaluate, to_markdown, to_json
+from .report import (
+    ReportError,
+    evaluate,
+    to_markdown,
+    to_json,
+    summarize_actionability,
+    actionability_to_json,
+    actionability_to_markdown,
+    PRICED_STATUSES,
+    WATCH_STATUS_PREFIX,
+)
+from . import market_baseline
+from .elo import (
+    EloError,
+    EloRatings,
+    EloBaseline,
+    make_elo_price_fn,
+    naive_price_fn,
+    SPORT_PARAMS,
+    INIT_RATING,
+)
 
 __all__ = [
     "Split",
@@ -62,4 +82,17 @@ __all__ = [
     "evaluate",
     "to_markdown",
     "to_json",
+    "summarize_actionability",
+    "actionability_to_json",
+    "actionability_to_markdown",
+    "PRICED_STATUSES",
+    "WATCH_STATUS_PREFIX",
+    "market_baseline",
+    "EloError",
+    "EloRatings",
+    "EloBaseline",
+    "make_elo_price_fn",
+    "naive_price_fn",
+    "SPORT_PARAMS",
+    "INIT_RATING",
 ]
