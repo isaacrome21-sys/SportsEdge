@@ -6,6 +6,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from sportsedge.generic_card_pipeline import _feature_index, run_generic_card
+
+# The MLB fixture CI workflow executes this module explicitly. Reuse its
+# prepricing regression suite so ESPN-to-StatsAPI fallback is exercised in CI.
+from tests.test_prepricing_ingestion import MlbPostseasonFixtureFallbackTests
 from sportsedge.live_slate import make_live_game
 from sportsedge.mlb_source import GameSnapshot
 from sportsedge.orchestrator import run_candidate as real_run_candidate

@@ -403,6 +403,80 @@ class MlbPitcherTests(unittest.TestCase):
         self.assertIn("COMPLETED_GAME_HISTORICAL_VALIDATION", hist[1][0]["reason"])
 
 
+
+class MlbPostseasonFixtureFallbackTests(unittest.TestCase):
+    """Strict MLB StatsAPI fallback must verify fixtures, never trust DK input."""
+
+    def _without_espn_game(self):
+        mapping = mlb_mapping()
+        mapping[f"{ESPN}/baseball/mlb/scoreboard?dates=20261012&limit=500"] = {
+            "events": []}
+        return mapping
+
+    def test_espn_missing_statsapi_game_unblocks_prepricing(self):
+        getter = FakeGetter(self._without_espn_game())
+        kickoff = free_models.dt(KICKOFF_MLB)
+        provider = free_models.PublicContext(NOW, getter=getter)
+        fixture = provider.fixture("MLB", "Los Angeles Dodgers",
+                                   "Milwaukee Brewers", kickoff)
+        self.assertIsNotNone(fixture)
+        verified_at, competition = fixture
+        self.assertEqual(verified_at, kickoff)
+        self.assertEqual(competition["game_pk"], 777001)
+        self.assertEqual(competition["source"], "MLB_STATSAPI_SCHEDULE_VERIFIED")
+        self.assertEqual(competition["venue"], {})  # Roof/weather NOT verified
+        self.assertTrue(any("statsapi.mlb.com/api/v1/schedule?" in url
+                            for url in getter.calls))
+        # Real production prepricing stage must also accept the same verified
+        # fixture and probable pitchers; this is not merely a helper unit test.
+        rows = fi.stage_games([mlb_row()], now=NOW,
+                              getter=FakeGetter(self._without_espn_game()))
+        self.assertEqual(len(rows), 1)
+        self.assertFalse(rows[0]["blocked"], rows[0]["block_detail"])
+        self.assertIn("home_pitcher_adj", rows[0]["adjustments"])
+        self.assertIn("away_pitcher_adj", rows[0]["adjustments"])
+        # Do not give weather or unvalidated factors artificial pricing credit.
+        self.assertFalse(any(f.get("source") == "OPEN_METEO_LIVE_FREE_NO_KEY"
+                             and f.get("status") == "USED" for f in rows[0]["factors"]))
+
+    def test_postponed_or_started_game_cannot_be_admitted(self):
+        for state in ("Final", "Postponed", "In Progress"):
+            with self.subTest(state=state):
+                mapping = self._without_espn_game()
+                url = ("https://statsapi.mlb.com/api/v1/schedule?sportId=1&"
+                       "date=2026-10-12&hydrate=team%2CprobablePitcher")
+                mapping[url]["dates"][0]["games"][0]["status"]["detailedState"] = state
+                self.assertIsNone(free_models.PublicContext(
+                    NOW, getter=FakeGetter(mapping)).fixture(
+                    "MLB", "Los Angeles Dodgers", "Milwaukee Brewers",
+                    free_models.dt(KICKOFF_MLB)))
+
+    def test_wrong_identity_or_kickoff_stays_blocked(self):
+        mapping = self._without_espn_game()
+        provider = free_models.PublicContext(NOW, getter=FakeGetter(mapping))
+        self.assertIsNone(provider.fixture(
+            "MLB", "Milwaukee Brewers", "Los Angeles Dodgers",
+            free_models.dt(KICKOFF_MLB)))  # swapped home/away
+        self.assertIsNone(provider.fixture(
+            "MLB", "Los Angeles Dodgers", "Milwaukee Brewers",
+            datetime(2026, 10, 12, 21, 0, tzinfo=timezone.utc)))
+        self.assertIsNone(provider.fixture(
+            "NFL", "Los Angeles Dodgers", "Milwaukee Brewers",
+            free_models.dt(KICKOFF_MLB)))  # fallback MLB ONLY
+
+    def test_ambiguous_statsapi_fixture_stays_blocked(self):
+        mapping = self._without_espn_game()
+        url = ("https://statsapi.mlb.com/api/v1/schedule?sportId=1&"
+               "date=2026-10-12&hydrate=team%2CprobablePitcher")
+        duplicate = dict(mapping[url]["dates"][0]["games"][0])
+        duplicate["gamePk"] = 777002
+        mapping[url]["dates"][0]["games"].append(duplicate)
+        self.assertIsNone(free_models.PublicContext(
+            NOW, getter=FakeGetter(mapping)).fixture(
+            "MLB", "Los Angeles Dodgers", "Milwaukee Brewers",
+            free_models.dt(KICKOFF_MLB)))
+
+
 class RunnerHookTests(unittest.TestCase):
     def test_run_full_applies_verified_adjustments(self):
         # Option 3: Prepricing adjustments are in a separate object, not in context.
