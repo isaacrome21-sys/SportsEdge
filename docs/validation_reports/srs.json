@@ -1,0 +1,24 @@
+{
+  "factor": "srs",
+  "n_fixtures": 563,
+  "n_splits": 32,
+  "verdict": "CONDITIONAL_PASS",
+  "reasons": [
+    "MARKET_BASELINE_MISSING: no archived market prices; the market-baseline leg of Isaac's bar could not be checked. Do not promote on this verdict alone."
+  ],
+  "existing": {
+    "n": 3984,
+    "brier": 0.2491337992413283,
+    "log_loss": 0.6914127916322256,
+    "mean_p": 0.5217963486197824,
+    "base_rate": 0.5323795180722891
+  },
+  "candidate": {
+    "n": 3984,
+    "brier": 0.2325421923593102,
+    "log_loss": 0.664343991504177,
+    "mean_p": 0.5144246302019472,
+    "base_rate": 0.5296184738955824
+  },
+  "research_only": true
+}

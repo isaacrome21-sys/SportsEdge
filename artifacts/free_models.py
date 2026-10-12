@@ -11,11 +11,20 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from datetime import datetime, timedelta, timezone
+import hashlib
 import json
 from math import erf, exp, factorial, isfinite, sqrt
 from pathlib import Path
+import sys
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from sportsedge.quote_freshness import (
+    MAX_QUOTE_AGE_SECONDS,
+    check_quote_freshness,
+    is_fresh as quote_is_fresh,
+)
 
 LEAGUES = {"NFL": "football/nfl", "CFB": "football/college-football",
            "NBA": "basketball/nba", "MLB": "baseball/mlb"}
@@ -25,13 +34,15 @@ PRIORS = {"NFL": (22.0, 13.5, 13.7, 1.5),
           "NBA": (113.0, 19.0, 12.5, 2.0),
           "MLB": (4.4, None, None, 0.20)}
 CONTEXT_KEYS = {"NFL": ("home_rating", "away_rating", "home_injury_pts",
-                        "away_injury_pts", "home_form", "away_form", "weather_total_adj"),
+                        "away_injury_pts", "home_form", "away_form", "weather_total_adj",
+                        "rest_diff_adj"),
                 "CFB": ("home_rating", "away_rating", "home_injury_pts",
-                        "away_injury_pts", "home_form", "away_form", "weather_total_adj"),
+                        "away_injury_pts", "home_form", "away_form", "weather_total_adj",
+                        "rest_diff_adj"),
                 "NBA": ("home_rating", "away_rating", "home_injury_pts",
                         "away_injury_pts", "home_form", "away_form", "rest_adj"),
                 "MLB": ("home_rating", "away_rating", "home_pitcher_adj",
-                        "away_pitcher_adj", "weather_total_adj")}
+                        "away_pitcher_adj", "weather_total_adj", "rest_diff_adj")}
 # Illinois-resident CFB exclusion (market/availability logic, NOT model skill).
 # Exact normalized school aliases avoid confusing Northwestern (IL) with
 # Northwestern State (Louisiana). Add only unambiguous labels.
@@ -78,6 +89,19 @@ def dt(value):
 
 def bounded(value, low, high):
     return max(low, min(high, value))
+
+
+def declared_weather_total_adj(wind_mph, precip_prob, sport):
+    """Declared uncalibrated weather scoring impact on the game total.
+
+    Research prior, NOT a learned edge: wind >= 18 mph -> -0.8, >= 13 ->
+    -0.4; precipitation probability >= 70% -> -0.4; MLB scaled 0.3.
+    Shared by the live provider.weather path and archived weather evidence
+    so the declared table cannot diverge between sources.
+    """
+    impact = (0.8 if wind_mph >= 18 else 0.4 if wind_mph >= 13 else 0.0)
+    impact += 0.4 if precip_prob >= 70 else 0.0
+    return -round(impact * (0.3 if sport == "MLB" else 1.0), 3)
 
 
 def numeric(value, name):
@@ -150,13 +174,22 @@ def model_probability(sport, market, side, line, home_mean, away_mean):
 
 
 class PublicContext:
-    """Request-scoped cache; no persisted odds, data keys or retrospective rewrites."""
-    def __init__(self, now, getter=None):
+    """Request-scoped cache; no persisted odds, data keys or retrospective rewrites.
+
+    ``now`` is the as-of clock: every time comparison in this provider uses it,
+    so passing a historical as-of reprices a fixture point-in-time. When
+    ``historical=True`` the provider additionally refuses "current state"
+    sources (injury reports, weather forecasts) that free endpoints only serve
+    as-of today — using them for a past kickoff would leak the present into
+    the backtest. Those factors are excluded with explicit AS_OF_* codes.
+    """
+    def __init__(self, now, getter=None, *, historical=False):
         self.now = now
         self.getter = getter or self._live_get
         self.cache = {}
         self.receipts = []
         self._injury_result_cache = {}
+        self.historical = bool(historical)
 
     @staticmethod
     def _live_get(url):
@@ -214,7 +247,12 @@ class PublicContext:
         url = f"{ESPN}/{LEAGUES[sport]}/teams/{team['id']}/schedule?season={season}"
         schedule = self.fetch(url) or {}
         completed = []
-        for event in schedule.get("events") or []:
+        events = schedule.get("events")
+        if not isinstance(events, list):
+            return []  # fail closed: unverified schedule is no schedule
+        for event in events:
+            if not isinstance(event, dict):
+                continue
             played = dt(event.get("date"))
             if played is None or played >= kickoff or played > self.now:
                 continue
@@ -250,12 +288,25 @@ class PublicContext:
             return str(group["id"])
         return None
 
-    def injury_points(self, sport, team):
-        """Verify team-group identity and return cautious heuristic injuries."""
+    def injury_rows(self, sport, team):
+        """Return verified team-scoped injury rows, or (None, status).
+
+        ("rows", "STRUCTURE_VERIFIED") when the ESPN injury payload binds to
+        exactly one team group; (None, "UNUSABLE_SCHEMA") when neither the
+        team nor league payload resolves; ([], "NOT_APPLICABLE") for MLB.
+        Same fetch path and receipts as injury_points; the pre-pricing
+        QB/participation check consumes these rows instead of a second,
+        divergent fetch path.
+        """
         if sport == "MLB":
-            return 0.0, "NOT_APPLICABLE"
+            return [], "NOT_APPLICABLE"
+        if self.historical:
+            # ESPN serves the CURRENT injury report only. There is no free
+            # as-of historical injury endpoint, so a historical repricing
+            # must not silently apply today's report to a past kickoff.
+            return [], "AS_OF_HISTORICAL_INJURIES_UNAVAILABLE"
         target_id = str(team["id"])
-        key = (sport, target_id)
+        key = ("injury_rows", sport, target_id)
         if key in self._injury_result_cache:
             return self._injury_result_cache[key]
         url = f"{ESPN}/{LEAGUES[sport]}/teams/{target_id}/injuries"
@@ -298,9 +349,37 @@ class PublicContext:
                 "status": "UNUSABLE_SCHEMA",
                 "reason": "TEAM[" + _shape(data) + "];LEAGUE[" + _shape(league) + "]",
                 "team_id": target_id[:20]})
-            result = (0.0, "MISSING_OR_UNRECOGNIZED_SOURCE")
+            result = (None, "UNUSABLE_SCHEMA")
             self._injury_result_cache[key] = result
             return result
+        self.receipts.append({
+            "source": f"{ESPN}/{LEAGUES[sport]}/injuries",
+            "status": "STRUCTURE_VERIFIED",
+            "team_id": target_id[:20],
+            "injury_rows_reported": len(candidates),
+            "note": "REPORTED_INJURIES_NOT_COMPLETE_ROSTER_HEALTH"})
+        result = (candidates, "STRUCTURE_VERIFIED")
+        self._injury_result_cache[key] = result
+        return result
+
+    def injury_points(self, sport, team):
+        """Verify team-group identity and return cautious heuristic injuries.
+
+        Contract: (points, status); MLB -> (0.0, "NOT_APPLICABLE");
+        verified payload -> (-loss, "HEURISTIC_OUT_DOUBTFUL_REPORTED_{n}_UNKNOWN_COMPLETENESS");
+        unusable payload -> (0.0, "MISSING_OR_UNRECOGNIZED_SOURCE").
+        QB out/doubtful costs 1.5 (NFL), NBA 0.3 each, others 0.15, capped 2.5.
+        """
+        if sport == "MLB":
+            return 0.0, "NOT_APPLICABLE"
+        rows, status = self.injury_rows(sport, team)
+        if rows is None:
+            return 0.0, "MISSING_OR_UNRECOGNIZED_SOURCE"
+        # Preserve historical unavailability: do not report a zero-injury
+        # heuristic when the injury feed itself is unavailable for as-of.
+        if status == "AS_OF_HISTORICAL_INJURIES_UNAVAILABLE":
+            return 0.0, "AS_OF_HISTORICAL_INJURIES_UNAVAILABLE"
+        candidates = rows
         seen = set()
         loss = 0.0
         for row in candidates:
@@ -323,16 +402,10 @@ class PublicContext:
             position = position.get("abbreviation") if isinstance(position, dict) else position
             loss += 1.5 if sport == "NFL" and str(position).upper() == "QB" else (
                 0.3 if sport == "NBA" else 0.15)
-        self.receipts.append({
-            "source": f"{ESPN}/{LEAGUES[sport]}/injuries",
-            "status": "STRUCTURE_VERIFIED",
-            "team_id": target_id[:20],
-            "injury_rows_reported": len(candidates),
-            "note": "REPORTED_INJURIES_NOT_COMPLETE_ROSTER_HEALTH"})
-        result = (-round(min(loss, 2.5), 3),
-                  f"HEURISTIC_OUT_DOUBTFUL_REPORTED_{len(seen)}_UNKNOWN_COMPLETENESS")
-        self._injury_result_cache[key] = result
-        return result
+        # Receipt already recorded by injury_rows (STRUCTURE_VERIFIED); the
+        # points heuristic keeps its original return contract.
+        return (-round(min(loss, 2.5), 3),
+                f"HEURISTIC_OUT_DOUBTFUL_REPORTED_{len(seen)}_UNKNOWN_COMPLETENESS")
 
     def fixture(self, sport, away, home, kickoff):
         """Bind competition/venue with BOTH teams and a unique start time."""
@@ -362,6 +435,11 @@ class PublicContext:
     def weather(self, sport, comp, kickoff, latitude=None, longitude=None):
         if sport not in {"NFL", "CFB", "MLB"}:
             return 0.0, "NOT_APPLICABLE"
+        if self.historical:
+            # The forecast endpoint serves a forward window only; the pre-game
+            # forecast for a historical kickoff is not reconstructible, and
+            # realized weather would be lookahead. Excluded, explicitly.
+            return 0.0, "AS_OF_HISTORICAL_WEATHER_UNAVAILABLE"
         venue = comp.get("venue") or {}
         if venue.get("indoor") is True:
             return 0.0, "INDOOR_VERIFIED"
@@ -464,9 +542,8 @@ class PublicContext:
         except (KeyError, TypeError, IndexError, ValueError):
             return 0.0, "FORECAST_VARIABLE_MISSING"
         # Deliberately small unvalidated weather prior, no claim of profit.
-        impact = (0.8 if wind >= 18 else 0.4 if wind >= 13 else 0.0)
-        impact += 0.4 if rain >= 70 else 0.0
-        return -round(impact * (0.3 if sport == "MLB" else 1.0), 3), "HEURISTIC_FORECAST_NOT_CALIBRATED"
+        # Shared declared table: see declared_weather_total_adj.
+        return declared_weather_total_adj(wind, rain, sport), "HEURISTIC_FORECAST_NOT_CALIBRATED"
 
 
 def context_for(sport, away, home, start, provider, row):
@@ -510,7 +587,77 @@ def context_for(sport, away, home, start, provider, row):
     return out, kickoff, notes
 
 
-def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
+# Pricing-lane contract (Priority 1 repair, Oct 11 2026).
+# Every probability the engine emits says which lane produced it:
+#   LANE_A_INDEPENDENT - truly market-blind; the default everywhere. The
+#                        win probability never sees a market price.
+#   LANE_B_ANCHORED    - Lane A shrunk ANCHOR_WEIGHT toward the posted market
+#                        line/total (MARKET_ANCHORED_UNVALIDATED). The 15% weight
+#                        is an unfitted research hypothesis: it earns its keep
+#                        in chronological out-of-sample backtesting or it goes.
+# Both lanes are always computed and always labeled; the harness backtests
+# them as two separate models.
+LANE_A = "LANE_A_INDEPENDENT"
+LANE_B = "LANE_B_ANCHORED"
+ANCHOR_WEIGHT = 0.15
+POSITIVE_EV_STATUS = "RESEARCH_POSITIVE_EV_UNVALIDATED"
+
+
+def _lane_view(lane, win, push, home_mean, away_mean, dec, raw_total,
+               raw_margin, extra=None):
+    """One fully-labeled pricing-lane view. Three quantities kept distinct:
+
+    - edge_over_break_even_pp / edge_vs_dk_no_vig_pp: MODEL EDGE estimates
+      (P_model vs quoted breakeven / vs DK no-vig). Unvalidated.
+    - ev_per_dollar: expected value AT THE AVAILABLE quoted price. Unvalidated.
+    - validated_profitability: always False here. Nothing in this engine is a
+      validated profitable edge; that verdict belongs to the backtest harness.
+    """
+    loss = bounded(1 - win - push, 0, 1)
+    ev = win * (dec - 1) - loss
+    breakeven = (1 - push) / dec  # win-probability threshold with push refund
+    conditional = (win / (win + loss) if win + loss > 0 else None)
+    fair = None
+    if conditional is not None and 0 < conditional < 1:
+        fair = (-100 * conditional / (1 - conditional)
+                if conditional >= 0.5
+                else 100 * (1 - conditional) / conditional)
+    view = {
+        "lane": lane,
+        "estimate_p": round(win, 6),
+        "push_p": round(push, 6),
+        "loss_p": round(loss, 6),
+        "ev_per_dollar": round(ev, 6),
+        "fair_american": round(fair) if fair is not None else None,
+        "book_break_even_p": round(breakeven, 6),
+        "edge_over_break_even_pp": round(100 * (win - breakeven), 3),
+        "home_mean": round(home_mean, 3),
+        "away_mean": round(away_mean, 3),
+        "projected_total": round(raw_total, 3),
+        "projected_home_margin": round(raw_margin, 3),
+        "validated_vs_close": False,
+        "validated_profitability": False,
+    }
+    if extra:
+        view.update(extra)
+    return view
+
+
+def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
+              lane="A", allow_manual_context=False, prepricing_adjustments=None):
+    """Price one game row in two labeled lanes.
+
+    lane="A" (default): the primary top-level view is LANE_A_INDEPENDENT.
+    lane="B": explicitly request the anchored primary view (Lane B).
+
+    allow_manual_context=False (default): any manual context override in the
+    untrusted intake row fails closed with BLOCKED_MANUAL_CONTEXT_UNDECLARED.
+    allow_manual_context=True: overrides apply but each is labeled
+    USER_SUPPLIED_MANUAL in context_provenance and context_notes.
+    """
+    lane = str(lane or "A").upper().strip()
+    if lane not in ("A", "B"):
+        raise ValueError("LANE_MUST_BE_A_OR_B")
     sport = str(row.get("sport") or "").upper().strip()
     if sport not in PRIORS:
         raise ValueError("UNSUPPORTED_SPORT")
@@ -566,15 +713,61 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
                     "game": f"{away} @ {home}", "sport": sport,
                     "reason": "FREE_CONTEXT_FIXTURE_NOT_VERIFIED:" + ",".join(notes),
                     "context_notes": notes, "research_only": True}
-    # Manual values override heuristics, including an explicit zero; reject extremes.
+    # Repair 1 (Oct 11 2026): untrusted intake must NEVER silently replace
+    # verified factors. Any manual override attempt without the explicit
+    # allow_manual_context flag fails closed; with the flag, every overridden
+    # factor is labeled USER_SUPPLIED_MANUAL in the audit. Verified factors
+    # always win on conflict because unflagged overrides never apply.
+    attempted_overrides = []
     overrides = row.get("context") or {}
+    if not isinstance(overrides, dict):
+        raise ValueError("CONTEXT_MUST_BE_OBJECT")
+    for key in context:
+        if key in overrides and overrides[key] is not None:
+            attempted_overrides.append("context." + key)
+        elif row.get(key) is not None:
+            attempted_overrides.append(key)
+    context_provenance = {key: "VERIFIED_PUBLIC" for key in context}
+    if attempted_overrides and not allow_manual_context:
+        return {"status": "BLOCKED_MANUAL_CONTEXT_UNDECLARED",
+                "game": f"{away} @ {home}", "sport": sport,
+                "reason": "MANUAL_CONTEXT_OVERRIDES_REQUIRE_EXPLICIT_FLAG:"
+                          + ",".join(sorted(attempted_overrides)),
+                "attempted_override_keys": sorted(attempted_overrides),
+                "context_notes": notes, "research_only": True}
     for key in context:
         val = overrides.get(key, row.get(key))
         if val is not None:
+            # Reachable only when attempted_overrides was non-empty (and the
+            # flag was set); every other path returned or left val None.
             n = numeric(val, key)
             if abs(n) > 15:
                 raise ValueError("CONTEXT_ADJUSTMENT_UNBOUNDED:" + key)
             context[key] = n
+            context_provenance[key] = "USER_SUPPLIED_MANUAL"
+            notes.append("OVERRIDE_USER_SUPPLIED:" + key)
+    # Option 3: System-verified prepricing adjustments, separate from user context.
+    # Applied after user context; verified prepricing wins on overlap (no double-count).
+    # A user-supplied "prepricing_adjustments" field is never trusted (stripped in run()).
+    if prepricing_adjustments:
+        pp_data = prepricing_adjustments.get("adjustments") or {}
+        pp_source = prepricing_adjustments.get("source", "UNKNOWN")
+        pp_status = prepricing_adjustments.get("verification_status", "UNVERIFIED")
+        if pp_status != "VERIFIED":
+            # Do not silently label unverified adjustments as verified
+            notes.append("PREPRICING_UNVERIFIED_SKIPPED:" + pp_source)
+        else:
+            for key, val in pp_data.items():
+                if key in context:
+                    # Overlap: verified prepricing wins, log the override
+                    if context_provenance.get(key) == "USER_SUPPLIED_MANUAL":
+                        notes.append("PREPRICING_OVERRIDE_MANUAL:" + key)
+                    n = numeric(val, "prepricing." + key)
+                    if abs(n) > 15:
+                        raise ValueError("PREPRICING_ADJUSTMENT_UNBOUNDED:" + key)
+                    context[key] = n
+                    context_provenance[key] = "VERIFIED_PREPRICING"
+                    notes.append("PREPRICING_VERIFIED:" + key + ":" + pp_source)
     if kickoff is None or kickoff <= now:
         return {"status": "BLOCKED_KICKOFF_UNVERIFIED", "game": f"{away} @ {home}", "sport": sport,
                 "context_notes": notes}
@@ -593,71 +786,96 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
     if "weather_total_adj" in context:
         home_mean += context["weather_total_adj"] / 2
         away_mean += context["weather_total_adj"] / 2
+    if "rest_diff_adj" in context:
+        # Declared rest-differential prior (HEURISTIC, harness-gated):
+        # positive favors the home team, split symmetrically.
+        home_mean += context["rest_diff_adj"] / 2
+        away_mean -= context["rest_diff_adj"] / 2
     if min(home_mean, away_mean) < 0.2:
         raise ValueError("IMPLAUSIBLE_SCORE_MEAN")
-    # A raw league-score baseline is NOT an executable fair price. Shrink
-    # game-location departures toward the posted market threshold; 15% is an
-    # unfitted RESEARCH prior, not a learned edge. Do not move an unknown line.
+    # Repair 3 (Oct 11 2026): quote freshness is checked centrally on every
+    # pricing path. Only a verified-fresh capture can support a positive-EV
+    # status; everything else is watch-only with an explicit code.
+    quote_freshness = check_quote_freshness(row.get("quote_captured_at"), now=now)
     raw_margin, raw_total = home_mean-away_mean, home_mean+away_mean
-    # The model's own score means MUST be captured before sportsbook
-    # anchoring. This is a simple unvalidated league/form/injury heuristic,
-    # not a proven independent model or a validated wagering probability.
-    raw_win, raw_push = model_probability(
+    # ---- Lane A (independent): the model's own score means, no market input
+    # in the probability. This is a simple unvalidated league/form/injury
+    # heuristic, not a proven independent model or validated probability. ----
+    a_win, a_push = model_probability(
         sport, market, side, line, home_mean, away_mean)
-    raw_loss = bounded(1 - raw_win - raw_push, 0, 1)
-    raw_ev = raw_win * (dec - 1) - raw_loss
-    raw_conditional = (raw_win / (raw_win + raw_loss)
-                       if raw_win + raw_loss > 0 else None)
-    raw_fair = None
-    if raw_conditional is not None and 0 < raw_conditional < 1:
-        raw_fair = (-100 * raw_conditional / (1 - raw_conditional)
-                    if raw_conditional >= 0.5
-                    else 100 * (1 - raw_conditional) / raw_conditional)
-    independent = {
-        "family": "FREE_TEAM_SCORE_HEURISTIC_UNVALIDATED",
-        "home_mean": round(home_mean, 3),
-        "away_mean": round(away_mean, 3),
-        "projected_total": round(raw_total, 3),
-        "projected_home_margin": round(raw_margin, 3),
-        "estimate_p": round(raw_win, 6),
-        "loss_p": round(raw_loss, 6),
-        "push_p": round(raw_push, 6),
-        "fair_american": round(raw_fair) if raw_fair is not None else None,
-        "ev_per_dollar": round(raw_ev, 6),
-        "uses_sportsbook_price_in_projection": False,
-        "not_wagering_authority": True,
-        "validated_vs_close": False,
-    }
-    anchor = {"status": "MARKET_ANCHORED_UNVALIDATED", "weight": 0.15}
+    lane_a = _lane_view(
+        LANE_A, a_win, a_push, home_mean, away_mean, dec,
+        raw_total, raw_margin,
+        extra={
+            "family": "FREE_TEAM_SCORE_HEURISTIC_UNVALIDATED",
+            # The Lane A PROBABILITY never sees a market price. EV necessarily
+            # compares that probability against the quoted price afterwards.
+            "uses_sportsbook_price_in_projection": False,
+            "not_wagering_authority": True,
+        })
+    # ---- Lane B (anchored): Lane A means shrunk ANCHOR_WEIGHT toward the
+    # posted market line/total. 15% is an unfitted RESEARCH prior, not a
+    # learned edge; it must prove itself out-of-sample or be removed. ----
+    anchor = {"status": "MARKET_ANCHORED_UNVALIDATED", "weight": ANCHOR_WEIGHT,
+              "hypothesis": "UNVALIDATED_OUT_OF_SAMPLE_REQUIRED"}
+    b_home_mean, b_away_mean = home_mean, away_mean
+    lane_b_blocked = None
     if market == "TOTAL":
-        anchored_total = line + 0.15 * (raw_total-line)
-        shift = (anchored_total-raw_total)/2
-        home_mean += shift
-        away_mean += shift
-        anchor.update(market_total=line, raw_total=raw_total, fair_total=anchored_total)
+        anchored_total = line + ANCHOR_WEIGHT * (raw_total - line)
+        shift = (anchored_total - raw_total) / 2
+        b_home_mean += shift
+        b_away_mean += shift
+        anchor.update(market_total=line, raw_total=raw_total,
+                      fair_total=anchored_total)
     elif market == "SPREAD":
         market_home_margin = -line if side == "HOME" else line
-        anchored_margin = market_home_margin + 0.15*(raw_margin-market_home_margin)
-        shift = (anchored_margin-raw_margin)/2
-        home_mean += shift
-        away_mean -= shift
-        anchor.update(market_home_margin=market_home_margin, raw_margin=raw_margin,
-                      fair_home_margin=anchored_margin)
+        anchored_margin = (market_home_margin
+                           + ANCHOR_WEIGHT * (raw_margin - market_home_margin))
+        shift = (anchored_margin - raw_margin) / 2
+        b_home_mean += shift
+        b_away_mean -= shift
+        anchor.update(market_home_margin=market_home_margin,
+                      raw_margin=raw_margin, fair_home_margin=anchored_margin)
     else:
         # A one-sided ML price contains vig. Without the opposite price we
-        # cannot infer the bookmaker's no-vig baseline. Reject, don't invent.
+        # cannot infer the bookmaker's no-vig baseline. Lane B is unavailable;
+        # Lane A (market-blind) still prices. Reject, don't invent.
         opposite = row.get("opposite_odds")
         if opposite is None:
-            return {"status": "BLOCKED_UNPAIRED_ML", "game": f"{away} @ {home}", "sport": sport}
-        opposite_dec = odds_decimal(opposite)
-        p1, p2 = 1/dec, 1/opposite_dec
-        anchor.update(market_no_vig_p=p1/(p1+p2))
-    win, push = model_probability(sport, market, side, line, home_mean, away_mean)
-    if market == "ML":
-        win = bounded(anchor["market_no_vig_p"] + 0.15*(win-anchor["market_no_vig_p"]), 0, 1)
-    loss = bounded(1 - win - push, 0, 1)
-    ev = win * (dec - 1) - loss
-    breakeven = (1 - push) / dec  # effective win-probability threshold with push refund
+            lane_b_blocked = "BLOCKED_UNPAIRED_ML"
+        else:
+            opposite_dec = odds_decimal(opposite)
+            p1, p2 = 1 / dec, 1 / opposite_dec
+            anchor.update(market_no_vig_p=p1 / (p1 + p2))
+    if lane_b_blocked is None:
+        b_win, b_push = model_probability(
+            sport, market, side, line, b_home_mean, b_away_mean)
+        if market == "ML":
+            b_win = bounded(anchor["market_no_vig_p"]
+                            + ANCHOR_WEIGHT * (b_win - anchor["market_no_vig_p"]),
+                            0, 1)
+        lane_b = _lane_view(
+            LANE_B, b_win, b_push, b_home_mean, b_away_mean, dec,
+            raw_total, raw_margin,
+            extra={
+                "anchor": anchor,
+                "uses_sportsbook_price_in_projection": True,
+            })
+    else:
+        lane_b = {"lane": LANE_B, "status": "LANE_B_UNAVAILABLE",
+                  "reason": lane_b_blocked, "anchor": anchor,
+                  "validated_vs_close": False, "validated_profitability": False}
+    if lane == "B" and lane_b.get("status") == "LANE_B_UNAVAILABLE":
+        return {"status": lane_b["reason"], "game": f"{away} @ {home}",
+                "sport": sport, "pricing_lane": LANE_B,
+                "pricing_lanes": {"lane_a_independent": lane_a,
+                                  "lane_b_anchored": lane_b},
+                "quote_freshness": quote_freshness,
+                "context": context, "context_notes": notes,
+                "context_provenance": context_provenance,
+                "research_only": True}
+    primary = lane_a if lane == "A" else lane_b
+    pricing_lane = primary["lane"]
     selection = ("OVER" if side == "OVER" else "UNDER") if market == "TOTAL" else home if side == "HOME" else away
     if market == "SPREAD":
         selection += f" {line:+g}"
@@ -665,23 +883,47 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
         selection += f" {line:g}"
     else:
         selection += " ML"
-    status = "RESEARCH_EDGE" if ev >= min_ev and price >= -165 else "BELOW_THRESHOLD"
-    if price < -165:
+    reason = None
+    if not quote_is_fresh(quote_freshness):
+        # A stale (or unverifiable) screenshot is NOT an executable edge.
+        status = "WATCH_QUOTE_NOT_CURRENT"
+        reason = "QUOTE_NOT_FRESH:" + quote_freshness["code"]
+    elif price < -165:
         status = "PRICE_CAP"
-    return {"schema": "SPORTSEDGE_FREE_RESEARCH_V1", "status": status, "sport": sport,
+    elif primary["ev_per_dollar"] >= min_ev:
+        # Repair 5: this is an UNVALIDATED positive-EV estimate, never a
+        # validated edge. Validated profitability is tracked separately and is
+        # always False in this engine; only the harness can change that.
+        status = POSITIVE_EV_STATUS
+    else:
+        status = "BELOW_THRESHOLD"
+    result = {"schema": "SPORTSEDGE_FREE_RESEARCH_V1", "status": status, "sport": sport,
             "game": f"{away} @ {home}", "selection": selection, "market": market,
             "odds_american": int(price), "line": line, "kickoff_utc": kickoff.isoformat(),
-            "estimate_p": round(win, 6), "push_p": round(push, 6),
-            "loss_p": round(loss, 6), "book_break_even_p": round(breakeven, 6),
-            "edge_over_break_even_pp": round(100 * (win - breakeven), 3),
-            "ev_per_dollar": round(ev, 6), "home_mean": round(home_mean, 3),
-            "away_mean": round(away_mean, 3), "context": context, "context_notes": notes,
+            "pricing_lane": pricing_lane,
+            "pricing_lanes": {"lane_a_independent": lane_a,
+                              "lane_b_anchored": lane_b},
+            "quote_freshness": quote_freshness,
+            "estimate_p": primary["estimate_p"], "push_p": primary["push_p"],
+            "loss_p": primary["loss_p"],
+            "book_break_even_p": primary["book_break_even_p"],
+            "edge_over_break_even_pp": primary["edge_over_break_even_pp"],
+            "ev_per_dollar": primary["ev_per_dollar"],
+            "fair_american": primary["fair_american"],
+            "home_mean": primary["home_mean"],
+            "away_mean": primary["away_mean"], "context": context,
+            "context_notes": notes, "context_provenance": context_provenance,
             "context_quality": "HEURISTIC_UNVALIDATED",
-            "independent_projection": independent,
+            "independent_projection": lane_a,
             "market_anchor": anchor,
-            "model_validation": "NOT_PROVEN_VS_CLOSE", "research_only": True,
+            "model_validation": "NOT_PROVEN_VS_CLOSE",
+            "validated_profitability": False,
+            "research_only": True,
             "model_p_authority": False, "official_authority": False,
             "staking_authority": False, "sharp_reference_compared": False}
+    if reason is not None:
+        result["reason"] = reason
+    return result
 
 
 
@@ -806,27 +1048,65 @@ def _paired_book_context(rows, evaluated, index):
 
 
 
-def run(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
-    now = now or datetime.now(timezone.utc)
-    if now.tzinfo is None or now.utcoffset() is None:
+def run(payload, *, now=None, as_of=None, historical=False, getter=None,
+        auto_context=True, min_ev=0.02, lane="A", allow_manual_context=False,
+        prepricing_adjustments=None):
+    """Build a research card. ``now`` is wall-clock execution time; ``as_of``
+    is the point-in-time clock the pricing must respect (defaults to ``now``).
+
+    Set as_of + historical=True when repricing history: the provider then
+    refuses current-state sources (injuries, forecasts) that free endpoints
+    cannot snapshot as-of, instead of leaking today's values into the past.
+    """
+    lane = str(lane or "A").upper().strip()
+    if lane not in ("A", "B"):
+        raise ValueError("LANE_MUST_BE_A_OR_B")
+    wall = now or datetime.now(timezone.utc)
+    if wall.tzinfo is None or wall.utcoffset() is None:
         raise ValueError("AS_OF_TIMEZONE_REQUIRED")
-    now = now.astimezone(timezone.utc)
+    wall = wall.astimezone(timezone.utc)
+    as_of = as_of if as_of is not None else wall
+    if isinstance(as_of, str):
+        as_of = dt(as_of)
+    if as_of is None or as_of.tzinfo is None or as_of.utcoffset() is None:
+        raise ValueError("AS_OF_TIMEZONE_REQUIRED")
+    as_of = as_of.astimezone(timezone.utc)
     rows = payload if isinstance(payload, list) else payload.get("lines") if isinstance(payload, dict) else None
     if not isinstance(rows, list):
         raise ValueError("LINES_MUST_BE_LIST")
-    provider = PublicContext(now, getter=getter)
+    # Repair 4: snapshot the inputs as-of run time for reproducibility.
+    canonical = json.dumps(rows, sort_keys=True, default=str)
+    input_snapshot = {
+        "n_rows": len(rows),
+        "rows_sha1": hashlib.sha1(canonical.encode("utf-8")).hexdigest(),
+        "as_of_utc": as_of.isoformat(),
+        "wall_utc": wall.isoformat(),
+        "historical_repriced": bool(historical),
+    }
+    provider = PublicContext(as_of, getter=getter, historical=historical)
     # A single-sport ticket may declare its sport once at the root.
     # Do not guess a sport from a team name or an ambiguous matchup.
     ticket_sport = payload.get("sport") if isinstance(payload, dict) else None
     all_rows = []
+    # Prepricing adjustments are system-verified, separate from user context.
+    # A user-supplied "prepricing_adjustments" field in the row is NEVER trusted;
+    # only the explicitly passed prepricing_adjustments parameter is used.
+    prepricing_list = prepricing_adjustments or []
     for i, row in enumerate(rows):
         try:
             if not isinstance(row, dict):
                 raise ValueError("LINE_MUST_BE_OBJECT")
             bound_row = dict(row)
+            # Strip any spoofed prepricing_adjustments from user intake
+            bound_row.pop("prepricing_adjustments", None)
             if not bound_row.get("sport") and ticket_sport is not None:
                 bound_row["sport"] = ticket_sport
-            result = calculate(bound_row, provider, now, auto_context=auto_context, min_ev=min_ev)
+            # Get system-verified prepricing for this row (if any)
+            pp_adj = prepricing_list[i] if i < len(prepricing_list) else None
+            result = calculate(bound_row, provider, as_of, auto_context=auto_context,
+                               min_ev=min_ev, lane=lane,
+                               allow_manual_context=allow_manual_context,
+                               prepricing_adjustments=pp_adj)
         except (ValueError, TypeError, KeyError, AttributeError) as exc:
             result = {"status": "BLOCKED_INVALID", "reason": str(exc)[:140]}
         result["input_index"] = i
@@ -843,6 +1123,11 @@ def run(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         projection = row.get("independent_projection")
         if not isinstance(projection, dict):
             continue
+        # Repair 3: a stale quote cannot support a research candidate, even
+        # when the model probability is strong. Watch-only, explicitly.
+        if not quote_is_fresh(row.get("quote_freshness") or {}):
+            watchlist.append(row)
+            continue
         if projection.get("paired_market_status") != "EXACT_DK_TWO_SIDED_NO_VIG_RESEARCH":
             watchlist.append(row)
             continue
@@ -857,12 +1142,39 @@ def run(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
                                     r["game"],r["selection"]))
     watchlist.sort(key=lambda r: (-r["independent_projection"]["ev_per_dollar"],
                                   r["game"],r["selection"]))
-    edges = [r for r in all_rows if r["status"] == "RESEARCH_EDGE"]
+    # Repair 2: Lane B is always computed and labeled, so the harness (and the
+    # card) can evaluate the anchored hypothesis separately from Lane A.
+    lane_b_edges = []
+    for r in all_rows:
+        lanes = r.get("pricing_lanes") or {}
+        lane_b = lanes.get("lane_b_anchored") or {}
+        if lane_b.get("status") == "LANE_B_UNAVAILABLE":
+            continue
+        if not quote_is_fresh(r.get("quote_freshness") or {}):
+            continue
+        if r.get("odds_american", -999) < -165:
+            continue
+        if lane_b.get("ev_per_dollar", -1) >= min_ev:
+            lane_b_edges.append(r)
+    lane_b_edges.sort(key=lambda r: (-r["pricing_lanes"]["lane_b_anchored"]["ev_per_dollar"],
+                                     r["game"], r["selection"]))
+    edges = [r for r in all_rows if r["status"] == POSITIVE_EV_STATUS]
     edges.sort(key=lambda r: (-r["ev_per_dollar"], r["game"], r["selection"]))
-    return {"schema": "SPORTSEDGE_FREE_RESEARCH_CARD_V1", "as_of_utc": now.isoformat(),
+    primary_lane = LANE_A if lane == "A" else LANE_B
+    return {"schema": "SPORTSEDGE_FREE_RESEARCH_CARD_V1",
+            "as_of_utc": as_of.isoformat(),
+            "wall_utc": wall.isoformat(),
+            "primary_lane": primary_lane,
+            "input_snapshot": input_snapshot,
+            "quote_freshness_policy": {
+                "max_age_seconds": MAX_QUOTE_AGE_SECONDS,
+                "stale_quotes_are_watch_only": True,
+            },
             "authority": {"research_only": True, "official": False, "model_p": False,
-                          "truth_gate": False, "staking": False},
+                          "truth_gate": False, "staking": False,
+                          "validated_profitability": False},
             "min_ev": min_ev, "edges": edges,
+            "lane_b_edges": lane_b_edges,
             "independent_candidates": independent,
             "independent_watchlist": watchlist,
             "research_projection_note": "Unvalidated independent league-score heuristic; DK is a paired same-book no-vig benchmark, not sharp market verification.",
@@ -870,10 +1182,11 @@ def run(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
             # factor coverage and honest diagnostics even when below threshold.
             "evaluated_rows": all_rows,
             "summary": {"rows": len(rows), "edges": len(edges),
+                        "lane_b_edges": len(lane_b_edges),
                         "status_counts": dict(sorted(Counter(r["status"] for r in all_rows).items()))},
             "diagnostics": [{"input_index": r["input_index"], "status": r["status"],
                              "reason": r.get("reason") or ",".join(r.get("context_notes") or [])}
-                            for r in all_rows if r["status"] != "RESEARCH_EDGE"],
+                            for r in all_rows if r["status"] != POSITIVE_EV_STATUS],
             "source_receipts": provider.receipts}
 
 
@@ -883,10 +1196,24 @@ def main(argv=None):
     parser.add_argument("--output", type=Path)
     parser.add_argument("--no-fetch", action="store_true", help="Only manual context; still requires explicit future kickoff")
     parser.add_argument("--min-ev", type=float, default=0.02)
+    parser.add_argument("--lane", choices=["A", "B"], default="A",
+                        help="Primary pricing lane: A=independent (default, market-blind), "
+                             "B=anchored (explicit 15%% shrink toward posted line, unvalidated)")
+    parser.add_argument("--allow-manual-context", action="store_true",
+                        help="Allow untrusted intake rows to override verified context factors; "
+                             "every override is labeled USER_SUPPLIED_MANUAL in the audit")
+    parser.add_argument("--as-of",
+                        help="Point-in-time clock (ISO-8601) the pricing must respect; defaults to now")
+    parser.add_argument("--historical", action="store_true",
+                        help="Repricing history: refuse current-state sources (injuries, forecasts) "
+                             "that cannot be snapshotted as-of instead of leaking today's values")
     args = parser.parse_args(argv)
     if not 0 <= args.min_ev <= 0.15:
         parser.error("min-ev outside [0, 0.15]")
-    card = run(json.loads(args.lines.read_text(encoding="utf-8")), auto_context=not args.no_fetch, min_ev=args.min_ev)
+    card = run(json.loads(args.lines.read_text(encoding="utf-8")),
+               auto_context=not args.no_fetch, min_ev=args.min_ev, lane=args.lane,
+               allow_manual_context=args.allow_manual_context,
+               as_of=args.as_of, historical=args.historical)
     rendered = json.dumps(card, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

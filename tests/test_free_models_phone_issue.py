@@ -53,9 +53,14 @@ def test_missing_price_rejected():
 def test_card_render_shows_candidate_and_rejection_diagnostics():
     card={"schema":"SPORTSEDGE_FREE_RESEARCH_CARD_V1",
           "as_of_utc":"2026-10-11T14:00:00Z","min_ev":0.02,
-          "summary":{"rows":2,"status_counts":{"RESEARCH_EDGE":1,"BLOCKED_CONTEXT_UNVERIFIED":1}},
+          "primary_lane":"LANE_A_INDEPENDENT",
+          "summary":{"rows":2,"status_counts":{"RESEARCH_POSITIVE_EV_UNVALIDATED":1,"BLOCKED_CONTEXT_UNVERIFIED":1}},
           "edges":[{"game":"A @ B","selection":"B -3.5","odds_american":-110,
-                    "estimate_p":0.55,"ev_per_dollar":0.05}],
+                    "estimate_p":0.55,"ev_per_dollar":0.05,
+                    "pricing_lane":"LANE_A_INDEPENDENT"}],
+          "lane_b_edges":[{"game":"A @ B","selection":"B -3.5","odds_american":-110,
+                    "pricing_lanes":{"lane_b_anchored":{"lane":"LANE_B_ANCHORED",
+                    "estimate_p":0.55,"ev_per_dollar":0.05}}}],
           "diagnostics":[{"input_index":1,"status":"BLOCKED_CONTEXT_UNVERIFIED",
                           "reason":"UNIQUE_FUTURE_ESPN_FIXTURE_MISSING"}],
           "source_receipts":[{"status":"FETCHED_AT_RUNTIME"},{"status":"UNAVAILABLE"}]}
