@@ -20,6 +20,13 @@ from sportsedge.mlb_phone_pitcher_pricing import phone_pitcher_rows, blocked
 from sportsedge.mlb_phone_batter_pricing import phone_batter_rows
 from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
 from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
+from sportsedge.market_coverage import (
+    COVERAGE_MARKETS,
+    normalize_coverage_market,
+    phone_coverage_rows,
+)
+from sportsedge.mlb_phone_f5_pricing import normalize_f5_market, phone_f5_rows
+from sportsedge.f5_distribution import F5_MARKETS
 from datetime import datetime, timezone
 
 FIELDS = (
@@ -37,6 +44,13 @@ def audit_row(source, result):
     market = str(source.get("market") or "").upper()
     market = {"MONEYLINE": "ML", "H2H": "ML", "RUN_LINE": "SPREAD",
               "GAME_TOTAL": "TOTAL", "TOTALS": "TOTAL"}.get(market, market)
+    coverage_market = normalize_coverage_market(market)
+    if coverage_market is not None:
+        market = coverage_market
+    elif sport == "MLB":
+        f5_market = normalize_f5_market(market)
+        if f5_market is not None:
+            market = f5_market
     context = result.get("context") or {}
     notes = [str(x).upper() for x in result.get("context_notes") or []]
     n = " ".join(notes)
@@ -92,7 +106,10 @@ def audit_row(source, result):
                               "detail": sport_specific.get(sport, "Unsupported sport")}
     if market not in ("ML", "SPREAD", "TOTAL"):
         src = result.get("source") or ""
-        if src in {"FREE_MLB_STATSAPI_GAMELOG", "FREE_MLB_STATSAPI_BATTER_GAMELOG",
+        if market in COVERAGE_MARKETS or market in F5_MARKETS:
+            out["player_props"] = {"status": "NOT_APPLICABLE",
+                                   "detail": "Game-level market"}
+        elif src in {"FREE_MLB_STATSAPI_GAMELOG", "FREE_MLB_STATSAPI_BATTER_GAMELOG",
                    "FREE_ESPN_NFL_GAMELOG", "FREE_ESPN_CFB_GAMELOG"} and result.get("status") != "NO_MODEL_OR_MARKET":
             out["player_props"] = {
                 "status": "REAL_PUBLIC_HISTORY_MODEL_UNVALIDATED",
@@ -123,6 +140,8 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         raise ValueError("MODEL_NOW_TIMEZONE_REQUIRED")
     default_sport = payload.get("sport") if isinstance(payload, dict) else None
     game_indices, games, prop_indices, props = [], [], [], []
+    coverage_indices, coverage_input = [], []
+    f5_indices, f5_input = [], []
     for i, raw in enumerate(rows):
         if not isinstance(raw, dict):
             raise ValueError("LINE_MUST_BE_OBJECT")
@@ -151,9 +170,22 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         if market in {"ML","SPREAD","TOTAL"}:
             game_indices.append(i)
             games.append(line)
-        else:
-            prop_indices.append(i)
-            props.append(line)
+            continue
+        coverage_market = normalize_coverage_market(market)
+        if coverage_market is not None:
+            line["market"] = coverage_market
+            coverage_indices.append(i)
+            coverage_input.append(line)
+            continue
+        f5_market = (normalize_f5_market(market)
+                     if line["sport"] == "MLB" else None)
+        if f5_market is not None:
+            line["market"] = f5_market
+            f5_indices.append(i)
+            f5_input.append(line)
+            continue
+        prop_indices.append(i)
+        props.append(line)
 
     if games:
         card = engine.run({"lines":games},now=clock,getter=getter,
@@ -209,6 +241,18 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         raise ValueError("FOOTBALL_RESULT_COUNT_MISMATCH")
     if len(pitcher_results) != len(pitcher_input):
         raise ValueError("PITCHER_RESULT_COUNT_MISMATCH")
+    coverage_results, coverage_receipts = phone_coverage_rows(
+        coverage_input, now=clock,
+        getter=getter if auto_context else (lambda url: None),
+        auto_context=auto_context, min_ev=min_ev)
+    f5_results, f5_receipts = phone_f5_rows(
+        f5_input, now=clock,
+        getter=getter if auto_context else (lambda url: None),
+        auto_context=auto_context, min_ev=min_ev)
+    if len(coverage_results) != len(coverage_input):
+        raise ValueError("COVERAGE_RESULT_COUNT_MISMATCH")
+    if len(f5_results) != len(f5_input):
+        raise ValueError("F5_RESULT_COUNT_MISMATCH")
     if len(batter_results) != len(batter_input):
         raise ValueError("BATTER_RESULT_COUNT_MISMATCH")
     modeled_props = [None]*len(props)
@@ -231,6 +275,12 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
     for i, result in zip(prop_indices, modeled_props):
         result["input_index"] = i
         evaluated[i] = result
+    for i, result in zip(coverage_indices, coverage_results):
+        result["input_index"] = i
+        evaluated[i] = result
+    for i, result in zip(f5_indices, f5_results):
+        result["input_index"] = i
+        evaluated[i] = result
     if any(r is None for r in evaluated):
         raise ValueError("EVALUATED_ROWS_REQUIRED_TO_AVOID_FALSE_FACTOR_COVERAGE")
     card["evaluated_rows"] = evaluated
@@ -247,10 +297,13 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
     card["prop_unpriced"] = [r for r in modeled_props if r.get("status")=="NO_MODEL_OR_MARKET"]
     card["source_receipts"] = (list(card.get("source_receipts") or [])
                               + pitcher_receipts + batter_receipts
-                              + nfl_receipts + cfb_receipts)
+                              + nfl_receipts + cfb_receipts
+                              + coverage_receipts + f5_receipts)
     card["prop_model_status"] = {
         "pitcher_engine":"MLB_PITCHER_JOINT_EMPIRICAL_BAYES",
         "batter_engine":"MLB_BATTER_EMPIRICAL_GAMELOG",
+        "coverage_engine":"FREE_COVERAGE_EXTENSION_MLB_3WAY_QUARTERS_MARGIN_UNVALIDATED",
+        "f5_engine":"MLB_F5_EMPIRICAL_LINESCORE_UNVALIDATED",
         "nfl_player_engine":"ESPN_NAMED_HISTORICAL_GAMELOG_WATCH_ONLY",
         "cfb_player_engine":"ESPN_NAMED_HISTORICAL_GAMELOG_WATCH_ONLY",
         "free_public_history":True,
