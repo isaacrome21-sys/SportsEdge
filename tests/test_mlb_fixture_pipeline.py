@@ -7,6 +7,9 @@ from unittest.mock import patch
 
 from sportsedge.generic_card_pipeline import _feature_index, run_generic_card
 
+# Keep the MLB research team-total contract covered by required fixture CI.
+from tests.test_mlb_free_team_totals import MLBTeamTotalsResearchTests
+
 # The MLB fixture CI workflow executes this module explicitly. Reuse its
 # prepricing regression suite so ESPN-to-StatsAPI fallback is exercised in CI.
 from tests.test_prepricing_ingestion import MlbPostseasonFixtureFallbackTests
