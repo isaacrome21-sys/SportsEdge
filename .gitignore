@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Live validation HTTP cache (reproducible from free endpoints; not committed)
+data/live_validation_cache/

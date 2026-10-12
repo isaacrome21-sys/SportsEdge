@@ -510,6 +510,35 @@ def context_for(sport, away, home, start, provider, row):
     return out, kickoff, notes
 
 
+def score_means(sport, context):
+    """Pregame expected scores from verified context.
+
+    Single source of truth for the pregame score means, shared by
+    ``calculate()`` and the live in-game repricing path
+    (``sportsedge.live_reprice``), which reconstructs these means as of
+    kickoff. Market anchoring is deliberately NOT part of this function:
+    live Model_P must stay market-blind per LIVE_POLICY_V1.
+    """
+    base, _, _, hfa = PRIORS[sport]
+    home_mean = base + hfa / 2 + context["home_rating"]
+    away_mean = base - hfa / 2 + context["away_rating"]
+    if sport == "MLB":
+        home_mean += context["home_pitcher_adj"]
+        away_mean += context["away_pitcher_adj"]
+    else:
+        home_mean += context["home_injury_pts"] + context["home_form"]
+        away_mean += context["away_injury_pts"] + context["away_form"]
+        if sport == "NBA":
+            home_mean += context["rest_adj"] / 2
+            away_mean -= context["rest_adj"] / 2
+    if "weather_total_adj" in context:
+        home_mean += context["weather_total_adj"] / 2
+        away_mean += context["weather_total_adj"] / 2
+    if min(home_mean, away_mean) < 0.2:
+        raise ValueError("IMPLAUSIBLE_SCORE_MEAN")
+    return home_mean, away_mean
+
+
 def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
     sport = str(row.get("sport") or "").upper().strip()
     if sport not in PRIORS:
@@ -578,23 +607,7 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
     if kickoff is None or kickoff <= now:
         return {"status": "BLOCKED_KICKOFF_UNVERIFIED", "game": f"{away} @ {home}", "sport": sport,
                 "context_notes": notes}
-    base, _, _, hfa = PRIORS[sport]
-    home_mean = base + hfa/2 + context["home_rating"]
-    away_mean = base - hfa/2 + context["away_rating"]
-    if sport == "MLB":
-        home_mean += context["home_pitcher_adj"]
-        away_mean += context["away_pitcher_adj"]
-    else:
-        home_mean += context["home_injury_pts"] + context["home_form"]
-        away_mean += context["away_injury_pts"] + context["away_form"]
-        if sport == "NBA":
-            home_mean += context["rest_adj"] / 2
-            away_mean -= context["rest_adj"] / 2
-    if "weather_total_adj" in context:
-        home_mean += context["weather_total_adj"] / 2
-        away_mean += context["weather_total_adj"] / 2
-    if min(home_mean, away_mean) < 0.2:
-        raise ValueError("IMPLAUSIBLE_SCORE_MEAN")
+    home_mean, away_mean = score_means(sport, context)
     # A raw league-score baseline is NOT an executable fair price. Shrink
     # game-location departures toward the posted market threshold; 15% is an
     # unfitted RESEARCH prior, not a learned edge. Do not move an unknown line.
