@@ -559,13 +559,16 @@ class TestMarketBlindBoundary(unittest.TestCase):
 
     def test_no_pricing_module_imports_backtest(self):
         # The import direction is one-way: pricing never pulls in the
-        # evaluation package (which holds market data).
+        # evaluation package (which holds market data). Validation scripts
+        # under scripts/ are tooling, not pricing, and may use the harness.
         repo = Path(__file__).parent.parent
         offenders = []
         for path in repo.rglob("*.py"):
             if "sportsedge/backtest" in str(path).replace("\\", "/"):
                 continue
             if "/tests/" in str(path).replace("\\", "/"):
+                continue
+            if "/scripts/" in str(path).replace("\\", "/"):
                 continue
             try:
                 src = path.read_text()
