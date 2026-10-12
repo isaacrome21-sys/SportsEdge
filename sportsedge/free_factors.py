@@ -23,8 +23,9 @@ Factor registry (source -> pricing use):
   4. NFL/CFB key numbers ....... empirical final-margin frequencies from
      ESPN scoreboards (2020-2023 NFL, 2021-2023 CFB) blended with the
      normal-model push estimate; push-aware SPREAD/TOTAL pricing.
-  5. MLB umpire ................ NOT_WIRED: historical assignments exist in
-     StatsAPI boxscores but no stable free pregame source exists.
+  5. MLB umpire ................ PENDING_VALIDATION: home-plate assignments
+     from MLB StatsAPI schedule hydrate=officials (free, pregame, no key);
+     tendency pricing effect inactive pending harness validation.
 
 Explicitly NOT_WIRED (never attempted): news speed, motivation spots,
 officiating tendencies, Statcast, Next Gen Stats, NBA props.
@@ -527,19 +528,192 @@ def apply_key_push(win: float, push_normal: float, loss: float,
 
 
 # ---------------------------------------------------------------------------
-# 5. MLB umpire — NOT_WIRED
+# 5. MLB umpire — PENDING_VALIDATION (assignment wired, pricing inactive)
 # ---------------------------------------------------------------------------
-UMPIRE_FACTOR_STATUS = "NOT_WIRED"
+# Assignment source (VERIFIED): MLB StatsAPI schedule endpoint with
+# hydrate=officials is free, public, no key, and returns pregame umpire
+# assignments, e.g.
+#   https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-15&hydrate=officials
+# Each game carries officials[] with officialType ("Home Plate",
+# "First Base", "Second Base", "Third Base") and official.fullName / id.
+#
+# Two lanes, kept separate:
+#   (a) Assignment (WHO is behind the plate): VERIFIED via the feed above.
+#       Missing assignment stays unknown; NEVER infer from crew rotation.
+#   (b) Tendency pricing effect (HOW they call the zone): PENDING_VALIDATION.
+#       Inactive until the backtest harness proves chronological out-of-sample
+#       improvement vs the existing model. See "5b" below for the design.
+UMPIRE_FACTOR_STATUS = "PENDING_VALIDATION"
+UMPIRE_ASSIGNMENT_SOURCE = "MLB_STATSAPI_OFFICIALS"
 UMPIRE_NOT_WIRED_REASON = (
-    "Historical home-plate umpire assignments are verifiable in MLB StatsAPI "
-    "boxscores (officials[].officialType == 'Home Plate'), but MLB publishes "
-    "no stable free pregame umpire-assignment feed; assignments are announced "
-    "day-of via press release. Without a verifiable pregame source the factor "
-    "cannot enter pregame pricing. Fails closed by design.")
+    "Home-plate umpire assignments are verified pregame via the MLB StatsAPI "
+    "schedule endpoint (hydrate=officials; free, public, no key). Assignment "
+    "is audit-visible; the tendency pricing effect is PENDING_VALIDATION and "
+    "inactive until the backtest harness proves chronological out-of-sample "
+    "improvement. Missing assignment stays unknown; never inferred from crew "
+    "rotation.")
+STATAPI_SCHEDULE_URL = "https://statsapi.mlb.com/api/v1/schedule"
+
+
+def fetch_officials_by_game(game_date: str, timeout_s: float = 20.0) -> dict:
+    """Fetch {gamePk: officials[]} for one date (YYYY-MM-DD) from MLB StatsAPI.
+
+    Free, public, no key. Raises RuntimeError on HTTP/network/parse failure
+    so callers fail closed. Does NOT infer anything: returns exactly what the
+    feed publishes.
+    """
+    import json as _json
+    import urllib.parse as _parse
+    import urllib.request as _request
+
+    qs = _parse.urlencode({"sportId": 1, "date": game_date, "hydrate": "officials"})
+    url = f"{STATAPI_SCHEDULE_URL}?{qs}"
+    req = _request.Request(url, headers={"User-Agent": "SportsEdge-research/1.0"})
+    try:
+        with _request.urlopen(req, timeout=timeout_s) as resp:
+            payload = _json.loads(resp.read().decode("utf-8"))
+    except Exception as exc:  # network, HTTP error, bad JSON -> fail closed
+        raise RuntimeError(f"UMPIRE_OFFICIALS_FETCH_FAILED: {exc}") from exc
+    out: dict = {}
+    for day in payload.get("dates", []) or []:
+        for game in day.get("games", []) or []:
+            pk = game.get("gamePk")
+            if pk is not None:
+                out[int(pk)] = game.get("officials", []) or []
+    return out
+
+
+def home_plate_assignment(game_pk: int, officials: list,
+                          captured_at_utc: str | None = None) -> dict | None:
+    """Extract the verified home-plate umpire from an officials list.
+
+    Pure function (no network) so tests inject fixtures directly. Returns
+    {"umpire_id", "umpire_name", "game_pk", "source", "captured_at_utc"} or
+    None when no Home Plate entry is present. NEVER infers from crew
+    rotation: a list with other positions but no Home Plate entry yields
+    None (unknown), not a guess.
+    """
+    from datetime import datetime, timezone
+
+    for off in officials or []:
+        if not isinstance(off, dict):
+            continue
+        if str(off.get("officialType", "")).strip().lower() != "home plate":
+            continue
+        person = off.get("official", {}) or {}
+        name = person.get("fullName")
+        uid = person.get("id")
+        if not name:
+            return None
+        return {
+            "umpire_id": uid,
+            "umpire_name": name,
+            "game_pk": int(game_pk),
+            "source": UMPIRE_ASSIGNMENT_SOURCE,
+            "captured_at_utc": captured_at_utc or datetime.now(timezone.utc).isoformat(),
+        }
+    return None
+
+
+def umpire_assignment_for_date(game_date: str,
+                               game_pk: int | None = None) -> dict | None:
+    """Convenience: fetch a date's officials, then extract one game's assignment.
+
+    If game_pk is None, returns {gamePk: assignment-or-None} for every game.
+    Network failure raises RuntimeError (fail closed); callers decide how to
+    surface the missing assignment.
+    """
+    by_game = fetch_officials_by_game(game_date)
+    if game_pk is not None:
+        return home_plate_assignment(game_pk, by_game.get(int(game_pk), []))
+    return {pk: home_plate_assignment(pk, offs) for pk, offs in by_game.items()}
 
 
 # ---------------------------------------------------------------------------
-# Registry + validation verdicts
+# 5b. MLB umpire tendencies — STRUCTURE ONLY, PENDING_VALIDATION
+# ---------------------------------------------------------------------------
+# Assignment (WHO, section 5 above) is verified. Tendency (HOW they call the
+# zone) is NOT validated and has NO pricing effect. This section defines the
+# estimation design that the harness must validate before any activation.
+#
+# Design:
+#   1. Join Statcast pitches to VERIFIED home-plate assignments by gamePk
+#      (game_id in Statcast == gamePk in StatsAPI). Do NOT use Savant's
+#      umpire column: it is deprecated and unreliable.
+#   2. Use ONLY pitches from games strictly before the priced game's date
+#      (no lookahead). The as-of cutoff is the game date, not first pitch.
+#   3. Model called-strike probability on taken pitches, adjusting for:
+#      pitch location (px, pz), count, batter handedness, pitcher identity,
+#      catcher identity. The umpire effect is the residual after these
+#      controls (extra called strikes / zone expansion vs average).
+#   4. Shrink small-sample umpire estimates toward league average
+#      (see shrink_toward_league_average() below). An umpire with 3 games
+#      does not get a 3-game tendency.
+#   5. 2026 ABS measurement change (CRITICAL): Savant documents changes to
+#      pitch coordinates and strike-zone definitions starting with the 2026
+#      ABS challenge system. Do NOT pool pre-2026 and 2026+ pitch data
+#      without explicit measurement harmonization. Estimate tendencies
+#      separately by era, or apply the documented coordinate transform first.
+#      Combining eras naively confounds the measurement change with the
+#      umpire effect.
+#   6. Validation bar: incremental improvement for pitcher K/BB and totals
+#      vs the existing model, chronological out-of-sample, before activation.
+#      Raw umpire over/under records alone are NOT sufficient evidence.
+UMPIRE_TENDENCY_STATUS = "PENDING_VALIDATION"
+# Era boundary for Statcast measurement harmonization (ABS challenge system).
+STATCAST_ABS_ERA_START = 2026
+
+
+def shrink_toward_league_average(n_obs: float, obs_rate: float,
+                                 league_rate: float,
+                                 prior_weight: float = 50.0) -> float:
+    """Shrink a small-sample rate toward the league average (prior).
+
+    posterior = (n_obs * obs_rate + prior_weight * league_rate)
+                / (n_obs + prior_weight)
+
+    Pure math, no pricing effect by itself. Used to keep umpires with few
+    observed games from getting extreme tendency estimates.
+    """
+    n = max(0.0, float(n_obs))
+    w = max(0.0, float(prior_weight))
+    if n + w <= 0:
+        return float(league_rate)
+    return (n * float(obs_rate) + w * float(league_rate)) / (n + w)
+
+
+def umpire_tendency_estimate(umpire_id, prior_pitches: list,
+                             league_called_strike_rate: float,
+                             era: int | None = None) -> dict:
+    """Structure-only stub for umpire tendency estimation.
+
+    `prior_pitches` would be taken-pitch records from games strictly before
+    the priced game, each with keys: game_pk, px, pz, count, batter_hand,
+    pitcher_id, catcher_id, called_strike (0/1). The real estimator (future
+    work, harness-gated) fits the called-strike model described above.
+
+    This stub validates inputs, enforces the era rule, and returns a
+    PENDING_VALIDATION entry with NO pricing effect. It never invents a
+    tendency.
+    """
+    if umpire_id is None:
+        return _entry("umpire_tendency", "none", None, None,
+                      UMPIRE_TENDENCY_STATUS,
+                      "UMPIRE_TENDENCY_UNKNOWN: no verified home-plate assignment",
+                      UMPIRE_ASSIGNMENT_SOURCE, set())
+    if era is not None and era < STATCAST_ABS_ERA_START:
+        era_note = (f"pre-ABS era ({era}); do not pool with 2026+ without "
+                    f"measurement harmonization")
+    else:
+        era_note = "ABS era (2026+); keep separate from pre-2026 data"
+    n = len(prior_pitches or [])
+    return _entry(
+        "umpire_tendency", "none", None, None, UMPIRE_TENDENCY_STATUS,
+        (f"UMPIRE_TENDENCY_STRUCTURE_ONLY: {n} prior pitches supplied; "
+         f"{era_note}; estimator not fitted; no pricing effect until harness "
+         f"proves incremental K/BB and totals improvement"),
+        "statcast-pitches-joined-to-verified-assignments-by-gamePk",
+        set())
 # ---------------------------------------------------------------------------
 # validation verdicts are filled by scripts/validate_free_factors.py runs:
 #   PASS / CONDITIONAL_PASS / FAIL / NOT_RUN, plus a one-line summary.
@@ -571,9 +745,10 @@ FACTOR_REGISTRY: dict[str, dict[str, Any]] = {
         "validation_note": "NFL push: Brier 0.1166->0.1096. CFB push: 0.0642->0.0623. Wired with labels.",
     },
     "mlb_umpire": {
-        "source": "none stable pregame (historical only: MLB StatsAPI boxscore officials)",
+        "source": ("MLB StatsAPI schedule hydrate=officials (free, public, "
+                   "no key); pregame home-plate assignments"),
         "wired": False,
-        "validation": "NOT_WIRED",
+        "validation": "PENDING_VALIDATION",
         "validation_note": UMPIRE_NOT_WIRED_REASON,
     },
     # Explicitly out of scope; never attempted.
@@ -915,12 +1090,24 @@ def ingest_participation(sport: str, team_side: str, qb_out_verified: bool,
                   "ESPN injuries API, team-identity-verified (free, public)", ok)
 
 
-def umpire_entry() -> dict:
-    """MLB umpire factor: NOT_WIRED by design (no stable free pregame source)."""
+def umpire_entry(assignment: dict | None = None) -> dict:
+    """MLB umpire factor: assignment verified, pricing effect PENDING_VALIDATION.
+
+    When `assignment` (from home_plate_assignment()) is provided, the audit
+    records the verified umpire; when None, the assignment is unknown. Either
+    way the pricing effect is inactive: status is PENDING_VALIDATION and the
+    entry kind is "none" until the harness proves tendency value.
+    """
+    ok: set = set()  # no status activates pricing yet
+    if assignment:
+        detail = (f"HOME_PLATE_UMPIRE_VERIFIED: {assignment.get('umpire_name')} "
+                  f"(gamePk={assignment.get('game_pk')}); tendency pricing "
+                  f"inactive pending harness validation")
+    else:
+        detail = ("UMPIRE_ASSIGNMENT_UNKNOWN: no Home Plate official published; "
+                  "never inferred from crew rotation; pricing inactive")
     return _entry("mlb_umpire", "none", None, None, UMPIRE_FACTOR_STATUS,
-                  UMPIRE_NOT_WIRED_REASON,
-                  "none stable pregame (historical only: MLB StatsAPI boxscore)",
-                  set())
+                  detail, UMPIRE_ASSIGNMENT_SOURCE, ok)
 
 
 INGEST_ENTRY_POINTS = {
@@ -934,7 +1121,7 @@ INGEST_ENTRY_POINTS = {
     "bullpen_workload": "ingest_mlb_bullpen(side: str, trailing_3d_pitches, n_games: int)",
     "rotation": "ingest_mlb_rotation(side: str, days_rest)",
     "injury_participation": "ingest_participation(sport: str, team_side: str, qb_out_verified: bool, qb_name: str | None = None)",
-    "mlb_umpire": "umpire_entry()  # NOT_WIRED",
+    "mlb_umpire": "umpire_entry(assignment=None)  # PENDING_VALIDATION: assignment verified, pricing inactive",
 }
 
 
@@ -1768,16 +1955,25 @@ FACTOR_REGISTRY["platoon_split"] = {
 }
 # Umpire zone effects and catcher framing: MISSING until proven stable
 # out-of-sample in the harness. Validation path: derive umpire K/BB
-# deltas from Retrosheet (umpire IDs in info records), test stability
-# across seasons in walk-forward. Do not wire on reputation.
+# deltas from Statcast pitch data joined to VERIFIED home-plate assignments
+# by gamePk (see umpire_tendency_estimate() below; do NOT use Savant's
+# deprecated umpire column). Test stability across seasons in walk-forward.
+# CRITICAL: MLB ABS challenge system (2026) structurally changes pitch
+# coordinates and strike-zone definitions (per Savant docs). Do NOT pool
+# pre-2026 and 2026+ pitch data without explicit measurement harmonization;
+# estimate tendencies separately by era. Raw umpire over/under records alone
+# are not sufficient evidence. Do not wire on reputation.
 FACTOR_REGISTRY["umpire_zone"] = {
-    "source": ("Retrosheet umpire IDs (info records); umpscorecards.com "
+    "source": ("Statcast pitch data joined to verified MLB StatsAPI "
+               "home-plate assignments by gamePk; umpscorecards.com "
                "assessed 2026-10-11: SvelteKit JS app, no keyless API found"),
-    "wired": False, "validation": "NOT_WIRED",
-    "validation_note": ("MISSING until proven stable OOS: umpire K/BB effects "
+    "wired": False, "validation": "PENDING_VALIDATION",
+    "validation_note": ("Assignment lane VERIFIED; tendency lane MISSING until "
+                        "proven stable OOS: umpire called-strike/K/BB effects "
                         "must validate across seasons before wiring. "
-                        "CRITICAL: MLB ABS challenge system (2026) structurally "
-                        "shrinks the umpire effect; do not over-invest."),
+                        "CRITICAL: 2026 ABS changes alter pitch coordinates "
+                        "and zone definitions; keep eras separate. "
+                        "Shrinks the umpire effect; do not over-invest."),
 }
 FACTOR_REGISTRY["catcher_framing"] = {
     "source": "TBD — stability TBD",
