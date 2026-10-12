@@ -17,6 +17,8 @@ from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from sportsedge import free_factors as ff
+
 LEAGUES = {"NFL": "football/nfl", "CFB": "football/college-football",
            "NBA": "basketball/nba", "MLB": "baseball/mlb"}
 # Explicit priors and heuristic variances; NOT fitted or calibrated.
@@ -25,9 +27,11 @@ PRIORS = {"NFL": (22.0, 13.5, 13.7, 1.5),
           "NBA": (113.0, 19.0, 12.5, 2.0),
           "MLB": (4.4, None, None, 0.20)}
 CONTEXT_KEYS = {"NFL": ("home_rating", "away_rating", "home_injury_pts",
-                        "away_injury_pts", "home_form", "away_form", "weather_total_adj"),
+                        "away_injury_pts", "home_form", "away_form", "weather_total_adj",
+                        "rest_margin_adj"),
                 "CFB": ("home_rating", "away_rating", "home_injury_pts",
-                        "away_injury_pts", "home_form", "away_form", "weather_total_adj"),
+                        "away_injury_pts", "home_form", "away_form", "weather_total_adj",
+                        "rest_margin_adj"),
                 "NBA": ("home_rating", "away_rating", "home_injury_pts",
                         "away_injury_pts", "home_form", "away_form", "rest_adj"),
                 "MLB": ("home_rating", "away_rating", "home_pitcher_adj",
@@ -147,6 +151,27 @@ def model_probability(sport, market, side, line, home_mean, away_mean):
     cut = decision + (0.5 if whole else 0)
     win = (1 - cdf(cut, mean, sd)) if sign > 0 else cdf(decision - (0.5 if whole else 0), mean, sd)
     return bounded(win, 0, 1), bounded(push, 0, 1)
+
+
+def apply_key_numbers(sport, market, line, win, push):
+    """Harness-gated key-number push blend (CONDITIONAL_PASS 2026-10-11).
+
+    Blends the normal-model push with empirical key-number push rates from
+    ESPN scoreboards (free, public). Returns (win, push, loss, status_note).
+    Market-blind: no odds used. Never raises on factor failure (fail closed
+    to the normal push).
+    """
+    loss = bounded(1 - win - push, 0, 1)
+    if sport not in ("NFL", "CFB") or market not in ("SPREAD", "TOTAL"):
+        return win, push, loss, "KEY_NUMBERS:NOT_APPLICABLE"
+    try:
+        entry = ff.ingest_key_numbers(sport, market, line, win, push, loss)
+    except Exception:
+        return win, push, loss, "KEY_NUMBERS:FACTOR_ERROR_FAIL_CLOSED"
+    if not entry.get("verified"):
+        return win, push, loss, "KEY_NUMBERS:" + str(entry.get("status"))
+    win2, push2, loss2 = entry["value"]
+    return win2, push2, loss2, "KEY_NUMBERS:" + str(entry.get("status"))
 
 
 class PublicContext:
@@ -478,6 +503,7 @@ def context_for(sport, away, home, start, provider, row):
         notes.append("UNIQUE_FUTURE_ESPN_FIXTURE_MISSING")
         return out, None, notes
     kickoff, competition = fixture
+    rest_days = {}
     for prefix, name in (("home", home), ("away", away)):
         team = provider.identify(sport, name)
         if team is None:
@@ -487,7 +513,7 @@ def context_for(sport, away, home, start, provider, row):
         if sample:
             days_rest = (kickoff - sample[0][0]).total_seconds() / 86400
             if 0 < days_rest < 40:
-                # Context only until a rest coefficient is trained vs closes.
+                rest_days[prefix] = days_rest
                 notes.append(prefix.upper() + "_REST_DAYS:" + str(round(days_rest, 2)))
             notes.append(prefix.upper() + "_HISTORY_COUNT:" + str(len(sample)))
             margins = [pf - pa for _, pf, pa in sample]
@@ -507,6 +533,13 @@ def context_for(sport, away, home, start, provider, row):
                             latitude=row.get("venue_latitude"), longitude=row.get("venue_longitude"))
         out["weather_total_adj"] = weather
         notes.append("WEATHER:" + status)
+    if sport in {"NFL", "CFB"} and "rest_margin_adj" in out:
+        # Validated rest factor (CONDITIONAL_PASS): rest differential to margin.
+        entry = ff.ingest_rest(sport,
+                               rest_days.get("home"), rest_days.get("away"))
+        if entry["verified"]:
+            out["rest_margin_adj"] = entry["value"]
+        notes.append("REST:" + entry["status"] + ":" + entry["detail"])
     return out, kickoff, notes
 
 
@@ -593,6 +626,10 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
     if "weather_total_adj" in context:
         home_mean += context["weather_total_adj"] / 2
         away_mean += context["weather_total_adj"] / 2
+    if "rest_margin_adj" in context:
+        # Validated rest factor: add to home margin (home_mean up, away down).
+        home_mean += context["rest_margin_adj"] / 2
+        away_mean -= context["rest_margin_adj"] / 2
     if min(home_mean, away_mean) < 0.2:
         raise ValueError("IMPLAUSIBLE_SCORE_MEAN")
     # A raw league-score baseline is NOT an executable fair price. Shrink
@@ -604,7 +641,9 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
     # not a proven independent model or a validated wagering probability.
     raw_win, raw_push = model_probability(
         sport, market, side, line, home_mean, away_mean)
-    raw_loss = bounded(1 - raw_win - raw_push, 0, 1)
+    raw_win, raw_push, raw_loss, key_note = apply_key_numbers(
+        sport, market, line, raw_win, raw_push)
+    notes.append(key_note)
     raw_ev = raw_win * (dec - 1) - raw_loss
     raw_conditional = (raw_win / (raw_win + raw_loss)
                        if raw_win + raw_loss > 0 else None)
@@ -653,6 +692,8 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02):
         p1, p2 = 1/dec, 1/opposite_dec
         anchor.update(market_no_vig_p=p1/(p1+p2))
     win, push = model_probability(sport, market, side, line, home_mean, away_mean)
+    win, push, loss, key_note = apply_key_numbers(sport, market, line, win, push)
+    notes.append(key_note)
     if market == "ML":
         win = bounded(anchor["market_no_vig_p"] + 0.15*(win-anchor["market_no_vig_p"]), 0, 1)
     loss = bounded(1 - win - push, 0, 1)

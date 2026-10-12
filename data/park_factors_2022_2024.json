@@ -1,0 +1,227 @@
+{
+  "formula": "pf = 1 + (home_rpg/road_rpg - 1) * home_games/(home_games+162); home_rpg and road_rpg count runs scored AND allowed; schedule team= param is ignored by the API so games are grouped by team locally",
+  "regress_games": 162,
+  "research_only": true,
+  "schema": "SPORTSEDGE_PARK_FACTORS_V1",
+  "seasons": [
+    2022,
+    2023,
+    2024
+  ],
+  "source": "MLB StatsAPI official schedule (free, public, no key)",
+  "source_urls": [
+    "https://statsapi.mlb.com/api/v1/schedule?sportId=1&season=<s>"
+  ],
+  "teams": {
+    "Arizona Diamondbacks": {
+      "home_games": 296,
+      "home_rpg": 9.382,
+      "park_factor_runs": 0.9747,
+      "raw_home_road_ratio": 0.9608,
+      "road_rpg": 9.765
+    },
+    "Atlanta Braves": {
+      "home_games": 288,
+      "home_rpg": 8.812,
+      "park_factor_runs": 0.9663,
+      "raw_home_road_ratio": 0.9474,
+      "road_rpg": 9.302
+    },
+    "Baltimore Orioles": {
+      "home_games": 286,
+      "home_rpg": 8.962,
+      "park_factor_runs": 0.9772,
+      "raw_home_road_ratio": 0.9643,
+      "road_rpg": 9.293
+    },
+    "Boston Red Sox": {
+      "home_games": 288,
+      "home_rpg": 9.872,
+      "park_factor_runs": 1.0692,
+      "raw_home_road_ratio": 1.1081,
+      "road_rpg": 8.909
+    },
+    "Chicago Cubs": {
+      "home_games": 288,
+      "home_rpg": 8.806,
+      "park_factor_runs": 0.9657,
+      "raw_home_road_ratio": 0.9463,
+      "road_rpg": 9.305
+    },
+    "Chicago White Sox": {
+      "home_games": 280,
+      "home_rpg": 8.893,
+      "park_factor_runs": 1.007,
+      "raw_home_road_ratio": 1.011,
+      "road_rpg": 8.796
+    },
+    "Cincinnati Reds": {
+      "home_games": 280,
+      "home_rpg": 9.889,
+      "park_factor_runs": 1.0526,
+      "raw_home_road_ratio": 1.083,
+      "road_rpg": 9.131
+    },
+    "Cleveland Guardians": {
+      "home_games": 292,
+      "home_rpg": 8.455,
+      "park_factor_runs": 0.9921,
+      "raw_home_road_ratio": 0.9878,
+      "road_rpg": 8.56
+    },
+    "Colorado Rockies": {
+      "home_games": 285,
+      "home_rpg": 11.274,
+      "park_factor_runs": 1.1614,
+      "raw_home_road_ratio": 1.2531,
+      "road_rpg": 8.996
+    },
+    "Detroit Tigers": {
+      "home_games": 284,
+      "home_rpg": 8.676,
+      "park_factor_runs": 1.025,
+      "raw_home_road_ratio": 1.0392,
+      "road_rpg": 8.348
+    },
+    "Houston Astros": {
+      "home_games": 295,
+      "home_rpg": 8.492,
+      "park_factor_runs": 0.99,
+      "raw_home_road_ratio": 0.9845,
+      "road_rpg": 8.625
+    },
+    "Kansas City Royals": {
+      "home_games": 279,
+      "home_rpg": 9.57,
+      "park_factor_runs": 1.0466,
+      "raw_home_road_ratio": 1.0736,
+      "road_rpg": 8.914
+    },
+    "Los Angeles Angels": {
+      "home_games": 283,
+      "home_rpg": 9.071,
+      "park_factor_runs": 1.017,
+      "raw_home_road_ratio": 1.0267,
+      "road_rpg": 8.835
+    },
+    "Los Angeles Dodgers": {
+      "home_games": 294,
+      "home_rpg": 9.017,
+      "park_factor_runs": 0.9522,
+      "raw_home_road_ratio": 0.9258,
+      "road_rpg": 9.74
+    },
+    "Miami Marlins": {
+      "home_games": 278,
+      "home_rpg": 8.935,
+      "park_factor_runs": 1.0755,
+      "raw_home_road_ratio": 1.1194,
+      "road_rpg": 7.982
+    },
+    "Milwaukee Brewers": {
+      "home_games": 288,
+      "home_rpg": 8.896,
+      "park_factor_runs": 0.9891,
+      "raw_home_road_ratio": 0.983,
+      "road_rpg": 9.049
+    },
+    "Minnesota Twins": {
+      "home_games": 289,
+      "home_rpg": 8.727,
+      "park_factor_runs": 0.9796,
+      "raw_home_road_ratio": 0.9681,
+      "road_rpg": 9.014
+    },
+    "New York Mets": {
+      "home_games": 287,
+      "home_rpg": 8.526,
+      "park_factor_runs": 0.9579,
+      "raw_home_road_ratio": 0.9341,
+      "road_rpg": 9.128
+    },
+    "New York Yankees": {
+      "home_games": 296,
+      "home_rpg": 9.051,
+      "park_factor_runs": 1.0216,
+      "raw_home_road_ratio": 1.0334,
+      "road_rpg": 8.759
+    },
+    "Oakland Athletics": {
+      "home_games": 285,
+      "home_rpg": 8.856,
+      "park_factor_runs": 0.9613,
+      "raw_home_road_ratio": 0.9392,
+      "road_rpg": 9.429
+    },
+    "Philadelphia Phillies": {
+      "home_games": 302,
+      "home_rpg": 9.179,
+      "park_factor_runs": 1.0095,
+      "raw_home_road_ratio": 1.0146,
+      "road_rpg": 9.047
+    },
+    "Pittsburgh Pirates": {
+      "home_games": 283,
+      "home_rpg": 9.194,
+      "park_factor_runs": 1.0271,
+      "raw_home_road_ratio": 1.0426,
+      "road_rpg": 8.819
+    },
+    "San Diego Padres": {
+      "home_games": 287,
+      "home_rpg": 8.429,
+      "park_factor_runs": 0.9551,
+      "raw_home_road_ratio": 0.9297,
+      "road_rpg": 9.066
+    },
+    "San Francisco Giants": {
+      "home_games": 284,
+      "home_rpg": 8.82,
+      "park_factor_runs": 0.9672,
+      "raw_home_road_ratio": 0.9485,
+      "road_rpg": 9.299
+    },
+    "Seattle Mariners": {
+      "home_games": 284,
+      "home_rpg": 8.021,
+      "park_factor_runs": 0.9171,
+      "raw_home_road_ratio": 0.8698,
+      "road_rpg": 9.222
+    },
+    "St. Louis Cardinals": {
+      "home_games": 283,
+      "home_rpg": 8.852,
+      "park_factor_runs": 0.9767,
+      "raw_home_road_ratio": 0.9633,
+      "road_rpg": 9.189
+    },
+    "Tampa Bay Rays": {
+      "home_games": 283,
+      "home_rpg": 8.247,
+      "park_factor_runs": 0.9625,
+      "raw_home_road_ratio": 0.941,
+      "road_rpg": 8.764
+    },
+    "Texas Rangers": {
+      "home_games": 291,
+      "home_rpg": 9.436,
+      "park_factor_runs": 1.0038,
+      "raw_home_road_ratio": 1.0059,
+      "road_rpg": 9.381
+    },
+    "Toronto Blue Jays": {
+      "home_games": 283,
+      "home_rpg": 8.989,
+      "park_factor_runs": 0.9968,
+      "raw_home_road_ratio": 0.995,
+      "road_rpg": 9.035
+    },
+    "Washington Nationals": {
+      "home_games": 282,
+      "home_rpg": 9.34,
+      "park_factor_runs": 1.0261,
+      "raw_home_road_ratio": 1.0412,
+      "road_rpg": 8.971
+    }
+  }
+}

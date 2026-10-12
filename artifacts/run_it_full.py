@@ -23,10 +23,15 @@ from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
 from datetime import datetime, timezone
 
 FIELDS = (
-    "team_quality", "injuries", "rest_travel", "home_park", "weather",
-    "recent_form", "matchups", "coaching", "key_numbers",
-    "market_context", "sport_specific", "player_props",
+    "team_quality", "team_strength", "injuries", "participation", "rest_travel",
+    "home_park", "weather", "recent_form", "matchups", "coaching", "key_numbers",
+    "pace", "turnovers", "pitcher_matchup", "pitcher_fip", "bullpen", "rotation",
+    "umpire", "market_context", "sport_specific", "player_props",
 )
+# Factors whose harness validation is pending: audit shows PENDING_VALIDATION
+# until the gate verdict lands (then wired -> verified status, or failed ->
+# MISSING with reason). Never silently priced.
+PENDING = "PENDING_VALIDATION"
 UNWIRED = "NOT_WIRED"
 MISSING = "MISSING_UNVERIFIED"
 HEURISTIC = "HEURISTIC_NOT_VALIDATED"
@@ -68,6 +73,25 @@ def audit_row(source, result):
         out["rest_travel"]["detail"] = "No verified schedule rest for both teams or calibrated travel/fatigue pricing; NBA rest_adj manual-only"
     out["home_park"] = {"status": "LEAGUE_BASELINE_ONLY" if has else MISSING,
                         "detail": "Static home advantage; no verified park-specific coefficients"}
+    out["team_strength"] = {"status": PENDING if has else MISSING,
+                            "detail": "SRS opponent-adjusted ratings pending harness gate; current: 5-game margin proxy (heuristic)"}
+    out["participation"] = {"status": PENDING if has and sport in ("NFL", "CFB") else ("NOT_APPLICABLE" if sport not in ("NFL", "CFB") else MISSING),
+                            "detail": "QB-out declared adjustment pending; not harness-validatable (no archived injury feed); backup quality never invented"}
+    out["pace"] = {"status": PENDING if has and sport == "NFL" else ("NOT_APPLICABLE" if sport != "NFL" else MISSING),
+                   "detail": "Plays/game total adjustment pending harness gate"}
+    out["turnovers"] = {"status": PENDING if has and sport == "NFL" else ("NOT_APPLICABLE" if sport != "NFL" else MISSING),
+                        "detail": "Regressed turnover-luck removal pending harness gate"}
+    out["pitcher_matchup"] = {"status": PENDING if has and sport == "MLB" else ("NOT_APPLICABLE" if sport != "MLB" else MISSING),
+                              "detail": "Probable-pitcher ERA adjustment pending harness gate; missing probable = downgraded, never silently priced"}
+    out["pitcher_fip"] = {"status": PENDING if has and sport == "MLB" else ("NOT_APPLICABLE" if sport != "MLB" else MISSING),
+                          "detail": "FIP-based pitcher adjustment pending harness gate"}
+    out["bullpen"] = {"status": PENDING if has and sport == "MLB" else ("NOT_APPLICABLE" if sport != "MLB" else MISSING),
+                      "detail": "Trailing-3d bullpen workload adjustment pending harness gate"}
+    out["rotation"] = {"status": PENDING if has and sport == "MLB" else ("NOT_APPLICABLE" if sport != "MLB" else MISSING),
+                       "detail": "Starter short-rest penalty pending harness gate"}
+    out["umpire"] = {"status": UNWIRED if sport == "MLB" else "NOT_APPLICABLE",
+                     "detail": ("No stable free pregame umpire-assignment source; historical only "
+                                "in MLB StatsAPI boxscores. NOT_WIRED by design.") if sport == "MLB" else "Non-MLB sport"}
     if sport in ("NFL", "CFB", "MLB"):
         state = HEURISTIC if "WEATHER:HEURISTIC_FORECAST" in n and has else (
             "VERIFIED_INDOOR" if "WEATHER:INDOOR_VERIFIED" in n else MISSING)
@@ -78,8 +102,19 @@ def audit_row(source, result):
                           "detail": "Short prior-game scoring trend; MLB form subsumed into rating"}
     out["matchups"]["detail"] = "No independently estimated player-vs-coverage, trenches, style or opponent fit"
     out["coaching"]["detail"] = "No independently estimated coaching, scheme or motivation effect"
-    out["key_numbers"] = {"status": "PUSH_AWARE_ONLY" if market in ("SPREAD", "TOTAL") and has else MISSING,
-                          "detail": "Integer push refund modeled; separate NFL 3/7 distribution not trained"}
+    if market in ("SPREAD", "TOTAL") and has:
+        if "KEY_NUMBERS:KEY_NUMBER_PUSH_VERIFIED" in n:
+            out["key_numbers"] = {
+                "status": "KEY_NUMBER_PUSH_VERIFIED",
+                "detail": ("Empirical key-number push blend (ESPN scoreboards, free); "
+                           "harness CONDITIONAL_PASS 2026-10-11 vs existing model, "
+                           "market baseline missing; NOT a validated edge")}
+        else:
+            out["key_numbers"] = {"status": "PUSH_AWARE_ONLY",
+                                  "detail": "Integer push refund modeled; key-number blend not applied"}
+    else:
+        out["key_numbers"] = {"status": MISSING,
+                              "detail": "No spread/total line or unverified context"}
     out["market_context"] = {"status": HEURISTIC if result.get("market_anchor") else MISSING,
                              "detail": "15% unfitted residual anchored to supplied DK line, no contemporaneous sharp reference"}
     sport_specific = {

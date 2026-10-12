@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+data/retrosheet/*.EV* 
+data/retrosheet/*.ROS
+data/retrosheet/*.zip
