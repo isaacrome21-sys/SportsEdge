@@ -243,6 +243,20 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 game_results[gpos] = _prepricing_blocked_row(
                     line, st, game_indices[gpos])
                 continue
+            # The no-fetch flag remains available to isolated free_models
+            # research tests, but must never populate an NFL RUN IT card.
+            # It yields no verified team strength, injury or QB information.
+            if line["sport"] == "NFL" and not auto_context:
+                blocked_stage = dict(st)
+                blocked_stage.update(
+                    blocked=True,
+                    block_reason="BLOCKED_NFL_NO_VERIFIED_CONTEXT",
+                    block_detail="NO_FETCH_MANUAL_MODE_NOT_ELIGIBLE_FOR_NFL_RUN_IT",
+                    adjustments={},
+                )
+                game_results[gpos] = _prepricing_blocked_row(
+                    line, blocked_stage, game_indices[gpos])
+                continue
             # System-verified adjustments: separate object with provenance
             # User-supplied context remains subject to allow_manual_context
             prepricing_by_index[gpos] = {
