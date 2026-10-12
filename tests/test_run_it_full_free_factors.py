@@ -13,7 +13,8 @@ KICKOFF="2026-10-11T20:25:00Z"
 
 def row(**extra):
     x={"sport":"NFL","away":"Detroit Lions","home":"Arizona Cardinals",
-       "market":"TOTAL","side":"UNDER","line":54.5,"odds":-102,"kickoff":KICKOFF}
+       "market":"TOTAL","side":"UNDER","line":54.5,"odds":-102,"kickoff":KICKOFF,
+       "quote_captured_at":"2026-10-11T12:59:00Z"}
     x.update(extra)
     return x
 
@@ -27,8 +28,15 @@ def test_full_runner_keeps_research_edge_and_flag_unwired_factors():
     assert f["coaching"]["status"]=="NOT_WIRED"
     assert f["matchups"]["status"]=="NOT_WIRED"
     assert f["rest_travel"]["status"]=="NOT_WIRED"
-    assert f["market_context"]["status"]=="HEURISTIC_NOT_VALIDATED"
+    # Lane A (default, market-blind): market context explicitly not used.
+    assert f["market_context"]["status"]=="NOT_USED_LANE_A_INDEPENDENT"
+    assert f["manual_context"]["status"]=="VERIFIED_PUBLIC_ONLY"
     assert f["injuries"]["status"]=="MISSING_UNVERIFIED"
+    # Lane B (explicitly requested): the anchored view is labeled as such.
+    anchored=full.run_full({"lines":[row()]}, now=NOW,auto_context=False,lane="B")
+    fb=anchored["factor_coverage"]["by_input_index"][0]["factors"]
+    assert fb["market_context"]["status"]=="ANCHORED_UNVALIDATED_LANE_B"
+    assert anchored["evaluated_rows"][0]["pricing_lane"]=="LANE_B_ANCHORED"
 
 
 def test_unknown_injury_source_not_rebranded_injury_free():
