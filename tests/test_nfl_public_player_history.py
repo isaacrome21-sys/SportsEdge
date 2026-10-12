@@ -216,9 +216,13 @@ def test_full_phone_run_it_stafford_paired_props_are_watch_not_bets():
     assert not card["prop_unpriced"]
     rows = card["evaluated_rows"]
     assert len(rows) == 2
-    assert all(row["status"] == "WATCH_PLAYER_PARTICIPATION_UNVERIFIED"
-               for row in rows)
+    # Both selections remain non-promoted; the positive-EV side is
+    # participation-WATCH while the opposite side fails the EV floor first.
+    assert all(row["status"].startswith("WATCH_") for row in rows)
     over = next(row for row in rows if row["selection"] == "OVER")
+    under = next(row for row in rows if row["selection"] == "UNDER")
+    assert over["status"] == "WATCH_PLAYER_PARTICIPATION_UNVERIFIED"
+    assert under["status"] == "WATCH_BELOW_EV_FLOOR"
     assert over["prior_game_count"] == 7
     assert over["model_probability"] == pytest.approx(4/7)
     assert over["stats_schema"] == "ESPN_EXPLICIT_NAMES_ONLY"
