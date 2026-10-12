@@ -225,13 +225,18 @@ def render_card(card, *, run_url="", intake_at=""):
         stats = factor_report.get("status_counts") or {}
         lines.append("All input rows (factor-status counts): " +
                      ", ".join(f"{safe(k)}={int(v)}" for k,v in sorted(stats.items())))
-        for row in rows[:8]:
-            coverage = by_idx.get(row.get("input_index"), {})
+        # Report absent critical inputs for blocked selections too. Iterating
+        # only ranked candidates would hide the most important verification
+        # failures and let a completely unpriced card look deceptively clean.
+        for entry in (factor_report.get("by_input_index") or [])[:8]:
+            coverage = entry.get("factors") or {}
             unavailable = [name for name, value in coverage.items()
                            if value.get("status") in ("NOT_WIRED", "MISSING_UNVERIFIED")]
             if unavailable:
-                lines.append(f"- {safe(row.get('selection'))}: "
-                             f"missing/not modeled: {safe(', '.join(unavailable),240)}")
+                lines.append(
+                    f"- Row {int(entry.get('input_index', 0))+1} "
+                    f"[{safe(entry.get('status'))}]: missing/not modeled: "
+                    f"{safe(', '.join(unavailable),240)}")
         lines.append("Statcast, Next Gen, lineup/usage, coaching, refs/umpires and "
                      "travel are not independently priced by this free runner.")
     return "\n".join(lines) + "\n"
