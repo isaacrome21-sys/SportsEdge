@@ -355,9 +355,25 @@ class MlbPitcherTests(unittest.TestCase):
         self.assertTrue(all(s[0] == "USED" for s in sp))
         self.assertTrue(any("Test Arm A" in s[2] for s in sp))
         wx = factor_status(stage, "weather_venue")[0]
-        self.assertEqual((wx[0], wx[1]), ("USED", "OPEN_METEO_LIVE_FREE_NO_KEY"))
+        # ESPN static indoor venue metadata cannot prove a retractable roof's
+        # *game-day* position at American Family Field.
+        self.assertEqual((wx[0], wx[1]), ("MISSING", "OPEN_METEO_LIVE_FREE_NO_KEY"))
+        self.assertIn("RETRACTABLE_ROOF_STATE_UNVERIFIED", wx[2])
+        self.assertNotIn("weather_total_adj", adj)
         bullpen = factor_status(stage, "bullpen")[0]
         self.assertEqual(bullpen[0], "NOT_WIRED")
+
+    def test_retractable_roof_espn_indoor_flag_does_not_claim_closed(self):
+        provider = free_models.PublicContext(NOW, getter=FakeGetter(mlb_mapping()))
+        fixture = provider.fixture(
+            "MLB", "Los Angeles Dodgers", "Milwaukee Brewers",
+            free_models.dt(KICKOFF_MLB))
+        self.assertIsNotNone(fixture)
+        _kickoff, competition = fixture
+        self.assertIs(competition["venue"]["indoor"], True)  # static ESPN flag
+        adjustment, state = provider.weather("MLB", competition, free_models.dt(KICKOFF_MLB))
+        self.assertEqual(adjustment, 0.0)
+        self.assertEqual(state, "RETRACTABLE_ROOF_STATE_UNVERIFIED")
 
     def test_pitcher_unconfirmed_blocks_game(self):
         mapping = mlb_mapping()
