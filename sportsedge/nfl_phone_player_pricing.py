@@ -123,7 +123,11 @@ def phone_nfl_player_rows(rows, *, now=None, getter=None):
         "status": "PUBLIC_NFL_PRIOR_GAMES_VERIFIED",
         "player_id": d["player_id"],
         "prior_games": d["prior_game_count"],
+        "prior_game_seasons": d.get("prior_game_seasons", []),
+        "prior_season_history_years": d.get("prior_season_history_years", []),
+        "history_finality_rule": d.get("history_finality_rule"),
         "stat_fields": d["explicit_stat_fields"],
         "schema_rejected_prior_events": d["schema_rejected_prior_events"],
+        "schema_rejected_prior_reasons": d.get("schema_rejected_prior_reasons", {}),
         "participation": "NOT_VERIFIED",
     } for d in cache.values() if isinstance(d, dict)]
