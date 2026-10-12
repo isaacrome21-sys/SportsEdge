@@ -636,8 +636,17 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
             "before pricing use"
             if _FREE_FACTORS_AVAILABLE else
             "PARK_FACTORS_NOT_WIRED: queued behind backtest bar"))
-        factors.append(_factor("umpire", NOT_WIRED, "NONE",
-                               "UMPIRE_NOT_WIRED: no stable free source"))
+        factors.append(_factor(
+            "umpire",
+            PENDING_VALIDATION if _FREE_FACTORS_AVAILABLE else NOT_WIRED,
+            "MLB_STATSAPI_OFFICIALS" if _FREE_FACTORS_AVAILABLE else "NONE",
+            "UMPIRE_ASSIGNMENT_HARNESS_GATED: home-plate umpire from MLB "
+            "StatsAPI schedule hydrate=officials (free, pregame, no key); "
+            "assignment verified and audit-visible; tendency pricing effect "
+            "inactive pending harness validation; missing assignment stays "
+            "unknown, never inferred from crew rotation"
+            if _FREE_FACTORS_AVAILABLE else
+            "UMPIRE_NOT_WIRED: no stable free source"))
         factors.append(_factor("opponent_adjusted_offense", NOT_WIRED, "NONE",
                                "WRCPLUS_OPPONENT_ADJUSTED_OFFENSE_NOT_WIRED"))
 

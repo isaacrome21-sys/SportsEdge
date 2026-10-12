@@ -242,7 +242,9 @@ def test_ingest_contract():
     e = ff.ingest_participation("NFL", "home", True, "Lamar Jackson")
     assert e["target"] == "HOME_MEAN" and e["value"] == -2.5 and e["verified"]
     e = ff.umpire_entry()
-    assert e["status"] == "NOT_WIRED" and e["kind"] == "none"
+    # Assignment wired (PENDING_VALIDATION), pricing effect inactive.
+    assert e["status"] == "PENDING_VALIDATION" and e["kind"] == "none"
+    assert e["verified"] is False and e["value"] is None
     # every registered entry point name resolves to a callable
     for name, sig in ff.INGEST_ENTRY_POINTS.items():
         fn = sig.split("(")[0]
