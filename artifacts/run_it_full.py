@@ -20,6 +20,7 @@ from sportsedge.mlb_phone_pitcher_pricing import phone_pitcher_rows, blocked
 from sportsedge.mlb_phone_batter_pricing import phone_batter_rows
 from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
 from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
+from sportsedge.prepricing.factor_ingestion import stage_games
 from datetime import datetime, timezone
 
 FIELDS = (
@@ -142,6 +143,26 @@ def audit_row(source, result):
     return out
 
 
+def _prepricing_blocked_row(line, stage, input_index):
+    """Fail-closed row for a game whose critical factor could not be verified."""
+    return {
+        "schema": "SPORTSEDGE_FREE_RESEARCH_V1",
+        "status": stage["block_reason"],
+        "sport": line.get("sport"),
+        "game": stage["game_label"],
+        "market": str(line.get("market") or "").upper(),
+        "reason": stage["block_detail"],
+        "research_only": True,
+        "prepricing_audit": {
+            "blocked": True,
+            "block_reason": stage["block_reason"],
+            "block_detail": stage["block_detail"],
+            "factors": stage["factors"],
+        },
+        "input_index": input_index,
+    }
+
+
 def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
              auto_context=True, min_ev=0.02, lane="A", allow_manual_context=False):
     """Separate real game, pitcher, and batter models, preserving original row order.
@@ -195,14 +216,50 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             props.append(line)
 
     if games:
-        card = engine.run({"lines":games},now=clock,as_of=as_of,historical=historical,
-                          getter=getter,auto_context=auto_context,min_ev=min_ev,
-                          lane=lane,allow_manual_context=allow_manual_context)
-        priced_games = card.get("evaluated_rows") or []
-        if len(priced_games) != len(games):
+        # Option 3: Prepricing adjustments stored separately from user context.
+        # Strip any user-supplied prepricing_adjustments (never trusted).
+        for line in games:
+            line.pop("prepricing_adjustments", None)
+        # Pre-pricing factor-ingestion stage: verified pulls BEFORE pricing.
+        stages = stage_games(
+            games, now=clock,
+            getter=getter if auto_context else (lambda url: None),
+            enforce_blocks=auto_context)
+        # Build separate prepricing_adjustments objects (not merged into context)
+        prepricing_by_index = {}
+        game_results = [None] * len(games)
+        clear_lines = []
+        clear_game_pos = []
+        for gpos, (line, st) in enumerate(zip(games, stages)):
+            if st["blocked"]:
+                game_results[gpos] = _prepricing_blocked_row(
+                    line, st, game_indices[gpos])
+                continue
+            # System-verified adjustments: separate object with provenance
+            # User-supplied context remains subject to allow_manual_context
+            prepricing_by_index[gpos] = {
+                "source": "SPORTSEDGE_PREPRICING_V1",
+                "timestamp_utc": clock.astimezone(timezone.utc).isoformat(),
+                "verification_status": "VERIFIED",
+                "adjustments": dict(st["adjustments"]) if isinstance(st.get("adjustments"), dict) else {},
+                "factors": list(st["factors"]) if isinstance(st.get("factors"), list) else [],
+            }
+            clear_lines.append(line)
+            clear_game_pos.append(gpos)
+        # Pass prepricing adjustments explicitly to the engine
+        # The engine applies them separately from user context (no double-count)
+        card = engine.run({"lines": clear_lines}, now=clock, as_of=as_of, historical=historical,
+                          getter=getter, auto_context=auto_context, min_ev=min_ev,
+                          lane=lane, allow_manual_context=allow_manual_context,
+                          prepricing_adjustments=[prepricing_by_index.get(gpos) for gpos in clear_game_pos])
+        priced = card.get("evaluated_rows") or []
+        if len(priced) != len(clear_lines):
             raise ValueError("GAME_EVALUATED_ROWS_INCOMPLETE")
-        for local, original in enumerate(game_indices):
-            priced_games[local]["input_index"] = original
+        for pos, gpos in enumerate(clear_game_pos):
+            priced[pos]["input_index"] = game_indices[gpos]
+            priced[pos]["prepricing_adjustments"] = prepricing_by_index[gpos]
+            game_results[gpos] = priced[pos]
+        priced_games = game_results
     else:
         priced_games = []
         card = {
