@@ -19,24 +19,26 @@ def row(**extra):
     return x
 
 
-def test_full_runner_keeps_research_edge_and_flag_unwired_factors():
+def test_full_runner_blocks_unverified_nfl_manual_card_and_flags_unwired_factors():
     result=full.run_full({"lines":[row()]}, now=NOW,auto_context=False)
     assert result["authority"]["official"] is False
     assert result["factor_coverage"]["coverage_is_not_validation"] is True
+    assert result["evaluated_rows"][0]["status"]=="BLOCKED_NFL_NO_VERIFIED_CONTEXT"
+    assert not result["edges"] and not result["independent_candidates"]
     f=result["factor_coverage"]["by_input_index"][0]["factors"]
     assert set(f)==set(full.FIELDS)
     assert f["coaching"]["status"]=="NOT_WIRED"
     assert f["matchups"]["status"]=="NOT_WIRED"
     assert f["rest_travel"]["status"]=="NOT_WIRED"
-    # Lane A (default, market-blind): market context explicitly not used.
-    assert f["market_context"]["status"]=="NOT_USED_LANE_A_INDEPENDENT"
+    assert f["market_context"]["status"]=="MISSING_UNVERIFIED"
     assert f["manual_context"]["status"]=="VERIFIED_PUBLIC_ONLY"
     assert f["injuries"]["status"]=="MISSING_UNVERIFIED"
-    # Lane B (explicitly requested): the anchored view is labeled as such.
+    # Choosing anchored Lane B cannot turn missing context into a candidate.
     anchored=full.run_full({"lines":[row()]}, now=NOW,auto_context=False,lane="B")
     fb=anchored["factor_coverage"]["by_input_index"][0]["factors"]
-    assert fb["market_context"]["status"]=="ANCHORED_UNVALIDATED_LANE_B"
-    assert anchored["evaluated_rows"][0]["pricing_lane"]=="LANE_B_ANCHORED"
+    assert fb["market_context"]["status"]=="MISSING_UNVERIFIED"
+    assert anchored["evaluated_rows"][0]["status"]=="BLOCKED_NFL_NO_VERIFIED_CONTEXT"
+    assert not anchored["lane_b_edges"]
 
 
 def test_unknown_injury_source_not_rebranded_injury_free():
@@ -164,11 +166,17 @@ def test_fixture_verified_rest_does_not_invent_pricing_effect():
     result=full.run_full({"lines":[row()]},now=NOW,getter=getter)
     assert result["summary"]["rows"]==1
     a=result["factor_coverage"]["by_input_index"][0]["factors"]
-    assert a["team_quality"]["status"]=="HEURISTIC_NOT_VALIDATED"
-    assert a["rest_travel"]["status"]=="SCHEDULE_REST_OBSERVED_NO_PRICE_EFFECT"
-    assert a["weather"]["status"]=="VERIFIED_INDOOR"
-    assert a["injuries"]["status"]=="HEURISTIC_NOT_VALIDATED"
-    assert all(abs(x["context"]["home_rating"])<10 for x in result["evaluated_rows"])
+    # One completed game is insufficient for the game-score model.
+    # The fact that rest and weather are independently observed must not
+    # permit a league-default 44-point total to become a ranked candidate.
+    assert result["evaluated_rows"][0]["status"] == "BLOCKED_PREPRICING_NFL_TEAM_HISTORY_UNVERIFIED"
+    assert a["team_quality"]["status"] == "MISSING_UNVERIFIED"
+    assert not result["edges"] and not result["independent_candidates"]
+    verified = result["prepricing_factor_audit"]["by_input_index"][0]
+    assert verified["blocked"] is True
+    assert verified["adjustments"] == {}
+    assert any(f["factor"] == "rest_schedule" and f["status"] == "USED"
+               for f in verified["factors"])
 
 
 def test_manual_mode_not_promoted_to_observed_team_history():
