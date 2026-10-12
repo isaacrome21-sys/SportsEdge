@@ -57,10 +57,16 @@ def test_prop_models_fail_closed_but_leave_traceable_factor_audit():
 def test_no_verified_fixture_rejects_and_audits_source_missing():
     r=full.run_full({"lines":[row()]},now=NOW,getter=lambda url: {})
     assert not r["edges"]
-    assert r["summary"]["status_counts"]["BLOCKED_CONTEXT_UNVERIFIED"]==1
+    # The pre-pricing stage fail-closes before the engine: an unverifiable
+    # fixture is a critical-factor miss, blocked with an explicit code.
+    assert r["summary"]["status_counts"]["BLOCKED_PREPRICING_FIXTURE_UNVERIFIED"]==1
     f=r["factor_coverage"]["by_input_index"][0]["factors"]
     assert f["weather"]["status"]=="MISSING_UNVERIFIED"
     assert f["team_quality"]["status"]=="MISSING_UNVERIFIED"
+    audit=r["prepricing_factor_audit"]["by_input_index"][0]
+    assert audit["blocked"] is True
+    assert audit["block_reason"]=="BLOCKED_PREPRICING_FIXTURE_UNVERIFIED"
+    assert audit["adjustments"]=={}
 
 
 def test_top_level_sport_and_two_rows_have_matching_audits():
