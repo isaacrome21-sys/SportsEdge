@@ -1,12 +1,67 @@
-"""Backtest harness package.
+"""Chronological out-of-sample backtest harness. Research only.
 
-On origin/main this package currently holds the Kaggle NBA baseline
-loader only; the full harness (runner, metrics, market_baseline, ...)
-lives on feat/backtest-harness-20261011 and feat/market-baseline-20261011
-and merges in separately. See
-sportsedge/backtest/kaggle_nba_baseline.py for the integration note.
+Isaac's bar (2026-10-11): every new factor must PROVE it improves
+chronological out-of-sample performance versus BOTH the existing model
+and a market baseline before entering production pricing. No factor is
+added on vibes.
+
+This package is the measurement foundation for that bar. It provides
+strict point-in-time train/test splitting (no lookahead), historical
+game-outcome collection from free public sources only, proper scoring
+metrics, a backtest runner, and a PASS/FAIL report.
+
+Market-baseline limitation: Isaac does not use the Odds API, so there is
+no complete historical market baseline. Archived or manually recorded
+closing prices may be supplied as the market baseline where they exist;
+everywhere else the baseline leg is explicitly flagged MISSING and the
+verdict is conditional. Market prices are never invented.
+
+All outputs are research_only. No betting authority, no staking.
 """
+from .splits import walk_forward_splits, fixed_split, Split, SplitError
+from .outcomes import (
+    OutcomeError,
+    fetch_football_scoreboard,
+    parse_completed_football_games,
+    fetch_mlb_schedule,
+    parse_completed_mlb_games,
+    settle_game,
+)
+from .metrics import (
+    MetricError,
+    brier_score,
+    log_loss,
+    calibration_bins,
+    hit_rate_at_thresholds,
+    summarize,
+)
+from .runner import RunnerError, run_backtest, compare_models
+from .report import ReportError, evaluate, to_markdown, to_json
+from .kaggle_nba_baseline import KaggleNbaBaseline
 
-from sportsedge.backtest.kaggle_nba_baseline import KaggleNbaBaseline
-
-__all__ = ["KaggleNbaBaseline"]
+__all__ = [
+    "Split",
+    "SplitError",
+    "walk_forward_splits",
+    "fixed_split",
+    "OutcomeError",
+    "fetch_football_scoreboard",
+    "parse_completed_football_games",
+    "fetch_mlb_schedule",
+    "parse_completed_mlb_games",
+    "settle_game",
+    "MetricError",
+    "brier_score",
+    "log_loss",
+    "calibration_bins",
+    "hit_rate_at_thresholds",
+    "summarize",
+    "RunnerError",
+    "run_backtest",
+    "compare_models",
+    "ReportError",
+    "evaluate",
+    "to_markdown",
+    "to_json",
+    "KaggleNbaBaseline",
+]
