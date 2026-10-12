@@ -262,19 +262,32 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             game_results[gpos] = priced[pos]
         priced_games = game_results
         # Option 3: Prepricing audit for transparency (separate from user context audit)
+        def _audit_entry(gpos):
+            pp = prepricing_by_index.get(gpos)
+            if pp is not None:
+                return {
+                    "input_index": game_indices[gpos],
+                    "blocked": False,
+                    "adjustments": pp.get("adjustments", {}),
+                    "verification_status": pp.get("verification_status", "NOT_APPLICABLE"),
+                    "factors": pp.get("factors", []),
+                }
+            # Blocked: copy reason/detail/factors from the blocked stage row
+            blocked_row = game_results[gpos] if gpos < len(game_results) else {}
+            pa = blocked_row.get("prepricing_audit", {}) if isinstance(blocked_row, dict) else {}
+            return {
+                "input_index": game_indices[gpos],
+                "blocked": True,
+                "block_reason": pa.get("block_reason", "UNKNOWN"),
+                "block_detail": pa.get("block_detail", ""),
+                "factors": pa.get("factors", []),
+                "adjustments": {},
+                "verification_status": "NOT_APPLICABLE",
+            }
         card["prepricing_factor_audit"] = {
             "schema": "SPORTSEDGE_PREPRICING_FACTOR_AUDIT_V1",
             "market_odds_as_features": "REJECTED_METHOD_NEVER_PRICED",
-            "by_input_index": [
-                {
-                    "input_index": game_indices[gpos],
-                    "blocked": prepricing_by_index.get(gpos) is None,
-                    "adjustments": prepricing_by_index.get(gpos, {}).get("adjustments", {}),
-                    "verification_status": prepricing_by_index.get(gpos, {}).get("verification_status", "NOT_APPLICABLE"),
-                    "factors": prepricing_by_index.get(gpos, {}).get("factors", []),
-                }
-                for gpos in range(len(games))
-            ],
+            "by_input_index": [_audit_entry(gpos) for gpos in range(len(games))],
         }
     else:
         priced_games = []

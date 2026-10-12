@@ -375,6 +375,10 @@ class PublicContext:
         rows, status = self.injury_rows(sport, team)
         if rows is None:
             return 0.0, "MISSING_OR_UNRECOGNIZED_SOURCE"
+        # Preserve historical unavailability: do not report a zero-injury
+        # heuristic when the injury feed itself is unavailable for as-of.
+        if status == "AS_OF_HISTORICAL_INJURIES_UNAVAILABLE":
+            return 0.0, "AS_OF_HISTORICAL_INJURIES_UNAVAILABLE"
         candidates = rows
         seen = set()
         loss = 0.0
