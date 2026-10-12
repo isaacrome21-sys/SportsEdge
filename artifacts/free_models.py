@@ -758,9 +758,9 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
         team_key = PublicContext.key(team_text)
         if not team_key:
             raise ValueError("TEAM_TOTAL_TEAM_REQUIRED")
-        if team_key in {"HOME", PublicContext.key(home)}:
+        if team_key in {"home", PublicContext.key(home)}:
             team_side, team_name = "HOME", home
-        elif team_key in {"AWAY", PublicContext.key(away)}:
+        elif team_key in {"away", PublicContext.key(away)}:
             team_side, team_name = "AWAY", away
         else:
             raise ValueError("TEAM_TOTAL_TEAM_NOT_IN_GAME")
@@ -1022,7 +1022,7 @@ def _pair_side(input_row, result):
     market = result.get("market")
     side = str(input_row.get("side") or input_row.get("selection") or "").strip()
     key = PublicContext.key
-    if market == "TOTAL":
+    if market in {"TOTAL", "TEAM_TOTAL"}:
         return side.upper() if side.upper() in ("OVER", "UNDER") else None
     game = str(result.get("game") or "")
     if " @ " not in game:
@@ -1065,8 +1065,9 @@ def _paired_book_context(rows, evaluated, index):
             return False
         if _pair_side(other_row, other) != expected_opposite:
             return False
-        if market == "TOTAL":
-            return other.get("line") == result.get("line")
+        if market in {"TOTAL", "TEAM_TOTAL"}:
+            return (other.get("line") == result.get("line")
+                    and (market != "TEAM_TOTAL" or other.get("team_side") == result.get("team_side")))
         if market == "SPREAD":
             try:
                 return abs(float(other["line"]) + float(result["line"])) < 1e-9
