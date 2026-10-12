@@ -97,6 +97,10 @@ def render_card(card, *, run_url="", intake_at=""):
     rows = card.get("edges") or []
     projections = card.get("independent_candidates") or []
     watchlist = card.get("independent_watchlist") or []
+    # Lane B is always computed and labeled separately; it is only a research
+    # hypothesis until it proves itself out-of-sample.
+    anchored_rows = card.get("lane_b_edges") or []
+    primary_lane = card.get("primary_lane") or "LANE_A_INDEPENDENT"
     summary = card.get("summary") or {}
     counts = summary.get("status_counts") or {}
     lines = [
@@ -107,7 +111,8 @@ def render_card(card, *, run_url="", intake_at=""):
         "Model adjustments and the 15% market-anchor weight have not been proven against out-of-sample closes.",
         "",
         f"Run snapshot: {safe(card.get('as_of_utc'))} · Issue last updated: {safe(intake_at)}",
-        f"Input rows: {int(summary.get('rows', 0))} · Research candidates at estimated EV ≥ {100*float(card.get('min_ev',0.02)):.1f}%: **{len(rows)}**",
+        f"Input rows: {int(summary.get('rows', 0))} · Primary pricing lane: {safe(primary_lane)} · "
+        f"Research candidates at estimated EV ≥ {100*float(card.get('min_ev',0.02)):.1f}%: **{len(rows)}**",
         "",
         _actionability_lines(summary),
         "",
@@ -144,17 +149,20 @@ def render_card(card, *, run_url="", intake_at=""):
         lines.append("- No additional priced model rows")
     lines += [
         "",
-        "**Conservative book-anchored research candidates (15% unfitted residual)**",
+        "**Conservative book-anchored research candidates (Lane B, 15% unfitted residual — hypothesis, not validated)**",
+        "Lane B shrinks Lane A toward the posted line; it has not proven out-of-sample superiority.",
         "",
-        "| Game | Research selection | DK | Estimate | Estimated EV |",
-        "| --- | --- | ---: | ---: | ---: |",
+        "| Game | Research selection | DK | Lane | Estimate | Estimated EV |",
+        "| --- | --- | ---: | --- | ---: | ---: |",
     ]
-    for row in rows[:12]:
+    for row in anchored_rows[:12]:
+        lane_b = (row.get("pricing_lanes") or {}).get("lane_b_anchored") or {}
         lines.append(f"| {safe(row.get('game'))} | **{safe(row.get('selection'))}** | "
-                     f"{fmt_price(row['odds_american'])} | {fmt_percent(row['estimate_p'])} | "
-                     f"{fmt_percent(row['ev_per_dollar'])}{_sample_tag(row)} |")
-    if not rows:
-        lines.append("| — | No eligible research candidates at supplied prices | — | — | — |")
+                     f"{fmt_price(row['odds_american'])} | {safe(lane_b.get('lane') or 'LANE_B_ANCHORED')} | "
+                     f"{fmt_percent(lane_b.get('estimate_p'))} | "
+                     f"{fmt_percent(lane_b.get('ev_per_dollar'))} |")
+    if not anchored_rows:
+        lines.append("| — | No eligible anchored research candidates at supplied prices | — | — | — | — |")
     # The game-only free runner is not the full prop-model card.
     # Keep the visible source/status receipts for each unpriced input.
     prop_picks = card.get("prop_candidates") or []
@@ -193,7 +201,7 @@ def render_card(card, *, run_url="", intake_at=""):
     if len(prop_missing) > 16:
         lines.append(f"- Plus {len(prop_missing)-16} further unpriced selections in the artifact.")
     lines += ["", "**Rejected or unpriced:**"]
-    excluded = [(k,v) for k,v in sorted(counts.items()) if k != "RESEARCH_EDGE"]
+    excluded = [(k,v) for k,v in sorted(counts.items()) if k != "RESEARCH_POSITIVE_EV_UNVALIDATED"]
     if excluded:
         lines.extend(f"- {safe(k)}: {int(v)}" for k,v in excluded)
     else:
