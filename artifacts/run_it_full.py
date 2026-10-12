@@ -20,6 +20,7 @@ from sportsedge.mlb_phone_pitcher_pricing import phone_pitcher_rows, blocked
 from sportsedge.mlb_phone_batter_pricing import phone_batter_rows
 from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
 from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
+from sportsedge.card_format import format_research_card
 from datetime import datetime, timezone
 
 FIELDS = (
@@ -285,6 +286,11 @@ def run_full(payload, *, now=None, getter=None, auto_context=True, min_ev=0.02):
         },
     }
     card["runner"]="RUN_IT_FULL_MLB_AND_NAMED_FOOTBALL_PLAYER_HISTORIES_V1"
+    # Presentation standard (Oct 2026, 4-account research adoption): one line
+    # per play — play + line + price -> modeled probability -> EV%, ranked by
+    # EV. Probability is stated before any status language. Zero-playable-edge
+    # cards are valid. Existing keys above are untouched.
+    card["card_format"] = format_research_card(card)
     return card
 
 
