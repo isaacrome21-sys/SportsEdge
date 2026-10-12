@@ -1,0 +1,26 @@
+{
+  "fit_window": {
+    "end": "2026-09-15",
+    "start": "2026-08-01"
+  },
+  "method": "nnls_zero_intercept",
+  "n_examples": 374,
+  "recorded_at": "2026-10-12T00:58:03.989362+00:00",
+  "schema_version": "statcast_search_csv_v2026-10-11",
+  "status": "VALIDATED_OUT_OF_SAMPLE",
+  "total_pitches": 161157,
+  "validation": {
+    "delta_xk_minus_raw": -0.00569,
+    "mean_poisson_logloss_raw_k": 1.6947,
+    "mean_poisson_logloss_xk": 1.68901,
+    "n_starts": 1078,
+    "verdict": "XK_WINS"
+  },
+  "weighted_r2_zero_intercept": 0.975755,
+  "weights": {
+    "called_strike": 0.083763,
+    "foul": 0.0,
+    "in_play": 0.0,
+    "whiff": 0.405325
+  }
+}
