@@ -911,6 +911,30 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
     if kickoff is None or kickoff <= now:
         return {"status": "BLOCKED_KICKOFF_UNVERIFIED", "game": f"{away} @ {home}", "sport": sport,
                 "context_notes": notes}
+    # Fixture binding alone is NOT proof of two team-specific NFL inputs.
+    # The league default (22 points/team) can otherwise masquerade as a huge
+    # game-specific total edge when both history feeds are empty. A reported
+    # empty/inaccessible injury feed is likewise not verified QB context.
+    # Manual-only (--no-fetch) runs remain diagnostic and are separately
+    # prevented from becoming card candidates below.
+    if sport == "NFL" and auto_context:
+        required = (
+            "HOME_HISTORY_COUNT:", "AWAY_HISTORY_COUNT:",
+            "HOME_INJURIES:HEURISTIC_OUT_DOUBTFUL_REPORTED_",
+            "AWAY_INJURIES:HEURISTIC_OUT_DOUBTFUL_REPORTED_",
+        )
+        missing = [marker.split(":", 1)[0] for marker in required
+                   if not any(str(note).startswith(marker) for note in notes)]
+        if missing:
+            return {
+                "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+                "game": f"{away} @ {home}", "sport": sport,
+                "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:" + ",".join(missing),
+                "context_notes": notes, "context_provenance": context_provenance,
+                "research_only": True,
+                "model_p_authority": False, "official_authority": False,
+                "staking_authority": False,
+            }
     base, _, _, hfa = PRIORS[sport]
     home_mean = base + hfa/2 + context["home_rating"]
     away_mean = base - hfa/2 + context["away_rating"]
@@ -1036,7 +1060,13 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
         else:
             selection += " ML"
     reason = None
-    if not quote_is_fresh(quote_freshness):
+    if not auto_context and sport == "NFL":
+        # The opt-in, no-fetch analysis mode may display a hypothetical
+        # projection for diagnostics. It MUST NOT elevate a league-prior
+        # estimate to a ranked current-game candidate.
+        status = "WATCH_NFL_NO_VERIFIED_CONTEXT"
+        reason = "NFL_MANUAL_ONLY_MODE_HAS_NO_VERIFIED_TEAM_FACTORS"
+    elif not quote_is_fresh(quote_freshness):
         # A stale (or unverifiable) screenshot is NOT an executable edge.
         status = "WATCH_QUOTE_NOT_CURRENT"
         reason = "QUOTE_NOT_FRESH:" + quote_freshness["code"]
