@@ -1060,16 +1060,17 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
         else:
             selection += " ML"
     reason = None
-    if not auto_context and sport == "NFL":
+    if not quote_is_fresh(quote_freshness):
+        # Preserve specific quote-freshness diagnosis ahead of the
+        # lower-priority no-fetch model-coverage blocker. Both prevent picks.
+        status = "WATCH_QUOTE_NOT_CURRENT"
+        reason = "QUOTE_NOT_FRESH:" + quote_freshness["code"]
+    elif not auto_context and sport == "NFL":
         # The opt-in, no-fetch analysis mode may display a hypothetical
         # projection for diagnostics. It MUST NOT elevate a league-prior
         # estimate to a ranked current-game candidate.
         status = "WATCH_NFL_NO_VERIFIED_CONTEXT"
         reason = "NFL_MANUAL_ONLY_MODE_HAS_NO_VERIFIED_TEAM_FACTORS"
-    elif not quote_is_fresh(quote_freshness):
-        # A stale (or unverifiable) screenshot is NOT an executable edge.
-        status = "WATCH_QUOTE_NOT_CURRENT"
-        reason = "QUOTE_NOT_FRESH:" + quote_freshness["code"]
     elif price < -165:
         status = "PRICE_CAP"
     elif primary["ev_per_dollar"] >= min_ev:
