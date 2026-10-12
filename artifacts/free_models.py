@@ -133,7 +133,7 @@ def poisson(lam, max_k=38):
     return [v / t for v in arr]
 
 
-def model_probability(sport, market, side, line, home_mean, away_mean):
+def model_probability(sport, market, side, line, home_mean, away_mean, team_totals_team=None):
     """Return win, push, loss; account for pushes on integer lines."""
     if sport == "MLB":
         a, b = poisson(home_mean), poisson(away_mean)
@@ -143,6 +143,13 @@ def model_probability(sport, market, side, line, home_mean, away_mean):
                 if market == "TOTAL":
                     score = h + aw
                     target = (score - line if side == "OVER" else line - score)
+                elif market == "TEAM_TOTALS":
+                    # Same verified team means as ML/total, but select one
+                    # team's count rather than the game count.
+                    if team_totals_team not in {"HOME", "AWAY"}:
+                        raise ValueError("TEAM_TOTALS_TEAM_UNVERIFIED")
+                    score = h if team_totals_team == "HOME" else aw
+                    target = score - line if side == "OVER" else line - score
                 else:
                     score = (h - aw if side == "HOME" else aw - h)
                     target = score + (line if market == "SPREAD" else 0)
@@ -719,8 +726,11 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
         raise ValueError("UNSUPPORTED_SPORT")
     market = str(row.get("market") or "").upper().strip()
     market = {"MONEYLINE": "ML", "H2H": "ML", "RUN_LINE": "SPREAD",
-              "GAME_TOTAL": "TOTAL", "TOTALS": "TOTAL"}.get(market, market)
-    if market not in {"ML", "SPREAD", "TOTAL"}:
+              "GAME_TOTAL": "TOTAL", "TOTALS": "TOTAL",
+              "TEAM_TOTAL": "TEAM_TOTALS"}.get(market, market)
+    if market not in {"ML", "SPREAD", "TOTAL", "TEAM_TOTALS"}:
+        raise ValueError("UNSUPPORTED_MARKET_NO_PROP_MODEL")
+    if market == "TEAM_TOTALS" and sport != "MLB":
         raise ValueError("UNSUPPORTED_MARKET_NO_PROP_MODEL")
     away = str(row.get("away") or "").strip()
     home = str(row.get("home") or "").strip()
@@ -736,14 +746,36 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
                 "game": f"{away} @ {home}", "reason": "IL_COLLEGE_EXCLUDED"}
     side_raw = str(row.get("side") or row.get("selection") or "").strip()
     side = {"OVER": "OVER", "UNDER": "UNDER", "HOME": "HOME", "AWAY": "AWAY"}.get(side_raw.upper())
-    if not side:
-        # Must identify either exact team; substring similarity is unsafe.
-        norm = PublicContext.key
-        side = "HOME" if norm(side_raw) == norm(home) else "AWAY" if norm(side_raw) == norm(away) else None
-    if side not in ({"OVER", "UNDER"} if market == "TOTAL" else {"HOME", "AWAY"}):
-        raise ValueError("SIDE_MARKET_MISMATCH")
+    team_totals_team = None
+    if market == "TEAM_TOTALS":
+        # The quote determines a SIDE and a TEAM; neither can be guessed.
+        # Support either "Milwaukee Brewers Over" as selection, or an
+        # explicit team with side="OVER". Team identity is exact only.
+        normalized = PublicContext.key
+        source_team = str(row.get("team") or "").strip()
+        tokenized = side_raw.rsplit(" ", 1)
+        if len(tokenized) == 2 and tokenized[-1].upper() in {"OVER", "UNDER"}:
+            if source_team and normalized(source_team) != normalized(tokenized[0]):
+                raise ValueError("TEAM_TOTALS_CONFLICTING_TEAM_IDENTITY")
+            source_team = tokenized[0]
+            side = tokenized[-1].upper()
+        if not source_team:
+            raise ValueError("TEAM_TOTALS_TEAM_REQUIRED")
+        if normalized(source_team) in {"home", normalized(home)}:
+            team_totals_team = "HOME"
+        elif normalized(source_team) in {"away", normalized(away)}:
+            team_totals_team = "AWAY"
+        if team_totals_team is None or side not in {"OVER", "UNDER"}:
+            raise ValueError("TEAM_TOTALS_TEAM_OR_SIDE_UNVERIFIED")
+    else:
+        if not side:
+            normalized = PublicContext.key
+            side = ("HOME" if normalized(side_raw) == normalized(home)
+                    else "AWAY" if normalized(side_raw) == normalized(away) else None)
+        if side not in ({"OVER", "UNDER"} if market == "TOTAL" else {"HOME", "AWAY"}):
+            raise ValueError("SIDE_MARKET_MISMATCH")
     line = None if market == "ML" else numeric(row.get("line"), "line")
-    if market == "TOTAL" and line <= 0:
+    if market in {"TOTAL", "TEAM_TOTALS"} and line <= 0:
         raise ValueError("TOTAL_LINE_INVALID")
     original_start = dt(row.get("commence_time") or row.get("kickoff"))
     if row.get("commence_time") or row.get("kickoff"):
@@ -858,7 +890,8 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
     # in the probability. This is a simple unvalidated league/form/injury
     # heuristic, not a proven independent model or validated probability. ----
     a_win, a_push = model_probability(
-        sport, market, side, line, home_mean, away_mean)
+        sport, market, side, line, home_mean, away_mean,
+        team_totals_team=team_totals_team)
     lane_a = _lane_view(
         LANE_A, a_win, a_push, home_mean, away_mean, dec,
         raw_total, raw_margin,
@@ -883,6 +916,11 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
         b_away_mean += shift
         anchor.update(market_total=line, raw_total=raw_total,
                       fair_total=anchored_total)
+    elif market == "TEAM_TOTALS":
+        # No trained market-anchor relationship for a team total. Leave
+        # independent pricing available, but do not misread team-total odds
+        # as full-game moneyline odds in Lane B.
+        lane_b_blocked = "LANE_B_TEAM_TOTALS_UNVALIDATED"
     elif market == "SPREAD":
         market_home_margin = -line if side == "HOME" else line
         anchored_margin = (market_home_margin
@@ -905,7 +943,8 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
             anchor.update(market_no_vig_p=p1 / (p1 + p2))
     if lane_b_blocked is None:
         b_win, b_push = model_probability(
-            sport, market, side, line, b_home_mean, b_away_mean)
+            sport, market, side, line, b_home_mean, b_away_mean,
+        team_totals_team=team_totals_team)
         if market == "ML":
             b_win = bounded(anchor["market_no_vig_p"]
                             + ANCHOR_WEIGHT * (b_win - anchor["market_no_vig_p"]),
@@ -932,13 +971,18 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
                 "research_only": True}
     primary = lane_a if lane == "A" else lane_b
     pricing_lane = primary["lane"]
-    selection = ("OVER" if side == "OVER" else "UNDER") if market == "TOTAL" else home if side == "HOME" else away
-    if market == "SPREAD":
-        selection += f" {line:+g}"
-    elif market == "TOTAL":
-        selection += f" {line:g}"
+    if market == "TEAM_TOTALS":
+        team_name = home if team_totals_team == "HOME" else away
+        selection = f"{team_name} {side} {line:g}"
     else:
-        selection += " ML"
+        selection = (("OVER" if side == "OVER" else "UNDER")
+                     if market == "TOTAL" else home if side == "HOME" else away)
+        if market == "SPREAD":
+            selection += f" {line:+g}"
+        elif market == "TOTAL":
+            selection += f" {line:g}"
+        else:
+            selection += " ML"
     reason = None
     if not quote_is_fresh(quote_freshness):
         # A stale (or unverifiable) screenshot is NOT an executable edge.
@@ -956,6 +1000,7 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
     result = {"schema": "SPORTSEDGE_FREE_RESEARCH_V1", "status": status, "sport": sport,
             "game": f"{away} @ {home}", "selection": selection, "market": market,
             "odds_american": int(price), "line": line, "kickoff_utc": kickoff.isoformat(),
+            "team_totals_team": team_totals_team if market == "TEAM_TOTALS" else None,
             "pricing_lane": pricing_lane,
             "pricing_lanes": {"lane_a_independent": lane_a,
                               "lane_b_anchored": lane_b},
@@ -988,8 +1033,12 @@ def _pair_side(input_row, result):
     market = result.get("market")
     side = str(input_row.get("side") or input_row.get("selection") or "").strip()
     key = PublicContext.key
-    if market == "TOTAL":
-        return side.upper() if side.upper() in ("OVER", "UNDER") else None
+    if market in {"TOTAL", "TEAM_TOTALS"}:
+        # Calculate has already verified the associated team identity.
+        return side.upper() if side.upper() in ("OVER", "UNDER") else (
+            side.rsplit(" ", 1)[-1].upper()
+            if market == "TEAM_TOTALS" and side.rsplit(" ", 1)[-1].upper() in {"OVER", "UNDER"}
+            else None)
     game = str(result.get("game") or "")
     if " @ " not in game:
         return None
@@ -1031,6 +1080,9 @@ def _paired_book_context(rows, evaluated, index):
             return False
         if _pair_side(other_row, other) != expected_opposite:
             return False
+        if market == "TEAM_TOTALS":
+            return (other.get("line") == result.get("line")
+                    and other.get("team_totals_team") == result.get("team_totals_team"))
         if market == "TOTAL":
             return other.get("line") == result.get("line")
         if market == "SPREAD":
