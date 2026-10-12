@@ -425,6 +425,18 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             "MLB_PITCHER_BATTER_AND_ESPN_NAMED_FOOTBALL_HISTORY_UNVALIDATED",
         },
     }
+    # Surface every catalog market on the same free phone research card.
+    # This is presentation ONLY: absent quotes and unsupported model families
+    # remain explicit blockers. No probabilities or quotes are synthesized.
+    if any(str((row.get("sport") or default_sport or "")).upper() == "MLB"
+           for row in rows):
+        from sportsedge.mlb_phone_full_board import phone_market_board
+        labeled_inputs = [
+            {**raw, "sport": str(raw.get("sport") or default_sport or "").upper()}
+            for raw in rows
+        ]
+        card["mlb_full_board"] = phone_market_board(labeled_inputs, evaluated)
+        card["summary"]["mlb_market_coverage"] = dict(card["mlb_full_board"]["input_coverage"])
     card["runner"]="RUN_IT_FULL_MLB_AND_NAMED_FOOTBALL_PLAYER_HISTORIES_V1"
     return card
 
