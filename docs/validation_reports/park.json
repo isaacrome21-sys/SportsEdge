@@ -1,0 +1,24 @@
+{
+  "factor": "park",
+  "n_fixtures": 2363,
+  "n_splits": 187,
+  "verdict": "FAIL",
+  "reasons": [
+    "BRIER_NOT_IMPROVED: candidate 0.2423 vs existing 0.2387"
+  ],
+  "existing": {
+    "n": 74948,
+    "brier": 0.2386902758405866,
+    "log_loss": 0.6944099542139867,
+    "mean_p": 0.4563741580421827,
+    "base_rate": 0.4916275284197043
+  },
+  "candidate": {
+    "n": 74948,
+    "brier": 0.24230202647297955,
+    "log_loss": 0.6925983562931715,
+    "mean_p": 0.4814951478208581,
+    "base_rate": 0.4994262688797566
+  },
+  "research_only": true
+}
