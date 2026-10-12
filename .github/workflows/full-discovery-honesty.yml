@@ -65,7 +65,9 @@ jobs:
           print(f'DEV_DEPENDENCY_CONTRACT_OK count={len(declared_dev)}')
           PY
       - name: Install frozen test dependencies
-        run: python -m pip install --disable-pip-version-check -r requirements-test.txt
+        run: |
+          python -m pip install --disable-pip-version-check -r requirements-test.txt
+          python -m pip install --force-reinstall --no-deps numpy==2.5.3
       - name: Compile repository Python
         run: python -m compileall -q sportsedge scripts tests
       - name: Run full pytest discovery
@@ -95,7 +97,9 @@ jobs:
           fi
           echo "PYTHON_CONTRACT_OK exact=$actual"
       - name: Install contracted discovery dependencies
-        run: python -m pip install --disable-pip-version-check -r requirements-test.txt
+        run: |
+          python -m pip install --disable-pip-version-check -r requirements-test.txt
+          python -m pip install --force-reinstall --no-deps numpy==2.5.3
       - name: Verify collection before and after floor resolver reorder
         shell: bash
         run: |
