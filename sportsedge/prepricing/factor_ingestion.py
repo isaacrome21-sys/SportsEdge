@@ -42,6 +42,16 @@ from artifacts.free_models import (
     PublicContext, bounded, declared_weather_total_adj, dt, numeric,
 )
 
+# Free factors module (harness-gated): provides park factors, rest/travel,
+# weather thresholds, key numbers. Marked PENDING_VALIDATION until the
+# backtest harness confirms predictive improvement.
+try:
+    from sportsedge import free_factors as _free_factors
+    _FREE_FACTORS_AVAILABLE = True
+except ImportError:
+    _free_factors = None
+    _FREE_FACTORS_AVAILABLE = False
+
 STATSAPI = "https://statsapi.mlb.com/api/v1"
 
 # Sourcing rule (Isaac): keyed APIs (odds, weather) run Actions-side ONLY via
@@ -146,14 +156,14 @@ SPORT_FACTORS = {
             "opponent_adjusted_offense"),
 }
 
-USED, MISSING, NOT_WIRED, NOT_APPLICABLE = (
-    "USED", "MISSING", "NOT_WIRED", "NOT_APPLICABLE")
+USED, MISSING, NOT_WIRED, NOT_APPLICABLE, PENDING_VALIDATION = (
+    "USED", "MISSING", "NOT_WIRED", "NOT_APPLICABLE", "PENDING_VALIDATION")
 
 
 @dataclass
 class FactorRecord:
     factor: str
-    status: str  # USED | MISSING | NOT_WIRED | NOT_APPLICABLE
+    status: str  # USED | MISSING | NOT_WIRED | NOT_APPLICABLE | PENDING_VALIDATION
     source: str
     reason: str
     adjustments: dict = field(default_factory=dict)
@@ -548,9 +558,15 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
                 f"HOME_REST_DAYS_{home_rest};AWAY_REST_DAYS_{away_rest};"
                 f"DECLARED_DIFF_ADJ_{adj}_NOT_CALIBRATED",
                 {"rest_diff_adj": adj}))
-        factors.append(_factor("travel", NOT_WIRED, "NONE",
-                               "TRAVEL_DISTANCE_NOT_WIRED: venue-history travel "
-                               "pipeline not built; rest days capture congestion only"))
+        factors.append(_factor(
+            "travel",
+            PENDING_VALIDATION if _FREE_FACTORS_AVAILABLE else NOT_WIRED,
+            "FREE_FACTORS_INGEST_TRAVEL" if _FREE_FACTORS_AVAILABLE else "NONE",
+            "TRAVEL_MILES_TZ_HARNESS_GATED: free_factors.ingest_travel "
+            "available; awaiting backtest validation before pricing use"
+            if _FREE_FACTORS_AVAILABLE else
+            "TRAVEL_DISTANCE_NOT_WIRED: venue-history travel "
+            "pipeline not built; rest days capture congestion only"))
     else:  # NBA
         home_rest = _rest_days(provider, sport, home_team, kickoff)
         away_rest = _rest_days(provider, sport, away_team, kickoff)
@@ -565,8 +581,14 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
                 "rest_back_to_back", USED, "ESPN_SCHEDULE_VERIFIED",
                 f"HOME_REST_DAYS_{home_rest};AWAY_REST_DAYS_{away_rest};"
                 f"BACK_TO_BACK_{b2b_flag};REST_ADJ_MANUAL_ONLY_NO_PRICE_EFFECT"))
-        factors.append(_factor("travel", NOT_WIRED, "NONE",
-                               "TRAVEL_DISTANCE_NOT_WIRED"))
+        factors.append(_factor(
+            "travel",
+            PENDING_VALIDATION if _FREE_FACTORS_AVAILABLE else NOT_WIRED,
+            "FREE_FACTORS_INGEST_TRAVEL" if _FREE_FACTORS_AVAILABLE else "NONE",
+            "TRAVEL_MILES_TZ_HARNESS_GATED: free_factors.ingest_travel "
+            "available; awaiting backtest validation before pricing use"
+            if _FREE_FACTORS_AVAILABLE else
+            "TRAVEL_DISTANCE_NOT_WIRED"))
 
     # -- engine-owned / backlog factors: stated honestly --------------------
     factors.append(_factor("team_strength_ratings", USED, "FREE_MODELS_ENGINE",
@@ -605,12 +627,39 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
         factors.append(_factor("bullpen", NOT_WIRED, "NONE",
                                "BULLPEN_WORKLOAD_NOT_WIRED: trailing-days IP/pitches "
                                "pipeline queued"))
-        factors.append(_factor("park_factors", NOT_WIRED, "NONE",
-                               "PARK_FACTORS_NOT_WIRED: queued behind backtest bar"))
+        factors.append(_factor(
+            "park_factors",
+            PENDING_VALIDATION if _FREE_FACTORS_AVAILABLE else NOT_WIRED,
+            "FREE_FACTORS_INGEST_MLB_PARK" if _FREE_FACTORS_AVAILABLE else "NONE",
+            "PARK_FACTORS_HARNESS_GATED: free_factors.ingest_mlb_park "
+            "(2022-2024 regressed) available; awaiting backtest validation "
+            "before pricing use"
+            if _FREE_FACTORS_AVAILABLE else
+            "PARK_FACTORS_NOT_WIRED: queued behind backtest bar"))
         factors.append(_factor("umpire", NOT_WIRED, "NONE",
                                "UMPIRE_NOT_WIRED: no stable free source"))
         factors.append(_factor("opponent_adjusted_offense", NOT_WIRED, "NONE",
                                "WRCPLUS_OPPONENT_ADJUSTED_OFFENSE_NOT_WIRED"))
+
+    # -- Free factors integration (harness-gated) ---------------------------
+    # sportsedge/free_factors.py provides declared, bounded factor
+    # calculations. They are wired into the audit as PENDING_VALIDATION:
+    # computed and visible, but NOT applied to pricing adjustments until
+    # the backtest harness confirms chronological out-of-sample improvement
+    # vs the existing model. See sportsedge/free_factors.py for the full
+    # factor registry and validation status.
+    if _FREE_FACTORS_AVAILABLE:
+        factors.append(_factor(
+            "free_factors_module", PENDING_VALIDATION,
+            "SPORTSEDGE_FREE_FACTORS_V1",
+            "HARNESS_GATED: park/rest/travel/weather/key_numbers available "
+            "via free_factors.ingest_*; awaiting backtest validation; "
+            "adjustments NOT applied to pricing"))
+    else:
+        factors.append(_factor(
+            "free_factors_module", NOT_WIRED, "NONE",
+            "FREE_FACTORS_MODULE_UNAVAILABLE: sportsedge.free_factors "
+            "could not be imported"))
 
     receipts.extend(provider.receipts)
     # Fail-closed: a blocked game must never carry partial adjustments.
