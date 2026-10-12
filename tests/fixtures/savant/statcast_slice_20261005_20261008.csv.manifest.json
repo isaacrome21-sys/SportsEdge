@@ -1,0 +1,9 @@
+{
+  "bytes": 1820588,
+  "note": "regression fixture; full 2652 real pitch rows from live probe 2026-10-11",
+  "recorded_at": "2026-10-12T00:39:58.453771+00:00",
+  "schema_version": "statcast_search_csv_v2026-10-11",
+  "sha256": "7e0e5001e3f8bff801d84c3cf896a471cf470ee3d48133737aed6036c9bdb3bd",
+  "window_end": "2026-10-08",
+  "window_start": "2026-10-05"
+}

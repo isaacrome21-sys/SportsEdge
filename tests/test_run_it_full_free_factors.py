@@ -13,7 +13,8 @@ KICKOFF="2026-10-11T20:25:00Z"
 
 def row(**extra):
     x={"sport":"NFL","away":"Detroit Lions","home":"Arizona Cardinals",
-       "market":"TOTAL","side":"UNDER","line":54.5,"odds":-102,"kickoff":KICKOFF}
+       "market":"TOTAL","side":"UNDER","line":54.5,"odds":-102,"kickoff":KICKOFF,
+       "quote_captured_at":"2026-10-11T12:59:00Z"}
     x.update(extra)
     return x
 
@@ -27,8 +28,15 @@ def test_full_runner_keeps_research_edge_and_flag_unwired_factors():
     assert f["coaching"]["status"]=="NOT_WIRED"
     assert f["matchups"]["status"]=="NOT_WIRED"
     assert f["rest_travel"]["status"]=="NOT_WIRED"
-    assert f["market_context"]["status"]=="HEURISTIC_NOT_VALIDATED"
+    # Lane A (default, market-blind): market context explicitly not used.
+    assert f["market_context"]["status"]=="NOT_USED_LANE_A_INDEPENDENT"
+    assert f["manual_context"]["status"]=="VERIFIED_PUBLIC_ONLY"
     assert f["injuries"]["status"]=="MISSING_UNVERIFIED"
+    # Lane B (explicitly requested): the anchored view is labeled as such.
+    anchored=full.run_full({"lines":[row()]}, now=NOW,auto_context=False,lane="B")
+    fb=anchored["factor_coverage"]["by_input_index"][0]["factors"]
+    assert fb["market_context"]["status"]=="ANCHORED_UNVALIDATED_LANE_B"
+    assert anchored["evaluated_rows"][0]["pricing_lane"]=="LANE_B_ANCHORED"
 
 
 def test_unknown_injury_source_not_rebranded_injury_free():
@@ -49,10 +57,16 @@ def test_prop_models_fail_closed_but_leave_traceable_factor_audit():
 def test_no_verified_fixture_rejects_and_audits_source_missing():
     r=full.run_full({"lines":[row()]},now=NOW,getter=lambda url: {})
     assert not r["edges"]
-    assert r["summary"]["status_counts"]["BLOCKED_CONTEXT_UNVERIFIED"]==1
+    # The pre-pricing stage fail-closes before the engine: an unverifiable
+    # fixture is a critical-factor miss, blocked with an explicit code.
+    assert r["summary"]["status_counts"]["BLOCKED_PREPRICING_FIXTURE_UNVERIFIED"]==1
     f=r["factor_coverage"]["by_input_index"][0]["factors"]
     assert f["weather"]["status"]=="MISSING_UNVERIFIED"
     assert f["team_quality"]["status"]=="MISSING_UNVERIFIED"
+    audit=r["prepricing_factor_audit"]["by_input_index"][0]
+    assert audit["blocked"] is True
+    assert audit["block_reason"]=="BLOCKED_PREPRICING_FIXTURE_UNVERIFIED"
+    assert audit["adjustments"]=={}
 
 
 def test_top_level_sport_and_two_rows_have_matching_audits():

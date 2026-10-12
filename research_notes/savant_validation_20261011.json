@@ -1,0 +1,151 @@
+{
+  "generated_at": "2026-10-12T00:59:08.509626+00:00",
+  "notes": [
+    "No market baseline: no odds data; baseline leg MISSING by design.",
+    "Books-shade-overs observation NOT used anywhere (eval-only).",
+    "Starter fallback (actual most-pitches arm) used when schedule probablePitcher missing; quality signal strictly train-window."
+  ],
+  "validation_a_xk_vs_raw_k": {
+    "delta_xk_minus_raw": -0.00569,
+    "mean_poisson_logloss_raw_k": 1.6947,
+    "mean_poisson_logloss_xk": 1.68901,
+    "n_starts": 1078,
+    "verdict": "XK_WINS"
+  },
+  "validation_b_savant_vs_boxscore": {
+    "baseline_status": "MISSING",
+    "n_fixtures": 167,
+    "summary": {
+      "boxscore_only/ML": {
+        "brier": 0.24343,
+        "log_loss": 0.68,
+        "n": 167
+      },
+      "boxscore_only/TOTAL_8.5": {
+        "brier": 0.25507,
+        "log_loss": 0.70402,
+        "n": 167
+      },
+      "savant_augmented/ML": {
+        "brier": 0.24191,
+        "log_loss": 0.67987,
+        "n": 167
+      },
+      "savant_augmented/TOTAL_8.5": {
+        "brier": 0.31396,
+        "log_loss": 0.86046,
+        "n": 167
+      }
+    },
+    "verdicts": {
+      "ML": {
+        "brier_delta_savant_minus_box": -0.00152,
+        "logloss_delta_savant_minus_box": -0.00013,
+        "verdict": "SAVANT_WINS"
+      },
+      "TOTAL_8.5": {
+        "brier_delta_savant_minus_box": 0.05889,
+        "logloss_delta_savant_minus_box": 0.15644,
+        "verdict": "BOX_WINS"
+      }
+    }
+  },
+  "validation_c_hr_model_vs_naive": {
+    "brier_delta_model_minus_base": 0.00026,
+    "logloss_delta_model_minus_base": 0.00561,
+    "model": {
+      "base_rate": 0.0993,
+      "brier": 0.0907,
+      "log_loss": 0.32884,
+      "mean_p": 0.1248
+    },
+    "n_batter_games": 1772,
+    "naive_baseline": {
+      "brier": 0.09045,
+      "log_loss": 0.32324
+    },
+    "skipped": {
+      "batter_history_insufficient": 553,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=103": 8,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=104": 8,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=105": 2,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=106": 4,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=107": 13,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=109": 5,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=11": 18,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=110": 2,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=112": 13,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=114": 6,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=115": 10,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=116": 21,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=117": 2,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=118": 2,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=122": 16,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=125": 18,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=126": 10,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=13": 15,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=131": 19,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=134": 15,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=135": 2,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=136": 13,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=137": 23,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=138": 4,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=142": 19,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=144": 1,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=145": 9,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=146": 5,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=147": 7,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=148": 2,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=149": 18,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=16": 10,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=20": 23,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=23": 25,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=24": 11,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=26": 7,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=3": 7,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=32": 8,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=34": 45,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=35": 8,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=37": 9,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=38": 8,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=4": 6,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=40": 18,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=44": 19,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=46": 21,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=58": 8,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=59": 15,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=60": 46,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=62": 16,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=64": 2,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=65": 3,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=66": 20,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=7": 8,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=72": 18,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=73": 35,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=77": 24,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=8": 7,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=81": 18,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=90": 10,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=93": 17,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=94": 17,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=95": 23,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=96": 33,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=97": 23,
+      "model_blocked:HR_PITCHER_SAMPLE_TOO_SMALL:bf=98": 10,
+      "park_factor_missing": 6,
+      "pitcher_hand_unknown": 100
+    },
+    "status": "AVAILABLE",
+    "verdict": "BASELINE_WINS"
+  },
+  "windows": {
+    "test": [
+      "2026-09-16",
+      "2026-09-30"
+    ],
+    "train": [
+      "2026-08-01",
+      "2026-09-15"
+    ]
+  }
+}
