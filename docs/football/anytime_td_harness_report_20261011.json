@@ -1,0 +1,28 @@
+{
+  "baseline": {
+    "status": "MISSING",
+    "summary": {
+      "n": 0
+    }
+  },
+  "candidate": {
+    "base_rate": 0.21256544502617802,
+    "brier": 0.15805455883593453,
+    "log_loss": 0.4986951310693384,
+    "mean_p": 0.15600978532799503,
+    "n": 955
+  },
+  "existing": {
+    "base_rate": 0.21256544502617802,
+    "brier": 0.1663178005333958,
+    "log_loss": 0.5140982470395117,
+    "mean_p": 0.17992302441758912,
+    "n": 955
+  },
+  "min_n": 30,
+  "reasons": [
+    "MARKET_BASELINE_MISSING: no archived market prices; the market-baseline leg of Isaac's bar could not be checked. Do not promote on this verdict alone."
+  ],
+  "research_only": true,
+  "verdict": "CONDITIONAL_PASS"
+}
