@@ -14,6 +14,9 @@ from .research_three_sport_bridge import price_three_sport_research
 BATTER_MARKETS = frozenset({
     "BATTER_HITS", "BATTER_TOTAL_BASES", "BATTER_RBIS", "BATTER_RUNS",
     "BATTER_HRS", "BATTER_HOME_RUNS", "BATTER_STOLEN_BASES",
+    "BATTER_BB", "BATTER_WALKS", "BATTER_K", "BATTER_STRIKEOUTS",
+    "BATTER_SINGLES", "SINGLES", "BATTER_DOUBLES", "DOUBLES",
+    "HITS_RUNS_RBIS", "H_R_RBI",
 })
 
 

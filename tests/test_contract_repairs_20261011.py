@@ -62,6 +62,11 @@ def test_conflicting_override_never_silently_replaces_verified_factors():
     def getter(url):
         if "scoreboard?" in url:
             return {"events": []}
+        # Fixture recovery may independently request an NFL team index
+        # before attempting a team-schedule fallback. No matching teams
+        # means there is still NO verified fixture in this negative test.
+        if url == "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams?limit=500":
+            return {"sports": []}
         raise AssertionError("unexpected " + url)
     c = model.run(
         {"sport": "NFL", "lines": [dict(row(), context={"home_rating": 5.0},

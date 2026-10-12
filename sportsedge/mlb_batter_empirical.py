@@ -12,6 +12,9 @@ from typing import Any, Mapping, Sequence
 BATTER_MARKETS = frozenset({
     "BATTER_HITS", "BATTER_TOTAL_BASES", "BATTER_RBIS", "BATTER_RUNS",
     "BATTER_HRS", "BATTER_HOME_RUNS", "BATTER_STOLEN_BASES",
+    "BATTER_BB", "BATTER_WALKS", "BATTER_K", "BATTER_STRIKEOUTS",
+    "BATTER_SINGLES", "SINGLES", "BATTER_DOUBLES", "DOUBLES",
+    "HITS_RUNS_RBIS", "H_R_RBI",
 })
 _FIELD = {
     "BATTER_HITS": "hits",
@@ -21,6 +24,11 @@ _FIELD = {
     "BATTER_HRS": "home_runs",
     "BATTER_HOME_RUNS": "home_runs",
     "BATTER_STOLEN_BASES": "stolen_bases",
+    "BATTER_BB": "walks", "BATTER_WALKS": "walks",
+    "BATTER_K": "strikeouts", "BATTER_STRIKEOUTS": "strikeouts",
+    "BATTER_SINGLES": "singles", "SINGLES": "singles",
+    "BATTER_DOUBLES": "doubles", "DOUBLES": "doubles",
+    "HITS_RUNS_RBIS": "hits_runs_rbis", "H_R_RBI": "hits_runs_rbis",
 }
 
 

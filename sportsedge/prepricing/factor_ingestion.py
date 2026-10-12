@@ -52,6 +52,21 @@ except ImportError:
     _free_factors = None
     _FREE_FACTORS_AVAILABLE = False
 
+# A module import establishes only a potentially usable source path, NEVER
+# proof of a game-specific, point-in-time sample or predictive validation.
+try:
+    from sportsedge import mlb_bullpen_workload_source as _bullpen_source
+    _BULLPEN_AVAILABLE = True
+except ImportError:
+    _bullpen_source = None
+    _BULLPEN_AVAILABLE = False
+try:
+    from sportsedge import mlb_savant_features as _savant_source
+    _SAVANT_AVAILABLE = True
+except ImportError:
+    _savant_source = None
+    _SAVANT_AVAILABLE = False
+
 STATSAPI = "https://statsapi.mlb.com/api/v1"
 
 # Sourcing rule (Isaac): keyed APIs (odds, weather) run Actions-side ONLY via
@@ -245,18 +260,36 @@ def fetch_probable_pitchers(fetch, game_date):
     return games
 
 
-def match_scheduled_game(games, home, away):
-    """Bind exactly one scheduled game by exact team-abbreviation match."""
+def match_scheduled_game(games, home, away, kickoff=None):
+    """Require unique two-team identity and, when known, exact pregame time.
+
+    ESPN and StatsAPI sometimes use different club abbreviations; compare
+    independently sourced full names as well. Date alone never selects a
+    doubleheader or the adjacent UTC-date schedule.
+    """
     key = PublicContext.key
-    matches = []
+    def same(official, wanted):
+        if not isinstance(official, dict):
+            return False
+        abbreviation = key(official.get("abbreviation") or "")
+        name = key(wanted.get("name") or "")
+        return ((abbreviation and abbreviation == key(wanted.get("abbr") or "")) or
+                (name and key(official.get("name") or "") == name))
+    matches = {}
     for game in games:
+        if not isinstance(game, dict) or not game.get("gamePk"):
+            continue
         teams = game.get("teams") or {}
         gh = ((teams.get("home") or {}).get("team") or {})
         ga = ((teams.get("away") or {}).get("team") or {})
-        if (key(gh.get("abbreviation") or "") == key(home.get("abbr") or "") and
-                key(ga.get("abbreviation") or "") == key(away.get("abbr") or "")):
-            matches.append(game)
-    return matches[0] if len(matches) == 1 else None
+        if not (same(gh, home) and same(ga, away)):
+            continue
+        if kickoff is not None:
+            actual = dt(game.get("gameDate"))
+            if actual is None or abs((actual - kickoff).total_seconds()) > 900:
+                continue
+        matches[str(game["gamePk"])] = game
+    return next(iter(matches.values())) if len(matches) == 1 else None
 
 
 def fetch_pitcher_season_line(fetch, pitcher_id, season):
@@ -300,7 +333,7 @@ def starter_suppression_adjustment(era, ip, gs):
 
 
 def mlb_pitcher_adjustments(fetch, *, game_date, home, away, season,
-                            stats_fetch=None, allow_completed=False):
+                            stats_fetch=None, allow_completed=False, kickoff=None):
     """Verified probable-pitcher adjustments for one MLB game.
 
     Returns (adjustments, factors, blocked, block_detail). ``home``/``away``
@@ -312,8 +345,23 @@ def mlb_pitcher_adjustments(fetch, *, game_date, home, away, season,
     """
     stats_fetch = stats_fetch or fetch_pitcher_season_line
     factors = []
-    games = fetch_probable_pitchers(fetch, game_date)
-    game = match_scheduled_game(games, home, away)
+    # A 7 PM Central game may begin at 00:00 UTC on the NEXT date.
+    # Fetch the neighboring schedule dates and bind by the verified start,
+    # not by an inferred UTC calendar day. Deduplicate repeated gamePk.
+    from datetime import timedelta
+    games_by_pk = {}
+    offsets = (-1, 0, 1) if kickoff is not None else (0,)
+    for offset in offsets:
+        # Missing adjacent-date payloads are unavailable, not fabricated
+        # empty games. The canonical provider.fetch records source failures.
+        try:
+            candidates = fetch_probable_pitchers(fetch, game_date + timedelta(days=offset))
+        except (OSError, TimeoutError, ValueError, TypeError):
+            continue
+        for candidate in candidates:
+            if candidate.get("gamePk"):
+                games_by_pk[str(candidate["gamePk"])] = candidate
+    game = match_scheduled_game(list(games_by_pk.values()), home, away, kickoff)
     if game is None:
         reason = "NO_UNIQUE_STATSAPI_SCHEDULE_MATCH_FOR_TEAMS_ON_DATE"
         factors.append(_factor("starting_pitcher", MISSING,
@@ -530,7 +578,7 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
             provider.fetch, game_date=kickoff.date(),
             home={"abbr": home_abbr, "name": home_name},
             away={"abbr": away_abbr, "name": away_name},
-            season=kickoff.year)
+            season=kickoff.year, kickoff=kickoff)
         factors.extend(pfactors)
         if pblocked:
             adjustments = {k: v for k, v in adjustments.items()
@@ -602,9 +650,16 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
                            "no venue-specific coefficient"))
     factors.append(_factor("pace_tempo", NOT_WIRED, "NONE",
                            "PACE_TEMPO_NOT_WIRED"))
-    factors.append(_factor("lineups_usage", NOT_WIRED, "NONE",
-                           "PROJECTED_LINEUPS_USAGE_NOT_WIRED: MLB verified "
-                           "batting order exists only in the batter-prop path"))
+    if sport == "MLB":
+        factors.append(_factor(
+            "lineups_usage", PENDING_VALIDATION,
+            "MLB_BATTER_LINEUP_VERIFICATION_PATH",
+            "MLB_BATTER_PROP_LINEUP_PATH_EXISTS; "
+            "THIS_GAME_LINEUP_NOT_VERIFIED_BY_PREPRICING; "
+            "GAME_LEVEL_PRICING_EFFECT_ZERO_PENDING_CHRONOLOGICAL_VALIDATION"))
+    else:
+        factors.append(_factor("lineups_usage", NOT_WIRED, "NONE",
+                               "PROJECTED_LINEUPS_USAGE_NOT_WIRED"))
     factors.append(_factor("advanced_metrics", NOT_WIRED, "NONE",
                            "EPA_DVOA_STATCAST_NEXTGEN_NOT_WIRED"))
     factors.append(_factor("situational", NOT_WIRED, "NONE",
@@ -624,9 +679,20 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
         factors.append(_factor("four_factors", NOT_WIRED, "NONE",
                                "ORtg_DRtg_FOUR_FACTORS_NOT_WIRED"))
     elif sport == "MLB":
-        factors.append(_factor("bullpen", NOT_WIRED, "NONE",
-                               "BULLPEN_WORKLOAD_NOT_WIRED: trailing-days IP/pitches "
-                               "pipeline queued"))
+        factors.append(_factor(
+            "bullpen", PENDING_VALIDATION if _BULLPEN_AVAILABLE else NOT_WIRED,
+            "MLB_STATSAPI_BULLPEN_SOURCE_PATH" if _BULLPEN_AVAILABLE else "NONE",
+            "SOURCE_MODULE_AVAILABLE_NOT_GAME_VERIFIED: prior-game workload collector; "
+            "no sample fetched by this prepricing stage; zero pricing impact; "
+            "chronological validation pending"
+            if _BULLPEN_AVAILABLE else "BULLPEN_SOURCE_UNAVAILABLE"))
+        factors.append(_factor(
+            "statcast", PENDING_VALIDATION if _SAVANT_AVAILABLE else NOT_WIRED,
+            "BASEBALL_SAVANT_SOURCE_PATH" if _SAVANT_AVAILABLE else "NONE",
+            "SOURCE_MODULE_AVAILABLE_NOT_GAME_VERIFIED: Savant metrics collector; "
+            "no sample fetched by this prepricing stage; zero pricing impact; "
+            "chronological validation pending"
+            if _SAVANT_AVAILABLE else "STATCAST_SOURCE_UNAVAILABLE"))
         factors.append(_factor(
             "park_factors",
             PENDING_VALIDATION if _FREE_FACTORS_AVAILABLE else NOT_WIRED,

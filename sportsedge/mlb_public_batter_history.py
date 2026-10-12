@@ -205,6 +205,23 @@ class MLBBatterPublicSource:
                     "stolen_bases": _int(data_row["stolenBases"], "STOLEN_BASES"),
                     "plate_appearances": pa,
                 }
+                # Preserve the historical input pool for existing batter
+                # markets when the API omits a newly required stat. A missing
+                # optional field stays MISSING (never silently treated as 0);
+                # the new-market pricer then fails closed on that game log.
+                for raw_field, output_field in (
+                    ("baseOnBalls", "walks"), ("strikeOuts", "strikeouts"),
+                    ("doubles", "doubles"), ("triples", "triples"),
+                ):
+                    if raw_field in data_row:
+                        stats[output_field] = _int(data_row[raw_field], output_field.upper())
+                if "doubles" in stats and "triples" in stats:
+                    singles = (stats["hits"] - stats["doubles"]
+                               - stats["triples"] - stats["home_runs"])
+                    if singles < 0:
+                        raise MissingMLBBatterHistory("INCONSISTENT_EXTRA_BASE_HIT_COUNTS")
+                    stats["singles"] = singles
+                stats["hits_runs_rbis"] = stats["hits"] + stats["runs"] + stats["rbi"]
                 hist.append((when, game_id, stats))
             except (ValueError, KeyError, TypeError, MissingMLBBatterHistory):
                 continue
