@@ -758,6 +758,27 @@ def _lane_view(lane, win, push, home_mean, away_mean, dec, raw_total,
     return view
 
 
+def _missing_nfl_context(notes):
+    """Check both per-team histories and structurally bound injury feeds.
+
+    A fixture, nonzero home advantage, or an empty injury list is not a
+    substitute for observed team performance. The injury feed establishes
+    only available report structure, not a confirmed starting quarterback.
+    """
+    missing = []
+    for side in ("HOME", "AWAY"):
+        counts = [item.partition(":")[2] for item in notes
+                  if isinstance(item, str)
+                  and item.startswith(side + "_HISTORY_COUNT:")]
+        if len(counts) != 1 or not counts[0].isdigit() or int(counts[0]) < 4:
+            missing.append(side + "_VERIFIED_TEAM_HISTORY_LT_4")
+        if not any(isinstance(item, str) and
+                   item.startswith(side + "_INJURIES:HEURISTIC_OUT_DOUBTFUL_REPORTED_")
+                   for item in notes):
+            missing.append(side + "_INJURY_SOURCE_UNVERIFIED")
+    return missing
+
+
 def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
               lane="A", allow_manual_context=False, prepricing_adjustments=None):
     """Price one game row in two labeled lanes.
@@ -911,6 +932,17 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
     if kickoff is None or kickoff <= now:
         return {"status": "BLOCKED_KICKOFF_UNVERIFIED", "game": f"{away} @ {home}", "sport": sport,
                 "context_notes": notes}
+    # Do not let a successful fixture fetch quietly produce a league-prior
+    # NFL score when no team-specific data was fetched. Applied to the
+    # standalone game engine as well as the phone RUN IT prepricing path.
+    if sport == "NFL" and auto_context:
+        missing = _missing_nfl_context(notes)
+        if missing:
+            return {"status": "BLOCKED_NFL_TEAM_CONTEXT_UNVERIFIED",
+                    "game": f"{away} @ {home}", "sport": sport,
+                    "reason": "NFL_CRITICAL_CONTEXT_REQUIRED:" + ",".join(missing),
+                    "context_notes": notes, "research_only": True,
+                    "validated_profitability": False}
     base, _, _, hfa = PRIORS[sport]
     home_mean = base + hfa/2 + context["home_rating"]
     away_mean = base - hfa/2 + context["away_rating"]
