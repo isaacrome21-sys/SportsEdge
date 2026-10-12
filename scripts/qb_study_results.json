@@ -1,0 +1,23 @@
+{
+  "fit": {
+    "n": 599,
+    "slope": 0.11756092102126921,
+    "intercept": -0.013610037717785572,
+    "mean_resid": -0.5818772027453163,
+    "gap_mean": -4.833810079836985,
+    "gap_sd": 12.667683199972515,
+    "resid_sd": 10.032306904094128
+  },
+  "eval": {
+    "n": 533,
+    "no_adjustment_mse": 90.48196998123828,
+    "declared_-3.0_mse": 96.26358348968105,
+    "calibrated_constant_mse": 90.19631581729278,
+    "per_qb_value_mse": 87.4449592866902,
+    "n_both_rated": 312,
+    "rated_no_adjustment_mse": 87.13528846153847,
+    "rated_declared_-3.0_mse": 93.08721153846153,
+    "rated_calibrated_constant_mse": 86.88266738269566,
+    "rated_per_qb_value_mse": 83.83890661819484
+  }
+}
