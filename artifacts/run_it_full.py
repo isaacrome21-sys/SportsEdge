@@ -39,7 +39,8 @@ def audit_row(source, result):
     sport = str(source.get("sport") or "").upper()
     market = str(source.get("market") or "").upper()
     market = {"MONEYLINE": "ML", "H2H": "ML", "RUN_LINE": "SPREAD",
-              "GAME_TOTAL": "TOTAL", "TOTALS": "TOTAL"}.get(market, market)
+              "GAME_TOTAL": "TOTAL", "TOTALS": "TOTAL",
+              "TEAM_TOTALS": "TEAM_TOTAL"}.get(market, market)
     context = result.get("context") or {}
     notes = [str(x).upper() for x in result.get("context_notes") or []]
     n = " ".join(notes)
@@ -81,7 +82,7 @@ def audit_row(source, result):
                           "detail": "Short prior-game scoring trend; MLB form subsumed into rating"}
     out["matchups"]["detail"] = "No independently estimated player-vs-coverage, trenches, style or opponent fit"
     out["coaching"]["detail"] = "No independently estimated coaching, scheme or motivation effect"
-    out["key_numbers"] = {"status": "PUSH_AWARE_ONLY" if market in ("SPREAD", "TOTAL") and has else MISSING,
+    out["key_numbers"] = {"status": "PUSH_AWARE_ONLY" if market in ("SPREAD", "TOTAL", "TEAM_TOTAL") and has else MISSING,
                           "detail": "Integer push refund modeled; separate NFL 3/7 distribution not trained"}
     out["market_context"] = {"status": HEURISTIC if result.get("market_anchor") else MISSING,
                              "detail": "15% unfitted residual anchored to supplied DK line, no contemporaneous sharp reference"}
@@ -127,7 +128,7 @@ def audit_row(source, result):
     }
     out["sport_specific"] = {"status": "PARTIAL_HEURISTIC" if has else MISSING,
                               "detail": sport_specific.get(sport, "Unsupported sport")}
-    if market not in ("ML", "SPREAD", "TOTAL"):
+    if market not in ("ML", "SPREAD", "TOTAL", "TEAM_TOTAL"):
         src = result.get("source") or ""
         if src in {"FREE_MLB_STATSAPI_GAMELOG", "FREE_MLB_STATSAPI_BATTER_GAMELOG",
                    "FREE_MLB_STATSAPI_LINESCORE",
@@ -193,7 +194,8 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         line["sport"] = str(line.get("sport") or default_sport or "").upper()
         market = str(line.get("market") or "").upper().strip()
         market = {"MONEYLINE":"ML","H2H":"ML","RUN_LINE":"SPREAD",
-                  "GAME_TOTAL":"TOTAL","TOTALS":"TOTAL"}.get(market,market)
+                  "GAME_TOTAL":"TOTAL","TOTALS":"TOTAL",
+                  "TEAM_TOTALS":"TEAM_TOTAL"}.get(market,market)
         if line["sport"] in {"NFL", "CFB"}:
             market = {
                 "PASS_YARDS":"PLAYER_PASSING_YARDS",
@@ -211,7 +213,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "RECEPTIONS":"PLAYER_RECEPTIONS",
             }.get(market,market)
             line["market"] = market
-        if market in {"ML","SPREAD","TOTAL"}:
+        if market in {"ML","SPREAD","TOTAL","TEAM_TOTAL"}:
             game_indices.append(i)
             games.append(line)
         else:
