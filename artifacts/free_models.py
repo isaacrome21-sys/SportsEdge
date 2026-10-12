@@ -1071,6 +1071,16 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
         # estimate to a ranked current-game candidate.
         status = "WATCH_NFL_NO_VERIFIED_CONTEXT"
         reason = "NFL_MANUAL_ONLY_MODE_HAS_NO_VERIFIED_TEAM_FACTORS"
+    elif sport == "NFL" and market == "TOTAL":
+        # This heuristic starts each NFL club at 22 points and incorporates
+        # previous games only through bounded point DIFFERENTIALS and form.
+        # A four-game ESPN history count does not prove an absolute offense /
+        # opponent-defense total scoring expectation. Bills/Rams 54.5 exposed
+        # the failure: a 44.15 prior-driven mean generated a fake +54% EV.
+        # Both independent and anchored totals remain diagnostic until an
+        # exact-production, PIT-safe NFL total model is tested vs closes.
+        status = "WATCH_NFL_TOTAL_PRIOR_ONLY"
+        reason = "NFL_ABSOLUTE_SCORING_RATE_MODEL_MISSING:22_PTS_PER_TEAM_PLUS_MARGIN_FORM_ONLY"
     elif price < -165:
         status = "PRICE_CAP"
     elif primary["ev_per_dollar"] >= min_ev:
@@ -1314,7 +1324,8 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
         projection = row.get("independent_projection")
         if not isinstance(projection, dict):
             continue
-        if row.get("status") == "WATCH_NFL_NO_VERIFIED_CONTEXT":
+        if row.get("status") in {"WATCH_NFL_NO_VERIFIED_CONTEXT",
+                                 "WATCH_NFL_TOTAL_PRIOR_ONLY"}:
             watchlist.append(row)
             continue
         # Repair 3: a stale quote cannot support a research candidate, even
@@ -1340,7 +1351,8 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
     # card) can evaluate the anchored hypothesis separately from Lane A.
     lane_b_edges = []
     for r in all_rows:
-        if r.get("status") == "WATCH_NFL_NO_VERIFIED_CONTEXT":
+        if r.get("status") in {"WATCH_NFL_NO_VERIFIED_CONTEXT",
+                              "WATCH_NFL_TOTAL_PRIOR_ONLY"}:
             continue
         lanes = r.get("pricing_lanes") or {}
         lane_b = lanes.get("lane_b_anchored") or {}
