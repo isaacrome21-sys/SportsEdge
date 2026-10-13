@@ -39,7 +39,8 @@ def _number(value):
 def _metrics(row):
     # Never substitute the independent projection for a row priced in Lane B:
     # its status may have been calculated from a different probability.
-    projection = row.get("independent_projection") or {}
+    projection = row.get("independent_projection")
+    projection = projection if isinstance(projection, dict) else {}
     provenance = row.get("pricing_provenance")
     provenance = provenance if isinstance(provenance, dict) else {}
     anchored = (row.get("pricing_lane") == "LANE_B_ANCHORED"
@@ -59,6 +60,9 @@ def _disposition(row, min_ev):
     priced = probability is not None and ev is not None
     if status.startswith("BLOCKED") or status in {"NO_MODEL_OR_MARKET", "NO_ENGINE", "NO_QUOTE", "MISSING_STATUS"}:
         return "BLOCKED", "blocked", row.get("reason") or status
+    if (row.get("independent_projection") is not None
+            and not isinstance(row.get("independent_projection"), dict)):
+        return "BLOCKED", "blocked", "INDEPENDENT_PROJECTION_MALFORMED"
     provenance = row.get("pricing_provenance")
     if provenance is not None and (
         not isinstance(provenance, dict)
@@ -76,7 +80,10 @@ def _disposition(row, min_ev):
         return "REFRESH REQUIRED", "stale", "Current quote required"
     if anchored:
         return "WATCH", "priced", "Independent pricing unavailable for this row"
-    if any("NO_FETCH_MANUAL_MODE" in str(note) for note in row.get("context_notes") or []):
+    notes = row.get("context_notes")
+    if notes is not None and not isinstance(notes, (list, tuple)):
+        return "WATCH", "priced", "CONTEXT_METADATA_MALFORMED"
+    if any("NO_FETCH_MANUAL_MODE" in str(note) for note in (notes or [])):
         return "WATCH", "priced", "Verified event and team inputs required"
     # Source/context/participation/deployment holds take precedence over EV.
     allowed = CANDIDATE_STATUSES | {"PRICE_CAP", "WATCH_PRICE_CAP", "BELOW_THRESHOLD", "WATCH_BELOW_EV_FLOOR"}
@@ -123,6 +130,8 @@ def build_phone_card(card):
         if not isinstance(row, dict) or row.get("input_index", index) != index:
             raise ValueError("EVALUATED_ROW_ORDER_MISMATCH")
         source = intake[index] if intake is not None else {}
+        if not isinstance(source, dict):
+            raise ValueError("SELECTION_INTAKE_ROW_NOT_OBJECT")
         label, bucket, reason = _disposition(row, floor)
         if str(row.get("status") or "") in {"BLOCKED_INVALID", "BLOCKED_IL_COLLEGE", "BLOCKED_STARTED"}:
             bucket = "rejected"
@@ -148,7 +157,9 @@ def build_phone_card(card):
             "status": label, "reason": reason,
             "probability": probability if bucket == "priced" and not anchored else None,
             "estimated_ev": ev if bucket == "priced" and not anchored else None,
-            "fair_odds": _number((row.get("independent_projection") or row).get("fair_american")) if bucket == "priced" and not anchored else None,
+            "fair_odds": _number((row.get("independent_projection")
+                                  if isinstance(row.get("independent_projection"), dict)
+                                  else row).get("fair_american")) if bucket == "priced" and not anchored else None,
             "source_status": row.get("status"),
         })
     ledger = [{**dict(zip(("sport", "market", "period", "phase", "alternate", "settlement_type"), key)),
