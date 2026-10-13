@@ -262,6 +262,7 @@
         "docs/NBA_QUARTER_SIM_2025_26_OOS_PREREG_20261013.md",
         "docs/NBA_QUARTER_SIM_FROZEN_CAL_AND_OT_FIX_PREREG_20261013.md",
         "docs/NBA_QUARTER_SIM_FROZEN_CAL_AND_OT_FIX_RESULT_20261013.md",
+        "docs/NBA_QUARTER_SIM_MARGIN_DISPERSION_2026_27_PREREG_20261013.md",
         "scripts/run_nba_quarter_sim_split_holdout.py",
         "docs/NBA_QUARTER_SIM_REG_SHARE_V2_PREREG_20261013.md",
         "docs/football/FRESH_VALIDATION_WINDOW_V1.md",
