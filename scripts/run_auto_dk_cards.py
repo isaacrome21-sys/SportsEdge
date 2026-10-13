@@ -66,6 +66,16 @@ def week_candidate(start: str):
     return (2026,min(16,week))
 
 
+def _nfl_prop_failure_status(diagnostics: str) -> str:
+    # Bad independently verified event-clock identity is a quote failure,
+    # not missing model probability. No provider retry here.
+    if ("QUOTE_KICKOFF_INDEPENDENT_SCHEDULE_MISMATCH" in diagnostics
+            or "quote_kickoff:" in diagnostics
+            or "SCHEDULE_MATCH_REQUIRED" in diagnostics):
+        return "QUOTE_EVENT_REJECTED"
+    return "MODEL_UNAVAILABLE"
+
+
 def run_nfl(raw, out, now):
     cards=[]
     days=nfl_tickets(raw.get("games") or [],now,
@@ -119,7 +129,8 @@ def run_nfl(raw, out, now):
                                         "selected_research_rows":len(row.get("selected_rows") or []),
                                         "source_status":row.get("source_status")}
                     else:
-                        entry["props"]={"status":"MODEL_UNAVAILABLE","reason":why[:550]}
+                        entry["props"]={"status":_nfl_prop_failure_status(why),
+                                        "reason":why[:550]}
                 elif targeted:
                     entry["props"]={"status":"MODEL_UNAVAILABLE",
                                     "reason":"PIT_NFLVERSE_HISTORY_REQUIRED"}

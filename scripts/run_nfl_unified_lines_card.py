@@ -22,7 +22,12 @@ from sportsedge.sports.nfl.market_anchored_residual import ResidualQuoteError, p
 from scripts.run_nfl_lines_card import _history_rows
 
 
-from sportsedge.nfl_unified_phone import build_unified_phone_card
+from sportsedge.nfl_unified_phone import (
+    UnifiedNflPhoneError,
+    _match_schedule,
+    _utc,
+    build_unified_phone_card,
+)
 from sportsedge.nfl_scoring_composition_artifact import load_prior_file
 from sportsedge.sports.nfl.auto_slate import discover_nfl_auto_games
 from sportsedge.sports.nfl.context_autopull import NFLContextError
@@ -43,6 +48,32 @@ def _has_props(ticket: dict) -> bool:
         if isinstance(row, dict)
     )
 
+
+
+def _validate_auto_prop_kickoffs(ticket: dict, schedule_games: list[dict]) -> None:
+    """Reject an externally quoted kickoff contradicting independent schedule.
+
+    Intake-only; never adjusts model outputs or frozen player-prop engine.
+    Older manual tickets without provider kickoff use the existing unique-match rule.
+    """
+    observed = _utc(ticket.get("observed_at"), "observed_at")
+    for game in ticket.get("games") or []:
+        if not isinstance(game, dict):
+            raise UnifiedNflPhoneError("GAME_OBJECT_REQUIRED")
+        raw_kickoff = game.get("commence_time")
+        if raw_kickoff is None:
+            continue
+        quote_kickoff = _utc(raw_kickoff, "quote_kickoff")
+        away = str(game.get("away") or "").strip().upper()
+        home = str(game.get("home") or "").strip().upper()
+        independent = _match_schedule(
+            schedule_games, away=away, home=home, observed_at=observed
+        )
+        verified_kickoff = _utc(independent["kickoff"], "kickoff")
+        if abs((verified_kickoff - quote_kickoff).total_seconds()) > 900:
+            raise UnifiedNflPhoneError(
+                f"QUOTE_KICKOFF_INDEPENDENT_SCHEDULE_MISMATCH:{away}@{home}"
+            )
 
 
 def attach_residual_game_research(payload: dict, ticket: dict, history: object) -> dict:
@@ -109,6 +140,7 @@ def main() -> int:
         game_types=("REG", "POST"),
     )
     schedule_games = list(plan.get("games") or [])
+    _validate_auto_prop_kickoffs(ticket, schedule_games)
     seasons = sorted({
         int(row["season"])
         for row in schedule_games
