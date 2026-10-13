@@ -25,7 +25,8 @@ from .quote_freshness import (
 SPORTS = frozenset({"NFL", "MLB", "CFB"})
 GAME_MARKETS = frozenset({
     "ML", "MONEYLINE", "SPREAD", "TOTAL", "TEAM_TOTAL",
-    "F5_ML", "F5_SPREAD", "F5_TOTAL", "F5_TEAM_TOTAL", "NRFI", "YRFI",
+    "F5_ML", "F5_SPREAD", "F5_TOTAL", "F5_TEAM_TOTAL",
+    "TOTAL_1H", "SPREAD_1H", "TEAM_TOTAL_1H", "NRFI", "YRFI",
 })
 ODDS_CAP = -165
 EV_MIN = 0.02
@@ -134,7 +135,7 @@ def _opposite(side):
 def _matching_opposite(key, other):
     if key[:4] != other[:4]:
         return False
-    if key[2] in {"SPREAD", "F5_SPREAD"}:
+    if key[2] in {"SPREAD", "F5_SPREAD", "SPREAD_1H"}:
         return key[4] is not None and other[4] is not None and abs(key[4] + other[4]) < 1e-9
     return key[4] == other[4]
 

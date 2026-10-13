@@ -24,6 +24,7 @@ from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
 from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
 from sportsedge.card_format import format_research_card
 from sportsedge.prepricing.factor_ingestion import stage_games
+from sportsedge.team_half_pricing import DERIVATIVES, price_team_half_rows
 from sportsedge.market_coverage import (
     COVERAGE_MARKETS,
     normalize_coverage_market,
@@ -143,7 +144,25 @@ def audit_row(source, result):
     }
     out["sport_specific"] = {"status": "PARTIAL_HEURISTIC" if has else MISSING,
                               "detail": sport_specific.get(sport, "Unsupported sport")}
-    if market not in ("ML", "SPREAD", "TOTAL", "TEAM_TOTALS"):
+    market = {
+        "FIRST_HALF_TOTAL": "TOTAL_1H", "HALF_TOTAL": "TOTAL_1H",
+        "1H_TOTAL": "TOTAL_1H", "FIRST_HALF_SPREAD": "SPREAD_1H",
+        "1H_SPREAD": "SPREAD_1H", "FIRST_HALF_TEAM_TOTAL": "TEAM_TOTAL_1H",
+        "1H_TEAM_TOTAL": "TEAM_TOTAL_1H",
+        "FIRST_FIVE_TOTAL": "F5_TOTAL", "FIRST_FIVE_TEAM_TOTAL": "F5_TEAM_TOTAL",
+    }.get(market, market)
+    if sport != "MLB":
+        market = {"TEAM_TOTALS": "TEAM_TOTAL",
+                  "TEAM_TOTAL_OVER_UNDER": "TEAM_TOTAL"}.get(market, market)
+    if market in DERIVATIVES:
+        out["player_props"] = {"status": "NOT_APPLICABLE",
+                               "detail": "Team or period game market, not a player prop"}
+        if result.get("source") == "FREE_ESPN_SCORE_DERIVATIVE_UNVALIDATED" and result.get("status") != "NO_MODEL_OR_MARKET":
+            out["team_quality"] = {"status": HEURISTIC,
+                                   "detail": "Public fixture and team score heuristic; unfitted for team/half distribution"}
+            out["key_numbers"] = {"status": "PUSH_AWARE_ONLY",
+                                  "detail": "Observed threshold and integer push mass; no fitted key-number model"}
+    elif market not in ("ML", "SPREAD", "TOTAL", "TEAM_TOTALS"):
         src = result.get("source") or ""
         if market in COVERAGE_MARKETS or market in F5_MARKETS:
             out["player_props"] = {"status": "NOT_APPLICABLE",
@@ -216,6 +235,25 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         market = {"MONEYLINE":"ML","H2H":"ML","RUN_LINE":"SPREAD",
                   "GAME_TOTAL":"TOTAL","TOTALS":"TOTAL",
                   "TEAM_TOTAL":"TEAM_TOTALS"}.get(market,market)
+        market = {
+            "FIRST_HALF_TOTAL": "TOTAL_1H", "HALF_TOTAL": "TOTAL_1H",
+            "1H_TOTAL": "TOTAL_1H", "FIRST_HALF_SPREAD": "SPREAD_1H",
+            "1H_SPREAD": "SPREAD_1H", "FIRST_HALF_TEAM_TOTAL": "TEAM_TOTAL_1H",
+            "1H_TEAM_TOTAL": "TEAM_TOTAL_1H",
+        }.get(market, market)
+        if line["sport"] != "MLB":
+            # Full-game team totals route to the team/half derivative lane
+            # for football. MLB TEAM_TOTALS keep the game-lane contract
+            # (paired no-vig team-score heuristic + prepricing fixture gate).
+            # The first-five derivative aliases are likewise non-MLB only:
+            # MLB FIRST_FIVE_* rows belong to the dedicated F5 lane below
+            # (normalize_f5_market claims them as F5_TOTALS/F5_TEAM_TOTALS),
+            # and renaming them here would preempt that lane. For other
+            # sports the derivative lane fails F5 markets closed.
+            market = {"FIRST_FIVE_TOTAL": "F5_TOTAL",
+                      "FIRST_FIVE_TEAM_TOTAL": "F5_TEAM_TOTAL",
+                      "TEAM_TOTALS": "TEAM_TOTAL",
+                      "TEAM_TOTAL_OVER_UNDER": "TEAM_TOTAL"}.get(market, market)
         if line["sport"] in {"NFL", "CFB"}:
             market = {
                 "PASS_YARDS":"PLAYER_PASSING_YARDS",
@@ -347,10 +385,14 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     first_pos, first_input = [], []
     nfl_pos, nfl_input = [], []
     cfb_pos, cfb_input = [], []
+    teamhalf_pos, teamhalf_input = [], []
     others = {}
     for local, line in enumerate(props):
         market = str(line.get("market") or "").upper()
-        if line["sport"] == "MLB" and market.startswith("PITCHER_"):
+        if market in DERIVATIVES:
+            teamhalf_pos.append(local)
+            teamhalf_input.append(line)
+        elif line["sport"] == "MLB" and market.startswith("PITCHER_"):
             pitcher_pos.append(local)
             pitcher_input.append(line)
         elif line["sport"] == "MLB" and (
@@ -380,6 +422,10 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         nfl_input, now=clock, getter=getter if auto_context else (lambda url: None))
     cfb_results, cfb_receipts = phone_cfb_player_rows(
         cfb_input, now=clock, getter=getter if auto_context else (lambda url: None))
+    teamhalf_results, teamhalf_receipts = price_team_half_rows(
+        teamhalf_input, now=clock, getter=getter if auto_context else (lambda url: None))
+    if len(teamhalf_results) != len(teamhalf_input):
+        raise ValueError("TEAM_HALF_RESULT_COUNT_MISMATCH")
     if len(nfl_results) != len(nfl_input) or len(cfb_results) != len(cfb_input):
         raise ValueError("FOOTBALL_RESULT_COUNT_MISMATCH")
     if len(pitcher_results) != len(pitcher_input):
@@ -410,6 +456,8 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     for local, result in zip(nfl_pos, nfl_results):
         modeled_props[local] = result
     for local, result in zip(cfb_pos, cfb_results):
+        modeled_props[local] = result
+    for local, result in zip(teamhalf_pos, teamhalf_results):
         modeled_props[local] = result
     for local, result in others.items():
         modeled_props[local] = result
@@ -446,7 +494,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                               + pitcher_receipts + batter_receipts
                               + first_receipts
                               + nfl_receipts + cfb_receipts
-                              + coverage_receipts + f5_receipts)
+                              + coverage_receipts + f5_receipts + teamhalf_receipts)
     card["prop_model_status"] = {
         "pitcher_engine":"MLB_PITCHER_JOINT_EMPIRICAL_BAYES",
         "batter_engine":"MLB_BATTER_EMPIRICAL_GAMELOG",
@@ -455,6 +503,8 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         "f5_engine":"MLB_F5_EMPIRICAL_LINESCORE_UNVALIDATED",
         "nfl_player_engine":"ESPN_NAMED_HISTORICAL_GAMELOG_WATCH_ONLY",
         "cfb_player_engine":"ESPN_NAMED_HISTORICAL_GAMELOG_WATCH_ONLY",
+        "team_half_engine":"FREE_ESPN_SCORE_DERIVATIVE_UNVALIDATED_PERIOD_SPLIT",
+        "team_half_period_fitted":False,
         "free_public_history":True,
         "model_vs_close_validated":False,
         "phone_odds_freshness_required":True,
@@ -484,6 +534,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             "statcast":UNWIRED,"next_gen":UNWIRED,"coaching":UNWIRED,
             "travel":UNWIRED,"player_props":
             "MLB_PITCHER_BATTER_AND_ESPN_NAMED_FOOTBALL_HISTORY_UNVALIDATED",
+            "team_half":"UNFITTED_RESEARCH_DERIVATIVE_NO_WAGER_AUTHORITY",
         },
     }
     # Surface every catalog market on the same free phone research card.
