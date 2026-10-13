@@ -202,10 +202,25 @@ def price_three_sport_research(model_rows: Sequence[Mapping], quotes: Sequence[M
             if len(ours) != 1 or len(others) != 1:
                 raise ResearchQuoteError("EXACT_PAIRED_DK_QUOTE_REQUIRED")
             own, other = ours[0], others[0]
-            if own[4] is not None and other[4] is not None and own[4] != other[4]:
-                raise ResearchQuoteError("PAIRED_QUOTES_CAPTURE_TIMES_CONFLICT")
-            # One centralized freshness check; legacy bridge labels preserved.
-            freshness = _bridge_quote_status(own[4], now=now)
+            # A pair is two independently captured quote ROWS, not a
+            # screenshot assertion on just one side. Both timestamps must
+            # be timezone-aware and at most 120 seconds apart; absent data
+            # cannot support an exact two-sided no-vig benchmark.
+            if own[4] is None or other[4] is None:
+                raise ResearchQuoteError("PAIRED_QUOTES_CAPTURE_TIMESTAMPS_REQUIRED")
+            pair_skew_seconds = abs((own[4] - other[4]).total_seconds())
+            if pair_skew_seconds > 120:
+                raise ResearchQuoteError("PAIRED_QUOTES_CAPTURE_WINDOW_EXCEEDED")
+            # Both sides need individually fresh captures to surface a
+            # current-price candidate. One recent side never refreshes an
+            # old, future, or otherwise invalid opposite-side quote.
+            own_freshness = _bridge_quote_status(own[4], now=now)
+            other_freshness = _bridge_quote_status(other[4], now=now)
+            freshness = ("RECENT_CAPTURED_QUOTE"
+                         if own_freshness == other_freshness == "RECENT_CAPTURED_QUOTE"
+                         else "STALE_QUOTE"
+                         if "STALE_QUOTE" in (own_freshness, other_freshness)
+                         else "UNVERIFIED_QUOTE_FRESHNESS")
             kickoff = _time(model.get("kickoff_utc"), "KICKOFF")
             phase = str(model.get("phase") or "PREGAME").upper()
             if phase == "PREGAME" and kickoff <= now:
@@ -231,6 +246,9 @@ def price_three_sport_research(model_rows: Sequence[Mapping], quotes: Sequence[M
                    "dk_odds": own[3], "dk_no_vig_p": round(market, 6),
                    "edge_pp": round(100 * (conditional - market), 3),
                    "ev_per_dollar": round(ev, 6), "quote_status": freshness,
+                   "paired_quote_skew_seconds": round(pair_skew_seconds, 3),
+                   "paired_quote_captured_at": [own[4].isoformat(),
+                                                other[4].isoformat()],
                    "research_only": True, "official_authority": False,
                    "model_p_authority": False, "staking_authority": False}
             if freshness != "RECENT_CAPTURED_QUOTE":

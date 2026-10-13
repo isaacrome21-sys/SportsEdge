@@ -22,6 +22,10 @@ from .mlb_settlement_evidence import (
     canonical_bytes as settlement_fact_bytes,
     validate_book_rules,
 )
+from .moneyline_settlement import (
+    declared_moneyline_settlement_type,
+    settle_moneyline,
+)
 from .odds_api_source import normalize_name
 from .prediction_journal import JOURNAL_SCHEMA_VERSION
 from .runtime import parse_timestamp
@@ -182,10 +186,21 @@ def _game_outcome(prediction: Mapping[str, Any], facts: Mapping[str, Any]) -> st
     if market == "TEAM_TOTALS": return _team_total_outcome(prediction, game)
     away = int(game["away_runs"]); home = int(game["home_runs"]); side = str(prediction.get("side") or "").upper()
     if market == "MONEYLINE":
-        if away == home: raise MLBCatalogSettlementError("MONEYLINE_FINAL_TIE_REQUIRES_BOOK_RULE")
-        if side in {"HOME", "HOME_ML"}: return "WIN" if home > away else "LOSS"
-        if side in {"AWAY", "AWAY_ML"}: return "WIN" if away > home else "LOSS"
-        raise MLBCatalogSettlementError("moneyline side unsupported")
+        if side in {"HOME", "HOME_ML"}: selected, other = home, away
+        elif side in {"AWAY", "AWAY_ML"}: selected, other = away, home
+        else: raise MLBCatalogSettlementError("moneyline side unsupported")
+        if away == home:
+            # A final tie settles only under the book's explicitly
+            # declared moneyline settlement type (TWO_WAY pushes);
+            # undeclared books keep the fail-closed refusal.
+            settlement_type = declared_moneyline_settlement_type(
+                market, _prediction_sportsbook(prediction))
+            if settlement_type is None:
+                raise MLBCatalogSettlementError("MONEYLINE_FINAL_TIE_REQUIRES_BOOK_RULE")
+            return settle_moneyline(
+                settlement_type, side=side,
+                selected_runs=selected, other_runs=other)
+        return "WIN" if selected > other else "LOSS"
     line = _line(prediction.get("line"))
     if market == "RUN_LINE":
         if side in {"HOME", "HOME_RL"}: margin = home + line - away
@@ -219,9 +234,10 @@ def _resolve_prediction(prediction: Mapping[str, Any], facts: Mapping[str, Any])
         try: return _team_total_outcome(prediction, f5), "OFFICIAL_F5_TEAM_FACTS_AND_NORMALIZED_BOOK_RULES"
         except Exception as exc: return "UNRESOLVED", f"F5_TEAM_TOTAL_SETTLEMENT_ERROR:{exc}"
     if market in ADDITIONAL_MARKETS:
-        ambiguity = _policy_ambiguity(facts, market)
+        sportsbook = _prediction_sportsbook(prediction)
+        ambiguity = _policy_ambiguity(facts, market, sportsbook=sportsbook)
         if ambiguity: return "UNRESOLVED", str(ambiguity[0])
-        try: return _derive_additional_outcome(facts, market, entity_id, line, side), "OFFICIAL_MARKET_FACTS_AND_NORMALIZED_BOOK_RULES"
+        try: return _derive_additional_outcome(facts, market, entity_id, line, side, sportsbook=sportsbook), "OFFICIAL_MARKET_FACTS_AND_NORMALIZED_BOOK_RULES"
         except Exception as exc: return "UNRESOLVED", f"ADDITIONAL_SETTLEMENT_ERROR:{exc}"
     if market in EITHER_PITCHER_MARKETS:
         try:
