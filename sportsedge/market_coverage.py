@@ -162,7 +162,7 @@ def _resolve_side_token(row: Mapping[str, Any], home: str, away: str) -> str | N
 def _base_means(row: Mapping[str, Any], *, now: datetime,
                 getter=None, auto_context: bool = True,
                 provider: PublicContext | None = None) -> dict[str, Any]:
-    """Replicate free_models.calculate's mean construction exactly.
+    """Replicate free_models.calculate's owner-ruled mean construction exactly.
 
     Returns {"home_mean", "away_mean", "context", "context_notes", "kickoff"}.
     Raises MarketCoverageError with a BLOCKED_*/NO_* reason when the base game
@@ -217,14 +217,23 @@ def _base_means(row: Mapping[str, Any], *, now: datetime,
     base, _, _, hfa = PRIORS[sport]
     home_mean = base + hfa / 2 + context["home_rating"]
     away_mean = base - hfa / 2 + context["away_rating"]
+    # Owner ruling (2026-10-13): ERA-based starter adjustments, recent
+    # form and rest are DISABLED_PENDING_INCREMENTAL_VALUE until separate
+    # chronological evidence shows incremental value. This independently
+    # routed Phase 7 coverage pricer must use the SAME market-blind base
+    # means as free_models.calculate / score_means, without letting a
+    # manually supplied nonzero disabled factor change any score.
+    #
+    # Retain collected values in context and receipts for future research;
+    # zero only their contribution to prices.
     if sport == "MLB":
-        home_mean += context["home_pitcher_adj"]
-        away_mean += context["away_pitcher_adj"]
+        notes.append("PITCHER_ADJ_DISABLED_PENDING_INCREMENTAL_VALUE")
     else:
-        # Full injury/form construction -- never the participation-blind
-        # simplified variant (2026-10-11 incident).
-        home_mean += context["home_injury_pts"] + context["home_form"]
-        away_mean += context["away_injury_pts"] + context["away_form"]
+        # Keep verified injury/participation context. Only the unvalidated
+        # recent-form heuristic is suppressed, not injuries.
+        home_mean += context["home_injury_pts"]
+        away_mean += context["away_injury_pts"]
+        notes.append("RECENT_FORM_DISABLED_PENDING_INCREMENTAL_VALUE")
     if "weather_total_adj" in context:
         home_mean += context["weather_total_adj"] / 2
         away_mean += context["weather_total_adj"] / 2
