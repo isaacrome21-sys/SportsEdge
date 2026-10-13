@@ -10,6 +10,7 @@ from typing import Any, Iterable, Mapping
 
 from .mlb_additional_pit_joiner import ARCHIVE_TYPE as ADDITIONAL_ARCHIVE_TYPE, join_additional_archive
 from .mlb_pit_joiner import MLBPITJoinError, join_prop_archive, observation_key
+from .moneyline_settlement import declared_moneyline_settlement_type
 
 COUNT_ARCHIVE_TYPE = "MLB_PROP_PIT_QUOTES"
 SUPPORTED_ARCHIVE_TYPES = frozenset({COUNT_ARCHIVE_TYPE, ADDITIONAL_ARCHIVE_TYPE})
@@ -36,11 +37,17 @@ def _harden_f5_moneyline_ties(
     official_fact_reports: list[dict[str, Any]],
     settlement_rows: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Make F5 ML ties ambiguous until rule evidence carries a normalized tie policy.
+    """Make F5 ML ties ambiguous until the book's tie policy is normalized.
 
-    Current rule records prove source provenance but do not encode the sportsbook's
-    tie interpretation as machine-readable semantics. A rule-document SHA therefore
-    cannot justify hardcoding PUSH/VOID/ACTION for an exact F5 tie.
+    Rule records prove source provenance but do not by themselves encode
+    the sportsbook's tie interpretation as machine-readable semantics. A
+    rule-document SHA therefore cannot justify hardcoding PUSH/VOID/ACTION
+    for an exact F5 tie. The one normalized encoding is a verified
+    settlement-type declaration (sportsedge.moneyline_settlement): where
+    the quote's book declares one (e.g. DraftKings F5_MONEYLINE is
+    TWO_WAY per its published rules and the 2026-10-12 owner ruling,
+    ties settle as PUSH), the tie is defined and no ambiguity is added.
+    Books without a verified declaration stay hardened.
     """
     facts_by_game: dict[str, list[dict[str, Any]]] = {}
     for report in official_fact_reports:
@@ -62,6 +69,10 @@ def _harden_f5_moneyline_ties(
         if not isinstance(quote, Mapping):
             continue
         if str(quote.get("market") or "").upper() != "F5_MONEYLINE":
+            continue
+        if declared_moneyline_settlement_type(
+                "F5_MONEYLINE",
+                quote.get("sportsbook") or "DraftKings") is not None:
             continue
         game_id = str(quote.get("game_id") or "").strip()
         reports = facts_by_game.get(game_id, [])
