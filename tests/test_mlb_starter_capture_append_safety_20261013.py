@@ -80,6 +80,26 @@ class AppendSafetyTests(unittest.TestCase):
             ):
                 capture.append_record(a, b, _record(2))
 
+    def test_unterminated_jsonl_pair_is_rejected_not_extended(self):
+        with tempfile.TemporaryDirectory() as folder:
+            a = Path(folder) / "captures.jsonl"
+            b = Path(folder) / "manifest.jsonl"
+            capture.append_record(a, b, _record(1))
+            # Both JSON objects and their hashes still parse, but neither
+            # JSONL file has the record delimiter required for an append.
+            a.write_bytes(a.read_bytes()[:-1])
+            b.write_bytes(b.read_bytes()[:-1])
+            before = (a.read_bytes(), b.read_bytes())
+            verdict = capture.verify_capture_chain(a, b)
+            self.assertFalse(verdict["ok"])
+            self.assertEqual(verdict["failure"]["reason"], "CAPTURE_LINE_UNTERMINATED")
+            with self.assertRaisesRegex(
+                capture.StarterCaptureError,
+                "CAPTURE_CHAIN_PREAPPEND_INVALID:CAPTURE_LINE_UNTERMINATED",
+            ):
+                capture.append_record(a, b, _record(2))
+            self.assertEqual((a.read_bytes(), b.read_bytes()), before)
+
     def test_same_file_for_capture_and_manifest_is_refused(self):
         with tempfile.TemporaryDirectory() as folder:
             a = Path(folder) / "all.jsonl"
