@@ -658,6 +658,292 @@ class ChangeDetectionTests(unittest.TestCase):
         self.assertEqual(moved_event["to_value"], "2026-10-14T23:05:00+00:00")
 
 
+class RescheduleEpochTests(unittest.TestCase):
+    """Owner finding (Oct 13, 2026, recorded on PR #2163): "I reproduced
+    an old capture incorrectly satisfying a rescheduled game's new
+    slot."
+
+    Root cause: slot satisfaction and missed-slot idempotency were
+    keyed by (gamePk, slot_id) alone, so a capture taken under the
+    original schedule counted toward the replanned schedule for the
+    same game. The binding rule these tests pin: a capture belongs to
+    the plan epoch it was taken under — the scheduled first pitch
+    stamped on the record as ``planned_first_pitch_utc`` — and can
+    satisfy only slots of a plan whose first pitch equals that stamp.
+    An old-shape record without the stamp fails closed: it satisfies
+    nothing and its failures explain nothing.
+    """
+
+    NEW_PITCH = datetime(2026, 10, 15, 23, 5, tzinfo=UTC)  # T + 2 days
+
+    def _plan2(self):
+        payload = _payload(
+            _game(GAME1_PK, self.NEW_PITCH, official_date="2026-10-15")
+        )
+        plan = _plan(payload, datetime(2026, 10, 14, 12, 0, tzinfo=UTC))
+        assert not plan["issues"], plan["issues"]
+        return plan, plan["games"][0]
+
+    def test_old_capture_does_not_satisfy_rescheduled_games_new_slot(self):
+        # The owner's reproduction: plan at T, take an on-time
+        # identity-valid T-6H capture, reschedule to T+2d, replan.
+        plan1, game1 = _game1_plan()
+        clock = FakeClock(datetime(2026, 10, 13, 17, 5, tzinfo=UTC))
+        record = capture_snapshot(
+            game1,
+            "T-6H",
+            fetcher=_static_fetcher(_payload_bytes(_game(GAME1_PK, GAME1_PITCH))),
+            clock=clock,
+        )
+        self.assertEqual(record["record_status"], "CAPTURED")
+        self.assertEqual(record["slot_disposition"], "ON_TIME")
+        # The capture is stamped with the first pitch it was planned
+        # against — the epoch it belongs to.
+        self.assertEqual(
+            record.get("planned_first_pitch_utc"), "2026-10-13T23:05:00+00:00"
+        )
+        # Sanity: it still satisfies its OWN plan's T-6H slot.
+        own = evaluate_missed_slots(
+            plan1, [record], now=datetime(2026, 10, 13, 18, 0, tzinfo=UTC)
+        )
+        self.assertNotIn("T-6H", {m["slot_id"] for m in own})
+        # The new plan (first pitch T+2d) must NOT inherit it: once the
+        # new T-6H window closes, the slot is reported missed.
+        plan2, _ = self._plan2()
+        missed = evaluate_missed_slots(
+            plan2, [record], now=datetime(2026, 10, 15, 18, 0, tzinfo=UTC)
+        )
+        by_slot = {m["slot_id"]: m for m in missed}
+        self.assertIn("T-6H", by_slot)
+        self.assertEqual(by_slot["T-6H"]["reason"], "NO_CAPTURE_IN_WINDOW")
+        self.assertEqual(
+            by_slot["T-6H"]["game_date_utc"], "2026-10-15T23:05:00+00:00"
+        )
+
+    def test_missed_record_from_another_epoch_does_not_suppress(self):
+        # A MISSED_SLOT record belongs to the plan epoch that generated
+        # it (its game_date_utc): it must not suppress the same slot of
+        # a different epoch's plan (idempotency is per-epoch).
+        plan2, _ = self._plan2()
+        missed2 = evaluate_missed_slots(
+            plan2, [], now=datetime(2026, 10, 15, 18, 0, tzinfo=UTC)
+        )
+        self.assertIn("T-6H", {m["slot_id"] for m in missed2})
+        plan1, _ = _game1_plan()
+        missed1 = evaluate_missed_slots(
+            plan1, missed2, now=datetime(2026, 10, 13, 18, 0, tzinfo=UTC)
+        )
+        by_slot = {m["slot_id"]: m for m in missed1}
+        self.assertIn("T-6H", by_slot)
+        self.assertEqual(by_slot["T-6H"]["reason"], "NO_CAPTURE_IN_WINDOW")
+
+    def test_postponement_without_new_start_lets_old_captures_satisfy_nothing_later(self):
+        # Postponed with no new start announced: epoch-1 records exist
+        # (a bound T-24H capture and the postponement observation
+        # itself). When the game is eventually replanned days later,
+        # none of them may satisfy the new plan's slots.
+        plan1, game1 = _game1_plan()
+        clock = FakeClock(datetime(2026, 10, 12, 23, 5, tzinfo=UTC))
+        early = capture_snapshot(
+            game1,
+            "T-24H",
+            fetcher=_static_fetcher(_payload_bytes(_game(GAME1_PK, GAME1_PITCH))),
+            clock=clock,
+        )
+        self.assertEqual(early["record_status"], "CAPTURED")
+        postponed_raw = _payload_bytes(
+            _game(
+                GAME1_PK,
+                GAME1_PITCH,
+                detailed="Postponed",
+                coded="D",
+                away_prob=("absent",),
+                home_prob=("absent",),
+            )
+        )
+        clock.set(datetime(2026, 10, 13, 17, 5, tzinfo=UTC))
+        postponed = capture_snapshot(
+            game1, "T-6H", fetcher=_static_fetcher(postponed_raw), clock=clock
+        )
+        self.assertEqual(postponed["record_status"], "OBSERVED")
+        # Days later the game gets its new start (Oct 16) and a new plan.
+        plan3 = _plan(
+            _payload(
+                _game(
+                    GAME1_PK,
+                    datetime(2026, 10, 16, 23, 5, tzinfo=UTC),
+                    official_date="2026-10-16",
+                )
+            ),
+            datetime(2026, 10, 14, 9, 0, tzinfo=UTC),
+        )
+        assert not plan3["issues"], plan3["issues"]
+        missed = evaluate_missed_slots(
+            plan3,
+            [early, postponed],
+            now=datetime(2026, 10, 16, 18, 0, tzinfo=UTC),
+        )
+        by_slot = {m["slot_id"]: m for m in missed}
+        self.assertEqual(by_slot["T-24H"]["reason"], "NO_CAPTURE_IN_WINDOW")
+        self.assertEqual(by_slot["T-6H"]["reason"], "NO_CAPTURE_IN_WINDOW")
+
+    def test_same_day_first_pitch_move_old_capture_cannot_satisfy_new_plan(self):
+        # 1:05pm -> 7:05pm-style move (17:05Z -> 23:05Z the same day):
+        # the afternoon plan's on-time T-90M capture must not satisfy
+        # the evening plan's T-90M slot.
+        afternoon = datetime(2026, 10, 13, 17, 5, tzinfo=UTC)
+        plan_a = _plan(
+            _payload(_game(GAME1_PK, afternoon)),
+            datetime(2026, 10, 12, 12, 0, tzinfo=UTC),
+        )
+        game_a = plan_a["games"][0]
+        clock = FakeClock(datetime(2026, 10, 13, 15, 35, tzinfo=UTC))
+        record = capture_snapshot(
+            game_a,
+            "T-90M",
+            fetcher=_static_fetcher(_payload_bytes(_game(GAME1_PK, afternoon))),
+            clock=clock,
+        )
+        self.assertEqual(record["record_status"], "CAPTURED")
+        self.assertEqual(record["slot_disposition"], "ON_TIME")
+        plan_b, _ = _game1_plan(planned_at=datetime(2026, 10, 13, 16, 0, tzinfo=UTC))
+        missed = evaluate_missed_slots(
+            plan_b, [record], now=datetime(2026, 10, 13, 22, 0, tzinfo=UTC)
+        )
+        by_slot = {m["slot_id"]: m for m in missed}
+        self.assertEqual(by_slot["T-90M"]["reason"], "NO_CAPTURE_IN_WINDOW")
+        self.assertEqual(by_slot["T-6H"]["reason"], "NO_CAPTURE_IN_WINDOW")
+        # The evening plan first saw the game after its T-24H window
+        # had closed — the pre-plan case still classifies correctly.
+        self.assertEqual(by_slot["T-24H"]["reason"], "NOT_YET_SCHEDULED")
+
+    def test_old_shape_record_without_binding_fails_closed(self):
+        # Evidence written before the epoch stamp existed carries no
+        # planned_first_pitch_utc. Absent binding = cannot satisfy any
+        # slot, and its failures cannot be attributed to a plan either.
+        plan1, game1 = _game1_plan()
+        clock = FakeClock(datetime(2026, 10, 13, 22, 35, tzinfo=UTC))
+        record = capture_snapshot(
+            game1,
+            "T-30M",
+            fetcher=_static_fetcher(_payload_bytes(_game(GAME1_PK, GAME1_PITCH))),
+            clock=clock,
+        )
+        old_shape = {
+            k: v for k, v in record.items() if k != "planned_first_pitch_utc"
+        }
+        missed = evaluate_missed_slots(
+            plan1, [old_shape], now=datetime(2026, 10, 13, 22, 50, tzinfo=UTC)
+        )
+        t30 = [m for m in missed if m["slot_id"] == "T-30M"]
+        self.assertEqual(len(t30), 1)
+        self.assertEqual(t30[0]["reason"], "NO_CAPTURE_IN_WINDOW")
+
+        def boom(url: str) -> bytes:
+            raise RuntimeError("HTTP 503")
+
+        attempt = capture_snapshot(game1, "T-30M", fetcher=boom, clock=clock)
+        old_attempt = {
+            k: v for k, v in attempt.items() if k != "planned_first_pitch_utc"
+        }
+        missed = evaluate_missed_slots(
+            plan1, [old_attempt], now=datetime(2026, 10, 13, 22, 50, tzinfo=UTC)
+        )
+        t30 = [m for m in missed if m["slot_id"] == "T-30M"]
+        self.assertEqual(len(t30), 1)
+        self.assertEqual(t30[0]["reason"], "NO_CAPTURE_IN_WINDOW")
+
+    def test_cross_epoch_detect_changes_emits_schedule_change_not_starter_change(self):
+        # Cross-epoch starter semantics: the pre-reschedule capture is
+        # the prior epoch's baseline. The pair straddling the
+        # reschedule yields the SCHEDULE_CHANGE event (the move itself)
+        # and NO starter event — the new plan's cleared probables are
+        # the reschedule's artifact, not a REMOVED decision. The first
+        # capture of the new epoch becomes its baseline, and an
+        # announcement inside the new epoch is detected normally.
+        plan1, game1 = _game1_plan()
+        clock = FakeClock(datetime(2026, 10, 13, 17, 5, tzinfo=UTC))
+        snap1 = capture_snapshot(
+            game1,
+            "T-6H",
+            fetcher=_static_fetcher(_payload_bytes(_game(GAME1_PK, GAME1_PITCH))),
+            clock=clock,
+        )
+        plan2, game2 = self._plan2()
+        cleared = _payload_bytes(
+            _game(
+                GAME1_PK,
+                self.NEW_PITCH,
+                official_date="2026-10-15",
+                away_prob=("absent",),
+                home_prob=("absent",),
+            )
+        )
+        clock.set(datetime(2026, 10, 15, 17, 5, tzinfo=UTC))
+        snap2 = capture_snapshot(game2, "T-6H", fetcher=_static_fetcher(cleared), clock=clock)
+        self.assertEqual(snap2["record_status"], "OBSERVED")
+        events = detect_changes([snap1, snap2])
+        schedule = [e for e in events if e["change_kind"] == "SCHEDULE_CHANGE"]
+        self.assertIn("FIRST_PITCH_MOVED", {e["change_detail"] for e in schedule})
+        self.assertEqual(
+            [e for e in events if e["change_kind"] == "STARTER_CHANGE"], []
+        )
+        announced = _payload_bytes(
+            _game(
+                GAME1_PK,
+                self.NEW_PITCH,
+                official_date="2026-10-15",
+                away_prob=("id", 222222),
+                home_prob=("absent",),
+            )
+        )
+        clock.set(datetime(2026, 10, 15, 22, 35, tzinfo=UTC))
+        snap3 = capture_snapshot(
+            game2, "T-30M", fetcher=_static_fetcher(announced), clock=clock
+        )
+        events = detect_changes([snap1, snap2, snap3])
+        starter = [e for e in events if e["change_kind"] == "STARTER_CHANGE"]
+        self.assertEqual(len(starter), 1)
+        self.assertEqual(starter[0]["change_detail"], "ANNOUNCED")
+        self.assertEqual(starter[0]["side"], "away")
+        self.assertIsNone(starter[0]["from_value"])
+        self.assertEqual(starter[0]["to_value"], 222222)
+
+    def test_postponement_straddle_suppresses_phantom_starter_removed(self):
+        # Same plan, but the pair straddles the postponement itself:
+        # probables cleared in the postponement observation are the
+        # postponement's artifact. The POSTPONED schedule event is the
+        # record of it; no STARTER_CHANGE/REMOVED is derived.
+        plan1, game1 = _game1_plan()
+        clock = FakeClock(datetime(2026, 10, 13, 17, 5, tzinfo=UTC))
+        snap_a = capture_snapshot(
+            game1,
+            "T-6H",
+            fetcher=_static_fetcher(_payload_bytes(_game(GAME1_PK, GAME1_PITCH))),
+            clock=clock,
+        )
+        postponed_raw = _payload_bytes(
+            _game(
+                GAME1_PK,
+                GAME1_PITCH,
+                detailed="Postponed",
+                coded="D",
+                away_prob=("absent",),
+                home_prob=("absent",),
+            )
+        )
+        clock.set(datetime(2026, 10, 13, 22, 35, tzinfo=UTC))
+        snap_b = capture_snapshot(
+            game1, "T-30M", fetcher=_static_fetcher(postponed_raw), clock=clock
+        )
+        events = detect_changes([snap_a, snap_b])
+        schedule = [e for e in events if e["change_kind"] == "SCHEDULE_CHANGE"]
+        self.assertIn("POSTPONED", {e["change_detail"] for e in schedule})
+        self.assertEqual(
+            [e for e in events if e["change_kind"] == "STARTER_CHANGE"], []
+        )
+
+
 class ManifestTests(unittest.TestCase):
     def _store(self, tmp: Path):
         return tmp / "captures.jsonl", tmp / "manifest.jsonl"
