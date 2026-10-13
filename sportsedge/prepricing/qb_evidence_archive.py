@@ -9,13 +9,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import stat
 import re
 from datetime import datetime, timezone
-from pathlib import Path
 
 from .qb_identity_evidence import evaluate_form2_bundle
 
 SCHEMA = "CFB_FORM2_ARCHIVE_MANIFEST_V1"
+MAX_MANIFEST_BYTES = 1024 * 1024
+MAX_BUNDLE_BYTES = 8 * 1024 * 1024
 
 
 class EvidenceArchiveError(ValueError):
@@ -46,12 +49,57 @@ def _json(raw):
                 raise EvidenceArchiveError("ARCHIVE_DUPLICATE_JSON_KEY")
             result[key] = value
         return result
+    def reject_constant(value):
+        raise EvidenceArchiveError("ARCHIVE_NONFINITE_JSON_NUMBER")
     try:
-        return json.loads(raw, object_pairs_hook=unique)
-    except (UnicodeError, ValueError) as exc:
+        result = json.loads(raw, object_pairs_hook=unique, parse_constant=reject_constant)
+        pending = [(result, 0)]
+        while pending:
+            value, depth = pending.pop()
+            if depth > 64:
+                raise EvidenceArchiveError("ARCHIVE_JSON_TOO_DEEP")
+            if isinstance(value, dict):
+                pending.extend((item, depth + 1) for item in value.values())
+            elif isinstance(value, list):
+                pending.extend((item, depth + 1) for item in value)
+        return result
+    except (UnicodeError, ValueError, RecursionError) as exc:
         if isinstance(exc, EvidenceArchiveError):
             raise
         raise EvidenceArchiveError("ARCHIVE_JSON_INVALID") from exc
+
+
+def _read_bundle(root, digest):
+    """Read bounded bytes from one regular file without following symlinks.
+
+    The archive root is operator configuration. Open the root and child using
+    descriptors, so swapping the root path after opening cannot redirect reads.
+    O_NONBLOCK prevents a malicious FIFO from hanging before fstat can refuse it.
+    """
+    directory = None
+    fd = None
+    try:
+        directory = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        fd = os.open(digest + ".json", os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                     dir_fd=directory)
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode):
+            raise EvidenceArchiveError("ARCHIVE_BUNDLE_NOT_REGULAR")
+        if info.st_size > MAX_BUNDLE_BYTES:
+            raise EvidenceArchiveError("ARCHIVE_BUNDLE_TOO_LARGE")
+        with os.fdopen(fd, "rb") as handle:
+            fd = None
+            raw = handle.read(MAX_BUNDLE_BYTES + 1)
+        if len(raw) > MAX_BUNDLE_BYTES:
+            raise EvidenceArchiveError("ARCHIVE_BUNDLE_TOO_LARGE")
+        return raw
+    except OSError as exc:
+        raise EvidenceArchiveError("ARCHIVE_BUNDLE_UNREADABLE") from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
+        if directory is not None:
+            os.close(directory)
 
 
 def load_archived_form2(root, *, manifest_bytes, trusted_manifest_sha256,
@@ -67,6 +115,8 @@ def load_archived_form2(root, *, manifest_bytes, trusted_manifest_sha256,
     """
     if not isinstance(manifest_bytes, bytes):
         raise EvidenceArchiveError("ARCHIVE_MANIFEST_BYTES_REQUIRED")
+    if len(manifest_bytes) > MAX_MANIFEST_BYTES:
+        raise EvidenceArchiveError("ARCHIVE_MANIFEST_TOO_LARGE")
     if hashlib.sha256(manifest_bytes).hexdigest() != _digest(trusted_manifest_sha256):
         raise EvidenceArchiveError("ARCHIVE_MANIFEST_HASH_MISMATCH")
     manifest = _json(manifest_bytes)
@@ -98,11 +148,7 @@ def load_archived_form2(root, *, manifest_bytes, trusted_manifest_sha256,
         raise EvidenceArchiveError("ARCHIVE_RECEIPT_NOT_AVAILABLE")
     digest = _digest(entry.get("bundle_sha256"))
     # Content addressing avoids accepting paths supplied by the evidence itself.
-    path = Path(root) / (digest + ".json")
-    try:
-        raw = path.read_bytes()
-    except OSError as exc:
-        raise EvidenceArchiveError("ARCHIVE_BUNDLE_UNREADABLE") from exc
+    raw = _read_bundle(root, digest)
     if hashlib.sha256(raw).hexdigest() != digest:
         raise EvidenceArchiveError("ARCHIVE_BUNDLE_HASH_MISMATCH")
     bundle = _json(raw)

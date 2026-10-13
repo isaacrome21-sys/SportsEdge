@@ -106,3 +106,65 @@ def test_duplicate_json_keys_refused_even_when_pinned(tmp_path):
     with pytest.raises(EvidenceArchiveError, match="DUPLICATE_JSON_KEY"):
         load(tmp_path, {}, manifest_bytes=raw,
              trusted_manifest_sha256=hashlib.sha256(raw).hexdigest())
+
+
+def test_symlink_bundle_refused_even_when_content_matches(tmp_path):
+    manifest, digest = setup_archive(tmp_path)
+    original = tmp_path / (digest + ".json")
+    target = tmp_path / "elsewhere.json"
+    original.rename(target)
+    original.symlink_to(target)
+    with pytest.raises(EvidenceArchiveError, match="UNREADABLE"):
+        load(tmp_path, manifest)
+
+
+def test_symlink_root_refused(tmp_path):
+    root = tmp_path / "archive"
+    root.mkdir()
+    manifest, _ = setup_archive(root)
+    link = tmp_path / "redirect"
+    link.symlink_to(root, target_is_directory=True)
+    with pytest.raises(EvidenceArchiveError, match="UNREADABLE"):
+        load(link, manifest)
+
+
+def test_fifo_refused_without_waiting_for_writer(tmp_path):
+    import os
+    manifest, digest = setup_archive(tmp_path)
+    path = tmp_path / (digest + ".json")
+    path.unlink()
+    os.mkfifo(path)
+    with pytest.raises(EvidenceArchiveError, match="NOT_REGULAR"):
+        load(tmp_path, manifest)
+
+
+def test_oversized_bundle_refused_before_read(tmp_path, monkeypatch):
+    from sportsedge.prepricing import qb_evidence_archive as archive
+    manifest, _ = setup_archive(tmp_path)
+    monkeypatch.setattr(archive, "MAX_BUNDLE_BYTES", 16)
+    with pytest.raises(EvidenceArchiveError, match="BUNDLE_TOO_LARGE"):
+        load(tmp_path, manifest)
+
+
+def test_oversized_manifest_refused(tmp_path, monkeypatch):
+    from sportsedge.prepricing import qb_evidence_archive as archive
+    manifest, _ = setup_archive(tmp_path)
+    monkeypatch.setattr(archive, "MAX_MANIFEST_BYTES", 16)
+    with pytest.raises(EvidenceArchiveError, match="MANIFEST_TOO_LARGE"):
+        load(tmp_path, manifest)
+
+
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
+def test_nonfinite_json_refused(tmp_path, constant):
+    raw = ('{"schema":"' + SCHEMA + '","entries":[],"extra":' + constant + '}').encode()
+    with pytest.raises(EvidenceArchiveError, match="NONFINITE"):
+        load(tmp_path, {}, manifest_bytes=raw,
+             trusted_manifest_sha256=hashlib.sha256(raw).hexdigest())
+
+
+def test_excessively_nested_json_returns_named_failure(tmp_path):
+    depth = 70
+    raw = b'[' * depth + b'0' + b']' * depth
+    with pytest.raises(EvidenceArchiveError, match="JSON_TOO_DEEP"):
+        load(tmp_path, {}, manifest_bytes=raw,
+             trusted_manifest_sha256=hashlib.sha256(raw).hexdigest())
