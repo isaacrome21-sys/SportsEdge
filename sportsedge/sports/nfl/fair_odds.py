@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta, timezone
+from math import isfinite
 from statistics import median
 from typing import Any, Iterable, Mapping
 
@@ -41,8 +42,8 @@ def team_abbr(full_name: str) -> str:
 
 def american_to_decimal(price: float) -> float:
     p = float(price)
-    if p == 0:
-        raise ValueError("AMERICAN_PRICE_ZERO")
+    if not isfinite(p) or -100.0 < p < 100.0:
+        raise ValueError("AMERICAN_PRICE_INVALID")
     return 1.0 + (p / 100.0 if p > 0 else 100.0 / -p)
 
 
@@ -72,10 +73,32 @@ def _two_way(book: Mapping[str, Any], market_key: str) -> dict[tuple[str, float 
         for o in outcomes:
             try:
                 point = None if o.get("point") is None else float(o["point"])
-                out[(str(o["name"]), point)] = float(o["price"])
+                price = float(o["price"])
+                if (point is not None and not isfinite(point)) or not price.is_integer():
+                    return None
+                american_to_decimal(price)  # fail closed on invalid/noisy API quotes
+                out[(str(o["name"]), point)] = price
             except (KeyError, TypeError, ValueError):
                 return None
-        return out if len(out) == 2 else None
+        if len(out) != 2:
+            return None
+        names = [name for name, _point in out]
+        points = [point for _name, point in out]
+        if market_key == "h2h":
+            if len(set(names)) != 2 or any(point is not None for point in points):
+                return None
+        elif market_key == "spreads":
+            if (len(set(names)) != 2 or any(point is None for point in points)
+                    or abs(points[0] + points[1]) > 1e-8):
+                return None
+        elif market_key == "totals":
+            if ({name.casefold() for name in names} != {"over", "under"}
+                    or any(point is None for point in points)
+                    or abs(points[0] - points[1]) > 1e-8):
+                return None
+        else:
+            return None
+        return out
     return None
 
 
@@ -99,6 +122,10 @@ def price_event(event: Mapping[str, Any]) -> list[dict]:
         sides = _two_way(dk, market_key)
         if sides is None:
             continue
+        if market_key in ("h2h", "spreads"):
+            expected_teams = {str(event.get("home_team")), str(event.get("away_team"))}
+            if {name for name, _point in sides} != expected_teams:
+                continue
         fair = None
         source = ""
         if SHARP_BOOK in books:

@@ -7,26 +7,82 @@
   "sports": {
     "MLB": {
       "minimum_training_seasons": 3,
-      "preferred_heldout_seasons": [2021, 2022, 2023, 2024, 2025],
-      "stress_test_excluded_seasons": [2020],
+      "preferred_heldout_seasons": [
+        2021,
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "stress_test_excluded_seasons": [
+        2020
+      ],
       "notes": "Use only PIT-safe snapshots. Statcast-era feature families must preserve source revision/hash lineage."
     },
     "NFL": {
       "minimum_training_seasons": 3,
-      "preferred_heldout_seasons": [2021, 2022, 2023, 2024, 2025],
-      "stress_test_excluded_seasons": [2020],
+      "preferred_heldout_seasons": [
+        2021,
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "stress_test_excluded_seasons": [
+        2020
+      ],
       "notes": "Use season-ordered features, QB identity/availability, participation and injury state available before kickoff."
     },
     "CFB": {
       "minimum_training_seasons": 3,
-      "preferred_heldout_seasons": [2021, 2022, 2023, 2024, 2025],
-      "stress_test_excluded_seasons": [2020],
+      "preferred_heldout_seasons": [
+        2021,
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "stress_test_excluded_seasons": [
+        2020
+      ],
       "notes": "FBS only. Week-1/offseason priors must be frozen before kickoff and transfer/recruiting/QB state must be PIT-safe."
+    },
+    "NBA": {
+      "minimum_training_seasons": 3,
+      "preferred_heldout_seasons": [
+        2021,
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "stress_test_excluded_seasons": [
+        2020
+      ],
+      "notes": "NBA season is keyed by its START calendar year (e.g. 2024 means 2024-25). Only pre-tipoff, observed-as-of rotation, availability and stat snapshots may affect features. The historical close is a held-out benchmark, never a pregame feature."
+    },
+    "NHL": {
+      "minimum_training_seasons": 3,
+      "preferred_heldout_seasons": [
+        2021,
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "stress_test_excluded_seasons": [
+        2020
+      ],
+      "notes": "NHL season is keyed by its START calendar year (e.g. 2024 means 2024-25). Use only strictly prior goalie starts, skater minutes/roles and roster information; full-season team ratings on past game rows are leakage. Regulation, overtime and shootout markets must have settlement-specific scoring."
     }
   },
   "fold_discipline": {
     "type": "EXPANDING_WINDOW_BY_SEASON",
-    "fit_order": ["TRAIN", "CALIBRATE", "TEST"],
+    "fit_order": [
+      "TRAIN",
+      "CALIBRATE",
+      "TEST"
+    ],
     "test_fold_may_tune_model": false,
     "test_fold_may_tune_edge_floor": false,
     "active_2026_forward_data_may_refit_historical_candidate": false
@@ -57,8 +113,8 @@
     "minimum_binary_rows": 200,
     "minimum_test_seasons": 3,
     "maximum_ece": 0.025,
-    "calibration_slope_min": 0.90,
-    "calibration_slope_max": 1.10,
+    "calibration_slope_min": 0.9,
+    "calibration_slope_max": 1.1,
     "maximum_absolute_calibration_intercept": 0.03
   },
   "model_search_rules": {
