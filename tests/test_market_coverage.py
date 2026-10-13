@@ -87,13 +87,19 @@ def nfl_row(**kw):
     return base
 
 
-def test_quarter_total_offline_prices():
-    # Quarter totals FAILED harness validation vs the naive baseline
-    # (2026-10-11): recognized but never priced.
+def test_quarter_total_nfl_blocked_no_engine_owner_ruling_20261013():
+    # Owner ruling (Oct 13, 2026): NFL period markets price only from a
+    # compliant period distribution; none exists, so an NFL quarter total
+    # under the legacy TOTAL_nQ spelling fails closed with the canonical
+    # derivative stage's outcome (NO_ENGINE / SIMULATION_ROWS_EMPTY) --
+    # the same outcome as the canonical QUARTER_TOTAL spelling. (The
+    # family's earlier harness FAILED_VALIDATION gate still governs the
+    # non-NFL spellings; see test_quarter_not_for_mlb.)
     out = price_coverage_row(nfl_row(market="TOTAL_1Q", side="OVER", line=9.5),
                              now=NOW, auto_context=False)
     assert out["status"] == "NO_MODEL_OR_MARKET"
-    assert out["reason"] == "COVERAGE_MARKET_FAILED_VALIDATION_NOT_WIRED"
+    assert out["reason"] == "SIMULATION_ROWS_EMPTY"
+    assert out["blocker"] == "NO_ENGINE"
 
 
 def test_quarter_total_math_sane_via_internals():
@@ -107,39 +113,57 @@ def test_quarter_total_math_sane_via_internals():
     assert 0.0 < win < 1.0 and 0.0 <= push < 1.0
 
 
-def test_quarter_spread_and_ml():
-    sp = price_coverage_row(nfl_row(market="SPREAD_2Q", side="HOME", line=-0.5),
-                            now=NOW, auto_context=False)
-    sp_plus = price_coverage_row(nfl_row(market="SPREAD_2Q", side="HOME", line=+0.5),
-                                 now=NOW, auto_context=False)
-    ml = price_coverage_row(nfl_row(market="ML_3Q", side="AWAY"),
-                            now=NOW, auto_context=False)
-    # -0.5 in a quarter means winning the quarter outright; at a 0.375-point
-    # mean quarter margin that is a touch under 50%. Math, not a bug.
-    assert sp["estimate_p"] == pytest.approx(0.4927, abs=0.01)
-    assert sp_plus["estimate_p"] > 0.5
-    assert ml["estimate_p"] < 0.5
-    assert ml["push_p"] > 0.0  # quarter ties carry mass
+def test_quarter_spread_and_ml_nfl_blocked_no_engine_owner_ruling_20261013():
+    # Owner ruling (Oct 13, 2026): the legacy *_nQ spellings no longer
+    # price NFL quarter markets at the unfitted QUARTER_FRACTION (0.25)
+    # scale (and the route previously added the disabled recent-form
+    # factor). NFL quarter spread/ML rows fail closed NO_ENGINE /
+    # SIMULATION_ROWS_EMPTY, identical to the canonical QUARTER_SPREAD /
+    # QUARTER_MONEYLINE spellings. The underlying quarter math remains
+    # unit-tested via internals (test_quarter_total_math_sane_via_internals)
+    # and through the still-wired CFB quarter path (adversarial suite).
+    for row_ in (nfl_row(market="SPREAD_2Q", side="HOME", line=-0.5),
+                 nfl_row(market="SPREAD_2Q", side="HOME", line=+0.5),
+                 nfl_row(market="ML_3Q", side="AWAY")):
+        out = price_coverage_row(row_, now=NOW, auto_context=False)
+        assert out["status"] == "NO_MODEL_OR_MARKET"
+        assert out["reason"] == "SIMULATION_ROWS_EMPTY"
+        assert out["blocker"] == "NO_ENGINE"
+        assert "estimate_p" not in out
 
 
 def test_quarter_team_total_side_styles():
-    # Quarter team totals FAILED harness validation: not wired.
+    # NFL quarter team totals take the canonical period block (owner
+    # ruling, Oct 13, 2026): NO_ENGINE / SIMULATION_ROWS_EMPTY, the same
+    # guard the derivative stage applies to first-half team totals.
     out = price_coverage_row(nfl_row(market="TEAM_TOTAL_1Q", side="HOME_OVER",
                                      line=6.5),
                              now=NOW, auto_context=False)
     assert out["status"] == "NO_MODEL_OR_MARKET"
-    assert out["reason"] == "COVERAGE_MARKET_FAILED_VALIDATION_NOT_WIRED"
+    assert out["reason"] == "SIMULATION_ROWS_EMPTY"
+    assert out["blocker"] == "NO_ENGINE"
 
 
 def test_quarter_requires_line_and_side():
+    # NFL quarter rows block on the period guard before line/side
+    # validation (owner ruling, Oct 13, 2026) -- the canonical derivative
+    # stage likewise blocks period rows without validating the side.
     out = price_coverage_row(nfl_row(market="TOTAL_1Q", side="OVER"),
                              now=NOW, auto_context=False)
     assert out["status"] == "NO_MODEL_OR_MARKET"
-    assert out["reason"] == "COVERAGE_MARKET_FAILED_VALIDATION_NOT_WIRED"
+    assert out["reason"] == "SIMULATION_ROWS_EMPTY"
     out2 = price_coverage_row(nfl_row(market="SPREAD_1Q", side="OVER", line=-1.5),
                               now=NOW, auto_context=False)
     assert out2["status"] == "NO_MODEL_OR_MARKET"
-    assert "SIDE_MUST_BE_HOME_AWAY" in out2["reason"]
+    assert out2["reason"] == "SIMULATION_ROWS_EMPTY"
+    # Side validation still fires on the wired (CFB) quarter path.
+    out3 = price_coverage_row(
+        {"sport": "CFB", "away": "Georgia Bulldogs",
+         "home": "Alabama Crimson Tide", "commence_time": FUTURE,
+         "odds": -110, "market": "SPREAD_1Q", "side": "OVER", "line": -1.5},
+        now=NOW, auto_context=False)
+    assert out3["status"] == "NO_MODEL_OR_MARKET"
+    assert "SIDE_MUST_BE_HOME_AWAY" in out3["reason"]
 
 
 def test_quarter_not_for_mlb():
@@ -313,11 +337,15 @@ def test_run_it_full_routes_coverage_and_alternates():
     assert by_market["ML_3WAY"]["status"] == "NO_MODEL_OR_MARKET"
     assert by_market["ML_3WAY"]["reason"] == \
         "COVERAGE_MARKET_FAILED_VALIDATION_NOT_WIRED"
-    # Quarter totals failed validation the same way.
+    # NFL quarter markets (both legacy spellings) fail closed with the
+    # canonical period outcome (owner ruling, Oct 13, 2026).
     assert by_market["TOTAL_1Q"]["status"] == "NO_MODEL_OR_MARKET"
+    assert by_market["TOTAL_1Q"]["reason"] == "SIMULATION_ROWS_EMPTY"
+    assert by_market["TOTAL_1Q"]["blocker"] == "NO_ENGINE"
     assert by_market["SPREAD_1Q"]["market"] == "SPREAD_1Q"
-    assert by_market["SPREAD_1Q"]["status"] in {"RESEARCH_EDGE",
-                                                "BELOW_THRESHOLD", "PRICE_CAP"}
+    assert by_market["SPREAD_1Q"]["status"] == "NO_MODEL_OR_MARKET"
+    assert by_market["SPREAD_1Q"]["reason"] == "SIMULATION_ROWS_EMPTY"
+    assert by_market["SPREAD_1Q"]["blocker"] == "NO_ENGINE"
     assert by_market["MARGIN_BAND"]["market"] == "MARGIN_BAND"
     assert by_market["F5_TOTALS"]["status"] == "NO_MODEL_OR_MARKET"
     assert by_market["F5_TOTALS"]["reason"] == "NO_QUOTE: F5_SOURCE_MISSING — quote names no sportsbook/source"
@@ -348,5 +376,8 @@ def test_run_it_full_coverage_aliases():
     assert rows[0]["market"] == "ML_3WAY"
     assert rows[0]["reason"] == "COVERAGE_MARKET_FAILED_VALIDATION_NOT_WIRED"
     assert rows[1]["market"] == "SPREAD_1Q"
-    assert rows[1]["status"] in {"RESEARCH_EDGE", "BELOW_THRESHOLD",
-                                 "PRICE_CAP"}
+    # The first_quarter_spread alias resolves to SPREAD_1Q and takes the
+    # canonical NFL period block (owner ruling, Oct 13, 2026).
+    assert rows[1]["status"] == "NO_MODEL_OR_MARKET"
+    assert rows[1]["reason"] == "SIMULATION_ROWS_EMPTY"
+    assert rows[1]["blocker"] == "NO_ENGINE"
