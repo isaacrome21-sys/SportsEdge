@@ -23,6 +23,8 @@ from sportsedge.mlb_phone_first_inning_pricing import (
 from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
 from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
 from sportsedge.prepricing.factor_ingestion import stage_games
+from sportsedge.pricing_provenance import (
+    apply_play_gate, determine_provenance)
 from sportsedge.canonical_coverage import (
     NFL_ANYTIME_TD_MARKETS, NFL_DERIVATIVE_MARKETS, NFL_FIRST_TD_MARKETS,
     blocked_row_for as coverage_blocked_row, coverage_summary)
@@ -406,6 +408,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     # free phone environment; if the runtime lacks those packages, the
     # rows fail closed with a named reason instead of crashing the card.
     deriv_results, deriv_receipts = [], []
+    deriv_distribution_provenance = {}
     if deriv_input:
         try:
             from sportsedge.nfl_phone_derivative_pricing import (
@@ -427,8 +430,15 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             for game_line, game_result in zip(games, priced_games):
                 dist = extract_distribution(game_result)
                 if dist:
-                    distributions[derivative_fixture_key(
-                        game_line.get("away"), game_line.get("home"))] = dist
+                    key = derivative_fixture_key(
+                        game_line.get("away"), game_line.get("home"))
+                    distributions[key] = dist
+                    # A derivative row inherits the provenance of the
+                    # distribution that priced it: an anchored source can
+                    # never launder itself into an independent derivative.
+                    source_prov = determine_provenance(game_result)
+                    if source_prov is not None:
+                        deriv_distribution_provenance[key] = source_prov
             deriv_results, deriv_receipts = phone_nfl_derivative_rows(
                 deriv_input, distributions=distributions, now=clock)
     # ANYTIME_TD stage: nflverse history through the engine's own opener
@@ -507,6 +517,22 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         evaluated[i] = result
     if any(r is None for r in evaluated):
         raise ValueError("EVALUATED_ROWS_REQUIRED_TO_AVOID_FALSE_FACTOR_COVERAGE")
+    # Provenance gate (Isaac's architecture-conflict ruling, Oct 12 2026):
+    # every priced row on this canonical card carries an explicit
+    # INDEPENDENT / MARKET_ANCHORED provenance, identifiable from the card
+    # output alone. Anchored rows are capped at WATCH; a priced row whose
+    # provenance cannot be determined fails closed
+    # (PROVENANCE_UNDETERMINED) -- it never defaults to independent. This
+    # runs BEFORE the candidate/watchlist surfaces below are built, so a
+    # demoted row can never slip into a play list.
+    apply_play_gate(evaluated,
+                    distribution_provenance=deriv_distribution_provenance)
+    card.setdefault("play_gate", {
+        "rule": "INDEPENDENT_PROBABILITY_REQUIRED_FOR_PLAY",
+        "anchored_max_surface": "WATCH",
+        "anchored_ev_in_edges_lists": "SUPPRESSED",
+        "undetermined_provenance": "FAIL_CLOSED",
+    })
     card["evaluated_rows"] = evaluated
     card.setdefault("summary",{})
     card["summary"]["rows"] = len(rows)
@@ -552,6 +578,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         totals.update(v["status"] for v in factors.values())
         audit.append({"input_index":i, "status":result.get("status"),
                       "sport":source.get("sport"),"market":source.get("market"),
+                      "pricing_provenance":result.get("pricing_provenance"),
                       "factors":factors})
     card["factor_coverage"] = {
         "schema":"SPORTSEDGE_FACTOR_COVERAGE_V1",
