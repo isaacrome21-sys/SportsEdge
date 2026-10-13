@@ -24,10 +24,15 @@ def getter(*, dh_schedule="ok"):
             if day == DH_DAY:
                 if dh_schedule == "missing":
                     return None
-                t2 = "2026-09-05T17:10:00Z" if dh_schedule == "same" else "2026-09-05T23:05:00Z"
+                t2 = {"same": "2026-09-05T17:10:00Z",
+                      "cross_utc": "2026-09-06T02:10:00Z"}.get(dh_schedule, "2026-09-05T23:05:00Z")
+                off2 = "2026-09-06" if dh_schedule == "wrong_official" else DH_DAY
+                g2 = {"gamePk": 700199, "gameDate": t2, "officialDate": off2}
+                if dh_schedule == "no_official":
+                    g2.pop("officialDate")
                 return {"dates": [{"games": [
-                    {"gamePk": 700104, "gameDate": "2026-09-05T17:10:00Z"},
-                    {"gamePk": 700199, "gameDate": t2}]}]}
+                    {"gamePk": 700104, "gameDate": "2026-09-05T17:10:00Z",
+                     "officialDate": DH_DAY}, g2]}]}
             return {"dates": [{"games": [{
                 "gamePk": 810001, "gameDate": KICKOFF,
                 "teams": {"away": {"team": {"name": "Los Angeles Dodgers"}},
@@ -98,3 +103,28 @@ def test_pre_fix_behavior_would_have_overfired():
     v = _prior()
     old = [t[:10] + "T00:00:00+00:00" for t in v["prior_game_times_utc"]]
     assert "HISTORY_LEAK_OR_DUPLICATE_GAME" in str(_bridge(dict(v, prior_game_times_utc=old)))
+
+
+def test_doubleheader_game2_crossing_utc_midnight_is_kept():
+    v = _prior(dh_schedule="cross_utc")
+    assert v["prior_game_count"] == 13
+    assert "2026-09-06T02:10:00+00:00" in v["prior_game_times_utc"]
+    times = v["prior_game_times_utc"]
+    assert len(set(times)) == len(times)
+    assert "HISTORY_LEAK_OR_DUPLICATE_GAME" not in str(_bridge(v))
+
+
+def test_late_west_coast_single_game_not_dropped():
+    # Single-game dates never depend on the UTC start date; the gameLog
+    # official date is kept (conservative midnight stamp) and not dropped.
+    v = _prior()  # 2026-09-08 row = official date of a late PT game
+    assert v["prior_game_count"] == 13
+    assert "2026-09-08T00:00:00+00:00" in v["prior_game_times_utc"]
+
+
+@pytest.mark.parametrize("mode", ["wrong_official", "no_official"])
+def test_official_date_mismatch_or_missing_still_drops(mode):
+    v = _prior(dh_schedule=mode)
+    assert v["prior_game_count"] == 11
+    assert not [t for t in v["prior_game_times_utc"] if t.startswith(DH_DAY)
+                or t.startswith("2026-09-06T02")]

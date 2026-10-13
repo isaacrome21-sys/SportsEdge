@@ -139,14 +139,21 @@ class MLBBatterPublicSource:
                         start = _clock(g.get("gameDate"), "PRIOR_GAME_START")
                     except MissingMLBBatterHistory:
                         continue
+                    # Match on MLB's official (local) game date, not the UTC
+                    # calendar date: a 10:10 PM ET game on Oct 12 starts
+                    # Oct 13 02:10Z but is officially an Oct 12 game, which
+                    # is how the gameLog row is dated. Missing officialDate
+                    # fails closed for that game.
                     if gpk in pks:
-                        found.setdefault(gpk, set()).add(start)
+                        official = str(g.get("officialDate") or "")
+                        found.setdefault(gpk, set()).add((start, official))
             for gpk in pks:
-                times = found.get(gpk) or set()
-                if (len(times) == 1 and next(iter(times)).date() == day
-                        and next(iter(times)) < kickoff
-                        and next(iter(times)) < now):
-                    verified[gpk] = next(iter(times))
+                entries = found.get(gpk) or set()
+                if len(entries) != 1:
+                    continue
+                start, official = next(iter(entries))
+                if official == day.isoformat() and start < kickoff and start < now:
+                    verified[gpk] = start
             if len({verified.get(g) for g in pks}) != len(pks) or not all(g in verified for g in pks):
                 for g in pks:
                     verified.pop(g, None)
