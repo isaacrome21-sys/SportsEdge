@@ -37,3 +37,31 @@ Module: `sportsedge/sports/nba/asof_team_ratings.py` (VERSION NBA_ASOF_TEAM_RATI
   "games_skipped_invalid": 3
 }
 ```
+
+## Quarter joint simulation (V1) — 1H / Q1 totals
+`sportsedge/sports/nba/quarter_joint_sim.py`: one path set per game (Q1–Q4 bivariate-normal team points with home/away correlation, integer, OT periods until untied); quarter shares, per-quarter SD, correlation, regulation share and OT scoring calibrated only on games before the slate. Full game, team totals, 1H, Q1 and ML all read from the same paths (ML vs margin inconsistency = 0.0). Pushes settled explicitly for whole-number lines.
+Lines below are **NAIVE STAND-INS (train mean), not market lines**; market baseline MISSING. Data: same free ESPN summaries with quarter linescores (1,231 games; cache not committed).
+
+```json
+{
+  "H1_TOTAL_NAIVE_STANDIN_LINE": {
+    "n": 1076,
+    "model_brier": 0.23527,
+    "model_logloss": 0.66307,
+    "naive_brier": 0.24951,
+    "naive_logloss": 0.69217
+  },
+  "Q1_TOTAL_NAIVE_STANDIN_LINE": {
+    "n": 1076,
+    "model_brier": 0.24098,
+    "model_logloss": 0.67482,
+    "naive_brier": 0.25003,
+    "naive_logloss": 0.69321
+  },
+  "lines": "NAIVE_STANDIN_TRAIN_MEAN_NOT_MARKET",
+  "max_ml_vs_margin_inconsistency": 0.0,
+  "market_baseline": "MISSING_NO_PAIRED_TIMESTAMPED_ODDS",
+  "rest_adj": 0.0,
+  "research_only": true
+}
+```
