@@ -49,3 +49,26 @@
 - Which host runs the capture, and how its clock is checked.
 - Confirming the 2026-27 cadence and naming once the season starts.
 - Terms of use.
+
+## Approved offline build + infrastructure design (ChatGPT ruling)
+**Offline module:** `sportsedge/sports/nba/injury_report_capture.py`, with tests in `tests/test_nba_injury_report_capture.py` using recorded fixtures only.
+- **Trusted receipt clock.** `received_at` comes from a module clock read inside the module; only tests monkeypatch it. It is kept separate from the header effective time.
+- **Slot status.** ON_TIME / LATE / AFTER_LAST_TIPOFF, plus explicit MISSED records.
+- **Inconsistencies.** Parse failures and `TIME_INCONSISTENT` are kept but marked unusable.
+- **Hash chain.** Records are hash-chained, and `verify_chain` requires an anchor head held outside the log. Tampering or truncation fails.
+- **As-of lookup.** `usable_as_of` uses the receipt time only.
+- **No network or scheduler.** The module has no network, scheduler, storage SDK or subprocess code, and a test enforces this.
+
+**Infrastructure (design only; nothing provisioned):**
+- **Runner:** a dedicated GitHub Actions runner/job identity used only for this capture. It has no repo write token beyond appending anchor heads, and no access to betting or pricing secrets.
+- **Storage:** an object bucket with retention lock (WORM/compliance mode, fixed retention period).
+  - **Write role:** `PutObject` only, no delete or overwrite, used by the capture job.
+  - **Read role:** `GetObject`/`List` only, used by analysis.
+  - The two roles are separate credentials. Neither can change retention settings.
+- **External anchor:** the chain head after each run goes to a separate append-only location (a different bucket prefix with its own lock, or an issue comment) that the write role cannot modify.
+- **Clock:** the runner records its NTP source and offset in each run header.
+- **Not done:** no provisioning, no automated downloads, no scheduler or workflow file. Turning any of this on needs an explicit owner decision.
+
+**Terms note:** the NBA's terms of use restrict use related to gambling, and **permission for this use is UNVERIFIED**. Every record carries `permission="UNVERIFIED_NBA_TERMS_RESTRICT_GAMBLING_USE"`. No capture may run until the owner confirms permission in writing (or rejects the source).
+
+This build is not evaluative, so it has no pre-registration. Any later evaluation using captured reports must be pre-registered first.
