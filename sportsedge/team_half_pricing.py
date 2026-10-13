@@ -50,6 +50,17 @@ def _scoring(sport, home, away, kickoff, now, provider):
         raise ValueError("SPORT_NOT_SUPPORTED_BY_TEAM_PERIOD_MODEL")
     if sport == "CFB" and any(engine.PublicContext.key(x) in engine.IL_COLLEGE_NAMES for x in (home,away)):
         raise ValueError("ILLINOIS_COLLEGE_EXCLUDED")
+    if sport == "CFB":
+        # ID-keyed enforcement on the verified directory binding: the name
+        # list above is form-dependent (it missed Chicago State, ESPN id
+        # 2130, in every attested form). A resolved registry id excludes
+        # outright; an unresolved team falls through to the fixture
+        # verification below, which already fails closed
+        # (UNIQUE_PUBLIC_MATCHUP_REQUIRED).
+        for name in (home, away):
+            team = provider.identify("CFB", name)
+            if team is not None and str(team.get("id") or "") in engine.IL_COLLEGE_ESPN_IDS:
+                raise ValueError("ILLINOIS_COLLEGE_EXCLUDED")
     if not home or not away or home == away:
         raise ValueError("AWAY_HOME_REQUIRED")
     start = engine.dt(kickoff)
