@@ -1,0 +1,26 @@
+{
+ "2024-11-20_01PM": {
+  "url": "https://ak-static.cms.nba.com/referee/injury/Injury-Report_2024-11-20_01PM.pdf",
+  "pdf_sha256": "7e2db2f69565ecfb8e06d82b0e76d9e818500f12bede47d8389f91948a389859",
+  "http_last_modified": "Wed, 20 Nov 2024 18:30:05 GMT",
+  "http_date_at_receipt": "Tue, 13 Oct 2026 15:22:14 GMT",
+  "extractor": "pdftotext -layout (poppler 25.03.0)",
+  "note": "Historical PDF fetched 2026-10-13 as a PARSER FIXTURE ONLY; not as-of evidence, not for evaluation backfill"
+ },
+ "2025-01-15_05PM": {
+  "url": "https://ak-static.cms.nba.com/referee/injury/Injury-Report_2025-01-15_05PM.pdf",
+  "pdf_sha256": "e8824fc221df5b6546e65157a13b9eaa8df0e5c368d0983ddadeb683af80336c",
+  "http_last_modified": "Wed, 15 Jan 2025 22:30:04 GMT",
+  "http_date_at_receipt": "Tue, 13 Oct 2026 15:22:13 GMT",
+  "extractor": "pdftotext -layout (poppler 25.03.0)",
+  "note": "Historical PDF fetched 2026-10-13 as a PARSER FIXTURE ONLY; not as-of evidence, not for evaluation backfill"
+ },
+ "2025-03-10_06PM": {
+  "url": "https://ak-static.cms.nba.com/referee/injury/Injury-Report_2025-03-10_06PM.pdf",
+  "pdf_sha256": "fb3508349cfea8d8fcac39398bf191151a7a216beb7e9581d3db9076bd7d99dd",
+  "http_last_modified": "Mon, 10 Mar 2025 22:30:04 GMT",
+  "http_date_at_receipt": "Tue, 13 Oct 2026 15:22:14 GMT",
+  "extractor": "pdftotext -layout (poppler 25.03.0)",
+  "note": "Historical PDF fetched 2026-10-13 as a PARSER FIXTURE ONLY; not as-of evidence, not for evaluation backfill"
+ }
+}
