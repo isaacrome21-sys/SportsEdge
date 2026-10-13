@@ -219,3 +219,93 @@ def test_radar_requires_market_exact_fresh_peer_receipts():
         assert scan(lambda ref: ref["fair"].__setitem__(0,.85)) == []
         assert scan(lambda ref: ref["peer_price_pairs"][0]["prices"].update(over=-125)) == []
         assert scan(lambda ref: ref.update(peer_price_pairs=[])) == []
+
+
+def test_radar_rejects_started_stale_or_insufficient_reference_books():
+    """Carry forward the old #2015 valid/stale/started/2-soft-book coverage."""
+    from scripts.collect_auto_dk_four_sports import _pair_fair
+    with TemporaryDirectory() as temp:
+        root=Path(temp)/"auto_dk_cards"
+        root.mkdir()
+        odds=root.parent/"auto_dk"
+        odds.mkdir()
+        current="2026-10-11T17:01:00Z"
+        now=datetime(2026,10,11,17,2,tzinfo=timezone.utc)
+        def game(name, *, kickoff="2026-10-11T20:25:00Z",
+                 seen=current, method="PINNACLE_POWER_V1",
+                 books=("pinnacle",), under=-102):
+            rows=[{"book":book,"observed_at":seen,"line":54.5} for book in books]
+            pair={"line":54.5,"over":105,"under":-115}
+            return {
+                "provider_event_id":name, "away":name,"home":"ARI",
+                "commence_time":kickoff,
+                "markets":{"totals":{"line":54.5,"over":-118,
+                                     "under":under,"observed_at":seen}},
+                "reference":{"totals":{
+                    "method":method,"fair":_pair_fair(pair),
+                    "books":list(books),"model_probability":None,
+                    "provider_event_id":name,"market_key":"totals",
+                    "dk_observed_at":seen,"dk_line":54.5,
+                    "peer_evidence":rows,
+                    "peer_price_pairs":[{"book":book,"prices":{"over":105,"under":-115}}
+                                        for book in books]}},
+            }
+        valid=game("DET")
+        two_books=game("SF",method="MULTIBOOK_MEDIAN_POWER_V1",
+                       books=("fanduel","betmgm"))
+        stale=game("BUF",seen="2026-10-11T16:30:00Z")
+        started=game("PHI",kickoff="2026-10-11T13:30:00Z")
+        (odds/"nfl_odds.json").write_text(json.dumps({
+            "status":"READY","games":[valid,two_books,stale,started]}))
+        scan,error=card.nfl_market_price_radar(root,now)
+        assert error is None
+        assert len(scan)==1
+        assert scan[0]["matchup"]=="DET @ ARI"
+        assert scan[0]["selection"]=="Under 54.5"
+        assert scan[0]["price"]==-102
+        assert .03 < scan[0]["ev"] < .05
+
+
+def test_radar_three_independent_books_required_and_straight_cap_enforced():
+    """Three fresh same-line peers can qualify, but a -200 DK side cannot."""
+    from scripts.collect_auto_dk_four_sports import _pair_fair
+    peer_pair={"line":54.5,"over":-115,"under":100}
+    with TemporaryDirectory() as temp:
+        root=Path(temp)/"auto_dk_cards"
+        root.mkdir()
+        odds=root.parent/"auto_dk"
+        odds.mkdir()
+        stamp="2026-10-11T17:01:00Z"
+        peers=["fanduel","betmgm","betrivers"]
+        row={
+            "provider_event_id":"game_1","away":"DET","home":"ARI",
+            "commence_time":"2026-10-11T20:25:00Z",
+            "markets":{"totals":{"line":54.5,"over":-102,"under":-200,
+                                 "observed_at":stamp}},
+            "reference":{"totals":{
+                "method":"MULTIBOOK_MEDIAN_POWER_V1","fair":_pair_fair(peer_pair),
+                "books":peers, "model_probability":None,
+                "provider_event_id":"game_1","market_key":"totals",
+                "dk_observed_at":stamp,"dk_line":54.5,
+                "peer_evidence":[{"book":book,"observed_at":stamp,"line":54.5}
+                                 for book in peers],
+                "peer_price_pairs":[{"book":book,"prices":{"over":-115,"under":100}}
+                                    for book in peers],
+            }},
+        }
+        def scan():
+            (odds/"nfl_odds.json").write_text(json.dumps({
+                "status":"READY","games":[row]}))
+            result,error=card.nfl_market_price_radar(
+                root,datetime(2026,10,11,17,2,tzinfo=timezone.utc))
+            assert error is None
+            return result
+        matched=scan()
+        assert len(matched)==1
+        assert matched[0]["selection"]=="Over 54.5"
+        assert matched[0]["price"]==-102
+        row["markets"]["totals"]["over"]=-200
+        assert scan()==[]
+        row["markets"]["totals"]["over"]=-102
+        row["reference"]["totals"]["peer_evidence"][2]["observed_at"]="2026-10-11T16:40:00Z"
+        assert scan()==[]
