@@ -4,9 +4,10 @@ Every pricer here derives from the same verified ``artifacts.free_models``
 context pipeline (``PublicContext`` + ``context_for``) and the same declared
 distribution families (Poisson for MLB, normal for football) as the existing
 game ML/spread/total engine. The mean construction replicates
-``free_models.calculate`` EXACTLY -- base prior + HFA + margin proxy +
-injury/form (football) or pitcher adjustments (MLB) + weather -- never the
-"simplified" construction that drops injury context (see 2026-10-11 incident:
+``free_models.calculate`` with the Oct 13 owner disables -- base prior +
+HFA + team ratings + retained injuries (football) + weather; unvalidated
+recent form (football) and pitcher ERA adjustments (MLB) contribute ZERO.
+Do not use the "simplified" construction that drops injury context (see 2026-10-11 incident:
 a participation-blind 1H price manufactured a fake edge on Lamar-out news).
 
 New declared (unfitted, unvalidated) assumptions, all constants below:
