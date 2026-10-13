@@ -20,6 +20,6 @@ Minutes MAE: v2 4.85 vs oracle-naive **4.83**.
 ## Decision (fixed rule): PTS PASS_RESEARCH, REB PASS_RESEARCH, AST PASS_RESEARCH, **MINUTES FAIL**
 
 ## Interpretation
-- **About half of v2's PTS edge was the oracle**, e.g. PTS 14.5: gap 0.0102 → 0.0070. The rest survives matching.
+- **About a third (≈31%) of v2's PTS edge was the oracle**, e.g. PTS 14.5: gap 0.0102 → 0.0070. The rest survives matching.
 - **v2 minutes add nothing** over oracle-redistributed last-10 minutes (4.85 vs 4.83). The remaining stat gain likely comes from shrunk per-minute rates and the player-level NB dispersion, not from minutes.
 - **Both arms still know who played.** This is not pregame skill. Real timestamped availability evidence is required before any claim. No promotion.
