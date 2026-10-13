@@ -37,6 +37,11 @@ from .mlb_settlement_evidence import (
     classify_observation_settlement,
     official_fact_coverage,
 )
+from .moneyline_settlement import (
+    MoneylineSettlementType,
+    declared_moneyline_settlement_type,
+    settle_moneyline,
+)
 from .odds_api_source import EVENT_TIME_TOLERANCE_SECONDS, normalize_name
 
 ARCHIVE_TYPE = "MLB_ADDITIONAL_PIT_QUOTES"
@@ -248,7 +253,12 @@ def _binary_outcome(event_true: bool, side: Any) -> str:
     return "WIN" if won else "LOSS"
 
 
-def _f5_moneyline_outcome(facts: Mapping[str, Any], side: Any) -> str:
+def _f5_moneyline_outcome(
+    facts: Mapping[str, Any],
+    side: Any,
+    *,
+    settlement_type: MoneylineSettlementType | None = None,
+) -> str:
     f5 = facts.get("f5")
     if not isinstance(f5, Mapping):
         raise MLBPITJoinError("F5_FACTS_MISSING")
@@ -262,7 +272,15 @@ def _f5_moneyline_outcome(facts: Mapping[str, Any], side: Any) -> str:
     else:
         raise MLBPITJoinError("F5_MONEYLINE_SIDE_INVALID")
     if selected == other:
-        raise MLBPITJoinError(_F5_TIE_POLICY_MISSING)
+        # A tie is settleable only under an explicitly declared
+        # settlement type (sportsedge.moneyline_settlement): TWO_WAY
+        # pushes, THREE_WAY makes the team selection lose to the DRAW
+        # selection. Undeclared keeps the historical fail-closed code.
+        if settlement_type is None:
+            raise MLBPITJoinError(_F5_TIE_POLICY_MISSING)
+        return settle_moneyline(
+            settlement_type, side=direction,
+            selected_runs=selected, other_runs=other)
     return "WIN" if selected > other else "LOSS"
 
 
@@ -301,13 +319,24 @@ def _f5_total_outcome(facts: Mapping[str, Any], line: Any, side: Any) -> str:
     return "WIN" if won else "LOSS"
 
 
-def _policy_ambiguity(facts: Mapping[str, Any], market: str) -> list[str]:
+def _policy_ambiguity(
+    facts: Mapping[str, Any],
+    market: str,
+    *,
+    sportsbook: Any = None,
+) -> list[str]:
     reasons: list[str] = []
     if market == "F5_MONEYLINE":
         f5 = facts.get("f5")
         if isinstance(f5, Mapping) and "away_runs" in f5 and "home_runs" in f5:
             if float(f5["away_runs"]) == float(f5["home_runs"]):
-                reasons.append(_F5_TIE_POLICY_MISSING)
+                # A tied F5 moneyline is ambiguous only while the
+                # book's settlement type is undeclared. A verified
+                # declaration (e.g. DraftKings TWO_WAY, ties push)
+                # defines the settlement, so no ambiguity is recorded.
+                if declared_moneyline_settlement_type(
+                        market, sportsbook) is None:
+                    reasons.append(_F5_TIE_POLICY_MISSING)
     elif market == "FIRST_HOME_RUN":
         first_hr = facts.get("first_home_run")
         if isinstance(first_hr, Mapping) and first_hr.get("occurred") is False:
@@ -315,9 +344,20 @@ def _policy_ambiguity(facts: Mapping[str, Any], market: str) -> list[str]:
     return reasons
 
 
-def _derive_outcome(facts: Mapping[str, Any], market: str, entity_id: str, line: Any, side: Any) -> str:
+def _derive_outcome(
+    facts: Mapping[str, Any],
+    market: str,
+    entity_id: str,
+    line: Any,
+    side: Any,
+    *,
+    sportsbook: Any = None,
+) -> str:
     if market == "F5_MONEYLINE":
-        return _f5_moneyline_outcome(facts, side)
+        return _f5_moneyline_outcome(
+            facts, side,
+            settlement_type=declared_moneyline_settlement_type(
+                market, sportsbook))
     if market == "F5_RUN_LINE":
         return _f5_run_line_outcome(facts, line, side)
     if market == "F5_TOTALS":
@@ -470,7 +510,10 @@ def join_additional_archive(
                 sportsbook=sportsbook,
             )
             fact_state = str((official_fact_coverage(facts).get(market) or {}).get("state") or "OFFICIAL_FACTS_MISSING")
-            ambiguity_reasons = [*ambiguity_reasons, *_policy_ambiguity(facts, market)]
+            ambiguity_reasons = [
+                *ambiguity_reasons,
+                *_policy_ambiguity(facts, market, sportsbook=sportsbook),
+            ]
             settlement_state = classify_observation_settlement(
                 official_fact_state=fact_state,
                 book_rules_validated=book_valid,
@@ -482,7 +525,8 @@ def join_additional_archive(
             settled_outcome = None
             if settlement_state == "SETTLEMENT_ELIGIBLE":
                 settled_outcome = _derive_outcome(
-                    facts, market, entity_id, quote.get("line"), quote.get("side")
+                    facts, market, entity_id, quote.get("line"),
+                    quote.get("side"), sportsbook=sportsbook,
                 )
 
             raw = {
