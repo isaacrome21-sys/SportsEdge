@@ -83,12 +83,13 @@ def _scoring(sport, home, away, kickoff, now, provider):
     base, sd_total, sd_margin, hfa = engine.PRIORS[sport]
     hm = base + hfa/2 + ctx["home_rating"]
     am = base - hfa/2 + ctx["away_rating"]
-    if sport == "MLB":
-        hm += ctx["home_pitcher_adj"]
-        am += ctx["away_pitcher_adj"]
-    else:
-        hm += ctx["home_injury_pts"] + ctx["home_form"]
-        am += ctx["away_injury_pts"] + ctx["away_form"]
+    # These factor observations remain in the PIT context for audit but
+    # are explicitly DISABLED in prices: MLB unvalidated pitcher adjustment,
+    # and NFL/CFB recent-form. Keep separately verified football injuries.
+    # Do not silently re-enable factors via the derivative/team-half route.
+    if sport in {"NFL", "CFB"}:
+        hm += ctx["home_injury_pts"]
+        am += ctx["away_injury_pts"]
     hm += ctx.get("weather_total_adj",0)/2
     am += ctx.get("weather_total_adj",0)/2
     if not min(hm,am) > .2:
