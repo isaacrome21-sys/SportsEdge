@@ -30,6 +30,7 @@ from sportsedge.pricing_provenance import (
     ANCHORED_WATCH_STATUS,
     LANE_MARKET_ANCHORED as PROVENANCE_MARKET_ANCHORED,
     apply_play_gate,
+    availability_forces_research_only,
     is_play_eligible,
     provenance_for_game_result,
 )
@@ -1465,12 +1466,16 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
     # only the explicitly passed prepricing_adjustments parameter is used.
     prepricing_list = prepricing_adjustments or []
     for i, row in enumerate(rows):
+        pp_adj = None
         try:
             if not isinstance(row, dict):
                 raise ValueError("LINE_MUST_BE_OBJECT")
             bound_row = dict(row)
             # Strip any spoofed prepricing_adjustments from user intake
             bound_row.pop("prepricing_adjustments", None)
+            # availability_status is system-stamped only (from the
+            # verified prepricing object below); never from intake.
+            bound_row.pop("availability_status", None)
             if not bound_row.get("sport") and ticket_sport is not None:
                 bound_row["sport"] = ticket_sport
             # Get system-verified prepricing for this row (if any)
@@ -1481,6 +1486,14 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
                                prepricing_adjustments=pp_adj)
         except (ValueError, TypeError, KeyError, AttributeError) as exc:
             result = {"status": "BLOCKED_INVALID", "reason": str(exc)[:140]}
+        # Trusted QB availability state (issue #2158): rides the
+        # VERIFIED prepricing object, stamped BEFORE the play gate and
+        # the surface builders below, so a row priced on Form 2 QB
+        # identity evidence is forced research-only by structure.
+        if (isinstance(pp_adj, dict)
+                and pp_adj.get("verification_status") == "VERIFIED"
+                and pp_adj.get("availability_status")):
+            result["availability_status"] = pp_adj["availability_status"]
         result["input_index"] = i
         all_rows.append(result)
     # Provenance gate (Oct 12 2026 ruling): stamp every priced row and
@@ -1504,6 +1517,15 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
             # The row's primary probability borrowed the sportsbook price.
             # Even if its independent side-view clears the EV floor, the
             # row itself is anchored research: watch surface only.
+            watchlist.append(row)
+            continue
+        if availability_forces_research_only(row):
+            # Availability guard (issue #2158): the row priced on a QB
+            # whose identity was verified (Form 2) but whose
+            # availability is explicitly unknown. This builder does not
+            # key on row status, so the gate's status demotion alone
+            # cannot keep the row off the candidate surface -- route it
+            # to the watchlist (research output carrying the label).
             watchlist.append(row)
             continue
         if row.get("status") in {"WATCH_NFL_NO_VERIFIED_CONTEXT",
@@ -1578,6 +1600,7 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "anchored_max_surface": "WATCH",
                 "anchored_ev_in_edges_lists": "SUPPRESSED",
                 "undetermined_provenance": "FAIL_CLOSED",
+                "availability_unverified_max_surface": "RESEARCH_ONLY",
             },
             "independent_candidates": independent,
             "independent_watchlist": watchlist,
