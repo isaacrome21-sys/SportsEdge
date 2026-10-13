@@ -718,6 +718,8 @@ def score_means(sport, context):
     No quoted market price enters here. Owner-disabled MLB pitcher ERA,
     recent form and rest differential factors must contribute exactly zero
     even when their unvalidated research values are present in context.
+    The identical Oct 13 ruling disables NBA rest_adj despite its different
+    key name; the live and pregame mean paths must remain in parity.
     This helper restores the live_run_it import omitted by composition.
     """
     base, _, _, hfa = PRIORS[sport]
@@ -726,9 +728,8 @@ def score_means(sport, context):
     if sport != "MLB":
         home_mean += context["home_injury_pts"]
         away_mean += context["away_injury_pts"]
-        if sport == "NBA":
-            home_mean += context["rest_adj"] / 2
-            away_mean -= context["rest_adj"] / 2
+        # NBA rest_adj is also DISABLED_PENDING_INCREMENTAL_VALUE. Values
+        # remain in context for research; no live mean contribution.
     if "weather_total_adj" in context:
         home_mean += context["weather_total_adj"] / 2
         away_mean += context["weather_total_adj"] / 2
@@ -991,8 +992,9 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
         away_mean += context["away_injury_pts"]
         notes.append("RECENT_FORM_DISABLED_PENDING_INCREMENTAL_VALUE")
         if sport == "NBA":
-            home_mean += context["rest_adj"] / 2
-            away_mean -= context["rest_adj"] / 2
+            # Owner ruling: rest_adj is research only, just like rest_diff_adj.
+            # Even a verified/manual nonzero context cannot change pricing.
+            notes.append("REST_ADJ_DISABLED_PENDING_INCREMENTAL_VALUE")
     if "weather_total_adj" in context:
         home_mean += context["weather_total_adj"] / 2
         away_mean += context["weather_total_adj"] / 2
@@ -1300,10 +1302,11 @@ def _paired_book_context(rows, evaluated, index):
         if abs((input_time - matching_time).total_seconds()) > 120:
             projected["paired_market_status"] = "MISMATCHED_QUOTE_TIMESTAMPS"
             return
-    elif input_time is None:
-        # The partner price came from this row's own opposite_odds field;
-        # the pair is only as evidenced as this quote's own capture time.
-        projected["paired_market_status"] = "QUOTE_TIMESTAMP_MISSING"
+    else:
+        # There is no independently timestamped counterpart row. A bare
+        # opposite_odds field cannot justify EXACT_DK_TWO_SIDED_NO_VIG,
+        # irrespective of this quote's timestamp. Do not invent a pair.
+        projected["paired_market_status"] = "OPPOSITE_PRICE_NOT_A_TIMESTAMPED_QUOTE"
         return
     try:
         p1 = 1.0 / odds_decimal(result["odds_american"])
