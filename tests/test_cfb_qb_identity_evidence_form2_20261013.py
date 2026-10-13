@@ -18,7 +18,7 @@ is touched.
 import copy
 import json
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sportsedge.prepricing import factor_ingestion as fi
 from sportsedge.prepricing import qb_identity_evidence as qe
@@ -513,11 +513,75 @@ class CaptureHelperTests(unittest.TestCase):
             opponent_id="2393", kickoff_utc=KICKOFF_ISO,
             previous_game_kickoff_utc=CHARTS["48"][3],
             depth_url=CHARTS["48"][0], now=NOW,
+            clock=lambda: NOW,
             fetch_text=lambda url: depth_text("48"),
             fetch_json=lambda url: copy.deepcopy(roster_obj))
         result = evaluate(bundle)
         self.assertTrue(result["ok"], result)
         self.assertEqual(result["resolved_athlete_id"], "5153846")
+
+    def test_capture_receipts_use_post_fetch_completion_times(self):
+        seen = []
+        times_checked = []
+        roster_obj = roster_payload("48")
+
+        def fetch_depth(_url):
+            seen.append("depth_fetched")
+            return depth_text("48")
+
+        def fetch_roster(_url):
+            seen.append("roster_fetched")
+            return copy.deepcopy(roster_obj)
+
+        def clock():
+            times_checked.append(tuple(seen))
+            return NOW - timedelta(seconds=30) if len(times_checked) == 1 else NOW
+
+        bundle = qe.capture_form2_bundle(
+            team_id="48", team_name="Delaware", event_id="401871067",
+            opponent_id="2393", kickoff_utc=KICKOFF_ISO,
+            previous_game_kickoff_utc=CHARTS["48"][3],
+            depth_url=CHARTS["48"][0], now=NOW,
+            clock=clock, fetch_text=fetch_depth, fetch_json=fetch_roster)
+        self.assertEqual(times_checked,
+                         [("depth_fetched",),
+                          ("depth_fetched", "roster_fetched", "roster_fetched")])
+        self.assertEqual(qe.dt(bundle["depth_snapshot"]["captured_at_utc"]),
+                         NOW - timedelta(seconds=30))
+        self.assertEqual(qe.dt(bundle["roster_snapshot"]["captured_at_utc"]), NOW)
+        self.assertTrue(evaluate(bundle)["ok"])
+
+    def test_capture_rejects_network_finish_at_kickoff(self):
+        with self.assertRaisesRegex(ValueError, "CAPTURE_AT_OR_AFTER_KICKOFF"):
+            qe.capture_form2_bundle(
+                team_id="48", team_name="Delaware", event_id="401871067",
+                opponent_id="2393", kickoff_utc=KICKOFF_ISO,
+                previous_game_kickoff_utc=CHARTS["48"][3],
+                depth_url=CHARTS["48"][0], now=NOW,
+                clock=lambda: KICKOFF,
+                fetch_text=lambda url: depth_text("48"),
+                fetch_json=lambda url: copy.deepcopy(roster_payload("48")))
+
+    def test_capture_rejects_nonmonotonic_or_unaware_clock(self):
+        values = iter([NOW, NOW - timedelta(seconds=1)])
+        with self.assertRaisesRegex(ValueError, "CAPTURE_CLOCK_NONMONOTONIC"):
+            qe.capture_form2_bundle(
+                team_id="48", team_name="Delaware", event_id="401871067",
+                opponent_id="2393", kickoff_utc=KICKOFF_ISO,
+                previous_game_kickoff_utc=CHARTS["48"][3],
+                depth_url=CHARTS["48"][0],
+                clock=lambda: next(values),
+                fetch_text=lambda url: depth_text("48"),
+                fetch_json=lambda url: copy.deepcopy(roster_payload("48")))
+        with self.assertRaisesRegex(ValueError, "CAPTURE_CLOCK_UNVERIFIED"):
+            qe.capture_form2_bundle(
+                team_id="48", team_name="Delaware", event_id="401871067",
+                opponent_id="2393", kickoff_utc=KICKOFF_ISO,
+                previous_game_kickoff_utc=CHARTS["48"][3],
+                depth_url=CHARTS["48"][0],
+                clock=lambda: datetime(2026, 10, 13, 14),
+                fetch_text=lambda url: depth_text("48"),
+                fetch_json=lambda url: copy.deepcopy(roster_payload("48")))
 
     def test_capture_refuses_unstable_roster_count(self):
         roster_obj = roster_payload("48")
