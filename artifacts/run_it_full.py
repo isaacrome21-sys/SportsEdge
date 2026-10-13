@@ -792,6 +792,9 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         card["mlb_full_board"] = phone_market_board(labeled_inputs, evaluated)
         card["summary"]["mlb_market_coverage"] = dict(card["mlb_full_board"]["input_coverage"])
     card["runner"]="RUN_IT_FULL_MLB_AND_NAMED_FOOTBALL_PLAYER_HISTORIES_V1"
+    from sportsedge.phone_display import identity_rows, build_phone_card
+    card["selection_intake"] = identity_rows(rows, default_sport)
+    card["phone_card"] = build_phone_card(card)
     return card
 
 
