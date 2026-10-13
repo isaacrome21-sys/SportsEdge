@@ -1,6 +1,6 @@
 """Run the CBB as-of ratings walk-forward on a local ESPN cache (outside the repo).
 
-Usage: PYTHONPATH=. python scripts/run_cbb_asof_harness.py /workspace/cbb_cache
+Usage: PYTHONPATH=. python scripts/run_cbb_asof_harness.py /workspace/cbb_cache [v1|v2] [d1]
 Cache: sb/YYYYMMDD.json (trimmed scoreboard events) and games/<id>.json (trimmed box stats).
 """
 import glob
@@ -30,6 +30,12 @@ for f in sorted(glob.glob(os.path.join(cache, "sb", "*.json"))):
                                  sum(poss) / len(poss), bool(e.get("neutral")), bool(e.get("completed"))))
         except (KeyError, ValueError, TypeError, FileNotFoundError, ZeroDivisionError):
             skipped += 1
-rep = run_harness(games)
+version = sys.argv[2] if len(sys.argv) > 2 else "v1"
+subset = len(sys.argv) > 3 and sys.argv[3] == "d1"
+d1 = None
+if version == "v2" or subset:
+    t = json.load(open(os.path.join(cache, "d1_teams.json")))["sports"][0]["leagues"][0]["teams"]
+    d1 = [x["team"]["id"] for x in t]
+rep = run_harness(games, version=version, d1_ids=d1)
 rep["games_loaded"], rep["skipped"] = len(games), skipped
 print(json.dumps(rep, indent=1))

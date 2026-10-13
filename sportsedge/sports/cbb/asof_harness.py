@@ -22,20 +22,22 @@ def _ll(p, y):
     return -(y * log(p) + (1 - y) * log(1 - p))
 
 
-def run_harness(games) -> dict:
+def run_harness(games, *, version: str = "v1", d1_ids=None) -> dict:
+    d1 = frozenset(map(str, d1_ids)) if d1_ids is not None else None
     games = sorted({g.game_id: g for g in games}.values(), key=lambda g: (g.start, g.game_id))
     by_day = defaultdict(list)
     for g in games:
         by_day[g.start.astimezone(CT).date()].append(g)
     acc = {k: [0, 0.0, 0.0, 0.0, 0.0] for k in ("moneyline", "spread", "total")}
     excluded_il = 0
+    excluded_non_d1 = 0
     for day in sorted(by_day):
         slate = by_day[day]
         cutoff = min(g.start for g in slate)
         train = [g for g in games if trainable(g, cutoff)]
         if len(train) < MIN_TRAIN:
             continue
-        r = fit_asof(train, cutoff)
+        r = fit_asof(train, cutoff, version=version, d1_ids=d1)
         pf, pa, cnt = defaultdict(float), defaultdict(float), defaultdict(int)
         for g in train:
             for t, f, a in ((g.home_id, g.home_points, g.away_points), (g.away_id, g.away_points, g.home_points)):
@@ -47,6 +49,9 @@ def run_harness(games) -> dict:
         for g in slate:
             if illinois_block(g.home_id, g.away_id):
                 excluded_il += 1
+                continue
+            if d1 is not None and (g.home_id not in d1 or g.away_id not in d1):
+                excluded_non_d1 += 1
                 continue
             if not g.completed or min(cnt.get(g.home_id, 0), cnt.get(g.away_id, 0)) < MIN_TEAM_GAMES:
                 continue
@@ -74,4 +79,5 @@ def run_harness(games) -> dict:
     passed = all(out[k]["n"] and out[k]["brier_model"] < out[k]["brier_naive"] for k in out) and \
         out["moneyline"]["ll_model"] < out["moneyline"]["ll_naive"]
     return {"markets": out, "decision": "PASS_RESEARCH" if passed else "FAIL", "lines": "NAIVE_STANDIN",
-            "market_baseline": "MISSING", "illinois_games_excluded": excluded_il}
+            "market_baseline": "MISSING", "illinois_games_excluded": excluded_il,
+            "non_d1_games_excluded": excluded_non_d1, "version": version, "hca_last": round(r.hca, 3)}

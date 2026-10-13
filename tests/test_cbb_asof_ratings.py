@@ -69,3 +69,45 @@ def test_illinois_excluded_by_id_home_and_away():
 
 def test_possessions_formula():
     assert possessions(59, 13, 8, 22) == pytest.approx(59 - 13 + 8 + 0.475 * 22)
+
+
+def _mismatch_games():
+    """Strong hosts vs weak non-D1 visitors at home; true HCA = 3."""
+    rng = random.Random(7)
+    st = dict(STRENGTH, nd1=-30, nd2=-30)
+    out, k = [], 0
+    for d in range(50):
+        pairs = [("150", "nd1"), ("57", "nd2")] if d < 15 else []
+        ids = list(STRENGTH)
+        rng.shuffle(ids)
+        pairs += [(ids[i], ids[i + 1]) for i in range(0, 6, 2)]
+        for h, a in pairs:
+            pos = 68.0
+            neutral = d % 4 == 0 and d >= 15
+            margin = (st[h] - st[a]) * 0.7 + (0 if neutral else 3) + rng.gauss(0, 6)
+            out.append(CBBGame(f"m{k}", T0 + timedelta(days=d, hours=k % 5), h, a,
+                               round(72 + margin / 2), round(72 - margin / 2), pos, neutral))
+            k += 1
+    return out
+
+
+def test_v2_joint_hca_removes_mismatch_bias_and_pools_non_d1():
+    g = _mismatch_games()
+    cut = T0 + timedelta(days=51)
+    v1 = fit_asof(g, cut)
+    v2 = fit_asof(g, cut, version="v2", d1_ids=STRENGTH.keys())
+    assert v1.hca > 6  # raw home margin is confounded by cupcake games
+    assert abs(v2.hca - 3) < 2
+    assert "NON_D1" in v2.n and "nd1" not in v2.n
+    assert v2.predict("150", "nd2", neutral=False)["margin"] > 10
+    with pytest.raises(ValueError):
+        fit_asof(g, cut, version="v2")
+
+
+def test_v2_leakage_invariance():
+    g = _mismatch_games()
+    cut = T0 + timedelta(days=30)
+    base = fit_asof(g, cut, version="v2", d1_ids=STRENGTH.keys())
+    fut = [CBBGame("z", cut - timedelta(hours=1), "150", "57", 300, 0, 70, False)]
+    again = fit_asof(list(reversed(g)) + fut, cut, version="v2", d1_ids=STRENGTH.keys())
+    assert round(base.hca, 9) == round(again.hca, 9) and base.off == again.off

@@ -20,6 +20,8 @@ FINAL_BUFFER = timedelta(hours=3)
 SHRINK_GAMES = 5.0
 ITERATIONS = 20
 FTA_COEF = 0.475
+NON_D1 = "NON_D1"
+VERSION_V2 = "CBB_ASOF_RATINGS_V2_20261013"
 
 
 @dataclass(frozen=True)
@@ -69,9 +71,14 @@ class CBBRatings:
     margin_sd: float
     total_sd: float
     version: str = VERSION
+    d1_ids: frozenset | None = None
+
+    def _key(self, t: str) -> str:
+        return t if self.d1_ids is None or t in self.d1_ids else NON_D1
 
     def predict(self, home_id: str, away_id: str, *, neutral: bool) -> dict:
         block = illinois_block(home_id, away_id)
+        home_id, away_id = self._key(home_id), self._key(away_id)
         for t in (home_id, away_id):
             if t not in self.n:
                 raise ValueError("TEAM_HAS_NO_PRIOR_GAMES:" + t)
@@ -94,7 +101,16 @@ class CBBRatings:
         return 1 - _phi((total_line - pred["total"]) / self.total_sd)
 
 
-def fit_asof(games: Iterable[CBBGame], cutoff: datetime) -> CBBRatings:
+def fit_asof(games: Iterable[CBBGame], cutoff: datetime, *, version: str = "v1",
+             d1_ids: Iterable[str] | None = None) -> CBBRatings:
+    """v1: raw home-margin H (pre-registered, biased). v2: H fitted jointly as the home
+    residual after team strengths each iteration; non-D1 teams pooled into NON_D1."""
+    if version not in {"v1", "v2"}:
+        raise ValueError("VERSION_INVALID")
+    d1 = frozenset(str(t) for t in d1_ids) if (version == "v2" and d1_ids is not None) else None
+    if version == "v2" and d1 is None:
+        raise ValueError("V2_REQUIRES_D1_IDS")
+    key = (lambda t: t) if d1 is None else (lambda t: t if t in d1 else NON_D1)
     if cutoff.tzinfo is None:
         raise ValueError("CUTOFF_TIMEZONE_REQUIRED")
     seen, prior = set(), []
@@ -108,12 +124,17 @@ def fit_asof(games: Iterable[CBBGame], cutoff: datetime) -> CBBRatings:
     if len(prior) < 20:
         raise ValueError("FEWER_THAN_20_TRAINABLE_GAMES")
     nn = [g for g in prior if not g.neutral]
-    hca = sum(g.home_points - g.away_points for g in nn) / len(nn) if nn else 0.0
-    rows = []  # (team, opp, eff_for, pace, home_sign)
-    for g in prior:
-        s = 0.0 if g.neutral else 1.0
-        rows.append((g.home_id, g.away_id, 100 * (g.home_points - s * hca / 2) / g.possessions, g.possessions))
-        rows.append((g.away_id, g.home_id, 100 * (g.away_points + s * hca / 2) / g.possessions, g.possessions))
+    hca = (sum(g.home_points - g.away_points for g in nn) / len(nn) if nn else 0.0) if version == "v1" else 0.0
+
+    def build_rows(h):
+        out = []
+        for g in prior:
+            s = 0.0 if g.neutral else 1.0
+            hk, ak = key(g.home_id), key(g.away_id)
+            out.append((hk, ak, 100 * (g.home_points - s * h / 2) / g.possessions, g.possessions))
+            out.append((ak, hk, 100 * (g.away_points + s * h / 2) / g.possessions, g.possessions))
+        return out
+    rows = build_rows(hca)
     eff = sum(r[2] for r in rows) / len(rows)
     lp = sum(r[3] for r in rows) / len(rows) / 2  # per-team pace contribution baseline
     teams = sorted({r[0] for r in rows})
@@ -123,17 +144,29 @@ def fit_asof(games: Iterable[CBBGame], cutoff: datetime) -> CBBRatings:
     off = {t: 0.0 for t in teams}
     de = {t: 0.0 for t in teams}
     pc = {t: 0.0 for t in teams}
-    by_t = defaultdict(list)
-    by_o = defaultdict(list)
-    for r in rows:
-        by_t[r[0]].append(r)
-        by_o[r[1]].append(r)
+    def index(rows_):
+        bt, bo = defaultdict(list), defaultdict(list)
+        for r in rows_:
+            bt[r[0]].append(r)
+            bo[r[1]].append(r)
+        return bt, bo
+    by_t, by_o = index(rows)
     for _ in range(ITERATIONS):
+        if version == "v2" and nn:
+            res = []
+            for g in nn:
+                hk, ak = key(g.home_id), key(g.away_id)
+                pace_g = 2 * lp + pc[hk] + pc[ak]
+                res.append((g.home_points - g.away_points) - pace_g * ((off[hk] + de[ak]) - (off[ak] + de[hk])) / 100)
+            hca = sum(res) / len(res)
+            rows = build_rows(hca)
+            by_t, by_o = index(rows)
         off = {t: sum(r[2] - eff - de[r[1]] for r in by_t[t]) / (n[t] + SHRINK_GAMES) for t in teams}
         de = {t: sum(r[2] - eff - off[r[0]] for r in by_o[t]) / (len(by_o[t]) + SHRINK_GAMES) for t in teams}
         pc = {t: sum(r[3] - 2 * lp - pc[r[1]] for r in by_t[t]) / (n[t] + SHRINK_GAMES) for t in teams}
     league_pace = 2 * lp
-    r0 = CBBRatings(cutoff, len(prior), eff, league_pace - 0.0, hca, off, de, pc, dict(n), 1.0, 1.0)
+    r0 = CBBRatings(cutoff, len(prior), eff, league_pace, hca, off, de, pc, dict(n), 1.0, 1.0,
+                    VERSION if version == "v1" else VERSION_V2, d1)
     r0.league_pace = league_pace
     # pace = league_pace + pc_h + pc_a
     mres, tres = [], []
