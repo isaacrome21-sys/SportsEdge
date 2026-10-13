@@ -25,6 +25,19 @@ def nfl(**kw):
     return base
 
 
+def cfb(**kw):
+    # Vehicle for generic wired-quarter machinery tests. Since the owner
+    # ruling of Oct 13, 2026, NFL quarter rows fail closed NO_ENGINE
+    # (SIMULATION_ROWS_EMPTY) before any pricing machinery runs, so the
+    # odds/line/degenerate-probability machinery of the quarter branch is
+    # exercised through the still-wired CFB quarter path (same code).
+    base = {"sport": "CFB", "away": "Georgia Bulldogs",
+            "home": "Alabama Crimson Tide", "commence_time": FUTURE,
+            "odds": -110}
+    base.update(kw)
+    return base
+
+
 def mlb(**kw):
     base = {"sport": "MLB", "away": "Los Angeles Dodgers",
             "home": "Milwaukee Brewers", "commence_time": FUTURE, "odds": -110}
@@ -45,7 +58,7 @@ def _sane(out):
 
 @pytest.mark.parametrize("line", [-0.5, 0.5])
 def test_quarter_spread_lines_sane(line):
-    out = price_coverage_row(nfl(market="SPREAD_1Q", side="HOME", line=line),
+    out = price_coverage_row(cfb(market="SPREAD_1Q", side="HOME", line=line),
                              now=NOW, auto_context=False)
     assert out["status"] in {"RESEARCH_EDGE", "BELOW_THRESHOLD", "PRICE_CAP"}
     _sane(out)
@@ -54,7 +67,7 @@ def test_quarter_spread_lines_sane(line):
 @pytest.mark.parametrize("line", [-10000, -100, 100, 10000])
 def test_absurd_spread_lines_fail_closed(line):
     # Float underflow would manufacture p=0; the degenerate guard refuses.
-    out = price_coverage_row(nfl(market="SPREAD_1Q", side="HOME", line=line),
+    out = price_coverage_row(cfb(market="SPREAD_1Q", side="HOME", line=line),
                              now=NOW, auto_context=False)
     assert out["status"] == "NO_MODEL_OR_MARKET"
     assert out["reason"] == "DEGENERATE_PROBABILITY_REFUSED"
@@ -63,16 +76,17 @@ def test_absurd_spread_lines_fail_closed(line):
 @pytest.mark.parametrize("line", [0.5, 20.0])
 def test_large_quarter_spread_lines_sane(line):
     # Large but representable: priced, never NaN, never exactly 0/1 reported.
-    out = price_coverage_row(nfl(market="SPREAD_1Q", side="HOME", line=-line),
+    out = price_coverage_row(cfb(market="SPREAD_1Q", side="HOME", line=-line),
                              now=NOW, auto_context=False)
     _sane(out)
 
 
-@pytest.mark.parametrize("line", [40, 1000])
+@pytest.mark.parametrize("line", [100, 1000])
 def test_absurd_spread_line_fails_closed(line):
-    # line=40 -> raw p~2e-9 rounds to a reported 0.0: refused, never priced
-    # as 0. line=1000 underflows to exactly 0.0: refused as well.
-    out = price_coverage_row(nfl(market="SPREAD_1Q", side="HOME", line=line),
+    # On the CFB vehicle (wider margin sd than the NFL), line=100 -> raw p
+    # close enough to 1 to round to a reported 1.0: refused, never priced
+    # as a certainty. line=1000 underflows to exactly 0.0/1.0: refused too.
+    out = price_coverage_row(cfb(market="SPREAD_1Q", side="HOME", line=line),
                              now=NOW, auto_context=False)
     assert out["status"] == "NO_MODEL_OR_MARKET"
     assert out["reason"] == "DEGENERATE_PROBABILITY_REFUSED"
@@ -164,17 +178,17 @@ def test_zero_odds_blocked():
 
 @pytest.mark.parametrize("odds", [+100, -100, "-110", -110.0])
 def test_american_sign_handling(odds):
-    out = price_coverage_row(nfl(market="SPREAD_1Q", side="HOME",
+    out = price_coverage_row(cfb(market="SPREAD_1Q", side="HOME",
                                  line=-1.5, odds=odds),
                              now=NOW, auto_context=False)
     assert out["status"] in {"RESEARCH_EDGE", "BELOW_THRESHOLD", "PRICE_CAP"}
 
 
 def test_plus_minus_100_identical():
-    a = price_coverage_row(nfl(market="SPREAD_1Q", side="HOME",
+    a = price_coverage_row(cfb(market="SPREAD_1Q", side="HOME",
                                line=-1.5, odds=+100),
                            now=NOW, auto_context=False)
-    b = price_coverage_row(nfl(market="SPREAD_1Q", side="HOME",
+    b = price_coverage_row(cfb(market="SPREAD_1Q", side="HOME",
                                line=-1.5, odds=-100),
                            now=NOW, auto_context=False)
     assert a["estimate_p"] == b["estimate_p"]
@@ -182,11 +196,11 @@ def test_plus_minus_100_identical():
 
 
 def test_extreme_odds_no_crash():
-    out = price_coverage_row(nfl(market="SPREAD_1Q", side="HOME",
+    out = price_coverage_row(cfb(market="SPREAD_1Q", side="HOME",
                                  line=-1.5, odds=+10000),
                              now=NOW, auto_context=False)
     _sane(out)
-    out2 = price_coverage_row(nfl(market="SPREAD_1Q", side="HOME",
+    out2 = price_coverage_row(cfb(market="SPREAD_1Q", side="HOME",
                                   line=-1.5, odds=-100000),
                               now=NOW, auto_context=False)
     assert out2["status"] == "PRICE_CAP"
@@ -195,26 +209,28 @@ def test_extreme_odds_no_crash():
 # --- contradictory / duplicate rows ----------------------------------------------
 
 def test_contradictory_sides_coherent():
-    # Quarter totals are validation-gated: both sides fail closed, coherently.
+    # NFL quarter totals take the canonical period block (owner ruling,
+    # Oct 13, 2026): both sides fail closed, coherently.
     over = price_coverage_row(nfl(market="TOTAL_1Q", side="OVER", line=9.5),
                               now=NOW, auto_context=False)
     under = price_coverage_row(nfl(market="TOTAL_1Q", side="UNDER", line=9.5),
                                now=NOW, auto_context=False)
-    assert over["reason"] == "COVERAGE_MARKET_FAILED_VALIDATION_NOT_WIRED"
-    assert under["reason"] == "COVERAGE_MARKET_FAILED_VALIDATION_NOT_WIRED"
+    assert over["reason"] == "SIMULATION_ROWS_EMPTY"
+    assert under["reason"] == "SIMULATION_ROWS_EMPTY"
+    assert over["blocker"] == under["blocker"] == "NO_ENGINE"
 
 
 def test_contradictory_spread_sides_coherent():
-    home = price_coverage_row(nfl(market="SPREAD_1Q", side="HOME", line=-1.5),
+    home = price_coverage_row(cfb(market="SPREAD_1Q", side="HOME", line=-1.5),
                               now=NOW, auto_context=False)
-    away = price_coverage_row(nfl(market="SPREAD_1Q", side="AWAY", line=1.5),
+    away = price_coverage_row(cfb(market="SPREAD_1Q", side="AWAY", line=1.5),
                               now=NOW, auto_context=False)
     total = home["estimate_p"] + away["estimate_p"] + home["push_p"]
     assert total == pytest.approx(1.0, abs=1e-9)
 
 
 def test_duplicate_rows_identical():
-    r = nfl(market="SPREAD_1Q", side="HOME", line=-1.5)
+    r = cfb(market="SPREAD_1Q", side="HOME", line=-1.5)
     outputs, _ = phone_coverage_rows([r, dict(r)], now=NOW, auto_context=False)
     assert outputs[0]["estimate_p"] == outputs[1]["estimate_p"]
     assert outputs[0]["status"] == outputs[1]["status"]
@@ -225,7 +241,7 @@ def test_duplicate_rows_identical():
 def test_degenerate_probability_refused(monkeypatch):
     monkeypatch.setattr(mc, "_normal_win_push",
                         lambda *a, **k: (1.0, 0.0))
-    out = price_coverage_row(nfl(market="SPREAD_1Q", side="HOME", line=-1.5),
+    out = price_coverage_row(cfb(market="SPREAD_1Q", side="HOME", line=-1.5),
                              now=NOW, auto_context=False)
     assert out["status"] == "NO_MODEL_OR_MARKET"
     assert out["reason"] == "DEGENERATE_PROBABILITY_REFUSED"
@@ -234,7 +250,7 @@ def test_degenerate_probability_refused(monkeypatch):
 def test_degenerate_zero_refused(monkeypatch):
     monkeypatch.setattr(mc, "_normal_win_push",
                         lambda *a, **k: (0.0, 0.0))
-    out = price_coverage_row(nfl(market="SPREAD_1Q", side="HOME", line=-1.5),
+    out = price_coverage_row(cfb(market="SPREAD_1Q", side="HOME", line=-1.5),
                              now=NOW, auto_context=False)
     assert out["status"] == "NO_MODEL_OR_MARKET"
     assert out["reason"] == "DEGENERATE_PROBABILITY_REFUSED"
@@ -267,13 +283,15 @@ def test_f5_wrong_sport_blocked():
 
 
 def test_team_total_quarter_nonpositive_line_blocked():
-    # Gating fires before line validation; the market is not wired.
+    # The NFL period block fires before line validation (owner ruling,
+    # Oct 13, 2026); the market is not wired.
     for line in (0, -3.5):
         out = price_coverage_row(nfl(market="TEAM_TOTAL_1Q",
                                      side="HOME_OVER", line=line),
                                  now=NOW, auto_context=False)
         assert out["status"] == "NO_MODEL_OR_MARKET"
-        assert out["reason"] == "COVERAGE_MARKET_FAILED_VALIDATION_NOT_WIRED"
+        assert out["reason"] == "SIMULATION_ROWS_EMPTY"
+        assert out["blocker"] == "NO_ENGINE"
 
 
 # --- pathological board through the full runner ------------------------------------
@@ -303,26 +321,28 @@ def test_pathological_board_no_crash():
     assert rows[5]["reason"] == "COVERAGE_MARKET_FAILED_VALIDATION_NOT_WIRED"
     assert rows[6]["reason"] == "ODDS_INVALID"
     assert rows[9]["reason"] == "MARGIN_BAND_SIDE_INVALID"
-    # Duplicates price identically.
-    assert rows[0]["estimate_p"] == rows[1]["estimate_p"]
+    # Duplicates block identically (NFL quarter rows take the canonical
+    # period block, owner ruling Oct 13, 2026).
+    assert rows[0]["status"] == rows[1]["status"] == "NO_MODEL_OR_MARKET"
+    assert rows[0]["reason"] == rows[1]["reason"] == "SIMULATION_ROWS_EMPTY"
 
 
 def test_game_field_instead_of_away_home():
     out = price_coverage_row(
-        {"sport": "NFL", "game": "Baltimore Ravens @ Atlanta Falcons",
+        {"sport": "CFB", "game": "Georgia Bulldogs @ Alabama Crimson Tide",
          "market": "SPREAD_1Q", "side": "HOME", "line": -1.5,
          "odds": " -110 ", "commence_time": FUTURE},
         now=NOW, auto_context=False)
     assert out["status"] in {"RESEARCH_EDGE", "BELOW_THRESHOLD", "PRICE_CAP"}
-    assert out["game"] == "Baltimore Ravens @ Atlanta Falcons"
+    assert out["game"] == "Georgia Bulldogs @ Alabama Crimson Tide"
 
 
 def test_team_name_side_mixed_case_whitespace():
     out = price_coverage_row(
-        nfl(market="ML_2Q", side="  atlanta FALCONS "),
+        cfb(market="ML_2Q", side="  alabama CRIMSON tide "),
         now=NOW, auto_context=False)
     assert out["status"] in {"RESEARCH_EDGE", "BELOW_THRESHOLD", "PRICE_CAP"}
-    assert "Atlanta Falcons" in out["selection"]
+    assert "Alabama Crimson Tide" in out["selection"]
 
 
 def test_lowercase_market_and_tie_side():
