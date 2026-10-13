@@ -98,3 +98,15 @@ def test_six_runner_callers_no_longer_pass_pre_fetch_time():
         for line in src.splitlines():
             if "fetch_schedule(" in line and "def " not in line and "import" not in line:
                 assert "now=" not in line.split("#")[0], (mod.__name__, line)
+
+
+def test_no_repo_caller_passes_pre_fetch_time_to_fetch_schedule():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    bad = []
+    for p in list((root / "sportsedge").rglob("*.py")) + list((root / "scripts").rglob("*.py")):
+        for i, line in enumerate(p.read_text(errors="ignore").splitlines(), 1):
+            code = line.split("#")[0]
+            if "fetch_schedule(" in code and "def fetch_schedule" not in code and "now=" in code:
+                bad.append(f"{p.relative_to(root)}:{i}")
+    assert not bad, bad
