@@ -451,13 +451,49 @@ class ExclusionTests(LoaderCase):
         self.write("a_delaware.json", make_bundle("48"))
         self.write("b_delaware.json", make_bundle("48"))
         mapping, audit = loader.load_form2_bundles(self.dir, [cfb_row()])
-        self.assertEqual(set(mapping), {"48"})
+        self.assertEqual(mapping, {})
         entries = self.entries_by_file(audit)
-        # Deterministic: sorted filename order admits the first.
-        self.assertEqual(entries["a_delaware.json"]["disposition"], "ADMITTED")
+        # Conflict poisons both names: never trust lexical winner.
+        self.assertEqual(entries["a_delaware.json"]["disposition"], "EXCLUDED")
         self.assertEqual(entries["b_delaware.json"]["disposition"], "EXCLUDED")
-        self.assertEqual(entries["b_delaware.json"]["reason"],
-                         "DUPLICATE_TEAM_BUNDLE")
+        self.assertEqual(entries["a_delaware.json"]["reason"], loader.REASON_DUPLICATE)
+        self.assertEqual(entries["b_delaware.json"]["reason"], loader.REASON_DUPLICATE)
+
+
+    def test_three_duplicate_bundles_refuse_entire_conflict(self):
+        for name in ("z.json", "a.json", "m.json"):
+            self.write(name, make_bundle("48"))
+        self.write("good_mtsu.json", make_bundle("2393"))
+        mapping, audit = loader.load_form2_bundles(self.dir, [cfb_row()])
+        self.assertEqual(set(mapping), {"2393"})
+        entries = self.entries_by_file(audit)
+        for name in ("a.json", "m.json", "z.json"):
+            self.assertEqual(entries[name]["disposition"], "EXCLUDED")
+            self.assertEqual(entries[name]["reason"], loader.REASON_DUPLICATE)
+
+    def test_symlink_bundle_refused_without_following(self):
+        self.write("good_mtsu.json", make_bundle("2393"))
+        target = self.write("elsewhere.txt", make_bundle("48"))
+        (self.dir / "z_link.json").symlink_to(target)
+        mapping, audit = loader.load_form2_bundles(self.dir, [cfb_row()])
+        self.assertEqual(set(mapping), {"2393"})
+        entry = self.entries_by_file(audit)["z_link.json"]
+        self.assertEqual(entry["reason"], loader.REASON_UNSAFE_FILE)
+
+    def test_symlink_directory_refused(self):
+        alias = self.dir.parent / (self.dir.name + "_alias")
+        alias.symlink_to(self.dir, target_is_directory=True)
+        self.addCleanup(alias.unlink)
+        mapping, audit = loader.load_form2_bundles(alias, [cfb_row()])
+        self.assertEqual(mapping, {})
+        self.assertEqual(audit["directory_status"], "UNSAFE_DIRECTORY_SYMLINK")
+
+    def test_oversized_bundle_is_excluded(self):
+        self.write("oversized.json", "x" * (loader.MAX_BUNDLE_BYTES + 1))
+        mapping, audit = loader.load_form2_bundles(self.dir, [cfb_row()])
+        self.assertEqual(mapping, {})
+        self.assertEqual(self.entries_by_file(audit)["oversized.json"]["reason"],
+                         loader.REASON_UNSAFE_FILE)
 
     def test_non_cfb_bundle_ignored_and_audited(self):
         bundle = make_bundle("48")
