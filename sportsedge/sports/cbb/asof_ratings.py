@@ -82,7 +82,10 @@ class CBBRatings:
 
     def predict(self, home_id: str, away_id: str, *, neutral: bool) -> dict:
         block = illinois_block(home_id, away_id)
-        home_id, away_id = self._key(home_id), self._key(away_id)
+        # ESPN provider IDs can be JSON integers; ratings train on canonical
+        # string IDs. Normalize before the model lookup without changing any
+        # learned rate, parameter or research result for existing string IDs.
+        home_id, away_id = self._key(str(home_id)), self._key(str(away_id))
         for t in (home_id, away_id):
             if t not in self.n:
                 raise ValueError("TEAM_HAS_NO_PRIOR_GAMES:" + t)
