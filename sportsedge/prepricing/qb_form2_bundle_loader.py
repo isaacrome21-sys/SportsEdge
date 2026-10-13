@@ -52,8 +52,8 @@ What the loader verifies, and what it deliberately does not:
     reads, trusts, or forwards a bundle-asserted QB1 as identity.
 
 Fail-closed discipline: a bundle that fails admission, is malformed,
-names a team/fixture outside the current intake, or duplicates an
-already-admitted team is EXCLUDED and recorded in the returned audit
+names a team/fixture outside the current intake, or is in a duplicate
+team group is EXCLUDED and recorded in the returned audit
 -- never silently dropped, never partially applied. A bad bundle
 never fails the run: its fixture simply proceeds without Form 2 and
 blocks at the gate exactly as it did before Form 2 existed. A
@@ -63,7 +63,9 @@ empty mapping -- today's behavior, unchanged.
 from __future__ import annotations
 
 import json
+import os
 import re
+import stat
 from pathlib import Path
 
 from artifacts.free_models import dt
@@ -88,6 +90,46 @@ REASON_SCHEMA_INCOMPLETE = "BUNDLE_SCHEMA_INCOMPLETE"
 REASON_TEAM_NOT_IN_INTAKE = "TEAM_NOT_IN_INTAKE"
 REASON_FIXTURE_NOT_IN_INTAKE = "FIXTURE_NOT_IN_INTAKE"
 REASON_DUPLICATE = "DUPLICATE_TEAM_BUNDLE"
+REASON_UNSAFE_FILE = "UNSAFE_BUNDLE_FILE"
+MAX_BUNDLE_BYTES = 8 * 1024 * 1024
+
+
+class UnsafeBundleError(OSError):
+    """Untrusted file type, changed inode, symlink, or oversized bundle."""
+
+
+def _read_regular_bundle(path):
+    """Read one bounded regular file, refusing symlinks and detected swaps.
+
+    Open with O_NOFOLLOW and O_NONBLOCK where supported: a malicious FIFO
+    may not hang the runner, and a symlink may not redirect evidence. Read
+    from the opened descriptor, then compare file identity/size/mtime with
+    its post-read path identity. This is local file safety, NOT an externally
+    anchored immutable archive or independent proof of capture time.
+    """
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    descriptor = os.open(path, flags)
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or before.st_size > MAX_BUNDLE_BYTES:
+            raise UnsafeBundleError("BUNDLE_NONREGULAR_OR_OVERSIZED")
+        with os.fdopen(descriptor, "rb") as handle:
+            descriptor = -1
+            raw = handle.read(MAX_BUNDLE_BYTES + 1)
+            after = os.fstat(handle.fileno())
+        if len(raw) > MAX_BUNDLE_BYTES:
+            raise UnsafeBundleError("BUNDLE_OVERSIZED")
+        current = path.lstat()
+        identity = lambda s: (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns)
+        if (not stat.S_ISREG(current.st_mode)
+                or identity(before) != identity(after)
+                or identity(after) != identity(current)):
+            raise UnsafeBundleError("BUNDLE_MUTATED_DURING_READ")
+        return raw.decode("utf-8")
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
 
 
 def _team_key(name):
@@ -214,6 +256,9 @@ def load_form2_bundles(bundles_dir, game_rows):
              "entries": []}
     mapping = {}
     directory = Path(bundles_dir)
+    if directory.is_symlink():
+        audit["directory_status"] = "UNSAFE_DIRECTORY_SYMLINK"
+        return mapping, audit
     if not directory.exists():
         audit["directory_status"] = "MISSING"
         return mapping, audit
@@ -227,12 +272,19 @@ def load_form2_bundles(bundles_dir, game_rows):
 
     intake = _intake_cfb_fixtures(game_rows)
     admitted_names = {}
+    conflicting_ids = set()
+    conflicting_names = set()
     for path in files:
         try:
-            raw = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeError) as exc:
+            raw = _read_regular_bundle(path)
+        except UnsafeBundleError as exc:
             audit["entries"].append(_entry(
-                path, EXCLUDED, REASON_UNREADABLE, type(exc).__name__))
+                path, EXCLUDED, REASON_UNSAFE_FILE, str(exc)))
+            continue
+        except (OSError, UnicodeError) as exc:
+            reason = REASON_UNSAFE_FILE if path.is_symlink() else REASON_UNREADABLE
+            audit["entries"].append(_entry(
+                path, EXCLUDED, reason, type(exc).__name__))
             continue
         try:
             bundle = json.loads(raw)
@@ -272,10 +324,30 @@ def load_form2_bundles(bundles_dir, game_rows):
                 f"FIXTURE_FOR_THIS_TEAM", bundle))
             continue
         team_id = str(bundle["team"]["espn_id"])
-        if team_id in mapping or team_key in admitted_names:
+        if team_id in conflicting_ids or team_key in conflicting_names:
             audit["entries"].append(_entry(
                 path, EXCLUDED, REASON_DUPLICATE,
-                "TEAM_ALREADY_HAS_AN_ADMITTED_BUNDLE", bundle))
+                "TEAM_OR_ID_PREVIOUSLY_CONFLICTED", bundle))
+            continue
+        if team_id in mapping or team_key in admitted_names:
+            # Never use lexical filename order to select an identity source.
+            # Both sides of a duplicate conflict, and any later candidates,
+            # fail as a group rather than preserving the first entry.
+            prior_id = team_id if team_id in mapping else admitted_names[team_key]
+            prior = mapping.pop(prior_id)
+            prior_name = _team_key(prior["team"]["name"])
+            admitted_names.pop(prior_name, None)
+            conflicting_ids.update((prior_id, team_id))
+            conflicting_names.update((prior_name, team_key))
+            for earlier in audit["entries"]:
+                if (earlier["disposition"] == ADMITTED
+                        and earlier.get("team_id") == prior_id):
+                    earlier["disposition"] = EXCLUDED
+                    earlier["reason"] = REASON_DUPLICATE
+                    earlier["detail"] = "TEAM_CONFLICT_BOTH_BUNDLES_REFUSED"
+            audit["entries"].append(_entry(
+                path, EXCLUDED, REASON_DUPLICATE,
+                "TEAM_CONFLICT_BOTH_BUNDLES_REFUSED", bundle))
             continue
         mapping[team_id] = bundle
         admitted_names[team_key] = team_id
