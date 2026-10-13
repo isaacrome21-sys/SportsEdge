@@ -227,6 +227,10 @@ class PublicContext:
     def __init__(self, now, getter=None, *, historical=False):
         self.now = now
         self.getter = getter or self._live_get
+        # Live ESPN directory floor (see team_directory). Injected fixture
+        # getters are exempt from the absolute floor only; pagination and
+        # short-page completeness apply to every getter.
+        self.enforce_directory_floor = getter is None
         self.cache = {}
         self.receipts = []
         self._injury_result_cache = {}
@@ -252,16 +256,76 @@ class PublicContext:
                                       "retrieved_at_utc": self.now.isoformat()})
         return self.cache[url]
 
-    def teams(self, sport):
-        obj = self.fetch(f"{ESPN}/{LEAGUES[sport]}/teams?limit=500") or {}
+    # Directory completeness (Grok reimplementation, 2026-10-13). ESPN's
+    # site teams endpoint silently truncates at ``limit`` and publishes no
+    # count/pageCount metadata. The CFB directory is 762 teams (all
+    # divisions), so the old single ``?limit=500`` fetch saw only the first
+    # 500 and any school past that cut failed identity resolution. Pages are
+    # now walked (``&page=N``) until a short page; the directory fails CLOSED
+    # (empty -> identify() returns None) when a page is unavailable/malformed,
+    # a page repeats team IDs, the page cap is hit, or the total is below the
+    # sport's declared floor. Page 1 keeps the historical URL.
+    TEAM_PAGE_SIZE = 500
+    TEAM_MAX_PAGES = 10
+    TEAM_DIRECTORY_FLOOR = {"NFL": 32, "NBA": 30, "MLB": 30, "CFB": 700}
+
+    @staticmethod
+    def _team_page(obj):
+        if not isinstance(obj, dict) or not isinstance(obj.get("sports"), list):
+            return None
         teams = []
         for group in obj.get("sports") or []:
+            if not isinstance(group, dict):
+                return None
             for league in group.get("leagues") or []:
+                if not isinstance(league, dict) or not isinstance(league.get("teams", []), list):
+                    return None
                 for data in league.get("teams") or []:
-                    team = data.get("team") or {}
-                    if team.get("id"):
+                    team = (data or {}).get("team") if isinstance(data, dict) else None
+                    if isinstance(team, dict) and team.get("id"):
                         teams.append(team)
         return teams
+
+    def team_directory(self, sport):
+        """Return (teams, status). status COMPLETE or DIRECTORY_INCOMPLETE:<why>."""
+        cache_key = ("team_directory", sport)
+        if cache_key in self._injury_result_cache:
+            return self._injury_result_cache[cache_key]
+        base = f"{ESPN}/{LEAGUES[sport]}/teams?limit={self.TEAM_PAGE_SIZE}"
+        teams, seen, status = [], set(), None
+        for page in range(1, self.TEAM_MAX_PAGES + 1):
+            url = base if page == 1 else f"{base}&page={page}"
+            batch = self._team_page(self.fetch(url))
+            if batch is None:
+                status = f"DIRECTORY_INCOMPLETE:PAGE_{page}_UNAVAILABLE_OR_MALFORMED"
+                break
+            ids = [str(t["id"]) for t in batch]
+            if len(set(ids)) != len(ids) or seen.intersection(ids):
+                status = f"DIRECTORY_INCOMPLETE:PAGE_{page}_REPEATS_TEAM_IDS"
+                break
+            seen.update(ids)
+            teams.extend(batch)
+            if len(batch) < self.TEAM_PAGE_SIZE:
+                status = "COMPLETE"
+                break
+        else:
+            status = f"DIRECTORY_INCOMPLETE:PAGE_CAP_{self.TEAM_MAX_PAGES}_REACHED"
+        floor = self.TEAM_DIRECTORY_FLOOR.get(sport, 1) if self.enforce_directory_floor else 1
+        if status == "COMPLETE" and len(teams) < floor:
+            status = f"DIRECTORY_INCOMPLETE:{len(teams)}_BELOW_FLOOR_{floor}"
+        if status != "COMPLETE":
+            self.receipts.append({"source": base, "status": "DIRECTORY_INCOMPLETE",
+                                  "reason": status, "teams_seen": len(teams)})
+            teams = []
+        else:
+            self.receipts.append({"source": base, "status": "DIRECTORY_COMPLETE",
+                                  "teams": len(teams)})
+        result = (teams, status)
+        self._injury_result_cache[cache_key] = result
+        return result
+
+    def teams(self, sport):
+        return self.team_directory(sport)[0]
 
     @staticmethod
     def key(value):
