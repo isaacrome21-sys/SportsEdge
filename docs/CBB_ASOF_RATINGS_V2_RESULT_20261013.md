@@ -19,3 +19,9 @@ Joint home court at the end of the season: **H = 4.69** (v1 raw = 8.94).
 - **Home court may still be high.** H ≈ 4.7 is above the usual ~3–3.5. Some schedule confounding probably remains.
 - **D1 directory look-ahead.** D1 membership comes from the ESPN directory as captured 2026-10-13. This is identity only, not outcomes, but there is a small look-ahead risk from conference and division moves.
 - **No tuning, one season.** There was no tuning, and this is a single season. v1 remains FAIL as recorded.
+
+## Additional caveats (ChatGPT review)
+- **Stand-in lines.** Spread and total lines are NAIVE_STANDIN constructions, not market lines. PASS_RESEARCH here is not evidence of an edge against DK.
+- **2026 directory.** Historical D1/non-D1 membership comes from the ESPN team directory as captured in 2026, not from a 2024-25 as-of directory.
+- **Season already examined.** The 2024-25 season was already examined during v1. v2 was designed after seeing v1's failure, so it is not fresh out-of-sample evidence. A clean confirmation needs an unexamined season.
+- **Governance flag.** `CBB_ASOF_RATINGS_V2_PREREG_20261013.md` fails the freeze-inventory check. It is left unrenamed for ChatGPT to register.
