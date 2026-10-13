@@ -214,6 +214,16 @@ def model_probability(sport, market, side, line, home_mean, away_mean, team_tota
     return bounded(win, 0, 1), bounded(push, 0, 1)
 
 
+# Injury-binding currency window (days before the as-of clock). CFB only.
+# NFL shared-binding consequence: injury_rows() is the single binding path
+# for NFL/CFB/NBA. The live NFL league feed legitimately carries season-long
+# IR/PUP rows dated weeks earlier (oldest row 2026-09-23 on 2026-10-13), so
+# a universal window would mark NFL teams STALE_UNKNOWN and block NFL games.
+# NFL/NBA behavior is therefore UNCHANGED pending owner review.
+INJURY_CURRENCY_DAYS = {"CFB": 21}
+INJURY_STALE_UNKNOWN = "STALE_INJURY_ENTRIES_UNKNOWN"
+
+
 class PublicContext:
     """Request-scoped cache; no persisted odds, data keys or retrospective rewrites.
 
@@ -394,6 +404,33 @@ class PublicContext:
             return str(group["id"])
         return None
 
+    def _injury_currency(self, sport, rows):
+        """Currency gate (Grok reimplementation, 2026-10-13).
+
+        ESPN's CFB injuries feed serves entries dated 2020-2022 (e.g. a 2020
+        Florida WR 'Out') that were being bound as the CURRENT report. For
+        sports in INJURY_CURRENCY_DAYS, every row must carry a parseable,
+        timezone-aware ``date`` within the window before the as-of clock
+        (``self.now``) and not after it. Any stale, undated, or future row
+        makes the WHOLE team binding STALE_UNKNOWN: a dropped row could be a
+        QB, so partial binding would imply health. Returns None when current.
+        NFL/NBA are deliberately NOT gated here (shared-binding consequence;
+        see INJURY_CURRENCY_DAYS).
+        """
+        window = INJURY_CURRENCY_DAYS.get(sport)
+        if window is None:
+            return None
+        oldest = self.now - timedelta(days=window)
+        for i, row in enumerate(rows):
+            stamp = dt(row.get("date")) if isinstance(row, dict) else None
+            if stamp is None:
+                return f"ROW_{i}_UNDATED"
+            if stamp > self.now:
+                return f"ROW_{i}_DATED_AFTER_AS_OF"
+            if stamp < oldest:
+                return f"ROW_{i}_DATED_{stamp.date().isoformat()}_OLDER_THAN_{window}D"
+        return None
+
     def injury_rows(self, sport, team):
         """Return verified team-scoped injury rows, or (None, status).
 
@@ -458,6 +495,17 @@ class PublicContext:
             result = (None, "UNUSABLE_SCHEMA")
             self._injury_result_cache[key] = result
             return result
+        currency = self._injury_currency(sport, candidates)
+        if currency is not None:
+            self.receipts.append({
+                "source": f"{ESPN}/{LEAGUES[sport]}/injuries",
+                "status": INJURY_STALE_UNKNOWN,
+                "reason": currency,
+                "team_id": target_id[:20],
+                "note": "STALE_ENTRIES_ARE_UNKNOWN_NOT_HEALTHY"})
+            result = (None, INJURY_STALE_UNKNOWN)
+            self._injury_result_cache[key] = result
+            return result
         self.receipts.append({
             "source": f"{ESPN}/{LEAGUES[sport]}/injuries",
             "status": "STRUCTURE_VERIFIED",
@@ -479,6 +527,8 @@ class PublicContext:
         if sport == "MLB":
             return 0.0, "NOT_APPLICABLE"
         rows, status = self.injury_rows(sport, team)
+        if rows is None and status == INJURY_STALE_UNKNOWN:
+            return 0.0, INJURY_STALE_UNKNOWN
         if rows is None:
             return 0.0, "MISSING_OR_UNRECOGNIZED_SOURCE"
         # Preserve historical unavailability: do not report a zero-injury
