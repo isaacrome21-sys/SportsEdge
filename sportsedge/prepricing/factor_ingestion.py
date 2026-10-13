@@ -44,7 +44,8 @@ from datetime import datetime, timezone
 from urllib.parse import urlencode
 
 from artifacts.free_models import (
-    PublicContext, bounded, declared_weather_total_adj, dt, numeric,
+    IL_COLLEGE_ESPN_IDS, PublicContext, bounded, declared_weather_total_adj,
+    dt, numeric,
 )
 
 # Free factors module (harness-gated): provides park factors, rest/travel,
@@ -151,6 +152,7 @@ DECL_REST_ADJ_CAP = {"NFL": 0.6, "CFB": 0.6, "MLB": 0.25}
 BLOCK_FIXTURE_UNVERIFIED = "BLOCKED_PREPRICING_FIXTURE_UNVERIFIED"
 BLOCK_TEAMS_UNRESOLVED = "BLOCKED_PREPRICING_TEAMS_UNRESOLVED"
 BLOCK_QB_IDENTITY_UNVERIFIED = "BLOCKED_PREPRICING_QB_IDENTITY_UNVERIFIED"
+BLOCK_IL_COLLEGE_EXCLUDED = "BLOCKED_PREPRICING_IL_COLLEGE_EXCLUDED"
 BLOCK_PITCHER_UNCONFIRMED = "BLOCKED_PREPRICING_PITCHER_UNCONFIRMED"
 BLOCK_NFL_TEAM_HISTORY = "BLOCKED_PREPRICING_NFL_TEAM_HISTORY_UNVERIFIED"
 
@@ -506,6 +508,38 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
                 "blocked": blocked, "block_reason": block_reason,
                 "block_detail": block_detail, "adjustments": adjustments,
                 "factors": factors, "receipts": receipts}
+
+    # -- Illinois college exclusion (owner rule): ID-keyed on the verified
+    # directory binding resolved just above. Either competitor whose ESPN
+    # id is in the frozen registry excludes the fixture, whatever name
+    # form the intake row carried (the IL_COLLEGE_NAMES list in
+    # free_models is form-dependent and missed Chicago State, id 2130, in
+    # every attested form). Unresolved identity already failed closed
+    # above (BLOCK_TEAMS_UNRESOLVED), so no Illinois team can reach
+    # pricing through an unbound name.
+    if sport == "CFB":
+        il_hit = None
+        for side, team in (("HOME", home_team), ("AWAY", away_team)):
+            school = IL_COLLEGE_ESPN_IDS.get(str(team.get("id") or ""))
+            if school is not None:
+                il_hit = (side, school, str(team.get("id")))
+                break
+        if il_hit is not None:
+            blocked = enforce_blocks
+            block_reason = BLOCK_IL_COLLEGE_EXCLUDED if enforce_blocks else ""
+            block_detail = (f"IL_COLLEGE_ESPN_ID_{il_hit[2]}:{il_hit[1]}"
+                            f"({il_hit[0]})")
+            if not enforce_blocks:
+                block_detail += ";MANUAL_MODE_NO_PUBLIC_FETCH"
+            all_missing(block_detail)
+            receipts.extend(provider.receipts)
+            return {"game_key": f"{sport}:{game_label}",
+                    "game_label": game_label,
+                    "sport": sport, "kickoff_utc": kickoff.isoformat(),
+                    "blocked": blocked, "block_reason": block_reason,
+                    "block_detail": block_detail,
+                    "adjustments": adjustments, "factors": factors,
+                    "receipts": receipts}
 
     # -- 1. injuries / QB-participation (canonical free_models path) -------
     if sport in {"NFL", "CFB", "NBA"}:

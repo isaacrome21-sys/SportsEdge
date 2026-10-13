@@ -63,7 +63,33 @@ IL_COLLEGE_NAMES = frozenset({
     "eastern illinois", "eastern illinois panthers",
     "northwestern", "northwestern wildcats",
     "loyola chicago", "uic flames", "illinois chicago",
+    "chicago state", "chicago state cougars", "chicago st",
 })
+# Frozen ESPN-ID registry for the same exclusion (owner rule: no Illinois
+# college teams on user-facing CFB/CBB cards). The name list above is
+# form-dependent: it missed Chicago State (ESPN id 2130) in every attested
+# name form, so the canonical intake enforces THIS registry on the verified
+# ESPN team-directory binding (PublicContext.identify) -- see
+# sportsedge/prepricing/factor_ingestion.py and
+# sportsedge/team_half_pricing.py. The name list remains a secondary
+# signal for provider-less paths (direct calculate calls, the research
+# bridge). Provenance: ESPN teams registry cross-checked in the CBB
+# foundation probe (workspace/sportsedge/cbb_foundation_probe/FINDINGS.md)
+# and the CFB participation design verification (2026-10-13). Re-derive
+# each season: conference realignment and D1 membership change (Chicago
+# State's conference status in particular has been unstable). Eight
+# schools field CFB teams in 2026 (ids 356, 77, 2287, 2459, 79, 2197,
+# 2710, 2130); the other five have no football program, so their ids
+# cannot appear in the CFB directory -- they are carried so this stays
+# the single 13-school record shared with the CBB exclusion.
+IL_COLLEGE_ESPN_IDS = {
+    "356": "Illinois", "77": "Northwestern", "305": "DePaul",
+    "2350": "Loyola Chicago", "82": "UIC", "71": "Bradley",
+    "2287": "Illinois State", "79": "Southern Illinois",
+    "2565": "SIU Edwardsville", "2197": "Eastern Illinois",
+    "2710": "Western Illinois", "2459": "Northern Illinois",
+    "2130": "Chicago State",
+}
 ESPN = "https://site.api.espn.com/apis/site/v2/sports"
 OPEN_METEO = "https://api.open-meteo.com/v1/forecast"
 GEO = "https://geocoding-api.open-meteo.com/v1/search"
