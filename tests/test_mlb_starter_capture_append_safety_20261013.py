@@ -100,6 +100,23 @@ class AppendSafetyTests(unittest.TestCase):
                 capture.append_record(a, b, _record(2))
             self.assertEqual((a.read_bytes(), b.read_bytes()), before)
 
+    def test_manifest_metadata_tampering_refused_even_with_intact_digest(self):
+        with tempfile.TemporaryDirectory() as folder:
+            a = Path(folder) / "captures.jsonl"
+            b = Path(folder) / "manifest.jsonl"
+            capture.append_record(a, b, _record(1))
+            entry = capture.read_manifest(b)[0]
+            entry["game_pk"] = 999999  # digest and chain deliberately unchanged
+            b.write_bytes(capture.canonical_line(entry) + b"\n")
+            verdict = capture.verify_capture_chain(a, b)
+            self.assertFalse(verdict["ok"])
+            self.assertEqual(verdict["failure"]["reason"], "MANIFEST_METADATA_MISMATCH")
+            with self.assertRaisesRegex(
+                capture.StarterCaptureError,
+                "CAPTURE_CHAIN_PREAPPEND_INVALID:MANIFEST_METADATA_MISMATCH",
+            ):
+                capture.append_record(a, b, _record(2))
+
     def test_same_file_for_capture_and_manifest_is_refused(self):
         with tempfile.TemporaryDirectory() as folder:
             a = Path(folder) / "all.jsonl"
