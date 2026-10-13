@@ -74,17 +74,20 @@ def test_mismatched_prop_threshold_does_not_make_up_no_vig():
 
 def test_unverified_odd_capture_does_not_become_playable_research_candidate():
     row = run(o=quote(captured=None), u=quote(selection="UNDER", captured=None))
-    assert row["status"] == "WATCH_QUOTE_NOT_CURRENT"
+    assert row["status"] == "NO_MODEL_OR_MARKET"
+    assert row["reason"] == "PAIRED_QUOTES_CAPTURE_TIMESTAMPS_REQUIRED"
+    assert "dk_no_vig_p" not in row
     old = "2026-10-11T19:00:00Z"
     row2 = run(o=quote(captured=old), u=quote(selection="UNDER", captured=old))
     assert row2["status"] == "WATCH_QUOTE_NOT_CURRENT"
 
 
-def test_opposite_quote_timestamps_must_be_same_capture():
+def test_opposite_quote_timestamps_within_two_minutes_pair():
     row = run(o=quote(), u=quote(selection="UNDER",
                                  captured="2026-10-11T20:29:20Z"))
-    assert row["status"] == "NO_MODEL_OR_MARKET"
-    assert row["reason"] == "PAIRED_QUOTES_CAPTURE_TIMES_CONFLICT"
+    assert row["status"] == "RESEARCH_CANDIDATE_NOT_VALIDATED"
+    assert row["paired_quote_skew_seconds"] == 10.0
+    assert len(row["paired_quote_captured_at"]) == 2
 
 
 def test_odds_beyond_max_straight_price_are_watch_only():
