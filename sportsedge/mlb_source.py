@@ -175,7 +175,15 @@ def verify_receipt_journal(root: str | Path, *, verifier_now: datetime | None = 
                                    MLBSourceError("RECEIPT_JOURNAL_NONFINITE_NUMBER")))
         except (ValueError, UnicodeDecodeError) as exc:
             raise MLBSourceError(f"RECEIPT_JOURNAL_CORRUPT:{lineno}") from exc
-        if type(entry) is not dict or set(entry) != expected_keys:
+        if type(entry) is not dict:
+            raise MLBSourceError(f"RECEIPT_JOURNAL_SCHEMA_DRIFT:{lineno}")
+        # Missing evidentiary fields retain their dedicated failure code.
+        # Unexpected additional fields are still refused rather than silently
+        # ignored by the fixed-field hash.
+        for field in _HASHED_FIELDS + ("record_sha256",):
+            if field not in entry:
+                raise MLBSourceError(f"RECEIPT_FIELD_MISSING:{field}")
+        if set(entry) != expected_keys:
             raise MLBSourceError(f"RECEIPT_JOURNAL_SCHEMA_DRIFT:{lineno}")
         for field in _HASHED_FIELDS + ("record_sha256",):
             if field not in entry or (entry[field] is None and field not in ("game_pk", "recorder_clock_assertion_utc")):
