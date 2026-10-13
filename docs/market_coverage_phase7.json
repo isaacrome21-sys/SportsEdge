@@ -1,0 +1,374 @@
+{
+ "base": "origin/main@5e161b9",
+ "branch": "feat/market-coverage-20261011",
+ "date": "2026-10-11",
+ "harness": {
+  "data": "2024 NFL (272 games, ESPN quarter linescores); 2024 CFB (917 games); 2024 MLB Apr-Sep (2374 games, StatsAPI inning linescores)",
+  "location": "~/workspace/sportsedge-backtest (not copied into branch)",
+  "market_baseline": "MISSING everywhere (no Odds API on pricing side); best achievable verdict CONDITIONAL_PASS",
+  "method": "chronological walk-forward, no lookahead; candidate vs naive train-base-rate baseline"
+ },
+ "markets": [
+  {
+   "detail": "pre-existing",
+   "market": "MLB_MONEYLINE_2WAY",
+   "sport": "MLB",
+   "status": "SUPPORTED"
+  },
+  {
+   "detail": "Built (Poisson 9-inning) then FAILED harness vs naive: Brier 0.1930/0.1918, log-loss 0.5628/0.5582, n=254301. Gated: COVERAGE_MARKET_FAILED_VALIDATION_NOT_WIRED",
+   "market": "ML_3WAY",
+   "reason_code": "FAILED_VALIDATION_VS_NAIVE",
+   "sport": "MLB",
+   "status": "NOT_WIRED_WITH_REASON"
+  },
+  {
+   "detail": "pre-existing SPREAD routing",
+   "market": "RUN_LINE_STANDARD",
+   "sport": "MLB",
+   "status": "SUPPORTED"
+  },
+  {
+   "detail": "pre-existing SPREAD routing with arbitrary line; regression-tested",
+   "market": "RUN_LINE_ALTERNATES",
+   "sport": "MLB",
+   "status": "SUPPORTED"
+  },
+  {
+   "detail": "pre-existing",
+   "market": "GAME_TOTAL",
+   "sport": "MLB",
+   "status": "SUPPORTED"
+  },
+  {
+   "detail": "pre-existing TOTAL routing; harness diagnostic on underlying Poisson total: FAIL vs naive (0.2388/0.2341, n=847670) - flagged for coordinator, routing unchanged",
+   "market": "GAME_TOTAL_ALTERNATES",
+   "sport": "MLB",
+   "status": "SUPPORTED"
+  },
+  {
+   "detail": "TEAM_TOTAL built by team-half branch feat/team-half-pricing-20261011 (pending Isaac's submit); not duplicated",
+   "market": "TEAM_TOTAL_FULL_GAME",
+   "sport": "MLB",
+   "status": "OWNED_BY_OTHER_WORK"
+  },
+  {
+   "detail": "Wired empirical F5 stack into phone RUN IT, then FAILED harness vs naive: Brier 0.2179/0.2132, log-loss 0.7038/0.6940, n=2898. Gated: F5_MARKET_FAILED_VALIDATION_NOT_WIRED.",
+   "harness_verdict": "FAIL",
+   "market": "F5_MONEYLINE",
+   "reason_code": "FAILED_VALIDATION_VS_NAIVE",
+   "sport": "MLB",
+   "status": "NOT_WIRED_WITH_REASON"
+  },
+  {
+   "detail": "Wired empirical F5 stack into phone RUN IT, then FAILED harness vs naive: Brier 0.2179/0.2132, log-loss 0.7038/0.6940, n=2898. Gated: F5_MARKET_FAILED_VALIDATION_NOT_WIRED.",
+   "harness_verdict": "FAIL",
+   "market": "F5_RUN_LINE",
+   "reason_code": "FAILED_VALIDATION_VS_NAIVE",
+   "sport": "MLB",
+   "status": "NOT_WIRED_WITH_REASON"
+  },
+  {
+   "detail": "Wired empirical F5 stack into phone RUN IT, then FAILED harness vs naive: Brier 0.2179/0.2132, log-loss 0.7038/0.6940, n=2898. Gated: F5_MARKET_FAILED_VALIDATION_NOT_WIRED.",
+   "harness_verdict": "FAIL",
+   "market": "F5_TOTALS",
+   "reason_code": "FAILED_VALIDATION_VS_NAIVE",
+   "sport": "MLB",
+   "status": "NOT_WIRED_WITH_REASON"
+  },
+  {
+   "detail": "Wired empirical F5 stack into phone RUN IT, then FAILED harness vs naive: Brier 0.2179/0.2132, log-loss 0.7038/0.6940, n=2898. Gated: F5_MARKET_FAILED_VALIDATION_NOT_WIRED.",
+   "harness_verdict": "FAIL",
+   "market": "F5_TEAM_TOTALS",
+   "reason_code": "FAILED_VALIDATION_VS_NAIVE",
+   "sport": "MLB",
+   "status": "NOT_WIRED_WITH_REASON"
+  },
+  {
+   "detail": "team-level score means do not determine first-scorer timing; needs play-by-play timing distributions",
+   "market": "FIRST_TO_SCORE_TEAM",
+   "reason_code": "NO_VERIFIED_SCORING_TIMING_MODEL",
+   "sport": "MLB",
+   "status": "BLOCKED_WITH_REASON"
+  },
+  {
+   "detail": "needs P(team reaches X first) from scoring-timing distributions",
+   "market": "RACE_TO_X_RUNS",
+   "reason_code": "NO_VERIFIED_SCORING_TIMING_MODEL",
+   "sport": "MLB",
+   "status": "BLOCKED_WITH_REASON"
+  },
+  {
+   "detail": "independence-Poisson product would systematically misprice (home bottom-9th truncation, extras, game-state correlation)",
+   "market": "EXACT_SCORE",
+   "reason_code": "NO_JOINT_SCORE_DISTRIBUTION_WITH_CORRELATION",
+   "sport": "MLB",
+   "status": "NOT_WIRED_WITH_REASON"
+  },
+  {
+   "detail": "pre-existing routing verified by test",
+   "market": "PITCHER_PROPS",
+   "sport": "MLB",
+   "status": "SUPPORTED"
+  },
+  {
+   "detail": "pre-existing routing verified by test",
+   "market": "BATTER_PROPS",
+   "sport": "MLB",
+   "status": "SUPPORTED"
+  },
+  {
+   "detail": "pre-existing",
+   "market": "MONEYLINE_SPREAD_TOTAL",
+   "sport": "NFL",
+   "status": "SUPPORTED"
+  },
+  {
+   "detail": "pre-existing",
+   "market": "MONEYLINE_SPREAD_TOTAL",
+   "sport": "CFB",
+   "status": "SUPPORTED"
+  },
+  {
+   "detail": "pre-existing routing; harness CONDITIONAL_PASS vs naive: Brier 0.1756/0.1853, n=2048",
+   "harness_verdict": "CONDITIONAL_PASS",
+   "market": "ALTERNATE_SPREADS",
+   "sport": "NFL",
+   "status": "SUPPORTED"
+  },
+  {
+   "detail": "pre-existing routing; harness CONDITIONAL_PASS vs naive: Brier 0.1742/0.1853, n=5076",
+   "harness_verdict": "CONDITIONAL_PASS",
+   "market": "ALTERNATE_SPREADS",
+   "sport": "CFB",
+   "status": "SUPPORTED"
+  },
+  {
+   "detail": "pre-existing routing; harness marginal CONDITIONAL_PASS: Brier 0.2220/0.2256, n=1280; totals signal weak overall, flagged for coordinator",
+   "harness_verdict": "CONDITIONAL_PASS_MARGINAL",
+   "market": "ALTERNATE_TOTALS",
+   "sport": "NFL",
+   "status": "SUPPORTED"
+  },
+  {
+   "detail": "pre-existing routing; harness FAIL vs naive: Brier 0.2257/0.2233, n=3384; flagged for coordinator, routing unchanged (pre-existing behavior)",
+   "harness_verdict": "FAIL",
+   "market": "ALTERNATE_TOTALS",
+   "sport": "CFB",
+   "status": "SUPPORTED"
+  },
+  {
+   "detail": "SPREAD_1Q..4Q, declared 0.25 fraction + halved sds; harness CONDITIONAL_PASS vs naive: Brier 0.2380/0.2407, n=4096",
+   "harness_verdict": "CONDITIONAL_PASS",
+   "market": "QUARTER_SPREAD_1Q_4Q",
+   "sport": "NFL",
+   "status": "IN_BUILD"
+  },
+  {
+   "detail": "harness CONDITIONAL_PASS vs naive: Brier 0.2130/0.2151, n=20304",
+   "harness_verdict": "CONDITIONAL_PASS",
+   "market": "QUARTER_SPREAD_1Q_4Q",
+   "sport": "CFB",
+   "status": "IN_BUILD"
+  },
+  {
+   "detail": "ML_1Q..4Q with discretized tie mass; harness CONDITIONAL_PASS: Brier 0.2007/0.2046, n=1024",
+   "harness_verdict": "CONDITIONAL_PASS",
+   "market": "QUARTER_ML_1Q_4Q",
+   "sport": "NFL",
+   "status": "IN_BUILD"
+  },
+  {
+   "detail": "harness CONDITIONAL_PASS: Brier 0.1997/0.2013, n=3384",
+   "harness_verdict": "CONDITIONAL_PASS",
+   "market": "QUARTER_ML_1Q_4Q",
+   "sport": "CFB",
+   "status": "IN_BUILD"
+  },
+  {
+   "detail": "Built then FAILED harness vs naive: Brier 0.2409/0.2239, n=3072. Gated.",
+   "market": "QUARTER_TOTAL_1Q_4Q",
+   "reason_code": "FAILED_VALIDATION_VS_NAIVE",
+   "sport": "NFL",
+   "status": "NOT_WIRED_WITH_REASON"
+  },
+  {
+   "detail": "Built then FAILED harness vs naive: Brier 0.2415/0.2336, n=10152. Gated.",
+   "market": "QUARTER_TOTAL_1Q_4Q",
+   "reason_code": "FAILED_VALIDATION_VS_NAIVE",
+   "sport": "CFB",
+   "status": "NOT_WIRED_WITH_REASON"
+  },
+  {
+   "detail": "Built then FAILED harness vs naive: Brier 0.2355/0.2216, n=6144. Gated.",
+   "market": "QUARTER_TEAM_TOTAL_1Q_4Q",
+   "reason_code": "FAILED_VALIDATION_VS_NAIVE",
+   "sport": "NFL",
+   "status": "NOT_WIRED_WITH_REASON"
+  },
+  {
+   "detail": "Built then FAILED harness vs naive: Brier 0.1886/0.1749, n=20304. Gated.",
+   "market": "QUARTER_TEAM_TOTAL_1Q_4Q",
+   "reason_code": "FAILED_VALIDATION_VS_NAIVE",
+   "sport": "CFB",
+   "status": "NOT_WIRED_WITH_REASON"
+  },
+  {
+   "detail": "MARGIN_BAND (1-6/7-12/13-18/19-24/25+); harness CONDITIONAL_PASS: Brier 0.0864/0.0876, n=1280",
+   "harness_verdict": "CONDITIONAL_PASS",
+   "market": "WINNING_MARGIN_BANDS",
+   "sport": "NFL",
+   "status": "IN_BUILD"
+  },
+  {
+   "detail": "harness CONDITIONAL_PASS: Brier 0.0878/0.0891, n=4230",
+   "harness_verdict": "CONDITIONAL_PASS",
+   "market": "WINNING_MARGIN_BANDS",
+   "sport": "CFB",
+   "status": "IN_BUILD"
+  },
+  {
+   "detail": "team-half branch; not duplicated",
+   "market": "TEAM_TOTAL_FULL_GAME",
+   "sport": "NFL",
+   "status": "OWNED_BY_OTHER_WORK"
+  },
+  {
+   "detail": "team-half branch; not duplicated",
+   "market": "TEAM_TOTAL_FULL_GAME",
+   "sport": "CFB",
+   "status": "OWNED_BY_OTHER_WORK"
+  },
+  {
+   "detail": "ESPN gamelog decoder carries only passing_tds; rushing/receiving TDs deliberately excluded as ambiguous. Unblock: verified per-game rush/rec TD indicators",
+   "market": "ANYTIME_TD",
+   "reason_code": "NO_VERIFIED_RUSH_RECEIVING_TD_HISTORY",
+   "sport": "NFL",
+   "status": "BLOCKED_WITH_REASON"
+  },
+  {
+   "detail": "same as NFL",
+   "market": "ANYTIME_TD",
+   "reason_code": "NO_VERIFIED_RUSH_RECEIVING_TD_HISTORY",
+   "sport": "CFB",
+   "status": "BLOCKED_WITH_REASON"
+  },
+  {
+   "detail": "needs per-player first-TD shares from play-by-play plus the TD-history gap",
+   "market": "FIRST_TD_PLAYER",
+   "reason_code": "NO_VERIFIED_FIRST_SCORING_ATTRIBUTION",
+   "sport": "NFL",
+   "status": "BLOCKED_WITH_REASON"
+  },
+  {
+   "detail": "same as NFL",
+   "market": "FIRST_TD_PLAYER",
+   "reason_code": "NO_VERIFIED_FIRST_SCORING_ATTRIBUTION",
+   "sport": "CFB",
+   "status": "BLOCKED_WITH_REASON"
+  },
+  {
+   "detail": "see MLB",
+   "market": "FIRST_TO_SCORE_TEAM",
+   "reason_code": "NO_VERIFIED_SCORING_TIMING_MODEL",
+   "sport": "NFL",
+   "status": "BLOCKED_WITH_REASON"
+  },
+  {
+   "detail": "see MLB",
+   "market": "FIRST_TO_SCORE_TEAM",
+   "reason_code": "NO_VERIFIED_SCORING_TIMING_MODEL",
+   "sport": "CFB",
+   "status": "BLOCKED_WITH_REASON"
+  },
+  {
+   "detail": "see MLB",
+   "market": "RACE_TO_X",
+   "reason_code": "NO_VERIFIED_SCORING_TIMING_MODEL",
+   "sport": "NFL",
+   "status": "BLOCKED_WITH_REASON"
+  },
+  {
+   "detail": "see MLB",
+   "market": "RACE_TO_X",
+   "reason_code": "NO_VERIFIED_SCORING_TIMING_MODEL",
+   "sport": "CFB",
+   "status": "BLOCKED_WITH_REASON"
+  },
+  {
+   "detail": "football normal marginals do not form a joint without correlation structure",
+   "market": "EXACT_SCORE",
+   "reason_code": "NO_JOINT_SCORE_DISTRIBUTION_WITH_CORRELATION",
+   "sport": "NFL",
+   "status": "NOT_WIRED_WITH_REASON"
+  },
+  {
+   "detail": "same as NFL",
+   "market": "EXACT_SCORE",
+   "reason_code": "NO_JOINT_SCORE_DISTRIBUTION_WITH_CORRELATION",
+   "sport": "CFB",
+   "status": "NOT_WIRED_WITH_REASON"
+  },
+  {
+   "detail": "not a DK-offered football market",
+   "market": "THREE_WAY_ML",
+   "reason_code": "NOT_OFFERED_BY_DK",
+   "sport": "NFL",
+   "status": "NOT_WIRED_WITH_REASON"
+  },
+  {
+   "detail": "not a DK-offered football market",
+   "market": "THREE_WAY_ML",
+   "reason_code": "NOT_OFFERED_BY_DK",
+   "sport": "CFB",
+   "status": "NOT_WIRED_WITH_REASON"
+  },
+  {
+   "detail": "routing verified; pricing via pre-existing ESPN gamelog empirical path (fails closed until gamelog-shape-fix merges)",
+   "market": "PLAYER_PROPS_YARDAGE",
+   "sport": "NFL",
+   "status": "SUPPORTED"
+  },
+  {
+   "detail": "same as NFL",
+   "market": "PLAYER_PROPS_YARDAGE",
+   "sport": "CFB",
+   "status": "SUPPORTED"
+  },
+  {
+   "detail": "Phase 5",
+   "market": "ALL_NBA",
+   "sport": "NBA",
+   "status": "OUT_OF_SCOPE"
+  },
+  {
+   "detail": "Phase 6",
+   "market": "LIVE_IN_GAME",
+   "sport": "ALL",
+   "status": "OUT_OF_SCOPE"
+  },
+  {
+   "detail": "Phase 1 (NRFI/YRFI)",
+   "market": "FIRST_INNING_MARKETS",
+   "sport": "MLB",
+   "status": "OUT_OF_SCOPE"
+  },
+  {
+   "detail": "long-horizon modeling / correlation modeling not in architecture",
+   "market": "FUTURES_SGP",
+   "reason_code": "OUT_OF_SCOPE_MATRIX",
+   "sport": "ALL",
+   "status": "NOT_WIRED_WITH_REASON"
+  }
+ ],
+ "research_only": true,
+ "schema": "SPORTSEDGE_MARKET_COVERAGE_PHASE7_V1",
+ "status_values": [
+  "SUPPORTED",
+  "IN_BUILD",
+  "NOT_WIRED_WITH_REASON",
+  "BLOCKED_WITH_REASON",
+  "OWNED_BY_OTHER_WORK",
+  "OUT_OF_SCOPE"
+ ]
+}
