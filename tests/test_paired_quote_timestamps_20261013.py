@@ -61,7 +61,10 @@ def test_absent_counterpart_timestamp_key_refuses_pair():
 
 def test_unparseable_counterpart_timestamp_refuses_pair():
     c = card([row(), row(side="OVER", odds=-115, captured="not-a-time")])
-    assert statuses(c)[0] == "COUNTERPART_QUOTE_TIMESTAMP_MISSING"
+    # Unparseable evidence is distinct from an absent capture receipt.
+    assert statuses(c) == ["INVALID_PAIR_QUOTE_TIMESTAMP"] * 2
+    assert all("market_no_vig_p" not in r["independent_projection"]
+               for r in c["evaluated_rows"])
 
 
 def test_pair_119_seconds_apart_is_accepted():
