@@ -160,6 +160,13 @@ def nfl_market_price_radar(root: Path, now: datetime):
             method = reference.get("method")
             books = reference.get("books") or []
             peer_rows = reference.get("peer_evidence") or []
+            # A malformed or duplicate book/peer list is not evidence.
+            if (not isinstance(books, list) or not books
+                    or any(not isinstance(b, str) or not b for b in books)
+                    or len(books) != len(set(books))
+                    or not isinstance(peer_rows, list)
+                    or any(not isinstance(p, dict) for p in peer_rows)):
+                continue
             expected_books = set(books)
             if (not game.get("provider_event_id")
                     or reference.get("provider_event_id") != game.get("provider_event_id")
@@ -182,9 +189,13 @@ def nfl_market_price_radar(root: Path, now: datetime):
                 continue
             if not same_ref_line or not peer_lines_ok:
                 continue
-            if any((_utc(p.get("observed_at")) is None
-                    or not 0 <= (now-_utc(p.get("observed_at"))).total_seconds() <= 600)
-                   for p in peer_rows):
+            peer_times = [_utc(p.get("observed_at")) for p in peer_rows]
+            # Freshness of each leg alone is insufficient; quote timestamps
+            # must be paired within 120 seconds to the exact DK market.
+            if any(t is None
+                   or not 0 <= (now - t).total_seconds() <= 600
+                   or abs((updated - t).total_seconds()) > 120
+                   for t in peer_times if t is not None) or any(t is None for t in peer_times):
                 continue
             if method == "PINNACLE_POWER_V1":
                 if "pinnacle" not in books:
