@@ -143,8 +143,14 @@ def pair_opposite_odds(rows: Sequence[Any]) -> list[dict[str,Any]]:
         for i in indexes:
             row=material[i]
             market=_norm_market(row)
-            if market in N_WAY_MARKETS or row.get("opposite_odds") is not None:
+            if market in N_WAY_MARKETS:
                 continue
+            if row.get("opposite_odds") is not None:
+                # A price asserted on this row's own opposite_odds field is NOT a
+                # separately timestamped counterpart quote. Refuse it; only a
+                # unique, timestamped complement row (<=120s skew) may supply it.
+                row["opposite_odds_refused"]="OPPOSITE_PRICE_NOT_A_TIMESTAMPED_QUOTE"
+                row["opposite_odds"]=None
             stamp=_retrieved_at(row)
             if stamp is None:
                 continue
