@@ -75,12 +75,22 @@ for _m in ("MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS"):
             "prepricing factor gate (verified StatsAPI identity/history).")
 for _m in ("F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS"):
     _blocked("MLB", _m, "NO_QUOTE",
-             "F5 markets are priced only behind the manual-snapshot intake "
-             "contract (gamePk-bound paired quotes assembled for "
-             "run_canonical_manual_mlb). The canonical card intake has no "
-             "F5 quote binding and no verified F5 feature assembly, so an "
-             "F5 quote cannot reach an engine on this path.",
-             engine="SHARED_F5_ENGINE (snapshot contract only)")
+             "F5 quotes now bind on the canonical path through "
+             "sportsedge.mlb_f5_quote_binding (sportsbook + book event ID "
+             "+ verified gamePk fixture + explicit FIRST_5 period + "
+             "selection/line/price + <=180s freshness + <=120s pairing), "
+             "and F5 features assemble from strictly-prior StatsAPI "
+             "linescores without the snapshot contract. Rows still "
+             "resolve BLOCKED here: the settlement basis is verified "
+             "from code for F5_RUN_LINE/F5_TOTALS/F5_TEAM_TOTALS but NOT "
+             "for F5_MONEYLINE (tie policy "
+             "F5_MONEYLINE_TIE_POLICY_NOT_NORMALIZED), and every F5 "
+             "deployment remains stage F5_STATE_CANDIDATE "
+             "(eligible=false) in config/deployments.json, so no F5 row "
+             "may price on this path; row-level reasons name the exact "
+             "gate (F5_* codes).",
+             engine="SHARED_F5_ENGINE (via MLB_F5_QUOTE_BINDING_V1, "
+                    "deployment-gated)")
 for _m in ("NRFI", "YRFI"):
     _priced("MLB", _m, "MLB_FIRST_INNING_BINARY (mlb_first_inning_model."
             "price_first_inning_binary via FIRST_INNING_RUNS at line 0.5; "

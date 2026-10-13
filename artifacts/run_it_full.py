@@ -26,6 +26,9 @@ from sportsedge.prepricing.factor_ingestion import stage_games
 from sportsedge.canonical_coverage import (
     NFL_ANYTIME_TD_MARKETS, NFL_DERIVATIVE_MARKETS, NFL_FIRST_TD_MARKETS,
     blocked_row_for as coverage_blocked_row, coverage_summary)
+from sportsedge.mlb_f5_quote_binding import (
+    F5_MARKET_ALIASES as F5_INTAKE_ALIASES, F5_MARKETS as F5_CANONICAL_MARKETS,
+    phone_f5_binding_rows)
 from datetime import datetime, timezone
 
 FIELDS = (
@@ -189,9 +192,16 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     misses fail closed instead of fetching). NFL team totals, period and
     alternate markets route to the derivative pricers, which price only
     from a joint score distribution embedded in a priced game result.
-    MLB NRFI/YRFI are the first-inning binary at line 0.5. Every other
-    matrix market without a priced route resolves through
-    sportsedge.canonical_coverage to a named taxonomy blocker.
+    MLB NRFI/YRFI are the first-inning binary at line 0.5. MLB F5 markets
+    route to the F5 quote-binding stage (sportsedge.mlb_f5_quote_binding):
+    quotes bind (source, book event ID, verified gamePk fixture, explicit
+    FIRST_5 period, selection/line/price, 180s freshness, 120s pairing),
+    the settlement basis is checked from the settlement code, features
+    assemble from strictly-prior StatsAPI linescores, and rows then block
+    at the F5 deployment gate (stage F5_STATE_CANDIDATE, eligible=false)
+    with the specific F5_* reason named. Every other matrix market
+    without a priced route resolves through sportsedge.canonical_coverage
+    to a named taxonomy blocker.
     """
     rows = payload if isinstance(payload, list) else payload.get("lines")
     if not isinstance(rows, list):
@@ -230,6 +240,9 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "FIRST_TOUCHDOWN":"FIRST_TD",
                 "FIRST_TD_SCORER":"FIRST_TD",
             }.get(market,market)
+            line["market"] = market
+        if line["sport"] == "MLB" and market in F5_INTAKE_ALIASES:
+            market = F5_INTAKE_ALIASES[market]
             line["market"] = market
         if market in {"ML", "SPREAD", "TOTAL"} or (
             line["sport"] == "MLB" and market == "TEAM_TOTALS"
@@ -329,6 +342,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         }
     pitcher_pos, pitcher_input = [], []
     batter_pos, batter_input = [], []
+    f5_pos, f5_input = [], []
     first_pos, first_input = [], []
     first_originals = {}  # local -> original market, for NRFI/YRFI translation
     nfl_pos, nfl_input = [], []
@@ -366,6 +380,9 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             first_pos.append(local)
             first_input.append(translated)
             first_originals[local] = market
+        elif line["sport"] == "MLB" and market in F5_CANONICAL_MARKETS:
+            f5_pos.append(local)
+            f5_input.append(line)
         elif line["sport"] == "MLB" and market in FIRST_INNING_PHONE_MARKETS:
             first_pos.append(local)
             first_input.append(line)
@@ -393,6 +410,31 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         batter_input, now=clock, getter=getter if auto_context else (lambda url: None))
     first_results, first_receipts = phone_first_inning_rows(
         first_input, now=clock, getter=getter if auto_context else (lambda url: None))
+    # F5 stage: quote binding + settlement-basis gate + strictly-prior
+    # feature assembly, then the F5 deployment gate. With auto_context
+    # off, fetching is disabled and binding fails closed on the fixture
+    # gate. The stage module is dependency-light at import time; its
+    # StatsAPI/engine dependencies load lazily inside the stage.
+    f5_results, f5_receipts = [], []
+    if f5_input:
+        try:
+            f5_results, f5_receipts = phone_f5_binding_rows(
+                f5_input, now=clock,
+                getter=getter if auto_context else None,
+                fetch_enabled=auto_context)
+        except Exception as exc:
+            f5_results = [{
+                "status": "NO_MODEL_OR_MARKET",
+                "reason": "NO_ENGINE: F5_BINDING_RUNTIME_UNAVAILABLE — "
+                          f"{type(exc).__name__}: {exc}",
+                "blocker": "NO_ENGINE",
+                "blocker_detail": str(exc),
+                "f5_reason": "F5_BINDING_RUNTIME_UNAVAILABLE",
+                "coverage_market": line.get("market"),
+                "sport": "MLB", "market": line.get("market"),
+                "research_only": True, "official_authority": False,
+                "model_p_authority": False, "staking_authority": False,
+            } for line in f5_input]
     nfl_results, nfl_receipts = phone_nfl_player_rows(
         nfl_input, now=clock, getter=getter if auto_context else (lambda url: None))
     cfb_results, cfb_receipts = phone_cfb_player_rows(
@@ -465,6 +507,8 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         raise ValueError("ANYTIME_TD_RESULT_COUNT_MISMATCH")
     if len(nfl_results) != len(nfl_input) or len(cfb_results) != len(cfb_input):
         raise ValueError("FOOTBALL_RESULT_COUNT_MISMATCH")
+    if len(f5_results) != len(f5_input):
+        raise ValueError("F5_RESULT_COUNT_MISMATCH")
     if len(pitcher_results) != len(pitcher_input):
         raise ValueError("PITCHER_RESULT_COUNT_MISMATCH")
     if len(batter_results) != len(batter_input):
@@ -485,6 +529,8 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             result["market"] = original
             result["underlying_market"] = "FIRST_INNING_RUNS"
             result["priced_via"] = "FIRST_INNING_RUNS_BINARY_AT_0_5"
+        modeled_props[local] = result
+    for local, result in zip(f5_pos, f5_results):
         modeled_props[local] = result
     for local, result in zip(deriv_pos, deriv_results):
         modeled_props[local] = result
@@ -521,13 +567,14 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     card["prop_unpriced"] = [r for r in modeled_props if r.get("status")=="NO_MODEL_OR_MARKET"]
     card["source_receipts"] = (list(card.get("source_receipts") or [])
                               + pitcher_receipts + batter_receipts
-                              + first_receipts
+                              + first_receipts + f5_receipts
                               + nfl_receipts + cfb_receipts
                               + deriv_receipts + td_receipts)
     card["prop_model_status"] = {
         "pitcher_engine":"MLB_PITCHER_JOINT_EMPIRICAL_BAYES",
         "batter_engine":"MLB_BATTER_EMPIRICAL_GAMELOG",
         "first_inning_engine":"MLB_FIRST_INNING_TEAM_RATES_POISSON_JEFFREYS",
+        "mlb_f5_engine":"SHARED_F5_ENGINE_VIA_MLB_F5_QUOTE_BINDING_V1_DEPLOYMENT_GATED_F5_STATE_CANDIDATE",
         "nfl_player_engine":"ESPN_NAMED_HISTORICAL_GAMELOG_WATCH_ONLY",
         "cfb_player_engine":"ESPN_NAMED_HISTORICAL_GAMELOG_WATCH_ONLY",
         "nfl_anytime_td_engine":"NFLVERSE_OPPORTUNITY_DECOMPOSITION_UNVALIDATED",
