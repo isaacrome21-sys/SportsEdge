@@ -207,8 +207,16 @@ def reconcile_dk_event(
             # Only a specific contract is disproved; other variants of this
             # family remain unverified. Never call the whole family absent.
             availability = "NOT_VERIFIED_ON_THIS_EVENT"
-        engine_state = normalized_engines.get(market, "UNVERIFIED")
+        family_engine_state = normalized_engines.get(market, "UNVERIFIED")
         registered = market in registry
+        # PRICED_PATH on a *family* does not prove that main, alternate and
+        # ladder contracts each have a matching period/settlement-aware engine.
+        # A family-wide block (NO_ENGINE) safely applies to every variant;
+        # a claimed positive path is ambiguous across multiple contracts.
+        engine_ambiguous = len(variants) > 1 and family_engine_state == "PRICED_PATH"
+        engine_state = "UNVERIFIED" if engine_ambiguous else family_engine_state
+        engine_scope = ("FAMILY_PATH_NOT_ATTESTED_FOR_EACH_VARIANT"
+                        if engine_ambiguous else "CALLER_SUPPLIED_FAMILY_STATE")
         rows.append({
             "market": market, "registered": registered,
             "registration_status": "REGISTERED" if registered else "NOT_REGISTERED",
@@ -224,7 +232,10 @@ def reconcile_dk_event(
             "offer_variants": sorted(variants, key=lambda v: tuple(v[k] for k in CONTRACT_DIMS)),
             "offer_variant_count": len(variants),
             "explicit_absence_scopes": scopes,
+            "family_engine_state": family_engine_state if registered else "NOT_REGISTERED",
             "engine_state": engine_state if registered else "NOT_REGISTERED",
+            "engine_state_scope": engine_scope if registered else "NOT_REGISTERED",
+            "engine_state_source": "CALLER_SUPPLIED_NOT_INDEPENDENTLY_ATTESTED",
             "can_derive_two_sided_no_vig": False,
             "model_validated": False,
             "deployment_eligible": False,
