@@ -320,7 +320,7 @@ def test_run_it_full_routes_coverage_and_alternates():
                                                 "BELOW_THRESHOLD", "PRICE_CAP"}
     assert by_market["MARGIN_BAND"]["market"] == "MARGIN_BAND"
     assert by_market["F5_TOTALS"]["status"] == "NO_MODEL_OR_MARKET"
-    assert by_market["F5_TOTALS"]["reason"] == "F5_MARKET_FAILED_VALIDATION_NOT_WIRED"
+    assert by_market["F5_TOTALS"]["reason"] == "NO_QUOTE: F5_SOURCE_MISSING — quote names no sportsbook/source"
     assert by_market["PITCHER_K"]["status"] == "NO_MODEL_OR_MARKET"
     assert by_market["FIRST_TO_SCORE"]["status"] == "NO_MODEL_OR_MARKET"
     assert by_market["FIRST_TO_SCORE"]["reason"] == "NO_VERIFIED_MODEL_FOR_THIS_MARKET"

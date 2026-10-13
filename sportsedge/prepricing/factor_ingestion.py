@@ -17,7 +17,12 @@ endpoints only (zero API keys, zero paid services, zero infra for Isaac):
   4. rest/travel from ESPN schedules -- verified rest days plus a declared
      bounded rest-differential adjustment; travel distance stays NOT_WIRED.
 
-Only VERIFIED adjustments shift a mean. Every factor is audited per game as
+OWNER RULING (Oct 13, 2026): items 3 and 4 and the engine's recent-form
+term are DISABLED_PENDING_INCREMENTAL_VALUE -- collected and audited,
+but their pricing contribution is zero until each demonstrates
+incremental value in the harness. Only the retained baseline
+(team-strength ratings + static home advantage) and other verified,
+non-disabled adjustments shift a mean. Every factor is audited per game as
 USED (with source) or MISSING (with explicit reason) against the factor
 taxonomy in model_factors_reference.md (NHL/Soccer omitted -- out of scope;
 motivation spots / news speed / officiating tendencies stay NOT_WIRED per
@@ -174,6 +179,15 @@ SPORT_FACTORS = {
 
 USED, MISSING, NOT_WIRED, NOT_APPLICABLE, PENDING_VALIDATION = (
     "USED", "MISSING", "NOT_WIRED", "NOT_APPLICABLE", "PENDING_VALIDATION")
+
+# Owner ruling (Oct 13, 2026): rest_schedule, the ERA-based
+# starting-pitcher adjustment, and recent_form are DISABLED in the
+# canonical pricing path until each demonstrates incremental value in
+# the harness against the retained baseline (team-strength ratings +
+# static home advantage) and the market. Their values are still
+# collected and reported here for research; the adjustments handed to
+# pricing are exactly zero and the factor status is this label.
+DISABLED_PENDING_INCREMENTAL_VALUE = "DISABLED_PENDING_INCREMENTAL_VALUE"
 
 
 @dataclass
@@ -588,7 +602,19 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
                 blocked, block_reason = True, BLOCK_PITCHER_UNCONFIRMED
                 block_detail = pdetail
         else:
-            adjustments.update(padj)
+            # DISABLED_PENDING_INCREMENTAL_VALUE (owner ruling, Oct 13
+            # 2026): the declared ERA-based starter adjustments stay
+            # visible in the factor audit for research (ERA/IP/GS and the
+            # declared heuristic label are in each factor's reason), but
+            # the priced contribution is exactly zero.
+            for f in pfactors:
+                if f["factor"] == "starting_pitcher" and f["status"] == USED:
+                    declared = dict(f["adjustments"])
+                    f["status"] = DISABLED_PENDING_INCREMENTAL_VALUE
+                    f["reason"] += (";PRICING_CONTRIBUTION_ZERO_"
+                                    "DISABLED_PENDING_INCREMENTAL_VALUE")
+                    f["adjustments"] = {k: 0.0 for k in declared}
+            adjustments.update({k: 0.0 for k in padj})
 
     # -- 4. rest/travel ------------------------------------------------------
     if sport in {"NFL", "CFB", "MLB"}:
@@ -601,12 +627,18 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
             diff = home_rest - away_rest
             cap = DECL_REST_ADJ_CAP[sport]
             adj = round(bounded(DECL_REST_PTS_PER_DAY[sport] * diff, -cap, cap), 3)
-            adjustments["rest_diff_adj"] = adj
+            # DISABLED_PENDING_INCREMENTAL_VALUE (owner ruling, Oct 13
+            # 2026): rest days and the declared differential stay visible
+            # for research; the priced contribution is exactly zero.
+            adjustments["rest_diff_adj"] = 0.0
             factors.append(_factor(
-                "rest_schedule", USED, "ESPN_SCHEDULE_VERIFIED",
+                "rest_schedule", DISABLED_PENDING_INCREMENTAL_VALUE,
+                "ESPN_SCHEDULE_VERIFIED",
                 f"HOME_REST_DAYS_{home_rest};AWAY_REST_DAYS_{away_rest};"
-                f"DECLARED_DIFF_ADJ_{adj}_NOT_CALIBRATED",
-                {"rest_diff_adj": adj}))
+                f"DECLARED_DIFF_ADJ_{adj}_NOT_CALIBRATED;"
+                f"PRICING_CONTRIBUTION_ZERO_"
+                f"DISABLED_PENDING_INCREMENTAL_VALUE",
+                {"rest_diff_adj": 0.0}))
         factors.append(_factor(
             "travel",
             PENDING_VALIDATION if _FREE_FACTORS_AVAILABLE else NOT_WIRED,
@@ -660,9 +692,13 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
         if nfl_history_missing else
         "HEURISTIC_NOT_VALIDATED: bounded prior-five-game "
         "scoring-margin proxy + static HFA"))
-    factors.append(_factor("recent_form", USED, "FREE_MODELS_ENGINE",
+    factors.append(_factor("recent_form", DISABLED_PENDING_INCREMENTAL_VALUE,
+                           "FREE_MODELS_ENGINE",
                            "HEURISTIC_NOT_VALIDATED: short prior-game scoring trend; "
-                           "MLB form subsumed into rating"))
+                           "MLB form subsumed into rating;"
+                           "PRICING_CONTRIBUTION_ZERO_"
+                           "DISABLED_PENDING_INCREMENTAL_VALUE "
+                           "(engine form term not applied to score means)"))
     factors.append(_factor("home_advantage", USED, "FREE_MODELS_ENGINE",
                            "STATIC_DECLARED_HFA_PRIOR: league baseline only, "
                            "no venue-specific coefficient"))
