@@ -1,4 +1,8 @@
-"""Unified MLB card execution through one canonical market path."""
+"""Unified MLB card execution (shared executor for the superseded auto
+runners). NOT the canonical RUN IT card path -- that is
+``artifacts/run_it_full.py`` (run_full). "Canonical" in this module's
+helpers (e.g. validate_canonical_quote) refers to quote validation
+inside this executor only."""
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
