@@ -1,0 +1,33 @@
+# ONE-TIME owner-approved AUDIT of cviaxmiwnptr/nba-betting-data (2026-10-13).
+# Runs only on a push to the dedicated single-use branch below; no schedule, no
+# workflow_run, no PR trigger. Writes ONLY a schema/coverage/provenance report
+# (artifact + log). Raw data is never committed or uploaded. Secrets are read from
+# env only and never echoed. Market baseline stays MISSING regardless of the result.
+name: audit-kaggle-nba-odds-once
+on:
+  push:
+    branches: [audit/kaggle-nba-odds-once-20261013]
+permissions:
+  contents: read
+concurrency:
+  group: audit-kaggle-nba-odds-once
+  cancel-in-progress: false
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download to temp and write schema report only
+        env:
+          SPORTSEDGE_KAGGLE_USERNAME: ${{ secrets.SPORTSEDGE_KAGGLE_USERNAME }}
+          SPORTSEDGE_KAGGLE_KEY: ${{ secrets.SPORTSEDGE_KAGGLE_KEY }}
+        run: python scripts/audit_kaggle_nba_odds_schema.py --dataset cviaxmiwnptr/nba-betting-data --out "$RUNNER_TEMP/report.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kaggle-nba-odds-schema-report
+          path: ${{ runner.temp }}/report.json
+          retention-days: 30
