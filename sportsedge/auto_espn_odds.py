@@ -65,7 +65,7 @@ def run_auto_mlb_espn_game_odds(
         raise ValueError("NOW_TIMEZONE_REQUIRED")
     current = current.astimezone(timezone.utc)
     slate_date_ct = current.astimezone(CHICAGO_TZ).date().isoformat()
-    schedule = fetch_schedule(slate_date_ct, opener=opener, now=current)
+    schedule = fetch_schedule(slate_date_ct, opener=opener)  # retrieved_at = post-fetch receipt clock; run as-of time is not a receipt claim
 
     espn = fetch_espn_mlb_game_quotes(schedule=schedule, opener=opener, now=current)
     quote_payload = list(espn.quotes)
