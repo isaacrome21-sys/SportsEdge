@@ -14,7 +14,7 @@ from math import exp
 from zoneinfo import ZoneInfo
 
 from .asof_team_ratings import fit_asof
-from .player_layer import Availability, PlayerLog, allocate, build_rotation, player_market
+from .player_layer import Availability, PlayerLog, allocate, build_rotation, player_market, player_marginal
 from .quarter_joint_sim import calibrate, simulate
 
 CT = ZoneInfo("America/Chicago")
@@ -38,7 +38,8 @@ def _poisson_over(mean: float, line: float) -> float:
     return 1.0 - cdf
 
 
-def run_player_harness(games, quarter_games, logs, *, min_team_games=5, min_player_games=3, n_paths=N_PATHS):
+def run_player_harness(games, quarter_games, logs, *, min_team_games=5, min_player_games=3, n_paths=N_PATHS,
+                       version: str = "v1"):
     """games: NBAGame list; quarter_games: QuarterGame list; logs: PlayerLog list (minutes > 0 only)."""
     qmap = {q.game_id: q for q in quarter_games}
     games = sorted((g for g in games if g.game_id in qmap), key=lambda g: (g.start, g.game_id))
@@ -80,10 +81,11 @@ def run_player_harness(games, quarter_games, logs, *, min_team_games=5, min_play
                 avail = {pid: Availability("AVAILABLE" if pid in played else "OUT", AVAILABILITY_LABEL,
                                            cutoff - timedelta(seconds=1)) for pid in pre.players}
                 try:
-                    rot = build_rotation(tlogs, team, cutoff, availability=avail)
+                    rot = build_rotation(tlogs, team, cutoff, availability=avail,
+                                         minutes_mode="played" if version == "v2" else "v1_zero_fill")
                 except ValueError:
                     continue
-                alloc = allocate(rot, paths, seed=int(g.game_id) % (2**31))
+                alloc = allocate(rot, paths, seed=int(g.game_id) % (2**31)) if version == "v1" else None
                 for pid, actual in played.items():
                     hist = by_player.get((team, pid), [])[-10:]
                     if pid not in rot.players or len(hist) < min_player_games:
@@ -97,7 +99,8 @@ def run_player_harness(games, quarter_games, logs, *, min_team_games=5, min_play
                         nmean = sum(getattr(l, FIELD[s]) for l in hist) / len(hist)
                         y_val = getattr(actual, FIELD[s])
                         for x in lines:
-                            m = player_market(rot, alloc, pid, s, x)
+                            m = (player_market(rot, alloc, pid, s, x) if version == "v1"
+                                 else player_marginal(rot, hist, pid, s, x))
                             assert m["status"] in {"WATCH", "BLOCKED"} and m["play_authority"] is False
                             y = int(y_val > x)
                             a = acc[s][str(x)]
@@ -110,7 +113,7 @@ def run_player_harness(games, quarter_games, logs, *, min_team_games=5, min_play
     decision = {s: "PASS_RESEARCH" if all(v["brier_cand"] < v["brier_naive"] for v in d.values()) and
                 any(v["n"] for v in d.values()) else "FAIL" for s, d in out.items()}
     decision["MINUTES"] = "PASS_RESEARCH" if m["n"] and m["mae_cand"] < m["mae_naive"] else "FAIL"
-    return {"stats": out, "minutes": m, "decision": decision, "availability": AVAILABILITY_LABEL,
+    return {"version": version, "stats": out, "minutes": m, "decision": decision, "availability": AVAILABILITY_LABEL,
             "market_baseline": "MISSING", "prop_status_ceiling": "WATCH"}
 
 

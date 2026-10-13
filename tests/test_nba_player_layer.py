@@ -79,3 +79,33 @@ def test_whole_line_push_mass():
     a = allocate(r, np.full(2000, 110), seed=5)
     m = player_market(r, a, "p0", "PTS", 20.0)
     assert m["push"] > 0 and m["over"] + m["push"] <= 1
+
+
+def test_v2_played_mode_does_not_count_missed_games_as_zero():
+    g = [l for l in logs() if not (l.player_id == "p0" and l.game_id in {f"g{d}" for d in range(6, 12)})]
+    v1 = build_rotation(g, "BOS", AS_OF)
+    v2 = build_rotation(g, "BOS", AS_OF, minutes_mode="played")
+    i = v1.players.index("p0")
+    raw_v1 = v1.exp_minutes[i] / v1.exp_minutes.sum()
+    raw_v2 = v2.exp_minutes[i] / v2.exp_minutes.sum()
+    assert raw_v2 > raw_v1 * 1.5  # missed games no longer drag p0 toward 0
+    assert abs(v2.exp_minutes.sum() - 240) < 1e-9
+    with pytest.raises(ValueError):
+        build_rotation(g, "BOS", AS_OF, minutes_mode="bogus")
+
+
+def test_v2_marginal_uses_player_variance_and_never_plays():
+    from sportsedge.sports.nba.player_layer import player_marginal
+    g = logs()
+    av = {p: Availability("AVAILABLE", "test", AS_OF - timedelta(hours=1)) for p in PIDS}
+    rot = build_rotation(g, "BOS", AS_OF, availability=av, minutes_mode="played")
+    steady = [PlayerLog("p0", "BOS", f"s{i}", T0, 30, 20, 5, 5) for i in range(10)]
+    wild = [PlayerLog("p0", "BOS", f"w{i}", T0, 30, 0 if i % 2 else 40, 5, 5) for i in range(10)]
+    a = player_marginal(rot, steady, "p0", "PTS", 30.5)
+    b = player_marginal(rot, wild, "p0", "PTS", 30.5)
+    assert b["variance"] > a["variance"] and b["over"] > a["over"]
+    assert a["mean"] == b["mean"]
+    for m in (a, b):
+        assert m["status"] == "WATCH" and m["play_authority"] is False
+    rot_u = build_rotation(g, "BOS", AS_OF, minutes_mode="played")
+    assert player_marginal(rot_u, steady, "p0", "PTS", 10.5)["status"] == "BLOCKED"

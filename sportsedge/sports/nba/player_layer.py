@@ -63,7 +63,11 @@ class TeamRotation:
 
 def build_rotation(logs: Sequence[PlayerLog], team: str, as_of: datetime, *,
                    availability: Mapping[str, Availability] | None = None,
-                   last_n: int = 10, shrink: float = 3.0) -> TeamRotation:
+                   last_n: int = 10, shrink: float = 3.0, minutes_mode: str = "v1_zero_fill") -> TeamRotation:
+    """minutes_mode: "v1_zero_fill" (missed recent team games count as 0, v1) or
+    "played" (v2: mean over the player's last ``last_n`` games played; DNP excluded)."""
+    if minutes_mode not in {"v1_zero_fill", "played"}:
+        raise ValueError("MINUTES_MODE_INVALID")
     if as_of.tzinfo is None or as_of.utcoffset() is None:
         raise ValueError("AS_OF_TIMEZONE_REQUIRED")
     prior = sorted((l for l in logs if l.team == team and l.start < as_of),
@@ -82,7 +86,11 @@ def build_rotation(logs: Sequence[PlayerLog], team: str, as_of: datetime, *,
     for p in pids:
         mine = [l for l in prior if l.player_id == p]
         rec = [l for l in mine if l.game_id in recent]
-        m = sum(l.minutes for l in rec) / len(recent)  # absent recent games count as 0
+        if minutes_mode == "played":
+            last = sorted(mine, key=lambda l: (l.start, l.game_id))[-last_n:]
+            m = sum(l.minutes for l in last) / len(last)
+        else:
+            m = sum(l.minutes for l in rec) / len(recent)  # absent recent games count as 0
         pm = sum(l.minutes for l in mine)
         ppm.append((sum(l.points for l in mine) + shrink * lg_ppm) / (pm + shrink))
         rpm.append((sum(l.rebounds for l in mine) + shrink * lg_rpm) / (pm + shrink))
@@ -127,3 +135,41 @@ def player_market(rot: TeamRotation, alloc: dict, player_id: str, stat: str, lin
             "reason": ("AVAILABILITY_" + avail) if blocked else "UNVALIDATED_RESEARCH",
             "availability": avail, "over": float((v > line).mean()),
             "push": float((v == line).mean()), "play_authority": False, "version": VERSION}
+
+
+def _nb_over(mean: float, var: float, line: float) -> float:
+    from math import exp, lgamma, log
+    if mean <= 0:
+        return 0.0
+    k_max = int(line)
+    if var <= mean * (1 + 1e-9):
+        term, cdf = exp(-mean), 0.0
+        for k in range(k_max + 1):
+            cdf += term
+            term *= mean / (k + 1)
+        return max(0.0, 1.0 - cdf)
+    r = mean * mean / (var - mean)
+    p = r / (r + mean)
+    cdf = sum(exp(lgamma(k + r) - lgamma(r) - lgamma(k + 1) + r * log(p) + k * log(1 - p)) for k in range(k_max + 1))
+    return max(0.0, 1.0 - cdf)
+
+
+def player_marginal(rot: TeamRotation, history: Sequence[PlayerLog], player_id: str, stat: str, line: float,
+                    *, var_shrink: float = 3.0) -> dict:
+    """v2 marginal: mean = rate x expected minutes; variance from the player's own recent games."""
+    if player_id not in rot.players:
+        return {"status": "BLOCKED", "reason": "PLAYER_NOT_IN_PRIOR_ROTATION", "play_authority": False}
+    i = rot.players.index(player_id)
+    field_ = {"PTS": "points", "REB": "rebounds", "AST": "assists"}[stat]
+    rate = {"PTS": rot.ppm, "REB": rot.rpm, "AST": rot.apm}[stat][i]
+    mu = float(rate * rot.exp_minutes[i])
+    xs = [getattr(l, field_) for l in history[-10:]]
+    n = len(xs)
+    s2 = (sum((x - sum(xs) / n) ** 2 for x in xs) / (n - 1)) if n > 1 else mu
+    var = (n * s2 + var_shrink * mu) / (n + var_shrink)
+    avail = rot.availability.get(player_id, "UNKNOWN")
+    blocked = avail in {"UNKNOWN", "OUT", "DOUBTFUL"}
+    return {"status": "BLOCKED" if blocked else "WATCH",
+            "reason": ("AVAILABILITY_" + avail) if blocked else "UNVALIDATED_RESEARCH",
+            "availability": avail, "mean": mu, "variance": var, "over": _nb_over(mu, var, line),
+            "play_authority": False, "version": VERSION + "_V2_MARGINAL"}
