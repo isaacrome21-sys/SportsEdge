@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# ---------------------------------------------------------------------------
+# SUPERSEDED ROUTE (2026-10-12): the ONE canonical RUN IT card path is
+# artifacts/run_it_full.py (run_full). This entry point is retained for
+# reference/replay only and must not be treated as a canonical card source.
+# ---------------------------------------------------------------------------
 """Price a manual DK CFB board with the bakeoff-selected PRIOR_CURRENT_BLEND fit.
 
 Works like the MLB card: a quote clears when its edge against the

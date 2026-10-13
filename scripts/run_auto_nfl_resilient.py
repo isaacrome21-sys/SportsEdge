@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# ---------------------------------------------------------------------------
+# SUPERSEDED ROUTE (2026-10-12): the ONE canonical RUN IT card path is
+# artifacts/run_it_full.py (run_full). This entry point is retained for
+# reference/replay only and must not be treated as a canonical card source.
+# ---------------------------------------------------------------------------
 """NFL card runner shaped like the MLB auto card.
 
 User-supplied lines only. No Odds API. Every prop, side, and total family is

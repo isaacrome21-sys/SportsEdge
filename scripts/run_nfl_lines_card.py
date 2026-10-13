@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# ---------------------------------------------------------------------------
+# SUPERSEDED ROUTE (2026-10-12): the ONE canonical RUN IT card path is
+# artifacts/run_it_full.py (run_full). This entry point is retained for
+# reference/replay only and must not be treated as a canonical card source.
+# ---------------------------------------------------------------------------
 """Price an NFL phone ticket with frozen Attempt 9. Fail closed."""
 from __future__ import annotations
 
