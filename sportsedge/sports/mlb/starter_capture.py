@@ -1280,3 +1280,139 @@ def verify_capture_chain(
         "manifest_entries": len(manifest_lines),
         "failure": None,
     }
+
+
+# --------------------------------------------------------------------------
+# Raw-response preservation (research-only, LOCAL and UNANCHORED).
+# --------------------------------------------------------------------------
+#
+# Each SNAPSHOT record built from a response carries ``response_sha256``.
+# The raw bytes are kept in a content-addressed local directory
+# (``<sha256>.json``) and the record names them via ``raw_store_file`` /
+# ``raw_sha256`` / ``raw_byte_length``. The record itself is inside the
+# hash-chained capture/manifest pair, so the raw-file link is chain-covered.
+# The link to #2166's receipt journal is by digest: a receipt entry whose
+# ``sha256`` equals ``raw_sha256`` and whose ``url`` equals ``source_url``.
+#
+# This store is NOT retention-locked, NOT WORM, NOT externally anchored.
+# It proves only local byte consistency at verification time.
+
+RAW_STORE_KIND = "LOCAL_UNANCHORED_NOT_RETENTION_LOCKED"
+_HEX = frozenset("0123456789abcdef")
+
+
+def _is_sha256_hex(value: Any) -> bool:
+    return isinstance(value, str) and len(value) == 64 and set(value) <= _HEX
+
+
+def store_raw_response(raw_dir: Path, raw: bytes) -> dict[str, Any]:
+    """Write ``raw`` content-addressed under ``raw_dir``; never overwrite."""
+    if not isinstance(raw, (bytes, bytearray)):
+        raise StarterCaptureError("RAW_RESPONSE_NOT_BYTES")
+    raw = bytes(raw)
+    digest = _sha256_hex(raw)
+    raw_dir = Path(raw_dir)
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    name = f"{digest}.json"
+    dest = raw_dir / name
+    if dest.is_symlink():
+        raise StarterCaptureError("RAW_STORE_PATH_UNSAFE")
+    if dest.exists():
+        if dest.read_bytes() != raw:
+            raise StarterCaptureError("RAW_STORE_COLLISION")
+    else:
+        tmp = raw_dir / f".{name}.tmp"
+        with tmp.open("wb") as handle:
+            handle.write(raw)
+            handle.flush()
+            import os
+
+            os.fsync(handle.fileno())
+        tmp.replace(dest)
+    return {
+        "raw_store_file": name,
+        "raw_sha256": digest,
+        "raw_byte_length": len(raw),
+        "raw_store_kind": RAW_STORE_KIND,
+    }
+
+
+def capture_snapshot_with_raw(
+    plan_game: Mapping[str, Any],
+    slot_id: str,
+    *,
+    fetcher: FetcherFn,
+    clock: ClockFn,
+    raw_dir: Path,
+    anchor: ClockFn | None = None,
+) -> dict[str, Any]:
+    """:func:`capture_snapshot` plus preservation of the exact response bytes.
+
+    The bytes stored are the same object the fetcher returned and the
+    parser consumed; nothing is refetched. Times come only from
+    :func:`capture_snapshot`'s clock handling; this wrapper adds none.
+    """
+    seen: list[bytes] = []
+
+    def keeping_fetcher(url: str) -> bytes:
+        raw = fetcher(url)
+        seen.append(raw)
+        return raw
+
+    record = capture_snapshot(
+        plan_game, slot_id, fetcher=keeping_fetcher, clock=clock, anchor=anchor
+    )
+    if seen and record.get("response_sha256") is not None:
+        link = store_raw_response(raw_dir, seen[-1])
+        if link["raw_sha256"] != record["response_sha256"]:
+            raise StarterCaptureError("RAW_RESPONSE_DIGEST_DIVERGED")
+        record.update(link)
+    return record
+
+
+def verify_raw_store(capture_path: Path, raw_dir: Path) -> dict[str, Any]:
+    """Fail closed unless every response-derived record's raw bytes verify."""
+    raw_dir = Path(raw_dir)
+    lines = _read_lines(Path(capture_path))
+
+    def failure(reason: str, seq: int) -> dict[str, Any]:
+        return {"ok": False, "records_checked": len(lines),
+                "failure": {"reason": reason, "seq": seq},
+                "raw_store_kind": RAW_STORE_KIND}
+
+    verified = 0
+    for index, line in enumerate(lines, start=1):
+        try:
+            record = json.loads(line.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return failure("CAPTURE_RECORD_UNPARSEABLE", index)
+        if not isinstance(record, dict):
+            return failure("CAPTURE_RECORD_NOT_OBJECT", index)
+        if record.get("response_sha256") is None:
+            if any(k in record for k in ("raw_store_file", "raw_sha256")):
+                return failure("RAW_LINK_WITHOUT_RESPONSE_DIGEST", index)
+            continue  # attempt-failed records carry no response
+        name = record.get("raw_store_file")
+        digest = record.get("raw_sha256")
+        length = record.get("raw_byte_length")
+        if name is None or digest is None:
+            return failure("RAW_LINK_MISSING", index)
+        if record.get("raw_store_kind") != RAW_STORE_KIND:
+            return failure("RAW_STORE_KIND_INVALID", index)
+        if not _is_sha256_hex(digest) or digest != record["response_sha256"]:
+            return failure("RAW_DIGEST_LINK_MISMATCH", index)
+        if name != f"{digest}.json":
+            return failure("RAW_STORE_PATH_UNSAFE", index)
+        if type(length) is not int or length < 0:
+            return failure("RAW_LENGTH_INVALID", index)
+        path = raw_dir / name
+        if path.is_symlink():
+            return failure("RAW_STORE_PATH_UNSAFE", index)
+        if not path.is_file():
+            return failure("RAW_BYTES_MISSING", index)
+        raw = path.read_bytes()
+        if len(raw) != length or _sha256_hex(raw) != digest:
+            return failure("RAW_BYTES_TAMPERED", index)
+        verified += 1
+    return {"ok": True, "records_checked": len(lines), "raw_verified": verified,
+            "failure": None, "raw_store_kind": RAW_STORE_KIND}
