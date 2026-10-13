@@ -1,0 +1,1089 @@
+{
+ "gameData": {
+  "game": {
+   "pk": 849831
+  },
+  "status": {
+   "abstractGameState": "Final",
+   "codedGameState": "F",
+   "detailedState": "Final",
+   "statusCode": "F",
+   "startTimeTBD": false,
+   "abstractGameCode": "F"
+  },
+  "teams": {
+   "away": {
+    "name": "Chicago White Sox"
+   },
+   "home": {
+    "name": "Cleveland Guardians"
+   }
+  },
+  "datetime": {
+   "dateTime": "2026-10-11T00:00:00Z"
+  }
+ },
+ "liveData": {
+  "linescore": {
+   "currentInning": 9,
+   "inningHalf": "Top",
+   "balls": 2,
+   "strikes": 3,
+   "outs": 3,
+   "teams": {
+    "home": {
+     "runs": 2,
+     "hits": 6,
+     "errors": 0,
+     "leftOnBase": 5
+    },
+    "away": {
+     "runs": 0,
+     "hits": 3,
+     "errors": 1,
+     "leftOnBase": 6
+    }
+   },
+   "innings": [
+    {
+     "num": 1,
+     "ordinalNum": "1st",
+     "home": {
+      "runs": 0,
+      "hits": 0,
+      "errors": 0,
+      "leftOnBase": 0
+     },
+     "away": {
+      "runs": 0,
+      "hits": 0,
+      "errors": 0,
+      "leftOnBase": 0
+     }
+    },
+    {
+     "num": 2,
+     "ordinalNum": "2nd",
+     "home": {
+      "runs": 0,
+      "hits": 0,
+      "errors": 0,
+      "leftOnBase": 0
+     },
+     "away": {
+      "runs": 0,
+      "hits": 0,
+      "errors": 0,
+      "leftOnBase": 1
+     }
+    },
+    {
+     "num": 3,
+     "ordinalNum": "3rd",
+     "home": {
+      "runs": 0,
+      "hits": 0,
+      "errors": 0,
+      "leftOnBase": 0
+     },
+     "away": {
+      "runs": 0,
+      "hits": 0,
+      "errors": 0,
+      "leftOnBase": 0
+     }
+    },
+    {
+     "num": 4,
+     "ordinalNum": "4th",
+     "home": {
+      "runs": 2,
+      "hits": 3,
+      "errors": 0,
+      "leftOnBase": 1
+     },
+     "away": {
+      "runs": 0,
+      "hits": 0,
+      "errors": 0,
+      "leftOnBase": 0
+     }
+    },
+    {
+     "num": 5,
+     "ordinalNum": "5th",
+     "home": {
+      "runs": 0,
+      "hits": 1,
+      "errors": 0,
+      "leftOnBase": 0
+     },
+     "away": {
+      "runs": 0,
+      "hits": 0,
+      "errors": 0,
+      "leftOnBase": 0
+     }
+    },
+    {
+     "num": 6,
+     "ordinalNum": "6th",
+     "home": {
+      "runs": 0,
+      "hits": 1,
+      "errors": 0,
+      "leftOnBase": 1
+     },
+     "away": {
+      "runs": 0,
+      "hits": 1,
+      "errors": 0,
+      "leftOnBase": 3
+     }
+    },
+    {
+     "num": 7,
+     "ordinalNum": "7th",
+     "home": {
+      "runs": 0,
+      "hits": 0,
+      "errors": 0,
+      "leftOnBase": 0
+     },
+     "away": {
+      "runs": 0,
+      "hits": 1,
+      "errors": 1,
+      "leftOnBase": 1
+     }
+    },
+    {
+     "num": 8,
+     "ordinalNum": "8th",
+     "home": {
+      "runs": 0,
+      "hits": 1,
+      "errors": 0,
+      "leftOnBase": 3
+     },
+     "away": {
+      "runs": 0,
+      "hits": 1,
+      "errors": 0,
+      "leftOnBase": 1
+     }
+    },
+    {
+     "num": 9,
+     "ordinalNum": "9th",
+     "home": {
+      "hits": 0,
+      "errors": 0,
+      "leftOnBase": 0
+     },
+     "away": {
+      "runs": 0,
+      "hits": 0,
+      "errors": 0,
+      "leftOnBase": 0
+     }
+    }
+   ]
+  },
+  "plays": {
+   "currentPlay": {
+    "about": {
+     "atBatIndex": 63,
+     "halfInning": "top",
+     "isTopInning": true,
+     "inning": 9,
+     "startTime": "2026-10-11T02:43:18.130Z",
+     "endTime": "2026-10-11T02:44:49.459Z",
+     "isComplete": true,
+     "isScoringPlay": false,
+     "hasReview": false,
+     "hasOut": true,
+     "captivatingIndex": 14
+    },
+    "count": {
+     "balls": 2,
+     "strikes": 3,
+     "outs": 3
+    },
+    "matchup": {
+     "batter": {
+      "id": 671976,
+      "fullName": "Tristan Peters",
+      "link": "/api/v1/people/671976"
+     },
+     "batSide": {
+      "code": "L",
+      "description": "Left"
+     },
+     "pitcher": {
+      "id": 671922,
+      "fullName": "Cade Smith",
+      "link": "/api/v1/people/671922"
+     },
+     "pitchHand": {
+      "code": "R",
+      "description": "Right"
+     },
+     "batterHotColdZoneStats": {
+      "stats": [
+       {
+        "type": {
+         "displayName": "hotColdZones"
+        },
+        "group": {
+         "displayName": "hitting"
+        },
+        "exemptions": [],
+        "splits": [
+         {
+          "stat": {
+           "name": "exitVelocity",
+           "zones": [
+            {
+             "zone": "01",
+             "color": "rgba(255, 255, 255, 0.55)",
+             "temp": "lukewarm",
+             "value": "-"
+            },
+            {
+             "zone": "02",
+             "color": "rgba(255, 255, 255, 0.55)",
+             "temp": "lukewarm",
+             "value": "-"
+            },
+            {
+             "zone": "03",
+             "color": "rgba(255, 255, 255, 0.55)",
+             "temp": "lukewarm",
+             "value": "-"
+            },
+            {
+             "zone": "04",
+             "color": "rgba(255, 255, 255, 0.55)",
+             "temp": "lukewarm",
+             "value": "-"
+            },
+            {
+             "zone": "05",
+             "color": "rgba(214, 41, 52, .55)",
+             "temp": "hot",
+             "value": "104.70"
+            },
+            {
+             "zone": "06",
+             "color": "rgba(255, 255, 255, 0.55)",
+             "temp": "lukewarm",
+             "value": "-"
+            },
+            {
+             "zone": "07",
+             "color": "rgba(214, 41, 52, .55)",
+             "temp": "hot",
+             "value": "94.54"
+            },
+            {
+             "zone": "08",
+             "color": "rgba(150, 188, 255, .55)",
+             "temp": "cool",
+             "value": "86.69"
+            },
+            {
+             "zone": "09",
+             "color": "rgba(6, 90, 238, .55)",
+             "temp": "cold",
+             "value": "77.26"
+            },
+            {
+             "zone": "11",
+             "color": "rgba(214, 41, 52, .55)",
+             "temp": "hot",
+             "value": "91.63"
+            },
+            {
+             "zone": "12",
+             "color": "rgba(255, 255, 255, 0.55)",
+             "temp": "lukewarm",
+             "value": "-"
+            },
+            {
+             "zone": "13",
+             "color": "rgba(214, 41, 52, .55)",
+             "temp": "hot",
+             "value": "92.59"
+            },
+            {
+             "zone": "14",
+             "color": "rgba(255, 255, 255, 0.55)",
+             "temp": "lukewarm",
+             "value": "-"
+            }
+           ]
+          }
+         },
+         {
+          "stat": {
+           "name": "onBasePlusSlugging",
+           "zones": [
+            {
+             "zone": "01",
+             "color": "rgba(6, 90, 238, .55)",
+             "temp": "cold",
+             "value": ".000"
+            },
+            {
+             "zone": "02",
+             "color": "rgba(255, 255, 255, 0.55)",
+             "temp": "lukewarm",
+             "value": "-"
+            },
+            {
+             "zone": "03",
+             "color": "rgba(6, 90, 238, .55)",
+             "temp": "cold",
+             "value": ".000"
+            },
+            {
+             "zone": "04",
+             "color": "rgba(255, 255, 255, 0.55)",
+             "temp": "lukewarm",
+             "value": "-"
+            },
+            {
+             "zone": "05",
+             "color": "rgba(6, 90, 238, .55)",
+             "temp": "cold",
+             "value": ".000"
+            },
+            {
+             "zone": "06",
+             "color": "rgba(255, 255, 255, 0.55)",
+             "temp": "lukewarm",
+             "value": "-"
+            },
+            {
+             "zone": "07",
+             "color": "rgba(214, 41, 52, .55)",
+             "temp": "hot",
+             "value": "2.000"
+            },
+            {
+             "zone": "08",
+             "color": "rgba(6, 90, 238, .55)",
+             "temp": "cold",
+             "value": ".000"
+            },
+            {
+             "zone": "09",
+             "color": "rgba(214, 41, 52, .55)",
+             "temp": "hot",
+             "value": "1.000"
+            },
+            {
+             "zone": "11",
+             "color": "rgba(6, 90, 238, .55)",
+             "temp": "cold",
+             "value": ".000"
+            },
+            {
+             "zone": "12",
+             "color": "rgba(6, 90, 238, .55)",
+             "temp": "cold",
+             "value": ".000"
+            },
+            {
+             "zone": "13",
+             "color": "rgba(214, 41, 52, .55)",
+             "temp": "hot",
+             "value": "1.500"
+            },
+            {
+             "zone": "14",
+             "color": "rgba(214, 41, 52, .55)",
+             "temp": "hot",
+             "value": "1.000"
+            }
+           ]
+          }
+         },
+         {
+          "stat": {
+           "name": "battingAverage",
+           "zones": [
+            {
+             "zone": "01",
+             "color": "rgba(6, 90, 238, .55)",
+             "temp": "cold",
+             "value": ".000"
+            },
+            {
+             "zone": "02",
+             "color": "rgba(255, 255, 255, 0.55)",
+             "temp": "lukewarm",
+             "value": "-"
+            },
+            {
+             "zone": "03",
+             "color": "rgba(6, 90, 238, .55)",
+             "temp": "cold",
+             "value": ".000"
+            },
+            {
+             "zone": "04",
+             "color": "rgba(255, 255, 255, 0.55)",
+             "temp": "lukewarm",
+             "value": "-"
+            },
+            {
+             "zone": "05",
+             "color": "rgba(6, 90, 238, .55)",
+             "temp": "cold",
+             "value": ".000"
+            },
+            {
+             "zone": "06",
+             "color": "rgba(255, 255, 255, 0.55)",
+             "temp": "lukewarm",
+             "value": "-"
+            },
+            {
+             "zone": "07",
+             "color": "rgba(214, 41, 52, .55)",
+             "temp": "hot",
+             "value": "1.000"
+            },
+            {
+             "zone": "08",
+             "color": "rgba(6, 90, 238, .55)",
+             "temp": "cold",
+             "value": ".000"
+            },
+            {
+             "zone": "09",
+             "color": "rgba(214, 41, 52, .55)",
+             "temp": "hot",
+             "value": ".500"
+            },
+            {
+             "zone": "11",
+             "color": "rgba(6, 90, 238, .55)",
+             "temp": "cold",
+             "value": ".000"
+            },
+            {
+             "zone": "12",
+             "color": "rgba(6, 90, 238, .55)",
+             "temp": "cold",
+             "value": ".000"
+            },
+            {
+             "zone": "13",
+             "color": "rgba(214, 41, 52, .55)",
+             "temp": "hot",
+             "value": ".500"
+            },
+            {
+             "zone": "14",
+             "color": "rgba(255, 255, 255, 0.55)",
+             "temp": "lukewarm",
+             "value": "-"
+            }
+           ]
+          }
+         }
+        ]
+       }
+      ]
+     },
+     "batterHotColdZones": [
+      {
+       "zone": "01",
+       "color": "rgba(6, 90, 238, .55)",
+       "temp": "cold",
+       "value": ".000"
+      },
+      {
+       "zone": "02",
+       "color": "rgba(255, 255, 255, 0.55)",
+       "temp": "lukewarm",
+       "value": "-"
+      },
+      {
+       "zone": "03",
+       "color": "rgba(6, 90, 238, .55)",
+       "temp": "cold",
+       "value": ".000"
+      },
+      {
+       "zone": "04",
+       "color": "rgba(255, 255, 255, 0.55)",
+       "temp": "lukewarm",
+       "value": "-"
+      },
+      {
+       "zone": "05",
+       "color": "rgba(6, 90, 238, .55)",
+       "temp": "cold",
+       "value": ".000"
+      },
+      {
+       "zone": "06",
+       "color": "rgba(255, 255, 255, 0.55)",
+       "temp": "lukewarm",
+       "value": "-"
+      },
+      {
+       "zone": "07",
+       "color": "rgba(214, 41, 52, .55)",
+       "temp": "hot",
+       "value": "2.000"
+      },
+      {
+       "zone": "08",
+       "color": "rgba(6, 90, 238, .55)",
+       "temp": "cold",
+       "value": ".000"
+      },
+      {
+       "zone": "09",
+       "color": "rgba(214, 41, 52, .55)",
+       "temp": "hot",
+       "value": "1.000"
+      },
+      {
+       "zone": "11",
+       "color": "rgba(6, 90, 238, .55)",
+       "temp": "cold",
+       "value": ".000"
+      },
+      {
+       "zone": "12",
+       "color": "rgba(6, 90, 238, .55)",
+       "temp": "cold",
+       "value": ".000"
+      },
+      {
+       "zone": "13",
+       "color": "rgba(214, 41, 52, .55)",
+       "temp": "hot",
+       "value": "1.500"
+      },
+      {
+       "zone": "14",
+       "color": "rgba(214, 41, 52, .55)",
+       "temp": "hot",
+       "value": "1.000"
+      }
+     ],
+     "pitcherHotColdZones": [],
+     "splits": {
+      "batter": "vs_RHP",
+      "pitcher": "vs_LHB",
+      "menOnBase": "Empty"
+     }
+    },
+    "runners": [
+     {
+      "movement": {
+       "originBase": null,
+       "start": null,
+       "end": null,
+       "outBase": "1B",
+       "isOut": true,
+       "outNumber": 3
+      },
+      "details": {
+       "event": "Strikeout",
+       "eventType": "strikeout",
+       "movementReason": null,
+       "runner": {
+        "id": 671976,
+        "fullName": "Tristan Peters",
+        "link": "/api/v1/people/671976"
+       },
+       "responsiblePitcher": null,
+       "isScoringEvent": false,
+       "rbi": false,
+       "earned": false,
+       "teamUnearned": false,
+       "playIndex": 4
+      },
+      "credits": [
+       {
+        "player": {
+         "id": 672275,
+         "link": "/api/v1/people/672275"
+        },
+        "position": {
+         "code": "2",
+         "name": "Catcher",
+         "type": "Catcher",
+         "abbreviation": "C"
+        },
+        "credit": "f_putout"
+       }
+      ]
+     }
+    ]
+   },
+   "allPlays": [
+    {
+     "about": {
+      "atBatIndex": 63,
+      "halfInning": "top",
+      "isTopInning": true,
+      "inning": 9,
+      "startTime": "2026-10-11T02:43:18.130Z",
+      "endTime": "2026-10-11T02:44:49.459Z",
+      "isComplete": true,
+      "isScoringPlay": false,
+      "hasReview": false,
+      "hasOut": true,
+      "captivatingIndex": 14
+     },
+     "count": {
+      "balls": 2,
+      "strikes": 3,
+      "outs": 3
+     },
+     "matchup": {
+      "batter": {
+       "id": 671976,
+       "fullName": "Tristan Peters",
+       "link": "/api/v1/people/671976"
+      },
+      "batSide": {
+       "code": "L",
+       "description": "Left"
+      },
+      "pitcher": {
+       "id": 671922,
+       "fullName": "Cade Smith",
+       "link": "/api/v1/people/671922"
+      },
+      "pitchHand": {
+       "code": "R",
+       "description": "Right"
+      },
+      "batterHotColdZoneStats": {
+       "stats": [
+        {
+         "type": {
+          "displayName": "hotColdZones"
+         },
+         "group": {
+          "displayName": "hitting"
+         },
+         "exemptions": [],
+         "splits": [
+          {
+           "stat": {
+            "name": "exitVelocity",
+            "zones": [
+             {
+              "zone": "01",
+              "color": "rgba(255, 255, 255, 0.55)",
+              "temp": "lukewarm",
+              "value": "-"
+             },
+             {
+              "zone": "02",
+              "color": "rgba(255, 255, 255, 0.55)",
+              "temp": "lukewarm",
+              "value": "-"
+             },
+             {
+              "zone": "03",
+              "color": "rgba(255, 255, 255, 0.55)",
+              "temp": "lukewarm",
+              "value": "-"
+             },
+             {
+              "zone": "04",
+              "color": "rgba(255, 255, 255, 0.55)",
+              "temp": "lukewarm",
+              "value": "-"
+             },
+             {
+              "zone": "05",
+              "color": "rgba(214, 41, 52, .55)",
+              "temp": "hot",
+              "value": "104.70"
+             },
+             {
+              "zone": "06",
+              "color": "rgba(255, 255, 255, 0.55)",
+              "temp": "lukewarm",
+              "value": "-"
+             },
+             {
+              "zone": "07",
+              "color": "rgba(214, 41, 52, .55)",
+              "temp": "hot",
+              "value": "94.54"
+             },
+             {
+              "zone": "08",
+              "color": "rgba(150, 188, 255, .55)",
+              "temp": "cool",
+              "value": "86.69"
+             },
+             {
+              "zone": "09",
+              "color": "rgba(6, 90, 238, .55)",
+              "temp": "cold",
+              "value": "77.26"
+             },
+             {
+              "zone": "11",
+              "color": "rgba(214, 41, 52, .55)",
+              "temp": "hot",
+              "value": "91.63"
+             },
+             {
+              "zone": "12",
+              "color": "rgba(255, 255, 255, 0.55)",
+              "temp": "lukewarm",
+              "value": "-"
+             },
+             {
+              "zone": "13",
+              "color": "rgba(214, 41, 52, .55)",
+              "temp": "hot",
+              "value": "92.59"
+             },
+             {
+              "zone": "14",
+              "color": "rgba(255, 255, 255, 0.55)",
+              "temp": "lukewarm",
+              "value": "-"
+             }
+            ]
+           }
+          },
+          {
+           "stat": {
+            "name": "onBasePlusSlugging",
+            "zones": [
+             {
+              "zone": "01",
+              "color": "rgba(6, 90, 238, .55)",
+              "temp": "cold",
+              "value": ".000"
+             },
+             {
+              "zone": "02",
+              "color": "rgba(255, 255, 255, 0.55)",
+              "temp": "lukewarm",
+              "value": "-"
+             },
+             {
+              "zone": "03",
+              "color": "rgba(6, 90, 238, .55)",
+              "temp": "cold",
+              "value": ".000"
+             },
+             {
+              "zone": "04",
+              "color": "rgba(255, 255, 255, 0.55)",
+              "temp": "lukewarm",
+              "value": "-"
+             },
+             {
+              "zone": "05",
+              "color": "rgba(6, 90, 238, .55)",
+              "temp": "cold",
+              "value": ".000"
+             },
+             {
+              "zone": "06",
+              "color": "rgba(255, 255, 255, 0.55)",
+              "temp": "lukewarm",
+              "value": "-"
+             },
+             {
+              "zone": "07",
+              "color": "rgba(214, 41, 52, .55)",
+              "temp": "hot",
+              "value": "2.000"
+             },
+             {
+              "zone": "08",
+              "color": "rgba(6, 90, 238, .55)",
+              "temp": "cold",
+              "value": ".000"
+             },
+             {
+              "zone": "09",
+              "color": "rgba(214, 41, 52, .55)",
+              "temp": "hot",
+              "value": "1.000"
+             },
+             {
+              "zone": "11",
+              "color": "rgba(6, 90, 238, .55)",
+              "temp": "cold",
+              "value": ".000"
+             },
+             {
+              "zone": "12",
+              "color": "rgba(6, 90, 238, .55)",
+              "temp": "cold",
+              "value": ".000"
+             },
+             {
+              "zone": "13",
+              "color": "rgba(214, 41, 52, .55)",
+              "temp": "hot",
+              "value": "1.500"
+             },
+             {
+              "zone": "14",
+              "color": "rgba(214, 41, 52, .55)",
+              "temp": "hot",
+              "value": "1.000"
+             }
+            ]
+           }
+          },
+          {
+           "stat": {
+            "name": "battingAverage",
+            "zones": [
+             {
+              "zone": "01",
+              "color": "rgba(6, 90, 238, .55)",
+              "temp": "cold",
+              "value": ".000"
+             },
+             {
+              "zone": "02",
+              "color": "rgba(255, 255, 255, 0.55)",
+              "temp": "lukewarm",
+              "value": "-"
+             },
+             {
+              "zone": "03",
+              "color": "rgba(6, 90, 238, .55)",
+              "temp": "cold",
+              "value": ".000"
+             },
+             {
+              "zone": "04",
+              "color": "rgba(255, 255, 255, 0.55)",
+              "temp": "lukewarm",
+              "value": "-"
+             },
+             {
+              "zone": "05",
+              "color": "rgba(6, 90, 238, .55)",
+              "temp": "cold",
+              "value": ".000"
+             },
+             {
+              "zone": "06",
+              "color": "rgba(255, 255, 255, 0.55)",
+              "temp": "lukewarm",
+              "value": "-"
+             },
+             {
+              "zone": "07",
+              "color": "rgba(214, 41, 52, .55)",
+              "temp": "hot",
+              "value": "1.000"
+             },
+             {
+              "zone": "08",
+              "color": "rgba(6, 90, 238, .55)",
+              "temp": "cold",
+              "value": ".000"
+             },
+             {
+              "zone": "09",
+              "color": "rgba(214, 41, 52, .55)",
+              "temp": "hot",
+              "value": ".500"
+             },
+             {
+              "zone": "11",
+              "color": "rgba(6, 90, 238, .55)",
+              "temp": "cold",
+              "value": ".000"
+             },
+             {
+              "zone": "12",
+              "color": "rgba(6, 90, 238, .55)",
+              "temp": "cold",
+              "value": ".000"
+             },
+             {
+              "zone": "13",
+              "color": "rgba(214, 41, 52, .55)",
+              "temp": "hot",
+              "value": ".500"
+             },
+             {
+              "zone": "14",
+              "color": "rgba(255, 255, 255, 0.55)",
+              "temp": "lukewarm",
+              "value": "-"
+             }
+            ]
+           }
+          }
+         ]
+        }
+       ]
+      },
+      "batterHotColdZones": [
+       {
+        "zone": "01",
+        "color": "rgba(6, 90, 238, .55)",
+        "temp": "cold",
+        "value": ".000"
+       },
+       {
+        "zone": "02",
+        "color": "rgba(255, 255, 255, 0.55)",
+        "temp": "lukewarm",
+        "value": "-"
+       },
+       {
+        "zone": "03",
+        "color": "rgba(6, 90, 238, .55)",
+        "temp": "cold",
+        "value": ".000"
+       },
+       {
+        "zone": "04",
+        "color": "rgba(255, 255, 255, 0.55)",
+        "temp": "lukewarm",
+        "value": "-"
+       },
+       {
+        "zone": "05",
+        "color": "rgba(6, 90, 238, .55)",
+        "temp": "cold",
+        "value": ".000"
+       },
+       {
+        "zone": "06",
+        "color": "rgba(255, 255, 255, 0.55)",
+        "temp": "lukewarm",
+        "value": "-"
+       },
+       {
+        "zone": "07",
+        "color": "rgba(214, 41, 52, .55)",
+        "temp": "hot",
+        "value": "2.000"
+       },
+       {
+        "zone": "08",
+        "color": "rgba(6, 90, 238, .55)",
+        "temp": "cold",
+        "value": ".000"
+       },
+       {
+        "zone": "09",
+        "color": "rgba(214, 41, 52, .55)",
+        "temp": "hot",
+        "value": "1.000"
+       },
+       {
+        "zone": "11",
+        "color": "rgba(6, 90, 238, .55)",
+        "temp": "cold",
+        "value": ".000"
+       },
+       {
+        "zone": "12",
+        "color": "rgba(6, 90, 238, .55)",
+        "temp": "cold",
+        "value": ".000"
+       },
+       {
+        "zone": "13",
+        "color": "rgba(214, 41, 52, .55)",
+        "temp": "hot",
+        "value": "1.500"
+       },
+       {
+        "zone": "14",
+        "color": "rgba(214, 41, 52, .55)",
+        "temp": "hot",
+        "value": "1.000"
+       }
+      ],
+      "pitcherHotColdZones": [],
+      "splits": {
+       "batter": "vs_RHP",
+       "pitcher": "vs_LHB",
+       "menOnBase": "Empty"
+      }
+     },
+     "runners": [
+      {
+       "movement": {
+        "originBase": null,
+        "start": null,
+        "end": null,
+        "outBase": "1B",
+        "isOut": true,
+        "outNumber": 3
+       },
+       "details": {
+        "event": "Strikeout",
+        "eventType": "strikeout",
+        "movementReason": null,
+        "runner": {
+         "id": 671976,
+         "fullName": "Tristan Peters",
+         "link": "/api/v1/people/671976"
+        },
+        "responsiblePitcher": null,
+        "isScoringEvent": false,
+        "rbi": false,
+        "earned": false,
+        "teamUnearned": false,
+        "playIndex": 4
+       },
+       "credits": [
+        {
+         "player": {
+          "id": 672275,
+          "link": "/api/v1/people/672275"
+         },
+         "position": {
+          "code": "2",
+          "name": "Catcher",
+          "type": "Catcher",
+          "abbreviation": "C"
+         },
+         "credit": "f_putout"
+        }
+       ]
+      }
+     ],
+     "result": {
+      "type": "atBat",
+      "event": "Strikeout",
+      "eventType": "strikeout",
+      "description": "Tristan Peters strikes out swinging.",
+      "rbi": 0,
+      "awayScore": 0,
+      "homeScore": 2,
+      "isOut": true
+     }
+    }
+   ]
+  }
+ },
+ "metaData": {
+  "timeStamp": "20261011_024449"
+ }
+}
