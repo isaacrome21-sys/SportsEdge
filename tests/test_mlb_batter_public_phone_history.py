@@ -143,7 +143,8 @@ def test_one_missing_total_bases_field_does_not_cherry_pick_history():
     upstream=mock_public(total_bases=True)
     def getter(url):
         result=upstream(url)
-        if "/people/" in url and url.endswith("/stats"):
+        if "/people/" in url and "/stats?" in url:
+            # StatsAPI endpoint has a query string: .../stats?stats=gameLog...
             result["stats"][0]["splits"][0]["stat"].pop("totalBases")
         return result
     hits=run(getter=getter)
