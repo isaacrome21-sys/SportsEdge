@@ -45,9 +45,12 @@ def test_whole_line_push_mass():
 
 
 def _ledger(avail, event_id="777"):
-    return {"schema": "DK_EVENT_COVERAGE_RECONCILIATION_V1", "event_id": event_id,
-            "observed_at_utc": "2026-10-13T12:00:00+00:00",
-            "rows": [{"market": "F5_TOTALS", "availability": avail}]}
+    variants = ([{"period": "F5", "phase": "PREGAME", "offer_shape": "OVER_UNDER",
+                  "settlement": "DK_STANDARD", "line_variant": "MAIN"}]
+                if avail == "OFFERED_ON_THIS_EVENT" else [])
+    return {"schema": "DK_EVENT_COVERAGE_RECONCILIATION_V1", "sport": "MLB", "book": "draftkings",
+            "event_id": event_id, "observed_at_utc": "2026-10-13T12:00:00+00:00",
+            "rows": [{"market": "F5_TOTALS", "availability": avail, "offer_variants": variants}]}
 
 
 def test_f5_game_total_offering_is_per_event_and_unknown_by_default():
@@ -58,6 +61,11 @@ def test_f5_game_total_offering_is_per_event_and_unknown_by_default():
     assert m.f5_game_total_offering(_ledger("NOT_VERIFIED_ON_THIS_EVENT"), event_id="777")["availability"] == "UNKNOWN"
     assert m.f5_game_total_offering(_ledger("OFFERED_ON_THIS_EVENT"), event_id="777")["availability"] \
         == "OFFERED_ON_THIS_EVENT"
+    bad = _ledger("NOT_OFFERED_ON_THIS_EVENT")
+    bad["book"] = "fanduel"  # rejected by #2143's audit -> UNKNOWN, never NOT_OFFERED
+    r = m.f5_game_total_offering(bad, event_id="777")
+    assert r["availability"] == "UNKNOWN" and r["reason"].startswith("LEDGER_INVALID")
+    assert r["source"] == "PROVIDER_BOOK_EVIDENCE_AUDIT_2143"
     off = m.f5_game_total_offering(_ledger("OFFERED_ON_THIS_EVENT"), event_id="777")
     assert "over" not in off and off["market_baseline"] == "MISSING"
 

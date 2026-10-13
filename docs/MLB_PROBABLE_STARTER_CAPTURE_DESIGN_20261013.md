@@ -3,7 +3,7 @@
 Design only, for review. Goal: replace the retrospective probable-starter identity used in the Either-Pitcher walk-forward with timestamped, pre-first-pitch snapshots from the free MLB Stats API. No paid data, odds or credit-consuming collectors.
 
 ## Source
-- `GET https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameType=R&date=YYYY-MM-DD&hydrate=probablePitcher,lineups`
+- `GET https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameType=R,F,D,L,W,A,S,E&date=YYYY-MM-DD&hydrate=probablePitcher,lineups`. Include all regular, postseason (F Wild Card, D Division Series, L League CS, W World Series) and other game types; record `gameType` per row. The research cohort filter decides which types are scored, not the capture.
 - Free and unauthenticated. We read `gamePk`, `gameDate` (UTC first pitch), `status.codedGameState` and `detailedState`, `teams.{away,home}.probablePitcher.id`, and `doubleHeader` / `gameNumber`.
 - Optional, per game near first pitch: `GET /api/v1.1/game/{gamePk}/feed/live` (`gameData.probablePitchers`, `liveData.boxscore` once lineups post).
 
@@ -25,7 +25,13 @@ Design only, for review. Goal: replace the retrospective probable-starter identi
 - Doubleheaders are keyed by `gamePk`, never by date and team.
 
 ## What a scheduled capture needs
-1. **A scheduler:** a GitHub Actions cron, or a box cron/systemd timer, running every 15 minutes during the 10:00–23:59 CT window. It computes which games are due for a snapshot and is idempotent per (gamePk, snapshot slot).
+1. **Scheduler: per-game scheduled snapshots** (revised per ChatGPT review; replaces 15-minute polling).
+   - A daily planner run (~06:00 CT, re-run hourly to catch reschedules, doubleheader game 2 times and postponements) reads the schedule and writes, for each gamePk, five due times keyed to that game's current `gameDate` (first pitch): **T−24h, T−6h, T−90m, T−30m, T−5m**.
+   - Tolerance windows: 24h ±30m, 6h ±15m, 90m ±10m, 30m ±5m, 5m ±2m. A snapshot taken outside its window is stored but labeled `OUT_OF_WINDOW`; it never stands in for the slot.
+   - **Missed slots are recorded.** If a slot's window closes with no capture, a `MISSED` record (gamePk, slot, due_at, reason such as RUNNER_DOWN/HTTP_ERROR/RESCHEDULED) is appended. Absence is never silent.
+   - If first pitch moves, slots are re-keyed to the new time. Already-taken snapshots keep their original due times and get a `RESCHEDULED_AFTER` flag.
+   - T−24h slots that fall before the planner first saw the game are recorded as `MISSED:NOT_YET_SCHEDULED`.
+   - Idempotent per (gamePk, slot).
 2. **Storage:** an append-only store outside the repo (box disk plus periodic archive). Retention and size: about 15 games × 5 snapshots × ~30 KB per day.
 3. **Integrity:** a per-file hash chain (each line includes the previous line's sha256) and a daily manifest. Clock source recorded. No retroactive edits.
 4. **Monitoring:**

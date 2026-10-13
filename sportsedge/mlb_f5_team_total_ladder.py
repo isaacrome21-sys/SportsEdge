@@ -159,21 +159,27 @@ def price_f5_team_totals(model_input: Mapping[str, Any]) -> dict:
 
 
 def f5_game_total_offering(reconciliation: Mapping[str, Any] | None, *, event_id: str) -> dict:
-    """Per-event F5 game-total offering from a #2136 DK reconciliation. Never universal.
-
-    Only market availability is reported; no probability or price is produced here.
+    """Per-event F5 game-total offering, read through #2143's reconciliation
+    (sportsedge.provider_book_evidence_audit). Never universal; UNKNOWN = uninspected
+    or unverifiable. Only availability is reported; no probability or price.
     """
-    base = {"market": "F5_TOTALS", "event_id": event_id, "scope": "PER_EVENT", "market_baseline": "MISSING"}
+    from sportsedge.provider_book_evidence_audit import (
+        ProviderBookAuditError, audit_provider_book_evidence)
+    base = {"market": "F5_TOTALS", "event_id": event_id, "scope": "PER_EVENT",
+            "market_baseline": "MISSING", "source": "PROVIDER_BOOK_EVIDENCE_AUDIT_2143"}
     if not reconciliation:
         return {**base, "availability": "UNKNOWN", "reason": "EVENT_NOT_INSPECTED"}
-    if str(reconciliation.get("event_id")) != str(event_id) or reconciliation.get("schema") != "DK_EVENT_COVERAGE_RECONCILIATION_V1":
+    if str(reconciliation.get("event_id")) != str(event_id):
         return {**base, "availability": "UNKNOWN", "reason": "LEDGER_EVENT_MISMATCH"}
-    row = next((r for r in reconciliation.get("rows") or [] if r.get("market") == "F5_TOTALS"), None)
+    try:
+        audited = audit_provider_book_evidence(reconciliation, [])
+    except ProviderBookAuditError as exc:
+        return {**base, "availability": "UNKNOWN", "reason": f"LEDGER_INVALID:{exc}"}
+    row = next((r for r in audited.get("rows") or [] if r.get("market") == "F5_TOTALS"), None)
     if row is None:
         return {**base, "availability": "UNKNOWN", "reason": "MARKET_NOT_IN_LEDGER"}
-    avail = row.get("availability")
-    mapped = {"OFFERED_ON_THIS_EVENT": "OFFERED_ON_THIS_EVENT",
-              "NOT_OFFERED_ON_THIS_EVENT": "NOT_OFFERED_ON_THIS_EVENT"}.get(avail, "UNKNOWN")
+    avail = row.get("dk_event_availability")
+    mapped = avail if avail in {"OFFERED_ON_THIS_EVENT", "NOT_OFFERED_ON_THIS_EVENT"} else "UNKNOWN"
     return {**base, "availability": mapped, "ledger_availability": avail,
             "observed_at_utc": reconciliation.get("observed_at_utc")}
 
