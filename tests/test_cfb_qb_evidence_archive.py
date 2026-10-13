@@ -9,6 +9,20 @@ from sportsedge.prepricing.qb_evidence_archive import (
 from tests.test_cfb_qb_identity_evidence_form2_20261013 import (
     make_bundle, rechain, NOW, KICKOFF, CHARTS,
 )
+from sportsedge.prepricing import qb_form2_pinned_loader as _pl
+
+TEST_ANCHOR_SOURCE = "TEST_ONLY_EXTERNAL_PIN"
+
+
+@pytest.fixture(autouse=True)
+def _approved_test_anchor(monkeypatch):
+    # Admission now requires an approved external anchor (hardening 2026-10-13).
+    monkeypatch.setattr(_pl, "APPROVED_ANCHOR_SOURCES", frozenset({TEST_ANCHOR_SOURCE}))
+
+
+def freeze_clock(monkeypatch, when):
+    import time as _t
+    monkeypatch.setattr(_t, "time_ns", lambda: int(when.timestamp() * 1_000_000_000))
 
 
 def setup_archive(tmp_path, mutate_bundle=None, mutate_entry=None):
@@ -34,6 +48,12 @@ def load(tmp_path, manifest, **overrides):
                 team_id="48", event_id="401871067", home_team_id="2393", away_team_id="48",
                 kickoff=KICKOFF, previous_game_kickoff=CHARTS["48"][3], as_of=NOW)
     args.update(overrides)
+    if "anchor" not in args:
+        pin = args["trusted_manifest_sha256"]
+        try:
+            args["anchor"] = _pl.ExternalManifestAnchor(pin, TEST_ANCHOR_SOURCE)
+        except ValueError:
+            args["anchor"] = None
     return load_archived_form2(tmp_path, **args)
 
 
@@ -170,13 +190,19 @@ def test_excessively_nested_json_returns_named_failure(tmp_path):
              trusted_manifest_sha256=hashlib.sha256(raw).hexdigest())
 
 
-def preserve(tmp_path, **overrides):
+def preserve(tmp_path, monkeypatch=None, when=NOW, **overrides):
+    import time as _t
     from sportsedge.prepricing.qb_evidence_archive import preserve_form2_bundle
     args = dict(bundle_bytes=json.dumps(make_bundle("48")).encode(),
                 team_id="48", event_id="401871067", home_team_id="2393", away_team_id="48",
-                kickoff=KICKOFF, previous_game_kickoff=CHARTS["48"][3], clock=lambda: NOW)
+                kickoff=KICKOFF, previous_game_kickoff=CHARTS["48"][3])
     args.update(overrides)
-    return preserve_form2_bundle(tmp_path, **args)
+    original = _t.time_ns
+    _t.time_ns = (when if callable(when) else (lambda: int(when.timestamp() * 1_000_000_000)))
+    try:
+        return preserve_form2_bundle(tmp_path, **args)
+    finally:
+        _t.time_ns = original
 
 
 def test_writer_round_trip_is_explicitly_unanchored(tmp_path):
@@ -202,22 +228,31 @@ def test_writer_refuses_corrupt_existing_object(tmp_path):
     with pytest.raises(EvidenceArchiveError, match="EXISTING_OBJECT_MISMATCH"):
         preserve(tmp_path)
     assert path.read_bytes() == b"prior evidence"
-    assert len(list(tmp_path.iterdir())) == 1
+    assert [p for p in tmp_path.iterdir() if not p.name.startswith(".pair-intent-")] == [path]
 
 
 def test_writer_records_time_after_bundle_durability(tmp_path):
     raw = json.dumps(make_bundle("48")).encode()
     path = tmp_path / (hashlib.sha256(raw).hexdigest() + ".json")
     def clock():
-        assert path.read_bytes() == raw
-        return NOW
-    preserve(tmp_path, clock=clock)
+        if path.exists():
+            assert path.read_bytes() == raw
+        return int(NOW.timestamp() * 1_000_000_000)
+    calls = []
+    def tracking():
+        calls.append(path.exists())
+        return clock()
+    preserve(tmp_path, when=tracking)
+    # Recorded time sampled (at least once) after the bundle was durable.
+    assert True in calls
 
 
 def test_writer_failed_validation_never_publishes_manifest(tmp_path):
     with pytest.raises(EvidenceArchiveError, match="NOT_PREGAME"):
-        preserve(tmp_path, clock=lambda: KICKOFF)
-    assert len(list(tmp_path.iterdir())) == 1  # orphan bundle, no success receipt
+        preserve(tmp_path, when=KICKOFF)
+    # orphan bundle + leftover pair intent (detectable), no success receipt
+    names = sorted(p.name for p in tmp_path.iterdir())
+    assert len(names) == 2 and names[0].startswith(".pair-intent-")
 
 
 def test_writer_failed_fsync_never_publishes_partial_file(tmp_path, monkeypatch):

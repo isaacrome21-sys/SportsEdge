@@ -154,7 +154,7 @@ def load_form2_bundles_pinned(archive_root, *, anchor, verified_fixtures, as_of)
             continue
         try:
             result = _arch.load_archived_form2(
-                root, manifest_bytes=raw, trusted_manifest_sha256=anchor.sha256,
+                root, anchor=anchor, manifest_bytes=raw, trusted_manifest_sha256=anchor.sha256,
                 team_id=team_id, event_id=fx.get("event_id"),
                 home_team_id=fx.get("home_team_id"), away_team_id=fx.get("away_team_id"),
                 kickoff=fx.get("kickoff"), previous_game_kickoff=fx.get("previous_game_kickoff"),
