@@ -1332,23 +1332,31 @@ def _paired_book_context(rows, evaluated, index):
     matching_time_raw = (rows[compatible[0]["input_index"]].get("quote_captured_at")
                          if len(compatible) == 1 else None)
     if len(compatible) == 1:
-        if not input_time_raw or not matching_time_raw:
-            projected["paired_market_status"] = "MISSING_COUNTERPART_QUOTE_TIMESTAMP"
+        # Preserve the established blocker contract for callers that
+        # already distinguish missing self vs missing/invalid counterpart.
+        # Both fail closed, including naïve clocks that old parsers accepted.
+        def strictly_aware(value):
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            if parsed.tzinfo is None or parsed.utcoffset() is None:
+                raise ValueError("TIMEZONE_REQUIRED")
+            return parsed
+
+        try:
+            captured_at = strictly_aware(input_time_raw)
+        except (TypeError, ValueError, OverflowError):
+            projected["paired_market_status"] = "QUOTE_TIMESTAMP_MISSING"
             return
         try:
-            pair_times = [datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
-                          for ts in (input_time_raw, matching_time_raw)]
-            if any(ts.tzinfo is None or ts.utcoffset() is None for ts in pair_times):
-                raise ValueError("TIMEZONE_REQUIRED")
+            counterpart_at = strictly_aware(matching_time_raw)
         except (TypeError, ValueError, OverflowError):
-            projected["paired_market_status"] = "INVALID_PAIR_QUOTE_TIMESTAMP"
+            projected["paired_market_status"] = "COUNTERPART_QUOTE_TIMESTAMP_MISSING"
             return
-        skew = abs((pair_times[0] - pair_times[1]).total_seconds())
+        skew = abs((captured_at - counterpart_at).total_seconds())
         if skew > 120:
             projected["paired_market_status"] = "MISMATCHED_QUOTE_TIMESTAMPS"
             return
         projected["paired_quote_skew_seconds"] = skew
-        projected["paired_quote_captured_at"] = [ts.isoformat() for ts in pair_times]
+        projected["paired_quote_captured_at"] = [captured_at.isoformat(), counterpart_at.isoformat()]
     else:
         # No compatible partner row exists: the partner price came solely
         # from this row's own opposite_odds field. An asserted field on the
