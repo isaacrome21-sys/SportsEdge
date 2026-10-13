@@ -159,3 +159,8 @@ def test_canonical_pitcher_family_routes_are_exercised_without_network():
     assert all(r.get("model_probability") is not None for r in c["evaluated_rows"])
     assert c["phone_card"]["coverage"]["distinct_market_families"] == 6
     assert sum(r["priced"] for r in c["phone_card"]["coverage"]["families"]) == 12
+
+
+def test_no_fetch_league_prior_cannot_be_a_lean():
+    row = result(context_notes=["NO_FETCH_MANUAL_MODE_NO_PUBLIC_CONTEXT"])
+    assert build_phone_card(card(row))["selections"][0]["status"] == "WATCH"

@@ -64,6 +64,8 @@ def _disposition(row, min_ev):
         return "REFRESH REQUIRED", "stale", "Current quote required"
     if anchored:
         return "WATCH", "priced", "Independent pricing unavailable for this row"
+    if any("NO_FETCH_MANUAL_MODE" in str(note) for note in row.get("context_notes") or []):
+        return "WATCH", "priced", "Verified event and team inputs required"
     # Source/context/participation/deployment holds take precedence over EV.
     allowed = CANDIDATE_STATUSES | {"PRICE_CAP", "WATCH_PRICE_CAP", "BELOW_THRESHOLD", "WATCH_BELOW_EV_FLOOR"}
     if status not in allowed:
