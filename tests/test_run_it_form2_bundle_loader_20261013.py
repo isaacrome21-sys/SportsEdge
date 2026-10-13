@@ -507,7 +507,10 @@ class RunnerWiringTests(LoaderCase):
         mapping = cfb_mapping()
         return lambda url: mapping.get(url, {})
 
-    def test_run_full_wires_bundles_and_audits_loader(self):
+    def test_run_full_refuses_unpinned_directory_bundles(self):
+        # Re-contracted (Grok, 2026-10-13): the runner now uses the pinned
+        # loader. Loose directory bundles without an approved external
+        # manifest anchor are refused with an audit; the fixture blocks.
         self.write("delaware.json", make_bundle("48"))
         self.write("mtsu.json", make_bundle("2393"))
         card = full.run_full({"lines": [cfb_row()]}, now=NOW,
@@ -515,19 +518,13 @@ class RunnerWiringTests(LoaderCase):
                              form2_bundles_dir=self.dir)
         audit = card["qb_form2_bundle_loader_audit"]
         self.assertEqual(audit["schema"],
-                         "SPORTSEDGE_QB_FORM2_BUNDLE_LOADER_AUDIT_V1")
-        self.assertEqual(audit["admitted_team_ids"], ["2393", "48"])
-        self.assertTrue(all(e["reason"] == loader.REASON_ADMITTED
-                            for e in audit["entries"]))
+                         "SPORTSEDGE_QB_FORM2_PINNED_LOADER_AUDIT_V1")
+        self.assertEqual(audit["status"], "NO_EXTERNAL_ANCHOR")
+        self.assertEqual(audit["admitted_team_ids"], [])
         (entry,) = card["prepricing_factor_audit"]["by_input_index"]
-        self.assertFalse(entry["blocked"])
-        qb = [f for f in entry["factors"] if f["factor"] == "qb_specific"]
-        self.assertTrue(any(f["status"] == "USED" for f in qb))
-        reasons = " ".join(f["reason"] for f in qb)
-        self.assertIn("AVAILABILITY_UNVERIFIED_NO_TEAM_INJURY_REPORT",
-                      reasons)
-        self.assertEqual(entry["adjustments"]["away_injury_pts"], 0.0)
-        self.assertEqual(entry["adjustments"]["home_injury_pts"], 0.0)
+        self.assertTrue(entry["blocked"])
+        self.assertEqual(entry["block_reason"],
+                         "BLOCKED_PREPRICING_QB_IDENTITY_UNVERIFIED")
 
     def test_run_full_without_bundles_dir_has_no_loader_audit(self):
         card = full.run_full({"lines": [cfb_row()]}, now=NOW,
@@ -539,39 +536,22 @@ class RunnerWiringTests(LoaderCase):
         self.assertEqual(entry["block_reason"],
                          "BLOCKED_PREPRICING_QB_IDENTITY_UNVERIFIED")
 
-    def test_run_full_form2_game_is_research_only_end_to_end(self):
-        # Issue #2158, asserted on the composed runner -- not at the
-        # gate function: bundles arrive through the loader, the stage
-        # satisfies identity via Form 2, the game is priced, and the
-        # priced rows carry the availability field and come out
-        # research-only with every actionable surface empty. (The
-        # offline fixture yields no engine probability for this game,
-        # so the row surfaces nowhere regardless; that the guard
-        # demotes even a positive-EV would-be play is pinned by
-        # tests/test_availability_research_only_gate_20261013.py.)
+    def test_run_full_self_computed_digest_is_refused(self):
+        # A bare digest string (what preserve_form2_bundle returns as its
+        # candidate) is not an external anchor. Research-only demotion of
+        # an admitted Form 2 game remains pinned by
+        # tests/test_availability_research_only_gate_20261013.py.
         self.write("delaware.json", make_bundle("48"))
-        self.write("mtsu.json", make_bundle("2393"))
         card = full.run_full({"lines": [cfb_row()]}, now=NOW,
                              getter=self._lenient_getter(),
-                             form2_bundles_dir=self.dir)
+                             form2_bundles_dir=self.dir,
+                             form2_manifest_anchor="0" * 64)
+        audit = card["qb_form2_bundle_loader_audit"]
+        self.assertEqual(audit["status"],
+                         "ANCHOR_NOT_EXTERNAL_SELF_COMPUTED_OR_UNTYPED")
         (entry,) = card["prepricing_factor_audit"]["by_input_index"]
-        self.assertFalse(entry["blocked"])  # the game was priced
-        rows = [r for r in card["evaluated_rows"]
-                if r.get("input_index") == 0]
-        self.assertEqual(len(rows), 1)
-        (row,) = rows
-        self.assertEqual(row["availability_status"],
-                         qe.AVAILABILITY_UNVERIFIED)
-        self.assertIs(row["research_only"], True)
-        self.assertEqual(
-            row["play_blocked_reason"],
-            "QB_AVAILABILITY_UNVERIFIED_CANNOT_SURFACE_AS_PLAY")
+        self.assertTrue(entry["blocked"])
         self.assertEqual(card["edges"], [])
-        self.assertEqual(card["independent_candidates"], [])
-        self.assertEqual(card["prop_candidates"], [])
-        self.assertEqual(
-            card["play_gate"]["availability_unverified_max_surface"],
-            "RESEARCH_ONLY")
 
 
 if __name__ == "__main__":
