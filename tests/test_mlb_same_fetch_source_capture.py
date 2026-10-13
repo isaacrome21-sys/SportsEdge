@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -148,6 +148,62 @@ class SameFetchSourceCaptureTest(unittest.TestCase):
         self.assertEqual(["R,F,D,L,W,A,S,E"], query["gameType"])
         self.assertEqual("W", games[0].game_type)
         self.assertEqual(1, len(opener.calls))
+
+    def test_direct_recorder_cannot_self_anchor_to_year_2000(self):
+        from sportsedge.mlb_source import MLBSourceCapture, MLBSourceError
+        now = datetime(2026, 10, 13, 17, 0, tzinfo=timezone.utc)
+        fake = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            recorder = MLBSourceCapture(Path(td), clock=lambda: fake)
+            with patch("sportsedge.mlb_source._trusted_now", lambda: now):
+                with self.assertRaisesRegex(MLBSourceError, "RECEIPT_STALE_OR_REPLAYED"):
+                    recorder.record(url="https://x/api/v1/schedule", raw=b"{}",
+                                    fetch_started_at=fake, received_at=fake)
+            self.assertEqual([], recorder.records)
+            self.assertEqual([], list(Path(td).iterdir()))
+
+    def test_direct_recorder_rejects_future_independent_anchor(self):
+        from sportsedge.mlb_source import MLBSourceCapture, MLBSourceError
+        now = datetime(2026, 10, 13, 17, 0, tzinfo=timezone.utc)
+        future = now + timedelta(hours=1)
+        with tempfile.TemporaryDirectory() as td:
+            recorder = MLBSourceCapture(Path(td), clock=lambda: future)
+            with patch("sportsedge.mlb_source._trusted_now", lambda: now):
+                with self.assertRaisesRegex(MLBSourceError, "RECEIPT_FUTURE_VS_SYSTEM_ANCHOR"):
+                    recorder.record(url="https://x/api/v1/schedule", raw=b"{}",
+                                    fetch_started_at=future, received_at=future)
+            self.assertEqual([], recorder.records)
+
+    def test_direct_recorder_rejects_stale_and_repeated_receipts(self):
+        from sportsedge.mlb_source import MLBSourceCapture, MLBSourceError
+        now = datetime(2026, 10, 13, 17, 0, tzinfo=timezone.utc)
+        prior = now - timedelta(minutes=2)
+        with tempfile.TemporaryDirectory() as td:
+            recorder = MLBSourceCapture(Path(td), clock=lambda: prior)
+            with patch("sportsedge.mlb_source._trusted_now", lambda: now):
+                with self.assertRaisesRegex(MLBSourceError, "RECEIPT_STALE_OR_REPLAYED"):
+                    recorder.record(url="https://x/api/v1/schedule", raw=b"{}",
+                                    fetch_started_at=prior, received_at=prior)
+            current = MLBSourceCapture(Path(td), clock=lambda: now)
+            with patch("sportsedge.mlb_source._trusted_now", lambda: now):
+                current.record(url="https://x/api/v1/schedule", raw=b"{}",
+                               fetch_started_at=now, received_at=now)
+                with self.assertRaisesRegex(MLBSourceError, "RECEIPT_DUPLICATE_REPLAY"):
+                    current.record(url="https://x/api/v1/schedule", raw=b"{}",
+                                   fetch_started_at=now, received_at=now)
+            self.assertEqual(1, len(current.records))
+
+    def test_direct_recorder_requires_independent_clock_anchor(self):
+        from sportsedge.mlb_source import MLBSourceCapture, MLBSourceError
+        now = datetime(2026, 10, 13, 17, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            recorder = MLBSourceCapture(Path(td), clock=lambda: now)
+            with patch("sportsedge.mlb_source._trusted_now", lambda: None):
+                with self.assertRaisesRegex(MLBSourceError, "RECEIPT_ANCHOR_UNAVAILABLE"):
+                    recorder.record(url="https://x/api/v1/schedule", raw=b"{}",
+                                    fetch_started_at=now, received_at=now)
+            self.assertEqual([], recorder.records)
+            self.assertEqual([], list(Path(td).iterdir()))
 
     def test_capture_is_opt_in(self):
         opener = _Opener(self.schedule_raw, self.boxscore_raw)
