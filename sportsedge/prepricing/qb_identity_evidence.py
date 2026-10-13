@@ -633,27 +633,46 @@ def _fetch_text(url):
 
 def capture_form2_bundle(*, team_id, team_name, event_id, opponent_id,
                          kickoff_utc, previous_game_kickoff_utc, depth_url,
-                         now=None, fetch_text=None, fetch_json=None):
-    """Live capture: fetch the chart + roster (twice, for the
-    count-stability assertion) and build the bundle. Capture-time
-    failures raise; nothing is half-emitted."""
-    now = now or datetime.now(timezone.utc)
+                         now=None, fetch_text=None, fetch_json=None, clock=None):
+    """Capture chart and roster with completion-time receipts.
+
+    Each timestamp is taken AFTER its fetch (after both roster polls for
+    the count-stability assertion), not before network I/O. An optional
+    injectable clock exists ONLY for deterministic offline tests; the
+    production default is the current UTC clock. The legacy 'now' input
+    never substitutes for an observation timestamp.
+    """
     fetch_text = fetch_text or _fetch_text
     fetch_json = fetch_json or (lambda url: json.loads(_fetch_text(url)))
-    captured = now.isoformat()
+    capture_clock = clock or (lambda: datetime.now(timezone.utc))
+
+    def completed_at_utc():
+        recorded = capture_clock()
+        if (not isinstance(recorded, datetime) or recorded.tzinfo is None
+                or recorded.utcoffset() is None):
+            raise ValueError(STATUS_STALE + ":CAPTURE_CLOCK_UNVERIFIED")
+        return recorded.astimezone(timezone.utc).isoformat()
+
     depth_content = fetch_text(depth_url)
+    depth_completed = completed_at_utc()
     roster_url = ROSTER_URL_TEMPLATE.format(team_id=team_id)
     roster_first = fetch_json(roster_url)
     roster_second = fetch_json(roster_url)
+    roster_completed = completed_at_utc()
+    if dt(roster_completed) < dt(depth_completed):
+        raise ValueError(STATUS_STALE + ":CAPTURE_CLOCK_NONMONOTONIC")
+    start = dt(kickoff_utc)
+    if start is None or dt(depth_completed) >= start or dt(roster_completed) >= start:
+        raise ValueError(STATUS_STALE + ":CAPTURE_AT_OR_AFTER_KICKOFF")
     count_second = len(roster_athletes(roster_second))
     return build_form2_bundle(
         team_id=team_id, team_name=team_name, event_id=event_id,
         opponent_id=opponent_id, kickoff_utc=kickoff_utc,
         previous_game_kickoff_utc=previous_game_kickoff_utc,
         depth_url=depth_url, depth_content=depth_content,
-        depth_captured_at_utc=captured,
+        depth_captured_at_utc=depth_completed,
         roster_content=json.dumps(roster_first, sort_keys=True),
-        roster_captured_at_utc=captured,
+        roster_captured_at_utc=roster_completed,
         roster_athlete_count_repeat=count_second, roster_url=roster_url)
 
 
