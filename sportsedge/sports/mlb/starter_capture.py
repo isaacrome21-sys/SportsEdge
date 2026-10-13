@@ -193,7 +193,7 @@ def _probable(row_team: Mapping[str, Any]) -> dict[str, Any]:
     and a present-but-ID-less probable is a binding failure, not a name
     waiting to be trusted.
     """
-    probable = row_team.get("probablePitcher")
+    probable = row_team.get("probablePitcher") if isinstance(row_team, Mapping) else None
     if probable is None:
         return {"present": False, "id": None}
     # Present but malformed is NOT a legitimate "not announced" state.
@@ -214,17 +214,37 @@ def parse_schedule_games(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
     closed with a named reason instead of guessing.
     """
     rows: list[dict[str, Any]] = []
-    for block in payload.get("dates", []) or []:
-        for game in (block or {}).get("games", []) or []:
+    # Untrusted schedule payloads must never crash the intake. Invalid
+    # containers produce no admissible fixtures (and thus no capture).
+    if not isinstance(payload, Mapping):
+        return rows
+    dates = payload.get("dates")
+    if not isinstance(dates, list):
+        return rows
+    for block in dates:
+        if not isinstance(block, Mapping):
+            continue
+        games = block.get("games")
+        if not isinstance(games, list):
+            continue
+        for game in games:
+            if not isinstance(game, Mapping):
+                continue
             game_pk = _positive_statsapi_id(game.get("gamePk"))
             if game_pk is None:
                 continue
-            teams = game.get("teams") or {}
-            away = teams.get("away") or {}
-            home = teams.get("home") or {}
-            away_team = away.get("team") or {}
-            home_team = home.get("team") or {}
-            status = game.get("status") or {}
+            teams = game.get("teams")
+            teams = teams if isinstance(teams, Mapping) else {}
+            away = teams.get("away")
+            away = away if isinstance(away, Mapping) else {}
+            home = teams.get("home")
+            home = home if isinstance(home, Mapping) else {}
+            away_team = away.get("team")
+            away_team = away_team if isinstance(away_team, Mapping) else {}
+            home_team = home.get("team")
+            home_team = home_team if isinstance(home_team, Mapping) else {}
+            status = game.get("status")
+            status = status if isinstance(status, Mapping) else {}
             first_pitch = _parse_iso(game.get("gameDate"))
             rows.append(
                 {
@@ -782,11 +802,14 @@ def detect_changes(records: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]
     snapshots = [
         r
         for r in records
-        if r.get("record_type") == "SNAPSHOT" and r.get("game_date_utc")
+        if isinstance(r, Mapping) and r.get("record_type") == "SNAPSHOT" and r.get("game_date_utc")
     ]
     by_game: dict[int, list[Mapping[str, Any]]] = {}
     for record in snapshots:
-        by_game.setdefault(int(record["game_pk"]), []).append(record)
+        pk = _positive_statsapi_id(record.get("game_pk"))
+        if pk is None:
+            continue  # Never coerce malformed or absent game identities.
+        by_game.setdefault(pk, []).append(record)
 
     events: list[dict[str, Any]] = []
     for game_pk in sorted(by_game):
