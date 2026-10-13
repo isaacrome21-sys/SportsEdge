@@ -81,15 +81,8 @@ def audit_gamelog(
                 rejection["GAMELOG_ROW_NOT_OBJECT"] += 1
                 continue
             try:
-                when = _row_date(entry.get("date"))
-                # Same conservative day-only rule as live batter source:
-                # a same-day completed game cannot be called prior evidence.
-                if when >= as_of.date():
-                    rejection["NOT_PRIOR_TO_AS_OF_DATE"] += 1
-                    continue
-                if when >= kickoff.date():
-                    rejection["NOT_PRIOR_TO_KICKOFF_DATE"] += 1
-                    continue
+                # Mirror the production parser's check order; the first
+                # failing rule determines why ingestion silently drops a row.
                 stat = entry.get("stat")
                 if not isinstance(stat, dict):
                     rejection["STAT_OBJECT_MISSING"] += 1
@@ -102,6 +95,15 @@ def audit_gamelog(
                                  "HISTORY_GAME_PK")
                 if not game_id:
                     rejection["HISTORY_GAME_PK_INVALID"] += 1
+                    continue
+                when = _row_date(entry.get("date"))
+                # Same conservative day-only rule as live batter source:
+                # a same-day completed game cannot be called prior evidence.
+                if when >= as_of.date():
+                    rejection["NOT_PRIOR_TO_AS_OF_DATE"] += 1
+                    continue
+                if when >= kickoff.date():
+                    rejection["NOT_PRIOR_TO_KICKOFF_DATE"] += 1
                     continue
                 fields = {k: _count(stat.get(k), k.upper()) for k in CORE}
                 for name in OPTIONAL:
@@ -139,7 +141,7 @@ def audit_gamelog(
         "diagnostic_only": True,
         "independent_model_validation": False,
         "backfilled_evidence": False,
-        "pregame_observation_verified": observed < kickoff,
+        "capture_clock_precedes_as_of_and_kickoff": observed <= as_of < kickoff,
         "observed_at_utc": observed.isoformat(),
         "as_of_utc": as_of.isoformat(),
         "kickoff_utc": kickoff.isoformat(),
