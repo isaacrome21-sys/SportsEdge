@@ -514,14 +514,25 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
             rows_, status = provider.injury_rows(sport, team)
             pts, pts_status = provider.injury_points(sport, team)
             if status != "STRUCTURE_VERIFIED":
+                # Both failure classes stay fail-closed; only the stated
+                # reason differs. TEAM_NOT_IN_INJURY_FEED means the ESPN
+                # feed parsed cleanly but carries no report for this team
+                # (the common CFB case -- ESPN reports only teams with
+                # current injury entries), so calling it a schema failure
+                # would misstate the evidence.
+                if status == "TEAM_NOT_IN_INJURY_FEED":
+                    feed_reason = f"{side}_INJURY_FEED_NO_TEAM_REPORT:{status}"
+                    detail = ("ESPN injury feed is well-formed but carries "
+                              "no report for this team")
+                else:
+                    feed_reason = f"{side}_INJURY_FEED_UNUSABLE:{status}"
+                    detail = "ESPN injury payload failed team-group binding"
                 factors.append(_factor(
                     "qb_specific" if sport in {"NFL", "CFB"} else "rotations_matchups",
-                    MISSING, "ESPN_INJURIES",
-                    f"{side}_INJURY_FEED_UNUSABLE:{status}"))
+                    MISSING, "ESPN_INJURIES", feed_reason))
                 if sport in {"NFL", "CFB"} and enforce_blocks:
                     blocked, block_reason = True, BLOCK_QB_IDENTITY_UNVERIFIED
-                    block_detail = (f"{side}_QB_IDENTITY_UNVERIFIABLE:ESPN injury "
-                                    f"payload failed team-group binding")
+                    block_detail = f"{side}_QB_IDENTITY_UNVERIFIABLE:{detail}"
                 continue
             out, doubtful = _out_doubtful(rows_)
             qbs_out = [e["name"] for e in out if e["position"] == "QB"]

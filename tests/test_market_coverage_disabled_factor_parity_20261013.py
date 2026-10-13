@@ -75,8 +75,19 @@ def test_observable_quarter_research_probability_not_changed_by_recent_form(spor
         _row(sport, market="SPREAD_1Q", side="HOME",
              context={"home_form": 5.0, "away_form": -5.0}),
         now=NOW, auto_context=False)
-    assert base["estimate_p"] == form["estimate_p"]
-    assert base["ev_per_dollar"] == form["ev_per_dollar"]
+    if sport == "NFL":
+        # Canonical owner ruling: an unfitted quarter fraction must NOT
+        # emit a price, even if recent-form changes are disabled.
+        for row in (base, form):
+            assert row["status"] == "NO_MODEL_OR_MARKET"
+            assert row["reason"] == "SIMULATION_ROWS_EMPTY"
+            assert row["blocker"] == "NO_ENGINE"
+            assert "estimate_p" not in row
+            assert "ev_per_dollar" not in row
+    else:
+        # The CFB research-only quarter path retains its prior behavior.
+        assert base["estimate_p"] == form["estimate_p"]
+        assert base["ev_per_dollar"] == form["ev_per_dollar"]
 
 
 def test_research_coverage_retained_baseline_terms():
