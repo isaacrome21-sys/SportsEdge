@@ -1211,6 +1211,11 @@ def _paired_book_context(rows, evaluated, index):
             return False
         if book(other_row) != book(row):
             return False
+        # A matching game/line is not sufficient across period or settlement
+        # contracts, or conflicting supplied sportsbook event identities.
+        for field in ("period", "phase", "settlement_type", "event_id", "dk_event_id"):
+            if str(other_row.get(field) or "").strip().upper() != str(row.get(field) or "").strip().upper():
+                return False
         if _pair_side(other_row, other) != expected_opposite:
             return False
         if market == "TEAM_TOTALS":
@@ -1266,15 +1271,30 @@ def _paired_book_context(rows, evaluated, index):
     if book(row) != "draftkings":
         projected["paired_market_status"] = "NOT_DRAFTKINGS_PAIR"
         return
-    # Optional quotes are assumed same screenshot unless an explicit
-    # timestamp proves they differ; never compare known mismatched captures.
+    # An inline opposite_odds number is not a timestamped counterpart.
+    # Preserve projection arithmetic, but emit no paired benchmark without
+    # two actual quote rows and timezone-aware capture times <=120s apart.
     input_time = row.get("quote_captured_at")
     matching_time = None
     if len(compatible) == 1:
         matching_time = rows[compatible[0]["input_index"]].get("quote_captured_at")
-    if input_time and matching_time and str(input_time) != str(matching_time):
+    if not input_time or not matching_time:
+        projected["paired_market_status"] = "MISSING_COUNTERPART_QUOTE_TIMESTAMP"
+        return
+    try:
+        stamps = [datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+                  for value in (input_time, matching_time)]
+        if any(stamp.tzinfo is None or stamp.utcoffset() is None for stamp in stamps):
+            raise ValueError("TIMEZONE_REQUIRED")
+    except (TypeError, ValueError, OverflowError):
+        projected["paired_market_status"] = "INVALID_PAIR_QUOTE_TIMESTAMP"
+        return
+    skew = abs((stamps[0] - stamps[1]).total_seconds())
+    if skew > 120:
         projected["paired_market_status"] = "MISMATCHED_QUOTE_TIMESTAMPS"
         return
+    projected["paired_quote_skew_seconds"] = skew
+    projected["paired_quote_captured_at"] = [stamp.isoformat() for stamp in stamps]
     try:
         p1 = 1.0 / odds_decimal(result["odds_american"])
         p2 = 1.0 / odds_decimal(partner_price)
