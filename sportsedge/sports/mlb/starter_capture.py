@@ -972,6 +972,8 @@ def verify_capture_chain(capture_path: Path, manifest_path: Path) -> dict[str, A
             entry = json.loads(manifest_line.decode("utf-8"))
         except (ValueError, UnicodeDecodeError):
             return failure("MANIFEST_LINE_UNPARSEABLE", index)
+        if not isinstance(entry, dict):
+            return failure("MANIFEST_RECORD_TYPE_INVALID", index)
         digest = _sha256_hex(line)
         if entry.get("record_sha256") != digest:
             return failure("CAPTURE_RECORD_HASH_MISMATCH", index)
