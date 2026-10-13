@@ -15,6 +15,13 @@ class SharpReferenceTest(unittest.TestCase):
         self.assertTrue(same_team("Miami (OH)", "Miami OH"))
         self.assertFalse(same_team("Kansas", "Kansas State Wildcats"))
         self.assertFalse(same_team("Miami", "Miami (OH) RedHawks"))
+        for short, other in [("Florida", "Florida Atlantic Owls"), ("Florida", "Florida International Panthers"),
+                             ("Louisiana", "Louisiana Monroe Warhawks"), ("Texas", "Texas A&M Aggies"),
+                             ("Texas", "Texas El Paso Miners"), ("Texas", "Texas San Antonio Roadrunners"),
+                             ("Georgia", "Georgia Southern Eagles"), ("North Carolina", "North Carolina Central Eagles")]:
+            self.assertFalse(same_team(short, other), (short, other))
+        self.assertTrue(same_team("Florida", "Florida Gators"))
+        self.assertTrue(same_team("Louisiana", "Louisiana Ragin' Cajuns"))
 
     def test_pinnacle_preferred(self):
         peers = [{"book": "pinnacle", "spread": [-8.5, -105, -105]},
