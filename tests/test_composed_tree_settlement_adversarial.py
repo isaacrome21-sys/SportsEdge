@@ -218,7 +218,12 @@ class ComposedTreeSettlementAdversarialTests(unittest.TestCase):
         self.assertEqual(row["settlement_state"], "SETTLEMENT_ELIGIBLE")
         self.assertEqual(row["settled_outcome"], "WIN")
 
-    def test_f5_moneyline_tie_is_ambiguous_not_push(self):
+    def test_f5_moneyline_tie_settles_push_under_draftkings_two_way(self):
+        # Owner settlement ruling (2026-10-12): DraftKings' F5 moneyline
+        # is a declared TWO_WAY market (no Draw selection; ties push),
+        # so a tied score after five settles PUSH -- it is no longer
+        # ambiguous for this book. Undeclared books stay ambiguous
+        # (covered in tests/test_mlb_moneyline_settlement_types.py).
         joined = _join(
             market="F5_MONEYLINE",
             entity_id="20",
@@ -227,8 +232,8 @@ class ComposedTreeSettlementAdversarialTests(unittest.TestCase):
         )
         self.assertEqual(joined["failure_count"], 0)
         row = joined["observations"][0]
-        self.assertEqual(row["settlement_state"], "AMBIGUOUS_SETTLEMENT")
-        self.assertIsNone(row["settled_outcome"])
+        self.assertEqual(row["settlement_state"], "SETTLEMENT_ELIGIBLE")
+        self.assertEqual(row["settled_outcome"], "PUSH")
 
     def test_first_home_run_with_actual_selected_batter_still_settles(self):
         joined = _join(
