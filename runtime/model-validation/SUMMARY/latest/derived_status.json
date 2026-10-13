@@ -803,7 +803,7 @@
     }
   },
   "replay_policy": {
-    "as_of_date": "2026-10-06",
+    "as_of_date": "2026-10-13",
     "effective_date": "2026-08-31",
     "enforced": true,
     "policy_id": "MLB_REPLAY_POLICY_V1",
