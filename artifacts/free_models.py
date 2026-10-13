@@ -710,6 +710,33 @@ def context_for(sport, away, home, start, provider, row):
     return out, kickoff, notes
 
 
+
+def score_means(sport, context):
+    """Market-blind pregame means for live repricing.
+
+    Keep this calculation in parity with calculate()'s Lane A base model.
+    No quoted market price enters here. Owner-disabled MLB pitcher ERA,
+    recent form and rest differential factors must contribute exactly zero
+    even when their unvalidated research values are present in context.
+    This helper restores the live_run_it import omitted by composition.
+    """
+    base, _, _, hfa = PRIORS[sport]
+    home_mean = base + hfa / 2 + context["home_rating"]
+    away_mean = base - hfa / 2 + context["away_rating"]
+    if sport != "MLB":
+        home_mean += context["home_injury_pts"]
+        away_mean += context["away_injury_pts"]
+        if sport == "NBA":
+            home_mean += context["rest_adj"] / 2
+            away_mean -= context["rest_adj"] / 2
+    if "weather_total_adj" in context:
+        home_mean += context["weather_total_adj"] / 2
+        away_mean += context["weather_total_adj"] / 2
+    if min(home_mean, away_mean) < 0.2:
+        raise ValueError("IMPLAUSIBLE_SCORE_MEAN")
+    return home_mean, away_mean
+
+
 # Pricing-lane contract (Priority 1 repair, Oct 11 2026).
 # Every probability the engine emits says which lane produced it:
 #   LANE_A_INDEPENDENT - truly market-blind; the default everywhere. The
