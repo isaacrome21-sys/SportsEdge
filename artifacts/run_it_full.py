@@ -349,8 +349,12 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     if games:
         # Option 3: Prepricing adjustments stored separately from user context.
         # Strip any user-supplied prepricing_adjustments (never trusted).
+        # availability_status is likewise system-stamped ONLY (from the
+        # pre-pricing stage): an intake row must never forge it in
+        # either direction (issue #2158).
         for line in games:
             line.pop("prepricing_adjustments", None)
+            line.pop("availability_status", None)
         # Pre-pricing factor-ingestion stage: verified pulls BEFORE pricing.
         stages = stage_games(
             games, now=clock,
@@ -373,6 +377,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "source": "SPORTSEDGE_PREPRICING_V1",
                 "timestamp_utc": clock.astimezone(timezone.utc).isoformat(),
                 "verification_status": "VERIFIED",
+                "availability_status": st.get("availability_status"),
                 "adjustments": dict(st["adjustments"]) if isinstance(st.get("adjustments"), dict) else {},
                 "factors": list(st["factors"]) if isinstance(st.get("factors"), list) else [],
             }
@@ -390,6 +395,14 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         for pos, gpos in enumerate(clear_game_pos):
             priced[pos]["input_index"] = game_indices[gpos]
             priced[pos]["prepricing_adjustments"] = prepricing_by_index[gpos]
+            # System-stamped availability (trusted stage output only):
+            # a game priced via Form 2 QB identity evidence carries
+            # AVAILABILITY_UNVERIFIED_NO_TEAM_INJURY_REPORT, and the
+            # classification gate below forces such rows research-only
+            # (issue #2158). Never read from the intake line.
+            stage_availability = stages[gpos].get("availability_status")
+            if stage_availability:
+                priced[pos]["availability_status"] = stage_availability
             game_results[gpos] = priced[pos]
         priced_games = game_results
         # Option 3: Prepricing audit for transparency (separate from user context audit)
