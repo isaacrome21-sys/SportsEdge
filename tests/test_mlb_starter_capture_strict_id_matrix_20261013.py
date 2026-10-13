@@ -93,3 +93,87 @@ def test_valid_positive_integer_identity_unmodified():
     assert row["home_team_id"] == HOME_TEAM
     assert row["away_probable"] == {"present": True, "id": AWAY_PROB}
     assert row["home_probable"] == {"present": True, "id": HOME_PROB}
+
+
+# Separate fixture/status fail-closed regressions, composed after the strict-ID
+# matrix. None weakens or modifies the 59 existing identity cases.
+def _fixture_capture(game):
+    _, plan_game = _game1_plan()
+    return capture_snapshot(
+        plan_game, "T-30M",
+        fetcher=_static_fetcher(json.dumps(_payload(game)).encode()),
+        clock=FakeClock(datetime(2026, 10, 13, 22, 35, tzinfo=timezone.utc)),
+    )
+
+
+def test_duplicate_gamepk_rejected_in_plan_and_capture():
+    game = _game(GAME1_PK, GAME1_PITCH)
+    payload = _payload(game, game)
+    plan = build_plan(payload, planned_at=datetime(2026, 10, 12, tzinfo=timezone.utc))
+    assert plan["games"] == []
+    assert plan["issues"] == [{"game_pk": GAME1_PK, "reason": "DUPLICATE_GAME_PK"}]
+    _, plan_game = _game1_plan()
+    record = capture_snapshot(
+        plan_game, "T-30M",
+        fetcher=_static_fetcher(json.dumps(payload).encode()),
+        clock=FakeClock(datetime(2026, 10, 13, 22, 35, tzinfo=timezone.utc)),
+    )
+    assert record["record_status"] == "FAILED"
+    assert record["failure_reason"] == "DUPLICATE_GAME_PK_IN_RESPONSE"
+
+
+def test_unrecognized_game_type_cannot_be_planned_or_bound():
+    game = _game(GAME1_PK, GAME1_PITCH)
+    game["gameType"] = "X"
+    plan = build_plan(_payload(game), planned_at=datetime(2026, 10, 12, tzinfo=timezone.utc))
+    assert plan["games"] == []
+    assert plan["issues"] == [{"game_pk": GAME1_PK, "reason": "GAME_TYPE_UNRECOGNIZED"}]
+    record = _fixture_capture(game)
+    assert record["record_status"] == "FAILED"
+    assert record["failure_reason"] == "GAME_TYPE_UNRECOGNIZED"
+
+
+@pytest.mark.parametrize("kind,reason", [
+    ("away", "FIXTURE_TEAM_ID_MISMATCH"),
+    ("home", "FIXTURE_TEAM_ID_MISMATCH"),
+    ("first_pitch", "FIXTURE_FIRST_PITCH_MISMATCH"),
+    ("official_date", "FIXTURE_OFFICIAL_DATE_MISMATCH"),
+    ("game_type", "FIXTURE_GAME_TYPE_MISMATCH"),
+    ("doubleheader", "FIXTURE_DOUBLEHEADER_MISMATCH"),
+    ("game_number", "FIXTURE_GAME_NUMBER_MISMATCH"),
+])
+def test_same_gamepk_hostile_fixture_drift_fails_closed(kind, reason):
+    from datetime import timedelta
+    game = _game(GAME1_PK, GAME1_PITCH)
+    if kind in ("away", "home"):
+        game["teams"][kind]["team"]["id"] = 999999
+    elif kind == "first_pitch":
+        game["gameDate"] = (GAME1_PITCH + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    elif kind == "official_date":
+        game["officialDate"] = "2026-10-14"
+    elif kind == "game_type":
+        game["gameType"] = "W"  # allowed type, but not the planned R
+    elif kind == "doubleheader":
+        game["doubleHeader"] = "Y"
+    elif kind == "game_number":
+        game["gameNumber"] = 2
+    record = _fixture_capture(game)
+    assert record["record_status"] == "FAILED"
+    assert record["failure_reason"] == reason
+
+
+@pytest.mark.parametrize("status", [
+    {"codedGameState": "I", "detailedState": "In Progress", "abstractGameState": "Live"},
+    {"codedGameState": "F", "detailedState": "Final", "abstractGameState": "Final"},
+    {"codedGameState": "S", "detailedState": "In Progress", "abstractGameState": "Preview"},
+    {"codedGameState": "S", "detailedState": "Suspended", "abstractGameState": "Preview"},
+    {},
+])
+def test_live_final_postponed_or_missing_status_is_not_pregame(status):
+    game = _game(GAME1_PK, GAME1_PITCH)
+    game["status"] = status
+    record = _fixture_capture(game)
+    # A future *scheduled* gameDate is not proof the game is pregame.
+    assert record["minutes_to_first_pitch"] == 30.0
+    assert record["record_status"] == "FAILED"
+    assert record["failure_reason"] == "GAME_STATUS_NOT_PREGAME"

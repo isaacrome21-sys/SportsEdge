@@ -262,7 +262,22 @@ def build_plan(payload: Mapping[str, Any], *, planned_at: datetime) -> dict[str,
     planned = _require_aware(planned_at, what="planned_at")
     games: list[dict[str, Any]] = []
     issues: list[dict[str, Any]] = []
-    for row in parse_schedule_games(payload):
+    rows = parse_schedule_games(payload)
+    counts: dict[int, int] = {}
+    for row in rows:
+        pk = row["game_pk"]
+        counts[pk] = counts.get(pk, 0) + 1
+    duplicate_issues: set[int] = set()
+    for row in rows:
+        pk = row["game_pk"]
+        if counts[pk] != 1:
+            if pk not in duplicate_issues:
+                issues.append({"game_pk": pk, "reason": "DUPLICATE_GAME_PK"})
+                duplicate_issues.add(pk)
+            continue
+        if row["game_type"] not in GAME_TYPES:
+            issues.append({"game_pk": pk, "reason": "GAME_TYPE_UNRECOGNIZED"})
+            continue
         if row["first_pitch"] is None:
             issues.append({"game_pk": row["game_pk"], "reason": "GAME_DATE_MISSING"})
             continue
@@ -413,9 +428,12 @@ def capture_snapshot(
         }
 
     completed = _require_aware(clock(), what="captured_at")
-    rows = {row["game_pk"]: row for row in parse_schedule_games(payload)}
-    row = rows.get(int(plan_game["game_pk"]))
-    if row is None:
+    plan_pk = _positive_statsapi_id(plan_game.get("game_pk"))
+    matches = [
+        row for row in parse_schedule_games(payload)
+        if plan_pk is not None and row["game_pk"] == plan_pk
+    ]
+    if len(matches) != 1:
         return {
             "schema": SCHEMA_SNAPSHOT,
             "record_type": "SNAPSHOT",
@@ -423,9 +441,13 @@ def capture_snapshot(
             "captured_at_utc": _iso(completed),
             "slot_disposition": _slot_disposition(completed, slot),
             "record_status": "FAILED",
-            "failure_reason": "GAME_NOT_IN_SCHEDULE_RESPONSE",
+            "failure_reason": (
+                "DUPLICATE_GAME_PK_IN_RESPONSE" if len(matches) > 1
+                else "GAME_NOT_IN_SCHEDULE_RESPONSE"
+            ),
             "response_sha256": _sha256_hex(raw),
         }
+    row = matches[0]
 
     probable_status = {
         side: _probable_identity_status(row[f"{side}_probable"])
@@ -477,6 +499,45 @@ def capture_snapshot(
     if row["away_team_id"] is None or row["home_team_id"] is None:
         record["record_status"] = "FAILED"
         record["failure_reason"] = "TEAM_ID_MISSING"
+        return record
+    if row["game_type"] not in GAME_TYPES:
+        record["record_status"] = "FAILED"
+        record["failure_reason"] = "GAME_TYPE_UNRECOGNIZED"
+        return record
+    # gamePk alone cannot authorize a response that quietly substitutes
+    # opponents, schedule epoch, postseason type, or doubleheader identity.
+    # Preserve the untrusted observation on a FAILED record for auditing,
+    # but do not let any of its pitcher IDs count as a bound starter.
+    fixture_fields = (
+        ("away_team_id", "FIXTURE_TEAM_ID_MISMATCH"),
+        ("home_team_id", "FIXTURE_TEAM_ID_MISMATCH"),
+        ("game_type", "FIXTURE_GAME_TYPE_MISMATCH"),
+        ("official_date", "FIXTURE_OFFICIAL_DATE_MISMATCH"),
+        ("game_date_utc", "FIXTURE_FIRST_PITCH_MISMATCH"),
+        ("double_header", "FIXTURE_DOUBLEHEADER_MISMATCH"),
+        ("game_number", "FIXTURE_GAME_NUMBER_MISMATCH"),
+    )
+    for field, reason in fixture_fields:
+        if row[field] != plan_game.get(field):
+            record["record_status"] = "FAILED"
+            record["failure_reason"] = reason
+            return record
+    # A postponed game is a valid observation of a schedule change, not
+    # evidence that a starter was confirmed pregame. Preserve the existing
+    # epoch/change-detection contract; reject live/final/unknown states.
+    postponed = (
+        row["status_code"] == "D"
+        and row["detailed_state"] == "Postponed"
+        and row["abstract_state"] == "Preview"
+    )
+    pregame = (
+        row["abstract_state"] == "Preview"
+        and row["status_code"] in ("S", "P")
+        and row["detailed_state"] in ("Scheduled", "Pre-Game", "Warmup")
+    )
+    if not (pregame or postponed):
+        record["record_status"] = "FAILED"
+        record["failure_reason"] = "GAME_STATUS_NOT_PREGAME"
         return record
     id_missing = [
         side for side in ("away", "home") if probable_status[side] == "ID_MISSING"
