@@ -522,14 +522,20 @@ def capture_snapshot(
             record["record_status"] = "FAILED"
             record["failure_reason"] = reason
             return record
-    # Scheduled first pitch is NOT evidence of an actual pregame state:
-    # in-progress/final/postponed/missing and contradictory statuses are
-    # unusable even if gameDate still lies in the future.
-    if (
-        row["abstract_state"] != "Preview"
-        or row["status_code"] not in ("S", "P")
-        or row["detailed_state"] not in ("Scheduled", "Pre-Game", "Warmup")
-    ):
+    # A postponed game is a valid observation of a schedule change, not
+    # evidence that a starter was confirmed pregame. Preserve the existing
+    # epoch/change-detection contract; reject live/final/unknown states.
+    postponed = (
+        row["status_code"] == "D"
+        and row["detailed_state"] == "Postponed"
+        and row["abstract_state"] == "Preview"
+    )
+    pregame = (
+        row["abstract_state"] == "Preview"
+        and row["status_code"] in ("S", "P")
+        and row["detailed_state"] in ("Scheduled", "Pre-Game", "Warmup")
+    )
+    if not (pregame or postponed):
         record["record_status"] = "FAILED"
         record["failure_reason"] = "GAME_STATUS_NOT_PREGAME"
         return record
