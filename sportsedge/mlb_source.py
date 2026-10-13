@@ -267,9 +267,16 @@ def parse_schedule(payload: dict[str, Any], retrieved_at: datetime) -> list[Game
 
 
 def fetch_schedule(date_iso: str, opener: Callable = urlopen, now: datetime | None = None) -> list[GameSnapshot]:
-    now = now or datetime.now(timezone.utc)
-    url = f"{BASE}/api/v1/schedule?sportId=1&date={date_iso}&hydrate=probablePitcher,team"
-    return parse_schedule(_get_json(url, opener), now)
+    # Read the default receipt clock only after the response has arrived.
+    # Explicit `now` remains a caller-supplied timestamp for compatibility;
+    # it is not independent proof of when the source became available.
+    url = (
+        f"{BASE}/api/v1/schedule?sportId=1&date={date_iso}"
+        "&gameType=R,F,D,L,W,A,S,E&hydrate=probablePitcher,team"
+    )
+    payload = _get_json(url, opener)
+    retrieved_at = now if now is not None else datetime.now(timezone.utc)
+    return parse_schedule(payload, retrieved_at)
 
 
 def parse_confirmed_lineup(boxscore: dict[str, Any], side: str) -> list[dict[str, Any]]:
