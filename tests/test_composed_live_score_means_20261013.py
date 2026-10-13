@@ -25,7 +25,7 @@ def test_live_score_means_ignore_disabled_unvalidated_factors(sport):
     ctx = {key: 0.0 for key in CONTEXT_KEYS[sport]}
     original = score_means(sport, ctx)
     for key in ("home_pitcher_adj", "away_pitcher_adj",
-                "home_form", "away_form", "rest_diff_adj"):
+                "home_form", "away_form", "rest_diff_adj", "rest_adj"):
         if key in ctx:
             ctx[key] = 9.0 if key.startswith(("home", "rest")) else -9.0
     assert score_means(sport, ctx) == original
@@ -42,9 +42,14 @@ def test_live_score_means_preserve_active_context():
 
     nba = {key: 0.0 for key in CONTEXT_KEYS["NBA"]}
     before = score_means("NBA", nba)
-    nba["rest_adj"] = 2.0  # distinct existing NBA context, not rest_diff_adj
-    assert score_means("NBA", nba) == pytest.approx(
-        (before[0] + 1, before[1] - 1))
+    # Owner ruling (Oct 13, 2026, extended on PR #2120): the NBA rest
+    # adjustment is DISABLED_PENDING_INCREMENTAL_VALUE in every canonical
+    # pricing path, regardless of its key name (rest_adj, not
+    # rest_diff_adj). It previously shifted the means (+1/-1 at 2.0);
+    # that expectation is superseded — the value stays in context for
+    # research and its pricing contribution is exactly zero.
+    nba["rest_adj"] = 2.0
+    assert score_means("NBA", nba) == before
 
 
 def test_live_score_means_keep_implausible_floor():
