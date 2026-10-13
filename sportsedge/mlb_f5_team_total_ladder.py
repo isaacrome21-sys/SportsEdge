@@ -97,6 +97,16 @@ def is_trainable(game: Mapping[str, Any], as_of: datetime) -> bool:
     return t is not None and t <= as_of
 
 
+def zinb_pmf(mean: float, r: float, pi: float, support: int = SUPPORT) -> list[float]:
+    """Zero-inflated NB with overall mean preserved (pre-registered F5 candidate)."""
+    if not 0 <= pi < 1 or r <= 0:
+        raise F5LadderError("invalid ZINB parameters")
+    base = nb_pmf(mean / (1 - pi), r, support)
+    out = [(1 - pi) * p for p in base]
+    out[0] += pi
+    return out
+
+
 def fit_f5_share(games: Sequence[Mapping[str, Any]], *, as_of: datetime) -> dict:
     """F5/regulation run ratio over games FINAL (and linescore available) by as_of."""
     prior = sorted((g for g in games if is_trainable(g, as_of) and g.get("completed_innings", 9) >= 9),
@@ -136,8 +146,13 @@ def price_f5_team_totals(model_input: Mapping[str, Any]) -> dict:
            "settlement_status": SETTLEMENT_STATUS,
            "main_line": F5_TEAM_TOTAL_MAIN_LINE, "f5_share": share,
            "dispersion_r": V8_INDEPENDENT_TEAM_DISPERSION_R, "teams": {}}
+    r_f5 = model_input.get("f5_dispersion_r")
+    pi = float(model_input.get("f5_zero_inflation", 0.0))
+    if r_f5 is not None:
+        out["dispersion_r"] = float(r_f5)
+        out["zero_inflation"] = pi
     for side, mu in (("AWAY", away_mu), ("HOME", home_mu)):
-        pmf = nb_pmf(share * mu)
+        pmf = nb_pmf(share * mu) if r_f5 is None else zinb_pmf(share * mu, float(r_f5), pi)
         out["teams"][side] = {"full_game_mean": mu, "f5_mean": share * mu,
                               "ladder": [_ou(pmf, x) for x in lines]}
     return out

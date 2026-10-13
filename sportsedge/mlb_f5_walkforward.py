@@ -68,7 +68,8 @@ def _ll(p: float, y: int) -> float:
     return -(y * log(p) + (1 - y) * log(1 - p))
 
 
-def run_walkforward(games: list[dict], *, start_date: str | None = None) -> dict:
+def run_walkforward(games: list[dict], *, start_date: str | None = None,
+                    f5_params: tuple[float, float] | None = None, rows_out: list | None = None) -> dict:
     by_date = defaultdict(list)
     for g in games:
         by_date[g["date"]].append(g)
@@ -101,7 +102,11 @@ def run_walkforward(games: list[dict], *, start_date: str | None = None) -> dict
                 out = price_f5_team_totals({
                     "away_mean_runs": max(sum(hist[g["away"]]) / len(hist[g["away"]]), 0.1),
                     "home_mean_runs": max(sum(hist[g["home"]]) / len(hist[g["home"]]), 0.1),
-                    "f5_share": share, "lines": LINES})
+                    "f5_share": share, "lines": LINES,
+                    **({"f5_dispersion_r": f5_params[0], "f5_zero_inflation": f5_params[1]} if f5_params else {})})
+                if rows_out is not None:
+                    rows_out.append((out["teams"]["AWAY"]["f5_mean"], g["away_f5"]))
+                    rows_out.append((out["teams"]["HOME"]["f5_mean"], g["home_f5"]))
                 for side, runs in (("AWAY", g["away_f5"]), ("HOME", g["home_f5"])):
                     for row in out["teams"][side]["ladder"]:
                         x = row["line"]
@@ -123,3 +128,23 @@ def run_walkforward(games: list[dict], *, start_date: str | None = None) -> dict
     return {"lines": {str(k): v for k, v in stats.items()},
             "final_f5_share": round(f5_sum / reg_sum, 5) if reg_sum else None,
             "market_baseline": "MISSING", "team_window": TEAM_WINDOW}
+
+
+R_GRID = tuple(0.5 + 0.25 * i for i in range(39))
+PI_GRID = tuple(i / 100 for i in range(31))
+
+
+def fit_f5_dispersion(rows: list[tuple[float, int]]) -> dict:
+    """Pre-registered grid MLE of (r_f5, pi) on (PIT mean, observed F5 runs) rows."""
+    from .mlb_f5_team_total_ladder import zinb_pmf
+    if not rows:
+        raise ValueError("no fitting rows")
+    means = sorted({round(m, 3) for m, _ in rows})
+    best = None
+    for pi in PI_GRID:
+        for r in reversed(R_GRID):
+            cache = {m: zinb_pmf(m, r, pi) for m in means}
+            ll = sum(log(max(cache[round(m, 3)][min(y, 39)], 1e-300)) for m, y in rows)
+            if best is None or ll > best[0] + 1e-9:
+                best = (ll, r, pi)
+    return {"r_f5": best[1], "pi": best[2], "loglik": best[0], "n": len(rows)}
