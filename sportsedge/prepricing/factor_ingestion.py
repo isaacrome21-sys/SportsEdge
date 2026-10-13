@@ -453,7 +453,8 @@ def mlb_pitcher_adjustments(fetch, *, game_date, home, away, season,
 # Per-game stage
 # ---------------------------------------------------------------------------
 def _consult_qb_form2(qb_form2_bundles, provider, sport, team, kickoff, now,
-                      receipts):
+                      receipts, *, event_id=None, home_team_id=None,
+                      away_team_id=None):
     """QB_IDENTITY_EVIDENCE Form 2 consult (owner ruling, issue #2154).
 
     Consulted ONLY for a CFB team whose injury-feed status is
@@ -463,6 +464,11 @@ def _consult_qb_form2(qb_form2_bundles, provider, sport, team, kickoff, now,
     Every consultation appends an evidence receipt, pass or fail.
     Bundles arrive ONLY through the stage_games parameter (a trusted
     loader / capture step), never from an input row.
+
+    The staged fixture's identity (ESPN event ID + both team IDs) is
+    passed through for the evaluator's exact-binding check (PR #2157
+    owner-review correction 1): a bundle for this team in another
+    game, or against another opponent, is not evidence here.
     """
     if not qb_form2_bundles:
         return None
@@ -473,7 +479,9 @@ def _consult_qb_form2(qb_form2_bundles, provider, sport, team, kickoff, now,
     previous_kickoff = completed[0][0] if completed else None
     result = _qb_evidence.evaluate_form2_bundle(
         bundle, team_id=str(team.get("id")), kickoff=kickoff,
-        previous_game_kickoff=previous_kickoff, now=now)
+        previous_game_kickoff=previous_kickoff, now=now,
+        event_id=event_id, home_team_id=home_team_id,
+        away_team_id=away_team_id)
     receipt = {"source": "QB_IDENTITY_EVIDENCE_FORM2",
                "status": result["status"], "detail": result["detail"]}
     if result.get("receipt"):
@@ -533,6 +541,12 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True,
                 "adjustments": adjustments, "factors": factors,
                 "receipts": receipts}
     kickoff, competition = fixture
+    # The staged fixture's ESPN event ID (the scoreboard event the
+    # provider bound both teams + start time to). Form 2 bundles must
+    # name exactly this event (PR #2157 owner-review correction 1);
+    # absent an ID the evaluator fails the binding closed.
+    fixture_event_id = (str(competition.get("id"))
+                        if competition.get("id") is not None else None)
 
     home_team = provider.identify(sport, home_name)
     away_team = provider.identify(sport, away_name)
@@ -583,6 +597,12 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True,
                     "adjustments": adjustments, "factors": factors,
                     "receipts": receipts}
 
+    # Game-level QB availability state for the priced record: stays
+    # None unless a Form 2 consult satisfies a team's identity limb,
+    # in which case availability is explicitly UNKNOWN (never clean)
+    # and the constant below is carried onto the priced rows.
+    availability_status = None
+
     # -- 1. injuries / QB-participation (canonical free_models path) -------
     if sport in {"NFL", "CFB", "NBA"}:
         for side, team, ctx_key in (("HOME", home_team, "home_injury_pts"),
@@ -616,10 +636,18 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True,
                 if sport == "CFB" and status == "TEAM_NOT_IN_INJURY_FEED":
                     form2 = _consult_qb_form2(
                         qb_form2_bundles, provider, sport, team, kickoff,
-                        now, receipts)
+                        now, receipts, event_id=fixture_event_id,
+                        home_team_id=str(home_team.get("id")),
+                        away_team_id=str(away_team.get("id")))
                 if form2 is not None and form2["ok"]:
                     proceeds, disposition_status = _qb_evidence.form2_disposition()
                     if proceeds:
+                        # The game prices on a QB whose AVAILABILITY is
+                        # explicitly unknown. Recorded structurally on
+                        # the stage result so the runner stamps it on
+                        # the priced rows and the classification layer
+                        # forces them research-only (issue #2158).
+                        availability_status = _qb_evidence.AVAILABILITY_UNVERIFIED
                         adjustments[ctx_key] = 0.0
                         factors.append(_factor(
                             "qb_specific", USED,
@@ -932,6 +960,7 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True,
             "game_label": game_label, "sport": sport,
             "kickoff_utc": kickoff.isoformat(), "blocked": blocked,
             "block_reason": block_reason, "block_detail": block_detail,
+            "availability_status": availability_status,
             "adjustments": adjustments, "factors": factors,
             "receipts": receipts}
 
