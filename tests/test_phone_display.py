@@ -232,3 +232,26 @@ def test_utf8_page_limits_count_bytes_not_characters():
     pages = phone_card_pages(text, max_bytes=2000)
     assert all(len(page.encode("utf-8")) < 2000 for page in pages)
     assert "".join(pages).count("球") == 10000
+
+
+@pytest.mark.parametrize("malformed", [True, 7, "bad", [], [1]])
+def test_malformed_independent_projection_blocks_row_without_crashing(malformed):
+    c = card(result(independent_projection=malformed), result())
+    view = build_phone_card(c)
+    assert view["coverage"]["input_rows"] == 2
+    assert view["selections"][0]["status"] == "BLOCKED"
+    assert view["selections"][0]["estimated_ev"] is None
+    assert view["selections"][1]["status"] == "LEAN"
+
+
+def test_malformed_context_notes_cannot_produce_eligible_status_or_crash():
+    display = build_phone_card(card(result(context_notes=42)))["selections"][0]
+    assert display["status"] == "WATCH"
+    assert display["reason"] == "CONTEXT_METADATA_MALFORMED"
+
+
+def test_untrusted_intake_row_is_refused_before_any_card_output():
+    c = card(result())
+    c["selection_intake"] = [42]
+    with pytest.raises(ValueError, match="SELECTION_INTAKE_ROW_NOT_OBJECT"):
+        build_phone_card(c)
