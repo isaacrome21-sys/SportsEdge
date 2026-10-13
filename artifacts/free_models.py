@@ -36,6 +36,15 @@ from sportsedge.pricing_provenance import (
 
 LEAGUES = {"NFL": "football/nfl", "CFB": "football/college-football",
            "NBA": "basketball/nba", "MLB": "baseball/mlb"}
+# ESPN site team-directory request sizes. The first request is the historical
+# one; a response that saturates it is indistinguishable from a truncated
+# directory (the college-football directory holds 762 teams > 500), so the
+# fetch escalates once to the large limit. A response saturating even that
+# cannot be proven complete and is refused (DIRECTORY_TRUNCATED). The site
+# payload carries no count/page metadata (verified live 2026-10-13), so this
+# saturation sentinel is the completeness assertion.
+TEAMS_DIRECTORY_LIMIT = 500
+TEAMS_DIRECTORY_ESCALATED_LIMIT = 1000
 # Explicit priors and heuristic variances; NOT fitted or calibrated.
 PRIORS = {"NFL": (22.0, 13.5, 13.7, 1.5),
           "CFB": (28.0, 18.5, 19.0, 2.5),
@@ -123,6 +132,60 @@ def dt(value):
 
 def bounded(value, low, high):
     return max(low, min(high, value))
+
+
+def injury_season_start(reference):
+    """Start of the football season window containing `reference`.
+
+    An ESPN injury entry is current evidence for a fixture only if it
+    was reported inside the fixture's own season. The season window
+    opens August 1 of the season year; fixtures in January-July
+    (bowls, playoffs) belong to the season that opened the previous
+    calendar year. Returns None when the reference cannot be parsed;
+    wired callers always pass a verified kickoff or the provider
+    clock, so None is unreachable on those paths and callers keep
+    legacy behavior rather than guessing a window.
+    """
+    ref = reference if isinstance(reference, datetime) else dt(reference)
+    if ref is None:
+        return None
+    season_year = ref.year if ref.month >= 8 else ref.year - 1
+    return datetime(season_year, 8, 1, tzinfo=timezone.utc)
+
+
+def injury_entry_date(row):
+    """Parse an ESPN injury entry's `date`; None when absent/unusable."""
+    if not isinstance(row, dict):
+        return None
+    return dt(row.get("date"))
+
+
+def injury_entry_is_current(row, season_start):
+    """True only for a parseably dated entry inside the season window.
+
+    Fail-closed: a missing or unparseable date is never current, so an
+    undated entry can never satisfy a currency gate (e.g. the
+    prepricing qb_specific factor).
+    """
+    if season_start is None:
+        return False
+    entry_date = injury_entry_date(row)
+    return entry_date is not None and entry_date >= season_start
+
+
+def injury_entry_is_stale(row, season_start):
+    """True only for a parseably dated entry BEFORE the season window.
+
+    Undated entries are not stale: they remain in the bound rows so
+    the legacy injury_points contract is unchanged for them (the
+    preserved contract tests stub undated entries, and real ESPN
+    entries always carry `date`), but per injury_entry_is_current
+    they can never satisfy a currency gate.
+    """
+    if season_start is None:
+        return False
+    entry_date = injury_entry_date(row)
+    return entry_date is not None and entry_date < season_start
 
 
 def declared_weather_total_adj(wind_mph, precip_prob, sport):
@@ -253,15 +316,27 @@ class PublicContext:
         return self.cache[url]
 
     def teams(self, sport):
-        obj = self.fetch(f"{ESPN}/{LEAGUES[sport]}/teams?limit=500") or {}
-        teams = []
-        for group in obj.get("sports") or []:
-            for league in group.get("leagues") or []:
-                for data in league.get("teams") or []:
-                    team = data.get("team") or {}
-                    if team.get("id"):
-                        teams.append(team)
-        return teams
+        limit = TEAMS_DIRECTORY_LIMIT
+        while True:
+            url = f"{ESPN}/{LEAGUES[sport]}/teams?limit={limit}"
+            obj = self.fetch(url) or {}
+            teams = []
+            for group in obj.get("sports") or []:
+                for league in group.get("leagues") or []:
+                    for data in league.get("teams") or []:
+                        team = data.get("team") or {}
+                        if team.get("id"):
+                            teams.append(team)
+            if len(teams) < limit:
+                return teams
+            # Saturated response: the directory may continue past the page
+            # we hold. Escalate once; never resolve identities against a
+            # directory whose completeness is unproven.
+            if limit >= TEAMS_DIRECTORY_ESCALATED_LIMIT:
+                self.receipts.append({"source": url, "status": "UNAVAILABLE",
+                                      "reason": "DIRECTORY_TRUNCATED"})
+                return []
+            limit = TEAMS_DIRECTORY_ESCALATED_LIMIT
 
     @staticmethod
     def key(value):
@@ -330,7 +405,7 @@ class PublicContext:
             return str(group["id"])
         return None
 
-    def injury_rows(self, sport, team):
+    def injury_rows(self, sport, team, reference_date=None):
         """Return verified team-scoped injury rows, or (None, status).
 
         ("rows", "STRUCTURE_VERIFIED") when the ESPN injury payload binds to
@@ -339,6 +414,17 @@ class PublicContext:
         Same fetch path and receipts as injury_points; the pre-pricing
         QB/participation check consumes these rows instead of a second,
         divergent fetch path.
+
+        Currency rule (Oct 13, 2026): structure alone no longer makes a
+        bound group current evidence. Entries whose parseable `date`
+        predates the season window of `reference_date` (the fixture
+        kickoff when the caller has one, else the provider clock; see
+        injury_season_start) are dropped from the returned rows, and
+        when EVERY entry in the bound group is stale-dated the binding
+        returns (None, "NO_CURRENT_ENTRIES") -- a years-old report
+        satisfies nothing: no gate, no points, no verified-context
+        note. Undated entries are retained (legacy injury_points
+        contract) but are never "current" (injury_entry_is_current).
         """
         if sport == "MLB":
             return [], "NOT_APPLICABLE"
@@ -348,7 +434,10 @@ class PublicContext:
             # must not silently apply today's report to a past kickoff.
             return [], "AS_OF_HISTORICAL_INJURIES_UNAVAILABLE"
         target_id = str(team["id"])
-        key = ("injury_rows", sport, target_id)
+        window = injury_season_start(
+            reference_date if reference_date is not None else self.now)
+        key = ("injury_rows", sport, target_id,
+               window.isoformat() if window is not None else "LEGACY")
         if key in self._injury_result_cache:
             return self._injury_result_cache[key]
         url = f"{ESPN}/{LEAGUES[sport]}/teams/{target_id}/injuries"
@@ -394,27 +483,54 @@ class PublicContext:
             result = (None, "UNUSABLE_SCHEMA")
             self._injury_result_cache[key] = result
             return result
+        # Currency filter: a bound group whose entries all predate the
+        # fixture's season window is not a current report (the Oct 13
+        # dry-run found Florida's group "binding" on one WR entry dated
+        # 2020-11-21). Drop stale-dated entries; if none survive, the
+        # binding fails closed with NO_CURRENT_ENTRIES.
+        dropped = 0
+        if candidates:
+            fresh = [r for r in candidates
+                     if not injury_entry_is_stale(r, window)]
+            dropped = len(candidates) - len(fresh)
+            if dropped and not fresh:
+                self.receipts.append({
+                    "source": f"{ESPN}/{LEAGUES[sport]}/injuries",
+                    "status": "NO_CURRENT_ENTRIES",
+                    "reason": (f"BOUND_GROUP_ENTRIES_{len(candidates)}"
+                               f"_ALL_PREDATE_SEASON_WINDOW_"
+                               f"{window.date().isoformat()}"),
+                    "team_id": target_id[:20]})
+                result = (None, "NO_CURRENT_ENTRIES")
+                self._injury_result_cache[key] = result
+                return result
+            candidates = fresh
         self.receipts.append({
             "source": f"{ESPN}/{LEAGUES[sport]}/injuries",
             "status": "STRUCTURE_VERIFIED",
             "team_id": target_id[:20],
             "injury_rows_reported": len(candidates),
+            "stale_entries_dropped": dropped,
             "note": "REPORTED_INJURIES_NOT_COMPLETE_ROSTER_HEALTH"})
         result = (candidates, "STRUCTURE_VERIFIED")
         self._injury_result_cache[key] = result
         return result
 
-    def injury_points(self, sport, team):
+    def injury_points(self, sport, team, reference_date=None):
         """Verify team-group identity and return cautious heuristic injuries.
 
         Contract: (points, status); MLB -> (0.0, "NOT_APPLICABLE");
         verified payload -> (-loss, "HEURISTIC_OUT_DOUBTFUL_REPORTED_{n}_UNKNOWN_COMPLETENESS");
         unusable payload -> (0.0, "MISSING_OR_UNRECOGNIZED_SOURCE").
         QB out/doubtful costs 1.5 (NFL), NBA 0.3 each, others 0.15, capped 2.5.
+        Points are computed from the currency-filtered bound rows (see
+        injury_rows): stale-dated entries contribute nothing; undated
+        entries keep the legacy contract above.
         """
         if sport == "MLB":
             return 0.0, "NOT_APPLICABLE"
-        rows, status = self.injury_rows(sport, team)
+        rows, status = self.injury_rows(sport, team,
+                                        reference_date=reference_date)
         if rows is None:
             return 0.0, "MISSING_OR_UNRECOGNIZED_SOURCE"
         # Preserve historical unavailability: do not report a zero-injury
@@ -725,7 +841,8 @@ def context_for(sport, away, home, start, provider, row):
         else:
             notes.append(prefix.upper() + "_HISTORY_MISSING")
         if sport in {"NFL", "CFB", "NBA"}:
-            injury, status = provider.injury_points(sport, team)
+            injury, status = provider.injury_points(
+                sport, team, reference_date=kickoff)
             out[f"{prefix}_injury_pts"] = injury
             notes.append(prefix.upper() + "_INJURIES:" + status)
     if sport in {"NFL", "CFB", "MLB"}:
