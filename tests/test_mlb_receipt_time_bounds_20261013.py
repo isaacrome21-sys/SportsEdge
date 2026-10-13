@@ -127,6 +127,75 @@ def test_recorder_requires_trusted_window_and_aware_clock(tmp_path):
             url="https://x/api/v1/schedule", raw=b"{}", fetch_started_at=T0, received_at=T0)
 
 
+def test_direct_recorder_year_2000_with_matching_forged_fetch_bounds_rejected(tmp_path):
+    # The old circular check accepted this: both the injected recorder clock
+    # and its caller-supplied bounds were the same year-2000 timestamp.
+    y2k = datetime(2000, 1, 1, tzinfo=timezone.utc)
+    rec = ms.MLBSourceCapture(tmp_path, clock=lambda: y2k)
+    with _trusted(T0):
+        with pytest.raises(ms.MLBSourceError, match="RECEIPT_STALE_OR_REPLAYED"):
+            rec.record(url="https://x/api/v1/schedule", raw=b"{}",
+                       fetch_started_at=y2k, received_at=y2k)
+    assert not rec.records
+    assert not list(tmp_path.iterdir())
+
+
+def test_direct_recorder_future_claim_vs_independent_system_anchor(tmp_path):
+    future = T0 + timedelta(hours=3)
+    rec = ms.MLBSourceCapture(tmp_path, clock=lambda: future)
+    with _trusted(T0):
+        with pytest.raises(ms.MLBSourceError, match="RECEIPT_FUTURE_VS_SYSTEM_ANCHOR"):
+            rec.record(url="https://x/api/v1/schedule", raw=b"{}",
+                       fetch_started_at=future, received_at=future)
+    assert not rec.records
+
+
+def test_direct_recorder_stale_replayed_receipt_rejected_even_with_present_clock(tmp_path):
+    old_start = T0 - timedelta(minutes=10)
+    old_end = old_start + timedelta(seconds=2)
+    rec = ms.MLBSourceCapture(tmp_path, clock=lambda: old_end)
+    with _trusted(T0):
+        with pytest.raises(ms.MLBSourceError, match="RECEIPT_STALE_OR_REPLAYED"):
+            rec.record(url="https://x/api/v1/schedule", raw=b"{}",
+                       fetch_started_at=old_start, received_at=old_end)
+    assert not rec.records
+
+
+def test_direct_recorder_duplicate_receipt_cannot_be_reused(tmp_path):
+    start = T0
+    end = T0 + timedelta(seconds=1)
+    rec = ms.MLBSourceCapture(tmp_path, clock=lambda: end)
+    url = "https://x/api/v1/schedule"
+    with _trusted(end):
+        first = rec.record(url=url, raw=b"{}", fetch_started_at=start, received_at=end)
+        with pytest.raises(ms.MLBSourceError, match="RECEIPT_DUPLICATE_REPLAY"):
+            rec.record(url=url, raw=b"{}", fetch_started_at=start, received_at=end)
+    assert first.sequence == 1
+    assert len(rec.records) == 1
+
+
+def test_missing_independent_anchor_fails_closed_without_writing(tmp_path):
+    rec = ms.MLBSourceCapture(tmp_path, clock=lambda: T0)
+    from unittest.mock import patch
+    with patch.object(ms, "_trusted_now", lambda: None):
+        with pytest.raises(ms.MLBSourceError, match="RECEIPT_ANCHOR_UNAVAILABLE"):
+            rec.record(url="https://x/api/v1/schedule", raw=b"{}",
+                       fetch_started_at=T0, received_at=T0)
+    assert not rec.records
+    assert not list(tmp_path.iterdir())
+
+
+def test_direct_recorder_unbounded_fetch_duration_rejected(tmp_path):
+    end = T0
+    start = T0 - timedelta(seconds=31)
+    rec = ms.MLBSourceCapture(tmp_path, clock=lambda: end)
+    with _trusted(end):
+        with pytest.raises(ms.MLBSourceError, match="RECEIPT_FETCH_SPAN_UNBOUNDED"):
+            rec.record(url="https://x/api/v1/schedule", raw=b"{}",
+                       fetch_started_at=start, received_at=end)
+    assert not rec.records
+
+
 def test_six_runner_callers_no_longer_pass_pre_fetch_time():
     import inspect
     from sportsedge import (auto_espn_odds, auto_joint_runner, auto_native_odds, auto_runner,
