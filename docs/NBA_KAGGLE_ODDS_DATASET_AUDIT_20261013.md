@@ -26,25 +26,26 @@ So **no row of this dataset was inspected**. Everything below is either unverifi
 - It cannot serve as a paired, timestamped, single-book (DK) market baseline. `market_baseline` stays **MISSING** in all NBA results.
 - **Next step needs an owner decision:** approve using the existing Kaggle secret in Actions for a one-time download plus schema/coverage report (still an audit, not acceptance), or drop the dataset.
 
-## Owner-approved one-time Actions audit run (2026-10-13 11:49 CT)
-- **Setup.** Workflow `.github/workflows/audit-kaggle-nba-odds-once.yml` (c91d47f). It is triggered only by a push to the single-use branch `audit/kaggle-nba-odds-once-20261013`; there is no schedule. Report-only script: `scripts/audit_kaggle_nba_odds_schema.py`.
-- **Run.** Run 38433667421, job 115422029561, ran **once**: **FAILED with `KAGGLE_HTTP_403`** on the dataset download.
-  - The secrets were present and masked (`***` in the log). Nothing was printed or exposed.
-  - No data was downloaded, no report artifact was produced, and nothing was committed.
-- **Interpretation (unconfirmed).** A 403 with credentials, plus a 404 on the public dataset page, suggests one of:
-  - the dataset was removed, renamed or made private;
-  - the Kaggle token is invalid or expired;
-  - the account lacks access.
+## Run 2 (owner-approved, final) — renamed slug
 
-  I can't tell which from here. The metadata call also failed, and the script records that error without detail.
-- **Not retried.** The approval was for a single run.
-- **Findings on schema, seasons, books, two-sided prices, timestamps, settlement fields, row counts and null rates: NONE OBTAINED.**
+- Root cause of run 1: the dataset was **renamed**. The old slug `cviaxmiwnptr/nba-betting-data` 404s (Muse, #2147 comment 6150793524).
+- Run 2: Actions run 38435472653, job 115428180154, single-use branch head `1f3e551`, conclusion **success**. Slug `cviaxmiwnptr/nba-betting-data-october-2007-to-june-2024`. Credentials stayed masked (`***`). Only the schema report went to stdout and the artifact. No raw data was committed. No retry, no scheduler.
+- Neutralized: the workflow was deleted on the branch in `3921947`. A deleted workflow can't be triggered by its own deletion push; see the run list check in the #2090 checkpoint.
 
-**Status unchanged: UNVERIFIED, not accepted, market baseline MISSING.**
+### Findings (schema/coverage/provenance only)
+- Title: "NBA Betting Data | October 2007 to June 2026". License CC0. Version 4, last updated 2026-06-15T05:27Z, 2,493,308 bytes.
+- One file, `nba_2008-2026.csv`: **24,440 rows**, 27 columns (season, date, regular, playoffs, away, home, scores, q1–q4/ot per side, whos_favored, spread, total, moneyline_away/home, h2_spread, h2_total, id_spread, id_total).
+- Seasons 2008–2026, about 1,310–1,323 games per season. Lower counts in 2012 (1,074, lockout), 2020 (1,143) and 2021 (1,171). Regular season 22,808 rows / non-regular 1,632.
+- Null rates: spread 0.01%, total 0%, **moneylines 18.94%**, h2_spread/h2_total about 18.9%.
+- Provenance, per the dataset description:
+  - Oct 2007–Jan 16 2023 comes from SportsbookReviewsOnline (scraped, "fixed a few errors").
+  - Jan 17 2023–Jun 22 2025 comes from ESPN, with **no moneyline or 2H odds** and non-integer lines.
+  - Since Oct 21 2025 the lines are the **median odds** across books on SportsbookReview.
+- There is no timestamp column: no capture time and no open/close label. There is no book identifier.
+- `spread` is always positive, with direction carried in `whos_favored`.
 
-**Owner options:**
-1. Confirm the dataset still exists (browser, logged in) and its current slug.
-2. Check or rotate the `SPORTSEDGE_KAGGLE_*` secret.
-3. Then approve exactly one more run, or drop the dataset.
-
-The single-use branch is still in place. Deleting it needs owner approval.
+### Verdict
+- **Not a verified market baseline.** There is no DraftKings pairing: the sources are a mixed or unknown book and, since 2025, a cross-book median. There is no snapshot timing either.
+- The NBA verified market baseline stays **MISSING**.
+- Usable at most as RESEARCH-only context (scores and settlement cross-check, an approximate line reference), and only under a separate pre-registration flagged for ChatGPT.
+- The Kaggle dataset audit is now **complete (schema verified, baseline-ineligible)**. No further runs are approved.
