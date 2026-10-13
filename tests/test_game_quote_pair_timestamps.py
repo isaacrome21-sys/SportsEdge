@@ -24,9 +24,13 @@ def projections(rows):
     ("2026-10-13T09:57:59Z", "MISMATCHED_QUOTE_TIMESTAMPS"),
 ])
 def test_missing_invalid_and_out_of_window_quotes_emit_no_pair(stamp, code):
-    for p in projections([row(), row("UNDER", quote_captured_at=stamp)]):
-        assert p["paired_market_status"] == code
-        assert "market_no_vig_p" not in p
+    ps = projections([row(), row("UNDER", quote_captured_at=stamp)])
+    assert all("market_no_vig_p" not in p for p in ps)
+    assert ps[0]["paired_market_status"] == code
+    expected_second = ("QUOTE_TIMESTAMP_MISSING"
+                       if stamp in (None, "bad", "2026-10-13T10:00:00")
+                       else "MISMATCHED_QUOTE_TIMESTAMPS")
+    assert ps[1]["paired_market_status"] == expected_second
 
 
 @pytest.mark.parametrize("stamp,skew", [
