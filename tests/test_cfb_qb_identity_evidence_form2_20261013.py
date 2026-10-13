@@ -74,6 +74,21 @@ EXPECTED_QB1 = {"48": ("5153846", "Nick Minicucci"),
                 "2229": ("4870883", "JJ Kohl"),
                 "55": ("5122157", "Caden Creel")}
 
+# The two recorded fixtures (owner-review correction 1: bundles bind
+# to an exact event + exact opponent, so fixtures name both).
+# Delaware (48, away) @ MTSU (2393, home), ESPN event 401871067;
+# FIU (2229, away) @ Jacksonville State (55, home), event 401871053.
+FIXTURE_OF_TEAM = {
+    "48": {"event_id": "401871067", "home_team_id": "2393",
+           "away_team_id": "48", "opponent_id": "2393"},
+    "2393": {"event_id": "401871067", "home_team_id": "2393",
+             "away_team_id": "48", "opponent_id": "48"},
+    "2229": {"event_id": "401871053", "home_team_id": "55",
+             "away_team_id": "2229", "opponent_id": "55"},
+    "55": {"event_id": "401871053", "home_team_id": "55",
+           "away_team_id": "2229", "opponent_id": "2229"},
+}
+
 
 def roster_payload(team_id, qb_records=None):
     records = QB_ROOMS[team_id] if qb_records is None else qb_records
@@ -96,14 +111,18 @@ def depth_text(team_id, stamp=None, qb_row=None):
 
 
 def make_bundle(team_id, *, kickoff_iso=KICKOFF_ISO, depth=None, roster=None,
-                captured=CAPTURED, repeat=None, prev=None):
+                captured=CAPTURED, repeat=None, prev=None, event_id=None,
+                opponent_id=None):
     """A valid bundle via the capture builder (offline, from fixtures)."""
     url, _, _, recorded_prev = CHARTS[team_id]
+    fixture = FIXTURE_OF_TEAM[team_id]
     roster_obj = roster or roster_payload(team_id)
     athletes = qe.roster_athletes(roster_obj)
     return qe.build_form2_bundle(
-        team_id=team_id, team_name=f"Team {team_id}", event_id="401871067",
-        opponent_id="0", kickoff_utc=kickoff_iso,
+        team_id=team_id, team_name=f"Team {team_id}",
+        event_id=event_id or fixture["event_id"],
+        opponent_id=opponent_id or fixture["opponent_id"],
+        kickoff_utc=kickoff_iso,
         previous_game_kickoff_utc=prev or recorded_prev,
         depth_url=url, depth_content=depth or depth_text(team_id),
         depth_captured_at_utc=captured,
@@ -126,7 +145,25 @@ def raw_bundle(team_id, *, roster_snapshot_overrides=None, depth_overrides=None)
 def evaluate(bundle, team_id="48", **kw):
     kw.setdefault("kickoff", KICKOFF)
     kw.setdefault("now", NOW)
+    fixture = FIXTURE_OF_TEAM[team_id]
+    kw.setdefault("event_id", fixture["event_id"])
+    kw.setdefault("home_team_id", fixture["home_team_id"])
+    kw.setdefault("away_team_id", fixture["away_team_id"])
     return qe.evaluate_form2_bundle(bundle, team_id=team_id, **kw)
+
+
+def rechain(bundle):
+    """Re-seal a mutated bundle (component hashes + receipt chain), so
+    a hostile case reaches the check it targets instead of dying at
+    the tamper checks: this simulates a capture that recorded bad
+    data CONSISTENTLY, which the semantic checks must still refuse."""
+    depth = bundle["depth_snapshot"]
+    depth["sha256"] = qe.sha256_text(depth["content"])
+    roster_snap = bundle["roster_snapshot"]
+    roster_snap["sha256"] = qe.sha256_text(roster_snap["content"])
+    bundle["receipt"] = {"version": qe.RECEIPT_VERSION,
+                         "sha256": qe.receipt_chain_sha256(bundle)}
+    return bundle
 
 
 class FourTeamResolutionTests(unittest.TestCase):
@@ -155,6 +192,12 @@ class FourTeamResolutionTests(unittest.TestCase):
         self.assertEqual(receipt["resolved_qb1_athlete_id"], "5153846")
         self.assertEqual(len(receipt["depth_sha256"]), 64)
         self.assertEqual(len(receipt["roster_sha256"]), 64)
+        # Receipt v2 (correction 3): the chain seal is on the receipt,
+        # and the exact fixture binding (correction 1) is recorded.
+        self.assertEqual(receipt["receipt_version"], qe.RECEIPT_VERSION)
+        self.assertEqual(len(receipt["receipt_sha256"]), 64)
+        self.assertEqual(receipt["event_id"], "401871067")
+        self.assertEqual(receipt["opponent_espn_id"], "2393")
 
 
 class HostileResolutionTests(unittest.TestCase):
@@ -232,15 +275,160 @@ class HostileSnapshotTests(unittest.TestCase):
         self.assertEqual(result["status"], qe.STATUS_MISSING)
 
     def test_bundle_for_another_fixture_is_not_evidence(self):
+        # UPDATED (owner-review correction 1): a kickoff mismatch is
+        # an exact-fixture-binding failure with its own status now,
+        # not generic missing evidence.
         bundle = make_bundle("48", kickoff_iso="2026-10-20T23:00:00Z")
         result = evaluate(bundle)
-        self.assertEqual(result["status"], qe.STATUS_MISSING)
-        self.assertEqual(result["detail"], "FIXTURE_BINDING_MISMATCH")
+        self.assertEqual(result["status"], qe.STATUS_FIXTURE_MISMATCH)
+        self.assertEqual(result["detail"], "FIXTURE_KICKOFF_MISMATCH")
 
     def test_missing_bundle_fails_closed(self):
         result = evaluate(None)
         self.assertFalse(result["ok"])
         self.assertEqual(result["status"], qe.STATUS_MISSING)
+
+
+class ExactFixtureBindingTests(unittest.TestCase):
+    """Owner-review correction 1: a bundle binds to an exact event
+    and an exact opponent, not loosely to a team + a kickoff."""
+
+    def test_wrong_event_id_fails_closed(self):
+        bundle = make_bundle("48", event_id="401871068")
+        result = evaluate(bundle)
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], qe.STATUS_FIXTURE_MISMATCH)
+        self.assertEqual(result["detail"], "EVENT_ID_MISMATCH")
+
+    def test_wrong_opponent_fails_closed(self):
+        # Delaware's chart, but the bundle claims the opponent was
+        # Jacksonville State (55) instead of MTSU (2393).
+        bundle = make_bundle("48", opponent_id="55")
+        result = evaluate(bundle)
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], qe.STATUS_FIXTURE_MISMATCH)
+        self.assertEqual(result["detail"], "OPPONENT_MISMATCH")
+
+    def test_team_not_in_staged_fixture_fails_closed(self):
+        # The Delaware bundle evaluated against the FIU @ Jax State
+        # fixture: right team, wrong game entirely.
+        result = evaluate(make_bundle("48"), event_id="401871053",
+                          home_team_id="55", away_team_id="2229")
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], qe.STATUS_FIXTURE_MISMATCH)
+        self.assertEqual(result["detail"], "TEAM_NOT_IN_STAGED_FIXTURE")
+
+    def test_unverifiable_staged_identity_fails_closed(self):
+        # Loose binding is the defect, not a fallback: without the
+        # staged event identity the evaluator cannot bind exactly.
+        result = evaluate(make_bundle("48"), event_id=None)
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], qe.STATUS_FIXTURE_MISMATCH)
+        self.assertEqual(result["detail"], "FIXTURE_IDENTITY_UNVERIFIABLE")
+
+
+class AssertedQb1Tests(unittest.TestCase):
+    """Owner-review correction 2: the QB1 ranking is DERIVED from the
+    captured chart. An asserted ordering can never override it."""
+
+    def test_asserted_qb2_over_captured_qb1_fails_closed(self):
+        # Streeter (QB2) IS on the roster at the right position --
+        # resolution alone would accept him. The captured chart ranks
+        # Minicucci first, and the assertion may not override it.
+        bundle = make_bundle("48")
+        order = bundle["depth_snapshot"]["qb_order"]
+        bundle["depth_snapshot"]["qb_order"] = (
+            [order[1], order[0]] + order[2:])
+        result = evaluate(bundle)
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], qe.STATUS_QB1_ASSERTION_MISMATCH)
+        self.assertEqual(result["detail"],
+                         "ASSERTED_QB1_DIFFERS_FROM_CAPTURED_CHART")
+
+    def test_captured_chart_governs_assertion_must_agree(self):
+        # A chart captured with Streeter ranked first: the builder's
+        # stored order follows the CHART (Streeter), and the bundle
+        # passes on the parsed QB1...
+        depth = depth_text(
+            "48", qb_row="1. Streeter, Braden — RS SO, #16 · "
+                         "2. Minicucci, Nick — SR, #4")
+        result = evaluate(make_bundle("48", depth=depth))
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["resolved_athlete_id"], "5224762")
+        # ...while rewriting the assertion back to Minicucci fails.
+        bundle = make_bundle("48", depth=depth)
+        order = bundle["depth_snapshot"]["qb_order"]
+        bundle["depth_snapshot"]["qb_order"] = (
+            [order[1], order[0]] + order[2:])
+        result = evaluate(bundle)
+        self.assertEqual(result["status"], qe.STATUS_QB1_ASSERTION_MISMATCH)
+
+    def test_bundle_without_asserted_order_passes_on_parsed_order(self):
+        bundle = make_bundle("48")
+        del bundle["depth_snapshot"]["qb_order"]
+        result = evaluate(bundle)
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["resolved_athlete_id"], "5153846")
+
+    def test_unparseable_captured_order_fails_closed(self):
+        # No readable QB row in the captured bytes and no assertion
+        # to fall back on: fail closed, never guess an ordering.
+        bundle = make_bundle("48")
+        depth = bundle["depth_snapshot"]
+        depth["content"] = depth_text(
+            "48", qb_row="QB chart unavailable for this fixture")
+        del depth["qb_order"]
+        result = evaluate(rechain(bundle))
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], qe.STATUS_MISSING)
+        self.assertEqual(result["detail"], "NO_QB_ORDER_CAPTURED")
+
+
+class ReceiptChainTests(unittest.TestCase):
+    """Owner-review correction 3: receipt v2 seals every receipt
+    field; any post-capture edit breaks the seal."""
+
+    def test_captured_at_edited_after_capture_breaks_seal(self):
+        bundle = make_bundle("48")
+        bundle["depth_snapshot"]["captured_at_utc"] = "2026-10-13T10:00:00Z"
+        result = evaluate(bundle)
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], qe.STATUS_HASH_MISMATCH)
+        self.assertEqual(result["detail"], "RECEIPT_CHAIN_MISMATCH")
+
+    def test_source_url_edited_after_capture_breaks_seal(self):
+        bundle = make_bundle("48")
+        bundle["depth_snapshot"]["source_url"] = (
+            "https://example.invalid/not-the-captured-chart")
+        result = evaluate(bundle)
+        self.assertEqual(result["status"], qe.STATUS_HASH_MISMATCH)
+        self.assertEqual(result["detail"], "RECEIPT_CHAIN_MISMATCH")
+
+    def test_event_id_edited_after_capture_breaks_seal(self):
+        # Rebind the bundle to another event AND evaluate it against
+        # that event, so the binding checks agree -- the seal is what
+        # catches the edit.
+        bundle = make_bundle("48")
+        bundle["fixture"]["event_id"] = "401871068"
+        result = evaluate(bundle, event_id="401871068")
+        self.assertEqual(result["status"], qe.STATUS_HASH_MISMATCH)
+        self.assertEqual(result["detail"], "RECEIPT_CHAIN_MISMATCH")
+
+    def test_receipt_removed_fails_closed(self):
+        bundle = make_bundle("48")
+        del bundle["receipt"]
+        result = evaluate(bundle)
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], qe.STATUS_HASH_MISMATCH)
+        self.assertEqual(result["detail"], "RECEIPT_CHAIN_MISSING")
+
+    def test_receipt_downgraded_to_v1_fails_closed(self):
+        bundle = make_bundle("48")
+        bundle["receipt"] = {"version": 1,
+                             "sha256": bundle["receipt"]["sha256"]}
+        result = evaluate(bundle)
+        self.assertEqual(result["status"], qe.STATUS_HASH_MISMATCH)
+        self.assertEqual(result["detail"], "RECEIPT_CHAIN_MISSING")
 
 
 class StalenessTests(unittest.TestCase):
@@ -272,10 +460,38 @@ class StalenessTests(unittest.TestCase):
         self.assertEqual(result["status"], qe.STATUS_STALE)
 
     def test_unreadable_stamp_is_stale(self):
+        # A capture that CONSISTENTLY recorded an unparseable stamp
+        # (content, field and seal all agree -- the builder itself
+        # refuses to emit such a bundle, so this is assembled by hand
+        # and re-sealed) is stale evidence, refused on the stamp.
+        bundle = make_bundle("48")
+        depth = bundle["depth_snapshot"]
+        depth["content"] = depth["content"].replace(
+            "Updated: 10/10/2026 9:07AM ET", "Updated: recently ET")
+        depth["update_stamp"] = "Updated: recently"
+        result = evaluate(rechain(bundle))
+        self.assertEqual(result["status"], qe.STATUS_STALE)
+        self.assertEqual(result["detail"], "UPDATE_STAMP_UNPARSEABLE")
+
+    def test_stamp_field_edited_after_capture_breaks_the_seal(self):
+        # UPDATED (owner-review correction 3): the recorded stamp is
+        # a sealed receipt field. Editing it after capture -- even to
+        # another plausible value -- is tampering, not staleness.
         bundle = raw_bundle("48", depth_overrides={
             "update_stamp": "Updated: recently"})
         result = evaluate(bundle)
+        self.assertEqual(result["status"], qe.STATUS_HASH_MISMATCH)
+        self.assertEqual(result["detail"], "RECEIPT_CHAIN_MISMATCH")
+
+    def test_stamp_after_capture_is_internally_inconsistent(self):
+        # The chart's stamp (Oct 10) postdates the recorded capture
+        # (Oct 9): the bytes cannot contain an update stamped after
+        # they were captured. Self-consistent seal; semantic refusal.
+        bundle = make_bundle("48", captured="2026-10-09T12:00:00Z")
+        result = evaluate(bundle)
+        self.assertFalse(result["ok"])
         self.assertEqual(result["status"], qe.STATUS_STALE)
+        self.assertEqual(result["detail"], "STAMP_AFTER_DEPTH_CAPTURE")
 
 
 class CaptureHelperTests(unittest.TestCase):
@@ -377,6 +593,7 @@ def cfb_mapping(league_payload):
     scoreboard = {"events": [{
         "id": "401871067", "date": KICKOFF_ISO,
         "competitions": [{
+            "id": "401871067",
             "competitors": [
                 {"homeAway": "home",
                  "team": {"id": "2393", "abbreviation": "MTSU",
@@ -450,6 +667,11 @@ class CfbStageForm2Tests(unittest.TestCase):
         # ...and injury points exactly 0.0 on both sides.
         self.assertEqual(stage["adjustments"]["away_injury_pts"], 0.0)
         self.assertEqual(stage["adjustments"]["home_injury_pts"], 0.0)
+        # The stage result carries the availability state structurally
+        # (issue #2158): the runner stamps it on the priced rows and
+        # the classification gate forces them research-only.
+        self.assertEqual(stage["availability_status"],
+                         "AVAILABILITY_UNVERIFIED_NO_TEAM_INJURY_REPORT")
         # Receipts carry both component hashes + resolved athlete IDs.
         receipts = form2_receipts(stage)
         self.assertEqual(len(receipts), 2)
@@ -519,6 +741,25 @@ class CfbStageForm2Tests(unittest.TestCase):
         self.assertEqual(stage["block_reason"],
                          "BLOCKED_PREPRICING_QB_AVAILABILITY_UNVERIFIED")
         self.assertEqual(stage["adjustments"], {})
+
+    def test_stage_bundle_for_wrong_event_blocks_fixture_mismatch(self):
+        # Both bundles name a different ESPN event than the staged
+        # fixture (correction 1, end to end): the gate stays blocked
+        # and the failure status is recorded on the factor + receipts.
+        bundles = {"48": make_bundle("48", event_id="401871068"),
+                   "2393": make_bundle("2393", event_id="401871068")}
+        (stage,) = fi.stage_games(
+            [cfb_row()], now=NOW,
+            getter=FakeGetter(cfb_mapping(RECORDED_CFB_LEAGUE)),
+            qb_form2_bundles=bundles)
+        self.assertTrue(stage["blocked"])
+        self.assertEqual(stage["block_reason"], fi.BLOCK_QB_IDENTITY_UNVERIFIED)
+        reasons = " ".join(f["reason"] for f in qb_factors(stage))
+        self.assertIn("FORM2_FAILED:QB_EVIDENCE_FIXTURE_MISMATCH", reasons)
+        receipts = form2_receipts(stage)
+        self.assertTrue(any(r["status"] == qe.STATUS_FIXTURE_MISMATCH
+                            for r in receipts))
+        self.assertIsNone(stage["availability_status"])
 
     def test_bundles_may_be_supplied_as_a_list(self):
         bundles = [make_bundle("48"), make_bundle("2393")]
