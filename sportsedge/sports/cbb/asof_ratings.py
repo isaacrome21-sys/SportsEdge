@@ -46,7 +46,11 @@ def trainable(g: CBBGame, cutoff: datetime) -> bool:
 
 
 def illinois_block(home_id: str, away_id: str) -> dict | None:
-    hit = [IL_COLLEGE_ESPN_IDS[t] for t in (home_id, away_id) if str(t) in IL_COLLEGE_ESPN_IDS]
+    # IDs arrive from JSON as either positive integers or decimal strings.
+    # Normalize before *both* membership and indexing: the old check used
+    # str(t) for membership but t for lookup, crashing on integer IDs.
+    ids = [str(t) for t in (home_id, away_id)]
+    hit = [IL_COLLEGE_ESPN_IDS[t] for t in ids if t in IL_COLLEGE_ESPN_IDS]
     if hit:
         return {"status": "BLOCKED", "reason": "ILLINOIS_COLLEGE_EXCLUDED", "excluded_teams": hit,
                 "play_authority": False}
