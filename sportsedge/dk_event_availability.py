@@ -37,6 +37,8 @@ OFFER_SHAPES = frozenset({
     "MULTIWAY_EXCLUSIVE",
 })
 SPORTS = frozenset({"MLB", "NFL", "CFB"})
+LINE_VARIANTS = frozenset({"MAIN", "ALTERNATE", "LADDER", "UNSPECIFIED"})
+CONTRACT_DIMS = ("period", "phase", "offer_shape", "settlement", "line_variant")
 ENGINE_STATES = frozenset({
     "PRICED_PATH", "NO_ENGINE", "ENGINE_BLOCKED",
     "UNVALIDATED_RESEARCH_ONLY", "NOT_REGISTERED", "UNVERIFIED",
@@ -110,13 +112,15 @@ def reconcile_dk_event(
     if not isinstance(observations, list) or not isinstance(absences, list):
         raise DKObservationError("OBSERVATION_LISTS_REQUIRED")
 
-    seen: dict[str, dict[str, Any]] = {}
+    # Market family != offered contract. A family can appear as both main
+    # O/U and single-sided alternates, or in several periods/phases.
+    # A market-name-only dict would erase these distinct offerings.
+    seen: dict[str, list[dict[str, Any]]] = {}
+    seen_contracts: set[tuple[str, ...]] = set()
     for item in observations:
         if not isinstance(item, Mapping):
             raise DKObservationError("MARKET_OBSERVATION_NOT_OBJECT")
         market = _market(item.get("market"))
-        if market in seen:
-            raise DKObservationError("DUPLICATE_MARKET_OBSERVATION:" + market)
         tab = _required_text(item.get("source_tab"), "MARKET_SOURCE_TAB")
         if tab not in inspected_tabs:
             raise DKObservationError("MARKET_TAB_NOT_INSPECTED:" + market)
@@ -126,29 +130,56 @@ def reconcile_dk_event(
         period = _required_text(item.get("period"), "PERIOD")
         phase = _required_text(item.get("phase"), "PHASE")
         settlement = _required_text(item.get("settlement"), "SETTLEMENT")
+        line_variant = str(item.get("line_variant") or "UNSPECIFIED").strip().upper()
+        if line_variant not in LINE_VARIANTS:
+            raise DKObservationError("LINE_VARIANT_INVALID:" + market)
         # Supply period/settlement as observed, even if unknown; neither can
         # be inferred from a market name. No source-backed rule -> unverified.
         if phase not in {"PREGAME", "LIVE"}:
             raise DKObservationError("PHASE_INVALID:" + market)
-        seen[market] = {
+        contract = {
             "availability": "OFFERED_ON_THIS_EVENT",
             "offer_shape": shape, "period": period, "phase": phase,
-            "settlement": settlement, "source_tab": tab,
+            "settlement": settlement, "line_variant": line_variant,
+            "source_tab": tab,
         }
+        identity = (market,) + tuple(contract[dim] for dim in CONTRACT_DIMS)
+        if identity in seen_contracts:
+            raise DKObservationError("DUPLICATE_MARKET_OBSERVATION:" + market)
+        seen_contracts.add(identity)
+        seen.setdefault(market, []).append(contract)
 
-    absent: set[str] = set()
+    absent: dict[str, list[dict[str, Any]]] = {}
     for item in absences:
         if not isinstance(item, Mapping):
             raise DKObservationError("ABSENCE_NOT_OBJECT")
         market = _market(item.get("market"))
-        if market in absent:
-            raise DKObservationError("DUPLICATE_ABSENCE:" + market)
-        if market in seen:
-            raise DKObservationError("OFFERED_AND_ABSENT_CONFLICT:" + market)
         tab = _required_text(item.get("source_tab"), "ABSENCE_SOURCE_TAB")
         if tab not in inspected_tabs:
             raise DKObservationError("ABSENCE_TAB_NOT_INSPECTED:" + market)
-        absent.add(market)
+        scope = {"source_tab": tab}
+        for field in CONTRACT_DIMS:
+            supplied = item.get(field)
+            scope[field] = (_required_text(supplied, field.upper())
+                            if supplied is not None else None)
+        if scope["line_variant"] is not None and scope["line_variant"] not in LINE_VARIANTS:
+            raise DKObservationError("ABSENCE_LINE_VARIANT_INVALID:" + market)
+        if scope["phase"] is not None and scope["phase"] not in {"PREGAME", "LIVE"}:
+            raise DKObservationError("ABSENCE_PHASE_INVALID:" + market)
+        if scope["offer_shape"] is not None and scope["offer_shape"] not in OFFER_SHAPES:
+            raise DKObservationError("ABSENCE_OFFER_SHAPE_INVALID:" + market)
+        # A scoped absence may coexist with a different OFFERED period, shape,
+        # phase, settlement or alternate-line contract. Overlapping claims are
+        # contradictory. Unscoped absence conflicts with *all* offered rows.
+        for offer in seen.get(market, []):
+            if all(scope[field] is None or scope[field] == offer[field]
+                   for field in CONTRACT_DIMS):
+                raise DKObservationError("OFFERED_AND_ABSENT_CONFLICT:" + market)
+        scopes = absent.setdefault(market, [])
+        if any(all(existing[f] == scope[f] for f in ("source_tab",) + CONTRACT_DIMS)
+               for existing in scopes):
+            raise DKObservationError("DUPLICATE_ABSENCE:" + market)
+        scopes.append(scope)
 
     if not isinstance(registry_markets, Sequence) or isinstance(registry_markets, (str, bytes)):
         raise DKObservationError("REGISTRY_NOT_MARKET_LIST")
@@ -162,15 +193,19 @@ def reconcile_dk_event(
     normalized_engines = {_market(k): v for k, v in engine_states.items()}
     if any(v not in ENGINE_STATES for v in normalized_engines.values()):
         raise DKObservationError("ENGINE_STATE_INVALID")
-    all_markets = sorted(set(registry) | set(seen) | absent)
+    all_markets = sorted(set(registry) | set(seen) | set(absent))
     rows = []
     for market in all_markets:
-        offered = seen.get(market)
-        if offered is not None:
-            availability = offered["availability"]
-        elif market in absent:
+        variants = seen.get(market, [])
+        scopes = absent.get(market, [])
+        if variants:
+            availability = "OFFERED_ON_THIS_EVENT"
+        elif scopes and any(all(scope[d] is None for d in CONTRACT_DIMS)
+                            for scope in scopes):
             availability = "NOT_OFFERED_ON_THIS_EVENT"
         else:
+            # Only a specific contract is disproved; other variants of this
+            # family remain unverified. Never call the whole family absent.
             availability = "NOT_VERIFIED_ON_THIS_EVENT"
         engine_state = normalized_engines.get(market, "UNVERIFIED")
         registered = market in registry
@@ -178,13 +213,17 @@ def reconcile_dk_event(
             "market": market, "registered": registered,
             "registration_status": "REGISTERED" if registered else "NOT_REGISTERED",
             "availability": availability,
-            "evidence": offered or {
-                "source_tab": next(
-                    (item["source_tab"] for item in absences
-                     if _market(item["market"]) == market), None),
+            # Exactly one offer may be projected into the legacy single
+            # evidence field. Otherwise there is no unambiguous variant.
+            "evidence": variants[0] if len(variants) == 1 else {
+                "source_tab": scopes[0]["source_tab"] if scopes and not variants else None,
                 "offer_shape": None, "period": None,
                 "phase": None, "settlement": "UNVERIFIED",
+                "line_variant": None,
             },
+            "offer_variants": sorted(variants, key=lambda v: tuple(v[k] for k in CONTRACT_DIMS)),
+            "offer_variant_count": len(variants),
+            "explicit_absence_scopes": scopes,
             "engine_state": engine_state if registered else "NOT_REGISTERED",
             "can_derive_two_sided_no_vig": False,
             "model_validated": False,
@@ -201,11 +240,16 @@ def reconcile_dk_event(
         "observation_evidence_is_user_supplied": True,
         "market_count": len(rows),
         "registered_count": len(registry),
+        "offered_contract_count": sum(map(len, seen.values())),
+        "distinct_offered_family_count": len(seen),
         "unregistered_offered": sorted(k for k in seen if k not in registry),
+        "catalog_inspection_scope": "ONLY_CALLER_DECLARED_REQUIRED_TABS",
         "rows": rows,
         "promotion_authority": False,
         "notes": [
             "Availability is per sport, game, and capture time; never globalized.",
+            "Each offered family may include multiple distinct periods, phases, settlement and alternate-line variants.",
+            "A scoped absence does not establish absence of the entire market family.",
             "Provider documentation cannot be inferred from DraftKings board observations.",
             "Ladders do not create a second side, a no-vig benchmark, or model probability.",
             "No pricing, eligibility or research promotion is decided by this report.",
