@@ -66,8 +66,15 @@ def _clock(value: Any) -> datetime:
     return time.astimezone(timezone.utc)
 
 
+def _dimension(value: Any, label: str) -> str:
+    # Do not count "first half", "FIRST-HALF" and "FIRST_HALF" as
+    # separate period contracts. Syntactic normalization only: we never
+    # infer a missing rule or settlement from ambiguous text.
+    return _required_text(value, label).upper().replace(" ", "_").replace("-", "_")
+
+
 def _market(value: Any) -> str:
-    return _required_text(value, "MARKET").upper().replace(" ", "_").replace("-", "_")
+    return _dimension(value, "MARKET")
 
 
 def reconcile_dk_event(
@@ -124,13 +131,15 @@ def reconcile_dk_event(
         tab = _required_text(item.get("source_tab"), "MARKET_SOURCE_TAB")
         if tab not in inspected_tabs:
             raise DKObservationError("MARKET_TAB_NOT_INSPECTED:" + market)
-        shape = _required_text(item.get("offer_shape"), "OFFER_SHAPE")
+        shape = _dimension(item.get("offer_shape"), "OFFER_SHAPE")
         if shape not in OFFER_SHAPES:
             raise DKObservationError("OFFER_SHAPE_UNVERIFIED:" + market)
-        period = _required_text(item.get("period"), "PERIOD")
-        phase = _required_text(item.get("phase"), "PHASE")
-        settlement = _required_text(item.get("settlement"), "SETTLEMENT")
-        line_variant = str(item.get("line_variant") or "UNSPECIFIED").strip().upper()
+        period = _dimension(item.get("period"), "PERIOD")
+        phase = _dimension(item.get("phase"), "PHASE")
+        settlement = _dimension(item.get("settlement"), "SETTLEMENT")
+        line_variant = (_dimension(item["line_variant"], "LINE_VARIANT")
+                        if item.get("line_variant") is not None
+                        else "UNSPECIFIED")
         if line_variant not in LINE_VARIANTS:
             raise DKObservationError("LINE_VARIANT_INVALID:" + market)
         # Supply period/settlement as observed, even if unknown; neither can
@@ -160,7 +169,7 @@ def reconcile_dk_event(
         scope = {"source_tab": tab}
         for field in CONTRACT_DIMS:
             supplied = item.get(field)
-            scope[field] = (_required_text(supplied, field.upper())
+            scope[field] = (_dimension(supplied, field.upper())
                             if supplied is not None else None)
         if scope["line_variant"] is not None and scope["line_variant"] not in LINE_VARIANTS:
             raise DKObservationError("ABSENCE_LINE_VARIANT_INVALID:" + market)
