@@ -45,6 +45,24 @@ Market-odds-as-features is a **rejected method**, never a MISSING audit item
 | Probable pitcher (both teams, usable season line ≥5 GS or ≥25 IP) | MLB | `BLOCKED_PREPRICING_PITCHER_UNCONFIRMED` |
 | Unique future ESPN fixture | all | `BLOCKED_PREPRICING_FIXTURE_UNVERIFIED` |
 
+**QB identity, Form 2 (CFB only; owner ruling Oct 13, 2026, issue #2154).**
+QB_IDENTITY_EVIDENCE has two forms. Form 1 is the injury payload above —
+the only form that speaks to availability. For a CFB team whose feed
+status is `TEAM_NOT_IN_INJURY_FEED`, Form 2 (`DEPTH_ROSTER_COMPOSITE`)
+may satisfy the **identity limb only**: an ESPN roster snapshot
+(asserted-complete `?limit=1000` pull) binds membership by athlete ID,
+a receipted pre-kickoff OurLads depth-chart snapshot supplies the QB
+ordering, and the named QB1 (name + jersey) must resolve to exactly
+one athlete ID on that team's roster. Form 2 is a research-stage
+evidence path, **not** proof of availability or a clean injury report:
+availability stays explicitly `AVAILABILITY_UNVERIFIED_NO_TEAM_INJURY_REPORT`,
+injury points are exactly 0.0, and every Form 2 failure (missing,
+stale, ambiguous, absent, incomplete roster, hash mismatch) fails
+closed to the block above with its own status recorded
+(`QB_IDENTITY_SATISFIED_FORM2_DEPTH_ROSTER_COMPOSITE` on a pass).
+Implementation + disposition switch (`FORM2_PROCEEDS_WITH_AVAILABILITY_LABEL`):
+`sportsedge/prepricing/qb_identity_evidence.py`.
+
 A blocked game carries **zero** partial adjustments. This closes the exact
 Oct-11 failure: Lamar-out (QB-blind) and Skubal/Misiorowski (pitcher-blind)
 can no longer be silently priced.

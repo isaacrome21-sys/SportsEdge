@@ -33,6 +33,16 @@ Critical factors -- QB identity for NFL/CFB, probable pitcher for MLB --
 that are missing or unverifiable DOWNGRADE the game's markets to blocked
 with an explicit reason code. Never silently priced.
 
+QB identity, CFB only (owner ruling, Oct 13 2026, issue #2154): for a
+team the ESPN injury feed does not cover (TEAM_NOT_IN_INJURY_FEED), a
+QB_IDENTITY_EVIDENCE Form 2 bundle (DEPTH_ROSTER_COMPOSITE -- ESPN
+roster membership + receipted OurLads depth order, resolved to exactly
+one athlete ID) may satisfy the IDENTITY limb as a research-stage
+evidence path. It is NOT proof of availability or a clean injury
+report: availability stays explicitly AVAILABILITY_UNVERIFIED_
+NO_TEAM_INJURY_REPORT and injury points are exactly 0.0. See
+sportsedge/prepricing/qb_identity_evidence.py.
+
 Research only. No betting authority. All numeric adjustments are DECLARED
 heuristics, NOT calibrated edges; each must earn production status through
 the backtest harness (chronological out-of-sample vs existing model).
@@ -44,9 +54,9 @@ from datetime import datetime, timezone
 from urllib.parse import urlencode
 
 from artifacts.free_models import (
-    IL_COLLEGE_ESPN_IDS, PublicContext, bounded, declared_weather_total_adj,
-    dt, numeric,
+    PublicContext, bounded, declared_weather_total_adj, dt, numeric,
 )
+from sportsedge.prepricing import qb_identity_evidence as _qb_evidence
 
 # Free factors module (harness-gated): provides park factors, rest/travel,
 # weather thresholds, key numbers. Marked PENDING_VALIDATION until the
@@ -152,7 +162,6 @@ DECL_REST_ADJ_CAP = {"NFL": 0.6, "CFB": 0.6, "MLB": 0.25}
 BLOCK_FIXTURE_UNVERIFIED = "BLOCKED_PREPRICING_FIXTURE_UNVERIFIED"
 BLOCK_TEAMS_UNRESOLVED = "BLOCKED_PREPRICING_TEAMS_UNRESOLVED"
 BLOCK_QB_IDENTITY_UNVERIFIED = "BLOCKED_PREPRICING_QB_IDENTITY_UNVERIFIED"
-BLOCK_IL_COLLEGE_EXCLUDED = "BLOCKED_PREPRICING_IL_COLLEGE_EXCLUDED"
 BLOCK_PITCHER_UNCONFIRMED = "BLOCKED_PREPRICING_PITCHER_UNCONFIRMED"
 BLOCK_NFL_TEAM_HISTORY = "BLOCKED_PREPRICING_NFL_TEAM_HISTORY_UNVERIFIED"
 
@@ -441,6 +450,36 @@ def mlb_pitcher_adjustments(fetch, *, game_date, home, away, season,
 # ---------------------------------------------------------------------------
 # Per-game stage
 # ---------------------------------------------------------------------------
+def _consult_qb_form2(qb_form2_bundles, provider, sport, team, kickoff, now,
+                      receipts):
+    """QB_IDENTITY_EVIDENCE Form 2 consult (owner ruling, issue #2154).
+
+    Consulted ONLY for a CFB team whose injury-feed status is
+    TEAM_NOT_IN_INJURY_FEED. Returns the evaluation result dict, or
+    None when no bundle was supplied for this team (Form 2 not in
+    play -- the gate then behaves exactly as it did before Form 2).
+    Every consultation appends an evidence receipt, pass or fail.
+    Bundles arrive ONLY through the stage_games parameter (a trusted
+    loader / capture step), never from an input row.
+    """
+    if not qb_form2_bundles:
+        return None
+    bundle = qb_form2_bundles.get(str(team.get("id")))
+    if bundle is None:
+        return None
+    completed = provider.schedule(sport, team, kickoff)
+    previous_kickoff = completed[0][0] if completed else None
+    result = _qb_evidence.evaluate_form2_bundle(
+        bundle, team_id=str(team.get("id")), kickoff=kickoff,
+        previous_game_kickoff=previous_kickoff, now=now)
+    receipt = {"source": "QB_IDENTITY_EVIDENCE_FORM2",
+               "status": result["status"], "detail": result["detail"]}
+    if result.get("receipt"):
+        receipt.update(result["receipt"])
+    receipts.append(receipt)
+    return result
+
+
 def _rest_days(provider, sport, team, kickoff):
     sample = provider.schedule(sport, team, kickoff)
     if not sample:
@@ -449,7 +488,8 @@ def _rest_days(provider, sport, team, kickoff):
     return round(days, 2) if days > 0 else None
 
 
-def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
+def _stage_one_game(rows, *, now, getter, enforce_blocks=True,
+                    qb_form2_bundles=None):
     row = rows[0]
     sport = str(row.get("sport") or "").upper()
     away_name, home_name = _resolve_teams(row)
@@ -509,38 +549,6 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
                 "block_detail": block_detail, "adjustments": adjustments,
                 "factors": factors, "receipts": receipts}
 
-    # -- Illinois college exclusion (owner rule): ID-keyed on the verified
-    # directory binding resolved just above. Either competitor whose ESPN
-    # id is in the frozen registry excludes the fixture, whatever name
-    # form the intake row carried (the IL_COLLEGE_NAMES list in
-    # free_models is form-dependent and missed Chicago State, id 2130, in
-    # every attested form). Unresolved identity already failed closed
-    # above (BLOCK_TEAMS_UNRESOLVED), so no Illinois team can reach
-    # pricing through an unbound name.
-    if sport == "CFB":
-        il_hit = None
-        for side, team in (("HOME", home_team), ("AWAY", away_team)):
-            school = IL_COLLEGE_ESPN_IDS.get(str(team.get("id") or ""))
-            if school is not None:
-                il_hit = (side, school, str(team.get("id")))
-                break
-        if il_hit is not None:
-            blocked = enforce_blocks
-            block_reason = BLOCK_IL_COLLEGE_EXCLUDED if enforce_blocks else ""
-            block_detail = (f"IL_COLLEGE_ESPN_ID_{il_hit[2]}:{il_hit[1]}"
-                            f"({il_hit[0]})")
-            if not enforce_blocks:
-                block_detail += ";MANUAL_MODE_NO_PUBLIC_FETCH"
-            all_missing(block_detail)
-            receipts.extend(provider.receipts)
-            return {"game_key": f"{sport}:{game_label}",
-                    "game_label": game_label,
-                    "sport": sport, "kickoff_utc": kickoff.isoformat(),
-                    "blocked": blocked, "block_reason": block_reason,
-                    "block_detail": block_detail,
-                    "adjustments": adjustments, "factors": factors,
-                    "receipts": receipts}
-
     # -- 1. injuries / QB-participation (canonical free_models path) -------
     if sport in {"NFL", "CFB", "NBA"}:
         for side, team, ctx_key in (("HOME", home_team, "home_injury_pts"),
@@ -548,14 +556,72 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
             rows_, status = provider.injury_rows(sport, team)
             pts, pts_status = provider.injury_points(sport, team)
             if status != "STRUCTURE_VERIFIED":
+                # Both failure classes stay fail-closed; only the stated
+                # reason differs. TEAM_NOT_IN_INJURY_FEED means the ESPN
+                # feed parsed cleanly but carries no report for this team
+                # (the common CFB case -- ESPN reports only teams with
+                # current injury entries), so calling it a schema failure
+                # would misstate the evidence.
+                if status == "TEAM_NOT_IN_INJURY_FEED":
+                    feed_reason = f"{side}_INJURY_FEED_NO_TEAM_REPORT:{status}"
+                    detail = ("ESPN injury feed is well-formed but carries "
+                              "no report for this team")
+                else:
+                    feed_reason = f"{side}_INJURY_FEED_UNUSABLE:{status}"
+                    detail = "ESPN injury payload failed team-group binding"
+                # QB_IDENTITY_EVIDENCE Form 2 (owner ruling, issue
+                # #2154): for a CFB team the injury feed does not cover,
+                # a DEPTH_ROSTER_COMPOSITE bundle may satisfy the
+                # IDENTITY limb only. Availability stays explicitly
+                # unknown (never a clean report) and injury points are
+                # exactly 0.0 -- there is no report to extract from.
+                # Any Form 2 failure falls through to the unchanged
+                # fail-closed block below, with the failure status
+                # recorded in the factor reason and block detail.
+                form2 = None
+                if sport == "CFB" and status == "TEAM_NOT_IN_INJURY_FEED":
+                    form2 = _consult_qb_form2(
+                        qb_form2_bundles, provider, sport, team, kickoff,
+                        now, receipts)
+                if form2 is not None and form2["ok"]:
+                    proceeds, disposition_status = _qb_evidence.form2_disposition()
+                    if proceeds:
+                        adjustments[ctx_key] = 0.0
+                        factors.append(_factor(
+                            "qb_specific", USED,
+                            "QB_IDENTITY_EVIDENCE_FORM2_DEPTH_ROSTER_COMPOSITE",
+                            f"{side}_QB_IDENTITY:{_qb_evidence.STATUS_SATISFIED};"
+                            f"QB1_ATHLETE_ID_{form2['resolved_athlete_id']};"
+                            f"INJURY_PTS_0.0_FORM2_NO_REPORT_TO_EXTRACT;"
+                            f"{_qb_evidence.AVAILABILITY_UNVERIFIED};"
+                            f"POSITIVE_STARTER_CONFIRMATION_UNAVAILABLE_FROM_FREE_ESPN",
+                            {ctx_key: 0.0}))
+                        continue
+                    factors.append(_factor(
+                        "qb_specific", MISSING,
+                        "QB_IDENTITY_EVIDENCE_FORM2_DEPTH_ROSTER_COMPOSITE",
+                        f"{side}_QB_IDENTITY:{_qb_evidence.STATUS_SATISFIED};"
+                        f"QB1_ATHLETE_ID_{form2['resolved_athlete_id']};"
+                        f"AVAILABILITY_UNVERIFIED_NO_TEAM_INJURY_REPORT"))
+                    if enforce_blocks:
+                        blocked = True
+                        block_reason = _qb_evidence.BLOCK_QB_AVAILABILITY_UNVERIFIED
+                        block_detail = (
+                            f"{side}_QB_AVAILABILITY_UNVERIFIABLE:identity "
+                            f"satisfied via Form 2 (athlete ID "
+                            f"{form2['resolved_athlete_id']}); no team injury "
+                            f"report exists to verify availability")
+                    continue
+                if form2 is not None:
+                    feed_reason += f";FORM2_FAILED:{form2['status']}"
+                    detail += (f"; Form 2 composite failed closed: "
+                               f"{form2['status']} ({form2['detail']})")
                 factors.append(_factor(
                     "qb_specific" if sport in {"NFL", "CFB"} else "rotations_matchups",
-                    MISSING, "ESPN_INJURIES",
-                    f"{side}_INJURY_FEED_UNUSABLE:{status}"))
+                    MISSING, "ESPN_INJURIES", feed_reason))
                 if sport in {"NFL", "CFB"} and enforce_blocks:
                     blocked, block_reason = True, BLOCK_QB_IDENTITY_UNVERIFIED
-                    block_detail = (f"{side}_QB_IDENTITY_UNVERIFIABLE:ESPN injury "
-                                    f"payload failed team-group binding")
+                    block_detail = f"{side}_QB_IDENTITY_UNVERIFIABLE:{detail}"
                 continue
             out, doubtful = _out_doubtful(rows_)
             qbs_out = [e["name"] for e in out if e["position"] == "QB"]
@@ -836,7 +902,27 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
             "receipts": receipts}
 
 
-def stage_games(game_rows, *, now, getter, enforce_blocks=True, as_of=None, historical=False):
+def _normalize_form2_bundles(qb_form2_bundles):
+    """Index Form 2 bundles by ESPN team ID (str). Accepts a mapping of
+    team ID -> bundle, or an iterable of bundle dicts (each carrying its
+    own team binding). Malformed entries are dropped here; a bundle that
+    cannot be indexed by its own asserted team ID is not evidence for
+    any team and the evaluator never sees it."""
+    if not qb_form2_bundles:
+        return {}
+    if isinstance(qb_form2_bundles, dict):
+        return {str(k): v for k, v in qb_form2_bundles.items()}
+    indexed = {}
+    for bundle in qb_form2_bundles:
+        if isinstance(bundle, dict):
+            team_id = (bundle.get("team") or {}).get("espn_id")
+            if team_id is not None:
+                indexed[str(team_id)] = bundle
+    return indexed
+
+
+def stage_games(game_rows, *, now, getter, enforce_blocks=True, as_of=None, historical=False,
+                qb_form2_bundles=None):
     """Run the pre-pricing stage for each game row.
 
     Rows sharing one game share one stage execution. Returns a list aligned
@@ -844,6 +930,11 @@ def stage_games(game_rows, *, now, getter, enforce_blocks=True, as_of=None, hist
     be timezone-aware. ``enforce_blocks=False`` audits without blocking
     (manual --no-fetch mode: critical factors report MISSING instead of
     downgrading, preserving the explicit manual-only research path).
+
+    ``qb_form2_bundles`` carries QB_IDENTITY_EVIDENCE Form 2 bundles
+    (owner ruling, issue #2154) from a trusted capture/loader step --
+    never from an input row. Default None: the gate behaves exactly as
+    it did before Form 2 existed.
     """
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("STAGE_NOW_TIMEZONE_REQUIRED")
@@ -861,10 +952,12 @@ def stage_games(game_rows, *, now, getter, enforce_blocks=True, as_of=None, hist
             groups[key] = []
             order.append(key)
         groups[key].append(i)
+    bundles = _normalize_form2_bundles(qb_form2_bundles)
     for key in order:
         idxs = groups[key]
         result = _stage_one_game([game_rows[i] for i in idxs], now=now,
-                                 getter=getter, enforce_blocks=enforce_blocks)
+                                 getter=getter, enforce_blocks=enforce_blocks,
+                                 qb_form2_bundles=bundles)
         for i in idxs:
             staged[i] = dict(result)
     return staged
