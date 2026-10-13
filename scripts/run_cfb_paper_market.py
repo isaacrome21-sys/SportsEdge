@@ -24,6 +24,61 @@ from pathlib import Path
 BOOKS = ("draftkings", "fanduel", "betmgm", "williamhill_us", "betonlineag", "pinnacle")
 SUPPORTED = ("h2h", "spreads", "totals")
 MARKET_NAME = {"h2h": "MONEYLINE", "spreads": "SPREAD", "totals": "TOTAL"}
+
+
+def _norm(value):
+    # Same normalization as artifacts.free_models.PublicContext.key.
+    return " ".join("".join(c.lower() if c.isalnum() else " "
+                            for c in str(value or "")).split())
+
+
+_FORMS_CACHE = None
+
+
+def _illinois_forms():
+    """Name forms of the frozen Illinois-college registry (PR #2148).
+
+    Derived from artifacts/free_models -- IL_COLLEGE_NAMES plus the
+    normalized display labels of IL_COLLEGE_ESPN_IDS -- never re-listed
+    here, so this script cannot drift from the single registry. The
+    substring tuple this replaced missed Chicago State (ESPN id 2130)
+    and SIU Edwardsville's "SIU Edwardsville" form (issue #2151).
+    "roosevelt" is retained from the former tuple: Roosevelt University
+    (Chicago, IL) is not in the frozen 13-school registry, but this
+    repair does not silently un-exclude a school the script previously
+    blocked; flagged for owner confirmation in the #2151 repair report.
+    """
+    global _FORMS_CACHE
+    if _FORMS_CACHE is None:
+        import sys
+        root = str(Path(__file__).resolve().parents[1])
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        from artifacts.free_models import IL_COLLEGE_ESPN_IDS, IL_COLLEGE_NAMES
+        forms = set(IL_COLLEGE_NAMES)
+        forms.update(_norm(name) for name in IL_COLLEGE_ESPN_IDS.values())
+        forms.add("roosevelt")
+        _FORMS_CACHE = frozenset(forms)
+    return _FORMS_CACHE
+
+
+def _is_illinois_team(name):
+    school = _norm(name)
+    if not school:
+        return False
+    if "illinois" in school:
+        return True
+    for form in _illinois_forms():
+        if school == form:
+            return True
+        if school.startswith(form + " "):
+            # Northwestern (IL) must not swallow Northwestern State (LA).
+            if form == "northwestern" and (
+                    school == "northwestern state"
+                    or school.startswith("northwestern state ")):
+                continue
+            return True
+    return False
 # Governance contract sentinels retained for the repository text guard:
 # "status":"PAPER_ONLY" "model_p":None "official":False
 
@@ -168,8 +223,8 @@ def build_payload(events, min_edge, now, market_input_source, input_status):
         if start.tzinfo is None or start <= now:
             counts["started_or_naive_kickoff"] += 1
             continue
-        participants = ' | '.join(str(event.get(k) or '').lower() for k in ('home_team', 'away_team'))
-        if any(team in participants for team in ('illinois', 'northwestern', 'depaul', 'bradley', 'loyola chicago', 'roosevelt')):
+        if (_is_illinois_team(event.get('home_team'))
+                or _is_illinois_team(event.get('away_team'))):
             counts['illinois_games_excluded'] += 1
             continue
 
