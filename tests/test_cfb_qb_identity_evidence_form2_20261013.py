@@ -339,11 +339,11 @@ class AssertedQb1Tests(unittest.TestCase):
         order = bundle["depth_snapshot"]["qb_order"]
         bundle["depth_snapshot"]["qb_order"] = (
             [order[1], order[0]] + order[2:])
-        result = evaluate(bundle)
+        result = evaluate(rechain(bundle))
         self.assertFalse(result["ok"])
         self.assertEqual(result["status"], qe.STATUS_QB1_ASSERTION_MISMATCH)
         self.assertEqual(result["detail"],
-                         "ASSERTED_QB1_DIFFERS_FROM_CAPTURED_CHART")
+                         "ASSERTED_QB_ORDER_DIFFERS_FROM_CAPTURED_CHART")
 
     def test_captured_chart_governs_assertion_must_agree(self):
         # A chart captured with Streeter ranked first: the builder's
@@ -360,15 +360,39 @@ class AssertedQb1Tests(unittest.TestCase):
         order = bundle["depth_snapshot"]["qb_order"]
         bundle["depth_snapshot"]["qb_order"] = (
             [order[1], order[0]] + order[2:])
-        result = evaluate(bundle)
+        result = evaluate(rechain(bundle))
         self.assertEqual(result["status"], qe.STATUS_QB1_ASSERTION_MISMATCH)
 
     def test_bundle_without_asserted_order_passes_on_parsed_order(self):
         bundle = make_bundle("48")
         del bundle["depth_snapshot"]["qb_order"]
-        result = evaluate(bundle)
+        result = evaluate(rechain(bundle))
         self.assertTrue(result["ok"], result)
         self.assertEqual(result["resolved_athlete_id"], "5153846")
+
+    def test_qb_rank_one_absent_or_duplicated_fails_closed(self):
+        for rows in ("2. Streeter, Braden — RS SO, #16",
+                     "1. Minicucci, Nick — SR, #4 · "
+                     "1. Streeter, Braden — RS SO, #16"):
+            depth = depth_text("48", qb_row=rows)
+            self.assertEqual(qe.parse_qb_order(depth), [])
+            with self.assertRaisesRegex(ValueError, "NO_QB_ORDER_CAPTURED"):
+                make_bundle("48", depth=depth)
+
+    def test_resealed_truncated_or_poisoned_order_still_blocks(self):
+        for mutate in ("truncate", "poison_qb2"):
+            bundle = make_bundle("48")
+            order = bundle["depth_snapshot"]["qb_order"]
+            if mutate == "truncate":
+                bundle["depth_snapshot"]["qb_order"] = order[:1]
+                expected = "ASSERTED_QB_ORDER_LENGTH_OR_SHAPE_MISMATCH"
+            else:
+                order[1] = dict(order[1], jersey="99")
+                expected = "ASSERTED_QB_ORDER_DIFFERS_FROM_CAPTURED_CHART"
+            result = evaluate(rechain(bundle))
+            self.assertFalse(result["ok"])
+            self.assertEqual(result["status"], qe.STATUS_QB1_ASSERTION_MISMATCH)
+            self.assertEqual(result["detail"], expected)
 
     def test_unparseable_captured_order_fails_closed(self):
         # No readable QB row in the captured bytes and no assertion
@@ -413,6 +437,19 @@ class ReceiptChainTests(unittest.TestCase):
         result = evaluate(bundle, event_id="401871068")
         self.assertEqual(result["status"], qe.STATUS_HASH_MISMATCH)
         self.assertEqual(result["detail"], "RECEIPT_CHAIN_MISMATCH")
+
+    def test_sealed_fixture_and_roster_assertions_reject_tampering(self):
+        for mutate in (
+            lambda b: b["fixture"].__setitem__("kickoff_utc", "2026-10-13T22:00:00Z"),
+            lambda b: b["previous_game"].__setitem__("kickoff_utc", "2026-10-10T23:00:00Z"),
+            lambda b: b["roster_snapshot"].__setitem__("athlete_count_repeat", 1),
+        ):
+            bundle = make_bundle("48")
+            mutate(bundle)
+            result = evaluate(bundle)
+            self.assertFalse(result["ok"])
+            self.assertEqual(result["status"], qe.STATUS_HASH_MISMATCH)
+            self.assertEqual(result["detail"], "RECEIPT_CHAIN_MISMATCH")
 
     def test_receipt_removed_fails_closed(self):
         bundle = make_bundle("48")
