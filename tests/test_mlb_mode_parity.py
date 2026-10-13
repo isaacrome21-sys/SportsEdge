@@ -69,7 +69,7 @@ def opener(req, timeout=15):
 
 def canonical_quotes(): return [validate_canonical_quote(row) for row in raw_quotes()]
 def live_game():
-    snap = fetch_schedule(TARGET_DATE.isoformat(), opener=opener, now=NOW)[0]
+    snap = fetch_schedule(TARGET_DATE.isoformat(), opener=opener, clock=lambda: NOW)[0]
     return _live_game(snap, boxscore=boxscore_payload(), projected={}, now=NOW)
 def frozen_features(game, quotes):
     source = MLBGenericHistorySource(opener=opener, retrieved_at=NOW)

@@ -90,7 +90,7 @@ class SameFetchSourceCaptureTest(unittest.TestCase):
         observed = datetime(2026, 9, 13, 17, 30, tzinfo=timezone.utc)
         with tempfile.TemporaryDirectory() as td:
             with capture_mlb_source_bytes(Path(td), clock=lambda: observed) as capture:
-                games = fetch_schedule("2026-09-13", opener=opener, now=observed)
+                games = fetch_schedule("2026-09-13", opener=opener, clock=lambda: observed)
                 box = fetch_boxscore(777001, opener=opener)
 
             self.assertEqual(101, games[0].away_probable_pitcher_id)
@@ -136,7 +136,8 @@ class SameFetchSourceCaptureTest(unittest.TestCase):
             games = fetch_schedule(
                 "2026-09-13", opener=lambda *a, **kw: DelayedResponse(raw)
             )
-        self.assertEqual(["body_received", "clock_read"], events)
+        # fetch-start clock, then body, then the receipt clock (retrieved_at)
+        self.assertEqual(["clock_read", "body_received", "clock_read"], events)
         self.assertEqual(observed.isoformat(), games[0].retrieved_at)
 
     def test_schedule_explicitly_requests_postseason_and_preserves_world_series(self):
@@ -151,7 +152,7 @@ class SameFetchSourceCaptureTest(unittest.TestCase):
     def test_capture_is_opt_in(self):
         opener = _Opener(self.schedule_raw, self.boxscore_raw)
         observed = datetime(2026, 9, 13, 17, 30, tzinfo=timezone.utc)
-        fetch_schedule("2026-09-13", opener=opener, now=observed)
+        fetch_schedule("2026-09-13", opener=opener, clock=lambda: observed)
         fetch_boxscore(777001, opener=opener)
         self.assertEqual(2, len(opener.calls))
         self.assertTrue(all(response.read_count == 1 for response in opener.responses))
