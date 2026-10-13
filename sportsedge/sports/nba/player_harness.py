@@ -42,6 +42,10 @@ def run_player_harness(games, quarter_games, logs, *, min_team_games=5, min_play
                        version: str = "v1", baseline: str = "naive"):
     if baseline not in {"naive", "naive_oracle"}:
         raise ValueError("BASELINE_INVALID")
+    if version not in {"v1", "v2", "v3"}:
+        raise ValueError("VERSION_INVALID")
+    if version == "v3" and baseline != "naive_oracle":
+        raise ValueError("V3_REQUIRES_NAIVE_ORACLE")
     """games: NBAGame list; quarter_games: QuarterGame list; logs: PlayerLog list (minutes > 0 only)."""
     qmap = {q.game_id: q for q in quarter_games}
     games = sorted((g for g in games if g.game_id in qmap), key=lambda g: (g.start, g.game_id))
@@ -80,22 +84,27 @@ def run_player_harness(games, quarter_games, logs, *, min_team_games=5, min_play
                     pre = build_rotation(tlogs, team, cutoff)
                 except ValueError:
                     continue
-                avail = {pid: Availability("AVAILABLE" if pid in played else "OUT", AVAILABILITY_LABEL,
+                shared = [q for q in pre.players if q in played]  # v3: identical set S for both sides
+                avail = {pid: Availability("AVAILABLE" if (pid in shared if version == "v3" else pid in played) else "OUT", AVAILABILITY_LABEL,
                                            cutoff - timedelta(seconds=1)) for pid in pre.players}
                 try:
                     rot = build_rotation(tlogs, team, cutoff, availability=avail,
-                                         minutes_mode="played" if version == "v2" else "v1_zero_fill")
+                                         minutes_mode="v1_zero_fill" if version == "v1" else "played")
                 except ValueError:
                     continue
                 alloc = allocate(rot, paths, seed=int(g.game_id) % (2**31)) if version == "v1" else None
                 scale = 1.0
-                if baseline == "naive_oracle":  # same after-the-fact who-played knowledge as the candidate
+                if version == "v3":
+                    raw = [sum(l.minutes for l in h) / len(h) for h in
+                           (by_player.get((team, q), [])[-10:] for q in shared) if h]
+                    scale = 240.0 / sum(raw) if raw and sum(raw) > 0 else 1.0
+                elif baseline == "naive_oracle":  # same after-the-fact who-played knowledge as the candidate
                     raw = [sum(l.minutes for l in h) / len(h) for h in
                            (by_player.get((team, q), [])[-10:] for q in played) if h]
                     scale = 240.0 / sum(raw) if raw and sum(raw) > 0 else 1.0
                 for pid, actual in played.items():
                     hist = by_player.get((team, pid), [])[-10:]
-                    if pid not in rot.players or len(hist) < min_player_games:
+                    if pid not in rot.players or len(hist) < min_player_games or (version == "v3" and pid not in shared):
                         continue
                     i = rot.players.index(pid)
                     nm = scale * sum(l.minutes for l in hist) / len(hist)

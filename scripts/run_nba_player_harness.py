@@ -12,7 +12,7 @@ from sportsedge.sports.nba.player_harness import parse_player_box, run_player_ha
 ap = argparse.ArgumentParser()
 ap.add_argument("--cache", required=True)
 ap.add_argument("--players", required=True)
-ap.add_argument("--version", default="v1", choices=["v1", "v2"])
+ap.add_argument("--version", default="v1", choices=["v1", "v2", "v3"])
 ap.add_argument("--baseline", default="naive", choices=["naive", "naive_oracle"])
 a = ap.parse_args()
 games, qs, _ = load(a.cache)

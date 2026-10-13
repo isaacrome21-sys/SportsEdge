@@ -109,3 +109,12 @@ def test_v2_marginal_uses_player_variance_and_never_plays():
         assert m["status"] == "WATCH" and m["play_authority"] is False
     rot_u = build_rotation(g, "BOS", AS_OF, minutes_mode="played")
     assert player_marginal(rot_u, steady, "p0", "PTS", 10.5)["status"] == "BLOCKED"
+
+
+def test_v3_requires_matched_oracle_baseline():
+    import pytest
+    from sportsedge.sports.nba.player_harness import run_player_harness
+    with pytest.raises(ValueError, match="V3_REQUIRES_NAIVE_ORACLE"):
+        run_player_harness([], [], [], version="v3", baseline="naive")
+    with pytest.raises(ValueError, match="VERSION_INVALID"):
+        run_player_harness([], [], [], version="v9")
