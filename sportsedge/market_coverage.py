@@ -3,10 +3,12 @@
 Every pricer here derives from the same verified ``artifacts.free_models``
 context pipeline (``PublicContext`` + ``context_for``) and the same declared
 distribution families (Poisson for MLB, normal for football) as the existing
-game ML/spread/total engine. The mean construction replicates
-``free_models.calculate`` EXACTLY -- base prior + HFA + margin proxy +
-injury/form (football) or pitcher adjustments (MLB) + weather -- never the
-"simplified" construction that drops injury context (see 2026-10-11 incident:
+game ML/spread/total engine. Base means retain the same active terms
+(team-strength, static home-field, verified injuries and weather). The Oct 13
+owner ruling disables unvalidated ERA-based starting pitcher, recent form and
+rest adjustments across canonical and derivative game pricing; values remain
+in context for research, with an exactly zero priced contribution. Never
+drop verified injury/participation context (see 2026-10-11 incident:
 a participation-blind 1H price manufactured a fake edge on Lamar-out news).
 
 New declared (unfitted, unvalidated) assumptions, all constants below:
@@ -162,9 +164,11 @@ def _resolve_side_token(row: Mapping[str, Any], home: str, away: str) -> str | N
 def _base_means(row: Mapping[str, Any], *, now: datetime,
                 getter=None, auto_context: bool = True,
                 provider: PublicContext | None = None) -> dict[str, Any]:
-    """Replicate free_models.calculate's mean construction exactly.
+    """Mirror canonical *active-factor* means (disabled adjustments stay zero).
 
     Returns {"home_mean", "away_mean", "context", "context_notes", "kickoff"}.
+    The unvalidated ERA pitcher, recent form and rest heuristics may be
+    retained in the context, but cannot alter the projection or price.
     Raises MarketCoverageError with a BLOCKED_*/NO_* reason when the base game
     cannot be verified -- coverage markets never price without verified means.
     """
@@ -218,13 +222,16 @@ def _base_means(row: Mapping[str, Any], *, now: datetime,
     home_mean = base + hfa / 2 + context["home_rating"]
     away_mean = base - hfa / 2 + context["away_rating"]
     if sport == "MLB":
-        home_mean += context["home_pitcher_adj"]
-        away_mean += context["away_pitcher_adj"]
+        # Owner Oct 13 disable ruling: ERA starting-pitcher heuristics are
+        # observed research values, but have exactly ZERO pricing authority.
+        # Unlike an absent feature this is a deliberate execution gate.
+        notes.append("PITCHER_ADJ_DISABLED_PENDING_INCREMENTAL_VALUE")
     else:
-        # Full injury/form construction -- never the participation-blind
-        # simplified variant (2026-10-11 incident).
-        home_mean += context["home_injury_pts"] + context["home_form"]
-        away_mean += context["away_injury_pts"] + context["away_form"]
+        # Injury/participation stays ACTIVE; unvalidated recent form does
+        # not. Do not regress into the participation-blind simplified path.
+        home_mean += context["home_injury_pts"]
+        away_mean += context["away_injury_pts"]
+        notes.append("RECENT_FORM_DISABLED_PENDING_INCREMENTAL_VALUE")
     if "weather_total_adj" in context:
         home_mean += context["weather_total_adj"] / 2
         away_mean += context["weather_total_adj"] / 2
