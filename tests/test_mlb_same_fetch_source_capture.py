@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
+from urllib.parse import parse_qs, urlparse
 
 from sportsedge.mlb_source import (
     capture_mlb_source_bytes,
@@ -113,6 +115,38 @@ class SameFetchSourceCaptureTest(unittest.TestCase):
             self.assertEqual("SAME_RESPONSE_BYTES_CONSUMED_BY_MODEL", manifest["capture_semantics"])
             self.assertFalse(manifest["promotion_authority"])
             self.assertFalse(manifest["retroactive_point_in_time_claim"])
+
+    def test_default_receipt_clock_is_read_after_response_body(self):
+        observed = datetime(2026, 9, 13, 17, 31, tzinfo=timezone.utc)
+        events = []
+        raw = self.schedule_raw
+
+        class DelayedResponse(_Response):
+            def read(self):
+                events.append("body_received")
+                return super().read()
+
+        class ReceiptClock(datetime):
+            @staticmethod
+            def now(tz):
+                events.append("clock_read")
+                return observed
+
+        with patch("sportsedge.mlb_source.datetime", ReceiptClock):
+            games = fetch_schedule(
+                "2026-09-13", opener=lambda *a, **kw: DelayedResponse(raw)
+            )
+        self.assertEqual(["body_received", "clock_read"], events)
+        self.assertEqual(observed.isoformat(), games[0].retrieved_at)
+
+    def test_schedule_explicitly_requests_postseason_and_preserves_world_series(self):
+        self.schedule["dates"][0]["games"][0]["gameType"] = "W"
+        opener = _Opener(json.dumps(self.schedule).encode(), self.boxscore_raw)
+        games = fetch_schedule("2026-09-13", opener=opener)
+        query = parse_qs(urlparse(opener.calls[0]).query)
+        self.assertEqual(["R,F,D,L,W,A,S,E"], query["gameType"])
+        self.assertEqual("W", games[0].game_type)
+        self.assertEqual(1, len(opener.calls))
 
     def test_capture_is_opt_in(self):
         opener = _Opener(self.schedule_raw, self.boxscore_raw)
