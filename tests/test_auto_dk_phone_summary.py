@@ -210,7 +210,7 @@ def test_radar_requires_market_exact_fresh_peer_receipts():
 
 def test_radar_rejects_started_stale_or_insufficient_reference_books():
     """Carry forward the old #2015 valid/stale/started/2-soft-book coverage."""
-    import copy
+    from scripts.collect_auto_dk_four_sports import _pair_fair
     with TemporaryDirectory() as temp:
         root=Path(temp)/"auto_dk_cards"
         root.mkdir()
@@ -222,17 +222,20 @@ def test_radar_rejects_started_stale_or_insufficient_reference_books():
                  seen=current, method="PINNACLE_POWER_V1",
                  books=("pinnacle",), under=-102):
             rows=[{"book":book,"observed_at":seen,"line":54.5} for book in books]
+            pair={"line":54.5,"over":105,"under":-115}
             return {
                 "provider_event_id":name, "away":name,"home":"ARI",
                 "commence_time":kickoff,
                 "markets":{"totals":{"line":54.5,"over":-118,
                                      "under":under,"observed_at":seen}},
                 "reference":{"totals":{
-                    "method":method,"fair":[.475,.525],
+                    "method":method,"fair":_pair_fair(pair),
                     "books":list(books),"model_probability":None,
                     "provider_event_id":name,"market_key":"totals",
                     "dk_observed_at":seen,"dk_line":54.5,
-                    "peer_evidence":rows}},
+                    "peer_evidence":rows,
+                    "peer_price_pairs":[{"book":book,"prices":{"over":105,"under":-115}}
+                                        for book in books]}},
             }
         valid=game("DET")
         two_books=game("SF",method="MULTIBOOK_MEDIAN_POWER_V1",
@@ -252,6 +255,8 @@ def test_radar_rejects_started_stale_or_insufficient_reference_books():
 
 def test_radar_three_independent_books_required_and_straight_cap_enforced():
     """Three fresh same-line peers can qualify, but a -200 DK side cannot."""
+    from scripts.collect_auto_dk_four_sports import _pair_fair
+    peer_pair={"line":54.5,"over":-115,"under":100}
     with TemporaryDirectory() as temp:
         root=Path(temp)/"auto_dk_cards"
         root.mkdir()
@@ -265,12 +270,14 @@ def test_radar_three_independent_books_required_and_straight_cap_enforced():
             "markets":{"totals":{"line":54.5,"over":-102,"under":-200,
                                  "observed_at":stamp}},
             "reference":{"totals":{
-                "method":"MULTIBOOK_MEDIAN_POWER_V1","fair":[.52,.48],
+                "method":"MULTIBOOK_MEDIAN_POWER_V1","fair":_pair_fair(peer_pair),
                 "books":peers, "model_probability":None,
                 "provider_event_id":"game_1","market_key":"totals",
                 "dk_observed_at":stamp,"dk_line":54.5,
                 "peer_evidence":[{"book":book,"observed_at":stamp,"line":54.5}
                                  for book in peers],
+                "peer_price_pairs":[{"book":book,"prices":{"over":-115,"under":100}}
+                                    for book in peers],
             }},
         }
         def scan():
