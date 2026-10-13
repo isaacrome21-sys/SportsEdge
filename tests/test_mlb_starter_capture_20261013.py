@@ -427,20 +427,33 @@ class ProductionPathTests(unittest.TestCase):
             )
 
     def test_production_wrapper_timestamps_come_from_the_system_clock(self):
-        _, game = _game1_plan()
-        raw = _payload_bytes(_game(GAME1_PK, GAME1_PITCH))
-        before = datetime.now(UTC)
-        record = capture_snapshot_production(
-            game, "T-30M", opener=_fake_opener(raw)
-        )
-        after = datetime.now(UTC)
-        # The receipt time is bracketed by the real system times around
-        # the call — it is neither the fixture era the injected-clock
-        # tests use (22:35) nor any other supplied value.
+        # This test deliberately exercises the REAL production clock. Build
+        # a fresh future fixture rather than assuming the Oct 13 recorded
+        # game stays pregame forever. The recorded-epoch clock regressions
+        # elsewhere remain frozen and continue testing late refusal.
+        first_pitch = (datetime.now(UTC) + timedelta(minutes=30)).replace(
+            microsecond=0)
+        payload_game = _game(
+            GAME1_PK, first_pitch, official_date=first_pitch.date().isoformat())
+        plan = _plan(_payload(payload_game), planned_at=datetime.now(UTC))
+        self.assertEqual(plan["issues"], [])
+        game = plan["games"][0]
+        raw = _payload_bytes(payload_game)
+        # The enclosing module uses a fixed Oct 14 anchor for *historical*
+        # fixtures. This real-clock test needs an independently sampled
+        # contemporaneous test anchor; do not change the production gate.
+        with _mock.patch("sportsedge.mlb_source._trusted_now",
+                         lambda: datetime.now(UTC)):
+            before = datetime.now(UTC)
+            record = capture_snapshot_production(
+                game, "T-30M", opener=_fake_opener(raw)
+            )
+            after = datetime.now(UTC)
         captured = datetime.fromisoformat(record["captured_at_utc"])
         self.assertLessEqual(before, captured)
         self.assertLessEqual(captured, after)
         self.assertEqual(record["record_status"], "CAPTURED")
+        self.assertEqual(record["slot_disposition"], "ON_TIME")
         self.assertEqual(record["away_probable_id"], AWAY_PROB)
 
 
