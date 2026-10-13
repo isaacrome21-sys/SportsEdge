@@ -205,6 +205,71 @@ class SameFetchSourceCaptureTest(unittest.TestCase):
             self.assertEqual([], recorder.records)
             self.assertEqual([], list(Path(td).iterdir()))
 
+    def test_journal_unchained_extra_metadata_fails_closed(self):
+        from sportsedge import mlb_source as ms
+        observed = datetime(2026, 10, 13, 17, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with patch("sportsedge.mlb_source._trusted_now", lambda: observed):
+                rec = ms.MLBSourceCapture(root, clock=lambda: observed)
+                rec.record(url="https://x/api/v1/schedule", raw=b"{}",
+                           fetch_started_at=observed, received_at=observed)
+            journal = root / ms.RECEIPT_JOURNAL_NAME
+            entry = json.loads(journal.read_text().strip())
+            entry["unhashed_extra"] = "attacker-added"
+            journal.write_text(json.dumps(entry) + "\n")
+            with self.assertRaisesRegex(ms.MLBSourceError, "RECEIPT_JOURNAL_SCHEMA_DRIFT"):
+                ms.verify_receipt_journal(root, verifier_now=observed)
+
+    def test_journal_duplicate_json_key_fails_closed(self):
+        from sportsedge import mlb_source as ms
+        observed = datetime(2026, 10, 13, 17, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with patch("sportsedge.mlb_source._trusted_now", lambda: observed):
+                rec = ms.MLBSourceCapture(root, clock=lambda: observed)
+                rec.record(url="https://x/api/v1/schedule", raw=b"{}",
+                           fetch_started_at=observed, received_at=observed)
+            journal = root / ms.RECEIPT_JOURNAL_NAME
+            text = journal.read_text()
+            original = '"url":"https://x/api/v1/schedule"'
+            self.assertIn(original, text)
+            journal.write_text(text.replace(original, original + "," + original, 1))
+            with self.assertRaisesRegex(ms.MLBSourceError, "RECEIPT_JOURNAL_DUPLICATE_JSON_KEY"):
+                ms.verify_receipt_journal(root, verifier_now=observed)
+
+    def test_journal_unterminated_final_record_fails_closed(self):
+        from sportsedge import mlb_source as ms
+        observed = datetime(2026, 10, 13, 17, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with patch("sportsedge.mlb_source._trusted_now", lambda: observed):
+                rec = ms.MLBSourceCapture(root, clock=lambda: observed)
+                rec.record(url="https://x/api/v1/schedule", raw=b"{}",
+                           fetch_started_at=observed, received_at=observed)
+            journal = root / ms.RECEIPT_JOURNAL_NAME
+            self.assertTrue(journal.read_bytes().endswith(b"\n"))
+            journal.write_bytes(journal.read_bytes()[:-1])
+            with self.assertRaisesRegex(ms.MLBSourceError, "RECEIPT_JOURNAL_UNTERMINATED"):
+                ms.verify_receipt_journal(root, verifier_now=observed)
+
+    def test_journal_resigned_parent_path_fails_closed(self):
+        from sportsedge import mlb_source as ms
+        observed = datetime(2026, 10, 13, 17, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with patch("sportsedge.mlb_source._trusted_now", lambda: observed):
+                rec = ms.MLBSourceCapture(root, clock=lambda: observed)
+                rec.record(url="https://x/api/v1/schedule", raw=b"{}",
+                           fetch_started_at=observed, received_at=observed)
+            journal = root / ms.RECEIPT_JOURNAL_NAME
+            entry = json.loads(journal.read_text().strip())
+            entry["file_name"] = "../outside.json"
+            entry["record_sha256"] = ms._record_hash(entry)
+            journal.write_text(json.dumps(entry) + "\n")
+            with self.assertRaisesRegex(ms.MLBSourceError, "RECEIPT_RAW_PATH_UNSAFE"):
+                ms.verify_receipt_journal(root, verifier_now=observed)
+
     def test_capture_is_opt_in(self):
         opener = _Opener(self.schedule_raw, self.boxscore_raw)
         observed = datetime(2026, 9, 13, 17, 30, tzinfo=timezone.utc)
