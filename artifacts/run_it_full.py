@@ -23,6 +23,9 @@ from sportsedge.mlb_phone_first_inning_pricing import (
 from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
 from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
 from sportsedge.prepricing.factor_ingestion import stage_games
+from sportsedge.canonical_coverage import (
+    NFL_ANYTIME_TD_MARKETS, NFL_DERIVATIVE_MARKETS, NFL_FIRST_TD_MARKETS,
+    blocked_row_for as coverage_blocked_row, coverage_summary)
 from datetime import datetime, timezone
 
 FIELDS = (
@@ -131,7 +134,7 @@ def audit_row(source, result):
     if market not in ("ML", "SPREAD", "TOTAL", "TEAM_TOTALS"):
         src = result.get("source") or ""
         if src in {"FREE_MLB_STATSAPI_GAMELOG", "FREE_MLB_STATSAPI_BATTER_GAMELOG",
-                   "FREE_MLB_STATSAPI_LINESCORE",
+                   "FREE_MLB_STATSAPI_LINESCORE", "FREE_NFLVERSE_ANYTIME_TD",
                    "FREE_ESPN_NFL_GAMELOG", "FREE_ESPN_CFB_GAMELOG"} and result.get("status") != "NO_MODEL_OR_MARKET":
             out["player_props"] = {
                 "status": "REAL_PUBLIC_HISTORY_MODEL_UNVALIDATED",
@@ -168,7 +171,8 @@ def _prepricing_blocked_row(line, stage, input_index):
 
 
 def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
-             auto_context=True, min_ev=0.02, lane="A", allow_manual_context=False):
+             auto_context=True, min_ev=0.02, lane="A", allow_manual_context=False,
+             td_cache_dir=None, td_opener=None):
     """Separate real game, pitcher, and batter models, preserving original row order.
 
     Issues are UNTRUSTED odds intake: NEVER use submitted features,
@@ -178,6 +182,16 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     lane="A" (default) prices game rows market-blind; lane="B" explicitly
     requests the anchored view. allow_manual_context=False (default) fails
     closed on any manual context override in the intake rows.
+
+    Canonical-path additions: NFL ANYTIME_TD is priced by the nflverse
+    opportunity-decomposition engine (td_cache_dir/td_opener are its cache
+    and fetch seams; with auto_context off and no explicit opener, cache
+    misses fail closed instead of fetching). NFL team totals, period and
+    alternate markets route to the derivative pricers, which price only
+    from a joint score distribution embedded in a priced game result.
+    MLB NRFI/YRFI are the first-inning binary at line 0.5. Every other
+    matrix market without a priced route resolves through
+    sportsedge.canonical_coverage to a named taxonomy blocker.
     """
     rows = payload if isinstance(payload, list) else payload.get("lines")
     if not isinstance(rows, list):
@@ -211,6 +225,10 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "RECEIVING_YARDS":"PLAYER_RECEIVING_YARDS",
                 "REC_YARDS":"PLAYER_RECEIVING_YARDS",
                 "RECEPTIONS":"PLAYER_RECEPTIONS",
+                "ANYTIME_TOUCHDOWN":"ANYTIME_TD",
+                "ANYTIME_TD_SCORER":"ANYTIME_TD",
+                "FIRST_TOUCHDOWN":"FIRST_TD",
+                "FIRST_TD_SCORER":"FIRST_TD",
             }.get(market,market)
             line["market"] = market
         if market in {"ML", "SPREAD", "TOTAL"} or (
@@ -312,8 +330,11 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     pitcher_pos, pitcher_input = [], []
     batter_pos, batter_input = [], []
     first_pos, first_input = [], []
+    first_originals = {}  # local -> original market, for NRFI/YRFI translation
     nfl_pos, nfl_input = [], []
     cfb_pos, cfb_input = [], []
+    deriv_pos, deriv_input = [], []
+    td_pos, td_input = [], []
     others = {}
     for local, line in enumerate(props):
         market = str(line.get("market") or "").upper()
@@ -326,9 +347,36 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         ):
             batter_pos.append(local)
             batter_input.append(line)
+        elif line["sport"] == "MLB" and market in {"NRFI", "YRFI"}:
+            # NRFI/YRFI ARE the first-inning binary at line 0.5
+            # (NRFI = UNDER 0.5 first-inning runs, YRFI = OVER). Translate
+            # into the first-inning engine's market; the engine enforces
+            # the 0.5 line. A conflicting explicit side fails closed.
+            side = str(line.get("side") or line.get("selection") or "").upper()
+            derived_side = "UNDER" if market == "NRFI" else "OVER"
+            if side in {"OVER", "UNDER"} and side != derived_side:
+                others[local] = blocked(
+                    line, "NRFI_YRFI_SIDE_CONFLICTS_WITH_MARKET")
+                continue
+            translated = dict(line)
+            translated["market"] = "FIRST_INNING_RUNS"
+            translated["side"] = derived_side
+            if translated.get("line") in (None, ""):
+                translated["line"] = 0.5
+            first_pos.append(local)
+            first_input.append(translated)
+            first_originals[local] = market
         elif line["sport"] == "MLB" and market in FIRST_INNING_PHONE_MARKETS:
             first_pos.append(local)
             first_input.append(line)
+        elif line["sport"] == "NFL" and market in NFL_DERIVATIVE_MARKETS:
+            deriv_pos.append(local)
+            deriv_input.append(line)
+        elif line["sport"] == "NFL" and (
+                market in NFL_ANYTIME_TD_MARKETS
+                or market in NFL_FIRST_TD_MARKETS):
+            td_pos.append(local)
+            td_input.append(line)
         elif line["sport"] == "NFL" and market.startswith("PLAYER_"):
             nfl_pos.append(local)
             nfl_input.append(line)
@@ -336,7 +384,9 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             cfb_pos.append(local)
             cfb_input.append(line)
         else:
-            others[local] = blocked(line, "NO_VERIFIED_MODEL_FOR_THIS_MARKET")
+            covered = coverage_blocked_row(line["sport"], market, line)
+            others[local] = covered if covered is not None else blocked(
+                line, "NO_VERIFIED_MODEL_FOR_THIS_MARKET")
     pitcher_results, pitcher_receipts = phone_pitcher_rows(
         pitcher_input, now=clock, getter=getter if auto_context else (lambda url: None))
     batter_results, batter_receipts = phone_batter_rows(
@@ -347,6 +397,72 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         nfl_input, now=clock, getter=getter if auto_context else (lambda url: None))
     cfb_results, cfb_receipts = phone_cfb_player_rows(
         cfb_input, now=clock, getter=getter if auto_context else (lambda url: None))
+    # Canonical derivative stage: NFL team totals / period / alternate rows
+    # price only from a joint score distribution embedded in a priced game
+    # result. The analytic game engine emits none today, so these rows
+    # resolve through the pricers' own fail-closed guards (NO_ENGINE).
+    # The stage modules are imported lazily and only when such rows exist:
+    # this runner must stay importable AND runnable in the numpy/pandas-
+    # free phone environment; if the runtime lacks those packages, the
+    # rows fail closed with a named reason instead of crashing the card.
+    deriv_results, deriv_receipts = [], []
+    if deriv_input:
+        try:
+            from sportsedge.nfl_phone_derivative_pricing import (
+                extract_distribution, fixture_key as derivative_fixture_key,
+                phone_nfl_derivative_rows)
+        except ImportError:
+            deriv_results = [{
+                "status": "NO_MODEL_OR_MARKET",
+                "reason": "DERIVATIVE_ENGINE_RUNTIME_UNAVAILABLE",
+                "blocker": "NO_ENGINE",
+                "blocker_detail": "The derivative pricer package could not "
+                                  "be imported in this runtime.",
+                "sport": "NFL", "market": line.get("market"),
+                "research_only": True, "official_authority": False,
+                "model_p_authority": False, "staking_authority": False,
+            } for line in deriv_input]
+        else:
+            distributions = {}
+            for game_line, game_result in zip(games, priced_games):
+                dist = extract_distribution(game_result)
+                if dist:
+                    distributions[derivative_fixture_key(
+                        game_line.get("away"), game_line.get("home"))] = dist
+            deriv_results, deriv_receipts = phone_nfl_derivative_rows(
+                deriv_input, distributions=distributions, now=clock)
+    # ANYTIME_TD stage: nflverse history through the engine's own opener
+    # seam. With auto_context off and no explicit opener, a cache miss
+    # fails closed instead of fetching (no-fetch means no-fetch). Same
+    # lazy-import discipline as the derivative stage (pandas-backed).
+    td_results, td_receipts = [], []
+    if td_input:
+        try:
+            from sportsedge.nfl_phone_anytime_td_pricing import (
+                phone_anytime_td_rows)
+        except ImportError:
+            td_results = [{
+                "status": "NO_MODEL_OR_MARKET",
+                "reason": "TD_ENGINE_RUNTIME_UNAVAILABLE",
+                "blocker": "NO_DATA",
+                "blocker_detail": "The anytime-TD engine package could not "
+                                  "be imported in this runtime.",
+                "sport": "NFL", "market": line.get("market"),
+                "player_name": line.get("player_name") or line.get("label"),
+                "research_only": True, "official_authority": False,
+                "model_p_authority": False, "staking_authority": False,
+            } for line in td_input]
+        else:
+            def _td_unavailable_opener(url, *args, **kwargs):
+                raise OSError("TD_HISTORY_FETCH_DISABLED_IN_NO_FETCH_MODE")
+            td_results, td_receipts = phone_anytime_td_rows(
+                td_input, now=clock, cache_dir=td_cache_dir,
+                opener=td_opener if td_opener is not None else (
+                    None if auto_context else _td_unavailable_opener))
+    if len(deriv_results) != len(deriv_input):
+        raise ValueError("DERIVATIVE_RESULT_COUNT_MISMATCH")
+    if len(td_results) != len(td_input):
+        raise ValueError("ANYTIME_TD_RESULT_COUNT_MISMATCH")
     if len(nfl_results) != len(nfl_input) or len(cfb_results) != len(cfb_input):
         raise ValueError("FOOTBALL_RESULT_COUNT_MISMATCH")
     if len(pitcher_results) != len(pitcher_input):
@@ -361,6 +477,18 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     for local, result in zip(batter_pos, batter_results):
         modeled_props[local] = result
     for local, result in zip(first_pos, first_results):
+        original = first_originals.get(local)
+        if original is not None:
+            # Restore the intake market label (NRFI/YRFI); the probability
+            # came from the underlying FIRST_INNING_RUNS binary at 0.5.
+            result = dict(result)
+            result["market"] = original
+            result["underlying_market"] = "FIRST_INNING_RUNS"
+            result["priced_via"] = "FIRST_INNING_RUNS_BINARY_AT_0_5"
+        modeled_props[local] = result
+    for local, result in zip(deriv_pos, deriv_results):
+        modeled_props[local] = result
+    for local, result in zip(td_pos, td_results):
         modeled_props[local] = result
     for local, result in zip(nfl_pos, nfl_results):
         modeled_props[local] = result
@@ -394,13 +522,17 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     card["source_receipts"] = (list(card.get("source_receipts") or [])
                               + pitcher_receipts + batter_receipts
                               + first_receipts
-                              + nfl_receipts + cfb_receipts)
+                              + nfl_receipts + cfb_receipts
+                              + deriv_receipts + td_receipts)
     card["prop_model_status"] = {
         "pitcher_engine":"MLB_PITCHER_JOINT_EMPIRICAL_BAYES",
         "batter_engine":"MLB_BATTER_EMPIRICAL_GAMELOG",
         "first_inning_engine":"MLB_FIRST_INNING_TEAM_RATES_POISSON_JEFFREYS",
         "nfl_player_engine":"ESPN_NAMED_HISTORICAL_GAMELOG_WATCH_ONLY",
         "cfb_player_engine":"ESPN_NAMED_HISTORICAL_GAMELOG_WATCH_ONLY",
+        "nfl_anytime_td_engine":"NFLVERSE_OPPORTUNITY_DECOMPOSITION_UNVALIDATED",
+        "nfl_derivative_engine":"WIRED_PRICERS_DISTRIBUTION_REQUIRED",
+        "first_inning_nrfi_yrfi":"FIRST_INNING_RUNS_BINARY_ALIAS_AT_0_5",
         "free_public_history":True,
         "model_vs_close_validated":False,
         "phone_odds_freshness_required":True,
@@ -432,6 +564,10 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             "MLB_PITCHER_BATTER_AND_ESPN_NAMED_FOOTBALL_HISTORY_UNVALIDATED",
         },
     }
+    # The 89-market coverage pass: every matrix market resolves through
+    # this one canonical path to a priced route or a named taxonomy
+    # blocker. Coverage is not validation; statuses are carried, not earned.
+    card["canonical_coverage"] = coverage_summary()
     # Surface every catalog market on the same free phone research card.
     # This is presentation ONLY: absent quotes and unsupported model families
     # remain explicit blockers. No probabilities or quotes are synthesized.
