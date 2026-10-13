@@ -44,20 +44,50 @@ def test_whole_line_push_mass():
     assert row["push"] > 0 and abs(row["over"] + row["under"] + row["push"] - 1) < 1e-12
 
 
-def test_f5_game_total_not_offered_and_disabled_factors_rejected():
-    for mk in ("F5_TOTALS", "F5_GAME_TOTAL"):
-        assert m.price_f5_team_totals({"market": mk})["reason"] == "NOT_OFFERED_ON_DK"
+def _ledger(avail, event_id="777"):
+    return {"schema": "DK_EVENT_COVERAGE_RECONCILIATION_V1", "event_id": event_id,
+            "observed_at_utc": "2026-10-13T12:00:00+00:00",
+            "rows": [{"market": "F5_TOTALS", "availability": avail}]}
+
+
+def test_f5_game_total_offering_is_per_event_and_unknown_by_default():
+    assert m.f5_game_total_offering(None, event_id="777")["availability"] == "UNKNOWN"
+    assert m.f5_game_total_offering(_ledger("NOT_OFFERED_ON_THIS_EVENT"), event_id="777")["availability"] \
+        == "NOT_OFFERED_ON_THIS_EVENT"
+    assert m.f5_game_total_offering(_ledger("NOT_OFFERED_ON_THIS_EVENT"), event_id="888")["availability"] == "UNKNOWN"
+    assert m.f5_game_total_offering(_ledger("NOT_VERIFIED_ON_THIS_EVENT"), event_id="777")["availability"] == "UNKNOWN"
+    assert m.f5_game_total_offering(_ledger("OFFERED_ON_THIS_EVENT"), event_id="777")["availability"] \
+        == "OFFERED_ON_THIS_EVENT"
+    off = m.f5_game_total_offering(_ledger("OFFERED_ON_THIS_EVENT"), event_id="777")
+    assert "over" not in off and off["market_baseline"] == "MISSING"
+
+
+def test_model_output_separate_from_market_and_disabled_factors_rejected():
+    out = m.price_f5_team_totals({"away_mean_runs": 4, "home_mean_runs": 4, "f5_share": .5})
+    assert out["kind"] == "MODEL_PROBABILITY_ONLY" and out["market_baseline"] == "MISSING"
+    assert not {"odds", "price", "edge", "ev"} & set(out)
+    with pytest.raises(m.F5LadderError):
+        m.price_f5_team_totals({"market": "F5_TOTALS", "away_mean_runs": 4, "home_mean_runs": 4, "f5_share": .5})
     with pytest.raises(m.F5LadderError, match="disabled"):
         m.price_f5_team_totals({"away_mean_runs": 4, "home_mean_runs": 4, "f5_share": .5, "rest_adj": 0.1})
 
 
-def test_settlement_push_tie_and_no_action():
-    assert m.settle_f5_team_total(team_f5_runs=2, line=2, side="OVER", completed_innings=5) == "PUSH"
-    assert m.settle_f5_team_total(team_f5_runs=2, line=1.5, side="OVER", completed_innings=9) == "WIN"
-    assert m.settle_f5_team_total(team_f5_runs=1, line=1.5, side="OVER", completed_innings=9) == "LOSS"
-    assert m.settle_f5_team_total(team_f5_runs=5, line=1.5, side="OVER", completed_innings=4.2) == "NO_ACTION"
-    assert m.settle_either_pitcher_max(away_value=5, home_value=3, line=5, side="OVER") == "PUSH"
-    assert m.settle_either_pitcher_max(away_value=7, home_value=3, line=5.5, side="UNDER") == "LOSS"
+def test_settlement_is_fail_closed_unverified_dk_rules():
+    cases = [
+        (m.settle_f5_team_total(team_f5_runs=2, line=2, side="OVER", completed_innings=5), "PUSH"),
+        (m.settle_f5_team_total(team_f5_runs=2, line=1.5, side="OVER", completed_innings=9), "WIN"),
+        (m.settle_f5_team_total(team_f5_runs=1, line=1.5, side="OVER", completed_innings=9), "LOSS"),
+        (m.settle_f5_team_total(team_f5_runs=5, line=1.5, side="OVER", completed_innings=4.2),
+         "SHORTENED_RULE_UNVERIFIED"),
+        (m.settle_either_pitcher_max(away_value=5, home_value=3, line=5, side="OVER"), "PUSH"),
+        (m.settle_either_pitcher_max(away_value=7, home_value=3, line=5.5, side="UNDER"), "LOSS"),
+        (m.settle_either_pitcher_max(away_value=7, home_value=3, line=5.5, side="OVER", both_started=False),
+         "PITCHER_DID_NOT_START_RULE_UNVERIFIED"),
+    ]
+    for res, structural in cases:
+        assert res["settlement_status"] == "UNVERIFIED_DK_RULES" and res["grade"] is None
+        assert res["authoritative"] is False and res["structural_outcome"] == structural
+    assert len(m.DK_RULES_REQUIRED) >= 4
 
 
 def test_share_is_point_in_time():
@@ -69,6 +99,19 @@ def test_share_is_point_in_time():
     assert a["share"] == pytest.approx(0.4)
     with pytest.raises(m.F5LadderError):
         m.fit_f5_share(games, as_of=T0 + timedelta(days=10))
+
+
+def test_started_but_not_final_before_cutoff_is_excluded():
+    games = _games(30)
+    cutoff = games[-1]["start"] + timedelta(hours=2)  # last game started but not final
+    with pytest.raises(m.F5LadderError):
+        m.fit_f5_share(games, as_of=cutoff)
+    assert m.fit_f5_share(games, as_of=games[-1]["start"] + timedelta(hours=6))["games"] == 30
+    ended = [dict(g, final_at=g["start"] + timedelta(hours=3)) for g in games]
+    assert m.fit_f5_share(ended, as_of=cutoff + timedelta(hours=1))["games"] == 30
+    live = [dict(g, status="IN_PROGRESS") if i == 29 else g for i, g in enumerate(games)]
+    with pytest.raises(m.F5LadderError):
+        m.fit_f5_share(live, as_of=cutoff + timedelta(days=5))
 
 
 def test_either_pitcher_max_ladder():
