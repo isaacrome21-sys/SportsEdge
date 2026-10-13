@@ -122,7 +122,9 @@ def _entry(path, disposition, reason, detail, bundle=None):
              "disposition": disposition, "reason": reason,
              "detail": detail, "team_id": None, "team_name": None}
     if isinstance(bundle, dict):
-        team = bundle.get("team") or {}
+        team = bundle.get("team")
+        if not isinstance(team, dict):
+            team = {}
         if team.get("espn_id") is not None:
             entry["team_id"] = str(team.get("espn_id"))
         if team.get("name") is not None:
@@ -228,7 +230,7 @@ def load_form2_bundles(bundles_dir, game_rows):
     for path in files:
         try:
             raw = path.read_text(encoding="utf-8")
-        except OSError as exc:
+        except (OSError, UnicodeError) as exc:
             audit["entries"].append(_entry(
                 path, EXCLUDED, REASON_UNREADABLE, type(exc).__name__))
             continue
