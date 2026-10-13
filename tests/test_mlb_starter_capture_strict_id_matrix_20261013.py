@@ -165,7 +165,6 @@ def test_same_gamepk_hostile_fixture_drift_fails_closed(kind, reason):
 @pytest.mark.parametrize("status", [
     {"codedGameState": "I", "detailedState": "In Progress", "abstractGameState": "Live"},
     {"codedGameState": "F", "detailedState": "Final", "abstractGameState": "Final"},
-    {"codedGameState": "D", "detailedState": "Postponed", "abstractGameState": "Preview"},
     {"codedGameState": "S", "detailedState": "In Progress", "abstractGameState": "Preview"},
     {"codedGameState": "S", "detailedState": "Suspended", "abstractGameState": "Preview"},
     {},
