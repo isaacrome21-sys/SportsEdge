@@ -528,7 +528,7 @@ def capture_snapshot(
     if (
         row["abstract_state"] != "Preview"
         or row["status_code"] not in ("S", "P")
-        or row["detailed_state"] in ("Postponed", "In Progress", "Final", "Game Over")
+        or row["detailed_state"] not in ("Scheduled", "Pre-Game", "Warmup")
     ):
         record["record_status"] = "FAILED"
         record["failure_reason"] = "GAME_STATUS_NOT_PREGAME"
