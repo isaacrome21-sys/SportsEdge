@@ -51,7 +51,7 @@ def possessions(box: Mapping[str, str]) -> float:
     fga = int(str(box["fieldGoalsMade-fieldGoalsAttempted"]).split("-")[1])
     fta = int(str(box["freeThrowsMade-freeThrowsAttempted"]).split("-")[1])
     orb = int(box["offensiveRebounds"])
-    tov = int(box.get("totalTurnovers", box["turnovers"]))
+    tov = int(box["totalTurnovers"] if "totalTurnovers" in box else box["turnovers"])
     return fga - orb + tov + 0.44 * fta
 
 
