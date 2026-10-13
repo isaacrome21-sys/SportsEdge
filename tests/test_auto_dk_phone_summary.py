@@ -176,6 +176,8 @@ def test_radar_requires_market_exact_fresh_peer_receipts():
         root.mkdir()
         now=datetime(2026,10,11,17,1,tzinfo=timezone.utc)
         fresh="2026-10-11T17:00:00Z"
+        from scripts.collect_auto_dk_four_sports import _pair_fair
+        peer_prices={"line":45.5,"over":-117,"under":101}
         base={
             "status":"READY",
             "games":[{
@@ -184,11 +186,12 @@ def test_radar_requires_market_exact_fresh_peer_receipts():
                 "markets":{"totals":{"line":45.5,"over":100,"under":-120,
                                      "observed_at":fresh}},
                 "reference":{"totals":{
-                    "method":"PINNACLE_POWER_V1","fair":[.52,.48],
+                    "method":"PINNACLE_POWER_V1","fair":_pair_fair(peer_prices),
                     "books":["pinnacle"],"model_probability":None,
                     "provider_event_id":"game_1","market_key":"totals",
                     "dk_observed_at":fresh,"dk_line":45.5,
                     "peer_evidence":[{"book":"pinnacle","observed_at":fresh,"line":45.5}],
+                    "peer_price_pairs":[{"book":"pinnacle","prices":{"over":-117,"under":101}}],
                 }},
             }],
         }
@@ -201,7 +204,18 @@ def test_radar_requires_market_exact_fresh_peer_receipts():
             return card.nfl_market_price_radar(root,now)[0]
         assert len(scan()) == 1
         assert scan(lambda ref: ref["peer_evidence"][0].update(observed_at="2026-10-11T16:45:00Z")) == []
+        # Both timestamps are <10 minutes old, but three minutes apart;
+        # a peer price this far from DK is not a paired price opportunity.
+        assert scan(lambda ref: ref["peer_evidence"][0].update(observed_at="2026-10-11T16:57:00Z")) == []
+        assert scan(lambda ref: ref.update(peer_evidence=[None])) == []
+        assert scan(lambda ref: ref.update(books=[{"unhashable":"book"}])) == []
+        assert scan(lambda ref: ref.update(books=["pinnacle","pinnacle"])) == []
         assert scan(lambda ref: ref["peer_evidence"][0].update(line=46.5)) == []
         assert scan(lambda ref: ref.update(provider_event_id="wrong")) == []
         assert scan(lambda ref: ref.update(peer_evidence=[])) == []
         assert scan(lambda ref: ref.update(dk_observed_at="2026-10-11T16:45:00Z")) == []
+        # A price-only positive discrepancy cannot use an unbound or edited
+        # reference probability, even when book names and clocks match.
+        assert scan(lambda ref: ref["fair"].__setitem__(0,.85)) == []
+        assert scan(lambda ref: ref["peer_price_pairs"][0]["prices"].update(over=-125)) == []
+        assert scan(lambda ref: ref.update(peer_price_pairs=[])) == []
