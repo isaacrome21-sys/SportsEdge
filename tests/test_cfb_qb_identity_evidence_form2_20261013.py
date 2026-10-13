@@ -819,7 +819,7 @@ class CfbStageForm2Tests(unittest.TestCase):
     def test_form1_governs_feed_covered_teams_form2_never_consulted(self):
         league = {"injuries": RECORDED_CFB_LEAGUE["injuries"] + [
             {"id": "48", "displayName": "Delaware Blue Hens", "injuries": [
-                {"status": "Out",
+                {"status": "Out", "date": "2026-10-13T13:00:00Z",
                  "athlete": {"displayName": "Reserve Wideout",
                              "position": {"abbreviation": "WR"}}}]},
             {"id": "2393", "displayName": "Middle Tennessee Blue Raiders",
