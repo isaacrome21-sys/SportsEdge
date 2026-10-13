@@ -109,6 +109,62 @@ class MLBBatterPublicSource:
             raise MissingMLBBatterHistory("MLB_PUBLIC_FIXTURE_NOT_UNIQUELY_VERIFIED")
         return next(iter(unique.values()))
 
+    def _prior_start_times(self, latest, kickoff, now):
+        """Prior-game timestamps keyed by gamePk.
+
+        Single-game dates keep the conservative date-midnight stamp. A date
+        holding two or more distinct gamePks (doubleheader) is otherwise
+        indistinguishable from a duplicated game, so each such gamePk's
+        start is independently verified from the free StatsAPI schedule for
+        that date. Unverifiable doubleheader games are dropped (never given
+        invented times); the downstream HISTORY_LEAK_OR_DUPLICATE_GAME gate
+        is unchanged and still rejects any true duplicate or post-as-of game.
+        Returns None if any game had to be dropped (caller re-selects).
+        """
+        per_day = {}
+        for day, pk, _ in latest:
+            per_day.setdefault(day, set()).add(pk)
+        verified = {}
+        for day, pks in per_day.items():
+            if len(pks) < 2:
+                continue
+            url = ROOT + "/schedule?" + urlencode({
+                "sportId": "1", "date": day.isoformat()})
+            resp = self._fetch(url)
+            found = {}
+            for block in (resp or {}).get("dates") or []:
+                for g in (block or {}).get("games") or []:
+                    try:
+                        gpk = _int(g.get("gamePk"), "PRIOR_GAME_PK")
+                        start = _clock(g.get("gameDate"), "PRIOR_GAME_START")
+                    except MissingMLBBatterHistory:
+                        continue
+                    # Match on MLB's official (local) game date, not the UTC
+                    # calendar date: a 10:10 PM ET game on Oct 12 starts
+                    # Oct 13 02:10Z but is officially an Oct 12 game, which
+                    # is how the gameLog row is dated. Missing officialDate
+                    # fails closed for that game.
+                    if gpk in pks:
+                        official = str(g.get("officialDate") or "")
+                        found.setdefault(gpk, set()).add((start, official))
+            for gpk in pks:
+                entries = found.get(gpk) or set()
+                if len(entries) != 1:
+                    continue
+                start, official = next(iter(entries))
+                if official == day.isoformat() and start < kickoff and start < now:
+                    verified[gpk] = start
+            if len({verified.get(g) for g in pks}) != len(pks) or not all(g in verified for g in pks):
+                for g in pks:
+                    verified.pop(g, None)
+        self._verified_pks = {pk for day, pk, _ in latest
+                              if len(per_day[day]) < 2 or pk in verified}
+        if len(self._verified_pks) != len(latest):
+            return None
+        return [(verified[pk] if pk in verified else
+                 datetime.combine(day, datetime.min.time(), timezone.utc)).isoformat()
+                for day, pk, _ in latest]
+
     def prior_games(self, *, away, home, player_name, owner_kickoff,
                     as_of, max_games=30):
         """Return actual prior batting game logs for a named player."""
@@ -244,8 +300,17 @@ class MLBBatterPublicSource:
             raise MissingMLBBatterHistory("FEWER_THAN_TEN_VERIFIED_PRIOR_GAMES")
         if sum(stats["plate_appearances"] for _, _, stats in latest) < 20:
             raise MissingMLBBatterHistory("FEWER_THAN_TWENTY_PRIOR_PLATE_APPEARANCES")
-        dates = [datetime.combine(day, datetime.min.time(), timezone.utc).isoformat()
-                 for day, _, _ in latest]
+        starts = self._prior_start_times(latest, kickoff, now)
+        if starts is None:
+            # A doubleheader date's games were dropped because their exact
+            # start could not be independently verified; re-select.
+            latest = [x for x in latest if x[1] in self._verified_pks]
+            starts = self._prior_start_times(latest, kickoff, now)
+        if len(latest) < 10:
+            raise MissingMLBBatterHistory("FEWER_THAN_TEN_VERIFIED_PRIOR_GAMES")
+        if sum(stats["plate_appearances"] for _, _, stats in latest) < 20:
+            raise MissingMLBBatterHistory("FEWER_THAN_TWENTY_PRIOR_PLATE_APPEARANCES")
+        dates = starts
         return {
             "game_id": str(game["gamePk"]), "batter_id": str(ident),
             "batter_name": resolved_name, "home_team": home,
