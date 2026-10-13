@@ -4,6 +4,7 @@ from contextvars import ContextVar
 from dataclasses import replace, dataclass, asdict
 from datetime import datetime, timedelta, timezone
 import hashlib
+import time as _time
 import json
 from pathlib import Path
 import re
@@ -50,8 +51,13 @@ class GameSnapshot:
 RECEIPT_CLOCK_SKEW = timedelta(seconds=5)
 
 
-def _utc_clock() -> datetime:
-    return datetime.now(timezone.utc)
+def _trusted_now() -> datetime:
+    """Trusted system clock for fetch start / receipt. Not injectable by callers or
+    recorders; only tests monkeypatch this module attribute."""
+    return _DATETIME.fromtimestamp(_time.time_ns() / 1e9, tz=timezone.utc)
+
+
+_utc_clock = _trusted_now  # backward-compatible name; same trusted source
 
 
 _DATETIME = datetime  # unpatched type for isinstance checks
@@ -96,7 +102,7 @@ class MLBSourceCapture:
 
     def __init__(self, root: Path, *, clock: Callable[[], datetime] | None = None):
         self.root = Path(root)
-        self.clock = clock or _utc_clock
+        self.clock = clock or (lambda: _trusted_now())
         self.records: list[MLBSourceCaptureRecord] = []
 
     @staticmethod
@@ -108,16 +114,19 @@ class MLBSourceCapture:
             return "MLB_STATSAPI_BOXSCORE", int(match.group(1))
         return "MLB_STATSAPI_OTHER", None
 
-    def record(self, *, url: str, raw: bytes, fetch_started_at: datetime | None = None) -> MLBSourceCaptureRecord:
+    def record(self, *, url: str, raw: bytes, fetch_started_at: datetime,
+               received_at: datetime) -> MLBSourceCaptureRecord:
+        """fetch_started_at / received_at must come from the trusted module clock
+        (``_trusted_now``), read independently of this recorder's injectable clock."""
         try:
             observed = _aware(self.clock(), "source capture clock")
         except MLBSourceError:
             raise MLBSourceError("source capture clock must return timezone-aware datetime")
-        if fetch_started_at is not None:
-            # Same bounds as caller-supplied times: not before the fetch start read from
-            # this recorder's clock, and not beyond real time + skew.
-            bound_caller_time(observed, fetch_started_at=_aware(fetch_started_at, "fetch start"),
-                              received_at=_utc_clock())
+        start = _aware(fetch_started_at, "trusted fetch start")
+        receipt = _aware(received_at, "trusted receipt")
+        if receipt < start:
+            raise MLBSourceError("RECEIPT_CLOCK_WENT_BACKWARDS")
+        bound_caller_time(observed, fetch_started_at=start, received_at=receipt)
         source_kind, game_pk = self._identity(url)
         digest = hashlib.sha256(raw).hexdigest()
         sequence = len(self.records) + 1
@@ -173,7 +182,7 @@ def capture_mlb_source_bytes(
 
 def _get_json(url: str, opener: Callable = urlopen) -> dict[str, Any]:
     recorder = _ACTIVE_SOURCE_CAPTURE.get()
-    started = recorder.clock() if recorder is not None else None
+    started = _trusted_now()
     try:
         with opener(url, timeout=15) as r:
             raw = r.read()
@@ -181,7 +190,7 @@ def _get_json(url: str, opener: Callable = urlopen) -> dict[str, Any]:
             raise MLBSourceError("MLB response body must be bytes")
         raw_bytes = bytes(raw)
         if recorder is not None:
-            recorder.record(url=url, raw=raw_bytes, fetch_started_at=started)
+            recorder.record(url=url, raw=raw_bytes, fetch_started_at=started, received_at=_trusted_now())
         return json.loads(raw_bytes.decode("utf-8"))
     except MLBSourceError:
         raise
@@ -301,18 +310,16 @@ def parse_schedule(payload: dict[str, Any], retrieved_at: datetime) -> list[Game
     return out
 
 
-def fetch_schedule(date_iso: str, opener: Callable = urlopen, now: datetime | None = None,
-                   *, clock: Callable[[], datetime] | None = None) -> list[GameSnapshot]:
+def fetch_schedule(date_iso: str, opener: Callable = urlopen, now: datetime | None = None) -> list[GameSnapshot]:
     """retrieved_at is ALWAYS the post-fetch clock. A caller-supplied ``now`` is kept
     only as ``caller_asserted_at`` and must satisfy fetch_start <= now <= receipt + skew."""
-    clock = clock or _utc_clock
     url = (
         f"{BASE}/api/v1/schedule?sportId=1&date={date_iso}"
         "&gameType=R,F,D,L,W,A,S,E&hydrate=probablePitcher,team"
     )
-    fetch_started_at = _aware(clock(), "receipt clock")
+    fetch_started_at = _aware(_trusted_now(), "receipt clock")
     payload = _get_json(url, opener)
-    retrieved_at = _aware(clock(), "receipt clock")
+    retrieved_at = _aware(_trusted_now(), "receipt clock")
     if retrieved_at < fetch_started_at:
         raise MLBSourceError("RECEIPT_CLOCK_WENT_BACKWARDS")
     games = parse_schedule(payload, retrieved_at)

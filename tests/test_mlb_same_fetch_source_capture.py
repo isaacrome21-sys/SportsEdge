@@ -89,8 +89,9 @@ class SameFetchSourceCaptureTest(unittest.TestCase):
         opener = _Opener(self.schedule_raw, self.boxscore_raw)
         observed = datetime(2026, 9, 13, 17, 30, tzinfo=timezone.utc)
         with tempfile.TemporaryDirectory() as td:
-            with capture_mlb_source_bytes(Path(td), clock=lambda: observed) as capture:
-                games = fetch_schedule("2026-09-13", opener=opener, clock=lambda: observed)
+            with patch("sportsedge.mlb_source._trusted_now", lambda: observed), \
+                    capture_mlb_source_bytes(Path(td), clock=lambda: observed) as capture:
+                games = fetch_schedule("2026-09-13", opener=opener)
                 box = fetch_boxscore(777001, opener=opener)
 
             self.assertEqual(101, games[0].away_probable_pitcher_id)
@@ -126,18 +127,17 @@ class SameFetchSourceCaptureTest(unittest.TestCase):
                 events.append("body_received")
                 return super().read()
 
-        class ReceiptClock(datetime):
-            @staticmethod
-            def now(tz):
-                events.append("clock_read")
-                return observed
+        def trusted():
+            events.append("clock_read")
+            return observed
 
-        with patch("sportsedge.mlb_source.datetime", ReceiptClock):
+        with patch("sportsedge.mlb_source._trusted_now", trusted):
             games = fetch_schedule(
                 "2026-09-13", opener=lambda *a, **kw: DelayedResponse(raw)
             )
-        # fetch-start clock, then body, then the receipt clock (retrieved_at)
-        self.assertEqual(["clock_read", "body_received", "clock_read"], events)
+        # trusted fetch-start reads (schedule + transport), body, then trusted receipt
+        self.assertEqual(["clock_read", "clock_read", "body_received", "clock_read"], events)
+        self.assertEqual("clock_read", events[-1])  # receipt read after the body
         self.assertEqual(observed.isoformat(), games[0].retrieved_at)
 
     def test_schedule_explicitly_requests_postseason_and_preserves_world_series(self):
@@ -152,7 +152,8 @@ class SameFetchSourceCaptureTest(unittest.TestCase):
     def test_capture_is_opt_in(self):
         opener = _Opener(self.schedule_raw, self.boxscore_raw)
         observed = datetime(2026, 9, 13, 17, 30, tzinfo=timezone.utc)
-        fetch_schedule("2026-09-13", opener=opener, clock=lambda: observed)
+        with patch("sportsedge.mlb_source._trusted_now", lambda: observed):
+            fetch_schedule("2026-09-13", opener=opener)
         fetch_boxscore(777001, opener=opener)
         self.assertEqual(2, len(opener.calls))
         self.assertTrue(all(response.read_count == 1 for response in opener.responses))

@@ -20,16 +20,22 @@ class _R:
 
 
 def _clock(*times):
-    it = iter(times)
-    return lambda: next(it)
+    """Yield the given times in order, then keep returning the last one."""
+    seq = list(times)
+
+    def nxt():
+        return seq.pop(0) if len(seq) > 1 else seq[0]
+    return nxt
 
 
 def _open(*a, **k):
     return _R(json.dumps(SCHED).encode())
 
 
-def fetch(now=None, start=T0, end=T0 + timedelta(seconds=2)):
-    return ms.fetch_schedule("2026-10-13", opener=_open, now=now, clock=_clock(start, end))
+def fetch(now=None, start=T0, end=T0 + timedelta(seconds=2), monkeypatch=None):
+    import unittest.mock as um
+    with um.patch.object(ms, "_trusted_now", _clock(start, end)):  # tests only
+        return ms.fetch_schedule("2026-10-13", opener=_open, now=now)
 
 
 def test_retrieved_at_is_post_fetch_clock_even_when_caller_supplies_now():
@@ -66,26 +72,59 @@ def test_naive_or_backwards_receipt_clock_fails_closed():
         fetch(start=T0, end=T0 - timedelta(seconds=1))
 
 
-def test_recorder_clock_bounded(tmp_path):
-    ok = ms.MLBSourceCapture(tmp_path, clock=_clock(T0))
-    ok.record(url="https://x/api/v1/schedule", raw=b"{}", fetch_started_at=T0)
+def _trusted(*times):
+    import unittest.mock as um
+    return um.patch.object(ms, "_trusted_now", _clock(*times))
+
+
+def test_fetch_schedule_has_no_injectable_clock():
+    import inspect
+    assert "clock" not in inspect.signature(ms.fetch_schedule).parameters
+
+
+def test_recorder_valid_clock_within_trusted_window(tmp_path):
+    with _trusted(T0, T0 + timedelta(seconds=1)):
+        with ms.capture_mlb_source_bytes(tmp_path, clock=lambda: T0 + timedelta(milliseconds=500)) as cap:
+            ms._get_json("https://x/api/v1/schedule", _open)
+    assert cap.records[0].observed_at_utc == (T0 + timedelta(milliseconds=500)).isoformat()
+
+
+def test_adversarial_year_2000_recorder_clock_rejected(tmp_path):
+    y2k = datetime(2000, 1, 1, tzinfo=timezone.utc)
+    with _trusted(T0, T0 + timedelta(seconds=1)):
+        with ms.capture_mlb_source_bytes(tmp_path, clock=lambda: y2k):
+            with pytest.raises(ms.MLBSourceError, match="BEFORE_FETCH_START"):
+                ms._get_json("https://x/api/v1/schedule", _open)
+    # and with the REAL trusted clock (no patching at all)
+    with ms.capture_mlb_source_bytes(tmp_path / "real", clock=lambda: y2k):
+        with pytest.raises(ms.MLBSourceError, match="BEFORE_FETCH_START"):
+            ms._get_json("https://x/api/v1/schedule", _open)
+
+
+def test_adversarial_far_future_recorder_clock_rejected(tmp_path):
+    far = datetime(2099, 1, 1, tzinfo=timezone.utc)
+    with ms.capture_mlb_source_bytes(tmp_path, clock=lambda: far):
+        with pytest.raises(ms.MLBSourceError, match="IN_FUTURE"):
+            ms._get_json("https://x/api/v1/schedule", _open)
+
+
+def test_adversarial_caller_now_year_2000_and_far_future_rejected():
     with pytest.raises(ms.MLBSourceError, match="BEFORE_FETCH_START"):
-        ms.MLBSourceCapture(tmp_path, clock=_clock(T0 - timedelta(seconds=1))).record(
-            url="https://x/api/v1/schedule", raw=b"{}", fetch_started_at=T0)
-    future = datetime.now(timezone.utc) + timedelta(hours=1)
+        ms.fetch_schedule("2026-10-13", opener=_open, now=datetime(2000, 1, 1, tzinfo=timezone.utc))
     with pytest.raises(ms.MLBSourceError, match="IN_FUTURE"):
-        ms.MLBSourceCapture(tmp_path, clock=_clock(future)).record(
-            url="https://x/api/v1/schedule", raw=b"{}", fetch_started_at=future - timedelta(seconds=1))
+        ms.fetch_schedule("2026-10-13", opener=_open, now=datetime(2099, 1, 1, tzinfo=timezone.utc))
+
+
+def test_recorder_requires_trusted_window_and_aware_clock(tmp_path):
+    rec = ms.MLBSourceCapture(tmp_path, clock=lambda: T0)
+    with pytest.raises(TypeError):
+        rec.record(url="https://x/api/v1/schedule", raw=b"{}")
+    with pytest.raises(ms.MLBSourceError, match="BACKWARDS"):
+        rec.record(url="https://x/api/v1/schedule", raw=b"{}", fetch_started_at=T0,
+                   received_at=T0 - timedelta(seconds=1))
     with pytest.raises(ms.MLBSourceError, match="timezone-aware"):
-        ms.MLBSourceCapture(tmp_path, clock=_clock(datetime(2026, 10, 13))).record(
-            url="https://x/api/v1/schedule", raw=b"{}")
-
-
-def test_recorder_reads_fetch_start_from_its_own_clock(tmp_path):
-    seq = _clock(T0, T0 + timedelta(seconds=1))
-    with ms.capture_mlb_source_bytes(tmp_path, clock=seq) as cap:
-        ms._get_json("https://x/api/v1/schedule", _open)
-    assert cap.records[0].observed_at_utc == (T0 + timedelta(seconds=1)).isoformat()
+        ms.MLBSourceCapture(tmp_path, clock=lambda: datetime(2026, 10, 13)).record(
+            url="https://x/api/v1/schedule", raw=b"{}", fetch_started_at=T0, received_at=T0)
 
 
 def test_six_runner_callers_no_longer_pass_pre_fetch_time():

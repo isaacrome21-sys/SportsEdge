@@ -14,7 +14,13 @@ import sportsedge.manual_hybrid_joint_runner as manual_hybrid
 from sportsedge.auto_runner import _live_game
 from sportsedge.mlb_generic_features import MLBGenericHistorySource
 from sportsedge.mlb_joint_mode_bridge import build_feature_rows_for_quotes
+from unittest.mock import patch as _patch
 from sportsedge.mlb_source import fetch_schedule
+
+
+def _fetch_at(date, opener, at):
+    with _patch("sportsedge.mlb_source._trusted_now", lambda: at):  # tests only
+        return fetch_schedule(date, opener=opener)
 from sportsedge.quote_bridge import validate_canonical_quote
 from sportsedge.unified_card import run_unified_card
 
@@ -69,7 +75,7 @@ def opener(req, timeout=15):
 
 def canonical_quotes(): return [validate_canonical_quote(row) for row in raw_quotes()]
 def live_game():
-    snap = fetch_schedule(TARGET_DATE.isoformat(), opener=opener, clock=lambda: NOW)[0]
+    snap = _fetch_at(TARGET_DATE.isoformat(), opener, NOW)[0]
     return _live_game(snap, boxscore=boxscore_payload(), projected={}, now=NOW)
 def frozen_features(game, quotes):
     source = MLBGenericHistorySource(opener=opener, retrieved_at=NOW)
