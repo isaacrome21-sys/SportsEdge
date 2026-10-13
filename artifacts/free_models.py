@@ -1263,6 +1263,11 @@ def _paired_book_context(rows, evaluated, index):
             return False
         if book(other_row) != book(row):
             return False
+        # A matching game/line is not sufficient across period or settlement
+        # contracts, or conflicting supplied sportsbook event identities.
+        for field in ("period", "phase", "settlement_type", "event_id", "dk_event_id"):
+            if str(other_row.get(field) or "").strip().upper() != str(row.get(field) or "").strip().upper():
+                return False
         if _pair_side(other_row, other) != expected_opposite:
             return False
         if market == "TEAM_TOTALS":
