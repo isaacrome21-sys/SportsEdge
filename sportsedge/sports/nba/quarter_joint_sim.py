@@ -113,3 +113,23 @@ def markets(H: np.ndarray, A: np.ndarray) -> dict:
         "home_ml": float((H.sum(1) > A.sum(1)).mean()),
         "went_ot": float((H[:, 4:].sum(1) + A[:, 4:].sum(1) > 0).mean()),
     }
+
+
+VERSION_V2 = "NBA_QUARTER_JOINT_SIM_V2_REGSHARE_20261013"
+
+
+def simulate_v2(cal: QuarterCalibration, home_mean: float, away_mean: float, *,
+                n: int = 4000, seed: int = 0, max_ot: int = 6):
+    """V2 (pre-registered): one moment-matching step on regulation means.
+
+    Simulate with V1 scaling, then shift both regulation means by the same
+    additive ``d`` so the simulated expected FINAL total equals the rating
+    total (margin preserved). Re-simulate with the same seed. Exactly one
+    correction step; no fitted parameter.
+    """
+    H, A = simulate(cal, home_mean, away_mean, n=n, seed=seed, max_ot=max_ot)
+    d = (home_mean + away_mean - float((H.sum(1) + A.sum(1)).mean())) / 2.0
+    if cal.reg_share <= 0:
+        raise ValueError("REG_SHARE_NONPOSITIVE")
+    adj = d / cal.reg_share  # simulate() multiplies the passed mean by reg_share
+    return simulate(cal, home_mean + adj, away_mean + adj, n=n, seed=seed, max_ot=max_ot)
