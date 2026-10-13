@@ -6,9 +6,9 @@ import json
 from pathlib import Path
 import re
 
-MAX_BODY = 50000
-MAX_ROWS = 80
-SPORTS = frozenset(("NFL", "CFB", "NBA", "MLB"))
+MAX_BODY = 1000000
+MAX_ROWS = 2000
+SPORTS = frozenset(("NFL", "CFB", "NBA", "CBB", "MLB"))
 TRIGGER = "[FREE RUN IT]"
 JSON_FENCE = re.compile(r"```(?:json)?[ \t]*\r?\n(.*?)\r?\n```", re.I | re.S)
 
@@ -254,12 +254,23 @@ def main(argv=None):
             if args.card is None:
                 raise IntakeError("CARD_REQUIRED")
             card = json.loads(args.card.read_text(encoding="utf-8"))
-            text = render_card(card, run_url=args.run_url,
+            # The default phone surface uses plain statuses and every input row.
+            # render_card remains available only as a legacy diagnostic helper.
+            from sportsedge.phone_display import render_phone_card
+            text = render_phone_card(card, run_url=args.run_url,
                                intake_at=(event.get("issue") or {}).get("updated_at") or "")
     except (OSError, ValueError, TypeError, KeyError) as exc:
         raise SystemExit("FREE_RESEARCH_ISSUE_ERROR:" + safe(exc, 160)) from exc
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(text, encoding="utf-8")
+    if args.mode == "render":
+        from sportsedge.phone_display import phone_card_pages
+        page_paths = []
+        for index, page in enumerate(phone_card_pages(text), 1):
+            path = args.output.with_name(f"{args.output.stem}.part-{index:04d}.md")
+            path.write_text(page, encoding="utf-8")
+            page_paths.append(str(path))
+        args.output.with_suffix(".parts.json").write_text(json.dumps(page_paths), encoding="utf-8")
 
 if __name__ == "__main__":
     main()

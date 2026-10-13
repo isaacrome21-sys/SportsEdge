@@ -1263,6 +1263,11 @@ def _paired_book_context(rows, evaluated, index):
             return False
         if book(other_row) != book(row):
             return False
+        # A matching game/line is not sufficient across period or settlement
+        # contracts, or conflicting supplied sportsbook event identities.
+        for field in ("period", "phase", "alternate", "settlement_type", "event_id", "dk_event_id"):
+            if str(other_row.get(field) or "").strip().upper() != str(row.get(field) or "").strip().upper():
+                return False
         if _pair_side(other_row, other) != expected_opposite:
             return False
         if market == "TEAM_TOTALS":
@@ -1325,16 +1330,26 @@ def _paired_book_context(rows, evaluated, index):
     # other, not merely unequal as strings.
     input_time = dt(row.get("quote_captured_at"))
     if len(compatible) == 1:
-        matching_time = dt(rows[compatible[0]["input_index"]].get("quote_captured_at"))
+        counterpart_raw_time = rows[compatible[0]["input_index"]].get("quote_captured_at")
+        matching_time = dt(counterpart_raw_time)
         if matching_time is None:
-            projected["paired_market_status"] = "COUNTERPART_QUOTE_TIMESTAMP_MISSING"
+            projected["paired_market_status"] = (
+                "COUNTERPART_QUOTE_TIMESTAMP_MISSING"
+                if counterpart_raw_time in (None, "") else "INVALID_PAIR_QUOTE_TIMESTAMP"
+            )
             return
         if input_time is None:
-            projected["paired_market_status"] = "QUOTE_TIMESTAMP_MISSING"
+            projected["paired_market_status"] = (
+                "QUOTE_TIMESTAMP_MISSING"
+                if row.get("quote_captured_at") in (None, "") else "INVALID_PAIR_QUOTE_TIMESTAMP"
+            )
             return
-        if abs((input_time - matching_time).total_seconds()) > 120:
+        skew = abs((input_time - matching_time).total_seconds())
+        if skew > 120:
             projected["paired_market_status"] = "MISMATCHED_QUOTE_TIMESTAMPS"
             return
+        projected["paired_quote_skew_seconds"] = skew
+        projected["paired_quote_captured_at"] = [input_time.isoformat(), matching_time.isoformat()]
     else:
         # No compatible partner row exists: the partner price came solely
         # from this row's own opposite_odds field. An asserted field on the

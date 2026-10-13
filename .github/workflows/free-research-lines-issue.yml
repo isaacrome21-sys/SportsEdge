@@ -41,7 +41,10 @@ jobs:
             --output artifacts/free_research_issue/card.md \
             --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
       - name: Reply to phone issue
-        run: gh issue comment "$ISSUE_NUMBER" --body-file artifacts/free_research_issue/card.md
+        run: |
+          jq -r '.[]' artifacts/free_research_issue/card.parts.json | while IFS= read -r page; do
+            gh issue comment "$ISSUE_NUMBER" --body-file "$page"
+          done
       - name: Explain any intake, public-source or model failure
         if: failure()
         run: |
