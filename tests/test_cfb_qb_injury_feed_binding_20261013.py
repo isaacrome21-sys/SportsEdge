@@ -82,13 +82,18 @@ def recorded_getter(league_payload=RECORDED_CFB_LEAGUE):
 
 
 class RecordedFeedBindingTests(unittest.TestCase):
-    def test_recorded_cfb_feed_binds_teams_it_reports(self):
+    def test_recorded_cfb_feed_reports_stale_or_undated_rows_as_unknown(self):
+        # The original recorded wire is NOT a current injury report:
+        # Florida's row dates to 2020; Rice and Virginia have no row dates.
+        # Preserve source provenance and assert the current fail-closed rule.
         provider = free_models.PublicContext(NOW, getter=recorded_getter())
         for tid, name in (("57", "Florida"), ("242", "Rice"),
                           ("258", "Virginia")):
             rows, status = provider.injury_rows("CFB", {"id": tid})
-            self.assertEqual(status, "STRUCTURE_VERIFIED", name)
-            self.assertEqual(len(rows), 1, name)
+            self.assertIsNone(rows, name)
+            self.assertEqual(status, free_models.INJURY_STALE_UNKNOWN, name)
+            self.assertEqual(provider.injury_points("CFB", {"id": tid}),
+                             (0.0, free_models.INJURY_STALE_UNKNOWN), name)
 
     def test_recorded_cfb_feed_absent_cusa_teams_are_not_unusable_schema(self):
         provider = free_models.PublicContext(NOW, getter=recorded_getter())
@@ -237,12 +242,12 @@ class CfbStageTests(unittest.TestCase):
     def test_reported_teams_bind_and_pass_the_qb_gate(self):
         league = {"injuries": RECORDED_CFB_LEAGUE["injuries"] + [
             {"id": "48", "displayName": "Delaware Blue Hens", "injuries": [
-                {"status": "Out",
+                {"status": "Out", "date": "2026-10-13T11:00:00Z",
                  "athlete": {"displayName": "Reserve Wideout",
                              "position": {"abbreviation": "WR"}}}]},
             {"id": "2393", "displayName": "Middle Tennessee Blue Raiders",
              "injuries": [
-                 {"status": "Active",
+                 {"status": "Active", "date": "2026-10-13T11:00:00Z",
                   "athlete": {"displayName": "Starting Quarterback",
                               "position": {"abbreviation": "QB"}}}]},
         ]}
