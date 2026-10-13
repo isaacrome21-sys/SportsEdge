@@ -40,7 +40,9 @@ def _metrics(row):
     # Never substitute the independent projection for a row priced in Lane B:
     # its status may have been calculated from a different probability.
     projection = row.get("independent_projection") or {}
+    provenance = row.get("pricing_provenance") or {}
     anchored = (row.get("pricing_lane") == "LANE_B_ANCHORED"
+                or provenance.get("lane") == "MARKET_ANCHORED"
                 or projection.get("uses_sportsbook_price_in_projection") is True)
     source = projection if projection and not anchored else row
     probability = _number(source.get("estimate_p", source.get("model_probability")))
@@ -56,10 +58,16 @@ def _disposition(row, min_ev):
     priced = probability is not None and ev is not None
     if status.startswith("BLOCKED") or status in {"NO_MODEL_OR_MARKET", "NO_ENGINE", "NO_QUOTE", "MISSING_STATUS"}:
         return "BLOCKED", "blocked", row.get("reason") or status
+    provenance = row.get("pricing_provenance") or {}
+    if provenance.get("lane") == "UNDETERMINED":
+        return "BLOCKED", "blocked", "PROVENANCE_UNDETERMINED"
     if not priced:
         return "BLOCKED", "blocked", row.get("reason") or "Usable probability and EV unavailable"
-    fresh = (is_fresh(row.get("quote_freshness") or {})
-             or row.get("quote_status") == "RECENT_CAPTURED_QUOTE")
+    # Explicit freshness evidence is authoritative. A legacy quote_status
+    # string must never override an explicit stale/invalid/future verdict.
+    freshness = row.get("quote_freshness")
+    fresh = (is_fresh(freshness) if freshness is not None
+             else row.get("quote_status") == "RECENT_CAPTURED_QUOTE")
     if not fresh or status == "WATCH_QUOTE_NOT_CURRENT":
         return "REFRESH REQUIRED", "stale", "Current quote required"
     if anchored:
