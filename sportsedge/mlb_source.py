@@ -49,6 +49,11 @@ class GameSnapshot:
 
 
 RECEIPT_CLOCK_SKEW = timedelta(seconds=5)
+# A claimed fetch receipt older than this cannot be certified by the current
+# independent system clock. This is a transport-ingestion limit, not evidence
+# that data were present at a historical game as-of instant.
+RECEIPT_ANCHOR_MAX_AGE = timedelta(seconds=30)
+RECEIPT_MAX_FETCH_SPAN = timedelta(seconds=30)
 
 
 def _trusted_now() -> datetime:
@@ -104,6 +109,7 @@ class MLBSourceCapture:
         self.root = Path(root)
         self.clock = clock or (lambda: _trusted_now())
         self.records: list[MLBSourceCaptureRecord] = []
+        self._used_receipts: set[tuple[str, str, str, str]] = set()
 
     @staticmethod
     def _identity(url: str) -> tuple[str, int | None]:
@@ -116,8 +122,13 @@ class MLBSourceCapture:
 
     def record(self, *, url: str, raw: bytes, fetch_started_at: datetime,
                received_at: datetime) -> MLBSourceCaptureRecord:
-        """fetch_started_at / received_at must come from the trusted module clock
-        (``_trusted_now``), read independently of this recorder's injectable clock."""
+        """Require an independent system-time anchor, not the recorder clock.
+
+        Caller-provided fetch bounds alone are not evidence. Reject stale,
+        future, implausibly long and duplicate receipt claims before writing.
+        This still is not a signed cross-process PIT receipt or proof of a
+        historical sportsbook/StatsAPI state; all capture remains research.
+        """
         try:
             observed = _aware(self.clock(), "source capture clock")
         except MLBSourceError:
@@ -127,8 +138,21 @@ class MLBSourceCapture:
         if receipt < start:
             raise MLBSourceError("RECEIPT_CLOCK_WENT_BACKWARDS")
         bound_caller_time(observed, fetch_started_at=start, received_at=receipt)
+        try:
+            anchor = _aware(_trusted_now(), "independent system receipt anchor")
+        except Exception as exc:
+            raise MLBSourceError("RECEIPT_ANCHOR_UNAVAILABLE") from exc
+        if receipt > anchor + RECEIPT_CLOCK_SKEW:
+            raise MLBSourceError("RECEIPT_FUTURE_VS_SYSTEM_ANCHOR")
+        if receipt < anchor - RECEIPT_ANCHOR_MAX_AGE:
+            raise MLBSourceError("RECEIPT_STALE_OR_REPLAYED")
+        if receipt - start > RECEIPT_MAX_FETCH_SPAN:
+            raise MLBSourceError("RECEIPT_FETCH_SPAN_UNBOUNDED")
         source_kind, game_pk = self._identity(url)
         digest = hashlib.sha256(raw).hexdigest()
+        receipt_key = (url, digest, start.isoformat(), receipt.isoformat())
+        if receipt_key in self._used_receipts:
+            raise MLBSourceError("RECEIPT_DUPLICATE_REPLAY")
         sequence = len(self.records) + 1
         suffix = f"game_{game_pk}" if game_pk is not None else source_kind.lower()
         name = f"{sequence:04d}_{suffix}_{digest}.json"
@@ -148,6 +172,7 @@ class MLBSourceCapture:
             game_pk=game_pk,
         )
         self.records.append(record)
+        self._used_receipts.add(receipt_key)
         return record
 
     def manifest(self) -> dict[str, Any]:
