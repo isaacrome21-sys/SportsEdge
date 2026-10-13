@@ -107,6 +107,21 @@ class StarterCaptureError(ValueError):
 # Small primitives (mirroring the repo's receipt/archiver conventions).
 # --------------------------------------------------------------------------
 
+def _as_mapping(value: Any) -> Mapping[str, Any]:
+    """Untrusted nested source object -> mapping; any other type -> ``{}``.
+
+    A wrong-typed nested object is treated as absent, so the field-level
+    fail-closed checks below (missing ID, missing date, unknown status)
+    name the failure instead of an AttributeError escaping.
+    """
+    return value if isinstance(value, Mapping) else {}
+
+
+def _as_list(value: Any) -> list[Any]:
+    """Untrusted source array -> list; any other type -> ``[]``."""
+    return list(value) if isinstance(value, (list, tuple)) else []
+
+
 def _sha256_hex(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
@@ -213,18 +228,22 @@ def parse_schedule_games(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
     deficiency is carried on the row so the plan/capture layers can fail
     closed with a named reason instead of guessing.
     """
+    if not isinstance(payload, Mapping):
+        raise StarterCaptureError("SCHEDULE_PAYLOAD_NOT_OBJECT")
     rows: list[dict[str, Any]] = []
-    for block in payload.get("dates", []) or []:
-        for game in (block or {}).get("games", []) or []:
+    for block in _as_list(payload.get("dates")):
+        for game in _as_list(_as_mapping(block).get("games")):
+            if not isinstance(game, Mapping):
+                continue  # cannot be keyed by gamePk: same as a missing gamePk
             game_pk = _positive_statsapi_id(game.get("gamePk"))
             if game_pk is None:
                 continue
-            teams = game.get("teams") or {}
-            away = teams.get("away") or {}
-            home = teams.get("home") or {}
-            away_team = away.get("team") or {}
-            home_team = home.get("team") or {}
-            status = game.get("status") or {}
+            teams = _as_mapping(game.get("teams"))
+            away = _as_mapping(teams.get("away"))
+            home = _as_mapping(teams.get("home"))
+            away_team = _as_mapping(away.get("team"))
+            home_team = _as_mapping(home.get("team"))
+            status = _as_mapping(game.get("status"))
             first_pitch = _parse_iso(game.get("gameDate"))
             rows.append(
                 {
@@ -321,8 +340,12 @@ def build_plan(payload: Mapping[str, Any], *, planned_at: datetime) -> dict[str,
 
 
 def _slot_of(plan_game: Mapping[str, Any], slot_id: str) -> Mapping[str, Any]:
-    for slot in plan_game.get("slots", []):
-        if slot.get("slot_id") == slot_id:
+    if not isinstance(plan_game, Mapping):
+        raise StarterCaptureError("PLAN_GAME_NOT_OBJECT")
+    if not isinstance(slot_id, str):
+        raise StarterCaptureError("SLOT_ID_INVALID")
+    for slot in _as_list(plan_game.get("slots")):
+        if isinstance(slot, Mapping) and slot.get("slot_id") == slot_id:
             return slot
     raise StarterCaptureError(f"SLOT_NOT_IN_PLAN:{slot_id}")
 
@@ -332,8 +355,11 @@ def _slot_of(plan_game: Mapping[str, Any], slot_id: str) -> Mapping[str, Any]:
 # --------------------------------------------------------------------------
 
 def _slot_disposition(completed: datetime, slot: Mapping[str, Any]) -> str:
-    start = _parse_iso(slot["window_start_utc"])
-    end = _parse_iso(slot["window_end_utc"])
+    start = _parse_iso(slot.get("window_start_utc"))
+    end = _parse_iso(slot.get("window_end_utc"))
+    if start is None or end is None:
+        # A plan slot without a parseable window can never be ON_TIME.
+        return "WINDOW_INVALID"
     if completed < start:
         return "EARLY"
     if completed > end:
@@ -393,6 +419,8 @@ def capture_snapshot(
     matches no plan and fails closed.)
     """
     slot = _slot_of(plan_game, slot_id)
+    if _positive_statsapi_id(plan_game.get("game_pk")) is None:
+        raise StarterCaptureError("PLAN_GAME_PK_INVALID")
     url = schedule_url(str(plan_game.get("official_date")))
     base = {
         "game_pk": plan_game["game_pk"],
@@ -414,9 +442,23 @@ def capture_snapshot(
             "failure_reason": "FETCH_FAILED",
             "failure_detail": f"{type(exc).__name__}: {exc}"[:200],
         }
+    if isinstance(raw, bytearray):
+        raw = bytes(raw)
+    if not isinstance(raw, bytes):
+        failed_at = _require_aware(clock(), what="attempt_failed_at")
+        return {
+            "schema": SCHEMA_ATTEMPT_FAILED,
+            "record_type": "CAPTURE_ATTEMPT_FAILED",
+            **base,
+            "attempted_at_utc": _iso(failed_at),
+            "failure_reason": "RESPONSE_NOT_BYTES",
+            "failure_detail": type(raw).__name__[:200],
+        }
     try:
         payload = json.loads(raw.decode("utf-8"))
-    except (ValueError, UnicodeDecodeError) as exc:
+        if not isinstance(payload, Mapping):
+            raise ValueError(f"schedule payload is {type(payload).__name__}, not object")
+    except (ValueError, UnicodeDecodeError, RecursionError) as exc:
         failed_at = _require_aware(clock(), what="attempt_failed_at")
         return {
             "schema": SCHEMA_ATTEMPT_FAILED,
@@ -637,10 +679,28 @@ def evaluate_missed_slots(
     way: they count toward no plan.
     """
     evaluated_at = _require_aware(now, what="evaluated_at")
+    if not isinstance(plan, Mapping):
+        raise StarterCaptureError("PLAN_NOT_OBJECT")
+    if not isinstance(records, (list, tuple)):
+        raise StarterCaptureError("RECORDS_NOT_SEQUENCE")
+    plan_games = plan.get("games")
+    if not isinstance(plan_games, (list, tuple)):
+        raise StarterCaptureError("PLAN_GAMES_INVALID")
+    for game in plan_games:
+        if (
+            not isinstance(game, Mapping)
+            or _positive_statsapi_id(game.get("game_pk")) is None
+            or not isinstance(game.get("slots"), (list, tuple))
+            or not all(
+                isinstance(slot, Mapping) and isinstance(slot.get("slot_id"), str)
+                for slot in game["slots"]
+            )
+        ):
+            raise StarterCaptureError("PLAN_GAME_INVALID")
     planned_at = _parse_iso(plan.get("planned_at_utc"))
     plan_first_pitch: dict[Any, Any] = {
         game.get("game_pk"): game.get("game_date_utc")
-        for game in plan.get("games", [])
+        for game in plan_games
     }
 
     def epoch_matches(record: Mapping[str, Any]) -> bool:
@@ -653,7 +713,13 @@ def evaluate_missed_slots(
     already_missed: set[tuple[int, str]] = set()
     failed_attempts: dict[tuple[int, str], str] = {}
     for record in records:
-        key = (record.get("game_pk"), record.get("slot_id"))
+        if not isinstance(record, Mapping):
+            continue  # a non-object record satisfies and explains nothing
+        record_pk = _positive_statsapi_id(record.get("game_pk"))
+        record_slot = record.get("slot_id")
+        if record_pk is None or not isinstance(record_slot, str):
+            continue  # unkeyable record counts toward no plan slot
+        key = (record_pk, record_slot)
         if record.get("record_type") == "SNAPSHOT":
             if (
                 record.get("record_status") in ("CAPTURED", "OBSERVED")
@@ -674,12 +740,12 @@ def evaluate_missed_slots(
                 already_missed.add(key)  # type: ignore[arg-type]
 
     missed: list[dict[str, Any]] = []
-    for game in plan.get("games", []):
-        for slot in game.get("slots", []):
+    for game in plan_games:
+        for slot in game["slots"]:
             key = (game["game_pk"], slot["slot_id"])
             if key in satisfied or key in already_missed:
                 continue
-            window_end = _parse_iso(slot["window_end_utc"])
+            window_end = _parse_iso(slot.get("window_end_utc"))
             if window_end is None or evaluated_at <= window_end:
                 continue  # window still open: nothing is missed yet
             if planned_at is not None and window_end <= planned_at:
@@ -697,8 +763,8 @@ def evaluate_missed_slots(
                     "game_pk": game["game_pk"],
                     "game_type": game.get("game_type"),
                     "slot_id": slot["slot_id"],
-                    "slot_due_at_utc": slot["due_at_utc"],
-                    "window_end_utc": slot["window_end_utc"],
+                    "slot_due_at_utc": slot.get("due_at_utc"),
+                    "window_end_utc": slot.get("window_end_utc"),
                     "game_date_utc": game.get("game_date_utc"),
                     "evaluated_at_utc": _iso(evaluated_at),
                     "reason": reason,
@@ -779,14 +845,22 @@ def detect_changes(records: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]
     first capture under the new plan becomes the new baseline against
     which later announcements and changes are measured.
     """
+    if not isinstance(records, (list, tuple)):
+        raise StarterCaptureError("RECORDS_NOT_SEQUENCE")
     snapshots = [
         r
         for r in records
-        if r.get("record_type") == "SNAPSHOT" and r.get("game_date_utc")
+        if isinstance(r, Mapping)
+        and r.get("record_type") == "SNAPSHOT"
+        and r.get("game_date_utc")
+        # An unkeyable game_pk (text, bool, float, <=0) cannot be grouped
+        # with anything; it derives no event rather than crashing or being
+        # coerced (int("12") / int(True) would forge a grouping).
+        and _positive_statsapi_id(r.get("game_pk")) is not None
     ]
     by_game: dict[int, list[Mapping[str, Any]]] = {}
     for record in snapshots:
-        by_game.setdefault(int(record["game_pk"]), []).append(record)
+        by_game.setdefault(record["game_pk"], []).append(record)
 
     events: list[dict[str, Any]] = []
     for game_pk in sorted(by_game):
@@ -890,18 +964,31 @@ def _append_line(path: Path, line: bytes) -> None:
         os.fsync(handle.fileno())
 
 
+def _as_path(value: Any, *, what: str) -> Path:
+    if not isinstance(value, (str, Path)) or not str(value):
+        raise StarterCaptureError(f"PATH_INVALID:{what}")
+    return Path(value)
+
+
+def _read_objects(path: Path, *, what: str) -> list[dict[str, Any]]:
+    out = []
+    for index, line in enumerate(_read_lines(path), start=1):
+        try:
+            obj = json.loads(line.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError, RecursionError):
+            raise StarterCaptureError(f"{what}_LINE_UNPARSEABLE:{index}") from None
+        if not isinstance(obj, dict):
+            raise StarterCaptureError(f"{what}_LINE_NOT_OBJECT:{index}")
+        out.append(obj)
+    return out
+
+
 def read_records(capture_path: Path) -> list[dict[str, Any]]:
-    records = []
-    for line in _read_lines(Path(capture_path)):
-        records.append(json.loads(line.decode("utf-8")))
-    return records
+    return _read_objects(_as_path(capture_path, what="capture"), what="CAPTURE")
 
 
 def read_manifest(manifest_path: Path) -> list[dict[str, Any]]:
-    entries = []
-    for line in _read_lines(Path(manifest_path)):
-        entries.append(json.loads(line.decode("utf-8")))
-    return entries
+    return _read_objects(_as_path(manifest_path, what="manifest"), what="MANIFEST")
 
 
 def append_record(
@@ -924,8 +1011,14 @@ def append_record(
     import fcntl
     import os
 
-    capture_path = Path(capture_path).resolve()
-    manifest_path = Path(manifest_path).resolve()
+    if not isinstance(record, Mapping):
+        raise StarterCaptureError("RECORD_NOT_OBJECT")
+    try:
+        canonical_line(record)
+    except (TypeError, ValueError, RecursionError):
+        raise StarterCaptureError("RECORD_NOT_JSON_SERIALIZABLE") from None
+    capture_path = _as_path(capture_path, what="capture").resolve()
+    manifest_path = _as_path(manifest_path, what="manifest").resolve()
     if capture_path == manifest_path:
         raise StarterCaptureError("CAPTURE_AND_MANIFEST_PATH_COLLIDE")
     capture_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1001,8 +1094,8 @@ def verify_capture_chain(capture_path: Path, manifest_path: Path) -> dict[str, A
     (or the manifest) fails at the first mismatching position with a
     named reason.
     """
-    capture_path = Path(capture_path)
-    manifest_path = Path(manifest_path)
+    capture_path = _as_path(capture_path, what="capture")
+    manifest_path = _as_path(manifest_path, what="manifest")
     capture_lines = _read_lines(capture_path)
     manifest_lines = _read_lines(manifest_path)
 
