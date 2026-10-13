@@ -343,3 +343,22 @@ def test_no_engine_block_can_apply_to_all_distinct_contracts():
     assert row["engine_state"] == "NO_ENGINE"
     assert row["family_engine_state"] == "NO_ENGINE"
     assert row["offer_variant_count"] == 2
+
+
+def test_case_and_spacing_variants_do_not_manufacture_extra_offers():
+    a = dict(offered("TEAM_TOTAL", "TWO_SIDED_OU",
+                     period="FIRST_HALF"), line_variant="MAIN")
+    b = dict(offered("team total", "two sided ou",
+                     period="first-half"), line_variant="main",
+             phase="pregame", settlement="rule unverified")
+    with pytest.raises(DKObservationError, match="DUPLICATE_MARKET_OBSERVATION"):
+        reconcile_dk_event(["TEAM_TOTAL"], board(observed=[a, b]))
+
+
+def test_normalized_negative_scope_cannot_erase_an_existing_contract():
+    observed = [offered("TEAM_TOTAL", "TWO_SIDED_OU",
+                        period="FIRST_HALF")]
+    absence = [dict(absent("TEAM_TOTAL"), period="first-half")]
+    with pytest.raises(DKObservationError, match="OFFERED_AND_ABSENT_CONFLICT"):
+        reconcile_dk_event(
+            ["TEAM_TOTAL"], board(observed=observed, absent=absence))
