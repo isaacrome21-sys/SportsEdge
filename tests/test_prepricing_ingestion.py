@@ -80,15 +80,22 @@ def nfl_schedules():
 
 
 def nfl_injuries():
+    # Entry dates added Oct 13, 2026 (injury-binding currency fix):
+    # real ESPN entries always carry `date`, and qb_specific
+    # satisfaction now requires a current QB entry. Values are inside
+    # the fixture's season window (kickoff 2026-10-12); every
+    # assertion on these stubs is unchanged.
     falcons = {"injuries": [
         {"athlete": {"id": "123", "displayName": "Kirk Cousins",
-                     "position": {"abbreviation": "QB"}}, "status": "Out"},
+                     "position": {"abbreviation": "QB"}}, "status": "Out",
+         "date": "2026-10-10T17:00Z"},
         {"athlete": {"id": "124", "displayName": "Bijan Robinson",
                      "position": {"abbreviation": "RB"}}, "status": "Questionable"},
     ]}
     ravens = {"injuries": [
         {"athlete": {"id": "456", "displayName": "Lamar Jackson",
-                     "position": {"abbreviation": "QB"}}, "status": "Doubtful"},
+                     "position": {"abbreviation": "QB"}}, "status": "Doubtful",
+         "date": "2026-10-10T17:00Z"},
     ]}
     return falcons, ravens
 
