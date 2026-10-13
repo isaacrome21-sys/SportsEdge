@@ -133,3 +133,43 @@ def simulate_v2(cal: QuarterCalibration, home_mean: float, away_mean: float, *,
         raise ValueError("REG_SHARE_NONPOSITIVE")
     adj = d / cal.reg_share  # simulate() multiplies the passed mean by reg_share
     return simulate(cal, home_mean + adj, away_mean + adj, n=n, seed=seed, max_ot=max_ot)
+
+
+VERSION_OT_FIX = "NBA_QUARTER_JOINT_SIM_OT_FIX_20261013"
+OT_FIX_GRID = tuple(round(0.60 + 0.02 * i, 2) for i in range(21))
+
+
+def simulate_margin_scaled(cal: QuarterCalibration, home_mean: float, away_mean: float, *,
+                           c: float, n: int = 4000, seed: int = 0, max_ot: int = 6):
+    """Pre-registered OT-frequency arm: shrink regulation-quarter margin
+    dispersion by ``c`` about its mean, leaving each quarter's sum intact.
+    Same RNG stream and OT logic as :func:`simulate`."""
+    if not 0 < c <= 1.5:
+        raise ValueError("MARGIN_SCALE_OUT_OF_RANGE")
+    rng = np.random.default_rng(seed)
+    hm, am = home_mean * cal.reg_share, away_mean * cal.reg_share
+    H = np.zeros((n, 4 + max_ot), int)
+    A = np.zeros((n, 4 + max_ot), int)
+    for q in range(4):
+        s = cal.resid_sd[q]
+        cov = [[s * s, cal.rho * s * s], [cal.rho * s * s, s * s]]
+        mu = [hm * cal.shares[q], am * cal.shares[q]]
+        z = rng.multivariate_normal(mu, cov, size=n)
+        tot = (z[:, 0] + z[:, 1]) / 2
+        mar = (z[:, 0] - z[:, 1]) / 2
+        mar = (mu[0] - mu[1]) / 2 + c * (mar - (mu[0] - mu[1]) / 2)
+        H[:, q] = np.maximum(0, np.rint(tot + mar))
+        A[:, q] = np.maximum(0, np.rint(tot - mar))
+    tied = H[:, :4].sum(1) == A[:, :4].sum(1)
+    for k in range(max_ot):
+        if not tied.any():
+            break
+        z = rng.normal(cal.ot_mean, cal.ot_sd, size=(n, 2))
+        H[tied, 4 + k] = np.maximum(0, np.rint(z[tied, 0]))
+        A[tied, 4 + k] = np.maximum(0, np.rint(z[tied, 1]))
+        tied = tied & (H.sum(1) == A.sum(1))
+    if tied.any():
+        flip = rng.random(n) < 0.5
+        H[tied & flip, -1] += 1
+        A[tied & ~flip, -1] += 1
+    return H, A
