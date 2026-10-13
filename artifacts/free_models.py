@@ -25,6 +25,14 @@ from sportsedge.quote_freshness import (
     check_quote_freshness,
     is_fresh as quote_is_fresh,
 )
+from sportsedge.pricing_provenance import (
+    ANCHORED_PLAY_BLOCK,
+    ANCHORED_WATCH_STATUS,
+    LANE_MARKET_ANCHORED as PROVENANCE_MARKET_ANCHORED,
+    apply_play_gate,
+    is_play_eligible,
+    provenance_for_game_result,
+)
 
 LEAGUES = {"NFL": "football/nfl", "CFB": "football/college-football",
            "NBA": "basketball/nba", "MLB": "baseball/mlb"}
@@ -1039,6 +1047,8 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
     if lane == "B" and lane_b.get("status") == "LANE_B_UNAVAILABLE":
         return {"status": lane_b["reason"], "game": f"{away} @ {home}",
                 "sport": sport, "pricing_lane": LANE_B,
+                "pricing_provenance": provenance_for_game_result(
+                    {"pricing_lane": LANE_B, "market": market}),
                 "pricing_lanes": {"lane_a_independent": lane_a,
                                   "lane_b_anchored": lane_b},
                 "quote_freshness": quote_freshness,
@@ -1090,11 +1100,23 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
         status = POSITIVE_EV_STATUS
     else:
         status = "BELOW_THRESHOLD"
+    # Architecture-conflict ruling (Oct 12 2026): a PLAY requires an
+    # INDEPENDENT probability that does not borrow the sportsbook price.
+    # When the anchored Lane B view is the primary view, its +EV is
+    # anchored research only -- it can never take the positive-EV play
+    # status. Demote to a named WATCH status with the mechanism visible.
+    if pricing_lane == LANE_B and status == POSITIVE_EV_STATUS:
+        status = ANCHORED_WATCH_STATUS
+        reason = (ANCHORED_PLAY_BLOCK + ":"
+                  + ("NO_VIG_BLEND_15PCT" if market == "ML"
+                     else "MARKET_SHRINK_15PCT"))
     result = {"schema": "SPORTSEDGE_FREE_RESEARCH_V1", "status": status, "sport": sport,
             "game": f"{away} @ {home}", "selection": selection, "market": market,
             "odds_american": int(price), "line": line, "kickoff_utc": kickoff.isoformat(),
             "team_totals_team": team_totals_team if market == "TEAM_TOTALS" else None,
             "pricing_lane": pricing_lane,
+            "pricing_provenance": provenance_for_game_result(
+                {"pricing_lane": pricing_lane, "market": market}),
             "pricing_lanes": {"lane_a_independent": lane_a,
                               "lane_b_anchored": lane_b},
             "quote_freshness": quote_freshness,
@@ -1312,6 +1334,10 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
             result = {"status": "BLOCKED_INVALID", "reason": str(exc)[:140]}
         result["input_index"] = i
         all_rows.append(result)
+    # Provenance gate (Oct 12 2026 ruling): stamp every priced row and
+    # refuse MARKET_ANCHORED rows any play status before surfaces are
+    # built. Anchored rows may surface at most as WATCH.
+    apply_play_gate(all_rows)
     # Keep independent projections available even when an optional 15%
     # book-anchored research view has zero qualifying candidates. Exact
     # paired DK no-vig is a benchmark, not a predictive feature.
@@ -1323,6 +1349,13 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
     for row in all_rows:
         projection = row.get("independent_projection")
         if not isinstance(projection, dict):
+            continue
+        if (row.get("pricing_provenance") or {}).get(
+                "lane") == PROVENANCE_MARKET_ANCHORED:
+            # The row's primary probability borrowed the sportsbook price.
+            # Even if its independent side-view clears the EV floor, the
+            # row itself is anchored research: watch surface only.
+            watchlist.append(row)
             continue
         if row.get("status") in {"WATCH_NFL_NO_VERIFIED_CONTEXT",
                                  "WATCH_NFL_TOTAL_PRIOR_ONLY"}:
@@ -1349,7 +1382,12 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
                                   r["game"],r["selection"]))
     # Repair 2: Lane B is always computed and labeled, so the harness (and the
     # card) can evaluate the anchored hypothesis separately from Lane A.
-    lane_b_edges = []
+    # Oct 12 2026 ruling: anchored EV is suppressed from every +EV / edges
+    # presentation. Qualifying Lane B rows surface ONLY on the watchlist
+    # below, with the anchored view labeled inside each row. The legacy
+    # lane_b_edges field is retained, always empty, so downstream consumers
+    # fail safe instead of rendering anchored "edges".
+    lane_b_watchlist = []
     for r in all_rows:
         if r.get("status") in {"WATCH_NFL_NO_VERIFIED_CONTEXT",
                               "WATCH_NFL_TOTAL_PRIOR_ONLY"}:
@@ -1363,10 +1401,12 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
         if r.get("odds_american", -999) < -165:
             continue
         if lane_b.get("ev_per_dollar", -1) >= min_ev:
-            lane_b_edges.append(r)
-    lane_b_edges.sort(key=lambda r: (-r["pricing_lanes"]["lane_b_anchored"]["ev_per_dollar"],
-                                     r["game"], r["selection"]))
-    edges = [r for r in all_rows if r["status"] == POSITIVE_EV_STATUS]
+            lane_b_watchlist.append(r)
+    lane_b_watchlist.sort(key=lambda r: (-r["pricing_lanes"]["lane_b_anchored"]["ev_per_dollar"],
+                                         r["game"], r["selection"]))
+    lane_b_edges = []
+    edges = [r for r in all_rows
+             if r["status"] == POSITIVE_EV_STATUS and is_play_eligible(r)]
     edges.sort(key=lambda r: (-r["ev_per_dollar"], r["game"], r["selection"]))
     primary_lane = LANE_A if lane == "A" else LANE_B
     return {"schema": "SPORTSEDGE_FREE_RESEARCH_CARD_V1",
@@ -1383,6 +1423,13 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
                           "validated_profitability": False},
             "min_ev": min_ev, "edges": edges,
             "lane_b_edges": lane_b_edges,
+            "lane_b_watchlist": lane_b_watchlist,
+            "play_gate": {
+                "rule": "INDEPENDENT_PROBABILITY_REQUIRED_FOR_PLAY",
+                "anchored_max_surface": "WATCH",
+                "anchored_ev_in_edges_lists": "SUPPRESSED",
+                "undetermined_provenance": "FAIL_CLOSED",
+            },
             "independent_candidates": independent,
             "independent_watchlist": watchlist,
             "research_projection_note": "Unvalidated independent league-score heuristic; DK is a paired same-book no-vig benchmark, not sharp market verification.",
@@ -1391,6 +1438,7 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
             "evaluated_rows": all_rows,
             "summary": {"rows": len(rows), "edges": len(edges),
                         "lane_b_edges": len(lane_b_edges),
+                        "lane_b_watchlist": len(lane_b_watchlist),
                         "status_counts": dict(sorted(Counter(r["status"] for r in all_rows).items()))},
             "diagnostics": [{"input_index": r["input_index"], "status": r["status"],
                              "reason": r.get("reason") or ",".join(r.get("context_notes") or [])}
