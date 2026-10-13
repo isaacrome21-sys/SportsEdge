@@ -19,7 +19,13 @@ NOTES = [
     "AWAY_INJURIES:HEURISTIC_OUT_DOUBTFUL_REPORTED_0_UNKNOWN_COMPLETENESS",
     "WEATHER:INDOOR_VERIFIED",
 ]
-PROVIDER = SimpleNamespace(fixture=lambda *args: (None, {"id": "verified-event"}))
+PROVIDER = SimpleNamespace(
+    fixture=lambda *args: (None, {"id": "verified-event"}),
+    # This focused factor-parity test uses generic non-Illinois teams;
+    # #2148 added the independent ID binder to CFB scoring. Stub the
+    # directory correctly without altering or bypassing the production gate.
+    identify=lambda *args: None,
+)
 
 
 def context(**overrides):
