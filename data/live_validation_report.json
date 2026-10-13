@@ -1,0 +1,162 @@
+{
+  "schema": "SPORTSEDGE_LIVE_VALIDATION_REPORT_V1",
+  "generated_at_utc": "2026-10-11T23:46:55.574598+00:00",
+  "research_only": true,
+  "config": {
+    "game_dates": [
+      "2025-04-15",
+      "2025-05-13",
+      "2025-06-10",
+      "2025-07-08",
+      "2025-08-05",
+      "2025-09-02"
+    ],
+    "max_games": 45,
+    "min_prior_games": 5,
+    "prior_window_days": 45,
+    "means_estimator": "PRIOR_GAMES_RS_RA_AVG_NO_LOOKAHEAD"
+  },
+  "games_used": 45,
+  "predictions": 810,
+  "degenerate_excluded": 0,
+  "skipped": {
+    "no_means": 0,
+    "feed_failed": 0
+  },
+  "candidate_summary": {
+    "n": 810,
+    "brier": 0.16269757006423805,
+    "log_loss": 0.48466318566200695,
+    "mean_p": 0.4962256031756719,
+    "base_rate": 0.5481481481481482
+  },
+  "existing_summary": {
+    "n": 810,
+    "brier": 0.23376287130819678,
+    "log_loss": 0.6595396217018423,
+    "mean_p": 0.5219343957623341,
+    "base_rate": 0.5481481481481482
+  },
+  "clustered_brier": {
+    "model_live": {
+      "value": 0.16269757006423805,
+      "game_clusters": 45,
+      "snapshots": 810
+    },
+    "market_static_pregame": {
+      "value": 0.23376287130819678,
+      "game_clusters": 45,
+      "snapshots": 810
+    }
+  },
+  "calibration_bins": [
+    {
+      "bin": 0,
+      "lo": 0.0,
+      "hi": 0.1,
+      "n": 127,
+      "mean_p": 0.02642134179329901,
+      "hit_rate": 0.031496062992125984
+    },
+    {
+      "bin": 1,
+      "lo": 0.1,
+      "hi": 0.2,
+      "n": 42,
+      "mean_p": 0.15096889182507034,
+      "hit_rate": 0.2619047619047619
+    },
+    {
+      "bin": 2,
+      "lo": 0.2,
+      "hi": 0.3,
+      "n": 62,
+      "mean_p": 0.25590984100196534,
+      "hit_rate": 0.3870967741935484
+    },
+    {
+      "bin": 3,
+      "lo": 0.3,
+      "hi": 0.4,
+      "n": 62,
+      "mean_p": 0.35364403913444,
+      "hit_rate": 0.41935483870967744
+    },
+    {
+      "bin": 4,
+      "lo": 0.4,
+      "hi": 0.5,
+      "n": 93,
+      "mean_p": 0.45433375505810447,
+      "hit_rate": 0.6021505376344086
+    },
+    {
+      "bin": 5,
+      "lo": 0.5,
+      "hi": 0.6,
+      "n": 123,
+      "mean_p": 0.5428835540842376,
+      "hit_rate": 0.5365853658536586
+    },
+    {
+      "bin": 6,
+      "lo": 0.6,
+      "hi": 0.7,
+      "n": 79,
+      "mean_p": 0.6475603095908093,
+      "hit_rate": 0.7215189873417721
+    },
+    {
+      "bin": 7,
+      "lo": 0.7,
+      "hi": 0.8,
+      "n": 71,
+      "mean_p": 0.7431238265800629,
+      "hit_rate": 0.8028169014084507
+    },
+    {
+      "bin": 8,
+      "lo": 0.8,
+      "hi": 0.9,
+      "n": 39,
+      "mean_p": 0.8486363919925469,
+      "hit_rate": 0.8974358974358975
+    },
+    {
+      "bin": 9,
+      "lo": 0.9,
+      "hi": 1.0,
+      "n": 112,
+      "mean_p": 0.9679518065544864,
+      "hit_rate": 0.9642857142857143
+    }
+  ],
+  "verdict": {
+    "verdict": "CONDITIONAL_PASS",
+    "reasons": [
+      "MARKET_BASELINE_MISSING: no archived market prices; the market-baseline leg of Isaac's bar could not be checked. Do not promote on this verdict alone."
+    ],
+    "candidate": {
+      "n": 810,
+      "brier": 0.16269757006423805,
+      "log_loss": 0.48466318566200695,
+      "mean_p": 0.4962256031756719,
+      "base_rate": 0.5481481481481482
+    },
+    "existing": {
+      "n": 810,
+      "brier": 0.23376287130819678,
+      "log_loss": 0.6595396217018423,
+      "mean_p": 0.5219343957623341,
+      "base_rate": 0.5481481481481482
+    },
+    "baseline": {
+      "status": "MISSING",
+      "summary": {
+        "n": 0
+      }
+    },
+    "min_n": 30,
+    "research_only": true
+  }
+}
