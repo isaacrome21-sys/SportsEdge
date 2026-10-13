@@ -23,6 +23,8 @@ from sportsedge.mlb_phone_first_inning_pricing import (
 from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
 from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
 from sportsedge.prepricing.factor_ingestion import stage_games
+from sportsedge.uncertainty import attach_uncertainty, methodology_block
+from sportsedge.actionability import annotate_actionability
 from sportsedge.market_coverage import (
     COVERAGE_MARKETS,
     normalize_coverage_market,
@@ -463,6 +465,18 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         "next_gen":"NOT_WIRED",
         "nfl_cfb_player":"ESPN_NAMED_GAMES_ONLY_PARTICIPATION_NOT_VERIFIED",
     }
+
+    # Uncertainty bands + sample-size flags on every priced row, and the
+    # actionability breakdown in the summary. Presentation/uncertainty
+    # only: attach_uncertainty adds an "uncertainty" block (and hoists a
+    # visible sample_caution) without modifying any probability, EV, or
+    # status; annotate_actionability only classifies rows into the
+    # summary. Both fail closed (no band invented for unknown samples).
+    uncertainty_counts = attach_uncertainty(evaluated)
+    card["uncertainty_methodology"] = methodology_block()
+    card["summary"] = dict(card.get("summary") or {})
+    card["summary"]["sample_flag_counts"] = uncertainty_counts
+    card["summary"]["actionability"] = annotate_actionability(evaluated)
 
     audit, totals = [], Counter()
     for i, (source,result) in enumerate(zip(rows,evaluated)):

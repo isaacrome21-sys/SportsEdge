@@ -62,6 +62,35 @@ def fmt_price(x):
 def fmt_percent(x):
     return f"{float(x)*100:+.1f}%"
 
+
+def _sample_tag(row):
+    """Compact sample-size caution marker for rendered card rows."""
+    flag = (row.get("uncertainty") or {}).get("sample_flag")
+    if flag in {"LOW_SAMPLE", "UNKNOWN_SAMPLE"}:
+        return f" [{flag}]"
+    return ""
+
+
+def _actionability_lines(summary):
+    """Actionability breakdown header: the pipeline-yield number Isaac checks."""
+    act = summary.get("actionability") or {}
+    if not act:
+        return "**Actionability:** not computed for this card"
+    counts = act.get("counts") or {}
+    pcts = act.get("percentages") or {}
+    lines = [
+        f"**Actionability:** {counts.get('ACTIONABLE', 0)} actionable "
+        f"({pcts.get('ACTIONABLE', 0)}%) · {counts.get('WATCH', 0)} watch "
+        f"({pcts.get('WATCH', 0)}%) · {counts.get('BLOCKED', 0)} blocked "
+        f"({pcts.get('BLOCKED', 0)}%) of {act.get('total_rows', 0)} rows",
+    ]
+    top = act.get("top_blocked_reasons") or []
+    if top:
+        lines.append("Top blocked reasons: " + "; ".join(
+            f"{safe(t.get('reason_code'), 60)} x{int(t.get('count', 0))}"
+            for t in top[:5]))
+    return "\n".join(lines)
+
 def render_card(card, *, run_url="", intake_at=""):
     if card.get("schema") != "SPORTSEDGE_FREE_RESEARCH_CARD_V1":
         raise IntakeError("INVALID_FREE_RESEARCH_CARD_SCHEMA")
@@ -85,6 +114,8 @@ def render_card(card, *, run_url="", intake_at=""):
         f"Input rows: {int(summary.get('rows', 0))} · Primary pricing lane: {safe(primary_lane)} · "
         f"Research candidates at estimated EV ≥ {100*float(card.get('min_ev',0.02)):.1f}%: **{len(rows)}**",
         "",
+        _actionability_lines(summary),
+        "",
         "**Projection-first research candidates (independent, UNVALIDATED)**",
         "Same-book DK no-vig is a reference, not independent sharp-market confirmation.",
         f"Raw model EV ≥ {100*float(card.get('min_ev',0.02)):.1f}% and straight price ≥ −165: **{len(projections)}**",
@@ -100,7 +131,7 @@ def render_card(card, *, run_url="", intake_at=""):
             f"{fmt_price(estimate['fair_american']) if estimate.get('fair_american') is not None else '—'} | "
             f"{float(estimate['market_no_vig_p'])*100:.1f}% | "
             f"{float(estimate['edge_vs_dk_no_vig_pp']):+.1f} | "
-            f"{fmt_percent(estimate['ev_per_dollar'])} |"
+            f"{fmt_percent(estimate['ev_per_dollar'])}{_sample_tag(row)} |"
         )
     if not projections:
         lines.append("| — | No qualifying independent research candidates on this board | — | — | — | — | — | — |")
@@ -112,6 +143,7 @@ def render_card(card, *, run_url="", intake_at=""):
             f"model {float(estimate['estimate_p'])*100:.1f}%, raw EV "
             f"{fmt_percent(estimate['ev_per_dollar'])}, "
             f"pair={safe(estimate.get('paired_market_status'),60)}"
+            f"{_sample_tag(row)}"
         )
     if not watchlist:
         lines.append("- No additional priced model rows")
@@ -157,7 +189,8 @@ def render_card(card, *, run_url="", intake_at=""):
             f"{float(r['edge_pp']):+.1f} | "
             f"{fmt_percent(r['ev_per_dollar'])} | "
             f"{safe(r.get('quote_status'),50)}"
-            f"{' / LINEUP_UNCONFIRMED' if r.get('lineup_status') == 'PUBLIC_BOXSCORE_LINEUP_NOT_VERIFIED' else ''} |"
+            f"{' / LINEUP_UNCONFIRMED' if r.get('lineup_status') == 'PUBLIC_BOXSCORE_LINEUP_NOT_VERIFIED' else ''}"
+            f"{_sample_tag(r)} |"
         )
     if not prop_picks and not prop_watch:
         lines.append("| — | — | — | — | — | — | No player props met verified model/paired quote requirements |")
