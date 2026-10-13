@@ -238,21 +238,22 @@ class HostileSnapshotTests(unittest.TestCase):
         bundle = raw_bundle("48", roster_snapshot_overrides={
             "requested_limit": 100, "athlete_count": 100,
             "athlete_count_repeat": 100})
-        result = evaluate(bundle)
+        # Simulate a consistently captured but incomplete roster; no tampering.
+        result = evaluate(rechain(bundle))
         self.assertFalse(result["ok"])
         self.assertEqual(result["status"], qe.STATUS_ROSTER_INCOMPLETE)
 
     def test_unstable_roster_count_fails_closed(self):
         bundle = raw_bundle("48", roster_snapshot_overrides={
             "athlete_count_repeat": 999})
-        result = evaluate(bundle)
+        result = evaluate(rechain(bundle))
         self.assertEqual(result["status"], qe.STATUS_ROSTER_INCOMPLETE)
         self.assertIn("ROSTER_COUNT_UNSTABLE", result["detail"])
 
     def test_roster_content_shorter_than_attested_count_fails_closed(self):
         bundle = raw_bundle("48", roster_snapshot_overrides={
             "athlete_count": 42, "athlete_count_repeat": 42})
-        result = evaluate(bundle)
+        result = evaluate(rechain(bundle))
         self.assertEqual(result["status"], qe.STATUS_ROSTER_INCOMPLETE)
         self.assertIn("ROSTER_COUNT_CONTENT_MISMATCH", result["detail"])
 
@@ -439,14 +440,17 @@ class ReceiptChainTests(unittest.TestCase):
         self.assertEqual(result["detail"], "RECEIPT_CHAIN_MISMATCH")
 
     def test_sealed_fixture_and_roster_assertions_reject_tampering(self):
-        for mutate in (
-            lambda b: b["fixture"].__setitem__("kickoff_utc", "2026-10-13T22:00:00Z"),
-            lambda b: b["previous_game"].__setitem__("kickoff_utc", "2026-10-10T23:00:00Z"),
-            lambda b: b["roster_snapshot"].__setitem__("athlete_count_repeat", 1),
+        # Align the caller's independently bound kickoff in the first case:
+        # only the receipt seal, not an earlier fixture mismatch, can reject it.
+        for mutate, overrides in (
+            (lambda b: b["fixture"].__setitem__("kickoff_utc", "2026-10-13T22:00:00Z"),
+             {"kickoff": datetime(2026, 10, 13, 22, 0, tzinfo=timezone.utc)}),
+            (lambda b: b["previous_game"].__setitem__("kickoff_utc", "2026-10-10T23:00:00Z"), {}),
+            (lambda b: b["roster_snapshot"].__setitem__("athlete_count_repeat", 1), {}),
         ):
             bundle = make_bundle("48")
             mutate(bundle)
-            result = evaluate(bundle)
+            result = evaluate(bundle, **overrides)
             self.assertFalse(result["ok"])
             self.assertEqual(result["status"], qe.STATUS_HASH_MISMATCH)
             self.assertEqual(result["detail"], "RECEIPT_CHAIN_MISMATCH")
