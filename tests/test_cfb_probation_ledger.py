@@ -1,5 +1,8 @@
 import csv
 import gzip
+import io
+import json
+from contextlib import redirect_stderr
 import importlib.util
 import tempfile
 import unittest
@@ -120,6 +123,44 @@ class GradeTest(unittest.TestCase):
         p = led["plays"][0]
         self.assertEqual(p["clv_status"], "EXACT_CONTRACT")
         self.assertEqual((p["close_odds"], p["close_opposite_odds"]), (100.0, -120.0))
+
+
+class CliSafetyTest(unittest.TestCase):
+    def test_record_cli_rejects_supplied_historical_clock(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "card.json"
+            source.write_text(json.dumps(card([row()])))
+            with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as caught:
+                L.main(["record", "--card", str(source), "--output", str(root / "ledger.json"),
+                        "--recorded-at", "2026-10-10T10:00:00Z"])
+            self.assertEqual(caught.exception.code, 2)
+            self.assertFalse((root / "ledger.json").exists())
+
+    def test_grade_cli_preserves_original_pregame_ledger(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "pregame.json"
+            source.write_text(json.dumps(L.record(card([row()]), card_sha256="b" * 64, recorded_at=NOW)))
+            original = source.read_bytes()
+            scores = root / "scores.csv.gz"
+            schedule(scores, [("UCF", "Oklahoma State", 20, 27, "true")])
+            output = root / "settled.json"
+            self.assertEqual(L.main(["grade", "--ledger", str(source),
+                                     "--scores", str(scores), "--output", str(output)]), 0)
+            self.assertEqual(source.read_bytes(), original)
+            self.assertEqual(json.loads(output.read_text())["plays"][0]["result"], "WIN")
+
+    def test_grade_cli_refuses_overwrite_even_with_explicit_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "pregame.json"
+            source.write_text(json.dumps(L.record(card([row()]), card_sha256="b" * 64, recorded_at=NOW)))
+            scores = root / "scores.csv.gz"
+            schedule(scores, [("UCF", "Oklahoma State", 20, 27, "true")])
+            with self.assertRaisesRegex(SystemExit, "CFB_LEDGER_IMMUTABLE_OUTPUT_REQUIRED"):
+                L.main(["grade", "--ledger", str(source), "--scores", str(scores),
+                        "--output", str(source)])
 
 
 class SummaryTest(unittest.TestCase):
