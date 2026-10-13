@@ -233,7 +233,7 @@ class SameFetchSourceCaptureTest(unittest.TestCase):
                     entry = json.loads(journal.read_text().strip())
                     self.assertIn(field, entry)
                     entry.pop(field)
-                    journal.write_text(json.dumps(entry) + "\\n")
+                    journal.write_text(json.dumps(entry) + "\n")
                     with self.assertRaisesRegex(
                         ms.MLBSourceError, "RECEIPT_FIELD_MISSING:" + field
                     ):
