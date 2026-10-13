@@ -232,8 +232,14 @@ class StageVerifiedPullTests(unittest.TestCase):
         self.assertEqual(adj["away_injury_pts"], -1.5)
         # Declared weather table: 20 mph + 80% precip -> -1.2 for NFL.
         self.assertEqual(adj["weather_total_adj"], -1.2)
-        # Rest: home 8.0d vs away 7.0d -> 0.12 * 1.0 = 0.12.
-        self.assertEqual(adj["rest_diff_adj"], 0.12)
+        # Rest: home 8.0d vs away 7.0d -> declared 0.12 * 1.0 = 0.12, but
+        # DISABLED_PENDING_INCREMENTAL_VALUE (owner ruling, Oct 13 2026):
+        # the priced contribution handed to the engine is zero; the
+        # declared value remains in the rest_schedule factor reason.
+        self.assertEqual(adj["rest_diff_adj"], 0.0)
+        rest = factor_status(stage, "rest_schedule")[0]
+        self.assertEqual(rest[0], "DISABLED_PENDING_INCREMENTAL_VALUE")
+        self.assertIn("DECLARED_DIFF_ADJ_0.12", rest[2])
         qb_home = factor_status(stage, "qb_specific")
         self.assertEqual(len(qb_home), 2)
         home_used = [s for s in qb_home if s[0] == "USED"]
@@ -346,13 +352,24 @@ class MlbPitcherTests(unittest.TestCase):
         (stage,) = fi.stage_games([mlb_row()], now=NOW, getter=getter)
         self.assertFalse(stage["blocked"])
         adj = stage["adjustments"]
-        # Away starter (ERA 2.50, 150 IP/25 GS): suppression 1.2 -> home offense -1.2.
-        self.assertEqual(adj["home_pitcher_adj"], -1.2)
-        # Home starter (ERA 3.00, 140 IP/24 GS): suppression ~0.843 -> away -0.843.
-        self.assertAlmostEqual(adj["away_pitcher_adj"], -0.843, places=3)
+        # Declared heuristic (unchanged research math): away starter
+        # (ERA 2.50, 150 IP/25 GS) suppression 1.2; home starter
+        # (ERA 3.00, 140 IP/24 GS) suppression ~0.843. But the pitcher
+        # adjustment is DISABLED_PENDING_INCREMENTAL_VALUE (owner
+        # ruling, Oct 13 2026): priced contributions are zero.
+        self.assertEqual(adj["home_pitcher_adj"], 0.0)
+        self.assertEqual(adj["away_pitcher_adj"], 0.0)
+        declared = fi.mlb_pitcher_adjustments(
+            getter, game_date=fi.dt(KICKOFF_MLB).date(),
+            home={"abbr": "MIL", "name": "Milwaukee Brewers"},
+            away={"abbr": "LAD", "name": "Los Angeles Dodgers"},
+            season=2026, kickoff=fi.dt(KICKOFF_MLB))[0]
+        self.assertEqual(declared["home_pitcher_adj"], -1.2)
+        self.assertAlmostEqual(declared["away_pitcher_adj"], -0.843, places=3)
         sp = factor_status(stage, "starting_pitcher")
         self.assertEqual(len(sp), 2)
-        self.assertTrue(all(s[0] == "USED" for s in sp))
+        self.assertTrue(all(s[0] == "DISABLED_PENDING_INCREMENTAL_VALUE"
+                            for s in sp))
         self.assertTrue(any("Test Arm A" in s[2] for s in sp))
         wx = factor_status(stage, "weather_venue")[0]
         # ESPN static indoor venue metadata cannot prove a retractable roof's
@@ -516,7 +533,11 @@ class RunnerHookTests(unittest.TestCase):
         self.assertEqual(pp["verification_status"], "VERIFIED")
         self.assertEqual(pp["adjustments"]["home_injury_pts"], -1.5)
         self.assertEqual(pp["adjustments"]["weather_total_adj"], -1.2)
-        self.assertEqual(pp["adjustments"]["rest_diff_adj"], 0.12)
+        # Owner ruling (Oct 13, 2026): the rest differential is DISABLED
+        # pending incremental-value evidence -- the declared 0.12 for
+        # this fixture (8.0d vs 7.0d) remains in the factor audit
+        # reason, but the priced contribution handed over is zero.
+        self.assertEqual(pp["adjustments"]["rest_diff_adj"], 0.0)
         # The context reflects applied values (including verified prepricing)
         # The separation is verified via the prepricing_adjustments object above,
         # not by excluding values from context
