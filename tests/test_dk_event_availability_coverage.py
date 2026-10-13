@@ -311,3 +311,35 @@ def test_repeat_market_with_same_dimensions_rejected_even_if_line_prices_differ(
     b = dict(offered("PITCHER_K", "TWO_SIDED_OU"), line=6.5, odds=+120)
     with pytest.raises(DKObservationError, match="DUPLICATE_MARKET_OBSERVATION"):
         reconcile_dk_event(["PITCHER_K"], board(observed=[a, b]))
+
+
+def test_family_priced_path_does_not_autovalidate_main_alt_and_ladder_engines():
+    offers = [
+        dict(offered("PASSING_YARDS", "TWO_SIDED_OU"), line_variant="MAIN"),
+        dict(offered("PASSING_YARDS", "TWO_SIDED_OU"), line_variant="ALTERNATE"),
+        dict(offered("PASSING_YARDS", "LADDER_ONLY"), line_variant="LADDER"),
+    ]
+    result = reconcile_dk_event(
+        ["PASSING_YARDS"], board(sport="NFL", observed=offers),
+        engine_states={"PASSING_YARDS": "PRICED_PATH"})
+    row = by_market(result)["PASSING_YARDS"]
+    assert row["family_engine_state"] == "PRICED_PATH"
+    assert row["engine_state"] == "UNVERIFIED"
+    assert row["engine_state_scope"] == "FAMILY_PATH_NOT_ATTESTED_FOR_EACH_VARIANT"
+    assert row["engine_state_source"] == "CALLER_SUPPLIED_NOT_INDEPENDENTLY_ATTESTED"
+    assert row["model_validated"] is False
+    assert row["deployment_eligible"] is False
+
+
+def test_no_engine_block_can_apply_to_all_distinct_contracts():
+    offers = [
+        dict(offered("TEAM_TOTAL", "TWO_SIDED_OU"), line_variant="MAIN"),
+        dict(offered("TEAM_TOTAL", "LADDER_ONLY"), line_variant="LADDER"),
+    ]
+    result = reconcile_dk_event(
+        ["TEAM_TOTAL"], board(sport="CFB", observed=offers),
+        engine_states={"TEAM_TOTAL": "NO_ENGINE"})
+    row = by_market(result)["TEAM_TOTAL"]
+    assert row["engine_state"] == "NO_ENGINE"
+    assert row["family_engine_state"] == "NO_ENGINE"
+    assert row["offer_variant_count"] == 2
