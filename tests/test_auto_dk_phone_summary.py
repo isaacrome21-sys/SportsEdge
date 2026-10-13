@@ -201,6 +201,12 @@ def test_radar_requires_market_exact_fresh_peer_receipts():
             return card.nfl_market_price_radar(root,now)[0]
         assert len(scan()) == 1
         assert scan(lambda ref: ref["peer_evidence"][0].update(observed_at="2026-10-11T16:45:00Z")) == []
+        # Both timestamps are <10 minutes old, but three minutes apart;
+        # a peer price this far from DK is not a paired price opportunity.
+        assert scan(lambda ref: ref["peer_evidence"][0].update(observed_at="2026-10-11T16:57:00Z")) == []
+        assert scan(lambda ref: ref.update(peer_evidence=[None])) == []
+        assert scan(lambda ref: ref.update(books=[{"unhashable":"book"}])) == []
+        assert scan(lambda ref: ref.update(books=["pinnacle","pinnacle"])) == []
         assert scan(lambda ref: ref["peer_evidence"][0].update(line=46.5)) == []
         assert scan(lambda ref: ref.update(provider_event_id="wrong")) == []
         assert scan(lambda ref: ref.update(peer_evidence=[])) == []
