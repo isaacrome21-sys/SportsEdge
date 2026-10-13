@@ -124,10 +124,47 @@ def test_min_twenty_pas_and_ten_games_must_both_hold():
     assert "FEWER_THAN_TEN" in c["prop_unpriced"][0]["reason"]
 
 
-def test_missing_stat_field_is_not_silently_treated_as_zero():
-    c=run(getter=mock_public(total_bases=False))
-    assert len(c["prop_unpriced"])==2
-    assert "FEWER_THAN_TEN" in c["prop_unpriced"][0]["reason"]
+def test_missing_stat_field_blocks_its_market_not_unrelated_hits():
+    # All 10 StatsAPI games have independent PA, hits and identity evidence.
+    # Missing totalBases is NOT a zero and must block TOTAL_BASES only.
+    getter=mock_public(total_bases=False)
+    hit_card=run(getter=getter)
+    assert hit_card["evaluated_rows"][0]["model_probability"] == 0.7
+    assert hit_card["prop_candidates"]
+    tb_rows=[quote("OVER",-110,market="BATTER_TOTAL_BASES"),
+             quote("UNDER",-110,market="BATTER_TOTAL_BASES")]
+    total_bases_card=run(getter=getter,rows=tb_rows)
+    assert len(total_bases_card["prop_unpriced"])==2
+    assert all("total_bases_INVALID" in r["reason"]
+               for r in total_bases_card["prop_unpriced"])
+
+
+def test_one_missing_total_bases_field_does_not_cherry_pick_history():
+    upstream=mock_public(total_bases=True)
+    def getter(url):
+        result=upstream(url)
+        if "/people/" in url and "/stats?" in url:
+            # StatsAPI endpoint has a query string: .../stats?stats=gameLog...
+            result["stats"][0]["splits"][0]["stat"].pop("totalBases")
+        return result
+    hits=run(getter=getter)
+    assert hits["evaluated_rows"][0]["model_probability"] == 0.7
+    tb=run(getter=getter,rows=[
+        quote("OVER",-110,market="BATTER_TOTAL_BASES"),
+        quote("UNDER",-110,market="BATTER_TOTAL_BASES")])
+    assert len(tb["prop_unpriced"]) == 2
+    assert all("total_bases_INVALID" in row["reason"]
+               for row in tb["prop_unpriced"])
+
+
+def test_missing_walk_stat_blocks_walk_market_not_hits():
+    hits=run(getter=mock_public())
+    assert hits["prop_candidates"]
+    walks=run(getter=mock_public(),rows=[
+        quote("OVER",-110,market="BATTER_BB"),
+        quote("UNDER",-110,market="BATTER_BB")])
+    assert len(walks["prop_unpriced"]) == 2
+    assert all("walks_INVALID" in row["reason"] for row in walks["prop_unpriced"])
 
 
 def test_wrong_name_is_not_fuzzy_matched():

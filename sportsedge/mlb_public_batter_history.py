@@ -196,32 +196,37 @@ class MLBBatterPublicSource:
                 when = datetime.fromisoformat(str(row["date"])).date()
                 if when >= now.date() or when >= kickoff.date():
                     continue
-                stats = {
-                    "hits": _int(data_row["hits"], "HITS"),
-                    "total_bases": _int(data_row["totalBases"], "TOTAL_BASES"),
-                    "rbi": _int(data_row["rbi"], "RBI"),
-                    "runs": _int(data_row["runs"], "RUNS"),
-                    "home_runs": _int(data_row["homeRuns"], "HOME_RUNS"),
-                    "stolen_bases": _int(data_row["stolenBases"], "STOLEN_BASES"),
-                    "plate_appearances": pa,
-                }
-                # Preserve the historical input pool for existing batter
-                # markets when the API omits a newly required stat. A missing
-                # optional field stays MISSING (never silently treated as 0);
-                # the new-market pricer then fails closed on that game log.
+                # A valid appearance is not the same as a fully observed
+                # market-specific outcome. Retain independently verified
+                # prior games with PA + game identity/date; parse every
+                # actually present stat, but NEVER fill missing with zero.
+                # The empirical pricer requires the chosen market's field
+                # in every retained game and fails closed otherwise.
+                # Requiring totalBases (or any other market's statistic)
+                # to retain a HITS appearance silently discarded otherwise
+                # usable history for unrelated markets.
+                stats = {"plate_appearances": pa}
                 for raw_field, output_field in (
+                    ("hits", "hits"), ("totalBases", "total_bases"),
+                    ("rbi", "rbi"), ("runs", "runs"),
+                    ("homeRuns", "home_runs"),
+                    ("stolenBases", "stolen_bases"),
                     ("baseOnBalls", "walks"), ("strikeOuts", "strikeouts"),
                     ("doubles", "doubles"), ("triples", "triples"),
                 ):
                     if raw_field in data_row:
-                        stats[output_field] = _int(data_row[raw_field], output_field.upper())
-                if "doubles" in stats and "triples" in stats:
+                        stats[output_field] = _int(
+                            data_row[raw_field], output_field.upper())
+                if all(k in stats for k in (
+                        "hits", "doubles", "triples", "home_runs")):
                     singles = (stats["hits"] - stats["doubles"]
                                - stats["triples"] - stats["home_runs"])
                     if singles < 0:
                         raise MissingMLBBatterHistory("INCONSISTENT_EXTRA_BASE_HIT_COUNTS")
                     stats["singles"] = singles
-                stats["hits_runs_rbis"] = stats["hits"] + stats["runs"] + stats["rbi"]
+                if all(k in stats for k in ("hits", "runs", "rbi")):
+                    stats["hits_runs_rbis"] = (
+                        stats["hits"] + stats["runs"] + stats["rbi"])
                 hist.append((when, game_id, stats))
             except (ValueError, KeyError, TypeError, MissingMLBBatterHistory):
                 continue
