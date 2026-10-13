@@ -167,6 +167,7 @@ def test_same_gamepk_hostile_fixture_drift_fails_closed(kind, reason):
     {"codedGameState": "F", "detailedState": "Final", "abstractGameState": "Final"},
     {"codedGameState": "D", "detailedState": "Postponed", "abstractGameState": "Preview"},
     {"codedGameState": "S", "detailedState": "In Progress", "abstractGameState": "Preview"},
+    {"codedGameState": "S", "detailedState": "Suspended", "abstractGameState": "Preview"},
     {},
 ])
 def test_live_final_postponed_or_missing_status_is_not_pregame(status):
