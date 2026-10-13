@@ -20,22 +20,24 @@ priced silently on the healthy-roster/default assumption.
   Unverifiable QB participation -> QB_PARTICIPATION_UNVERIFIED (refuse).
 - NBA: injury_points wired; unverifiable participation ->
   PARTICIPATION_UNVERIFIED (refuse).
-- MLB: starting-pitcher adjustment is REQUIRED. Probable pitchers are verified
-  from the free MLB StatsAPI schedule
-  (https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=YYYY-MM-DD&hydrate=probablePitcher,
-  games[].teams.{home,away}.probablePitcher.{id,fullName}). Each starter's
-  season ERA (minimum 5 games started) is verified from
-  /people/{id}/stats?stats=season&group=pitching&season=YYYY and compared
-  against his own club's season staff ERA (verified
-  /teams/{id}/stats?stats=season&group=pitching&season=YYYY):
+- MLB: starting-pitcher adjustment is REQUIRED (538-adapted; see
+  sportsedge/mlb_sp_rgs.py). Probable pitchers are verified from the free
+  MLB StatsAPI schedule (hydrate=probablePitcher), exactly as before. Each
+  starter's trailing 20-start rolling game score is verified from the free
+  season gameLog (/people/{id}/stats?stats=gameLog&group=pitching, starts
+  only, strictly before the game date):
 
-      suppression_per_9 = clamp(staff_ERA - pitcher_ERA, -1.5, +1.5)
-      ip_share          = clamp(avg_IP_per_start, 4.0, 7.0) / 9
-      team_total_adj    = -suppression_per_9 * ip_share, bounded to +-2.0 runs
+      gameScore = 47.4 + K + 1.5*outs - 2*BB - 2*H - 3*R - 4*HR   (538's
+      Tangotiger-modified Bill James score, read from the archived
+      methodology page)
+      opp_total_adj = 0.014 - 0.0699 * (pitcher_rGS - 51.54)
 
-  applied to the OPPOSING team's total (your starter suppresses their total,
-  not yours). Missing/unverifiable probable pitcher, opener/bullpen-game
-  shape (<5 GS), or unverifiable ERA -> PROBABLE_PITCHER_UNVERIFIED (refuse).
+  applied to the OPPOSING team's total, capped at +-2.0 runs. The gamma
+  (-0.0699) and league mean (51.54) are FIT, not borrowed: 2021-2022 fit,
+  2023-2024 out-of-sample eval beat both no-adjustment and the old
+  ERA-vs-staff formula (scripts/study_sp_ablation.py). Missing/unverifiable
+  probable pitcher, opener/bullpen-game shape (<5 starts or <4.0 IP/start),
+  or unverifiable gameLog -> PROBABLE_PITCHER_UNVERIFIED (refuse).
 
 Source hierarchy for participation (VERIFIED sources only):
   1. Official inactive lists (e.g. NFL game-day inactives) -- highest
@@ -48,20 +50,29 @@ Source hierarchy for participation (VERIFIED sources only):
      future wiring, not used here.
   Never: beat-writer speculation, rumors, social media.
 
-LIMITS (declared, not validated):
-- All point values are bounded heuristics, NOT fitted or calibrated edges.
-- QB_OUT_EXTRA (-1.5) stacks on top of injury_points' own generic QB term
-  (-1.5): total declared QB-absence effect is -3.0 team points. Direction is
-  verified; magnitude is a declared placeholder pending harness validation.
+LIMITS (declared vs calibrated):
+- NFL QB adjustment is now EMPIRICALLY CALIBRATED (fit 2015-2020, validated
+  out-of-sample 2021-2024; see sportsedge/qb_value.py and
+  scripts/study_qb_adjustment.py), not a declared constant. The old declared
+  -3.0 total (-1.5 injury_points + -1.5 extra) was shown out-of-sample to be
+  WORSE than no adjustment; the per-QB 538-adapted VALUE version wins.
+  Tier 2 (backup unverifiable) uses the empirical mean backup-start effect
+  (-0.582 total). Doubtful = 50% of the OUT extra remains a DECLARED
+  play-probability weight (538's published data has no doubtful cases).
+- CFB QB penalties (-1.5/-0.75) remain DECLARED and audit-flagged
+  UNCALIBRATED: no 538 analog for college, no free college QB history wired.
 - Pitcher suppression is expressed vs the starter's OWN club staff ERA, which
   understates aces on elite staffs and flatters weak starters on weak staffs.
   Bullpen quality, park, and platoon effects are NOT modeled.
+  (Refinement to 538-style rolling game scores: see sportsedge/mlb_sp_rgs.py
+  once the calibration study lands.)
 - Doubleheader dates (two same-team games on one date) block: the schedule
   match must be unique.
 - Early-season MLB (fewer than 5 starts) blocks until the sample gate passes.
 """
 from __future__ import annotations
 
+import os
 from math import erf, isfinite, sqrt
 from typing import Any, Mapping
 from urllib.parse import urlencode
@@ -70,6 +81,8 @@ from artifacts.free_models import (
     PRIORS, model_probability, PublicContext, numeric, bounded, dt, odds_decimal,
     ESPN, LEAGUES,
 )
+from sportsedge import qb_value as _qb_value
+from sportsedge import mlb_sp_rgs as _sp_rgs
 
 # Bound at import so tests can monkeypatch the PublicContext *constructor*
 # without breaking the stateless helpers below.
@@ -77,11 +90,14 @@ _TEAM_MATCHES = PublicContext.team_matches
 _INJURY_GROUP_ID = PublicContext._injury_group_id
 
 # Declared, uncalibrated heuristics. See module docstring.
-_QB_OUT_EXTRA = -1.5
-_QB_DOUBTFUL_EXTRA = -0.75
-_MIN_PITCHER_GS = 5
-_SUPPRESSION_CAP_PER_9 = 1.5
-_PITCHER_ADJ_CAP = 2.0
+# NOTE (2026-10-11, qb-sp-adjustment): the NFL QB extras below were REPLACED
+# by the empirically calibrated two-tier scheme in sportsedge/qb_value.py
+# (538-adapted VALUE; fit 2015-2020, validated out-of-sample 2021-2024; see
+# scripts/study_qb_adjustment.py and MATCHUP_VALIDATION.md). The CFB values
+# remain declared: no 538 analog exists for college and no free college
+# QB box-score history is wired, so they are audit-flagged UNCALIBRATED.
+_QB_OUT_EXTRA_CFB = -1.5
+_QB_DOUBTFUL_EXTRA_CFB = -0.75
 _STATSAPI = "https://statsapi.mlb.com/api/v1"
 
 
@@ -151,12 +167,47 @@ def _injury_candidates(ctx, sport, team_id):
     return None
 
 
-def _qb_status(ctx, sport, team):
+_QB_RATINGS_CACHE = {}
+
+
+def _qb_ratings(cache_dir, kickoff):
+    """Cached {pid: rating_state} for the trailing seasons.
+
+    Ratings are point-in-time safe: weekly nflverse CSVs only ever contain
+    completed weeks, and completed seasons are loaded whole. Keyed by
+    (cache_dir, seasons) so a stale process never mixes seasons.
+    """
+    current = kickoff.year
+    seasons = tuple(range(max(2015, current - 11), current + 1))
+    key = (cache_dir, seasons)
+    if key not in _QB_RATINGS_CACHE:
+        _QB_RATINGS_CACHE[key] = _qb_value.build_ratings(
+            cache_dir, seasons, current, kickoff)[0]
+    return _QB_RATINGS_CACHE[key]
+
+
+def _qb_value_dir():
+    d = os.path.expanduser("~/.cache/sportsedge/qb_value")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _qb_status(ctx, sport, team, kickoff):
     """Verify the starting QB's participation from the ESPN injury feed.
 
-    Returns (status, extra_points, detail). Raises _MatchupUnverified with
-    QB_PARTICIPATION_UNVERIFIED when the feed cannot be verified -- the price
-    must not assume a healthy starting QB in that case.
+    Returns (status, extra_points, detail, value_audit). Raises
+    _MatchupUnverified with QB_PARTICIPATION_UNVERIFIED when the feed cannot
+    be verified -- the price must not assume a healthy starting QB in that
+    case.
+
+    NFL: the extra is the empirically calibrated 538-adapted adjustment
+    (sportsedge/qb_value.py): Tier 1 per-QB VALUE gap when the backup is
+    verifiable, else the Tier 2 calibrated constant. Both are TOTAL-effect
+    estimates with injury_points' generic QB component (-1.5) compensated
+    in the stacking: the published empirical effects are TOTAL effects, so
+    the +1.5 compensation below offsets injury_points' generic -1.5 QB term
+    (see _apply_matchup_adjustments).
+    CFB: declared -1.5/-0.75, audit-flagged UNCALIBRATED (no 538 analog).
     """
     rows = _injury_candidates(ctx, sport, team.get("id"))
     if rows is None:
@@ -164,6 +215,7 @@ def _qb_status(ctx, sport, team):
             "QB_PARTICIPATION_UNVERIFIED",
             "ESPN injury feed shape unverifiable for team id "
             + str(team.get("id")) + "; starting-QB status unknown")
+    found = None
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -182,65 +234,49 @@ def _qb_status(ctx, sport, team):
             continue
         name = str(athlete.get("fullName") or athlete.get("displayName")
                    or athlete.get("id") or "UNKNOWN_QB")
-        if status == "out":
-            return ("QB_OUT_VERIFIED", _QB_OUT_EXTRA,
-                    "starting QB verified OUT: " + name)
-        return ("QB_DOUBTFUL_VERIFIED", _QB_DOUBTFUL_EXTRA,
-                "starting QB verified DOUBTFUL: " + name)
-    return ("QB_NO_ABSENCE_VERIFIED", 0.0,
-            "no QB out/doubtful in the verified injury feed")
-
-
-def _innings_to_outs(value):
-    """Parse StatsAPI inningsPitched ("198.2" == 198 + 2/3 innings)."""
-    try:
-        whole_s, _, frac_s = str(value).strip().partition(".")
-        whole, frac = int(whole_s), int(frac_s or "0")
-    except (ValueError, AttributeError):
-        return None
-    if whole < 0 or not 0 <= frac <= 2:
-        return None
-    return whole * 3 + frac
-
-
-def _season_pitching_stat(getter, url, season):
-    """Verify one season pitching split from a StatsAPI /stats endpoint.
-
-    Strict shape checks; anything unrecognized raises _MatchupUnverified so
-    the market refuses instead of pricing on a guessed ERA.
-    """
-    try:
-        data = getter(url)
-    except Exception as exc:  # noqa: BLE001 - any fetch failure is unverified
-        raise _MatchupUnverified("PROBABLE_PITCHER_UNVERIFIED",
-                                 "pitching stats fetch failed: "
-                                 + type(exc).__name__) from exc
-    if not isinstance(data, dict) or not isinstance(data.get("stats"), list):
-        raise _MatchupUnverified("PROBABLE_PITCHER_UNVERIFIED",
-                                 "pitching stats payload shape unverified")
-    for entry in data["stats"]:
-        if not isinstance(entry, dict):
-            continue
-        group = entry.get("group") or {}
-        if str(group.get("displayName") or "").lower() != "pitching":
-            continue
-        for split in entry.get("splits") or []:
-            if not isinstance(split, dict):
-                continue
-            if str(split.get("season")) != str(season):
-                continue
-            stat = split.get("stat") or {}
-            era = _finite_number(stat.get("era"))
-            games_started = _finite_number(stat.get("gamesStarted"))
-            outs = _innings_to_outs(stat.get("inningsPitched"))
-            if era is None or games_started is None or outs is None:
-                continue
-            if not 0.0 <= era <= 15.0 or games_started < 0 or outs < 0:
-                continue
-            return {"era": era, "games_started": int(games_started),
-                    "innings_outs": outs}
-    raise _MatchupUnverified("PROBABLE_PITCHER_UNVERIFIED",
-                             "season pitching split unverified for " + url[:80])
+        espn_id = str(athlete.get("id") or "").strip()
+        found = (status, name, espn_id)
+        break
+    if found is None:
+        return ("QB_NO_ABSENCE_VERIFIED", 0.0,
+                "no QB out/doubtful in the verified injury feed", {})
+    status, name, espn_id = found
+    doubtful = status == "doubtful"
+    if sport == "NFL":
+        try:
+            cache_dir = _qb_value_dir()
+            ratings = _qb_ratings(cache_dir, kickoff)
+            vout = _qb_value.qb_absence_extra(
+                ratings, starter_name=name,
+                team_abbr=str(team.get("abbreviation") or "").upper(),
+                cache=cache_dir)
+        except Exception as exc:  # noqa: BLE001 - fail closed, never blind
+            raise _MatchupUnverified(
+                "QB_PARTICIPATION_UNVERIFIED",
+                "QB VALUE pipeline failed for verified-%s QB %s: %s"
+                % (status.upper(), name, type(exc).__name__)) from exc
+        extra = vout["extra_total"]
+        if doubtful:
+            # Doubtful = 50% of the OUT extra: DECLARED, not calibrated.
+            extra = 0.5 * extra
+        vaudit = {"tier": vout["variant"], "source": vout["source"],
+                  "doubtful_weight": 0.5 if doubtful else 1.0,
+                  "provenance": vout["provenance"]}
+        vaudit.update(vout["audit"])
+        code = "QB_OUT_VERIFIED" if status == "out" else "QB_DOUBTFUL_VERIFIED"
+        detail = ("starting QB verified %s: %s; %s adjustment (538-adapted "
+                  "VALUE, %s%s)" % (status.upper(), name,
+                                  "per-QB" if vout["variant"] ==
+                                  "TIER1_PER_QB_VALUE" else "calibrated-constant",
+                                  vout["variant"],
+                                  ", doubtful halved (DECLARED)" if doubtful else ""))
+        return (code, extra, detail, vaudit)
+    # CFB: declared, explicitly uncalibrated.
+    extra = _QB_OUT_EXTRA_CFB if status == "out" else _QB_DOUBTFUL_EXTRA_CFB
+    code = "QB_OUT_VERIFIED" if status == "out" else "QB_DOUBTFUL_VERIFIED"
+    return (code, extra, "starting QB verified %s: %s (CFB declared penalty, "
+            "UNCALIBRATED -- no 538 analog)" % (status.upper(), name),
+            {"tier": "DECLARED_CFB_UNCALIBRATED"})
 
 
 def _mlb_probable_pitchers(getter, kickoff, home_name, away_name):
@@ -312,59 +348,32 @@ def _mlb_probable_pitchers(getter, kickoff, home_name, away_name):
 def _mlb_pitcher_adjustment(getter, kickoff, home_name, away_name):
     """Compute the required starting-pitcher adjustment for MLB team totals.
 
-    Returns (home_total_adj, away_total_adj, audit). Each side's total is
-    suppressed by the OPPOSING starter. See module docstring for the formula,
-    inputs, and limits. Raises _MatchupUnverified on any unverifiable input.
+    538-adapted (see sportsedge/mlb_sp_rgs.py): each probable starter's
+    trailing 20-start rolling game score (free StatsAPI season gameLog,
+    point-in-time) is compared against the trailing league-mean game score;
+    the OPPOSING team's total moves by INTERCEPT + GAMMA * gap, capped.
+    Returns (home_total_adj, away_total_adj, audit). Raises
+    _MatchupUnverified on any unverifiable input.
     """
     probables, meta = _mlb_probable_pitchers(getter, kickoff, home_name, away_name)
     season = kickoff.year
     per_side = {}
     for side in ("home", "away"):
         pitcher = probables[side]
-        pitcher_url = (_STATSAPI + "/people/%d/stats?" % pitcher["id"]
-                       + urlencode({"stats": "season", "group": "pitching",
-                                    "season": str(season), "gameType": "R"}))
-        pstat = _season_pitching_stat(getter, pitcher_url, season)
-        if pstat["games_started"] < _MIN_PITCHER_GS:
+        try:
+            adj, audit = _sp_rgs.suppression_for_starter(
+                getter, pitcher["id"], season, kickoff.date())
+        except _sp_rgs.Unverifiable as exc:
             raise _MatchupUnverified(
                 "PROBABLE_PITCHER_UNVERIFIED",
-                "%s: only %d games started (<%d); opener/bullpen-game "
-                "shape is not modeled" % (pitcher["name"],
-                                          pstat["games_started"],
-                                          _MIN_PITCHER_GS))
-        staff_id = _finite_number((pitcher["team"] or {}).get("id"))
-        if staff_id is None:
-            raise _MatchupUnverified("PROBABLE_PITCHER_UNVERIFIED",
-                                     "pitcher team id unverified")
-        staff_url = (_STATSAPI + "/teams/%d/stats?" % int(staff_id)
-                     + urlencode({"stats": "season", "group": "pitching",
-                                  "season": str(season), "gameType": "R"}))
-        staff = _season_pitching_stat(getter, staff_url, season)
-        raw_avg_ip = (pstat["innings_outs"] / 3.0) / pstat["games_started"]
-        if raw_avg_ip < 4.0:
-            # A 5-start "probable" averaging under 4 IP/start is a de-facto
-            # opener; the starter-suppression formula does not apply.
-            raise _MatchupUnverified(
-                "PROBABLE_PITCHER_UNVERIFIED",
-                "%s: %.2f IP/start (<4.0); opener/bullpen shape not modeled"
-                % (pitcher["name"], raw_avg_ip))
-        avg_ip = min(7.0, raw_avg_ip)
-        suppression_9 = max(-_SUPPRESSION_CAP_PER_9,
-                            min(_SUPPRESSION_CAP_PER_9,
-                                staff["era"] - pstat["era"]))
-        adj = max(-_PITCHER_ADJ_CAP,
-                  min(_PITCHER_ADJ_CAP, -suppression_9 * (avg_ip / 9.0)))
+                "%s: %s" % (pitcher["name"], exc)) from exc
         per_side[side] = {
-            "adjustment_to_opponent_total": round(adj, 3),
+            "adjustment_to_opponent_total": adj,
             "probable_pitcher": pitcher["name"],
             "probable_pitcher_id": pitcher["id"],
-            "pitcher_era": round(pstat["era"], 3),
-            "pitcher_games_started": pstat["games_started"],
-            "staff_era_reference": round(staff["era"], 3),
-            "suppression_per_9": round(suppression_9, 3),
-            "avg_ip_per_start": round(avg_ip, 2),
             "schedule_date": meta["schedule_date"],
             "game_status": meta["game_status"],
+            **audit,
         }
     # The home total is suppressed by the AWAY starter and vice versa.
     home_adj = per_side["away"]["adjustment_to_opponent_total"]
@@ -456,13 +465,15 @@ def _apply_matchup_adjustments(ctx, sport, home, away, home_team, away_team,
                 "injury_status": injury_status,
             }
             if sport in {"NFL", "CFB"}:
-                qb_status, qb_pts, qb_detail = _qb_status(ctx, sport, team)
+                qb_status, qb_pts, qb_detail, qb_vaudit = _qb_status(
+                    ctx, sport, team, kickoff)
                 if is_home:
                     home_mean += qb_pts
                 else:
                     away_mean += qb_pts
                 entry.update({"qb_status": qb_status, "qb_points": qb_pts,
-                              "qb_detail": qb_detail})
+                              "qb_detail": qb_detail,
+                              "qb_value_audit": qb_vaudit})
                 matchup_audit["coverage"]["verified_applied"].append(
                     prefix + "_qb:" + qb_status)
             matchup_audit[prefix] = entry

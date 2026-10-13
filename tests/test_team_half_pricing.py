@@ -8,8 +8,9 @@ directly, and the runner is exercised in no-fetch mode.
 Research-only semantics are asserted throughout.
 
 Also covers the 2026-10-11 matchup-adjustment audit: injury_points wiring,
-the explicit starting-QB scan (out/doubtful -> declared backup-replacement
-penalty; unverifiable -> QB_PARTICIPATION_UNVERIFIED), and the required MLB
+the explicit starting-QB scan (out/doubtful -> 538-adapted calibrated
+adjustment, Tier 1 per-QB VALUE gap or Tier 2 calibrated constant;
+unverifiable -> QB_PARTICIPATION_UNVERIFIED), and the required MLB
 probable-pitcher adjustment (verified schedule + season ERA vs staff ERA;
 missing/unverifiable -> PROBABLE_PITCHER_UNVERIFIED).
 """
@@ -78,6 +79,26 @@ def _price(monkeypatch, row, getter=None, **ctxkw):
     monkeypatch.setattr(th, "PublicContext",
                         lambda now, getter=None: _FakeCtx(now, getter, **ctxkw))
     return th.price_team_or_half(row, now=NOW, getter=getter)
+
+
+def _stub_qb_value(monkeypatch, extra_out=0.918, tier="TIER2_CALIBRATED_CONSTANT",
+                   **audit_kw):
+    """Stub the nflverse-backed QB VALUE pipeline (no network in tests).
+
+    Default extra_out=+0.918 is the real Tier-2 stacking arithmetic:
+    QB_CONSTANT_TOTAL (-0.582) minus injury_points' generic QB component
+    (-1.5). Doubtful returns the 50% weight, mirroring production.
+    """
+    def fake(ratings, starter_name, team_abbr, cache):
+        audit = {"tier": tier, "variant": tier,
+                 "extra_applied": round(extra_out, 3)}
+        audit.update(audit_kw)
+        return {"extra_total": extra_out, "variant": tier,
+                "source": "TEST_STUB", "audit": audit,
+                "provenance": "test"}
+    monkeypatch.setattr(th._qb_value, "qb_absence_extra", fake)
+    monkeypatch.setattr(th, "_qb_ratings", lambda cache_dir, kickoff: {})
+    monkeypatch.setattr(th, "_qb_value_dir", lambda: "/tmp/x")
 
 
 def test_half_scale_is_declared_0_50(monkeypatch):
@@ -221,9 +242,15 @@ def test_injury_points_wired_into_means(monkeypatch):
         in audit["coverage"]["verified_applied"]
 
 
-def test_qb_out_applies_declared_backup_penalty(monkeypatch):
-    # The Lamar Jackson case: verified OUT QB -> generic injury term (-1.5)
-    # PLUS the declared backup-replacement penalty (-1.5).
+def test_qb_out_applies_calibrated_adjustment(monkeypatch):
+    # DELIBERATE CHANGE (2026-10-11, qb-sp-adjustment): the old test asserted
+    # the declared -1.5 extra (total -3.0 with injury_points). The calibration
+    # study (scripts/study_qb_adjustment.py, nflverse 2015-2020, validated
+    # out-of-sample 2021-2024) showed the declared -3.0 is WORSE than no
+    # adjustment; the empirical mean backup-start TOTAL effect is -0.582, so
+    # the extra stacked on injury_points' generic -1.5 QB term is +0.918.
+    # The Lamar Jackson case now prices the verified adjustment, not a guess.
+    _stub_qb_value(monkeypatch)
     rows = {"1": [{"status": "Out",
                    "athlete": {"id": "1", "fullName": "Lamar Jackson",
                                "position": {"abbreviation": "QB"}}}]}
@@ -231,22 +258,49 @@ def test_qb_out_applies_declared_backup_penalty(monkeypatch):
     out = _price(monkeypatch, _row(), getter=lambda url: None,
                  injury=injury, injury_rows=rows)
     assert out["status"] == "PRICED_RESEARCH"
-    assert out["home_mean"] == 22.75 - 1.5 - 1.5
+    assert out["home_mean"] == 22.75 - 1.5 + 0.918
     assert out["away_mean"] == 21.25
     audit = out["matchup_audit"]
     assert audit["home"]["qb_status"] == "QB_OUT_VERIFIED"
-    assert audit["home"]["qb_points"] == -1.5
+    assert audit["home"]["qb_points"] == 0.918
+    assert audit["home"]["qb_value_audit"]["tier"] == "TIER2_CALIBRATED_CONSTANT"
     assert "Lamar Jackson" in audit["home"]["qb_detail"]
     assert "home_qb:QB_OUT_VERIFIED" in audit["coverage"]["verified_applied"]
 
 
-def test_qb_doubtful_applies_smaller_declared_penalty(monkeypatch):
+def test_qb_out_tier1_per_qb_value_gap(monkeypatch):
+    # Tier 1: backup verifiable -> the 538-adapted VALUE gap determines the
+    # extra (here a -22.0 VALUE gap ~= Huntley-for-Lamar scale), fully
+    # recorded in the audit. Direction and magnitude come from the study,
+    # not from a declared constant.
+    _stub_qb_value(monkeypatch, extra_out=-1.082,
+                   tier="TIER1_PER_QB_VALUE", value_gap=-22.0,
+                   backup="Tyler Huntley")
+    rows = {"1": [{"status": "Out",
+                   "athlete": {"id": "1", "fullName": "Lamar Jackson",
+                               "position": {"abbreviation": "QB"}}}]}
+    injury = {"1": (-1.5, "HEURISTIC_OUT_DOUBTFUL_REPORTED_1_UNKNOWN_COMPLETENESS")}
+    out = _price(monkeypatch, _row(), getter=lambda url: None,
+                 injury=injury, injury_rows=rows)
+    assert out["status"] == "PRICED_RESEARCH"
+    assert out["home_mean"] == 22.75 - 1.5 - 1.082
+    vaudit = out["matchup_audit"]["home"]["qb_value_audit"]
+    assert vaudit["tier"] == "TIER1_PER_QB_VALUE"
+    assert vaudit["value_gap"] == -22.0
+    assert vaudit["backup"] == "Tyler Huntley"
+
+
+def test_qb_doubtful_applies_half_weight(monkeypatch):
+    # DELIBERATE CHANGE: doubtful is 50% of the calibrated OUT extra
+    # (declared play-probability weight; 538's published data has no
+    # doubtful cases to fit). Old test asserted the declared -0.75.
+    _stub_qb_value(monkeypatch)
     rows = {"1": [{"status": "Doubtful",
                    "athlete": {"id": "9", "fullName": "Joe Burrow",
                                "position": {"abbreviation": "QB"}}}]}
     out = _price(monkeypatch, _row(), getter=lambda url: None, injury_rows=rows)
     assert out["status"] == "PRICED_RESEARCH"
-    assert out["home_mean"] == 22.75 - 0.75
+    assert out["home_mean"] == 22.75 + 0.459
     assert out["matchup_audit"]["home"]["qb_status"] == "QB_DOUBTFUL_VERIFIED"
 
 
@@ -297,15 +351,32 @@ def test_nba_injury_points_wired_when_verified(monkeypatch):
 # Matchup-adjustment audit: MLB probable-pitcher adjustment
 # ---------------------------------------------------------------------------
 
-def _mlb_people_stats(era, games_started, innings_pitched):
-    return {"stats": [{"group": {"displayName": "pitching"},
-                       "splits": [{"season": "2026",
-                                   "stat": {"era": str(era),
-                                            "gamesStarted": games_started,
-                                            "inningsPitched": innings_pitched}}]}]}
+def _mlb_gamelog(starts, start_date="2026-09-01"):
+    """Build a StatsAPI season gameLog payload from per-start lines.
+
+    starts: list of (k, bb, h, r, hr, ip_str). Every split is a start
+    (gamesStarted=1) dated before the Oct-2026 kickoff (point-in-time).
+    """
+    from datetime import date, timedelta
+    day = date.fromisoformat(start_date)
+    splits = []
+    for i, (k, bb, h, r, hr, ip) in enumerate(starts):
+        splits.append({
+            "date": (day + timedelta(days=5 * i)).isoformat(),
+            "season": "2026",
+            "opponent": {"id": 999, "name": "Test Opp"},
+            "stat": {"gamesStarted": 1, "strikeOuts": k, "baseOnBalls": bb,
+                     "hits": h, "runs": r, "homeRuns": hr,
+                     "inningsPitched": ip},
+        })
+    return {"stats": [{"group": {"displayName": "pitching"}, "splits": splits}]}
 
 
-def _mlb_getter(schedule_probables, people, teams, game_status="Scheduled",
+def _mlb_ace_starts(n, k=8, ip="7.0", bb=1, h=5, r=2, hr=1):
+    return [(k, bb, h, r, hr, ip)] * n
+
+
+def _mlb_getter(schedule_probables, gamelogs, game_status="Scheduled",
                 extra_games=()):
     def get(url):
         if "/schedule?" in url:
@@ -322,10 +393,7 @@ def _mlb_getter(schedule_probables, people, teams, game_status="Scheduled",
             return {"dates": [{"games": games}]}
         if "/people/" in url:
             pid = int(url.split("/people/")[1].split("/")[0])
-            return people[pid]
-        if "/teams/" in url:
-            tid = int(url.split("/teams/")[1].split("/")[0])
-            return teams[tid]
+            return gamelogs[pid]
         raise AssertionError("unexpected URL: " + url)
     return get
 
@@ -339,31 +407,37 @@ def _mlb_row(**kw):
 
 
 def _mlb_standard_getter():
-    # Misiorowski (1.80 ERA, Brewers staff 3.70) vs Skubal (2.72, Dodgers staff 4.10).
+    # DELIBERATE CHANGE (2026-10-11, qb-sp-adjustment): the old ERA-vs-staff
+    # formula is replaced by the 538-adapted rolling game score
+    # (sportsedge/mlb_sp_rgs.py; gamma=-0.0699 fit, league mean 51.54).
+    # Misiorowski: 20 starts of (7K, 2BB, 4H, 1R, 0HR, 6.0IP):
+    #   GS = 47.4+7+27-4-8-3-0 = 66.4; gap = 14.86;
+    #   adj = 0.014 - 0.0699*14.86 = -1.025.
+    # Skubal: 20 starts of (8K, 1BB, 5H, 2R, 1HR, 7.0IP):
+    #   GS = 47.4+8+31.5-2-10-6-4 = 64.9; gap = 13.36;
+    #   adj = 0.014 - 0.0699*13.36 = -0.920.
     return _mlb_getter(
         ({"id": 101, "fullName": "Jacob Misiorowski"},
          {"id": 102, "fullName": "Tarik Skubal"}),
-        {101: _mlb_people_stats(1.80, 20, "120.0"),
-         102: _mlb_people_stats(2.72, 30, "198.0")},
-        {158: _mlb_people_stats(3.70, 162, "1450.0"),
-         119: _mlb_people_stats(4.10, 162, "1458.1")})
+        {101: _mlb_gamelog(_mlb_ace_starts(20, k=7, ip="6.0", bb=2, h=4, r=1, hr=0)),
+         102: _mlb_gamelog(_mlb_ace_starts(20, k=8, ip="7.0", bb=1, h=5, r=2, hr=1))})
 
 
 def test_mlb_probable_pitcher_adjustment_shifts_means(monkeypatch):
     out = _price(monkeypatch, _mlb_row(), getter=_mlb_standard_getter())
     assert out["status"] == "PRICED_RESEARCH", out
     # MLB PRIORS: base 4.4, hfa 0.20 -> home 4.5 / away 4.3 before pitching.
-    # Home (Brewers) faces Skubal: suppression = min(1.5, 4.10-2.72)=1.38;
-    # avg IP/start = 198/30 = 6.6 -> share 0.7333; adj = -1.38*0.7333 = -1.012.
-    # Away (Dodgers) faces Misiorowski: suppression = min(1.5, 3.70-1.80)=1.5;
-    # avg IP/start = 120/20 = 6.0 -> share 0.6667; adj = -1.5*0.6667 = -1.0.
-    assert out["home_mean"] == round(4.5 - 1.38 * (6.6 / 9.0), 3)
-    assert out["away_mean"] == round(4.3 - 1.5 * (6.0 / 9.0), 3)
+    # Home (Brewers) faces Skubal (-0.920); away (Dodgers) faces
+    # Misiorowski (-1.025). Each side's total is moved by the OPPOSING
+    # starter's rGS adjustment.
+    assert out["home_mean"] == round(4.5 - 0.920, 3)
+    assert out["away_mean"] == round(4.3 - 1.025, 3)
     audit = out["matchup_audit"]
     assert audit["home"]["probable_pitcher"] == "Tarik Skubal"
     assert audit["away"]["probable_pitcher"] == "Jacob Misiorowski"
-    assert audit["home"]["pitcher_era"] == 2.72
-    assert audit["away"]["staff_era_reference"] == 3.70
+    assert audit["home"]["pitcher_rgs"] == 64.9
+    assert audit["away"]["rgs_gap_vs_league"] == 14.86
+    assert audit["home"]["variant"] == "V2_league_relative_raw"
     assert any(v.startswith("probable_pitcher_home:") for v in
                audit["coverage"]["verified_applied"])
 
@@ -371,9 +445,7 @@ def test_mlb_probable_pitcher_adjustment_shifts_means(monkeypatch):
 def test_mlb_missing_probable_pitcher_fail_closed(monkeypatch):
     getter = _mlb_getter(
         ({"id": 101, "fullName": "Jacob Misiorowski"}, {}),
-        {101: _mlb_people_stats(1.80, 20, "120.0")},
-        {158: _mlb_people_stats(3.70, 162, "1450.0"),
-         119: _mlb_people_stats(4.10, 162, "1458.1")})
+        {101: _mlb_gamelog(_mlb_ace_starts(20, k=7, ip="6.0", bb=2, h=4, r=1, hr=0))})
     out = _price(monkeypatch, _mlb_row(), getter=getter)
     assert out["status"] == "NO_MODEL_OR_MARKET"
     assert out["reason"] == "PROBABLE_PITCHER_UNVERIFIED"
@@ -384,29 +456,26 @@ def test_mlb_opener_shape_fail_closed(monkeypatch):
     getter = _mlb_getter(
         ({"id": 101, "fullName": "Jacob Misiorowski"},
          {"id": 102, "fullName": "Tarik Skubal"}),
-        {101: _mlb_people_stats(1.80, 20, "120.0"),
-         102: _mlb_people_stats(2.10, 2, "8.0")},
-        {158: _mlb_people_stats(3.70, 162, "1450.0"),
-         119: _mlb_people_stats(4.10, 162, "1458.1")})
+        {101: _mlb_gamelog(_mlb_ace_starts(20, k=7, ip="6.0", bb=2, h=4, r=1, hr=0)),
+         102: _mlb_gamelog(_mlb_ace_starts(2, k=8, ip="7.0", bb=1, h=5, r=2, hr=1))})
     out = _price(monkeypatch, _mlb_row(), getter=getter)
     assert out["status"] == "NO_MODEL_OR_MARKET"
     assert out["reason"] == "PROBABLE_PITCHER_UNVERIFIED"
 
 
 def test_mlb_bad_starter_is_a_boost_not_a_suppression(monkeypatch):
-    # A below-staff-average starter raises the opposing total (positive adj).
+    # A below-league-average starter raises the opposing total (positive adj).
+    # Replacement Arm: 12 starts of (3K, 3BB, 8H, 5R, 2HR, 5.0IP):
+    #   GS = 47.4+3+22.5-6-16-15-8 = 27.9; gap = -23.64;
+    #   adj = 0.014 - 0.0699*(-23.64) = +1.666.
     getter = _mlb_getter(
         ({"id": 101, "fullName": "Jacob Misiorowski"},
          {"id": 103, "fullName": "Replacement Arm"}),
-        {101: _mlb_people_stats(1.80, 20, "120.0"),
-         103: _mlb_people_stats(6.50, 12, "60.0")},
-        {158: _mlb_people_stats(3.70, 162, "1450.0"),
-         119: _mlb_people_stats(4.10, 162, "1458.1")})
+        {101: _mlb_gamelog(_mlb_ace_starts(20, k=7, ip="6.0", bb=2, h=4, r=1, hr=0)),
+         103: _mlb_gamelog(_mlb_ace_starts(12, k=3, ip="5.0", bb=3, h=8, r=5, hr=2))})
     out = _price(monkeypatch, _mlb_row(), getter=getter)
     assert out["status"] == "PRICED_RESEARCH", out
-    # Brewers face a 6.50 ERA arm on a 4.10 staff: suppression = -1.5 (capped);
-    # avg IP/start = 5.0 -> adj = +1.5 * 5/9 = +0.833.
-    assert out["home_mean"] == round(4.5 + 1.5 * (5.0 / 9.0), 3)
+    assert out["home_mean"] == round(4.5 + 1.666, 3)
 
 
 def test_mlb_first_half_total_uses_adjusted_means(monkeypatch):
@@ -414,11 +483,13 @@ def test_mlb_first_half_total_uses_adjusted_means(monkeypatch):
     row.pop("team", None)
     out = _price(monkeypatch, row, getter=_mlb_standard_getter())
     assert out["status"] == "PRICED_RESEARCH", out
-    home_mean = round(4.5 - 1.38 * (6.6 / 9.0), 3)
-    away_mean = round(4.3 - 1.5 * (6.0 / 9.0), 3)
+    home_mean = round(4.5 - 0.920, 3)
+    away_mean = round(4.3 - 1.025, 3)
+    # NOTE: the pricer scales the UNROUNDED means by 0.50; mirror that here.
+    # Float tolerance: the production path rounds means only for display.
     exp_p, exp_push = model_probability(
-        "MLB", "TOTAL", "OVER", 4.5, home_mean * 0.50, away_mean * 0.50)
-    assert out["estimate_p"] == exp_p
+        "MLB", "TOTAL", "OVER", 4.5, (4.5 - 0.920) * 0.50, (4.3 - 1.025) * 0.50)
+    assert abs(out["estimate_p"] - exp_p) < 1e-9
 
 
 # ---------------------------------------------------------------------------
@@ -452,6 +523,13 @@ def test_regression_lamar_out_feed_available_applies_adjustment(monkeypatch):
     # Feed available and the verified starter is OUT -> the verified
     # adjustment applies; the price is fully determined by verified inputs,
     # never the stale assumption.
+    # DELIBERATE CHANGE (2026-10-11, qb-sp-adjustment): the old assertion
+    # pinned the declared -3.0 total (-1.5 generic + -1.5 declared extra).
+    # The calibration study replaced the declared extra with the empirical
+    # Tier-2 constant: total effect -0.582, i.e. +0.918 stacked on the -1.5
+    # generic term. See MATCHUP_VALIDATION.md and
+    # scripts/study_qb_adjustment.py.
+    _stub_qb_value(monkeypatch)
     rows = {"2": [{"status": "Out",
                    "athlete": {"id": "8", "fullName": "Lamar Jackson",
                                "position": {"abbreviation": "QB"}}}]}
@@ -460,13 +538,15 @@ def test_regression_lamar_out_feed_available_applies_adjustment(monkeypatch):
                  injury=injury, injury_rows=rows)
     assert out["status"] == "PRICED_RESEARCH"
     assert out["matchup_audit"]["away"]["qb_status"] == "QB_OUT_VERIFIED"
-    # -1.5 generic QB injury term + -1.5 declared backup-replacement term.
-    assert out["away_mean"] == 21.25 - 3.0
+    # -1.5 generic QB injury term + +0.918 calibrated extra = -0.582 total,
+    # the empirical mean backup-start effect (Tier 2; backup unverifiable in
+    # this fixture).
+    assert out["away_mean"] == 21.25 - 1.5 + 0.918
     assert out["home_mean"] == 22.75
     # The estimate is recomputed from the ADJUSTED means: no stale input
     # leaks into the probability.
     exp_p, _ = model_probability("NFL", "ML", "AWAY", None,
-                                 22.75 * 0.50, (21.25 - 3.0) * 0.50)
+                                 22.75 * 0.50, (21.25 - 1.5 + 0.918) * 0.50)
     assert out["estimate_p"] == exp_p
     # And the stale-assumption price is demonstrably different: the withdrawn
     # card's number was materially higher.
@@ -494,9 +574,8 @@ def test_regression_skubal_stats_unavailable_blocks(monkeypatch):
     getter = _mlb_getter(
         ({"id": 101, "fullName": "Jacob Misiorowski"},
          {"id": 102, "fullName": "Tarik Skubal"}),
-        {101: _mlb_people_stats(1.80, 20, "120.0")},  # Skubal's stats missing
-        {158: _mlb_people_stats(3.70, 162, "1450.0"),
-         119: _mlb_people_stats(4.10, 162, "1458.1")})
+        {101: _mlb_gamelog(_mlb_ace_starts(20, k=7, ip="6.0", bb=2, h=4, r=1, hr=0))})
+        # Skubal's gameLog missing -> unverifiable
     out = _price(monkeypatch, _mlb_row(), getter=getter)
     assert out["status"] == "NO_MODEL_OR_MARKET"
     assert out["reason"] == "PROBABLE_PITCHER_UNVERIFIED"
@@ -512,10 +591,8 @@ def test_redteam_late_scratch_stale_status_refuses(monkeypatch):
     out = _price(monkeypatch, _mlb_row(), getter=_mlb_getter(
         ({"id": 101, "fullName": "Jacob Misiorowski"},
          {"id": 102, "fullName": "Tarik Skubal"}),
-        {101: _mlb_people_stats(1.80, 20, "120.0"),
-         102: _mlb_people_stats(2.72, 30, "198.0")},
-        {158: _mlb_people_stats(3.70, 162, "1450.0"),
-         119: _mlb_people_stats(4.10, 162, "1458.1")},
+        {101: _mlb_gamelog(_mlb_ace_starts(20, k=7, ip="6.0", bb=2, h=4, r=1, hr=0)),
+         102: _mlb_gamelog(_mlb_ace_starts(20, k=8, ip="7.0", bb=1, h=5, r=2, hr=1))},
         game_status="In Progress"))
     assert out["status"] == "NO_MODEL_OR_MARKET"
     assert out["reason"] == "PROBABLE_PITCHER_UNVERIFIED"
@@ -527,10 +604,8 @@ def test_redteam_opener_low_ip_per_start_refuses(monkeypatch):
     getter = _mlb_getter(
         ({"id": 101, "fullName": "Jacob Misiorowski"},
          {"id": 104, "fullName": "Opener Arm"}),
-        {101: _mlb_people_stats(1.80, 20, "120.0"),
-         104: _mlb_people_stats(3.10, 5, "12.0")},
-        {158: _mlb_people_stats(3.70, 162, "1450.0"),
-         119: _mlb_people_stats(4.10, 162, "1458.1")})
+        {101: _mlb_gamelog(_mlb_ace_starts(20, k=7, ip="6.0", bb=2, h=4, r=1, hr=0)),
+         104: _mlb_gamelog([(4, 1, 3, 1, 0, "2.1")] * 5)})
     out = _price(monkeypatch, _mlb_row(), getter=getter)
     assert out["status"] == "NO_MODEL_OR_MARKET"
     assert out["reason"] == "PROBABLE_PITCHER_UNVERIFIED"
@@ -538,33 +613,31 @@ def test_redteam_opener_low_ip_per_start_refuses(monkeypatch):
 
 
 def test_redteam_suppression_caps_at_declared_bounds(monkeypatch):
-    # An ace 3.2 runs better than his staff: suppression capped at 1.5/9.
+    # DELIBERATE CHANGE: cap is now on the rGS adjustment (+-2.0), not the
+    # ERA suppression rate. A super-ace (rGS 86.4, gap 34.86) would suppress
+    # -2.42 runs -> capped at -2.0.
     getter = _mlb_getter(
         ({"id": 101, "fullName": "Jacob Misiorowski"},
          {"id": 105, "fullName": "Super Ace"}),
-        {101: _mlb_people_stats(1.80, 20, "120.0"),
-         105: _mlb_people_stats(0.90, 30, "198.0")},
-        {158: _mlb_people_stats(3.70, 162, "1450.0"),
-         119: _mlb_people_stats(4.10, 162, "1458.1")})
+        {101: _mlb_gamelog(_mlb_ace_starts(20, k=7, ip="6.0", bb=2, h=4, r=1, hr=0)),
+         105: _mlb_gamelog(_mlb_ace_starts(30, k=11, ip="8.0", bb=1, h=3, r=0, hr=0))})
     out = _price(monkeypatch, _mlb_row(), getter=getter)
     assert out["status"] == "PRICED_RESEARCH", out
     audit = out["matchup_audit"]["home"]  # Brewers face the away ace
-    assert audit["suppression_per_9"] == 1.5
-    assert audit["points_applied"] == round(-1.5 * (6.6 / 9.0), 3)
-    assert out["home_mean"] == round(4.5 + round(-1.5 * (6.6 / 9.0), 3), 3)
+    assert audit["rgs_gap_vs_league"] == 34.86
+    assert audit["points_applied"] == -2.0
+    assert out["home_mean"] == round(4.5 - 2.0, 3)
 
 
 def test_redteam_gs_boundary_exactly_five_passes(monkeypatch):
     getter = _mlb_getter(
         ({"id": 101, "fullName": "Jacob Misiorowski"},
          {"id": 106, "fullName": "Fifth Starter"}),
-        {101: _mlb_people_stats(1.80, 20, "120.0"),
-         106: _mlb_people_stats(4.00, 5, "28.0")},
-        {158: _mlb_people_stats(3.70, 162, "1450.0"),
-         119: _mlb_people_stats(4.10, 162, "1458.1")})
+        {101: _mlb_gamelog(_mlb_ace_starts(20, k=7, ip="6.0", bb=2, h=4, r=1, hr=0)),
+         106: _mlb_gamelog(_mlb_ace_starts(5, k=6, ip="6.0", bb=2, h=5, r=2, hr=1))})
     out = _price(monkeypatch, _mlb_row(), getter=getter)
     assert out["status"] == "PRICED_RESEARCH", out
-    assert out["matchup_audit"]["home"]["pitcher_games_started"] == 5
+    assert out["matchup_audit"]["home"]["pitcher_starts"] == 5
 
 
 def test_redteam_malformed_innings_refuses(monkeypatch):
@@ -572,26 +645,26 @@ def test_redteam_malformed_innings_refuses(monkeypatch):
         getter = _mlb_getter(
             ({"id": 101, "fullName": "Jacob Misiorowski"},
              {"id": 107, "fullName": "Bad Data"}),
-            {101: _mlb_people_stats(1.80, 20, "120.0"),
-             107: _mlb_people_stats(3.50, 20, bad_ip)},
-            {158: _mlb_people_stats(3.70, 162, "1450.0"),
-             119: _mlb_people_stats(4.10, 162, "1458.1")})
+            {101: _mlb_gamelog(_mlb_ace_starts(20, k=7, ip="6.0", bb=2, h=4, r=1, hr=0)),
+             107: _mlb_gamelog([(6, 2, 5, 2, 1, bad_ip)] * 20)})
         out = _price(monkeypatch, _mlb_row(), getter=getter)
         assert out["status"] == "NO_MODEL_OR_MARKET", bad_ip
         assert out["reason"] == "PROBABLE_PITCHER_UNVERIFIED", bad_ip
 
 
-def test_redteam_missing_era_blocks(monkeypatch):
+def test_redteam_missing_gamelog_fields_blocks(monkeypatch):
+    # DELIBERATE CHANGE: the rGS engine reads per-start gameLogs, not season
+    # ERA. A split missing a required gameScore input refuses.
     stats = {"stats": [{"group": {"displayName": "pitching"},
-                        "splits": [{"season": "2026",
-                                    "stat": {"gamesStarted": 20,
-                                             "inningsPitched": "120.0"}}]}]}
+                        "splits": [{"date": "2026-09-01", "season": "2026",
+                                    "opponent": {"id": 999},
+                                    "stat": {"gamesStarted": 1,
+                                             "inningsPitched": "6.0"}}]}]}
     getter = _mlb_getter(
         ({"id": 101, "fullName": "Jacob Misiorowski"},
          {"id": 102, "fullName": "Tarik Skubal"}),
-        {101: stats, 102: _mlb_people_stats(2.72, 30, "198.0")},
-        {158: _mlb_people_stats(3.70, 162, "1450.0"),
-         119: _mlb_people_stats(4.10, 162, "1458.1")})
+        {101: stats,
+         102: _mlb_gamelog(_mlb_ace_starts(20, k=8, ip="7.0", bb=1, h=5, r=2, hr=1))})
     out = _price(monkeypatch, _mlb_row(), getter=getter)
     assert out["status"] == "NO_MODEL_OR_MARKET"
     assert out["reason"] == "PROBABLE_PITCHER_UNVERIFIED"
@@ -608,10 +681,8 @@ def test_redteam_doubleheader_refuses(monkeypatch):
     out = _price(monkeypatch, _mlb_row(), getter=_mlb_getter(
         ({"id": 101, "fullName": "Jacob Misiorowski"},
          {"id": 102, "fullName": "Tarik Skubal"}),
-        {101: _mlb_people_stats(1.80, 20, "120.0"),
-         102: _mlb_people_stats(2.72, 30, "198.0")},
-        {158: _mlb_people_stats(3.70, 162, "1450.0"),
-         119: _mlb_people_stats(4.10, 162, "1458.1")},
+        {101: _mlb_gamelog(_mlb_ace_starts(20, k=7, ip="6.0", bb=2, h=4, r=1, hr=0)),
+         102: _mlb_gamelog(_mlb_ace_starts(20, k=8, ip="7.0", bb=1, h=5, r=2, hr=1))},
         extra_games=(dh_game,)))
     assert out["status"] == "NO_MODEL_OR_MARKET"
     assert out["reason"] == "PROBABLE_PITCHER_UNVERIFIED"
@@ -622,9 +693,7 @@ def test_redteam_tbd_probable_id_refuses(monkeypatch):
     out = _price(monkeypatch, _mlb_row(), getter=_mlb_getter(
         ({"id": 101, "fullName": "Jacob Misiorowski"},
          {"id": 0, "fullName": "TBD"}),
-        {101: _mlb_people_stats(1.80, 20, "120.0")},
-        {158: _mlb_people_stats(3.70, 162, "1450.0"),
-         119: _mlb_people_stats(4.10, 162, "1458.1")}))
+        {101: _mlb_gamelog(_mlb_ace_starts(20, k=7, ip="6.0", bb=2, h=4, r=1, hr=0))}))
     assert out["status"] == "NO_MODEL_OR_MARKET"
     assert out["reason"] == "PROBABLE_PITCHER_UNVERIFIED"
 
@@ -650,18 +719,22 @@ def test_redteam_qb_questionable_applies_no_penalty(monkeypatch):
 
 def test_redteam_qb_status_dict_shape(monkeypatch):
     # ESPN sometimes nests status as {"name": "Out"}.
+    # DELIBERATE CHANGE: calibrated +0.918 extra replaces the declared -1.5.
+    _stub_qb_value(monkeypatch)
     rows = {"2": [{"status": {"name": "Out"},
                    "athlete": {"id": "8", "fullName": "Lamar Jackson",
                                "position": {"abbreviation": "QB"}}}]}
     out = _price(monkeypatch, _row(), getter=lambda url: None, injury_rows=rows)
     assert out["status"] == "PRICED_RESEARCH"
     assert out["matchup_audit"]["away"]["qb_status"] == "QB_OUT_VERIFIED"
-    assert out["away_mean"] == 21.25 - 1.5  # declared term only here
+    assert out["away_mean"] == 21.25 + 0.918  # calibrated extra only here
 
 
 def test_redteam_two_qbs_out_single_declared_penalty(monkeypatch):
     # Documents the declared behavior: the first verified out/doubtful QB
     # triggers the backup penalty once; it does not stack per QB.
+    # DELIBERATE CHANGE: calibrated +0.918 extra replaces the declared -1.5.
+    _stub_qb_value(monkeypatch)
     rows = {"2": [
         {"status": "Out", "athlete": {"id": "8", "fullName": "QB One",
                                       "position": {"abbreviation": "QB"}}},
@@ -670,8 +743,8 @@ def test_redteam_two_qbs_out_single_declared_penalty(monkeypatch):
     ]}
     out = _price(monkeypatch, _row(), getter=lambda url: None, injury_rows=rows)
     assert out["status"] == "PRICED_RESEARCH"
-    assert out["matchup_audit"]["away"]["qb_points"] == -1.5
-    assert out["away_mean"] == 21.25 - 1.5
+    assert out["matchup_audit"]["away"]["qb_points"] == 0.918
+    assert out["away_mean"] == 21.25 + 0.918
 
 
 def test_redteam_ambiguous_grouped_payload_blocks(monkeypatch):
@@ -694,6 +767,8 @@ def test_redteam_ambiguous_grouped_payload_blocks(monkeypatch):
 def test_redteam_grouped_single_match_qb_detected(monkeypatch):
     # Grouped league payload with exactly one matching group: the QB scan
     # agrees with injury_points' attribution rule.
+    # DELIBERATE CHANGE: doubtful = 50% of the calibrated +0.918 OUT extra.
+    _stub_qb_value(monkeypatch)
     groups = [
         {"team": {"id": "1"}, "injuries": []},
         {"team": {"id": "2"}, "injuries": [
@@ -707,4 +782,4 @@ def test_redteam_grouped_single_match_qb_detected(monkeypatch):
                  injury=injury, injury_rows=groups)
     assert out["status"] == "PRICED_RESEARCH"
     assert out["matchup_audit"]["away"]["qb_status"] == "QB_DOUBTFUL_VERIFIED"
-    assert out["away_mean"] == 21.25 - 1.5 - 0.75
+    assert out["away_mean"] == 21.25 - 1.5 + 0.459
