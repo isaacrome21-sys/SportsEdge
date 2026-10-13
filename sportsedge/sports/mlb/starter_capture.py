@@ -181,6 +181,11 @@ def fetch_statsapi(url: str, *, opener=urlopen, timeout: int = 20) -> bytes:
         return response.read()
 
 
+def _positive_statsapi_id(value: Any) -> int | None:
+    """An ID is a real positive JSON integer; never coerce booleans or text."""
+    return value if type(value) is int and value > 0 else None
+
+
 def _probable(row_team: Mapping[str, Any]) -> dict[str, Any]:
     """Normalize one side's probablePitcher to presence + ID only.
 
@@ -189,12 +194,14 @@ def _probable(row_team: Mapping[str, Any]) -> dict[str, Any]:
     waiting to be trusted.
     """
     probable = row_team.get("probablePitcher")
-    if not isinstance(probable, dict):
+    if probable is None:
         return {"present": False, "id": None}
-    pid = probable.get("id")
-    if pid in (None, ""):
+    # Present but malformed is NOT a legitimate "not announced" state.
+    # This distinction makes bare strings, lists, booleans and numbers
+    # fail as ID_MISSING rather than silently become usable evidence.
+    if not isinstance(probable, dict):
         return {"present": True, "id": None}
-    return {"present": True, "id": int(pid)}
+    return {"present": True, "id": _positive_statsapi_id(probable.get("id"))}
 
 
 def parse_schedule_games(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -209,8 +216,8 @@ def parse_schedule_games(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for block in payload.get("dates", []) or []:
         for game in (block or {}).get("games", []) or []:
-            game_pk = game.get("gamePk")
-            if game_pk in (None, ""):
+            game_pk = _positive_statsapi_id(game.get("gamePk"))
+            if game_pk is None:
                 continue
             teams = game.get("teams") or {}
             away = teams.get("away") or {}
@@ -221,7 +228,7 @@ def parse_schedule_games(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
             first_pitch = _parse_iso(game.get("gameDate"))
             rows.append(
                 {
-                    "game_pk": int(game_pk),
+                    "game_pk": game_pk,
                     "game_type": game.get("gameType"),
                     "official_date": game.get("officialDate"),
                     "game_date_utc": _iso(first_pitch) if first_pitch else None,
@@ -231,16 +238,8 @@ def parse_schedule_games(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
                     "abstract_state": status.get("abstractGameState"),
                     "double_header": game.get("doubleHeader"),
                     "game_number": game.get("gameNumber"),
-                    "away_team_id": (
-                        int(away_team["id"])
-                        if away_team.get("id") not in (None, "")
-                        else None
-                    ),
-                    "home_team_id": (
-                        int(home_team["id"])
-                        if home_team.get("id") not in (None, "")
-                        else None
-                    ),
+                    "away_team_id": _positive_statsapi_id(away_team.get("id")),
+                    "home_team_id": _positive_statsapi_id(home_team.get("id")),
                     "away_probable": _probable(away),
                     "home_probable": _probable(home),
                 }
@@ -847,36 +846,89 @@ def read_manifest(manifest_path: Path) -> list[dict[str, Any]]:
 def append_record(
     capture_path: Path, manifest_path: Path, record: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """Append one record to the capture file and chain it in the manifest.
+    """Serialize cooperating writers and fail closed on partial pair appends.
 
-    The manifest is a *separate* append-only file: each entry carries
-    the record's SHA-256 (over the exact line bytes written) chained to
-    the previous entry's chain hash, so editing the capture file — or
-    the manifest — breaks verification at the first touched position.
+    The stable, never-unlinked POSIX lock is shared by all appenders of a
+    manifest. Under the lock we validate *both* files before deriving a
+    sequence number; a damaged/incomplete pair is not extended or
+    silently repaired. Ordinary write exceptions roll back both files
+    to their prior byte lengths and fsync the rollback.
+
+    POSIX flock protects cooperating appenders, not unsynchronized readers.
+    Two files cannot be made crash-atomic: a process/power failure between
+    the two durable appends can leave a mismatch which a later append
+    must refuse. This is a research-only writer, NOT live-activation
+    approval or a claim of crash-atomic, externally anchored evidence.
     """
-    capture_path = Path(capture_path)
-    manifest_path = Path(manifest_path)
-    line = canonical_line(record)
-    digest = _sha256_hex(line)
-    existing = read_manifest(manifest_path)
-    prev_chain = (
-        str(existing[-1]["chain_sha256"]) if existing else GENESIS_CHAIN_SHA256
-    )
-    seq = len(existing) + 1
-    chain = _sha256_hex(f"{prev_chain}:{digest}".encode("utf-8"))
-    entry = {
-        "schema": SCHEMA_MANIFEST_ENTRY,
-        "seq": seq,
-        "record_sha256": digest,
-        "record_type": record.get("record_type"),
-        "game_pk": record.get("game_pk"),
-        "slot_id": record.get("slot_id"),
-        "prev_chain_sha256": prev_chain,
-        "chain_sha256": chain,
-    }
-    _append_line(capture_path, line)
-    _append_line(manifest_path, canonical_line(entry))
-    return entry
+    import fcntl
+    import os
+
+    capture_path = Path(capture_path).resolve()
+    manifest_path = Path(manifest_path).resolve()
+    if capture_path == manifest_path:
+        raise StarterCaptureError("CAPTURE_AND_MANIFEST_PATH_COLLIDE")
+    capture_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = manifest_path.with_name(manifest_path.name + ".lock")
+
+    # Never unlink this file: changing its inode would permit separate
+    # processes to hold distinct locks while both believe they are alone.
+    with lock_path.open("a+b") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        try:
+            checked = verify_capture_chain(capture_path, manifest_path)
+            if not checked["ok"]:
+                reason = checked["failure"]["reason"]
+                raise StarterCaptureError(
+                    f"CAPTURE_CHAIN_PREAPPEND_INVALID:{reason}"
+                )
+
+            line = canonical_line(record)
+            digest = _sha256_hex(line)
+            existing = read_manifest(manifest_path)
+            prev_chain = (
+                str(existing[-1]["chain_sha256"])
+                if existing else GENESIS_CHAIN_SHA256
+            )
+            seq = len(existing) + 1
+            chain = _sha256_hex(f"{prev_chain}:{digest}".encode("utf-8"))
+            entry = {
+                "schema": SCHEMA_MANIFEST_ENTRY,
+                "seq": seq,
+                "record_sha256": digest,
+                "record_type": record.get("record_type"),
+                "game_pk": record.get("game_pk"),
+                "slot_id": record.get("slot_id"),
+                "prev_chain_sha256": prev_chain,
+                "chain_sha256": chain,
+            }
+            before = {
+                capture_path: capture_path.stat().st_size if capture_path.exists() else 0,
+                manifest_path: manifest_path.stat().st_size if manifest_path.exists() else 0,
+            }
+            try:
+                _append_line(capture_path, line)
+                _append_line(manifest_path, canonical_line(entry))
+            except BaseException:
+                rollback_errors = []
+                for path, length in before.items():
+                    try:
+                        if path.exists():
+                            with path.open("r+b") as handle:
+                                handle.truncate(length)
+                                handle.flush()
+                                os.fsync(handle.fileno())
+                    except OSError as exc:
+                        rollback_errors.append(f"{path.name}:{type(exc).__name__}")
+                if rollback_errors:
+                    raise StarterCaptureError(
+                        "CAPTURE_APPEND_ROLLBACK_FAILED:" +
+                        ",".join(rollback_errors)
+                    )
+                raise
+            return entry
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
 
 def verify_capture_chain(capture_path: Path, manifest_path: Path) -> dict[str, Any]:
@@ -888,8 +940,10 @@ def verify_capture_chain(capture_path: Path, manifest_path: Path) -> dict[str, A
     (or the manifest) fails at the first mismatching position with a
     named reason.
     """
-    capture_lines = _read_lines(Path(capture_path))
-    manifest_lines = _read_lines(Path(manifest_path))
+    capture_path = Path(capture_path)
+    manifest_path = Path(manifest_path)
+    capture_lines = _read_lines(capture_path)
+    manifest_lines = _read_lines(manifest_path)
 
     def failure(reason: str, seq: int | None) -> dict[str, Any]:
         return {
@@ -899,6 +953,14 @@ def verify_capture_chain(capture_path: Path, manifest_path: Path) -> dict[str, A
             "failure": {"reason": reason, "seq": seq},
         }
 
+    # A JSONL final line without a newline can appear valid to a splitlines
+    # reader but the next append would concatenate two separate records.
+    # Treat an interrupted terminal write as a failed archive, not a
+    # successfully chained record awaiting silent continuation.
+    if capture_path.exists() and capture_path.stat().st_size and not capture_path.read_bytes().endswith(b"\n"):
+        return failure("CAPTURE_LINE_UNTERMINATED", len(capture_lines))
+    if manifest_path.exists() and manifest_path.stat().st_size and not manifest_path.read_bytes().endswith(b"\n"):
+        return failure("MANIFEST_LINE_UNTERMINATED", len(manifest_lines))
     if len(capture_lines) != len(manifest_lines):
         return failure("RECORD_COUNT_MISMATCH", None)
     prev_chain = GENESIS_CHAIN_SHA256
@@ -909,6 +971,8 @@ def verify_capture_chain(capture_path: Path, manifest_path: Path) -> dict[str, A
             entry = json.loads(manifest_line.decode("utf-8"))
         except (ValueError, UnicodeDecodeError):
             return failure("MANIFEST_LINE_UNPARSEABLE", index)
+        if not isinstance(entry, dict):
+            return failure("MANIFEST_RECORD_TYPE_INVALID", index)
         digest = _sha256_hex(line)
         if entry.get("record_sha256") != digest:
             return failure("CAPTURE_RECORD_HASH_MISMATCH", index)
@@ -917,6 +981,26 @@ def verify_capture_chain(capture_path: Path, manifest_path: Path) -> dict[str, A
         chain = _sha256_hex(f"{prev_chain}:{digest}".encode("utf-8"))
         if entry.get("chain_sha256") != chain or entry.get("seq") != index:
             return failure("MANIFEST_HASH_MISMATCH", index)
+        try:
+            source_record = json.loads(line.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return failure("CAPTURE_RECORD_UNPARSEABLE", index)
+        if not isinstance(source_record, dict) or not isinstance(entry, dict):
+            return failure("MANIFEST_RECORD_TYPE_INVALID", index)
+        expected_entry = {
+            "schema": SCHEMA_MANIFEST_ENTRY,
+            "seq": index,
+            "record_sha256": digest,
+            "record_type": source_record.get("record_type"),
+            "game_pk": source_record.get("game_pk"),
+            "slot_id": source_record.get("slot_id"),
+            "prev_chain_sha256": prev_chain,
+            "chain_sha256": chain,
+        }
+        if entry != expected_entry:
+            return failure("MANIFEST_METADATA_MISMATCH", index)
+        if manifest_line != canonical_line(entry):
+            return failure("MANIFEST_ENCODING_MISMATCH", index)
         prev_chain = chain
     return {
         "ok": True,
