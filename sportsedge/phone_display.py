@@ -40,7 +40,8 @@ def _metrics(row):
     # Never substitute the independent projection for a row priced in Lane B:
     # its status may have been calculated from a different probability.
     projection = row.get("independent_projection") or {}
-    provenance = row.get("pricing_provenance") or {}
+    provenance = row.get("pricing_provenance")
+    provenance = provenance if isinstance(provenance, dict) else {}
     anchored = (row.get("pricing_lane") == "LANE_B_ANCHORED"
                 or provenance.get("lane") == "MARKET_ANCHORED"
                 or projection.get("uses_sportsbook_price_in_projection") is True)
@@ -58,8 +59,11 @@ def _disposition(row, min_ev):
     priced = probability is not None and ev is not None
     if status.startswith("BLOCKED") or status in {"NO_MODEL_OR_MARKET", "NO_ENGINE", "NO_QUOTE", "MISSING_STATUS"}:
         return "BLOCKED", "blocked", row.get("reason") or status
-    provenance = row.get("pricing_provenance") or {}
-    if provenance.get("lane") == "UNDETERMINED":
+    provenance = row.get("pricing_provenance")
+    if provenance is not None and (
+        not isinstance(provenance, dict)
+        or provenance.get("lane") not in {"INDEPENDENT", "MARKET_ANCHORED"}
+    ):
         return "BLOCKED", "blocked", "PROVENANCE_UNDETERMINED"
     if not priced:
         return "BLOCKED", "blocked", row.get("reason") or "Usable probability and EV unavailable"
