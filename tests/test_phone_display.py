@@ -134,6 +134,17 @@ def test_undetermined_provenance_fails_closed_despite_positive_ev():
     assert displayed["estimated_ev"] is None
 
 
+@pytest.mark.parametrize("provenance", [
+    {"lane": "UNKNOWN_NEW_LANE"}, {"lane": None}, "MARKET_ANCHORED",
+])
+def test_unknown_or_malformed_pricing_provenance_fails_closed(provenance):
+    row = result(pricing_provenance=provenance)
+    displayed = build_phone_card(card(row))["selections"][0]
+    assert displayed["status"] == "BLOCKED"
+    assert displayed["reason"] == "PROVENANCE_UNDETERMINED"
+    assert displayed["estimated_ev"] is None
+
+
 def test_unpaired_game_cannot_become_a_lean():
     row = result(independent_projection={"estimate_p": .7, "ev_per_dollar": .2,
                                          "paired_market_status": "MISSING_EXACT_OPPOSITE_DK_PRICE"})
