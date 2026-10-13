@@ -205,6 +205,40 @@ class SameFetchSourceCaptureTest(unittest.TestCase):
             self.assertEqual([], recorder.records)
             self.assertEqual([], list(Path(td).iterdir()))
 
+    def test_missing_receipt_fields_required_ci(self):
+        """Required native CI must execute all six receipt schema regressions.
+
+        The separate pytest replay suite also checks these, but the required
+        same-fetch job only runs this unittest module. A missing mandatory
+        field must get RECEIPT_FIELD_MISSING rather than generic schema drift.
+        """
+        from sportsedge import mlb_source as ms
+
+        observed = datetime(2026, 10, 13, 17, 0, tzinfo=timezone.utc)
+        required = (
+            "fetch_started_at_utc", "received_at_utc", "receipt_nonce",
+            "record_sha256", "prev_record_sha256", "sha256",
+        )
+        for field in required:
+            with self.subTest(missing_field=field):
+                with tempfile.TemporaryDirectory() as td:
+                    root = Path(td)
+                    with patch("sportsedge.mlb_source._trusted_now", lambda: observed):
+                        recorder = ms.MLBSourceCapture(root, clock=lambda: observed)
+                        recorder.record(
+                            url="https://x/api/v1/schedule", raw=b"{}",
+                            fetch_started_at=observed, received_at=observed,
+                        )
+                    journal = root / ms.RECEIPT_JOURNAL_NAME
+                    entry = json.loads(journal.read_text().strip())
+                    self.assertIn(field, entry)
+                    entry.pop(field)
+                    journal.write_text(json.dumps(entry) + "\\n")
+                    with self.assertRaisesRegex(
+                        ms.MLBSourceError, "RECEIPT_FIELD_MISSING:" + field
+                    ):
+                        ms.verify_receipt_journal(root, verifier_now=observed)
+
     def test_journal_unchained_extra_metadata_fails_closed(self):
         from sportsedge import mlb_source as ms
         observed = datetime(2026, 10, 13, 17, 0, tzinfo=timezone.utc)
