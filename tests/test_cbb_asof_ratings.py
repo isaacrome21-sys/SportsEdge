@@ -122,3 +122,14 @@ def test_illinois_exclusion_integer_and_string_ids_same_result():
         assert blocked["reason"] == "ILLINOIS_COLLEGE_EXCLUDED"
         assert blocked["play_authority"] is False
     assert illinois_block(2466, 150) is None
+
+
+def test_predict_integer_espn_ids_match_string_ids_and_block_illinois():
+    r = fit_asof(_games(40), T0 + timedelta(days=41))
+    baseline = r.predict("150", "57", neutral=False)
+    numeric = r.predict(150, 57, neutral=False)
+    assert numeric == baseline
+    illinois = r.predict(305, 150, neutral=False)
+    assert illinois["status"] == "BLOCKED"
+    assert illinois["reason"] == "ILLINOIS_COLLEGE_EXCLUDED"
+    assert illinois["play_authority"] is False
