@@ -79,6 +79,10 @@ class AutoOddsTests(unittest.TestCase):
         self.assertEqual(ref["method"],"PINNACLE_POWER_V1")
         self.assertAlmostEqual(sum(ref["fair"]),1.0)
         self.assertIsNone(ref["model_probability"])
+        self.assertEqual(ref["provider_event_id"], "e1")
+        self.assertEqual(ref["dk_observed_at"], NOW.isoformat())
+        self.assertEqual(ref["market_key"], "h2h")
+        self.assertEqual(ref["peer_evidence"], [{"book":"pinnacle","observed_at":NOW.isoformat(),"line":None}])
 
     def test_longshots_with_sensitive_devig_have_no_fair_price(self):
         item=event("NFL")

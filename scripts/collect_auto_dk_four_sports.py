@@ -144,25 +144,30 @@ def _same_line(a,b,market_key):
 
 
 def _fair_context(target, peers, market_key):
-    """No-vig peer context ONLY; never substitute this for estimate_p."""
+    """Market-only no-vig, with exact per-peer receipt provenance retained."""
     eligible=[]
     for p in peers:
         if not _same_line(target,p,market_key):
             continue
         fair=_pair_fair(p)
         if fair:
-            eligible.append((p["book"],fair))
-    for book,vals in eligible:
+            eligible.append((p["book"],fair,p.get("observed_at"),p.get("line")))
+    def provenance(chosen):
+        return [{"book":book,"observed_at":at,"line":line} for book,_,at,line in chosen]
+    for entry in eligible:
+        book,vals,_,_=entry
         if book=="pinnacle":
-            return {"method":"PINNACLE_POWER_V1","fair":vals,
-                    "books":[book],"model_probability":None}
+            return {"method":"PINNACLE_POWER_V1","fair":vals,"books":[book],
+                    "peer_evidence":provenance([entry]),"model_probability":None}
     if len(eligible) < 2:
-        return {"method":"MISSING","fair":None,"books":[],"model_probability":None}
+        return {"method":"MISSING","fair":None,"books":[],
+                "peer_evidence":[],"model_probability":None}
     import statistics
     return {"method":"MULTIBOOK_MEDIAN_POWER_V1",
-            "fair":[statistics.median([v[0] for _,v in eligible]),
-                    statistics.median([v[1] for _,v in eligible])],
-            "books":[b for b,_ in eligible],"model_probability":None}
+            "fair":[statistics.median([v[1][0] for v in eligible]),
+                    statistics.median([v[1][1] for v in eligible])],
+            "books":[v[0] for v in eligible],
+            "peer_evidence":provenance(eligible),"model_probability":None}
 
 
 def events_to_board(sport, events, now):
@@ -201,7 +206,10 @@ def events_to_board(sport, events, now):
                 elif market=="totals":
                     target["total"]=[peer["line"],peer["over"],peer["under"]]
                 target["observed_at"]=peer["observed_at"]
-            peer_info[market]=_fair_context(dk,peers,market)
+            ref=_fair_context(dk,peers,market)
+            ref.update(provider_event_id=ev.get("id"),market_key=market,
+                       dk_observed_at=dk["observed_at"],dk_line=dk.get("line"))
+            peer_info[market]=ref
         if not markets:
             continue
         games.append({
