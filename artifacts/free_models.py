@@ -215,6 +215,16 @@ def model_probability(sport, market, side, line, home_mean, away_mean, team_tota
     return bounded(win, 0, 1), bounded(push, 0, 1)
 
 
+# Injury-binding currency window (days before the as-of clock). CFB only.
+# NFL shared-binding consequence: injury_rows() is the single binding path
+# for NFL/CFB/NBA. The live NFL league feed legitimately carries season-long
+# IR/PUP rows dated weeks earlier (oldest row 2026-09-23 on 2026-10-13), so
+# a universal window would mark NFL teams STALE_UNKNOWN and block NFL games.
+# NFL/NBA behavior is therefore UNCHANGED pending owner review.
+INJURY_CURRENCY_DAYS = {"CFB": 21}
+INJURY_STALE_UNKNOWN = "STALE_INJURY_ENTRIES_UNKNOWN"
+
+
 class PublicContext:
     """Request-scoped cache; no persisted odds, data keys or retrospective rewrites.
 
@@ -228,6 +238,10 @@ class PublicContext:
     def __init__(self, now, getter=None, *, historical=False):
         self.now = now
         self.getter = getter or self._live_get
+        # Live ESPN directory floor (see team_directory). Injected fixture
+        # getters are exempt from the absolute floor only; pagination and
+        # short-page completeness apply to every getter.
+        self.enforce_directory_floor = getter is None
         self.cache = {}
         self.receipts = []
         self._injury_result_cache = {}
@@ -253,16 +267,76 @@ class PublicContext:
                                       "retrieved_at_utc": self.now.isoformat()})
         return self.cache[url]
 
-    def teams(self, sport):
-        obj = self.fetch(f"{ESPN}/{LEAGUES[sport]}/teams?limit=500") or {}
+    # Directory completeness (Grok reimplementation, 2026-10-13). ESPN's
+    # site teams endpoint silently truncates at ``limit`` and publishes no
+    # count/pageCount metadata. The CFB directory is 762 teams (all
+    # divisions), so the old single ``?limit=500`` fetch saw only the first
+    # 500 and any school past that cut failed identity resolution. Pages are
+    # now walked (``&page=N``) until a short page; the directory fails CLOSED
+    # (empty -> identify() returns None) when a page is unavailable/malformed,
+    # a page repeats team IDs, the page cap is hit, or the total is below the
+    # sport's declared floor. Page 1 keeps the historical URL.
+    TEAM_PAGE_SIZE = 500
+    TEAM_MAX_PAGES = 10
+    TEAM_DIRECTORY_FLOOR = {"NFL": 32, "NBA": 30, "MLB": 30, "CFB": 700}
+
+    @staticmethod
+    def _team_page(obj):
+        if not isinstance(obj, dict) or not isinstance(obj.get("sports"), list):
+            return None
         teams = []
         for group in obj.get("sports") or []:
+            if not isinstance(group, dict):
+                return None
             for league in group.get("leagues") or []:
+                if not isinstance(league, dict) or not isinstance(league.get("teams", []), list):
+                    return None
                 for data in league.get("teams") or []:
-                    team = data.get("team") or {}
-                    if team.get("id"):
+                    team = (data or {}).get("team") if isinstance(data, dict) else None
+                    if isinstance(team, dict) and team.get("id"):
                         teams.append(team)
         return teams
+
+    def team_directory(self, sport):
+        """Return (teams, status). status COMPLETE or DIRECTORY_INCOMPLETE:<why>."""
+        cache_key = ("team_directory", sport)
+        if cache_key in self._injury_result_cache:
+            return self._injury_result_cache[cache_key]
+        base = f"{ESPN}/{LEAGUES[sport]}/teams?limit={self.TEAM_PAGE_SIZE}"
+        teams, seen, status = [], set(), None
+        for page in range(1, self.TEAM_MAX_PAGES + 1):
+            url = base if page == 1 else f"{base}&page={page}"
+            batch = self._team_page(self.fetch(url))
+            if batch is None:
+                status = f"DIRECTORY_INCOMPLETE:PAGE_{page}_UNAVAILABLE_OR_MALFORMED"
+                break
+            ids = [str(t["id"]) for t in batch]
+            if len(set(ids)) != len(ids) or seen.intersection(ids):
+                status = f"DIRECTORY_INCOMPLETE:PAGE_{page}_REPEATS_TEAM_IDS"
+                break
+            seen.update(ids)
+            teams.extend(batch)
+            if len(batch) < self.TEAM_PAGE_SIZE:
+                status = "COMPLETE"
+                break
+        else:
+            status = f"DIRECTORY_INCOMPLETE:PAGE_CAP_{self.TEAM_MAX_PAGES}_REACHED"
+        floor = self.TEAM_DIRECTORY_FLOOR.get(sport, 1) if self.enforce_directory_floor else 1
+        if status == "COMPLETE" and len(teams) < floor:
+            status = f"DIRECTORY_INCOMPLETE:{len(teams)}_BELOW_FLOOR_{floor}"
+        if status != "COMPLETE":
+            self.receipts.append({"source": base, "status": "DIRECTORY_INCOMPLETE",
+                                  "reason": status, "teams_seen": len(teams)})
+            teams = []
+        else:
+            self.receipts.append({"source": base, "status": "DIRECTORY_COMPLETE",
+                                  "teams": len(teams)})
+        result = (teams, status)
+        self._injury_result_cache[cache_key] = result
+        return result
+
+    def teams(self, sport):
+        return self.team_directory(sport)[0]
 
     @staticmethod
     def key(value):
@@ -329,6 +403,33 @@ class PublicContext:
         # injuries: [{displayName: ..., id: <TEAM_ID>, injuries: [...]}].
         if isinstance(group.get("injuries"), list) and group.get("id") is not None:
             return str(group["id"])
+        return None
+
+    def _injury_currency(self, sport, rows):
+        """Currency gate (Grok reimplementation, 2026-10-13).
+
+        ESPN's CFB injuries feed serves entries dated 2020-2022 (e.g. a 2020
+        Florida WR 'Out') that were being bound as the CURRENT report. For
+        sports in INJURY_CURRENCY_DAYS, every row must carry a parseable,
+        timezone-aware ``date`` within the window before the as-of clock
+        (``self.now``) and not after it. Any stale, undated, or future row
+        makes the WHOLE team binding STALE_UNKNOWN: a dropped row could be a
+        QB, so partial binding would imply health. Returns None when current.
+        NFL/NBA are deliberately NOT gated here (shared-binding consequence;
+        see INJURY_CURRENCY_DAYS).
+        """
+        window = INJURY_CURRENCY_DAYS.get(sport)
+        if window is None:
+            return None
+        oldest = self.now - timedelta(days=window)
+        for i, row in enumerate(rows):
+            stamp = dt(row.get("date")) if isinstance(row, dict) else None
+            if stamp is None:
+                return f"ROW_{i}_UNDATED"
+            if stamp > self.now:
+                return f"ROW_{i}_DATED_AFTER_AS_OF"
+            if stamp < oldest:
+                return f"ROW_{i}_DATED_{stamp.date().isoformat()}_OLDER_THAN_{window}D"
         return None
 
     def injury_rows(self, sport, team):
@@ -449,6 +550,17 @@ class PublicContext:
             result = (None, status)
             self._injury_result_cache[key] = result
             return result
+        currency = self._injury_currency(sport, candidates)
+        if currency is not None:
+            self.receipts.append({
+                "source": f"{ESPN}/{LEAGUES[sport]}/injuries",
+                "status": INJURY_STALE_UNKNOWN,
+                "reason": currency,
+                "team_id": target_id[:20],
+                "note": "STALE_ENTRIES_ARE_UNKNOWN_NOT_HEALTHY"})
+            result = (None, INJURY_STALE_UNKNOWN)
+            self._injury_result_cache[key] = result
+            return result
         self.receipts.append({
             "source": f"{ESPN}/{LEAGUES[sport]}/injuries",
             "status": "STRUCTURE_VERIFIED",
@@ -474,6 +586,8 @@ class PublicContext:
         if sport == "MLB":
             return 0.0, "NOT_APPLICABLE"
         rows, status = self.injury_rows(sport, team)
+        if rows is None and status == INJURY_STALE_UNKNOWN:
+            return 0.0, INJURY_STALE_UNKNOWN
         if rows is None:
             return 0.0, "MISSING_OR_UNRECOGNIZED_SOURCE"
         # Preserve historical unavailability: do not report a zero-injury
@@ -1322,6 +1436,11 @@ def _paired_book_context(rows, evaluated, index):
             return False
         if book(other_row) != book(row):
             return False
+        # A matching game/line is not sufficient across period or settlement
+        # contracts, or conflicting supplied sportsbook event identities.
+        for field in ("period", "phase", "alternate", "settlement_type", "event_id", "dk_event_id"):
+            if str(other_row.get(field) or "").strip().upper() != str(row.get(field) or "").strip().upper():
+                return False
         if _pair_side(other_row, other) != expected_opposite:
             return False
         if market == "TEAM_TOTALS":
@@ -1384,16 +1503,26 @@ def _paired_book_context(rows, evaluated, index):
     # other, not merely unequal as strings.
     input_time = dt(row.get("quote_captured_at"))
     if len(compatible) == 1:
-        matching_time = dt(rows[compatible[0]["input_index"]].get("quote_captured_at"))
+        counterpart_raw_time = rows[compatible[0]["input_index"]].get("quote_captured_at")
+        matching_time = dt(counterpart_raw_time)
         if matching_time is None:
-            projected["paired_market_status"] = "COUNTERPART_QUOTE_TIMESTAMP_MISSING"
+            projected["paired_market_status"] = (
+                "COUNTERPART_QUOTE_TIMESTAMP_MISSING"
+                if counterpart_raw_time in (None, "") else "INVALID_PAIR_QUOTE_TIMESTAMP"
+            )
             return
         if input_time is None:
-            projected["paired_market_status"] = "QUOTE_TIMESTAMP_MISSING"
+            projected["paired_market_status"] = (
+                "QUOTE_TIMESTAMP_MISSING"
+                if row.get("quote_captured_at") in (None, "") else "INVALID_PAIR_QUOTE_TIMESTAMP"
+            )
             return
-        if abs((input_time - matching_time).total_seconds()) > 120:
+        skew = abs((input_time - matching_time).total_seconds())
+        if skew > 120:
             projected["paired_market_status"] = "MISMATCHED_QUOTE_TIMESTAMPS"
             return
+        projected["paired_quote_skew_seconds"] = skew
+        projected["paired_quote_captured_at"] = [input_time.isoformat(), matching_time.isoformat()]
     else:
         # No compatible partner row exists: the partner price came solely
         # from this row's own opposite_odds field. An asserted field on the

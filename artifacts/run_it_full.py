@@ -831,6 +831,9 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     if form2_loader_audit is not None:
         card["qb_form2_bundle_loader_audit"] = form2_loader_audit
     card["runner"]="RUN_IT_FULL_MLB_AND_NAMED_FOOTBALL_PLAYER_HISTORIES_V1"
+    from sportsedge.phone_display import identity_rows, build_phone_card
+    card["selection_intake"] = identity_rows(rows, default_sport)
+    card["phone_card"] = build_phone_card(card)
     return card
 
 
