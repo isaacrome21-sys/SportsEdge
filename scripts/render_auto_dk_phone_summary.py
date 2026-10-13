@@ -9,6 +9,8 @@ from __future__ import annotations
 import argparse
 import json
 from datetime import datetime, timezone
+from math import isfinite
+from statistics import median
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -128,6 +130,51 @@ def _decimal_odds(american):
         return None
 
 
+def _verified_peer_market_fair(reference, method, books, key, line):
+    """Recompute market-only fair from *exact peer prices*, not an unbound field.
+
+    Older captured artifacts that lack priced receipts fail closed. This never
+    creates an independent predictive model or performs network requests.
+    """
+    from scripts.collect_auto_dk_four_sports import _pair_fair
+
+    receipts=reference.get("peer_price_pairs")
+    if (not isinstance(receipts,list) or len(receipts)!=len(books)
+            or any(not isinstance(row,dict) for row in receipts)):
+        return None
+    pairs={}
+    sides=("over","under") if key=="totals" else ("away","home")
+    for receipt in receipts:
+        book=receipt.get("book")
+        odds=receipt.get("prices")
+        if not isinstance(book,str) or book in pairs or book not in books or not isinstance(odds,dict):
+            return None
+        if set(odds)!=set(sides):
+            return None
+        parsed={}
+        for side in sides:
+            try:
+                raw=float(odds[side])
+            except (ValueError,TypeError,OverflowError):
+                return None
+            if not isfinite(raw) or not raw.is_integer() or -100 < raw < 100:
+                return None
+            parsed[side]=int(raw)
+        fair=_pair_fair({"line":line,**parsed})
+        if fair is None or len(fair)!=2:
+            return None
+        pairs[book]=fair
+    if set(pairs)!=set(books):
+        return None
+    if method=="PINNACLE_POWER_V1":
+        if len(books)!=1 or books[0]!="pinnacle":
+            return None
+        return pairs["pinnacle"]
+    if method=="MULTIBOOK_MEDIAN_POWER_V1" and len(books)>=3 and "pinnacle" not in books:
+        return [median(pairs[b][side] for b in books) for side in (0,1)]
+    return None
+
+
 def nfl_market_price_radar(root: Path, now: datetime):
     """Compare already captured DK prices to same-line reference books; ZERO network requests.
 
@@ -160,6 +207,13 @@ def nfl_market_price_radar(root: Path, now: datetime):
             method = reference.get("method")
             books = reference.get("books") or []
             peer_rows = reference.get("peer_evidence") or []
+            # A malformed or duplicate book/peer list is not evidence.
+            if (not isinstance(books, list) or not books
+                    or any(not isinstance(b, str) or not b for b in books)
+                    or len(books) != len(set(books))
+                    or not isinstance(peer_rows, list)
+                    or any(not isinstance(p, dict) for p in peer_rows)):
+                continue
             expected_books = set(books)
             if (not game.get("provider_event_id")
                     or reference.get("provider_event_id") != game.get("provider_event_id")
@@ -182,9 +236,13 @@ def nfl_market_price_radar(root: Path, now: datetime):
                 continue
             if not same_ref_line or not peer_lines_ok:
                 continue
-            if any((_utc(p.get("observed_at")) is None
-                    or not 0 <= (now-_utc(p.get("observed_at"))).total_seconds() <= 600)
-                   for p in peer_rows):
+            peer_times = [_utc(p.get("observed_at")) for p in peer_rows]
+            # Freshness of each leg alone is insufficient; quote timestamps
+            # must be paired within 120 seconds to the exact DK market.
+            if any(t is None
+                   or not 0 <= (now - t).total_seconds() <= 600
+                   or abs((updated - t).total_seconds()) > 120
+                   for t in peer_times if t is not None) or any(t is None for t in peer_times):
                 continue
             if method == "PINNACLE_POWER_V1":
                 if "pinnacle" not in books:
@@ -195,7 +253,15 @@ def nfl_market_price_radar(root: Path, now: datetime):
             else:
                 continue
             fair = reference.get("fair")
-            if not isinstance(fair, list) or len(fair) != 2:
+            verified_fair = _verified_peer_market_fair(reference,method,books,key,quote.get("line"))
+            if not isinstance(fair,list) or len(fair)!=2 or verified_fair is None:
+                continue
+            try:
+                if any(not isfinite(float(fair[i])) or
+                       abs(float(fair[i])-float(verified_fair[i])) > 1e-8
+                       for i in (0,1)):
+                    continue
+            except (ValueError,TypeError,OverflowError):
                 continue
             sides = (("over", "under") if key == "totals" else ("away", "home"))
             for idx, side in enumerate(sides):

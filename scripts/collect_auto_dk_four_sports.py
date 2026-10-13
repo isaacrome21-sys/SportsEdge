@@ -146,28 +146,36 @@ def _same_line(a,b,market_key):
 def _fair_context(target, peers, market_key):
     """Market-only no-vig, with exact per-peer receipt provenance retained."""
     eligible=[]
+    price_pairs_by_book={}
     for p in peers:
         if not _same_line(target,p,market_key):
             continue
         fair=_pair_fair(p)
         if fair:
             eligible.append((p["book"],fair,p.get("observed_at"),p.get("line")))
+            sides=("over","under") if market_key=="totals" else ("away","home")
+            price_pairs_by_book[p["book"]]={"book":p["book"],
+                                             "prices":{side:p[side] for side in sides}}
     def provenance(chosen):
         return [{"book":book,"observed_at":at,"line":line} for book,_,at,line in chosen]
+    def price_receipts(chosen):
+        return [price_pairs_by_book[book] for book,_,_,_ in chosen]
     for entry in eligible:
         book,vals,_,_=entry
         if book=="pinnacle":
             return {"method":"PINNACLE_POWER_V1","fair":vals,"books":[book],
-                    "peer_evidence":provenance([entry]),"model_probability":None}
+                    "peer_evidence":provenance([entry]),
+                    "peer_price_pairs":price_receipts([entry]),"model_probability":None}
     if len(eligible) < 2:
         return {"method":"MISSING","fair":None,"books":[],
-                "peer_evidence":[],"model_probability":None}
+                "peer_evidence":[],"peer_price_pairs":[],"model_probability":None}
     import statistics
     return {"method":"MULTIBOOK_MEDIAN_POWER_V1",
             "fair":[statistics.median([v[1][0] for v in eligible]),
                     statistics.median([v[1][1] for v in eligible])],
             "books":[v[0] for v in eligible],
-            "peer_evidence":provenance(eligible),"model_probability":None}
+            "peer_evidence":provenance(eligible),
+            "peer_price_pairs":price_receipts(eligible),"model_probability":None}
 
 
 def events_to_board(sport, events, now):
