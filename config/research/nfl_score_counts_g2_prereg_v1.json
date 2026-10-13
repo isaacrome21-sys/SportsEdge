@@ -1,0 +1,327 @@
+{
+  "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G2_PREREG_V1",
+  "status": "FROZEN_BEFORE_IMPLEMENTATION_OR_SCORING",
+  "frozen_date": "2026-10-12",
+  "family": "NFL_SCORE_COUNTS_G2",
+  "attempt_number": 1,
+  "owner_rulings_applied": {
+    "source": "Isaac approval decisions, Oct 12 2026 (G2 engineering rulings 1-6)",
+    "attempt_budget_maximum": 3,
+    "genuinely_new_family": true,
+    "budget_reset_by_renaming": "FORBIDDEN",
+    "threshold_changes_after_outcomes_seen": "FORBIDDEN",
+    "fg_bands_yards": [
+      [
+        0,
+        29
+      ],
+      [
+        30,
+        39
+      ],
+      [
+        40,
+        49
+      ],
+      [
+        50,
+        59
+      ],
+      [
+        60,
+        null
+      ]
+    ],
+    "fg_opportunity_and_conversion_modeled_separately": true,
+    "prespecified_shrinkage_for_sparse_bands": true,
+    "invented_distance_data": "FORBIDDEN \u2014 attempts lacking real kick_distance evidence are excluded from the FG band leg and counted, never imputed",
+    "period_architecture": "ONE shared coherent score-generating framework (count components + shared latent + conversions) with SEPARATELY FITTED period-specific parameters per quarter; halves/quarters may NOT inherit full-game probabilities and may NOT use any fixed multiplier (0.50 or otherwise); each period family has its own gate",
+    "evidence_window": "Candidate frozen BEFORE evaluation; development on labeled already-exposed 2018-2025; prospective evidence forward-only after a separate activation (NOT part of this attempt); sealed holdout untouched; NO retrospective reconstruction of supposedly historical predictions \u2014 development predictions are computed by the frozen runner over historical feature rows and labeled DEVELOPMENT",
+    "gate": "Every count target must beat its intercept in >=3 of 5 folds AND pooled (all_targets_must_pass). No threshold reductions, no automatic promotion, no fallback to the exhausted G1 family.",
+    "receipt_format": "Immutable source payloads with byte SHA-256, fixture identity, retrieved_at_utc (observation time), origin URI (provenance), parser code SHA-256; source manifest written at fit time records the preregistration commit SHA. (Effective-availability time and correction history apply to forward receipts; development sources are byte-frozen release objects whose availability precedes the whole window.)"
+  },
+  "relationship_to_g1": {
+    "g1_family": "NFL_SCORE_COUNTS_G1",
+    "g1_budget_status": "EXHAUSTED (candidate_family_exhausted: true, no_fourth_attempt: true)",
+    "fallback_to_g1": "FORBIDDEN",
+    "carried_verbatim": [
+      "20-feature PIT vector and builder (sportsedge/sports/nfl/score_counts_features.py)",
+      "Touchdown leg: L2-regularized Poisson GLM (log link), heritage design and alpha grid",
+      "Rare-score empirical-Bayes construction (prior 25 events) and conversion beta-binomial construction (team-specific at >=50 TDs, prior 25 TDs)",
+      "Shared mean-preserving lognormal latent and its out-of-fold residual-product sigma selection",
+      "Fold semantics: expanding window, validation seasons 2021-2025, training-fold-only standardization and alpha CV, intercept baseline = training-fold mean",
+      "Final score formula 6*TD + PAT + 2*2PT + 3*FG + 2*SAFETY; OT implicit in final counts"
+    ],
+    "materially_new": [
+      "FG leg: opportunity (attempts) x band-allocation x per-band conversion, five owner-ruled distance bands, in place of every G1 FG construction",
+      "Period construction: per-quarter fitted count components within the shared framework (G1 had no period object)",
+      "G2 source projection adds kick_distance and period/drive fields under an explicit allowlist"
+    ]
+  },
+  "source_contract": {
+    "contract_file": "config/research/nfl_score_counts_g2_source_contract_v1.json",
+    "objects": "The SAME byte-frozen objects as the G1 source contract (nflverse/nfldata games.csv at commit be9813d153e6694af4d98c7287a7db32225806ae, expected sha256 59c8bea7e185dde9e6053a06c24c34f6e5a91dcaea3187c0d9bab12759bb05fb; SportsEdge release nfl-source-freeze-v1 play_by_play_{2018..2025}.csv.gz and depth_charts_{2018..2025}.csv with the expected SHA-256 values recorded in the G1 contract and re-verified before parse)",
+    "mutable_upstream_without_byte_binding": "FORBIDDEN",
+    "expected_sha256_must_match_before_parse": true,
+    "g2_projection": {
+      "heritage_rows": "sportsedge.sports.nfl.score_counts_source_projection.project_pbp_row (G1 allowlist, unchanged)",
+      "g2_side_aggregates": "G2 allowlist = G1 allowlist PLUS: kick_distance, field_goal_attempt, qtr, drive, yardline_100, fixed_drive, play_type. Market-adjacent fields remain forbidden by the same token screen."
+    }
+  },
+  "development_window": {
+    "seasons": [
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "role": "DEVELOPMENT_ONLY_ALREADY_EXPOSED",
+    "game_type": "REG (heritage builder population: schedule rows for the declared seasons; the heritage feature builder labels rows from PBP presence)",
+    "validation_folds": [
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "fold_minimum_games": 250,
+    "fold_below_minimum": "Attempt is NOT_RUN (data failure), not a fail",
+    "training_per_fold": "All rows with season < validation season (expanding window); alpha chosen by expanding-season CV inside the training window only (heritage choose_alpha); standardization training-fold only"
+  },
+  "feature_policy": {
+    "heritage_vector": "FEATURE_NAMES from sportsedge.sports.nfl.score_counts_g1 (20 features, frozen order), built by the heritage PIT builder: lookback 8 team games, decay 0.85, minimum 4 prior team games, cross-season carry, QB shrinkage prior 100 pseudo-dropbacks / minimum 20 prior dropbacks, starting QB requires the heritage depth-chart PIT selection; rows the heritage builder cannot emit (insufficient history or unresolved QB) are excluded and counted",
+    "fg_opportunity_features": [
+      "fg_rz_trips_per_game",
+      "fg_drives35_per_game",
+      "fg_drives25_per_game",
+      "opp_fg_rz_trips_allowed_per_game",
+      "opp_fg_drives35_allowed_per_game",
+      "opp_fg_drives25_allowed_per_game",
+      "off_plays_per_game",
+      "off_turnover_rate",
+      "opp_takeaway_rate",
+      "home_indicator"
+    ],
+    "fg_feature_semantics": "Trailing weighted means over the team's prior 8 team games (decay 0.85) of per-game drive-penetration counts computed from byte-bound PBP: a drive is a (game_id, posteam, drive) group of scrimmage plays; RZ trip = drive minimum yardline_100 <= 20; reaching opp 35/25 = drive minimum yardline_100 <= 35 / <= 25. Opponent versions use the opponent's defensive aggregates (drives against them). Strictly before target kickoff; target-game plays forbidden.",
+    "period_features_per_quarter": [
+      "q{quarter}_off_td_per_game",
+      "q{quarter}_off_fg_per_game",
+      "q{quarter}_def_td_allowed_per_game",
+      "q{quarter}_fg_allowed_per_game",
+      "off_plays_per_game",
+      "home_indicator"
+    ],
+    "period_feature_semantics": "Trailing weighted means (8 games, decay 0.85) of the team's per-quarter scoring counts and the opponent's per-quarter allowed counts, from byte-bound PBP quarter aggregates; pregame only, no within-game information",
+    "forbidden_inputs": "Heritage list verbatim: sportsbook lines/prices, public splits/handle, consensus opinion, postgame or future information, target-game participation to infer the starter, any other model's residuals, post-hoc key-number redistribution"
+  },
+  "model_specification": {
+    "offensive_touchdowns": {
+      "family": "L2_REGULARIZED_POISSON_GLM_LOG_LINK (heritage fit_poisson_ridge)",
+      "design": "Heritage 20-feature row (own offense + opponent defense flattened by the heritage builder)",
+      "alpha_grid": [
+        0.1,
+        1.0,
+        10.0,
+        100.0
+      ],
+      "alpha_selection": "Heritage choose_alpha expanding-season CV on the training window, metric mean Poisson deviance"
+    },
+    "field_goals_banded": {
+      "opportunity": {
+        "target": "fg_attempts_with_distance (attempts whose kick_distance is present and > 0)",
+        "family": "L2-regularized Poisson GLM (log link) on fg_opportunity_features",
+        "alpha_grid": [
+          0.1,
+          1.0,
+          10.0,
+          100.0
+        ],
+        "alpha_selection": "Expanding-season CV inside the training window, mean Poisson deviance on the opportunity target"
+      },
+      "band_allocation": {
+        "bands_yards": [
+          [
+            0,
+            29
+          ],
+          [
+            30,
+            39
+          ],
+          [
+            40,
+            49
+          ],
+          [
+            50,
+            59
+          ],
+          [
+            60,
+            null
+          ]
+        ],
+        "distance_field": "kick_distance (nflverse PBP, as recorded; no derivation, no imputation)",
+        "team_share_b": "(team PIT attempts in band b + 25 * league PIT share b) / (team PIT attempts all bands + 25)",
+        "league_share_b": "All completed team-games strictly before the target game (heritage full-history PIT semantics, matching the heritage FG make-rate override)",
+        "prior_attempts": 25
+      },
+      "conversion": {
+        "team_rate_b": "(team PIT makes in band b + 25 * league PIT rate b) / (team PIT attempts in band b + 25)",
+        "league_rate_b": "Makes / attempts in band b over all completed team-games strictly before the target game",
+        "prior_attempts": 25
+      },
+      "made_fg_mean": "opportunity_mean * SUM_b( share_b * rate_b )",
+      "gate_target": "made_field_goals (ALL realized made FGs in the team-game)",
+      "exclusions": "Attempts with missing or non-positive kick_distance are excluded from shares, rates, and the opportunity target; excluded attempts and any made FGs among them are counted per fold and overall and reported in the result artifact"
+    },
+    "rare_scores": {
+      "construction": "Heritage per-row PIT empirical-Bayes team rates (def_st_td_rate, safety_rate) carried on heritage rows; league rates from the training window for the artifact fit",
+      "prior_events": 25
+    },
+    "conversions": {
+      "construction": "Heritage per-row PIT beta-binomial probabilities (conversion_pat_p, conversion_two_p, conversion_no_p) carried on heritage rows; team-specific only at >=50 prior TDs, prior 25 TDs"
+    },
+    "shared_latent": {
+      "family": "MEAN_PRESERVING_LOGNORMAL_MULTIPLICATIVE",
+      "applies_to": [
+        "HOME_OFFENSE_TD",
+        "AWAY_OFFENSE_TD",
+        "HOME_FG",
+        "AWAY_FG"
+      ],
+      "sigma_grid": [
+        0.0,
+        0.1,
+        0.2,
+        0.3
+      ],
+      "sigma_selection": "Heritage method: out-of-fold (expanding folds over the development window) predicted TD+FG means; sigma minimizing MSE of (residual product) vs (mu_home * mu_away * (exp(sigma^2) - 1)); ties break to the smaller sigma"
+    },
+    "period_model": {
+      "framework": "Same count components + shared latent + conversion construction as the full-game model, with parameters fitted SEPARATELY for each quarter q in {1,2,3,4}",
+      "per_quarter_legs": {
+        "offensive_td_q": "Poisson ridge (log link) on period_features_per_quarter for q, target = team offensive TDs in quarter q; alpha grid and CV as the TD leg",
+        "made_fg_q": "Poisson ridge (log link) on period_features_per_quarter for q, target = team made FGs in quarter q (a period-specific direct leg, declared; the banded construction is the full-game FG leg and period families stand on their own fits)",
+        "def_st_td_q_and_safety_q": "Per-quarter empirical-Bayes team rates (prior 25 events) computed PIT; league per-quarter rates as fallback",
+        "conversions_q": "Global heritage conversion probabilities applied to quarter TDs (offensive + def/ST) within the same path"
+      },
+      "dependence": "ONE shared latent draw per simulated path scales TD and FG means in ALL quarters and the full-game legs are a separate path set; quarter draws are conditionally independent given the latent (preregistered period-residual simplification). Halves are sums of their quarters on the same paths.",
+      "second_half_scope": "Regulation Q3+Q4 only; overtime points belong to neither half in development scoring. The pricer-side include_ot settlement declaration remains production prerequisite P4 and is NOT resolved by this attempt.",
+      "no_fixed_multipliers": true,
+      "no_inheritance": "Period parameters, gates, and verdicts are independent of the full-game fit; a full-game pass implies nothing for periods"
+    },
+    "simulation": {
+      "paths_per_game": 50000,
+      "minimum_paths_for_scored_output": 10000,
+      "bit_generator": "NUMPY_PCG64",
+      "root_seed_literal": "SportsEdge|NFL_SCORE_COUNTS_G2|FORWARD_V1|ROOT_SEED",
+      "root_seed_sha256": "33427560d98897b9965bc1499bc2616f5f096061a24c6447dda0a19f4293f604",
+      "root_seed_uint64_decimal": "13373308085707555379",
+      "child_seed_rule": "Heritage child_seed construction with the G2 root seed: sha256 of '{root_seed_uint64}:{game_id}' first 8 bytes little-endian (as implemented in the G2 module and recorded in the fit manifest)",
+      "pmf_floor": "log score uses p_floor = 0.5 / paths_per_game for any realized score with zero simulated mass"
+    }
+  },
+  "gates": {
+    "all_targets_must_pass_for_full_game": true,
+    "fold_standard": "Candidate better than baseline in >=3 of 5 folds AND pooled, unless a gate states otherwise",
+    "G_TD": {
+      "target": "offense_touchdowns per team-game",
+      "metric": "mean Poisson deviance",
+      "baseline": "training-fold intercept mean",
+      "standard": "fold standard"
+    },
+    "G_FG": {
+      "target": "made_field_goals per team-game (banded construction)",
+      "metric": "mean Poisson deviance",
+      "baseline": "training-fold intercept mean",
+      "standard": "fold standard \u2014 UNCHANGED from G1"
+    },
+    "G_RARE": {
+      "target": "def_st_touchdowns + safeties per team-game",
+      "metric": "pooled Poisson log score over all validation rows and folds",
+      "baseline": "league-rate-only construction (training-window league rates)",
+      "standard": "candidate pooled log score >= baseline (no-harm), tolerance 1e-12"
+    },
+    "G_JOINT": {
+      "target": "joint (home_score, away_score) final-score distribution",
+      "metric": "mean log score of realized scores under the simulated PMF (50,000 paths, preregistered floor)",
+      "baseline_i": "league empirical score PMF from the training window (realized final scores, same floor)",
+      "standard_i": "candidate better pooled AND in >=3/5 folds",
+      "baseline_ii_frozen_discrete_v2_grid": {
+        "status": "NOT_RUNNABLE_IN_DEVELOPMENT_WINDOW",
+        "reason": "The frozen discrete_v2 grid requires per-game Attempt-9 margin/total locations. No frozen per-game Attempt-9 location rows exist in the repository for the 2021-2025 development folds (the discrete_v2 evaluation freeze targets a 2026 forward holdout), and re-deriving Attempt-9 locations per fold would create a new fitted object inside this attempt with fold-leakage risk. The leg is recorded, not silently dropped.",
+        "preregistered_consequence": "G_JOINT verdict is FAIL with reason G_JOINT_BASELINE_II_NOT_RUNNABLE regardless of the baseline-(i) outcome (which is computed and reported for the record). The gate is NOT lowered: a required comparison that cannot be run cannot be passed."
+      }
+    },
+    "G_CAL": {
+      "total_pit_slope": "Randomized PIT of realized game totals under each game's simulated total CDF (randomization stream: PCG64 seeded from the G2 root seed and the game_id, declared in code); decile reliability slope = OLS slope of observed cumulative fraction vs expected cumulative fraction at decile midpoints 0.05..0.95, pooled over folds; PASS if slope in [0.9, 1.1]",
+      "margin_pit_deviation": "Randomized PIT of realized margins under simulated margin CDFs; decile histogram frequencies pooled; PASS if max |frequency - 0.1| <= 0.05 (bound fixed here, before scoring)"
+    },
+    "G_KEY": {
+      "keys": [
+        -7,
+        -3,
+        3,
+        7
+      ],
+      "standard": "pooled |model P(margin = k) - realized frequency| <= 0.0075 at EACH key"
+    },
+    "G_PERIOD": {
+      "families": {
+        "FIRST_HALF": "joint (home, away) Q1+Q2 points",
+        "SECOND_HALF": "joint (home, away) Q3+Q4 regulation points",
+        "QUARTER": "joint (home, away) per-quarter points, pooled over quarters 1-4 (pooled-quarter treatment, declared)"
+      },
+      "metric": "mean log score of realized period score pairs under the period simulated PMF (same floor rule)",
+      "baseline": "period league empirical score PMF from the training window",
+      "standard": "per family: candidate better pooled AND in >=3/5 folds",
+      "inheritance": "NONE \u2014 period verdicts neither affect nor are affected by the full-game verdict"
+    }
+  },
+  "failure_semantics": {
+    "completed_evaluation_consumes_attempt": true,
+    "attempt_budget": 3,
+    "implementation_bug_with_frozen_math_unchanged": "Does not consume an attempt; requires a written note in the G2 ledger",
+    "any_change_after_first_scored_run": "New attempt consuming budget \u2014 NOT authorized in the current task; work stops after attempt 1's evaluation",
+    "results_preserved_verbatim": true,
+    "threshold_changes_retroactive": "FORBIDDEN"
+  },
+  "fit_manifest_at_fit_time": {
+    "written_by_runner": "fit_manifest.json beside the attempt artifact",
+    "required_fields": [
+      "preregistration_commit_sha",
+      "preregistration_sha256",
+      "code_identity_sha256",
+      "source_manifest_sha256",
+      "fit_window_seasons",
+      "training_row_count",
+      "rng_identity",
+      "paths_per_game",
+      "attempt_number",
+      "family"
+    ],
+    "note": "The preregistration commit SHA is recorded in the manifest written at fit time (the preregistration cannot contain its own commit SHA)."
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "phone_card": false,
+    "truth_gate": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "pricing": false,
+    "backfill": false
+  },
+  "explicitly_not_in_this_attempt": [
+    "No wiring into run_it_full or the derivative seam (extract_distribution)",
+    "No changes to deployments.json, existing freeze files, or any existing authority block",
+    "No prospective/forward evaluation (separate activation, separate approval)",
+    "Production prerequisites P1 (PIT feature builder in canonical prepricing), P2 (QB PIT-receipt integration), P3 (provenance stamping), P4 (settlement/score binding) \u2014 untouched"
+  ]
+}
