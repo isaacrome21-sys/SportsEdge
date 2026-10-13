@@ -111,3 +111,14 @@ def test_v2_leakage_invariance():
     fut = [CBBGame("z", cut - timedelta(hours=1), "150", "57", 300, 0, 70, False)]
     again = fit_asof(list(reversed(g)) + fut, cut, version="v2", d1_ids=STRENGTH.keys())
     assert round(base.hca, 9) == round(again.hca, 9) and base.off == again.off
+
+
+def test_illinois_exclusion_integer_and_string_ids_same_result():
+    """Int IDs from provider JSON must block, not produce a KeyError."""
+    for team_id in ("305", 305, "77", 77, "2130", 2130):
+        blocked = illinois_block(team_id, 150)
+        assert blocked is not None
+        assert blocked["status"] == "BLOCKED"
+        assert blocked["reason"] == "ILLINOIS_COLLEGE_EXCLUDED"
+        assert blocked["play_authority"] is False
+    assert illinois_block(2466, 150) is None
