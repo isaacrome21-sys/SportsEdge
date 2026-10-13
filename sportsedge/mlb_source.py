@@ -151,7 +151,7 @@ def verify_receipt_journal(root: str | Path, *, verifier_now: datetime | None = 
     # A half-written final JSON record may parse as a complete object, but the
     # next append would concatenate two lines. Reject such an archive as-is.
     journal_bytes = journal.read_bytes()
-    if not journal_bytes or not journal_bytes.endswith(b"\\n"):
+    if not journal_bytes or not journal_bytes.endswith(b"\n"):
         raise MLBSourceError("RECEIPT_JOURNAL_UNTERMINATED")
     now = _aware(verifier_now, "verifier clock") if verifier_now is not None else _aware(_trusted_now(), "verifier clock")
     entries: list[dict[str, Any]] = []
@@ -205,7 +205,7 @@ def verify_receipt_journal(root: str | Path, *, verifier_now: datetime | None = 
         nonces.add(entry["receipt_nonce"]); keys.add(key)
         filename = entry["file_name"]
         if (not isinstance(filename, str) or not filename or len(filename) > 180
-                or Path(filename).name != filename or "\\\\" in filename):
+                or Path(filename).name != filename or chr(92) in filename):
             raise MLBSourceError("RECEIPT_RAW_PATH_UNSAFE")
         raw_path = root / filename
         if raw_path.is_symlink():
