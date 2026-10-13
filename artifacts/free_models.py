@@ -25,6 +25,14 @@ from sportsedge.quote_freshness import (
     check_quote_freshness,
     is_fresh as quote_is_fresh,
 )
+from sportsedge.pricing_provenance import (
+    ANCHORED_PLAY_BLOCK,
+    ANCHORED_WATCH_STATUS,
+    LANE_MARKET_ANCHORED as PROVENANCE_MARKET_ANCHORED,
+    apply_play_gate,
+    is_play_eligible,
+    provenance_for_game_result,
+)
 
 LEAGUES = {"NFL": "football/nfl", "CFB": "football/college-football",
            "NBA": "basketball/nba", "MLB": "baseball/mlb"}
@@ -702,41 +710,29 @@ def context_for(sport, away, home, start, provider, row):
     return out, kickoff, notes
 
 
+
 def score_means(sport, context):
-    """Pregame expected scores from verified context.
+    """Market-blind pregame means for live repricing.
 
-    Score-mean source for the live in-game repricing path
-    (``sportsedge.live_reprice`` / ``sportsedge.live_run_it``), which
-    reconstructs these means as of kickoff. Market anchoring is
-    deliberately NOT part of this function: live Model_P must stay
-    market-blind per LIVE_POLICY_V1.
-
-    NOTE (re-port onto current main, Oct 12 verification round 2): this
-    replicates, term for term, the inline score-mean computation inside
-    ``calculate()`` below (same terms, same order, same
-    IMPLAUSIBLE_SCORE_MEAN floor). ``calculate()`` itself is unchanged;
-    on the original Phase 16 branch ``calculate()`` called this function,
-    but on current main the inline form is the merged implementation and
-    is left as-is.
+    Keep this calculation in parity with calculate()'s Lane A base model.
+    No quoted market price enters here. Owner-disabled MLB pitcher ERA,
+    recent form and rest differential factors must contribute exactly zero
+    even when their unvalidated research values are present in context.
+    The NBA rest adjustment (context key rest_adj) is disabled by the
+    same Oct 13 ruling, extended on PR #2120 regardless of key name: it
+    stays in context for research and contributes exactly zero here, so
+    live repricing remains in parity with calculate().
+    This helper restores the live_run_it import omitted by composition.
     """
     base, _, _, hfa = PRIORS[sport]
     home_mean = base + hfa / 2 + context["home_rating"]
     away_mean = base - hfa / 2 + context["away_rating"]
-    if sport == "MLB":
-        home_mean += context["home_pitcher_adj"]
-        away_mean += context["away_pitcher_adj"]
-    else:
-        home_mean += context["home_injury_pts"] + context["home_form"]
-        away_mean += context["away_injury_pts"] + context["away_form"]
-        if sport == "NBA":
-            home_mean += context["rest_adj"] / 2
-            away_mean -= context["rest_adj"] / 2
+    if sport != "MLB":
+        home_mean += context["home_injury_pts"]
+        away_mean += context["away_injury_pts"]
     if "weather_total_adj" in context:
         home_mean += context["weather_total_adj"] / 2
         away_mean += context["weather_total_adj"] / 2
-    if "rest_diff_adj" in context:
-        home_mean += context["rest_diff_adj"] / 2
-        away_mean -= context["rest_diff_adj"] / 2
     if min(home_mean, away_mean) < 0.2:
         raise ValueError("IMPLAUSIBLE_SCORE_MEAN")
     return home_mean, away_mean
@@ -978,23 +974,39 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
     base, _, _, hfa = PRIORS[sport]
     home_mean = base + hfa/2 + context["home_rating"]
     away_mean = base - hfa/2 + context["away_rating"]
+    # Owner ruling (Oct 13, 2026): three unvalidated adjustments are
+    # DISABLED_PENDING_INCREMENTAL_VALUE in canonical pricing until each
+    # demonstrates incremental value in the harness against the retained
+    # baseline (team-strength ratings + static HFA, above) and the
+    # market: the ERA-based starting-pitcher adjustment
+    # (home/away_pitcher_adj), recent form (home/away_form), and the
+    # rest differential (rest_diff_adj). Their values remain in context
+    # and in the factor audit for research; the pricing contribution
+    # here is exactly zero. The prepricing stage already hands these
+    # keys over as 0.0; this gate keeps the contribution zero even if a
+    # nonzero value reaches the engine by another path. The NBA rest
+    # adjustment (key name rest_adj, not rest_diff_adj) is governed by
+    # the same ruling — the owner extended it on PR #2120 with no
+    # carve-out: the disable applies across all supported sports
+    # regardless of the adjustment's key name.
     if sport == "MLB":
-        home_mean += context["home_pitcher_adj"]
-        away_mean += context["away_pitcher_adj"]
+        notes.append("PITCHER_ADJ_DISABLED_PENDING_INCREMENTAL_VALUE")
     else:
-        home_mean += context["home_injury_pts"] + context["home_form"]
-        away_mean += context["away_injury_pts"] + context["away_form"]
+        home_mean += context["home_injury_pts"]
+        away_mean += context["away_injury_pts"]
+        notes.append("RECENT_FORM_DISABLED_PENDING_INCREMENTAL_VALUE")
         if sport == "NBA":
-            home_mean += context["rest_adj"] / 2
-            away_mean -= context["rest_adj"] / 2
+            # rest_adj is NOT applied: contribution exactly zero. The
+            # value stays in context for research (schedule/rest data
+            # remains available for future point-in-time validation);
+            # this gate holds however the value arrived — verified
+            # prepricing, top-level intake key, or manual override.
+            notes.append("REST_ADJ_DISABLED_PENDING_INCREMENTAL_VALUE")
     if "weather_total_adj" in context:
         home_mean += context["weather_total_adj"] / 2
         away_mean += context["weather_total_adj"] / 2
     if "rest_diff_adj" in context:
-        # Declared rest-differential prior (HEURISTIC, harness-gated):
-        # positive favors the home team, split symmetrically.
-        home_mean += context["rest_diff_adj"] / 2
-        away_mean -= context["rest_diff_adj"] / 2
+        notes.append("REST_DIFF_ADJ_DISABLED_PENDING_INCREMENTAL_VALUE")
     if min(home_mean, away_mean) < 0.2:
         raise ValueError("IMPLAUSIBLE_SCORE_MEAN")
     # Repair 3 (Oct 11 2026): quote freshness is checked centrally on every
@@ -1079,6 +1091,8 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
     if lane == "B" and lane_b.get("status") == "LANE_B_UNAVAILABLE":
         return {"status": lane_b["reason"], "game": f"{away} @ {home}",
                 "sport": sport, "pricing_lane": LANE_B,
+                "pricing_provenance": provenance_for_game_result(
+                    {"pricing_lane": LANE_B, "market": market}),
                 "pricing_lanes": {"lane_a_independent": lane_a,
                                   "lane_b_anchored": lane_b},
                 "quote_freshness": quote_freshness,
@@ -1130,11 +1144,23 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
         status = POSITIVE_EV_STATUS
     else:
         status = "BELOW_THRESHOLD"
+    # Architecture-conflict ruling (Oct 12 2026): a PLAY requires an
+    # INDEPENDENT probability that does not borrow the sportsbook price.
+    # When the anchored Lane B view is the primary view, its +EV is
+    # anchored research only -- it can never take the positive-EV play
+    # status. Demote to a named WATCH status with the mechanism visible.
+    if pricing_lane == LANE_B and status == POSITIVE_EV_STATUS:
+        status = ANCHORED_WATCH_STATUS
+        reason = (ANCHORED_PLAY_BLOCK + ":"
+                  + ("NO_VIG_BLEND_15PCT" if market == "ML"
+                     else "MARKET_SHRINK_15PCT"))
     result = {"schema": "SPORTSEDGE_FREE_RESEARCH_V1", "status": status, "sport": sport,
             "game": f"{away} @ {home}", "selection": selection, "market": market,
             "odds_american": int(price), "line": line, "kickoff_utc": kickoff.isoformat(),
             "team_totals_team": team_totals_team if market == "TEAM_TOTALS" else None,
             "pricing_lane": pricing_lane,
+            "pricing_provenance": provenance_for_game_result(
+                {"pricing_lane": pricing_lane, "market": market}),
             "pricing_lanes": {"lane_a_independent": lane_a,
                               "lane_b_anchored": lane_b},
             "quote_freshness": quote_freshness,
@@ -1266,14 +1292,35 @@ def _paired_book_context(rows, evaluated, index):
     if book(row) != "draftkings":
         projected["paired_market_status"] = "NOT_DRAFTKINGS_PAIR"
         return
-    # Optional quotes are assumed same screenshot unless an explicit
-    # timestamp proves they differ; never compare known mismatched captures.
-    input_time = row.get("quote_captured_at")
-    matching_time = None
+    # Pairing requires contemporaneous, independently timestamped quotes.
+    # A counterpart quote without a parseable capture time is NOT assumed
+    # to be from the same screenshot: the pair is refused. When both
+    # timestamps parse, the captures must be within 120 seconds of each
+    # other, not merely unequal as strings.
+    input_time = dt(row.get("quote_captured_at"))
     if len(compatible) == 1:
-        matching_time = rows[compatible[0]["input_index"]].get("quote_captured_at")
-    if input_time and matching_time and str(input_time) != str(matching_time):
-        projected["paired_market_status"] = "MISMATCHED_QUOTE_TIMESTAMPS"
+        matching_time = dt(rows[compatible[0]["input_index"]].get("quote_captured_at"))
+        if matching_time is None:
+            projected["paired_market_status"] = "COUNTERPART_QUOTE_TIMESTAMP_MISSING"
+            return
+        if input_time is None:
+            projected["paired_market_status"] = "QUOTE_TIMESTAMP_MISSING"
+            return
+        if abs((input_time - matching_time).total_seconds()) > 120:
+            projected["paired_market_status"] = "MISMATCHED_QUOTE_TIMESTAMPS"
+            return
+    else:
+        # No compatible partner row exists: the partner price came solely
+        # from this row's own opposite_odds field. An asserted field on the
+        # same row is NOT a separately timestamped quote — there is no
+        # counterpart observation, no event/period/settlement identity
+        # check on a second quote, and no timestamp pair. It must not be
+        # labeled an exact two-sided quote or yield a no-vig comparison,
+        # regardless of this row's own capture time: timestamping the
+        # assertion does not cure the missing counterpart, and the refusal
+        # names that defect (not QUOTE_TIMESTAMP_MISSING, which would
+        # falsely imply this quote itself lacked a timestamp).
+        projected["paired_market_status"] = "OPPOSITE_PRICE_NOT_A_TIMESTAMPED_QUOTE"
         return
     try:
         p1 = 1.0 / odds_decimal(result["odds_american"])
@@ -1352,6 +1399,10 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
             result = {"status": "BLOCKED_INVALID", "reason": str(exc)[:140]}
         result["input_index"] = i
         all_rows.append(result)
+    # Provenance gate (Oct 12 2026 ruling): stamp every priced row and
+    # refuse MARKET_ANCHORED rows any play status before surfaces are
+    # built. Anchored rows may surface at most as WATCH.
+    apply_play_gate(all_rows)
     # Keep independent projections available even when an optional 15%
     # book-anchored research view has zero qualifying candidates. Exact
     # paired DK no-vig is a benchmark, not a predictive feature.
@@ -1363,6 +1414,13 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
     for row in all_rows:
         projection = row.get("independent_projection")
         if not isinstance(projection, dict):
+            continue
+        if (row.get("pricing_provenance") or {}).get(
+                "lane") == PROVENANCE_MARKET_ANCHORED:
+            # The row's primary probability borrowed the sportsbook price.
+            # Even if its independent side-view clears the EV floor, the
+            # row itself is anchored research: watch surface only.
+            watchlist.append(row)
             continue
         if row.get("status") in {"WATCH_NFL_NO_VERIFIED_CONTEXT",
                                  "WATCH_NFL_TOTAL_PRIOR_ONLY"}:
@@ -1389,7 +1447,12 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
                                   r["game"],r["selection"]))
     # Repair 2: Lane B is always computed and labeled, so the harness (and the
     # card) can evaluate the anchored hypothesis separately from Lane A.
-    lane_b_edges = []
+    # Oct 12 2026 ruling: anchored EV is suppressed from every +EV / edges
+    # presentation. Qualifying Lane B rows surface ONLY on the watchlist
+    # below, with the anchored view labeled inside each row. The legacy
+    # lane_b_edges field is retained, always empty, so downstream consumers
+    # fail safe instead of rendering anchored "edges".
+    lane_b_watchlist = []
     for r in all_rows:
         if r.get("status") in {"WATCH_NFL_NO_VERIFIED_CONTEXT",
                               "WATCH_NFL_TOTAL_PRIOR_ONLY"}:
@@ -1403,10 +1466,12 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
         if r.get("odds_american", -999) < -165:
             continue
         if lane_b.get("ev_per_dollar", -1) >= min_ev:
-            lane_b_edges.append(r)
-    lane_b_edges.sort(key=lambda r: (-r["pricing_lanes"]["lane_b_anchored"]["ev_per_dollar"],
-                                     r["game"], r["selection"]))
-    edges = [r for r in all_rows if r["status"] == POSITIVE_EV_STATUS]
+            lane_b_watchlist.append(r)
+    lane_b_watchlist.sort(key=lambda r: (-r["pricing_lanes"]["lane_b_anchored"]["ev_per_dollar"],
+                                         r["game"], r["selection"]))
+    lane_b_edges = []
+    edges = [r for r in all_rows
+             if r["status"] == POSITIVE_EV_STATUS and is_play_eligible(r)]
     edges.sort(key=lambda r: (-r["ev_per_dollar"], r["game"], r["selection"]))
     primary_lane = LANE_A if lane == "A" else LANE_B
     return {"schema": "SPORTSEDGE_FREE_RESEARCH_CARD_V1",
@@ -1423,6 +1488,13 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
                           "validated_profitability": False},
             "min_ev": min_ev, "edges": edges,
             "lane_b_edges": lane_b_edges,
+            "lane_b_watchlist": lane_b_watchlist,
+            "play_gate": {
+                "rule": "INDEPENDENT_PROBABILITY_REQUIRED_FOR_PLAY",
+                "anchored_max_surface": "WATCH",
+                "anchored_ev_in_edges_lists": "SUPPRESSED",
+                "undetermined_provenance": "FAIL_CLOSED",
+            },
             "independent_candidates": independent,
             "independent_watchlist": watchlist,
             "research_projection_note": "Unvalidated independent league-score heuristic; DK is a paired same-book no-vig benchmark, not sharp market verification.",
@@ -1431,6 +1503,7 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
             "evaluated_rows": all_rows,
             "summary": {"rows": len(rows), "edges": len(edges),
                         "lane_b_edges": len(lane_b_edges),
+                        "lane_b_watchlist": len(lane_b_watchlist),
                         "status_counts": dict(sorted(Counter(r["status"] for r in all_rows).items()))},
             "diagnostics": [{"input_index": r["input_index"], "status": r["status"],
                              "reason": r.get("reason") or ",".join(r.get("context_notes") or [])}
