@@ -9,11 +9,12 @@ import argparse, json, pathlib
 from datetime import datetime
 
 from sportsedge.sports.nba.asof_team_ratings import NBAGame, possessions
-from sportsedge.sports.nba.asof_harness import run_harness
+from sportsedge.sports.nba.asof_harness import run_harness, run_period_harness
+from sportsedge.sports.nba.quarter_joint_sim import QuarterGame
 
 
 def load(cache):
-    out, skipped = [], 0
+    out, qs, skipped = [], [], 0
     for p in sorted(pathlib.Path(cache).glob("*.json")):
         d = json.loads(p.read_text())
         try:
@@ -23,14 +24,19 @@ def load(cache):
                         possessions(t["home"]["box"]), possessions(t["away"]["box"]))
             g.validate()
             out.append(g)
+            hl, al = tuple(t["home"].get("lines") or ()), tuple(t["away"].get("lines") or ())
+            if len(hl) >= 4 and len(hl) == len(al) and sum(hl) == g.home_points and sum(al) == g.away_points:
+                qs.append(QuarterGame(g.game_id, g.start, hl, al))
         except (KeyError, ValueError, IndexError):
             skipped += 1
-    return out, skipped
+    return out, qs, skipped
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(); ap.add_argument("--cache", required=True)
-    games, skipped = load(ap.parse_args().cache)
+    games, qs, skipped = load(ap.parse_args().cache)
     rep = run_harness(games)
+    rep["periods"] = run_period_harness(games, qs) if qs else "NO_QUARTER_LINESCORES_IN_CACHE"
+    rep["quarter_games_loaded"] = len(qs)
     rep["games_loaded"] = len(games); rep["games_skipped_invalid"] = skipped
     print(json.dumps(rep, indent=2))
