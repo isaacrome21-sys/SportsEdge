@@ -115,6 +115,122 @@ def row_text(r):
             f"EV {pct(r['ev'],True)}{pit} · {str(r['reason'])}")
 
 
+def _decimal_odds(american):
+    """Quote conversion only; never treat reference fair as an originated model."""
+    try:
+        val = float(american)
+        if not (val >= 100 or val <= -100):
+            return None
+        if val != val or abs(val) == float("inf"):
+            return None
+        return 1.0 + (val / 100.0 if val > 0 else 100.0 / -val)
+    except (ValueError, TypeError, OverflowError, ZeroDivisionError):
+        return None
+
+
+def nfl_market_price_radar(root: Path, now: datetime):
+    """Compare already captured DK prices to same-line reference books; ZERO network requests.
+
+    Pinnacle no-vig is accepted, else require three independently quoted peer
+    books. This radar is NOT a validated predictive model or a certified bet.
+    Reject stale quotes, in-play games, invalid prices and excessive gaps.
+    """
+    odds_file = root.parent / "auto_dk" / "nfl_odds.json"
+    if not odds_file.is_file():
+        return [], "AUTO_DK_NFL_QUOTES_MISSING"
+    try:
+        captured = json.loads(odds_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return [], "AUTO_DK_NFL_QUOTES_INVALID"
+    if captured.get("status") != "READY":
+        return [], "AUTO_DK_NFL_NOT_READY"
+    found = []
+    for game in captured.get("games") or []:
+        kickoff = _utc(game.get("commence_time"))
+        if kickoff is None or kickoff <= now:
+            continue
+        matchup = f"{game.get('away')} @ {game.get('home')}"
+        for key, quote in (game.get("markets") or {}).items():
+            if key not in {"h2h", "spreads", "totals"} or not isinstance(quote, dict):
+                continue
+            updated = _utc(quote.get("observed_at"))
+            if updated is None or not 0 <= (now - updated).total_seconds() <= 600:
+                continue
+            reference = (game.get("reference") or {}).get(key) or {}
+            method = reference.get("method")
+            books = reference.get("books") or []
+            peer_rows = reference.get("peer_evidence") or []
+            expected_books = set(books)
+            if (not game.get("provider_event_id")
+                    or reference.get("provider_event_id") != game.get("provider_event_id")
+                    or reference.get("market_key") != key
+                    or reference.get("dk_observed_at") != quote.get("observed_at")
+                    or not peer_rows or not expected_books
+                    or len(peer_rows) != len(expected_books)
+                    or {p.get("book") for p in peer_rows if isinstance(p, dict)} != expected_books):
+                continue
+            try:
+                same_ref_line = (reference.get("dk_line") == quote.get("line")
+                                 if key == "h2h" else
+                                 abs(float(reference["dk_line"])-float(quote["line"])) < 1e-9)
+                peer_lines_ok = all(
+                    (p.get("line") is None if key == "h2h" else
+                     abs(float(p["line"])-float(quote["line"])) < 1e-9)
+                    for p in peer_rows
+                )
+            except (ValueError,TypeError,KeyError,OverflowError):
+                continue
+            if not same_ref_line or not peer_lines_ok:
+                continue
+            if any((_utc(p.get("observed_at")) is None
+                    or not 0 <= (now-_utc(p.get("observed_at"))).total_seconds() <= 600)
+                   for p in peer_rows):
+                continue
+            if method == "PINNACLE_POWER_V1":
+                if "pinnacle" not in books:
+                    continue
+            elif method == "MULTIBOOK_MEDIAN_POWER_V1":
+                if len(set(books)) < 3:
+                    continue
+            else:
+                continue
+            fair = reference.get("fair")
+            if not isinstance(fair, list) or len(fair) != 2:
+                continue
+            sides = (("over", "under") if key == "totals" else ("away", "home"))
+            for idx, side in enumerate(sides):
+                price_num = quote.get(side)
+                dec = _decimal_odds(price_num)
+                if dec is None:
+                    continue
+                try:
+                    quote_price = int(price_num)
+                    p = float(fair[idx])
+                except (TypeError, ValueError, OverflowError):
+                    continue
+                if quote_price != float(price_num) or quote_price < -165 or not 0 < p < 1:
+                    continue
+                ev = p * dec - 1.0
+                # Outliers frequently mean a stale or mismatched offer. Fail closed.
+                if not 0.02 <= ev < 0.05:
+                    continue
+                if key == "totals":
+                    selection = f"{side.title()} {float(quote['line']):g}"
+                elif key == "spreads":
+                    line = float(quote["line"]) * (1 if side == "away" else -1)
+                    selection = f"{game.get(side)} {line:+g}"
+                else:
+                    selection = f"{game.get(side)} ML"
+                found.append({
+                    "matchup": matchup, "selection": selection,
+                    "price": quote_price, "ev": ev, "fair_p": p,
+                    "method": method, "books": len(set(books)),
+                    "kickoff": kickoff.isoformat(), "observed": updated.isoformat(),
+                })
+    found.sort(key=lambda row: (-row["ev"], row["matchup"], row["selection"]))
+    return found, None
+
+
 def render(root: Path, run_url: str, *, as_of_date: str | None = None,
            asof: datetime | None = None):
     now=asof or datetime.now(timezone.utc)
@@ -127,6 +243,23 @@ def render(root: Path, run_url: str, *, as_of_date: str | None = None,
            f"Snapshot captured {_ct(now.isoformat())}. Not continuously live; game starts invalidate pregame prices.","",
            "Prices: captured DraftKings offers. Probabilities: existing SportsEdge engines.",
            "**EV and edge are model estimates, not a guarantee of profitability.**",""]
+    lines.append("### NFL sharp-price radar · market comparison only")
+    radar, radar_problem = nfl_market_price_radar(root, now)
+    if radar_problem:
+        lines.append(f"Not priced: {radar_problem}. No market price or probability was invented.")
+    elif not radar:
+        lines.append("No fully verified fresh DK/peer exact-market discrepancies.")
+    else:
+        lines.append("Market-only discrepancies, not SportsEdge model EV, validated bets, or guaranteed returns. Recheck prices.")
+        for candidate in radar[:5]:
+            lines.append(
+                f"- **{candidate['matchup']} — {candidate['selection']}** · "
+                f"DK {price(candidate['price'])} · peer fair {pct(candidate['fair_p'])} · "
+                f"price-only EV {pct(candidate['ev'],True)} · "
+                f"DK quote {_ct(candidate['observed'])} · kickoff {_ct(candidate['kickoff'])} · "
+                f"{candidate['method']} ({candidate['books']} book(s)) · PRICE_ONLY_NOT_MODEL_VALIDATED"
+            )
+    lines.append("")
     for sport in ("NFL","CFB"):
         state=summary.get(sport) or {}
         lines.append(f"### {sport} · {state.get('status') or 'MISSING'}")
