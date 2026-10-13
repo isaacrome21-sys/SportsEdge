@@ -117,6 +117,26 @@ class AppendSafetyTests(unittest.TestCase):
             ):
                 capture.append_record(a, b, _record(2))
 
+    def test_manifest_json_nonobject_refused_with_named_failure(self):
+        with tempfile.TemporaryDirectory() as folder:
+            a = Path(folder) / "captures.jsonl"
+            b = Path(folder) / "manifest.jsonl"
+            capture.append_record(a, b, _record(1))
+            # Valid JSON can still be an invalid manifest entry type.
+            # The verification API must fail closed, not raise AttributeError.
+            for wrong in (b"[]\n", b"null\n", b"42\n"):
+                b.write_bytes(wrong)
+                verdict = capture.verify_capture_chain(a, b)
+                self.assertFalse(verdict["ok"])
+                self.assertEqual(
+                    verdict["failure"]["reason"], "MANIFEST_RECORD_TYPE_INVALID"
+                )
+                with self.assertRaisesRegex(
+                    capture.StarterCaptureError,
+                    "CAPTURE_CHAIN_PREAPPEND_INVALID:MANIFEST_RECORD_TYPE_INVALID",
+                ):
+                    capture.append_record(a, b, _record(2))
+
     def test_same_file_for_capture_and_manifest_is_refused(self):
         with tempfile.TemporaryDirectory() as folder:
             a = Path(folder) / "all.jsonl"
