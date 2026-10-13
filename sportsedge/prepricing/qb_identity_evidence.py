@@ -198,6 +198,12 @@ def receipt_chain_fields(bundle):
         "team_id": _chain_value(team.get("espn_id")),
         "opponent_id": _chain_value(fixture.get("opponent_espn_id")),
         "event_id": _chain_value(fixture.get("event_id")),
+        "fixture_kickoff_utc": fixture.get("kickoff_utc"),
+        "previous_game_kickoff_utc": (bundle.get("previous_game") or {}).get("kickoff_utc"),
+        "depth_qb_order": depth.get("qb_order"),
+        "roster_requested_limit": roster_snap.get("requested_limit"),
+        "roster_athlete_count": roster_snap.get("athlete_count"),
+        "roster_athlete_count_repeat": roster_snap.get("athlete_count_repeat"),
         "depth_sha256": depth.get("sha256"),
         "depth_source_url": depth.get("source_url"),
         "depth_update_stamp": depth.get("update_stamp"),
@@ -252,6 +258,11 @@ def parse_qb_order(text):
         entries.append({"rank": int(rank), "name": " ".join(name.split()),
                         "jersey": str(int(jersey))})
     entries.sort(key=lambda e: e["rank"])
+    # A clipped QB1, duplicate rank or missing rank is NOT a valid depth
+    # ordering. Otherwise an unverified QB2 could be promoted to QB1.
+    ranks = [entry["rank"] for entry in entries]
+    if ranks != list(range(1, len(entries) + 1)):
+        return []
     return entries
 
 
@@ -526,17 +537,17 @@ def evaluate_form2_bundle(bundle, *, team_id, kickoff, previous_game_kickoff=Non
         return _fail(STATUS_MISSING, "NO_QB_ORDER_CAPTURED", receipt)
     qb1 = order[0]
     asserted = depth.get("qb_order")
-    if isinstance(asserted, list) and asserted:
-        claimed = asserted[0] if isinstance(asserted[0], dict) else {}
-        if (not _name_tokens(claimed.get("name"))
-                or not _jersey_key(claimed.get("jersey"))):
+    if asserted is not None:
+        if not isinstance(asserted, list) or len(asserted) != len(order):
             return _fail(STATUS_QB1_ASSERTION_MISMATCH,
-                         "ASSERTED_QB1_UNREADABLE", receipt)
-        if (_name_tokens(claimed.get("name")) != _name_tokens(qb1.get("name"))
-                or _jersey_key(claimed.get("jersey"))
-                != _jersey_key(qb1.get("jersey"))):
-            return _fail(STATUS_QB1_ASSERTION_MISMATCH,
-                         "ASSERTED_QB1_DIFFERS_FROM_CAPTURED_CHART", receipt)
+                         "ASSERTED_QB_ORDER_LENGTH_OR_SHAPE_MISMATCH", receipt)
+        for claimed, actual in zip(asserted, order):
+            if (not isinstance(claimed, dict)
+                    or claimed.get("rank") != actual["rank"]
+                    or _name_tokens(claimed.get("name")) != _name_tokens(actual["name"])
+                    or _jersey_key(claimed.get("jersey")) != actual["jersey"]):
+                return _fail(STATUS_QB1_ASSERTION_MISMATCH,
+                             "ASSERTED_QB_ORDER_DIFFERS_FROM_CAPTURED_CHART", receipt)
     if not _qb1_in_content(qb1, depth_content):
         return _fail(STATUS_MISSING, "QB1_NOT_IN_CAPTURED_CONTENT", receipt)
 
