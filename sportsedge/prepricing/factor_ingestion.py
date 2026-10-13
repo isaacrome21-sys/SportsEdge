@@ -45,7 +45,7 @@ from urllib.parse import urlencode
 
 from artifacts.free_models import (
     IL_COLLEGE_ESPN_IDS, PublicContext, bounded, declared_weather_total_adj,
-    dt, numeric,
+    dt, injury_entry_is_current, injury_season_start, numeric,
 )
 
 # Free factors module (harness-gated): provides park factors, rest/travel,
@@ -233,6 +233,18 @@ def _parse_ip(value):
         return float(whole) + (float(outs) / 3.0 if outs else 0.0)
     except (ValueError, TypeError):
         return None
+
+
+def _entry_position(row):
+    """Athlete position abbreviation for one injury entry ('' if absent)."""
+    if not isinstance(row, dict):
+        return ""
+    athlete = row.get("athlete") or {}
+    if not isinstance(athlete, dict):
+        return ""
+    pos = athlete.get("position") or {}
+    pos = pos.get("abbreviation") if isinstance(pos, dict) else pos
+    return str(pos or "").upper()
 
 
 def _out_doubtful(rows):
@@ -545,8 +557,10 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
     if sport in {"NFL", "CFB", "NBA"}:
         for side, team, ctx_key in (("HOME", home_team, "home_injury_pts"),
                                     ("AWAY", away_team, "away_injury_pts")):
-            rows_, status = provider.injury_rows(sport, team)
-            pts, pts_status = provider.injury_points(sport, team)
+            rows_, status = provider.injury_rows(
+                sport, team, reference_date=kickoff)
+            pts, pts_status = provider.injury_points(
+                sport, team, reference_date=kickoff)
             if status != "STRUCTURE_VERIFIED":
                 factors.append(_factor(
                     "qb_specific" if sport in {"NFL", "CFB"} else "rotations_matchups",
@@ -557,6 +571,34 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True):
                     block_detail = (f"{side}_QB_IDENTITY_UNVERIFIABLE:ESPN injury "
                                     f"payload failed team-group binding")
                 continue
+            if sport in {"NFL", "CFB"} and rows_:
+                # qb_specific satisfaction (Oct 13, 2026): a bound report
+                # certifies the QB limb only when it speaks about a QB in
+                # the fixture's own season window. A non-empty report
+                # whose entries are all non-QB, or whose QB entries are
+                # undated/unparseable, does NOT satisfy the factor --
+                # the dry-run defect was Florida passing this gate on a
+                # single 2020 WR entry. (An empty bound report keeps
+                # the legacy clean-report behavior and skips this
+                # check.) Fail closed exactly like a binding failure:
+                # factor MISSING, no injury points staged, game blocked.
+                window = injury_season_start(kickoff)
+                has_current_qb = any(
+                    _entry_position(r) == "QB"
+                    and injury_entry_is_current(r, window)
+                    for r in rows_)
+                if not has_current_qb:
+                    factors.append(_factor(
+                        "qb_specific", MISSING, "ESPN_INJURIES",
+                        f"{side}_QB_SPECIFIC_UNSATISFIED:"
+                        f"BOUND_REPORT_HAS_NO_CURRENT_QB_ENTRY"))
+                    if enforce_blocks:
+                        blocked, block_reason = (True,
+                                                 BLOCK_QB_IDENTITY_UNVERIFIED)
+                        block_detail = (
+                            f"{side}_QB_IDENTITY_UNVERIFIABLE:bound injury "
+                            f"report has no current QB entry")
+                    continue
             out, doubtful = _out_doubtful(rows_)
             qbs_out = [e["name"] for e in out if e["position"] == "QB"]
             qbs_doubt = [e["name"] for e in doubtful if e["position"] == "QB"]
