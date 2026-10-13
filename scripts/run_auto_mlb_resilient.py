@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Run the canonical SportsEdge MLB machine with native keyring and ESPN fallback."""
+# ---------------------------------------------------------------------------
+# SUPERSEDED ROUTE (2026-10-12): the ONE canonical RUN IT card path is
+# artifacts/run_it_full.py (run_full). This entry point is retained for
+# reference/replay only and must not be treated as a canonical card source.
+# ---------------------------------------------------------------------------
+"""Run the SportsEdge MLB auto card with native keyring and ESPN fallback.
+
+SUPERSEDED ROUTE: see the notice at the top of this file -- the canonical
+RUN IT card path is artifacts/run_it_full.py.
+"""
 from __future__ import annotations
 
 import argparse
