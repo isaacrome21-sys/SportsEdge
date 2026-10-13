@@ -198,3 +198,116 @@ def test_market_registration_cannot_self_attest_price_or_deployment():
     assert row["can_derive_two_sided_no_vig"] is False
     assert row["model_validated"] is False
     assert row["deployment_eligible"] is False
+
+
+def test_one_family_can_have_main_alternate_and_ladder_without_erasing_shapes():
+    observed = [
+        dict(offered("PASSING_YARDS", "TWO_SIDED_OU"), line_variant="MAIN"),
+        dict(offered("PASSING_YARDS", "TWO_SIDED_OU"), line_variant="ALTERNATE"),
+        dict(offered("PASSING_YARDS", "LADDER_ONLY"), line_variant="LADDER"),
+    ]
+    report = reconcile_dk_event(
+        ["PASSING_YARDS"], board(sport="NFL", observed=observed))
+    row = by_market(report)["PASSING_YARDS"]
+    assert report["registered_count"] == 1
+    assert report["market_count"] == 1
+    assert report["offered_contract_count"] == 3
+    assert row["offer_variant_count"] == 3
+    assert {x["line_variant"] for x in row["offer_variants"]} == {
+        "MAIN", "ALTERNATE", "LADDER"
+    }
+    assert row["evidence"]["offer_shape"] is None
+    assert row["can_derive_two_sided_no_vig"] is False
+
+
+def test_same_family_pregame_and_live_are_distinct_contracts():
+    pregame = offered("TEAM_TOTAL", "TWO_SIDED_OU")
+    live = dict(pregame, phase="LIVE")
+    result = reconcile_dk_event(
+        ["TEAM_TOTAL"], board(sport="NFL", observed=[pregame, live]))
+    variants = by_market(result)["TEAM_TOTAL"]["offer_variants"]
+    assert len(variants) == 2
+    assert {r["phase"] for r in variants} == {"PREGAME", "LIVE"}
+
+
+def test_same_family_full_and_first_half_periods_not_merged():
+    full = offered("TEAM_TOTAL", "TWO_SIDED_OU", period="FULL_GAME")
+    half = offered("TEAM_TOTAL", "TWO_SIDED_OU", period="FIRST_HALF")
+    result = reconcile_dk_event(
+        ["TEAM_TOTAL"], board(sport="CFB", observed=[full, half]))
+    variants = by_market(result)["TEAM_TOTAL"]["offer_variants"]
+    assert len(variants) == 2
+    assert {r["period"] for r in variants} == {"FULL_GAME", "FIRST_HALF"}
+
+
+def test_same_family_different_settlement_not_silently_merged():
+    a = offered("MONEYLINE", "TWO_SIDED_MONEYLINE")
+    b = dict(a, settlement="TIE_PUSH_VERIFIED")
+    result = reconcile_dk_event(["MONEYLINE"], board(observed=[a, b]))
+    assert by_market(result)["MONEYLINE"]["offer_variant_count"] == 2
+    assert {r["settlement"] for r in
+            by_market(result)["MONEYLINE"]["offer_variants"]} == {
+                "RULE_UNVERIFIED", "TIE_PUSH_VERIFIED"
+            }
+
+
+def test_scoped_absence_cannot_erase_offered_other_period_or_phase():
+    observed = [offered("TEAM_TOTAL", "TWO_SIDED_OU",
+                        period="FULL_GAME")]
+    evidence = board(
+        observed=observed,
+        absent=[dict(absent("TEAM_TOTAL"), period="FIRST_HALF")])
+    result = reconcile_dk_event(["TEAM_TOTAL"], evidence)
+    row = by_market(result)["TEAM_TOTAL"]
+    assert row["availability"] == "OFFERED_ON_THIS_EVENT"
+    assert row["explicit_absence_scopes"][0]["period"] == "FIRST_HALF"
+    assert row["offer_variant_count"] == 1
+
+
+def test_variant_specific_absence_does_not_deny_whole_family():
+    evidence = board(
+        absent=[dict(absent("TEAM_TOTAL"), period="FIRST_HALF")])
+    result = reconcile_dk_event(["TEAM_TOTAL"], evidence)
+    row = by_market(result)["TEAM_TOTAL"]
+    assert row["availability"] == "NOT_VERIFIED_ON_THIS_EVENT"
+    assert row["explicit_absence_scopes"][0]["period"] == "FIRST_HALF"
+    assert result["catalog_verified_globally"] is False
+
+
+def test_overlapping_scoped_absence_and_offer_is_a_conflict():
+    evidence = board(
+        observed=[offered("TEAM_TOTAL", "TWO_SIDED_OU")],
+        absent=[dict(absent("TEAM_TOTAL"), period="FULL_GAME")])
+    with pytest.raises(DKObservationError, match="OFFERED_AND_ABSENT_CONFLICT"):
+        reconcile_dk_event(["TEAM_TOTAL"], evidence)
+
+
+def test_duplicate_contract_across_different_tabs_is_not_independent_evidence():
+    a = offered("TEAM_TOTAL", "TWO_SIDED_OU")
+    b = offered("TEAM_TOTAL", "TWO_SIDED_OU", tab="Game")
+    evidence = board(
+        inspected=["Popular", "Game"], observed=[a, b])
+    with pytest.raises(DKObservationError, match="DUPLICATE_MARKET_OBSERVATION"):
+        reconcile_dk_event(["TEAM_TOTAL"], evidence)
+
+
+def test_bad_line_variant_refused_in_offered_and_absent_contracts():
+    with pytest.raises(DKObservationError, match="LINE_VARIANT_INVALID"):
+        reconcile_dk_event(
+            ["PITCHER_K"], board(observed=[
+                dict(offered("PITCHER_K", "TWO_SIDED_OU"),
+                     line_variant="MAGIC_ODDS")]))
+    with pytest.raises(DKObservationError, match="ABSENCE_LINE_VARIANT_INVALID"):
+        reconcile_dk_event(
+            ["PITCHER_K"], board(absent=[
+                dict(absent("PITCHER_K"), line_variant="MAGIC_ODDS")]))
+
+
+def test_repeat_market_with_same_dimensions_rejected_even_if_line_prices_differ():
+    # This API audits *catalog contract families*, not individual prices.
+    # Quoted lines/odds belong in immutable quote evidence, never an
+    # independent second contract that manufactures market coverage.
+    a = dict(offered("PITCHER_K", "TWO_SIDED_OU"), line=5.5, odds=-110)
+    b = dict(offered("PITCHER_K", "TWO_SIDED_OU"), line=6.5, odds=+120)
+    with pytest.raises(DKObservationError, match="DUPLICATE_MARKET_OBSERVATION"):
+        reconcile_dk_event(["PITCHER_K"], board(observed=[a, b]))
