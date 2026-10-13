@@ -1416,3 +1416,328 @@ def verify_raw_store(capture_path: Path, raw_dir: Path) -> dict[str, Any]:
         verified += 1
     return {"ok": True, "records_checked": len(lines), "raw_verified": verified,
             "failure": None, "raw_store_kind": RAW_STORE_KIND}
+
+
+# --------------------------------------------------------------------------
+# Crash-safe, cross-process write-ahead commit (research-only, LOCAL).
+# --------------------------------------------------------------------------
+#
+# Protocol, all under the manifest's never-unlinked fcntl lock:
+#   1. append + fsync an INTENT line (``<manifest>.intent.jsonl``) carrying
+#      the full canonical record, its digest, the raw digest, and the
+#      #2166 receipt link keys (raw sha256 + source url);
+#   2. raw bytes -> unique temp file, fsync, os.replace, fsync the directory;
+#   3. append + fsync the capture line, then the manifest entry;
+#   4. append + fsync a COMMIT line.
+# ``recover_capture_store`` (also run before every commit) rolls a pending
+# intent forward only when its raw bytes verify, or aborts it with a reason.
+# Orphan blobs, temp files and torn terminal lines are MOVED to a quarantine
+# directory with a reason file, never deleted. Anything not explained by an
+# intent fails closed. No timestamps are written by this layer.
+# This is local crash consistency, NOT an external anchor or WORM store.
+
+SCHEMA_INTENT = "mlb_starter_capture_intent_v1"
+SCHEMA_QUARANTINE = "mlb_starter_capture_quarantine_v1"
+
+
+def _fsync_dir(path: Path) -> None:
+    import os
+
+    fd = os.open(str(path), os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def _store_paths(manifest_path: Path, raw_dir: Path, quarantine_dir: Path | None):
+    manifest_path = Path(manifest_path).resolve()
+    raw_dir = Path(raw_dir).resolve()
+    q = Path(quarantine_dir).resolve() if quarantine_dir else raw_dir.with_name(raw_dir.name + ".quarantine")
+    return (manifest_path.with_name(manifest_path.name + ".lock"),
+            manifest_path.with_name(manifest_path.name + ".intent.jsonl"), q)
+
+
+def _quarantine_bytes(qdir: Path, label: str, data: bytes, reason: str) -> str:
+    import os
+
+    qdir.mkdir(parents=True, exist_ok=True)
+    digest = _sha256_hex(data)
+    base = f"{label}.{digest[:16]}.{os.getpid()}.{len(list(qdir.iterdir()))}"
+    blob = qdir / (base + ".bin")
+    with blob.open("wb") as h:
+        h.write(data); h.flush(); os.fsync(h.fileno())
+    meta = {"schema": SCHEMA_QUARANTINE, "label": label, "reason": reason,
+            "sha256": digest, "byte_length": len(data)}
+    with (qdir / (base + ".reason.json")).open("wb") as h:
+        h.write(canonical_line(meta)); h.flush(); os.fsync(h.fileno())
+    _fsync_dir(qdir)
+    return base
+
+
+def _quarantine_move(qdir: Path, path: Path, reason: str) -> str:
+    import os
+
+    data = path.read_bytes()
+    base = _quarantine_bytes(qdir, path.name.lstrip("."), data, reason)
+    os.unlink(path)
+    _fsync_dir(path.parent)
+    return base
+
+
+def _repair_torn_tail(path: Path, qdir: Path, label: str) -> bool:
+    """Move an unterminated final line to quarantine, truncate, fsync."""
+    import os
+
+    if not path.exists():
+        return False
+    raw = path.read_bytes()
+    if not raw or raw.endswith(b"\n"):
+        return False
+    cut = raw.rfind(b"\n") + 1
+    _quarantine_bytes(qdir, label, raw[cut:], f"TORN_TERMINAL_LINE:{path.name}")
+    with path.open("r+b") as h:
+        h.truncate(cut); h.flush(); os.fsync(h.fileno())
+    return True
+
+
+def _read_intents(intent_path: Path) -> list[dict[str, Any]]:
+    out = []
+    for i, line in enumerate(_read_lines(intent_path), start=1):
+        try:
+            obj = json.loads(line.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            raise StarterCaptureError(f"INTENT_LINE_UNPARSEABLE:{i}")
+        if not isinstance(obj, dict) or obj.get("schema") != SCHEMA_INTENT:
+            raise StarterCaptureError(f"INTENT_LINE_INVALID:{i}")
+        out.append(obj)
+    return out
+
+
+def _pending(intents: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    closed = {i["intent_id"] for i in intents if i.get("state") in ("COMMIT", "ABORT")}
+    return [i for i in intents if i.get("state") == "BEGIN" and i["intent_id"] not in closed]
+
+
+def _manifest_entry(record_line: bytes, record: Mapping[str, Any], seq: int, prev: str):
+    digest = _sha256_hex(record_line)
+    return {
+        "schema": SCHEMA_MANIFEST_ENTRY, "seq": seq, "record_sha256": digest,
+        "record_type": record.get("record_type"), "game_pk": record.get("game_pk"),
+        "slot_id": record.get("slot_id"), "prev_chain_sha256": prev,
+        "chain_sha256": _sha256_hex(f"{prev}:{digest}".encode("utf-8")),
+    }
+
+
+def _write_raw_atomic(raw_dir: Path, raw: bytes) -> str:
+    import os
+
+    digest = _sha256_hex(raw)
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    dest = raw_dir / f"{digest}.json"
+    if dest.is_symlink():
+        raise StarterCaptureError("RAW_STORE_PATH_UNSAFE")
+    if dest.exists():
+        if dest.read_bytes() != raw:
+            raise StarterCaptureError("RAW_STORE_COLLISION")
+        return dest.name
+    tmp = raw_dir / f".{dest.name}.{os.getpid()}.tmp"
+    with tmp.open("wb") as h:
+        h.write(raw); h.flush(); os.fsync(h.fileno())
+    os.replace(tmp, dest)
+    _fsync_dir(raw_dir)
+    return dest.name
+
+
+def _referenced_raw(capture_path: Path) -> set[str]:
+    refs = set()
+    for line in _read_lines(capture_path):
+        try:
+            rec = json.loads(line.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            continue
+        if isinstance(rec, dict) and isinstance(rec.get("raw_store_file"), str):
+            refs.add(rec["raw_store_file"])
+    return refs
+
+
+def _recover_locked(capture_path, manifest_path, raw_dir, intent_path, qdir, verifier_now):
+    import os
+
+    actions: list[str] = []
+    if _repair_torn_tail(intent_path, qdir, "intent_tail"):
+        actions.append("QUARANTINED_TORN_INTENT_LINE")
+    intents = _read_intents(intent_path)
+    pend = _pending(intents)
+    if len(pend) > 1:
+        raise StarterCaptureError("INTENT_MULTIPLE_PENDING")
+    if pend:
+        # Torn capture/manifest tails are only repairable when an intent
+        # explains them; otherwise verify_capture_chain fails closed.
+        for p, label in ((capture_path, "capture_tail"), (manifest_path, "manifest_tail")):
+            if _repair_torn_tail(p, qdir, label):
+                actions.append(f"QUARANTINED_TORN_LINE:{p.name}")
+        it = pend[0]
+        line = it["record_line"].encode("utf-8")
+        record = json.loads(line)
+        if _sha256_hex(line) != it["record_sha256"] or canonical_line(record) != line:
+            raise StarterCaptureError("INTENT_RECORD_DIGEST_MISMATCH")
+        caps, mans = _read_lines(capture_path), _read_lines(manifest_path)
+        base = it["base_seq"]
+        raw_ok = True
+        if it.get("raw_sha256") is not None:
+            rp = raw_dir / f"{it['raw_sha256']}.json"
+            raw_ok = rp.is_file() and not rp.is_symlink() and _sha256_hex(rp.read_bytes()) == it["raw_sha256"]
+        state = None
+        if len(caps) == base and len(mans) == base:
+            state = "ROLL_FORWARD_FULL" if raw_ok else "ABORT_RAW_MISSING"
+        elif len(caps) == base + 1 and caps[-1] == line and len(mans) in (base, base + 1):
+            state = "ROLL_FORWARD_TAIL" if raw_ok else None
+        if state is None:
+            raise StarterCaptureError("INTENT_STATE_UNEXPLAINED")
+        if state.startswith("ROLL_FORWARD"):
+            prev = json.loads(mans[base - 1])["chain_sha256"] if base else GENESIS_CHAIN_SHA256
+            entry = _manifest_entry(line, record, base + 1, prev)
+            if len(caps) == base:
+                _append_line(capture_path, line)
+            if len(_read_lines(manifest_path)) == base:
+                _append_line(manifest_path, canonical_line(entry))
+            elif _read_lines(manifest_path)[-1] != canonical_line(entry):
+                raise StarterCaptureError("INTENT_MANIFEST_DIVERGED")
+            _append_line(intent_path, canonical_line({**_intent_head(it), "state": "COMMIT", "recovery": state}))
+        else:
+            _append_line(intent_path, canonical_line({**_intent_head(it), "state": "ABORT", "reason": state}))
+        actions.append(state)
+    # Temp files and unreferenced blobs: quarantine with reason, never drop.
+    if raw_dir.exists():
+        refs = _referenced_raw(capture_path)
+        for p in sorted(raw_dir.iterdir()):
+            if p.name.endswith(".tmp"):
+                _quarantine_move(qdir, p, "RAW_TEMP_WITHOUT_RENAME")
+                actions.append(f"QUARANTINED_TEMP:{p.name}")
+            elif p.name not in refs:
+                _quarantine_move(qdir, p, "RAW_ORPHAN_BLOB_UNREFERENCED")
+                actions.append(f"QUARANTINED_ORPHAN:{p.name}")
+    checked = verify_capture_chain(capture_path, manifest_path, verifier_now=verifier_now)
+    if not checked["ok"]:
+        raise StarterCaptureError(f"RECOVERY_CHAIN_INVALID:{checked['failure']['reason']}")
+    return actions
+
+
+def _intent_head(it: Mapping[str, Any]) -> dict[str, Any]:
+    return {"schema": SCHEMA_INTENT, "intent_id": it["intent_id"]}
+
+
+def _locked(lock_path: Path):
+    import contextlib
+    import fcntl
+
+    @contextlib.contextmanager
+    def cm():
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with lock_path.open("a+b") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+    return cm()
+
+
+def recover_capture_store(capture_path, manifest_path, raw_dir, *, quarantine_dir=None,
+                          verifier_now: datetime | None = None) -> dict[str, Any]:
+    """Roll forward / abort pending intents and quarantine orphans, under lock.
+
+    Raises :class:`StarterCaptureError` (fail closed) on any state that no
+    intent explains. Returns the list of actions taken."""
+    capture_path, raw_dir = Path(capture_path).resolve(), Path(raw_dir).resolve()
+    lock, intent, qdir = _store_paths(manifest_path, raw_dir, quarantine_dir)
+    with _locked(lock):
+        actions = _recover_locked(capture_path, Path(manifest_path).resolve(), raw_dir,
+                                  intent, qdir, verifier_now)
+    return {"ok": True, "actions": actions, "quarantine_dir": str(qdir)}
+
+
+def commit_capture_atomic(capture_path, manifest_path, raw_dir, record: Mapping[str, Any],
+                          raw: bytes | None, *, quarantine_dir=None,
+                          verifier_now: datetime | None = None) -> dict[str, Any]:
+    """Write-ahead, fcntl-serialized commit of raw bytes + capture + manifest.
+
+    ``record`` comes from :func:`capture_snapshot`; this layer adds only the
+    content-addressed raw link and never adds or alters a timestamp."""
+    capture_path = Path(capture_path).resolve()
+    manifest_path = Path(manifest_path).resolve()
+    raw_dir = Path(raw_dir).resolve()
+    if capture_path == manifest_path:
+        raise StarterCaptureError("CAPTURE_AND_MANIFEST_PATH_COLLIDE")
+    record = dict(record)
+    raw_digest = None
+    if record.get("response_sha256") is not None:
+        if not isinstance(raw, (bytes, bytearray)):
+            raise StarterCaptureError("RAW_RESPONSE_NOT_BYTES")
+        raw = bytes(raw)
+        raw_digest = _sha256_hex(raw)
+        if raw_digest != record["response_sha256"]:
+            raise StarterCaptureError("RAW_RESPONSE_DIGEST_DIVERGED")
+        record.update({"raw_store_file": f"{raw_digest}.json", "raw_sha256": raw_digest,
+                       "raw_byte_length": len(raw), "raw_store_kind": RAW_STORE_KIND})
+    elif raw is not None:
+        raise StarterCaptureError("RAW_WITHOUT_RESPONSE_DIGEST")
+    reason = _record_clock_failure(record, verifier_now)
+    if reason is not None:
+        raise StarterCaptureError(f"CAPTURE_RECORD_CLOCK_INVALID:{reason}")
+    lock, intent_path, qdir = _store_paths(manifest_path, raw_dir, quarantine_dir)
+    capture_path.parent.mkdir(parents=True, exist_ok=True)
+    with _locked(lock):
+        _recover_locked(capture_path, manifest_path, raw_dir, intent_path, qdir, verifier_now)
+        line = canonical_line(record)
+        mans = _read_lines(manifest_path)
+        base = len(mans)
+        prev = json.loads(mans[-1])["chain_sha256"] if mans else GENESIS_CHAIN_SHA256
+        entry = _manifest_entry(line, record, base + 1, prev)
+        intent_id = _sha256_hex(f"{prev}:{entry['record_sha256']}".encode())
+        it = {"schema": SCHEMA_INTENT, "intent_id": intent_id, "state": "BEGIN",
+              "base_seq": base, "record_sha256": entry["record_sha256"],
+              "record_line": line.decode("utf-8"), "raw_sha256": raw_digest,
+              "receipt_link": {"sha256": raw_digest, "url": record.get("source_url")}}
+        _append_line(intent_path, canonical_line(it))                      # 1
+        if raw_digest is not None:
+            _write_raw_atomic(raw_dir, raw)                                 # 2
+        _append_line(capture_path, line)                                    # 3a
+        _append_line(manifest_path, canonical_line(entry))                  # 3b
+        _append_line(intent_path, canonical_line({**_intent_head(it), "state": "COMMIT"}))  # 4
+    return {**entry, "intent_id": intent_id, "record": record}
+
+
+def verify_capture_store(capture_path, manifest_path, raw_dir, *, quarantine_dir=None,
+                         verifier_now: datetime | None = None) -> dict[str, Any]:
+    """Read-only. Fails closed on pending intents, orphans, temps, torn lines,
+    chain or raw-byte failures. Does not repair; call recover_capture_store."""
+    capture_path, raw_dir = Path(capture_path), Path(raw_dir)
+    _, intent_path, _ = _store_paths(manifest_path, raw_dir, quarantine_dir)
+
+    def fail(reason):
+        return {"ok": False, "failure": {"reason": reason}, "raw_store_kind": RAW_STORE_KIND}
+
+    if intent_path.exists() and intent_path.stat().st_size and not intent_path.read_bytes().endswith(b"\n"):
+        return fail("INTENT_LINE_UNTERMINATED")
+    try:
+        if _pending(_read_intents(intent_path)):
+            return fail("INTENT_UNCOMMITTED")
+    except StarterCaptureError as exc:
+        return fail(str(exc))
+    if raw_dir.exists():
+        refs = _referenced_raw(capture_path)
+        for p in raw_dir.iterdir():
+            if p.name.endswith(".tmp"):
+                return fail("RAW_TEMP_PRESENT")
+            if p.name not in refs:
+                return fail("RAW_ORPHAN_BLOB")
+    chain = verify_capture_chain(capture_path, manifest_path, verifier_now=verifier_now)
+    if not chain["ok"]:
+        return fail(chain["failure"]["reason"])
+    raw = verify_raw_store(capture_path, raw_dir)
+    if not raw["ok"]:
+        return fail(raw["failure"]["reason"])
+    return {"ok": True, "failure": None, "records_checked": chain["records_checked"],
+            "raw_verified": raw["raw_verified"], "raw_store_kind": RAW_STORE_KIND}
