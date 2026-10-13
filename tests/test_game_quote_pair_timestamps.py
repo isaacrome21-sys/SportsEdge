@@ -17,16 +17,17 @@ def projections(rows):
     return [r["independent_projection"] for r in card["evaluated_rows"]]
 
 
-@pytest.mark.parametrize("stamp,code", [
-    (None, "COUNTERPART_QUOTE_TIMESTAMP_MISSING"),
-    ("bad", "INVALID_PAIR_QUOTE_TIMESTAMP"),
-    ("2026-10-13T10:00:00", "INVALID_PAIR_QUOTE_TIMESTAMP"),
-    ("2026-10-13T09:57:59Z", "MISMATCHED_QUOTE_TIMESTAMPS"),
+@pytest.mark.parametrize("stamp,expected_codes", [
+    (None, ("COUNTERPART_QUOTE_TIMESTAMP_MISSING", "QUOTE_TIMESTAMP_MISSING")),
+    ("bad", ("INVALID_PAIR_QUOTE_TIMESTAMP", "INVALID_PAIR_QUOTE_TIMESTAMP")),
+    ("2026-10-13T10:00:00", ("INVALID_PAIR_QUOTE_TIMESTAMP", "INVALID_PAIR_QUOTE_TIMESTAMP")),
+    ("2026-10-13T09:57:59Z", ("MISMATCHED_QUOTE_TIMESTAMPS", "MISMATCHED_QUOTE_TIMESTAMPS")),
 ])
-def test_missing_invalid_and_out_of_window_quotes_emit_no_pair(stamp, code):
-    for p in projections([row(), row("UNDER", quote_captured_at=stamp)]):
-        assert p["paired_market_status"] == code
-        assert "market_no_vig_p" not in p
+def test_missing_invalid_and_out_of_window_quotes_emit_no_pair(stamp, expected_codes):
+    projections_for_pair = projections([row(), row("UNDER", quote_captured_at=stamp)])
+    assert tuple(p["paired_market_status"] for p in projections_for_pair) == expected_codes
+    assert all("market_no_vig_p" not in p for p in projections_for_pair)
+    assert all("paired_quote_captured_at" not in p for p in projections_for_pair)
 
 
 @pytest.mark.parametrize("stamp,skew", [
