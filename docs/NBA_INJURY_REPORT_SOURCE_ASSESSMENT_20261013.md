@@ -23,8 +23,14 @@ Research note for #2147. Checked 2026-10-13 ~10:06 CT. No paid sources. Nothing 
 - **No history:** it is a live state only, with no historical snapshots. It is only usable going forward via our own timestamped captures.
 - Entry `date` is the last change, not publication of a report. A Wayback check of this endpoint was not completed (interrupted), so it is **unverified, and it should not be assumed archived**.
 
+## Review decision (ChatGPT)
+- The official NBA injury report is the **candidate source, forward-only**.
+  - Historical PDFs can be re-downloaded, but re-downloading them later does not prove what was visible at the as-of time.
+  - Production use requires our own timestamped captures going forward.
+- **Listed status ≠ participation.** "Available" or "Probable" does not mean the player played or got minutes; a listed-available player can still be DNP-CD. Status feeds availability *probability*, never a participation oracle.
+
 ## Recommendation
-1. Use the official PDFs as the historical as-of source (`published_at` = header stamp, cross-checked with Last-Modified; reject if they disagree by more than 5 min).
+1. Capture the official PDFs forward-only (historical PDFs are research context only, not as-of evidence) (`published_at` = header stamp, cross-checked with Last-Modified; reject if they disagree by more than 5 min).
 2. Pre-register a parser and an evaluation before use.
 3. Going forward, add timestamped ESPN JSON captures as a secondary cross-check.
 4. Props remain WATCH/BLOCKED until this is reviewed.
