@@ -42,12 +42,21 @@ F5_RUN_LINE, F5_TOTALS and F5_TEAM_TOTALS settle from the score through
 5 completed innings with explicit push handling
 (mlb_additional_pit_joiner._f5_run_line_outcome / _f5_total_outcome and
 mlb_catalog_prediction_settlement._team_total_outcome over facts["f5"]).
-F5_MONEYLINE does NOT fully verify: the pricing readout carries tie
-mass as push_p, but settlement raises
-F5_MONEYLINE_TIE_POLICY_NOT_NORMALIZED on a tied score after five
-(mlb_additional_pit_joiner._f5_moneyline_outcome / _policy_ambiguity) --
-the book tie policy is not normalized anywhere in the codebase, so the
-basis cannot be confirmed and F5_MONEYLINE stays blocked at gate 10.
+F5_MONEYLINE verifies as TWO_WAY (owner settlement ruling 2026-10-12):
+DraftKings' published market rules define 2-Way Moneyline Markets as
+offering no Draw/Tie selection with ties settled as Push, and its
+baseball guide's first-five section offers only the two teams and
+states a tied team bet pushes with the stake refunded. The settlement
+type is declared explicitly in sportsedge.moneyline_settlement
+(TWO_WAY for F5_MONEYLINE @ DraftKings) and the settlement code now
+settles a tied score after five as PUSH through that typed model
+(mlb_additional_pit_joiner._f5_moneyline_outcome via settle_moneyline);
+the pricing readout's tie mass (push_p) and the settlement outcome now
+agree. Undeclared books still fail closed at gate 10's code-level
+equivalent (F5_MONEYLINE_TIE_POLICY_NOT_NORMALIZED in the joiner /
+router hardening), because no type may be inherited by assumption.
+F5_MONEYLINE therefore clears gate 10 and, like the other three F5
+markets, stops only at the deployment gate below.
 
 Feature honesty: the snapshot pricer's F5 feature assembly
 (MLBAllMarketHistorySource.feature_row) depends only on a StatsAPI
@@ -169,16 +178,30 @@ BLOCKER_BY_REASON = {
 # named in each entry -- not from documentation or market convention.
 SETTLEMENT_BASIS = {
     "F5_MONEYLINE": {
-        "status": "UNVERIFIED",
-        "basis": "Leader after 5 completed innings wins; the tie case "
-                 "is not normalized -- settlement raises "
-                 "F5_MONEYLINE_TIE_POLICY_NOT_NORMALIZED and the "
-                 "catalog settler leaves tied F5 moneylines UNRESOLVED, "
-                 "while the pricing readout carries tie mass as push_p. "
-                 "Book tie policy cannot be confirmed from code.",
+        "status": "VERIFIED",
+        "settlement_type": "TWO_WAY",
+        "basis": "VERIFIED_TWO_WAY -- leader after 5 completed innings "
+                 "wins; a tied score after five is a PUSH (stake "
+                 "returned), never a loss and never a draw outcome. "
+                 "DraftKings offers only the two teams for the F5 "
+                 "moneyline (no Draw selection) and publishes that a "
+                 "tied team bet pushes with the stake refunded; its "
+                 "market-rules taxonomy classifies that as a 2-Way "
+                 "Moneyline Market. The settlement code settles ties "
+                 "through the explicitly declared TWO_WAY type "
+                 "(sportsedge.moneyline_settlement), consistent with "
+                 "the pricing readout's separate push_p tie mass.",
         "verified_in": (
+            "sportsedge/moneyline_settlement.py:"
+            "declared_moneyline_settlement_type(F5_MONEYLINE, "
+            "DraftKings)=TWO_WAY; "
             "sportsedge/mlb_additional_pit_joiner.py:"
-            "_f5_moneyline_outcome,_policy_ambiguity"),
+            "_f5_moneyline_outcome via settle_moneyline"),
+        "rules_sources": (
+            "https://sportsbook.draftkings.com/help/how-to-bet/"
+            "baseball-betting-guide",
+            "https://sportsbook.draftkings.com/help/"
+            "general-betting-rules/market-rules"),
     },
     "F5_RUN_LINE": {
         "status": "VERIFIED",
