@@ -57,6 +57,42 @@ This module never fetches during evaluation: the pre-pricing stage
 consumes bundles produced ahead of time by the capture helper
 (``build_form2_bundle`` / the module CLI). No autonomous scraping is
 wired into the runner.
+
+Owner-review corrections (Oct 13, 2026; the four findings posted on
+PR #2157):
+
+  1. EXACT FIXTURE BINDING. A bundle must bind to the staged fixture
+     exactly: ESPN event ID plus BOTH team ESPN IDs. The evaluator
+     requires the bundle's event ID to equal the staged event's, and
+     the bundle's opponent to be exactly the staged fixture's other
+     team. A bundle for the right team in the wrong game is not
+     evidence (QB_EVIDENCE_FIXTURE_MISMATCH).
+  2. QB1 RANKING IS DERIVED, NEVER ASSERTED. The evaluator parses the
+     QB ordering out of the captured chart content itself (the same
+     parser the capture path uses). A bundle-carried ``qb_order`` is
+     an assertion that is cross-checked against the parsed ordering;
+     a disagreement fails closed
+     (QB_EVIDENCE_QB1_ASSERTION_MISMATCH). The parsed QB1 is the only
+     QB1 ever resolved.
+  3. RECEIPT v2. The capture helper seals each bundle with a chained
+     receipt hash over both component content hashes, both source
+     URLs, the verbatim update stamp, both capture timestamps, the
+     event ID and both team IDs. The evaluator recomputes the chain
+     over the bundle's recorded fields and rejects any inconsistency
+     (QB_EVIDENCE_RECEIPT_HASH_MISMATCH): no receipt field can be
+     edited after capture without breaking the seal. Trust boundary,
+     stated honestly: the chain proves the bundle was not edited
+     after capture and binds the recorded time to the recorded
+     content; the wall-clock truth of the capture itself rests on
+     the capture operator (this system's own RUN IT capture step),
+     anchored by the external audit trail -- the chain does not, and
+     cannot, prove a clock honest.
+  4. RESEARCH-ONLY ROUTE. A row priced on Form 2 evidence carries
+     AVAILABILITY_UNVERIFIED_NO_TEAM_INJURY_REPORT as its
+     availability_status, and the classification layer
+     (sportsedge.pricing_provenance.apply_play_gate) forces any such
+     row to research-only output regardless of EV or status. See
+     issue #2158.
 """
 from __future__ import annotations
 
@@ -88,6 +124,16 @@ BLOCK_QB_AVAILABILITY_UNVERIFIED = "BLOCKED_PREPRICING_QB_AVAILABILITY_UNVERIFIE
 # coined here in the same style (recorded in the build report).
 STATUS_POSITION_MISMATCH = "QB_DEPTH_QB1_POSITION_MISMATCH"
 STATUS_HASH_MISMATCH = "QB_EVIDENCE_RECEIPT_HASH_MISMATCH"
+
+# Owner-review corrections (PR #2157 findings): exact fixture binding
+# and the derived-vs-asserted QB1 rule. Coined in the same style.
+STATUS_FIXTURE_MISMATCH = "QB_EVIDENCE_FIXTURE_MISMATCH"
+STATUS_QB1_ASSERTION_MISMATCH = "QB_EVIDENCE_QB1_ASSERTION_MISMATCH"
+
+# Receipt v2: the capture helper seals every bundle it emits with a
+# chained hash (see receipt_chain_sha256). A bundle without a valid
+# v2 seal is not evidence, however consistent its components look.
+RECEIPT_VERSION = 2
 
 # ---------------------------------------------------------------------------
 # OWNER DISPOSITION SWITCH -- the one place the Form 2 disposition lives.
@@ -127,6 +173,49 @@ _NAME_SUFFIXES = {"jr", "sr", "ii", "iii", "iv", "v"}
 
 def sha256_text(text):
     return hashlib.sha256(str(text).encode("utf-8")).hexdigest()
+
+
+def _chain_value(value):
+    if value is None or isinstance(value, str):
+        return value
+    return str(value)
+
+
+def receipt_chain_fields(bundle):
+    """The exact field set the receipt v2 chain seals (owner-review
+    correction 3): both component content hashes, both source URLs,
+    the chart's verbatim update stamp, both capture timestamps, the
+    fixture's event ID and BOTH team IDs (subject + opponent). Read
+    from the bundle's recorded fields only, so the capture helper and
+    the evaluator compute over identical inputs by construction."""
+    team = bundle.get("team") or {}
+    fixture = bundle.get("fixture") or {}
+    depth = bundle.get("depth_snapshot") or {}
+    roster_snap = bundle.get("roster_snapshot") or {}
+    return {
+        "evidence_class": bundle.get("evidence_class"),
+        "evidence_form": bundle.get("evidence_form"),
+        "team_id": _chain_value(team.get("espn_id")),
+        "opponent_id": _chain_value(fixture.get("opponent_espn_id")),
+        "event_id": _chain_value(fixture.get("event_id")),
+        "depth_sha256": depth.get("sha256"),
+        "depth_source_url": depth.get("source_url"),
+        "depth_update_stamp": depth.get("update_stamp"),
+        "depth_captured_at_utc": depth.get("captured_at_utc"),
+        "roster_sha256": roster_snap.get("sha256"),
+        "roster_source_url": roster_snap.get("source_url"),
+        "roster_captured_at_utc": roster_snap.get("captured_at_utc"),
+    }
+
+
+def receipt_chain_sha256(bundle):
+    """Chained receipt hash: sha256 over the canonical JSON of
+    receipt_chain_fields. Editing ANY sealed field after capture --
+    a timestamp, a URL, the stamp, either binding ID -- breaks the
+    chain even when the component contents themselves are untouched."""
+    canonical = json.dumps(receipt_chain_fields(bundle),
+                           sort_keys=True, separators=(",", ":"))
+    return sha256_text(canonical)
 
 
 def parse_update_stamp(text):
@@ -298,7 +387,8 @@ def _fail(status, detail, receipt=None):
 
 
 def evaluate_form2_bundle(bundle, *, team_id, kickoff, previous_game_kickoff=None,
-                          now=None):
+                          now=None, event_id=None, home_team_id=None,
+                          away_team_id=None):
     """Verify one Form 2 bundle for one fixture team. Fail-closed.
 
     ``kickoff`` is the fixture's kickoff (aware datetime). ``now`` is
@@ -306,9 +396,16 @@ def evaluate_form2_bundle(bundle, *, team_id, kickoff, previous_game_kickoff=Non
     team's most recent completed game when the caller can derive it
     (the stage passes the provider-schedule value); the bundle's own
     attestation is the fallback, and a disagreement between the two
-    fails closed. Returns a result dict; on success it carries the
-    receipt and the AVAILABILITY_UNVERIFIED label -- never an
-    availability claim.
+    fails closed.
+
+    ``event_id`` / ``home_team_id`` / ``away_team_id`` are the STAGED
+    fixture's identity (owner-review correction 1): the bundle must
+    name this exact event and this exact opponent. When the caller
+    cannot supply the staged identity, exact binding cannot be
+    established and the bundle fails closed -- loose binding is the
+    defect being corrected, not a fallback. Returns a result dict;
+    on success it carries the receipt and the AVAILABILITY_UNVERIFIED
+    label -- never an availability claim.
     """
     team_id = str(team_id)
     if not isinstance(bundle, dict):
@@ -319,9 +416,21 @@ def evaluate_form2_bundle(bundle, *, team_id, kickoff, previous_game_kickoff=Non
     team = bundle.get("team") or {}
     if str(team.get("espn_id")) != team_id:
         return _fail(STATUS_MISSING, "TEAM_BINDING_MISMATCH")
+
+    # -- Exact fixture binding (correction 1): event + opponent + sides.
     fixture = bundle.get("fixture") or {}
+    if event_id is None or home_team_id is None or away_team_id is None:
+        return _fail(STATUS_FIXTURE_MISMATCH, "FIXTURE_IDENTITY_UNVERIFIABLE")
+    home_team_id, away_team_id = str(home_team_id), str(away_team_id)
+    if team_id not in (home_team_id, away_team_id):
+        return _fail(STATUS_FIXTURE_MISMATCH, "TEAM_NOT_IN_STAGED_FIXTURE")
+    if str(fixture.get("event_id")) != str(event_id):
+        return _fail(STATUS_FIXTURE_MISMATCH, "EVENT_ID_MISMATCH")
+    expected_opponent = away_team_id if team_id == home_team_id else home_team_id
+    if str(fixture.get("opponent_espn_id")) != expected_opponent:
+        return _fail(STATUS_FIXTURE_MISMATCH, "OPPONENT_MISMATCH")
     if dt(fixture.get("kickoff_utc")) != kickoff:
-        return _fail(STATUS_MISSING, "FIXTURE_BINDING_MISMATCH")
+        return _fail(STATUS_FIXTURE_MISMATCH, "FIXTURE_KICKOFF_MISMATCH")
     depth = bundle.get("depth_snapshot")
     roster_snap = bundle.get("roster_snapshot")
     if not isinstance(depth, dict) or not isinstance(roster_snap, dict):
@@ -330,6 +439,10 @@ def evaluate_form2_bundle(bundle, *, team_id, kickoff, previous_game_kickoff=Non
     receipt = {
         "evidence_class": EVIDENCE_CLASS, "evidence_form": EVIDENCE_FORM,
         "team_id": team_id,
+        "event_id": str(fixture.get("event_id")),
+        "opponent_espn_id": str(fixture.get("opponent_espn_id")),
+        "receipt_version": RECEIPT_VERSION,
+        "receipt_sha256": None,
         "depth_source_url": depth.get("source_url"),
         "depth_update_stamp": depth.get("update_stamp"),
         "depth_captured_at_utc": depth.get("captured_at_utc"),
@@ -351,6 +464,18 @@ def evaluate_form2_bundle(bundle, *, team_id, kickoff, previous_game_kickoff=Non
     if sha256_text(roster_content) != roster_snap.get("sha256"):
         return _fail(STATUS_HASH_MISMATCH, "ROSTER_CONTENT_SHA256_MISMATCH", receipt)
 
+    # -- Receipt v2 chain (correction 3): every sealed field recomputed
+    # over the bundle as presented. A bundle sealed by an older (or no)
+    # receipt format, or edited in any sealed field after capture,
+    # fails here even when both component contents are intact.
+    sealed = bundle.get("receipt")
+    if not isinstance(sealed, dict) or sealed.get("version") != RECEIPT_VERSION:
+        return _fail(STATUS_HASH_MISMATCH, "RECEIPT_CHAIN_MISSING", receipt)
+    chain = receipt_chain_sha256(bundle)
+    if sealed.get("sha256") != chain:
+        return _fail(STATUS_HASH_MISMATCH, "RECEIPT_CHAIN_MISMATCH", receipt)
+    receipt["receipt_sha256"] = chain
+
     depth_captured = dt(depth.get("captured_at_utc"))
     roster_captured = dt(roster_snap.get("captured_at_utc"))
     if depth_captured is None or roster_captured is None:
@@ -365,6 +490,11 @@ def evaluate_form2_bundle(bundle, *, team_id, kickoff, previous_game_kickoff=Non
     if stamp_dt is None:
         return _fail(STATUS_STALE, "UPDATE_STAMP_UNPARSEABLE", receipt)
     receipt["depth_update_stamp"] = stamp_verbatim
+    if stamp_dt > depth_captured:
+        # The captured bytes cannot contain an update stamped after
+        # the capture that recorded them: the recorded stamp and the
+        # recorded capture time contradict each other.
+        return _fail(STATUS_STALE, "STAMP_AFTER_DEPTH_CAPTURE", receipt)
 
     attested_prev = dt((bundle.get("previous_game") or {}).get("kickoff_utc"))
     prev = previous_game_kickoff or attested_prev
@@ -385,10 +515,28 @@ def evaluate_form2_bundle(bundle, *, team_id, kickoff, previous_game_kickoff=Non
     if not complete:
         return _fail(STATUS_ROSTER_INCOMPLETE, detail, receipt)
 
-    order = depth.get("qb_order") or parse_qb_order(depth_content)
+    # -- QB ordering is DERIVED from the captured bytes (correction 2).
+    # The same parser the capture path uses reads the ordering out of
+    # the hashed content; a bundle-carried qb_order is an assertion to
+    # be cross-checked, never an input to resolution. A bundle whose
+    # content cannot be parsed into an ordering fails closed here --
+    # there is no asserted fallback to guess from.
+    order = parse_qb_order(depth_content)
     if not order:
         return _fail(STATUS_MISSING, "NO_QB_ORDER_CAPTURED", receipt)
     qb1 = order[0]
+    asserted = depth.get("qb_order")
+    if isinstance(asserted, list) and asserted:
+        claimed = asserted[0] if isinstance(asserted[0], dict) else {}
+        if (not _name_tokens(claimed.get("name"))
+                or not _jersey_key(claimed.get("jersey"))):
+            return _fail(STATUS_QB1_ASSERTION_MISMATCH,
+                         "ASSERTED_QB1_UNREADABLE", receipt)
+        if (_name_tokens(claimed.get("name")) != _name_tokens(qb1.get("name"))
+                or _jersey_key(claimed.get("jersey"))
+                != _jersey_key(qb1.get("jersey"))):
+            return _fail(STATUS_QB1_ASSERTION_MISMATCH,
+                         "ASSERTED_QB1_DIFFERS_FROM_CAPTURED_CHART", receipt)
     if not _qb1_in_content(qb1, depth_content):
         return _fail(STATUS_MISSING, "QB1_NOT_IN_CAPTURED_CONTENT", receipt)
 
@@ -450,7 +598,7 @@ def build_form2_bundle(*, team_id, team_name, event_id, opponent_id,
     complete, detail = check_roster_completeness(roster_snap, athletes)
     if not complete:
         raise ValueError(STATUS_ROSTER_INCOMPLETE + ":" + detail)
-    return {
+    bundle = {
         "evidence_class": EVIDENCE_CLASS,
         "evidence_form": EVIDENCE_FORM,
         "sport": "CFB",
@@ -468,6 +616,13 @@ def build_form2_bundle(*, team_id, team_name, event_id, opponent_id,
         },
         "roster_snapshot": roster_snap,
     }
+    # Receipt v2 seal (correction 3): computed LAST, over the finished
+    # bundle's recorded fields, so any later edit to a sealed field --
+    # either binding ID, either timestamp, the stamp, either URL,
+    # either content hash -- breaks the chain at evaluation.
+    bundle["receipt"] = {"version": RECEIPT_VERSION,
+                         "sha256": receipt_chain_sha256(bundle)}
+    return bundle
 
 
 def _fetch_text(url):
