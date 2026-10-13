@@ -1,0 +1,534 @@
+#!/usr/bin/env python3
+"""QB_IDENTITY_EVIDENCE Form 2 -- DEPTH_ROSTER_COMPOSITE (CFB only).
+
+Owner ruling (Isaac, Oct 13, 2026; issue #2154): Form 2 is approved as
+an IDENTITY-ONLY, research-stage evidence path for the CFB pre-pricing
+QB gate. It implements the contract proposed in
+``cfb_qb_alternative_source_20261013/PROPOSAL.md`` section 4 verbatim.
+
+The composite, admitted ONLY for a CFB team whose ESPN injury-feed
+status is ``TEAM_NOT_IN_INJURY_FEED`` (Form 1 cannot cover it):
+
+  1. MEMBERSHIP -- an ESPN roster snapshot for the fixture team, pulled
+     by team ID at an asserted-complete limit (?limit=1000 plus the
+     count-stability assertion), providing athlete-ID-keyed,
+     team-scoped membership. No ordering, no availability content.
+  2. DEPTH_ORDER -- an OurLads depth-chart snapshot captured under
+     receipt discipline (pre-kickoff capture, SHA-256 of the captured
+     bytes, source URL, retrieval timestamp, on-page update stamp
+     recorded verbatim), providing a projected QB ordering. No athlete
+     IDs, no availability content.
+  3. Resolution join -- the chart's named QB1 (name + jersey) must
+     resolve to EXACTLY ONE athlete ID on the fixture team's roster
+     snapshot, at position QB. Zero matches, multiple matches, a
+     non-QB match, an incomplete roster snapshot, a missing bundle, or
+     a stale bundle each fail closed with a distinct status (section
+     4.5 of the proposal; two modes the proposal does not name are
+     coined in the same style and marked below).
+
+What Form 2 establishes, and what it never establishes:
+
+  * IDENTITY limb: satisfied on a pass, at projected-editorial
+    strength, recorded as
+    QB_IDENTITY_SATISFIED_FORM2_DEPTH_ROSTER_COMPOSITE.
+  * AVAILABILITY limb: NOT satisfied -- by Form 2 or by any free
+    source -- for teams outside the ESPN injury feed. Availability
+    stays EXPLICITLY UNKNOWN, labeled
+    AVAILABILITY_UNVERIFIED_NO_TEAM_INJURY_REPORT wherever the record
+    is printed. Form 2 evidence is never read as availability, health,
+    or a clean injury report.
+  * ``injury_points`` under Form 2 is exactly 0.0. There is no report
+    to extract Out/Doubtful designations from, so there is nothing to
+    extract; deriving an injury adjustment from depth order would be
+    an invented probability and is prohibited.
+
+Capture discipline (proposal section 4.4): both component snapshots
+are captured before the fixture's kickoff and the gate decision is
+made before kickoff; receipts are append-only and never backfilled;
+a bundle binds to exactly one fixture (team + kickoff) -- a bundle
+captured at/after kickoff, or issued for another fixture, is invalid.
+The chart's update stamp must postdate the kickoff of the team's most
+recent completed game (the previous-game bound; the stamp is a
+publisher batch stamp, so a stamp that predates that game is
+disqualifying even on the publisher's own account, while a fresh
+stamp is necessary, never sufficient).
+
+This module never fetches during evaluation: the pre-pricing stage
+consumes bundles produced ahead of time by the capture helper
+(``build_form2_bundle`` / the module CLI). No autonomous scraping is
+wired into the runner.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+import sys
+from datetime import datetime, timezone
+from urllib.request import Request, urlopen
+from zoneinfo import ZoneInfo
+
+from artifacts.free_models import dt
+
+EVIDENCE_CLASS = "QB_IDENTITY_EVIDENCE"
+EVIDENCE_FORM = "DEPTH_ROSTER_COMPOSITE"
+
+# Outcome statuses -- proposal section 4.5, verbatim.
+STATUS_SATISFIED = "QB_IDENTITY_SATISFIED_FORM2_DEPTH_ROSTER_COMPOSITE"
+STATUS_MISSING = "QB_DEPTH_EVIDENCE_MISSING"
+STATUS_STALE = "QB_DEPTH_EVIDENCE_STALE"
+STATUS_AMBIGUOUS = "QB_DEPTH_QB1_RESOLUTION_AMBIGUOUS"
+STATUS_NOT_ON_ROSTER = "QB_DEPTH_QB1_NOT_ON_ROSTER"
+STATUS_ROSTER_INCOMPLETE = "QB_ROSTER_SNAPSHOT_INCOMPLETE"
+AVAILABILITY_UNVERIFIED = "AVAILABILITY_UNVERIFIED_NO_TEAM_INJURY_REPORT"
+BLOCK_QB_AVAILABILITY_UNVERIFIED = "BLOCKED_PREPRICING_QB_AVAILABILITY_UNVERIFIED"
+
+# Failure modes the proposal requires to fail closed but does not name;
+# coined here in the same style (recorded in the build report).
+STATUS_POSITION_MISMATCH = "QB_DEPTH_QB1_POSITION_MISMATCH"
+STATUS_HASH_MISMATCH = "QB_EVIDENCE_RECEIPT_HASH_MISMATCH"
+
+# ---------------------------------------------------------------------------
+# OWNER DISPOSITION SWITCH -- the one place the Form 2 disposition lives.
+#
+# Ruling (issue #2154): Form 2 is an identity-only, RESEARCH-STAGE
+# evidence path. Under the ruling as implemented, a team whose identity
+# limb is satisfied by Form 2 PROCEEDS to pricing as research, with
+# AVAILABILITY_UNVERIFIED_NO_TEAM_INJURY_REPORT carried on the record.
+# Flipping this single constant to False restores continued blocking
+# for such teams, under BLOCKED_PREPRICING_QB_AVAILABILITY_UNVERIFIED
+# (identity verified; availability unverifiable) -- nothing else in
+# the binder changes.
+# ---------------------------------------------------------------------------
+FORM2_PROCEEDS_WITH_AVAILABILITY_LABEL = True
+
+
+def form2_disposition():
+    """Return (proceeds, status) for a Form-2-satisfied team."""
+    if FORM2_PROCEEDS_WITH_AVAILABILITY_LABEL:
+        return True, AVAILABILITY_UNVERIFIED
+    return False, BLOCK_QB_AVAILABILITY_UNVERIFIED
+
+
+ROSTER_URL_TEMPLATE = (
+    "https://site.api.espn.com/apis/site/v2/sports/football/"
+    "college-football/teams/{team_id}/roster?limit=1000")
+ROSTER_REQUIRED_LIMIT = 1000
+
+_EASTERN = ZoneInfo("America/New_York")
+_STAMP_RE = re.compile(
+    r"Updated:\s*(\d{1,2}/\d{1,2}/\d{4}\s+\d{1,2}:\d{2}\s*[AP]M)\s*ET")
+_QB_ROW_ENTRY_RE = re.compile(
+    r"(\d+)\.\s+([A-Z][A-Za-z.'-]+(?:\s+(?:Jr|Sr|II|III|IV)\.)?,\s*[^—,·\n]+?)"
+    r"\s+—[^#·\n]*#(\d{1,2})")
+_NAME_SUFFIXES = {"jr", "sr", "ii", "iii", "iv", "v"}
+
+
+def sha256_text(text):
+    return hashlib.sha256(str(text).encode("utf-8")).hexdigest()
+
+
+def parse_update_stamp(text):
+    """Extract the verbatim OurLads update stamp and its ET datetime.
+
+    Returns (verbatim, aware datetime in UTC) or (None, None). The
+    stamp is publisher-asserted (a batch-publication stamp, per the
+    proposal's honest limits) -- it is recorded verbatim and used only
+    for the disqualifying direction of the staleness test.
+    """
+    match = _STAMP_RE.search(str(text or ""))
+    if not match:
+        return None, None
+    verbatim = "Updated: " + match.group(1) + " ET"
+    raw = re.sub(r"\s*([AP]M)$", r" \1", match.group(1).strip())
+    try:
+        naive = datetime.strptime(raw, "%m/%d/%Y %I:%M %p")
+    except ValueError:
+        return verbatim, None
+    return verbatim, naive.replace(tzinfo=_EASTERN).astimezone(timezone.utc)
+
+
+def parse_qb_order(text):
+    """Parse the QB ordering (QB1 first) from captured chart text.
+
+    Recognizes the numbered ``N. Last, First -- CLASS, #N`` entry
+    format the source publishes (and that the archived verification
+    summaries record verbatim). Returns a list of
+    {"rank", "name", "jersey"} in chart order; empty when no ordering
+    can be read -- the caller fails closed, never guesses.
+    """
+    entries = []
+    for rank, name, jersey in _QB_ROW_ENTRY_RE.findall(str(text or "")):
+        entries.append({"rank": int(rank), "name": " ".join(name.split()),
+                        "jersey": str(int(jersey))})
+    entries.sort(key=lambda e: e["rank"])
+    return entries
+
+
+def _name_tokens(name):
+    """Canonical name key: 'Minicucci, Nick' == 'Nick Minicucci'."""
+    text = str(name or "")
+    if "," in text:
+        last, _, first = text.partition(",")
+        text = f"{first} {last}"
+    tokens = [t for t in re.findall(r"[a-z0-9]+", text.lower())
+              if t not in _NAME_SUFFIXES]
+    return tuple(sorted(tokens))
+
+
+def _jersey_key(jersey):
+    digits = re.sub(r"\D", "", str(jersey or ""))
+    return str(int(digits)) if digits else ""
+
+
+def roster_athletes(roster_obj):
+    """Flatten an ESPN roster payload into its athlete records."""
+    if isinstance(roster_obj, list):
+        return [a for a in roster_obj if isinstance(a, dict)]
+    if not isinstance(roster_obj, dict):
+        return []
+    athletes = []
+    groups = roster_obj.get("athletes")
+    if isinstance(groups, list):
+        for group in groups:
+            if not isinstance(group, dict):
+                continue
+            items = group.get("items")
+            if isinstance(items, list):
+                athletes.extend(a for a in items if isinstance(a, dict))
+            elif group.get("id") is not None:
+                athletes.append(group)  # flat athlete record, not a group
+    return athletes
+
+
+def _qb1_in_content(qb1, content):
+    """Integrity tie between the recorded QB1 and the captured bytes:
+    the QB1's name must literally appear in the hashed chart content
+    (either 'Last, First' chart order or 'First Last')."""
+    name = " ".join(str(qb1.get("name") or "").split())
+    if not name:
+        return False
+    haystack = " ".join(str(content or "").split())
+    if name in haystack:
+        return True
+    if "," in name:
+        last, _, first = name.partition(",")
+        return f"{first.strip()} {last.strip()}" in haystack
+    return False
+
+
+def _position_abbr(athlete):
+    pos = athlete.get("position")
+    if isinstance(pos, dict):
+        return str(pos.get("abbreviation") or "").upper()
+    return str(pos or "").upper()
+
+
+def check_roster_completeness(snapshot, athletes):
+    """The asserted-complete-limit + count-stability assertion.
+
+    Proposal section 4.2 / design section 2.2: a roster consumer must
+    pull at an explicit high limit and assert count stability, or the
+    default pull's silent 100-athlete cap drops real players and the
+    binding surface cannot be trusted. Returns (ok, detail).
+    """
+    try:
+        limit = int(snapshot.get("requested_limit"))
+    except (TypeError, ValueError):
+        return False, "ROSTER_LIMIT_UNRECORDED"
+    if limit < ROSTER_REQUIRED_LIMIT:
+        return False, f"ROSTER_LIMIT_{limit}_BELOW_ASSERTED_COMPLETE_{ROSTER_REQUIRED_LIMIT}"
+    try:
+        attested = int(snapshot.get("athlete_count"))
+        repeat = int(snapshot.get("athlete_count_repeat"))
+    except (TypeError, ValueError):
+        return False, "ROSTER_COUNT_ATTESTATION_MISSING"
+    if attested != repeat:
+        return False, f"ROSTER_COUNT_UNSTABLE:{attested}_VS_{repeat}"
+    if attested >= limit:
+        return False, f"ROSTER_COUNT_{attested}_AT_LIMIT_{limit}_POSSIBLE_TRUNCATION"
+    if len(athletes) != attested:
+        return False, f"ROSTER_COUNT_CONTENT_MISMATCH:{len(athletes)}_VS_{attested}"
+    ids = [str(a.get("id")) for a in athletes if a.get("id") is not None]
+    if len(ids) != len(set(ids)) or len(ids) != len(athletes):
+        return False, "ROSTER_ATHLETE_IDS_NOT_UNIQUE"
+    return True, "ROSTER_COMPLETE_ASSERTED"
+
+
+def resolve_qb1(qb1, athletes):
+    """Resolve the chart's QB1 (name + jersey) on ONE team's roster.
+
+    Exactly one joint name+jersey match, at position QB, is a
+    resolution. Returns (status, athlete, detail); status is
+    STATUS_SATISFIED on success.
+    """
+    if not qb1:
+        return STATUS_MISSING, None, "NO_QB1_IN_CAPTURED_ORDER"
+    wanted_name = _name_tokens(qb1.get("name"))
+    wanted_jersey = _jersey_key(qb1.get("jersey"))
+    if not wanted_name or not wanted_jersey:
+        return STATUS_MISSING, None, "QB1_NAME_OR_JERSEY_UNREADABLE"
+    matches = [a for a in athletes
+               if _name_tokens(a.get("displayName") or a.get("fullName"))
+               == wanted_name
+               and _jersey_key(a.get("jersey")) == wanted_jersey]
+    if not matches:
+        name_only = [a for a in athletes
+                     if _name_tokens(a.get("displayName") or a.get("fullName"))
+                     == wanted_name]
+        detail = ("NAME_MATCHES_WITH_DIFFERENT_JERSEY" if name_only
+                  else "NO_NAME_MATCH_ON_ROSTER")
+        return STATUS_NOT_ON_ROSTER, None, detail
+    if len(matches) > 1:
+        return (STATUS_AMBIGUOUS, None,
+                f"{len(matches)}_ATHLETES_MATCH_QB1_NAME_AND_JERSEY")
+    athlete = matches[0]
+    if _position_abbr(athlete) != "QB":
+        return (STATUS_POSITION_MISMATCH, None,
+                f"RESOLVED_ATHLETE_POSITION_{_position_abbr(athlete) or 'UNKNOWN'}")
+    return STATUS_SATISFIED, athlete, "UNIQUE_QB_RESOLUTION"
+
+
+def _fail(status, detail, receipt=None):
+    return {"ok": False, "status": status, "detail": detail,
+            "resolved_athlete_id": None, "resolved_athlete_name": None,
+            "availability_status": None, "injury_points": 0.0,
+            "receipt": receipt}
+
+
+def evaluate_form2_bundle(bundle, *, team_id, kickoff, previous_game_kickoff=None,
+                          now=None):
+    """Verify one Form 2 bundle for one fixture team. Fail-closed.
+
+    ``kickoff`` is the fixture's kickoff (aware datetime). ``now`` is
+    the stage clock. ``previous_game_kickoff`` is the kickoff of the
+    team's most recent completed game when the caller can derive it
+    (the stage passes the provider-schedule value); the bundle's own
+    attestation is the fallback, and a disagreement between the two
+    fails closed. Returns a result dict; on success it carries the
+    receipt and the AVAILABILITY_UNVERIFIED label -- never an
+    availability claim.
+    """
+    team_id = str(team_id)
+    if not isinstance(bundle, dict):
+        return _fail(STATUS_MISSING, "BUNDLE_ABSENT")
+    if (bundle.get("evidence_class") != EVIDENCE_CLASS
+            or bundle.get("evidence_form") != EVIDENCE_FORM):
+        return _fail(STATUS_MISSING, "WRONG_EVIDENCE_FORM")
+    team = bundle.get("team") or {}
+    if str(team.get("espn_id")) != team_id:
+        return _fail(STATUS_MISSING, "TEAM_BINDING_MISMATCH")
+    fixture = bundle.get("fixture") or {}
+    if dt(fixture.get("kickoff_utc")) != kickoff:
+        return _fail(STATUS_MISSING, "FIXTURE_BINDING_MISMATCH")
+    depth = bundle.get("depth_snapshot")
+    roster_snap = bundle.get("roster_snapshot")
+    if not isinstance(depth, dict) or not isinstance(roster_snap, dict):
+        return _fail(STATUS_MISSING, "COMPONENT_SNAPSHOT_MISSING")
+
+    receipt = {
+        "evidence_class": EVIDENCE_CLASS, "evidence_form": EVIDENCE_FORM,
+        "team_id": team_id,
+        "depth_source_url": depth.get("source_url"),
+        "depth_update_stamp": depth.get("update_stamp"),
+        "depth_captured_at_utc": depth.get("captured_at_utc"),
+        "depth_sha256": depth.get("sha256"),
+        "roster_source_url": roster_snap.get("source_url"),
+        "roster_captured_at_utc": roster_snap.get("captured_at_utc"),
+        "roster_sha256": roster_snap.get("sha256"),
+        "resolved_qb1_athlete_id": None,
+        "availability_status": None,
+        "injury_points": 0.0,
+    }
+
+    depth_content = depth.get("content")
+    roster_content = roster_snap.get("content")
+    if not isinstance(depth_content, str) or not isinstance(roster_content, str):
+        return _fail(STATUS_MISSING, "COMPONENT_CONTENT_MISSING", receipt)
+    if sha256_text(depth_content) != depth.get("sha256"):
+        return _fail(STATUS_HASH_MISMATCH, "DEPTH_CONTENT_SHA256_MISMATCH", receipt)
+    if sha256_text(roster_content) != roster_snap.get("sha256"):
+        return _fail(STATUS_HASH_MISMATCH, "ROSTER_CONTENT_SHA256_MISMATCH", receipt)
+
+    depth_captured = dt(depth.get("captured_at_utc"))
+    roster_captured = dt(roster_snap.get("captured_at_utc"))
+    if depth_captured is None or roster_captured is None:
+        return _fail(STATUS_STALE, "CAPTURE_TIMESTAMP_UNREADABLE", receipt)
+    if depth_captured >= kickoff or roster_captured >= kickoff:
+        return _fail(STATUS_STALE, "CAPTURE_AT_OR_AFTER_KICKOFF", receipt)
+    if now is not None and (depth_captured > now or roster_captured > now):
+        return _fail(STATUS_STALE, "CAPTURE_IN_FUTURE", receipt)
+
+    stamp_verbatim, stamp_dt = parse_update_stamp(
+        depth.get("update_stamp") or depth_content)
+    if stamp_dt is None:
+        return _fail(STATUS_STALE, "UPDATE_STAMP_UNPARSEABLE", receipt)
+    receipt["depth_update_stamp"] = stamp_verbatim
+
+    attested_prev = dt((bundle.get("previous_game") or {}).get("kickoff_utc"))
+    prev = previous_game_kickoff or attested_prev
+    if (previous_game_kickoff is not None and attested_prev is not None
+            and abs((previous_game_kickoff - attested_prev).total_seconds()) > 120):
+        return _fail(STATUS_STALE, "PREVIOUS_GAME_ATTESTATION_MISMATCH", receipt)
+    if prev is None:
+        return _fail(STATUS_STALE, "PREVIOUS_GAME_BOUND_UNVERIFIABLE", receipt)
+    if stamp_dt <= prev:
+        return _fail(STATUS_STALE, "STAMP_PREDATES_PREVIOUS_GAME_KICKOFF", receipt)
+
+    try:
+        roster_obj = json.loads(roster_content)
+    except ValueError:
+        return _fail(STATUS_ROSTER_INCOMPLETE, "ROSTER_CONTENT_UNPARSEABLE", receipt)
+    athletes = roster_athletes(roster_obj)
+    complete, detail = check_roster_completeness(roster_snap, athletes)
+    if not complete:
+        return _fail(STATUS_ROSTER_INCOMPLETE, detail, receipt)
+
+    order = depth.get("qb_order") or parse_qb_order(depth_content)
+    if not order:
+        return _fail(STATUS_MISSING, "NO_QB_ORDER_CAPTURED", receipt)
+    qb1 = order[0]
+    if not _qb1_in_content(qb1, depth_content):
+        return _fail(STATUS_MISSING, "QB1_NOT_IN_CAPTURED_CONTENT", receipt)
+
+    status, athlete, detail = resolve_qb1(qb1, athletes)
+    if status != STATUS_SATISFIED:
+        return _fail(status, detail, receipt)
+    receipt["resolved_qb1_athlete_id"] = str(athlete.get("id"))
+    receipt["resolved_qb1_name"] = athlete.get("displayName")
+    receipt["resolved_qb1_jersey"] = _jersey_key(athlete.get("jersey"))
+    receipt["availability_status"] = AVAILABILITY_UNVERIFIED
+    return {"ok": True, "status": STATUS_SATISFIED, "detail": detail,
+            "resolved_athlete_id": str(athlete.get("id")),
+            "resolved_athlete_name": athlete.get("displayName"),
+            "availability_status": AVAILABILITY_UNVERIFIED,
+            "injury_points": 0.0, "receipt": receipt}
+
+
+# ---------------------------------------------------------------------------
+# Capture helper -- produces a Form 2 bundle. Used at RUN IT time,
+# pre-kickoff, by an operator/runner step; the pre-pricing stage only
+# ever CONSUMES bundles. Refuses to emit a bundle it cannot verify.
+# ---------------------------------------------------------------------------
+def build_form2_bundle(*, team_id, team_name, event_id, opponent_id,
+                       kickoff_utc, previous_game_kickoff_utc,
+                       depth_url, depth_content, depth_captured_at_utc,
+                       roster_content, roster_captured_at_utc,
+                       roster_athlete_count_repeat, roster_url=None,
+                       roster_requested_limit=ROSTER_REQUIRED_LIMIT):
+    """Assemble a bundle dict from captured component contents.
+
+    ``depth_content`` / ``roster_content`` are the captured texts
+    (roster may be a parsed JSON object, serialized canonically).
+    Raises ValueError with a named status when the capture cannot
+    support a bundle (no readable stamp/order, incomplete roster) --
+    capture-time failure is fail-closed, exactly like gate-time.
+    """
+    if not isinstance(roster_content, str):
+        roster_content = json.dumps(roster_content, sort_keys=True)
+    stamp_verbatim, stamp_dt = parse_update_stamp(depth_content)
+    if stamp_dt is None:
+        raise ValueError(STATUS_STALE + ":UPDATE_STAMP_UNPARSEABLE")
+    order = parse_qb_order(depth_content)
+    if not order:
+        raise ValueError(STATUS_MISSING + ":NO_QB_ORDER_CAPTURED")
+    try:
+        roster_obj = json.loads(roster_content)
+    except ValueError as exc:
+        raise ValueError(STATUS_ROSTER_INCOMPLETE + ":ROSTER_CONTENT_UNPARSEABLE") from exc
+    athletes = roster_athletes(roster_obj)
+    roster_snap = {
+        "source_url": roster_url or ROSTER_URL_TEMPLATE.format(team_id=team_id),
+        "captured_at_utc": roster_captured_at_utc,
+        "sha256": sha256_text(roster_content),
+        "content": roster_content,
+        "requested_limit": roster_requested_limit,
+        "athlete_count": len(athletes),
+        "athlete_count_repeat": roster_athlete_count_repeat,
+    }
+    complete, detail = check_roster_completeness(roster_snap, athletes)
+    if not complete:
+        raise ValueError(STATUS_ROSTER_INCOMPLETE + ":" + detail)
+    return {
+        "evidence_class": EVIDENCE_CLASS,
+        "evidence_form": EVIDENCE_FORM,
+        "sport": "CFB",
+        "team": {"espn_id": str(team_id), "name": team_name},
+        "fixture": {"event_id": str(event_id), "opponent_espn_id": str(opponent_id),
+                    "kickoff_utc": kickoff_utc},
+        "previous_game": {"kickoff_utc": previous_game_kickoff_utc},
+        "depth_snapshot": {
+            "source_url": depth_url,
+            "update_stamp": stamp_verbatim,
+            "captured_at_utc": depth_captured_at_utc,
+            "sha256": sha256_text(depth_content),
+            "content": depth_content,
+            "qb_order": order,
+        },
+        "roster_snapshot": roster_snap,
+    }
+
+
+def _fetch_text(url):
+    req = Request(url, headers={"User-Agent": "SportsEdge-free-context/1.0"})
+    with urlopen(req, timeout=15) as response:
+        return response.read().decode("utf-8", "replace")
+
+
+def capture_form2_bundle(*, team_id, team_name, event_id, opponent_id,
+                         kickoff_utc, previous_game_kickoff_utc, depth_url,
+                         now=None, fetch_text=None, fetch_json=None):
+    """Live capture: fetch the chart + roster (twice, for the
+    count-stability assertion) and build the bundle. Capture-time
+    failures raise; nothing is half-emitted."""
+    now = now or datetime.now(timezone.utc)
+    fetch_text = fetch_text or _fetch_text
+    fetch_json = fetch_json or (lambda url: json.loads(_fetch_text(url)))
+    captured = now.isoformat()
+    depth_content = fetch_text(depth_url)
+    roster_url = ROSTER_URL_TEMPLATE.format(team_id=team_id)
+    roster_first = fetch_json(roster_url)
+    roster_second = fetch_json(roster_url)
+    count_second = len(roster_athletes(roster_second))
+    return build_form2_bundle(
+        team_id=team_id, team_name=team_name, event_id=event_id,
+        opponent_id=opponent_id, kickoff_utc=kickoff_utc,
+        previous_game_kickoff_utc=previous_game_kickoff_utc,
+        depth_url=depth_url, depth_content=depth_content,
+        depth_captured_at_utc=captured,
+        roster_content=json.dumps(roster_first, sort_keys=True),
+        roster_captured_at_utc=captured,
+        roster_athlete_count_repeat=count_second, roster_url=roster_url)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        description="Capture a QB_IDENTITY_EVIDENCE Form 2 bundle "
+                    "(DEPTH_ROSTER_COMPOSITE) for one CFB fixture team.")
+    parser.add_argument("--team-id", required=True)
+    parser.add_argument("--team-name", required=True)
+    parser.add_argument("--event-id", required=True)
+    parser.add_argument("--opponent-id", required=True)
+    parser.add_argument("--kickoff", required=True,
+                        help="fixture kickoff, ISO UTC (e.g. 2026-10-13T23:00:00Z)")
+    parser.add_argument("--previous-game-kickoff", required=True,
+                        help="kickoff of the team's most recent completed game, ISO UTC")
+    parser.add_argument("--ourlads-url", required=True)
+    parser.add_argument("--out", required=True)
+    args = parser.parse_args(argv)
+    bundle = capture_form2_bundle(
+        team_id=args.team_id, team_name=args.team_name,
+        event_id=args.event_id, opponent_id=args.opponent_id,
+        kickoff_utc=args.kickoff,
+        previous_game_kickoff_utc=args.previous_game_kickoff,
+        depth_url=args.ourlads_url)
+    with open(args.out, "w", encoding="utf-8") as handle:
+        json.dump(bundle, handle, indent=2)
+    print(f"WROTE {args.out}: {EVIDENCE_FORM} team {args.team_id} "
+          f"QB1 {bundle['depth_snapshot']['qb_order'][0]['name']}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
