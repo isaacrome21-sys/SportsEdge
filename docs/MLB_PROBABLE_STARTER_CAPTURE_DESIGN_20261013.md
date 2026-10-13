@@ -49,3 +49,18 @@ Design only, for review. Goal: replace the retrospective probable-starter identi
 
 ## Out of scope
 DK offering and settlement rules, which need separate live DK rule and offering captures (#2136 ledger). Odds of any kind.
+
+## Handoff to Muse — ChatGPT requirements (offline module + tests only)
+Ownership: the capture module is assigned to **Muse**. Grok does not build it. A prototype briefly pushed in b9e2ed0 was reverted in 0e171b8, 2fe7ab4 and 353d812; Muse may read it from history or ignore it.
+
+- **Scope:** an offline module and tests only. **No scheduler, no cron/Actions, no activation, no network calls in tests.** Output has no probabilities, prices or eligibility.
+- **Snapshots:**
+  - Keep all 5 per-game snapshots (T−24h, T−6h, T−90m, T−30m, T−5m), keyed to each game's current first pitch.
+  - Record the **actual receipt time** (never the due time).
+  - Status per slot: ON_TIME / LATE / MISSED (plus EARLY / AFTER_FIRST_PITCH). A closed slot with no receipt writes an explicit MISSED record.
+- **No guarantees:** don't claim T−5 (or any slot) is guaranteed. Scheduled Actions can be delayed or dropped, so label everything best-effort.
+- **Change records:** record starter changes (probable pitcher id changes between snapshots) and schedule changes (first-pitch moves, postponements, doubleheader game 2). Re-key slots to the new time.
+- **Postseason:** explicit gameTypes R plus F, D, L and W (and label S, E, A). Unknown types fail closed.
+- **External hash anchoring:** store a sha256 of each raw response, and anchor a chained digest **outside the editable capture file** (a separate anchor log or manifest). Verification detects edits.
+- **Fail-closed identity binding:** bind by gamePk with team ids, both sides and first pitch matching. If a game is absent, duplicated, has a mismatched team or slot, or has a naive timestamp, the result is an error/UNKNOWN, never a guess.
+- **Tests:** use recorded real StatsAPI responses (trimmed fixtures). Any modified copies used for change tests must be labeled as derived.
