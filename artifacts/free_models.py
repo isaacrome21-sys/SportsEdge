@@ -718,6 +718,10 @@ def score_means(sport, context):
     No quoted market price enters here. Owner-disabled MLB pitcher ERA,
     recent form and rest differential factors must contribute exactly zero
     even when their unvalidated research values are present in context.
+    The NBA rest adjustment (context key rest_adj) is disabled by the
+    same Oct 13 ruling, extended on PR #2120 regardless of key name: it
+    stays in context for research and contributes exactly zero here, so
+    live repricing remains in parity with calculate().
     This helper restores the live_run_it import omitted by composition.
     """
     base, _, _, hfa = PRIORS[sport]
@@ -726,9 +730,6 @@ def score_means(sport, context):
     if sport != "MLB":
         home_mean += context["home_injury_pts"]
         away_mean += context["away_injury_pts"]
-        if sport == "NBA":
-            home_mean += context["rest_adj"] / 2
-            away_mean -= context["rest_adj"] / 2
     if "weather_total_adj" in context:
         home_mean += context["weather_total_adj"] / 2
         away_mean += context["weather_total_adj"] / 2
@@ -983,7 +984,11 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
     # and in the factor audit for research; the pricing contribution
     # here is exactly zero. The prepricing stage already hands these
     # keys over as 0.0; this gate keeps the contribution zero even if a
-    # nonzero value reaches the engine by another path.
+    # nonzero value reaches the engine by another path. The NBA rest
+    # adjustment (key name rest_adj, not rest_diff_adj) is governed by
+    # the same ruling — the owner extended it on PR #2120 with no
+    # carve-out: the disable applies across all supported sports
+    # regardless of the adjustment's key name.
     if sport == "MLB":
         notes.append("PITCHER_ADJ_DISABLED_PENDING_INCREMENTAL_VALUE")
     else:
@@ -991,8 +996,12 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
         away_mean += context["away_injury_pts"]
         notes.append("RECENT_FORM_DISABLED_PENDING_INCREMENTAL_VALUE")
         if sport == "NBA":
-            home_mean += context["rest_adj"] / 2
-            away_mean -= context["rest_adj"] / 2
+            # rest_adj is NOT applied: contribution exactly zero. The
+            # value stays in context for research (schedule/rest data
+            # remains available for future point-in-time validation);
+            # this gate holds however the value arrived — verified
+            # prepricing, top-level intake key, or manual override.
+            notes.append("REST_ADJ_DISABLED_PENDING_INCREMENTAL_VALUE")
     if "weather_total_adj" in context:
         home_mean += context["weather_total_adj"] / 2
         away_mean += context["weather_total_adj"] / 2
@@ -1300,10 +1309,18 @@ def _paired_book_context(rows, evaluated, index):
         if abs((input_time - matching_time).total_seconds()) > 120:
             projected["paired_market_status"] = "MISMATCHED_QUOTE_TIMESTAMPS"
             return
-    elif input_time is None:
-        # The partner price came from this row's own opposite_odds field;
-        # the pair is only as evidenced as this quote's own capture time.
-        projected["paired_market_status"] = "QUOTE_TIMESTAMP_MISSING"
+    else:
+        # No compatible partner row exists: the partner price came solely
+        # from this row's own opposite_odds field. An asserted field on the
+        # same row is NOT a separately timestamped quote — there is no
+        # counterpart observation, no event/period/settlement identity
+        # check on a second quote, and no timestamp pair. It must not be
+        # labeled an exact two-sided quote or yield a no-vig comparison,
+        # regardless of this row's own capture time: timestamping the
+        # assertion does not cure the missing counterpart, and the refusal
+        # names that defect (not QUOTE_TIMESTAMP_MISSING, which would
+        # falsely imply this quote itself lacked a timestamp).
+        projected["paired_market_status"] = "OPPOSITE_PRICE_NOT_A_TIMESTAMPED_QUOTE"
         return
     try:
         p1 = 1.0 / odds_decimal(result["odds_american"])
