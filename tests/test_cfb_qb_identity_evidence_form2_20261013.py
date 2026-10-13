@@ -641,6 +641,7 @@ class CaptureHelperTests(unittest.TestCase):
                 opponent_id="2393", kickoff_utc=KICKOFF_ISO,
                 previous_game_kickoff_utc=CHARTS["48"][3],
                 depth_url=CHARTS["48"][0], now=NOW,
+                clock=lambda: NOW,  # deterministic pre-kickoff: test roster disagreement, not live wall clock
                 fetch_text=lambda url: depth_text("48"), fetch_json=flaky)
         self.assertIn(qe.STATUS_ROSTER_INCOMPLETE, str(ctx.exception))
 
