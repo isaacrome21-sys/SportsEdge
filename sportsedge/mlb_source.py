@@ -148,18 +148,35 @@ def verify_receipt_journal(root: str | Path, *, verifier_now: datetime | None = 
     journal = root / RECEIPT_JOURNAL_NAME
     if not journal.exists():
         return []
+    # A half-written final JSON record may parse as a complete object, but the
+    # next append would concatenate two lines. Reject such an archive as-is.
+    journal_bytes = journal.read_bytes()
+    if not journal_bytes or not journal_bytes.endswith(b"\\n"):
+        raise MLBSourceError("RECEIPT_JOURNAL_UNTERMINATED")
     now = _aware(verifier_now, "verifier clock") if verifier_now is not None else _aware(_trusted_now(), "verifier clock")
     entries: list[dict[str, Any]] = []
     prev = GENESIS_SHA256
     nonces: set[str] = set()
     keys: set[tuple[str, str, str, str]] = set()
-    for lineno, line in enumerate(journal.read_text().splitlines(), start=1):
+    expected_keys = set(_HASHED_FIELDS) | {"record_sha256"}
+    for lineno, line in enumerate(journal_bytes.decode("utf-8").splitlines(), start=1):
         if not line.strip():
             raise MLBSourceError(f"RECEIPT_JOURNAL_BLANK_LINE:{lineno}")
+        def unique_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+            data = {}
+            for key, value in pairs:
+                if key in data:
+                    raise MLBSourceError(f"RECEIPT_JOURNAL_DUPLICATE_JSON_KEY:{lineno}")
+                data[key] = value
+            return data
         try:
-            entry = json.loads(line)
-        except json.JSONDecodeError as exc:
+            entry = json.loads(line, object_pairs_hook=unique_pairs,
+                               parse_constant=lambda value: (_ for _ in ()).throw(
+                                   MLBSourceError("RECEIPT_JOURNAL_NONFINITE_NUMBER")))
+        except (ValueError, UnicodeDecodeError) as exc:
             raise MLBSourceError(f"RECEIPT_JOURNAL_CORRUPT:{lineno}") from exc
+        if type(entry) is not dict or set(entry) != expected_keys:
+            raise MLBSourceError(f"RECEIPT_JOURNAL_SCHEMA_DRIFT:{lineno}")
         for field in _HASHED_FIELDS + ("record_sha256",):
             if field not in entry or (entry[field] is None and field not in ("game_pk", "recorder_clock_assertion_utc")):
                 raise MLBSourceError(f"RECEIPT_FIELD_MISSING:{field}")
@@ -186,7 +203,13 @@ def verify_receipt_journal(root: str | Path, *, verifier_now: datetime | None = 
         if entry["receipt_nonce"] in nonces or key in keys:
             raise MLBSourceError("RECEIPT_DUPLICATE_REPLAY")
         nonces.add(entry["receipt_nonce"]); keys.add(key)
-        raw_path = root / entry["file_name"]
+        filename = entry["file_name"]
+        if (not isinstance(filename, str) or not filename or len(filename) > 180
+                or Path(filename).name != filename or "\\\\" in filename):
+            raise MLBSourceError("RECEIPT_RAW_PATH_UNSAFE")
+        raw_path = root / filename
+        if raw_path.is_symlink():
+            raise MLBSourceError("RECEIPT_RAW_PATH_UNSAFE")
         if not raw_path.exists():
             raise MLBSourceError("RECEIPT_RAW_BYTES_MISSING")
         raw = raw_path.read_bytes()
