@@ -14,9 +14,28 @@ from unittest.mock import patch
 from sportsedge.sports.mlb import starter_capture as capture
 
 
+# Deterministic trusted anchor for offline fixtures (stamped 2026-10-13
+# ~22:35 UTC). mlb_source documents _trusted_now as test-patchable only.
+from datetime import datetime as _dt, timezone as _tz
+from unittest import mock as _mock
+_ANCHOR_PATCH = _mock.patch(
+    "sportsedge.mlb_source._trusted_now",
+    lambda: _dt(2026, 10, 14, 0, 0, tzinfo=_tz.utc),
+)
+
+
+def setUpModule():
+    _ANCHOR_PATCH.start()
+
+
+def tearDownModule():
+    _ANCHOR_PATCH.stop()
+
+
 def _record(n):
     return {"record_type": "SNAPSHOT", "game_pk": 849001,
-            "slot_id": f"slot-{n}", "record_status": "OBSERVED"}
+            "slot_id": f"slot-{n}", "record_status": "OBSERVED",
+            "captured_at_utc": "2026-10-13T20:00:00+00:00"}
 
 
 class AppendSafetyTests(unittest.TestCase):

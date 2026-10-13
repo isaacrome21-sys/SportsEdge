@@ -31,6 +31,24 @@ from sportsedge.sports.mlb.starter_capture import (
     verify_capture_chain,
 )
 
+
+# Deterministic trusted anchor for offline fixtures (stamped 2026-10-13
+# ~22:35 UTC). mlb_source documents _trusted_now as test-patchable only.
+from datetime import datetime as _dt, timezone as _tz
+from unittest import mock as _mock
+_ANCHOR_PATCH = _mock.patch(
+    "sportsedge.mlb_source._trusted_now",
+    lambda: _dt(2026, 10, 14, 0, 0, tzinfo=_tz.utc),
+)
+
+
+def setUpModule():
+    _ANCHOR_PATCH.start()
+
+
+def tearDownModule():
+    _ANCHOR_PATCH.stop()
+
 UTC = timezone.utc
 
 # Game 1: regular season, first pitch 2026-10-13T23:05:00Z.
@@ -195,12 +213,13 @@ class PlanTests(unittest.TestCase):
 class CaptureTests(unittest.TestCase):
     def test_on_time_capture_binds_ids_and_stamps_after_fetch(self):
         _, game = _game1_plan()
-        clock = FakeClock(datetime(2026, 10, 13, 22, 34, tzinfo=UTC))
+        clock = FakeClock(datetime(2026, 10, 13, 22, 34, 40, tzinfo=UTC))
 
         def fetch(url: str) -> bytes:
-            # The fetch "takes" a minute; the receipt time must be the
-            # completion time (22:35), never the pre-fetch time (22:34).
-            clock.advance(minutes=1)
+            # The fetch "takes" 20s (inside #2166's 30s span bound); the
+            # receipt time must be the completion time (22:35), never the
+            # pre-fetch time (22:34:40).
+            clock.advance(seconds=20)
             return _payload_bytes(_game(GAME1_PK, GAME1_PITCH))
 
         record = capture_snapshot(game, "T-30M", fetcher=fetch, clock=clock)

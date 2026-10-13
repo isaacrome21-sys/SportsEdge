@@ -146,6 +146,45 @@ def _iso(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat()
 
 
+# --------------------------------------------------------------------------
+# Clock bounds (reuses #2166's trusted-clock / receipt-bound semantics).
+# --------------------------------------------------------------------------
+
+def _receipt_bounds():
+    from sportsedge import mlb_source as _ms
+    return _ms
+
+
+def _check_clock_bounds(
+    value: datetime, *, what: str, anchor: datetime | None
+) -> datetime:
+    """Refuse clock readings outside a sane window.
+
+    Floor and skew are #2166's ``RECEIPT_PLAUSIBLE_FLOOR`` (2020-01-01 UTC)
+    and ``RECEIPT_CLOCK_SKEW``. A reset clock (e.g. 2000-01-01) or a reading
+    in the future of the trusted anchor can never become a receipt time.
+    """
+    ms = _receipt_bounds()
+    value = _require_aware(value, what=what)
+    if value < ms.RECEIPT_PLAUSIBLE_FLOOR:
+        raise StarterCaptureError(f"CAPTURE_CLOCK_IMPLAUSIBLY_OLD:{what}")
+    if anchor is not None and value > anchor + ms.RECEIPT_CLOCK_SKEW:
+        raise StarterCaptureError(f"CAPTURE_CLOCK_IN_FUTURE:{what}")
+    return value
+
+
+def _check_fetch_span(started: datetime, received: datetime) -> None:
+    ms = _receipt_bounds()
+    if received < started:
+        raise StarterCaptureError("CAPTURE_CLOCK_WENT_BACKWARDS")
+    if received - started > ms.RECEIPT_MAX_FETCH_SPAN:
+        raise StarterCaptureError("CAPTURE_FETCH_SPAN_UNBOUNDED")
+
+
+def _trusted_anchor() -> datetime:
+    return _receipt_bounds()._trusted_now()
+
+
 def _parse_iso(value: Any) -> datetime | None:
     if not isinstance(value, str) or not value.strip():
         return None
@@ -395,6 +434,7 @@ def capture_snapshot(
     *,
     fetcher: FetcherFn,
     clock: ClockFn,
+    anchor: ClockFn | None = None,
 ) -> dict[str, Any]:
     """Capture one planned slot for one game and return its record.
 
@@ -430,10 +470,28 @@ def capture_snapshot(
         "planned_first_pitch_utc": plan_game.get("game_date_utc"),
         "source_url": url,
     }
+    # Clock bounds: the fetch start is read before the fetch and the
+    # receipt after it; both must sit inside #2166's sane window
+    # (>= 2020-01-01 UTC, <= trusted anchor + skew when an anchor is
+    # supplied; production always supplies the trusted system anchor).
+    fetch_started = _check_clock_bounds(
+        clock(), what="fetch_started_at",
+        anchor=_require_aware(anchor(), what="anchor") if anchor else None,
+    )
+    base["fetch_started_at_utc"] = _iso(fetch_started)
+
+    def _received(what: str) -> datetime:
+        value = _check_clock_bounds(
+            clock(), what=what,
+            anchor=_require_aware(anchor(), what="anchor") if anchor else None,
+        )
+        _check_fetch_span(fetch_started, value)
+        return value
+
     try:
         raw = fetcher(url)
     except Exception as exc:  # network/HTTP failure: record the attempt
-        failed_at = _require_aware(clock(), what="attempt_failed_at")
+        failed_at = _received("attempt_failed_at")
         return {
             "schema": SCHEMA_ATTEMPT_FAILED,
             "record_type": "CAPTURE_ATTEMPT_FAILED",
@@ -445,7 +503,7 @@ def capture_snapshot(
     if isinstance(raw, bytearray):
         raw = bytes(raw)
     if not isinstance(raw, bytes):
-        failed_at = _require_aware(clock(), what="attempt_failed_at")
+        failed_at = _received("attempt_failed_at")
         return {
             "schema": SCHEMA_ATTEMPT_FAILED,
             "record_type": "CAPTURE_ATTEMPT_FAILED",
@@ -459,7 +517,7 @@ def capture_snapshot(
         if not isinstance(payload, Mapping):
             raise ValueError(f"schedule payload is {type(payload).__name__}, not object")
     except (ValueError, UnicodeDecodeError, RecursionError) as exc:
-        failed_at = _require_aware(clock(), what="attempt_failed_at")
+        failed_at = _received("attempt_failed_at")
         return {
             "schema": SCHEMA_ATTEMPT_FAILED,
             "record_type": "CAPTURE_ATTEMPT_FAILED",
@@ -469,7 +527,7 @@ def capture_snapshot(
             "failure_detail": f"{type(exc).__name__}: {exc}"[:200],
         }
 
-    completed = _require_aware(clock(), what="captured_at")
+    completed = _received("captured_at")
     plan_pk = _positive_statsapi_id(plan_game.get("game_pk"))
     matches = [
         row for row in parse_schedule_games(payload)
@@ -639,6 +697,7 @@ def capture_snapshot_production(
         slot_id,
         fetcher=lambda url: fetch_statsapi(url, opener=opener),
         clock=system_utc_now,
+        anchor=_trusted_anchor,
     )
 
 
@@ -992,7 +1051,8 @@ def read_manifest(manifest_path: Path) -> list[dict[str, Any]]:
 
 
 def append_record(
-    capture_path: Path, manifest_path: Path, record: Mapping[str, Any]
+    capture_path: Path, manifest_path: Path, record: Mapping[str, Any],
+    *, verifier_now: datetime | None = None,
 ) -> dict[str, Any]:
     """Serialize cooperating writers and fail closed on partial pair appends.
 
@@ -1030,7 +1090,12 @@ def append_record(
     with lock_path.open("a+b") as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
         try:
-            checked = verify_capture_chain(capture_path, manifest_path)
+            reason = _record_clock_failure(record, verifier_now)
+            if reason is not None:
+                raise StarterCaptureError(f"CAPTURE_RECORD_CLOCK_INVALID:{reason}")
+            checked = verify_capture_chain(
+                capture_path, manifest_path, verifier_now=verifier_now
+            )
             if not checked["ok"]:
                 reason = checked["failure"]["reason"]
                 raise StarterCaptureError(
@@ -1085,7 +1150,57 @@ def append_record(
             fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
 
-def verify_capture_chain(capture_path: Path, manifest_path: Path) -> dict[str, Any]:
+_RECORD_TIME_FIELDS = {
+    "SNAPSHOT": "captured_at_utc",
+    "CAPTURE_ATTEMPT_FAILED": "attempted_at_utc",
+}
+
+
+def _record_clock_failure(
+    record: Mapping[str, Any], verifier_now: datetime | None
+) -> str | None:
+    """Return a failure reason when a record's clock stamps are out of bounds.
+
+    Snapshot / attempt records must carry their receipt stamp; any stamp
+    present (receipt or ``fetch_started_at_utc``) must be >= 2020-01-01 UTC
+    and <= the trusted verifier clock + skew, and the fetch span must be
+    ordered and bounded. Fails closed; never repairs a timestamp.
+    """
+    if not isinstance(record, Mapping):
+        return "RECORD_NOT_OBJECT"
+    try:
+        now = _require_aware(
+            verifier_now if verifier_now is not None else _trusted_anchor(),
+            what="verifier_now",
+        )
+    except StarterCaptureError:
+        return "VERIFIER_CLOCK_UNVERIFIED"
+    field = _RECORD_TIME_FIELDS.get(record.get("record_type"))
+    stamps = {}
+    for name in filter(None, (field, "fetch_started_at_utc")):
+        raw = record.get(name)
+        if raw is None:
+            if name == field:
+                return f"TIMESTAMP_MISSING:{name}"
+            continue
+        parsed = _parse_iso(raw)
+        if parsed is None or parsed.tzinfo is None:
+            return f"TIMESTAMP_UNPARSEABLE:{name}"
+        try:
+            stamps[name] = _check_clock_bounds(parsed, what=name, anchor=now)
+        except StarterCaptureError as exc:
+            return str(exc)
+    if field in stamps and "fetch_started_at_utc" in stamps:
+        try:
+            _check_fetch_span(stamps["fetch_started_at_utc"], stamps[field])
+        except StarterCaptureError as exc:
+            return str(exc)
+    return None
+
+
+def verify_capture_chain(
+    capture_path: Path, manifest_path: Path, *, verifier_now: datetime | None = None
+) -> dict[str, Any]:
     """Re-derive the hash chain from the capture file and compare.
 
     Returns ``{"ok": True, ...}`` only when every capture line's hash,
@@ -1155,6 +1270,9 @@ def verify_capture_chain(capture_path: Path, manifest_path: Path) -> dict[str, A
             return failure("MANIFEST_METADATA_MISMATCH", index)
         if manifest_line != canonical_line(entry):
             return failure("MANIFEST_ENCODING_MISMATCH", index)
+        clock_reason = _record_clock_failure(source_record, verifier_now)
+        if clock_reason is not None:
+            return failure(f"RECORD_CLOCK_INVALID:{clock_reason}", index)
         prev_chain = chain
     return {
         "ok": True,
