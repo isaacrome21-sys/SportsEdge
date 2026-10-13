@@ -6,9 +6,9 @@ Proves the canonical-path F5 binding layer
   shared F5 pricer (provenance hashes), and blocks only at the F5
   deployment gate;
 * each admissibility failure produces its specific F5_* reason code;
-* F5_MONEYLINE blocks on the settlement basis (tie policy not
-  normalized in the settlement code), the other three markets carry a
-  verified basis;
+* all four markets carry a verified settlement basis -- F5_MONEYLINE
+  as VERIFIED_TWO_WAY (declared settlement type, ties push) since the
+  2026-10-12 owner settlement ruling;
 * through run_full, F5 rows resolve to named blockers, never the
   legacy generic reason.
 """
@@ -127,25 +127,29 @@ def test_team_totals_pair_binds_to_fixture_team_entity():
 # ------------------------------------------------------- settlement basis
 
 def test_settlement_basis_table_matches_settlement_code():
-    assert settlement_basis("F5_MONEYLINE")["status"] == "UNVERIFIED"
-    assert "F5_MONEYLINE_TIE_POLICY_NOT_NORMALIZED" in \
-        SETTLEMENT_BASIS["F5_MONEYLINE"]["basis"]
+    basis = settlement_basis("F5_MONEYLINE")
+    assert basis["status"] == "VERIFIED"
+    assert basis["settlement_type"] == "TWO_WAY"
+    assert "VERIFIED_TWO_WAY" in basis["basis"]
+    assert "PUSH" in basis["basis"]
+    assert "draftkings.com" in " ".join(basis["rules_sources"])
     for market in ("F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS"):
         assert settlement_basis(market)["status"] == "VERIFIED"
         assert "PUSH" in settlement_basis(market)["basis"]
 
 
-def test_moneyline_pair_blocks_on_settlement_basis():
+def test_moneyline_pair_binds_with_verified_two_way_basis():
     rows = [
         _row(market="F5_MONEYLINE", side="HOME", line=None, odds=-120),
         _row(market="F5_MONEYLINE", side="AWAY", line=None, odds=100,
              quote_captured_at="2026-09-14T22:59:30Z"),
     ]
     bound = bind_f5_quotes(rows, now=NOW, fixture_resolver=_resolver)
-    assert bound["pairs"][0]["status"] == "SETTLEMENT_UNVERIFIED"
-    assert _codes(bound) == [F5_SETTLEMENT_BASIS_UNVERIFIED] * 2
-    assert all(r["blocker"] == "NO_SETTLEMENT"
-               for r in bound["row_results"])
+    assert [r["status"] for r in bound["row_results"]] == ["BOUND", "BOUND"]
+    pair = bound["pairs"][0]
+    assert pair["status"] == "BOUND"
+    assert pair["settlement_basis"]["status"] == "VERIFIED"
+    assert pair["settlement_basis"]["settlement_type"] == "TWO_WAY"
 
 
 # --------------------------------------------------------- identity gates
@@ -370,17 +374,27 @@ def test_stage_blocks_at_feature_assembly_without_history():
         assert result["f5_binding"]["pair_id"]
 
 
-def test_stage_moneyline_blocks_on_settlement_before_features():
+def test_stage_moneyline_reaches_deployment_gate_like_other_f5():
     rows = [
         _row(market="F5_MONEYLINE", side="HOME", line=None, odds=-120),
         _row(market="F5_MONEYLINE", side="AWAY", line=None, odds=100,
              quote_captured_at="2026-09-14T22:59:30Z"),
     ]
-    results, _ = phone_f5_binding_rows(rows, now=NOW,
-                                       fixture_resolver=_resolver)
+    results, _ = phone_f5_binding_rows(
+        rows, now=NOW, fixture_resolver=_resolver,
+        opener=_history_opener)
     for result in results:
-        assert result["f5_reason"] == F5_SETTLEMENT_BASIS_UNVERIFIED
-        assert result["blocker"] == "NO_SETTLEMENT"
+        assert result["status"] == "NO_MODEL_OR_MARKET"
+        assert result["f5_reason"] == F5_DEPLOYMENT_NOT_ELIGIBLE
+        assert result["blocker"] == "NO_VALIDATION"
+        assert result["f5_deployment"]["eligible"] is False
+        basis = result["f5_binding"]["settlement_basis"]
+        assert basis["status"] == "VERIFIED"
+        assert basis["settlement_type"] == "TWO_WAY"
+        reach = result["f5_pricer_reachability"]
+        assert reach["engine"] == "SHARED_F5_ENGINE"
+        assert len(reach["readouts"]) == 2
+        assert "model_p" not in result
 
 
 # ------------------------------------------------------------- run_full

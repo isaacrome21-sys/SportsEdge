@@ -182,7 +182,14 @@ class PR131133CompositionTests(unittest.TestCase):
         self.assertEqual(joined["joined_observation_count"], 1)
         self.assertEqual(joined["observations"][0]["settled_outcome"], "WIN")
 
-    def test_f5_moneyline_tie_is_ambiguous_until_policy_is_normalized(self):
+    def test_f5_moneyline_tie_settles_push_under_declared_two_way(self):
+        # Owner settlement ruling (2026-10-12): the tie policy is now
+        # normalized as an explicit settlement-type declaration --
+        # DraftKings F5_MONEYLINE is TWO_WAY, so this DraftKings tie
+        # settles PUSH instead of staying ambiguous. Books without a
+        # verified declaration remain hardened with
+        # F5_TIE_POLICY_AMBIGUITY (tests in
+        # tests/test_mlb_moneyline_settlement_types.py).
         quote = _additional_quote(market="F5_MONEYLINE", entity_id="20", side="HOME")
         joined = join_mlb_pit_archive(
             archive_payload=_archive(quote),
@@ -193,8 +200,8 @@ class PR131133CompositionTests(unittest.TestCase):
             settlement_rows=[_settlement(market="F5_MONEYLINE", entity_id="20", side="HOME")],
         )
         row = joined["observations"][0]
-        self.assertEqual(row["settlement_state"], "AMBIGUOUS_SETTLEMENT")
-        self.assertIsNone(row["settled_outcome"])
+        self.assertEqual(row["settlement_state"], "SETTLEMENT_ELIGIBLE")
+        self.assertEqual(row["settled_outcome"], "PUSH")
         self.assertEqual(joined["failure_count"], 0)
         self.assertEqual(F5_TIE_POLICY_AMBIGUITY, "F5_MONEYLINE_TIE_POLICY_NOT_NORMALIZED")
 
