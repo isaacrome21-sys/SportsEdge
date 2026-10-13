@@ -308,11 +308,21 @@ class PublicContext:
         """Return verified team-scoped injury rows, or (None, status).
 
         ("rows", "STRUCTURE_VERIFIED") when the ESPN injury payload binds to
-        exactly one team group; (None, "UNUSABLE_SCHEMA") when neither the
-        team nor league payload resolves; ([], "NOT_APPLICABLE") for MLB.
-        Same fetch path and receipts as injury_points; the pre-pricing
-        QB/participation check consumes these rows instead of a second,
-        divergent fetch path.
+        exactly one team group; (None, "TEAM_NOT_IN_INJURY_FEED") when the
+        league payload parses as a well-formed team-group feed that simply
+        carries no group for this team; (None, "UNUSABLE_SCHEMA") when
+        neither payload's shape supports any judgment; ([], "NOT_APPLICABLE")
+        for MLB. The distinction is live-verified (2026-10-13): ESPN's CFB
+        injuries feed contains groups ONLY for teams with current injury
+        entries (3 groups for ~136 FBS teams that day) and the per-team
+        endpoint returns {} for every team in both leagues, so most CFB
+        teams are ABSENT from the feed rather than victims of a schema
+        break. Absence is not a verified clean report -- it stays
+        unverified and the QB gate keeps blocking; the separate status
+        exists so the audit trail stops calling a parseable feed a schema
+        failure. Same fetch path and receipts as injury_points; the
+        pre-pricing QB/participation check consumes these rows instead of
+        a second, divergent fetch path.
         """
         if sport == "MLB":
             return [], "NOT_APPLICABLE"
@@ -328,6 +338,34 @@ class PublicContext:
         url = f"{ESPN}/{LEAGUES[sport]}/teams/{target_id}/injuries"
         data = self.fetch(url)
         candidates = None
+        # Feed forensics for the fail-closed classification below. Absence
+        # may be declared ONLY from the league payload: the league feed is
+        # the league-wide injury report (the per-team endpoint is vestigial
+        # -- it returns {} for every team), so "the feed carries no report
+        # for this team" is a property of that payload. league_feed_seen =
+        # the league payload is a grouped feed whose every group carries a
+        # resolvable documented team ID; target_seen = the target appears
+        # in a feed but did not bind exactly once (duplicate groups are an
+        # integrity problem, not absence); schema_bad = a payload carries
+        # an "injuries" member that is not a list, or a league group whose
+        # team ID cannot be resolved (an unresolvable group might BE the
+        # target, so absence cannot be declared).
+        league_feed_seen = False
+        target_seen = False
+        schema_bad = False
+
+        def _forensics(groups, *, is_league):
+            nonlocal league_feed_seen, target_seen, schema_bad
+            ids = [self._injury_group_id(g) for g in groups]
+            if target_id in ids:
+                target_seen = True
+            if any(i is None for i in ids):
+                if is_league:
+                    schema_bad = True
+                return
+            if is_league:
+                league_feed_seen = True
+
         if isinstance(data, dict) and isinstance(data.get("injuries"), list):
             groups = data["injuries"]
             # Single-team payload uses a flat injuries list. A grouped payload
@@ -335,19 +373,25 @@ class PublicContext:
             grouped = any(isinstance(g, dict) and isinstance(g.get("injuries"), list)
                           for g in groups)
             if grouped:
+                _forensics(groups, is_league=False)
                 matches = [g for g in groups if self._injury_group_id(g) == target_id]
                 if len(matches) == 1:
                     candidates = matches[0]["injuries"]
             else:
                 candidates = groups
+        elif isinstance(data, dict) and "injuries" in data:
+            schema_bad = True
         league = None
         if candidates is None:
             league = self.fetch(f"{ESPN}/{LEAGUES[sport]}/injuries")
             if isinstance(league, dict) and isinstance(league.get("injuries"), list):
+                _forensics(league["injuries"], is_league=True)
                 matches = [group for group in league["injuries"]
                            if self._injury_group_id(group) == target_id]
                 if len(matches) == 1:
                     candidates = matches[0]["injuries"]
+            elif isinstance(league, dict) and "injuries" in league:
+                schema_bad = True
         if candidates is None:
             def _shape(response):
                 if not isinstance(response, dict):
@@ -360,12 +404,22 @@ class PublicContext:
                 first_keys = ",".join(sorted(str(k) for k in first)[:8]) if isinstance(first, dict) else "NOT_OBJECT"
                 ids = [self._injury_group_id(g) or "" for g in groups[:6]]
                 return f"KEYS={keys};N={len(groups)};FIRST_KEYS={first_keys};SAMPLE_TEAM_IDS={','.join(ids)}"
-            self.receipts.append({
+            if league_feed_seen and not schema_bad and not target_seen:
+                status = "TEAM_NOT_IN_INJURY_FEED"
+            else:
+                status = "UNUSABLE_SCHEMA"
+            receipt = {
                 "source": f"{ESPN}/{LEAGUES[sport]}/injuries",
-                "status": "UNUSABLE_SCHEMA",
+                "status": status,
                 "reason": "TEAM[" + _shape(data) + "];LEAGUE[" + _shape(league) + "]",
-                "team_id": target_id[:20]})
-            result = (None, "UNUSABLE_SCHEMA")
+                "team_id": target_id[:20]}
+            if status == "TEAM_NOT_IN_INJURY_FEED":
+                receipt["note"] = ("FEED_WELL_FORMED_TEAM_ABSENT: the feed "
+                                   "carries no injury report for this team; "
+                                   "absence is not a verified clean report "
+                                   "and QB status stays UNVERIFIED")
+            self.receipts.append(receipt)
+            result = (None, status)
             self._injury_result_cache[key] = result
             return result
         self.receipts.append({
@@ -383,7 +437,11 @@ class PublicContext:
 
         Contract: (points, status); MLB -> (0.0, "NOT_APPLICABLE");
         verified payload -> (-loss, "HEURISTIC_OUT_DOUBTFUL_REPORTED_{n}_UNKNOWN_COMPLETENESS");
-        unusable payload -> (0.0, "MISSING_OR_UNRECOGNIZED_SOURCE").
+        unusable payload OR team absent from the injury feed (injury_rows
+        status "TEAM_NOT_IN_INJURY_FEED") -> (0.0, "MISSING_OR_UNRECOGNIZED_SOURCE"):
+        no verified rows, no points -- feed absence is never read as a
+        clean injury report. The precise classification lives in
+        injury_rows' return value and receipt, which the QB gate consumes.
         QB out/doubtful costs 1.5 (NFL), NBA 0.3 each, others 0.15, capped 2.5.
         """
         if sport == "MLB":
