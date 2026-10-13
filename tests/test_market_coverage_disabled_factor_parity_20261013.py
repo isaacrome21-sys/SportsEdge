@@ -75,6 +75,17 @@ def test_observable_quarter_research_probability_not_changed_by_recent_form(spor
         _row(sport, market="SPREAD_1Q", side="HOME",
              context={"home_form": 5.0, "away_form": -5.0}),
         now=NOW, auto_context=False)
+    if sport == "NFL":
+        # Owner ruling (Oct 13, 2026): NFL period markets have NO priced
+        # probability on this route at all -- they fail closed NO_ENGINE /
+        # SIMULATION_ROWS_EMPTY -- so a manual form field has nothing to
+        # move. The disabled-form protection holds in its strongest form.
+        for out in (base, form):
+            assert out["status"] == "NO_MODEL_OR_MARKET"
+            assert out["reason"] == "SIMULATION_ROWS_EMPTY"
+            assert out["blocker"] == "NO_ENGINE"
+            assert "estimate_p" not in out
+        return
     assert base["estimate_p"] == form["estimate_p"]
     assert base["ev_per_dollar"] == form["ev_per_dollar"]
 
