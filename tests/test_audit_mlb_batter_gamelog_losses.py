@@ -137,3 +137,38 @@ def test_naive_observed_clock_is_rejected():
     with pytest.raises(ValueError, match="OBSERVED_AT_TIMEZONE_REQUIRED"):
         _audit([_row(i) for i in range(10)],
                observed_at_utc="2026-10-13T15:00:00")
+
+
+def test_per_market_coverage_requires_all_fields_not_a_fabricated_zero():
+    report = _audit([_row(i) for i in range(12)])
+    ready = report["market_history_field_readiness"]
+    assert ready["BATTER_HITS"]["status"] == "HISTORY_FIELDS_PRESENT_NOT_VALIDATED"
+    assert ready["BATTER_SINGLES"]["status"] == "REQUIRED_HISTORY_FIELD_MISSING"
+    assert ready["BATTER_SINGLES"]["missing_fields"] == ["doubles", "triples"]
+    assert ready["BATTER_BB"]["status"] == "REQUIRED_HISTORY_FIELD_MISSING"
+    assert ready["BATTER_K"]["status"] == "REQUIRED_HISTORY_FIELD_MISSING"
+    assert all(item["does_not_grant_pricing_authority"] for item in ready.values())
+
+
+def test_partial_walk_coverage_cannot_be_mistaken_for_complete_walk_history():
+    rows = [_row(i, baseOnBalls=1, doubles=0, triples=0) for i in range(10)]
+    del rows[0]["stat"]["baseOnBalls"]
+    report = _audit(rows)
+    assert report["market_history_field_readiness"]["BATTER_BB"]["missing_fields"] == [
+        "baseOnBalls"
+    ]
+    assert report["market_history_field_readiness"]["BATTER_SINGLES"]["status"] == (
+        "HISTORY_FIELDS_PRESENT_NOT_VALIDATED"
+    )
+
+
+def test_insufficient_history_does_not_claim_market_history_field_readiness():
+    rows = [_row(i, baseOnBalls=1, doubles=0, triples=0) for i in range(9)]
+    report = _audit(rows)
+    assert report["history_minimum_met"] is False
+    assert report["market_history_field_readiness"]["BATTER_HITS"]["status"] == (
+        "INSUFFICIENT_HISTORY"
+    )
+    assert report["market_history_field_readiness"]["BATTER_SINGLES"]["status"] == (
+        "INSUFFICIENT_HISTORY"
+    )
