@@ -847,36 +847,89 @@ def read_manifest(manifest_path: Path) -> list[dict[str, Any]]:
 def append_record(
     capture_path: Path, manifest_path: Path, record: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """Append one record to the capture file and chain it in the manifest.
+    """Serialize cooperating writers and fail closed on partial pair appends.
 
-    The manifest is a *separate* append-only file: each entry carries
-    the record's SHA-256 (over the exact line bytes written) chained to
-    the previous entry's chain hash, so editing the capture file — or
-    the manifest — breaks verification at the first touched position.
+    The stable, never-unlinked POSIX lock is shared by all appenders of a
+    manifest. Under the lock we validate *both* files before deriving a
+    sequence number; a damaged/incomplete pair is not extended or
+    silently repaired. Ordinary write exceptions roll back both files
+    to their prior byte lengths and fsync the rollback.
+
+    POSIX flock protects cooperating appenders, not unsynchronized readers.
+    Two files cannot be made crash-atomic: a process/power failure between
+    the two durable appends can leave a mismatch which a later append
+    must refuse. This is a research-only writer, NOT live-activation
+    approval or a claim of crash-atomic, externally anchored evidence.
     """
-    capture_path = Path(capture_path)
-    manifest_path = Path(manifest_path)
-    line = canonical_line(record)
-    digest = _sha256_hex(line)
-    existing = read_manifest(manifest_path)
-    prev_chain = (
-        str(existing[-1]["chain_sha256"]) if existing else GENESIS_CHAIN_SHA256
-    )
-    seq = len(existing) + 1
-    chain = _sha256_hex(f"{prev_chain}:{digest}".encode("utf-8"))
-    entry = {
-        "schema": SCHEMA_MANIFEST_ENTRY,
-        "seq": seq,
-        "record_sha256": digest,
-        "record_type": record.get("record_type"),
-        "game_pk": record.get("game_pk"),
-        "slot_id": record.get("slot_id"),
-        "prev_chain_sha256": prev_chain,
-        "chain_sha256": chain,
-    }
-    _append_line(capture_path, line)
-    _append_line(manifest_path, canonical_line(entry))
-    return entry
+    import fcntl
+    import os
+
+    capture_path = Path(capture_path).resolve()
+    manifest_path = Path(manifest_path).resolve()
+    if capture_path == manifest_path:
+        raise StarterCaptureError("CAPTURE_AND_MANIFEST_PATH_COLLIDE")
+    capture_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = manifest_path.with_name(manifest_path.name + ".lock")
+
+    # Never unlink this file: changing its inode would permit separate
+    # processes to hold distinct locks while both believe they are alone.
+    with lock_path.open("a+b") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        try:
+            checked = verify_capture_chain(capture_path, manifest_path)
+            if not checked["ok"]:
+                reason = checked["failure"]["reason"]
+                raise StarterCaptureError(
+                    f"CAPTURE_CHAIN_PREAPPEND_INVALID:{reason}"
+                )
+
+            line = canonical_line(record)
+            digest = _sha256_hex(line)
+            existing = read_manifest(manifest_path)
+            prev_chain = (
+                str(existing[-1]["chain_sha256"])
+                if existing else GENESIS_CHAIN_SHA256
+            )
+            seq = len(existing) + 1
+            chain = _sha256_hex(f"{prev_chain}:{digest}".encode("utf-8"))
+            entry = {
+                "schema": SCHEMA_MANIFEST_ENTRY,
+                "seq": seq,
+                "record_sha256": digest,
+                "record_type": record.get("record_type"),
+                "game_pk": record.get("game_pk"),
+                "slot_id": record.get("slot_id"),
+                "prev_chain_sha256": prev_chain,
+                "chain_sha256": chain,
+            }
+            before = {
+                capture_path: capture_path.stat().st_size if capture_path.exists() else 0,
+                manifest_path: manifest_path.stat().st_size if manifest_path.exists() else 0,
+            }
+            try:
+                _append_line(capture_path, line)
+                _append_line(manifest_path, canonical_line(entry))
+            except BaseException:
+                rollback_errors = []
+                for path, length in before.items():
+                    try:
+                        if path.exists():
+                            with path.open("r+b") as handle:
+                                handle.truncate(length)
+                                handle.flush()
+                                os.fsync(handle.fileno())
+                    except OSError as exc:
+                        rollback_errors.append(f"{path.name}:{type(exc).__name__}")
+                if rollback_errors:
+                    raise StarterCaptureError(
+                        "CAPTURE_APPEND_ROLLBACK_FAILED:" +
+                        ",".join(rollback_errors)
+                    )
+                raise
+            return entry
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
 
 def verify_capture_chain(capture_path: Path, manifest_path: Path) -> dict[str, Any]:
