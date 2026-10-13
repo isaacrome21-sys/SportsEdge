@@ -186,11 +186,13 @@ def render_card(card, *, run_url="", intake_at=""):
                                              "PUBLIC_CFB_PRIOR_GAMES_VERIFIED"}]
     missing = sum(r.get("status") == "UNAVAILABLE" for r in receipts)
     malformed = [r for r in receipts if r.get("status") == "UNUSABLE_SCHEMA"]
+    absent = [r for r in receipts if r.get("status") == "TEAM_NOT_IN_INJURY_FEED"]
     lines += ["", f"Free context: {fetched} ESPN/weather retrievals, "
               f"{len(public_pitchers)} verified public MLB pitcher-log inputs, "
               f"{len(public_batters)} verified public MLB batter-log inputs, "
               f"{len(public_football)} verified ESPN football named-stat histories, "
-              f"{missing} unavailable, {len(malformed)} unusable-schema reports. "
+              f"{missing} unavailable, {len(malformed)} unusable-schema reports, "
+              f"{len(absent)} absent-from-injury-feed reports. "
               "No paid odds calls.",
               "Full model card and source receipts are available in the workflow artifact.",
               f"GitHub Actions run: {safe(run_url, 300)}"]
@@ -213,6 +215,11 @@ def render_card(card, *, run_url="", intake_at=""):
     for item in malformed[:4]:
         lines.append("- Unusable public injury source for team ID " +
                      safe(item.get("team_id"), 20) + ": " +
+                     safe(item.get("reason"), 300))
+    for item in absent[:4]:
+        lines.append("- ESPN injury feed carries no report for team ID " +
+                     safe(item.get("team_id"), 20) + " (feed well-formed; "
+                     "team absent -- QB status unverified): " +
                      safe(item.get("reason"), 300))
     factor_report = card.get("factor_coverage")
     if factor_report:
