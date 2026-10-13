@@ -21,6 +21,22 @@ CORE = (
 )
 OPTIONAL = ("baseOnBalls", "strikeOuts", "doubles", "triples")
 
+# Contract-level field coverage for *observed* markets only. Neither a
+# populated field nor ten games establishes lineup, model skill or a DK quote.
+MARKET_FIELDS = {
+    "BATTER_HITS": ("hits",),
+    "BATTER_TOTAL_BASES": ("totalBases",),
+    "BATTER_RBIS": ("rbi",),
+    "BATTER_RUNS": ("runs",),
+    "BATTER_HRS": ("homeRuns",),
+    "BATTER_STOLEN_BASES": ("stolenBases",),
+    "BATTER_BB": ("baseOnBalls",),
+    "BATTER_K": ("strikeOuts",),
+    "BATTER_DOUBLES": ("doubles",),
+    "BATTER_SINGLES": ("hits", "doubles", "triples", "homeRuns"),
+    "HITS_RUNS_RBIS": ("hits", "runs", "rbi"),
+}
+
 
 def _utc(value: str, label: str) -> datetime:
     try:
@@ -136,6 +152,18 @@ def audit_gamelog(
     coverage = {field: sum(field in stats for _, _, stats in selected)
                 for field in CORE + OPTIONAL}
     total_pa = sum(stats["plateAppearances"] for _, _, stats in selected)
+    minimum = len(selected) >= 10 and total_pa >= 20
+    field_ready = {}
+    for market, names in sorted(MARKET_FIELDS.items()):
+        missing = [key for key in names if coverage[key] != len(selected)]
+        field_ready[market] = {
+            "status": ("HISTORY_FIELDS_PRESENT_NOT_VALIDATED"
+                       if minimum and not missing
+                       else "INSUFFICIENT_HISTORY" if not minimum
+                       else "REQUIRED_HISTORY_FIELD_MISSING"),
+            "missing_fields": missing,
+            "does_not_grant_pricing_authority": True,
+        }
     return {
         "schema": "MLB_BATTER_GAMELOG_LOSS_AUDIT_V1",
         "diagnostic_only": True,
@@ -147,8 +175,9 @@ def audit_gamelog(
         "kickoff_utc": kickoff.isoformat(),
         "retained_prior_games": len(selected),
         "retained_plate_appearances": total_pa,
-        "history_minimum_met": len(selected) >= 10 and total_pa >= 20,
+        "history_minimum_met": minimum,
         "per_field_retained_game_count": coverage,
+        "market_history_field_readiness": field_ready,
         "rejected_row_counts": dict(sorted(rejection.items())),
         "notes": [
             "No network access; input must be an authentic externally captured StatsAPI payload.",
