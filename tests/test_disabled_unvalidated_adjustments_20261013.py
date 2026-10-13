@@ -141,6 +141,55 @@ def test_engine_recent_form_and_rest_contribute_zero():
     assert "REST_DIFF_ADJ_DISABLED_PENDING_INCREMENTAL_VALUE" in notes
 
 
+def _nba_row(**extra):
+    row = {"sport": "NBA", "market": "ML", "side": "HOME",
+           "away": "New York Knicks", "home": "Boston Celtics",
+           "odds": -110, "kickoff": "2026-10-12T17:00:00Z",
+           "quote_captured_at": "2026-10-11T17:59:00Z"}
+    row.update(extra)
+    return row
+
+
+def test_engine_nba_rest_adj_contributes_zero():
+    # Owner ruling extended on PR #2120: the NBA rest adjustment is
+    # disabled in every canonical pricing path regardless of key name.
+    base = free_models.calculate(_nba_row(), None, CALC_NOW,
+                                 auto_context=False)
+    loaded = free_models.calculate(
+        _nba_row(), None, CALC_NOW, auto_context=False,
+        prepricing_adjustments=_verified({"rest_adj": 3.0}))
+    assert _lane_a_means(loaded) == _lane_a_means(base)
+    assert loaded["estimate_p"] == base["estimate_p"]
+    # Retained baseline only: league prior + static HFA (no ratings in
+    # no-fetch mode); the rest value changes nothing.
+    prior, _, _, hfa = free_models.PRIORS["NBA"]
+    assert _lane_a_means(base) == pytest.approx((prior + hfa / 2,
+                                                 prior - hfa / 2))
+    # Research retention: the value is still carried in context, and
+    # the gate is disclosed on the priced row.
+    assert loaded["context"]["rest_adj"] == 3.0
+    assert "REST_ADJ_DISABLED_PENDING_INCREMENTAL_VALUE" in \
+        " ".join(loaded["context_notes"])
+
+
+def test_engine_nba_rest_adj_manual_override_cannot_reactivate():
+    # The disable holds however the value arrives: a flagged manual
+    # context override (the only way rest_adj reaches an NBA row in
+    # practice) must not reactivate the factor.
+    zero = free_models.calculate(
+        _nba_row(context={"rest_adj": 0.0}), None, CALC_NOW,
+        auto_context=False, allow_manual_context=True)
+    loaded = free_models.calculate(
+        _nba_row(context={"rest_adj": 4.0}), None, CALC_NOW,
+        auto_context=False, allow_manual_context=True)
+    assert _lane_a_means(loaded) == _lane_a_means(zero)
+    assert loaded["estimate_p"] == zero["estimate_p"]
+    assert loaded["context"]["rest_adj"] == 4.0
+    assert loaded["context_provenance"]["rest_adj"] == "USER_SUPPLIED_MANUAL"
+    assert "REST_ADJ_DISABLED_PENDING_INCREMENTAL_VALUE" in \
+        " ".join(loaded["context_notes"])
+
+
 def test_engine_pitcher_and_rest_contribute_zero_mlb():
     base = free_models.calculate(_mlb_row(), None, CALC_NOW,
                                  auto_context=False)
