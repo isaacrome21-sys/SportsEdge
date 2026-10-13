@@ -958,9 +958,9 @@ def verify_capture_chain(capture_path: Path, manifest_path: Path) -> dict[str, A
     # reader but the next append would concatenate two separate records.
     # Treat an interrupted terminal write as a failed archive, not a
     # successfully chained record awaiting silent continuation.
-    if capture_path.exists() and capture_path.stat().st_size and not capture_path.read_bytes().endswith(b"\\n"):
+    if capture_path.exists() and capture_path.stat().st_size and not capture_path.read_bytes().endswith(b"\n"):
         return failure("CAPTURE_LINE_UNTERMINATED", len(capture_lines))
-    if manifest_path.exists() and manifest_path.stat().st_size and not manifest_path.read_bytes().endswith(b"\\n"):
+    if manifest_path.exists() and manifest_path.stat().st_size and not manifest_path.read_bytes().endswith(b"\n"):
         return failure("MANIFEST_LINE_UNTERMINATED", len(manifest_lines))
     if len(capture_lines) != len(manifest_lines):
         return failure("RECORD_COUNT_MISMATCH", None)
