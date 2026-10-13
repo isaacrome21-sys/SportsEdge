@@ -86,7 +86,9 @@ def test_recorder_valid_clock_within_trusted_window(tmp_path):
     with _trusted(T0, T0 + timedelta(seconds=1)):
         with ms.capture_mlb_source_bytes(tmp_path, clock=lambda: T0 + timedelta(milliseconds=500)) as cap:
             ms._get_json("https://x/api/v1/schedule", _open)
-    assert cap.records[0].observed_at_utc == (T0 + timedelta(milliseconds=500)).isoformat()
+    # Canonical observation is the trusted post-read receipt, never the earlier recorder clock.
+    assert cap.records[0].observed_at_utc == (T0 + timedelta(seconds=1)).isoformat()
+    assert cap.records[0].recorder_clock_assertion_utc == (T0 + timedelta(milliseconds=500)).isoformat()
 
 
 def test_adversarial_year_2000_recorder_clock_rejected(tmp_path):
