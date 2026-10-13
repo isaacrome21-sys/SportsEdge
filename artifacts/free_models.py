@@ -1263,6 +1263,12 @@ def _paired_book_context(rows, evaluated, index):
             return False
         if book(other_row) != book(row):
             return False
+        # The counterpart must be the same explicit sportsbook contract.
+        # A game/line match alone does not match regulation vs period,
+        # live vs pregame, settlement or supplied event identity.
+        for field in ("period", "phase", "settlement_type", "event_id", "dk_event_id"):
+            if str(other_row.get(field) or "").strip().upper() != str(row.get(field) or "").strip().upper():
+                return False
         if _pair_side(other_row, other) != expected_opposite:
             return False
         if market == "TEAM_TOTALS":
@@ -1318,23 +1324,31 @@ def _paired_book_context(rows, evaluated, index):
     if book(row) != "draftkings":
         projected["paired_market_status"] = "NOT_DRAFTKINGS_PAIR"
         return
-    # Pairing requires contemporaneous, independently timestamped quotes.
-    # A counterpart quote without a parseable capture time is NOT assumed
-    # to be from the same screenshot: the pair is refused. When both
-    # timestamps parse, the captures must be within 120 seconds of each
-    # other, not merely unequal as strings.
-    input_time = dt(row.get("quote_captured_at"))
+    # A manually entered opposite price is not independent quote evidence.
+    # Parse both timestamps WITHOUT assuming a timezone, and compare true
+    # instants rather than representation strings. Missing or invalid clocks
+    # cannot support a paired sportsbook baseline.
+    input_time_raw = row.get("quote_captured_at")
+    matching_time_raw = (rows[compatible[0]["input_index"]].get("quote_captured_at")
+                         if len(compatible) == 1 else None)
     if len(compatible) == 1:
-        matching_time = dt(rows[compatible[0]["input_index"]].get("quote_captured_at"))
-        if matching_time is None:
-            projected["paired_market_status"] = "COUNTERPART_QUOTE_TIMESTAMP_MISSING"
+        if not input_time_raw or not matching_time_raw:
+            projected["paired_market_status"] = "MISSING_COUNTERPART_QUOTE_TIMESTAMP"
             return
-        if input_time is None:
-            projected["paired_market_status"] = "QUOTE_TIMESTAMP_MISSING"
+        try:
+            pair_times = [datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+                          for ts in (input_time_raw, matching_time_raw)]
+            if any(ts.tzinfo is None or ts.utcoffset() is None for ts in pair_times):
+                raise ValueError("TIMEZONE_REQUIRED")
+        except (TypeError, ValueError, OverflowError):
+            projected["paired_market_status"] = "INVALID_PAIR_QUOTE_TIMESTAMP"
             return
-        if abs((input_time - matching_time).total_seconds()) > 120:
+        skew = abs((pair_times[0] - pair_times[1]).total_seconds())
+        if skew > 120:
             projected["paired_market_status"] = "MISMATCHED_QUOTE_TIMESTAMPS"
             return
+        projected["paired_quote_skew_seconds"] = skew
+        projected["paired_quote_captured_at"] = [ts.isoformat() for ts in pair_times]
     else:
         # No compatible partner row exists: the partner price came solely
         # from this row's own opposite_odds field. An asserted field on the
