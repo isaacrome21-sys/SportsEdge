@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 .pytest_cache/
 research/.cache_first_inning/
+# Live validation HTTP cache (reproducible from free endpoints; not committed)
+data/live_validation_cache/
