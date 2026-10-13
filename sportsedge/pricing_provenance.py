@@ -54,6 +54,10 @@ ANCHORED_EV_PRESENTATION = "ANCHORED_RESEARCH_ONLY_NOT_A_PLAY"
 PLAY_SURFACE_STATUSES = frozenset({
     "RESEARCH_POSITIVE_EV_UNVALIDATED",
     "RESEARCH_CANDIDATE_NOT_VALIDATED",
+    # Phase 7 quarter/margin/alternate coverage emits RESEARCH_EDGE on
+    # theoretical EV. It must NOT bypass provenance simply because its
+    # status spelling differs from the canonical game/prop lanes.
+    "RESEARCH_EDGE",
 })
 GATED_STATUSES = PLAY_SURFACE_STATUSES | {"PRICED_RESEARCH"}
 
