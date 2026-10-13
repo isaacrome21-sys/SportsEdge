@@ -1,0 +1,123 @@
+{
+ "event_id": "401872992",
+ "injuries": [
+  {
+   "team": {
+    "id": "26",
+    "displayName": "Seattle Seahawks",
+    "abbreviation": "SEA"
+   },
+   "injuries": [
+    {
+     "athlete": {
+      "id": "4428659",
+      "displayName": "Drake Thomas",
+      "position": "LB"
+     },
+     "status": "Questionable",
+     "date": "2026-10-11T22:04Z",
+     "type": "Q"
+    },
+    {
+     "athlete": {
+      "id": "4432734",
+      "displayName": "Jalen Milroe",
+      "position": "QB"
+     },
+     "status": "Out",
+     "date": "2026-10-11T19:24Z",
+     "type": "O"
+    },
+    {
+     "athlete": {
+      "id": "4037521",
+      "displayName": "Chazz Surratt",
+      "position": "LB"
+     },
+     "status": "Out",
+     "date": "2026-10-11T19:02Z",
+     "type": "O"
+    },
+    {
+     "athlete": {
+      "id": "5151317",
+      "displayName": "Robert Henry Jr.",
+      "position": "RB"
+     },
+     "status": "Out",
+     "date": "2026-10-11T19:02Z",
+     "type": "O"
+    },
+    {
+     "athlete": {
+      "id": "4569547",
+      "displayName": "Nick Kallerup",
+      "position": "TE"
+     },
+     "status": "Out",
+     "date": "2026-10-11T19:02Z",
+     "type": "O"
+    }
+   ]
+  },
+  {
+   "team": {
+    "id": "25",
+    "displayName": "San Francisco 49ers",
+    "abbreviation": "SF"
+   },
+   "injuries": [
+    {
+     "athlete": {
+      "id": "3126486",
+      "displayName": "Deebo Samuel Sr.",
+      "position": "WR"
+     },
+     "status": "Out",
+     "date": "2026-10-11T23:06Z",
+     "type": "O"
+    },
+    {
+     "athlete": {
+      "id": "4430431",
+      "displayName": "Kurtis Rourke",
+      "position": "QB"
+     },
+     "status": "Out",
+     "date": "2026-10-11T19:17Z",
+     "type": "O"
+    },
+    {
+     "athlete": {
+      "id": "4693337",
+      "displayName": "Marques Sigle",
+      "position": "S"
+     },
+     "status": "Out",
+     "date": "2026-10-11T18:59Z",
+     "type": "O"
+    },
+    {
+     "athlete": {
+      "id": "4693371",
+      "displayName": "James Thompson Jr.",
+      "position": "DT"
+     },
+     "status": "Out",
+     "date": "2026-10-11T18:59Z",
+     "type": "O"
+    },
+    {
+     "athlete": {
+      "id": "16002",
+      "displayName": "Kyle Juszczyk",
+      "position": "FB"
+     },
+     "status": "Out",
+     "date": "2026-10-11T18:59Z",
+     "type": "O"
+    }
+   ]
+  }
+ ]
+}
