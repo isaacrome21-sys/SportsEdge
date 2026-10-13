@@ -164,3 +164,23 @@ def test_canonical_pitcher_family_routes_are_exercised_without_network():
 def test_no_fetch_league_prior_cannot_be_a_lean():
     row = result(context_notes=["NO_FETCH_MANUAL_MODE_NO_PUBLIC_CONTEXT"])
     assert build_phone_card(card(row))["selections"][0]["status"] == "WATCH"
+
+
+def test_large_board_pages_keep_every_selection_under_comment_limit():
+    from sportsedge.phone_display import phone_card_pages
+    c = card(*(result(player_name=f"UniquePlayer{i}") for i in range(2000)))
+    pages = phone_card_pages(render_phone_card(c))
+    assert len(pages) > 1
+    assert all(len(page.encode("utf-8")) < 55000 for page in pages)
+    joined = "".join(pages)
+    assert joined.count("| LEAN |") == 2000
+    assert all(f"UniquePlayer{i} " in joined for i in range(2000))
+    assert all("| Selection / market |" in page for page in pages[:-1])
+
+
+def test_utf8_page_limits_count_bytes_not_characters():
+    from sportsedge.phone_display import phone_card_pages
+    text = "".join("| " + "球" * 100 + " |\n" for _ in range(100))
+    pages = phone_card_pages(text, max_bytes=2000)
+    assert all(len(page.encode("utf-8")) < 2000 for page in pages)
+    assert "".join(pages).count("球") == 10000

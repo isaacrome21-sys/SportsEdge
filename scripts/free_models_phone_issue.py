@@ -263,6 +263,14 @@ def main(argv=None):
         raise SystemExit("FREE_RESEARCH_ISSUE_ERROR:" + safe(exc, 160)) from exc
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(text, encoding="utf-8")
+    if args.mode == "render":
+        from sportsedge.phone_display import phone_card_pages
+        page_paths = []
+        for index, page in enumerate(phone_card_pages(text), 1):
+            path = args.output.with_name(f"{args.output.stem}.part-{index:04d}.md")
+            path.write_text(page, encoding="utf-8")
+            page_paths.append(str(path))
+        args.output.with_suffix(".parts.json").write_text(json.dumps(page_paths), encoding="utf-8")
 
 if __name__ == "__main__":
     main()

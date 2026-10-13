@@ -191,3 +191,34 @@ def render_phone_card(card, *, run_url="", intake_at=""):
     if run_url:
         lines += ["", f"Run receipt: {_safe(run_url)}"]
     return "\n".join(lines) + "\n"
+
+
+def phone_card_pages(markdown, *, max_bytes=55000):
+    """Bound GitHub comment size without dropping rows; repeat table context."""
+    if max_bytes < 1000:
+        raise ValueError("PHONE_PAGE_LIMIT_TOO_SMALL")
+    pages, current = [], []
+    heading, table, separator = "", "", ""
+    size = 0
+    for line in markdown.splitlines(keepends=True):
+        needed = len(line.encode("utf-8"))
+        if needed > max_bytes - 1000:
+            raise ValueError("PHONE_ROW_EXCEEDS_PAGE_LIMIT")
+        if current and size + needed > max_bytes - 200:
+            pages.append("".join(current))
+            context = [heading, "\n", table, separator] if line.startswith("|") else []
+            current = [part for part in context if part]
+            size = sum(len(part.encode("utf-8")) for part in current)
+        current.append(line)
+        size += needed
+        if line.startswith("### "):
+            heading, table, separator = line, "", ""
+        elif line.startswith("| Selection /") or line.startswith("| Sport / market"):
+            table = line
+        elif line.startswith("| ---"):
+            separator = line
+    if current:
+        pages.append("".join(current))
+    if len(pages) <= 1:
+        return pages
+    return [f"## SportsEdge · page {i}/{len(pages)}\n\n" + page for i, page in enumerate(pages, 1)]
