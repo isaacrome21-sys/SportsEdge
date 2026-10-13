@@ -39,7 +39,9 @@ def _poisson_over(mean: float, line: float) -> float:
 
 
 def run_player_harness(games, quarter_games, logs, *, min_team_games=5, min_player_games=3, n_paths=N_PATHS,
-                       version: str = "v1"):
+                       version: str = "v1", baseline: str = "naive"):
+    if baseline not in {"naive", "naive_oracle"}:
+        raise ValueError("BASELINE_INVALID")
     """games: NBAGame list; quarter_games: QuarterGame list; logs: PlayerLog list (minutes > 0 only)."""
     qmap = {q.game_id: q for q in quarter_games}
     games = sorted((g for g in games if g.game_id in qmap), key=lambda g: (g.start, g.game_id))
@@ -86,17 +88,22 @@ def run_player_harness(games, quarter_games, logs, *, min_team_games=5, min_play
                 except ValueError:
                     continue
                 alloc = allocate(rot, paths, seed=int(g.game_id) % (2**31)) if version == "v1" else None
+                scale = 1.0
+                if baseline == "naive_oracle":  # same after-the-fact who-played knowledge as the candidate
+                    raw = [sum(l.minutes for l in h) / len(h) for h in
+                           (by_player.get((team, q), [])[-10:] for q in played) if h]
+                    scale = 240.0 / sum(raw) if raw and sum(raw) > 0 else 1.0
                 for pid, actual in played.items():
                     hist = by_player.get((team, pid), [])[-10:]
                     if pid not in rot.players or len(hist) < min_player_games:
                         continue
                     i = rot.players.index(pid)
-                    nm = sum(l.minutes for l in hist) / len(hist)
+                    nm = scale * sum(l.minutes for l in hist) / len(hist)
                     mins[0] += 1
                     mins[1] += abs(rot.exp_minutes[i] - actual.minutes)
                     mins[2] += abs(nm - actual.minutes)
                     for s, lines in LINES.items():
-                        nmean = sum(getattr(l, FIELD[s]) for l in hist) / len(hist)
+                        nmean = scale * sum(getattr(l, FIELD[s]) for l in hist) / len(hist)
                         y_val = getattr(actual, FIELD[s])
                         for x in lines:
                             m = (player_market(rot, alloc, pid, s, x) if version == "v1"
@@ -113,7 +120,7 @@ def run_player_harness(games, quarter_games, logs, *, min_team_games=5, min_play
     decision = {s: "PASS_RESEARCH" if all(v["brier_cand"] < v["brier_naive"] for v in d.values()) and
                 any(v["n"] for v in d.values()) else "FAIL" for s, d in out.items()}
     decision["MINUTES"] = "PASS_RESEARCH" if m["n"] and m["mae_cand"] < m["mae_naive"] else "FAIL"
-    return {"version": version, "stats": out, "minutes": m, "decision": decision, "availability": AVAILABILITY_LABEL,
+    return {"version": version, "baseline": baseline, "stats": out, "minutes": m, "decision": decision, "availability": AVAILABILITY_LABEL,
             "market_baseline": "MISSING", "prop_status_ceiling": "WATCH"}
 
 

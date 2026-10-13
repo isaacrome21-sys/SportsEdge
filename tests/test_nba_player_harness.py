@@ -23,3 +23,12 @@ def test_parse_drops_dnp_zero_minutes_and_incomplete():
 
 def test_poisson_over():
     assert abs(_poisson_over(2.0, 2.5) - (1 - 5 * 2.718281828 ** -2)) < 1e-6
+
+
+def test_baseline_option_validated():
+    import pytest
+    from sportsedge.sports.nba.player_harness import run_player_harness
+    with pytest.raises(ValueError):
+        run_player_harness([], [], [], baseline="bogus")
+    r = run_player_harness([], [], [], version="v2", baseline="naive_oracle")
+    assert r["baseline"] == "naive_oracle" and r["prop_status_ceiling"] == "WATCH"
