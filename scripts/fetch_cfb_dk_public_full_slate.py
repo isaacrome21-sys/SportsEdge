@@ -47,8 +47,6 @@ EXPECTED_MATCHUPS = (
     ("Minnesota", "Purdue"), ("Kansas", "Utah"),
     ("Hawaii", "Arizona State"), ("Boise State", "Fresno State"),
 )
-ILLINOIS_MATCHUPS = {("Ball State", "Northwestern"), ("Illinois", "Michigan State"),
-                    ("Air Force", "Northern Illinois")}
 NATIVE_FCS_GAPS = {("Sacramento State", "Bowling Green"),
                    ("North Dakota State", "UNLV")}
 _GAME = re.compile(r"^\s*([^@]{2,70})\s+@\s+([^@]{2,70})\s*$")
@@ -67,6 +65,51 @@ def _name(s):
     return {"central florida": "ucf", "miami ohio": "miami oh",
             "miami oh": "miami oh", "connecticut": "uconn",
             "ul lafayette": "louisiana", "louisiana lafayette": "louisiana"}.get(n, n)
+
+
+_FORMS_CACHE = None
+
+
+def _illinois_forms():
+    """Name forms of the frozen Illinois-college registry (PR #2148).
+
+    Derived from artifacts/free_models -- IL_COLLEGE_NAMES plus the
+    normalized display labels of IL_COLLEGE_ESPN_IDS -- never re-listed
+    here, so this script cannot drift from the single registry. The
+    pair-keyed ILLINOIS_MATCHUPS set this replaced excluded only three
+    hardcoded fixtures (issue #2151).
+    """
+    global _FORMS_CACHE
+    if _FORMS_CACHE is None:
+        import sys
+        root = str(Path(__file__).resolve().parents[1])
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        from artifacts.free_models import IL_COLLEGE_ESPN_IDS, IL_COLLEGE_NAMES
+        forms = {_name(name) for name in IL_COLLEGE_NAMES}
+        forms.update(_name(name) for name in IL_COLLEGE_ESPN_IDS.values())
+        _FORMS_CACHE = frozenset(forms)
+    return _FORMS_CACHE
+
+
+def _is_illinois_team(name):
+    """Team-keyed Illinois-college check (either participant excludes)."""
+    school = _name(name)
+    if not school:
+        return False
+    if "illinois" in school:
+        return True
+    for form in _illinois_forms():
+        if school == form:
+            return True
+        if school.startswith(form + " "):
+            # Northwestern (IL) must not swallow Northwestern State (LA).
+            if form == "northwestern" and (
+                    school == "northwestern state"
+                    or school.startswith("northwestern state ")):
+                continue
+            return True
+    return False
 
 
 def _odds(s):
@@ -176,7 +219,7 @@ def compile_full_slate(pages, *, captured_at_utc=None, min_eligible_paired=30):
     for away, home in EXPECTED_MATCHUPS:
         key = (_name(away), _name(home))
         row = observed.get(key)
-        reason = ("ILLINOIS_COLLEGE_EXCLUDED" if (away, home) in ILLINOIS_MATCHUPS else
+        reason = ("ILLINOIS_COLLEGE_EXCLUDED" if _is_illinois_team(away) or _is_illinois_team(home) else
                   "FCS_NATIVE_MODEL_SNAPSHOT_UNAVAILABLE" if (away, home) in NATIVE_FCS_GAPS else
                   "MISSING_PUBLIC_DK_MATCHUP" if row is None else
                   "CONFLICTING_PUBLIC_PAGE_QUOTES" if row.get("ambiguous_pagination") else
@@ -203,7 +246,10 @@ def compile_full_slate(pages, *, captured_at_utc=None, min_eligible_paired=30):
         raise ValueError("CFB_DK_PUBLIC_BOARD_INSUFFICIENT_PAIRED_COVERAGE:%d" % len(board))
     return {"schema": SCHEMA, "slate_date": GAME_DATE,
             "captured_at_utc": captured, "scheduled_fbs_games": 46,
-            "illinois_exclusions": 3, "fcs_native_gap_exclusions": 2,
+            "illinois_exclusions": sum(
+                1 for item in inventory
+                if item["status"] == "ILLINOIS_COLLEGE_EXCLUDED"),
+            "fcs_native_gap_exclusions": 2,
             "scorable_games_with_both_pairs": len(board),
             "source": "DRAFTKINGS_NETWORK_PUBLIC_AGGREGATE_SPLITS",
             "unverified_individual_quote_timestamps": True,
