@@ -96,6 +96,24 @@ def _price(text: str) -> int:
     return value
 
 
+# Period / source-field contract. Every intake row carries the scoring period
+# its label names, so F5 and first-inning selections can never be confused
+# with full-game rows downstream. ``period_source`` records that the period
+# came from the typed market label (transcription), not from a sportsbook feed.
+PERIOD_FULL_GAME = "FULL_GAME"
+PERIOD_F5 = "F5"
+PERIOD_FIRST_INNING = "FIRST_INNING"
+PERIOD_SOURCE = "INTAKE_MARKET_LABEL"
+
+
+def period_for_market(market_type: str) -> str:
+    if market_type.startswith("FIRST_FIVE_"):
+        return PERIOD_F5
+    if market_type == "FIRST_INNING_TOTAL":
+        return PERIOD_FIRST_INNING
+    return PERIOD_FULL_GAME
+
+
 def _norm(text: str) -> str:
     return " ".join(re.sub(r"[^a-z0-9 ]", " ", text.lower()).split())
 
@@ -281,6 +299,8 @@ def build_input(
             "first_pitch_at": parse_game_start(game.game_date).isoformat(),
             "source": "MANUAL",
             "timestamp_source": "INTAKE_STAMPED",
+            "period": period_for_market(row.market_type),
+            "period_source": PERIOD_SOURCE,
         }
         if row.subject_name:
             record["subject_name"] = row.subject_name

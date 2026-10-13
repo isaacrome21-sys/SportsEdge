@@ -49,6 +49,25 @@ _TOTAL = re.compile(
 )
 
 
+# Period-prefixed shapes. These are parsed and accounted for, never priced:
+# they are returned under ``blocked_selections`` and never enter ``quotes``.
+#   CFB/NFL "1H ML ..." / "1H SPREAD ..."  -> BLOCKED / NO_ENGINE
+#   MLB     "F5 ML ..." / "F5 RL ..." / "F5 TOTAL ..." -> BLOCKED / NOT_VALIDATED
+_PERIOD = re.compile(r"^(1H|FIRST_HALF|FIRST HALF|F5|FIRST5|FIRST_5)\s+(.+)$", re.IGNORECASE)
+_PERIOD_CANON = {"1H": "1H", "FIRST_HALF": "1H", "FIRST HALF": "1H",
+                 "F5": "F5", "FIRST5": "F5", "FIRST_5": "F5"}
+_PERIOD_SPORTS = {"1H": frozenset({"CFB", "NFL"}), "F5": frozenset({"MLB"})}
+_PERIOD_MARKETS = {"1H": frozenset({"moneyline", "spread"}),
+                   "F5": frozenset({"moneyline", "spread", "total"})}
+_PERIOD_BLOCK = {
+    "1H": ("NO_ENGINE", "No validated first-half score distribution exists; "
+                        "1H selections are intake-only."),
+    "F5": ("NOT_VALIDATED", "F5 engine is eligible=false (F5 validation failed; "
+                            "prospective prereg pending); intake-only."),
+}
+_PERIOD_MARKET_PREFIX = {"1H": "first_half_", "F5": "f5_"}
+
+
 def _book(raw: str) -> str:
     key = raw.strip().upper()
     if key in _BOOK_ALIASES:
@@ -95,6 +114,7 @@ def parse_manual_line_paste(text: str) -> dict[str, Any]:
     retrieved_at = _aware(retrieved_raw)
 
     quotes: list[dict[str, Any]] = []
+    blocked: list[dict[str, Any]] = []
     away = home = None
     game_id = None
     for raw in lines[1:]:
@@ -105,6 +125,13 @@ def parse_manual_line_paste(text: str) -> dict[str, Any]:
             continue
         if home is None or away is None or game_id is None:
             raise ManualLinePasteError("GAME_LINE_REQUIRED_BEFORE_MARKETS")
+        period = _PERIOD.match(raw)
+        if period:
+            blocked.extend(_period_rows(
+                period, raw, sport=sport, game_id=game_id, home=home, away=away,
+                book=book, retrieved_at=retrieved_at,
+            ))
+            continue
         ml = _ML.match(raw)
         if ml:
             quotes.extend(
@@ -194,7 +221,7 @@ def parse_manual_line_paste(text: str) -> dict[str, Any]:
             continue
         raise ManualLinePasteError(f"PASTE_LINE_UNRECOGNIZED:{raw}")
 
-    if not quotes:
+    if not quotes and not blocked:
         raise ManualLinePasteError("PASTE_NO_MARKETS")
 
     normalized = [normalize_quote(q) for q in quotes]
@@ -208,8 +235,55 @@ def parse_manual_line_paste(text: str) -> dict[str, Any]:
         "source": "MANUAL",
         "odds_api": False,
         "quotes": normalized,
+        "blocked_selections": blocked,
+        "selection_accounting": {
+            "submitted": len(normalized) + len(blocked),
+            "priced_path": len(normalized),
+            "blocked": len(blocked),
+        },
         "authority_footer": "NOT Model_P / NOT Truth Gate / NOT OFFICIAL",
     }
+
+
+def _period_rows(match, raw, *, sport, game_id, home, away, book, retrieved_at):
+    period = _PERIOD_CANON[match.group(1).upper().replace("  ", " ")]
+    if sport not in _PERIOD_SPORTS[period]:
+        raise ManualLinePasteError(f"PERIOD_NOT_SUPPORTED_FOR_SPORT:{period}:{sport}")
+    rest = match.group(2).strip()
+    sides: list[tuple[str, str, float | None, int]] = []
+    if (m := _ML.match(rest)):
+        market = "moneyline"
+        sides = [(market, m.group(1), None, _american(m.group(2))),
+                 (market, m.group(3), None, _american(m.group(4)))]
+    elif (m := _SPREAD.match(rest)):
+        market = "spread"
+        sides = [(market, m.group(1), float(m.group(2)), _american(m.group(3))),
+                 (market, m.group(4), float(m.group(5)), _american(m.group(6)))]
+    elif (m := _TOTAL.match(rest)):
+        market = "total"
+        sides = [(market, "OVER", float(m.group(1)), _american(m.group(3))),
+                 (market, "UNDER", float(m.group(1)), _american(m.group(5)))]
+    else:
+        raise ManualLinePasteError(f"PASTE_LINE_UNRECOGNIZED:{raw}")
+    if market not in _PERIOD_MARKETS[period]:
+        raise ManualLinePasteError(f"PERIOD_MARKET_NOT_SUPPORTED:{period}:{market}")
+    if market == "spread":
+        (_, _, l1, _), (_, _, l2, _) = sides
+        if l1 != -l2:
+            raise ManualLinePasteError(f"PERIOD_SPREAD_LINES_NOT_OPPOSED:{raw}")
+    reason, detail = _PERIOD_BLOCK[period]
+    return [
+        {
+            "game_id": game_id, "home": home, "away": away,
+            "market": _PERIOD_MARKET_PREFIX[period] + mk,
+            "period": period, "period_source": "PASTE_PERIOD_PREFIX",
+            "selection": sel, "line": line, "price_american": price,
+            "book": book, "retrieved_at": retrieved_at,
+            "status": "BLOCKED", "block_reason": reason, "block_detail": detail,
+            "priced": False, "pricing_authorized": False, "raw": raw,
+        }
+        for mk, sel, line, price in sides
+    ]
 
 
 __all__ = ["ManualLinePasteError", "SCHEMA", "parse_manual_line_paste"]
