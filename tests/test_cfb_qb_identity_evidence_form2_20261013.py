@@ -824,7 +824,7 @@ class CfbStageForm2Tests(unittest.TestCase):
                              "position": {"abbreviation": "WR"}}}]},
             {"id": "2393", "displayName": "Middle Tennessee Blue Raiders",
              "injuries": [
-                 {"status": "Active",
+                 {"status": "Active", "date": "2026-10-13T13:00:00Z",
                   "athlete": {"displayName": "Starting Quarterback",
                               "position": {"abbreviation": "QB"}}}]},
         ]}
