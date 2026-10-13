@@ -980,6 +980,26 @@ def verify_capture_chain(capture_path: Path, manifest_path: Path) -> dict[str, A
         chain = _sha256_hex(f"{prev_chain}:{digest}".encode("utf-8"))
         if entry.get("chain_sha256") != chain or entry.get("seq") != index:
             return failure("MANIFEST_HASH_MISMATCH", index)
+        try:
+            source_record = json.loads(line.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return failure("CAPTURE_RECORD_UNPARSEABLE", index)
+        if not isinstance(source_record, dict) or not isinstance(entry, dict):
+            return failure("MANIFEST_RECORD_TYPE_INVALID", index)
+        expected_entry = {
+            "schema": SCHEMA_MANIFEST_ENTRY,
+            "seq": index,
+            "record_sha256": digest,
+            "record_type": source_record.get("record_type"),
+            "game_pk": source_record.get("game_pk"),
+            "slot_id": source_record.get("slot_id"),
+            "prev_chain_sha256": prev_chain,
+            "chain_sha256": chain,
+        }
+        if entry != expected_entry:
+            return failure("MANIFEST_METADATA_MISMATCH", index)
+        if manifest_line != canonical_line(entry):
+            return failure("MANIFEST_ENCODING_MISMATCH", index)
         prev_chain = chain
     return {
         "ok": True,
