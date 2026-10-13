@@ -97,6 +97,43 @@ def test_anchored_lane_never_displays_independent_ev_as_its_own():
     assert public["probability"] is None and public["estimated_ev"] is None
 
 
+@pytest.mark.parametrize("freshness", [
+    {"code": "QUOTE_STALE_OVER_180S", "age_seconds": 900},
+    {"code": "QUOTE_TIMESTAMP_INVALID", "age_seconds": None},
+    {"code": "QUOTE_TIMESTAMP_IN_FUTURE", "age_seconds": -60},
+    {"code": "QUOTE_FRESHNESS_UNVERIFIED", "age_seconds": None},
+    {},
+])
+def test_explicit_nonfresh_evidence_defeats_legacy_recent_label(freshness):
+    row = result(quote_status="RECENT_CAPTURED_QUOTE",
+                 quote_freshness=freshness)
+    displayed = build_phone_card(card(row))["selections"][0]
+    assert displayed["status"] == "REFRESH REQUIRED"
+    assert displayed["probability"] is None
+    assert displayed["estimated_ev"] is None
+
+
+def test_market_anchored_provenance_marker_alone_suppresses_metrics():
+    row = result(pricing_provenance={"lane": "MARKET_ANCHORED",
+                                    "mechanism": "MARKET_SHRINK_15PCT"},
+                 pricing_lane=None)
+    displayed = build_phone_card(card(row))["selections"][0]
+    assert displayed["status"] == "WATCH"
+    assert displayed["probability"] is None
+    assert displayed["estimated_ev"] is None
+    assert displayed["fair_odds"] is None
+
+
+def test_undetermined_provenance_fails_closed_despite_positive_ev():
+    row = result(pricing_provenance={"lane": "UNDETERMINED",
+                                    "source": "NO_PROVENANCE_MARKERS_ON_PRICED_ROW"})
+    displayed = build_phone_card(card(row))["selections"][0]
+    assert displayed["status"] == "BLOCKED"
+    assert displayed["reason"] == "PROVENANCE_UNDETERMINED"
+    assert displayed["probability"] is None
+    assert displayed["estimated_ev"] is None
+
+
 def test_unpaired_game_cannot_become_a_lean():
     row = result(independent_projection={"estimate_p": .7, "ev_per_dollar": .2,
                                          "paired_market_status": "MISSING_EXACT_OPPOSITE_DK_PRICE"})
