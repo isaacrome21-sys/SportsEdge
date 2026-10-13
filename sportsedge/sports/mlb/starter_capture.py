@@ -941,8 +941,10 @@ def verify_capture_chain(capture_path: Path, manifest_path: Path) -> dict[str, A
     (or the manifest) fails at the first mismatching position with a
     named reason.
     """
-    capture_lines = _read_lines(Path(capture_path))
-    manifest_lines = _read_lines(Path(manifest_path))
+    capture_path = Path(capture_path)
+    manifest_path = Path(manifest_path)
+    capture_lines = _read_lines(capture_path)
+    manifest_lines = _read_lines(manifest_path)
 
     def failure(reason: str, seq: int | None) -> dict[str, Any]:
         return {
@@ -952,6 +954,14 @@ def verify_capture_chain(capture_path: Path, manifest_path: Path) -> dict[str, A
             "failure": {"reason": reason, "seq": seq},
         }
 
+    # A JSONL final line without a newline can appear valid to a splitlines
+    # reader but the next append would concatenate two separate records.
+    # Treat an interrupted terminal write as a failed archive, not a
+    # successfully chained record awaiting silent continuation.
+    if capture_path.exists() and capture_path.stat().st_size and not capture_path.read_bytes().endswith(b"\\n"):
+        return failure("CAPTURE_LINE_UNTERMINATED", len(capture_lines))
+    if manifest_path.exists() and manifest_path.stat().st_size and not manifest_path.read_bytes().endswith(b"\\n"):
+        return failure("MANIFEST_LINE_UNTERMINATED", len(manifest_lines))
     if len(capture_lines) != len(manifest_lines):
         return failure("RECORD_COUNT_MISMATCH", None)
     prev_chain = GENESIS_CHAIN_SHA256
