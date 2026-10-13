@@ -201,6 +201,21 @@ def load_research_starter_binding(
     raw = sc.verify_raw_store(Path(capture_path), Path(raw_dir))
     if not raw["ok"]:
         return _blocked(f"RAW_BYTES_UNVERIFIED:{raw['failure']['reason']}", game_pk)
+    # Hash-chain and raw-byte verification alone can accept a paired write
+    # that has no COMMIT in the write-ahead intent journal. A pending BEGIN,
+    # torn intent line, orphan or temporary raw blob is never usable as
+    # point-in-time starter evidence, even for research-only binding.
+    try:
+        committed_store = sc.verify_capture_store(
+            Path(capture_path), Path(manifest_path), Path(raw_dir),
+            verifier_now=verifier_now,
+        )
+    except Exception as exc:  # I/O, corrupt intent or malformed archive
+        return _blocked(f"CAPTURE_STORE_UNVERIFIED:{type(exc).__name__}", game_pk)
+    if not isinstance(committed_store, Mapping) or committed_store.get("ok") is not True:
+        failure = committed_store.get("failure") if isinstance(committed_store, Mapping) else None
+        reason = failure.get("reason") if isinstance(failure, Mapping) else "INVALID_VERIFIER_RESULT"
+        return _blocked(f"CAPTURE_STORE_UNVERIFIED:{reason}", game_pk)
     try:
         receipts = mlb_source.verify_receipt_journal(Path(receipt_root),
                                                      verifier_now=verifier_now)
