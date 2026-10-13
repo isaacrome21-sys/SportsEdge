@@ -18,9 +18,9 @@ def projections(rows):
 
 
 @pytest.mark.parametrize("stamp,code", [
-    (None, "MISSING_COUNTERPART_QUOTE_TIMESTAMP"),
-    ("bad", "INVALID_PAIR_QUOTE_TIMESTAMP"),
-    ("2026-10-13T10:00:00", "INVALID_PAIR_QUOTE_TIMESTAMP"),
+    (None, "COUNTERPART_QUOTE_TIMESTAMP_MISSING"),
+    ("bad", "COUNTERPART_QUOTE_TIMESTAMP_MISSING"),
+    ("2026-10-13T10:00:00", "COUNTERPART_QUOTE_TIMESTAMP_MISSING"),
     ("2026-10-13T09:57:59Z", "MISMATCHED_QUOTE_TIMESTAMPS"),
 ])
 def test_missing_invalid_and_out_of_window_quotes_emit_no_pair(stamp, code):
@@ -42,7 +42,7 @@ def test_aware_same_instant_or_within_window_pairs(stamp, skew):
 
 def test_bare_inline_opposite_price_cannot_supply_pair_provenance():
     p = projections([row("AWAY", market="ML", opposite_odds=-110)])[0]
-    assert p["paired_market_status"] == "MISSING_COUNTERPART_QUOTE_TIMESTAMP"
+    assert p["paired_market_status"] == "OPPOSITE_PRICE_NOT_A_TIMESTAMPED_QUOTE"
     assert "market_no_vig_p" not in p
 
 
