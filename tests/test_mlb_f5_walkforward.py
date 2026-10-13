@@ -65,3 +65,16 @@ def test_previous_night_game_not_final_at_cutoff_is_excluded():
     a = run_walkforward(moved, start_date=last)
     b = run_walkforward(base, start_date=last)
     assert a["lines"]["1.5"] == b["lines"]["1.5"] and a["lines"]["1.5"]["n"] > 0
+
+
+def test_zinb_preserves_mean_and_fit_recovers_inflation():
+    import random as _r
+    from sportsedge.mlb_f5_team_total_ladder import zinb_pmf
+    from sportsedge.mlb_f5_walkforward import fit_f5_dispersion
+    pmf = zinb_pmf(2.6, 2.5, 0.06)
+    assert abs(sum(pmf) - 1) < 1e-9 and abs(sum(k * p for k, p in enumerate(pmf)) - 2.6) < 1e-3
+    rng = _r.Random(1)
+    true = zinb_pmf(2.5, 2.0, 0.10)
+    rows = [(2.5, rng.choices(range(len(true)), true)[0]) for _ in range(3000)]
+    fit = fit_f5_dispersion(rows)
+    assert abs(fit["pi"] - 0.10) <= 0.06 and 1.0 <= fit["r_f5"] <= 4.0
