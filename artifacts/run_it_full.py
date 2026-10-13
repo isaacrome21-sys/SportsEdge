@@ -22,6 +22,7 @@ from sportsedge.mlb_phone_first_inning_pricing import (
     phone_first_inning_rows, FIRST_INNING_PHONE_MARKETS)
 from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
 from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
+from sportsedge.card_format import format_research_card
 from sportsedge.prepricing.factor_ingestion import stage_games
 from sportsedge.team_half_pricing import DERIVATIVES, price_team_half_rows
 from sportsedge.market_coverage import (
@@ -549,6 +550,11 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         card["mlb_full_board"] = phone_market_board(labeled_inputs, evaluated)
         card["summary"]["mlb_market_coverage"] = dict(card["mlb_full_board"]["input_coverage"])
     card["runner"]="RUN_IT_FULL_MLB_AND_NAMED_FOOTBALL_PLAYER_HISTORIES_V1"
+    # Presentation standard (Oct 2026, 4-account research adoption): one line
+    # per play — play + line + price -> modeled probability -> EV%, ranked by
+    # EV. Probability is stated before any status language. Zero-playable-edge
+    # cards are valid. Existing keys above are untouched.
+    card["card_format"] = format_research_card(card)
     return card
 
 
