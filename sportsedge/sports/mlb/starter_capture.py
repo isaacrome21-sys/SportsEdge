@@ -181,6 +181,11 @@ def fetch_statsapi(url: str, *, opener=urlopen, timeout: int = 20) -> bytes:
         return response.read()
 
 
+def _positive_statsapi_id(value: Any) -> int | None:
+    """An ID is a real positive JSON integer; never coerce booleans or text."""
+    return value if type(value) is int and value > 0 else None
+
+
 def _probable(row_team: Mapping[str, Any]) -> dict[str, Any]:
     """Normalize one side's probablePitcher to presence + ID only.
 
@@ -189,12 +194,14 @@ def _probable(row_team: Mapping[str, Any]) -> dict[str, Any]:
     waiting to be trusted.
     """
     probable = row_team.get("probablePitcher")
-    if not isinstance(probable, dict):
+    if probable is None:
         return {"present": False, "id": None}
-    pid = probable.get("id")
-    if pid in (None, ""):
+    # Present but malformed is NOT a legitimate "not announced" state.
+    # This distinction makes bare strings, lists, booleans and numbers
+    # fail as ID_MISSING rather than silently become usable evidence.
+    if not isinstance(probable, dict):
         return {"present": True, "id": None}
-    return {"present": True, "id": int(pid)}
+    return {"present": True, "id": _positive_statsapi_id(probable.get("id"))}
 
 
 def parse_schedule_games(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -209,8 +216,8 @@ def parse_schedule_games(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for block in payload.get("dates", []) or []:
         for game in (block or {}).get("games", []) or []:
-            game_pk = game.get("gamePk")
-            if game_pk in (None, ""):
+            game_pk = _positive_statsapi_id(game.get("gamePk"))
+            if game_pk is None:
                 continue
             teams = game.get("teams") or {}
             away = teams.get("away") or {}
@@ -221,7 +228,7 @@ def parse_schedule_games(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
             first_pitch = _parse_iso(game.get("gameDate"))
             rows.append(
                 {
-                    "game_pk": int(game_pk),
+                    "game_pk": game_pk,
                     "game_type": game.get("gameType"),
                     "official_date": game.get("officialDate"),
                     "game_date_utc": _iso(first_pitch) if first_pitch else None,
@@ -231,16 +238,8 @@ def parse_schedule_games(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
                     "abstract_state": status.get("abstractGameState"),
                     "double_header": game.get("doubleHeader"),
                     "game_number": game.get("gameNumber"),
-                    "away_team_id": (
-                        int(away_team["id"])
-                        if away_team.get("id") not in (None, "")
-                        else None
-                    ),
-                    "home_team_id": (
-                        int(home_team["id"])
-                        if home_team.get("id") not in (None, "")
-                        else None
-                    ),
+                    "away_team_id": _positive_statsapi_id(away_team.get("id")),
+                    "home_team_id": _positive_statsapi_id(home_team.get("id")),
                     "away_probable": _probable(away),
                     "home_probable": _probable(home),
                 }
