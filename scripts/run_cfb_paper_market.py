@@ -14,15 +14,13 @@ converted, interpolated, or treated as equivalent.
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import json
 import os
 from datetime import datetime, timezone
 from math import isfinite
 from pathlib import Path
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
 
-ODDS_URL = "https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/odds"
 BOOKS = ("draftkings", "fanduel", "betmgm", "williamhill_us", "betonlineag", "pinnacle")
 SUPPORTED = ("h2h", "spreads", "totals")
 MARKET_NAME = {"h2h": "MONEYLINE", "spreads": "SPREAD", "totals": "TOTAL"}
@@ -35,20 +33,6 @@ def implied(a):
     if not isfinite(a) or (-100.0 < a < 100.0):
         raise ValueError("CFB_PAPER_AMERICAN_ODDS_INVALID")
     return 100 / (100 + a) if a > 0 else (-a) / ((-a) + 100)
-
-
-def fetch(key):
-    q = urlencode(
-        {
-            "apiKey": key,
-            "regions": "us,eu",
-            "markets": ",".join(SUPPORTED),
-            "oddsFormat": "american",
-            "bookmakers": ",".join(BOOKS),
-        }
-    )
-    with urlopen(Request(ODDS_URL + "?" + q), timeout=30) as r:
-        return json.loads(r.read().decode())
 
 
 def _decode_events(raw, source):
@@ -71,17 +55,7 @@ def load_events(key, input_json=None, inline_json=None):
     inline = (inline_json or "").strip()
     if inline:
         return _decode_events(inline, "MANUAL_INLINE"), "MANUAL_JSON_INLINE", "READY"
-    if key:
-        try:
-            events = fetch(key)
-        except (OSError, TimeoutError, ValueError) as exc:
-            # Machine-readable fail-closed artifact on quota, bad credentials,
-            # or provider outage: never synthesize prices or model predictions.
-            print("CFB_PAPER_PROVIDER_UNAVAILABLE " + type(exc).__name__)
-            return [], "ODDS_PROVIDER_UNAVAILABLE", "BLOCKED_PROVIDER_UNAVAILABLE"
-        if not isinstance(events, list):
-            return [], "ODDS_PROVIDER_INVALID", "BLOCKED_PROVIDER_INVALID"
-        return events, "ODDS_PROVIDER", "READY"
+    # Key retained only for call compatibility; supplied prices only, no provider calls.
     return [], "MARKET_INPUT_UNAVAILABLE", "BLOCKED_NO_MARKET_INPUT"
 
 
@@ -184,27 +158,35 @@ def _book_markets(event, *, now=None):
 
 def build_payload(events, min_edge, now, market_input_source, input_status):
     candidates = []
+    counts = Counter(events_received=len(events))
     for event in events:
         try:
             start = datetime.fromisoformat(str(event["commence_time"]).replace("Z", "+00:00"))
         except (KeyError, TypeError, ValueError):
+            counts["invalid_kickoff"] += 1
             continue
         if start.tzinfo is None or start <= now:
+            counts["started_or_naive_kickoff"] += 1
             continue
         participants = ' | '.join(str(event.get(k) or '').lower() for k in ('home_team', 'away_team'))
         if any(team in participants for team in ('illinois', 'northwestern', 'depaul', 'bradley', 'loyola chicago', 'roosevelt')):
+            counts['illinois_games_excluded'] += 1
             continue
 
         books = _book_markets(event, now=now if market_input_source == "ODDS_PROVIDER" else None)
         dk = books.get("draftkings")
         if not dk:
+            counts["no_usable_draftkings_market"] += 1
             continue
+        counts["games_with_usable_draftkings"] += 1
 
         for market_key in SUPPORTED:
             dk_rows = dk.get(market_key)
             if not dk_rows:
+                counts["missing_draftkings_market"] += 1
                 continue
             for dk_row in dk_rows:
+                counts["draftkings_selections"] += 1
                 selection_key = _selection_key(market_key, dk_row)
                 peer_probabilities = []
                 peer_books = []
@@ -217,17 +199,21 @@ def build_payload(events, min_edge, now, market_input_source, input_status):
                             peer_books.append(peer_key)
                             break
                 if len(peer_probabilities) < 2:
+                    counts["fewer_than_two_exact_line_peers"] += 1
                     continue
+                counts["selections_with_two_exact_line_peers"] += 1
 
                 consensus = sum(peer_probabilities) / len(peer_probabilities)
                 price = float(dk_row["price"])
                 if price < -165:
+                    counts["straight_price_cap"] += 1
                     continue  # Straight-wager cap; no SGP path in paper lane.
                 raw = implied(price)
                 decimal = 1 + (100 / abs(price) if price < 0 else price / 100)
                 ev_per_dollar = consensus * (decimal - 1) - (1 - consensus)
                 edge = consensus - raw
                 if edge < float(min_edge) or ev_per_dollar <= 0:
+                    counts["below_edge_floor_or_nonpositive_ev"] += 1
                     continue
 
                 side = str(dk_row["name"])
@@ -274,6 +260,8 @@ def build_payload(events, min_edge, now, market_input_source, input_status):
         "markets": ["MONEYLINE", "SPREAD", "TOTAL"],
         "min_edge": min_edge,
         "candidates": candidates,
+        "coverage": {**dict(counts), "candidate_count": len(candidates),
+                     "scan_completed": input_status == "READY"},
         "authority": {
             "model_p": False,
             "truth_gate": False,
@@ -297,10 +285,9 @@ def main():
     )
     args = ap.parse_args()
 
-    key = (os.getenv("ODDS_API_KEY") or os.getenv("SPORTSEDGE_ODDS_API_KEY") or "").strip()
     inline_json = os.getenv("CFB_PAPER_BOARD_JSON", "")
     now = datetime.now(timezone.utc)
-    events, source, input_status = load_events(key, args.input_json, inline_json)
+    events, source, input_status = load_events("", args.input_json, inline_json)
     payload = build_payload(events, args.min_edge, now, source, input_status)
 
     out = Path(args.output)
@@ -313,6 +300,7 @@ def main():
                 "input_status": input_status,
                 "market_input_source": source,
                 "candidate_count": len(payload["candidates"]),
+                "coverage": payload["coverage"],
                 "markets": payload["markets"],
                 "output": str(out),
             },
