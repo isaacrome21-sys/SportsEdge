@@ -80,6 +80,28 @@ def test_fail_closed_inputs():
         fit_asof(g, AS_OF).predict("T00", "NOPE")
 
 
+def test_possessions_accepts_total_turnovers_only():
+    box = {"fieldGoalsMade-fieldGoalsAttempted": "42-83",
+           "freeThrowsMade-freeThrowsAttempted": "22-25",
+           "offensiveRebounds": "7", "totalTurnovers": "15"}
+    assert possessions(box) == pytest.approx(83 - 7 + 15 + 0.44 * 25)
+
+
+def test_possessions_accepts_turnovers_only():
+    box = {"fieldGoalsMade-fieldGoalsAttempted": "42-83",
+           "freeThrowsMade-freeThrowsAttempted": "22-25",
+           "offensiveRebounds": "7", "turnovers": "15"}
+    assert possessions(box) == pytest.approx(83 - 7 + 15 + 0.44 * 25)
+
+
+def test_possessions_without_either_turnovers_key_fails_closed():
+    box = {"fieldGoalsMade-fieldGoalsAttempted": "42-83",
+           "freeThrowsMade-freeThrowsAttempted": "22-25",
+           "offensiveRebounds": "7"}
+    with pytest.raises(KeyError):
+        possessions(box)
+
+
 def test_possessions_from_real_espn_box_shape():
     box = {"fieldGoalsMade-fieldGoalsAttempted": "42-83", "freeThrowsMade-freeThrowsAttempted": "22-25",
            "offensiveRebounds": "7", "totalTurnovers": "15", "turnovers": "15"}
