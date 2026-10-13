@@ -161,3 +161,52 @@ def test_wrong_type_fixtures_never_crash(tmp_path, approved, fx):
     d = publish(tmp_path, manifest)
     m, a = run(tmp_path, pl.ExternalManifestAnchor(d, SRC), fixtures=fx)
     assert m == {} and a["entries"][0]["disposition"] == "EXCLUDED"
+
+
+# --- #2172 review 6156404742 (2026-10-13 22:18Z) requested regressions ---
+
+def test_bundle_file_swap_after_pinning_refused(tmp_path, approved):
+    manifest, digest = setup_archive(tmp_path)
+    d = publish(tmp_path, manifest)
+    path = tmp_path / (digest + ".json")
+    swapped = json.loads(path.read_bytes()); swapped["tamper"] = 1
+    path.write_bytes(json.dumps(swapped).encode())
+    m, a = run(tmp_path, pl.ExternalManifestAnchor(d, SRC))
+    assert m == {} and a["entries"][0]["reason"] == "ARCHIVE_BUNDLE_HASH_MISMATCH"
+
+
+def test_manifest_swap_under_same_name_refused(tmp_path, approved):
+    manifest, _ = setup_archive(tmp_path)
+    d = publish(tmp_path, manifest)
+    manifest["entries"][0]["recorded_at_utc"] = "2026-10-13T13:00:00Z"
+    (tmp_path / (d + ".json")).write_bytes(json.dumps(manifest).encode())
+    m, a = run(tmp_path, pl.ExternalManifestAnchor(d, SRC))
+    assert m == {} and a["status"] == "ARCHIVE_MANIFEST_HASH_MISMATCH"
+
+
+@pytest.mark.parametrize("first", [0, 1])
+def test_duplicate_refusal_independent_of_order(tmp_path, approved, first):
+    manifest, _ = setup_archive(tmp_path)
+    e1 = manifest["entries"][0]
+    e2 = dict(e1, event_id="999", bundle_sha256="c" * 64)
+    manifest["entries"] = [e1, e2] if first == 0 else [e2, e1]
+    d = publish(tmp_path, manifest)
+    m, a = run(tmp_path, pl.ExternalManifestAnchor(d, SRC))
+    assert m == {} and a["status"] == pl.WHOLE_INTAKE_DUPLICATE
+    assert a["admitted_team_ids"] == [] and a["entries"] == []
+
+
+def test_stale_fixture_kickoff_refused(tmp_path, approved):
+    manifest, _ = setup_archive(tmp_path)
+    d = publish(tmp_path, manifest)
+    from datetime import timedelta
+    fx = {"48": dict(FX["48"], kickoff=KICKOFF + timedelta(days=7))}
+    m, a = run(tmp_path, pl.ExternalManifestAnchor(d, SRC), fixtures=fx)
+    assert m == {} and a["entries"][0]["disposition"] == "EXCLUDED"
+
+
+def test_admitted_bundle_never_claims_availability(tmp_path, approved):
+    manifest, _ = setup_archive(tmp_path)
+    d = publish(tmp_path, manifest)
+    m, a = run(tmp_path, pl.ExternalManifestAnchor(d, SRC))
+    assert "availability_status" not in a and not a["eligibility"]
