@@ -264,11 +264,11 @@ def main(argv=None) -> int:
     r = sub.add_parser("record")
     r.add_argument("--card", type=Path, required=True)
     r.add_argument("--output", type=Path, required=True)
-    r.add_argument("--recorded-at")
     g = sub.add_parser("grade")
     g.add_argument("--ledger", type=Path, required=True)
     g.add_argument("--scores", type=Path, required=True)
     g.add_argument("--closing", type=Path)
+    g.add_argument("--output", type=Path, required=True, help="New graded snapshot; never overwrite pregame ledger")
     s = sub.add_parser("summary")
     s.add_argument("--ledger-dir", type=Path, required=True)
     s.add_argument("--policy", type=Path, default=ROOT / "config" / "cfb_probation_policy_v1.json")
@@ -277,7 +277,8 @@ def main(argv=None) -> int:
     if args.cmd == "record":
         if args.output.exists():
             raise SystemExit("CFB_LEDGER_EXISTS_REFUSING_OVERWRITE:" + str(args.output))
-        when = _utc(args.recorded_at) if args.recorded_at else datetime.now(timezone.utc)
+        # Never accept a caller-supplied historical clock: it could forge pregame evidence.
+        when = datetime.now(timezone.utc)
         led = record(json.loads(args.card.read_text()), card_sha256=_sha256(args.card), recorded_at=when)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(led, indent=2) + "\n")
@@ -287,10 +288,13 @@ def main(argv=None) -> int:
                   f"{p['american_odds']:+.0f} {p['stake_units']}u")
         return 0
     if args.cmd == "grade":
+        if args.output.resolve() == args.ledger.resolve() or args.output.exists():
+            raise SystemExit("CFB_LEDGER_IMMUTABLE_OUTPUT_REQUIRED:" + str(args.output))
         led = json.loads(args.ledger.read_text())
         closing = json.loads(args.closing.read_text()) if args.closing else None
         grade(led, load_final_scores(args.scores), closing)
-        args.ledger.write_text(json.dumps(led, indent=2) + "\n")
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(json.dumps(led, indent=2) + "\n")
         for p in led["plays"]:
             print(f"{p['away']} @ {p['home']} {p['market']} {p['side']} {p['line'] or ''}: "
                   f"{p['result'] or 'PENDING'} {p['units'] if p['units'] is not None else ''} "
