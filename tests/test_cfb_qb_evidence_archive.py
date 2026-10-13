@@ -168,3 +168,63 @@ def test_excessively_nested_json_returns_named_failure(tmp_path):
     with pytest.raises(EvidenceArchiveError, match="JSON_TOO_DEEP"):
         load(tmp_path, {}, manifest_bytes=raw,
              trusted_manifest_sha256=hashlib.sha256(raw).hexdigest())
+
+
+def preserve(tmp_path, **overrides):
+    from sportsedge.prepricing.qb_evidence_archive import preserve_form2_bundle
+    args = dict(bundle_bytes=json.dumps(make_bundle("48")).encode(),
+                team_id="48", event_id="401871067", home_team_id="2393", away_team_id="48",
+                kickoff=KICKOFF, previous_game_kickoff=CHARTS["48"][3], clock=lambda: NOW)
+    args.update(overrides)
+    return preserve_form2_bundle(tmp_path, **args)
+
+
+def test_writer_round_trip_is_explicitly_unanchored(tmp_path):
+    result = preserve(tmp_path)
+    assert result["anchor_status"] == "UNANCHORED"
+    assert not result["eligibility"]
+    assert (tmp_path / (result["candidate_manifest_sha256"] + ".json")).read_bytes() == result["manifest_bytes"]
+    assert load(tmp_path, json.loads(result["manifest_bytes"]))["identity_evidence"]["ok"]
+    assert not list(tmp_path.glob(".pending-*"))
+
+
+def test_writer_retries_preserve_existing_bytes(tmp_path):
+    first = preserve(tmp_path)
+    paths = {p.name: (p.stat().st_ino, p.read_bytes()) for p in tmp_path.iterdir()}
+    assert preserve(tmp_path) == first
+    assert paths == {p.name: (p.stat().st_ino, p.read_bytes()) for p in tmp_path.iterdir()}
+
+
+def test_writer_refuses_corrupt_existing_object(tmp_path):
+    raw = json.dumps(make_bundle("48")).encode()
+    path = tmp_path / (hashlib.sha256(raw).hexdigest() + ".json")
+    path.write_bytes(b"prior evidence")
+    with pytest.raises(EvidenceArchiveError, match="EXISTING_OBJECT_MISMATCH"):
+        preserve(tmp_path)
+    assert path.read_bytes() == b"prior evidence"
+    assert len(list(tmp_path.iterdir())) == 1
+
+
+def test_writer_records_time_after_bundle_durability(tmp_path):
+    raw = json.dumps(make_bundle("48")).encode()
+    path = tmp_path / (hashlib.sha256(raw).hexdigest() + ".json")
+    def clock():
+        assert path.read_bytes() == raw
+        return NOW
+    preserve(tmp_path, clock=clock)
+
+
+def test_writer_failed_validation_never_publishes_manifest(tmp_path):
+    with pytest.raises(EvidenceArchiveError, match="NOT_PREGAME"):
+        preserve(tmp_path, clock=lambda: KICKOFF)
+    assert len(list(tmp_path.iterdir())) == 1  # orphan bundle, no success receipt
+
+
+def test_writer_failed_fsync_never_publishes_partial_file(tmp_path, monkeypatch):
+    import os
+    def fail(fd):
+        raise OSError("simulated disk failure")
+    monkeypatch.setattr(os, "fsync", fail)
+    with pytest.raises(OSError, match="disk failure"):
+        preserve(tmp_path)
+    assert not list(tmp_path.iterdir())

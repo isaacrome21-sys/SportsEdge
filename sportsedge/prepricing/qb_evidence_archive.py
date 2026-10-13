@@ -169,3 +169,76 @@ def load_archived_form2(root, *, manifest_bytes, trusted_manifest_sha256,
             "recorded_at_utc": recorded.isoformat(),
             "research_only": True, "eligibility": False, "staking_allowed": False,
             "activation_allowed": False}
+
+
+def _publish_once(root, name, raw):
+    """Publish complete bytes atomically without replacing an existing object."""
+    import uuid
+    directory = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    temporary = ".pending-" + uuid.uuid4().hex
+    try:
+        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                     0o600, dir_fd=directory)
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(raw)
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(temporary, name, src_dir_fd=directory, dst_dir_fd=directory,
+                    follow_symlinks=False)
+        except FileExistsError:
+            # A prior publication is immutable, even when its filename looks
+            # content-addressed. Verify its actual bytes before calling it reused.
+            digest = name.removesuffix(".json")
+            if _read_bundle(root, digest) != raw:
+                raise EvidenceArchiveError("ARCHIVE_EXISTING_OBJECT_MISMATCH")
+        os.fsync(directory)
+    finally:
+        try:
+            os.unlink(temporary, dir_fd=directory)
+        except FileNotFoundError:
+            pass
+        os.close(directory)
+
+
+def preserve_form2_bundle(root, *, bundle_bytes, team_id, event_id,
+                          home_team_id, away_team_id, kickoff,
+                          previous_game_kickoff, clock=None):
+    """Offline write-once preservation, not a trusted capture or activation.
+
+    The caller owns an existing operator-controlled directory. Source receipt
+    timestamps must already exist: this function does not fetch, reconstruct,
+    or certify them. The archive clock is sampled after durable bundle storage.
+    The returned candidate digest is NOT an independently trusted anchor.
+    A failed validation may leave a bundle object, but publishes no manifest.
+    Each manifest is an immutable single-receipt snapshot, not a mutable index.
+    """
+    if not isinstance(bundle_bytes, bytes):
+        raise EvidenceArchiveError("ARCHIVE_BUNDLE_BYTES_REQUIRED")
+    if len(bundle_bytes) > MAX_BUNDLE_BYTES:
+        raise EvidenceArchiveError("ARCHIVE_BUNDLE_TOO_LARGE")
+    _json(bundle_bytes)
+    digest = hashlib.sha256(bundle_bytes).hexdigest()
+    _publish_once(root, digest + ".json", bundle_bytes)
+    recorded = _time((clock or (lambda: datetime.now(timezone.utc)))())
+    manifest = {"schema": SCHEMA, "entries": [{
+        "team_id": str(team_id), "event_id": str(event_id),
+        "home_team_id": str(home_team_id), "away_team_id": str(away_team_id),
+        "kickoff_utc": _time(kickoff).isoformat(),
+        "recorded_at_utc": recorded.isoformat(), "bundle_sha256": digest,
+    }]}
+    raw = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    candidate = hashlib.sha256(raw).hexdigest()
+    # Internal consistency check only. Passing our own digest here does not
+    # turn that digest into an independently anchored historical receipt.
+    load_archived_form2(
+        root, manifest_bytes=raw, trusted_manifest_sha256=candidate,
+        team_id=team_id, event_id=event_id, home_team_id=home_team_id,
+        away_team_id=away_team_id, kickoff=kickoff,
+        previous_game_kickoff=previous_game_kickoff, as_of=recorded)
+    _publish_once(root, candidate + ".json", raw)
+    return {"manifest_bytes": raw, "candidate_manifest_sha256": candidate,
+            "bundle_sha256": digest, "recorded_at_utc": recorded.isoformat(),
+            "anchor_status": "UNANCHORED", "research_only": True,
+            "eligibility": False, "staking_allowed": False,
+            "activation_allowed": False}
