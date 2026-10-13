@@ -26,6 +26,16 @@ Honesty contract (owner requirements, Oct 13, 2026):
   stands in for the slot it missed. Nothing here backfills, reconstructs
   retrospectively, or represents the final T-5M snapshot as guaranteed
   (scheduled runners can be delayed or dropped).
+- Captures belong to the plan epoch they were taken under. Every
+  snapshot/attempt record carries ``planned_first_pitch_utc`` — the
+  scheduled first pitch of the plan it served — and a record counts
+  toward a plan (satisfaction, failure attribution, missed-slot
+  idempotency) only when that stamp equals the plan's first pitch for
+  the game. When a game is rescheduled and replanned, the old plan's
+  captures satisfy nothing in the new plan (owner finding, PR #2163,
+  Oct 13, 2026: an old capture was reproduced satisfying a rescheduled
+  game's new slot). The stamp is additive; a record without it (older
+  evidence) fails closed and counts toward no plan.
 - Identity is fail-closed and ID-only. Teams and starters bind by MLB
   StatsAPI IDs (``teams.*.team.id``, ``teams.*.probablePitcher.id``).
   Pitcher and team *names* are never read into a record and never
@@ -358,6 +368,15 @@ def capture_snapshot(
     must use :func:`capture_snapshot_production`, which hard-wires the
     fetcher and the system clock so no caller-supplied time value can
     reach a record.
+
+    The record is stamped with ``planned_first_pitch_utc`` — the
+    scheduled first pitch of the plan this capture serves. That stamp
+    is the capture's plan-epoch binding: :func:`evaluate_missed_slots`
+    counts the record toward a plan only when the stamp equals that
+    plan's first pitch for the game, so a capture taken under a
+    superseded schedule can never satisfy a replanned game's slot.
+    (A plan game without a stated first pitch stamps ``None``, which
+    matches no plan and fails closed.)
     """
     slot = _slot_of(plan_game, slot_id)
     url = schedule_url(str(plan_game.get("official_date")))
@@ -366,6 +385,7 @@ def capture_snapshot(
         "game_type": plan_game.get("game_type"),
         "slot_id": slot_id,
         "slot_due_at_utc": slot["due_at_utc"],
+        "planned_first_pitch_utc": plan_game.get("game_date_utc"),
         "source_url": url,
     }
     try:
@@ -542,9 +562,33 @@ def evaluate_missed_slots(
     captures, and failed fetch attempts never satisfy a slot.
     Evaluation is idempotent: a slot already carrying a MISSED_SLOT
     record is not reported twice.
+
+    All three judgments — satisfaction, failure attribution, and
+    idempotency — are scoped to the plan epoch. A record counts toward
+    this plan only when its epoch stamp matches the plan's first pitch
+    for the game: snapshot and attempt records carry the stamp as
+    ``planned_first_pitch_utc``; MISSED_SLOT records are generated from
+    a plan, so their ``game_date_utc`` is the stamp of the plan that
+    produced them. A capture taken under a superseded schedule (the
+    game was rescheduled and replanned) therefore satisfies nothing
+    here, its failures explain nothing here, and a MISSED_SLOT from
+    another epoch suppresses nothing here. Records without a stamp
+    (evidence written before the stamp existed) fail closed the same
+    way: they count toward no plan.
     """
     evaluated_at = _require_aware(now, what="evaluated_at")
     planned_at = _parse_iso(plan.get("planned_at_utc"))
+    plan_first_pitch: dict[Any, Any] = {
+        game.get("game_pk"): game.get("game_date_utc")
+        for game in plan.get("games", [])
+    }
+
+    def epoch_matches(record: Mapping[str, Any]) -> bool:
+        stamp = record.get("planned_first_pitch_utc")
+        return stamp is not None and stamp == plan_first_pitch.get(
+            record.get("game_pk")
+        )
+
     satisfied: set[tuple[int, str]] = set()
     already_missed: set[tuple[int, str]] = set()
     failed_attempts: dict[tuple[int, str], str] = {}
@@ -554,14 +598,20 @@ def evaluate_missed_slots(
             if (
                 record.get("record_status") in ("CAPTURED", "OBSERVED")
                 and record.get("slot_disposition") == "ON_TIME"
+                and epoch_matches(record)
             ):
                 satisfied.add(key)  # type: ignore[arg-type]
-            elif record.get("record_status") == "FAILED":
+            elif record.get("record_status") == "FAILED" and epoch_matches(record):
                 failed_attempts.setdefault(key, str(record.get("failure_reason")))  # type: ignore[arg-type]
         elif record.get("record_type") == "CAPTURE_ATTEMPT_FAILED":
-            failed_attempts.setdefault(key, str(record.get("failure_reason")))  # type: ignore[arg-type]
+            if epoch_matches(record):
+                failed_attempts.setdefault(key, str(record.get("failure_reason")))  # type: ignore[arg-type]
         elif record.get("record_type") == "MISSED_SLOT":
-            already_missed.add(key)  # type: ignore[arg-type]
+            missed_stamp = record.get("game_date_utc")
+            if missed_stamp is not None and missed_stamp == plan_first_pitch.get(
+                record.get("game_pk")
+            ):
+                already_missed.add(key)  # type: ignore[arg-type]
 
     missed: list[dict[str, Any]] = []
     for game in plan.get("games", []):
@@ -601,6 +651,52 @@ def evaluate_missed_slots(
 # Change detection across snapshots.
 # --------------------------------------------------------------------------
 
+def _is_postponed_observation(record: Mapping[str, Any]) -> bool:
+    return "Postpon" in str(record.get("detailed_state") or "")
+
+
+def _same_starter_epoch(
+    prev: Mapping[str, Any], curr: Mapping[str, Any]
+) -> bool:
+    """Whether two consecutive snapshots' starter states are comparable.
+
+    Starter states are comparable only inside one plan epoch observing
+    one scheduled occurrence. The pair is an epoch boundary — the
+    pre-reschedule capture is the prior epoch's baseline, and the
+    later capture becomes the new epoch's baseline — whenever any of
+    these hold:
+
+    - either capture's plan-epoch stamp (``planned_first_pitch_utc``)
+      is absent (older evidence: comparability cannot be established,
+      so it fails closed) or the stamps differ (the captures served
+      different plans, i.e. the game was replanned);
+    - the observed first pitch (``game_date_utc``) differs — the
+      schedule itself moved between the two observations, even under
+      one plan, so the later announcement state belongs to a different
+      scheduled occurrence;
+    - either observation is a postponement — probables cleared in the
+      shadow of a postponement are the postponement's artifact, not a
+      starter decision; the SCHEDULE_CHANGE/POSTPONED event is the
+      record of that fact.
+
+    Across a boundary no STARTER_CHANGE is derived: a probable that
+    vanishes because the game moved is not a REMOVED, and one that
+    appears on the new schedule is not an ANNOUNCED against the old
+    baseline. SCHEDULE_CHANGE events are unaffected — they describe
+    the boundary itself and are always derived from the observed
+    schedule states.
+    """
+    prev_stamp = prev.get("planned_first_pitch_utc")
+    curr_stamp = curr.get("planned_first_pitch_utc")
+    if prev_stamp is None or curr_stamp is None or prev_stamp != curr_stamp:
+        return False
+    if prev.get("game_date_utc") != curr.get("game_date_utc"):
+        return False
+    return not (
+        _is_postponed_observation(prev) or _is_postponed_observation(curr)
+    )
+
+
 def detect_changes(records: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """Derive change events from consecutive snapshot observations per game.
 
@@ -614,6 +710,14 @@ def detect_changes(records: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]
     capture yields the STARTER_CHANGE/ANNOUNCED event and the OBSERVED
     record itself is never upgraded. Events are derived, never edited
     into earlier records: the append-only stream stays intact.
+
+    STARTER_CHANGE events are derived only between snapshots of the
+    same plan epoch observing the same scheduled occurrence (see
+    :func:`_same_starter_epoch`): across a reschedule the earlier
+    capture is the prior epoch's baseline — it produces the
+    SCHEDULE_CHANGE events for the move and no starter event, and the
+    first capture under the new plan becomes the new baseline against
+    which later announcements and changes are measured.
     """
     snapshots = [
         r
@@ -638,27 +742,32 @@ def detect_changes(records: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]
                 "previous_captured_at_utc": prev.get("captured_at_utc"),
                 "captured_at_utc": curr.get("captured_at_utc"),
             }
-            for side in ("away", "home"):
-                before = prev.get(f"{side}_probable_id")
-                after = curr.get(f"{side}_probable_id")
-                if before == after:
-                    continue
-                if before is None:
-                    detail = "ANNOUNCED"
-                elif after is None:
-                    detail = "REMOVED"
-                else:
-                    detail = "CHANGED"
-                events.append(
-                    {
-                        **base,
-                        "change_kind": "STARTER_CHANGE",
-                        "change_detail": detail,
-                        "side": side,
-                        "from_value": before,
-                        "to_value": after,
-                    }
-                )
+            if _same_starter_epoch(prev, curr):
+                for side in ("away", "home"):
+                    before = prev.get(f"{side}_probable_id")
+                    after = curr.get(f"{side}_probable_id")
+                    if before == after:
+                        continue
+                    if before is None:
+                        detail = "ANNOUNCED"
+                    elif after is None:
+                        detail = "REMOVED"
+                    else:
+                        detail = "CHANGED"
+                    events.append(
+                        {
+                            **base,
+                            "change_kind": "STARTER_CHANGE",
+                            "change_detail": detail,
+                            "side": side,
+                            "from_value": before,
+                            "to_value": after,
+                        }
+                    )
+            # Else: the pair straddles an epoch boundary (reschedule,
+            # postponement, or a plan change). Starter states are not
+            # compared across it — the SCHEDULE_CHANGE events below are
+            # the record of the boundary itself.
             if prev.get("game_date_utc") != curr.get("game_date_utc"):
                 events.append(
                     {
