@@ -601,6 +601,22 @@ def load_form2_bundle_manifests(bundles_dir, game_rows, *,
             "REPEATED_MANIFEST_PIN; COMPOSITE_REFUSED"))
         return {}, audit
     audit["manifest_sha256s"] = pins
+
+    def refuse_composite(reason, detail):
+        # Per-pin evaluation may have admitted a candidate before a later
+        # pin failed. The *combined* audit must never carry a misleading
+        # ADMITTED marker when the returned mapping is empty.
+        audit["pin_status"] = PIN_UNVERIFIED
+        audit["admitted_team_ids"] = []
+        for entry in audit["entries"]:
+            if entry["disposition"] == ADMITTED:
+                entry["disposition"] = EXCLUDED
+                entry["reason"] = reason
+                entry["detail"] = "COMPOSITE_REFUSED_AFTER_PARTIAL_PIN_LOAD"
+        audit["entries"].append(_entry(
+            None, EXCLUDED, reason, detail))
+        return {}, audit
+
     candidates = {}
     for pin in pins:
         mapping, subaudit = load_form2_bundles(
@@ -611,21 +627,22 @@ def load_form2_bundle_manifests(bundles_dir, game_rows, *,
         if (subaudit["pin_status"] != PIN_VERIFIED
                 or subaudit["directory_status"] != "OK"):
             audit["directory_status"] = subaudit["directory_status"]
-            audit["pin_status"] = PIN_UNVERIFIED
-            audit["entries"].append(_entry(
-                None, EXCLUDED, "ARCHIVE_COMPOSITE_PIN_UNVERIFIED",
+            return refuse_composite(
+                "ARCHIVE_COMPOSITE_PIN_UNVERIFIED",
                 "ONE_OR_MORE_EXTERNAL_MANIFESTS_FAILED_ADMISSION; "
-                "ENTIRE_COMPOSITE_REFUSED"))
-            return {}, audit
+                "ENTIRE_COMPOSITE_REFUSED")
         if any(entry["reason"] in (
             "ARCHIVE_RECEIPT_NOT_UNIQUE", REASON_DUPLICATE)
                for entry in subaudit["entries"]):
-            audit["pin_status"] = PIN_UNVERIFIED
-            audit["entries"].append(_entry(
-                None, EXCLUDED, "ARCHIVE_COMPOSITE_INTERNAL_CONFLICT",
+            return refuse_composite(
+                "ARCHIVE_COMPOSITE_INTERNAL_CONFLICT",
                 "PINNED_MANIFEST_CONTAINS_CONFLICTED_RECEIPTS; "
-                "ENTIRE_COMPOSITE_REFUSED"))
-            return {}, audit
+                "ENTIRE_COMPOSITE_REFUSED")
+        if not mapping:
+            return refuse_composite(
+                "ARCHIVE_COMPOSITE_PIN_NO_ADMISSION",
+                "A_SUPPLIED_PER_TEAM_MANIFEST_ADMITTED_NO_INTAKE_TEAM; "
+                "ENTIRE_COMPOSITE_REFUSED")
         for team_id, bundle in mapping.items():
             candidates.setdefault(team_id, []).append((pin, bundle))
     # Identity collision across manifests is a refusal, not last-wins.
