@@ -144,7 +144,7 @@ for _m in ("TRIPLES", "EXTRA_BASE_HITS", "RUNS_RBIS"):
             "EXTRA_BASE_HITS is the exact per-game sum "
             "doubles+triples+home_runs; RUNS_RBIS the exact per-game sum "
             "runs+rbi; a game missing any component fails the market "
-            "closed). FORM TRUTH (verified DK enumeration, Oct 13 2026): "
+            "closed). FIXTURE OBSERVATION (DK Oct 13 2026, not global): "
             "On the inspected fixture this family appeared as a single-sided "
             "milestone ladder (no two-sided O/U observed there); ladder rows convert "
             "at intake through sportsedge.milestone_ladder_intake and "

@@ -118,14 +118,18 @@ def test_blocked_row_for_names_the_taxonomy_blocker():
     assert row["blocker"] == "NO_ENGINE"
     # Priced-path markets are owned by their engines, not this fallback.
     assert blocked_row_for("MLB", "HITS", {"market": "HITS"}) is None
-    # t114 proposal: governance NO_ENGINE for NFL props and NOT_OFFERED SB.
+    # NFL props remain governed; the DK October 13 MLB absence is
+    # fixture-specific, not a permanent claim about provider offerings.
     assert blocked_row_for("NFL", "ANYTIME_TD",
                            {"market": "ANYTIME_TD"})["blocker"] == "NO_ENGINE"
-    assert "NOT_OFFERED" in blocked_row_for(
-        "MLB", "STOLEN_BASES", {"market": "STOLEN_BASES"})["reason"]
-    assert "PROVIDER_UNAVAILABLE" in blocked_row_for(
+    sb = blocked_row_for("MLB", "STOLEN_BASES", {"market": "STOLEN_BASES"})
+    assert sb["blocker"] == "NO_QUOTE"
+    assert "NOT_OBSERVED_ON_INSPECTED_FIXTURE" in sb["reason"]
+    combo = blocked_row_for(
         "MLB", "PITCHER_HITS_WALKS_ER",
-        {"market": "PITCHER_HITS_WALKS_ER"})["reason"]
+        {"market": "PITCHER_HITS_WALKS_ER"})
+    assert combo["blocker"] == "NO_QUOTE"
+    assert "NO VERIFIED OFFERED QUOTE" in combo["reason"]
     assert blocked_row_for("NBA", "PLAYER_POINTS", {"market": "X"}) is None
 
 
