@@ -17,11 +17,76 @@ ALIASES = {"ML": "moneyline", "MONEYLINE": "moneyline", "SPREAD": "spread",
            "GAME_TOTAL": "total", "POINTS_TOTAL": "total"}
 CFB_ALIASES = {"TEAM_TOTAL": "team_total", "TEAM_TOTALS": "team_total",
                "TEAMTOTAL": "team_total", "TEAM_POINTS": "team_total",
-               "TEAM_TOTAL_POINTS": "team_total"}
+               "TEAM_TOTAL_POINTS": "team_total",
+               # CFB player-prop families registered 2026-10-14 (wiring
+               # completion). Keys are the canonicalized spellings emitted
+               # by the CFB phone pricer / research market surface.
+               "PLAYER_PASSING_YARDS": "player_passing_yards",
+               "PLAYER_PASS_YARDS": "player_passing_yards",
+               "PLAYER_PASS_YDS": "player_passing_yards",
+               "PLAYER_PASSING_TDS": "player_passing_tds",
+               "PLAYER_PASS_TDS": "player_passing_tds",
+               "PLAYER_PASS_ATTEMPTS": "player_pass_attempts",
+               "PLAYER_COMPLETIONS": "player_completions",
+               "PLAYER_PASS_COMPLETIONS": "player_completions",
+               # NOTE: the bare spelling PLAYER_INTERCEPTIONS is
+               # deliberately NOT bound to this family. The same string
+               # denotes the defensive-interceptions market in
+               # config/football_market_surface.json (NO_ENGINE, no intake
+               # path), while the QB market is interceptions *thrown*. A
+               # market string that cannot distinguish a priced family
+               # from an engineless one keeps the conservative
+               # UNREGISTERED refusal; only the unambiguous QB spelling
+               # is registered. Completing this binding is an owner call.
+               "PLAYER_PASS_INTERCEPTIONS": "player_interceptions",
+               "PLAYER_RUSHING_YARDS": "player_rushing_yards",
+               "PLAYER_RUSH_YARDS": "player_rushing_yards",
+               "PLAYER_RUSH_YDS": "player_rushing_yards",
+               "PLAYER_RUSH_ATTEMPTS": "player_rush_attempts",
+               "PLAYER_RECEIVING_YARDS": "player_receiving_yards",
+               "PLAYER_REC_YARDS": "player_receiving_yards",
+               "PLAYER_RECEPTION_YDS": "player_receiving_yards",
+               "PLAYER_RECEPTIONS": "player_receptions",
+               "PLAYER_RUSH_PLUS_REC_YARDS": "player_rush_plus_rec_yards",
+               "PLAYER_RUSH_RECEPTION_YDS": "player_rush_plus_rec_yards",
+               "PLAYER_PASS_PLUS_RUSH_YARDS": "player_pass_plus_rush_yards",
+               "PLAYER_PASS_RUSH_YDS": "player_pass_plus_rush_yards"}
+# The registered CFB player-prop families: exactly the families with an
+# existing research pricing path (the CFB phone empirical pricer; passing
+# yards additionally carries the Form 2 research distribution layer).
+# CFB player markets with no engine path at all -- anytime/first TD,
+# longest-play, rushing/receiving TDs, kicking, defensive stats -- remain
+# deliberately UNREGISTERED, so their refusal stays NO_ENGINE, which is
+# the truthful reason for them.
+CFB_PLAYER_FAMILIES = frozenset({
+    "player_passing_yards", "player_passing_tds", "player_pass_attempts",
+    "player_completions", "player_interceptions", "player_rushing_yards",
+    "player_rush_attempts", "player_receiving_yards", "player_receptions",
+    "player_rush_plus_rec_yards", "player_pass_plus_rush_yards",
+})
 EVALUATION_SCOPES = frozenset({"HISTORICAL", "FORWARD_ONLY"})
 CFB_EVALUATION_SCOPE = {
     "moneyline": "HISTORICAL", "spread": "HISTORICAL",
     "total": "HISTORICAL", "team_total": "FORWARD_ONLY",
+    # Player families mirror team_total: FORWARD_ONLY. No historical
+    # player-prop market evidence exists in the frozen evaluation dataset
+    # (pooled matched team-total count is 0; player props are absent
+    # entirely) and the family's market leg is forward-only by design, so
+    # cfb_evaluation_admissible keeps refusing HISTORICAL requests for
+    # them. Registration changes only the refusal reason (NOT_VALIDATED
+    # instead of UNREGISTERED); every family stays BLOCKED / UNVALIDATED
+    # and registration confers no pricing, evaluation or PLAY authority.
+    "player_passing_yards": "FORWARD_ONLY",
+    "player_passing_tds": "FORWARD_ONLY",
+    "player_pass_attempts": "FORWARD_ONLY",
+    "player_completions": "FORWARD_ONLY",
+    "player_interceptions": "FORWARD_ONLY",
+    "player_rushing_yards": "FORWARD_ONLY",
+    "player_rush_attempts": "FORWARD_ONLY",
+    "player_receiving_yards": "FORWARD_ONLY",
+    "player_receptions": "FORWARD_ONLY",
+    "player_rush_plus_rec_yards": "FORWARD_ONLY",
+    "player_pass_plus_rush_yards": "FORWARD_ONLY",
 }
 
 

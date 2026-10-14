@@ -15,12 +15,27 @@ def test_family_stopgap_blocks_game_markets(sport, market):
     assert result["staking_authority"] is False
 
 @pytest.mark.parametrize("sport", ["CFB", "NBA", "CBB"])
-@pytest.mark.parametrize("market", ["PLAYER_PASSING_YARDS", "PLAYER_POINTS", "UNLISTED_MARKET", ""])
+@pytest.mark.parametrize("market", ["PLAYER_POINTS", "UNLISTED_MARKET", ""])
 def test_unknown_family_market_fails_closed(sport, market):
     result = family_market_decision(sport, market)
     assert result["state"] == "BLOCKED"
     assert result["blocker"] == "NO_ENGINE"
     assert result["staking_authority"] is False
+
+
+def test_player_passing_yards_registered_for_cfb_only():
+    # Registered NOT_VALIDATED for CFB on 2026-10-14 (wiring completion);
+    # still an unknown market for NBA/CBB, where it keeps failing closed.
+    result = family_market_decision("CFB", "PLAYER_PASSING_YARDS")
+    assert result["state"] == "BLOCKED"
+    assert result["blocker"] == "NO_VALIDATION"
+    assert result["validation_status"] == "UNVALIDATED"
+    assert result["staking_authority"] is False
+    for sport in ("NBA", "CBB"):
+        other = family_market_decision(sport, "PLAYER_PASSING_YARDS")
+        assert other["state"] == "BLOCKED"
+        assert other["blocker"] == "NO_ENGINE"
+        assert other["staking_authority"] is False
 
 
 def test_phase_one_coverage_unchanged_and_il_exclusions_not_shadowed():
