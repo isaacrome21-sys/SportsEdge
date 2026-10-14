@@ -265,7 +265,7 @@ def main(argv: list[str] | None = None) -> int:
             args.dk_json.strip() or None,
             os.getenv("MLB_DK_MONEYLINE_JSON", ""),
         )
-        schedule = fetch_schedule(slate_date, now=now)
+        schedule = fetch_schedule(slate_date)  # retrieved_at = post-fetch receipt clock; caller time is not a receipt claim
         history = MLBGenericHistorySource(retrieved_at=now)
         payload = build_shadow_card(
             schedule=schedule,
