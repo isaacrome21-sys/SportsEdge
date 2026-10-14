@@ -91,6 +91,22 @@ def test_mlb_blocked_markets_never_reach_pricer(no_pricers, market):
     _assert_blocked(card["evaluated_rows"][0], "MLB", market)
 
 
+@pytest.mark.parametrize("sport,market", [
+    ("CFB", "PLAYER_PASSING_YARDS"), ("CFB", "TEAM_TOTAL"),
+    ("NBA", "ML"), ("NBA", "TOTAL"), ("CBB", "SPREAD"),
+])
+def test_unvalidated_family_rows_never_reach_pricers(no_pricers, sport, market):
+    card = R.run_full({"lines": [_row(sport, market)]},
+                      now=NOW, auto_context=False)
+    row = card["evaluated_rows"][0]
+    assert row["status"] == "NO_MODEL_OR_MARKET", (sport, market, row)
+    assert row["registry_enforced"] is True
+    assert row["blocker"] in {"NO_VALIDATION", "NO_ENGINE"}
+    for key in PRICE_KEYS:
+        assert row.get(key) in (None, False), (sport, market, key, row)
+    assert card["edges"] == [] and card["prop_candidates"] == []
+
+
 def test_default_sport_payload_cannot_dodge(no_pricers):
     card = R.run_full({"sport": "mlb", "lines": [
         {k: v for k, v in _row("", "STOLEN_BASES").items() if k != "sport"}]},
