@@ -1550,8 +1550,27 @@ def _read_intents(intent_path: Path) -> list[dict[str, Any]]:
 
 
 def _pending(intents: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
-    closed = {i["intent_id"] for i in intents if i.get("state") in ("COMMIT", "ABORT")}
-    return [i for i in intents if i.get("state") == "BEGIN" and i["intent_id"] not in closed]
+    """Reject orphan/duplicate transitions instead of trusting terminal markers.
+
+    An unpaired COMMIT must never hide a missing BEGIN; repeated BEGINs and
+    duplicate closes likewise make journal integrity indeterminate. An ID may
+    be retried only after its prior transaction has explicitly closed.
+    """
+    open_intents: dict[str, Mapping[str, Any]] = {}
+    for intent in intents:
+        ident = intent["intent_id"]  # _read_intents checked structural validity
+        state = intent["state"]
+        if state == "BEGIN":
+            if ident in open_intents:
+                raise StarterCaptureError("INTENT_DUPLICATE_BEGIN")
+            open_intents[ident] = intent
+        elif state in ("COMMIT", "ABORT"):
+            if ident not in open_intents:
+                raise StarterCaptureError("INTENT_ORPHAN_TERMINAL")
+            del open_intents[ident]
+        else:
+            raise StarterCaptureError("INTENT_STATE_INVALID")
+    return list(open_intents.values())
 
 
 def _manifest_entry(record_line: bytes, record: Mapping[str, Any], seq: int, prev: str):
