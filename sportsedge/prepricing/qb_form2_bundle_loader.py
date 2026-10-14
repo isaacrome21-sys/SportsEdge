@@ -379,6 +379,17 @@ def load_form2_bundles(bundles_dir, game_rows, *, manifest_sha256=None,
              "entries": []}
     mapping = {}
     directory = Path(bundles_dir)
+    if directory.is_symlink():
+        # #2177 parity: a symlinked bundles directory is refused at
+        # the directory, by name, before any name is enumerated. The
+        # archive module's O_NOFOLLOW root open remains the
+        # enforcement backstop on every content read; this check
+        # gives that refusal its audited directory-level status
+        # instead of a directory_status of OK over per-object
+        # refusals. (is_symlink reads lstat metadata only; no bundle
+        # content is touched here, as everywhere in this adapter.)
+        audit["directory_status"] = "UNSAFE_DIRECTORY_SYMLINK"
+        return mapping, audit
     if not directory.exists():
         audit["directory_status"] = "MISSING"
         return mapping, audit
@@ -518,15 +529,35 @@ def load_form2_bundles(bundles_dir, game_rows, *, manifest_sha256=None,
     # Duplicate policy (verdict): competing valid bundles for the
     # same team are never resolved by selection. Every candidate for
     # a contested team is refused; the team proceeds without Form 2.
+    # A team is contested by identity (two surviving candidates
+    # under one ESPN team id) or by name (#2177 parity: surviving
+    # candidates carrying the same normalized team name under
+    # DIFFERENT ids leave the name -- the surface the binder
+    # resolves teams by -- ambiguous, so no candidate under any of
+    # those ids may be selected either).
+    ids_by_name = {}
     for team_id, group in candidates.items():
-        if len(group) == 1:
+        for _cand_entry, bundle in group:
+            ids_by_name.setdefault(
+                _team_key(bundle["team"]["name"]), set()).add(team_id)
+    name_conflicted_ids = set()
+    for ids in ids_by_name.values():
+        if len(ids) > 1:
+            name_conflicted_ids |= ids
+    for team_id, group in candidates.items():
+        if len(group) == 1 and team_id not in name_conflicted_ids:
             mapping[team_id] = group[0][1]
             continue
         for entry, _bundle in group:
             entry["disposition"] = EXCLUDED
             entry["reason"] = REASON_DUPLICATE
-            entry["detail"] = (
-                "CONFLICTING_VALID_BUNDLES_FOR_SAME_TEAM; "
-                "ALL_REFUSED_FAIL_CLOSED")
+            if len(group) > 1:
+                entry["detail"] = (
+                    "CONFLICTING_VALID_BUNDLES_FOR_SAME_TEAM; "
+                    "ALL_REFUSED_FAIL_CLOSED")
+            else:
+                entry["detail"] = (
+                    "CONFLICTING_TEAM_IDS_FOR_SAME_TEAM_NAME; "
+                    "ALL_REFUSED_FAIL_CLOSED")
     audit["admitted_team_ids"] = sorted(mapping)
     return mapping, audit
