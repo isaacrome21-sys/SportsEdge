@@ -1502,21 +1502,77 @@ def _repair_torn_tail(path: Path, qdir: Path, label: str) -> bool:
 
 
 def _read_intents(intent_path: Path) -> list[dict[str, Any]]:
+    """Validate journal record structure before recovery reads any fields.
+
+    A schema tag alone is insufficient: a truncated but valid JSON object
+    previously escaped as KeyError during pending-intent detection/replay.
+    Corrupt journals remain untouched and fail closed for manual inspection.
+    """
     out = []
     for i, line in enumerate(_read_lines(intent_path), start=1):
+        def unique_pairs(pairs):
+            obj = {}
+            for key, value in pairs:
+                if key in obj:
+                    raise StarterCaptureError(f"INTENT_DUPLICATE_JSON_KEY:{i}")
+                obj[key] = value
+            return obj
+
         try:
-            obj = json.loads(line.decode("utf-8"))
-        except (ValueError, UnicodeDecodeError):
-            raise StarterCaptureError(f"INTENT_LINE_UNPARSEABLE:{i}")
+            obj = json.loads(
+                line.decode("utf-8"), object_pairs_hook=unique_pairs,
+                parse_constant=lambda value: (_ for _ in ()).throw(
+                    StarterCaptureError(f"INTENT_NONFINITE_NUMBER:{i}")
+                ),
+            )
+        except StarterCaptureError:
+            raise  # preserve distinct duplicate-key/nonfinite failure codes
+        except (ValueError, UnicodeDecodeError, RecursionError):
+            raise StarterCaptureError(f"INTENT_LINE_UNPARSEABLE:{i}") from None
         if not isinstance(obj, dict) or obj.get("schema") != SCHEMA_INTENT:
             raise StarterCaptureError(f"INTENT_LINE_INVALID:{i}")
+        state = obj.get("state")
+        if state not in ("BEGIN", "COMMIT", "ABORT") or not _is_sha256_hex(obj.get("intent_id")):
+            raise StarterCaptureError(f"INTENT_LINE_INVALID:{i}")
+        if state == "BEGIN":
+            base = obj.get("base_seq")
+            raw_digest = obj.get("raw_sha256")
+            receipt = obj.get("receipt_link")
+            if (type(base) is not int or base < 0
+                    or not _is_sha256_hex(obj.get("record_sha256"))
+                    or not isinstance(obj.get("record_line"), str)
+                    or (raw_digest is not None and not _is_sha256_hex(raw_digest))
+                    or not isinstance(receipt, dict)
+                    or receipt.get("sha256") != raw_digest
+                    or (receipt.get("url") is not None
+                        and not isinstance(receipt.get("url"), str))):
+                raise StarterCaptureError(f"INTENT_LINE_INVALID:{i}")
         out.append(obj)
     return out
 
 
 def _pending(intents: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
-    closed = {i["intent_id"] for i in intents if i.get("state") in ("COMMIT", "ABORT")}
-    return [i for i in intents if i.get("state") == "BEGIN" and i["intent_id"] not in closed]
+    """Reject orphan/duplicate transitions instead of trusting terminal markers.
+
+    An unpaired COMMIT must never hide a missing BEGIN; repeated BEGINs and
+    duplicate closes likewise make journal integrity indeterminate. An ID may
+    be retried only after its prior transaction has explicitly closed.
+    """
+    open_intents: dict[str, Mapping[str, Any]] = {}
+    for intent in intents:
+        ident = intent["intent_id"]  # _read_intents checked structural validity
+        state = intent["state"]
+        if state == "BEGIN":
+            if ident in open_intents:
+                raise StarterCaptureError("INTENT_DUPLICATE_BEGIN")
+            open_intents[ident] = intent
+        elif state in ("COMMIT", "ABORT"):
+            if ident not in open_intents:
+                raise StarterCaptureError("INTENT_ORPHAN_TERMINAL")
+            del open_intents[ident]
+        else:
+            raise StarterCaptureError("INTENT_STATE_INVALID")
+    return list(open_intents.values())
 
 
 def _manifest_entry(record_line: bytes, record: Mapping[str, Any], seq: int, prev: str):
@@ -1579,7 +1635,12 @@ def _recover_locked(capture_path, manifest_path, raw_dir, intent_path, qdir, ver
                 actions.append(f"QUARANTINED_TORN_LINE:{p.name}")
         it = pend[0]
         line = it["record_line"].encode("utf-8")
-        record = json.loads(line)
+        try:
+            record = json.loads(line)
+        except (ValueError, UnicodeDecodeError, RecursionError):
+            raise StarterCaptureError("INTENT_RECORD_UNPARSEABLE") from None
+        if not isinstance(record, dict):
+            raise StarterCaptureError("INTENT_RECORD_NOT_OBJECT")
         if _sha256_hex(line) != it["record_sha256"] or canonical_line(record) != line:
             raise StarterCaptureError("INTENT_RECORD_DIGEST_MISMATCH")
         caps, mans = _read_lines(capture_path), _read_lines(manifest_path)
