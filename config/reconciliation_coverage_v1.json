@@ -529,7 +529,8 @@
     ".github/workflows/nfl-location-symmetric-g1-readout.yml": "NFL_LOCATION_SYMMETRIC_G1_EXACT_MAIN_DEVELOPMENT_READOUT_WORKFLOW_ZERO_BETTING_AUTHORITY",
     "tests/test_nfl_location_symmetric_g1_readout_workflow.py": "TEST_ONLY_NFL_LOCATION_SYMMETRIC_G1_READOUT_BOUNDARY_NO_RUNTIME_AUTHORITY",
     "scripts/collect_auto_dk_four_sports.py": "PROSPECTIVE_DRAFTKINGS_AND_REFERENCE_BOOK_QUOTE_CAPTURE_ONLY_NO_PREDICTIVE_MODEL_TRUTH_GATE_PROMOTION_STAKING_VALIDATION_OR_EVIDENCE_CLOCK_AUTHORITY",
-    "tests/test_mlb_receipt_durable_journal_20261014.py": "TEST_ONLY_MLB_RECEIPT_2221_REPIN_NO_RUNTIME_AUTHORITY"
+    "tests/test_mlb_receipt_durable_journal_20261014.py": "TEST_ONLY_MLB_RECEIPT_2221_REPIN_NO_RUNTIME_AUTHORITY",
+    "tests/test_mlb_receipt_recovery_sync_t153_20261014.py": "TEST_ONLY_MLB_RECEIPT_RECOVERY_SYNC_NO_RUNTIME_AUTHORITY"
   },
   "inventory_completion_claim": {
     "status": "HOSTED_AUDIT_ZERO_UNMAPPED",
