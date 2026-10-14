@@ -8,6 +8,15 @@ _UPPER_SUPPORT={"PITCHER_OUTS":27}
 ENGINE_VERSION="mlb_pitcher_joint_empirical_bayes_v4_long_window_prior"
 LONG_WINDOW_PRIOR_POLICY="STRICT_PRIOR_EMPIRICAL_POOL_CAPPED_AT_RECENT_EFFECTIVE_N"
 PITCHER_MARKETS=frozenset({"PITCHER_K","PITCHER_OUTS","PITCHER_ER","PITCHER_HITS_ALLOWED","PITCHER_BB","PITCHER_HITS_WALKS_ER","EITHER_PITCHER_HITS_ALLOWED","EITHER_PITCHER_BB","EITHER_PITCHER_ER"})
+# Markets this engine can price that are NOT in the 38-family registry
+# catalog (config/mlb_market_catalog.json). PITCHER_PITCHES is priced
+# here and wired through the phone RUN IT path, but it is deliberately
+# kept out of PITCHER_MARKETS: that set feeds the quote bridge and the
+# registry-accounting tests, where the supported set must equal the
+# registered catalog exactly. Registering a 39th family is a separate
+# governance act (REGISTRY_DIFF.md item 9 lists pitches thrown as
+# worth registering); until then the family is priced-but-unregistered.
+PRICED_PITCHER_MARKETS=PITCHER_MARKETS|frozenset({"PITCHER_PITCHES"})
 class PitcherJointEngineError(ValueError):pass
 def _f(v:Any,name:str,lo:float=0.0)->float:
     if isinstance(v,bool):raise PitcherJointEngineError(f"{name} must be numeric")
@@ -26,6 +35,14 @@ def _normalize_pool(raw:Any,name:str,minimum:int=5)->list[dict[str,int]]:
             x=_f(item.get(key),f"{name}[{i}].{key}")
             if int(x)!=x:raise PitcherJointEngineError(f"{name}[{i}].{key} must be integer")
             row[key]=int(x)
+        # Optional measured pitch count (per-start integer from the same
+        # gameLog payload). Carried only when the collector supplied it;
+        # pools assembled without it keep their exact prior shape, and
+        # PITCHER_PITCHES fails closed on pools that lack it (see _value).
+        if item.get("pitches") is not None:
+            x=_f(item.get("pitches"),f"{name}[{i}].pitches")
+            if int(x)!=x:raise PitcherJointEngineError(f"{name}[{i}].pitches must be integer")
+            row["pitches"]=int(x)
         if not 0<=row["outs"]<=27:raise PitcherJointEngineError(f"{name}[{i}].outs outside [0,27]")
         rows.append(row)
     if len(rows)<minimum:raise PitcherJointEngineError(f"{name} requires at least {minimum} prior starts")
@@ -42,6 +59,9 @@ def _value(row:Mapping[str,int],market:str)->int:
     if market=="PITCHER_ER":return row["earned_runs"]
     if market=="PITCHER_HITS_ALLOWED":return row["hits_allowed"]
     if market=="PITCHER_BB":return row["walks_allowed"]
+    if market=="PITCHER_PITCHES":
+        if "pitches" not in row:raise PitcherJointEngineError("PITCHER_PITCHES_REQUIRES_MEASURED_PITCH_COUNT_IN_HISTORY_POOL")
+        return row["pitches"]
     if market=="PITCHER_HITS_WALKS_ER":return row["hits_allowed"]+row["walks_allowed"]+row["earned_runs"]
     raise PitcherJointEngineError(f"unsupported single-pitcher market {market}")
 def _posterior(over:float,under:float,push:float,n:float,line:float,market:str)->dict[str,Any]:return posterior_settlement_mass(over_mass=over,under_mass=under,push_mass=push,effective_n=n,has_push=float(line).is_integer(),feasible=feasible_settlements(line,lower=0,upper=_UPPER_SUPPORT.get(market)))
@@ -180,7 +200,7 @@ def _price_ump_bb(features:Mapping[str,Any],line:float,side:str,market:str)->tup
     return (post["p_over"] if side=="OVER" else post["p_under"]),post["p_push"],meta,identity
 def price_pitcher_market(model_input:Mapping[str,Any])->dict[str,Any]:
     market=str(model_input.get("market","")).upper()
-    if market not in PITCHER_MARKETS:raise PitcherJointEngineError(f"unsupported pitcher market {market}")
+    if market not in PRICED_PITCHER_MARKETS:raise PitcherJointEngineError(f"unsupported pitcher market {market}")
     side=str(model_input.get("side","")).upper()
     if side not in {"OVER","UNDER"}:raise PitcherJointEngineError("side must be OVER or UNDER")
     line=_f(model_input.get("line"),"line");features=model_input.get("features")

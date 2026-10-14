@@ -16,7 +16,8 @@ from hashlib import sha256
 import json
 
 from sportsedge.pitcher_joint_engine import (
-    price_pitcher_market, PitcherJointEngineError, PITCHER_MARKETS, ENGINE_VERSION,
+    price_pitcher_market, PitcherJointEngineError, PRICED_PITCHER_MARKETS,
+    ENGINE_VERSION,
 )
 from sportsedge.mlb_batter_empirical import price_batter_market, BatterEmpiricalError
 def derive_player_stat_market(*args, **kwargs):
@@ -132,7 +133,7 @@ def mlb_pitcher_to_bridge_rows(
     not fetch or backfill features. No generic league priors are substituted.
     """
     try:
-        if str(market).upper() not in PITCHER_MARKETS or market.startswith("EITHER_"):
+        if str(market).upper() not in PRICED_PITCHER_MARKETS or market.startswith("EITHER_"):
             raise ValueError("SINGLE_PITCHER_MARKET_REQUIRED")
         if starting_pitcher_verified is not True:
             raise ValueError("STARTER_UNVERIFIED")
