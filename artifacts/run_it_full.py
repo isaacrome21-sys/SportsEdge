@@ -26,12 +26,16 @@ from sportsedge.prepricing.factor_ingestion import stage_games
 from sportsedge.team_half_pricing import DERIVATIVES, price_team_half_rows
 from sportsedge.pricing_provenance import (
     apply_play_gate, determine_provenance)
+from sportsedge.registry_gate import registry_blocked_row as _shared_registry_blocked_row
+from sportsedge.registry_gate import is_priced as _registry_is_priced
 from sportsedge.canonical_coverage import (
     NFL_ANYTIME_TD_MARKETS, NFL_DERIVATIVE_MARKETS, NFL_FIRST_TD_MARKETS,
-    blocked_row_for as coverage_blocked_row, coverage_summary)
+    blocked_row_for as coverage_blocked_row, coverage_summary,
+    resolve_market as coverage_resolve_market, BLOCKED as COVERAGE_BLOCKED)
 from sportsedge.mlb_f5_quote_binding import (
     F5_MARKET_ALIASES as F5_INTAKE_ALIASES, F5_MARKETS as F5_CANONICAL_MARKETS,
     phone_f5_binding_rows)
+from sportsedge.mlb_f5_fixture_resolution import stamp_f5_game_pks
 from sportsedge.market_coverage import (
     COVERAGE_MARKETS,
     normalize_coverage_market,
@@ -230,6 +234,16 @@ def _prepricing_blocked_row(line, stage, input_index):
     }
 
 
+def _registry_blocked_row(sport, markets, line, *, include_unregistered=False):
+    """Runtime registry enforcement (t115); implementation shared with the
+    legacy runners in sportsedge.registry_gate (t118). Pre-routing call:
+    BLOCKED registry entries only. The post-evaluation call passes
+    include_unregistered=True and is applied to PRICED rows only, so an
+    unregistered market (e.g. CFB player props) can never keep a price."""
+    return _shared_registry_blocked_row(sport, markets, line,
+                                        include_unregistered=include_unregistered)
+
+
 def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
              auto_context=True, min_ev=0.02, lane="A", allow_manual_context=False,
              td_cache_dir=None, td_opener=None):
@@ -256,7 +270,12 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     the settlement basis is checked from the settlement code, features
     assemble from strictly-prior StatsAPI linescores, and rows then block
     at the F5 deployment gate (stage F5_STATE_CANDIDATE, eligible=false)
-    with the specific F5_* reason named. Every other matrix market
+    with the specific F5_* reason named. The verified gamePk the binder's
+    gate 2.5 requires is resolved in-run from the official StatsAPI
+    schedule (fixture team names + stated first pitch) by
+    sportsedge.mlb_f5_fixture_resolution when fetching is enabled; a
+    fixture that does not resolve leaves its rows unstamped, and they
+    refuse at gate 2.5 exactly as before. Every other matrix market
     without a priced route resolves through sportsedge.canonical_coverage
     to a named taxonomy blocker.
     """
@@ -270,6 +289,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     game_indices, games, prop_indices, props = [], [], [], []
     coverage_indices, coverage_input = [], []
     f5_indices, f5_input = [], []
+    registry_gated = {}  # local prop index -> registry blocker row
     for i, raw in enumerate(rows):
         if not isinstance(raw, dict):
             raise ValueError("LINE_MUST_BE_OBJECT")
@@ -322,6 +342,21 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         if line["sport"] == "MLB" and market in F5_INTAKE_ALIASES:
             market = F5_INTAKE_ALIASES[market]
             line["market"] = market
+        raw_market = str(raw.get("market") or "").upper().strip()
+        gate = _registry_blocked_row(line["sport"], [
+            raw_market, market,
+            normalize_coverage_market(market),
+            normalize_f5_market(market) if line["sport"] == "MLB" else None,
+            _NFL_RULING_DERIVATIVE_TRANSLATION.get(market)
+            if line["sport"] == "NFL" else None,
+        ], line)
+        if gate is not None:
+            # Registry blocker wins over every routing lane (game,
+            # coverage, F5, prop, team-half, derivative, TD, player).
+            prop_indices.append(i)
+            props.append(line)
+            registry_gated[len(props) - 1] = gate
+            continue
         if market in {"ML", "SPREAD", "TOTAL"} or (
             line["sport"] == "MLB" and market == "TEAM_TOTALS"
         ):
@@ -446,6 +481,9 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     td_pos, td_input = [], []
     others = {}
     for local, line in enumerate(props):
+        if local in registry_gated:
+            others[local] = registry_gated[local]
+            continue
         market = str(line.get("market") or "").upper()
         if line["sport"] == "NFL" and market in _NFL_RULING_DERIVATIVE_TRANSLATION:
             # Owner ruling (Oct 13, 2026; see the constant): NFL team
@@ -524,6 +562,16 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     # StatsAPI/engine dependencies load lazily inside the stage.
     f5_results, f5_receipts = [], []
     if f5_input:
+        f5_resolution_receipts = []
+        if auto_context:
+            # Gate 2.5 fixture binding: stamp the verified gamePk
+            # resolved in-run from the official StatsAPI schedule
+            # (team names + stated first pitch; never from board
+            # text). A failed or ambiguous resolution leaves the
+            # rows unstamped, and the binder refuses them
+            # F5_FIXTURE_BINDING_MISSING, exactly as before.
+            f5_input, f5_resolution_receipts = stamp_f5_game_pks(
+                f5_input, getter=getter, resolved_at=clock)
         try:
             f5_results, f5_receipts = phone_f5_binding_rows(
                 f5_input, now=clock,
@@ -542,6 +590,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "research_only": True, "official_authority": False,
                 "model_p_authority": False, "staking_authority": False,
             } for line in f5_input]
+        f5_receipts = f5_receipts + f5_resolution_receipts
     nfl_results, nfl_receipts = phone_nfl_player_rows(
         nfl_input, now=clock, getter=getter if auto_context else (lambda url: None))
     cfb_results, cfb_receipts = phone_cfb_player_rows(
@@ -694,6 +743,31 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         evaluated[i] = result
     if any(r is None for r in evaluated):
         raise ValueError("EVALUATED_ROWS_REQUIRED_TO_AVOID_FALSE_FACTOR_COVERAGE")
+    # Defense in depth: re-check every evaluated row against the registry
+    # by its raw intake name and its emitted market name. Any blocked
+    # market that reached a pricer through a path not caught above is
+    # replaced by the fail-closed blocker row before any surface is built.
+    prop_local = {i: local for local, i in enumerate(prop_indices)}
+    for i, raw in enumerate(rows):
+        sport = str(raw.get("sport") or default_sport or "").upper()
+        result = evaluated[i]
+        gate = _registry_blocked_row(sport, [
+            str(raw.get("market") or "").upper().strip(),
+            str(result.get("market") or "").upper().strip(),
+            str(result.get("coverage_market") or "").upper().strip(),
+        ], {**raw, "sport": sport})
+        if gate is None and _registry_is_priced(result):
+            gate = _registry_blocked_row(sport, [
+                str(raw.get("market") or "").upper().strip(),
+                str(result.get("market") or "").upper().strip(),
+                str(result.get("coverage_market") or "").upper().strip(),
+            ], {**raw, "sport": sport}, include_unregistered=True)
+        if gate is None or result.get("registry_enforced"):
+            continue
+        gate["input_index"] = i
+        evaluated[i] = gate
+        if i in prop_local:
+            modeled_props[prop_local[i]] = gate
     # Provenance gate (Isaac's architecture-conflict ruling, Oct 12 2026):
     # every priced row on this canonical card carries an explicit
     # INDEPENDENT / MARKET_ANCHORED provenance, identifiable from the card
