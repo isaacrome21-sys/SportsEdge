@@ -1,0 +1,47 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "candidate_p_over": 0.315083433373568,
+  "candidate_p_push": 0.0,
+  "candidate_p_under": 0.684916566626432,
+  "context_proof": {
+    "confirmed_lineup": "ABSENT",
+    "max_age_seconds": 1200,
+    "path": "runtime/mlb-context/runs/38558638471/2026-10-14/game_849811.json",
+    "plate_umpire": "ABSENT",
+    "retrieved_at": "2026-10-14T11:44:20.243448+00:00"
+  },
+  "entity_name": "Blake Snell",
+  "evaluation_run_id": 37603403636,
+  "first_pitch_at_utc": "2026-10-15T00:00:00+00:00",
+  "fit_sha256": "70a31ff9b995a2d54df87feb2d51e2518fa9cd8593bf6c047970e08557b6ecea",
+  "game_pk": 849811,
+  "line": 6.5,
+  "market": "PITCHER_K",
+  "market_fair_p_over": 0.4250232434586267,
+  "observed_at_utc": "2026-10-14T12:04:18.350286+00:00",
+  "over_odds": 122,
+  "pitcher_id": 605483,
+  "pitcher_team_id": 119,
+  "predicted_k_per_batter_faced": 0.27629596235612947,
+  "projected_batters_faced": 20,
+  "provider_event_id": "34821533",
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-14/props_20261014T120419.883523Z.json",
+  "receipt_sha256": "8f27b06bcde933c87d459b7750ae3bc28abcf0f4de495a9325adbca9f33b5afc",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_PREDICTION_V1",
+  "statcast_proof": {
+    "head_sha": "007f323f58c620b54bdabdd92de205a6601bf0c1",
+    "manifest_path": "runtime/statcast/runs/38464891408/2026-10-13/manifest.json",
+    "pitcher_row_sha256": "c8988da1a08a0dda41625054b1c0cfbe82b176575f33fac069615fb08ed1c6cd",
+    "pitchers_path": "runtime/statcast/runs/38464891408/2026-10-13/pitchers.json",
+    "provenance_path": "runtime/statcast/runs/38464891408/2026-10-13/provenance.json",
+    "retrieved_at": "2026-10-13T20:42:59.388785+00:00",
+    "run_id": "38464891408"
+  },
+  "status": "CAPTURED_PROSPECTIVE",
+  "under_odds": -156
+}
