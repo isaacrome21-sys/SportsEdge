@@ -666,11 +666,29 @@ class RunnerWiringTests(LoaderCase):
                   self.cover(bundle2393, self.publish(bundle2393))]
         return self.manifest_for(covers)
 
-    def test_run_full_wires_bundles_and_audits_loader(self):
-        # Re-contracted: the runner now also carries the external pin
-        # (form2_manifest_sha256 / form2_manifest_bytes); the manifest
-        # is supplied as caller bytes, so the archive root holds only
-        # the two bundle objects and every audit entry is an admission.
+    @staticmethod
+    def _assert_runtime_registry_refusal(card):
+        # The merged #2224 family registry is a prepricing hard stop.
+        # Archive loader and QB identity admission are tested directly
+        # above; the canonical runner cannot allow CFB markets through
+        # to the underlying stage while the family is unvalidated.
+        assert "prepricing_factor_audit" not in card
+        (row,) = card["evaluated_rows"]
+        assert row["status"] == "NO_MODEL_OR_MARKET"
+        assert row["blocker"] == "NO_VALIDATION"
+        assert row["registry_enforced"] is True
+        for key in ("model_p", "probability", "fair_odds",
+                    "ev_per_dollar", "fair_price", "edge"):
+            assert row.get(key) is None, key
+        assert card["edges"] == []
+        assert card["independent_candidates"] == []
+        assert card["prop_candidates"] == []
+
+    def test_run_full_wires_archive_audit_without_registry_bypass(self):
+        # Even an externally pinned Form 2 archive cannot price CFB
+        # when the runtime market registry blocks the family. The
+        # direct loader+binder tests prove admission of the same
+        # bundles in their research-only internal stage.
         pin, raw = self._pinned_archive()
         card = full.run_full({"lines": [cfb_row()]}, now=NOW,
                              getter=self._lenient_getter(),
@@ -682,65 +700,28 @@ class RunnerWiringTests(LoaderCase):
                          "SPORTSEDGE_QB_FORM2_BUNDLE_LOADER_AUDIT_V1")
         self.assertEqual(audit["pin_status"], "VERIFIED")
         self.assertEqual(audit["manifest_sha256"], pin)
-        self.assertEqual(audit["admitted_team_ids"], ["2393", "48"])
-        self.assertTrue(all(e["reason"] == loader.REASON_ADMITTED
-                            for e in audit["entries"]))
-        (entry,) = card["prepricing_factor_audit"]["by_input_index"]
-        self.assertFalse(entry["blocked"])
-        qb = [f for f in entry["factors"] if f["factor"] == "qb_specific"]
-        self.assertTrue(any(f["status"] == "USED" for f in qb))
-        reasons = " ".join(f["reason"] for f in qb)
-        self.assertIn("AVAILABILITY_UNVERIFIED_NO_TEAM_INJURY_REPORT",
-                      reasons)
-        self.assertEqual(entry["adjustments"]["away_injury_pts"], 0.0)
-        self.assertEqual(entry["adjustments"]["home_injury_pts"], 0.0)
+        self.assertEqual(audit["admitted_team_ids"], [])
+        self._assert_runtime_registry_refusal(card)
 
     def test_run_full_without_bundles_dir_has_no_loader_audit(self):
         card = full.run_full({"lines": [cfb_row()]}, now=NOW,
                              getter=self._lenient_getter())
         self.assertNotIn("qb_form2_bundle_loader_audit", card)
-        (entry,) = card["prepricing_factor_audit"]["by_input_index"]
-        # Without Form 2 the same fixture still blocks at the QB gate.
-        self.assertTrue(entry["blocked"])
-        self.assertEqual(entry["block_reason"],
-                         "BLOCKED_PREPRICING_QB_IDENTITY_UNVERIFIED")
+        self._assert_runtime_registry_refusal(card)
 
-    def test_run_full_form2_game_is_research_only_end_to_end(self):
-        # Issue #2158, asserted on the composed runner -- not at the
-        # gate function: bundles arrive through the loader (now under
-        # the external pin), the stage satisfies identity via Form 2,
-        # the game is priced, and the priced rows carry the
-        # availability field and come out research-only with every
-        # actionable surface empty. (The offline fixture yields no
-        # engine probability for this game, so the row surfaces
-        # nowhere regardless; that the guard demotes even a
-        # positive-EV would-be play is pinned by
-        # tests/test_availability_research_only_gate_20261013.py.)
+    def test_run_full_form2_game_cannot_bypass_unvalidated_family(self):
+        # #2158's research-only availability gate still has its
+        # standalone positive tests. The stronger current runtime
+        # rule (#2224) rejects the market before prepricing.
         pin, raw = self._pinned_archive()
         card = full.run_full({"lines": [cfb_row()]}, now=NOW,
                              getter=self._lenient_getter(),
                              form2_bundles_dir=self.dir,
                              form2_manifest_sha256=pin,
                              form2_manifest_bytes=raw)
-        (entry,) = card["prepricing_factor_audit"]["by_input_index"]
-        self.assertFalse(entry["blocked"])  # the game was priced
-        rows = [r for r in card["evaluated_rows"]
-                if r.get("input_index") == 0]
-        self.assertEqual(len(rows), 1)
-        (row,) = rows
-        self.assertEqual(row["availability_status"],
-                         qe.AVAILABILITY_UNVERIFIED)
-        self.assertIs(row["research_only"], True)
         self.assertEqual(
-            row["play_blocked_reason"],
-            "QB_AVAILABILITY_UNVERIFIED_CANNOT_SURFACE_AS_PLAY")
-        self.assertEqual(card["edges"], [])
-        self.assertEqual(card["independent_candidates"], [])
-        self.assertEqual(card["prop_candidates"], [])
-        self.assertEqual(
-            card["play_gate"]["availability_unverified_max_surface"],
-            "RESEARCH_ONLY")
-
+            card["qb_form2_bundle_loader_audit"]["admitted_team_ids"], [])
+        self._assert_runtime_registry_refusal(card)
 
 if __name__ == "__main__":
     unittest.main()
