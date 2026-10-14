@@ -5,15 +5,21 @@ synthetic universe as the QB bridge battery.  All player ids/names are
 synthetic; the ESPN payloads below are fabricated in the recorded
 fixture's shape, not captured data.
 
-Rules under test (documented in the bridge + phone modules):
+Rules under test (documented in the bridge + phone modules, as
+remediated per the PR #2274 audit):
 - Skill states mirror the QB discipline.  Only the confirmed tier --
   CONFIRMED_STARTER (game-day active, chart rank 1) and CONFIRMED_ACTIVE
-  (game-day active, rotation) -- passes a participation gate.  Projected
-  tiers never confirm.
-- In the phone pricer, that same confirmed tier is the ONLY thing that
-  lifts STARTING_ROLE_NOT_VERIFIED_FROM_GAMELOG; every other outcome
-  keeps the stamp and records the bridge's named refusal.  Labels and
-  authority flags are identical either way.
+  (game-day active, rotation) -- passes a participation gate, and
+  "game-day active" now requires a completeness-provable official
+  inactive snapshot (B1): loose designation rows are positive evidence
+  only.  Projected tiers never confirm.
+- In the phone pricer, that same confirmed tier lifts
+  STARTING_ROLE_NOT_VERIFIED_FROM_GAMELOG only when the bundle arrives
+  through the anchored archive loader with verified provenance (B2);
+  an inline payload bundle is UNVERIFIED_BUNDLE and never lifts.
+  Bindings are the versioned ESPN-ID <-> GSIS-ID crosswalk (B3).
+  Every non-lift outcome keeps the stamp and records the named
+  refusal.  Labels and authority flags are identical either way.
 """
 from __future__ import annotations
 
@@ -109,6 +115,29 @@ def inactive_rows(inactive_ids=("rb2",), published="2026-10-04T15:30:00Z"):
         for pid in inactive_ids]
 
 
+def _complete_ids(team, named):
+    ids = list(named)
+    i = 1
+    while len(ids) < 7:
+        filler = f"{team.lower()}-inactive-{i}"
+        if filler not in ids:
+            ids.append(filler)
+        i += 1
+    return ids
+
+
+def inactive_snapshots(chi_ids=("rb2",), gb_ids=(),
+                       published="2026-10-04T15:30:00Z"):
+    """Source-complete official inactive snapshots (audit B1 form)."""
+    out = [{"game_id": GAME_ID, "team": "CHI", "published_at": published,
+            "player_ids": _complete_ids("CHI", chi_ids)}]
+    if gb_ids:
+        out.append({"game_id": GAME_ID, "team": "GB",
+                    "published_at": published,
+                    "player_ids": _complete_ids("GB", gb_ids)})
+    return out
+
+
 def injury_row(player_id, status, *, team="CHI",
                modified="2026-10-01T17:00:00Z"):
     return {"season": 2026, "week": 4, "team": team, "gsis_id": player_id,
@@ -118,7 +147,7 @@ def injury_row(player_id, status, *, team="CHI",
 def assess(pid, **overrides):
     kwargs = dict(
         team="CHI", player_id=pid, depth_rows=depth_rows(),
-        inactive_rows=inactive_rows(), game_id=GAME_ID,
+        inactive_snapshots=inactive_snapshots(), game_id=GAME_ID,
         target_season=2026, target_week=4, kickoff=KICKOFF, as_of=GAMEDAY)
     kwargs.update(overrides)
     return assess_skill_participation(**kwargs)
@@ -151,14 +180,14 @@ def test_skill_te1_confirmed_starter():
 
 
 def test_skill_projected_tiers_refuse_by_name_before_inactives():
-    starter = assess("wr1", as_of=PRE_INACTIVES, inactive_rows=())
+    starter = assess("wr1", as_of=PRE_INACTIVES, inactive_snapshots=())
     assert starter["state"] == "PROJECTED_STARTER"
     assert starter["subclass"] == "DEPTH_STARTER_NO_ADVERSE_DESIGNATION"
     with pytest.raises(NFLParticipationError,
                        match="NFL_SKILL_ROLE_NOT_CONFIRMED:PROJECTED_STARTER"):
         require_confirmed_skill_role(starter)
 
-    rotation = assess("wr2", as_of=PRE_INACTIVES, inactive_rows=())
+    rotation = assess("wr2", as_of=PRE_INACTIVES, inactive_snapshots=())
     assert rotation["state"] == "PROJECTED_ROTATION"
     assert rotation["subclass"] == "DEPTH_ROTATION_NO_ADVERSE_DESIGNATION"
     with pytest.raises(NFLParticipationError,
@@ -176,7 +205,7 @@ def test_skill_officially_inactive_refuses_out():
 
 
 def test_skill_injury_out_refuses_out():
-    verdict = assess("wr1", as_of=PRE_INACTIVES, inactive_rows=(),
+    verdict = assess("wr1", as_of=PRE_INACTIVES, inactive_snapshots=(),
                      injury_rows=[injury_row("wr1", "Out")])
     assert verdict["state"] == "OUT"
     with pytest.raises(NFLParticipationError,
@@ -185,7 +214,7 @@ def test_skill_injury_out_refuses_out():
 
 
 def test_skill_questionable_refuses_by_name():
-    verdict = assess("wr1", as_of=PRE_INACTIVES, inactive_rows=(),
+    verdict = assess("wr1", as_of=PRE_INACTIVES, inactive_snapshots=(),
                      injury_rows=[injury_row("wr1", "Questionable")])
     assert verdict["state"] == "QUESTIONABLE"
     with pytest.raises(
@@ -241,7 +270,8 @@ def test_skill_missing_snapshot_and_absent_player_refuse():
 def test_skill_assessment_shares_and_route_unknown_propagates():
     bundle = skill_role_assessment(
         team="CHI", player_id="wr1", depth_rows=depth_rows(),
-        player_stat_rows=player_rows(), inactive_rows=inactive_rows(),
+        player_stat_rows=player_rows(),
+        inactive_snapshots=inactive_snapshots(),
         game_id=GAME_ID, target_season=2026, target_week=4,
         kickoff=KICKOFF, as_of=GAMEDAY, position="WR")
     assert bundle["verdict"]["state"] == "CONFIRMED_STARTER"
@@ -261,7 +291,8 @@ def test_skill_assessment_shares_and_route_unknown_propagates():
         for w in (1, 2, 3)]
     rb_bundle = skill_role_assessment(
         team="CHI", player_id="rb1", depth_rows=depth_rows(),
-        player_stat_rows=player_rows(), inactive_rows=inactive_rows(),
+        player_stat_rows=player_rows(),
+        inactive_snapshots=inactive_snapshots(),
         snap_rows=snap_rows, game_id=GAME_ID, target_season=2026,
         target_week=4, kickoff=KICKOFF, as_of=GAMEDAY, position="RB")
     rb_shares = rb_bundle["opportunity_shares"]
@@ -273,14 +304,15 @@ def test_skill_assessment_shares_and_route_unknown_propagates():
 
 def test_qb_require_gate_matches_bridge_rule():
     verdict = assess_qb_participation(
-        team="CHI", depth_rows=depth_rows(), inactive_rows=inactive_rows(),
+        team="CHI", depth_rows=depth_rows(),
+        inactive_snapshots=inactive_snapshots(),
         game_id=GAME_ID, target_season=2026, target_week=4,
         kickoff=KICKOFF, as_of=GAMEDAY, expected_player_id="qb1")
     assert require_confirmed_qb_role(
         verdict, depth_rows=depth_rows(), as_of=GAMEDAY)["state"] \
         == "CONFIRMED_STARTER"
     projected = assess_qb_participation(
-        team="CHI", depth_rows=depth_rows(), inactive_rows=(),
+        team="CHI", depth_rows=depth_rows(), inactive_snapshots=(),
         game_id=GAME_ID, target_season=2026, target_week=4,
         kickoff=KICKOFF, as_of=PRE_INACTIVES, expected_player_id="qb1")
     with pytest.raises(NFLParticipationError,
@@ -363,21 +395,48 @@ def _phone_pair(player, market, line, *, captured="2026-10-04T15:59:00Z"):
     return [dict(base, side="OVER"), dict(base, side="UNDER")]
 
 
-def _bundle(*, depth=None, inactives=None, bindings=None):
+def _bundle(*, depth=None, inactives=None, snapshots=None, bindings=None):
     return {
+        "schema": "SPORTSEDGE_NFL_PARTICIPATION_BUNDLE_V1",
         "depth_rows": depth if depth is not None else depth_rows(),
         "injury_rows": [],
-        "inactive_rows": inactive_rows() if inactives is None else inactives,
+        "inactive_rows": [] if inactives is None else inactives,
+        "inactive_snapshots":
+            inactive_snapshots() if snapshots is None else snapshots,
         "games": [{"away": "Green Bay Packers", "home": "Chicago Bears",
                    "kickoff": KICKOFF, "game_id": GAME_ID,
                    "season": 2026, "week": 4,
                    "away_code": "GB", "home_code": "CHI"}],
+        "player_bindings_version": "ESPN_GSIS_CROSSWALK_V1",
         "player_bindings": bindings if bindings is not None else [
-            {"player_name": "Chi QB", "team": "CHI", "player_id": "qb1",
+            {"player_name": "Chi QB", "team": "CHI",
+             "espn_player_id": "900101", "gsis_id": "qb1",
              "position": "QB"},
             {"player_name": "Chi WR One", "team": "CHI",
-             "player_id": "wr1", "position": "WR"}],
+             "espn_player_id": "900102", "gsis_id": "wr1",
+             "position": "WR"}],
     }
+
+
+def _write_archive(tmp_path, bundle, *, recorded="2026-10-01T00:00:00Z"):
+    """Write a manifest + content-addressed bundle; return loader kwargs.
+
+    Test-side mirror of the operator archive layout: the bundle object
+    is named by its own SHA-256 and the manifest -- the file the
+    external pin covers -- names that digest.
+    """
+    import hashlib
+    raw = json.dumps(bundle, sort_keys=True).encode()
+    digest = hashlib.sha256(raw).hexdigest()
+    (tmp_path / f"{digest}.json").write_bytes(raw)
+    manifest = {"schema": "SPORTSEDGE_NFL_PARTICIPATION_MANIFEST_V1",
+                "entries": [{"bundle_sha256": digest,
+                             "recorded_at_utc": recorded}]}
+    mraw = json.dumps(manifest, sort_keys=True).encode()
+    (tmp_path / "manifest.json").write_bytes(mraw)
+    return {"participation_archive_root": str(tmp_path),
+            "participation_manifest_sha256":
+                hashlib.sha256(mraw).hexdigest()}
 
 
 def _over(rows):
@@ -399,29 +458,31 @@ def test_phone_stamp_and_demotion_without_participation_bundle():
     assert receipts[0]["participation"] == "NOT_VERIFIED"
 
 
-def test_phone_stamp_lifts_on_confirmed_skill_verdict():
+def test_phone_stamp_lifts_on_confirmed_skill_verdict(tmp_path):
     rows, receipts = phone_nfl_player_rows(
         _phone_pair("Chi WR One", "PLAYER_RECEIVING_YARDS", 84.5),
         now=datetime(2026, 10, 4, 16, 0, tzinfo=timezone.utc),
-        getter=_getter, participation=_bundle())
+        getter=_getter, **_write_archive(tmp_path, _bundle()))
     over = _over(rows)
     assert over["participation_status"] == "CONFIRMED_STARTER"
     assert over["status"] == "RESEARCH_CANDIDATE_NOT_VALIDATED"
     assert over["research_only"] is True
     assert over["official_authority"] is False
+    assert over["participation_provenance"] == "VERIFIED_ANCHORED"
     assert "participation_refusal" not in over
     verdict = over["participation_verdict"]
     assert verdict["subclass"] == "GAMEDAY_ACTIVE_STARTER"
     assert verdict["candidate_id"] == "wr1"
     assert receipts[0]["participation"] == "CONFIRMED_STARTER"
     assert receipts[0]["participation_player_id"] == "wr1"
+    assert receipts[0]["participation_provenance"] == "VERIFIED_ANCHORED"
 
 
-def test_phone_stamp_lifts_on_confirmed_qb_verdict():
+def test_phone_stamp_lifts_on_confirmed_qb_verdict(tmp_path):
     rows, receipts = phone_nfl_player_rows(
         _phone_pair("Chi QB", "PLAYER_PASSING_YARDS", 269.5),
         now=datetime(2026, 10, 4, 16, 0, tzinfo=timezone.utc),
-        getter=_getter, participation=_bundle())
+        getter=_getter, **_write_archive(tmp_path, _bundle()))
     over = _over(rows)
     assert over["participation_status"] == "CONFIRMED_STARTER"
     assert over["status"] == "RESEARCH_CANDIDATE_NOT_VALIDATED"
@@ -429,13 +490,36 @@ def test_phone_stamp_lifts_on_confirmed_qb_verdict():
     assert receipts[0]["participation"] == "CONFIRMED_STARTER"
 
 
-def test_phone_stamp_persists_on_projected_only_verdict():
+def test_phone_inline_bundle_never_lifts(tmp_path):
+    # The same perfectly-formed bundle, carried inline in the payload:
+    # untrusted by construction (audit B2).  No lift, UNVERIFIED_BUNDLE
+    # recorded on the row and in the receipt.
+    rows, receipts = phone_nfl_player_rows(
+        _phone_pair("Chi WR One", "PLAYER_RECEIVING_YARDS", 84.5),
+        now=datetime(2026, 10, 4, 16, 0, tzinfo=timezone.utc),
+        getter=_getter, participation=_bundle())
+    over = _over(rows)
+    assert over["participation_status"] == \
+        "STARTING_ROLE_NOT_VERIFIED_FROM_GAMELOG"
+    assert over["status"] == "WATCH_PLAYER_PARTICIPATION_UNVERIFIED"
+    assert over["participation_provenance"] == "UNVERIFIED_BUNDLE"
+    assert over["participation_refusal"] == \
+        "NFL_PARTICIPATION_BUNDLE_UNVERIFIED:NO_EXTERNAL_ANCHOR"
+    assert "participation_verdict" not in over
+    assert receipts[0]["participation"] == "UNVERIFIED_BUNDLE"
+    assert receipts[0]["participation_provenance"] == "UNVERIFIED_BUNDLE"
+    assert receipts[0]["participation_refusal"].startswith(
+        "NFL_PARTICIPATION_BUNDLE_UNVERIFIED")
+
+
+def test_phone_stamp_persists_on_projected_only_verdict(tmp_path):
     captured = "2026-10-02T17:59:00Z"
     rows, receipts = phone_nfl_player_rows(
         _phone_pair("Chi WR One", "PLAYER_RECEIVING_YARDS", 84.5,
                     captured=captured),
         now=datetime(2026, 10, 2, 18, 0, tzinfo=timezone.utc),
-        getter=_getter, participation=_bundle(inactives=[]))
+        getter=_getter,
+        **_write_archive(tmp_path, _bundle(snapshots=[])))
     over = _over(rows)
     assert over["participation_status"] == \
         "STARTING_ROLE_NOT_VERIFIED_FROM_GAMELOG"
@@ -447,13 +531,14 @@ def test_phone_stamp_persists_on_projected_only_verdict():
         "NFL_SKILL_ROLE_NOT_CONFIRMED")
 
 
-def test_phone_stamp_persists_and_names_team_switch():
+def test_phone_stamp_persists_and_names_team_switch(tmp_path):
     rows = [r for r in depth_rows() if r["gsis_id"] != "wr1"]
     rows.append(_depth(SNAPSHOT, "GB", "wr1", "Chi WR One", "WR", 1))
     out, _receipts = phone_nfl_player_rows(
         _phone_pair("Chi WR One", "PLAYER_RECEIVING_YARDS", 84.5),
         now=datetime(2026, 10, 4, 16, 0, tzinfo=timezone.utc),
-        getter=_getter, participation=_bundle(depth=rows))
+        getter=_getter,
+        **_write_archive(tmp_path, _bundle(depth=rows)))
     over = _over(out)
     assert over["participation_status"] == \
         "STARTING_ROLE_NOT_VERIFIED_FROM_GAMELOG"
@@ -462,13 +547,13 @@ def test_phone_stamp_persists_and_names_team_switch():
     assert over["status"] == "WATCH_PLAYER_PARTICIPATION_UNVERIFIED"
 
 
-def test_phone_stamp_persists_on_stale_participation_evidence():
+def test_phone_stamp_persists_on_stale_participation_evidence(tmp_path):
     out, _receipts = phone_nfl_player_rows(
         _phone_pair("Chi WR One", "PLAYER_RECEIVING_YARDS", 84.5),
         now=datetime(2026, 10, 4, 16, 0, tzinfo=timezone.utc),
         getter=_getter,
-        participation=_bundle(depth=depth_rows(
-            snapshot="2026-09-20T12:00:00Z")))
+        **_write_archive(tmp_path, _bundle(depth=depth_rows(
+            snapshot="2026-09-20T12:00:00Z"))))
     over = _over(out)
     assert over["participation_status"] == \
         "STARTING_ROLE_NOT_VERIFIED_FROM_GAMELOG"
@@ -476,11 +561,12 @@ def test_phone_stamp_persists_on_stale_participation_evidence():
         "NFL_PARTICIPATION_EVIDENCE_STALE"
 
 
-def test_phone_stamp_persists_without_player_binding():
+def test_phone_stamp_persists_without_player_binding(tmp_path):
     out, _receipts = phone_nfl_player_rows(
         _phone_pair("Chi WR One", "PLAYER_RECEIVING_YARDS", 84.5),
         now=datetime(2026, 10, 4, 16, 0, tzinfo=timezone.utc),
-        getter=_getter, participation=_bundle(bindings=[]))
+        getter=_getter,
+        **_write_archive(tmp_path, _bundle(bindings=[])))
     over = _over(out)
     assert over["participation_status"] == \
         "STARTING_ROLE_NOT_VERIFIED_FROM_GAMELOG"
@@ -507,3 +593,21 @@ def test_run_full_forwards_participation_bundle_to_phone_pricer():
                                      tzinfo=timezone.utc),
                         auto_context=False)
     assert phone.call_args.kwargs["participation"] == bundle
+    # The payload can never supply the trust channel: with no runner
+    # configuration, both provenance kwargs forward as None and the
+    # inline bundle stays UNVERIFIED_BUNDLE downstream.
+    assert phone.call_args.kwargs["participation_archive_root"] is None
+    assert phone.call_args.kwargs["participation_manifest_sha256"] is None
+    with patch.object(runner, "phone_nfl_player_rows",
+                      return_value=fake) as phone:
+        runner.run_full({"sport": "NFL", "lines": [line],
+                         "nfl_participation": bundle},
+                        now=datetime(2026, 10, 11, 20, 30,
+                                     tzinfo=timezone.utc),
+                        auto_context=False,
+                        nfl_participation_archive_root="/srv/archive",
+                        nfl_participation_manifest_sha256="a" * 64)
+    assert phone.call_args.kwargs["participation_archive_root"] == \
+        "/srv/archive"
+    assert phone.call_args.kwargs["participation_manifest_sha256"] == \
+        "a" * 64
