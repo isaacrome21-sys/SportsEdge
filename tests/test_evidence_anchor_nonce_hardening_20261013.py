@@ -85,9 +85,34 @@ def make_tsa(d: Path, name: str, policy: str, *, ca_from: dict | None = None,
         shutil.copy(ca_from["dir"] / "ca.key", d / "ca.key")
     _o("req", "-newkey", "rsa:2048", "-nodes", "-keyout", "tsa.key", "-out", "tsa.csr",
        "-subj", f"/CN=SportsEdge TEST TSA {name}", "-config", str(cnf), cwd=d)
-    validity = (["-not_before", not_before, "-not_after", not_after] if not_before else ["-days", "2"])
-    _o("x509", "-req", "-in", "tsa.csr", "-CA", "ca.pem", "-CAkey", "ca.key", "-CAcreateserial",
-       "-out", "tsa.pem", *validity, "-extfile", str(cnf), "-extensions", "v3_tsa", cwd=d)
+    if not_before:
+        # ``openssl x509 -req -not_before/-not_after`` needs OpenSSL >= 3.4; hosted CI runs 3.0.
+        # ``openssl ca -startdate/-enddate`` is supported on 3.0+, so mint explicit windows with it.
+        (d / "index.txt").write_text("")
+        (d / "serial-ca").write_text("1000\n")
+        (d / "newcerts").mkdir()
+        ca_cnf = d / "explicit-validity-ca.cnf"
+        ca_cnf.write_text(cnf.read_text() + f"""
+[ ca ]
+default_ca = CA_default
+[ CA_default ]
+database = {d}/index.txt
+new_certs_dir = {d}/newcerts
+certificate = {d}/ca.pem
+private_key = {d}/ca.key
+serial = {d}/serial-ca
+default_md = sha256
+policy = policy_anything
+unique_subject = no
+[ policy_anything ]
+commonName = optional
+""")
+        _o("ca", "-batch", "-notext", "-config", str(ca_cnf), "-extensions", "v3_tsa",
+           "-startdate", not_before, "-enddate", not_after, "-in", "tsa.csr", "-out", "tsa.pem",
+           cwd=d)
+    else:
+        _o("x509", "-req", "-in", "tsa.csr", "-CA", "ca.pem", "-CAkey", "ca.key", "-CAcreateserial",
+           "-out", "tsa.pem", "-days", "2", "-extfile", str(cnf), "-extensions", "v3_tsa", cwd=d)
     der = _o("x509", "-in", "tsa.pem", "-outform", "DER", cwd=d)
     return {"dir": d, "ca": (d / "ca.pem").read_bytes(), "pin": hashlib.sha256(der).hexdigest(),
             "policy": policy}
