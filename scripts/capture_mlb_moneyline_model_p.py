@@ -29,7 +29,7 @@ def main(argv=None) -> int:
     now = datetime.now(timezone.utc)
     slate_date = now.astimezone(CHICAGO_TZ).date().isoformat()
     try:
-        schedule = fetch_schedule(slate_date, now=now)
+        schedule = fetch_schedule(slate_date)  # retrieved_at = post-fetch receipt clock; caller time is not a receipt claim
         history = MLBGenericHistorySource(retrieved_at=now)
         result = capture_due_predictions(
             schedule=schedule,
