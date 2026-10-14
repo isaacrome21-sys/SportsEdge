@@ -667,6 +667,9 @@ class MultiPinnedArchiveTests(AdapterCase):
         self.assertEqual(audit["admitted_team_ids"], [])
         self.assertIn("ARCHIVE_COMPOSITE_PIN_UNVERIFIED",
                       self.reasons(audit))
+        self.assertFalse(any(
+            entry["disposition"] == loader.ADMITTED
+            for entry in audit["entries"]))
 
     def test_repeated_pin_is_not_two_independent_archive_receipts(self):
         pin_a, _ = self._two_team_pins()
