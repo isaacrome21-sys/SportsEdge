@@ -1,0 +1,1390 @@
+"""Synthetic-only tests for NFL_SCORE_COUNTS_G2 attempt 2 (model form v2).
+
+Owner ruling (issue #2131, Oct 13 2026): implementation + synthetic testing
+approved; execution NO-GO. Every dataset in this file is generated in-file
+from a seeded RNG with documented generative parameters. No test reads real
+game data, touches the network, or opens any holdout path.
+
+Coverage map (task requirements):
+  (a) K3 PMF normalization            -> test_k3_contract_a_* (audit item 4a)
+  (b) K3 one-directional movement     -> test_k3_contract_b_* (audit item 4b)
+  (c) leakage resistance              -> test_leakage_* (audit item 4d names
+                                         the driver-level test as the
+                                         training-only-estimation contract)
+  (d) comparator (ii') correctness    -> test_comparator_ii_prime_*
+  (e) gates arithmetic                -> test_gate_*
+  (f) execution refusal               -> test_runner_*
+  (g) attempt-1 compat                -> test_v1_compat_*
+  audit item 1 (same-kickoff PIT)     -> test_same_kickoff_*
+  audit item 4e (determinism)         -> test_k3_contract_e_*
+"""
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+from fractions import Fraction
+from hashlib import sha256
+import importlib.util
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+import numpy as np
+import pytest
+
+from sportsedge.sports.nfl.score_counts_g1 import FEATURE_NAMES
+from sportsedge.research import nfl_score_counts_g2_v2 as m
+from sportsedge.research import nfl_score_counts_g2_eval_v2 as ev
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+TEAMS = [f"SYN{i}" for i in range(8)]
+QUARTER_WEIGHTS = (0.22, 0.28, 0.24, 0.26)
+BAND_MAKE_RATE = (0.62, 0.78, 0.85, 0.88, 0.90)
+
+
+# ---------------------------------------------------------------------------
+# Synthetic universe factory. Generative parameters (documented, seeded):
+# per-team offensive/defensive log-strengths ~ N(0, 0.18); offensive TD
+# mean exp(log(2.05) + off - def_opp + 0.12*home), optionally multiplied by
+# a Gamma(10, 1/10) frailty (negative-binomial marginal with theta = 10);
+# FG attempts ~ Poisson(1.55), distance bands from a per-team Dirichlet
+# profile, makes Bernoulli per BAND_MAKE_RATE, ~8% of attempts lose their
+# distance evidence; defensive TDs ~ Poisson(0.13), safeties ~
+# Poisson(0.045); quarter splits multinomial on QUARTER_WEIGHTS;
+# conversions per TD: PAT attempt p=0.93 (made 0.955), 2PT attempt p=0.05
+# (made 0.48), otherwise no conversion.
+# ---------------------------------------------------------------------------
+
+def _feature_values(rng, off_s, def_s, home, lam_td):
+    base = {
+        "off_epa_per_play": 0.03 + 0.30 * off_s,
+        "opp_def_epa_allowed_per_play": 0.03 - 0.30 * def_s,
+        "off_success_rate": 0.44 + 0.05 * off_s,
+        "opp_def_success_rate_allowed": 0.44 - 0.05 * def_s,
+        "off_pass_epa_per_dropback": 0.05 + 0.35 * off_s,
+        "opp_def_pass_epa_allowed_per_dropback": 0.05 - 0.35 * def_s,
+        "off_rush_epa_per_rush": 0.0 + 0.20 * off_s,
+        "opp_def_rush_epa_allowed_per_rush": 0.0 - 0.20 * def_s,
+        "off_plays_per_game": 63.0 + 2.0 * off_s,
+        "off_td_per_game": lam_td,
+        "opp_td_allowed_per_game": 2.05,
+        "made_fg_per_game": 1.35,
+        "opp_fg_allowed_per_game": 1.35,
+        "off_turnover_rate": 0.022,
+        "opp_takeaway_rate": 0.022,
+        "off_sack_rate_allowed": 0.065,
+        "opp_def_sack_rate": 0.065,
+        "starting_qb_epa_shrunk": 0.02 + 0.25 * off_s,
+        "starting_qb_cpoe_shrunk": 0.4 * off_s,
+        "home_indicator": 1.0 if home else 0.0,
+    }
+    return {name: float(base[name] + rng.normal(0, 0.01)) if name != "home_indicator"
+            else base[name] for name in FEATURE_NAMES}
+
+
+def _team_game_line(rng, team, opp, home, off_s, def_s, band_profile, nb_td):
+    lam_td = float(np.exp(np.log(2.05) + off_s[team] - def_s[opp]
+                          + (0.12 if home else 0.0)))
+    frailty = float(rng.gamma(10.0, 1.0 / 10.0)) if nb_td else 1.0
+    off_td = int(rng.poisson(lam_td * frailty))
+    fg_att_total = int(rng.poisson(1.55))
+    band_att = rng.multinomial(fg_att_total, band_profile[team])
+    missing = int(rng.binomial(fg_att_total, 0.08))
+    if missing:
+        # Move `missing` attempts out of the banded counts (no distance).
+        movable = [b for b in range(5) if band_att[b] > 0]
+        for _ in range(missing):
+            if not movable:
+                break
+            b = movable[int(rng.integers(0, len(movable)))]
+            band_att[b] -= 1
+            if band_att[b] == 0:
+                movable.remove(b)
+    band_made = [int(rng.binomial(int(band_att[b]), BAND_MAKE_RATE[b])) for b in range(5)]
+    made_missing = int(rng.binomial(missing, 0.80))
+    def_td = int(rng.poisson(0.13))
+    safeties = int(rng.poisson(0.045))
+    q_off = rng.multinomial(off_td, QUARTER_WEIGHTS)
+    q_fg = rng.multinomial(int(sum(band_made)) + made_missing, QUARTER_WEIGHTS)
+    q_def = [0, 0, 0, 0]
+    q_saf = [0, 0, 0, 0]
+    for _ in range(def_td):
+        q_def[int(rng.integers(0, 4))] += 1
+    for _ in range(safeties):
+        q_saf[int(rng.integers(0, 4))] += 1
+    quarters = {}
+    pat_made = two_made = no_conv = 0
+    for qi in range(4):
+        tds_q = int(q_off[qi]) + q_def[qi]
+        pat_q = two_q = 0
+        for _ in range(tds_q):
+            u = rng.random()
+            if u < 0.93:
+                if rng.random() < 0.955:
+                    pat_q += 1
+                else:
+                    no_conv += 1
+            elif u < 0.98:
+                if rng.random() < 0.48:
+                    two_q += 1
+                else:
+                    no_conv += 1
+            else:
+                no_conv += 1
+        pat_made += pat_q
+        two_made += two_q
+        quarters[qi + 1] = {
+            "off_td": int(q_off[qi]), "made_fg": int(q_fg[qi]),
+            "def_td": q_def[qi], "safeties": q_saf[qi],
+            "pat": pat_q, "two_pt": two_q,
+        }
+    return {
+        "off_td": off_td, "made_fg": int(sum(band_made)) + made_missing,
+        "def_td": def_td, "safeties": safeties,
+        "pat_made": pat_made, "two_made": two_made, "no_conv": no_conv,
+        "band_att": [int(v) for v in band_att], "band_made": band_made,
+        "att_missing": missing, "made_missing": made_missing,
+        "att_total": fg_att_total, "quarters": quarters,
+        "rz": int(rng.poisson(3.2)), "drives35": int(rng.poisson(4.5)),
+        "drives25": int(rng.poisson(2.0)),
+        "lam_td": lam_td,
+    }
+
+
+def synthetic_universe(*, seed=20261013, seasons=(2018, 2019, 2020, 2021, 2022),
+                       rounds_per_season=6, nb_td=False):
+    """Returns (heritage_rows, g2_agg) in chronological order."""
+    rng = np.random.default_rng(seed)
+    off_s = {t: float(rng.normal(0, 0.18)) for t in TEAMS}
+    def_s = {t: float(rng.normal(0, 0.18)) for t in TEAMS}
+    profiles = {t: rng.dirichlet([6, 8, 6, 3, 1]) for t in TEAMS}
+    rows: list[dict] = []
+    agg: dict[tuple[str, str], dict] = {}
+    for season in seasons:
+        order = TEAMS[1:]
+        base = datetime(season, 9, 10, tzinfo=timezone.utc)
+        for r in range(rounds_per_season):
+            ring = [TEAMS[0]] + order
+            pairs = [(ring[i], ring[-1 - i]) for i in range(4)]
+            order = order[1:] + order[:1]
+            for pi, (t1, t2) in enumerate(pairs):
+                home, away = (t1, t2) if (r + pi) % 2 == 0 else (t2, t1)
+                gid = f"SYN{season}R{r}P{pi}"
+                slot = 0 if pi < 2 else 1
+                ts = (base + timedelta(days=7 * r, hours=3 * slot)).isoformat()
+                lines = {
+                    home: _team_game_line(rng, home, away, True, off_s, def_s, profiles, nb_td),
+                    away: _team_game_line(rng, away, home, False, off_s, def_s, profiles, nb_td),
+                }
+                for team, opp in ((home, away), (away, home)):
+                    line = lines[team]
+                    row = _feature_values(rng, off_s[team], def_s[opp],
+                                          team == home, line["lam_td"])
+                    row.update({
+                        "game_id": gid, "season": season, "week": r + 1,
+                        "game_start_ts": ts, "team": team, "opponent": opp,
+                        "offense_touchdowns": line["off_td"],
+                        "def_st_touchdowns": line["def_td"],
+                        "safeties": line["safeties"],
+                        "made_field_goals": line["made_fg"],
+                        "pat_made": line["pat_made"],
+                        "two_point_made": line["two_made"],
+                        "no_conversion": line["no_conv"],
+                        "conversion_pat_p": 0.93, "conversion_two_p": 0.05,
+                        "conversion_no_p": 0.02,
+                        "def_st_td_rate": 0.13, "safety_rate": 0.045,
+                    })
+                    rows.append(row)
+                    oline = lines[opp]
+                    agg[(gid, team)] = {
+                        "rz_trips": line["rz"], "drives35": line["drives35"],
+                        "drives25": line["drives25"],
+                        "def_rz_trips": oline["rz"],
+                        "def_drives35": oline["drives35"],
+                        "def_drives25": oline["drives25"],
+                        "fg_att_band": line["band_att"],
+                        "fg_made_band": line["band_made"],
+                        "fg_att_missing_dist": line["att_missing"],
+                        "fg_made_missing_dist": line["made_missing"],
+                        "fg_attempts_total": line["att_total"],
+                        "quarters": line["quarters"],
+                        "def_quarters": {
+                            q: {"off_td_allowed": oline["quarters"][q]["off_td"],
+                                "fg_allowed": oline["quarters"][q]["made_fg"]}
+                            for q in (1, 2, 3, 4)
+                        },
+                    }
+    return rows, agg
+
+
+def enriched_universe(**kwargs):
+    rows, agg = synthetic_universe(**kwargs)
+    return m.build_g2_rows_v2(rows, agg)
+
+
+# ---------------------------------------------------------------------------
+# Frozen constants and seed pins.
+# ---------------------------------------------------------------------------
+
+def test_attempt2_seed_pins():
+    assert m.ROOT_SEED_LITERAL_V2 == "SportsEdge|NFL_SCORE_COUNTS_G2|ATTEMPT_2|ROOT_SEED"
+    assert m.ROOT_SEED_SHA256_V2 == "e298a262cb6e302b9c98243ffbe6f01f1601568d0ed028e77faae824af7eaf4a"
+    assert m.ROOT_SEED_UINT64_V2 == 3112109162325252322
+
+
+def test_attempt1_seed_reproduction():
+    digest = sha256(b"SportsEdge|NFL_SCORE_COUNTS_G2|FORWARD_V1|ROOT_SEED").digest()
+    assert digest.hex() == "33427560d98897b9965bc1499bc2616f5f096061a24c6447dda0a19f4293f604"
+    assert int.from_bytes(digest[:8], "little") == 13373308085707555379
+
+
+def test_frozen_gate_constants():
+    # Attempt-1 standards verbatim (preregistration section 9 provenance:
+    # config/research/nfl_score_counts_g2_prereg_v1.json).
+    assert ev.KEY_ABS_BOUND == 0.0075
+    assert ev.CAL_SLOPE_BOUNDS == (0.9, 1.1)
+    assert ev.CAL_MARGIN_DEV_BOUND == 0.05
+    assert ev.RARE_TOLERANCE == 1e-12
+    assert ev.MIN_FOLD_WINS == 3
+    assert ev.FOLD_MIN_GAMES == 250
+    assert m.ALPHA_GRID_V2 == (0.1, 1.0, 10.0, 100.0, 1000.0)
+    assert m.THETA_GRID == (5.0, 10.0, 20.0, 50.0, 200.0, float("inf"))
+    assert m.RARE_PRIOR_GRID == (25.0, 100.0, 400.0, "LEAGUE_ONLY")
+    assert m.SIGMA_GRID == (0.0, 0.10, 0.20, 0.30)
+    assert m.K3_KEYS == (-7, -3, 3, 7)
+    assert m.K3_WINDOWS == {-7: (-9, -8, -6, -5), -3: (-4, -2, -1),
+                            3: (1, 2, 4), 7: (5, 6, 8, 9)}
+    assert m.K3_LAMBDA_MAX == 0.50
+    assert m.PATHS_PER_GAME == 50000
+    assert 0 not in m.K3_KEYS  # margin 0 is deliberately not a key
+
+
+# ---------------------------------------------------------------------------
+# Decayed-PIT band machinery (section 2.3).
+# ---------------------------------------------------------------------------
+
+def test_decayed_recursion_hand_fixture():
+    book = m.BandBook(decayed=True)
+    c1 = [1.0, 0.0, 2.0, 0.0, 0.0]
+    c2 = [0.0, 3.0, 0.0, 1.0, 0.0]
+    c3 = [2.0, 1.0, 1.0, 0.0, 1.0]
+    for counts in (c1, c2, c3):
+        book.update("T", counts, counts)
+    snap = book.snapshot("T")
+    for b in range(5):
+        expected = 0.85 ** 2 * c1[b] + 0.85 * c2[b] + c3[b]
+        assert snap["team_attempts"][b] == pytest.approx(expected, rel=0, abs=1e-15)
+    # League accumulator = sum over teams of their decayed accumulators.
+    assert snap["league_attempts"] == snap["team_attempts"]
+
+
+def test_band_shares_rates_hand_numbers():
+    snap = {
+        "team_attempts": [10.0, 20.0, 30.0, 40.0, 50.0],
+        "team_makes": [8.0, 15.0, 20.0, 26.0, 30.0],
+        "league_attempts": [100.0, 200.0, 300.0, 400.0, 500.0],
+        "league_makes": [80.0, 150.0, 200.0, 260.0, 300.0],
+    }
+    shares, rates = m.band_shares_rates_v2(snap)
+    for b in range(5):
+        exp_share = float((Fraction(int(snap["team_attempts"][b]))
+                           + 25 * Fraction(int(snap["league_attempts"][b]), 1500))
+                          / (150 + 25))
+        exp_rate = float((Fraction(int(snap["team_makes"][b]))
+                          + 25 * Fraction(int(snap["league_makes"][b]),
+                                          int(snap["league_attempts"][b])))
+                         / (int(snap["team_attempts"][b]) + 25))
+        assert shares[b] == pytest.approx(exp_share, abs=1e-15)
+        assert rates[b] == pytest.approx(exp_rate, abs=1e-15)
+    assert sum(shares) == pytest.approx(1.0, abs=1e-12)
+
+
+def test_band_shares_rates_zero_league_is_zero_model_row():
+    snap = {"team_attempts": [0.0] * 5, "team_makes": [0.0] * 5,
+            "league_attempts": [0.0] * 5, "league_makes": [0.0] * 5}
+    with pytest.raises(m.ZeroModelRow):
+        m.band_shares_rates_v2(snap)
+
+
+def test_band_shares_rates_empty_band_fallback():
+    # Band 4 has league attempts 0 -> pooled decayed league rate fallback.
+    snap = {
+        "team_attempts": [5.0, 5.0, 5.0, 5.0, 0.0],
+        "team_makes": [4.0, 4.0, 4.0, 4.0, 0.0],
+        "league_attempts": [50.0, 50.0, 50.0, 50.0, 0.0],
+        "league_makes": [40.0, 38.0, 36.0, 34.0, 0.0],
+    }
+    shares, rates = m.band_shares_rates_v2(snap)
+    pooled = (40 + 38 + 36 + 34) / 200.0
+    assert rates[4] == pytest.approx((0.0 + 25 * pooled) / (0.0 + 25), abs=1e-15)
+    assert rates[4] == pytest.approx(pooled, abs=1e-15)
+
+
+def test_enrichment_attempt_volume_features():
+    rows = enriched_universe(seasons=(2018,), rounds_per_season=6)
+    # Find a team with >= 2 prior games and verify the trailing weighted mean
+    # by hand: weights over the last <= 8 prior games, most recent weight 1.
+    from collections import defaultdict
+    hist = defaultdict(list)
+    checked = 0
+    for row in rows:
+        prior = hist[row["team"]]
+        if len(prior) >= 2:
+            vals = prior[-8:]
+            n = len(vals)
+            weights = [0.85 ** (n - 1 - i) for i in range(n)]
+            expected = sum(w * v for w, v in zip(weights, vals)) / sum(weights)
+            assert row["fg_attempts_per_game"] == pytest.approx(expected, abs=1e-12)
+            checked += 1
+        hist[row["team"]].append(row["fg_attempts_total"])
+    assert checked > 0
+
+
+# ---------------------------------------------------------------------------
+# AUDIT ITEM 1 - same-kickoff leakage (section 2.3). Accumulators include
+# exactly the team-games with kickoff STRICTLY BEFORE the target game's
+# kickoff; kickoff ties are processing order only, never information flow.
+# ---------------------------------------------------------------------------
+
+def _mini_universe(games_spec):
+    """games_spec: list of (gid, ts, home, away, att_home, att_away) with
+    deterministic FG band counts so information flow is visible."""
+    rows, agg = [], {}
+    for gid, ts, home, away, att_h, att_a in games_spec:
+        for team, opp, att, is_home in ((home, away, att_h, True),
+                                        (away, home, att_a, False)):
+            row = {name: 0.1 for name in FEATURE_NAMES}
+            row.update({
+                "game_id": gid, "season": 2021, "week": 1, "game_start_ts": ts,
+                "team": team, "opponent": opp,
+                "home_indicator": 1.0 if is_home else 0.0,
+                "offense_touchdowns": 2, "def_st_touchdowns": 0, "safeties": 0,
+                "made_field_goals": 1, "pat_made": 2, "two_point_made": 0,
+                "no_conversion": 0, "conversion_pat_p": 0.93,
+                "conversion_two_p": 0.05, "conversion_no_p": 0.02,
+                "def_st_td_rate": 0.13, "safety_rate": 0.045,
+            })
+            rows.append(row)
+            band = [att, 0, 0, 0, 0]
+            agg[(gid, team)] = {
+                "rz_trips": att, "drives35": att, "drives25": att,
+                "def_rz_trips": 0, "def_drives35": 0, "def_drives25": 0,
+                "fg_att_band": band, "fg_made_band": [att, 0, 0, 0, 0],
+                "fg_att_missing_dist": 0, "fg_made_missing_dist": 0,
+                "fg_attempts_total": att,
+                "quarters": {q: {"off_td": 0, "made_fg": 0, "def_td": 0,
+                                  "safeties": 0, "pat": 0, "two_pt": 0}
+                             for q in (1, 2, 3, 4)},
+                "def_quarters": {q: {"off_td_allowed": 0, "fg_allowed": 0}
+                                 for q in (1, 2, 3, 4)},
+            }
+    return rows, agg
+
+
+def test_same_kickoff_games_never_feed_each_other():
+    T0, T1, T2 = ("2021-09-12T17:00:00+00:00", "2021-09-19T17:00:00+00:00",
+                  "2021-09-26T17:00:00+00:00")
+    full = [("G1", T0, "A", "B", 3, 2), ("G2", T1, "C", "D", 4, 1),
+            ("G3", T1, "A", "C", 2, 2), ("G4", T2, "B", "D", 1, 3)]
+    rows_f, agg_f = _mini_universe(full)
+    enriched_full = m.build_g2_rows_v2(rows_f, agg_f)
+
+    def rows_for(enriched, gid):
+        return sorted([r for r in enriched if r["game_id"] == gid],
+                      key=lambda r: r["team"])
+
+    # Direction 1: G3's inputs are bit-identical whether or not the tied
+    # game G2 is present in the dataset.
+    rows_no_g2, agg_no_g2 = _mini_universe([g for g in full if g[0] != "G2"])
+    enriched_no_g2 = m.build_g2_rows_v2(rows_no_g2, agg_no_g2)
+    assert rows_for(enriched_full, "G3") == rows_for(enriched_no_g2, "G3")
+
+    # Direction 2: G2's inputs are bit-identical whether or not G3 present.
+    rows_no_g3, agg_no_g3 = _mini_universe([g for g in full if g[0] != "G3"])
+    enriched_no_g3 = m.build_g2_rows_v2(rows_no_g3, agg_no_g3)
+    assert rows_for(enriched_full, "G2") == rows_for(enriched_no_g3, "G2")
+
+    # Non-vacuity control: G4 kicks off strictly later, so its inputs DO
+    # change when the T1 games are present (they are legitimately prior).
+    rows_t0_only, agg_t0_only = _mini_universe(
+        [g for g in full if g[0] in ("G1", "G4")])
+    enriched_t0 = m.build_g2_rows_v2(rows_t0_only, agg_t0_only)
+    assert rows_for(enriched_full, "G4") != rows_for(enriched_t0, "G4")
+
+    # Decayed shares/rates for G3's teams reflect G1 only (plus nothing
+    # from G2): team A played once before (G1, 3 attempts in band 0).
+    g3 = {r["team"]: r for r in rows_for(enriched_full, "G3")}
+    assert g3["A"]["decayed_team_band_attempts"] == [3.0, 0.0, 0.0, 0.0, 0.0]
+    assert g3["C"]["decayed_team_band_attempts"] == [0.0, 0.0, 0.0, 0.0, 0.0]
+
+
+def test_same_kickoff_rare_rates_never_feed_each_other():
+    T0, T1 = "2021-09-12T17:00:00+00:00", "2021-09-19T17:00:00+00:00"
+
+    def mk(gid, ts, home, away, def_h, def_a):
+        return [
+            {"game_id": gid, "game_start_ts": ts, "team": home,
+             "def_st_touchdowns": def_h, "safeties": 0},
+            {"game_id": gid, "game_start_ts": ts, "team": away,
+             "def_st_touchdowns": def_a, "safeties": 0},
+        ]
+
+    g1 = mk("G1", T0, "A", "B", 1, 0)
+    g2 = mk("G2", T1, "C", "D", 3, 3)   # tied with G3, extreme outcomes
+    g3 = mk("G3", T1, "A", "C", 0, 0)
+    rates_with = m.pit_eb_rates([], g1 + g2 + g3, prior=25.0)
+    rates_without = m.pit_eb_rates([], g1 + g3, prior=25.0)
+    # G3's rows are indices 4,5 with G2 present and 2,3 without; identical.
+    assert rates_with[4:] == rates_without[2:]
+    # And G2's rates do not move when G3 is appended after it.
+    rates_g2_only = m.pit_eb_rates([], g1 + g2, prior=25.0)
+    assert rates_with[2:4] == rates_g2_only[2:]
+
+
+# ---------------------------------------------------------------------------
+# Selection direction tests (C2 theta, C3 rare prior, C4 alpha).
+# ---------------------------------------------------------------------------
+
+def test_theta_selection_prefers_fitted_dispersion():
+    rng = np.random.default_rng(777)
+    mus = [2.0] * 4000
+    # Gamma-Poisson mixture with theta = 10 (documented generative value).
+    frailty = rng.gamma(10.0, 1.0 / 10.0, size=4000)
+    ys_nb = [float(v) for v in rng.poisson(np.asarray(mus) * frailty)]
+    theta_nb, _ = m.select_theta_cv([(mus, ys_nb)])
+    assert theta_nb in (5.0, 10.0, 20.0)
+    ys_pois = [float(v) for v in rng.poisson(np.asarray(mus))]
+    theta_pois, _ = m.select_theta_cv([(mus, ys_pois)])
+    assert theta_pois == float("inf")
+
+
+def test_nb_draw_moments_and_poisson_identity():
+    rng = np.random.default_rng(4242)
+    draws = m.draw_count(rng, np.full(200_000, 3.0), 10.0)
+    assert float(np.mean(draws)) == pytest.approx(3.0, abs=0.03)
+    assert float(np.var(draws)) == pytest.approx(3.0 + 9.0 / 10.0, abs=0.15)
+    # theta = inf is exactly the attempt-1 Poisson draw on the same stream.
+    r1 = np.random.Generator(np.random.PCG64(np.random.SeedSequence(99)))
+    r2 = np.random.Generator(np.random.PCG64(np.random.SeedSequence(99)))
+    via_nb = m.draw_count(r1, np.full(1000, 2.5), float("inf"))
+    via_pois = r2.poisson(np.full(1000, 2.5))
+    assert np.array_equal(via_nb, via_pois)
+
+
+def _rare_rows(team_counts, seasons=(2018, 2019, 2020, 2021)):
+    """team_counts: {team: def_count_per_game} - every team-game identical
+    within a team, so EB-vs-league behavior is exact."""
+    rows = []
+    for season in seasons:
+        for gi in range(6):
+            gid = f"R{season}G{gi}"
+            teams = list(team_counts)
+            home, away = teams[gi % len(teams)], teams[(gi + 1) % len(teams)]
+            for team in (home, away):
+                rows.append({
+                    "game_id": gid, "season": season, "team": team,
+                    "game_start_ts": f"{season}-09-12T17:00:00+00:00",
+                    "def_st_touchdowns": team_counts[team], "safeties": 0,
+                })
+    return rows
+
+
+def test_rare_prior_tie_breaks_to_league_only():
+    # No team differentiation: every prior gives the identical rate, the
+    # CV scores tie exactly, and the tie breaks to LEAGUE_ONLY (largest).
+    rows = _rare_rows({"A": 1, "B": 1, "C": 1, "D": 1})
+    prior, scores = m.select_rare_prior(rows, m.V2_CONFIG)
+    assert prior == "LEAGUE_ONLY"
+    assert len(set(scores.values())) == 1
+
+
+def test_rare_prior_detects_strong_differentiation():
+    rows = _rare_rows({"A": 2, "B": 0, "C": 2, "D": 0})
+    prior, scores = m.select_rare_prior(rows, m.V2_CONFIG)
+    assert prior == 25.0
+    assert scores["25.0"] > scores["LEAGUE_ONLY"]
+
+
+def test_alpha_selection_uses_restored_grid():
+    # Target independent of the 12 opportunity features (pure noise around
+    # a season intercept): heavy shrinkage must win, and the restored
+    # 1000 point of the grid must be reachable and selected.
+    rng = np.random.default_rng(31337)
+    rows = []
+    for season in (2018, 2019, 2020, 2021):
+        for i in range(120):
+            row = {name: float(rng.normal(0, 1)) for name in m.FG_OPPORTUNITY_FEATURES_V2}
+            row["season"] = season
+            row["fg_attempts_with_distance"] = int(rng.poisson(1.6))
+            rows.append(row)
+    alpha, scores = m.choose_alpha_v2(
+        rows, target="fg_attempts_with_distance",
+        feature_names=m.FG_OPPORTUNITY_FEATURES_V2, alphas=m.ALPHA_GRID_V2)
+    assert set(scores) == {0.1, 1.0, 10.0, 100.0, 1000.0}
+    assert alpha == 1000.0
+
+
+# ---------------------------------------------------------------------------
+# K3 contract tests (audit item 4a/4b/4c/4e; 4d is the leakage test below).
+# ---------------------------------------------------------------------------
+
+def _random_pmf(rng, n_cells=60, max_score=45):
+    cells = set()
+    while len(cells) < n_cells:
+        cells.add((int(rng.integers(0, max_score)), int(rng.integers(0, max_score))))
+    weights = {c: float(rng.random() + 0.01) for c in cells}
+    total = sum(weights.values())
+    return {c: w / total for c, w in weights.items()}
+
+
+def test_k3_contract_a_probability_conservation():
+    rng = np.random.default_rng(2026)
+    cases = [
+        {k: 0.0 for k in m.K3_KEYS},                      # lambda = 0
+        {k: 0.50 for k in m.K3_KEYS},                     # lambda at the cap
+        {k: float(rng.random() * 0.5) for k in m.K3_KEYS},
+    ]
+    for _ in range(30):
+        pmf = _random_pmf(rng)
+        for lambdas in cases:
+            out = m.apply_k3(pmf, lambdas)
+            assert abs(sum(out.values()) - 1.0) <= 1e-12
+            assert all(v >= 0.0 for v in out.values())
+
+
+def test_k3_contract_b_windows_disjoint_and_one_directional():
+    # (audit 4b, static part) donor windows are mutually disjoint and
+    # disjoint from every key cell and from margin 0.
+    windows = [set(m.K3_WINDOWS[k]) for k in m.K3_KEYS]
+    for i in range(len(windows)):
+        for j in range(i + 1, len(windows)):
+            assert not (windows[i] & windows[j])
+    all_window = set().union(*windows)
+    assert not (all_window & set(m.K3_KEYS))
+    assert 0 not in all_window
+
+    # (dynamic part) mass moves ONLY from window cells toward the key:
+    # window cells scale by exactly (1 - lambda), key cells only gain,
+    # every other cell (incl. margin 0) is untouched.
+    pmf = {(10, 9): 0.04, (11, 9): 0.03, (13, 9): 0.05,      # margins 1, 2, 4
+           (12, 9): 0.10, (19, 16): 0.06,                    # margin 3 (key)
+           (7, 7): 0.40, (30, 10): 0.32}                     # margin 0, margin 20
+    out = m.apply_k3(pmf, {-7: 0.0, -3: 0.0, 3: 0.25, 7: 0.0})
+    assert out[(10, 9)] == pytest.approx(0.04 * 0.75, abs=1e-15)
+    assert out[(11, 9)] == pytest.approx(0.03 * 0.75, abs=1e-15)
+    assert out[(13, 9)] == pytest.approx(0.05 * 0.75, abs=1e-15)
+    gained = (out[(12, 9)] - 0.10) + (out[(19, 16)] - 0.06)
+    assert gained == pytest.approx(0.25 * (0.04 + 0.03 + 0.05), abs=1e-15)
+    assert out[(12, 9)] > 0.10 and out[(19, 16)] > 0.06
+    assert out[(7, 7)] == 0.40          # margin 0 untouched, exactly
+    assert out[(30, 10)] == 0.32        # unrelated margin untouched, exactly
+    # One-directional: a lambda can never REMOVE key mass (lambda >= 0 by
+    # construction of the estimator; apply with lambda 0 is the identity).
+    identity = m.apply_k3(pmf, {k: 0.0 for k in m.K3_KEYS})
+    assert identity == pmf
+
+
+def test_k3_contract_c_within_margin_composition_unchanged():
+    rng = np.random.default_rng(555)
+    for _ in range(25):
+        pmf = _random_pmf(rng)
+        lambdas = {k: float(rng.random() * 0.5) for k in m.K3_KEYS}
+        out = m.apply_k3(pmf, lambdas)
+        margins = sorted({h - a for (h, a) in pmf} | {h - a for (h, a) in out})
+        for margin in margins:
+            before = {c: p for c, p in pmf.items() if c[0] - c[1] == margin}
+            after = {c: p for c, p in out.items() if c[0] - c[1] == margin}
+            assert set(before) == set(after)
+            tot_b = sum(before.values())
+            tot_a = sum(after.values())
+            if tot_b == 0:
+                assert tot_a == 0
+                continue
+            for cell in before:
+                # Conditional share within the margin: bit-identical ratio
+                # up to the single rescaling of the whole margin.
+                assert after[cell] / tot_a == pytest.approx(
+                    before[cell] / tot_b, rel=0, abs=1e-15)
+
+
+def test_k3_corner_rule_zero_key_mass():
+    # Window mass positive but skeleton key mass exactly 0 -> no transfer.
+    pmf = {(10, 9): 0.30, (11, 9): 0.20, (7, 7): 0.50}   # margins 1, 2, 0
+    out = m.apply_k3(pmf, {-7: 0.0, -3: 0.0, 3: 0.50, 7: 0.0})
+    assert out == pmf
+
+
+def test_k3_lambda_estimator_hand_case():
+    # S̄(3) = 0.10, S̄(W_3) = 0.20 in both games; realized margins [3, 5]
+    # -> R(3) = 0.5 -> lambda = clip((0.5 - 0.1)/0.2, 0, 0.5) = 0.5 (cap).
+    pmf = {(12, 9): 0.10, (10, 9): 0.08, (11, 9): 0.07, (13, 9): 0.05,
+           (7, 7): 0.70}
+    est = m.estimate_k3_lambdas([pmf, pmf], [3, 5])
+    assert est["lambdas"][3] == pytest.approx(0.50)
+    # Realized below skeleton -> floor 0 (one-directional).
+    est_floor = m.estimate_k3_lambdas([pmf, pmf], [5, 6])
+    assert est_floor["lambdas"][3] == 0.0
+    # No window mass -> lambda 0.
+    pmf_nowin = {(12, 9): 0.30, (7, 7): 0.70}
+    est_nowin = m.estimate_k3_lambdas([pmf_nowin], [3])
+    assert est_nowin["lambdas"][3] == 0.0
+
+
+def test_k3_contract_e_deterministic_simulation():
+    rows = enriched_universe(seasons=(2018, 2019, 2020, 2021),
+                             rounds_per_season=4)
+    train = [r for r in rows if int(r["season"]) < 2021]
+    bundle = m.fit_fold_bundle(train, m.V2_CONFIG)
+    valid = [r for r in rows if int(r["season"]) == 2021]
+    pairs = m.game_pairs(valid)
+    gid, (home, away) = sorted(pairs.items())[0]
+    rates = (0.13, 0.045)
+    hashes = []
+    for _ in range(2):
+        sim = m.simulate_full_game_v2(
+            bundle, game_id=gid, home_row=home, away_row=away,
+            home_rates=rates, away_rates=rates, sigma=0.2, paths=4000)
+        counts = m.pmf_counts(sim["home_score"], sim["away_score"])
+        hashes.append(m.joint_distribution_sha256(counts))
+    assert hashes[0] == hashes[1]
+    other = m.simulate_full_game_v2(
+        bundle, game_id=gid + "X", home_row=home, away_row=away,
+        home_rates=rates, away_rates=rates, sigma=0.2, paths=4000)
+    other_hash = m.joint_distribution_sha256(
+        m.pmf_counts(other["home_score"], other["away_score"]))
+    assert other_hash != hashes[0]
+
+
+# ---------------------------------------------------------------------------
+# Comparator (ii') correctness (requirement d).
+# ---------------------------------------------------------------------------
+
+def _joint_fold(season, cand, base_i, prime, n=10):
+    return {
+        "validation_season": season, "n_games": n,
+        "candidate_mean_log_score": cand,
+        "baseline_i_mean_log_score": base_i,
+        "baseline_ii_prime_mean_log_score": prime,
+        "fold_win_vs_baseline_i": cand > base_i,
+        "fold_win_vs_baseline_ii_prime": cand > prime,
+    }
+
+
+def test_comparator_ii_prime_dependence_helps():
+    # Perfectly dependent PMF: margin is always +3 or +4 with the score
+    # pair fully determined. Independence composition smears the mass.
+    dep = {(20, 17): 0.5, (24, 20): 0.5}
+    prime = m.independent_marginals_pmf(dep)
+    assert prime[(20, 17)] == pytest.approx(0.25)
+    assert prime[(24, 20)] == pytest.approx(0.25)
+    realized = (20, 17)
+    cand = ev.log_score_pmf(dep, realized, 50000)     # log(0.5)
+    comp = ev.log_score_pmf(prime, realized, 50000)   # log(0.25)
+    assert cand > comp
+    folds = [_joint_fold(s, cand, comp - 0.1, comp) for s in (2021, 2022, 2023, 2024, 2025)]
+    gate = ev.assemble_joint_gate(folds)
+    assert gate["pass"] is True
+    assert gate["baseline_ii_frozen_discrete_v2_grid"]["status"] == "UNEVALUATED"
+
+
+def test_comparator_ii_prime_independence_ties():
+    # Independence-true PMF: (ii') reproduces it exactly, so the candidate
+    # does NOT beat it (the comparison is strict) and the gate cannot pass
+    # on this leg.
+    indep = {(20, 17): 0.25, (20, 20): 0.25, (24, 17): 0.25, (24, 20): 0.25}
+    prime = m.independent_marginals_pmf(indep)
+    assert prime == indep
+    # Marginals are preserved by the composition.
+    for pmf in (indep, {(20, 17): 0.5, (24, 20): 0.5}):
+        comp = m.independent_marginals_pmf(pmf)
+        for team in ("h", "a"):
+            idx = 0 if team == "h" else 1
+            orig = {}
+            for cell, p in pmf.items():
+                orig[cell[idx]] = orig.get(cell[idx], 0.0) + p
+            new = {}
+            for cell, p in comp.items():
+                new[cell[idx]] = new.get(cell[idx], 0.0) + p
+            assert new == pytest.approx(orig)
+    folds = [_joint_fold(s, -3.0, -3.5, -3.0) for s in (2021, 2022, 2023, 2024, 2025)]
+    gate = ev.assemble_joint_gate(folds)
+    assert gate["baseline_ii_prime_independent_marginals"]["pass_vs_baseline_ii_prime"] is False
+    assert gate["pass"] is False
+
+
+# ---------------------------------------------------------------------------
+# Gates arithmetic on synthetic records (requirement e).
+# ---------------------------------------------------------------------------
+
+def _count_fold(season, y, cand, base):
+    y = np.asarray(y, dtype=float)
+    cand = np.asarray(cand, dtype=float)
+    base = np.asarray(base, dtype=float)
+    cd = m.poisson_deviance(y, cand)
+    bd = m.poisson_deviance(y, base)
+    return {
+        "validation_season": season, "n_team_rows": len(y),
+        "candidate_poisson_deviance": cd,
+        "intercept_baseline_poisson_deviance": bd,
+        "fold_win": bool(cd < bd), "y": y, "cand": cand, "base": base,
+    }
+
+
+def test_gate_count_fold_rule():
+    good = _count_fold(2021, [2, 3, 1, 4], [2.1, 2.9, 1.2, 3.8], [2.5] * 4)
+    # Pooled better + exactly 3 fold wins -> pass.
+    loss = _count_fold(2024, [2, 3], [3.5, 1.5], [2.5, 2.5])
+    assert loss["fold_win"] is False
+    gate = ev.assemble_count_gate([good, good, good, loss, loss])
+    assert gate["fold_wins"] == 3
+    assert gate["pass"] is True
+    # Two huge wins + three small losses: pooled better, only 2 wins -> fail.
+    big_y = [2, 3, 1, 4] * 30
+    big_win = _count_fold(2021, big_y, [2.05, 2.95, 1.05, 3.95] * 30, [2.5] * 120)
+    small_loss = _count_fold(2022, [2, 3], [2.6, 2.6], [2.5, 2.5])
+    gate2 = ev.assemble_count_gate([big_win, big_win, small_loss, small_loss, small_loss])
+    assert gate2["pooled_candidate_poisson_deviance"] < gate2["pooled_intercept_baseline_poisson_deviance"]
+    assert gate2["fold_wins"] == 2
+    assert gate2["pass"] is False
+    # 4 fold wins but pooled worse (one huge fold loses) -> fail.
+    huge_loss = _count_fold(2023, [10] * 400, [2.0] * 400, [9.0] * 400)
+    gate3 = ev.assemble_count_gate([good, good, good, good, huge_loss])
+    assert gate3["fold_wins"] == 4
+    assert gate3["pass"] is False
+
+
+def test_gate_rare_tolerance_boundary():
+    assert ev.assemble_rare_gate(100.0 - 1e-12, 100.0, 10)["pass"] is True
+    assert ev.assemble_rare_gate(100.0 - 2e-12, 100.0, 10)["pass"] is False
+    assert ev.assemble_rare_gate(100.0, 100.0, 10)["pass"] is True
+
+
+def test_gate_key_bound():
+    realized = [3] * 250 + [0] * 250 + [10] * 250 + [-14] * 250
+    skeleton = {k: [0.0] * 1000 for k in m.K3_KEYS}
+    cand_ok = {k: [0.0] * 1000 for k in m.K3_KEYS}
+    cand_ok[3] = [0.25 + 0.0074] * 1000
+    gate_ok = ev.assemble_key_gate(cand_ok, skeleton, realized)
+    assert gate_ok["pass"] is True
+    cand_bad = {k: [0.0] * 1000 for k in m.K3_KEYS}
+    cand_bad[3] = [0.25 + 0.0076] * 1000
+    gate_bad = ev.assemble_key_gate(cand_bad, skeleton, realized)
+    assert gate_bad["pass"] is False
+    assert gate_bad["keys"]["3"]["abs_error"] == pytest.approx(0.0076, abs=1e-12)
+
+
+def test_gate_cal_bounds():
+    uniform = list(np.linspace(0.005, 0.995, 1000))
+    assert ev.assemble_cal_gate(uniform, uniform)["pass"] is True
+    degenerate = [0.5] * 1000
+    assert ev.assemble_cal_gate(degenerate, uniform)["pass"] is False
+    # Margin-deviation boundary: 0.049 passes, 0.051 fails.
+    def margins_with_bin0(count0):
+        pits = [0.05] * count0
+        remaining = 1000 - count0
+        per = remaining // 9
+        for b in range(1, 10):
+            n = per if b < 9 else remaining - per * 8
+            pits.extend([0.05 + 0.1 * b] * n)
+        return pits
+    assert ev.assemble_cal_gate(uniform, margins_with_bin0(149))["pass"] is True
+    assert ev.assemble_cal_gate(uniform, margins_with_bin0(151))["pass"] is False
+
+
+def test_gate_period_fold_rule():
+    def scores(win_seasons):
+        cand, base = {}, {}
+        for s in (2021, 2022, 2023, 2024, 2025):
+            win = s in win_seasons
+            cand[s] = {"candidate_mean_log_score": -3.0 if win else -3.2, "n": 10}
+            base[s] = {"baseline_mean_log_score": -3.1, "n": 10}
+        return {"FIRST_HALF": cand}, {"FIRST_HALF": base}
+    cand, base = scores({2021, 2022, 2023})
+    gate = ev.assemble_period_gate(cand, base)
+    assert gate["FIRST_HALF"]["pass"] is True
+    cand, base = scores({2021, 2022})
+    gate = ev.assemble_period_gate(cand, base)
+    assert gate["FIRST_HALF"]["pass"] is False
+
+
+def test_gate_indeterminate_becomes_fail_with_reason():
+    folds = [_joint_fold(s, -3.0, -3.5, -2.9) for s in (2021, 2022, 2023, 2024, 2025)]
+    gate = ev.assemble_joint_gate(
+        folds, leg_ii_prime_available=False,
+        leg_ii_prime_unavailable_reason="COMPARATOR_II_PRIME_NOT_RUNNABLE")
+    assert gate["pass"] is False
+    assert gate["baseline_ii_prime_independent_marginals"]["status"] == "FAIL"
+    assert gate["baseline_ii_prime_independent_marginals"]["reason"] == \
+        "COMPARATOR_II_PRIME_NOT_RUNNABLE"
+    assert gate["baseline_ii_frozen_discrete_v2_grid"]["status"] == "UNEVALUATED"
+    direct = ev.fail_gate("SOME_REASON", detail=1)
+    assert direct == {"pass": False, "status": "FAIL", "reason": "SOME_REASON", "detail": 1}
+
+
+def test_result_record_shape_and_not_run():
+    evaluation = {
+        "gates": {
+            "G_TD": {"pass": True}, "G_FG": {"pass": False},
+            "G_RARE": {"pass": True}, "G_JOINT": {"pass": False},
+            "G_CAL": {"pass": True}, "G_KEY": {"pass": False},
+            "G_PERIOD": {"FIRST_HALF": {"pass": True},
+                         "SECOND_HALF": {"pass": False},
+                         "QUARTER": {"pass": True}},
+        },
+        "full_game_pass": False,
+    }
+    record = ev.build_attempt2_result_record(
+        evaluation=evaluation, status="DEVELOPMENT_ATTEMPT_FAIL",
+        attempt_consumed=True, preregistration_sha256="x" * 64,
+        training_team_rows=2626)
+    for key in ("schema", "attempt_budget", "attempt_consumed",
+                "attempts_remaining_after_this_result", "authority",
+                "code_identity_sha256", "evaluation", "failing_gates",
+                "passing_gates", "period_gate_results",
+                "preregistration_commit_sha", "preregistration_sha256",
+                "runner_provenance", "schedule_score_cross_check",
+                "source_manifest_sha256", "status", "training_team_rows"):
+        assert key in record
+    assert record["attempts_remaining_after_this_result"] == 1
+    assert record["passing_gates"] == ["G_TD", "G_RARE", "G_CAL"]
+    assert record["failing_gates"] == ["G_FG", "G_JOINT", "G_KEY"]
+    assert record["authority"]["research_only"] is True
+    assert record["market_data_used"] is False
+
+    not_run = ev.not_run_record("FOLD_BELOW_MINIMUM:2021:200<250")
+    assert not_run["status"] == "NOT_RUN"
+    assert not_run["attempt_consumed"] is False
+    assert not_run["attempts_remaining_after_this_result"] == 2
+    assert not_run["evaluation"] is None
+
+
+def test_result_record_writer_round_trip(tmp_path):
+    record = ev.not_run_record("SYNTHETIC_TEST")
+    path = tmp_path / "record.json"
+    digest = ev.write_result_record(record, path)
+    payload = path.read_text(encoding="utf-8")
+    assert sha256(payload.encode("utf-8")).hexdigest() == digest
+    assert json.loads(payload)["status"] == "NOT_RUN"
+
+
+# ---------------------------------------------------------------------------
+# Execution refusal (requirement f).
+# ---------------------------------------------------------------------------
+
+def _load_runner():
+    path = REPO_ROOT / "scripts" / "run_nfl_score_counts_g2_attempt2.py"
+    spec = importlib.util.spec_from_file_location("g2_attempt2_runner", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_runner_refuses_by_construction(tmp_path):
+    mod = _load_runner()
+    out_dir = tmp_path / "out"
+    with pytest.raises(mod.Attempt2NotAuthorized) as excinfo:
+        mod.run_attempt(confirm="CONSUME_SCORE_COUNTS_G2_ATTEMPT_2",
+                        output_dir=out_dir, repo_root=REPO_ROOT)
+    assert "ATTEMPT_2_NOT_AUTHORIZED" in str(excinfo.value)
+    assert not out_dir.exists()
+    # The frozen confirmation string does not help; nothing is written.
+    assert mod.main(["--confirm", "CONSUME_SCORE_COUNTS_G2_ATTEMPT_2"]) == 2
+    # The go/no-go ledger artifact does not exist (precondition of refusal).
+    assert not (REPO_ROOT / mod.GO_NO_GO_LEDGER_PATH).exists()
+
+
+def test_runner_refuses_via_cli(tmp_path):
+    script = REPO_ROOT / "scripts" / "run_nfl_score_counts_g2_attempt2.py"
+    proc = subprocess.run(
+        [sys.executable, str(script), "--confirm",
+         "CONSUME_SCORE_COUNTS_G2_ATTEMPT_2", "--output-dir", str(tmp_path / "o")],
+        capture_output=True, text=True, cwd=tmp_path)
+    assert proc.returncode == 2
+    assert "ATTEMPT_2_NOT_AUTHORIZED" in proc.stderr
+    assert list(tmp_path.iterdir()) == []
+
+
+# ---------------------------------------------------------------------------
+# Leakage resistance (requirement c). Fitted quantities: K3 lambda per key,
+# theta per leg, alpha per leg, rare-prior choice, FG band shares/rates
+# state, and - since Amendment 2 - sigma per fold. None may depend on
+# evaluation-fold outcomes.
+# ---------------------------------------------------------------------------
+
+_OUTCOME_KEYS = (
+    ["offense_touchdowns", "def_st_touchdowns", "safeties", "made_field_goals",
+     "pat_made", "two_point_made", "no_conversion", "fg_att_band", "fg_made_band"]
+    + [f"q{q}_{f}" for q in (1, 2, 3, 4)
+       for f in ("off_td", "made_fg", "def_td", "safeties", "points")]
+)
+
+
+def _corrupt_eval_outcomes(rows, season, seed=99):
+    """Permute the outcome fields among the given season's rows."""
+    rng = np.random.default_rng(seed)
+    out = [dict(r) for r in rows]
+    idx = [i for i, r in enumerate(out) if int(r["season"]) == season]
+    bundles = [[r[k] for k in _OUTCOME_KEYS] for i in idx for r in [out[i]]]
+    order = rng.permutation(len(idx))
+    for pos, i in enumerate(idx):
+        for k, v in zip(_OUTCOME_KEYS, bundles[int(order[pos])]):
+            out[i][k] = v
+    return out
+
+
+def _estimate_lambda_fixed_sigma(bundle, train_rows, sigma=0.2, paths=2000):
+    _eval_rates, train_rates = m.fold_rare_rates(bundle, train_rows, [])
+    rate_map = {(str(r["game_id"]), str(r["team"])): train_rates[i]
+                for i, r in enumerate(train_rows)}
+    pmfs, margins = [], []
+    for gid, (home, away) in sorted(m.game_pairs(train_rows).items()):
+        if not (m.row_has_band_context(home, bundle["config"])
+                and m.row_has_band_context(away, bundle["config"])):
+            continue  # ZERO_MODEL_ROW games are excluded from estimation
+        sim = m.simulate_full_game_v2(
+            bundle, game_id=gid, home_row=home, away_row=away,
+            home_rates=rate_map[(gid, str(home["team"]))],
+            away_rates=rate_map[(gid, str(away["team"]))],
+            sigma=sigma, paths=paths)
+        pmfs.append(m.pmf_from_counts(
+            m.pmf_counts(sim["home_score"], sim["away_score"]), paths))
+        margins.append(m.realized_final_score(home) - m.realized_final_score(away))
+    return m.estimate_k3_lambdas(pmfs, margins)["lambdas"]
+
+
+def test_k3_contract_d_training_only_estimation():
+    """AUDIT ITEM 4(d): K3 lambda (and every other fitted value) is a
+    function of the TRAINING fold only. Permuting the evaluation fold's
+    outcomes leaves all fitted values bit-identical."""
+    rows = enriched_universe(seasons=(2018, 2019, 2020, 2021, 2022),
+                             rounds_per_season=4)
+    train = [r for r in rows if int(r["season"]) < 2022]
+    bundle_clean = m.fit_fold_bundle(train, m.V2_CONFIG)
+    digest_clean = m.fitted_values_digest(bundle_clean)
+    lambda_clean = _estimate_lambda_fixed_sigma(bundle_clean, train)
+
+    corrupted = _corrupt_eval_outcomes(rows, 2022)
+    train_after = [r for r in corrupted if int(r["season"]) < 2022]
+    bundle_after = m.fit_fold_bundle(train_after, m.V2_CONFIG)
+    assert m.fitted_values_digest(bundle_after) == digest_clean
+    lambda_after = _estimate_lambda_fixed_sigma(bundle_after, train_after)
+    assert lambda_after == lambda_clean
+    # Selections explicitly: alphas, thetas, rare prior.
+    assert bundle_after["td_alpha"] == bundle_clean["td_alpha"]
+    assert bundle_after["fg_alpha"] == bundle_clean["fg_alpha"]
+    assert bundle_after["thetas"] == bundle_clean["thetas"]
+    assert bundle_after["rare_prior"] == bundle_clean["rare_prior"]
+
+
+def test_leakage_pit_corruption_at_build_level():
+    """FG shares/rates state is strictly-prior: corrupting game j's
+    outcomes cannot change any row at or before game j, and DOES change
+    later rows (non-vacuity)."""
+    rows, agg = synthetic_universe(seasons=(2021,), rounds_per_season=6)
+    clean = m.build_g2_rows_v2(rows, agg)
+    target_gid = clean[10]["game_id"]  # a mid-season game (pair index 5)
+    agg_bad = {k: dict(v) for k, v in agg.items()}
+    for (gid, team), entry in agg_bad.items():
+        if gid == target_gid:
+            entry["fg_att_band"] = [9, 9, 9, 9, 9]
+            entry["fg_made_band"] = [9, 9, 9, 9, 9]
+    corrupted = m.build_g2_rows_v2(rows, agg_bad)
+    pos = next(i for i, r in enumerate(clean) if r["game_id"] == target_gid)
+    # Every row before the corrupted game is fully identical.
+    assert corrupted[:pos] == clean[:pos]
+    # The corrupted game's own PIT-derived state (band snapshots and
+    # trailing features, all computed from strictly-prior games) is also
+    # identical; only its agg-derived outcome fields change.
+    pit_keys = [k for k in clean[pos]
+                if k.startswith(("decayed_", "pit_", "fg_", "opp_", "q"))]
+    pit_keys = [k for k in pit_keys if not k.startswith(
+        ("fg_att", "fg_made", "fg_attempts"))]
+    for offset in (0, 1):
+        for k in pit_keys:
+            assert corrupted[pos + offset][k] == clean[pos + offset][k]
+    # The next game legitimately sees the corrupted history.
+    assert corrupted[pos + 2] != clean[pos + 2]
+
+
+@pytest.fixture(scope="module")
+def pipeline():
+    rows = enriched_universe(seasons=(2018, 2019, 2020, 2021, 2022),
+                             rounds_per_season=6)
+    evaluation = ev.run_development_evaluation_v2(
+        rows, paths=10000, validation_seasons=(2021, 2022), fold_min_games=10)
+    return rows, evaluation
+
+
+def test_driver_end_to_end_synthetic(pipeline):
+    _rows, evaluation = pipeline
+    assert evaluation["market_data_used"] is False
+    assert evaluation["all_targets_must_pass"] is True
+    gates = evaluation["gates"]
+    assert set(gates) == {"G_TD", "G_FG", "G_RARE", "G_JOINT", "G_CAL",
+                          "G_KEY", "G_PERIOD"}
+    joint = gates["G_JOINT"]
+    assert joint["baseline_ii_frozen_discrete_v2_grid"]["status"] == "UNEVALUATED"
+    assert "baseline_ii_prime_independent_marginals" in joint
+    assert set(evaluation["k3_folds"]) == {"2021", "2022"}
+    for fold in evaluation["k3_folds"].values():
+        assert fold["estimation_scope"] == "TRAINING_GAMES_ONLY"
+        for lam in fold["lambdas"].values():
+            assert 0.0 <= lam <= 0.50
+    for meta in evaluation["fold_meta"]:
+        assert set(meta["thetas"]) == {
+            "TD", "FG", "TD_Q1", "TD_Q2", "TD_Q3", "TD_Q4",
+            "FG_Q1", "FG_Q2", "FG_Q3", "FG_Q4"}
+    record = ev.build_attempt2_result_record(
+        evaluation=evaluation,
+        status=("DEVELOPMENT_ATTEMPT_PASS" if evaluation["full_game_pass"]
+                else "DEVELOPMENT_ATTEMPT_FAIL"),
+        attempt_consumed=True, training_team_rows=len(_rows))
+    assert record["attempts_remaining_after_this_result"] == 1
+    assert sorted(record["passing_gates"] + record["failing_gates"]) == \
+        ["G_CAL", "G_FG", "G_JOINT", "G_KEY", "G_RARE", "G_TD"]
+
+
+def test_leakage_future_season_never_enters_a_fold(pipeline):
+    """Driver-level: appending an extreme synthetic season AFTER the
+    development window changes no fitted value of any fold (fold_meta
+    selections and K3 lambdas bit-identical), because every fold trains on
+    strictly earlier seasons and sigma is selected inside each fold's
+    training window only (Amendment 2)."""
+    rows, evaluation_clean = pipeline
+    garbage_rows, garbage_agg = synthetic_universe(
+        seed=777, seasons=(2099,), rounds_per_season=6)
+    for r in garbage_rows:
+        r["offense_touchdowns"] = 25
+        r["made_field_goals"] = 25
+    # Build the combined row set through the same enrichment path: the
+    # factory agg keys are (game_id, team); merge the two universes first.
+    rows_a, agg_a = synthetic_universe(seasons=(2018, 2019, 2020, 2021, 2022),
+                                      rounds_per_season=6)
+    assert [r["game_id"] for r in rows_a] == [r["game_id"] for r in rows]
+    combined = m.build_g2_rows_v2(rows_a + garbage_rows, {**agg_a, **garbage_agg})
+    evaluation_garbage = ev.run_development_evaluation_v2(
+        combined, paths=10000, validation_seasons=(2021, 2022),
+        fold_min_games=10)
+    assert evaluation_garbage["fold_meta"] == evaluation_clean["fold_meta"]
+    assert evaluation_garbage["k3_folds"] == evaluation_clean["k3_folds"]
+    assert evaluation_garbage["sigma_by_fold"] == evaluation_clean["sigma_by_fold"]
+    assert evaluation_garbage["sigma_selection"] == \
+        evaluation_clean["sigma_selection"]
+
+
+def test_sigma_joins_leakage_identity_set(pipeline):
+    """Amendment 2 (section 6 governs): sigma is now part of the
+    leakage-identity set. Permuting the OUTER VALIDATION outcomes of the
+    last validation season (2022 - a training season for no fold in this
+    fixture) must leave every fold's selected sigma, its selection detail,
+    and every other fitted value bit-identical, because sigma is selected
+    inside each fold's training window only."""
+    rows, evaluation_clean = pipeline
+    corrupted = _corrupt_eval_outcomes(rows, 2022)
+    evaluation_after = ev.run_development_evaluation_v2(
+        corrupted, paths=10000, validation_seasons=(2021, 2022),
+        fold_min_games=10)
+    assert evaluation_after["sigma_by_fold"] == evaluation_clean["sigma_by_fold"]
+    assert evaluation_after["sigma_selection"] == \
+        evaluation_clean["sigma_selection"]
+    assert evaluation_after["fold_meta"] == evaluation_clean["fold_meta"]
+    assert evaluation_after["k3_folds"] == evaluation_clean["k3_folds"]
+    for meta_clean, meta_after in zip(evaluation_clean["fold_meta"],
+                                      evaluation_after["fold_meta"]):
+        assert meta_after["sigma"] == meta_clean["sigma"]
+    assert set(evaluation_clean["sigma_by_fold"]) == {"2021", "2022"}
+    assert evaluation_clean["sigma_selection_rule"] == \
+        "AMENDMENT_2_NESTED_TRAINING_WINDOW_ONLY"
+
+
+def test_sigma_selection_fails_closed_without_inner_fold():
+    """Amendment 2 section 2.5: a training window with a single season
+    cannot form an inner fold - the selector fails closed and never falls
+    back to validation data."""
+    rows = enriched_universe(seasons=(2018, 2019, 2020, 2021),
+                             rounds_per_season=4)
+    train = [r for r in rows if int(r["season"]) < 2021]
+    bundle = m.fit_fold_bundle(train, m.V2_CONFIG)
+    one_season = [r for r in train if int(r["season"]) == 2018]
+    with pytest.raises(m.ScoreCountsG2V2Error,
+                       match="SIGMA_SELECTION_NO_INNER_FOLD"):
+        m.select_sigma_nested_v2(one_season, bundle)
+
+
+def test_sigma_selection_driver_abort_never_reads_validation():
+    """Driver level: when the (single) fold's training window is one
+    season, the run aborts NOT_RUN with the sigma fail-closed code BEFORE
+    any fit or scoring. The validation rows' outcome fields are poisoned
+    with a sentinel string: any read of them (by selection, a fit, or a
+    gate) would raise TypeError/ValueError instead of the fail-closed
+    NotRunError, so the observed error proves they were never read."""
+    rows = enriched_universe(seasons=(2020, 2021), rounds_per_season=6)
+    poisoned = [
+        dict(r, offense_touchdowns="SENTINEL", made_field_goals="SENTINEL")
+        if int(r["season"]) == 2021 else r
+        for r in rows
+    ]
+    with pytest.raises(ev.NotRunError,
+                       match="SIGMA_SELECTION_NO_INNER_FOLD"):
+        ev.run_development_evaluation_v2(
+            poisoned, paths=10000, validation_seasons=(2021,),
+            fold_min_games=10)
+
+
+def _hand_sigma_argmin(residuals):
+    """The frozen statistic, computed from the spec text: residuals are
+    (residual_product, mu_h, mu_a) triples; MSE per sigma over the pooled
+    residuals vs mu_h * mu_a * (exp(sigma^2) - 1); argmin, ties to the
+    smaller sigma. Returns (sigma, {str(sigma): mse})."""
+    from math import exp as _exp
+    mse = {}
+    for sigma in m.SIGMA_GRID:
+        factor = _exp(float(sigma) ** 2) - 1.0
+        mse[float(sigma)] = float(np.mean([
+            (rp - mh * ma * factor) ** 2 for rp, mh, ma in residuals]))
+    best = min(mse, key=lambda s: (mse[s], s))
+    return float(best), {str(k): mse[k] for k in sorted(mse)}
+
+
+def _hand_nested_sigma(train_rows, bundle):
+    """Independent reimplementation of amended section 2.5 from the spec
+    text, using only public fitting/prediction primitives."""
+    cfg = bundle["config"]
+    seasons = sorted({int(r["season"]) for r in train_rows})
+    residuals = []
+    for s in seasons[1:]:
+        itr = [r for r in train_rows if int(r["season"]) < s]
+        iva = [r for r in train_rows if int(r["season"]) == s]
+        td = m.fit_poisson_ridge_v2(
+            itr, target="offense_touchdowns", alpha=float(bundle["td_alpha"]),
+            feature_names=FEATURE_NAMES)
+        fg = m.fit_poisson_ridge_v2(
+            itr, target="fg_attempts_with_distance",
+            alpha=float(bundle["fg_alpha"]),
+            feature_names=cfg.opportunity_features)
+        for _gid, (home, away) in sorted(m.game_pairs(iva).items()):
+            if not (m.row_has_band_context(home, cfg)
+                    and m.row_has_band_context(away, cfg)):
+                continue
+            h_mu = m.heritage_predict_mean(td, home) \
+                + m.banded_made_fg_mean(fg, home, cfg)
+            a_mu = m.heritage_predict_mean(td, away) \
+                + m.banded_made_fg_mean(fg, away, cfg)
+            h_obs = float(home["offense_touchdowns"]) \
+                + float(home["made_field_goals"])
+            a_obs = float(away["offense_touchdowns"]) \
+                + float(away["made_field_goals"])
+            residuals.append(((h_obs - h_mu) * (a_obs - a_mu), h_mu, a_mu))
+    sigma, mse = _hand_sigma_argmin(residuals)
+    mean_rp = float(np.mean([rp for rp, _h, _a in residuals]))
+    return sigma, mse, mean_rp
+
+
+def _hand_heritage_sigma(valid_rows, bundle):
+    """Attempt 1's pooled statistic over one fold's validation rows,
+    computed from the spec text with the outer fold's fitted models."""
+    cfg = bundle["config"]
+    residuals = []
+    for _gid, (home, away) in sorted(m.game_pairs(valid_rows).items()):
+        h_mu = m.heritage_predict_mean(bundle["td_model"], home) \
+            + m.banded_made_fg_mean(bundle["fg_opportunity_model"], home, cfg)
+        a_mu = m.heritage_predict_mean(bundle["td_model"], away) \
+            + m.banded_made_fg_mean(bundle["fg_opportunity_model"], away, cfg)
+        h_obs = float(home["offense_touchdowns"]) \
+            + float(home["made_field_goals"])
+        a_obs = float(away["offense_touchdowns"]) \
+            + float(away["made_field_goals"])
+        residuals.append(((h_obs - h_mu) * (a_obs - a_mu), h_mu, a_mu))
+    sigma, mse = _hand_sigma_argmin(residuals)
+    mean_rp = float(np.mean([rp for rp, _h, _a in residuals]))
+    return sigma, mse, mean_rp
+
+
+def test_sigma_nested_matches_hand_computation_and_diverges_from_heritage():
+    """Amendment 2 correctness: on a constructed case, the nested
+    (training-window-only) selection returns exactly the sigma the frozen
+    statistic dictates from training data alone - and it is NOT the sigma
+    the superseded heritage pooled procedure returns on the same window.
+
+    Construction: every training team-row's observed TD+FG total is set to
+    5 while model means sit near 4.1-4.3, so every inner residual product
+    is positive (nested selection must move off sigma = 0). Every
+    validation game's home total is set to 6 and away total to 1 against
+    means near 2.5-4.3, so every validation residual product is negative
+    and the heritage pooled MSE is strictly increasing in the implied
+    factor (heritage must stay at sigma = 0). Both expectations are also
+    computed by independent hand reimplementations of the two statistics.
+    """
+    rows = enriched_universe(seasons=(2018, 2019, 2020, 2021, 2022),
+                             rounds_per_season=4)
+    train0 = [r for r in rows if int(r["season"]) < 2022]
+    bundle = m.fit_fold_bundle(train0, m.V2_CONFIG)
+
+    train_s = [dict(r, offense_touchdowns=3, made_field_goals=2)
+               for r in train0]
+    got_sigma, detail = m.select_sigma_nested_v2(train_s, bundle)
+    exp_sigma, exp_mse, mean_rp_train = _hand_nested_sigma(train_s, bundle)
+    assert mean_rp_train > 0  # construction sanity: positive inner products
+    assert got_sigma == exp_sigma
+    assert got_sigma != 0.0
+    assert detail["mse_by_sigma"] == pytest.approx(exp_mse, abs=1e-9)
+    assert detail["selection_rule"] == \
+        "AMENDMENT_2_NESTED_TRAINING_WINDOW_ONLY"
+    assert [f["inner_validation_season"] for f in detail["inner_folds"]] == \
+        [2019, 2020, 2021]
+
+    valid_s = [
+        dict(r, offense_touchdowns=5, made_field_goals=1)
+        if float(r["home_indicator"]) == 1.0
+        else dict(r, offense_touchdowns=0, made_field_goals=1)
+        for r in rows if int(r["season"]) == 2022
+    ]
+    heritage_sigma, _h_detail = m.select_sigma_oof_v2(
+        train_s + valid_s, {2022: bundle}, validation_seasons=(2022,))
+    exp_h_sigma, _exp_h_mse, mean_rp_valid = _hand_heritage_sigma(
+        valid_s, bundle)
+    assert mean_rp_valid < 0  # construction sanity: negative products
+    assert heritage_sigma == exp_h_sigma == 0.0
+    assert got_sigma != heritage_sigma
+
+
+def test_zero_model_row_exclusion_is_counted(pipeline):
+    _rows, evaluation = pipeline
+    counts = evaluation["zero_model_row_exclusions"]
+    # The synthetic window's first kickoff batch (2 games) sits in every
+    # fold's training window: excluded from K3 estimation, per fold.
+    assert counts["k3_training_games"] == 4
+    # Validation games always have league context by construction here.
+    assert counts["validation_games"] == 0
+    assert counts["fg_gate_rows"] == 0
+
+
+def test_simulation_fails_closed_on_zero_model_row():
+    rows = enriched_universe(seasons=(2018, 2019, 2020, 2021),
+                             rounds_per_season=4)
+    train = [r for r in rows if int(r["season"]) < 2021]
+    bundle = m.fit_fold_bundle(train, m.V2_CONFIG)
+    first = [r for r in rows if int(r["season"]) == 2018]
+    gid, (home, away) = sorted(m.game_pairs(first).items())[0]
+    assert not m.row_has_band_context(home, m.V2_CONFIG)
+    with pytest.raises(m.ZeroModelRow):
+        m.simulate_full_game_v2(
+            bundle, game_id=gid, home_row=home, away_row=away,
+            home_rates=(0.13, 0.045), away_rates=(0.13, 0.045),
+            sigma=0.0, paths=100)
+
+
+def test_driver_not_run_conditions(pipeline):
+    rows, _evaluation = pipeline
+    with pytest.raises(ev.NotRunError):
+        ev.run_development_evaluation_v2(
+            rows, paths=5000, validation_seasons=(2021, 2022),
+            fold_min_games=10)
+    with pytest.raises(ev.NotRunError):
+        ev.run_development_evaluation_v2(
+            rows, paths=10000, validation_seasons=(2021, 2022),
+            fold_min_games=250)
+
+
+def test_k3_applies_to_full_game_pmf_only(pipeline):
+    rows, _evaluation = pipeline
+    train = [r for r in rows if int(r["season"]) < 2022]
+    bundle = m.fit_fold_bundle(train, m.V2_CONFIG)
+    valid = [r for r in rows if int(r["season"]) == 2022]
+    gid, (home, away) = sorted(m.game_pairs(valid).items())[0]
+    period_rates = {q: (0.03, 0.01) for q in (1, 2, 3, 4)}
+    with_k3 = dict(bundle)
+    with_k3["k3"] = {"lambdas": {k: 0.5 for k in m.K3_KEYS}}
+    a = m.simulate_period_game_v2(
+        bundle, game_id=gid, home_row=home, away_row=away,
+        home_period_rates=period_rates, away_period_rates=period_rates,
+        sigma=0.2, paths=2000)
+    b = m.simulate_period_game_v2(
+        with_k3, game_id=gid, home_row=home, away_row=away,
+        home_period_rates=period_rates, away_period_rates=period_rates,
+        sigma=0.2, paths=2000)
+    for q in (1, 2, 3, 4):
+        assert np.array_equal(a["home_points"][q], b["home_points"][q])
+        assert np.array_equal(a["away_points"][q], b["away_points"][q])
+
+
+# ---------------------------------------------------------------------------
+# Attempt-1 compat (requirement g): V1_COMPAT_CONFIG reduces v2 to the
+# attempt-1 model form for every pre-simulation quantity. Full pathwise
+# reproduction is impossible BY DESIGN: section 2.1 freezes a new root
+# seed for attempt separation (and attempt-1's module is not on main).
+# ---------------------------------------------------------------------------
+
+def test_v1_compat_band_formula():
+    snap = {
+        "team_attempts": [10, 20, 30, 40, 50], "team_makes": [8, 15, 20, 26, 30],
+        "league_attempts": [100, 200, 300, 400, 500],
+        "league_makes": [80, 150, 200, 260, 300],
+    }
+    shares, rates = m.band_shares_rates_v1(snap)
+    for b in range(5):
+        exp_share = float((Fraction(snap["team_attempts"][b])
+                           + 25 * Fraction(snap["league_attempts"][b], 1500))
+                          / (150 + 25))
+        exp_rate = float((Fraction(snap["team_makes"][b])
+                          + 25 * Fraction(snap["league_makes"][b],
+                                          snap["league_attempts"][b]))
+                         / (snap["team_attempts"][b] + 25))
+        assert shares[b] == pytest.approx(exp_share, abs=1e-15)
+        assert rates[b] == pytest.approx(exp_rate, abs=1e-15)
+    # Attempt-1 fallbacks differ from v2: empty league -> share 0.2, rate 0.
+    empty = {"team_attempts": [0] * 5, "team_makes": [0] * 5,
+             "league_attempts": [0] * 5, "league_makes": [0] * 5}
+    shares_e, rates_e = m.band_shares_rates_v1(empty)
+    assert shares_e == [0.2] * 5
+    assert rates_e == [0.0] * 5
+
+
+def test_v1_compat_config_switches():
+    cfg = m.V1_COMPAT_CONFIG
+    assert cfg.decayed_fg_shares is False
+    assert cfg.alpha_grid == (0.1, 1.0, 10.0, 100.0)
+    assert cfg.theta_grid == (float("inf"),)
+    assert cfg.rare_prior_mode == "FIXED" and cfg.rare_prior_fixed == 25.0
+    assert cfg.k3_enabled is False
+    assert cfg.opportunity_features == (
+        "fg_rz_trips_per_game", "fg_drives35_per_game", "fg_drives25_per_game",
+        "opp_fg_rz_trips_allowed_per_game", "opp_fg_drives35_allowed_per_game",
+        "opp_fg_drives25_allowed_per_game", "off_plays_per_game",
+        "off_turnover_rate", "opp_takeaway_rate", "home_indicator")
+    rows = _rare_rows({"A": 1, "B": 0, "C": 1, "D": 0})
+    prior, _ = m.select_rare_prior(rows, cfg)
+    assert prior == 25.0
+    # Theta grid (inf,) short-circuits CV entirely: the Poisson draw.
+    theta, scores = m.select_theta_for_leg(rows, "TD", cfg, mean_alpha=10.0)
+    assert theta == float("inf")
+    assert scores == {}
+
+
+def test_v1_compat_banded_mean_wiring():
+    rows = enriched_universe(seasons=(2018, 2019, 2020), rounds_per_season=4)
+    train = [r for r in rows if int(r["season"]) < 2020]
+    model = m.fit_poisson_ridge_v2(
+        train, target="fg_attempts_with_distance", alpha=10.0,
+        feature_names=m.FG_OPPORTUNITY_FEATURES_V1)
+    row = [r for r in rows if int(r["season"]) == 2020][0]
+    got = m.banded_made_fg_mean(model, row, m.V1_COMPAT_CONFIG)
+    shares, rates = m.band_shares_rates_v1({
+        "team_attempts": row["pit_team_band_attempts"],
+        "team_makes": row["pit_team_band_makes"],
+        "league_attempts": row["pit_league_band_attempts"],
+        "league_makes": row["pit_league_band_makes"],
+    })
+    expected = m.predict_mean_v2(model, row) * sum(
+        s * r for s, r in zip(shares, rates))
+    assert got == pytest.approx(expected, abs=1e-12)
+
+
+def test_v1_reproduction_limits_are_structural():
+    # The attempt-2 root seed is a different frozen literal (section 2.1):
+    # pathwise equality with attempt 1 is impossible by design, which is
+    # why compat is asserted at the level of formulas and selections.
+    assert m.ROOT_SEED_UINT64_V2 != 13373308085707555379
+    assert m.ROOT_SEED_LITERAL_V2 != \
+        "SportsEdge|NFL_SCORE_COUNTS_G2|FORWARD_V1|ROOT_SEED"
