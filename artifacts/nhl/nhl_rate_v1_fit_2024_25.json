@@ -1,0 +1,30 @@
+{
+  "version": "nhl_rate_v1_official_boxscore_2024_25",
+  "fit_window": {
+    "start": "2024-10-08",
+    "end": "2025-04-18"
+  },
+  "validate_window_reserved": {
+    "start": "2025-10-07",
+    "end": "2026-04-18"
+  },
+  "source": "api-web.nhle.com /v1/score (REG gameType=2, sog+score)",
+  "n_completed_games": 1310,
+  "n_skipped_thin_history": 169,
+  "n_training_rows": 2282,
+  "parameters": {
+    "version": "nhl_rate_v1_official_boxscore_2024_25",
+    "intercept": 0.7561576127990453,
+    "offense_xg": 0.07650332504722998,
+    "opponent_xga": 0.14581225383016316,
+    "shot_share": -0.9048966022435356,
+    "special_teams": 0.0,
+    "goalie_gsax": 0.0,
+    "rest": 0.019948423364810963,
+    "travel": 0.0,
+    "lineup": 0.0,
+    "home_ice": 0.13160542693040692
+  },
+  "standin": "GF/60 and GA/60 occupy offense_xg and opponent_xga. GSAx/travel/lineup=0.",
+  "status": "RESEARCH_FIT_ONLY_NOT_VALIDATED"
+}
