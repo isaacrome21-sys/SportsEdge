@@ -32,6 +32,7 @@ from sportsedge.football_full_board import (
     catalog_complete,
 )
 from sportsedge.nfl_attempt9_live_forecast import load_model_p, load_runtime, raw_forecasts, recency_features
+from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp
 
 SPREAD_SIGMA_FALLBACK = 13.78774897397055
 TOTAL_SIGMA_FALLBACK = 13.99738332096112
@@ -283,11 +284,13 @@ def main() -> int:
             "funnel": {"odds_rows_fetched": 0, "bets_emitted": 0, "pipeline_health": "BROKEN"},
             "governance": {"truth_gate": False, "official_authority": False, "odds_api_called": False},
         }
+        payload = _registry_gate_and_stamp(payload, "NFL", "scripts/run_auto_nfl_resilient.py")
         out = Path(args.output)
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(json.dumps({"run_status": payload["run_status"], "summary": payload["summary"]}, sort_keys=True))
         return 2
+    payload = _registry_gate_and_stamp(payload, "NFL", "scripts/run_auto_nfl_resilient.py")
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")

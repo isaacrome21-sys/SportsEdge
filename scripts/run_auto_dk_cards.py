@@ -26,6 +26,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from scripts.collect_auto_dk_four_sports import cfb_compact, mlb_line_text, nfl_tickets
+from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp
 
 CT=ZoneInfo("America/Chicago")
 ROOT=Path(__file__).resolve().parents[1]
@@ -352,6 +353,7 @@ def main():
                             "cards":[]}
     results["NBA"]={"status":"CAPTURE_ONLY","cards":[],
                     "reason":"NO_PREDICTIVE_ENGINE_WIRED"}
+    results=_registry_gate_and_stamp(results,None,"scripts/run_auto_dk_cards.py")
     target=args.out_dir/"summary.json"
     target.write_text(json.dumps(results,indent=2,sort_keys=True)+"\n")
     print(json.dumps({k:{"status":v["status"],"cards":len(v["cards"])} for k,v in results.items()}))
