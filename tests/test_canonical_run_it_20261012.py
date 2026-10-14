@@ -97,10 +97,13 @@ def test_coverage_summary_counts():
     # t114 registry-fix proposal: STOLEN_BASES NOT_OFFERED (NO_QUOTE),
     # PITCHER_HITS_WALKS_ER provider-unavailable (NO_QUOTE), 13 NFL props
     # governance NO_ENGINE, F5 gate named as NO_VALIDATION (eligible=false).
-    assert summary["priced_path_count"] == 24
-    assert summary["blocked_count"] == 65
+    # Oct 14 wiring completion: TRIPLES / EXTRA_BASE_HITS / RUNS_RBIS
+    # joined the empirical batter engine's market set (priced path),
+    # moving three families out of NO_ENGINE.
+    assert summary["priced_path_count"] == 27
+    assert summary["blocked_count"] == 62
     assert summary["blocked_counts_by_cause"] == {
-        "NO_DATA": 1, "NO_ENGINE": 58, "NO_QUOTE": 2, "NO_VALIDATION": 4}
+        "NO_DATA": 1, "NO_ENGINE": 55, "NO_QUOTE": 2, "NO_VALIDATION": 4}
     assert summary["coverage_is_not_validation"] is True
 
 
@@ -115,14 +118,18 @@ def test_blocked_row_for_names_the_taxonomy_blocker():
     assert row["blocker"] == "NO_ENGINE"
     # Priced-path markets are owned by their engines, not this fallback.
     assert blocked_row_for("MLB", "HITS", {"market": "HITS"}) is None
-    # t114 proposal: governance NO_ENGINE for NFL props and NOT_OFFERED SB.
+    # NFL props remain governed; the DK October 13 MLB absence is
+    # fixture-specific, not a permanent claim about provider offerings.
     assert blocked_row_for("NFL", "ANYTIME_TD",
                            {"market": "ANYTIME_TD"})["blocker"] == "NO_ENGINE"
-    assert "NOT_OFFERED" in blocked_row_for(
-        "MLB", "STOLEN_BASES", {"market": "STOLEN_BASES"})["reason"]
-    assert "PROVIDER_UNAVAILABLE" in blocked_row_for(
+    sb = blocked_row_for("MLB", "STOLEN_BASES", {"market": "STOLEN_BASES"})
+    assert sb["blocker"] == "NO_QUOTE"
+    assert "NOT_OBSERVED_ON_INSPECTED_FIXTURE" in sb["reason"]
+    combo = blocked_row_for(
         "MLB", "PITCHER_HITS_WALKS_ER",
-        {"market": "PITCHER_HITS_WALKS_ER"})["reason"]
+        {"market": "PITCHER_HITS_WALKS_ER"})
+    assert combo["blocker"] == "NO_QUOTE"
+    assert "NO VERIFIED OFFERED QUOTE" in combo["reason"]
     assert blocked_row_for("NBA", "PLAYER_POINTS", {"market": "X"}) is None
 
 
