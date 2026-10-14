@@ -102,15 +102,14 @@ APPROVED = frozenset({ea.ANCHOR_ID})
 
 
 # ------------------------------------------------------------- not activated
-def test_approved_list_is_empty_and_anchor_unregistered():
-    assert ea.APPROVED_ANCHOR_IDS == frozenset()
-    assert ea.ANCHOR_ID == "anchor:rfc3161+ots:v1"
-    assert ea.ANCHOR_ID not in ea.APPROVED_ANCHOR_IDS
+def test_approved_list_comes_from_owner_config_but_nothing_active():
+    assert ea.APPROVED_ANCHOR_IDS == frozenset({"anchor:rfc3161+ots:v1"})
+    assert ea.CAPTURE_ACTIVE is False and ea.ADMISSION_ACTIVE is False
 
 
 def test_default_admission_refuses_even_valid_bundle(env):
     d = ea.admit(_bundle(env), event_cutoff=FUTURE, ca_bundle_pem=env["a"]["ca"])
-    assert not d.admitted and d.reason == "anchor_id_not_approved"
+    assert not d.admitted and d.reason == "admission_not_activated"
 
 
 def test_network_refused_without_explicit_flag(env):
@@ -259,7 +258,8 @@ def test_missing_ca_bundle_refused(env):
 # ------------------------------------------------------------- OTS (secondary)
 def _ots(root_hex: str) -> bytes:
     # Synthetic structural proof (header + sha256 op + digest); not a calendar response.
-    return ea.OTS_MAGIC + b"\x01\x08" + bytes.fromhex(root_hex) + b"\x00"
+    return (ea.OTS_MAGIC + b"\x01\x08" + bytes.fromhex(root_hex) + b"\x00"
+            + bytes.fromhex("83dfe30d2ef90c8e") + b"\x0a\x09cal.test/")
 
 
 def test_ots_structure_ok_but_never_attested(env):
