@@ -40,7 +40,11 @@ def is_x_host(host):
     return any(h == r or h.endswith("." + r) for r in X_ROOTS)
 
 
-# Preserve the already published local helper name from #2238.\n_is_x_host = is_x_host\n\n\ndef _pinned(hosts):
+# Preserve the already published local helper name from #2238.
+_is_x_host = is_x_host
+
+
+def _pinned(hosts):
     out = set()
     for h in hosts:
         try:
