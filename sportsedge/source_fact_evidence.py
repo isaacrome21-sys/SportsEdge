@@ -67,9 +67,17 @@ def _screen(row, pins, event_id, subject_id, kind, cutoff, max_age):
         raise ValueError("invalid confirmation")
     if pin["kind"] == "SOCIAL" and confirmation == "CONFIRMED":
         raise ValueError("social rumor cannot self-confirm")
+    # Re-fetching an old article does not make its underlying fact fresh.
+    # Require both publication and observation to be recent at the cutoff.
+    fresh = all(0 <= (cutoff - stamp).total_seconds() <= max_age
+                for stamp in (published, observed, fetched))
     return {"source_id": row["source_id"], "source_url": row["source_url"],
             "kind": pin["kind"], "value": value.strip(), "confirmation": confirmation,
-            "fresh": (cutoff - fetched).total_seconds() <= max_age}
+            "published_at_utc": published.isoformat(),
+            "observed_at_utc": observed.isoformat(),
+            "fetched_at_utc": fetched.isoformat(),
+            "pre_event_cutoff_utc": cutoff.isoformat(),
+            "fresh": fresh}
 
 
 def adjudicate_pregame_fact(*, event_id, subject_id, fact_kind, cutoff_utc,
