@@ -23,7 +23,8 @@ from sportsedge.mlb_phone_first_inning_pricing import (
 from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
 from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
 from sportsedge.prepricing.factor_ingestion import stage_games
-from sportsedge.prepricing.qb_form2_bundle_loader import load_form2_bundles
+from sportsedge.prepricing.qb_form2_bundle_loader import (
+    load_form2_bundles, load_form2_bundle_manifests)
 from sportsedge.milestone_ladder_intake import (
     expand_milestone_ladder_rows, milestone_refusal_row)
 from sportsedge.team_half_pricing import DERIVATIVES, price_team_half_rows
@@ -437,6 +438,10 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     supplies the manifest itself, verified against the pin either
     way). With a directory but no pin, Form 2 admission is disabled
     and the run behaves exactly as it did before the loader existed.
+    A tuple/list of independent external manifest SHA-256 pins is also
+    accepted: each per-team archive is admitted independently and then
+    composed with cross-manifest identity collision refusals. No pin may
+    be derived from the local archive itself.
     Default None: no Form 2 loading.
     """
     rows = payload if isinstance(payload, list) else payload.get("lines")
@@ -600,10 +605,20 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     form2_bundles = None
     form2_loader_audit = None
     if form2_bundles_dir is not None:
-        loaded_bundles, form2_loader_audit = load_form2_bundles(
-            form2_bundles_dir, games,
-            manifest_sha256=form2_manifest_sha256,
-            manifest_bytes=form2_manifest_bytes)
+        if isinstance(form2_manifest_sha256, (tuple, list)):
+            # Multiple operator-supplied *external* pins from separately
+            # sealed per-team captures. Do not accept manifest bytes here:
+            # every object is verified against its external digest.
+            if form2_manifest_bytes is not None:
+                raise ValueError("FORM2_MULTI_PIN_MANIFEST_BYTES_UNSUPPORTED")
+            loaded_bundles, form2_loader_audit = load_form2_bundle_manifests(
+                form2_bundles_dir, games,
+                manifest_sha256s=form2_manifest_sha256)
+        else:
+            loaded_bundles, form2_loader_audit = load_form2_bundles(
+                form2_bundles_dir, games,
+                manifest_sha256=form2_manifest_sha256,
+                manifest_bytes=form2_manifest_bytes)
         if loaded_bundles:
             form2_bundles = loaded_bundles
 
@@ -1164,11 +1179,11 @@ def main(argv=None):
                         "QB_IDENTITY_EVIDENCE bundles (CFB); read locally "
                         "through the archive module, never fetched. "
                         "Admission requires --form2-manifest-sha256")
-    p.add_argument("--form2-manifest-sha256",
-                   help="External pin: the Form 2 archive manifest's "
-                        "SHA-256, supplied from an independent channel "
-                        "(never read from the archive root). Without it, "
-                        "Form 2 admission is disabled")
+    p.add_argument("--form2-manifest-sha256", action="append",
+                   help="External pin: Form 2 archive manifest SHA-256 "
+                        "from an independent channel, not the archive root. "
+                        "Repeat once per sealed per-team manifest to compose "
+                        "without weakening the pin requirement")
     args = p.parse_args(argv)
     if not 0 <= args.min_ev <= 0.15:
         p.error("min-ev must be between 0 and 0.15")
@@ -1177,7 +1192,11 @@ def main(argv=None):
                     lane=args.lane, allow_manual_context=args.allow_manual_context,
                     as_of=args.as_of, historical=args.historical,
                     form2_bundles_dir=args.form2_bundles_dir,
-                    form2_manifest_sha256=args.form2_manifest_sha256)
+                    form2_manifest_sha256=(
+                        args.form2_manifest_sha256[0]
+                        if args.form2_manifest_sha256
+                        and len(args.form2_manifest_sha256) == 1
+                        else args.form2_manifest_sha256))
     rendered = json.dumps(card, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
