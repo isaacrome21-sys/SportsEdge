@@ -312,6 +312,7 @@
         "tests/conftest.py",
         "tests/test_anchored_lane_play_gate_20261012.py",
         "tests/test_canonical_run_it_20261012.py",
+        "tests/test_family_registry_stopgap_20261013.py",
         "tests/test_football_phone_named_source_contract.py",
         "tests/test_market_coverage.py",
         "tests/test_mlb_f5_quote_binding.py",
