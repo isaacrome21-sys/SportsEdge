@@ -567,9 +567,12 @@ def admit(bundle: Mapping, *, event_cutoff: datetime, ca_bundle_pem: bytes,
     root; at least ``min_tokens`` tokens verify; and the EARLIEST verified
     genTime is <= event_cutoff - margin. Never raises.
     """
-    if approved_ids is None and not ADMISSION_ACTIVE:
-        return AdmissionDecision(False, "admission_not_activated")
-    approved = APPROVED_ANCHOR_IDS if approved_ids is None else approved_ids
+    if approved_ids is None:
+        if not ADMISSION_ACTIVE:
+            return AdmissionDecision(False, "admission_not_activated")
+        # Legacy single-TSA admission must never become a production route.
+        return AdmissionDecision(False, "single_tsa_admission_forbidden")
+    approved = approved_ids
     try:
         if not isinstance(bundle, Mapping):
             return AdmissionDecision(False, "malformed_bundle")
@@ -691,3 +694,39 @@ def admit_quorum(bundle: Mapping, *, event_cutoff: datetime,
         return AdmissionDecision(True, "admitted", gen, tuple(details))
     except Exception as e:  # fail closed
         return AdmissionDecision(False, f"internal_error:{type(e).__name__}")
+
+def admit_configured_quorum(bundle: Mapping, *, event_cutoff: datetime) -> AdmissionDecision:
+    """Production path: use only configured, separately approved pinned authorities.
+
+    The injectable admit_quorum primitive is used by offline tests; production
+    evidence consumers must use this wrapper, without caller-supplied trust.
+    """
+    if not ADMISSION_ACTIVE:
+        return AdmissionDecision(False, "admission_not_activated")
+    try:
+        cfg = load_config()
+        if not cfg.admission_active or ANCHOR_ID not in cfg.approved_anchor_ids:
+            return AdmissionDecision(False, "admission_not_activated")
+        if cfg.min_distinct_providers < 2:
+            return AdmissionDecision(False, "quorum_below_two")
+        if not isinstance(bundle, Mapping):
+            return AdmissionDecision(False, "malformed_bundle")
+        entries = bundle.get("tsa_tokens")
+        if not isinstance(entries, (list, tuple)) or not entries:
+            return AdmissionDecision(False, "missing_token")
+        # Preserve the exact request DER for every token so nonce binding is
+        # obligatory for newly captured evidence, not an optional test knob.
+        for e in entries:
+            if (not isinstance(e, Mapping) or not isinstance(e.get("request"), (bytes, bytearray))
+                    or not e["request"]):
+                return AdmissionDecision(False, "request_binding_required")
+        if len(cfg.providers) < cfg.min_distinct_providers or any(not p.pinned for p in cfg.providers):
+            return AdmissionDecision(False, "tsa_trust_not_pinned")
+        trust = {p.id: provider_trust(p) for p in cfg.providers}
+        return admit_quorum(bundle, event_cutoff=event_cutoff, trust=trust,
+                            min_distinct_providers=cfg.min_distinct_providers,
+                            margin_s=cfg.pregame_margin_s,
+                            approved_ids=cfg.approved_anchor_ids,
+                            max_clock_skew_s=cfg.max_clock_skew_s)
+    except (AnchorError, OSError, ValueError, TypeError):
+        return AdmissionDecision(False, "configured_trust_unavailable")
