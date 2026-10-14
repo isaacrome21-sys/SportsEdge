@@ -54,6 +54,7 @@ from sportsedge.sports.cfb.market_anchored_spread import (
     forward_track_eligible,
     load_frozen_fit,
 )
+from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp
 
 # Bakeoff run 37093707442: per-team joint home/away score RMSE.
 TEAM_SCORE_RMSE = 12.018
@@ -976,6 +977,7 @@ def main() -> int:
     payload["sharp_reference_rows"] = n_sharp
     print(f"CFB_SDV_SHARP_REFERENCE rows={n_sharp} (Pinnacle no-vig, else >=2-book consensus, exact line only)")
     payload = apply_probation(payload)
+    payload = _registry_gate_and_stamp(payload, "CFB", "scripts/run_cfb_sdv_card_v2.py")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     # Visible in the phone comment (lines containing CFB_SDV_ are echoed).

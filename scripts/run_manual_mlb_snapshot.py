@@ -19,6 +19,7 @@ from sportsedge.mlb_history_cache import MLBHistoryCachedOpener
 from sportsedge.mlb_schedule_filter import filter_schedule_to_game_pk
 from sportsedge.mlb_source import GameSnapshot
 from sportsedge.runtime import parse_timestamp
+from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp
 
 # Re-export for tests.test_manual_mlb_live_guards (loads this file as a module).
 validate_live_rows = validate_live_rows
@@ -191,6 +192,7 @@ def main() -> int:
     payload["blocked"] = list(blocked) + list(extra_blocked)
     payload["quote_notes"] = notes
     payload = attach_mlb_both_sides(payload)
+    payload = _registry_gate_and_stamp(payload, "MLB", "scripts/run_manual_mlb_snapshot.py")
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n")
