@@ -9,13 +9,6 @@ from __future__ import annotations
 from math import isfinite
 from typing import Any, Mapping, Sequence
 
-BATTER_MARKETS = frozenset({
-    "BATTER_HITS", "BATTER_TOTAL_BASES", "BATTER_RBIS", "BATTER_RUNS",
-    "BATTER_HRS", "BATTER_HOME_RUNS", "BATTER_STOLEN_BASES",
-    "BATTER_BB", "BATTER_WALKS", "BATTER_K", "BATTER_STRIKEOUTS",
-    "BATTER_SINGLES", "SINGLES", "BATTER_DOUBLES", "DOUBLES",
-    "HITS_RUNS_RBIS", "H_R_RBI",
-})
 _FIELD = {
     "BATTER_HITS": "hits",
     "BATTER_TOTAL_BASES": "total_bases",
@@ -28,8 +21,22 @@ _FIELD = {
     "BATTER_K": "strikeouts", "BATTER_STRIKEOUTS": "strikeouts",
     "BATTER_SINGLES": "singles", "SINGLES": "singles",
     "BATTER_DOUBLES": "doubles", "DOUBLES": "doubles",
+    "BATTER_TRIPLES": "triples", "TRIPLES": "triples",
     "HITS_RUNS_RBIS": "hits_runs_rbis", "H_R_RBI": "hits_runs_rbis",
 }
+# Derived markets: exact per-game arithmetic over measured component
+# fields the public history source already collects (deployments.json:
+# EXTRA_BASE_HITS is the "exact marginal of doubles+triples+home runs
+# from same prior-game rows"; RUNS_RBIS is "exact arithmetic on same
+# prior-game rows"). A game missing any component fails the market
+# closed; components are never zero-filled.
+_DERIVED = {
+    "BATTER_EXTRA_BASE_HITS": ("doubles", "triples", "home_runs"),
+    "EXTRA_BASE_HITS": ("doubles", "triples", "home_runs"),
+    "BATTER_RUNS_RBIS": ("runs", "rbi"),
+    "RUNS_RBIS": ("runs", "rbi"),
+}
+BATTER_MARKETS = frozenset(_FIELD) | frozenset(_DERIVED)
 
 
 class BatterEmpiricalError(ValueError):
@@ -49,11 +56,26 @@ def price_batter_market(
         raise BatterEmpiricalError("SIDE_MUST_BE_OVER_UNDER")
     if not isfinite(float(line)):
         raise BatterEmpiricalError("LINE_NONFINITE")
-    field = _FIELD[m]
     values = []
     for i, row in enumerate(pa_history):
         if not isinstance(row, Mapping):
             raise BatterEmpiricalError(f"PA_HISTORY[{i}]_NOT_OBJECT")
+        if m in _DERIVED:
+            total = 0
+            for component in _DERIVED[m]:
+                raw = row.get(component)
+                try:
+                    v = int(raw)
+                except (TypeError, ValueError) as exc:
+                    raise BatterEmpiricalError(
+                        f"PA_HISTORY[{i}].{component}_INVALID") from exc
+                if v < 0:
+                    raise BatterEmpiricalError(
+                        f"PA_HISTORY[{i}].{component}_NEGATIVE")
+                total += v
+            values.append(total)
+            continue
+        field = _FIELD[m]
         raw = row.get(field)
         try:
             v = int(raw)

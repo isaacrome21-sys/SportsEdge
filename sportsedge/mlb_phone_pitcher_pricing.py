@@ -15,7 +15,7 @@ from .research_three_sport_bridge import price_three_sport_research
 
 PITCHER_MARKETS = frozenset({
     "PITCHER_K", "PITCHER_OUTS", "PITCHER_HITS_ALLOWED",
-    "PITCHER_BB", "PITCHER_ER", "PITCHER_HITS_WALKS_ER",
+    "PITCHER_BB", "PITCHER_ER", "PITCHER_PITCHES", "PITCHER_HITS_WALKS_ER",
 })
 
 

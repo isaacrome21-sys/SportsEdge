@@ -118,21 +118,47 @@ for _m in ("NRFI", "YRFI"):
 _BATTER = ("MLB_BATTER_EMPIRICAL_GAMELOG (mlb_phone_batter_pricing -> "
            "research_three_sport_bridge; verified StatsAPI game logs, "
            "official-lineup gate per row)")
-for _m in ("HITS", "TOTAL_BASES", "RBI", "RUNS", "HOME_RUNS",
-           "BATTER_BB", "BATTER_K", "SINGLES", "DOUBLES",
+for _m in ("HITS", "TOTAL_BASES", "RBI", "RUNS",
+           "BATTER_BB", "SINGLES", "DOUBLES",
            "HITS_RUNS_RBIS"):
     _priced("MLB", _m, _BATTER,
             "Batter market in the empirical gamelog engine's market set; "
             "rows fail closed per player when identity/history is "
             "unverified or the official starting lineup is unconfirmed "
             "(row-level NO_PARTICIPATION).")
+for _m in ("HOME_RUNS", "BATTER_K"):
+    _priced("MLB", _m, _BATTER,
+            "Batter market in the empirical gamelog engine's market set. "
+            "FORM TRUTH (verified DK enumeration, Oct 13 2026): "
+            "DraftKings offers this family ONLY as a single-sided "
+            "milestone ladder (no two-sided O/U variant); ladder rows "
+            "convert at intake through "
+            "sportsedge.milestone_ladder_intake and reach this engine "
+            "as one-sided rows. Rows fail closed per player when "
+            "identity/history is unverified or the official starting "
+            "lineup is unconfirmed (row-level NO_PARTICIPATION).")
+for _m in ("TRIPLES", "EXTRA_BASE_HITS", "RUNS_RBIS"):
+    _priced("MLB", _m, _BATTER,
+            "Batter market in the empirical gamelog engine's market set "
+            "(TRIPLES reads the measured per-game triples field; "
+            "EXTRA_BASE_HITS is the exact per-game sum "
+            "doubles+triples+home_runs; RUNS_RBIS the exact per-game sum "
+            "runs+rbi; a game missing any component fails the market "
+            "closed). FORM TRUTH (verified DK enumeration, Oct 13 2026): "
+            "DraftKings offers this family ONLY as a single-sided "
+            "milestone ladder (no two-sided O/U); ladder rows convert "
+            "at intake through sportsedge.milestone_ladder_intake and "
+            "reach this engine as one-sided rows. Rows fail closed per "
+            "player when identity/history is unverified or the official "
+            "starting lineup is unconfirmed (row-level "
+            "NO_PARTICIPATION).")
 _blocked("MLB", "STOLEN_BASES", "NO_QUOTE",
          "NOT_OFFERED (owner rule 2026-10-13: MLB stolen bases are not "
          "offered; no DK board inspection supports an offering). The "
          "empirical gamelog engine could compute it, but no row may price "
          "without an inspected offering.", engine=_BATTER)
-for _m in ("EXTRA_BASE_HITS", "HITS_RUNS_STOLEN_BASES", "RUNS_RBIS",
-           "HITS_STOLEN_BASES", "HITS_WALKS_STOLEN_BASES", "TRIPLES"):
+for _m in ("HITS_RUNS_STOLEN_BASES",
+           "HITS_STOLEN_BASES", "HITS_WALKS_STOLEN_BASES"):
     _blocked("MLB", _m, "NO_ENGINE",
              "The empirical gamelog engine's market set excludes this "
              "market; " + _SNAPSHOT_ONLY + ".",
@@ -282,8 +308,10 @@ INTAKE_ALIASES = {
         "BATTER_DOUBLES": "DOUBLES", "DOUBLES": "DOUBLES",
         "HITS_RUNS_RBIS": "HITS_RUNS_RBIS", "H_R_RBI": "HITS_RUNS_RBIS",
         "EXTRA_BASE_HITS": "EXTRA_BASE_HITS",
+        "BATTER_EXTRA_BASE_HITS": "EXTRA_BASE_HITS",
         "HITS_RUNS_STOLEN_BASES": "HITS_RUNS_STOLEN_BASES",
         "RUNS_RBIS": "RUNS_RBIS",
+        "BATTER_RUNS_RBIS": "RUNS_RBIS",
         "HITS_STOLEN_BASES": "HITS_STOLEN_BASES",
         "HITS_WALKS_STOLEN_BASES": "HITS_WALKS_STOLEN_BASES",
         "BATTER_TRIPLES": "TRIPLES", "TRIPLES": "TRIPLES",
