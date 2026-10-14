@@ -7,7 +7,9 @@ from sportsedge.anchor_payload_binding import (BINDING_DOMAIN, BindingError, bin
                                                verify_bound_leaf)
 
 PAY = hashlib.sha256(b"synthetic MLB_RECEIPT_JOURNAL_ANCHOR_V1 payload").hexdigest()
-LOC = "s3://sportsedge-anchor-test/mlb/journal/2026-10-14/seg-0001.jsonl"
+# t141: unversioned S3 locations are refused by bind_leaf (owner ruling); S3 uses bind_s3_leaf.
+LOC = "git://github.com/isaacrome21-sys/records/mlb/journal/2026-10-14/seg-0001.jsonl"
+S3LOC = "s3://sportsedge-anchor-test/mlb/journal/2026-10-14/seg-0001.jsonl"
 S = "MLB_RECEIPT_JOURNAL_ANCHOR_V1"
 
 
@@ -30,8 +32,9 @@ def test_leaf_is_deterministic_and_domain_separated():
 
 @pytest.mark.parametrize("change", [
     {"location": LOC.replace("seg-0001", "seg-0002")},
-    {"location": "git://github.com/isaacrome21-sys/records/mlb/seg-0001.jsonl"},
+    {"location": "https://records.example/mlb/seg-0001.jsonl"},
     {"carrier": "OPENTIMESTAMPS"},
+    {"carrier": "GIT_RECORDS_BRANCH"},
     {"payload_sha256": hashlib.sha256(b"other").hexdigest()},
 ])
 def test_location_carrier_payload_each_change_leaf_and_root(change):
@@ -60,3 +63,9 @@ def test_verify_ok_and_each_substitution_refused():
     assert verify_bound_leaf({**rec, "location": LOC.replace("0001", "0009")}, **ok)[1] == "LEAF_MISMATCH"
     assert verify_bound_leaf({**rec, "domain": "X"}, **ok)[1] == "WRONG_DOMAIN"
     assert verify_bound_leaf("nope", **ok)[1] == "WRONG_DOMAIN"
+
+
+@pytest.mark.parametrize("bad", [{"location": S3LOC}, {"carrier": "S3_OBJECT_LOCK"}])
+def test_unversioned_s3_binding_refused_by_v1(bad):
+    with pytest.raises(BindingError, match="S3_REQUIRES_VERSIONED_BINDING"):
+        _b(**bad)
