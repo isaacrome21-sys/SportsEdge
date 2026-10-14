@@ -5,6 +5,7 @@ import re
 
 FACT_KINDS = {"STARTER", "LINEUP", "INJURY", "AVAILABILITY", "PARTICIPATION", "ROTATION", "QB_AVAILABILITY", "GAME_STATUS"}
 HASH = re.compile(r"^[0-9a-f]{64}$")
+X_HOSTS = frozenset({"x.com", "www.x.com", "twitter.com", "www.twitter.com"})
 
 
 def _time(value):
@@ -43,7 +44,11 @@ def _screen(row, pins, event_id, subject_id, kind, cutoff, max_age):
     hosts = pin.get("hosts")
     if not isinstance(hosts, (list, tuple)) or not hosts or any(type(h) is not str for h in hosts):
         raise ValueError("missing pinned hosts")
-    if _host(row.get("source_url")) not in [h.lower() for h in hosts]:
+    source_host = _host(row.get("source_url"))
+    # An X post is social evidence even if a caller mislabels its source pin.
+    if source_host in X_HOSTS and pin["kind"] != "SOCIAL":
+        raise ValueError("X source cannot be official or verified reporter")
+    if source_host not in [h.lower() for h in hosts]:
         raise ValueError("source host mismatch")
     digest = pin.get("anchor_sha256")
     if type(digest) is not str or not HASH.fullmatch(digest) or row.get("anchor_sha256") != digest:
@@ -115,9 +120,8 @@ def adjudicate_pregame_fact(*, event_id, subject_id, fact_kind, cutoff_utc,
         for pin in source_registry.values()
         if isinstance(pin, dict) and pin.get("kind") in ("OFFICIAL", "VERIFIED_REPORTER")
         for host in (pin.get("hosts") if isinstance(pin.get("hosts"), (list, tuple)) else ())
-        if isinstance(host, str)
+        if isinstance(host, str) and host.lower() not in X_HOSTS
     }
-    x_hosts = {"x.com", "www.x.com", "twitter.com", "www.twitter.com"}
     if isinstance(search_log, (list, tuple)):
         for row in search_log:
             if not isinstance(row, dict) or row.get("channel") not in ("OFFICIAL_WEB", "X") or not isinstance(row.get("query"), str) or not row["query"].strip():
@@ -126,7 +130,7 @@ def adjudicate_pregame_fact(*, event_id, subject_id, fact_kind, cutoff_utc,
                 if _time(row.get("searched_at_utc")) > cutoff:
                     continue
                 host = _host(row.get("search_url"))
-                if row["channel"] == "X" and host in x_hosts:
+                if row["channel"] == "X" and host in X_HOSTS:
                     channels.add("X")
                 elif row["channel"] == "OFFICIAL_WEB" and host in credible_hosts:
                     channels.add("OFFICIAL_WEB")
