@@ -204,8 +204,6 @@ _CHILD = textwrap.dedent(
         os._exit(9)
 
     def dw_wrapper(path, data, *, append):
-        if state["dw"] == 0:
-            state["fsync"] = 0  # exclude prior root recovery syncs
         state["dw"] += 1
         k = state["dw"]
         if mode == "before_dw" and k == param:
@@ -230,6 +228,11 @@ _CHILD = textwrap.dedent(
         return result
 
     def fsync_wrapper(fd):
+        # A recorded root is re-fsynced by the verifier before the next
+        # append starts. Those synchronization calls are not boundaries of
+        # this append; count only after its first durable-write entry.
+        if state["dw"] == 0:
+            return real_fsync(fd)
         state["fsync"] += 1
         if mode == "before_fsync" and state["fsync"] == param:
             die()
