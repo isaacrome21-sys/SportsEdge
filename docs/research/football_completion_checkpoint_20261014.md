@@ -39,3 +39,14 @@ GitHub GET /commits/bfba59f3f returned 422, No commit found. The cited candidate
 5. Complete Form 2 archive/capture composition and source-specific reporting-period validity independently; neither a universal 21-day nor a season-wide window proves current QB availability.
 
 No backfill, capture/admission activation, holdout use, validation reset, invented probability or promotion occurred in this pass.
+
+## Follow-through, 2026-10-14 08:40 CT
+
+- #2235 completed 10/10 returned hosted checks, then merged into #2224's integration branch (NOT main), merge commit e618331e9700d648c43c307b6ac9bf3855aa2ebf. Exact branch ref independently verified at that commit. Main remains unchanged.
+- Muse #2216 advanced to 7b4d503da49b164ec4fad740c86980275db368a4 with the deterministic clock repair. Independent 52-test identity battery passes; complete composed 9-module unittest battery passes 136 tests. Pytest-only archive battery is not included in that local count.
+- Opened #2236, current-main Form 2 composition at a513a08a7d2ff3a840a95049c1127bef7dfaff53. All 19 implementation/test blobs copied directly from #2216's remote tree; 19 paths registered in coverage; no assertion or implementation edits. Protected/core/discovery CI running.
+- Independently found an actual #2224 publication leak: ev_per_dollar and other production probability/distribution fields were absent from PRICING_KEYS. An EV-only CFB row escaped unchanged with checked=0; such scalar fields also survived as siblings of a rejected model_p.
+- Opened #2237 at 51d48ef3b556e2d76ed93d264620340fa2db0e1d, stacked on e618331e. Adds 13 actual production fields to refusal/stripping; 4 tests pass, including 39 sport/field subcases, sibling stripping, nested EV refusal and NFL/MLB preservation. CI pending. Parent #2224 remains held.
+- Combined new repair tests: 11 pass. With 31 existing engine tests and 136 Form 2 unittest tests, 178 distinct local tests passed. No full local pytest claim.
+- NFL #2234 has 12 returned checks successful; evidence job still running (past exact-SHA M2 replay determinism, building isolated candidate diagnostics). No main merge while that relevant check remains unfinished.
+- G2 code commit 2f3af2a2594effa1bbaed4137516ade8e1c15422 and CFB candidate bfba59f3f remain unavailable through GitHub. All four G2 document hashes are verified, but executable identity and validation execution remain blocked. No complete NFL/CFB model claim.
