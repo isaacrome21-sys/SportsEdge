@@ -16,6 +16,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from sportsedge.odds_keyring import fetch_with_key_failover
+from sportsedge.registry_gate import gate_odds_api_events as _registry_gate_odds_events
 from sportsedge.sports.nfl.fair_odds import BOOKMAKERS, MARKETS, now_utc, render_card, upcoming
 
 try:
@@ -88,7 +89,12 @@ def main() -> int:
             return 0
         Path("artifacts").mkdir(exist_ok=True)
         Path("artifacts/nfl_fair_odds_raw.json").write_text(json.dumps(events) + "\n", encoding="utf-8")
+    # t126: registry gate BEFORE any fair price is rendered to text.
+    events, gate_stats = _registry_gate_odds_events(
+        events, "NFL", "scripts/run_nfl_fair_odds_card.py")
     md = render_card(upcoming(events, now), fetched_at=now)
+    md += ("\n_Registry gate: {checked} market quotes checked, {blocked} blocked, "
+           "{unregistered} unregistered (sportsedge.registry_gate)._\n").format(**gate_stats)
     args.out.write_text(md, encoding="utf-8")
     print(json.dumps({"state": "OK", "events": len(events)}))
     return 0

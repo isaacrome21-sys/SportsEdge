@@ -20,6 +20,7 @@ from sportsedge.sports.cfb.candidate_live_source import (
     fetch_cfbd_candidate_metric_snapshots,
 )
 from sportsedge.sports.cfb.sdv_selected_fit import load_selected_sdv_fit, score_selected_game
+from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp
 from sportsedge.sports.cfb.source import attach_weather, fetch_cfbd_games, fetch_cfbd_weather
 
 # Bakeoff run 37093707442 joint RMSE for PRIOR_CURRENT_BLEND.
@@ -120,6 +121,7 @@ def main() -> int:
         "results": results,
         "bets": sum(r["bet_status"] == "OFFICIAL_BET" for r in results),
     }
+    payload = _registry_gate_and_stamp(payload, "CFB", "scripts/run_cfb_sdv_card.py")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"bets": payload["bets"], "rows": len(results), "output": str(args.output)}))

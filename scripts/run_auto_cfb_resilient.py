@@ -21,6 +21,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from sportsedge.sports.cfb.sdv_selected_fit import load_selected_sdv_fit, score_selected_game
+from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp
 
 BAKEOFF_RUN = 37093707442
 FAMILY = "PRIOR_CURRENT_BLEND"
@@ -347,6 +348,7 @@ def main() -> int:
         payload = build_card([], model=None, source_failures=[{"stage": "BOARD", "reason": f"{type(exc).__name__}: {exc}"}])
         payload["run_status"] = "BLOCKED_NO_ODDS"
         payload["status"] = "BLOCKED_NO_ODDS"
+        payload = _registry_gate_and_stamp(payload, "CFB", "scripts/run_auto_cfb_resilient.py")
         Path(args.output).parent.mkdir(parents=True, exist_ok=True)
         Path(args.output).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(payload, indent=2))
@@ -354,6 +356,7 @@ def main() -> int:
     if _quote_count(rows) == 0:
         model = load_selected_sdv_fit(args.fit)
         payload = build_card(rows, model=model, source_failures=[{"stage": "FUNNEL", "reason": "NO_ODDS_ROWS_REACHED_PRICING"}])
+        payload = _registry_gate_and_stamp(payload, "CFB", "scripts/run_auto_cfb_resilient.py")
         Path(args.output).parent.mkdir(parents=True, exist_ok=True)
         Path(args.output).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         print(json.dumps({"run_status": payload["run_status"], "bets": 0, "quotes": 0}))
@@ -361,6 +364,7 @@ def main() -> int:
     model = load_selected_sdv_fit(args.fit)
     rows, failures = _attach_live(rows, season=args.season, week=args.week, asof=args.asof)
     payload = build_card(rows, model=model, source_failures=failures)
+    payload = _registry_gate_and_stamp(payload, "CFB", "scripts/run_auto_cfb_resilient.py")
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"run_status": payload["run_status"], "bets": payload["funnel"]["bets_emitted"], "quotes": payload["funnel"]["odds_rows_fetched"], "output": args.output}))
