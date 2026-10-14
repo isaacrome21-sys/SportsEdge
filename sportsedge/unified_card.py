@@ -13,6 +13,7 @@ from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
 from .generic_card_pipeline import DECISION_STATUSES, GENERIC_MARKETS, run_generic_card
 from .live_slate import LiveGame
 from .quote_bridge import validate_canonical_quote
+from .registry_gate import registry_blocked_row as _registry_blocked_row
 
 SUPPORTED_MARKETS = GENERIC_MARKETS
 
@@ -111,6 +112,15 @@ def run_unified_card(
             market = str(quote["market"])
             if market not in SUPPORTED_MARKETS:
                 raise ValueError(f"unsupported unified market: {market}")
+            gate = _registry_blocked_row("MLB", [market, raw_quote.get("market")], dict(quote))
+            if gate is not None:
+                output[i] = UnifiedCardResult(
+                    str(quote.get("game_id") or "UNKNOWN"), market,
+                    str(quote.get("entity_id") or "UNKNOWN"), quote.get("line"),
+                    str(quote.get("side") or "UNKNOWN"), quote.get("american_odds"),
+                    None, "BLOCKED", "REGISTRY_" + gate["blocker"] + ": " + gate["reason"][:300],
+                )
+                continue
             indexed.append((i, quote))
         except Exception as exc:
             output[i] = UnifiedCardResult(
