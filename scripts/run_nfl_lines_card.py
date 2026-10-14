@@ -25,6 +25,7 @@ from sportsedge.sports.nfl.market_anchored_residual import (
     ResidualQuoteError, load_frozen_policy, price_game,
 )
 from sportsedge.truth_gate import american_to_decimal
+from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp
 
 
 # Markets whose card-legal model has beaten breakeven (52.4% at -110) in an
@@ -306,6 +307,7 @@ def main() -> int:
         "authority_footer": "NOT Model_P / NOT Truth Gate / NOT OFFICIAL",
     }
     payload = attach_nfl_phone_board(payload)
+    payload = _registry_gate_and_stamp(payload, "NFL", "scripts/run_nfl_lines_card.py")
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return 0

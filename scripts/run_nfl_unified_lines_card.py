@@ -34,6 +34,7 @@ from sportsedge.sports.nfl.context_autopull import NFLContextError
 from sportsedge.sports.nfl.full_auto import fetch_nflverse_depth_charts
 from sportsedge.sports.nfl.injury_report_source import fetch_nflverse_injuries
 from sportsedge.sports.nfl.live_role_source import fetch_nflverse_player_stats
+from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp
 
 
 def _read(path: str):
@@ -208,6 +209,7 @@ def main() -> int:
     payload = attach_residual_game_research(payload, ticket, history)
     payload["source_status"] = source_status
     payload["schedule_source_sha256"] = plan.get("schedule_source_sha256")
+    payload = _registry_gate_and_stamp(payload, "NFL", "scripts/run_nfl_unified_lines_card.py")
 
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
