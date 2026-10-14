@@ -242,9 +242,11 @@ def _parse_gentime(text: str) -> datetime:
         raise AnchorError("genTime missing from token")
     raw = m.group(1).replace(" GMT", "").strip()
     raw = re.sub(r"\s+", " ", raw)
-    raw = re.sub(r"\.\d+", "", raw)  # drop fractional seconds (floor)
+    # Preserve sub-second precision: flooring could wrongly pass a token just
+    # after the pregame admission cutoff.
+    fmt = "%b %d %H:%M:%S.%f %Y" if re.search(r"\.\d+\s+\d{4}$", raw) else "%b %d %H:%M:%S %Y"
     try:
-        return datetime.strptime(raw, "%b %d %H:%M:%S %Y").replace(tzinfo=timezone.utc)
+        return datetime.strptime(raw, fmt).replace(tzinfo=timezone.utc)
     except ValueError as e:
         raise AnchorError("unparseable genTime") from e
 
