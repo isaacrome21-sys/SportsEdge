@@ -312,8 +312,30 @@ def test_signer_cert_not_yet_valid_refused(env):
     ca = _make_ca(d / "c", "LATE")
     cd = ca["dir"]
     nb = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y%m%d%H%M%SZ")
-    _ossl("x509", "-req", "-in", "tsa.csr", "-CA", "ca.pem", "-CAkey", "ca.key", "-out", "tsa.pem",
-          "-not_before", nb, "-days", "2", "-extfile", str(cd / "tsa.cnf"), "-extensions", "v3_tsa", cwd=cd)
+    na = (datetime.now(timezone.utc) + timedelta(days=3)).strftime("%Y%m%d%H%M%SZ")
+    # openssl x509 -req does NOT support -not_before on GitHub's OpenSSL 3.x.
+    # Use openssl ca -startdate / -enddate to mint a truly future-valid TSA.
+    (cd / "index.txt").write_text("")
+    (cd / "serial-ca").write_text("1000\n")
+    (cd / "newcerts").mkdir()
+    cfg = cd / "future-ca.cnf"
+    cfg.write_text((cd / "tsa.cnf").read_text() + f"""
+[ ca ]
+default_ca = CA_default
+[ CA_default ]
+database = {cd}/index.txt
+new_certs_dir = {cd}/newcerts
+certificate = {cd}/ca.pem
+private_key = {cd}/ca.key
+serial = {cd}/serial-ca
+default_md = sha256
+policy = policy_anything
+unique_subject = no
+[ policy_anything ]
+commonName = optional
+""")
+    _ossl("ca", "-batch", "-notext", "-config", str(cfg), "-extensions", "v3_tsa",
+          "-startdate", nb, "-enddate", na, "-in", "tsa.csr", "-out", "tsa.pem", cwd=cd)
     tok = _stamp(ca, env["root"])
     assert not ea.tsa_verify(tok, env["root"], ca["ca"]).ok
 
