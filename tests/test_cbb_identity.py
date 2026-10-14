@@ -73,3 +73,38 @@ def test_northwestern_state_distinct_from_northwestern():
     assert resolve_team(DIR, "Northwestern State")["illinois_excluded"] is False
     assert resolve_team(DIR, "Northwestern")["illinois_excluded"] is True
     assert bind("Northwestern St", "Duke", sb(away="2466"))["playable_status"] == "RESEARCH_ONLY"
+
+
+
+@pytest.mark.parametrize("bad_id", [None, "", "None", 0, True, -1, "abc"])
+def test_missing_or_nonpositive_event_ids_never_bind(bad_id):
+    event = sb()["events"][0]
+    event["id"] = bad_id
+    with pytest.raises(CBBIdentityError, match="FIXTURE_NOT_UNIQUELY_VERIFIED:0"):
+        bind("Florida", "Duke", {"events": [event]})
+
+
+def test_duplicate_home_competitor_is_not_last_wins(tmp_path=None):
+    event = sb()["events"][0]
+    event["competitions"][0]["competitors"].insert(
+        0, {"homeAway": "home", "team": {"id": "2130"}})
+    with pytest.raises(CBBIdentityError, match="FIXTURE_NOT_UNIQUELY_VERIFIED:0"):
+        bind("Florida", "Duke", {"events": [event]})
+
+
+@pytest.mark.parametrize("as_of", [None, "2026-11-10T12:00:00Z",
+                                  datetime(2026, 11, 10, 12),
+                                  datetime(2026, 11, 10, 12, tzinfo=None)])
+def test_as_of_must_be_aware_datetime(as_of):
+    with pytest.raises(CBBIdentityError, match="AS_OF_TIMEZONE_REQUIRED"):
+        bind("Florida", "Duke", sb(), as_of=as_of)
+
+
+@pytest.mark.parametrize("events", [None, "bad", {}, [None], ["bad"], [0], [True]])
+def test_missing_or_malformed_scoreboard_events_fail_safely(events):
+    if not isinstance(events, list):
+        with pytest.raises(CBBIdentityError, match="SCOREBOARD_EVENTS_INVALID"):
+            bind("Florida", "Duke", {"events": events})
+    else:
+        with pytest.raises(CBBIdentityError, match="FIXTURE_NOT_UNIQUELY_VERIFIED:0"):
+            bind("Florida", "Duke", {"events": events})
