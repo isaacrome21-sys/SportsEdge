@@ -1,0 +1,1172 @@
+{
+ "schema": "SPORTSEDGE_REPRODUCE_PUBLISHED_INPUTS_V1",
+ "chunk_raw_bytes": 75000,
+ "encoding": "base64 (single line + trailing newline per part file)",
+ "files": [
+  {
+   "package_path": "sources/cfb_schedule_2013.csv.gz.b64.part*",
+   "target": "sources/schedules/cfb_schedule_2013.csv.gz",
+   "size_bytes": 29822,
+   "sha256": "b4fa660289b3ee618f6a5b398701ac5285b0bcfa8b7dacb36a5b898ef4752a07",
+   "parts": [
+    {
+     "file": "cfb_schedule_2013.csv.gz.b64.part000",
+     "sha256": "407721628c088e3b07383dd792f03840b8b06faeab12fdc8e4fc15b2c291bbad",
+     "size_bytes": 39765
+    }
+   ]
+  },
+  {
+   "package_path": "sources/cfb_schedule_2014.csv.gz.b64.part*",
+   "target": "sources/schedules/cfb_schedule_2014.csv.gz",
+   "size_bytes": 30304,
+   "sha256": "e414f7ff0c31f6a23320fa7fb6e0fad0ee7f54fcda7e085ae32102c754dd3562",
+   "parts": [
+    {
+     "file": "cfb_schedule_2014.csv.gz.b64.part000",
+     "sha256": "e9900608e774ec30635f5ca670590728abd7d4093679c0d96b2301543b747476",
+     "size_bytes": 40409
+    }
+   ]
+  },
+  {
+   "package_path": "sources/cfb_schedule_2015.csv.gz.b64.part*",
+   "target": "sources/schedules/cfb_schedule_2015.csv.gz",
+   "size_bytes": 30382,
+   "sha256": "f6efc44b1dfa424ad094cb609a3f221bad90a3ce942d5e7259f79921d3efd5ab",
+   "parts": [
+    {
+     "file": "cfb_schedule_2015.csv.gz.b64.part000",
+     "sha256": "73a6617131b844e205c5ad6a5d84ef8d8039ef33190197ec89e4b1b8ce96a117",
+     "size_bytes": 40513
+    }
+   ]
+  },
+  {
+   "package_path": "sources/cfb_schedule_2016.csv.gz.b64.part*",
+   "target": "sources/schedules/cfb_schedule_2016.csv.gz",
+   "size_bytes": 30526,
+   "sha256": "b06b040c38aa8b1411b5bdfafb3d37fa6d237e2de667eebccac8506354d59b9b",
+   "parts": [
+    {
+     "file": "cfb_schedule_2016.csv.gz.b64.part000",
+     "sha256": "1bfc4d67794da35cf197bcff9fb1ff95dad254596e15e5bc5ada6c0591a2381a",
+     "size_bytes": 40705
+    }
+   ]
+  },
+  {
+   "package_path": "sources/cfb_schedule_2017.csv.gz.b64.part*",
+   "target": "sources/schedules/cfb_schedule_2017.csv.gz",
+   "size_bytes": 30718,
+   "sha256": "3e295d03ab816fd1c03955e8932fe089a88ffebbcddf768bb4b617a6c0a3f7ca",
+   "parts": [
+    {
+     "file": "cfb_schedule_2017.csv.gz.b64.part000",
+     "sha256": "d746e1deb6c934bb0539ff60d4911a18417627282bedfd303bcc2506a88f3581",
+     "size_bytes": 40961
+    }
+   ]
+  },
+  {
+   "package_path": "sources/cfb_schedule_2018.csv.gz.b64.part*",
+   "target": "sources/schedules/cfb_schedule_2018.csv.gz",
+   "size_bytes": 31227,
+   "sha256": "2cbaa0c3b785f0d2d7d4a7614bdc2a30abfb6f5bbeee3e7ed567c4dafa7287d3",
+   "parts": [
+    {
+     "file": "cfb_schedule_2018.csv.gz.b64.part000",
+     "sha256": "085c32d3fd988f640c229f927806b5dae1c64fd73d15171c83735cef0cc480af",
+     "size_bytes": 41637
+    }
+   ]
+  },
+  {
+   "package_path": "sources/cfb_schedule_2019.csv.gz.b64.part*",
+   "target": "sources/schedules/cfb_schedule_2019.csv.gz",
+   "size_bytes": 31096,
+   "sha256": "e85fa562d7d2065b1ac3d384bb83785619c8adbe6c4b586f43402ae428c6eaf1",
+   "parts": [
+    {
+     "file": "cfb_schedule_2019.csv.gz.b64.part000",
+     "sha256": "964970971ea0d170f3abf240d3b64cec7153fa1ada49f52c2b8991440a6ec685",
+     "size_bytes": 41465
+    }
+   ]
+  },
+  {
+   "package_path": "sources/cfb_schedule_2020.csv.gz.b64.part*",
+   "target": "sources/schedules/cfb_schedule_2020.csv.gz",
+   "size_bytes": 22191,
+   "sha256": "64cc43834ee7da1e6b6e65362b45dab362c3748d9b42ce1224561f14634f14e4",
+   "parts": [
+    {
+     "file": "cfb_schedule_2020.csv.gz.b64.part000",
+     "sha256": "bdc3e19fb3c17fc1e003e9abd5d4a9fc308533ba46636bde59d968d2ddbba6a2",
+     "size_bytes": 29589
+    }
+   ]
+  },
+  {
+   "package_path": "sources/cfb_schedule_2021.csv.gz.b64.part*",
+   "target": "sources/schedules/cfb_schedule_2021.csv.gz",
+   "size_bytes": 31113,
+   "sha256": "0fd757f0152e93cb1e03cd0f1038a5c2a7626e48589d194d2f80d38135d2c869",
+   "parts": [
+    {
+     "file": "cfb_schedule_2021.csv.gz.b64.part000",
+     "sha256": "0ab3d0f9bcfb64808276296ea828457cb30063801dd815d824f87b08240392c0",
+     "size_bytes": 41485
+    }
+   ]
+  },
+  {
+   "package_path": "sources/cfb_schedule_2022.csv.gz.b64.part*",
+   "target": "sources/schedules/cfb_schedule_2022.csv.gz",
+   "size_bytes": 31466,
+   "sha256": "1053ceb10a0d73b5e04bc234cef449262db7ade8e622d389db2756675c7cb3c5",
+   "parts": [
+    {
+     "file": "cfb_schedule_2022.csv.gz.b64.part000",
+     "sha256": "cdf85a614af0197397e3dfbb61a1aa5895d5336eca222b57355159ff03a93df5",
+     "size_bytes": 41957
+    }
+   ]
+  },
+  {
+   "package_path": "sources/cfb_schedule_2023.csv.gz.b64.part*",
+   "target": "sources/schedules/cfb_schedule_2023.csv.gz",
+   "size_bytes": 31460,
+   "sha256": "ba9743c99636ed04dcb6177088e44c7db19cd93eb2ad7d9977d05e392b62aefd",
+   "parts": [
+    {
+     "file": "cfb_schedule_2023.csv.gz.b64.part000",
+     "sha256": "d9134b3dfa35c20b2bbb9ae337232030f2a977b6a4e21f27092b814a51486708",
+     "size_bytes": 41949
+    }
+   ]
+  },
+  {
+   "package_path": "sources/cfb_schedule_2024.csv.gz.b64.part*",
+   "target": "sources/schedules/cfb_schedule_2024.csv.gz",
+   "size_bytes": 33299,
+   "sha256": "4fb9c661e76a9ecc3748878a7e5d6a3aa9cb9b6c82140e44a1812151e6e16645",
+   "parts": [
+    {
+     "file": "cfb_schedule_2024.csv.gz.b64.part000",
+     "sha256": "9ed20e792848887f38c027668202e9a966599c4273d1e536e9a451819cd74533",
+     "size_bytes": 44401
+    }
+   ]
+  },
+  {
+   "package_path": "sources/cfb_schedule_2025.csv.gz.b64.part*",
+   "target": "sources/schedules/cfb_schedule_2025.csv.gz",
+   "size_bytes": 33168,
+   "sha256": "9666c50349255005ea1912aba26851eb8184602a7b79580176990807d6f1a9ff",
+   "parts": [
+    {
+     "file": "cfb_schedule_2025.csv.gz.b64.part000",
+     "sha256": "456de5b1635d04c1902478e0781f1180a2371185d0233b2c9fb78aad6cc0db81",
+     "size_bytes": 44225
+    }
+   ]
+  },
+  {
+   "package_path": "sources/cfb_line_odds.csv.gz.b64.part*",
+   "target": "sources/cfb_line_odds.csv.gz",
+   "size_bytes": 7047701,
+   "sha256": "7ae899d9035750dccf22470d7923087a2659052aeb37a44204c35fbf6bf38d4d",
+   "parts": [
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part000",
+     "sha256": "3eaa66cccd1d529ef9bc3ee3c70043916f3bb49522c1b4fb59231c7875b77b06",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part001",
+     "sha256": "1a240654b75a78130074c9e2034cc44243dc9a3aa454aab7841c2195fce7ad72",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part002",
+     "sha256": "9199842fce3de20f62d782c2c80528ce4154c0ec6340d6332d9372801eac9f72",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part003",
+     "sha256": "78a945be9cc262efa7849319a68f5c00973755dc42ba522be1e5882984321839",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part004",
+     "sha256": "9b16c7b42c6243cbe4346d3d63c1be940e482d359d3dfa653bf2c9c535b08a74",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part005",
+     "sha256": "e2e42a31389ba598263177c9664155ede52cc493cde117a6f9b228942d4f665e",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part006",
+     "sha256": "a5ec3177c609f4ff762f9c8da5c6fa52b2e7de282b1b16f76029543fa22c1070",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part007",
+     "sha256": "af2f7fcca9a030b0808547672f9ef7201d11fd91f7f8f13cc8077f55b77f08af",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part008",
+     "sha256": "a097ccf60123134007f67c8632f1e972fb8eeb8e3b16b42d1d2de4890e7fa3c7",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part009",
+     "sha256": "92624333328295d06d5777513cda1dd7d30e01894c47b3b161a49699d62b527f",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part010",
+     "sha256": "808735cd2251fc3867e884f4119ddb160bc1f3f0adde70f2dc3b15c4feb6bf1f",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part011",
+     "sha256": "49672f2c087ae4087bdba06ba9fa90ffcafe47f2081cb95f41d937303faa0458",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part012",
+     "sha256": "9f7d27e12d63f092b18289305fff8e86c621338631dbd90db819599e2b78df07",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part013",
+     "sha256": "748ea472b1095cce053b595631d438dc206ac1e2db635a67757d3c393f73fdb5",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part014",
+     "sha256": "c6b2777fee5559ecb9f9995ab0f0d5ed038357fd7241d0d07a39d71730cfc26d",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part015",
+     "sha256": "6ea6da370c76ef97879adcd6c81cc206c709b9bdeea75071fdde6bd56d499676",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part016",
+     "sha256": "a6b29a1a13f5d3661a4f139861ad5b7bc81d8cca93a3f2fadbabe301cd8c4927",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part017",
+     "sha256": "dc84a10b1f45f0b33b011ffc2efd65b21b486aee933d5bf99ec83e5aa1134610",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part018",
+     "sha256": "5601432629d170f2e00b0e255661b10e9d9f1183094fd3f33726f726927f845e",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part019",
+     "sha256": "15554c9ade68f1b0709875f14cd83963f9b456fe852e8eb5f20e803196336141",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part020",
+     "sha256": "c4f71a63de99d1749e5b81efc0f322d4da21afca766f93ed1bb3decb43773259",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part021",
+     "sha256": "4410ffb994b29525d2602084dbf1dd88680bf1b90f560627c13216e01f93d6b0",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part022",
+     "sha256": "620fc1756328e87a97293ed0cf38d65a9a78fa8798cb68e1dae0f9f1d1a61468",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part023",
+     "sha256": "ffa90f08fa3ec50f0ed79e4021fbbda46b2cd362ff0c572d773b9a7e6b46d50c",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part024",
+     "sha256": "fe344b845f789c731d3ec517ad6a808e5fa1ef95b03cc312adca94ec9481c028",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part025",
+     "sha256": "75f9c09dbde8c300af216ac06921d5b940ada29d91caa22ff6629a598fe151b5",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part026",
+     "sha256": "e53845f00dfcbb138e670d1592148e797eb7772932d39de0f58e8272810b9859",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part027",
+     "sha256": "a0aaaad042f0b45bde8e7f29d3644aa92ee1340ff852812532cf100ee8e294d4",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part028",
+     "sha256": "8923a042165cde8e913e4e6a34c53f1338be011c2a9a35b4d92380e5c63f577a",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part029",
+     "sha256": "d468bd201549cd6ce475737d23cfefb333d3ac032228f9f9bc8deef5e1b09aff",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part030",
+     "sha256": "ee86402babce603eec765700518af7bed031a8d35b7802de4843d1e594197eb2",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part031",
+     "sha256": "6a9f857cc6b3d1093064e0cd0da83717137cf1681eed0bccc224ff2cb6385de2",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part032",
+     "sha256": "5d4ab840e30f61e8c78dbf12b16f7dcb1bf7684dbabf5a2da0ff15849dca5525",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part033",
+     "sha256": "01322165464e6831c2b75b7f60b422e30b35e7977c7df494f4d21db78673e266",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part034",
+     "sha256": "c0e6375f50f3c3785af6b1b6dabcf4cf550c3d1a9a76399a8ef56d9dc02b87c2",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part035",
+     "sha256": "24fe2795d4a7d77d59b7f741f3728e9fea8c82e48626c44e261c2c0fb29d0e71",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part036",
+     "sha256": "ff17bb5b368fb2caa051460e9bc486fc3a254a748269aa0a064f0f824d452d88",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part037",
+     "sha256": "fb3f7b22c60b3929daa5fe853e45e041c0736f123276d54757caf39ea0a3aeae",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part038",
+     "sha256": "3a55b98f236a59b3ee4cd65d4b063f40fcf3ec20eae6e16cdf7d7da4ab238777",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part039",
+     "sha256": "e421276f1b7f0b0944a1e5e57335d489a27946259a3457b91de9c0e29832ec91",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part040",
+     "sha256": "31044c4faad6cd431cf4318c2a211580a063f95daa1d6448dc12842726cb8953",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part041",
+     "sha256": "38d2928ebafb824e247828b91c80ba20b9e378651864a02f59fe1fd9e2bec7b4",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part042",
+     "sha256": "b13da8d9d816828ff6bfc1b7bed560e672ee20ae728df5757ed5f83e00192b65",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part043",
+     "sha256": "5e5be7bc5156944f3065e03a8ba710104246b115b11fef499d89304d73270533",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part044",
+     "sha256": "8464b436876af3edb5e357ef56d99512b2452398b6921ee8ff9887c984830dca",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part045",
+     "sha256": "a7aca2d9f13b4df2df6b0a984d9cd94b6278c423fb0c4e55854184d3d0fe8547",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part046",
+     "sha256": "16083b8d37a7a6974c8d96995ab269f251bee260a41fcbc2436936caaeacc257",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part047",
+     "sha256": "3c0f0bdfd817b0bdb1ee9e0bc22fab5b6c819b7783c968b7c9d756ea6836da2b",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part048",
+     "sha256": "11a50a5297bfe4ac7d7d3e54020416e1137683b42df9549ca75943fd785ce992",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part049",
+     "sha256": "6c75305a2438337c5f2d65ef659e707af2fb5590ad01a33f020244d33c6095dd",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part050",
+     "sha256": "8d1377252aef821e2577e07262928854adf5a07360371fd6107d3d0d3affa5d1",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part051",
+     "sha256": "afdad007ce11d0caf87fbbce901e45edb866a5349801a976c9b36f56fd8e991c",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part052",
+     "sha256": "ac6a43055cc69ee176cc98ff154346cac292ef7c35dfee13246d4db715c7af8f",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part053",
+     "sha256": "39e2a09a500c611fc4c187fdc1aa4fa138358d9943e882aca73f74c45627c27e",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part054",
+     "sha256": "23e65360ad21138fccd6e22c28a825f6c4e1b49f2041238bf624567bf7032a73",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part055",
+     "sha256": "627ba904033f5e600d1864748f7c73b4f04b10584ffc80b1989c9ef706bd91ea",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part056",
+     "sha256": "7e510184b75b02b33a047e0307e682ea1a5dcdf7ba39b286a462bb7255c4c323",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part057",
+     "sha256": "cbb8f23b366cbb56e71393a6fd02acc164548481cb7860ada55827bc2ba28508",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part058",
+     "sha256": "8c257b049906e4fb2836430c6879e9a4c377eed14ed860d98344b933252b8df3",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part059",
+     "sha256": "10e86f540239d7b1794efbc9652e3d23acc2c42b2b9aba1992c9267adfaded61",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part060",
+     "sha256": "075540ca2ccd35dffb4db681e41118476ae2b4710304eda9143b2914825f2e4e",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part061",
+     "sha256": "cb8b54cb565dd7c43161e9c3246bd5083e1b1a3f11e17487821ddccc4bb4979f",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part062",
+     "sha256": "58e5e2d5c5cbca9cac5931d4d161527e78083dea87fc2675b8f976e2e04519fe",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part063",
+     "sha256": "5938b6ef10f8aab4e5ff9b77feabebca98fba8db719296a25c66c4136be98606",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part064",
+     "sha256": "5406ce6d623ff2afe5a9f078bb0b197f12a266730d135cc5807497aa30bd6391",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part065",
+     "sha256": "2d96085ecb95d5437390b131c7aa144d1e190eac16f3cf56b4f20fa9f67103d4",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part066",
+     "sha256": "a63e42e1f615fa98bc0edb6538aa1224a625ce9bbb233c37ffdf6f60f77e10ae",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part067",
+     "sha256": "9ea9beb37985e502ca5cef5f3b1762798fcab09ab3f423beff2e87dfa3b48db1",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part068",
+     "sha256": "bf7226b90e80fbd1bcb6bcbb384aa73de8a8451c176d6b3054c5c27f2abfb136",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part069",
+     "sha256": "603568495691b133eb3fbfc4ec285442645e848e1f4e3da16fb1ecf3b9755905",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part070",
+     "sha256": "b13c622b987f7486f345bd1262f7d78a7a59eec5497845b2e90824c937d617ab",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part071",
+     "sha256": "86e716ae585fd4a0cf49223c37d77124bf08e636567c54a6b4bcc1307d3e1ee6",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part072",
+     "sha256": "8a916859652a359afacbbc631a18dc9779503d92cca70623e204652d91ffca57",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part073",
+     "sha256": "2256e1be0815ef752a123be8c8bee1f9c9ea8f9d89d4221a4de2aff2c9163941",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part074",
+     "sha256": "89e70999419219d4adafd33bba2be6c40cf2a791e1aa98d2b92d005cd0f5e1d1",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part075",
+     "sha256": "521833e32d6f026ccad1fe7d2f7332e35c8439b8a94ee509a192a49798ab57dd",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part076",
+     "sha256": "7d961eea4b2c8d4a8ad9c68b90a8484fc0352e83073d2e63bcd6d2c844877726",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part077",
+     "sha256": "c8d7fa17c185891c9a3feb63d800e74a436b197100e2fe6890a5c7c4c1138993",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part078",
+     "sha256": "e03d1313332ada9e13aec955acc9c5eaaab3f6c53cfd256a5dad6fe5c11de0ae",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part079",
+     "sha256": "d1e08f5c921012f7932cb3c3b0eb1b7e0b59d765aadacc71a7124e2870890efd",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part080",
+     "sha256": "1e00ad049b4227b25ca2200e0830f4b7c696f6aa3f96b9a14806417a472f3431",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part081",
+     "sha256": "c06e49a5eb62602f2e617505a4a714e1ffdcc71b07980dc73d5168427375f74d",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part082",
+     "sha256": "1ca43fb6bb7a6f75b995de21c48c95614c44ff9394735f37963a636b68b017af",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part083",
+     "sha256": "3a86e981cbde71a8a565b98f03f8d04c12ed729e1d3b583b49267e5d203591ce",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part084",
+     "sha256": "dcad8d8eeb0adb53a6da4fd1fa2a0e41bfbb7d8b53441127c32d464f2a881e3b",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part085",
+     "sha256": "1a29c7ba589eef0a51073e6542c1130ff4f8d8d1229d02557d21b12321e13f2e",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part086",
+     "sha256": "1cffaa42d2c0e647b83442e4693488063984faf4414393b1f9148b0897aed52e",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part087",
+     "sha256": "c4bad772c52e325082dd9401be2d90a479ef8ca5207bde04cfc5d1da33970372",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part088",
+     "sha256": "286049de7489e2f36110a597cdb3b5dbae90c997bb020096adaa2226e5c22c04",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part089",
+     "sha256": "41b599b6a3516cab323fe8b8843324860f41683ed3c2c37df54accdb53b3f032",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part090",
+     "sha256": "569a45cb148b2929112520a59fe8c20c978561be8dc73eafa586060086d65b8c",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part091",
+     "sha256": "a86fffcd766a55393e1afbd092c5a8e8195b822413754ac8863d13450c75b5d9",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part092",
+     "sha256": "a196d2e3289b1cd59b69ec51c41b40f38dda643e0e8cb5345bf8ae9f78a3f71c",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_line_odds.csv.gz.b64.part093",
+     "sha256": "611df47b9dc7d259f9db1b0dc1bc566f0802a7dda4357208ec56dfebd7db1d1e",
+     "size_bytes": 96937
+    }
+   ]
+  },
+  {
+   "package_path": "sources/cfb_team_info_2024.parquet.b64.part*",
+   "target": "sources/cfb_team_info_2024.parquet",
+   "size_bytes": 133323,
+   "sha256": "503549b9b3c4b5c40accbb58d8ebf38d6555f369a883be4d42dcee27cfbda808",
+   "parts": [
+    {
+     "file": "cfb_team_info_2024.parquet.b64.part000",
+     "sha256": "4be30966ef66970ede6a258562a0da7c07611491053c68a679bfa0a67e17ed8f",
+     "size_bytes": 100001
+    },
+    {
+     "file": "cfb_team_info_2024.parquet.b64.part001",
+     "sha256": "a80675b80933ca105403eda447d1d33b63f9da9830814a95b4aae41df53ca86e",
+     "size_bytes": 77765
+    }
+   ]
+  },
+  {
+   "package_path": "snapshots/results_snapshot.json.b64.part*",
+   "target": "snapshots/results_snapshot.json",
+   "size_bytes": 4515975,
+   "sha256": "830ebe5a0262b26b8ebc62b6075a7bf70eb814c99025b1ea94ab9596ae586389",
+   "parts": [
+    {
+     "file": "results_snapshot.json.b64.part000",
+     "sha256": "f4f1afcca1921111dbae7daa602362a99fd4bc956b7d9ba4345c2d902867a3bb",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part001",
+     "sha256": "7289d94da3ee8f3681c7d88c4911f57ec6c919561712b413e23aace019d072e0",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part002",
+     "sha256": "f7fc5c5e80a587b5b840eb4f9eb9371444176c0e4247630251aaf871823ad32f",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part003",
+     "sha256": "dd9097441904de67f70e9b75a764711a25c3acb91753d1d566b835052150ab31",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part004",
+     "sha256": "48de05c25c6c20df87c246c7d04b58c8d1fad0f874283683422cb94cf8538bf9",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part005",
+     "sha256": "bda677aaddc182cdf9085af9334bfeb29b66ca299836cb50b0c26fe3065c6312",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part006",
+     "sha256": "3e218700ce217bb96b00355aea9083164aa9dc5166446846ff2621f5b1ab0bbf",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part007",
+     "sha256": "d86e957e4f67bc57271a4bbed538c935a74bf9af9b35810fba32c1f5685af4dc",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part008",
+     "sha256": "39d2d38d209f3b58b2b082778a55d7a56a7c968c724702dbb7ed29f97bfe767c",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part009",
+     "sha256": "2df0b0055d3cedc8b12e6f7afb7ceb081358a8327696a4615534cd972a56c57b",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part010",
+     "sha256": "88bb05ca92e7c474b5b635313346f0421e614bbb503b8027c27cb29c7196c5a1",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part011",
+     "sha256": "7e852e33933cca3f14a5741fd161a7e3db3a0fa466645826053b3183413465f0",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part012",
+     "sha256": "f73f957622665979b4db01fe1be7e069e0f954c1406650bc090f714f14da0546",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part013",
+     "sha256": "e1f1d49606512eb8d77dbaf2726a7b266c41f5f27ec76ca05dcb545d8786876b",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part014",
+     "sha256": "f9a6fb40d4240af5b734fd1a43377a2ef3660fc339d05fcc28d17a8febfdb1e8",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part015",
+     "sha256": "51602b4cbb535c68469acb4805599179feafc2ee4c782cf58a00dcaece6239f2",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part016",
+     "sha256": "01024797f68516ac093ce08e8737161f521c60c00fe103bc3da6f6bacbb97f82",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part017",
+     "sha256": "fb5d8080c5bce5a721a749a3649bd25eff57ac2eef9d9c80919def39e7c6f13e",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part018",
+     "sha256": "158d39d428cc6f8fa593a6e9cadb4bc5365977711eb879c4bf2ca02d7107d2ce",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part019",
+     "sha256": "6af8fe9d075e4e6d8caa9e3332e68fbf9a39cfd59ad9d94e888f133b3acf9246",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part020",
+     "sha256": "942f370366d84616f9459e31caa361a76cdf906f3a6cecae3bb7cf7bd479d807",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part021",
+     "sha256": "0ebf1b070cf1c750f3de8979b99e578345dfb6888570501bdd8d7310151679f9",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part022",
+     "sha256": "9a78cb7af96b75b746b6fc10ab18d8340a497494a2c98ea3e62c5d30c1053d05",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part023",
+     "sha256": "33b4f2abd9f9a6f0b601a3249fa302d464ed4811f83b7aeb959e660864d3335e",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part024",
+     "sha256": "f803c54e93d33774c1e58164aca06933bd8265111c9d45e92b9a38732c0ea8bb",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part025",
+     "sha256": "c43b2d63804f98c25c2d35840112e9883d021b60cce23a9fa354bdeb60e46ad1",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part026",
+     "sha256": "fc9cf6833238dae562287b48eaa2466c5923481da54a00990bfe286e57a1ef69",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part027",
+     "sha256": "33ad9607f614978e5137811e9feb3647ff495098de0615e96b4abeb8aa6ba068",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part028",
+     "sha256": "dc88ca11fc3bab04b9486ef72cef59a611d1f8d2f8502f7b705bb2bb85e5dab2",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part029",
+     "sha256": "847fc9e52cd834657ee01caa4f4b4e0662ceac1c5dab2144d4bef5599063c4c9",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part030",
+     "sha256": "ab88542d1ebfc3945ea5f96e8e04587e935751aef6d7849ee1c479ecad19dd8e",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part031",
+     "sha256": "fd96288b88bc38f1bac4bfe77204d7b2a193ba70f5064fb400bb9320a1400939",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part032",
+     "sha256": "832319ea7ced234fa079c4f0e7576e42ab1c30a9b5765316163cba134d4fe58e",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part033",
+     "sha256": "693ffcbca6c1f1c5d2c501254811ce4901c062b9bd47eab6f5f520bdfbc957f4",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part034",
+     "sha256": "b3d7d33d93a7611c94ce0c7f5772dee8d7fea54afc93cfe6928e30520b2dc2bb",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part035",
+     "sha256": "df510f51f56134819af42933dd0ab38c5d13d2f26545729ceb011c5a1132c163",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part036",
+     "sha256": "9f480c68f50200b07370953d939bee1dc7acf4ec6375ffd4bbbb7f53c7978807",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part037",
+     "sha256": "614e8276e4dbf9dae243c1a5ff3aa44d74eff6217fe266c455946c31fa70354e",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part038",
+     "sha256": "60010c2fcdc50d84135164699020af2e2124ee154fc4b245c4658ffc3a01ae08",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part039",
+     "sha256": "4b63315278e574e6a14193c7b2cf637ff08bc293a95382e169ef1fbb998ca310",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part040",
+     "sha256": "a0197e1354dee5e23a81f73290ea0417926807ed71913728758223b0d312c121",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part041",
+     "sha256": "c1fb7e069ae24b93d054c63129ed4f31c05be1269d7b4d117589913b8aa85b44",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part042",
+     "sha256": "290551d16df1c478f22dc0da30e260a4e1f1e4463e12eed6af08790e72e21884",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part043",
+     "sha256": "a17e155c1921a6df627f4be27ec07a243e61f8ea6b37c31f22e60dbb30778e09",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part044",
+     "sha256": "57a6d0a1ebb70d5daa2939981214a757917856ff446cbe7d8e5a5b03b130aa3a",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part045",
+     "sha256": "d74df509291876bfdcb520d325ad3bdf3f048614575ccfaa9748c574fc81a689",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part046",
+     "sha256": "8e445f4282fabc8842c4544fcc85dcfc81ce6ba0ac9fec8bcb5864ead906593a",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part047",
+     "sha256": "8bff5d28fecb64109b46c2cd5a6da71f545ce761ca21b30cef40c812029d01ec",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part048",
+     "sha256": "bcdc12386e033b6a5d15ac5ce13dbcc98ff47ad9cdf21c36951bbc5901aa540f",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part049",
+     "sha256": "c6b2c3a559f7be171810ef89ce570c88262f76ad36a2289a9f5434acacc4fbaa",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part050",
+     "sha256": "e502735be53e64d10532d78eaef3d923702d409c4473a7b5737ee12897bb07d1",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part051",
+     "sha256": "392362c864fa71aed64915222f2568ee2bddf64d426fb765bcdeda53bcb6ae8c",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part052",
+     "sha256": "9d8787405336246fa19fc5cdc99299c907f57f4fbe380e42d1c4184f3678981e",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part053",
+     "sha256": "8dc3a348638e43aabdceb7a38f09fb544a7501863f70187a5495eec58442b0d3",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part054",
+     "sha256": "3d08977e1469500796274e05ebf3e9cb6a392af6d32de0cef1a546da27e672c3",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part055",
+     "sha256": "6a57f23237f0a9c2f88dcb5babf42281cc4e052788f0cb1ef74408b096eb50a5",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part056",
+     "sha256": "74afc21e12ca8e983791eb5d2283e368b02bb62bad7a04c7fb2a4eced19d6761",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part057",
+     "sha256": "0fcf4bee0d28ddd7f506bb38d68ff81e03510995f249906956a88792504de712",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part058",
+     "sha256": "32e892461d380459f7d3d7396cccf4d381816f0388fd54a285f907e7770194c7",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part059",
+     "sha256": "65b382d59b14e270d08047deb52f59b1644bd880839e234dad63e3ff9f9169a3",
+     "size_bytes": 100001
+    },
+    {
+     "file": "results_snapshot.json.b64.part060",
+     "sha256": "b62e6575b095e16585827252c92fd8e9f57e10558391259a71f1f59367bef2d1",
+     "size_bytes": 21301
+    }
+   ]
+  },
+  {
+   "package_path": "snapshots/lines_snapshot.json.b64.part*",
+   "target": "snapshots/lines_snapshot.json",
+   "size_bytes": 1921452,
+   "sha256": "72c4476f78f7b1b82919df97a1c02f781260969f334ab5f7185c8b0e42e0c578",
+   "parts": [
+    {
+     "file": "lines_snapshot.json.b64.part000",
+     "sha256": "4179d395e16bb045365016a7a8493ed78a5aa028b2dd6e19b69c274025d04238",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part001",
+     "sha256": "80e56db8e9b42d925de34a321aa767ae8d28b2fb7f69dc8898ef4e569bf96592",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part002",
+     "sha256": "ff07f193ec90a09d9be74842bd5131705d8cca9806a195f70ebda7463240d3b3",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part003",
+     "sha256": "26cbffc41e043204a3415b5d350334f8d237d948889776ae48e4539ac9cbf4c1",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part004",
+     "sha256": "17e7251f3aa7df2ee0d461a5d367292b21383b3c6ab30d5d619204c1aa8d505c",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part005",
+     "sha256": "5a8658d689fad61788caef06aef1b7aa5a6e3b96a8f60ee62cf3904e5ba2fe4e",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part006",
+     "sha256": "0d4eb33cff21e8d0df953fd39b241b2dc9dd2424602816134e5eeb11cb999a6a",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part007",
+     "sha256": "be58ba12185be6e619bc89e869932a91862642288fe36260051707bfd0ada55f",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part008",
+     "sha256": "e9451fd796f3cf8f140d8a09f25990c8ff542826f5c1604ee2b046c5cb8c52f9",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part009",
+     "sha256": "401033430ef7a0ef3534ce51c844c59c1ea90ab9f2cbcf5cfd3b6cb21e184785",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part010",
+     "sha256": "2f77802fbf62174500d5178f87660ad55321b944469c10cfb68e358207d29c89",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part011",
+     "sha256": "eb21d9157cf686ad33116afa7783df0f5f1784149409821ace7de29651395cc1",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part012",
+     "sha256": "b1c17f1a068cf1fda63281fae84b9c687597b779be12fcf5292ff8540e170cb5",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part013",
+     "sha256": "b90b3bf0fdd94bf8e927e93a9780916d6cc113f6cf4a30cbd13e7b5fbb011bf9",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part014",
+     "sha256": "c1d704a64906f9c068b4fcff9c376fff404035edf52ea7ad664355a3d17e22a1",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part015",
+     "sha256": "5ffbab1f5c1725858d2b302180f23c17ba0f1688b505b54630b01f1b79a871e5",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part016",
+     "sha256": "919ee979656c5b772ef7b5c93ef6999ee26af6825c77019c06669046d6ba9313",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part017",
+     "sha256": "27592638820953dd34c6e3dae517cb0cdbc0e54f08e6f92db88eae4b13b9a11b",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part018",
+     "sha256": "062b3881ee2ae01204937859579196a070878e24ddd0491cfda1203d870badd2",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part019",
+     "sha256": "1b66ea89369322b5489d855cfb3862f40ec87c00f987290c7f19800715318079",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part020",
+     "sha256": "6a72b04df36b6ce15d24151a23cf3d7857bb80484942ce1e6b4690b2212951a6",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part021",
+     "sha256": "794a230e115e42cc8813b78e51830d4f67a33fe5e9f013a14b3fc639c36ba08d",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part022",
+     "sha256": "2d732e2b145545d3793005f68b4ab8a63015806c443d81b0e1f1adbee25a5695",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part023",
+     "sha256": "626d42621b7f2a8e00e75c96946a352051360b0316880aa156fceca7649312b6",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part024",
+     "sha256": "249a1e254d42dfe8c12d07b69db31cf92520fa4f07953e5255e61d73cfefd1fe",
+     "size_bytes": 100001
+    },
+    {
+     "file": "lines_snapshot.json.b64.part025",
+     "sha256": "e576b59c5d5104763491325ee4c629519530fb1577908cd70743488f9cae94be",
+     "size_bytes": 61937
+    }
+   ]
+  },
+  {
+   "package_path": "snapshots/directory_snapshot.json.b64.part*",
+   "target": "snapshots/directory_snapshot.json",
+   "size_bytes": 179129,
+   "sha256": "503d29b60e05ff73fb0997eba83b8dcd908a510415737674bb621d2e93b9a3b6",
+   "parts": [
+    {
+     "file": "directory_snapshot.json.b64.part000",
+     "sha256": "39d4bde389d64d03c6bc25d8cb7d2d6cb69f38e650e2a3687f36b3a4603b5474",
+     "size_bytes": 100001
+    },
+    {
+     "file": "directory_snapshot.json.b64.part001",
+     "sha256": "3f847fed1a9b959b8a68aead4af37cc6d25ff8a5c24cecf4d4819c1e771f7216",
+     "size_bytes": 100001
+    },
+    {
+     "file": "directory_snapshot.json.b64.part002",
+     "sha256": "af9cd1200993579579288495e0d40a15c137fa5c7be4c82b6ab345d734d22bcb",
+     "size_bytes": 38841
+    }
+   ]
+  },
+  {
+   "package_path": "snapshots/SNAPSHOT_MANIFEST.json.b64.part*",
+   "target": "snapshots/SNAPSHOT_MANIFEST.json",
+   "size_bytes": 8335,
+   "sha256": "3860cca7393bae68faee110a43c2753b0807a61c0025387606e58cfd11e82b99",
+   "parts": [
+    {
+     "file": "SNAPSHOT_MANIFEST.json.b64.part000",
+     "sha256": "d0089aee91f3628135f000ce68156c1d8c09cf6f2f8992b748f4a8bfb099c94a",
+     "size_bytes": 11117
+    }
+   ]
+  },
+  {
+   "package_path": "snapshots/DRY_RUN_MANIFEST.json.b64.part*",
+   "target": "snapshots/DRY_RUN_MANIFEST.json",
+   "size_bytes": 13345,
+   "sha256": "d6a1e30a1cd6c4780833ccafd35cb2ace15da73ecd4b5c913f024861f4c2bb6d",
+   "parts": [
+    {
+     "file": "DRY_RUN_MANIFEST.json.b64.part000",
+     "sha256": "65412a91b12a2540ba043b9f02cafa10fba711195455d417b75e8a427a0fe2cf",
+     "size_bytes": 17797
+    }
+   ]
+  }
+ ]
+}

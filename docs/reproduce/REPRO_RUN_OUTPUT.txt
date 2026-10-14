@@ -1,0 +1,204 @@
+REPRODUCTION RUN — CFB_FOUR_FAMILY_EVALUATION_V1 R3 recount (144 checks)
+Date: 2026-10-14 (America/Chicago)
+Procedure: docs/reproduce/REPRODUCTION.md §3 — candidate tree re-derived from base 655715907d101052bfc7cb3357f1442db82d8d8b + the two patch artifacts published on this branch (SHA-256 verified: harness 841b0a80893739a9b6fa7c4b988dfe7315cc087545d40a66ceb39b059683c44e, bindings 1ef56cb795c3c2334394ddbee7324142db552f20883aaead93f082b2278e60ca); all 7 candidate files' git hash-object values match the blob table in REPRODUCTION.md §2; inputs reassembled from this branch's published parts (PUBLISHED_INPUTS_MANIFEST.json) and hash-verified by both tools below.
+
+$ python3 docs/reproduce/reassemble_inputs.py --out /tmp/recipe_inputs
+OK sources/schedules/cfb_schedule_2013.csv.gz  29822 B  sha256=b4fa660289b3ee618f6a5b398701ac5285b0bcfa8b7dacb36a5b898ef4752a07
+OK sources/schedules/cfb_schedule_2014.csv.gz  30304 B  sha256=e414f7ff0c31f6a23320fa7fb6e0fad0ee7f54fcda7e085ae32102c754dd3562
+OK sources/schedules/cfb_schedule_2015.csv.gz  30382 B  sha256=f6efc44b1dfa424ad094cb609a3f221bad90a3ce942d5e7259f79921d3efd5ab
+OK sources/schedules/cfb_schedule_2016.csv.gz  30526 B  sha256=b06b040c38aa8b1411b5bdfafb3d37fa6d237e2de667eebccac8506354d59b9b
+OK sources/schedules/cfb_schedule_2017.csv.gz  30718 B  sha256=3e295d03ab816fd1c03955e8932fe089a88ffebbcddf768bb4b617a6c0a3f7ca
+OK sources/schedules/cfb_schedule_2018.csv.gz  31227 B  sha256=2cbaa0c3b785f0d2d7d4a7614bdc2a30abfb6f5bbeee3e7ed567c4dafa7287d3
+OK sources/schedules/cfb_schedule_2019.csv.gz  31096 B  sha256=e85fa562d7d2065b1ac3d384bb83785619c8adbe6c4b586f43402ae428c6eaf1
+OK sources/schedules/cfb_schedule_2020.csv.gz  22191 B  sha256=64cc43834ee7da1e6b6e65362b45dab362c3748d9b42ce1224561f14634f14e4
+OK sources/schedules/cfb_schedule_2021.csv.gz  31113 B  sha256=0fd757f0152e93cb1e03cd0f1038a5c2a7626e48589d194d2f80d38135d2c869
+OK sources/schedules/cfb_schedule_2022.csv.gz  31466 B  sha256=1053ceb10a0d73b5e04bc234cef449262db7ade8e622d389db2756675c7cb3c5
+OK sources/schedules/cfb_schedule_2023.csv.gz  31460 B  sha256=ba9743c99636ed04dcb6177088e44c7db19cd93eb2ad7d9977d05e392b62aefd
+OK sources/schedules/cfb_schedule_2024.csv.gz  33299 B  sha256=4fb9c661e76a9ecc3748878a7e5d6a3aa9cb9b6c82140e44a1812151e6e16645
+OK sources/schedules/cfb_schedule_2025.csv.gz  33168 B  sha256=9666c50349255005ea1912aba26851eb8184602a7b79580176990807d6f1a9ff
+OK sources/cfb_line_odds.csv.gz  7047701 B  sha256=7ae899d9035750dccf22470d7923087a2659052aeb37a44204c35fbf6bf38d4d
+OK sources/cfb_team_info_2024.parquet  133323 B  sha256=503549b9b3c4b5c40accbb58d8ebf38d6555f369a883be4d42dcee27cfbda808
+OK snapshots/results_snapshot.json  4515975 B  sha256=830ebe5a0262b26b8ebc62b6075a7bf70eb814c99025b1ea94ab9596ae586389
+OK snapshots/lines_snapshot.json  1921452 B  sha256=72c4476f78f7b1b82919df97a1c02f781260969f334ab5f7185c8b0e42e0c578
+OK snapshots/directory_snapshot.json  179129 B  sha256=503d29b60e05ff73fb0997eba83b8dcd908a510415737674bb621d2e93b9a3b6
+OK snapshots/SNAPSHOT_MANIFEST.json  8335 B  sha256=3860cca7393bae68faee110a43c2753b0807a61c0025387606e58cfd11e82b99
+OK snapshots/DRY_RUN_MANIFEST.json  13345 B  sha256=d6a1e30a1cd6c4780833ccafd35cb2ace15da73ecd4b5c913f024861f4c2bb6d
+REASSEMBLED: 20 files into /tmp/recipe_inputs
+
+$ python3 docs/reproduce/recount_repro.py --sources-dir /tmp/recipe_inputs/sources --snapshots-dir /tmp/recipe_inputs/snapshots --config <candidate-tree>/config/research/cfb_four_family_bindings_v1.json
+CONFIG: /tmp/recipe/config/research/cfb_four_family_bindings_v1.json sha256=ed10c50081bff54da7113b72a488c9a6b03444e0bb46e7e2614fc3b374c0b4fc
+INPUT VERIFICATION: 20 files hash-verified against frozen pins
+CHECKS: 112 total, 112 match, 0 MISMATCH
+DETAILS: {
+ "r2_name_diffs": [
+  [
+   "Sam Houston",
+   "2534",
+   "config says 'Sam Houston State'"
+  ]
+ ],
+ "r2_season_diffs": [],
+ "r2_class_diffs": [],
+ "r2_guard_failures": [],
+ "per_season_rows": {
+  "2013": 861,
+  "2014": 873,
+  "2015": 876,
+  "2016": 879,
+  "2017": 890,
+  "2018": 898,
+  "2019": 892,
+  "2020": 692,
+  "2021": 895,
+  "2022": 904,
+  "2023": 911,
+  "2024": 966,
+  "2025": 958
+ },
+ "season_type_all": {
+  "2": 10936,
+  "": 1,
+  "3": 526,
+  "4": 30,
+  "5": 2
+ },
+ "frozen_unresolved_id_list": [
+  "125290",
+  "125291",
+  "3144",
+  "3145",
+  "3146",
+  "3147",
+  "3193",
+  "3194"
+ ],
+ "unresolved_absent_from_directory": [
+  "125290",
+  "125291"
+ ],
+ "unresolved_present_unclassified_allstar": [
+  "3144",
+  "3145",
+  "3146",
+  "3147",
+  "3193",
+  "3194"
+ ],
+ "unresolved_decomposition": "2 absent + 6 present-unclassified = 8 frozen-listed",
+ "games_touching_present_unclassified_allstar_ids": 28,
+ "games_touching_unresolved_ids": 2,
+ "directory_classification_values": {
+  "": 1158,
+  "iii": 247,
+  "ii": 172,
+  "fbs": 134,
+  "fcs": 129
+ },
+ "population_season_type": {
+  "2": 9032,
+  "": 1,
+  "3": 503
+ },
+ "population_postseason_games": 504,
+ "readingB_regular_season_only_population": 9033,
+ "readingB_burn_in": 5460,
+ "readingB_folds": {
+  "2021": 699,
+  "2022": 706,
+  "2023": 717,
+  "2024": 721,
+  "2025": 730
+ },
+ "overlap_il_and_nonfbs": 70,
+ "overlap_il_and_unresolved": 0,
+ "overlap_unresolved_and_nonfbs": 2,
+ "post_kickoff_detail": {
+  "401520150": {
+   "in_lines_snapshot": true,
+   "archive_minus_schedule_kickoff_minutes": 180.0,
+   "population_game": false
+  },
+  "401532395": {
+   "in_lines_snapshot": true,
+   "archive_minus_schedule_kickoff_minutes": 120.0,
+   "population_game": false
+  },
+  "401752685": {
+   "in_lines_snapshot": true,
+   "archive_minus_schedule_kickoff_minutes": 62.0,
+   "population_game": false
+  }
+ },
+ "post_kickoff_ids": [
+  "401520150",
+  "401532395",
+  "401752685"
+ ],
+ "post_kickoff_results_kickoffs": {
+  "401520150": "2023-09-02T17:00:00+00:00",
+  "401532395": "2023-09-02T16:00:00+00:00",
+  "401752685": "2025-09-06T18:28:00+00:00"
+ },
+ "matched_by_fold": {
+  "moneyline": {
+   "2021": 646,
+   "2022": 633,
+   "2023": 691,
+   "2024": 682,
+   "2025": 683
+  },
+  "spread": {
+   "2021": 735,
+   "2022": 743,
+   "2023": 757,
+   "2024": 764,
+   "2025": 774
+  },
+  "total": {
+   "2021": 735,
+   "2022": 743,
+   "2023": 757,
+   "2024": 764,
+   "2025": 774
+  },
+  "team_total": {}
+ },
+ "readingB_pooled_matched": {
+  "moneyline": 3210,
+  "spread": 3567,
+  "total": 3567
+ },
+ "results_per_record_timestamps": "ABSENT \u2014 the source release carries retrieval timestamps per file, never per game; PIT discipline for results is the harness walk-forward chronology over kickoff_utc",
+ "lines_limitation": "CFBD closing lines carry no per-row timestamps; this comparison is descriptive only and supports no claim of market outperformance, no CLV statement, and no promotion input.",
+ "lines_source_limitations": {
+  "close_time_certified": false,
+  "decision_time_certified": false,
+  "paired_two_sided_quote_certified": false,
+  "per_row_pit_certified": false,
+  "retrospective_archive": true
+ },
+ "results_payload_source": "CFB_SPORTSDATAVERSE_RELEASE_V1"
+}
+PHASE-2 CHECKS: 32 total, 32 match, 0 MISMATCH
+DETAILS: {
+ "orphans_by_book": {
+  "Bovada": 58,
+  "Caesars (Pennsylvania)": 0,
+  "Caesars Sportsbook (Colorado)": 71,
+  "Draft Kings": 8,
+  "DraftKings": 0,
+  "ESPN Bet": 1395,
+  "William Hill (New Jersey)": 809,
+  "consensus": 364,
+  "numberfire": 0,
+  "teamrankings": 0
+ },
+ "outcome_mismatch_games": [],
+ "post_kickoff_deltas_minutes": {
+  "401520150": 180.0,
+  "401532395": 120.0,
+  "401752685": 62.0
+ }
+}
+TOTAL CHECKS: 144 total, 144 match, 0 MISMATCH
+exit=0
