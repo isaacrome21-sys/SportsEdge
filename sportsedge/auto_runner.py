@@ -302,7 +302,7 @@ def run_auto_mlb(*, quote_url: str, feature_url: str, projected_lineups_url: str
     canonical_quotes, quote_failures = _canonical_quotes(raw_quote_rows)
     projected = _projected_index(projected_raw)
     envelopes = _feature_envelopes(feature_rows_raw)
-    schedule = fetch_schedule(slate_date_ct, opener=opener, now=current)
+    schedule = fetch_schedule(slate_date_ct, opener=opener)  # retrieved_at = post-fetch receipt clock; run as-of time is not a receipt claim
     snapshots = {str(g.game_pk): g for g in schedule}
     games: list[LiveGame] = []
     game_failures: dict[str, str] = {}
