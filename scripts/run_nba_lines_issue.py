@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp, gate_text as _registry_gate_text  # noqa: E402  t134 family gate
 from sportsedge.sports.nba.lines_card import (  # noqa: E402
     NBALinesError, parse_lines, ratings_from_results, render, team_abbr,
 )
@@ -171,6 +172,7 @@ def main() -> int:
     if errors:
         note += f" Fetch gaps: {len(errors)} request(s) failed."
     card = render(games, ratings, observed=observed.strftime("%Y-%m-%d %H:%M CT"), results_note=note)
+    card = _registry_gate_text(card, "NBA", "scripts/run_nba_lines_issue.py")
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(card, encoding="utf-8")
