@@ -194,6 +194,7 @@ def test_unconfirmed_lineup_remains_watch():
     assert build_phone_card(card(row))["selections"][0]["status"] == "WATCH"
 
 
+@pytest.mark.registry_lane_internals
 def test_canonical_pitcher_family_routes_are_exercised_without_network():
     # Known-input route test, NOT a historical model-quality evaluation.
     import importlib.util
