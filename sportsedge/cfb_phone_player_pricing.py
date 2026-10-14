@@ -12,11 +12,20 @@ from .research_three_sport_bridge import price_three_sport_research
 CFB_PLAYER_MARKETS = frozenset({
     "PLAYER_PASSING_YARDS", "PLAYER_PASS_YARDS", "PLAYER_PASS_TDS",
     "PLAYER_PASSING_TDS", "PLAYER_PASS_ATTEMPTS", "PLAYER_COMPLETIONS",
-    "PLAYER_INTERCEPTIONS", "PLAYER_RUSHING_YARDS", "PLAYER_RUSH_YARDS",
+    "PLAYER_PASS_INTERCEPTIONS", "PLAYER_RUSHING_YARDS", "PLAYER_RUSH_YARDS",
     "PLAYER_RUSH_ATTEMPTS", "PLAYER_RECEIVING_YARDS", "PLAYER_REC_YARDS",
     "PLAYER_RECEPTIONS", "PLAYER_RUSH_PLUS_REC_YARDS",
     "PLAYER_PASS_PLUS_RUSH_YARDS",
 })
+
+
+# A precise external QB-pass-interceptions identity is required. The shared
+# empirical pricer historically names its *internal* QB INTs-thrown statistic
+# PLAYER_INTERCEPTIONS, while the football market surface uses that bare key
+# for defensive INTs caught. Never accept or emit the ambiguous external key.
+_CFB_EMPIRICAL_STAT_ALIAS = {
+    "PLAYER_PASS_INTERCEPTIONS": "PLAYER_INTERCEPTIONS",
+}
 
 
 def blocked(row, reason):
@@ -37,6 +46,9 @@ def phone_cfb_player_rows(rows, *, now=None, getter=None):
     cache = {}
     for row in rows:
         market = str(row.get("market") or "").upper()
+        if market == "PLAYER_INTERCEPTIONS":
+            outputs.append(blocked(row, "CFB_PLAYER_INTERCEPTIONS_AMBIGUOUS"))
+            continue
         if market not in CFB_PLAYER_MARKETS:
             outputs.append(blocked(row, "MARKET_NOT_SUPPORTED_BY_CFB_EMPIRICAL"))
             continue
@@ -66,7 +78,8 @@ def phone_cfb_player_rows(rows, *, now=None, getter=None):
             continue
         try:
             outcome = price_nfl_player_market(
-                market=market, side=side, line=line,
+                market=_CFB_EMPIRICAL_STAT_ALIAS.get(market, market),
+                side=side, line=line,
                 game_history=verified["features"]["game_history"])
         except (NFLEmpiricalError, KeyError, TypeError) as exc:
             outputs.append(blocked(row, str(exc)))
