@@ -7,7 +7,10 @@
       "journal_last_sequence": 3,
       "journal_sha256": "835a91fc4d455036ca1181bc9edf559ac5ca200ff32c16a5d34156effd622d42",
       "path": "anchors/2026-10-14/mlb-receipt-journal.json",
-      "publication": null,
+      "publication": {
+        "commit_sha": "0eb216c4c86a85109ee5ba9a0ed280c727f2412e",
+        "published_at_utc": "2026-10-13T22:13:09-05:00"
+      },
       "receipt_chain_head_sha256": "fda4f36d12fa46666d0b496a25f9bbf6901a2fb9ee0bc51e0ee7b18a78ab581a",
       "schema": "MLB_RECEIPT_JOURNAL_ANCHOR_V1",
       "system": "mlb-receipt-journal"
