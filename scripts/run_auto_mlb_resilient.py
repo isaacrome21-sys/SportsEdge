@@ -27,6 +27,7 @@ from sportsedge.mlb_model_artifact import mlb_model_artifact_sha256
 from sportsedge.mlb_run_machine import MLBMachineReport, machine_report_to_dict, run_it_mlb
 from sportsedge.mlb_source import capture_mlb_source_bytes
 from sportsedge.prediction_journal import journal_reference, write_prediction_journal
+from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
 
@@ -246,6 +247,7 @@ def main() -> int:
         })
 
     _attach_mlb_board(payload)
+    payload = _registry_gate_and_stamp(payload, "MLB", "scripts/run_auto_mlb_resilient.py")
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")

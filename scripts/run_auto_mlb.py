@@ -18,6 +18,7 @@ from sportsedge.auto_native_odds import run_auto_mlb_native_odds
 from sportsedge.auto_runner import AutoRunnerError, report_to_dict, run_auto_mlb
 from sportsedge.edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
 from sportsedge.prediction_journal import journal_reference, write_prediction_journal
+from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
 
@@ -115,6 +116,7 @@ def main() -> int:
         })
 
     _attach_mlb_board(payload)
+    payload = _registry_gate_and_stamp(payload, "MLB", "scripts/run_auto_mlb.py")
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
