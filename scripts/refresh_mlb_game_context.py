@@ -33,7 +33,7 @@ def main() -> int:
         "failures": [],
     }
     try:
-        schedule = fetch_schedule(slate_date, now=now)
+        schedule = fetch_schedule(slate_date)  # retrieved_at = post-fetch receipt clock; caller time is not a receipt claim
     except Exception as exc:
         summary["status"] = "ERROR"
         summary["failures"].append({"stage": "SCHEDULE", "reason": f"{type(exc).__name__}:{exc}"})

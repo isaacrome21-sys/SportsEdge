@@ -1,9 +1,14 @@
 from __future__ import annotations
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
+from dataclasses import replace, dataclass, asdict
+from datetime import datetime, timedelta, timezone
 import hashlib
+import fcntl
+import os
+import stat
+import uuid
+import time as _time
 import json
 from pathlib import Path
 import re
@@ -11,6 +16,7 @@ from typing import Any, Callable, Iterator
 from urllib.request import urlopen
 from zoneinfo import ZoneInfo
 
+from . import evidence_admission_gate as _anchor_gate
 from .source_lineage import canonical_game_identity
 
 BASE = "https://statsapi.mlb.com"
@@ -43,6 +49,45 @@ class GameSnapshot:
     official_date: str | None = None
     detailed_status: str | None = None
     game_type: str | None = None
+    # Caller's own timestamp (e.g. run as-of); never receipt evidence. Bounded in fetch_schedule.
+    caller_asserted_at: str | None = None
+
+
+RECEIPT_CLOCK_SKEW = timedelta(seconds=5)
+# A claimed fetch receipt older than this cannot be certified by the current
+# independent system clock. This is a transport-ingestion limit, not evidence
+# that data were present at a historical game as-of instant.
+RECEIPT_ANCHOR_MAX_AGE = timedelta(seconds=30)
+RECEIPT_MAX_FETCH_SPAN = timedelta(seconds=30)
+
+
+def _trusted_now() -> datetime:
+    """Trusted system clock for fetch start / receipt. Not injectable by callers or
+    recorders; only tests monkeypatch this module attribute."""
+    return _DATETIME.fromtimestamp(_time.time_ns() / 1e9, tz=timezone.utc)
+
+
+_utc_clock = _trusted_now  # backward-compatible name; same trusted source
+
+
+_DATETIME = datetime  # unpatched type for isinstance checks
+
+
+def _aware(value: Any, label: str) -> datetime:
+    if not isinstance(value, _DATETIME) or value.tzinfo is None or value.utcoffset() is None:
+        raise MLBSourceError(f"{label} must be a timezone-aware datetime")
+    return value.astimezone(timezone.utc)
+
+
+def bound_caller_time(value: datetime, *, fetch_started_at: datetime, received_at: datetime,
+                      skew: timedelta = RECEIPT_CLOCK_SKEW) -> datetime:
+    """Fail closed unless fetch_started_at <= value <= received_at + skew."""
+    v = _aware(value, "caller-supplied time")
+    if v < fetch_started_at:
+        raise MLBSourceError("CALLER_TIME_BEFORE_FETCH_START")
+    if v > received_at + skew:
+        raise MLBSourceError("CALLER_TIME_IN_FUTURE")
+    return v
 
 
 @dataclass(frozen=True)
@@ -55,6 +100,278 @@ class MLBSourceCaptureRecord:
     path: str
     byte_length: int
     game_pk: int | None = None
+    # Persisted receipt bounds from the trusted module clock. observed_at_utc is
+    # ALWAYS equal to received_at_utc (post-read completion), never earlier.
+    fetch_started_at_utc: str | None = None
+    received_at_utc: str | None = None
+    # Non-evidentiary: the injectable recorder clock's own assertion, kept only
+    # for diagnostics. Never used as a receipt or PIT time.
+    recorder_clock_assertion_utc: str | None = None
+    receipt_nonce: str | None = None
+    prev_record_sha256: str | None = None
+    record_sha256: str | None = None
+
+
+RECEIPT_JOURNAL_NAME = "receipt_journal.jsonl"
+GENESIS_SHA256 = "0" * 64
+RECEIPT_PLAUSIBLE_FLOOR = datetime(2020, 1, 1, tzinfo=timezone.utc)
+_HASHED_FIELDS = (
+    "sequence", "source_kind", "url", "observed_at_utc", "sha256", "file_name",
+    "byte_length", "game_pk", "fetch_started_at_utc", "received_at_utc",
+    "recorder_clock_assertion_utc", "receipt_nonce", "prev_record_sha256",
+)
+
+
+def _record_hash(entry: dict[str, Any]) -> str:
+    body = {k: entry.get(k) for k in _HASHED_FIELDS}
+    return hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def _parse_utc(value: Any, label: str) -> datetime:
+    if not isinstance(value, str) or not value:
+        raise MLBSourceError(f"RECEIPT_FIELD_MISSING:{label}")
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise MLBSourceError(f"RECEIPT_FIELD_INVALID:{label}") from exc
+    if dt.tzinfo is None:
+        raise MLBSourceError(f"RECEIPT_FIELD_NAIVE:{label}")
+    return dt.astimezone(timezone.utc)
+
+
+# Hard limit on archived StatsAPI responses. A hostile or corrupted path must never
+# block on a FIFO/device or cause unbounded memory consumption during verification.
+MAX_RECEIPT_RAW_BYTES = 32 * 1024 * 1024
+
+
+def _read_verified_receipt_raw(root: Path, filename: str, expected_length: Any) -> bytes:
+    """Read regular immutable-evidence bytes with no symlink/FIFO following.
+
+    This is local archive safety, NOT a trusted external timestamp, immutable
+    storage guarantee or authority to promote retrospective source evidence.
+    """
+    if (type(expected_length) is not int or expected_length < 0
+            or expected_length > MAX_RECEIPT_RAW_BYTES):
+        raise MLBSourceError("RECEIPT_RAW_SIZE_INVALID")
+    path = root / filename
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    try:
+        fd = os.open(path, flags)
+    except FileNotFoundError as exc:
+        raise MLBSourceError("RECEIPT_RAW_BYTES_MISSING") from exc
+    except OSError as exc:
+        raise MLBSourceError("RECEIPT_RAW_PATH_UNSAFE") from exc
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode):
+            raise MLBSourceError("RECEIPT_RAW_PATH_UNSAFE")
+        if before.st_size > MAX_RECEIPT_RAW_BYTES:
+            raise MLBSourceError("RECEIPT_RAW_SIZE_INVALID")
+        if before.st_size != expected_length:
+            raise MLBSourceError("RECEIPT_RAW_BYTES_TAMPERED")
+        with os.fdopen(fd, "rb") as handle:
+            fd = -1
+            raw = handle.read(expected_length + 1)
+            after = os.fstat(handle.fileno())
+        # Check the path once more: a file swapped while open cannot silently
+        # stand in for the path independently referenced by the journal.
+        try:
+            current = path.lstat()
+        except OSError as exc:
+            raise MLBSourceError("RECEIPT_RAW_PATH_UNSAFE") from exc
+        identity = lambda info: (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)
+        if (len(raw) != expected_length or not stat.S_ISREG(current.st_mode)
+                or identity(before) != identity(after) or identity(after) != identity(current)):
+            raise MLBSourceError("RECEIPT_RAW_BYTES_TAMPERED")
+        return raw
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+
+def verify_receipt_journal(root: str | Path, *, verifier_now: datetime | None = None) -> list[dict[str, Any]]:
+    """Independently re-verify a persisted capture directory (fresh process / restart).
+
+    Fails closed on: missing fields, broken hash chain, edited entries, raw byte
+    tamper, observed != received, received < fetch start, fetch span over the limit,
+    implausible (pre-2020 or future vs verifier clock) receipts, duplicate nonces or
+    duplicate receipt tuples. The chain is local tamper-evidence only; it is NOT an
+    external, independently anchored timestamp.
+    """
+    root = Path(root)
+    journal = root / RECEIPT_JOURNAL_NAME
+    try:
+        info = journal.lstat()
+    except FileNotFoundError:
+        return []
+    if not stat.S_ISREG(info.st_mode):
+        raise MLBSourceError("RECEIPT_JOURNAL_PATH_UNSAFE")
+    # A half-written final JSON record may parse as a complete object, but the
+    # next append would concatenate two lines. Reject such an archive as-is.
+    try:
+        journal_bytes = _read_verified_receipt_raw(root, RECEIPT_JOURNAL_NAME, info.st_size)
+    except MLBSourceError as exc:
+        raise MLBSourceError(str(exc).replace("RECEIPT_RAW", "RECEIPT_JOURNAL")) from exc
+    if not journal_bytes or not journal_bytes.endswith(b"\n"):
+        raise MLBSourceError("RECEIPT_JOURNAL_UNTERMINATED")
+    now = _aware(verifier_now, "verifier clock") if verifier_now is not None else _aware(_trusted_now(), "verifier clock")
+    entries: list[dict[str, Any]] = []
+    prev = GENESIS_SHA256
+    nonces: set[str] = set()
+    keys: set[tuple[str, str, str, str]] = set()
+    expected_keys = set(_HASHED_FIELDS) | {"record_sha256"}
+    try:
+        journal_text = journal_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise MLBSourceError("RECEIPT_JOURNAL_CORRUPT") from exc
+    for lineno, line in enumerate(journal_text.splitlines(), start=1):
+        if not line.strip():
+            raise MLBSourceError(f"RECEIPT_JOURNAL_BLANK_LINE:{lineno}")
+        def unique_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+            data = {}
+            for key, value in pairs:
+                if key in data:
+                    raise MLBSourceError(f"RECEIPT_JOURNAL_DUPLICATE_JSON_KEY:{lineno}")
+                data[key] = value
+            return data
+        try:
+            entry = json.loads(line, object_pairs_hook=unique_pairs,
+                               parse_constant=lambda value: (_ for _ in ()).throw(
+                                   MLBSourceError("RECEIPT_JOURNAL_NONFINITE_NUMBER")))
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise MLBSourceError(f"RECEIPT_JOURNAL_CORRUPT:{lineno}") from exc
+        if type(entry) is not dict:
+            raise MLBSourceError(f"RECEIPT_JOURNAL_SCHEMA_DRIFT:{lineno}")
+        # Missing evidentiary fields retain their dedicated failure code.
+        # Unexpected additional fields are still refused rather than silently
+        # ignored by the fixed-field hash.
+        for field in _HASHED_FIELDS + ("record_sha256",):
+            if field not in entry:
+                raise MLBSourceError(f"RECEIPT_FIELD_MISSING:{field}")
+        if set(entry) != expected_keys:
+            raise MLBSourceError(f"RECEIPT_JOURNAL_SCHEMA_DRIFT:{lineno}")
+        for field in _HASHED_FIELDS + ("record_sha256",):
+            if field not in entry or (entry[field] is None and field not in ("game_pk", "recorder_clock_assertion_utc")):
+                raise MLBSourceError(f"RECEIPT_FIELD_MISSING:{field}")
+        if entry["sequence"] != lineno:
+            raise MLBSourceError("RECEIPT_SEQUENCE_GAP")
+        if entry["prev_record_sha256"] != prev:
+            raise MLBSourceError("RECEIPT_CHAIN_BROKEN")
+        if _record_hash(entry) != entry["record_sha256"]:
+            raise MLBSourceError("RECEIPT_RECORD_TAMPERED")
+        start = _parse_utc(entry["fetch_started_at_utc"], "fetch_started_at_utc")
+        received = _parse_utc(entry["received_at_utc"], "received_at_utc")
+        observed = _parse_utc(entry["observed_at_utc"], "observed_at_utc")
+        if observed != received:
+            raise MLBSourceError("RECEIPT_OBSERVED_NOT_POST_READ")
+        if received < start:
+            raise MLBSourceError("RECEIPT_CLOCK_WENT_BACKWARDS")
+        if received - start > RECEIPT_MAX_FETCH_SPAN:
+            raise MLBSourceError("RECEIPT_FETCH_SPAN_UNBOUNDED")
+        if start < RECEIPT_PLAUSIBLE_FLOOR:
+            raise MLBSourceError("RECEIPT_IMPLAUSIBLY_OLD")
+        if received > now + RECEIPT_CLOCK_SKEW:
+            raise MLBSourceError("RECEIPT_FUTURE_VS_VERIFIER")
+        key = (entry["url"], entry["sha256"], entry["fetch_started_at_utc"], entry["received_at_utc"])
+        if entry["receipt_nonce"] in nonces or key in keys:
+            raise MLBSourceError("RECEIPT_DUPLICATE_REPLAY")
+        nonces.add(entry["receipt_nonce"]); keys.add(key)
+        filename = entry["file_name"]
+        if (not isinstance(filename, str) or not filename or len(filename) > 180
+                or Path(filename).name != filename or chr(92) in filename):
+            raise MLBSourceError("RECEIPT_RAW_PATH_UNSAFE")
+        raw = _read_verified_receipt_raw(root, filename, entry["byte_length"])
+        if hashlib.sha256(raw).hexdigest() != entry["sha256"]:
+            raise MLBSourceError("RECEIPT_RAW_BYTES_TAMPERED")
+        prev = entry["record_sha256"]
+        entries.append(entry)
+    return entries
+
+
+def receipt_supports_as_of(entry: dict[str, Any], as_of: datetime) -> bool:
+    """A receipt can only evidence pregame availability if bytes were received at or
+    before ``as_of``. A schedule fetched today for an old game is never as-of proof."""
+    received = _parse_utc(entry.get("received_at_utc") if isinstance(entry, dict) else None, "received_at_utc")
+    return received <= _aware(as_of, "as_of")
+
+
+def _fsync_receipt_directory(root: Path) -> None:
+    fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+@contextmanager
+def _receipt_writer_lock(root: Path):
+    """Serialize cooperating processes; never follow a replaced lock path."""
+    root.mkdir(parents=True, exist_ok=True)
+    fd = os.open(root / ".receipt_journal.lock", os.O_CREAT | os.O_RDWR
+                 | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise MLBSourceError("RECEIPT_LOCK_PATH_UNSAFE")
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        os.close(fd)
+
+
+def _durable_receipt_write(path: Path, data: bytes, *, append: bool) -> None:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK
+    flags |= os.O_APPEND if append else os.O_EXCL
+    fd = os.open(path, flags, 0o600)
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise MLBSourceError("RECEIPT_WRITE_PATH_UNSAFE")
+        if append and os.fstat(fd).st_size + len(data) > MAX_RECEIPT_RAW_BYTES:
+            raise MLBSourceError("RECEIPT_JOURNAL_SIZE_INVALID")
+        pending = memoryview(data)
+        while pending:
+            count = os.write(fd, pending)
+            if count <= 0:
+                raise MLBSourceError("RECEIPT_WRITE_INCOMPLETE")
+            pending = pending[count:]
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    _fsync_receipt_directory(path.parent)
+
+
+RECEIPT_ANCHOR_REFUSED = "RECEIPT_ANCHOR_REFUSED"
+
+
+def admit_anchored_receipt(root: str | Path, record_sha256: str, *, tsa_bundle: Any,
+                           event_cutoff: datetime | None,
+                           verifier_now: datetime | None = None) -> dict[str, Any]:
+    """t127: admit ONE journal receipt as externally time-anchored evidence.
+
+    Goes through the shared dual-TSA admission gate (#2090 anchor
+    ``anchor:rfc3161+ots:v1``). While admission is off (committed config) every
+    call is refused with ``RECEIPT_ANCHOR_REFUSED:admission_not_activated``
+    before the journal is read; the local journal semantics above are
+    unchanged. When separately activated, the dual-TSA bundle must cover
+    ``record_sha256`` as a leaf, the journal must re-verify, the record must be
+    in it and its receipt must be at or before ``event_cutoff``. Never raises.
+    """
+    refused = {"admitted": False, "external_time_anchor": False, "research_only": True}
+    d = _anchor_gate.anchored_admission(tsa_bundle, bound_sha256=record_sha256,
+                                        event_cutoff=event_cutoff)
+    if not d.admitted:
+        return {**refused, "reason": f"{RECEIPT_ANCHOR_REFUSED}:{d.reason}"}
+    try:
+        entries = verify_receipt_journal(root, verifier_now=verifier_now)
+        entry = next((e for e in entries if e["record_sha256"] == record_sha256), None)
+        if entry is None:
+            return {**refused, "reason": f"{RECEIPT_ANCHOR_REFUSED}:record_not_in_journal"}
+        if not receipt_supports_as_of(entry, event_cutoff):
+            return {**refused, "reason": f"{RECEIPT_ANCHOR_REFUSED}:receipt_after_cutoff"}
+    except MLBSourceError as exc:
+        return {**refused, "reason": f"{RECEIPT_ANCHOR_REFUSED}:{exc}"}
+    return {"admitted": True, "external_time_anchor": True, "research_only": True,
+            "reason": "admitted", "sequence": entry["sequence"],
+            "anchor_gen_time_utc": d.gen_time.isoformat() if d.gen_time else None}
 
 
 class MLBSourceCapture:
@@ -67,8 +384,19 @@ class MLBSourceCapture:
 
     def __init__(self, root: Path, *, clock: Callable[[], datetime] | None = None):
         self.root = Path(root)
-        self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.clock = clock or (lambda: _trusted_now())
         self.records: list[MLBSourceCaptureRecord] = []
+        self._used_receipts: set[tuple[str, str, str, str]] = set()
+        self._used_nonces: set[str] = set()
+        self._prev_sha = GENESIS_SHA256
+        self._sequence = 0
+        # Restart: reload and re-verify persisted state so a new recorder at the
+        # same root cannot re-admit a receipt tuple already in the journal.
+        for entry in verify_receipt_journal(self.root):
+            self._used_receipts.add((entry["url"], entry["sha256"], entry["fetch_started_at_utc"], entry["received_at_utc"]))
+            self._used_nonces.add(entry["receipt_nonce"])
+            self._prev_sha = entry["record_sha256"]
+            self._sequence = entry["sequence"]
 
     @staticmethod
     def _identity(url: str) -> tuple[str, int | None]:
@@ -79,37 +407,127 @@ class MLBSourceCapture:
             return "MLB_STATSAPI_BOXSCORE", int(match.group(1))
         return "MLB_STATSAPI_OTHER", None
 
-    def record(self, *, url: str, raw: bytes) -> MLBSourceCaptureRecord:
-        observed = self.clock()
-        if not isinstance(observed, datetime) or observed.tzinfo is None or observed.utcoffset() is None:
-            raise MLBSourceError("source capture clock must return timezone-aware datetime")
-        observed = observed.astimezone(timezone.utc)
+    def record(self, *, url: str, raw: bytes, fetch_started_at: datetime,
+               received_at: datetime) -> MLBSourceCaptureRecord:
+        self._validated_bounds(raw, fetch_started_at, received_at)
+        # Refresh the verified chain while holding the same cross-process lock
+        # used for both durable writes. A recorder's cached sequence is not an
+        # append authority. This remains local evidence, not external anchoring.
+        with _receipt_writer_lock(self.root):
+            entries = verify_receipt_journal(self.root)
+            self._used_receipts = {(e["url"], e["sha256"], e["fetch_started_at_utc"],
+                                    e["received_at_utc"]) for e in entries}
+            self._used_nonces = {e["receipt_nonce"] for e in entries}
+            self._prev_sha = entries[-1]["record_sha256"] if entries else GENESIS_SHA256
+            self._sequence = len(entries)
+            return self._record_locked(url=url, raw=raw, fetch_started_at=fetch_started_at,
+                                       received_at=received_at)
+
+    def _record_locked(self, *, url: str, raw: bytes, fetch_started_at: datetime,
+                       received_at: datetime) -> MLBSourceCaptureRecord:
+        """Require an independent system-time anchor, not the recorder clock.
+
+        Caller-provided fetch bounds alone are not evidence. Reject stale,
+        future, implausibly long and duplicate receipt claims before writing.
+        This still is not a signed cross-process PIT receipt or proof of a
+        historical sportsbook/StatsAPI state; all capture remains research.
+        """
+        observed, start, receipt = self._validated_bounds(raw, fetch_started_at, received_at)
         source_kind, game_pk = self._identity(url)
         digest = hashlib.sha256(raw).hexdigest()
-        sequence = len(self.records) + 1
+        receipt_key = (url, digest, start.isoformat(), receipt.isoformat())
+        if receipt_key in self._used_receipts:
+            raise MLBSourceError("RECEIPT_DUPLICATE_REPLAY")
+        if start < RECEIPT_PLAUSIBLE_FLOOR:
+            raise MLBSourceError("RECEIPT_IMPLAUSIBLY_OLD")
+        nonce = uuid.uuid4().hex
+        while nonce in self._used_nonces:
+            nonce = uuid.uuid4().hex
+        sequence = self._sequence + 1
         suffix = f"game_{game_pk}" if game_pk is not None else source_kind.lower()
         name = f"{sequence:04d}_{suffix}_{digest}.json"
         destination = self.root / name
         destination.parent.mkdir(parents=True, exist_ok=True)
-        if destination.exists() and destination.read_bytes() != raw:
-            raise MLBSourceError("immutable raw source capture collision")
-        destination.write_bytes(raw)
+        try:
+            _durable_receipt_write(destination, raw, append=False)
+        except FileExistsError:
+            if _read_verified_receipt_raw(self.root, name, len(raw)) != raw:
+                raise MLBSourceError("immutable raw source capture collision")
+            # A previous attempt may have created the exact raw file and then
+            # failed its fsync. Reusing bytes does not establish durability.
+            # Re-sync the existing inode before writing its first receipt.
+            fd = os.open(destination, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            try:
+                if not stat.S_ISREG(os.fstat(fd).st_mode):
+                    raise MLBSourceError("RECEIPT_WRITE_PATH_UNSAFE")
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+            _fsync_receipt_directory(self.root)
+        entry = {
+            "sequence": sequence, "source_kind": source_kind, "url": url,
+            # Canonical observation == trusted post-read completion. Never earlier.
+            "observed_at_utc": receipt.isoformat(), "sha256": digest, "file_name": name,
+            "byte_length": len(raw), "game_pk": game_pk,
+            "fetch_started_at_utc": start.isoformat(), "received_at_utc": receipt.isoformat(),
+            "recorder_clock_assertion_utc": observed.isoformat(), "receipt_nonce": nonce,
+            "prev_record_sha256": self._prev_sha,
+        }
+        entry["record_sha256"] = _record_hash(entry)
+        _durable_receipt_write(
+            self.root / RECEIPT_JOURNAL_NAME,
+            (json.dumps(entry, sort_keys=True, separators=(",", ":")) + "\n").encode(),
+            append=True,
+        )
         record = MLBSourceCaptureRecord(
-            sequence=sequence,
-            source_kind=source_kind,
-            url=url,
-            observed_at_utc=observed.isoformat(),
-            sha256=digest,
-            path=str(destination),
-            byte_length=len(raw),
-            game_pk=game_pk,
+            sequence=sequence, source_kind=source_kind, url=url,
+            observed_at_utc=entry["observed_at_utc"], sha256=digest, path=str(destination),
+            byte_length=len(raw), game_pk=game_pk,
+            fetch_started_at_utc=entry["fetch_started_at_utc"], received_at_utc=entry["received_at_utc"],
+            recorder_clock_assertion_utc=entry["recorder_clock_assertion_utc"], receipt_nonce=nonce,
+            prev_record_sha256=entry["prev_record_sha256"], record_sha256=entry["record_sha256"],
         )
         self.records.append(record)
+        self._used_receipts.add(receipt_key)
+        self._used_nonces.add(nonce)
+        self._prev_sha = entry["record_sha256"]
+        self._sequence = sequence
         return record
+
+    def _validated_bounds(self, raw, fetch_started_at, received_at):
+        try:
+            observed = _aware(self.clock(), "source capture clock")
+        except MLBSourceError:
+            raise MLBSourceError("source capture clock must return timezone-aware datetime")
+        start = _aware(fetch_started_at, "trusted fetch start")
+        receipt = _aware(received_at, "trusted receipt")
+        if receipt < start:
+            raise MLBSourceError("RECEIPT_CLOCK_WENT_BACKWARDS")
+        bound_caller_time(observed, fetch_started_at=start, received_at=receipt)
+        try:
+            anchor = _aware(_trusted_now(), "independent system receipt anchor")
+        except Exception as exc:
+            raise MLBSourceError("RECEIPT_ANCHOR_UNAVAILABLE") from exc
+        if receipt > anchor + RECEIPT_CLOCK_SKEW:
+            raise MLBSourceError("RECEIPT_FUTURE_VS_SYSTEM_ANCHOR")
+        if receipt < anchor - RECEIPT_ANCHOR_MAX_AGE:
+            raise MLBSourceError("RECEIPT_STALE_OR_REPLAYED")
+        if receipt - start > RECEIPT_MAX_FETCH_SPAN:
+            raise MLBSourceError("RECEIPT_FETCH_SPAN_UNBOUNDED")
+        if not isinstance(raw, bytes) or len(raw) > MAX_RECEIPT_RAW_BYTES:
+            raise MLBSourceError("RECEIPT_RAW_SIZE_INVALID")
+        if start < RECEIPT_PLAUSIBLE_FLOOR:
+            raise MLBSourceError("RECEIPT_IMPLAUSIBLY_OLD")
+        return observed, start, receipt
 
     def manifest(self) -> dict[str, Any]:
         return {
             "schema": "MLB_SAME_FETCH_PIT_SOURCE_CAPTURE_V1",
+            "receipt_schema_version": 2,
+            "receipt_journal": RECEIPT_JOURNAL_NAME,
+            "receipt_chain_head_sha256": self._prev_sha,
+            "receipt_time_semantics": "OBSERVED_EQUALS_TRUSTED_POST_READ_RECEIPT",
+            "external_time_anchor": False,
             "capture_semantics": "SAME_RESPONSE_BYTES_CONSUMED_BY_MODEL",
             "promotion_authority": False,
             "retroactive_point_in_time_claim": False,
@@ -138,15 +556,16 @@ def capture_mlb_source_bytes(
 
 
 def _get_json(url: str, opener: Callable = urlopen) -> dict[str, Any]:
+    recorder = _ACTIVE_SOURCE_CAPTURE.get()
+    started = _trusted_now()
     try:
         with opener(url, timeout=15) as r:
             raw = r.read()
         if not isinstance(raw, (bytes, bytearray)):
             raise MLBSourceError("MLB response body must be bytes")
         raw_bytes = bytes(raw)
-        recorder = _ACTIVE_SOURCE_CAPTURE.get()
         if recorder is not None:
-            recorder.record(url=url, raw=raw_bytes)
+            recorder.record(url=url, raw=raw_bytes, fetch_started_at=started, received_at=_trusted_now())
         return json.loads(raw_bytes.decode("utf-8"))
     except MLBSourceError:
         raise
@@ -267,16 +686,22 @@ def parse_schedule(payload: dict[str, Any], retrieved_at: datetime) -> list[Game
 
 
 def fetch_schedule(date_iso: str, opener: Callable = urlopen, now: datetime | None = None) -> list[GameSnapshot]:
-    # Read the default receipt clock only after the response has arrived.
-    # Explicit `now` remains a caller-supplied timestamp for compatibility;
-    # it is not independent proof of when the source became available.
+    """retrieved_at is ALWAYS the post-fetch clock. A caller-supplied ``now`` is kept
+    only as ``caller_asserted_at`` and must satisfy fetch_start <= now <= receipt + skew."""
     url = (
         f"{BASE}/api/v1/schedule?sportId=1&date={date_iso}"
         "&gameType=R,F,D,L,W,A,S,E&hydrate=probablePitcher,team"
     )
+    fetch_started_at = _aware(_trusted_now(), "receipt clock")
     payload = _get_json(url, opener)
-    retrieved_at = now if now is not None else datetime.now(timezone.utc)
-    return parse_schedule(payload, retrieved_at)
+    retrieved_at = _aware(_trusted_now(), "receipt clock")
+    if retrieved_at < fetch_started_at:
+        raise MLBSourceError("RECEIPT_CLOCK_WENT_BACKWARDS")
+    games = parse_schedule(payload, retrieved_at)
+    if now is None:
+        return games
+    asserted = bound_caller_time(now, fetch_started_at=fetch_started_at, received_at=retrieved_at).isoformat()
+    return [replace(g, caller_asserted_at=asserted) for g in games]
 
 
 def parse_confirmed_lineup(boxscore: dict[str, Any], side: str) -> list[dict[str, Any]]:
