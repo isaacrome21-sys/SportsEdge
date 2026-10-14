@@ -1102,6 +1102,13 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         card["summary"]["mlb_market_coverage"] = dict(card["mlb_full_board"]["input_coverage"])
     if form2_loader_audit is not None:
         card["qb_form2_bundle_loader_audit"] = form2_loader_audit
+    # Optional operator-captured fixture-specific DraftKings tab census.
+    # This is DIAGNOSTICS ONLY, not a trusted quote, model, registry
+    # eligibility switch, or evidence of book-offered wagers.
+    if isinstance(payload, dict) and "dk_fixture_menu_snapshot" in payload:
+        from sportsedge.dk_fixture_menu_audit import audit_dk_fixture_menu
+        card["dk_fixture_menu_audit"] = audit_dk_fixture_menu(
+            payload["dk_fixture_menu_snapshot"])
     card["runner"]="RUN_IT_FULL_MLB_AND_NAMED_FOOTBALL_PLAYER_HISTORIES_V1"
     from sportsedge.phone_display import identity_rows, build_phone_card
     card["selection_intake"] = identity_rows(rows, default_sport)
