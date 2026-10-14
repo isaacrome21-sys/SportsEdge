@@ -19,9 +19,12 @@
     {
       "id": "freetsa",
       "url": "https://freetsa.org/tsr",
-      "ca_bundle_path": null,
-      "signer_cert_sha256": [],
-      "status": "unpinned",
+      "ca_bundle_path": "config/anchors/freetsa_ca.pem",
+      "ca_bundle_sha256": "2151b61137ffa86bf664691ba67e7da0b19f98c758e3d228d5d8ebf27e044438",
+      "signer_cert_sha256": ["32e841a95cc1164101ffde41298ef2fc75c1c4372ef095e88a6bbd47dfb191fc"],
+      "status": "pinned",
+      "pinned_at": "2026-10-14T02:48:21Z",
+      "provenance": "docs/ANCHOR_TSA_PINNING_PROVENANCE_20261013.md",
       "pin_procedure": "Download cacert.pem and tsa.crt from freetsa.org over two independent networks, compare, commit to config/anchors/freetsa_ca.pem, record DER sha256 of tsa.crt here, set status=pinned. Owner/ChatGPT step."
     },
     {
@@ -30,6 +33,7 @@
       "ca_bundle_path": null,
       "signer_cert_sha256": [],
       "status": "unpinned",
+      "blocked_reason": "t127: no real DigiCert RFC 3161 token could be recorded from the build host (timestamp.digicert.com is HTTP-only; outbound port 80 times out, HTTPS refused), so the signer cert cannot be taken from a real token. Root G4 cross-checked in the provenance doc; provider stays unpinned.",
       "pin_procedure": "Obtain DigiCert Assured ID / Trusted Root G4 and the current timestamping intermediate from DigiCert's published repository; take signer cert from a real token; commit bundle to config/anchors/digicert_ca.pem, record DER sha256, set status=pinned. Owner/ChatGPT step."
     }
   ],
