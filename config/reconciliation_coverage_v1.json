@@ -541,7 +541,8 @@
     "tests/test_t134_family_gate_wiring_20261014.py": "TEST_ONLY_FAMILY_REGISTRY_RUNTIME_REFUSAL_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "tests/test_family_gate_pricing_field_leaks.py": "TEST_ONLY_FAMILY_GATE_PRODUCTION_PRICING_FIELDS_REFUSAL_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "tests/test_nfl_interception_coverage_aliases.py": "TEST_ONLY_NFL_INTERCEPTION_ALIAS_COLLISION_REGRESSION_NO_MODEL_OR_PROMOTION_AUTHORITY",
-    "tests/test_cfb_registry_complete_coverage_20261014.py": "TEST_ONLY_CFB_FAMILY_REGISTRY_COVERAGE_CONTRACT_NO_MODEL_OR_PROMOTION_AUTHORITY"
+    "tests/test_cfb_registry_complete_coverage_20261014.py": "TEST_ONLY_CFB_FAMILY_REGISTRY_COVERAGE_CONTRACT_NO_MODEL_OR_PROMOTION_AUTHORITY",
+    "tests/test_source_fact_hostname_hardening_t153.py": "TEST_ONLY_RESEARCH_X_HOSTNAME_HARDENING_NO_PRICING_AUTHORITY"
   },
   "inventory_completion_claim": {
     "status": "HOSTED_AUDIT_ZERO_UNMAPPED",
