@@ -446,6 +446,24 @@ def test_s3_bucket_verification_fails_closed(fake):
         ls.S3ObjectLockWriter("sportsedge-evidence-locked", fake, enabled=True).verify_bucket()
 
 
+def test_s3_put_revalidates_bucket_even_if_caller_skips_preflight():
+    c = _FakeS3(lock="Disabled")
+    w = ls.S3ObjectLockWriter("sportsedge-evidence-locked", c, enabled=True)
+    with pytest.raises(ls.LockStoreError, match="Object Lock"):
+        w.put_locked("mlb/receipt.json", b"critical")
+    assert c.calls == []
+
+
+def test_s3_put_rejects_stale_or_naive_retention_clock():
+    c = _FakeS3()
+    w = ls.S3ObjectLockWriter("sportsedge-evidence-locked", c, enabled=True)
+    with pytest.raises(ls.LockStoreError, match="stale"):
+        w.put_locked("mlb/receipt.json", b"critical", now=datetime(2000, 1, 1, tzinfo=timezone.utc))
+    with pytest.raises(ls.LockStoreError, match="timezone-aware"):
+        w.put_locked("mlb/receipt.json", b"critical", now=datetime(2026, 10, 13))
+    assert c.calls == []
+
+
 def test_s3_missing_version_id_refused():
     w = ls.S3ObjectLockWriter("sportsedge-evidence-locked", _FakeS3(vid=None), enabled=True)
     with pytest.raises(ls.LockStoreError):
