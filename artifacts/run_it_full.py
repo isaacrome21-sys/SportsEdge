@@ -868,6 +868,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         "anchored_max_surface": "WATCH",
         "anchored_ev_in_edges_lists": "SUPPRESSED",
         "undetermined_provenance": "FAIL_CLOSED",
+        "availability_unverified_max_surface": "RESEARCH_ONLY",
     })
     card["evaluated_rows"] = evaluated
     card.setdefault("summary",{})
