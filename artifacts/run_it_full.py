@@ -283,9 +283,13 @@ def _team_totals_intake_refusal(line):
       A contradiction (the team names the other side, or a third team)
       is refused at intake by name; a stated team is NEVER silently
       overridden by team_side.
-    - No team identity and no resolvable team_side -> refused at
-      intake by name (TEAM_TOTALS_TEAM_REQUIRED), instead of dying
-      deep in the engine as BLOCKED_INVALID.
+    - A team_side that is present but neither HOME/AWAY nor resolvable
+      to either team (a team name is resolvable) is refused at intake
+      by name (TEAM_TOTALS_TEAM_SIDE_INVALID) -- a corrupt identity
+      signal is never silently ignored.
+    - No team identity and no team_side -> refused at intake by name
+      (TEAM_TOTALS_TEAM_REQUIRED), instead of dying deep in the
+      engine as BLOCKED_INVALID.
 
     The engine's own team derivation is mirrored exactly: the ``team``
     field, else the team named in a "<Team> OVER|UNDER" side/selection.
@@ -334,8 +338,17 @@ def _team_totals_intake_refusal(line):
         if team and key(team) != key(tokenized[0]):
             return None  # engine-owned conflict; behavior unchanged
         team = tokenized[0]
-    raw_side = str(line.get("team_side") or "").strip().upper()
-    team_side = raw_side if raw_side in {"HOME", "AWAY"} else None
+    raw_side = str(line.get("team_side") or "").strip()
+    team_side = None
+    if raw_side:
+        team_side = (raw_side.upper() if raw_side.upper() in {"HOME", "AWAY"}
+                     else _referent(raw_side))
+        if team_side is None:
+            return _refusal(
+                "TEAM_TOTALS_TEAM_SIDE_INVALID",
+                f"team_side {raw_side!r} is neither HOME/AWAY nor the "
+                f"home ({home!r}) or away ({away!r}) team; an invalid "
+                "team_side is refused at intake, never ignored")
 
     if team:
         if team_side is not None and _referent(team) != team_side:
@@ -354,7 +367,7 @@ def _team_totals_intake_refusal(line):
     return _refusal(
         "TEAM_TOTALS_TEAM_REQUIRED",
         "team is missing at intake: no team field, no team named in "
-        "the selection, and no resolvable team_side (HOME/AWAY)")
+        "the selection, and no team_side")
 
 
 def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,

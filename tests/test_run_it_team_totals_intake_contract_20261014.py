@@ -120,3 +120,79 @@ def test_team_field_conflicting_with_selection_stays_engine_owned():
     r = _card([row])["evaluated_rows"][0]
     assert r["status"] == "BLOCKED_INVALID"
     assert r["reason"] == "TEAM_TOTALS_CONFLICTING_TEAM_IDENTITY"
+
+
+def test_invalid_team_side_value_refused_at_intake_by_name():
+    # A present-but-corrupt team_side is its own rejection class
+    # (owner contract, Oct 14): not HOME/AWAY and not resolvable to
+    # either team -- refused by name, never silently ignored.
+    for bad in ("MIL", "OVER", "HOME_TEAM"):
+        row = dict(BASE, side="OVER", line=3.5, odds=114, team_side=bad)
+        r = _card([row])["evaluated_rows"][0]
+        assert r["status"] == "NO_MODEL_OR_MARKET", bad
+        assert r["blocker"] == "TEAM_TOTALS_TEAM_SIDE_INVALID", bad
+        assert r["intake_enforced"] is True
+        assert "ev_per_dollar" not in r
+
+
+def test_invalid_team_side_refused_even_with_valid_team():
+    row = dict(BASE, side="OVER", line=4.5, odds=114,
+               team="Los Angeles Dodgers", team_side="MIL")
+    r = _card([row])["evaluated_rows"][0]
+    assert r["status"] == "NO_MODEL_OR_MARKET"
+    assert r["blocker"] == "TEAM_TOTALS_TEAM_SIDE_INVALID"
+    assert r["intake_enforced"] is True
+
+
+def test_team_side_naming_a_team_is_resolvable():
+    # team_side carrying the team's name resolves to that side.
+    row = dict(BASE, side="OVER", line=3.5, odds=114,
+               team_side="Milwaukee Brewers")
+    r = _card([row])["evaluated_rows"][0]
+    assert r["selection"] == "Milwaukee Brewers OVER 3.5"
+    assert r["status"] == "RESEARCH_POSITIVE_EV_UNVALIDATED"
+
+
+def test_mixed_slate_regression():
+    """The Oct 14 diagnostic slate shape: MLB game markets price, the
+    team_side TEAM_TOTALS rows price, F5 and CFB refusals stay intact."""
+    mlb = {k: BASE[k] for k in ("sport", "away", "home", "kickoff",
+                                "book", "quote_captured_at")}
+    cfb = {"sport": "CFB", "away": "Kennesaw State",
+           "home": "Missouri State", "kickoff": "2026-10-14T18:30:00-05:00",
+           "book": "draftkings", "quote_captured_at": CAPTURE.isoformat()}
+    rows = [
+        dict(mlb, market="ML", side="HOME", odds=-150),
+        dict(mlb, market="ML", side="AWAY", odds=130),
+        dict(mlb, market="TOTAL", side="OVER", line=8.5, odds=-110),
+        dict(mlb, market="TOTAL", side="UNDER", line=8.5, odds=-110),
+        dict(BASE, team_side="HOME", side="OVER", line=4.5, odds=114),
+        dict(BASE, team_side="AWAY", side="OVER", line=3.5, odds=114),
+        {"sport": "MLB", "market": "F5_MONEYLINE",
+         "away": "Milwaukee Brewers", "home": "Los Angeles Dodgers",
+         "side": "HOME", "odds": -120,
+         "kickoff": "2026-10-14T19:00:00-05:00",
+         "quote_captured_at": CAPTURE.isoformat()},
+        dict(cfb, market="ML", side="HOME", odds=-150),
+        dict(cfb, market="TEAM_TOTALS", team_side="HOME", side="OVER",
+             line=27.5, odds=-110),
+    ]
+    card = _card(rows)
+    evaluated = card["evaluated_rows"]
+    assert len(evaluated) == len(rows)
+    # MLB game markets + mapped team totals evaluate with prices.
+    for r in evaluated[:6]:
+        assert "ev_per_dollar" in r, r
+        assert r["status"] in (
+            "BELOW_THRESHOLD", "RESEARCH_POSITIVE_EV_UNVALIDATED"), r
+    assert evaluated[4]["selection"] == "Los Angeles Dodgers OVER 4.5"
+    assert evaluated[5]["selection"] == "Milwaukee Brewers OVER 3.5"
+    # F5 and CFB refusals intact: named, registry-enforced, priceless.
+    for r in evaluated[6:]:
+        assert r["status"] == "NO_MODEL_OR_MARKET", r
+        assert r["registry_enforced"] is True, r
+        assert r["blocker"] in {"NO_VALIDATION", "NO_ENGINE"}, r
+        assert "ev_per_dollar" not in r, r
+    # No refused row leaks onto any priced surface.
+    assert all(e["sport"] == "MLB" for e in card["edges"])
+    assert card["prop_candidates"] == []
