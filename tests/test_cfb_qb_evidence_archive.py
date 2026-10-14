@@ -228,3 +228,139 @@ def test_writer_failed_fsync_never_publishes_partial_file(tmp_path, monkeypatch)
     with pytest.raises(OSError, match="disk failure"):
         preserve(tmp_path)
     assert not list(tmp_path.iterdir())
+
+
+# -- Archive-level seal: one pin for a whole multi-team capture -------
+# preserve_form2_bundle seals one receipt per manifest by design; the
+# RUN IT loader takes ONE external pin per capture. The sealer is the
+# enumeration step between them: it must re-verify everything it
+# enumerates (never trust the caller's copies), publish exactly one
+# new immutable object, and fail closed without publishing on any
+# disagreement.
+
+def preserve_second(tmp_path):
+    from sportsedge.prepricing.qb_evidence_archive import preserve_form2_bundle
+    return preserve_form2_bundle(
+        tmp_path, bundle_bytes=json.dumps(make_bundle("2393")).encode(),
+        team_id="2393", event_id="401871067", home_team_id="2393",
+        away_team_id="48", kickoff=KICKOFF,
+        previous_game_kickoff=CHARTS["2393"][3], clock=lambda: NOW)
+
+
+def seal(tmp_path, pins):
+    from sportsedge.prepricing.qb_evidence_archive import \
+        seal_form2_archive_manifest
+    return seal_form2_archive_manifest(tmp_path, manifest_sha256s=pins)
+
+
+def publish_raw(tmp_path, manifest):
+    raw = json.dumps(manifest, sort_keys=True,
+                     separators=(",", ":")).encode()
+    digest = hashlib.sha256(raw).hexdigest()
+    (tmp_path / (digest + ".json")).write_bytes(raw)
+    return digest
+
+
+def inventory(tmp_path):
+    return {p.name: p.read_bytes() for p in tmp_path.iterdir()}
+
+
+def test_sealer_combines_single_receipt_manifests(tmp_path):
+    first, second = preserve(tmp_path), preserve_second(tmp_path)
+    result = seal(tmp_path, [first["candidate_manifest_sha256"],
+                             second["candidate_manifest_sha256"]])
+    assert result["receipt_count"] == 2
+    assert result["anchor_status"] == "UNANCHORED"
+    assert not any(result[k] for k in
+                   ("eligibility", "staking_allowed", "activation_allowed"))
+    sealed_path = tmp_path / (result["candidate_manifest_sha256"] + ".json")
+    assert sealed_path.read_bytes() == result["manifest_bytes"]
+    combined = json.loads(result["manifest_bytes"])
+    assert combined["schema"] == SCHEMA
+    assert [e["team_id"] for e in combined["entries"]] == ["2393", "48"]
+    assert result["bundle_sha256s"] == sorted(
+        [first["bundle_sha256"], second["bundle_sha256"]])
+    # The archive reader resolves BOTH teams under the one sealed pin.
+    assert load(tmp_path, combined)["identity_evidence"]["ok"]
+    other = load(tmp_path, combined, team_id="2393",
+                 previous_game_kickoff=CHARTS["2393"][3])
+    assert other["identity_evidence"]["ok"]
+    assert not list(tmp_path.glob(".pending-*"))
+
+
+def test_sealer_is_idempotent_and_order_insensitive(tmp_path):
+    first, second = preserve(tmp_path), preserve_second(tmp_path)
+    pins = [first["candidate_manifest_sha256"],
+            second["candidate_manifest_sha256"]]
+    result = seal(tmp_path, pins)
+    before = inventory(tmp_path)
+    assert seal(tmp_path, list(reversed(pins))) == result
+    assert inventory(tmp_path) == before
+
+
+def test_sealer_refuses_duplicate_receipt(tmp_path):
+    first = preserve(tmp_path)
+    before = inventory(tmp_path)
+    with pytest.raises(EvidenceArchiveError, match="RECEIPT_NOT_UNIQUE"):
+        seal(tmp_path, [first["candidate_manifest_sha256"]] * 2)
+    assert inventory(tmp_path) == before
+
+
+def test_sealer_refuses_tampered_bundle_object(tmp_path):
+    first = preserve(tmp_path)
+    (tmp_path / (first["bundle_sha256"] + ".json")).write_bytes(
+        b"tampered bytes")
+    before = inventory(tmp_path)
+    with pytest.raises(EvidenceArchiveError, match="BUNDLE_HASH_MISMATCH"):
+        seal(tmp_path, [first["candidate_manifest_sha256"]])
+    assert inventory(tmp_path) == before
+
+
+def test_sealer_refuses_manifest_object_not_matching_its_pin(tmp_path):
+    first = preserve(tmp_path)
+    pin = first["candidate_manifest_sha256"]
+    (tmp_path / (pin + ".json")).write_bytes(
+        json.dumps({"schema": SCHEMA, "entries": []}).encode())
+    with pytest.raises(EvidenceArchiveError, match="MANIFEST_HASH_MISMATCH"):
+        seal(tmp_path, [pin])
+
+
+def test_sealer_refuses_multi_receipt_manifest_input(tmp_path):
+    first = preserve(tmp_path)
+    entry = json.loads(first["manifest_bytes"])["entries"][0]
+    digest = publish_raw(tmp_path, {"schema": SCHEMA, "entries": [
+        entry, dict(entry, team_id="9999")]})
+    before = inventory(tmp_path)
+    with pytest.raises(EvidenceArchiveError, match="SINGLE_RECEIPT"):
+        seal(tmp_path, [digest])
+    assert inventory(tmp_path) == before
+
+
+def test_sealer_refuses_receipt_that_disagrees_with_bundle(tmp_path):
+    first = preserve(tmp_path)
+    entry = dict(json.loads(first["manifest_bytes"])["entries"][0],
+                 team_id="9999")
+    digest = publish_raw(tmp_path, {"schema": SCHEMA, "entries": [entry]})
+    before = inventory(tmp_path)
+    with pytest.raises(EvidenceArchiveError, match="FIXTURE_MISMATCH"):
+        seal(tmp_path, [digest])
+    assert inventory(tmp_path) == before
+
+
+def test_sealer_refuses_receipt_recorded_before_capture(tmp_path):
+    first = preserve(tmp_path)
+    entry = dict(json.loads(first["manifest_bytes"])["entries"][0],
+                 recorded_at_utc="2026-10-13T13:00:00Z")
+    digest = publish_raw(tmp_path, {"schema": SCHEMA, "entries": [entry]})
+    before = inventory(tmp_path)
+    with pytest.raises(EvidenceArchiveError, match="PRECEDES_FETCH"):
+        seal(tmp_path, [digest])
+    assert inventory(tmp_path) == before
+
+
+def test_sealer_refuses_empty_or_scalar_input(tmp_path):
+    with pytest.raises(EvidenceArchiveError, match="SEAL_NO_MANIFESTS"):
+        seal(tmp_path, [])
+    with pytest.raises(EvidenceArchiveError, match="SEAL_NO_MANIFESTS"):
+        seal(tmp_path, "a" * 64)
+    assert not list(tmp_path.iterdir())
