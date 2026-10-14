@@ -98,6 +98,7 @@ def test_fewer_than_five_games_blocks_cfb_and_nfl():
         assert "FEWER_THAN_FIVE" in c["prop_unpriced"][0]["reason"]
 
 
+@pytest.mark.registry_lane_internals
 def test_il_colleges_are_blocked_in_cfb_research_quote_bridge():
     home="Illinois Fighting Illini"
     original=[quote("CFB","OVER",home=home),quote("CFB","UNDER",home=home)]

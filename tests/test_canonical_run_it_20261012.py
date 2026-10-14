@@ -123,7 +123,11 @@ def test_blocked_row_for_names_the_taxonomy_blocker():
     assert "PROVIDER_UNAVAILABLE" in blocked_row_for(
         "MLB", "PITCHER_HITS_WALKS_ER",
         {"market": "PITCHER_HITS_WALKS_ER"})["reason"]
-    assert blocked_row_for("NBA", "PLAYER_POINTS", {"market": "X"}) is None
+    # t126 family registry: NBA props are now registered (BLOCKED NO_ENGINE);
+    # a sport with no registry at all still falls outside this map.
+    assert blocked_row_for("NBA", "PLAYER_POINTS",
+                           {"market": "X"})["blocker"] == "NO_ENGINE"
+    assert blocked_row_for("PGA", "PLAYER_POINTS", {"market": "X"}) is None
 
 
 def test_dispatch_sets_match_stage_modules():
