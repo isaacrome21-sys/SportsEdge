@@ -552,5 +552,74 @@ class PinnedHappyPathTests(AdapterCase):
             self.assertIsNone(row.get(key), key)
 
 
+class HardeningParityTests(AdapterCase):
+    """#2177 loader-hardening parity (PR #2192's loader lineage),
+    ported under the Oct 13 settlement: #2192's loader is not the
+    survivor -- the pinned-archive adapter is -- but its hardening
+    must not be lost. Each test names the #2192-side case it adapts;
+    adaptations are limited to the canonical surface (pinned calls,
+    content-addressed object names, archive reason vocabulary)."""
+
+    def test_symlink_directory_refused(self):
+        # Adapts #2192's test_symlink_directory_refused (loader battery):
+        # a symlinked bundles directory is refused at the directory,
+        # by name, before any object is enumerated -- not merely
+        # refused object-by-object under a directory_status of OK.
+        _, entry48 = self.preserve(make_bundle("48"), "48")
+        raw, pin = self.combined_manifest([entry48])
+        alias = self.dir.parent / (self.dir.name + "_alias")
+        os.symlink(self.dir, alias, target_is_directory=True)
+        self.addCleanup(lambda: alias.is_symlink() and alias.unlink())
+        mapping, audit = loader.load_form2_bundles(
+            alias, [cfb_row()], manifest_sha256=pin, manifest_bytes=raw)
+        self.assertEqual(mapping, {})
+        self.assertEqual(audit["directory_status"],
+                         "UNSAFE_DIRECTORY_SYMLINK")
+        self.assertEqual(audit["entries"], [])
+
+    def test_conflicting_team_ids_same_name_all_refused(self):
+        # Adapts the name-key half of #2192's both-sides duplicate
+        # refusal (#2177): two sealed bundles carrying the SAME team
+        # name under DIFFERENT ESPN ids, each uniquely covered by the
+        # pinned manifest and each passing every per-object check,
+        # still refuse BOTH -- the name the binder resolves by is
+        # ambiguous, so neither candidate may be selected. An
+        # unrelated team is unaffected.
+        _, entry48 = self.preserve(make_bundle("48"), "48")
+        _, entry_mtsu = self.preserve(make_bundle("2393"), "2393")
+        roster_obj = roster_payload("48")
+        roster_obj["team"] = {"id": "9999"}
+        name, url, _, _, prev = TEAMS["48"]
+        bundle_b = qe.build_form2_bundle(
+            team_id="9999", team_name=name,
+            event_id="401871067", opponent_id="2393",
+            kickoff_utc=KICKOFF_ISO,
+            previous_game_kickoff_utc=prev,
+            depth_url=url,
+            depth_content=depth_text("48"),
+            depth_captured_at_utc=CAPTURED,
+            roster_content=json.dumps(roster_obj, sort_keys=True),
+            roster_captured_at_utc="2026-10-13T13:12:14Z",
+            roster_athlete_count_repeat=len(qe.roster_athletes(roster_obj)))
+        digest_b = self.publish_raw(bundle_bytes(bundle_b))
+        entry_b = {"team_id": "9999", "event_id": "401871067",
+                   "home_team_id": "2393", "away_team_id": "9999",
+                   "kickoff_utc": KICKOFF_ISO,
+                   "recorded_at_utc": NOW.isoformat(),
+                   "bundle_sha256": digest_b}
+        raw, pin = self.combined_manifest([entry48, entry_b, entry_mtsu])
+        mapping, audit = loader.load_form2_bundles(
+            self.dir, [cfb_row()], manifest_sha256=pin,
+            manifest_bytes=raw)
+        self.assertEqual(set(mapping), {"2393"})
+        entries = self.entries_by_file(audit)
+        digest_a = entry48["bundle_sha256"]
+        for digest in (digest_a, digest_b):
+            entry_for = entries[f"{digest}.json"]
+            self.assertEqual(entry_for["disposition"], loader.EXCLUDED)
+            self.assertEqual(entry_for["reason"], loader.REASON_DUPLICATE)
+        self.assertIn("SAME_TEAM_NAME", entries[f"{digest_b}.json"]["detail"])
+
+
 if __name__ == "__main__":
     unittest.main()
