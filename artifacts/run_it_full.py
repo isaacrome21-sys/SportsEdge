@@ -811,8 +811,15 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "research_only": True, "official_authority": False,
                 "model_p_authority": False, "staking_authority": False,
             } for line in f5_input]
+    # Participation evidence is caller-supplied only: the payload may
+    # carry an "nfl_participation" bundle (nflverse depth/injury rows,
+    # official inactives, game contexts, ESPN<->nflverse bindings) which
+    # the phone pricer checks through the participation bridge.  Absent
+    # the bundle, phone rows keep the gamelog participation stamp.
     nfl_results, nfl_receipts = phone_nfl_player_rows(
-        nfl_input, now=clock, getter=getter if auto_context else (lambda url: None))
+        nfl_input, now=clock, getter=getter if auto_context else (lambda url: None),
+        participation=payload.get("nfl_participation")
+        if isinstance(payload, dict) else None)
     cfb_results, cfb_receipts = phone_cfb_player_rows(
         cfb_input, now=clock, getter=getter if auto_context else (lambda url: None))
     teamhalf_results, teamhalf_receipts = price_team_half_rows(
@@ -1095,13 +1102,6 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         card["summary"]["mlb_market_coverage"] = dict(card["mlb_full_board"]["input_coverage"])
     if form2_loader_audit is not None:
         card["qb_form2_bundle_loader_audit"] = form2_loader_audit
-    # Optional operator-captured fixture-specific DraftKings tab census.
-    # This is DIAGNOSTICS ONLY, not a trusted quote, model, registry
-    # eligibility switch, or evidence of book-offered wagers.
-    if isinstance(payload, dict) and "dk_fixture_menu_snapshot" in payload:
-        from sportsedge.dk_fixture_menu_audit import audit_dk_fixture_menu
-        card["dk_fixture_menu_audit"] = audit_dk_fixture_menu(
-            payload["dk_fixture_menu_snapshot"])
     card["runner"]="RUN_IT_FULL_MLB_AND_NAMED_FOOTBALL_PLAYER_HISTORIES_V1"
     from sportsedge.phone_display import identity_rows, build_phone_card
     card["selection_intake"] = identity_rows(rows, default_sport)
