@@ -459,6 +459,38 @@ def _refuse_pending_receipt_intents(root: Path) -> None:
         raise MLBSourceError("RECEIPT_INTENT_ORPHAN_UNCOMMITTED")
 
 
+def _sync_verified_receipt_commit(root: Path) -> None:
+    """Commit bytes surviving a killed writer need recovery fsync before ACCEPT.
+
+    Do not synthesize a commit, alter a journal or grant authority to a
+    legacy journal-only root. Recovery errors must refuse the entire root.
+    """
+    intent = root / RECEIPT_INTENT_JOURNAL_NAME
+    if not intent.exists():
+        return
+    directory = -1
+    try:
+        directory = os.open(root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+                            | getattr(os, "O_NOFOLLOW", 0))
+        for name in (RECEIPT_JOURNAL_NAME, RECEIPT_INTENT_JOURNAL_NAME):
+            fd = -1
+            try:
+                fd = os.open(name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                             | getattr(os, "O_NONBLOCK", 0), dir_fd=directory)
+                if not stat.S_ISREG(os.fstat(fd).st_mode):
+                    raise MLBSourceError("RECEIPT_RECOVERY_SYNC_FAILED")
+                os.fsync(fd)
+            finally:
+                if fd >= 0:
+                    os.close(fd)
+        os.fsync(directory)
+    except OSError as exc:
+        raise MLBSourceError("RECEIPT_RECOVERY_SYNC_FAILED") from exc
+    finally:
+        if directory >= 0:
+            os.close(directory)
+
+
 def verify_receipt_journal(root: str | Path, *, verifier_now: datetime | None = None) -> list[dict[str, Any]]:
     """Independently re-verify a persisted capture directory (fresh process / restart).
 
@@ -578,6 +610,8 @@ def verify_receipt_journal(root: str | Path, *, verifier_now: datetime | None = 
         entries.append(entry)
     _refuse_unjournaled_raw(root, entries)
     _refuse_pending_receipt_intents(root)
+    # A visible COMMIT can survive process death before the writer fsync.
+    _sync_verified_receipt_commit(root)
     return entries
 
 

@@ -204,6 +204,8 @@ _CHILD = textwrap.dedent(
         os._exit(9)
 
     def dw_wrapper(path, data, *, append):
+        if state["dw"] == 0:
+            state["fsync"] = 0  # exclude prior root recovery syncs
         state["dw"] += 1
         k = state["dw"]
         if mode == "before_dw" and k == param:
@@ -293,8 +295,8 @@ BOUNDARY_CASES = [
     ("B8_journal_fsynced", "before_fsync", 7, ("refuse", UNCOMMITTED)),
     # B9: journal line fully durable, death before the COMMIT write.
     ("B9_journal_durable", "after_dw", 3, ("refuse", UNCOMMITTED)),
-    # B10: COMMIT bytes written, death before the COMMIT fsync. Process
-    # death preserves written bytes: the receipt IS complete committed.
+    # B10: COMMIT visible before fsync: acceptance requires successful
+    # verifier recovery-sync of intent, journal and directory.
     ("B10_commit_written", "before_fsync", 9, ("verify", [1, 2])),
     # B11: COMMIT fully durable; death after the append's durable work,
     # before record() returns to its caller.
@@ -359,6 +361,32 @@ def _raw_names(root: Path) -> list[str]:
 def _journal_line_count(root: Path) -> int:
     journal = root / ms.RECEIPT_JOURNAL_NAME
     return journal.read_bytes().count(b"\n") if journal.exists() else 0
+
+
+
+def test_b10_verifier_recovery_syncs_commit(tmp_path):
+    root = _run_injection(tmp_path, "before_fsync", 9)
+    real = os.fsync
+    called = []
+    def tracked(fd):
+        called.append(fd)
+        return real(fd)
+    with patch.object(os, "fsync", tracked):
+        entries = ms.verify_receipt_journal(root, verifier_now=T0)
+    assert [e["sequence"] for e in entries] == [1, 2]
+    assert len(called) >= 3, "journal, intent COMMIT and directory must sync"
+
+
+def test_b10_recovery_sync_failure_refuses_without_repair(tmp_path):
+    root = _run_injection(tmp_path, "before_fsync", 9)
+    before = _snapshot(root)
+    with patch.object(os, "fsync", side_effect=OSError("injected recovery sync failure")):
+        with pytest.raises(ms.MLBSourceError, match="RECEIPT_RECOVERY_SYNC_FAILED"):
+            ms.verify_receipt_journal(root, verifier_now=T0)
+        with patch.object(ms, "_trusted_now", lambda: T0):
+            with pytest.raises(ms.MLBSourceError, match="RECEIPT_RECOVERY_SYNC_FAILED"):
+                ms.MLBSourceCapture(root)
+    assert _snapshot(root) == before
 
 
 def test_sigkill_in_pair_window_refuses_by_name(tmp_path):
