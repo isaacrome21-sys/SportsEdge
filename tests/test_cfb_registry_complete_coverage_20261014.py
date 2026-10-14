@@ -1,6 +1,12 @@
 """t146: every CFB market path is registered-and-blocked or unregistered-and-blocked; none priced.
 
 Ruling 2026-10-14: unvalidated CFB game lines cannot become PLAY; CFB team totals FORWARD_ONLY.
+Registration update 2026-10-14 (wiring completion): the CFB player-prop families
+with an existing research pricing path are registered NOT_VALIDATED /
+FORWARD_ONLY, mirroring team_total -- their refusal reason is now the accurate
+FAMILY_REGISTRY_NOT_VALIDATED instead of FAMILY_MARKET_UNREGISTERED. Player
+markets with no engine path (anytime TD, longest-play, kicking, defensive)
+stay UNREGISTERED / NO_ENGINE. Nothing becomes priced or playable.
 """
 from __future__ import annotations
 
@@ -20,6 +26,36 @@ FOOTBALL = json.loads((ROOT / "config/football_market_surface.json").read_text()
 
 GAME_FAMILIES = {"MONEYLINE": "moneyline", "SPREAD": "spread", "TOTAL": "total",
                  "TEAM_TOTAL": "team_total"}
+REGISTERED_PLAYER = {  # research-surface spelling -> canonical family
+    "player_pass_yds": "player_passing_yards", "player_pass_tds": "player_passing_tds",
+    "player_pass_attempts": "player_pass_attempts",
+    "player_pass_completions": "player_completions",
+    "player_pass_interceptions": "player_interceptions",
+    "player_rush_yds": "player_rushing_yards",
+    "player_rush_attempts": "player_rush_attempts",
+    "player_reception_yds": "player_receiving_yards",
+    "player_receptions": "player_receptions",
+    "player_rush_reception_yds": "player_rush_plus_rec_yards",
+    "player_pass_rush_yds": "player_pass_plus_rush_yards",
+}
+PRICER_PLAYER_KEYS = {  # canonical keys emitted by the CFB phone pricer
+    "PLAYER_PASSING_YARDS": "player_passing_yards",
+    "PLAYER_PASS_YARDS": "player_passing_yards",
+    "PLAYER_PASSING_TDS": "player_passing_tds",
+    "PLAYER_PASS_TDS": "player_passing_tds",
+    "PLAYER_PASS_ATTEMPTS": "player_pass_attempts",
+    "PLAYER_COMPLETIONS": "player_completions",
+    "PLAYER_RUSHING_YARDS": "player_rushing_yards",
+    "PLAYER_RUSH_YARDS": "player_rushing_yards",
+    "PLAYER_RUSH_ATTEMPTS": "player_rush_attempts",
+    "PLAYER_RECEIVING_YARDS": "player_receiving_yards",
+    "PLAYER_REC_YARDS": "player_receiving_yards",
+    "PLAYER_RECEPTIONS": "player_receptions",
+    "PLAYER_RUSH_PLUS_REC_YARDS": "player_rush_plus_rec_yards",
+    "PLAYER_PASS_PLUS_RUSH_YARDS": "player_pass_plus_rush_yards",
+}
+UNREGISTERED_PLAYER = sorted(set(SURFACE["player_prop_candidate_markets"])
+                             - set(REGISTERED_PLAYER))
 FEED_ALIASES = {  # odds-feed spelling -> canonical family
     "h2h": "moneyline", "H2H": "moneyline", "ml": "moneyline", "money_line": "moneyline",
     "moneyline": "moneyline", "spreads": "spread", "spread": "spread", "point_spread": "spread",
@@ -63,9 +99,24 @@ def test_every_surface_game_market_registered_with_declared_scope(key, family):
     assert d["evaluation_scope"] == ("FORWARD_ONLY" if family == "team_total" else "HISTORICAL")
 
 
-def test_scope_table_exactly_the_four_cfb_game_families():
-    assert CFB_EVALUATION_SCOPE == {"moneyline": "HISTORICAL", "spread": "HISTORICAL",
-                                    "total": "HISTORICAL", "team_total": "FORWARD_ONLY"}
+def test_scope_table_exactly_the_registered_cfb_families():
+    expected = {"moneyline": "HISTORICAL", "spread": "HISTORICAL",
+                "total": "HISTORICAL", "team_total": "FORWARD_ONLY"}
+    expected.update({family: "FORWARD_ONLY"
+                     for family in set(REGISTERED_PLAYER.values())})
+    assert CFB_EVALUATION_SCOPE == expected
+
+
+@pytest.mark.parametrize("key,family", sorted({**REGISTERED_PLAYER,
+                                               **PRICER_PLAYER_KEYS}.items()))
+def test_registered_player_prop_families_blocked_not_validated(key, family):
+    d = family_market_decision("CFB", key)
+    assert d["market"] == family and d["reason"] == "FAMILY_REGISTRY_NOT_VALIDATED"
+    assert d["blocker"] == "NO_VALIDATION"
+    assert d["evaluation_scope"] == "FORWARD_ONLY"
+    assert d["state"] == "BLOCKED" and d["validation_status"] == "UNVALIDATED"
+    assert not (d["official_authority"] or d["model_p_authority"]
+                or d["staking_authority"])
 
 
 @pytest.mark.parametrize("alias,family", sorted(FEED_ALIASES.items()))
@@ -80,8 +131,8 @@ def test_every_feed_literal_in_cfb_code_is_registered():
 
 @pytest.mark.parametrize("key", [m for m, s in _football_cfb_markets().items() if s == "NO_ENGINE"]
                          + list(SURFACE["unsupported_or_not_promoted"])
-                         + list(SURFACE["player_prop_candidate_markets"]))
-def test_no_engine_and_prop_markets_stay_unregistered(key):
+                         + UNREGISTERED_PLAYER)
+def test_no_engine_and_unregistered_markets_stay_unregistered(key):
     d = family_market_decision("CFB", key)
     assert d["evaluation_scope"] == "UNREGISTERED" and d["blocker"] == "NO_ENGINE", key
 
@@ -116,6 +167,28 @@ def test_illinois_exclusion_still_first():
     assert out["family_decision"]["market"] == "moneyline"
 
 
+def test_bare_player_interceptions_spelling_stays_unregistered():
+    # PLAYER_INTERCEPTIONS is ambiguous: the football market surface uses
+    # the same string for the defensive-interceptions market (NO_ENGINE,
+    # no intake path), while the CFB pricer uses it for QB interceptions
+    # thrown. The string alone cannot distinguish them, so it keeps the
+    # conservative UNREGISTERED refusal; the unambiguous QB spelling
+    # PLAYER_PASS_INTERCEPTIONS is registered (see REGISTERED_PLAYER).
+    d = family_market_decision("CFB", "PLAYER_INTERCEPTIONS")
+    assert d["evaluation_scope"] == "UNREGISTERED" and d["blocker"] == "NO_ENGINE"
+
+
+def test_player_prop_gate_row_refuses_not_validated_and_priceless():
+    out = rg.family_gate_row("CFB", "PLAYER_PASSING_YARDS",
+                             {"home": "Kennesaw State", "away": "Missouri State",
+                              "player_name": "Rickie Collins"})
+    assert out["status"] == "NO_MODEL_OR_MARKET"
+    assert out["blocker"] == "NO_VALIDATION"
+    assert out["reason"].startswith("FAMILY_REGISTRY_NOT_VALIDATED")
+    assert out["family_decision"]["evaluation_scope"] == "FORWARD_ONLY"
+    assert not (set(out) & rg.PRICING_KEYS)
+
+
 # ---- scope enforcement (fail closed) ----
 
 @pytest.mark.parametrize("market", ["moneyline", "h2h", "spreads", "totals"])
@@ -132,11 +205,22 @@ def test_team_total_forward_only(market):
     assert cfb_evaluation_admissible(market, "FORWARD_ONLY")[0] is True
 
 
+@pytest.mark.parametrize("market,family", [("PLAYER_PASSING_YARDS", "player_passing_yards"),
+                                           ("player_pass_yds", "player_passing_yards"),
+                                           ("player_rush_yds", "player_rushing_yards")])
+def test_player_prop_families_forward_only(market, family):
+    assert cfb_evaluation_admissible(market, "HISTORICAL") == (
+        False, f"SCOPE_MISMATCH:{family}:FORWARD_ONLY")
+    assert cfb_evaluation_admissible(market, "FORWARD_ONLY")[0] is True
+    assert family_market_decision("CFB", market)["state"] == "BLOCKED"  # still no PLAY
+
+
 @pytest.mark.parametrize("market,scope,reason", [
     ("moneyline", None, "EVALUATION_SCOPE_INVALID"), ("moneyline", "historical", "EVALUATION_SCOPE_INVALID"),
     ("moneyline", "BOTH", "EVALUATION_SCOPE_INVALID"), ("moneyline", 1, "EVALUATION_SCOPE_INVALID"),
     ("alternate_spread", "HISTORICAL", "FAMILY_MARKET_UNREGISTERED"),
-    ("player_pass_yds", "FORWARD_ONLY", "FAMILY_MARKET_UNREGISTERED"),
+    ("player_pass_yds", "HISTORICAL", "SCOPE_MISMATCH:player_passing_yards:FORWARD_ONLY"),
+    ("player_anytime_td", "FORWARD_ONLY", "FAMILY_MARKET_UNREGISTERED"),
     (None, "HISTORICAL", "FAMILY_MARKET_UNREGISTERED"), ("", "HISTORICAL", "FAMILY_MARKET_UNREGISTERED")])
 def test_scope_check_fails_closed(market, scope, reason):
     assert cfb_evaluation_admissible(market, scope) == (False, reason)
