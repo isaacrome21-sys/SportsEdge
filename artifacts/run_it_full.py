@@ -269,6 +269,109 @@ def _registry_blocked_row(sport, markets, line):
     return None
 
 
+def _team_totals_intake_refusal(line):
+    """MLB TEAM_TOTALS game-lane intake contract.
+
+    The game engine requires an exact ``team`` and refuses to guess one
+    (TEAM_TOTALS_TEAM_REQUIRED); that strictness is the contract, not a
+    bug. Board-shaped intake rows may instead identify the team by
+    ``team_side`` (HOME/AWAY). Resolve that mapping HERE, at intake,
+    with the engine's own identity key, so a well-formed board row is
+    not trapped by a field-name mismatch:
+
+    - team_side resolvable + no team identity -> supply ``team`` (the
+      corresponding home/away name) on the line; the row proceeds.
+    - team identity present + team_side present -> the two must agree.
+      A contradiction (the team names the other side, or a third team)
+      is refused at intake by name; a stated team is NEVER silently
+      overridden by team_side.
+    - A team_side that is present but neither HOME/AWAY nor resolvable
+      to either team (a team name is resolvable) is refused at intake
+      by name (TEAM_TOTALS_TEAM_SIDE_INVALID) -- a corrupt identity
+      signal is never silently ignored.
+    - No team identity and no team_side -> refused at intake by name
+      (TEAM_TOTALS_TEAM_REQUIRED), instead of dying deep in the
+      engine as BLOCKED_INVALID.
+
+    The engine's own team derivation is mirrored exactly: the ``team``
+    field, else the team named in a "<Team> OVER|UNDER" side/selection.
+    A team field that conflicts with the selection-embedded team stays
+    engine-owned (TEAM_TOTALS_CONFLICTING_TEAM_IDENTITY) and this gate
+    does not touch the row. Returns None when the row may proceed,
+    else the fail-closed card row.
+    """
+    key = engine.PublicContext.key
+    away = str(line.get("away") or "").strip()
+    home = str(line.get("home") or "").strip()
+    if not home or not away or home == away:
+        game = str(line.get("game") or "")
+        if " @ " in game:
+            away, home = (s.strip() for s in game.split(" @ ", 1))
+    if not away or not home or away == home:
+        return None  # AWAY_HOME_REQUIRED is the engine's call, unchanged
+
+    def _referent(name):
+        kn = key(name)
+        if kn in {"home", key(home)}:
+            return "HOME"
+        if kn in {"away", key(away)}:
+            return "AWAY"
+        return None
+
+    def _refusal(blocker, detail):
+        return {
+            "status": "NO_MODEL_OR_MARKET",
+            "reason": f"{blocker}: {detail}"[:400],
+            "blocker": blocker,
+            "blocker_detail": detail,
+            "sport": line.get("sport"),
+            "market": line.get("market"),
+            "selection": line.get("side") or line.get("selection"),
+            "game": f"{away} @ {home}",
+            "research_only": True, "official_authority": False,
+            "model_p_authority": False, "staking_authority": False,
+            "intake_enforced": True,
+        }
+
+    team = str(line.get("team") or "").strip()
+    side_raw = str(line.get("side") or line.get("selection") or "").strip()
+    tokenized = side_raw.rsplit(" ", 1)
+    if len(tokenized) == 2 and tokenized[-1].upper() in {"OVER", "UNDER"}:
+        if team and key(team) != key(tokenized[0]):
+            return None  # engine-owned conflict; behavior unchanged
+        team = tokenized[0]
+    raw_side = str(line.get("team_side") or "").strip()
+    team_side = None
+    if raw_side:
+        team_side = (raw_side.upper() if raw_side.upper() in {"HOME", "AWAY"}
+                     else _referent(raw_side))
+        if team_side is None:
+            return _refusal(
+                "TEAM_TOTALS_TEAM_SIDE_INVALID",
+                f"team_side {raw_side!r} is neither HOME/AWAY nor the "
+                f"home ({home!r}) or away ({away!r}) team; an invalid "
+                "team_side is refused at intake, never ignored")
+
+    if team:
+        if team_side is not None and _referent(team) != team_side:
+            named = home if team_side == "HOME" else away
+            return _refusal(
+                "TEAM_TOTALS_TEAM_SIDE_CONFLICT",
+                f"team {team!r} does not identify the {team_side} team "
+                f"({named!r}); a team/team_side contradiction is refused "
+                "at intake, never silently overridden")
+        return None
+    if team_side is not None:
+        named = home if team_side == "HOME" else away
+        if named:
+            line["team"] = named
+            return None
+    return _refusal(
+        "TEAM_TOTALS_TEAM_REQUIRED",
+        "team is missing at intake: no team field, no team named in "
+        "the selection, and no team_side")
+
+
 def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
              auto_context=True, min_ev=0.02, lane="A", allow_manual_context=False,
              td_cache_dir=None, td_opener=None, form2_bundles_dir=None,
@@ -330,7 +433,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     coverage_indices, coverage_input = [], []
     f5_indices, f5_input = [], []
     registry_gated = {}  # local prop index -> registry blocker row
-    intake_gated = {}  # local prop index -> milestone intake refusal row
+    intake_gated = {}  # local prop index -> intake contract refusal row
     # Only CFB game-identity evidence may continue through prepricing.
     # The registry still blocks its pricer, output probabilities and plays.
     family_game_gated = {}  # game position -> precomputed registry blocker
@@ -418,9 +521,19 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             props.append(line)
             registry_gated[len(props) - 1] = gate
             continue
-        if market in {"ML", "SPREAD", "TOTAL"} or (
-            line["sport"] == "MLB" and market == "TEAM_TOTALS"
-        ):
+        if line["sport"] == "MLB" and market == "TEAM_TOTALS":
+            # Game-lane intake contract: resolve team_side -> team (or
+            # refuse by name) BEFORE the row reaches staging/the engine.
+            refusal = _team_totals_intake_refusal(line)
+            if refusal is not None:
+                prop_indices.append(i)
+                props.append(line)
+                intake_gated[len(props) - 1] = refusal
+                continue
+            game_indices.append(i)
+            games.append(line)
+            continue
+        if market in {"ML", "SPREAD", "TOTAL"}:
             game_indices.append(i)
             games.append(line)
             continue
