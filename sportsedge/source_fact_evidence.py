@@ -105,22 +105,39 @@ def adjudicate_pregame_fact(*, event_id, subject_id, fact_kind, cutoff_utc,
         state, reason, value = "UNKNOWN", ("SOURCE_EVIDENCE_MISSING" if not valid else "SOURCE_EVIDENCE_STALE" if not fresh else "OFFICIAL_CONFIRMATION_MISSING"), None
     else:
         state, reason, value = "SUPPORTED_RESEARCH_ONLY", "OFFICIAL_PRE_CUTOFF", official[0]["value"]
+    # Search entries are caller declarations, NOT independently authenticated
+    # browsing receipts. Validate the channel against pinned research hosts so
+    # an X URL cannot masquerade as an official-source search (or vice versa).
+    # Neither a declared search nor a pinned host establishes content truth.
     channels = set()
+    credible_hosts = {
+        host.lower()
+        for pin in source_registry.values()
+        if isinstance(pin, dict) and pin.get("kind") in ("OFFICIAL", "VERIFIED_REPORTER")
+        for host in pin.get("hosts", ())
+        if isinstance(host, str)
+    }
+    x_hosts = {"x.com", "www.x.com", "twitter.com", "www.twitter.com"}
     if isinstance(search_log, (list, tuple)):
         for row in search_log:
             if not isinstance(row, dict) or row.get("channel") not in ("OFFICIAL_WEB", "X") or not isinstance(row.get("query"), str) or not row["query"].strip():
                 continue
             try:
-                if _time(row.get("searched_at_utc")) <= cutoff:
-                    _host(row.get("search_url"))
-                    channels.add(row["channel"])
+                if _time(row.get("searched_at_utc")) > cutoff:
+                    continue
+                host = _host(row.get("search_url"))
+                if row["channel"] == "X" and host in x_hosts:
+                    channels.add("X")
+                elif row["channel"] == "OFFICIAL_WEB" and host in credible_hosts:
+                    channels.add("OFFICIAL_WEB")
             except ValueError:
                 continue
     return {"schema": "SPORTSEDGE_PREGAME_FACT_PROVENANCE_V1",
             "state": state, "reason": reason, "value": value,
             "accepted_sources": valid, "rejected_sources": rejected,
             "search_channels_pre_cutoff": sorted(channels),
-            "missing_search_channels": [c for c in ("OFFICIAL_WEB", "X") if c not in channels] if state != "SUPPORTED_RESEARCH_ONLY" else [],
+            "missing_search_channels": [c for c in ("OFFICIAL_WEB", "X") if c not in channels],
+            "search_execution_verified": False,
             "source_authenticity_verified": False, "receipt_bytes_verified": False,
             "model_probability_verified": False, "play_authority": False,
             "pricing_authority": False, "staking_authority": False}
