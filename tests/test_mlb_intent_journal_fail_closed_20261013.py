@@ -97,10 +97,12 @@ class IntentJournalFailClosedTests(unittest.TestCase):
         record_line = 'not-json\n'
         raw = record_line.encode()
         begin = _begin(record_line=record_line, record_sha256=hashlib.sha256(raw).hexdigest())
-        self._verify_and_recover_reject([begin], "INTENT_UNCOMMITTED")
         with tempfile.TemporaryDirectory() as root:
             capture, manifest, raw_dir, journal = self._paths(root)
             journal.write_text(json.dumps(begin) + "\n")
+            result = sc.verify_capture_store(capture, manifest, raw_dir)
+            self.assertFalse(result["ok"])
+            self.assertEqual(result["failure"]["reason"], "INTENT_UNCOMMITTED")
             with self.assertRaisesRegex(sc.StarterCaptureError, "INTENT_RECORD_UNPARSEABLE"):
                 sc.recover_capture_store(capture, manifest, raw_dir)
 
