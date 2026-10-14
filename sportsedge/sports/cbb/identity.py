@@ -68,6 +68,9 @@ def _utc(v: str) -> datetime:
 
 def bind_fixture(directory: Mapping, scoreboard: Mapping, *, away: str, home: str,
                  start: str, as_of: datetime) -> dict:
+    if (not isinstance(as_of, datetime) or as_of.tzinfo is None
+            or as_of.utcoffset() is None):
+        raise CBBIdentityError("AS_OF_TIMEZONE_REQUIRED")
     a, h = resolve_team(directory, away), resolve_team(directory, home)
     if a["id"] == h["id"]:
         raise CBBIdentityError("DISTINCT_TEAMS_REQUIRED")
@@ -88,10 +91,17 @@ def bind_fixture(directory: Mapping, scoreboard: Mapping, *, away: str, home: st
     if len(matches) != 1:
         raise CBBIdentityError("FIXTURE_NOT_UNIQUELY_VERIFIED:" + str(len(matches)))
     ev, st, neutral = matches[0]
+    event_id = ev.get("id")
+    # Missing ID must not silently become the string "None" or "null".
+    # ESPN's numeric event IDs are positive decimal identifiers, not booleans.
+    if (type(event_id) not in (str, int)
+            or not re.fullmatch(r"[0-9]+", str(event_id))
+            or int(event_id) <= 0):
+        raise CBBIdentityError("EVENT_ID_INVALID")
     if st <= as_of:
         raise CBBIdentityError("GAME_STARTED_OR_PAST")
     excluded = [x["name"] for x in (a, h) if x["illinois_excluded"]]
-    return {"event_id": str(ev.get("id")), "start_utc": st.isoformat(), "neutral_site": neutral,
+    return {"event_id": str(event_id), "start_utc": st.isoformat(), "neutral_site": neutral,
             "home_id": h["id"], "away_id": a["id"],
             "playable_status": "BLOCKED" if excluded else "RESEARCH_ONLY",
             "reason": "ILLINOIS_COLLEGE_EXCLUDED" if excluded else None,
