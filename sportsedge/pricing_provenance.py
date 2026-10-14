@@ -47,6 +47,23 @@ UNDETERMINED_REASON = "PROVENANCE_UNDETERMINED"
 ANCHORED_PLAY_BLOCK = "MARKET_ANCHORED_CANNOT_QUALIFY_AS_INDEPENDENT_PLAY"
 ANCHORED_EV_PRESENTATION = "ANCHORED_RESEARCH_ONLY_NOT_A_PLAY"
 
+# Availability guard (owner review of PR #2157, finding 4; issue
+# #2158). A row priced on QB_IDENTITY_EVIDENCE Form 2 carries
+# availability_status == AVAILABILITY_UNVERIFIED_NO_TEAM_INJURY_REPORT
+# (the constant is defined in
+# sportsedge.prepricing.qb_identity_evidence; the literal is repeated
+# here because that module imports the engine this module serves --
+# importing it would be circular). Identity was verified; the QB's
+# AVAILABILITY is explicitly unknown, and a verified name must never
+# be mistaken for verified availability: such a row is research-only
+# BY STRUCTURE, whatever its EV or engine status claims. The guard is
+# driven by the availability FIELD, never by a status string, so a
+# forged candidate status cannot switch it off.
+AVAILABILITY_UNVERIFIED = "AVAILABILITY_UNVERIFIED_NO_TEAM_INJURY_REPORT"
+AVAILABILITY_RESEARCH_ONLY_STATUS = "RESEARCH_ONLY_AVAILABILITY_UNVERIFIED"
+AVAILABILITY_PLAY_BLOCK = "QB_AVAILABILITY_UNVERIFIED_CANNOT_SURFACE_AS_PLAY"
+AVAILABILITY_EV_PRESENTATION = "RESEARCH_ONLY_AVAILABILITY_UNVERIFIED"
+
 # Statuses that place a row on a card PLAY surface (the engine's positive-EV
 # list and the bridge's research-candidate list), plus PRICED_RESEARCH --
 # a priced row that is not itself a play but must still carry provenance
@@ -156,8 +173,19 @@ def determine_provenance(
     return None
 
 
+def availability_forces_research_only(row: Mapping[str, Any]) -> bool:
+    """True when the row's QB availability is explicitly UNVERIFIED
+    (Form 2 identity evidence): the row may appear only in research
+    output carrying the availability label, never on a PLAY or
+    candidate surface, regardless of EV or status."""
+    return row.get("availability_status") == AVAILABILITY_UNVERIFIED
+
+
 def is_play_eligible(row: Mapping[str, Any]) -> bool:
-    """True only when the row's provenance is established INDEPENDENT."""
+    """True only when the row's provenance is established INDEPENDENT
+    and its availability is not explicitly unverified."""
+    if availability_forces_research_only(row):
+        return False
     prov = row.get("pricing_provenance")
     if isinstance(prov, dict) and prov.get("lane"):
         return prov["lane"] == LANE_INDEPENDENT
@@ -182,6 +210,12 @@ def apply_play_gate(
       ``PROVENANCE_UNDETERMINED``.
     - INDEPENDENT rows, and rows without a probability, are untouched
       apart from the provenance stamp itself.
+    - AVAILABILITY guard (issue #2158): any priced row whose
+      ``availability_status`` is AVAILABILITY_UNVERIFIED_NO_TEAM_INJURY_REPORT
+      is forced research-only (demoted to
+      ``RESEARCH_ONLY_AVAILABILITY_UNVERIFIED`` when on a gated
+      status), whatever its lane or EV -- a verified QB identity is
+      not verified availability.
     """
     changed = 0
     for row in rows:
@@ -199,6 +233,24 @@ def apply_play_gate(
                     "source": "NO_PROVENANCE_MARKERS_ON_PLAY_SURFACE_ROW",
                     "engine_lane": None, "play_eligible": False}
         row["pricing_provenance"] = prov
+        # Availability guard (issue #2158): applied on the FIELD, ahead
+        # of every lane consideration, to any priced row. A play-surface
+        # status is demoted outright; the row keeps its availability
+        # label and its probability (research output), but it is
+        # stamped research-only and play-blocked so no downstream
+        # surface builder can promote it on EV alone.
+        if availability_forces_research_only(row) and (
+                status in GATED_STATUSES or _carries_probability(row)):
+            row["research_only"] = True
+            row["availability_research_only"] = True
+            row["play_blocked_reason"] = AVAILABILITY_PLAY_BLOCK
+            row["ev_presentation"] = AVAILABILITY_EV_PRESENTATION
+            if status in GATED_STATUSES:
+                row["status"] = AVAILABILITY_RESEARCH_ONLY_STATUS
+                row["reason"] = (
+                    AVAILABILITY_PLAY_BLOCK + ":" + AVAILABILITY_UNVERIFIED)
+                changed += 1
+            continue
         if status not in GATED_STATUSES:
             continue
         if prov["lane"] == LANE_MARKET_ANCHORED:
