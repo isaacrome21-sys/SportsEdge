@@ -38,6 +38,11 @@ def _is_x(host):
                for domain in ("x.com", "twitter.com"))
 
 
+def _is_mlb_official_web(host):
+    # Conservative research allowlist, not a proof of site or document authenticity.
+    return host == "mlb.com" or host.endswith(".mlb.com")
+
+
 def audit_pre_event_fact(fact_key, cutoff_utc, observations, *, freshness_hours=24):
     """Audit submitted observations, fail closed, and require WEB plus X coverage.
 
@@ -81,7 +86,7 @@ def audit_pre_event_fact(fact_key, cutoff_utc, observations, *, freshness_hours=
         else:
             reason = "TIMELY_UNAUTHENTICATED"
             channels.add(channel)
-            if channel == "WEB" and source_class == "OFFICIAL":
+            if channel == "WEB" and source_class == "OFFICIAL" and _is_mlb_official_web(host):
                 primary_claims.add(claim.strip().upper())
             elif source_class in ("OFFICIAL", "VERIFIED_REPORTER"):
                 secondary_claims.add(claim.strip().upper())
