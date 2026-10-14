@@ -6,6 +6,48 @@ import re
 FACT_KINDS = {"STARTER", "LINEUP", "INJURY", "AVAILABILITY", "PARTICIPATION", "ROTATION", "QB_AVAILABILITY", "GAME_STATUS"}
 HASH = re.compile(r"^[0-9a-f]{64}$")
 X_HOSTS = frozenset({"x.com", "www.x.com", "twitter.com", "www.twitter.com"})
+X_ROOTS = ("x.com", "twitter.com")
+_LABEL = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
+
+
+def _canon_host(host):
+    """Lowercase, strip ONE trailing dot, require plain ASCII LDH labels.
+
+    Non-ASCII and IDNA/punycode (xn--) labels are refused outright so a
+    homoglyph cannot pose as an X/Twitter or pinned official host.
+    """
+    if not isinstance(host, str) or not host:
+        raise ValueError("invalid host")
+    h = host.lower()
+    if h.endswith("."):
+        h = h[:-1]
+    if not h or len(h) > 253 or not h.isascii():
+        raise ValueError("invalid host")
+    labels = h.split(".")
+    if len(labels) < 2 or any(not _LABEL.fullmatch(l) for l in labels):
+        raise ValueError("invalid host")
+    if any(l.startswith("xn--") for l in labels):
+        raise ValueError("IDNA host refused")
+    return h
+
+
+def is_x_host(host):
+    """True for exact x.com/twitter.com and genuine subdomains (mobile.x.com)."""
+    try:
+        h = _canon_host(host)
+    except ValueError:
+        return False
+    return any(h == r or h.endswith("." + r) for r in X_ROOTS)
+
+
+def _pinned(hosts):
+    out = set()
+    for h in hosts:
+        try:
+            out.add(_canon_host(h))
+        except ValueError:
+            continue
+    return out
 
 
 def _time(value):
@@ -30,7 +72,7 @@ def _host(url):
         raise ValueError("invalid URL") from exc
     if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or port not in (None, 443):
         raise ValueError("HTTPS pinned host required")
-    return parsed.hostname.lower()
+    return _canon_host(parsed.hostname)
 
 
 def _screen(row, pins, event_id, subject_id, kind, cutoff, max_age):
@@ -46,9 +88,9 @@ def _screen(row, pins, event_id, subject_id, kind, cutoff, max_age):
         raise ValueError("missing pinned hosts")
     source_host = _host(row.get("source_url"))
     # An X post is social evidence even if a caller mislabels its source pin.
-    if source_host in X_HOSTS and pin["kind"] != "SOCIAL":
+    if is_x_host(source_host) and pin["kind"] != "SOCIAL":
         raise ValueError("X source cannot be official or verified reporter")
-    if source_host not in [h.lower() for h in hosts]:
+    if source_host not in _pinned(hosts):
         raise ValueError("source host mismatch")
     digest = pin.get("anchor_sha256")
     if type(digest) is not str or not HASH.fullmatch(digest) or row.get("anchor_sha256") != digest:
@@ -116,11 +158,11 @@ def adjudicate_pregame_fact(*, event_id, subject_id, fact_kind, cutoff_utc,
     # Neither a declared search nor a pinned host establishes content truth.
     channels = set()
     credible_hosts = {
-        host.lower()
+        host
         for pin in source_registry.values()
         if isinstance(pin, dict) and pin.get("kind") in ("OFFICIAL", "VERIFIED_REPORTER")
-        for host in (pin.get("hosts") if isinstance(pin.get("hosts"), (list, tuple)) else ())
-        if isinstance(host, str) and host.lower() not in X_HOSTS
+        for host in _pinned(pin.get("hosts") if isinstance(pin.get("hosts"), (list, tuple)) else ())
+        if not is_x_host(host)
     }
     if isinstance(search_log, (list, tuple)):
         for row in search_log:
@@ -132,7 +174,7 @@ def adjudicate_pregame_fact(*, event_id, subject_id, fact_kind, cutoff_utc,
                 if not 0 <= age_seconds <= max_age_seconds:
                     continue
                 host = _host(row.get("search_url"))
-                if row["channel"] == "X" and host in X_HOSTS:
+                if row["channel"] == "X" and is_x_host(host):
                     channels.add("X")
                 elif row["channel"] == "OFFICIAL_WEB" and host in credible_hosts:
                     channels.add("OFFICIAL_WEB")
