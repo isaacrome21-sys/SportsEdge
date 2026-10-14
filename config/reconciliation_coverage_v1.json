@@ -219,6 +219,9 @@
         ".github/workflows/mlb-v8-actual-start-binding.yml",
         ".github/workflows/mlb-v8-evidence.yml",
         ".github/workflows/mlb-v8-oddspapi-replay-readiness-v2.yml",
+        "artifacts/run_it_automation.py",
+        "artifacts/run_it_browser.py",
+        "artifacts/run_it_full.py",
         "config/cfb_truth_gate_v1.json",
         "config/cross_sport_backtest_policy_v1.json",
         "config/ev_tracker_policy_v1.json",
@@ -247,8 +250,8 @@
         "docs/MLB_PITCHER_PRIOR_FALLBACK_EXT_PREREG.md",
         "docs/MLB_PITCHER_PRIOR_FALLBACK_HWE_PREREG.md",
         "docs/MLB_PITCHER_PRIOR_FALLBACK_PREREG.md",
-        "docs/MLB_PITCHER_PROP_PROMOTION_PREREG.md",
         "docs/MLB_PITCHER_PROP_PROMOTION_PIT_CONTEXT_AMENDMENT.md",
+        "docs/MLB_PITCHER_PROP_PROMOTION_PREREG.md",
         "docs/MLB_POSTSEASON_PITCHER_PROP_BIAS_EXT_PREREG.md",
         "docs/MLB_POSTSEASON_PITCHER_PROP_BIAS_PREREG.md",
         "docs/MLB_RUN_IT_PREGAME.md",
@@ -292,6 +295,7 @@
         "scripts/run_mlb_v8_forward_lane_v2.py",
         "scripts/run_nfl_external_evidence.sh",
         "scripts/verify_mlb_odds_api_freeze.py",
+        "sportsedge/mlb_f5_fixture_resolution.py",
         "sportsedge/sports/cfb/acquisition_readiness.py",
         "sportsedge/sports/cfb/depth_chart_source.py",
         "sportsedge/sports/cfb/forward_evidence.py",
@@ -307,8 +311,13 @@
         "sportsedge/sports/mlb/the_odds_api_history.py",
         "sportsedge/sports/mlb/the_odds_api_materializer.py",
         "sportsedge/sports/mlb/the_odds_api_pairing.py",
+        "tests/test_f5_fixture_binding_gamepk_20261013.py",
         "tests/test_research_mlb_f5_nrfi_tightening.py",
-        "tests/test_research_mlb_pitcher_prop_promotion.py"
+        "tests/test_research_mlb_pitcher_prop_promotion.py",
+        "tests/test_run_it_intake_defects_20261013.py",
+        "tests/test_run_it_intake_f5_eventid_20261013.py",
+        "tests/test_run_it_intake_shapes_extension_20261013.py",
+        "tests/test_team_prop_side_shape_20261013.py"
       ],
       "coverage_prefixes": []
     }
