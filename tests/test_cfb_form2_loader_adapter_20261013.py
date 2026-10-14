@@ -498,10 +498,13 @@ class PinnedHappyPathTests(AdapterCase):
                             for e in manifest_entries))
 
     def test_run_full_pinned_archive_cannot_bypass_family_registry(self):
-        # #2224 is enforced BEFORE the game/prepricing stage. The pinned
-        # Form 2 archive still passes its standalone adapter+stage contract
-        # in test_pinned_admission_and_binder_identity; it cannot create
-        # an eligible CFB market while the family remains UNVALIDATED.
+        # Registry x Form 2 seam (owner ruling, Oct 14 2026): #2224
+        # refuses PRICING at the output boundary, not evidence
+        # collection. The pinned archive IS admitted against the game
+        # rows and the prepricing audit IS produced (the evidence
+        # path); the emitted row is still the registry refusal -- the
+        # archive cannot create an eligible CFB market while the
+        # family remains UNVALIDATED.
         pin = self._pinned_two_team_archive()
         card = full.run_full({"lines": [cfb_row()]}, now=NOW,
                              getter=lambda url: cfb_mapping().get(url, {}),
@@ -510,8 +513,9 @@ class PinnedHappyPathTests(AdapterCase):
         audit = card["qb_form2_bundle_loader_audit"]
         self.assertEqual(audit["pin_status"], "VERIFIED")
         self.assertEqual(audit["manifest_sha256"], pin)
-        self.assertEqual(audit["admitted_team_ids"], [])
-        self.assertNotIn("prepricing_factor_audit", card)
+        self.assertEqual(audit["admitted_team_ids"], ["2393", "48"])
+        (entry,) = card["prepricing_factor_audit"]["by_input_index"]
+        self.assertFalse(entry["blocked"])
         (row,) = card["evaluated_rows"]
         self.assertEqual(row["status"], "NO_MODEL_OR_MARKET")
         self.assertEqual(row["blocker"], "NO_VALIDATION")
@@ -525,8 +529,9 @@ class PinnedHappyPathTests(AdapterCase):
 
     def test_run_full_without_pin_stays_registry_blocked(self):
         # No caller-independent archive pin means no Form 2 admission.
-        # With #2224, the family registry blocks the market earlier than
-        # the QB prepricing gate: absence of a prepricing audit is correct.
+        # Under the registry x Form 2 seam the game still reaches
+        # prepricing, where the QB gate blocks it and the audit
+        # records that block; the emitted row is the registry refusal.
         self._pinned_two_team_archive()
         card = full.run_full({"lines": [cfb_row()]}, now=NOW,
                              getter=lambda url: cfb_mapping().get(url, {}),
@@ -534,7 +539,10 @@ class PinnedHappyPathTests(AdapterCase):
         audit = card["qb_form2_bundle_loader_audit"]
         self.assertEqual(audit["pin_status"], "ABSENT")
         self.assertEqual(audit["admitted_team_ids"], [])
-        self.assertNotIn("prepricing_factor_audit", card)
+        (entry,) = card["prepricing_factor_audit"]["by_input_index"]
+        self.assertTrue(entry["blocked"])
+        self.assertEqual(entry["block_reason"],
+                         "BLOCKED_PREPRICING_QB_IDENTITY_UNVERIFIED")
         (row,) = card["evaluated_rows"]
         self.assertEqual(row["status"], "NO_MODEL_OR_MARKET")
         self.assertEqual(row["blocker"], "NO_VALIDATION")
