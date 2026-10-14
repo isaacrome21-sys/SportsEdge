@@ -55,3 +55,56 @@ Pinned main: `655715907d101052bfc7cb3357f1442db82d8d8b`
 | #2140/#2145/#2146 | open drafts | Muse CFB taxonomy; #2146 is the composition; no QB unblock |
 
 New file: flag for ChatGPT registration.
+
+
+## F. Exact-head CI classification (t114, snapshot 2026-10-13 ~19:20 CT)
+
+Source: GitHub check-runs API on each open PR's current head (37 open PRs updated 2026-10-13). "success" excludes skipped. Read-only; nothing rerun, merged or closed.
+
+| PR | head | base | checks | success | failing/pending | classification |
+|---|---|---|---:|---:|---|---|
+| #2196 | `625b91a5` | audit/mlb-starter-current-main-verify-20261013 | 7 | 5 | pytest-discovery (pending), test (pending) | PENDING: pytest-discovery/test in progress at snapshot |
+| #2195 | `86035397` | audit/mlb-starter-current-main-verify-20261013 | 9 | 7 | pytest-discovery (pending), test (pending) | PENDING: pytest-discovery/test in progress at snapshot |
+| #2192 | `b4c5ef8f` | audit/cfb-form2-current-main-verify-20261013 | 9 | 9 | — | PASS (all completed checks green) |
+| #2190 | `ad5084ae` | main | 24 | 20 | audit | CODE GREEN; `audit` cancelled+in-progress = superseded concurrency runs (ENVIRONMENTAL) |
+| #2189 | `7650166f` | main | 12 | 12 | — | PASS (all completed checks green) |
+| #2188 | `511bc57d` | audit/finish-pass-data-gaps-20261013 | 9 | 9 | — | PASS (all completed checks green) |
+| #2186 | `a2cde6d1` | audit/cfb-form2-current-main-verify-20261013 | 20 | 20 | — | PASS (all completed checks green) |
+| #2174 | `d56c4383` | main | 39 | 35 | — | PASS (all completed checks green) |
+| #2173 | `bf26882d` | main | 23 | 21 | — | PASS (all completed checks green) |
+| #2172 | `a2cde6d1` | main | 20 | 20 | — | PASS (all completed checks green) |
+| #2171 | `4284238b` | main | 30 | 27 | — | PASS (all completed checks green) |
+| #2170 | `07e2ce7a` | audit/mlb-starter-append-locked-20261013 | 8 | 8 | — | PASS (all completed checks green) |
+| #2169 | `39f26a36` | fix/mlb-receipt-bounds-20261013 | 8 | 8 | — | PASS (all completed checks green) |
+| #2168 | `157539fc` | feat/mlb-starter-capture-20261013 | 10 | 10 | — | PASS (all completed checks green) |
+| #2167 | `0700b619` | feat/cfb-qb-identity-evidence-form2-20261013 | 13 | 13 | — | PASS (all completed checks green) |
+| #2166 | `fd04cb55` | main | 22 | 20 | — | PASS (all completed checks green) |
+| #2165 | `e79cf138` | feat/cfb-pinned-bundle-reader-20261013 | 9 | 9 | — | PASS (all completed checks green) |
+| #2164 | `a20e3ebb` | feat/cfb-qb-identity-evidence-form2-20261013 | 9 | 9 | — | PASS (all completed checks green) |
+| #2163 | `14be28c5` | main | 13 | 12 | main-merge-hold from the freeze-reconciliation-hold | GOVERNANCE (real, intended): main-merge-hold / freeze-reconciliation-hold — unregistered paths; stays ON HOLD |
+| #2157 | `73f3fa6e` | main | 12 | 12 | — | PASS (all completed checks green) |
+| #2156 | `3698cab4` | main | 12 | 12 | — | PASS (all completed checks green) |
+| #2152 | `e7e334d4` | main | 14 | 12 | audit, audit | `audit` x2 cancelled = superseded concurrency (ENVIRONMENTAL); 12/12 others green |
+| #2147 | `eabf3046` | main | 12 | 12 | — | PASS (all completed checks green) |
+| #2146 | `b59086d5` | main | 13 | 13 | — | PASS (all completed checks green) |
+| #2145 | `53a8c4c7` | main | 12 | 12 | — | PASS (all completed checks green) |
+| #2140 | `19717151` | main | 13 | 13 | — | PASS (all completed checks green) |
+| #2116 | `6959838a` | main | 10 | 10 | — | PASS (all completed checks green) |
+| #2115 | `dcc47743` | main | 1 | 0 | audit | only check `audit` cancelled (ENVIRONMENTAL); no test run on head -> UNVERIFIED |
+| #2114 | `64a50374` | main | 11 | 11 | — | PASS (all completed checks green) |
+| #2113 | `b9527049` | main | 11 | 9 | pytest-discovery, test | REAL: tests/test_team_half_pricing.py::test_runner_routes_team_half_to_pricer_no_fetch (1 failed / 6415 passed) |
+| #2105 | `af1a813b` | feat/canonical-run-it-20261012 | 8 | 6 | pytest-discovery, test | REAL (stale stack): collection ImportError `_validate_auto_prop_kickoffs` from scripts/run_nfl_unified_lines_card |
+| #2104 | `ff5929d4` | feat/f5-quote-binding-20261012 | 10 | 8 | pytest-discovery, test | LIKELY REAL (same failing checks as #2105 on the same stale stack; log not individually read) |
+| #2103 | `c6f16e1e` | feat/canonical-run-it-20261012 | 9 | 7 | test, pytest-discovery | LIKELY REAL (same failing checks as #2105 on the same stale stack; log not individually read) |
+| #2097 | `2f1a8d51` | main | 1 | 1 | — | only 1 check on head (no test run) -> UNVERIFIED |
+| #2084 | `8415f160` | main | 11 | 11 | — | PASS (all completed checks green) |
+| #2060 | `b52a6b90` | main | 1 | 1 | — | only 1 check on head (no test run) -> UNVERIFIED |
+| #1989 | `4a1255f8` | main | 13 | 13 | — | PASS (all completed checks green) |
+
+Summary: 25 PASS; 2 ENVIRONMENTAL (cancelled concurrency: #2190, #2152); 1 GOVERNANCE hold (#2163); 4 REAL failures (#2113 team-half routing test; #2103/#2104/#2105 stale canonical-run-it stack ImportError); 2 PENDING (#2195, #2196 — new MLB fail-closed drafts on #2190's base); 3 UNVERIFIED (#2097, #2060, #2115 have no test run on head). Stacked PRs (base != main) never run the main-only freeze hold; their green does not imply main-mergeability.
+
+## G. Phone-card final reconciliation (#2176)
+
+- #2176 merged 2026-10-13 17:37 CT as `fbf1f13ac3cf`. Post-merge checks on that commit: 13 success, 9 skipped, 2 cancelled (superseded `audit` concurrency), 0 failures — includes `test`, `run-card`, `frozen-full-pipeline`, `contract`, `audit`.
+- Current main `655715907d10`: `test`, `pytest-discovery`, `frozen-full-pipeline`, `audit` success. Scheduled ops jobs on that SHA show failures (`mlb-moneyline-durable-deadman` x2, `capture`, `nfl-durable-deadman`) — these are scheduled capture/deadman workflows, not phone-card code; classified OPERATIONAL, not a #2176 regression (not investigated further; capture stays off).
+- Disposition: phone-card reconciliation CLOSED-VERIFIED on main. See section D for #2117/#2118.
