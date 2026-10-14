@@ -127,7 +127,9 @@ def adjudicate_pregame_fact(*, event_id, subject_id, fact_kind, cutoff_utc,
             if not isinstance(row, dict) or row.get("channel") not in ("OFFICIAL_WEB", "X") or not isinstance(row.get("query"), str) or not row["query"].strip():
                 continue
             try:
-                if _time(row.get("searched_at_utc")) > cutoff:
+                searched_at = _time(row.get("searched_at_utc"))
+                age_seconds = (cutoff - searched_at).total_seconds()
+                if not 0 <= age_seconds <= max_age_seconds:
                     continue
                 host = _host(row.get("search_url"))
                 if row["channel"] == "X" and host in X_HOSTS:
