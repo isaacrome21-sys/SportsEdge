@@ -334,7 +334,7 @@ INTAKE_ALIASES = {
         "FG_MADE": "fg_made", "KICKING_POINTS": "kicking_points",
         "XP_MADE": "xp_made", "PLAYER_SACKS": "player_sacks",
         "TACKLES_ASSISTS": "tackles_assists",
-        "PLAYER_INTERCEPTIONS": "player_interceptions",
+        "DEFENSIVE_PLAYER_INTERCEPTIONS": "player_interceptions",
         "TEAM_SACKS": "team_sacks", "TEAM_TURNOVERS": "team_turnovers",
     },
 }
