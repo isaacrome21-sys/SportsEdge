@@ -21,11 +21,16 @@ BLOCKED_CASES = [("MLB", "STOLEN_BASES"), ("MLB", "BATTER_STOLEN_BASES"),
                  ("MLB", "PITCHER_HITS_WALKS_ER"), ("MLB", "F5_MONEYLINE"),
                  ("MLB", "F5_TOTALS"), ("NFL", "PLAYER_PASSING_YARDS"),
                  ("NFL", "ANYTIME_TD"), ("NFL", "receptions"),
-                 ("NFL", "TEAM_TOTAL")]
-UNREGISTERED_CASES = [("CFB", "PLAYER_PASSING_YARDS"), ("CFB", "ANYTIME_TD"),
-                      ("CFB", "TEAM_TOTAL"), ("NBA", "PLAYER_POINTS"),
-                      ("CBB", "FIRST_HALF_SPREAD"), ("MLB", "MADE_UP_MARKET"),
-                      ("NFL", "ML_3WAY"), ("", "TOTAL")]
+                 ("NFL", "TEAM_TOTAL"),
+                 # t126: CFB/NBA/CBB family registry (formerly UNREGISTERED
+                 # cases here; now BLOCKED with a named taxonomy blocker).
+                 ("CFB", "PLAYER_PASSING_YARDS"), ("CFB", "ANYTIME_TD"),
+                 ("CFB", "TEAM_TOTAL"), ("NBA", "PLAYER_POINTS"),
+                 ("CBB", "FIRST_HALF_SPREAD"), ("CBB", "ML")]
+UNREGISTERED_CASES = [("MLB", "MADE_UP_MARKET"), ("NFL", "ML_3WAY"),
+                      ("", "TOTAL"), ("CFB", "MADE_UP_MARKET"),
+                      ("NBA", "ML_3WAY"), ("CBB", "MADE_UP_MARKET"),
+                      ("PGA", "TOTAL"), ("UFC", "ML")]
 
 
 def _priced(sport, market):
@@ -53,13 +58,33 @@ def test_unregistered_markets_fail_closed_unknown(sport, market):
     assert row["registry_state"] == "UNKNOWN"
 
 
-@pytest.mark.parametrize("sport", ["CFB", "NBA", "CBB"])
+# t126: the t118 SPORT_NOT_IN_REGISTRY stopgap is removed. CFB/NBA core
+# game markets pass through their family entry (engine exists, governance
+# permits) with no stopgap label; CBB has no engine, so it is blocked.
+@pytest.mark.parametrize("sport", ["CFB", "NBA"])
 @pytest.mark.parametrize("market", ["ML", "SPREAD", "TOTAL", "moneyline"])
-def test_unregistered_sport_core_game_passes_but_is_labelled(sport, market):
+def test_family_registered_core_game_passes_without_stopgap_label(sport, market):
     assert G.registry_blocked_row(sport, [market], {"market": market}) is None
     out, st = G.gate_payload({"results": [_priced(sport, market)]})
-    assert out["results"][0]["registry_status"] == "SPORT_NOT_IN_REGISTRY"
+    assert out["results"][0]["model_p"] == 0.71
+    assert "registry_status" not in out["results"][0]
     assert st["blocked"] == st["unregistered"] == 0
+
+
+@pytest.mark.parametrize("market", ["ML", "SPREAD", "TOTAL", "moneyline"])
+def test_cbb_core_game_blocked_no_engine(market):
+    out, st = G.gate_payload({"results": [_priced("CBB", market)]})
+    _no_price(out["results"][0])
+    assert out["results"][0]["blocker"] == "NO_ENGINE"
+    assert st["blocked"] == 1 and st["unregistered"] == 0
+
+
+@pytest.mark.parametrize("sport", ["PGA", "UFC", "", None])
+def test_sport_without_registry_core_game_now_blocked(sport):
+    out, st = G.gate_payload({"results": [_priced(sport, "ML")]})
+    _no_price(out["results"][0])
+    assert out["results"][0]["blocker"] == "UNREGISTERED"
+    assert st["unregistered"] == 1
 
 
 def test_registered_priced_markets_untouched():
@@ -81,8 +106,8 @@ def test_gate_payload_nested_and_sport_inheritance():
     assert out["cards"][0]["rows"][1]["model_p"] == 0.6
     _no_price(out["NFL"]["props"][0])
     _no_price(out["CFB"]["props"][0])
-    assert out["CFB"]["props"][0]["blocker"] == "UNREGISTERED"
-    assert st == {"checked": 4, "blocked": 2, "unregistered": 1}
+    assert out["CFB"]["props"][0]["blocker"] == "NO_ENGINE"  # t126 family
+    assert st == {"checked": 4, "blocked": 3, "unregistered": 0}
 
 
 def test_unpriced_rows_keep_specific_reason():
@@ -107,9 +132,11 @@ def test_run_full_cfb_player_prop_priced_by_lane_is_blocked(monkeypatch):
     card = R.run_full({"lines": [line]}, now=NOW, auto_context=False)
     row = card["evaluated_rows"][0]
     if row.get("status") == "RESEARCH_CANDIDATE_NOT_VALIDATED":
-        pytest.fail("unregistered CFB prop kept a price")
+        pytest.fail("CFB prop kept a price")
     assert not G.is_priced(row)
-    assert row["blocker"] == "UNREGISTERED" and row["registry_state"] == "UNKNOWN"
+    # t126: CFB player props are a registered BLOCKED family (governance
+    # NO_ENGINE), so the gate names that blocker instead of UNREGISTERED.
+    assert row["blocker"] == "NO_ENGINE" and row["registry_enforced"] is True
     assert card.get("prop_candidates", []) == []
 
 

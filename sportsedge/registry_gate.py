@@ -8,11 +8,12 @@ Rules (fail closed):
     sportsedge.canonical_coverage -> blocked row naming the blocker.
   * A sport that HAS a registry (MLB, NFL) and a market none of whose
     names resolve -> blocked row, blocker UNREGISTERED (state UNKNOWN).
-  * A sport with NO registry at all (CFB, NBA, CBB, ...): every market is
-    blocked UNREGISTERED except the core game markets (moneyline / spread
-    / total), which pass but are labelled
-    registry_status=SPORT_NOT_IN_REGISTRY. This interim exception is a
-    documented residual: it disappears once those sports are registered.
+  * CFB, NBA and CBB are registered at family level (t126,
+    canonical_coverage.FAMILY_RESOLUTIONS); their markets resolve like any
+    other registered sport.
+  * A sport with NO registry at all, a missing sport, or a market matching
+    no entry -> blocked UNREGISTERED (state UNKNOWN). The t118
+    SPORT_NOT_IN_REGISTRY core-game-market pass-through is removed.
 A blocked row never carries a probability, price or EV.
 """
 from __future__ import annotations
@@ -21,13 +22,15 @@ from typing import Any, Iterable
 
 from sportsedge.canonical_coverage import (
     BLOCKED as COVERAGE_BLOCKED,
+    FAMILY_SPORTS,
     MARKET_RESOLUTIONS,
     blocked_row_for as coverage_blocked_row,
     resolve_market as coverage_resolve_market,
 )
 
 UNREGISTERED = "UNREGISTERED"
-REGISTERED_SPORTS = frozenset(s for (s, _m) in MARKET_RESOLUTIONS)
+REGISTERED_SPORTS = frozenset(
+    {s for (s, _m) in MARKET_RESOLUTIONS} | set(FAMILY_SPORTS))
 CORE_GAME_MARKETS = frozenset({
     "ML", "MONEYLINE", "H2H", "SPREAD", "SPREADS", "RUN_LINE", "POINT_SPREAD",
     "TOTAL", "TOTALS", "GAME_TOTAL",
@@ -74,17 +77,14 @@ def registry_blocked_row(sport, markets: Iterable[Any], line: dict, *,
             return row
     if any_resolved or not include_unregistered:
         return None
-    if sport and sport not in REGISTERED_SPORTS and any(
-            n.upper() in CORE_GAME_MARKETS for n in names):
-        return None
     return unregistered_row(sport, names[0] if names else "", line)
 
 
 def unregistered_row(sport, market, line):
     scope = ("market absent from the %s registry" % sport
              if sport in REGISTERED_SPORTS else
-             "sport %s has no canonical registry; only core game markets "
-             "pass (labelled SPORT_NOT_IN_REGISTRY)" % (sport or "UNKNOWN"))
+             "sport %s has no canonical registry; every market is "
+             "blocked" % (sport or "UNKNOWN"))
     return {
         "status": "NO_MODEL_OR_MARKET",
         "reason": "UNREGISTERED: " + scope + "; absence is not a verified "
@@ -156,6 +156,70 @@ def gate_payload(obj, default_sport=None, *, _sport=None, stats=None):
     else:
         res = obj
     return (res, stats) if top else res
+
+
+# The Odds API market keys -> registry intake names (t126; NFL fair-odds card).
+ODDS_API_MARKET_ALIASES = {"h2h": "ML", "spreads": "SPREAD", "totals": "TOTAL",
+                           "team_totals": "TEAM_TOTAL",
+                           "alternate_spreads": "ALTERNATE_SPREAD",
+                           "alternate_totals": "ALTERNATE_TOTAL"}
+
+
+def gate_odds_api_events(events, sport, runner: str):
+    """Drop every bookmaker market whose key the registry blocks or does not
+    know, BEFORE any text/price is rendered from the events (t126).
+
+    Returns (gated_events, stats). Events/bookmakers are copied, never
+    mutated; a market with no key is dropped (fail closed)."""
+    stats = {"runner": runner, "module": "sportsedge.registry_gate",
+             "checked": 0, "blocked": 0, "unregistered": 0}
+    out = []
+    for event in events or []:
+        if not isinstance(event, dict):
+            continue
+        ev = dict(event)
+        books = []
+        for book in event.get("bookmakers") or []:
+            if not isinstance(book, dict):
+                continue
+            bk = dict(book)
+            kept = []
+            for market in book.get("markets") or []:
+                key = str((market or {}).get("key") or "").strip()
+                stats["checked"] += 1
+                names = [key, ODDS_API_MARKET_ALIASES.get(key.lower(), "")]
+                gate = registry_blocked_row(sport, names, {"market": key})
+                if gate is None:
+                    kept.append(market)
+                else:
+                    stats["unregistered" if gate["blocker"] == UNREGISTERED
+                          else "blocked"] += 1
+            bk["markets"] = kept
+            books.append(bk)
+        ev["bookmakers"] = books
+        out.append(ev)
+    return out, stats
+
+
+def gate_card_file(card_path, sport, runner: str):
+    """Gate a card JSON on disk and write the gated copy next to it; returns
+    the gated path, or None when the card cannot be read (caller must then
+    refuse to render). Used before image/text rendering (t126)."""
+    import json
+    from pathlib import Path
+    src = Path(card_path)
+    try:
+        payload = json.loads(src.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if isinstance(payload, dict):
+        gated = gate_and_stamp(payload, sport, runner)
+    else:
+        gated, _ = gate_payload(payload, sport)
+    dst = src.with_name(src.stem + ".registry_gated.json")
+    dst.write_text(json.dumps(gated, indent=2, sort_keys=True) + "\n",
+                   encoding="utf-8")
+    return dst
 
 
 def gate_and_stamp(payload: dict, default_sport, runner: str) -> dict:
