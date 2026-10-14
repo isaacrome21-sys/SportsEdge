@@ -24,6 +24,8 @@ from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
 from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
 from sportsedge.prepricing.factor_ingestion import stage_games
 from sportsedge.prepricing.qb_form2_bundle_loader import load_form2_bundles
+from sportsedge.milestone_ladder_intake import (
+    expand_milestone_ladder_rows, milestone_refusal_row)
 from sportsedge.team_half_pricing import DERIVATIVES, price_team_half_rows
 from sportsedge.pricing_provenance import (
     apply_play_gate, determine_provenance)
@@ -318,10 +320,17 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     if clock.tzinfo is None or clock.utcoffset() is None:
         raise ValueError("MODEL_NOW_TIMEZONE_REQUIRED")
     default_sport = payload.get("sport") if isinstance(payload, dict) else None
+    # Milestone-ladder prop intake (SPEC rev. 2, Oct 14 2026): DraftKings
+    # "X+" ladders convert to canonical one-sided OVER/UNDER rows BEFORE
+    # routing, so they reach the prop pipelines (or their named blockers)
+    # instead of dying at intake. A refused ladder stays a single row
+    # carrying milestone_ladder_refusal, blocked by name at routing.
+    rows = expand_milestone_ladder_rows(rows, default_sport=default_sport)
     game_indices, games, prop_indices, props = [], [], [], []
     coverage_indices, coverage_input = [], []
     f5_indices, f5_input = [], []
     registry_gated = {}  # local prop index -> registry blocker row
+    intake_gated = {}  # local prop index -> milestone intake refusal row
     # Only CFB game-identity evidence may continue through prepricing.
     # The registry still blocks its pricer, output probabilities and plays.
     family_game_gated = {}  # game position -> precomputed registry blocker
@@ -378,6 +387,13 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             market = F5_INTAKE_ALIASES[market]
             line["market"] = market
         raw_market = str(raw.get("market") or "").upper().strip()
+        if line.get("milestone_ladder_refusal"):
+            # Fail-closed milestone intake refusal: the row never reaches
+            # a pricer and the adapter's named reason is preserved.
+            prop_indices.append(i)
+            props.append(line)
+            intake_gated[len(props) - 1] = milestone_refusal_row(line)
+            continue
         gate = _registry_blocked_row(line["sport"], [
             raw_market, market,
             normalize_coverage_market(market),
@@ -582,6 +598,9 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     for local, line in enumerate(props):
         if local in registry_gated:
             others[local] = registry_gated[local]
+            continue
+        if local in intake_gated:
+            others[local] = intake_gated[local]
             continue
         market = str(line.get("market") or "").upper()
         if line["sport"] == "NFL" and market in _NFL_RULING_DERIVATIVE_TRANSLATION:
@@ -814,6 +833,16 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         modeled_props[local] = result
     for local, result in others.items():
         modeled_props[local] = result
+    # Milestone provenance survives onto the card row: every consumer
+    # must be able to tell a one-sided milestone conversion from a
+    # natively offered O/U pair on every surface the row reaches.
+    for local, line in enumerate(props):
+        form = line.get("source_quote_form")
+        if form and isinstance(modeled_props[local], dict):
+            modeled_props[local].setdefault("source_quote_form", form)
+            if line.get("milestone_threshold") is not None:
+                modeled_props[local].setdefault(
+                    "milestone_threshold", line["milestone_threshold"])
     if any(r is None for r in modeled_props):
         raise ValueError("PROP_RESULT_COUNT_MISMATCH")
 
