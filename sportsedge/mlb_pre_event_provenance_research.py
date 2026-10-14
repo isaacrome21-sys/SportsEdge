@@ -110,7 +110,9 @@ def audit_pre_event_fact(fact_key, cutoff_utc, observations, *, freshness_hours=
         "schema": "SPORTSEDGE_MLB_PRE_EVENT_PROVENANCE_RESEARCH_V1",
         "fact_key": fact_key, "pre_event_cutoff_utc": cutoff.isoformat(),
         "observations": records, "timely_channels": sorted(channels),
-        "candidate_claim": next(iter(primary_claims)) if len(primary_claims) == 1 else None,
+        "candidate_claim": (next(iter(primary_claims)) if len(primary_claims) == 1
+                            and blocker == "SOURCE_AUTHENTICITY_NOT_INDEPENDENTLY_VERIFIED"
+                            else None),
         "resolved_status": "UNKNOWN", "blocker": blocker,
         "source_authenticity_verified": False,
         "market_probability_verified": False, "pricing_authority": False,
