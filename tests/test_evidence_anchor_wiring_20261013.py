@@ -225,6 +225,25 @@ def test_signer_pin_enforced_per_provider(env):
     assert not d.admitted and "tsa_b:tsa_cert_not_pinned" in d.details
 
 
+def test_pinned_extra_embedded_ca_must_not_impersonate_actual_signer(tmp_path):
+    # A valid token may contain CA/intermediate certs in addition to its signer.
+    # Pinning one of those extra certs must NEVER establish signer identity.
+    ca = _make_ca(tmp_path / "extra", "EXTRA")
+    d = ca["dir"]
+    (d / "both.pem").write_bytes((d / "tsa.pem").read_bytes() + (d / "ca.pem").read_bytes())
+    cnf = d / "tsa.cnf"
+    old_config = cnf.read_text()
+    cnf.write_text(old_config.replace(f"certs = {d}/tsa.pem", f"certs = {d}/both.pem"))
+    root = ea.batch_root(LEAVES)
+    tok = _stamp(ca, root)
+    ca_der = subprocess.run(["openssl", "x509", "-in", "ca.pem", "-outform", "DER"],
+                            cwd=d, check=True, capture_output=True).stdout
+    wrong_pin = hashlib.sha256(ca_der).hexdigest()
+    assert ea.tsa_verify(tok, root, ca["ca"], pinned_tsa_cert_sha256=[ca["tsa_der_sha"]]).ok
+    bad = ea.tsa_verify(tok, root, ca["ca"], pinned_tsa_cert_sha256=[wrong_pin])
+    assert not bad.ok and bad.reason == "tsa_cert_not_pinned"
+
+
 def test_unknown_provider_and_malformed_entries(env):
     d = ea.admit_quorum(_qb(env, [{"provider": "evil", "token": env["ta"]}, "x", {"token": env["tb"]}]),
                         event_cutoff=_cut(), trust=env["trust"], approved_ids=APPROVED)
