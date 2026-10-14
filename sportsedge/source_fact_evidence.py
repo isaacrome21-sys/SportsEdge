@@ -114,7 +114,7 @@ def adjudicate_pregame_fact(*, event_id, subject_id, fact_kind, cutoff_utc,
         host.lower()
         for pin in source_registry.values()
         if isinstance(pin, dict) and pin.get("kind") in ("OFFICIAL", "VERIFIED_REPORTER")
-        for host in pin.get("hosts", ())
+        for host in (pin.get("hosts") if isinstance(pin.get("hosts"), (list, tuple)) else ())
         if isinstance(host, str)
     }
     x_hosts = {"x.com", "www.x.com", "twitter.com", "www.twitter.com"}
