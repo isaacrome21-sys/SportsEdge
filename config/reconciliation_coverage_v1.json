@@ -308,7 +308,14 @@
         "sportsedge/sports/mlb/the_odds_api_materializer.py",
         "sportsedge/sports/mlb/the_odds_api_pairing.py",
         "tests/test_research_mlb_f5_nrfi_tightening.py",
-        "tests/test_research_mlb_pitcher_prop_promotion.py"
+        "tests/test_research_mlb_pitcher_prop_promotion.py",
+        "config/anchors/anchor_config_v1.json",
+        "config/anchors/freetsa_ca.pem",
+        "config/anchors/freetsa_tsa_signer.pem",
+        "sportsedge/evidence_anchor.py",
+        "sportsedge/evidence_admission_gate.py",
+        "tests/anchor_test_ca.py",
+        "tests/test_form2_qb_anchor_admission_20261013.py"
       ],
       "coverage_prefixes": []
     }
