@@ -1,0 +1,48 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "blocked_count": 4,
+  "blockers": [
+    {
+      "entity_name": "Blake Snell",
+      "observed_at": "2026-10-14T06:14:33.600561+00:00",
+      "provider_event_id": "34821533",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    },
+    {
+      "entity_name": "Robert Gasser",
+      "observed_at": "2026-10-14T06:14:33.600561+00:00",
+      "provider_event_id": "34821533",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    },
+    {
+      "entity_name": "Gavin Williams",
+      "observed_at": "2026-10-14T06:14:34.833352+00:00",
+      "provider_event_id": "34826925",
+      "reason": "ValueError:SUBJECT_UNRESOLVED:Gavin Williams"
+    },
+    {
+      "entity_name": "Griffin Jax",
+      "observed_at": "2026-10-14T06:14:34.833352+00:00",
+      "provider_event_id": "34826925",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    }
+  ],
+  "eligible_quote_units": 4,
+  "observed_at_utc": "2026-10-14T06:16:08.588460+00:00",
+  "predictions_created": 0,
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-14/props_20261014T061435.344464Z.json",
+  "run_attempt": "1",
+  "run_id": "38521105569",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_RUN_V1",
+  "selection_drops": {
+    "selected_units": 16
+  },
+  "settlements_created": 0,
+  "status": "OK",
+  "summary_sha256": "1a7c7e9a2efd73663e7a3bd2ceb2c128b97ba4984a44c05fe7dc67723ed63c8a"
+}
