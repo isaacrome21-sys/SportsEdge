@@ -28,7 +28,10 @@ from sportsedge.pricing_provenance import (
     apply_play_gate, determine_provenance)
 from sportsedge.canonical_coverage import (
     NFL_ANYTIME_TD_MARKETS, NFL_DERIVATIVE_MARKETS, NFL_FIRST_TD_MARKETS,
-    blocked_row_for as coverage_blocked_row, coverage_summary)
+    blocked_row_for as coverage_blocked_row, coverage_summary,
+    resolve_market as coverage_resolve_market, BLOCKED as COVERAGE_BLOCKED)
+from sportsedge.registry_gate import (
+    FAMILY_SPORTS as FAMILY_GATE_SPORTS, family_gate_row)
 from sportsedge.mlb_f5_quote_binding import (
     F5_MARKET_ALIASES as F5_INTAKE_ALIASES, F5_MARKETS as F5_CANONICAL_MARKETS,
     phone_f5_binding_rows)
@@ -230,6 +233,39 @@ def _prepricing_blocked_row(line, stage, input_index):
     }
 
 
+def _registry_blocked_row(sport, markets, line):
+    """Runtime registry enforcement (reviewer requirement, t115).
+
+    If ANY name this row is known by (raw intake market, normalized
+    market, F5/coverage canonical name) resolves to a BLOCKED registry
+    entry in sportsedge.canonical_coverage, return the fail-closed card
+    row naming the blocker. The row never reaches a pricer and can never
+    carry a probability, price or EV. Returns None otherwise.
+    """
+    # t134 (#2219): CFB/NBA/CBB go through the family registry gate. The
+    # Illinois-college exclusion is evaluated first inside family_gate_row
+    # and its ILLINOIS_COLLEGE_EXCLUDED reason is preserved on the row.
+    if str(sport or "").upper() in FAMILY_GATE_SPORTS:
+        first = next((str(n).strip() for n in markets if n and str(n).strip()), "")
+        return family_gate_row(sport, first, line)
+    for name in markets:
+        if not name:
+            continue
+        name = str(name).strip()
+        res = coverage_resolve_market(sport, name)
+        if res is None:
+            # Matrix keys for some sports are lower-case (NFL); intake is
+            # case-insensitive, so the registry lookup must be too.
+            name = name.lower()
+            res = coverage_resolve_market(sport, name)
+        if res is not None and res.get("state") == COVERAGE_BLOCKED:
+            row = coverage_blocked_row(sport, name, line)
+            row["market"] = line.get("market")
+            row["registry_enforced"] = True
+            return row
+    return None
+
+
 def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
              auto_context=True, min_ev=0.02, lane="A", allow_manual_context=False,
              td_cache_dir=None, td_opener=None):
@@ -270,6 +306,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     game_indices, games, prop_indices, props = [], [], [], []
     coverage_indices, coverage_input = [], []
     f5_indices, f5_input = [], []
+    registry_gated = {}  # local prop index -> registry blocker row
     for i, raw in enumerate(rows):
         if not isinstance(raw, dict):
             raise ValueError("LINE_MUST_BE_OBJECT")
@@ -322,6 +359,21 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         if line["sport"] == "MLB" and market in F5_INTAKE_ALIASES:
             market = F5_INTAKE_ALIASES[market]
             line["market"] = market
+        raw_market = str(raw.get("market") or "").upper().strip()
+        gate = _registry_blocked_row(line["sport"], [
+            raw_market, market,
+            normalize_coverage_market(market),
+            normalize_f5_market(market) if line["sport"] == "MLB" else None,
+            _NFL_RULING_DERIVATIVE_TRANSLATION.get(market)
+            if line["sport"] == "NFL" else None,
+        ], line)
+        if gate is not None:
+            # Registry blocker wins over every routing lane (game,
+            # coverage, F5, prop, team-half, derivative, TD, player).
+            prop_indices.append(i)
+            props.append(line)
+            registry_gated[len(props) - 1] = gate
+            continue
         if market in {"ML", "SPREAD", "TOTAL"} or (
             line["sport"] == "MLB" and market == "TEAM_TOTALS"
         ):
@@ -446,6 +498,9 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     td_pos, td_input = [], []
     others = {}
     for local, line in enumerate(props):
+        if local in registry_gated:
+            others[local] = registry_gated[local]
+            continue
         market = str(line.get("market") or "").upper()
         if line["sport"] == "NFL" and market in _NFL_RULING_DERIVATIVE_TRANSLATION:
             # Owner ruling (Oct 13, 2026; see the constant): NFL team
@@ -694,6 +749,25 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         evaluated[i] = result
     if any(r is None for r in evaluated):
         raise ValueError("EVALUATED_ROWS_REQUIRED_TO_AVOID_FALSE_FACTOR_COVERAGE")
+    # Defense in depth: re-check every evaluated row against the registry
+    # by its raw intake name and its emitted market name. Any blocked
+    # market that reached a pricer through a path not caught above is
+    # replaced by the fail-closed blocker row before any surface is built.
+    prop_local = {i: local for local, i in enumerate(prop_indices)}
+    for i, raw in enumerate(rows):
+        sport = str(raw.get("sport") or default_sport or "").upper()
+        result = evaluated[i]
+        gate = _registry_blocked_row(sport, [
+            str(raw.get("market") or "").upper().strip(),
+            str(result.get("market") or "").upper().strip(),
+            str(result.get("coverage_market") or "").upper().strip(),
+        ], {**raw, "sport": sport})
+        if gate is None or result.get("registry_enforced"):
+            continue
+        gate["input_index"] = i
+        evaluated[i] = gate
+        if i in prop_local:
+            modeled_props[prop_local[i]] = gate
     # Provenance gate (Isaac's architecture-conflict ruling, Oct 12 2026):
     # every priced row on this canonical card carries an explicit
     # INDEPENDENT / MARKET_ANCHORED provenance, identifiable from the card

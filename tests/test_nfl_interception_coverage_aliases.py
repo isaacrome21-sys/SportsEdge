@@ -6,10 +6,12 @@ from sportsedge.canonical_coverage import resolve_market
 
 
 class InterceptionCoverageTests(unittest.TestCase):
-    def test_quarterback_interception_alias_keeps_empirical_route(self):
+    def test_quarterback_interception_alias_keeps_quarterback_identity(self):
         result = resolve_market('NFL', 'PLAYER_INTERCEPTIONS')
         self.assertEqual(result['market'], 'interceptions')
-        self.assertEqual(result['state'], 'PRICED_PATH')
+        # Registry enforcement changes admission, not the alias identity.
+        self.assertEqual(result['state'], 'BLOCKED')
+        self.assertEqual(result['blocker'], 'NO_ENGINE')
 
     def test_defensive_interceptions_remain_blocked(self):
         for name in ('DEFENSIVE_PLAYER_INTERCEPTIONS', 'player_interceptions'):

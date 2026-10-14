@@ -74,7 +74,10 @@ for _m in ("MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS"):
             "Game market priced by the canonical game stage after the "
             "prepricing factor gate (verified StatsAPI identity/history).")
 for _m in ("F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS"):
-    _blocked("MLB", _m, "NO_QUOTE",
+    _blocked("MLB", _m, "NO_VALIDATION",
+             "F5_DEPLOYMENT_NOT_ELIGIBLE (deployment eligible=false, stage "
+             "F5_STATE_CANDIDATE; this gate stays until an owner ruling -- "
+             "quotes are not the blocker). "
              "F5 quotes now bind on the canonical path through "
              "sportsedge.mlb_f5_quote_binding (sportsbook + book event ID "
              "+ verified gamePk fixture + explicit FIRST_5 period + "
@@ -116,13 +119,18 @@ _BATTER = ("MLB_BATTER_EMPIRICAL_GAMELOG (mlb_phone_batter_pricing -> "
            "research_three_sport_bridge; verified StatsAPI game logs, "
            "official-lineup gate per row)")
 for _m in ("HITS", "TOTAL_BASES", "RBI", "RUNS", "HOME_RUNS",
-           "STOLEN_BASES", "BATTER_BB", "BATTER_K", "SINGLES", "DOUBLES",
+           "BATTER_BB", "BATTER_K", "SINGLES", "DOUBLES",
            "HITS_RUNS_RBIS"):
     _priced("MLB", _m, _BATTER,
             "Batter market in the empirical gamelog engine's market set; "
             "rows fail closed per player when identity/history is "
             "unverified or the official starting lineup is unconfirmed "
             "(row-level NO_PARTICIPATION).")
+_blocked("MLB", "STOLEN_BASES", "NO_QUOTE",
+         "NOT_OFFERED (owner rule 2026-10-13: MLB stolen bases are not "
+         "offered; no DK board inspection supports an offering). The "
+         "empirical gamelog engine could compute it, but no row may price "
+         "without an inspected offering.", engine=_BATTER)
 for _m in ("EXTRA_BASE_HITS", "HITS_RUNS_STOLEN_BASES", "RUNS_RBIS",
            "HITS_STOLEN_BASES", "HITS_WALKS_STOLEN_BASES", "TRIPLES"):
     _blocked("MLB", _m, "NO_ENGINE",
@@ -132,10 +140,15 @@ for _m in ("EXTRA_BASE_HITS", "HITS_RUNS_STOLEN_BASES", "RUNS_RBIS",
 _PITCHER = ("MLB_PITCHER_JOINT_EMPIRICAL_BAYES (mlb_phone_pitcher_pricing "
             "-> research_three_sport_bridge; verified StatsAPI prior starts)")
 for _m in ("PITCHER_K", "PITCHER_OUTS", "PITCHER_HITS_ALLOWED",
-           "PITCHER_BB", "PITCHER_ER", "PITCHER_HITS_WALKS_ER"):
+           "PITCHER_BB", "PITCHER_ER"):
     _priced("MLB", _m, _PITCHER,
             "Pitcher market priced from verified prior starts; rows fail "
             "closed per pitcher when identity/history is unverified.")
+_blocked("MLB", "PITCHER_HITS_WALKS_ER", "NO_QUOTE",
+         "PROVIDER_UNAVAILABLE: config/mlb_market_surface.json declares "
+         "this market UNAVAILABLE with provider_expected=false, so no quote "
+         "acquisition path exists; the pitcher engine is not the blocker.",
+         engine=_PITCHER)
 for _m in ("EITHER_PITCHER_HITS_ALLOWED", "EITHER_PITCHER_BB",
            "EITHER_PITCHER_ER", "PITCHER_RECORD_WIN", "FIRST_HOME_RUN"):
     _blocked("MLB", _m, "NO_ENGINE",
@@ -183,22 +196,23 @@ for _m in ("passing_yards", "completions", "attempts", "passing_tds",
            "interceptions", "rush_yards", "pass_plus_rush_yards",
            "rushing_yards", "receiving_yards", "receptions",
            "rush_attempts", "rush_plus_rec_yards"):
-    _priced("NFL", _m, _EMPIRICAL,
-            "Player market in the empirical gamelog engine's set; rows "
-            "fail closed per player on identity/history and surface as "
-            "WATCH while participation is unverified.")
+    _blocked("NFL", _m, "NO_ENGINE",
+             "GOVERNANCE_NO_ENGINE: config/football_prop_engine_surface.json "
+             "and football_market_surface.engine_state_by_sport.NFL declare "
+             "NO_ENGINE for all NFL player props; the empirical gamelog "
+             "pricer is wired but not governance-admitted, so it may not "
+             "price on the canonical path.", engine=_EMPIRICAL)
 for _m in ("longest_completion", "targets", "longest_reception",
            "longest_rush"):
     _blocked("NFL", _m, "NO_ENGINE",
              "The empirical gamelog engine's market set excludes this "
              "market and no other pricer exists for it.")
-_priced("NFL", "anytime_td",
-        "NFL_ANYTIME_TD_NFLVERSE (nfl_anytime_td.estimate_anytime_td; "
-        "opportunity decomposition over verified nflverse history with "
-        "in-engine snap-share participation gate)",
-        "Anytime-TD priced from strictly point-in-time nflverse player "
-        "history; rows fail closed on identity, history depth, or the "
-        "snap-share participation gate inside the engine.")
+_blocked("NFL", "anytime_td", "NO_ENGINE",
+         "GOVERNANCE_NO_ENGINE: the prop-engine surface declares NO_ENGINE "
+         "for NFL player props; the nflverse anytime-TD estimator is wired "
+         "but not governance-admitted.",
+         engine="NFL_ANYTIME_TD_NFLVERSE (nfl_anytime_td.estimate_anytime_td, "
+                "wired, not admitted)")
 _blocked("NFL", "first_td", "NO_DATA",
          "NO_VERIFIED_FIRST_SCORING_ATTRIBUTION: opening possession is a "
          "game-time coin toss recorded only post-game, and no free "
@@ -350,6 +364,20 @@ def resolve_market(sport, market):
     alias = INTAKE_ALIASES.get(sport, {}).get(str(market or "").upper())
     if alias is not None:
         return dict(MARKET_RESOLUTIONS[(sport, alias)])
+    # t134 (#2219): CFB/NBA/CBB resolve through the isolated family
+    # registry so the canonical lookup can never return None (= pass
+    # through) for them. Always BLOCKED; not part of the 89-market matrix.
+    from sportsedge.family_market_registry import family_market_decision
+    family = family_market_decision(sport, market)
+    if family is not None:
+        return {
+            "sport": sport, "market": family["market"], "state": BLOCKED,
+            "engine": None, "blocker": family["blocker"],
+            "detail": family["reason"] + " (family-level registry, "
+                      "sportsedge.family_market_registry; research-only)",
+            "validation_status": family["validation_status"],
+            "family_registry": True,
+        }
     return None
 
 
@@ -361,6 +389,11 @@ def blocked_row_for(sport, market, row):
     """
     resolution = resolve_market(sport, market)
     if resolution is None or resolution["state"] != BLOCKED:
+        return None
+    if resolution.get("family_registry"):
+        # Family rows are built by sportsedge.registry_gate.family_gate_row,
+        # which applies the Illinois exclusion first; this matrix helper
+        # must not shadow it (t134).
         return None
     return {
         "status": "NO_MODEL_OR_MARKET",

@@ -290,6 +290,12 @@ def main():
     events, source, input_status = load_events("", args.input_json, inline_json)
     payload = build_payload(events, args.min_edge, now, source, input_status)
 
+    import sys  # t134 family registry gate (lazy: module import stays stdlib-only)
+    _root = str(Path(__file__).resolve().parents[1])
+    if _root not in sys.path:
+        sys.path.insert(0, _root)
+    from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp
+    payload = _registry_gate_and_stamp(payload, "CFB", "scripts/run_cfb_paper_market.py")
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")

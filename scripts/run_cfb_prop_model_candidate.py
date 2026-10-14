@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp, gate_text as _registry_gate_text  # noqa: E402  t134 family gate
 from sportsedge.football_prop_odds_source import build_odds_snapshot, fetch_event_prop_odds
 from sportsedge.football_prop_run_machine import FootballPropRunError
 from sportsedge.football_prop_extended_run_machine import (
@@ -375,6 +376,7 @@ def main() -> int:
                 "production_eligible": False,
             },
         }
+        payload = _registry_gate_and_stamp(payload, "CFB", "scripts/run_cfb_prop_model_candidate.py")
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(
             json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -412,6 +414,7 @@ def main() -> int:
                 "bettor_facing_engine_surface_unchanged": True,
             },
         }
+        payload = _registry_gate_and_stamp(payload, "CFB", "scripts/run_cfb_prop_model_candidate.py")
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(
             json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
