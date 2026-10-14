@@ -337,20 +337,40 @@ def tsa_verify(token: bytes, root_hex: str, ca_bundle_pem: bytes,
                 if not (nb <= gen <= na):
                     return TsaResult(False, "cert_not_valid_at_gentime", gen, tok_sha)
             if pinned_tsa_cert_sha256 is not None:
+                # Pin ONLY the certificate that actually signed this RFC 3161
+                # CMS token, never any arbitrary embedded chain certificate.
                 pins = {p.lower() for p in pinned_tsa_cert_sha256}
+                if not pins:
+                    return TsaResult(False, "tsa_cert_not_pinned", token_sha256=tok_sha)
                 tok = os.path.join(d, "tok.der")
+                signed = os.path.join(d, "signer.pem")
+                payload = os.path.join(d, "tstinfo.der")
                 x = _run(["ts", "-reply", "-in", tsr, "-token_out", "-out", tok])
-                c = _run(["pkcs7", "-inform", "DER", "-in", tok, "-print_certs"]) if x.returncode == 0 else x
-                certs = re.findall(rb"-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----",
-                                   c.stdout or b"", re.S)
-                ders = []
-                for pem in certs:
-                    pf = os.path.join(d, "c.pem")
-                    open(pf, "wb").write(pem)
-                    r = _run(["x509", "-in", pf, "-outform", "DER"])
-                    if r.returncode == 0:
-                        ders.append(hashlib.sha256(r.stdout).hexdigest())
-                if not ders or not (set(ders) & pins):
+                if x.returncode != 0:
+                    return TsaResult(False, "tsa_signer_unreadable", token_sha256=tok_sha)
+                # OpenSSL cms -verify validates CMS signatures and writes the
+                # actual signer(s) to -signer. Chain/EKU verification remains
+                # the separate openssl ts -verify step above.
+                c = _run(["cms", "-verify", "-inform", "DER", "-in", tok,
+                          "-noverify", "-signer", signed, "-out", payload])
+                if c.returncode != 0:
+                    return TsaResult(False, "tsa_signer_unreadable", token_sha256=tok_sha)
+                try:
+                    signer_pem = Path(signed).read_bytes()
+                except OSError:
+                    return TsaResult(False, "tsa_signer_unreadable", token_sha256=tok_sha)
+                signer_certs = re.findall(rb"-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----",
+                                          signer_pem, re.S)
+                if len(signer_certs) != 1:
+                    # No signer / multi-signer tokens require a separate,
+                    # reviewed policy rather than 'any pin intersects'.
+                    return TsaResult(False, "tsa_signer_count_invalid", token_sha256=tok_sha)
+                pf = os.path.join(d, "signer_one.pem")
+                Path(pf).write_bytes(signer_certs[0])
+                der = _run(["x509", "-in", pf, "-outform", "DER"])
+                if der.returncode != 0 or not der.stdout:
+                    return TsaResult(False, "tsa_signer_unreadable", token_sha256=tok_sha)
+                if hashlib.sha256(der.stdout).hexdigest() not in pins:
                     return TsaResult(False, "tsa_cert_not_pinned", token_sha256=tok_sha)
         return TsaResult(True, "ok", gen, tok_sha)
     except AnchorError as e:
