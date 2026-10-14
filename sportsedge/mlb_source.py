@@ -90,9 +90,6 @@ def bound_caller_time(value: datetime, *, fetch_started_at: datetime, received_a
 
 
 @dataclass(frozen=True)
-
-
-
 class MLBSourceCaptureRecord:
     sequence: int
     source_kind: str
@@ -589,6 +586,8 @@ def receipt_supports_as_of(entry: dict[str, Any], as_of: datetime) -> bool:
     before ``as_of``. A schedule fetched today for an old game is never as-of proof."""
     received = _parse_utc(entry.get("received_at_utc") if isinstance(entry, dict) else None, "received_at_utc")
     return received <= _aware(as_of, "as_of")
+
+
 
 
 RECEIPT_ANCHOR_REFUSED = "RECEIPT_ANCHOR_REFUSED"
