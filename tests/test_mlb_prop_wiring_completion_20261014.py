@@ -363,7 +363,12 @@ def test_batter_ladder_rung_beyond_empirical_support_refuses_by_name():
                             player="Mookie Betts")], batter_getter)
     row = card["evaluated_rows"][0]
     assert row["status"] == "NO_MODEL_OR_MARKET"
-    assert row["reason"] == "ENGINE_PROBABILITY_MASS_INVALID"
+    # Re-contract: this is a valid 0-event empirical count, not corrupted
+    # probability accounting. No calibrated extrapolation model exists.
+    assert row["reason"] == "EMPIRICAL_DEGENERATE_TAIL_NO_VALIDATED_MODEL"
+    assert "model_probability" not in row
+    assert "ev_per_dollar" not in row
+    assert "dk_no_vig_p" not in row
 
 
 def test_batter_ladder_conversion_and_monotonicity_refusal():

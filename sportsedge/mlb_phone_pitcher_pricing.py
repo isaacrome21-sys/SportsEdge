@@ -12,6 +12,7 @@ from typing import Mapping
 from .mlb_public_pitcher_history import MLBPitcherPublicSource, MissingMLBHistory
 from .research_model_adapters import mlb_pitcher_to_bridge_rows
 from .research_three_sport_bridge import price_three_sport_research
+from .quoted_count_threshold import same_quoted_count_threshold
 
 PITCHER_MARKETS = frozenset({
     "PITCHER_K", "PITCHER_OUTS", "PITCHER_HITS_ALLOWED",
@@ -86,7 +87,7 @@ def phone_pitcher_rows(rows, *, now=None, getter=None):
                 str(another.get("home")) != home or
                 str(another.get("player_name") or another.get("label") or "").strip() != name or
                 str(another.get("market") or "").upper() != market or
-                another.get("line") != row.get("line")):
+                not same_quoted_count_threshold(another.get("line"), row.get("line"))):
                 continue
             quotes.append({
                 "sport":"MLB", "game_id": verified["game_id"],
