@@ -420,7 +420,12 @@ def test_mixed_slate_regression_oct14_diagnostic():
         "RESEARCH_POSITIVE_EV_UNVALIDATED", "PRICE_CAP",
         "RESEARCH_POSITIVE_EV_UNVALIDATED", "BELOW_THRESHOLD",
         "RESEARCH_POSITIVE_EV_UNVALIDATED", "BELOW_THRESHOLD"]
-    assert len(card["edges"]) == 3
+    # Composed state (P0 team-totals intake merged, PR #2259): the priced
+    # MIL team-total row is a fourth edge. On this branch's pre-P0 base
+    # the count was 3 because the team-total rows died at intake.
+    assert len(card["edges"]) == 4
+    assert sum(1 for e in card["edges"]
+               if e.get("market") == "TEAM_TOTALS") == 1
 
     # F5 refusals intact.
     f5 = [r for l, r in zip(lines, rows)
@@ -450,3 +455,38 @@ def test_mixed_slate_regression_oct14_diagnostic():
                 ) or r["status"] in {
                     "RESEARCH_POSITIVE_EV_UNVALIDATED", "PRICE_CAP",
                     "BELOW_THRESHOLD", "RESEARCH_CANDIDATE_NOT_VALIDATED"}
+
+
+# --------------------------------------- composition with P0 (shared table)
+
+def test_shared_intake_table_carries_both_refusal_producers():
+    # Composition proof (post-P0 main): the milestone-ladder refusal and
+    # the P0 team-totals intake refusal are deposited by two different
+    # producers into the ONE shared intake_gated table in run_full and
+    # both surface by name in a single run -- neither overwrites the
+    # other, and neither row is priced.
+    ladder = snell_ladder()
+    ladder["milestone_ladder"]["rungs"] = [
+        {"threshold": 3, "odds": -110}, {"threshold": 4, "odds": -2600}]
+    tt_row = {"sport": "MLB", "market": "TEAM_TOTALS",
+              "away": "Milwaukee Brewers", "home": "Los Angeles Dodgers",
+              "kickoff": "2026-10-14T19:00:00-05:00", "book": "draftkings",
+              "quote_captured_at": CAP, "side": "OVER", "line": 4.5,
+              "odds": 114, "team": "Los Angeles Dodgers",
+              "team_side": "MIL"}
+    now = datetime(2026, 10, 14, 19, 46, tzinfo=timezone.utc)
+    card = run_full({"lines": [ladder, tt_row]}, now=now,
+                    auto_context=False)
+    rows = card["evaluated_rows"]
+    assert len(rows) == 2
+    milestone = [r for r in rows
+                 if r.get("reason") == "MILESTONE_LADDER_NON_MONOTONE"]
+    team_total = [r for r in rows
+                  if r.get("blocker") == "TEAM_TOTALS_TEAM_SIDE_INVALID"]
+    assert len(milestone) == 1 and len(team_total) == 1
+    assert milestone[0]["status"] == "NO_MODEL_OR_MARKET"
+    assert team_total[0]["status"] == "NO_MODEL_OR_MARKET"
+    assert team_total[0]["intake_enforced"] is True
+    for r in rows:
+        assert "ev_per_dollar" not in r
+    assert card["edges"] == []
