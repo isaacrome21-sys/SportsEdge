@@ -25,7 +25,7 @@ def test_invalid_utf8_is_audited_without_crashing(tmp_path):
     content-addressed invalid-UTF8 object must be EXCLUDED by the strict
     archive parser rather than crashing or entering the Form 2 mapping.
     """
-    raw = b"\\xff"
+    raw = b"\xff"
     digest = hashlib.sha256(raw).hexdigest()
     (tmp_path / (digest + ".json")).write_bytes(raw)
 
