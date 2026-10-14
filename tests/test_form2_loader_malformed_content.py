@@ -43,7 +43,7 @@ def test_invalid_utf8_is_audited_without_crashing(tmp_path):
     assert mapping == {}
     assert audit["admitted_team_ids"] == []
     assert audit["pin_status"] == "VERIFIED"
-    bad = [e for e in audit["entries"] if e.get("file_name") == digest + ".json"]
+    bad = [e for e in audit["entries"] if e.get("file") == digest + ".json"]
     assert len(bad) == 1
     assert bad[0]["disposition"] == "EXCLUDED"
     assert bad[0]["reason"] == "ARCHIVE_JSON_INVALID"
