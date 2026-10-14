@@ -735,7 +735,8 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             pitcher_input.append(line)
         elif line["sport"] == "MLB" and (
             market.startswith("BATTER_") or
-            market in {"SINGLES", "DOUBLES", "HITS_RUNS_RBIS", "H_R_RBI"}
+            market in {"SINGLES", "DOUBLES", "TRIPLES", "EXTRA_BASE_HITS",
+                       "RUNS_RBIS", "HITS_RUNS_RBIS", "H_R_RBI"}
         ):
             batter_pos.append(local)
             batter_input.append(line)
