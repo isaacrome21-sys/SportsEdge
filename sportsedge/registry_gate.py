@@ -19,6 +19,10 @@ from sportsedge.family_market_registry import FAMILIES, family_market_decision
 FAMILY_SPORTS = FAMILIES
 PRICING_KEYS = frozenset({
     "model_p", "model_prob", "model_probability", "probability", "prob",
+    "ev_per_dollar", "fair_decimal", "model_conditional_p", "model_push_p",
+    "push_p", "loss_p", "edge_pp", "edge_over_break_even_pp",
+    "edge_vs_dk_no_vig_pp", "home_mean", "away_mean", "projected_total",
+    "projected_home_margin",
     "p_model", "estimate_p", "fair_p", "fair_prob", "fair_odds", "fair_price",
     "fair_american", "ev", "edge", "expected_value", "model_price",
     "p_over", "p_under", "p_side", "win_prob", "p_home", "p_away",
