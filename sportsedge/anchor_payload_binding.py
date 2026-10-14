@@ -3,7 +3,7 @@
 Coordination (#2219, #2218): Muse's ``sportsedge/mlb_receipt_anchor_publisher.py`` (registry
 ``MLB_RECEIPT_JOURNAL_ANCHOR_V1``) reportedly derives ``anchor_id`` from the payload alone,
 so the same id can be presented from any storage location or by any carrier.  The dual-TSA
-layer (``sportsedge.evidence_anchor``) stamps ``batch_root(leaves)`` where each leaf is a
+layer (the RFC 3161 anchor module) stamps ``batch_root(leaves)`` where each leaf is a
 lowercase 64-hex SHA-256.  Any payload digest can therefore be stamped as-is; this module
 adds an optional, domain-separated *bound leaf* so a TSA token also commits to where the
 payload lives and how it was carried.  It does not replace or re-encode the payload, and it
@@ -38,7 +38,7 @@ class BoundLeaf:
     payload_sha256: str
     location: str
     carrier: str
-    leaf: str           # hex SHA-256 to pass to evidence_anchor.batch_root
+    leaf: str           # hex SHA-256 to pass to the anchor module's batch_root
 
     def as_record(self) -> dict:
         return {"domain": BINDING_DOMAIN, "schema": self.schema,
