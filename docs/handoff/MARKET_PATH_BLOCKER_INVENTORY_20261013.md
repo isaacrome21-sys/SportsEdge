@@ -117,3 +117,19 @@ Shared-lane inventory by Grok under owner directive t113u.
 | NHL/PGA/UFC | all | NOT IN REGISTRY | RUN IT surface lists PGA/UFC; no engine/registry seat -> NO_ENGINE |
 
 Note: the SB combo rows (15–17) are already BLOCKED NO_ENGINE. Per owner rule they are also NOT_OFFERED. New file: flag for ChatGPT registration.
+
+## t114 update (2026-10-13 ~19:20 CT)
+
+### Registry fix proposal (not on main)
+Branch `grok/t114-registry-fix-proposal-20261013` edits `sportsedge/canonical_coverage.py` + its test. If accepted, the counts move from 39 priced / 50 blocked to **24 priced / 65 blocked** (NO_ENGINE 58, NO_QUOTE 2, NO_VALIDATION 4, NO_DATA 1):
+- MLB `STOLEN_BASES` → BLOCKED NO_QUOTE, reason `NOT_OFFERED` (owner rule).
+- MLB `PITCHER_HITS_WALKS_ER` → BLOCKED NO_QUOTE, reason `PROVIDER_UNAVAILABLE` (mlb_market_surface UNAVAILABLE, provider_expected=false).
+- 13 NFL props (passing_yards, completions, attempts, passing_tds, interceptions, rush_yards, pass_plus_rush_yards, rushing_yards, receiving_yards, receptions, rush_attempts, rush_plus_rec_yards, anytime_td) → BLOCKED NO_ENGINE, reason `GOVERNANCE_NO_ENGINE` (prop-engine surface).
+- 4 F5 markets → blocker NO_QUOTE → NO_VALIDATION with leading reason `F5_DEPLOYMENT_NOT_ELIGIBLE` (eligible=false stays).
+Caveat for review: `artifacts/run_it_full.py` uses the registry only as a fallback for markets it does not route to an engine, so the runtime router still sends NFL props / SB / H+BB+ER to their engines. The proposal fixes the matrix truth only; making runtime match is a separate change for ChatGPT.
+
+### RUN IT / source truth
+- Canonical RUN IT: unchanged on main `655715907`; #2176 phone cards post-merge CI green. #2097 / #2103–#2105 (older canonical-run-it stack) are stale: #2103–#2105 fail collection on head.
+- MLB source truth: #2190 CODE GREEN / EVIDENCE HOLD; new drafts #2195 (unsafe receipt raw files) and #2196 (malformed intent journals) stacked on it, CI pending at snapshot. External anchor/host decision still the blocker.
+- NFL source truth: G2 Amendment 2 / source contract / code still absent (see NFL G2 handoff §6, issue #2161).
+- CFB: unchanged (#2182/#2184 on main; QB identity UNVERIFIED; owner §8/§10).
