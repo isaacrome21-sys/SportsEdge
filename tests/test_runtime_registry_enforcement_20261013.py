@@ -98,7 +98,12 @@ def test_mlb_blocked_markets_never_reach_pricer(no_pricers, market):
 def test_unvalidated_family_rows_never_reach_pricers(no_pricers, sport, market):
     card = R.run_full({"lines": [_row(sport, market)]},
                       now=NOW, auto_context=False)
-    _assert_blocked(card["evaluated_rows"][0], sport, market)
+    row = card["evaluated_rows"][0]
+    assert row["status"] == "NO_MODEL_OR_MARKET", (sport, market, row)
+    assert row["registry_enforced"] is True
+    assert row["blocker"] in {"NO_VALIDATION", "NO_ENGINE"}
+    for key in PRICE_KEYS:
+        assert row.get(key) in (None, False), (sport, market, key, row)
     assert card["edges"] == [] and card["prop_candidates"] == []
 
 
