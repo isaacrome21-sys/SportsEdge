@@ -174,7 +174,10 @@ def test_refusal_player_mismatch():
 
 def test_refusal_unsupported_market_and_malformed():
     row = snell_ladder()
-    row["market"] = "BATTER_HITS"
+    # BATTER_HITS is now a deliberately supported count-stat ladder;
+    # preserve the original refusal property using a true non-count
+    # first-plate-appearance result market instead of weakening it.
+    row["market"] = "BATTER_FIRST_PA_RESULT"
     assert _refusal(row) == "MILESTONE_LADDER_MARKET_UNSUPPORTED"
     row = snell_ladder()
     row["milestone_ladder"]["rungs"] = []
