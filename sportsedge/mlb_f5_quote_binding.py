@@ -449,7 +449,19 @@ def _parse_quote(row: Mapping[str, Any], *, now: datetime) -> dict[str, Any]:
         "home": row.get("home"),
         "team": row.get("team"),
         "team_id": row.get("team_id"),
+        "game_number": _game_number(row.get("game_number")),
     }
+
+
+def _game_number(value: Any) -> int | None:
+    """Doubleheader game number (1/2); None when not supplied."""
+    if value in (None, ""):
+        return None
+    try:
+        number = int(str(value).strip())
+    except (TypeError, ValueError):
+        return -1  # malformed: never equals a fixture's game number
+    return number
 
 
 def _resolve_team_entity(parsed: Mapping[str, Any],
@@ -525,6 +537,7 @@ def _resolve_fixture(parsed: Mapping[str, Any],
         "home_name": fixture.get("home_name"),
         "first_pitch_at": first_pitch,
         "official_date": str(fixture.get("official_date") or slate_date),
+        "game_number": _game_number(fixture.get("game_number")),
     }
     cache[game_pk] = resolved
     return resolved
@@ -540,6 +553,13 @@ def _cross_check_fixture(parsed: Mapping[str, Any],
                 F5_FIXTURE_BINDING_MISMATCH,
                 f"quote {field} team {parsed.get(field)!r} does not "
                 f"match the verified fixture ({fixture.get(fixture_field)!r})")
+    quote_game_no = parsed.get("game_number")
+    if quote_game_no is not None and fixture.get("game_number") \
+            is not None and quote_game_no != fixture["game_number"]:
+        raise F5BindingError(
+            F5_FIXTURE_BINDING_MISMATCH,
+            f"quote doubleheader game_number {quote_game_no} does not match "
+            f"the verified fixture ({fixture.get('game_number')})")
     first_pitch = fixture["first_pitch_at"]
     if abs((first_pitch - parsed["kickoff"]).total_seconds()) \
             > FIRST_PITCH_TOLERANCE_SECONDS:
@@ -591,6 +611,37 @@ def _canonical_quote(parsed: Mapping[str, Any], fixture: Mapping[str, Any],
 def _opposite(side: str) -> str:
     return {"HOME": "AWAY", "AWAY": "HOME",
             "OVER": "UNDER", "UNDER": "OVER"}[side]
+
+
+def _rung_key(market: str, side: str, line: float) -> float:
+    """Side-normalized rung of a two-sided F5 market.
+
+    Run line: expressed from the HOME perspective (HOME -1.5 and AWAY
+    +1.5 are the same rung, key -1.5). Totals/team totals: the line
+    itself (OVER and UNDER share it). Moneyline: 0.0. Rounded so float
+    noise cannot split one rung.
+    """
+    if market == "F5_RUN_LINE":
+        value = line if side == "HOME" else -line
+    else:
+        value = line
+    return round(value + 0.0, 6) + 0.0
+
+
+def _pairing_key(parsed: Mapping[str, Any]) -> tuple:
+    """Pairing identity (2026-10-13 reviewer ruling): game identity
+    (gamePk + doubleheader game number + book event ID), period, market
+    type, side-normalized rung line, sportsbook, and entity (team-total
+    team). The quote window is enforced at the row level (180s freshness
+    at pricing time) and per pair (<=120s capture skew)."""
+    fixture = parsed.get("fixture") or {}
+    game_number = fixture.get("game_number")
+    if game_number is None:
+        game_number = parsed.get("game_number")
+    return (parsed["book_key"], parsed["event_id"], parsed["game_pk"],
+            game_number, parsed["period"], parsed["market"],
+            parsed["entity_id"],
+            _rung_key(parsed["market"], parsed["side"], parsed["line"]))
 
 
 def _lines_pair(market: str, own: float, other: float) -> bool:
@@ -647,12 +698,13 @@ def bind_f5_quotes(rows: Sequence[Mapping[str, Any]], *, now: datetime,
                 "research_only": True,
             }
 
-    # Pairing: group admissible quotes by book/event/fixture/market/
-    # entity; a group prices only as exactly one opposite pair.
+    # Pairing: group admissible quotes by the full pairing identity
+    # (_pairing_key: book/event/gamePk/doubleheader game/period/market/
+    # entity/side-normalized rung); a group prices only as exactly one
+    # opposite pair, so each rung of a ladder pairs on its own.
     groups: dict[tuple, list[int]] = {}
     for i, parsed in parsed_by_index.items():
-        key = (parsed["book_key"], parsed["event_id"], parsed["game_pk"],
-               parsed["market"], parsed["entity_id"])
+        key = _pairing_key(parsed)
         groups.setdefault(key, []).append(i)
 
     pairs: list[dict[str, Any]] = []
@@ -669,7 +721,8 @@ def bind_f5_quotes(rows: Sequence[Mapping[str, Any]], *, now: datetime,
         if len(indices) != 2:
             _block(indices, F5_QUOTE_UNPAIRED,
                    "a two-sided F5 market requires exactly one quote "
-                   f"per side in the binding group; found {len(indices)}")
+                   "per side in the binding group (one rung at one book "
+                   f"for one game); found {len(indices)}")
             continue
         first, second = (parsed_by_index[indices[0]],
                          parsed_by_index[indices[1]])
@@ -715,6 +768,8 @@ def bind_f5_quotes(rows: Sequence[Mapping[str, Any]], *, now: datetime,
                 "official_date": first["fixture"]["official_date"],
             },
             "entity_id": first["entity_id"],
+            "rung_key": key[-1],
+            "game_number": key[3],
             "quotes": quotes,
             "member_indices": list(indices),
             "settlement_basis": basis,
