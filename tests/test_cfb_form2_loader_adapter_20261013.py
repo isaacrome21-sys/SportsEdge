@@ -621,5 +621,90 @@ class HardeningParityTests(AdapterCase):
         self.assertIn("SAME_TEAM_NAME", entries[f"{digest_b}.json"]["detail"])
 
 
+class MultiPinnedArchiveTests(AdapterCase):
+    """Per-team preservation emits single-entry manifests; no synthetic union
+    pin or untrusted directory-derived anchor is needed to load them."""
+
+    def _two_team_pins(self):
+        _, first = self.preserve(make_bundle("48"), "48")
+        _, second = self.preserve(make_bundle("2393"), "2393")
+        return (self.combined_manifest([first])[1],
+                self.combined_manifest([second])[1])
+
+    def test_independent_per_team_pins_compose_with_registry_still_blocked(self):
+        pin_a, pin_b = self._two_team_pins()
+        mapping, audit = loader.load_form2_bundle_manifests(
+            self.dir, [cfb_row()], manifest_sha256s=[pin_a, pin_b])
+        self.assertEqual(set(mapping), {"48", "2393"})
+        self.assertEqual(audit["pin_status"], loader.PIN_VERIFIED)
+        self.assertEqual(audit["manifest_sha256s"], [pin_a, pin_b])
+        self.assertEqual(audit["admitted_team_ids"], ["2393", "48"])
+        card = full.run_full(
+            {"lines": [cfb_row()]}, now=NOW,
+            getter=lambda url: cfb_mapping().get(url, {}),
+            form2_bundles_dir=self.dir,
+            form2_manifest_sha256=[pin_a, pin_b])
+        self.assertEqual(
+            card["qb_form2_bundle_loader_audit"]["admitted_team_ids"],
+            ["2393", "48"])
+        (prepricing,) = card["prepricing_factor_audit"]["by_input_index"]
+        self.assertFalse(prepricing["blocked"])
+        (row,) = card["evaluated_rows"]
+        self.assertEqual(row["status"], "NO_MODEL_OR_MARKET")
+        self.assertEqual(row["blocker"], "NO_VALIDATION")
+        self.assertTrue(row["registry_enforced"])
+        self.assertFalse(card["edges"])
+        self.assertFalse(card["prop_candidates"])
+        for field in ("model_p", "ev_per_dollar", "probability", "fair_odds"):
+            self.assertIsNone(row.get(field))
+
+    def test_one_bad_pin_poisoned_composite_never_partially_admits(self):
+        pin_a, _ = self._two_team_pins()
+        mapping, audit = loader.load_form2_bundle_manifests(
+            self.dir, [cfb_row()], manifest_sha256s=[pin_a, "f" * 64])
+        self.assertEqual(mapping, {})
+        self.assertEqual(audit["pin_status"], loader.PIN_UNVERIFIED)
+        self.assertEqual(audit["admitted_team_ids"], [])
+        self.assertIn("ARCHIVE_COMPOSITE_PIN_UNVERIFIED",
+                      self.reasons(audit))
+        self.assertFalse(any(
+            entry["disposition"] == loader.ADMITTED
+            for entry in audit["entries"]))
+
+    def test_repeated_pin_is_not_two_independent_archive_receipts(self):
+        pin_a, _ = self._two_team_pins()
+        mapping, audit = loader.load_form2_bundle_manifests(
+            self.dir, [cfb_row()], manifest_sha256s=[pin_a, pin_a])
+        self.assertEqual(mapping, {})
+        self.assertIn("ARCHIVE_MULTI_PIN_DUPLICATE", self.reasons(audit))
+
+    def test_conflicting_team_bundles_across_pins_fail_closed(self):
+        pin_a, pin_mtsu = self._two_team_pins()
+        _, entry_b = self.preserve(
+            make_bundle("48", depth_stamp="10/10/2026 9:12AM",
+                        depth_captured="2026-10-13T13:26:00Z"), "48")
+        pin_b = self.combined_manifest([entry_b])[1]
+        mapping, audit = loader.load_form2_bundle_manifests(
+            self.dir, [cfb_row()],
+            manifest_sha256s=[pin_a, pin_mtsu, pin_b])
+        self.assertEqual(set(mapping), {"2393"})
+        self.assertEqual(audit["admitted_team_ids"], ["2393"])
+        self.assertTrue(any(
+            e["reason"] == loader.REASON_DUPLICATE
+            for e in audit["entries"] if e.get("team_id") == "48"))
+        self.assertFalse(any(
+            e["disposition"] == loader.ADMITTED
+            for e in audit["entries"] if e.get("team_id") == "48"))
+
+    def test_malformed_or_missing_external_pins_never_admit(self):
+        self._two_team_pins()
+        for pins in (None, [], ["not_a_sha256"], ["a" * 64, None]):
+            with self.subTest(pins=pins):
+                mapping, audit = loader.load_form2_bundle_manifests(
+                    self.dir, [cfb_row()], manifest_sha256s=pins)
+                self.assertEqual(mapping, {})
+                self.assertNotEqual(audit["pin_status"], loader.PIN_VERIFIED)
+
+
 if __name__ == "__main__":
     unittest.main()
