@@ -108,15 +108,28 @@ def is_milestone_ladder_row(row) -> bool:
     return isinstance(row, Mapping) and "milestone_ladder" in row
 
 
+# Parser-only coverage is NOT a claim of an executable probability engine.
+# These offered DK count-stat ladders must reach an explicit downstream
+# NO_ENGINE/NO_QUOTE refusal instead of dying at parser recognition.
+_MLB_PARSER_ONLY = frozenset({
+    "BATTER_EXTRA_BASE_HITS", "BATTER_TRIPLES", "PITCHER_PITCHES",
+})
+
+
 def _supported(sport: str, market: str) -> bool:
     if sport == "MLB":
         from .mlb_phone_pitcher_pricing import PITCHER_MARKETS
-        return market in PITCHER_MARKETS
-    if sport in {"NFL", "CFB"}:
-        # CFB converts identically; its rows then die at the standing
-        # identity/registry gates in the runner (HOLD -- no CFB pricing
-        # path is created here).
-        return market in _FOOTBALL_PASSING_MARKETS
+        from .mlb_phone_batter_pricing import BATTER_MARKETS
+        return (market in PITCHER_MARKETS or market in BATTER_MARKETS
+                or market in _MLB_PARSER_ONLY)
+    if sport == "NFL":
+        from .nfl_phone_player_pricing import NFL_PLAYER_MARKETS
+        return market in NFL_PLAYER_MARKETS or market in _FOOTBALL_PASSING_MARKETS
+    if sport == "CFB":
+        from .cfb_phone_player_pricing import CFB_PLAYER_MARKETS
+        # The family registry gate still refuses all CFB pricing before
+        # any player-stat model stage is reached; syntax != authority.
+        return market in CFB_PLAYER_MARKETS or market in _FOOTBALL_PASSING_MARKETS
     return False
 
 
