@@ -330,6 +330,11 @@ def test_gentime_in_future_refused(env):
     assert not r.ok and r.reason == "gentime_in_future"
 
 
+def test_fractional_gen_time_must_not_round_down_at_pregame_boundary():
+    parsed = ea._parse_gentime("Time stamp: Oct 13 20:45:00.900 2026 GMT")
+    assert parsed == datetime(2026, 10, 13, 20, 45, 0, 900000, tzinfo=timezone.utc)
+
+
 def test_message_imprint_mismatch_refused(env):
     assert not ea.tsa_verify(env["ta"], ea.batch_root(LEAVES[:3]), env["a"]["ca"]).ok
 
