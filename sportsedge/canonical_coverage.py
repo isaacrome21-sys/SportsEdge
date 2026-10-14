@@ -237,15 +237,6 @@ for _m in ("player_sacks", "tackles_assists", "player_interceptions",
              "the canonical path and the governance surface declares "
              "NO_ENGINE for NFL props.")
 
-# Research-family stopgap: no CFB/NBA/CBB family is validated for PLAY.
-# A family entry is a refusal contract, never a declaration of model eligibility.
-for _sport in ("CFB", "NBA", "CBB"):
-    for _market in ("moneyline", "spread", "total"):
-        _blocked(_sport, _market, "NO_VALIDATION",
-                 "FAMILY_REGISTRY_NOT_VALIDATED: chronological family-level "
-                 "preregistration and prospective evidence are required; "
-                 "research prices have no PLAY authority.", validation="UNVALIDATED")
-
 MARKET_RESOLUTIONS = dict(_R)
 
 # Canonical-path dispatch sets (kept in this dependency-light module so
@@ -370,17 +361,6 @@ def resolve_market(sport, market):
     direct = MARKET_RESOLUTIONS.get((sport, key))
     if direct is not None:
         return dict(direct)
-    if sport in ("CFB", "NBA", "CBB"):
-        family_key = str(market or "").strip().lower()
-        if family_key in ("ml", "moneyline", "spread", "total", "totals"):
-            family_key = {"ml": "moneyline", "totals": "total"}.get(family_key, family_key)
-            return dict(MARKET_RESOLUTIONS[(sport, family_key)])
-        return {
-            "sport": sport, "market": family_key, "state": BLOCKED,
-            "engine": None, "blocker": "NO_ENGINE",
-            "detail": "FAMILY_MARKET_UNREGISTERED: fail closed until explicitly registered.",
-            "validation_status": "UNVALIDATED",
-        }
     alias = INTAKE_ALIASES.get(sport, {}).get(str(market or "").upper())
     if alias is not None:
         return dict(MARKET_RESOLUTIONS[(sport, alias)])
