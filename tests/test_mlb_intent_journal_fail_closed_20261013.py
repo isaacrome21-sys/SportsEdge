@@ -23,7 +23,7 @@ def _begin(**overrides):
         "state": "BEGIN",
         "base_seq": 0,
         "record_sha256": DIGEST,
-        "record_line": '{}\\n',
+        "record_line": '{}\n',
         "raw_sha256": None,
         "receipt_link": {"sha256": None, "url": None},
     }
@@ -41,7 +41,7 @@ class IntentJournalFailClosedTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             capture, manifest, raw, journal = self._paths(root)
             journal.write_bytes(b"".join(
-                (json.dumps(obj, sort_keys=True, separators=(",", ":")) + "\\n").encode()
+                (json.dumps(obj, sort_keys=True, separators=(",", ":")) + "\n").encode()
                 if isinstance(obj, dict) else obj for obj in entries
             ))
             result = sc.verify_capture_store(capture, manifest, raw)
@@ -85,22 +85,22 @@ class IntentJournalFailClosedTests(unittest.TestCase):
 
     def test_duplicate_json_key_rejected(self):
         bad = ('{"schema":"' + SCHEMA + '","schema":"' + SCHEMA
-               + '","intent_id":"' + IDENT + '","state":"COMMIT"}\\n').encode()
+               + '","intent_id":"' + IDENT + '","state":"COMMIT"}\n').encode()
         self._verify_and_recover_reject([bad], "INTENT_DUPLICATE_JSON_KEY")
 
     def test_nonfinite_json_rejected(self):
         bad = ('{"schema":"' + SCHEMA + '","intent_id":"' + IDENT
-               + '","state":"BEGIN","extra":NaN}\\n').encode()
+               + '","state":"BEGIN","extra":NaN}\n').encode()
         self._verify_and_recover_reject([bad], "INTENT_NONFINITE_NUMBER")
 
     def test_bad_record_json_fails_as_controlled_recovery_error(self):
-        record_line = 'not-json\\n'
+        record_line = 'not-json\n'
         raw = record_line.encode()
         begin = _begin(record_line=record_line, record_sha256=hashlib.sha256(raw).hexdigest())
         self._verify_and_recover_reject([begin], "INTENT_UNCOMMITTED")
         with tempfile.TemporaryDirectory() as root:
             capture, manifest, raw_dir, journal = self._paths(root)
-            journal.write_text(json.dumps(begin) + "\\n")
+            journal.write_text(json.dumps(begin) + "\n")
             with self.assertRaisesRegex(sc.StarterCaptureError, "INTENT_RECORD_UNPARSEABLE"):
                 sc.recover_capture_store(capture, manifest, raw_dir)
 
