@@ -16,7 +16,7 @@ import hashlib
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Protocol
+from typing import Any, Mapping, Protocol
 
 LOCK_MODE = "COMPLIANCE"
 MIN_RETENTION_DAYS = 3650
@@ -52,10 +52,43 @@ def _check(key: str, body: bytes, retention_days: int, mode: str) -> str:
     return hashlib.sha256(body).hexdigest()
 
 
+def _check_policy(mode: Any, retention_days: Any) -> None:
+    if mode != LOCK_MODE:
+        raise LockStoreError("only COMPLIANCE mode is allowed")
+    if isinstance(retention_days, bool) or not isinstance(retention_days, int) or retention_days < MIN_RETENTION_DAYS:
+        raise LockStoreError("retention below approved minimum")
+
+
+_BUCKET = re.compile(r"^[a-z0-9][a-z0-9.-]{2,62}$")
+
+
+@dataclass(frozen=True)
+class ObjectLockSettings:
+    bucket: str
+    mode: str
+    retention_days: int
+
+
+def object_lock_settings(block: Any) -> ObjectLockSettings:
+    """Strictly validate the ``object_lock`` config block (t130). Refuses anything
+    missing, mistyped, non-COMPLIANCE or with retention < 3650 days."""
+    if not isinstance(block, Mapping):
+        raise LockStoreError("object_lock config missing")
+    b = block.get("bucket")
+    if not isinstance(b, str):
+        raise LockStoreError("object_lock.bucket missing")
+    name = b[len("s3://"):] if b.startswith("s3://") else b
+    if not _BUCKET.match(name) or ".." in name:
+        raise LockStoreError("bad bucket name")
+    _check_policy(block.get("mode"), block.get("retention_days"))
+    return ObjectLockSettings(name, block["mode"], block["retention_days"])
+
+
 class InMemoryLockWriter:
     """Test double with Object Lock semantics: write-once, no delete."""
 
     def __init__(self, retention_days: int = MIN_RETENTION_DAYS, mode: str = LOCK_MODE):
+        _check_policy(mode, retention_days)
         self.retention_days, self.mode = retention_days, mode
         self._objs: dict[str, tuple[bytes, LockReceipt]] = {}
 
@@ -84,17 +117,37 @@ class S3ObjectLockWriter:
             raise LockStoreError("object-lock writer not activated")
         if client is None:
             raise LockStoreError("client required (credentials via host secret store)")
-        if not isinstance(bucket, str) or not re.match(r"^[a-z0-9][a-z0-9.-]{2,62}$", bucket):
+        if not isinstance(bucket, str) or not _BUCKET.match(bucket):
             raise LockStoreError("bad bucket name")
+        _check_policy(mode, retention_days)
         self.bucket, self.client, self.retention_days, self.mode = bucket, client, retention_days, mode
 
+    @classmethod
+    def from_config(cls, block: Any, client: Any, *, enabled: bool = False) -> "S3ObjectLockWriter":
+        st = object_lock_settings(block)
+        return cls(st.bucket, client, enabled=enabled, retention_days=st.retention_days, mode=st.mode)
+
     def verify_bucket(self) -> None:
-        cfg = self.client.get_object_lock_configuration(Bucket=self.bucket)["ObjectLockConfiguration"]
-        if cfg.get("ObjectLockEnabled") != "Enabled":
+        try:
+            cfg = self.client.get_object_lock_configuration(Bucket=self.bucket)["ObjectLockConfiguration"]
+            ver = self.client.get_bucket_versioning(Bucket=self.bucket)
+        except LockStoreError:
+            raise
+        except Exception as e:  # fail closed on any client/shape error
+            raise LockStoreError(f"bucket preflight failed: {type(e).__name__}") from e
+        if not isinstance(cfg, Mapping) or cfg.get("ObjectLockEnabled") != "Enabled":
             raise LockStoreError("bucket does not have Object Lock enabled")
-        ver = self.client.get_bucket_versioning(Bucket=self.bucket)
-        if ver.get("Status") != "Enabled":
+        if not isinstance(ver, Mapping) or ver.get("Status") != "Enabled":
             raise LockStoreError("bucket versioning not enabled")
+        dr = (cfg.get("Rule") or {}).get("DefaultRetention") if isinstance(cfg.get("Rule"), Mapping) else None
+        if not isinstance(dr, Mapping) or dr.get("Mode") != LOCK_MODE:
+            raise LockStoreError("bucket default retention is not COMPLIANCE")
+        days = dr.get("Days")
+        years = dr.get("Years")
+        eff = (days if isinstance(days, int) and not isinstance(days, bool) else
+               years * 365 if isinstance(years, int) and not isinstance(years, bool) else None)
+        if eff is None or eff < MIN_RETENTION_DAYS:
+            raise LockStoreError("bucket default retention below approved minimum")
 
     def put_locked(self, key, body, *, now=None):
         sha = _check(key, body, self.retention_days, self.mode)
@@ -109,11 +162,16 @@ class S3ObjectLockWriter:
                 raise LockStoreError("retention clock is stale")
         now = now or current
         until = now + timedelta(days=self.retention_days)
-        r = self.client.put_object(
-            Bucket=self.bucket, Key=key, Body=bytes(body),
-            ChecksumSHA256=base64.b64encode(bytes.fromhex(sha)).decode(),
-            ObjectLockMode=self.mode, ObjectLockRetainUntilDate=until,
-            IfNoneMatch="*")
+        try:
+            r = self.client.put_object(
+                Bucket=self.bucket, Key=key, Body=bytes(body),
+                ChecksumSHA256=base64.b64encode(bytes.fromhex(sha)).decode(),
+                ObjectLockMode=self.mode, ObjectLockRetainUntilDate=until,
+                IfNoneMatch="*")
+        except Exception as e:  # e.g. 412 PreconditionFailed: key exists
+            raise LockStoreError(f"write refused (overwrite or store error): {type(e).__name__}") from e
+        if not isinstance(r, Mapping):
+            raise LockStoreError("bad store response")
         vid = r.get("VersionId")
         if not vid:
             raise LockStoreError("no VersionId returned; versioning/Object Lock not effective")

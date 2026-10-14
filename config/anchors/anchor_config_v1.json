@@ -22,6 +22,9 @@
       "ca_bundle_path": "config/anchors/freetsa_ca.pem",
       "ca_bundle_sha256": "2151b61137ffa86bf664691ba67e7da0b19f98c758e3d228d5d8ebf27e044438",
       "signer_cert_sha256": ["32e841a95cc1164101ffde41298ef2fc75c1c4372ef095e88a6bbd47dfb191fc"],
+      "policy_oids": ["1.2.3.4.1"],
+      "tsa_name_sha256": "80a15f31cd8cc1a0d55822bdfbc11bb5ef33a5fffa7249c67f727932ec9c9199",
+      "policy_provenance": "t130: TSTInfo policy OID and DER sha256 of the [0] tsa GeneralName, parsed from the real recorded t127 fixture token (tests/fixtures/anchor/tsa_fixture_t127.json).",
       "status": "pinned",
       "pinned_at": "2026-10-14T02:48:21Z",
       "provenance": "docs/ANCHOR_TSA_PINNING_PROVENANCE_20261013.md",
@@ -32,6 +35,7 @@
       "url": "http://timestamp.digicert.com",
       "ca_bundle_path": null,
       "signer_cert_sha256": [],
+      "policy_oids": [],
       "status": "unpinned",
       "blocked_reason": "t127: no real DigiCert RFC 3161 token could be recorded from the build host (timestamp.digicert.com is HTTP-only; outbound port 80 times out, HTTPS refused), so the signer cert cannot be taken from a real token. Root G4 cross-checked in the provenance doc; provider stays unpinned.",
       "pin_procedure": "Obtain DigiCert Assured ID / Trusted Root G4 and the current timestamping intermediate from DigiCert's published repository; take signer cert from a real token; commit bundle to config/anchors/digicert_ca.pem, record DER sha256, set status=pinned. Owner/ChatGPT step."
@@ -40,6 +44,8 @@
   "quorum": {"min_distinct_providers": 2},
   "pregame_margin_s": 900,
   "max_clock_skew_s": 30,
+  "max_response_window_s": 300,
+  "nonce_ledger": {"path": "state/anchors/tsa_nonce_ledger.jsonl", "note": "t130: append-only, flock-serialised, single-use nonces; recorded at request time; ledger errors refuse admission. Must live on the capture host's persistent disk."},
   "ots": {"enabled": true, "role": "secondary long-run proof; never gates admission", "calendars": "default"},
   "object_lock": {
     "bucket": "s3://sportsedge-evidence-locked",
