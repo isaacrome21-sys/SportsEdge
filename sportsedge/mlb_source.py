@@ -4,6 +4,8 @@ from contextvars import ContextVar
 from dataclasses import replace, dataclass, asdict
 from datetime import datetime, timedelta, timezone
 import hashlib
+import os
+import stat
 import uuid
 import time as _time
 import json
@@ -135,6 +137,56 @@ def _parse_utc(value: Any, label: str) -> datetime:
     return dt.astimezone(timezone.utc)
 
 
+# Hard limit on archived StatsAPI responses. A hostile or corrupted path must never
+# block on a FIFO/device or cause unbounded memory consumption during verification.
+MAX_RECEIPT_RAW_BYTES = 32 * 1024 * 1024
+
+
+def _read_verified_receipt_raw(root: Path, filename: str, expected_length: Any) -> bytes:
+    """Read regular immutable-evidence bytes with no symlink/FIFO following.
+
+    This is local archive safety, NOT a trusted external timestamp, immutable
+    storage guarantee or authority to promote retrospective source evidence.
+    """
+    if (type(expected_length) is not int or expected_length < 0
+            or expected_length > MAX_RECEIPT_RAW_BYTES):
+        raise MLBSourceError("RECEIPT_RAW_SIZE_INVALID")
+    path = root / filename
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    try:
+        fd = os.open(path, flags)
+    except FileNotFoundError as exc:
+        raise MLBSourceError("RECEIPT_RAW_BYTES_MISSING") from exc
+    except OSError as exc:
+        raise MLBSourceError("RECEIPT_RAW_PATH_UNSAFE") from exc
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode):
+            raise MLBSourceError("RECEIPT_RAW_PATH_UNSAFE")
+        if before.st_size > MAX_RECEIPT_RAW_BYTES:
+            raise MLBSourceError("RECEIPT_RAW_SIZE_INVALID")
+        if before.st_size != expected_length:
+            raise MLBSourceError("RECEIPT_RAW_BYTES_TAMPERED")
+        with os.fdopen(fd, "rb") as handle:
+            fd = -1
+            raw = handle.read(expected_length + 1)
+            after = os.fstat(handle.fileno())
+        # Check the path once more: a file swapped while open cannot silently
+        # stand in for the path independently referenced by the journal.
+        try:
+            current = path.lstat()
+        except OSError as exc:
+            raise MLBSourceError("RECEIPT_RAW_PATH_UNSAFE") from exc
+        identity = lambda info: (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)
+        if (len(raw) != expected_length or not stat.S_ISREG(current.st_mode)
+                or identity(before) != identity(after) or identity(after) != identity(current)):
+            raise MLBSourceError("RECEIPT_RAW_BYTES_TAMPERED")
+        return raw
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+
 def verify_receipt_journal(root: str | Path, *, verifier_now: datetime | None = None) -> list[dict[str, Any]]:
     """Independently re-verify a persisted capture directory (fresh process / restart).
 
@@ -215,13 +267,8 @@ def verify_receipt_journal(root: str | Path, *, verifier_now: datetime | None = 
         if (not isinstance(filename, str) or not filename or len(filename) > 180
                 or Path(filename).name != filename or chr(92) in filename):
             raise MLBSourceError("RECEIPT_RAW_PATH_UNSAFE")
-        raw_path = root / filename
-        if raw_path.is_symlink():
-            raise MLBSourceError("RECEIPT_RAW_PATH_UNSAFE")
-        if not raw_path.exists():
-            raise MLBSourceError("RECEIPT_RAW_BYTES_MISSING")
-        raw = raw_path.read_bytes()
-        if hashlib.sha256(raw).hexdigest() != entry["sha256"] or len(raw) != entry["byte_length"]:
+        raw = _read_verified_receipt_raw(root, filename, entry["byte_length"])
+        if hashlib.sha256(raw).hexdigest() != entry["sha256"]:
             raise MLBSourceError("RECEIPT_RAW_BYTES_TAMPERED")
         prev = entry["record_sha256"]
         entries.append(entry)
