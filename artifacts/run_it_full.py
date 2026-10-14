@@ -23,8 +23,7 @@ from sportsedge.mlb_phone_first_inning_pricing import (
 from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
 from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
 from sportsedge.prepricing.factor_ingestion import stage_games
-from sportsedge.prepricing.qb_form2_bundle_loader import (
-    load_form2_bundles, load_form2_bundle_manifests)
+from sportsedge.prepricing.qb_form2_bundle_loader import load_form2_bundles
 from sportsedge.milestone_ladder_intake import (
     expand_milestone_ladder_rows, milestone_refusal_row)
 from sportsedge.team_half_pricing import DERIVATIVES, price_team_half_rows
@@ -373,6 +372,29 @@ def _team_totals_intake_refusal(line):
         "the selection, and no team_side")
 
 
+def _as_of_instant(as_of):
+    """Aware UTC datetime for a declared as-of value, else None.
+
+    Accepts the CLI's ISO string or a datetime. A missing, naive or
+    unparseable value yields None (the caller falls back to the wall
+    clock, and the game engine still refuses a malformed as-of by
+    name downstream, exactly as before).
+    """
+    if as_of is None:
+        return None
+    if isinstance(as_of, datetime):
+        instant = as_of
+    else:
+        try:
+            instant = datetime.fromisoformat(
+                str(as_of).replace("Z", "+00:00"))
+        except (ValueError, TypeError, OverflowError):
+            return None
+    if instant.tzinfo is None or instant.utcoffset() is None:
+        return None
+    return instant.astimezone(timezone.utc)
+
+
 def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
              auto_context=True, min_ev=0.02, lane="A", allow_manual_context=False,
              td_cache_dir=None, td_opener=None, form2_bundles_dir=None,
@@ -415,10 +437,6 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     supplies the manifest itself, verified against the pin either
     way). With a directory but no pin, Form 2 admission is disabled
     and the run behaves exactly as it did before the loader existed.
-    A tuple/list of independent external manifest SHA-256 pins is also
-    accepted: each per-team archive is admitted independently and then
-    composed with cross-manifest identity collision refusals. No pin may
-    be derived from the local archive itself.
     Default None: no Form 2 loading.
     """
     rows = payload if isinstance(payload, list) else payload.get("lines")
@@ -427,6 +445,19 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     clock = now or datetime.now(timezone.utc)
     if clock.tzinfo is None or clock.utcoffset() is None:
         raise ValueError("MODEL_NOW_TIMEZONE_REQUIRED")
+    # Operative instant for every prop lane. The game engine prices
+    # against the declared as-of; the prop lanes historically received
+    # only the wall clock, so a run declared --as-of the capture
+    # instant judged its own fresh quotes stale once wall time drifted
+    # past the 180s freshness bound (Oct 14 2026 operative run: quotes
+    # captured 23:03:00Z, --as-of 23:03:00Z, wall 23:07:38Z -> the
+    # uniquely-paired OUTS/BB/HITS_ALLOWED props landed
+    # WATCH_QUOTE_NOT_CURRENT). When an as-of is declared it IS the
+    # operative instant for prop freshness, model as-of and
+    # started-game checks; the wall clock remains the execution audit
+    # stamp (engine now=) and is never used to re-judge a quote.
+    # quote_captured_at values are inputs and are never rewritten.
+    prop_clock = _as_of_instant(as_of) or clock
     default_sport = payload.get("sport") if isinstance(payload, dict) else None
     # Milestone-ladder prop intake (SPEC rev. 2, Oct 14 2026): DraftKings
     # "X+" ladders convert to canonical one-sided OVER/UNDER rows BEFORE
@@ -569,20 +600,10 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     form2_bundles = None
     form2_loader_audit = None
     if form2_bundles_dir is not None:
-        if isinstance(form2_manifest_sha256, (tuple, list)):
-            # Multiple operator-supplied *external* pins from separately
-            # sealed per-team captures. Do not accept manifest bytes here:
-            # every object is verified against its external digest.
-            if form2_manifest_bytes is not None:
-                raise ValueError("FORM2_MULTI_PIN_MANIFEST_BYTES_UNSUPPORTED")
-            loaded_bundles, form2_loader_audit = load_form2_bundle_manifests(
-                form2_bundles_dir, games,
-                manifest_sha256s=form2_manifest_sha256)
-        else:
-            loaded_bundles, form2_loader_audit = load_form2_bundles(
-                form2_bundles_dir, games,
-                manifest_sha256=form2_manifest_sha256,
-                manifest_bytes=form2_manifest_bytes)
+        loaded_bundles, form2_loader_audit = load_form2_bundles(
+            form2_bundles_dir, games,
+            manifest_sha256=form2_manifest_sha256,
+            manifest_bytes=form2_manifest_bytes)
         if loaded_bundles:
             form2_bundles = loaded_bundles
 
@@ -797,11 +818,11 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             others[local] = covered if covered is not None else blocked(
                 line, "NO_VERIFIED_MODEL_FOR_THIS_MARKET")
     pitcher_results, pitcher_receipts = phone_pitcher_rows(
-        pitcher_input, now=clock, getter=getter if auto_context else (lambda url: None))
+        pitcher_input, now=prop_clock, getter=getter if auto_context else (lambda url: None))
     batter_results, batter_receipts = phone_batter_rows(
-        batter_input, now=clock, getter=getter if auto_context else (lambda url: None))
+        batter_input, now=prop_clock, getter=getter if auto_context else (lambda url: None))
     first_results, first_receipts = phone_first_inning_rows(
-        first_input, now=clock, getter=getter if auto_context else (lambda url: None))
+        first_input, now=prop_clock, getter=getter if auto_context else (lambda url: None))
     # F5 stage: quote binding + settlement-basis gate + strictly-prior
     # feature assembly, then the F5 deployment gate. With auto_context
     # off, fetching is disabled and binding fails closed on the fixture
@@ -811,7 +832,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     if f5_input:
         try:
             f5_results, f5_receipts = phone_f5_binding_rows(
-                f5_input, now=clock,
+                f5_input, now=prop_clock,
                 getter=getter if auto_context else None,
                 fetch_enabled=auto_context)
         except Exception as exc:
@@ -828,11 +849,11 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "model_p_authority": False, "staking_authority": False,
             } for line in f5_input]
     nfl_results, nfl_receipts = phone_nfl_player_rows(
-        nfl_input, now=clock, getter=getter if auto_context else (lambda url: None))
+        nfl_input, now=prop_clock, getter=getter if auto_context else (lambda url: None))
     cfb_results, cfb_receipts = phone_cfb_player_rows(
-        cfb_input, now=clock, getter=getter if auto_context else (lambda url: None))
+        cfb_input, now=prop_clock, getter=getter if auto_context else (lambda url: None))
     teamhalf_results, teamhalf_receipts = price_team_half_rows(
-        teamhalf_input, now=clock, getter=getter if auto_context else (lambda url: None))
+        teamhalf_input, now=prop_clock, getter=getter if auto_context else (lambda url: None))
     if len(teamhalf_results) != len(teamhalf_input):
         raise ValueError("TEAM_HALF_RESULT_COUNT_MISMATCH")
     # Canonical derivative stage: NFL team totals / period / alternate rows
@@ -876,7 +897,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                     if source_prov is not None:
                         deriv_distribution_provenance[key] = source_prov
             deriv_results, deriv_receipts = phone_nfl_derivative_rows(
-                deriv_input, distributions=distributions, now=clock)
+                deriv_input, distributions=distributions, now=prop_clock)
     # ANYTIME_TD stage: nflverse history through the engine's own opener
     # seam. With auto_context off and no explicit opener, a cache miss
     # fails closed instead of fetching (no-fetch means no-fetch). Same
@@ -902,7 +923,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             def _td_unavailable_opener(url, *args, **kwargs):
                 raise OSError("TD_HISTORY_FETCH_DISABLED_IN_NO_FETCH_MODE")
             td_results, td_receipts = phone_anytime_td_rows(
-                td_input, now=clock, cache_dir=td_cache_dir,
+                td_input, now=prop_clock, cache_dir=td_cache_dir,
                 opener=td_opener if td_opener is not None else (
                     None if auto_context else _td_unavailable_opener))
     if len(deriv_results) != len(deriv_input):
@@ -916,7 +937,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     if len(pitcher_results) != len(pitcher_input):
         raise ValueError("PITCHER_RESULT_COUNT_MISMATCH")
     coverage_results, coverage_receipts = phone_coverage_rows(
-        coverage_input, now=clock,
+        coverage_input, now=prop_clock,
         getter=getter if auto_context else (lambda url: None),
         auto_context=auto_context, min_ev=min_ev)
     if len(coverage_results) != len(coverage_input):
@@ -1143,11 +1164,11 @@ def main(argv=None):
                         "QB_IDENTITY_EVIDENCE bundles (CFB); read locally "
                         "through the archive module, never fetched. "
                         "Admission requires --form2-manifest-sha256")
-    p.add_argument("--form2-manifest-sha256", action="append",
-                   help="External pin: Form 2 archive manifest SHA-256 "
-                        "from an independent channel, not the archive root. "
-                        "Repeat once per sealed per-team manifest to compose "
-                        "without weakening the pin requirement")
+    p.add_argument("--form2-manifest-sha256",
+                   help="External pin: the Form 2 archive manifest's "
+                        "SHA-256, supplied from an independent channel "
+                        "(never read from the archive root). Without it, "
+                        "Form 2 admission is disabled")
     args = p.parse_args(argv)
     if not 0 <= args.min_ev <= 0.15:
         p.error("min-ev must be between 0 and 0.15")
@@ -1156,11 +1177,7 @@ def main(argv=None):
                     lane=args.lane, allow_manual_context=args.allow_manual_context,
                     as_of=args.as_of, historical=args.historical,
                     form2_bundles_dir=args.form2_bundles_dir,
-                    form2_manifest_sha256=(
-                        args.form2_manifest_sha256[0]
-                        if args.form2_manifest_sha256
-                        and len(args.form2_manifest_sha256) == 1
-                        else args.form2_manifest_sha256))
+                    form2_manifest_sha256=args.form2_manifest_sha256)
     rendered = json.dumps(card, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
