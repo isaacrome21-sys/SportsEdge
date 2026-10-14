@@ -25,6 +25,7 @@ from sportsedge.nfl_card_game_info import (
     movement_lines,
     snapshot_marker,
 )
+from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp
 # research_notes/nfl_team_total_prop_backtest_20261003.md
 TEAM_TOTAL_NOTE = (
     "TRACK ONLY (not a bet): team totals tested, no edge "
@@ -258,6 +259,8 @@ def main() -> int:
     ap.add_argument("--out-dir", required=True)
     args = ap.parse_args()
     engine = json.loads(Path(args.engine_output).read_text(encoding="utf-8"))
+    # t126: registry gate BEFORE any text is rendered from the engine output.
+    engine = _registry_gate_and_stamp(engine, "NFL", "scripts/render_nfl_myspari_card.py")
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
     first_card = None

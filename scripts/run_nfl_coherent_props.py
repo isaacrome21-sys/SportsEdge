@@ -20,6 +20,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 from sportsedge.nfl_coherent_prop_runner import run_coherent_prop_estimates
 from sportsedge.nfl_prop_shared_sim import NflPropSimulationError
+from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp
 
 
 class NFLCoherentPropCLIError(ValueError):
@@ -75,6 +76,7 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, json.JSONDecodeError, TypeError, ValueError, NflPropSimulationError) as exc:
         print(f"NFL_COHERENT_PROP_RUN_FAILED:{exc}", file=sys.stderr)
         return 2
+    result = _registry_gate_and_stamp(result, "NFL", "scripts/run_nfl_coherent_props.py")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return 0
