@@ -32,6 +32,7 @@ from sportsedge.canonical_coverage import (
 from sportsedge.mlb_f5_quote_binding import (
     F5_MARKET_ALIASES as F5_INTAKE_ALIASES, F5_MARKETS as F5_CANONICAL_MARKETS,
     phone_f5_binding_rows)
+from sportsedge.mlb_f5_fixture_resolution import stamp_f5_game_pks
 from sportsedge.market_coverage import (
     COVERAGE_MARKETS,
     normalize_coverage_market,
@@ -256,7 +257,12 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     the settlement basis is checked from the settlement code, features
     assemble from strictly-prior StatsAPI linescores, and rows then block
     at the F5 deployment gate (stage F5_STATE_CANDIDATE, eligible=false)
-    with the specific F5_* reason named. Every other matrix market
+    with the specific F5_* reason named. The verified gamePk the binder's
+    gate 2.5 requires is resolved in-run from the official StatsAPI
+    schedule (fixture team names + stated first pitch) by
+    sportsedge.mlb_f5_fixture_resolution when fetching is enabled; a
+    fixture that does not resolve leaves its rows unstamped, and they
+    refuse at gate 2.5 exactly as before. Every other matrix market
     without a priced route resolves through sportsedge.canonical_coverage
     to a named taxonomy blocker.
     """
@@ -524,6 +530,16 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     # StatsAPI/engine dependencies load lazily inside the stage.
     f5_results, f5_receipts = [], []
     if f5_input:
+        f5_resolution_receipts = []
+        if auto_context:
+            # Gate 2.5 fixture binding: stamp the verified gamePk
+            # resolved in-run from the official StatsAPI schedule
+            # (team names + stated first pitch; never from board
+            # text). A failed or ambiguous resolution leaves the
+            # rows unstamped, and the binder refuses them
+            # F5_FIXTURE_BINDING_MISSING, exactly as before.
+            f5_input, f5_resolution_receipts = stamp_f5_game_pks(
+                f5_input, getter=getter, resolved_at=clock)
         try:
             f5_results, f5_receipts = phone_f5_binding_rows(
                 f5_input, now=clock,
@@ -542,6 +558,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "research_only": True, "official_authority": False,
                 "model_p_authority": False, "staking_authority": False,
             } for line in f5_input]
+        f5_receipts = f5_receipts + f5_resolution_receipts
     nfl_results, nfl_receipts = phone_nfl_player_rows(
         nfl_input, now=clock, getter=getter if auto_context else (lambda url: None))
     cfb_results, cfb_receipts = phone_cfb_player_rows(
