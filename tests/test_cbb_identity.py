@@ -76,7 +76,7 @@ def test_northwestern_state_distinct_from_northwestern():
 
 
 
-@pytest.mark.parametrize("bad_id", [None, "", "None", 0, True, -1, "abc"])
+@pytest.mark.parametrize("bad_id", [None, "", "None", 0, True, -1, "abc", "0" * 5000, "١٢٣"])
 def test_missing_or_nonpositive_event_ids_never_bind(bad_id):
     event = sb()["events"][0]
     event["id"] = bad_id
