@@ -375,7 +375,9 @@ def _team_totals_intake_refusal(line):
 def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
              auto_context=True, min_ev=0.02, lane="A", allow_manual_context=False,
              td_cache_dir=None, td_opener=None, form2_bundles_dir=None,
-             form2_manifest_sha256=None, form2_manifest_bytes=None):
+             form2_manifest_sha256=None, form2_manifest_bytes=None,
+             nfl_participation_archive_root=None,
+             nfl_participation_manifest_sha256=None):
     """Separate real game, pitcher, and batter models, preserving original row order.
 
     Issues are UNTRUSTED odds intake: NEVER use submitted features,
@@ -811,15 +813,21 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "research_only": True, "official_authority": False,
                 "model_p_authority": False, "staking_authority": False,
             } for line in f5_input]
-    # Participation evidence is caller-supplied only: the payload may
-    # carry an "nfl_participation" bundle (nflverse depth/injury rows,
-    # official inactives, game contexts, ESPN<->nflverse bindings) which
-    # the phone pricer checks through the participation bridge.  Absent
-    # the bundle, phone rows keep the gamelog participation stamp.
+    # Participation evidence provenance (PR #2274 audit B2): the payload
+    # may carry an inline "nfl_participation" bundle, but payload data is
+    # UNTRUSTED -- the phone pricer records it as UNVERIFIED_BUNDLE and
+    # it can never lift the gamelog stamp.  The stamp lifts only for a
+    # bundle the pricer loads through the anchored archive loader from
+    # nfl_participation_archive_root (operator configuration) verified
+    # against nfl_participation_manifest_sha256, an external pin from
+    # this trusted channel -- never read from the payload or the
+    # archive root.  With neither supplied, phone rows keep the stamp.
     nfl_results, nfl_receipts = phone_nfl_player_rows(
         nfl_input, now=clock, getter=getter if auto_context else (lambda url: None),
         participation=payload.get("nfl_participation")
-        if isinstance(payload, dict) else None)
+        if isinstance(payload, dict) else None,
+        participation_archive_root=nfl_participation_archive_root,
+        participation_manifest_sha256=nfl_participation_manifest_sha256)
     cfb_results, cfb_receipts = phone_cfb_player_rows(
         cfb_input, now=clock, getter=getter if auto_context else (lambda url: None))
     teamhalf_results, teamhalf_receipts = price_team_half_rows(
@@ -1139,6 +1147,18 @@ def main(argv=None):
                         "SHA-256, supplied from an independent channel "
                         "(never read from the archive root). Without it, "
                         "Form 2 admission is disabled")
+    p.add_argument("--nfl-participation-archive-root", type=Path,
+                   help="NFL participation archive root of operator-"
+                        "captured evidence bundles; read locally through "
+                        "the anchored loader, never fetched. Admission "
+                        "requires --nfl-participation-manifest-sha256")
+    p.add_argument("--nfl-participation-manifest-sha256",
+                   help="External pin: the NFL participation archive "
+                        "manifest's SHA-256, supplied from an independent "
+                        "channel (never read from the payload or the "
+                        "archive root). Without it, payload participation "
+                        "bundles stay UNVERIFIED_BUNDLE and the gamelog "
+                        "stamp never lifts")
     args = p.parse_args(argv)
     if not 0 <= args.min_ev <= 0.15:
         p.error("min-ev must be between 0 and 0.15")
@@ -1147,7 +1167,11 @@ def main(argv=None):
                     lane=args.lane, allow_manual_context=args.allow_manual_context,
                     as_of=args.as_of, historical=args.historical,
                     form2_bundles_dir=args.form2_bundles_dir,
-                    form2_manifest_sha256=args.form2_manifest_sha256)
+                    form2_manifest_sha256=args.form2_manifest_sha256,
+                    nfl_participation_archive_root=
+                    args.nfl_participation_archive_root,
+                    nfl_participation_manifest_sha256=
+                    args.nfl_participation_manifest_sha256)
     rendered = json.dumps(card, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
