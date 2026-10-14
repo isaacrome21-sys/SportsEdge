@@ -94,10 +94,13 @@ def test_every_matrix_market_resolves_priced_path_or_named_blocker():
 def test_coverage_summary_counts():
     summary = coverage_summary()
     assert summary["markets_total"] == 89
-    assert summary["priced_path_count"] == 39
-    assert summary["blocked_count"] == 50
+    # t114 registry-fix proposal: STOLEN_BASES NOT_OFFERED (NO_QUOTE),
+    # PITCHER_HITS_WALKS_ER provider-unavailable (NO_QUOTE), 13 NFL props
+    # governance NO_ENGINE, F5 gate named as NO_VALIDATION (eligible=false).
+    assert summary["priced_path_count"] == 24
+    assert summary["blocked_count"] == 65
     assert summary["blocked_counts_by_cause"] == {
-        "NO_DATA": 1, "NO_ENGINE": 45, "NO_QUOTE": 4}
+        "NO_DATA": 1, "NO_ENGINE": 58, "NO_QUOTE": 2, "NO_VALIDATION": 4}
     assert summary["coverage_is_not_validation"] is True
 
 
@@ -105,12 +108,21 @@ def test_blocked_row_for_names_the_taxonomy_blocker():
     row = blocked_row_for("MLB", "F5_MONEYLINE",
                           {"market": "F5_MONEYLINE", "side": "HOME"})
     assert row["status"] == "NO_MODEL_OR_MARKET"
-    assert row["blocker"] == "NO_QUOTE"
-    assert row["reason"].startswith("NO_QUOTE: ")
+    assert row["blocker"] == "NO_VALIDATION"
+    assert row["reason"].startswith("NO_VALIDATION: ")
+    assert "F5_DEPLOYMENT_NOT_ELIGIBLE" in row["reason"]
     row = blocked_row_for("NFL", "FG_MADE", {"market": "FG_MADE"})
     assert row["blocker"] == "NO_ENGINE"
     # Priced-path markets are owned by their engines, not this fallback.
-    assert blocked_row_for("NFL", "ANYTIME_TD", {"market": "ANYTIME_TD"}) is None
+    assert blocked_row_for("MLB", "HITS", {"market": "HITS"}) is None
+    # t114 proposal: governance NO_ENGINE for NFL props and NOT_OFFERED SB.
+    assert blocked_row_for("NFL", "ANYTIME_TD",
+                           {"market": "ANYTIME_TD"})["blocker"] == "NO_ENGINE"
+    assert "NOT_OFFERED" in blocked_row_for(
+        "MLB", "STOLEN_BASES", {"market": "STOLEN_BASES"})["reason"]
+    assert "PROVIDER_UNAVAILABLE" in blocked_row_for(
+        "MLB", "PITCHER_HITS_WALKS_ER",
+        {"market": "PITCHER_HITS_WALKS_ER"})["reason"]
     assert blocked_row_for("NBA", "PLAYER_POINTS", {"market": "X"}) is None
 
 
