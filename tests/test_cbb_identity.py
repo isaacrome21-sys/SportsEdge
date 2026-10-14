@@ -73,3 +73,17 @@ def test_northwestern_state_distinct_from_northwestern():
     assert resolve_team(DIR, "Northwestern State")["illinois_excluded"] is False
     assert resolve_team(DIR, "Northwestern")["illinois_excluded"] is True
     assert bind("Northwestern St", "Duke", sb(away="2466"))["playable_status"] == "RESEARCH_ONLY"
+
+
+@pytest.mark.parametrize("bad_id", [None, "None", "null", "", 0, True, -1, "1.5", [], {}])
+def test_missing_or_malformed_scoreboard_event_id_fails_closed(bad_id):
+    board = sb()
+    board["events"][0]["id"] = bad_id
+    with pytest.raises(CBBIdentityError, match="EVENT_ID_INVALID"):
+        bind("Florida", "Duke", board)
+
+
+@pytest.mark.parametrize("bad_as_of", [None, "2026-11-10T12:00:00Z", datetime(2026, 11, 10, 12)])
+def test_untrusted_or_timezone_naive_asof_rejected(bad_as_of):
+    with pytest.raises(CBBIdentityError, match="AS_OF_TIMEZONE_REQUIRED"):
+        bind("Florida", "Duke", sb(), as_of=bad_as_of)
