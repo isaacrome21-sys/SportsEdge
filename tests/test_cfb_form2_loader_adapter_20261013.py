@@ -497,7 +497,11 @@ class PinnedHappyPathTests(AdapterCase):
         self.assertTrue(all(e["disposition"] == loader.IGNORED
                             for e in manifest_entries))
 
-    def test_run_full_pinned_research_only_end_to_end(self):
+    def test_run_full_pinned_archive_cannot_bypass_family_registry(self):
+        # #2224 is enforced BEFORE the game/prepricing stage. The pinned
+        # Form 2 archive still passes its standalone adapter+stage contract
+        # in test_pinned_admission_and_binder_identity; it cannot create
+        # an eligible CFB market while the family remains UNVALIDATED.
         pin = self._pinned_two_team_archive()
         card = full.run_full({"lines": [cfb_row()]}, now=NOW,
                              getter=lambda url: cfb_mapping().get(url, {}),
@@ -506,27 +510,23 @@ class PinnedHappyPathTests(AdapterCase):
         audit = card["qb_form2_bundle_loader_audit"]
         self.assertEqual(audit["pin_status"], "VERIFIED")
         self.assertEqual(audit["manifest_sha256"], pin)
-        self.assertEqual(audit["admitted_team_ids"], ["2393", "48"])
-        (entry,) = card["prepricing_factor_audit"]["by_input_index"]
-        self.assertFalse(entry["blocked"])
-        rows = [r for r in card["evaluated_rows"]
-                if r.get("input_index") == 0]
-        self.assertEqual(len(rows), 1)
-        (row,) = rows
-        self.assertEqual(row["availability_status"],
-                         qe.AVAILABILITY_UNVERIFIED)
-        self.assertIs(row["research_only"], True)
-        self.assertEqual(
-            row["play_blocked_reason"],
-            "QB_AVAILABILITY_UNVERIFIED_CANNOT_SURFACE_AS_PLAY")
+        self.assertEqual(audit["admitted_team_ids"], [])
+        self.assertNotIn("prepricing_factor_audit", card)
+        (row,) = card["evaluated_rows"]
+        self.assertEqual(row["status"], "NO_MODEL_OR_MARKET")
+        self.assertEqual(row["blocker"], "NO_VALIDATION")
+        self.assertIs(row["registry_enforced"], True)
+        for key in ("model_p", "probability", "fair_odds",
+                    "ev_per_dollar", "fair_price", "edge"):
+            self.assertIsNone(row.get(key), key)
         self.assertEqual(card["edges"], [])
         self.assertEqual(card["independent_candidates"], [])
         self.assertEqual(card["prop_candidates"], [])
-        self.assertEqual(
-            card["play_gate"]["availability_unverified_max_surface"],
-            "RESEARCH_ONLY")
 
-    def test_run_full_without_pin_is_preloader_behavior(self):
+    def test_run_full_without_pin_stays_registry_blocked(self):
+        # No caller-independent archive pin means no Form 2 admission.
+        # With #2224, the family registry blocks the market earlier than
+        # the QB prepricing gate: absence of a prepricing audit is correct.
         self._pinned_two_team_archive()
         card = full.run_full({"lines": [cfb_row()]}, now=NOW,
                              getter=lambda url: cfb_mapping().get(url, {}),
@@ -534,12 +534,14 @@ class PinnedHappyPathTests(AdapterCase):
         audit = card["qb_form2_bundle_loader_audit"]
         self.assertEqual(audit["pin_status"], "ABSENT")
         self.assertEqual(audit["admitted_team_ids"], [])
-        (entry,) = card["prepricing_factor_audit"]["by_input_index"]
-        # Without a pin the same fixture blocks at the QB gate,
-        # exactly as it did before Form 2 existed.
-        self.assertTrue(entry["blocked"])
-        self.assertEqual(entry["block_reason"],
-                         "BLOCKED_PREPRICING_QB_IDENTITY_UNVERIFIED")
+        self.assertNotIn("prepricing_factor_audit", card)
+        (row,) = card["evaluated_rows"]
+        self.assertEqual(row["status"], "NO_MODEL_OR_MARKET")
+        self.assertEqual(row["blocker"], "NO_VALIDATION")
+        self.assertIs(row["registry_enforced"], True)
+        for key in ("model_p", "probability", "fair_odds",
+                    "ev_per_dollar", "fair_price", "edge"):
+            self.assertIsNone(row.get(key), key)
 
 
 if __name__ == "__main__":
