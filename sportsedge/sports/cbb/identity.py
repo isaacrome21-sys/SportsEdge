@@ -88,8 +88,10 @@ def bind_fixture(directory: Mapping, scoreboard: Mapping, *, away: str, home: st
         event_id = ev.get("id")
         # Missing, bool, zero or text sentinel IDs may not become "None"
         # or an apparently identified research fixture.
-        if (type(event_id) not in (str, int) or not str(event_id).isdigit()
-                or int(event_id) <= 0):
+        id_text = str(event_id)
+        if (type(event_id) not in (str, int) or len(id_text) > 20
+                or not id_text.isascii() or not id_text.isdigit()
+                or not any(ch != "0" for ch in id_text)):
             continue
         competitions = ev.get("competitions")
         if not isinstance(competitions, list) or len(competitions) != 1:
