@@ -26,9 +26,12 @@ from __future__ import annotations
 import os
 import re
 import stat
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Mapping
 from pathlib import PurePath
 
+from sportsedge import evidence_admission_gate as _gate
 from sportsedge.prepricing import qb_evidence_archive as _arch
 
 AUDIT_SCHEMA = "SPORTSEDGE_QB_FORM2_PINNED_LOADER_AUDIT_V1"
@@ -47,6 +50,11 @@ ROOT_UNSAFE = "ARCHIVE_ROOT_UNSAFE"
 WHOLE_INTAKE_DUPLICATE = "WHOLE_INTAKE_REFUSED_DUPLICATE_ENTRY"
 FIXTURE_UNVERIFIED = "FIXTURE_NOT_INDEPENDENTLY_VERIFIED"
 ADMITTED = "ADMITTED_PINNED_ARCHIVE"
+# t127: the owner-approved dual-TSA anchor (#2090). Admitted ONLY through the
+# shared evidence_admission_gate; refused with
+# ANCHOR_QUORUM_REFUSED:admission_not_activated while admission is off.
+QUORUM_ANCHOR_SOURCE = _gate.ANCHOR_SOURCE
+ANCHOR_QUORUM_REFUSED = "ANCHOR_QUORUM_REFUSED"
 
 
 @dataclass(frozen=True)
@@ -56,6 +64,10 @@ class ExternalManifestAnchor:
     distinguishable from a digest the archive computed over itself."""
     sha256: str
     anchor_source: str
+    # Only for QUORUM_ANCHOR_SOURCE: the dual-TSA bundle whose leaves cover
+    # ``sha256`` and the event cutoff its quorum genTime must precede.
+    tsa_bundle: Mapping[str, Any] | None = field(default=None, compare=False, hash=False, repr=False)
+    event_cutoff: datetime | None = field(default=None, compare=False, hash=False)
 
     def __post_init__(self):
         if not isinstance(self.sha256, str) or re.fullmatch(r"[0-9a-f]{64}", self.sha256) is None:
@@ -81,6 +93,10 @@ def check_anchor(anchor):
         return ANCHOR_NOT_EXTERNAL
     if anchor.anchor_source.strip().upper() in SELF_COMPUTED_MARKERS:
         return ANCHOR_NOT_EXTERNAL
+    if anchor.anchor_source == QUORUM_ANCHOR_SOURCE:
+        d = _gate.anchored_admission(anchor.tsa_bundle, bound_sha256=anchor.sha256,
+                                     event_cutoff=anchor.event_cutoff)
+        return None if d.admitted else f"{ANCHOR_QUORUM_REFUSED}:{d.reason}"
     if anchor.anchor_source not in APPROVED_ANCHOR_SOURCES:
         return ANCHOR_SOURCE_NOT_APPROVED
     return None
