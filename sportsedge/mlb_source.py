@@ -90,9 +90,6 @@ def bound_caller_time(value: datetime, *, fetch_started_at: datetime, received_a
 
 
 @dataclass(frozen=True)
-
-
-
 class MLBSourceCaptureRecord:
     sequence: int
     source_kind: str
@@ -462,6 +459,46 @@ def _refuse_pending_receipt_intents(root: Path) -> None:
         raise MLBSourceError("RECEIPT_INTENT_ORPHAN_UNCOMMITTED")
 
 
+def _sync_verified_receipt_commit(root: Path) -> None:
+    """Commit bytes surviving a killed writer need recovery fsync before ACCEPT.
+
+    Do not synthesize a commit or alter a journal. A journal-only root
+    (no intent journal) is refused with RECEIPT_INTENT_JOURNAL_MISSING.
+    Journal, intent journal and directory are always fsynced; any error
+    refuses the entire root with RECEIPT_RECOVERY_SYNC_FAILED.
+    """
+    # t153: a journal with no intent journal (legacy journal-only root, or an
+    # intent journal removed after a crash) carries no COMMIT evidence at
+    # all. It is refused by name -- never accepted unsynced, never repaired.
+    try:
+        (root / RECEIPT_INTENT_JOURNAL_NAME).lstat()
+    except FileNotFoundError:
+        raise MLBSourceError("RECEIPT_INTENT_JOURNAL_MISSING") from None
+    except OSError as exc:
+        raise MLBSourceError("RECEIPT_RECOVERY_SYNC_FAILED") from exc
+    directory = -1
+    try:
+        directory = os.open(root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+                            | getattr(os, "O_NOFOLLOW", 0))
+        for name in (RECEIPT_JOURNAL_NAME, RECEIPT_INTENT_JOURNAL_NAME):
+            fd = -1
+            try:
+                fd = os.open(name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                             | getattr(os, "O_NONBLOCK", 0), dir_fd=directory)
+                if not stat.S_ISREG(os.fstat(fd).st_mode):
+                    raise MLBSourceError("RECEIPT_RECOVERY_SYNC_FAILED")
+                os.fsync(fd)
+            finally:
+                if fd >= 0:
+                    os.close(fd)
+        os.fsync(directory)
+    except OSError as exc:
+        raise MLBSourceError("RECEIPT_RECOVERY_SYNC_FAILED") from exc
+    finally:
+        if directory >= 0:
+            os.close(directory)
+
+
 def verify_receipt_journal(root: str | Path, *, verifier_now: datetime | None = None) -> list[dict[str, Any]]:
     """Independently re-verify a persisted capture directory (fresh process / restart).
 
@@ -581,6 +618,8 @@ def verify_receipt_journal(root: str | Path, *, verifier_now: datetime | None = 
         entries.append(entry)
     _refuse_unjournaled_raw(root, entries)
     _refuse_pending_receipt_intents(root)
+    # A visible COMMIT can survive process death before the writer fsync.
+    _sync_verified_receipt_commit(root)
     return entries
 
 
@@ -589,6 +628,8 @@ def receipt_supports_as_of(entry: dict[str, Any], as_of: datetime) -> bool:
     before ``as_of``. A schedule fetched today for an old game is never as-of proof."""
     received = _parse_utc(entry.get("received_at_utc") if isinstance(entry, dict) else None, "received_at_utc")
     return received <= _aware(as_of, "as_of")
+
+
 
 
 RECEIPT_ANCHOR_REFUSED = "RECEIPT_ANCHOR_REFUSED"
