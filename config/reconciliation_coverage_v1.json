@@ -341,7 +341,24 @@
         "tests/test_research_mlb_pitcher_prop_promotion.py",
         "tests/test_run_it_form2_bundle_loader_20261013.py",
         "tests/test_run_it_full_free_factors.py",
-        "tests/test_runtime_registry_enforcement_20261013.py"
+        "tests/test_runtime_registry_enforcement_20261013.py",
+        "config/anchors/anchor_config_v1.json",
+        "config/anchors/freetsa_ca.pem",
+        "config/anchors/freetsa_tsa_signer.pem",
+        "docs/ANCHOR_TSA_PINNING_PROVENANCE_20261013.md",
+        "docs/ANCHOR_WIRING_AND_HOST_CONFIG_20261013.md",
+        "sportsedge/evidence_admission_gate.py",
+        "sportsedge/evidence_anchor.py",
+        "sportsedge/evidence_lock_store.py",
+        "sportsedge/sports/mlb/starter_capture.py",
+        "tests/anchor_test_ca.py",
+        "tests/fixtures/anchor/tsa_fixture_t127.json",
+        "tests/test_evidence_admission_gate_20261013.py",
+        "tests/test_evidence_anchor_20261013.py",
+        "tests/test_evidence_anchor_pinning_20261013.py",
+        "tests/test_evidence_anchor_wiring_20261013.py",
+        "tests/test_form2_qb_anchor_admission_20261013.py",
+        "tests/test_mlb_receipt_anchor_admission_20261013.py"
       ],
       "coverage_prefixes": []
     }
@@ -542,7 +559,14 @@
     "tests/test_family_gate_pricing_field_leaks.py": "TEST_ONLY_FAMILY_GATE_PRODUCTION_PRICING_FIELDS_REFUSAL_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "tests/test_nfl_interception_coverage_aliases.py": "TEST_ONLY_NFL_INTERCEPTION_ALIAS_COLLISION_REGRESSION_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "tests/test_cfb_registry_complete_coverage_20261014.py": "TEST_ONLY_CFB_FAMILY_REGISTRY_COVERAGE_CONTRACT_NO_MODEL_OR_PROMOTION_AUTHORITY",
-    "tests/test_source_fact_hostname_hardening_t153.py": "TEST_ONLY_RESEARCH_X_HOSTNAME_HARDENING_NO_PRICING_AUTHORITY"
+    "tests/test_reconciliation_coverage_paths_unique_t156.py": "TEST_ONLY_RECONCILIATION_COVERAGE_PATHS_UNIQUENESS_NO_RUNTIME_AUTHORITY",
+    "tests/test_source_fact_hostname_hardening_t153.py": "TEST_ONLY_RESEARCH_X_HOSTNAME_HARDENING_NO_PRICING_AUTHORITY",
+    "tests/test_mlb_receipt_journal_path_safety_20261014.py": "TEST_ONLY_MLB_RECEIPT_JOURNAL_PATH_SAFETY_NO_RUNTIME_AUTHORITY",
+    "tests/test_mlb_receipt_single_writer_kill9_20261014.py": "TEST_ONLY_MLB_RECEIPT_SINGLE_WRITER_KILL9_NO_RUNTIME_AUTHORITY",
+    "tests/test_mlb_receipt_paired_writes_anchor_20261013.py": "TEST_ONLY_MLB_RECEIPT_PAIRED_WRITES_ANCHOR_NO_RUNTIME_AUTHORITY",
+    "tests/test_mlb_receipt_boundary_interruptions_20261014.py": "TEST_ONLY_MLB_RECEIPT_BOUNDARY_INTERRUPTIONS_NO_RUNTIME_AUTHORITY",
+    "tests/test_mlb_receipt_durable_journal_20261014.py": "TEST_ONLY_MLB_RECEIPT_2221_REPIN_NO_RUNTIME_AUTHORITY",
+    "tests/test_mlb_receipt_recovery_sync_t153_20261014.py": "TEST_ONLY_MLB_RECEIPT_RECOVERY_SYNC_NO_RUNTIME_AUTHORITY"
   },
   "inventory_completion_claim": {
     "status": "HOSTED_AUDIT_ZERO_UNMAPPED",
