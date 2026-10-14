@@ -1,0 +1,41 @@
+# NFL / CFB completion checkpoint — 2026-10-14
+
+This is an integration evidence record, not a model promotion or execution authorization.
+
+## Saved repairs
+
+- NFL interception coverage alias collision: PR #2234, exact head 800063bcfb98429cfe5f44f74d2f2256debd5e37. Three local regression tests pass. Hosted discovery/core/protection checks succeeded; NFL evidence workflow still running when this record was written. Not merged.
+- CFB family scope: PR #2235, exact head c9a46cf37680d8187bb4ffd4611aa8c61b52e2cc, stacked on #2224 at 7336ceb778de8d3a90feb90fbefd3368232b2eb9. Four local tests pass. CFB team totals registered FORWARD_ONLY/NO_VALIDATION; ML/spread/total HISTORICAL/NO_VALIDATION; all remain BLOCKED. Parent registry_gate and two regression files registered. Full runtime review and current-main composition still owed.
+
+## Independent engine test verification
+
+Source snapshot exported from Actions run 38571769520, head 800063bcfb98429cfe5f44f74d2f2256debd5e37. Inner ZIP SHA-256 dcbea1d94ae8430e699478c9f7a05693723c6813f10af33db712d1d59ca5aa30 matched the export manifest.
+
+31 tests passed across test_nfl_location_symmetric_g1, test_cfb_game_freeze, test_cfb_candidate_bakeoff, test_cfb_candidate_bakeoff_v2, test_cfb_candidate_bakeoff_v3 and test_cfb_dispersion_only_evaluator. These are synthetic correctness/freeze tests, not real-data model validation. No G2 attempt or new CFB evaluation was executed.
+
+## G2 Amendment 2 document hash verification
+
+Read the records/g2-attempt2-preregistration-20261013 branch through GitHub and independently hashed exact retrieved UTF-8 bytes. All four publication hashes match:
+
+| File | SHA-256 |
+|---|---|
+| G2_ATTEMPT2_PREREGISTRATION.md | 78e0b6a63d7fbb7c160733cdd26c63addab8ea00e2ff204d740e75ae3ab8c06f |
+| G2_ATTEMPT2_PREREGISTRATION_v_bb35cafc.md | bb35cafcdc34ed2d39632ebf564af2de0879daa8e4bdc90434789aa684555a70 |
+| nfl_score_counts_g2_prereg_v2.json | 114b0a5d9bb1e9c8cbc6108f08ebaa0223c2e63e2e02da08aca8bfe3cb8f1ff5 |
+| G2_ATTEMPT2_AMENDMENT_2.md | 88f3a84310030a1e4715cf5889fc92266253289d5a82ceb7ab0a769bbcd3be4a |
+
+Document integrity VERIFIED. Executable integrity NOT VERIFIED: GitHub GET /commits/2f3af2a2594effa1bbaed4137516ade8e1c15422 returned 422, No commit found. The bound implementation patch 92d6d3b72529ea56e9e5a3353bd9c12b195e76205b2ab7b5972a8128150c41f6 cannot be independently derived until the exact code/base objects are published. Attempt 2 remains unspent; no execution ruling issued.
+
+## CFB remaining evidence gap
+
+GitHub GET /commits/bfba59f3f returned 422, No commit found. The cited candidate and its R1–R3 ratifications have not been independently bound to retrievable code in this pass. Current main cfb_game_model_freeze.json remains UNFROZEN. Do not substitute older SportsDataverse selection artifacts or synthetic fixtures for this candidate.
+
+## Next exact actions
+
+1. Complete #2234 exact-head evidence CI; protected merge only after all required/relevant checks succeed.
+2. Independently review the complete #2224/#2235 runtime enforcement and compose with current main before protected merge.
+3. Publish the exact G2 Amendment 2 code/base commits and implementation record; derive and match its patch hash, rerun the 49-case synthetic battery, then record an execution disposition.
+4. Publish the full CFB candidate commit and R1–R3 records; verify their binding before any freeze/evaluation.
+5. Complete Form 2 archive/capture composition and source-specific reporting-period validity independently; neither a universal 21-day nor a season-wide window proves current QB availability.
+
+No backfill, capture/admission activation, holdout use, validation reset, invented probability or promotion occurred in this pass.
