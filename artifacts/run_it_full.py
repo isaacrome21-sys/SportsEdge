@@ -23,6 +23,7 @@ from sportsedge.mlb_phone_first_inning_pricing import (
 from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
 from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
 from sportsedge.prepricing.factor_ingestion import stage_games
+from sportsedge.prepricing.qb_form2_bundle_loader import load_form2_bundles
 from sportsedge.team_half_pricing import DERIVATIVES, price_team_half_rows
 from sportsedge.pricing_provenance import (
     apply_play_gate, determine_provenance)
@@ -232,7 +233,8 @@ def _prepricing_blocked_row(line, stage, input_index):
 
 def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
              auto_context=True, min_ev=0.02, lane="A", allow_manual_context=False,
-             td_cache_dir=None, td_opener=None):
+             td_cache_dir=None, td_opener=None, form2_bundles_dir=None,
+             form2_manifest_sha256=None, form2_manifest_bytes=None):
     """Separate real game, pitcher, and batter models, preserving original row order.
 
     Issues are UNTRUSTED odds intake: NEVER use submitted features,
@@ -259,6 +261,19 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     with the specific F5_* reason named. Every other matrix market
     without a priced route resolves through sportsedge.canonical_coverage
     to a named taxonomy blocker.
+
+    form2_bundles_dir, when supplied, is the operator's local Form 2
+    archive root (CFB; issue #2154). The runtime adapter
+    (sportsedge.prepricing.qb_form2_bundle_loader) reads it -- never
+    fetches -- through the archive module's IO, and hands admitted
+    bundles to the pre-pricing stage; its audit lands on the card as
+    qb_form2_bundle_loader_audit. Admission requires the external pin
+    form2_manifest_sha256 (the archive manifest's SHA-256, supplied
+    from an independent channel; form2_manifest_bytes optionally
+    supplies the manifest itself, verified against the pin either
+    way). With a directory but no pin, Form 2 admission is disabled
+    and the run behaves exactly as it did before the loader existed.
+    Default None: no Form 2 loading.
     """
     rows = payload if isinstance(payload, list) else payload.get("lines")
     if not isinstance(rows, list):
@@ -346,17 +361,38 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         prop_indices.append(i)
         props.append(line)
 
+    # QB_IDENTITY_EVIDENCE Form 2 bundles (CFB, owner ruling issue
+    # #2154): trusted-loader input ONLY -- read from the operator-
+    # supplied directory, never from an intake row, never fetched.
+    # Default None: no loading, and the pre-pricing QB gate behaves
+    # exactly as it did before the loader existed. A bad bundle is
+    # excluded + audited by the loader; it never fails the run.
+    form2_bundles = None
+    form2_loader_audit = None
+    if form2_bundles_dir is not None:
+        loaded_bundles, form2_loader_audit = load_form2_bundles(
+            form2_bundles_dir, games,
+            manifest_sha256=form2_manifest_sha256,
+            manifest_bytes=form2_manifest_bytes)
+        if loaded_bundles:
+            form2_bundles = loaded_bundles
+
     if games:
         # Option 3: Prepricing adjustments stored separately from user context.
         # Strip any user-supplied prepricing_adjustments (never trusted).
+        # availability_status is likewise system-stamped ONLY (from the
+        # pre-pricing stage): an intake row must never forge it in
+        # either direction (issue #2158).
         for line in games:
             line.pop("prepricing_adjustments", None)
+            line.pop("availability_status", None)
         # Pre-pricing factor-ingestion stage: verified pulls BEFORE pricing.
         stages = stage_games(
             games, now=clock,
             getter=getter if auto_context else (lambda url: None),
             enforce_blocks=auto_context,
-            as_of=as_of, historical=historical)
+            as_of=as_of, historical=historical,
+            qb_form2_bundles=form2_bundles)
         # Build separate prepricing_adjustments objects (not merged into context)
         prepricing_by_index = {}
         game_results = [None] * len(games)
@@ -373,6 +409,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "source": "SPORTSEDGE_PREPRICING_V1",
                 "timestamp_utc": clock.astimezone(timezone.utc).isoformat(),
                 "verification_status": "VERIFIED",
+                "availability_status": st.get("availability_status"),
                 "adjustments": dict(st["adjustments"]) if isinstance(st.get("adjustments"), dict) else {},
                 "factors": list(st["factors"]) if isinstance(st.get("factors"), list) else [],
             }
@@ -390,6 +427,14 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         for pos, gpos in enumerate(clear_game_pos):
             priced[pos]["input_index"] = game_indices[gpos]
             priced[pos]["prepricing_adjustments"] = prepricing_by_index[gpos]
+            # System-stamped availability (trusted stage output only):
+            # a game priced via Form 2 QB identity evidence carries
+            # AVAILABILITY_UNVERIFIED_NO_TEAM_INJURY_REPORT, and the
+            # classification gate below forces such rows research-only
+            # (issue #2158). Never read from the intake line.
+            stage_availability = stages[gpos].get("availability_status")
+            if stage_availability:
+                priced[pos]["availability_status"] = stage_availability
             game_results[gpos] = priced[pos]
         priced_games = game_results
         # Option 3: Prepricing audit for transparency (separate from user context audit)
@@ -791,6 +836,8 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         ]
         card["mlb_full_board"] = phone_market_board(labeled_inputs, evaluated)
         card["summary"]["mlb_market_coverage"] = dict(card["mlb_full_board"]["input_coverage"])
+    if form2_loader_audit is not None:
+        card["qb_form2_bundle_loader_audit"] = form2_loader_audit
     card["runner"]="RUN_IT_FULL_MLB_AND_NAMED_FOOTBALL_PLAYER_HISTORIES_V1"
     from sportsedge.phone_display import identity_rows, build_phone_card
     card["selection_intake"] = identity_rows(rows, default_sport)
@@ -811,13 +858,25 @@ def main(argv=None):
     p.add_argument("--as-of", help="Point-in-time clock (ISO-8601); defaults to now")
     p.add_argument("--historical", action="store_true",
                    help="Repricing history: refuse current-state sources that cannot be snapshotted as-of")
+    p.add_argument("--form2-bundles-dir", type=Path,
+                   help="Form 2 archive root of operator-captured "
+                        "QB_IDENTITY_EVIDENCE bundles (CFB); read locally "
+                        "through the archive module, never fetched. "
+                        "Admission requires --form2-manifest-sha256")
+    p.add_argument("--form2-manifest-sha256",
+                   help="External pin: the Form 2 archive manifest's "
+                        "SHA-256, supplied from an independent channel "
+                        "(never read from the archive root). Without it, "
+                        "Form 2 admission is disabled")
     args = p.parse_args(argv)
     if not 0 <= args.min_ev <= 0.15:
         p.error("min-ev must be between 0 and 0.15")
     card = run_full(json.loads(args.lines.read_text(encoding="utf-8")),
                     auto_context=not args.no_fetch, min_ev=args.min_ev,
                     lane=args.lane, allow_manual_context=args.allow_manual_context,
-                    as_of=args.as_of, historical=args.historical)
+                    as_of=args.as_of, historical=args.historical,
+                    form2_bundles_dir=args.form2_bundles_dir,
+                    form2_manifest_sha256=args.form2_manifest_sha256)
     rendered = json.dumps(card, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
