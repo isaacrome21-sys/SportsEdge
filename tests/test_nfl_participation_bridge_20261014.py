@@ -97,6 +97,29 @@ def inactive_rows(inactive_ids=("wr2",), published="2026-10-04T15:30:00Z"):
         for pid in inactive_ids]
 
 
+def _complete_ids(team, named):
+    """A full official list: the named inactives + declared fillers."""
+    ids = list(named)
+    i = 1
+    while len(ids) < 7:
+        filler = f"{team.lower()}-inactive-{i}"
+        if filler not in ids:
+            ids.append(filler)
+        i += 1
+    return ids
+
+
+def inactive_snapshots(chi_ids=("wr2",), gb_ids=("gwr2",),
+                       published="2026-10-04T15:30:00Z"):
+    """Source-complete official inactive snapshots (audit B1 form)."""
+    return [
+        {"game_id": GAME_ID, "team": "CHI", "published_at": published,
+         "player_ids": _complete_ids("CHI", chi_ids)},
+        {"game_id": GAME_ID, "team": "GB", "published_at": published,
+         "player_ids": _complete_ids("GB", gb_ids)},
+    ]
+
+
 def injury_row(player_id, status, *, team="CHI",
                modified="2026-10-01T17:00:00Z"):
     return {"season": 2026, "week": 4, "team": team, "gsis_id": player_id,
@@ -108,7 +131,8 @@ def research(**overrides):
         game_id=GAME_ID, priced_team="CHI", opponent_team="GB",
         target_season=2026, target_week=4, kickoff=KICKOFF,
         as_of="2026-10-04T16:00:00Z", depth_rows=depth_rows(),
-        player_stat_rows=player_rows(), inactive_rows=inactive_rows(),
+        player_stat_rows=player_rows(),
+        inactive_snapshots=inactive_snapshots(),
         min_paths=120,
     )
     kwargs.update(overrides)
@@ -142,27 +166,30 @@ def test_confirmed_qb_produces_research_distribution():
 def test_projected_qb_refuses_by_name_before_inactives():
     with pytest.raises(NFLParticipationError,
                        match="NFL_QB_ROLE_NOT_CONFIRMED:PROJECTED_STARTER"):
-        research(as_of="2026-10-02T18:00:00Z", inactive_rows=())
+        research(as_of="2026-10-02T18:00:00Z", inactive_snapshots=())
 
 
 def test_questionable_qb_refuses_by_name():
     with pytest.raises(
             NFLParticipationError,
             match="NFL_QB_ROLE_NOT_CONFIRMED:QUESTIONABLE:INJURY_QUESTIONABLE"):
-        research(as_of="2026-10-02T18:00:00Z", inactive_rows=(),
+        research(as_of="2026-10-02T18:00:00Z", inactive_snapshots=(),
                  injury_rows=[injury_row("qb1", "Questionable")])
 
 
 def test_officially_inactive_qb_refuses_out():
+    # Positive evidence: qb1 named on a loose designation row is OUT
+    # even though no complete snapshot is supplied.
     with pytest.raises(NFLParticipationError,
                        match="NFL_QB_ROLE_OUT:OFFICIAL_INACTIVE"):
-        research(inactive_rows=inactive_rows(inactive_ids=("qb1",)))
+        research(inactive_snapshots=(),
+                 inactive_rows=inactive_rows(inactive_ids=("qb1",)))
 
 
 def test_injury_out_qb_refuses_out():
     with pytest.raises(NFLParticipationError,
                        match="NFL_QB_ROLE_OUT:INJURY_REPORT_OUT"):
-        research(as_of="2026-10-02T18:00:00Z", inactive_rows=(),
+        research(as_of="2026-10-02T18:00:00Z", inactive_snapshots=(),
                  injury_rows=[injury_row("qb1", "Out")])
 
 
@@ -197,12 +224,13 @@ def test_gameday_active_supersedes_earlier_questionable_designation():
     verdict = assess_qb_participation(
         team="CHI", depth_rows=depth_rows(),
         injury_rows=[injury_row("qb1", "Questionable")],
-        inactive_rows=inactive_rows(), game_id=GAME_ID,
+        inactive_snapshots=inactive_snapshots(), game_id=GAME_ID,
         target_season=2026, target_week=4, kickoff=KICKOFF,
         as_of="2026-10-04T16:00:00Z")
     assert verdict["state"] == "CONFIRMED_STARTER"
     assert verdict["subclass"] == "GAMEDAY_ACTIVE"
     assert verdict["injury_status"] == "QUESTIONABLE"
+    assert verdict["inactives_completeness"] == "VERIFIED_COMPLETE"
 
 
 def test_future_evidence_is_invisible_and_counted():
@@ -210,7 +238,7 @@ def test_future_evidence_is_invisible_and_counted():
     rows.append(_depth("2026-10-03T12:00:00Z", "CHI", "futureqb",
                        "Future QB", "QB", 1))
     verdict = assess_qb_participation(
-        team="CHI", depth_rows=rows, inactive_rows=(), game_id=GAME_ID,
+        team="CHI", depth_rows=rows, inactive_snapshots=(), game_id=GAME_ID,
         target_season=2026, target_week=4, kickoff=KICKOFF,
         as_of="2026-10-02T18:00:00Z")
     assert verdict["candidate_id"] == "qb1"

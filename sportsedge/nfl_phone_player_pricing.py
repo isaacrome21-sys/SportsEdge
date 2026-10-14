@@ -5,23 +5,43 @@ This module resolves identity and prior game logs solely via free ESPN endpoints
 Research only. Stale quotes produce WATCH status. Next Gen tracking is not yet
 consumed. Lineup/participation is not confirmed from gamelog.
 
-Participation wiring (Oct 2026): when the caller supplies a
-``participation`` evidence bundle (nflverse depth/injury rows, official
-inactive designations, per-game contexts, and explicit ESPN<->nflverse
-player bindings), each priced row is checked against the participation
-bridge's verdict for that exact (game, team, player).  A confirmed-tier
-verdict (``CONFIRMED_STARTER`` / ``CONFIRMED_ACTIVE`` from game-day
-actives) replaces the ``STARTING_ROLE_NOT_VERIFIED_FROM_GAMELOG`` stamp
-with the verdict state and the candidate keeps its research status; every
-other outcome keeps the stamp and records the bridge's named refusal.
-The bundle changes evidence quality only -- labels, eligibility and
-authority flags are identical either way.  With no bundle supplied the
-behavior is byte-for-byte the historical one: the gamelog alone can
-never verify a role, so the stamp always applies.
+Participation wiring (Oct 2026; remediated per the PR #2274 audit):
+
+* PROVENANCE (audit B2).  A ``participation`` bundle carried inline in
+  the caller's payload is UNTRUSTED input: it is recorded on the row
+  and in the receipts as ``UNVERIFIED_BUNDLE`` and can NEVER lift the
+  ``STARTING_ROLE_NOT_VERIFIED_FROM_GAMELOG`` stamp.  The stamp lifts
+  only for a bundle loaded through the anchored archive loader
+  (``sportsedge.nfl_participation_archive``) from an operator archive
+  root against an external manifest pin supplied via runner
+  configuration -- never from the payload.  No auto-fetch, no silent
+  trust.
+* IDENTITY (audit B3).  ESPN<->GSIS bindings are a versioned crosswalk
+  (``ESPN_GSIS_CROSSWALK_V1``): each binding carries an explicit ESPN
+  athlete ID and GSIS ID, both unique across the bundle; the phone
+  path's ESPN-resolved athlete ID selects the binding.  Same-name
+  collisions and duplicated/cross-namespace mappings refuse by name.
+  Names survive only as an ADDITIONAL cross-check, never the binding.
+* COMPLETENESS (audit B1) lives in the bridge: confirmation requires a
+  source-complete official inactive snapshot, so the archived bundle
+  carries ``inactive_snapshots`` as first-class objects.
+
+For an anchored, verified bundle, each priced row is checked against
+the bridge's verdict for that exact (game, team, player).  A
+confirmed-tier verdict (``CONFIRMED_STARTER`` / ``CONFIRMED_ACTIVE``)
+replaces the stamp with the verdict state and the candidate keeps its
+research status; every other outcome keeps the stamp and records the
+named refusal.  Labels, eligibility and authority flags are identical
+in every path.  With no participation input at all, behavior is
+byte-for-byte the historical one: the gamelog alone can never verify
+a role, so the stamp always applies.
 """
 from __future__ import annotations
 from datetime import datetime, timezone
 
+from .nfl_participation_archive import (
+    CROSSWALK_VERSION, ParticipationArchiveError,
+    load_participation_bundle)
 from .nfl_participation_bridge import (
     NFLParticipationError, assess_qb_participation,
     assess_skill_participation, require_confirmed_qb_role,
@@ -76,71 +96,120 @@ def _instant(value):
     return out if out.tzinfo is not None else None
 
 
-def _participation_context(participation, *, away, home, start):
-    """The bundle's game context for this phone fixture, or None."""
-    for ctx in participation.get("games") or ():
+def _participation_context(games, *, away, home, start):
+    """The bundle's game context for this phone fixture.
+
+    Returns ``(ctx | None, refusal | None)``.  The fixture join is
+    EXACT: a name-matching context whose kickoff is missing/malformed
+    -- or a row kickoff that cannot be parsed -- refuses as
+    ``PARTICIPATION_GAME_KICKOFF_UNVERIFIED`` instead of joining on
+    names alone (audit addendum on PR #2274); a name-matching context
+    with a different parseable kickoff is a different fixture.
+    """
+    kickoff_unverified = False
+    for ctx in games:
         if str(ctx.get("away") or "") != away:
             continue
         if str(ctx.get("home") or "") != home:
             continue
         ctx_kick, row_kick = _instant(ctx.get("kickoff")), _instant(start)
-        if ctx_kick is not None and row_kick is not None \
-                and ctx_kick != row_kick:
+        if ctx_kick is None or row_kick is None:
+            kickoff_unverified = True
             continue
-        return ctx
-    return None
+        if ctx_kick != row_kick:
+            continue
+        return ctx, None
+    if kickoff_unverified:
+        return None, "PARTICIPATION_GAME_KICKOFF_UNVERIFIED"
+    return None, "PARTICIPATION_GAME_CONTEXT_MISSING"
 
 
-def _participation_binding(participation, *, player_name, ctx):
-    """The caller's explicit ESPN<->nflverse binding for this player.
+def _validate_participation_bundle(bundle):
+    """Validate an anchored bundle's games + crosswalk ONCE per call.
 
-    The phone path resolves ESPN athlete ids; the bridge grades nflverse
-    GSIS ids.  The two namespaces are never guessed across: intake joins
-    them in a binding row (player name + nflverse team code + GSIS id),
-    and a row without exactly such a binding keeps the gamelog stamp.
+    Returns ``(games, bindings_by_espn_id, refusal | None)``.  The
+    crosswalk is the versioned ESPN-athlete-ID <-> GSIS-ID pairing
+    (audit B3): every binding must carry BOTH ids, and each namespace's
+    ids -- and the normalized names -- must be unique across the whole
+    bundle.  Any duplication or collision refuses the bundle for every
+    row; there is no first-match-wins anywhere in this path.
     """
-    codes = {_nfl_team_code(ctx.get("away_code")),
-             _nfl_team_code(ctx.get("home_code"))} - {""}
-    wanted = _norm_person_name(player_name)
-    for binding in participation.get("player_bindings") or ():
-        if _norm_person_name(binding.get("player_name")) != wanted:
-            continue
-        if codes and _nfl_team_code(binding.get("team")) not in codes:
-            continue
-        return binding
-    return None
+    games = bundle.get("games")
+    if not isinstance(games, list) or any(
+            not isinstance(g, dict) for g in games):
+        return None, None, "PARTICIPATION_GAMES_MALFORMED"
+    if bundle.get("player_bindings_version") != CROSSWALK_VERSION:
+        return None, None, "PARTICIPATION_BINDINGS_VERSION_UNSUPPORTED"
+    bindings = bundle.get("player_bindings")
+    if not isinstance(bindings, list) or any(
+            not isinstance(b, dict) for b in bindings):
+        return None, None, "PARTICIPATION_BINDINGS_MALFORMED"
+    by_espn: dict[str, dict] = {}
+    seen_gsis: set[str] = set()
+    seen_names: set[str] = set()
+    for binding in bindings:
+        espn_id = str(binding.get("espn_player_id") or "").strip()
+        gsis_id = str(binding.get("gsis_id") or "").strip()
+        if not espn_id or not gsis_id:
+            return None, None, "PARTICIPATION_PLAYER_BINDING_INCOMPLETE"
+        if espn_id in by_espn:
+            return None, None, f"PARTICIPATION_BINDING_DUPLICATE:{espn_id}"
+        if gsis_id in seen_gsis:
+            return None, None, f"PARTICIPATION_BINDING_DUPLICATE:{gsis_id}"
+        name_key = _norm_person_name(binding.get("player_name"))
+        if name_key and name_key in seen_names:
+            return None, None, \
+                f"PARTICIPATION_BINDING_NAME_COLLISION:{name_key}"
+        by_espn[espn_id] = binding
+        seen_gsis.add(gsis_id)
+        if name_key:
+            seen_names.add(name_key)
+    return games, by_espn, None
 
 
-def _participation_verdict(participation, *, market, verified, away, home,
+def _participation_verdict(bundle, parts, *, market, verified, away, home,
                            start, now_utc):
     """Bridge verdict for one phone row: (verdict | None, refusal | None).
 
     A non-None refusal is the named reason the gamelog stamp stays: the
     bridge gate's own refusal string when a verdict was computed, or a
-    PARTICIPATION_* name when the bundle cannot even address this row.
+    PARTICIPATION_* name when the bundle cannot address this row.  The
+    binding is selected by the ESPN athlete ID this module itself
+    resolved from the ESPN roster (``verified["player_id"]``) -- never
+    by name; the name and candidate cross-checks below are ADDITIONAL
+    guards on top of the ID binding, not the binding itself.
     """
-    ctx = _participation_context(
-        participation, away=away, home=home, start=start)
+    games, by_espn, bundle_refusal = parts
+    if bundle_refusal is not None:
+        return None, bundle_refusal
+    ctx, refusal = _participation_context(
+        games, away=away, home=home, start=start)
     if ctx is None:
-        return None, "PARTICIPATION_GAME_CONTEXT_MISSING"
-    binding = _participation_binding(
-        participation, player_name=verified["player_name"], ctx=ctx)
+        return None, refusal
+    espn_id = str(verified.get("player_id") or "").strip()
+    binding = by_espn.get(espn_id)
     if binding is None:
         return None, "PARTICIPATION_PLAYER_BINDING_MISSING"
+    codes = {_nfl_team_code(ctx.get("away_code")),
+             _nfl_team_code(ctx.get("home_code"))} - {""}
+    team_code = _nfl_team_code(binding.get("team"))
+    if not team_code or (codes and team_code not in codes):
+        return None, "PARTICIPATION_PLAYER_BINDING_TEAM_MISMATCH"
+    if _norm_person_name(binding.get("player_name")) != \
+            _norm_person_name(verified["player_name"]):
+        return None, f"PARTICIPATION_BINDING_NAME_MISMATCH:{espn_id}"
     try:
         season, week = int(ctx["season"]), int(ctx["week"])
     except (KeyError, TypeError, ValueError):
         return None, "PARTICIPATION_GAME_CONTEXT_INCOMPLETE"
-    team_code = _nfl_team_code(binding.get("team"))
-    pid = str(binding.get("player_id") or "").strip()
-    if not team_code or not pid:
-        return None, "PARTICIPATION_PLAYER_BINDING_INCOMPLETE"
+    pid = str(binding.get("gsis_id")).strip()
     common = dict(
-        depth_rows=participation.get("depth_rows") or (),
-        injury_rows=participation.get("injury_rows") or (),
-        inactive_rows=participation.get("inactive_rows") or (),
+        depth_rows=bundle.get("depth_rows") or (),
+        injury_rows=bundle.get("injury_rows") or (),
+        inactive_rows=bundle.get("inactive_rows") or (),
+        inactive_snapshots=bundle.get("inactive_snapshots") or (),
         game_id=ctx.get("game_id"), target_season=season,
-        target_week=week, kickoff=ctx.get("kickoff") or start,
+        target_week=week, kickoff=ctx.get("kickoff"),
         as_of=now_utc)
     verdict = None
     try:
@@ -162,7 +231,49 @@ def _participation_verdict(participation, *, market, verified, away, home,
     return verdict, None
 
 
-def phone_nfl_player_rows(rows, *, now=None, getter=None, participation=None):
+def _resolve_participation_provenance(participation, *,
+                                      participation_archive_root,
+                                      participation_manifest_sha256,
+                                      now_utc):
+    """Decide, once per call, whether participation evidence is trusted.
+
+    Returns ``(bundle | None, provenance_state | None, refusal | None,
+    digests)``.  ``provenance_state`` is None only when the caller
+    supplied no participation input at all (the historical path).
+    Inline payload bundles are UNVERIFIED_BUNDLE by construction: only
+    the anchored loader's output -- bytes verified against the external
+    pin -- becomes the effective bundle, and any inline rows are then
+    disregarded entirely.
+    """
+    anchored = participation_archive_root is not None or \
+        participation_manifest_sha256 is not None
+    if participation is None and not anchored:
+        return None, None, None, {}
+    if participation_archive_root is not None and \
+            participation_manifest_sha256 is not None:
+        try:
+            loaded = load_participation_bundle(
+                participation_archive_root,
+                manifest_sha256=participation_manifest_sha256,
+                as_of=now_utc)
+        except ParticipationArchiveError as exc:
+            return None, "UNVERIFIED_BUNDLE", \
+                f"NFL_PARTICIPATION_BUNDLE_UNVERIFIED:{exc}", {}
+        return loaded["bundle"], "VERIFIED_ANCHORED", None, {
+            "manifest_sha256": loaded["manifest_sha256"],
+            "bundle_sha256": loaded["bundle_sha256"],
+            "recorded_at_utc": loaded["recorded_at_utc"],
+        }
+    if anchored:
+        return None, "UNVERIFIED_BUNDLE", \
+            "NFL_PARTICIPATION_BUNDLE_UNVERIFIED:ANCHOR_INCOMPLETE", {}
+    return None, "UNVERIFIED_BUNDLE", \
+        "NFL_PARTICIPATION_BUNDLE_UNVERIFIED:NO_EXTERNAL_ANCHOR", {}
+
+
+def phone_nfl_player_rows(rows, *, now=None, getter=None, participation=None,
+                          participation_archive_root=None,
+                          participation_manifest_sha256=None):
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("NOW_TIMEZONE_REQUIRED")
@@ -172,15 +283,32 @@ def phone_nfl_player_rows(rows, *, now=None, getter=None, participation=None):
     cache = {}
     verdict_cache = {}
     part_by_key = {}
+    # Provenance is decided once, before any row is priced (audit B2):
+    # an inline bundle never becomes the effective bundle.
+    eff_bundle, prov_state, prov_refusal, prov_digests = \
+        _resolve_participation_provenance(
+            participation,
+            participation_archive_root=participation_archive_root,
+            participation_manifest_sha256=participation_manifest_sha256,
+            now_utc=now_utc)
+    bundle_parts = None
+    if eff_bundle is not None:
+        bundle_parts = _validate_participation_bundle(eff_bundle)
 
     def verdict_for(key, market, verified, away, home, start):
         """Bridge verdict per (player, market family), computed once."""
         family = "QB" if market in _PASSING_MARKETS else "SKILL"
         ck = (key, family)
         if ck not in verdict_cache:
-            verdict_cache[ck] = _participation_verdict(
-                participation, market=market, verified=verified,
-                away=away, home=home, start=start, now_utc=now_utc)
+            if prov_state == "UNVERIFIED_BUNDLE":
+                verdict_cache[ck] = (None, prov_refusal)
+            elif bundle_parts is not None:
+                verdict_cache[ck] = _participation_verdict(
+                    eff_bundle, bundle_parts, market=market,
+                    verified=verified, away=away, home=home, start=start,
+                    now_utc=now_utc)
+            else:
+                verdict_cache[ck] = (None, None)
             verdict, refusal = verdict_cache[ck]
             entry = part_by_key.setdefault(
                 key, {"verdict": None, "refusal": None})
@@ -264,15 +392,22 @@ def phone_nfl_player_rows(rows, *, now=None, getter=None, participation=None):
         judged["stats_schema"] = "ESPN_EXPLICIT_NAMES_ONLY"
         judged["participation_status"] = "STARTING_ROLE_NOT_VERIFIED_FROM_GAMELOG"
         role_confirmed = False
-        if participation is not None:
+        if prov_state is not None:
+            judged["participation_provenance"] = prov_state
+            if prov_state == "VERIFIED_ANCHORED":
+                judged["participation_manifest_sha256"] = \
+                    prov_digests["manifest_sha256"]
+                judged["participation_bundle_sha256"] = \
+                    prov_digests["bundle_sha256"]
             verdict, refusal = verdict_for(
                 key, market, verified, away, home, start)
             if verdict is not None:
                 judged["participation_verdict"] = verdict
             if verdict is not None and refusal is None:
-                # Confirmed by gamelog-independent evidence as of the
-                # pricing cutoff: the stamp lifts and the row keeps its
-                # research-candidate status.  Labels/authority unchanged.
+                # Confirmed by anchored, gamelog-independent evidence
+                # as of the pricing cutoff: the stamp lifts and the row
+                # keeps its research-candidate status.
+                # Labels/authority unchanged.
                 judged["participation_status"] = verdict["state"]
                 role_confirmed = True
             elif refusal is not None:
@@ -304,6 +439,17 @@ def phone_nfl_player_rows(rows, *, now=None, getter=None, participation=None):
             "schema_rejected_prior_reasons": d.get("schema_rejected_prior_reasons", {}),
             "participation": verdict["state"] if verdict else "NOT_VERIFIED",
         }
+        if prov_state is not None:
+            receipt["participation_provenance"] = prov_state
+            receipt["participation"] = (
+                verdict["state"] if verdict else
+                "UNVERIFIED_BUNDLE" if prov_state == "UNVERIFIED_BUNDLE"
+                else "NOT_VERIFIED")
+            if prov_state == "VERIFIED_ANCHORED":
+                receipt["participation_manifest_sha256"] = \
+                    prov_digests["manifest_sha256"]
+                receipt["participation_bundle_sha256"] = \
+                    prov_digests["bundle_sha256"]
         if verdict is not None:
             receipt["participation_subclass"] = verdict.get("subclass")
             receipt["participation_team"] = verdict.get("team")
