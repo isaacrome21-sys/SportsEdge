@@ -192,6 +192,34 @@ def test_quorum_default_path_not_activated(env):
     assert not d.admitted and d.reason == "admission_not_activated"
 
 
+def test_production_entrypoint_stays_off_without_separate_owner_activation(env, monkeypatch):
+    entries = [{"provider": "tsa_a", "token": env["ta"]},
+               {"provider": "tsa_b", "token": env["tb"]}]
+    assert ea.admit_configured_quorum(_qb(env, entries), event_cutoff=_cut()).reason == "admission_not_activated"
+    monkeypatch.setattr(ea, "ADMISSION_ACTIVE", True)
+    # A future activation must not unlock the obsolete single-TSA admission path.
+    legacy = ea.admit({"anchor_id": ea.ANCHOR_ID, "leaves": list(LEAVES),
+                       "root": env["root"], "tsa_tokens": [env["ta"]]},
+                      event_cutoff=_cut(), ca_bundle_pem=env["a"]["ca"])
+    assert legacy.reason == "single_tsa_admission_forbidden"
+    # Even a forged runtime flag cannot override the actual approved config.
+    assert ea.admit_configured_quorum(_qb(env, entries), event_cutoff=_cut()).reason == "admission_not_activated"
+
+
+def test_configured_entrypoint_requires_saved_nonce_request_and_real_pins(env, monkeypatch):
+    from dataclasses import replace
+
+    cfg = ea.load_config()
+    monkeypatch.setattr(ea, "ADMISSION_ACTIVE", True)
+    monkeypatch.setattr(ea, "load_config", lambda: replace(cfg, admission_active=True))
+    entries = [{"provider": "tsa_a", "token": env["ta"]},
+               {"provider": "tsa_b", "token": env["tb"]}]
+    assert ea.admit_configured_quorum(_qb(env, entries), event_cutoff=_cut()).reason == "request_binding_required"
+    for e in entries:
+        e["request"] = ea.tsa_request(env["root"])
+    assert ea.admit_configured_quorum(_qb(env, entries), event_cutoff=_cut()).reason == "tsa_trust_not_pinned"
+
+
 def test_two_distinct_tsas_admitted(env):
     d = ea.admit_quorum(_qb(env, [{"provider": "tsa_a", "token": env["ta"]},
                                   {"provider": "tsa_b", "token": env["tb"]}]),
