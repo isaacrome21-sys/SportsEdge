@@ -284,7 +284,27 @@ def tsa_verify(token: bytes, root_hex: str, ca_bundle_pem: bytes,
             tsr, ca = os.path.join(d, "t.tsr"), os.path.join(d, "ca.pem")
             open(tsr, "wb").write(token)
             open(ca, "wb").write(ca_bundle_pem)
-            args = ["ts", "-verify", "-digest", root_hex, "-in", tsr, "-CAfile", ca]
+            # Parse the signed token's generation time before chain checking.
+            # Validation at the verifier's *current* clock incorrectly rejects
+            # genuine older timestamps once their signer certificates expire.
+            # -attime checks the complete X.509 chain at RFC 3161 genTime.
+            t = _run(["ts", "-reply", "-in", tsr, "-text"])
+            if t.returncode != 0:
+                return TsaResult(False, "token_unreadable", token_sha256=tok_sha)
+            text = t.stdout.decode("utf-8", "replace")
+            if "Status: Granted." not in text:
+                return TsaResult(False, "status_not_granted", token_sha256=tok_sha)
+            if not re.search(r"Hash Algorithm:\s*sha256", text):
+                return TsaResult(False, "imprint_not_sha256", token_sha256=tok_sha)
+            gen = _parse_gentime(text)
+            ref = now or datetime.now(timezone.utc)
+            if not isinstance(ref, datetime) or ref.tzinfo is None or ref.utcoffset() is None:
+                return TsaResult(False, "invalid_verifier_clock", token_sha256=tok_sha)
+            if gen > ref + timedelta(seconds=max_clock_skew_s):
+                return TsaResult(False, "gentime_in_future", gen, tok_sha)
+            at_time = str(int(gen.timestamp()))
+            args = ["ts", "-verify", "-attime", at_time, "-digest", root_hex,
+                    "-in", tsr, "-CAfile", ca]
             extra: list[str] = []
             if untrusted_pem:
                 un = os.path.join(d, "u.pem")
@@ -299,21 +319,10 @@ def tsa_verify(token: bytes, root_hex: str, ca_bundle_pem: bytes,
                 q = os.path.join(d, "q.tsq")
                 open(q, "wb").write(request_der)
                 # -queryfile enforces reply imprint == request imprint AND nonce equality
-                v2 = _run(["ts", "-verify", "-queryfile", q, "-in", tsr, "-CAfile", ca] + extra)
+                v2 = _run(["ts", "-verify", "-attime", at_time, "-queryfile", q,
+                           "-in", tsr, "-CAfile", ca] + extra)
                 if v2.returncode != 0 or b"Verification: OK" not in v2.stdout:
                     return TsaResult(False, "request_mismatch", token_sha256=tok_sha)
-            t = _run(["ts", "-reply", "-in", tsr, "-text"])
-            if t.returncode != 0:
-                return TsaResult(False, "token_unreadable", token_sha256=tok_sha)
-            text = t.stdout.decode("utf-8", "replace")
-            if "Status: Granted." not in text:
-                return TsaResult(False, "status_not_granted", token_sha256=tok_sha)
-            if not re.search(r"Hash Algorithm:\s*sha256", text):
-                return TsaResult(False, "imprint_not_sha256", token_sha256=tok_sha)
-            gen = _parse_gentime(text)
-            ref = now or datetime.now(timezone.utc)
-            if gen > ref + timedelta(seconds=max_clock_skew_s):
-                return TsaResult(False, "gentime_in_future", gen, tok_sha)
             # certificate validity at genTime (openssl -verify checks at "now")
             tokv = os.path.join(d, "tokv.der")
             xv = _run(["ts", "-reply", "-in", tsr, "-token_out", "-out", tokv])
