@@ -118,21 +118,48 @@ for _m in ("NRFI", "YRFI"):
 _BATTER = ("MLB_BATTER_EMPIRICAL_GAMELOG (mlb_phone_batter_pricing -> "
            "research_three_sport_bridge; verified StatsAPI game logs, "
            "official-lineup gate per row)")
-for _m in ("HITS", "TOTAL_BASES", "RBI", "RUNS", "HOME_RUNS",
-           "BATTER_BB", "BATTER_K", "SINGLES", "DOUBLES",
+for _m in ("HITS", "TOTAL_BASES", "RBI", "RUNS",
+           "BATTER_BB", "SINGLES", "DOUBLES",
            "HITS_RUNS_RBIS"):
     _priced("MLB", _m, _BATTER,
             "Batter market in the empirical gamelog engine's market set; "
             "rows fail closed per player when identity/history is "
             "unverified or the official starting lineup is unconfirmed "
             "(row-level NO_PARTICIPATION).")
+for _m in ("HOME_RUNS", "BATTER_K"):
+    _priced("MLB", _m, _BATTER,
+            "Batter market in the empirical gamelog engine's market set. "
+            "FIXTURE OBSERVATION (DK Oct 13 2026, not global): "
+            "On the inspected fixture this family appeared as a single-sided "
+            "milestone ladder (no native two-sided O/U observed there); ladder rows "
+            "convert at intake through "
+            "sportsedge.milestone_ladder_intake and reach this engine "
+            "as one-sided rows. Rows fail closed per player when "
+            "identity/history is unverified or the official starting "
+            "lineup is unconfirmed (row-level NO_PARTICIPATION).")
+for _m in ("TRIPLES", "EXTRA_BASE_HITS", "RUNS_RBIS"):
+    _priced("MLB", _m, _BATTER,
+            "Batter market in the empirical gamelog engine's market set "
+            "(TRIPLES reads the measured per-game triples field; "
+            "EXTRA_BASE_HITS is the exact per-game sum "
+            "doubles+triples+home_runs; RUNS_RBIS the exact per-game sum "
+            "runs+rbi; a game missing any component fails the market "
+            "closed). FORM TRUTH (verified DK enumeration, Oct 13 2026): "
+            "On the inspected fixture this family appeared as a single-sided "
+            "milestone ladder (no two-sided O/U observed there); ladder rows convert "
+            "at intake through sportsedge.milestone_ladder_intake and "
+            "reach this engine as one-sided rows. Rows fail closed per "
+            "player when identity/history is unverified or the official "
+            "starting lineup is unconfirmed (row-level "
+            "NO_PARTICIPATION).")
 _blocked("MLB", "STOLEN_BASES", "NO_QUOTE",
-         "NOT_OFFERED (owner rule 2026-10-13: MLB stolen bases are not "
-         "offered; no DK board inspection supports an offering). The "
-         "empirical gamelog engine could compute it, but no row may price "
-         "without an inspected offering.", engine=_BATTER)
-for _m in ("EXTRA_BASE_HITS", "HITS_RUNS_STOLEN_BASES", "RUNS_RBIS",
-           "HITS_STOLEN_BASES", "HITS_WALKS_STOLEN_BASES", "TRIPLES"):
+         "NOT_OBSERVED_ON_INSPECTED_FIXTURE (DK Oct 13 2026), not a "
+         "global determination of market availability. The empirical "
+         "gamelog engine can research this statistic, but no row may "
+         "price without verified per-fixture offered quote evidence.",
+         engine=_BATTER)
+for _m in ("HITS_RUNS_STOLEN_BASES",
+           "HITS_STOLEN_BASES", "HITS_WALKS_STOLEN_BASES"):
     _blocked("MLB", _m, "NO_ENGINE",
              "The empirical gamelog engine's market set excludes this "
              "market; " + _SNAPSHOT_ONLY + ".",
@@ -145,10 +172,11 @@ for _m in ("PITCHER_K", "PITCHER_OUTS", "PITCHER_HITS_ALLOWED",
             "Pitcher market priced from verified prior starts; rows fail "
             "closed per pitcher when identity/history is unverified.")
 _blocked("MLB", "PITCHER_HITS_WALKS_ER", "NO_QUOTE",
-         "PROVIDER_UNAVAILABLE: config/mlb_market_surface.json declares "
-         "this market UNAVAILABLE with provider_expected=false, so no quote "
-         "acquisition path exists; the pitcher engine is not the blocker.",
-         engine=_PITCHER)
+         "NO VERIFIED OFFERED QUOTE on the inspected fixture. The current "
+         "config/mlb_market_surface.json provider flags prevent acquisition "
+         "until separately reconciled against per-fixture evidence; do not "
+         "infer global market nonexistence. The pitcher probability engine "
+         "is not the immediate blocker.", engine=_PITCHER)
 for _m in ("EITHER_PITCHER_HITS_ALLOWED", "EITHER_PITCHER_BB",
            "EITHER_PITCHER_ER", "PITCHER_RECORD_WIN", "FIRST_HOME_RUN"):
     _blocked("MLB", _m, "NO_ENGINE",
@@ -282,8 +310,10 @@ INTAKE_ALIASES = {
         "BATTER_DOUBLES": "DOUBLES", "DOUBLES": "DOUBLES",
         "HITS_RUNS_RBIS": "HITS_RUNS_RBIS", "H_R_RBI": "HITS_RUNS_RBIS",
         "EXTRA_BASE_HITS": "EXTRA_BASE_HITS",
+        "BATTER_EXTRA_BASE_HITS": "EXTRA_BASE_HITS",
         "HITS_RUNS_STOLEN_BASES": "HITS_RUNS_STOLEN_BASES",
         "RUNS_RBIS": "RUNS_RBIS",
+        "BATTER_RUNS_RBIS": "RUNS_RBIS",
         "HITS_STOLEN_BASES": "HITS_STOLEN_BASES",
         "HITS_WALKS_STOLEN_BASES": "HITS_WALKS_STOLEN_BASES",
         "BATTER_TRIPLES": "TRIPLES", "TRIPLES": "TRIPLES",

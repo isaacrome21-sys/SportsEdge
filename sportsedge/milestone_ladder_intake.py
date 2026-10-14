@@ -2,8 +2,10 @@
 
 DraftKings serves several headline prop families ONLY as milestone ladders
 -- rungs "X+" with American odds on the event {stat >= X} -- not as
-over/under pairs (MLB pitcher strikeouts; football passing yards; the
-mirror "N or Fewer" form for earned runs). Canonical intake requires O/U
+over/under pairs (MLB pitcher strikeouts; MLB batter home runs,
+extra-base hits, triples, batter strikeouts and runs+RBIs; football
+passing yards; the mirror "N or Fewer" form for earned runs). Canonical
+intake requires O/U
 rows, so without this adapter those families die at intake instead of
 reaching their pricers or their named blockers.
 
@@ -83,8 +85,9 @@ REFUSAL_MALFORMED = "MILESTONE_LADDER_MALFORMED"
 _FORM_X_PLUS = {"X_PLUS", "MILESTONE_X_PLUS", "PLUS", "GE"}
 _FORM_OR_FEWER = {"OR_FEWER", "MILESTONE_OR_FEWER", "FEWER", "LE"}
 
-# MLB integer counting-stat pitcher markets (single source of truth is
-# sportsedge.mlb_phone_pitcher_pricing.PITCHER_MARKETS; imported lazily
+# MLB integer counting-stat pitcher AND batter markets (single sources
+# of truth are sportsedge.mlb_phone_pitcher_pricing.PITCHER_MARKETS and
+# sportsedge.mlb_phone_batter_pricing.BATTER_MARKETS; imported lazily
 # in _supported so this module stays dependency-light at import time).
 _FOOTBALL_PASSING_MARKETS = frozenset({
     "PLAYER_PASSING_YARDS", "PLAYER_PASS_YARDS",
@@ -109,11 +112,16 @@ def is_milestone_ladder_row(row) -> bool:
 
 
 # Parser-only coverage is NOT a claim of an executable probability engine.
-# These offered DK count-stat ladders must reach an explicit downstream
-# NO_ENGINE/NO_QUOTE refusal instead of dying at parser recognition.
-_MLB_PARSER_ONLY = frozenset({
-    "BATTER_EXTRA_BASE_HITS", "BATTER_TRIPLES", "PITCHER_PITCHES",
-})
+# Offered DK count-stat ladders with no engine behind them must reach an
+# explicit downstream NO_ENGINE/NO_QUOTE refusal instead of dying at
+# parser recognition. (The three families #2273 parked here --
+# BATTER_EXTRA_BASE_HITS, BATTER_TRIPLES, PITCHER_PITCHES -- graduated
+# to engine-backed phone market sets with the Oct 14 wiring completion:
+# the empirical gamelog engine prices triples and the exact
+# doubles+triples+home-runs sum, and the joint engine prices measured
+# per-start pitch counts. The set is empty today; park future
+# engine-less families here rather than widening the phone sets.)
+_MLB_PARSER_ONLY = frozenset()
 
 
 def _supported(sport: str, market: str) -> bool:
