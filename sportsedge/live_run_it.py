@@ -68,6 +68,7 @@ from .live_state import (
     LiveStateError,
     MLBGameState,
 )
+from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp
 
 
 CARD_SCHEMA = "SPORTSEDGE_LIVE_RESEARCH_CARD_V1"
@@ -443,7 +444,8 @@ def run_live_full(payload: Mapping[str, Any] | list,
                      "no price, never guessed or extrapolated."),
         },
     }
-    return card
+    # t118: shared runtime registry gate (blocked/unregistered -> no price).
+    return _registry_gate_and_stamp(card, None, "sportsedge/live_run_it.py")
 
 
 def _event_key(line: dict[str, Any]) -> str:

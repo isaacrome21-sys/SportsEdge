@@ -26,6 +26,8 @@ from sportsedge.prepricing.factor_ingestion import stage_games
 from sportsedge.team_half_pricing import DERIVATIVES, price_team_half_rows
 from sportsedge.pricing_provenance import (
     apply_play_gate, determine_provenance)
+from sportsedge.registry_gate import registry_blocked_row as _shared_registry_blocked_row
+from sportsedge.registry_gate import is_priced as _registry_is_priced
 from sportsedge.canonical_coverage import (
     NFL_ANYTIME_TD_MARKETS, NFL_DERIVATIVE_MARKETS, NFL_FIRST_TD_MARKETS,
     blocked_row_for as coverage_blocked_row, coverage_summary,
@@ -231,31 +233,14 @@ def _prepricing_blocked_row(line, stage, input_index):
     }
 
 
-def _registry_blocked_row(sport, markets, line):
-    """Runtime registry enforcement (reviewer requirement, t115).
-
-    If ANY name this row is known by (raw intake market, normalized
-    market, F5/coverage canonical name) resolves to a BLOCKED registry
-    entry in sportsedge.canonical_coverage, return the fail-closed card
-    row naming the blocker. The row never reaches a pricer and can never
-    carry a probability, price or EV. Returns None otherwise.
-    """
-    for name in markets:
-        if not name:
-            continue
-        name = str(name).strip()
-        res = coverage_resolve_market(sport, name)
-        if res is None:
-            # Matrix keys for some sports are lower-case (NFL); intake is
-            # case-insensitive, so the registry lookup must be too.
-            name = name.lower()
-            res = coverage_resolve_market(sport, name)
-        if res is not None and res.get("state") == COVERAGE_BLOCKED:
-            row = coverage_blocked_row(sport, name, line)
-            row["market"] = line.get("market")
-            row["registry_enforced"] = True
-            return row
-    return None
+def _registry_blocked_row(sport, markets, line, *, include_unregistered=False):
+    """Runtime registry enforcement (t115); implementation shared with the
+    legacy runners in sportsedge.registry_gate (t118). Pre-routing call:
+    BLOCKED registry entries only. The post-evaluation call passes
+    include_unregistered=True and is applied to PRICED rows only, so an
+    unregistered market (e.g. CFB player props) can never keep a price."""
+    return _shared_registry_blocked_row(sport, markets, line,
+                                        include_unregistered=include_unregistered)
 
 
 def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
@@ -754,6 +739,12 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             str(result.get("market") or "").upper().strip(),
             str(result.get("coverage_market") or "").upper().strip(),
         ], {**raw, "sport": sport})
+        if gate is None and _registry_is_priced(result):
+            gate = _registry_blocked_row(sport, [
+                str(raw.get("market") or "").upper().strip(),
+                str(result.get("market") or "").upper().strip(),
+                str(result.get("coverage_market") or "").upper().strip(),
+            ], {**raw, "sport": sport}, include_unregistered=True)
         if gate is None or result.get("registry_enforced"):
             continue
         gate["input_index"] = i
