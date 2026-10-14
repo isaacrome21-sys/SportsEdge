@@ -71,27 +71,62 @@ def bind_fixture(directory: Mapping, scoreboard: Mapping, *, away: str, home: st
     a, h = resolve_team(directory, away), resolve_team(directory, home)
     if a["id"] == h["id"]:
         raise CBBIdentityError("DISTINCT_TEAMS_REQUIRED")
+    if (not isinstance(as_of, datetime) or as_of.tzinfo is None
+            or as_of.utcoffset() is None):
+        raise CBBIdentityError("AS_OF_TIMEZONE_REQUIRED")
+    as_of_utc = as_of.astimezone(timezone.utc)
     want = _utc(start)
+    if not isinstance(scoreboard, Mapping):
+        raise CBBIdentityError("SCOREBOARD_INVALID")
+    events = scoreboard.get("events")
+    if not isinstance(events, list):
+        raise CBBIdentityError("SCOREBOARD_EVENTS_INVALID")
     matches = []
-    for ev in scoreboard.get("events") or []:
-        comp = (ev.get("competitions") or [{}])[0]
-        slots = {c.get("homeAway"): str((c.get("team") or {}).get("id"))
-                 for c in comp.get("competitors") or []}
-        if slots.get("home") != h["id"] or slots.get("away") != a["id"]:
+    for ev in events:
+        if not isinstance(ev, Mapping):
+            continue
+        event_id = ev.get("id")
+        # Missing, bool, zero or text sentinel IDs may not become "None"
+        # or an apparently identified research fixture.
+        id_text = str(event_id)
+        if (type(event_id) not in (str, int) or len(id_text) > 20
+                or not id_text.isascii() or not id_text.isdigit()
+                or not any(ch != "0" for ch in id_text)):
+            continue
+        competitions = ev.get("competitions")
+        if not isinstance(competitions, list) or len(competitions) != 1:
+            continue
+        comp = competitions[0]
+        if not isinstance(comp, Mapping):
+            continue
+        competitors = comp.get("competitors")
+        if not isinstance(competitors, list) or any(
+                not isinstance(c, Mapping) for c in competitors):
+            continue
+        # Never use last-wins dictionary construction for duplicate slots.
+        home_slots = [c for c in competitors if c.get("homeAway") == "home"]
+        away_slots = [c for c in competitors if c.get("homeAway") == "away"]
+        if len(competitors) != 2 or len(home_slots) != 1 or len(away_slots) != 1:
+            continue
+        home_team = home_slots[0].get("team")
+        away_team = away_slots[0].get("team")
+        if not isinstance(home_team, Mapping) or not isinstance(away_team, Mapping):
+            continue
+        if str(home_team.get("id")) != h["id"] or str(away_team.get("id")) != a["id"]:
             continue
         try:
             st = _utc(ev.get("date") or comp.get("date"))
         except (CBBIdentityError, ValueError, TypeError):
             continue
         if abs((st - want).total_seconds()) <= KICKOFF_TOLERANCE_S:
-            matches.append((ev, st, bool(comp.get("neutralSite"))))
+            matches.append((str(event_id), st, bool(comp.get("neutralSite"))))
     if len(matches) != 1:
         raise CBBIdentityError("FIXTURE_NOT_UNIQUELY_VERIFIED:" + str(len(matches)))
-    ev, st, neutral = matches[0]
-    if st <= as_of:
+    event_id, st, neutral = matches[0]
+    if st <= as_of_utc:
         raise CBBIdentityError("GAME_STARTED_OR_PAST")
     excluded = [x["name"] for x in (a, h) if x["illinois_excluded"]]
-    return {"event_id": str(ev.get("id")), "start_utc": st.isoformat(), "neutral_site": neutral,
+    return {"event_id": event_id, "start_utc": st.isoformat(), "neutral_site": neutral,
             "home_id": h["id"], "away_id": a["id"],
             "playable_status": "BLOCKED" if excluded else "RESEARCH_ONLY",
             "reason": "ILLINOIS_COLLEGE_EXCLUDED" if excluded else None,
