@@ -12,8 +12,15 @@ sources INDEPENDENT of the game log:
   snapshot discipline as ``sports.nfl.live_role_source``),
 * availability from nflverse injury reports known by the cutoff
   (``date_modified`` point-in-time, again mirroring ``live_role_source``),
-* game-day confirmation from official inactive designations published
-  before the cutoff.
+* game-day confirmation from an official inactive snapshot published
+  before the cutoff whose COMPLETENESS is provable (see
+  :func:`_inactive_scan`): only a source-complete, exact game/team
+  snapshot supports the negative inference "not listed => dressed".
+  Loose designation rows are positive evidence only -- a candidate
+  found on any of them is OUT -- and can never confirm anyone.  When
+  inactive evidence exists for the game/team but no complete snapshot
+  does, the verdict is ``UNKNOWN / INACTIVES_COMPLETENESS_UNVERIFIED``
+  (integrator audit B1 on PR #2274).
 
 The state vocabulary mirrors STARTER_CERTAINTY_V1: the state of a slot is a
 pure function of evidence with ``observed_at <= cutoff``; later evidence is
@@ -76,12 +83,28 @@ STATE_QUESTIONABLE = "QUESTIONABLE"
 STATE_OUT = "OUT"
 STATE_UNKNOWN = "UNKNOWN"
 
-# The confirmed tier: game-day inactives are published and the player is
-# NOT on them.  CONFIRMED_STARTER additionally requires chart rank 1 at
-# the player's position (the QB slot, an RB1, a WR1, a TE1); a dressed
-# rotation player is CONFIRMED_ACTIVE.  Only this tier satisfies a
-# participation gate; projected/questionable/out/unknown never do.
+# The confirmed tier: a completeness-proven official inactive snapshot
+# for the game/team is published and the player is NOT on it.
+# CONFIRMED_STARTER additionally requires chart rank 1 at the player's
+# position (the QB slot, an RB1, a WR1, a TE1); a dressed rotation
+# player is CONFIRMED_ACTIVE.  Only this tier satisfies a participation
+# gate; projected/questionable/out/unknown never do.
 CONFIRMED_STATES = frozenset({STATE_CONFIRMED, STATE_CONFIRMED_ACTIVE})
+
+# Completeness contract for official inactive snapshots (audit B1).
+# An official game-day inactive list names the team's FULL inactive set
+# (the players not dressing from the game-day roster); it is never a
+# one-name note, so a snapshot shorter than this floor cannot be the
+# complete official list and the negative inference is unavailable
+# from it.  Declared conservative constant: failing closed (UNKNOWN)
+# is the safe direction for a genuinely short list.
+MIN_OFFICIAL_INACTIVE_SNAPSHOT_ROWS = 5
+# Official inactives are published on game day, shortly before kickoff.
+# A list claiming to be this game's inactives published longer than
+# this before kickoff is not a credible game-day publication (a prior
+# game's list cannot be re-bound to this fixture), so its completeness
+# is unverified.
+INACTIVES_SNAPSHOT_MAX_LEAD_HOURS = 24.0
 
 
 def _utc(value: Any, field: str) -> datetime:
@@ -95,7 +118,8 @@ def _utc(value: Any, field: str) -> datetime:
     return out.astimezone(timezone.utc)
 
 
-def _count_excluded(depth_rows, injury_rows, inactive_rows, cutoff) -> int:
+def _count_excluded(depth_rows, injury_rows, inactive_rows, cutoff,
+                    inactive_snapshots=()) -> int:
     """Evidence after the cutoff is invisible; count it for audit."""
     excluded = 0
     for raw in depth_rows:
@@ -116,6 +140,14 @@ def _count_excluded(depth_rows, injury_rows, inactive_rows, cutoff) -> int:
             continue
     for raw in inactive_rows:
         if raw.get("published_at") in (None, ""):
+            continue
+        try:
+            if _utc(raw.get("published_at"), "inactive published_at") > cutoff:
+                excluded += 1
+        except NFLParticipationError:
+            continue
+    for raw in inactive_snapshots:
+        if not isinstance(raw, Mapping) or raw.get("published_at") in (None, ""):
             continue
         try:
             if _utc(raw.get("published_at"), "inactive published_at") > cutoff:
@@ -147,34 +179,111 @@ def _qb1_of(snapshot_rows) -> list[Mapping[str, Any]]:
     ]
 
 
-def _scan_inactives(inactive_rows, *, game_id, team_id, candidate_id, cutoff):
-    """Official-inactive scan for one candidate, evidence <= cutoff only.
+def _snapshot_player_ids(snapshot) -> list[str] | None:
+    """Validated player-id list of one snapshot object, or None.
 
-    Returns ``(published, candidate_inactive)``: ``published`` is True when
-    at least one designation row for this game/team was published by the
-    cutoff (the list exists at all), ``candidate_inactive`` when this
-    candidate is on it.  Rows from other games/teams and rows published
-    after the cutoff are invisible here (and counted as excluded by the
-    callers' audit).
+    A complete official list is a list of distinct, non-empty player
+    ids meeting the declared floor; anything else (not a list, too
+    short, duplicates, non-string/empty entries) is not a complete
+    list and proves nothing by absence.
     """
-    published = False
-    candidate_inactive = False
+    ids = snapshot.get("player_ids")
+    if not isinstance(ids, (list, tuple)):
+        return None
+    out = [str(v).strip() for v in ids]
+    if len(out) < MIN_OFFICIAL_INACTIVE_SNAPSHOT_ROWS:
+        return None
+    if any(not v for v in out) or len(set(out)) != len(out):
+        return None
+    return out
+
+
+def _inactive_scan(inactive_rows, inactive_snapshots, *, game_id, team_id,
+                   candidate_id, kickoff, cutoff):
+    """Official-inactive evidence scan for one candidate, <= cutoff only.
+
+    Returns a dict with:
+
+    * ``candidate_inactive`` -- POSITIVE evidence only: the candidate
+      is named inactive on any loose designation row for this
+      game/team published by the cutoff, or in any matching snapshot's
+      player list.  Positive evidence is sound even from a partial
+      list, so loose rows can mark a player OUT -- and nothing else.
+    * ``evidence_present`` -- some inactive evidence for this game/team
+      was published by the cutoff (a parseable loose row or snapshot).
+    * ``complete_published`` -- the NEGATIVE inference is available: a
+      source-complete official snapshot for exactly this game/team was
+      published by the cutoff and within the game-day lead window
+      before kickoff, its player list validates (see
+      :func:`_snapshot_player_ids`), and it is not contradicted by a
+      conflicting same-instant snapshot.  Only under this flag may an
+      unlisted candidate be read as dressed (CONFIRMED tier).  A
+      truncated, malformed, wrong-game, wrong-team, future-dated,
+      stale or mixed snapshot NEVER sets it (audit B1).
+
+    Rows/snapshots from other games/teams, published after the cutoff,
+    or with unparseable timestamps are invisible here (post-cutoff
+    evidence is counted as excluded by the callers' audit).
+    """
+    result = {"candidate_inactive": False, "evidence_present": False,
+              "complete_published": False}
     if game_id is None:
-        return published, candidate_inactive
+        return result
     for raw in inactive_rows:
+        if not isinstance(raw, Mapping):
+            continue
         if str(raw.get("game_id") or "") != str(game_id):
             continue
         if _team(raw.get("team")) != team_id:
             continue
         if raw.get("published_at") in (None, ""):
             continue
-        if _utc(raw.get("published_at"), "inactive published_at") > cutoff:
+        try:
+            published_at = _utc(raw.get("published_at"),
+                                "inactive published_at")
+        except NFLParticipationError:
+            continue  # unplaceable in time: not evidence
+        if published_at > cutoff:
             continue
-        published = True
+        result["evidence_present"] = True
         if _player_id(raw) == candidate_id and str(
                 raw.get("status") or "").strip().upper() == "INACTIVE":
-            candidate_inactive = True
-    return published, candidate_inactive
+            result["candidate_inactive"] = True
+    valid: dict[datetime, set] = {}
+    for raw in inactive_snapshots:
+        if not isinstance(raw, Mapping):
+            continue
+        if str(raw.get("game_id") or "") != str(game_id):
+            continue
+        if _team(raw.get("team")) != team_id:
+            continue
+        if raw.get("published_at") in (None, ""):
+            continue
+        try:
+            published_at = _utc(raw.get("published_at"),
+                                "inactive published_at")
+        except NFLParticipationError:
+            continue
+        if published_at > cutoff:
+            continue
+        result["evidence_present"] = True
+        ids = raw.get("player_ids")
+        if isinstance(ids, (list, tuple)) and candidate_id in {
+                str(v).strip() for v in ids}:
+            result["candidate_inactive"] = True
+        lead = (kickoff - published_at).total_seconds() / 3600.0
+        if lead < 0.0 or lead > INACTIVES_SNAPSHOT_MAX_LEAD_HOURS:
+            continue  # not a credible game-day publication for this game
+        validated = _snapshot_player_ids(raw)
+        if validated is None:
+            continue
+        valid.setdefault(published_at, set()).add(tuple(sorted(validated)))
+    if valid:
+        latest = valid[max(valid)]
+        # Conflicting same-instant versions poison the snapshot: which
+        # list is official cannot be proven, so completeness fails.
+        result["complete_published"] = len(latest) == 1
+    return result
 
 
 def assess_qb_participation(
@@ -183,6 +292,7 @@ def assess_qb_participation(
     depth_rows: Sequence[Mapping[str, Any]],
     injury_rows: Sequence[Mapping[str, Any]] = (),
     inactive_rows: Sequence[Mapping[str, Any]] = (),
+    inactive_snapshots: Sequence[Mapping[str, Any]] = (),
     game_id: str | None = None,
     target_season: int,
     target_week: int,
@@ -200,8 +310,11 @@ def assess_qb_participation(
     3. snapshot QB1 count != 1            -> UNKNOWN / DEPTH_QB_AMBIGUOUS
     4. candidate on official inactives    -> OUT / OFFICIAL_INACTIVE
     5. injury status OUT or INACTIVE      -> OUT / INJURY_REPORT_OUT
-    6. inactives published, candidate not -> CONFIRMED_STARTER / GAMEDAY_ACTIVE
-       inactive (game-day active supersedes earlier-week designations)
+    6. COMPLETE inactive snapshot         -> CONFIRMED_STARTER / GAMEDAY_ACTIVE
+       published, candidate not on it       (game-day active supersedes
+                                             earlier-week designations)
+    6b. inactive evidence exists but      -> UNKNOWN /
+        completeness unproven                INACTIVES_COMPLETENESS_UNVERIFIED
     7. injury status DOUBTFUL            -> QUESTIONABLE / INJURY_DOUBTFUL
     8. injury status QUESTIONABLE         -> QUESTIONABLE / INJURY_QUESTIONABLE
     9. otherwise (rank-1, no adverse      -> PROJECTED_STARTER /
@@ -220,9 +333,16 @@ def assess_qb_participation(
         "kickoff": kick.isoformat(),
         "expected_player_id": expected_player_id,
         "excluded_evidence": _count_excluded(
-            depth_rows, injury_rows, inactive_rows, cutoff),
+            depth_rows, injury_rows, inactive_rows, cutoff,
+            inactive_snapshots),
         "max_depth_age_hours": float(max_depth_age_hours),
     }
+
+    def _no_inactives() -> dict[str, Any]:
+        return {"injury_status": None, "inactives_published": False,
+                "inactives_evidence_present": False,
+                "inactives_completeness": "NOT_PUBLISHED",
+                "candidate_inactive": False}
 
     try:
         depth_at, snapshot = _latest_depth_snapshot(
@@ -232,8 +352,7 @@ def assess_qb_participation(
             "state": STATE_UNKNOWN, "subclass": "DEPTH_SNAPSHOT_MISSING",
             "candidate_id": None, "candidate_name": None,
             "depth_as_of": None, "depth_age_hours": None,
-            "injury_status": None, "inactives_published": False,
-            "candidate_inactive": False,
+            **_no_inactives(),
         })
         return verdict
 
@@ -244,8 +363,7 @@ def assess_qb_participation(
         verdict.update({
             "state": STATE_UNKNOWN, "subclass": "DEPTH_SNAPSHOT_STALE",
             "candidate_id": None, "candidate_name": None,
-            "injury_status": None, "inactives_published": False,
-            "candidate_inactive": False,
+            **_no_inactives(),
         })
         return verdict
 
@@ -254,8 +372,7 @@ def assess_qb_participation(
         verdict.update({
             "state": STATE_UNKNOWN, "subclass": "DEPTH_QB_AMBIGUOUS",
             "candidate_id": None, "candidate_name": None,
-            "injury_status": None, "inactives_published": False,
-            "candidate_inactive": False,
+            **_no_inactives(),
         })
         return verdict
 
@@ -271,19 +388,28 @@ def assess_qb_participation(
     injury_status = statuses.get(candidate_id)
     verdict["injury_status"] = injury_status
 
-    published, candidate_inactive = _scan_inactives(
-        inactive_rows, game_id=game_id, team_id=team_id,
-        candidate_id=candidate_id, cutoff=cutoff)
-    verdict["inactives_published"] = published
-    verdict["candidate_inactive"] = candidate_inactive
+    scan = _inactive_scan(
+        inactive_rows, inactive_snapshots, game_id=game_id,
+        team_id=team_id, candidate_id=candidate_id, kickoff=kick,
+        cutoff=cutoff)
+    verdict["inactives_published"] = scan["complete_published"]
+    verdict["inactives_evidence_present"] = scan["evidence_present"]
+    verdict["inactives_completeness"] = (
+        "VERIFIED_COMPLETE" if scan["complete_published"]
+        else "UNVERIFIED" if scan["evidence_present"] else "NOT_PUBLISHED")
+    verdict["candidate_inactive"] = scan["candidate_inactive"]
 
-    if candidate_inactive:
+    if scan["candidate_inactive"]:
         verdict.update({"state": STATE_OUT, "subclass": "OFFICIAL_INACTIVE"})
     elif injury_status in {"OUT", "INACTIVE"}:
         verdict.update({"state": STATE_OUT, "subclass": "INJURY_REPORT_OUT"})
-    elif published:
+    elif scan["complete_published"]:
         verdict.update({
             "state": STATE_CONFIRMED, "subclass": "GAMEDAY_ACTIVE"})
+    elif scan["evidence_present"]:
+        verdict.update({
+            "state": STATE_UNKNOWN,
+            "subclass": "INACTIVES_COMPLETENESS_UNVERIFIED"})
     elif injury_status == "DOUBTFUL":
         verdict.update({
             "state": STATE_QUESTIONABLE, "subclass": "INJURY_DOUBTFUL"})
@@ -306,6 +432,8 @@ def _gate_refusal(verdict: Mapping[str, Any]) -> NFLParticipationError:
         return NFLParticipationError("NFL_PARTICIPATION_DEPTH_SNAPSHOT_MISSING")
     if subclass == "DEPTH_QB_AMBIGUOUS":
         return NFLParticipationError("NFL_PARTICIPATION_DEPTH_QB_AMBIGUOUS")
+    if subclass == "INACTIVES_COMPLETENESS_UNVERIFIED":
+        return NFLParticipationError("INACTIVES_COMPLETENESS_UNVERIFIED")
     if state == STATE_OUT:
         return NFLParticipationError(f"NFL_QB_ROLE_OUT:{subclass}")
     return NFLParticipationError(
@@ -368,6 +496,7 @@ def assess_skill_participation(
     depth_rows: Sequence[Mapping[str, Any]],
     injury_rows: Sequence[Mapping[str, Any]] = (),
     inactive_rows: Sequence[Mapping[str, Any]] = (),
+    inactive_snapshots: Sequence[Mapping[str, Any]] = (),
     game_id: str | None = None,
     target_season: int,
     target_week: int,
@@ -391,11 +520,13 @@ def assess_skill_participation(
     3b. player on no chart at all         -> UNKNOWN / PLAYER_NOT_ON_DEPTH_CHART
     4. candidate on official inactives    -> OUT / OFFICIAL_INACTIVE
     5. injury status OUT or INACTIVE      -> OUT / INJURY_REPORT_OUT
-    6. inactives published, candidate     -> CONFIRMED_STARTER /
-       not inactive                          GAMEDAY_ACTIVE_STARTER (rank 1)
+    6. COMPLETE inactive snapshot         -> CONFIRMED_STARTER /
+       published, candidate not on it        GAMEDAY_ACTIVE_STARTER (rank 1)
                                              CONFIRMED_ACTIVE /
                                              GAMEDAY_ACTIVE_ROTATION (rank > 1
                                              or unranked)
+    6b. inactive evidence exists but      -> UNKNOWN /
+        completeness unproven                INACTIVES_COMPLETENESS_UNVERIFIED
     7. injury status DOUBTFUL             -> QUESTIONABLE / INJURY_DOUBTFUL
     8. injury status QUESTIONABLE         -> QUESTIONABLE / INJURY_QUESTIONABLE
     9. otherwise (on chart, no adverse    -> PROJECTED_STARTER /
@@ -421,7 +552,8 @@ def assess_skill_participation(
         "expected_player_id": pid,
         "position": (str(position).strip().upper() or None) if position else None,
         "excluded_evidence": _count_excluded(
-            depth_rows, injury_rows, inactive_rows, cutoff),
+            depth_rows, injury_rows, inactive_rows, cutoff,
+            inactive_snapshots),
         "max_depth_age_hours": float(max_depth_age_hours),
     }
 
@@ -431,6 +563,8 @@ def assess_skill_participation(
             "candidate_id": None, "candidate_name": None,
             "chart_position": None, "chart_rank": None,
             "injury_status": None, "inactives_published": False,
+            "inactives_evidence_present": False,
+            "inactives_completeness": "NOT_PUBLISHED",
             "candidate_inactive": False,
         })
         verdict.update(extra)
@@ -487,18 +621,22 @@ def assess_skill_participation(
     injury_status = statuses.get(pid)
     verdict["injury_status"] = injury_status
 
-    published, candidate_inactive = _scan_inactives(
-        inactive_rows, game_id=game_id, team_id=team_id,
-        candidate_id=pid, cutoff=cutoff)
-    verdict["inactives_published"] = published
-    verdict["candidate_inactive"] = candidate_inactive
+    scan = _inactive_scan(
+        inactive_rows, inactive_snapshots, game_id=game_id,
+        team_id=team_id, candidate_id=pid, kickoff=kick, cutoff=cutoff)
+    verdict["inactives_published"] = scan["complete_published"]
+    verdict["inactives_evidence_present"] = scan["evidence_present"]
+    verdict["inactives_completeness"] = (
+        "VERIFIED_COMPLETE" if scan["complete_published"]
+        else "UNVERIFIED" if scan["evidence_present"] else "NOT_PUBLISHED")
+    verdict["candidate_inactive"] = scan["candidate_inactive"]
 
     starter = chart_rank == 1
-    if candidate_inactive:
+    if scan["candidate_inactive"]:
         verdict.update({"state": STATE_OUT, "subclass": "OFFICIAL_INACTIVE"})
     elif injury_status in {"OUT", "INACTIVE"}:
         verdict.update({"state": STATE_OUT, "subclass": "INJURY_REPORT_OUT"})
-    elif published:
+    elif scan["complete_published"]:
         if starter:
             verdict.update({
                 "state": STATE_CONFIRMED,
@@ -507,6 +645,10 @@ def assess_skill_participation(
             verdict.update({
                 "state": STATE_CONFIRMED_ACTIVE,
                 "subclass": "GAMEDAY_ACTIVE_ROTATION"})
+    elif scan["evidence_present"]:
+        verdict.update({
+            "state": STATE_UNKNOWN,
+            "subclass": "INACTIVES_COMPLETENESS_UNVERIFIED"})
     elif injury_status == "DOUBTFUL":
         verdict.update({
             "state": STATE_QUESTIONABLE, "subclass": "INJURY_DOUBTFUL"})
@@ -539,6 +681,8 @@ def _skill_gate_refusal(verdict: Mapping[str, Any]) -> NFLParticipationError:
         return NFLParticipationError(
             "NFL_PARTICIPATION_PLAYER_NOT_ON_DEPTH_CHART:"
             f"{verdict.get('player_id')}")
+    if subclass == "INACTIVES_COMPLETENESS_UNVERIFIED":
+        return NFLParticipationError("INACTIVES_COMPLETENESS_UNVERIFIED")
     if state == STATE_OUT:
         return NFLParticipationError(f"NFL_SKILL_ROLE_OUT:{subclass}")
     return NFLParticipationError(
@@ -687,6 +831,7 @@ def skill_role_assessment(
     player_stat_rows: Sequence[Mapping[str, Any]] = (),
     injury_rows: Sequence[Mapping[str, Any]] = (),
     inactive_rows: Sequence[Mapping[str, Any]] = (),
+    inactive_snapshots: Sequence[Mapping[str, Any]] = (),
     snap_rows: Sequence[Mapping[str, Any]] = (),
     game_id: str | None = None,
     target_season: int,
@@ -710,6 +855,7 @@ def skill_role_assessment(
     verdict = assess_skill_participation(
         team=team, player_id=player_id, depth_rows=depth_rows,
         injury_rows=injury_rows, inactive_rows=inactive_rows,
+        inactive_snapshots=inactive_snapshots,
         game_id=game_id, target_season=target_season,
         target_week=target_week, kickoff=kickoff, as_of=as_of,
         position=position, max_depth_age_hours=max_depth_age_hours)
@@ -823,6 +969,7 @@ def qb_passing_yards_research(
     player_stat_rows: Sequence[Mapping[str, Any]],
     injury_rows: Sequence[Mapping[str, Any]] = (),
     inactive_rows: Sequence[Mapping[str, Any]] = (),
+    inactive_snapshots: Sequence[Mapping[str, Any]] = (),
     snap_rows: Sequence[Mapping[str, Any]] = (),
     expected_qb_id: str | None = None,
     ladder_lines: Sequence[float] | None = None,
@@ -842,7 +989,8 @@ def qb_passing_yards_research(
     cutoff = _utc(as_of, "as_of")
     verdict = assess_qb_participation(
         team=priced_team, depth_rows=depth_rows, injury_rows=injury_rows,
-        inactive_rows=inactive_rows, game_id=game_id,
+        inactive_rows=inactive_rows, inactive_snapshots=inactive_snapshots,
+        game_id=game_id,
         target_season=target_season, target_week=target_week,
         kickoff=kickoff, as_of=as_of,
         expected_player_id=expected_qb_id,
@@ -853,7 +1001,8 @@ def qb_passing_yards_research(
 
     opponent_verdict = assess_qb_participation(
         team=opponent_team, depth_rows=depth_rows, injury_rows=injury_rows,
-        inactive_rows=inactive_rows, game_id=game_id,
+        inactive_rows=inactive_rows, inactive_snapshots=inactive_snapshots,
+        game_id=game_id,
         target_season=target_season, target_week=target_week,
         kickoff=kickoff, as_of=as_of,
         max_depth_age_hours=max_depth_age_hours)
@@ -956,6 +1105,8 @@ def qb_passing_yards_research(
 __all__ = [
     "CONFIRMED_STATES",
     "DEFAULT_MAX_DEPTH_AGE_HOURS",
+    "INACTIVES_SNAPSHOT_MAX_LEAD_HOURS",
+    "MIN_OFFICIAL_INACTIVE_SNAPSHOT_ROWS",
     "NFLParticipationError",
     "STATE_CONFIRMED",
     "STATE_CONFIRMED_ACTIVE",
