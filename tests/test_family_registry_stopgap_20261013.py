@@ -1,27 +1,29 @@
-"""Fail-closed research family registry contract: no model promotion."""
-from sportsedge.canonical_coverage import resolve_market, blocked_row_for, BLOCKED
+"""Independent family policy contract; does not override existing exclusion gates."""
 import pytest
+from sportsedge.family_market_registry import family_market_decision
+from sportsedge.canonical_coverage import coverage_summary, blocked_row_for
 
 @pytest.mark.parametrize("sport", ["CFB", "NBA", "CBB"])
 @pytest.mark.parametrize("market", ["ML", "MONEYLINE", "SPREAD", "TOTAL", "TOTALS"])
-def test_family_stopgap_blocks_all_game_markets(sport, market):
-    result = resolve_market(sport, market)
-    assert result["state"] == BLOCKED
+def test_family_stopgap_blocks_game_markets(sport, market):
+    result = family_market_decision(sport, market)
+    assert result["state"] == "BLOCKED"
     assert result["blocker"] == "NO_VALIDATION"
     assert result["validation_status"] == "UNVALIDATED"
-    row = blocked_row_for(sport, market, {"market": market, "side": "HOME"})
-    assert row["status"] == "NO_MODEL_OR_MARKET"
-    assert row["research_only"] is True
-    assert row["official_authority"] is False
-    assert row["model_p_authority"] is False
-    assert row["staking_authority"] is False
+    assert result["official_authority"] is False
+    assert result["model_p_authority"] is False
+    assert result["staking_authority"] is False
 
 @pytest.mark.parametrize("sport", ["CFB", "NBA", "CBB"])
 @pytest.mark.parametrize("market", ["PLAYER_PASSING_YARDS", "PLAYER_POINTS", "UNLISTED_MARKET", ""])
-def test_unregistered_family_market_fails_closed(sport, market):
-    result = resolve_market(sport, market)
-    assert result["state"] == BLOCKED
+def test_unknown_family_market_fails_closed(sport, market):
+    result = family_market_decision(sport, market)
+    assert result["state"] == "BLOCKED"
     assert result["blocker"] == "NO_ENGINE"
-    row = blocked_row_for(sport, market, {"market": market})
-    assert row["staking_authority"] is False
-    assert row["model_p_authority"] is False
+    assert result["staking_authority"] is False
+
+
+def test_phase_one_coverage_unchanged_and_il_exclusions_not_shadowed():
+    assert coverage_summary()["markets_total"] == 89
+    assert blocked_row_for("NBA", "PLAYER_POINTS", {"market": "X"}) is None
+    assert family_market_decision("MLB", "MONEYLINE") is None
