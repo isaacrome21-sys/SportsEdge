@@ -1,4 +1,5 @@
 """NFL/CFB user-odds input -> free ESPN named history -> research watch-only."""
+import pytest
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
@@ -53,6 +54,7 @@ def run(sport, getter=None, game_rows=None):
         now=NOW,getter=getter or public_response)
 
 
+@pytest.mark.registry_lane_internals
 def test_named_espn_stats_decode_unambiguous_paired_research_watch():
     for sport in ("NFL","CFB"):
         c=run(sport)
@@ -73,6 +75,7 @@ def test_named_espn_stats_decode_unambiguous_paired_research_watch():
         assert c["summary"]["rows"]==2
 
 
+@pytest.mark.registry_lane_internals
 def test_unlabelled_stat_arrays_are_never_guessed():
     for sport in ("NFL","CFB"):
         c=run(sport, getter=lambda url:public_response(url,names=False))
@@ -80,12 +83,14 @@ def test_unlabelled_stat_arrays_are_never_guessed():
         assert "FEWER_THAN_FIVE_VERIFIED_NAMED_PRIOR_GAMES" in c["prop_unpriced"][0]["reason"]
 
 
+@pytest.mark.registry_lane_internals
 def test_player_not_on_verified_matchup_team_is_not_priced():
     c=run("NFL",getter=lambda url:public_response(url,matching_team=False))
     assert len(c["prop_unpriced"])==2
     assert "PLAYER_NOT_UNIQUELY_RESOLVED_FROM_ESPN_SEARCH" in c["prop_unpriced"][0]["reason"]
 
 
+@pytest.mark.registry_lane_internals
 def test_fewer_than_five_games_blocks_cfb_and_nfl():
     for sport in ("NFL","CFB"):
         c=run(sport,getter=lambda url:public_response(url,games=4))
@@ -128,6 +133,7 @@ def test_bad_or_duplicate_stat_labels_fail_closed():
             raise AssertionError("unverified stat labels cannot create probability")
 
 
+@pytest.mark.registry_lane_internals
 def test_prior_gamelogs_ignore_untrusted_user_model_flags():
     rows=[quote("NFL","OVER",estimate_p=.99,verified=True,
                 game_history=[{"receiving_yards":800}]*12),
@@ -137,6 +143,7 @@ def test_prior_gamelogs_ignore_untrusted_user_model_flags():
     assert not c["prop_candidates"]
 
 
+@pytest.mark.registry_lane_internals
 def test_kickoff_started_does_not_reuse_pregame_player_history():
     c=run_full({"sport":"NFL","lines":[quote("NFL","OVER"),quote("NFL","UNDER")]},
         now=datetime(2026,10,12,0,1,tzinfo=timezone.utc),
@@ -145,6 +152,7 @@ def test_kickoff_started_does_not_reuse_pregame_player_history():
     assert all("STARTED_GAME" in x["reason"] for x in c["prop_unpriced"])
 
 
+@pytest.mark.registry_lane_internals
 def test_football_roster_resolves_exact_player_without_global_search_team_id():
     for sport in ("NFL", "CFB"):
         called = []
@@ -169,6 +177,7 @@ def test_football_roster_resolves_exact_player_without_global_search_team_id():
         assert all("/search/v2" not in url for url in called)
 
 
+@pytest.mark.registry_lane_internals
 def test_same_name_on_both_matchup_rosters_is_ambiguous_not_priced():
     def duplicated(url):
         path = urlparse(url).path
@@ -183,6 +192,7 @@ def test_same_name_on_both_matchup_rosters_is_ambiguous_not_priced():
         assert "PLAYER_DUPLICATE_MATCHUP_ROSTERS" in c["prop_unpriced"][0]["reason"]
 
 
+@pytest.mark.registry_lane_internals
 def test_roster_claiming_wrong_team_does_not_override_fixture():
     def wrong_team(url):
         path = urlparse(url).path
