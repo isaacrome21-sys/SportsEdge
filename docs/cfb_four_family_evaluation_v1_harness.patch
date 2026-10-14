@@ -1,0 +1,2632 @@
+diff --git a/config/research/cfb_four_family_evaluation_v1.json b/config/research/cfb_four_family_evaluation_v1.json
+new file mode 100644
+index 000000000..01d15bb0f
+--- /dev/null
++++ b/config/research/cfb_four_family_evaluation_v1.json
+@@ -0,0 +1 @@
++{"bootstrap_reps":10000,"bootstrap_seed":null,"burn_in_seasons":[2013,2014,2015,2016,2017,2018,2019,2020],"calibration_intercept_band":0.1,"calibration_slope_band":[0.8,1.25],"coverage_floor":0.75,"evaluation_seasons":[2021,2022,2023,2024,2025],"families":["moneyline","spread","total","team_total"],"fold_min_games":500,"folds_required_better":3,"forward_extension_games":600,"forward_target_blocks":20,"forward_target_games":300,"freeze_sha":null,"home_advantage_points":2.5,"league_mean_total_points":55.0,"log_loss_eps":1e-15,"margin_sigma":19.0,"pooled_min_games":2500,"program":"CFB_FOUR_FAMILY_EVALUATION_V1","ratings_k":0.12,"ratings_regression_to_mean":0.85,"ruling_recommendations_from_draft":{"candidate_mode":"CAND_2_INJURY_NEUTRAL","cfbd_role":"DESCRIPTIVE_ONLY","fold_window":"SEASONS_2021_2025","population_rule":"EXCLUDE_FCS_OPPONENTS"},"rulings":{"candidate_mode":"UNRULED","cfbd_role":"UNRULED","cfbd_verification_steps_completed":false,"fold_window":"UNRULED","population_rule":"UNRULED"},"spec":"cfb_four_family_evaluation_20261013/PREREGISTRATION_DRAFT.md (SHA-256 57f1d81b1cc2cd82d09e12395d1dbbc0d8b37012fca1e93bf4774129c2f381bf)","status":"PREREGISTRATION_DRAFT_NOT_FILED_NOT_IN_FORCE","team_total_sigma":10.5,"total_sigma":13.5}
+\ No newline at end of file
+diff --git a/sportsedge/research/cfb_four_family_evaluation_v1.py b/sportsedge/research/cfb_four_family_evaluation_v1.py
+new file mode 100644
+index 000000000..140e6d1b6
+--- /dev/null
++++ b/sportsedge/research/cfb_four_family_evaluation_v1.py
+@@ -0,0 +1,1656 @@
++"""CFB four-family evaluation harness — RESEARCH ONLY. NOT ACTIVATED.
++
++Implements the machinery specified by the CFB market-family evaluation
++preregistration draft (``PREREGISTRATION_DRAFT.md``, prepared 2026-10-13,
++SHA-256 57f1d81b1cc2cd82d09e12395d1dbbc0d8b37012fca1e93bf4774129c2f381bf).
++The draft is NOT FILED and NOT IN FORCE. This module is machinery only:
++
++* It performs NO evaluation of real data. Every scored path in this module
++  is exercised by the synthetic-fixture battery
++  (``tests/test_cfb_four_family_evaluation_20261013.py``) and nothing else.
++* A scored run requires an established freeze (owner-named freeze SHA plus
++  the SPORTSEDGE_EVIDENCE_UNIT_V1 manifest hashes) AND all three owner
++  rulings of draft section 10 resolved in configuration. The shipped
++  configuration (``config/research/cfb_four_family_evaluation_v1.json``)
++  carries every ruling as UNRULED and ``freeze_sha: null``, so the harness
++  refuses (NOT_RUN) out of the box, pre-scoring, consuming no attempt.
++* The candidate evaluated by the historical leg is the frozen production
++  code in a DECLARED injury-neutral evaluation configuration (draft CAND-2).
++  The neutrality of every model input is machine-checked here: injury/QB
++  context is neutralized or omitted by construction, and the scorer
++  REFUSES any input in which a non-neutral value reaches the model.
++* The CFBD market comparison is DESCRIPTIVE ONLY, end to end. The label
++  ``DESCRIPTIVE_MARKET_COMPARISON_NOT_A_VERDICT`` is attached to every
++  descriptive record this module emits; no descriptive path can emit a
++  verdict of any kind.
++* No verdict this module can emit changes any family status. Every result
++  record carries ``family_status: UNVALIDATED`` and
++  ``status_change: NONE``. The strongest label any verdict function here
++  can produce is ``DEMONSTRATED_EDGE_RESEARCH_ONLY`` (forward leg, draft
++  section 5.5), and the historical leg's ceiling is
++  ``BEATS_FROZEN_BASELINE``.
++
++This module performs no network access, no file IO, and no subprocess
++work; inputs arrive as in-memory records and results leave as in-memory
++records. Binding real data snapshots, the frozen production engine, and
++real CFBD lines is freeze-time work under a separate execution ruling
++(draft section 9) and is deliberately absent here.
++"""
++
++from __future__ import annotations
++
++import hashlib
++import json
++import math
++import random
++from dataclasses import dataclass, field, replace
++from datetime import datetime
++from statistics import NormalDist
++from typing import Callable, Iterable, Mapping, Optional, Protocol, Sequence
++
++# --------------------------------------------------------------------------
++# Standing labels and vocabulary (draft sections 5.4, 5.5, 6.2)
++# --------------------------------------------------------------------------
++
++FAMILIES: tuple[str, ...] = ("moneyline", "spread", "total", "team_total")
++
++#: The standing descriptive label. It must appear in every record the
++#: CFBD comparison emits; a CFBD comparison can never emit a verdict.
++DESCRIPTIVE_LABEL = "DESCRIPTIVE_MARKET_COMPARISON_NOT_A_VERDICT"
++
++#: Verbatim limitation text that accompanies every descriptive readout
++#: (draft section 5.4).
++DESCRIPTIVE_LIMITATION_TEXT = (
++    "CFBD closing lines carry no per-row timestamps; this comparison is "
++    "descriptive only and supports no claim of market outperformance, no "
++    "CLV statement, and no promotion input."
++)
++
++#: Emitted in place of any market-relative number for team_total, which
++#: has no CFBD comparator at all (draft section 2.4).
++NO_HISTORICAL_MARKET_COMPARATOR = "NO_HISTORICAL_MARKET_COMPARATOR"
++
++#: The evaluated object, named in every output (draft section 3.1, CAND-2).
++EVALUATED_OBJECT_INJURY_NEUTRAL = (
++    "frozen CFB game engine, injury-neutral evaluation configuration"
++)
++EVALUATED_OBJECT_PRODUCTION_FORWARD = (
++    "frozen CFB game engine, production configuration (forward leg)"
++)
++
++#: Families stay UNVALIDATED at every outcome of this program (draft
++#: sections 5.4 and 9 item 6).
++FAMILY_STATUS_UNVALIDATED = "UNVALIDATED"
++
++# Historical-leg verdict labels (draft section 5.4).
++VERDICT_BEATS_FROZEN_BASELINE = "BEATS_FROZEN_BASELINE"
++VERDICT_WORSE_THAN_FROZEN_BASELINE = "WORSE_THAN_FROZEN_BASELINE"
++VERDICT_INCONCLUSIVE = "INCONCLUSIVE"
++VERDICT_INCONCLUSIVE_COVERAGE = "INCONCLUSIVE (COVERAGE)"
++
++# Forward-leg verdict labels (draft section 5.5). DEMONSTRATED_EDGE_
++# RESEARCH_ONLY is the ceiling of the entire program.
++VERDICT_DEMONSTRATED_EDGE_RESEARCH_ONLY = "DEMONSTRATED_EDGE_RESEARCH_ONLY"
++VERDICT_REFUTED = "REFUTED"
++ACCRUAL_ONLY_NOT_A_VERDICT = "ACCRUAL_ONLY_NOT_A_VERDICT"
++
++#: Every verdict label this module is capable of emitting. A battery test
++#: pins this set: nothing above the program ceiling may ever appear here.
++ALL_VERDICT_LABELS = frozenset(
++    {
++        VERDICT_BEATS_FROZEN_BASELINE,
++        VERDICT_WORSE_THAN_FROZEN_BASELINE,
++        VERDICT_INCONCLUSIVE,
++        VERDICT_INCONCLUSIVE_COVERAGE,
++        VERDICT_DEMONSTRATED_EDGE_RESEARCH_ONLY,
++        VERDICT_REFUTED,
++    }
++)
++
++# Exclusion reason strings (draft section 6.2, verbatim).
++EXCL_IL_COLLEGE = "BLOCKED_PREPRICING_IL_COLLEGE_EXCLUDED"
++EXCL_TEAMS_UNRESOLVED = "BLOCK_TEAMS_UNRESOLVED"
++EXCL_NON_FBS_OPPONENT = "POPULATION_NON_FBS_OPPONENT"
++EXCL_PUSH_INTEGER_LINE = "PUSH_AT_INTEGER_LINE_EXCLUDED"
++EXCL_NO_CONTEST = "GAME_NO_CONTEST_OR_CANCELLED"
++
++# NOT_RUN reasons (draft section 7 kill criteria / pre-scoring aborts).
++NOT_RUN_OWNER_RULINGS_UNRESOLVED = "OWNER_RULINGS_UNRESOLVED"
++NOT_RUN_FREEZE_NOT_ESTABLISHED = "FREEZE_NOT_ESTABLISHED"
++NOT_RUN_FREEZE_HASH_MISMATCH = "FREEZE_HASH_MISMATCH"
++NOT_RUN_FORWARD_ONLY_CANDIDATE = "CANDIDATE_MODE_FORWARD_ONLY"
++NOT_RUN_PIT_AUDIT_FAILURE = "PIT_AUDIT_FAILURE"
++NOT_RUN_NEUTRALITY_GUARD_REFUSAL = "NEUTRALITY_GUARD_REFUSAL"
++NOT_RUN_FOLD_BELOW_MINIMUM = "FOLD_BELOW_MINIMUM"
++NOT_RUN_INSUFFICIENT_BOUND_DATA = "INSUFFICIENT_BOUND_DATA"
++NOT_RUN_PROGRAM_ABORT = "PROGRAM_ABORT_TWO_OR_MORE_FAMILIES_BELOW_FLOOR"
++
++#: Illinois-college ESPN id registry, frozen on main by PR #2148
++#: (``artifacts/free_models.py: IL_COLLEGE_ESPN_IDS``). A fixture with
++#: either competitor in this registry is removed before the population
++#: is counted (draft sections 4.1 and 6.2).
++IL_COLLEGE_ESPN_IDS = frozenset(
++    {
++        "356",   # Illinois
++        "77",    # Northwestern
++        "305",   # DePaul
++        "2350",  # Loyola Chicago
++        "82",    # UIC
++        "71",    # Bradley
++        "2287",  # Illinois State
++        "79",    # Southern Illinois
++        "2565",  # SIU Edwardsville
++        "2197",  # Eastern Illinois
++        "2710",  # Western Illinois
++        "2459",  # Northern Illinois
++        "2130",  # Chicago State
++    }
++)
++
++
++class HarnessError(Exception):
++    """Base class for harness refusals."""
++
++
++class ConfigError(HarnessError):
++    """The configuration is invalid or expresses a prohibited posture."""
++
++
++class NonNeutralInputError(HarnessError):
++    """A non-neutral input would reach the model. Fail closed."""
++
++
++class PitAuditError(HarnessError):
++    """A feature or selection input used information from its target
++    game or later. Fail closed (draft section 7, kill criterion 3)."""
++
++
++# --------------------------------------------------------------------------
++# Configuration (draft sections 3-5; section 10 rulings as switches)
++# --------------------------------------------------------------------------
++
++#: Owner ruling switch 1 (draft section 10 item 1): which candidate the
++#: historical leg evaluates.
++CANDIDATE_MODES = ("CAND_2_INJURY_NEUTRAL", "CAND_3_FORWARD_ONLY")
++#: Owner ruling switch 2 (draft section 10 item 2): the CFBD role. The
++#: descriptive ceiling is structural: no value expressing a verdict-grade
++#: CFBD role is admissible in configuration at all.
++CFBD_ROLES = ("DESCRIPTIVE_ONLY", "DESCRIPTIVE_STRENGTHENED")
++#: Owner ruling switch 3a (draft section 10 item 3): population boundary.
++POPULATION_RULES = ("EXCLUDE_FCS_OPPONENTS", "INCLUDE_FCS_OPPONENTS")
++#: Owner ruling switch 3b (draft section 10 item 3): fold window.
++FOLD_WINDOWS = ("SEASONS_2021_2025", "SEASONS_2018_2025")
++
++UNRULED = "UNRULED"
++
++
++@dataclass(frozen=True)
++class OwnerRulings:
++    """The owner's section 10 decisions, as configuration. UNRULED is
++    the shipped state; an UNRULED switch blocks any scored run."""
++
++    candidate_mode: str = UNRULED
++    cfbd_role: str = UNRULED
++    cfbd_verification_steps_completed: bool = False
++    population_rule: str = UNRULED
++    fold_window: str = UNRULED
++
++    def unresolved(self) -> tuple[str, ...]:
++        out = []
++        if self.candidate_mode not in CANDIDATE_MODES:
++            out.append("candidate_mode")
++        if self.cfbd_role not in CFBD_ROLES:
++            out.append("cfbd_role")
++        if self.population_rule not in POPULATION_RULES:
++            out.append("population_rule")
++        if self.fold_window not in FOLD_WINDOWS:
++            out.append("fold_window")
++        return tuple(out)
++
++
++@dataclass(frozen=True)
++class EvalConfig:
++    """Every number the draft leaves to configuration, with the draft's
++    proposed values as the defaults. Changing a value here is a config
++    change, never a code change; after filing, draft section 7 binds:
++    thresholds never change retroactively."""
++
++    families: tuple[str, ...] = FAMILIES
++    burn_in_seasons: tuple[int, ...] = tuple(range(2013, 2021))
++    evaluation_seasons: tuple[int, ...] = (2021, 2022, 2023, 2024, 2025)
++    fold_min_games: int = 500
++    pooled_min_games: int = 2500
++    folds_required_better: int = 3
++    coverage_floor: float = 0.75
++    bootstrap_reps: int = 10000
++    bootstrap_seed: Optional[int] = None  # predeclared at filing
++    log_loss_eps: float = 1e-15
++    calibration_slope_band: tuple[float, float] = (0.8, 1.25)
++    calibration_intercept_band: float = 0.10
++    # Forward-leg targets (draft section 5.5), pre-registered here; the
++    # forward leg itself is undesigned and unauthorized (section 2.2).
++    forward_target_games: int = 300
++    forward_target_blocks: int = 20
++    forward_extension_games: int = 600
++    # Ratings/distribution machinery constants. These are the harness's
++    # working values for the BASE-1 construction and the walk-forward
++    # state; at freeze time they are either frozen as-is or replaced by
++    # the frozen production construction, and the selection of any fitted
++    # value happens inside the training window only (draft section 4.1).
++    ratings_k: float = 0.12
++    ratings_regression_to_mean: float = 0.85  # applied at season rollover
++    home_advantage_points: float = 2.5  # BASE-1 static constant
++    margin_sigma: float = 19.0
++    total_sigma: float = 13.5
++    team_total_sigma: float = 10.5
++    league_mean_total_points: float = 55.0
++    il_college_espn_ids: frozenset = IL_COLLEGE_ESPN_IDS
++    rulings: OwnerRulings = field(default_factory=OwnerRulings)
++
++    def validate(self) -> None:
++        if tuple(self.families) != FAMILIES:
++            raise ConfigError(
++                "family set is fixed by the draft: %r" % (FAMILIES,)
++            )
++        if set(self.burn_in_seasons) & set(self.evaluation_seasons):
++            raise ConfigError("burn-in and evaluation seasons overlap")
++        if self.fold_min_games <= 0 or self.pooled_min_games <= 0:
++            raise ConfigError("sample floors must be positive")
++        if not 0.0 < self.coverage_floor <= 1.0:
++            raise ConfigError("coverage floor must be in (0, 1]")
++        if self.folds_required_better < 1:
++            raise ConfigError("folds_required_better must be >= 1")
++        if self.bootstrap_reps < 100:
++            raise ConfigError("bootstrap_reps below 100 cannot support a CI")
++        # The CFBD descriptive ceiling is structural: a configuration
++        # expressing a verdict-grade (or any unlisted) CFBD role is
++        # invalid, whether or not the rulings have been made.
++        if self.rulings.cfbd_role not in CFBD_ROLES + (UNRULED,):
++            raise ConfigError(
++                "cfbd_role %r is not admissible: CFBD evidence is "
++                "descriptive-only under this program and no configuration "
++                "may express a verdict-grade CFBD role"
++                % (self.rulings.cfbd_role,)
++            )
++        if self.rulings.candidate_mode not in CANDIDATE_MODES + (UNRULED,):
++            raise ConfigError(
++                "unknown candidate_mode %r" % (self.rulings.candidate_mode,)
++            )
++        if self.rulings.population_rule not in POPULATION_RULES + (UNRULED,):
++            raise ConfigError(
++                "unknown population_rule %r" % (self.rulings.population_rule,)
++            )
++        if self.rulings.fold_window not in FOLD_WINDOWS + (UNRULED,):
++            raise ConfigError(
++                "unknown fold_window %r" % (self.rulings.fold_window,)
++            )
++        if (
++            self.rulings.cfbd_role == "DESCRIPTIVE_STRENGTHENED"
++            and not self.rulings.cfbd_verification_steps_completed
++        ):
++            raise ConfigError(
++                "DESCRIPTIVE_STRENGTHENED requires the Sep 27 audit "
++                "verification steps to be recorded complete"
++            )
++
++
++@dataclass(frozen=True)
++class ResolvedConfig:
++    """An EvalConfig with every section 10 ruling applied. Only a
++    ResolvedConfig may drive a scored run."""
++
++    base: EvalConfig
++    evaluation_seasons: tuple[int, ...]
++    burn_in_seasons: tuple[int, ...]
++    include_fcs_opponents: bool
++    candidate_mode: str
++    cfbd_role: str
++
++
++def resolve_config(config: EvalConfig) -> ResolvedConfig:
++    """Apply the owner's rulings. Raises ConfigError listing every
++    unresolved switch; the draft's recommended rulings produce the
++    draft's proposed fold window and population."""
++    config.validate()
++    unresolved = config.rulings.unresolved()
++    if unresolved:
++        raise ConfigError(
++            "%s: owner rulings unresolved for: %s"
++            % (NOT_RUN_OWNER_RULINGS_UNRESOLVED, ", ".join(unresolved))
++        )
++    if config.rulings.fold_window == "SEASONS_2018_2025":
++        evaluation = tuple(range(2018, 2026))
++        burn_in = tuple(range(2013, 2018))
++    else:
++        evaluation = tuple(config.evaluation_seasons)
++        burn_in = tuple(config.burn_in_seasons)
++    return ResolvedConfig(
++        base=config,
++        evaluation_seasons=evaluation,
++        burn_in_seasons=burn_in,
++        include_fcs_opponents=(
++            config.rulings.population_rule == "INCLUDE_FCS_OPPONENTS"
++        ),
++        candidate_mode=config.rulings.candidate_mode,
++        cfbd_role=config.rulings.cfbd_role,
++    )
++
++
++def config_from_dict(payload: Mapping) -> EvalConfig:
++    """Build an EvalConfig from the shipped JSON companion's shape."""
++    rulings_payload = payload.get("rulings", {})
++    rulings = OwnerRulings(
++        candidate_mode=rulings_payload.get("candidate_mode", UNRULED),
++        cfbd_role=rulings_payload.get("cfbd_role", UNRULED),
++        cfbd_verification_steps_completed=bool(
++            rulings_payload.get("cfbd_verification_steps_completed", False)
++        ),
++        population_rule=rulings_payload.get("population_rule", UNRULED),
++        fold_window=rulings_payload.get("fold_window", UNRULED),
++    )
++    cfg = EvalConfig(
++        families=tuple(payload.get("families", FAMILIES)),
++        burn_in_seasons=tuple(payload.get("burn_in_seasons", range(2013, 2021))),
++        evaluation_seasons=tuple(
++            payload.get("evaluation_seasons", (2021, 2022, 2023, 2024, 2025))
++        ),
++        fold_min_games=int(payload.get("fold_min_games", 500)),
++        pooled_min_games=int(payload.get("pooled_min_games", 2500)),
++        folds_required_better=int(payload.get("folds_required_better", 3)),
++        coverage_floor=float(payload.get("coverage_floor", 0.75)),
++        bootstrap_reps=int(payload.get("bootstrap_reps", 10000)),
++        bootstrap_seed=payload.get("bootstrap_seed"),
++        log_loss_eps=float(payload.get("log_loss_eps", 1e-15)),
++        calibration_slope_band=tuple(
++            payload.get("calibration_slope_band", (0.8, 1.25))
++        ),
++        calibration_intercept_band=float(
++            payload.get("calibration_intercept_band", 0.10)
++        ),
++        forward_target_games=int(payload.get("forward_target_games", 300)),
++        forward_target_blocks=int(payload.get("forward_target_blocks", 20)),
++        forward_extension_games=int(
++            payload.get("forward_extension_games", 600)
++        ),
++        ratings_k=float(payload.get("ratings_k", 0.12)),
++        ratings_regression_to_mean=float(
++            payload.get("ratings_regression_to_mean", 0.85)
++        ),
++        home_advantage_points=float(payload.get("home_advantage_points", 2.5)),
++        margin_sigma=float(payload.get("margin_sigma", 19.0)),
++        total_sigma=float(payload.get("total_sigma", 13.5)),
++        team_total_sigma=float(payload.get("team_total_sigma", 10.5)),
++        league_mean_total_points=float(
++            payload.get("league_mean_total_points", 55.0)
++        ),
++        rulings=rulings,
++    )
++    cfg.validate()
++    return cfg
++
++
++def load_config_json(text: str) -> EvalConfig:
++    return config_from_dict(json.loads(text))
++
++
++# --------------------------------------------------------------------------
++# Bound records (in-memory; real snapshot binding is freeze-time work)
++# --------------------------------------------------------------------------
++
++
++@dataclass(frozen=True)
++class GameRecord:
++    """One bound game from the historical snapshot. Scores are final
++    (full-game markets include overtime, draft section 4.1)."""
++
++    game_id: str
++    season: int
++    week: int
++    kickoff_utc: datetime
++    home_team_id: str
++    away_team_id: str
++    home_fbs: bool
++    away_fbs: bool
++    home_score: Optional[int]
++    away_score: Optional[int]
++    no_contest: bool = False
++
++    @property
++    def decided(self) -> bool:
++        return (
++            not self.no_contest
++            and self.home_score is not None
++            and self.away_score is not None
++        )
++
++
++@dataclass(frozen=True)
++class GameLines:
++    """The lines a family's probabilities are computed at: the captured
++    headline line only (draft section 5.1, same-threshold rule). In the
++    historical leg these come from the CFBD snapshot; in the forward leg
++    from the paired closing capture."""
++
++    spread_home: Optional[float] = None  # home spread, e.g. -1.5
++    total: Optional[float] = None
++    team_total_home: Optional[float] = None
++    team_total_away: Optional[float] = None
++    home_moneyline: Optional[int] = None
++    away_moneyline: Optional[int] = None
++
++
++@dataclass(frozen=True)
++class ExternalFeature:
++    """An externally supplied feature for a game, carrying the time its
++    value became available. The PIT audit (below) refuses any feature
++    whose availability is not strictly before its game's kickoff."""
++
++    game_id: str
++    name: str
++    value: float
++    available_at: datetime
++
++
++# --------------------------------------------------------------------------
++# The declared injury-neutral evaluation configuration (draft CAND-2)
++#
++# The frozen CFB engine consumes a context dict (artifacts/free_models.py
++# CONTEXT_KEYS["CFB"]): home_rating, away_rating, home_injury_pts,
++# away_injury_pts, home_form, away_form, weather_total_adj, rest_diff_adj.
++# In the evaluation configuration:
++#   * ALLOWED keys are copied from the walk-forward ratings state — the
++#     only inputs that are point-in-time reconstructible from completed
++#     games and schedule facts (draft section 3.1).
++#   * FORCE_ZERO keys are written explicitly as exactly 0.0: the injury
++#     points (no honest historical value exists), every owner-disabled
++#     factor under every key name (recent form home_form/away_form; rest
++#     rest_diff_adj and rest_adj), and weather_total_adj (no PIT-bound
++#     historical weather input exists in the freeze; declared-threshold
++#     weather is an unproven free factor and stays at zero here).
++#   * FORBIDDEN keys — any QB-context or availability key — must be
++#     ABSENT, not zeroed: the configuration omits them, and their
++#     presence in a model input is a refusal.
++# The scorer validates every input before any producer sees it, so a
++# non-neutral value cannot reach the model through any path.
++# --------------------------------------------------------------------------
++
++ALLOWED_CONTEXT_KEYS = frozenset({"home_rating", "away_rating"})
++FORCE_ZERO_CONTEXT_KEYS = frozenset(
++    {
++        "home_injury_pts",
++        "away_injury_pts",
++        "home_form",
++        "away_form",
++        "rest_diff_adj",
++        "rest_adj",
++        "rest",
++        "weather_total_adj",
++    }
++)
++STATIC_CONTEXT_KEYS = frozenset({"home_advantage_points"})
++
++
++def _is_forbidden_context_key(key: str) -> bool:
++    lowered = key.lower()
++    return (
++        lowered.startswith("qb")
++        or "_qb" in lowered
++        or lowered.endswith("_qb")
++        or "availab" in lowered
++        or "injury_report" in lowered
++        or lowered in {"starter", "starting_qb", "depth_chart"}
++    )
++
++
++@dataclass
++class CandidateGameInput:
++    """The exact input object a probability producer receives for one
++    game in the evaluation configuration."""
++
++    game_id: str
++    context: Mapping[str, float]
++    #: Fields present in the raw production-shaped context whose values
++    #: were NOT carried into the model input (provenance, draft 3.1).
++    neutralized_fields: tuple[str, ...] = ()
++    omitted_fields: tuple[str, ...] = ()
++
++    def validate_neutral(self) -> None:
++        for key, value in self.context.items():
++            if _is_forbidden_context_key(key):
++                raise NonNeutralInputError(
++                    "QB/availability context key %r present in evaluation "
++                    "input for game %s; the injury-neutral configuration "
++                    "omits it entirely" % (key, self.game_id)
++                )
++            if key in FORCE_ZERO_CONTEXT_KEYS:
++                if float(value) != 0.0:
++                    raise NonNeutralInputError(
++                        "context key %r carries non-neutral value %r for "
++                        "game %s; the evaluation configuration fixes it "
++                        "at exactly 0.0" % (key, value, self.game_id)
++                    )
++            elif key in ALLOWED_CONTEXT_KEYS or key in STATIC_CONTEXT_KEYS:
++                continue
++            else:
++                raise NonNeutralInputError(
++                    "context key %r is not on the evaluation "
++                    "configuration allowlist (game %s); unlisted inputs "
++                    "do not reach the model" % (key, self.game_id)
++                )
++
++
++def build_candidate_input(
++    game: GameRecord,
++    *,
++    home_rating: float,
++    away_rating: float,
++    home_advantage_points: float,
++    raw_context: Optional[Mapping[str, float]] = None,
++) -> CandidateGameInput:
++    """Construct the neutral model input for one game.
++
++    Ratings come from the walk-forward state (the only copied values).
++    ``raw_context`` is the production-shaped context, accepted solely so
++    its non-neutral fields can be recorded as neutralized/omitted in the
++    provenance — values from it are never copied.
++    """
++    context: dict[str, float] = {
++        "home_rating": float(home_rating),
++        "away_rating": float(away_rating),
++        "home_advantage_points": float(home_advantage_points),
++    }
++    for key in sorted(FORCE_ZERO_CONTEXT_KEYS):
++        if key in ("rest", "rest_adj"):
++            continue  # alternate key names for the same disabled factor
++        context[key] = 0.0
++    neutralized: list[str] = []
++    omitted: list[str] = []
++    for key, value in (raw_context or {}).items():
++        if _is_forbidden_context_key(key):
++            omitted.append(key)
++        elif key in FORCE_ZERO_CONTEXT_KEYS and float(value) != 0.0:
++            neutralized.append(key)
++    return CandidateGameInput(
++        game_id=game.game_id,
++        context=context,
++        neutralized_fields=tuple(sorted(neutralized)),
++        omitted_fields=tuple(sorted(omitted)),
++    )
++
++
++# --------------------------------------------------------------------------
++# Probability producers
++#
++# A producer maps a validated CandidateGameInput plus the game's lines
++# to family probabilities. The candidate producer in a real run is the
++# frozen production engine, bound at freeze time; it is injected here,
++# never imported, so this module stays machinery. BASE-1 ships as
++# RatingsBaselineProducer.
++# --------------------------------------------------------------------------
++
++
++@dataclass(frozen=True)
++class FamilyProbabilities:
++    moneyline_home_win: float
++    spread_home_cover: Optional[float]
++    total_over: Optional[float]
++    team_total_home_over: Optional[float]
++    team_total_away_over: Optional[float]
++
++
++class ProbabilityProducer(Protocol):
++    name: str
++
++    def family_probabilities(
++        self, inp: CandidateGameInput, lines: GameLines
++    ) -> FamilyProbabilities:
++        ...
++
++
++def _cover_probability(mu: float, sigma: float, threshold: float) -> float:
++    """P(value > threshold) for a normal score variable, with push mass
++    at an integer threshold excluded and the remainder renormalized
++    (draft section 4.1: integer-line pushes are excluded from the
++    family's metric; the scored probability is the cover probability
++    over decisive outcomes)."""
++    dist = NormalDist(mu, sigma)
++    if float(threshold).is_integer():
++        # The discrete outcome landing exactly on the threshold is the
++        # push band [t - 0.5, t + 0.5]; score over decisive outcomes.
++        p_over = 1.0 - dist.cdf(threshold + 0.5)
++        p_under = dist.cdf(threshold - 0.5)
++        decisive = p_over + p_under
++        if decisive <= 0.0:
++            return 0.5
++        return p_over / decisive
++    return 1.0 - dist.cdf(threshold)
++
++
++class RatingsBaselineProducer:
++    """BASE-1 (draft section 3.2): team-strength ratings plus static
++    home advantage, and nothing else. Also used by the battery as the
++    stand-in producer; a real candidate is a different injected object.
++    """
++
++    name = "BASE_1_TEAM_STRENGTH_PLUS_STATIC_HOME_ADVANTAGE"
++
++    def __init__(self, config: EvalConfig):
++        self._cfg = config
++
++    def family_probabilities(
++        self, inp: CandidateGameInput, lines: GameLines
++    ) -> FamilyProbabilities:
++        cfg = self._cfg
++        ctx = inp.context
++        margin_mu = (ctx["home_rating"] - ctx["away_rating"]) + ctx[
++            "home_advantage_points"
++        ]
++        # Team expected scores split the league mean total by the margin.
++        home_mean = (cfg.league_mean_total_points + margin_mu) / 2.0
++        away_mean = (cfg.league_mean_total_points - margin_mu) / 2.0
++        margin_dist = NormalDist(margin_mu, cfg.margin_sigma)
++        p_home_win = 1.0 - margin_dist.cdf(0.0)
++        spread_p = None
++        if lines.spread_home is not None:
++            # Home covers when margin > -spread_home.
++            spread_p = _cover_probability(
++                margin_mu, cfg.margin_sigma, -float(lines.spread_home)
++            )
++        total_p = None
++        if lines.total is not None:
++            total_p = _cover_probability(
++                cfg.league_mean_total_points
++                + 0.0,  # totals mean is the league mean in BASE-1
++                cfg.total_sigma,
++                float(lines.total),
++            )
++        tt_home = None
++        if lines.team_total_home is not None:
++            tt_home = _cover_probability(
++                home_mean, cfg.team_total_sigma, float(lines.team_total_home)
++            )
++        tt_away = None
++        if lines.team_total_away is not None:
++            tt_away = _cover_probability(
++                away_mean, cfg.team_total_sigma, float(lines.team_total_away)
++            )
++        return FamilyProbabilities(
++            moneyline_home_win=p_home_win,
++            spread_home_cover=spread_p,
++            total_over=total_p,
++            team_total_home_over=tt_home,
++            team_total_away_over=tt_away,
++        )
++
++
++# --------------------------------------------------------------------------
++# Walk-forward ratings state (draft section 4.1: ratings for a scored
++# game come from games completed strictly before it, including games
++# earlier in the same validation season)
++# --------------------------------------------------------------------------
++
++
++class RatingsState:
++    """Point-scale team ratings updated game by game in kickoff order.
++    A snapshot taken before a game is scored can only contain results
++    of games already processed, which the fold engine orders strictly
++    before it — that ordering is the PIT discipline, and every emitted
++    prediction records its evidence game ids so the audit can verify
++    it after the fact."""
++
++    def __init__(self, config: EvalConfig):
++        self._cfg = config
++        self._ratings: dict[str, float] = {}
++        self._season_seen: Optional[int] = None
++        self.evidence_game_ids: list[str] = []
++
++    def rating(self, team_id: str) -> float:
++        return self._ratings.get(team_id, 0.0)
++
++    def update(self, game: GameRecord) -> None:
++        if not game.decided:
++            return
++        if self._season_seen is not None and game.season != self._season_seen:
++            shrink = self._cfg.ratings_regression_to_mean
++            for team in self._ratings:
++                self._ratings[team] *= shrink
++        self._season_seen = game.season
++        home_r = self.rating(game.home_team_id)
++        away_r = self.rating(game.away_team_id)
++        expected_margin = (home_r - away_r) + self._cfg.home_advantage_points
++        actual_margin = float(game.home_score - game.away_score)
++        delta = self._cfg.ratings_k * (actual_margin - expected_margin)
++        self._ratings[game.home_team_id] = home_r + delta
++        self._ratings[game.away_team_id] = away_r - delta
++        self.evidence_game_ids.append(game.game_id)
++
++
++# --------------------------------------------------------------------------
++# Settlement / grading (draft section 4.1)
++# --------------------------------------------------------------------------
++
++
++def grade_outcome(
++    game: GameRecord, family: str, lines: GameLines, side: str = "home"
++) -> Optional[float]:
++    """Realized outcome for one family row: 1.0 / 0.0, or None when the
++    row is excluded (push at an integer line; missing line)."""
++    if not game.decided:
++        return None
++    home = float(game.home_score)
++    away = float(game.away_score)
++    if family == "moneyline":
++        return 1.0 if home > away else 0.0
++    if family == "spread":
++        if lines.spread_home is None:
++            return None
++        margin = home - away
++        if margin == -float(lines.spread_home):
++            return None  # push at an integer line
++        return 1.0 if margin > -float(lines.spread_home) else 0.0
++    if family == "total":
++        if lines.total is None:
++            return None
++        total = home + away
++        if total == float(lines.total):
++            return None
++        return 1.0 if total > float(lines.total) else 0.0
++    if family == "team_total":
++        if side == "home":
++            line, scored = lines.team_total_home, home
++        else:
++            line, scored = lines.team_total_away, away
++        if line is None:
++            return None
++        if scored == float(line):
++            return None
++        return 1.0 if scored > float(line) else 0.0
++    raise HarnessError("unknown family %r" % (family,))
++
++
++# --------------------------------------------------------------------------
++# Population classification (draft sections 4.1 and 6.2)
++# --------------------------------------------------------------------------
++
++
++@dataclass(frozen=True)
++class Exclusion:
++    game_id: str
++    reason: str
++
++
++def classify_population(
++    games: Sequence[GameRecord],
++    resolved: ResolvedConfig,
++    *,
++    known_team_ids: Optional[frozenset] = None,
++) -> tuple[list[GameRecord], list[Exclusion]]:
++    """Split bound games into the scored population and counted
++    exclusions. Illinois fixtures are removed before the population is
++    counted; they were never in the production population."""
++    cfg = resolved.base
++    population: list[GameRecord] = []
++    exclusions: list[Exclusion] = []
++    for game in games:
++        if (
++            game.home_team_id in cfg.il_college_espn_ids
++            or game.away_team_id in cfg.il_college_espn_ids
++        ):
++            exclusions.append(Exclusion(game.game_id, EXCL_IL_COLLEGE))
++            continue
++        if (
++            not game.home_team_id
++            or not game.away_team_id
++            or (
++                known_team_ids is not None
++                and (
++                    game.home_team_id not in known_team_ids
++                    or game.away_team_id not in known_team_ids
++                )
++            )
++        ):
++            exclusions.append(Exclusion(game.game_id, EXCL_TEAMS_UNRESOLVED))
++            continue
++        if game.no_contest or game.home_score is None or game.away_score is None:
++            exclusions.append(Exclusion(game.game_id, EXCL_NO_CONTEST))
++            continue
++        if not resolved.include_fcs_opponents and not (
++            game.home_fbs and game.away_fbs
++        ):
++            exclusions.append(Exclusion(game.game_id, EXCL_NON_FBS_OPPONENT))
++            continue
++        population.append(game)
++    return population, exclusions
++
++
++# --------------------------------------------------------------------------
++# Scoring metrics and uncertainty (draft sections 5.1 and 5.2)
++# --------------------------------------------------------------------------
++
++
++def brier(probability: float, outcome: float) -> float:
++    return (probability - outcome) ** 2
++
++
++def log_loss(probability: float, outcome: float, eps: float) -> float:
++    p = min(max(probability, eps), 1.0 - eps)
++    return -(outcome * math.log(p) + (1.0 - outcome) * math.log(1.0 - p))
++
++
++@dataclass(frozen=True)
++class ScoredRow:
++    """One paired observation: candidate and comparator scored on the
++    same game, at the same line, against the same outcome."""
++
++    game_id: str
++    family: str
++    season: int
++    block: str  # week block: "season:week" — the bootstrap cluster unit
++    p_candidate: float
++    p_comparator: float
++    outcome: float
++
++    def delta_brier(self) -> float:
++        return brier(self.p_candidate, self.outcome) - brier(
++            self.p_comparator, self.outcome
++        )
++
++    def delta_log_loss(self, eps: float) -> float:
++        return log_loss(self.p_candidate, self.outcome, eps) - log_loss(
++            self.p_comparator, self.outcome, eps
++        )
++
++
++def cluster_bootstrap_ci(
++    rows: Sequence[ScoredRow],
++    value: Callable[[ScoredRow], float],
++    *,
++    reps: int,
++    seed: Optional[int],
++) -> tuple[float, float, float]:
++    """95% percentile CI for the mean of ``value`` over rows, by cluster
++    bootstrap over week blocks (draft section 5.2). Both team_total rows
++    of a game share the game's block, so they resample together.
++    Returns (point estimate, ci_low, ci_high). Deterministic given the
++    seed; seed determinism is a pre-scoring kill criterion (section 7).
++    """
++    if not rows:
++        raise HarnessError("bootstrap over zero rows")
++    blocks: dict[str, list[ScoredRow]] = {}
++    for row in rows:
++        blocks.setdefault(row.block, []).append(row)
++    block_keys = sorted(blocks)
++    point = sum(value(r) for r in rows) / len(rows)
++    rng = random.Random(seed)
++    estimates: list[float] = []
++    for _ in range(reps):
++        total = 0.0
++        count = 0
++        for _ in range(len(block_keys)):
++            key = block_keys[rng.randrange(len(block_keys))]
++            for row in blocks[key]:
++                total += value(row)
++                count += 1
++        estimates.append(total / count)
++    estimates.sort()
++    lo = estimates[int(0.025 * (len(estimates) - 1))]
++    hi = estimates[int(0.975 * (len(estimates) - 1))]
++    return point, lo, hi
++
++
++def calibration_recalibration(
++    rows: Sequence[ScoredRow], eps: float
++) -> Optional[tuple[float, float]]:
++    """Descriptive logistic recalibration of outcome on candidate
++    log-odds (draft section 5.1): returns (slope, intercept) or None
++    when not estimable. Never gated; a defect is disclosed, not hidden.
++    """
++    xs: list[float] = []
++    ys: list[float] = []
++    for row in rows:
++        p = min(max(row.p_candidate, eps), 1.0 - eps)
++        xs.append(math.log(p / (1.0 - p)))
++        ys.append(row.outcome)
++    if len(xs) < 20 or len(set(ys)) < 2:
++        return None
++    slope, intercept = 1.0, 0.0
++    for _ in range(50):
++        # Newton-Raphson on the two-parameter logistic fit.
++        g0 = g1 = h00 = h01 = h11 = 0.0
++        for x, y in zip(xs, ys):
++            z = intercept + slope * x
++            p = 1.0 / (1.0 + math.exp(-z)) if z > -700 else 0.0
++            w = max(p * (1.0 - p), 1e-12)
++            r = y - p
++            g0 += r
++            g1 += r * x
++            h00 += w
++            h01 += w * x
++            h11 += w * x * x
++        det = h00 * h11 - h01 * h01
++        if abs(det) < 1e-12:
++            return None
++        d0 = (h11 * g0 - h01 * g1) / det
++        d1 = (h00 * g1 - h01 * g0) / det
++        intercept += d0
++        slope += d1
++        if abs(d0) + abs(d1) < 1e-9:
++            break
++    if not (math.isfinite(slope) and math.isfinite(intercept)):
++        return None
++    return slope, intercept
++
++
++# --------------------------------------------------------------------------
++# Freeze manifest (draft section 3.3)
++# --------------------------------------------------------------------------
++
++
++@dataclass(frozen=True)
++class FreezeManifest:
++    """The freeze record. ``freeze_sha`` is named by the owner at
++    filing from the then-current verified main head — this module
++    selects no SHA, and a manifest without one establishes nothing."""
++
++    freeze_sha: Optional[str] = None
++    artifact_sha256: Optional[str] = None
++    feature_schema_sha256: Optional[str] = None
++    predictive_code_manifest_sha256: Optional[str] = None
++    acquisition_code_manifest_sha256: Optional[str] = None
++    policy_sha256: Optional[str] = None
++    close_definition_id: Optional[str] = None
++    #: path -> expected SHA-256 for every frozen file, verified before
++    #: any parse or scoring (draft section 7, kill criterion 1).
++    file_hashes: Mapping[str, str] = field(default_factory=dict)
++
++    def is_established(self) -> bool:
++        return bool(
++            self.freeze_sha
++            and self.artifact_sha256
++            and self.feature_schema_sha256
++            and self.predictive_code_manifest_sha256
++            and self.acquisition_code_manifest_sha256
++            and self.policy_sha256
++            and self.close_definition_id
++        )
++
++    def verify_files(self, file_bytes: Mapping[str, bytes]) -> Optional[str]:
++        """Returns a NOT_RUN reason on the first mismatch, else None."""
++        for path, expected in sorted(self.file_hashes.items()):
++            actual_bytes = file_bytes.get(path)
++            if actual_bytes is None:
++                return NOT_RUN_FREEZE_HASH_MISMATCH
++            actual = hashlib.sha256(actual_bytes).hexdigest()
++            if actual != expected:
++                return NOT_RUN_FREEZE_HASH_MISMATCH
++        return None
++
++
++# --------------------------------------------------------------------------
++# PIT audit (draft sections 4.1 and 7)
++# --------------------------------------------------------------------------
++
++
++def audit_external_features(
++    features: Sequence[ExternalFeature], games_by_id: Mapping[str, GameRecord]
++) -> None:
++    for feature in features:
++        game = games_by_id.get(feature.game_id)
++        if game is None:
++            raise PitAuditError(
++                "external feature %r bound to unknown game %s"
++                % (feature.name, feature.game_id)
++            )
++        if not feature.available_at < game.kickoff_utc:
++            raise PitAuditError(
++                "external feature %r for game %s became available at %s, "
++                "not strictly before kickoff %s"
++                % (
++                    feature.name,
++                    feature.game_id,
++                    feature.available_at.isoformat(),
++                    game.kickoff_utc.isoformat(),
++                )
++            )
++
++
++def audit_prediction_evidence(
++    predictions: Sequence["PredictionRecord"],
++    games_by_id: Mapping[str, GameRecord],
++) -> None:
++    """Every game whose result informed a prediction must have kicked
++    off strictly before the predicted game."""
++    for prediction in predictions:
++        target = games_by_id[prediction.game_id]
++        for evidence_id in prediction.evidence_game_ids:
++            evidence = games_by_id[evidence_id]
++            if not evidence.kickoff_utc < target.kickoff_utc:
++                raise PitAuditError(
++                    "prediction for game %s used result of game %s, "
++                    "which did not kick off strictly before it"
++                    % (prediction.game_id, evidence_id)
++                )
++
++
++# --------------------------------------------------------------------------
++# Fold engine (draft section 4.1) and the historical-leg run
++# --------------------------------------------------------------------------
++
++
++@dataclass(frozen=True)
++class PredictionRecord:
++    game_id: str
++    season: int
++    week: int
++    candidate: FamilyProbabilities
++    baseline: FamilyProbabilities
++    evidence_game_ids: tuple[str, ...]
++
++    @property
++    def block(self) -> str:
++        return "%d:%d" % (self.season, self.week)
++
++
++@dataclass
++class AttemptLedger:
++    """Draft section 7 consumption accounting. A completed scored run
++    consumes one attempt regardless of outcome; a pre-scoring abort
++    (NOT_RUN) consumes nothing; a post-hoc void consumes and is never
++    refunded."""
++
++    budget: int = 3
++    consumed: int = 0
++    voided: int = 0
++
++    def consume_completed_run(self) -> None:
++        if self.consumed >= self.budget:
++            raise HarnessError("attempt budget exhausted")
++        self.consumed += 1
++
++    def record_void(self) -> None:
++        self.voided += 1
++
++
++@dataclass
++class ProgramResult:
++    status: str  # "SCORED" or "NOT_RUN"
++    reason: Optional[str]
++    family_records: list = field(default_factory=list)
++    descriptive_records: list = field(default_factory=list)
++    exclusions: list = field(default_factory=list)
++    predictions: list = field(default_factory=list)
++    attempts_consumed: int = 0
++
++    def all_records(self) -> list:
++        return list(self.family_records) + list(self.descriptive_records)
++
++    def result_hash(self) -> str:
++        payload = json.dumps(
++            {
++                "status": self.status,
++                "reason": self.reason,
++                "family_records": self.family_records,
++                "descriptive_records": self.descriptive_records,
++                "exclusions": [
++                    {"game_id": e.game_id, "reason": e.reason}
++                    for e in self.exclusions
++                ],
++            },
++            sort_keys=True,
++            default=str,
++        )
++        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
++
++
++def _invariant_fields(evaluated_object: str) -> dict:
++    """Fields every emitted record carries, whatever its content."""
++    return {
++        "family_status": FAMILY_STATUS_UNVALIDATED,
++        "status_change": "NONE",
++        "evaluated_object": evaluated_object,
++        "program": "CFB_FOUR_FAMILY_EVALUATION_V1",
++    }
++
++
++def _family_rows(
++    predictions: Sequence[PredictionRecord],
++    games_by_id: Mapping[str, GameRecord],
++    lines_by_game: Mapping[str, GameLines],
++    family: str,
++) -> tuple[list[ScoredRow], int]:
++    """Paired rows for one family (candidate vs baseline, same game,
++    same line, same outcome). Pushes are excluded and counted."""
++    rows: list[ScoredRow] = []
++    pushes = 0
++    for prediction in predictions:
++        game = games_by_id[prediction.game_id]
++        lines = lines_by_game.get(prediction.game_id, GameLines())
++        cand = prediction.candidate
++        base = prediction.baseline
++        if family == "moneyline":
++            outcome = grade_outcome(game, family, lines)
++            if outcome is None:
++                continue
++            rows.append(
++                ScoredRow(
++                    game.game_id, family, game.season, prediction.block,
++                    cand.moneyline_home_win, base.moneyline_home_win, outcome,
++                )
++            )
++        elif family == "spread":
++            outcome = grade_outcome(game, family, lines)
++            if outcome is None:
++                if lines.spread_home is not None and game.decided:
++                    pushes += 1
++                continue
++            if cand.spread_home_cover is None or base.spread_home_cover is None:
++                continue
++            rows.append(
++                ScoredRow(
++                    game.game_id, family, game.season, prediction.block,
++                    cand.spread_home_cover, base.spread_home_cover, outcome,
++                )
++            )
++        elif family == "total":
++            outcome = grade_outcome(game, family, lines)
++            if outcome is None:
++                if lines.total is not None and game.decided:
++                    pushes += 1
++                continue
++            if cand.total_over is None or base.total_over is None:
++                continue
++            rows.append(
++                ScoredRow(
++                    game.game_id, family, game.season, prediction.block,
++                    cand.total_over, base.total_over, outcome,
++                )
++            )
++        elif family == "team_total":
++            for side, cand_p, base_p in (
++                ("home", cand.team_total_home_over, base.team_total_home_over),
++                ("away", cand.team_total_away_over, base.team_total_away_over),
++            ):
++                outcome = grade_outcome(game, family, lines, side=side)
++                if outcome is None:
++                    line = (
++                        lines.team_total_home
++                        if side == "home"
++                        else lines.team_total_away
++                    )
++                    if line is not None and game.decided:
++                        pushes += 1
++                    continue
++                if cand_p is None or base_p is None:
++                    continue
++                rows.append(
++                    ScoredRow(
++                        game.game_id, family, game.season,
++                        prediction.block, cand_p, base_p, outcome,
++                    )
++                )
++    return rows, pushes
++
++
++# --------------------------------------------------------------------------
++# Verdict functions (draft sections 5.4 and 5.5)
++#
++# Pure functions over scored rows. Their maximum outputs are the draft's
++# ceilings; neither can change a family status, and every record they
++# produce carries the invariant fields.
++# --------------------------------------------------------------------------
++
++
++def historical_verdict(
++    family: str,
++    rows: Sequence[ScoredRow],
++    *,
++    config: EvalConfig,
++    scored_fraction: float,
++    evaluated_object: str = EVALUATED_OBJECT_INJURY_NEUTRAL,
++) -> dict:
++    """The historical-leg verdict vs the frozen baseline (section 5.4).
++    Ceiling: BEATS_FROZEN_BASELINE. A pass changes no status."""
++    record = dict(_invariant_fields(evaluated_object))
++    record.update(
++        {
++            "record_type": "HISTORICAL_BASELINE_VERDICT",
++            "family": family,
++            "n_pooled": len(rows),
++            "scored_fraction": scored_fraction,
++        }
++    )
++    folds_present = len({r.season for r in rows})
++    record["folds_present"] = folds_present
++    if len(rows) < config.pooled_min_games or folds_present < len(
++        config.evaluation_seasons
++    ):
++        record["verdict"] = None
++        record["not_run_reason"] = NOT_RUN_INSUFFICIENT_BOUND_DATA
++        return record
++    eps = config.log_loss_eps
++    b_point, b_lo, b_hi = cluster_bootstrap_ci(
++        rows, lambda r: r.delta_brier(),
++        reps=config.bootstrap_reps, seed=config.bootstrap_seed,
++    )
++    l_point, l_lo, l_hi = cluster_bootstrap_ci(
++        rows, lambda r: r.delta_log_loss(eps),
++        reps=config.bootstrap_reps, seed=config.bootstrap_seed,
++    )
++    record["delta_brier"] = {"point": b_point, "ci_low": b_lo, "ci_high": b_hi}
++    record["delta_log_loss"] = {
++        "point": l_point, "ci_low": l_lo, "ci_high": l_hi,
++    }
++    folds_better = 0
++    per_fold = {}
++    for season in sorted({r.season for r in rows}):
++        fold_rows = [r for r in rows if r.season == season]
++        fb = sum(r.delta_brier() for r in fold_rows) / len(fold_rows)
++        fl = sum(r.delta_log_loss(eps) for r in fold_rows) / len(fold_rows)
++        per_fold[str(season)] = {
++            "n": len(fold_rows), "delta_brier": fb, "delta_log_loss": fl,
++        }
++        if fb < 0.0 and fl < 0.0:
++            folds_better += 1
++    record["per_fold"] = per_fold
++    record["folds_better_on_both_metrics"] = folds_better
++    calibration = calibration_recalibration(rows, eps)
++    if calibration is None:
++        record["calibration"] = "CALIBRATION_NOT_ESTIMABLE"
++    else:
++        slope, intercept = calibration
++        record["calibration"] = {"slope": slope, "intercept": intercept}
++        lo_s, hi_s = config.calibration_slope_band
++        if not (lo_s <= slope <= hi_s) or abs(intercept) > (
++            config.calibration_intercept_band
++        ):
++            record["calibration_flag"] = "CALIBRATION_DEFECT"
++    if scored_fraction < config.coverage_floor:
++        # The coverage presumption governs regardless of metrics.
++        record["verdict"] = VERDICT_INCONCLUSIVE_COVERAGE
++        return record
++    if b_hi < 0.0 and l_hi < 0.0 and folds_better >= config.folds_required_better:
++        record["verdict"] = VERDICT_BEATS_FROZEN_BASELINE
++    elif b_lo > 0.0 or l_lo > 0.0:
++        record["verdict"] = VERDICT_WORSE_THAN_FROZEN_BASELINE
++    else:
++        record["verdict"] = VERDICT_INCONCLUSIVE
++    return record
++
++
++def forward_verdict(
++    family: str,
++    rows: Sequence[ScoredRow],
++    *,
++    config: EvalConfig,
++    sensitivity_rows: Optional[Sequence[ScoredRow]] = None,
++) -> dict:
++    """The forward-leg verdict vs the DK no-vig close (section 5.5),
++    pre-registered here for the future paired-capture cohort. Ceiling:
++    DEMONSTRATED_EDGE_RESEARCH_ONLY. Below target this emits an
++    accrual record, never a verdict, and there are no interim verdicts.
++    """
++    record = dict(_invariant_fields(EVALUATED_OBJECT_PRODUCTION_FORWARD))
++    record.update(
++        {
++            "record_type": "FORWARD_MARKET_VERDICT",
++            "family": family,
++            "n_games": len({r.game_id for r in rows}),
++            "n_blocks": len({r.block for r in rows}),
++        }
++    )
++    if (
++        record["n_games"] < config.forward_target_games
++        or record["n_blocks"] < config.forward_target_blocks
++    ):
++        record["verdict"] = None
++        record["label"] = ACCRUAL_ONLY_NOT_A_VERDICT
++        return record
++    eps = config.log_loss_eps
++    b_point, b_lo, b_hi = cluster_bootstrap_ci(
++        rows, lambda r: r.delta_brier(),
++        reps=config.bootstrap_reps, seed=config.bootstrap_seed,
++    )
++    l_point, l_lo, l_hi = cluster_bootstrap_ci(
++        rows, lambda r: r.delta_log_loss(eps),
++        reps=config.bootstrap_reps, seed=config.bootstrap_seed,
++    )
++    record["delta_brier"] = {"point": b_point, "ci_low": b_lo, "ci_high": b_hi}
++    record["delta_log_loss"] = {
++        "point": l_point, "ci_low": l_lo, "ci_high": l_hi,
++    }
++    if sensitivity_rows is not None:
++        s_point_b = sum(r.delta_brier() for r in sensitivity_rows) / len(
++            sensitivity_rows
++        )
++        p_point_b = sum(r.delta_brier() for r in rows) / len(rows)
++        if (s_point_b < 0.0) != (p_point_b < 0.0):
++            record["method_sensitive"] = True
++            record["verdict"] = VERDICT_INCONCLUSIVE
++            return record
++    if b_hi < 0.0 and l_hi < 0.0:
++        record["verdict"] = VERDICT_DEMONSTRATED_EDGE_RESEARCH_ONLY
++    elif b_lo > 0.0 or l_lo > 0.0:
++        record["verdict"] = VERDICT_REFUTED
++    else:
++        record["verdict"] = VERDICT_INCONCLUSIVE
++    return record
++
++
++def forward_extension_available(
++    verdict_record: Mapping, *, config: EvalConfig, already_extended: bool
++) -> bool:
++    """The single predeclared extension (section 5.5): an INCONCLUSIVE
++    verdict at target with favorable point estimates on both metrics
++    may extend once, to the extension target. No second extension."""
++    if already_extended or verdict_record.get("verdict") != VERDICT_INCONCLUSIVE:
++        return False
++    brier = verdict_record.get("delta_brier") or {}
++    logloss = verdict_record.get("delta_log_loss") or {}
++    favorable = (
++        brier.get("point", 0.0) < 0.0 and logloss.get("point", 0.0) < 0.0
++    )
++    below_extension_target = verdict_record.get(
++        "n_games", 0
++    ) < config.forward_extension_games
++    return favorable and below_extension_target
++
++
++# --------------------------------------------------------------------------
++# CFBD descriptive comparison (draft sections 2.1, 5.3, 5.4)
++#
++# Descriptive only, structurally: this section's functions return
++# records whose "verdict" field is None by construction, and every
++# record carries DESCRIPTIVE_LABEL plus the verbatim limitation text.
++# --------------------------------------------------------------------------
++
++
++def _no_vig_proportional(home_ml: int, away_ml: int) -> tuple[float, float]:
++    def implied(ml: int) -> float:
++        return (-ml) / (-ml + 100.0) if ml < 0 else 100.0 / (ml + 100.0)
++
++    h, a = implied(home_ml), implied(away_ml)
++    total = h + a
++    return h / total, a / total
++
++
++def descriptive_market_comparison(
++    family: str,
++    predictions: Sequence[PredictionRecord],
++    games_by_id: Mapping[str, GameRecord],
++    lines_by_game: Mapping[str, GameLines],
++    *,
++    config: EvalConfig,
++) -> dict:
++    """Per-family descriptive comparison vs CFBD-close-implied
++    probabilities. NOT A VERDICT — see the label on the record."""
++    record = dict(_invariant_fields(EVALUATED_OBJECT_INJURY_NEUTRAL))
++    record.update(
++        {
++            "record_type": "DESCRIPTIVE_MARKET_COMPARISON",
++            "family": family,
++            "comparison_label": DESCRIPTIVE_LABEL,
++            "label_text": DESCRIPTIVE_LIMITATION_TEXT,
++            "verdict": None,
++        }
++    )
++    if family == "team_total":
++        # CFBD's audited schema carries no team-total lines; there is
++        # no comparator, descriptive or otherwise (draft section 2.4).
++        record["market_comparator"] = NO_HISTORICAL_MARKET_COMPARATOR
++        return record
++    rows: list[ScoredRow] = []
++    construction = None
++    for prediction in predictions:
++        game = games_by_id[prediction.game_id]
++        lines = lines_by_game.get(prediction.game_id, GameLines())
++        cand = prediction.candidate
++        if family == "moneyline":
++            if lines.home_moneyline is None or lines.away_moneyline is None:
++                continue
++            p_market, _ = _no_vig_proportional(
++                lines.home_moneyline, lines.away_moneyline
++            )
++            construction = "NO_VIG_PROPORTIONAL_FROM_CFBD_MONEYLINES"
++            outcome = grade_outcome(game, family, lines)
++            p_cand = cand.moneyline_home_win
++        elif family == "spread":
++            if lines.spread_home is None:
++                continue
++            # Implied parity: the market is treated as pricing the
++            # cover at 0.5 at its own line (draft section 5.3). This is
++            # not a priced no-vig pair.
++            construction = "IMPLIED_PARITY_AT_CFBD_LINE_NOT_A_PRICED_PAIR"
++            p_market = 0.5
++            outcome = grade_outcome(game, family, lines)
++            p_cand = cand.spread_home_cover
++        elif family == "total":
++            if lines.total is None:
++                continue
++            construction = "IMPLIED_PARITY_AT_CFBD_LINE_NOT_A_PRICED_PAIR"
++            p_market = 0.5
++            outcome = grade_outcome(game, family, lines)
++            p_cand = cand.total_over
++        else:
++            raise HarnessError("unknown family %r" % (family,))
++        if outcome is None or p_cand is None:
++            continue
++        rows.append(
++            ScoredRow(
++                game.game_id, family, game.season, prediction.block,
++                p_cand, p_market, outcome,
++            )
++        )
++    record["construction"] = construction
++    record["n"] = len(rows)
++    if rows:
++        eps = config.log_loss_eps
++        record["delta_brier"] = sum(r.delta_brier() for r in rows) / len(rows)
++        record["delta_log_loss"] = sum(
++            r.delta_log_loss(eps) for r in rows
++        ) / len(rows)
++    return record
++
++
++# --------------------------------------------------------------------------
++# The historical-leg run
++# --------------------------------------------------------------------------
++
++#: Hook invoked once per fold with the fold's training-window games
++#: ONLY (draft section 4.1: all selection inside the training window).
++SelectionHook = Callable[[int, Sequence[GameRecord]], None]
++
++
++def run_historical_leg(
++    games: Sequence[GameRecord],
++    lines_by_game: Mapping[str, GameLines],
++    *,
++    config: EvalConfig,
++    freeze: FreezeManifest,
++    candidate: ProbabilityProducer,
++    freeze_file_bytes: Optional[Mapping[str, bytes]] = None,
++    external_features: Sequence[ExternalFeature] = (),
++    raw_contexts: Optional[Mapping[str, Mapping[str, float]]] = None,
++    selection_hook: Optional[SelectionHook] = None,
++    ledger: Optional[AttemptLedger] = None,
++) -> ProgramResult:
++    """Run the historical leg over bound in-memory records.
++
++    Every gate that can refuse does so pre-scoring and returns NOT_RUN
++    (consuming no attempt): unresolved owner rulings, unestablished
++    freeze, freeze hash mismatch, forward-only candidate mode, PIT
++    audit failure, neutrality-guard refusal, fold floors. A completed
++    scored run consumes exactly one attempt on ``ledger``.
++    """
++    config.validate()
++    try:
++        resolved = resolve_config(config)
++    except ConfigError:
++        return ProgramResult(
++            status="NOT_RUN", reason=NOT_RUN_OWNER_RULINGS_UNRESOLVED
++        )
++    if not freeze.is_established():
++        return ProgramResult(
++            status="NOT_RUN", reason=NOT_RUN_FREEZE_NOT_ESTABLISHED
++        )
++    if freeze_file_bytes is not None:
++        mismatch = freeze.verify_files(freeze_file_bytes)
++        if mismatch is not None:
++            return ProgramResult(status="NOT_RUN", reason=mismatch)
++    if resolved.candidate_mode == "CAND_3_FORWARD_ONLY":
++        return ProgramResult(
++            status="NOT_RUN", reason=NOT_RUN_FORWARD_ONLY_CANDIDATE
++        )
++
++    games_by_id = {g.game_id: g for g in games}
++    try:
++        audit_external_features(external_features, games_by_id)
++    except PitAuditError:
++        return ProgramResult(
++            status="NOT_RUN", reason=NOT_RUN_PIT_AUDIT_FAILURE
++        )
++
++    population, exclusions = classify_population(games, resolved)
++    population_ids = {g.game_id for g in population}
++    baseline = RatingsBaselineProducer(config)
++
++    # Single chronological walk-forward pass. Ratings state for a game
++    # is snapshotted before its result is folded in; evaluation-season
++    # games are predicted, then their results update the state (draft
++    # section 4.1 within-fold walk-forward).
++    ordered = sorted(population, key=lambda g: (g.kickoff_utc, g.game_id))
++    state = RatingsState(config)
++    predictions: list[PredictionRecord] = []
++    selection_called_for: set[int] = set()
++    try:
++        for game in ordered:
++            if game.season in resolved.evaluation_seasons:
++                if selection_hook is not None and (
++                    game.season not in selection_called_for
++                ):
++                    training = [
++                        g
++                        for g in population
++                        if g.season < game.season
++                    ]
++                    selection_hook(game.season, training)
++                    selection_called_for.add(game.season)
++                inp = build_candidate_input(
++                    game,
++                    home_rating=state.rating(game.home_team_id),
++                    away_rating=state.rating(game.away_team_id),
++                    home_advantage_points=config.home_advantage_points,
++                    raw_context=(raw_contexts or {}).get(game.game_id),
++                )
++                inp.validate_neutral()
++                lines = lines_by_game.get(game.game_id, GameLines())
++                predictions.append(
++                    PredictionRecord(
++                        game_id=game.game_id,
++                        season=game.season,
++                        week=game.week,
++                        candidate=candidate.family_probabilities(inp, lines),
++                        baseline=baseline.family_probabilities(inp, lines),
++                        evidence_game_ids=tuple(state.evidence_game_ids),
++                    )
++                )
++            state.update(game)
++    except NonNeutralInputError:
++        return ProgramResult(
++            status="NOT_RUN",
++            reason=NOT_RUN_NEUTRALITY_GUARD_REFUSAL,
++            exclusions=exclusions,
++        )
++
++    try:
++        audit_prediction_evidence(predictions, games_by_id)
++    except PitAuditError:
++        return ProgramResult(
++            status="NOT_RUN",
++            reason=NOT_RUN_PIT_AUDIT_FAILURE,
++            exclusions=exclusions,
++        )
++
++    evaluated_object = EVALUATED_OBJECT_INJURY_NEUTRAL
++    family_records: list[dict] = []
++    families_below_floor = 0
++    scored_games_by_family: dict[str, set] = {}
++    for family in config.families:
++        rows, pushes = _family_rows(
++            predictions, games_by_id, lines_by_game, family
++        )
++        scored_games_by_family[family] = {r.game_id for r in rows}
++        fold_counts = {}
++        for season in resolved.evaluation_seasons:
++            fold_counts[season] = len(
++                [r for r in rows if r.season == season]
++            )
++        record = dict(_invariant_fields(evaluated_object))
++        record.update(
++            {
++                "record_type": "HISTORICAL_FAMILY_RESULT",
++                "family": family,
++                "fold_counts": {str(k): v for k, v in fold_counts.items()},
++                "push_exclusions": pushes,
++                "push_exclusion_reason": EXCL_PUSH_INTEGER_LINE,
++            }
++        )
++        if any(
++            count < config.fold_min_games for count in fold_counts.values()
++        ):
++            record["verdict"] = None
++            record["not_run_reason"] = NOT_RUN_FOLD_BELOW_MINIMUM
++            families_below_floor += 1
++            family_records.append(record)
++            continue
++        population_for_family = len(
++            [g for g in population if g.season in resolved.evaluation_seasons]
++        )
++        scored_fraction = (
++            len(scored_games_by_family[family]) / population_for_family
++            if population_for_family
++            else 0.0
++        )
++        verdict_record = historical_verdict(
++            family,
++            rows,
++            config=replace(
++                config, evaluation_seasons=resolved.evaluation_seasons
++            ),
++            scored_fraction=scored_fraction,
++            evaluated_object=evaluated_object,
++        )
++        verdict_record["push_exclusions"] = pushes
++        verdict_record["push_exclusion_reason"] = EXCL_PUSH_INTEGER_LINE
++        verdict_record["fold_counts"] = {
++            str(k): v for k, v in fold_counts.items()
++        }
++        family_records.append(verdict_record)
++
++    descriptive = [
++        descriptive_market_comparison(
++            family, predictions, games_by_id, lines_by_game, config=config
++        )
++        for family in config.families
++    ]
++
++    if families_below_floor >= 2:
++        return ProgramResult(
++            status="NOT_RUN",
++            reason=NOT_RUN_PROGRAM_ABORT,
++            family_records=family_records,
++            descriptive_records=descriptive,
++            exclusions=exclusions,
++            predictions=predictions,
++        )
++
++    if ledger is not None:
++        ledger.consume_completed_run()
++    return ProgramResult(
++        status="SCORED",
++        reason=None,
++        family_records=family_records,
++        descriptive_records=descriptive,
++        exclusions=exclusions,
++        predictions=predictions,
++        attempts_consumed=1 if ledger is not None else 0,
++    )
+diff --git a/tests/test_cfb_four_family_evaluation_20261013.py b/tests/test_cfb_four_family_evaluation_20261013.py
+new file mode 100644
+index 000000000..d0aa72356
+--- /dev/null
++++ b/tests/test_cfb_four_family_evaluation_20261013.py
+@@ -0,0 +1,956 @@
++"""Synthetic-fixture battery for the CFB four-family evaluation harness.
++
++Every fixture in this file is synthetic and generated in-memory. No real
++game, line, or CFBD record is touched; no evaluation of real data is
++performed or authorized by these tests. They prove the machinery of
++``sportsedge/research/cfb_four_family_evaluation_v1.py``:
++
++* the injury-neutral configuration is machine-checked and fails closed;
++* fold construction is chronological with no train/test leakage;
++* the CFBD descriptive label propagates and never becomes a verdict;
++* verdict functions cap at the draft's ceilings and never change a
++  family status (UNVALIDATED everywhere);
++* PIT discipline is canary-tested;
++* the shipped configuration refuses to run (rulings UNRULED, no freeze).
++"""
++
++from __future__ import annotations
++
++import ast
++import hashlib
++import json
++import random
++from dataclasses import replace
++from datetime import datetime, timedelta, timezone
++from pathlib import Path
++
++import pytest
++
++from sportsedge.research import cfb_four_family_evaluation_v1 as harness
++from sportsedge.research.cfb_four_family_evaluation_v1 import (
++    CandidateGameInput,
++    EvalConfig,
++    ExternalFeature,
++    FamilyProbabilities,
++    FreezeManifest,
++    GameLines,
++    GameRecord,
++    OwnerRulings,
++    PredictionRecord,
++    RatingsBaselineProducer,
++    ScoredRow,
++)
++
++REPO_ROOT = Path(__file__).resolve().parents[1]
++SHIPPED_CONFIG_PATH = (
++    REPO_ROOT / "config" / "research" / "cfb_four_family_evaluation_v1.json"
++)
++
++DRAFT_RULINGS = OwnerRulings(
++    candidate_mode="CAND_2_INJURY_NEUTRAL",
++    cfbd_role="DESCRIPTIVE_ONLY",
++    population_rule="EXCLUDE_FCS_OPPONENTS",
++    fold_window="SEASONS_2021_2025",
++)
++
++SMALL = dict(
++    fold_min_games=10,
++    pooled_min_games=40,
++    bootstrap_reps=400,
++    bootstrap_seed=1234,
++)
++
++
++def small_config(**overrides) -> EvalConfig:
++    cfg = EvalConfig(rulings=DRAFT_RULINGS, **{**SMALL, **overrides})
++    cfg.validate()
++    return cfg
++
++
++def synthetic_freeze(**overrides) -> FreezeManifest:
++    base = dict(
++        freeze_sha="SYNTHETIC-TEST-ONLY-NOT-A-REAL-FREEZE",
++        artifact_sha256="a" * 64,
++        feature_schema_sha256="b" * 64,
++        predictive_code_manifest_sha256="c" * 64,
++        acquisition_code_manifest_sha256="d" * 64,
++        policy_sha256="e" * 64,
++        close_definition_id="SYNTHETIC",
++    )
++    base.update(overrides)
++    return FreezeManifest(**base)
++
++
++# ----------------------------------------------------------------------
++# Synthetic slate generation
++# ----------------------------------------------------------------------
++
++FBS_TEAMS = [str(100 + i) for i in range(24)]
++FCS_TEAM = "900"
++IL_TEAM = "356"  # Illinois — in the frozen IL registry
++
++
++def make_games(
++    *,
++    seed: int = 7,
++    seasons=range(2013, 2026),
++    games_per_season: int = 60,
++    plant_specials: bool = True,
++) -> tuple[list[GameRecord], dict[str, GameLines]]:
++    """Deterministic synthetic slate. Latent strengths give the ratings
++    machinery real signal; scores are noisy realizations of them."""
++    rng = random.Random(seed)
++    strength = {t: rng.gauss(0.0, 7.0) for t in FBS_TEAMS}
++    games: list[GameRecord] = []
++    lines: dict[str, GameLines] = {}
++    for season in seasons:
++        season_start = datetime(season, 9, 2, 17, 0, tzinfo=timezone.utc)
++        for i in range(games_per_season):
++            home, away = rng.sample(FBS_TEAMS, 2)
++            kickoff = season_start + timedelta(days=7 * (i % 12), hours=i % 5)
++            margin_mu = strength[home] - strength[away] + 2.5
++            home_score = max(
++                0, round(rng.gauss((55.0 + margin_mu) / 2.0, 10.0))
++            )
++            away_score = max(
++                0, round(rng.gauss((55.0 - margin_mu) / 2.0, 10.0))
++            )
++            if home_score == away_score:
++                home_score += 3  # FBS games cannot end tied
++            gid = "%d-g%02d" % (season, i)
++            games.append(
++                GameRecord(
++                    game_id=gid,
++                    season=season,
++                    week=(i % 12) + 1,
++                    kickoff_utc=kickoff,
++                    home_team_id=home,
++                    away_team_id=away,
++                    home_fbs=True,
++                    away_fbs=True,
++                    home_score=home_score,
++                    away_score=away_score,
++                )
++            )
++            total_points = home_score + away_score
++            lines[gid] = GameLines(
++                spread_home=float(rng.choice([-7.5, -3.5, -1.5, 2.5, 6.5])),
++                total=float(rng.choice([44.5, 51.5, 57.5, 63.5])),
++                team_total_home=float(rng.choice([20.5, 27.5, 34.5])),
++                team_total_away=float(rng.choice([17.5, 24.5, 31.5])),
++                home_moneyline=-150,
++                away_moneyline=130,
++            )
++        if plant_specials:
++            base = season_start + timedelta(days=84)
++            specials = [
++                # Illinois fixture — excluded before population counting.
++                GameRecord(
++                    "%d-il" % season, season, 13, base, IL_TEAM, FBS_TEAMS[0],
++                    True, True, 21, 17,
++                ),
++                # FCS opponent — excluded under the draft population rule.
++                GameRecord(
++                    "%d-fcs" % season, season, 13,
++                    base + timedelta(hours=1), FBS_TEAMS[1], FCS_TEAM,
++                    True, False, 45, 10,
++                ),
++                # No-contest — excluded and counted.
++                GameRecord(
++                    "%d-nc" % season, season, 13,
++                    base + timedelta(hours=2), FBS_TEAMS[2], FBS_TEAMS[3],
++                    True, True, None, None, no_contest=True,
++                ),
++            ]
++            games.extend(specials)
++    return games, lines
++
++
++def run_synthetic(cfg=None, games=None, lines=None, **kwargs):
++    cfg = cfg or small_config()
++    if games is None:
++        games, lines = make_games()
++    producer = RatingsBaselineProducer(cfg)
++    return harness.run_historical_leg(
++        games,
++        lines,
++        config=cfg,
++        freeze=synthetic_freeze(),
++        candidate=producer,
++        **kwargs,
++    )
++
++
++def _walk(obj, path=""):
++    if isinstance(obj, dict):
++        for key, value in obj.items():
++            yield from _walk(value, "%s.%s" % (path, key))
++    elif isinstance(obj, (list, tuple)):
++        for idx, value in enumerate(obj):
++            yield from _walk(value, "%s[%d]" % (path, idx))
++    else:
++        yield path, obj
++
++
++def verdict_values(records):
++    return [
++        value
++        for record in records
++        for path, value in _walk(record)
++        if path.endswith(".verdict") and value is not None
++    ]
++
++
++# ----------------------------------------------------------------------
++# Configuration and the section 10 switches
++# ----------------------------------------------------------------------
++
++
++def test_shipped_config_loads_with_rulings_unruled_and_no_freeze():
++    raw = json.loads(SHIPPED_CONFIG_PATH.read_text())
++    assert raw["freeze_sha"] is None
++    assert raw["status"] == "PREREGISTRATION_DRAFT_NOT_FILED_NOT_IN_FORCE"
++    cfg = harness.load_config_json(SHIPPED_CONFIG_PATH.read_text())
++    assert cfg.rulings.unresolved() == (
++        "candidate_mode",
++        "cfbd_role",
++        "population_rule",
++        "fold_window",
++    )
++
++
++def test_shipped_config_refuses_to_run_and_consumes_no_attempt():
++    cfg = harness.load_config_json(SHIPPED_CONFIG_PATH.read_text())
++    games, lines = make_games(seasons=range(2021, 2023), games_per_season=5)
++    ledger = harness.AttemptLedger()
++    result = harness.run_historical_leg(
++        games,
++        lines,
++        config=cfg,
++        freeze=synthetic_freeze(),
++        candidate=RatingsBaselineProducer(cfg),
++        ledger=ledger,
++    )
++    assert result.status == "NOT_RUN"
++    assert result.reason == harness.NOT_RUN_OWNER_RULINGS_UNRESOLVED
++    assert ledger.consumed == 0
++
++
++def test_config_rejects_verdict_grade_cfbd_role_structurally():
++    payload = json.loads(SHIPPED_CONFIG_PATH.read_text())
++    payload["rulings"] = {
++        "candidate_mode": "CAND_2_INJURY_NEUTRAL",
++        "cfbd_role": "VERDICT_GRADE",
++        "population_rule": "EXCLUDE_FCS_OPPONENTS",
++        "fold_window": "SEASONS_2021_2025",
++    }
++    with pytest.raises(harness.ConfigError):
++        harness.config_from_dict(payload)
++
++
++def test_config_rejects_strengthened_cfbd_without_verification_steps():
++    rulings = replace(
++        DRAFT_RULINGS,
++        cfbd_role="DESCRIPTIVE_STRENGTHENED",
++        cfbd_verification_steps_completed=False,
++    )
++    with pytest.raises(harness.ConfigError):
++        replace(small_config(), rulings=rulings).validate()
++
++
++def test_config_accepts_strengthened_cfbd_with_verification_recorded():
++    rulings = replace(
++        DRAFT_RULINGS,
++        cfbd_role="DESCRIPTIVE_STRENGTHENED",
++        cfbd_verification_steps_completed=True,
++    )
++    cfg = replace(small_config(), rulings=rulings)
++    cfg.validate()  # descriptive ceiling unchanged; no error
++
++
++def test_resolve_config_applies_draft_recommendations():
++    resolved = harness.resolve_config(small_config())
++    assert resolved.evaluation_seasons == (2021, 2022, 2023, 2024, 2025)
++    assert resolved.burn_in_seasons == tuple(range(2013, 2021))
++    assert resolved.include_fcs_opponents is False
++    assert resolved.candidate_mode == "CAND_2_INJURY_NEUTRAL"
++
++
++def test_resolve_config_long_window_and_fcs_switches():
++    rulings = replace(
++        DRAFT_RULINGS,
++        fold_window="SEASONS_2018_2025",
++        population_rule="INCLUDE_FCS_OPPONENTS",
++    )
++    resolved = harness.resolve_config(replace(small_config(), rulings=rulings))
++    assert resolved.evaluation_seasons == tuple(range(2018, 2026))
++    assert resolved.burn_in_seasons == tuple(range(2013, 2018))
++    assert resolved.include_fcs_opponents is True
++
++
++# ----------------------------------------------------------------------
++# Freeze gates (draft section 7 kill criteria)
++# ----------------------------------------------------------------------
++
++
++class ExplodingProducer:
++    name = "MUST_NEVER_BE_CALLED"
++
++    def family_probabilities(self, inp, lines):  # pragma: no cover
++        raise AssertionError("scoring began despite a pre-scoring abort")
++
++
++def test_unestablished_freeze_aborts_before_scoring():
++    cfg = small_config()
++    games, lines = make_games(seasons=range(2021, 2022), games_per_season=5)
++    result = harness.run_historical_leg(
++        games, lines, config=cfg, freeze=FreezeManifest(),
++        candidate=ExplodingProducer(),
++    )
++    assert result.status == "NOT_RUN"
++    assert result.reason == harness.NOT_RUN_FREEZE_NOT_ESTABLISHED
++
++
++def test_freeze_hash_mismatch_aborts_before_parse_and_scoring():
++    cfg = small_config()
++    games, lines = make_games(seasons=range(2021, 2022), games_per_season=5)
++    freeze = synthetic_freeze(file_hashes={"engine.py": "0" * 64})
++    result = harness.run_historical_leg(
++        games, lines, config=cfg, freeze=freeze,
++        candidate=ExplodingProducer(),
++        freeze_file_bytes={"engine.py": b"anything at all"},
++    )
++    assert result.status == "NOT_RUN"
++    assert result.reason == harness.NOT_RUN_FREEZE_HASH_MISMATCH
++
++
++def test_freeze_hash_match_lets_the_run_proceed():
++    cfg = small_config()
++    games, lines = make_games()
++    blob = b"frozen engine bytes (synthetic)"
++    freeze = synthetic_freeze(
++        file_hashes={"engine.py": hashlib.sha256(blob).hexdigest()}
++    )
++    result = harness.run_historical_leg(
++        games, lines, config=cfg, freeze=freeze,
++        candidate=RatingsBaselineProducer(cfg),
++        freeze_file_bytes={"engine.py": blob},
++    )
++    assert result.status == "SCORED"
++
++
++def test_forward_only_candidate_disables_historical_leg():
++    rulings = replace(DRAFT_RULINGS, candidate_mode="CAND_3_FORWARD_ONLY")
++    cfg = replace(small_config(), rulings=rulings)
++    games, lines = make_games(seasons=range(2021, 2022), games_per_season=5)
++    result = harness.run_historical_leg(
++        games, lines, config=cfg, freeze=synthetic_freeze(),
++        candidate=ExplodingProducer(),
++    )
++    assert result.status == "NOT_RUN"
++    assert result.reason == harness.NOT_RUN_FORWARD_ONLY_CANDIDATE
++
++
++# ----------------------------------------------------------------------
++# Neutrality guard (draft CAND-2): machine-checked, fail closed
++# ----------------------------------------------------------------------
++
++KICKOFF = datetime(2024, 9, 7, 17, 0, tzinfo=timezone.utc)
++
++
++def _game(**overrides) -> GameRecord:
++    base = dict(
++        game_id="g1", season=2024, week=2, kickoff_utc=KICKOFF,
++        home_team_id="100", away_team_id="101", home_fbs=True,
++        away_fbs=True, home_score=28, away_score=24,
++    )
++    base.update(overrides)
++    return GameRecord(**base)
++
++
++def test_builder_neutralizes_poisoned_production_context():
++    raw = {
++        "home_injury_pts": 7.5,
++        "away_injury_pts": 3.0,
++        "home_form": 1.2,
++        "away_form": -0.6,
++        "rest_diff_adj": 0.8,
++        "weather_total_adj": 2.0,
++        "qb_context": 1.0,
++        "home_rating": 4.0,
++        "away_rating": 1.0,
++    }
++    inp = harness.build_candidate_input(
++        _game(), home_rating=4.0, away_rating=1.0,
++        home_advantage_points=2.5, raw_context=raw,
++    )
++    inp.validate_neutral()  # the constructed input is neutral
++    assert inp.context["home_injury_pts"] == 0.0
++    assert inp.context["away_injury_pts"] == 0.0
++    assert inp.context["home_form"] == 0.0
++    assert inp.context["rest_diff_adj"] == 0.0
++    assert inp.context["weather_total_adj"] == 0.0
++    assert "qb_context" not in inp.context
++    assert set(inp.neutralized_fields) == {
++        "home_injury_pts", "away_injury_pts", "home_form", "away_form",
++        "rest_diff_adj", "weather_total_adj",
++    }
++    assert inp.omitted_fields == ("qb_context",)
++
++
++def test_guard_refuses_nonzero_injury_points_reaching_the_model():
++    inp = CandidateGameInput(
++        game_id="g1",
++        context={"home_rating": 0.0, "away_rating": 0.0,
++                 "home_injury_pts": 3.0},
++    )
++    with pytest.raises(harness.NonNeutralInputError):
++        inp.validate_neutral()
++
++
++def test_guard_refuses_any_qb_context_key_present():
++    for key in ("qb_context", "starting_qb", "qb1_identity",
++                "availability_status"):
++        inp = CandidateGameInput(
++            game_id="g1",
++            context={"home_rating": 0.0, "away_rating": 0.0, key: 0.0},
++        )
++        with pytest.raises(harness.NonNeutralInputError):
++            inp.validate_neutral()
++
++
++def test_guard_refuses_unlisted_context_key():
++    inp = CandidateGameInput(
++        game_id="g1",
++        context={"home_rating": 0.0, "away_rating": 0.0, "coach_adj": 1.0},
++    )
++    with pytest.raises(harness.NonNeutralInputError):
++        inp.validate_neutral()
++
++
++def test_run_converts_a_neutrality_refusal_to_not_run(monkeypatch):
++    poisoned = CandidateGameInput(
++        game_id="x", context={"home_injury_pts": 9.0}
++    )
++    monkeypatch.setattr(
++        harness, "build_candidate_input", lambda *a, **k: poisoned
++    )
++    ledger = harness.AttemptLedger()
++    result = run_synthetic(ledger=ledger)
++    assert result.status == "NOT_RUN"
++    assert result.reason == harness.NOT_RUN_NEUTRALITY_GUARD_REFUSAL
++    assert ledger.consumed == 0
++
++
++# ----------------------------------------------------------------------
++# Population, exclusions, settlement (draft sections 4.1 and 6.2)
++# ----------------------------------------------------------------------
++
++
++def test_population_exclusions_carry_the_drafts_reason_strings():
++    games, _ = make_games(seasons=range(2024, 2025), games_per_season=10)
++    resolved = harness.resolve_config(small_config())
++    population, exclusions = harness.classify_population(games, resolved)
++    reasons = {e.game_id: e.reason for e in exclusions}
++    assert reasons["2024-il"] == "BLOCKED_PREPRICING_IL_COLLEGE_EXCLUDED"
++    assert reasons["2024-fcs"] == "POPULATION_NON_FBS_OPPONENT"
++    assert reasons["2024-nc"] == "GAME_NO_CONTEST_OR_CANCELLED"
++    assert all(g.game_id not in reasons for g in population)
++    assert len(population) == 10
++
++
++def test_population_includes_fcs_games_only_under_the_include_ruling():
++    games, _ = make_games(seasons=range(2024, 2025), games_per_season=10)
++    rulings = replace(
++        DRAFT_RULINGS, population_rule="INCLUDE_FCS_OPPONENTS"
++    )
++    resolved = harness.resolve_config(replace(small_config(), rulings=rulings))
++    population, exclusions = harness.classify_population(games, resolved)
++    assert any(g.game_id == "2024-fcs" for g in population)
++    assert all(
++        e.reason != "POPULATION_NON_FBS_OPPONENT" for e in exclusions
++    )
++
++
++def test_population_refuses_unresolved_team_identity():
++    games = [_game(home_team_id=""), _game(game_id="g2")]
++    resolved = harness.resolve_config(small_config())
++    population, exclusions = harness.classify_population(games, resolved)
++    assert [e.reason for e in exclusions] == ["BLOCK_TEAMS_UNRESOLVED"]
++    assert [g.game_id for g in population] == ["g2"]
++
++
++def test_integer_line_push_is_excluded_and_counted_not_scored():
++    game = _game(home_score=31, away_score=28)  # margin exactly 3
++    lines = GameLines(spread_home=-3.0, total=59.0)
++    assert harness.grade_outcome(game, "spread", lines) is None
++    assert harness.grade_outcome(game, "total", lines) is None
++    result = run_synthetic()
++    spread_records = [
++        r for r in result.family_records if r["family"] == "spread"
++    ]
++    assert spread_records and "push_exclusions" in spread_records[0]
++    assert (
++        spread_records[0]["push_exclusion_reason"]
++        == "PUSH_AT_INTEGER_LINE_EXCLUDED"
++    )
++
++
++# ----------------------------------------------------------------------
++# Fold chronology, leakage canaries, PIT discipline (draft section 4.1)
++# ----------------------------------------------------------------------
++
++
++def test_fold_construction_is_chronological_no_future_leakage():
++    """Canary: flipping a 2025 result must not move any 2021 prediction.
++    If a later season's information leaked into an earlier fold, this
++    fails."""
++    games_a, lines = make_games()
++    result_a = run_synthetic(games=games_a, lines=lines)
++    assert result_a.status == "SCORED"
++
++    games_b = []
++    for game in games_a:
++        if game.game_id == "2025-g00":
++            game = replace(game, home_score=3, away_score=49)
++        games_b.append(game)
++    result_b = run_synthetic(games=games_b, lines=lines)
++
++    def fold_2021(result):
++        return {
++            p.game_id: p.candidate
++            for p in result.predictions
++            if p.season == 2021
++        }
++
++    assert fold_2021(result_a) == fold_2021(result_b)
++    assert fold_2021(result_a)  # the fold is non-empty
++
++
++def test_selection_hook_sees_training_window_games_only():
++    seen: dict[int, list[str]] = {}
++
++    def hook(season, training_games):
++        seen[season] = [g.game_id for g in training_games]
++
++    games, lines = make_games()
++    games_by_id = {g.game_id: g for g in games}
++    result = run_synthetic(
++        games=games, lines=lines, selection_hook=hook
++    )
++    assert result.status == "SCORED"
++    assert set(seen) == {2021, 2022, 2023, 2024, 2025}
++    for fold_season, ids in seen.items():
++        assert ids, "selection must receive the training window"
++        assert all(
++            games_by_id[gid].season < fold_season for gid in ids
++        ), "a validation-season game reached parameter selection"
++
++
++def test_prediction_evidence_audit_passes_on_harness_output():
++    result = run_synthetic()
++    games, _ = make_games()
++    harness.audit_prediction_evidence(
++        result.predictions, {g.game_id: g for g in games}
++    )  # no exception: every evidence game kicked off strictly earlier
++
++
++def test_pit_canary_feature_available_after_kickoff_aborts_not_run():
++    games, lines = make_games(seasons=range(2021, 2026),
++                               games_per_season=20)
++    target = next(g for g in games if g.game_id == "2023-g00")
++    poison = ExternalFeature(
++        game_id=target.game_id, name="future_result_leak", value=1.0,
++        available_at=target.kickoff_utc + timedelta(hours=1),
++    )
++    ledger = harness.AttemptLedger()
++    result = run_synthetic(
++        games=games, lines=lines, external_features=[poison], ledger=ledger
++    )
++    assert result.status == "NOT_RUN"
++    assert result.reason == harness.NOT_RUN_PIT_AUDIT_FAILURE
++    assert ledger.consumed == 0
++
++
++def test_pit_feature_available_before_kickoff_is_admitted():
++    games, lines = make_games(seasons=range(2021, 2026),
++                               games_per_season=20)
++    target = next(g for g in games if g.game_id == "2023-g00")
++    honest = ExternalFeature(
++        game_id=target.game_id, name="schedule_fact", value=1.0,
++        available_at=target.kickoff_utc - timedelta(hours=1),
++    )
++    result = run_synthetic(
++        games=games, lines=lines, external_features=[honest]
++    )
++    assert result.status == "SCORED"
++
++
++# ----------------------------------------------------------------------
++# End-to-end synthetic run: invariants, determinism, attempt accounting
++# ----------------------------------------------------------------------
++
++
++def test_end_to_end_run_invariants_and_attempt_consumption():
++    ledger = harness.AttemptLedger()
++    result = run_synthetic(ledger=ledger)
++    assert result.status == "SCORED"
++    assert ledger.consumed == 1 and result.attempts_consumed == 1
++    assert {r["family"] for r in result.family_records} == set(
++        harness.FAMILIES
++    )
++    for record in result.all_records():
++        assert record["family_status"] == "UNVALIDATED"
++        assert record["status_change"] == "NONE"
++        assert (
++            record["evaluated_object"]
++            == "frozen CFB game engine, injury-neutral evaluation "
++            "configuration"
++        )
++    for verdict in verdict_values(result.all_records()):
++        assert verdict in harness.ALL_VERDICT_LABELS
++
++
++def test_identical_inputs_produce_byte_identical_result_hash():
++    first = run_synthetic()
++    second = run_synthetic()
++    assert first.result_hash() == second.result_hash()
++
++
++def test_thin_fold_marks_family_not_run_but_program_scores():
++    games, lines = make_games()
++    trimmed = dict(lines)
++    for gid, gl in lines.items():
++        if gid.startswith("2023") and not gid.endswith(("g00", "g01")):
++            trimmed[gid] = replace(
++                gl, team_total_home=None, team_total_away=None
++            )
++    result = run_synthetic(games=games, lines=trimmed)
++    assert result.status == "SCORED"
++    team_total = next(
++        r for r in result.family_records if r["family"] == "team_total"
++    )
++    assert team_total["verdict"] is None
++    assert team_total["not_run_reason"] == harness.NOT_RUN_FOLD_BELOW_MINIMUM
++
++
++def test_two_thin_families_abort_the_program_not_run():
++    games, lines = make_games()
++    trimmed = dict(lines)
++    for gid, gl in lines.items():
++        if gid.startswith("2023") and not gid.endswith(("g00", "g01")):
++            trimmed[gid] = replace(
++                gl, team_total_home=None, team_total_away=None,
++                total=None,
++            )
++    ledger = harness.AttemptLedger()
++    result = run_synthetic(games=games, lines=trimmed, ledger=ledger)
++    assert result.status == "NOT_RUN"
++    assert result.reason == harness.NOT_RUN_PROGRAM_ABORT
++    assert ledger.consumed == 0
++
++
++# ----------------------------------------------------------------------
++# Metrics and bootstrap units
++# ----------------------------------------------------------------------
++
++
++def test_metric_known_values():
++    assert harness.brier(0.8, 1.0) == pytest.approx(0.04)
++    assert harness.log_loss(0.5, 1.0, 1e-15) == pytest.approx(0.693147, abs=1e-6)
++
++
++def test_cover_probability_push_band_is_symmetric():
++    # Pick'em at an integer threshold with a centered distribution:
++    # decisive outcomes split evenly after the push band is removed.
++    assert harness._cover_probability(0.0, 19.0, 0.0) == pytest.approx(
++        0.5, abs=1e-9
++    )
++    assert harness._cover_probability(10.0, 19.0, -7.5) > 0.5
++
++
++def test_bootstrap_is_deterministic_and_brackets_the_point_estimate():
++    rows = [
++        ScoredRow("g%d" % i, "moneyline", 2024, "2024:%d" % (i % 4),
++                  0.9 if i % 2 else 0.1, 0.55, 1.0 if i % 2 else 0.0)
++        for i in range(40)
++    ]
++    first = harness.cluster_bootstrap_ci(
++        rows, lambda r: r.delta_brier(), reps=400, seed=99
++    )
++    second = harness.cluster_bootstrap_ci(
++        rows, lambda r: r.delta_brier(), reps=400, seed=99
++    )
++    assert first == second
++    point, lo, hi = first
++    assert lo <= point <= hi and hi < 0.0
++
++
++# ----------------------------------------------------------------------
++# Historical verdict function (draft section 5.4)
++# ----------------------------------------------------------------------
++
++
++def _verdict_rows(*, candidate_better: bool, n_per_fold: int = 60):
++    rows = []
++    for season in (2021, 2022, 2023, 2024, 2025):
++        for i in range(n_per_fold):
++            outcome = 1.0 if i % 2 == 0 else 0.0
++            sharp, dull = (0.9, 0.6) if outcome else (0.1, 0.4)
++            p_cand, p_base = (
++                (sharp, dull) if candidate_better else (dull, sharp)
++            )
++            rows.append(
++                ScoredRow(
++                    "%d-%d" % (season, i), "moneyline", season,
++                    "%d:%d" % (season, i % 6), p_cand, p_base, outcome,
++                )
++            )
++    return rows
++
++
++def test_verdict_beats_frozen_baseline_and_changes_no_status():
++    cfg = small_config()
++    record = harness.historical_verdict(
++        "moneyline", _verdict_rows(candidate_better=True),
++        config=cfg, scored_fraction=1.0,
++    )
++    assert record["verdict"] == "BEATS_FROZEN_BASELINE"
++    assert record["family_status"] == "UNVALIDATED"
++    assert record["status_change"] == "NONE"
++    assert record["folds_better_on_both_metrics"] == 5
++
++
++def test_verdict_worse_than_frozen_baseline():
++    record = harness.historical_verdict(
++        "moneyline", _verdict_rows(candidate_better=False),
++        config=small_config(), scored_fraction=1.0,
++    )
++    assert record["verdict"] == "WORSE_THAN_FROZEN_BASELINE"
++
++
++def test_verdict_inconclusive_when_candidate_equals_baseline():
++    rows = [
++        replace(r, p_candidate=r.p_comparator)
++        for r in _verdict_rows(candidate_better=True)
++    ]
++    record = harness.historical_verdict(
++        "moneyline", rows, config=small_config(), scored_fraction=1.0
++    )
++    assert record["verdict"] == "INCONCLUSIVE"
++
++
++def test_verdict_coverage_presumption_overrides_metrics():
++    record = harness.historical_verdict(
++        "moneyline", _verdict_rows(candidate_better=True),
++        config=small_config(), scored_fraction=0.50,
++    )
++    assert record["verdict"] == "INCONCLUSIVE (COVERAGE)"
++
++
++def test_verdict_below_sample_floor_is_not_run_not_failed():
++    record = harness.historical_verdict(
++        "moneyline", _verdict_rows(candidate_better=True, n_per_fold=5),
++        config=small_config(), scored_fraction=1.0,
++    )
++    assert record["verdict"] is None
++    assert record["not_run_reason"] == harness.NOT_RUN_INSUFFICIENT_BOUND_DATA
++
++
++# ----------------------------------------------------------------------
++# Descriptive CFBD comparison (draft sections 2.1, 5.3, 5.4)
++# ----------------------------------------------------------------------
++
++
++def _predictions(games, lines, cfg):
++    producer = RatingsBaselineProducer(cfg)
++    out = []
++    for game in games:
++        if game.game_id not in lines or not game.decided:
++            continue
++        inp = harness.build_candidate_input(
++            game, home_rating=3.0, away_rating=0.0,
++            home_advantage_points=2.5,
++        )
++        out.append(
++            PredictionRecord(
++                game.game_id, game.season, game.week,
++                producer.family_probabilities(inp, lines[game.game_id]),
++                producer.family_probabilities(inp, lines[game.game_id]),
++                (),
++            )
++        )
++    return out
++
++
++def test_descriptive_records_carry_the_label_and_no_verdict():
++    cfg = small_config()
++    games, lines = make_games(seasons=range(2024, 2025), games_per_season=8)
++    games_by_id = {g.game_id: g for g in games}
++    predictions = _predictions(games, lines, cfg)
++    for family in ("moneyline", "spread", "total"):
++        record = harness.descriptive_market_comparison(
++            family, predictions, games_by_id, lines, config=cfg
++        )
++        assert record["verdict"] is None
++        assert (
++            record["comparison_label"]
++            == "DESCRIPTIVE_MARKET_COMPARISON_NOT_A_VERDICT"
++        )
++        assert "no per-row timestamps" in record["label_text"]
++        assert record["n"] > 0
++    assert (
++        harness.descriptive_market_comparison(
++            "moneyline", predictions, games_by_id, lines, config=cfg
++        )["construction"]
++        == "NO_VIG_PROPORTIONAL_FROM_CFBD_MONEYLINES"
++    )
++    assert (
++        harness.descriptive_market_comparison(
++            "spread", predictions, games_by_id, lines, config=cfg
++        )["construction"]
++        == "IMPLIED_PARITY_AT_CFBD_LINE_NOT_A_PRICED_PAIR"
++    )
++
++
++def test_descriptive_team_total_has_no_market_comparator():
++    cfg = small_config()
++    games, lines = make_games(seasons=range(2024, 2025), games_per_season=4)
++    games_by_id = {g.game_id: g for g in games}
++    record = harness.descriptive_market_comparison(
++        "team_total", _predictions(games, lines, cfg),
++        games_by_id, lines, config=cfg,
++    )
++    assert record["market_comparator"] == "NO_HISTORICAL_MARKET_COMPARATOR"
++    assert "delta_brier" not in record
++    assert record["verdict"] is None
++    assert (
++        record["comparison_label"]
++        == "DESCRIPTIVE_MARKET_COMPARISON_NOT_A_VERDICT"
++    )
++
++
++def test_descriptive_label_propagates_through_a_full_run():
++    result = run_synthetic()
++    assert len(result.descriptive_records) == 4
++    for record in result.descriptive_records:
++        blob = json.dumps(record)
++        assert "DESCRIPTIVE_MARKET_COMPARISON_NOT_A_VERDICT" in blob
++        assert record["verdict"] is None
++
++
++# ----------------------------------------------------------------------
++# Forward verdict (draft section 5.5): the program ceiling
++# ----------------------------------------------------------------------
++
++
++def _forward_rows(*, candidate_better=True, games=320, blocks=24):
++    rows = []
++    for i in range(games):
++        outcome = 1.0 if i % 2 == 0 else 0.0
++        sharp, dull = (0.9, 0.6) if outcome else (0.1, 0.4)
++        p_cand, p_mkt = (sharp, dull) if candidate_better else (dull, sharp)
++        rows.append(
++            ScoredRow(
++                "fg%03d" % i, "moneyline", 2027, "2027:%d" % (i % blocks),
++                p_cand, p_mkt, outcome,
++            )
++        )
++    return rows
++
++
++def _forward_config():
++    return replace(
++        small_config(), forward_target_games=300, forward_target_blocks=20
++    )
++
++
++def test_forward_below_target_is_accrual_only_never_a_verdict():
++    record = harness.forward_verdict(
++        "moneyline", _forward_rows(games=120), config=_forward_config()
++    )
++    assert record["verdict"] is None
++    assert record["label"] == "ACCRUAL_ONLY_NOT_A_VERDICT"
++
++
++def test_forward_at_target_can_reach_the_program_ceiling():
++    record = harness.forward_verdict(
++        "moneyline", _forward_rows(), config=_forward_config()
++    )
++    assert record["verdict"] == "DEMONSTRATED_EDGE_RESEARCH_ONLY"
++    assert record["family_status"] == "UNVALIDATED"
++    assert record["status_change"] == "NONE"
++
++
++def test_forward_at_target_worse_is_refuted():
++    record = harness.forward_verdict(
++        "moneyline", _forward_rows(candidate_better=False),
++        config=_forward_config(),
++    )
++    assert record["verdict"] == "REFUTED"
++
++
++def test_forward_method_sensitive_sign_is_inconclusive():
++    rows = _forward_rows()
++    flipped = [replace(r, p_candidate=r.p_comparator,
++                       p_comparator=r.p_candidate) for r in rows]
++    record = harness.forward_verdict(
++        "moneyline", rows, config=_forward_config(),
++        sensitivity_rows=flipped,
++    )
++    assert record["verdict"] == "INCONCLUSIVE"
++    assert record["method_sensitive"] is True
++
++
++def test_forward_extension_is_single_and_requires_favorable_points():
++    cfg = _forward_config()
++    rows = [
++        replace(r, p_candidate=0.62 if r.outcome else 0.38,
++                p_comparator=0.60 if r.outcome else 0.40)
++        for r in _forward_rows()
++    ]
++    record = harness.forward_verdict("moneyline", rows, config=cfg)
++    if record["verdict"] == "INCONCLUSIVE":
++        assert harness.forward_extension_available(
++            record, config=cfg, already_extended=False
++        )
++        assert not harness.forward_extension_available(
++            record, config=cfg, already_extended=True
++        )
++
++
++# ----------------------------------------------------------------------
++# Ceiling scan and module hygiene
++# ----------------------------------------------------------------------
++
++
++def test_no_verdict_anywhere_exceeds_the_program_ceiling():
++    result = run_synthetic()
++    fwd = harness.forward_verdict(
++        "moneyline", _forward_rows(), config=_forward_config()
++    )
++    all_records = result.all_records() + [fwd]
++    emitted = set(verdict_values(all_records))
++    assert emitted <= harness.ALL_VERDICT_LABELS
++    forbidden_fragments = ("VALIDATED_EDGE", "PLAY", "DEPLOYMENT_ELIGIBLE")
++    for verdict in emitted:
++        assert not any(f in verdict for f in forbidden_fragments)
++    for record in all_records:
++        assert record["family_status"] == "UNVALIDATED"
++
++
++def test_module_has_no_network_subprocess_or_io_imports():
++    source = Path(harness.__file__).read_text()
++    tree = ast.parse(source)
++    imported = set()
++    for node in ast.walk(tree):
++        if isinstance(node, ast.Import):
++            imported.update(a.name.split(".")[0] for a in node.names)
++        elif isinstance(node, ast.ImportFrom) and node.module:
++            imported.add(node.module.split(".")[0])
++    banned = {
++        "socket", "urllib", "requests", "http", "subprocess", "os",
++        "sys", "pathlib", "io", "shutil",
++    }
++    assert imported & banned == set()
++    assert "ACTIVATION" not in source or "NOT ACTIVATED" in source
