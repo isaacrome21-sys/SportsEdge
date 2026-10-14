@@ -1525,6 +1525,8 @@ def _read_intents(intent_path: Path) -> list[dict[str, Any]]:
                     StarterCaptureError(f"INTENT_NONFINITE_NUMBER:{i}")
                 ),
             )
+        except StarterCaptureError:
+            raise  # preserve distinct duplicate-key/nonfinite failure codes
         except (ValueError, UnicodeDecodeError, RecursionError):
             raise StarterCaptureError(f"INTENT_LINE_UNPARSEABLE:{i}") from None
         if not isinstance(obj, dict) or obj.get("schema") != SCHEMA_INTENT:
