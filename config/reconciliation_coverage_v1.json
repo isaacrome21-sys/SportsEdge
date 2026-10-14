@@ -315,6 +315,7 @@
     }
   },
   "exact_exemptions": {
+    "tests/test_mlb_receipt_durable_journal_20261014.py": "TEST_ONLY_MLB_RECEIPT_DURABILITY_NO_RUNTIME_AUTHORITY",
     ".github/workflows/active-evidence-window-liveness.yml": "ACTIVE_EVIDENCE_WINDOW_LIVENESS_GOVERNANCE_CONTROL_NO_MODEL_OR_PROMOTION_AUTHORITY",
     ".github/workflows/archive-mlb-game-odds.yml": "PROSPECTIVE_MLB_MONEYLINE_EVIDENCE_CAPTURE_ONLY_NO_PROMOTION_OR_OFFICIAL_AUTHORITY",
     ".github/workflows/cfb-reconstructed-selection-provider-preflight.yml": "CFB_RECONSTRUCTED_SELECTION_PROVIDER_PREFLIGHT_ONLY_ZERO_REPLAY_CALLS_NO_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
