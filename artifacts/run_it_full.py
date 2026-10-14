@@ -23,7 +23,7 @@ from sportsedge.mlb_phone_first_inning_pricing import (
 from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
 from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
 from sportsedge.prepricing.factor_ingestion import stage_games
-from sportsedge.prepricing.qb_form2_bundle_loader import load_form2_bundles
+from sportsedge.prepricing.qb_form2_pinned_loader import load_form2_bundles_pinned
 from sportsedge.team_half_pricing import DERIVATIVES, price_team_half_rows
 from sportsedge.pricing_provenance import (
     apply_play_gate, determine_provenance)
@@ -233,7 +233,8 @@ def _prepricing_blocked_row(line, stage, input_index):
 
 def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
              auto_context=True, min_ev=0.02, lane="A", allow_manual_context=False,
-             td_cache_dir=None, td_opener=None, form2_bundles_dir=None):
+             td_cache_dir=None, td_opener=None, form2_bundles_dir=None,
+             form2_manifest_anchor=None, form2_verified_fixtures=None):
     """Separate real game, pitcher, and batter models, preserving original row order.
 
     Issues are UNTRUSTED odds intake: NEVER use submitted features,
@@ -364,8 +365,12 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     form2_bundles = None
     form2_loader_audit = None
     if form2_bundles_dir is not None:
-        loaded_bundles, form2_loader_audit = load_form2_bundles(
-            form2_bundles_dir, games)
+        # Pinned loader (Grok, 2026-10-13) replaces the unpinned directory
+        # loader: admission needs an ExternalManifestAnchor from an approved
+        # source. None approved yet -> audited refusal, no bundles.
+        loaded_bundles, form2_loader_audit = load_form2_bundles_pinned(
+            form2_bundles_dir, anchor=form2_manifest_anchor,
+            verified_fixtures=form2_verified_fixtures, as_of=clock)
         if loaded_bundles:
             form2_bundles = loaded_bundles
 
