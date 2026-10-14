@@ -1,5 +1,18 @@
 {
-  "entries": [],
+  "entries": [
+    {
+      "anchor_id": "1bdcffb4e8f274caafdd40678a04770aadd890d59ae20410caef2fae02851bc1",
+      "journal_entry_count": 3,
+      "journal_first_sequence": 1,
+      "journal_last_sequence": 3,
+      "journal_sha256": "835a91fc4d455036ca1181bc9edf559ac5ca200ff32c16a5d34156effd622d42",
+      "path": "anchors/2026-10-14/mlb-receipt-journal.json",
+      "publication": null,
+      "receipt_chain_head_sha256": "fda4f36d12fa46666d0b496a25f9bbf6901a2fb9ee0bc51e0ee7b18a78ab581a",
+      "schema": "MLB_RECEIPT_JOURNAL_ANCHOR_V1",
+      "system": "mlb-receipt-journal"
+    }
+  ],
   "schema": "EVIDENCE_ANCHOR_INDEX_V1",
   "series": "records/evidence-anchors"
 }

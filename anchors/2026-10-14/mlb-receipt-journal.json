@@ -1,0 +1,24 @@
+{
+  "anchor_claim": "EXISTENCE_BY_GITHUB_PUBLICATION_RECEIPT",
+  "anchor_id": "1bdcffb4e8f274caafdd40678a04770aadd890d59ae20410caef2fae02851bc1",
+  "anchored": false,
+  "external_time_anchor": false,
+  "honest_limits": [
+    "Proves only that this journal head hash existed at or before the anchor's publication receipt time.",
+    "Publication time is issued by the publishing platform (GitHub), not by this machine.",
+    "Does NOT prove the fetch times claimed inside individual receipts.",
+    "Does NOT prove the journal accumulated gradually; only a cadence of anchors bounds rewriting.",
+    "NOT a cryptographic signature or attestation; carries no promotion authority."
+  ],
+  "journal_entry_count": 3,
+  "journal_first_sequence": 1,
+  "journal_genesis_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "journal_last_sequence": 3,
+  "journal_sha256": "835a91fc4d455036ca1181bc9edf559ac5ca200ff32c16a5d34156effd622d42",
+  "prepared_at_utc": "2026-10-14T03:12:38.978812+00:00",
+  "prepared_clock": "PREPARER_SYSTEM_CLOCK_NOT_EVIDENCE",
+  "promotion_authority": false,
+  "receipt_chain_head_sha256": "fda4f36d12fa46666d0b496a25f9bbf6901a2fb9ee0bc51e0ee7b18a78ab581a",
+  "receipt_journal": "receipt_journal.jsonl",
+  "schema": "MLB_RECEIPT_JOURNAL_ANCHOR_V1"
+}
