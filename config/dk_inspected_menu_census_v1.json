@@ -239,7 +239,9 @@
             "TWO_SIDED",
             "YES_NO",
             "ALTERNATE"
-          ]
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
         },
         {
           "market_key": "INNING_3_MARKETS",
@@ -249,7 +251,9 @@
             "TWO_SIDED",
             "YES_NO",
             "ALTERNATE"
-          ]
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
         },
         {
           "market_key": "INNING_4_MARKETS",
@@ -259,7 +263,9 @@
             "TWO_SIDED",
             "YES_NO",
             "ALTERNATE"
-          ]
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
         },
         {
           "market_key": "INNING_5_MARKETS",
@@ -269,7 +275,9 @@
             "TWO_SIDED",
             "YES_NO",
             "ALTERNATE"
-          ]
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
         },
         {
           "market_key": "INNING_6_MARKETS",
@@ -279,7 +287,9 @@
             "TWO_SIDED",
             "YES_NO",
             "ALTERNATE"
-          ]
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
         },
         {
           "market_key": "INNING_7_MARKETS",
@@ -289,7 +299,9 @@
             "TWO_SIDED",
             "YES_NO",
             "ALTERNATE"
-          ]
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
         },
         {
           "market_key": "INNING_8_MARKETS",
@@ -299,7 +311,9 @@
             "TWO_SIDED",
             "YES_NO",
             "ALTERNATE"
-          ]
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
         },
         {
           "market_key": "INNING_9_MARKETS",
@@ -309,7 +323,9 @@
             "TWO_SIDED",
             "YES_NO",
             "ALTERNATE"
-          ]
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
         },
         {
           "market_key": "PITCHER_K",
@@ -934,7 +950,9 @@
             "OVER_UNDER_LADDER",
             "X_PLUS_LADDER",
             "OR_FEWER_LADDER"
-          ]
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
         },
         {
           "market_key": "PLAYER_1H_PASSING",
@@ -945,7 +963,9 @@
             "OVER_UNDER_LADDER",
             "X_PLUS_LADDER",
             "OR_FEWER_LADDER"
-          ]
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
         },
         {
           "market_key": "PLAYER_RECEIVING_YARDS",
@@ -989,7 +1009,9 @@
             "OVER_UNDER_LADDER",
             "X_PLUS_LADDER",
             "OR_FEWER_LADDER"
-          ]
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
         },
         {
           "market_key": "PLAYER_1H_RECEIVING",
@@ -1000,7 +1022,9 @@
             "OVER_UNDER_LADDER",
             "X_PLUS_LADDER",
             "OR_FEWER_LADDER"
-          ]
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
         },
         {
           "market_key": "MOST_RECEIVING_YARDS",
@@ -1063,7 +1087,9 @@
             "OVER_UNDER_LADDER",
             "X_PLUS_LADDER",
             "OR_FEWER_LADDER"
-          ]
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
         },
         {
           "market_key": "PLAYER_1H_RUSHING",
@@ -1074,7 +1100,9 @@
             "OVER_UNDER_LADDER",
             "X_PLUS_LADDER",
             "OR_FEWER_LADDER"
-          ]
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
         },
         {
           "market_key": "ANYTIME_TD",

@@ -167,3 +167,16 @@ def test_invalid_ladder_missing_threshold_refused():
     out = audit_dk_fixture_menu(fixture(offers=[
         row("PITCHER_K", "X_PLUS_LADDER", player_id="P-6")]))
     assert out["observations"][0]["status"] == "MILESTONE_LINE_REQUIRED"
+
+
+def test_umbrella_label_is_not_executable_book_market():
+    o = audit_dk_fixture_menu(fixture(offers=[
+        row("INNING_2_MARKETS", "TWO_SIDED", period="INNING_2", line=0.5)]))
+    assert o["observations"][0]["status"] == "PROVISIONAL_FAMILY_NOT_EXECUTABLE"
+    assert o["promotion_eligible"] is False
+
+
+def test_nfl_generic_period_placeholder_needs_exact_stat_identity():
+    o = audit_dk_fixture_menu(fixture("NFL", offers=[
+        row("PLAYER_1H_RECEIVING", "TWO_SIDED", period="FIRST_HALF", line=35.5)]))
+    assert o["observations"][0]["status"] == "PROVISIONAL_FAMILY_NOT_EXECUTABLE"

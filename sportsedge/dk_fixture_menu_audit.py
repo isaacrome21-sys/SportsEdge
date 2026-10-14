@@ -128,6 +128,8 @@ def audit_dk_fixture_menu(snapshot: Mapping[str, Any],
             out["status"] = "REFUSED_MALFORMED_OFFER"
         elif spec is None:
             out["status"] = "MARKET_UNCATALOGED"
+        elif spec.get("provisional_group") is True:
+            out["status"] = "PROVISIONAL_FAMILY_NOT_EXECUTABLE"
         elif not _form_compatible(spec["forms"], form):
             out["status"] = "MARKET_FORM_NOT_REGISTERED"
         elif (spec["period"] not in {"FULL_GAME", "MULTI_PERIOD"}
