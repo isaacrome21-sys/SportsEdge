@@ -30,6 +30,8 @@ from sportsedge.canonical_coverage import (
     NFL_ANYTIME_TD_MARKETS, NFL_DERIVATIVE_MARKETS, NFL_FIRST_TD_MARKETS,
     blocked_row_for as coverage_blocked_row, coverage_summary,
     resolve_market as coverage_resolve_market, BLOCKED as COVERAGE_BLOCKED)
+from sportsedge.registry_gate import (
+    FAMILY_SPORTS as FAMILY_GATE_SPORTS, family_gate_row)
 from sportsedge.mlb_f5_quote_binding import (
     F5_MARKET_ALIASES as F5_INTAKE_ALIASES, F5_MARKETS as F5_CANONICAL_MARKETS,
     phone_f5_binding_rows)
@@ -240,6 +242,12 @@ def _registry_blocked_row(sport, markets, line):
     row naming the blocker. The row never reaches a pricer and can never
     carry a probability, price or EV. Returns None otherwise.
     """
+    # t134 (#2219): CFB/NBA/CBB go through the family registry gate. The
+    # Illinois-college exclusion is evaluated first inside family_gate_row
+    # and its ILLINOIS_COLLEGE_EXCLUDED reason is preserved on the row.
+    if str(sport or "").upper() in FAMILY_GATE_SPORTS:
+        first = next((str(n).strip() for n in markets if n and str(n).strip()), "")
+        return family_gate_row(sport, first, line)
     for name in markets:
         if not name:
             continue

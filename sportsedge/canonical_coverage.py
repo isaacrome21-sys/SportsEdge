@@ -364,6 +364,20 @@ def resolve_market(sport, market):
     alias = INTAKE_ALIASES.get(sport, {}).get(str(market or "").upper())
     if alias is not None:
         return dict(MARKET_RESOLUTIONS[(sport, alias)])
+    # t134 (#2219): CFB/NBA/CBB resolve through the isolated family
+    # registry so the canonical lookup can never return None (= pass
+    # through) for them. Always BLOCKED; not part of the 89-market matrix.
+    from sportsedge.family_market_registry import family_market_decision
+    family = family_market_decision(sport, market)
+    if family is not None:
+        return {
+            "sport": sport, "market": family["market"], "state": BLOCKED,
+            "engine": None, "blocker": family["blocker"],
+            "detail": family["reason"] + " (family-level registry, "
+                      "sportsedge.family_market_registry; research-only)",
+            "validation_status": family["validation_status"],
+            "family_registry": True,
+        }
     return None
 
 
@@ -375,6 +389,11 @@ def blocked_row_for(sport, market, row):
     """
     resolution = resolve_market(sport, market)
     if resolution is None or resolution["state"] != BLOCKED:
+        return None
+    if resolution.get("family_registry"):
+        # Family rows are built by sportsedge.registry_gate.family_gate_row,
+        # which applies the Illinois exclusion first; this matrix helper
+        # must not shadow it (t134).
         return None
     return {
         "status": "NO_MODEL_OR_MARKET",
