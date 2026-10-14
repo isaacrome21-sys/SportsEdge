@@ -25,6 +25,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.run_cfb_auto import discover_cfb_week
+from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp, gate_text as _registry_gate_text  # noqa: E402  t134 family gate
 from sportsedge.sports.cfb.model_artifact import (
     CFBModelArtifactError,
     cfb_model_code_surface_sha256,
@@ -172,6 +173,7 @@ def main() -> int:
                 "evidence_clock_started": False,
             },
         }
+        payload = _registry_gate_and_stamp(payload, "CFB", "scripts/run_cfb_game_model_candidate.py")
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(json.dumps({
@@ -195,6 +197,7 @@ def main() -> int:
                 "evidence_clock_started": False,
             },
         }
+        payload = _registry_gate_and_stamp(payload, "CFB", "scripts/run_cfb_game_model_candidate.py")
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(json.dumps(payload, sort_keys=True))

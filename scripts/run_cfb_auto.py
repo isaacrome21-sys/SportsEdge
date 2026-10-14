@@ -22,6 +22,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp, gate_text as _registry_gate_text  # noqa: E402  t134 family gate
 from sportsedge.sports.cfb.auto_slate import discover_cfb_auto_games
 from sportsedge.sports.cfb.full_auto import build_cfb_full_auto_slate
 from sportsedge.sports.cfb.game_freeze import (
@@ -221,6 +222,7 @@ def _objective_context(*, current: datetime, season: int, cfbd_key: str) -> tupl
 
 
 def _write(path: Path, payload: dict) -> None:
+    payload = _registry_gate_and_stamp(payload, "CFB", "scripts/run_cfb_auto.py")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
