@@ -194,7 +194,11 @@ def test_only_valid_game_lines_can_receive_model_edge_while_props_always_block()
     assert r["evaluated_rows"][1]["status"]=="NO_MODEL_OR_MARKET"
 
 
-def test_injury_schema_probe_logs_only_shape_when_unusable():
+def test_injury_feed_absence_probe_logs_only_shape():
+    # The league payload below is well-formed and its only group resolves
+    # to a documented team ID (55) that is not the target (2): the correct
+    # classification is TEAM_NOT_IN_INJURY_FEED (feed read fine, team
+    # absent), not UNUSABLE_SCHEMA. Blocking behavior is unchanged.
     from artifacts import free_models as base
     def getter(url):
         if "/teams/2/injuries" in url:
@@ -206,16 +210,17 @@ def test_injury_schema_probe_logs_only_shape_when_unusable():
     impact,status=provider.injury_points("NFL",{"id":"2"})
     assert impact == 0.0
     assert status == "MISSING_OR_UNRECOGNIZED_SOURCE"
-    bad=[r for r in provider.receipts if r["status"]=="UNUSABLE_SCHEMA"]
+    bad=[r for r in provider.receipts if r["status"]=="TEAM_NOT_IN_INJURY_FEED"]
     assert len(bad)==1
     assert "TEAM[KEYS=" in bad[0]["reason"]
     assert "SAMPLE_TEAM_IDS=55" in bad[0]["reason"]
     assert "PRIVATE_TEST_NAME" not in str(bad)
+    assert not [r for r in provider.receipts if r["status"]=="UNUSABLE_SCHEMA"]
     from scripts.free_models_phone_issue import render_card
     card=full.run_full({"lines":[row()]},now=NOW,auto_context=False)
     card["source_receipts"]=provider.receipts
     result=render_card(card)
-    assert "1 unusable-schema reports" in result
+    assert "1 absent-from-injury-feed reports" in result
     assert "team ID 2" in result
 
 
@@ -258,7 +263,10 @@ def test_live_group_id_requires_exact_match_and_never_assigns_other_team_injury(
     provider=base.PublicContext(NOW,getter=getter)
     val,status=provider.injury_points("NFL",{"id":"2"})
     assert val==0.0 and status=="MISSING_OR_UNRECOGNIZED_SOURCE"
-    bad=[x for x in provider.receipts if x.get("status")=="UNUSABLE_SCHEMA"]
+    # The feed is well-formed and group 14 resolves exactly; team 2 is
+    # absent from it. The refusal is recorded as TEAM_NOT_IN_INJURY_FEED
+    # (not a schema failure) and still never assigns team 14's QB.
+    bad=[x for x in provider.receipts if x.get("status")=="TEAM_NOT_IN_INJURY_FEED"]
     assert len(bad)==1 and "SAMPLE_TEAM_IDS=14" in bad[0]["reason"]
     provider.injury_points("NFL",{"id":"2"})
-    assert len([x for x in provider.receipts if x.get("status")=="UNUSABLE_SCHEMA"])==1
+    assert len([x for x in provider.receipts if x.get("status")=="TEAM_NOT_IN_INJURY_FEED"])==1
