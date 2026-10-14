@@ -282,6 +282,7 @@ def test_phone_f5_rows_bad_side_offline():
 
 # --- run_it_full routing -----------------------------------------------------
 
+@pytest.mark.registry_lane_internals
 def test_run_it_full_routes_coverage_and_alternates():
     from artifacts import run_it_full
     payload = {"lines": [

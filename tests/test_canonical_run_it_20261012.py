@@ -248,6 +248,7 @@ def test_derivative_stage_first_half_team_total_blocks_period_reason():
     assert out[0]["reason"] == "SIMULATION_ROWS_EMPTY"
 
 
+@pytest.mark.registry_lane_internals
 def test_derivative_rows_blocked_through_run_full():
     from artifacts.run_it_full import run_full
     rows = [
@@ -416,6 +417,7 @@ def test_anytime_td_unknown_player_and_team_fail_closed(tmp_path):
     assert out[0]["reason"] == "TD_TEAM_IDENTITY_UNVERIFIED"
 
 
+@pytest.mark.registry_lane_internals
 def test_anytime_td_and_first_td_through_run_full(tmp_path):
     from artifacts.run_it_full import run_full
     cache = _td_cache(tmp_path / "td")
@@ -470,6 +472,7 @@ def test_nrfi_yrfi_priced_through_run_full():
     assert nrfi_p + yrfi_p == pytest.approx(1.0, abs=1e-6)
 
 
+@pytest.mark.registry_lane_internals
 def test_f5_blocked_with_named_reason_through_run_full():
     from artifacts.run_it_full import run_full
     rows = [{"sport": "MLB", "market": "F5_MONEYLINE",
