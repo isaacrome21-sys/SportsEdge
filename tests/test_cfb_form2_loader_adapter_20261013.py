@@ -241,12 +241,15 @@ class AdapterCase(unittest.TestCase):
         (bundle_sha256, manifest_entry) for manifest composition."""
         event_id, _, home_id, away_id = FIXTURES[team_id]
         _, _, _, _, prev = TEAMS[team_id]
-        result = archive.preserve_form2_bundle(
-            self.dir, bundle_bytes=bundle_bytes(bundle),
-            team_id=team_id, event_id=event_id,
-            home_team_id=home_id, away_team_id=away_id,
-            kickoff=KICKOFF_ISO, previous_game_kickoff=prev,
-            clock=lambda: NOW)
+        # Re-pin the fixture under the archive's trusted time.time_ns clock.
+        # A caller-supplied clock is no longer a production API.
+        from unittest.mock import patch
+        with patch("time.time_ns", return_value=int(NOW.timestamp() * 1_000_000_000)):
+            result = archive.preserve_form2_bundle(
+                self.dir, bundle_bytes=bundle_bytes(bundle),
+                team_id=team_id, event_id=event_id,
+                home_team_id=home_id, away_team_id=away_id,
+                kickoff=KICKOFF_ISO, previous_game_kickoff=prev)
         entry = json.loads(result["manifest_bytes"])["entries"][0]
         return result["bundle_sha256"], entry
 
