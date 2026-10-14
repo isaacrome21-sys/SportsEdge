@@ -11,6 +11,8 @@ is replaced by a BLOCKED card (fail closed).
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from pathlib import Path
 import sys
 
@@ -29,7 +31,7 @@ def _output_path(argv):
             return Path(argv[i + 1])
         if arg.startswith("--output="):
             return Path(arg.split("=", 1)[1])
-    return None
+    return Path("artifacts/run_it/nfl_card.json")
 
 
 def gate_output(path: Path) -> None:
@@ -52,16 +54,47 @@ def main(argv=None) -> int:
         "run_nfl_auto_frozen", _REPO_ROOT / "scripts/run_nfl_auto.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    saved = sys.argv
-    sys.argv = ["scripts/run_nfl_auto.py", *argv]
-    try:
-        code = mod.main()
-    finally:
-        sys.argv = saved
     out = _output_path(argv)
-    if out is not None and out.exists():
-        gate_output(out)
-    return code
+    out.parent.mkdir(parents=True, exist_ok=True)
+    # The frozen runner can only publish into a private staging directory.
+    # Neither an ungated card nor an older card is consumed as this result.
+    with tempfile.TemporaryDirectory(prefix=".nfl-registry-", dir=out.parent) as tmp:
+        staged = Path(tmp) / "card.json"
+        child_argv = []
+        skip = False
+        for arg in argv:
+            if skip:
+                skip = False
+                continue
+            if arg == "--output":
+                skip = True
+                continue
+            if arg.startswith("--output="):
+                continue
+            child_argv.append(arg)
+        child_argv.extend(["--output", str(staged)])
+        saved = sys.argv
+        sys.argv = ["scripts/run_nfl_auto.py", *child_argv]
+        try:
+            code = mod.main()
+        except Exception:
+            # Publish only a fresh blocker when the child crashes.
+            staged.write_text(json.dumps({"status": "BLOCKED",
+                "blocker": "NFL_AUTO_CHILD_FAILED"}), encoding="utf-8")
+            code = 2
+        finally:
+            sys.argv = saved
+        try:
+            gate_output(staged)
+        except Exception:
+            # A gate failure must never expose the frozen runner's raw result.
+            staged.write_text(json.dumps({"status": "BLOCKED",
+                "blocker": "REGISTRY_GATE_FAILED"}) + "\n", encoding="utf-8")
+            code = 2
+        with staged.open("rb") as handle:
+            os.fsync(handle.fileno())
+        os.replace(staged, out)
+        return code
 
 
 if __name__ == "__main__":

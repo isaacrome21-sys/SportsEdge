@@ -24,14 +24,17 @@ def _output_path(args: list[str]) -> Path:
         index = args.index("--output")
         if index + 1 < len(args):
             return Path(args[index + 1])
-    return Path("artifacts/live_nfl_card.json")
+    for arg in args:
+        if arg.startswith("--output="):
+            return Path(arg.split("=", 1)[1])
+    return Path("artifacts/run_it/nfl_card.json")
 
 
 def main() -> int:
     args = sys.argv[1:]
     output = _output_path(args)
     completed = subprocess.run(
-        [sys.executable, str(ROOT / "scripts/run_nfl_auto.py"), *args],
+        [sys.executable, str(ROOT / "scripts/run_nfl_auto_gated.py"), *args],
         cwd=ROOT,
         check=False,
     )

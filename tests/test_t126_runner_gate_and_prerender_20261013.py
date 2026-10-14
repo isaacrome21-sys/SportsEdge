@@ -204,7 +204,9 @@ def test_run_nfl_auto_wrapper_gates_after_frozen_main(tmp_path, monkeypatch):
     class Fake:
         def main(self):
             assert sys.argv[0] == "scripts/run_nfl_auto.py"
-            out.write_text(json.dumps({"rows": [
+            child_output = Path(sys.argv[sys.argv.index("--output") + 1])
+            assert child_output != out
+            child_output.write_text(json.dumps({"rows": [
                 {"market": "ANYTIME_TD", "model_p": 0.3}]}))
             return 0
 
