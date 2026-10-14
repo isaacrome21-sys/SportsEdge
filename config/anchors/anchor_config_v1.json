@@ -1,0 +1,51 @@
+{
+  "schema": "sportsedge.anchor_config.v1",
+  "owner_decision": {
+    "anchor_ids": ["anchor:rfc3161+ots:v1"],
+    "approved_by": "Isaac (repository owner)",
+    "approved_at": "2026-10-13T20:23:00-05:00",
+    "decision": "Approve the anchor proposal: RFC 3161 (FreeTSA + DigiCert) plus OpenTimestamps, S3 Object Lock, VPS host",
+    "proposal": "handoff/anchor_and_host_proposal_20261013.md (Grok lane handoff; design only)",
+    "record": "https://github.com/isaacrome21-sys/SportsEdge/issues/2090",
+    "scope": "DESIGN APPROVAL ONLY. Not capture activation, not admission activation, not forward validation, not eligibility."
+  },
+  "approved_anchor_ids": ["anchor:rfc3161+ots:v1"],
+  "activation": {
+    "capture_active": false,
+    "admission_active": false,
+    "note": "Each flag requires a separate owner ruling after VPS, bucket, pinned CA bundles, CI wiring and independent review."
+  },
+  "tsa_providers": [
+    {
+      "id": "freetsa",
+      "url": "https://freetsa.org/tsr",
+      "ca_bundle_path": "config/anchors/freetsa_ca.pem",
+      "ca_bundle_sha256": "2151b61137ffa86bf664691ba67e7da0b19f98c758e3d228d5d8ebf27e044438",
+      "signer_cert_sha256": ["32e841a95cc1164101ffde41298ef2fc75c1c4372ef095e88a6bbd47dfb191fc"],
+      "status": "pinned",
+      "pinned_at": "2026-10-14T02:48:21Z",
+      "provenance": "docs/ANCHOR_TSA_PINNING_PROVENANCE_20261013.md",
+      "pin_procedure": "Download cacert.pem and tsa.crt from freetsa.org over two independent networks, compare, commit to config/anchors/freetsa_ca.pem, record DER sha256 of tsa.crt here, set status=pinned. Owner/ChatGPT step."
+    },
+    {
+      "id": "digicert",
+      "url": "http://timestamp.digicert.com",
+      "ca_bundle_path": null,
+      "signer_cert_sha256": [],
+      "status": "unpinned",
+      "blocked_reason": "t127: no real DigiCert RFC 3161 token could be recorded from the build host (timestamp.digicert.com is HTTP-only; outbound port 80 times out, HTTPS refused), so the signer cert cannot be taken from a real token. Root G4 cross-checked in the provenance doc; provider stays unpinned.",
+      "pin_procedure": "Obtain DigiCert Assured ID / Trusted Root G4 and the current timestamping intermediate from DigiCert's published repository; take signer cert from a real token; commit bundle to config/anchors/digicert_ca.pem, record DER sha256, set status=pinned. Owner/ChatGPT step."
+    }
+  ],
+  "quorum": {"min_distinct_providers": 2},
+  "pregame_margin_s": 900,
+  "max_clock_skew_s": 30,
+  "ots": {"enabled": true, "role": "secondary long-run proof; never gates admission", "calendars": "default"},
+  "object_lock": {
+    "bucket": "s3://sportsedge-evidence-locked",
+    "mode": "COMPLIANCE",
+    "retention_days": 3650,
+    "status": "not_provisioned"
+  },
+  "host": {"capture_host_id": "vps-capture-01", "clock_source": "system", "status": "not_provisioned"}
+}
