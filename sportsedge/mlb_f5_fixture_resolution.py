@@ -130,20 +130,24 @@ def stamp_f5_game_pks(rows: Sequence[Mapping[str, Any]], *,
     rows unstamped, which is exactly the pre-existing fail-closed
     behavior at the binder's gate 2.5.
     """
-    resolved_at = resolved_at or datetime.now(timezone.utc)
-    if resolved_at.tzinfo is None or resolved_at.utcoffset() is None:
-        resolved_at = datetime.now(timezone.utc)
     out: list = list(rows)
     receipts: list[dict[str, Any]] = []
     try:
+        if resolved_at is None:
+            resolved_at = datetime.now(timezone.utc)
+        if (not isinstance(resolved_at, datetime)
+                or resolved_at.tzinfo is None
+                or resolved_at.utcoffset() is None):
+            raise ValueError("RESOLUTION_CLOCK_INVALID")
         _stamp(rows, out, receipts, getter=getter, opener=opener,
                resolved_at=resolved_at)
     except Exception as exc:  # resolution must never kill the run
-        receipts.append({
+        # Whole-call rollback must also discard provisional success receipts.
+        receipts = [{
             "source": RESOLUTION_VERSION, "status": STATUS_UNAVAILABLE,
             "detail": f"{type(exc).__name__}: {exc}",
             "rows_stamped": 0,
-        })
+        }]
         return list(rows), receipts
     return out, receipts
 
@@ -288,3 +292,4 @@ def _stamp(rows, out, receipts, *, getter, opener, resolved_at) -> None:
             }
             out[i] = stamped
             receipt["rows_stamped"] += 1
+
