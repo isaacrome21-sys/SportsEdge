@@ -30,6 +30,14 @@ from sportsedge.market_coverage import (
 )
 from sportsedge.mlb_phone_f5_pricing import normalize_f5_market, phone_f5_rows
 from sportsedge.f5_distribution import F5_MARKETS
+from sportsedge.team_half_pricing import price_team_or_half
+
+# Team-total / first-half families routed to the team-half pricer.
+# FIRST_HALF_TOTAL -> TOTAL_1H; TEAM_TOTALS (game-line normalization of
+# TEAM_TOTAL for non-MLB sports) -> TEAM_TOTAL before pricing.
+TEAM_HALF_MARKET_ALIASES = {"FIRST_HALF_TOTAL": "TOTAL_1H", "TEAM_TOTALS": "TEAM_TOTAL"}
+TEAM_HALF_MARKETS = frozenset({"TEAM_TOTAL", "TEAM_TOTAL_1H", "TOTAL_1H",
+                               "SPREAD_1H", "ML_1H"})
 from datetime import datetime, timezone
 
 FIELDS = (
@@ -142,6 +150,11 @@ def audit_row(source, result):
     }
     out["sport_specific"] = {"status": "PARTIAL_HEURISTIC" if has else MISSING,
                               "detail": sport_specific.get(sport, "Unsupported sport")}
+    # A row the router sent to the team-half pricer is audited by the
+    # pricer's own (normalized) market, not as a game-level line.
+    routed_market = str(result.get("market") or "").upper()
+    if routed_market in TEAM_HALF_MARKETS:
+        market = routed_market
     if market not in ("ML", "SPREAD", "TOTAL", "TEAM_TOTALS"):
         src = result.get("source") or ""
         if market in COVERAGE_MARKETS or market in F5_MARKETS:
@@ -346,6 +359,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     first_pos, first_input = [], []
     nfl_pos, nfl_input = [], []
     cfb_pos, cfb_input = [], []
+    th_pos, th_input = [], []
     others = {}
     for local, line in enumerate(props):
         market = str(line.get("market") or "").upper()
@@ -367,8 +381,15 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         elif line["sport"] == "CFB" and market.startswith("PLAYER_"):
             cfb_pos.append(local)
             cfb_input.append(line)
+        elif (line["sport"] in {"NFL", "CFB", "NBA", "CBB", "MLB"} and
+              TEAM_HALF_MARKET_ALIASES.get(market, market) in TEAM_HALF_MARKETS):
+            th_pos.append(local)
+            th_input.append({**line, "market": TEAM_HALF_MARKET_ALIASES.get(market, market)})
         else:
             others[local] = blocked(line, "NO_VERIFIED_MODEL_FOR_THIS_MARKET")
+    th_getter = getter if auto_context else (lambda url: None)
+    th_results = [price_team_or_half(row, now=clock, getter=th_getter)
+                  for row in th_input]
     pitcher_results, pitcher_receipts = phone_pitcher_rows(
         pitcher_input, now=clock, getter=getter if auto_context else (lambda url: None))
     batter_results, batter_receipts = phone_batter_rows(
@@ -409,6 +430,8 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     for local, result in zip(nfl_pos, nfl_results):
         modeled_props[local] = result
     for local, result in zip(cfb_pos, cfb_results):
+        modeled_props[local] = result
+    for local, result in zip(th_pos, th_results):
         modeled_props[local] = result
     for local, result in others.items():
         modeled_props[local] = result
@@ -454,6 +477,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         "f5_engine":"MLB_F5_EMPIRICAL_LINESCORE_UNVALIDATED",
         "nfl_player_engine":"ESPN_NAMED_HISTORICAL_GAMELOG_WATCH_ONLY",
         "cfb_player_engine":"ESPN_NAMED_HISTORICAL_GAMELOG_WATCH_ONLY",
+        "team_half_engine":"FREE_MODELS_MEANS_DECLARED_HALF_SCALE_UNVALIDATED",
         "free_public_history":True,
         "model_vs_close_validated":False,
         "phone_odds_freshness_required":True,
@@ -497,7 +521,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         ]
         card["mlb_full_board"] = phone_market_board(labeled_inputs, evaluated)
         card["summary"]["mlb_market_coverage"] = dict(card["mlb_full_board"]["input_coverage"])
-    card["runner"]="RUN_IT_FULL_MLB_AND_NAMED_FOOTBALL_PLAYER_HISTORIES_V1"
+    card["runner"]="RUN_IT_FULL_MLB_AND_NAMED_FOOTBALL_PLAYER_HISTORIES_TEAM_HALF_V1"
     return card
 
 
