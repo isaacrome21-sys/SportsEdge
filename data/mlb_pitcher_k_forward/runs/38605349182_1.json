@@ -1,0 +1,36 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "blocked_count": 2,
+  "blockers": [
+    {
+      "entity_name": "Gavin Williams",
+      "observed_at": "2026-10-14T17:16:44.207127+00:00",
+      "provider_event_id": "34826925",
+      "reason": "ValueError:SUBJECT_UNRESOLVED:Gavin Williams"
+    },
+    {
+      "entity_name": "Griffin Jax",
+      "observed_at": "2026-10-14T17:16:44.207127+00:00",
+      "provider_event_id": "34826925",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    }
+  ],
+  "eligible_quote_units": 4,
+  "observed_at_utc": "2026-10-14T17:18:17.137914+00:00",
+  "predictions_created": 2,
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-14/props_20261014T171645.063258Z.json",
+  "run_attempt": "1",
+  "run_id": "38605349182",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_RUN_V1",
+  "selection_drops": {
+    "selected_units": 16
+  },
+  "settlements_created": 0,
+  "status": "OK",
+  "summary_sha256": "8e77995690a400a3ee7087f7ff197ec14c418ef0dddef9f5794eab937974983e"
+}
