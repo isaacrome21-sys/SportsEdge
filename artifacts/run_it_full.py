@@ -375,13 +375,25 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             market = F5_INTAKE_ALIASES[market]
             line["market"] = market
         raw_market = str(raw.get("market") or "").upper().strip()
-        gate = _registry_blocked_row(line["sport"], [
-            raw_market, market,
-            normalize_coverage_market(market),
-            normalize_f5_market(market) if line["sport"] == "MLB" else None,
-            _NFL_RULING_DERIVATIVE_TRANSLATION.get(market)
-            if line["sport"] == "NFL" else None,
-        ], line)
+        if line["sport"] in FAMILY_GATE_SPORTS:
+            # Registry x Form 2 seam (owner ruling, Oct 14 2026): the
+            # family registry refuses PRICING, not evidence collection.
+            # CFB/NBA/CBB rows are NOT diverted here: they flow through
+            # staging and prepricing (the Form 2 loader sees the game
+            # rows, bundle admissions are recorded, and the prepricing
+            # factor audit is produced), and the registry refusal is
+            # stamped at the output boundary below, where the
+            # defense-in-depth re-check replaces every evaluated row
+            # for a gated sport before any surface is built.
+            gate = None
+        else:
+            gate = _registry_blocked_row(line["sport"], [
+                raw_market, market,
+                normalize_coverage_market(market),
+                normalize_f5_market(market) if line["sport"] == "MLB" else None,
+                _NFL_RULING_DERIVATIVE_TRANSLATION.get(market)
+                if line["sport"] == "NFL" else None,
+            ], line)
         if gate is not None:
             # Registry blocker wins over every routing lane (game,
             # coverage, F5, prop, team-half, derivative, TD, player).
@@ -813,6 +825,25 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         evaluated[i] = gate
         if i in prop_local:
             modeled_props[prop_local[i]] = gate
+    # Registry x Form 2 seam (output boundary, cont.): the game engine
+    # built its candidate surfaces (edges, independent_candidates,
+    # independent_watchlist, lane_b_watchlist) from the same row objects
+    # the re-check above may have just replaced with registry refusals.
+    # Drop every surface entry whose row did not survive into
+    # `evaluated`, so a refused row can never surface as an edge or a
+    # candidate through the engine's own lists. (The prop surfaces are
+    # rebuilt from modeled_props below, after this replacement, and so
+    # already exclude refused prop rows.)
+    _surviving_row_ids = {id(r) for r in evaluated if isinstance(r, dict)}
+    for _surface in ("edges", "independent_candidates",
+                     "independent_watchlist", "lane_b_watchlist",
+                     "lane_b_edges"):
+        _entries = card.get(_surface)
+        if isinstance(_entries, list):
+            card[_surface] = [r for r in _entries
+                              if id(r) in _surviving_row_ids]
+    if isinstance(card.get("summary"), dict) and "edges" in card["summary"]:
+        card["summary"]["edges"] = len(card.get("edges") or [])
     # Provenance gate (Isaac's architecture-conflict ruling, Oct 12 2026):
     # every priced row on this canonical card carries an explicit
     # INDEPENDENT / MARKET_ANCHORED provenance, identifiable from the card
