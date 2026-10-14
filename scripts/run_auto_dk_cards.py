@@ -27,6 +27,7 @@ from zoneinfo import ZoneInfo
 
 from scripts.collect_auto_dk_four_sports import cfb_compact, mlb_line_text, nfl_tickets
 from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp
+from sportsedge.registry_gate import gate_card_file as _registry_gate_card_file
 
 CT=ZoneInfo("America/Chicago")
 ROOT=Path(__file__).resolve().parents[1]
@@ -47,7 +48,12 @@ def call(command, *, timeout=180, env=None):
 def image_card(card, sport, path):
     if not (ROOT/"scripts/render_sportsedge_png.py").is_file():
         return "PNG_RENDERER_NOT_MERGED"
-    ok,details=call(["scripts/render_sportsedge_png.py","--card",card,
+    # t126: the registry gate runs BEFORE the image is rendered; the PNG is
+    # drawn only from the gated copy, and an unreadable card is not drawn.
+    gated=_registry_gate_card_file(card,sport,"scripts/run_auto_dk_cards.py:image_card")
+    if gated is None:
+        return "PNG_UNAVAILABLE:REGISTRY_GATE_UNREADABLE_CARD"
+    ok,details=call(["scripts/render_sportsedge_png.py","--card",gated,
                       "--sport",sport,"--output",path],timeout=40)
     return "READY" if ok else "PNG_UNAVAILABLE:"+details[:120]
 

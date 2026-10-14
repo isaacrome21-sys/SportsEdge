@@ -354,6 +354,120 @@ INTAKE_ALIASES = {
 }
 
 
+# ------------------------------------------- family-level registry (t126)
+# CFB / NBA / CBB are registered at MARKET-FAMILY level (not in the 89-row
+# Phase 1 matrix above, which stays byte-for-byte the MLB+NFL matrix).
+# Each family resolves to PRICED_PATH only where an engine is reachable on
+# the canonical path AND governance permits it; everything else is BLOCKED
+# with a taxonomy blocker. Nothing here is validated: CFB is UNVALIDATED,
+# NBA/CBB are RESEARCH_ONLY. Row-level fail-closed rules stay with the
+# engines (Illinois college exclusion for CFB/CBB in artifacts/free_models;
+# NBA rest_adj contribution fixed at zero) -- this registry neither adds
+# nor removes any of them. Any market in these sports that matches no
+# family below is UNREGISTERED (fail closed, state UNKNOWN).
+FAMILY_REGISTRY_VERSION = "SPORTSEDGE_FAMILY_REGISTRY_V1_20261013"
+FAMILY_SPORTS = ("CFB", "NBA", "CBB")
+_F = {}
+
+
+def _family(sport, family, state, *, engine=None, blocker=None, detail,
+            validation, markets, prefixes=()):
+    if state == BLOCKED:
+        assert blocker in BLOCKER_TAXONOMY, blocker
+    else:
+        assert state == PRICED_PATH and blocker is None
+    _F[(sport, family)] = {
+        "sport": sport, "market": family, "family": family, "state": state,
+        "engine": engine, "blocker": blocker, "detail": detail,
+        "validation_status": validation,
+        "members": frozenset(markets), "prefixes": tuple(prefixes),
+        "registry_level": "FAMILY",
+    }
+
+
+_GAME_MEMBERS = ("ML", "MONEYLINE", "H2H", "SPREAD", "SPREADS",
+                 "POINT_SPREAD", "TOTAL", "TOTALS", "GAME_TOTAL")
+_DERIV_MEMBERS = ("TEAM_TOTAL", "TEAM_TOTALS", "TEAM_TOTAL_OVER_UNDER",
+                  "FIRST_HALF_MONEYLINE", "FIRST_HALF_SPREAD",
+                  "FIRST_HALF_TOTAL", "FIRST_HALF_TEAM_TOTAL",
+                  "SECOND_HALF_MONEYLINE", "SECOND_HALF_SPREAD",
+                  "SECOND_HALF_TOTAL", "QUARTER_MONEYLINE", "QUARTER_SPREAD",
+                  "QUARTER_TOTAL", "ALTERNATE_SPREAD", "ALTERNATE_TOTAL",
+                  "ALT_SPREAD", "ALT_TOTAL", "1H_TOTAL", "1H_SPREAD",
+                  "1H_TEAM_TOTAL", "HALF_TOTAL", "TOTAL_1H", "SPREAD_1H",
+                  "TEAM_TOTAL_1H")
+_PROP_PREFIXES = ("PLAYER_", "ANYTIME_", "FIRST_TD", "FIRST_TOUCHDOWN")
+
+_family("CFB", "CFB_GAME", PRICED_PATH, engine=_FREE_MODELS,
+        detail="CFB moneyline/spread/total priced by the canonical game stage "
+               "(free_models PRIORS['CFB'], explicit unfitted priors) after the "
+               "prepricing factor gate; config/football_market_surface.json "
+               "declares CFB game markets IMPLEMENTED. Illinois-resident "
+               "college exclusion stays enforced per row by the engine.",
+        validation="UNVALIDATED", markets=_GAME_MEMBERS)
+_family("CFB", "CFB_GAME_DERIVATIVES", BLOCKED, blocker="NO_ENGINE",
+        detail=_DISTRIBUTION_MISSING + " (CFB team totals and period/"
+               "alternate markets; football_market_surface declares CFB "
+               "period markets NO_ENGINE.)",
+        validation="NOT_RUN", markets=_DERIV_MEMBERS)
+_family("CFB", "CFB_PLAYER_PROPS", BLOCKED, blocker="NO_ENGINE",
+        detail="GOVERNANCE_NO_ENGINE: config/football_prop_engine_surface.json "
+               "declares CFB engine_state NO_ENGINE (promotion BLOCKED_NO_"
+               "VALIDATED_PROBABILITY_ENGINE). Absence of a validated prop "
+               "engine is not a pricing engine; CFB player props never price.",
+        validation="NOT_RUN", markets=(), prefixes=_PROP_PREFIXES)
+_family("NBA", "NBA_GAME", PRICED_PATH, engine=_FREE_MODELS,
+        detail="RESEARCH_ONLY: NBA moneyline/spread/total reach the canonical "
+               "game stage (free_models PRIORS['NBA'], explicit unfitted "
+               "priors). rest_adj contribution is fixed at zero (manual-only, "
+               "governed off) and is not changed by this registry. Research "
+               "rows only; no validation exists.",
+        validation="RESEARCH_ONLY_UNVALIDATED", markets=_GAME_MEMBERS)
+_family("NBA", "NBA_GAME_DERIVATIVES", BLOCKED, blocker="NO_ENGINE",
+        detail=_DISTRIBUTION_MISSING + " (NBA team totals, halves, quarters, "
+               "alternates.)",
+        validation="RESEARCH_ONLY_UNVALIDATED", markets=_DERIV_MEMBERS)
+_family("NBA", "NBA_PLAYER_PROPS", BLOCKED, blocker="NO_ENGINE",
+        detail="No NBA player-prop pricer is reachable from the canonical "
+               "intake; research prop work is not a governed engine.",
+        validation="RESEARCH_ONLY_UNVALIDATED", markets=(),
+        prefixes=_PROP_PREFIXES)
+_family("CBB", "CBB_GAME", BLOCKED, blocker="NO_ENGINE",
+        detail="RESEARCH_ONLY: the canonical game engine (artifacts/"
+               "free_models) has no CBB league or priors (UNSUPPORTED_SPORT), "
+               "so no CBB game market can price on this path. Illinois-"
+               "resident college exclusion remains in force for any future "
+               "CBB lane.",
+        validation="RESEARCH_ONLY_UNVALIDATED", markets=_GAME_MEMBERS)
+_family("CBB", "CBB_GAME_DERIVATIVES", BLOCKED, blocker="NO_ENGINE",
+        detail="No CBB engine on the canonical path.",
+        validation="RESEARCH_ONLY_UNVALIDATED", markets=_DERIV_MEMBERS)
+_family("CBB", "CBB_PLAYER_PROPS", BLOCKED, blocker="NO_ENGINE",
+        detail="No CBB player-prop engine on the canonical path.",
+        validation="RESEARCH_ONLY_UNVALIDATED", markets=(),
+        prefixes=_PROP_PREFIXES)
+
+FAMILY_RESOLUTIONS = dict(_F)
+
+
+def resolve_family(sport, market):
+    """Family-level resolution for CFB/NBA/CBB, or None (unregistered)."""
+    sport = str(sport or "").upper()
+    if sport not in FAMILY_SPORTS:
+        return None
+    key = str(market or "").upper().strip()
+    if not key:
+        return None
+    for (s, _fam), res in FAMILY_RESOLUTIONS.items():
+        if s == sport and (key in res["members"] or any(
+                key.startswith(p) for p in res["prefixes"])):
+            out = {k: v for k, v in res.items()
+                   if k not in ("members", "prefixes")}
+            out["matched_market"] = key
+            return out
+    return None
+
+
 def resolve_market(sport, market):
     """Resolution for a matrix market name or a canonical intake alias."""
     sport = str(sport or "").upper()
@@ -364,7 +478,7 @@ def resolve_market(sport, market):
     alias = INTAKE_ALIASES.get(sport, {}).get(str(market or "").upper())
     if alias is not None:
         return dict(MARKET_RESOLUTIONS[(sport, alias)])
-    return None
+    return resolve_family(sport, market)
 
 
 def blocked_row_for(sport, market, row):
