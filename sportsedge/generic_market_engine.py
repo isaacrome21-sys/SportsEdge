@@ -11,6 +11,8 @@ import json
 from math import comb, exp, floor, isfinite
 from typing import Any, Mapping
 
+from .game_distribution_readout import GameReadoutError, read_game_probability
+
 GENERIC_ENGINE_VERSION = "mlb_full_market_runtime_v2"
 PA_BOUNDED_ENGINE_VERSION = "mlb_pa_bounded_count_v1"
 V8_PRIMARY_GAME_DEFAULT_SIMULATIONS = 100000
@@ -300,49 +302,44 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         first_inning_dispersion_r=DEFAULT_FIRST_INNING_DISPERSION_R,
         extra_half_inning_mean=V8_INDEPENDENT_EXTRA_HALF_INNING_MEAN,
     )
-    states = _joint_states(result.joint_score_pmf)
-    p_push = 0.0
-
+    # Settlement is read from the joint score PMF by the ONE shared MLB
+    # readout (game_distribution_readout.read_game_probability) -- the same
+    # code shared_game_engine and the research joint readout use. Input
+    # validation stays here so error types/messages are unchanged.
+    _joint_states(result.joint_score_pmf)
+    readout_team_side = None
     if market == "MONEYLINE":
-        if side in {"HOME", "HOME_ML"}:
-            p = sum(prob for away, home, prob in states if home > away)
-        elif side in {"AWAY", "AWAY_ML"}:
-            p = sum(prob for away, home, prob in states if away > home)
-        else:
+        if side not in {"HOME", "HOME_ML", "AWAY", "AWAY_ML"}:
             raise GenericMarketEngineError("moneyline side must be HOME or AWAY")
     elif market == "RUN_LINE":
-        if side in {"HOME", "HOME_RL"}:
-            adjusted = [(home - away) + line for away, home, _ in states]
-        elif side in {"AWAY", "AWAY_RL"}:
-            adjusted = [(away - home) + line for away, home, _ in states]
-        else:
+        if side not in {"HOME", "HOME_RL", "AWAY", "AWAY_RL"}:
             raise GenericMarketEngineError("run-line side must be HOME or AWAY")
-        p = sum(prob for (_, _, prob), value in zip(states, adjusted) if value > 0)
-        p_push = sum(prob for (_, _, prob), value in zip(states, adjusted) if abs(value) < 1e-12)
     elif market == "TOTALS":
-        if side == "OVER":
-            p = sum(prob for away, home, prob in states if away + home > line)
-        elif side == "UNDER":
-            p = sum(prob for away, home, prob in states if away + home < line)
-        else:
+        if side not in {"OVER", "UNDER"}:
             raise GenericMarketEngineError("totals side must be OVER or UNDER")
-        p_push = sum(prob for away, home, prob in states if abs((away + home) - line) < 1e-12)
     elif market == "TEAM_TOTALS":
-        team_side = str(model_input.get("team_side", "")).upper()
-        if team_side not in {"HOME", "AWAY"}:
+        readout_team_side = str(model_input.get("team_side", "")).upper()
+        if readout_team_side not in {"HOME", "AWAY"}:
             raise GenericMarketEngineError("team_side must be HOME or AWAY")
         if side not in {"OVER", "UNDER"}:
             raise GenericMarketEngineError("team-total side must be OVER or UNDER")
         if line < 0:
             raise GenericMarketEngineError("team-total line must be >= 0")
-        values = [home if team_side == "HOME" else away for away, home, _ in states]
-        if side == "OVER":
-            p = sum(prob for (_, _, prob), value in zip(states, values) if value > line)
-        else:
-            p = sum(prob for (_, _, prob), value in zip(states, values) if value < line)
-        p_push = sum(prob for (_, _, prob), value in zip(states, values) if abs(value - line) < 1e-12)
     else:
         raise GenericMarketEngineError(f"unsupported game market {market}")
+    try:
+        readout = read_game_probability(
+            {"joint_score_pmf": result.joint_score_pmf,
+             "result_sha256": result.result_sha256},
+            market=market,
+            line=None if market == "MONEYLINE" else line,
+            side=side,
+            team_side=readout_team_side,
+        )
+    except GameReadoutError as exc:
+        raise GenericMarketEngineError(str(exc)) from exc
+    p = readout.probability
+    p_push = readout.push_probability
 
     if p < -1e-12 or p_push < -1e-12 or p + p_push > 1.0 + 1e-9:
         raise GenericMarketEngineError("game probability mass invalid")
