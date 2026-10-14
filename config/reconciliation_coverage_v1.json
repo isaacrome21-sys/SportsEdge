@@ -294,6 +294,7 @@
         "scripts/run_nfl_external_evidence.sh",
         "scripts/verify_mlb_odds_api_freeze.py",
         "sportsedge/canonical_coverage.py",
+        "sportsedge/family_market_registry.py",
         "sportsedge/sports/cfb/acquisition_readiness.py",
         "sportsedge/sports/cfb/depth_chart_source.py",
         "sportsedge/sports/cfb/forward_evidence.py",
