@@ -133,11 +133,14 @@ def test_repo_config_records_owner_decision_and_keeps_flags_off():
     assert not ea.CAPTURE_ACTIVE and not ea.ADMISSION_ACTIVE
 
 
-def test_real_providers_are_unpinned_and_refused():
-    for p in ea.load_config().providers:
-        assert not p.pinned
-        with pytest.raises(ea.AnchorError):
-            ea.provider_trust(p)
+def test_unpinned_real_providers_are_refused():
+    # t127: FreeTSA is pinned (see test_evidence_anchor_pinning_20261013); DigiCert
+    # could not be cross-checked and must stay unpinned and refused.
+    provs = {p.id: p for p in ea.load_config().providers}
+    assert provs["freetsa"].pinned
+    assert not provs["digicert"].pinned
+    with pytest.raises(ea.AnchorError):
+        ea.provider_trust(provs["digicert"])
 
 
 def _write(tmp_path, mut):

@@ -128,7 +128,10 @@ def test_tsa_stamp_rejects_unpinned_url(env):
 def test_no_repository_code_imports_module():
     repo = Path(__file__).resolve().parents[1]
     hits = [p for p in (repo / "sportsedge").rglob("*.py")
-            if p.name != "evidence_anchor.py" and "evidence_anchor" in p.read_text(errors="ignore")]
+            # t127: the shared admission gate is the ONLY permitted importer;
+            # consumers go through the gate, never the anchor module directly.
+            if p.name not in {"evidence_anchor.py", "evidence_admission_gate.py"}
+            and "evidence_anchor" in p.read_text(errors="ignore")]
     hits += [p for p in (repo / ".github" / "workflows").glob("*.y*ml")
              if "evidence_anchor" in p.read_text(errors="ignore")]
     assert hits == []
