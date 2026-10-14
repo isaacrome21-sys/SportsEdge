@@ -39,6 +39,8 @@ PITCHER_STAT_KEYS = {
     "PITCHER_BB": "baseOnBalls", "PITCHER_ER": "earnedRuns",
 }
 
+from .mlb_source_identity import MLBSourceIdentityError, check_split_identity, refuse_conflicting_game_pk
+
 class MLBGenericFeatureError(ValueError):
     pass
 
@@ -99,7 +101,8 @@ def _split_date(split: Mapping[str, Any]) -> date | None:
     except ValueError:
         return None
 
-def _splits(payload: Mapping[str, Any], *, target_date: date) -> list[Mapping[str, Any]]:
+def _splits(payload: Mapping[str, Any], *, target_date: date, expected_player_id: int | None = None,
+            expected_team_id: int | None = None) -> list[Mapping[str, Any]]:
     rows: list[Mapping[str, Any]] = []
     stats = payload.get("stats")
     if not isinstance(stats, list):
@@ -110,6 +113,10 @@ def _splits(payload: Mapping[str, Any], *, target_date: date) -> list[Mapping[st
         for split in block.get("splits") or []:
             if not isinstance(split, Mapping):
                 continue
+            try:
+                check_split_identity(split, expected_player_id=expected_player_id, expected_team_id=expected_team_id)
+            except MLBSourceIdentityError as exc:
+                raise MLBGenericFeatureError(f"source_identity: {exc}") from exc
             d = _split_date(split)
             if d is None or d >= target_date:
                 continue
@@ -121,7 +128,25 @@ def _splits(payload: Mapping[str, Any], *, target_date: date) -> list[Mapping[st
                 game_pk = _nonnegative_integer(game.get("gamePk")) if isinstance(game, Mapping) else None
                 rows.append({"date": d, "stat": stat, "opponent_id": opp_id, "game_pk": game_pk})
     rows.sort(key=lambda x: x["date"])
-    return rows
+    return _dedupe_game_pk(rows)
+
+
+def _dedupe_game_pk(rows: list[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    """Collapse identical duplicate gamePk rows; refuse conflicting duplicates."""
+    try:
+        refuse_conflicting_game_pk((row["game_pk"], row["stat"]) for row in rows)
+    except MLBSourceIdentityError as exc:
+        raise MLBGenericFeatureError(f"source_identity: {exc}") from exc
+    out: list[Mapping[str, Any]] = []
+    seen: set[int] = set()
+    for row in rows:
+        pk = row["game_pk"]
+        if pk is not None and pk in seen:
+            continue
+        if pk is not None:
+            seen.add(pk)
+        out.append(row)
+    return out
 
 def _schedule_games(payload: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     games: list[Mapping[str, Any]] = []
@@ -247,14 +272,16 @@ class MLBGenericHistorySource:
     def player_rows(self, *, player_id: int, group: str, target_date: date) -> list[Mapping[str, Any]]:
         rows: list[Mapping[str, Any]] = []
         for season in (target_date.year - 1, target_date.year):
-            rows.extend(_splits(self._player_season(player_id, group, season), target_date=target_date))
+            rows.extend(_splits(self._player_season(player_id, group, season), target_date=target_date,
+                                expected_player_id=int(player_id)))
         rows.sort(key=lambda x: x["date"])
-        return rows
+        return _dedupe_game_pk(rows)
 
     def team_rows(self, *, team_id: int, target_date: date) -> list[Mapping[str, Any]]:
         rows: list[Mapping[str, Any]] = []
         for season in (target_date.year - 1, target_date.year):
-            rows.extend(_splits(self._team_season(team_id, season), target_date=target_date))
+            rows.extend(_splits(self._team_season(team_id, season), target_date=target_date,
+                                expected_team_id=int(team_id)))
         rows.sort(key=lambda x: x["date"])
         return rows
 
