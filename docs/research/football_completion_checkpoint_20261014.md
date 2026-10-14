@@ -50,3 +50,10 @@ No backfill, capture/admission activation, holdout use, validation reset, invent
 - Combined new repair tests: 11 pass. With 31 existing engine tests and 136 Form 2 unittest tests, 178 distinct local tests passed. No full local pytest claim.
 - NFL #2234 has 12 returned checks successful; evidence job still running (past exact-SHA M2 replay determinism, building isolated candidate diagnostics). No main merge while that relevant check remains unfinished.
 - G2 code commit 2f3af2a2594effa1bbaed4137516ade8e1c15422 and CFB candidate bfba59f3f remain unavailable through GitHub. All four G2 document hashes are verified, but executable identity and validation execution remain blocked. No complete NFL/CFB model claim.
+
+## Final saved state of this pass
+
+- #2234: all 13 returned exact-head checks SUCCESS, including NFL evidence; protected merge succeeded into main at 8170a2e15ec77766be9df46f4b8f0867a24e7776. Main ref independently confirmed. Post-merge main CI must be followed separately; not claimed complete here.
+- #2237: all 9 returned exact-head checks SUCCESS; merged into #2224 integration branch at 3fc4cdbce104d88c6094463661bec4b7108f406e (NOT main). Branch ref independently confirmed. Scope and pricing-field repairs now coexist in that parent.
+- #2236: original a513a08a head completed 13/13 returned checks SUCCESS. Rebased onto the new main using all 19 exact #2216 blobs and a union manifest preserving #2234 registration; new head 55f0179c3ca15a3cd59609fb403645de5a4a2384. New exact-head CI running; PR remains draft/unmerged pending complete review and checks.
+- Full NFL/CFB model completion remains blocked by the unavailable frozen executable identities described above. No real-data G2 attempt or CFB candidate run was performed. This record is a durable handoff of completed repairs and outstanding verifiable actions, not a completed model claim.
