@@ -98,7 +98,16 @@ class S3ObjectLockWriter:
 
     def put_locked(self, key, body, *, now=None):
         sha = _check(key, body, self.retention_days, self.mode)
-        now = now or datetime.now(timezone.utc)
+        # Validate the *actual target bucket* on every write. A caller cannot
+        # skip the Object Lock + versioning preflight by omitting verify_bucket().
+        self.verify_bucket()
+        current = datetime.now(timezone.utc)
+        if now is not None:
+            if not isinstance(now, datetime) or now.tzinfo is None or now.utcoffset() is None:
+                raise LockStoreError("retention clock must be timezone-aware")
+            if now < current - timedelta(seconds=30):
+                raise LockStoreError("retention clock is stale")
+        now = now or current
         until = now + timedelta(days=self.retention_days)
         r = self.client.put_object(
             Bucket=self.bucket, Key=key, Body=bytes(body),
