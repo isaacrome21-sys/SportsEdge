@@ -174,6 +174,7 @@ def test_run_full_independent_game_row_still_reaches_play():
     assert audit["pricing_provenance"]["lane"] == LANE_INDEPENDENT
 
 
+@pytest.mark.registry_lane_internals
 def test_run_full_anytime_td_rows_carry_independent_provenance(tmp_path):
     from tests.test_canonical_run_it_20261012 import _td_cache, _td_row
     cache = _td_cache(tmp_path / "td")

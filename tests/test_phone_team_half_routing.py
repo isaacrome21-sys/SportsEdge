@@ -1,4 +1,5 @@
 """Phone RUN IT team/half routing regressions; no fake bettor probabilities."""
+import pytest
 from datetime import datetime, timezone
 from unittest.mock import patch
 
@@ -17,6 +18,7 @@ def row(market, side, **extra):
     }
 
 
+@pytest.mark.registry_lane_internals
 def test_phone_aliases_blocked_no_engine_owner_ruling_20261013():
     # Owner ruling (Isaac, Oct 13, 2026) -- supersedes the #2111 routing
     # expectation this test previously asserted: NFL full-game team
@@ -62,6 +64,7 @@ def test_phone_aliases_blocked_no_engine_owner_ruling_20261013():
     assert c["prop_model_status"]["team_half_period_fitted"] is False
 
 
+@pytest.mark.registry_lane_internals
 def test_owner_ruling_first_half_aliases_blocked_period_reason():
     # Every first-half alias the runner accepts resolves to the same
     # period-distribution block (owner ruling, Oct 13, 2026).
@@ -81,6 +84,7 @@ def test_owner_ruling_first_half_aliases_blocked_period_reason():
                for r in c["evaluated_rows"])
 
 
+@pytest.mark.registry_lane_internals
 def test_owner_ruling_is_nfl_only_cfb_still_routes_team_half():
     # The ruling is NFL-scoped: CFB team totals / first-half totals keep
     # the team/half lane exactly as before (owner ruling, Oct 13, 2026).
@@ -124,6 +128,7 @@ def test_owner_ruling_is_nfl_only_cfb_still_routes_team_half():
     assert evaluated[3]["reason"] == "CFB_TEAMHALF_SENTINEL"
 
 
+@pytest.mark.registry_lane_internals
 def test_team_half_never_hijacks_football_player_props():
     x = row("RECEIVING_YARDS", "OVER", player_name="Example Receiver",
             line=50.5)
@@ -139,6 +144,7 @@ def test_team_half_never_hijacks_football_player_props():
     assert c["evaluated_rows"][0]["reason"] == "TEST_PLAYER_HISTORY_MISSING"
 
 
+@pytest.mark.registry_lane_internals
 def test_no_public_sources_means_no_team_total_probabilities():
     # The outcome is unchanged, but since the owner ruling (Oct 13,
     # 2026) it is produced by the canonical derivative stage's

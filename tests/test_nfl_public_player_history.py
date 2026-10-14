@@ -206,6 +206,7 @@ def test_unsupported_event_shape_returns_specific_error():
         prior({"names": REAL["names"], "events": "not an event collection"})
 
 
+@pytest.mark.registry_lane_internals
 def test_full_phone_run_it_stafford_paired_props_are_watch_not_bets():
     now = datetime(2026, 10, 12, 21, 52, tzinfo=timezone.utc)
     def quote(side, price):
@@ -415,6 +416,7 @@ def test_empty_prior_season_fetch_preserves_five_game_gate():
         _season_prior(current,{2025:None,2024:None})
 
 
+@pytest.mark.registry_lane_internals
 def test_end_to_end_props_after_prior_season_fill_remain_watch_only():
     current,old=_split_seasons(REAL)
     now=datetime(2026,10,12,21,52,tzinfo=timezone.utc)

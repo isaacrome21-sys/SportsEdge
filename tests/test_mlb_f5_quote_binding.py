@@ -412,6 +412,7 @@ def _fixture_schedule_payload():
     }]}]}
 
 
+@pytest.mark.registry_lane_internals
 def test_f5_pair_through_run_full_binds_and_names_feature_blocker():
     from artifacts.run_it_full import run_full
 
@@ -434,6 +435,7 @@ def test_f5_pair_through_run_full_binds_and_names_feature_blocker():
         "SHARED_F5_ENGINE_VIA_MLB_F5_QUOTE_BINDING_V1")
 
 
+@pytest.mark.registry_lane_internals
 def test_f5_alias_intake_routes_to_binding_stage():
     from artifacts.run_it_full import run_full
     rows = [{"sport": "MLB", "market": "FIRST_FIVE_TOTAL",

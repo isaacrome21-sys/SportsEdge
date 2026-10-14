@@ -101,6 +101,7 @@ def test_legacy_spellings_still_recognized():
 
 # --- parity through the full runner ------------------------------------------
 
+@pytest.mark.registry_lane_internals
 def test_run_full_legacy_canonical_spelling_parity():
     from artifacts import run_it_full
     pairs = [
