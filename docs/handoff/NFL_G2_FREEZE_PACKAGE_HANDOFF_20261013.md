@@ -42,3 +42,11 @@ Pinned main: `655715907d101052bfc7cb3357f1442db82d8d8b`
 - **CFB model:** directory and currency fixes are on main (#2182/#2184). The scope-amendment and §8/§10 owner decisions are still open.
 
 New file: flag for ChatGPT registration.
+
+## 6. t114 recheck (2026-10-13 ~19:20 CT) — still missing
+
+- Owner ruling is recorded in issue #2161 (Amendment 2 prep + bounded σ correction APPROVED; fitting/scoring/Attempt 2 NO-GO; Attempt 2 UNSPENT).
+- Searched every origin branch tree for an Amendment 2 doc, `nfl_score_counts_g2_source_contract_v1.json`, or G2 code: **none found**. The only G2-named branch is `records/g2-attempt1-preregistration-20261013` (c0ecac14b, prereg record only).
+- Original synthetic-tested code commit `dbb5f172b` is still **not reachable** on GitHub (commits API 422). Base `9f8a17cd1` is reachable (200).
+- Consequence: no Amendment 2 bytes to hash and no G2 code to run synthetic σ-leakage tests against. Nothing new hashed or run in t114. Heritage hashes and the 48/48 synthetic result in §2–3 are unchanged.
+- **Still needed from Muse (per #2161 acceptance packet):** one research-only review branch with the Amendment 2 Markdown + full SHA-256 and supersession ledger, corrected §6 nested train-only σ selection code with commit/patch hashes, σ-placement and validation-outcome-invariance tests, and the aligned machine JSON. Then integration can hash and run synthetic-only verification. Attempt 2 stays unexecuted; separate owner GO required.
