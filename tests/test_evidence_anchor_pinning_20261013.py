@@ -85,7 +85,7 @@ def test_real_token_refused_for_other_digest_wrong_pin_and_wrong_ca():
     tok, req = _tok()
     ca, pins = ea.provider_trust(_freetsa())
     other = hashlib.sha256(b"different").hexdigest()
-    assert ea.tsa_verify(tok, other, ca, None, list(pins), now=VERIFY_NOW).reason == "tsa_verify_failed"
+    assert ea.tsa_verify(tok, other, ca, None, list(pins), now=VERIFY_NOW).reason == "imprint_mismatch"
     assert ea.tsa_verify(tok, FIX["root_sha256"], ca, None, ["0" * 64], now=VERIFY_NOW).reason == "tsa_cert_not_pinned"
     g4 = subprocess.run(["openssl", "x509", "-in", str(REPO / "config/anchors/freetsa_tsa_signer.pem")],
                         check=True, capture_output=True).stdout  # a non-CA cert as trust anchor

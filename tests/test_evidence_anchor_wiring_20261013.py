@@ -175,9 +175,11 @@ def test_missing_config_rejected(tmp_path):
 def test_provider_trust_reads_pinned_bundle_inside_repo(tmp_path, env):
     (tmp_path / "config").mkdir()
     (tmp_path / "config" / "ca.pem").write_bytes(env["a"]["ca"])
-    p = ea.TsaProvider("x", ea.TSA_URLS[0], "config/ca.pem", (env["a"]["tsa_der_sha"],), "pinned")
+    p = ea.TsaProvider("x", ea.TSA_URLS[0], "config/ca.pem", (env["a"]["tsa_der_sha"],), "pinned",
+                       ("1.2.3.4.1",))
     assert ea.provider_trust(p, tmp_path)[0] == env["a"]["ca"]
-    bad = ea.TsaProvider("x", ea.TSA_URLS[0], "../escape.pem", (env["a"]["tsa_der_sha"],), "pinned")
+    bad = ea.TsaProvider("x", ea.TSA_URLS[0], "../escape.pem", (env["a"]["tsa_der_sha"],), "pinned",
+                         ("1.2.3.4.1",))
     with pytest.raises(ea.AnchorError):
         ea.provider_trust(bad, tmp_path)
 
@@ -214,7 +216,7 @@ def test_configured_entrypoint_requires_saved_nonce_request_and_real_pins(env, m
 
     cfg = ea.load_config()
     monkeypatch.setattr(ea, "ADMISSION_ACTIVE", True)
-    monkeypatch.setattr(ea, "load_config", lambda: replace(cfg, admission_active=True))
+    monkeypatch.setattr(ea, "load_config", lambda *a: replace(cfg, admission_active=True))
     entries = [{"provider": "tsa_a", "token": env["ta"]},
                {"provider": "tsa_b", "token": env["tb"]}]
     assert ea.admit_configured_quorum(_qb(env, entries), event_cutoff=_cut()).reason == "request_binding_required"
@@ -470,7 +472,8 @@ class _FakeS3:
         self.lock, self.ver, self.vid, self.calls = lock, ver, vid, []
 
     def get_object_lock_configuration(self, Bucket):
-        return {"ObjectLockConfiguration": {"ObjectLockEnabled": self.lock}}
+        return {"ObjectLockConfiguration": {"ObjectLockEnabled": self.lock, "Rule": {
+            "DefaultRetention": {"Mode": "COMPLIANCE", "Days": 3650}}}}
 
     def get_bucket_versioning(self, Bucket):
         return {"Status": self.ver}
