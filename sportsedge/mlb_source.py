@@ -16,6 +16,7 @@ from typing import Any, Callable, Iterator
 from urllib.request import urlopen
 from zoneinfo import ZoneInfo
 
+from . import evidence_admission_gate as _anchor_gate
 from .source_lineage import canonical_game_identity
 
 BASE = "https://statsapi.mlb.com"
@@ -336,6 +337,41 @@ def _durable_receipt_write(path: Path, data: bytes, *, append: bool) -> None:
     finally:
         os.close(fd)
     _fsync_receipt_directory(path.parent)
+
+
+RECEIPT_ANCHOR_REFUSED = "RECEIPT_ANCHOR_REFUSED"
+
+
+def admit_anchored_receipt(root: str | Path, record_sha256: str, *, tsa_bundle: Any,
+                           event_cutoff: datetime | None,
+                           verifier_now: datetime | None = None) -> dict[str, Any]:
+    """t127: admit ONE journal receipt as externally time-anchored evidence.
+
+    Goes through the shared dual-TSA admission gate (#2090 anchor
+    ``anchor:rfc3161+ots:v1``). While admission is off (committed config) every
+    call is refused with ``RECEIPT_ANCHOR_REFUSED:admission_not_activated``
+    before the journal is read; the local journal semantics above are
+    unchanged. When separately activated, the dual-TSA bundle must cover
+    ``record_sha256`` as a leaf, the journal must re-verify, the record must be
+    in it and its receipt must be at or before ``event_cutoff``. Never raises.
+    """
+    refused = {"admitted": False, "external_time_anchor": False, "research_only": True}
+    d = _anchor_gate.anchored_admission(tsa_bundle, bound_sha256=record_sha256,
+                                        event_cutoff=event_cutoff)
+    if not d.admitted:
+        return {**refused, "reason": f"{RECEIPT_ANCHOR_REFUSED}:{d.reason}"}
+    try:
+        entries = verify_receipt_journal(root, verifier_now=verifier_now)
+        entry = next((e for e in entries if e["record_sha256"] == record_sha256), None)
+        if entry is None:
+            return {**refused, "reason": f"{RECEIPT_ANCHOR_REFUSED}:record_not_in_journal"}
+        if not receipt_supports_as_of(entry, event_cutoff):
+            return {**refused, "reason": f"{RECEIPT_ANCHOR_REFUSED}:receipt_after_cutoff"}
+    except MLBSourceError as exc:
+        return {**refused, "reason": f"{RECEIPT_ANCHOR_REFUSED}:{exc}"}
+    return {"admitted": True, "external_time_anchor": True, "research_only": True,
+            "reason": "admitted", "sequence": entry["sequence"],
+            "anchor_gen_time_utc": d.gen_time.isoformat() if d.gen_time else None}
 
 
 class MLBSourceCapture:
