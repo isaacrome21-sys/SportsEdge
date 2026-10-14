@@ -322,6 +322,9 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     coverage_indices, coverage_input = [], []
     f5_indices, f5_input = [], []
     registry_gated = {}  # local prop index -> registry blocker row
+    # Only CFB game-identity evidence may continue through prepricing.
+    # The registry still blocks its pricer, output probabilities and plays.
+    family_game_gated = {}  # game position -> precomputed registry blocker
     for i, raw in enumerate(rows):
         if not isinstance(raw, dict):
             raise ValueError("LINE_MUST_BE_OBJECT")
@@ -375,28 +378,26 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             market = F5_INTAKE_ALIASES[market]
             line["market"] = market
         raw_market = str(raw.get("market") or "").upper().strip()
-        if line["sport"] in FAMILY_GATE_SPORTS:
-            # Registry x Form 2 seam (owner ruling, Oct 14 2026): the
-            # family registry refuses PRICING, not evidence collection.
-            # CFB/NBA/CBB rows are NOT diverted here: they flow through
-            # staging and prepricing (the Form 2 loader sees the game
-            # rows, bundle admissions are recorded, and the prepricing
-            # factor audit is produced), and the registry refusal is
-            # stamped at the output boundary below, where the
-            # defense-in-depth re-check replaces every evaluated row
-            # for a gated sport before any surface is built.
-            gate = None
-        else:
-            gate = _registry_blocked_row(line["sport"], [
-                raw_market, market,
-                normalize_coverage_market(market),
-                normalize_f5_market(market) if line["sport"] == "MLB" else None,
-                _NFL_RULING_DERIVATIVE_TRANSLATION.get(market)
-                if line["sport"] == "NFL" else None,
-            ], line)
+        gate = _registry_blocked_row(line["sport"], [
+            raw_market, market,
+            normalize_coverage_market(market),
+            normalize_f5_market(market) if line["sport"] == "MLB" else None,
+            _NFL_RULING_DERIVATIVE_TRANSLATION.get(market)
+            if line["sport"] == "NFL" else None,
+        ], line)
         if gate is not None:
-            # Registry blocker wins over every routing lane (game,
-            # coverage, F5, prop, team-half, derivative, TD, player).
+            # Preserve the CFB identity evidence path only for game markets
+            # that are not excluded Illinois-college fixtures. These rows
+            # MUST stop after prepricing, and never enter engine.run().
+            if (line["sport"] == "CFB"
+                    and market in {"ML", "SPREAD", "TOTAL"}
+                    and gate.get("blocker") != "ILLINOIS_COLLEGE_EXCLUDED"):
+                game_indices.append(i)
+                games.append(line)
+                family_game_gated[len(games) - 1] = gate
+                continue
+            # Every other blocked family/market (including CFB props,
+            # NBA/CBB, Illinois schools) is refused before any pricer.
             prop_indices.append(i)
             props.append(line)
             registry_gated[len(props) - 1] = gate
@@ -477,14 +478,38 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "adjustments": dict(st["adjustments"]) if isinstance(st.get("adjustments"), dict) else {},
                 "factors": list(st["factors"]) if isinstance(st.get("factors"), list) else [],
             }
+            if gpos in family_game_gated:
+                # Evidence-only: record positive QB identity/factor audit,
+                # but never hand any adjustment, probability or game row
+                # to the model. No CFB market can produce a candidate.
+                gate_row = dict(family_game_gated[gpos])
+                gate_row["input_index"] = game_indices[gpos]
+                game_results[gpos] = gate_row
+                continue
             clear_lines.append(line)
             clear_game_pos.append(gpos)
         # Pass prepricing adjustments explicitly to the engine
         # The engine applies them separately from user context (no double-count)
-        card = engine.run({"lines": clear_lines}, now=clock, as_of=as_of, historical=historical,
-                          getter=getter, auto_context=auto_context, min_ev=min_ev,
-                          lane=lane, allow_manual_context=allow_manual_context,
-                          prepricing_adjustments=[prepricing_by_index.get(gpos) for gpos in clear_game_pos])
+        if clear_lines:
+            card = engine.run({"lines": clear_lines}, now=clock, as_of=as_of, historical=historical,
+                              getter=getter, auto_context=auto_context, min_ev=min_ev,
+                              lane=lane, allow_manual_context=allow_manual_context,
+                              prepricing_adjustments=[prepricing_by_index.get(gpos) for gpos in clear_game_pos])
+        else:
+            # All games were blocked at prepricing or the registry; no
+            # game engine should run. Keep the same empty-card contract.
+            card = {
+                "schema": "SPORTSEDGE_FREE_RESEARCH_CARD_V1",
+                "as_of_utc": clock.astimezone(timezone.utc).isoformat(),
+                "min_ev": min_ev, "edges": [],
+                "independent_candidates": [], "independent_watchlist": [],
+                "lane_b_watchlist": [], "lane_b_edges": [],
+                "diagnostics": [], "source_receipts": [],
+                "summary": {"rows": 0, "edges": 0, "status_counts": {}},
+                "research_only": True,
+                "authority": {"research_only": True, "official": False,
+                              "model_p": False, "staking": False},
+            }
         priced = card.get("evaluated_rows") or []
         if len(priced) != len(clear_lines):
             raise ValueError("GAME_EVALUATED_ROWS_INCOMPLETE")
@@ -825,25 +850,9 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         evaluated[i] = gate
         if i in prop_local:
             modeled_props[prop_local[i]] = gate
-    # Registry x Form 2 seam (output boundary, cont.): the game engine
-    # built its candidate surfaces (edges, independent_candidates,
-    # independent_watchlist, lane_b_watchlist) from the same row objects
-    # the re-check above may have just replaced with registry refusals.
-    # Drop every surface entry whose row did not survive into
-    # `evaluated`, so a refused row can never surface as an edge or a
-    # candidate through the engine's own lists. (The prop surfaces are
-    # rebuilt from modeled_props below, after this replacement, and so
-    # already exclude refused prop rows.)
-    _surviving_row_ids = {id(r) for r in evaluated if isinstance(r, dict)}
-    for _surface in ("edges", "independent_candidates",
-                     "independent_watchlist", "lane_b_watchlist",
-                     "lane_b_edges"):
-        _entries = card.get(_surface)
-        if isinstance(_entries, list):
-            card[_surface] = [r for r in _entries
-                              if id(r) in _surviving_row_ids]
-    if isinstance(card.get("summary"), dict) and "edges" in card["summary"]:
-        card["summary"]["edges"] = len(card.get("edges") or [])
+    # Family markets were stopped before every pricer. Preserve legitimate
+    # NFL/MLB game-engine surfaces; identity-based list filtering here can
+    # incorrectly discard independently copied (but valid) candidate rows.
     # Provenance gate (Isaac's architecture-conflict ruling, Oct 12 2026):
     # every priced row on this canonical card carries an explicit
     # INDEPENDENT / MARKET_ANCHORED provenance, identifiable from the card

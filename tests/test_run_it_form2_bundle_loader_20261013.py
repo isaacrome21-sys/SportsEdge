@@ -65,6 +65,7 @@ import json
 import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -745,10 +746,24 @@ class RunnerWiringTests(LoaderCase):
         assert card["prop_watchlist"] == []
 
     def test_run_full_registry_refusal_stamps_every_emitted_row(self):
-        # Even with an externally pinned Form 2 archive admitted and
-        # the game priced internally, the emitted row is the registry
-        # refusal -- the loader is an evidence path, not a bypass.
+        # Archive admission can succeed while market pricing is forbidden.
         self._assert_registry_refusal(self._pinned_card())
+
+    def test_pinned_cfb_identity_reaches_stage_but_never_game_pricer(self):
+        pin, raw = self._pinned_archive()
+        with patch.object(full.engine, "run",
+                          side_effect=AssertionError("CFB_GAME_PRICER_REACHED")):
+            card = full.run_full({"lines": [cfb_row()]}, now=NOW,
+                                 getter=self._lenient_getter(),
+                                 form2_bundles_dir=self.dir,
+                                 form2_manifest_sha256=pin,
+                                 form2_manifest_bytes=raw)
+        self.assertEqual(
+            card["qb_form2_bundle_loader_audit"]["admitted_team_ids"],
+            ["2393", "48"])
+        (stage,) = card["prepricing_factor_audit"]["by_input_index"]
+        self.assertFalse(stage["blocked"])
+        self._assert_registry_refusal(card)
 
     def test_run_full_registry_refusal_without_bundles(self):
         # Prepricing blocks this fixture at the QB gate; the emitted
@@ -759,9 +774,9 @@ class RunnerWiringTests(LoaderCase):
 
     def test_run_full_form2_game_is_research_only_end_to_end(self):
         # Issue #2158, asserted on the composed runner under the
-        # registry seam: bundles arrive through the loader, the stage
+        # registry seam: bundles arrive through the loader and the stage
         # satisfies identity via Form 2 (audit entry NOT blocked --
-        # the game was priced internally), and the availability label
+        # the game is NOT priced), and the availability label
         # rides the prepricing audit. The emitted row itself is the
         # registry refusal (research-only, play-blocked by refusal,
         # every actionable surface empty); the availability guard's
@@ -769,7 +784,7 @@ class RunnerWiringTests(LoaderCase):
         # tests/test_availability_research_only_gate_20261013.py.
         card = self._pinned_card()
         (entry,) = card["prepricing_factor_audit"]["by_input_index"]
-        self.assertFalse(entry["blocked"])  # the game was priced
+        self.assertFalse(entry["blocked"])  # identity stage only; no pricer
         self.assertEqual(
             card["qb_form2_bundle_loader_audit"]["admitted_team_ids"],
             ["2393", "48"])
