@@ -39,6 +39,10 @@ from sportsedge.registry_gate import (
 from sportsedge.mlb_f5_quote_binding import (
     F5_MARKET_ALIASES as F5_INTAKE_ALIASES, F5_MARKETS as F5_CANONICAL_MARKETS,
     phone_f5_binding_rows)
+from sportsedge.mlb_period_quote_binding import (
+    PERIOD_MARKET_ALIASES as PERIOD_INTAKE_ALIASES,
+    normalize_period_market, phone_period_binding_rows)
+from sportsedge.period_distribution import PERIOD_MARKETS as PERIOD_CANONICAL_MARKETS
 from sportsedge.market_coverage import (
     COVERAGE_MARKETS,
     normalize_coverage_market,
@@ -423,7 +427,12 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     the settlement basis is checked from the settlement code, features
     assemble from strictly-prior StatsAPI linescores, and rows then block
     at the F5 deployment gate (stage F5_STATE_CANDIDATE, eligible=false)
-    with the specific F5_* reason named. Every other matrix market
+    with the specific F5_* reason named. MLB first-3 / first-7 period
+    markets (F3_*/F7_*) route to the sibling period quote-binding stage
+    (sportsedge.mlb_period_quote_binding) under the same discipline and
+    block at its deployment gate (PERIOD_DEPLOYMENT_NOT_ELIGIBLE; the
+    period markets are absent from the deployment registry, whose
+    lookup fails closed). Every other matrix market
     without a priced route resolves through sportsedge.canonical_coverage
     to a named taxonomy blocker.
 
@@ -538,6 +547,9 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         if line["sport"] == "MLB" and market in F5_INTAKE_ALIASES:
             market = F5_INTAKE_ALIASES[market]
             line["market"] = market
+        if line["sport"] == "MLB" and market in PERIOD_INTAKE_ALIASES:
+            market = PERIOD_INTAKE_ALIASES[market]
+            line["market"] = market
         raw_market = str(raw.get("market") or "").upper().strip()
         if line.get("milestone_ladder_refusal"):
             # Fail-closed milestone intake refusal: the row never reaches
@@ -550,6 +562,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             raw_market, market,
             normalize_coverage_market(market),
             normalize_f5_market(market) if line["sport"] == "MLB" else None,
+            normalize_period_market(market) if line["sport"] == "MLB" else None,
             _NFL_RULING_DERIVATIVE_TRANSLATION.get(market)
             if line["sport"] == "NFL" else None,
         ], line)
@@ -601,6 +614,15 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             # where the canonical F5 quote-binding lane owns them (quote
             # binding + settlement basis + deployment gate).
             line["market"] = f5_market
+        period_market = (normalize_period_market(market)
+                         if line["sport"] == "MLB" else None)
+        if period_market is not None:
+            # Same composition resolution for the first-3 / first-7
+            # period sets: canonicalize the name here; the rows fall
+            # through to prop routing, where the canonical period
+            # quote-binding lane owns them (quote binding + settlement
+            # basis + deployment gate).
+            line["market"] = period_market
         prop_indices.append(i)
         props.append(line)
 
@@ -759,6 +781,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     pitcher_pos, pitcher_input = [], []
     batter_pos, batter_input = [], []
     f5_pos, f5_input = [], []
+    period_pos, period_input = [], []
     first_pos, first_input = [], []
     first_originals = {}  # local -> original market, for NRFI/YRFI translation
     nfl_pos, nfl_input = [], []
@@ -820,6 +843,9 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         elif line["sport"] == "MLB" and market in F5_CANONICAL_MARKETS:
             f5_pos.append(local)
             f5_input.append(line)
+        elif line["sport"] == "MLB" and market in PERIOD_CANONICAL_MARKETS:
+            period_pos.append(local)
+            period_input.append(line)
         elif line["sport"] == "MLB" and market in FIRST_INNING_PHONE_MARKETS:
             first_pos.append(local)
             first_input.append(line)
@@ -872,6 +898,30 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "research_only": True, "official_authority": False,
                 "model_p_authority": False, "staking_authority": False,
             } for line in f5_input]
+    # Period stage (first-3 / first-7 innings): the F5 stage's sibling --
+    # quote binding + settlement-basis gate + strictly-prior feature
+    # assembly, then the deployment gate (the period markets are absent
+    # from config/deployments.json, so the registry lookup fails closed).
+    period_results, period_receipts = [], []
+    if period_input:
+        try:
+            period_results, period_receipts = phone_period_binding_rows(
+                period_input, now=prop_clock,
+                getter=getter if auto_context else None,
+                fetch_enabled=auto_context)
+        except Exception as exc:
+            period_results = [{
+                "status": "NO_MODEL_OR_MARKET",
+                "reason": "NO_ENGINE: PERIOD_BINDING_RUNTIME_UNAVAILABLE — "
+                          f"{type(exc).__name__}: {exc}",
+                "blocker": "NO_ENGINE",
+                "blocker_detail": str(exc),
+                "period_reason": "PERIOD_BINDING_RUNTIME_UNAVAILABLE",
+                "coverage_market": line.get("market"),
+                "sport": "MLB", "market": line.get("market"),
+                "research_only": True, "official_authority": False,
+                "model_p_authority": False, "staking_authority": False,
+            } for line in period_input]
     nfl_results, nfl_receipts = phone_nfl_player_rows(
         nfl_input, now=prop_clock, getter=getter if auto_context else (lambda url: None))
     cfb_results, cfb_receipts = phone_cfb_player_rows(
@@ -958,6 +1008,8 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         raise ValueError("FOOTBALL_RESULT_COUNT_MISMATCH")
     if len(f5_results) != len(f5_input):
         raise ValueError("F5_RESULT_COUNT_MISMATCH")
+    if len(period_results) != len(period_input):
+        raise ValueError("PERIOD_RESULT_COUNT_MISMATCH")
     if len(pitcher_results) != len(pitcher_input):
         raise ValueError("PITCHER_RESULT_COUNT_MISMATCH")
     coverage_results, coverage_receipts = phone_coverage_rows(
@@ -986,6 +1038,8 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             result["priced_via"] = "FIRST_INNING_RUNS_BINARY_AT_0_5"
         modeled_props[local] = result
     for local, result in zip(f5_pos, f5_results):
+        modeled_props[local] = result
+    for local, result in zip(period_pos, period_results):
         modeled_props[local] = result
     for local, result in zip(deriv_pos, deriv_results):
         original = deriv_originals.get(local)
@@ -1089,13 +1143,15 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                               + pitcher_receipts + batter_receipts
                               + first_receipts
                               + nfl_receipts + cfb_receipts
-                              + coverage_receipts + f5_receipts + teamhalf_receipts
+                              + coverage_receipts + f5_receipts + period_receipts
+                              + teamhalf_receipts
                               + deriv_receipts + td_receipts)
     card["prop_model_status"] = {
         "pitcher_engine":"MLB_PITCHER_JOINT_EMPIRICAL_BAYES",
         "batter_engine":"MLB_BATTER_EMPIRICAL_GAMELOG",
         "first_inning_engine":"MLB_FIRST_INNING_TEAM_RATES_POISSON_JEFFREYS",
         "mlb_f5_engine":"SHARED_F5_ENGINE_VIA_MLB_F5_QUOTE_BINDING_V1_DEPLOYMENT_GATED_F5_STATE_CANDIDATE",
+        "mlb_period_engine":"SHARED_PERIOD_ENGINE_VIA_MLB_PERIOD_QUOTE_BINDING_V1_DEPLOYMENT_GATED_NOT_IN_DEPLOYMENT_REGISTRY",
         "coverage_engine":"FREE_COVERAGE_EXTENSION_MLB_3WAY_QUARTERS_MARGIN_UNVALIDATED",
         "f5_engine":"MLB_F5_EMPIRICAL_LINESCORE_UNVALIDATED",
         "nfl_player_engine":"ESPN_NAMED_HISTORICAL_GAMELOG_WATCH_ONLY",
