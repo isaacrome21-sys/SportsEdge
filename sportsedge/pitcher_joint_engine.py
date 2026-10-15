@@ -1,7 +1,7 @@
 """Joint pitcher props from strictly-prior starts with finite-sample shrinkage."""
 from __future__ import annotations
 import hashlib,json
-from math import isfinite
+from math import fsum,isfinite
 from typing import Any,Mapping,Sequence
 from .mlb_empirical_bayes import effective_sample_size,feasible_settlements,posterior_settlement_mass
 _UPPER_SUPPORT={"PITCHER_OUTS":27}
@@ -208,9 +208,10 @@ def price_pitcher_market(model_input:Mapping[str,Any])->dict[str,Any]:
     if market.startswith("EITHER_PITCHER_"):
         a=_normalize_pool(features.get("pitcher_a_history"),"pitcher_a_history");b=_normalize_pool(features.get("pitcher_b_history"),"pitcher_b_history");wa=_weights(features.get("pitcher_a_weights"),len(a),"pitcher_a_weights");wb=_weights(features.get("pitcher_b_weights"),len(b),"pitcher_b_weights")
         base={"EITHER_PITCHER_HITS_ALLOWED":"PITCHER_HITS_ALLOWED","EITHER_PITCHER_BB":"PITCHER_BB","EITHER_PITCHER_ER":"PITCHER_ER"}[market];states=[(_value(x,base),_value(y,base),wx*wy) for x,wx in zip(a,wa) for y,wy in zip(b,wb)]
-        if side=="OVER":raw=sum(w for x,y,w in states if (x>line) or (y>line));raw_push=sum(w for x,y,w in states if not((x>line) or (y>line)) and ((x==line) or (y==line))) if float(line).is_integer() else 0.0
-        else:raw=sum(w for x,y,w in states if (x<line) or (y<line));raw_push=sum(w for x,y,w in states if not((x<line) or (y<line)) and ((x==line) or (y==line))) if float(line).is_integer() else 0.0
-        raw_other=1.0-raw-raw_push;over,under=(raw,raw_other) if side=="OVER" else (raw_other,raw);eff=min(effective_sample_size(wa,len(wa)),effective_sample_size(wb,len(wb)));post=_posterior(over,under,raw_push,eff,line,base);p=post["p_over"] if side=="OVER" else post["p_under"];p_push=post["p_push"];meta={"raw_empirical_p":raw,"raw_push_p":raw_push,"effective_history_starts":float(eff),"posterior_prior":post["prior"],"weighted":features.get("pitcher_a_weights") is not None or features.get("pitcher_b_weights") is not None};identity_features={"pitcher_a_history":a,"pitcher_b_history":b,"pitcher_a_weights":wa,"pitcher_b_weights":wb}
+        total=fsum(w for x,y,w in states)
+        if side=="OVER":raw=fsum(w for x,y,w in states if (x>line) or (y>line))/total;raw_push=fsum(w for x,y,w in states if not((x>line) or (y>line)) and ((x==line) or (y==line)))/total if float(line).is_integer() else 0.0;raw_other=fsum(w for x,y,w in states if not((x>line) or (y>line)) and not((x==line) or (y==line)))/total
+        else:raw=fsum(w for x,y,w in states if (x<line) or (y<line))/total;raw_push=fsum(w for x,y,w in states if not((x<line) or (y<line)) and ((x==line) or (y==line)))/total if float(line).is_integer() else 0.0;raw_other=fsum(w for x,y,w in states if not((x<line) or (y<line)) and not((x==line) or (y==line)))/total
+        over,under=(raw,raw_other) if side=="OVER" else (raw_other,raw);eff=min(effective_sample_size(wa,len(wa)),effective_sample_size(wb,len(wb)));post=_posterior(over,under,raw_push,eff,line,base);p=post["p_over"] if side=="OVER" else post["p_under"];p_push=post["p_push"];meta={"raw_empirical_p":raw,"raw_push_p":raw_push,"effective_history_starts":float(eff),"posterior_prior":post["prior"],"weighted":features.get("pitcher_a_weights") is not None or features.get("pitcher_b_weights") is not None};identity_features={"pitcher_a_history":a,"pitcher_b_history":b,"pitcher_a_weights":wa,"pitcher_b_weights":wb}
     elif features.get("opp_outs_adjustment") is not None and market=="PITCHER_OUTS" and not float(line).is_integer():
         p,p_push,meta,identity_features=_price_opp_outs(features,line,side,market);meta["weighted"]=False
     elif features.get("ump_bb_adjustment") is not None and market=="PITCHER_BB" and not float(line).is_integer():
