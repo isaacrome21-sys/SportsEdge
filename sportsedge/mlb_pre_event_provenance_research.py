@@ -81,7 +81,8 @@ def audit_pre_event_fact(fact_key, cutoff_utc, observations, *, freshness_hours=
             raise ValueError("channel does not match source host")
         if published > observed or observed > cutoff:
             reason = "POST_CUTOFF_OR_CLOCK_CONFLICT"
-        elif cutoff - observed > timedelta(hours=freshness_hours):
+        elif (cutoff - observed > timedelta(hours=freshness_hours)
+              or cutoff - published > timedelta(hours=freshness_hours)):
             reason = "STALE"
         else:
             reason = "TIMELY_UNAUTHENTICATED"
