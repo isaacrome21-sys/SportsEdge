@@ -29,6 +29,7 @@ def test_research_acquisition_creates_manifest(tmp_path, monkeypatch):
     assert result["games"] == 2
     manifest = json.loads((output / "manifest.json").read_text())
     assert manifest["no_pit_market_evidence"] is True
+    assert manifest["historical_result_availability_verified"] is False
     assert manifest["feed_paths"] == ["game-100.json", "game-101.json"]
     assert (output / "schedule.json").exists()
 
