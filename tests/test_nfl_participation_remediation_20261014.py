@@ -504,3 +504,27 @@ def test_addendum_malformed_games_refuse(tmp_path):
     assert over["participation_refusal"] == (
         "NFL_PARTICIPATION_BUNDLE_UNVERIFIED:"
         "NFL_PARTICIPATION_ARCHIVE_BUNDLE_SCHEMA_INVALID")
+
+
+def test_b1_exactly_five_unique_ids_cannot_prove_qb_active():
+    """Five valid rows can be a truncated official inactive list (5 of 7)."""
+    verdict = _qb_verdict(inactive_snapshots=[_snapshot([
+        "rb2", "chi-inactive-1", "chi-inactive-2",
+        "chi-inactive-3", "chi-inactive-4",
+    ])])
+    _assert_completeness_refusal(
+        verdict, lambda v: require_confirmed_qb_role(
+            v, depth_rows=depth_rows(), as_of=GAMEDAY))
+
+
+def test_b1_inline_complete_flag_cannot_prove_five_id_snapshot():
+    """A source-supplied boolean is not an independent completeness proof."""
+    snapshot = _snapshot([
+        "rb2", "chi-inactive-1", "chi-inactive-2",
+        "chi-inactive-3", "chi-inactive-4",
+    ])
+    snapshot["complete"] = True
+    verdict = _qb_verdict(inactive_snapshots=[snapshot])
+    _assert_completeness_refusal(
+        verdict, lambda v: require_confirmed_qb_role(
+            v, depth_rows=depth_rows(), as_of=GAMEDAY))
