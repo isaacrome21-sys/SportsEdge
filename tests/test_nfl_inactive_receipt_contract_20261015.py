@@ -91,3 +91,35 @@ def test_inline_authentication_flags_cannot_substitute_for_verifier():
     rec.update({"issuer_authenticated": True, "complete": True,
                 "independently_verified": True})
     assert verify(rec=rec) is False
+
+
+def test_internal_scan_accepts_only_separately_verified_receipt():
+    from sportsedge.nfl_participation_bridge import _inactive_scan
+    kickoff = datetime(2026, 10, 4, 17, 0, tzinfo=timezone.utc)
+    kwargs = dict(game_id=GAME, team_id=TEAM,
+                  candidate_id="active-qb", kickoff=kickoff, cutoff=CUTOFF)
+    unverified = _inactive_scan([], [snapshot()], **kwargs)
+    assert unverified["complete_published"] is False
+    verified = _inactive_scan(
+        [], [snapshot()], trusted_receipts=[receipt()],
+        trusted_issuer_verifier=lambda *_: True, **kwargs)
+    assert verified["complete_published"] is True
+    wrong = receipt()
+    wrong["player_ids"] = ["inactive-a"]
+    rejected = _inactive_scan(
+        [], [snapshot()], trusted_receipts=[wrong],
+        trusted_issuer_verifier=lambda *_: True, **kwargs)
+    assert rejected["complete_published"] is False
+
+
+def test_conflicting_same_instant_lists_never_confirm():
+    from sportsedge.nfl_participation_bridge import _inactive_scan
+    kickoff = datetime(2026, 10, 4, 17, 0, tzinfo=timezone.utc)
+    conflict = snapshot()
+    conflict["player_ids"] = ["inactive-a", "inactive-c"]
+    out = _inactive_scan(
+        [], [snapshot(), conflict], game_id=GAME, team_id=TEAM,
+        candidate_id="active-qb", kickoff=kickoff, cutoff=CUTOFF,
+        trusted_receipts=[receipt()],
+        trusted_issuer_verifier=lambda *_: True)
+    assert out["complete_published"] is False
