@@ -373,6 +373,29 @@ def _team_totals_intake_refusal(line):
         "the selection, and no team_side")
 
 
+def _as_of_instant(as_of):
+    """Aware UTC datetime for a declared as-of value, else None.
+
+    Accepts the CLI's ISO string or a datetime. A missing, naive or
+    unparseable value yields None (the caller falls back to the wall
+    clock, and the game engine still refuses a malformed as-of by
+    name downstream, exactly as before).
+    """
+    if as_of is None:
+        return None
+    if isinstance(as_of, datetime):
+        instant = as_of
+    else:
+        try:
+            instant = datetime.fromisoformat(
+                str(as_of).replace("Z", "+00:00"))
+        except (ValueError, TypeError, OverflowError):
+            return None
+    if instant.tzinfo is None or instant.utcoffset() is None:
+        return None
+    return instant.astimezone(timezone.utc)
+
+
 def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
              auto_context=True, min_ev=0.02, lane="A", allow_manual_context=False,
              td_cache_dir=None, td_opener=None, form2_bundles_dir=None,
@@ -420,6 +443,14 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     composed with cross-manifest identity collision refusals. No pin may
     be derived from the local archive itself.
     Default None: no Form 2 loading.
+
+    When the intake carries CFB QB passing-yard ladders, the card
+    gains a cfb_research_projections annex (RESEARCH ONLY): the
+    Form 2 identity-gated research distribution read for each ladder
+    QB whose identity the pre-pricing stage's seam verdicts establish,
+    or an explicit IDENTITY_NOT_ESTABLISHED entry where they do not.
+    The annex never alters a row's registry terminal state and carries
+    no prices, EV or no-vig figures.
     """
     rows = payload if isinstance(payload, list) else payload.get("lines")
     if not isinstance(rows, list):
@@ -427,6 +458,19 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     clock = now or datetime.now(timezone.utc)
     if clock.tzinfo is None or clock.utcoffset() is None:
         raise ValueError("MODEL_NOW_TIMEZONE_REQUIRED")
+    # Operative instant for every prop lane. The game engine prices
+    # against the declared as-of; the prop lanes historically received
+    # only the wall clock, so a run declared --as-of the capture
+    # instant judged its own fresh quotes stale once wall time drifted
+    # past the 180s freshness bound (Oct 14 2026 operative run: quotes
+    # captured 23:03:00Z, --as-of 23:03:00Z, wall 23:07:38Z -> the
+    # uniquely-paired OUTS/BB/HITS_ALLOWED props landed
+    # WATCH_QUOTE_NOT_CURRENT). When an as-of is declared it IS the
+    # operative instant for prop freshness, model as-of and
+    # started-game checks; the wall clock remains the execution audit
+    # stamp (engine now=) and is never used to re-judge a quote.
+    # quote_captured_at values are inputs and are never rewritten.
+    prop_clock = _as_of_instant(as_of) or clock
     default_sport = payload.get("sport") if isinstance(payload, dict) else None
     # Milestone-ladder prop intake (SPEC rev. 2, Oct 14 2026): DraftKings
     # "X+" ladders convert to canonical one-sided OVER/UNDER rows BEFORE
@@ -586,6 +630,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         if loaded_bundles:
             form2_bundles = loaded_bundles
 
+    stages = []
     if games:
         # Option 3: Prepricing adjustments stored separately from user context.
         # Strip any user-supplied prepricing_adjustments (never trusted).
@@ -797,11 +842,11 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             others[local] = covered if covered is not None else blocked(
                 line, "NO_VERIFIED_MODEL_FOR_THIS_MARKET")
     pitcher_results, pitcher_receipts = phone_pitcher_rows(
-        pitcher_input, now=clock, getter=getter if auto_context else (lambda url: None))
+        pitcher_input, now=prop_clock, getter=getter if auto_context else (lambda url: None))
     batter_results, batter_receipts = phone_batter_rows(
-        batter_input, now=clock, getter=getter if auto_context else (lambda url: None))
+        batter_input, now=prop_clock, getter=getter if auto_context else (lambda url: None))
     first_results, first_receipts = phone_first_inning_rows(
-        first_input, now=clock, getter=getter if auto_context else (lambda url: None))
+        first_input, now=prop_clock, getter=getter if auto_context else (lambda url: None))
     # F5 stage: quote binding + settlement-basis gate + strictly-prior
     # feature assembly, then the F5 deployment gate. With auto_context
     # off, fetching is disabled and binding fails closed on the fixture
@@ -811,7 +856,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     if f5_input:
         try:
             f5_results, f5_receipts = phone_f5_binding_rows(
-                f5_input, now=clock,
+                f5_input, now=prop_clock,
                 getter=getter if auto_context else None,
                 fetch_enabled=auto_context)
         except Exception as exc:
@@ -828,11 +873,11 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "model_p_authority": False, "staking_authority": False,
             } for line in f5_input]
     nfl_results, nfl_receipts = phone_nfl_player_rows(
-        nfl_input, now=clock, getter=getter if auto_context else (lambda url: None))
+        nfl_input, now=prop_clock, getter=getter if auto_context else (lambda url: None))
     cfb_results, cfb_receipts = phone_cfb_player_rows(
-        cfb_input, now=clock, getter=getter if auto_context else (lambda url: None))
+        cfb_input, now=prop_clock, getter=getter if auto_context else (lambda url: None))
     teamhalf_results, teamhalf_receipts = price_team_half_rows(
-        teamhalf_input, now=clock, getter=getter if auto_context else (lambda url: None))
+        teamhalf_input, now=prop_clock, getter=getter if auto_context else (lambda url: None))
     if len(teamhalf_results) != len(teamhalf_input):
         raise ValueError("TEAM_HALF_RESULT_COUNT_MISMATCH")
     # Canonical derivative stage: NFL team totals / period / alternate rows
@@ -876,7 +921,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                     if source_prov is not None:
                         deriv_distribution_provenance[key] = source_prov
             deriv_results, deriv_receipts = phone_nfl_derivative_rows(
-                deriv_input, distributions=distributions, now=clock)
+                deriv_input, distributions=distributions, now=prop_clock)
     # ANYTIME_TD stage: nflverse history through the engine's own opener
     # seam. With auto_context off and no explicit opener, a cache miss
     # fails closed instead of fetching (no-fetch means no-fetch). Same
@@ -902,7 +947,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             def _td_unavailable_opener(url, *args, **kwargs):
                 raise OSError("TD_HISTORY_FETCH_DISABLED_IN_NO_FETCH_MODE")
             td_results, td_receipts = phone_anytime_td_rows(
-                td_input, now=clock, cache_dir=td_cache_dir,
+                td_input, now=prop_clock, cache_dir=td_cache_dir,
                 opener=td_opener if td_opener is not None else (
                     None if auto_context else _td_unavailable_opener))
     if len(deriv_results) != len(deriv_input):
@@ -916,7 +961,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     if len(pitcher_results) != len(pitcher_input):
         raise ValueError("PITCHER_RESULT_COUNT_MISMATCH")
     coverage_results, coverage_receipts = phone_coverage_rows(
-        coverage_input, now=clock,
+        coverage_input, now=prop_clock,
         getter=getter if auto_context else (lambda url: None),
         auto_context=auto_context, min_ev=min_ev)
     if len(coverage_results) != len(coverage_input):
@@ -1111,6 +1156,41 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         card["summary"]["mlb_market_coverage"] = dict(card["mlb_full_board"]["input_coverage"])
     if form2_loader_audit is not None:
         card["qb_form2_bundle_loader_audit"] = form2_loader_audit
+    # CFB QB passing research annex (RESEARCH ONLY): beside the family
+    # registry refusals, surface the identity-gated research read for
+    # CFB games whose intake carried QB passing-yard ladders. The
+    # annex reads ONLY the pre-pricing stage's Form 2 seam verdicts and
+    # the evaluated rows' terminal states; it changes no row, no
+    # candidate list and no gate. Identity not established to the
+    # runner (e.g. no admitted bundle) yields an explicit
+    # NOT_ESTABLISHED entry and NO distribution -- never a name-matched
+    # fallback. Lazily imported: the distribution builder is
+    # numpy-backed and this runner must stay runnable in the
+    # numpy-free phone environment; if the annex cannot build, the
+    # section records its failure by name and the card stands.
+    if any(str(r.get("sport") or "").upper() == "CFB"
+           and str(r.get("market") or "").upper() == "PLAYER_PASSING_YARDS"
+           for r in rows if isinstance(r, dict)):
+        try:
+            from sportsedge.research.cfb_qb_card_annex import (
+                build_cfb_research_projections)
+            card["cfb_research_projections"] = build_cfb_research_projections(
+                rows=rows, evaluated=evaluated, games=games, stages=stages,
+                form2_loader_audit=form2_loader_audit,
+                as_of_utc=as_of or clock.astimezone(timezone.utc).isoformat(),
+                fetch_enabled=auto_context, getter=getter)
+        except Exception as exc:
+            card["cfb_research_projections"] = {
+                "schema": "SPORTSEDGE_CFB_RESEARCH_PROJECTIONS_V1",
+                "section_label": "RESEARCH_ONLY",
+                "content_kind": "RESEARCH_PROJECTION",
+                "research_only": True,
+                "official_authority": False, "model_p_authority": False,
+                "staking_authority": False,
+                "projections": [],
+                "section_failure": (
+                    f"ANNEX_BUILD_FAILED:{type(exc).__name__}:{exc}")[:300],
+            }
     # Optional operator-captured fixture-specific DraftKings tab census.
     # This is DIAGNOSTICS ONLY, not a trusted quote, model, registry
     # eligibility switch, or evidence of book-offered wagers.
