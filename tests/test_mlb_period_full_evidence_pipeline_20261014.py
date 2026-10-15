@@ -22,9 +22,9 @@ def test_local_feed_to_both_period_reports(tmp_path):
             "liveData": {"linescore": {
                 "innings": [
                     {"num": j, "away": {"runs": int(j == 1 and i % 2 == 0)},
-                     "home": {"runs": int(j == 2)}} for j in range(1, 10)
+                     "home": {"runs": int(j == 2) * 2}} for j in range(1, 10)
                 ],
-                "teams": {"away": {"runs": int(i % 2 == 0)}, "home": {"runs": 1}},
+                "teams": {"away": {"runs": int(i % 2 == 0)}, "home": {"runs": 2}},
             }},
         }
         name = f"game-{i}.json"
