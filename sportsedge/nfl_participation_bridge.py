@@ -268,6 +268,10 @@ def _inactive_scan(inactive_rows, inactive_snapshots, *, game_id, team_id,
     """
     result = {"candidate_inactive": False, "evidence_present": False,
               "complete_published": False}
+    # A trusted verifier is deliberately not accepted from evidence rows.
+    # The only authorized integration point is a separate, authenticated
+    # intake boundary; without one, absence from an inactive list is not
+    # proof of active status.
     if game_id is None:
         return result
     for raw in inactive_rows:
