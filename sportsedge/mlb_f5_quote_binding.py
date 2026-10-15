@@ -31,9 +31,18 @@ with a specific F5_* reason code:
    schedule, with team-name and first-pitch (<=120s) cross-checks and a
    pregame capture (F5_FIXTURE_BINDING_MISSING /
    F5_FIXTURE_BINDING_MISMATCH / F5_QUOTE_NOT_PREGAME);
-9. a paired counterpart: same book, same event, same fixture, opposite
-   selection, line-compatible (negated for the run line), captured
-   <=120s apart (F5_QUOTE_UNPAIRED / F5_PAIR_SKEW_EXCEEDED);
+9. a paired counterpart: same book, same event, same fixture, same
+   rung, opposite selection, line-compatible (negated for the run
+   line), captured <=120s apart (F5_QUOTE_UNPAIRED /
+   F5_PAIR_SKEW_EXCEEDED). The rung is part of the pairing identity
+   (owner ruling 2026-10-13): the pairing key is game identity,
+   period, market type, LINE, sportsbook and quote window, with
+   team-side normalization -- run-line rungs are recorded as the
+   AWAY side's signed line, so an away -0.5 / home +0.5 pair is the
+   -0.5 rung group, an away -1.5 / home +1.5 pair is the -1.5 rung
+   group, and quotes at different rungs never cross-pair (a
+   multi-rung ladder therefore binds rung by rung instead of
+   collapsing into one group);
 10. a verified settlement basis (see SETTLEMENT_BASIS below):
     F5_SETTLEMENT_BASIS_UNVERIFIED.
 
@@ -356,6 +365,14 @@ def _parse_quote(row: Mapping[str, Any], *, now: datetime) -> dict[str, Any]:
     if market in ("F5_MONEYLINE", "F5_RUN_LINE"):
         side = _TEAM_SIDE_TOKENS.get(side_raw)
         if side is None:
+            if market == "F5_MONEYLINE" and side_raw in ("DRAW", "TIE"):
+                raise F5BindingError(
+                    F5_SELECTION_UNVERIFIED,
+                    "a three-way DRAW selection is not admissible: "
+                    "the F5 moneyline settlement basis is TWO_WAY "
+                    "(DraftKings offers no Draw selection; a tied "
+                    "score after five pushes), so a three-way row "
+                    "refuses named and never joins two-way pairing")
             raise F5BindingError(
                 F5_SELECTION_UNVERIFIED,
                 f"{market} selection must be a team side (HOME/AWAY), "
@@ -599,6 +616,29 @@ def _lines_pair(market: str, own: float, other: float) -> bool:
     return abs(own - other) < 1e-9
 
 
+def _pairing_rung(market: str, side: str, line: float) -> float:
+    """The pairing-identity rung of a quote's line (owner ruling
+    2026-10-13: the rung line IS part of the pairing identity).
+
+    Run-line rungs are normalized to the AWAY side's signed line
+    (team-side normalization): a quote on the away team contributes
+    its line as-is, a quote on the home team contributes its
+    negation, so away -0.5 and home +0.5 are the same rung (-0.5),
+    away -1.5 and home +1.5 another (-1.5), and the distinct
+    contract away +1.5 / home -1.5 is the +1.5 rung -- magnitude
+    alone would merge the two -1.5/+1.5 contracts into one group.
+    The pairing check itself still requires the two quoted lines to
+    negate exactly. Totals and team totals pair on the identical
+    line, so their rung is the line itself; the moneyline's only
+    rung is 0.0. A pair's rung is recorded as this away-side line.
+    """
+    if market == "F5_RUN_LINE":
+        rung = line if side == "AWAY" else -line
+    else:
+        rung = line
+    return round(rung, 6) + 0.0  # + 0.0 folds a -0.0 rung into 0.0
+
+
 def bind_f5_quotes(rows: Sequence[Mapping[str, Any]], *, now: datetime,
                    fixture_resolver: Callable | None = None) -> dict[str, Any]:
     """Bind canonical-intake F5 quote rows into admissible pairs.
@@ -648,11 +688,15 @@ def bind_f5_quotes(rows: Sequence[Mapping[str, Any]], *, now: datetime,
             }
 
     # Pairing: group admissible quotes by book/event/fixture/market/
-    # entity; a group prices only as exactly one opposite pair.
+    # entity/rung -- the LINE is part of the pairing identity (owner
+    # ruling 2026-10-13, _pairing_rung), so each rung of a ladder is
+    # its own group; a group prices only as exactly one opposite pair.
     groups: dict[tuple, list[int]] = {}
     for i, parsed in parsed_by_index.items():
         key = (parsed["book_key"], parsed["event_id"], parsed["game_pk"],
-               parsed["market"], parsed["entity_id"])
+               parsed["market"], parsed["entity_id"],
+               _pairing_rung(parsed["market"], parsed["side"],
+                             parsed["line"]))
         groups.setdefault(key, []).append(i)
 
     pairs: list[dict[str, Any]] = []
@@ -715,6 +759,8 @@ def bind_f5_quotes(rows: Sequence[Mapping[str, Any]], *, now: datetime,
                 "official_date": first["fixture"]["official_date"],
             },
             "entity_id": first["entity_id"],
+            "rung_line": _pairing_rung(first["market"], first["side"],
+                                        first["line"]),
             "quotes": quotes,
             "member_indices": list(indices),
             "settlement_basis": basis,
