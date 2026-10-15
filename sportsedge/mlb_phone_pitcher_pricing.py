@@ -20,6 +20,36 @@ PITCHER_MARKETS = frozenset({
 })
 
 
+# DK board names for pitcher strikeouts. The pitcher lane canonicalizes
+# them to PITCHER_K (for the row AND its companion quotes) so the real
+# pitcher engine prices them. Pairing, freshness and the pitcher-K forward
+# hold are unchanged.
+PITCHER_MARKET_ALIASES = {
+    "PITCHER_STRIKEOUTS": "PITCHER_K", "PITCHER_KS": "PITCHER_K",
+    "STRIKEOUTS": "PITCHER_K",
+}
+
+
+def _canonical_market(value):
+    market = str(value or "").upper()
+    return PITCHER_MARKET_ALIASES.get(market, market)
+
+
+PITCHER_K_ANNEX_WITHHELD = "PITCHER_K_FORWARD_HOLD_RESEARCH_ESTIMATE_WITHHELD"
+
+
+def withhold_pitcher_k_annex(judged, market):
+    """Pitcher K stays under its forward hold (6/150): no research annex.
+
+    The row keeps its named blocker; the estimate is withheld by name so the
+    card never shows a pitcher-K probability while the hold is open.
+    """
+    if market == "PITCHER_K" and isinstance(judged, dict) and "research_estimate" in judged:
+        judged.pop("research_estimate", None)
+        judged["research_estimate_withheld"] = PITCHER_K_ANNEX_WITHHELD
+    return judged
+
+
 def blocked(row, reason):
     return {"status": "NO_MODEL_OR_MARKET", "reason": str(reason)[:180],
             "sport": "MLB", "market": row.get("market"),
@@ -37,7 +67,7 @@ def phone_pitcher_rows(rows, *, now=None, getter=None):
     outputs = []
     cache = {}
     for row in rows:
-        market = str(row.get("market") or "").upper()
+        market = _canonical_market(row.get("market"))
         if market not in PITCHER_MARKETS:
             outputs.append(blocked(row,"MARKET_NOT_SUPPORTED_BY_REAL_PITCHER_ENGINE"))
             continue
@@ -86,7 +116,7 @@ def phone_pitcher_rows(rows, *, now=None, getter=None):
             if (str(another.get("away")) != away or
                 str(another.get("home")) != home or
                 str(another.get("player_name") or another.get("label") or "").strip() != name or
-                str(another.get("market") or "").upper() != market or
+                _canonical_market(another.get("market")) != market or
                 not same_quoted_count_threshold(another.get("line"), row.get("line"))):
                 continue
             quotes.append({
@@ -98,7 +128,8 @@ def phone_pitcher_rows(rows, *, now=None, getter=None):
                 "book": another.get("book") or "draftkings",
                 "quote_captured_at": another.get("quote_captured_at"),
             })
-        judged = price_three_sport_research([p],quotes,as_of=now_utc)["rows"][0]
+        judged = withhold_pitcher_k_annex(
+            price_three_sport_research([p],quotes,as_of=now_utc)["rows"][0], market)
         # The generic bridge returns pricing fields but does not echo the
         # market threshold. Preserve the independently matched quoted line.
         judged["line"] = line

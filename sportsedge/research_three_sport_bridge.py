@@ -163,6 +163,34 @@ def _model(model, now):
     return key, win, push, conditional, round(fair)
 
 
+# Quote-binding refusals that happen AFTER the model produced a verified
+# pregame probability. The probability is real engine output; only the
+# benchmark (paired no-vig, capture clock) is missing, so it may be shown as
+# a RESEARCH_ONLY estimate. The row's status/reason stay the named blocker.
+QUOTE_BINDING_RESEARCH_REASONS = frozenset({
+    "EXACT_PAIRED_DK_QUOTE_REQUIRED",
+    "PAIRED_QUOTES_CAPTURE_TIMESTAMPS_REQUIRED",
+    "PAIRED_QUOTES_CAPTURE_WINDOW_EXCEEDED",
+})
+
+
+def _quote_binding_research_estimate(model, modeled, reason, now):
+    if modeled is None or reason not in QUOTE_BINDING_RESEARCH_REASONS:
+        return None
+    try:
+        kickoff = _time(model.get("kickoff_utc"), "KICKOFF")
+    except (ValueError, KeyError, TypeError):
+        return None
+    if str(model.get("phase") or "PREGAME").upper() != "PREGAME" or kickoff <= now:
+        return None
+    from .research_estimate import build_research_estimate
+    win, push, fair = modeled
+    return build_research_estimate(
+        win, push_p=push, fair=fair,
+        engine=str(model.get("model_source") or "UNNAMED_RESEARCH_MODEL"),
+        blocker=reason, quote_basis="NO_EXACT_PAIRED_TIMESTAMPED_DK_QUOTE")
+
+
 def price_three_sport_research(model_rows: Sequence[Mapping], quotes: Sequence[Mapping],
                                *, as_of, ev_floor=EV_MIN):
     """Return model-versus-DK research rows; never compute model p from odds.
@@ -193,8 +221,10 @@ def price_three_sport_research(model_rows: Sequence[Mapping], quotes: Sequence[M
         identity = {"input_index": i, "sport": model.get("sport"), "game_id": model.get("game_id"),
                     "market": model.get("market"), "selection": model.get("selection"),
                     "player_id": model.get("player_id")}
+        modeled = None
         try:
             key, win, push, conditional, fair = _model(model, now)
+            modeled = (win, push, fair)
             side = _side(model)
             ours = [q for q in parsed_quotes if q[1] == key and q[2] == side]
             others = [q for q in parsed_quotes
@@ -261,9 +291,13 @@ def price_three_sport_research(model_rows: Sequence[Mapping], quotes: Sequence[M
                 row["status"] = "RESEARCH_CANDIDATE_NOT_VALIDATED"
             rows.append(row)
         except (ValueError, KeyError, TypeError) as exc:
-            rows.append({**identity, "status": "NO_MODEL_OR_MARKET",
-                         "reason": str(exc)[:150], "research_only": True,
-                         "official_authority": False, "staking_authority": False})
+            out = {**identity, "status": "NO_MODEL_OR_MARKET",
+                   "reason": str(exc)[:150], "research_only": True,
+                   "official_authority": False, "staking_authority": False}
+            estimate = _quote_binding_research_estimate(model, modeled, str(exc), now)
+            if estimate is not None:
+                out["research_estimate"] = estimate
+            rows.append(out)
     rows.sort(key=lambda r: (r["status"] != "RESEARCH_CANDIDATE_NOT_VALIDATED",
                              -r.get("ev_per_dollar", -1e6), str(r.get("game_id"))))
     return {"schema": "SPORTSEDGE_THREE_SPORT_GAMES_PROPS_RESEARCH_V1",

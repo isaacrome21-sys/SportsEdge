@@ -266,7 +266,12 @@ def phone_first_inning_rows(rows, *, now=None, getter=None):
         judged = price_three_sport_research([model_row], quotes,
                                             as_of=now_utc)["rows"][0]
         if judged.get("status") == "NO_MODEL_OR_MARKET":
-            outputs.append(blocked(row, judged.get("reason") or "FIRST_INNING_QUOTE_PAIRING_FAILED"))
+            out = blocked(row, judged.get("reason") or "FIRST_INNING_QUOTE_PAIRING_FAILED")
+            if isinstance(judged.get("research_estimate"), dict):
+                # Blocker kept; the real first-inning engine estimate rides
+                # along as a RESEARCH_ONLY annex (no EV, never eligible).
+                out["research_estimate"] = judged["research_estimate"]
+            outputs.append(out)
             continue
         judged["line"] = line
         judged["team"] = _team_side(row)
