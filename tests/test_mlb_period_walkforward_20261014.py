@@ -9,6 +9,7 @@ from sportsedge.mlb_period_walkforward import evaluate_period_walkforward
 def _games(n=30):
     return [
         {"game_id": f"g{i}", "start_time": (datetime(2026, 8, 1, 18, tzinfo=timezone.utc) + timedelta(days=i)).isoformat(),
+         "result_available_at": (datetime(2026, 8, 1, 22, tzinfo=timezone.utc) + timedelta(days=i)).isoformat(),
          "inning_runs": [i % 3, 0, 1, 0, 0, 0, 0, 0, 0]}
         for i in range(n)
     ]
