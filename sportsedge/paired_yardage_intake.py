@@ -67,5 +67,6 @@ def bind_nfl_yardage_pair(quote: Mapping, *, as_of: datetime, max_age_seconds: i
         raise YardagePairRefusal("FUTURE_QUOTE")
     if age > max_age_seconds:
         raise YardagePairRefusal("STALE_QUOTE")
-    common = dict(identity, sport="NFL", market="PLAYER_" + market, book="DRAFTKINGS", line=float(line),\n                  quote_captured_at=captured.isoformat(), captured_at=captured.isoformat())
+    common = dict(identity, sport="NFL", market="PLAYER_" + market, book="DRAFTKINGS", line=float(line),
+                  quote_captured_at=captured.isoformat(), captured_at=captured.isoformat())
     return ({**common, "side": "OVER", "odds": over}, {**common, "side": "UNDER", "odds": under})
