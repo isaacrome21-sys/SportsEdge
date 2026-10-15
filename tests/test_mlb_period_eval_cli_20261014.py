@@ -16,6 +16,7 @@ def _input(tmp_path):
         "games": [
             {"game_id": str(i),
              "start_time": (start + timedelta(days=i)).isoformat(),
+             "result_available_at": (start + timedelta(days=i, hours=4)).isoformat(),
              "inning_runs": [i % 2, 1, 0, 0, 0, 0, 0, 0, 0]}
             for i in range(24)
         ],

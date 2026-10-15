@@ -21,6 +21,10 @@ def load_historical_inning_export(path: str | Path) -> list[dict]:
     if not isinstance(payload.get("observed_at"), str):
         raise ValueError("MISSING_OBSERVATION_TIME")
     _instant(payload["observed_at"])
+    if payload.get("availability_attestation_authenticity_verified") is True:
+        raise ValueError("UNSUPPORTED_AUTHENTICITY_CLAIM")
+    if payload.get("availability_attestation_authenticity_verified") is False:
+        raise ValueError("UNVERIFIED_AVAILABILITY_ATTESTATION")
     games = payload.get("games")
     if not isinstance(games, list) or not games:
         raise ValueError("EMPTY_HISTORICAL_GAMES")
@@ -38,11 +42,17 @@ def load_historical_inning_export(path: str | Path) -> list[dict]:
         start = _instant(row.get("start_time"))
         if start > _instant(payload["observed_at"]):
             raise ValueError("GAME_AFTER_OBSERVATION")
+        if "result_available_at" not in row:
+            raise ValueError("MISSING_RESULT_AVAILABILITY")
+        available = _instant(row["result_available_at"])
+        if available <= start or available > _instant(payload["observed_at"]):
+            raise ValueError("INVALID_RESULT_AVAILABILITY")
         innings = row.get("inning_runs")
         if (not isinstance(innings, list) or len(innings) < 9
                 or any(not isinstance(v, int) or isinstance(v, bool) or v < 0 for v in innings)):
             raise ValueError("INCOMPLETE_OR_INVALID_INNINGS")
         result.append({"game_id": str(game_id), "start_time": row["start_time"],
+                       "result_available_at": row["result_available_at"],
                        "inning_runs": innings})
     return result
 
@@ -54,4 +64,7 @@ def evaluate_historical_export(path: str | Path, *, innings: int,
         games, innings=innings, min_train=min_train, half_line=half_line)
     report["source_kind"] = "LOCAL_HISTORICAL_EXPORT"
     report["research_only"] = True
+    report["result_availability_authenticity_verified"] = False
+    report["pit_evidence_verified"] = False
+    report["market_evidence_paired"] = False
     return report

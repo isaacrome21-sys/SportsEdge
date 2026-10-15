@@ -9,6 +9,7 @@ from sportsedge.mlb_period_walkforward import evaluate_period_walkforward
 def _games(n=30):
     return [
         {"game_id": f"g{i}", "start_time": (datetime(2026, 8, 1, 18, tzinfo=timezone.utc) + timedelta(days=i)).isoformat(),
+         "result_available_at": (datetime(2026, 8, 1, 22, tzinfo=timezone.utc) + timedelta(days=i)).isoformat(),
          "inning_runs": [i % 3, 0, 1, 0, 0, 0, 0, 0, 0]}
         for i in range(n)
     ]
@@ -46,3 +47,17 @@ def test_invalid_line_refused():
 def test_no_forward_rows_refused():
     with pytest.raises(ValueError, match="NO_FORWARD_EVALUATION_ROWS"):
         evaluate_period_walkforward(_games(20), innings=3, min_train=20)
+
+
+def test_malformed_warmup_result_refused_even_when_not_scored():
+    games = _games(21)
+    games[0]["inning_runs"] = [0, 0]
+    with pytest.raises(ValueError, match="INVALID_TARGET_INNINGS"):
+        evaluate_period_walkforward(games, innings=3, min_train=20)
+
+
+def test_malformed_unscored_result_refused_with_no_forward_rows():
+    games = _games(5)
+    games[0]["inning_runs"] = [True] + [0] * 8
+    with pytest.raises(ValueError, match="INVALID_TARGET_INNINGS"):
+        evaluate_period_walkforward(games, innings=3, min_train=20)

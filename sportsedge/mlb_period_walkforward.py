@@ -30,8 +30,9 @@ def evaluate_period_walkforward(
     """Score chronological forward predictions against observed period totals.
 
     Input rows require unique game IDs, timezone-aware start times, and
-    nine completed inning counts. Same-timestamp games cannot train on
-    one another. Strictly-prior data only. Brier score is lower-is-better.
+    nine completed inning counts and independently evidenced result_available_at.
+    Same-timestamp games cannot train on one another. Result availability
+    must strictly precede target start. Brier score is lower-is-better.
     """
     if not isinstance(half_line, (float, int)) or isinstance(half_line, bool) or half_line < 0 or float(half_line) % 1 != .5:
         raise ValueError("HALF_INTEGER_LINE_REQUIRED")
@@ -42,10 +43,30 @@ def evaluate_period_walkforward(
         if not isinstance(gid, (str, int)) or isinstance(gid, bool) or not str(gid) or str(gid) in seen:
             raise ValueError("INVALID_OR_DUPLICATE_GAME_ID")
         seen.add(str(gid))
+    # Fail closed before scoring any target. A prior start does not prove
+    # its result was known at the target cutoff.
+    for g in ordered:
+        if "result_available_at" not in g:
+            raise ValueError("MISSING_RESULT_AVAILABILITY")
+        available = _instant(g["result_available_at"])
+        if available <= _instant(g["start_time"]):
+            raise ValueError("RESULT_AVAILABLE_BEFORE_START")
+    # Never score a target against a training pool that includes a result
+    # whose declared availability is after the target cutoff.
+    # Validate every outcome, including warm-up rows that are not scored.
+    # Otherwise malformed training history can remain latent until a later
+    # target happens to select it.
+    for g in ordered:
+        runs = g.get("inning_runs")
+        if (not isinstance(runs, (list, tuple)) or len(runs) < 9
+                or any(not isinstance(x, int) or isinstance(x, bool) or x < 0
+                       for x in runs)):
+            raise ValueError("INVALID_TARGET_INNINGS")
     scores = []
     for row in ordered:
         cutoff = _instant(row["start_time"])
-        prior = [g for g in ordered if _instant(g["start_time"]) < cutoff]
+        prior = [g for g in ordered if _instant(g["start_time"]) < cutoff
+                 and _instant(g["result_available_at"]) < cutoff]
         if len(prior) < min_train:
             continue
         empirical = period_run_distribution(prior, cutoff=row["start_time"],
