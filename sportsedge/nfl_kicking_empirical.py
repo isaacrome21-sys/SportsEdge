@@ -188,11 +188,41 @@ def prob_over_under(pmf: Mapping[int, float],
     return over, push, under
 
 
+def _valid_distance(distance: Any) -> float:
+    """Measured FG distance or a named refusal (never 0 / never 60+)."""
+    if distance is None or isinstance(distance, bool):
+        raise NflKickingError("KICKING_FG_DISTANCE_INVALID:missing")
+    try:
+        d = float(distance)
+    except (TypeError, ValueError):
+        raise NflKickingError(
+            f"KICKING_FG_DISTANCE_INVALID:{distance!r}") from None
+    if not math.isfinite(d) or d < 0:
+        raise NflKickingError(f"KICKING_FG_DISTANCE_INVALID:{d!r}")
+    return d
+
+
+def _pat_count(value: Any, field: str) -> int:
+    if value is None or isinstance(value, bool):
+        raise NflKickingError(f"KICKING_PAT_SUPPORT_INVALID:{field}")
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        raise NflKickingError(
+            f"KICKING_PAT_SUPPORT_INVALID:{field}") from None
+    if not math.isfinite(f) or f < 0 or f != int(f):
+        raise NflKickingError(f"KICKING_PAT_SUPPORT_INVALID:{field}={value!r}")
+    return int(f)
+
+
 def _band_index(distance: float) -> int:
+    distance = _valid_distance(distance)
     for i, (lo, hi, _rate, _mix) in enumerate(DISTANCE_BANDS):
         if lo <= distance <= hi:
             return i
-    return len(DISTANCE_BANDS) - 1
+        if i + 1 < len(DISTANCE_BANDS) and hi < distance < DISTANCE_BANDS[i + 1][0]:
+            return i + 1  # fractional yardage between integer bands
+    raise NflKickingError(f"KICKING_FG_DISTANCE_INVALID:{distance!r}")
 
 
 # ---------------------------------------------------------------------------
@@ -214,7 +244,23 @@ def estimate_kicking(games: Iterable[Mapping[str, Any]], *,
     if kickoff.tzinfo is None:
         raise NflKickingError("KICKING_KICKOFF_TIMEZONE_REQUIRED")
     rows: list[Mapping[str, Any]] = []
+    seen_games: set[str] = set()
     for g in games:
+        gkid = str(g.get("kicker_id") or "").strip()
+        if gkid != kid:
+            raise NflKickingError(
+                f"KICKING_HISTORY_PLAYER_MISMATCH:{kid}:got={gkid or None}")
+        gid = str(g.get("game_id") or "").strip()
+        if not gid:
+            raise NflKickingError("KICKING_HISTORY_GAME_ID_MISSING")
+        if gid in seen_games:
+            raise NflKickingError(f"KICKING_HISTORY_DUPLICATE_GAME:{gid}")
+        seen_games.add(gid)
+        pa = _pat_count(g.get("pat_attempts"), "pat_attempts")
+        pm = _pat_count(g.get("pat_makes"), "pat_makes")
+        if pm > pa:
+            raise NflKickingError(
+                f"KICKING_PAT_SUPPORT_INVALID:{gid}:makes={pm}>attempts={pa}")
         gk = g.get("kickoff")
         if gk is None:
             raise NflKickingError("KICKING_HISTORY_KICKOFF_MISSING")
@@ -357,9 +403,9 @@ def build_kicking_games(pbp: Any, games: Any) -> list[dict[str, Any]]:
             "fg_attempts": [], "pat_attempts": 0, "pat_makes": 0,
         })
         if int(row.field_goal_attempt or 0) == 1:
-            dist = row.kick_distance
+            dist = _valid_distance(row.kick_distance)
             rec["fg_attempts"].append((
-                float(dist) if dist == dist else 0.0,
+                dist,
                 str(row.field_goal_result).strip().lower() == "made"))
         if int(row.extra_point_attempt or 0) == 1:
             rec["pat_attempts"] += 1
