@@ -199,19 +199,18 @@ def _snapshot_player_ids(snapshot) -> list[str] | None:
 
 
 def _complete_inactive_snapshot_receipt(snapshot, receipt, *, game_id,
-                                        team_id, cutoff):
-    """Check an independently authenticated completeness claim.
+                                        team_id, cutoff,
+                                        trusted_issuer_verifier=None):
+    """Verify a complete official inactive snapshot using independent trust.
 
-    This predicate is deliberately NOT called on caller-supplied receipt
-    dictionaries: the archive/intake boundary must first authenticate the
-    issuer and bind the content hash to the official publication. A manifest
-    hash alone authenticates bytes, not source completeness.
+    The verifier is supplied by the trusted ingestion boundary, never by an
+    odds payload or archived evidence. It must validate publisher identity,
+    publication authenticity, and the claim of source completeness. An
+    external manifest hash alone is insufficient.
     """
     if not isinstance(snapshot, Mapping) or not isinstance(receipt, Mapping):
         return False
-    # A receipt without explicit independent issuer authentication is never
-    # sufficient, regardless of any caller-supplied 'complete' flag.
-    if receipt.get("issuer_authenticated") is not True:
+    if not callable(trusted_issuer_verifier):
         return False
     if receipt.get("source_complete") is not True:
         return False
@@ -219,14 +218,25 @@ def _complete_inactive_snapshot_receipt(snapshot, receipt, *, game_id,
         return False
     if _team(receipt.get("team")) != team_id:
         return False
-    if str(receipt.get("published_at") or "") != str(snapshot.get("published_at") or ""):
-        return False
     try:
-        if _utc(receipt.get("published_at"), "receipt published_at") > cutoff:
-            return False
+        published = _utc(receipt.get("published_at"), "receipt published_at")
+        snapshot_published = _utc(snapshot.get("published_at"),
+                                  "snapshot published_at")
     except NFLParticipationError:
         return False
-    return False  # Until trusted issuer verification is implemented, HOLD.
+    if published != snapshot_published or published > cutoff:
+        return False
+    ids = _snapshot_player_ids(snapshot)
+    if ids is None:
+        return False
+    # Exact canonical ID-set binding, not just a count or a boolean.
+    if receipt.get("player_ids") != sorted(ids):
+        return False
+    try:
+        return trusted_issuer_verifier(snapshot, receipt) is True
+    except Exception:
+        return False
+
 
 
 def _inactive_scan(inactive_rows, inactive_snapshots, *, game_id, team_id,
