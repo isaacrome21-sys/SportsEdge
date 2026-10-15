@@ -37,11 +37,43 @@ MAX_OT = 10              # refuse rather than loop forever on degenerate input
 EVENT_POINTS = {"FG2": 2, "FG3": 3, "FT": 1}
 
 
-def _norm(name):
-    t = str(name).lower()
-    for ch in ".-()/,'&":
-        t = t.replace(ch, " ")
+import re as _re
+import unicodedata as _ud
+
+# Confusables -> Latin (Cyrillic / Greek lookalikes), applied after NFKC.
+_CONFUSABLE = str.maketrans({
+    "а": "a", "в": "b", "е": "e", "ё": "e", "к": "k", "м": "m", "н": "h", "о": "o",
+    "р": "p", "с": "c", "т": "t", "у": "y", "х": "x", "і": "i", "ї": "i", "ј": "j",
+    "ѕ": "s", "ԁ": "d", "ӏ": "l", "ɩ": "i", "ᴅ": "d",
+    "А": "A", "В": "B", "Е": "E", "К": "K", "М": "M", "Н": "H", "О": "O", "Р": "P",
+    "С": "C", "Т": "T", "У": "Y", "Х": "X", "І": "I", "Ј": "J", "Ѕ": "S", "Ԁ": "D",
+    "α": "a", "β": "b", "ε": "e", "ι": "i", "κ": "k", "ν": "v", "ο": "o", "ρ": "p",
+    "τ": "t", "υ": "u", "χ": "x", "Α": "A", "Β": "B", "Ε": "E", "Ι": "I", "Κ": "K",
+    "Μ": "M", "Ν": "N", "Ο": "O", "Ρ": "P", "Τ": "T", "Χ": "X", "Υ": "Y", "Ζ": "Z",
+})
+_INVISIBLE = _re.compile("[\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180e"
+                         "\u200b-\u200f\u202a-\u202e\u2060-\u2064\u206a-\u206f\ufeff]")
+
+
+def _fold(name):
+    """NFKC, strip zero-width/format chars, map confusables, drop accents."""
+    t = _ud.normalize("NFKC", str(name))
+    t = _INVISIBLE.sub("", t).translate(_CONFUSABLE)
+    t = "".join(c for c in _ud.normalize("NFKD", t) if not _ud.combining(c))
+    return t
+
+
+def _norm(name, *, split_camel=False):
+    t = _fold(name)
+    if split_camel:
+        t = _re.sub(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", " ", t)
+    t = t.lower().replace("_", " ")
+    t = _re.sub(r"[^a-z0-9 ]", " ", t)
     return " ".join(t.split())
+
+
+def _collapse(name):
+    return _re.sub(r"[^a-z]", "", _norm(name))
 
 
 # Expanded alias list (mascot forms, abbreviations, sportsbook spellings). The
@@ -69,10 +101,13 @@ _IL_TOKENS = frozenset({
     "illinois", "illini", "ill", "chicago",
     "uiuc", "niu", "siu", "siue", "eiu", "wiu", "uic", "luc", "ilst", "chst",
     "depaul", "dep", "bradley", "brad", "salukis", "redbirds", "leathernecks",
-    "ramblers", "illinoisstate",
+    "ramblers", "illinoisstate", "illst", "il", "edwardsville",
 })
 # Multi-word forms that need no Illinois token ("U of I", mascots, ...).
 _IL_PHRASES = frozenset({
+    "il state", "il st", "chi state", "chi st", "n western", "nwestern",
+    "saint xavier", "st xavier", "saint xavier cougars", "st xavier cougars",
+    "lewis", "lewis flyers", "lewis university", "siu edwardsville",
     "u of i", "northwestern", "northwestern wildcats", "northwestern university", "nwu",
     "blue demons", "fighting illini",
 })
@@ -97,23 +132,36 @@ def _canon_id(ident):
     return raw.lstrip("0") if raw.isdigit() else raw
 
 
-def illinois_excluded(*identities) -> bool:
-    """True when any team name or ESPN id is an Illinois college (fail closed)."""
+@__import__("functools").lru_cache(maxsize=1)
+def _match_keys():
     names, ids = _excluded_keys()
-    names = names | IL_COLLEGE_ALIASES | _IL_PHRASES
-    stripped = {_strip(x) for x in names} - {""}
+    names = frozenset(_norm(x) for x in names | IL_COLLEGE_ALIASES | _IL_PHRASES)
+    stripped = frozenset({_strip(x) for x in names} - {""})
+    collapsed = frozenset({_collapse(x) for x in names | stripped} - {""})
+    return names, stripped, collapsed, frozenset(ids)
+
+
+def illinois_excluded(*identities) -> bool:
+    """True when any team name or ESPN id is an Illinois college (fail closed).
+    Matching is Unicode-hardened (NFKC, zero-width/confusable stripping,
+    Cyrillic/Greek -> Latin), splits underscores and camelCase, and also
+    compares a letters-only collapsed form against every known form."""
+    names, stripped, collapsed, ids = _match_keys()
     for ident in identities:
         if ident is None:
             continue
-        if _canon_id(ident) in ids:
+        if _canon_id(_fold(ident)) in ids:
             return True
-        n = _norm(ident)
-        if n in names or _strip(n) in stripped:
-            return True
-        toks = n.split()
-        if any(t in _IL_TOKENS for t in toks):
-            return True
-        if " ".join(toks[:1]) == "northwestern" and "state" not in toks:
+        for n in {_norm(ident), _norm(ident, split_camel=True)}:
+            toks = n.split()
+            if n in names or _strip(n) in stripped:
+                return True
+            if any(t in _IL_TOKENS for t in toks):
+                return True
+            if toks[:1] == ["northwestern"] and not ({"state", "st"} & set(toks)):
+                return True
+        c = _collapse(ident)
+        if c and (c in collapsed or _collapse(_strip(_norm(ident))) in collapsed):
             return True
     return False
 
