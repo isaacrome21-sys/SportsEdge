@@ -214,6 +214,12 @@ def _complete_inactive_snapshot_receipt(snapshot, receipt, *, game_id,
         return False
     if receipt.get("source_complete") is not True:
         return False
+    # Bind both sides independently; a valid receipt for one game must
+    # never authenticate a snapshot belonging to another game or team.
+    if str(snapshot.get("game_id") or "") != str(game_id):
+        return False
+    if _team(snapshot.get("team")) != team_id:
+        return False
     if str(receipt.get("game_id") or "") != str(game_id):
         return False
     if _team(receipt.get("team")) != team_id:
