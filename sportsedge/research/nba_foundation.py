@@ -96,6 +96,9 @@ class GamePath:
     away_id: str
     events: list = field(default_factory=list)
     periods_played: int = REG_PERIODS
+    # (home TeamInput, away TeamInput) bound by simulate_game; settle() needs
+    # rosters to run check_path and refuses a path without them (fail closed).
+    teams: tuple | None = field(default=None, repr=False, compare=False)
 
     def points(self, team_id, periods=None):
         return sum(EVENT_POINTS[e.kind] for e in self.events if e.team_id == team_id
@@ -156,6 +159,7 @@ def simulate_game(home: TeamInput, away: TeamInput, rng: random.Random) -> GameP
             _period(rng, path, t, period, OT_MIN)
     path.periods_played = period
     check_path(path, home, away)
+    path.teams = (home, away)
     return path
 
 
@@ -208,7 +212,20 @@ def _segment(path, segment):
 
 
 def settle(path: GamePath, market: str, *, selection=None, line=None,
-           segment="GAME", player_id=None, team_id=None):
+           segment="GAME", player_id=None, team_id=None, home=None, away=None):
+    """Fail closed: check_path runs on the path's rosters before settlement."""
+    if path.final_score()[0] == path.final_score()[1]:
+        raise FoundationError(f"{SPORT}_GAME_ENDED_TIED")   # empty or tied path
+    if home is not None or away is not None:
+        if home is None or away is None:
+            raise FoundationError(f"{SPORT}_PATH_ROSTERS_MISSING", "need home and away")
+        teams = (home, away)
+    else:
+        teams = path.teams
+    if not teams:
+        raise FoundationError(f"{SPORT}_PATH_ROSTERS_MISSING")
+    check_path(path, *teams)
+    rosters = {t.team_id: t.roster for t in teams}
     per = _segment(path, segment)
     h, a = path.points(path.home_id, per), path.points(path.away_id, per)
     sides = (path.home_id, path.away_id)
@@ -241,6 +258,8 @@ def settle(path: GamePath, market: str, *, selection=None, line=None,
             raise FoundationError(f"{SPORT}_TEAM_IDENTITY_MISMATCH", str(team_id))
         if not isinstance(player_id, str) or not player_id:
             raise FoundationError(f"{SPORT}_PLAYER_ID_MISSING")
+        if player_id not in rosters.get(team_id, ()):   # ghost player: not rostered
+            raise FoundationError(f"{SPORT}_PLAYER_IDENTITY_MISMATCH", str(player_id))
         if any(e.player_id == player_id and e.team_id != team_id for e in path.events):
             raise FoundationError(f"{SPORT}_PLAYER_IDENTITY_MISMATCH", str(player_id))
         v = path.player_points(player_id) if market == "PLAYER_POINTS" \
@@ -255,7 +274,8 @@ def settle_player_prop(path, home, away, market, player_id, line, team_id):
         raise FoundationError(f"{SPORT}_TEAM_IDENTITY_MISMATCH", str(team_id))
     if player_id not in rosters[team_id]:
         raise FoundationError(f"{SPORT}_PLAYER_IDENTITY_MISMATCH", str(player_id))
-    return settle(path, market, player_id=player_id, line=line, team_id=team_id)
+    return settle(path, market, player_id=player_id, line=line, team_id=team_id,
+                  home=home, away=away)
 
 
 _SIM = "joint scoring-event skeleton + settlement; caller-supplied rates, no fit, no backtest"

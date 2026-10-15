@@ -74,7 +74,8 @@ def test_ot_settlement_scopes():
 
 
 def test_whole_number_push_and_spread():
-    p = GamePath("HOM", "AWY", [Event("HOM", "HOM_p0", 1, "FG3"), Event("AWY", "AWY_p0", 2, "FG2")])
+    p = GamePath("HOM", "AWY", [Event("HOM", "HOM_p0", 1, "FG3"), Event("AWY", "AWY_p0", 2, "FG2")],
+                 teams=(H, A))
     assert F.check_path(p, H, A)
     assert F.settle(p, "SPREAD", selection="HOM", line=-1) == "PUSH"
     assert F.settle(p, "SPREAD", selection="AWY", line=1.5) == "WIN"
