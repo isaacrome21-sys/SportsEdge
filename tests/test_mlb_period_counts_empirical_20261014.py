@@ -9,6 +9,7 @@ from sportsedge.mlb_period_counts_empirical import (
 def _games(n=20):
     return [
         {"game_id": f"g{i}", "start_time": f"2026-09-{i + 1:02d}T18:00:00Z",
+         "result_available_at": f"2026-09-{i + 1:02d}T22:00:00Z",
          "inning_runs": [i % 2, 1, 0, 0, 0, 0, 0, 0, 0]}
         for i in range(n)
     ]
@@ -60,3 +61,17 @@ def test_insufficient_history_refused():
 def test_naive_cutoff_refused():
     with pytest.raises(ValueError, match="NAIVE_EVENT_TIME"):
         period_run_distribution(_games(), cutoff="2026-10-01T00:00:00", innings=3)
+
+
+def test_late_result_refused_at_distribution_boundary():
+    games = _games()
+    games[-1]["result_available_at"] = "2026-10-02T00:00:00Z"
+    with pytest.raises(ValueError, match="RESULT_NOT_AVAILABLE_AT_CUTOFF"):
+        period_run_distribution(games, cutoff="2026-10-01T00:00:00Z", innings=3)
+
+
+def test_missing_result_timestamp_refused_at_distribution_boundary():
+    games = _games()
+    games[0].pop("result_available_at")
+    with pytest.raises(ValueError, match="MISSING_RESULT_AVAILABILITY"):
+        period_run_distribution(games, cutoff="2026-10-01T00:00:00Z", innings=3)
