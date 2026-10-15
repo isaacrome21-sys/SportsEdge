@@ -211,6 +211,16 @@ def mlb_batter_to_bridge_rows(
             raise ValueError("HISTORY_LEAK_OR_DUPLICATE_GAME")
         outcome = price_batter_market(
             market=market, side=side, line=line, pa_history=history)
+        # An unsmoothed prior-game empirical proportion can be exactly 0
+        # or 1 (particularly for rare HR and triples). Its win/loss/push
+        # accounting still conserves mass: this is NOT a corrupt PMF.
+        # No independently validated tail model exists to turn an
+        # unobserved event into a current-price probability. Refuse by
+        # the actual reason instead of the generic engine-mass error;
+        # never clip, add pseudo-counts or infer an opposite quote.
+        if (outcome["model_p"] in (0.0, 1.0)
+                or outcome["push_p"] == 1.0):
+            raise ValueError("EMPIRICAL_DEGENERATE_TAIL_NO_VALIDATED_MODEL")
         return [_outcome(
             sport="MLB", game_id=game_id, market=market.upper(), selection=side,
             p=outcome["model_p"], push=outcome["push_p"],
