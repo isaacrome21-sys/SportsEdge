@@ -370,6 +370,8 @@ def assess_qb_participation(
     injury_rows: Sequence[Mapping[str, Any]] = (),
     inactive_rows: Sequence[Mapping[str, Any]] = (),
     inactive_snapshots: Sequence[Mapping[str, Any]] = (),
+    trusted_inactive_receipts: Sequence[Mapping[str, Any]] = (),
+    trusted_issuer_verifier: Any = None,
     game_id: str | None = None,
     target_season: int,
     target_week: int,
@@ -468,7 +470,8 @@ def assess_qb_participation(
     scan = _inactive_scan(
         inactive_rows, inactive_snapshots, game_id=game_id,
         team_id=team_id, candidate_id=candidate_id, kickoff=kick,
-        cutoff=cutoff)
+        cutoff=cutoff, trusted_receipts=trusted_inactive_receipts,
+        trusted_issuer_verifier=trusted_issuer_verifier)
     verdict["inactives_published"] = scan["complete_published"]
     verdict["inactives_evidence_present"] = scan["evidence_present"]
     verdict["inactives_completeness"] = (
@@ -574,6 +577,8 @@ def assess_skill_participation(
     injury_rows: Sequence[Mapping[str, Any]] = (),
     inactive_rows: Sequence[Mapping[str, Any]] = (),
     inactive_snapshots: Sequence[Mapping[str, Any]] = (),
+    trusted_inactive_receipts: Sequence[Mapping[str, Any]] = (),
+    trusted_issuer_verifier: Any = None,
     game_id: str | None = None,
     target_season: int,
     target_week: int,
@@ -700,7 +705,9 @@ def assess_skill_participation(
 
     scan = _inactive_scan(
         inactive_rows, inactive_snapshots, game_id=game_id,
-        team_id=team_id, candidate_id=pid, kickoff=kick, cutoff=cutoff)
+        team_id=team_id, candidate_id=pid, kickoff=kick, cutoff=cutoff,
+        trusted_receipts=trusted_inactive_receipts,
+        trusted_issuer_verifier=trusted_issuer_verifier)
     verdict["inactives_published"] = scan["complete_published"]
     verdict["inactives_evidence_present"] = scan["evidence_present"]
     verdict["inactives_completeness"] = (
