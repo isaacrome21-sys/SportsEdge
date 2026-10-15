@@ -5,6 +5,8 @@ These are constructed fixtures, not MLB historical performance observations.
 import json
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from sportsedge.mlb_statsapi_feed_cli import main as convert
 from sportsedge.mlb_period_eval_cli import main as evaluate
 
@@ -40,7 +42,12 @@ def test_local_feed_to_both_period_reports(tmp_path):
     evidence = tmp_path / "historical.json"
     report = tmp_path / "evaluation.json"
     assert convert(["--manifest", str(manifest), "--output", str(evidence)]) == 0
-    assert evaluate(["--input", str(evidence), "--output", str(report)]) == 0
+    # Retrospectively fetched final feeds do not establish when results were
+    # available; evaluating them as pregame knowledge must refuse.
+    with pytest.raises(ValueError, match="MISSING_RESULT_AVAILABILITY"):
+        evaluate(["--input", str(evidence), "--output", str(report)])
+    assert not report.exists()
+    return
     result = json.loads(report.read_text())
     assert result["reports"]["first_3"]["forward_predictions"] == 4
     assert result["reports"]["first_7"]["forward_predictions"] == 4
