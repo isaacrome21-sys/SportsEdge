@@ -177,12 +177,86 @@ _blocked("MLB", "PITCHER_HITS_WALKS_ER", "NO_QUOTE",
          "until separately reconciled against per-fixture evidence; do not "
          "infer global market nonexistence. The pitcher probability engine "
          "is not the immediate blocker.", engine=_PITCHER)
+# Truthful named gates (backtest matrix M32/M33; wiring-queue items
+# 3-4). Both families used to share the generic NO_ENGINE text "No
+# engine for this market is reachable" -- which was never the real
+# reason for either: a probability construction EXISTS in research
+# code for both. These are label refinements only -- pricing stays
+# refused on every path, no intake path produces a price, and no
+# registry/deployment/validation state changes.
+_blocked("MLB", "PITCHER_RECORD_WIN", "NO_ENGINE",
+         "PITCHER_RECORD_WIN_OFFERING_UNVERIFIED (pricing gate; "
+         "also outstanding: PITCHER_RECORD_WIN_ENGINE_CANDIDATE_"
+         "UNVALIDATED): a win-credit probability construction "
+         "EXISTS in research code (pitcher_record_win_engine "
+         "credit-state candidate: F5 joint lead state x starter "
+         "workload x team score paths), so 'no engine' was never "
+         "the real reason. The immediate gate is the OFFERING: no "
+         "verified DraftKings offering rows for this market exist "
+         "on the enumerated board in this lane's evidence, so no "
+         "quote can bind (per-fixture absence is not proof of "
+         "global nonexistence). Behind it, the engine itself "
+         "remains a candidate -- historical PIT, holdout, "
+         "calibration, sportsbook settlement, forward evidence "
+         "and production parity are all unsatisfied, by the "
+         "engine module's own statement. Pricing stays refused "
+         "until a verified offering exists AND the candidate "
+         "clears its own gates; intake plumbing is deliberately "
+         "not built ahead of either.",
+         engine="PITCHER_RECORD_WIN_ENGINE credit-state candidate "
+                "v2 (research complex only; gated PITCHER_RECORD_"
+                "WIN_OFFERING_UNVERIFIED)")
+_blocked("MLB", "FIRST_HOME_RUN", "NO_ENGINE",
+         "FIRST_HOME_RUN_ABSENT_ON_ENUMERATED_BOARD (pricing "
+         "gate; also outstanding: FIRST_HOME_RUN_MULTI_OUTCOME_"
+         "SELECTION_SET_UNBOUND): a batting-order probability "
+         "construction EXISTS in research code (first_hr_order_"
+         "engine lineup-order candidate), so 'no engine' was "
+         "never the whole reason. The immediate gate is the "
+         "BOARD: this market was absent on the sampled board in "
+         "this lane's evidence (per-fixture absence is not proof "
+         "of global nonexistence). Behind it, the market is "
+         "MULTI-OUTCOME -- one selection per batter across both "
+         "lineups, an N-way field -- and the canonical path binds "
+         "binary, pair and verified-partition markets only; no "
+         "N-way selection-set binding exists, and first-HR "
+         "settlement needs full-game play-by-play first-home-run "
+         "attribution. Pricing stays refused until a verified "
+         "offering exists AND the multi-outcome binding is built.",
+         engine="FIRST_HR_ORDER_ENGINE lineup-order candidate v1 "
+                "(research complex only; gated FIRST_HOME_RUN_"
+                "ABSENT_ON_ENUMERATED_BOARD)")
 for _m in ("EITHER_PITCHER_HITS_ALLOWED", "EITHER_PITCHER_BB",
-           "EITHER_PITCHER_ER", "PITCHER_RECORD_WIN", "FIRST_HOME_RUN"):
+           "EITHER_PITCHER_ER"):
+    # Truthful named gate (EITHER_PITCHER decision package, DESIGN.md
+    # sections 3/5/7; owner-approved Oct 14 2026). An either-probability
+    # construction EXISTS in the research joint engine (Cartesian-product
+    # pools), so "no engine" was never the real reason: the construction
+    # assumes the two starters' outcomes are independent, and that
+    # dependence is unmeasured. This is a label refinement only --
+    # pricing stays refused, no intake path produces a price, and
+    # settlement stays fail-closed (EITHER_PITCHER_BOOK_SPECIFIC_
+    # SEMANTICS_REQUIRED in either_pitcher_settlement).
     _blocked("MLB", _m, "NO_ENGINE",
-             "No engine for this market is reachable from the canonical "
-             "intake; " + _SNAPSHOT_ONLY + ".",
-             engine="CANONICAL_REGISTRY (snapshot contract only)")
+             "EITHER_PITCHER_DEPENDENCE_UNMEASURED (pricing gate; "
+             "also outstanding: EITHER_PITCHER_RUNG_LABEL_UNVERIFIED, "
+             "EITHER_PITCHER_PAIR_BINDING_INCOMPLETE): the only "
+             "either-probability construction (pitcher_joint_engine "
+             "Cartesian-product pools) assumes the two starters are "
+             "independent; they share park/weather/umpire/game script, "
+             "and under dependence the independence value OVERSTATES "
+             "the one-sided rung probabilities DraftKings sells. "
+             "Pricing stays refused "
+             "until a preregistered paired-starter dependence audit "
+             "bounds the independence error. Rung labels: no capture "
+             "on record pins them to the max/min reading (vs a "
+             "combined-sum reading). Pair binding: no verified "
+             "two-pitcher intake exists on the canonical path; the "
+             "pair identity <away_pitcher_id>|<home_pitcher_id> is "
+             "defined only in the settlement and PIT layers.",
+             engine="PITCHER_JOINT_ENGINE either branch (research "
+                    "complex only; gated EITHER_PITCHER_DEPENDENCE_"
+                    "UNMEASURED)")
 
 # ---------------------------------------------------------------- NFL (51)
 for _m in ("moneyline", "spread"):

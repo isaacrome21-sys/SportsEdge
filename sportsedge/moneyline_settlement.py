@@ -105,6 +105,25 @@ _declare(
         "adopts the same two-way/three-way distinction."),
     sources=(DK_BASEBALL_GUIDE_URL, DK_MARKET_RULES_URL),
 )
+for _period_market in ("F3_MONEYLINE", "F7_MONEYLINE"):
+    _declare(
+        market=_period_market,
+        sportsbook="DraftKings",
+        settlement_type=MoneylineSettlementType.TWO_WAY,
+        basis=(
+            "VERIFIED_TWO_WAY -- DraftKings offers only the two teams "
+            "for the first-3-innings and first-7-innings moneylines "
+            "(no Draw selection; enumerated in the Oct 13 2026 "
+            "DraftKings catalog capture's 1st-3 / 1st-7 innings sets), "
+            "and its published baseball guide states a team bet tied "
+            "after the period pushes with the stake refunded; under "
+            "DraftKings' published market-rules taxonomy that is a "
+            "2-Way Moneyline Market, whose ties settle as Push -- the "
+            "same published-rules basis as the F5_MONEYLINE "
+            "declaration. Owner ruling 2026-10-12 adopts the same "
+            "two-way/three-way distinction."),
+        sources=(DK_BASEBALL_GUIDE_URL, DK_MARKET_RULES_URL),
+    )
 _declare(
     market="MONEYLINE",
     sportsbook="DraftKings",
