@@ -17,6 +17,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from artifacts import free_models as engine
+from sportsedge.research_estimate import build_research_estimate
 from sportsedge.mlb_phone_pitcher_pricing import phone_pitcher_rows, blocked
 from sportsedge.mlb_phone_batter_pricing import phone_batter_rows
 from sportsedge.mlb_phone_first_inning_pricing import (
@@ -245,6 +246,51 @@ def audit_row(source, result):
     else:
         out["player_props"] = {"status": "NOT_APPLICABLE", "detail": "Game-level market"}
     return out
+
+
+REGISTRY_RESEARCH_SCORE_ENGINE = "free_models.game_engine:LANE_A_MARKET_BLIND"
+
+
+def _attach_registry_research_scores(games, game_results, positions,
+                                     prepricing_by_index, **run_kwargs):
+    """Research-score pass for registry-blocked game rows (#2319).
+
+    Scores the gated games in a SEPARATE, discarded engine card (lane A,
+    market-blind) and attaches only the probability/fair odds as a
+    research_estimate annex. The registry row's status, blocker and reason
+    are unchanged; nothing from this pass reaches edges, candidates, PLAY
+    or staking. Rows the engine itself refuses (Illinois, started, invalid)
+    or prices from the market get no annex. Any engine failure leaves the
+    plain blocker.
+    """
+    lines = [dict(games[g]) for g in positions]
+    try:
+        side_card = engine.run(
+            {"lines": lines}, lane="A",
+            prepricing_adjustments=[prepricing_by_index.get(g) for g in positions],
+            **run_kwargs)
+    except Exception:  # fail closed: the blocker row stands alone
+        return
+    scored = side_card.get("evaluated_rows") or []
+    if len(scored) != len(positions):
+        return
+    for gpos, result in zip(positions, scored):
+        if not isinstance(result, dict):
+            continue
+        status = str(result.get("status") or "")
+        provenance = result.get("pricing_provenance")
+        if (status.startswith("BLOCKED") or status in {"NO_MODEL_OR_MARKET", "NO_ENGINE"}
+                or result.get("pricing_lane") == "LANE_B_ANCHORED"
+                or (isinstance(provenance, dict) and provenance.get("lane") != "INDEPENDENT")):
+            continue
+        row = game_results[gpos]
+        estimate = build_research_estimate(
+            result.get("estimate_p"), push_p=result.get("push_p"),
+            fair=result.get("fair_american"),
+            engine=REGISTRY_RESEARCH_SCORE_ENGINE,
+            blocker=row.get("reason") or row.get("blocker") or "FAMILY_REGISTRY_NOT_VALIDATED")
+        if estimate is not None:
+            row["research_estimate"] = estimate
 
 
 def _prepricing_blocked_row(line, stage, input_index):
@@ -756,6 +802,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             qb_form2_bundles=form2_bundles)
         # Build separate prepricing_adjustments objects (not merged into context)
         prepricing_by_index = {}
+        research_score_pos = []
         game_results = [None] * len(games)
         clear_lines = []
         clear_game_pos = []
@@ -775,12 +822,16 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "factors": list(st["factors"]) if isinstance(st.get("factors"), list) else [],
             }
             if gpos in family_game_gated:
-                # Evidence-only: record positive QB identity/factor audit,
-                # but never hand any adjustment, probability or game row
-                # to the model. No CFB market can produce a candidate.
+                # Evidence-only: record positive QB identity/factor audit.
+                # The registry row stays the terminal row; the game is NOT
+                # handed to the priced card. It may only be scored in the
+                # separate research-score pass below, whose output rides
+                # on this row as a RESEARCH_ONLY annex (no EV, never a
+                # candidate, never eligible, not validation).
                 gate_row = dict(family_game_gated[gpos])
                 gate_row["input_index"] = game_indices[gpos]
                 game_results[gpos] = gate_row
+                research_score_pos.append(gpos)
                 continue
             clear_lines.append(line)
             clear_game_pos.append(gpos)
@@ -821,6 +872,12 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             if stage_availability:
                 priced[pos]["availability_status"] = stage_availability
             game_results[gpos] = priced[pos]
+        if research_score_pos:
+            _attach_registry_research_scores(
+                games, game_results, research_score_pos, prepricing_by_index,
+                now=clock, as_of=as_of, historical=historical, getter=getter,
+                auto_context=auto_context, min_ev=min_ev,
+                allow_manual_context=allow_manual_context)
         priced_games = game_results
         # Option 3: Prepricing audit for transparency (separate from user context audit)
         def _audit_entry(gpos):
@@ -1329,6 +1386,14 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         if gate is None or result.get("registry_enforced"):
             continue
         gate["input_index"] = i
+        upstream = str(result.get("status") or "")
+        if upstream.startswith("BLOCKED_PREPRICING"):
+            # Keep the first failing gate visible: a prepricing refusal
+            # (e.g. QB identity unverifiable) is why no research score
+            # could run, and the card must say so by name.
+            gate["upstream_blocker"] = upstream
+            gate["upstream_blocker_detail"] = str(result.get("reason") or "")[:200]
+            gate["reason"] = f"{gate.get('reason')}; prepricing: {upstream}"[:400]
         evaluated[i] = gate
         if i in prop_local:
             modeled_props[prop_local[i]] = gate
