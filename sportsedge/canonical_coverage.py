@@ -177,12 +177,42 @@ _blocked("MLB", "PITCHER_HITS_WALKS_ER", "NO_QUOTE",
          "until separately reconciled against per-fixture evidence; do not "
          "infer global market nonexistence. The pitcher probability engine "
          "is not the immediate blocker.", engine=_PITCHER)
-for _m in ("EITHER_PITCHER_HITS_ALLOWED", "EITHER_PITCHER_BB",
-           "EITHER_PITCHER_ER", "PITCHER_RECORD_WIN", "FIRST_HOME_RUN"):
+for _m in ("PITCHER_RECORD_WIN", "FIRST_HOME_RUN"):
     _blocked("MLB", _m, "NO_ENGINE",
              "No engine for this market is reachable from the canonical "
              "intake; " + _SNAPSHOT_ONLY + ".",
              engine="CANONICAL_REGISTRY (snapshot contract only)")
+for _m in ("EITHER_PITCHER_HITS_ALLOWED", "EITHER_PITCHER_BB",
+           "EITHER_PITCHER_ER"):
+    # Truthful named gate (EITHER_PITCHER decision package, DESIGN.md
+    # sections 3/5/7; owner-approved Oct 14 2026). An either-probability
+    # construction EXISTS in the research joint engine (Cartesian-product
+    # pools), so "no engine" was never the real reason: the construction
+    # assumes the two starters' outcomes are independent, and that
+    # dependence is unmeasured. This is a label refinement only --
+    # pricing stays refused, no intake path produces a price, and
+    # settlement stays fail-closed (EITHER_PITCHER_BOOK_SPECIFIC_
+    # SEMANTICS_REQUIRED in either_pitcher_settlement).
+    _blocked("MLB", _m, "NO_ENGINE",
+             "EITHER_PITCHER_DEPENDENCE_UNMEASURED (pricing gate; "
+             "also outstanding: EITHER_PITCHER_RUNG_LABEL_UNVERIFIED, "
+             "EITHER_PITCHER_PAIR_BINDING_INCOMPLETE): the only "
+             "either-probability construction (pitcher_joint_engine "
+             "Cartesian-product pools) assumes the two starters are "
+             "independent; they share park/weather/umpire/game script, "
+             "and under dependence the independence value OVERSTATES "
+             "the one-sided rung probabilities DraftKings sells. "
+             "Pricing stays refused "
+             "until a preregistered paired-starter dependence audit "
+             "bounds the independence error. Rung labels: no capture "
+             "on record pins them to the max/min reading (vs a "
+             "combined-sum reading). Pair binding: no verified "
+             "two-pitcher intake exists on the canonical path; the "
+             "pair identity <away_pitcher_id>|<home_pitcher_id> is "
+             "defined only in the settlement and PIT layers.",
+             engine="PITCHER_JOINT_ENGINE either branch (research "
+                    "complex only; gated EITHER_PITCHER_DEPENDENCE_"
+                    "UNMEASURED)")
 
 # ---------------------------------------------------------------- NFL (51)
 for _m in ("moneyline", "spread"):
