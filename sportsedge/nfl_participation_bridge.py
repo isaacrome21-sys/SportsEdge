@@ -310,6 +310,9 @@ def _inactive_scan(inactive_rows, inactive_snapshots, *, game_id, team_id,
                 raw.get("status") or "").strip().upper() == "INACTIVE":
             result["candidate_inactive"] = True
     valid: dict[datetime, set] = {}
+    # Track every published snapshot's canonical identity, including malformed
+    # revisions, so a conflicting same-instant object cannot be ignored.
+    published_snapshot_count: dict[datetime, int] = {}
     latest_seen_publication = None
     for raw in inactive_snapshots:
         if not isinstance(raw, Mapping):
@@ -328,6 +331,7 @@ def _inactive_scan(inactive_rows, inactive_snapshots, *, game_id, team_id,
         if published_at > cutoff:
             continue
         result["evidence_present"] = True
+        published_snapshot_count[published_at] = published_snapshot_count.get(published_at, 0) + 1
         if latest_seen_publication is None or published_at > latest_seen_publication:
             latest_seen_publication = published_at
         ids = raw.get("player_ids")
@@ -363,7 +367,7 @@ def _inactive_scan(inactive_rows, inactive_snapshots, *, game_id, team_id,
             if _team(raw.get("team")) != team_id:
                 continue
             # Conflicting same-instant lists cannot prove completeness.
-            if len(valid[pub]) != 1:
+            if len(valid[pub]) != 1 or published_snapshot_count[pub] != 1:
                 continue
             for receipt in trusted_receipts:
                 if _complete_inactive_snapshot_receipt(
