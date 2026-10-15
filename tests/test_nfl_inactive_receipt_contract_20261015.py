@@ -33,7 +33,7 @@ def receipt():
     }
 
 
-def verify(s, r, *, verifier=None, snap=None, rec=None, cutoff=CUTOFF,
+def verify(*, verifier=None, snap=None, rec=None, cutoff=CUTOFF,
            game=GAME, team=TEAM):
     return _complete_inactive_snapshot_receipt(
         snapshot() if snap is None else snap,
