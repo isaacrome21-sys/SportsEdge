@@ -799,5 +799,52 @@ class RunnerWiringTests(LoaderCase):
             "RESEARCH_ONLY")
         self._assert_registry_refusal(card)
 
+class SealedArchiveManifestTests(LoaderCase):
+    """End-to-end writer composition: per-team preserves sealed by
+    qb_evidence_archive.seal_form2_archive_manifest produce the ONE
+    archive pin the runner is handed. The sealed directory admits
+    both teams under that pin, and -- the contract that failed in
+    production composition before the sealer existed -- the same
+    directory without the pin admits nothing."""
+
+    def test_preserved_and_sealed_archive_admits_under_sealed_pin(self):
+        from tests.test_cfb_qb_identity_evidence_form2_20261013 import (
+            CHARTS, KICKOFF, NOW as SEAL_NOW, make_bundle as seal_bundle)
+
+        def preserve(team_id):
+            return archive.preserve_form2_bundle(
+                self.dir,
+                bundle_bytes=json.dumps(seal_bundle(team_id)).encode(),
+                team_id=team_id, event_id="401871067",
+                home_team_id="2393", away_team_id="48",
+                kickoff=KICKOFF,
+                previous_game_kickoff=CHARTS[team_id][3],
+                clock=lambda: SEAL_NOW)
+
+        first = preserve("48")
+        second = preserve("2393")
+        sealed = archive.seal_form2_archive_manifest(
+            self.dir,
+            manifest_sha256s=[first["candidate_manifest_sha256"],
+                              second["candidate_manifest_sha256"]])
+        self.assertEqual(sealed["receipt_count"], 2)
+        rows = [{"sport": "CFB", "market": "SPREAD", "away": "Team 48",
+                 "home": "Team 2393", "side": "HOME", "line": -1.5,
+                 "odds": -110, "commence_time": KICKOFF_ISO,
+                 "quote_captured_at": NOW.isoformat()}]
+        mapping, audit = loader.load_form2_bundles(self.dir, rows)
+        self.assertEqual(mapping, {})
+        self.assertEqual(audit["pin_status"], "ABSENT")
+        self.assertIn(loader.REASON_PIN_REQUIRED, self.reasons(audit))
+        mapping, audit = loader.load_form2_bundles(
+            self.dir, rows,
+            manifest_sha256=sealed["candidate_manifest_sha256"])
+        self.assertEqual(set(mapping), {"48", "2393"})
+        self.assertEqual(audit["pin_status"], "VERIFIED")
+        self.assertEqual(audit["manifest_sha256"],
+                         sealed["candidate_manifest_sha256"])
+        self.assertEqual(audit["admitted_team_ids"], ["2393", "48"])
+
+
 if __name__ == "__main__":
     unittest.main()

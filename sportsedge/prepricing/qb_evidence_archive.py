@@ -242,3 +242,120 @@ def preserve_form2_bundle(root, *, bundle_bytes, team_id, event_id,
             "anchor_status": "UNANCHORED", "research_only": True,
             "eligibility": False, "staking_allowed": False,
             "activation_allowed": False}
+
+
+def seal_form2_archive_manifest(root, *, manifest_sha256s):
+    """Seal ONE archive-level manifest over already-preserved bundles.
+
+    preserve_form2_bundle seals each bundle under an immutable
+    single-receipt manifest snapshot, by design not a mutable index.
+    Operative consumers take a SINGLE external pin for a whole
+    capture (the RUN IT Form 2 loader's manifest_sha256), so a
+    multi-team capture also needs one manifest enumerating every
+    receipt. This sealer is that enumeration step, and nothing more:
+    each named single-receipt manifest object is read back from the
+    store through the archive's own bounded read and its bytes are
+    verified against the digest the caller names (never trusted
+    from the caller); every referenced bundle object is likewise
+    re-read and verified against its content address; and each
+    receipt is bound to its bundle -- team, event, home/away roles,
+    kickoff, and the receipt ordering (recorded no earlier than
+    either snapshot's capture completion, strictly before kickoff) --
+    with the same checks and refusal codes the archive readers
+    enforce. The combined manifest is published as one more
+    immutable content-addressed object; per-receipt manifests and
+    bundles are never modified. Sealing enumerates receipts whose
+    bundles already passed full evaluation at preserve time; it
+    does not re-evaluate, fetch, or certify anything, and the
+    returned candidate digest is NOT an independently trusted
+    anchor -- it becomes a consumer's pin only when an operator
+    supplies it from an independent channel. A receipt set that
+    covers one fixture/team twice fails closed, exactly as at read
+    time, and a failed seal publishes nothing. Re-sealing the same
+    receipt set is idempotent (identical bytes, reused object).
+    """
+    if isinstance(manifest_sha256s, (str, bytes)) \
+            or not manifest_sha256s:
+        raise EvidenceArchiveError("ARCHIVE_SEAL_NO_MANIFESTS")
+    entries = []
+    seen_fixtures = set()
+    seen_bundles = set()
+    for value in manifest_sha256s:
+        pin = _digest(value)
+        raw_manifest = _read_bundle(root, pin)
+        if len(raw_manifest) > MAX_MANIFEST_BYTES:
+            raise EvidenceArchiveError("ARCHIVE_MANIFEST_TOO_LARGE")
+        if hashlib.sha256(raw_manifest).hexdigest() != pin:
+            raise EvidenceArchiveError("ARCHIVE_MANIFEST_HASH_MISMATCH")
+        manifest = _json(raw_manifest)
+        if not isinstance(manifest, dict) \
+                or manifest.get("schema") != SCHEMA:
+            raise EvidenceArchiveError("ARCHIVE_SCHEMA_INVALID")
+        receipts = manifest.get("entries")
+        if not isinstance(receipts, list) \
+                or any(not isinstance(e, dict) for e in receipts):
+            raise EvidenceArchiveError("ARCHIVE_ENTRIES_INVALID")
+        if len(receipts) != 1:
+            raise EvidenceArchiveError(
+                "ARCHIVE_SEAL_REQUIRES_SINGLE_RECEIPT_MANIFEST")
+        entry = receipts[0]
+        if any(entry.get(name) is None or not str(entry.get(name)).strip()
+               for name in ("team_id", "event_id", "home_team_id",
+                            "away_team_id", "kickoff_utc",
+                            "recorded_at_utc", "bundle_sha256")):
+            raise EvidenceArchiveError("ARCHIVE_ENTRIES_INVALID")
+        fixture_key = (str(entry["team_id"]), str(entry["event_id"]))
+        if fixture_key in seen_fixtures:
+            raise EvidenceArchiveError("ARCHIVE_RECEIPT_NOT_UNIQUE")
+        seen_fixtures.add(fixture_key)
+        digest = _digest(entry["bundle_sha256"])
+        if digest in seen_bundles:
+            raise EvidenceArchiveError("ARCHIVE_RECEIPT_NOT_UNIQUE")
+        seen_bundles.add(digest)
+        raw_bundle = _read_bundle(root, digest)
+        if hashlib.sha256(raw_bundle).hexdigest() != digest:
+            raise EvidenceArchiveError("ARCHIVE_BUNDLE_HASH_MISMATCH")
+        bundle = _json(raw_bundle)
+        if not isinstance(bundle, dict) \
+                or bundle.get("schema") == SCHEMA:
+            raise EvidenceArchiveError("ARCHIVE_BUNDLE_SCHEMA_INVALID")
+        try:
+            team = bundle["team"]
+            fixture = bundle["fixture"]
+            if str(entry["team_id"]) != str(team["espn_id"]):
+                raise EvidenceArchiveError("ARCHIVE_FIXTURE_MISMATCH")
+            if str(entry["event_id"]) != str(fixture["event_id"]):
+                raise EvidenceArchiveError("ARCHIVE_FIXTURE_MISMATCH")
+            roles = {str(entry["home_team_id"]), str(entry["away_team_id"])}
+            if roles != {str(team["espn_id"]),
+                         str(fixture["opponent_espn_id"])}:
+                raise EvidenceArchiveError("ARCHIVE_FIXTURE_MISMATCH")
+            kickoff = _time(entry["kickoff_utc"])
+            if kickoff != _time(fixture["kickoff_utc"]):
+                raise EvidenceArchiveError("ARCHIVE_FIXTURE_MISMATCH")
+            recorded = _time(entry["recorded_at_utc"])
+            captured = [_time(bundle["depth_snapshot"]["captured_at_utc"]),
+                        _time(bundle["roster_snapshot"]["captured_at_utc"])]
+        except (KeyError, TypeError, AttributeError) as exc:
+            raise EvidenceArchiveError(
+                "ARCHIVE_BUNDLE_SCHEMA_INVALID") from exc
+        if any(recorded < stamp for stamp in captured):
+            raise EvidenceArchiveError("ARCHIVE_RECEIPT_PRECEDES_FETCH")
+        if recorded >= kickoff:
+            raise EvidenceArchiveError("ARCHIVE_RECEIPT_NOT_AVAILABLE")
+        entries.append(entry)
+    entries.sort(key=lambda e: (str(e["event_id"]), str(e["team_id"]),
+                                str(e["bundle_sha256"])))
+    combined = {"schema": SCHEMA, "entries": entries}
+    raw = json.dumps(combined, sort_keys=True,
+                     separators=(",", ":")).encode()
+    if len(raw) > MAX_MANIFEST_BYTES:
+        raise EvidenceArchiveError("ARCHIVE_MANIFEST_TOO_LARGE")
+    candidate = hashlib.sha256(raw).hexdigest()
+    _publish_once(root, candidate + ".json", raw)
+    return {"manifest_bytes": raw, "candidate_manifest_sha256": candidate,
+            "bundle_sha256s": sorted(seen_bundles),
+            "receipt_count": len(entries),
+            "anchor_status": "UNANCHORED", "research_only": True,
+            "eligibility": False, "staking_allowed": False,
+            "activation_allowed": False}
