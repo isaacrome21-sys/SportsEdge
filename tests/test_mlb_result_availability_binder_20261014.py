@@ -54,3 +54,27 @@ def test_rejects_existing_output(tmp_path):
     source, evidence = _inputs(tmp_path)
     with pytest.raises(FileExistsError, match="OUTPUT_ALREADY_EXISTS"):
         bind_result_availability(source, evidence, source)
+
+
+def test_rejects_duplicate_export_game_ids(tmp_path):
+    source, evidence = _inputs(tmp_path)
+    data = json.loads(source.read_text())
+    data["games"].append(dict(data["games"][0]))
+    source.write_text(json.dumps(data))
+    att = json.loads(evidence.read_text())
+    att["export_sha256"] = hashlib.sha256(source.read_bytes()).hexdigest()
+    evidence.write_text(json.dumps(att))
+    with pytest.raises(ValueError, match="DUPLICATE_EXPORT_GAME"):
+        bind_result_availability(source, evidence, tmp_path / "bound.json")
+
+
+def test_rejects_malformed_export_row(tmp_path):
+    source, evidence = _inputs(tmp_path)
+    data = json.loads(source.read_text())
+    data["games"] = [None]
+    source.write_text(json.dumps(data))
+    att = json.loads(evidence.read_text())
+    att["export_sha256"] = hashlib.sha256(source.read_bytes()).hexdigest()
+    evidence.write_text(json.dumps(att))
+    with pytest.raises(ValueError, match="INVALID_EXPORT_GAMES"):
+        bind_result_availability(source, evidence, tmp_path / "bound.json")
