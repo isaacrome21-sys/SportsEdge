@@ -99,6 +99,9 @@ class GamePath:
     away_id: str
     goals: list = field(default_factory=list)
     shootout_winner: str | None = None
+    # (home TeamInput, away TeamInput) bound by simulate_game; settle() needs
+    # rosters to run check_path and refuses a path without them (fail closed).
+    teams: tuple | None = field(default=None, repr=False, compare=False)
 
     def team_goals(self, team_id, *, periods=None):
         return sum(1 for g in self.goals if g.team_id == team_id
@@ -213,6 +216,7 @@ def simulate_game(home: TeamInput, away: TeamInput, rng: random.Random, *,
                 raise NHLFoundationError("NHL_PLAYOFF_OT_NOT_MODELED")
             path.shootout_winner = home.team_id if rng.random() < 0.5 else away.team_id
     check_path(path, home, away)
+    path.teams = (home, away)
     return path
 
 
@@ -272,9 +276,30 @@ def _ou(value, line):
     return "PUSH"
 
 
+def _check_line(line):
+    if isinstance(line, bool) or not isinstance(line, (int, float)) \
+            or not math.isfinite(line):
+        raise NHLFoundationError("NHL_LINE_NONFINITE", repr(line))
+    return line
+
+
 def settle(path: GamePath, market: str, *, selection=None, line=None,
-           period=None, player_id=None):
-    """Settle a market on a path. Returns WIN/LOSE/PUSH or OVER/UNDER/PUSH."""
+           period=None, player_id=None, home=None, away=None):
+    """Settle a market on a path. Returns WIN/LOSE/PUSH or OVER/UNDER/PUSH.
+
+    Fail closed: the path is re-validated with check_path against its rosters
+    (``home``/``away`` or the TeamInputs bound by simulate_game) before any
+    settlement, so misattributed scorers or tied no-shootout paths refuse.
+    """
+    if home is not None or away is not None:
+        if home is None or away is None:
+            raise NHLFoundationError("NHL_PATH_ROSTERS_MISSING", "need home and away")
+        teams = (home, away)
+    else:
+        teams = path.teams
+    if not teams:
+        raise NHLFoundationError("NHL_PATH_ROSTERS_MISSING")
+    check_path(path, *teams)
     h, a = path.final_score()
     if market == "MONEYLINE":            # includes OT and shootout
         if selection not in (path.home_id, path.away_id):
@@ -291,6 +316,7 @@ def settle(path: GamePath, market: str, *, selection=None, line=None,
     if market == "PUCK_LINE":             # final score incl. SO decisive goal
         if selection not in (path.home_id, path.away_id):
             raise NHLFoundationError("NHL_SELECTION_IDENTITY_MISMATCH", str(selection))
+        _check_line(line)                 # validate BEFORE arithmetic
         margin = (h - a) if selection == path.home_id else (a - h)
         r = _ou(margin + line, 0)
         return {"OVER": "WIN", "UNDER": "LOSE", "PUSH": "PUSH"}[r]
@@ -307,6 +333,8 @@ def settle(path: GamePath, market: str, *, selection=None, line=None,
     if market in ("PLAYER_GOALS", "PLAYER_ASSISTS", "PLAYER_POINTS"):
         if not isinstance(player_id, str) or not player_id:
             raise NHLFoundationError("NHL_PLAYER_ID_MISSING")
+        if not any(player_id in t.scorer_shares for t in teams):
+            raise NHLFoundationError("NHL_PLAYER_IDENTITY_MISMATCH", player_id)
         fn = {"PLAYER_GOALS": path.player_goals, "PLAYER_ASSISTS": path.player_assists,
               "PLAYER_POINTS": path.player_points}[market]
         return _ou(fn(player_id), line)   # shootout goals never count
@@ -332,7 +360,7 @@ def settle_player_prop(path, home: TeamInput, away: TeamInput, market, player_id
         raise NHLFoundationError("NHL_TEAM_IDENTITY_MISMATCH", str(team_id))
     if player_id not in rosters[team_id]:
         raise NHLFoundationError("NHL_PLAYER_IDENTITY_MISMATCH", str(player_id))
-    return settle(path, market, player_id=player_id, line=line)
+    return settle(path, market, player_id=player_id, line=line, home=home, away=away)
 
 
 # --- market-terminal map -------------------------------------------------

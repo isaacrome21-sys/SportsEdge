@@ -48,7 +48,7 @@ def test_no_game_ends_tied_and_shootout_only_after_tied_ot():
 def test_shootout_goal_counts_for_total_not_players():
     g = Goal("HOM", 1, 1.0, "HOM_p0", ())
     g2 = Goal("AWY", 2, 1.0, "AWY_p0", ())
-    p = GamePath("HOM", "AWY", [g, g2], shootout_winner="HOM")
+    p = GamePath("HOM", "AWY", [g, g2], shootout_winner="HOM", teams=(H, A))
     assert nf.check_path(p, H, A)
     assert p.final_score() == (2, 1)
     assert nf.settle(p, "TOTAL", line=2.5) == "OVER"
@@ -146,7 +146,7 @@ def test_settlement_identity_and_line_refusals():
 def test_whole_line_push():
     p = GamePath("HOM", "AWY", [Goal("HOM", 1, 1.0, "HOM_p0", ()),
                                 Goal("HOM", 2, 1.0, "HOM_p1", ()),
-                                Goal("AWY", 3, 1.0, "AWY_p1", ())])
+                                Goal("AWY", 3, 1.0, "AWY_p1", ())], teams=(H, A))
     assert nf.settle(p, "TOTAL", line=3) == "PUSH"
     assert nf.settle(p, "PUCK_LINE", selection="AWY", line=1) == "PUSH"
 
