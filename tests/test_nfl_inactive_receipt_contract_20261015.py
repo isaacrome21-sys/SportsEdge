@@ -166,3 +166,19 @@ def test_older_authenticated_list_cannot_override_newer_revision():
     )
     assert out["evidence_present"] is True
     assert out["complete_published"] is False
+
+
+def test_later_truncated_revision_blocks_older_trusted_absence_proof():
+    from sportsedge.nfl_participation_bridge import _inactive_scan
+    kickoff = datetime(2026, 10, 4, 17, 0, tzinfo=timezone.utc)
+    later = snapshot()
+    later["published_at"] = "2026-10-04T15:45:00Z"
+    later["player_ids"] = ["inactive-a"]  # visibly incomplete revision
+    out = _inactive_scan(
+        [], [snapshot(), later], game_id=GAME, team_id=TEAM,
+        candidate_id="active-qb", kickoff=kickoff, cutoff=CUTOFF,
+        trusted_receipts=[receipt()],
+        trusted_issuer_verifier=lambda *_: True,
+    )
+    assert out["evidence_present"] is True
+    assert out["complete_published"] is False
