@@ -240,7 +240,8 @@ def _complete_inactive_snapshot_receipt(snapshot, receipt, *, game_id,
 
 
 def _inactive_scan(inactive_rows, inactive_snapshots, *, game_id, team_id,
-                   candidate_id, kickoff, cutoff):
+                   candidate_id, kickoff, cutoff, trusted_receipts=(),
+                   trusted_issuer_verifier=None):
     """Official-inactive evidence scan for one candidate, <= cutoff only.
 
     Returns a dict with:
@@ -323,6 +324,30 @@ def _inactive_scan(inactive_rows, inactive_snapshots, *, game_id, team_id,
         if validated is None:
             continue
         valid.setdefault(published_at, set()).add(tuple(sorted(validated)))
+    if valid and callable(trusted_issuer_verifier):
+        # The trusted ingestion boundary supplies receipts independently of
+        # the archive payload. A payload's own completeness flags are inert.
+        for raw in inactive_snapshots:
+            if not isinstance(raw, Mapping):
+                continue
+            try:
+                pub = _utc(raw.get("published_at"), "inactive published_at")
+            except NFLParticipationError:
+                continue
+            if pub not in valid or str(raw.get("game_id") or "") != str(game_id):
+                continue
+            if _team(raw.get("team")) != team_id:
+                continue
+            # Conflicting same-instant lists cannot prove completeness.
+            if len(valid[pub]) != 1:
+                continue
+            for receipt in trusted_receipts:
+                if _complete_inactive_snapshot_receipt(
+                        raw, receipt, game_id=game_id, team_id=team_id,
+                        cutoff=cutoff,
+                        trusted_issuer_verifier=trusted_issuer_verifier):
+                    result["complete_published"] = True
+                    return result
     if valid:
         # A list of any length can be truncated. Matching game/team,
         # plausible publication time, and unique IDs prove only that
