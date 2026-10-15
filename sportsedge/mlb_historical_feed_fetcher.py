@@ -23,11 +23,10 @@ def _fetch_json(url: str) -> tuple[bytes, dict]:
     return raw, json.loads(raw)
 
 
-def acquire_historical_date(day: str, output_dir: str | Path, *, observed_at: str) -> dict:
+def acquire_historical_date(day: str, output_dir: str | Path) -> dict:
     target = date.fromisoformat(day)
-    observed = datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
-    if observed.tzinfo is None:
-        raise ValueError("NAIVE_OBSERVATION")
+    observed = datetime.now(timezone.utc)
+    observed_at = observed.isoformat()
     if target >= observed.astimezone(timezone.utc).date():
         raise ValueError("DATE_NOT_HISTORICAL")
     output = Path(output_dir)
@@ -81,10 +80,8 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--date", required=True, help="Historical YYYY-MM-DD")
     parser.add_argument("--output-dir", required=True)
-    parser.add_argument("--observed-at", required=True, help="Actual retrieval time ISO UTC")
     args = parser.parse_args(argv)
-    result = acquire_historical_date(args.date, args.output_dir,
-                                     observed_at=args.observed_at)
+    result = acquire_historical_date(args.date, args.output_dir)
     print(json.dumps(result, sort_keys=True))
     return 0
 
