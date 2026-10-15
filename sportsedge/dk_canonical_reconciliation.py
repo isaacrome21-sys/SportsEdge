@@ -23,13 +23,16 @@ def reconcile_dk_census(path: str | Path) -> dict:
             if key in seen:
                 raise ValueError(f"DUPLICATE_MARKET_KEY:{sport}:{key}")
             seen.add(key)
-            # No guessed aliases: only existing canonical registry decisions.
-            resolution = resolve_market(sport, key)
-            state = "NO_CANONICAL_ROUTE" if resolution is None else resolution["state"]
+            # Provisional umbrella tabs are not normalized market identities.
+            provisional = market.get("provisional_group") is True
+            resolution = None if provisional else resolve_market(sport, key)
+            state = ("PROVISIONAL_NOT_A_MARKET" if provisional else
+                     "NO_CANONICAL_ROUTE" if resolution is None else resolution["state"])
             rows.append({
                 "sport": sport, "dk_market_key": key, "route_state": state,
                 "canonical_market": resolution.get("market") if resolution else None,
-                "blocker": resolution.get("blocker") if resolution else "NO_ROUTE",
+                "blocker": ("NO_NORMALIZED_MARKET_ID" if provisional else
+                            resolution.get("blocker") if resolution else "NO_ROUTE"),
                 "validation_status": resolution.get("validation_status") if resolution else "NOT_RUN",
                 "verified_probability": False, "play_authorized": False,
                 "authority": "RESEARCH_ONLY_MENU_NOT_QUOTE",

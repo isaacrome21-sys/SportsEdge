@@ -24,6 +24,7 @@ def build_route_gap_report(census_path) -> dict:
             "priced_path_not_validated": counts["PRICED_PATH"],
             "blocked": counts["BLOCKED"],
             "no_canonical_route": counts["NO_CANONICAL_ROUTE"],
+            "provisional_not_a_market": counts["PROVISIONAL_NOT_A_MARKET"],
             "blockers": dict(sorted((str(k), v) for k, v in blockers.items())),
             "inventory_missing": sport in inventory["missing_sport_census"],
         }
@@ -33,7 +34,8 @@ def build_route_gap_report(census_path) -> dict:
         for row in rows if row["route_state"] != "PRICED_PATH"
     ]
     gaps.sort(key=lambda row: (PRIORITY.index(row["sport"]),
-                               0 if row["route_state"] == "NO_CANONICAL_ROUTE" else 1,
+                               0 if row["route_state"] == "NO_CANONICAL_ROUTE" else
+                               1 if row["route_state"] == "BLOCKED" else 2,
                                row["market"]))
     return {
         "schema": "SPORTSEDGE_DK_ROUTE_GAPS_V1",
