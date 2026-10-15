@@ -510,6 +510,19 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     # routing, so they reach the prop pipelines (or their named blockers)
     # instead of dying at intake. A refused ladder stays a single row
     # carrying milestone_ladder_refusal, blocked by name at routing.
+    # Optional strictly-paired DK NFL yardage mains. This is additive input;
+    # each observed pair becomes two ordinary player rows before the existing
+    # registry and quote-pricing gates. Malformed pairs refuse the entire run.
+    # No side or market quote is inferred from an incomplete board.
+    yardage_pairs = payload.get("nfl_yardage_pairs", []) if isinstance(payload, dict) else []
+    if not isinstance(yardage_pairs, list):
+        raise ValueError("NFL_YARDAGE_PAIRS_MUST_BE_LIST")
+    if yardage_pairs:
+        from sportsedge.paired_yardage_intake import bind_nfl_yardage_pair
+        rows = list(rows)
+        for pair in yardage_pairs:
+            over_row, under_row = bind_nfl_yardage_pair(pair, as_of=prop_clock)
+            rows.extend((over_row, under_row))
     rows = expand_milestone_ladder_rows(rows, default_sport=default_sport)
     game_indices, games, prop_indices, props = [], [], [], []
     coverage_indices, coverage_input = [], []
