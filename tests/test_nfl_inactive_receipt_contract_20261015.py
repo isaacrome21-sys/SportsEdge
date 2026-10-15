@@ -215,3 +215,18 @@ def test_same_instant_malformed_revision_blocks_complete_inference():
         trusted_issuer_verifier=lambda *_: True,
     )
     assert out["complete_published"] is False
+
+
+@pytest.mark.parametrize("limit", [0, -1, 97, float("nan"), float("inf")])
+def test_qb_and_skill_reject_unsafe_depth_age_limit(limit):
+    from sportsedge.nfl_participation_bridge import (
+        NFLParticipationError, assess_qb_participation, assess_skill_participation,
+    )
+    kwargs = dict(team=TEAM, depth_rows=[], target_season=2026,
+                  target_week=4, kickoff="2026-10-04T17:00:00Z",
+                  as_of="2026-10-04T16:00:00Z", max_depth_age_hours=limit)
+    for fn, extra in ((assess_qb_participation, {}),
+                      (assess_skill_participation, {"player_id": "synthetic-p"})):
+        with pytest.raises(NFLParticipationError,
+                           match="NFL_PARTICIPATION_DEPTH_AGE_LIMIT_INVALID"):
+            fn(**kwargs, **extra)
