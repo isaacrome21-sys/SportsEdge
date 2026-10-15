@@ -68,3 +68,10 @@ def test_explicitly_unverified_attestation_refused(tmp_path):
     data["availability_attestation_authenticity_verified"] = False
     with pytest.raises(ValueError, match="UNVERIFIED_AVAILABILITY_ATTESTATION"):
         evaluate_historical_export(_write(tmp_path, data), innings=3)
+
+
+def test_self_asserted_authenticity_refused_without_verifier(tmp_path):
+    data = _export()
+    data["availability_attestation_authenticity_verified"] = True
+    with pytest.raises(ValueError, match="UNSUPPORTED_AUTHENTICITY_CLAIM"):
+        evaluate_historical_export(_write(tmp_path, data), innings=3)
