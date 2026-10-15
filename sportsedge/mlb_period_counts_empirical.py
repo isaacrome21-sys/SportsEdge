@@ -31,7 +31,7 @@ def period_run_distribution(
 ) -> dict:
     """Compute prior-only empirical run totals for exactly 3 or 7 innings.
 
-    Each row must provide an event time, 9+ completed inning run counts,
+    Each row must provide event and result-availability times, 9+ completed inning run counts,
     and a unique game ID. Every row must predate the target cutoff.
     No rows may be silently dropped, including future or malformed records.
     """
@@ -51,6 +51,12 @@ def period_run_distribution(
         seen.add(str(gid))
         if _instant(game.get("start_time")) >= target:
             raise ValueError("NON_PRIOR_GAME")
+        if "result_available_at" not in game:
+            raise ValueError("MISSING_RESULT_AVAILABILITY")
+        if _instant(game["result_available_at"]) <= _instant(game["start_time"]):
+            raise ValueError("RESULT_AVAILABLE_BEFORE_START")
+        if _instant(game["result_available_at"]) >= target:
+            raise ValueError("RESULT_NOT_AVAILABLE_AT_CUTOFF")
         scores = game.get("inning_runs")
         if not isinstance(scores, (list, tuple)) or len(scores) < 9:
             raise ValueError("INCOMPLETE_INNINGS")
