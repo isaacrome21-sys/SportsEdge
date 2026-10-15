@@ -12,7 +12,8 @@ S = F.SPORT
 
 
 def _team(tid):
-    return TeamInput(tid, tuple(PlayerInput(f"{tid}_p{i}", 8.0, 2.5, 4.0) for i in range(5)), espn_id="99999")
+    return TeamInput(tid, tuple(PlayerInput(f"{tid}_p{i}", 8.0, 2.5, 4.0) for i in range(5)),
+                     espn_id={"HOM": "SYN-0001", "AWY": "SYN-0002"}[tid])
 
 
 H, A = _team("HOM"), _team("AWY")

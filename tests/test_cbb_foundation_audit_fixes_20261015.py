@@ -15,7 +15,7 @@ def _team(tid, espn_id, **kw):
 
 
 # Non-Illinois synthetic ESPN ids (not in IL_COLLEGE_ESPN_IDS).
-H, A = _team("HOM", "90001"), _team("AWY", "90002")
+H, A = _team("HOM", "SYN-0001"), _team("AWY", "SYN-0002")
 
 FAIL_OPEN = ["DePaul Blue Demons", "Bradley Braves", "SIUE", "SIUE Cougars",
              "Loyola (IL) Ramblers", "ILL", "Loyola Ramblers", "Illinois-Chicago Flames",
@@ -28,7 +28,7 @@ def test_illinois_aliases_blocked(name):
     r = F.market_terminal("MONEYLINE", name, "AWY")
     assert r["terminal"] == "BLOCKED_BY_AUTHORIZATION"
     with pytest.raises(FoundationError) as e:
-        F.simulate_game(_team(name, "90001"), A, random.Random(1))
+        F.simulate_game(_team(name, "SYN-0001"), A, random.Random(1))
     assert e.value.code == "ILLINOIS_COLLEGE_EXCLUDED"
 
 
@@ -48,7 +48,7 @@ def test_missing_espn_id_fails_closed(espn_id):
 def test_settle_checks_display_name_and_espn_id():
     p = F.simulate_game(H, A, random.Random(2))
     with pytest.raises(FoundationError) as e:
-        F.settle(p, "TOTAL", line=0.5, home=_team("HOM", "90001", display_name="DePaul"), away=A)
+        F.settle(p, "TOTAL", line=0.5, home=_team("HOM", "SYN-0001", display_name="DePaul"), away=A)
     assert e.value.code == "ILLINOIS_COLLEGE_EXCLUDED"
     with pytest.raises(FoundationError) as e:
         F.settle(p, "TOTAL", line=0.5, home=_team("HOM", "305"), away=A)
