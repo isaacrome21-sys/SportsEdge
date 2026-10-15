@@ -42,6 +42,7 @@ def evaluate(rows, *, training_cutoff, priors, window=20, pseudo_count=20):
     validated = []
     previous_forecast = cutoff
     seen = set()
+    event_times = {}
     for row in rows:
         if not isinstance(row, dict):
             raise ValueError("INVALID_ROW")
@@ -59,6 +60,9 @@ def evaluate(rows, *, training_cutoff, priors, window=20, pseudo_count=20):
         observed = _utc(row.get("outcome_observed_at"))
         if not (cutoff <= forecast < event <= observed):
             raise ValueError("INVALID_PIT_ORDER")
+        if event_id in event_times and event_times[event_id] != event:
+            raise ValueError("CONFLICTING_EVENT_TIME")
+        event_times[event_id] = event
         if forecast < previous_forecast:
             raise ValueError("NON_CHRONOLOGICAL_FORECAST")
         previous_forecast = forecast
