@@ -56,6 +56,15 @@ from sportsedge.mlb_phone_f5_pricing import normalize_f5_market, phone_f5_rows
 from sportsedge.f5_distribution import F5_MARKETS
 from datetime import datetime, timezone
 
+# DraftKings serves the 1st-inning runs market in board form — "Runs -
+# 1st Inning" OVER/UNDER lines (CATALOG_MLB.md: "Runs O/U (0.5/1.5
+# alts)"; the inspected-menu census carries it as INNING_1_RUNS, group
+# inning, period INNING_1). Those rows ARE the FIRST_INNING_RUNS market
+# the first-inning engine prices; intake binds them at routing (side
+# preserved, never derived) instead of letting them die unrouted.
+FIRST_INNING_BOARD_MARKETS = frozenset(
+    {"INNING_1_RUNS", "RUNS_1ST_INNING", "1ST_INNING_RUNS"})
+
 FIELDS = (
     "team_quality", "injuries", "rest_travel", "home_park", "weather",
     "recent_form", "matchups", "coaching", "key_numbers",
@@ -855,6 +864,44 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             first_pos.append(local)
             first_input.append(translated)
             first_originals[local] = market
+        elif line["sport"] == "MLB" and market in FIRST_INNING_BOARD_MARKETS:
+            # Board-form 1st-inning runs ("Runs - 1st Inning"): DK serves
+            # this market as OVER/UNDER lines rather than an NRFI/YRFI
+            # label. The row IS FIRST_INNING_RUNS: preserve its OVER/
+            # UNDER side (it selects the side of the binary — never
+            # derived, never overridden), default a missing line to the
+            # 0.5 binary line (DK's main board line; a stated 1.5
+            # alternate is refused by name by the engine as
+            # FIRST_INNING_RUNS_LINE_MUST_BE_0_5), and restore the board
+            # label on the result via first_originals. Malformed rows
+            # refuse at intake by name and never reach the engine.
+            side = str(line.get("side") or line.get("selection") or "").upper()
+            if not side:
+                others[local] = blocked(line, "INNING_1_RUNS_SIDE_REQUIRED")
+                continue
+            if side not in {"OVER", "UNDER"}:
+                others[local] = blocked(line, "INNING_1_RUNS_SIDE_INVALID")
+                continue
+            raw_line = line.get("line")
+            if raw_line not in (None, ""):
+                if isinstance(raw_line, bool):
+                    others[local] = blocked(
+                        line, "INNING_1_RUNS_LINE_INVALID")
+                    continue
+                try:
+                    float(raw_line)
+                except (TypeError, ValueError):
+                    others[local] = blocked(
+                        line, "INNING_1_RUNS_LINE_INVALID")
+                    continue
+            translated = dict(line)
+            translated["market"] = "FIRST_INNING_RUNS"
+            translated["side"] = side
+            if translated.get("line") in (None, ""):
+                translated["line"] = 0.5
+            first_pos.append(local)
+            first_input.append(translated)
+            first_originals[local] = market
         elif line["sport"] == "MLB" and market in F5_CANONICAL_MARKETS:
             f5_pos.append(local)
             f5_input.append(line)
@@ -1193,6 +1240,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         "nfl_anytime_td_engine":"NFLVERSE_OPPORTUNITY_DECOMPOSITION_UNVALIDATED",
         "nfl_derivative_engine":"WIRED_PRICERS_DISTRIBUTION_REQUIRED",
         "first_inning_nrfi_yrfi":"FIRST_INNING_RUNS_BINARY_ALIAS_AT_0_5",
+        "first_inning_board_form":"INNING_1_RUNS_BOUND_TO_FIRST_INNING_RUNS_ENGINE",
         "free_public_history":True,
         "model_vs_close_validated":False,
         "phone_odds_freshness_required":True,
