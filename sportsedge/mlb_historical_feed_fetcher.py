@@ -53,8 +53,16 @@ def acquire_historical_date(day: str, output_dir: str | Path) -> dict:
     for pk in ids:
         game_url = f"{API}/game/{pk}/feed/live"
         feed_raw, feed = _fetch_json(game_url)
-        if feed.get("gamePk") != pk:
+        if feed.get("gamePk") != pk or feed.get("gameData", {}).get("game", {}).get("pk") != pk:
             raise ValueError("FEED_GAME_ID_MISMATCH")
+        if feed.get("gameData", {}).get("status", {}).get("abstractGameState") != "Final":
+            raise ValueError("NON_FINAL_FEED_GAME")
+        scheduled = feed.get("gameData", {}).get("datetime", {}).get("dateTime")
+        if not isinstance(scheduled, str):
+            raise ValueError("MISSING_FEED_START_TIME")
+        started = datetime.fromisoformat(scheduled.replace("Z", "+00:00"))
+        if started.tzinfo is None or started.astimezone(timezone.utc) >= observed:
+            raise ValueError("FUTURE_OR_NAIVE_FEED_START")
         fetched.append((pk, feed_raw))
     output.mkdir(parents=True, exist_ok=False)
     (output / "schedule.json").write_bytes(raw)
