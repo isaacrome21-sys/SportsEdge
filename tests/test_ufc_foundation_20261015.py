@@ -59,7 +59,7 @@ def test_total_rounds_half_point_boundary():
 def test_draw_and_no_contest_void():
     d = BoutPath("RED", "BLU", 3, "DRAW", None, 3, 300)
     assert F.settle(d, "MONEYLINE", selection="RED") == "PUSH"   # owner ruling (#2351)
-    assert F.settle(d, "METHOD_OF_VICTORY", selection=("RED", "DECISION")) == "VOID"
+    assert F.settle(d, "METHOD_OF_VICTORY", selection=("RED", "DECISION")) == "LOSE"  # owner ruling #2351
     assert F.settle(d, "GOES_THE_DISTANCE", selection="YES") == "WIN"
     nc = BoutPath("RED", "BLU", 5, "NO_CONTEST", None, 2, 30)
     for m, sel in (("MONEYLINE", "RED"), ("TOTAL_ROUNDS", None), ("GOES_THE_DISTANCE", "YES"),
