@@ -20,6 +20,8 @@ def _time(value):
 
 
 def _source_url(url, kind):
+    if not isinstance(url, str) or not isinstance(kind, str):
+        return False
     try:
         p = urlsplit(url)
         host = (p.hostname or "").lower()
@@ -52,7 +54,8 @@ def audit_starter_sources(rows, *, game_id, team_id, cutoff, first_pitch, max_ag
         sha = row.get("source_snapshot_sha256")
         if row.get("game_id") != game_id or type(row.get("team_id")) is not int or row["team_id"] != team_id:
             reason = "IDENTITY_MISMATCH"
-        elif (kind not in KINDS or assertion not in {"NAMED", "SCRATCHED"}
+        elif (not isinstance(kind, str) or kind not in KINDS
+              or not isinstance(assertion, str) or assertion not in {"NAMED", "SCRATCHED"}
               or (assertion == "NAMED" and (type(pitcher) is not int or pitcher <= 0))
               or (assertion == "SCRATCHED" and pitcher is not None and (type(pitcher) is not int or pitcher <= 0))
               or not _source_url(row.get("source_url"), kind)
