@@ -21,7 +21,8 @@ def _inputs(tmp_path):
                 "results": [{"game_id": "42",
                              "result_available_at": "2024-04-01T22:00:00Z",
                              "source_url": "https://example.org/synthetic",
-                             "source_sha256": "a" * 64}]}
+                             "source_path": "snapshot.json",
+                             "source_sha256": hashlib.sha256(snapshot.read_bytes()).hexdigest()}]}
     attestation.write_text(json.dumps(evidence))
     return export, attestation
 
@@ -77,4 +78,27 @@ def test_rejects_malformed_export_row(tmp_path):
     att["export_sha256"] = hashlib.sha256(source.read_bytes()).hexdigest()
     evidence.write_text(json.dumps(att))
     with pytest.raises(ValueError, match="INVALID_EXPORT_GAMES"):
+        bind_result_availability(source, evidence, tmp_path / "bound.json")
+
+
+def test_rejects_tampered_snapshot(tmp_path):
+    source, evidence = _inputs(tmp_path)
+    (tmp_path / "snapshot.json").write_text("changed")
+    with pytest.raises(ValueError, match="ATTESTATION_SOURCE_HASH_MISMATCH"):
+        bind_result_availability(source, evidence, tmp_path / "bound.json")
+
+
+def test_rejects_missing_snapshot(tmp_path):
+    source, evidence = _inputs(tmp_path)
+    (tmp_path / "snapshot.json").unlink()
+    with pytest.raises(ValueError, match="MISSING_ATTESTATION_SOURCE_SNAPSHOT"):
+        bind_result_availability(source, evidence, tmp_path / "bound.json")
+
+
+def test_rejects_source_path_traversal(tmp_path):
+    source, evidence = _inputs(tmp_path)
+    data = json.loads(evidence.read_text())
+    data["results"][0]["source_path"] = "../snapshot.json"
+    evidence.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="UNSAFE_ATTESTATION_SOURCE_PATH"):
         bind_result_availability(source, evidence, tmp_path / "bound.json")
