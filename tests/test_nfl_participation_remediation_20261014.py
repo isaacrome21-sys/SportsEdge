@@ -528,3 +528,31 @@ def test_b1_inline_complete_flag_cannot_prove_five_id_snapshot():
     _assert_completeness_refusal(
         verdict, lambda v: require_confirmed_qb_role(
             v, depth_rows=depth_rows(), as_of=GAMEDAY))
+
+
+def test_b1_seven_unique_ids_still_not_independent_completeness():
+    """Seven unique IDs can also be a truncated or mixed source list."""
+    snapshot = _snapshot([
+        "rb2", "chi-inactive-1", "chi-inactive-2",
+        "chi-inactive-3", "chi-inactive-4",
+        "chi-inactive-5", "chi-inactive-6",
+    ])
+    verdict = _qb_verdict(inactive_snapshots=[snapshot])
+    _assert_completeness_refusal(
+        verdict, lambda v: require_confirmed_qb_role(
+            v, depth_rows=depth_rows(), as_of=GAMEDAY))
+
+
+def test_b1_inline_complete_and_source_verified_flags_are_not_receipts():
+    """Caller-controlled booleans must never authenticate negative evidence."""
+    snapshot = _snapshot([
+        "rb2", "chi-inactive-1", "chi-inactive-2",
+        "chi-inactive-3", "chi-inactive-4",
+        "chi-inactive-5", "chi-inactive-6",
+    ])
+    snapshot.update(complete=True, source_verified=True,
+                    independently_verified=True)
+    verdict = _qb_verdict(inactive_snapshots=[snapshot])
+    _assert_completeness_refusal(
+        verdict, lambda v: require_confirmed_qb_role(
+            v, depth_rows=depth_rows(), as_of=GAMEDAY))
