@@ -97,7 +97,8 @@ def _evaluate(q: Mapping[str, Any], home: int, away: int) -> int:
         score = home if side == "home" else away
         opponent = away if side == "home" else home
         if market == "win":
-            return 1 if score > opponent else -1
+            # NFL two-way moneyline ties push; a three-way market is not supported.
+            return 1 if score > opponent else (0 if score == opponent else -1)
         if market == "win_by":
             points = q.get("points")
             if isinstance(points, bool) or not isinstance(points, int) or not 1 <= points <= 255:
