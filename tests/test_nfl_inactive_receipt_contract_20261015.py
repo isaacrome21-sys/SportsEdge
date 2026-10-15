@@ -148,3 +148,22 @@ def test_qb_assessment_receipt_can_confirm_only_via_trusted_verifier():
     untrusted = assess_qb_participation(
         **kwargs, trusted_inactive_receipts=[receipt()])
     assert untrusted["state"] != "CONFIRMED_STARTER"
+
+
+def test_older_authenticated_list_cannot_override_newer_revision():
+    from sportsedge.nfl_participation_bridge import _inactive_scan
+    kickoff = datetime(2026, 10, 4, 17, 0, tzinfo=timezone.utc)
+    revised = snapshot()
+    revised["published_at"] = "2026-10-04T15:45:00Z"
+    revised["player_ids"] = [
+        "inactive-a", "inactive-b", "inactive-c", "inactive-d",
+        "inactive-e", "inactive-f", "inactive-new",
+    ]
+    out = _inactive_scan(
+        [], [snapshot(), revised], game_id=GAME, team_id=TEAM,
+        candidate_id="active-qb", kickoff=kickoff, cutoff=CUTOFF,
+        trusted_receipts=[receipt()],
+        trusted_issuer_verifier=lambda *_: True,
+    )
+    assert out["evidence_present"] is True
+    assert out["complete_published"] is False
