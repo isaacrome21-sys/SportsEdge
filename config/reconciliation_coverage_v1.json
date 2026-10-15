@@ -242,6 +242,8 @@
         "docs/LIVE_DATA_ARCHIVE_V1.md",
         "docs/LIVE_ENGINE_V1.md",
         "docs/MLB_CONTEXT_LANE_STABILITY_2026_PREREG.md",
+        "docs/MLB_EITHER_PITCHER_WALKFORWARD_SPEC_20261013.md",
+        "docs/MLB_F5_DISPERSION_PREREG_20261013.md",
         "docs/MLB_F5_NRFI_TIGHTENING_PREREG.md",
         "docs/MLB_LINEUP_K_CONTEXT_PREREG.md",
         "docs/MLB_OPP_K_CONTEXT_PREREG.md",
