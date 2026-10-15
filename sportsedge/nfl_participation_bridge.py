@@ -300,6 +300,7 @@ def _inactive_scan(inactive_rows, inactive_snapshots, *, game_id, team_id,
                 raw.get("status") or "").strip().upper() == "INACTIVE":
             result["candidate_inactive"] = True
     valid: dict[datetime, set] = {}
+    latest_seen_publication = None
     for raw in inactive_snapshots:
         if not isinstance(raw, Mapping):
             continue
@@ -317,6 +318,8 @@ def _inactive_scan(inactive_rows, inactive_snapshots, *, game_id, team_id,
         if published_at > cutoff:
             continue
         result["evidence_present"] = True
+        if latest_seen_publication is None or published_at > latest_seen_publication:
+            latest_seen_publication = published_at
         ids = raw.get("player_ids")
         if isinstance(ids, (list, tuple)) and candidate_id in {
                 str(v).strip() for v in ids}:
@@ -332,6 +335,10 @@ def _inactive_scan(inactive_rows, inactive_snapshots, *, game_id, team_id,
         # Only the latest eligible publication may prove an absence.
         # An older signed list cannot override a later revised list.
         latest_published = max(valid)
+        # A later malformed, truncated, or unverified revision invalidates
+        # negative inference from an older otherwise trusted snapshot.
+        if latest_seen_publication != latest_published:
+            return result
         # The trusted ingestion boundary supplies receipts independently of
         # the archive payload. A payload's own completeness flags are inert.
         for raw in inactive_snapshots:
