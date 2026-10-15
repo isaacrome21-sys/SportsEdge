@@ -49,7 +49,7 @@ def bind_nfl_yardage_pair(quote: Mapping, *, as_of: datetime, max_age_seconds: i
     book = _required_string(quote, "book").upper()
     if book not in {"DRAFTKINGS", "DK"}:
         raise YardagePairRefusal("NOT_DK_QUOTE")
-    identity = {key: _required_string(quote, key) for key in ("game_id", "player_id", "team", "capture_id")}
+    identity = {key: _required_string(quote, key) for key in ("game_id", "player_id", "team", "capture_id", "player_name", "away", "home", "kickoff")}
     line = quote.get("line")
     if isinstance(line, bool) or not isinstance(line, (int, float)) or not isfinite(line) or line < 0:
         raise YardagePairRefusal("INVALID_YARDAGE_LINE")
@@ -67,5 +67,5 @@ def bind_nfl_yardage_pair(quote: Mapping, *, as_of: datetime, max_age_seconds: i
         raise YardagePairRefusal("FUTURE_QUOTE")
     if age > max_age_seconds:
         raise YardagePairRefusal("STALE_QUOTE")
-    common = dict(identity, sport="NFL", market=market, book="DRAFTKINGS", line=float(line), captured_at=captured)
+    common = dict(identity, sport="NFL", market="PLAYER_" + market, book="DRAFTKINGS", line=float(line),\n                  quote_captured_at=captured.isoformat(), captured_at=captured.isoformat())
     return ({**common, "side": "OVER", "odds": over}, {**common, "side": "UNDER", "odds": under})
