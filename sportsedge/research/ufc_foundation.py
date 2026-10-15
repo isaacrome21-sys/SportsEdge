@@ -11,7 +11,7 @@ Bout path contract:
   * a finish ends the bout: no later round is fought.
 
 Settlement conventions (sportsbook-standard, encoded explicitly):
-  * MONEYLINE: DRAW or NO_CONTEST -> VOID (stake returned) when no draw option.
+  * MONEYLINE: DRAW -> PUSH (two-way, no draw option); NO_CONTEST -> VOID.
   * NO_CONTEST voids every market on the bout.
   * METHOD_OF_VICTORY: KO_TKO and DQ settle together as KO/TKO/DQ; decision
     types collapse to DECISION; DRAW -> VOID (no winner).
@@ -88,15 +88,15 @@ class BoutPath:
 
 
 def check_bout(b: BoutPath):
-    if b.scheduled_rounds not in (3, 5):
+    if not _int(b.scheduled_rounds) or b.scheduled_rounds not in (3, 5):
         raise FoundationError("UFC_SCHEDULED_ROUNDS_INVALID", str(b.scheduled_rounds))
     if not b.red_id or not b.blue_id or b.red_id == b.blue_id:
         raise FoundationError("UFC_FIGHTER_IDENTITY_COLLISION")
     if b.method not in ALL_METHODS:
         raise FoundationError("UFC_METHOD_INVALID", str(b.method))
-    if not isinstance(b.end_round, int) or not 1 <= b.end_round <= b.scheduled_rounds:
+    if not _int(b.end_round) or not 1 <= b.end_round <= b.scheduled_rounds:
         raise FoundationError("UFC_ROUND_INVALID", str(b.end_round))
-    if not isinstance(b.end_second, int) or not 0 < b.end_second <= ROUND_SEC:
+    if not _int(b.end_second) or not 0 < b.end_second <= ROUND_SEC:
         raise FoundationError("UFC_TIME_INVALID", str(b.end_second))
     if b.method in FINISH_METHODS:
         if b.winner not in (b.red_id, b.blue_id):
@@ -168,44 +168,85 @@ def _line(line):
     return line
 
 
-def settle(b: BoutPath, market: str, *, selection=None, line=None, round_no=None):
-    check_bout(b)
+def _int(v):
+    return isinstance(v, int) and not isinstance(v, bool)
+
+
+def _validate_request(b, market, selection, line, round_no):
+    """Validate market identity, selection and line BEFORE any VOID/settle."""
     fighters = (b.red_id, b.blue_id)
-    if b.method == "NO_CONTEST":
-        if market not in MARKET_TERMINALS:
-            raise FoundationError("UFC_MARKET_NO_SETTLEMENT", market)
-        return "VOID"
+    if market == "ROUND_BETTING":
+        # Owner ruling 2026-10-15: no generic round-betting rule; the exact
+        # DK market (FIGHTER_TO_WIN_IN_ROUND, WIN_AND_TOTAL_ROUNDS) governs.
+        raise FoundationError("UFC_MARKET_AMBIGUOUS", market)
     if market == "MONEYLINE":
         if selection not in fighters:
             raise FoundationError("UFC_SELECTION_IDENTITY_MISMATCH", str(selection))
-        if b.method == "DRAW":
-            return "VOID"
-        return "WIN" if selection == b.winner else "LOSE"
-    if market == "METHOD_OF_VICTORY":
+    elif market == "METHOD_OF_VICTORY":
         fid, how = selection if isinstance(selection, tuple) and len(selection) == 2 else (None, None)
         if fid not in fighters or how not in ("KO_TKO_DQ", "SUBMISSION", "DECISION"):
             raise FoundationError("UFC_SELECTION_IDENTITY_MISMATCH", repr(selection))
-        if b.method == "DRAW":
-            return "VOID"
-        got = ("KO_TKO_DQ" if b.method in ("KO_TKO", "DQ") else
-               "SUBMISSION" if b.method == "SUBMISSION" else "DECISION")
-        return "WIN" if (fid, how) == (b.winner, got) else "LOSE"
-    if market == "ROUND_BETTING":
-        if selection not in fighters or not isinstance(round_no, int) \
+    elif market == "FIGHTER_TO_WIN_IN_ROUND":
+        if selection not in fighters or not _int(round_no) \
                 or not 1 <= round_no <= b.scheduled_rounds:
             raise FoundationError("UFC_SELECTION_IDENTITY_MISMATCH", f"{selection}/{round_no}")
-        finished = b.method in FINISH_METHODS
-        return "WIN" if finished and b.winner == selection and b.end_round == round_no else "LOSE"
-    if market == "TOTAL_ROUNDS":
+    elif market in ("TOTAL_ROUNDS", "WIN_AND_TOTAL_ROUNDS"):
         ln = _line(line)
         if ln >= b.scheduled_rounds:
             raise FoundationError("UFC_ROUNDS_LINE_OUT_OF_RANGE", repr(line))
-        threshold = int(math.floor(ln)) * ROUND_SEC + ROUND_SEC // 2
-        return "OVER" if b.elapsed_seconds >= threshold else "UNDER"
-    if market == "GOES_THE_DISTANCE":
+        if market == "WIN_AND_TOTAL_ROUNDS":
+            fid, ou = selection if isinstance(selection, tuple) and len(selection) == 2 else (None, None)
+            if fid not in fighters or ou not in ("OVER", "UNDER"):
+                raise FoundationError("UFC_SELECTION_IDENTITY_MISMATCH", repr(selection))
+    elif market == "GOES_THE_DISTANCE":
         if selection not in ("YES", "NO"):
             raise FoundationError("UFC_SELECTION_IDENTITY_MISMATCH", str(selection))
-        went = b.method in DECISION_METHODS or b.method == "DRAW"
+    else:
+        raise FoundationError("UFC_MARKET_NO_SETTLEMENT", market)
+
+
+def _total_rounds(b, line):
+    threshold = int(math.floor(line)) * ROUND_SEC + ROUND_SEC // 2
+    return "OVER" if b.elapsed_seconds >= threshold else "UNDER"
+
+
+def settle(b: BoutPath, market: str, *, selection=None, line=None, round_no=None):
+    """Settle by EXACT market identity (DK house rules v15 MMA, owner ruling
+    2026-10-15 on #2351; jurisdiction/version still to be confirmed):
+      * MONEYLINE (two-way, no draw option): DRAW -> PUSH.
+      * FIGHTER_TO_WIN_IN_ROUND: DRAW -> LOSE (no fighter won in that round).
+      * WIN_AND_TOTAL_ROUNDS (fighter to win + over/under rounds): DRAW -> LOSE.
+      * TOTAL_ROUNDS: actual elapsed time, draws included.
+      * NO_CONTEST: VOID, but only after identity/line validation.
+    """
+    check_bout(b)
+    _validate_request(b, market, selection, line, round_no)
+    if b.method == "NO_CONTEST":
+        return "VOID"
+    draw = b.method == "DRAW"
+    if market == "MONEYLINE":
+        if draw:
+            return "PUSH"
+        return "WIN" if selection == b.winner else "LOSE"
+    if market == "METHOD_OF_VICTORY":
+        fid, how = selection
+        if draw:
+            return "VOID"   # unchanged; DK classifies technical draw as DRAW -- pending ruling
+        got = ("KO_TKO_DQ" if b.method in ("KO_TKO", "DQ") else
+               "SUBMISSION" if b.method == "SUBMISSION" else "DECISION")
+        return "WIN" if (fid, how) == (b.winner, got) else "LOSE"
+    if market == "FIGHTER_TO_WIN_IN_ROUND":
+        finished = b.method in FINISH_METHODS
+        return "WIN" if finished and b.winner == selection and b.end_round == round_no else "LOSE"
+    if market == "TOTAL_ROUNDS":
+        return _total_rounds(b, line)
+    if market == "WIN_AND_TOTAL_ROUNDS":
+        if draw:
+            return "LOSE"
+        fid, ou = selection
+        return "WIN" if fid == b.winner and _total_rounds(b, line) == ou else "LOSE"
+    if market == "GOES_THE_DISTANCE":
+        went = b.method in DECISION_METHODS or draw
         return "WIN" if (selection == "YES") == went else "LOSE"
     raise FoundationError("UFC_MARKET_NO_SETTLEMENT", market)
 
@@ -214,7 +255,9 @@ _SIM = "per-round hazard skeleton + settlement; caller-supplied hazards, no fit,
 MARKET_TERMINALS = {
     "MONEYLINE": ("RESEARCH_ONLY", _SIM),
     "METHOD_OF_VICTORY": ("RESEARCH_ONLY", _SIM),
-    "ROUND_BETTING": ("RESEARCH_ONLY", _SIM),
+    "ROUND_BETTING": ("NO_SETTLEMENT", "generic round betting refused; use exact DK market"),
+    "FIGHTER_TO_WIN_IN_ROUND": ("RESEARCH_ONLY", _SIM + "; draw -> LOSE per DK v15"),
+    "WIN_AND_TOTAL_ROUNDS": ("RESEARCH_ONLY", _SIM + "; draw -> LOSE per DK v15"),
     "TOTAL_ROUNDS": ("RESEARCH_ONLY", _SIM),
     "GOES_THE_DISTANCE": ("RESEARCH_ONLY", _SIM),
     "DRAW_3WAY": ("NO_SETTLEMENT", "3-way draw market settlement not encoded"),

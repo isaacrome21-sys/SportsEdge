@@ -32,14 +32,14 @@ def test_markets_mutually_consistent():
     for b in _bouts():
         ml = {f: F.settle(b, "MONEYLINE", selection=f) for f in ("RED", "BLU")}
         if b.method == "DRAW":
-            assert set(ml.values()) == {"VOID"}
+            assert set(ml.values()) == {"PUSH"}   # owner ruling 2026-10-15 (#2351)
             continue
         assert sorted(ml.values()) == ["LOSE", "WIN"]
         mov = [(f, h) for f in ("RED", "BLU") for h in ("KO_TKO_DQ", "SUBMISSION", "DECISION")
                if F.settle(b, "METHOD_OF_VICTORY", selection=(f, h)) == "WIN"]
         assert len(mov) == 1 and mov[0][0] == b.winner
         rb = [(f, r) for f in ("RED", "BLU") for r in range(1, b.scheduled_rounds + 1)
-              if F.settle(b, "ROUND_BETTING", selection=f, round_no=r) == "WIN"]
+              if F.settle(b, "FIGHTER_TO_WIN_IN_ROUND", selection=f, round_no=r) == "WIN"]
         dist = F.settle(b, "GOES_THE_DISTANCE", selection="YES") == "WIN"
         assert (len(rb) == 0) == dist
 
@@ -58,12 +58,13 @@ def test_total_rounds_half_point_boundary():
 
 def test_draw_and_no_contest_void():
     d = BoutPath("RED", "BLU", 3, "DRAW", None, 3, 300)
-    assert F.settle(d, "MONEYLINE", selection="RED") == "VOID"
+    assert F.settle(d, "MONEYLINE", selection="RED") == "PUSH"   # owner ruling (#2351)
     assert F.settle(d, "METHOD_OF_VICTORY", selection=("RED", "DECISION")) == "VOID"
     assert F.settle(d, "GOES_THE_DISTANCE", selection="YES") == "WIN"
     nc = BoutPath("RED", "BLU", 5, "NO_CONTEST", None, 2, 30)
-    for m in ("MONEYLINE", "TOTAL_ROUNDS", "GOES_THE_DISTANCE", "ROUND_BETTING"):
-        assert F.settle(nc, m, selection="RED", line=1.5, round_no=1) == "VOID"
+    for m, sel in (("MONEYLINE", "RED"), ("TOTAL_ROUNDS", None), ("GOES_THE_DISTANCE", "YES"),
+                   ("FIGHTER_TO_WIN_IN_ROUND", "RED")):
+        assert F.settle(nc, m, selection=sel, line=1.5, round_no=1) == "VOID"
 
 
 def test_dq_settles_with_ko_tko():
