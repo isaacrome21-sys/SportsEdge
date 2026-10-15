@@ -156,6 +156,30 @@ def test_line_invalid_refused():
         _assert_refusal(results[0], TOTAL_HITS_LINE_INVALID)
 
 
+def test_boolean_lines_refused():
+    for bad in (True, False):
+        results, _ = phone_total_hits_rows([_game_row(line=bad)], now=NOW)
+        _assert_refusal(results[0], TOTAL_HITS_LINE_INVALID)
+
+
+def test_named_team_side_conflict_refused():
+    for side, team in (("Home Club", "Away Club"),
+                       ("Away Club", "Home Club")):
+        results, _ = phone_total_hits_rows(
+            [_team_row(team_side=side, team=team)], now=NOW)
+        _assert_refusal(results[0], TEAM_TOTAL_HITS_TEAM_SIDE_CONFLICT)
+
+
+def test_named_team_side_agreement_and_ambiguity():
+    results, _ = phone_total_hits_rows(
+        [_team_row(team_side="Home Club", team="Home Club")], now=NOW)
+    _assert_refusal(results[0], TEAM_TOTAL_HITS_MODEL_HARNESS_FAIL)
+    results, _ = phone_total_hits_rows(
+        [_team_row(team_side="Same Club", home="Same Club",
+                   away="Same Club")], now=NOW)
+    _assert_refusal(results[0], TEAM_TOTAL_HITS_TEAM_SIDE_INVALID)
+
+
 def test_game_row_with_team_identity_refused():
     results, _ = phone_total_hits_rows(
         [_game_row(team_side="HOME")], now=NOW)

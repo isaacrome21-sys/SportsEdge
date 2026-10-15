@@ -194,6 +194,8 @@ def _validate_row_shape(row: Mapping[str, Any], market: str) -> str | None:
     if side not in ("OVER", "UNDER"):
         return TOTAL_HITS_SIDE_INVALID
     line_raw = row.get("line")
+    if isinstance(line_raw, bool):
+        return TOTAL_HITS_LINE_INVALID
     try:
         line = float(line_raw)
     except (TypeError, ValueError):
@@ -217,10 +219,11 @@ def _validate_row_shape(row: Mapping[str, Any], market: str) -> str | None:
         # A team NAME in the team_side field is resolvable; anything
         # else is a corrupt identity signal and refuses by name.
         named = _norm_name(team_side_raw)
-        candidates = {
-            _norm_name(row.get("away")), _norm_name(row.get("home"))}
-        if named not in candidates:
+        matches = [side for side in ("HOME", "AWAY")
+                   if named == _norm_name(row.get(side.lower()))]
+        if len(matches) != 1:
             return TEAM_TOTAL_HITS_TEAM_SIDE_INVALID
+        team_side_raw = matches[0]
     if team_side_raw in ("HOME", "AWAY") and team_name:
         expected = row.get("home") if team_side_raw == "HOME" else row.get("away")
         if _norm_name(team_name) != _norm_name(expected):
