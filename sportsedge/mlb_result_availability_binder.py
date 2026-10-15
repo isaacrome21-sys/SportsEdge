@@ -63,6 +63,21 @@ def bind_result_availability(export_path, attestation_path, output_path) -> dict
         if not (_instant(game["start_time"]) < _instant(a["result_available_at"]) <= observed):
             raise ValueError("INVALID_RESULT_AVAILABILITY")
         game["result_available_at"] = a["result_available_at"]
+    # Require local source snapshots to match claimed hashes. A bare digest
+    # string is not evidence that any underlying record was supplied.
+    source_root = attest.resolve().parent
+    for a in keyed.values():
+        relative = a.get("source_path")
+        if not isinstance(relative, str) or not relative:
+            raise ValueError("MISSING_ATTESTATION_SOURCE_SNAPSHOT")
+        rel = Path(relative)
+        if rel.is_absolute() or ".." in rel.parts:
+            raise ValueError("UNSAFE_ATTESTATION_SOURCE_PATH")
+        snapshot = (source_root / rel).resolve()
+        if not snapshot.is_relative_to(source_root) or not snapshot.is_file():
+            raise ValueError("MISSING_ATTESTATION_SOURCE_SNAPSHOT")
+        if hashlib.sha256(snapshot.read_bytes()).hexdigest() != a["source_sha256"]:
+            raise ValueError("ATTESTATION_SOURCE_HASH_MISMATCH")
     payload["availability_attestation_sha256"] = hashlib.sha256(attest.read_bytes()).hexdigest()
     payload["availability_attestation_authenticity_verified"] = False
     payload["play_authorized"] = False
