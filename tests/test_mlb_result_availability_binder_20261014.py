@@ -15,6 +15,8 @@ def _inputs(tmp_path):
         "games": [{"game_id": "42", "start_time": "2024-04-01T18:00:00Z",
                    "inning_runs": [0] * 9}],
     }))
+    snapshot = tmp_path / "snapshot.json"
+    snapshot.write_text('{"synthetic":true}')
     attestation = tmp_path / "attestation.json"
     evidence = {"schema": "MLB_RESULT_AVAILABILITY_ATTESTATIONS_V1",
                 "export_sha256": hashlib.sha256(export.read_bytes()).hexdigest(),
