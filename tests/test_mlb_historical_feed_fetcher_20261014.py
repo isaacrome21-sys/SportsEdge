@@ -14,7 +14,10 @@ def _stub(url):
             {"gamePk": 101, "status": {"abstractGameState": "Final"}},
         ]}]}
     else:
-        payload = {"gamePk": int(url.split("/game/")[1].split("/")[0])}
+        pk = int(url.split("/game/")[1].split("/")[0])
+        payload = {"gamePk": pk, "gameData": {
+            "game": {"pk": pk}, "status": {"abstractGameState": "Final"},
+            "datetime": {"dateTime": "2024-04-01T18:00:00Z"}}}
     raw = json.dumps(payload).encode()
     return raw, payload
 
@@ -63,3 +66,38 @@ def test_existing_output_refused(tmp_path, monkeypatch):
     monkeypatch.setattr(fetcher, "_fetch_json", lambda _: pytest.fail("network called"))
     with pytest.raises(FileExistsError, match="OUTPUT_DIRECTORY_EXISTS"):
         fetcher.acquire_historical_date("2024-04-01", tmp_path)
+
+
+def test_non_final_feed_refused_without_output(tmp_path, monkeypatch):
+    def bad(url):
+        raw, data = _stub(url)
+        if "/game/101/" in url:
+            data["gameData"]["status"]["abstractGameState"] = "Live"
+        return raw, data
+    monkeypatch.setattr(fetcher, "_fetch_json", bad)
+    output = tmp_path / "out"
+    with pytest.raises(ValueError, match="NON_FINAL_FEED_GAME"):
+        fetcher.acquire_historical_date("2024-04-01", output)
+    assert not output.exists()
+
+
+def test_mismatched_embedded_game_id_refused(tmp_path, monkeypatch):
+    def bad(url):
+        raw, data = _stub(url)
+        if "/game/101/" in url:
+            data["gameData"]["game"]["pk"] = 999
+        return raw, data
+    monkeypatch.setattr(fetcher, "_fetch_json", bad)
+    with pytest.raises(ValueError, match="FEED_GAME_ID_MISMATCH"):
+        fetcher.acquire_historical_date("2024-04-01", tmp_path / "out")
+
+
+def test_naive_start_refused(tmp_path, monkeypatch):
+    def bad(url):
+        raw, data = _stub(url)
+        if "/game/101/" in url:
+            data["gameData"]["datetime"]["dateTime"] = "2024-04-01T18:00:00"
+        return raw, data
+    monkeypatch.setattr(fetcher, "_fetch_json", bad)
+    with pytest.raises(ValueError, match="FUTURE_OR_NAIVE_FEED_START"):
+        fetcher.acquire_historical_date("2024-04-01", tmp_path / "out")
