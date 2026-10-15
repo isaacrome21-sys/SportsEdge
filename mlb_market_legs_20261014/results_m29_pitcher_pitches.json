@@ -1,0 +1,382 @@
+{
+ "item": "M29_PITCHER_PITCHES_CALIBRATION",
+ "label": "RESEARCH_EVIDENCE",
+ "evidence_class": "RETROSPECTIVE_CALIBRATION \u2014 no historical paired DK lines for this family; market leg FORWARD_ONLY_BY_DESIGN. NOT validation, NOT a promotion input.",
+ "spec_sha256": "8299481c72609023a899f416959ee45b62a254b137ce4262e3a7a502130a1723",
+ "spec_path": "/home/hatch/workspace/tmp/wt-market-legs/mlb_market_legs_20261014/SPEC_M29_PITCHER_PITCHES.md",
+ "model_identity": {
+  "file": "sportsedge/pitcher_joint_engine.py",
+  "main_commit": "83e0c396a4761ea3de80583be5e61e8ca2e07f9a",
+  "engine_blob_at_pin": "00cba6f664e313b53ab0084e6f3f471a9d85b566",
+  "engine_blob_check": "MATCHES spec blob 00cba6f664e313b53ab0084e6f3f471a9d85b566 (identical at Phase 2 pin 12999fc22)",
+  "worktree_head": "28149cbe47368534a597a2bda1e2691e32edb6fe",
+  "engine_blob_at_worktree_head": "00cba6f664e313b53ab0084e6f3f471a9d85b566",
+  "engine_version": "mlb_pitcher_joint_empirical_bayes_v4_long_window_prior",
+  "config": "price_pitcher_market market=PITCHER_PITCHES, features={'history_pool': [...]} only"
+ },
+ "dataset": {
+  "transport": "MLB StatsAPI disk cache (public endpoints)",
+  "cache_dir": "/home/hatch/workspace/tmp/bt_data/statsapi_cache",
+  "manifest": "mlb_market_legs_20261014/DATASET_MANIFEST_STAGE2.md section 2",
+  "manifest_combined_identity_sha256": "87841854d03f8e65686503b1ee19c011d66604d6501bc9c96fee1b6d18cea55e",
+  "acquisition_done": {
+   "urls_total": 4637,
+   "failures": [],
+   "log": [
+    "players: 1798 unique ids",
+    "gamelog urls: 4610",
+    "gamelog failures: 0",
+    "schedule urls: 25",
+    "schedule failures: 0"
+   ]
+  },
+  "in_repo": false
+ },
+ "pool_code_identity_vs_undercard_evaluator": {
+  "functions": {
+   "parse_starts": {
+    "this_file_sha256": "4d108c9c223ed1293011e41ea876bbc7cb749ee34f30fb77721b5ba1273b6d5e",
+    "undercard_sha256": "4d108c9c223ed1293011e41ea876bbc7cb749ee34f30fb77721b5ba1273b6d5e",
+    "identical": true
+   },
+   "production_order": {
+    "this_file_sha256": "c20f25bcd1831308dc35778e6036f08c71a039789c0eb558f5484a8d742328db",
+    "undercard_sha256": "c20f25bcd1831308dc35778e6036f08c71a039789c0eb558f5484a8d742328db",
+    "identical": true
+   },
+   "engine_pool": {
+    "this_file_sha256": "b0f53781bb64cca7350b1e01b9226a6e2cd43a34f0014b7a1588fd43fa7b042c",
+    "undercard_sha256": "b0f53781bb64cca7350b1e01b9226a6e2cd43a34f0014b7a1588fd43fa7b042c",
+    "identical": true
+   },
+   "all_prior": {
+    "this_file_sha256": "43fd4673d12a790b7af5ca8bb26c8f5a6749fda089c2a021212d5fb73cb8b890",
+    "undercard_sha256": "43fd4673d12a790b7af5ca8bb26c8f5a6749fda089c2a021212d5fb73cb8b890",
+    "identical": true
+   }
+  },
+  "all_identical": true
+ },
+ "generated_at": "2026-10-15T10:09:35.162781+00:00",
+ "seed": 20261015,
+ "bootstrap": {
+  "blocks": "ISO calendar weeks",
+  "resamples": 2000,
+  "seed": 20261015
+ },
+ "parity": {
+  "status": "PASSED",
+  "required": 25,
+  "successes": 25,
+  "attempts": 25,
+  "production_refusals_counted_and_replaced": {},
+  "live_schedule_fetches": [
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-08-29&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-08-28&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-09-15&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-09-14&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-08-05&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-08-06&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-08-23&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-08-22&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-07-25&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-07-26&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2024-06-01&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2024-06-02&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-08-10&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-08-09&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-05-12&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-05-13&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-09-25&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-09-26&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-09-11&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-09-12&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-07-12&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-07-11&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2024-06-28&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2024-06-29&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2024-05-19&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2024-05-18&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-07-23&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-07-22&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2024-06-25&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2024-06-26&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-05-20&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-05-21&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2024-05-31&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-07-18&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-07-17&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-08-08&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-08-07&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-09-18&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-09-17&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-06-25&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2025-06-24&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2024-05-13&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2024-05-14&hydrate=probablePitcher"
+  ],
+  "pairs": [
+   {
+    "pitcher_id": 680730,
+    "date": "2025-08-29",
+    "game_pk": 776545
+   },
+   {
+    "pitcher_id": 680573,
+    "date": "2025-09-15",
+    "game_pk": 776313
+   },
+   {
+    "pitcher_id": 624133,
+    "date": "2025-08-06",
+    "game_pk": 776851
+   },
+   {
+    "pitcher_id": 683004,
+    "date": "2025-08-23",
+    "game_pk": 776623
+   },
+   {
+    "pitcher_id": 677958,
+    "date": "2025-07-26",
+    "game_pk": 776993
+   },
+   {
+    "pitcher_id": 669432,
+    "date": "2024-06-02",
+    "game_pk": 746061
+   },
+   {
+    "pitcher_id": 686799,
+    "date": "2025-08-10",
+    "game_pk": 776806
+   },
+   {
+    "pitcher_id": 669358,
+    "date": "2025-05-13",
+    "game_pk": 777935
+   },
+   {
+    "pitcher_id": 571945,
+    "date": "2025-09-26",
+    "game_pk": 776167
+   },
+   {
+    "pitcher_id": 621111,
+    "date": "2025-09-12",
+    "game_pk": 776354
+   },
+   {
+    "pitcher_id": 669432,
+    "date": "2025-07-12",
+    "game_pk": 777141
+   },
+   {
+    "pitcher_id": 656557,
+    "date": "2024-06-29",
+    "game_pk": 746940
+   },
+   {
+    "pitcher_id": 607067,
+    "date": "2024-05-19",
+    "game_pk": 746392
+   },
+   {
+    "pitcher_id": 621107,
+    "date": "2025-07-23",
+    "game_pk": 777036
+   },
+   {
+    "pitcher_id": 527048,
+    "date": "2025-09-12",
+    "game_pk": 776361
+   },
+   {
+    "pitcher_id": 680570,
+    "date": "2024-06-26",
+    "game_pk": 747019
+   },
+   {
+    "pitcher_id": 657277,
+    "date": "2025-05-21",
+    "game_pk": 777819
+   },
+   {
+    "pitcher_id": 657006,
+    "date": "2024-06-01",
+    "game_pk": 746870
+   },
+   {
+    "pitcher_id": 666200,
+    "date": "2025-07-18",
+    "game_pk": 777106
+   },
+   {
+    "pitcher_id": 686613,
+    "date": "2025-08-08",
+    "game_pk": 776835
+   },
+   {
+    "pitcher_id": 669373,
+    "date": "2025-09-18",
+    "game_pk": 776275
+   },
+   {
+    "pitcher_id": 663903,
+    "date": "2025-06-25",
+    "game_pk": 777367
+   },
+   {
+    "pitcher_id": 676130,
+    "date": "2024-05-14",
+    "game_pk": 745821
+   },
+   {
+    "pitcher_id": 669467,
+    "date": "2025-05-21",
+    "game_pk": 777827
+   },
+   {
+    "pitcher_id": 686563,
+    "date": "2025-07-18",
+    "game_pk": 777107
+   }
+  ],
+  "sampling_note": "Candidates restricted to fixtures where the sealed filter is inactive (2025, or date < 2024-07-01), schedule gameDate UTC date == gameLog date, and kickoff >= 01:00 UTC; as_of = kickoff - 30 min."
+ },
+ "counts": {
+  "2024": {
+   "candidate_regular_starts": 4858,
+   "undercard_exclusions": {
+    "SEALED_WINDOW": 1564,
+    "POOL_STARTS_LT_5": 1318
+   },
+   "undercard_population": 1976,
+   "PITCHES_NOT_MEASURED": 0,
+   "POOL_PITCH_COUNT_MISSING": 0,
+   "scored": 1976
+  },
+  "2025": {
+   "candidate_regular_starts": 4846,
+   "undercard_exclusions": {
+    "POOL_STARTS_LT_5": 1451
+   },
+   "undercard_population": 3395,
+   "PITCHES_NOT_MEASURED": 0,
+   "POOL_PITCH_COUNT_MISSING": 0,
+   "scored": 3395
+  },
+  "pooled": {
+   "undercard_population": 5371,
+   "PITCHES_NOT_MEASURED": 0,
+   "POOL_PITCH_COUNT_MISSING": 0,
+   "scored": 5371
+  }
+ },
+ "sweep_sanity": {
+  "n_fixtures": 10,
+  "line": 85.5,
+  "max_abs_diff": 5.551115123125783e-17,
+  "note": "direct model_p(OVER, 85.5) == 1 - F(85) from the sweep"
+ },
+ "metrics": {
+  "pooled": {
+   "n": 5371,
+   "crps_engine_mean": 7.01109251397464,
+   "crps_b1_mean": 6.746544155688279,
+   "crps_b2_mean": 6.908740734151005,
+   "delta_crps_vs_b1": {
+    "mean_delta": 0.2645483582863592,
+    "ci95_lo": 0.2279362102704193,
+    "ci95_hi": 0.3051237495203515,
+    "n_blocks": 40,
+    "resamples": 2000,
+    "entirely_below_zero": false
+   },
+   "delta_crps_vs_b2": {
+    "mean_delta": 0.10235177982363405,
+    "ci95_lo": -0.021389343139126073,
+    "ci95_hi": 0.23566650152005547,
+    "n_blocks": 40,
+    "resamples": 2000,
+    "entirely_below_zero": false
+   },
+   "mean_predicted": 88.0450307685343,
+   "mean_realized": 87.88642710854589,
+   "coverage80_empirical": 0.7940793148389499,
+   "residual_tail_mass_mean": 0.04850639725197534,
+   "residual_tail_mass_max": 0.08333333333333337
+  },
+  "per_season": {
+   "2024": {
+    "n": 1976,
+    "crps_engine_mean": 7.140583452325913,
+    "crps_b1_mean": 6.884962116083474,
+    "crps_b2_mean": 7.041178855272541,
+    "delta_crps_vs_b1": {
+     "mean_delta": 0.2556213362424377,
+     "ci95_lo": 0.20104748575792564,
+     "ci95_hi": 0.32339781169422144,
+     "n_blocks": 17,
+     "resamples": 2000,
+     "entirely_below_zero": false
+    },
+    "delta_crps_vs_b2": {
+     "mean_delta": 0.09940459705337287,
+     "ci95_lo": -0.1549539263207599,
+     "ci95_hi": 0.3376875823117251,
+     "n_blocks": 17,
+     "resamples": 2000,
+     "entirely_below_zero": false
+    },
+    "mean_predicted": 88.34887204001576,
+    "mean_realized": 88.08097165991903,
+    "coverage80_empirical": 0.7803643724696356,
+    "residual_tail_mass_mean": 0.05075985361916535,
+    "residual_tail_mass_max": 0.08333333333333337
+   },
+   "2025": {
+    "n": 3395,
+    "crps_engine_mean": 6.935724592271514,
+    "crps_b1_mean": 6.665980417914818,
+    "crps_b2_mean": 6.831657456585129,
+    "delta_crps_vs_b1": {
+     "mean_delta": 0.2697441743566947,
+     "ci95_lo": 0.22406024540934877,
+     "ci95_hi": 0.3194263076242793,
+     "n_blocks": 23,
+     "resamples": 2000,
+     "entirely_below_zero": false
+    },
+    "delta_crps_vs_b2": {
+     "mean_delta": 0.10406713568638394,
+     "ci95_lo": -0.032269996203304264,
+     "ci95_hi": 0.24305903951973096,
+     "n_blocks": 23,
+     "resamples": 2000,
+     "entirely_below_zero": false
+    },
+    "mean_predicted": 87.8681853038959,
+    "mean_realized": 87.77319587628865,
+    "coverage80_empirical": 0.8020618556701031,
+    "residual_tail_mass_mean": 0.047194812632956946,
+    "residual_tail_mass_max": 0.08333333333333337
+   }
+  }
+ },
+ "crps_truncation": {
+  "m_range": [
+   0,
+   170
+  ],
+  "note": "CRPS truncated at m=170 for engine/B1/B2 identically; mean residual tail mass 1 - F(170) reported in metrics."
+ },
+ "methodology_notes": [
+  "Gate applied to pooled paired dCRPS CIs vs both baselines; per-season CIs reported alongside.",
+  "Exclusion precedence: SEALED_WINDOW and POOL_STARTS_LT_5 (undercard population), then PITCHES_NOT_MEASURED, then POOL_PITCH_COUNT_MISSING.",
+  "B1 uses measured pitch counts over ALL prior same-season starts (no cap); B2 uses measured pitch counts over all starters' prior starts in the season to date; sealed-window starts removed from both.",
+  "Predicted mean = sum_{m=0}^{170} (1 - F(m)); central 80% interval = [smallest m with F(m)>=0.10, smallest m with F(m)>=0.90].",
+  "No per-line Brier table (spec section 5): DK hangs pitches at starter-specific lines; no canonical line set exists."
+ ],
+ "verdict": "DOES_NOT_BEAT_BASELINE"
+}
