@@ -59,6 +59,7 @@ from __future__ import annotations
 import gzip
 import io
 import math
+import numbers
 from datetime import datetime, timezone
 from typing import Any, Callable, Iterable, Mapping, Sequence
 from urllib.request import Request, urlopen
@@ -188,16 +189,27 @@ def prob_over_under(pmf: Mapping[int, float],
     return over, push, under
 
 
+def _real(value: Any) -> float | None:
+    """A genuine real number (never bool/str/None); NaN/inf returned as-is."""
+    if value is None or isinstance(value, (bool, str, bytes)):
+        return None
+    if not isinstance(value, numbers.Real):
+        return None
+    return float(value)
+
+
+FG_DISTANCE_MIN = 18.0  # LOS at the 1 + 17 yards (snap + end-zone depth)
+FG_DISTANCE_MAX = 75.0  # beyond any recorded NFL attempt; implausible
+
+
 def _valid_distance(distance: Any) -> float:
     """Measured FG distance or a named refusal (never 0 / never 60+)."""
     if distance is None or isinstance(distance, bool):
         raise NflKickingError("KICKING_FG_DISTANCE_INVALID:missing")
-    try:
-        d = float(distance)
-    except (TypeError, ValueError):
-        raise NflKickingError(
-            f"KICKING_FG_DISTANCE_INVALID:{distance!r}") from None
-    if not math.isfinite(d) or d < 0:
+    d = _real(distance)
+    if d is None:
+        raise NflKickingError(f"KICKING_FG_DISTANCE_INVALID:{distance!r}")
+    if not math.isfinite(d) or not FG_DISTANCE_MIN <= d <= FG_DISTANCE_MAX:
         raise NflKickingError(f"KICKING_FG_DISTANCE_INVALID:{d!r}")
     return d
 
@@ -205,14 +217,29 @@ def _valid_distance(distance: Any) -> float:
 def _pat_count(value: Any, field: str) -> int:
     if value is None or isinstance(value, bool):
         raise NflKickingError(f"KICKING_PAT_SUPPORT_INVALID:{field}")
-    try:
-        f = float(value)
-    except (TypeError, ValueError):
-        raise NflKickingError(
-            f"KICKING_PAT_SUPPORT_INVALID:{field}") from None
+    f = _real(value)
+    if f is None:
+        raise NflKickingError(f"KICKING_PAT_SUPPORT_INVALID:{field}")
     if not math.isfinite(f) or f < 0 or f != int(f):
         raise NflKickingError(f"KICKING_PAT_SUPPORT_INVALID:{field}={value!r}")
     return int(f)
+
+
+def _valid_fg_attempts(value: Any, gid: str) -> list[tuple[float, bool]]:
+    if value is None:
+        raise NflKickingError(f"KICKING_FG_ATTEMPTS_MISSING:{gid}")
+    if not isinstance(value, (list, tuple)):
+        raise NflKickingError(f"KICKING_FG_ATTEMPTS_INVALID:{gid}")
+    out = []
+    for item in value:
+        if not isinstance(item, (list, tuple)) or len(item) != 2:
+            raise NflKickingError(f"KICKING_FG_ATTEMPTS_INVALID:{gid}")
+        dist, made = item
+        d = _valid_distance(dist)
+        if not isinstance(made, bool):
+            raise NflKickingError(f"KICKING_FG_RESULT_INVALID:{gid}:{made!r}")
+        out.append((d, made))
+    return out
 
 
 def _band_index(distance: float) -> int:
@@ -256,6 +283,7 @@ def estimate_kicking(games: Iterable[Mapping[str, Any]], *,
         if gid in seen_games:
             raise NflKickingError(f"KICKING_HISTORY_DUPLICATE_GAME:{gid}")
         seen_games.add(gid)
+        _valid_fg_attempts(g.get("fg_attempts"), gid)
         pa = _pat_count(g.get("pat_attempts"), "pat_attempts")
         pm = _pat_count(g.get("pat_makes"), "pat_makes")
         if pm > pa:
@@ -264,6 +292,10 @@ def estimate_kicking(games: Iterable[Mapping[str, Any]], *,
         gk = g.get("kickoff")
         if gk is None:
             raise NflKickingError("KICKING_HISTORY_KICKOFF_MISSING")
+        if not isinstance(gk, datetime) or gk.tzinfo is None \
+                or gk.utcoffset() is None:
+            raise NflKickingError(
+                f"KICKING_HISTORY_KICKOFF_TIMEZONE_REQUIRED:{gid}")
         if gk < kickoff:
             rows.append(g)
     rows.sort(key=lambda g: g["kickoff"])
@@ -282,7 +314,7 @@ def estimate_kicking(games: Iterable[Mapping[str, Any]], *,
     band_made = [0] * len(DISTANCE_BANDS)
     for g in rows:
         for dist, made in (g.get("fg_attempts") or ()):
-            b = _band_index(float(dist))
+            b = _band_index(dist)
             band_att[b] += 1
             band_made[b] += 1 if made else 0
     total_att = sum(band_att)
