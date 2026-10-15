@@ -127,13 +127,10 @@ def test_conflicting_same_instant_lists_never_confirm():
 
 def test_qb_assessment_receipt_can_confirm_only_via_trusted_verifier():
     from sportsedge.nfl_participation_bridge import assess_qb_participation
-    depth = [{
-        "dt": "2026-10-01T12:00:00Z", "team": TEAM,
-        "gsis_id": "active-qb", "player_name": "Synthetic QB",
-        "pos_abb": "QB", "pos_rank": 1,
-    }]
+    from tests.test_nfl_participation_bridge_20261014 import depth_rows
+    # Reuse the established nflverse-shaped fixture, not a guessed schema.
     kwargs = dict(
-        team=TEAM, depth_rows=depth, game_id=GAME,
+        team=TEAM, depth_rows=depth_rows(), game_id=GAME,
         target_season=2026, target_week=4,
         kickoff="2026-10-04T17:00:00Z",
         as_of="2026-10-04T16:00:00Z",
