@@ -12,7 +12,7 @@ REG = tuple(range(1, F.REG_PERIODS + 1))
 
 def _team(tid, scale=1.0):
     return TeamInput(tid, tuple(PlayerInput(f"{tid}_p{i}", 8 * scale, 2.5 * scale, 4 * scale)
-                                for i in range(5)))
+                                for i in range(5)), espn_id="99999")
 
 
 H, A = _team("HOM"), _team("AWY")
@@ -74,7 +74,8 @@ def test_ot_settlement_scopes():
 
 
 def test_whole_number_push_and_spread():
-    p = GamePath("HOM", "AWY", [Event("HOM", "HOM_p0", 1, "FG3"), Event("AWY", "AWY_p0", 2, "FG2")])
+    p = GamePath("HOM", "AWY", [Event("HOM", "HOM_p0", 1, "FG3"), Event("AWY", "AWY_p0", 2, "FG2")],
+                 teams=(H, A))
     assert F.check_path(p, H, A)
     assert F.settle(p, "SPREAD", selection="HOM", line=-1) == "PUSH"
     assert F.settle(p, "SPREAD", selection="AWY", line=1.5) == "WIN"
@@ -84,7 +85,7 @@ def test_whole_number_push_and_spread():
 
 @pytest.mark.parametrize("bad", [float("nan"), float("inf"), -0.1, True, None])
 def test_nonfinite_rates_refused(bad):
-    t = TeamInput("HOM", (PlayerInput("HOM_p0", bad, 1.0, 1.0),))
+    t = TeamInput("HOM", (PlayerInput("HOM_p0", bad, 1.0, 1.0),), espn_id="99999")
     with pytest.raises(FoundationError) as e:
         F.simulate_game(t, A, random.Random(1))
     assert e.value.code.startswith(S + "_INPUT_")
@@ -104,9 +105,9 @@ def test_identity_refusals():
         F.simulate_game(H, _team("HOM"), random.Random(1))
     assert e.value.code == f"{S}_TEAM_IDENTITY_COLLISION"
     with pytest.raises(FoundationError) as e:
-        F.simulate_game(H, TeamInput("AWY", H.players), random.Random(1))
+        F.simulate_game(H, TeamInput("AWY", H.players, espn_id="99998"), random.Random(1))
     assert e.value.code == f"{S}_PLAYER_ON_BOTH_TEAMS"
-    dup = TeamInput("HOM", (H.players[0], H.players[0]))
+    dup = TeamInput("HOM", (H.players[0], H.players[0]), espn_id="99999")
     with pytest.raises(FoundationError) as e:
         dup.validate()
     assert e.value.code == f"{S}_PLAYER_DUPLICATE"
