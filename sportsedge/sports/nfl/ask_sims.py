@@ -58,6 +58,14 @@ def parse_question(question: str, *, home_team: str, away_team: str,
     win = re.fullmatch(r"(.+?)\s+wins?", value, re.I)
     if win:
         return {"market": "win", "team": _team(win.group(1), home_team, away_team, aka)}
+    spread = re.fullmatch(r"(.+?)\s+covers\s+([+-]?\d{1,3}(?:\.\d+)?)", value, re.I)
+    if spread:
+        return {"market": "spread", "team": _team(spread.group(1), home_team, away_team, aka),
+                "line": float(spread.group(2))}
+    correct_score = re.fullmatch(r"correct score\s+(\d{1,3})[-:](\d{1,3})", value, re.I)
+    if correct_score:
+        return {"market": "correct_score", "home_score": int(correct_score.group(1)),
+                "away_score": int(correct_score.group(2))}
     total = re.fullmatch(r"total\s+(over|under)\s+(\d{1,3}(?:\.\d+)?)", value, re.I)
     if total:
         return {"market": "total_" + total.group(1).lower(),
@@ -79,6 +87,13 @@ def _line(value: Any) -> float:
     return float(value)
 
 
+def _signed_line(x: Any) -> float:
+    if (isinstance(x, bool) or not isinstance(x, (int, float)) or
+            not isfinite(x) or not -255 <= x <= 255):
+        raise AskSimsError("ASK_SIMS_LINE_INVALID")
+    return float(x)
+
+
 def _evaluate(q: Mapping[str, Any], home: int, away: int) -> int:
     """1 win, 0 push, -1 loss; integer-line pushes are retained."""
     if not isinstance(q, Mapping):
@@ -90,7 +105,7 @@ def _evaluate(q: Mapping[str, Any], home: int, away: int) -> int:
         outcomes = [_evaluate(term, home, away) for term in terms]
         return -1 if -1 in outcomes else (0 if 0 in outcomes else 1)
     market = q.get("market")
-    if market in ("win", "win_by", "team_total_over", "team_total_under"):
+    if market in ("win", "win_by", "team_total_over", "team_total_under", "spread"):
         side = q.get("team")
         if side not in ("home", "away"):
             raise AskSimsError("ASK_SIMS_TEAM_SIDE_INVALID")
@@ -99,6 +114,9 @@ def _evaluate(q: Mapping[str, Any], home: int, away: int) -> int:
         if market == "win":
             # NFL two-way moneyline ties push; a three-way market is not supported.
             return 1 if score > opponent else (0 if score == opponent else -1)
+        if market == "spread":
+            delta = score - opponent + _signed_line(q.get("line"))
+            return 1 if delta > 0 else (0 if delta == 0 else -1)
         if market == "win_by":
             points = q.get("points")
             if isinstance(points, bool) or not isinstance(points, int) or not 1 <= points <= 255:
@@ -111,6 +129,12 @@ def _evaluate(q: Mapping[str, Any], home: int, away: int) -> int:
         delta = home + away - _line(q.get("line"))
         if market.endswith("under"):
             delta = -delta
+    elif market == "correct_score":
+        expected = (q.get("home_score"), q.get("away_score"))
+        if any(isinstance(v, bool) or not isinstance(v, int) or not 0 <= v <= 255
+               for v in expected):
+            raise AskSimsError("ASK_SIMS_SCORE_INVALID")
+        return 1 if (home, away) == expected else -1
     else:
         raise AskSimsError("ASK_SIMS_MARKET_UNSUPPORTED")
     return 1 if delta > 0 else (0 if delta == 0 else -1)
@@ -138,7 +162,9 @@ def ask_score_paths(
     price_american: int | None = None,
 ) -> dict[str, Any]:
     """Empirical outcomes from caller-supplied paths and optional UNVERIFIED quote."""
-    if not home_team or not away_team or home_team.casefold() == away_team.casefold():
+    if (not isinstance(home_team, str) or not isinstance(away_team, str) or
+        not home_team.strip() or not away_team.strip() or
+        home_team.casefold() == away_team.casefold()):
         raise AskSimsError("ASK_SIMS_GAME_IDENTITY_INVALID")
     if isinstance(question, str):
         query = parse_question(question, home_team=home_team, away_team=away_team, aliases=aliases)
