@@ -52,6 +52,7 @@ from sportsedge.f5_derived_readouts import (
 from sportsedge.mlb_f5_derived_quote_binding import (
     normalize_f5_derived_market, phone_f5_derived_binding_rows)
 from sportsedge.mlb_first_inning_deep_set import deep_set_blocked_row
+from sportsedge.mlb_per_inning_gates import per_inning_blocked_row
 from sportsedge.mlb_plate_appearance_gates import plate_appearance_blocked_row
 from sportsedge.mlb_total_hits import (
     TOTAL_HITS_MARKETS,
@@ -992,6 +993,10 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 # Non-matrix Plate Appearance names (M49) refuse at
                 # their named gates, not the generic fallback.
                 covered = plate_appearance_blocked_row(line)
+            if covered is None and line["sport"] == "MLB":
+                # Non-matrix per-inning 2nd-9th names (M22) refuse at
+                # their named gates, not the generic fallback.
+                covered = per_inning_blocked_row(line)
             others[local] = covered if covered is not None else blocked(
                 line, "NO_VERIFIED_MODEL_FOR_THIS_MARKET")
     pitcher_results, pitcher_receipts = phone_pitcher_rows(
