@@ -104,6 +104,8 @@ FIRST_REC_SHRINK = 10.0   # pseudo-games of league first-reception dist
 MAX_OPPS = 40   # opportunity-count support; tail folded at 40
 Y_MIN = -20     # yardage grid floor; plays below fold to Y_MIN
 Y_MAX = 99      # yardage grid cap; plays above fold to Y_MAX
+YARDS_FIELD_MIN = -99  # a single play can never lose more than 99 yards
+YARDS_FIELD_MAX = 99   # nor gain more than 99 yards
 
 ROLES = ("PASSER", "RECEIVER", "RUSHER")
 ROLE_MARKET = {
@@ -210,6 +212,43 @@ def prob_over_under(pmf: Mapping[int, float],
     return over, push, under
 
 
+
+def _yard(v: Any) -> int:
+    """Measured integral yardage or a named refusal (no coercion)."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        raise NflLongestPlaysError(f"LONGEST_HISTORY_YARDS_INVALID:{v!r}")
+    if not math.isfinite(v) or v != int(v):
+        raise NflLongestPlaysError(f"LONGEST_HISTORY_YARDS_INVALID:{v!r}")
+    if not YARDS_FIELD_MIN <= v <= YARDS_FIELD_MAX:
+        # Physically impossible on a 100-yard field; refuse before any
+        # clamp/fold onto the grid could silently absorb it.
+        raise NflLongestPlaysError(f"LONGEST_HISTORY_YARDS_INVALID:{v!r}")
+    return int(v)
+
+
+def _validated_row(r: Mapping[str, Any]) -> dict[str, Any]:
+    """Fail-closed row check: identity, game id, tz-aware kickoff,
+    non-empty measured plays, consistent first reception."""
+    pid = str(r.get("player_id") or "").strip()
+    if not pid:
+        raise NflLongestPlaysError("LONGEST_HISTORY_PLAYER_ID_MISSING")
+    gid = str(r.get("game_id") or "").strip()
+    if not gid:
+        raise NflLongestPlaysError("LONGEST_HISTORY_GAME_ID_MISSING")
+    plays = [_yard(y) for y in (r.get("play_yards") or ())]
+    if not plays:
+        raise NflLongestPlaysError(
+            f"LONGEST_HISTORY_PLAYS_EMPTY:LONGEST_NO_PLAYS:{pid}:{gid}")
+    fr = r.get("first_reception_yards")
+    if fr is not None:
+        fr = _yard(fr)
+        if fr not in plays:
+            raise NflLongestPlaysError(
+                f"LONGEST_HISTORY_FIRST_RECEPTION_INCONSISTENT:{pid}:{gid}")
+    return {**r, "player_id": pid, "game_id": gid,
+            "play_yards": plays, "first_reception_yards": fr}
+
+
 # ---------------------------------------------------------------------------
 # Estimator
 # ---------------------------------------------------------------------------
@@ -240,21 +279,35 @@ def estimate_longest_plays(records: Iterable[Mapping[str, Any]], *,
     league_counts: list[int] = []
     league_plays: list[int] = []
     league_first_rec: list[int] = []
+    seen: set[tuple[str, str]] = set()
     for r in records:
         rk = r.get("kickoff")
         if rk is None:
             raise NflLongestPlaysError("LONGEST_HISTORY_KICKOFF_MISSING")
         if str(r.get("role") or "").strip().upper() != role:
+            if str(r.get("player_id") or "").strip() == pid:
+                raise NflLongestPlaysError(
+                    f"LONGEST_HISTORY_ROLE_MISMATCH:{pid}:"
+                    f"expected={role}:got={r.get('role')!r}")
             continue
+        if getattr(rk, "tzinfo", None) is None:
+            raise NflLongestPlaysError(
+                "LONGEST_HISTORY_KICKOFF_TIMEZONE_REQUIRED")
         if not rk < kickoff:
             continue
-        plays = [int(y) for y in (r.get("play_yards") or ())]
+        r = _validated_row(r)
+        key = (r["player_id"], r["game_id"])
+        if key in seen:
+            raise NflLongestPlaysError(
+                f"LONGEST_HISTORY_DUPLICATE_GAME:{key[0]}:{key[1]}")
+        seen.add(key)
+        plays = r["play_yards"]
         league_counts.append(len(plays))
         league_plays.extend(plays)
         fr = r.get("first_reception_yards")
         if fr is not None:
-            league_first_rec.append(int(fr))
-        if str(r.get("player_id") or "").strip() == pid:
+            league_first_rec.append(fr)
+        if r["player_id"] == pid:
             player_rows.append(r)
     player_rows.sort(key=lambda r: r["kickoff"])
     player_rows = player_rows[-TRAILING_GAMES_K:]
@@ -342,8 +395,8 @@ def build_longest_play_games(pbp: Any, games: Any) -> list[dict[str, Any]]:
     in play order. Only plays define a record: a player-game with
     zero opportunities of a role emits no record for that role
     (zero-opportunity games are not identifiable from pbp alone).
-    A missing yards_gained on a recorded play coerces to 0 (the
-    kicking source's distance precedent).
+    A missing/non-finite yards_gained on a recorded opportunity
+    refuses (LONGEST_PBP_YARDS_MISSING); it is never coerced to 0.
     """
     import pandas as pd  # local: core above is dependency-light
 
@@ -388,7 +441,13 @@ def build_longest_play_games(pbp: Any, games: Any) -> list[dict[str, Any]]:
     for row in p.itertuples(index=False):
         gid = str(row.game_id)
         yards = row.yards_gained
-        yards = int(yards) if yards == yards else 0
+        is_opp = (int(row.pass_attempt or 0) == 1
+                  and int(row.complete_pass or 0) == 1) \
+            or int(row.rush_attempt or 0) == 1
+        if is_opp and not (yards == yards and math.isfinite(yards)):
+            raise NflLongestPlaysError(
+                f"LONGEST_PBP_YARDS_MISSING:{gid}:{row.play_id}")
+        yards = int(yards) if is_opp else 0
         team = str(row.posteam)
         if int(row.pass_attempt or 0) == 1 \
                 and int(row.complete_pass or 0) == 1:
