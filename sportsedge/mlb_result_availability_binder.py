@@ -52,7 +52,10 @@ def bind_result_availability(export_path, attestation_path, output_path) -> dict
     games = payload.get("games")
     if not isinstance(games, list) or not games or any(not isinstance(g, dict) for g in games):
         raise ValueError("INVALID_EXPORT_GAMES")
-    game_ids = [str(g.get("game_id")) for g in games]
+    if any(not isinstance(g.get("game_id"), (str, int)) or isinstance(g.get("game_id"), bool)
+           or not str(g.get("game_id")) for g in games):
+        raise ValueError("INVALID_EXPORT_GAME_ID")
+    game_ids = [str(g["game_id"]) for g in games]
     if len(set(game_ids)) != len(game_ids):
         raise ValueError("DUPLICATE_EXPORT_GAME")
     if set(game_ids) != set(keyed):
@@ -74,7 +77,7 @@ def bind_result_availability(export_path, attestation_path, output_path) -> dict
         if rel.is_absolute() or ".." in rel.parts:
             raise ValueError("UNSAFE_ATTESTATION_SOURCE_PATH")
         snapshot = (source_root / rel).resolve()
-        if not snapshot.is_relative_to(source_root) or not snapshot.is_file():
+        if not snapshot.is_relative_to(source_root) or not snapshot.is_file() or (source_root / rel).is_symlink():
             raise ValueError("MISSING_ATTESTATION_SOURCE_SNAPSHOT")
         if hashlib.sha256(snapshot.read_bytes()).hexdigest() != a["source_sha256"]:
             raise ValueError("ATTESTATION_SOURCE_HASH_MISMATCH")
