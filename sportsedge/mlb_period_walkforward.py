@@ -5,7 +5,6 @@ No market quotes, sealed holdouts, deployment or betting authority.
 """
 from __future__ import annotations
 
-from datetime import datetime
 from math import exp, lgamma, log
 
 from sportsedge.mlb_period_counts_empirical import (
@@ -51,12 +50,13 @@ def evaluate_period_walkforward(
             continue
         empirical = period_run_distribution(prior, cutoff=row["start_time"],
                                             innings=innings, min_games=min_train)
-        # Validate target as a complete, nonnegative observed game without
-        # including its result in any fitted distribution.
-        target = period_run_distribution(
-            [dict(row, start_time="2000-01-01T00:00:00Z")],
-            cutoff="2000-01-02T00:00:00Z", innings=innings, min_games=1)
-        observed = int(target["sample_mean"] > half_line)
+        # Validate observed target without altering its event timestamp.
+        inning_runs = row.get("inning_runs")
+        if (not isinstance(inning_runs, (list, tuple)) or len(inning_runs) < 9
+                or any(not isinstance(x, int) or isinstance(x, bool) or x < 0
+                       for x in inning_runs)):
+            raise ValueError("INVALID_TARGET_INNINGS")
+        observed = int(sum(inning_runs[:innings]) > half_line)
         p_emp = _prob_over_half_line(empirical["pmf"], half_line)
         mu = empirical["sample_mean"]
         # Tail by complement avoids truncation of high-scoring outcomes.
