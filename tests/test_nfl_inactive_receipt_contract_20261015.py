@@ -182,3 +182,13 @@ def test_later_truncated_revision_blocks_older_trusted_absence_proof():
     )
     assert out["evidence_present"] is True
     assert out["complete_published"] is False
+
+
+def test_receipt_cannot_authenticate_different_snapshot_identity():
+    wrong_game = snapshot()
+    wrong_game["game_id"] = "different-game"
+    wrong_team = snapshot()
+    wrong_team["team"] = "GB"
+    issuer = lambda *_: True
+    assert verify(snap=wrong_game, verifier=issuer) is False
+    assert verify(snap=wrong_team, verifier=issuer) is False
