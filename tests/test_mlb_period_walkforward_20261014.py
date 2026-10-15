@@ -1,4 +1,6 @@
 """Synthetic chronological evaluation tests; no historical results fabricated."""
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 from sportsedge.mlb_period_walkforward import evaluate_period_walkforward
@@ -6,7 +8,7 @@ from sportsedge.mlb_period_walkforward import evaluate_period_walkforward
 
 def _games(n=30):
     return [
-        {"game_id": f"g{i}", "start_time": f"2026-08-{i + 1:02d}T18:00:00Z",
+        {"game_id": f"g{i}", "start_time": (datetime(2026, 8, 1, 18, tzinfo=timezone.utc) + timedelta(days=i)).isoformat(),
          "inning_runs": [i % 3, 0, 1, 0, 0, 0, 0, 0, 0]}
         for i in range(n)
     ]
