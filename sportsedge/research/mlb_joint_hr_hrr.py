@@ -57,6 +57,8 @@ def validate_run_conservation(result: MlbJointPathResult, *,
             or snap.get("path_count") != n or snap.get("game_id") != game.game_id
             or snap.get("version") != MLB_JOINT_PATH_VERSION):
         raise ValueError("HRR_PATH_IDENTITY_MISMATCH")
+    if snap.get("rules_mode") != game.rules_mode:
+        raise ValueError("HRR_RULES_MODE_MISMATCH")
     games = snap.get("game_samples")
     if not isinstance(games, list) or len(games) != n or any(
             not isinstance(g, dict) for g in games):
@@ -66,21 +68,26 @@ def validate_run_conservation(result: MlbJointPathResult, *,
     rows = snap.get("players")
     if not isinstance(rows, list) or any(not isinstance(r, dict) for r in rows):
         raise ValueError("HRR_PLAYER_SET_INVALID")
-    hitters = {}
+    starters = {game.away.starter_player_id: game.away.team,
+                game.home.starter_player_id: game.home.team}
+    expected_team = {**team_of, **starters}
+    hitters, seen = {}, set()
     for row in rows:
         pid = row.get("player_id")
-        if pid not in team_of:
-            continue
-        if pid in hitters:
+        if not isinstance(pid, str) or pid not in expected_team:
+            raise ValueError("HRR_PLAYER_UNEXPECTED")
+        if pid in seen:
             raise ValueError("HRR_PLAYER_DUPLICATE")
-        if row.get("team") != team_of[pid] or row.get("path_set_id") != expected_id:
+        seen.add(pid)
+        if row.get("team") != expected_team[pid] or row.get("path_set_id") != expected_id:
             raise ValueError("HRR_PLAYER_IDENTITY_MISMATCH")
         samples = row.get("samples")
         if not isinstance(samples, list) or len(samples) != n or any(
                 not isinstance(s, dict) for s in samples):
             raise ValueError("HRR_PLAYER_SAMPLES_MISSING")
-        hitters[pid] = samples
-    if set(hitters) != set(team_of):
+        if pid in team_of:
+            hitters[pid] = samples
+    if seen != set(expected_team) or set(hitters) != set(team_of):
         raise ValueError("HRR_PLAYER_SET_INVALID")
     for i in range(n):
         runs = {t: 0 for t in side_of}
@@ -125,7 +132,8 @@ def read_joint_hr_hrr(result: MlbJointPathResult, *, game: MlbGamePathInput,
         hrr_pmf[str(hrr)] = hrr_pmf.get(str(hrr), 0) + 1
     norm = lambda d: {k: v / n for k, v in sorted(d.items(), key=lambda kv: tuple(map(int, kv[0].split(","))))}
     readout = {
-        "player_id": player_id, "path_set_id": result.path_set_id, "path_count": n,
+        "player_id": player_id, "path_set_id": result.path_set_id,
+        "rules_mode": game.rules_mode, "path_count": n,
         "joint_pmf_hr_hrr": norm(joint),
         "home_runs_pmf": norm(hr_pmf), "hits_runs_rbi_pmf": norm(hrr_pmf),
         "p_home_runs_at_least": sum(hr >= hr_at_least for hr, _ in pairs) / n,
