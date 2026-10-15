@@ -24,6 +24,7 @@ from typing import Any, Mapping, Sequence
 
 NHL_WEB_API_BASE = "https://api-web.nhle.com"
 BOXSCORE_ENDPOINT = NHL_WEB_API_BASE + "/v1/gamecenter/{game_id}/boxscore"
+RIGHT_RAIL_ENDPOINT = NHL_WEB_API_BASE + "/v1/gamecenter/{game_id}/right-rail"
 SOURCE_REFERENCES = (
     "pseudo-r/Public-NHL-API:docs/web-api/games.md",
     "Zmalski/NHL-API-Reference:README.md",
@@ -148,8 +149,18 @@ class NHLOfficialCompletedGame:
     source_uri: str
     source_raw_sha256: str
     source_version: str
+    # Live feed: linescore comes from the separately fetched right-rail.
+    right_rail_uri: str | None = None
+    right_rail_raw_sha256: str | None = None
 
     def __post_init__(self) -> None:
+        if (self.right_rail_uri is None) != (self.right_rail_raw_sha256 is None):
+            raise ValueError("right-rail uri/sha256 must be present together")
+        if self.right_rail_uri is not None:
+            if self.right_rail_uri != RIGHT_RAIL_ENDPOINT.format(game_id=self.game_id):
+                raise ValueError("official NHL Gamecenter right-rail URI required")
+            if not _SHA256.fullmatch(str(self.right_rail_raw_sha256).lower()):
+                raise ValueError("valid raw right-rail SHA-256 required")
         if not self.game_id or not self.season or not self.source_version:
             raise ValueError("game identity/source_version required")
         start = _utc(self.start_time_utc, "start_time_utc")
@@ -190,6 +201,10 @@ class NHLOfficialCompletedGame:
         payload = asdict(self)
         payload["away_goalies"] = [asdict(g) for g in self.away_goalies]
         payload["home_goalies"] = [asdict(g) for g in self.home_goalies]
+        if self.right_rail_uri is None:
+            # Keep legacy receipts (and their dataset hashes) byte-identical.
+            payload.pop("right_rail_uri", None)
+            payload.pop("right_rail_raw_sha256", None)
         return payload
 
 
@@ -270,6 +285,8 @@ def build_official_completed_game(
     raw_sha256: str,
     source_uri: str | None = None,
     source_version: str = "nhl-web-api-v1",
+    right_rail_payload: Mapping[str, Any] | None = None,
+    right_rail_raw_sha256: str | None = None,
 ) -> NHLOfficialCompletedGame:
     """Normalize an already-fetched official final Gamecenter boxscore.
 
@@ -298,8 +315,28 @@ def build_official_completed_game(
 
     away_id, away_abbrev, away_final, away_sog, away_pp = _team_identity(payload, "away")
     home_id, home_abbrev, home_final, home_sog, home_pp = _team_identity(payload, "home")
+    rail_uri: str | None = None
+    rail_sha: str | None = None
     boxscore = payload.get("boxscore")
-    if not isinstance(boxscore, Mapping):
+    if isinstance(boxscore, Mapping):
+        if right_rail_payload is not None:
+            raise ValueError("ambiguous source: legacy boxscore object and right-rail both supplied")
+    elif isinstance(payload.get("playerByGameStats"), Mapping):
+        # Live split shape: stats top-level, linescore in /right-rail.
+        if not isinstance(right_rail_payload, Mapping):
+            raise ValueError("live boxscore shape requires the official right-rail payload")
+        if right_rail_raw_sha256 is None or not _SHA256.fullmatch(str(right_rail_raw_sha256).lower()):
+            raise ValueError("valid raw right-rail SHA-256 required")
+        info = right_rail_payload.get("gameInfo")
+        if isinstance(info, Mapping) and info.get("id") is not None and str(info.get("id")).strip() != game_id:
+            raise ValueError("right-rail payload is for a different game")
+        boxscore = {
+            "linescore": right_rail_payload.get("linescore"),
+            "playerByGameStats": payload.get("playerByGameStats"),
+        }
+        rail_uri = RIGHT_RAIL_ENDPOINT.format(game_id=game_id)
+        rail_sha = str(right_rail_raw_sha256).lower()
+    else:
         raise ValueError("official boxscore object required")
 
     return NHLOfficialCompletedGame(
@@ -329,6 +366,8 @@ def build_official_completed_game(
         source_uri=uri,
         source_raw_sha256=str(raw_sha256).lower(),
         source_version=str(source_version),
+        right_rail_uri=rail_uri,
+        right_rail_raw_sha256=rail_sha,
     )
 
 
@@ -353,7 +392,7 @@ def dataset_sha256(games: Sequence[NHLOfficialCompletedGame]) -> str:
 
 
 __all__ = [
-    "NHL_WEB_API_BASE", "BOXSCORE_ENDPOINT", "SOURCE_REFERENCES",
+    "NHL_WEB_API_BASE", "BOXSCORE_ENDPOINT", "RIGHT_RAIL_ENDPOINT", "SOURCE_REFERENCES",
     "NHLGoalieBoxscore", "NHLOfficialCompletedGame",
     "build_official_completed_game", "completed_game_from_json_dict",
     "raw_sha256", "dataset_sha256",
