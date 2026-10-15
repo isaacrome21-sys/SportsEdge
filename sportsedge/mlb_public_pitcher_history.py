@@ -17,6 +17,8 @@ import re
 ROOT = "https://statsapi.mlb.com/api/v1"
 
 
+from .mlb_source_identity import MLBSourceIdentityError, check_split_identity, refuse_conflicting_game_pk
+
 class MissingMLBHistory(ValueError):
     pass
 
@@ -148,6 +150,11 @@ class MLBPitcherPublicSource:
                   for v in stat["splits"]]
         if not splits:
             raise MissingMLBHistory("MLB_GAMELOG_EMPTY")
+        try:
+            for row in splits:
+                check_split_identity(row, expected_player_id=ident)
+        except MLBSourceIdentityError as exc:
+            raise MissingMLBHistory("SOURCE_IDENTITY_" + str(exc)) from exc
         hist = []
         for row in splits:
             try:
@@ -180,6 +187,10 @@ class MLBPitcherPublicSource:
             except (ValueError, KeyError, TypeError, MissingMLBHistory):
                 continue
         # Only real, distinct, completed, dated games.
+        try:
+            refuse_conflicting_game_pk((pk, {"date": day.isoformat(), **st}) for day, pk, st in hist)
+        except MLBSourceIdentityError as exc:
+            raise MissingMLBHistory("SOURCE_IDENTITY_" + str(exc)) from exc
         hist.sort(key=lambda x: (x[0], x[1]), reverse=True)
         latest = []
         seen = set()
