@@ -49,6 +49,8 @@ def parse_question(question: str, *, home_team: str, away_team: str,
     if not isinstance(question, str) or not question.strip() or len(question) > 160:
         raise AskSimsError("ASK_SIMS_QUESTION_INVALID")
     value = " ".join(question.strip().split())
+    if aliases is not None and not isinstance(aliases, Mapping):
+        raise AskSimsError("ASK_SIMS_ALIASES_INVALID")
     aka = aliases or {}
     win_by = re.fullmatch(r"(.+?)\s+wins?\s+by\s+([1-9]\d{0,2})\+", value, re.I)
     if win_by:
@@ -247,7 +249,10 @@ def ask_unified_score_sims(
            not isfinite(x) or not 0.5 <= x <= 70 for x in (h, a)):
         raise AskSimsError("ASK_SIMS_MEANS_INVALID")
     for key, supplied in (("home_team", home_team), ("away_team", away_team)):
-        if engine.get(key) is not None and engine[key].casefold() != supplied.casefold():
+        declared = engine.get(key)
+        if declared is not None and (not isinstance(declared, str) or
+                                     not isinstance(supplied, str) or
+                                     declared.casefold() != supplied.casefold()):
             raise AskSimsError("ASK_SIMS_GAME_IDENTITY_MISMATCH")
     paths = sample_score_paths(score_grid(float(h), float(a), freeze), n_sims=n_sims, seed=seed)
     result = ask_score_paths(paths, question, home_team=home_team, away_team=away_team,
