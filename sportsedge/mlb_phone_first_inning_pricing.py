@@ -125,7 +125,13 @@ def _starter_binary_indicators(fixture, games_by_pk, src, *, seasons):
 
 def _price_first_inning_runs(line, pools_away, pools_home, fixture,
                              games_by_pk, src):
-    if abs(float(line) - 0.5) > 1e-9:
+    try:
+        numeric_line = float(line)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise FirstInningModelError("FIRST_INNING_RUNS_LINE_INVALID") from exc
+    if isinstance(line, bool) or not math.isfinite(numeric_line):
+        raise FirstInningModelError("FIRST_INNING_RUNS_LINE_INVALID")
+    if abs(numeric_line - 0.5) > 1e-9:
         raise FirstInningModelError("FIRST_INNING_RUNS_LINE_MUST_BE_0_5")
     kickoff_year = int(fixture["kickoff_utc"][:4])
     away_allow_ind, home_allow_ind = _starter_binary_indicators(
