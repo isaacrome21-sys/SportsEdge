@@ -1,0 +1,19 @@
+{
+  "actual_count": 12,
+  "actual_over": false,
+  "allow_betting_card": false,
+  "authority": "RESEARCH_ONLY",
+  "baseline_brier": 0.018731384854738284,
+  "game_pk": 849818,
+  "line": 17.5,
+  "market": "PITCHER_OUTS",
+  "official_boxscore_sha256": "249a87f924a2c8d386df44b64c139b0c158d6b773a07a992228b7732d83e4003",
+  "pitcher_id": 643377,
+  "prediction_receipt_sha256": "7c391762bbeb026dbbbed0527ad4001bc1293b38005df442451023f7a22b73c8",
+  "receipt_sha256": "a7f4d75699546780c75fb75e5f64d88749b10c8587776f4eedd9040262b2f53c",
+  "schema": "mlb_postseason_k_outs_2026_shadow_settlement_v1",
+  "settled_at_utc": "2026-10-15T22:24:49.098079+00:00",
+  "shadow_brier": 0.0026961968570618274,
+  "shadow_minus_baseline_brier": -0.016035187997676455,
+  "status": "GRADED"
+}
