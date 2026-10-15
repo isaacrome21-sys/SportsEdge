@@ -12,9 +12,9 @@ def _prepare(tmp_path):
         "gameData": {"game": {"pk": 12}, "status": {"abstractGameState": "Final"},
                      "datetime": {"dateTime": "2026-08-01T18:00:00Z"}},
         "liveData": {"linescore": {
-            "innings": [{"num": i, "away": {"runs": 0}, "home": {"runs": 0}}
+            "innings": [{"num": i, "away": {"runs": 0}, "home": {"runs": 1 if i == 1 else 0}}
                         for i in range(1, 10)],
-            "teams": {"away": {"runs": 0}, "home": {"runs": 0}},
+            "teams": {"away": {"runs": 0}, "home": {"runs": 1}},
         }},
     }
     source = tmp_path / "game.json"
