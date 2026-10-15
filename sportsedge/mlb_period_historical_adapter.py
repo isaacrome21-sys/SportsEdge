@@ -38,11 +38,17 @@ def load_historical_inning_export(path: str | Path) -> list[dict]:
         start = _instant(row.get("start_time"))
         if start > _instant(payload["observed_at"]):
             raise ValueError("GAME_AFTER_OBSERVATION")
+        if "result_available_at" not in row:
+            raise ValueError("MISSING_RESULT_AVAILABILITY")
+        available = _instant(row["result_available_at"])
+        if available <= start or available > _instant(payload["observed_at"]):
+            raise ValueError("INVALID_RESULT_AVAILABILITY")
         innings = row.get("inning_runs")
         if (not isinstance(innings, list) or len(innings) < 9
                 or any(not isinstance(v, int) or isinstance(v, bool) or v < 0 for v in innings)):
             raise ValueError("INCOMPLETE_OR_INVALID_INNINGS")
         result.append({"game_id": str(game_id), "start_time": row["start_time"],
+                       "result_available_at": row["result_available_at"],
                        "inning_runs": innings})
     return result
 
