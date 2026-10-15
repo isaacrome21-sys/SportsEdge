@@ -17,7 +17,7 @@ def quote(**updates):
 def test_preserves_both_prices_and_identity():
     over, under = bind_nfl_yardage_pair(quote(over_odds=105, under_odds=-125), as_of=NOW)
     assert (over["side"], over["odds"], under["side"], under["odds"]) == ("OVER", 105, "UNDER", -125)
-    assert over["game_id"] == under["game_id"] == "game-1"
+    assert over["game_id"] == under["game_id"] == "game-1"\n    assert over["market"] == under["market"] == "PLAYER_RECEIVING_YARDS"\n    assert over["quote_captured_at"] == under["quote_captured_at"] == NOW.isoformat()\n    assert over["player_name"] == under["player_name"] == "Example Player"
 
 
 @pytest.mark.parametrize("changes,reason", [
