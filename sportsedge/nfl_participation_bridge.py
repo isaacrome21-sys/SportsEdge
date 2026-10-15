@@ -190,7 +190,11 @@ def _snapshot_player_ids(snapshot) -> list[str] | None:
     ids = snapshot.get("player_ids")
     if not isinstance(ids, (list, tuple)):
         return None
-    out = [str(v).strip() for v in ids]
+    # Never coerce numbers, nulls, or other objects into player IDs.
+    # Such coercion can create a plausible but unauthentic roster set.
+    if any(not isinstance(v, str) or not v or v != v.strip() for v in ids):
+        return None
+    out = list(ids)
     if len(out) < MIN_OFFICIAL_INACTIVE_SNAPSHOT_ROWS:
         return None
     if any(not v for v in out) or len(set(out)) != len(out):
