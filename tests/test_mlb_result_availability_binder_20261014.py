@@ -102,3 +102,25 @@ def test_rejects_source_path_traversal(tmp_path):
     evidence.write_text(json.dumps(data))
     with pytest.raises(ValueError, match="UNSAFE_ATTESTATION_SOURCE_PATH"):
         bind_result_availability(source, evidence, tmp_path / "bound.json")
+
+
+def test_rejects_missing_game_identifier(tmp_path):
+    source, evidence = _inputs(tmp_path)
+    data = json.loads(source.read_text())
+    data["games"][0].pop("game_id")
+    source.write_text(json.dumps(data))
+    att = json.loads(evidence.read_text())
+    att["export_sha256"] = hashlib.sha256(source.read_bytes()).hexdigest()
+    evidence.write_text(json.dumps(att))
+    with pytest.raises(ValueError, match="INVALID_EXPORT_GAME_ID"):
+        bind_result_availability(source, evidence, tmp_path / "bound.json")
+
+
+def test_rejects_symlinked_snapshot(tmp_path):
+    source, evidence = _inputs(tmp_path)
+    original = tmp_path / "snapshot.json"
+    target = tmp_path / "target.json"
+    original.rename(target)
+    original.symlink_to(target)
+    with pytest.raises(ValueError, match="MISSING_ATTESTATION_SOURCE_SNAPSHOT"):
+        bind_result_availability(source, evidence, tmp_path / "bound.json")
