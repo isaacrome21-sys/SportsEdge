@@ -51,6 +51,7 @@ keeps the stamp with the gate's named refusal recorded.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from math import isfinite
 from typing import Any, Mapping, Sequence
 
 from sportsedge.nfl_coherent_prop_runner import run_coherent_prop_estimates
@@ -74,6 +75,20 @@ class NFLParticipationError(ValueError):
 # chart is stale evidence, not a current role.  Declared constant; the
 # caller may tighten it, never silently widen it per-call site.
 DEFAULT_MAX_DEPTH_AGE_HOURS = 96.0
+
+
+def _validated_depth_age_hours(value: Any) -> float:
+    """Per-call freshness can tighten, never widen or disable the 96h cap."""
+    if isinstance(value, (bool, str, bytes)):
+        raise NFLParticipationError("NFL_PARTICIPATION_DEPTH_AGE_LIMIT_INVALID")
+    try:
+        hours = float(value)
+    except (TypeError, ValueError, OverflowError):
+        raise NFLParticipationError("NFL_PARTICIPATION_DEPTH_AGE_LIMIT_INVALID") from None
+    if not isfinite(hours) or not 0.0 < hours <= DEFAULT_MAX_DEPTH_AGE_HOURS:
+        raise NFLParticipationError("NFL_PARTICIPATION_DEPTH_AGE_LIMIT_INVALID")
+    return hours
+
 
 STATE_CONFIRMED = "CONFIRMED_STARTER"
 STATE_CONFIRMED_ACTIVE = "CONFIRMED_ACTIVE"
@@ -432,6 +447,7 @@ def assess_qb_participation(
     cutoff = _utc(as_of, "as_of")
     if cutoff >= kick:
         raise NFLParticipationError("NFL_PARTICIPATION_CUTOFF_NOT_PREGAME")
+    max_depth_age_hours = _validated_depth_age_hours(max_depth_age_hours)
 
     verdict: dict[str, Any] = {
         "team": team_id,
@@ -652,6 +668,7 @@ def assess_skill_participation(
     cutoff = _utc(as_of, "as_of")
     if cutoff >= kick:
         raise NFLParticipationError("NFL_PARTICIPATION_CUTOFF_NOT_PREGAME")
+    max_depth_age_hours = _validated_depth_age_hours(max_depth_age_hours)
 
     verdict: dict[str, Any] = {
         "team": team_id,
