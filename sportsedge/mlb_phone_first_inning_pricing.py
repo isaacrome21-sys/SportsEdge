@@ -12,6 +12,8 @@ it passes the backtest harness. The factor audit discloses this.
 """
 from __future__ import annotations
 
+import math
+
 from datetime import datetime, timedelta, timezone
 
 from .mlb_first_inning_data import (
