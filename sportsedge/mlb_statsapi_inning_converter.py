@@ -56,6 +56,8 @@ def convert_final_game_feed(feed: Mapping) -> dict:
             or not isinstance(atotal, int) or isinstance(atotal, bool) or atotal < 0
             or sum(runs) != htotal + atotal):
         raise ValueError("INNING_TOTAL_MISMATCH")
+    if htotal == atotal:
+        raise ValueError("FINAL_GAME_TIED")
     # Inning-level totals must also reconcile independently by side. A
     # swapped home/away run can preserve combined totals and hide corruption.
     away_sum = sum(inning["away"]["runs"] for inning in innings)
