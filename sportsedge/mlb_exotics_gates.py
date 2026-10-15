@@ -40,15 +40,12 @@ missing constructions differ:
   M7 totals construction) exposes only the Over / Exactly / Under
   total readout and is itself deployment-gated.
 
-WINNING_MARGIN is deliberately NOT claimed here: the bare name is
-owned by the Phase-7 coverage layer (sportsedge.market_coverage
-normalizes it to MARGIN_BAND, a football margin construction), and
-an MLB row already terminates at that layer's named refusal
-COVERAGE_MARKET_NOT_OFFERED_FOR_MLB:MARGIN_BAND before it can
-reach this fallback. The full-game MLB margin form's readout gap
-is the FULL_GAME_DERIVED_READOUT_UNBUILT gap above; re-gating the
-name here would require reordering the coverage dispatch, which
-this label item does not do.
+WINNING_MARGIN remains owned by the Phase-7 coverage dispatch:
+sportsedge.market_coverage normalizes it to MARGIN_BAND, a football
+construction, but the inspected MLB menu marks Winning Margin offered.
+The coverage layer therefore terminates MLB rows at the truthful
+NO_ENGINE: FULL_GAME_DERIVED_READOUT_UNBUILT gate, with no pricing.
+This module does not re-own or duplicate the alias.
 
 Nothing here prices: every row terminates BLOCKED with the gate
 named. No registry/deployment/validation state is touched.

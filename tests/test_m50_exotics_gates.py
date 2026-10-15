@@ -26,11 +26,10 @@ construction:
   principle from a full-game joint; no full-game readout or
   binding exists (F5 analogues are deployment-gated readouts).
 
-WINNING_MARGIN is NOT claimed here: the Phase-7 coverage layer
-owns the bare name (normalized to the football MARGIN_BAND
-construction) and an MLB row already terminates at its named
-refusal COVERAGE_MARKET_NOT_OFFERED_FOR_MLB:MARGIN_BAND -- pinned
-below so the disposition stays explicit.
+WINNING_MARGIN stays owned by the Phase-7 coverage layer, but
+is an inspected offered MLB market. It must refuse with the truthful
+NO_ENGINE: FULL_GAME_DERIVED_READOUT_UNBUILT reason, not as unoffered
+or via the football margin distribution. The alias remains pinned below.
 
 Label refinements ONLY: pricing stays refused on every path, no
 probability or EV may appear, and no registry/deployment/
@@ -122,13 +121,23 @@ def test_aliases_resolve_to_the_canonical_gate(alias, canonical):
     assert result["coverage_market"] == canonical
 
 
-def test_winning_margin_stays_with_the_coverage_layer():
+@pytest.mark.parametrize("market", [
+    "WINNING_MARGIN", "MARGIN_OF_VICTORY", "MARGIN_BAND",
+])
+def test_winning_margin_stays_with_coverage_but_names_real_engine_gap(market):
     from sportsedge.mlb_exotics_gates import canonical_exotic_market
     assert canonical_exotic_market("WINNING_MARGIN") is None
-    result = _run(_row("WINNING_MARGIN"))
+    result = _run(_row(market))
     assert result["status"] == "NO_MODEL_OR_MARKET"
-    assert result["reason"].startswith(
-        "COVERAGE_MARKET_NOT_OFFERED_FOR_MLB")
+    assert result["reason"] == "NO_ENGINE: FULL_GAME_DERIVED_READOUT_UNBUILT"
+    assert result["blocker"] == "NO_ENGINE"
+    assert result["coverage_market"] == "WINNING_MARGIN"
+    assert result["research_only"] is True
+    assert result["official_authority"] is False
+    assert result["model_p_authority"] is False
+    assert result["staking_authority"] is False
+    for forbidden in ("model_p", "estimate_p", "ev", "ev_per_dollar"):
+        assert forbidden not in result
 
 
 def test_neighbouring_names_are_not_claimed():
