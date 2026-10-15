@@ -77,7 +77,9 @@ def bind_result_availability(export_path, attestation_path, output_path) -> dict
         if rel.is_absolute() or ".." in rel.parts:
             raise ValueError("UNSAFE_ATTESTATION_SOURCE_PATH")
         snapshot = (source_root / rel).resolve()
-        if not snapshot.is_relative_to(source_root) or not snapshot.is_file() or (source_root / rel).is_symlink():
+        if (not snapshot.is_relative_to(source_root) or not snapshot.is_file()
+                or any(part.is_symlink() for part in [source_root / Path(*rel.parts[:i])
+                                                       for i in range(1, len(rel.parts) + 1)])) :
             raise ValueError("MISSING_ATTESTATION_SOURCE_SNAPSHOT")
         if hashlib.sha256(snapshot.read_bytes()).hexdigest() != a["source_sha256"]:
             raise ValueError("ATTESTATION_SOURCE_HASH_MISMATCH")
