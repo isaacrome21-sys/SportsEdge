@@ -123,7 +123,10 @@ def check_stats(path: StatsPath):
     return True
 
 
-def settle_stat(path: StatsPath, market: str, *, fighter_id, line):
+def settle_stat(path: StatsPath, market: str, *, fighter_id, line, side=None):
+    """O/U on a fighter stat. NO_CONTEST (#2351 re-audit): a line already
+    reached before the stoppage is decided -> OVER (and an UNDER ticket LOSEs);
+    a line not yet reached is VOID."""
     check_stats(path)
     if market not in MARKET_STAT:
         raise FoundationError("UFC_MARKET_NO_SETTLEMENT", market)
@@ -131,7 +134,11 @@ def settle_stat(path: StatsPath, market: str, *, fighter_id, line):
         raise FoundationError("UFC_SELECTION_IDENTITY_MISMATCH", str(fighter_id))
     if isinstance(line, bool) or not isinstance(line, (int, float)) or not math.isfinite(line):
         raise FoundationError("UFC_LINE_NONFINITE", repr(line))
-    if path.bout.method == "NO_CONTEST":
-        return "VOID"
+    if side not in (None, "OVER", "UNDER"):
+        raise FoundationError("UFC_SELECTION_IDENTITY_MISMATCH", repr(side))
     v = path.total(fighter_id, MARKET_STAT[market])
+    if path.bout.method == "NO_CONTEST":
+        if v > line:
+            return "LOSE" if side == "UNDER" else "OVER"
+        return "VOID"
     return "OVER" if v > line else "UNDER" if v < line else "PUSH"

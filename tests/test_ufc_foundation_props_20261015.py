@@ -57,8 +57,10 @@ def test_settlement_and_no_contest_void():
     assert P.settle_stat(p, "SIGNIFICANT_STRIKES", fighter_id="RED", line=v - 0.5) == "OVER"
     nc = BoutPath("RED", "BLU", 3, "NO_CONTEST", None, 2, 40)
     q = P.simulate_stats(nc, RS, BS, random.Random(1))
-    for m in P.PROPS_MARKETS:
-        assert P.settle_stat(q, m, fighter_id="BLU", line=0.5) == "VOID"
+    for m in P.PROPS_MARKETS:   # decided-before-NC lines settle (#2351 re-audit)
+        want = "OVER" if q.total("BLU", P.MARKET_STAT[m]) > 0.5 else "VOID"
+        assert P.settle_stat(q, m, fighter_id="BLU", line=0.5) == want
+        assert P.settle_stat(q, m, fighter_id="BLU", line=10**6) == "VOID"
 
 
 def _fixed():
