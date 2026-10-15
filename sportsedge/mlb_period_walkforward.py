@@ -53,6 +53,15 @@ def evaluate_period_walkforward(
             raise ValueError("RESULT_AVAILABLE_BEFORE_START")
     # Never score a target against a training pool that includes a result
     # whose declared availability is after the target cutoff.
+    # Validate every outcome, including warm-up rows that are not scored.
+    # Otherwise malformed training history can remain latent until a later
+    # target happens to select it.
+    for g in ordered:
+        runs = g.get("inning_runs")
+        if (not isinstance(runs, (list, tuple)) or len(runs) < 9
+                or any(not isinstance(x, int) or isinstance(x, bool) or x < 0
+                       for x in runs)):
+            raise ValueError("INVALID_TARGET_INNINGS")
     scores = []
     for row in ordered:
         cutoff = _instant(row["start_time"])
