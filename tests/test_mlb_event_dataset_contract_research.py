@@ -32,7 +32,7 @@ def test_bad_event_refused(change):
 
 def test_duplicate_refused():
     with pytest.raises(ValueError,match="DUPLICATE"):
-        validate_events([event(),event(event_time="2026-01-03T00:00:00Z")],training_cutoff=CUT)
+        validate_events([event(),event(event_time="2026-01-03T00:00:00Z", outcome_observed_at="2026-01-03T04:00:00Z")],training_cutoff=CUT)
 
 def test_missing_timing_fields_refused():
     row=event()
