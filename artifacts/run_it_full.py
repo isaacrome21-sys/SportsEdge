@@ -51,6 +51,7 @@ from sportsedge.f5_derived_readouts import (
     F5_DERIVED_MARKETS as F5_DERIVED_CANONICAL_MARKETS)
 from sportsedge.mlb_f5_derived_quote_binding import (
     normalize_f5_derived_market, phone_f5_derived_binding_rows)
+from sportsedge.mlb_first_inning_deep_set import deep_set_blocked_row
 from sportsedge.mlb_total_hits import (
     TOTAL_HITS_MARKETS,
     canonical_total_hits_market as resolve_total_hits_market,
@@ -982,6 +983,10 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             cfb_input.append(line)
         else:
             covered = coverage_blocked_row(line["sport"], market, line)
+            if covered is None and line["sport"] == "MLB":
+                # Non-matrix 1st-inning deep-set names (M21) refuse at
+                # their named gates, not the generic fallback.
+                covered = deep_set_blocked_row(line)
             others[local] = covered if covered is not None else blocked(
                 line, "NO_VERIFIED_MODEL_FOR_THIS_MARKET")
     pitcher_results, pitcher_receipts = phone_pitcher_rows(
