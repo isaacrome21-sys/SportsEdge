@@ -21,6 +21,8 @@ def load_historical_inning_export(path: str | Path) -> list[dict]:
     if not isinstance(payload.get("observed_at"), str):
         raise ValueError("MISSING_OBSERVATION_TIME")
     _instant(payload["observed_at"])
+    if payload.get("availability_attestation_authenticity_verified") is False:
+        raise ValueError("UNVERIFIED_AVAILABILITY_ATTESTATION")
     games = payload.get("games")
     if not isinstance(games, list) or not games:
         raise ValueError("EMPTY_HISTORICAL_GAMES")
