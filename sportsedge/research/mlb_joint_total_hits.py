@@ -78,6 +78,22 @@ def read_joint_total_hits(result: MlbJointPathResult, *, game: MlbGamePathInput,
             if hits > _count(sample.get("plate_appearances")):
                 raise ValueError("TOTAL_HITS_EXCEEDS_PA")
             totals[expected[pid]][i] += hits
+    # Conservation: each starter's per-path witnesses for the opposing
+    # lineup must equal the summed batter hits and their decomposition.
+    by_id = {r["player_id"]: r for r in rows}
+    for own, opp in ((game.away, game.home), (game.home, game.away)):
+        witness = by_id[own.starter_player_id].get("samples")
+        if not isinstance(witness, list) or len(witness) != n:
+            raise ValueError("TOTAL_HITS_PITCHER_SAMPLES_MISSING")
+        for i, sample in enumerate(witness):
+            if not isinstance(sample, dict):
+                raise ValueError("TOTAL_HITS_SAMPLE_INVALID")
+            opp_hits = _count(sample.get("opponent_team_hits"))
+            if opp_hits != totals[opp.team][i]:
+                raise ValueError("TOTAL_HITS_CONSERVATION_MISMATCH")
+            if (_count(sample.get("hits_allowed"))
+                    + _count(sample.get("bullpen_hits_allowed"))) != opp_hits:
+                raise ValueError("TOTAL_HITS_DECOMPOSITION_MISMATCH")
     values = (totals[team] if team is not None else
               [a + h for a, h in zip(totals[game.away.team], totals[game.home.team])])
     counts = {}

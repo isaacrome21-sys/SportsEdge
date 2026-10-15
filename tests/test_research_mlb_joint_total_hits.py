@@ -57,6 +57,13 @@ def test_dependence_is_preserved_not_convolved(paths):
             continue
         for i, sample in enumerate(row["samples"]):
             sample.update(singles=i % 2, doubles=0, triples=0, home_runs=0, plate_appearances=1)
+    # Keep the pitcher witnesses consistent with the mutated hitter paths
+    # (9 opposing hits on odd paths), or conservation correctly refuses.
+    for row in snapshot["players"]:
+        if row["player_id"] in {game.away.starter_player_id, game.home.starter_player_id}:
+            for i, sample in enumerate(row["samples"]):
+                sample.update(opponent_team_hits=float(9 * (i % 2)),
+                              hits_allowed=float(9 * (i % 2)), bullpen_hits_allowed=0.0)
     r = read((game, replace(result, snapshot=snapshot)), line=9)
     assert r["count_pmf"] == {"0": .5, "18": .5}
     assert r["research_p"] == .5 and r["push_p"] == 0
