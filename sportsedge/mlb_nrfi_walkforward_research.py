@@ -25,7 +25,7 @@ def _utc(value):
 def _prepare(rows):
     if not isinstance(rows, (list, tuple)):
         raise ValueError("rows must be a sequence")
-    games, seen = [], set()
+    games, seen, seen_fixtures = [], set(), set()
     for row in rows:
         if not isinstance(row, dict):
             raise ValueError("game must be an object")
@@ -41,6 +41,10 @@ def _prepare(rows):
         known = _utc(row.get("result_known_at_utc"))
         if not (cutoff < scheduled < known):
             raise ValueError("cutoff must precede start and result-known must follow start")
+        fixture_key = (scheduled, frozenset((home, away)))
+        if fixture_key in seen_fixtures:
+            raise ValueError("duplicate fixture with conflicting event identity")
+        seen_fixtures.add(fixture_key)
         seen.add(event)
         games.append((cutoff, event, home, away, row["yrfi"], known))
     return sorted(games, key=lambda g: (g[0], g[1]))
