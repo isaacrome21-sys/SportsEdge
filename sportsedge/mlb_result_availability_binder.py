@@ -50,7 +50,12 @@ def bind_result_availability(export_path, attestation_path, output_path) -> dict
     if payload.get("schema") != "MLB_HISTORICAL_INNING_EXPORT_V1":
         raise ValueError("INVALID_EXPORT_SCHEMA")
     games = payload.get("games")
-    if not isinstance(games, list) or set(str(g.get("game_id")) for g in games) != set(keyed):
+    if not isinstance(games, list) or not games or any(not isinstance(g, dict) for g in games):
+        raise ValueError("INVALID_EXPORT_GAMES")
+    game_ids = [str(g.get("game_id")) for g in games]
+    if len(set(game_ids)) != len(game_ids):
+        raise ValueError("DUPLICATE_EXPORT_GAME")
+    if set(game_ids) != set(keyed):
         raise ValueError("ATTESTATION_GAME_SET_MISMATCH")
     observed = _instant(payload.get("observed_at"))
     for game in games:
