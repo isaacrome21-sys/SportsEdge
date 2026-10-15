@@ -79,6 +79,11 @@ class AskSimsResearchTests(unittest.TestCase):
         with self.assertRaisesRegex(AskSimsError, "GAME_IDENTITY_INVALID"):
             ask_score_paths(PATHS, "SEA wins", home_team="SEA", away_team="SEA")
 
+    def test_malformed_alias_mapping_is_named_refusal(self):
+        with self.assertRaisesRegex(AskSimsError, "ALIASES_INVALID"):
+            ask_score_paths(PATHS, "SEA wins", home_team=HOME, away_team=AWAY,
+                            aliases=["not a mapping"])
+
     def test_no_nonpush_paths_does_not_claim_conditional_fair_price(self):
         row = self.ask("total under 40")
         self.assertEqual(row["push_count"], 1)
