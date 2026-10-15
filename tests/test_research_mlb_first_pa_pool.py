@@ -6,9 +6,21 @@ from sportsedge.research.mlb_first_pa_pool import (
 )
 
 
-def _game(pk, start, plays, status="Final"):
-    return {"game_pk": pk, "first_pitch_utc": start, "status": status,
-            "plays": [dict(at_bat_index=i, **p) for i, p in enumerate(plays)]}
+_DEFAULT = object()
+
+
+def _game(pk, start, plays, status="Final", final_observed=_DEFAULT, starters=_DEFAULT):
+    # t190: pool games now carry the final/settled observation timestamp and the
+    # independently confirmed starters (owner review 6202306708).
+    g = {"game_pk": pk, "first_pitch_utc": start, "status": status,
+         "plays": [dict(at_bat_index=i, **p) for i, p in enumerate(plays)]}
+    g["final_observed_utc"] = start.replace("T23:05", "T23:59") if final_observed is _DEFAULT else final_observed
+    g["starting_pitchers"] = {"home": "SP_H", "away": "SP_A"} if starters is _DEFAULT else starters
+    if g["final_observed_utc"] is None:
+        del g["final_observed_utc"]
+    if g["starting_pitchers"] is None:
+        del g["starting_pitchers"]
+    return g
 
 
 def P(half, b, p, e):
@@ -86,3 +98,48 @@ def test_reader_refusals():
         read_first_pa_on_base(empty, batter_id="A", prior_strength=4)
     with pytest.raises(ValueError, match="FIRST_PA_CUTOFF_INVALID"):
         build_first_pa_pool([G1], cutoff_utc="yesterday")
+
+
+# --- t190 PIT availability and PBP completeness battery ---------------------
+
+_FULL = [P("top", "A", "SP_H", "single"), P("bottom", "X", "SP_A", "walk")]
+CUT = "2026-09-03T00:00:00Z"
+
+
+@pytest.mark.parametrize("game,code", [
+    (_game(9, "2026-09-01T23:05:00Z", _FULL, final_observed=None), "FIRST_PA_FINAL_AS_OF_MISSING"),
+    (_game(9, "2026-09-01T23:05:00Z", _FULL, final_observed="2026-09-01T23:59:00"), "FIRST_PA_FINAL_AS_OF_INVALID"),
+    (_game(9, "2026-09-01T23:05:00Z", _FULL, final_observed="2026-09-01T22:00:00Z"), "FIRST_PA_FINAL_BEFORE_START"),
+    (_game(9, "2026-09-01T23:05:00Z", _FULL, starters=None), "FIRST_PA_STARTER_UNCONFIRMED"),
+    (_game(9, "2026-09-01T23:05:00Z", _FULL, starters={"home": "SP_H"}), "FIRST_PA_STARTER_UNCONFIRMED"),
+    (_game(9, "2026-09-01T23:05:00Z", _FULL, starters={"home": "OPENER", "away": "SP_A"}), "FIRST_PA_STARTER_MISMATCH"),
+    (_game(9, "2026-09-01T23:05:00Z", [P("top", "A", "SP_H", "single")]), "FIRST_PA_PLAYS_INCOMPLETE"),
+    (_game(9, "2026-09-01T23:05:00Z", [P("bottom", "X", "SP_A", "walk"), P("top", "A", "SP_H", "single")]),
+     "FIRST_PA_PLAYS_INCOMPLETE"),
+])
+def test_pit_and_completeness_refusals_t190(game, code):
+    with pytest.raises(ValueError, match=code):
+        build_first_pa_pool([game], cutoff_utc=CUT)
+
+
+def test_truncated_pbp_not_starting_at_zero_refused_t190():
+    g = _game(9, "2026-09-01T23:05:00Z", _FULL)
+    for i, play in enumerate(g["plays"]):
+        play["at_bat_index"] = i + 3  # first PAs missing from the feed
+    with pytest.raises(ValueError, match="FIRST_PA_PLAYS_INCOMPLETE"):
+        build_first_pa_pool([g], cutoff_utc=CUT)
+
+
+def test_gap_in_pbp_refused_t190():
+    g = _game(9, "2026-09-01T23:05:00Z", _FULL + [P("top", "B", "SP_H", "single")])
+    g["plays"][2]["at_bat_index"] = 5
+    with pytest.raises(ValueError, match="FIRST_PA_PLAYS_INCOMPLETE"):
+        build_first_pa_pool([g], cutoff_utc=CUT)
+
+
+def test_final_observed_after_cutoff_is_excluded_not_used_t190():
+    late = _game(9, "2026-09-02T23:05:00Z", _FULL, final_observed="2026-09-03T04:00:00Z")
+    pool = build_first_pa_pool([G1, late], cutoff_utc=CUT)
+    assert pool["games_used"] == ["1"]
+    assert pool["games_excluded_final_not_observed_by_cutoff"] == 1
+    assert "X" in pool["batters"] and pool["batters"]["X"] == {"WALK": 1}
