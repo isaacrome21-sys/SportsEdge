@@ -64,4 +64,7 @@ def evaluate_historical_export(path: str | Path, *, innings: int,
         games, innings=innings, min_train=min_train, half_line=half_line)
     report["source_kind"] = "LOCAL_HISTORICAL_EXPORT"
     report["research_only"] = True
+    report["result_availability_authenticity_verified"] = False
+    report["pit_evidence_verified"] = False
+    report["market_evidence_paired"] = False
     return report
