@@ -51,7 +51,11 @@ def price_nfl_player_market(
     s = str(side).upper()
     if s not in {"OVER", "UNDER"}:
         raise NFLEmpiricalError("SIDE_MUST_BE_OVER_UNDER")
-    if not isfinite(float(line)):
+    try:
+        threshold = float(line)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise NFLEmpiricalError("LINE_INVALID") from exc
+    if not isfinite(threshold):
         raise NFLEmpiricalError("LINE_NONFINITE")
     field = _FIELD[m]
     values = []
@@ -84,7 +88,6 @@ def price_nfl_player_market(
     if len(values) < 5:
         raise NFLEmpiricalError("FEWER_THAN_FIVE_PRIOR_GAMES")
     n = len(values)
-    threshold = float(line)
     over = sum(v > threshold for v in values) / n
     under = sum(v < threshold for v in values) / n
     push = sum(abs(v - threshold) < 1e-9 for v in values) / n if threshold.is_integer() else 0.0
