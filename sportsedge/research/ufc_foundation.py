@@ -220,6 +220,19 @@ def _total_rounds(b, line):
     return "OVER" if b.elapsed_seconds >= threshold else "UNDER"
 
 
+def _no_contest(b, market, selection, line, round_no):
+    """NO_CONTEST voids only markets NOT already decided before the stoppage
+    (#2351 re-audit). Decided outcomes settle; undecided ones VOID."""
+    if market == "TOTAL_ROUNDS":
+        return "OVER" if _total_rounds(b, line) == "OVER" else "VOID"
+    if market == "FIGHTER_TO_WIN_IN_ROUND":
+        return "LOSE" if round_no < b.end_round else "VOID"   # round passed with no win
+    if market == "WIN_AND_TOTAL_ROUNDS":
+        _, ou = selection
+        return "LOSE" if ou == "UNDER" and _total_rounds(b, line) == "OVER" else "VOID"
+    return "VOID"   # MONEYLINE / METHOD_OF_VICTORY / GOES_THE_DISTANCE: undecided
+
+
 def settle(b: BoutPath, market: str, *, selection=None, line=None, round_no=None,
            draw_offered=False):
     """Settle by EXACT market identity (DK house rules v15 MMA, owner ruling
@@ -228,12 +241,13 @@ def settle(b: BoutPath, market: str, *, selection=None, line=None, round_no=None
       * FIGHTER_TO_WIN_IN_ROUND: DRAW -> LOSE (no fighter won in that round).
       * WIN_AND_TOTAL_ROUNDS (fighter to win + over/under rounds): DRAW -> LOSE.
       * TOTAL_ROUNDS: actual elapsed time, draws included.
-      * NO_CONTEST: VOID, but only after identity/line validation.
+      * NO_CONTEST: after validation, already-decided outcomes settle
+        (e.g. Over 1.5 passed at R2 2:30); undecided markets VOID.
     """
     check_bout(b)
     _validate_request(b, market, selection, line, round_no, draw_offered)
     if b.method == "NO_CONTEST":
-        return "VOID"
+        return _no_contest(b, market, selection, line, round_no)
     draw = b.method in DRAW_METHODS
     if market == "MONEYLINE":
         if draw:

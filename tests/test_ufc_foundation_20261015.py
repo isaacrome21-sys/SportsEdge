@@ -64,7 +64,9 @@ def test_draw_and_no_contest_void():
     nc = BoutPath("RED", "BLU", 5, "NO_CONTEST", None, 2, 30)
     for m, sel in (("MONEYLINE", "RED"), ("TOTAL_ROUNDS", None), ("GOES_THE_DISTANCE", "YES"),
                    ("FIGHTER_TO_WIN_IN_ROUND", "RED")):
-        assert F.settle(nc, m, selection=sel, line=1.5, round_no=1) == "VOID"
+        assert F.settle(nc, m, selection=sel, line=1.5, round_no=2) == "VOID"
+    # round 1 completed with no RED win before the R2 no-contest: already decided
+    assert F.settle(nc, "FIGHTER_TO_WIN_IN_ROUND", selection="RED", round_no=1) == "LOSE"
 
 
 def test_dq_settles_with_ko_tko():
