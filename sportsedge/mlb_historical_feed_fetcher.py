@@ -78,6 +78,7 @@ def acquire_historical_date(day: str, output_dir: str | Path) -> dict:
         "feed_paths": names,
         "research_only": True,
         "no_pit_market_evidence": True,
+        "historical_result_availability_verified": False,
     }
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     return {"games": len(ids), "manifest": str(output / "manifest.json"),
