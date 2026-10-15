@@ -78,3 +78,11 @@ def test_negative_final_total_refused():
     feed["liveData"]["linescore"]["teams"]["away"]["runs"] = -1
     with pytest.raises(ValueError, match="INNING_TOTAL_MISMATCH"):
         convert_final_game_feed(feed)
+
+
+def test_tied_final_refused():
+    feed = _feed()
+    feed["liveData"]["linescore"]["innings"][0]["away"]["runs"] = 1
+    feed["liveData"]["linescore"]["teams"]["away"]["runs"] = 1
+    with pytest.raises(ValueError, match="FINAL_GAME_TIED"):
+        convert_final_game_feed(feed)
