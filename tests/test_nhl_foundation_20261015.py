@@ -177,10 +177,21 @@ def test_terminal_map_one_terminal_never_validated():
 
 
 def test_every_research_only_market_has_settlement():
+    from sportsedge.research import nhl_foundation_props as npp
     p = _paths(1)[0]
     kw = {"selection": "HOM", "line": 0.5, "period": 1, "player_id": "HOM_p0"}
+    hp = npp.TeamPropsInput("HOM", "HOM_g", {}, {}, {}, 0.2)
+    ap = npp.TeamPropsInput("AWY", "AWY_g", {}, {}, {}, 0.2)
+    props = npp.simulate_props(p, H, A, hp, ap, random.Random(0))
     for m, (t, _) in nf.MARKET_TERMINALS.items():
         if t != "RESEARCH_ONLY":
+            continue
+        if m in npp.PROPS_MARKETS:   # settled by the props layer, not the game layer
+            pid = "HOM_g" if m == "GOALIE_SAVES" else "HOM_p0"
+            assert npp.settle_prop(props, H, A, m, player_id=pid, team_id="HOM",
+                                   line=0.5) in ("OVER", "UNDER", "PUSH")
+            with pytest.raises(NHLFoundationError):
+                nf.settle(p, m, **kw)
             continue
         k = dict(kw)
         if m == "REGULATION_3WAY":
