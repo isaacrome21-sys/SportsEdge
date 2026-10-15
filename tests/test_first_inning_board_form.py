@@ -273,3 +273,11 @@ def test_nonfinite_board_line_refuses_before_pricing(bad_line):
     rows = _run([_row(line=bad_line)], with_history=False)["evaluated_rows"]
     assert rows[0]["reason"] == "INNING_1_RUNS_LINE_INVALID"
     assert rows[0].get("model_probability") is None
+
+
+@pytest.mark.registry_lane_internals
+@pytest.mark.parametrize("bad_line", [True, False, None, {}, [], "not-a-number"])
+def test_invalid_board_line_never_reaches_first_inning_model(bad_line):
+    rows = _run([_row(line=bad_line)], with_history=False)["evaluated_rows"]
+    assert rows[0].get("model_probability") is None
+    assert rows[0].get("status") != "PLAY"
