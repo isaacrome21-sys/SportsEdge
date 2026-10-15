@@ -63,3 +63,18 @@ def test_valid_export_is_research_only():
     assert payload["schema"] == "MLB_HISTORICAL_INNING_EXPORT_V1"
     assert len(payload["games"]) == 1
     assert "play_authorized" not in payload
+
+
+def test_swapped_side_runs_refused_even_when_combined_total_matches():
+    feed = _feed()
+    feed["liveData"]["linescore"]["teams"]["home"]["runs"] = 0
+    feed["liveData"]["linescore"]["teams"]["away"]["runs"] = 1
+    with pytest.raises(ValueError, match="SIDE_INNING_TOTAL_MISMATCH"):
+        convert_final_game_feed(feed)
+
+
+def test_negative_final_total_refused():
+    feed = _feed()
+    feed["liveData"]["linescore"]["teams"]["away"]["runs"] = -1
+    with pytest.raises(ValueError, match="INNING_TOTAL_MISMATCH"):
+        convert_final_game_feed(feed)
