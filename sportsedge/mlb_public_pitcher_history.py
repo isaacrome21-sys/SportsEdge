@@ -17,6 +17,9 @@ import re
 ROOT = "https://statsapi.mlb.com/api/v1"
 
 
+POSTSEASON_GAME_TYPES = frozenset({"F", "D", "L", "W"})
+
+
 class MissingMLBHistory(ValueError):
     pass
 
@@ -146,6 +149,21 @@ class MLBPitcherPublicSource:
         splits = [v for stat in data["stats"]
                   if isinstance(stat, dict) and isinstance(stat.get("splits"), list)
                   for v in stat["splits"]]
+        # A postseason game must also see the pitcher's own earlier
+        # postseason starts; the default gameLog is regular season only.
+        # If that log cannot be fetched, fail closed rather than silently
+        # pricing on a stale regular-season-only pool.
+        if str(game.get("gameType") or "").upper() in POSTSEASON_GAME_TYPES:
+            post_url = ROOT + f"/people/{ident}/stats?" + urlencode({
+                "stats": "gameLog", "group": "pitching", "season": str(season),
+                "gameType": "P",
+            })
+            post = self._fetch(post_url)
+            if not isinstance(post, dict) or not isinstance(post.get("stats"), list):
+                raise MissingMLBHistory("MLB_PITCHER_POSTSEASON_GAMELOG_UNAVAILABLE")
+            splits += [v for stat in post["stats"]
+                       if isinstance(stat, dict) and isinstance(stat.get("splits"), list)
+                       for v in stat["splits"]]
         if not splits:
             raise MissingMLBHistory("MLB_GAMELOG_EMPTY")
         hist = []
