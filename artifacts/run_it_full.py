@@ -443,6 +443,14 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     composed with cross-manifest identity collision refusals. No pin may
     be derived from the local archive itself.
     Default None: no Form 2 loading.
+
+    When the intake carries CFB QB passing-yard ladders, the card
+    gains a cfb_research_projections annex (RESEARCH ONLY): the
+    Form 2 identity-gated research distribution read for each ladder
+    QB whose identity the pre-pricing stage's seam verdicts establish,
+    or an explicit IDENTITY_NOT_ESTABLISHED entry where they do not.
+    The annex never alters a row's registry terminal state and carries
+    no prices, EV or no-vig figures.
     """
     rows = payload if isinstance(payload, list) else payload.get("lines")
     if not isinstance(rows, list):
@@ -622,6 +630,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         if loaded_bundles:
             form2_bundles = loaded_bundles
 
+    stages = []
     if games:
         # Option 3: Prepricing adjustments stored separately from user context.
         # Strip any user-supplied prepricing_adjustments (never trusted).
@@ -1147,6 +1156,41 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         card["summary"]["mlb_market_coverage"] = dict(card["mlb_full_board"]["input_coverage"])
     if form2_loader_audit is not None:
         card["qb_form2_bundle_loader_audit"] = form2_loader_audit
+    # CFB QB passing research annex (RESEARCH ONLY): beside the family
+    # registry refusals, surface the identity-gated research read for
+    # CFB games whose intake carried QB passing-yard ladders. The
+    # annex reads ONLY the pre-pricing stage's Form 2 seam verdicts and
+    # the evaluated rows' terminal states; it changes no row, no
+    # candidate list and no gate. Identity not established to the
+    # runner (e.g. no admitted bundle) yields an explicit
+    # NOT_ESTABLISHED entry and NO distribution -- never a name-matched
+    # fallback. Lazily imported: the distribution builder is
+    # numpy-backed and this runner must stay runnable in the
+    # numpy-free phone environment; if the annex cannot build, the
+    # section records its failure by name and the card stands.
+    if any(str(r.get("sport") or "").upper() == "CFB"
+           and str(r.get("market") or "").upper() == "PLAYER_PASSING_YARDS"
+           for r in rows if isinstance(r, dict)):
+        try:
+            from sportsedge.research.cfb_qb_card_annex import (
+                build_cfb_research_projections)
+            card["cfb_research_projections"] = build_cfb_research_projections(
+                rows=rows, evaluated=evaluated, games=games, stages=stages,
+                form2_loader_audit=form2_loader_audit,
+                as_of_utc=as_of or clock.astimezone(timezone.utc).isoformat(),
+                fetch_enabled=auto_context, getter=getter)
+        except Exception as exc:
+            card["cfb_research_projections"] = {
+                "schema": "SPORTSEDGE_CFB_RESEARCH_PROJECTIONS_V1",
+                "section_label": "RESEARCH_ONLY",
+                "content_kind": "RESEARCH_PROJECTION",
+                "research_only": True,
+                "official_authority": False, "model_p_authority": False,
+                "staking_authority": False,
+                "projections": [],
+                "section_failure": (
+                    f"ANNEX_BUILD_FAILED:{type(exc).__name__}:{exc}")[:300],
+            }
     # Optional operator-captured fixture-specific DraftKings tab census.
     # This is DIAGNOSTICS ONLY, not a trusted quote, model, registry
     # eligibility switch, or evidence of book-offered wagers.
