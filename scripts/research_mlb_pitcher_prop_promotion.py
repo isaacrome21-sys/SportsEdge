@@ -601,7 +601,7 @@ def run_final(*, out_dir: Path, cache_dir: Path) -> dict:
         schedule = _cache_once(
             schedule_cache,
             day,
-            lambda: fetch_schedule(day, now=_parse_iso(unit["observed_at"])),
+            lambda: fetch_schedule(day),
         )
         game = _match_game(unit, schedule)
         if game is None:
