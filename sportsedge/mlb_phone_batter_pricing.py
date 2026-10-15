@@ -10,12 +10,16 @@ from datetime import datetime, timezone
 from .mlb_public_batter_history import MLBBatterPublicSource, MissingMLBBatterHistory
 from .research_model_adapters import mlb_batter_to_bridge_rows
 from .research_three_sport_bridge import price_three_sport_research
+from .quoted_count_threshold import same_quoted_count_threshold
 
 BATTER_MARKETS = frozenset({
     "BATTER_HITS", "BATTER_TOTAL_BASES", "BATTER_RBIS", "BATTER_RUNS",
     "BATTER_HRS", "BATTER_HOME_RUNS", "BATTER_STOLEN_BASES",
     "BATTER_BB", "BATTER_WALKS", "BATTER_K", "BATTER_STRIKEOUTS",
     "BATTER_SINGLES", "SINGLES", "BATTER_DOUBLES", "DOUBLES",
+    "BATTER_TRIPLES", "TRIPLES",
+    "BATTER_EXTRA_BASE_HITS", "EXTRA_BASE_HITS",
+    "BATTER_RUNS_RBIS", "RUNS_RBIS",
     "HITS_RUNS_RBIS", "H_R_RBI",
 })
 
@@ -83,7 +87,7 @@ def phone_batter_rows(rows, *, now=None, getter=None):
                 str(another.get("home")) != home or
                 str(another.get("player_name") or another.get("label") or "").strip() != name or
                 str(another.get("market") or "").upper() != market or
-                another.get("line") != row.get("line")):
+                not same_quoted_count_threshold(another.get("line"), row.get("line"))):
                 continue
             quotes.append({
                 "sport": "MLB", "game_id": verified["game_id"],

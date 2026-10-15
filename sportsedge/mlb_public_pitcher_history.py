@@ -168,6 +168,14 @@ class MLBPitcherPublicSource:
                     "hits_allowed": _int(data_row["hits"],"HITS"),
                     "walks_allowed": _int(data_row["baseOnBalls"],"WALKS"),
                 }
+                # Pitch count is a measured per-start integer in the same
+                # gameLog payload; carry it only when actually present
+                # (never filled with zero). A malformed value drops the
+                # start via the surrounding fail-closed handler, exactly
+                # like a malformed core stat.
+                if "numberOfPitches" in data_row:
+                    stats["pitches"] = _int(
+                        data_row["numberOfPitches"], "PITCHES")
                 hist.append((when, game_id, stats))
             except (ValueError, KeyError, TypeError, MissingMLBHistory):
                 continue

@@ -2,8 +2,10 @@
 
 DraftKings serves several headline prop families ONLY as milestone ladders
 -- rungs "X+" with American odds on the event {stat >= X} -- not as
-over/under pairs (MLB pitcher strikeouts; football passing yards; the
-mirror "N or Fewer" form for earned runs). Canonical intake requires O/U
+over/under pairs (MLB pitcher strikeouts; MLB batter home runs,
+extra-base hits, triples, batter strikeouts and runs+RBIs; football
+passing yards; the mirror "N or Fewer" form for earned runs). Canonical
+intake requires O/U
 rows, so without this adapter those families die at intake instead of
 reaching their pricers or their named blockers.
 
@@ -45,6 +47,24 @@ never a partial emission):
   non-integer threshold, invalid American odds, missing player, missing
   shared capture).
 
+Per-rung duplicate disposition (Oct 14 2026 operative-run defect):
+DraftKings hangs BOTH forms for some families -- a native two-sided
+O/U at the main line AND the milestone ladder whose rung converts to
+that same line (Snell K: native Over 6.5 and ladder 7+; ER: native
+Under 1.5 and ladder "1 or Fewer"). The converted rung and the native
+quote are the SAME book quote on the same pairing identity (sport,
+game, player, market, side, line); emitting both hands the downstream
+paired-quote bridge two quotes for one side and its exactly-one rule
+refuses the genuine pair (EXACT_PAIRED_DK_QUOTE_REQUIRED). So a
+converted rung that duplicates an existing NATIVE quote row in the
+same intake list is NOT emitted as a quote: it is emitted as a named
+disposition row (``LADDER_RUNG_DUPLICATES_NATIVE_QUOTE``) carrying
+both prices in ``milestone_duplicate`` -- if the prices differ that is
+a data conflict, recorded as such; prices are never merged, averaged
+or silently picked between. Only exact-identity duplicates are
+suppressed; every other rung converts normally and keeps its one-sided
+fate downstream.
+
 Irregular rung spacing is legal by design (DraftKings inserts main-line
 rungs such as 226+); gaps are never interpolated. A ladder with a single
 rung is a single milestone quote and converts as one binary row.
@@ -79,12 +99,16 @@ REFUSAL_MIXED_CAPTURE = "MILESTONE_LADDER_MIXED_CAPTURE"
 REFUSAL_PLAYER_MISMATCH = "MILESTONE_LADDER_PLAYER_MISMATCH"
 REFUSAL_MARKET_UNSUPPORTED = "MILESTONE_LADDER_MARKET_UNSUPPORTED"
 REFUSAL_MALFORMED = "MILESTONE_LADDER_MALFORMED"
+# Per-rung disposition (not a whole-ladder refusal): the converted rung
+# duplicates an existing native quote row on the full pairing identity.
+REFUSAL_DUPLICATES_NATIVE_QUOTE = "LADDER_RUNG_DUPLICATES_NATIVE_QUOTE"
 
 _FORM_X_PLUS = {"X_PLUS", "MILESTONE_X_PLUS", "PLUS", "GE"}
 _FORM_OR_FEWER = {"OR_FEWER", "MILESTONE_OR_FEWER", "FEWER", "LE"}
 
-# MLB integer counting-stat pitcher markets (single source of truth is
-# sportsedge.mlb_phone_pitcher_pricing.PITCHER_MARKETS; imported lazily
+# MLB integer counting-stat pitcher AND batter markets (single sources
+# of truth are sportsedge.mlb_phone_pitcher_pricing.PITCHER_MARKETS and
+# sportsedge.mlb_phone_batter_pricing.BATTER_MARKETS; imported lazily
 # in _supported so this module stays dependency-light at import time).
 _FOOTBALL_PASSING_MARKETS = frozenset({
     "PLAYER_PASSING_YARDS", "PLAYER_PASS_YARDS",
@@ -108,15 +132,33 @@ def is_milestone_ladder_row(row) -> bool:
     return isinstance(row, Mapping) and "milestone_ladder" in row
 
 
+# Parser-only coverage is NOT a claim of an executable probability engine.
+# Offered DK count-stat ladders with no engine behind them must reach an
+# explicit downstream NO_ENGINE/NO_QUOTE refusal instead of dying at
+# parser recognition. (The three families #2273 parked here --
+# BATTER_EXTRA_BASE_HITS, BATTER_TRIPLES, PITCHER_PITCHES -- graduated
+# to engine-backed phone market sets with the Oct 14 wiring completion:
+# the empirical gamelog engine prices triples and the exact
+# doubles+triples+home-runs sum, and the joint engine prices measured
+# per-start pitch counts. The set is empty today; park future
+# engine-less families here rather than widening the phone sets.)
+_MLB_PARSER_ONLY = frozenset()
+
+
 def _supported(sport: str, market: str) -> bool:
     if sport == "MLB":
         from .mlb_phone_pitcher_pricing import PITCHER_MARKETS
-        return market in PITCHER_MARKETS
-    if sport in {"NFL", "CFB"}:
-        # CFB converts identically; its rows then die at the standing
-        # identity/registry gates in the runner (HOLD -- no CFB pricing
-        # path is created here).
-        return market in _FOOTBALL_PASSING_MARKETS
+        from .mlb_phone_batter_pricing import BATTER_MARKETS
+        return (market in PITCHER_MARKETS or market in BATTER_MARKETS
+                or market in _MLB_PARSER_ONLY)
+    if sport == "NFL":
+        from .nfl_phone_player_pricing import NFL_PLAYER_MARKETS
+        return market in NFL_PLAYER_MARKETS or market in _FOOTBALL_PASSING_MARKETS
+    if sport == "CFB":
+        from .cfb_phone_player_pricing import CFB_PLAYER_MARKETS
+        # The family registry gate still refuses all CFB pricing before
+        # any player-stat model stage is reached; syntax != authority.
+        return market in CFB_PLAYER_MARKETS or market in _FOOTBALL_PASSING_MARKETS
     return False
 
 
@@ -190,8 +232,11 @@ def milestone_refusal_row(line) -> dict:
 
     Mirrors the phone pricers' blocked-row shape so refused ladders land
     in prop_unpriced with the named milestone reason and no price fields.
+    A per-rung duplicate disposition keeps its audit detail (both the
+    ladder and native prices, and whether they conflict) so the
+    suppression is visible in the card, never silent.
     """
-    return {
+    row = {
         "status": "NO_MODEL_OR_MARKET",
         "reason": str(line.get("milestone_ladder_refusal") or REFUSAL_MALFORMED),
         "sport": line.get("sport"),
@@ -202,9 +247,116 @@ def milestone_refusal_row(line) -> dict:
         "research_only": True, "official_authority": False,
         "model_p_authority": False, "staking_authority": False,
     }
+    if line.get("line") is not None:
+        # A per-rung disposition names its converted line (a refused
+        # whole ladder has no single line and stays without one).
+        row["line"] = line.get("line")
+    duplicate = line.get("milestone_duplicate")
+    if isinstance(duplicate, Mapping):
+        row["milestone_duplicate"] = dict(duplicate)
+    return row
 
 
-def _expand_one(row: Mapping, *, default_sport=None) -> list:
+def _as_line(value):
+    """Numeric line as float, or None when not a finite number."""
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        line = float(value)
+    except (ValueError, TypeError, OverflowError):
+        return None
+    return line if isfinite(line) else None
+
+
+def _game_key(row) -> tuple:
+    """Game identity from raw intake fields: teams + start instant.
+
+    The start instant is compared as a parsed instant when parseable
+    (so equivalent spellings of one instant match) and as the raw
+    string otherwise; a missing start compares as empty.
+    """
+    raw_start = row.get("kickoff") or row.get("commence_time")
+    instant = _parse_instant(raw_start)
+    start_key = (instant.isoformat() if instant is not None
+                 else str(raw_start or "").strip())
+    return (_norm_name(row.get("away")), _norm_name(row.get("home")),
+            start_key)
+
+
+def _quote_identity(row, *, default_sport=None):
+    """Full pairing identity of a binary quote row, or None.
+
+    (sport, game, market, player, side, line) -- the identity the
+    downstream paired-quote bridge keys on, expressed in raw intake
+    fields. Only OVER/UNDER rows with a named player and a numeric
+    line have a prop pairing identity.
+    """
+    side = str(row.get("side") or row.get("selection") or "").upper().strip()
+    if side not in {"OVER", "UNDER"}:
+        return None
+    player = _norm_name(row.get("player_name") or row.get("label"))
+    if not player:
+        return None
+    line = _as_line(row.get("line"))
+    if line is None:
+        return None
+    sport = str(row.get("sport") or default_sport or "").upper().strip()
+    market = str(row.get("market") or "").upper().strip()
+    if not sport or not market:
+        return None
+    return (sport, _game_key(row), market, player, side, line)
+
+
+def _native_quote_index(rows, *, default_sport=None) -> dict:
+    """Pairing identity -> native quote evidence, from non-ladder rows.
+
+    A row counts as a native quote only when it carries a valid
+    American price; a malformed native row must never suppress a rung.
+    """
+    index = {}
+    for row in rows:
+        if not isinstance(row, Mapping) or is_milestone_ladder_row(row):
+            continue
+        if row.get("milestone_ladder_refusal"):
+            continue
+        identity = _quote_identity(row, default_sport=default_sport)
+        if identity is None:
+            continue
+        odds = _as_odds(row.get("odds", row.get("price")))
+        if odds is None:
+            continue
+        index.setdefault(identity, []).append({
+            "odds": odds,
+            "quote_captured_at": row.get("quote_captured_at"),
+        })
+    return index
+
+
+def _duplicate_disposition_row(converted: dict, native_matches: list) -> dict:
+    """Named non-quote row for a converted rung duplicating a native quote.
+
+    The rung's own price keys are removed so the row can never enter a
+    quote set; both prices ride in ``milestone_duplicate`` for audit.
+    A price difference is a data conflict and is flagged, never merged.
+    """
+    row = {k: v for k, v in converted.items() if k not in ("odds", "price")}
+    ladder_odds = converted.get("odds")
+    native_odds_values = sorted({m["odds"] for m in native_matches})
+    row["milestone_ladder_refusal"] = REFUSAL_DUPLICATES_NATIVE_QUOTE
+    row["milestone_duplicate"] = {
+        "ladder_odds": ladder_odds,
+        "native_odds": native_matches[0]["odds"],
+        "native_odds_values": native_odds_values,
+        "native_matches": len(native_matches),
+        "native_quote_captured_at": native_matches[0]["quote_captured_at"],
+        "price_conflict": any(m["odds"] != ladder_odds
+                              for m in native_matches),
+    }
+    return row
+
+
+def _expand_one(row: Mapping, *, default_sport=None,
+                native_quotes=None) -> list:
     base = {k: v for k, v in row.items() if k != "milestone_ladder"}
     ladder = row.get("milestone_ladder")
     if not isinstance(ladder, Mapping):
@@ -304,6 +456,16 @@ def _expand_one(row: Mapping, *, default_sport=None) -> list:
         out["quote_captured_at"] = shared_capture
         out["milestone_threshold"] = threshold
         out["milestone_form"] = form
+        if native_quotes:
+            identity = _quote_identity(out, default_sport=default_sport)
+            matches = native_quotes.get(identity) if identity else None
+            if matches:
+                # The book already hangs this exact quote natively;
+                # the converted rung must not become a second quote
+                # on the pairing identity. Emit the named disposition
+                # instead -- the native row keeps its own provenance.
+                emitted.append(_duplicate_disposition_row(out, matches))
+                continue
         emitted.append(out)
     return emitted
 
@@ -316,11 +478,19 @@ def expand_milestone_ladder_rows(rows: Sequence, *, default_sport=None) -> list:
     single row carrying ``milestone_ladder_refusal`` for the runner's
     prop intake to block by name. Row order is preserved: a ladder's
     emitted rows occupy the ladder row's position, rungs ascending.
+
+    A converted rung whose full pairing identity duplicates a native
+    (non-ladder) quote row elsewhere in *rows* is emitted as a
+    ``LADDER_RUNG_DUPLICATES_NATIVE_QUOTE`` disposition row instead of
+    a second quote (see the module docstring); the native row itself
+    is passed through untouched.
     """
+    native_quotes = _native_quote_index(rows, default_sport=default_sport)
     out = []
     for row in rows:
         if is_milestone_ladder_row(row):
-            out.extend(_expand_one(row, default_sport=default_sport))
+            out.extend(_expand_one(row, default_sport=default_sport,
+                                   native_quotes=native_quotes))
         else:
             out.append(row)
     return out

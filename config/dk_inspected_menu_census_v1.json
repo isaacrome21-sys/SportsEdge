@@ -1,0 +1,1514 @@
+{
+  "schema": "SPORTSEDGE_DK_INSPECTED_MENU_CENSUS_V1",
+  "as_of": "2026-10-13",
+  "authority": "OPERATOR_REPORTED_FIXTURE_MENU_ENUMERATION__NOT_VERIFIED_QUOTE_SOURCE__NO_MODEL_OR_ACTIVATION_AUTHORITY",
+  "rule": "These are observed market families in specific DK matchups; a market may be absent on any fixture. A menu/tab is not a quote, a price, a valid model, or evidence of wagering edge.",
+  "sports": {
+    "MLB": {
+      "reported_tabs": 15,
+      "markets": [
+        {
+          "market_key": "MONEYLINE",
+          "group": "game",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "RUN_LINE",
+          "group": "game",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "GAME_TOTAL_RUNS",
+          "group": "game",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "TEAM_TOTAL_RUNS",
+          "group": "game",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE",
+            "OVER_UNDER_LADDER"
+          ]
+        },
+        {
+          "market_key": "GAME_TOTAL_HITS",
+          "group": "game",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "TEAM_TOTAL_HITS",
+          "group": "game",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "GAME_TOTAL_3_WAY",
+          "group": "game",
+          "period": "FULL_GAME",
+          "forms": [
+            "BAND"
+          ]
+        },
+        {
+          "market_key": "F5_MONEYLINE",
+          "group": "period",
+          "period": "FIRST_5",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "F5_RUN_LINE",
+          "group": "period",
+          "period": "FIRST_5",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "F5_TEAM_TOTAL_RUNS",
+          "group": "period",
+          "period": "FIRST_5",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "FIRST_3_MONEYLINE",
+          "group": "period",
+          "period": "FIRST_3",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "FIRST_3_RUN_LINE",
+          "group": "period",
+          "period": "FIRST_3",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "FIRST_3_TEAM_TOTAL_RUNS",
+          "group": "period",
+          "period": "FIRST_3",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "FIRST_7_MONEYLINE",
+          "group": "period",
+          "period": "FIRST_7",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "FIRST_7_RUN_LINE",
+          "group": "period",
+          "period": "FIRST_7",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "FIRST_7_TEAM_TOTAL_RUNS",
+          "group": "period",
+          "period": "FIRST_7",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "INNING_1_RUNS",
+          "group": "inning",
+          "period": "INNING_1",
+          "forms": [
+            "TWO_SIDED",
+            "YES_NO",
+            "OVER_UNDER_LADDER"
+          ]
+        },
+        {
+          "market_key": "INNING_1_TEAM_HITS",
+          "group": "inning",
+          "period": "INNING_1",
+          "forms": [
+            "TWO_SIDED",
+            "YES_NO",
+            "OVER_UNDER_LADDER"
+          ]
+        },
+        {
+          "market_key": "INNING_1_RUN_SCORED",
+          "group": "inning",
+          "period": "INNING_1",
+          "forms": [
+            "TWO_SIDED",
+            "YES_NO",
+            "OVER_UNDER_LADDER"
+          ]
+        },
+        {
+          "market_key": "INNING_1_HOME_RUN",
+          "group": "inning",
+          "period": "INNING_1",
+          "forms": [
+            "TWO_SIDED",
+            "YES_NO",
+            "OVER_UNDER_LADDER"
+          ]
+        },
+        {
+          "market_key": "INNING_1_PITCHER_K",
+          "group": "inning",
+          "period": "INNING_1",
+          "forms": [
+            "TWO_SIDED",
+            "YES_NO",
+            "OVER_UNDER_LADDER"
+          ]
+        },
+        {
+          "market_key": "INNING_1_PITCHES",
+          "group": "inning",
+          "period": "INNING_1",
+          "forms": [
+            "TWO_SIDED",
+            "YES_NO",
+            "OVER_UNDER_LADDER"
+          ]
+        },
+        {
+          "market_key": "INNING_1_STRIKES",
+          "group": "inning",
+          "period": "INNING_1",
+          "forms": [
+            "TWO_SIDED",
+            "YES_NO",
+            "OVER_UNDER_LADDER"
+          ]
+        },
+        {
+          "market_key": "INNING_1_BATTERS_FACED",
+          "group": "inning",
+          "period": "INNING_1",
+          "forms": [
+            "TWO_SIDED",
+            "YES_NO",
+            "OVER_UNDER_LADDER"
+          ]
+        },
+        {
+          "market_key": "INNING_2_MARKETS",
+          "group": "inning",
+          "period": "INNING_2",
+          "forms": [
+            "TWO_SIDED",
+            "YES_NO",
+            "ALTERNATE"
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
+        },
+        {
+          "market_key": "INNING_3_MARKETS",
+          "group": "inning",
+          "period": "INNING_3",
+          "forms": [
+            "TWO_SIDED",
+            "YES_NO",
+            "ALTERNATE"
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
+        },
+        {
+          "market_key": "INNING_4_MARKETS",
+          "group": "inning",
+          "period": "INNING_4",
+          "forms": [
+            "TWO_SIDED",
+            "YES_NO",
+            "ALTERNATE"
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
+        },
+        {
+          "market_key": "INNING_5_MARKETS",
+          "group": "inning",
+          "period": "INNING_5",
+          "forms": [
+            "TWO_SIDED",
+            "YES_NO",
+            "ALTERNATE"
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
+        },
+        {
+          "market_key": "INNING_6_MARKETS",
+          "group": "inning",
+          "period": "INNING_6",
+          "forms": [
+            "TWO_SIDED",
+            "YES_NO",
+            "ALTERNATE"
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
+        },
+        {
+          "market_key": "INNING_7_MARKETS",
+          "group": "inning",
+          "period": "INNING_7",
+          "forms": [
+            "TWO_SIDED",
+            "YES_NO",
+            "ALTERNATE"
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
+        },
+        {
+          "market_key": "INNING_8_MARKETS",
+          "group": "inning",
+          "period": "INNING_8",
+          "forms": [
+            "TWO_SIDED",
+            "YES_NO",
+            "ALTERNATE"
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
+        },
+        {
+          "market_key": "INNING_9_MARKETS",
+          "group": "inning",
+          "period": "INNING_9",
+          "forms": [
+            "TWO_SIDED",
+            "YES_NO",
+            "ALTERNATE"
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
+        },
+        {
+          "market_key": "PITCHER_K",
+          "group": "pitcher",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "PITCHER_OUTS",
+          "group": "pitcher",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "PITCHER_HITS_ALLOWED",
+          "group": "pitcher",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "PITCHER_ER",
+          "group": "pitcher",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "PITCHER_BB",
+          "group": "pitcher",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "PITCHER_PITCHES",
+          "group": "pitcher",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "EITHER_PITCHER_K",
+          "group": "pitcher",
+          "period": "FULL_GAME",
+          "forms": [
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "EITHER_PITCHER_OUTS",
+          "group": "pitcher",
+          "period": "FULL_GAME",
+          "forms": [
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "EITHER_PITCHER_HITS_ALLOWED",
+          "group": "pitcher",
+          "period": "FULL_GAME",
+          "forms": [
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "EITHER_PITCHER_ER",
+          "group": "pitcher",
+          "period": "FULL_GAME",
+          "forms": [
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "EITHER_PITCHER_BB",
+          "group": "pitcher",
+          "period": "FULL_GAME",
+          "forms": [
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "EITHER_PITCHER_PITCHES",
+          "group": "pitcher",
+          "period": "FULL_GAME",
+          "forms": [
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "BATTER_HITS",
+          "group": "batter",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED"
+          ]
+        },
+        {
+          "market_key": "BATTER_TOTAL_BASES",
+          "group": "batter",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED"
+          ]
+        },
+        {
+          "market_key": "BATTER_RBI",
+          "group": "batter",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED"
+          ]
+        },
+        {
+          "market_key": "BATTER_HITS_RUNS_RBI",
+          "group": "batter",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED"
+          ]
+        },
+        {
+          "market_key": "BATTER_RUNS",
+          "group": "batter",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED"
+          ]
+        },
+        {
+          "market_key": "BATTER_SINGLES",
+          "group": "batter",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED"
+          ]
+        },
+        {
+          "market_key": "BATTER_DOUBLES",
+          "group": "batter",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED"
+          ]
+        },
+        {
+          "market_key": "BATTER_WALKS",
+          "group": "batter",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED"
+          ]
+        },
+        {
+          "market_key": "BATTER_HOME_RUNS",
+          "group": "batter",
+          "period": "FULL_GAME",
+          "forms": [
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "BATTER_EXTRA_BASE_HITS",
+          "group": "batter",
+          "period": "FULL_GAME",
+          "forms": [
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "BATTER_TRIPLES",
+          "group": "batter",
+          "period": "FULL_GAME",
+          "forms": [
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "BATTER_K",
+          "group": "batter",
+          "period": "FULL_GAME",
+          "forms": [
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "BATTER_FIRST_PA_RESULT",
+          "group": "batter",
+          "period": "FULL_GAME",
+          "forms": [
+            "SINGLE_OUTCOME"
+          ]
+        },
+        {
+          "market_key": "BATTER_FIRST_PA_ON_BASE",
+          "group": "batter",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_NO"
+          ]
+        },
+        {
+          "market_key": "RACE_TO_RUNS",
+          "group": "exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "X_PLUS_LADDER",
+            "TWO_SIDED"
+          ]
+        },
+        {
+          "market_key": "BOTH_TEAMS_TO_SCORE_RUNS",
+          "group": "exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "X_PLUS_LADDER",
+            "TWO_SIDED"
+          ]
+        },
+        {
+          "market_key": "GRAND_SLAM",
+          "group": "exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_NO"
+          ]
+        },
+        {
+          "market_key": "EXTRA_INNINGS",
+          "group": "exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_NO"
+          ]
+        },
+        {
+          "market_key": "WINNING_MARGIN",
+          "group": "exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "BAND"
+          ]
+        },
+        {
+          "market_key": "CORRECT_SCORE",
+          "group": "exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "BAND"
+          ]
+        }
+      ]
+    },
+    "NFL": {
+      "reported_tabs": 16,
+      "markets": [
+        {
+          "market_key": "MONEYLINE",
+          "group": "game",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "SPREAD",
+          "group": "game",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "TOTAL",
+          "group": "game",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "TEAM_TOTAL_POINTS",
+          "group": "game",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "TEAM_TOTAL_TOUCHDOWNS",
+          "group": "game",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER"
+          ]
+        },
+        {
+          "market_key": "FIRST_HALF_MONEYLINE",
+          "group": "period",
+          "period": "FIRST_HALF",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "FIRST_HALF_SPREAD",
+          "group": "period",
+          "period": "FIRST_HALF",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "FIRST_HALF_TOTAL",
+          "group": "period",
+          "period": "FIRST_HALF",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "QUARTER_1_MONEYLINE",
+          "group": "period",
+          "period": "Q1",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "QUARTER_1_SPREAD",
+          "group": "period",
+          "period": "Q1",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "QUARTER_1_TOTAL",
+          "group": "period",
+          "period": "Q1",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "QUARTER_2_MONEYLINE",
+          "group": "period",
+          "period": "Q2",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "QUARTER_2_SPREAD",
+          "group": "period",
+          "period": "Q2",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "QUARTER_2_TOTAL",
+          "group": "period",
+          "period": "Q2",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "QUARTER_3_MONEYLINE",
+          "group": "period",
+          "period": "Q3",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "QUARTER_3_SPREAD",
+          "group": "period",
+          "period": "Q3",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "QUARTER_3_TOTAL",
+          "group": "period",
+          "period": "Q3",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "QUARTER_4_MONEYLINE",
+          "group": "period",
+          "period": "Q4",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "QUARTER_4_SPREAD",
+          "group": "period",
+          "period": "Q4",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "QUARTER_4_TOTAL",
+          "group": "period",
+          "period": "Q4",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "FIRST_HALF_TEAM_TOTAL_POINTS",
+          "group": "period",
+          "period": "FIRST_HALF",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER"
+          ]
+        },
+        {
+          "market_key": "QUARTER_1_TEAM_TOTAL_POINTS",
+          "group": "period",
+          "period": "Q1",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER"
+          ]
+        },
+        {
+          "market_key": "QUARTER_1_TOTAL_TOUCHDOWNS",
+          "group": "period",
+          "period": "Q1",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER"
+          ]
+        },
+        {
+          "market_key": "QUARTER_2_TOTAL_TOUCHDOWNS",
+          "group": "period",
+          "period": "Q2",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER"
+          ]
+        },
+        {
+          "market_key": "QUARTER_3_TOTAL_TOUCHDOWNS",
+          "group": "period",
+          "period": "Q3",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER"
+          ]
+        },
+        {
+          "market_key": "QUARTER_4_TOTAL_TOUCHDOWNS",
+          "group": "period",
+          "period": "Q4",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER"
+          ]
+        },
+        {
+          "market_key": "HALF_TIME_FULL_TIME_RESULT",
+          "group": "period",
+          "period": "FULL_GAME",
+          "forms": [
+            "BAND",
+            "EXACTA"
+          ]
+        },
+        {
+          "market_key": "PLAYER_PASSING_YARDS",
+          "group": "player_passing",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "PLAYER_PASS_TDS",
+          "group": "player_passing",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "PLAYER_PASS_ATTEMPTS",
+          "group": "player_passing",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "PLAYER_COMPLETIONS",
+          "group": "player_passing",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "PLAYER_PASS_RUSH_YARDS",
+          "group": "player_passing",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "PLAYER_INTERCEPTIONS",
+          "group": "player_passing",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "PLAYER_LONGEST_COMPLETION",
+          "group": "player_passing",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "QB_VS_QB_HEAD_TO_HEAD",
+          "group": "player_passing",
+          "period": "FULL_GAME",
+          "forms": [
+            "H2H"
+          ]
+        },
+        {
+          "market_key": "PLAYER_Q1_PASSING",
+          "group": "player_passing",
+          "period": "MULTI_PERIOD",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
+        },
+        {
+          "market_key": "PLAYER_1H_PASSING",
+          "group": "player_passing",
+          "period": "MULTI_PERIOD",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
+        },
+        {
+          "market_key": "PLAYER_RECEIVING_YARDS",
+          "group": "player_receiving",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "PLAYER_RECEPTIONS",
+          "group": "player_receiving",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "PLAYER_LONGEST_RECEPTION",
+          "group": "player_receiving",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "PLAYER_Q1_RECEIVING",
+          "group": "player_receiving",
+          "period": "MULTI_PERIOD",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
+        },
+        {
+          "market_key": "PLAYER_1H_RECEIVING",
+          "group": "player_receiving",
+          "period": "MULTI_PERIOD",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
+        },
+        {
+          "market_key": "MOST_RECEIVING_YARDS",
+          "group": "player_receiving",
+          "period": "FULL_GAME",
+          "forms": [
+            "BAND"
+          ]
+        },
+        {
+          "market_key": "PLAYER_RUSHING_YARDS",
+          "group": "player_rushing",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "PLAYER_RUSH_ATTEMPTS",
+          "group": "player_rushing",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "PLAYER_RUSH_RECEIVING_YARDS",
+          "group": "player_rushing",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "PLAYER_LONGEST_RUSH",
+          "group": "player_rushing",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "PLAYER_Q1_RUSHING",
+          "group": "player_rushing",
+          "period": "MULTI_PERIOD",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
+        },
+        {
+          "market_key": "PLAYER_1H_RUSHING",
+          "group": "player_rushing",
+          "period": "MULTI_PERIOD",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ],
+          "provisional_group": true,
+          "provisional_reason": "Umbrella label, not an exact provider-normalized market; specific stat and line/period market ID missing from published tab enumeration. Cannot claim offered or price."
+        },
+        {
+          "market_key": "ANYTIME_TD",
+          "group": "player_touchdown",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_ONLY"
+          ]
+        },
+        {
+          "market_key": "FIRST_TD",
+          "group": "player_touchdown",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_ONLY"
+          ]
+        },
+        {
+          "market_key": "LAST_TD",
+          "group": "player_touchdown",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_ONLY"
+          ]
+        },
+        {
+          "market_key": "TWO_PLUS_TD",
+          "group": "player_touchdown",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_ONLY"
+          ]
+        },
+        {
+          "market_key": "THREE_PLUS_TD",
+          "group": "player_touchdown",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_ONLY"
+          ]
+        },
+        {
+          "market_key": "PLAYER_PERIOD_TD",
+          "group": "player_touchdown",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_ONLY"
+          ]
+        },
+        {
+          "market_key": "TD_SCORER_EXACTA",
+          "group": "player_touchdown",
+          "period": "FULL_GAME",
+          "forms": [
+            "EXACTA"
+          ]
+        },
+        {
+          "market_key": "PLAYER_FIELD_GOALS_MADE",
+          "group": "kicking",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER"
+          ]
+        },
+        {
+          "market_key": "PLAYER_KICKING_POINTS",
+          "group": "kicking",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER"
+          ]
+        },
+        {
+          "market_key": "PLAYER_PATS_MADE",
+          "group": "kicking",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER"
+          ]
+        },
+        {
+          "market_key": "FIRST_DRIVE_RESULT",
+          "group": "game_exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_NO",
+            "BAND",
+            "X_PLUS_LADDER"
+          ]
+        },
+        {
+          "market_key": "RACE_TO_POINTS",
+          "group": "game_exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_NO",
+            "BAND",
+            "X_PLUS_LADDER"
+          ]
+        },
+        {
+          "market_key": "BOTH_TEAMS_TO_SCORE",
+          "group": "game_exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_NO",
+            "BAND",
+            "X_PLUS_LADDER"
+          ]
+        },
+        {
+          "market_key": "SAFETY",
+          "group": "game_exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_NO",
+            "BAND",
+            "X_PLUS_LADDER"
+          ]
+        },
+        {
+          "market_key": "OVERTIME",
+          "group": "game_exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_NO",
+            "BAND",
+            "X_PLUS_LADDER"
+          ]
+        },
+        {
+          "market_key": "DK_SQUARES",
+          "group": "game_exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "SINGLE_OUTCOME"
+          ]
+        }
+      ]
+    },
+    "CFB": {
+      "reported_tabs": 7,
+      "markets": [
+        {
+          "market_key": "MONEYLINE",
+          "group": "game",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "SPREAD",
+          "group": "game",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "TOTAL",
+          "group": "game",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "TEAM_TOTAL_POINTS",
+          "group": "game",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "TEAM_TOTAL_TOUCHDOWNS",
+          "group": "game",
+          "period": "FULL_GAME",
+          "forms": [
+            "TWO_SIDED",
+            "OVER_UNDER_LADDER"
+          ]
+        },
+        {
+          "market_key": "FIRST_HALF_MONEYLINE",
+          "group": "period",
+          "period": "FIRST_HALF",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "FIRST_HALF_SPREAD",
+          "group": "period",
+          "period": "FIRST_HALF",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "FIRST_HALF_TOTAL",
+          "group": "period",
+          "period": "FIRST_HALF",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "QUARTER_1_MONEYLINE",
+          "group": "period",
+          "period": "Q1",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "QUARTER_1_SPREAD",
+          "group": "period",
+          "period": "Q1",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "QUARTER_1_TOTAL",
+          "group": "period",
+          "period": "Q1",
+          "forms": [
+            "TWO_SIDED",
+            "ALTERNATE"
+          ]
+        },
+        {
+          "market_key": "ODD_EVEN",
+          "group": "game_exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_NO",
+            "BAND",
+            "X_PLUS_LADDER"
+          ]
+        },
+        {
+          "market_key": "FIRST_DRIVE_RESULT",
+          "group": "game_exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_NO",
+            "BAND",
+            "X_PLUS_LADDER"
+          ]
+        },
+        {
+          "market_key": "FIRST_DRIVE_YARD_LINE",
+          "group": "game_exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_NO",
+            "BAND",
+            "X_PLUS_LADDER"
+          ]
+        },
+        {
+          "market_key": "BOTH_TEAMS_TO_SCORE",
+          "group": "game_exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_NO",
+            "BAND",
+            "X_PLUS_LADDER"
+          ]
+        },
+        {
+          "market_key": "RACE_TO_POINTS",
+          "group": "game_exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_NO",
+            "BAND",
+            "X_PLUS_LADDER"
+          ]
+        },
+        {
+          "market_key": "WINNING_MARGIN",
+          "group": "game_exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_NO",
+            "BAND",
+            "X_PLUS_LADDER"
+          ]
+        },
+        {
+          "market_key": "POINTS_BANDS",
+          "group": "game_exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_NO",
+            "BAND",
+            "X_PLUS_LADDER"
+          ]
+        },
+        {
+          "market_key": "CORRECT_SCORE",
+          "group": "game_exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_NO",
+            "BAND",
+            "X_PLUS_LADDER"
+          ]
+        },
+        {
+          "market_key": "LONGEST_TOUCHDOWN",
+          "group": "game_exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_NO",
+            "BAND",
+            "X_PLUS_LADDER"
+          ]
+        },
+        {
+          "market_key": "OVERTIME",
+          "group": "game_exotic",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_NO",
+            "BAND",
+            "X_PLUS_LADDER"
+          ]
+        },
+        {
+          "market_key": "PLAYER_PASSING_YARDS",
+          "group": "player",
+          "period": "FULL_GAME",
+          "forms": [
+            "X_PLUS_LADDER",
+            "OR_FEWER_LADDER"
+          ]
+        },
+        {
+          "market_key": "ANYTIME_TD",
+          "group": "player",
+          "period": "FULL_GAME",
+          "forms": [
+            "YES_ONLY"
+          ]
+        }
+      ]
+    }
+  },
+  "known_observation_discrepancies": [
+    {
+      "sport": "MLB",
+      "market_key": "F5_GAME_TOTAL",
+      "reason": "Not displayed on 2026-10-13 enumerated board even though SportsEdge defines F5_TOTALS; do not assume globally absent or enable routing."
+    },
+    {
+      "sport": "MLB",
+      "market_key": "BATTER_STOLEN_BASES",
+      "reason": "Not displayed on 2026-10-13 enumerated DK board; do not create a quote."
+    },
+    {
+      "sport": "MLB",
+      "market_key": "BATTER_HBP",
+      "reason": "Not displayed on 2026-10-13 enumerated DK board; do not create a quote."
+    },
+    {
+      "sport": "NFL",
+      "market_key": "DEFENSIVE_PLAYER_PROPS",
+      "reason": "No defensive-player props on enumerated NFL board; never synthesize player sacks/tackles/interceptions quotes."
+    },
+    {
+      "sport": "NFL",
+      "market_key": "PUNTING_PROPS",
+      "reason": "No punting props on enumerated NFL board."
+    },
+    {
+      "sport": "CFB",
+      "market_key": "PLAYER_PROPS",
+      "reason": "No player props on enumerated Oct-13 mid-major fixture; QB passing-yard rungs and anytime TD appeared on other Oct-14 boards; capture per fixture."
+    }
+  ],
+  "source_files": "Operator reports local ~/workspace/sportsedge/dk_catalog_20261013/. Original pages/registry diff have not been independently reproduced in GitHub; catalog is source-reported and cannot assert executable real odds.",
+  "governance": {
+    "catalog_is_not_quote": true,
+    "one_sided_no_vig": "UNAVAILABLE",
+    "no_price_or_probability_generated": true,
+    "not_offered_per_fixture_not_global": true,
+    "model_authority": false,
+    "betting_authority": false
+  }
+}
