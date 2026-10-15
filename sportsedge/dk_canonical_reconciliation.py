@@ -6,6 +6,26 @@ from pathlib import Path
 
 from sportsedge.canonical_coverage import resolve_market
 
+# Explicit menu-to-canonical identities only; not proof of live quote intake.
+MLB_DK_ALIASES = {
+    "GAME_TOTAL_RUNS": "TOTALS",
+    "TEAM_TOTAL_RUNS": "TEAM_TOTALS",
+    "F5_TEAM_TOTAL_RUNS": "F5_TEAM_TOTALS",
+    "BATTER_HITS": "HITS",
+    "BATTER_TOTAL_BASES": "TOTAL_BASES",
+    "BATTER_RBI": "RBI",
+    "BATTER_HITS_RUNS_RBI": "HITS_RUNS_RBIS",
+    "BATTER_RUNS": "RUNS",
+    "BATTER_SINGLES": "SINGLES",
+    "BATTER_DOUBLES": "DOUBLES",
+    "BATTER_WALKS": "BATTER_BB",
+    "BATTER_HOME_RUNS": "HOME_RUNS",
+    "BATTER_EXTRA_BASE_HITS": "EXTRA_BASE_HITS",
+    "BATTER_TRIPLES": "TRIPLES",
+    "BATTER_K": "BATTER_K",
+}
+
+
 
 def reconcile_dk_census(path: str | Path) -> dict:
     census = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -25,7 +45,8 @@ def reconcile_dk_census(path: str | Path) -> dict:
             seen.add(key)
             # Provisional umbrella tabs are not normalized market identities.
             provisional = market.get("provisional_group") is True
-            resolution = None if provisional else resolve_market(sport, key)
+            canonical_key = MLB_DK_ALIASES.get(key, key) if sport == "MLB" else key
+            resolution = None if provisional else resolve_market(sport, canonical_key)
             state = ("PROVISIONAL_NOT_A_MARKET" if provisional else
                      "NO_CANONICAL_ROUTE" if resolution is None else resolution["state"])
             rows.append({
