@@ -79,5 +79,39 @@ class AskSimsResearchTests(unittest.TestCase):
             self.ask({"all": []})
 
 
+
+class AskSimsEngineReplayTests(unittest.TestCase):
+    def test_unified_replay_matches_native_seeded_score_path(self):
+        from sportsedge.sports.nfl.ask_sims import ask_unified_score_sims
+        from sportsedge.sports.nfl.discrete_v2 import load_freeze, score_grid
+        from sportsedge.sports.nfl.unified_market_engine import (
+            run_unified_nfl_model, sample_score_paths,
+        )
+        engine = run_unified_nfl_model(
+            game_id="2026_06_SEA_DEN", home_team=HOME, away_team=AWAY,
+            attempt9_margin=0.0, attempt9_total=44.0, n_sims=128, seed=7,
+        )
+        result = ask_unified_score_sims(
+            engine, "Seahawks win by 7+", home_team=HOME, away_team=AWAY,
+            aliases={"Seahawks": AWAY},
+        )
+        means = engine["score_means"]
+        native = sample_score_paths(
+            score_grid(means["mean_home"], means["mean_away"], load_freeze()),
+            n_sims=128, seed=7,
+        )
+        comparison = ask_score_paths(
+            native, "SEA wins by 7+", home_team=HOME, away_team=AWAY,
+        )
+        self.assertEqual(result["win_count"], comparison["win_count"])
+        self.assertEqual(result["sample_count"], 128)
+        self.assertEqual(result["source_status"], "FROZEN_GRID_SEEDED_REPLAY_RESEARCH_ONLY")
+        self.assertFalse(result["eligible_as_bet"])
+        engine["score_distribution"]["freeze_sha256"] = "tampered"
+        with self.assertRaisesRegex(AskSimsError, "FROZEN_GRID_MISMATCH"):
+            ask_unified_score_sims(
+                engine, "SEA wins", home_team=HOME, away_team=AWAY,
+            )
+
 if __name__ == "__main__":
     unittest.main()
