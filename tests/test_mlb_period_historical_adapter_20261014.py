@@ -16,7 +16,9 @@ def _export(n=24):
             "observed_at": "2026-10-01T00:00:00Z",
             "games": [{"game_id": str(i),
                        "start_time": (start + timedelta(days=i)).isoformat(),
-                       "inning_runs": [i % 2, 1, 0, 0, 0, 0, 0, 0, 0]}
+                       "result_available_at": (start + timedelta(days=i, hours=4)).isoformat(),
+                       "result_available_at": (start + timedelta(days=i, hours=4)).isoformat(),
+             "inning_runs": [i % 2, 1, 0, 0, 0, 0, 0, 0, 0]}
                       for i in range(n)]}
 
 
