@@ -31,9 +31,21 @@ def _odds(value: object) -> int:
 
 
 def _clock(value: object) -> datetime:
-    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+    # RUN IT --lines is JSON; captured_at arrives as an offset-aware ISO
+    # string in live operation. Accept datetime for in-process callers, but
+    # never infer a timezone or accept a naive captured instant.
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except (TypeError, ValueError, OverflowError):
+            raise YardagePairRefusal("PIT_CAPTURE_TIME_REQUIRED") from None
+    elif isinstance(value, datetime):
+        parsed = value
+    else:
         raise YardagePairRefusal("PIT_CAPTURE_TIME_REQUIRED")
-    return value.astimezone(timezone.utc)
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise YardagePairRefusal("PIT_CAPTURE_TIME_REQUIRED")
+    return parsed.astimezone(timezone.utc)
 
 
 def bind_nfl_yardage_pair(quote: Mapping, *, as_of: datetime, max_age_seconds: int = 180) -> tuple[dict, dict]:
@@ -68,5 +80,5 @@ def bind_nfl_yardage_pair(quote: Mapping, *, as_of: datetime, max_age_seconds: i
     if age > max_age_seconds:
         raise YardagePairRefusal("STALE_QUOTE")
     common = dict(identity, sport="NFL", market="PLAYER_" + market, book="DRAFTKINGS", line=float(line),
-                  quote_captured_at=captured.isoformat(), captured_at=captured.isoformat())
+                  quote_captured_at=(quote["captured_at"] if isinstance(quote["captured_at"], str)\n                                     else captured.isoformat()),\n                  captured_at=(quote["captured_at"] if isinstance(quote["captured_at"], str)\n                               else captured.isoformat()))
     return ({**common, "side": "OVER", "odds": over}, {**common, "side": "UNDER", "odds": under})
