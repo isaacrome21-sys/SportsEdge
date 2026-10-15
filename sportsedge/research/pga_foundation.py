@@ -207,6 +207,53 @@ def _after_cut_wd_verified(path, wd_pid, evidence):
             and 1 <= holes <= 17)
 
 
+def _int_ok(v):
+    return isinstance(v, int) and not isinstance(v, bool)
+
+
+def _both_wd_settle(path, player_id, opponent_id, evidence):
+    """Both golfers teed off and withdrew/DQ'd (owner ruling #2352, DK current
+    Golf Sport Rules): more completed rounds ranks higher; equal -> cumulative
+    score after the last fully completed round (partial rounds ignored); equal
+    -> ticket tie rule. Every fact must be present and match the path, else
+    SETTLEMENT_UNVERIFIED. Neither completing a full round is unresolved."""
+    def bad(why):
+        raise FoundationError("SETTLEMENT_UNVERIFIED", f"both WD: {why}")
+    if not isinstance(evidence, dict):
+        bad("no evidence")
+    src = evidence.get("rule_source")
+    if not (evidence.get("market_type") == "TOURNAMENT_72_H2H"
+            and evidence.get("both_teed_off") is True
+            and evidence.get("rule_confirmed") is True
+            and isinstance(src, str) and src.strip()):
+        bad("market/participation/rule not confirmed")
+    ws = evidence.get("withdrawals")
+    if not isinstance(ws, dict):
+        bad("withdrawals missing")
+    rank = {}
+    for pid in (player_id, opponent_id):
+        w = ws.get(pid)
+        if not isinstance(w, dict) or w.get("kind") not in _H2H_WD_KINDS:
+            bad(f"{pid} withdrawal record")
+        n, sc = w.get("completed_rounds"), w.get("score_after_last_completed")
+        rs = path.rounds[pid]
+        if not _int_ok(n) or n != len(rs) or w.get("round") != path.withdrawn.get(pid):
+            bad(f"{pid} completed rounds/WD round mismatch")
+        if n > 0 and (not _int_ok(sc) or sc != sum(rs)):
+            bad(f"{pid} score after last completed round mismatch")
+        rank[pid] = (n, sc)
+    (pn, ps), (on, os_) = rank[player_id], rank[opponent_id]
+    if pn == 0 and on == 0:
+        bad("neither completed a full round")
+    if pn != on:
+        return ("WIN", Fraction(1)) if pn > on else ("LOSE", Fraction(1))
+    if ps != os_:
+        return ("WIN", Fraction(1)) if ps < os_ else ("LOSE", Fraction(1))
+    if evidence.get("tie_rule") == "PUSH":
+        return ("PUSH", Fraction(1))
+    bad("equal score and no confirmed ticket tie rule")
+
+
 def settle(path: TournamentPath, market: str, *, player_id=None, opponent_id=None, n=None,
            evidence=None):
     """Returns (result, stake_fraction) with result in WIN/LOSE/PUSH/VOID.
@@ -246,7 +293,7 @@ def settle(path: TournamentPath, market: str, *, player_id=None, opponent_id=Non
         after_cut = [q for q in (player_id, opponent_id)
                      if q in path.withdrawn and q in path.made_cut]
         if pw and ow:
-            raise FoundationError("SETTLEMENT_UNVERIFIED", "both golfers withdrew")
+            return _both_wd_settle(path, player_id, opponent_id, evidence)
         if after_cut:
             wq = after_cut[0]
             if not _after_cut_wd_verified(path, wq, evidence):
