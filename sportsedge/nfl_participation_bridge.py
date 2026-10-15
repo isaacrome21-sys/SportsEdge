@@ -329,6 +329,9 @@ def _inactive_scan(inactive_rows, inactive_snapshots, *, game_id, team_id,
             continue
         valid.setdefault(published_at, set()).add(tuple(sorted(validated)))
     if valid and callable(trusted_issuer_verifier):
+        # Only the latest eligible publication may prove an absence.
+        # An older signed list cannot override a later revised list.
+        latest_published = max(valid)
         # The trusted ingestion boundary supplies receipts independently of
         # the archive payload. A payload's own completeness flags are inert.
         for raw in inactive_snapshots:
@@ -338,7 +341,7 @@ def _inactive_scan(inactive_rows, inactive_snapshots, *, game_id, team_id,
                 pub = _utc(raw.get("published_at"), "inactive published_at")
             except NFLParticipationError:
                 continue
-            if pub not in valid or str(raw.get("game_id") or "") != str(game_id):
+            if pub != latest_published or str(raw.get("game_id") or "") != str(game_id):
                 continue
             if _team(raw.get("team")) != team_id:
                 continue
