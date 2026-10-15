@@ -21,10 +21,38 @@ MIN_REFERENCE_BOOKS = 2
 MIN_ADVANTAGE_PP = 0.02
 MAX_REFERENCE_DISAGREEMENT = 0.12
 TARGET_BOOKS = {"draftkings", "dk", "draft kings"}
-EXCLUDED_ILLINOIS_TEAMS = (
-    "illinois", "northwestern", "northern illinois", "western illinois",
-    "eastern illinois", "southern illinois", "illinois state",
-)
+
+
+def _norm(value):
+    # Same normalization as artifacts.free_models.PublicContext.key.
+    return " ".join("".join(c.lower() if c.isalnum() else " "
+                            for c in str(value or "")).split())
+
+
+_FORMS_CACHE = None
+
+
+def _illinois_forms():
+    """Name forms of the frozen Illinois-college registry (PR #2148).
+
+    Derived from artifacts/free_models -- IL_COLLEGE_NAMES plus the
+    normalized display labels of IL_COLLEGE_ESPN_IDS -- never re-listed
+    here, so this script cannot drift from the single registry. The
+    hand-maintained tuple this replaced missed Chicago State (ESPN id
+    2130) and every non-football registry school (issue #2151).
+    """
+    global _FORMS_CACHE
+    if _FORMS_CACHE is None:
+        import sys
+        from pathlib import Path
+        root = str(Path(__file__).resolve().parents[1])
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        from artifacts.free_models import IL_COLLEGE_ESPN_IDS, IL_COLLEGE_NAMES
+        forms = set(IL_COLLEGE_NAMES)
+        forms.update(_norm(name) for name in IL_COLLEGE_ESPN_IDS.values())
+        _FORMS_CACHE = frozenset(forms)
+    return _FORMS_CACHE
 OPPOSITES = {"MONEYLINE": {"HOME", "AWAY"},
              "SPREAD": {"HOME", "AWAY"},
              "TOTAL": {"OVER", "UNDER"}}
@@ -91,8 +119,17 @@ def _contract(q):
 
 def _illinois(matchup):
     import re
-    name = str(matchup or "").lower()
-    return any(re.search(r"\b" + re.escape(t) + r"\b", name) for t in EXCLUDED_ILLINOIS_TEAMS)
+    name = _norm(matchup)
+    if not name:
+        return False
+    for form in _illinois_forms():
+        pattern = r"\b" + re.escape(form) + r"\b"
+        if form == "northwestern":
+            # Northwestern (IL) must not swallow Northwestern State (LA).
+            pattern += r"(?!\s+state\b)"
+        if re.search(pattern, name):
+            return True
+    return False
 
 
 def _book_pairs(book):

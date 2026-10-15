@@ -23,17 +23,42 @@ MIN_LOCKED_RETURN = 0.005  # 0.5% theoretical return at unchanged two-sided pric
 PRICE_CAP = -165
 
 # User's Illinois collegiate sports restriction. Exclude any listed participant.
-IL_SCHOOLS = {
-    "illinois","northern illinois","eastern illinois","western illinois",
-    "southern illinois","illinois state","northwestern","chicago state",
-    "uic","loyola chicago","loyola (il)","depaul","bradley",
-    "siu edwardsville","illinois chicago","roosevelt",
-}
+# IL_SCHOOLS is built below _normalize_team from the frozen canonical
+# registry (PR #2148); see _canonical_illinois_schools.
 
 
 def _normalize_team(name):
     clean=re.sub(r"[^a-z0-9 ]", " ",str(name or "").lower())
     return " ".join(clean.split())
+
+
+def _canonical_illinois_schools():
+    """Name forms of the frozen Illinois-college registry (PR #2148).
+
+    Derived from artifacts/free_models -- IL_COLLEGE_NAMES plus the
+    normalized display labels of IL_COLLEGE_ESPN_IDS -- never re-listed
+    here, so this script cannot drift from the single registry. The
+    hand-maintained set this replaced already covered all 13 schools'
+    display forms but missed Chicago State's attested short form
+    "Chicago St" (issue #2151 re-check). Two former entries are retained
+    as extras beyond the registry: "roosevelt" (Roosevelt University,
+    Chicago IL) and "loyola il" (the former "loyola (il)" entry,
+    normalized -- as written it could never match a normalized name).
+    """
+    import sys
+    from pathlib import Path
+    root = str(Path(__file__).resolve().parents[1])
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from artifacts.free_models import IL_COLLEGE_ESPN_IDS, IL_COLLEGE_NAMES
+    forms = {_normalize_team(name) for name in IL_COLLEGE_NAMES}
+    forms.update(_normalize_team(name)
+                 for name in IL_COLLEGE_ESPN_IDS.values())
+    forms.update({"roosevelt", "loyola il"})
+    return frozenset(forms)
+
+
+IL_SCHOOLS = _canonical_illinois_schools()
 
 
 def excluded_illinois(away,home):
@@ -44,7 +69,9 @@ def excluded_illinois(away,home):
         if "illinois" in school or school in IL_SCHOOLS:
             return True
         if any(school.startswith(prefix + " ") for prefix in IL_SCHOOLS
-               if not (prefix == "northwestern" and school.startswith("northwestern state "))):
+               if not (prefix == "northwestern" and (
+                   school == "northwestern state"
+                   or school.startswith("northwestern state ")))):
             return True
     return False
 
