@@ -104,6 +104,8 @@ FIRST_REC_SHRINK = 10.0   # pseudo-games of league first-reception dist
 MAX_OPPS = 40   # opportunity-count support; tail folded at 40
 Y_MIN = -20     # yardage grid floor; plays below fold to Y_MIN
 Y_MAX = 99      # yardage grid cap; plays above fold to Y_MAX
+YARDS_FIELD_MIN = -99  # a single play can never lose more than 99 yards
+YARDS_FIELD_MAX = 99   # nor gain more than 99 yards
 
 ROLES = ("PASSER", "RECEIVER", "RUSHER")
 ROLE_MARKET = {
@@ -217,6 +219,10 @@ def _yard(v: Any) -> int:
         raise NflLongestPlaysError(f"LONGEST_HISTORY_YARDS_INVALID:{v!r}")
     if not math.isfinite(v) or v != int(v):
         raise NflLongestPlaysError(f"LONGEST_HISTORY_YARDS_INVALID:{v!r}")
+    if not YARDS_FIELD_MIN <= v <= YARDS_FIELD_MAX:
+        # Physically impossible on a 100-yard field; refuse before any
+        # clamp/fold onto the grid could silently absorb it.
+        raise NflLongestPlaysError(f"LONGEST_HISTORY_YARDS_INVALID:{v!r}")
     return int(v)
 
 
@@ -279,6 +285,10 @@ def estimate_longest_plays(records: Iterable[Mapping[str, Any]], *,
         if rk is None:
             raise NflLongestPlaysError("LONGEST_HISTORY_KICKOFF_MISSING")
         if str(r.get("role") or "").strip().upper() != role:
+            if str(r.get("player_id") or "").strip() == pid:
+                raise NflLongestPlaysError(
+                    f"LONGEST_HISTORY_ROLE_MISMATCH:{pid}:"
+                    f"expected={role}:got={r.get('role')!r}")
             continue
         if getattr(rk, "tzinfo", None) is None:
             raise NflLongestPlaysError(
