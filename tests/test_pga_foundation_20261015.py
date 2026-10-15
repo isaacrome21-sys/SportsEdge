@@ -65,7 +65,7 @@ def test_matchup_rules():
     assert F.settle(p, "MATCHUP", player_id="A", opponent_id="C")[0] == "WIN"
     assert F.settle(p, "MATCHUP", player_id="C", opponent_id="A")[0] == "LOSE"
     wd = TournamentPath({"A": [70, 70, 70, 70], "W": [71], "X": [], "Z": [75, 75]},
-                        {"A"}, {"W": 1, "X": 0}, winner="A")
+                        {"A"}, {"W": 2, "X": 0}, winner="A")   # 1 completed round => WD in R2
     assert F.check_path(wd)
     assert F.settle(wd, "MATCHUP", player_id="A", opponent_id="W")[0] == "WIN"
     assert F.settle(wd, "MATCHUP", player_id="W", opponent_id="A")[0] == "LOSE"

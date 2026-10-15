@@ -10,11 +10,13 @@ from sportsedge.research import pga_foundation as F
 from sportsedge.research.pga_foundation import FoundationError, TournamentPath
 
 
-def _ev(pid="M", kind="WD", rnd=3, holes=9, **kw):
+def _ev(pid="M", kind="WD", rnd=3, holes=9, opp="C", **kw):
     e = {"market_type": "TOURNAMENT_72_H2H", "both_teed_off": True,
          "official_cut_confirmed": True,
          "withdrawal": {"player_id": pid, "kind": kind, "round": rnd, "holes_completed": holes},
-         "rule_confirmed": True, "rule_source": "DK house rules v15 golf H2H"}
+         "rule_confirmed": True, "rule_source": "DK_GOLF_SPORT_RULES_CURRENT",
+         "tournament_id": "PGA-SYN-2026-01", "player_ids": ["M", opp],
+         "market_instance_id": "MKT-1"}
     e.update(kw)
     return e
 
@@ -23,7 +25,8 @@ def _path(m_rounds=(70, 70), m_wd=3):
     # M made the cut then withdrew in round m_wd; C missed the cut; A won.
     return TournamentPath({"A": [68, 68, 68, 68], "M": list(m_rounds), "C": [80, 80],
                            "B": [70, 70, 70, 70]},
-                          {"A", "M", "B"}, {"M": m_wd}, winner="A")
+                          {"A", "M", "B"}, {"M": m_wd}, winner="A",
+                          tournament_id="PGA-SYN-2026-01")
 
 
 # --- check_path withdrawn-map validation ---------------------------------
@@ -87,7 +90,7 @@ def test_both_made_cut_one_wd_unverified_without_evidence_lose_with():
     with pytest.raises(FoundationError) as e:
         F.settle(p, "MATCHUP", player_id="M", opponent_id="B")
     assert e.value.code == "SETTLEMENT_UNVERIFIED"
-    assert F.settle(p, "MATCHUP", player_id="M", opponent_id="B", evidence=_ev())[0] == "LOSE"
+    assert F.settle(p, "MATCHUP", player_id="M", opponent_id="B", evidence=_ev(opp="B"))[0] == "LOSE"
 
 
 def test_both_missed_cut_and_no_tee_off():

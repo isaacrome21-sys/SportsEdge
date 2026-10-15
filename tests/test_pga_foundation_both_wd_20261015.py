@@ -11,7 +11,7 @@ from sportsedge.research.pga_foundation import FoundationError, TournamentPath
 def _path(p_rounds, p_wd, q_rounds, q_wd):
     return TournamentPath({"A": [68, 68, 68, 68], "P": list(p_rounds), "Q": list(q_rounds)},
                           {"A"} | ({"P"} if p_wd >= 3 else set()) | ({"Q"} if q_wd >= 3 else set()),
-                          {"P": p_wd, "Q": q_wd}, winner="A")
+                          {"P": p_wd, "Q": q_wd}, winner="A", tournament_id="PGA-SYN-2026-01")
 
 
 def _w(path, pid, kind="WD"):
@@ -22,7 +22,8 @@ def _w(path, pid, kind="WD"):
 
 def _ev(path, **kw):
     e = {"market_type": "TOURNAMENT_72_H2H", "both_teed_off": True, "rule_confirmed": True,
-         "rule_source": "DK Golf Sport Rules (current) - completed rounds / last full round",
+         "rule_source": "DK_GOLF_SPORT_RULES_CURRENT",
+         "tournament_id": "PGA-SYN-2026-01", "player_ids": ["P", "Q"], "market_instance_id": "MKT-1",
          "withdrawals": {"P": _w(path, "P"), "Q": _w(path, "Q")}}
     e.update(kw)
     return e
@@ -46,7 +47,7 @@ def test_both_complete_r1_wd_r2_lower_r1_score_wins():
 
 
 def test_more_completed_rounds_ranks_higher_even_with_worse_score():
-    p = _path([75, 75], 3 - 1, [66], 2)       # P completed R1+R2, Q only R1
+    p = _path([75, 75], 3, [66], 2)           # P completed R1+R2 (WD in R3), Q only R1
     assert _s(p) == "WIN" and _s(p, "Q", "P") == "LOSE"
 
 

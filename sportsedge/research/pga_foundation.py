@@ -69,9 +69,16 @@ class TournamentPath:
     made_cut: set
     withdrawn: dict = field(default_factory=dict)   # player_id -> round of WD (0 = pre-start)
     winner: str | None = None
+    # Strokes in an INCOMPLETE round at withdrawal (pid -> int). Recorded
+    # separately and never counted as a completed round or in any total.
+    partial_round: dict = field(default_factory=dict)
+    tournament_id: str | None = None
 
     def total(self, pid):
-        return sum(self.rounds[pid])
+        return sum(self.rounds[pid])          # completed rounds only
+
+    def completed_rounds(self, pid):
+        return len(self.rounds[pid])
 
     def positions(self):
         """Standard tied positions among made-cut finishers: pid -> (pos, n_tied)."""
@@ -145,8 +152,17 @@ def check_path(path: TournamentPath):
         # WD in R1/R2 cannot have made the cut; WD in R3/R4 must have made it.
         if (wd in (1, 2) and pid in path.made_cut) or (wd >= 3 and pid not in path.made_cut):
             raise FoundationError("PGA_WITHDRAWN_CUT_INCONSISTENT", f"{pid}:{wd}")
-        if wd > 0 and len(path.rounds[pid]) > wd:     # wd == 0 handled below
-            raise FoundationError("PGA_WITHDRAWN_ROUND_INVALID", f"{pid}: scores after WD")
+        # WD during round wd => at most wd-1 COMPLETED rounds (partial round
+        # strokes live in partial_round, never in rounds).
+        if wd > 0 and len(path.rounds[pid]) > wd - 1:     # wd == 0 handled below
+            raise FoundationError("PGA_WITHDRAWN_ROUND_INVALID", f"{pid}: completed rounds >= WD round")
+    if not isinstance(path.partial_round, dict):
+        raise FoundationError("PGA_PARTIAL_ROUND_INVALID", "partial_round map")
+    for pid, st in path.partial_round.items():
+        wd = path.withdrawn.get(pid)
+        if pid not in path.rounds or not isinstance(wd, int) or wd < 1 \
+                or isinstance(st, bool) or not isinstance(st, int) or st < 0:
+            raise FoundationError("PGA_PARTIAL_ROUND_INVALID", f"{pid}:{st!r}")
     for pid, rs in path.rounds.items():
         if not isinstance(rs, list) or len(rs) > 4:
             raise FoundationError("PGA_ROUND_COUNT_INVALID", pid)
@@ -181,14 +197,39 @@ def check_path(path: TournamentPath):
 
 _H2H_WD_KINDS = ("WD", "DQ")
 
+# Allowlisted settlement-rule sources (#2352 re-audit). Free text and
+# placeholders ("?", "TBD") are refused; jurisdiction/version still pending.
+RULE_SOURCE_REGISTRY = {
+    "DK_GOLF_SPORT_RULES_CURRENT":
+        "https://www.goldennugget.com/lake-charles/casino/draftkings-sportsbook-bar-grill/"
+        "draftkings-sportsbook-house-rules/ (Golf > General Golf Settlement Rules)",
+    "DK_GNLC_RETAIL_V15":
+        "https://lb.goldennugget.com/contentassets/9800d7ef44d6474dad6cd3e69d29dd99/"
+        "draftkings-gnlc-retail-house-rules-v15.pdf",
+}
 
-def _after_cut_wd_verified(path, wd_pid, evidence):
+
+def _evidence_bound(path, a, b, evidence):
+    """Evidence must name this tournament, exactly these two golfers, a market
+    instance, and an allowlisted rule source."""
+    if not isinstance(evidence, dict):
+        return False
+    tid, mid, pids = (evidence.get("tournament_id"), evidence.get("market_instance_id"),
+                      evidence.get("player_ids"))
+    return (isinstance(path.tournament_id, str) and bool(path.tournament_id)
+            and tid == path.tournament_id
+            and isinstance(mid, str) and bool(mid.strip())
+            and isinstance(pids, (list, tuple)) and len(pids) == 2 and set(pids) == {a, b}
+            and evidence.get("rule_source") in RULE_SOURCE_REGISTRY)
+
+
+def _after_cut_wd_verified(path, wd_pid, evidence, a=None, b=None):
     """True only when every fact the owner ruling (#2352, 2026-10-15) requires
     is present and confirmed: tournament-long H2H market, both teed off, the
     official cut, the exact withdrawal/DQ timing, and a confirmed rule. The rule
     itself is PENDING DraftKings confirmation; WD before teeing off in R3
     (0 holes completed) is never universalised."""
-    if not isinstance(evidence, dict):
+    if not _evidence_bound(path, a, b, evidence):
         return False
     w = evidence.get("withdrawal")
     if not isinstance(w, dict):
@@ -219,8 +260,8 @@ def _both_wd_settle(path, player_id, opponent_id, evidence):
     SETTLEMENT_UNVERIFIED. Neither completing a full round is unresolved."""
     def bad(why):
         raise FoundationError("SETTLEMENT_UNVERIFIED", f"both WD: {why}")
-    if not isinstance(evidence, dict):
-        bad("no evidence")
+    if not _evidence_bound(path, player_id, opponent_id, evidence):
+        bad("evidence not bound to tournament/players/market/allowlisted rule source")
     src = evidence.get("rule_source")
     if not (evidence.get("market_type") == "TOURNAMENT_72_H2H"
             and evidence.get("both_teed_off") is True
@@ -296,7 +337,7 @@ def settle(path: TournamentPath, market: str, *, player_id=None, opponent_id=Non
             return _both_wd_settle(path, player_id, opponent_id, evidence)
         if after_cut:
             wq = after_cut[0]
-            if not _after_cut_wd_verified(path, wq, evidence):
+            if not _after_cut_wd_verified(path, wq, evidence, player_id, opponent_id):
                 raise FoundationError("SETTLEMENT_UNVERIFIED", f"after-cut WD/DQ {wq}")
             other = opponent_id if wq == player_id else player_id
             wd_wins = other not in path.made_cut      # made cut beats missed cut
