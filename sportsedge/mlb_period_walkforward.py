@@ -51,6 +51,8 @@ def evaluate_period_walkforward(
         available = _instant(g["result_available_at"])
         if available <= _instant(g["start_time"]):
             raise ValueError("RESULT_AVAILABLE_BEFORE_START")
+    # Never score a target against a training pool that includes a result
+    # whose declared availability is after the target cutoff.
     scores = []
     for row in ordered:
         cutoff = _instant(row["start_time"])
