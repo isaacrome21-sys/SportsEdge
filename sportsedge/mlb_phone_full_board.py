@@ -36,8 +36,11 @@ RESEARCH_DISPLAY_STATUSES = frozenset({
 def _market(market: str, side: str) -> tuple[str, str]:
     key = str(market or "").upper().strip()
     side = str(side or "").upper().strip()
-    if key == "FIRST_INNING_RUNS":
+    if key in {"FIRST_INNING_RUNS", "INNING_1_RUNS", "RUNS_1ST_INNING",
+               "1ST_INNING_RUNS"}:
         # Over .5 = YRFI YES; Under .5 = NRFI YES, distinct market identities.
+        # The board-form spellings (INNING_1_RUNS et al.) are the same
+        # market in DraftKings "Runs - 1st Inning" dress.
         return ("YRFI", "YES") if side == "OVER" else ("NRFI", "YES") if side == "UNDER" else (key, side)
     return ALIASES.get(key, key), side
 
