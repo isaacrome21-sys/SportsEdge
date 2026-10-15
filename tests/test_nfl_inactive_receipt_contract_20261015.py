@@ -201,3 +201,17 @@ def test_completeness_refuses_coerced_or_noncanonical_player_ids():
         altered["player_ids"][-1] = bad
         assert _snapshot_player_ids(altered) is None
         assert verify(snap=altered, verifier=lambda *_: True) is False
+
+
+def test_same_instant_malformed_revision_blocks_complete_inference():
+    from sportsedge.nfl_participation_bridge import _inactive_scan
+    kickoff = datetime(2026, 10, 4, 17, 0, tzinfo=timezone.utc)
+    malformed = snapshot()
+    malformed["player_ids"] = ["inactive-a"]
+    out = _inactive_scan(
+        [], [snapshot(), malformed], game_id=GAME, team_id=TEAM,
+        candidate_id="active-qb", kickoff=kickoff, cutoff=CUTOFF,
+        trusted_receipts=[receipt()],
+        trusted_issuer_verifier=lambda *_: True,
+    )
+    assert out["complete_published"] is False
