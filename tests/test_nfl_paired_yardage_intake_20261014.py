@@ -8,7 +8,7 @@ NOW = datetime(2026, 10, 14, 18, 0, tzinfo=timezone.utc)
 
 def quote(**updates):
     q = dict(sport="NFL", market="RECEIVING_YARDS", book="DRAFTKINGS",
-             game_id="game-1", player_id="player-1", team="SEA", capture_id="capture-1",
+             game_id="game-1", player_id="player-1", team="SEA", capture_id="capture-1",\n             player_name="Example Player", away="Seattle Seahawks", home="Denver Broncos", kickoff="2026-10-15T00:00:00Z",
              line=94.5, over_odds=-112, under_odds=-112, captured_at=NOW)
     q.update(updates)
     return q
