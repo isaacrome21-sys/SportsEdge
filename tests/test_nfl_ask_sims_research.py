@@ -30,6 +30,12 @@ class AskSimsResearchTests(unittest.TestCase):
         self.assertFalse(row["eligible_as_bet"])
         self.assertEqual(row["quote_status"], "USER_SUPPLIED_UNVERIFIED")
 
+    def test_two_way_moneyline_tie_pushes(self):
+        row = self.ask("SEA wins", price_american=180)
+        self.assertEqual((row["win_count"], row["push_count"], row["loss_count"]), (2, 1, 1))
+        self.assertAlmostEqual(row["sample_conditional_win_probability"], 2 / 3)
+        self.assertAlmostEqual(row["estimated_roi_per_dollar"], (2 * 1.8 - 1) / 4)
+
     def test_total_and_team_total_integer_pushes(self):
         row = self.ask("total over 40", price_american=-110)
         self.assertEqual((row["win_count"], row["push_count"], row["loss_count"]), (1, 1, 2))
