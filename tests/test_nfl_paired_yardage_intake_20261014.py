@@ -67,3 +67,28 @@ def test_canonical_run_it_refuses_incomplete_pair_before_pricing():
             {"lines": [], "nfl_yardage_pairs": [quote(under_odds=None)]},
             now=NOW, as_of=NOW.isoformat(), auto_context=False,
         )
+
+
+def test_json_iso_capture_timestamp_preserved_and_routed():
+    """CLI JSON capture timestamps must be accepted without timestamp rewrite."""
+    from artifacts.run_it_full import run_full
+
+    raw = "2026-10-14T18:00:00Z"
+    pair = quote(captured_at=raw)
+    over, under = bind_nfl_yardage_pair(pair, as_of=NOW)
+    assert over["quote_captured_at"] == raw
+    assert under["quote_captured_at"] == raw
+    assert over["side"] == "OVER" and under["side"] == "UNDER"
+    card = run_full(
+        {"lines": [], "nfl_yardage_pairs": [pair]},
+        now=NOW, as_of=NOW.isoformat(), auto_context=False,
+    )
+    assert len(card["evaluated_rows"]) == 2
+    assert all(r.get("staking_authority") is not True for r in card["evaluated_rows"])
+
+
+def test_naive_json_capture_timestamp_refuses():
+    with pytest.raises(YardagePairRefusal, match="PIT_CAPTURE_TIME_REQUIRED"):
+        bind_nfl_yardage_pair(
+            quote(captured_at="2026-10-14T18:00:00"), as_of=NOW,
+        )
