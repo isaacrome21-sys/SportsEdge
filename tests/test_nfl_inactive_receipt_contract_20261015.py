@@ -192,3 +192,12 @@ def test_receipt_cannot_authenticate_different_snapshot_identity():
     issuer = lambda *_: True
     assert verify(snap=wrong_game, verifier=issuer) is False
     assert verify(snap=wrong_team, verifier=issuer) is False
+
+
+def test_completeness_refuses_coerced_or_noncanonical_player_ids():
+    from sportsedge.nfl_participation_bridge import _snapshot_player_ids
+    for bad in (None, 42, True, {"id": "inactive-g"}, " inactive-g ", ""):
+        altered = snapshot()
+        altered["player_ids"][-1] = bad
+        assert _snapshot_player_ids(altered) is None
+        assert verify(snap=altered, verifier=lambda *_: True) is False
