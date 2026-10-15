@@ -1,0 +1,1102 @@
+{
+  "item": "N1_N3_NFL_CALIBRATION",
+  "label": "RESEARCH_EVIDENCE_RETROSPECTIVE_CALIBRATION_NOT_VALIDATION",
+  "evidence_class": "RETROSPECTIVE CALIBRATION on 2018-2025 development data. Calibration legs only: the market legs are FORWARD_ONLY_BY_DESIGN (no historical paired NFL odds corpus under the paired contract; the corpus file's single-source line columns were NOT read). NOT a market verdict, NOT validation, NOT a promotion input.",
+  "contract_note": "Promotes nothing; no model, registry, or threshold change. Does not touch the G2 program (Attempt 2 unspent, owner's separate ruling). NFL rows keep their current labels, including WATCH_NFL_TOTAL_PRIOR_ONLY for totals whatever N3 shows.",
+  "spec_sha256": "9e005933cda2cabfbc673140ab5093f9395d5032e3965d1037caa90e65828d60",
+  "spec_sha256_verified_at_load": true,
+  "model_identity": {
+    "file": "artifacts/free_models.py",
+    "main_commit": "83e0c396a4761ea3de80583be5e61e8ca2e07f9a",
+    "blob": "253b0c6d91840c906941216be117f2acc1497a57",
+    "blob_verified_at_load": true,
+    "path": "calculate() Lane A via context_for + score_means + model_probability(NFL, ML/SPREAD/TOTAL)",
+    "priors_nfl": {
+      "base_pts_per_team": 22.0,
+      "total_sd": 13.5,
+      "margin_sd": 13.7,
+      "hfa": 1.5
+    },
+    "declared_neutralizations": {
+      "injury_points": 0.0,
+      "weather_total_adj": 0.0
+    }
+  },
+  "dataset": {
+    "file": "nfl_games.csv (local copy ~/workspace/tmp/bt_data/nfl_games.csv)",
+    "source": "nflverse/nfldata games.csv",
+    "sha256": "a484c6ae884d03b11ab14f9fb3ed9ee8ca7168f3a22550e74f566532c4c6b284",
+    "sha256_verified_at_load": true,
+    "in_repo": false,
+    "manifest": "mlb_market_legs_20261014/DATASET_MANIFEST_STAGE2.md",
+    "games_total_in_file": 7548,
+    "fields_used_only": [
+      "season",
+      "game_type",
+      "gameday",
+      "gametime",
+      "away_team",
+      "home_team",
+      "away_score",
+      "home_score"
+    ],
+    "fields_not_read": "spread_line, total_line, moneyline/odds columns present in the file were never accessed by this evaluator"
+  },
+  "population_reconciliation_by_season": {
+    "2018": {
+      "corpus_reg": 256,
+      "scored": 256,
+      "excluded_no_final_score": 0,
+      "paired_eligible": 226,
+      "paired_ineligible_lt30_prior": 30
+    },
+    "2019": {
+      "corpus_reg": 256,
+      "scored": 256,
+      "excluded_no_final_score": 0,
+      "paired_eligible": 226,
+      "paired_ineligible_lt30_prior": 30
+    },
+    "2020": {
+      "corpus_reg": 256,
+      "scored": 256,
+      "excluded_no_final_score": 0,
+      "paired_eligible": 226,
+      "paired_ineligible_lt30_prior": 30
+    },
+    "2021": {
+      "corpus_reg": 272,
+      "scored": 272,
+      "excluded_no_final_score": 0,
+      "paired_eligible": 242,
+      "paired_ineligible_lt30_prior": 30
+    },
+    "2022": {
+      "corpus_reg": 271,
+      "scored": 271,
+      "excluded_no_final_score": 0,
+      "paired_eligible": 241,
+      "paired_ineligible_lt30_prior": 30
+    },
+    "2023": {
+      "corpus_reg": 272,
+      "scored": 272,
+      "excluded_no_final_score": 0,
+      "paired_eligible": 242,
+      "paired_ineligible_lt30_prior": 30
+    },
+    "2024": {
+      "corpus_reg": 272,
+      "scored": 272,
+      "excluded_no_final_score": 0,
+      "paired_eligible": 242,
+      "paired_ineligible_lt30_prior": 30
+    },
+    "2025": {
+      "corpus_reg": 272,
+      "scored": 272,
+      "excluded_no_final_score": 0,
+      "paired_eligible": 242,
+      "paired_ineligible_lt30_prior": 30
+    }
+  },
+  "counts": {
+    "corpus_rows_total": 7548,
+    "scored": 2127,
+    "paired_ineligible_lt30_prior": 240,
+    "paired_eligible": 1887
+  },
+  "parity": {
+    "phase_a_first25_population_games": {
+      "games_attempted": 25,
+      "row_checks": 27,
+      "games_blocked_by_calculate_gate": 16,
+      "blocked": [
+        {
+          "date": "2018-09-06T20:20:00-04:00",
+          "away": "ATL",
+          "home": "PHI",
+          "market": "ML",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-06T20:20:00-04:00",
+          "away": "ATL",
+          "home": "PHI",
+          "market": "SPREAD",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-06T20:20:00-04:00",
+          "away": "ATL",
+          "home": "PHI",
+          "market": "TOTAL",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "BUF",
+          "home": "BAL",
+          "market": "ML",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "BUF",
+          "home": "BAL",
+          "market": "SPREAD",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "BUF",
+          "home": "BAL",
+          "market": "TOTAL",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "CIN",
+          "home": "IND",
+          "market": "ML",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "CIN",
+          "home": "IND",
+          "market": "SPREAD",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "CIN",
+          "home": "IND",
+          "market": "TOTAL",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "HOU",
+          "home": "NE",
+          "market": "ML",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "HOU",
+          "home": "NE",
+          "market": "SPREAD",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "HOU",
+          "home": "NE",
+          "market": "TOTAL",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "JAX",
+          "home": "NYG",
+          "market": "ML",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "JAX",
+          "home": "NYG",
+          "market": "SPREAD",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "JAX",
+          "home": "NYG",
+          "market": "TOTAL",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "PIT",
+          "home": "CLE",
+          "market": "ML",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "PIT",
+          "home": "CLE",
+          "market": "SPREAD",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "PIT",
+          "home": "CLE",
+          "market": "TOTAL",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "SF",
+          "home": "MIN",
+          "market": "ML",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "SF",
+          "home": "MIN",
+          "market": "SPREAD",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "SF",
+          "home": "MIN",
+          "market": "TOTAL",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "TB",
+          "home": "NO",
+          "market": "ML",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "TB",
+          "home": "NO",
+          "market": "SPREAD",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "TB",
+          "home": "NO",
+          "market": "TOTAL",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "TEN",
+          "home": "MIA",
+          "market": "ML",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "TEN",
+          "home": "MIA",
+          "market": "SPREAD",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T13:00:00-04:00",
+          "away": "TEN",
+          "home": "MIA",
+          "market": "TOTAL",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T16:05:00-04:00",
+          "away": "KC",
+          "home": "LAC",
+          "market": "ML",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T16:05:00-04:00",
+          "away": "KC",
+          "home": "LAC",
+          "market": "SPREAD",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T16:05:00-04:00",
+          "away": "KC",
+          "home": "LAC",
+          "market": "TOTAL",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T16:25:00-04:00",
+          "away": "DAL",
+          "home": "CAR",
+          "market": "ML",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T16:25:00-04:00",
+          "away": "DAL",
+          "home": "CAR",
+          "market": "SPREAD",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T16:25:00-04:00",
+          "away": "DAL",
+          "home": "CAR",
+          "market": "TOTAL",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T16:25:00-04:00",
+          "away": "SEA",
+          "home": "DEN",
+          "market": "ML",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T16:25:00-04:00",
+          "away": "SEA",
+          "home": "DEN",
+          "market": "SPREAD",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T16:25:00-04:00",
+          "away": "SEA",
+          "home": "DEN",
+          "market": "TOTAL",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T16:25:00-04:00",
+          "away": "WAS",
+          "home": "ARI",
+          "market": "ML",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T16:25:00-04:00",
+          "away": "WAS",
+          "home": "ARI",
+          "market": "SPREAD",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T16:25:00-04:00",
+          "away": "WAS",
+          "home": "ARI",
+          "market": "TOTAL",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T20:20:00-04:00",
+          "away": "CHI",
+          "home": "GB",
+          "market": "ML",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T20:20:00-04:00",
+          "away": "CHI",
+          "home": "GB",
+          "market": "SPREAD",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-09T20:20:00-04:00",
+          "away": "CHI",
+          "home": "GB",
+          "market": "TOTAL",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-10T19:10:00-04:00",
+          "away": "NYJ",
+          "home": "DET",
+          "market": "ML",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-10T19:10:00-04:00",
+          "away": "NYJ",
+          "home": "DET",
+          "market": "SPREAD",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-10T19:10:00-04:00",
+          "away": "NYJ",
+          "home": "DET",
+          "market": "TOTAL",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-10T22:20:00-04:00",
+          "away": "LA",
+          "home": "OAK",
+          "market": "ML",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-10T22:20:00-04:00",
+          "away": "LA",
+          "home": "OAK",
+          "market": "SPREAD",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        },
+        {
+          "date": "2018-09-10T22:20:00-04:00",
+          "away": "LA",
+          "home": "OAK",
+          "market": "TOTAL",
+          "status": "BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED",
+          "reason": "NFL_TWO_TEAM_HISTORY_AND_INJURY_RECEIPTS_REQUIRED:HOME_HISTORY_COUNT,AWAY_HISTORY_COUNT"
+        }
+      ],
+      "games_passed": 9,
+      "max_diff": 0.0
+    },
+    "phase_b_first25_lane_a_returning_games": {
+      "games_checked": 25,
+      "row_checks": 75,
+      "max_diff": 0.0,
+      "games_skipped_blocked": 16
+    },
+    "outcome": "PASSED_PROBABILITY_PARITY",
+    "discrepancy_note": "calculate() carries an NFL critical-context gate (HOME/AWAY_HISTORY_COUNT + injury receipts, BLOCKED_NFL_CRITICAL_CONTEXT_UNVERIFIED) that the direct context_for -> score_means -> model_probability construction lacks: it blocks week-1 games (0 prior same-season games) before pricing, while the direct construction scores them with the production 0.0 ratings \u2014 which is why the spec \u00a75 population includes week-1 fixtures. The gate changes availability, not probabilities: wherever calculate() returns a Lane A view, its probabilities equal the direct pipeline (max diff recorded above). Phase A records the gate's effect on the literal first 25 population games; Phase B is the 25-game probability parity \u00a76 asks for."
+  },
+  "parity_checks_passed": 75,
+  "items": {
+    "N1_moneyline": {
+      "metric": "Brier + log loss of model P(home win) vs B1 (expanding strictly-prior same-season margin climatology) implied P(home margin > 0); realized ties score y = 0, push mass excluded",
+      "gate": "BEATS_BASELINE iff pooled paired dBrier CI entirely < 0 AND dLogLoss CI entirely < 0",
+      "paired": {
+        "n": 1887,
+        "brier_model": 0.23934522495044305,
+        "brier_b1": 0.2501663501829719,
+        "logloss_model": 0.6715869616749193,
+        "logloss_b1": 0.6935218221451758,
+        "paired_brier_diff": {
+          "mean_diff": -0.010821125232528876,
+          "ci95_lo": -0.01325809615694326,
+          "ci95_hi": -0.008398427958766455,
+          "n_blocks": 130,
+          "resamples": 2000
+        },
+        "paired_logloss_diff": {
+          "mean_diff": -0.021934860470256584,
+          "ci95_lo": -0.026836639472418666,
+          "ci95_hi": -0.01702744801818217,
+          "n_blocks": 130,
+          "resamples": 2000
+        }
+      },
+      "by_season": {
+        "2018": {
+          "n": 226,
+          "brier_model": 0.2330267324690505,
+          "brier_b1": 0.24199385655279862,
+          "logloss_model": 0.6589221441917164,
+          "logloss_b1": 0.6772622213093789,
+          "paired_brier_diff": {
+            "mean_diff": -0.008967124083748116,
+            "ci95_lo": -0.016901385187279048,
+            "ci95_hi": -0.0012228128515876645,
+            "n_blocks": 16,
+            "resamples": 2000
+          },
+          "paired_logloss_diff": {
+            "mean_diff": -0.018340077117662522,
+            "ci95_lo": -0.03453664784562306,
+            "ci95_hi": -0.0026198575901145676,
+            "n_blocks": 16,
+            "resamples": 2000
+          }
+        },
+        "2019": {
+          "n": 226,
+          "brier_model": 0.23960677055309648,
+          "brier_b1": 0.2542268055530175,
+          "logloss_model": 0.6720478234741222,
+          "logloss_b1": 0.7016526111765258,
+          "paired_brier_diff": {
+            "mean_diff": -0.014620034999921015,
+            "ci95_lo": -0.02680158786018434,
+            "ci95_hi": -0.0018691286783168277,
+            "n_blocks": 16,
+            "resamples": 2000
+          },
+          "paired_logloss_diff": {
+            "mean_diff": -0.02960478770240356,
+            "ci95_lo": -0.054195385152155585,
+            "ci95_hi": -0.003938841431266938,
+            "n_blocks": 16,
+            "resamples": 2000
+          }
+        },
+        "2020": {
+          "n": 226,
+          "brier_model": 0.24236602398911122,
+          "brier_b1": 0.25245778027277216,
+          "logloss_model": 0.6777293609018709,
+          "logloss_b1": 0.698077096217825,
+          "paired_brier_diff": {
+            "mean_diff": -0.010091756283660968,
+            "ci95_lo": -0.01574886585298244,
+            "ci95_hi": -0.004347676241900127,
+            "n_blocks": 16,
+            "resamples": 2000
+          },
+          "paired_logloss_diff": {
+            "mean_diff": -0.020347735315954105,
+            "ci95_lo": -0.031734808267059295,
+            "ci95_hi": -0.00874846372951776,
+            "n_blocks": 16,
+            "resamples": 2000
+          }
+        },
+        "2021": {
+          "n": 242,
+          "brier_model": 0.2425257837056848,
+          "brier_b1": 0.2519087458978453,
+          "logloss_model": 0.6779953900107211,
+          "logloss_b1": 0.6969709805351268,
+          "paired_brier_diff": {
+            "mean_diff": -0.009382962192160496,
+            "ci95_lo": -0.01683736805450123,
+            "ci95_hi": -0.0030739421744610715,
+            "n_blocks": 17,
+            "resamples": 2000
+          },
+          "paired_logloss_diff": {
+            "mean_diff": -0.018975590524405818,
+            "ci95_lo": -0.03411040210483708,
+            "ci95_hi": -0.006258793223522749,
+            "n_blocks": 17,
+            "resamples": 2000
+          }
+        },
+        "2022": {
+          "n": 241,
+          "brier_model": 0.2404979828608516,
+          "brier_b1": 0.2485364954213592,
+          "logloss_model": 0.6739403133955304,
+          "logloss_b1": 0.6902295084633788,
+          "paired_brier_diff": {
+            "mean_diff": -0.00803851256050756,
+            "ci95_lo": -0.011540319861843623,
+            "ci95_hi": -0.004317762574740187,
+            "n_blocks": 16,
+            "resamples": 2000
+          },
+          "paired_logloss_diff": {
+            "mean_diff": -0.01628919506784851,
+            "ci95_lo": -0.023308154250477976,
+            "ci95_hi": -0.008736501092138926,
+            "n_blocks": 16,
+            "resamples": 2000
+          }
+        },
+        "2023": {
+          "n": 242,
+          "brier_model": 0.2394231905546555,
+          "brier_b1": 0.2500026705626724,
+          "logloss_model": 0.6717175797502264,
+          "logloss_b1": 0.6931988654386275,
+          "paired_brier_diff": {
+            "mean_diff": -0.010579480008016858,
+            "ci95_lo": -0.015437962787012257,
+            "ci95_hi": -0.006191510772516418,
+            "n_blocks": 16,
+            "resamples": 2000
+          },
+          "paired_logloss_diff": {
+            "mean_diff": -0.02148128568840107,
+            "ci95_lo": -0.03132123844850177,
+            "ci95_hi": -0.012595718914747346,
+            "n_blocks": 16,
+            "resamples": 2000
+          }
+        },
+        "2024": {
+          "n": 242,
+          "brier_model": 0.24091369067736962,
+          "brier_b1": 0.25091361126043027,
+          "logloss_model": 0.6747689329491966,
+          "logloss_b1": 0.6949826325119662,
+          "paired_brier_diff": {
+            "mean_diff": -0.009999920583060666,
+            "ci95_lo": -0.015600017171410158,
+            "ci95_hi": -0.0027420046384148663,
+            "n_blocks": 17,
+            "resamples": 2000
+          },
+          "paired_logloss_diff": {
+            "mean_diff": -0.020213699562769562,
+            "ci95_lo": -0.031590143934469454,
+            "ci95_hi": -0.005474192655444168,
+            "n_blocks": 17,
+            "resamples": 2000
+          }
+        },
+        "2025": {
+          "n": 242,
+          "brier_model": 0.23620565120888679,
+          "brier_b1": 0.25116373021772753,
+          "logloss_model": 0.6651831092565803,
+          "logloss_b1": 0.6955507899491118,
+          "paired_brier_diff": {
+            "mean_diff": -0.01495807900884076,
+            "ci95_lo": -0.017938935214718434,
+            "ci95_hi": -0.011808191560510932,
+            "n_blocks": 16,
+            "resamples": 2000
+          },
+          "paired_logloss_diff": {
+            "mean_diff": -0.030367680692531502,
+            "ci95_lo": -0.03629439637524339,
+            "ci95_hi": -0.02405602880341873,
+            "n_blocks": 16,
+            "resamples": 2000
+          }
+        }
+      },
+      "verdict": "BEATS_BASELINE"
+    },
+    "N2_spread": {
+      "metric": "Margin-distribution CRPS: Normal closed form (sd 13.7) for the model vs empirical CRPS for B1",
+      "gate": "BEATS_BASELINE iff pooled paired dCRPS CI entirely < 0",
+      "paired": {
+        "n": 1887,
+        "crps_m_model_mean": 7.838891347439681,
+        "crps_m_b1_mean": 8.043370181211337,
+        "paired_diff": {
+          "mean_diff": -0.20447883377165754,
+          "ci95_lo": -0.2612935035758427,
+          "ci95_hi": -0.14790083797480227,
+          "n_blocks": 130,
+          "resamples": 2000
+        }
+      },
+      "by_season": {
+        "2018": {
+          "n": 226,
+          "crps_m_model_mean": 7.824528775635832,
+          "crps_m_b1_mean": 8.065756337766109,
+          "paired_diff": {
+            "mean_diff": -0.24122756213027782,
+            "ci95_lo": -0.36894044902986367,
+            "ci95_hi": -0.11221323652324726,
+            "n_blocks": 16,
+            "resamples": 2000
+          }
+        },
+        "2019": {
+          "n": 226,
+          "crps_m_model_mean": 7.939978462190317,
+          "crps_m_b1_mean": 8.248674660188065,
+          "paired_diff": {
+            "mean_diff": -0.3086961979977487,
+            "ci95_lo": -0.5238335754794003,
+            "ci95_hi": -0.083771623953811,
+            "n_blocks": 16,
+            "resamples": 2000
+          }
+        },
+        "2020": {
+          "n": 226,
+          "crps_m_model_mean": 7.916285557258236,
+          "crps_m_b1_mean": 8.030317582542102,
+          "paired_diff": {
+            "mean_diff": -0.11403202528386532,
+            "ci95_lo": -0.26087719637988754,
+            "ci95_hi": 0.047535584589890545,
+            "n_blocks": 16,
+            "resamples": 2000
+          }
+        },
+        "2021": {
+          "n": 242,
+          "crps_m_model_mean": 8.47355465282695,
+          "crps_m_b1_mean": 8.771973290383889,
+          "paired_diff": {
+            "mean_diff": -0.2984186375569394,
+            "ci95_lo": -0.47350948468313736,
+            "ci95_hi": -0.12846529255583972,
+            "n_blocks": 17,
+            "resamples": 2000
+          }
+        },
+        "2022": {
+          "n": 241,
+          "crps_m_model_mean": 6.852574180438747,
+          "crps_m_b1_mean": 6.938534824190702,
+          "paired_diff": {
+            "mean_diff": -0.08596064375195565,
+            "ci95_lo": -0.22688526881298055,
+            "ci95_hi": 0.049695013817078214,
+            "n_blocks": 16,
+            "resamples": 2000
+          }
+        },
+        "2023": {
+          "n": 242,
+          "crps_m_model_mean": 7.965850012028783,
+          "crps_m_b1_mean": 8.086809710489087,
+          "paired_diff": {
+            "mean_diff": -0.12095969846030327,
+            "ci95_lo": -0.2639878935596991,
+            "ci95_hi": 0.045670052047464216,
+            "n_blocks": 16,
+            "resamples": 2000
+          }
+        },
+        "2024": {
+          "n": 242,
+          "crps_m_model_mean": 7.883113837868818,
+          "crps_m_b1_mean": 8.078992335048177,
+          "paired_diff": {
+            "mean_diff": -0.19587849717935943,
+            "ci95_lo": -0.29377065908545974,
+            "ci95_hi": -0.09283403376453778,
+            "n_blocks": 17,
+            "resamples": 2000
+          }
+        },
+        "2025": {
+          "n": 242,
+          "crps_m_model_mean": 7.862020437126144,
+          "crps_m_b1_mean": 8.135528218308918,
+          "paired_diff": {
+            "mean_diff": -0.2735077811827735,
+            "ci95_lo": -0.407960930610369,
+            "ci95_hi": -0.13014452303981947,
+            "n_blocks": 16,
+            "resamples": 2000
+          }
+        }
+      },
+      "verdict": "BEATS_BASELINE"
+    },
+    "N3_total": {
+      "metric": "Total-distribution CRPS: Normal closed form (sd 13.5) for the model vs empirical CRPS for B2 (total climatology)",
+      "gate": "BEATS_BASELINE iff pooled paired dCRPS CI entirely < 0",
+      "engine_caveat": {
+        "status": "WATCH_NFL_TOTAL_PRIOR_ONLY",
+        "reason": "NFL_ABSOLUTE_SCORING_RATE_MODEL_MISSING:22_PTS_PER_TEAM_PLUS_MARGIN_FORM_ONLY",
+        "note": "The total mean is a 22-points-per-team prior adjusted only by the margin-form rating split \u2014 there is no absolute scoring-rate model. This caveat rides on every N3 number in this record."
+      },
+      "paired": {
+        "n": 1887,
+        "crps_t_model_mean": 7.822484424396665,
+        "crps_t_b2_mean": 7.712624514456436,
+        "paired_diff": {
+          "mean_diff": 0.10985990994022918,
+          "ci95_lo": 0.028304438941461597,
+          "ci95_hi": 0.19867720105271836,
+          "n_blocks": 130,
+          "resamples": 2000
+        }
+      },
+      "by_season": {
+        "2018": {
+          "n": 226,
+          "crps_t_model_mean": 8.188052365342205,
+          "crps_t_b2_mean": 8.072253230419033,
+          "paired_diff": {
+            "mean_diff": 0.11579913492317168,
+            "ci95_lo": -0.11454924259481358,
+            "ci95_hi": 0.4056731175948792,
+            "n_blocks": 16,
+            "resamples": 2000
+          }
+        },
+        "2019": {
+          "n": 226,
+          "crps_t_model_mean": 7.926019899574908,
+          "crps_t_b2_mean": 7.809176439916458,
+          "paired_diff": {
+            "mean_diff": 0.1168434596584502,
+            "ci95_lo": -0.05665989149430589,
+            "ci95_hi": 0.3721670178631697,
+            "n_blocks": 16,
+            "resamples": 2000
+          }
+        },
+        "2020": {
+          "n": 226,
+          "crps_t_model_mean": 8.395666616848391,
+          "crps_t_b2_mean": 7.80776026558197,
+          "paired_diff": {
+            "mean_diff": 0.5879063512664229,
+            "ci95_lo": 0.1848446148013559,
+            "ci95_hi": 1.008621491796431,
+            "n_blocks": 16,
+            "resamples": 2000
+          }
+        },
+        "2021": {
+          "n": 242,
+          "crps_t_model_mean": 7.743795870723068,
+          "crps_t_b2_mean": 7.774174355860005,
+          "paired_diff": {
+            "mean_diff": -0.030378485136936827,
+            "ci95_lo": -0.20994014796090463,
+            "ci95_hi": 0.17706139047530023,
+            "n_blocks": 17,
+            "resamples": 2000
+          }
+        },
+        "2022": {
+          "n": 241,
+          "crps_t_model_mean": 7.6350013571220305,
+          "crps_t_b2_mean": 7.632236672124438,
+          "paired_diff": {
+            "mean_diff": 0.002764684997592487,
+            "ci95_lo": -0.10895873417551252,
+            "ci95_hi": 0.11905495965614084,
+            "n_blocks": 16,
+            "resamples": 2000
+          }
+        },
+        "2023": {
+          "n": 242,
+          "crps_t_model_mean": 7.665515040119416,
+          "crps_t_b2_mean": 7.611835333495359,
+          "paired_diff": {
+            "mean_diff": 0.0536797066240587,
+            "ci95_lo": -0.09510225897368775,
+            "ci95_hi": 0.26517975113772513,
+            "n_blocks": 16,
+            "resamples": 2000
+          }
+        },
+        "2024": {
+          "n": 242,
+          "crps_t_model_mean": 7.370683315922847,
+          "crps_t_b2_mean": 7.274927734012511,
+          "paired_diff": {
+            "mean_diff": 0.09575558191033536,
+            "ci95_lo": -0.068565723836344,
+            "ci95_hi": 0.27857777660265093,
+            "n_blocks": 17,
+            "resamples": 2000
+          }
+        },
+        "2025": {
+          "n": 242,
+          "crps_t_model_mean": 7.723277651297033,
+          "crps_t_b2_mean": 7.754750573656744,
+          "paired_diff": {
+            "mean_diff": -0.031472922359711074,
+            "ci95_lo": -0.17331953287094795,
+            "ci95_hi": 0.14034987930346138,
+            "n_blocks": 16,
+            "resamples": 2000
+          }
+        }
+      },
+      "verdict": "DOES_NOT_BEAT_BASELINE"
+    }
+  },
+  "verdicts": {
+    "N1": "BEATS_BASELINE",
+    "N2": "BEATS_BASELINE",
+    "N3": "DOES_NOT_BEAT_BASELINE"
+  },
+  "descriptive": {
+    "subset": "identical paired-eligible subset (\u226530 prior same-season games) for all three items",
+    "p_home_win_calibration_deciles": [
+      {
+        "bin": "0.0-0.1",
+        "n": 0,
+        "mean_pred": null,
+        "observed": null
+      },
+      {
+        "bin": "0.1-0.2",
+        "n": 0,
+        "mean_pred": null,
+        "observed": null
+      },
+      {
+        "bin": "0.2-0.3",
+        "n": 0,
+        "mean_pred": null,
+        "observed": null
+      },
+      {
+        "bin": "0.3-0.4",
+        "n": 1,
+        "mean_pred": 0.39130767145886314,
+        "observed": 1.0
+      },
+      {
+        "bin": "0.4-0.5",
+        "n": 261,
+        "mean_pred": 0.48058106121559846,
+        "observed": 0.3448275862068966
+      },
+      {
+        "bin": "0.5-0.6",
+        "n": 1493,
+        "mean_pred": 0.546825937199058,
+        "observed": 0.5545880776959142
+      },
+      {
+        "bin": "0.6-0.7",
+        "n": 132,
+        "mean_pred": 0.6191430951183967,
+        "observed": 0.803030303030303
+      },
+      {
+        "bin": "0.7-0.8",
+        "n": 0,
+        "mean_pred": null,
+        "observed": null
+      },
+      {
+        "bin": "0.8-0.9",
+        "n": 0,
+        "mean_pred": null,
+        "observed": null
+      },
+      {
+        "bin": "0.9-1.0",
+        "n": 0,
+        "mean_pred": null,
+        "observed": null
+      }
+    ],
+    "cover_brier_fixed_half_line_grid": [
+      {
+        "home_line": -7.5,
+        "n": 1887,
+        "brier_model": 0.20366716192979278,
+        "brier_b1": 0.2135641095142724,
+        "brier_diff_model_minus_b1": -0.009896947584479615
+      },
+      {
+        "home_line": -3.5,
+        "n": 1887,
+        "brier_model": 0.23381394187632615,
+        "brier_b1": 0.24550378078892993,
+        "brier_diff_model_minus_b1": -0.011689838912603763
+      },
+      {
+        "home_line": -2.5,
+        "n": 1887,
+        "brier_model": 0.24154247619914895,
+        "brier_b1": 0.2526259698055155,
+        "brier_diff_model_minus_b1": -0.011083493606366526
+      },
+      {
+        "home_line": -1.5,
+        "n": 1887,
+        "brier_model": 0.24141240725116034,
+        "brier_b1": 0.252308816926982,
+        "brier_diff_model_minus_b1": -0.01089640967582161
+      },
+      {
+        "home_line": -0.5,
+        "n": 1887,
+        "brier_model": 0.23954153441710682,
+        "brier_b1": 0.2501663501829723,
+        "brier_diff_model_minus_b1": -0.010624815765865454
+      },
+      {
+        "home_line": 0.5,
+        "n": 1887,
+        "brier_model": 0.23938204658645656,
+        "brier_b1": 0.24991865679866415,
+        "brier_diff_model_minus_b1": -0.010536610212207573
+      },
+      {
+        "home_line": 1.5,
+        "n": 1887,
+        "brier_model": 0.2370556669729633,
+        "brier_b1": 0.24674059451326102,
+        "brier_diff_model_minus_b1": -0.00968492754029772
+      },
+      {
+        "home_line": 2.5,
+        "n": 1887,
+        "brier_model": 0.23447464768191312,
+        "brier_b1": 0.24329340243239936,
+        "brier_diff_model_minus_b1": -0.00881875475048626
+      },
+      {
+        "home_line": 3.5,
+        "n": 1887,
+        "brier_model": 0.2186827893166626,
+        "brier_b1": 0.22678161018011453,
+        "brier_diff_model_minus_b1": -0.008098820863451936
+      },
+      {
+        "home_line": 7.5,
+        "n": 1887,
+        "brier_model": 0.1675555712071681,
+        "brier_b1": 0.1718119586478636,
+        "brier_diff_model_minus_b1": -0.004256387440695502
+      }
+    ],
+    "cover_grid_note": "Fixed grid declared in spec \u00a75; no market lines used. Event: home margin + line > 0.",
+    "model_only_all_scored": {
+      "n": 2127,
+      "n1_brier_model": 0.2403685952475292,
+      "n1_logloss_model": 0.673662375154733,
+      "n2_crps_margin_model": 7.798186447478577,
+      "n3_crps_total_model": 7.8111968106516505
+    }
+  },
+  "bootstrap": {
+    "blocks": "ISO calendar weeks",
+    "resamples": 2000,
+    "seed": 20261015
+  },
+  "generated_at": "2026-10-15T10:09:30.765921+00:00"
+}
