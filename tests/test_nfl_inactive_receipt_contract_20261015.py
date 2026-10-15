@@ -21,14 +21,14 @@ CUTOFF = datetime(2026, 10, 4, 16, 0, tzinfo=timezone.utc)
 def snapshot():
     return {
         "game_id": GAME, "team": TEAM, "published_at": PUBLISHED,
-        "player_ids": ["inactive-a", "inactive-b"],
+        "player_ids": ["inactive-a", "inactive-b", "inactive-c", "inactive-d", "inactive-e", "inactive-f", "inactive-g"],
     }
 
 
 def receipt():
     return {
         "game_id": GAME, "team": TEAM, "published_at": PUBLISHED,
-        "player_ids": ["inactive-a", "inactive-b"],
+        "player_ids": ["inactive-a", "inactive-b", "inactive-c", "inactive-d", "inactive-e", "inactive-f", "inactive-g"],
         "source_complete": True,
     }
 
@@ -116,7 +116,7 @@ def test_conflicting_same_instant_lists_never_confirm():
     from sportsedge.nfl_participation_bridge import _inactive_scan
     kickoff = datetime(2026, 10, 4, 17, 0, tzinfo=timezone.utc)
     conflict = snapshot()
-    conflict["player_ids"] = ["inactive-a", "inactive-c"]
+    conflict["player_ids"] = ["inactive-a", "inactive-b", "inactive-c", "inactive-d", "inactive-e", "inactive-f", "inactive-h"]
     out = _inactive_scan(
         [], [snapshot(), conflict], game_id=GAME, team_id=TEAM,
         candidate_id="active-qb", kickoff=kickoff, cutoff=CUTOFF,
