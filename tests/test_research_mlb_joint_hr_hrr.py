@@ -113,3 +113,40 @@ def test_starter_pitcher_is_not_a_hitter(paths):
     with pytest.raises(ValueError, match="HRR_PLAYER_NOT_IN_LINEUP"):
         read_joint_hr_hrr(result, game=game, seed=SEED,
                           player_id=game.away.starter_player_id, hrr_line=1.5)
+
+
+# --- t190 adversarial identity battery (owner review 6202306084) -----------
+
+def _starter_row(snap, game):
+    return next(p for p in snap["players"] if p["player_id"] == game.away.starter_player_id)
+
+
+def _foreign_row(snap, game):
+    row = deepcopy(_first_hitter(snap, game))
+    row["player_id"] = "foreign-player-999"
+    return row
+
+
+@pytest.mark.parametrize("mutation,code", [
+    (lambda s, g: s["players"].append(_foreign_row(s, g)), "HRR_PLAYER_UNEXPECTED"),
+    (lambda s, g: s.update(rules_mode="POSTSEASON" if g.rules_mode == "REGULAR_SEASON"
+                           else "REGULAR_SEASON"), "HRR_RULES_MODE_MISMATCH"),
+    (lambda s, g: s.pop("rules_mode"), "HRR_RULES_MODE_MISMATCH"),
+    (lambda s, g: s["players"].append(deepcopy(_starter_row(s, g))), "HRR_PLAYER_DUPLICATE"),
+    (lambda s, g: s["players"].remove(_starter_row(s, g)), "HRR_PLAYER_SET_INVALID"),
+    (lambda s, g: _starter_row(s, g).update(team=g.home.team), "HRR_PLAYER_IDENTITY_MISMATCH"),
+    (lambda s, g: _starter_row(s, g).update(path_set_id="x"), "HRR_PLAYER_IDENTITY_MISMATCH"),
+    (lambda s, g: _starter_row(s, g)["samples"].pop(), "HRR_PLAYER_SAMPLES_MISSING"),
+    (lambda s, g: s["players"].append({"player_id": None}), "HRR_PLAYER_UNEXPECTED"),
+])
+def test_identity_refusals_t190(paths, mutation, code):
+    game, result = paths
+    bad = _mutate(result, lambda s: mutation(s, game))
+    with pytest.raises(ValueError, match=code):
+        read_joint_hr_hrr(bad, game=game, seed=SEED, player_id=_pid(game), hrr_line=1.5)
+
+
+def test_rules_mode_in_readout_t190(paths):
+    game, result = paths
+    r = read_joint_hr_hrr(result, game=game, seed=SEED, player_id=_pid(game), hrr_line=1.5)
+    assert r["rules_mode"] == game.rules_mode
