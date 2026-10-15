@@ -43,6 +43,10 @@ from sportsedge.mlb_period_quote_binding import (
     PERIOD_MARKET_ALIASES as PERIOD_INTAKE_ALIASES,
     normalize_period_market, phone_period_binding_rows)
 from sportsedge.period_distribution import PERIOD_MARKETS as PERIOD_CANONICAL_MARKETS
+from sportsedge.mlb_total_hits import (
+    TOTAL_HITS_MARKETS,
+    canonical_total_hits_market as resolve_total_hits_market,
+    normalize_total_hits_market_name, phone_total_hits_rows)
 from sportsedge.market_coverage import (
     COVERAGE_MARKETS,
     normalize_coverage_market,
@@ -550,6 +554,15 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         if line["sport"] == "MLB" and market in PERIOD_INTAKE_ALIASES:
             market = PERIOD_INTAKE_ALIASES[market]
             line["market"] = market
+        if line["sport"] == "MLB":
+            # Total Hits canonicalization is row-aware (a bare
+            # TOTAL_HITS row carrying team identity is the team
+            # market); see sportsedge.mlb_total_hits.
+            total_hits_market = resolve_total_hits_market(
+                dict(line, market=market))
+            if total_hits_market is not None:
+                market = total_hits_market
+                line["market"] = market
         raw_market = str(raw.get("market") or "").upper().strip()
         if line.get("milestone_ladder_refusal"):
             # Fail-closed milestone intake refusal: the row never reaches
@@ -563,6 +576,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             normalize_coverage_market(market),
             normalize_f5_market(market) if line["sport"] == "MLB" else None,
             normalize_period_market(market) if line["sport"] == "MLB" else None,
+            normalize_total_hits_market_name(market) if line["sport"] == "MLB" else None,
             _NFL_RULING_DERIVATIVE_TRANSLATION.get(market)
             if line["sport"] == "NFL" else None,
         ], line)
@@ -782,6 +796,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     batter_pos, batter_input = [], []
     f5_pos, f5_input = [], []
     period_pos, period_input = [], []
+    hits_pos, hits_input = [], []
     first_pos, first_input = [], []
     first_originals = {}  # local -> original market, for NRFI/YRFI translation
     nfl_pos, nfl_input = [], []
@@ -846,6 +861,9 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         elif line["sport"] == "MLB" and market in PERIOD_CANONICAL_MARKETS:
             period_pos.append(local)
             period_input.append(line)
+        elif line["sport"] == "MLB" and market in TOTAL_HITS_MARKETS:
+            hits_pos.append(local)
+            hits_input.append(line)
         elif line["sport"] == "MLB" and market in FIRST_INNING_PHONE_MARKETS:
             first_pos.append(local)
             first_input.append(line)
@@ -922,6 +940,14 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "research_only": True, "official_authority": False,
                 "model_p_authority": False, "staking_authority": False,
             } for line in period_input]
+    # Total Hits stage: first-class intake names with truthful
+    # NO_ENGINE terminal states (game distribution unconstructed;
+    # team candidate model harness-failed). The stage prices nothing
+    # by construction; see sportsedge.mlb_total_hits.
+    hits_results, hits_receipts = [], []
+    if hits_input:
+        hits_results, hits_receipts = phone_total_hits_rows(
+            hits_input, now=prop_clock)
     nfl_results, nfl_receipts = phone_nfl_player_rows(
         nfl_input, now=prop_clock, getter=getter if auto_context else (lambda url: None))
     cfb_results, cfb_receipts = phone_cfb_player_rows(
@@ -1010,6 +1036,8 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         raise ValueError("F5_RESULT_COUNT_MISMATCH")
     if len(period_results) != len(period_input):
         raise ValueError("PERIOD_RESULT_COUNT_MISMATCH")
+    if len(hits_results) != len(hits_input):
+        raise ValueError("TOTAL_HITS_RESULT_COUNT_MISMATCH")
     if len(pitcher_results) != len(pitcher_input):
         raise ValueError("PITCHER_RESULT_COUNT_MISMATCH")
     coverage_results, coverage_receipts = phone_coverage_rows(
@@ -1040,6 +1068,8 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     for local, result in zip(f5_pos, f5_results):
         modeled_props[local] = result
     for local, result in zip(period_pos, period_results):
+        modeled_props[local] = result
+    for local, result in zip(hits_pos, hits_results):
         modeled_props[local] = result
     for local, result in zip(deriv_pos, deriv_results):
         original = deriv_originals.get(local)
@@ -1144,6 +1174,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                               + first_receipts
                               + nfl_receipts + cfb_receipts
                               + coverage_receipts + f5_receipts + period_receipts
+                              + hits_receipts
                               + teamhalf_receipts
                               + deriv_receipts + td_receipts)
     card["prop_model_status"] = {
@@ -1152,6 +1183,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         "first_inning_engine":"MLB_FIRST_INNING_TEAM_RATES_POISSON_JEFFREYS",
         "mlb_f5_engine":"SHARED_F5_ENGINE_VIA_MLB_F5_QUOTE_BINDING_V1_DEPLOYMENT_GATED_F5_STATE_CANDIDATE",
         "mlb_period_engine":"SHARED_PERIOD_ENGINE_VIA_MLB_PERIOD_QUOTE_BINDING_V1_DEPLOYMENT_GATED_NOT_IN_DEPLOYMENT_REGISTRY",
+        "mlb_total_hits":"NO_ENGINE_GAME_TOTAL_HITS_DISTRIBUTION_UNCONSTRUCTED_TEAM_TOTAL_HITS_MODEL_HARNESS_FAIL",
         "coverage_engine":"FREE_COVERAGE_EXTENSION_MLB_3WAY_QUARTERS_MARGIN_UNVALIDATED",
         "f5_engine":"MLB_F5_EMPIRICAL_LINESCORE_UNVALIDATED",
         "nfl_player_engine":"ESPN_NAMED_HISTORICAL_GAMELOG_WATCH_ONLY",
