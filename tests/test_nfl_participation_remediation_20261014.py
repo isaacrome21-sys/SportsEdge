@@ -556,3 +556,28 @@ def test_b1_inline_complete_and_source_verified_flags_are_not_receipts():
     _assert_completeness_refusal(
         verdict, lambda v: require_confirmed_qb_role(
             v, depth_rows=depth_rows(), as_of=GAMEDAY))
+
+
+def test_receipt_verifier_refuses_untrusted_and_mismatched_identity():
+    from sportsedge.nfl_participation_bridge import (
+        _complete_inactive_snapshot_receipt as verify)
+    snap = _snapshot(["rb2", "chi-inactive-1", "chi-inactive-2",
+                      "chi-inactive-3", "chi-inactive-4"])
+    receipt = {"source_complete": True, "game_id": GAME_ID,
+               "team": "CHI", "published_at": snap["published_at"],
+               "player_ids": sorted(snap["player_ids"])}
+    args = {"game_id": GAME_ID, "team_id": "CHI",
+            "cutoff": GAMEDAY}
+    assert not verify(snap, receipt, **args)
+    assert not verify(snap, dict(receipt, game_id="wrong"),
+                      trusted_issuer_verifier=lambda *_: True, **args)
+    assert not verify(snap, dict(receipt, player_ids=["rb2"]),
+                      trusted_issuer_verifier=lambda *_: True, **args)
+    assert not verify(snap, dict(receipt, source_complete=False),
+                      trusted_issuer_verifier=lambda *_: True, **args)
+    assert not verify(snap, receipt,
+                      trusted_issuer_verifier=lambda *_: False, **args)
+    # Synthetic trusted-verifier positive control tests the contract only;
+    # production intake has no verifier wired and remains fail closed.
+    assert verify(snap, receipt,
+                  trusted_issuer_verifier=lambda *_: True, **args)
