@@ -230,3 +230,14 @@ def test_qb_and_skill_reject_unsafe_depth_age_limit(limit):
         with pytest.raises(NFLParticipationError,
                            match="NFL_PARTICIPATION_DEPTH_AGE_LIMIT_INVALID"):
             fn(**kwargs, **extra)
+
+
+def test_depth_age_limit_allows_tightening_and_default_cap():
+    from sportsedge.nfl_participation_bridge import assess_qb_participation
+    common = dict(team=TEAM, depth_rows=[], target_season=2026,
+                  target_week=4, kickoff="2026-10-04T17:00:00Z",
+                  as_of="2026-10-04T16:00:00Z")
+    for hours in (1.0, 24.0, 96.0):
+        verdict = assess_qb_participation(**common, max_depth_age_hours=hours)
+        assert verdict["state"] == "UNKNOWN"
+        assert verdict["max_depth_age_hours"] == hours
