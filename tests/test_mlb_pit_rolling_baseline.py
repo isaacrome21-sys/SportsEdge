@@ -38,7 +38,7 @@ def test_different_markets_do_not_pool():
     rows = [row(1), row(2, pred="2026-01-03T12:00:00Z",
                          event="2026-01-03T18:00:00Z", result="2026-01-03T22:00:00Z",
                          market_key="walk_1plus")]
-    result = evaluate(rows, train_cutoff=CUT, league_rate=.4)
+    result = evaluate(rows, train_cutoff=CUT, league_rate={"hit_1plus": .4, "walk_1plus": .2})
     assert result["mean_log_loss"]["trailing"] == pytest.approx(result["mean_log_loss"]["league"])
 
 
@@ -86,3 +86,21 @@ def test_pre_cutoff_forecast_refused():
 def test_invalid_hyperparameters_refused(rate,strength,window):
     with pytest.raises(ValueError):
         evaluate([row(1)], train_cutoff=CUT, league_rate=rate, strength=strength, window=window)
+
+
+def test_mixed_market_requires_distinct_frozen_priors():
+    rows = [row(1), row(2, pred="2026-01-03T12:00:00Z",
+                         event="2026-01-03T18:00:00Z",
+                         result="2026-01-03T22:00:00Z", market_key="walk_1plus")]
+    with pytest.raises(ValueError, match="MARKET_PRIOR_MAPPING_REQUIRED"):
+        evaluate(rows, train_cutoff=CUT, league_rate=.4)
+    with pytest.raises(ValueError, match="MISSING_MARKET_PRIOR"):
+        evaluate(rows, train_cutoff=CUT, league_rate={"hit_1plus": .4})
+
+
+def test_composite_identity_allows_same_game_different_market():
+    rows = [row(1), row(1, market_key="walk_1plus")]
+    result = evaluate(rows, train_cutoff=CUT,
+                      league_rate={"hit_1plus": .4, "walk_1plus": .2})
+    assert result["n"] == 2
+    assert not result["market_probability_verified"]
