@@ -26,6 +26,21 @@ from sportsedge.research.cbb_foundation import (EVENT_POINTS, OT_MIN, REG_PERIOD
                                                 REG_PERIODS, SPORT, FoundationError,
                                                 GamePath, TeamInput, _num, _ou)
 
+def illinois_guard(*identities) -> bool:
+    """Props-layer Illinois check, independent of the game layer having run:
+    re-imports the exclusion and is applied at every props boundary."""
+    from sportsedge.research.cbb_foundation import illinois_excluded
+    return illinois_excluded(*identities)
+
+
+def _guard_teams(*teams):
+    for t in teams:
+        ids = (t.team_id, getattr(t, "espn_id", None), getattr(t, "display_name", None)) \
+            if not isinstance(t, str) else (t,)
+        if illinois_guard(*ids):
+            raise FoundationError("ILLINOIS_COLLEGE_EXCLUDED", str(ids[0]))
+
+
 STATUS = "RESEARCH_ONLY"
 VALIDATION = "NO_VALIDATION"
 RATE_MIN = 40.0
@@ -133,6 +148,7 @@ def _pick(rng, weights: dict, exclude=()):
 
 def simulate_props(game: GamePath, home: TeamInput, away: TeamInput,
                    hp: TeamPropsInput, ap: TeamPropsInput, rng: random.Random) -> PropsPath:
+    _guard_teams(home, away, hp.team_id, ap.team_id, game.home_id, game.away_id)
     home.validate()
     away.validate()
     hp.validate(home)
@@ -282,6 +298,11 @@ def double_double(path: PropsPath, pid: str) -> bool:
 def settle_prop(path: PropsPath, market: str, *, player_id=None, team_id=None,
                 line=None, selection=None, n=None):
     """O/U for counting props; WIN/LOSE for DD; race: VOID if neither team reaches n."""
+    _guard_teams(*path.rosters, path.game.home_id, path.game.away_id,
+                 *(path.game.teams or ()))
+    for x in (team_id, selection):
+        if isinstance(x, str) and illinois_guard(x):
+            raise FoundationError("ILLINOIS_COLLEGE_EXCLUDED", x)
     check_props(path)
     if market == "RACE_TO_POINTS":
         if selection not in path.rosters:

@@ -63,8 +63,20 @@ IL_COLLEGE_ALIASES = frozenset({
     "university of illinois chicago", "university of illinois at chicago",
     "chicago st", "chicago st cougars", "chicago state univ", "chst",
 })
-# Any name containing one of these tokens is treated as Illinois (fail closed).
-_IL_TOKENS = ("illinois", "illini", "chicago")
+# Any name containing one of these whole tokens is Illinois (fail closed).
+# "ill" covers "Ill." / "(Ill.)" forms; the abbreviations are Illinois-only.
+_IL_TOKENS = frozenset({
+    "illinois", "illini", "ill", "chicago",
+    "uiuc", "niu", "siu", "siue", "eiu", "wiu", "uic", "luc", "ilst", "chst",
+    "depaul", "dep", "bradley", "brad", "salukis", "redbirds", "leathernecks",
+    "ramblers", "illinoisstate",
+})
+# Multi-word forms that need no Illinois token ("U of I", mascots, ...).
+_IL_PHRASES = frozenset({
+    "u of i", "northwestern", "northwestern wildcats", "northwestern university", "nwu",
+    "blue demons", "fighting illini",
+})
+_FILLER = frozenset({"university", "univ", "the", "of", "at", "college"})
 
 
 def _excluded_keys():
@@ -74,21 +86,55 @@ def _excluded_keys():
     return names, {str(k) for k in IL_COLLEGE_ESPN_IDS}
 
 
+def _strip(n):
+    return " ".join(t for t in n.split() if t not in _FILLER)
+
+
+def _canon_id(ident):
+    raw = str(ident).strip()
+    if raw.endswith(".0"):
+        raw = raw[:-2]
+    return raw.lstrip("0") if raw.isdigit() else raw
+
+
 def illinois_excluded(*identities) -> bool:
     """True when any team name or ESPN id is an Illinois college (fail closed)."""
     names, ids = _excluded_keys()
-    names = names | IL_COLLEGE_ALIASES
+    names = names | IL_COLLEGE_ALIASES | _IL_PHRASES
+    stripped = {_strip(x) for x in names} - {""}
     for ident in identities:
         if ident is None:
             continue
-        n = _norm(ident)
-        raw = str(ident).strip()
-        idn = raw[:-2] if raw.endswith(".0") else raw
-        if raw in ids or idn.lstrip("0") in ids or n in names:
+        if _canon_id(ident) in ids:
             return True
-        if any(tok in n.split() for tok in _IL_TOKENS):
+        n = _norm(ident)
+        if n in names or _strip(n) in stripped:
+            return True
+        toks = n.split()
+        if any(t in _IL_TOKENS for t in toks):
+            return True
+        if " ".join(toks[:1]) == "northwestern" and "state" not in toks:
             return True
     return False
+
+
+# ESPN-id registry for admission. artifacts.free_models carries only the frozen
+# ILLINOIS registry; no verified non-Illinois CBB id registry exists in the repo,
+# so every real (numeric) non-Illinois id is UNREGISTERED and fails closed until
+# one is frozen. Only explicitly synthetic research-fixture ids are admitted, each
+# bound to exactly one team_id (they cannot collide with numeric ESPN ids).
+CBB_ADMITTED_ESPN_IDS = {f"SYN-{k:04d}": tid for k, tid in
+                         ((1, "HOM"), (2, "AWY"), (3, "AWY2"), (4, "TEAM_X"))}
+
+
+def check_espn_id(team_id, espn_id):
+    if not isinstance(espn_id, str) or not espn_id.strip():
+        raise FoundationError("CBB_ESPN_ID_MISSING", str(team_id))
+    bound = CBB_ADMITTED_ESPN_IDS.get(espn_id.strip())
+    if bound is None:
+        raise FoundationError("CBB_ESPN_ID_UNREGISTERED", repr(espn_id))
+    if bound != team_id:
+        raise FoundationError("CBB_ESPN_ID_NAME_CONFLICT", f"{espn_id}->{bound}!={team_id}")
 
 
 class FoundationError(ValueError):
@@ -128,8 +174,7 @@ class TeamInput:
             raise FoundationError("ILLINOIS_COLLEGE_EXCLUDED", str(self.team_id))
         # Fail closed: without a verified ESPN id the exclusion cannot be
         # enforced on the frozen id registry, so the team is refused.
-        if not isinstance(self.espn_id, str) or not self.espn_id.strip():
-            raise FoundationError("CBB_ESPN_ID_MISSING", str(self.team_id))
+        check_espn_id(self.team_id, self.espn_id)
         if not isinstance(self.team_id, str) or not self.team_id.strip():
             raise FoundationError(f"{SPORT}_TEAM_ID_MISSING")
         if not self.players:
@@ -295,8 +340,7 @@ def settle(path: GamePath, market: str, *, selection=None, line=None,
     for t in teams:
         if illinois_excluded(t.team_id, t.espn_id, t.display_name):
             raise FoundationError("ILLINOIS_COLLEGE_EXCLUDED", str(t.team_id))
-        if not isinstance(t.espn_id, str) or not t.espn_id.strip():
-            raise FoundationError("CBB_ESPN_ID_MISSING", str(t.team_id))
+        check_espn_id(t.team_id, t.espn_id)
     check_path(path, *teams)
     rosters = {t.team_id: t.roster for t in teams}
     per = _segment(path, segment)
