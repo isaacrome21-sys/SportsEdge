@@ -135,6 +135,18 @@ def simulate_tournament(players, rng: random.Random, *, cut_top=65) -> Tournamen
 
 
 def check_path(path: TournamentPath):
+    if not isinstance(path.withdrawn, dict):
+        raise FoundationError("PGA_WITHDRAWN_ROUND_INVALID", "withdrawn map")
+    for pid, wd in path.withdrawn.items():
+        if pid not in path.rounds:
+            raise FoundationError("PGA_WITHDRAWN_UNKNOWN_PLAYER", str(pid))
+        if isinstance(wd, bool) or not isinstance(wd, int) or not 0 <= wd <= 4:
+            raise FoundationError("PGA_WITHDRAWN_ROUND_INVALID", f"{pid}:{wd!r}")
+        # WD in R1/R2 cannot have made the cut; WD in R3/R4 must have made it.
+        if (wd in (1, 2) and pid in path.made_cut) or (wd >= 3 and pid not in path.made_cut):
+            raise FoundationError("PGA_WITHDRAWN_CUT_INCONSISTENT", f"{pid}:{wd}")
+        if wd > 0 and len(path.rounds[pid]) > wd:     # wd == 0 handled below
+            raise FoundationError("PGA_WITHDRAWN_ROUND_INVALID", f"{pid}: scores after WD")
     for pid, rs in path.rounds.items():
         if not isinstance(rs, list) or len(rs) > 4:
             raise FoundationError("PGA_ROUND_COUNT_INVALID", pid)
@@ -167,8 +179,41 @@ def check_path(path: TournamentPath):
     return True
 
 
-def settle(path: TournamentPath, market: str, *, player_id=None, opponent_id=None, n=None):
-    """Returns (result, stake_fraction) with result in WIN/LOSE/PUSH/VOID."""
+_H2H_WD_KINDS = ("WD", "DQ")
+
+
+def _after_cut_wd_verified(path, wd_pid, evidence):
+    """True only when every fact the owner ruling (#2352, 2026-10-15) requires
+    is present and confirmed: tournament-long H2H market, both teed off, the
+    official cut, the exact withdrawal/DQ timing, and a confirmed rule. The rule
+    itself is PENDING DraftKings confirmation; WD before teeing off in R3
+    (0 holes completed) is never universalised."""
+    if not isinstance(evidence, dict):
+        return False
+    w = evidence.get("withdrawal")
+    if not isinstance(w, dict):
+        return False
+    holes = w.get("holes_completed")
+    src = evidence.get("rule_source")
+    return (evidence.get("market_type") == "TOURNAMENT_72_H2H"
+            and evidence.get("both_teed_off") is True
+            and evidence.get("official_cut_confirmed") is True
+            and evidence.get("rule_confirmed") is True
+            and isinstance(src, str) and bool(src.strip())
+            and w.get("player_id") == wd_pid
+            and w.get("kind") in _H2H_WD_KINDS
+            and w.get("round") == path.withdrawn.get(wd_pid)
+            and isinstance(holes, int) and not isinstance(holes, bool)
+            and 1 <= holes <= 17)
+
+
+def settle(path: TournamentPath, market: str, *, player_id=None, opponent_id=None, n=None,
+           evidence=None):
+    """Returns (result, stake_fraction) with result in WIN/LOSE/PUSH/VOID.
+
+    MATCHUP with a golfer who made the cut and then withdrew/was DQ'd raises
+    SETTLEMENT_UNVERIFIED unless ``evidence`` confirms every required fact
+    (see _after_cut_wd_verified); pending DraftKings confirmation."""
     check_path(path)
     if player_id not in path.rounds:
         raise FoundationError("PGA_PLAYER_IDENTITY_MISMATCH", str(player_id))
@@ -198,8 +243,17 @@ def settle(path: TournamentPath, market: str, *, player_id=None, opponent_id=Non
         if path.withdrawn.get(opponent_id) == 0:
             return ("VOID", Fraction(1))
         pw, ow = player_id in path.withdrawn, opponent_id in path.withdrawn
+        after_cut = [q for q in (player_id, opponent_id)
+                     if q in path.withdrawn and q in path.made_cut]
         if pw and ow:
-            return ("VOID", Fraction(1))
+            raise FoundationError("SETTLEMENT_UNVERIFIED", "both golfers withdrew")
+        if after_cut:
+            wq = after_cut[0]
+            if not _after_cut_wd_verified(path, wq, evidence):
+                raise FoundationError("SETTLEMENT_UNVERIFIED", f"after-cut WD/DQ {wq}")
+            other = opponent_id if wq == player_id else player_id
+            wd_wins = other not in path.made_cut      # made cut beats missed cut
+            return ("WIN", Fraction(1)) if wd_wins == (wq == player_id) else ("LOSE", Fraction(1))
         if pw or ow:
             return ("LOSE", Fraction(1)) if pw else ("WIN", Fraction(1))
         pc, oc = player_id in path.made_cut, opponent_id in path.made_cut
