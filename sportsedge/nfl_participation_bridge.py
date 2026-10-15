@@ -279,10 +279,17 @@ def _inactive_scan(inactive_rows, inactive_snapshots, *, game_id, team_id,
             continue
         valid.setdefault(published_at, set()).add(tuple(sorted(validated)))
     if valid:
-        latest = valid[max(valid)]
-        # Conflicting same-instant versions poison the snapshot: which
-        # list is official cannot be proven, so completeness fails.
-        result["complete_published"] = len(latest) == 1
+        # A list of any length can be truncated. Matching game/team,
+        # plausible publication time, and unique IDs prove only that
+        # these players were named inactive; they do NOT prove that
+        # every inactive was named. Even a sole latest snapshot or an
+        # inline 'complete' flag is untrusted negative evidence.
+        #
+        # Fail closed until a separately authenticated, content-bound
+        # source-completeness receipt is verified by the intake layer
+        # and plumbed through a dedicated trusted contract. Never infer
+        # CONFIRMED_* from snapshot absence alone.
+        result["complete_published"] = False
     return result
 
 
