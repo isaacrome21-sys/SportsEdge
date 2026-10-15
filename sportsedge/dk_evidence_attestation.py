@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 
 from sportsedge.dk_market_coverage_contract import REQUIRED_EVIDENCE
 
@@ -16,6 +17,21 @@ def _timestamp(value):
     if parsed.tzinfo is None:
         return None
     return parsed.astimezone(timezone.utc)
+
+
+def _safe_https_url(value):
+    if not isinstance(value, str) or value != value.strip():
+        return False
+    try:
+        parts = urlsplit(value)
+        host = parts.hostname
+        port = parts.port
+    except ValueError:
+        return False
+    return (parts.scheme == "https" and bool(host) and
+            parts.username is None and parts.password is None and
+            port in (None, 443) and not any(ch.isspace() or ord(ch) < 32 for ch in value) and
+            "\\\\" not in value and parts.fragment == "")
 
 
 def review_attestations(evidence: dict, *, cutoff: str) -> dict:
@@ -36,7 +52,7 @@ def review_attestations(evidence: dict, *, cutoff: str) -> dict:
         url = record.get("source_url")
         observed = _timestamp(record.get("observed_at"))
         published = _timestamp(record.get("published_at"))
-        if not isinstance(url, str) or not url.startswith("https://") or not url[8:]:
+        if not _safe_https_url(url):
             missing.append(field)
         elif observed is None or published is None or published > observed or observed > boundary:
             missing.append(field)
