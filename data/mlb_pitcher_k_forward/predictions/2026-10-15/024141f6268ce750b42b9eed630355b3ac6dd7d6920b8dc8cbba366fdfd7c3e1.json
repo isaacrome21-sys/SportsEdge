@@ -1,0 +1,47 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "candidate_p_over": 0.8311035654856307,
+  "candidate_p_push": 0.0,
+  "candidate_p_under": 0.16889643451436917,
+  "context_proof": {
+    "confirmed_lineup": "PRESENT",
+    "max_age_seconds": 1200,
+    "path": "runtime/mlb-context/runs/38814873122/2026-10-15/game_849810.json",
+    "plate_umpire": "PRESENT",
+    "retrieved_at": "2026-10-15T22:07:37.754311+00:00"
+  },
+  "entity_name": "Shane Drohan",
+  "evaluation_run_id": 37603403636,
+  "first_pitch_at_utc": "2026-10-16T00:00:00+00:00",
+  "fit_sha256": "70a31ff9b995a2d54df87feb2d51e2518fa9cd8593bf6c047970e08557b6ecea",
+  "game_pk": 849810,
+  "line": 2.5,
+  "market": "PITCHER_K",
+  "market_fair_p_over": 0.4620082487309644,
+  "observed_at_utc": "2026-10-15T22:23:45.804400+00:00",
+  "over_odds": 104,
+  "pitcher_id": 675660,
+  "pitcher_team_id": 158,
+  "predicted_k_per_batter_faced": 0.2134315549085361,
+  "projected_batters_faced": 21,
+  "provider_event_id": "34832090",
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-15/props_20261015T222347.452413Z.json",
+  "receipt_sha256": "024141f6268ce750b42b9eed630355b3ac6dd7d6920b8dc8cbba366fdfd7c3e1",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_PREDICTION_V1",
+  "statcast_proof": {
+    "head_sha": "d83e5a12f458c6ab4c5ba28bea09ee0a6a334513",
+    "manifest_path": "runtime/statcast/runs/38791837035/2026-10-15/manifest.json",
+    "pitcher_row_sha256": "058bdab82358e963d736c904a5a9367b20986b1ef03aedb9bf0949de0c55a068",
+    "pitchers_path": "runtime/statcast/runs/38791837035/2026-10-15/pitchers.json",
+    "provenance_path": "runtime/statcast/runs/38791837035/2026-10-15/provenance.json",
+    "retrieved_at": "2026-10-15T19:12:32.185039+00:00",
+    "run_id": "38791837035"
+  },
+  "status": "CAPTURED_PROSPECTIVE",
+  "under_odds": -133
+}

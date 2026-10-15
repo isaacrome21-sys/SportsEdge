@@ -1,0 +1,30 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "blocked_count": 1,
+  "blockers": [
+    {
+      "entity_name": "Nick Martinez",
+      "observed_at": "2026-10-15T22:23:46.965921+00:00",
+      "provider_event_id": "34839449",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    }
+  ],
+  "eligible_quote_units": 3,
+  "observed_at_utc": "2026-10-15T22:25:17.622207+00:00",
+  "predictions_created": 2,
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-15/props_20261015T222347.452413Z.json",
+  "run_attempt": "1",
+  "run_id": "38816860422",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_RUN_V1",
+  "selection_drops": {
+    "selected_units": 12
+  },
+  "settlements_created": 0,
+  "status": "OK",
+  "summary_sha256": "a16bc424bc6cdabf3461fa98ea25b87caa31561b64a678a9966839138e70735e"
+}
