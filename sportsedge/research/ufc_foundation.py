@@ -218,9 +218,9 @@ MARKET_TERMINALS = {
     "TOTAL_ROUNDS": ("RESEARCH_ONLY", _SIM),
     "GOES_THE_DISTANCE": ("RESEARCH_ONLY", _SIM),
     "DRAW_3WAY": ("NO_SETTLEMENT", "3-way draw market settlement not encoded"),
-    "SIGNIFICANT_STRIKES": ("NO_ENGINE", "no strike process"),
-    "TAKEDOWNS": ("NO_ENGINE", "no grappling process"),
-    "KNOCKDOWNS": ("NO_ENGINE", "no knockdown process"),
+    "SIGNIFICANT_STRIKES": ("RESEARCH_ONLY", _SIM + "; stats layer, exposure-scaled to the finish"),
+    "TAKEDOWNS": ("RESEARCH_ONLY", _SIM + "; stats layer, landed <= attempts"),
+    "KNOCKDOWNS": ("RESEARCH_ONLY", _SIM + "; stats layer, KD <= landed strikes"),
     "FIGHT_OF_THE_NIGHT": ("NOT_OFFERED", "award markets out of scope"),
 }
 for _m, (_t, _r) in MARKET_TERMINALS.items():
