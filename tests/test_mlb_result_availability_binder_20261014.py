@@ -124,3 +124,16 @@ def test_rejects_symlinked_snapshot(tmp_path):
     original.symlink_to(target)
     with pytest.raises(ValueError, match="MISSING_ATTESTATION_SOURCE_SNAPSHOT"):
         bind_result_availability(source, evidence, tmp_path / "bound.json")
+
+
+def test_rejects_symlinked_parent_directory(tmp_path):
+    source, evidence = _inputs(tmp_path)
+    directory = tmp_path / "real"
+    directory.mkdir()
+    (tmp_path / "snapshot.json").rename(directory / "snapshot.json")
+    (tmp_path / "alias").symlink_to(directory, target_is_directory=True)
+    data = json.loads(evidence.read_text())
+    data["results"][0]["source_path"] = "alias/snapshot.json"
+    evidence.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="MISSING_ATTESTATION_SOURCE_SNAPSHOT"):
+        bind_result_availability(source, evidence, tmp_path / "bound.json")
