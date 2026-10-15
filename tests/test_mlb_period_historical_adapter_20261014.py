@@ -33,6 +33,9 @@ def test_adapter_to_chronological_evaluator(tmp_path):
     assert report["forward_predictions"] == 4
     assert report["source_kind"] == "LOCAL_HISTORICAL_EXPORT"
     assert report["play_authorized"] is False
+    assert report["pit_evidence_verified"] is False
+    assert report["result_availability_authenticity_verified"] is False
+    assert report["market_evidence_paired"] is False
 
 
 def test_future_relative_to_observation_refused(tmp_path):
