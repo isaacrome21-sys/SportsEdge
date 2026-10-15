@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - run-it-requests
+      - run-it-request-20261015-evening
     paths:
       - ops/run_it_request.json
   pull_request:
