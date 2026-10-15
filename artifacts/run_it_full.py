@@ -420,7 +420,9 @@ def _as_of_instant(as_of):
 def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
              auto_context=True, min_ev=0.02, lane="A", allow_manual_context=False,
              td_cache_dir=None, td_opener=None, form2_bundles_dir=None,
-             form2_manifest_sha256=None, form2_manifest_bytes=None):
+             form2_manifest_sha256=None, form2_manifest_bytes=None,
+             nfl_participation_archive_root=None,
+             nfl_participation_manifest_sha256=None):
     """Separate real game, pitcher, and batter models, preserving original row order.
 
     Issues are UNTRUSTED odds intake: NEVER use submitted features,
@@ -1045,8 +1047,14 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     if hits_input:
         hits_results, hits_receipts = phone_total_hits_rows(
             hits_input, now=prop_clock)
+    # Inline participation is untrusted; an external archive pin is required.
     nfl_results, nfl_receipts = phone_nfl_player_rows(
-        nfl_input, now=prop_clock, getter=getter if auto_context else (lambda url: None))
+        nfl_input, now=prop_clock,
+        getter=getter if auto_context else (lambda url: None),
+        participation=payload.get("nfl_participation")
+        if isinstance(payload, dict) else None,
+        participation_archive_root=nfl_participation_archive_root,
+        participation_manifest_sha256=nfl_participation_manifest_sha256)
     cfb_results, cfb_receipts = phone_cfb_player_rows(
         cfb_input, now=prop_clock, getter=getter if auto_context else (lambda url: None))
     teamhalf_results, teamhalf_receipts = price_team_half_rows(
@@ -1420,6 +1428,10 @@ def main(argv=None):
                         "from an independent channel, not the archive root. "
                         "Repeat once per sealed per-team manifest to compose "
                         "without weakening the pin requirement")
+    p.add_argument("--nfl-participation-archive-root", type=Path,
+                   help="NFL participation archive root; requires an external pin")
+    p.add_argument("--nfl-participation-manifest-sha256",
+                   help="Independent SHA256 manifest pin, not inferred from payload")
     args = p.parse_args(argv)
     if not 0 <= args.min_ev <= 0.15:
         p.error("min-ev must be between 0 and 0.15")
@@ -1432,7 +1444,9 @@ def main(argv=None):
                         args.form2_manifest_sha256[0]
                         if args.form2_manifest_sha256
                         and len(args.form2_manifest_sha256) == 1
-                        else args.form2_manifest_sha256))
+                        else args.form2_manifest_sha256),
+                    nfl_participation_archive_root=args.nfl_participation_archive_root,
+                    nfl_participation_manifest_sha256=args.nfl_participation_manifest_sha256)
     rendered = json.dumps(card, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
