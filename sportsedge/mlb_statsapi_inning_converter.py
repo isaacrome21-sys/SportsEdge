@@ -5,7 +5,6 @@ and a source URL; a timestamped evidence manifest is mandatory.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Mapping, Sequence
 
 from sportsedge.mlb_period_counts_empirical import _instant
@@ -53,10 +52,16 @@ def convert_final_game_feed(feed: Mapping) -> dict:
     teams = live["linescore"].get("teams", {})
     htotal = teams.get("home", {}).get("runs")
     atotal = teams.get("away", {}).get("runs")
-    if (not isinstance(htotal, int) or isinstance(htotal, bool)
-            or not isinstance(atotal, int) or isinstance(atotal, bool)
+    if (not isinstance(htotal, int) or isinstance(htotal, bool) or htotal < 0
+            or not isinstance(atotal, int) or isinstance(atotal, bool) or atotal < 0
             or sum(runs) != htotal + atotal):
         raise ValueError("INNING_TOTAL_MISMATCH")
+    # Inning-level totals must also reconcile independently by side. A
+    # swapped home/away run can preserve combined totals and hide corruption.
+    away_sum = sum(inning["away"]["runs"] for inning in innings)
+    home_sum = sum((inning["home"]["runs"] or 0) for inning in innings)
+    if away_sum != atotal or home_sum != htotal:
+        raise ValueError("SIDE_INNING_TOTAL_MISMATCH")
     return {"game_id": str(game_id), "start_time": when, "inning_runs": runs}
 
 
