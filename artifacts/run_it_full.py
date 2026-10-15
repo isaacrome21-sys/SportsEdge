@@ -39,14 +39,6 @@ from sportsedge.registry_gate import (
 from sportsedge.mlb_f5_quote_binding import (
     F5_MARKET_ALIASES as F5_INTAKE_ALIASES, F5_MARKETS as F5_CANONICAL_MARKETS,
     phone_f5_binding_rows)
-from sportsedge.mlb_period_quote_binding import (
-    PERIOD_MARKET_ALIASES as PERIOD_INTAKE_ALIASES,
-    normalize_period_market, phone_period_binding_rows)
-from sportsedge.period_distribution import PERIOD_MARKETS as PERIOD_CANONICAL_MARKETS
-from sportsedge.mlb_total_hits import (
-    TOTAL_HITS_MARKETS,
-    canonical_total_hits_market as resolve_total_hits_market,
-    normalize_total_hits_market_name, phone_total_hits_rows)
 from sportsedge.market_coverage import (
     COVERAGE_MARKETS,
     normalize_coverage_market,
@@ -55,15 +47,6 @@ from sportsedge.market_coverage import (
 from sportsedge.mlb_phone_f5_pricing import normalize_f5_market, phone_f5_rows
 from sportsedge.f5_distribution import F5_MARKETS
 from datetime import datetime, timezone
-
-# DraftKings serves the 1st-inning runs market in board form — "Runs -
-# 1st Inning" OVER/UNDER lines (CATALOG_MLB.md: "Runs O/U (0.5/1.5
-# alts)"; the inspected-menu census carries it as INNING_1_RUNS, group
-# inning, period INNING_1). Those rows ARE the FIRST_INNING_RUNS market
-# the first-inning engine prices; intake binds them at routing (side
-# preserved, never derived) instead of letting them die unrouted.
-FIRST_INNING_BOARD_MARKETS = frozenset(
-    {"INNING_1_RUNS", "RUNS_1ST_INNING", "1ST_INNING_RUNS"})
 
 FIELDS = (
     "team_quality", "injuries", "rest_travel", "home_park", "weather",
@@ -416,7 +399,9 @@ def _as_of_instant(as_of):
 def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
              auto_context=True, min_ev=0.02, lane="A", allow_manual_context=False,
              td_cache_dir=None, td_opener=None, form2_bundles_dir=None,
-             form2_manifest_sha256=None, form2_manifest_bytes=None):
+             form2_manifest_sha256=None, form2_manifest_bytes=None,
+             nfl_participation_archive_root=None,
+             nfl_participation_manifest_sha256=None):
     """Separate real game, pitcher, and batter models, preserving original row order.
 
     Issues are UNTRUSTED odds intake: NEVER use submitted features,
@@ -440,12 +425,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     the settlement basis is checked from the settlement code, features
     assemble from strictly-prior StatsAPI linescores, and rows then block
     at the F5 deployment gate (stage F5_STATE_CANDIDATE, eligible=false)
-    with the specific F5_* reason named. MLB first-3 / first-7 period
-    markets (F3_*/F7_*) route to the sibling period quote-binding stage
-    (sportsedge.mlb_period_quote_binding) under the same discipline and
-    block at its deployment gate (PERIOD_DEPLOYMENT_NOT_ELIGIBLE; the
-    period markets are absent from the deployment registry, whose
-    lookup fails closed). Every other matrix market
+    with the specific F5_* reason named. Every other matrix market
     without a priced route resolves through sportsedge.canonical_coverage
     to a named taxonomy blocker.
 
@@ -560,18 +540,6 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         if line["sport"] == "MLB" and market in F5_INTAKE_ALIASES:
             market = F5_INTAKE_ALIASES[market]
             line["market"] = market
-        if line["sport"] == "MLB" and market in PERIOD_INTAKE_ALIASES:
-            market = PERIOD_INTAKE_ALIASES[market]
-            line["market"] = market
-        if line["sport"] == "MLB":
-            # Total Hits canonicalization is row-aware (a bare
-            # TOTAL_HITS row carrying team identity is the team
-            # market); see sportsedge.mlb_total_hits.
-            total_hits_market = resolve_total_hits_market(
-                dict(line, market=market))
-            if total_hits_market is not None:
-                market = total_hits_market
-                line["market"] = market
         raw_market = str(raw.get("market") or "").upper().strip()
         if line.get("milestone_ladder_refusal"):
             # Fail-closed milestone intake refusal: the row never reaches
@@ -584,8 +552,6 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             raw_market, market,
             normalize_coverage_market(market),
             normalize_f5_market(market) if line["sport"] == "MLB" else None,
-            normalize_period_market(market) if line["sport"] == "MLB" else None,
-            normalize_total_hits_market_name(market) if line["sport"] == "MLB" else None,
             _NFL_RULING_DERIVATIVE_TRANSLATION.get(market)
             if line["sport"] == "NFL" else None,
         ], line)
@@ -637,15 +603,6 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             # where the canonical F5 quote-binding lane owns them (quote
             # binding + settlement basis + deployment gate).
             line["market"] = f5_market
-        period_market = (normalize_period_market(market)
-                         if line["sport"] == "MLB" else None)
-        if period_market is not None:
-            # Same composition resolution for the first-3 / first-7
-            # period sets: canonicalize the name here; the rows fall
-            # through to prop routing, where the canonical period
-            # quote-binding lane owns them (quote binding + settlement
-            # basis + deployment gate).
-            line["market"] = period_market
         prop_indices.append(i)
         props.append(line)
 
@@ -804,8 +761,6 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     pitcher_pos, pitcher_input = [], []
     batter_pos, batter_input = [], []
     f5_pos, f5_input = [], []
-    period_pos, period_input = [], []
-    hits_pos, hits_input = [], []
     first_pos, first_input = [], []
     first_originals = {}  # local -> original market, for NRFI/YRFI translation
     nfl_pos, nfl_input = [], []
@@ -864,53 +819,9 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             first_pos.append(local)
             first_input.append(translated)
             first_originals[local] = market
-        elif line["sport"] == "MLB" and market in FIRST_INNING_BOARD_MARKETS:
-            # Board-form 1st-inning runs ("Runs - 1st Inning"): DK serves
-            # this market as OVER/UNDER lines rather than an NRFI/YRFI
-            # label. The row IS FIRST_INNING_RUNS: preserve its OVER/
-            # UNDER side (it selects the side of the binary — never
-            # derived, never overridden), default a missing line to the
-            # 0.5 binary line (DK's main board line; a stated 1.5
-            # alternate is refused by name by the engine as
-            # FIRST_INNING_RUNS_LINE_MUST_BE_0_5), and restore the board
-            # label on the result via first_originals. Malformed rows
-            # refuse at intake by name and never reach the engine.
-            side = str(line.get("side") or line.get("selection") or "").upper()
-            if not side:
-                others[local] = blocked(line, "INNING_1_RUNS_SIDE_REQUIRED")
-                continue
-            if side not in {"OVER", "UNDER"}:
-                others[local] = blocked(line, "INNING_1_RUNS_SIDE_INVALID")
-                continue
-            raw_line = line.get("line")
-            if raw_line not in (None, ""):
-                if isinstance(raw_line, bool):
-                    others[local] = blocked(
-                        line, "INNING_1_RUNS_LINE_INVALID")
-                    continue
-                try:
-                    float(raw_line)
-                except (TypeError, ValueError):
-                    others[local] = blocked(
-                        line, "INNING_1_RUNS_LINE_INVALID")
-                    continue
-            translated = dict(line)
-            translated["market"] = "FIRST_INNING_RUNS"
-            translated["side"] = side
-            if translated.get("line") in (None, ""):
-                translated["line"] = 0.5
-            first_pos.append(local)
-            first_input.append(translated)
-            first_originals[local] = market
         elif line["sport"] == "MLB" and market in F5_CANONICAL_MARKETS:
             f5_pos.append(local)
             f5_input.append(line)
-        elif line["sport"] == "MLB" and market in PERIOD_CANONICAL_MARKETS:
-            period_pos.append(local)
-            period_input.append(line)
-        elif line["sport"] == "MLB" and market in TOTAL_HITS_MARKETS:
-            hits_pos.append(local)
-            hits_input.append(line)
         elif line["sport"] == "MLB" and market in FIRST_INNING_PHONE_MARKETS:
             first_pos.append(local)
             first_input.append(line)
@@ -963,40 +874,15 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "research_only": True, "official_authority": False,
                 "model_p_authority": False, "staking_authority": False,
             } for line in f5_input]
-    # Period stage (first-3 / first-7 innings): the F5 stage's sibling --
-    # quote binding + settlement-basis gate + strictly-prior feature
-    # assembly, then the deployment gate (the period markets are absent
-    # from config/deployments.json, so the registry lookup fails closed).
-    period_results, period_receipts = [], []
-    if period_input:
-        try:
-            period_results, period_receipts = phone_period_binding_rows(
-                period_input, now=prop_clock,
-                getter=getter if auto_context else None,
-                fetch_enabled=auto_context)
-        except Exception as exc:
-            period_results = [{
-                "status": "NO_MODEL_OR_MARKET",
-                "reason": "NO_ENGINE: PERIOD_BINDING_RUNTIME_UNAVAILABLE — "
-                          f"{type(exc).__name__}: {exc}",
-                "blocker": "NO_ENGINE",
-                "blocker_detail": str(exc),
-                "period_reason": "PERIOD_BINDING_RUNTIME_UNAVAILABLE",
-                "coverage_market": line.get("market"),
-                "sport": "MLB", "market": line.get("market"),
-                "research_only": True, "official_authority": False,
-                "model_p_authority": False, "staking_authority": False,
-            } for line in period_input]
-    # Total Hits stage: first-class intake names with truthful
-    # NO_ENGINE terminal states (game distribution unconstructed;
-    # team candidate model harness-failed). The stage prices nothing
-    # by construction; see sportsedge.mlb_total_hits.
-    hits_results, hits_receipts = [], []
-    if hits_input:
-        hits_results, hits_receipts = phone_total_hits_rows(
-            hits_input, now=prop_clock)
+    # Inline intake claims remain unverified. Only an operator-supplied archive
+    # with an independently supplied manifest pin can establish availability.
     nfl_results, nfl_receipts = phone_nfl_player_rows(
-        nfl_input, now=prop_clock, getter=getter if auto_context else (lambda url: None))
+        nfl_input, now=prop_clock,
+        getter=getter if auto_context else (lambda url: None),
+        participation=payload.get("nfl_participation")
+        if isinstance(payload, dict) else None,
+        participation_archive_root=nfl_participation_archive_root,
+        participation_manifest_sha256=nfl_participation_manifest_sha256)
     cfb_results, cfb_receipts = phone_cfb_player_rows(
         cfb_input, now=prop_clock, getter=getter if auto_context else (lambda url: None))
     teamhalf_results, teamhalf_receipts = price_team_half_rows(
@@ -1081,10 +967,6 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         raise ValueError("FOOTBALL_RESULT_COUNT_MISMATCH")
     if len(f5_results) != len(f5_input):
         raise ValueError("F5_RESULT_COUNT_MISMATCH")
-    if len(period_results) != len(period_input):
-        raise ValueError("PERIOD_RESULT_COUNT_MISMATCH")
-    if len(hits_results) != len(hits_input):
-        raise ValueError("TOTAL_HITS_RESULT_COUNT_MISMATCH")
     if len(pitcher_results) != len(pitcher_input):
         raise ValueError("PITCHER_RESULT_COUNT_MISMATCH")
     coverage_results, coverage_receipts = phone_coverage_rows(
@@ -1113,10 +995,6 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             result["priced_via"] = "FIRST_INNING_RUNS_BINARY_AT_0_5"
         modeled_props[local] = result
     for local, result in zip(f5_pos, f5_results):
-        modeled_props[local] = result
-    for local, result in zip(period_pos, period_results):
-        modeled_props[local] = result
-    for local, result in zip(hits_pos, hits_results):
         modeled_props[local] = result
     for local, result in zip(deriv_pos, deriv_results):
         original = deriv_originals.get(local)
@@ -1220,17 +1098,13 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                               + pitcher_receipts + batter_receipts
                               + first_receipts
                               + nfl_receipts + cfb_receipts
-                              + coverage_receipts + f5_receipts + period_receipts
-                              + hits_receipts
-                              + teamhalf_receipts
+                              + coverage_receipts + f5_receipts + teamhalf_receipts
                               + deriv_receipts + td_receipts)
     card["prop_model_status"] = {
         "pitcher_engine":"MLB_PITCHER_JOINT_EMPIRICAL_BAYES",
         "batter_engine":"MLB_BATTER_EMPIRICAL_GAMELOG",
         "first_inning_engine":"MLB_FIRST_INNING_TEAM_RATES_POISSON_JEFFREYS",
         "mlb_f5_engine":"SHARED_F5_ENGINE_VIA_MLB_F5_QUOTE_BINDING_V1_DEPLOYMENT_GATED_F5_STATE_CANDIDATE",
-        "mlb_period_engine":"SHARED_PERIOD_ENGINE_VIA_MLB_PERIOD_QUOTE_BINDING_V1_DEPLOYMENT_GATED_NOT_IN_DEPLOYMENT_REGISTRY",
-        "mlb_total_hits":"NO_ENGINE_GAME_TOTAL_HITS_DISTRIBUTION_UNCONSTRUCTED_TEAM_TOTAL_HITS_MODEL_HARNESS_FAIL",
         "coverage_engine":"FREE_COVERAGE_EXTENSION_MLB_3WAY_QUARTERS_MARGIN_UNVALIDATED",
         "f5_engine":"MLB_F5_EMPIRICAL_LINESCORE_UNVALIDATED",
         "nfl_player_engine":"ESPN_NAMED_HISTORICAL_GAMELOG_WATCH_ONLY",
@@ -1240,7 +1114,6 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         "nfl_anytime_td_engine":"NFLVERSE_OPPORTUNITY_DECOMPOSITION_UNVALIDATED",
         "nfl_derivative_engine":"WIRED_PRICERS_DISTRIBUTION_REQUIRED",
         "first_inning_nrfi_yrfi":"FIRST_INNING_RUNS_BINARY_ALIAS_AT_0_5",
-        "first_inning_board_form":"INNING_1_RUNS_BOUND_TO_FIRST_INNING_RUNS_ENGINE",
         "free_public_history":True,
         "model_vs_close_validated":False,
         "phone_odds_freshness_required":True,
@@ -1364,6 +1237,10 @@ def main(argv=None):
                         "from an independent channel, not the archive root. "
                         "Repeat once per sealed per-team manifest to compose "
                         "without weakening the pin requirement")
+    p.add_argument("--nfl-participation-archive-root", type=Path,
+                   help="NFL participation archive root; only verified with an external pin")
+    p.add_argument("--nfl-participation-manifest-sha256",
+                   help="Independent SHA256 manifest pin; never inferred from payload or archive")
     args = p.parse_args(argv)
     if not 0 <= args.min_ev <= 0.15:
         p.error("min-ev must be between 0 and 0.15")
@@ -1376,7 +1253,9 @@ def main(argv=None):
                         args.form2_manifest_sha256[0]
                         if args.form2_manifest_sha256
                         and len(args.form2_manifest_sha256) == 1
-                        else args.form2_manifest_sha256))
+                        else args.form2_manifest_sha256),
+                    nfl_participation_archive_root=args.nfl_participation_archive_root,
+                    nfl_participation_manifest_sha256=args.nfl_participation_manifest_sha256)
     rendered = json.dumps(card, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
