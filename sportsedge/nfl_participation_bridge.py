@@ -224,7 +224,11 @@ def _complete_inactive_snapshot_receipt(snapshot, receipt, *, game_id,
                                   "snapshot published_at")
     except NFLParticipationError:
         return False
-    if published != snapshot_published or published > cutoff:
+    try:
+        cutoff_time = _utc(cutoff, "receipt cutoff")
+    except (NFLParticipationError, TypeError, ValueError):
+        return False
+    if published != snapshot_published or published > cutoff_time:
         return False
     ids = _snapshot_player_ids(snapshot)
     if ids is None:
