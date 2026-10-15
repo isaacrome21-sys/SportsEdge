@@ -506,6 +506,13 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True,
     game_label = f"{away_name} @ {home_name}" if away_name else "UNKNOWN_GAME"
     adjustments, factors, receipts = {}, [], []
     blocked, block_reason, block_detail = False, "", ""
+    # Structured Form 2 verdicts by side, retained for downstream
+    # RESEARCH consumers (the card's CFB research-projection annex).
+    # Purely additive metadata: no pricing, blocking or adjustment
+    # behavior reads this mapping; the pre-pricing gate remains the
+    # only consumer that can affect the priced record. A side appears
+    # here only when a bundle was actually consulted for it.
+    qb_form2_identities = {}
 
     def all_missing(reason):
         for name in UNIVERSAL_FACTORS + SPORT_FACTORS.get(sport, ()):
@@ -522,7 +529,8 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True,
                 "sport": sport, "kickoff_utc": None, "blocked": blocked,
                 "block_reason": block_reason, "block_detail": block_detail,
                 "adjustments": adjustments, "factors": factors,
-                "receipts": receipts}
+                "receipts": receipts,
+                "qb_form2_identities": qb_form2_identities}
 
     kickoff = dt(row.get("commence_time") or row.get("kickoff"))
     provider = PublicContext(now, getter=getter)
@@ -539,7 +547,8 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True,
                 "sport": sport, "kickoff_utc": None, "blocked": blocked,
                 "block_reason": block_reason, "block_detail": block_detail,
                 "adjustments": adjustments, "factors": factors,
-                "receipts": receipts}
+                "receipts": receipts,
+                "qb_form2_identities": qb_form2_identities}
     kickoff, competition = fixture
     # The staged fixture's ESPN event ID (the scoreboard event the
     # provider bound both teams + start time to). Form 2 bundles must
@@ -563,7 +572,8 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True,
                 "sport": sport, "kickoff_utc": kickoff.isoformat(),
                 "blocked": blocked, "block_reason": block_reason,
                 "block_detail": block_detail, "adjustments": adjustments,
-                "factors": factors, "receipts": receipts}
+                "factors": factors, "receipts": receipts,
+                "qb_form2_identities": qb_form2_identities}
 
     # -- Illinois college exclusion (owner rule): ID-keyed on the verified
     # directory binding resolved just above. Either competitor whose ESPN
@@ -595,7 +605,8 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True,
                     "blocked": blocked, "block_reason": block_reason,
                     "block_detail": block_detail,
                     "adjustments": adjustments, "factors": factors,
-                    "receipts": receipts}
+                    "receipts": receipts,
+                    "qb_form2_identities": qb_form2_identities}
 
     # Game-level QB availability state for the priced record: stays
     # None unless a Form 2 consult satisfies a team's identity limb,
@@ -639,6 +650,25 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True,
                         now, receipts, event_id=fixture_event_id,
                         home_team_id=str(home_team.get("id")),
                         away_team_id=str(away_team.get("id")))
+                if form2 is not None:
+                    # Retain the evaluator's verdict verbatim (identity
+                    # limb only; availability label exactly as issued)
+                    # for the research annex. Recording is not a second
+                    # evaluation: this is the same result object the
+                    # gate below consumes.
+                    form2_receipt = form2.get("receipt") or {}
+                    qb_form2_identities[side] = {
+                        "team_id": str(team.get("id")),
+                        "ok": bool(form2.get("ok")),
+                        "status": form2.get("status"),
+                        "detail": form2.get("detail"),
+                        "resolved_athlete_id": form2.get("resolved_athlete_id"),
+                        "resolved_athlete_name": form2.get("resolved_athlete_name"),
+                        "availability_status": form2.get("availability_status"),
+                        "injury_points": form2.get("injury_points"),
+                        "event_id": form2_receipt.get("event_id"),
+                        "opponent_espn_id": form2_receipt.get("opponent_espn_id"),
+                    }
                 if form2 is not None and form2["ok"]:
                     proceeds, disposition_status = _qb_evidence.form2_disposition()
                     if proceeds:
@@ -962,7 +992,8 @@ def _stage_one_game(rows, *, now, getter, enforce_blocks=True,
             "block_reason": block_reason, "block_detail": block_detail,
             "availability_status": availability_status,
             "adjustments": adjustments, "factors": factors,
-            "receipts": receipts}
+            "receipts": receipts,
+            "qb_form2_identities": qb_form2_identities}
 
 
 def _normalize_form2_bundles(qb_form2_bundles):
