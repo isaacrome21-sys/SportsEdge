@@ -248,6 +248,23 @@ def audit_row(source, result):
     return out
 
 
+def _anytime_td_milestone_side(line):
+    """DK "1+" anytime-TD milestone == the YES selection (OVER 0.5).
+
+    Only the exact 0.5 threshold (or no line) maps; any other line or
+    side is left untouched so the TD engine refuses it by name.
+    """
+    side = str(line.get("side") or line.get("selection") or "").upper().strip()
+    raw = line.get("line")
+    try:
+        at_half = raw in (None, "") or float(raw) == 0.5
+    except (TypeError, ValueError):
+        at_half = False
+    if at_half and side in {"OVER", "UNDER"}:
+        line["side"] = "YES" if side == "OVER" else "NO"
+        line.pop("selection", None)
+
+
 REGISTRY_RESEARCH_SCORE_ENGINE = "free_models.game_engine:LANE_A_MARKET_BLIND"
 
 
@@ -640,10 +657,14 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "RECEPTIONS":"PLAYER_RECEPTIONS",
                 "ANYTIME_TOUCHDOWN":"ANYTIME_TD",
                 "ANYTIME_TD_SCORER":"ANYTIME_TD",
+                "PLAYER_ANYTIME_TD":"ANYTIME_TD",
+                "PLAYER_ANYTIME_TOUCHDOWN":"ANYTIME_TD",
                 "FIRST_TOUCHDOWN":"FIRST_TD",
                 "FIRST_TD_SCORER":"FIRST_TD",
             }.get(market,market)
             line["market"] = market
+            if market == "ANYTIME_TD":
+                _anytime_td_milestone_side(line)
         if line["sport"] == "MLB" and market in F5_INTAKE_ALIASES:
             market = F5_INTAKE_ALIASES[market]
             line["market"] = market
