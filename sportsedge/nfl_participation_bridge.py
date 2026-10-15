@@ -198,6 +198,37 @@ def _snapshot_player_ids(snapshot) -> list[str] | None:
     return out
 
 
+def _complete_inactive_snapshot_receipt(snapshot, receipt, *, game_id,
+                                        team_id, cutoff):
+    """Check an independently authenticated completeness claim.
+
+    This predicate is deliberately NOT called on caller-supplied receipt
+    dictionaries: the archive/intake boundary must first authenticate the
+    issuer and bind the content hash to the official publication. A manifest
+    hash alone authenticates bytes, not source completeness.
+    """
+    if not isinstance(snapshot, Mapping) or not isinstance(receipt, Mapping):
+        return False
+    # A receipt without explicit independent issuer authentication is never
+    # sufficient, regardless of any caller-supplied 'complete' flag.
+    if receipt.get("issuer_authenticated") is not True:
+        return False
+    if receipt.get("source_complete") is not True:
+        return False
+    if str(receipt.get("game_id") or "") != str(game_id):
+        return False
+    if _team(receipt.get("team")) != team_id:
+        return False
+    if str(receipt.get("published_at") or "") != str(snapshot.get("published_at") or ""):
+        return False
+    try:
+        if _utc(receipt.get("published_at"), "receipt published_at") > cutoff:
+            return False
+    except NFLParticipationError:
+        return False
+    return False  # Until trusted issuer verification is implemented, HOLD.
+
+
 def _inactive_scan(inactive_rows, inactive_snapshots, *, game_id, team_id,
                    candidate_id, kickoff, cutoff):
     """Official-inactive evidence scan for one candidate, <= cutoff only.
