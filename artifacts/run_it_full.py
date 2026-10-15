@@ -43,6 +43,10 @@ from sportsedge.mlb_period_quote_binding import (
     PERIOD_MARKET_ALIASES as PERIOD_INTAKE_ALIASES,
     normalize_period_market, phone_period_binding_rows)
 from sportsedge.period_distribution import PERIOD_MARKETS as PERIOD_CANONICAL_MARKETS
+from sportsedge.game_total_distribution import (
+    GAME_TOTAL_3WAY_MARKETS as GAME_TOTAL_3WAY_CANONICAL_MARKETS)
+from sportsedge.mlb_game_total_quote_binding import (
+    normalize_game_total_market, phone_game_total_binding_rows)
 from sportsedge.mlb_total_hits import (
     TOTAL_HITS_MARKETS,
     canonical_total_hits_market as resolve_total_hits_market,
@@ -445,9 +449,16 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     (sportsedge.mlb_period_quote_binding) under the same discipline and
     block at its deployment gate (PERIOD_DEPLOYMENT_NOT_ELIGIBLE; the
     period markets are absent from the deployment registry, whose
-    lookup fails closed). Every other matrix market
-    without a priced route resolves through sportsedge.canonical_coverage
-    to a named taxonomy blocker.
+    lookup fails closed). The full-game Total Runs 3-Way market
+    (GAME_TOTAL_3_WAY: OVER / EXACTLY / UNDER at an integer line)
+    routes to the game-total quote-binding stage
+    (sportsedge.mlb_game_total_quote_binding) under the same
+    discipline -- three-selection grouping instead of pairing,
+    strictly-prior final-score features -- and blocks at its
+    deployment gate (GAME_TOTAL_3WAY_DEPLOYMENT_NOT_ELIGIBLE; the
+    market is absent from the deployment registry). Every other
+    matrix market without a priced route resolves through
+    sportsedge.canonical_coverage to a named taxonomy blocker.
 
     form2_bundles_dir, when supplied, is the operator's local Form 2
     archive root (CFB; issue #2154). The runtime adapter
@@ -586,6 +597,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             normalize_f5_market(market) if line["sport"] == "MLB" else None,
             normalize_period_market(market) if line["sport"] == "MLB" else None,
             normalize_total_hits_market_name(market) if line["sport"] == "MLB" else None,
+            normalize_game_total_market(market) if line["sport"] == "MLB" else None,
             _NFL_RULING_DERIVATIVE_TRANSLATION.get(market)
             if line["sport"] == "NFL" else None,
         ], line)
@@ -646,6 +658,15 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
             # quote-binding lane owns them (quote binding + settlement
             # basis + deployment gate).
             line["market"] = period_market
+        game_total_market = (normalize_game_total_market(market)
+                             if line["sport"] == "MLB" else None)
+        if game_total_market is not None:
+            # Same composition resolution for the full-game Total Runs
+            # 3-Way: canonicalize the name here; the rows fall through
+            # to prop routing, where the canonical game-total
+            # quote-binding lane owns them (quote binding + settlement
+            # basis + deployment gate).
+            line["market"] = game_total_market
         prop_indices.append(i)
         props.append(line)
 
@@ -805,6 +826,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     batter_pos, batter_input = [], []
     f5_pos, f5_input = [], []
     period_pos, period_input = [], []
+    gt3_pos, gt3_input = [], []
     hits_pos, hits_input = [], []
     first_pos, first_input = [], []
     first_originals = {}  # local -> original market, for NRFI/YRFI translation
@@ -908,6 +930,9 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         elif line["sport"] == "MLB" and market in PERIOD_CANONICAL_MARKETS:
             period_pos.append(local)
             period_input.append(line)
+        elif line["sport"] == "MLB" and market in GAME_TOTAL_3WAY_CANONICAL_MARKETS:
+            gt3_pos.append(local)
+            gt3_input.append(line)
         elif line["sport"] == "MLB" and market in TOTAL_HITS_MARKETS:
             hits_pos.append(local)
             hits_input.append(line)
@@ -987,6 +1012,31 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "research_only": True, "official_authority": False,
                 "model_p_authority": False, "staking_authority": False,
             } for line in period_input]
+    # Game Total 3-Way stage (full-game Total Runs 3-Way): the period
+    # stage's sibling -- three-selection quote grouping + settlement-
+    # basis gate + strictly-prior final-score feature assembly, then
+    # the deployment gate (GAME_TOTAL_3_WAY is absent from
+    # config/deployments.json, so the registry lookup fails closed).
+    gt3_results, gt3_receipts = [], []
+    if gt3_input:
+        try:
+            gt3_results, gt3_receipts = phone_game_total_binding_rows(
+                gt3_input, now=prop_clock,
+                getter=getter if auto_context else None,
+                fetch_enabled=auto_context)
+        except Exception as exc:
+            gt3_results = [{
+                "status": "NO_MODEL_OR_MARKET",
+                "reason": "NO_ENGINE: GAME_TOTAL_3WAY_BINDING_RUNTIME_UNAVAILABLE — "
+                          f"{type(exc).__name__}: {exc}",
+                "blocker": "NO_ENGINE",
+                "blocker_detail": str(exc),
+                "game_total_reason": "GAME_TOTAL_3WAY_BINDING_RUNTIME_UNAVAILABLE",
+                "coverage_market": line.get("market"),
+                "sport": "MLB", "market": line.get("market"),
+                "research_only": True, "official_authority": False,
+                "model_p_authority": False, "staking_authority": False,
+            } for line in gt3_input]
     # Total Hits stage: first-class intake names with truthful
     # NO_ENGINE terminal states (game distribution unconstructed;
     # team candidate model harness-failed). The stage prices nothing
@@ -1083,6 +1133,8 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         raise ValueError("F5_RESULT_COUNT_MISMATCH")
     if len(period_results) != len(period_input):
         raise ValueError("PERIOD_RESULT_COUNT_MISMATCH")
+    if len(gt3_results) != len(gt3_input):
+        raise ValueError("GAME_TOTAL_3WAY_RESULT_COUNT_MISMATCH")
     if len(hits_results) != len(hits_input):
         raise ValueError("TOTAL_HITS_RESULT_COUNT_MISMATCH")
     if len(pitcher_results) != len(pitcher_input):
@@ -1115,6 +1167,8 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     for local, result in zip(f5_pos, f5_results):
         modeled_props[local] = result
     for local, result in zip(period_pos, period_results):
+        modeled_props[local] = result
+    for local, result in zip(gt3_pos, gt3_results):
         modeled_props[local] = result
     for local, result in zip(hits_pos, hits_results):
         modeled_props[local] = result
@@ -1221,6 +1275,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                               + first_receipts
                               + nfl_receipts + cfb_receipts
                               + coverage_receipts + f5_receipts + period_receipts
+                              + gt3_receipts
                               + hits_receipts
                               + teamhalf_receipts
                               + deriv_receipts + td_receipts)
@@ -1230,6 +1285,7 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         "first_inning_engine":"MLB_FIRST_INNING_TEAM_RATES_POISSON_JEFFREYS",
         "mlb_f5_engine":"SHARED_F5_ENGINE_VIA_MLB_F5_QUOTE_BINDING_V1_DEPLOYMENT_GATED_F5_STATE_CANDIDATE",
         "mlb_period_engine":"SHARED_PERIOD_ENGINE_VIA_MLB_PERIOD_QUOTE_BINDING_V1_DEPLOYMENT_GATED_NOT_IN_DEPLOYMENT_REGISTRY",
+        "mlb_game_total_engine":"SHARED_GAME_TOTAL_ENGINE_VIA_MLB_GAME_TOTAL_QUOTE_BINDING_V1_DEPLOYMENT_GATED_NOT_IN_DEPLOYMENT_REGISTRY",
         "mlb_total_hits":"NO_ENGINE_GAME_TOTAL_HITS_DISTRIBUTION_UNCONSTRUCTED_TEAM_TOTAL_HITS_MODEL_HARNESS_FAIL",
         "coverage_engine":"FREE_COVERAGE_EXTENSION_MLB_3WAY_QUARTERS_MARGIN_UNVALIDATED",
         "f5_engine":"MLB_F5_EMPIRICAL_LINESCORE_UNVALIDATED",
