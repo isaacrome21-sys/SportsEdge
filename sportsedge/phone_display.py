@@ -9,14 +9,21 @@ from collections import Counter, defaultdict
 from math import isfinite
 import re
 
-from sportsedge.quote_freshness import is_fresh
+from sportsedge.quote_freshness import (
+    QUOTE_STALE, QUOTE_UNVERIFIED, is_fresh,
+)
+from sportsedge.research_estimate import RESEARCH_LABEL, valid_research_estimate
 
 CANDIDATE_STATUSES = frozenset({
     "RESEARCH_POSITIVE_EV_UNVALIDATED", "RESEARCH_CANDIDATE_NOT_VALIDATED",
 })
 INTAKE_FIELDS = ("sport", "away", "home", "market", "side", "selection",
                  "player_name", "line", "period", "phase", "alternate",
-                 "settlement_type", "kickoff", "commence_time", "book")
+                 "settlement_type", "kickoff", "commence_time", "book",
+                 "quote_source", "book_quote_receipt_verified")
+SCREENSHOT_UNATTESTED = "OWNER_SCREENSHOT_QUOTE_NOT_ATTESTED"
+RECEIPT_UNATTESTED = "QUOTE_RECEIPT_NOT_ATTESTED"
+RESEARCH_STATUS = "RESEARCH ONLY"
 
 
 def identity_rows(rows, default_sport=None):
@@ -54,11 +61,35 @@ def _metrics(row):
     return probability, ev, anchored
 
 
-def _disposition(row, min_ev):
+def _quote_hold(row, source):
+    """Name WHY a quote is not current. Unattested is not the same as stale."""
+    freshness = row.get("quote_freshness")
+    code = freshness.get("code") if isinstance(freshness, dict) else None
+    if code == QUOTE_UNVERIFIED:
+        screenshot = (str(source.get("quote_source") or "").upper() == "OWNER_DK_SCREENSHOT"
+                      or str(row.get("quote_source") or "").upper() == "OWNER_DK_SCREENSHOT")
+        return "UNATTESTED", (SCREENSHOT_UNATTESTED if screenshot else RECEIPT_UNATTESTED)
+    if code == QUOTE_STALE:
+        age = _number(freshness.get("age_seconds"))
+        limit = freshness.get("max_age_seconds")
+        age_text = f"{age:.0f}s" if age is not None else "unknown age"
+        return "STALE", f"QUOTE_STALE: quote age {age_text} exceeds {limit}s; refresh required"
+    if code:
+        return "INVALID", f"{code}: quote timestamp unusable; refresh required"
+    return "UNKNOWN", "Current quote required"
+
+
+def _disposition(row, min_ev, source=None):
+    source = source if isinstance(source, dict) else {}
     status = str(row.get("status") or "MISSING_STATUS")
     probability, ev, anchored = _metrics(row)
     priced = probability is not None and ev is not None
     if status.startswith("BLOCKED") or status in {"NO_MODEL_OR_MARKET", "NO_ENGINE", "NO_QUOTE", "MISSING_STATUS"}:
+        # A real engine estimate may ride on a blocked row as a research
+        # annex. The blocker name is kept; no EV, never eligible/PLAY.
+        if not status.startswith("BLOCKED") and valid_research_estimate(row) is not None:
+            return (RESEARCH_STATUS, "research",
+                    f"{RESEARCH_LABEL} · blocker kept: {row.get('reason') or status}")
         return "BLOCKED", "blocked", row.get("reason") or status
     if (row.get("independent_projection") is not None
             and not isinstance(row.get("independent_projection"), dict)):
@@ -77,7 +108,15 @@ def _disposition(row, min_ev):
     fresh = (is_fresh(freshness) if freshness is not None
              else row.get("quote_status") == "RECENT_CAPTURED_QUOTE")
     if not fresh or status == "WATCH_QUOTE_NOT_CURRENT":
-        return "REFRESH REQUIRED", "stale", "Current quote required"
+        kind, detail = _quote_hold(row, source)
+        screenshot = detail == SCREENSHOT_UNATTESTED
+        if kind == "UNATTESTED" and screenshot and not anchored and probability is not None:
+            # The engine priced the row; only the quote's capture time is
+            # unattested. Show the estimate as research, with no EV.
+            return (RESEARCH_STATUS, "research",
+                    f"{RESEARCH_LABEL} · {detail}: no attested capture time, "
+                    "estimate only, no EV, never PLAY")
+        return "REFRESH REQUIRED", "stale", detail
     if anchored:
         return "WATCH", "priced", "Independent pricing unavailable for this row"
     notes = row.get("context_notes")
@@ -132,10 +171,14 @@ def build_phone_card(card):
         source = intake[index] if intake is not None else {}
         if not isinstance(source, dict):
             raise ValueError("SELECTION_INTAKE_ROW_NOT_OBJECT")
-        label, bucket, reason = _disposition(row, floor)
+        label, bucket, reason = _disposition(row, floor, source)
         if str(row.get("status") or "") in {"BLOCKED_INVALID", "BLOCKED_IL_COLLEGE", "BLOCKED_STARTED"}:
             bucket = "rejected"
         probability, ev, anchored = _metrics(row)
+        research = bucket == "research"
+        estimate = valid_research_estimate(row) if research else None
+        if estimate is not None:
+            probability = _number(estimate.get("probability"))
         game = row.get("game") or (
             f"{source['away']} @ {source['home']}" if source.get("away") and source.get("home") else "Event unavailable")
         sport = str(source.get("sport") or row.get("sport") or "UNKNOWN").upper()
@@ -155,15 +198,19 @@ def build_phone_card(card):
             "line": row.get("line", source.get("line")),
             "odds": _number(row.get("odds_american", row.get("dk_odds"))),
             "status": label, "reason": reason,
-            "probability": probability if bucket == "priced" and not anchored else None,
+            "probability": probability if bucket in {"priced", "research"} and not anchored else None,
             "estimated_ev": ev if bucket == "priced" and not anchored else None,
-            "fair_odds": _number((row.get("independent_projection")
-                                  if isinstance(row.get("independent_projection"), dict)
-                                  else row).get("fair_american")) if bucket == "priced" and not anchored else None,
+            "fair_odds": (_number(estimate.get("fair_american")) if estimate is not None
+                          else _number((row.get("independent_projection")
+                                        if isinstance(row.get("independent_projection"), dict)
+                                        else row).get("fair_american"))
+                          if bucket in {"priced", "research"} and not anchored else None),
             "source_status": row.get("status"),
+            "research_only_estimate": research,
+            "eligible": False,
         })
     ledger = [{**dict(zip(("sport", "market", "period", "phase", "alternate", "settlement_type"), key)),
-               **{k: counts[k] for k in ("priced", "blocked", "rejected", "stale")},
+               **{k: counts[k] for k in ("priced", "research", "blocked", "rejected", "stale")},
                "rows": sum(counts.values())} for key, counts in sorted(families.items())]
     return {"schema": "SPORTSEDGE_PHONE_DISPLAY_V1", "as_of_utc": card.get("as_of_utc"),
             "selections": selections, "status_counts": dict(Counter(r["status"] for r in selections)),
@@ -205,12 +252,21 @@ def render_phone_card(card, *, run_url="", intake_at=""):
                 name += " " + str(row["line"])
             lines.append(f"| {_safe(name)} | {_price(row['odds'])} | {row['status']} | {p} | {_price(row['fair_odds'])} | {ev} | {_safe(row['reason'])} |")
         lines.append("")
-    lines += ["### Board coverage", "", "Counts describe this submitted board; the full DraftKings catalog has not been verified.", "",
-              "| Sport / market / period / phase / alternate / settlement | Priced | Blocked | Rejected | Refresh |",
-              "| --- | ---: | ---: | ---: | ---: |"]
+    # The research column/legend appear only when a research row exists, so
+    # a card without research rows renders exactly as before.
+    has_research = any(f["research"] for f in coverage["families"])
+    lines += ["### Board coverage", "", "Counts describe this submitted board; the full DraftKings catalog has not been verified.", ""]
+    if has_research:
+        lines += ["Research only = real unvalidated engine estimate shown for research; never eligible, never PLAY, no EV, not validation.", "",
+                  "| Sport / market / period / phase / alternate / settlement | Priced | Research only | Blocked | Rejected | Refresh |",
+                  "| --- | ---: | ---: | ---: | ---: | ---: |"]
+    else:
+        lines += ["| Sport / market / period / phase / alternate / settlement | Priced | Blocked | Rejected | Refresh |",
+                  "| --- | ---: | ---: | ---: | ---: |"]
     for family in coverage["families"]:
         name = " / ".join(str(family[k]) for k in ("sport", "market", "period", "phase", "alternate", "settlement_type"))
-        lines.append(f"| {_safe(name)} | {family['priced']} | {family['blocked']} | {family['rejected']} | {family['stale']} |")
+        research = f" {family['research']} |" if has_research else ""
+        lines.append(f"| {_safe(name)} | {family['priced']} |{research} {family['blocked']} | {family['rejected']} | {family['stale']} |")
     if run_url:
         lines += ["", f"Run receipt: {_safe(run_url)}"]
     return "\n".join(lines) + "\n"
