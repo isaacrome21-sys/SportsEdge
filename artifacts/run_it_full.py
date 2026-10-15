@@ -8,6 +8,7 @@ props and Statcast/Next Gen remain unpriced until verified collectors exist.
 Issues are untrusted odds intake.
 """
 from __future__ import annotations
+import math
 import argparse
 from collections import Counter
 import json
@@ -889,7 +890,9 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                         line, "INNING_1_RUNS_LINE_INVALID")
                     continue
                 try:
-                    float(raw_line)
+                    parsed_line = float(raw_line)
+                    if not math.isfinite(parsed_line):
+                        raise ValueError("non-finite first-inning line")
                 except (TypeError, ValueError):
                     others[local] = blocked(
                         line, "INNING_1_RUNS_LINE_INVALID")
