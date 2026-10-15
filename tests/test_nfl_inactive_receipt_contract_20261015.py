@@ -123,3 +123,28 @@ def test_conflicting_same_instant_lists_never_confirm():
         trusted_receipts=[receipt()],
         trusted_issuer_verifier=lambda *_: True)
     assert out["complete_published"] is False
+
+
+def test_qb_assessment_receipt_can_confirm_only_via_trusted_verifier():
+    from sportsedge.nfl_participation_bridge import assess_qb_participation
+    depth = [{
+        "dt": "2026-10-01T12:00:00Z", "team": TEAM,
+        "gsis_id": "active-qb", "player_name": "Synthetic QB",
+        "pos_abb": "QB", "pos_rank": 1,
+    }]
+    kwargs = dict(
+        team=TEAM, depth_rows=depth, game_id=GAME,
+        target_season=2026, target_week=4,
+        kickoff="2026-10-04T17:00:00Z",
+        as_of="2026-10-04T16:00:00Z",
+        inactive_snapshots=[snapshot()],
+    )
+    no_receipt = assess_qb_participation(**kwargs)
+    assert no_receipt["state"] != "CONFIRMED_STARTER"
+    confirmed = assess_qb_participation(
+        **kwargs, trusted_inactive_receipts=[receipt()],
+        trusted_issuer_verifier=lambda *_: True)
+    assert confirmed["state"] == "CONFIRMED_STARTER"
+    untrusted = assess_qb_participation(
+        **kwargs, trusted_inactive_receipts=[receipt()])
+    assert untrusted["state"] != "CONFIRMED_STARTER"
