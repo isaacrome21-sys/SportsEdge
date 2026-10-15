@@ -462,12 +462,20 @@ def _refuse_pending_receipt_intents(root: Path) -> None:
 def _sync_verified_receipt_commit(root: Path) -> None:
     """Commit bytes surviving a killed writer need recovery fsync before ACCEPT.
 
-    Do not synthesize a commit, alter a journal or grant authority to a
-    legacy journal-only root. Recovery errors must refuse the entire root.
+    Do not synthesize a commit or alter a journal. A journal-only root
+    (no intent journal) is refused with RECEIPT_INTENT_JOURNAL_MISSING.
+    Journal, intent journal and directory are always fsynced; any error
+    refuses the entire root with RECEIPT_RECOVERY_SYNC_FAILED.
     """
-    intent = root / RECEIPT_INTENT_JOURNAL_NAME
-    if not intent.exists():
-        return
+    # t153: a journal with no intent journal (legacy journal-only root, or an
+    # intent journal removed after a crash) carries no COMMIT evidence at
+    # all. It is refused by name -- never accepted unsynced, never repaired.
+    try:
+        (root / RECEIPT_INTENT_JOURNAL_NAME).lstat()
+    except FileNotFoundError:
+        raise MLBSourceError("RECEIPT_INTENT_JOURNAL_MISSING") from None
+    except OSError as exc:
+        raise MLBSourceError("RECEIPT_RECOVERY_SYNC_FAILED") from exc
     directory = -1
     try:
         directory = os.open(root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
