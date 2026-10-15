@@ -39,3 +39,31 @@ def test_preserves_both_prices_and_identity():
 def test_refuses_untrustworthy_pairs(changes, reason):
     with pytest.raises(YardagePairRefusal, match=reason):
         bind_nfl_yardage_pair(quote(**changes), as_of=NOW)
+
+
+def test_canonical_run_it_receives_both_sides_without_promotion():
+    """Actual RUN IT entrypoint, offline: both quotes must reach the card."""
+    from artifacts.run_it_full import run_full
+
+    card = run_full(
+        {"lines": [], "nfl_yardage_pairs": [quote()]},
+        now=NOW, as_of=NOW.isoformat(), auto_context=False,
+    )
+    rows = card["evaluated_rows"]
+    assert len(rows) == 2
+    assert card["summary"]["rows"] == 2
+    # Registry gates are preserved; no synthetic quote earns play authority.
+    assert all(r.get("official_authority") is not True for r in rows)
+    assert all(r.get("model_p_authority") is not True for r in rows)
+    assert all(r.get("staking_authority") is not True for r in rows)
+    assert card["research_only"] is True
+
+
+def test_canonical_run_it_refuses_incomplete_pair_before_pricing():
+    from artifacts.run_it_full import run_full
+
+    with pytest.raises(YardagePairRefusal, match="INVALID_AMERICAN_ODDS"):
+        run_full(
+            {"lines": [], "nfl_yardage_pairs": [quote(under_odds=None)]},
+            now=NOW, as_of=NOW.isoformat(), auto_context=False,
+        )
