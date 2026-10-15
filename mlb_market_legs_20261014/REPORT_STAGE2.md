@@ -415,11 +415,15 @@ remains unavailable.**
   climatology reconstruction matching the Stage 1 audit's
   eligibility set and margin CRPS exactly. N1–N3 — probability
   parity bit-exact (75/75) and 0-ulp probability determinism
-  across three worktrees. M29 — production parity 25/25 and
-  byte-identical pool lineage. M31 — 1,546 independent
-  event-semantics checks (max deviation 3.3e-16) including the
-  Amendment-1 dispositioned calls; the stopped first pass and its
-  census are preserved in the results file.
+  across three worktrees. M29 — production parity 25/25,
+  byte-identical pool lineage, re-run identical except
+  `generated_at` and the ordering of adjacent entries in a parity
+  fetch log (a set-iteration artifact in a log field, no metric
+  affected; audit CSV byte-identical). M31 — re-run identical
+  except `generated_at` (audit CSV byte-identical), plus 1,546
+  independent event-semantics checks (max deviation 3.3e-16)
+  including the Amendment-1 dispositioned calls; the stopped
+  first pass and its census are preserved in the results file.
 - Publication: specs, the dataset manifest, the hash record,
   Amendment 1, all four evaluators, all five results files, the
   Stage 1 supplementary verdicts file, and this report are on
