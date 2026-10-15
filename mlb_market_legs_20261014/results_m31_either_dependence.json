@@ -1,0 +1,983 @@
+{
+ "item": "M31_EITHER_PITCHER_DEPENDENCE",
+ "label": "RESEARCH_EVIDENCE",
+ "evidence_class": "RETROSPECTIVE_MEASUREMENT of the independence construction's calibration error. NOT a market verdict, NOT validation, NOT a promotion input. Family state unchanged: EITHER_PITCHER_DEPENDENCE_UNMEASURED.",
+ "spec_sha256": "5e0eb54368b35094e58de4300185e5f28d0e48bb1dfb9cda1c02b02917d65153",
+ "spec_path": "/home/hatch/workspace/tmp/wt-market-legs/mlb_market_legs_20261014/SPEC_M31_EITHER_DEPENDENCE.md",
+ "model_identity": {
+  "file": "sportsedge/pitcher_joint_engine.py",
+  "main_commit": "83e0c396a4761ea3de80583be5e61e8ca2e07f9a",
+  "engine_blob_at_pin": "00cba6f664e313b53ab0084e6f3f471a9d85b566",
+  "engine_blob_check": "MATCHES spec blob 00cba6f664e313b53ab0084e6f3f471a9d85b566 (identical at Phase 2 pin 12999fc22)",
+  "worktree_head": "6d50c2b6064eb5aac7dd49591dbb7784600d7666",
+  "engine_blob_at_worktree_head": "00cba6f664e313b53ab0084e6f3f471a9d85b566",
+  "engine_version": "mlb_pitcher_joint_empirical_bayes_v4_long_window_prior",
+  "config": "price_pitcher_market either-branch, features={'pitcher_a_history': [...], 'pitcher_b_history': [...]} raw pools only"
+ },
+ "dataset": {
+  "transport": "MLB StatsAPI disk cache (public endpoints)",
+  "cache_dir": "/home/hatch/workspace/tmp/bt_data/statsapi_cache",
+  "manifest": "mlb_market_legs_20261014/DATASET_MANIFEST_STAGE2.md section 2",
+  "manifest_combined_identity_sha256": "87841854d03f8e65686503b1ee19c011d66604d6501bc9c96fee1b6d18cea55e",
+  "acquisition_done": {
+   "urls_total": 4637,
+   "failures": [],
+   "log": [
+    "players: 1798 unique ids",
+    "gamelog urls: 4610",
+    "gamelog failures: 0",
+    "schedule urls: 25",
+    "schedule failures: 0"
+   ]
+  },
+  "in_repo": false
+ },
+ "pool_code_identity_vs_undercard_evaluator": {
+  "functions": {
+   "parse_starts": {
+    "this_file_sha256": "4d108c9c223ed1293011e41ea876bbc7cb749ee34f30fb77721b5ba1273b6d5e",
+    "undercard_sha256": "4d108c9c223ed1293011e41ea876bbc7cb749ee34f30fb77721b5ba1273b6d5e",
+    "identical": true
+   },
+   "production_order": {
+    "this_file_sha256": "c20f25bcd1831308dc35778e6036f08c71a039789c0eb558f5484a8d742328db",
+    "undercard_sha256": "c20f25bcd1831308dc35778e6036f08c71a039789c0eb558f5484a8d742328db",
+    "identical": true
+   },
+   "engine_pool": {
+    "this_file_sha256": "b0f53781bb64cca7350b1e01b9226a6e2cd43a34f0014b7a1588fd43fa7b042c",
+    "undercard_sha256": "b0f53781bb64cca7350b1e01b9226a6e2cd43a34f0014b7a1588fd43fa7b042c",
+    "identical": true
+   },
+   "all_prior": {
+    "this_file_sha256": "43fd4673d12a790b7af5ca8bb26c8f5a6749fda089c2a021212d5fb73cb8b890",
+    "undercard_sha256": "43fd4673d12a790b7af5ca8bb26c8f5a6749fda089c2a021212d5fb73cb8b890",
+    "identical": true
+   }
+  },
+  "all_identical": true
+ },
+ "parity_lineage": {
+  "source": "M29 evaluator fresh run on the identical pool lineage (spec M31 section 6)",
+  "m29_results_file": "/home/hatch/workspace/tmp/wt-market-legs/mlb_market_legs_20261014/results_m29_pitcher_pitches.json",
+  "m29_parity_status": "PASSED",
+  "m29_parity_successes": 25,
+  "m29_pool_code_identity_all_identical": true
+ },
+ "population": {
+  "2024": {
+   "candidate_regular_starts": 4858,
+   "undercard_exclusions": {
+    "SEALED_WINDOW": 1564,
+    "POOL_STARTS_LT_5": 1318
+   },
+   "undercard_population_fixtures": 1976
+  },
+  "2025": {
+   "candidate_regular_starts": 4846,
+   "undercard_exclusions": {
+    "POOL_STARTS_LT_5": 1451
+   },
+   "undercard_population_fixtures": 3395
+  }
+ },
+ "counts": {
+  "2024": {
+   "distinct_game_pks_with_qualifying_fixture": 1211,
+   "PAIR_SIDE_MISSING": 446,
+   "PAIR_ANOMALY": 0,
+   "pairs_scored": 765
+  },
+  "2025": {
+   "distinct_game_pks_with_qualifying_fixture": 2000,
+   "PAIR_SIDE_MISSING": 605,
+   "PAIR_ANOMALY": 0,
+   "pairs_scored": 1395
+  },
+  "pooled": {
+   "distinct_game_pks_with_qualifying_fixture": 3211,
+   "PAIR_SIDE_MISSING": 1051,
+   "PAIR_ANOMALY": 0,
+   "pairs_scored": 2160
+  }
+ },
+ "generated_at": "2026-10-15T10:18:51.932070+00:00",
+ "seed": 20261015,
+ "bootstrap": {
+  "blocks": "ISO calendar weeks",
+  "resamples": 2000,
+  "seed": 20261015
+ },
+ "amendment": {
+  "path": "/home/hatch/workspace/tmp/wt-market-legs/mlb_market_legs_20261014/AMENDMENT_M31_ULP_DISPOSITION.md",
+  "sha256": "f1b55887489710d87d7d1ecd7b152d0ebfb12021129733742055e54fd189585f"
+ },
+ "engine_either_census": {
+  "total_either_calls": 51840,
+  "failures": 110,
+  "pairs_affected": 68,
+  "all_failures_full_coverage": true,
+  "failure_total_weight_sums": [
+   1.0000000000000002
+  ],
+  "failures_by_cell": {
+   "HA|XPLUS|5": 13,
+   "BB|ORFEWER|2": 40,
+   "ER|ORFEWER|2": 17,
+   "HA|XPLUS|6": 4,
+   "HA|ORFEWER|5": 23,
+   "HA|ORFEWER|4": 7,
+   "HA|ORFEWER|3": 1,
+   "ER|ORFEWER|1": 1,
+   "ER|XPLUS|3": 1,
+   "ER|XPLUS|4": 1,
+   "BB|ORFEWER|0": 1,
+   "BB|ORFEWER|1": 1
+  },
+  "note": "Original failure census, preserved per Amendment 1: every failure is a full-coverage event whose uniform-weight Cartesian sum is 1.0000000000000002, so the raw event mass exceeds 1 by one floating-point ulp (or its complement is -2.2e-16) and posterior_settlement_mass refuses it. The stopped first run (verdict STOPPED_ENGINE_EITHER_MASS_ERROR) reported this census with no measurements; this re-run under Amendment 1 dispositions each refusal as declared there and proceeds to the section 4 measurements."
+ },
+ "ulp_disposition": {
+  "amendment": "AMENDMENT_M31_ULP_DISPOSITION.md",
+  "dispositioned_calls": 110,
+  "dispositioned_by_cell": {
+   "HA|XPLUS|5": 13,
+   "BB|ORFEWER|2": 40,
+   "ER|ORFEWER|2": 17,
+   "HA|XPLUS|6": 4,
+   "HA|ORFEWER|5": 23,
+   "HA|ORFEWER|4": 7,
+   "HA|ORFEWER|3": 1,
+   "ER|ORFEWER|1": 1,
+   "ER|XPLUS|3": 1,
+   "ER|XPLUS|4": 1,
+   "BB|ORFEWER|0": 1,
+   "BB|ORFEWER|1": 1
+  },
+  "pairs_affected": 68,
+  "undispositionable_refusals": [],
+  "method": "math.fsum category masses over the branch's Cartesian state weights, expressed as proportions of the fsum total weight; boundary test 1e-12; probability from the pinned module's own _posterior with branch assignment and eff.",
+  "scoring_dispositioned_calls": 110,
+  "scoring_dispositioned_by_cell": {
+   "HA|XPLUS|5": 13,
+   "BB|ORFEWER|2": 40,
+   "ER|ORFEWER|2": 17,
+   "HA|XPLUS|6": 4,
+   "HA|ORFEWER|5": 23,
+   "HA|ORFEWER|4": 7,
+   "HA|ORFEWER|3": 1,
+   "ER|ORFEWER|1": 1,
+   "ER|XPLUS|3": 1,
+   "ER|XPLUS|4": 1,
+   "BB|ORFEWER|0": 1,
+   "BB|ORFEWER|1": 1
+  },
+  "census_matches_scoring": true
+ },
+ "event_semantics_hand_check": {
+  "n_pairs": 773,
+  "n_checks": 1546,
+  "n_dispositioned_checks": 3,
+  "max_abs_diff": 3.3306690738754696e-16,
+  "checks": {
+   "omitted_for_transport": true,
+   "reason": "Per-check records (1,546 entries, ~298 KB) exceed the push transport's per-argument limit. All summary fields of this section (n_pairs, n_checks, n_dispositioned_checks, max_abs_diff, note) are preserved verbatim in this branch copy.",
+   "n_records": 1546,
+   "canonical_file_sha256": "51aaec58f67aaa694a5a418009b814481772e71dead0cbf2fd9e12026ba44330",
+   "canonical_file": "The canonical results file exactly as written by scripts/eval_mlb_either_dependence.py (SHA-256 above) is retained in the lane's local records and is reproduced byte-for-byte (except generated_at) by re-running the evaluator; every key outside event_semantics_hand_check.checks is identical between this branch copy and the canonical file."
+  },
+  "note": "Independent Cartesian-product re-derivation with the Jeffreys posterior re-derived from the single-pitcher path formula; HA at X+ 6 (line 5.5) and or-fewer 3 (line 3.5); pairs scanned in (date, game_pk) order until >= 10 pairs and >= 3 dispositioned calls are covered (Amendment 1 additional verification)."
+ },
+ "stats": {
+  "HA": {
+   "forms": {
+    "XPLUS": {
+     "thresholds": {
+      "5": {
+       "threshold": 5,
+       "n": 2160,
+       "mean_predicted": 0.7820696099087678,
+       "observed_rate": 0.825462962962963,
+       "mean_signed_error": -0.04339335305419513,
+       "error_ci95": [
+        -0.060738604245326754,
+        -0.026760463821439578
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.1524071071104562,
+       "frechet_lo_mean": 0.6564653003889115,
+       "frechet_hi_mean": 0.9541633122535902,
+       "per_season_mean_signed_error": {
+        "2024": -0.0515675550504265,
+        "2025": -0.03891072615303598
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": false,
+       "joint_exceedance": {
+        "ratio": 1.064521547185271,
+        "ci95_lo": 0.9922248889706525,
+        "ci95_hi": 1.1402700677521562,
+        "n_blocks": 39,
+        "resamples": 2000,
+        "realized_joint_rate": 0.3388888888888889,
+        "mean_independence_product": 0.31834854802606277
+       }
+      },
+      "6": {
+       "threshold": 6,
+       "n": 2160,
+       "mean_predicted": 0.6117613029468502,
+       "observed_rate": 0.6282407407407408,
+       "mean_signed_error": -0.01647943779389062,
+       "error_ci95": [
+        -0.042875064136388176,
+        0.010202570979703094
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.24410585866566636,
+       "frechet_lo_mean": 0.4895256550291273,
+       "frechet_hi_mean": 0.772246228565673,
+       "per_season_mean_signed_error": {
+        "2024": -0.023748342730361808,
+        "2025": -0.012493264119051576
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": false,
+       "joint_exceedance": {
+        "ratio": 1.022528344124472,
+        "ci95_lo": 0.9178148910310236,
+        "ci95_hi": 1.130404161362597,
+        "n_blocks": 39,
+        "resamples": 2000,
+        "realized_joint_rate": 0.16203703703703703,
+        "mean_independence_product": 0.15846703709302004
+       }
+      },
+      "7": {
+       "threshold": 7,
+       "n": 2160,
+       "mean_predicted": 0.43577914647312116,
+       "observed_rate": 0.4310185185185185,
+       "mean_signed_error": 0.004760627954602661,
+       "error_ci95": [
+        -0.018316039181154382,
+        0.028205341729546633
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.25573966860178254,
+       "frechet_lo_mean": 0.34644049045090713,
+       "frechet_hi_mean": 0.5352718866781367,
+       "per_season_mean_signed_error": {
+        "2024": -0.009782194948097681,
+        "2025": 0.012735724385115747
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": false,
+       "joint_exceedance": {
+        "ratio": 0.8485923626053979,
+        "ci95_lo": 0.7207731220952129,
+        "ci95_hi": 0.9880611421332549,
+        "n_blocks": 39,
+        "resamples": 2000,
+        "realized_joint_rate": 0.06018518518518518,
+        "mean_independence_product": 0.07092355274139057
+       }
+      },
+      "8": {
+       "threshold": 8,
+       "n": 2160,
+       "mean_predicted": 0.2723271463196933,
+       "observed_rate": 0.2523148148148148,
+       "mean_signed_error": 0.020012331504878494,
+       "error_ci95": [
+        0.0004777304157060359,
+        0.03857176726476702
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.19766154891349125,
+       "frechet_lo_mean": 0.226884849332766,
+       "frechet_hi_mean": 0.3334602383213494,
+       "per_season_mean_signed_error": {
+        "2024": 0.004898962022681709,
+        "2025": 0.028300308317696095
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": false,
+       "joint_exceedance": {
+        "ratio": 0.7824927329337518,
+        "ci95_lo": 0.5967350065274221,
+        "ci95_hi": 0.9990212153348144,
+        "n_blocks": 39,
+        "resamples": 2000,
+        "realized_joint_rate": 0.021296296296296296,
+        "mean_independence_product": 0.027215966870965568
+       }
+      },
+      "9": {
+       "threshold": 9,
+       "n": 2160,
+       "mean_predicted": 0.1624600340605544,
+       "observed_rate": 0.13333333333333333,
+       "mean_signed_error": 0.029126700727221063,
+       "error_ci95": [
+        0.01652054375862125,
+        0.04194212316476448
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.12372039827120682,
+       "frechet_lo_mean": 0.14302433484725155,
+       "frechet_hi_mean": 0.21130447870031202,
+       "per_season_mean_signed_error": {
+        "2024": 0.029211309688235813,
+        "2025": 0.029080302264729102
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": false,
+       "joint_exceedance": {
+        "ratio": 0.455008449115458,
+        "ci95_lo": 0.21639251803483697,
+        "ci95_hi": 0.7321672278627822,
+        "n_blocks": 39,
+        "resamples": 2000,
+        "realized_joint_rate": 0.005092592592592593,
+        "mean_independence_product": 0.011192303357207223
+       }
+      },
+      "10": {
+       "threshold": 10,
+       "n": 2160,
+       "mean_predicted": 0.09791661657148745,
+       "observed_rate": 0.05694444444444444,
+       "mean_signed_error": 0.040972172127043,
+       "error_ci95": [
+        0.03003599494651412,
+        0.05120987723355415
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.059344141591954266,
+       "frechet_lo_mean": 0.09284493156020934,
+       "frechet_hi_mean": 0.143221830895442,
+       "per_season_mean_signed_error": {
+        "2024": 0.04414672004517942,
+        "2025": 0.039231291010645625
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": true,
+       "joint_exceedance": {
+        "ratio": 0.08885385076517864,
+        "ci95_lo": 0.0,
+        "ci95_hi": 0.2857741365245051,
+        "n_blocks": 39,
+        "resamples": 2000,
+        "realized_joint_rate": 0.000462962962962963,
+        "mean_independence_product": 0.0052103871579688
+       }
+      }
+     },
+     "pooled_mean_signed_error": {
+      "mean": 0.005833173577609913,
+      "ci95": [
+       -0.008043681753672836,
+       0.020009460500767025
+      ],
+      "definition": "average across the form's grid thresholds of the per-threshold mean signed errors (equal weight per threshold)"
+     }
+    },
+    "ORFEWER": {
+     "thresholds": {
+      "2": {
+       "threshold": 2,
+       "n": 2160,
+       "mean_predicted": 0.24663520030041142,
+       "observed_rate": 0.21064814814814814,
+       "mean_signed_error": 0.03598705215226329,
+       "error_ci95": [
+        0.018528831637167273,
+        0.05328797002699537
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.17463227170679935,
+       "frechet_lo_mean": 0.20772969635816857,
+       "frechet_hi_mean": 0.3047321839682951,
+       "per_season_mean_signed_error": {
+        "2024": 0.04642878073623553,
+        "2025": 0.030260942928794637
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": false
+      },
+      "3": {
+       "threshold": 3,
+       "n": 2160,
+       "mean_predicted": 0.4466859353607778,
+       "observed_rate": 0.4236111111111111,
+       "mean_signed_error": 0.02307482424966666,
+       "error_ci95": [
+        -0.0017716145423496941,
+        0.0438277497637692
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.2615717453009215,
+       "frechet_lo_mean": 0.3552822730253286,
+       "frechet_hi_mean": 0.5493788888580554,
+       "per_season_mean_signed_error": {
+        "2024": 0.04433287611100049,
+        "2025": 0.011417182906354564
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": false
+      },
+      "4": {
+       "threshold": 4,
+       "n": 2160,
+       "mean_predicted": 0.6559447443775144,
+       "observed_rate": 0.6611111111111111,
+       "mean_signed_error": -0.005166366733596586,
+       "error_ci95": [
+        -0.028130975216740694,
+        0.01920065813713917
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.23560128946285722,
+       "frechet_lo_mean": 0.5291596559304893,
+       "frechet_hi_mean": 0.8268576677951679,
+       "per_season_mean_signed_error": {
+        "2024": 0.0130028134323327,
+        "2025": -0.015130110695557808
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": false
+      },
+      "5": {
+       "threshold": 5,
+       "n": 2160,
+       "mean_predicted": 0.8137905416055569,
+       "observed_rate": 0.8379629629629629,
+       "mean_signed_error": -0.024172421357406146,
+       "error_ci95": [
+        -0.04047610422135685,
+        -0.00745411047160705
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.13974375771492897,
+       "frechet_lo_mean": 0.6931532093164037,
+       "frechet_hi_mean": 0.9758737828529497,
+       "per_season_mean_signed_error": {
+        "2024": -0.017075672903743542,
+        "2025": -0.02806418663844693
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": false
+      }
+     },
+     "pooled_mean_signed_error": {
+      "mean": 0.007430772077731802,
+      "ci95": [
+       -0.009680279621493388,
+       0.023743908306798348
+      ],
+      "definition": "average across the form's grid thresholds of the per-threshold mean signed errors (equal weight per threshold)"
+     }
+    }
+   },
+   "residual_correlation": {
+    "pearson": {
+     "value": -0.006072477975519999,
+     "ci95_lo": -0.04364692445424809,
+     "ci95_hi": 0.02910426016825814
+    },
+    "spearman": {
+     "value": -0.0037689288683410488,
+     "ci95_lo": -0.043600850427114535,
+     "ci95_hi": 0.03321907590917622
+    },
+    "n_blocks": 39,
+    "resamples": 2000,
+    "per_season_point_estimates": {
+     "2024": {
+      "pearson": 0.006568685649208856,
+      "spearman": 0.023130318399949418,
+      "n": 765
+     },
+     "2025": {
+      "pearson": -0.013115235783137455,
+      "spearman": -0.018857845922134818,
+      "n": 1395
+     }
+    }
+   }
+  },
+  "BB": {
+   "forms": {
+    "XPLUS": {
+     "thresholds": {
+      "3": {
+       "threshold": 3,
+       "n": 2160,
+       "mean_predicted": 0.4522459354353807,
+       "observed_rate": 0.4263888888888889,
+       "mean_signed_error": 0.025857046546491833,
+       "error_ci95": [
+        0.006623963084955659,
+        0.04610090584788557
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.2508619804687334,
+       "frechet_lo_mean": 0.3627949159893604,
+       "frechet_hi_mean": 0.5579247681331015,
+       "per_season_mean_signed_error": {
+        "2024": 0.03419377347827465,
+        "2025": 0.021285293067772226
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": false,
+       "joint_exceedance": {
+        "ratio": 0.73808380819976,
+        "ci95_lo": 0.6138797530854282,
+        "ci95_hi": 0.8629896092407267,
+        "n_blocks": 39,
+        "resamples": 2000,
+        "realized_joint_rate": 0.0587962962962963,
+        "mean_independence_product": 0.07966073180727908
+       }
+      },
+      "4": {
+       "threshold": 4,
+       "n": 2160,
+       "mean_predicted": 0.21022291005340873,
+       "observed_rate": 0.16342592592592592,
+       "mean_signed_error": 0.04679698412748281,
+       "error_ci95": [
+        0.030007600507220688,
+        0.06312029602272824
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.14362067450240554,
+       "frechet_lo_mean": 0.18088804264151487,
+       "frechet_hi_mean": 0.2638657458796348,
+       "per_season_mean_signed_error": {
+        "2024": 0.05114099206678714,
+        "2025": 0.04441478622528367
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": true,
+       "joint_exceedance": {
+        "ratio": 0.4920236175848859,
+        "ci95_lo": 0.28132319389918314,
+        "ci95_hi": 0.7425244009426863,
+        "n_blocks": 39,
+        "resamples": 2000,
+        "realized_joint_rate": 0.008796296296296297,
+        "mean_independence_product": 0.017877792817087127
+       }
+      },
+      "5": {
+       "threshold": 5,
+       "n": 2160,
+       "mean_predicted": 0.0998855553134065,
+       "observed_rate": 0.05185185185185185,
+       "mean_signed_error": 0.048033703461554646,
+       "error_ci95": [
+        0.03871636115154247,
+        0.057903599335582735
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.05391101669222855,
+       "frechet_lo_mean": 0.09481049750146972,
+       "frechet_hi_mean": 0.14529395630090072,
+       "per_season_mean_signed_error": {
+        "2024": 0.060851367035215334,
+        "2025": 0.041004662146966527
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": true,
+       "joint_exceedance": {
+        "ratio": 0.0,
+        "ci95_lo": 0.0,
+        "ci95_hi": 0.0,
+        "n_blocks": 39,
+        "resamples": 2000,
+        "realized_joint_rate": 0.0,
+        "mean_independence_product": 0.005442213626061798
+       }
+      },
+      "6": {
+       "threshold": 6,
+       "n": 2160,
+       "mean_predicted": 0.058557151151979646,
+       "observed_rate": 0.008796296296296297,
+       "mean_signed_error": 0.049760854855683344,
+       "error_ci95": [
+        0.04549401724546826,
+        0.05430538997368362
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.01192410332994981,
+       "frechet_lo_mean": 0.05830387333859556,
+       "frechet_hi_mean": 0.10290623342706674,
+       "per_season_mean_signed_error": {
+        "2024": 0.05323075989556977,
+        "2025": 0.04785800370477789
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": true,
+       "joint_exceedance": {
+        "ratio": 0.0,
+        "ci95_lo": 0.0,
+        "ci95_hi": 0.0,
+        "n_blocks": 39,
+        "resamples": 2000,
+        "realized_joint_rate": 0.0,
+        "mean_independence_product": 0.002726840011830242
+       }
+      }
+     },
+     "pooled_mean_signed_error": {
+      "mean": 0.04261214724780316,
+      "ci95": [
+       0.03288481047794006,
+       0.05231388124681633
+      ],
+      "definition": "average across the form's grid thresholds of the per-threshold mean signed errors (equal weight per threshold)"
+     }
+    },
+    "ORFEWER": {
+     "thresholds": {
+      "0": {
+       "threshold": 0,
+       "n": 2160,
+       "mean_predicted": 0.348117250470732,
+       "observed_rate": 0.3375,
+       "mean_signed_error": 0.010617250470731952,
+       "error_ci95": [
+        -0.007242373725442102,
+        0.029495805648349045
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.23799303017631615,
+       "frechet_lo_mean": 0.2849731762578985,
+       "frechet_hi_mean": 0.42471410084257305,
+       "per_season_mean_signed_error": {
+        "2024": 0.021547217440629856,
+        "2025": 0.004623397616271819
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": false
+      },
+      "1": {
+       "threshold": 1,
+       "n": 2160,
+       "mean_predicted": 0.7058069327973229,
+       "observed_rate": 0.7402777777777778,
+       "mean_signed_error": -0.03447084498045498,
+       "error_ci95": [
+        -0.048368857567594556,
+        -0.02034664730236509
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.19796057442652074,
+       "frechet_lo_mean": 0.5792908486832097,
+       "frechet_hi_mean": 0.8823558919218643,
+       "per_season_mean_signed_error": {
+        "2024": -0.028506601684989214,
+        "2025": -0.037741559045710416
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": false
+      },
+      "2": {
+       "threshold": 2,
+       "n": 2160,
+       "mean_predicted": 0.8879288418636575,
+       "observed_rate": 0.9412037037037037,
+       "mean_signed_error": -0.053274861840046185,
+       "error_ci95": [
+        -0.06408311986099398,
+        -0.042575919257862575
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.05992619950479822,
+       "frechet_lo_mean": 0.802297919415975,
+       "frechet_hi_mean": 0.997427771559716,
+       "per_season_mean_signed_error": {
+        "2024": -0.05472023165598274,
+        "2025": -0.0524822396829197
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": false
+      }
+     },
+     "pooled_mean_signed_error": {
+      "mean": -0.02570948544992307,
+      "ci95": [
+       -0.03573779199368833,
+       -0.015521205903347154
+      ],
+      "definition": "average across the form's grid thresholds of the per-threshold mean signed errors (equal weight per threshold)"
+     }
+    }
+   },
+   "residual_correlation": {
+    "pearson": {
+     "value": 0.008706723671899739,
+     "ci95_lo": -0.03325158550461626,
+     "ci95_hi": 0.047356867664905294
+    },
+    "spearman": {
+     "value": 0.00800913186622307,
+     "ci95_lo": -0.03195114946575289,
+     "ci95_hi": 0.04568934821074297
+    },
+    "n_blocks": 39,
+    "resamples": 2000,
+    "per_season_point_estimates": {
+     "2024": {
+      "pearson": 0.08878398447566506,
+      "spearman": 0.08320738640214642,
+      "n": 765
+     },
+     "2025": {
+      "pearson": -0.03230250331527579,
+      "spearman": -0.030585659961812926,
+      "n": 1395
+     }
+    }
+   }
+  },
+  "ER": {
+   "forms": {
+    "XPLUS": {
+     "thresholds": {
+      "3": {
+       "threshold": 3,
+       "n": 2160,
+       "mean_predicted": 0.6294704861286764,
+       "observed_rate": 0.6712962962962963,
+       "mean_signed_error": -0.04182581016761989,
+       "error_ci95": [
+        -0.061314176252608835,
+        -0.023484750330422546
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.22964312352792912,
+       "frechet_lo_mean": 0.4987375079909802,
+       "frechet_hi_mean": 0.8001936707839487,
+       "per_season_mean_signed_error": {
+        "2024": -0.048845363368179066,
+        "2025": -0.03797637776731325
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": false,
+       "joint_exceedance": {
+        "ratio": 1.0956825244839958,
+        "ci95_lo": 1.0017721158773474,
+        "ci95_hi": 1.1865380687374696,
+        "n_blocks": 39,
+        "resamples": 2000,
+        "realized_joint_rate": 0.18703703703703703,
+        "mean_independence_product": 0.1707036781709381
+       }
+      },
+      "4": {
+       "threshold": 4,
+       "n": 2160,
+       "mean_predicted": 0.4454614384139734,
+       "observed_rate": 0.4671296296296296,
+       "mean_signed_error": -0.021668191215656198,
+       "error_ci95": [
+        -0.044346190932472,
+        0.0004262332180416553
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.26195328414463626,
+       "frechet_lo_mean": 0.3490597898757621,
+       "frechet_hi_mean": 0.5486991230220397,
+       "per_season_mean_signed_error": {
+        "2024": -0.0171134462475888,
+        "2025": -0.02416595458524155
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": false,
+       "joint_exceedance": {
+        "ratio": 1.0278510194247794,
+        "ci95_lo": 0.8745690147831283,
+        "ci95_hi": 1.1889400985073078,
+        "n_blocks": 39,
+        "resamples": 2000,
+        "realized_joint_rate": 0.07777777777777778,
+        "mean_independence_product": 0.07567028324912776
+       }
+      },
+      "5": {
+       "threshold": 5,
+       "n": 2160,
+       "mean_predicted": 0.28635360060632004,
+       "observed_rate": 0.27685185185185185,
+       "mean_signed_error": 0.009501748754468152,
+       "error_ci95": [
+        -0.011723288864778879,
+        0.02968897439686036
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.21077598253984103,
+       "frechet_lo_mean": 0.23285678120747566,
+       "frechet_hi_mean": 0.3504977706192984,
+       "per_season_mean_signed_error": {
+        "2024": 0.021716941447086018,
+        "2025": 0.002803094697226094
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": false,
+       "joint_exceedance": {
+        "ratio": 0.8123294197571347,
+        "ci95_lo": 0.5788061100779375,
+        "ci95_hi": 1.0968957248877582,
+        "n_blocks": 39,
+        "resamples": 2000,
+        "realized_joint_rate": 0.025,
+        "mean_independence_product": 0.030775691969243645
+       }
+      },
+      "6": {
+       "threshold": 6,
+       "n": 2160,
+       "mean_predicted": 0.1821145000340765,
+       "observed_rate": 0.1574074074074074,
+       "mean_signed_error": 0.024707092626669095,
+       "error_ci95": [
+        0.008041030270894978,
+        0.042610033326483374
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.14144900329952345,
+       "frechet_lo_mean": 0.15661884090703534,
+       "frechet_hi_mean": 0.23269068765596543,
+       "per_season_mean_signed_error": {
+        "2024": 0.034713454179204115,
+        "2025": 0.019219733065601503
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": false,
+       "joint_exceedance": {
+        "ratio": 0.6439512682662262,
+        "ci95_lo": 0.36026381580484756,
+        "ci95_hi": 0.94249282319147,
+        "n_blocks": 39,
+        "resamples": 2000,
+        "realized_joint_rate": 0.008796296296296297,
+        "mean_independence_product": 0.013659878828998096
+       }
+      }
+     },
+     "pooled_mean_signed_error": {
+      "mean": -0.007321290000534713,
+      "ci95": [
+       -0.023421611500212505,
+       0.008204626125370615
+      ],
+      "definition": "average across the form's grid thresholds of the per-threshold mean signed errors (equal weight per threshold)"
+     }
+    },
+    "ORFEWER": {
+     "thresholds": {
+      "0": {
+       "threshold": 0,
+       "n": 2160,
+       "mean_predicted": 0.3401131498062164,
+       "observed_rate": 0.2972222222222222,
+       "mean_signed_error": 0.04289092758399416,
+       "error_ci95": [
+        0.01543056784391059,
+        0.06759301347554166
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.22655958083971703,
+       "frechet_lo_mean": 0.2714690344377844,
+       "frechet_hi_mean": 0.4152656866024922,
+       "per_season_mean_signed_error": {
+        "2024": 0.05291671847370642,
+        "2025": 0.037392913225119694
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": false
+      },
+      "1": {
+       "threshold": 1,
+       "n": 2160,
+       "mean_predicted": 0.6198901790219531,
+       "observed_rate": 0.5949074074074074,
+       "mean_signed_error": 0.02498277161454569,
+       "error_ci95": [
+        0.0012000262388756498,
+        0.04893106794463728
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.2532725731319898,
+       "frechet_lo_mean": 0.4904132987639933,
+       "frechet_hi_mean": 0.7863001857967137,
+       "per_season_mean_signed_error": {
+        "2024": 0.016808776062885777,
+        "2025": 0.02946528530416565
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": false
+      },
+      "2": {
+       "threshold": 2,
+       "n": 2160,
+       "mean_predicted": 0.8019723986659262,
+       "observed_rate": 0.812962962962963,
+       "mean_signed_error": -0.010990564297036778,
+       "error_ci95": [
+        -0.027301268854525978,
+        0.00446463715853254
+       ],
+       "n_blocks": 39,
+       "brier_mean": 0.15818361902380376,
+       "frechet_lo_mean": 0.6726423030416087,
+       "frechet_hi_mean": 0.974098465834577,
+       "per_season_mean_signed_error": {
+        "2024": -0.01707440891352134,
+        "2025": -0.0076542624105775045
+       },
+       "material_overstatement_ci_lo_gt_plus_2pp": false
+      }
+     },
+     "pooled_mean_signed_error": {
+      "mean": 0.01896104496716769,
+      "ci95": [
+       0.00048331868510117246,
+       0.03738762833522814
+      ],
+      "definition": "average across the form's grid thresholds of the per-threshold mean signed errors (equal weight per threshold)"
+     }
+    }
+   },
+   "residual_correlation": {
+    "pearson": {
+     "value": 0.0014223100664272534,
+     "ci95_lo": -0.04230442003131268,
+     "ci95_hi": 0.048235574101483665
+    },
+    "spearman": {
+     "value": -0.0008349135513288998,
+     "ci95_lo": -0.0458427862320919,
+     "ci95_hi": 0.04412592935516896
+    },
+    "n_blocks": 39,
+    "resamples": 2000,
+    "per_season_point_estimates": {
+     "2024": {
+      "pearson": -0.020633069736042748,
+      "spearman": -0.004638148300875032,
+      "n": 765
+     },
+     "2025": {
+      "pearson": 0.01323012062833029,
+      "spearman": 0.0020097321773295115,
+      "n": 1395
+     }
+    }
+   }
+  }
+ },
+ "materiality_reading_spec_s5": {
+  "HA": {
+   "XPLUS": "MATERIAL_OVERSTATEMENT at thresholds 10",
+   "ORFEWER": "No threshold with 95% CI lower bound above +2pp; errors not shown material at the declared +2pp standard on this grid."
+  },
+  "BB": {
+   "XPLUS": "MATERIAL_OVERSTATEMENT at thresholds 4, 5, 6",
+   "ORFEWER": "No threshold with 95% CI lower bound above +2pp; errors not shown material at the declared +2pp standard on this grid."
+  },
+  "ER": {
+   "XPLUS": "No threshold with 95% CI lower bound above +2pp; errors not shown material at the declared +2pp standard on this grid.",
+   "ORFEWER": "No threshold with 95% CI lower bound above +2pp; errors not shown material at the declared +2pp standard on this grid."
+  }
+ },
+ "methodology_notes": [
+  "Calibration error = predicted - observed (probability points); positive = the independence construction overstates the buyable yes-only side.",
+  "Materiality (spec section 5, declared before results): a threshold is material iff the 95% CI lower bound of its signed error exceeds +0.02. CIs including 0 are reported as not distinguishable from zero on this sample, not as proof of independence.",
+  "Posterior means for residuals: E[X] = sum_{m=0}^{m_max} (1 - F(m)) from the swept single-pitcher CDFs, truncated at the undercard grid bound (HA 14, BB 9, ER 11); identical construction for both starters.",
+  "Frechet bounds: max(pA, pB) <= P(either) <= min(1, pA + pB) with pA/pB the engine single-pitcher posterior probabilities for the same event form; reported as per-pair means.",
+  "Per-season calibration errors are point estimates (descriptive); CIs are pooled only. Residual-correlation CIs are pooled; per-season correlations are point estimates.",
+  "Pair assembly: away starter (gameLog isHome == False) is pitcher_a; measurements are symmetric in A/B (max/min events)."
+ ],
+ "verdict": "DEPENDENCE_MEASURED"
+}

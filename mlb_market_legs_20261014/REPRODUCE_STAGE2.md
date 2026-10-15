@@ -22,3 +22,15 @@ re-run reproduces the results JSON except `generated_at`
 records and are available on request; the results JSONs carry
 every aggregate the verdicts rest on, and M31's carries its full
 per-cell tables and hand-check record.
+
+**Transport note (M31 results):** the canonical
+`results_m31_either_dependence.json` as written by the evaluator
+is 397,440 bytes, of which ~298 KB is the hand-check section's
+1,546 per-check records; the push transport refuses arguments of
+that size. The branch copy therefore carries that one array as a
+stub recording the record count and the canonical file's SHA-256
+(`51aaec58f67aaa694a5a418009b814481772e71dead0cbf2fd9e12026ba44330`);
+every other key — including all hand-check summary fields — is
+identical to the canonical file (deep-compared at publication).
+The canonical file is retained in the lane's local records and is
+reproduced (except `generated_at`) by re-running the evaluator.
