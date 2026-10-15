@@ -43,6 +43,13 @@ from .moneyline_settlement import (
     settle_moneyline,
 )
 from .odds_api_source import EVENT_TIME_TOLERANCE_SECONDS, normalize_name
+from .f5_derived_readouts import (
+    ANY_OTHER as _F5_ANY_OTHER,
+    F5DerivedReadoutError,
+    parse_btts_rung,
+    parse_correct_score_selection,
+    parse_margin_band,
+)
 
 ARCHIVE_TYPE = "MLB_ADDITIONAL_PIT_QUOTES"
 _BINARY_MARKETS = frozenset({"FIRST_HOME_RUN", "PITCHER_RECORD_WIN"})
@@ -319,6 +326,53 @@ def _f5_total_outcome(facts: Mapping[str, Any], line: Any, side: Any) -> str:
     return "WIN" if won else "LOSS"
 
 
+# Derived F5 settlement (matrix M14/M15): outcomes derive from the
+# same facts["f5"] score slice as the four canonical F5 markets, with
+# the selection grammars shared with the pricing read-out layer
+# (sportsedge.f5_derived_readouts), so a selection means the same
+# thing at intake and at settlement.
+
+def _f5_score(facts: Mapping[str, Any]) -> tuple[float, float]:
+    f5 = facts.get("f5")
+    if not isinstance(f5, Mapping):
+        raise MLBPITJoinError("F5_FACTS_MISSING")
+    return float(f5["away_runs"]), float(f5["home_runs"])
+
+
+def _f5_btts_outcome(facts: Mapping[str, Any], line: Any, side: Any) -> str:
+    away, home = _f5_score(facts)
+    try:
+        rung = parse_btts_rung(line)
+    except F5DerivedReadoutError as exc:
+        raise MLBPITJoinError(f"F5_BTTS_RUNG_INVALID: {exc}") from exc
+    return _binary_outcome(away >= rung and home >= rung, side)
+
+
+def _f5_winning_margin_outcome(facts: Mapping[str, Any], side: Any) -> str:
+    away, home = _f5_score(facts)
+    try:
+        band = parse_margin_band(side)
+    except F5DerivedReadoutError as exc:
+        raise MLBPITJoinError(f"F5_WINNING_MARGIN_SELECTION_INVALID: {exc}") from exc
+    margin = int(home - away)
+    return "WIN" if band.contains(margin) else "LOSS"
+
+
+def _f5_correct_score_outcome(facts: Mapping[str, Any], side: Any) -> str:
+    away, home = _f5_score(facts)
+    try:
+        parsed = parse_correct_score_selection(side)
+    except F5DerivedReadoutError as exc:
+        raise MLBPITJoinError(f"F5_CORRECT_SCORE_SELECTION_INVALID: {exc}") from exc
+    if parsed[0] == _F5_ANY_OTHER:
+        # The catch-all wins iff the realized score is none of the
+        # market's other quoted cells -- a fact about the whole
+        # selection set, which a single settlement row cannot carry.
+        # Fail closed by name rather than guessing the set.
+        raise MLBPITJoinError("F5_CORRECT_SCORE_ANY_OTHER_REQUIRES_SELECTION_SET")
+    return "WIN" if (int(away), int(home)) == (parsed[1], parsed[2]) else "LOSS"
+
+
 # Period (first-3 / first-7 innings) settlement, the F3/F7 counterpart
 # of the F5 functions above: outcomes derive from the cumulative score
 # through the period's completed innings, carried on facts["f3"] /
@@ -484,6 +538,12 @@ def _derive_outcome(
         return _f5_run_line_outcome(facts, line, side)
     if market == "F5_TOTALS":
         return _f5_total_outcome(facts, line, side)
+    if market == "F5_BOTH_TEAMS_TO_SCORE":
+        return _f5_btts_outcome(facts, line, side)
+    if market == "F5_WINNING_MARGIN":
+        return _f5_winning_margin_outcome(facts, side)
+    if market == "F5_CORRECT_SCORE":
+        return _f5_correct_score_outcome(facts, side)
     if market in _PERIOD_TEAM_TOTAL_FACT_KEY:
         fact_key = _PERIOD_TEAM_TOTAL_FACT_KEY[market]
         return _period_team_total_outcome(
