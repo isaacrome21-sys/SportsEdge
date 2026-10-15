@@ -25,7 +25,16 @@ def _live():
     legacy = _payload()
     box = legacy.pop("boxscore")
     legacy["playerByGameStats"] = box["playerByGameStats"]
-    rail = {"linescore": box["linescore"]}
+    linescore = copy.deepcopy(box["linescore"])
+    linescore["totals"] = {"away": 3, "home": 4}
+    rail = {
+        "linescore": linescore,
+        "shotsByPeriod": [
+            {"periodDescriptor": {"number": 1, "periodType": "REG"}, "away": 10, "home": 12},
+            {"periodDescriptor": {"number": 2, "periodType": "REG"}, "away": 9, "home": 11},
+            {"periodDescriptor": {"number": 3, "periodType": "REG"}, "away": 10, "home": 11},
+        ],
+    }
     return legacy, rail
 
 
@@ -85,3 +94,55 @@ def test_live_receipt_round_trips_and_legacy_hash_unchanged():
     d = legacy.as_json_dict()
     assert "right_rail_uri" not in d and "right_rail_raw_sha256" not in d
     assert dataset_sha256([legacy]) == dataset_sha256([completed_game_from_json_dict(d)])
+
+
+# --- Binding: the right-rail must be provably for THIS boxscore. ---------
+# Real files carry no gameInfo.id, so binding is by content: linescore
+# totals == boxscore final score, period goals sum to the totals, and
+# shotsByPeriod sums == boxscore sog.
+
+
+def test_right_rail_without_totals_fails_closed():
+    payload, rail = _live()
+    del rail["linescore"]["totals"]
+    with pytest.raises(ValueError, match="totals"):
+        _build(payload, rail)
+
+
+@pytest.mark.parametrize("side", ["away", "home"])
+def test_right_rail_totals_must_match_final_score(side):
+    payload, rail = _live()
+    rail["linescore"]["totals"][side] += 1
+    with pytest.raises(ValueError, match="final score"):
+        _build(payload, rail)
+
+
+def test_period_goals_must_sum_to_totals():
+    payload, rail = _live()
+    rail["linescore"]["byPeriod"][0]["home"] += 1  # totals untouched
+    with pytest.raises(ValueError, match="period goals"):
+        _build(payload, rail)
+
+
+def test_right_rail_without_shots_binding_fails_closed():
+    payload, rail = _live()
+    del rail["shotsByPeriod"]
+    with pytest.raises(ValueError, match="shotsByPeriod"):
+        _build(payload, rail)
+
+
+@pytest.mark.parametrize("side", ["away", "home"])
+def test_right_rail_shots_must_match_boxscore_sog(side):
+    payload, rail = _live()
+    rail["shotsByPeriod"][1][side] += 1
+    with pytest.raises(ValueError, match="shots on goal"):
+        _build(payload, rail)
+
+
+def test_neighbouring_game_right_rail_with_same_score_rejected():
+    """Identical final score but different game: shots binding rejects it."""
+    payload, rail = _live()
+    rail["shotsByPeriod"][0]["away"] -= 2
+    rail["shotsByPeriod"][0]["home"] += 3
+    with pytest.raises(ValueError):
+        _build(payload, rail)

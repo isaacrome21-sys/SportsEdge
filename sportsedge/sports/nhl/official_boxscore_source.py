@@ -222,6 +222,36 @@ def _team_identity(payload: Mapping[str, Any], side: str) -> tuple[str, str, int
     return team_id, abbrev, score, sog, pp
 
 
+def _side_sums(rows: Any, label: str) -> tuple[int, int]:
+    if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes, bytearray)) or not rows:
+        raise ValueError(f"right-rail {label} required for binding")
+    away = home = 0
+    for row in rows:
+        if not isinstance(row, Mapping):
+            raise ValueError(f"right-rail {label} row must be a mapping")
+        away += _nonnegative_int(row.get("away"), f"{label} away")
+        home += _nonnegative_int(row.get("home"), f"{label} home")
+    return away, home
+
+
+def _bind_right_rail(rail: Mapping[str, Any], final: tuple[int, int], sog: tuple[int, int]) -> None:
+    """Fail closed unless the right-rail is provably for this boxscore."""
+    linescore = rail.get("linescore")
+    if not isinstance(linescore, Mapping):
+        raise ValueError("official boxscore missing linescore")
+    totals = linescore.get("totals")
+    if not isinstance(totals, Mapping):
+        raise ValueError("right-rail linescore.totals required for binding")
+    tot = (_nonnegative_int(totals.get("away"), "totals away"),
+           _nonnegative_int(totals.get("home"), "totals home"))
+    if tot != tuple(final):
+        raise ValueError("right-rail linescore totals do not match boxscore final score")
+    if _side_sums(linescore.get("byPeriod"), "linescore.byPeriod") != tot:
+        raise ValueError("right-rail period goals inconsistent with linescore totals")
+    if _side_sums(rail.get("shotsByPeriod"), "shotsByPeriod") != tuple(sog):
+        raise ValueError("right-rail shotsByPeriod do not match boxscore shots on goal")
+
+
 def _regulation_goals(boxscore: Mapping[str, Any], side: str) -> int:
     linescore = boxscore.get("linescore")
     if not isinstance(linescore, Mapping):
@@ -330,6 +360,8 @@ def build_official_completed_game(
         info = right_rail_payload.get("gameInfo")
         if isinstance(info, Mapping) and info.get("id") is not None and str(info.get("id")).strip() != game_id:
             raise ValueError("right-rail payload is for a different game")
+        # Real right-rail files carry no gameInfo.id, so bind by content.
+        _bind_right_rail(right_rail_payload, (away_final, home_final), (away_sog, home_sog))
         boxscore = {
             "linescore": right_rail_payload.get("linescore"),
             "playerByGameStats": payload.get("playerByGameStats"),
