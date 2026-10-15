@@ -319,6 +319,119 @@ def _f5_total_outcome(facts: Mapping[str, Any], line: Any, side: Any) -> str:
     return "WIN" if won else "LOSS"
 
 
+# Period (first-3 / first-7 innings) settlement, the F3/F7 counterpart
+# of the F5 functions above: outcomes derive from the cumulative score
+# through the period's completed innings, carried on facts["f3"] /
+# facts["f7"] in the same {away_runs, home_runs} shape as facts["f5"].
+_PERIOD_FACT_KEY_BY_MARKET = {
+    "F3_MONEYLINE": "f3", "F3_RUN_LINE": "f3", "F3_TOTALS": "f3",
+    "F7_MONEYLINE": "f7", "F7_RUN_LINE": "f7", "F7_TOTALS": "f7",
+}
+PERIOD_MONEYLINE_TIE_POLICY_MISSING = {
+    "F3_MONEYLINE": "F3_MONEYLINE_TIE_POLICY_NOT_NORMALIZED",
+    "F7_MONEYLINE": "F7_MONEYLINE_TIE_POLICY_NOT_NORMALIZED",
+}
+_PERIOD_TEAM_TOTAL_FACT_KEY = {"F3_TEAM_TOTALS": "f3", "F7_TEAM_TOTALS": "f7"}
+
+
+def _period_team_total_outcome(facts: Mapping[str, Any], entity_id: str,
+                               line: Any, side: Any, *, fact_key: str,
+                               tag: str) -> str:
+    """Period team total over facts[fact_key], whose slice carries the
+    team identity ({away_runs, home_runs, away_team_id, home_team_id})
+    -- the same settlement semantics the catalog module's
+    _team_total_outcome applies over facts["f5"] for F5_TEAM_TOTALS."""
+    period = facts.get(fact_key)
+    if not isinstance(period, Mapping):
+        raise MLBPITJoinError(f"{tag}_FACTS_MISSING")
+    away_id = str(period.get("away_team_id") or "").strip()
+    home_id = str(period.get("home_team_id") or "").strip()
+    if not away_id or not home_id or away_id == home_id:
+        raise MLBPITJoinError(f"{tag}_TEAM_SCORE_IDENTITY_MISSING")
+    entity = str(entity_id or "").strip()
+    if entity == away_id:
+        runs = float(period["away_runs"])
+    elif entity == home_id:
+        runs = float(period["home_runs"])
+    else:
+        raise MLBPITJoinError(f"{tag}_TEAM_TOTAL_ENTITY_ID_NOT_IN_GAME")
+    threshold = float(line)
+    direction = str(side or "").upper()
+    if abs(runs - threshold) <= 1e-12:
+        return "PUSH"
+    if direction == "OVER":
+        return "WIN" if runs > threshold else "LOSS"
+    if direction == "UNDER":
+        return "WIN" if runs < threshold else "LOSS"
+    raise MLBPITJoinError(f"{tag}_TEAM_TOTAL_SIDE_INVALID")
+
+
+def _period_score(facts: Mapping[str, Any], fact_key: str, tag: str) -> tuple[float, float]:
+    period = facts.get(fact_key)
+    if not isinstance(period, Mapping):
+        raise MLBPITJoinError(f"{tag}_FACTS_MISSING")
+    return float(period["away_runs"]), float(period["home_runs"])
+
+
+def _period_moneyline_outcome(
+    facts: Mapping[str, Any],
+    side: Any,
+    *,
+    fact_key: str,
+    tag: str,
+    settlement_type: MoneylineSettlementType | None = None,
+) -> str:
+    away, home = _period_score(facts, fact_key, tag)
+    direction = str(side or "").upper()
+    if direction in {"HOME", "HOME_ML"}:
+        selected, other = home, away
+    elif direction in {"AWAY", "AWAY_ML"}:
+        selected, other = away, home
+    else:
+        raise MLBPITJoinError(f"{tag}_MONEYLINE_SIDE_INVALID")
+    if selected == other:
+        # Same fail-closed tie discipline as F5: a tie settles only
+        # under an explicitly declared settlement type.
+        if settlement_type is None:
+            raise MLBPITJoinError(
+                PERIOD_MONEYLINE_TIE_POLICY_MISSING[f"{tag}_MONEYLINE"])
+        return settle_moneyline(
+            settlement_type, side=direction,
+            selected_runs=selected, other_runs=other)
+    return "WIN" if selected > other else "LOSS"
+
+
+def _period_run_line_outcome(facts: Mapping[str, Any], line: Any, side: Any,
+                             *, fact_key: str, tag: str) -> str:
+    away, home = _period_score(facts, fact_key, tag)
+    spread = float(line)
+    direction = str(side or "").upper()
+    if direction in {"HOME", "HOME_RL"}:
+        selected, other = home, away
+    elif direction in {"AWAY", "AWAY_RL"}:
+        selected, other = away, home
+    else:
+        raise MLBPITJoinError(f"{tag}_RUN_LINE_SIDE_INVALID")
+    adjusted = selected + spread
+    if abs(adjusted - other) <= 1e-12:
+        return "PUSH"
+    return "WIN" if adjusted > other else "LOSS"
+
+
+def _period_total_outcome(facts: Mapping[str, Any], line: Any, side: Any,
+                          *, fact_key: str, tag: str) -> str:
+    away, home = _period_score(facts, fact_key, tag)
+    total = away + home
+    threshold = float(line)
+    direction = str(side or "").upper()
+    if direction not in {"OVER", "UNDER"}:
+        raise MLBPITJoinError(f"{tag}_TOTAL_SIDE_INVALID")
+    if abs(total - threshold) <= 1e-12:
+        return "PUSH"
+    won = total > threshold if direction == "OVER" else total < threshold
+    return "WIN" if won else "LOSS"
+
+
 def _policy_ambiguity(
     facts: Mapping[str, Any],
     market: str,
@@ -326,6 +439,15 @@ def _policy_ambiguity(
     sportsbook: Any = None,
 ) -> list[str]:
     reasons: list[str] = []
+    if market in PERIOD_MONEYLINE_TIE_POLICY_MISSING:
+        period = facts.get(_PERIOD_FACT_KEY_BY_MARKET[market])
+        if isinstance(period, Mapping) and "away_runs" in period and "home_runs" in period:
+            if float(period["away_runs"]) == float(period["home_runs"]):
+                # A tied period moneyline is ambiguous only while the
+                # book's settlement type is undeclared (mirrors F5).
+                if declared_moneyline_settlement_type(
+                        market, sportsbook) is None:
+                    reasons.append(PERIOD_MONEYLINE_TIE_POLICY_MISSING[market])
     if market == "F5_MONEYLINE":
         f5 = facts.get("f5")
         if isinstance(f5, Mapping) and "away_runs" in f5 and "home_runs" in f5:
@@ -362,6 +484,24 @@ def _derive_outcome(
         return _f5_run_line_outcome(facts, line, side)
     if market == "F5_TOTALS":
         return _f5_total_outcome(facts, line, side)
+    if market in _PERIOD_TEAM_TOTAL_FACT_KEY:
+        fact_key = _PERIOD_TEAM_TOTAL_FACT_KEY[market]
+        return _period_team_total_outcome(
+            facts, entity_id, line, side,
+            fact_key=fact_key, tag=market.split("_", 1)[0])
+    if market in _PERIOD_FACT_KEY_BY_MARKET:
+        fact_key = _PERIOD_FACT_KEY_BY_MARKET[market]
+        tag = market.split("_", 1)[0]
+        if market.endswith("_MONEYLINE"):
+            return _period_moneyline_outcome(
+                facts, side, fact_key=fact_key, tag=tag,
+                settlement_type=declared_moneyline_settlement_type(
+                    market, sportsbook))
+        if market.endswith("_RUN_LINE"):
+            return _period_run_line_outcome(
+                facts, line, side, fact_key=fact_key, tag=tag)
+        return _period_total_outcome(
+            facts, line, side, fact_key=fact_key, tag=tag)
     if market in {"NRFI", "YRFI"}:
         first = facts.get("first_inning")
         if not isinstance(first, Mapping):
