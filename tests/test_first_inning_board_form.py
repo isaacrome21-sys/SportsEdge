@@ -265,3 +265,19 @@ def test_board_market_is_no_longer_unrouted():
         assert r["reason"] != "NO_VERIFIED_MODEL_FOR_THIS_MARKET"
     assert card["prop_model_status"]["first_inning_board_form"] == \
         "INNING_1_RUNS_BOUND_TO_FIRST_INNING_RUNS_ENGINE"
+
+
+@pytest.mark.registry_lane_internals
+@pytest.mark.parametrize("bad_line", [float("nan"), float("inf"), -float("inf"), "nan", "inf", "-inf"])
+def test_nonfinite_board_line_refuses_before_pricing(bad_line):
+    rows = _run([_row(line=bad_line)], with_history=False)["evaluated_rows"]
+    assert rows[0]["reason"] == "INNING_1_RUNS_LINE_INVALID"
+    assert rows[0].get("model_probability") is None
+
+
+@pytest.mark.registry_lane_internals
+@pytest.mark.parametrize("bad_line", [True, False, None, {}, [], "not-a-number"])
+def test_invalid_board_line_never_reaches_first_inning_model(bad_line):
+    rows = _run([_row(line=bad_line)], with_history=False)["evaluated_rows"]
+    assert rows[0].get("model_probability") is None
+    assert rows[0].get("status") != "PLAY"
