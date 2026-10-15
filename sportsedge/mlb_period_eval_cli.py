@@ -7,6 +7,7 @@ No downloads, live pricing, quote fabrication, capture, or PLAY.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
@@ -20,6 +21,7 @@ def main(argv=None) -> int:
     parser.add_argument("--min-train", type=int, default=20)
     parser.add_argument("--half-line", type=float, default=1.5)
     args = parser.parse_args(argv)
+    source_sha256 = hashlib.sha256(Path(args.input).read_bytes()).hexdigest()
     reports = {
         f"first_{innings}": evaluate_historical_export(
             args.input, innings=innings,
@@ -29,6 +31,10 @@ def main(argv=None) -> int:
     result = {
         "schema": "MLB_PERIOD_WALKFORWARD_RESEARCH_REPORT_V1",
         "input_path": str(args.input),
+        "input_sha256": source_sha256,
+        "result_availability_authenticity_verified": False,
+        "pit_evidence_verified": False,
+        "market_evidence_paired": False,
         "research_only": True,
         "validated": False,
         "play_authorized": False,

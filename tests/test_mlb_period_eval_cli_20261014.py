@@ -1,5 +1,6 @@
 """Research-only MLB period evaluation CLI regression tests."""
 import json
+import hashlib
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -36,6 +37,10 @@ def test_cli_writes_both_period_reports(tmp_path):
     assert report["reports"]["first_7"]["forward_predictions"] == 4
     assert report["play_authorized"] is False
     assert report["validated"] is False
+    assert report["input_sha256"] == hashlib.sha256(source.read_bytes()).hexdigest()
+    assert report["pit_evidence_verified"] is False
+    assert report["result_availability_authenticity_verified"] is False
+    assert report["market_evidence_paired"] is False
 
 
 def test_cli_refuses_overwriting_source(tmp_path):
