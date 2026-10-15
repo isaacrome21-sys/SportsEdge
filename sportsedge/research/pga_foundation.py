@@ -221,8 +221,8 @@ MARKET_TERMINALS = {
     "ROUND_SCORE": ("NO_SETTLEMENT", "round over/under settlement not encoded"),
     "THREE_BALL": ("NO_SETTLEMENT", "3-ball dead-heat rules not encoded"),
     "FIRST_ROUND_LEADER": ("NO_SETTLEMENT", "FRL dead-heat rules not encoded"),
-    "HOLE_PROPS": ("NO_ENGINE", "no hole-level process"),
-    "BIRDIES_PROPS": ("NO_ENGINE", "no hole-level process"),
+    "HOLE_PROPS": ("RESEARCH_ONLY", _SIM + "; hole layer: birdie-or-better per hole"),
+    "BIRDIES_PROPS": ("RESEARCH_ONLY", _SIM + "; hole layer: birdie/bogey counts"),
     "NATIONALITY_SPECIALS": ("NOT_OFFERED", "specials out of scope"),
 }
 for _m, (_t, _r) in MARKET_TERMINALS.items():
