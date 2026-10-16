@@ -84,14 +84,15 @@ def parse_question(question: str, *, home_team: str, away_team: str,
 
 
 def _line(value: Any) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not isfinite(value) or not 0 <= value <= 255:
+    if (isinstance(value, bool) or not isinstance(value, (int, float)) or
+            not 0 <= value <= 255 or not isfinite(value)):
         raise AskSimsError("ASK_SIMS_LINE_INVALID")
     return float(value)
 
 
 def _signed_line(x: Any) -> float:
     if (isinstance(x, bool) or not isinstance(x, (int, float)) or
-            not isfinite(x) or not -255 <= x <= 255):
+            not -255 <= x <= 255 or not isfinite(x)):
         raise AskSimsError("ASK_SIMS_LINE_INVALID")
     return float(x)
 
@@ -246,7 +247,7 @@ def ask_unified_score_sims(
         raise AskSimsError("ASK_SIMS_MEANS_INVALID")
     h, a = means.get("mean_home"), means.get("mean_away")
     if any(isinstance(x, bool) or not isinstance(x, (int, float)) or
-           not isfinite(x) or not 0.5 <= x <= 70 for x in (h, a)):
+           not 0.5 <= x <= 70 or not isfinite(x) for x in (h, a)):
         raise AskSimsError("ASK_SIMS_MEANS_INVALID")
     for key, supplied in (("home_team", home_team), ("away_team", away_team)):
         declared = engine.get(key)
