@@ -110,20 +110,9 @@ jobs:
 
       - name: Refuse green collection when release is unavailable
         if: steps.release.outputs.available != 'true'
-        shell: bash
         run: |
-          set -euo pipefail
-          STATE="$(jq -r '.state // "RELEASE_STATE_UNAVAILABLE"' artifacts/football/forward-run/release-status.json)"
-          FREEZE="$(jq -r '.freeze_status // "UNKNOWN"' artifacts/football/forward-run/release-status.json)"
-          {
-            echo '## NFL forward CLV — BLOCKED, not collected'
-            echo
-            echo "Reason: $STATE (model freeze: $FREEZE)."
-            echo 'No production decisions or closing quotes were captured by this run.'
-            echo 'No covered games are credited. Never backfill missed windows.'
-          } >> "$GITHUB_STEP_SUMMARY"
-          echo "::error title=NFL_FORWARD_COLLECTION_BLOCKED::$STATE (freeze=$FREEZE). No decisions, closes, or covered games collected."
-          exit 1
+          python3 scripts/require_nfl_forward_release.py \
+            --status-file artifacts/football/forward-run/release-status.json
 
       - name: Checkout exact model-release implementation
         if: steps.release.outputs.available == 'true'
