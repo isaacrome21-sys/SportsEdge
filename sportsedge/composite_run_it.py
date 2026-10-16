@@ -31,6 +31,12 @@ SUPERSEDE_NOT_LATER = "SUPERSEDE_RERUN_AS_OF_NOT_LATER"
 SUPERSEDE_CONFLICT = "SUPERSEDE_CONFLICT_SAME_AS_OF"
 
 _COMPOSITE_ONLY_KEYS = ("verification",)
+# Projection of a canonical evaluated row carried into the composite. EV,
+# edge, kelly and any authority fields are deliberately NOT carried.
+EVALUATION_FIELDS = ("status", "reason", "blocker", "blocker_detail", "market",
+                     "selection", "line", "odds_american", "estimate_p", "push_p",
+                     "loss_p", "fair_american", "pricing_lane", "pricing_provenance",
+                     "schema")
 
 
 def _canonical_run_full():
@@ -119,9 +125,13 @@ def run_full_evaluator(run_full: Callable | None = None, **kw) -> Callable:
         for i, (src, e) in enumerate(zip(rows, ev)):
             if not isinstance(e, Mapping) or e.get("input_index", i) != i:
                 raise cc.CompositeError(f"{CHILD_CARD_ROW_MISMATCH}:{game_id}")
-            out.append({**cc.row_identity_dict(src), "game_id": src["game_id"],
-                        "quote_captured_at": src["quote_captured_at"],
-                        "status": e.get("status"), "evaluation": copy.deepcopy(dict(e))})
+            proj = {k: copy.deepcopy(e[k]) for k in EVALUATION_FIELDS if k in e}
+            row_out = {**cc.row_identity_dict(src), "game_id": src["game_id"],
+                       "quote_captured_at": src["quote_captured_at"],
+                       "status": e.get("status"), "evaluation": proj}
+            if src.get("thesis_id"):
+                row_out["thesis_id"] = src["thesis_id"]
+            out.append(row_out)
         return {"as_of_utc": as_of, "game_id": game_id, "rows": out,
                 "child_card_summary": copy.deepcopy(card.get("summary"))}
     return evaluate

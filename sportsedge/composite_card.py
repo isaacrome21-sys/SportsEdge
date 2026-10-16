@@ -70,7 +70,7 @@ RELEASE_RESEARCH_ONLY_REGRESSIONS_PASSED = "COMPOSITE_RESEARCH_ONLY_REGRESSIONS_
 
 
 _CHILD_ALLOWED_FIELDS = set(IDENTITY_FIELDS) | {"game_id", "quote_captured_at", "status",
-                                               "evaluation", "reason"} | {
+                                               "evaluation", "reason", "thesis_id"} | {
     "eligible", "official_authority", "staking_authority", "model_p_authority",
     "production_activation", "promotion", "official", "play", "stake"}  # values guarded falsy
 
@@ -216,32 +216,44 @@ def _grammar_sets(rows: list[dict]) -> tuple[dict[str, list[dict]], dict[str, st
     return sets, refusal
 
 
-_DENY_TOKENS = {"PLAY", "PLAYS", "BET", "WAGER", "OFFICIAL", "STAKE", "STAKED",
-                "PROMOTED", "ACTIVATED", "PICK"}
-_NEGATORS = {"NO", "NOT", "NON"}
+def _load_status_allowlist() -> frozenset:
+    import json
+    from pathlib import Path
+    doc = json.loads((Path(__file__).with_name("composite_status_allowlist.json"))
+                     .read_text(encoding="utf-8"))
+    return frozenset(str(x).upper() for x in doc["statuses"])
+
+
+# Owner-reviewable ALLOWLIST (sportsedge/composite_status_allowlist.json, built
+# by scripts/build_composite_status_allowlist.py from the statuses the pricing
+# path emits). Any status not on it -- 'PLAY NOW', PLAYABLE, LOCK, BUY,
+# OFFICIALPICK, 'play.' -- is refused.
+STATUS_ALLOWLIST = _load_status_allowlist()
+# Field names compared case-insensitively at any depth.
 _AUTHORITY_FIELDS = {"eligible", "official_authority", "staking_authority",
                      "model_p_authority", "production_activation", "promotion",
-                     "official", "play"}
+                     "official", "play", "playable", "lock"}
+_MONEY_FIELDS = {"stake", "units", "unit", "ev", "ev_per_dollar", "kelly",
+                 "kelly_fraction", "recommendation", "bet", "wager", "pick",
+                 "estimated_ev", "edge", "edge_over_break_even_pp"}
 
 
-def _status_promotes(status: Any) -> bool:
-    toks = str(status).upper().replace("-", "_").split("_")
-    for i, t in enumerate(toks):
-        if t in _DENY_TOKENS and not (i > 0 and toks[i - 1] in _NEGATORS):
-            return True
-    return False
+def _status_allowed(value: Any) -> bool:
+    return isinstance(value, str) and value.strip().upper() in STATUS_ALLOWLIST
 
 
 def authority_violation(obj: Any) -> str | None:
-    """Fail-closed permission guard: research statuses only, no authority."""
+    """Fail-closed guard, recursive: allowlisted statuses only; no authority
+    flag may be truthy; no stake/units/EV/kelly/recommendation at any depth."""
     if isinstance(obj, Mapping):
         for k, v in obj.items():
-            if k == "status" and v is not None and _status_promotes(v):
+            key = str(k).strip().lower()
+            if key == "status" and v is not None and not _status_allowed(v):
                 return f"status={v}"
-            if k in _AUTHORITY_FIELDS and v not in (None, False):
+            if key in _AUTHORITY_FIELDS and v not in (None, False):
                 return f"{k}={v}"
-            if k == "stake" and v not in (None, 0):
-                return f"stake={v}"
+            if key in _MONEY_FIELDS and v is not None:
+                return f"{k}={v}"
             hit = authority_violation(v)
             if hit:
                 return hit
@@ -351,12 +363,12 @@ def build_composite(rows: Iterable[Mapping[str, Any]], *,
             active_by_key = {_identity_key(r): r for r in active}
             seen_keys = set()
             for cr in child_out.get("rows", []):
-                hit = authority_violation(cr)
-                if hit:
-                    raise CompositeError(f"{CHILD_ACTIVE_STAKE}:{game}:{hit}")
                 extra = set(cr) - _CHILD_ALLOWED_FIELDS
                 if extra:
                     raise CompositeError(f"{CHILD_FIELD_NOT_ALLOWED}:{game}:{sorted(extra)}")
+                hit = authority_violation(cr)
+                if hit:
+                    raise CompositeError(f"{CHILD_ACTIVE_STAKE}:{game}:{hit}")
                 if str(cr.get("game_id")) != game:
                     raise CompositeError(f"{CHILD_CROSS_GAME}:{game}")
                 k = _identity_key(cr)
