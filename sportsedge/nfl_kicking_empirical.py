@@ -188,9 +188,17 @@ def prob_over_under(pmf: Mapping[int, float],
     (non-finite, negative, or mass not ~1) is a named refusal -- never
     silent zeros and never renormalised.
     """
-    if isinstance(line, bool) or not isinstance(line, (int, float)) \
-            or not math.isfinite(line):
+    if isinstance(line, bool) or not isinstance(line, numbers.Real) \
+            or not math.isfinite(float(line)):
         raise NflKickingError("KICKING_LINE_INVALID")
+    line = float(line)
+    if isinstance(pmf, Mapping):
+        for key in pmf:
+            # Counts are finite non-negative integers; a NaN/None/str/float/
+            # bool key would silently drop or misplace mass.
+            if isinstance(key, bool) or not isinstance(key, numbers.Integral) \
+                    or int(key) < 0:
+                raise NflKickingError(f"KICKING_PMF_KEY_INVALID:{key!r}"[:60])
     vals = list(pmf.values()) if isinstance(pmf, Mapping) else []
     if not vals or any(isinstance(v, bool) or not isinstance(v, (int, float))
                        or not math.isfinite(v) or v < 0 for v in vals) \
@@ -445,7 +453,11 @@ def build_kicking_games(pbp: Any, games: Any) -> list[dict[str, Any]]:
 
     kicks = pbp[pbp["kicker_player_id"].notna()].copy()
     for col in ("field_goal_attempt", "extra_point_attempt"):
-        kicks[col] = pd.to_numeric(kicks[col], errors="coerce").fillna(0)
+        # A NaN / non-0/1 attempt flag is a named refusal, never coerced to 0.
+        flags = pd.to_numeric(kicks[col], errors="coerce")
+        if (flags.isna() | ~flags.isin([0, 1])).any():
+            raise NflKickingError(f"KICKING_ATTEMPT_FLAG_INVALID:{col}")
+        kicks[col] = flags
     # Only FG/PAT plays define a kicking record: kickoff-only
     # appearances must not fabricate 0-attempt games.
     kicks = kicks[(kicks["field_goal_attempt"] == 1)
