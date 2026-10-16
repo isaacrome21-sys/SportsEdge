@@ -66,7 +66,7 @@ def test_string_values_and_ev_key_patterns(obj):
 
 def test_benign_values_pass():
     assert cc.authority_violation({"status": "PRICED_RESEARCH", "reason": "no verified context",
-                                   "evaluation": {"pricing_provenance": {"clv_eligible": False}}}) is None
+                                   "evaluation": {"pricing_provenance": {"play_eligible": False}}}) is None
 
 
 def _ev_with(evaluation, **top):

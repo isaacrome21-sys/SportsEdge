@@ -249,34 +249,60 @@ def _status_allowed(value: Any) -> bool:
     return isinstance(value, str) and value.strip().upper() in STATUS_ALLOWLIST
 
 
+_KEY_MONEY_TOKENS = frozenset({"BET", "BETS", "WAGER", "STAKE", "STAKES", "UNIT", "UNITS",
+                               "KELLY", "EV", "EDGE", "RISKED", "SIZE"})
+# Keys that may carry a truthy boolean; any other truthy boolean is refused.
+_TRUE_BOOL_KEYS = frozenset({"research_only"})
+# pricing_provenance has its own key allowlist (matches sportsedge.pricing_provenance).
+PROVENANCE_KEYS = frozenset({"lane", "mechanism", "source", "engine_lane", "play_eligible"})
+
+
 def _authority_key(key: str) -> bool:
-    return key in _AUTHORITY_FIELDS or key.endswith("_eligible") or key.endswith("_authority")
+    return (key in _AUTHORITY_FIELDS or key.endswith("_eligible") or key.endswith("_authority")
+            or promotes(key))
 
 
 def _money_key(key: str) -> bool:
-    return key in _MONEY_FIELDS or any(p.search(key) for p in _MONEY_PATTERNS)
+    if key in _MONEY_FIELDS or any(p.search(key) for p in _MONEY_PATTERNS):
+        return True
+    toks = set(_key_tokens(key))
+    return bool(toks & _KEY_MONEY_TOKENS)
 
 
-def authority_violation(obj: Any) -> str | None:
-    """Fail-closed guard, recursive and case-insensitive on field names:
-    statuses must be allowlisted; no *_eligible/*_authority (or other
-    authority) key may be truthy; no stake/units/EV/edge/kelly key may carry a
-    value; no string value anywhere may carry promotion language."""
+def _key_tokens(key: str) -> list[str]:
+    from .promotion_screen import tokens
+    return tokens(key)
+
+
+def authority_violation(obj: Any, _parent: str = "") -> str | None:
+    """Fail-closed guard, recursive. Field names are screened after camelCase /
+    snake_case tokenisation: promotion or money words in a key refuse a truthy
+    (authority) or any (money) value. Statuses must be allowlisted; every
+    string value is promotion-screened; truthy booleans are refused unless
+    their key is listed; pricing_provenance keys are allowlisted."""
     if isinstance(obj, Mapping):
+        if _parent == "pricing_provenance":
+            unknown = {str(k) for k in obj} - PROVENANCE_KEYS
+            if unknown:
+                return f"pricing_provenance_keys={sorted(unknown)}"
         for k, v in obj.items():
-            key = str(k).strip().lower()
+            raw_key = str(k).strip()
+            key = raw_key.lower()
+            norm = "_".join(t.lower() for t in _key_tokens(raw_key))
             if key == "status" and v is not None and not _status_allowed(v):
                 return f"status={v}"
-            if _authority_key(key) and v not in (None, False, 0):
+            if (_authority_key(key) or _authority_key(norm)) and v not in (None, False, 0):
                 return f"{k}={v}"
-            if _money_key(key) and v is not None:
+            if (_money_key(key) or _money_key(norm)) and v is not None:
                 return f"{k}={v}"
-            hit = authority_violation(v)
+            if v is True and key not in _TRUE_BOOL_KEYS:
+                return f"{k}=True"
+            hit = authority_violation(v, key)
             if hit:
                 return hit
     elif isinstance(obj, (list, tuple)):
         for v in obj:
-            hit = authority_violation(v)
+            hit = authority_violation(v, _parent)
             if hit:
                 return hit
     elif isinstance(obj, str) and promotes(obj):
