@@ -184,6 +184,9 @@ def _price(value):
 
 
 def render_phone_card(card, *, run_url="", intake_at=""):
+    from sportsedge.composite_run_it import is_composite, render_composite_markdown
+    if is_composite(card):
+        return render_composite_markdown(card, run_url=run_url)
     view = build_phone_card(card)
     coverage = view["coverage"]
     lines = ["## SportsEdge · RUN IT", "",
