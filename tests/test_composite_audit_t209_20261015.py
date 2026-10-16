@@ -188,3 +188,58 @@ def test_verification_without_raw_hash_refused():
     out = cp.preflight(rows, receipts=rc, evaluated_at=iso(1))
     codes = {r["row_id"]: r.get("refusal_code") for r in out["rows"]}
     assert codes["a"] == cp.REFUSE_CAPTURE_RECEIPT_UNPROVEN
+
+
+# ---------- t211 audit follow-ups ----------
+
+def test_status_allowlist_file_matches_builder_and_screens_promotions():
+    import importlib.util
+    from pathlib import Path
+    spec = importlib.util.spec_from_file_location(
+        "bsa", Path(__file__).resolve().parents[1] / "scripts" / "build_composite_status_allowlist.py")
+    bsa = importlib.util.module_from_spec(spec); spec.loader.exec_module(bsa)
+    assert bsa.main(["--check"]) == 0
+    assert not bsa.promotes("NOT_A_PLAY") and not bsa.promotes("NO_PLAY")
+    for bad in ("PLAY", "PLAYABLE", "LOCK", "BUY", "OFFICIALPICK", "OFFICIAL_PICK", "BET_NOW"):
+        assert bsa.promotes(bad)
+    assert not any(bsa.promotes(x) for x in cc.STATUS_ALLOWLIST)
+
+
+@pytest.mark.parametrize("status", ["NOT_A_PLAY", "Totally research", "PLAY NOW"])
+def test_unknown_status_refused(status):
+    assert cc.authority_violation({"status": status}) is not None
+
+
+def test_case_insensitive_field_names():
+    assert cc.authority_violation({"Evaluation": {"KELLY": 0.1}}) is not None
+    assert cc.authority_violation({"ELIGIBLE": True}) is not None
+
+
+def test_raw_read_shared_across_receipts_refused(tmp_path):
+    import hashlib
+    import json
+    from _capture_receipt_fixtures import write_store
+    rows = [row("x", "G1", 0)]
+    root, _ = write_store(rows, tmp_path)
+    rc = json.loads((root / "receipts/read-x.json").read_text())
+    rc.update(receipt_id="rc-twin")
+    rb = json.dumps(rc, sort_keys=True).encode()
+    (root / "receipts/twin.json").write_bytes(rb)
+    m = json.loads((root / "manifest.json").read_text())
+    m["receipts"].append({"receipt_id": "rc-twin", "path": "receipts/twin.json",
+                          "sha256": hashlib.sha256(rb).hexdigest()})
+    mb = json.dumps(m, sort_keys=True).encode()
+    (root / "manifest.json").write_bytes(mb)
+    with pytest.raises(ValueError, match=cp.RECEIPT_RAW_REUSED):
+        cp.load_capture_receipts(root, manifest_sha256=hashlib.sha256(mb).hexdigest())
+
+
+def test_canonical_evaluator_projection_drops_ev_and_authority():
+    from sportsedge import composite_run_it as cri
+    assert not {"ev_per_dollar", "edge_over_break_even_pp", "kelly", "stake"} & set(cri.EVALUATION_FIELDS)
+
+
+def test_cli_does_not_write_colocated_pin():
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1] / "artifacts" / "run_it_full.py").read_text()
+    assert '".pin"' not in src
