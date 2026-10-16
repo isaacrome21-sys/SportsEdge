@@ -79,6 +79,36 @@ class AskSimsResearchTests(unittest.TestCase):
         with self.assertRaisesRegex(AskSimsError, "GAME_IDENTITY_INVALID"):
             ask_score_paths(PATHS, "SEA wins", home_team="SEA", away_team="SEA")
 
+    def test_enormous_structured_lines_refuse_without_overflow(self):
+        # Python math.isfinite(10**1000) raises OverflowError; reject the
+        # out-of-range value first, without changing market authority.
+        huge = 10 ** 1000
+        for market, line in (("total_over", huge),
+                             ("team_total_under", -huge),
+                             ("spread", huge), ("spread", -huge)):
+            query = {"market": market, "line": line}
+            if market != "total_over":
+                query["team"] = "away"
+            with self.subTest(market=market, sign=line > 0):
+                with self.assertRaisesRegex(AskSimsError, "ASK_SIMS_LINE_INVALID"):
+                    self.ask(query)
+
+    def test_enormous_replay_means_refuse_without_overflow(self):
+        from sportsedge.sports.nfl.ask_sims import ask_unified_score_sims
+        from sportsedge.sports.nfl.unified_market_engine import run_unified_nfl_model
+        engine = run_unified_nfl_model(
+            game_id="2026_06_SEA_DEN", home_team=HOME, away_team=AWAY,
+            attempt9_margin=0.0, attempt9_total=44.0, n_sims=16, seed=7,
+        )
+        for field in ("mean_home", "mean_away"):
+            for value in (10 ** 1000, -(10 ** 1000)):
+                tampered = {**engine, "score_means": {**engine["score_means"], field: value}}
+                with self.subTest(field=field, positive=value > 0):
+                    with self.assertRaisesRegex(AskSimsError, "ASK_SIMS_MEANS_INVALID"):
+                        ask_unified_score_sims(
+                            tampered, "SEA wins", home_team=HOME, away_team=AWAY,
+                        )
+
     def test_malformed_alias_mapping_is_named_refusal(self):
         with self.assertRaisesRegex(AskSimsError, "ALIASES_INVALID"):
             ask_score_paths(PATHS, "SEA wins", home_team=HOME, away_team=AWAY,
