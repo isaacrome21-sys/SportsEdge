@@ -1515,10 +1515,54 @@ def main(argv=None):
                         "from an independent channel, not the archive root. "
                         "Repeat once per sealed per-team manifest to compose "
                         "without weakening the pin requirement")
+    p.add_argument("--require-capture-verification", action="store_true",
+                   help="#2359 A: refuse every row lacking a genuine final-read record")
+    p.add_argument("--capture-receipts-dir", type=Path,
+                   help="#2359 A: pinned capture-receipt store (raw sportsbook read bytes)")
+    p.add_argument("--capture-receipts-manifest-sha256",
+                   help="External pin for the capture-receipt manifest (independent channel)")
+    p.add_argument("--composite", action="store_true",
+                   help="#2359 B: per-game multi-as-of composite card (research only)")
     args = p.parse_args(argv)
     if not 0 <= args.min_ev <= 0.15:
         p.error("min-ev must be between 0 and 0.15")
-    card = run_full(json.loads(args.lines.read_text(encoding="utf-8")),
+    from sportsedge import composite_run_it as cri
+    payload = json.loads(args.lines.read_text(encoding="utf-8"))
+    receipts = None
+    if args.capture_receipts_dir is not None:
+        from sportsedge.capture_preflight import load_capture_receipts
+        if not args.capture_receipts_manifest_sha256:
+            p.error("--capture-receipts-dir requires --capture-receipts-manifest-sha256")
+        receipts = load_capture_receipts(
+            args.capture_receipts_dir,
+            manifest_sha256=args.capture_receipts_manifest_sha256)
+    if args.composite:
+        import os
+        import subprocess
+        revision = os.environ.get("GITHUB_SHA") or subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True,
+            cwd=Path(__file__).resolve().parents[1]).stdout.strip() or "UNKNOWN"
+        if args.as_of:
+            p.error("--as-of is per game in a composite; it comes from each game's final read")
+        card = cri.run_composite(
+            payload, revision=revision, receipts=receipts,
+            publication_clock=datetime.now(timezone.utc).isoformat(),
+            auto_context=not args.no_fetch, min_ev=args.min_ev, lane=args.lane,
+            allow_manual_context=args.allow_manual_context, historical=args.historical)
+        rendered = json.dumps(card, indent=2) + "\n"
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(rendered, encoding="utf-8")
+            # Publish this pin through an independent channel; verification,
+            # rendering and grading of the composite require it.
+            args.output.with_suffix(args.output.suffix + ".pin").write_text(
+                card["manifest_digest"] + "\n", encoding="utf-8")
+        print(f"COMPOSITE_MANIFEST_PIN {card['manifest_digest']}", file=sys.stderr)
+        print(rendered)
+        return
+    card = cri.run_it_with_preflight(payload,
+                    require_verification=args.require_capture_verification,
+                    receipts=receipts,
                     auto_context=not args.no_fetch, min_ev=args.min_ev,
                     lane=args.lane, allow_manual_context=args.allow_manual_context,
                     as_of=args.as_of, historical=args.historical,
