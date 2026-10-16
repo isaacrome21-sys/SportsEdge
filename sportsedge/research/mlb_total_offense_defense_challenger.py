@@ -114,6 +114,22 @@ def parse_finals(history: Iterable[Mapping[str, Any]]) -> tuple[FinalScore, ...]
     records = tuple(FinalScore.parse(row) for row in history)
     if len({row.event_id for row in records}) != len(records):
         raise MLBTotalCandidateError("DUPLICATE_EVENT_ID")
+    # Fixture identity (t211u): one real game under two event ids, or a
+    # team booked into two games at the same instant, would be counted
+    # twice.  Team ids compare case/space-insensitively.  Fail closed.
+    fixtures: set = set()
+    team_slots: set = set()
+    for row in records:
+        away, home = row.away_id.casefold(), row.home_id.casefold()
+        key = (away, home, row.event_start)
+        if key in fixtures:
+            raise MLBTotalCandidateError(f"DUPLICATE_FIXTURE_IDENTITY:{row.event_id}")
+        fixtures.add(key)
+        for team in (away, home):
+            if (team, row.event_start) in team_slots:
+                raise MLBTotalCandidateError(
+                    f"DUPLICATE_FIXTURE_IDENTITY:TEAM_DOUBLE_BOOKED:{row.event_id}")
+            team_slots.add((team, row.event_start))
     return records
 
 
