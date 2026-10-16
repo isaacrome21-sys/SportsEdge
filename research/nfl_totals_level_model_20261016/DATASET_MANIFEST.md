@@ -29,6 +29,15 @@ evaluator's verification binds this run to those exact bytes.
 | Git blob | `253b0c6d91840c906941216be117f2acc1497a57` |
 | Note | Byte-identical to the Stage 2 pin (main `83e0c396a`); the evaluator verifies the blob at load |
 
+## Published per-game audit (split for transport)
+
+The evaluator's single audit CSV (2,127 rows) exceeds the push
+transport's per-call limit, so it is published in five sequential
+parts, `audit_nfl_totals_level_model_part1.csv` … `part5.csv`,
+each repeating the header. Concatenating the parts' data rows in
+order reproduces the whole file, whose SHA-256 is
+`f0153a9c8280aabdf744a60cfbce5ae8e4d66adf1d3f018a9bf23161200bbd10`.
+
 ## Stage 2 reference values (reproduction precondition, prereg §1)
 
 Paired subset (n = 1,887), from
