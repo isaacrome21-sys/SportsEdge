@@ -1,0 +1,66 @@
+{
+ "artifact": "metrics_input.jsonl (per-game RPS / typical-line over-probabilities for all scorers)",
+ "encoding": "gzip -9 (mtime=0), then base64; concatenate parts in order, base64-decode, gunzip",
+ "jsonl_sha256": "f6b88d6ee64c992077e82d6f2cc828822602361f2011dfe6703ae43029e1b08c",
+ "jsonl_bytes": 1669164,
+ "gz_sha256": "586acd09f6fb66c7b97109d5cc3c082658ecd368b09a44ab163ae1f6c2275694",
+ "gz_bytes": 450703,
+ "games": 1118,
+ "parts": [
+  {
+   "path": "research/mlb_total_hits_joint_path_harness/metrics_input.parts/part-01.b64",
+   "sha256": "5cb982c40d6b489d09144ee8565434b8ebfaa6058258ab9fb47577160209a931",
+   "bytes": 60000
+  },
+  {
+   "path": "research/mlb_total_hits_joint_path_harness/metrics_input.parts/part-02.b64",
+   "sha256": "a54eba2056d3e0f5e445106aa6aa8b849a6c45e51d87ac0d83e780c65f7faef5",
+   "bytes": 60000
+  },
+  {
+   "path": "research/mlb_total_hits_joint_path_harness/metrics_input.parts/part-03.b64",
+   "sha256": "c6a23a4a379db56afcd59aed4bcdf4a24f25fb17eaf9a513985756bdc42d908e",
+   "bytes": 60000
+  },
+  {
+   "path": "research/mlb_total_hits_joint_path_harness/metrics_input.parts/part-04.b64",
+   "sha256": "2b6a4dc0f1e3022a918d70f66cbb8122d83bed207d60d0d18afafa7ecc2ba896",
+   "bytes": 60000
+  },
+  {
+   "path": "research/mlb_total_hits_joint_path_harness/metrics_input.parts/part-05.b64",
+   "sha256": "e0c5fe13869e9f8d94ada16d714cb4adf4a1639ab0d68a67dbd3c5a46a170b23",
+   "bytes": 60000
+  },
+  {
+   "path": "research/mlb_total_hits_joint_path_harness/metrics_input.parts/part-06.b64",
+   "sha256": "189860c6375ee7bb78ad201f8e8b27d0b150ca23c6aa4c805a33aac573753972",
+   "bytes": 60000
+  },
+  {
+   "path": "research/mlb_total_hits_joint_path_harness/metrics_input.parts/part-07.b64",
+   "sha256": "6be24dca73bb91373416da0d7caf94bde4a3db4409e57baf891e26677479dd18",
+   "bytes": 60000
+  },
+  {
+   "path": "research/mlb_total_hits_joint_path_harness/metrics_input.parts/part-08.b64",
+   "sha256": "c500f41dce6e553ed847abc5df07f25fcc91edde9214f129e119d3172e6339f3",
+   "bytes": 60000
+  },
+  {
+   "path": "research/mlb_total_hits_joint_path_harness/metrics_input.parts/part-09.b64",
+   "sha256": "31867e2dd4a3104f0645e3c12a52d8800833f95ca4940529be82e1a1da5823a1",
+   "bytes": 60000
+  },
+  {
+   "path": "research/mlb_total_hits_joint_path_harness/metrics_input.parts/part-10.b64",
+   "sha256": "f0d9781b12cee207fcfd656c0699a0dc998b875004c9bd914e286d1a87b20cc3",
+   "bytes": 60000
+  },
+  {
+   "path": "research/mlb_total_hits_joint_path_harness/metrics_input.parts/part-11.b64",
+   "sha256": "d45be48f0225a28aeaebd521b19cf072740541e3f51a266958b9c2e62746dacd",
+   "bytes": 940
+  }
+ ]
+}

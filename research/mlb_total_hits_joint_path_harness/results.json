@@ -1,0 +1,74 @@
+{
+ "schema": "MLB_TOTAL_HITS_JOINT_PATH_HARNESS_PREREG_V1",
+ "games_scored_fold_2025": 1118,
+ "markets": {
+  "GAME_TOTAL_HITS": {
+   "cell": "fold_2025",
+   "mean_rps": {
+    "candidate": 2.3263723135688728,
+    "naive_team_rate_poisson": 2.2254782377333657,
+    "league_constant_rate": 2.2092318934903554,
+    "trailing_20_game_team_rate": 2.309666170619965,
+    "independence_convolution": 2.248417081403962
+   },
+   "best_baseline": "league_constant_rate",
+   "delta_vs_best": 0.11714042007851773,
+   "bootstrap_ci95": [
+    0.05811771422473614,
+    0.17580564790017617
+   ],
+   "typical_line": 15.5,
+   "ece": {
+    "candidate": 0.11954016100178899,
+    "best_baseline": 0.023874202168775893
+   },
+   "logloss": {
+    "candidate": 0.7177207869738633,
+    "best_baseline": 0.6852716076026872
+   },
+   "fold_2025_legs": {
+    "rps_ci_high_below_0": false,
+    "ece_within_best_plus_0.005": false,
+    "logloss_not_worse_than_best": false
+   },
+   "fold_2025_pass": false,
+   "pooled": "NOT_COMPUTABLE_AS_FROZEN (fold 2024 unscored: training window absent from the section-6 archive)",
+   "verdict": "DOES_NOT_PASS",
+   "verdict_basis": "Two independent grounds, either sufficient: (1) in fold 2025 itself the candidate fails the legs listed in fold_2025_legs (delta vs best baseline is positive with the 95% CI entirely above zero, ECE exceeds best baseline + 0.005, log loss is worse than best baseline); (2) section 8 also requires the legs pooled and in every fold, and fold 2024 is not scoreable as frozen (training window absent from the section-6 archive), so the pooled cell is not computable and PASS would be unavailable even if fold 2025 had passed."
+  },
+  "TEAM_TOTAL_HITS": {
+   "cell": "fold_2025",
+   "mean_rps": {
+    "candidate": 1.739528372911449,
+    "naive_team_rate_poisson": 1.7020012622110137,
+    "league_constant_rate": 1.6958558518499132,
+    "trailing_20_game_team_rate": 1.7597961182754662,
+    "independence_convolution": 1.710607946116712
+   },
+   "best_baseline": "league_constant_rate",
+   "delta_vs_best": 0.04367252106153602,
+   "bootstrap_ci95": [
+    0.019106211197107047,
+    0.06903643991798528
+   ],
+   "typical_line": 7.5,
+   "ece": {
+    "candidate": 0.09165737924865829,
+    "best_baseline": 0.015563874349404205
+   },
+   "logloss": {
+    "candidate": 0.7030005057154378,
+    "best_baseline": 0.685549290788576
+   },
+   "fold_2025_legs": {
+    "rps_ci_high_below_0": false,
+    "ece_within_best_plus_0.005": false,
+    "logloss_not_worse_than_best": false
+   },
+   "fold_2025_pass": false,
+   "pooled": "NOT_COMPUTABLE_AS_FROZEN (fold 2024 unscored: training window absent from the section-6 archive)",
+   "verdict": "DOES_NOT_PASS",
+   "verdict_basis": "Two independent grounds, either sufficient: (1) in fold 2025 itself the candidate fails the legs listed in fold_2025_legs (delta vs best baseline is positive with the 95% CI entirely above zero, ECE exceeds best baseline + 0.005, log loss is worse than best baseline); (2) section 8 also requires the legs pooled and in every fold, and fold 2024 is not scoreable as frozen (training window absent from the section-6 archive), so the pooled cell is not computable and PASS would be unavailable even if fold 2025 had passed."
+  }
+ }
+}
