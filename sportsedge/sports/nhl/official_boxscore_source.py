@@ -252,6 +252,50 @@ def _bind_right_rail(rail: Mapping[str, Any], final: tuple[int, int], sog: tuple
         raise ValueError("right-rail shotsByPeriod do not match boxscore shots on goal")
 
 
+_GAME_SUMMARY_RE = re.compile(
+    r"^https://www\.nhl\.com/scores/htmlreports/(\d{4})(\d{4})/GS(\d{2})(\d{4})\.HTM$"
+)
+
+
+def _bind_right_rail_identity(rail: Mapping[str, Any], payload: Mapping[str, Any], game_id: str) -> None:
+    """Fail closed unless the right-rail's own identity anchors name this game.
+
+    Content binding alone collides (same final score and shots), so require:
+    gameReports.gameSummary URL == this season/game number, seasonSeries[]
+    lists this game id, last byPeriod periodType == gameOutcome.lastPeriodType,
+    and byPeriod count == periodDescriptor.number.
+    """
+    reports = rail.get("gameReports")
+    url = reports.get("gameSummary") if isinstance(reports, Mapping) else None
+    m = _GAME_SUMMARY_RE.fullmatch(url) if isinstance(url, str) else None
+    if m is None:
+        raise ValueError("right-rail gameReports.gameSummary URL required for identity binding")
+    y1, y2, gtype, num = m.groups()
+    if int(y2) != int(y1) + 1 or f"{y1}{gtype}{num}" != game_id:
+        raise ValueError("right-rail gameReports.gameSummary is for a different game")
+    series = rail.get("seasonSeries")
+    if not isinstance(series, Sequence) or isinstance(series, (str, bytes, bytearray)) or not series:
+        raise ValueError("right-rail seasonSeries required for identity binding")
+    ids = {str(g.get("id")).strip() for g in series if isinstance(g, Mapping) and g.get("id") is not None}
+    if game_id not in ids:
+        raise ValueError("right-rail seasonSeries does not list this game id")
+    outcome = payload.get("gameOutcome")
+    lpt = outcome.get("lastPeriodType") if isinstance(outcome, Mapping) else None
+    if not isinstance(lpt, str) or not lpt:
+        raise ValueError("boxscore gameOutcome.lastPeriodType required for binding")
+    rows = rail["linescore"]["byPeriod"]
+    last = rows[-1].get("periodDescriptor") if isinstance(rows[-1], Mapping) else None
+    rail_lpt = last.get("periodType") if isinstance(last, Mapping) else None
+    if not isinstance(rail_lpt, str) or rail_lpt != lpt:
+        raise ValueError("right-rail last periodType does not match gameOutcome.lastPeriodType")
+    desc = payload.get("periodDescriptor")
+    number = desc.get("number") if isinstance(desc, Mapping) else None
+    if isinstance(number, bool) or not isinstance(number, int) or number < 1:
+        raise ValueError("boxscore periodDescriptor.number required for period count binding")
+    if len(rows) != number:
+        raise ValueError("right-rail period count does not match periodDescriptor.number")
+
+
 def _regulation_goals(boxscore: Mapping[str, Any], side: str) -> int:
     linescore = boxscore.get("linescore")
     if not isinstance(linescore, Mapping):
@@ -362,6 +406,7 @@ def build_official_completed_game(
             raise ValueError("right-rail payload is for a different game")
         # Real right-rail files carry no gameInfo.id, so bind by content.
         _bind_right_rail(right_rail_payload, (away_final, home_final), (away_sog, home_sog))
+        _bind_right_rail_identity(right_rail_payload, payload, game_id)
         boxscore = {
             "linescore": right_rail_payload.get("linescore"),
             "playerByGameStats": payload.get("playerByGameStats"),
