@@ -63,3 +63,15 @@ def test_duration_cannot_beat_90_minute_floor(dur, gap):
     _refused([_g("a", "NYY", "BOS", 0, gameNumber=1, doubleHeader="Y",
                  game_duration_minutes=dur),
               _g("b", "NYY", "BOS", gap, gameNumber=2, doubleHeader="Y")])
+
+
+@pytest.mark.parametrize("end_kw", [{"game_duration_minutes": 140},
+                                    {"game_end_ts": (DAY + timedelta(minutes=100)).isoformat()}])
+@pytest.mark.parametrize("gap", [175, 150, 179])
+def test_different_opponent_needs_180_even_with_recorded_end(end_kw, gap):
+    _refused([_g("a", "NYY", "BOS", 0, **end_kw), _g("b", "TOR", "NYY", gap)])
+
+
+def test_different_opponent_at_180_with_end_passes():
+    rows = [_g("a", "NYY", "BOS", 0, game_duration_minutes=140), _g("b", "TOR", "NYY", 180)]
+    assert len(_load(rows)) == 202
