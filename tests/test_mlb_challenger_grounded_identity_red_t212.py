@@ -4,6 +4,7 @@ grounded in a hash-pinned raw index.  Ungrounded rows go to a refusal ledger
 longer a load gate."""
 from datetime import timedelta
 
+from mlb_statsapi_fixture_helpers import trusted_manifest  # noqa: F401  (autouse)
 import pytest
 
 from sportsedge.research.mlb_total_offense_defense_challenger import (

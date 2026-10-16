@@ -1,4 +1,5 @@
 """Synthetic contract tests for the isolated research-only MLB totals candidate."""
+from mlb_statsapi_fixture_helpers import trusted_manifest  # noqa: F401  (autouse)
 import unittest
 from datetime import datetime, timedelta, timezone
 

@@ -2,6 +2,7 @@
 caller's reach (trusted manifest whose own sha is a code constant), the
 FixtureIndex constructor is private and re-verified on every load, and ledger
 thresholds come from config only with bounds."""
+from mlb_statsapi_fixture_helpers import trusted_manifest  # noqa: F401  (autouse)
 import hashlib
 import json
 import re
@@ -96,7 +97,8 @@ def test_config_thresholds_bounded(tmp_path, monkeypatch, rows, frac):
            "max_unverified_fraction": frac}
     p = tmp_path / "cfg.json"
     p.write_text(json.dumps(cfg, allow_nan=True))
-    monkeypatch.setattr(ch, "IDENTITY_CONFIG_PATH", p)
+    from mlb_statsapi_fixture_helpers import use_config
+    use_config(p)
     real = [raw_game(810031, "NYY", "BOS", DAY)]
     with pytest.raises(ch.MLBTotalCandidateError, match="FIXTURE_IDENTITY_CONFIG_INVALID"):
         ch.load_grounded_finals([row_for(real[0])], fixture_index=trusted_index(real))
