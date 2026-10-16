@@ -38,7 +38,7 @@ def test_single_moneyline_can_never_pass_as_all_markets_priced():
     missing = [r for r in board["rows"] if r["market"] == "F5_MONEYLINE"]
     assert len(missing) == 2
     assert all(r["presentation"] == "BLOCKED" and r["model_p"] is None for r in missing)
-    assert result["evaluated_rows"][0]["status"] in {
+    assert result["evaluated_rows"][0]["status"] in {"RESEARCH_DIAGNOSTIC_LANE_A_RETIRED",
         "RESEARCH_POSITIVE_EV_UNVALIDATED", "BELOW_THRESHOLD", "PRICE_CAP"
     }
 

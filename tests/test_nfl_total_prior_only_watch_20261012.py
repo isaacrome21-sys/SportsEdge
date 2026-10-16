@@ -27,7 +27,7 @@ def test_verified_histories_do_not_promote_44_pt_league_prior_total():
     assert card["edges"] == []
     assert card["independent_candidates"] == []
     assert card["lane_b_edges"] == []
-    assert len(card["independent_watchlist"]) == 2
+    assert len(card["lane_a_research_diagnostics"]) == 2
     for item in card["evaluated_rows"]:
         assert item["status"] == "WATCH_NFL_TOTAL_PRIOR_ONLY"
         assert "NFL_ABSOLUTE_SCORING_RATE_MODEL_MISSING" in item["reason"]

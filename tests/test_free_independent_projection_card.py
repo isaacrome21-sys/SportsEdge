@@ -53,7 +53,7 @@ def test_total_two_side_no_vig_and_market_blind_projection():
     # No-fetch prices remain available to audit projection arithmetic, never
     # ranked as game-specific betting opportunities.
     assert c["independent_candidates"] == []
-    assert any(r["selection"]=="UNDER 54.5" for r in c["independent_watchlist"])
+    assert any(r["selection"]=="UNDER 54.5" for r in c["lane_a_research_diagnostics"])
     assert all(r["status"] == "WATCH_NFL_NO_VERIFIED_CONTEXT"
                for r in c["evaluated_rows"])
     assert c["authority"]["official"] is False
@@ -77,7 +77,7 @@ def test_moneyline_no_vig_from_exact_opposite_and_model_stays_market_blind():
     assert a["paired_market_status"]=="EXACT_DK_TWO_SIDED_NO_VIG_RESEARCH"
     assert abs(a["market_no_vig_p"]+b["market_no_vig_p"]-1)<1e-5
     assert all(r["odds_american"]>=-165 for r in c["independent_candidates"])
-    assert any(r["odds_american"]==-175 for r in c["independent_watchlist"])
+    assert any(r["odds_american"]==-175 for r in c["lane_a_research_diagnostics"])
 
 
 def test_ml_conflicting_opposite_quoted_price_fails_closed():

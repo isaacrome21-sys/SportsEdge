@@ -111,10 +111,12 @@ def test_form1_row_without_the_field_is_unaffected():
              "pricing_lane": "LANE_A_INDEPENDENT",
              "estimate_p": 0.99, "ev_per_dollar": 5.0}]
     changed = apply_play_gate(rows)
-    assert changed == 0
-    assert rows[0]["status"] == "RESEARCH_POSITIVE_EV_UNVALIDATED"
-    assert "research_only" not in rows[0]
-    assert is_play_eligible(rows[0])
+    # t207u: not availability-demoted, but Lane A is retired from
+    # actionable cards, so it becomes a labeled diagnostic.
+    assert changed == 1
+    assert rows[0]["status"] == "RESEARCH_DIAGNOSTIC_LANE_A_RETIRED"
+    assert rows[0].get("availability_research_only") is None
+    assert not is_play_eligible(rows[0])
 
 
 def test_blocked_row_carrying_the_field_is_not_reclassified():
@@ -144,9 +146,10 @@ def test_engine_surfaces_exclude_availability_unverified_rows():
     assert under["research_only"] is True
     assert card["edges"] == []
     assert card["independent_candidates"] == []
-    # Research output only: the row surfaces on the watchlist,
-    # carrying its availability label.
-    assert under in card["independent_watchlist"]
+    # Research output only: t207u retired Lane A, so the row surfaces
+    # only as a labeled Lane A diagnostic, carrying its availability label.
+    assert under not in card["independent_watchlist"]
+    assert under in card["lane_a_research_diagnostics"]
 
 
 def test_engine_control_same_fixture_without_the_stamp_plays():
@@ -157,9 +160,11 @@ def test_engine_control_same_fixture_without_the_stamp_plays():
     under = next(r for r in card["evaluated_rows"]
                  if r["selection"].startswith("UNDER"))
     assert "availability_status" not in under
-    assert under["status"] == "RESEARCH_POSITIVE_EV_UNVALIDATED"
-    assert under in card["edges"]
-    assert under in card["independent_candidates"]
+    # t207u: without the stamp the row is still Lane A -> diagnostic only.
+    assert under["status"] == "RESEARCH_DIAGNOSTIC_LANE_A_RETIRED"
+    assert under not in card["edges"]
+    assert under not in card["independent_candidates"]
+    assert under in card["lane_a_research_diagnostics"]
 
 
 def test_intake_cannot_forge_the_availability_field():
@@ -174,8 +179,8 @@ def test_intake_cannot_forge_the_availability_field():
     under = next(r for r in card["evaluated_rows"]
                  if r["selection"].startswith("UNDER"))
     assert "availability_status" not in under
-    assert under["status"] == "RESEARCH_POSITIVE_EV_UNVALIDATED"
-    assert under in card["independent_candidates"]
+    assert under["status"] == "RESEARCH_DIAGNOSTIC_LANE_A_RETIRED"
+    assert under in card["lane_a_research_diagnostics"]
 
 
 def test_unverified_prepricing_object_cannot_stamp_the_field():
@@ -188,7 +193,7 @@ def test_unverified_prepricing_object_cannot_stamp_the_field():
     under = next(r for r in card["evaluated_rows"]
                  if r["selection"].startswith("UNDER"))
     assert "availability_status" not in under
-    assert under in card["independent_candidates"]
+    assert under in card["lane_a_research_diagnostics"]
 
 
 # ------------------------------------------- canonical run_full chain
