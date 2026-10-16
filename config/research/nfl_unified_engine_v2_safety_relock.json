@@ -1,0 +1,27 @@
+{
+  "schema": "SPORTSEDGE_NFL_UNIFIED_ENGINE_V2_SAFETY_RELOCK_RECORD",
+  "owner_ruling": "t212u #2265 narrowly scoped V2 safety re-lock APPROVED",
+  "status": "UNFROZEN_NO_FORWARD_EVIDENCE",
+  "engine_module": "sportsedge/sports/nfl/unified_market_engine_v2.py",
+  "engine_version": "NFL_UNIFIED_MARKET_ENGINE_V2",
+  "replaces_v1": false,
+  "v2_evidence_starts": "ONLY_AFTER_NEW_OWNER_APPROVED_FREEZE",
+  "v1_forward_records_altered": false,
+  "v1_frozen_sha256": {
+    "sportsedge/sports/nfl/market_context_props.py": "b20728a3ccf09b943370f7e3745b528742c525aa837aadf00c4498f94c6619a3",
+    "sportsedge/nfl_unified_phone.py": "4fe6c0f5b762d5f8b0afabc738fdaf2d75ddef43095228e0b8b0b0e92dd238b3",
+    "sportsedge/sports/nfl/unified_run_it.py": "d7061725baa85a9e156413a35df5685ea30cd0167c08f84a68d1c6971efd495c",
+    "sportsedge/sports/nfl/unified_auto_roles.py": "103c096c2dba231af4f51aa3d120fbffa124cf081888f2a4c050ec55e0013e17",
+    "sportsedge/sports/nfl/unified_market_engine.py": "ec83bf2353f70bcaaa4f123cb984ed9b246d668fce224e21f879f1f006f1a44d",
+    "sportsedge/sports/nfl/live_role_source.py": "763e654affffa2d808f36870c265d99bb209d6e1d1b3a98c778367ee453c4576",
+    "sportsedge/sports/nfl/nflverse_role_bridge.py": "c6baa0da7793f6205f2a8cc079aab36caa243d35d6c265857d3eabc6b798836c"
+  },
+  "grid_contract": "Refuse non-numeric, non-finite, negative, empty, or mass off 1 beyond 1e-9; no renormalization; no cumulative[-1]=1.0 masking",
+  "authority": {
+    "research_only": true,
+    "truth_gate": false,
+    "official": false,
+    "promotion": false,
+    "staking": false
+  }
+}

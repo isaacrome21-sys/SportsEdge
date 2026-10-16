@@ -6,6 +6,7 @@ never renormalizes. V2 has NO forward evidence until a new approved freeze.
 """
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import math
@@ -154,11 +155,19 @@ def test_no_direct_v1_engine_bypass_callers_remain():
         rel = path.relative_to(ROOT).as_posix()
         if rel in FROZEN_V1_ALLOWED or rel == V2_MODULE:
             continue
-        text = path.read_text(encoding="utf-8", errors="replace")
-        if re.search(r"unified_market_engine\b(?!_v2)", text) and any(
-            re.search(rf"\b{name}\b", text) for name in BYPASS_NAMES
-        ):
-            offenders.append(rel)
+        tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and (node.module or "").endswith("unified_market_engine"):
+                if any(alias.name in BYPASS_NAMES or alias.name == "*" for alias in node.names):
+                    offenders.append(rel)
+            elif isinstance(node, ast.ImportFrom) and (node.module or "").endswith("sports.nfl") and any(
+                alias.name == "unified_market_engine" for alias in node.names
+            ):
+                offenders.append(rel)
+            elif isinstance(node, ast.Import) and any(
+                alias.name.endswith("unified_market_engine") for alias in node.names
+            ):
+                offenders.append(rel)
     assert offenders == []
 
 
