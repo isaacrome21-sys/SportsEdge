@@ -2,6 +2,7 @@
 double counted (history or prequential trials)."""
 from datetime import timedelta
 
+from mlb_statsapi_fixture_helpers import trusted_manifest  # noqa: F401  (autouse)
 import pytest
 
 from sportsedge.research.mlb_total_offense_defense_challenger import (
@@ -46,7 +47,8 @@ def test_backtest_excludes_duplicate_fixture(tmp_path, monkeypatch):
     cfg = tmp_path / "cfg.json"
     cfg.write_text(json.dumps({"identity": "STATSAPI_GAMEPK_RAW_RECORD",
                                "max_unverified_rows": 1, "max_unverified_fraction": 0.01}))
-    monkeypatch.setattr(ch, "IDENTITY_CONFIG_PATH", cfg)
+    from mlb_statsapi_fixture_helpers import use_config
+    use_config(cfg)
     with pytest.raises(MLBTotalCandidateError, match="UNVERIFIED_FIXTURE_LEDGER_EXCEEDED"):
         prequential_backtest(_dup(sample_games(), i=190),
                              holdout_from=(BASE + timedelta(days=180)).isoformat(),

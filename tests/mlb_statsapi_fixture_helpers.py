@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import tempfile
+
+import pytest
 from pathlib import Path
 
 import sportsedge.research.mlb_total_offense_defense_challenger as ch
@@ -44,19 +46,52 @@ def row_for(doc, *, event_id=None, **override):
     return row
 
 
-_TEST_PINS = set()
-_MANIFEST = Path(tempfile.mkdtemp(prefix="mlb_fixture_manifest_")) / "manifest.json"
+ORIGINALS = {"path": ch.TRUSTED_MANIFEST_PATH, "sha": ch.TRUSTED_MANIFEST_SHA256,
+             "config": ch.IDENTITY_CONFIG_PATH}
+_STATE = {"dir": None, "pins": set()}
+
+
+def _write_manifest():
+    cfg = hashlib.sha256(Path(ch.IDENTITY_CONFIG_PATH).read_bytes()).hexdigest()
+    raw = json.dumps({"pinned_index_sha256": sorted(_STATE["pins"]),
+                      "identity_config_sha256": cfg}).encode()
+    path = _STATE["dir"] / "manifest.json"
+    path.write_bytes(raw)
+    ch.TRUSTED_MANIFEST_PATH = path
+    ch.TRUSTED_MANIFEST_SHA256 = hashlib.sha256(raw).hexdigest()
+
+
+def _manifest_session():
+    """TEST ONLY: a temporary trusted manifest (simulating an owner-reviewed
+    manifest + constant change).  Always restores the production constants."""
+    _STATE["dir"] = Path(tempfile.mkdtemp(prefix="mlb_fixture_manifest_"))
+    _STATE["pins"] = set()
+    _write_manifest()
+    try:
+        yield
+    finally:
+        ch.TRUSTED_MANIFEST_PATH = ORIGINALS["path"]
+        ch.TRUSTED_MANIFEST_SHA256 = ORIGINALS["sha"]
+        ch.IDENTITY_CONFIG_PATH = ORIGINALS["config"]
+        _STATE["dir"] = None
+
+
+@pytest.fixture(autouse=True)
+def trusted_manifest():
+    yield from _manifest_session()
 
 
 def trust(docs):
-    """TEST ONLY: register these documents' digest in a test manifest and point
-    the module's trusted-manifest constants at it (simulates an owner-reviewed
-    manifest + code constant change)."""
-    _TEST_PINS.add(FixtureIndex.digest_documents(docs))
-    raw = json.dumps({"pinned_index_sha256": sorted(_TEST_PINS)}).encode()
-    _MANIFEST.write_bytes(raw)
-    ch.TRUSTED_MANIFEST_PATH = _MANIFEST
-    ch.TRUSTED_MANIFEST_SHA256 = hashlib.sha256(raw).hexdigest()
+    if _STATE["dir"] is None:
+        raise RuntimeError("trust() requires the trusted_manifest fixture")
+    _STATE["pins"].add(FixtureIndex.digest_documents(docs))
+    _write_manifest()
+
+
+def use_config(path):
+    """TEST ONLY: point at a threshold config and pin its sha in the test manifest."""
+    ch.IDENTITY_CONFIG_PATH = Path(path)
+    _write_manifest()
 
 
 def trusted_index(docs):

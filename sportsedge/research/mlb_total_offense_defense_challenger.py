@@ -304,8 +304,12 @@ MAX_UNVERIFIED_FRACTION_CEILING = 0.05
 
 
 def _identity_config() -> dict[str, Any]:
-    """Ledger thresholds come from committed config only, bounded."""
-    cfg = json.loads(Path(IDENTITY_CONFIG_PATH).read_text(encoding="utf-8"))
+    """Ledger thresholds come from committed config only, sha-pinned in the
+    trusted manifest, and bounded."""
+    raw = Path(IDENTITY_CONFIG_PATH).read_bytes()
+    if hashlib.sha256(raw).hexdigest() != _trusted_manifest().get("identity_config_sha256"):
+        raise MLBTotalCandidateError("FIXTURE_IDENTITY_CONFIG_TAMPERED")
+    cfg = json.loads(raw)
     rows, frac = cfg.get("max_unverified_rows"), cfg.get("max_unverified_fraction")
     if (cfg.get("identity") != "STATSAPI_GAMEPK_RAW_RECORD"
             or type(rows) is not int or not 0 <= rows <= MAX_UNVERIFIED_ROWS_CEILING
@@ -389,15 +393,19 @@ def _documents_games(docs: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any
 # lift the expected hash.
 TRUSTED_MANIFEST_PATH = (Path(__file__).resolve().parents[2] / "config" / "research"
                          / "mlb_challenger_fixture_index_manifest_v1.json")
-TRUSTED_MANIFEST_SHA256 = "b308d3cb37e8f9a1b77cb0cda045feeaa551be63a77cead97d290ceced30be22"
+TRUSTED_MANIFEST_SHA256 = "69073e4dc31e6170db6d91370989bfe1e7c93b61569bc3b554929ed6b0544616"
 _PRIVATE = object()
 
 
-def _trusted_index_sha256s() -> frozenset[str]:
+def _trusted_manifest() -> dict[str, Any]:
     raw = Path(TRUSTED_MANIFEST_PATH).read_bytes()
     if hashlib.sha256(raw).hexdigest() != TRUSTED_MANIFEST_SHA256:
         raise MLBTotalCandidateError("FIXTURE_MANIFEST_TAMPERED")
-    manifest = json.loads(raw)
+    return json.loads(raw)
+
+
+def _trusted_index_sha256s() -> frozenset[str]:
+    manifest = _trusted_manifest()
     pins = manifest.get("pinned_index_sha256")
     if not isinstance(pins, list) or not all(isinstance(p, str) and len(p) == 64 for p in pins):
         raise MLBTotalCandidateError("FIXTURE_MANIFEST_INVALID")
@@ -423,27 +431,45 @@ def _digest_games(games: Iterable[Mapping[str, Any]]) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _verified_fixtures(index: "FixtureIndex") -> tuple[dict[int, RawFixture], str]:
+    """Module-level verification: reads the raw games straight from the slot
+    (no instance methods are called), checks the digest against the trusted
+    manifest, and returns freshly rebuilt fixtures."""
+    if type(index) is not FixtureIndex:
+        raise MLBTotalCandidateError("FIXTURE_INDEX_REQUIRED")
+    games = object.__getattribute__(index, "_games")
+    digest = _digest_games(games)
+    if digest not in _trusted_index_sha256s():
+        raise MLBTotalCandidateError(f"FIXTURE_INDEX_NOT_TRUSTED:{digest}")
+    return _build_fixtures(games), digest
+
+
 class FixtureIndex:
     """Index of stored statsapi raw records whose digest is in the trusted
-    manifest.  Construct only via from_statsapi_documents / from_raw_dir; the
-    index is re-verified from its raw games on every load."""
+    manifest.  Construct only via from_statsapi_documents / from_raw_dir.
+    Immutable (__slots__ + guarded __setattr__); loads never trust instance
+    state or methods and re-derive fixtures from the verified raw games."""
+
+    __slots__ = ("_games", "_fixtures", "sha256")
 
     def __init__(self, *args: Any, _token: Any = None, **kwargs: Any):
         if _token is not _PRIVATE or args or set(kwargs) != {"games"}:
             raise MLBTotalCandidateError("FIXTURE_INDEX_PRIVATE_CONSTRUCTOR")
-        self._games = json.loads(json.dumps(list(kwargs["games"]), default=str))
-        self._fixtures: dict[int, RawFixture] = {}
-        self.sha256 = ""
-        self.verify()
+        object.__setattr__(self, "_games", json.loads(json.dumps(list(kwargs["games"]), default=str)))
+        object.__setattr__(self, "_fixtures", {})
+        object.__setattr__(self, "sha256", "")
+        FixtureIndex.verify(self)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        raise MLBTotalCandidateError(f"FIXTURE_INDEX_IMMUTABLE:{name}")
+
+    def __delattr__(self, name: str) -> None:
+        raise MLBTotalCandidateError(f"FIXTURE_INDEX_IMMUTABLE:{name}")
 
     def verify(self) -> None:
-        digest = _digest_games(self._games)
-        if digest not in _trusted_index_sha256s():
-            raise MLBTotalCandidateError(f"FIXTURE_INDEX_NOT_TRUSTED:{digest}")
-        # Fixtures are always rebuilt from the verified raw games; anything
-        # injected into the cache is discarded.
-        self._fixtures = _build_fixtures(self._games)
-        self.sha256 = digest
+        fixtures, digest = _verified_fixtures(self)
+        object.__setattr__(self, "_fixtures", fixtures)
+        object.__setattr__(self, "sha256", digest)
 
     @staticmethod
     def digest_documents(docs: Iterable[Mapping[str, Any]]) -> str:
@@ -471,11 +497,11 @@ def _team_matches(row_team: str, canonical: str, team_id: str | None) -> bool:
         team_id is not None and str(row_team).strip() == team_id)
 
 
-def _ground(row: FinalScore, raw: Mapping[str, Any], index: FixtureIndex) -> tuple[RawFixture | None, str | None]:
+def _ground(row: FinalScore, raw: Mapping[str, Any], fixtures: Mapping[int, RawFixture]) -> tuple[RawFixture | None, str | None]:
     pk = _pk(_first(raw, "game_pk", "gamePk"))
     if pk is None:
         return None, "GAME_PK_MISSING"
-    fx = index.get(pk)
+    fx = fixtures.get(pk)
     if fx is None:
         return None, f"GAME_PK_NOT_IN_INDEX:{pk}"
     if not fx.final:
@@ -510,9 +536,9 @@ class GroundedLoad:
 
 def load_grounded_finals(history: Iterable[Mapping[str, Any]], *,
                          fixture_index: FixtureIndex) -> GroundedLoad:
-    if type(fixture_index) is not FixtureIndex:
-        raise MLBTotalCandidateError("FIXTURE_INDEX_REQUIRED")
-    fixture_index.verify()  # re-verify on every load
+    # Re-verify on every load via the module function; never call instance
+    # methods, and look up only the freshly rebuilt fixtures.
+    fixtures, index_sha = _verified_fixtures(fixture_index)
     cfg = _identity_config()
     if isinstance(history, (str, bytes, Mapping)):
         raise MLBTotalCandidateError("HISTORY_SEQUENCE_REQUIRED")
@@ -524,7 +550,7 @@ def load_grounded_finals(history: Iterable[Mapping[str, Any]], *,
     ledger: list[dict[str, Any]] = []
     grounded: list[tuple[FinalScore, RawFixture]] = []
     for row, raw in zip(parsed, raws):
-        fx, reason = _ground(row, raw, fixture_index)
+        fx, reason = _ground(row, raw, fixtures)
         if fx is None:
             ledger.append({"event_id": row.event_id, "status": UNVERIFIED, "reason": reason, "_row": row})
         else:
@@ -534,7 +560,7 @@ def load_grounded_finals(history: Iterable[Mapping[str, Any]], *,
         seen = set()
         while fx.resumed_from_pk is not None and fx.resumed_from_pk not in seen:
             seen.add(fx.game_pk)
-            nxt = fixture_index.get(fx.resumed_from_pk)
+            nxt = fixtures.get(fx.resumed_from_pk)
             if nxt is None:
                 return fx.resumed_from_pk
             fx = nxt
@@ -573,7 +599,7 @@ def load_grounded_finals(history: Iterable[Mapping[str, Any]], *,
         raise MLBTotalCandidateError(
             f"UNVERIFIED_FIXTURE_LEDGER_EXCEEDED:{len(ledger)}>{limit_rows}rows/{limit_frac}")
     records.sort(key=lambda r: (r.event_start, r.event_id))
-    return GroundedLoad(records=tuple(records), ledger=ledger, index_sha256=fixture_index.sha256)
+    return GroundedLoad(records=tuple(records), ledger=ledger, index_sha256=index_sha)
 
 
 def _predict(records: tuple[FinalScore, ...], target: Mapping[str, Any],
