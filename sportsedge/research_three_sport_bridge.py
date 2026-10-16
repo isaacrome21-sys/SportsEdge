@@ -26,7 +26,7 @@ SPORTS = frozenset({"NFL", "MLB", "CFB"})
 GAME_MARKETS = frozenset({
     "ML", "MONEYLINE", "SPREAD", "TOTAL", "TEAM_TOTAL",
     "F5_ML", "F5_SPREAD", "F5_TOTAL", "F5_TEAM_TOTAL",
-    "TOTAL_1H", "SPREAD_1H", "TEAM_TOTAL_1H", "NRFI", "YRFI",
+    "TOTAL_1H", "SPREAD_1H", "TEAM_TOTAL_1H", "ML_1H", "NRFI", "YRFI",
 })
 ODDS_CAP = -165
 EV_MIN = 0.02
@@ -112,7 +112,7 @@ def _key(row):
     if market not in GAME_MARKETS and not player:
         raise ResearchQuoteError("PROP_PLAYER_ID_REQUIRED")
     line = None if row.get("line") is None else _num(row["line"], "LINE")
-    if market in {"ML", "MONEYLINE", "F5_ML", "NRFI", "YRFI"}:
+    if market in {"ML", "MONEYLINE", "F5_ML", "ML_1H", "NRFI", "YRFI"}:
         if line is not None:
             raise ResearchQuoteError("LINE_MUST_BE_NULL")
     elif line is None:
