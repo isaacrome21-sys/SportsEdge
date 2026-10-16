@@ -22,6 +22,7 @@ from sportsedge.nfl_run_it_scored import run_it_scored
 from sportsedge.nfl_td_run_it_score_b import run_td_board
 from sportsedge.sports.nfl.discrete_v2 import load_freeze, means_from_attempt9, score_grid
 from sportsedge.sports.nfl.unified_auto_roles import build_unified_team_models_from_nflverse
+from sportsedge.sports.nfl.v1_live_pin import require_verified_v1_live
 from sportsedge.sports.nfl.unified_market_engine import (
     TD_PROP_MARKETS,
     run_unified_nfl_model,
@@ -348,6 +349,7 @@ def run_unified_nfl_run_it(
         fair_margin = float(attempt9_margin)
         fair_total = float(attempt9_total)
 
+    require_verified_v1_live()  # t214u: pinned freeze+V1 hashes, fail closed
     model = run_unified_nfl_model(
         game_id=game_id,
         home_team=home_team,

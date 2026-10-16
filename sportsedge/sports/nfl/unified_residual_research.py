@@ -11,6 +11,7 @@ from typing import Any, Mapping, Sequence
 
 from sportsedge.nfl_run_it import run_it_market_anchored
 from sportsedge.sports.nfl.unified_market_engine import run_unified_nfl_model
+from sportsedge.sports.nfl.v1_live_pin import require_verified_v1_live
 
 
 class UnifiedResidualResearchError(ValueError):
@@ -64,6 +65,7 @@ def run_unified_residual_research(
     total = float(fair[0]["fair_total"])
     # Same immutable discrete score shape and joint paths as the frozen
     # runtime; no game probabilities from its absolute score grid are used.
+    require_verified_v1_live()  # t214u: pinned freeze+V1 hashes, fail closed
     engine = run_unified_nfl_model(
         game_id=game_id,
         home_team=home_team,

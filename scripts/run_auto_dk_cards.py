@@ -28,6 +28,20 @@ from zoneinfo import ZoneInfo
 from scripts.collect_auto_dk_four_sports import cfb_compact, mlb_line_text, nfl_tickets
 
 CT=ZoneInfo("America/Chicago")
+
+
+def _nfl_v1_live_preflight():
+    """t214u Option A: verify externally pinned NFL freeze + seven V1 hashes.
+
+    Returns None when verified, else the refusal code. A refusal blocks the
+    whole NFL V1 prop execution; there is no fallback and no renormalization.
+    """
+    from sportsedge.sports.nfl.v1_live_pin import V1LivePinError, verify_v1_live_pins
+    try:
+        verify_v1_live_pins()
+    except V1LivePinError as exc:
+        return "NFL_V1_LIVE_PIN_REFUSED:"+str(exc)
+    return None
 ROOT=Path(__file__).resolve().parents[1]
 
 
@@ -110,7 +124,11 @@ def run_nfl(raw, out, now):
                 # research sim; the verified game-line card is already written.
                 targeted=[g for g in prop_ticket.get("games") or []
                           if any(m.get("player") for m in g.get("markets") or [])]
-                if targeted and ok and history.is_file():
+                pin_refusal=_nfl_v1_live_preflight() if targeted else None
+                if pin_refusal:
+                    entry["props"]={"status":"NFL_V1_LIVE_PIN_REFUSED",
+                                    "reason":pin_refusal[:550]}
+                elif targeted and ok and history.is_file():
                     prop_ticket["games"]=targeted
                     targeted_file=out/("nfl_prop_target_"+day+".json")
                     targeted_file.write_text(json.dumps(prop_ticket,indent=2)+"\n")

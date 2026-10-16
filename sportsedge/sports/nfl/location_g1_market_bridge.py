@@ -15,6 +15,7 @@ from sportsedge.sports.nfl.location_symmetric_g1 import (
 )
 from sportsedge.sports.nfl.m2 import NFL_M2_FEATURE_CONTRACT, _assert_market_blind
 from sportsedge.nfl_run_it import run_it_market_anchored
+from sportsedge.sports.nfl.v1_live_pin import require_verified_v1_live
 from sportsedge.sports.nfl.unified_market_engine import (
     UnifiedNflModelError, run_unified_nfl_model,
 )
@@ -122,6 +123,7 @@ def run_location_g1_research_market_bridge(
     if any(not MEAN_FLOOR <= mean <= MEAN_CEILING for mean in means.values()):
         raise UnifiedNflModelError("LOCATION_G1_OUTSIDE_FROZEN_GRID_MEAN_BOUNDS")
 
+    require_verified_v1_live()  # t214u: pinned freeze+V1 hashes, fail closed
     out = run_unified_nfl_model(
         game_id=game_id, home_team=home_team, away_team=away_team,
         attempt9_margin=fair_margin, attempt9_total=fair_total,
