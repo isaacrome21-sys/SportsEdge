@@ -75,29 +75,29 @@ _TEAM_ALIASES = {
     "ATL": ('ATLANTA', 'BRAVES', 'ATLANTA BRAVES'),
     "BAL": ('BALTIMORE', 'ORIOLES', 'BALTIMORE ORIOLES'),
     "BOS": ('BOSTON', 'RED SOX', 'BOSTON RED SOX'),
-    "CHC": ('CUBS', 'CHICAGO CUBS', 'CHN'),
-    "CWS": ('CHW', 'CHA', 'WHITE SOX', 'CHICAGO WHITE SOX'),
+    "CHC": ('CHI CUBS', 'CUBS', 'CHICAGO CUBS', 'CHN'),
+    "CWS": ('CHI WHITE SOX', 'CHW', 'CHA', 'WHITE SOX', 'CHICAGO WHITE SOX'),
     "CIN": ('CINCINNATI', 'REDS', 'CINCINNATI REDS'),
     "CLE": ('CLEVELAND', 'GUARDIANS', 'CLEVELAND GUARDIANS'),
     "COL": ('COLORADO', 'ROCKIES', 'COLORADO ROCKIES'),
     "DET": ('DETROIT', 'TIGERS', 'DETROIT TIGERS'),
     "HOU": ('HOUSTON', 'ASTROS', 'HOUSTON ASTROS'),
-    "KC": ('KCR', 'KCA', 'KANSAS CITY', 'ROYALS', 'KANSAS CITY ROYALS'),
+    "KC": ('KC ROYALS', 'KCR', 'KCA', 'KANSAS CITY', 'ROYALS', 'KANSAS CITY ROYALS'),
     "LAA": ('ANA', 'ANGELS', 'LOS ANGELES ANGELS', 'LA ANGELS'),
-    "LAD": ('LAN', 'DODGERS', 'LOS ANGELES DODGERS', 'LA DODGERS'),
+    "LAD": ('LOS ANGELES DODGERS', 'LAN', 'DODGERS', 'LOS ANGELES DODGERS', 'LA DODGERS'),
     "MIA": ('FLA', 'MIAMI', 'MARLINS', 'MIAMI MARLINS'),
     "MIL": ('MILWAUKEE', 'BREWERS', 'MILWAUKEE BREWERS'),
     "MIN": ('MINNESOTA', 'TWINS', 'MINNESOTA TWINS'),
-    "NYM": ('NYN', 'METS', 'NEW YORK METS'),
-    "NYY": ('NYA', 'YANKEES', 'NEW YORK YANKEES'),
+    "NYM": ('NY METS', 'NYN', 'METS', 'NEW YORK METS'),
+    "NYY": ('NY YANKEES', 'NYA', 'YANKEES', 'NEW YORK YANKEES'),
     "ATH": ('OAK', 'ATHLETICS', 'OAKLAND ATHLETICS', 'AS', "A'S", 'SACRAMENTO ATHLETICS'),
     "PHI": ('PHILADELPHIA', 'PHILLIES', 'PHILADELPHIA PHILLIES'),
     "PIT": ('PITTSBURGH', 'PIRATES', 'PITTSBURGH PIRATES'),
-    "SD": ('SDP', 'SDN', 'SAN DIEGO', 'PADRES', 'SAN DIEGO PADRES'),
-    "SF": ('SFG', 'SFN', 'SAN FRANCISCO', 'GIANTS', 'SAN FRANCISCO GIANTS'),
+    "SD": ('SD PADRES', 'SDP', 'SDN', 'SAN DIEGO', 'PADRES', 'SAN DIEGO PADRES'),
+    "SF": ('SF GIANTS', 'SFG', 'SFN', 'SAN FRANCISCO', 'GIANTS', 'SAN FRANCISCO GIANTS'),
     "SEA": ('SEATTLE', 'MARINERS', 'SEATTLE MARINERS'),
-    "STL": ('SLN', 'ST LOUIS', 'CARDINALS', 'ST LOUIS CARDINALS', 'ST. LOUIS CARDINALS'),
-    "TB": ('TBR', 'TBA', 'TAMPA BAY', 'RAYS', 'TAMPA BAY RAYS'),
+    "STL": ('STL CARDINALS', 'SLN', 'ST LOUIS', 'CARDINALS', 'ST LOUIS CARDINALS', 'ST. LOUIS CARDINALS'),
+    "TB": ('TB RAYS', 'TBR', 'TBA', 'TAMPA BAY', 'RAYS', 'TAMPA BAY RAYS'),
     "TEX": ('TEXAS', 'RANGERS', 'TEXAS RANGERS'),
     "TOR": ('TORONTO', 'BLUE JAYS', 'TORONTO BLUE JAYS'),
     "WSH": ('WSN', 'WAS', 'WASHINGTON', 'NATIONALS', 'WASHINGTON NATIONALS'),
@@ -122,7 +122,7 @@ def canonical_team_id(value: Any) -> str:
 # Same-team overlap window (t212): two games for one club whose starts are
 # closer than this cannot both be real.  Real doubleheaders (traditional game 2
 # after game 1 ends; split games hours apart) pass.
-MIN_SAME_TEAM_START_GAP = timedelta(minutes=90)
+MIN_SAME_TEAM_START_GAP = timedelta(minutes=180)
 
 
 def _runs(value: Any, name: str) -> int:
