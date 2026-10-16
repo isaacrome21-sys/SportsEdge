@@ -424,11 +424,20 @@ def _build_fixtures(games: Iterable[Mapping[str, Any]]) -> dict[int, RawFixture]
     return fixtures
 
 
+def _canonical_games_bytes(games: Iterable[Mapping[str, Any]]) -> bytes:
+    """Canonical JSON bytes of the games, sorted by gamePk.  Round-trips
+    through json first so dict subclasses / overridden methods are stripped
+    to plain JSON before anything reads them."""
+    plain = json.loads(json.dumps(list(games), default=str))
+    if not isinstance(plain, list) or not all(type(g) is dict for g in plain):
+        raise MLBTotalCandidateError("FIXTURE_INDEX_INVALID")
+    plain.sort(key=lambda g: str(g.get("gamePk")))
+    return json.dumps(plain, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=False).encode("utf-8")
+
+
 def _digest_games(games: Iterable[Mapping[str, Any]]) -> str:
-    ordered = sorted(games, key=lambda g: str(g.get("gamePk")))
-    raw = json.dumps(ordered, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
-                     default=str).encode("utf-8")
-    return hashlib.sha256(raw).hexdigest()
+    return hashlib.sha256(_canonical_games_bytes(games)).hexdigest()
 
 
 def _verified_fixtures(index: "FixtureIndex") -> tuple[dict[int, RawFixture], str]:
@@ -437,10 +446,17 @@ def _verified_fixtures(index: "FixtureIndex") -> tuple[dict[int, RawFixture], st
     manifest, and returns freshly rebuilt fixtures."""
     if type(index) is not FixtureIndex:
         raise MLBTotalCandidateError("FIXTURE_INDEX_REQUIRED")
-    games = object.__getattribute__(index, "_games")
-    digest = _digest_games(games)
+    blob = object.__getattribute__(index, "_games")
+    if type(blob) is not bytes:
+        raise MLBTotalCandidateError("FIXTURE_INDEX_INVALID")
+    digest = hashlib.sha256(blob).hexdigest()
     if digest not in _trusted_index_sha256s():
         raise MLBTotalCandidateError(f"FIXTURE_INDEX_NOT_TRUSTED:{digest}")
+    # Parse fresh from the hashed bytes: plain dicts only, hash and build
+    # read the very same canonical copy.
+    games = json.loads(blob)
+    if not isinstance(games, list) or not all(type(g) is dict for g in games):
+        raise MLBTotalCandidateError("FIXTURE_INDEX_INVALID")
     return _build_fixtures(games), digest
 
 
@@ -455,7 +471,7 @@ class FixtureIndex:
     def __init__(self, *args: Any, _token: Any = None, **kwargs: Any):
         if _token is not _PRIVATE or args or set(kwargs) != {"games"}:
             raise MLBTotalCandidateError("FIXTURE_INDEX_PRIVATE_CONSTRUCTOR")
-        object.__setattr__(self, "_games", json.loads(json.dumps(list(kwargs["games"]), default=str)))
+        object.__setattr__(self, "_games", _canonical_games_bytes(kwargs["games"]))
         object.__setattr__(self, "_fixtures", {})
         object.__setattr__(self, "sha256", "")
         FixtureIndex.verify(self)

@@ -67,7 +67,9 @@ def test_mutated_index_reverified_on_every_load():
     base_docs, base_rows = _base()
     real = base_docs + [raw_game(810021, "NYY", "BOS", DAY)]
     idx = trusted_index(real)
-    idx._games[-1]["teams"]["away"]["score"] = 99  # tamper after construction
+    _g = json.loads(object.__getattribute__(idx, "_games"))
+    _g[-1]["teams"]["away"]["score"] = 99  # tamper after construction
+    object.__setattr__(idx, "_games", ch._canonical_games_bytes(_g))
     with pytest.raises(ch.MLBTotalCandidateError, match="FIXTURE_INDEX_NOT_TRUSTED"):
         ch.load_grounded_finals(base_rows + [row_for(real[-1])], fixture_index=idx)
     idx2 = trusted_index(real)

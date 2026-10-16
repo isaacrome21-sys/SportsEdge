@@ -50,8 +50,9 @@ def test_object_setattr_bypass_still_reverified():
 
 def test_tampered_games_refused_even_with_overrides():
     idx, rows, real = _setup()
-    games = object.__getattribute__(idx, "_games")
-    games[-1]["teams"]["away"]["score"] = 99
+    _g = json.loads(object.__getattribute__(idx, "_games"))
+    _g[-1]["teams"]["away"]["score"] = 99  # tamper after construction
+    object.__setattr__(idx, "_games", ch._canonical_games_bytes(_g))
     with pytest.raises(ch.MLBTotalCandidateError, match="FIXTURE_INDEX_NOT_TRUSTED"):
         ch.load_grounded_finals(rows, fixture_index=idx)
 
