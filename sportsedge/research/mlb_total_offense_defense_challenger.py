@@ -126,7 +126,8 @@ def canonical_team_id(value: Any) -> str:
 #     binding: the later start must not precede it;
 #   * grounded doubleheader: same away/home pair, gameNumber exactly 1 then 2,
 #     doubleHeader Y or S and identical on both games, within a day;
-#   * else a recorded end that precedes the later start suffices;
+#   * a different opponent always needs the 180-minute window;
+#   * else (same pair) a recorded end that precedes the later start suffices;
 #   * else (no grounded field) the later start must be >= 180 minutes after.
 DOUBLEHEADER_MIN_GAP = timedelta(minutes=90)
 MIN_SAME_TEAM_START_GAP = timedelta(minutes=180)
@@ -141,6 +142,9 @@ def _same_club_games_ok(earlier: "FinalScore", later: "FinalScore") -> bool:
         return False
     same_pair = (canonical_team_id(earlier.away_id), canonical_team_id(earlier.home_id)) == \
         (canonical_team_id(later.away_id), canonical_team_id(later.home_id))
+    if not same_pair:
+        # Different opponent: 180 minutes regardless of any recorded end.
+        return gap >= MIN_SAME_TEAM_START_GAP
     if (same_pair and (earlier.game_number, later.game_number) == (1, 2)
             and earlier.double_header in {"Y", "S"}
             and earlier.double_header == later.double_header
