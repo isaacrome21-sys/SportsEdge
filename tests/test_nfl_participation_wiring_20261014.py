@@ -127,19 +127,21 @@ def _complete_ids(team, named):
 
 
 def proven_evidence(snapshots=None):
-    """Genuine pinned completeness evidence (#2274): independent official
-    game-day roster + pinned manifests over canonical content hashes."""
+    """Genuine completeness evidence (#2274): fixed independent official
+    rosters + allowlisted manifests.  Pins are NOT in the evidence."""
     from nfl_completeness_evidence_fixture import prove
-    snaps = inactive_snapshots() if snapshots is None else snapshots
-    return prove(snaps, depth_rows())
+    return prove(inactive_snapshots() if snapshots is None else snapshots)[0]
+
+
+def proven_pins(snapshots=None):
+    """Operator-flag pins for proven_evidence (trusted channel)."""
+    from nfl_completeness_evidence_fixture import prove
+    return prove(inactive_snapshots() if snapshots is None else snapshots)[1]
 
 
 def _with_actives(snaps):
-    from nfl_completeness_evidence_fixture import team_ids
-    for s in snaps:
-        s["active_player_ids"] = [p for p in team_ids(depth_rows(), s["team"])
-                                  if p not in s["player_ids"]]
-    return snaps
+    from nfl_completeness_evidence_fixture import with_actives
+    return with_actives(snaps)
 
 
 def inactive_snapshots(chi_ids=("rb2",), gb_ids=(),
@@ -164,7 +166,8 @@ def assess(pid, **overrides):
     kwargs = dict(
         team="CHI", player_id=pid, depth_rows=depth_rows(),
         inactive_snapshots=inactive_snapshots(),
-        completeness_evidence=proven_evidence(), game_id=GAME_ID,
+        completeness_evidence=proven_evidence(),
+        operator_manifest_pins=proven_pins(), game_id=GAME_ID,
         target_season=2026, target_week=4, kickoff=KICKOFF, as_of=GAMEDAY)
     kwargs.update(overrides)
     return assess_skill_participation(**kwargs)
@@ -290,6 +293,7 @@ def test_skill_assessment_shares_and_route_unknown_propagates():
         player_stat_rows=player_rows(),
         inactive_snapshots=inactive_snapshots(),
         completeness_evidence=proven_evidence(),
+        operator_manifest_pins=proven_pins(),
         game_id=GAME_ID, target_season=2026, target_week=4,
         kickoff=KICKOFF, as_of=GAMEDAY, position="WR")
     assert bundle["verdict"]["state"] == "CONFIRMED_STARTER"
@@ -312,6 +316,7 @@ def test_skill_assessment_shares_and_route_unknown_propagates():
         player_stat_rows=player_rows(),
         inactive_snapshots=inactive_snapshots(),
         completeness_evidence=proven_evidence(),
+        operator_manifest_pins=proven_pins(),
         snap_rows=snap_rows, game_id=GAME_ID, target_season=2026,
         target_week=4, kickoff=KICKOFF, as_of=GAMEDAY, position="RB")
     rb_shares = rb_bundle["opportunity_shares"]
@@ -326,6 +331,7 @@ def test_qb_require_gate_matches_bridge_rule():
         team="CHI", depth_rows=depth_rows(),
         inactive_snapshots=inactive_snapshots(),
         completeness_evidence=proven_evidence(),
+        operator_manifest_pins=proven_pins(),
         game_id=GAME_ID, target_season=2026, target_week=4,
         kickoff=KICKOFF, as_of=GAMEDAY, expected_player_id="qb1")
     assert require_confirmed_qb_role(

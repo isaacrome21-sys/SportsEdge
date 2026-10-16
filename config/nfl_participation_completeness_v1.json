@@ -1,0 +1,7 @@
+{
+  "schema": "SPORTSEDGE_NFL_PARTICIPATION_COMPLETENESS_CONFIG_V1",
+  "note": "Committed trust config for #2274 completeness (t207u). Sources are allowlisted here, never taken from evidence. Manifest pins come only from this file's published_manifest_pins or the operator flag (operator_manifest_pins), never from the completeness_evidence payload. No pins are published yet: without operator pins every inactive list is UNKNOWN.",
+  "official_inactives_sources": ["NFL_GAMEDAY_INACTIVES"],
+  "official_roster_sources": ["NFL_GSIS_GAMEDAY_ROSTER"],
+  "published_manifest_pins": {"inactives": [], "roster": []}
+}

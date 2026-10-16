@@ -52,6 +52,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import hashlib
+from pathlib import Path
 import json
 import re
 from typing import Any, Mapping, Sequence
@@ -230,12 +231,63 @@ def canonical_sha256(obj: Any) -> str:
         allow_nan=False).encode()).hexdigest()
 
 
-def _pinned_manifest(raw: Any, pin: Any, schema: str):
-    if not isinstance(raw, (bytes, bytearray)) or not isinstance(pin, str):
+COMPLETENESS_CONFIG_PATH = (Path(__file__).resolve().parents[1]
+                            / "config" / "nfl_participation_completeness_v1.json")
+COMPLETENESS_CONFIG_SCHEMA = "SPORTSEDGE_NFL_PARTICIPATION_COMPLETENESS_CONFIG_V1"
+
+
+def load_completeness_config(path: Path | None = None) -> dict[str, Any] | None:
+    """Committed trust config: source allowlists + published pins.
+
+    Read from the repository, never from evidence.  Any defect returns
+    None, which makes every completeness proof fail (UNKNOWN).
+    """
+    try:
+        doc = json.loads(Path(path or COMPLETENESS_CONFIG_PATH).read_text(
+            encoding="utf-8"))
+    except (OSError, ValueError):
         return None
-    pin = pin.strip().lower()
-    if not _HEX64.match(pin) or hashlib.sha256(bytes(raw)).hexdigest() != pin:
+    if not isinstance(doc, dict) or doc.get("schema") != COMPLETENESS_CONFIG_SCHEMA:
         return None
+    pins = doc.get("published_manifest_pins")
+    if not isinstance(pins, dict):
+        return None
+    out = {"inactives_sources": doc.get("official_inactives_sources"),
+           "roster_sources": doc.get("official_roster_sources"),
+           "pins": pins}
+    for key in ("inactives_sources", "roster_sources"):
+        v = out[key]
+        if not isinstance(v, list) or not all(
+                isinstance(x, str) and x.strip() for x in v):
+            return None
+        out[key] = frozenset(x.strip().upper() for x in v)
+    if out["inactives_sources"] & out["roster_sources"]:
+        return None  # one source cannot attest both sides
+    return out
+
+
+def _pin_set(*groups: Any) -> frozenset:
+    pins = set()
+    for group in groups:
+        if isinstance(group, str):
+            group = [group]
+        if not isinstance(group, (list, tuple, set, frozenset)):
+            continue
+        for pin in group:
+            if isinstance(pin, str) and _HEX64.match(pin.strip().lower()):
+                pins.add(pin.strip().lower())
+    return frozenset(pins)
+
+
+def _pinned_manifest(raw: Any, allowed_pins: frozenset, schema: str,
+                     allowed_sources: frozenset):
+    """Manifest whose bytes hash to an OPERATOR/CONFIG pin and whose
+    declared source is on the committed allowlist; else None."""
+    if not isinstance(raw, (bytes, bytearray)) or not allowed_pins:
+        return None
+    digest = hashlib.sha256(bytes(raw)).hexdigest()
+    if digest not in allowed_pins:
+        return None  # caller-sealed: no trusted pin covers these bytes
     try:
         doc = json.loads(bytes(raw).decode("utf-8"))
     except (UnicodeDecodeError, ValueError):
@@ -244,10 +296,13 @@ def _pinned_manifest(raw: Any, pin: Any, schema: str):
         return None
     source = doc.get("source")
     entries = doc.get("entries")
-    if not isinstance(source, str) or not source.strip() or not isinstance(
-            entries, list) or any(not isinstance(e, dict) for e in entries):
+    if not isinstance(source, str) or \
+            source.strip().upper() not in allowed_sources:
         return None
-    return pin, source.strip(), entries
+    if not isinstance(entries, list) or any(
+            not isinstance(e, dict) for e in entries):
+        return None
+    return digest, source.strip().upper(), entries
 
 
 def _ids(value) -> list[str] | None:
@@ -261,15 +316,26 @@ def _ids(value) -> list[str] | None:
 
 
 def _completeness_proven(snapshot, inactive_ids, evidence, *, game_id,
-                         team_id, candidate_id, cutoff) -> bool:
+                         team_id, candidate_id, cutoff,
+                         operator_manifest_pins=None) -> bool:
     if not isinstance(evidence, Mapping):
         return False
-    inact = _pinned_manifest(evidence.get("inactives_manifest"),
-                             evidence.get("inactives_manifest_sha256"),
-                             INACTIVES_MANIFEST_SCHEMA)
-    ros = _pinned_manifest(evidence.get("roster_manifest"),
-                           evidence.get("roster_manifest_sha256"),
-                           ROSTER_MANIFEST_SCHEMA)
+    config = load_completeness_config()
+    if config is None:
+        return False
+    # Pins NEVER come from the evidence payload (any *_sha256 keys there
+    # are ignored): only the committed config's published pins or the
+    # operator flag.  Caller-sealed manifests are therefore UNKNOWN.
+    op = operator_manifest_pins if isinstance(
+        operator_manifest_pins, Mapping) else {}
+    inact = _pinned_manifest(
+        evidence.get("inactives_manifest"),
+        _pin_set(config["pins"].get("inactives"), op.get("inactives")),
+        INACTIVES_MANIFEST_SCHEMA, config["inactives_sources"])
+    ros = _pinned_manifest(
+        evidence.get("roster_manifest"),
+        _pin_set(config["pins"].get("roster"), op.get("roster")),
+        ROSTER_MANIFEST_SCHEMA, config["roster_sources"])
     if inact is None or ros is None:
         return False
     # Independence: distinct pins AND distinct declared sources.
@@ -320,7 +386,8 @@ def _completeness_proven(snapshot, inactive_ids, evidence, *, game_id,
 
 
 def _inactive_scan(inactive_rows, inactive_snapshots, *, game_id, team_id,
-                   candidate_id, kickoff, cutoff, completeness_evidence=None):
+                   candidate_id, kickoff, cutoff, completeness_evidence=None,
+                   operator_manifest_pins=None):
     """Official-inactive evidence scan for one candidate, <= cutoff only.
 
     Returns a dict with:
@@ -399,7 +466,8 @@ def _inactive_scan(inactive_rows, inactive_snapshots, *, game_id, team_id,
         if validated is None:
             continue
         if not _completeness_proven(
-                raw, validated, completeness_evidence, game_id=game_id,
+                raw, validated, completeness_evidence,
+                operator_manifest_pins=operator_manifest_pins, game_id=game_id,
                 team_id=team_id, candidate_id=candidate_id, cutoff=cutoff):
             continue
         valid.setdefault(published_at, set()).add(tuple(sorted(validated)))
@@ -419,6 +487,7 @@ def assess_qb_participation(
     inactive_rows: Sequence[Mapping[str, Any]] = (),
     inactive_snapshots: Sequence[Mapping[str, Any]] = (),
     completeness_evidence: Mapping[str, Any] | None = None,
+    operator_manifest_pins: Mapping[str, Any] | None = None,
     game_id: str | None = None,
     target_season: int,
     target_week: int,
@@ -516,7 +585,8 @@ def assess_qb_participation(
 
     scan = _inactive_scan(
         inactive_rows, inactive_snapshots,
-        completeness_evidence=completeness_evidence, game_id=game_id,
+        completeness_evidence=completeness_evidence,
+        operator_manifest_pins=operator_manifest_pins, game_id=game_id,
         team_id=team_id, candidate_id=candidate_id, kickoff=kick,
         cutoff=cutoff)
     verdict["inactives_published"] = scan["complete_published"]
@@ -625,6 +695,7 @@ def assess_skill_participation(
     inactive_rows: Sequence[Mapping[str, Any]] = (),
     inactive_snapshots: Sequence[Mapping[str, Any]] = (),
     completeness_evidence: Mapping[str, Any] | None = None,
+    operator_manifest_pins: Mapping[str, Any] | None = None,
     game_id: str | None = None,
     target_season: int,
     target_week: int,
@@ -751,7 +822,8 @@ def assess_skill_participation(
 
     scan = _inactive_scan(
         inactive_rows, inactive_snapshots,
-        completeness_evidence=completeness_evidence, game_id=game_id,
+        completeness_evidence=completeness_evidence,
+        operator_manifest_pins=operator_manifest_pins, game_id=game_id,
         team_id=team_id, candidate_id=pid, kickoff=kick, cutoff=cutoff)
     verdict["inactives_published"] = scan["complete_published"]
     verdict["inactives_evidence_present"] = scan["evidence_present"]
@@ -962,6 +1034,7 @@ def skill_role_assessment(
     inactive_rows: Sequence[Mapping[str, Any]] = (),
     inactive_snapshots: Sequence[Mapping[str, Any]] = (),
     completeness_evidence: Mapping[str, Any] | None = None,
+    operator_manifest_pins: Mapping[str, Any] | None = None,
     snap_rows: Sequence[Mapping[str, Any]] = (),
     game_id: str | None = None,
     target_season: int,
@@ -987,6 +1060,7 @@ def skill_role_assessment(
         injury_rows=injury_rows, inactive_rows=inactive_rows,
         inactive_snapshots=inactive_snapshots,
         completeness_evidence=completeness_evidence,
+        operator_manifest_pins=operator_manifest_pins,
         game_id=game_id, target_season=target_season,
         target_week=target_week, kickoff=kickoff, as_of=as_of,
         position=position, max_depth_age_hours=max_depth_age_hours)
@@ -1102,6 +1176,7 @@ def qb_passing_yards_research(
     inactive_rows: Sequence[Mapping[str, Any]] = (),
     inactive_snapshots: Sequence[Mapping[str, Any]] = (),
     completeness_evidence: Mapping[str, Any] | None = None,
+    operator_manifest_pins: Mapping[str, Any] | None = None,
     snap_rows: Sequence[Mapping[str, Any]] = (),
     expected_qb_id: str | None = None,
     ladder_lines: Sequence[float] | None = None,
@@ -1123,6 +1198,7 @@ def qb_passing_yards_research(
         team=priced_team, depth_rows=depth_rows, injury_rows=injury_rows,
         inactive_rows=inactive_rows, inactive_snapshots=inactive_snapshots,
         completeness_evidence=completeness_evidence,
+        operator_manifest_pins=operator_manifest_pins,
         game_id=game_id,
         target_season=target_season, target_week=target_week,
         kickoff=kickoff, as_of=as_of,
@@ -1136,6 +1212,7 @@ def qb_passing_yards_research(
         team=opponent_team, depth_rows=depth_rows, injury_rows=injury_rows,
         inactive_rows=inactive_rows, inactive_snapshots=inactive_snapshots,
         completeness_evidence=completeness_evidence,
+        operator_manifest_pins=operator_manifest_pins,
         game_id=game_id,
         target_season=target_season, target_week=target_week,
         kickoff=kickoff, as_of=as_of,
