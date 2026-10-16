@@ -149,3 +149,16 @@ def test_spread_same_sign_different_teams_not_merged():
     rows = [_spread(0, "A", 0.6, 3.0), _spread(1, "B", 0.6, 3.0)]
     sels = _sel({"evaluated_rows": rows, "summary": {"rows": 2}, "min_ev": 0.02})
     assert [s["probability"] for s in sels] == [0.6, 0.6]
+
+
+@pytest.mark.parametrize("market", ["Run Line", "run_line", "Puck Line", "PUCK LINE",
+                                    "Point Spread", "point-spread", "Spread"])
+def test_spaced_or_cased_spread_names_use_signed_pairing(market):
+    a, b = _spread(0, "A", 0.55, -1.5, 0.0), _spread(1, "B", 0.50, 1.5, 0.0)
+    a["market"] = b["market"] = market
+    sels = _sel({"evaluated_rows": [a, b], "summary": {"rows": 2}, "min_ev": 0.02})
+    assert all(s["probability"] is None for s in sels), market
+    c, d = _spread(0, "A", 0.6, 1.5, 0.0), _spread(1, "B", 0.6, 1.5, 0.0)
+    c["market"] = d["market"] = market
+    sels = _sel({"evaluated_rows": [c, d], "summary": {"rows": 2}, "min_ev": 0.02})
+    assert [s["probability"] for s in sels] == [0.6, 0.6], market
