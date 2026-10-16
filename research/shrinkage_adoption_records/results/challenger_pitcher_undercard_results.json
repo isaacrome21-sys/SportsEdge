@@ -1,0 +1,837 @@
+{
+ "label": "RESEARCH_EVIDENCE \u2014 retrospective calibration evaluation. NOT a market verdict, NOT validation, NOT a promotion input.",
+ "family": "MLB pitcher undercard challenger (Model Fix Lane, family 2)",
+ "evaluation": "MLB pitcher undercard calibration, 2026 test split",
+ "prereg": {
+  "path": "/home/hatch/workspace/sportsedge/model_fix_20261014/specs/PREREG_PITCHER_UNDERCARD.md",
+  "sha256": "9628b9626ccd42ed04f836f32ed51aa62d0eeca6b72deac782e1ef8622c5a41c"
+ },
+ "repo": {
+  "main": "2a713380c7d49733577c238a126f487382634040",
+  "phase2_main": "12999fc227b6bce3f781749f99918d52c2080b9d",
+  "evaluand_identity": {
+   "sportsedge/mlb_batter_empirical.py": {
+    "phase2_12999fc22_sha256": "88914925126a938b5f551a855921959a35d9c26337dbef9b8e79a51365754918",
+    "main_2a713380c_sha256": "88914925126a938b5f551a855921959a35d9c26337dbef9b8e79a51365754918",
+    "byte_identical": true
+   },
+   "sportsedge/mlb_public_batter_history.py": {
+    "phase2_12999fc22_sha256": "1449d8510e1d513758230f3d07ceb23e675b956df746ae83c7a891e14983fed8",
+    "main_2a713380c_sha256": "1449d8510e1d513758230f3d07ceb23e675b956df746ae83c7a891e14983fed8",
+    "byte_identical": true
+   },
+   "sportsedge/pitcher_joint_engine.py": {
+    "phase2_12999fc22_sha256": "fee2dd8535c9a3a4aefa8e0dfa6ffa4a2894c91fb896d5f2bb9e574e8b32fc48",
+    "main_2a713380c_sha256": "fee2dd8535c9a3a4aefa8e0dfa6ffa4a2894c91fb896d5f2bb9e574e8b32fc48",
+    "byte_identical": true
+   },
+   "sportsedge/mlb_public_pitcher_history.py": {
+    "phase2_12999fc22_sha256": "c648dc922182bb6372f8b074dc452458ef8e141b0aa2271b2972ff19f22a96a6",
+    "main_2a713380c_sha256": "c648dc922182bb6372f8b074dc452458ef8e141b0aa2271b2972ff19f22a96a6",
+    "byte_identical": true
+   }
+  }
+ },
+ "engine_version": "mlb_pitcher_joint_empirical_bayes_v4_long_window_prior",
+ "engine_config": "price_pitcher_market, features={'history_pool': [...]} only (canonical phone-path configuration)",
+ "challenger": {
+  "construction": "P(v) = (count_pool(v) + K * L_m(d)(v)) / (n + K), K=10; pool = ALL prior same-season starts (gamesStarted==1, strictly prior dates, no 12-start cap = B1's pool); L = pooled empirical distribution over all starters' prior starts season-to-date (Phase 2 B2 construction)",
+  "K": 10
+ },
+ "split": {
+  "case": "SINGLE_SPLIT",
+  "test_season": 2026,
+  "design_seasons": [
+   2024,
+   2025
+  ],
+  "sealed_window": "not applicable to 2026 (prereg section 4)"
+ },
+ "generated_at": "2026-10-15T03:14:20.302667+00:00",
+ "seed": 20261015,
+ "acquisition": {
+  "manifest": "/home/hatch/workspace/tmp/bt_data/ACQUISITION_2026_DONE.json",
+  "failures": [],
+  "players_2026": 1511,
+  "gamelog_urls": 1511,
+  "missing_pitcher_gamelog_payloads_in_cache": []
+ },
+ "population": {
+  "gametype_distribution_all_parsed_starts": {
+   "R": 4844
+  },
+  "candidate_regular_starts": 4844,
+  "exclusions": {
+   "POOL_STARTS_LT_5": 1462
+  },
+  "scored_fixtures": 3382
+ },
+ "parity": {
+  "status": "PASSED",
+  "required": 25,
+  "successes": 25,
+  "attempts": 25,
+  "production_refusals_counted_and_replaced": {},
+  "live_schedule_fetches": [
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-05&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-06&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-01&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-02&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-01&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-30&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-04&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-03&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-16&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-17&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-11&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-10&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-29&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-28&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-12&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-13&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-27&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-28&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-24&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-25&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-07&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-08&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-28&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-27&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-17&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-16&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-05&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-17&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-16&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-18&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-21&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-22&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-09&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-18&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-17&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-15&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-27&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-26&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-07&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-06&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-31&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-30&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-04&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-03&hydrate=probablePitcher"
+  ],
+  "pairs": [
+   {
+    "pitcher_id": 543243,
+    "date": "2026-05-06",
+    "game_pk": 824282
+   },
+   {
+    "pitcher_id": 643377,
+    "date": "2026-09-02",
+    "game_pk": 822931
+   },
+   {
+    "pitcher_id": 669022,
+    "date": "2026-05-01",
+    "game_pk": 824287
+   },
+   {
+    "pitcher_id": 607200,
+    "date": "2026-09-04",
+    "game_pk": 824554
+   },
+   {
+    "pitcher_id": 664285,
+    "date": "2026-08-17",
+    "game_pk": 823343
+   },
+   {
+    "pitcher_id": 663567,
+    "date": "2026-07-11",
+    "game_pk": 822875
+   },
+   {
+    "pitcher_id": 671096,
+    "date": "2026-08-29",
+    "game_pk": 824637
+   },
+   {
+    "pitcher_id": 691725,
+    "date": "2026-09-13",
+    "game_pk": 824869
+   },
+   {
+    "pitcher_id": 605400,
+    "date": "2026-07-28",
+    "game_pk": 823838
+   },
+   {
+    "pitcher_id": 656302,
+    "date": "2026-07-25",
+    "game_pk": 824734
+   },
+   {
+    "pitcher_id": 680694,
+    "date": "2026-08-08",
+    "game_pk": 822864
+   },
+   {
+    "pitcher_id": 663436,
+    "date": "2026-05-28",
+    "game_pk": 824595
+   },
+   {
+    "pitcher_id": 685299,
+    "date": "2026-09-17",
+    "game_pk": 824305
+   },
+   {
+    "pitcher_id": 579328,
+    "date": "2026-09-05",
+    "game_pk": 823335
+   },
+   {
+    "pitcher_id": 808963,
+    "date": "2026-05-17",
+    "game_pk": 824034
+   },
+   {
+    "pitcher_id": 684007,
+    "date": "2026-05-18",
+    "game_pk": 824680
+   },
+   {
+    "pitcher_id": 669160,
+    "date": "2026-09-22",
+    "game_pk": 823412
+   },
+   {
+    "pitcher_id": 677960,
+    "date": "2026-07-10",
+    "game_pk": 822709
+   },
+   {
+    "pitcher_id": 677960,
+    "date": "2026-06-18",
+    "game_pk": 823533
+   },
+   {
+    "pitcher_id": 671096,
+    "date": "2026-09-16",
+    "game_pk": 824467
+   },
+   {
+    "pitcher_id": 543037,
+    "date": "2026-08-27",
+    "game_pk": 823503
+   },
+   {
+    "pitcher_id": 694973,
+    "date": "2026-07-07",
+    "game_pk": 823361
+   },
+   {
+    "pitcher_id": 687473,
+    "date": "2026-08-31",
+    "game_pk": 822689
+   },
+   {
+    "pitcher_id": 665152,
+    "date": "2026-07-28",
+    "game_pk": 824243
+   },
+   {
+    "pitcher_id": 678394,
+    "date": "2026-06-04",
+    "game_pk": 824753
+   }
+  ],
+  "sampling_note": "Phase 2 sampling rule transposed to 2026: candidates restricted to fixtures where the sealed filter is inactive (automatic in 2026), schedule gameDate UTC date == gameLog date, kickoff >= 01:00 UTC; production resolves the fixture via schedule probablePitcher; refusals counted and replaced; as_of = kickoff - 30 min."
+ },
+ "sweep_sanity": {
+  "n_fixtures": 10,
+  "checks": {
+   "OUTS": {
+    "median_typical_line_lower_median": 16.5,
+    "max_abs_diff": 5.551115123125783e-17,
+    "note": "identity checked: direct model_p(OVER, L) == swept p_over(L) == 1 - F(L-0.5)"
+   },
+   "HITS_ALLOWED": {
+    "median_typical_line_lower_median": 5.5,
+    "max_abs_diff": 5.551115123125783e-17,
+    "note": "identity checked: direct model_p(OVER, L) == swept p_over(L) == 1 - F(L-0.5)"
+   },
+   "BB": {
+    "median_typical_line_lower_median": 1.5,
+    "max_abs_diff": 5.551115123125783e-17,
+    "note": "identity checked: direct model_p(OVER, L) == swept p_over(L) == 1 - F(L-0.5)"
+   },
+   "ER": {
+    "median_typical_line_lower_median": 1.5,
+    "max_abs_diff": 5.551115123125783e-17,
+    "note": "identity checked: direct model_p(OVER, L) == swept p_over(L) == 1 - F(L-0.5)"
+   }
+  },
+  "max_abs_diff": 5.551115123125783e-17,
+  "passed": true
+ },
+ "unit_checks": {
+  "pmf_sums_to_1": {
+   "trials": 300,
+   "max_abs_dev": 1.1102230246251565e-16,
+   "tol": 1e-12,
+   "passed": true
+  },
+  "k_to_0_reduces_to_B1_distribution": {
+   "trials": 300,
+   "max_abs_dev": 0.0,
+   "passed": true
+  },
+  "all_passed": true
+ },
+ "challenger_pmf_sum_max_abs_dev_over_scored_fixtures": 2.220446049250313e-16,
+ "markets": {
+  "OUTS": {
+   "engine_market": "PITCHER_OUTS",
+   "n": 3382,
+   "crps_engine_mean": 2.139210115046386,
+   "crps_challenger_mean": 2.0511936756242934,
+   "crps_b1_mean": 2.116295473527476,
+   "crps_b2_mean": 2.1705066699519433,
+   "delta_crps_challenger_vs_FROZEN": {
+    "mean_delta": -0.08801643942209231,
+    "ci95_lo": -0.10778555057735383,
+    "ci95_hi": -0.06822868888920124,
+    "n_blocks": 23,
+    "resamples": 2000,
+    "entirely_below_zero": true
+   },
+   "delta_crps_challenger_vs_B1": {
+    "mean_delta": -0.06510179790318261,
+    "ci95_lo": -0.08820809469510262,
+    "ci95_hi": -0.045895103680910945,
+    "n_blocks": 23,
+    "resamples": 2000,
+    "entirely_below_zero": true
+   },
+   "delta_crps_challenger_vs_B2": {
+    "mean_delta": -0.11931299432764976,
+    "ci95_lo": -0.13496940353700237,
+    "ci95_hi": -0.1035463469590884,
+    "n_blocks": 23,
+    "resamples": 2000,
+    "entirely_below_zero": true
+   },
+   "delta_crps_FROZEN_vs_B1_descriptive": {
+    "mean_delta": 0.02291464151890971,
+    "ci95_lo": 0.007344998165571175,
+    "ci95_hi": 0.03822296587606058,
+    "n_blocks": 23,
+    "resamples": 2000,
+    "entirely_below_zero": false
+   },
+   "delta_crps_FROZEN_vs_B2_descriptive": {
+    "mean_delta": -0.03129655490555742,
+    "ci95_lo": -0.06188680149598343,
+    "ci95_hi": 0.0009746412937175328,
+    "n_blocks": 23,
+    "resamples": 2000,
+    "entirely_below_zero": false
+   },
+   "per_line_brier_logloss_descriptive": {
+    "14.5": {
+     "engine": {
+      "brier_mean": 0.19495432422299847,
+      "logloss_mean": 0.5840254422711932,
+      "p_over_mean": 0.728144086759551
+     },
+     "challenger": {
+      "brier_mean": 0.1885132417385686,
+      "logloss_mean": 0.5629073793657584,
+      "p_over_mean": 0.7281259758097978
+     },
+     "b1": {
+      "brier_mean": 0.19788549646305237,
+      "logloss_mean": 1.0342622233863046,
+      "p_over_mean": 0.7474456257272131
+     },
+     "b2": {
+      "brier_mean": 0.19634857324766483,
+      "logloss_mean": 0.5820977011330262,
+      "p_over_mean": 0.6908021122380185
+     },
+     "n": 3382,
+     "outcome_over_rate": 0.735659373151981
+    },
+    "15.5": {
+     "engine": {
+      "brier_mean": 0.24261866623191858,
+      "logloss_mean": 0.686540176143822,
+      "p_over_mean": 0.5440373744298936
+     },
+     "challenger": {
+      "brier_mean": 0.23549770597331418,
+      "logloss_mean": 0.6633379653390507,
+      "p_over_mean": 0.5275853328305311
+     },
+     "b1": {
+      "brier_mean": 0.24373913504561562,
+      "logloss_mean": 0.9207360787488151,
+      "p_over_mean": 0.5406446772151742
+     },
+     "b2": {
+      "brier_mean": 0.25054533460784484,
+      "logloss_mean": 0.6942380745012184,
+      "p_over_mean": 0.4957623274511002
+     },
+     "n": 3382,
+     "outcome_over_rate": 0.5443524541691307
+    },
+    "16.5": {
+     "engine": {
+      "brier_mean": 0.24368886512975874,
+      "logloss_mean": 0.6888737494973055,
+      "p_over_mean": 0.4806995877996765
+     },
+     "challenger": {
+      "brier_mean": 0.23644468931281867,
+      "logloss_mean": 0.6654614752950483,
+      "p_over_mean": 0.4557155971792854
+     },
+     "b1": {
+      "brier_mean": 0.24438630213226603,
+      "logloss_mean": 0.9700003321126582,
+      "p_over_mean": 0.4662036609674964
+     },
+     "b2": {
+      "brier_mean": 0.2532481232504952,
+      "logloss_mean": 0.6997530462578264,
+      "p_over_mean": 0.4271653025910522
+     },
+     "n": 3382,
+     "outcome_over_rate": 0.48225901833234774
+    },
+    "17.5": {
+     "engine": {
+      "brier_mean": 0.23699068760834563,
+      "logloss_mean": 0.6754133760897368,
+      "p_over_mean": 0.4177998462704258
+     },
+     "challenger": {
+      "brier_mean": 0.23003066813589948,
+      "logloss_mean": 0.6521000140306022,
+      "p_over_mean": 0.3892986423625014
+     },
+     "b1": {
+      "brier_mean": 0.23802252972038923,
+      "logloss_mean": 1.0678263190499375,
+      "p_over_mean": 0.3983375757898964
+     },
+     "b2": {
+      "brier_mean": 0.245890232436598,
+      "logloss_mean": 0.6852779070734819,
+      "p_over_mean": 0.3629201391283986
+     },
+     "n": 3382,
+     "outcome_over_rate": 0.4148432879952691
+    },
+    "18.5": {
+     "engine": {
+      "brier_mean": 0.15281482245395292,
+      "logloss_mean": 0.4845920692680206,
+      "p_over_mean": 0.2078034394969641
+     },
+     "challenger": {
+      "brier_mean": 0.14476056033312912,
+      "logloss_mean": 0.4623876582298257,
+      "p_over_mean": 0.16616928425686783
+     },
+     "b1": {
+      "brier_mean": 0.1512585373264539,
+      "logloss_mean": 1.2691086526587307,
+      "p_over_mean": 0.16976368672496467
+     },
+     "b2": {
+      "brier_mean": 0.1489170007268537,
+      "logloss_mean": 0.4757428327477196,
+      "p_over_mean": 0.15432878857244986
+     },
+     "n": 3382,
+     "outcome_over_rate": 0.180662329982259
+    }
+   },
+   "verdict": "ADOPT-CANDIDATE"
+  },
+  "HITS_ALLOWED": {
+   "engine_market": "PITCHER_HITS_ALLOWED",
+   "n": 3382,
+   "crps_engine_mean": 1.308044903737031,
+   "crps_challenger_mean": 1.2327586475517203,
+   "crps_b1_mean": 1.2926054613998206,
+   "crps_b2_mean": 1.2507356532366423,
+   "delta_crps_challenger_vs_FROZEN": {
+    "mean_delta": -0.07528625618531064,
+    "ci95_lo": -0.0917375727285548,
+    "ci95_hi": -0.06040182026129304,
+    "n_blocks": 23,
+    "resamples": 2000,
+    "entirely_below_zero": true
+   },
+   "delta_crps_challenger_vs_B1": {
+    "mean_delta": -0.059846813848100394,
+    "ci95_lo": -0.07850010322793938,
+    "ci95_hi": -0.04442204101958826,
+    "n_blocks": 23,
+    "resamples": 2000,
+    "entirely_below_zero": true
+   },
+   "delta_crps_challenger_vs_B2": {
+    "mean_delta": -0.017977005684921967,
+    "ci95_lo": -0.02782464044345574,
+    "ci95_hi": -0.0078942107910262,
+    "n_blocks": 23,
+    "resamples": 2000,
+    "entirely_below_zero": true
+   },
+   "delta_crps_FROZEN_vs_B1_descriptive": {
+    "mean_delta": 0.015439442337210238,
+    "ci95_lo": 0.006082872764022515,
+    "ci95_hi": 0.024846865707866286,
+    "n_blocks": 23,
+    "resamples": 2000,
+    "entirely_below_zero": false
+   },
+   "delta_crps_FROZEN_vs_B2_descriptive": {
+    "mean_delta": 0.05730925050038867,
+    "ci95_lo": 0.035160651487119506,
+    "ci95_hi": 0.08186336888496461,
+    "n_blocks": 23,
+    "resamples": 2000,
+    "entirely_below_zero": false
+   },
+   "per_line_brier_logloss_descriptive": {
+    "4.5": {
+     "engine": {
+      "brier_mean": 0.254062248512303,
+      "logloss_mean": 0.7085432654373055,
+      "p_over_mean": 0.551308681708593
+     },
+     "challenger": {
+      "brier_mean": 0.2427403756539126,
+      "logloss_mean": 0.678373610748071,
+      "p_over_mean": 0.5433560919920776
+     },
+     "b1": {
+      "brier_mean": 0.2556400399498861,
+      "logloss_mean": 0.9081270855571665,
+      "p_over_mean": 0.5477089705915298
+     },
+     "b2": {
+      "brier_mean": 0.2469390547542848,
+      "logloss_mean": 0.6870189470413632,
+      "p_over_mean": 0.531476975920883
+     },
+     "n": 3382,
+     "outcome_over_rate": 0.5700768775872265
+    },
+    "5.5": {
+     "engine": {
+      "brier_mean": 0.2498512794524425,
+      "logloss_mean": 0.7012735276922926,
+      "p_over_mean": 0.3899431991722057
+     },
+     "challenger": {
+      "brier_mean": 0.23982197420307869,
+      "logloss_mean": 0.673130373146948,
+      "p_over_mean": 0.36538284911219265
+     },
+     "b1": {
+      "brier_mean": 0.2516575943900168,
+      "logloss_mean": 1.0426953309123468,
+      "p_over_mean": 0.3664559726036553
+     },
+     "b2": {
+      "brier_mean": 0.2430527082005286,
+      "logloss_mean": 0.6795577840527166,
+      "p_over_mean": 0.35821310022558644
+     },
+     "n": 3382,
+     "outcome_over_rate": 0.4021289178001183
+    },
+    "6.5": {
+     "engine": {
+      "brier_mean": 0.19276513139097537,
+      "logloss_mean": 0.5813298198850836,
+      "p_over_mean": 0.2524535910734905
+     },
+     "challenger": {
+      "brier_mean": 0.1848329968976316,
+      "logloss_mean": 0.558322869019676,
+      "p_over_mean": 0.21979528632350134
+     },
+     "b1": {
+      "brier_mean": 0.19382556005928303,
+      "logloss_mean": 1.1787950680641484,
+      "p_over_mean": 0.2201502438177256
+     },
+     "b2": {
+      "brier_mean": 0.18521249416144697,
+      "logloss_mean": 0.5580678563775192,
+      "p_over_mean": 0.2148735530543277
+     },
+     "n": 3382,
+     "outcome_over_rate": 0.2433471318746304
+    }
+   },
+   "verdict": "ADOPT-CANDIDATE"
+  },
+  "BB": {
+   "engine_market": "PITCHER_BB",
+   "n": 3382,
+   "crps_engine_mean": 0.741377958107972,
+   "crps_challenger_mean": 0.6899985623130296,
+   "crps_b1_mean": 0.7268498421718104,
+   "crps_b2_mean": 0.7002863007441755,
+   "delta_crps_challenger_vs_FROZEN": {
+    "mean_delta": -0.05137939579494245,
+    "ci95_lo": -0.061933691433759874,
+    "ci95_hi": -0.04233724889643268,
+    "n_blocks": 23,
+    "resamples": 2000,
+    "entirely_below_zero": true
+   },
+   "delta_crps_challenger_vs_B1": {
+    "mean_delta": -0.03685127985878074,
+    "ci95_lo": -0.04823764312516954,
+    "ci95_hi": -0.02737592827207418,
+    "n_blocks": 23,
+    "resamples": 2000,
+    "entirely_below_zero": true
+   },
+   "delta_crps_challenger_vs_B2": {
+    "mean_delta": -0.010287738431145844,
+    "ci95_lo": -0.016285008592240663,
+    "ci95_hi": -0.0042231338090787255,
+    "n_blocks": 23,
+    "resamples": 2000,
+    "entirely_below_zero": true
+   },
+   "delta_crps_FROZEN_vs_B1_descriptive": {
+    "mean_delta": 0.014528115936161701,
+    "ci95_lo": 0.009808719110998771,
+    "ci95_hi": 0.019288402598590774,
+    "n_blocks": 23,
+    "resamples": 2000,
+    "entirely_below_zero": false
+   },
+   "delta_crps_FROZEN_vs_B2_descriptive": {
+    "mean_delta": 0.04109165736379661,
+    "ci95_lo": 0.027080734481317984,
+    "ci95_hi": 0.0562367468169235,
+    "n_blocks": 23,
+    "resamples": 2000,
+    "entirely_below_zero": false
+   },
+   "per_line_brier_logloss_descriptive": {
+    "1.5": {
+     "engine": {
+      "brier_mean": 0.2529816329585837,
+      "logloss_mean": 0.7061017725475968,
+      "p_over_mean": 0.5491168447000794
+     },
+     "challenger": {
+      "brier_mean": 0.24278570753528406,
+      "logloss_mean": 0.6787594246746461,
+      "p_over_mean": 0.5581090888643566
+     },
+     "b1": {
+      "brier_mean": 0.2536643045646188,
+      "logloss_mean": 0.876934507669847,
+      "p_over_mean": 0.5596143912974539
+     },
+     "b2": {
+      "brier_mean": 0.2479299979824117,
+      "logloss_mean": 0.6890046649630419,
+      "p_over_mean": 0.5554976294621101
+     },
+     "n": 3382,
+     "outcome_over_rate": 0.5464222353636902
+    },
+    "2.5": {
+     "engine": {
+      "brier_mean": 0.19352913477018058,
+      "logloss_mean": 0.5811413081264903,
+      "p_over_mean": 0.28954966488600437
+     },
+     "challenger": {
+      "brier_mean": 0.18305182180208393,
+      "logloss_mean": 0.5504286862477988,
+      "p_over_mean": 0.2758177059791828
+     },
+     "b1": {
+      "brier_mean": 0.19385984807256743,
+      "logloss_mean": 0.9969834362855977,
+      "p_over_mean": 0.2757433978454587
+     },
+     "b2": {
+      "brier_mean": 0.18760549525818263,
+      "logloss_mean": 0.5628490975588735,
+      "p_over_mean": 0.27822531359477937
+     },
+     "n": 3382,
+     "outcome_over_rate": 0.2483737433471319
+    }
+   },
+   "verdict": "ADOPT-CANDIDATE"
+  },
+  "ER": {
+   "engine_market": "PITCHER_ER",
+   "n": 3382,
+   "crps_engine_mean": 1.1636212195364328,
+   "crps_challenger_mean": 1.0975862196841852,
+   "crps_b1_mean": 1.154395400697569,
+   "crps_b2_mean": 1.0951368073670096,
+   "delta_crps_challenger_vs_FROZEN": {
+    "mean_delta": -0.06603499985224777,
+    "ci95_lo": -0.0759460510578442,
+    "ci95_hi": -0.05593786900472447,
+    "n_blocks": 23,
+    "resamples": 2000,
+    "entirely_below_zero": true
+   },
+   "delta_crps_challenger_vs_B1": {
+    "mean_delta": -0.05680918101338363,
+    "ci95_lo": -0.06981338922674885,
+    "ci95_hi": -0.045548556168429934,
+    "n_blocks": 23,
+    "resamples": 2000,
+    "entirely_below_zero": true
+   },
+   "delta_crps_challenger_vs_B2": {
+    "mean_delta": 0.0024494123171756393,
+    "ci95_lo": -0.003949158119059973,
+    "ci95_hi": 0.009357060315236997,
+    "n_blocks": 23,
+    "resamples": 2000,
+    "entirely_below_zero": false
+   },
+   "delta_crps_FROZEN_vs_B1_descriptive": {
+    "mean_delta": 0.009225818838864152,
+    "ci95_lo": 0.0011833780241054563,
+    "ci95_hi": 0.016894789578867534,
+    "n_blocks": 23,
+    "resamples": 2000,
+    "entirely_below_zero": false
+   },
+   "delta_crps_FROZEN_vs_B2_descriptive": {
+    "mean_delta": 0.0684844121694234,
+    "ci95_lo": 0.05362762414423474,
+    "ci95_hi": 0.08299041613214528,
+    "n_blocks": 23,
+    "resamples": 2000,
+    "entirely_below_zero": false
+   },
+   "per_line_brier_logloss_descriptive": {
+    "1.5": {
+     "engine": {
+      "brier_mean": 0.24509781618220128,
+      "logloss_mean": 0.6900164930965353,
+      "p_over_mean": 0.5945166695942864
+     },
+     "challenger": {
+      "brier_mean": 0.23444206364424933,
+      "logloss_mean": 0.6617481490994133,
+      "p_over_mean": 0.6006976511577924
+     },
+     "b1": {
+      "brier_mean": 0.24596857242803308,
+      "logloss_mean": 0.8218013939194259,
+      "p_over_mean": 0.598504023409797
+     },
+     "b2": {
+      "brier_mean": 0.23643698964990587,
+      "logloss_mean": 0.665789745334011,
+      "p_over_mean": 0.6028612278885327
+     },
+     "n": 3382,
+     "outcome_over_rate": 0.6179775280898876
+    },
+    "2.5": {
+     "engine": {
+      "brier_mean": 0.2553798975533806,
+      "logloss_mean": 0.7118466803718457,
+      "p_over_mean": 0.41244327859866003
+     },
+     "challenger": {
+      "brier_mean": 0.2457011417094761,
+      "logloss_mean": 0.685060988639383,
+      "p_over_mean": 0.39901642548322624
+     },
+     "b1": {
+      "brier_mean": 0.25838852802385553,
+      "logloss_mean": 0.9154669174639337,
+      "p_over_mean": 0.39549806087239686
+     },
+     "b2": {
+      "brier_mean": 0.24536241310104756,
+      "logloss_mean": 0.6838869702097506,
+      "p_over_mean": 0.4041118522686909
+     },
+     "n": 3382,
+     "outcome_over_rate": 0.42667060910703725
+    }
+   },
+   "verdict": "KEEP FROZEN"
+  }
+ },
+ "tail_treatment": {
+  "rule": "CRPS convention restated (identical to Phase 2's application to B1/B2, now applied to all four arms): CRPS = sum over m = 0..crps_m_max of (F(m) - 1{y <= m})^2 with F(m) = 1 - p_over(m + 0.5) for the engine sweep and F(m) = predictive PMF mass at values <= m for challenger, B1 and B2. Bounds: OUTS m=0..27 (engine support; F(27)=1 via line 27.5), HITS_ALLOWED m=0..14, BB m=0..9, ER m=0..11 (Phase 2 spec grid bounds). Truncation omits a non-negative tail penalty for every scorer.",
+  "per_market": {
+   "OUTS": {
+    "crps_m_range": [
+     0,
+     27
+    ],
+    "engine_residual_tail_mass_mean": 0.0,
+    "engine_residual_tail_mass_max": 0.0,
+    "fixtures_with_outcome_beyond_crps_bound": 0
+   },
+   "HITS_ALLOWED": {
+    "crps_m_range": [
+     0,
+     14
+    ],
+    "engine_residual_tail_mass_mean": 0.04718545015336852,
+    "engine_residual_tail_mass_max": 0.08333333333333337,
+    "fixtures_with_outcome_beyond_crps_bound": 0
+   },
+   "BB": {
+    "crps_m_range": [
+     0,
+     9
+    ],
+    "engine_residual_tail_mass_mean": 0.04718545015336852,
+    "engine_residual_tail_mass_max": 0.08333333333333337,
+    "fixtures_with_outcome_beyond_crps_bound": 0
+   },
+   "ER": {
+    "crps_m_range": [
+     0,
+     11
+    ],
+    "engine_residual_tail_mass_mean": 0.04718545015336852,
+    "engine_residual_tail_mass_max": 0.08333333333333337,
+    "fixtures_with_outcome_beyond_crps_bound": 0
+   }
+  }
+ },
+ "methodology_notes": [
+  "Gate (prereg section 6): ADOPT-CANDIDATE per market iff challenger paired dCRPS 95% CI (ISO-week block bootstrap, 2000 resamples, seed 20261015) is entirely < 0 against FROZEN and B1 and B2. Otherwise KEEP FROZEN.",
+  "Log loss clipped at 1e-15 for all scorers (Phase 2 convention; descriptive only).",
+  "BB/ER median typical line for sweep sanity: lower median (1.5).",
+  "Exclusion precedence: POOL_STARTS_LT_5 only (sealed window not applicable to 2026).",
+  "Fixtures are regular-season (gameType == 'R') starts only.",
+  "CDF monotonicity asserted per fixture per market during sweeps; any violation raises StopRun.",
+  "Challenger vs B1 isolates the league shrinkage alone: the challenger's base pool equals B1's pool (prereg section 5)."
+ ],
+ "status": "COMPLETED"
+}
