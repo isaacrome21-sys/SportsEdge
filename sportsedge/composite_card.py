@@ -253,6 +253,12 @@ _MONEY_PATTERNS = (re.compile(r"^ev($|_)"), re.compile(r"expected_value"),
                    re.compile(r"official"), re.compile(r"^ok_to_"))
 # Parameter / identifier names, not authority or money values (t211e).
 _EXEMPT_SUFFIXES = ("_id", "_floor", "_cap", "_type", "_policy", "_policy_id")
+# Inside reason_detail / blocker_detail (t211f) only _id rescues a money or
+# authority base word; _cap/_type/_policy/_floor (+unit tag) do not, and these
+# size tokens refuse as defense in depth.
+_DETAIL_SIZE_TOKENS = frozenset({"unit", "units", "u", "size", "sizing", "amount",
+                                 "dollars", "bankroll"})
+_DETAIL_BENIGN_PHRASES = (("sample", "size"),)
 # ...also when the parameter word is followed by a unit tag (edge_floor_pp).
 _EXEMPT_SEGMENT = re.compile(r"_(id|floor|cap|type|policy)(_[a-z0-9]{1,4})?$")
 # Keys that may carry a truthy boolean inside pricing_provenance: none.
@@ -272,6 +278,30 @@ def _code_allowed(value: Any) -> bool:
 # reason_detail / blocker_detail are DIAGNOSTICS ONLY (t211e): the renderer,
 # quote audit, grading and pitcher-K units must never display or consume them.
 DIAGNOSTIC_ONLY_FIELDS = ("reason_detail", "blocker_detail")
+
+
+DIAGNOSTICS_KIND = "NON_CARD_DIAGNOSTICS"
+
+
+def diagnostics_record(row: Mapping, row_id: str, game: str) -> dict | None:
+    """Detail fields of one child row, for the separate NON-CARD diagnostics file."""
+    ev = row.get("evaluation") if isinstance(row, Mapping) else None
+    if not isinstance(ev, Mapping):
+        return None
+    det = {k: copy.deepcopy(ev[k]) for k in DIAGNOSTIC_ONLY_FIELDS if k in ev}
+    if not det:
+        return None
+    return {"artifact_kind": DIAGNOSTICS_KIND, "is_card": False, "row_id": row_id,
+            "game_id": game, **det}
+
+
+def card_contains_diagnostics(obj: Any) -> bool:
+    if isinstance(obj, Mapping):
+        return any(k in DIAGNOSTIC_ONLY_FIELDS or card_contains_diagnostics(v)
+                   for k, v in obj.items())
+    if isinstance(obj, (list, tuple)):
+        return any(card_contains_diagnostics(v) for v in obj)
+    return False
 
 
 def strip_diagnostics(row: Any) -> Any:
@@ -301,6 +331,30 @@ def _money_key(key: str) -> bool:
     return key in _MONEY_FIELDS or any(p.search(key) for p in _MONEY_PATTERNS)
 
 
+def _detail_key_violation(raw: str, norm: str, v: Any) -> bool:
+    """Key screen inside detail fields: any non-empty value on a money /
+    authority / size key refuses (strings included)."""
+    if v is None or v is False or v == "" or v == [] or v == {}:
+        return False
+    for key in {raw.lower(), norm}:
+        if key.endswith("_id"):
+            continue
+        base = _EXEMPT_SEGMENT.sub("", key)
+        base = base[:-len("_policy")] if base.endswith("_policy") else base
+        for k in {key, base}:
+            if k in _AUTHORITY_FIELDS or k.endswith("_eligible") or k.endswith("_authority"):
+                return True
+            if k in _MONEY_FIELDS or any(p.search(k) for p in _MONEY_PATTERNS):
+                return True
+        toks = key.split("_")
+        for i, t in enumerate(toks):
+            if t in _DETAIL_SIZE_TOKENS:
+                if i > 0 and (toks[i - 1], t) in _DETAIL_BENIGN_PHRASES:
+                    continue
+                return True
+    return False
+
+
 def _live(v: Any) -> bool:
     """Numeric (0 included) or boolean True. Strings, False and None are inert
     (t211e: refuse only numeric or boolean-truthy values)."""
@@ -314,9 +368,11 @@ _COMPOSITE_ADDED_FIELDS = frozenset({"row_id", "as_of_utc", "child_run_id",
                                      "quote_age_seconds", "research_only"})
 # Evaluation values that may be structured; every other evaluation value is scalar.
 _STRUCTURED_EVAL_FIELDS = frozenset({"blocker_detail", "pricing_provenance", "reason_detail"})
+_DETAIL_PARENTS = frozenset({"blocker_detail", "reason_detail"})
 
 
-_NESTED_PARENTS = frozenset({"evaluation", "pricing_provenance", "blocker_detail"})
+_NESTED_PARENTS = frozenset({"evaluation", "pricing_provenance", "blocker_detail",
+                             "reason_detail"})
 
 
 def _structure_violation(obj: Mapping, parent: str) -> str | None:
@@ -334,7 +390,7 @@ def _structure_violation(obj: Mapping, parent: str) -> str | None:
     return None
 
 
-def authority_violation(obj: Any, _parent: str = "") -> str | None:
+def authority_violation(obj: Any, _parent: str = "", _in_detail: bool = False) -> str | None:
     """Structural fail-closed guard, recursive over mappings/lists.
 
     * any key matching the authority/money/EV patterns with a live value refuses;
@@ -355,18 +411,21 @@ def authority_violation(obj: Any, _parent: str = "") -> str | None:
             for key in {raw.lower(), norm}:
                 if (_authority_key(key) or _money_key(key)) and _live(v):
                     return f"{k}={v}"
+            if _in_detail and _detail_key_violation(raw, norm, v):
+                return f"detail.{k}={v}"
             if norm == "status" and v is not None and not _status_allowed(v):
                 return f"status={v}"
             if norm in _CODE_KEYS and v not in (None, "") and not _code_allowed(v):
                 return f"{norm}={v}"
             if _parent == "pricing_provenance" and v is True:
                 return f"{k}=True"
-            hit = authority_violation(v, norm if norm in _NESTED_PARENTS else "*")
+            hit = authority_violation(v, norm if norm in _NESTED_PARENTS else "*",
+                                      _in_detail or norm in _DETAIL_PARENTS)
             if hit:
                 return hit
     elif isinstance(obj, (list, tuple)):
         for v in obj:
-            hit = authority_violation(v, _parent)
+            hit = authority_violation(v, _parent, _in_detail)
             if hit:
                 return hit
     return None
@@ -394,6 +453,7 @@ def build_composite(rows: Iterable[Mapping[str, Any]], *,
                     revision: str, publication_clock: str,
                     context: Mapping[str, list] | None = None,
                     receipts: Mapping[str, Any] | None = None,
+                    diagnostics_sink: list | None = None,
                     clock: Callable[[str], datetime] | None = None) -> dict:
     if evaluator is None:
         raise CompositeError("EVALUATOR_REQUIRED")
@@ -494,7 +554,11 @@ def build_composite(rows: Iterable[Mapping[str, Any]], *,
                 hit = authority_violation(cr)
                 if hit:
                     raise CompositeError(f"{CHILD_ACTIVE_STAKE}:{src['row_id']}:{hit}")
-                out_rows.append({**copy.deepcopy(dict(cr)), "row_id": src["row_id"],
+                if diagnostics_sink is not None:
+                    drec = diagnostics_record(cr, src["row_id"], game)
+                    if drec:
+                        diagnostics_sink.append(drec)
+                out_rows.append({**strip_diagnostics(cr), "row_id": src["row_id"],
                                  "as_of_utc": as_of_iso, "child_run_id": child_run_id,
                                  "quote_age_seconds": ages.get(src["row_id"]),
                                  "research_only": True})
@@ -567,6 +631,8 @@ def verify_composite(comp: Mapping[str, Any], *, pin: str | None) -> dict:
         problems.append("MANIFEST_DIGEST_MISMATCH")
     if m.get("artifact_kind") != "MULTI_AS_OF_COMPOSITE":
         problems.append("ARTIFACT_KIND")
+    if card_contains_diagnostics(comp.get("rows")) or card_contains_diagnostics(comp.get("refused")):
+        problems.append("DIAGNOSTICS_IN_CARD")
     hit = authority_violation(comp.get("rows"))
     if hit:
         problems.append(f"AUTHORITY_PROMOTION:{hit}")

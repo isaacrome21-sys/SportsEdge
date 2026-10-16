@@ -109,6 +109,7 @@ DOMAIN_PAIRS = frozenset({
     # freeze/preregistration locks; edge-floor refusals and the CFB edge model name
     ("TUNING", "LOCK"), ("PREREGISTRATION", "LOCK"), ("OPENER", "LOCK"),
     ("EDGE", "BELOW"), ("EDGE", "FLOORS"), ("EDGE", "NONFINITE"), ("CFB", "EDGE"),
+    ("HARD", "PASS"),  # t211f: HARD_PASS means no bet
     ("EVALUATION", "ALLOWED"),  # t211e owner: FIRST_EVALUATION_ALLOWED is a scheduling gate
     })
 

@@ -1523,6 +1523,10 @@ def main(argv=None):
                    help="External pin for the capture-receipt manifest (independent channel)")
     p.add_argument("--composite", action="store_true",
                    help="#2359 B: per-game multi-as-of composite card (research only)")
+    p.add_argument("--diagnostics-output", type=Path,
+                   help="--composite only: separate NON-CARD diagnostics file "
+                        "(reason_detail/blocker_detail). Never read by the renderer, "
+                        "grading or any card consumer.")
     args = p.parse_args(argv)
     if not 0 <= args.min_ev <= 0.15:
         p.error("min-ev must be between 0 and 0.15")
@@ -1544,15 +1548,26 @@ def main(argv=None):
             cwd=Path(__file__).resolve().parents[1]).stdout.strip() or "UNKNOWN"
         if args.as_of:
             p.error("--as-of is per game in a composite; it comes from each game's final read")
+        diagnostics: list = []
         card = cri.run_composite(
-            payload, revision=revision, receipts=receipts,
+            payload, revision=revision, receipts=receipts, diagnostics_sink=diagnostics,
             publication_clock=datetime.now(timezone.utc).isoformat(),
             auto_context=not args.no_fetch, min_ev=args.min_ev, lane=args.lane,
             allow_manual_context=args.allow_manual_context, historical=args.historical)
+        from sportsedge import composite_card as _cc
+        if _cc.card_contains_diagnostics(card):
+            raise SystemExit("DIAGNOSTICS_IN_CARD: refusing to emit")
         rendered = json.dumps(card, indent=2) + "\n"
         if args.output:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(rendered, encoding="utf-8")
+        if args.diagnostics_output:
+            args.diagnostics_output.parent.mkdir(parents=True, exist_ok=True)
+            args.diagnostics_output.write_text(json.dumps({
+                "artifact_kind": _cc.DIAGNOSTICS_KIND, "is_card": False,
+                "notice": "NON-CARD diagnostics. Never rendered, graded or consumed.",
+                "card_manifest_digest": card["manifest_digest"],
+                "rows": diagnostics}, indent=2) + "\n", encoding="utf-8")
         # The pin is NOT written next to the card: a co-located pin is not
         # independent. Publish it through a separate channel (e.g. the run's
         # issue comment); verify/render/grade require it supplied externally.

@@ -143,11 +143,15 @@ def run_composite(payload: Mapping[str, Any], *, revision: str, publication_cloc
                   context: Mapping[str, list] | None = None,
                   receipts: Mapping[str, Any] | None = None,
                   run_full: Callable | None = None, clock: Callable | None = None,
-                  **kw) -> dict:
+                  diagnostics_sink: list | None = None, **kw) -> dict:
+    """Build the composite card. Detail fields (reason_detail/blocker_detail)
+    never enter the card; pass ``diagnostics_sink`` to collect them for a
+    separate NON-CARD diagnostics file that no renderer/grader/consumer reads."""
     comp = cc.build_composite(list((payload or {}).get("lines") or []),
                               evaluator=run_full_evaluator(run_full, **kw),
                               revision=revision, publication_clock=publication_clock,
-                              context=context, receipts=receipts, clock=clock)
+                              context=context, receipts=receipts, clock=clock,
+                              diagnostics_sink=diagnostics_sink)
     comp["card_kind"] = "COMPOSITE_RUN_IT"
     return comp
 
@@ -314,8 +318,8 @@ def supersede(composites: Iterable[Mapping[str, Any]], *, pins: Iterable[str]) -
     rows, refused = [], []
     for g in sorted(active):
         c, comp = active[g]
-        rows += [copy.deepcopy(r) for r in comp["rows"] if r["child_run_id"] == c["child_run_id"]]
-        refused += [copy.deepcopy(r) for r in comp["refused"] if r["child_run_id"] == c["child_run_id"]]
+        rows += [cc.strip_diagnostics(r) for r in comp["rows"] if r["child_run_id"] == c["child_run_id"]]
+        refused += [cc.strip_diagnostics(r) for r in comp["refused"] if r["child_run_id"] == c["child_run_id"]]
     return {"active_children": [copy.deepcopy(active[g][0]) for g in sorted(active)],
             "superseded": superseded, "rows": rows, "refused": refused, "research_only": True}
 
