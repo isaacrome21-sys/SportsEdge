@@ -238,29 +238,25 @@ for _m in ("EITHER_PITCHER_HITS_ALLOWED", "EITHER_PITCHER_BB",
     # settlement stays fail-closed (EITHER_PITCHER_BOOK_SPECIFIC_
     # SEMANTICS_REQUIRED in either_pitcher_settlement).
     _blocked("MLB", _m, "NO_ENGINE",
-             "EITHER_PITCHER_MARGINAL_TAIL_ERROR (pricing gate; "
+             "EITHER_PITCHER_DEPENDENCE_UNMEASURED (pricing gate; "
              "also outstanding: EITHER_PITCHER_RUNG_LABEL_UNVERIFIED, "
              "EITHER_PITCHER_PAIR_BINDING_INCOMPLETE): the only "
              "either-probability construction (pitcher_joint_engine "
-             "Cartesian-product pools) inherits the single-pitcher "
-             "marginals' tail error and OVERSTATES the far X+ rungs "
-             "DraftKings sells. Evidence: M31 paired-starter audit "
-             "(spec 5e0eb543, research/mlb-market-legs-20261014) verdict "
-             "DEPENDENCE_MEASURED, starter residual correlation ~0 "
-             "(n=2,160 pairs; HA/BB/ER |rho|<=0.009), but independence "
-             "either-probabilities materially wrong from the marginals "
-             "(BB X+6 pred 0.059 vs obs 0.009). The previous "
-             "independence/dependence blocker is superseded: repairing "
-             "the combination rule fixes nothing; the marginals must be "
-             "repaired first. Pricing stays refused. Rung labels: no "
-             "capture on record pins them to the max/min reading (vs a "
+             "Cartesian-product pools) assumes the two starters are "
+             "independent; they share park/weather/umpire/game script, "
+             "and under dependence the independence value OVERSTATES "
+             "the one-sided rung probabilities DraftKings sells. "
+             "Pricing stays refused "
+             "until a preregistered paired-starter dependence audit "
+             "bounds the independence error. Rung labels: no capture "
+             "on record pins them to the max/min reading (vs a "
              "combined-sum reading). Pair binding: no verified "
              "two-pitcher intake exists on the canonical path; the "
              "pair identity <away_pitcher_id>|<home_pitcher_id> is "
              "defined only in the settlement and PIT layers.",
              engine="PITCHER_JOINT_ENGINE either branch (research "
-                    "complex only; gated EITHER_PITCHER_MARGINAL_"
-                    "TAIL_ERROR)")
+                    "complex only; gated EITHER_PITCHER_DEPENDENCE_"
+                    "UNMEASURED)")
 
 # ---------------------------------------------------------------- NFL (51)
 for _m in ("moneyline", "spread"):
@@ -473,16 +469,34 @@ INTAKE_ALIASES = {
 }
 
 
+def _with_nfl_registration(sport, resolution):
+    """Layer the versioned NFL family registration (#2265) onto a matrix
+    resolution.  Registration names the governed research-only state
+    (NOT_VALIDATED, eligible=false, non-promotable) for NFL player-prop
+    families; it never changes the state, blocker, or detail, and no
+    other sport or market is affected."""
+    if sport != "NFL" or resolution is None:
+        return resolution
+    from sportsedge.nfl_family_registry_v2 import coverage_registration_v2
+    registration = coverage_registration_v2(sport, resolution["market"])
+    if registration is None:
+        return resolution
+    merged = dict(resolution)
+    merged.update(registration)
+    return merged
+
+
 def resolve_market(sport, market):
     """Resolution for a matrix market name or a canonical intake alias."""
     sport = str(sport or "").upper()
     key = str(market or "").upper() if sport == "MLB" else str(market or "")
     direct = MARKET_RESOLUTIONS.get((sport, key))
     if direct is not None:
-        return dict(direct)
+        return _with_nfl_registration(sport, dict(direct))
     alias = INTAKE_ALIASES.get(sport, {}).get(str(market or "").upper())
     if alias is not None:
-        return dict(MARKET_RESOLUTIONS[(sport, alias)])
+        return _with_nfl_registration(
+            sport, dict(MARKET_RESOLUTIONS[(sport, alias)]))
     # The versioned pitch-count extension names its failed validation
     # verdict without changing the frozen 89-market V1 census or granting
     # authority to the existing research pricing route.
