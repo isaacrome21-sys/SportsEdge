@@ -1,0 +1,32 @@
+{
+  "schema_version": "MLB_FAMILY_REGISTRY_V2",
+  "supersedes": null,
+  "extends": {
+    "catalog": "config/mlb_market_catalog.json",
+    "catalog_sha256": "f06b7193a047d62529d653b2a81126357c336bb05b26c79c0c6a5f798bb3117e",
+    "catalog_mutated": false
+  },
+  "families": {
+    "PITCHER_PITCHES": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "pricer": "sportsedge.mlb_phone_pitcher_pricing (merged #2276, d791f618)",
+      "evidence_group": "PITCHER_PITCH_COUNT_V2",
+      "settlement_field": "numberOfPitches",
+      "settlement_source": "MLB StatsAPI boxscore pitching.numberOfPitches",
+      "offer_forms": ["TWO_SIDED_OU", "MILESTONE_LADDER"],
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "evidence": {
+        "M29": {
+          "verdict": "DOES_NOT_BEAT_BASELINE",
+          "source": "research/mlb-market-legs-20261014 @ 21e2c8be3 mlb_market_legs_20261014/results_m29_pitcher_pitches.json",
+          "n_starts": 5371,
+          "delta_crps_vs_b1": 0.2645483582863592,
+          "delta_crps_vs_b2": 0.10235177982363405
+        }
+      }
+    }
+  }
+}
