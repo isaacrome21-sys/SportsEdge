@@ -199,13 +199,13 @@ def test_status_allowlist_file_matches_builder_and_screens_promotions():
         "bsa", Path(__file__).resolve().parents[1] / "scripts" / "build_composite_status_allowlist.py")
     bsa = importlib.util.module_from_spec(spec); spec.loader.exec_module(bsa)
     assert bsa.main(["--check"]) == 0
-    assert not bsa.promotes("NOT_A_PLAY") and not bsa.promotes("NO_PLAY")
+    assert bsa.promotes("NOT_A_PLAY") and not bsa.promotes("NO_PLAY")  # immediate negation only
     for bad in ("PLAY", "PLAYABLE", "LOCK", "BUY", "OFFICIALPICK", "OFFICIAL_PICK", "BET_NOW"):
         assert bsa.promotes(bad)
     assert not any(bsa.promotes(x) for x in cc.STATUS_ALLOWLIST)
 
 
-@pytest.mark.parametrize("status", ["NOT_A_PLAY", "Totally research", "PLAY NOW"])
+@pytest.mark.parametrize("status", ["NOT_A_PLAY", "Totally research", "PLAY NOW", "NO_X_PLAY"])
 def test_unknown_status_refused(status):
     assert cc.authority_violation({"status": status}) is not None
 

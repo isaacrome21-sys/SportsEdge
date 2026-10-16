@@ -236,6 +236,9 @@ def test_real_canonical_run_full_runs_per_game_offline():
     for r in comp["rows"]:
         assert r["as_of_utc"] == iso(5)
         assert r.get("status")
+    # Canonical rows whose provenance says play_eligible=True are withheld by name.
+    for r in comp["refused"]:
+        assert r["refusal_code"] in {cc.REFUSE_CHILD_AUTHORITY_WITHHELD, cc.REFUSE_SET_MEMBER_REFUSED}
 
 
 # ---------------- renderer ----------------

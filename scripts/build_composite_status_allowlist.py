@@ -25,19 +25,9 @@ PATTERNS = (re.compile(r"""["']status["']\s*:\s*["']([A-Z][A-Z0-9_]*)["']"""),
             re.compile(r"""["']((?:BLOCKED|WATCH|NO|NOT|RESEARCH|PRICED|REFRESH|STALE|QUOTE|"""
                        r"""GOVERNANCE|MISSING|UNVERIFIED|VERIFIED|REFUSED|DIAGNOSTIC|UNPRICED)"""
                        r"""_[A-Z0-9_]+)["']"""))
-PROMOTION = {"PLAY", "PLAYS", "PLAYABLE", "BET", "BETS", "WAGER", "PICK", "PICKS", "LOCK",
-             "BUY", "OFFICIAL", "OFFICIALPICK", "STAKE", "STAKED", "PROMOTED", "ACTIVATED"}
-NEGATORS = {"NO", "NOT", "NON"}
-
-
-def promotes(status: str) -> bool:
-    toks = status.upper().split("_")
-    for i, t in enumerate(toks):
-        if t in PROMOTION:
-            prev = toks[max(0, i - 2):i]
-            if not any(p in NEGATORS for p in prev):
-                return True
-    return False
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from sportsedge.promotion_screen import promotes  # noqa: E402
 
 
 def collect() -> list[str]:
@@ -57,6 +47,9 @@ def main(argv=None) -> int:
     doc = {"schema": "SPORTSEDGE_COMPOSITE_STATUS_ALLOWLIST_V1",
            "derived_from": "status and status-code literals in artifacts/ and sportsedge/ (see script)",
            "unknown_status_policy": "REFUSE",
+           "curation_state": "PENDING_OWNER_CURATION",
+           "curation_note": "machine-derived; the owner must review every entry "
+                            "before this list is treated as curated",
            "statuses": collect()}
     rendered = json.dumps(doc, indent=1, sort_keys=True) + "\n"
     if "--check" in argv:

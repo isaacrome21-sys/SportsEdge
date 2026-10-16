@@ -212,7 +212,6 @@ def test_research_statuses_pass_guard():
         out = echo(g, rows, as_of, ctx)
         out["rows"][0]["status"] = "NO_VALIDATION"  # allowlisted research status
         out["rows"][1]["status"] = "BLOCKED_PREPRICING_FIXTURE_UNVERIFIED"
-        out["rows"][1]["eligible"] = False
         return out
     assert len(build(ou("a", "G", 0, 1), evaluator=ev)["rows"]) == 2
 
