@@ -1,0 +1,38 @@
+{
+ "whole_file": "research/mlb_total_hits_joint_path_harness/dataset_manifest.json",
+ "whole_sha256": "05d7cc83b6a4b0cf8938b999609bd77adc26ab51bf452af84bf9859bf89115b7",
+ "whole_bytes": 339932,
+ "parts": [
+  {
+   "path": "research/mlb_total_hits_joint_path_harness/dataset_manifest.parts/part-01.json",
+   "sha256": "3d2e3dec2f0b19213fa996b2080a6482f0df86dd390ff58404c4b72ad17fa08a",
+   "bytes": 60000
+  },
+  {
+   "path": "research/mlb_total_hits_joint_path_harness/dataset_manifest.parts/part-02.json",
+   "sha256": "4049201e597eb06e68321bd1ad42049c01ca9bad5395c320dc7e28bd58ee3244",
+   "bytes": 60000
+  },
+  {
+   "path": "research/mlb_total_hits_joint_path_harness/dataset_manifest.parts/part-03.json",
+   "sha256": "939442913305d6911773bdb262f31955a3adf1301d9272f7c4a2cdfdf40dd5db",
+   "bytes": 60000
+  },
+  {
+   "path": "research/mlb_total_hits_joint_path_harness/dataset_manifest.parts/part-04.json",
+   "sha256": "b3ab93517eac7bf90ff730d78573537608027c16954c56cc1f0b944640ce737a",
+   "bytes": 60000
+  },
+  {
+   "path": "research/mlb_total_hits_joint_path_harness/dataset_manifest.parts/part-05.json",
+   "sha256": "9818d8af3a7620d7497cd182b08f8988a9d823e23e84adb728a9d8d9e12e5909",
+   "bytes": 60000
+  },
+  {
+   "path": "research/mlb_total_hits_joint_path_harness/dataset_manifest.parts/part-06.json",
+   "sha256": "b6b5acbf22b6bf055f399546d7d9ca0847cf74a868e858b85e931ece12cec949",
+   "bytes": 39932
+  }
+ ],
+ "note": "dataset_manifest.json ships split for push transport; concatenate parts in order to reassemble byte-identically and verify whole_sha256."
+}
