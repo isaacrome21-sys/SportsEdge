@@ -1172,7 +1172,8 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
         else:
             distributions = {}
             for game_line, game_result in zip(games, priced_games):
-                dist = extract_distribution(game_result)
+                dist = (extract_distribution(game_result)
+                        or _nfl_canonical_distribution(game_result))
                 if dist:
                     key = derivative_fixture_key(
                         game_line.get("away"), game_line.get("home"))
@@ -1537,3 +1538,21 @@ def main(argv=None):
 
 if __name__ == "__main__":
     main()
+
+
+def _nfl_canonical_distribution(game_result):
+    """Lane-A joint score paths for the NFL derivative stage (default OFF).
+
+    Research-only; returns None (pricers keep their NO_ENGINE guard) when the
+    flag is off or the Lane A means are unavailable/invalid.
+    """
+    try:
+        from sportsedge import nfl_canonical_joint_distribution as cjd
+    except ImportError:
+        return None
+    if not cjd.ENABLED_BY_DEFAULT or not isinstance(game_result, dict):
+        return None
+    try:
+        return cjd.canonical_joint_score_distribution(game_result)["rows"]
+    except cjd.CanonicalJointDistributionError:
+        return None
