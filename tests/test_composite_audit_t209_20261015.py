@@ -199,10 +199,11 @@ def test_status_allowlist_file_matches_builder_and_screens_promotions():
         "bsa", Path(__file__).resolve().parents[1] / "scripts" / "build_composite_status_allowlist.py")
     bsa = importlib.util.module_from_spec(spec); spec.loader.exec_module(bsa)
     assert bsa.main(["--check"]) == 0
-    assert bsa.promotes("NOT_A_PLAY") and not bsa.promotes("NO_PLAY")  # immediate negation only
+    # t211d: the builder excludes by MEANING (promotion_screen.promotion_meaning).
+    from sportsedge.promotion_screen import promotion_meaning
     for bad in ("PLAY", "PLAYABLE", "LOCK", "BUY", "OFFICIALPICK", "OFFICIAL_PICK", "BET_NOW"):
-        assert bsa.promotes(bad)
-    assert not any(bsa.promotes(x) for x in cc.STATUS_ALLOWLIST)
+        assert promotion_meaning(bad)
+    assert not any(promotion_meaning(x) for x in cc.STATUS_ALLOWLIST | cc.CODE_ALLOWLIST)
 
 
 @pytest.mark.parametrize("status", ["NOT_A_PLAY", "Totally research", "PLAY NOW", "NO_X_PLAY"])

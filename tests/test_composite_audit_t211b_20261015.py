@@ -43,7 +43,8 @@ def test_allowlist_has_no_promotion_and_is_pending_owner_curation():
                 "FIRST_EVALUATION_ALLOWED", "FORWARD_EVIDENCE_GATE_PASS",
                 "RESEARCH_POSITIVE_EV", "RESEARCH_EDGE"):
         assert bad not in doc["statuses"]
-    assert not [s for s in doc["statuses"] if promotes(s)]
+    from sportsedge.promotion_screen import promotion_meaning  # t211d: exclusion by meaning
+    assert not [s for s in doc["statuses"] + doc["codes"] if promotion_meaning(s)]
 
 
 @pytest.mark.parametrize("obj", [
@@ -65,8 +66,9 @@ def test_string_values_and_ev_key_patterns(obj):
 
 
 def test_benign_values_pass():
-    assert cc.authority_violation({"status": "PRICED_RESEARCH", "reason": "no verified context",
-                                   "evaluation": {"pricing_provenance": {"play_eligible": False}}}) is None
+    assert cc.authority_violation({"status": "PRICED_RESEARCH", "reason": "WATCH_NFL_NO_VERIFIED_CONTEXT",
+                                   "evaluation": {"reason_detail": "no verified context",
+                                                  "pricing_provenance": {"play_eligible": False}}}) is None
 
 
 def _ev_with(evaluation, **top):

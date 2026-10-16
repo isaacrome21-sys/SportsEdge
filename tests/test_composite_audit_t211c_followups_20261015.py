@@ -24,7 +24,7 @@ def test_truthy_boolean_on_unlisted_key_refused(obj):
     assert cc.authority_violation(obj) is not None
 
 
-@pytest.mark.parametrize("v", ["take the over", "HAMMER", "smash it", "fade them", "tail", "Ｌｏｃｋ", "b e t"])
+@pytest.mark.parametrize("v", ["bet the over", "HAMMER", "smash it", "wager it", "Ｌｏｃｋ", "b e t"])
 def test_betting_verbs_and_obfuscation(v):
     assert ps.promotes(v)
 
@@ -36,7 +36,9 @@ def test_single_letter_join_does_not_overreach(v):
 
 def test_vocabulary_marked_owner_curatable():
     assert ps.VOCABULARY_STATE == "OWNER_CURATABLE_PENDING_REVIEW"
-    assert {"TAKE", "HAMMER", "SMASH", "FADE", "TAIL", "BET", "WAGER", "LOCK", "PLAY"} <= ps.PROMOTION_TOKENS
+    assert {"HAMMER", "SMASH", "BET", "WAGER", "LOCK", "PLAY"} <= ps.PROMOTION_TOKENS
+    # t211d owner ruling: TAIL/TAKE/FADE dropped (legit codes such as *_TAIL_ERROR).
+    assert not {"TAKE", "FADE", "TAIL"} & ps.PROMOTION_TOKENS
 
 
 @pytest.mark.parametrize("key", ["playEligible", "is_official", "approved", "actionable",
