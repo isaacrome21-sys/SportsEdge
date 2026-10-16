@@ -6,6 +6,8 @@ Registration here grants no pricing, promotion, or betting authority.
 """
 from __future__ import annotations
 
+import math
+
 import json
 from pathlib import Path
 from typing import Any, Mapping
@@ -43,6 +45,11 @@ def settle_pitcher_pitches(stat: Mapping[str, Any], line: float, side: str) -> s
     n = stat.get("numberOfPitches") if isinstance(stat, Mapping) else None
     if isinstance(n, bool) or not isinstance(n, int) or n < 0:
         raise ValueError("PITCHER_PITCHES_OFFICIAL_COUNT_MISSING")
+    # Fail closed (t211u): a NaN/inf/non-real line compares False both
+    # ways and would silently settle UNDER as WIN.
+    if isinstance(line, bool) or not isinstance(line, (int, float)) \
+            or not math.isfinite(line):
+        raise ValueError("PITCHER_PITCHES_LINE_INVALID")
     s = str(side).strip().upper()
     if s not in {"OVER", "UNDER"}:
         raise ValueError(f"PITCHER_PITCHES_SIDE_INVALID:{side}")
