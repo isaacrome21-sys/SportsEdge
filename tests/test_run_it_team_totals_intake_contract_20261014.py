@@ -150,7 +150,8 @@ def test_team_side_naming_a_team_is_resolvable():
                team_side="Milwaukee Brewers")
     r = _card([row])["evaluated_rows"][0]
     assert r["selection"] == "Milwaukee Brewers OVER 3.5"
-    assert r["status"] == "RESEARCH_POSITIVE_EV_UNVALIDATED"
+    # t207u: Lane A positive-EV rows are labeled diagnostics only.
+    assert r["status"] == "RESEARCH_DIAGNOSTIC_LANE_A_RETIRED"
 
 
 def test_mixed_slate_regression():
@@ -184,7 +185,7 @@ def test_mixed_slate_regression():
     for r in evaluated[:6]:
         assert "ev_per_dollar" in r, r
         assert r["status"] in (
-            "BELOW_THRESHOLD", "RESEARCH_POSITIVE_EV_UNVALIDATED"), r
+            "BELOW_THRESHOLD", "RESEARCH_DIAGNOSTIC_LANE_A_RETIRED"), r
     assert evaluated[4]["selection"] == "Los Angeles Dodgers OVER 4.5"
     assert evaluated[5]["selection"] == "Milwaukee Brewers OVER 3.5"
     # F5 and CFB refusals intact: named, registry-enforced, priceless.

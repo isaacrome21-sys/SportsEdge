@@ -63,7 +63,7 @@ def test_opposite_odds_only_with_own_timestamp_is_refused():
     # The refusal has surface consequences: no independent candidate, the
     # row may surface at most on the watchlist.
     assert c["independent_candidates"] == []
-    assert len(c["independent_watchlist"]) == 1
+    assert len(c["lane_a_research_diagnostics"]) == 1
 
 
 def test_opposite_odds_only_without_timestamp_is_refused_with_same_status():

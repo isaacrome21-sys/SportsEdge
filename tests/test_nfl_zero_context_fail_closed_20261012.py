@@ -94,7 +94,7 @@ def test_nfl_no_fetch_can_show_diagnostic_but_never_rank():
     assert not card["edges"]
     assert not card["independent_candidates"]
     assert not card["lane_b_edges"]
-    assert len(card["independent_watchlist"]) == 2
+    assert len(card["lane_a_research_diagnostics"]) == 2
     for row in card["evaluated_rows"]:
         assert row["status"] == "WATCH_NFL_NO_VERIFIED_CONTEXT"
         assert row["research_only"] is True
