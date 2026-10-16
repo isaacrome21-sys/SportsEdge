@@ -52,7 +52,7 @@ def test_blocker_detail_diagnostics_allowed():
            "evaluation": {"blocker": "EDGE_BELOW_FROZEN_FLOOR",
                           "blocker_detail": {"sample_size": 40, "paired": True,
                                              "note": "Edge Rusher depth chart unverified",
-                                             "unit": "yards"}}}
+                                             "measure": "yards"}}}  # t211f: unit is a size token in detail
     assert cc.authority_violation(row) is None
 
 

@@ -81,14 +81,15 @@ def test_broadened_patterns_refuse_numeric_or_true(key, val):
 
 
 @pytest.mark.parametrize("key", ["units", "edge", "roi", "best_bet", "model_authority"])
-@pytest.mark.parametrize("val", ["yards", "n/a", False, None])
+@pytest.mark.parametrize("val", [False, None])  # t211f: strings in detail fields now refuse
 def test_patterns_ignore_strings_and_false(key, val):
     assert cc.authority_violation(_bd({key: val})) is None
 
 
-@pytest.mark.parametrize("key", ["edge_floor_pp", "kelly_cap", "bet_id", "wager_type",
-                                 "stake_policy", "stake_policy_id", "official_game_id"])
+@pytest.mark.parametrize("key", ["bet_id", "stake_policy_id", "official_game_id"])
 def test_parameter_suffixes_exempt(key):
+    # t211f: inside detail fields only _id rescues a money/authority base word;
+    # edge_floor_pp, kelly_cap, wager_type, stake_policy now refuse there.
     assert cc.authority_violation(_bd({key: 2})) is None
 
 

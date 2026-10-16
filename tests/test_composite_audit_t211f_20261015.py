@@ -63,6 +63,10 @@ def test_render_has_no_detail():
 def test_cli_stdout_output_and_diagnostics_file(tmp_path, monkeypatch, capsys):
     rows = ou("a", "G", 0, 1)
     root, pin = write_store(rows, tmp_path / "store")
+    from sportsedge.capture_preflight import load_capture_receipts
+    rc = load_capture_receipts(root, manifest_sha256=pin)
+    for r in rows:  # what the live capture adapter records at read time
+        r["verification"]["raw_sha256"] = rc[r["verification"]["read_id"]]["raw_sha256"]
     lines = tmp_path / "lines.json"
     lines.write_text(json.dumps({"lines": rows}))
     monkeypatch.setattr(cri, "run_full_evaluator", lambda *a, **k: _detail_eval)
@@ -70,12 +74,12 @@ def test_cli_stdout_output_and_diagnostics_file(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(cri, "run_composite",
                         lambda *a, **k: orig(*a, **{**k, "clock": _clock_for(rows)}))
     out, diag = tmp_path / "card.json", tmp_path / "diag.json"
-    full.main([str(lines), "--composite", "--no-fetch", "--output", str(out),
+    full.main(["--lines", str(lines), "--composite", "--no-fetch", "--output", str(out),
                "--diagnostics-output", str(diag),
                "--capture-receipts-dir", str(root), "--capture-receipts-manifest-sha256", pin])
     stdout = capsys.readouterr().out
     card = json.loads(out.read_text())
-    assert card["rows"], "fixture must produce active rows"
+    assert card["rows"], [r["refusal_code"] for r in card["refused"]]
     _assert_clean(stdout)
     _assert_clean(out.read_text())
     d = json.loads(diag.read_text())
