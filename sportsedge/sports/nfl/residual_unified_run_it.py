@@ -20,6 +20,7 @@ from sportsedge.nfl_run_it import normalize_quote, run_it_market_anchored
 from sportsedge.sports.nfl.market_anchored_residual import ResidualQuoteError, anchor_prediction
 from sportsedge.nfl_run_it_scored import run_it_scored
 from sportsedge.nfl_td_run_it_score_b import run_td_board
+from sportsedge.sports.nfl.score_grid_integrity import guarded_sample_score_paths
 from sportsedge.sports.nfl.discrete_v2 import load_freeze, means_from_attempt9, score_grid
 from sportsedge.sports.nfl.unified_auto_roles import build_unified_team_models_from_nflverse
 from sportsedge.sports.nfl.unified_market_engine import (
@@ -385,7 +386,8 @@ def run_unified_nfl_run_it(
     freeze = load_freeze()
     means = means_from_attempt9(fair_margin, fair_total)
     grid = score_grid(means["mean_home"], means["mean_away"], freeze)
-    score_paths = sample_score_paths(grid, n_sims=n_sims, seed=seed)
+    # Mass guard (wired t211u): refuse malformed mass before sampling.
+    score_paths = guarded_sample_score_paths(grid, n_sims=n_sims, seed=seed)
 
     # Keep the model's coherent score paths available to prop workloads, but
     # DO NOT send absolute frozen-grid game p into the legacy selection rail.

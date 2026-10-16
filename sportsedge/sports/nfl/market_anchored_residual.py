@@ -11,6 +11,8 @@ Push mass comes from the fair grid for integer lines. No betting authority.
 """
 from __future__ import annotations
 
+from sportsedge.sports.nfl.score_grid_integrity import validate_score_grid
+
 from datetime import datetime, timezone
 import json
 from math import isfinite
@@ -220,6 +222,9 @@ def price_game(game: Mapping[str, Any], *, raw_model_margin: Any, raw_model_tota
     grid_factory = score_grid_factory or (lambda home, away: score_grid(home, away, freeze))
     baseline = grid_factory(means["mean_home"], means["mean_away"])
     residual = grid_factory(anchor["mean_home"], anchor["mean_away"])
+    # Mass guard (wired t211u): a factory grid with bad mass is refused.
+    validate_score_grid(baseline)
+    validate_score_grid(residual)
     rows = []
     for key in MARKETS:
         if key not in markets:

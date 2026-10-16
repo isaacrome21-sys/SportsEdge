@@ -46,3 +46,19 @@ def validate_score_grid(grid: Any) -> None:
             probabilities.append(p)
     if abs(fsum(probabilities) - 1.0) > MASS_TOLERANCE:
         raise ScoreGridIntegrityError("SCORE_GRID_MASS_NOT_ONE")
+
+
+def guarded_sample_score_paths(grid: Any, *, n_sims: int, seed: int):
+    """Validate mass, then sample.  Consumers outside the frozen
+    forward-lock surface use this instead of the raw sampler, whose
+    ``_flat_grid`` would otherwise rewrite the CDF tail to 1.0."""
+    from sportsedge.sports.nfl.unified_market_engine import sample_score_paths
+    validate_score_grid(grid)
+    return sample_score_paths(grid, n_sims=n_sims, seed=seed)
+
+
+def guarded_price_game_market(grid: Any, request: Any):
+    """Validate mass, then price one game market from the grid."""
+    from sportsedge.sports.nfl.unified_market_engine import price_game_market
+    validate_score_grid(grid)
+    return price_game_market(grid, request)
