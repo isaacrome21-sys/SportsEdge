@@ -260,11 +260,11 @@ def test_pitcher_pitches_pair_blocked_when_payload_lacks_pitch_counts():
      "MILESTONE_OR_FEWER", "NOT_RUN"),
     ("PITCHER_OUTS", "X_PLUS", [(15, -300), (18, 130)], "MILESTONE_X_PLUS",
      "NOT_RUN"),
-    # The canonical coverage authority has no resolution entry at all for
-    # PITCHER_PITCHES (resolve_market returns None); the gate names that
-    # exactly instead of inventing a state.
+    # PITCHER_PITCHES resolves in the canonical coverage authority since
+    # its V2 family registration (#2361), carrying the recorded M29
+    # verdict as its validation_status; the gate names that state exactly.
     ("PITCHER_PITCHES", "X_PLUS", [(85, -200), (95, 200)],
-     "MILESTONE_X_PLUS", "NO_COVERAGE_RESOLUTION"),
+     "MILESTONE_X_PLUS", "DOES_NOT_BEAT_BASELINE"),
 ])
 def test_pitcher_ladders_reach_model_and_stop_at_single_side_gate(
         market, form, rungs, quote_form, state):
