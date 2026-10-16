@@ -22,6 +22,7 @@ from typing import Any
 
 from . import capture_preflight as cp
 from .card_correlation import grade_card_positions
+from .promotion_screen import norm_code, tokens
 from .promotion_screen import promotes
 from .quote_freshness import (MAX_QUOTE_AGE_SECONDS, _parse,
                               check_quote_freshness, is_fresh)
@@ -76,7 +77,7 @@ RELEASE_RESEARCH_ONLY_REGRESSIONS_PASSED = "COMPOSITE_RESEARCH_ONLY_REGRESSIONS_
 _CHILD_ALLOWED_FIELDS = set(IDENTITY_FIELDS) | {"game_id", "quote_captured_at", "status",
                                                "evaluation", "reason", "thesis_id"}
 # Any evaluator's ``evaluation`` dict is validated against this projection.
-EVALUATION_FIELDS = ("status", "reason", "blocker", "blocker_detail", "market",
+EVALUATION_FIELDS = ("status", "reason", "reason_detail", "blocker", "blocker_detail", "market",
                      "selection", "line", "odds_american", "estimate_p", "push_p",
                      "loss_p", "fair_american", "pricing_lane", "pricing_provenance",
                      "schema", "model_p")
@@ -223,81 +224,118 @@ def _grammar_sets(rows: list[dict]) -> tuple[dict[str, list[dict]], dict[str, st
     return sets, refusal
 
 
-def _load_status_allowlist() -> frozenset:
+def _load_allowlist() -> tuple[frozenset, frozenset]:
     import json
     from pathlib import Path
     doc = json.loads((Path(__file__).with_name("composite_status_allowlist.json"))
                      .read_text(encoding="utf-8"))
-    return frozenset(str(x).upper() for x in doc["statuses"])
+    statuses = frozenset(norm_code(x) for x in doc["statuses"])
+    return statuses, statuses | frozenset(norm_code(x) for x in doc.get("codes", ()))
 
 
-# Owner-reviewable ALLOWLIST (sportsedge/composite_status_allowlist.json, built
-# by scripts/build_composite_status_allowlist.py from the statuses the pricing
-# path emits). Any status not on it -- 'PLAY NOW', PLAYABLE, LOCK, BUY,
-# OFFICIALPICK, 'play.' -- is refused.
-STATUS_ALLOWLIST = _load_status_allowlist()
-# Field names compared case-insensitively at any depth.
-_AUTHORITY_FIELDS = {"eligible", "official", "play", "playable", "lock", "promotion",
-                     "production_activation"}
-_MONEY_FIELDS = {"stake", "units", "unit", "recommendation", "bet", "wager", "pick",
-                 "estimated_ev"}
+# STRUCTURAL guard (t211d). Owner-reviewable code sets
+# (sportsedge/composite_status_allowlist.json, built by
+# scripts/build_composite_status_allowlist.py from the repo's own literals;
+# only codes whose MEANING is promotion are excluded). status must be an exact
+# member of the status set, reason/blocker of the status|code set, after NFKC
+# + single-letter joining. Unknown codes are refused. Identity fields and
+# free text are never word-screened.
+STATUS_ALLOWLIST, CODE_ALLOWLIST = _load_allowlist()
+_CODE_KEYS = frozenset({"reason", "blocker"})
+_AUTHORITY_FIELDS = frozenset({"eligible", "play", "playable", "official", "lock", "approved",
+                               "actionable", "promotion", "production_activation"})
+_MONEY_FIELDS = frozenset({"recommendation", "pick", "estimated_ev"})
 _MONEY_PATTERNS = (re.compile(r"^ev($|_)"), re.compile(r"expected_value"),
-                   re.compile(r"^edge($|_)"), re.compile(r"^kelly"))
-
-
-def _status_allowed(value: Any) -> bool:
-    return isinstance(value, str) and value.strip().upper() in STATUS_ALLOWLIST
-
-
-_KEY_MONEY_TOKENS = frozenset({"BET", "BETS", "WAGER", "STAKE", "STAKES", "UNIT", "UNITS",
-                               "KELLY", "EV", "EDGE", "RISKED", "SIZE"})
-# Keys that may carry a truthy boolean; any other truthy boolean is refused.
+                   re.compile(r"^edge_"), re.compile(r"^kelly"), re.compile(r"^stake"),
+                   re.compile(r"^bet($|_)"), re.compile(r"^wager"))
+# Keys that may carry a truthy boolean inside pricing_provenance: none.
 _TRUE_BOOL_KEYS = frozenset({"research_only"})
 # pricing_provenance has its own key allowlist (matches sportsedge.pricing_provenance).
 PROVENANCE_KEYS = frozenset({"lane", "mechanism", "source", "engine_lane", "play_eligible"})
 
 
+def _status_allowed(value: Any) -> bool:
+    return isinstance(value, str) and norm_code(value) in STATUS_ALLOWLIST
+
+
+def _code_allowed(value: Any) -> bool:
+    return isinstance(value, str) and norm_code(value) in CODE_ALLOWLIST
+
+
+def _norm_key(key: str) -> str:
+    return "_".join(t.lower() for t in tokens(key))
+
+
 def _authority_key(key: str) -> bool:
-    return (key in _AUTHORITY_FIELDS or key.endswith("_eligible") or key.endswith("_authority")
-            or promotes(key))
+    return key in _AUTHORITY_FIELDS or key.endswith("_eligible") or key.endswith("_authority")
 
 
 def _money_key(key: str) -> bool:
-    if key in _MONEY_FIELDS or any(p.search(key) for p in _MONEY_PATTERNS):
+    return key in _MONEY_FIELDS or any(p.search(key) for p in _MONEY_PATTERNS)
+
+
+def _live(v: Any) -> bool:
+    """Truthy, or numeric (0 included); False/None/'' are inert."""
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
         return True
-    toks = set(_key_tokens(key))
-    return bool(toks & _KEY_MONEY_TOKENS)
+    return bool(v)
 
 
-def _key_tokens(key: str) -> list[str]:
-    from .promotion_screen import tokens
-    return tokens(key)
+# Keys the composite itself adds to a child row (stripped nowhere; allowlisted).
+_COMPOSITE_ADDED_FIELDS = frozenset({"row_id", "as_of_utc", "child_run_id",
+                                     "quote_age_seconds", "research_only"})
+# Evaluation values that may be structured; every other evaluation value is scalar.
+_STRUCTURED_EVAL_FIELDS = frozenset({"blocker_detail", "pricing_provenance", "reason_detail"})
+
+
+_NESTED_PARENTS = frozenset({"evaluation", "pricing_provenance", "blocker_detail"})
+
+
+def _structure_violation(obj: Mapping, parent: str) -> str | None:
+    if parent == "":
+        extra = {str(k) for k in obj} - _CHILD_ALLOWED_FIELDS - _COMPOSITE_ADDED_FIELDS
+        if extra:
+            return f"row_keys={sorted(extra)}"
+    elif parent == "evaluation":
+        extra = {str(k) for k in obj} - set(EVALUATION_FIELDS)
+        if extra:
+            return f"evaluation_keys={sorted(extra)}"
+        for k, v in obj.items():
+            if k not in _STRUCTURED_EVAL_FIELDS and isinstance(v, (Mapping, list, tuple)):
+                return f"evaluation.{k}=NOT_SCALAR"
+    return None
 
 
 def authority_violation(obj: Any, _parent: str = "") -> str | None:
-    """Fail-closed guard, recursive. Field names are screened after camelCase /
-    snake_case tokenisation: promotion or money words in a key refuse a truthy
-    (authority) or any (money) value. Statuses must be allowlisted; every
-    string value is promotion-screened; truthy booleans are refused unless
-    their key is listed; pricing_provenance keys are allowlisted."""
+    """Structural fail-closed guard, recursive over mappings/lists.
+
+    * any key matching the authority/money/EV patterns with a live value refuses;
+    * status / reason / blocker values must be exact allowlisted codes;
+    * pricing_provenance: key allowlist, and no truthy boolean;
+    * nothing else (identity, free text, blocker_detail diagnostics) is screened."""
     if isinstance(obj, Mapping):
+        hit = _structure_violation(obj, _parent)
+        if hit:
+            return hit
         if _parent == "pricing_provenance":
             unknown = {str(k) for k in obj} - PROVENANCE_KEYS
             if unknown:
                 return f"pricing_provenance_keys={sorted(unknown)}"
         for k, v in obj.items():
-            raw_key = str(k).strip()
-            key = raw_key.lower()
-            norm = "_".join(t.lower() for t in _key_tokens(raw_key))
-            if key == "status" and v is not None and not _status_allowed(v):
+            raw = str(k).strip()
+            norm = _norm_key(raw)
+            for key in {raw.lower(), norm}:
+                if (_authority_key(key) or _money_key(key)) and _live(v):
+                    return f"{k}={v}"
+            if norm == "status" and v is not None and not _status_allowed(v):
                 return f"status={v}"
-            if (_authority_key(key) or _authority_key(norm)) and v not in (None, False, 0):
-                return f"{k}={v}"
-            if (_money_key(key) or _money_key(norm)) and v is not None:
-                return f"{k}={v}"
-            if v is True and key not in _TRUE_BOOL_KEYS:
+            if norm in _CODE_KEYS and v not in (None, "") and not _code_allowed(v):
+                return f"{norm}={v}"
+            if _parent == "pricing_provenance" and v is True:
                 return f"{k}=True"
-            hit = authority_violation(v, key)
+            hit = authority_violation(v, norm if norm in _NESTED_PARENTS else "*")
             if hit:
                 return hit
     elif isinstance(obj, (list, tuple)):
@@ -305,8 +343,6 @@ def authority_violation(obj: Any, _parent: str = "") -> str | None:
             hit = authority_violation(v, _parent)
             if hit:
                 return hit
-    elif isinstance(obj, str) and promotes(obj):
-        return f"value={obj}"
     return None
 
 
@@ -410,15 +446,14 @@ def build_composite(rows: Iterable[Mapping[str, Any]], *,
             for cr in child_out.get("rows", []):
                 extra = set(cr) - _CHILD_ALLOWED_FIELDS
                 hit = authority_violation(cr)
-                if hit or extra:
+                evd = cr.get("evaluation", {})
+                bad = (sorted(set(evd) - set(EVALUATION_FIELDS)) if isinstance(evd, Mapping)
+                       else "NOT_A_MAPPING")
+                if hit or extra or bad:
                     codes = ([f"{CHILD_ACTIVE_STAKE}:{hit}"] if hit else []) + \
-                            ([f"{CHILD_FIELD_NOT_ALLOWED}:{sorted(extra)}"] if extra else [])
+                            ([f"{CHILD_FIELD_NOT_ALLOWED}:{sorted(extra)}"] if extra else []) + \
+                            ([f"{CHILD_EVALUATION_FIELD_NOT_ALLOWED}:{game}:{bad}"] if bad else [])
                     raise CompositeError(f"{game}:" + "|".join(codes))
-                if "evaluation" in cr:
-                    evd = cr["evaluation"]
-                    if not isinstance(evd, Mapping) or set(evd) - set(EVALUATION_FIELDS):
-                        bad = sorted(set(evd) - set(EVALUATION_FIELDS)) if isinstance(evd, Mapping) else "NOT_A_MAPPING"
-                        raise CompositeError(f"{CHILD_EVALUATION_FIELD_NOT_ALLOWED}:{game}:{bad}")
                 if str(cr.get("game_id")) != game:
                     raise CompositeError(f"{CHILD_CROSS_GAME}:{game}")
                 k = _identity_key(cr)

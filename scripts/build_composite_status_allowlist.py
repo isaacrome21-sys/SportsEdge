@@ -27,19 +27,36 @@ PATTERNS = (re.compile(r"""["']status["']\s*:\s*["']([A-Z][A-Z0-9_]*)["']"""),
                        r"""_[A-Z0-9_]+)["']"""))
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-from sportsedge.promotion_screen import promotes  # noqa: E402
+from sportsedge.promotion_screen import norm_code, promotion_meaning  # noqa: E402
+
+
+CODE_LITERAL = re.compile(r"""["']([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)["']""")
+SKIP = ("composite_", "promotion_screen")
+
+
+def collect_codes() -> tuple[list[str], list[str]]:
+    """All UPPER_SNAKE code literals; returns (allowed, excluded-as-promotion)."""
+    found = set()
+    for src in SOURCES:
+        for p in sorted((ROOT / src).rglob("*.py")):
+            if p.name.startswith(SKIP):
+                continue
+            found.update(CODE_LITERAL.findall(p.read_text(encoding="utf-8", errors="replace")))
+    allowed = sorted(norm_code(s) for s in found if not promotion_meaning(s))
+    excluded = sorted(s for s in found if promotion_meaning(s))
+    return sorted(set(allowed)), excluded
 
 
 def collect() -> list[str]:
     found = set()
     for src in SOURCES:
         for p in sorted((ROOT / src).rglob("*.py")):
-            if p.name.startswith("composite_"):
+            if p.name.startswith(SKIP):
                 continue
             text = p.read_text(encoding="utf-8", errors="replace")
             for pat in PATTERNS:
                 found.update(pat.findall(text))
-    return sorted(s for s in found if not promotes(s))
+    return sorted({norm_code(s) for s in found if not promotion_meaning(s)})
 
 
 def main(argv=None) -> int:
@@ -51,6 +68,11 @@ def main(argv=None) -> int:
            "curation_note": "machine-derived; the owner must review every entry "
                             "before this list is treated as curated",
            "statuses": collect()}
+    codes, excluded = collect_codes()
+    doc["codes"] = codes
+    doc["excluded_promotion_codes"] = excluded
+    doc["exclusion_rule"] = ("promotion_screen.promotion_meaning: promotion token present, "
+                             "not refusal-shaped, not a domain phrase")
     rendered = json.dumps(doc, indent=1, sort_keys=True) + "\n"
     if "--check" in argv:
         return 0 if OUT.read_text(encoding="utf-8") == rendered else 1

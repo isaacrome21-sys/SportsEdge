@@ -23,11 +23,11 @@ PROMOTION_TOKENS = frozenset({
     "PROMOTED", "ACTIVATED", "ACTIONABLE", "LEAN", "LEANS", "LEANING", "ELIGIBLE",
     "ALLOWED", "EDGE", "EDGES", "RECOMMEND", "RECOMMENDED", "RECOMMENDATION",
     "APPROVED", "GREENLIGHT", "GREENLIT",
-    # betting verbs
-    "TAKE", "HAMMER", "SMASH", "FADE", "TAIL"})
+    # betting verbs (TAKE/FADE/TAIL dropped: common in legitimate codes/text)
+    "HAMMER", "SMASH"})
 NEGATORS = frozenset({"NO", "NOT", "NON"})
 GATE_CONTEXT = frozenset({"GATE", "GATES", "CHECK", "CHECKS", "THRESHOLD", "HARNESS",
-                          "CRITERIA", "CRITERION"})
+                          "CRITERIA", "CRITERION", "CLEARANCE", "METRICS"})
 
 
 def tokens(value: str) -> list[str]:
@@ -65,3 +65,53 @@ def promotes(value: str) -> bool:
             if before not in NEGATORS:
                 return True
     return False
+
+
+# Refusal-shaped codes never mean promotion (EDGE_BELOW_FROZEN_FLOOR, NO_EDGE).
+REFUSAL_MARKERS = frozenset({
+    "BLOCKED", "BLOCK", "NO", "NOT", "NON", "MISSING", "BELOW", "DUPLICATE", "ERROR",
+    "ERRORS", "FAIL", "FAILED", "FAILS", "FAILURE", "DISABLED", "REFUSE", "REFUSED",
+    "REFUSAL", "INSUFFICIENT", "UNVERIFIED", "WATCH", "STALE", "INVALID", "UNAVAILABLE",
+    "MISMATCH", "REQUIRED", "NEEDS", "WITHOUT", "UNKNOWN", "REJECTED", "VOID", "ABSENT",
+    "EXCEEDED", "FORBIDDEN", "CANNOT", "INCOMPLETE", "PARTIAL", "UNRESOLVED", "BROKEN",
+    "UNBUILT", "NONFINITE", "EMPTY", "NONZERO", "WAITING", "PENDING"})
+# Domain phrases whose words are not promotion (baseball/football vocabulary).
+DOMAIN_PAIRS = frozenset({
+    ("HITS", "ALLOWED"), ("RUNS", "ALLOWED"), ("WALKS", "ALLOWED"), ("HR", "ALLOWED"),
+    ("HOMERS", "ALLOWED"), ("YARDS", "ALLOWED"), ("POINTS", "ALLOWED"), ("SACKS", "ALLOWED"),
+    ("GOALS", "ALLOWED"), ("SCORING", "PLAY"), ("SCORING", "PLAYS"), ("PLAY", "ID"),
+    ("PLAY", "BY"), ("BY", "PLAY"), ("PLAY", "TYPE"), ("PLAYS", "ID"), ("LONGEST", "PLAY"),
+    ("PLAY", "CLOCK"), ("OFFICIAL", "DATE"), ("OFFICIAL", "SCORER"), ("OFFICIAL", "STATS"),
+    ("EDGE", "RUSHER"), ("EDGE", "FLOOR"), ("EDGE", "FROM"),
+    # play-by-play nouns
+    ("DRIVE", "PLAY"), ("PLAY", "EVENT"), ("PLAY", "PATH"), ("PLAY", "SCORE"),
+    ("PLAY", "SCORING"), ("LAST", "PLAY"), ("LONGEST", "PLAYS"), ("TEAM", "PLAY"),
+    ("PLAY", "RUNNER"),
+    # OFFICIAL as a data source, not authority
+    ("OFFICIAL", "NFL"), ("OFFICIAL", "FACTS"), ("OFFICIAL", "FACT"), ("OFFICIAL", "WEB"),
+    ("OFFICIAL", "API"), ("NGS", "OFFICIAL"), ("OFFICIAL", "GAME"), ("OFFICIAL", "MARKET"),
+    ("OFFICIAL", "COUNT"), ("OFFICIAL", "F5"), ("OFFICIAL", "TWO"), ("OFFICIAL", "PRE"),
+    ("NEAR", "OFFICIAL"), ("OFFICIAL", "WARNING"), ("OFFICIAL", "INJURY"),
+    # ALLOWED / ELIGIBLE / BET as data or accounting vocabulary
+    ("PBP", "ALLOWED"), ("EVENT", "ALLOWED"), ("ALLOWED", "FIELDS"),
+    ("ELIGIBLE", "DECISION"), ("SETTLEMENT", "ELIGIBLE"), ("GRADED", "BET"),
+    ("CLV", "OFFICIAL"), ("BINDING", "ALLOWED"), ("REVIEW", "ALLOWED"),
+    })
+
+
+def norm_code(value) -> str:
+    """Canonical code form for exact set membership (NFKC, joined letters)."""
+    return "_".join(tokens(value))
+
+
+def promotion_meaning(code) -> bool:
+    """True only when a code's MEANING is promotion (builder exclusion rule)."""
+    toks = tokens(code)
+    if any(t in REFUSAL_MARKERS for t in toks):
+        return False
+    drop = set()
+    for i in range(len(toks) - 1):
+        if (toks[i], toks[i + 1]) in DOMAIN_PAIRS:
+            drop.update({i, i + 1})
+    kept = [t for i, t in enumerate(toks) if i not in drop]
+    return bool(kept) and promotes(" ".join(kept))
