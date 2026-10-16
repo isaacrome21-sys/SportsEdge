@@ -45,7 +45,8 @@ def test_thesis_id_survives_to_composite_grading():
     except cc.CompositeError as e:
         pytest.fail(f"thesis_id rejected by child allowlist: {e}")
     g = cc.grade_composite(comp, {}, pin=comp["manifest_digest"])
-    assert len(g.get("positions", g.get("stacks", []))) == 1
+    # grade output reports positions as an int (stacks as the list)
+    assert g["positions"] == 1 and len(g["stacks"]) == 1
 
 
 def test_raw_read_id_must_match_receipt_read_id(tmp_path):

@@ -28,10 +28,14 @@ def write_store(rows, root=None):
         rid = str(ver["read_id"])
         if rid in seen:
             continue
+        ts = str(r.get("quote_captured_at") or "")
+        if not (ts.endswith("Z") or "+" in ts[10:] or "-" in ts[10:]):
+            continue  # a capture adapter cannot receipt a timezone-less read
         seen.add(rid)
         offer = {k: r.get(k) for k in OFFER_FIELDS}
         offer["price"] = r.get("price", r.get("odds"))
-        raw = json.dumps({"book": r.get("book"), "read_id": rid, "offers": [offer]},
+        raw = json.dumps({"book": r.get("book"), "read_id": rid,
+                          "captured_at": r.get("quote_captured_at"), "offers": [offer]},
                          sort_keys=True).encode()
         raw_path = f"raw/{rid}.json"
         (root / raw_path).write_bytes(raw)

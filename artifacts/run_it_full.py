@@ -1553,10 +1553,9 @@ def main(argv=None):
         if args.output:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(rendered, encoding="utf-8")
-            # Publish this pin through an independent channel; verification,
-            # rendering and grading of the composite require it.
-            args.output.with_suffix(args.output.suffix + ".pin").write_text(
-                card["manifest_digest"] + "\n", encoding="utf-8")
+        # The pin is NOT written next to the card: a co-located pin is not
+        # independent. Publish it through a separate channel (e.g. the run's
+        # issue comment); verify/render/grade require it supplied externally.
         print(f"COMPOSITE_MANIFEST_PIN {card['manifest_digest']}", file=sys.stderr)
         print(rendered)
         return

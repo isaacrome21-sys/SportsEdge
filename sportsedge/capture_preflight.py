@@ -47,6 +47,8 @@ RECEIPT_RAW_HASH_MISMATCH = "CAPTURE_RECEIPT_RAW_READ_HASH_MISMATCH"
 RECEIPT_OFFER_NOT_IN_RAW_READ = "CAPTURE_RECEIPT_OFFER_NOT_IN_RAW_READ"
 RECEIPT_PATH_INVALID = "CAPTURE_RECEIPT_PATH_INVALID"
 RECEIPT_MALFORMED = "CAPTURE_RECEIPT_MALFORMED"
+RECEIPT_RAW_BINDING_MISMATCH = "CAPTURE_RECEIPT_RAW_READ_ID_OR_TIME_MISMATCH"
+RECEIPT_RAW_REUSED = "CAPTURE_RECEIPT_RAW_READ_SHARED_ACROSS_RECEIPTS"
 RECEIPT_OFFER_FIELDS = ("game_id", "book", "market", "selection", "period", "line", "player")
 
 
@@ -73,7 +75,14 @@ def _safe_path(root, rel):
 
 
 def load_capture_receipts(root, *, manifest_sha256: str) -> dict:
-    """Load a pinned capture-receipt store; any break in the chain raises."""
+    """Load a pinned capture-receipt store; any break in the chain raises.
+
+    Trust boundary: receipts are only as trustworthy as whoever wrote the
+    manifest. The out-of-band pin proves the store was not altered after the
+    writer published it; it does not prove the writer read the sportsbook
+    honestly. The raw bytes must carry their own read_id and capture time,
+    which must equal the receipt's, and one raw read can back only one
+    receipt (no re-wrapping an old read as a new capture)."""
     import json
     from pathlib import Path
     mb = (Path(root) / "manifest.json").read_bytes()
@@ -81,6 +90,7 @@ def load_capture_receipts(root, *, manifest_sha256: str) -> dict:
         raise ValueError(RECEIPT_MANIFEST_PIN_MISMATCH)
     manifest = json.loads(mb)
     out = {}
+    raw_seen: set[str] = set()
     for e in manifest.get("receipts") or []:
         rb = _safe_path(root, e.get("path")).read_bytes()
         if _sha256(rb) != e.get("sha256"):
@@ -91,12 +101,26 @@ def load_capture_receipts(root, *, manifest_sha256: str) -> dict:
         raw = _safe_path(root, rc.get("raw_path")).read_bytes()
         if _sha256(raw) != rc.get("raw_sha256"):
             raise ValueError(RECEIPT_RAW_HASH_MISMATCH)
+        if rc["raw_sha256"] in raw_seen:
+            raise ValueError(RECEIPT_RAW_REUSED)
+        raw_seen.add(rc["raw_sha256"])
+        try:
+            raw_doc = json.loads(raw)
+        except ValueError:
+            raw_doc = None
+        if not isinstance(raw_doc, dict):
+            raise ValueError(RECEIPT_OFFER_NOT_IN_RAW_READ)
+        try:
+            raw_time = _parse(raw_doc.get("captured_at"))
+            rc_time = _parse(rc.get("captured_at"))
+        except ValueError:
+            raw_time = rc_time = None
+        if str(raw_doc.get("read_id")) != str(rc["read_id"]) or raw_time is None \
+                or raw_time != rc_time:
+            raise ValueError(RECEIPT_RAW_BINDING_MISMATCH)
         offer = {k: rc.get(k) for k in RECEIPT_OFFER_FIELDS}
         offer["price"] = rc.get("price")
-        try:
-            offers = json.loads(raw).get("offers") or []
-        except (ValueError, AttributeError):
-            offers = []
+        offers = raw_doc.get("offers") or []
         if not any(isinstance(o, dict) and all(o.get(k) == v for k, v in offer.items())
                    for o in offers):
             raise ValueError(RECEIPT_OFFER_NOT_IN_RAW_READ)
