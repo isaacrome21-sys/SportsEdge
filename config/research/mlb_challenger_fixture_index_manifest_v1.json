@@ -1,0 +1,18 @@
+{
+  "schema": "SPORTSEDGE_MLB_CHALLENGER_FIXTURE_INDEX_MANIFEST_V1",
+  "identity": "STATSAPI_GAMEPK_RAW_RECORD",
+  "pinned_index_sha256": [
+    "2db433d394e086e65200cf8c8b3d74db737af4fd4402d9f48f6ead3baaebb362"
+  ],
+  "pinned_sources": [
+    {
+      "sha256": "2db433d394e086e65200cf8c8b3d74db737af4fd4402d9f48f6ead3baaebb362",
+      "branch": "data",
+      "path": "data/mlb_forward_calibration_raw",
+      "raw_files": 77,
+      "games": 77,
+      "digest": "CANONICAL_JSON_SHA256 of sorted statsapi games (FixtureIndex.digest_documents)"
+    }
+  ],
+  "change_policy": "Adding an index requires a new manifest and a new TRUSTED_MANIFEST_SHA256 code constant (owner-reviewed)."
+}

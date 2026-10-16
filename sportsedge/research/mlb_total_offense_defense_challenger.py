@@ -299,11 +299,20 @@ IDENTITY_CONFIG_PATH = (Path(__file__).resolve().parents[2] / "config" / "resear
 UNVERIFIED = "UNVERIFIED_FIXTURE_IDENTITY"
 
 
+MAX_UNVERIFIED_ROWS_CEILING = 50
+MAX_UNVERIFIED_FRACTION_CEILING = 0.05
+
+
 def _identity_config() -> dict[str, Any]:
-    cfg = json.loads(IDENTITY_CONFIG_PATH.read_text(encoding="utf-8"))
-    if cfg.get("identity") != "STATSAPI_GAMEPK_RAW_RECORD":
+    """Ledger thresholds come from committed config only, bounded."""
+    cfg = json.loads(Path(IDENTITY_CONFIG_PATH).read_text(encoding="utf-8"))
+    rows, frac = cfg.get("max_unverified_rows"), cfg.get("max_unverified_fraction")
+    if (cfg.get("identity") != "STATSAPI_GAMEPK_RAW_RECORD"
+            or type(rows) is not int or not 0 <= rows <= MAX_UNVERIFIED_ROWS_CEILING
+            or isinstance(frac, bool) or not isinstance(frac, (int, float))
+            or not isfinite(float(frac)) or not 0.0 <= float(frac) <= MAX_UNVERIFIED_FRACTION_CEILING):
         raise MLBTotalCandidateError("FIXTURE_IDENTITY_CONFIG_INVALID")
-    return cfg
+    return {**cfg, "max_unverified_fraction": float(frac)}
 
 
 def _pk(value: Any) -> int | None:
@@ -375,44 +384,80 @@ def _documents_games(docs: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any
     return games
 
 
-class FixtureIndex:
-    """Hash-pinned index of stored statsapi raw schedule records."""
+# Trusted pin (t212 audit): the accepted index digests live in a committed
+# manifest whose own sha256 is this code constant.  Callers cannot supply or
+# lift the expected hash.
+TRUSTED_MANIFEST_PATH = (Path(__file__).resolve().parents[2] / "config" / "research"
+                         / "mlb_challenger_fixture_index_manifest_v1.json")
+TRUSTED_MANIFEST_SHA256 = "b308d3cb37e8f9a1b77cb0cda045feeaa551be63a77cead97d290ceced30be22"
+_PRIVATE = object()
 
-    def __init__(self, fixtures: Mapping[int, RawFixture], sha256: str):
-        self._fixtures = dict(fixtures)
-        self.sha256 = sha256
+
+def _trusted_index_sha256s() -> frozenset[str]:
+    raw = Path(TRUSTED_MANIFEST_PATH).read_bytes()
+    if hashlib.sha256(raw).hexdigest() != TRUSTED_MANIFEST_SHA256:
+        raise MLBTotalCandidateError("FIXTURE_MANIFEST_TAMPERED")
+    manifest = json.loads(raw)
+    pins = manifest.get("pinned_index_sha256")
+    if not isinstance(pins, list) or not all(isinstance(p, str) and len(p) == 64 for p in pins):
+        raise MLBTotalCandidateError("FIXTURE_MANIFEST_INVALID")
+    return frozenset(pins)
+
+
+def _build_fixtures(games: Iterable[Mapping[str, Any]]) -> dict[int, RawFixture]:
+    fixtures: dict[int, RawFixture] = {}
+    for game in games:
+        fx = RawFixture.from_game(game)
+        prior = fixtures.get(fx.game_pk)
+        # The same gamePk may be listed on its original (suspended) date and
+        # its resume date; the Final record is authoritative.
+        if prior is None or (fx.final and not prior.final):
+            fixtures[fx.game_pk] = fx
+    return fixtures
+
+
+def _digest_games(games: Iterable[Mapping[str, Any]]) -> str:
+    ordered = sorted(games, key=lambda g: str(g.get("gamePk")))
+    raw = json.dumps(ordered, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                     default=str).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+class FixtureIndex:
+    """Index of stored statsapi raw records whose digest is in the trusted
+    manifest.  Construct only via from_statsapi_documents / from_raw_dir; the
+    index is re-verified from its raw games on every load."""
+
+    def __init__(self, *args: Any, _token: Any = None, **kwargs: Any):
+        if _token is not _PRIVATE or args or set(kwargs) != {"games"}:
+            raise MLBTotalCandidateError("FIXTURE_INDEX_PRIVATE_CONSTRUCTOR")
+        self._games = json.loads(json.dumps(list(kwargs["games"]), default=str))
+        self._fixtures: dict[int, RawFixture] = {}
+        self.sha256 = ""
+        self.verify()
+
+    def verify(self) -> None:
+        digest = _digest_games(self._games)
+        if digest not in _trusted_index_sha256s():
+            raise MLBTotalCandidateError(f"FIXTURE_INDEX_NOT_TRUSTED:{digest}")
+        # Fixtures are always rebuilt from the verified raw games; anything
+        # injected into the cache is discarded.
+        self._fixtures = _build_fixtures(self._games)
+        self.sha256 = digest
 
     @staticmethod
     def digest_documents(docs: Iterable[Mapping[str, Any]]) -> str:
-        games = sorted(_documents_games(docs), key=lambda g: str(g.get("gamePk")))
-        raw = json.dumps(games, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
-                         default=str).encode("utf-8")
-        return hashlib.sha256(raw).hexdigest()
+        return _digest_games(_documents_games(docs))
 
     @classmethod
-    def from_statsapi_documents(cls, docs: Iterable[Mapping[str, Any]], *,
-                                expected_sha256: str | None) -> "FixtureIndex":
-        docs = list(docs)
-        if not isinstance(expected_sha256, str) or len(expected_sha256) != 64:
-            raise MLBTotalCandidateError("FIXTURE_INDEX_HASH_REQUIRED")
-        actual = cls.digest_documents(docs)
-        if actual != expected_sha256.lower():
-            raise MLBTotalCandidateError("FIXTURE_INDEX_HASH_MISMATCH")
-        fixtures: dict[int, RawFixture] = {}
-        for game in _documents_games(docs):
-            fx = RawFixture.from_game(game)
-            prior = fixtures.get(fx.game_pk)
-            # The same gamePk may be listed on its original (suspended) date
-            # and its resume date; the Final record is authoritative.
-            if prior is None or (fx.final and not prior.final):
-                fixtures[fx.game_pk] = fx
-        return cls(fixtures, actual)
+    def from_statsapi_documents(cls, docs: Iterable[Mapping[str, Any]]) -> "FixtureIndex":
+        return cls(games=_documents_games(list(docs)), _token=_PRIVATE)
 
     @classmethod
-    def from_raw_dir(cls, path: str | Path, *, expected_sha256: str | None) -> "FixtureIndex":
+    def from_raw_dir(cls, path: str | Path) -> "FixtureIndex":
         docs = [json.loads(p.read_text(encoding="utf-8"))
                 for p in sorted(Path(path).rglob("*.json"))]
-        return cls.from_statsapi_documents(docs, expected_sha256=expected_sha256)
+        return cls.from_statsapi_documents(docs)
 
     def has(self, pk: int) -> bool:
         return pk in self._fixtures
@@ -463,11 +508,12 @@ class GroundedLoad:
     index_sha256: str = ""
 
 
-def load_grounded_finals(history: Iterable[Mapping[str, Any]], *, fixture_index: FixtureIndex,
-                         max_unverified_rows: int | None = None,
-                         max_unverified_fraction: float | None = None) -> GroundedLoad:
-    if not isinstance(fixture_index, FixtureIndex):
+def load_grounded_finals(history: Iterable[Mapping[str, Any]], *,
+                         fixture_index: FixtureIndex) -> GroundedLoad:
+    if type(fixture_index) is not FixtureIndex:
         raise MLBTotalCandidateError("FIXTURE_INDEX_REQUIRED")
+    fixture_index.verify()  # re-verify on every load
+    cfg = _identity_config()
     if isinstance(history, (str, bytes, Mapping)):
         raise MLBTotalCandidateError("HISTORY_SEQUENCE_REQUIRED")
     raws = list(history)
@@ -520,10 +566,8 @@ def load_grounded_finals(history: Iterable[Mapping[str, Any]], *, fixture_index:
                 if not _same_club_games_ok(a, b):
                     conflict = True
         entry["time_window_check"] = "CONFLICT" if conflict else "CONSISTENT"
-    cfg = _identity_config()
-    limit_rows = cfg["max_unverified_rows"] if max_unverified_rows is None else max_unverified_rows
-    limit_frac = (cfg["max_unverified_fraction"] if max_unverified_fraction is None
-                  else max_unverified_fraction)
+    limit_rows = cfg["max_unverified_rows"]
+    limit_frac = cfg["max_unverified_fraction"]
     total = max(len(parsed), 1)
     if len(ledger) > limit_rows or len(ledger) / total > limit_frac:
         raise MLBTotalCandidateError(
@@ -595,12 +639,9 @@ def _predict(records: tuple[FinalScore, ...], target: Mapping[str, Any],
 
 
 def predict_total(history: Iterable[Mapping[str, Any]], target: Mapping[str, Any],
-                  *, fixture_index: FixtureIndex, spec: CandidateSpec = CandidateSpec(),
-                  max_unverified_rows: int | None = None,
-                  max_unverified_fraction: float | None = None) -> dict[str, Any]:
-    load = load_grounded_finals(history, fixture_index=fixture_index,
-                                max_unverified_rows=max_unverified_rows,
-                                max_unverified_fraction=max_unverified_fraction)
+                  *, fixture_index: FixtureIndex,
+                  spec: CandidateSpec = CandidateSpec()) -> dict[str, Any]:
+    load = load_grounded_finals(history, fixture_index=fixture_index)
     out = _predict(load.records, target, spec)
     out.update({"fixture_index_sha256": load.index_sha256,
                 "n_unverified_fixture_identity": len(load.ledger),
@@ -610,17 +651,13 @@ def predict_total(history: Iterable[Mapping[str, Any]], target: Mapping[str, Any
 
 def prequential_backtest(history: Iterable[Mapping[str, Any]], *,
                          holdout_from: str, fixture_index: FixtureIndex,
-                         spec: CandidateSpec = CandidateSpec(),
-                         max_unverified_rows: int | None = None,
-                         max_unverified_fraction: float | None = None) -> dict[str, Any]:
+                         spec: CandidateSpec = CandidateSpec()) -> dict[str, Any]:
     """Development score-only comparison. Never treats row count as independent markets.
 
     Walks forward at each actual kickoff, using only finals *already observed*.
     Holdout boundary must have been selected externally before inspecting data.
     """
-    load = load_grounded_finals(history, fixture_index=fixture_index,
-                                max_unverified_rows=max_unverified_rows,
-                                max_unverified_fraction=max_unverified_fraction)
+    load = load_grounded_finals(history, fixture_index=fixture_index)
     records = load.records
     boundary = _timestamp(holdout_from, "holdout_from")
     trials: list[tuple[float, float, float]] = []

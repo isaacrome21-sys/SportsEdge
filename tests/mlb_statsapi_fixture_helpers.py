@@ -1,6 +1,12 @@
 """Synthetic statsapi-shaped raw schedule documents for challenger tests."""
 from datetime import datetime, timezone
 
+import hashlib
+import json
+import tempfile
+from pathlib import Path
+
+import sportsedge.research.mlb_total_offense_defense_challenger as ch
 from sportsedge.research.mlb_total_offense_defense_challenger import FixtureIndex
 
 NAMES = {"NYY": "New York Yankees", "BOS": "Boston Red Sox", "TOR": "Toronto Blue Jays",
@@ -38,5 +44,24 @@ def row_for(doc, *, event_id=None, **override):
     return row
 
 
-def pinned_index(docs):
-    return FixtureIndex.from_statsapi_documents(docs, expected_sha256=FixtureIndex.digest_documents(docs))
+_TEST_PINS = set()
+_MANIFEST = Path(tempfile.mkdtemp(prefix="mlb_fixture_manifest_")) / "manifest.json"
+
+
+def trust(docs):
+    """TEST ONLY: register these documents' digest in a test manifest and point
+    the module's trusted-manifest constants at it (simulates an owner-reviewed
+    manifest + code constant change)."""
+    _TEST_PINS.add(FixtureIndex.digest_documents(docs))
+    raw = json.dumps({"pinned_index_sha256": sorted(_TEST_PINS)}).encode()
+    _MANIFEST.write_bytes(raw)
+    ch.TRUSTED_MANIFEST_PATH = _MANIFEST
+    ch.TRUSTED_MANIFEST_SHA256 = hashlib.sha256(raw).hexdigest()
+
+
+def trusted_index(docs):
+    trust(docs)
+    return FixtureIndex.from_statsapi_documents(docs)
+
+
+pinned_index = trusted_index
