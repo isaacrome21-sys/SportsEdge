@@ -111,8 +111,11 @@ class ExactPairPhoneBridgeTests(unittest.TestCase):
             priced, _ = phone_batter_rows([self._row("OVER", "0.50")],
                                           now=NOW)
         self.assertEqual(priced[0]["status"], "NO_MODEL_OR_MARKET")
+        # One-sided shape: the bridge's single-side validation gate refuses
+        # naming the family state (no VALIDATED family exists), it does not
+        # fall back to the paired-quote form refusal.
         self.assertEqual(priced[0]["reason"],
-                         "EXACT_PAIRED_DK_QUOTE_REQUIRED")
+                         "MILESTONE_SINGLE_SIDE_REQUIRES_VALIDATED_MODEL:NOT_RUN")
 
 
 if __name__ == "__main__":

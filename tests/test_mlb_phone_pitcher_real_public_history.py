@@ -154,9 +154,13 @@ def test_unmodeled_batter_and_first_inning_markets_remain_visible():
 
 
 def test_paired_quotes_must_be_exact_same_market_and_line():
+    # Mismatched lines never pair and never price. The phone pricer binds
+    # quotes per quoted line, so each bridge call is one-sided; with no
+    # VALIDATED family in the canonical coverage authority the terminal
+    # refusal is the single-side validation gate naming the state.
     c=full([prop(),prop(side="UNDER",line=6.5,odds=-114)])
     assert len(c["prop_unpriced"])==2
-    assert all("EXACT_PAIRED_DK_QUOTE_REQUIRED" in r["reason"] for r in c["prop_unpriced"])
+    assert all("MILESTONE_SINGLE_SIDE_REQUIRES_VALIDATED_MODEL:NOT_RUN" in r["reason"] for r in c["prop_unpriced"])
 
 
 def test_mixed_game_and_prop_rows_keep_input_positions_without_missing_models():

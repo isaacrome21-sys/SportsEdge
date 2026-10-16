@@ -4,6 +4,30 @@ THIS IS NOT A MODEL. Only trusted internal model runtimes may call this with
 their generated predictions. Never accept probabilities from the lines issue.
 Missing prop predictions and unavailable/incoherent LIVE data fail closed.
 No odds APIs, paid endpoints, Model_P, betting authority, or staking.
+
+Single-side milestone binding (owner policy): a one-sided quote set for a
+prop market -- exactly one own-side quote and no opposite-side quote at ANY
+line, the shape milestone ladders convert into -- is priceable ONLY when the
+family's validation state in the canonical coverage authority
+(sportsedge.canonical_coverage.resolve_market, the same lookup
+artifacts/run_it_full.py applies to every card row) is VALIDATED. EV then
+binds the model probability against the single quoted price only; no de-vig
+benchmark exists, so single-side rows carry NO dk_no_vig_p / edge_pp and are
+labeled ev_basis=MODEL_PROBABILITY_VS_SINGLE_QUOTED_PRICE_NO_DEVIG. When the
+family is not VALIDATED the row refuses with
+MILESTONE_SINGLE_SIDE_REQUIRES_VALIDATED_MODEL:<state> -- the refusal names
+the validation state, never the quote form. No family is VALIDATED in the
+authority today, so one-sided rows still refuse, now for the stated reason.
+
+Why _model still refuses a model row asserting validated_vs_close
+(RESEARCH_AUTHORITY_ONLY): that flag is a SELF-assertion carried inside the
+model row, and this bridge never lets a model row certify itself. Validation
+is read from the external authority at quote-binding time, never from the
+row. The two checks are complementary: self-asserted authority is refused;
+authority-pronounced validation is honored for single-side binding. Paired
+rows are unaffected either way -- their success status remains
+RESEARCH_CANDIDATE_NOT_VALIDATED by construction of this research bridge,
+and this bridge grants no official/staking authority on any row.
 """
 from __future__ import annotations
 
@@ -163,12 +187,106 @@ def _model(model, now):
     return key, win, push, conditional, round(fair)
 
 
+def _enforce_phase(model, now, freshness):
+    """Pregame/live phase gate shared by the paired and single-side paths."""
+    kickoff = _time(model.get("kickoff_utc"), "KICKOFF")
+    phase = str(model.get("phase") or "PREGAME").upper()
+    if phase == "PREGAME" and kickoff <= now:
+        raise ResearchQuoteError("GAME_STARTED_REQUIRES_LIVE_MODEL_AND_LIVE_QUOTES")
+    if phase == "LIVE":
+        state = model.get("live_state")
+        if (not isinstance(state, Mapping) or
+            not all(state.get(k) is not None
+                    for k in ("period", "clock", "home_score", "away_score")) or
+            not state.get("verified_source") or
+            model.get("live_model") is not True or freshness != "RECENT_CAPTURED_QUOTE"):
+            raise ResearchQuoteError("VERIFIED_LIVE_MODEL_STATE_AND_QUOTES_REQUIRED")
+    elif phase != "PREGAME":
+        raise ResearchQuoteError("PHASE_UNSUPPORTED")
+
+
+def _family_validation_state(sport, market, validation_resolver):
+    """Family validation state from the canonical coverage authority.
+
+    The authority is sportsedge.canonical_coverage.resolve_market -- the
+    same lookup the canonical card path applies to every market. Returns its
+    validation_status (upper-cased), or "NO_COVERAGE_RESOLUTION" when the
+    authority has no entry (or no status) for the family. Fail closed: any
+    resolver error also yields "NO_COVERAGE_RESOLUTION", which is not
+    VALIDATED, so single-side binding refuses. This is deliberately NOT read
+    from the model row: a row asserting its own validation is refused in
+    _model (RESEARCH_AUTHORITY_ONLY); validation is pronounced by the
+    authority, never self-declared.
+    """
+    resolver = validation_resolver
+    if resolver is None:
+        from .canonical_coverage import resolve_market as resolver
+    try:
+        resolution = resolver(sport, market)
+    except Exception:
+        resolution = None
+    if isinstance(resolution, Mapping):
+        state = resolution.get("validation_status")
+        if state:
+            return str(state).upper()
+    return "NO_COVERAGE_RESOLUTION"
+
+
+def _single_side_row(*, identity, model, key, win, push, conditional, fair,
+                     own, now, floor, validation_state):
+    """Price a one-sided prop quote for a VALIDATED family.
+
+    EV binds the model probability against the single quoted price only.
+    There is no opposite side, hence no de-vig benchmark: the row carries no
+    dk_no_vig_p and no edge_pp, and ev_basis labels the basis explicitly.
+    Status ladder mirrors the paired path (freshness, price cap, EV floor);
+    only the success status differs, naming the single-side validated basis
+    instead of the paired path's RESEARCH_CANDIDATE_NOT_VALIDATED.
+    """
+    if own[4] is None:
+        raise ResearchQuoteError("SINGLE_SIDE_QUOTE_CAPTURE_TIMESTAMP_REQUIRED")
+    freshness = _bridge_quote_status(own[4], now=now)
+    _enforce_phase(model, now, freshness)
+    dec = _decimal(own[3])
+    loss = 1 - win - push
+    ev = win * (dec - 1) - loss
+    row = {**identity, "model_source": model.get("model_source"),
+           "model_probability": round(win, 6),
+           "model_conditional_p": round(conditional, 6),
+           "model_push_p": round(push, 6), "fair_american": fair,
+           "dk_odds": own[3],
+           "ev_per_dollar": round(ev, 6), "quote_status": freshness,
+           "quote_form": "SINGLE_SIDE",
+           "ev_basis": "MODEL_PROBABILITY_VS_SINGLE_QUOTED_PRICE_NO_DEVIG",
+           "family_validation_status": validation_state,
+           "validation_authority": "SPORTSEDGE_CANONICAL_COVERAGE",
+           "quote_captured_at": own[4].isoformat(),
+           "research_only": True, "official_authority": False,
+           "model_p_authority": False, "staking_authority": False}
+    if freshness != "RECENT_CAPTURED_QUOTE":
+        row["status"] = "WATCH_QUOTE_NOT_CURRENT"
+    elif own[3] < ODDS_CAP:
+        row["status"] = "WATCH_PRICE_CAP"
+    elif ev < floor:
+        row["status"] = "WATCH_BELOW_EV_FLOOR"
+    else:
+        row["status"] = "RESEARCH_CANDIDATE_SINGLE_SIDE_VALIDATED"
+    return row
+
+
 def price_three_sport_research(model_rows: Sequence[Mapping], quotes: Sequence[Mapping],
-                               *, as_of, ev_floor=EV_MIN):
+                               *, as_of, ev_floor=EV_MIN, validation_resolver=None):
     """Return model-versus-DK research rows; never compute model p from odds.
 
     Source models must have verified their pregame/live feature provenance.
     This is only a quote-binding stage; a flag is NOT proof of model provenance.
+
+    validation_resolver: optional (sport, market) -> resolution-mapping
+    callable used ONLY by the single-side milestone stage to read a family's
+    validation state. Production callers pass nothing and get the canonical
+    coverage authority (sportsedge.canonical_coverage.resolve_market); the
+    parameter exists so tests can fixture an authority verdict without
+    editing any family's recorded state.
     """
     now = _time(as_of, "AS_OF")
     floor = _num(ev_floor, "EV_FLOOR")
@@ -199,6 +317,29 @@ def price_three_sport_research(model_rows: Sequence[Mapping], quotes: Sequence[M
             ours = [q for q in parsed_quotes if q[1] == key and q[2] == side]
             others = [q for q in parsed_quotes
                       if _matching_opposite(key, q[1]) and q[2] == _opposite(side)]
+            if (len(ours) == 1 and len(others) == 0
+                    and key[2] not in GAME_MARKETS
+                    and not any(q[1][:4] == key[:4] and q[2] == _opposite(side)
+                                for q in parsed_quotes)):
+                # One-sided quote set: the book hung no opposite side for
+                # this player/market at any line (the milestone-ladder
+                # shape). An opposite quote at a MISMATCHED line is an
+                # incoherent pair instead and keeps the paired refusal
+                # below. Gate on the family's validation state, read from
+                # the canonical coverage authority -- never on quote form
+                # and never on the model row's self-assertion.
+                validation_state = _family_validation_state(
+                    key[0], key[2], validation_resolver)
+                if validation_state != "VALIDATED":
+                    raise ResearchQuoteError(
+                        "MILESTONE_SINGLE_SIDE_REQUIRES_VALIDATED_MODEL:"
+                        + validation_state)
+                rows.append(_single_side_row(
+                    identity=identity, model=model, key=key, win=win,
+                    push=push, conditional=conditional, fair=fair,
+                    own=ours[0], now=now, floor=floor,
+                    validation_state=validation_state))
+                continue
             if len(ours) != 1 or len(others) != 1:
                 raise ResearchQuoteError("EXACT_PAIRED_DK_QUOTE_REQUIRED")
             own, other = ours[0], others[0]
@@ -221,20 +362,7 @@ def price_three_sport_research(model_rows: Sequence[Mapping], quotes: Sequence[M
                          else "STALE_QUOTE"
                          if "STALE_QUOTE" in (own_freshness, other_freshness)
                          else "UNVERIFIED_QUOTE_FRESHNESS")
-            kickoff = _time(model.get("kickoff_utc"), "KICKOFF")
-            phase = str(model.get("phase") or "PREGAME").upper()
-            if phase == "PREGAME" and kickoff <= now:
-                raise ResearchQuoteError("GAME_STARTED_REQUIRES_LIVE_MODEL_AND_LIVE_QUOTES")
-            if phase == "LIVE":
-                state = model.get("live_state")
-                if (not isinstance(state, Mapping) or
-                    not all(state.get(k) is not None
-                            for k in ("period", "clock", "home_score", "away_score")) or
-                    not state.get("verified_source") or
-                    model.get("live_model") is not True or freshness != "RECENT_CAPTURED_QUOTE"):
-                    raise ResearchQuoteError("VERIFIED_LIVE_MODEL_STATE_AND_QUOTES_REQUIRED")
-            elif phase != "PREGAME":
-                raise ResearchQuoteError("PHASE_UNSUPPORTED")
+            _enforce_phase(model, now, freshness)
             dec, opposite_dec = _decimal(own[3]), _decimal(other[3])
             market = (1 / dec) / ((1 / dec) + (1 / opposite_dec))
             loss = 1 - win - push
