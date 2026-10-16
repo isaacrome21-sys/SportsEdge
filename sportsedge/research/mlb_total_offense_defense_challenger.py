@@ -10,9 +10,12 @@ pricing/PLAY/OFFICIAL authority. No bookmaker data enter the mean formula.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+import hashlib
+import json
 from math import isfinite, sqrt
+from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 
@@ -248,6 +251,8 @@ class FinalScore:
 
 
 def parse_finals(history: Iterable[Mapping[str, Any]]) -> tuple[FinalScore, ...]:
+    """Legacy ungrounded structural + time-window screen.  Secondary only:
+    predict_total / prequential_backtest load through load_grounded_finals."""
     if isinstance(history, (str, bytes, Mapping)):
         raise MLBTotalCandidateError("HISTORY_SEQUENCE_REQUIRED")
     records = tuple(FinalScore.parse(row) for row in history)
@@ -276,6 +281,255 @@ def parse_finals(history: Iterable[Mapping[str, Any]]) -> tuple[FinalScore, ...]
                     f"DUPLICATE_FIXTURE_IDENTITY:TEAM_OVERLAP:{team}:"
                     f"{earlier.event_id}:{later.event_id}")
     return records
+
+
+# ---------------------------------------------------------------------------
+# Grounded fixture identity (t212, owner redesign on #2357).
+#
+# Identity is the statsapi gamePk.  A row counts only when its gamePk resolves
+# to a stored statsapi raw record in a hash-pinned index and the row's teams,
+# start, scores, gameNumber, doubleHeader and any end/duration claim match that
+# record.  Rows that cannot be grounded are excluded and listed in a refusal
+# ledger as UNVERIFIED_FIXTURE_IDENTITY; the load fails closed only when the
+# ledger exceeds the configured threshold.  Time windows are a secondary
+# annotation on ungrounded rows only and never gate the load.
+# ---------------------------------------------------------------------------
+IDENTITY_CONFIG_PATH = (Path(__file__).resolve().parents[2] / "config" / "research"
+                        / "mlb_challenger_fixture_identity_v1.json")
+UNVERIFIED = "UNVERIFIED_FIXTURE_IDENTITY"
+
+
+def _identity_config() -> dict[str, Any]:
+    cfg = json.loads(IDENTITY_CONFIG_PATH.read_text(encoding="utf-8"))
+    if cfg.get("identity") != "STATSAPI_GAMEPK_RAW_RECORD":
+        raise MLBTotalCandidateError("FIXTURE_IDENTITY_CONFIG_INVALID")
+    return cfg
+
+
+def _pk(value: Any) -> int | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, int):
+        return value if value > 0 else None
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return None
+
+
+@dataclass(frozen=True)
+class RawFixture:
+    game_pk: int
+    start: datetime
+    official_date: str | None
+    away: str
+    home: str
+    away_team_id: str | None
+    home_team_id: str | None
+    away_runs: int | None
+    home_runs: int | None
+    game_number: int | None
+    double_header: str | None
+    final: bool
+    resumed_from_pk: int | None
+    duration_minutes: float | None
+
+    @classmethod
+    def from_game(cls, game: Mapping[str, Any]) -> "RawFixture":
+        pk = _pk(game.get("gamePk"))
+        if pk is None:
+            raise MLBTotalCandidateError("RAW_GAME_PK_INVALID")
+        teams = game.get("teams") or {}
+        def side(name):
+            t = (teams.get(name) or {})
+            team = t.get("team") or {}
+            score = t.get("score")
+            return (canonical_team_id(team.get("name") or team.get("abbreviation") or team.get("id")),
+                    None if team.get("id") is None else str(team.get("id")),
+                    score if type(score) is int else None)
+        away, away_id, away_runs = side("away")
+        home, home_id, home_runs = side("home")
+        status = game.get("status") or {}
+        info = game.get("gameInfo") or {}
+        duration = info.get("gameDurationMinutes", game.get("gameDurationMinutes"))
+        return cls(
+            game_pk=pk, start=_timestamp(game.get("gameDate"), "raw_gameDate"),
+            official_date=game.get("officialDate"), away=away, home=home,
+            away_team_id=away_id, home_team_id=home_id,
+            away_runs=away_runs, home_runs=home_runs,
+            game_number=game.get("gameNumber") if type(game.get("gameNumber")) is int else None,
+            double_header=(str(game["doubleHeader"]).upper() if game.get("doubleHeader") else None),
+            final=str(status.get("abstractGameState") or "").lower() == "final",
+            resumed_from_pk=_pk(game.get("resumedFromGamePk") or game.get("resumedFromPk")),
+            duration_minutes=(float(duration) if isinstance(duration, (int, float))
+                              and not isinstance(duration, bool) else None),
+        )
+
+
+def _documents_games(docs: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    games = []
+    for doc in docs:
+        if not isinstance(doc, Mapping):
+            raise MLBTotalCandidateError("RAW_DOCUMENT_INVALID")
+        for day in doc.get("dates") or []:
+            games.extend(day.get("games") or [])
+    return games
+
+
+class FixtureIndex:
+    """Hash-pinned index of stored statsapi raw schedule records."""
+
+    def __init__(self, fixtures: Mapping[int, RawFixture], sha256: str):
+        self._fixtures = dict(fixtures)
+        self.sha256 = sha256
+
+    @staticmethod
+    def digest_documents(docs: Iterable[Mapping[str, Any]]) -> str:
+        games = sorted(_documents_games(docs), key=lambda g: str(g.get("gamePk")))
+        raw = json.dumps(games, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                         default=str).encode("utf-8")
+        return hashlib.sha256(raw).hexdigest()
+
+    @classmethod
+    def from_statsapi_documents(cls, docs: Iterable[Mapping[str, Any]], *,
+                                expected_sha256: str | None) -> "FixtureIndex":
+        docs = list(docs)
+        if not isinstance(expected_sha256, str) or len(expected_sha256) != 64:
+            raise MLBTotalCandidateError("FIXTURE_INDEX_HASH_REQUIRED")
+        actual = cls.digest_documents(docs)
+        if actual != expected_sha256.lower():
+            raise MLBTotalCandidateError("FIXTURE_INDEX_HASH_MISMATCH")
+        fixtures: dict[int, RawFixture] = {}
+        for game in _documents_games(docs):
+            fx = RawFixture.from_game(game)
+            prior = fixtures.get(fx.game_pk)
+            # The same gamePk may be listed on its original (suspended) date
+            # and its resume date; the Final record is authoritative.
+            if prior is None or (fx.final and not prior.final):
+                fixtures[fx.game_pk] = fx
+        return cls(fixtures, actual)
+
+    @classmethod
+    def from_raw_dir(cls, path: str | Path, *, expected_sha256: str | None) -> "FixtureIndex":
+        docs = [json.loads(p.read_text(encoding="utf-8"))
+                for p in sorted(Path(path).rglob("*.json"))]
+        return cls.from_statsapi_documents(docs, expected_sha256=expected_sha256)
+
+    def has(self, pk: int) -> bool:
+        return pk in self._fixtures
+
+    def get(self, pk: int) -> RawFixture | None:
+        return self._fixtures.get(pk)
+
+
+def _team_matches(row_team: str, canonical: str, team_id: str | None) -> bool:
+    return canonical_team_id(row_team) == canonical or (
+        team_id is not None and str(row_team).strip() == team_id)
+
+
+def _ground(row: FinalScore, raw: Mapping[str, Any], index: FixtureIndex) -> tuple[RawFixture | None, str | None]:
+    pk = _pk(_first(raw, "game_pk", "gamePk"))
+    if pk is None:
+        return None, "GAME_PK_MISSING"
+    fx = index.get(pk)
+    if fx is None:
+        return None, f"GAME_PK_NOT_IN_INDEX:{pk}"
+    if not fx.final:
+        return None, f"RAW_RECORD_NOT_FINAL:{pk}"
+    if not (_team_matches(row.away_id, fx.away, fx.away_team_id)
+            and _team_matches(row.home_id, fx.home, fx.home_team_id)):
+        return None, f"TEAMS_MISMATCH:{pk}"
+    if row.event_start != fx.start:
+        return None, f"START_MISMATCH:{pk}"
+    if raw.get("official_date") is not None and raw.get("official_date") != fx.official_date:
+        return None, f"DATE_MISMATCH:{pk}"
+    if (fx.away_runs, fx.home_runs) != (row.away_runs, row.home_runs):
+        return None, f"SCORE_MISMATCH:{pk}"
+    if row.game_number is not None and row.game_number != fx.game_number:
+        return None, f"GAME_NUMBER_MISMATCH:{pk}"
+    if row.double_header is not None and row.double_header != fx.double_header:
+        return None, f"DOUBLE_HEADER_MISMATCH:{pk}"
+    if row.game_end is not None:
+        if fx.duration_minutes is None:
+            return None, f"GAME_END_UNGROUNDED:{pk}"
+        if abs((row.game_end - row.event_start).total_seconds() / 60.0 - fx.duration_minutes) > 1.0:
+            return None, f"GAME_END_MISMATCH:{pk}"
+    return fx, None
+
+
+@dataclass(frozen=True)
+class GroundedLoad:
+    records: tuple[FinalScore, ...]
+    ledger: list = field(default_factory=list)
+    index_sha256: str = ""
+
+
+def load_grounded_finals(history: Iterable[Mapping[str, Any]], *, fixture_index: FixtureIndex,
+                         max_unverified_rows: int | None = None,
+                         max_unverified_fraction: float | None = None) -> GroundedLoad:
+    if not isinstance(fixture_index, FixtureIndex):
+        raise MLBTotalCandidateError("FIXTURE_INDEX_REQUIRED")
+    if isinstance(history, (str, bytes, Mapping)):
+        raise MLBTotalCandidateError("HISTORY_SEQUENCE_REQUIRED")
+    raws = list(history)
+    # Structural refusals (non-final, market leak, bad clocks) still raise.
+    parsed = [FinalScore.parse(r) for r in raws]
+    if len({r.event_id for r in parsed}) != len(parsed):
+        raise MLBTotalCandidateError("DUPLICATE_EVENT_ID")
+    ledger: list[dict[str, Any]] = []
+    grounded: list[tuple[FinalScore, RawFixture]] = []
+    for row, raw in zip(parsed, raws):
+        fx, reason = _ground(row, raw, fixture_index)
+        if fx is None:
+            ledger.append({"event_id": row.event_id, "status": UNVERIFIED, "reason": reason, "_row": row})
+        else:
+            grounded.append((row, fx))
+    # Duplicates: same gamePk, or gamePks linked as one resumed game.
+    def root(fx: RawFixture) -> int:
+        seen = set()
+        while fx.resumed_from_pk is not None and fx.resumed_from_pk not in seen:
+            seen.add(fx.game_pk)
+            nxt = fixture_index.get(fx.resumed_from_pk)
+            if nxt is None:
+                return fx.resumed_from_pk
+            fx = nxt
+        return fx.game_pk
+    groups: dict[int, list] = {}
+    for row, fx in grounded:
+        groups.setdefault(root(fx), []).append((row, fx))
+    records = []
+    for key, members in groups.items():
+        if len(members) == 1:
+            records.append(members[0][0])
+            continue
+        for row, fx in members:  # fail closed: every copy excluded
+            ledger.append({"event_id": row.event_id, "status": UNVERIFIED,
+                           "reason": f"DUPLICATE_FIXTURE_IDENTITY:{key}", "_row": row})
+    # Secondary sanity annotation on ungrounded rows only (never a gate).
+    by_team: dict[str, list[FinalScore]] = {}
+    for row in [*records, *(e["_row"] for e in ledger)]:
+        for team in (canonical_team_id(row.away_id), canonical_team_id(row.home_id)):
+            by_team.setdefault(team, []).append(row)
+    for entry in ledger:
+        row = entry.pop("_row")
+        conflict = False
+        for team in (canonical_team_id(row.away_id), canonical_team_id(row.home_id)):
+            for other in by_team.get(team, []):
+                if other is row:
+                    continue
+                a, b = sorted((row, other), key=lambda r: (r.event_start, r.event_id))
+                if not _same_club_games_ok(a, b):
+                    conflict = True
+        entry["time_window_check"] = "CONFLICT" if conflict else "CONSISTENT"
+    cfg = _identity_config()
+    limit_rows = cfg["max_unverified_rows"] if max_unverified_rows is None else max_unverified_rows
+    limit_frac = (cfg["max_unverified_fraction"] if max_unverified_fraction is None
+                  else max_unverified_fraction)
+    total = max(len(parsed), 1)
+    if len(ledger) > limit_rows or len(ledger) / total > limit_frac:
+        raise MLBTotalCandidateError(
+            f"UNVERIFIED_FIXTURE_LEDGER_EXCEEDED:{len(ledger)}>{limit_rows}rows/{limit_frac}")
+    records.sort(key=lambda r: (r.event_start, r.event_id))
+    return GroundedLoad(records=tuple(records), ledger=ledger, index_sha256=fixture_index.sha256)
 
 
 def _predict(records: tuple[FinalScore, ...], target: Mapping[str, Any],
@@ -341,19 +595,33 @@ def _predict(records: tuple[FinalScore, ...], target: Mapping[str, Any],
 
 
 def predict_total(history: Iterable[Mapping[str, Any]], target: Mapping[str, Any],
-                  *, spec: CandidateSpec = CandidateSpec()) -> dict[str, Any]:
-    return _predict(parse_finals(history), target, spec)
+                  *, fixture_index: FixtureIndex, spec: CandidateSpec = CandidateSpec(),
+                  max_unverified_rows: int | None = None,
+                  max_unverified_fraction: float | None = None) -> dict[str, Any]:
+    load = load_grounded_finals(history, fixture_index=fixture_index,
+                                max_unverified_rows=max_unverified_rows,
+                                max_unverified_fraction=max_unverified_fraction)
+    out = _predict(load.records, target, spec)
+    out.update({"fixture_index_sha256": load.index_sha256,
+                "n_unverified_fixture_identity": len(load.ledger),
+                "refusal_ledger": load.ledger})
+    return out
 
 
 def prequential_backtest(history: Iterable[Mapping[str, Any]], *,
-                         holdout_from: str,
-                         spec: CandidateSpec = CandidateSpec()) -> dict[str, Any]:
+                         holdout_from: str, fixture_index: FixtureIndex,
+                         spec: CandidateSpec = CandidateSpec(),
+                         max_unverified_rows: int | None = None,
+                         max_unverified_fraction: float | None = None) -> dict[str, Any]:
     """Development score-only comparison. Never treats row count as independent markets.
 
     Walks forward at each actual kickoff, using only finals *already observed*.
     Holdout boundary must have been selected externally before inspecting data.
     """
-    records = parse_finals(history)
+    load = load_grounded_finals(history, fixture_index=fixture_index,
+                                max_unverified_rows=max_unverified_rows,
+                                max_unverified_fraction=max_unverified_fraction)
+    records = load.records
     boundary = _timestamp(holdout_from, "holdout_from")
     trials: list[tuple[float, float, float]] = []
     refused: dict[str, int] = {}
@@ -386,5 +654,8 @@ def prequential_backtest(history: Iterable[Mapping[str, Any]], *,
         "n_refused": sum(refused.values()), "refusal_reasons": refused,
         "candidate": metric(1), "league_only_baseline": metric(2),
         "paired_market_benchmark": "MISSING",
+        "fixture_index_sha256": load.index_sha256,
+        "n_unverified_fixture_identity": len(load.ledger),
+        "refusal_ledger": load.ledger,
         "claim": "No calibrated distribution or market-relative edge established",
     }

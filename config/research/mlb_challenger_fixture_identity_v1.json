@@ -1,0 +1,9 @@
+{
+  "schema": "SPORTSEDGE_MLB_CHALLENGER_FIXTURE_IDENTITY_V1",
+  "identity": "STATSAPI_GAMEPK_RAW_RECORD",
+  "raw_source": "data branch data/mlb_forward_calibration_raw or injected hash-pinned index",
+  "max_unverified_rows": 5,
+  "max_unverified_fraction": 0.01,
+  "time_windows": "SECONDARY_ANNOTATION_ON_UNGROUNDED_ROWS_ONLY",
+  "research_only": true
+}
