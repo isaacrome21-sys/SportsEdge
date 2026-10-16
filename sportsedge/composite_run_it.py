@@ -31,12 +31,7 @@ SUPERSEDE_NOT_LATER = "SUPERSEDE_RERUN_AS_OF_NOT_LATER"
 SUPERSEDE_CONFLICT = "SUPERSEDE_CONFLICT_SAME_AS_OF"
 
 _COMPOSITE_ONLY_KEYS = ("verification",)
-# Projection of a canonical evaluated row carried into the composite. EV,
-# edge, kelly and any authority fields are deliberately NOT carried.
-EVALUATION_FIELDS = ("status", "reason", "blocker", "blocker_detail", "market",
-                     "selection", "line", "odds_american", "estimate_p", "push_p",
-                     "loss_p", "fair_american", "pricing_lane", "pricing_provenance",
-                     "schema")
+EVALUATION_FIELDS = cc.EVALUATION_FIELDS  # EV/edge/kelly/authority never carried
 
 
 def _canonical_run_full():
@@ -121,7 +116,7 @@ def run_full_evaluator(run_full: Callable | None = None, **kw) -> Callable:
         ev = card.get("evaluated_rows")
         if not isinstance(ev, list) or len(ev) != len(rows):
             raise cc.CompositeError(f"{CHILD_CARD_ROW_MISMATCH}:{game_id}")
-        out = []
+        out, withheld = [], []
         for i, (src, e) in enumerate(zip(rows, ev)):
             if not isinstance(e, Mapping) or e.get("input_index", i) != i:
                 raise cc.CompositeError(f"{CHILD_CARD_ROW_MISMATCH}:{game_id}")
@@ -131,8 +126,15 @@ def run_full_evaluator(run_full: Callable | None = None, **kw) -> Callable:
                        "status": e.get("status"), "evaluation": proj}
             if src.get("thesis_id"):
                 row_out["thesis_id"] = src["thesis_id"]
+            hit = cc.authority_violation(row_out)
+            if hit:
+                # The canonical row carries authority/promotion language (e.g.
+                # pricing_provenance.play_eligible=True): never laundered or
+                # stripped; withheld so the composite refuses it by name.
+                withheld.append({**cc.row_identity_dict(src), "code": f"AUTHORITY:{hit}"[:200]})
+                continue
             out.append(row_out)
-        return {"as_of_utc": as_of, "game_id": game_id, "rows": out,
+        return {"as_of_utc": as_of, "game_id": game_id, "rows": out, "withheld": withheld,
                 "child_card_summary": copy.deepcopy(card.get("summary"))}
     return evaluate
 

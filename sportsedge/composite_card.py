@@ -13,6 +13,7 @@ removes cross-game capture delay. No stake, PLAY, EV or gate override.
 from __future__ import annotations
 
 import copy
+import re
 import hashlib
 import json
 from collections.abc import Callable, Iterable, Mapping
@@ -21,6 +22,7 @@ from typing import Any
 
 from . import capture_preflight as cp
 from .card_correlation import grade_card_positions
+from .promotion_screen import promotes
 from .quote_freshness import (MAX_QUOTE_AGE_SECONDS, _parse,
                               check_quote_freshness, is_fresh)
 
@@ -48,6 +50,7 @@ REFUSE_CONTEXT_AFTER_AS_OF = "REFUSE_CONTEXT_AFTER_CHILD_AS_OF"
 REFUSE_CONTEXT_CROSS_GAME = "REFUSE_CONTEXT_FROM_OTHER_GAME"
 REFUSE_CONTEXT_UNGROUNDED = "REFUSE_CONTEXT_SOURCE_TIMESTAMP_MISSING"
 REFUSE_CHILD_ROW_NOT_EVALUATED = "REFUSE_CHILD_ROW_NOT_EVALUATED"
+REFUSE_CHILD_AUTHORITY_WITHHELD = "REFUSE_CHILD_ROW_WITHHELD_AUTHORITY_OR_PROMOTION"
 REFUSE_MARKET_SET_GRAMMAR_UNKNOWN = "REFUSE_MARKET_SET_GRAMMAR_UNKNOWN"
 SELECTION_CAPTURED_TWICE = "SELECTION_CAPTURED_TWICE_NO_SUPERSESSION"
 SUPERSESSION_NOT_LATER = "SUPERSESSION_NOT_LATER_CAPTURE"
@@ -60,6 +63,7 @@ CHILD_UNKNOWN_ROW = "CHILD_UNKNOWN_ROW"
 CHILD_DUPLICATE_ROW = "CHILD_DUPLICATE_ROW"
 CHILD_ACTIVE_STAKE = "CHILD_EMITTED_STAKE_OR_PLAY"
 TIMESTAMP_MUTATED = "QUOTE_TIMESTAMP_MUTATED"
+CHILD_EVALUATION_FIELD_NOT_ALLOWED = "CHILD_EVALUATION_FIELD_NOT_ALLOWED"
 CHILD_FIELD_NOT_ALLOWED = "CHILD_FIELD_NOT_ALLOWED"
 COMPOSITE_UNVERIFIED = "COMPOSITE_MANIFEST_UNVERIFIED"
 GRADE_ROW_NOT_ACTIVE = "GRADE_ROW_NOT_ACTIVE"
@@ -70,9 +74,12 @@ RELEASE_RESEARCH_ONLY_REGRESSIONS_PASSED = "COMPOSITE_RESEARCH_ONLY_REGRESSIONS_
 
 
 _CHILD_ALLOWED_FIELDS = set(IDENTITY_FIELDS) | {"game_id", "quote_captured_at", "status",
-                                               "evaluation", "reason", "thesis_id"} | {
-    "eligible", "official_authority", "staking_authority", "model_p_authority",
-    "production_activation", "promotion", "official", "play", "stake"}  # values guarded falsy
+                                               "evaluation", "reason", "thesis_id"}
+# Any evaluator's ``evaluation`` dict is validated against this projection.
+EVALUATION_FIELDS = ("status", "reason", "blocker", "blocker_detail", "market",
+                     "selection", "line", "odds_american", "estimate_p", "push_p",
+                     "loss_p", "fair_american", "pricing_lane", "pricing_provenance",
+                     "schema", "model_p")
 
 
 class CompositeError(ValueError):
@@ -230,29 +237,39 @@ def _load_status_allowlist() -> frozenset:
 # OFFICIALPICK, 'play.' -- is refused.
 STATUS_ALLOWLIST = _load_status_allowlist()
 # Field names compared case-insensitively at any depth.
-_AUTHORITY_FIELDS = {"eligible", "official_authority", "staking_authority",
-                     "model_p_authority", "production_activation", "promotion",
-                     "official", "play", "playable", "lock"}
-_MONEY_FIELDS = {"stake", "units", "unit", "ev", "ev_per_dollar", "kelly",
-                 "kelly_fraction", "recommendation", "bet", "wager", "pick",
-                 "estimated_ev", "edge", "edge_over_break_even_pp"}
+_AUTHORITY_FIELDS = {"eligible", "official", "play", "playable", "lock", "promotion",
+                     "production_activation"}
+_MONEY_FIELDS = {"stake", "units", "unit", "recommendation", "bet", "wager", "pick",
+                 "estimated_ev"}
+_MONEY_PATTERNS = (re.compile(r"^ev($|_)"), re.compile(r"expected_value"),
+                   re.compile(r"^edge($|_)"), re.compile(r"^kelly"))
 
 
 def _status_allowed(value: Any) -> bool:
     return isinstance(value, str) and value.strip().upper() in STATUS_ALLOWLIST
 
 
+def _authority_key(key: str) -> bool:
+    return key in _AUTHORITY_FIELDS or key.endswith("_eligible") or key.endswith("_authority")
+
+
+def _money_key(key: str) -> bool:
+    return key in _MONEY_FIELDS or any(p.search(key) for p in _MONEY_PATTERNS)
+
+
 def authority_violation(obj: Any) -> str | None:
-    """Fail-closed guard, recursive: allowlisted statuses only; no authority
-    flag may be truthy; no stake/units/EV/kelly/recommendation at any depth."""
+    """Fail-closed guard, recursive and case-insensitive on field names:
+    statuses must be allowlisted; no *_eligible/*_authority (or other
+    authority) key may be truthy; no stake/units/EV/edge/kelly key may carry a
+    value; no string value anywhere may carry promotion language."""
     if isinstance(obj, Mapping):
         for k, v in obj.items():
             key = str(k).strip().lower()
             if key == "status" and v is not None and not _status_allowed(v):
                 return f"status={v}"
-            if key in _AUTHORITY_FIELDS and v not in (None, False):
+            if _authority_key(key) and v not in (None, False, 0):
                 return f"{k}={v}"
-            if key in _MONEY_FIELDS and v is not None:
+            if _money_key(key) and v is not None:
                 return f"{k}={v}"
             hit = authority_violation(v)
             if hit:
@@ -262,6 +279,8 @@ def authority_violation(obj: Any) -> str | None:
             hit = authority_violation(v)
             if hit:
                 return hit
+    elif isinstance(obj, str) and promotes(obj):
+        return f"value={obj}"
     return None
 
 
@@ -364,11 +383,16 @@ def build_composite(rows: Iterable[Mapping[str, Any]], *,
             seen_keys = set()
             for cr in child_out.get("rows", []):
                 extra = set(cr) - _CHILD_ALLOWED_FIELDS
-                if extra:
-                    raise CompositeError(f"{CHILD_FIELD_NOT_ALLOWED}:{game}:{sorted(extra)}")
                 hit = authority_violation(cr)
-                if hit:
-                    raise CompositeError(f"{CHILD_ACTIVE_STAKE}:{game}:{hit}")
+                if hit or extra:
+                    codes = ([f"{CHILD_ACTIVE_STAKE}:{hit}"] if hit else []) + \
+                            ([f"{CHILD_FIELD_NOT_ALLOWED}:{sorted(extra)}"] if extra else [])
+                    raise CompositeError(f"{game}:" + "|".join(codes))
+                if "evaluation" in cr:
+                    evd = cr["evaluation"]
+                    if not isinstance(evd, Mapping) or set(evd) - set(EVALUATION_FIELDS):
+                        bad = sorted(set(evd) - set(EVALUATION_FIELDS)) if isinstance(evd, Mapping) else "NOT_A_MAPPING"
+                        raise CompositeError(f"{CHILD_EVALUATION_FIELD_NOT_ALLOWED}:{game}:{bad}")
                 if str(cr.get("game_id")) != game:
                     raise CompositeError(f"{CHILD_CROSS_GAME}:{game}")
                 k = _identity_key(cr)
@@ -387,10 +411,18 @@ def build_composite(rows: Iterable[Mapping[str, Any]], *,
                                  "as_of_utc": as_of_iso, "child_run_id": child_run_id,
                                  "quote_age_seconds": ages.get(src["row_id"]),
                                  "research_only": True})
+            withheld = {}
+            for w in child_out.get("withheld", []) or []:
+                k = _identity_key(w)
+                if k not in active_by_key or k in seen_keys:
+                    raise CompositeError(f"{CHILD_UNKNOWN_ROW}:{game}:withheld")
+                withheld[k] = str(w.get("code") or "")
             omitted = [r for r in active if _identity_key(r) not in seen_keys]
             if omitted:
                 for r in omitted:
-                    refusal[r["row_id"]] = REFUSE_CHILD_ROW_NOT_EVALUATED
+                    refusal[r["row_id"]] = (REFUSE_CHILD_AUTHORITY_WITHHELD
+                                            if _identity_key(r) in withheld
+                                            else REFUSE_CHILD_ROW_NOT_EVALUATED)
                 for sid, members in sets.items():
                     if members[0]["game_id"] == game and any(m["row_id"] in refusal for m in members):
                         for m in members:

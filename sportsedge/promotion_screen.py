@@ -1,0 +1,43 @@
+"""Promotion-language screen shared by the composite guard and the status
+allowlist builder (#2359). Research only.
+
+A string "promotes" when, after splitting on non-alphanumerics, it carries a
+promotion token that is not negated by the token IMMEDIATELY before it
+(NO_PLAY is fine; NO_X_PLAY and NOT_A_PLAY are not). PASS counts only in a
+gate context (GATE/CHECK/THRESHOLD/HARNESS/CRITERIA); EV counts when it is
+POSITIVE/PLUS EV.
+"""
+from __future__ import annotations
+
+import re
+
+PROMOTION_TOKENS = frozenset({
+    "PLAY", "PLAYS", "PLAYABLE", "BET", "BETS", "WAGER", "WAGERS", "PICK", "PICKS",
+    "LOCK", "LOCKS", "BUY", "OFFICIAL", "OFFICIALPICK", "STAKE", "STAKED",
+    "PROMOTED", "ACTIVATED", "ACTIONABLE", "LEAN", "LEANS", "LEANING", "ELIGIBLE",
+    "ALLOWED", "EDGE", "EDGES", "RECOMMEND", "RECOMMENDED", "RECOMMENDATION",
+    "APPROVED", "GREENLIGHT", "GREENLIT"})
+NEGATORS = frozenset({"NO", "NOT", "NON"})
+GATE_CONTEXT = frozenset({"GATE", "GATES", "CHECK", "CHECKS", "THRESHOLD", "HARNESS",
+                          "CRITERIA", "CRITERION"})
+
+
+def tokens(value: str) -> list[str]:
+    text = str(value).upper().replace("+", " PLUS ")
+    return [t for t in re.split(r"[^A-Z0-9]+", text) if t]
+
+
+def promotes(value: str) -> bool:
+    toks = tokens(value)
+    gate = any(t in GATE_CONTEXT for t in toks)
+    for i, t in enumerate(toks):
+        prev = toks[i - 1] if i > 0 else None
+        if t in PROMOTION_TOKENS and prev not in NEGATORS:
+            return True
+        if t == "PASS" and gate and prev not in NEGATORS:
+            return True
+        if t == "EV" and prev in {"POSITIVE", "PLUS"}:
+            before = toks[i - 2] if i > 1 else None
+            if before not in NEGATORS:
+                return True
+    return False
