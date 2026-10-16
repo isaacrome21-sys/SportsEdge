@@ -10,6 +10,7 @@ from math import isfinite
 import re
 
 from sportsedge.quote_freshness import (
+    MAX_QUOTE_AGE_SECONDS,
     QUOTE_STALE, QUOTE_UNVERIFIED, is_fresh,
 )
 from sportsedge.research_estimate import RESEARCH_LABEL, valid_research_estimate
@@ -79,21 +80,49 @@ def _quote_hold(row, source):
     return "UNKNOWN", "Current quote required"
 
 
+_QUOTE_FIELDS = ("odds_american", "dk_odds", "price", "price_american",
+                 "american_odds", "odds", "decimal_odds", "book_price")
+_CAPTURE_FIELDS = ("captured_at", "quote_captured_at", "quote_retrieved_at",
+                   "retrieved_at", "quote_timestamp", "observed_at")
+
+
+def _has_quote_field(row, source):
+    """Any quote-bearing field on the row or its intake (not fair/model odds)."""
+    for obj in (row, source):
+        for key, value in obj.items():
+            k = str(key).lower()
+            if k.startswith("fair") or value is None:
+                continue
+            if k in _QUOTE_FIELDS or "odds" in k or "price" in k:
+                return True
+    return False
+
+
+def _has_capture_time(*objs):
+    return any(isinstance(obj, dict) and obj.get(k) not in (None, "")
+               for obj in objs for k in _CAPTURE_FIELDS)
+
+
 def _research_quote_ok(row, source):
-    """180s limit kept (t211u): a research estimate may show only when the
-    quote is fresh, or is an owner screenshot with NO recorded age (truly
-    unattested).  Any recorded age over the limit, a stale/invalid code, or
-    missing freshness on a quoted row blocks it."""
+    """180s limit kept (t211u/t212u): a research estimate may show only when
+    the quote is fresh, or is an owner screenshot that is truly unattested
+    (no recorded age AND no recorded capture time).  A recorded age over the
+    limit, a non-finite age, a capture time without a valid fresh verdict, a
+    stale/invalid code, or missing freshness on any quote-bearing row blocks."""
     freshness = row.get("quote_freshness")
     if freshness is None:
-        return row.get("odds_american", row.get("dk_odds")) is None
+        return not _has_quote_field(row, source)
     if not isinstance(freshness, dict):
         return False
+    raw_age = freshness.get("age_seconds")
+    if raw_age is not None and _number(raw_age) is None:
+        return False  # NaN/inf/garbage age: refuse, never treat as unattested
     if is_fresh(freshness):
-        return True
-    age = _number(freshness.get("age_seconds"))
-    if age is not None:
+        return raw_age is None or _number(raw_age) <= MAX_QUOTE_AGE_SECONDS
+    if raw_age is not None:
         return False
+    if _has_capture_time(freshness, row, source):
+        return False  # a capture time exists but no valid fresh age: refuse
     if freshness.get("code") != QUOTE_UNVERIFIED:
         return False
     return (str(source.get("quote_source") or "").upper() == "OWNER_DK_SCREENSHOT"
@@ -174,37 +203,72 @@ def _disposition(row, min_ev, source=None):
 
 
 IMPOSSIBLE_TOTAL = "PROBABILITY_TOTAL_IMPOSSIBLE"
+_SIGNED_LINE_MARKETS = ("SPREAD", "RUN_LINE", "RUNLINE", "PUCK_LINE", "HANDICAP", "ATS")
 
 
-def _refuse_impossible_totals(selections):
-    """Sides of one market (same game/market/line/player) whose displayed
-    probabilities sum above 1 are ALL refused -- never renormalised."""
+def _line_value(line):
+    if line is None:
+        return None
+    value = _number(line)
+    return value if value is not None else ("INVALID", str(line))
+
+
+def _complementary(a, b):
+    """Two displayed selections are disjoint outcomes of one contract when they
+    are different sides of the same game/market/player at the same line, or --
+    for signed-line (spread-like) markets only -- at exactly opposite lines.
+    abs(line) is never used, so different lines are never merged."""
+    la, lb = _line_value(a.get("line")), _line_value(b.get("line"))
+    signed = any(tag in str(a.get("market") or "").upper() for tag in _SIGNED_LINE_MARKETS)
+    if signed:
+        # A -3 / B +3 are one contract; A +3 / B +3 are two different contracts.
+        return isinstance(la, float) and isinstance(lb, float) and la == -lb
+    return la == lb
+
+
+def _refuse_impossible_totals(selections, push_masses):
+    """Disjoint sides whose displayed probabilities plus push mass exceed 1,
+    or two copies of one selection that disagree, are ALL refused -- never
+    renormalised."""
     groups = defaultdict(list)
-    for sel in selections:
+    for index, sel in enumerate(selections):
         if sel.get("probability") is None:
             continue
-        line = sel.get("line")
-        key = (sel.get("game"), sel.get("market"),
-               abs(line) if isinstance(line, (int, float)) and not isinstance(line, bool) else line,
-               sel.get("player_name"))
-        groups[key].append(sel)
+        groups[(sel.get("game"), sel.get("market"), sel.get("player_name"))].append(index)
+    refused = {}
     for members in groups.values():
-        by_sel = {}
-        conflict = False
-        for sel in members:
-            name = str(sel.get("selection"))
-            if name in by_sel and by_sel[name] != sel["probability"]:
-                conflict = True
-            by_sel[name] = sel["probability"]
-        if conflict or sum(by_sel.values()) > 1 + 1e-6:
-            for sel in members:
-                sel["probability"] = None
-                sel["estimated_ev"] = None
-                sel["fair_odds"] = None
-                sel["status"] = "BLOCKED"
-                sel["research_only_estimate"] = False
-                sel["reason"] = (f"{IMPOSSIBLE_TOTAL}: side probabilities sum "
-                                 f"{sum(by_sel.values()):.4f} > 1; refused, not renormalised")
+        for i, x in enumerate(members):
+            for y in members[i + 1:]:
+                a, b = selections[x], selections[y]
+                if str(a.get("selection")) == str(b.get("selection")):
+                    if (_line_value(a.get("line")) == _line_value(b.get("line"))
+                            and a["probability"] != b["probability"]):
+                        refused[x] = refused[y] = "duplicate selection disagrees"
+                    continue
+                if not _complementary(a, b):
+                    continue
+                push = max(push_masses[x], push_masses[y])
+                total = a["probability"] + b["probability"] + push
+                if total > 1 + 1e-6:
+                    msg = f"sides plus push sum {total:.4f} > 1"
+                    refused[x] = refused[y] = msg
+    for index, msg in refused.items():
+        sel = selections[index]
+        sel["probability"] = None
+        sel["estimated_ev"] = None
+        sel["fair_odds"] = None
+        sel["status"] = "BLOCKED"
+        sel["research_only_estimate"] = False
+        sel["reason"] = f"{IMPOSSIBLE_TOTAL}: {msg}; refused, not renormalised"
+    return set(refused)
+
+
+def _push_mass(row, estimate):
+    for obj in (estimate, row.get("independent_projection"), row):
+        if isinstance(obj, dict) and obj.get("push_p") is not None:
+            value = _number(obj.get("push_p"))
+            return value if value is not None and value >= 0 else 1.0  # bad push => refuse
+    return 0.0
 
 
 def build_phone_card(card):
@@ -221,7 +285,8 @@ def build_phone_card(card):
     if floor is None or not 0 <= floor <= 0.15:
         raise ValueError("INVALID_EDGE_FLOOR")
     selections = []
-    families = defaultdict(Counter)
+    dimensions = []
+    push_masses = []
     for index, row in enumerate(rows):
         if not isinstance(row, dict) or row.get("input_index", index) != index:
             raise ValueError("EVALUATED_ROW_ORDER_MISMATCH")
@@ -246,7 +311,8 @@ def build_phone_card(card):
                      str(source.get("phase") or "UNSPECIFIED"),
                      str(source.get("alternate", "UNSPECIFIED")),
                      str(source.get("settlement_type") or "UNSPECIFIED"))
-        families[dimension][bucket] += 1
+        dimensions.append((dimension, bucket))
+        push_masses.append(_push_mass(row, estimate) if bucket in {"priced", "research"} else 0.0)
         selections.append({
             "input_index": index, "game": game, "sport": sport, "market": market,
             "kickoff": row.get("kickoff_utc") or source.get("kickoff") or source.get("commence_time"),
@@ -266,7 +332,12 @@ def build_phone_card(card):
             "research_only_estimate": research,
             "eligible": False,
         })
-    _refuse_impossible_totals(selections)
+    refused = _refuse_impossible_totals(selections, push_masses)
+    # Family counts are rebuilt from the FINALIZED displayed selections, after
+    # refusal: a refused market contributes 0 priced/research rows.
+    families = defaultdict(Counter)
+    for index, (dimension, bucket) in enumerate(dimensions):
+        families[dimension]["blocked" if index in refused else bucket] += 1
     ledger = [{**dict(zip(("sport", "market", "period", "phase", "alternate", "settlement_type"), key)),
                **{k: counts[k] for k in ("priced", "research", "blocked", "rejected", "stale")},
                "rows": sum(counts.values())} for key, counts in sorted(families.items())]
