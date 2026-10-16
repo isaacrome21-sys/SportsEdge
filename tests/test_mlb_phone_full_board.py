@@ -26,7 +26,10 @@ def test_single_moneyline_can_never_pass_as_all_markets_priced():
     coverage = board["input_coverage"]
     assert coverage["catalog_market_count"] >= 38
     assert coverage["supplied_market_count"] == 1
-    assert coverage["priced_research_market_count"] == 1
+    # t207u: the only supplied market is a retired Lane A diagnostic,
+    # so nothing counts as priced research.
+    assert coverage["priced_research_market_count"] == 0
+    assert coverage["lane_a_diagnostic_market_count"] == 1
     assert coverage["supplied_markets"] == ["MONEYLINE"]
     assert "RUN_LINE" in coverage["not_supplied_markets"]
     assert "TOTALS" in coverage["not_supplied_markets"]

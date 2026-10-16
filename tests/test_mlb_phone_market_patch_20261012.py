@@ -89,7 +89,10 @@ def test_team_totals_phone_run_routes_and_preserves_both_sides_and_no_vig():
                "EXACT_DK_TWO_SIDED_NO_VIG_RESEARCH" for row in results)
     coverage = ticket["mlb_full_board"]["input_coverage"]
     assert "TEAM_TOTALS" in coverage["supplied_markets"]
-    assert "TEAM_TOTALS" in coverage["priced_research_markets"]
+    # t207u: these team-total rows are Lane A -> labeled diagnostics, not
+    # priced research on the board.
+    assert "TEAM_TOTALS" not in coverage["priced_research_markets"]
+    assert coverage["lane_a_diagnostic_market_count"] >= 1
 
 
 def test_missing_fixture_still_blocks_team_totals_before_pricing():

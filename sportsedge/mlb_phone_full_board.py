@@ -10,6 +10,7 @@ from collections import Counter
 from typing import Any, Mapping, Sequence
 
 from sportsedge.mlb_full_board import build_mlb_full_board, catalog_markets
+from sportsedge.pricing_provenance import LANE_A_RETIRED_STATUS, is_lane_a_label
 
 ALIASES = {
     "ML": "MONEYLINE", "MONEYLINE": "MONEYLINE",
@@ -31,9 +32,6 @@ ALIASES = {
 RESEARCH_DISPLAY_STATUSES = frozenset({
     "RESEARCH_POSITIVE_EV_UNVALIDATED", "BELOW_THRESHOLD",
     "RESEARCH_CANDIDATE_NOT_VALIDATED", "PRICE_CAP",
-    # t207u: retired Lane A rows still display as labeled research
-    # diagnostics (status names the retirement); never actionable.
-    "RESEARCH_DIAGNOSTIC_LANE_A_RETIRED",
 })
 
 def _market(market: str, side: str) -> tuple[str, str]:
@@ -55,6 +53,7 @@ def phone_market_board(inputs: Sequence[Mapping[str, Any]],
         raise ValueError("MLB_PHONE_BOARD_INPUT_RESULT_COUNT_MISMATCH")
     all_markets = set(catalog_markets())
     normalized = []
+    lane_a_markets = set()
     for i, (source, result) in enumerate(zip(inputs, evaluated)):
         if str(source.get("sport") or "").upper() != "MLB":
             continue
@@ -76,6 +75,30 @@ def phone_market_board(inputs: Sequence[Mapping[str, Any]],
             continue
         status = str(result.get("status") or "")
         prob = result.get("estimate_p", result.get("model_p", result.get("research_p")))
+        _prov = result.get("pricing_provenance")
+        lane_a = (status == LANE_A_RETIRED_STATUS
+                  or is_lane_a_label(result.get("pricing_lane"))
+                  or (isinstance(_prov, dict)
+                      and is_lane_a_label(_prov.get("engine_lane"))))
+        if lane_a:
+            # t207u: Lane A retired -- labeled diagnostic, no probability,
+            # EV or fair odds on the board (mirrors phone_display).
+            lane_a_markets.add(market)
+            normalized.append({
+                "market": market,
+                "game_id": source.get("game_pk") or source.get("game_id") or
+                           f"{away}@{home}:{source.get('commence_time') or source.get('kickoff')}",
+                "entity_id": (source.get("player_name") or source.get("player") or
+                              result.get("team_totals_team") or source.get("team") or "GAME"),
+                "side": side, "line": source.get("line"),
+                "american_odds": source.get("odds", source.get("price")),
+                "model_p": None,
+                "status": "BLOCKED",
+                "reason": LANE_A_RETIRED_STATUS,
+                "research_diagnostic": "LANE_A_RETIRED_DIAGNOSTIC",
+                "input_index": i,
+            })
+            continue
         if status not in RESEARCH_DISPLAY_STATUSES or not isinstance(prob, (int, float)) or isinstance(prob, bool) or not 0 < float(prob) < 1:
             prob = None
         quote = source.get("odds", source.get("price"))
@@ -102,6 +125,7 @@ def phone_market_board(inputs: Sequence[Mapping[str, Any]],
         "catalog_market_count": len(all_markets),
         "supplied_market_count": len(present),
         "priced_research_market_count": len(priced),
+        "lane_a_diagnostic_market_count": len(lane_a_markets),
         "supplied_markets": sorted(present),
         "priced_research_markets": sorted(priced),
         "not_supplied_markets": sorted(all_markets - present),
