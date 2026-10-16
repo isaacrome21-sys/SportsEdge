@@ -232,8 +232,12 @@ def ask_unified_score_sims(
 
     This verifies grid *identity*, not fitted model performance or provenance.
     """
-    from sportsedge.sports.nfl.discrete_v2 import load_freeze, score_grid
-    from sportsedge.sports.nfl.unified_market_engine import sample_score_paths
+    # V2 safety re-lock (t212): the replay grid is validated for complete
+    # mass before any sampling; a malformed grid never reaches V1 code.
+    from sportsedge.sports.nfl.discrete_v2 import load_freeze
+    from sportsedge.sports.nfl.unified_market_engine_v2 import (
+        UnifiedNflV2GridError, guarded_score_grid, sample_score_paths,
+    )
 
     if not isinstance(engine, Mapping) or engine.get("schema") not in (
         "SPORTSEDGE_NFL_UNIFIED_RESEARCH_MARKET_ENGINE_V1",
@@ -264,9 +268,13 @@ def ask_unified_score_sims(
         if not isinstance(supplied, str) or \
                 declared.strip().casefold() != supplied.strip().casefold():
             raise AskSimsError("ASK_SIMS_GAME_IDENTITY_MISMATCH")
+    try:
+        grid = guarded_score_grid(float(h), float(a), freeze)
+        sampled = sample_score_paths(grid, n_sims=n_sims, seed=seed)
+    except UnifiedNflV2GridError as exc:
+        raise AskSimsError(f"ASK_SIMS_{exc}") from exc
     paths = [dict(p, home_team=engine["home_team"], away_team=engine["away_team"])
-             for p in sample_score_paths(score_grid(float(h), float(a), freeze),
-                                         n_sims=n_sims, seed=seed)]
+             for p in sampled]
     result = ask_score_paths(paths, question, home_team=home_team, away_team=away_team,
                              aliases=aliases, price_american=price_american)
     result.update({
