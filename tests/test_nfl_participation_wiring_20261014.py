@@ -126,6 +126,22 @@ def _complete_ids(team, named):
     return ids
 
 
+def proven_evidence(snapshots=None):
+    """Genuine pinned completeness evidence (#2274): independent official
+    game-day roster + pinned manifests over canonical content hashes."""
+    from nfl_completeness_evidence_fixture import prove
+    snaps = inactive_snapshots() if snapshots is None else snapshots
+    return prove(snaps, depth_rows())
+
+
+def _with_actives(snaps):
+    from nfl_completeness_evidence_fixture import team_ids
+    for s in snaps:
+        s["active_player_ids"] = [p for p in team_ids(depth_rows(), s["team"])
+                                  if p not in s["player_ids"]]
+    return snaps
+
+
 def inactive_snapshots(chi_ids=("rb2",), gb_ids=(),
                        published="2026-10-04T15:30:00Z"):
     """Source-complete official inactive snapshots (audit B1 form)."""
@@ -135,7 +151,7 @@ def inactive_snapshots(chi_ids=("rb2",), gb_ids=(),
         out.append({"game_id": GAME_ID, "team": "GB",
                     "published_at": published,
                     "player_ids": _complete_ids("GB", gb_ids)})
-    return out
+    return _with_actives(out)
 
 
 def injury_row(player_id, status, *, team="CHI",
@@ -147,7 +163,8 @@ def injury_row(player_id, status, *, team="CHI",
 def assess(pid, **overrides):
     kwargs = dict(
         team="CHI", player_id=pid, depth_rows=depth_rows(),
-        inactive_snapshots=inactive_snapshots(), game_id=GAME_ID,
+        inactive_snapshots=inactive_snapshots(),
+        completeness_evidence=proven_evidence(), game_id=GAME_ID,
         target_season=2026, target_week=4, kickoff=KICKOFF, as_of=GAMEDAY)
     kwargs.update(overrides)
     return assess_skill_participation(**kwargs)
@@ -272,6 +289,7 @@ def test_skill_assessment_shares_and_route_unknown_propagates():
         team="CHI", player_id="wr1", depth_rows=depth_rows(),
         player_stat_rows=player_rows(),
         inactive_snapshots=inactive_snapshots(),
+        completeness_evidence=proven_evidence(),
         game_id=GAME_ID, target_season=2026, target_week=4,
         kickoff=KICKOFF, as_of=GAMEDAY, position="WR")
     assert bundle["verdict"]["state"] == "CONFIRMED_STARTER"
@@ -293,6 +311,7 @@ def test_skill_assessment_shares_and_route_unknown_propagates():
         team="CHI", player_id="rb1", depth_rows=depth_rows(),
         player_stat_rows=player_rows(),
         inactive_snapshots=inactive_snapshots(),
+        completeness_evidence=proven_evidence(),
         snap_rows=snap_rows, game_id=GAME_ID, target_season=2026,
         target_week=4, kickoff=KICKOFF, as_of=GAMEDAY, position="RB")
     rb_shares = rb_bundle["opportunity_shares"]
@@ -306,6 +325,7 @@ def test_qb_require_gate_matches_bridge_rule():
     verdict = assess_qb_participation(
         team="CHI", depth_rows=depth_rows(),
         inactive_snapshots=inactive_snapshots(),
+        completeness_evidence=proven_evidence(),
         game_id=GAME_ID, target_season=2026, target_week=4,
         kickoff=KICKOFF, as_of=GAMEDAY, expected_player_id="qb1")
     assert require_confirmed_qb_role(
@@ -458,36 +478,38 @@ def test_phone_stamp_and_demotion_without_participation_bundle():
     assert receipts[0]["participation"] == "NOT_VERIFIED"
 
 
-def test_phone_stamp_lifts_on_confirmed_skill_verdict(tmp_path):
+def test_phone_stamp_stays_without_independent_roster_on_confirmed_skill_verdict(tmp_path):
+    # #2274 (t207u + audit): a pinned archive bundle alone does not prove
+    # inactive-list completeness; the phone path carries no independent
+    # official game-day roster evidence, so the verdict is UNKNOWN and
+    # the conservative gamelog stamp stays.
     rows, receipts = phone_nfl_player_rows(
         _phone_pair("Chi WR One", "PLAYER_RECEIVING_YARDS", 84.5),
         now=datetime(2026, 10, 4, 16, 0, tzinfo=timezone.utc),
         getter=_getter, **_write_archive(tmp_path, _bundle()))
     over = _over(rows)
-    assert over["participation_status"] == "CONFIRMED_STARTER"
-    assert over["status"] == "RESEARCH_CANDIDATE_NOT_VALIDATED"
-    assert over["research_only"] is True
-    assert over["official_authority"] is False
-    assert over["participation_provenance"] == "VERIFIED_ANCHORED"
-    assert "participation_refusal" not in over
-    verdict = over["participation_verdict"]
-    assert verdict["subclass"] == "GAMEDAY_ACTIVE_STARTER"
-    assert verdict["candidate_id"] == "wr1"
-    assert receipts[0]["participation"] == "CONFIRMED_STARTER"
-    assert receipts[0]["participation_player_id"] == "wr1"
-    assert receipts[0]["participation_provenance"] == "VERIFIED_ANCHORED"
+    assert over["participation_status"] == \
+        "STARTING_ROLE_NOT_VERIFIED_FROM_GAMELOG"
+    verdict = over.get("participation_verdict") or {}
+    assert verdict.get("state") != "CONFIRMED_STARTER"
+    assert verdict.get("inactives_completeness") != "VERIFIED_COMPLETE"
 
 
-def test_phone_stamp_lifts_on_confirmed_qb_verdict(tmp_path):
+def test_phone_stamp_stays_without_independent_roster_on_confirmed_qb_verdict(tmp_path):
+    # #2274 (t207u + audit): a pinned archive bundle alone does not prove
+    # inactive-list completeness; the phone path carries no independent
+    # official game-day roster evidence, so the verdict is UNKNOWN and
+    # the conservative gamelog stamp stays.
     rows, receipts = phone_nfl_player_rows(
         _phone_pair("Chi QB", "PLAYER_PASSING_YARDS", 269.5),
         now=datetime(2026, 10, 4, 16, 0, tzinfo=timezone.utc),
         getter=_getter, **_write_archive(tmp_path, _bundle()))
     over = _over(rows)
-    assert over["participation_status"] == "CONFIRMED_STARTER"
-    assert over["status"] == "RESEARCH_CANDIDATE_NOT_VALIDATED"
-    assert over["participation_verdict"]["subclass"] == "GAMEDAY_ACTIVE"
-    assert receipts[0]["participation"] == "CONFIRMED_STARTER"
+    assert over["participation_status"] == \
+        "STARTING_ROLE_NOT_VERIFIED_FROM_GAMELOG"
+    verdict = over.get("participation_verdict") or {}
+    assert verdict.get("state") != "CONFIRMED_STARTER"
+    assert verdict.get("inactives_completeness") != "VERIFIED_COMPLETE"
 
 
 def test_phone_inline_bundle_never_lifts(tmp_path):

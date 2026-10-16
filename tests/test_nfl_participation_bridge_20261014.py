@@ -109,15 +109,31 @@ def _complete_ids(team, named):
     return ids
 
 
+def proven_evidence(snapshots=None):
+    """Genuine pinned completeness evidence (#2274): independent official
+    game-day roster + pinned manifests over canonical content hashes."""
+    from nfl_completeness_evidence_fixture import prove
+    snaps = inactive_snapshots() if snapshots is None else snapshots
+    return prove(snaps, depth_rows())
+
+
+def _with_actives(snaps):
+    from nfl_completeness_evidence_fixture import team_ids
+    for s in snaps:
+        s["active_player_ids"] = [p for p in team_ids(depth_rows(), s["team"])
+                                  if p not in s["player_ids"]]
+    return snaps
+
+
 def inactive_snapshots(chi_ids=("wr2",), gb_ids=("gwr2",),
                        published="2026-10-04T15:30:00Z"):
     """Source-complete official inactive snapshots (audit B1 form)."""
-    return [
+    return _with_actives([
         {"game_id": GAME_ID, "team": "CHI", "published_at": published,
          "player_ids": _complete_ids("CHI", chi_ids)},
         {"game_id": GAME_ID, "team": "GB", "published_at": published,
          "player_ids": _complete_ids("GB", gb_ids)},
-    ]
+    ])
 
 
 def injury_row(player_id, status, *, team="CHI",
@@ -133,6 +149,7 @@ def research(**overrides):
         as_of="2026-10-04T16:00:00Z", depth_rows=depth_rows(),
         player_stat_rows=player_rows(),
         inactive_snapshots=inactive_snapshots(),
+        completeness_evidence=proven_evidence(),
         min_paths=120,
     )
     kwargs.update(overrides)
@@ -224,7 +241,8 @@ def test_gameday_active_supersedes_earlier_questionable_designation():
     verdict = assess_qb_participation(
         team="CHI", depth_rows=depth_rows(),
         injury_rows=[injury_row("qb1", "Questionable")],
-        inactive_snapshots=inactive_snapshots(), game_id=GAME_ID,
+        inactive_snapshots=inactive_snapshots(),
+        completeness_evidence=proven_evidence(), game_id=GAME_ID,
         target_season=2026, target_week=4, kickoff=KICKOFF,
         as_of="2026-10-04T16:00:00Z")
     assert verdict["state"] == "CONFIRMED_STARTER"

@@ -51,6 +51,9 @@ keeps the stamp with the gate's named refusal recorded.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import hashlib
+import json
+import re
 from typing import Any, Mapping, Sequence
 
 from sportsedge.nfl_coherent_prop_runner import run_coherent_prop_estimates
@@ -198,8 +201,126 @@ def _snapshot_player_ids(snapshot) -> list[str] | None:
     return out
 
 
+# ---------------------------------------------------------------------
+# #2274 completeness proof (owner ruling t207u + independent audit).
+#
+# A row count, a caller ``complete`` flag, or any in-process token is
+# never proof.  Completeness of an official inactive list is proven ONLY
+# when THIS module itself verifies, from caller-supplied bytes against
+# caller-supplied external pins:
+#   1. the inactives manifest bytes hash to their external pin and list
+#      the canonical content hash of exactly this game/team snapshot (so
+#      any post-load edit invalidates it);
+#   2. an official game-day roster from an INDEPENDENT source -- a
+#      separate manifest with its OWN distinct pin and a different
+#      declared source -- lists the canonical hash of the roster object;
+#   3. inactive ids + the snapshot's active ids partition that roster
+#      exactly (disjoint, no gaps), and the candidate is on it.
+# Without all of this the verdict is UNKNOWN /
+# INACTIVES_COMPLETENESS_UNVERIFIED.
+INACTIVES_MANIFEST_SCHEMA = "SPORTSEDGE_NFL_INACTIVES_MANIFEST_V1"
+ROSTER_MANIFEST_SCHEMA = "SPORTSEDGE_NFL_GAMEDAY_ROSTER_MANIFEST_V1"
+_HEX64 = re.compile(r"^[0-9a-f]{64}$")
+
+
+def canonical_sha256(obj: Any) -> str:
+    """SHA-256 of a JSON object's canonical form (sorted keys, compact)."""
+    return hashlib.sha256(json.dumps(
+        obj, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+        allow_nan=False).encode()).hexdigest()
+
+
+def _pinned_manifest(raw: Any, pin: Any, schema: str):
+    if not isinstance(raw, (bytes, bytearray)) or not isinstance(pin, str):
+        return None
+    pin = pin.strip().lower()
+    if not _HEX64.match(pin) or hashlib.sha256(bytes(raw)).hexdigest() != pin:
+        return None
+    try:
+        doc = json.loads(bytes(raw).decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return None
+    if not isinstance(doc, dict) or doc.get("schema") != schema:
+        return None
+    source = doc.get("source")
+    entries = doc.get("entries")
+    if not isinstance(source, str) or not source.strip() or not isinstance(
+            entries, list) or any(not isinstance(e, dict) for e in entries):
+        return None
+    return pin, source.strip(), entries
+
+
+def _ids(value) -> list[str] | None:
+    if not isinstance(value, (list, tuple)):
+        return None
+    out = [str(v).strip() for v in value if isinstance(v, str)]
+    if len(out) != len(value) or any(not v for v in out) or len(
+            set(out)) != len(out):
+        return None
+    return out
+
+
+def _completeness_proven(snapshot, inactive_ids, evidence, *, game_id,
+                         team_id, candidate_id, cutoff) -> bool:
+    if not isinstance(evidence, Mapping):
+        return False
+    inact = _pinned_manifest(evidence.get("inactives_manifest"),
+                             evidence.get("inactives_manifest_sha256"),
+                             INACTIVES_MANIFEST_SCHEMA)
+    ros = _pinned_manifest(evidence.get("roster_manifest"),
+                           evidence.get("roster_manifest_sha256"),
+                           ROSTER_MANIFEST_SCHEMA)
+    if inact is None or ros is None:
+        return False
+    # Independence: distinct pins AND distinct declared sources.
+    if inact[0] == ros[0] or inact[1].upper() == ros[1].upper():
+        return False
+    try:
+        snap_hash = canonical_sha256(dict(snapshot))
+    except (TypeError, ValueError):
+        return False
+    if not any(str(e.get("game_id") or "") == str(game_id)
+               and _team(e.get("team")) == team_id
+               and e.get("snapshot_sha256") == snap_hash for e in inact[2]):
+        return False
+    active = _ids(snapshot.get("active_player_ids"))
+    if active is None:
+        return False
+    pinned_roster_hashes = {
+        e.get("roster_sha256") for e in ros[2]
+        if str(e.get("game_id") or "") == str(game_id)
+        and _team(e.get("team")) == team_id}
+    matches = []
+    for roster in evidence.get("official_rosters") or ():
+        if not isinstance(roster, Mapping):
+            continue
+        if str(roster.get("game_id") or "") != str(game_id) or _team(
+                roster.get("team")) != team_id:
+            continue
+        try:
+            if canonical_sha256(dict(roster)) not in pinned_roster_hashes:
+                continue
+            if _utc(roster.get("published_at"),
+                    "roster published_at") > cutoff:
+                continue
+        except (TypeError, ValueError, NFLParticipationError):
+            continue
+        roster_ids = _ids(roster.get("player_ids"))
+        if roster_ids is not None:
+            matches.append(frozenset(roster_ids))
+    if len(set(matches)) != 1:
+        return False  # none, or conflicting official rosters
+    roster_ids = matches[0]
+    inactive = set(inactive_ids)
+    if inactive & set(active):
+        return False
+    if inactive | set(active) != roster_ids:
+        return False
+    return candidate_id in roster_ids
+
+
 def _inactive_scan(inactive_rows, inactive_snapshots, *, game_id, team_id,
-                   candidate_id, kickoff, cutoff):
+                   candidate_id, kickoff, cutoff, completeness_evidence=None):
     """Official-inactive evidence scan for one candidate, <= cutoff only.
 
     Returns a dict with:
@@ -277,6 +398,10 @@ def _inactive_scan(inactive_rows, inactive_snapshots, *, game_id, team_id,
         validated = _snapshot_player_ids(raw)
         if validated is None:
             continue
+        if not _completeness_proven(
+                raw, validated, completeness_evidence, game_id=game_id,
+                team_id=team_id, candidate_id=candidate_id, cutoff=cutoff):
+            continue
         valid.setdefault(published_at, set()).add(tuple(sorted(validated)))
     if valid:
         latest = valid[max(valid)]
@@ -293,6 +418,7 @@ def assess_qb_participation(
     injury_rows: Sequence[Mapping[str, Any]] = (),
     inactive_rows: Sequence[Mapping[str, Any]] = (),
     inactive_snapshots: Sequence[Mapping[str, Any]] = (),
+    completeness_evidence: Mapping[str, Any] | None = None,
     game_id: str | None = None,
     target_season: int,
     target_week: int,
@@ -389,7 +515,8 @@ def assess_qb_participation(
     verdict["injury_status"] = injury_status
 
     scan = _inactive_scan(
-        inactive_rows, inactive_snapshots, game_id=game_id,
+        inactive_rows, inactive_snapshots,
+        completeness_evidence=completeness_evidence, game_id=game_id,
         team_id=team_id, candidate_id=candidate_id, kickoff=kick,
         cutoff=cutoff)
     verdict["inactives_published"] = scan["complete_published"]
@@ -497,6 +624,7 @@ def assess_skill_participation(
     injury_rows: Sequence[Mapping[str, Any]] = (),
     inactive_rows: Sequence[Mapping[str, Any]] = (),
     inactive_snapshots: Sequence[Mapping[str, Any]] = (),
+    completeness_evidence: Mapping[str, Any] | None = None,
     game_id: str | None = None,
     target_season: int,
     target_week: int,
@@ -622,7 +750,8 @@ def assess_skill_participation(
     verdict["injury_status"] = injury_status
 
     scan = _inactive_scan(
-        inactive_rows, inactive_snapshots, game_id=game_id,
+        inactive_rows, inactive_snapshots,
+        completeness_evidence=completeness_evidence, game_id=game_id,
         team_id=team_id, candidate_id=pid, kickoff=kick, cutoff=cutoff)
     verdict["inactives_published"] = scan["complete_published"]
     verdict["inactives_evidence_present"] = scan["evidence_present"]
@@ -832,6 +961,7 @@ def skill_role_assessment(
     injury_rows: Sequence[Mapping[str, Any]] = (),
     inactive_rows: Sequence[Mapping[str, Any]] = (),
     inactive_snapshots: Sequence[Mapping[str, Any]] = (),
+    completeness_evidence: Mapping[str, Any] | None = None,
     snap_rows: Sequence[Mapping[str, Any]] = (),
     game_id: str | None = None,
     target_season: int,
@@ -856,6 +986,7 @@ def skill_role_assessment(
         team=team, player_id=player_id, depth_rows=depth_rows,
         injury_rows=injury_rows, inactive_rows=inactive_rows,
         inactive_snapshots=inactive_snapshots,
+        completeness_evidence=completeness_evidence,
         game_id=game_id, target_season=target_season,
         target_week=target_week, kickoff=kickoff, as_of=as_of,
         position=position, max_depth_age_hours=max_depth_age_hours)
@@ -970,6 +1101,7 @@ def qb_passing_yards_research(
     injury_rows: Sequence[Mapping[str, Any]] = (),
     inactive_rows: Sequence[Mapping[str, Any]] = (),
     inactive_snapshots: Sequence[Mapping[str, Any]] = (),
+    completeness_evidence: Mapping[str, Any] | None = None,
     snap_rows: Sequence[Mapping[str, Any]] = (),
     expected_qb_id: str | None = None,
     ladder_lines: Sequence[float] | None = None,
@@ -990,6 +1122,7 @@ def qb_passing_yards_research(
     verdict = assess_qb_participation(
         team=priced_team, depth_rows=depth_rows, injury_rows=injury_rows,
         inactive_rows=inactive_rows, inactive_snapshots=inactive_snapshots,
+        completeness_evidence=completeness_evidence,
         game_id=game_id,
         target_season=target_season, target_week=target_week,
         kickoff=kickoff, as_of=as_of,
@@ -1002,6 +1135,7 @@ def qb_passing_yards_research(
     opponent_verdict = assess_qb_participation(
         team=opponent_team, depth_rows=depth_rows, injury_rows=injury_rows,
         inactive_rows=inactive_rows, inactive_snapshots=inactive_snapshots,
+        completeness_evidence=completeness_evidence,
         game_id=game_id,
         target_season=target_season, target_week=target_week,
         kickoff=kickoff, as_of=as_of,
