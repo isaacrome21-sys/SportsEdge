@@ -20,9 +20,10 @@ from sportsedge.nfl_run_it import normalize_quote, run_it_market_anchored
 from sportsedge.sports.nfl.market_anchored_residual import ResidualQuoteError, anchor_prediction
 from sportsedge.nfl_run_it_scored import run_it_scored
 from sportsedge.nfl_td_run_it_score_b import run_td_board
-from sportsedge.sports.nfl.discrete_v2 import load_freeze, means_from_attempt9, score_grid
+from sportsedge.sports.nfl.discrete_v2 import load_freeze, means_from_attempt9
 from sportsedge.sports.nfl.unified_auto_roles import build_unified_team_models_from_nflverse
-from sportsedge.sports.nfl.unified_market_engine import (
+from sportsedge.sports.nfl.unified_market_engine_v2 import (
+    guarded_score_grid,
     TD_PROP_MARKETS,
     run_unified_nfl_model,
     sample_score_paths,
@@ -384,7 +385,7 @@ def run_unified_nfl_run_it(
     # seed so this is the same model distribution, not a second model.
     freeze = load_freeze()
     means = means_from_attempt9(fair_margin, fair_total)
-    grid = score_grid(means["mean_home"], means["mean_away"], freeze)
+    grid = guarded_score_grid(means["mean_home"], means["mean_away"], freeze)
     score_paths = sample_score_paths(grid, n_sims=n_sims, seed=seed)
 
     # Keep the model's coherent score paths available to prop workloads, but

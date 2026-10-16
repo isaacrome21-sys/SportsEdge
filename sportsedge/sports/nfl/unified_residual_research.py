@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any, Mapping, Sequence
 
 from sportsedge.nfl_run_it import run_it_market_anchored
-from sportsedge.sports.nfl.unified_market_engine import run_unified_nfl_model
+from sportsedge.sports.nfl.unified_market_engine_v2 import run_unified_nfl_model
 
 
 class UnifiedResidualResearchError(ValueError):

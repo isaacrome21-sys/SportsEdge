@@ -15,7 +15,7 @@ from sportsedge.sports.nfl.location_symmetric_g1 import (
 )
 from sportsedge.sports.nfl.m2 import NFL_M2_FEATURE_CONTRACT, _assert_market_blind
 from sportsedge.nfl_run_it import run_it_market_anchored
-from sportsedge.sports.nfl.unified_market_engine import (
+from sportsedge.sports.nfl.unified_market_engine_v2 import (
     UnifiedNflModelError, run_unified_nfl_model,
 )
 
