@@ -1,0 +1,116 @@
+# MLB PBP Pool — Build Report
+
+## 2024
+- games enumerated (distinct Final R): 2430 (non-Final schedule entries ignored: 0)
+- games admitted: 2429; excluded: 1
+- pool rows (PAs): 182449
+- incomplete plays excluded (not PAs): 0
+- non-PA complete plays excluded (baserunning during a PA): 454
+- games whose derived game_date is not a schedule officialDate: 0
+- orphan scoring plays (runs on non-PA plays, side table): 7 plays, 7 runs -> pool_orphans_2024.jsonl.gz
+- games ending on a later ET date than they started (post-midnight finishes incl. suspended/resumed): 313
+- artifact: pool_2024.jsonl.gz (4465138 bytes gz)
+  - sha256(gz): `059475e1176c7d571695323069607a33491444bc880079edd1c0418a2b674d8f`
+  - sha256(jsonl): `644d4c61fcc531b90fb4a2a6d3b4866e1b4ba9a852a3828a4118942e7a9705a2`
+- event-type census (admitted games):
+  - field_out: 73822
+  - strikeout: 41086
+  - single: 25902
+  - walk: 14420
+  - double: 7771
+  - home_run: 5453
+  - force_out: 3479
+  - grounded_into_double_play: 3222
+  - hit_by_pitch: 2020
+  - sac_fly: 1248
+  - field_error: 1112
+  - triple: 697
+  - intent_walk: 509
+  - sac_bunt: 452
+  - fielders_choice: 378
+  - double_play: 339
+  - fielders_choice_out: 313
+  - strikeout_double_play: 111
+  - catcher_interf: 100
+  - sac_fly_double_play: 13
+  - triple_play: 2
+- EXCLUDED games (fail-closed):
+  - 746577: PoolError: game 746577: empty allPlays
+
+## 2025
+- games enumerated (distinct Final R): 2430 (non-Final schedule entries ignored: 0)
+- games admitted: 2428; excluded: 2
+- pool rows (PAs): 182784
+- incomplete plays excluded (not PAs): 2
+- non-PA complete plays excluded (baserunning during a PA): 459
+- games whose derived game_date is not a schedule officialDate: 0
+- orphan scoring plays (runs on non-PA plays, side table): 11 plays, 11 runs -> pool_orphans_2025.jsonl.gz
+- games ending on a later ET date than they started (post-midnight finishes incl. suspended/resumed): 369
+- artifact: pool_2025.jsonl.gz (4471474 bytes gz)
+  - sha256(gz): `699ac96ad44d0534bf054460990a567aa30f69d9875762899b386ef15a059120`
+  - sha256(jsonl): `225263105a1067a4e8e7a030f3f4e746e33738712e184d78cfcb6b708ed171ce`
+- event-type census (admitted games):
+  - field_out: 74240
+  - strikeout: 40488
+  - single: 26095
+  - walk: 14817
+  - double: 7737
+  - home_run: 5649
+  - force_out: 3361
+  - grounded_into_double_play: 3110
+  - hit_by_pitch: 1927
+  - sac_fly: 1291
+  - field_error: 1008
+  - triple: 628
+  - sac_bunt: 560
+  - intent_walk: 556
+  - fielders_choice: 387
+  - double_play: 376
+  - fielders_choice_out: 325
+  - strikeout_double_play: 125
+  - catcher_interf: 86
+  - sac_fly_double_play: 15
+  - triple_play: 3
+- EXCLUDED games (fail-closed):
+  - 776272: away PA components 31 != PA 32
+  - 776474: away PA components 40 != PA 41
+
+## 2026
+- games enumerated (distinct Final R): 2430 (non-Final schedule entries ignored: 0)
+- games admitted: 2427; excluded: 3
+- pool rows (PAs): 183705
+- incomplete plays excluded (not PAs): 1
+- non-PA complete plays excluded (baserunning during a PA): 478
+- games whose derived game_date is not a schedule officialDate: 0
+- orphan scoring plays (runs on non-PA plays, side table): 5 plays, 5 runs -> pool_orphans_2026.jsonl.gz
+- games ending on a later ET date than they started (post-midnight finishes incl. suspended/resumed): 357
+- artifact: pool_2026.jsonl.gz (4506526 bytes gz)
+  - sha256(gz): `fbb04d0ee26ae29d2279327e075ae0f23bd103a8ca00ebc02462448616bb849a`
+  - sha256(jsonl): `83e995206bf540c56411161ed1ee5765ce20036900ecf24e218528b188c4aaa9`
+- event-type census (admitted games):
+  - field_out: 74024
+  - strikeout: 40567
+  - single: 26096
+  - walk: 15779
+  - double: 7485
+  - home_run: 5572
+  - force_out: 3406
+  - grounded_into_double_play: 3135
+  - hit_by_pitch: 2115
+  - sac_fly: 1287
+  - field_error: 1038
+  - sac_bunt: 682
+  - triple: 671
+  - intent_walk: 545
+  - fielders_choice: 407
+  - double_play: 383
+  - fielders_choice_out: 319
+  - strikeout_double_play: 100
+  - catcher_interf: 83
+  - sac_fly_double_play: 10
+  - triple_play: 1
+- EXCLUDED games (fail-closed):
+  - 823490: PoolError: game 823490: empty allPlays
+  - 823732: home PA components 40 != PA 41
+  - 824784: away PA components 34 != PA 35
+

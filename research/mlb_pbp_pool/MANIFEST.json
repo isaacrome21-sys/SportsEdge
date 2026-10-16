@@ -1,0 +1,69 @@
+{
+  "artifact": "mlb_pbp_pool",
+  "builder_file": "build_pbp_pool.py",
+  "builder_sha256": "238e36d31b9169ceb1a959d82d8cbcfdca35619c10dc273e60042f6b21905ec0",
+  "built_at_utc": "2026-10-16T12:57:33.135769+00:00",
+  "pit_rule": "pool game G feeds target T only if G.game_completed_date < T.game_date",
+  "sample": {
+    "boxscore_fixture": "sample/sample_boxscores.json",
+    "games": 30,
+    "pool_file": "sample/pool_sample.jsonl",
+    "rows": 2218,
+    "sha256_jsonl": "393eb3264d87c200ef680be085579edee393d810bab5e5c98e3b2da836957169"
+  },
+  "seasons": {
+    "2024": {
+      "bytes_gz": 4465138,
+      "file": "pool_2024.jsonl.gz",
+      "first_game_date": "2024-03-20",
+      "games_admitted": 2429,
+      "games_excluded": 1,
+      "last_game_date": "2024-09-30",
+      "orphan_rows": 7,
+      "orphan_runs": 7,
+      "orphans_bytes_gz": 366,
+      "orphans_file": "pool_orphans_2024.jsonl.gz",
+      "orphans_sha256_gz": "3491bf4f071e1c88ed030961c3c3d51f28cacf8182d68041a40803a6c46f4e66",
+      "orphans_sha256_jsonl": "9686f59de778b673bb0acb7c506e9d2a06feb642fa0dbbff8b4ddaa3ba48b0c4",
+      "rows": 182449,
+      "sha256_gz": "059475e1176c7d571695323069607a33491444bc880079edd1c0418a2b674d8f",
+      "sha256_jsonl": "644d4c61fcc531b90fb4a2a6d3b4866e1b4ba9a852a3828a4118942e7a9705a2"
+    },
+    "2025": {
+      "bytes_gz": 4471474,
+      "file": "pool_2025.jsonl.gz",
+      "first_game_date": "2025-03-18",
+      "games_admitted": 2428,
+      "games_excluded": 2,
+      "last_game_date": "2025-09-28",
+      "orphan_rows": 11,
+      "orphan_runs": 11,
+      "orphans_bytes_gz": 467,
+      "orphans_file": "pool_orphans_2025.jsonl.gz",
+      "orphans_sha256_gz": "d09596b65a7b360eaacdba5fe2e1d96d9a69a7e70735bd53e0324d0a223fbd16",
+      "orphans_sha256_jsonl": "0fff40d5bfd4e57986c047328addf6502b1b6f2bc1fedfa7df6df96623b8eadb",
+      "rows": 182784,
+      "sha256_gz": "699ac96ad44d0534bf054460990a567aa30f69d9875762899b386ef15a059120",
+      "sha256_jsonl": "225263105a1067a4e8e7a030f3f4e746e33738712e184d78cfcb6b708ed171ce"
+    },
+    "2026": {
+      "bytes_gz": 4506526,
+      "file": "pool_2026.jsonl.gz",
+      "first_game_date": "2026-03-25",
+      "games_admitted": 2427,
+      "games_excluded": 3,
+      "last_game_date": "2026-09-27",
+      "orphan_rows": 5,
+      "orphan_runs": 5,
+      "orphans_bytes_gz": 327,
+      "orphans_file": "pool_orphans_2026.jsonl.gz",
+      "orphans_sha256_gz": "2903249bbf7a55b0156a360c85ef8383c23146622245dad2568d97506fcf0bc8",
+      "orphans_sha256_jsonl": "1141607ed9a5cff12282e817e1811e37fef828bc2e5ce20cb6632c5bc8c90059",
+      "rows": 183705,
+      "sha256_gz": "fbb04d0ee26ae29d2279327e075ae0f23bd103a8ca00ebc02462448616bb849a",
+      "sha256_jsonl": "83e995206bf540c56411161ed1ee5765ce20036900ecf24e218528b188c4aaa9"
+    }
+  },
+  "source": "MLB StatsAPI playByPlay + boxscore (statsapi.mlb.com)",
+  "stage": 1
+}
