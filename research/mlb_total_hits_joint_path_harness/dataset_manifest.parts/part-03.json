@@ -1,0 +1,3111 @@
+
+     "detail": {
+      "batter": 689200,
+      "role": "STARTER",
+      "prior_pa": 14
+     }
+    },
+    {
+     "game_id": "777592",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 681715,
+      "role": "STARTER",
+      "prior_pa": 10
+     }
+    },
+    {
+     "game_id": "777595",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805249,
+      "role": "STARTER",
+      "prior_pa": 2
+     }
+    },
+    {
+     "game_id": "777596",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 696030,
+      "role": "STARTER",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "777574",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 681715,
+      "role": "STARTER",
+      "prior_pa": 12
+     }
+    },
+    {
+     "game_id": "777576",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 680862,
+      "role": "STARTER",
+      "prior_pa": 11
+     }
+    },
+    {
+     "game_id": "777577",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 702284,
+      "role": "STARTER",
+      "prior_pa": 18
+     }
+    },
+    {
+     "game_id": "777578",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805249,
+      "role": "STARTER",
+      "prior_pa": 5
+     }
+    },
+    {
+     "game_id": "777580",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 671286,
+      "role": "BULLPEN",
+      "prior_pa": 22
+     }
+    },
+    {
+     "game_id": "777584",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 701350,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "777559",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 702284,
+      "role": "STARTER",
+      "prior_pa": 20
+     }
+    },
+    {
+     "game_id": "777560",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 687221,
+      "role": "STARTER",
+      "prior_pa": 18
+     }
+    },
+    {
+     "game_id": "777563",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669374,
+      "role": "BULLPEN",
+      "prior_pa": 14
+     }
+    },
+    {
+     "game_id": "777564",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 672016,
+      "role": "BULLPEN",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "777565",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 701350,
+      "role": "STARTER",
+      "prior_pa": 2
+     }
+    },
+    {
+     "game_id": "777567",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691019,
+      "role": "STARTER",
+      "prior_pa": 7
+     }
+    },
+    {
+     "game_id": "777569",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 671286,
+      "role": "BULLPEN",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "777570",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 677595,
+      "role": "STARTER",
+      "prior_pa": 8
+     }
+    },
+    {
+     "game_id": "777571",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805249,
+      "role": "STARTER",
+      "prior_pa": 8
+     }
+    },
+    {
+     "game_id": "777572",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695506,
+      "role": "STARTER",
+      "prior_pa": 12
+     }
+    },
+    {
+     "game_id": "777573",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 663330,
+      "role": "BULLPEN",
+      "prior_pa": 24
+     }
+    },
+    {
+     "game_id": "777542",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 680862,
+      "role": "STARTER",
+      "prior_pa": 13
+     }
+    },
+    {
+     "game_id": "777547",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669374,
+      "role": "BULLPEN",
+      "prior_pa": 14
+     }
+    },
+    {
+     "game_id": "777549",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 671286,
+      "role": "BULLPEN",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "777550",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691019,
+      "role": "STARTER",
+      "prior_pa": 9
+     }
+    },
+    {
+     "game_id": "777551",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695506,
+      "role": "STARTER",
+      "prior_pa": 15
+     }
+    },
+    {
+     "game_id": "777552",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 681715,
+      "role": "STARTER",
+      "prior_pa": 14
+     }
+    },
+    {
+     "game_id": "777553",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805249,
+      "role": "STARTER",
+      "prior_pa": 10
+     }
+    },
+    {
+     "game_id": "777555",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 676724,
+      "role": "STARTER",
+      "prior_pa": 18
+     }
+    },
+    {
+     "game_id": "777561",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 701350,
+      "role": "STARTER",
+      "prior_pa": 5
+     }
+    },
+    {
+     "game_id": "777534",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 682515,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "777536",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695506,
+      "role": "STARTER",
+      "prior_pa": 17
+     }
+    },
+    {
+     "game_id": "777541",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 664954,
+      "role": "STARTER",
+      "prior_pa": 9
+     }
+    },
+    {
+     "game_id": "777520",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 702284,
+      "role": "STARTER",
+      "prior_pa": 22
+     }
+    },
+    {
+     "game_id": "777524",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691019,
+      "role": "STARTER",
+      "prior_pa": 12
+     }
+    },
+    {
+     "game_id": "777527",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 689200,
+      "role": "STARTER",
+      "prior_pa": 20
+     }
+    },
+    {
+     "game_id": "777528",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 677595,
+      "role": "STARTER",
+      "prior_pa": 12
+     }
+    },
+    {
+     "game_id": "777529",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695506,
+      "role": "STARTER",
+      "prior_pa": 19
+     }
+    },
+    {
+     "game_id": "777530",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 681715,
+      "role": "STARTER",
+      "prior_pa": 17
+     }
+    },
+    {
+     "game_id": "777531",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805249,
+      "role": "STARTER",
+      "prior_pa": 13
+     }
+    },
+    {
+     "game_id": "777535",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669374,
+      "role": "BULLPEN",
+      "prior_pa": 15
+     }
+    },
+    {
+     "game_id": "777537",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 701350,
+      "role": "STARTER",
+      "prior_pa": 8
+     }
+    },
+    {
+     "game_id": "777539",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695681,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "777507",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 702284,
+      "role": "STARTER",
+      "prior_pa": 24
+     }
+    },
+    {
+     "game_id": "777508",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691019,
+      "role": "STARTER",
+      "prior_pa": 13
+     }
+    },
+    {
+     "game_id": "777509",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805249,
+      "role": "STARTER",
+      "prior_pa": 15
+     }
+    },
+    {
+     "game_id": "777511",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 680862,
+      "role": "STARTER",
+      "prior_pa": 15
+     }
+    },
+    {
+     "game_id": "777516",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691785,
+      "role": "BULLPEN",
+      "prior_pa": 19
+     }
+    },
+    {
+     "game_id": "777518",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 677595,
+      "role": "STARTER",
+      "prior_pa": 14
+     }
+    },
+    {
+     "game_id": "777519",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695681,
+      "role": "STARTER",
+      "prior_pa": 2
+     }
+    },
+    {
+     "game_id": "777523",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 690022,
+      "role": "STARTER",
+      "prior_pa": 15
+     }
+    },
+    {
+     "game_id": "777492",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 676480,
+      "role": "STARTER",
+      "prior_pa": 11
+     }
+    },
+    {
+     "game_id": "777493",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691019,
+      "role": "STARTER",
+      "prior_pa": 15
+     }
+    },
+    {
+     "game_id": "777494",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669450,
+      "role": "STARTER",
+      "prior_pa": 3
+     }
+    },
+    {
+     "game_id": "777496",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695506,
+      "role": "STARTER",
+      "prior_pa": 24
+     }
+    },
+    {
+     "game_id": "777497",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 664954,
+      "role": "STARTER",
+      "prior_pa": 11
+     }
+    },
+    {
+     "game_id": "777498",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 682515,
+      "role": "STARTER",
+      "prior_pa": 2
+     }
+    },
+    {
+     "game_id": "777499",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 683770,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "777501",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 676679,
+      "role": "STARTER",
+      "prior_pa": 6
+     }
+    },
+    {
+     "game_id": "777503",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 681715,
+      "role": "STARTER",
+      "prior_pa": 19
+     }
+    },
+    {
+     "game_id": "777504",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 690022,
+      "role": "STARTER",
+      "prior_pa": 17
+     }
+    },
+    {
+     "game_id": "777483",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805249,
+      "role": "STARTER",
+      "prior_pa": 19
+     }
+    },
+    {
+     "game_id": "777485",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 680862,
+      "role": "STARTER",
+      "prior_pa": 17
+     }
+    },
+    {
+     "game_id": "777486",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 701350,
+      "role": "STARTER",
+      "prior_pa": 10
+     }
+    },
+    {
+     "game_id": "777487",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695681,
+      "role": "STARTER",
+      "prior_pa": 4
+     }
+    },
+    {
+     "game_id": "777488",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 690022,
+      "role": "STARTER",
+      "prior_pa": 19
+     }
+    },
+    {
+     "game_id": "777490",
+     "reason": "PLAYER_ID_COLLISION"
+    },
+    {
+     "game_id": "777468",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695506,
+      "role": "BULLPEN",
+      "prior_pa": 22
+     }
+    },
+    {
+     "game_id": "777469",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669450,
+      "role": "STARTER",
+      "prior_pa": 5
+     }
+    },
+    {
+     "game_id": "777473",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 701350,
+      "role": "STARTER",
+      "prior_pa": 12
+     }
+    },
+    {
+     "game_id": "777476",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695681,
+      "role": "STARTER",
+      "prior_pa": 7
+     }
+    },
+    {
+     "game_id": "777479",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 683770,
+      "role": "STARTER",
+      "prior_pa": 2
+     }
+    },
+    {
+     "game_id": "777480",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 690022,
+      "role": "STARTER",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "777481",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805249,
+      "role": "STARTER",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "777489",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 676724,
+      "role": "STARTER",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "777453",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 701350,
+      "role": "STARTER",
+      "prior_pa": 15
+     }
+    },
+    {
+     "game_id": "777457",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 670092,
+      "role": "STARTER",
+      "prior_pa": 20
+     }
+    },
+    {
+     "game_id": "777461",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 690022,
+      "role": "STARTER",
+      "prior_pa": 24
+     }
+    },
+    {
+     "game_id": "777465",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 681715,
+      "role": "BULLPEN",
+      "prior_pa": 11
+     }
+    },
+    {
+     "game_id": "777466",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 664068,
+      "role": "STARTER",
+      "prior_pa": 9
+     }
+    },
+    {
+     "game_id": "777470",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 677595,
+      "role": "STARTER",
+      "prior_pa": 20
+     }
+    },
+    {
+     "game_id": "777441",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 680862,
+      "role": "STARTER",
+      "prior_pa": 19
+     }
+    },
+    {
+     "game_id": "777443",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695506,
+      "role": "BULLPEN",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "777444",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805249,
+      "role": "STARTER",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "777445",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 690022,
+      "role": "BULLPEN",
+      "prior_pa": 16
+     }
+    },
+    {
+     "game_id": "777447",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691019,
+      "role": "STARTER",
+      "prior_pa": 17
+     }
+    },
+    {
+     "game_id": "777448",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 683770,
+      "role": "STARTER",
+      "prior_pa": 4
+     }
+    },
+    {
+     "game_id": "777449",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 664068,
+      "role": "STARTER",
+      "prior_pa": 11
+     }
+    },
+    {
+     "game_id": "777451",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695257,
+      "role": "BULLPEN",
+      "prior_pa": 22
+     }
+    },
+    {
+     "game_id": "777455",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 677595,
+      "role": "STARTER",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "777458",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 676480,
+      "role": "STARTER",
+      "prior_pa": 13
+     }
+    },
+    {
+     "game_id": "777425",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 701350,
+      "role": "STARTER",
+      "prior_pa": 18
+     }
+    },
+    {
+     "game_id": "777426",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 670092,
+      "role": "STARTER",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "777427",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691781,
+      "role": "STARTER",
+      "prior_pa": 9
+     }
+    },
+    {
+     "game_id": "777428",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669450,
+      "role": "STARTER",
+      "prior_pa": 7
+     }
+    },
+    {
+     "game_id": "777430",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 690022,
+      "role": "BULLPEN",
+      "prior_pa": 18
+     }
+    },
+    {
+     "game_id": "777435",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691019,
+      "role": "STARTER",
+      "prior_pa": 20
+     }
+    },
+    {
+     "game_id": "777436",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 702284,
+      "role": "BULLPEN",
+      "prior_pa": 22
+     }
+    },
+    {
+     "game_id": "777437",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 676724,
+      "role": "STARTER",
+      "prior_pa": 24
+     }
+    },
+    {
+     "game_id": "777438",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 676679,
+      "role": "STARTER",
+      "prior_pa": 8
+     }
+    },
+    {
+     "game_id": "777439",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 681715,
+      "role": "BULLPEN",
+      "prior_pa": 12
+     }
+    },
+    {
+     "game_id": "777410",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 605244,
+      "role": "STARTER",
+      "prior_pa": 4
+     }
+    },
+    {
+     "game_id": "777413",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 670231,
+      "role": "STARTER",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "777414",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695681,
+      "role": "STARTER",
+      "prior_pa": 13
+     }
+    },
+    {
+     "game_id": "777416",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691781,
+      "role": "STARTER",
+      "prior_pa": 11
+     }
+    },
+    {
+     "game_id": "777417",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 701350,
+      "role": "STARTER",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "777419",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 702284,
+      "role": "BULLPEN",
+      "prior_pa": 24
+     }
+    },
+    {
+     "game_id": "777423",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 676724,
+      "role": "BULLPEN",
+      "prior_pa": 8
+     }
+    },
+    {
+     "game_id": "777395",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 701350,
+      "role": "STARTER",
+      "prior_pa": 24
+     }
+    },
+    {
+     "game_id": "777397",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669450,
+      "role": "STARTER",
+      "prior_pa": 10
+     }
+    },
+    {
+     "game_id": "777398",
+     "reason": "PLAYER_ID_COLLISION"
+    },
+    {
+     "game_id": "777399",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 690924,
+      "role": "STARTER",
+      "prior_pa": 12
+     }
+    },
+    {
+     "game_id": "777400",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 680862,
+      "role": "STARTER",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "777405",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805249,
+      "role": "BULLPEN",
+      "prior_pa": 22
+     }
+    },
+    {
+     "game_id": "777406",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 668974,
+      "role": "BULLPEN",
+      "prior_pa": 19
+     }
+    },
+    {
+     "game_id": "777407",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 676480,
+      "role": "STARTER",
+      "prior_pa": 15
+     }
+    },
+    {
+     "game_id": "777408",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691019,
+      "role": "STARTER",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "777381",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 701350,
+      "role": "BULLPEN",
+      "prior_pa": 18
+     }
+    },
+    {
+     "game_id": "777382",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691781,
+      "role": "STARTER",
+      "prior_pa": 14
+     }
+    },
+    {
+     "game_id": "777389",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 676724,
+      "role": "BULLPEN",
+      "prior_pa": 12
+     }
+    },
+    {
+     "game_id": "777393",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691019,
+      "role": "STARTER",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "777394",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 679822,
+      "role": "STARTER",
+      "prior_pa": 24
+     }
+    },
+    {
+     "game_id": "777372",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691781,
+      "role": "STARTER",
+      "prior_pa": 16
+     }
+    },
+    {
+     "game_id": "777376",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 701350,
+      "role": "BULLPEN",
+      "prior_pa": 19
+     }
+    },
+    {
+     "game_id": "777377",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805249,
+      "role": "BULLPEN",
+      "prior_pa": 24
+     }
+    },
+    {
+     "game_id": "777378",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 670231,
+      "role": "BULLPEN",
+      "prior_pa": 13
+     }
+    },
+    {
+     "game_id": "777379",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 690022,
+      "role": "BULLPEN",
+      "prior_pa": 22
+     }
+    },
+    {
+     "game_id": "777380",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 696030,
+      "role": "BULLPEN",
+      "prior_pa": 13
+     }
+    },
+    {
+     "game_id": "777355",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 681715,
+      "role": "BULLPEN",
+      "prior_pa": 14
+     }
+    },
+    {
+     "game_id": "777359",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 670231,
+      "role": "BULLPEN",
+      "prior_pa": 14
+     }
+    },
+    {
+     "game_id": "777360",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691781,
+      "role": "STARTER",
+      "prior_pa": 18
+     }
+    },
+    {
+     "game_id": "777362",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 681987,
+      "role": "STARTER",
+      "prior_pa": 4
+     }
+    },
+    {
+     "game_id": "777365",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 696030,
+      "role": "BULLPEN",
+      "prior_pa": 14
+     }
+    },
+    {
+     "game_id": "777366",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669450,
+      "role": "STARTER",
+      "prior_pa": 16
+     }
+    },
+    {
+     "game_id": "777369",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 663584,
+      "role": "STARTER",
+      "prior_pa": 18
+     }
+    },
+    {
+     "game_id": "777370",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691019,
+      "role": "BULLPEN",
+      "prior_pa": 20
+     }
+    },
+    {
+     "game_id": "777371",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 680862,
+      "role": "STARTER",
+      "prior_pa": 24
+     }
+    },
+    {
+     "game_id": "777344",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 690924,
+      "role": "STARTER",
+      "prior_pa": 14
+     }
+    },
+    {
+     "game_id": "777350",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669450,
+      "role": "STARTER",
+      "prior_pa": 18
+     }
+    },
+    {
+     "game_id": "777331",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691781,
+      "role": "STARTER",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "777332",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 681715,
+      "role": "BULLPEN",
+      "prior_pa": 16
+     }
+    },
+    {
+     "game_id": "777335",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 670231,
+      "role": "BULLPEN",
+      "prior_pa": 15
+     }
+    },
+    {
+     "game_id": "777336",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 666211,
+      "role": "STARTER",
+      "prior_pa": 4
+     }
+    },
+    {
+     "game_id": "777337",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 680862,
+      "role": "BULLPEN",
+      "prior_pa": 18
+     }
+    },
+    {
+     "game_id": "777338",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691019,
+      "role": "BULLPEN",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "777339",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 690924,
+      "role": "STARTER",
+      "prior_pa": 16
+     }
+    },
+    {
+     "game_id": "777340",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 696030,
+      "role": "BULLPEN",
+      "prior_pa": 16
+     }
+    },
+    {
+     "game_id": "777341",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 663584,
+      "role": "STARTER",
+      "prior_pa": 20
+     }
+    },
+    {
+     "game_id": "777345",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 701350,
+      "role": "BULLPEN",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "777346",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 670092,
+      "role": "STARTER",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "777315",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691781,
+      "role": "STARTER",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "777319",
+     "reason": "PLAYER_ID_COLLISION"
+    },
+    {
+     "game_id": "777320",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669450,
+      "role": "STARTER",
+      "prior_pa": 20
+     }
+    },
+    {
+     "game_id": "777321",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 690924,
+      "role": "STARTER",
+      "prior_pa": 19
+     }
+    },
+    {
+     "game_id": "777322",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 696030,
+      "role": "BULLPEN",
+      "prior_pa": 16
+     }
+    },
+    {
+     "game_id": "777323",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 701350,
+      "role": "BULLPEN",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "777301",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 690924,
+      "role": "STARTER",
+      "prior_pa": 22
+     }
+    },
+    {
+     "game_id": "777302",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 696030,
+      "role": "BULLPEN",
+      "prior_pa": 18
+     }
+    },
+    {
+     "game_id": "777303",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 681715,
+      "role": "BULLPEN",
+      "prior_pa": 20
+     }
+    },
+    {
+     "game_id": "777307",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 680862,
+      "role": "BULLPEN",
+      "prior_pa": 19
+     }
+    },
+    {
+     "game_id": "777308",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669450,
+      "role": "STARTER",
+      "prior_pa": 22
+     }
+    },
+    {
+     "game_id": "777310",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 681987,
+      "role": "STARTER",
+      "prior_pa": 6
+     }
+    },
+    {
+     "game_id": "777311",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691019,
+      "role": "BULLPEN",
+      "prior_pa": 22
+     }
+    },
+    {
+     "game_id": "777291",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669288,
+      "role": "STARTER",
+      "prior_pa": 14
+     }
+    },
+    {
+     "game_id": "777292",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 679822,
+      "role": "BULLPEN",
+      "prior_pa": 20
+     }
+    },
+    {
+     "game_id": "777297",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 670231,
+      "role": "BULLPEN",
+      "prior_pa": 17
+     }
+    },
+    {
+     "game_id": "777278",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669288,
+      "role": "STARTER",
+      "prior_pa": 16
+     }
+    },
+    {
+     "game_id": "777280",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691019,
+      "role": "BULLPEN",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "777281",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 670231,
+      "role": "BULLPEN",
+      "prior_pa": 18
+     }
+    },
+    {
+     "game_id": "777282",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 696030,
+      "role": "BULLPEN",
+      "prior_pa": 22
+     }
+    },
+    {
+     "game_id": "777285",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669450,
+      "role": "STARTER",
+      "prior_pa": 24
+     }
+    },
+    {
+     "game_id": "777286",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 687515,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "777293",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 681715,
+      "role": "BULLPEN",
+      "prior_pa": 20
+     }
+    },
+    {
+     "game_id": "777268",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 696030,
+      "role": "BULLPEN",
+      "prior_pa": 24
+     }
+    },
+    {
+     "game_id": "777269",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669450,
+      "role": "BULLPEN",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "777271",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 687515,
+      "role": "STARTER",
+      "prior_pa": 3
+     }
+    },
+    {
+     "game_id": "777273",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 670092,
+      "role": "BULLPEN",
+      "prior_pa": 16
+     }
+    },
+    {
+     "game_id": "777276",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678011,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "777289",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678011,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "777251",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 670231,
+      "role": "BULLPEN",
+      "prior_pa": 19
+     }
+    },
+    {
+     "game_id": "777253",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 691019,
+      "role": "BULLPEN",
+      "prior_pa": 24
+     }
+    },
+    {
+     "game_id": "777261",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 677060,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "777264",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669450,
+      "role": "BULLPEN",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "777235",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 666211,
+      "role": "STARTER",
+      "prior_pa": 6
+     }
+    },
+    {
+     "game_id": "777239",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 670092,
+      "role": "BULLPEN",
+      "prior_pa": 20
+     }
+    },
+    {
+     "game_id": "777242",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 677060,
+      "role": "STARTER",
+      "prior_pa": 3
+     }
+    },
+    {
+     "game_id": "777243",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695657,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "777244",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 642727,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "777248",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 670231,
+      "role": "BULLPEN",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "777221",
+     "reason": "PLAYER_ID_COLLISION"
+    },
+    {
+     "game_id": "777228",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 681987,
+      "role": "STARTER",
+      "prior_pa": 8
+     }
+    },
+    {
+     "game_id": "777231",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 677060,
+      "role": "STARTER",
+      "prior_pa": 5
+     }
+    },
+    {
+     "game_id": "777232",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695657,
+      "role": "STARTER",
+      "prior_pa": 3
+     }
+    },
+    {
+     "game_id": "777206",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 665923,
+      "role": "BULLPEN",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "777207",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 670092,
+      "role": "BULLPEN",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "777213",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 681987,
+      "role": "STARTER",
+      "prior_pa": 12
+     }
+    },
+    {
+     "game_id": "777214",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 677060,
+      "role": "STARTER",
+      "prior_pa": 7
+     }
+    },
+    {
+     "game_id": "777215",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695657,
+      "role": "STARTER",
+      "prior_pa": 6
+     }
+    },
+    {
+     "game_id": "777216",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 663584,
+      "role": "STARTER",
+      "prior_pa": 24
+     }
+    },
+    {
+     "game_id": "777218",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 670231,
+      "role": "BULLPEN",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "777224",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 681715,
+      "role": "BULLPEN",
+      "prior_pa": 22
+     }
+    },
+    {
+     "game_id": "777200",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 680737,
+      "role": "STARTER",
+      "prior_pa": 6
+     }
+    },
+    {
+     "game_id": "777202",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 666211,
+      "role": "STARTER",
+      "prior_pa": 8
+     }
+    },
+    {
+     "game_id": "777203",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 670092,
+      "role": "BULLPEN",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "777209",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 692585,
+      "role": "STARTER",
+      "prior_pa": 9
+     }
+    },
+    {
+     "game_id": "777212",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695657,
+      "role": "STARTER",
+      "prior_pa": 8
+     }
+    },
+    {
+     "game_id": "777185",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 670092,
+      "role": "BULLPEN",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "777188",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695657,
+      "role": "STARTER",
+      "prior_pa": 10
+     }
+    },
+    {
+     "game_id": "777192",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 666211,
+      "role": "STARTER",
+      "prior_pa": 10
+     }
+    },
+    {
+     "game_id": "777196",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 681987,
+      "role": "STARTER",
+      "prior_pa": 17
+     }
+    },
+    {
+     "game_id": "777197",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 681715,
+      "role": "BULLPEN",
+      "prior_pa": 24
+     }
+    },
+    {
+     "game_id": "777162",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 663536,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "777172",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695657,
+      "role": "STARTER",
+      "prior_pa": 12
+     }
+    },
+    {
+     "game_id": "777174",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 666211,
+      "role": "STARTER",
+      "prior_pa": 12
+     }
+    },
+    {
+     "game_id": "777177",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 686475,
+      "role": "STARTER",
+      "prior_pa": 2
+     }
+    },
+    {
+     "game_id": "777179",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 692585,
+      "role": "STARTER",
+      "prior_pa": 12
+     }
+    },
+    {
+     "game_id": "777165",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 676679,
+      "role": "STARTER",
+      "prior_pa": 11
+     }
+    },
+    {
+     "game_id": "777169",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678391,
+      "role": "BULLPEN",
+      "prior_pa": 18
+     }
+    },
+    {
+     "game_id": "777181",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 663584,
+      "role": "BULLPEN",
+      "prior_pa": 19
+     }
+    },
+    {
+     "game_id": "777146",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695657,
+      "role": "STARTER",
+      "prior_pa": 14
+     }
+    },
+    {
+     "game_id": "777154",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 694728,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "777127",
+     "reason": "PLAYER_ID_COLLISION"
+    },
+    {
+     "game_id": "777133",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805373,
+      "role": "STARTER",
+      "prior_pa": 18
+     }
+    },
+    {
+     "game_id": "777137",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 666211,
+      "role": "STARTER",
+      "prior_pa": 17
+     }
+    },
+    {
+     "game_id": "777138",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695657,
+      "role": "STARTER",
+      "prior_pa": 17
+     }
+    },
+    {
+     "game_id": "777140",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 692585,
+      "role": "STARTER",
+      "prior_pa": 14
+     }
+    },
+    {
+     "game_id": "777118",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805373,
+      "role": "STARTER",
+      "prior_pa": 20
+     }
+    },
+    {
+     "game_id": "777120",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695657,
+      "role": "STARTER",
+      "prior_pa": 19
+     }
+    },
+    {
+     "game_id": "777123",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678011,
+      "role": "STARTER",
+      "prior_pa": 2
+     }
+    },
+    {
+     "game_id": "777125",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 666211,
+      "role": "STARTER",
+      "prior_pa": 19
+     }
+    },
+    {
+     "game_id": "777128",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 692585,
+      "role": "STARTER",
+      "prior_pa": 17
+     }
+    },
+    {
+     "game_id": "777099",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 666211,
+      "role": "STARTER",
+      "prior_pa": 22
+     }
+    },
+    {
+     "game_id": "777102",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 692585,
+      "role": "STARTER",
+      "prior_pa": 19
+     }
+    },
+    {
+     "game_id": "777107",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695657,
+      "role": "STARTER",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "777114",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678391,
+      "role": "BULLPEN",
+      "prior_pa": 18
+     }
+    },
+    {
+     "game_id": "777086",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 694728,
+      "role": "STARTER",
+      "prior_pa": 6
+     }
+    },
+    {
+     "game_id": "777090",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695657,
+      "role": "STARTER",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "777093",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 686475,
+      "role": "STARTER",
+      "prior_pa": 4
+     }
+    },
+    {
+     "game_id": "777097",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805373,
+      "role": "STARTER",
+      "prior_pa": 22
+     }
+    },
+    {
+     "game_id": "777067",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 666211,
+      "role": "BULLPEN",
+      "prior_pa": 24
+     }
+    },
+    {
+     "game_id": "777072",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 692585,
+      "role": "STARTER",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "777073",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 683227,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "777074",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695657,
+      "role": "BULLPEN",
+      "prior_pa": 16
+     }
+    },
+    {
+     "game_id": "777083",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678391,
+      "role": "BULLPEN",
+      "prior_pa": 19
+     }
+    },
+    {
+     "game_id": "777050",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678011,
+      "role": "STARTER",
+      "prior_pa": 4
+     }
+    },
+    {
+     "game_id": "777051",
+     "reason": "PLAYER_ID_COLLISION"
+    },
+    {
+     "game_id": "777053",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 692585,
+      "role": "STARTER",
+      "prior_pa": 24
+     }
+    },
+    {
+     "game_id": "777055",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 694728,
+      "role": "STARTER",
+      "prior_pa": 8
+     }
+    },
+    {
+     "game_id": "777057",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 680737,
+      "role": "STARTER",
+      "prior_pa": 8
+     }
+    },
+    {
+     "game_id": "777059",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695657,
+      "role": "BULLPEN",
+      "prior_pa": 18
+     }
+    },
+    {
+     "game_id": "777035",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678011,
+      "role": "STARTER",
+      "prior_pa": 6
+     }
+    },
+    {
+     "game_id": "777040",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 694728,
+      "role": "STARTER",
+      "prior_pa": 11
+     }
+    },
+    {
+     "game_id": "777043",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 687515,
+      "role": "STARTER",
+      "prior_pa": 5
+     }
+    },
+    {
+     "game_id": "777046",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678391,
+      "role": "BULLPEN",
+      "prior_pa": 20
+     }
+    },
+    {
+     "game_id": "777048",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695657,
+      "role": "BULLPEN",
+      "prior_pa": 20
+     }
+    },
+    {
+     "game_id": "777024",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 672012,
+      "role": "BULLPEN",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "777028",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 543592,
+      "role": "STARTER",
+      "prior_pa": 12
+     }
+    },
+    {
+     "game_id": "777030",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 695657,
+      "role": "BULLPEN",
+      "prior_pa": 22
+     }
+    },
+    {
+     "game_id": "777031",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 686475,
+      "role": "STARTER",
+      "prior_pa": 6
+     }
+    },
+    {
+     "game_id": "777032",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 694728,
+      "role": "STARTER",
+      "prior_pa": 14
+     }
+    },
+    {
+     "game_id": "777033",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 687515,
+      "role": "STARTER",
+      "prior_pa": 7
+     }
+    },
+    {
+     "game_id": "777025",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 666126,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "777007",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 666126,
+      "role": "STARTER",
+      "prior_pa": 3
+     }
+    },
+    {
+     "game_id": "777009",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 680737,
+      "role": "STARTER",
+      "prior_pa": 13
+     }
+    },
+    {
+     "game_id": "777014",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 663536,
+      "role": "STARTER",
+      "prior_pa": 3
+     }
+    },
+    {
+     "game_id": "777020",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 692585,
+      "role": "BULLPEN",
+      "prior_pa": 12
+     }
+    },
+    {
+     "game_id": "776991",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 666126,
+      "role": "STARTER",
+      "prior_pa": 6
+     }
+    },
+    {
+     "game_id": "776999",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 682653,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "777002",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 663536,
+      "role": "STARTER",
+      "prior_pa": 5
+     }
+    },
+    {
+     "game_id": "776975",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 686475,
+      "role": "STARTER",
+      "prior_pa": 8
+     }
+    },
+    {
+     "game_id": "776976",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 687515,
+      "role": "STARTER",
+      "prior_pa": 9
+     }
+    },
+    {
+     "game_id": "776982",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 656484,
+      "role": "STARTER",
+      "prior_pa": 12
+     }
+    },
+    {
+     "game_id": "776984",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 663536,
+      "role": "STARTER",
+      "prior_pa": 7
+     }
+    },
+    {
+     "game_id": "776986",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 692585,
+      "role": "BULLPEN",
+      "prior_pa": 14
+     }
+    },
+    {
+     "game_id": "776957",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 666126,
+      "role": "STARTER",
+      "prior_pa": 8
+     }
+    },
+    {
+     "game_id": "776964",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678894,
+      "role": "STARTER",
+      "prior_pa": 17
+     }
+    },
+    {
+     "game_id": "776968",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 682653,
+      "role": "STARTER",
+      "prior_pa": 4
+     }
+    },
+    {
+     "game_id": "776969",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 689200,
+      "role": "STARTER",
+      "prior_pa": 22
+     }
+    },
+    {
+     "game_id": "776970",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 656484,
+      "role": "STARTER",
+      "prior_pa": 15
+     }
+    },
+    {
+     "game_id": "776973",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 663536,
+      "role": "STARTER",
+      "prior_pa": 9
+     }
+    },
+    {
+     "game_id": "776943",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678894,
+      "role": "STARTER",
+      "prior_pa": 19
+     }
+    },
+    {
+     "game_id": "776944",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 666126,
+      "role": "STARTER",
+      "prior_pa": 11
+     }
+    },
+    {
+     "game_id": "776946",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 687859,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "776950",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 689200,
+      "role": "STARTER",
+      "prior_pa": 24
+     }
+    },
+    {
+     "game_id": "776951",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 682653,
+      "role": "STARTER",
+      "prior_pa": 7
+     }
+    },
+    {
+     "game_id": "776953",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 663536,
+      "role": "STARTER",
+      "prior_pa": 11
+     }
+    },
+    {
+     "game_id": "776956",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678011,
+      "role": "STARTER",
+      "prior_pa": 11
+     }
+    },
+    {
+     "game_id": "776929",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 694208,
+      "role": "STARTER",
+      "prior_pa": 12
+     }
+    },
+    {
+     "game_id": "776930",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 666126,
+      "role": "STARTER",
+      "prior_pa": 13
+     }
+    },
+    {
+     "game_id": "776933",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678894,
+      "role": "STARTER",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "776934",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 687859,
+      "role": "STARTER",
+      "prior_pa": 2
+     }
+    },
+    {
+     "game_id": "776936",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 686475,
+      "role": "STARTER",
+      "prior_pa": 10
+     }
+    },
+    {
+     "game_id": "776940",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 663536,
+      "role": "STARTER",
+      "prior_pa": 12
+     }
+    },
+    {
+     "game_id": "776941",
+     "reason": "PLAYER_ID_COLLISION"
+    },
+    {
+     "game_id": "776942",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 682653,
+      "role": "STARTER",
+      "prior_pa": 10
+     }
+    },
+    {
+     "game_id": "776914",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 682988,
+      "role": "BULLPEN",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "776915",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669236,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "776918",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 690976,
+      "role": "STARTER",
+      "prior_pa": 2
+     }
+    },
+    {
+     "game_id": "776919",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 682653,
+      "role": "STARTER",
+      "prior_pa": 11
+     }
+    },
+    {
+     "game_id": "776925",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805300,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "776898",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669326,
+      "role": "STARTER",
+      "prior_pa": 9
+     }
+    },
+    {
+     "game_id": "776899",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 682988,
+      "role": "BULLPEN",
+      "prior_pa": 23
+     }
+    },
+    {
+     "game_id": "776901",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 690976,
+      "role": "STARTER",
+      "prior_pa": 4
+     }
+    },
+    {
+     "game_id": "776902",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669236,
+      "role": "STARTER",
+      "prior_pa": 2
+     }
+    },
+    {
+     "game_id": "776903",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678011,
+      "role": "STARTER",
+      "prior_pa": 13
+     }
+    },
+    {
+     "game_id": "776904",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678894,
+      "role": "STARTER",
+      "prior_pa": 24
+     }
+    },
+    {
+     "game_id": "776905",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 692216,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "776910",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805300,
+      "role": "STARTER",
+      "prior_pa": 2
+     }
+    },
+    {
+     "game_id": "776881",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 663731,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "776885",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669326,
+      "role": "STARTER",
+      "prior_pa": 11
+     }
+    },
+    {
+     "game_id": "776886",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678894,
+      "role": "BULLPEN",
+      "prior_pa": 14
+     }
+    },
+    {
+     "game_id": "776888",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669236,
+      "role": "STARTER",
+      "prior_pa": 4
+     }
+    },
+    {
+     "game_id": "776889",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 690976,
+      "role": "STARTER",
+      "prior_pa": 6
+     }
+    },
+    {
+     "game_id": "776891",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805300,
+      "role": "STARTER",
+      "prior_pa": 4
+     }
+    },
+    {
+     "game_id": "776892",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 692216,
+      "role": "STARTER",
+      "prior_pa": 2
+     }
+    },
+    {
+     "game_id": "776894",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678011,
+      "role": "STARTER",
+      "prior_pa": 15
+     }
+    },
+    {
+     "game_id": "776867",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669326,
+      "role": "STARTER",
+      "prior_pa": 13
+     }
+    },
+    {
+     "game_id": "776872",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 682653,
+      "role": "STARTER",
+      "prior_pa": 18
+     }
+    },
+    {
+     "game_id": "776873",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678489,
+      "role": "STARTER",
+      "prior_pa": 15
+     }
+    },
+    {
+     "game_id": "776875",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805300,
+      "role": "STARTER",
+      "prior_pa": 6
+     }
+    },
+    {
+     "game_id": "776877",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669236,
+      "role": "STARTER",
+      "prior_pa": 6
+     }
+    },
+    {
+     "game_id": "776879",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678894,
+      "role": "BULLPEN",
+      "prior_pa": 16
+     }
+    },
+    {
+     "game_id": "776882",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678011,
+      "role": "STARTER",
+      "prior_pa": 17
+     }
+    },
+    {
+     "game_id": "776848",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 676439,
+      "role": "STARTER",
+      "prior_pa": 10
+     }
+    },
+    {
+     "game_id": "776854",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 682653,
+      "role": "STARTER",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "776858",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 690976,
+      "role": "STARTER",
+      "prior_pa": 8
+     }
+    },
+    {
+     "game_id": "776861",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 807712,
+      "role": "STARTER",
+      "prior_pa": 16
+     }
+    },
+    {
+     "game_id": "776862",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805300,
+      "role": "STARTER",
+      "prior_pa": 8
+     }
+    },
+    {
+     "game_id": "776863",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 692216,
+      "role": "STARTER",
+      "prior_pa": 4
+     }
+    },
+    {
+     "game_id": "776865",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 687515,
+      "role": "STARTER",
+      "prior_pa": 14
+     }
+    },
+    {
+     "game_id": "776868",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669236,
+      "role": "STARTER",
+      "prior_pa": 8
+     }
+    },
+    {
+     "game_id": "776836",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 671083,
+      "role": "STARTER",
+      "prior_pa": 14
+     }
+    },
+    {
+     "game_id": "776838",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678489,
+      "role": "STARTER",
+      "prior_pa": 17
+     }
+    },
+    {
+     "game_id": "776839",
+     "reason": "PLAYER_ID_COLLISION"
+    },
+    {
+     "game_id": "776843",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669326,
+      "role": "STARTER",
+      "prior_pa": 18
+     }
+    },
+    {
+     "game_id": "776844",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678894,
+      "role": "BULLPEN",
+      "prior_pa": 17
+     }
+    },
+    {
+     "game_id": "776846",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 692216,
+      "role": "STARTER",
+      "prior_pa": 6
+     }
+    },
+    {
+     "game_id": "776849",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805300,
+      "role": "STARTER",
+      "prior_pa": 8
+     }
+    },
+    {
+     "game_id": "776851",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 669236,
+      "role": "STARTER",
+      "prior_pa": 10
+     }
+    },
+    {
+     "game_id": "776853",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678011,
+      "role": "STARTER",
+      "prior_pa": 19
+     }
+    },
+    {
+     "game_id": "776859",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 807712,
+      "role": "STARTER",
+      "prior_pa": 18
+     }
+    },
+    {
+     "game_id": "776837",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 680862,
+      "role": "BULLPEN",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "776842",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 805300,
+      "role": "STARTER",
+      "prior_pa": 10
+     }
+    },
+    {
+     "game_id": "776822",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 687551,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "776823",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 690976,
+      "role": "STARTER",
+      "prior_pa": 11
+     }
+    },
+    {
+     "game_id": "776824",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 671976,
+      "role": "STARTER",
+      "prior_pa": 0
+     }
+    },
+    {
+     "game_id": "776825",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 682653,
+      "role": "BULLPEN",
+      "prior_pa": 18
+     }
+    },
+    {
+     "game_id": "776827",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 807712,
+      "role": "STARTER",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "776829",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 678894,
+      "role": "BULLPEN",
+      "prior_pa": 17
+     }
+    },
+    {
+     "game_id": "776831",
+     "reason": "PROFILE_MIN_PA_NOT_MET",
+     "detail": {
+      "batter": 666126,
+      "role": "STARTER",
+      "prior_pa": 21
+     }
+    },
+    {
+     "game_id": "776832",
+     "reason": "PROFILE_MI
