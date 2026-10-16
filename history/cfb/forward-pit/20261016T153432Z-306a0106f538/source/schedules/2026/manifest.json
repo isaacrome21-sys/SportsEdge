@@ -1,0 +1,23 @@
+{
+  "asset": {
+    "asset_id": 646688257,
+    "asset_name": "cfb_schedule_2026.csv",
+    "browser_download_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_cfb_schedules/cfb_schedule_2026.csv",
+    "dataset": "schedules",
+    "release_id": 101941072,
+    "release_tag": "espn_cfb_schedules",
+    "release_updated_at": "2026-10-16T08:33:44Z",
+    "season": 2026,
+    "sha256": "543cfd6d721bc1c157c488f1a2754833ac3df0127edc76399f6472c436e2a36b",
+    "size": 73798,
+    "usage": "PREDICTIVE_INPUT"
+  },
+  "cache_relative_path": "schedules/2026/cfb_schedule_2026.csv",
+  "cache_reused": false,
+  "content_sha256": "543cfd6d721bc1c157c488f1a2754833ac3df0127edc76399f6472c436e2a36b",
+  "contract": "CFB_SPORTSDATAVERSE_RELEASE_V1",
+  "manifest_sha256": "b8fb843dbf36e2f621de3f18e31e2651918c49a77a085d5f0432f362d01ebd46",
+  "market_role": "PREDICTIVE_INPUT",
+  "retrieved_at": "2026-10-16T15:34:29.684280+00:00",
+  "row_count": 455
+}
