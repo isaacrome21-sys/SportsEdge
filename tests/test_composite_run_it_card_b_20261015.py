@@ -338,3 +338,23 @@ def test_release_stays_research_only_until_all_regressions_pass():
 
 def test_required_regressions_named():
     assert set(cc.REQUIRED_REGRESSIONS) == {"audit_schema", "pit_context", "freshness", "dedup", "grading"}
+
+
+# --- audit follow-ups ------------------------------------------------------------
+
+def test_child_omitting_active_row_refuses_it_and_its_set_by_name():
+    def ev(g, rows, as_of, ctx):
+        out = echo_eval(g, rows, as_of, ctx)
+        out["rows"] = [r for r in out["rows"] if r["selection"] != "under"]
+        return out
+    comp = build(pair("a", "G", 0, 1) + [row("solo", "G", 2, market="ml")], evaluator=ev)
+    ref = statuses(comp)
+    assert ref["au"]["refusal_code"] == cc.REFUSE_CHILD_ROW_NOT_EVALUATED
+    assert ref["ao"]["refusal_code"] == cc.REFUSE_SET_MEMBER_REFUSED
+    assert {r["row_id"] for r in comp["rows"]} == {"solo"}
+    assert cc.verify_composite(comp)["ok"] is True
+
+
+def test_boolean_set_size_is_not_a_complete_set():
+    rows = [row("x", "G", 0, set_id="s", set_size=True)]
+    assert statuses(build(rows))["x"]["refusal_code"] == cc.REFUSE_SET_INCOMPLETE
