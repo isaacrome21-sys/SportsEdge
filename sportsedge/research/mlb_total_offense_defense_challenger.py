@@ -119,16 +119,80 @@ def canonical_team_id(value: Any) -> str:
     return _CANONICAL.get(key, key.casefold())
 
 
-# Same-team overlap window (t212): two games for one club whose starts are
-# closer than this cannot both be real.  Real doubleheaders (traditional game 2
-# after game 1 ends; split games hours apart) pass.
+# Same-club fixture identity (t212).  final_observed is an ingest time and is
+# never used as a game end.  For two consecutive games of one club:
+#   * starts under DOUBLEHEADER_MIN_GAP apart can never both be real;
+#   * grounded doubleheader: same away/home pair, both carry statsapi
+#     gameNumber, ascending (g1 < g2), doubleHeader not "N", within a day;
+#   * else a recorded game end (end ts / duration) of the earlier game must
+#     precede the later start;
+#   * else (no grounded field) the later start must be >= 180 minutes after.
+DOUBLEHEADER_MIN_GAP = timedelta(minutes=90)
 MIN_SAME_TEAM_START_GAP = timedelta(minutes=180)
+
+
+def _same_club_games_ok(earlier: "FinalScore", later: "FinalScore") -> bool:
+    gap = later.event_start - earlier.event_start
+    if gap < DOUBLEHEADER_MIN_GAP:
+        return False
+    same_pair = (canonical_team_id(earlier.away_id), canonical_team_id(earlier.home_id)) == \
+        (canonical_team_id(later.away_id), canonical_team_id(later.home_id))
+    if (same_pair and earlier.game_number is not None and later.game_number is not None
+            and earlier.game_number < later.game_number
+            and "N" not in (earlier.double_header, later.double_header)
+            and gap < timedelta(hours=24)):
+        return True
+    if earlier.game_end is not None:
+        return later.event_start >= earlier.game_end
+    return gap >= MIN_SAME_TEAM_START_GAP
 
 
 def _runs(value: Any, name: str) -> int:
     if type(value) is not int or not 0 <= value <= 100:
         raise MLBTotalCandidateError(f"{name}:NONNEGATIVE_INTEGER_REQUIRED")
     return value
+
+
+def _first(raw: Mapping[str, Any], *keys: str) -> Any:
+    for key in keys:
+        if raw.get(key) is not None:
+            return raw.get(key)
+    return None
+
+
+def _game_number(raw: Mapping[str, Any]) -> int | None:
+    value = _first(raw, "gameNumber", "game_number")
+    if value is None:
+        return None
+    if type(value) is not int or not 1 <= value <= 3:
+        raise MLBTotalCandidateError("GAME_NUMBER_INVALID")
+    return value
+
+
+def _double_header(raw: Mapping[str, Any]) -> str | None:
+    value = _first(raw, "doubleHeader", "double_header")
+    if value is None:
+        return None
+    out = str(value).strip().upper()
+    if out not in {"Y", "S", "N"}:
+        raise MLBTotalCandidateError("DOUBLE_HEADER_FLAG_INVALID")
+    return out
+
+
+def _game_end(raw: Mapping[str, Any], start: datetime) -> datetime | None:
+    end_raw = _first(raw, "game_end_ts", "gameEndDateTime")
+    if end_raw is not None:
+        end = _timestamp(end_raw, "game_end_ts")
+        if end <= start:
+            raise MLBTotalCandidateError("GAME_END_BEFORE_START")
+        return end
+    minutes = _first(raw, "game_duration_minutes", "gameDurationMinutes")
+    if minutes is None:
+        return None
+    if isinstance(minutes, bool) or not isinstance(minutes, (int, float)) or \
+            not isfinite(float(minutes)) or not 0 < float(minutes) <= 600:
+        raise MLBTotalCandidateError("GAME_DURATION_INVALID")
+    return start + timedelta(minutes=float(minutes))
 
 
 @dataclass(frozen=True)
@@ -140,6 +204,12 @@ class FinalScore:
     final_observed: datetime
     away_runs: int
     home_runs: int
+    # Grounded fixture identity (t212): statsapi gameNumber / doubleHeader and
+    # a recorded game end (end timestamp or duration).  Optional; absent
+    # fields fall back to the 180-minute same-club window.
+    game_number: int | None = None
+    double_header: str | None = None
+    game_end: datetime | None = None
 
     @classmethod
     def parse(cls, raw: Mapping[str, Any]) -> "FinalScore":
@@ -163,6 +233,9 @@ class FinalScore:
             event_start=start, final_observed=observed,
             away_runs=_runs(raw.get("away_runs"), "away_runs"),
             home_runs=_runs(raw.get("home_runs"), "home_runs"),
+            game_number=_game_number(raw),
+            double_header=_double_header(raw),
+            game_end=_game_end(raw, start),
         )
 
 
@@ -190,9 +263,7 @@ def parse_finals(history: Iterable[Mapping[str, Any]]) -> tuple[FinalScore, ...]
     for team, games in by_team.items():
         games.sort(key=lambda r: (r.event_start, r.event_id))
         for earlier, later in zip(games, games[1:]):
-            # final_observed is an ingest time (may be days late), so it is
-            # not used as a game-end proxy; the start gap is the window.
-            if later.event_start - earlier.event_start < MIN_SAME_TEAM_START_GAP:
+            if not _same_club_games_ok(earlier, later):
                 raise MLBTotalCandidateError(
                     f"DUPLICATE_FIXTURE_IDENTITY:TEAM_OVERLAP:{team}:"
                     f"{earlier.event_id}:{later.event_id}")

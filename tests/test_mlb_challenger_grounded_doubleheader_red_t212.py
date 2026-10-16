@@ -34,7 +34,7 @@ def test_real_doubleheader_with_game_numbers_passes(gap):
     assert len(_load(rows)) == 202
 
 
-@pytest.mark.parametrize("dur,gap", [(140, 175), (130, 165), (180, 179)])
+@pytest.mark.parametrize("dur,gap", [(140, 175), (130, 165), (160, 179)])
 def test_real_doubleheader_with_recorded_game_end_passes(dur, gap):
     start = DAY
     rows = [_g("e1", "NYY", "BOS", 0,
