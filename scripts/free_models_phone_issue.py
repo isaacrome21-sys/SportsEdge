@@ -264,7 +264,12 @@ def main(argv=None):
             # The default phone surface uses plain statuses and every input row.
             # render_card remains available only as a legacy diagnostic helper.
             from sportsedge.phone_display import render_phone_card
-            text = render_phone_card(card, run_url=args.run_url,
+            # Display-only: the DK prices the user actually supplied.
+            try:
+                input_lines = parse_issue(event).get("lines")
+            except (ValueError, TypeError, KeyError, AttributeError):
+                input_lines = None   # no parsable input: show "no DK price in input"
+            text = render_phone_card(card, run_url=args.run_url, input_lines=input_lines,
                                intake_at=(event.get("issue") or {}).get("updated_at") or "")
     except (OSError, ValueError, TypeError, KeyError) as exc:
         raise SystemExit("FREE_RESEARCH_ISSUE_ERROR:" + safe(exc, 160)) from exc

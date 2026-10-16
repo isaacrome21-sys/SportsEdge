@@ -179,11 +179,30 @@ class MLBBatterPublicSource:
         # unrestricted MLB name search. Will Smith and Max Muncy are shared
         # names; choose an ID only when the verified game's roster makes the
         # identity unique. This is source identity, never user-claimed status.
+        # DK may qualify a shared name with a team, e.g. "Will Smith (LAD)".
+        # The qualifier must be bound to a side by the official boxscore's
+        # own team abbreviation; it is never guessed and never search-resolved.
+        qualifier = None
+        qualified = re.fullmatch(r"\s*(.*?)\s*\(\s*([A-Za-z]{2,4})\s*\)\s*", str(player_name or ""))
+        if qualified:
+            player_name, qualifier = qualified.group(1), qualified.group(2).upper()
         boxscore_url = ROOT + f"/game/{game['gamePk']}/boxscore"
         box = self._fetch(boxscore_url)
         lineup_people = []
+        qualified_spot = None
+        if qualifier is not None:
+            if not (isinstance(box, dict) and isinstance(box.get("teams"), dict)):
+                raise MissingMLBBatterHistory("PLAYER_TEAM_QUALIFIER_UNVERIFIED")
+            sides = [spot for spot in ("away", "home")
+                     if str((((box["teams"].get(spot) or {}).get("team") or {})
+                             .get("abbreviation") or "")).upper() == qualifier]
+            if len(sides) != 1:
+                raise MissingMLBBatterHistory("PLAYER_TEAM_QUALIFIER_UNVERIFIED")
+            qualified_spot = sides[0]
         if isinstance(box, dict) and isinstance(box.get("teams"), dict):
             for spot in ("away", "home"):
+                if qualified_spot is not None and spot != qualified_spot:
+                    continue
                 expected = away if spot == "away" else home
                 team_meta = ((game.get("teams") or {}).get(spot) or {}).get("team") or {}
                 if _norm(team_meta.get("name")) != _norm(expected):
@@ -212,6 +231,8 @@ class MLBBatterPublicSource:
             if len(lineup_people) != 1:
                 raise MissingMLBBatterHistory("PLAYER_DUPLICATE_IN_VERIFIED_GAME")
             lineup_verified = bool(starter)
+        elif qualifier is not None:
+            raise MissingMLBBatterHistory("PLAYER_TEAM_QUALIFIED_NOT_ON_VERIFIED_ROSTER")
         else:
             # If MLB hasn't published a roster, allow an unambiguous player
             # search only for historical research. Lineup stays UNCONFIRMED

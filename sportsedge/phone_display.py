@@ -150,7 +150,39 @@ def _disposition(row, min_ev, source=None):
     return "LEAN", "priced", reason
 
 
-def build_phone_card(card):
+def _name_key(value):
+    import unicodedata
+    folded = "".join(ch for ch in unicodedata.normalize("NFKD", str(value or ""))
+                     if not unicodedata.combining(ch))   # Hernández == Hernandez
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", folded.lower()).split())
+
+
+def _display_price(row, line):
+    """DK price for display only: the engine row's, else the bound user input.
+
+    Never invented. A disagreement between the two shows no price.
+    """
+    row_odds = _number(row.get("odds_american", row.get("dk_odds")))
+    src_odds = None
+    if isinstance(line, dict):
+        same_sport = (not line.get("sport") or not row.get("sport")
+                      or str(line["sport"]).upper() == str(row["sport"]).upper())
+        # DK's "Will Smith (LAD)" team qualifier vs the roster-resolved name.
+        bare = re.sub(r"\s*\(\s*[A-Za-z]{2,4}\s*\)\s*$", "", str(line.get("player_name") or ""))
+        same_player = _name_key(bare) == _name_key(re.sub(
+            r"\s*\(\s*[A-Za-z]{2,4}\s*\)\s*$", "", str(row.get("player_name") or "")))
+        if same_sport and same_player:
+            src_odds = _number(line.get("odds"))
+    if row_odds is not None and src_odds is not None and row_odds != src_odds:
+        return None, "PRICE_CONFLICT"
+    if row_odds is not None:
+        return row_odds, "ENGINE_ROW"
+    if src_odds is not None:
+        return src_odds, "USER_INPUT_LINE"
+    return None, None
+
+
+def build_phone_card(card, *, input_lines=None):
     rows = card.get("evaluated_rows")
     if not isinstance(rows, list):
         raise ValueError("COMPLETE_EVALUATED_ROWS_REQUIRED")
@@ -163,6 +195,8 @@ def build_phone_card(card):
     floor = _number(card.get("min_ev", 0.02))
     if floor is None or not 0 <= floor <= 0.15:
         raise ValueError("INVALID_EDGE_FLOOR")
+    if not isinstance(input_lines, list) or len(input_lines) != len(rows):
+        input_lines = None   # unbound input never lends a price
     selections = []
     families = defaultdict(Counter)
     for index, row in enumerate(rows):
@@ -196,7 +230,8 @@ def build_phone_card(card):
             "selection": row.get("selection") or source.get("side") or source.get("selection") or "Selection unavailable",
             "player_name": row.get("player_name") or source.get("player_name"),
             "line": row.get("line", source.get("line")),
-            "odds": _number(row.get("odds_american", row.get("dk_odds"))),
+            **dict(zip(("odds", "odds_source"),
+                       _display_price(row, input_lines[index] if input_lines else None))),
             "status": label, "reason": reason,
             "probability": probability if bucket in {"priced", "research"} and not anchored else None,
             "estimated_ev": ev if bucket == "priced" and not anchored else None,
@@ -230,8 +265,14 @@ def _price(value):
     return "—" if value is None else f"{value:+g}"
 
 
-def render_phone_card(card, *, run_url="", intake_at=""):
-    view = build_phone_card(card)
+def _dk_cell(row):
+    if row.get("odds_source") == "PRICE_CONFLICT":
+        return "DK price conflict"
+    return "no DK price in input" if row["odds"] is None else f"{row['odds']:+g}"
+
+
+def render_phone_card(card, *, run_url="", intake_at="", input_lines=None):
+    view = build_phone_card(card, input_lines=input_lines)
     coverage = view["coverage"]
     lines = ["## SportsEdge · RUN IT", "",
              f"Snapshot: {_safe(view['as_of_utc'])}",
@@ -250,7 +291,7 @@ def render_phone_card(card, *, run_url="", intake_at=""):
             name = " ".join(str(x) for x in (row.get("player_name"), row["market"], row["selection"]) if x)
             if row.get("line") is not None and str(row["line"]) not in str(row["selection"]):
                 name += " " + str(row["line"])
-            lines.append(f"| {_safe(name)} | {_price(row['odds'])} | {row['status']} | {p} | {_price(row['fair_odds'])} | {ev} | {_safe(row['reason'])} |")
+            lines.append(f"| {_safe(name)} | {_dk_cell(row)} | {row['status']} | {p} | {_price(row['fair_odds'])} | {ev} | {_safe(row['reason'])} |")
         lines.append("")
     # The research column/legend appear only when a research row exists, so
     # a card without research rows renders exactly as before.
