@@ -255,25 +255,31 @@ def test_pitcher_pitches_pair_blocked_when_payload_lacks_pitch_counts():
                in r["reason"] for r in card["prop_unpriced"])
 
 
-@pytest.mark.parametrize("market,form,rungs,quote_form", [
+@pytest.mark.parametrize("market,form,rungs,quote_form,state", [
     ("PITCHER_ER", "OR_FEWER", [(0, 150), (1, -150), (2, -450)],
-     "MILESTONE_OR_FEWER"),
-    ("PITCHER_OUTS", "X_PLUS", [(15, -300), (18, 130)], "MILESTONE_X_PLUS"),
+     "MILESTONE_OR_FEWER", "NOT_RUN"),
+    ("PITCHER_OUTS", "X_PLUS", [(15, -300), (18, 130)], "MILESTONE_X_PLUS",
+     "NOT_RUN"),
+    # The canonical coverage authority has no resolution entry at all for
+    # PITCHER_PITCHES (resolve_market returns None); the gate names that
+    # exactly instead of inventing a state.
     ("PITCHER_PITCHES", "X_PLUS", [(85, -200), (95, 200)],
-     "MILESTONE_X_PLUS"),
+     "MILESTONE_X_PLUS", "NO_COVERAGE_RESOLUTION"),
 ])
-def test_pitcher_ladders_reach_model_and_stop_at_paired_quote_blocker(
-        market, form, rungs, quote_form):
+def test_pitcher_ladders_reach_model_and_stop_at_single_side_gate(
+        market, form, rungs, quote_form, state):
     card = full([ladder_row(market, form, rungs,
                              player="Jacob Misiorowski")], pitcher_getter)
     rows = card["evaluated_rows"]
     assert len(rows) == len(rungs)
     # The model ran (a pitcher receipt exists) and no price was invented:
-    # one-sided rows stop at the bridge's standing paired-quote blocker.
+    # one-sided rows stop at the bridge's single-side validation gate --
+    # no family is VALIDATED, and the refusal names the validation state.
     assert card["source_receipts"]
     for row in rows:
         assert row["status"] == "NO_MODEL_OR_MARKET"
-        assert row["reason"] == "EXACT_PAIRED_DK_QUOTE_REQUIRED"
+        assert row["reason"] == (
+            "MILESTONE_SINGLE_SIDE_REQUIRES_VALIDATED_MODEL:" + state)
         assert row["source_quote_form"] == quote_form
         assert "dk_no_vig_p" not in row
 
@@ -350,7 +356,10 @@ def test_batter_ladder_only_families_reach_model(market, rungs):
     assert card["source_receipts"]  # batter history was verified + priced
     for row in rows:
         assert row["status"] == "NO_MODEL_OR_MARKET"
-        assert row["reason"] == "EXACT_PAIRED_DK_QUOTE_REQUIRED"
+        # Ladder-only family: one-sided rows refuse at the bridge's
+        # single-side validation gate, naming the family state.
+        assert row["reason"] == (
+            "MILESTONE_SINGLE_SIDE_REQUIRES_VALIDATED_MODEL:NOT_RUN")
         assert row["source_quote_form"] == "MILESTONE_X_PLUS"
         assert "dk_no_vig_p" not in row
 

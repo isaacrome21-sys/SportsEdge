@@ -4,8 +4,11 @@ Owner contract: DraftKings "X+" converts to Over (X - 0.5) with the REAL
 offered price and the ladder's original shared capture; the "N or Fewer"
 mirror converts to Under (N + 0.5). No opposite-side price is ever
 invented; one-sided rows take the existing pipelines' own named blockers
-(the three-sport bridge's EXACT_PAIRED_DK_QUOTE_REQUIRED). CFB ladders are
-parser fixtures only -- their rows must still die at the registry gate.
+(the three-sport bridge's single-side validation gate:
+MILESTONE_SINGLE_SIDE_REQUIRES_VALIDATED_MODEL:<state> -- no family is
+VALIDATED in the canonical coverage authority, so they still refuse).
+CFB ladders are parser fixtures only -- their rows must still die at the
+registry gate.
 
 Fixtures are verbatim from the Oct 14, 2026 DraftKings pull recorded in
 ~/workspace/sportsedge/diagnostic_run_20261014/REPORT.md.
@@ -257,11 +260,14 @@ def test_pitcher_k_ladder_reaches_k_pipeline_named_blocker():
     assert card["prop_candidates"] == []
     for r in rows:
         # The starter verified via StatsAPI and the empirical model ran;
-        # the row then takes the bridge's existing pair requirement --
+        # the row then takes the bridge's single-side validation gate --
         # a one-sided milestone quote is never de-vigged or paired with
-        # an invented Under price.
+        # an invented Under price, and with no VALIDATED family in the
+        # canonical coverage authority it refuses naming the validation
+        # state (PITCHER_K: NOT_RUN), not the quote form.
         assert r["status"] == "NO_MODEL_OR_MARKET", r
-        assert "EXACT_PAIRED_DK_QUOTE_REQUIRED" in (r.get("reason") or "")
+        assert ("MILESTONE_SINGLE_SIDE_REQUIRES_VALIDATED_MODEL:NOT_RUN"
+                in (r.get("reason") or ""))
         assert r["source"] == "FREE_MLB_STATSAPI_GAMELOG"
         assert r["source_quote_form"] == MILESTONE_X_PLUS
         assert "dk_no_vig_p" not in r
@@ -350,7 +356,8 @@ def test_nfl_passing_ladder_canonical_path_governance_blocker():
 def test_nfl_passing_ladder_reaches_empirical_stage():
     # At the stage level (where governance admits the empirical pricer),
     # expanded rung rows verify identity from ESPN gamelogs, the model
-    # runs, and each one-sided row takes the bridge's pair requirement.
+    # runs, and each one-sided row takes the bridge's single-side
+    # validation gate (passing_yards family state: NOT_RUN).
     from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
     row = _stafford_ladder_row()
     row["market"] = "PLAYER_PASSING_YARDS"  # canonical stage-level name
@@ -361,7 +368,8 @@ def test_nfl_passing_ladder_reaches_empirical_stage():
     assert len(results) == 3 and len(receipts) == 1
     for r in results:
         assert r["status"] == "NO_MODEL_OR_MARKET", r
-        assert "EXACT_PAIRED_DK_QUOTE_REQUIRED" in (r.get("reason") or "")
+        assert ("MILESTONE_SINGLE_SIDE_REQUIRES_VALIDATED_MODEL:NOT_RUN"
+                in (r.get("reason") or ""))
         assert r["source"] == "FREE_ESPN_NFL_GAMELOG"
         assert r["prior_game_count"] == 7
         assert "dk_no_vig_p" not in r
