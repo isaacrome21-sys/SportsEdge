@@ -36,7 +36,7 @@ def test_legit_repo_codes_accepted_as_reason_and_blocker(code):
 
 
 @pytest.mark.parametrize("code", ["ACTIONABLE", "LEAN", "RESEARCH_LEANS_AVAILABLE", "CLV_ELIGIBLE",
-                                  "FIRST_EVALUATION_ALLOWED", "FORWARD_EVIDENCE_GATE_PASS",
+                                  "FORWARD_EVIDENCE_GATE_PASS",
                                   "RESEARCH_POSITIVE_EV", "RESEARCH_EDGE"])
 def test_promotion_codes_excluded(code):
     assert ps.promotion_meaning(code)
@@ -59,7 +59,7 @@ def test_blocker_detail_diagnostics_allowed():
 @pytest.mark.parametrize("detail", [{"ev": 0.1}, {"ev_pct": 2}, {"expected_value_usd": 1},
                                     {"edge_bps": 3}, {"kelly_frac": 0.1}, {"stake_amt": 2},
                                     {"bet_size": 1}, {"wager": 1}, {"clv_eligible": True},
-                                    {"model_authority": "yes"}, {"play": True}, {"playable": 1},
+                                    {"model_authority": True}, {"play": True}, {"playable": 1},
                                     {"official": True}, {"lock": True}, {"approved": True},
                                     {"actionable": True}, {"inner": {"playEligible": True}}])
 def test_blocker_detail_authority_or_money_keys_refused(detail):

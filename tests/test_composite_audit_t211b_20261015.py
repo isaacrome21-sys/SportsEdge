@@ -40,7 +40,7 @@ def test_allowlist_has_no_promotion_and_is_pending_owner_curation():
     doc = json.loads(ALLOWLIST.read_text())
     assert doc["curation_state"] == "PENDING_OWNER_CURATION"
     for bad in ("ACTIONABLE", "LEAN", "RESEARCH_LEANS_AVAILABLE", "CLV_ELIGIBLE",
-                "FIRST_EVALUATION_ALLOWED", "FORWARD_EVIDENCE_GATE_PASS",
+                "FORWARD_EVIDENCE_GATE_PASS",  # FIRST_EVALUATION_ALLOWED allowed (t211e owner)
                 "RESEARCH_POSITIVE_EV", "RESEARCH_EDGE"):
         assert bad not in doc["statuses"]
     from sportsedge.promotion_screen import promotion_meaning  # t211d: exclusion by meaning
@@ -49,7 +49,7 @@ def test_allowlist_has_no_promotion_and_is_pending_owner_curation():
 
 @pytest.mark.parametrize("obj", [
     {"play_eligible": True}, {"evaluation": {"pricing_provenance": {"clv_eligible": True}}},
-    {"x": [{"model_authority": "yes"}]}, {"Play_Eligible": 1},
+    {"x": [{"model_authority": 1}]}, {"Play_Eligible": 1},
 ])
 def test_eligible_and_authority_keys_any_depth(obj):
     assert cc.authority_violation(obj) is not None

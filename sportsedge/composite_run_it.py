@@ -172,6 +172,12 @@ def _safe(v: Any) -> str:
 
 def render_composite_markdown(comp: Mapping[str, Any], *, pin: str | None,
                               run_url: str = "") -> str:
+    """Render a verified composite card (research only).
+
+    Identity fields (game, market, selection, player, line) are displayed as
+    DATA ONLY: escaped, never interpreted as authority; authority is decided
+    solely by the structural guard. Diagnostic-only fields (reason_detail,
+    blocker_detail) are never displayed."""
     _require_verified(comp, pin)
     m = comp["manifest"]
     graded = cc.grade_composite(comp, {}, pin=pin)
@@ -184,7 +190,7 @@ def render_composite_markdown(comp: Mapping[str, Any], *, pin: str | None,
              ""]
     rows_by = {}
     for r in comp.get("rows", []):
-        rows_by.setdefault(r["game_id"], []).append(("ACTIVE", r))
+        rows_by.setdefault(r["game_id"], []).append(("ACTIVE", cc.strip_diagnostics(r)))
     for r in comp.get("refused", []):
         rows_by.setdefault(r["game_id"], []).append(("REFUSED", r))
     for c in m["children"]:
@@ -242,7 +248,7 @@ def composite_pitcher_k_units(comp: Mapping[str, Any], *, first_pitch_by_game: M
     _require_verified(comp, pin)
     taken = {(str(u.get("provider_event_id")), str(u.get("entity_name"))) for u in existing_units}
     pairs: dict[tuple, dict] = {}
-    for r in comp.get("rows", []):
+    for r in (cc.strip_diagnostics(x) for x in comp.get("rows", [])):
         if str(r.get("market") or "").upper() != "PITCHER_K":
             continue
         side = str(r.get("selection") or "").upper()
