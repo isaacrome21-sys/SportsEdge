@@ -78,7 +78,16 @@ def valid_research_estimate(row):
                  "staking_authority", "model_p_authority", "official_authority"):
         if est.get(flag) is not False:
             return None
-    if _prob(est.get("probability")) is None:
+    p = _prob(est.get("probability"))
+    if p is None:
+        return None
+    # Impossible totals are refused, never renormalised (t211u).
+    push = est.get("push_p", 0.0)
+    if push in (None, 0):
+        push = 0.0
+    elif _prob(push) is None:
+        return None
+    if p + float(push) > 1 + 1e-9:
         return None
     blocker = str(est.get("blocker_kept") or "")
     if not blocker or blocker.split(":", 1)[0].strip() in NEVER_ESTIMATE_BLOCKERS:

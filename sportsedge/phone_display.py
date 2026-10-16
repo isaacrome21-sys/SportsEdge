@@ -79,6 +79,27 @@ def _quote_hold(row, source):
     return "UNKNOWN", "Current quote required"
 
 
+def _research_quote_ok(row, source):
+    """180s limit kept (t211u): a research estimate may show only when the
+    quote is fresh, or is an owner screenshot with NO recorded age (truly
+    unattested).  Any recorded age over the limit, a stale/invalid code, or
+    missing freshness on a quoted row blocks it."""
+    freshness = row.get("quote_freshness")
+    if freshness is None:
+        return row.get("odds_american", row.get("dk_odds")) is None
+    if not isinstance(freshness, dict):
+        return False
+    if is_fresh(freshness):
+        return True
+    age = _number(freshness.get("age_seconds"))
+    if age is not None:
+        return False
+    if freshness.get("code") != QUOTE_UNVERIFIED:
+        return False
+    return (str(source.get("quote_source") or "").upper() == "OWNER_DK_SCREENSHOT"
+            or str(row.get("quote_source") or "").upper() == "OWNER_DK_SCREENSHOT")
+
+
 def _disposition(row, min_ev, source=None):
     source = source if isinstance(source, dict) else {}
     status = str(row.get("status") or "MISSING_STATUS")
@@ -87,7 +108,8 @@ def _disposition(row, min_ev, source=None):
     if status.startswith("BLOCKED") or status in {"NO_MODEL_OR_MARKET", "NO_ENGINE", "NO_QUOTE", "MISSING_STATUS"}:
         # A real engine estimate may ride on a blocked row as a research
         # annex. The blocker name is kept; no EV, never eligible/PLAY.
-        if not status.startswith("BLOCKED") and valid_research_estimate(row) is not None:
+        if (not status.startswith("BLOCKED") and valid_research_estimate(row) is not None
+                and _research_quote_ok(row, source)):
             return (RESEARCH_STATUS, "research",
                     f"{RESEARCH_LABEL} · blocker kept: {row.get('reason') or status}")
         return "BLOCKED", "blocked", row.get("reason") or status
@@ -110,7 +132,8 @@ def _disposition(row, min_ev, source=None):
     if not fresh or status == "WATCH_QUOTE_NOT_CURRENT":
         kind, detail = _quote_hold(row, source)
         screenshot = detail == SCREENSHOT_UNATTESTED
-        if kind == "UNATTESTED" and screenshot and not anchored and probability is not None:
+        if (kind == "UNATTESTED" and screenshot and not anchored and probability is not None
+                and _research_quote_ok(row, source)):
             # The engine priced the row; only the quote's capture time is
             # unattested. Show the estimate as research, with no EV.
             return (RESEARCH_STATUS, "research",
@@ -148,6 +171,40 @@ def _disposition(row, min_ev, source=None):
     if row.get("pitcher_status") == "PROBABLE_STARTER_ONLY_NOT_CONFIRMED":
         reason += "; probable starter only"
     return "LEAN", "priced", reason
+
+
+IMPOSSIBLE_TOTAL = "PROBABILITY_TOTAL_IMPOSSIBLE"
+
+
+def _refuse_impossible_totals(selections):
+    """Sides of one market (same game/market/line/player) whose displayed
+    probabilities sum above 1 are ALL refused -- never renormalised."""
+    groups = defaultdict(list)
+    for sel in selections:
+        if sel.get("probability") is None:
+            continue
+        line = sel.get("line")
+        key = (sel.get("game"), sel.get("market"),
+               abs(line) if isinstance(line, (int, float)) and not isinstance(line, bool) else line,
+               sel.get("player_name"))
+        groups[key].append(sel)
+    for members in groups.values():
+        by_sel = {}
+        conflict = False
+        for sel in members:
+            name = str(sel.get("selection"))
+            if name in by_sel and by_sel[name] != sel["probability"]:
+                conflict = True
+            by_sel[name] = sel["probability"]
+        if conflict or sum(by_sel.values()) > 1 + 1e-6:
+            for sel in members:
+                sel["probability"] = None
+                sel["estimated_ev"] = None
+                sel["fair_odds"] = None
+                sel["status"] = "BLOCKED"
+                sel["research_only_estimate"] = False
+                sel["reason"] = (f"{IMPOSSIBLE_TOTAL}: side probabilities sum "
+                                 f"{sum(by_sel.values()):.4f} > 1; refused, not renormalised")
 
 
 def build_phone_card(card):
@@ -209,6 +266,7 @@ def build_phone_card(card):
             "research_only_estimate": research,
             "eligible": False,
         })
+    _refuse_impossible_totals(selections)
     ledger = [{**dict(zip(("sport", "market", "period", "phase", "alternate", "settlement_type"), key)),
                **{k: counts[k] for k in ("priced", "research", "blocked", "rejected", "stale")},
                "rows": sum(counts.values())} for key, counts in sorted(families.items())]
