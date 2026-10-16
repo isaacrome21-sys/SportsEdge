@@ -24,7 +24,7 @@ import pytest
 NOW = datetime(2026, 10, 11, 20, 0, tzinfo=timezone.utc)
 EITHER_MARKETS = ("EITHER_PITCHER_HITS_ALLOWED", "EITHER_PITCHER_BB",
                   "EITHER_PITCHER_ER")
-GATE = "EITHER_PITCHER_DEPENDENCE_UNMEASURED"
+GATE = "EITHER_PITCHER_MARGINAL_TAIL_ERROR"  # renamed after M31 (was EITHER_PITCHER_DEPENDENCE_UNMEASURED)
 
 
 def _row(market, **kw):
@@ -71,7 +71,7 @@ def test_gate_reason_names_the_other_outstanding_items(market):
     from sportsedge.canonical_coverage import MARKET_RESOLUTIONS
     detail = MARKET_RESOLUTIONS[("MLB", market)]["detail"]
     assert "independence" in detail
-    assert "paired-starter dependence audit" in detail
+    assert "M31 paired-starter audit" in detail
     assert "max/min" in detail
 
 
