@@ -17,6 +17,7 @@ def _invoke(tmp_path, question, price=None):
         {"home_score": 20, "away_score": 20},
     ]
     file = tmp_path / "paths.json"
+    paths = [dict(p, home_team="DEN", away_team="SEA") for p in paths]
     file.write_text(json.dumps(paths), encoding="utf-8")
     args = [sys.executable, str(SCRIPT), "--paths-json", str(file),
             "--question", question, "--home", "DEN", "--away", "SEA",

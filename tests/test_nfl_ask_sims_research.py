@@ -6,12 +6,12 @@ from sportsedge.sports.nfl.ask_sims import (
 )
 
 HOME, AWAY = "DEN", "SEA"
-PATHS = [
+PATHS = [dict(p, home_team=HOME, away_team=AWAY) for p in (
     {"home_score": 10, "away_score": 17},
     {"home_score": 10, "away_score": 16},
     {"home_score": 35, "away_score": 10},
     {"home_score": 20, "away_score": 20},
-]
+)]
 
 
 class AskSimsResearchTests(unittest.TestCase):
@@ -70,7 +70,7 @@ class AskSimsResearchTests(unittest.TestCase):
 
     def test_malformed_score_line_quote_and_identity_refuse(self):
         with self.assertRaisesRegex(AskSimsError, "SCORE_INVALID"):
-            ask_score_paths([{"home_score": True, "away_score": 14}], "SEA wins",
+            ask_score_paths([{"home_score": True, "away_score": 14, "home_team": HOME, "away_team": AWAY}], "SEA wins",
                             home_team=HOME, away_team=AWAY)
         with self.assertRaisesRegex(AskSimsError, "LINE_INVALID"):
             self.ask({"market": "total_over", "line": float("nan")})
@@ -121,6 +121,7 @@ class AskSimsEngineReplayTests(unittest.TestCase):
             score_grid(means["mean_home"], means["mean_away"], load_freeze()),
             n_sims=128, seed=7,
         )
+        native = [dict(p, home_team=HOME, away_team=AWAY) for p in native]
         comparison = ask_score_paths(
             native, "SEA wins by 7+", home_team=HOME, away_team=AWAY,
         )

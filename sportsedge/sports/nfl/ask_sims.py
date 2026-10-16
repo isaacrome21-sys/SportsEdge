@@ -177,9 +177,18 @@ def ask_score_paths(
     if not isinstance(score_paths, (list, tuple)) or not 1 <= len(score_paths) <= MAX_PATHS:
         raise AskSimsError("ASK_SIMS_PATH_COUNT_INVALID")
     wins = pushes = 0
+    want = (home_team.strip().casefold(), away_team.strip().casefold())
     for path in score_paths:
         if not isinstance(path, Mapping):
             raise AskSimsError("ASK_SIMS_PATH_INVALID")
+        # Team binding (t211u): every path must name the teams whose scores
+        # it carries, and they must be exactly this game's home/away.
+        ph, pa = path.get("home_team"), path.get("away_team")
+        if not isinstance(ph, str) or not isinstance(pa, str) \
+                or not ph.strip() or not pa.strip():
+            raise AskSimsError("ASK_SIMS_PATH_IDENTITY_UNBOUND")
+        if (ph.strip().casefold(), pa.strip().casefold()) != want:
+            raise AskSimsError("ASK_SIMS_PATH_IDENTITY_MISMATCH")
         h, a = path.get("home_score"), path.get("away_score")
         if any(isinstance(x, bool) or not isinstance(x, int) or not 0 <= x <= 255 for x in (h, a)):
             raise AskSimsError("ASK_SIMS_SCORE_INVALID")
@@ -250,11 +259,14 @@ def ask_unified_score_sims(
         raise AskSimsError("ASK_SIMS_MEANS_INVALID")
     for key, supplied in (("home_team", home_team), ("away_team", away_team)):
         declared = engine.get(key)
-        if declared is not None and (not isinstance(declared, str) or
-                                     not isinstance(supplied, str) or
-                                     declared.casefold() != supplied.casefold()):
+        if not isinstance(declared, str) or not declared.strip():
+            raise AskSimsError("ASK_SIMS_GAME_IDENTITY_UNBOUND")
+        if not isinstance(supplied, str) or \
+                declared.strip().casefold() != supplied.strip().casefold():
             raise AskSimsError("ASK_SIMS_GAME_IDENTITY_MISMATCH")
-    paths = sample_score_paths(score_grid(float(h), float(a), freeze), n_sims=n_sims, seed=seed)
+    paths = [dict(p, home_team=engine["home_team"], away_team=engine["away_team"])
+             for p in sample_score_paths(score_grid(float(h), float(a), freeze),
+                                         n_sims=n_sims, seed=seed)]
     result = ask_score_paths(paths, question, home_team=home_team, away_team=away_team,
                              aliases=aliases, price_american=price_american)
     result.update({
