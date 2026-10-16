@@ -23,9 +23,9 @@ def _base():
     return docs, rows
 
 
-def _load(extra_docs, extra_rows, **kw):
+def _load(extra_docs, extra_rows):
     docs, rows = _base()
-    return load_grounded_finals(rows + extra_rows, fixture_index=pinned_index(docs + extra_docs), **kw)
+    return load_grounded_finals(rows + extra_rows, fixture_index=pinned_index(docs + extra_docs))
 
 
 def _ok(extra_docs, extra_rows=None):
@@ -69,7 +69,7 @@ def test_quick_doubleheaders_pass(gap):
                                    {"event_start_ts": "2027-05-16T21:00:00+00:00"}])
 def test_forged_fields_not_matching_raw_record_are_unverified(forge):
     doc = raw_game(800041, "NYY", "BOS", DAY)
-    out = _load([doc], [row_for(doc, **forge)], max_unverified_rows=5)
+    out = _load([doc], [row_for(doc, **forge)])
     assert len(out.records) == 200
     assert [e["status"] for e in out.ledger] == ["UNVERIFIED_FIXTURE_IDENTITY"]
     assert out.ledger[0]["event_id"] == "pk-800041"
@@ -78,7 +78,7 @@ def test_forged_fields_not_matching_raw_record_are_unverified(forge):
 def test_row_without_game_pk_or_unknown_pk_is_unverified_not_crash():
     doc = raw_game(800051, "NYY", "BOS", DAY)
     rows = [row_for(doc, game_pk=None), row_for(doc, event_id="ghost", game_pk=123)]
-    out = _load([doc], rows, max_unverified_rows=5)
+    out = _load([doc], rows)
     assert len(out.records) == 200
     assert sorted(e["reason"].split(":")[0] for e in out.ledger) == ["GAME_PK_MISSING", "GAME_PK_NOT_IN_INDEX"]
 
@@ -86,7 +86,7 @@ def test_row_without_game_pk_or_unknown_pk_is_unverified_not_crash():
 def test_same_game_pk_twice_is_duplicate_and_excluded():
     doc = raw_game(800061, "NYY", "BOS", DAY)
     rows = [row_for(doc), row_for(doc, event_id="relist")]
-    out = _load([doc], rows, max_unverified_rows=5)
+    out = _load([doc], rows)
     assert len(out.records) == 200
     assert {e["reason"].split(":")[0] for e in out.ledger} == {"DUPLICATE_FIXTURE_IDENTITY"}
 
@@ -94,16 +94,16 @@ def test_same_game_pk_twice_is_duplicate_and_excluded():
 def test_resume_linked_game_pks_are_one_game():
     original = raw_game(800071, "NYY", "BOS", DAY)
     resumed = raw_game(800072, "NYY", "BOS", DAY + timedelta(days=1), resumedFromGamePk=800071)
-    out = _load([original, resumed], [row_for(original), row_for(resumed)], max_unverified_rows=5)
+    out = _load([original, resumed], [row_for(original), row_for(resumed)])
     assert len(out.records) == 200
     assert {e["reason"].split(":")[0] for e in out.ledger} == {"DUPLICATE_FIXTURE_IDENTITY"}
 
 
 def test_ledger_over_threshold_fails_closed():
     doc = raw_game(800081, "NYY", "BOS", DAY)
-    rows = [row_for(doc, event_id=f"x{i}", game_pk=None) for i in range(3)]
+    rows = [row_for(doc, event_id=f"x{i}", game_pk=None) for i in range(6)]
     with pytest.raises(MLBTotalCandidateError, match="UNVERIFIED_FIXTURE_LEDGER_EXCEEDED"):
-        _load([doc], rows, max_unverified_rows=2)
+        _load([doc], rows)  # config: 5 rows
 
 
 def test_default_threshold_comes_from_config():
@@ -116,17 +116,15 @@ def test_default_threshold_comes_from_config():
 
 def test_index_hash_pinned():
     doc = raw_game(800091, "NYY", "BOS", DAY)
-    with pytest.raises(MLBTotalCandidateError, match="FIXTURE_INDEX_HASH_MISMATCH"):
-        FixtureIndex.from_statsapi_documents([doc], expected_sha256="0" * 64)
-    with pytest.raises(MLBTotalCandidateError, match="FIXTURE_INDEX_HASH_REQUIRED"):
-        FixtureIndex.from_statsapi_documents([doc], expected_sha256=None)
+    with pytest.raises(MLBTotalCandidateError, match="FIXTURE_INDEX_NOT_TRUSTED"):
+        FixtureIndex.from_statsapi_documents([doc])
 
 
 def test_ungrounded_rows_excluded_from_backtest_and_reported():
     docs, rows = _base()
     rows[195] = dict(rows[195], game_pk=None)
     report = prequential_backtest(rows, holdout_from=(BASE + timedelta(days=180)).isoformat(),
-                                  fixture_index=pinned_index(docs), max_unverified_rows=5)
+                                  fixture_index=pinned_index(docs))
     assert report["n_distinct_games"] == 19
     assert report["n_unverified_fixture_identity"] == 1
     assert report["refusal_ledger"][0]["event_id"] == "game-195"
@@ -137,5 +135,7 @@ def test_index_from_stored_raw_dir(tmp_path):
     docs = [raw_game(800101, "NYY", "BOS", DAY), raw_game(800102, "TOR", "BAL", DAY)]
     for i, d in enumerate(docs):
         (tmp_path / f"game_{i}.json").write_text(json.dumps(d))
-    idx = FixtureIndex.from_raw_dir(tmp_path, expected_sha256=FixtureIndex.digest_documents(docs))
+    from mlb_statsapi_fixture_helpers import trust
+    trust(docs)
+    idx = FixtureIndex.from_raw_dir(tmp_path)
     assert idx.has(800101) and idx.has(800102)

@@ -33,7 +33,7 @@ def test_team_in_two_games_at_same_start_refused():
         parse_finals(g + [row])
 
 
-def test_backtest_excludes_duplicate_fixture():
+def test_backtest_excludes_duplicate_fixture(tmp_path, monkeypatch):
     # t212 redesign: a re-listed gamePk is excluded (both copies) and ledgered,
     # never double counted; the load fails closed only past the threshold.
     report = prequential_backtest(_dup(sample_games(), i=190),
@@ -41,10 +41,16 @@ def test_backtest_excludes_duplicate_fixture():
                                   fixture_index=index_for(sample_games()))
     assert report["n_distinct_games"] == 19
     assert {e["reason"].split(":")[0] for e in report["refusal_ledger"]} == {"DUPLICATE_FIXTURE_IDENTITY"}
+    import json
+    import sportsedge.research.mlb_total_offense_defense_challenger as ch
+    cfg = tmp_path / "cfg.json"
+    cfg.write_text(json.dumps({"identity": "STATSAPI_GAMEPK_RAW_RECORD",
+                               "max_unverified_rows": 1, "max_unverified_fraction": 0.01}))
+    monkeypatch.setattr(ch, "IDENTITY_CONFIG_PATH", cfg)
     with pytest.raises(MLBTotalCandidateError, match="UNVERIFIED_FIXTURE_LEDGER_EXCEEDED"):
         prequential_backtest(_dup(sample_games(), i=190),
                              holdout_from=(BASE + timedelta(days=180)).isoformat(),
-                             fixture_index=index_for(sample_games()), max_unverified_rows=1)
+                             fixture_index=index_for(sample_games()))
 
 
 def test_doubleheader_distinct_starts_still_allowed():

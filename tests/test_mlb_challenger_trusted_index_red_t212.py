@@ -13,6 +13,7 @@ import pytest
 import sportsedge.research.mlb_total_offense_defense_challenger as ch
 from mlb_statsapi_fixture_helpers import raw_game, row_for, trusted_index
 from test_mlb_total_offense_defense_challenger import BASE, index_for, sample_games, target
+from test_mlb_challenger_grounded_identity_red_t212 import _base
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = (ROOT / "sportsedge/research/mlb_total_offense_defense_challenger.py").read_text()
@@ -43,13 +44,14 @@ def test_fabricated_game_with_recomputed_hash_refused():
 
 
 def test_duplicate_under_new_game_pk_refused():
-    real = [raw_game(810011, "NYY", "BOS", DAY)]
+    base_docs, base_rows = _base()
+    real = base_docs + [raw_game(810011, "NYY", "BOS", DAY)]
     idx = trusted_index(real)
     forged = real + [raw_game(810012, "NYY", "BOS", DAY)]
     with pytest.raises(ch.MLBTotalCandidateError, match="FIXTURE_INDEX_NOT_TRUSTED"):
         ch.FixtureIndex.from_statsapi_documents(forged)
-    row = row_for(forged[1])
-    out = ch.load_grounded_finals([row_for(real[0]), row], fixture_index=idx)
+    row = row_for(forged[-1])
+    out = ch.load_grounded_finals(base_rows + [row_for(real[-1]), row], fixture_index=idx)
     assert [e["reason"].split(":")[0] for e in out.ledger] == ["GAME_PK_NOT_IN_INDEX"]
 
 
@@ -61,15 +63,17 @@ def test_direct_constructor_with_fake_hash_refused():
 
 
 def test_mutated_index_reverified_on_every_load():
-    real = [raw_game(810021, "NYY", "BOS", DAY)]
+    base_docs, base_rows = _base()
+    real = base_docs + [raw_game(810021, "NYY", "BOS", DAY)]
     idx = trusted_index(real)
-    idx._games[0]["teams"]["away"]["score"] = 99  # tamper after construction
+    idx._games[-1]["teams"]["away"]["score"] = 99  # tamper after construction
     with pytest.raises(ch.MLBTotalCandidateError, match="FIXTURE_INDEX_NOT_TRUSTED"):
-        ch.load_grounded_finals([row_for(real[0])], fixture_index=idx)
+        ch.load_grounded_finals(base_rows + [row_for(real[-1])], fixture_index=idx)
     idx2 = trusted_index(real)
     fake = ch.RawFixture.from_game(raw_game(810099, "NYY", "BOS", DAY)["dates"][0]["games"][0])
     idx2._fixtures[810099] = fake  # inject a fixture without touching games
-    out = ch.load_grounded_finals([row_for(real[0]), row_for(raw_game(810099, "NYY", "BOS", DAY))],
+    out = ch.load_grounded_finals(base_rows + [row_for(real[-1]),
+                                               row_for(raw_game(810099, "NYY", "BOS", DAY))],
                                   fixture_index=idx2)
     assert [e["reason"].split(":")[0] for e in out.ledger] == ["GAME_PK_NOT_IN_INDEX"]
 
