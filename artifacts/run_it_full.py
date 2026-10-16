@@ -8,6 +8,7 @@ props and Statcast/Next Gen remain unpriced until verified collectors exist.
 Issues are untrusted odds intake.
 """
 from __future__ import annotations
+import math
 import argparse
 from collections import Counter
 import json
@@ -51,7 +52,9 @@ from sportsedge.f5_derived_readouts import (
     F5_DERIVED_MARKETS as F5_DERIVED_CANONICAL_MARKETS)
 from sportsedge.mlb_f5_derived_quote_binding import (
     normalize_f5_derived_market, phone_f5_derived_binding_rows)
+from sportsedge.mlb_exotics_gates import exotic_blocked_row
 from sportsedge.mlb_first_inning_deep_set import deep_set_blocked_row
+from sportsedge.mlb_per_inning_gates import per_inning_blocked_row
 from sportsedge.mlb_plate_appearance_gates import plate_appearance_blocked_row
 from sportsedge.mlb_total_hits import (
     TOTAL_HITS_MARKETS,
@@ -524,6 +527,19 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
     # routing, so they reach the prop pipelines (or their named blockers)
     # instead of dying at intake. A refused ladder stays a single row
     # carrying milestone_ladder_refusal, blocked by name at routing.
+    # Optional strictly-paired DK NFL yardage mains. This is additive input;
+    # each observed pair becomes two ordinary player rows before the existing
+    # registry and quote-pricing gates. Malformed pairs refuse the entire run.
+    # No side or market quote is inferred from an incomplete board.
+    yardage_pairs = payload.get("nfl_yardage_pairs", []) if isinstance(payload, dict) else []
+    if not isinstance(yardage_pairs, list):
+        raise ValueError("NFL_YARDAGE_PAIRS_MUST_BE_LIST")
+    if yardage_pairs:
+        from sportsedge.paired_yardage_intake import bind_nfl_yardage_pair
+        rows = list(rows)
+        for pair in yardage_pairs:
+            over_row, under_row = bind_nfl_yardage_pair(pair, as_of=prop_clock)
+            rows.extend((over_row, under_row))
     rows = expand_milestone_ladder_rows(rows, default_sport=default_sport)
     game_indices, games, prop_indices, props = [], [], [], []
     coverage_indices, coverage_input = [], []
@@ -937,7 +953,9 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                         line, "INNING_1_RUNS_LINE_INVALID")
                     continue
                 try:
-                    float(raw_line)
+                    parsed_line = float(raw_line)
+                    if not math.isfinite(parsed_line):
+                        raise ValueError("non-finite first-inning line")
                 except (TypeError, ValueError):
                     others[local] = blocked(
                         line, "INNING_1_RUNS_LINE_INVALID")
@@ -992,6 +1010,14 @@ def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
                 # Non-matrix Plate Appearance names (M49) refuse at
                 # their named gates, not the generic fallback.
                 covered = plate_appearance_blocked_row(line)
+            if covered is None and line["sport"] == "MLB":
+                # Non-matrix per-inning 2nd-9th names (M22) refuse at
+                # their named gates, not the generic fallback.
+                covered = per_inning_blocked_row(line)
+            if covered is None and line["sport"] == "MLB":
+                # Non-matrix game-exotic names (M50) refuse at their
+                # named gates, not the generic fallback.
+                covered = exotic_blocked_row(line)
             others[local] = covered if covered is not None else blocked(
                 line, "NO_VERIFIED_MODEL_FOR_THIS_MARKET")
     pitcher_results, pitcher_receipts = phone_pitcher_rows(

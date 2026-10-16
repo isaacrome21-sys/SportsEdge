@@ -304,11 +304,19 @@ for _m in ("passing_yards", "completions", "attempts", "passing_tds",
              "NO_ENGINE for all NFL player props; the empirical gamelog "
              "pricer is wired but not governance-admitted, so it may not "
              "price on the canonical path.", engine=_EMPIRICAL)
-for _m in ("longest_completion", "targets", "longest_reception",
-           "longest_rush"):
+for _m in ("targets",):
     _blocked("NFL", _m, "NO_ENGINE",
              "The empirical gamelog engine's market set excludes this "
              "market and no other pricer exists for it.")
+for _m in ("longest_completion", "longest_reception", "longest_rush"):
+    _blocked("NFL", _m, "NO_ENGINE",
+             "GOVERNANCE_NO_ENGINE: config/football_prop_engine_surface.json "
+             "and football_market_surface.engine_state_by_sport.NFL declare "
+             "NO_ENGINE for all NFL player props; the empirical longest-plays "
+             "engine is wired but not governance-admitted, so it may not "
+             "price on the canonical path.",
+             engine="NFL_LONGEST_PLAYS_EMPIRICAL (nfl_longest_plays_empirical."
+                    "estimate_longest_plays, wired, not admitted)")
 _blocked("NFL", "anytime_td", "NO_ENGINE",
          "GOVERNANCE_NO_ENGINE: the prop-engine surface declares NO_ENGINE "
          "for NFL player props; the nflverse anytime-TD estimator is wired "
@@ -327,10 +335,13 @@ _blocked("NFL", "two_plus_td", "NO_ENGINE",
          "derived by extending the >=1 model.")
 for _m in ("fg_made", "kicking_points", "xp_made"):
     _blocked("NFL", _m, "NO_ENGINE",
-             "Kicker derivative pricers exist only over attributed "
-             "simulation paths (core/simulate); no such paths exist on "
-             "the canonical path and the governance surface declares "
-             "NO_ENGINE for NFL props.")
+             "GOVERNANCE_NO_ENGINE: config/football_prop_engine_surface.json "
+             "and football_market_surface.engine_state_by_sport.NFL declare "
+             "NO_ENGINE for all NFL player props; the empirical kicking "
+             "engine is wired but not governance-admitted, so it may not "
+             "price on the canonical path.",
+             engine="NFL_KICKING_EMPIRICAL (nfl_kicking_empirical."
+                    "estimate_kicking, wired, not admitted)")
 for _m in ("player_sacks", "tackles_assists", "player_interceptions",
            "team_sacks", "team_turnovers"):
     _blocked("NFL", _m, "NO_ENGINE",
