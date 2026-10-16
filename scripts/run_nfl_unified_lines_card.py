@@ -29,6 +29,7 @@ from sportsedge.nfl_unified_phone import (
     build_unified_phone_card,
 )
 from sportsedge.nfl_scoring_composition_artifact import load_prior_file
+from sportsedge.sports.nfl.v1_live_pin import V1LivePinError, require_verified_v1_live
 from sportsedge.sports.nfl.auto_slate import discover_nfl_auto_games
 from sportsedge.sports.nfl.context_autopull import NFLContextError
 from sportsedge.sports.nfl.full_auto import fetch_nflverse_depth_charts
@@ -126,6 +127,11 @@ def main() -> int:
     ap.add_argument("--horizon-days", type=int, default=10)
     ap.add_argument("--scoring-prior")
     args = ap.parse_args()
+    try:
+        require_verified_v1_live()
+    except V1LivePinError as exc:
+        # t214u Option A: refuse the entire execution; no fallback.
+        raise SystemExit(f"NFL_V1_LIVE_PIN_REFUSED:{exc}") from None
 
     ticket = _read(args.input)
     history = _read(args.history)

@@ -1,0 +1,62 @@
+{
+  "authority": {
+    "activation": false,
+    "play_authority": false,
+    "reroute_to_v2": false,
+    "research_only": true
+  },
+  "freeze_file": {
+    "git_blob_sha1": "df830de9a6ffe1aab419f0b579b226d232728120",
+    "path": "config/nfl_discrete_v2_freeze.json",
+    "sha256": "2babcaef765d6496f735b23d9a89acfeabfabacbbc3ab30a7cf08a52c8541e00"
+  },
+  "grid_dependencies": [
+    {
+      "git_blob_sha1": "ce7470b2458dee57e38dc3d4fac141e8b021090e",
+      "path": "sportsedge/sports/nfl/discrete_v2.py",
+      "sha256": "7091bbc4c0846e74600f9a9f60cd612b401475cd8a0f87e029a598f1f8c7ceae"
+    }
+  ],
+  "lock_source": "config/research/nfl_market_context_prop_v1_2026_forward_lock.json",
+  "locked_v1_files": [
+    {
+      "git_blob_sha1": "1047a382c1b6630d0cabbea0cca007c3c623ac28",
+      "path": "sportsedge/sports/nfl/market_context_props.py",
+      "sha256": "b20728a3ccf09b943370f7e3745b528742c525aa837aadf00c4498f94c6619a3"
+    },
+    {
+      "git_blob_sha1": "0e0c554bcbcc776f57cab797d426bdce2dbe6534",
+      "path": "sportsedge/nfl_unified_phone.py",
+      "sha256": "4fe6c0f5b762d5f8b0afabc738fdaf2d75ddef43095228e0b8b0b0e92dd238b3"
+    },
+    {
+      "git_blob_sha1": "bd87f6a7ae7680108d6490a223abd3fea02b650f",
+      "path": "sportsedge/sports/nfl/unified_run_it.py",
+      "sha256": "d7061725baa85a9e156413a35df5685ea30cd0167c08f84a68d1c6971efd495c"
+    },
+    {
+      "git_blob_sha1": "9cd60fe09748ccf31d540ba132a062d9879cba1e",
+      "path": "sportsedge/sports/nfl/unified_auto_roles.py",
+      "sha256": "103c096c2dba231af4f51aa3d120fbffa124cf081888f2a4c050ec55e0013e17"
+    },
+    {
+      "git_blob_sha1": "f50c86540f997040e98812effd302f1b4c4900e9",
+      "path": "sportsedge/sports/nfl/unified_market_engine.py",
+      "sha256": "ec83bf2353f70bcaaa4f123cb984ed9b246d668fce224e21f879f1f006f1a44d"
+    },
+    {
+      "git_blob_sha1": "54df0060c5b3d0858fb397af855001de3e7d197e",
+      "path": "sportsedge/sports/nfl/live_role_source.py",
+      "sha256": "763e654affffa2d808f36870c265d99bb209d6e1d1b3a98c778367ee453c4576"
+    },
+    {
+      "git_blob_sha1": "1859b6c2a8a45bfc528cce4b4fcb0c1c50404dc8",
+      "path": "sportsedge/sports/nfl/nflverse_role_bridge.py",
+      "sha256": "c6baa0da7793f6205f2a8cc079aab36caa243d35d6c265857d3eabc6b798836c"
+    }
+  ],
+  "on_failure": "REFUSE_ENTIRE_EXECUTION_NO_RENORMALIZATION_NO_FALLBACK",
+  "pinned_from_main_sha": "0f96676f560fc1b65010ba48da6d221b2cd26112",
+  "ruling": "t214u Option A: external pin; expected hashes are NOT stored inside the files they protect",
+  "schema": "SPORTSEDGE_NFL_V1_LIVE_PIN_MANIFEST_V1"
+}
