@@ -57,3 +57,19 @@ def test_real_doubleheaders_still_pass():
     split = [_game("s1", "TOR", "BAL", DAY, hours=3),
              _game("s2", "TOR", "BAL", DAY + timedelta(hours=6), hours=3)]
     assert len(parse_finals(sample_games() + traditional + split)) == 204
+
+
+# --- t212 follow-up: 180-minute same-club window; NY short forms ------------
+@pytest.mark.parametrize("minutes", [100, 150, 179])
+def test_second_game_within_180_minutes_refused(minutes):
+    g = [_game("w1", "NYY", "BOS", DAY), _game("w2", "TOR", "NYY", DAY + timedelta(minutes=minutes))]
+    with pytest.raises(MLBTotalCandidateError, match="DUPLICATE_FIXTURE_IDENTITY"):
+        parse_finals(sample_games() + g)
+
+
+@pytest.mark.parametrize("a,b", [("NY Yankees", "NYY"), ("NY Mets", "NYM"),
+                                 ("LA Dodgers", "LAD"), ("LA Angels", "LAA"),
+                                 ("Chi Cubs", "CHC"), ("Chi White Sox", "CWS"),
+                                 ("St. Louis Cardinals", "STL")])
+def test_common_short_forms_alias(a, b):
+    assert canonical_team_id(a) == canonical_team_id(b)
