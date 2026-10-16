@@ -122,10 +122,11 @@ def canonical_team_id(value: Any) -> str:
 # Same-club fixture identity (t212).  final_observed is an ingest time and is
 # never used as a game end.  For two consecutive games of one club:
 #   * starts under DOUBLEHEADER_MIN_GAP apart can never both be real;
-#   * grounded doubleheader: same away/home pair, both carry statsapi
-#     gameNumber, ascending (g1 < g2), doubleHeader not "N", within a day;
-#   * else a recorded game end (end ts / duration) of the earlier game must
-#     precede the later start;
+#   * a recorded game end (end ts / duration) of the earlier game is always
+#     binding: the later start must not precede it;
+#   * grounded doubleheader: same away/home pair, gameNumber exactly 1 then 2,
+#     doubleHeader Y or S and identical on both games, within a day;
+#   * else a recorded end that precedes the later start suffices;
 #   * else (no grounded field) the later start must be >= 180 minutes after.
 DOUBLEHEADER_MIN_GAP = timedelta(minutes=90)
 MIN_SAME_TEAM_START_GAP = timedelta(minutes=180)
@@ -135,15 +136,18 @@ def _same_club_games_ok(earlier: "FinalScore", later: "FinalScore") -> bool:
     gap = later.event_start - earlier.event_start
     if gap < DOUBLEHEADER_MIN_GAP:
         return False
+    # A recorded end is binding in every case (t212 audit).
+    if earlier.game_end is not None and later.event_start < earlier.game_end:
+        return False
     same_pair = (canonical_team_id(earlier.away_id), canonical_team_id(earlier.home_id)) == \
         (canonical_team_id(later.away_id), canonical_team_id(later.home_id))
-    if (same_pair and earlier.game_number is not None and later.game_number is not None
-            and earlier.game_number < later.game_number
-            and "N" not in (earlier.double_header, later.double_header)
+    if (same_pair and (earlier.game_number, later.game_number) == (1, 2)
+            and earlier.double_header in {"Y", "S"}
+            and earlier.double_header == later.double_header
             and gap < timedelta(hours=24)):
         return True
     if earlier.game_end is not None:
-        return later.event_start >= earlier.game_end
+        return True  # end recorded and already proven before the later start
     return gap >= MIN_SAME_TEAM_START_GAP
 
 
