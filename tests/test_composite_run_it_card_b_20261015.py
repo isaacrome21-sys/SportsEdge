@@ -74,7 +74,7 @@ def pair(prefix, game, s1, s2, **kw):
 def echo_eval(game_id, rows, as_of, context):
     return {"as_of_utc": as_of, "game_id": game_id,
             "rows": [{**cc.row_identity_dict(r), "game_id": r["game_id"],
-                      "status": "RESEARCH_ESTIMATE", "quote_captured_at": r["quote_captured_at"]}
+                      "status": "PRICED_RESEARCH", "quote_captured_at": r["quote_captured_at"]}
                      for r in rows]}
 
 

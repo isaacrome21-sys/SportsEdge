@@ -99,7 +99,7 @@ class FakeRunFull:
         rows = payload["lines"]
         return {"as_of_utc": kw.get("as_of"), "min_ev": 0.02,
                 "summary": {"rows": len(rows), "edges": 0, "status_counts": {}},
-                "evaluated_rows": [{"input_index": i, "status": "RESEARCH_ESTIMATE",
+                "evaluated_rows": [{"input_index": i, "status": "PRICED_RESEARCH",
                                     "market": r["market"], "selection": r["side"],
                                     "line": r["line"], "odds_american": r["odds"],
                                     "quote_captured_at": r["quote_captured_at"]}
@@ -221,7 +221,7 @@ def test_evaluator_carries_child_status_not_inventing_probability():
     comp = _rc({"lines": pair("a", "G", 0, 1)}, run_full=FakeRunFull(),
                              revision="r", publication_clock=iso(9))
     for r in comp["rows"]:
-        assert r["status"] == "RESEARCH_ESTIMATE"
+        assert r["status"] == "PRICED_RESEARCH"
         assert "stake" not in r and r.get("play") is not True
 
 

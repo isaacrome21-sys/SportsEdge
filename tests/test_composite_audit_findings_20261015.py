@@ -210,7 +210,7 @@ def test_render_and_grade_recheck_authority_after_tamper():
 def test_research_statuses_pass_guard():
     def ev(g, rows, as_of, ctx):
         out = echo(g, rows, as_of, ctx)
-        out["rows"][0]["status"] = "NO_PLAY_RESEARCH_ONLY"  # negated token is research
+        out["rows"][0]["status"] = "NO_VALIDATION"  # allowlisted research status
         out["rows"][1]["status"] = "BLOCKED_PREPRICING_FIXTURE_UNVERIFIED"
         out["rows"][1]["eligible"] = False
         return out
@@ -280,7 +280,8 @@ def test_raw_read_must_contain_offer(tmp_path):
     import hashlib
     root, _ = write_store(ou("a", "G", 0, 1), tmp_path)
     # Rebuild a consistent chain whose raw bytes do not contain the offer.
-    raw = b'{"offers": []}'
+    raw = json.dumps({"read_id": "read-ao", "captured_at": iso(0), "offers": []},
+                     sort_keys=True).encode()
     (root / "raw" / "read-ao.json").write_bytes(raw)
     rp = root / "receipts" / "read-ao.json"
     d = json.loads(rp.read_text()); d["raw_sha256"] = hashlib.sha256(raw).hexdigest()
