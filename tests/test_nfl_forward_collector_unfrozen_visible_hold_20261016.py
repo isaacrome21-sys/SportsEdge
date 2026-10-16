@@ -31,7 +31,7 @@ def test_unfrozen_model_is_a_visible_failed_collection(tmp_path):
     p, summary = _exercise(tmp_path, {"state": "CURRENT_MAIN_MODEL_NOT_FROZEN", "freeze_status": "UNFROZEN"})
     assert p.returncode != 0
     assert "NFL_FORWARD_COLLECTION_BLOCKED:CURRENT_MAIN_MODEL_NOT_FROZEN:freeze=UNFROZEN" in p.stdout
-    assert "no decisions" in summary.lower()
+    assert "no production decisions" in summary.lower()
     assert "backfilled" in summary
 
 
