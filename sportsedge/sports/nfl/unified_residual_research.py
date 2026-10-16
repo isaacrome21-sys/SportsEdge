@@ -11,7 +11,7 @@ from typing import Any, Mapping, Sequence
 
 from sportsedge.sports.nfl.ask_sims import AskSimsError, ask_unified_score_sims
 from sportsedge.nfl_run_it import run_it_market_anchored
-from sportsedge.sports.nfl.unified_market_engine import run_unified_nfl_model
+from sportsedge.sports.nfl.unified_market_engine_v2 import run_unified_nfl_model
 
 
 class UnifiedResidualResearchError(ValueError):
