@@ -100,12 +100,20 @@ def main() -> None:
         "hits_mismatch": [], "pa_mismatch": [], "runs_mismatch": [],
         "pa_rows": 0, "hook_rows": 0, "baserun_rows": 0,
     }
+    seen_pk: set = set()
     for season in SEASONS:
         sched = json.loads((CACHE / f"pbp_cache/schedule_{season}.json").read_text())
         for day in sched.get("dates") or []:
             for g in day.get("games") or []:
                 if g.get("gameType") != "R":
                     continue
+                # The cached season schedules list some games twice
+                # (identical officialDate and facts). Each gamePk is one
+                # game: process it once or its PAs would be double-counted
+                # in every empirical profile.
+                if g["gamePk"] in seen_pk:
+                    continue
+                seen_pk.add(g["gamePk"])
                 report["games_seen"] += 1
                 pk = g["gamePk"]
                 date = g["officialDate"]

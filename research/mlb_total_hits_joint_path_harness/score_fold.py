@@ -117,7 +117,7 @@ def build_bundles(data_dir: Path, manifest: dict, work_dir: Path) -> list:
     policy_cfg = manifest["fit_policy"]
     games = [json.loads(x) for x in (data_dir / "games.jsonl").read_text().splitlines()]
     games_by_id = {g["game_id"]: g for g in games}
-    scored_ids = set(manifest["scored_game_ids"])
+    scored_ids = set(manifest["folds"]["2025"]["scored_game_ids"])
     file_hash = {}
     cache = Path.home() / "workspace/tmp/bt_data"
     for g in games:
@@ -148,7 +148,7 @@ def build_bundles(data_dir: Path, manifest: dict, work_dir: Path) -> list:
             source_label=f"TH_V1_{role}")
 
     def dt_of_idx(ordinal: int) -> datetime:
-        return datetime.fromordinal(ordinal, tz=timezone.utc)
+        return datetime.fromordinal(ordinal).replace(tzinfo=timezone.utc)
 
     # ---- league context fits on the training window (dates < TRAIN_END)
     train_policy = MlbJointPathFitPolicy(
