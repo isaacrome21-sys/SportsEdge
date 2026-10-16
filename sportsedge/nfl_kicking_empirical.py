@@ -182,7 +182,20 @@ def _mean(pmf: Mapping[int, float]) -> float:
 
 def prob_over_under(pmf: Mapping[int, float],
                     line: float) -> tuple[float, float, float]:
-    """(p_over, p_push, p_under) for an O/U line on the count."""
+    """(p_over, p_push, p_under) for an O/U line on the count.
+
+    Fail closed (t211u): a non-finite / non-real line or an invalid pmf
+    (non-finite, negative, or mass not ~1) is a named refusal -- never
+    silent zeros and never renormalised.
+    """
+    if isinstance(line, bool) or not isinstance(line, (int, float)) \
+            or not math.isfinite(line):
+        raise NflKickingError("KICKING_LINE_INVALID")
+    vals = list(pmf.values()) if isinstance(pmf, Mapping) else []
+    if not vals or any(isinstance(v, bool) or not isinstance(v, (int, float))
+                       or not math.isfinite(v) or v < 0 for v in vals) \
+            or abs(math.fsum(vals) - 1.0) > 1e-9:
+        raise NflKickingError("KICKING_PMF_INVALID")
     over = math.fsum(v for k, v in pmf.items() if k > line)
     push = math.fsum(v for k, v in pmf.items() if k == line)
     under = math.fsum(v for k, v in pmf.items() if k < line)
@@ -387,6 +400,23 @@ PBP_COLUMNS = (
 GAMES_COLUMNS = ("game_id", "gameday", "gametime")
 
 
+# Known nflverse outcomes -> made?  Anything else (missing, NaN, empty,
+# unrecognised) is an unknown outcome: refuse, never count it as a miss.
+FG_OUTCOMES = {"made": True, "missed": False, "blocked": False,
+               "no_good": False}
+PAT_OUTCOMES = {"good": True, "failed": False, "blocked": False,
+                "aborted": False}
+
+
+def _known_outcome(value: Any, table: Mapping[str, bool], code: str) -> bool:
+    if not isinstance(value, str):
+        raise NflKickingError(code)
+    key = value.strip().lower()
+    if key not in table:
+        raise NflKickingError(f"{code}:{key[:20]}")
+    return table[key]
+
+
 def build_kicking_games(pbp: Any, games: Any) -> list[dict[str, Any]]:
     """Per-(game, kicker) kicking records from nflverse frames.
 
@@ -437,11 +467,13 @@ def build_kicking_games(pbp: Any, games: Any) -> list[dict[str, Any]]:
         if int(row.field_goal_attempt or 0) == 1:
             dist = _valid_distance(row.kick_distance)
             rec["fg_attempts"].append((
-                dist,
-                str(row.field_goal_result).strip().lower() == "made"))
+                dist, _known_outcome(row.field_goal_result, FG_OUTCOMES,
+                                     "KICKING_FG_RESULT_UNKNOWN")))
         if int(row.extra_point_attempt or 0) == 1:
+            made = _known_outcome(row.extra_point_result, PAT_OUTCOMES,
+                                  "KICKING_PAT_RESULT_UNKNOWN")
             rec["pat_attempts"] += 1
-            if str(row.extra_point_result).strip().lower() == "good":
+            if made:
                 rec["pat_makes"] += 1
     return sorted(out.values(), key=lambda r: r["kickoff"])
 
