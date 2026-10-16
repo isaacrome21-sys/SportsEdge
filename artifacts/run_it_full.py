@@ -1535,10 +1535,6 @@ def main(argv=None):
     print(rendered)
 
 
-if __name__ == "__main__":
-    main()
-
-
 _ACCOUNTED_SURFACES = ("edges", "independent_candidates", "independent_watchlist")
 
 
@@ -1596,3 +1592,7 @@ def attach_position_accounting(card):
 
 def run_full(*args, **kwargs):
     return attach_position_accounting(_run_full_impl(*args, **kwargs))
+
+
+if __name__ == "__main__":
+    main()
