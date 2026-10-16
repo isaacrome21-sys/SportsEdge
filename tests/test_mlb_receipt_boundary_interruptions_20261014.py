@@ -228,6 +228,13 @@ _CHILD = textwrap.dedent(
         return result
 
     def fsync_wrapper(fd):
+        # A recorded root is re-fsynced by the verifier (recovery sync,
+        # B10) before the next append starts, and again by the append's
+        # own pre-append verification. Those synchronization calls are
+        # not boundaries of this append; count only after its first
+        # durable-write entry.
+        if state["dw"] == 0:
+            return real_fsync(fd)
         state["fsync"] += 1
         if mode == "before_fsync" and state["fsync"] == param:
             die()
@@ -293,8 +300,8 @@ BOUNDARY_CASES = [
     ("B8_journal_fsynced", "before_fsync", 7, ("refuse", UNCOMMITTED)),
     # B9: journal line fully durable, death before the COMMIT write.
     ("B9_journal_durable", "after_dw", 3, ("refuse", UNCOMMITTED)),
-    # B10: COMMIT bytes written, death before the COMMIT fsync. Process
-    # death preserves written bytes: the receipt IS complete committed.
+    # B10: COMMIT visible before fsync: acceptance requires successful
+    # verifier recovery-sync of intent, journal and directory.
     ("B10_commit_written", "before_fsync", 9, ("verify", [1, 2])),
     # B11: COMMIT fully durable; death after the append's durable work,
     # before record() returns to its caller.
@@ -322,6 +329,44 @@ def test_interruption_at_each_durable_boundary(tmp_path, mode, param,
         _assert_verified_and_extensible(root, expected)
     else:
         _assert_refused_and_frozen(root, expected)
+
+
+# ---------------------------------------------------------------------------
+# B10 recovery sync: acceptance must complete the durability chain
+# ---------------------------------------------------------------------------
+
+def test_b10_verifier_recovery_syncs_commit(tmp_path):
+    """B10 residue (COMMIT visible, its fsync never ran) verifies only
+    because the verifier recovery-syncs journal, intent and directory;
+    the fsync calls are observed, not assumed."""
+    root = _run_injection(tmp_path, "before_fsync", 9)
+    real = os.fsync
+    called = []
+    def tracked(fd):
+        called.append(fd)
+        return real(fd)
+    with patch.object(os, "fsync", tracked):
+        entries = ms.verify_receipt_journal(root, verifier_now=LATER)
+    assert [e["sequence"] for e in entries] == [1, 2]
+    assert len(called) >= 3, "journal, intent COMMIT and directory must sync"
+
+
+def test_b10_recovery_sync_failure_refuses_without_repair(tmp_path):
+    """If the recovery sync cannot complete, the B10 root is refused by
+    name -- never certified with an incomplete durability chain -- from
+    both the verifier and a fresh recorder, and the residue is untouched."""
+    root = _run_injection(tmp_path, "before_fsync", 9)
+    before = _snapshot(root)
+    with patch.object(os, "fsync",
+                      side_effect=OSError("injected recovery sync failure")):
+        with pytest.raises(ms.MLBSourceError,
+                           match="RECEIPT_RECOVERY_SYNC_FAILED"):
+            ms.verify_receipt_journal(root, verifier_now=LATER)
+        with patch.object(ms, "_trusted_now", lambda: T0):
+            with pytest.raises(ms.MLBSourceError,
+                               match="RECEIPT_RECOVERY_SYNC_FAILED"):
+                ms.MLBSourceCapture(root)
+    assert _snapshot(root) == before
 
 
 # ---------------------------------------------------------------------------
