@@ -51,3 +51,17 @@ def test_run_full_card_carries_accounting():
     card = run_full({"lines": [], "sport": "MLB"},
                     now=datetime(2026, 10, 11, 20, 0, tzinfo=timezone.utc), auto_context=False)
     assert "position_accounting" in card
+
+
+def test_audit_same_selection_text_in_different_games_not_deduped():
+    rows = [{"game": "G1", "selection": "Over 8.5"}, {"game": "G2", "selection": "Over 8.5"}]
+    pa = attach_position_accounting(_card(rows, []))["position_accounting"]
+    assert pa["legs"] == 2 and pa["positions"] == 2
+
+
+def test_audit_bad_result_refuses_accounting_without_crashing_card():
+    card = attach_position_accounting(_card([{"game": "G1", "selection": "x", "result": "maybe"}], []))
+    pa = card["position_accounting"]
+    assert pa["status"].startswith("ACCOUNTING_REFUSED")
+    assert pa["positions"] is None
+    assert card["summary"]["surfaced_positions"] is None
