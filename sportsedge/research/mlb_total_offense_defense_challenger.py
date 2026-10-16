@@ -67,6 +67,64 @@ def _id(value: Any, name: str) -> str:
     return out
 
 
+# Canonical MLB club ids (t212): one club under two spellings must compare
+# equal for fixture identity.  Ids outside this table (e.g. numeric MLBAM ids
+# or synthetic fixtures) compare by their casefolded, space-collapsed form.
+_TEAM_ALIASES = {
+    "ARI": ('AZ', 'ARIZONA', 'DIAMONDBACKS', 'DBACKS', 'ARIZONA DIAMONDBACKS'),
+    "ATL": ('ATLANTA', 'BRAVES', 'ATLANTA BRAVES'),
+    "BAL": ('BALTIMORE', 'ORIOLES', 'BALTIMORE ORIOLES'),
+    "BOS": ('BOSTON', 'RED SOX', 'BOSTON RED SOX'),
+    "CHC": ('CUBS', 'CHICAGO CUBS', 'CHN'),
+    "CWS": ('CHW', 'CHA', 'WHITE SOX', 'CHICAGO WHITE SOX'),
+    "CIN": ('CINCINNATI', 'REDS', 'CINCINNATI REDS'),
+    "CLE": ('CLEVELAND', 'GUARDIANS', 'CLEVELAND GUARDIANS'),
+    "COL": ('COLORADO', 'ROCKIES', 'COLORADO ROCKIES'),
+    "DET": ('DETROIT', 'TIGERS', 'DETROIT TIGERS'),
+    "HOU": ('HOUSTON', 'ASTROS', 'HOUSTON ASTROS'),
+    "KC": ('KCR', 'KCA', 'KANSAS CITY', 'ROYALS', 'KANSAS CITY ROYALS'),
+    "LAA": ('ANA', 'ANGELS', 'LOS ANGELES ANGELS', 'LA ANGELS'),
+    "LAD": ('LAN', 'DODGERS', 'LOS ANGELES DODGERS', 'LA DODGERS'),
+    "MIA": ('FLA', 'MIAMI', 'MARLINS', 'MIAMI MARLINS'),
+    "MIL": ('MILWAUKEE', 'BREWERS', 'MILWAUKEE BREWERS'),
+    "MIN": ('MINNESOTA', 'TWINS', 'MINNESOTA TWINS'),
+    "NYM": ('NYN', 'METS', 'NEW YORK METS'),
+    "NYY": ('NYA', 'YANKEES', 'NEW YORK YANKEES'),
+    "ATH": ('OAK', 'ATHLETICS', 'OAKLAND ATHLETICS', 'AS', "A'S", 'SACRAMENTO ATHLETICS'),
+    "PHI": ('PHILADELPHIA', 'PHILLIES', 'PHILADELPHIA PHILLIES'),
+    "PIT": ('PITTSBURGH', 'PIRATES', 'PITTSBURGH PIRATES'),
+    "SD": ('SDP', 'SDN', 'SAN DIEGO', 'PADRES', 'SAN DIEGO PADRES'),
+    "SF": ('SFG', 'SFN', 'SAN FRANCISCO', 'GIANTS', 'SAN FRANCISCO GIANTS'),
+    "SEA": ('SEATTLE', 'MARINERS', 'SEATTLE MARINERS'),
+    "STL": ('SLN', 'ST LOUIS', 'CARDINALS', 'ST LOUIS CARDINALS', 'ST. LOUIS CARDINALS'),
+    "TB": ('TBR', 'TBA', 'TAMPA BAY', 'RAYS', 'TAMPA BAY RAYS'),
+    "TEX": ('TEXAS', 'RANGERS', 'TEXAS RANGERS'),
+    "TOR": ('TORONTO', 'BLUE JAYS', 'TORONTO BLUE JAYS'),
+    "WSH": ('WSN', 'WAS', 'WASHINGTON', 'NATIONALS', 'WASHINGTON NATIONALS'),
+}
+
+
+def _alias_key(value: str) -> str:
+    return " ".join("".join(ch for ch in str(value).upper() if ch.isalnum() or ch.isspace()).split())
+
+
+_CANONICAL = {}
+for _club, _names in _TEAM_ALIASES.items():
+    for _name in (_club, *_names):
+        _CANONICAL[_alias_key(_name)] = _club
+
+
+def canonical_team_id(value: Any) -> str:
+    key = _alias_key(value)
+    return _CANONICAL.get(key, key.casefold())
+
+
+# Same-team overlap window (t212): two games for one club whose starts are
+# closer than this cannot both be real.  Real doubleheaders (traditional game 2
+# after game 1 ends; split games hours apart) pass.
+MIN_SAME_TEAM_START_GAP = timedelta(minutes=90)
+
+
 def _runs(value: Any, name: str) -> int:
     if type(value) is not int or not 0 <= value <= 100:
         raise MLBTotalCandidateError(f"{name}:NONNEGATIVE_INTEGER_REQUIRED")
@@ -114,22 +172,30 @@ def parse_finals(history: Iterable[Mapping[str, Any]]) -> tuple[FinalScore, ...]
     records = tuple(FinalScore.parse(row) for row in history)
     if len({row.event_id for row in records}) != len(records):
         raise MLBTotalCandidateError("DUPLICATE_EVENT_ID")
-    # Fixture identity (t211u): one real game under two event ids, or a
-    # team booked into two games at the same instant, would be counted
-    # twice.  Team ids compare case/space-insensitively.  Fail closed.
+    # Fixture identity (t211u/t212): one real game under two event ids, or a
+    # club booked into overlapping games, would be counted twice.  Team ids
+    # are compared by canonical club id (aliases, case, spacing).  Fail closed.
     fixtures: set = set()
-    team_slots: set = set()
+    by_team: dict = {}
     for row in records:
-        away, home = row.away_id.casefold(), row.home_id.casefold()
+        away, home = canonical_team_id(row.away_id), canonical_team_id(row.home_id)
+        if away == home:
+            raise MLBTotalCandidateError(f"SAME_TEAM_BOTH_SIDES:{row.event_id}")
         key = (away, home, row.event_start)
         if key in fixtures:
             raise MLBTotalCandidateError(f"DUPLICATE_FIXTURE_IDENTITY:{row.event_id}")
         fixtures.add(key)
         for team in (away, home):
-            if (team, row.event_start) in team_slots:
+            by_team.setdefault(team, []).append(row)
+    for team, games in by_team.items():
+        games.sort(key=lambda r: (r.event_start, r.event_id))
+        for earlier, later in zip(games, games[1:]):
+            # final_observed is an ingest time (may be days late), so it is
+            # not used as a game-end proxy; the start gap is the window.
+            if later.event_start - earlier.event_start < MIN_SAME_TEAM_START_GAP:
                 raise MLBTotalCandidateError(
-                    f"DUPLICATE_FIXTURE_IDENTITY:TEAM_DOUBLE_BOOKED:{row.event_id}")
-            team_slots.add((team, row.event_start))
+                    f"DUPLICATE_FIXTURE_IDENTITY:TEAM_OVERLAP:{team}:"
+                    f"{earlier.event_id}:{later.event_id}")
     return records
 
 
