@@ -1555,7 +1555,8 @@ def attach_position_accounting(card):
         for r in card.get(surface) or ():
             if not isinstance(r, dict):
                 continue
-            ident = (r.get("input_index"), r.get("selection"))
+            ident = (r.get("input_index"), r.get("game_id") or r.get("game"),
+                     r.get("thesis_id"), r.get("selection"))
             if ident in seen:
                 continue
             seen.add(ident)
@@ -1572,7 +1573,18 @@ def attach_position_accounting(card):
             if r.get("result") is not None:
                 leg["result"] = r["result"]
             legs.append(leg)
-    pa = grade_card_positions(legs)
+    try:
+        pa = grade_card_positions(legs)
+    except ValueError as exc:
+        pa = {"positions": None, "legs": len(legs), "stacks": [],
+              "accounting": "CORRELATED_STACK_AS_SINGLE_POSITION",
+              "unkeyed_rows": unkeyed,
+              "status": f"ACCOUNTING_REFUSED:{exc}"[:200]}
+        card["position_accounting"] = pa
+        summary = card.setdefault("summary", {})
+        summary["surfaced_positions"] = None
+        summary["surfaced_legs"] = len(legs)
+        return card
     pa["unkeyed_rows"] = unkeyed
     pa["status"] = "INCOMPLETE_CORRELATION_KEYS" if unkeyed else "COMPLETE"
     card["position_accounting"] = pa
