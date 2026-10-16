@@ -244,10 +244,17 @@ STATUS_ALLOWLIST, CODE_ALLOWLIST = _load_allowlist()
 _CODE_KEYS = frozenset({"reason", "blocker"})
 _AUTHORITY_FIELDS = frozenset({"eligible", "play", "playable", "official", "lock", "approved",
                                "actionable", "promotion", "production_activation"})
-_MONEY_FIELDS = frozenset({"recommendation", "pick", "estimated_ev"})
+_MONEY_FIELDS = frozenset({"recommendation", "pick", "estimated_ev", "units", "edge",
+                           "to_win", "roi"})
 _MONEY_PATTERNS = (re.compile(r"^ev($|_)"), re.compile(r"expected_value"),
                    re.compile(r"^edge_"), re.compile(r"^kelly"), re.compile(r"^stake"),
-                   re.compile(r"^bet($|_)"), re.compile(r"^wager"))
+                   re.compile(r"^bet($|_)"), re.compile(r"_bet$"), re.compile(r"^wager"),
+                   re.compile(r"^unit_"), re.compile(r"_units$"), re.compile(r"^risk"),
+                   re.compile(r"official"), re.compile(r"^ok_to_"))
+# Parameter / identifier names, not authority or money values (t211e).
+_EXEMPT_SUFFIXES = ("_id", "_floor", "_cap", "_type", "_policy", "_policy_id")
+# ...also when the parameter word is followed by a unit tag (edge_floor_pp).
+_EXEMPT_SEGMENT = re.compile(r"_(id|floor|cap|type|policy)(_[a-z0-9]{1,4})?$")
 # Keys that may carry a truthy boolean inside pricing_provenance: none.
 _TRUE_BOOL_KEYS = frozenset({"research_only"})
 # pricing_provenance has its own key allowlist (matches sportsedge.pricing_provenance).
@@ -262,25 +269,44 @@ def _code_allowed(value: Any) -> bool:
     return isinstance(value, str) and norm_code(value) in CODE_ALLOWLIST
 
 
+# reason_detail / blocker_detail are DIAGNOSTICS ONLY (t211e): the renderer,
+# quote audit, grading and pitcher-K units must never display or consume them.
+DIAGNOSTIC_ONLY_FIELDS = ("reason_detail", "blocker_detail")
+
+
+def strip_diagnostics(row: Any) -> Any:
+    """Copy of a row with diagnostic-only evaluation fields removed."""
+    if not isinstance(row, Mapping):
+        return row
+    out = copy.deepcopy(dict(row))
+    ev = out.get("evaluation")
+    if isinstance(ev, Mapping):
+        out["evaluation"] = {k: v for k, v in ev.items() if k not in DIAGNOSTIC_ONLY_FIELDS}
+    return out
+
+
 def _norm_key(key: str) -> str:
     return "_".join(t.lower() for t in tokens(key))
 
 
 def _authority_key(key: str) -> bool:
+    if key.endswith(_EXEMPT_SUFFIXES) or _EXEMPT_SEGMENT.search(key):
+        return False
     return key in _AUTHORITY_FIELDS or key.endswith("_eligible") or key.endswith("_authority")
 
 
 def _money_key(key: str) -> bool:
+    if key.endswith(_EXEMPT_SUFFIXES) or _EXEMPT_SEGMENT.search(key):
+        return False
     return key in _MONEY_FIELDS or any(p.search(key) for p in _MONEY_PATTERNS)
 
 
 def _live(v: Any) -> bool:
-    """Truthy, or numeric (0 included); False/None/'' are inert."""
+    """Numeric (0 included) or boolean True. Strings, False and None are inert
+    (t211e: refuse only numeric or boolean-truthy values)."""
     if isinstance(v, bool):
         return v
-    if isinstance(v, (int, float)):
-        return True
-    return bool(v)
+    return isinstance(v, (int, float))
 
 
 # Keys the composite itself adds to a child row (stripped nowhere; allowlisted).
@@ -586,7 +612,7 @@ def grade_composite(comp: Mapping[str, Any], results: Mapping[str, Any], *,
     v = verify_composite(comp, pin=pin)
     if not v["ok"]:
         raise CompositeError(f"{COMPOSITE_UNVERIFIED}:{v['problems']}")
-    active = {r["row_id"]: r for r in comp["rows"]}
+    active = {r["row_id"]: strip_diagnostics(r) for r in comp["rows"]}
     for rid in results:
         if rid not in active:
             raise CompositeError(f"{GRADE_ROW_NOT_ACTIVE}:{rid}")

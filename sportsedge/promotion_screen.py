@@ -96,6 +96,20 @@ DOMAIN_PAIRS = frozenset({
     ("PBP", "ALLOWED"), ("EVENT", "ALLOWED"), ("ALLOWED", "FIELDS"),
     ("ELIGIBLE", "DECISION"), ("SETTLEMENT", "ELIGIBLE"), ("GRADED", "BET"),
     ("CLV", "OFFICIAL"), ("BINDING", "ALLOWED"), ("REVIEW", "ALLOWED"),
+    # t211e: football PASS (the play type) and play-by-play PLAY nouns
+    *((("PASS", w) for w in ("ATTEMPTS", "TDS", "TD", "YARDS", "YDS", "RUSH", "COMPLETION",
+                               "COMPLETIONS", "INTERCEPTIONS", "PLUS", "ATTRIBUTION",
+                               "CANNOT", "DEFENSIVE"))),
+    *(((w, "PASS") for w in ("PLAYER", "TEAM", "QB", "RECEIVING", "HAVE", "OT"))),
+    *((("PLAY", w) for w in ("DISTANCE", "DOWN", "IDS", "INDEX", "MULTIPLE", "POINTS",
+                               "POSSESSION", "QUARTER", "YARDLINE", "COUNT", "DEFENSIVE",
+                               "RAW", "SPECIAL", "TEAM", "OPPORTUNITY", "HAS"))),
+    *(((w, "PLAY") for w in ("BASE", "OT", "OFFENSIVE", "TACKLE", "V2K", "SOURCE"))),
+    ("PITCH", "PASSED"),
+    # freeze/preregistration locks; edge-floor refusals and the CFB edge model name
+    ("TUNING", "LOCK"), ("PREREGISTRATION", "LOCK"), ("OPENER", "LOCK"),
+    ("EDGE", "BELOW"), ("EDGE", "FLOORS"), ("EDGE", "NONFINITE"), ("CFB", "EDGE"),
+    ("EVALUATION", "ALLOWED"),  # t211e owner: FIRST_EVALUATION_ALLOWED is a scheduling gate
     })
 
 
@@ -104,14 +118,38 @@ def norm_code(value) -> str:
     return "_".join(tokens(value))
 
 
+# Promotion RESULTS (t211e): promotion unless the immediately preceding token negates.
+PROMOTION_RESULTS = frozenset({"PASS", "PASSED", "QUALIFIED", "OK", "PROMOTION"})
+_RESULT_SEQUENCES = (("READY", "FOR", "AUTHORITY"),)
+
+
 def promotion_meaning(code) -> bool:
-    """True only when a code's MEANING is promotion (builder exclusion rule)."""
+    """True only when a code's MEANING is promotion (builder exclusion rule).
+
+    A promotion token/result counts unless the token IMMEDIATELY before it is
+    a negation/refusal-type word (NO, NOT, MISSING, BELOW, ...). Refusal words
+    elsewhere grant no immunity. Domain phrases (HITS_ALLOWED, SCORING_PLAY,
+    EDGE_FLOOR ...) are neutral."""
     toks = tokens(code)
-    if any(t in REFUSAL_MARKERS for t in toks):
-        return False
     drop = set()
     for i in range(len(toks) - 1):
         if (toks[i], toks[i + 1]) in DOMAIN_PAIRS:
             drop.update({i, i + 1})
-    kept = [t for i, t in enumerate(toks) if i not in drop]
-    return bool(kept) and promotes(" ".join(kept))
+    for i, t in enumerate(toks):
+        if i in drop:
+            continue
+        prev = toks[i - 1] if i > 0 else None
+        if prev in REFUSAL_MARKERS:
+            continue
+        if t in PROMOTION_TOKENS or t in PROMOTION_RESULTS:
+            return True
+        if t == "EV" and prev in {"POSITIVE", "PLUS"}:
+            before = toks[i - 2] if i > 1 else None
+            if before not in REFUSAL_MARKERS:
+                return True
+    for seq in _RESULT_SEQUENCES:
+        n = len(seq)
+        for i in range(len(toks) - n + 1):
+            if tuple(toks[i:i + n]) == seq and (i == 0 or toks[i - 1] not in REFUSAL_MARKERS):
+                return True
+    return False

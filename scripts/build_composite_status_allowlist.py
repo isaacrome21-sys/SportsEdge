@@ -32,6 +32,10 @@ from sportsedge.promotion_screen import norm_code, promotion_meaning  # noqa: E4
 
 CODE_LITERAL = re.compile(r"""["']([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)["']""")
 SKIP = ("composite_", "promotion_screen")
+# Codes added explicitly by owner approval (not found on this branch).
+OWNER_APPROVED_CODES = frozenset({
+    "EITHER_PITCHER_MARGINAL_TAIL_ERROR",  # owner t207u/t208u; branch 6f5b1ea8
+})
 
 
 def collect_codes() -> tuple[list[str], list[str]]:
@@ -69,7 +73,8 @@ def main(argv=None) -> int:
                             "before this list is treated as curated",
            "statuses": collect()}
     codes, excluded = collect_codes()
-    doc["codes"] = codes
+    doc["owner_approved_codes"] = sorted(OWNER_APPROVED_CODES)
+    doc["codes"] = sorted(set(codes) | OWNER_APPROVED_CODES)
     doc["excluded_promotion_codes"] = excluded
     doc["exclusion_rule"] = ("promotion_screen.promotion_meaning: promotion token present, "
                              "not refusal-shaped, not a domain phrase")
