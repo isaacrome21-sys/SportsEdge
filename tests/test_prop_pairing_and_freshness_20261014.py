@@ -214,10 +214,12 @@ def test_native_k_pair_prices_with_ladder_present_end_to_end():
                 for r in card["prop_unpriced"] if r.get("market") == "PITCHER_K"}
     # The duplicated rung is visible as its named disposition...
     assert (6.5, REFUSAL_DUPLICATES_NATIVE_QUOTE) in unpriced
-    # ...and the non-duplicated rungs keep their one-sided fate.
-    assert (4.5, "EXACT_PAIRED_DK_QUOTE_REQUIRED") in unpriced
-    assert (5.5, "EXACT_PAIRED_DK_QUOTE_REQUIRED") in unpriced
-    assert (7.5, "EXACT_PAIRED_DK_QUOTE_REQUIRED") in unpriced
+    # ...and the non-duplicated rungs keep their one-sided fate: refusal
+    # at the bridge's single-side validation gate, naming the family
+    # validation state (PITCHER_K is NOT_RUN; no family is VALIDATED).
+    assert (4.5, "MILESTONE_SINGLE_SIDE_REQUIRES_VALIDATED_MODEL:NOT_RUN") in unpriced
+    assert (5.5, "MILESTONE_SINGLE_SIDE_REQUIRES_VALIDATED_MODEL:NOT_RUN") in unpriced
+    assert (7.5, "MILESTONE_SINGLE_SIDE_REQUIRES_VALIDATED_MODEL:NOT_RUN") in unpriced
     disp = [r for r in card["prop_unpriced"]
             if r.get("reason") == REFUSAL_DUPLICATES_NATIVE_QUOTE]
     assert len(disp) == 1

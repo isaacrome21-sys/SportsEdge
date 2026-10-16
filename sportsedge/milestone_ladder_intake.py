@@ -28,8 +28,12 @@ it can support an EV calculation against an independently estimated
 probability, but it cannot establish a two-sided no-vig market. This
 module performs NO de-vigging, fair-line derivation, or complement-price
 synthesis; any downstream component that requires an opposite quote
-refuses the row with its own existing named blocker (e.g. the three-sport
-research bridge's EXACT_PAIRED_DK_QUOTE_REQUIRED).
+refuses the row with its own existing named blocker. The three-sport
+research bridge binds a one-sided row only when the family's validation
+state in the canonical coverage authority is VALIDATED, and otherwise
+refuses it with MILESTONE_SINGLE_SIDE_REQUIRES_VALIDATED_MODEL:<state> --
+naming the validation state, not the quote form (no family is VALIDATED
+today, so converted rows still refuse downstream).
 
 Fail-closed ladder validation (SPEC section 3; the whole ladder refuses,
 never a partial emission):
