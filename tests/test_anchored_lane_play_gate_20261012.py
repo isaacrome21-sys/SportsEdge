@@ -111,10 +111,13 @@ def test_same_fixture_independent_lane_can_reach_play():
     assert under["pricing_lane"] == "LANE_A_INDEPENDENT"
     assert under["pricing_provenance"]["lane"] == LANE_INDEPENDENT
     assert under["pricing_provenance"]["mechanism"] is None
-    assert under["pricing_provenance"]["play_eligible"] is True
-    assert under["status"] == "RESEARCH_POSITIVE_EV_UNVALIDATED"
-    assert under in card["edges"]
-    assert under in card["independent_candidates"]
+    # t207u: Lane A retired from actionable cards -> labeled diagnostic.
+    assert under["pricing_provenance"]["play_eligible"] is False
+    assert under["status"] == "RESEARCH_DIAGNOSTIC_LANE_A_RETIRED"
+    assert under["research_diagnostic"] == "LANE_A_RETIRED_DIAGNOSTIC"
+    assert under not in card["edges"]
+    assert under not in card["independent_candidates"]
+    assert under in card["lane_a_research_diagnostics"]
     # Even in an independent run, the anchored side-view never becomes an
     # edge: lane_b_edges stays suppressed.
     assert card["lane_b_edges"] == []
@@ -168,8 +171,10 @@ def test_run_full_independent_game_row_still_reaches_play():
     under = next(r for r in card["evaluated_rows"]
                  if str(r.get("selection") or "").startswith("UNDER"))
     assert under["pricing_provenance"]["lane"] == LANE_INDEPENDENT
-    assert under["status"] == "RESEARCH_POSITIVE_EV_UNVALIDATED"
-    assert under in card["edges"]
+    # t207u: Lane A retired from actionable cards -> labeled diagnostic.
+    assert under["status"] == "RESEARCH_DIAGNOSTIC_LANE_A_RETIRED"
+    assert under not in card["edges"]
+    assert under not in card.get("independent_candidates", [])
     audit = card["factor_coverage"]["by_input_index"][0]
     assert audit["pricing_provenance"]["lane"] == LANE_INDEPENDENT
 
@@ -265,8 +270,11 @@ def test_independent_and_blocked_rows_untouched_by_gate():
         {"status": "NO_MODEL_OR_MARKET", "reason": "NO_ENGINE"},
     ]
     changed = apply_play_gate(rows)
-    assert changed == 0
-    assert rows[0]["status"] == "RESEARCH_POSITIVE_EV_UNVALIDATED"
+    # t207u: the Lane A play-surface row is demoted (1 change); the
+    # blocked row is untouched.
+    assert changed == 1
+    assert rows[0]["status"] == "RESEARCH_DIAGNOSTIC_LANE_A_RETIRED"
+    assert rows[1]["status"] == "NO_MODEL_OR_MARKET"
     assert rows[0]["pricing_provenance"]["lane"] == LANE_INDEPENDENT
     # Blocked rows carry no probability and get no lane stamp.
     assert "pricing_provenance" not in rows[1]

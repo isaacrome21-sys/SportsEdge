@@ -1637,9 +1637,17 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
             _paired_book_context(rows, all_rows, i)
     independent = []
     watchlist = []
+    lane_a_diagnostics = []
     for row in all_rows:
         projection = row.get("independent_projection")
         if not isinstance(projection, dict):
+            continue
+        if (row.get("pricing_provenance") or {}).get(
+                "engine_lane") == LANE_A or row.get("pricing_lane") == LANE_A:
+            # Owner ruling t207u: Lane A is retired from actionable cards.
+            # Its output is a labeled research diagnostic only -- never a
+            # lean, candidate, watch position, or graded position.
+            lane_a_diagnostics.append(row)
             continue
         if (row.get("pricing_provenance") or {}).get(
                 "lane") == PROVENANCE_MARKET_ANCHORED:
@@ -1733,6 +1741,8 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
             },
             "independent_candidates": independent,
             "independent_watchlist": watchlist,
+            "lane_a_research_diagnostics": lane_a_diagnostics,
+            "lane_a_status": "RETIRED_FROM_ACTIONABLE_CARDS_T207U_DIAGNOSTIC_ONLY",
             "research_projection_note": "Unvalidated independent league-score heuristic; DK is a paired same-book no-vig benchmark, not sharp market verification.",
             # Keep the complete graded, source-annotated rows for reproducible
             # factor coverage and honest diagnostics even when below threshold.

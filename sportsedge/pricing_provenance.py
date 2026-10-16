@@ -78,6 +78,16 @@ PLAY_SURFACE_STATUSES = frozenset({
 })
 GATED_STATUSES = PLAY_SURFACE_STATUSES | {"PRICED_RESEARCH"}
 
+# Owner ruling t207u: Lane A (free_models LANE_A_INDEPENDENT) is retired
+# from actionable cards pending a rebuild and an independent backtest
+# (recorded Brier deficits vs market: ML +0.0115, RL +0.0186, TOT +0.0224).
+# Its output may appear only as a labeled research diagnostic: never a
+# lean, candidate, PLAY, or position.  Historical results are untouched.
+LANE_A_ENGINE_LANE = "LANE_A_INDEPENDENT"
+LANE_A_RETIRED_STATUS = "RESEARCH_DIAGNOSTIC_LANE_A_RETIRED"
+LANE_A_RETIRED_PLAY_BLOCK = "LANE_A_RETIRED_FROM_ACTIONABLE_CARDS_T207U"
+LANE_A_RETIRED_EV_PRESENTATION = "DIAGNOSTIC_ONLY_LANE_A_RETIRED"
+
 
 def game_lane_mechanism(market: Any) -> str:
     """How free_models Lane B anchors each market family.
@@ -96,7 +106,8 @@ def provenance_for_game_result(result: Mapping[str, Any]) -> dict[str, Any]:
     if lane == "LANE_A_INDEPENDENT":
         return {"lane": LANE_INDEPENDENT, "mechanism": None,
                 "source": "FREE_MODELS_LANE_A_INDEPENDENT",
-                "engine_lane": lane, "play_eligible": True}
+                "engine_lane": lane, "play_eligible": False,
+                "retired": LANE_A_RETIRED_PLAY_BLOCK}
     if lane == "LANE_B_ANCHORED":
         return {"lane": LANE_MARKET_ANCHORED,
                 "mechanism": game_lane_mechanism(result.get("market")),
@@ -186,11 +197,21 @@ def is_play_eligible(row: Mapping[str, Any]) -> bool:
     and its availability is not explicitly unverified."""
     if availability_forces_research_only(row):
         return False
+    if _is_lane_a(row):
+        return False
     prov = row.get("pricing_provenance")
     if isinstance(prov, dict) and prov.get("lane"):
         return prov["lane"] == LANE_INDEPENDENT
     # Fall back to the engine's declared lane for rows stamped elsewhere.
-    return row.get("pricing_lane") == "LANE_A_INDEPENDENT"
+    # Lane A was the only fallback-eligible lane and is retired (t207u).
+    return False
+
+
+def _is_lane_a(row: Mapping[str, Any]) -> bool:
+    prov = row.get("pricing_provenance")
+    if isinstance(prov, dict) and prov.get("engine_lane") == LANE_A_ENGINE_LANE:
+        return True
+    return row.get("pricing_lane") == LANE_A_ENGINE_LANE
 
 
 def apply_play_gate(
@@ -252,6 +273,20 @@ def apply_play_gate(
                 changed += 1
             continue
         if status not in GATED_STATUSES:
+            continue
+        if _is_lane_a(row):
+            # A play-surface status (lean/candidate/edge) is demoted; a
+            # non-actionable PRICED_RESEARCH row keeps its status so
+            # coverage accounting is unchanged, but is labeled too.
+            if status in PLAY_SURFACE_STATUSES:
+                row["status"] = LANE_A_RETIRED_STATUS
+                changed += 1
+            row["research_only"] = True
+            row["research_diagnostic"] = "LANE_A_RETIRED_DIAGNOSTIC"
+            row["play_blocked_reason"] = LANE_A_RETIRED_PLAY_BLOCK
+            row["ev_presentation"] = LANE_A_RETIRED_EV_PRESENTATION
+            if status in PLAY_SURFACE_STATUSES:
+                row["reason"] = LANE_A_RETIRED_PLAY_BLOCK
             continue
         if prov["lane"] == LANE_MARKET_ANCHORED:
             row["status"] = ANCHORED_WATCH_STATUS

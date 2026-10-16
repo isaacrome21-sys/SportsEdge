@@ -31,6 +31,9 @@ ALIASES = {
 RESEARCH_DISPLAY_STATUSES = frozenset({
     "RESEARCH_POSITIVE_EV_UNVALIDATED", "BELOW_THRESHOLD",
     "RESEARCH_CANDIDATE_NOT_VALIDATED", "PRICE_CAP",
+    # t207u: retired Lane A rows still display as labeled research
+    # diagnostics (status names the retirement); never actionable.
+    "RESEARCH_DIAGNOSTIC_LANE_A_RETIRED",
 })
 
 def _market(market: str, side: str) -> tuple[str, str]:
