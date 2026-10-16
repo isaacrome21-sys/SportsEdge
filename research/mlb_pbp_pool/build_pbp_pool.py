@@ -647,18 +647,42 @@ def cmd_build(args: argparse.Namespace) -> int:
     pkg_dir = os.path.dirname(os.path.abspath(__file__))
     sample_dir = os.path.join(pkg_dir, "sample")
     os.makedirs(sample_dir, exist_ok=True)
-    with open(os.path.join(sample_dir, "pool_sample.jsonl"), "w", encoding="utf-8") as fh:
-        for r in sorted(sample_rows, key=lambda r: (r["game_date"], r["game_id"], r["pa_index"])):
-            fh.write(json.dumps(r, sort_keys=True, separators=(",", ":")) + "\n")
+    ordered = sorted(sample_rows,
+                     key=lambda r: (r["game_date"], r["game_id"], r["pa_index"]))
+    lines = [json.dumps(r, sort_keys=True, separators=(",", ":")) + "\n"
+             for r in ordered]
+    # The sample ships in <=60KB part files: the repo's push path
+    # passes file contents inside a single command-line argument,
+    # which the OS caps at ~128KB per argument.
+    for stale in os.listdir(sample_dir):
+        if stale.startswith("pool_sample") and stale.endswith(".jsonl"):
+            os.remove(os.path.join(sample_dir, stale))
+    part_names: list[str] = []
+    buf: list[str] = []
+    buf_bytes = 0
+    for line in lines:
+        n = len(line.encode("utf-8"))
+        if buf and buf_bytes + n > 60000:
+            name = f"pool_sample_part{len(part_names) + 1:02d}.jsonl"
+            with open(os.path.join(sample_dir, name), "w", encoding="utf-8") as fh:
+                fh.write("".join(buf))
+            part_names.append(name)
+            buf, buf_bytes = [], 0
+        buf.append(line)
+        buf_bytes += n
+    if buf:
+        name = f"pool_sample_part{len(part_names) + 1:02d}.jsonl"
+        with open(os.path.join(sample_dir, name), "w", encoding="utf-8") as fh:
+            fh.write("".join(buf))
+        part_names.append(name)
     with open(os.path.join(sample_dir, "sample_boxscores.json"), "w", encoding="utf-8") as fh:
         json.dump(sample_boxes, fh)
     manifest["sample"] = {
         "games": len(sample_boxes),
         "rows": len(sample_rows),
-        "pool_file": "sample/pool_sample.jsonl",
+        "pool_files": [f"sample/{n}" for n in part_names],
         "boxscore_fixture": "sample/sample_boxscores.json",
-        "sha256_jsonl": _sha256_bytes(
-            open(os.path.join(sample_dir, "pool_sample.jsonl"), "rb").read()),
+        "sha256_jsonl": _sha256_bytes("".join(lines).encode("utf-8")),
     }
     with open(os.path.join(args.out, "MANIFEST.json"), "w", encoding="utf-8") as fh:
         json.dump(manifest, fh, indent=2, sort_keys=True)
