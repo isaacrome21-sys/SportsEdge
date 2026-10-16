@@ -18,7 +18,8 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from sports.common.ev_math import devig
-from sportsedge.sports.nfl.discrete_v2 import load_freeze, score_grid
+from sportsedge.sports.nfl.discrete_v2 import load_freeze
+from sportsedge.sports.nfl.unified_market_engine_v2 import guarded_score_grid, validate_score_grid
 
 POLICY_PATH = Path(__file__).resolve().parents[3] / "config" / "nfl_market_anchored_residual_v1.json"
 SCHEMA = "SPORTSEDGE_NFL_MARKET_ANCHORED_RESIDUAL_POLICY_V1"
@@ -217,9 +218,12 @@ def price_game(game: Mapping[str, Any], *, raw_model_margin: Any, raw_model_tota
     if not all(0.5 <= value <= 70 for value in means.values()):
         raise ResidualQuoteError("MARKET_MEANS_OUT_OF_GRID_RANGE")
     freeze = load_freeze()
-    grid_factory = score_grid_factory or (lambda home, away: score_grid(home, away, freeze))
+    grid_factory = score_grid_factory or (lambda home, away: guarded_score_grid(home, away, freeze))
     baseline = grid_factory(means["mean_home"], means["mean_away"])
     residual = grid_factory(anchor["mean_home"], anchor["mean_away"])
+    # V2 safety re-lock: injected factories are validated too; no renormalization.
+    validate_score_grid(baseline)
+    validate_score_grid(residual)
     rows = []
     for key in MARKETS:
         if key not in markets:
