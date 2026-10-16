@@ -11,12 +11,80 @@ permissions:
   contents: write
   actions: read
 
-concurrency:
-  group: sportsedge-paid-odds-api
-  cancel-in-progress: false
+# t215u Option A: no workflow-level concurrency. The cheap freeze-gate job runs
+# first and outside the shared paid group; only the gated collect job joins it.
 
 jobs:
+  freeze-gate:
+    # Runs before any Odds API call, nflverse download, reserve/quota guard,
+    # paid concurrency group, diagnostics upload or durable write. No secrets.
+    #   FROZEN (valid hash)  -> collect proceeds on this same run.
+    #   UNFROZEN             -> collect is skipped quietly; the first blocked
+    #                           scheduled run of each America/Chicago day (no
+    #                           cache marker yet) fails visibly once with
+    #                           NFL_FORWARD_COLLECTION_BLOCKED:M2_UNFROZEN.
+    #   missing/invalid file -> this job fails visibly on every run.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      frozen: ${{ steps.freeze.outputs.frozen }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          sparse-checkout: |
+            config/nfl_m2_freeze.json
+            scripts/nfl_forward_freeze_gate.py
+            scripts/require_nfl_forward_release.py
+          sparse-checkout-cone-mode: false
+
+      - name: Verify NFL M2 freeze before any spend
+        id: freeze
+        run: python3 scripts/nfl_forward_freeze_gate.py check --freeze config/nfl_m2_freeze.json
+
+      - name: Look up today's CT blocked-report marker (no secrets)
+        id: marker
+        if: steps.freeze.outputs.frozen != 'true' && github.event_name == 'schedule'
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: .nfl-forward-blocked-marker
+          key: ${{ steps.freeze.outputs.marker_key }}
+          lookup-only: true
+
+      - name: Decide whether this blocked run is the daily visible report
+        id: daily
+        if: steps.freeze.outputs.frozen != 'true'
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          MARKER_HIT: ${{ steps.marker.outputs.cache-hit }}
+        run: python3 scripts/nfl_forward_freeze_gate.py daily --event "$EVENT_NAME" --marker-hit "$MARKER_HIT"
+
+      - name: Write today's CT blocked-report marker
+        if: steps.freeze.outputs.frozen != 'true' && steps.daily.outputs.report == 'true'
+        run: echo "${{ steps.freeze.outputs.ct_date }} run ${{ github.run_id }}" > .nfl-forward-blocked-marker
+
+      - name: Save today's CT blocked-report marker before failing
+        if: steps.freeze.outputs.frozen != 'true' && steps.daily.outputs.report == 'true' && github.event_name == 'schedule'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: .nfl-forward-blocked-marker
+          key: ${{ steps.freeze.outputs.marker_key }}
+
+      - name: Report daily NFL_FORWARD_COLLECTION_BLOCKED:M2_UNFROZEN
+        if: steps.freeze.outputs.frozen != 'true' && steps.daily.outputs.report == 'true'
+        run: |
+          printf '%s\n' '{"state":"M2_UNFROZEN","freeze_status":"UNFROZEN"}' > "$RUNNER_TEMP/release-status.json"
+          python3 scripts/require_nfl_forward_release.py --status-file "$RUNNER_TEMP/release-status.json"
+
   collect:
+    needs: freeze-gate
+    if: needs.freeze-gate.outputs.frozen == 'true'
+    concurrency:
+      group: sportsedge-paid-odds-api
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 55
     env:

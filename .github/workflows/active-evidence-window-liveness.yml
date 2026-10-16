@@ -47,10 +47,34 @@ jobs:
             tests.test_mlb_moneyline_active_liveness \
             tests.test_nfl_forward_accrual
 
-  nfl-durable-deadman:
+  nfl-freeze-gate:
+    # t215u: while M2 is not verified FROZEN the collector deliberately skips,
+    # so the durable deadman must not fire off its workflow_run completions.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'football-nfl-forward-clv-collection')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      frozen: ${{ steps.freeze.outputs.frozen }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          sparse-checkout: |
+            config/nfl_m2_freeze.json
+            scripts/nfl_forward_freeze_gate.py
+          sparse-checkout-cone-mode: false
+      - name: Read collector freeze state (no secrets)
+        id: freeze
+        run: python3 scripts/nfl_forward_freeze_gate.py check --freeze config/nfl_m2_freeze.json
+
+  nfl-durable-deadman:
+    needs: nfl-freeze-gate
+    if: >-
+      !cancelled() && (github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'football-nfl-forward-clv-collection' &&
+      needs.nfl-freeze-gate.outputs.frozen == 'true'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
