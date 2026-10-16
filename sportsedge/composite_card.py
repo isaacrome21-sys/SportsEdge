@@ -37,6 +37,7 @@ REFUSE_F5_PAIR_SEPARATION = "REFUSE_F5_PAIR_SEPARATION_OVER_120S"
 REFUSE_CONTEXT_AFTER_AS_OF = "REFUSE_CONTEXT_AFTER_CHILD_AS_OF"
 REFUSE_CONTEXT_CROSS_GAME = "REFUSE_CONTEXT_FROM_OTHER_GAME"
 REFUSE_CONTEXT_UNGROUNDED = "REFUSE_CONTEXT_SOURCE_TIMESTAMP_MISSING"
+REFUSE_CHILD_ROW_NOT_EVALUATED = "REFUSE_CHILD_ROW_NOT_EVALUATED"
 
 ROW_IDENTITY_CONFLICT = "ROW_IDENTITY_CONFLICT"
 ROW_IDENTITY_INCOMPLETE = "ROW_IDENTITY_INCOMPLETE"
@@ -147,6 +148,7 @@ def build_composite(rows: Iterable[Mapping[str, Any]], *,
         if len(games) > 1:
             code = REFUSE_SET_SPLIT
         elif len(sizes) != 1 or not isinstance(next(iter(sizes)), int) \
+                or isinstance(next(iter(sizes)), bool) \
                 or len(members) != next(iter(sizes)):
             code = REFUSE_SET_INCOMPLETE
         if code:
@@ -231,6 +233,15 @@ def build_composite(rows: Iterable[Mapping[str, Any]], *,
                                  "as_of_utc": as_of_iso, "child_run_id": child_run_id,
                                  "quote_age_seconds": ages.get(src["row_id"]),
                                  "research_only": True})
+            omitted = [r for r in active if _identity_key(r) not in seen_keys]
+            if omitted:
+                for r in omitted:
+                    refusal[r["row_id"]] = REFUSE_CHILD_ROW_NOT_EVALUATED
+                for sid, members in sets.items():
+                    if members[0]["game_id"] == game and any(m["row_id"] in refusal for m in members):
+                        for m in members:
+                            refusal.setdefault(m["row_id"], REFUSE_SET_MEMBER_REFUSED)
+                out_rows[:] = [o for o in out_rows if o["row_id"] not in refusal]
         for r in grows:
             if r["row_id"] in refusal:
                 refused.append({**row_identity_dict(r), "row_id": r["row_id"],
