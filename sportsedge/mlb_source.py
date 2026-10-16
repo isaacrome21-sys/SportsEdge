@@ -459,6 +459,50 @@ def _refuse_pending_receipt_intents(root: Path) -> None:
         raise MLBSourceError("RECEIPT_INTENT_ORPHAN_UNCOMMITTED")
 
 
+def _sync_verified_receipt_commit(root: Path) -> None:
+    """Commit bytes surviving a killed writer need recovery fsync before ACCEPT.
+
+    B10 (owner audit, Oct 14): a COMMIT whose bytes were written but whose
+    fsync never completed survives process death in the page cache, so the
+    structural checks alone cannot tell it from a durable commit -- its
+    durability is indeterminate from the bytes. Before any receipt is
+    certified, the verifier therefore completes the durability chain
+    itself: fsync the receipt journal, the intent journal and the root
+    directory. Acceptance then asserts durability established *at
+    verification time*; it cannot and does not assert the bytes were
+    durable before the crash. A sync error refuses the entire root by
+    name (``RECEIPT_RECOVERY_SYNC_FAILED``) -- the receipt is neither
+    silently certified nor silently condemned as tampered. Do not
+    synthesize a commit, alter a journal or grant authority to a legacy
+    journal-only root (no intent journal: nothing to recovery-sync, the
+    pre-intent protocol's journal line was its own commit record).
+    """
+    intent = root / RECEIPT_INTENT_JOURNAL_NAME
+    if not intent.exists():
+        return
+    directory = -1
+    try:
+        directory = os.open(root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+                            | getattr(os, "O_NOFOLLOW", 0))
+        for name in (RECEIPT_JOURNAL_NAME, RECEIPT_INTENT_JOURNAL_NAME):
+            fd = -1
+            try:
+                fd = os.open(name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                             | getattr(os, "O_NONBLOCK", 0), dir_fd=directory)
+                if not stat.S_ISREG(os.fstat(fd).st_mode):
+                    raise MLBSourceError("RECEIPT_RECOVERY_SYNC_FAILED")
+                os.fsync(fd)
+            finally:
+                if fd >= 0:
+                    os.close(fd)
+        os.fsync(directory)
+    except OSError as exc:
+        raise MLBSourceError("RECEIPT_RECOVERY_SYNC_FAILED") from exc
+    finally:
+        if directory >= 0:
+            os.close(directory)
+
+
 def verify_receipt_journal(root: str | Path, *, verifier_now: datetime | None = None) -> list[dict[str, Any]]:
     """Independently re-verify a persisted capture directory (fresh process / restart).
 
@@ -471,9 +515,14 @@ def verify_receipt_journal(root: str | Path, *, verifier_now: datetime | None = 
     torn pair) and an intent BEGIN with no COMMIT/ABORT (a writer that died
     mid-pair). A FIFO, directory, symlink or oversized file at the journal
     path itself is refused by name (RECEIPT_JOURNAL_PATH_UNSAFE /
-    RECEIPT_JOURNAL_SIZE_INVALID) before any read. The chain is local
-    tamper-evidence only; it is NOT an external, independently anchored
-    timestamp.
+    RECEIPT_JOURNAL_SIZE_INVALID) before any read. After every structural
+    check passes, acceptance recovery-syncs the journal, the intent
+    journal and the root directory (B10): a COMMIT that survived its
+    writer's death in the page cache is certified only once its durability
+    is established at verification time, and a failed recovery sync
+    refuses the root (RECEIPT_RECOVERY_SYNC_FAILED) rather than certifying
+    an indeterminate chain. The chain is local tamper-evidence only; it is
+    NOT an external, independently anchored timestamp.
     """
     root = Path(root)
     journal = root / RECEIPT_JOURNAL_NAME
@@ -578,6 +627,10 @@ def verify_receipt_journal(root: str | Path, *, verifier_now: datetime | None = 
         entries.append(entry)
     _refuse_unjournaled_raw(root, entries)
     _refuse_pending_receipt_intents(root)
+    # A visible COMMIT can survive process death before the writer fsync.
+    # Acceptance requires the durability chain completed by recovery sync
+    # (B10); see _sync_verified_receipt_commit.
+    _sync_verified_receipt_commit(root)
     return entries
 
 
