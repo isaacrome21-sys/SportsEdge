@@ -4,7 +4,7 @@ A separately versioned forward identity. It does NOT replace or edit the frozen
 V1 engine (``unified_market_engine.py`` and the six other V1 forward-lock files
 stay byte-identical). V2 validates complete probability mass on every score
 grid before any direct sampling or pricing and refuses malformed grids
-(non-numeric, non-finite, negative, empty, or mass off 1 beyond
+(non-numeric, non-finite, negative, empty, ragged/non-square, or mass off 1 beyond
 ``MASS_TOLERANCE``). It never renormalizes and never relies on V1's
 ``cumulative[-1] = 1.0`` masking: an invalid grid never reaches V1 code.
 
@@ -47,9 +47,13 @@ def validate_score_grid(grid: Sequence[Sequence[Any]]) -> None:
     if not isinstance(grid, Sequence) or isinstance(grid, (str, bytes)):
         raise UnifiedNflV2GridError("SCORE_GRID_NONNUMERIC")
     values: list[float] = []
+    width = len(grid)
+    rectangular = True
     for row in grid:
         if not isinstance(row, Sequence) or isinstance(row, (str, bytes)):
             raise UnifiedNflV2GridError("SCORE_GRID_NONNUMERIC")
+        if len(row) != width:
+            rectangular = False
         for value in row:
             if isinstance(value, bool) or not isinstance(value, Real):
                 raise UnifiedNflV2GridError("SCORE_GRID_NONNUMERIC")
@@ -62,6 +66,10 @@ def validate_score_grid(grid: Sequence[Sequence[Any]]) -> None:
     mass = fsum(values)
     if not values or mass <= 0.0:
         raise UnifiedNflV2GridError("SCORE_GRID_EMPTY")
+    # #2265: a joint home x away grid must be square (0..grid_max on both
+    # axes). Ragged or non-square grids are refused even at unit total mass.
+    if not rectangular:
+        raise UnifiedNflV2GridError("SCORE_GRID_NOT_RECTANGULAR")
     if abs(mass - 1.0) > MASS_TOLERANCE:
         raise UnifiedNflV2GridError(f"SCORE_GRID_MASS_NOT_ONE:{mass!r}")
 
