@@ -109,14 +109,36 @@ def _complete_ids(team, named):
     return ids
 
 
+def _proven(snapshot, *, attach_token=True):
+    """Add the #2274 completeness proof: the official game-day roster
+    partition (inactives + actives == roster) and, for in-memory
+    fixtures, the archive provenance token the pinned loader attaches."""
+    from sportsedge.nfl_participation_archive import (
+        ArchiveProvenance, PROVENANCE_KEY)
+    team = snapshot["team"]
+    inactive = list(snapshot["player_ids"])
+    team_ids = []
+    for row in depth_rows():
+        if str(row.get("club_code") or row.get("team")) == team:
+            pid = row.get("gsis_id") or row.get("player_id")
+            if pid and pid not in team_ids:
+                team_ids.append(pid)
+    active = [p for p in team_ids if p not in inactive]
+    snapshot["active_player_ids"] = active
+    snapshot["gameday_roster_player_ids"] = inactive + active
+    if attach_token:
+        snapshot[PROVENANCE_KEY] = ArchiveProvenance("0" * 64, "1" * 64)
+    return snapshot
+
+
 def inactive_snapshots(chi_ids=("wr2",), gb_ids=("gwr2",),
                        published="2026-10-04T15:30:00Z"):
     """Source-complete official inactive snapshots (audit B1 form)."""
     return [
-        {"game_id": GAME_ID, "team": "CHI", "published_at": published,
-         "player_ids": _complete_ids("CHI", chi_ids)},
-        {"game_id": GAME_ID, "team": "GB", "published_at": published,
-         "player_ids": _complete_ids("GB", gb_ids)},
+        _proven({"game_id": GAME_ID, "team": "CHI", "published_at": published,
+                 "player_ids": _complete_ids("CHI", chi_ids)}),
+        _proven({"game_id": GAME_ID, "team": "GB", "published_at": published,
+                 "player_ids": _complete_ids("GB", gb_ids)}),
     ]
 
 

@@ -63,6 +63,24 @@ _BUNDLE_LIST_KEYS = (
 )
 
 
+class ArchiveProvenance:
+    """Non-JSON provenance token attached ONLY by
+    :func:`load_participation_bundle` to inactive snapshots it loaded
+    against an external pin.  A dict field such as ``complete: True`` or
+    any JSON value can never equal an instance of this class, so caller
+    payloads cannot forge it (#2274 completeness-proof ruling, t207u).
+    """
+
+    __slots__ = ("manifest_sha256", "bundle_sha256")
+
+    def __init__(self, manifest_sha256: str, bundle_sha256: str) -> None:
+        self.manifest_sha256 = manifest_sha256
+        self.bundle_sha256 = bundle_sha256
+
+
+PROVENANCE_KEY = "_archive_provenance"
+
+
 class ParticipationArchiveError(ValueError):
     """Named fail-closed refusal from the participation archive loader."""
 
@@ -222,6 +240,9 @@ def load_participation_bundle(root: str | Path, *,
     if bundle.get("player_bindings_version") != CROSSWALK_VERSION:
         raise ParticipationArchiveError(
             "NFL_PARTICIPATION_ARCHIVE_BINDINGS_VERSION_UNSUPPORTED")
+    token = ArchiveProvenance(pin, digest)
+    for snap in bundle["inactive_snapshots"]:
+        snap[PROVENANCE_KEY] = token
     return {
         "bundle": bundle,
         "manifest_sha256": pin,
@@ -235,6 +256,8 @@ def load_participation_bundle(root: str | Path, *,
 
 
 __all__ = [
+    "ArchiveProvenance",
+    "PROVENANCE_KEY",
     "BUNDLE_SCHEMA",
     "CROSSWALK_VERSION",
     "MAX_BUNDLE_BYTES",

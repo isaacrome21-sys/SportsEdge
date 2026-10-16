@@ -126,15 +126,39 @@ def _complete_ids(team, named):
     return ids
 
 
+def _proven(snapshot, *, attach_token=True):
+    """Add the #2274 completeness proof: the official game-day roster
+    partition (inactives + actives == roster) and, for in-memory
+    fixtures, the archive provenance token the pinned loader attaches."""
+    from sportsedge.nfl_participation_archive import (
+        ArchiveProvenance, PROVENANCE_KEY)
+    team = snapshot["team"]
+    inactive = list(snapshot["player_ids"])
+    team_ids = []
+    for row in depth_rows():
+        if str(row.get("club_code") or row.get("team")) == team:
+            pid = row.get("gsis_id") or row.get("player_id")
+            if pid and pid not in team_ids:
+                team_ids.append(pid)
+    active = [p for p in team_ids if p not in inactive]
+    snapshot["active_player_ids"] = active
+    snapshot["gameday_roster_player_ids"] = inactive + active
+    if attach_token:
+        snapshot[PROVENANCE_KEY] = ArchiveProvenance("0" * 64, "1" * 64)
+    return snapshot
+
+
 def inactive_snapshots(chi_ids=("rb2",), gb_ids=(),
-                       published="2026-10-04T15:30:00Z"):
+                       published="2026-10-04T15:30:00Z", attach_token=True):
     """Source-complete official inactive snapshots (audit B1 form)."""
     out = [{"game_id": GAME_ID, "team": "CHI", "published_at": published,
             "player_ids": _complete_ids("CHI", chi_ids)}]
+    out = [_proven(o, attach_token=attach_token) for o in out]
     if gb_ids:
         out.append({"game_id": GAME_ID, "team": "GB",
                     "published_at": published,
                     "player_ids": _complete_ids("GB", gb_ids)})
+        out[-1] = _proven(out[-1], attach_token=attach_token)
     return out
 
 
@@ -402,7 +426,8 @@ def _bundle(*, depth=None, inactives=None, snapshots=None, bindings=None):
         "injury_rows": [],
         "inactive_rows": [] if inactives is None else inactives,
         "inactive_snapshots":
-            inactive_snapshots() if snapshots is None else snapshots,
+            inactive_snapshots(attach_token=False) if snapshots is None
+            else snapshots,
         "games": [{"away": "Green Bay Packers", "home": "Chicago Bears",
                    "kickoff": KICKOFF, "game_id": GAME_ID,
                    "season": 2026, "week": 4,

@@ -187,13 +187,35 @@ def _snapshot_player_ids(snapshot) -> list[str] | None:
     short, duplicates, non-string/empty entries) is not a complete
     list and proves nothing by absence.
     """
+    # #2274 ruling (t207u): a row count -- or a caller ``complete``
+    # flag -- is never proof.  Completeness requires BOTH
+    #   (a) archive provenance: the snapshot was loaded through the
+    #       externally pinned participation archive (non-forgeable
+    #       token, see nfl_participation_archive.ArchiveProvenance), and
+    #   (b) an official game-day roster partition that can be checked
+    #       independently: inactive ids + active ids == the official
+    #       game-day roster ids, disjoint, with no gaps.
+    # Anything less leaves completeness UNKNOWN (fail closed).
+    from sportsedge.nfl_participation_archive import (
+        ArchiveProvenance, PROVENANCE_KEY)
+    if not isinstance(snapshot.get(PROVENANCE_KEY), ArchiveProvenance):
+        return None
     ids = snapshot.get("player_ids")
-    if not isinstance(ids, (list, tuple)):
+    active = snapshot.get("active_player_ids")
+    roster = snapshot.get("gameday_roster_player_ids")
+    if not all(isinstance(v, (list, tuple)) for v in (ids, active, roster)):
         return None
     out = [str(v).strip() for v in ids]
+    act = [str(v).strip() for v in active]
+    ros = [str(v).strip() for v in roster]
+    for seq in (out, act, ros):
+        if any(not v for v in seq) or len(set(seq)) != len(seq):
+            return None
     if len(out) < MIN_OFFICIAL_INACTIVE_SNAPSHOT_ROWS:
         return None
-    if any(not v for v in out) or len(set(out)) != len(out):
+    if set(out) & set(act):
+        return None
+    if set(out) | set(act) != set(ros):
         return None
     return out
 
@@ -276,6 +298,11 @@ def _inactive_scan(inactive_rows, inactive_snapshots, *, game_id, team_id,
             continue  # not a credible game-day publication for this game
         validated = _snapshot_player_ids(raw)
         if validated is None:
+            continue
+        # The candidate must be on the verified official game-day
+        # roster; absence from an unrelated partition proves nothing.
+        if candidate_id not in {str(v).strip() for v in
+                                raw.get("gameday_roster_player_ids")}:
             continue
         valid.setdefault(published_at, set()).add(tuple(sorted(validated)))
     if valid:
