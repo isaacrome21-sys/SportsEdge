@@ -206,6 +206,15 @@ IMPOSSIBLE_TOTAL = "PROBABILITY_TOTAL_IMPOSSIBLE"
 _SIGNED_LINE_MARKETS = ("SPREAD", "RUN_LINE", "RUNLINE", "PUCK_LINE", "HANDICAP", "ATS")
 
 
+def _is_signed_line_market(market):
+    """Spread-like markets, whatever the spacing/case/punctuation:
+    'Run Line', 'puck-line', 'Point Spread', 'RUNLINE', 'ATS'."""
+    tokens = re.sub(r"[^A-Z0-9]+", " ", str(market or "").upper()).split()
+    joined = "_".join(tokens)
+    return (any(t in {"SPREAD", "SPREADS", "HANDICAP", "ATS", "RUNLINE", "PUCKLINE"} for t in tokens)
+            or "RUN_LINE" in joined or "PUCK_LINE" in joined)
+
+
 def _line_value(line):
     if line is None:
         return None
@@ -219,7 +228,7 @@ def _complementary(a, b):
     for signed-line (spread-like) markets only -- at exactly opposite lines.
     abs(line) is never used, so different lines are never merged."""
     la, lb = _line_value(a.get("line")), _line_value(b.get("line"))
-    signed = any(tag in str(a.get("market") or "").upper() for tag in _SIGNED_LINE_MARKETS)
+    signed = _is_signed_line_market(a.get("market"))
     if signed:
         # A -3 / B +3 are one contract; A +3 / B +3 are two different contracts.
         return isinstance(la, float) and isinstance(lb, float) and la == -lb
