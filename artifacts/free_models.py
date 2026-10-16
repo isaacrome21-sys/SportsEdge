@@ -26,6 +26,7 @@ from sportsedge.quote_freshness import (
     is_fresh as quote_is_fresh,
 )
 from sportsedge.pricing_provenance import (
+    is_lane_a_label,
     ANCHORED_PLAY_BLOCK,
     ANCHORED_WATCH_STATUS,
     LANE_MARKET_ANCHORED as PROVENANCE_MARKET_ANCHORED,
@@ -1642,8 +1643,8 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
         projection = row.get("independent_projection")
         if not isinstance(projection, dict):
             continue
-        if (row.get("pricing_provenance") or {}).get(
-                "engine_lane") == LANE_A or row.get("pricing_lane") == LANE_A:
+        if is_lane_a_label((row.get("pricing_provenance") or {}).get(
+                "engine_lane")) or is_lane_a_label(row.get("pricing_lane")):
             # Owner ruling t207u: Lane A is retired from actionable cards.
             # Its output is a labeled research diagnostic only -- never a
             # lean, candidate, watch position, or graded position.
@@ -1697,6 +1698,11 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
     # fail safe instead of rendering anchored "edges".
     lane_b_watchlist = []
     for r in all_rows:
+        if is_lane_a_label(r.get("pricing_lane")) or is_lane_a_label(
+                (r.get("pricing_provenance") or {}).get("engine_lane")):
+            # t207u: a row whose primary lane is A is a retired-lane
+            # diagnostic; its Lane B side view never makes it a watch.
+            continue
         if r.get("status") in {"WATCH_NFL_NO_VERIFIED_CONTEXT",
                               "WATCH_NFL_TOTAL_PRIOR_ONLY"}:
             continue

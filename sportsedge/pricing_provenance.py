@@ -84,6 +84,11 @@ GATED_STATUSES = PLAY_SURFACE_STATUSES | {"PRICED_RESEARCH"}
 # Its output may appear only as a labeled research diagnostic: never a
 # lean, candidate, PLAY, or position.  Historical results are untouched.
 LANE_A_ENGINE_LANE = "LANE_A_INDEPENDENT"
+
+
+def is_lane_a_label(value: Any) -> bool:
+    """Case/whitespace-insensitive Lane A detection (audit LOW)."""
+    return isinstance(value, str) and value.strip().upper() == LANE_A_ENGINE_LANE
 LANE_A_RETIRED_STATUS = "RESEARCH_DIAGNOSTIC_LANE_A_RETIRED"
 LANE_A_RETIRED_PLAY_BLOCK = "LANE_A_RETIRED_FROM_ACTIONABLE_CARDS_T207U"
 LANE_A_RETIRED_EV_PRESENTATION = "DIAGNOSTIC_ONLY_LANE_A_RETIRED"
@@ -103,6 +108,8 @@ def game_lane_mechanism(market: Any) -> str:
 def provenance_for_game_result(result: Mapping[str, Any]) -> dict[str, Any]:
     """Classify a free_models game result from its declared pricing lane."""
     lane = str(result.get("pricing_lane") or "")
+    if is_lane_a_label(lane):
+        lane = LANE_A_ENGINE_LANE
     if lane == "LANE_A_INDEPENDENT":
         return {"lane": LANE_INDEPENDENT, "mechanism": None,
                 "source": "FREE_MODELS_LANE_A_INDEPENDENT",
@@ -209,9 +216,9 @@ def is_play_eligible(row: Mapping[str, Any]) -> bool:
 
 def _is_lane_a(row: Mapping[str, Any]) -> bool:
     prov = row.get("pricing_provenance")
-    if isinstance(prov, dict) and prov.get("engine_lane") == LANE_A_ENGINE_LANE:
+    if isinstance(prov, dict) and is_lane_a_label(prov.get("engine_lane")):
         return True
-    return row.get("pricing_lane") == LANE_A_ENGINE_LANE
+    return is_lane_a_label(row.get("pricing_lane"))
 
 
 def apply_play_gate(
@@ -242,6 +249,8 @@ def apply_play_gate(
     for row in rows:
         if not isinstance(row, dict):
             continue
+        if is_lane_a_label(row.get("pricing_lane")):
+            row["pricing_lane"] = LANE_A_ENGINE_LANE  # normalise spelling
         prov = determine_provenance(
             row, distribution_provenance=distribution_provenance)
         status = row.get("status")
@@ -275,6 +284,7 @@ def apply_play_gate(
         if status not in GATED_STATUSES:
             continue
         if _is_lane_a(row):
+            row["pricing_lane"] = LANE_A_ENGINE_LANE  # normalised spelling
             # A play-surface status (lean/candidate/edge) is demoted; a
             # non-actionable PRICED_RESEARCH row keeps its status so
             # coverage accounting is unchanged, but is labeled too.

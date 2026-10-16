@@ -10,6 +10,7 @@ from math import isfinite
 import re
 
 from sportsedge.quote_freshness import is_fresh
+from sportsedge.pricing_provenance import is_lane_a_label
 
 CANDIDATE_STATUSES = frozenset({
     "RESEARCH_POSITIVE_EV_UNVALIDATED", "RESEARCH_CANDIDATE_NOT_VALIDATED",
@@ -58,6 +59,14 @@ def _disposition(row, min_ev):
     status = str(row.get("status") or "MISSING_STATUS")
     probability, ev, anchored = _metrics(row)
     priced = probability is not None and ev is not None
+    provenance_ = row.get("pricing_provenance")
+    if (str(row.get("status") or "") == "RESEARCH_DIAGNOSTIC_LANE_A_RETIRED"
+            or is_lane_a_label(row.get("pricing_lane"))
+            or (isinstance(provenance_, dict)
+                and is_lane_a_label(provenance_.get("engine_lane")))):
+        # t207u: Lane A is retired; never ranked as LEAN/WATCH/PASS.
+        return ("RESEARCH DIAGNOSTIC", "diagnostic",
+                "Lane A retired from actionable cards (t207u)")
     if status.startswith("BLOCKED") or status in {"NO_MODEL_OR_MARKET", "NO_ENGINE", "NO_QUOTE", "MISSING_STATUS"}:
         return "BLOCKED", "blocked", row.get("reason") or status
     if (row.get("independent_projection") is not None
