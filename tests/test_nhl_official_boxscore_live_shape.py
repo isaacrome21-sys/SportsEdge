@@ -27,7 +27,13 @@ def _live():
     legacy["playerByGameStats"] = box["playerByGameStats"]
     linescore = copy.deepcopy(box["linescore"])
     linescore["totals"] = {"away": 3, "home": 4}
+    legacy["gameOutcome"] = {"lastPeriodType": "OT"}
+    legacy["periodDescriptor"] = {"number": 4, "periodType": "OT", "maxRegulationPeriods": 3}
     rail = {
+        "seasonSeries": [{"id": 2026020001}, {"id": 2026020777}],
+        "gameReports": {
+            "gameSummary": "https://www.nhl.com/scores/htmlreports/20262027/GS020001.HTM",
+        },
         "linescore": linescore,
         "shotsByPeriod": [
             {"periodDescriptor": {"number": 1, "periodType": "REG"}, "away": 10, "home": 12},
