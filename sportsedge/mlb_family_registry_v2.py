@@ -47,8 +47,13 @@ def settle_pitcher_pitches(stat: Mapping[str, Any], line: float, side: str) -> s
         raise ValueError("PITCHER_PITCHES_OFFICIAL_COUNT_MISSING")
     # Fail closed (t211u): a NaN/inf/non-real line compares False both
     # ways and would silently settle UNDER as WIN.
-    if isinstance(line, bool) or not isinstance(line, (int, float)) \
-            or not math.isfinite(line):
+    try:
+        valid_line = (not isinstance(line, bool)
+                      and isinstance(line, (int, float))
+                      and math.isfinite(line) and line >= 0)
+    except (OverflowError, TypeError, ValueError):
+        valid_line = False
+    if not valid_line:
         raise ValueError("PITCHER_PITCHES_LINE_INVALID")
     s = str(side).strip().upper()
     if s not in {"OVER", "UNDER"}:
@@ -57,3 +62,26 @@ def settle_pitcher_pitches(stat: Mapping[str, Any], line: float, side: str) -> s
         return "PUSH"
     over = n > line
     return "WIN" if over == (s == "OVER") else "LOSS"
+
+
+def coverage_resolution_v2(sport: str, market: str) -> dict[str, Any] | None:
+    """Expose the existing research route and its verdict outside V1's census.
+
+    This is metadata for an already-wired research pricer, not a validation
+    or receipt-admission decision. No V1 catalog or evidence set is extended.
+    """
+    if str(sport).upper() != "MLB" or str(market).upper() != "PITCHER_PITCHES":
+        return None
+    fam = REGISTRY_V2["families"]["PITCHER_PITCHES"]
+    return {
+        "sport": "MLB", "market": "PITCHER_PITCHES", "state": "PRICED_PATH",
+        "engine": fam["pricer"], "blocker": None,
+        "detail": "Existing measured pitch-count research route; M29 "
+                  "DOES_NOT_BEAT_BASELINE. V2 registration is non-promotable; "
+                  "quote/PIT/receipt and per-family validation are separate.",
+        "validation_status": fam["evidence"]["M29"]["verdict"],
+        "registry_schema": REGISTRY_V2["schema_version"],
+        "registration_state": fam["registration_state"],
+        "evidence_group": fam["evidence_group"],
+        "research_only": True, "promotable": False,
+    }

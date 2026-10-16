@@ -42,7 +42,7 @@ def test_registration_is_research_only_and_non_promotable():
     fam = load_registry_v2()["families"]["PITCHER_PITCHES"]
     assert fam["status"] == "RESEARCH_ONLY"
     assert fam["promotable"] is False
-    assert fam["registration_state"] == "PENDING_OWNER_REVIEW"
+    assert fam["registration_state"] == "REGISTERED_RESEARCH_ONLY"
     assert fam["evidence"]["M29"]["verdict"] == "DOES_NOT_BEAT_BASELINE"
     assert fam["one_sided_no_vig"] == "UNAVAILABLE"
     assert fam["settlement_field"] == "numberOfPitches"

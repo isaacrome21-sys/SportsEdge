@@ -426,7 +426,7 @@ def _as_of_instant(as_of):
     return instant.astimezone(timezone.utc)
 
 
-def run_full(payload, *, now=None, as_of=None, historical=False, getter=None,
+def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=None,
              auto_context=True, min_ev=0.02, lane="A", allow_manual_context=False,
              td_cache_dir=None, td_opener=None, form2_bundles_dir=None,
              form2_manifest_sha256=None, form2_manifest_bytes=None):
@@ -1533,6 +1533,65 @@ def main(argv=None):
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered, encoding="utf-8")
     print(rendered)
+
+
+_ACCOUNTED_SURFACES = ("edges", "independent_candidates", "independent_watchlist")
+
+
+def attach_position_accounting(card):
+    """Attach correlated-stack position accounting (research only).
+
+    Surfaced rows sharing a game (or an explicit thesis_id) count as ONE
+    position, so a card cannot present one thesis as N positions. Adds no
+    probability, EV, or stake; rows without a correlation key are named.
+    """
+    from sportsedge.card_correlation import grade_card_positions
+    seen, legs, unkeyed = set(), [], []
+    for surface in _ACCOUNTED_SURFACES:
+        for r in card.get(surface) or ():
+            if not isinstance(r, dict):
+                continue
+            ident = (r.get("input_index"), r.get("game_id") or r.get("game"),
+                     r.get("thesis_id"), r.get("selection"))
+            if ident in seen:
+                continue
+            seen.add(ident)
+            game = r.get("game_id") or r.get("game")
+            thesis = r.get("thesis_id")
+            if not game and not thesis:
+                unkeyed.append(r.get("input_index"))
+                continue
+            leg = {"selection": r.get("selection"), "input_index": r.get("input_index")}
+            if game:
+                leg["game_id"] = str(game)
+            if thesis:
+                leg["thesis_id"] = str(thesis)
+            if r.get("result") is not None:
+                leg["result"] = r["result"]
+            legs.append(leg)
+    try:
+        pa = grade_card_positions(legs)
+    except ValueError as exc:
+        pa = {"positions": None, "legs": len(legs), "stacks": [],
+              "accounting": "CORRELATED_STACK_AS_SINGLE_POSITION",
+              "unkeyed_rows": unkeyed,
+              "status": f"ACCOUNTING_REFUSED:{exc}"[:200]}
+        card["position_accounting"] = pa
+        summary = card.setdefault("summary", {})
+        summary["surfaced_positions"] = None
+        summary["surfaced_legs"] = len(legs)
+        return card
+    pa["unkeyed_rows"] = unkeyed
+    pa["status"] = "INCOMPLETE_CORRELATION_KEYS" if unkeyed else "COMPLETE"
+    card["position_accounting"] = pa
+    summary = card.setdefault("summary", {})
+    summary["surfaced_positions"] = pa["positions"]
+    summary["surfaced_legs"] = pa["legs"]
+    return card
+
+
+def run_full(*args, **kwargs):
+    return attach_position_accounting(_run_full_impl(*args, **kwargs))
 
 
 if __name__ == "__main__":

@@ -479,6 +479,13 @@ def resolve_market(sport, market):
     alias = INTAKE_ALIASES.get(sport, {}).get(str(market or "").upper())
     if alias is not None:
         return dict(MARKET_RESOLUTIONS[(sport, alias)])
+    # The versioned pitch-count extension names its failed validation
+    # verdict without changing the frozen 89-market V1 census or granting
+    # authority to the existing research pricing route.
+    from sportsedge.mlb_family_registry_v2 import coverage_resolution_v2
+    extension = coverage_resolution_v2(sport, market)
+    if extension is not None:
+        return extension
     # t134 (#2219): CFB/NBA/CBB resolve through the isolated family
     # registry so the canonical lookup can never return None (= pass
     # through) for them. Always BLOCKED; not part of the 89-market matrix.

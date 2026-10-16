@@ -9,7 +9,7 @@
   "families": {
     "PITCHER_PITCHES": {
       "status": "RESEARCH_ONLY",
-      "registration_state": "PENDING_OWNER_REVIEW",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
       "promotable": false,
       "pricer": "sportsedge.mlb_phone_pitcher_pricing (merged #2276, d791f618)",
       "evidence_group": "PITCHER_PITCH_COUNT_V2",
