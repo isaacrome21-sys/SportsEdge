@@ -1,0 +1,50 @@
+{
+  "access": "public, unauthenticated, free; no keys",
+  "bundles_sha256": {
+    "boxscores.jsonl.gz": "73fce31ea71d953a41d9f1b4d792862fc39aed8295d354f4fd1d2923402d8343",
+    "hitting_gamelogs.jsonl.gz": "727494ee43d3c9503710266921617c06ebd07f6743f8c673468c199a53ca0551",
+    "pitching_gamelogs.jsonl.gz": "2e879cec63c631d5821eb06bae426229c6871de475c6aee9403c2afa8a4803ec",
+    "players.jsonl.gz": "3355fd10e66e0d0ac0fa72f85e6aeeab56b82cd21940747d6f2c3651a280aff8",
+    "schedule.jsonl.gz": "dd5f3ae6c84b486f206332153caf984d3d6d5fb27477c112f05c53deb40b8bc5"
+  },
+  "completeness": {
+    "boxscores_checked": true,
+    "fetch_failures": 0,
+    "final_regular_games": 2429,
+    "games_missing_both_starters": [],
+    "games_missing_boxscore": [],
+    "games_with_more_than_two_starters": [],
+    "games_with_one_starter": [],
+    "games_with_two_starters": 2429,
+    "rule": "COMPLETE iff zero fetch failures and every Final REG game has exactly two gamesStarted==1 pitching rows and a boxscore payload",
+    "start_rows_outside_final_schedule": 0,
+    "status": "COMPLETE"
+  },
+  "failures": [],
+  "is_not": [
+    "PREGAME_SNAPSHOT",
+    "ISSUE_2344_RECOVERED_ORIGINAL"
+  ],
+  "license_handling": "Third-party data; research use; source copyright notice recorded verbatim; not redistributed beyond this repository's staging data branch.",
+  "license_notice_from_source": "Copyright 2026 MLB Advanced Media, L.P.  Use of any content on this page acknowledges agreement to the terms posted here http://gdx.mlb.com/components/copyright.txt",
+  "payload_counts": {
+    "boxscores": 2429,
+    "hitters_listed": 674,
+    "hitting_gamelogs": 674,
+    "pitchers_listed": 839,
+    "pitching_gamelogs": 839,
+    "players": 1,
+    "schedule_months": 8
+  },
+  "provenance_label": "ACQUIRED_POSTHOC_FROM_PUBLIC_STATSAPI",
+  "rate_limit_seconds_min_interval": 0.25,
+  "run": {
+    "finished_at_utc": "2026-10-17T13:10:56.351739+00:00",
+    "head_sha": "b90a08dd5190aa9f313b3ee59090b2ec081ed988",
+    "ref": "refs/heads/feat/mlb-statsapi-history-job-20261017",
+    "run_id": "39032124764"
+  },
+  "schema": "SPORTSEDGE_STATSAPI_HISTORY_BUNDLE_V1",
+  "season": 2026,
+  "source": "https://statsapi.mlb.com/api/v1"
+}
