@@ -29,3 +29,7 @@ Failing leg in every case: vs B2⊗B2. ER failure was declared expected (§4).
 - But per-pitcher information on top of the league distribution adds no proven value at the pair level;
   HA misses the gate by a CI upper bound of +0.00004.
 - Gate `EITHER_PITCHER_MARGINAL_TAIL_ERROR` stays in place. No promotion, no market use. K is not re-tuned.
+
+## Independent verification
+
+A separate verifier re-ran from a fresh checkout of `8285107a`: result sha256 `d827f294…f464` reproduced, prereg/engine hashes PASS, no lookahead or off-by-one found, its own no-import recomputation matched pooled Brier for CHALLENGER and B2 on all three stats, hand check PASS. Verdicts supported. Note: the HA miss vs B2 is knife-edge (+0.00004), but the seed was fixed in advance, so it stands.
