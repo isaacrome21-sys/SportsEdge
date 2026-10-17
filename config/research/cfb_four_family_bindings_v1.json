@@ -1,0 +1,335 @@
+{
+ "bindings": "CFB_FOUR_FAMILY_BINDINGS_V1",
+ "fbs_membership_overrides": {
+  "basis": "NCAA FBS reclassification public record; each entry lists the seasons in which the program's FBS status differs from the current-state directory table. The freeze ratifies or replaces this table.",
+  "status": "BINDINGS_DECLARED_NOT_OWNER_RULED",
+  "teams": [
+   {
+    "fcs_seasons": [
+     2013
+    ],
+    "school": "Appalachian State",
+    "table_classification": "fbs",
+    "team_id": "2026"
+   },
+   {
+    "fcs_seasons": [
+     2013
+    ],
+    "school": "Georgia Southern",
+    "table_classification": "fbs",
+    "team_id": "290"
+   },
+   {
+    "fcs_seasons": [
+     2013
+    ],
+    "school": "Old Dominion",
+    "table_classification": "fbs",
+    "team_id": "295"
+   },
+   {
+    "fcs_seasons": [
+     2013,
+     2014
+    ],
+    "school": "Charlotte",
+    "table_classification": "fbs",
+    "team_id": "2429"
+   },
+   {
+    "fcs_seasons": [
+     2013,
+     2014,
+     2015,
+     2016
+    ],
+    "school": "Coastal Carolina",
+    "table_classification": "fbs",
+    "team_id": "324"
+   },
+   {
+    "fcs_seasons": [
+     2013,
+     2014,
+     2015,
+     2016,
+     2017
+    ],
+    "school": "Liberty",
+    "table_classification": "fbs",
+    "team_id": "2335"
+   },
+   {
+    "fcs_seasons": [
+     2013,
+     2014,
+     2015,
+     2016,
+     2017,
+     2018,
+     2019,
+     2020,
+     2021
+    ],
+    "school": "James Madison",
+    "table_classification": "fbs",
+    "team_id": "256"
+   },
+   {
+    "fcs_seasons": [
+     2013,
+     2014,
+     2015,
+     2016,
+     2017,
+     2018,
+     2019,
+     2020,
+     2021,
+     2022
+    ],
+    "school": "Sam Houston State",
+    "table_classification": "fbs",
+    "team_id": "2534"
+   },
+   {
+    "fcs_seasons": [
+     2013,
+     2014,
+     2015,
+     2016,
+     2017,
+     2018,
+     2019,
+     2020,
+     2021,
+     2022
+    ],
+    "school": "Jacksonville State",
+    "table_classification": "fbs",
+    "team_id": "55"
+   },
+   {
+    "fcs_seasons": [
+     2013,
+     2014,
+     2015,
+     2016,
+     2017,
+     2018,
+     2019,
+     2020,
+     2021,
+     2022,
+     2023
+    ],
+    "school": "Kennesaw State",
+    "table_classification": "fbs",
+    "team_id": "338"
+   },
+   {
+    "fbs_seasons": [
+     2025
+    ],
+    "school": "Delaware",
+    "table_classification": "fcs",
+    "team_id": "48"
+   },
+   {
+    "fbs_seasons": [
+     2025
+    ],
+    "school": "Missouri State",
+    "table_classification": "fcs",
+    "team_id": "2623"
+   },
+   {
+    "fbs_seasons": [
+     2013,
+     2014,
+     2015,
+     2016,
+     2017
+    ],
+    "school": "Idaho",
+    "table_classification": "fcs",
+    "team_id": "70"
+   }
+  ],
+  "version": "FBS_MEMBERSHIP_OVERRIDES_V1"
+ },
+ "harness_config": "config/research/cfb_four_family_evaluation_v1.json",
+ "program": "CFB_FOUR_FAMILY_EVALUATION_V1",
+ "rulings": {
+  "candidate_mode": "CAND_2_INJURY_NEUTRAL",
+  "cfbd_role": "DESCRIPTIVE_ONLY",
+  "cfbd_verification_steps_completed": false,
+  "decided_by": "Isaac (owner), delegated to Rocky's judgment 2026-10-13 ~21:57 CT",
+  "execution_authorized": false,
+  "fold_window": "SEASONS_2021_2025",
+  "freeze_sha": null,
+  "note": "Rulings recorded here for the bindings layer and the dry-run manifest. The harness's shipped config keeps its UNRULED switches; applying these rulings to that config is part of the freeze step. freeze_sha stays null: naming it is a reserved owner act at freeze time.",
+  "population_rule": "EXCLUDE_FCS_OPPONENTS",
+  "status": "RULED"
+ },
+ "snapshots": {
+  "descriptive_label": "DESCRIPTIVE_MARKET_COMPARISON_NOT_A_VERDICT",
+  "directory_schema": "SPORTSEDGE_CFB_DIRECTORY_SNAPSHOT_V1",
+  "lines_schema": "SPORTSEDGE_CFB_LINES_SNAPSHOT_V1",
+  "results_schema": "SPORTSEDGE_CFB_RESULTS_SNAPSHOT_V1"
+ },
+ "sources": {
+  "lines": {
+   "cfbd_era_seasons": [
+    2020,
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "config": "config/research/cfb_historical_market_source_v1.json",
+   "designated_provider": "Bovada",
+   "designated_provider_status": "BINDINGS_DEFAULT_NOT_OWNER_RULED",
+   "expected_git_blob_sha1": "fe568cf1ef50794c80fdbbbff6a8e1061f76528e",
+   "expected_sha256": "7ae899d9035750dccf22470d7923087a2659052aeb37a44204c35fbf6bf38d4d",
+   "expected_size_bytes": 7047701,
+   "limitations": {
+    "close_time_certified": false,
+    "decision_time_certified": false,
+    "paired_two_sided_quote_certified": false,
+    "per_row_pit_certified": false,
+    "retrospective_archive": true
+   },
+   "raw_url": "https://raw.githubusercontent.com/sportsdataverse/cfbfastR-data/f5a05dc815951b8dbe18961a824f34cf154dfa61/betting/csv/cfb_line_odds.csv.gz",
+   "restrictions_version": "CFB_MARKET_RESTRICTIONS_V2",
+   "snapshot_seasons": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "source_id": "CFB_HISTORICAL_MARKET_SOURCE_V1",
+   "upstream_commit": "f5a05dc815951b8dbe18961a824f34cf154dfa61",
+   "upstream_path": "betting/csv/cfb_line_odds.csv.gz",
+   "upstream_repository": "sportsdataverse/cfbfastR-data"
+  },
+  "schedules": {
+   "contract": "CFB_SPORTSDATAVERSE_RELEASE_V1",
+   "data_branch": "origin/data",
+   "data_branch_commit": "40f164b454ef9a36e9b7dcfca7a6b1972732c3ce",
+   "release_id": 101941072,
+   "release_tag": "espn_cfb_schedules",
+   "repository": "sportsdataverse/sportsdataverse-data",
+   "seasons": {
+    "2013": {
+     "asset_name": "cfb_schedule_2013.csv.gz",
+     "pin_source": "GITHUB_RELEASE_API_DIGEST",
+     "sha256": "b4fa660289b3ee618f6a5b398701ac5285b0bcfa8b7dacb36a5b898ef4752a07",
+     "size_bytes": 29822
+    },
+    "2014": {
+     "asset_name": "cfb_schedule_2014.csv.gz",
+     "pin_source": "GITHUB_RELEASE_API_DIGEST",
+     "sha256": "e414f7ff0c31f6a23320fa7fb6e0fad0ee7f54fcda7e085ae32102c754dd3562",
+     "size_bytes": 30304
+    },
+    "2015": {
+     "asset_name": "cfb_schedule_2015.csv.gz",
+     "pin_source": "GITHUB_RELEASE_API_DIGEST",
+     "sha256": "f6efc44b1dfa424ad094cb609a3f221bad90a3ce942d5e7259f79921d3efd5ab",
+     "size_bytes": 30382
+    },
+    "2016": {
+     "asset_name": "cfb_schedule_2016.csv.gz",
+     "pin_source": "GITHUB_RELEASE_API_DIGEST",
+     "sha256": "b06b040c38aa8b1411b5bdfafb3d37fa6d237e2de667eebccac8506354d59b9b",
+     "size_bytes": 30526
+    },
+    "2017": {
+     "asset_name": "cfb_schedule_2017.csv.gz",
+     "pin_source": "GITHUB_RELEASE_API_DIGEST",
+     "sha256": "3e295d03ab816fd1c03955e8932fe089a88ffebbcddf768bb4b617a6c0a3f7ca",
+     "size_bytes": 30718
+    },
+    "2018": {
+     "asset_name": "cfb_schedule_2018.csv.gz",
+     "pin_source": "GITHUB_RELEASE_API_DIGEST",
+     "sha256": "2cbaa0c3b785f0d2d7d4a7614bdc2a30abfb6f5bbeee3e7ed567c4dafa7287d3",
+     "size_bytes": 31227
+    },
+    "2019": {
+     "asset_name": "cfb_schedule_2019.csv.gz",
+     "pin_source": "GITHUB_RELEASE_API_DIGEST",
+     "sha256": "e85fa562d7d2065b1ac3d384bb83785619c8adbe6c4b586f43402ae428c6eaf1",
+     "size_bytes": 31096
+    },
+    "2020": {
+     "asset_name": "cfb_schedule_2020.csv.gz",
+     "pin_source": "GITHUB_RELEASE_API_DIGEST",
+     "sha256": "64cc43834ee7da1e6b6e65362b45dab362c3748d9b42ce1224561f14634f14e4",
+     "size_bytes": 22191
+    },
+    "2021": {
+     "asset_id": 474295987,
+     "asset_name": "cfb_schedule_2021.csv.gz",
+     "pin_source": "IN_REPO_DATA_BRANCH_MANIFEST",
+     "row_count": 895,
+     "sha256": "0fd757f0152e93cb1e03cd0f1038a5c2a7626e48589d194d2f80d38135d2c869",
+     "size_bytes": 31113
+    },
+    "2022": {
+     "asset_id": 474295999,
+     "asset_name": "cfb_schedule_2022.csv.gz",
+     "pin_source": "IN_REPO_DATA_BRANCH_MANIFEST",
+     "row_count": 904,
+     "sha256": "1053ceb10a0d73b5e04bc234cef449262db7ade8e622d389db2756675c7cb3c5",
+     "size_bytes": 31466
+    },
+    "2023": {
+     "asset_id": 474296023,
+     "asset_name": "cfb_schedule_2023.csv.gz",
+     "pin_source": "IN_REPO_DATA_BRANCH_MANIFEST",
+     "row_count": 911,
+     "sha256": "ba9743c99636ed04dcb6177088e44c7db19cd93eb2ad7d9977d05e392b62aefd",
+     "size_bytes": 31460
+    },
+    "2024": {
+     "asset_id": 481501147,
+     "asset_name": "cfb_schedule_2024.csv.gz",
+     "pin_source": "IN_REPO_DATA_BRANCH_MANIFEST",
+     "row_count": 966,
+     "sha256": "4fb9c661e76a9ecc3748878a7e5d6a3aa9cb9b6c82140e44a1812151e6e16645",
+     "size_bytes": 33299
+    },
+    "2025": {
+     "asset_id": 474297192,
+     "asset_name": "cfb_schedule_2025.csv.gz",
+     "pin_source": "IN_REPO_DATA_BRANCH_MANIFEST",
+     "row_count": 958,
+     "sha256": "9666c50349255005ea1912aba26851eb8184602a7b79580176990807d6f1a9ff",
+     "size_bytes": 33168
+    }
+   }
+  },
+  "team_directory": {
+   "espn_live_directory_reference": {
+    "role": "CONTEXT_ONLY \u2014 the live 2026 directory is not historical membership evidence and is not used as the population identity source; the CFBD table above (1,840 ids, all divisions) is the binding source.",
+    "team_count_live_verified": 762,
+    "verified_by": "companion work 2026-10-13 (PR #2200; PublicContext directory floor CFB=700)"
+   },
+   "identity_table": {
+    "commit": "f5a05dc815951b8dbe18961a824f34cf154dfa61",
+    "finding": "The per-season cfb_team_info files in this repository are a single current-state teams table stamped per year (the 2013 and 2021 files agree on conference+classification for all 1,840 shared teams; James Madison is listed Sun Belt/FBS in the nominal 2021 file although it was CAA/FCS that season). The table is bound as IDENTITY + CURRENT-STATE classification only; season-effective FBS membership comes from fbs_membership_overrides below.",
+    "git_blob_sha1": "c94db36d0d3835c1b6fce78cafa0e68f328124dd",
+    "path": "team_info/parquet/cfb_team_info_2024.parquet",
+    "repository": "sportsdataverse/cfbfastR-data",
+    "sha256": "503549b9b3c4b5c40accbb58d8ebf38d6555f369a883be4d42dcee27cfbda808",
+    "size_bytes": 133323
+   }
+  }
+ },
+ "status": "BINDINGS_BUILT_NOT_EXECUTED"
+}
