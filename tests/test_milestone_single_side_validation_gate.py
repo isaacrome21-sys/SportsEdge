@@ -81,7 +81,7 @@ def test_one_sided_nfl_yardage_refuses_naming_validation_state():
               [quote(sport="NFL", market="PLAYER_PASSING_YARDS", line=250.5,
                      player="qb-9")])
     assert row["status"] == "NO_MODEL_OR_MARKET"
-    assert row["reason"] == "MILESTONE_SINGLE_SIDE_REQUIRES_VALIDATED_MODEL:NOT_RUN"
+    assert row["reason"] == "MILESTONE_SINGLE_SIDE_REQUIRES_VALIDATED_MODEL:NOT_VALIDATED"
 
 
 def test_one_sided_under_milestone_also_gated_on_validation():

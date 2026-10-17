@@ -357,7 +357,7 @@ def test_nfl_passing_ladder_reaches_empirical_stage():
     # At the stage level (where governance admits the empirical pricer),
     # expanded rung rows verify identity from ESPN gamelogs, the model
     # runs, and each one-sided row takes the bridge's single-side
-    # validation gate (passing_yards family state: NOT_RUN).
+    # validation gate (passing_yards family state: NOT_VALIDATED).
     from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
     row = _stafford_ladder_row()
     row["market"] = "PLAYER_PASSING_YARDS"  # canonical stage-level name
@@ -368,7 +368,7 @@ def test_nfl_passing_ladder_reaches_empirical_stage():
     assert len(results) == 3 and len(receipts) == 1
     for r in results:
         assert r["status"] == "NO_MODEL_OR_MARKET", r
-        assert ("MILESTONE_SINGLE_SIDE_REQUIRES_VALIDATED_MODEL:NOT_RUN"
+        assert ("MILESTONE_SINGLE_SIDE_REQUIRES_VALIDATED_MODEL:NOT_VALIDATED"
                 in (r.get("reason") or ""))
         assert r["source"] == "FREE_ESPN_NFL_GAMELOG"
         assert r["prior_game_count"] == 7
