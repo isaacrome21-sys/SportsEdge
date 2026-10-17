@@ -50,24 +50,34 @@ def main(argv=None) -> int:
     months = [int(m) for m in args.months.split(",")]
     sched, sfail = sh.acquire([sh.schedule_url(args.season, m) for m in months], fetch)
     logs, lfail = sh.acquire([sh.pitching_log_url(i, args.season) for i in ids], fetch)
-    failures = pfail + sfail + lfail
+    final_games = sh.final_regular_games(json.loads(r["body"]) for r in sched)
+    hids = sh.hitter_ids(pbody)
+    hlogs, hfail = sh.acquire([sh.hitting_log_url(i, args.season) for i in hids], fetch)
+    boxes, bfail = sh.acquire([sh.boxscore_url(g) for g in sorted(final_games)], fetch)
+    box_games = {int(r["url"].split("/game/")[1].split("/")[0]) for r in boxes}
+    failures = pfail + sfail + lfail + hfail + bfail
 
     bundles = {
         "players.jsonl.gz": sh.write_bundle(str(out / "players.jsonl.gz"), players),
         "schedule.jsonl.gz": sh.write_bundle(str(out / "schedule.jsonl.gz"), sched),
         "pitching_gamelogs.jsonl.gz": sh.write_bundle(
             str(out / "pitching_gamelogs.jsonl.gz"), logs),
+        "hitting_gamelogs.jsonl.gz": sh.write_bundle(
+            str(out / "hitting_gamelogs.jsonl.gz"), hlogs),
+        "boxscores.jsonl.gz": sh.write_bundle(str(out / "boxscores.jsonl.gz"), boxes),
     }
     comp = sh.completeness(
-        sh.final_regular_games(json.loads(r["body"]) for r in sched),
-        sh.starts_by_game(json.loads(r["body"]) for r in logs), failures)
+        final_games, sh.starts_by_game(json.loads(r["body"]) for r in logs), failures,
+        boxscore_games=box_games)
     run = {"run_id": os.environ.get("GITHUB_RUN_ID", "local"),
            "head_sha": os.environ.get("GITHUB_SHA", "local"),
            "ref": os.environ.get("GITHUB_REF", "local"),
            "finished_at_utc": datetime.now(timezone.utc).isoformat()}
     man = sh.manifest(args.season, bundles,
                       {"players": len(players), "schedule_months": len(sched),
-                       "pitching_gamelogs": len(logs), "pitchers_listed": len(ids)},
+                       "pitching_gamelogs": len(logs), "pitchers_listed": len(ids),
+                       "hitting_gamelogs": len(hlogs), "hitters_listed": len(hids),
+                       "boxscores": len(boxes)},
                       comp, failures, copyright_text, run)
     (out / "manifest.json").write_text(json.dumps(man, indent=2, sort_keys=True) + "\n")
     print(json.dumps({"season": args.season, "status": comp["status"],

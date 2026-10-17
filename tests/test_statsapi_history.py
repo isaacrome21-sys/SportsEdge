@@ -99,3 +99,15 @@ def test_cancelled_final_games_are_not_counted_as_played():
     final = sh.final_regular_games([_sched([(746577, "Final", "Cancelled"),
                                             (1, "Final", "Final")])])
     assert final == {1}
+
+
+def test_hitters_and_boxscore_completeness():
+    body = {"people": [{"id": 5, "primaryPosition": {"type": "Pitcher"}},
+                       {"id": 7, "primaryPosition": {"type": "Infielder"}},
+                       {"id": 9, "primaryPosition": {"type": "Two-Way Player"}}]}
+    assert sh.hitter_ids(body) == [7, 9]
+    assert sh.hitting_log_url(7, 2026).endswith("group=hitting&season=2026")
+    starts = sh.starts_by_game([_log([(1, 1), (1, 1)])])
+    assert sh.completeness({1}, starts, [], boxscore_games={1})["status"] == "COMPLETE"
+    c = sh.completeness({1}, starts, [], boxscore_games=set())
+    assert c["status"] == "INCOMPLETE" and c["games_missing_boxscore"] == [1]

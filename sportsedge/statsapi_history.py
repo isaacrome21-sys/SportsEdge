@@ -13,7 +13,9 @@ PROVENANCE CONTRACT (owner ruling 9, Oct 17 2026):
   SHA-256, the request URL, and the retrieval timestamp.
 * A season bundle is COMPLETE only if (a) every requested URL succeeded,
   and (b) every Final regular-season game in the schedule has exactly two
-  starting-pitcher rows (gamesStarted == 1) across the pitching game logs.
+  starting-pitcher rows (gamesStarted == 1) across the pitching game logs,
+  and (c) every such game has a boxscore payload. Hitting game logs for
+  every non-pitcher listed player are also bundled (#2368 batter families).
   Anything else is INCOMPLETE, with the exact gaps listed. It is never
   rounded up.
 """
@@ -44,6 +46,16 @@ def players_url(season: int) -> str:
 def pitching_log_url(player_id: int, season: int) -> str:
     return (f"{ROOT}/people/{player_id}/stats?stats=gameLog"
             f"&group=pitching&season={season}&gameType=R")
+
+
+def hitting_log_url(player_id: int, season: int) -> str:
+    # Same URL form as the #2368 batter-props evaluator's cache keys.
+    return (f"{ROOT}/people/{player_id}/stats?stats=gameLog"
+            f"&group=hitting&season={season}")
+
+
+def boxscore_url(game_pk: int) -> str:
+    return f"{ROOT}/game/{game_pk}/boxscore"
 
 
 def schedule_url(season: int, month: int) -> str:
@@ -133,6 +145,16 @@ def pitcher_ids(players_body: Mapping) -> list[int]:
     return sorted(set(out))
 
 
+def hitter_ids(players_body: Mapping) -> list[int]:
+    """Every listed player whose primaryPosition.type is not 'Pitcher'
+    (two-way players included), as the #2368 batter acquisition did."""
+    out = []
+    for p in players_body.get("people", []):
+        if ((p.get("primaryPosition") or {}).get("type") or "") != "Pitcher":
+            out.append(int(p["id"]))
+    return sorted(set(out))
+
+
 def final_regular_games(schedule_bodies: Iterable[Mapping]) -> set[int]:
     games = set()
     for body in schedule_bodies:
@@ -161,12 +183,15 @@ def starts_by_game(log_bodies: Iterable[Mapping]) -> Counter:
 
 
 def completeness(final_games: set[int], starts: Counter,
-                 failures: Sequence[Mapping]) -> dict:
+                 failures: Sequence[Mapping],
+                 boxscore_games: set[int] | None = None) -> dict:
     missing = sorted(g for g in final_games if starts.get(g, 0) == 0)
     one = sorted(g for g in final_games if starts.get(g, 0) == 1)
     over = sorted(g for g in final_games if starts.get(g, 0) > 2)
     unknown = sorted(g for g in starts if g not in final_games)
-    ok = not failures and not missing and not one and not over
+    box_missing = (sorted(g for g in final_games if g not in boxscore_games)
+                   if boxscore_games is not None else [])
+    ok = not failures and not missing and not one and not over and not box_missing
     return {
         "status": "COMPLETE" if ok else "INCOMPLETE",
         "final_regular_games": len(final_games),
@@ -176,8 +201,11 @@ def completeness(final_games: set[int], starts: Counter,
         "games_with_more_than_two_starters": over[:200],
         "start_rows_outside_final_schedule": len(unknown),
         "fetch_failures": len(failures),
+        "boxscores_checked": boxscore_games is not None,
+        "games_missing_boxscore": box_missing[:200],
         "rule": ("COMPLETE iff zero fetch failures and every Final REG game "
-                 "has exactly two gamesStarted==1 pitching rows"),
+                 "has exactly two gamesStarted==1 pitching rows"
+                 + (" and a boxscore payload" if boxscore_games is not None else "")),
     }
 
 
