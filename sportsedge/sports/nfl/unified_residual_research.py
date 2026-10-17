@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
+from sportsedge.sports.nfl.ask_sims import AskSimsError, ask_unified_score_sims
 from sportsedge.nfl_run_it import run_it_market_anchored
 from sportsedge.sports.nfl.unified_market_engine import run_unified_nfl_model
 
@@ -34,6 +35,8 @@ def run_unified_residual_research(
     scoring_prior: Any = None,
     n_sims: int = 20000,
     seed: int = 21,
+    ask_sims_questions: Sequence[Mapping[str, Any]] = (),
+    ask_sims_aliases: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Single executable-book residual pricing, coherent game/prop distribution.
 
@@ -78,6 +81,18 @@ def run_unified_residual_research(
         n_sims=n_sims,
         seed=seed,
     )
+    asked_sims = []
+    # Query exactly the same recorded frozen game score paths; book odds are
+    # caller supplied and never treated as quote receipts or betting authority.
+    if not isinstance(ask_sims_questions, (list, tuple)) or len(ask_sims_questions) > 40:
+        raise AskSimsError("ASK_SIMS_REQUEST_BATCH_INVALID")
+    for request in ask_sims_questions:
+        if not isinstance(request, Mapping) or not isinstance(request.get("question"), (str, dict)):
+            raise AskSimsError("ASK_SIMS_REQUEST_INVALID")
+        asked_sims.append(ask_unified_score_sims(
+            engine, request["question"], home_team=home_team, away_team=away_team,
+            aliases=ask_sims_aliases, price_american=request.get("price_american"),
+        ))
     return {
         "schema": "SPORTSEDGE_NFL_UNIFIED_RESIDUAL_RESEARCH_V1",
         "game_id": game_id,
@@ -85,6 +100,7 @@ def run_unified_residual_research(
         "score_means": engine["score_means"],
         "workload_coupling": engine["workload_coupling"],
         "prop_markets": engine["prop_markets"],
+        "asked_sims": asked_sims,
         "game_markets": fair,
         "market_anchored_residual": {
             "fair_margin": margin, "fair_total": total,
