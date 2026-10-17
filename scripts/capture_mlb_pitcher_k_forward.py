@@ -274,7 +274,7 @@ def _settle_existing(*, output_root: Path, now: datetime) -> tuple[int, list[dic
             first_pitch = _parse_iso(prediction["first_pitch_at_utc"])
             day = first_pitch.astimezone(EASTERN).date().isoformat()
             if day not in schedule_cache:
-                schedule_cache[day] = fetch_schedule(day, now=now)
+                schedule_cache[day] = fetch_schedule(day)  # retrieved_at = post-fetch receipt clock; caller time is not a receipt claim
             game = next(
                 (g for g in schedule_cache[day] if int(g.game_pk) == int(prediction["game_pk"])),
                 None,
@@ -332,7 +332,7 @@ def run(*, output_root: Path, cache_dir: Path, now: datetime | None = None) -> d
                 raise ForwardCaptureBlocked("CAPTURE_RUN_AT_OR_AFTER_FIRST_PITCH")
             day = first_pitch.astimezone(EASTERN).date().isoformat()
             if day not in schedule_cache:
-                schedule_cache[day] = fetch_schedule(day, now=observed)
+                schedule_cache[day] = fetch_schedule(day)  # retrieved_at = post-fetch receipt clock; caller time is not a receipt claim
             game = _match_game(dict(unit), schedule_cache[day])
             if game is None:
                 raise ForwardCaptureBlocked("GAME_IDENTITY_UNRESOLVED")
