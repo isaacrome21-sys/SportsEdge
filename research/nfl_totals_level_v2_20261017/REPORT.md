@@ -1,5 +1,15 @@
 # REPORT — NFL Totals LEVEL v2, Part A (diagnostic screen)
 
+> **AMENDMENT 1 (governs). Read `DEVIATION_RECORD.md`.** The numbers in
+> the body of this report are the **as-run** result. The as-run evaluator
+> let season S−2 data into season-S predictions through the residual
+> anchors, which breaks prereg §1. It was not lookahead. The conforming
+> re-run (`results_nfl_totals_level_v2_part_a_amendment1.json`) is the
+> governing result: **SCREEN_PASSED**, candidate **7.6342**; vs FROZEN
+> −0.1883 [−0.2802, −0.1035]; vs B2 −0.0785 [−0.1498, −0.0053]; vs B3
+> −0.1751 [−0.2412, −0.1065]; n = 1,887. A second independent verifier
+> pass confirmed it at `17bed5e4`.
+
 **Date:** Sat 2026-10-17 · **Label:** RESEARCH_EVIDENCE — DIAGNOSTIC
 SCREEN on reused 2018–2025 development data. NOT out-of-sample
 validation, NOT a market verdict, NOT a promotion input. Nothing is
@@ -92,8 +102,8 @@ vs 0.2475 / 0.2480 / 0.2481).
 - **Audit CSV:** 2,127 rows, SHA-256 `a7ee2c0d…bf1`. It is regenerated
   by the evaluator's `--audit` flag and is not committed (transport
   size).
-- **Pending:** independent verifier re-run from a fresh worktree of the
-  pushed head (prereg §7). It is not complete at the time of writing.
+- **Independent verifier:** VERIFIED the as-run result at `c1753443`, and
+  VERIFIED Amendment 1 at `17bed5e4`. Both re-runs were from fresh clones.
 
 ## Reproduce
 
