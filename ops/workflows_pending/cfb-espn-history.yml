@@ -1,0 +1,137 @@
+name: cfb-espn-history
+
+# STAGED HERE because the authoring integration lacks GitHub's `workflows`
+# permission. Install with:
+#   git mv ops/workflows_pending/cfb-espn-history.yml .github/workflows/
+#
+# Isaac, Oct 17 2026 ("Finish CFB"): acquire free public ESPN CFB history
+# for the #2368 CFB QB reproduction into a STAGING data branch, same
+# contract as the MLB StatsAPI job. Provenance:
+# ACQUIRED_POSTHOC_FROM_PUBLIC_ESPN. Never a pregame snapshot, never a
+# #2344 recovered original. Raw data is unfiltered; consumers apply the
+# Illinois exclusion.
+
+on:
+  workflow_dispatch:
+    inputs:
+      seasons:
+        description: "Comma-separated seasons"
+        default: "2022,2023,2024"
+  push:
+    branches: [feat/cfb-espn-history-job-20261017]
+    paths:
+      - 'sportsedge/espn_cfb_history.py'
+      - 'scripts/acquire_espn_cfb_history.py'
+      - '.github/workflows/cfb-espn-history.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cfb-espn-history
+  cancel-in-progress: false
+
+env:
+  STAGING_BRANCH: data-staging/cfb-espn-history
+
+jobs:
+  acquire:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12.13'
+      - name: Offline contract tests (stdlib only)
+        shell: bash
+        run: |
+          python - <<'PY'
+          import importlib.util, inspect, pathlib, sys, tempfile, types
+          sys.path.insert(0, ".")
+          # minimal stand-in so the offline tests run without installing pytest
+          pt = types.ModuleType("pytest")
+          import contextlib, math
+          class approx:
+              def __init__(s, v, abs=1e-12, rel=1e-6): s.v, s.a, s.r = v, abs, rel
+              def __eq__(s, o): return math.isclose(o, s.v, abs_tol=s.a, rel_tol=s.r)
+          @contextlib.contextmanager
+          def raises(e):
+              try:
+                  yield
+              except e:
+                  return
+              raise AssertionError("did not raise")
+          pt.approx, pt.raises = approx, raises
+          sys.modules["pytest"] = pt
+          spec = importlib.util.spec_from_file_location("t", "tests/test_espn_cfb_history.py")
+          t = importlib.util.module_from_spec(spec); spec.loader.exec_module(t)
+          for name in sorted(dir(t)):
+              if name.startswith("test_"):
+                  f = getattr(t, name)
+                  kw = {"tmp_path": pathlib.Path(tempfile.mkdtemp())} if "tmp_path" in inspect.signature(f).parameters else {}
+                  f(**kw); print("PASS", name)
+          PY
+      - name: Acquire seasons
+        id: acquire
+        shell: bash
+        run: |
+          set +e
+          SEASONS="${{ github.event.inputs.seasons }}"
+          if [ -z "$SEASONS" ]; then SEASONS="2022,2023,2024"; fi
+          worst=0
+          for s in ${SEASONS//,/ }; do
+            extra=""; if [ "$s" = "2024" ]; then extra="--gamelogs"; fi
+            python scripts/acquire_espn_cfb_history.py --season "$s" --out out/espn_cfb_history $extra
+            code=$?
+            echo "season $s exit $code"
+            if [ "$code" -gt "$worst" ]; then worst=$code; fi
+          done
+          echo "exit_code=$worst" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Persist to staging data branch (immutable per run)
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d out/espn_cfb_history
+          git config user.name sportsedge-data-bot
+          git config user.email sportsedge-data-bot@users.noreply.github.com
+          if git ls-remote --exit-code --heads origin "$STAGING_BRANCH" >/dev/null; then
+            git fetch --depth=1 origin "$STAGING_BRANCH"
+            git worktree add --detach .staging FETCH_HEAD
+          else
+            git worktree add --detach .staging
+            (cd .staging && git checkout --orphan staging-init && git rm -rf . >/dev/null 2>&1 || true)
+          fi
+          RUN_DIR=".staging/cfb_espn_history/runs/${GITHUB_RUN_ID}"
+          mkdir -p "$RUN_DIR"
+          cp -R out/espn_cfb_history/. "$RUN_DIR"/
+          printf '%s\n' "${GITHUB_RUN_ID}" > .staging/cfb_espn_history/latest_run_id.txt
+          cd .staging
+          git add cfb_espn_history
+          git commit -m "espn cfb history: run ${GITHUB_RUN_ID} (staging; ACQUIRED_POSTHOC_FROM_PUBLIC_ESPN)"
+          pushed=0
+          for attempt in 1 2 3 4 5; do
+            if git push origin "HEAD:refs/heads/$STAGING_BRANCH"; then pushed=1; break; fi
+            git fetch origin "$STAGING_BRANCH" && git rebase FETCH_HEAD || { git rebase --abort || true; }
+            sleep $((attempt * 2))
+          done
+          test "$pushed" -eq 1
+      - name: Upload manifests
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: espn-cfb-history-${{ github.run_id }}
+          path: out/espn_cfb_history/**/manifest.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Propagate completeness result
+        if: always()
+        shell: bash
+        run: |
+          code='${{ steps.acquire.outputs.exit_code }}'
+          test -n "$code" || { echo 'acquire step emitted no exit code' >&2; exit 99; }
+          exit "$code"
