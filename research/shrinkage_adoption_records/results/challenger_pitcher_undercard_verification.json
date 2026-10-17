@@ -1,0 +1,227 @@
+{
+ "prereg_sha256": "9628b9626ccd42ed04f836f32ed51aa62d0eeca6b72deac782e1ef8622c5a41c",
+ "parity": {
+  "status": "PASSED",
+  "required": 25,
+  "successes": 25,
+  "attempts": 25,
+  "production_refusals_counted_and_replaced": {},
+  "live_schedule_fetches": [
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-05&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-06&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-01&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-02&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-01&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-30&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-04&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-03&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-16&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-17&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-11&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-10&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-29&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-28&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-12&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-13&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-27&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-28&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-24&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-25&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-07&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-08&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-28&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-27&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-17&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-16&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-05&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-17&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-16&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-18&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-21&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-22&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-09&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-18&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-17&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-15&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-27&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-26&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-07&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-06&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-31&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-30&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-04&hydrate=probablePitcher",
+   "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-03&hydrate=probablePitcher"
+  ],
+  "pairs": [
+   {
+    "pitcher_id": 543243,
+    "date": "2026-05-06",
+    "game_pk": 824282
+   },
+   {
+    "pitcher_id": 643377,
+    "date": "2026-09-02",
+    "game_pk": 822931
+   },
+   {
+    "pitcher_id": 669022,
+    "date": "2026-05-01",
+    "game_pk": 824287
+   },
+   {
+    "pitcher_id": 607200,
+    "date": "2026-09-04",
+    "game_pk": 824554
+   },
+   {
+    "pitcher_id": 664285,
+    "date": "2026-08-17",
+    "game_pk": 823343
+   },
+   {
+    "pitcher_id": 663567,
+    "date": "2026-07-11",
+    "game_pk": 822875
+   },
+   {
+    "pitcher_id": 671096,
+    "date": "2026-08-29",
+    "game_pk": 824637
+   },
+   {
+    "pitcher_id": 691725,
+    "date": "2026-09-13",
+    "game_pk": 824869
+   },
+   {
+    "pitcher_id": 605400,
+    "date": "2026-07-28",
+    "game_pk": 823838
+   },
+   {
+    "pitcher_id": 656302,
+    "date": "2026-07-25",
+    "game_pk": 824734
+   },
+   {
+    "pitcher_id": 680694,
+    "date": "2026-08-08",
+    "game_pk": 822864
+   },
+   {
+    "pitcher_id": 663436,
+    "date": "2026-05-28",
+    "game_pk": 824595
+   },
+   {
+    "pitcher_id": 685299,
+    "date": "2026-09-17",
+    "game_pk": 824305
+   },
+   {
+    "pitcher_id": 579328,
+    "date": "2026-09-05",
+    "game_pk": 823335
+   },
+   {
+    "pitcher_id": 808963,
+    "date": "2026-05-17",
+    "game_pk": 824034
+   },
+   {
+    "pitcher_id": 684007,
+    "date": "2026-05-18",
+    "game_pk": 824680
+   },
+   {
+    "pitcher_id": 669160,
+    "date": "2026-09-22",
+    "game_pk": 823412
+   },
+   {
+    "pitcher_id": 677960,
+    "date": "2026-07-10",
+    "game_pk": 822709
+   },
+   {
+    "pitcher_id": 677960,
+    "date": "2026-06-18",
+    "game_pk": 823533
+   },
+   {
+    "pitcher_id": 671096,
+    "date": "2026-09-16",
+    "game_pk": 824467
+   },
+   {
+    "pitcher_id": 543037,
+    "date": "2026-08-27",
+    "game_pk": 823503
+   },
+   {
+    "pitcher_id": 694973,
+    "date": "2026-07-07",
+    "game_pk": 823361
+   },
+   {
+    "pitcher_id": 687473,
+    "date": "2026-08-31",
+    "game_pk": 822689
+   },
+   {
+    "pitcher_id": 665152,
+    "date": "2026-07-28",
+    "game_pk": 824243
+   },
+   {
+    "pitcher_id": 678394,
+    "date": "2026-06-04",
+    "game_pk": 824753
+   }
+  ],
+  "sampling_note": "Phase 2 sampling rule transposed to 2026: candidates restricted to fixtures where the sealed filter is inactive (automatic in 2026), schedule gameDate UTC date == gameLog date, kickoff >= 01:00 UTC; production resolves the fixture via schedule probablePitcher; refusals counted and replaced; as_of = kickoff - 30 min."
+ },
+ "verified_at_utc": "2026-10-15T03:14:07.816622+00:00",
+ "sweep_sanity": {
+  "n_fixtures": 10,
+  "checks": {
+   "OUTS": {
+    "median_typical_line_lower_median": 16.5,
+    "max_abs_diff": 5.551115123125783e-17,
+    "note": "identity checked: direct model_p(OVER, L) == swept p_over(L) == 1 - F(L-0.5)"
+   },
+   "HITS_ALLOWED": {
+    "median_typical_line_lower_median": 5.5,
+    "max_abs_diff": 5.551115123125783e-17,
+    "note": "identity checked: direct model_p(OVER, L) == swept p_over(L) == 1 - F(L-0.5)"
+   },
+   "BB": {
+    "median_typical_line_lower_median": 1.5,
+    "max_abs_diff": 5.551115123125783e-17,
+    "note": "identity checked: direct model_p(OVER, L) == swept p_over(L) == 1 - F(L-0.5)"
+   },
+   "ER": {
+    "median_typical_line_lower_median": 1.5,
+    "max_abs_diff": 5.551115123125783e-17,
+    "note": "identity checked: direct model_p(OVER, L) == swept p_over(L) == 1 - F(L-0.5)"
+   }
+  },
+  "max_abs_diff": 5.551115123125783e-17,
+  "passed": true
+ },
+ "unit_checks": {
+  "pmf_sums_to_1": {
+   "trials": 300,
+   "max_abs_dev": 1.1102230246251565e-16,
+   "tol": 1e-12,
+   "passed": true
+  },
+  "k_to_0_reduces_to_B1_distribution": {
+   "trials": 300,
+   "max_abs_dev": 0.0,
+   "passed": true
+  },
+  "all_passed": true
+ },
+ "status": "PASSED"
+}
