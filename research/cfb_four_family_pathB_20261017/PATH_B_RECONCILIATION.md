@@ -88,18 +88,15 @@ postseason (`3`), and **1 game with a blank `season_type`**.
 | Burn-in | 5,754 | **5,459 or 5,460** (blank game) | 295 |
 
 Every Path B fold stays above the frozen 500-game population floor. The
-per-family **matched** counts (moneyline coverage ≈ 85–91% under Path A)
-must be restated under Path B by the dry run before the freeze. They are
-not computed here, because that requires running the harness's matching
-step under a Path B config.
+per-family **matched** counts are restated under Path B in §7.
 
 ## 5. What remains before the execution GO (nothing here consumes Attempt 1)
 
 1. **Your one-line ruling** on game `333200213` (9,033 vs 9,032).
-2. **Path B config + dry-run restatement:** set `population_rule` to the
-   regular-season-only rule, re-run the dry run (NOT_RUN, zero
-   probabilities), and restate per-fold matched counts for
-   ML/spread/total. A separate verifier reproduces it.
+2. **Path B config change:** set `population_rule` to the
+   regular-season-only rule in the draft config at freeze time. The
+   matched counts are already restated in §7 (NOT_RUN); a separate
+   verifier still has to reproduce them.
 3. **R1** (Bovada descriptive-only comparator) and **R2** (13-program FBS
    override table): reviewed and independently reproduced. The override
    table is a public-record list, checked line by line.
@@ -126,3 +123,32 @@ All 13 bound overrides match the public NCAA FBS membership record:
 
 This is a reviewer's check against public knowledge, not a ruling. R2
 ratification remains Isaac's.
+
+## 7. Path B dry-run restatement of matched counts (NOT_RUN, zero probabilities)
+
+`pathB_dry_restatement.py` runs the frozen bindings loaders and
+`build_dry_run_manifest` on the rebuilt, byte-verified snapshots. It
+filters games to the regular season and does not edit the draft config.
+Each run asserts `probabilities_computed == False` and
+`attempts_consumed == 0`. Output: `pathB_dry_restatement_results.json`.
+
+**Control:** Path A reproduces the freeze package's published matched
+counts exactly (pooled ML 3,335 / spread 3,773 / total 3,773; per-fold
+646/633/691/682/683 ML).
+
+| Fold | Pop (B) | ML matched (cov) | Spread | Total | Team total |
+|---|---|---|---|---|---|
+| 2021 | 699 | 629 (90.0%) | 698 | 698 | 0 |
+| 2022 | 706 | 617 (87.4%) | 702 | 702 | 0 |
+| 2023 | 717 | 662 (92.3%) | 717 | 717 | 0 |
+| 2024 | 721 | 649 (90.0%) | 720 | 720 | 0 |
+| 2025 | 730 | 653 (89.5%) | 730 | 730 | 0 |
+| **Pooled** | **3,573** | **3,210** | **3,567** | **3,567** | **0** |
+
+- Every fold passes the 500-game floor (lowest is 617, ML 2022) and the
+  0.75 coverage floor.
+- Every pooled count passes the 2,500 floor.
+- Team totals remain unscoreable historically (0 lines; forward-only, as
+  already on record).
+- The blank-type game is in 2013 burn-in, so the scored counts are
+  identical for 9,033 vs 9,032.
