@@ -31,6 +31,7 @@ ROOT = "https://statsapi.mlb.com/api/v1"
 SCHEMA = "SPORTSEDGE_STATSAPI_HISTORY_BUNDLE_V1"
 PROVENANCE_LABEL = "ACQUIRED_POSTHOC_FROM_PUBLIC_STATSAPI"
 NOT_A = ("PREGAME_SNAPSHOT", "ISSUE_2344_RECOVERED_ORIGINAL")
+NOT_PLAYED_STATES = frozenset({"Postponed", "Cancelled"})
 MIN_INTERVAL_SECONDS = 0.25  # polite client-side rate limit (<= 4 req/s)
 
 Fetcher = Callable[[str], bytes]
@@ -137,9 +138,12 @@ def final_regular_games(schedule_bodies: Iterable[Mapping]) -> set[int]:
     for body in schedule_bodies:
         for d in body.get("dates", []):
             for g in d.get("games", []):
-                if (g.get("gameType") == "R" and
-                        (g.get("status") or {}).get("abstractGameState") == "Final"
-                        and (g.get("status") or {}).get("detailedState") != "Postponed"):
+                st = g.get("status") or {}
+                # StatsAPI marks never-played games abstractGameState=Final
+                # with detailedState Postponed/Cancelled: no starters exist.
+                if (g.get("gameType") == "R"
+                        and st.get("abstractGameState") == "Final"
+                        and st.get("detailedState") not in NOT_PLAYED_STATES):
                     games.add(int(g["gamePk"]))
     return games
 

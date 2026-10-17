@@ -91,3 +91,11 @@ def test_pitcher_ids_and_manifest_labels():
     assert m["provenance_label"] == "ACQUIRED_POSTHOC_FROM_PUBLIC_STATSAPI"
     assert "PREGAME_SNAPSHOT" in m["is_not"] and "ISSUE_2344_RECOVERED_ORIGINAL" in m["is_not"]
     assert json.dumps(m)  # serializable
+
+
+def test_cancelled_final_games_are_not_counted_as_played():
+    # Observed in real data: 2024 HOU@CLE (746577) and 2026 BAL@NYY (823490)
+    # are abstractGameState=Final, detailedState=Cancelled, with no starters.
+    final = sh.final_regular_games([_sched([(746577, "Final", "Cancelled"),
+                                            (1, "Final", "Final")])])
+    assert final == {1}
