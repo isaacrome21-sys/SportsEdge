@@ -1,0 +1,44 @@
+{
+  "access": "public, unauthenticated, free; no keys",
+  "bundles_sha256": {
+    "fbs_teams.jsonl.gz": "4ed7e5cade34b7d179d20e285a99fc1a12cd963d86d2253838c173cf1b76c99e",
+    "passer_gamelogs.jsonl.gz": "db2c5355ac2062045a149c93b1f4c05397b3f5e7ed8d48ddf91d864efa28636a",
+    "scoreboards.jsonl.gz": "75cd98583432e7f4b950f99122954c1e137892906da8496fe32687d8ae93f00b",
+    "summaries.jsonl.gz": "0f7b2591b5ace8f263ce0ff9e14f375cd0c3337411f548ce139f2c8c18da1bb2"
+  },
+  "completeness": {
+    "completed_events": 919,
+    "events_missing_summary": [],
+    "fbs_team_count": 144,
+    "fetch_failures": 0,
+    "rule": "COMPLETE iff zero fetch failures, every completed scoreboard event has a summary, and the FBS list is non-empty",
+    "status": "COMPLETE",
+    "summaries": 919
+  },
+  "failures": [],
+  "illinois_note": "raw data unfiltered; consumers apply the Illinois exclusion",
+  "is_not": [
+    "PREGAME_SNAPSHOT",
+    "ISSUE_2344_RECOVERED_ORIGINAL"
+  ],
+  "license_handling": "Third-party data; research use; not redistributed beyond this repository's staging data branch.",
+  "payload_counts": {
+    "fbs_teams": 144,
+    "passer_gamelogs": 703,
+    "scoreboards": 17,
+    "summaries": 919
+  },
+  "provenance_label": "ACQUIRED_POSTHOC_FROM_PUBLIC_ESPN",
+  "run": {
+    "finished_at_utc": "2026-10-17T21:42:58.736474+00:00",
+    "head_sha": "702f975c778dcd5d1b5c8fe715a0ea29ffdc8895",
+    "run_id": "39070915985"
+  },
+  "schema": "SPORTSEDGE_ESPN_CFB_HISTORY_BUNDLE_V1",
+  "season": 2024,
+  "source": [
+    "https://site.api.espn.com/apis/site/v2/sports/football/college-football",
+    "https://site.web.api.espn.com/apis/common/v3/sports/football/college-football",
+    "https://sports.core.api.espn.com/v2/sports/football/leagues/college-football"
+  ]
+}
