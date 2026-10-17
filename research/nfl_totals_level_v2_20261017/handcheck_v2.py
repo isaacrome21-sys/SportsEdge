@@ -36,7 +36,7 @@ def mean_for(games, fx):
         mine = [g for g in prior if team in (g["h"], g["a"])]   # newest first
         so = sd = sw = 0.0
         for age, g in enumerate(mine):
-            anchor, _ = lvl(games, g["k"], g["s"])
+            anchor, _ = lvl(games, g["k"], fx["s"])  # fixture window {S-1,S} (Amendment 1)
             pf, pa = (g["hs"], g["as_"]) if g["h"] == team else (g["as_"], g["hs"])
             w = 2.0 ** (-age / 6.0) * (0.5 if g["s"] < fx["s"] else 1.0)
             so += w * (pf - anchor); sd += w * (pa - anchor); sw += w
