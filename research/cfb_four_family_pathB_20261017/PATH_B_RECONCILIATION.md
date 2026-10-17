@@ -36,7 +36,9 @@ unavailable. The pinned parquet (SHA-256-verified by the builder) was
 decoded with hyparquet (pure JS, cloned from GitHub) through a one-file
 `pyarrow.parquet` shim. The **directory snapshot is content-addressed**.
 Its byte-identity with the freeze package proves this decode equals the
-original pyarrow decode.
+original pyarrow decode **for the columns the directory snapshot uses**.
+The Illinois exclusion reads the `state` column, which that hash does not
+cover. The 511 Illinois count matches the freeze package independently.
 
 ## 3. Independent recount (raw sources only; imports nothing from the repo)
 
@@ -95,11 +97,12 @@ per-family **matched** counts are restated under Path B in §7.
 1. **Your one-line ruling** on game `333200213` (9,033 vs 9,032).
 2. **Path B config change:** set `population_rule` to the
    regular-season-only rule in the draft config at freeze time. The
-   matched counts are already restated in §7 (NOT_RUN); a separate
-   verifier still has to reproduce them.
-3. **R1** (Bovada descriptive-only comparator) and **R2** (13-program FBS
-   override table): reviewed and independently reproduced. The override
-   table is a public-record list, checked line by line.
+   matched counts are already restated in §7 (NOT_RUN) and were
+   independently reproduced (§8).
+3. **R2** (13-program FBS override table): spot-checked here (§6) and by
+   the independent verifier, who also matched per-season FBS team counts
+   2013–2025. **R1** (Bovada as the descriptive-only comparator) is **not**
+   independently reproduced by this record; it is still open.
 4. Immutable freeze identity (`freeze_sha` set at the freeze commit),
    governance registration, and a fresh all-green hosted CI on the exact
    head.
@@ -130,7 +133,9 @@ ratification remains Isaac's.
 `build_dry_run_manifest` on the rebuilt, byte-verified snapshots. It
 filters games to the regular season and does not edit the draft config.
 Each run asserts `probabilities_computed == False` and
-`attempts_consumed == 0`. Output: `pathB_dry_restatement_results.json`.
+`attempts_consumed == 0`. `build_dry_run_manifest` always sets those
+fields, so the real assurance is the code review: the script calls only
+the snapshot loaders and that counts-only builder. Output: `pathB_dry_restatement_results.json`.
 
 **Control:** Path A reproduces the freeze package's published matched
 counts exactly (pooled ML 3,335 / spread 3,773 / total 3,773; per-fold
@@ -152,3 +157,10 @@ counts exactly (pooled ML 3,335 / spread 3,773 / total 3,773; per-fold
   already on record).
 - The blank-type game is in 2013 burn-in, so the scored counts are
   identical for 9,033 vs 9,032.
+
+## 8. Independent verification
+
+**VERIFIED** by a separate verifier at `5a14f848` (fresh acquisition of
+all 15 sources, its own counter and parquet decode, snapshot rebuild,
+dry-run restatement, and an R2 cross-check against per-season FBS team
+counts). Its three low-severity wording notes are corrected above.
