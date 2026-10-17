@@ -1,0 +1,45 @@
+{
+  "access": "public, unauthenticated, free; no keys",
+  "bundles_sha256": {
+    "pitching_gamelogs.jsonl.gz": "88a0c104abe33ca21211a03d0bcc553f0022c45f04873744af7e75b6ccf18171",
+    "players.jsonl.gz": "7d779b8cb90e022dc3679ca8385b5f6ae5f141e4e375de267d329439e99b9b63",
+    "schedule.jsonl.gz": "7fbd9842ba56cce74a328434d6401b37b1e5f5f2c76818e143e3ec4840bb49d6"
+  },
+  "completeness": {
+    "fetch_failures": 0,
+    "final_regular_games": 2430,
+    "games_missing_both_starters": [
+      823490
+    ],
+    "games_with_more_than_two_starters": [],
+    "games_with_one_starter": [],
+    "games_with_two_starters": 2429,
+    "rule": "COMPLETE iff zero fetch failures and every Final REG game has exactly two gamesStarted==1 pitching rows",
+    "start_rows_outside_final_schedule": 0,
+    "status": "INCOMPLETE"
+  },
+  "failures": [],
+  "is_not": [
+    "PREGAME_SNAPSHOT",
+    "ISSUE_2344_RECOVERED_ORIGINAL"
+  ],
+  "license_handling": "Third-party data; research use; source copyright notice recorded verbatim; not redistributed beyond this repository's staging data branch.",
+  "license_notice_from_source": "Copyright 2026 MLB Advanced Media, L.P.  Use of any content on this page acknowledges agreement to the terms posted here http://gdx.mlb.com/components/copyright.txt",
+  "payload_counts": {
+    "pitchers_listed": 839,
+    "pitching_gamelogs": 839,
+    "players": 1,
+    "schedule_months": 8
+  },
+  "provenance_label": "ACQUIRED_POSTHOC_FROM_PUBLIC_STATSAPI",
+  "rate_limit_seconds_min_interval": 0.25,
+  "run": {
+    "finished_at_utc": "2026-10-17T10:55:55.615166+00:00",
+    "head_sha": "5343b07dea47078e08f1bd75f512ef560e2c7d7d",
+    "ref": "refs/heads/feat/mlb-statsapi-history-job-20261017",
+    "run_id": "39026089063"
+  },
+  "schema": "SPORTSEDGE_STATSAPI_HISTORY_BUNDLE_V1",
+  "season": 2026,
+  "source": "https://statsapi.mlb.com/api/v1"
+}
