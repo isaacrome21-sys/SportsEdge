@@ -473,16 +473,34 @@ INTAKE_ALIASES = {
 }
 
 
+def _with_nfl_registration(sport, resolution):
+    """Layer the versioned NFL family registration (#2265) onto a matrix
+    resolution.  Registration names the governed research-only state
+    (NOT_VALIDATED, eligible=false, non-promotable) for NFL player-prop
+    families; it never changes the state, blocker, or detail, and no
+    other sport or market is affected."""
+    if sport != "NFL" or resolution is None:
+        return resolution
+    from sportsedge.nfl_family_registry_v2 import coverage_registration_v2
+    registration = coverage_registration_v2(sport, resolution["market"])
+    if registration is None:
+        return resolution
+    merged = dict(resolution)
+    merged.update(registration)
+    return merged
+
+
 def resolve_market(sport, market):
     """Resolution for a matrix market name or a canonical intake alias."""
     sport = str(sport or "").upper()
     key = str(market or "").upper() if sport == "MLB" else str(market or "")
     direct = MARKET_RESOLUTIONS.get((sport, key))
     if direct is not None:
-        return dict(direct)
+        return _with_nfl_registration(sport, dict(direct))
     alias = INTAKE_ALIASES.get(sport, {}).get(str(market or "").upper())
     if alias is not None:
-        return dict(MARKET_RESOLUTIONS[(sport, alias)])
+        return _with_nfl_registration(
+            sport, dict(MARKET_RESOLUTIONS[(sport, alias)]))
     # The versioned pitch-count extension names its failed validation
     # verdict without changing the frozen 89-market V1 census or granting
     # authority to the existing research pricing route.

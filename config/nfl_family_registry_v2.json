@@ -1,0 +1,482 @@
+{
+  "schema_version": "NFL_FAMILY_REGISTRY_V2",
+  "supersedes": null,
+  "extends": {
+    "catalog": "config/football_prop_engine_surface.json",
+    "catalog_sha256": "5195611559b0634bf92bd02d2f298d36274f2ffc8c9833de7ecbe4b881303a61",
+    "catalog_mutated": false,
+    "coverage_authority": "sportsedge.canonical_coverage (Phase 1 matrix, NFL section)"
+  },
+  "registration_scope": "NFL player-prop families named by issue #2265. Registration records a governed research-only state with settlement contracts; it grants no pricing, admission, promotion, or betting authority. The governance surface continues to declare NO_ENGINE for NFL player props and every family here remains BLOCKED on the canonical path until a validated engine is separately admitted.",
+  "families": {
+    "passing_yards": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; research pricer exists but is not governance-admitted)",
+      "provider_market": "player_pass_yds",
+      "settlement_field": "passing_yards",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "TWO_SIDED_OU",
+        "MILESTONE_LADDER"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "evidence_group": "NFL_PROP_PASSING_YARDS_V2"
+    },
+    "completions": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; research pricer exists but is not governance-admitted)",
+      "provider_market": "player_pass_completions",
+      "settlement_field": "completions",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "TWO_SIDED_OU",
+        "MILESTONE_LADDER"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "evidence_group": "NFL_PROP_COMPLETIONS_V2"
+    },
+    "attempts": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; research pricer exists but is not governance-admitted)",
+      "provider_market": "player_pass_attempts",
+      "settlement_field": "attempts",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "TWO_SIDED_OU",
+        "MILESTONE_LADDER"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "evidence_group": "NFL_PROP_ATTEMPTS_V2"
+    },
+    "passing_tds": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; research pricer exists but is not governance-admitted)",
+      "provider_market": "player_pass_tds",
+      "settlement_field": "passing_touchdowns",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "TWO_SIDED_OU",
+        "MILESTONE_LADDER"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "evidence_group": "NFL_PROP_PASSING_TDS_V2"
+    },
+    "interceptions": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; research pricer exists but is not governance-admitted)",
+      "provider_market": "player_pass_interceptions",
+      "settlement_field": "interceptions_thrown",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "TWO_SIDED_OU",
+        "MILESTONE_LADDER"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "evidence_group": "NFL_PROP_INTERCEPTIONS_V2"
+    },
+    "longest_completion": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": "NFL_LONGEST_PLAYS_EMPIRICAL (nfl_longest_plays_empirical; research pricer exists but is not governance-admitted)",
+      "provider_market": "player_pass_longest_completion",
+      "settlement_field": "longest_completion_yards",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "TWO_SIDED_OU",
+        "MILESTONE_LADDER"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "evidence_group": "NFL_PROP_LONGEST_COMPLETION_V2"
+    },
+    "pass_plus_rush_yards": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; research pricer exists but is not governance-admitted)",
+      "provider_market": "player_pass_rush_yds",
+      "settlement_field": "pass_plus_rush_yards",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "TWO_SIDED_OU",
+        "MILESTONE_LADDER"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "evidence_group": "NFL_PROP_PASS_PLUS_RUSH_YARDS_V2"
+    },
+    "rushing_yards": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; research pricer exists but is not governance-admitted)",
+      "provider_market": "player_rush_yds",
+      "settlement_field": "rushing_yards",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "TWO_SIDED_OU",
+        "MILESTONE_LADDER"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "evidence_group": "NFL_PROP_RUSHING_YARDS_V2"
+    },
+    "rush_yards": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; research pricer exists but is not governance-admitted)",
+      "provider_market": "player_rush_yds",
+      "settlement_field": "rushing_yards",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "TWO_SIDED_OU",
+        "MILESTONE_LADDER"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "registration_note": "Matrix alias-form of rushing_yards retained from the Phase 1 census; same registration.",
+      "evidence_group": "NFL_PROP_RUSH_YARDS_V2"
+    },
+    "rush_attempts": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; research pricer exists but is not governance-admitted)",
+      "provider_market": "player_rush_attempts",
+      "settlement_field": "rush_attempts",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "TWO_SIDED_OU",
+        "MILESTONE_LADDER"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "evidence_group": "NFL_PROP_RUSH_ATTEMPTS_V2"
+    },
+    "longest_rush": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": "NFL_LONGEST_PLAYS_EMPIRICAL (nfl_longest_plays_empirical; research pricer exists but is not governance-admitted)",
+      "provider_market": "player_rush_longest",
+      "settlement_field": "longest_rush_yards",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "TWO_SIDED_OU",
+        "MILESTONE_LADDER"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "evidence_group": "NFL_PROP_LONGEST_RUSH_V2"
+    },
+    "rush_plus_rec_yards": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; research pricer exists but is not governance-admitted)",
+      "provider_market": "player_rush_reception_yds",
+      "settlement_field": "rush_plus_receiving_yards",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "TWO_SIDED_OU",
+        "MILESTONE_LADDER"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "evidence_group": "NFL_PROP_RUSH_PLUS_REC_YARDS_V2"
+    },
+    "receiving_yards": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; research pricer exists but is not governance-admitted)",
+      "provider_market": "player_reception_yds",
+      "settlement_field": "receiving_yards",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "TWO_SIDED_OU",
+        "MILESTONE_LADDER"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "evidence_group": "NFL_PROP_RECEIVING_YARDS_V2"
+    },
+    "receptions": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; research pricer exists but is not governance-admitted)",
+      "provider_market": "player_receptions",
+      "settlement_field": "receptions",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "TWO_SIDED_OU",
+        "MILESTONE_LADDER"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "evidence_group": "NFL_PROP_RECEPTIONS_V2"
+    },
+    "longest_reception": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": "NFL_LONGEST_PLAYS_EMPIRICAL (nfl_longest_plays_empirical; research pricer exists but is not governance-admitted)",
+      "provider_market": "player_reception_longest",
+      "settlement_field": "longest_reception_yards",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "TWO_SIDED_OU",
+        "MILESTONE_LADDER"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "evidence_group": "NFL_PROP_LONGEST_RECEPTION_V2"
+    },
+    "targets": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": null,
+      "provider_market": null,
+      "settlement_field": "targets",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "TWO_SIDED_OU"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "registration_note": "No pricer exists for targets anywhere in the repository; the governance surface lists no bound provider targets settlement market.",
+      "evidence_group": "NFL_PROP_TARGETS_V2"
+    },
+    "anytime_td": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": "NFL_ANYTIME_TD_NFLVERSE (nfl_anytime_td.estimate_anytime_td; research estimator exists but is not governance-admitted)",
+      "provider_market": "player_anytime_td",
+      "settlement_field": "touchdowns_scored",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "YES_ONLY"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "evidence_group": "NFL_PROP_ANYTIME_TD_V2"
+    },
+    "first_td": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": "NFL_ANYTIME_TD (nfl_anytime_td.assess_first_td, assessment only)",
+      "provider_market": null,
+      "settlement_field": "touchdowns_scored",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "YES_ONLY"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "registration_note": "No verified pre-kickoff first-scoring attribution exists (NO_VERIFIED_FIRST_SCORING_ATTRIBUTION); blocker remains NO_DATA.",
+      "evidence_group": "NFL_PROP_FIRST_TD_V2"
+    },
+    "two_plus_td": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": null,
+      "provider_market": "player_tds_over",
+      "settlement_field": "touchdowns_scored",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "YES_ONLY"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "registration_note": "No P(two or more TDs) pricer exists; the >=1 anytime model is not extended to >=2.",
+      "evidence_group": "NFL_PROP_TWO_PLUS_TD_V2"
+    },
+    "fg_made": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": "NFL_KICKING_EMPIRICAL (nfl_kicking_empirical; research pricer exists but is not governance-admitted)",
+      "provider_market": "player_field_goals",
+      "settlement_field": "field_goals_made",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "TWO_SIDED_OU",
+        "MILESTONE_LADDER"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "evidence_group": "NFL_PROP_FG_MADE_V2"
+    },
+    "kicking_points": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": "NFL_KICKING_EMPIRICAL (nfl_kicking_empirical; research pricer exists but is not governance-admitted)",
+      "provider_market": "player_kicking_points",
+      "settlement_field": "kicking_points",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "TWO_SIDED_OU",
+        "MILESTONE_LADDER"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "evidence_group": "NFL_PROP_KICKING_POINTS_V2"
+    },
+    "xp_made": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": "NFL_KICKING_EMPIRICAL (nfl_kicking_empirical; research pricer exists but is not governance-admitted)",
+      "provider_market": "player_pats",
+      "settlement_field": "extra_points_made",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [
+        "TWO_SIDED_OU",
+        "MILESTONE_LADDER"
+      ],
+      "offer_status": "OFFERED_FIXTURE_OBSERVED",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "evidence_group": "NFL_PROP_XP_MADE_V2"
+    },
+    "player_sacks": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": null,
+      "provider_market": "player_sacks",
+      "settlement_field": "sacks",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [],
+      "offer_status": "NOT_OBSERVED_ON_INSPECTED_BOARD",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "registration_note": "derivative pricers exist only over attributed simulation paths (core/simulate), which the canonical path does not emit; no defensive player props were shown on the inspected DraftKings board (#2265 fixture census), so no offered status is claimed.",
+      "evidence_group": "NFL_PROP_PLAYER_SACKS_V2"
+    },
+    "tackles_assists": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": null,
+      "provider_market": "player_tackles_assists",
+      "settlement_field": "tackles_plus_assists",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [],
+      "offer_status": "NOT_OBSERVED_ON_INSPECTED_BOARD",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "registration_note": "derivative pricers exist only over attributed simulation paths (core/simulate), which the canonical path does not emit; not observed on the inspected board (#2265 fixture census).",
+      "evidence_group": "NFL_PROP_TACKLES_ASSISTS_V2"
+    },
+    "player_interceptions": {
+      "status": "RESEARCH_ONLY",
+      "registration_state": "REGISTERED_RESEARCH_ONLY",
+      "promotable": false,
+      "eligible": false,
+      "validation_status": "NOT_VALIDATED",
+      "pricer": null,
+      "provider_market": "player_defensive_interceptions",
+      "settlement_field": "interceptions",
+      "settlement_source": "Official NFL gamebook final player statistics (nflverse game logs; post-game, final)",
+      "offer_forms": [],
+      "offer_status": "NOT_OBSERVED_ON_INSPECTED_BOARD",
+      "one_sided_no_vig": "UNAVAILABLE",
+      "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
+      "registration_note": "derivative pricers exist only over attributed simulation paths (core/simulate), which the canonical path does not emit; not observed on the inspected board (#2265 fixture census). Defensive interceptions are a distinct family from quarterback interceptions thrown.",
+      "evidence_group": "NFL_PROP_PLAYER_INTERCEPTIONS_V2"
+    }
+  }
+}
