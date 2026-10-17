@@ -241,6 +241,60 @@ def crps_empirical_int(pmf, y):
     return total
 
 
+def build_v2_predictor(inputs):
+    """Return predict(g) -> (league, e_home, e_away) for the LEVEL v2
+    candidate. `inputs` = every completed REG game in the loaded window.
+    Strictly-prior rule: only inputs with kickoff < g's kickoff (bisect_left,
+    so identical kickoffs never see each other), seasons {s-1, s}; each
+    input game's residual anchor is the league level strictly before IT."""
+    inputs = sorted(inputs, key=lambda g: (g["kickoff"], g["away"], g["home"]))
+    in_kicks = [g["kickoff"] for g in inputs]
+
+    def window_prior(kickoff, season):
+        j = bisect.bisect_left(in_kicks, kickoff)
+        return [inputs[t] for t in range(j)
+                if inputs[t]["season"] in (season - 1, season)]
+
+    def v2_prediction(g):
+        prior = window_prior(g["kickoff"], g["season"])
+        league = v2.league_level(
+            [(p["home_score"] + p["away_score"]) / 2.0 for p in prior])
+        # Prereg §1: a season-S fixture may use inputs from seasons S-1 and
+        # S ONLY. Each input game's anchor L(t_p) is therefore the league
+        # level strictly before p computed over the FIXTURE's window
+        # {S-1, S} (never p's own window, which would admit S-2 data).
+        # Amendment 1 (DEVIATION_RECORD.md) - conforming re-run.
+        # Exact EW prefix recurrence: lvl[k] = league_level(vals[:k]).
+        vals = [(q["home_score"] + q["away_score"]) / 2.0 for q in prior]
+        r = 0.5 ** (1.0 / v2.LEAGUE_HALF_LIFE_GAMES)
+        lvl, num, den = [v2.LEAGUE_FALLBACK], 0.0, 0.0
+        for v in vals:
+            num = num * r + v
+            den = den * r + 1.0
+            lvl.append(num / den)
+        pk = [q["kickoff"] for q in prior]
+        anchors = {id(q): lvl[bisect.bisect_left(pk, q["kickoff"])]
+                   for q in prior}
+
+        def hist(team):
+            out = []
+            for p in prior:
+                a = anchors[id(p)]
+                if p["home"] == team:
+                    out.append((p["season"], p["home_score"] - a,
+                                p["away_score"] - a))
+                elif p["away"] == team:
+                    out.append((p["season"], p["away_score"] - a,
+                                p["home_score"] - a))
+            return out
+        hres = v2.team_residuals(hist(g["home"]), g["season"])
+        ares = v2.team_residuals(hist(g["away"]), g["season"])
+        e_home, e_away = v2.expected_scores(league, hres, ares)
+        return league, e_home, e_away
+
+    return v2_prediction
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--dataset", required=True)
@@ -295,42 +349,7 @@ def main():
     for g in inputs:
         season_totals_all[g["season"]].append(g["home_score"] + g["away_score"])
 
-    # ---- v2 anchors: league level strictly before each input game,
-    # window = seasons {s-1, s}; identical kickoffs never see each other.
-    inputs.sort(key=lambda g: (g["kickoff"], g["away"], g["home"]))
-    in_kicks = [g["kickoff"] for g in inputs]
-
-    def window_prior(kickoff, season):
-        j = bisect.bisect_left(in_kicks, kickoff)
-        return [inputs[t] for t in range(j)
-                if inputs[t]["season"] in (season - 1, season)]
-
-    anchor = {}
-    for g in inputs:
-        prior = window_prior(g["kickoff"], g["season"])
-        anchor[id(g)] = v2.league_level(
-            [(p["home_score"] + p["away_score"]) / 2.0 for p in prior])
-
-    def v2_prediction(g):
-        prior = window_prior(g["kickoff"], g["season"])
-        league = v2.league_level(
-            [(p["home_score"] + p["away_score"]) / 2.0 for p in prior])
-
-        def hist(team):
-            out = []
-            for p in prior:
-                a = anchor[id(p)]
-                if p["home"] == team:
-                    out.append((p["season"], p["home_score"] - a,
-                                p["away_score"] - a))
-                elif p["away"] == team:
-                    out.append((p["season"], p["away_score"] - a,
-                                p["home_score"] - a))
-            return out
-        hres = v2.team_residuals(hist(g["home"]), g["season"])
-        ares = v2.team_residuals(hist(g["away"]), g["season"])
-        e_home, e_away = v2.expected_scores(league, hres, ares)
-        return league, e_home, e_away
+    v2_prediction = build_v2_predictor(inputs)
 
     _, sd_total, _, _ = fm.PRIORS["NFL"]
     rows, audit, model_only = [], [], []
@@ -430,7 +449,8 @@ def main():
                  **{f"brier_{k}": b[k] / b["n"] for k in ("cand", "frozen", "b2", "b3")}}
                 for line, b in band_sums.items()]
     results = {
-        "item": "NFL_TOTALS_LEVEL_V2_PART_A",
+        "item": "NFL_TOTALS_LEVEL_V2_PART_A_AMENDMENT1_CONFORMING",
+        "amendment": "DEVIATION_RECORD.md: anchors restricted to the fixture window {S-1,S} (prereg section 1); the as-run result is preserved in results_nfl_totals_level_v2_part_a.json (evaluator at d07ca77f).",
         "label": "RESEARCH_EVIDENCE_DIAGNOSTIC_SCREEN_REUSED_DEVELOPMENT_DATA",
         "evidence_class": ("Part A diagnostic screen on 2018-2025 data already "
                            "used by Stage 2 N3 and LEVEL v1. NOT out-of-sample "
@@ -458,10 +478,10 @@ def main():
                     "games_total_in_file": total_rows,
                     "fields_not_read": "spread/total/moneyline columns"},
         "implementation_notes": [
-            "Residual anchors for 2017 burn-in games use only strictly-prior 2017 "
-            "games (2016 is outside the declared input window and is not loaded); "
-            "the earliest 2017 anchors therefore use the 22.0 fallback. This "
-            "affects only the carried prior-season residuals of 2018 fixtures."],
+            "Residual anchors are computed over the fixture's own window "
+            "{S-1, S}, strictly before each input game (prereg section 1); no "
+            "S-2 data enters any season-S prediction. 2016 is not loaded, so "
+            "2018 fixtures' earliest 2017 anchors use the 22.0 fallback."],
         "population_reconciliation_by_season": recon,
         "counts": dict(counts),
         "reproduction_precondition": repro_check,
