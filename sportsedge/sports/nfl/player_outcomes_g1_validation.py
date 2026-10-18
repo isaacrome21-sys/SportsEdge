@@ -4,7 +4,7 @@ Research-only. No market prices are consumed and no runtime authority is granted
 """
 from __future__ import annotations
 
-from math import log, sqrt
+from math import isfinite, log, sqrt
 from statistics import mean
 from typing import Any, Iterable
 
@@ -18,7 +18,11 @@ def _clip(p: float) -> float:
 
 
 def probability_metrics(pairs: Iterable[tuple[int, float]]) -> dict[str, float]:
-    rows = [(int(y), _clip(float(p))) for y, p in pairs]
+    rows = []
+    for y, p in pairs:
+        if y not in (0, 1) or not isfinite(float(p)) or not 0 <= float(p) <= 1:
+            raise ValueError("NFL_PROP_G1_INVALID_PROBABILITY_EVAL")
+        rows.append((int(y), _clip(float(p))))
     if not rows:
         raise ValueError("NFL_PROP_G1_EMPTY_PROBABILITY_EVAL")
     brier = mean((p - y) ** 2 for y, p in rows)
@@ -30,6 +34,8 @@ def quantity_metrics(actual_pred: Iterable[tuple[float, float]]) -> dict[str, fl
     rows = [(float(a), float(p)) for a, p in actual_pred]
     if not rows:
         raise ValueError("NFL_PROP_G1_EMPTY_QUANTITY_EVAL")
+    if any(not isfinite(a) or not isfinite(p) for a, p in rows):
+        raise ValueError("NFL_PROP_G1_INVALID_QUANTITY_EVAL")
     errors = [p - a for a, p in rows]
     return {
         "n": len(rows),
@@ -49,7 +55,43 @@ def chronological_receptions_readout(
     Rows must include player_id, season, week, receptions. Each prediction uses
     only rows with an earlier (season, week) for the same player.
     """
-    data = [dict(r) for r in rows]
+    if isinstance(min_prior_games, bool) or not isinstance(min_prior_games, int) or min_prior_games < 1:
+        raise ValueError("NFL_PROP_G1_INVALID_MIN_PRIOR_GAMES")
+    line = float(line)
+    if not isfinite(line) or line < 0:
+        raise ValueError("NFL_PROP_G1_INVALID_LINE")
+    # Validate the complete input before fitting anything. One player-week is
+    # one observation; duplicates cannot become prior history for each other.
+    data = []
+    seen = set()
+    for source in rows:
+        row = dict(source)
+        player_id = str(row.get("player_id") or "").strip()
+        if not player_id:
+            raise ValueError("NFL_PROP_G1_PLAYER_ID_REQUIRED")
+        row["player_id"] = player_id
+        for key in ("season", "week"):
+            value = row.get(key)
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                raise ValueError("NFL_PROP_G1_INVALID_CHRONOLOGY") from None
+            if isinstance(value, bool) or not isfinite(number) or not number.is_integer() or number <= 0:
+                raise ValueError("NFL_PROP_G1_INVALID_CHRONOLOGY")
+            row[key] = int(number)
+        identity = (player_id, row["season"], row["week"])
+        if identity in seen:
+            raise ValueError("NFL_PROP_G1_DUPLICATE_PLAYER_WEEK")
+        seen.add(identity)
+        value = row.get("receptions")
+        try:
+            current = float(value)
+        except (TypeError, ValueError):
+            raise ValueError("NFL_PROP_G1_INVALID_RECEPTIONS") from None
+        if isinstance(value, bool) or not isfinite(current) or current < 0 or not current.is_integer():
+            raise ValueError("NFL_PROP_G1_INVALID_RECEPTIONS")
+        row["receptions"] = current
+        data.append(row)
     data.sort(key=lambda r: (int(r["season"]), int(r["week"]), str(r.get("player_id") or "")))
     history: dict[str, list[dict[str, Any]]] = {}
     probability_rows: list[tuple[int, float]] = []
@@ -61,9 +103,9 @@ def chronological_receptions_readout(
         if not player_id:
             raise ValueError("NFL_PROP_G1_PLAYER_ID_REQUIRED")
         prior = history.setdefault(player_id, [])
-        current = float(row.get("receptions") or 0.0)
+        current = row["receptions"]
         if len(prior) >= min_prior_games:
-            values = [float(r.get("receptions") or 0.0) for r in prior]
+            values = [r["receptions"] for r in prior]
             dist = fit_count_distribution(values)
             p_over = dist.prob_over_count_line(line)
             outcome = int(current > line)
