@@ -1,0 +1,23 @@
+{
+  "away_lineup": [],
+  "away_lineup_primary_slots": [],
+  "away_probable_pitcher_id": 656876,
+  "away_team_id": 139,
+  "boxscore_blob": "artifacts/mlb_pit_inputs/raw/boxscore/4bb7522592e923dc64a4e621a58cffe415bb0fb9fd9a12c04c32e5e2119d7b2e.json",
+  "boxscore_source_sha256": "4bb7522592e923dc64a4e621a58cffe415bb0fb9fd9a12c04c32e5e2119d7b2e",
+  "game_pk": 849817,
+  "game_status": "Preview",
+  "home_lineup": [],
+  "home_lineup_primary_slots": [],
+  "home_probable_pitcher_id": 800048,
+  "home_team_id": 114,
+  "model_p_authority": false,
+  "observed_at_utc": "2026-10-18T08:08:26.613080+00:00",
+  "promotion_authority": false,
+  "retroactive_point_in_time_claim": false,
+  "schedule_blob": "artifacts/mlb_pit_inputs/raw/schedule/4d5211508d760110f173f0bdb266ce42d6af7e73876043acff8ac77440d1bbef.json",
+  "schedule_source_sha256": "4d5211508d760110f173f0bdb266ce42d6af7e73876043acff8ac77440d1bbef",
+  "scheduled_start_utc": "2026-10-18T21:08:00Z",
+  "schema": "SPORTSEDGE_MLB_PIT_LINEUP_STARTER_OBSERVATION_V1",
+  "slate_date": "2026-10-18"
+}
