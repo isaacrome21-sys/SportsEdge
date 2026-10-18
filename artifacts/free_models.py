@@ -951,6 +951,7 @@ LANE_A = "LANE_A_INDEPENDENT"
 LANE_B = "LANE_B_ANCHORED"
 ANCHOR_WEIGHT = 0.15
 POSITIVE_EV_STATUS = "RESEARCH_POSITIVE_EV_UNVALIDATED"
+NFL_SIDE_WATCH_STATUS = "WATCH_NFL_SIDE_UNVALIDATED"
 
 
 def _lane_view(lane, win, push, home_mean, away_mean, dec, raw_total,
@@ -1334,6 +1335,14 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
         # exact-production, PIT-safe NFL total model is tested vs closes.
         status = "WATCH_NFL_TOTAL_PRIOR_ONLY"
         reason = "NFL_ABSOLUTE_SCORING_RATE_MODEL_MISSING:22_PTS_PER_TEAM_PLUS_MARGIN_FORM_ONLY"
+    elif sport == "NFL" and market in ("ML", "SPREAD"):
+        # Owner ruling Oct 17 2026 (#2384/#2385): the same 22-point prior
+        # compresses side probabilities toward 0.5. The composite acceptance
+        # run (#2383) surfaced 20/20 positive-EV rows on the underdog, largest
+        # "edges" on the largest dogs. Sides stay diagnostic WATCH until a
+        # new side model beats closing lines under its own preregistration.
+        status = NFL_SIDE_WATCH_STATUS
+        reason = "NFL_SIDE_MODEL_UNVALIDATED:PRIOR_COMPRESSION_TOWARD_EVEN:ISSUE_2384"
     elif price < -165:
         status = "PRICE_CAP"
     elif primary["ev_per_dollar"] >= min_ev:
@@ -1658,7 +1667,8 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
             watchlist.append(row)
             continue
         if row.get("status") in {"WATCH_NFL_NO_VERIFIED_CONTEXT",
-                                 "WATCH_NFL_TOTAL_PRIOR_ONLY"}:
+                                 "WATCH_NFL_TOTAL_PRIOR_ONLY",
+                                 NFL_SIDE_WATCH_STATUS}:
             watchlist.append(row)
             continue
         # Repair 3: a stale quote cannot support a research candidate, even
@@ -1690,7 +1700,8 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
     lane_b_watchlist = []
     for r in all_rows:
         if r.get("status") in {"WATCH_NFL_NO_VERIFIED_CONTEXT",
-                              "WATCH_NFL_TOTAL_PRIOR_ONLY"}:
+                              "WATCH_NFL_TOTAL_PRIOR_ONLY",
+                              NFL_SIDE_WATCH_STATUS}:
             continue
         lanes = r.get("pricing_lanes") or {}
         lane_b = lanes.get("lane_b_anchored") or {}
