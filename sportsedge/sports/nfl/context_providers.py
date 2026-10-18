@@ -50,7 +50,9 @@ class StadiumRecord:
     team_ids: tuple[str, ...]
     lat: float
     lon: float
-    field_bearing_deg: float
+    # None = bearing unknown (registry v2026.2+). Unknown must never be
+    # coerced to 0.0: consumers fail closed (no field-relative wind) instead.
+    field_bearing_deg: float | None
     roof_type: str
     timezone_name: str
     typical_home_kickoff_hour_local: float
@@ -63,7 +65,7 @@ class StadiumRecord:
             raise NFLContextError("stadium team_ids required")
         if not (-90 <= float(self.lat) <= 90 and -180 <= float(self.lon) <= 180):
             raise NFLContextError("stadium coordinates invalid")
-        if not (0 <= float(self.field_bearing_deg) < 360):
+        if self.field_bearing_deg is not None and not (0 <= float(self.field_bearing_deg) < 360):
             raise NFLContextError("field bearing invalid")
         if self.roof_type not in ROOF_TYPES:
             raise NFLContextError("roof type invalid")
@@ -80,6 +82,10 @@ def stadium_registry_hash(rows: Mapping[str, StadiumRecord]) -> str:
 
 
 def rotate_wind_to_field(*, wind_speed_mph: float, wind_dir_deg: float, field_bearing_deg: float) -> dict[str, float]:
+    if field_bearing_deg is None:
+        # Fail closed: an unknown bearing has no field-relative wind.
+        # Never substitute 0.0, which would fabricate a north-aligned field.
+        raise NFLContextError("field bearing unknown")
     speed = float(wind_speed_mph)
     if speed < 0:
         raise NFLContextError("wind speed invalid")
@@ -172,7 +178,13 @@ def build_weather_roof_provider(*, game_id: str, stadium: StadiumRecord, kickoff
             payload["wind_speed_mph"] = float(period["windSpeedMph"])
         if period.get("windDirDeg") is not None:
             payload["wind_dir_deg"] = float(period["windDirDeg"])
-        if payload["wind_speed_mph"] is not None and payload["wind_dir_deg"] is not None:
+        if (
+            payload["wind_speed_mph"] is not None
+            and payload["wind_dir_deg"] is not None
+            and stadium.field_bearing_deg is not None
+        ):
+            # Unknown bearing: wind_relative stays None (no bearing
+            # adjustment) rather than rotating against a placeholder 0.0.
             payload["wind_relative"] = rotate_wind_to_field(
                 wind_speed_mph=payload["wind_speed_mph"],
                 wind_dir_deg=payload["wind_dir_deg"],
