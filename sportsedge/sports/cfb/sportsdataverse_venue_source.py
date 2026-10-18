@@ -149,6 +149,49 @@ def apply_pinned_venue_supplements(
         }
     return out
 
+def apply_pinned_venue_aliases(
+    venues: Mapping[int, Mapping[str, Any]],
+    aliases: object,
+) -> dict[int, dict[str, Any]]:
+    """Bind schedule-era venue IDs to an existing pinned physical venue."""
+    out={int(k):dict(v) for k,v in venues.items()}
+    if aliases in (None, []):
+        return out
+    if not isinstance(aliases, list):
+        raise SDVVenueSourceError("CFB_SDV_VENUE_ALIASES_LIST_REQUIRED")
+    seen=set()
+    for index,item in enumerate(aliases):
+        if not isinstance(item, Mapping):
+            raise SDVVenueSourceError(f"CFB_SDV_VENUE_ALIAS_OBJECT_REQUIRED:{index}")
+        try:
+            venue_id=int(item.get("venue_id"))
+            source_venue_id=int(item.get("source_venue_id"))
+        except (TypeError,ValueError) as exc:
+            raise SDVVenueSourceError(f"CFB_SDV_VENUE_ALIAS_VALUE_INVALID:{index}") from exc
+        if venue_id in seen:
+            raise SDVVenueSourceError(f"CFB_SDV_VENUE_ALIAS_DUPLICATE:{venue_id}")
+        seen.add(venue_id)
+        if venue_id in out:
+            raise SDVVenueSourceError(f"CFB_SDV_VENUE_ALIAS_OVERRIDE_FORBIDDEN:{venue_id}")
+        source=out.get(source_venue_id)
+        if not isinstance(source, Mapping):
+            raise SDVVenueSourceError(
+                f"CFB_SDV_VENUE_ALIAS_SOURCE_MISSING:{venue_id}:{source_venue_id}"
+            )
+        expected_name=str(item.get("expected_source_name") or "").strip()
+        if expected_name and str(source.get("name") or "").strip() != expected_name:
+            raise SDVVenueSourceError(
+                f"CFB_SDV_VENUE_ALIAS_SOURCE_NAME_MISMATCH:{venue_id}:{source_venue_id}"
+            )
+        alias=dict(source)
+        alias["venue_id"]=venue_id
+        alias["name"]=str(item.get("name") or source.get("name") or "").strip() or None
+        alias["alias_source_venue_id"]=source_venue_id
+        alias["alias_policy"]="PINNED_PHYSICAL_VENUE_ID_REMAP"
+        out[venue_id]=alias
+    return out
+
+
 def venue_source_attestation(raw: bytes, *, usable_rows: int) -> dict[str, Any]:
     return {
         "byte_count": len(raw),
@@ -164,5 +207,6 @@ __all__ = [
     "git_blob_sha1",
     "parse_pinned_venues",
     "apply_pinned_venue_supplements",
+    "apply_pinned_venue_aliases",
     "venue_source_attestation",
 ]
