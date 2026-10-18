@@ -40,6 +40,8 @@ class AcquireMlbCardContextFastTests(TestCase):
                     str(engine),
                     "--out-dir",
                     str(out),
+                    "--capture-dir",
+                    str(root / "capture"),
                     "--workers",
                     "3",
                 ],

@@ -15,5 +15,5 @@ class ContextCardTests(unittest.TestCase):
    if game_pk==2:raise RuntimeError("savant down")
    return dict(BUNDLE,game_pk=game_pk)
   with tempfile.TemporaryDirectory() as tmp:
-   eng=Path(tmp)/"engine.json";eng.write_text(json.dumps(payload));out=Path(tmp)/"ctx";acquire_main(["--engine-output",str(eng),"--out-dir",str(out)],acquire=fake);self.assertIn("savant down",json.loads((out/"failures.json").read_text())[0])
+   eng=Path(tmp)/"engine.json";eng.write_text(json.dumps(payload));out=Path(tmp)/"ctx";acquire_main(["--engine-output",str(eng),"--out-dir",str(out),"--capture-dir",str(Path(tmp)/"capture")],acquire=fake);self.assertIn("savant down",json.loads((out/"failures.json").read_text())[0])
 if __name__=="__main__":unittest.main()

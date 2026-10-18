@@ -9,7 +9,7 @@ from sportsedge.sports.nfl.discrete_v2 import (
     tie_mass,
 )
 from sportsedge.sports.nfl.discrete_v2_eval import evaluate_holdout, load_eval_freeze
-from sportsedge.sports.nfl.discrete_v2_fit import SNAPSHOT, build_freeze, snapshot_sha256
+from sportsedge.sports.nfl.discrete_v2_fit import build_freeze, snapshot_sha256
 
 
 def _game(week: int = 4, season: int = 2026, game_type: str = "REG") -> dict:
@@ -24,12 +24,16 @@ def _game(week: int = 4, season: int = 2026, game_type: str = "REG") -> dict:
     }
 
 
-def test_fit_rebuilds_freeze_sha() -> None:
-    rebuilt = build_freeze()
+def test_fit_rebuilds_freeze_sha(tmp_path) -> None:
+    # Materialize the pinned snapshot under tmp_path: the default location is
+    # inside the repo tree (data/nfl_discrete_v2/), and snapshot_bytes()
+    # writes the decompressed JSON there when it is absent.
+    snapshot_copy = tmp_path / "scores_2021_2024_reg.json"
+    rebuilt = build_freeze(snapshot_copy)
     on_disk = load_freeze()
     assert rebuilt["artifact_sha256"] == on_disk["artifact_sha256"]
     assert on_disk["fit_window"]["source"] == "data/nfl_discrete_v2/scores_2021_2024_reg.json"
-    assert on_disk["fit_window"]["source_sha256"] == snapshot_sha256(SNAPSHOT)
+    assert on_disk["fit_window"]["source_sha256"] == snapshot_sha256(snapshot_copy)
     assert on_disk["family"] == FAMILY
     assert on_disk["authority"]["phone_card"] is False
 
