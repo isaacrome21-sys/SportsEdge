@@ -525,7 +525,7 @@ class RunnerHookTests(unittest.TestCase):
         card = run_full({"lines": [nfl_row()]}, now=NOW,
                         getter=FakeGetter(nfl_mapping()))
         row = card["evaluated_rows"][0]
-        self.assertIn(row["status"], ("RESEARCH_EDGE", "BELOW_THRESHOLD", "PRICE_CAP"))
+        self.assertEqual(row["status"], free_models.NFL_SIDE_WATCH_STATUS)
         # Prepricing adjustments are separate from user context
         pp = row.get("prepricing_adjustments")
         self.assertIsNotNone(pp)
@@ -602,7 +602,7 @@ class RunnerHookTests(unittest.TestCase):
                          now=NOW, getter=FakeGetter(nfl_mapping()),
                          allow_manual_context=True)
         row2 = card2["evaluated_rows"][0]
-        self.assertIn(row2["status"], ("RESEARCH_EDGE", "BELOW_THRESHOLD", "PRICE_CAP", "WATCH_QUOTE_NOT_CURRENT"))
+        self.assertEqual(row2["status"], free_models.NFL_SIDE_WATCH_STATUS)
         # Spoofed prepricing_adjustments in user intake must be ignored
         spoofed = nfl_row()
         spoofed["prepricing_adjustments"] = {"source": "SPOOFED", "adjustments": {"home_injury_pts": 999}}
