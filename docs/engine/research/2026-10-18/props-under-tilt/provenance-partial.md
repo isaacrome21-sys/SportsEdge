@@ -79,3 +79,18 @@ Tuten, Lawrence and Stroud had no model_mu published; n/a is preserved, not impu
 Disposition: **HISTORICAL_ONLY / INCOMPLETE_SOURCE / REPRODUCTION_NOT_ESTABLISHED**. All eight rows are excluded from prospective scoring. The Collins correlation note is preserved; the two rows are not represented as independent positions. No outcomes were fetched or used for this addendum.
 
 Remaining blockers: original input snapshots, exact fitting and pool rules, predictive parameterization, original producing module/configuration, full paired prices and capture provenance, and EV/rounding rules. The published row table is now preserved as relayed, but it does not establish reproducibility or preregistration. Reconstruction and archival replay remain blocked. No model or grading ledger changed.
+
+## Addendum — MySpariEdge comparison corrections (2026-10-18)
+
+Source: user's relayed correction of a separate verification summary titled "✅ Ping — the MySpariEdge pull cleared verification", with reported read window "8:47–9:19 AM CT". The original note/link and underlying source rows were not recovered by this session. The quoted window is preserved as reported, not asserted as an independently verified capture interval. User states the pull already cleared; no watch is requested or created.
+
+### Claims withdrawn or quarantined
+- **Tuten:** our published mean is n/a. The reported external value 67.2 has no published own-model mean to match. Withdraw "identical to our μ to the decimal" and "same mean, opposite conclusion" for Tuten. A later scratch-session value, if recovered, must be labeled unpublished and cannot replace n/a in the original card.
+- **Collins yardage:** reported external mean 67.5, line 72.5 and "under 46.9%" have unresolved side/line/distribution binding. Do not silently flip the probability or infer a corrected line. Exclude this tuple from evidence for the mean-versus-median explanation until the underlying source is checked. Mean below the line alone does not prove under >50% for every possible distribution, but the tuple needs verification under the claimed model.
+
+### Retained historical comparisons, attributed to the user-reported summary
+- Washington receptions UNDER 4.5: reported agreement across the two model outputs.
+- Collins receptions UNDER 5.5: reported agreement across the two model outputs.
+- Marks: external projection reportedly 50.1 versus our published 42.2; consistent with the existing backup-weeks / lead-role flag, not proof that role blindness caused the difference.
+
+These are descriptive cross-model comparisons, not a verified demonstration of statistical independence, predictive accuracy, causality, or promotion eligibility. Their underlying MySpariEdge source remains uninspected in this session. Preserve them separately from independently source-verified observations. No prospective rows, model changes, retrospective mean imputation or grading changes.
