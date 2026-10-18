@@ -40,6 +40,8 @@ HERE = Path(__file__).resolve().parent
 EVALUATOR_NAME = "eval_nfl_props_calibration_v1.py"
 EVALUATOR_SHA256 = "66de56155e3c36f90c1f39c648b24e724328ec86056dee0e9adbed57281bc25b"
 PREREG_NAME = "PREREG_NFL_PROPS_PART2_FORWARD_V1.md"
+# §4.5: a close older than this before kickoff is CLOSE_STALE (CLV_MISSING).
+CLOSE_MAX_AGE_MINUTES = 60
 CALIBRATION_PREREG_NAME = "PREREG_NFL_PROPS_CALIBRATION_V1.md"
 CV_SOURCE = "POOLED"  # frozen prereg §1/§5: one pooled constant per market, all four stats
 
@@ -275,27 +277,43 @@ def cmd_price(args) -> int:
 def attach_close(run_dir: Path, close_capture_path: Path) -> dict:
     """Attach the final pre-kickoff capture's prices to a priced run.
     Frozen rule (§4.5): a row whose two-sided close is not readable in the
-    close capture — absent, single-sided, or timestamped at/after kickoff —
-    is CLV_MISSING. Closes are never taken from any other time or source."""
+    close capture is CLV_MISSING, with exactly one reason:
+      NO_CLOSE_ROW        - nothing for that player/market in the close capture
+      LINE_MOVED          - the market closed at a different line than entry
+      CLOSE_SINGLE_SIDED  - the entry line is present but one side is missing
+      CLOSE_NOT_PREKICKOFF - the close is timestamped at/after kickoff
+      CLOSE_STALE         - the close is more than CLOSE_MAX_AGE_MINUTES
+                            before kickoff
+    Closes are never taken from any other time, line, or source."""
     rows_path = run_dir / "priced_rows.json"
     payload = json.loads(rows_path.read_text())
     close = json.loads(close_capture_path.read_text())
     by_key = {}
+    markets_seen = set()
     for raw in close["rows"]:
         key = (raw["game_id"], raw["player_id"], raw["market"], float(raw["line"]))
         by_key[key] = raw
+        markets_seen.add((raw["game_id"], raw["player_id"], raw["market"]))
     summary = {"readable": 0, "clv_missing": 0}
     for row in payload["rows"]:
         if row["status"] != "PRICED":
             continue
         key = (row["game_id"], row["player_id"], row["market"], row["line"])
         raw = by_key.get(key)
-        readable = (
-            raw is not None
-            and raw.get("over_price") is not None
-            and raw.get("under_price") is not None
-            and _parse_ts(raw["captured_at"]) < _parse_ts(row["kickoff"])
-        )
+        kickoff = _parse_ts(row["kickoff"])
+        reason = None
+        if raw is None:
+            reason = ("LINE_MOVED" if (row["game_id"], row["player_id"], row["market"]) in markets_seen
+                      else "NO_CLOSE_ROW")
+        elif raw.get("over_price") is None or raw.get("under_price") is None:
+            reason = "CLOSE_SINGLE_SIDED"
+        else:
+            captured = _parse_ts(raw["captured_at"])
+            if captured >= kickoff:
+                reason = "CLOSE_NOT_PREKICKOFF"
+            elif (kickoff - captured).total_seconds() > CLOSE_MAX_AGE_MINUTES * 60:
+                reason = "CLOSE_STALE"
+        readable = reason is None
         if readable:
             nv_over, nv_under = devig_pair(raw["over_price"], raw["under_price"])
             row.update(close_status="READABLE",
@@ -307,9 +325,6 @@ def attach_close(run_dir: Path, close_capture_path: Path) -> dict:
                        clv_missing_reason=None)
             summary["readable"] += 1
         else:
-            reason = ("NO_CLOSE_ROW" if raw is None else
-                      "CLOSE_SINGLE_SIDED" if (raw.get("over_price") is None or raw.get("under_price") is None)
-                      else "CLOSE_NOT_PREKICKOFF")
             row.update(close_status="CLV_MISSING", clv_missing_reason=reason)
             summary["clv_missing"] += 1
     payload["close_attach"] = {
