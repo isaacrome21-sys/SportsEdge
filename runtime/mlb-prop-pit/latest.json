@@ -1,10 +1,10 @@
 {
-  "captured_at": "2026-10-18T05:58:30.432850+00:00",
-  "immutable_file": "artifacts/prop_odds/2026-10-18/props_20261018T055830.432850Z.json",
+  "captured_at": "2026-10-18T11:14:15.779024+00:00",
+  "immutable_file": "artifacts/prop_odds/2026-10-18/props_20261018T111415.779024Z.json",
   "market_counts": {
     "BATTER_BB": 0,
     "BATTER_K": 0,
-    "DOUBLES": 0,
+    "DOUBLES": 36,
     "EITHER_PITCHER_BB": 0,
     "EITHER_PITCHER_ER": 0,
     "EITHER_PITCHER_HITS_ALLOWED": 0,
@@ -21,15 +21,15 @@
     "PITCHER_HITS_WALKS_ER": 0,
     "PITCHER_K": 4,
     "PITCHER_OUTS": 0,
-    "RBI": 0,
-    "RUNS": 0,
+    "RBI": 36,
+    "RUNS": 36,
     "RUNS_RBIS": 0,
-    "SINGLES": 0,
-    "STOLEN_BASES": 0,
+    "SINGLES": 36,
+    "STOLEN_BASES": 22,
     "TOTAL_BASES": 6,
     "TRIPLES": 0
   },
-  "payload_sha256": "d16339762d7e5691961594bf22c85731ca76a52e2bf597f8fdc7170608cc26df",
-  "pit_target_quote_count": 94,
+  "payload_sha256": "c45076fb814986b9f877926be913a49730f4eb2c5d3b054d94380bab677a0abb",
+  "pit_target_quote_count": 260,
   "schema_version": 2
 }
