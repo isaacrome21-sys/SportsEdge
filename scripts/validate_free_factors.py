@@ -495,6 +495,10 @@ def era5_temp_humidity_venue_month(lat: float, lon: float, year: int,
         "temperature_unit": "fahrenheit", "timezone": "UTC"}))
     data = cached_json(key, url)
     return (data or {}).get("hourly")
+
+
+def pitcher_gamelog(pid: int, season: int) -> list:
+    """Per-start pitching game log for one pitcher-season (MLB Stats API, cached)."""
     key = f"mlb_plog_{pid}_{season}"
     url = (f"https://statsapi.mlb.com/api/v1/people/{pid}/stats?"
            + urlencode({"stats": "gameLog", "season": season, "group": "pitching"}))
