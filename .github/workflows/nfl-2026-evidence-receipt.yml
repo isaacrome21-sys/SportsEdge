@@ -1,0 +1,31 @@
+name: NFL 2026 evidence receipt
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["NFL 2026 line capture"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  receipt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+
+      - name: Build read-only NFL capture receipt
+        run: |
+          python3 -m py_compile scripts/build_nfl_2026_capture_receipt.py sportsedge/core/validation/evidence_receipt.py
+          python3 scripts/build_nfl_2026_capture_receipt.py --require-lock-match
+
+      - name: Upload chain-of-custody receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-2026-evidence-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/nfl_2026_capture_receipt/receipt.json
+          if-no-files-found: error
+          retention-days: 90
