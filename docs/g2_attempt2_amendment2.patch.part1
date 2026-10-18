@@ -1,0 +1,2415 @@
+diff --git a/scripts/run_nfl_score_counts_g2_attempt2.py b/scripts/run_nfl_score_counts_g2_attempt2.py
+new file mode 100644
+index 000000000..3af038e36
+--- /dev/null
++++ b/scripts/run_nfl_score_counts_g2_attempt2.py
+@@ -0,0 +1,87 @@
++#!/usr/bin/env python3
++"""Governed development-attempt runner for NFL_SCORE_COUNTS_G2 attempt 2.
++
++EXECUTION IS NOT AUTHORIZED. Owner ruling (Isaac, Oct 13 2026, issue
++#2131): the J1 + K3 attempt-2 design is approved for IMPLEMENTATION AND
++SYNTHETIC TESTING ONLY. Execution - fitting or evaluating on real
++development data - is NO-GO, and attempt 2 remains unspent.
++
++This entry point therefore refuses BY CONSTRUCTION:
++
++* It contains no execution implementation at all: no source download, no
++  source parsing, no row building, no evaluation call, no output writing.
++  There is no code path from this file to a consumed attempt.
++* Any invocation raises ATTEMPT_2_NOT_AUTHORIZED unless a go/no-go ledger
++  artifact exists at
++  ``config/research/nfl_score_counts_g2_attempt2_go_nogo_v1.json``.
++  No such artifact exists, and creating one is itself an owner action
++  outside this implementation. Even if one appeared, this build still
++  refuses (ATTEMPT_2_EXECUTION_NOT_IMPLEMENTED_IN_THIS_BUILD): the
++  execution implementation may only be added by the separately approved
++  go/no-go step that derives and freezes the attempt-2 preregistration
++  config and dispatches with the frozen confirmation string
++  ``CONSUME_SCORE_COUNTS_G2_ATTEMPT_2``.
++* The refusal happens before any argument is acted on and writes nothing.
++
++The model form and gates harness live in
++``sportsedge/research/nfl_score_counts_g2_v2.py`` and
++``sportsedge/research/nfl_score_counts_g2_eval_v2.py`` and are exercised
++only by the synthetic test suite (tests/test_nfl_score_counts_g2_attempt2.py),
++which fits nothing but seeded synthetic data.
++"""
++from __future__ import annotations
++
++import argparse
++from pathlib import Path
++import sys
++
++GO_NO_GO_LEDGER_PATH = Path(
++    "config/research/nfl_score_counts_g2_attempt2_go_nogo_v1.json")
++CONFIRMATION = "CONSUME_SCORE_COUNTS_G2_ATTEMPT_2"
++
++
++class Attempt2NotAuthorized(RuntimeError):
++    """Raised on every invocation of the attempt-2 execution entry point."""
++
++
++def assert_attempt2_authorized(repo_root: Path) -> None:
++    """Refuse unless a go/no-go ledger artifact exists. It does not."""
++    ledger = Path(repo_root) / GO_NO_GO_LEDGER_PATH
++    if not ledger.is_file():
++        raise Attempt2NotAuthorized(
++            "ATTEMPT_2_NOT_AUTHORIZED: no go/no-go ledger artifact at "
++            f"{GO_NO_GO_LEDGER_PATH.as_posix()} — owner ruling (issue #2131, "
++            "Oct 13 2026) approves implementation and synthetic testing only; "
++            "execution is NO-GO and attempt 2 remains unspent.")
++    raise Attempt2NotAuthorized(
++        "ATTEMPT_2_EXECUTION_NOT_IMPLEMENTED_IN_THIS_BUILD: a go/no-go "
++        "ledger artifact is present, but this build contains no execution "
++        "implementation; execution code is added only by the separately "
++        "approved go/no-go step.")
++
++
++def run_attempt(*, confirm: str, output_dir: Path,
++                repo_root: Path = Path(".")) -> dict:
++    # Authorization is checked first and unconditionally: the confirmation
++    # string, the output directory, and every other argument are inert.
++    assert_attempt2_authorized(repo_root)
++    raise Attempt2NotAuthorized("ATTEMPT_2_NOT_AUTHORIZED")  # unreachable
++
++
++def main(argv: list[str] | None = None) -> int:
++    parser = argparse.ArgumentParser(
++        description="NFL_SCORE_COUNTS_G2 attempt 2 — execution NOT authorized.")
++    parser.add_argument("--confirm", default=None)
++    parser.add_argument("--output-dir", type=Path, default=None)
++    args = parser.parse_args(argv)
++    try:
++        run_attempt(confirm=args.confirm or "",
++                    output_dir=args.output_dir or Path("."))
++    except Attempt2NotAuthorized as exc:
++        print(str(exc), file=sys.stderr)
++        return 2
++    return 0  # unreachable while execution is unauthorized
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/sportsedge/research/nfl_score_counts_g2_eval_v2.py b/sportsedge/research/nfl_score_counts_g2_eval_v2.py
+new file mode 100644
+index 000000000..8e9f7e202
+--- /dev/null
++++ b/sportsedge/research/nfl_score_counts_g2_eval_v2.py
+@@ -0,0 +1,929 @@
++"""Development evaluation + records for NFL_SCORE_COUNTS_G2 attempt 2.
++
++Gate standards are attempt-1's, verbatim (preregistration section 5;
++threshold provenance cross-checked against
++``config/research/nfl_score_counts_g2_prereg_v1.json`` - see the
++preregistration package's section 9 table). Attempt-2 changes are confined
++to the candidate's construction and the G-JOINT comparator set:
++
++* comparator (ii') - the independent-marginals composition of the
++  candidate's own PMF - replaces the attempt-1 discrete_v2 leg as the
++  second runnable development comparator (ruling J1). Per Amendment 1 it
++  is governed as a DEPENDENCE-VALUE test derived from the candidate's own
++  PMF, NOT an independent external benchmark, and no record produced here
++  may present it as one.
++* the discrete_v2 leg is recorded with status UNEVALUATED: it cannot pass
++  or fail the development gate, is not waived, and no development PASS may
++  be represented as satisfying it. It is not implemented here.
++* G-JOINT, G-CAL and G-KEY consume the candidate (post-K3) PMF;
++  skeleton-PMF key errors are computed and reported as diagnostics.
++
++A required comparison that cannot be run makes its gate FAIL with the
++reason recorded (the attempt-1 G_JOINT_BASELINE_II_NOT_RUNNABLE pattern);
++no gate is ever left INDETERMINATE in a result record. Pre-scoring aborts
++(source failure, fold below the 250-game minimum, paths below the scored
++minimum) produce NOT_RUN records and do not consume the attempt.
++
++EXECUTION STATUS: attempt 2 is NOT authorized (owner NO-GO, Oct 13 2026).
++This module is exercised only by synthetic tests; the governed runner
++refuses by construction.
++"""
++from __future__ import annotations
++
++from hashlib import sha256
++import json
++from math import log
++from typing import Any, Mapping, Sequence
++
++import numpy as np
++
++from sportsedge.sports.nfl.score_counts_g1 import predict_mean as heritage_predict_mean
++
++from sportsedge.research.nfl_score_counts_g2_v2 import (
++    ATTEMPT_NUMBER,
++    K3_KEYS,
++    MIN_PATHS_FOR_SCORED_OUTPUT,
++    PATHS_PER_GAME,
++    ROOT_SEED_LITERAL_V2,
++    ROOT_SEED_SHA256_V2,
++    VALIDATION_SEASONS,
++    V2_CONFIG,
++    ModelFormConfig,
++    ScoreCountsG2V2Error,
++    apply_k3,
++    banded_made_fg_detail,
++    banded_made_fg_mean,
++    estimate_k3_lambdas,
++    fit_fold_bundle,
++    fold_rare_rates,
++    game_pairs,
++    independent_marginals_pmf,
++    log_score,
++    log_score_pmf,
++    margin_law,
++    pmf_counts,
++    pmf_from_counts,
++    poisson_deviance,
++    poisson_logpmf,
++    randomized_pit,
++    realized_final_score,
++    rng_for_v2,
++    row_has_band_context,
++    select_sigma_nested_v2,
++    simulate_full_game_v2,
++    simulate_period_game_v2,
++)
++
++# Gate constants - attempt-1 standards verbatim (preregistration section 9
++# provenance: config/research/nfl_score_counts_g2_prereg_v1.json).
++RARE_TOLERANCE = 1e-12
++CAL_SLOPE_BOUNDS = (0.9, 1.1)
++CAL_MARGIN_DEV_BOUND = 0.05
++KEY_ABS_BOUND = 0.0075
++MIN_FOLD_WINS = 3
++FOLD_MIN_GAMES = 250
++
++ATTEMPT_BUDGET = 3
++ATTEMPTS_CONSUMED_BEFORE = 1  # attempt 1, DEVELOPMENT_ATTEMPT_FAIL, Oct 12 2026
++
++AUTHORITY = {
++    "research_only": True,
++    "creates_model_p": False,
++    "phone_card": False,
++    "truth_gate": False,
++    "promotion": False,
++    "staking": False,
++    "official": False,
++}
++
++DISCRETE_V2_LEG = {
++    "status": "UNEVALUATED",
++    "reason": (
++        "The discrete_v2 comparison is a prospective-stage requirement under "
++        "ruling J1. It cannot pass or fail the development gate, is not "
++        "waived, and no development PASS may be represented as satisfying it."
++    ),
++}
++
++
++class NotRunError(ScoreCountsG2V2Error):
++    """Pre-scoring abort: the attempt is NOT_RUN and NOT consumed."""
++
++
++def fail_gate(reason: str, **detail: Any) -> dict[str, Any]:
++    """The INDETERMINATE-to-FAIL rule: a required comparison that cannot be
++    run is a gate FAIL with the reason recorded, never an open state."""
++    out = {"pass": False, "status": "FAIL", "reason": reason}
++    out.update(detail)
++    return out
++
++
++def _decile_slope(pits: np.ndarray) -> float:
++    midpoints = np.asarray([0.05 + 0.1 * k for k in range(10)], dtype=float)
++    observed = np.asarray([float(np.mean(pits <= m)) for m in midpoints], dtype=float)
++    x = midpoints
++    return float(np.cov(x, observed, ddof=0)[0, 1] / np.var(x))
++
++
++def _decile_max_deviation(pits: np.ndarray) -> float:
++    bins = np.histogram(pits, bins=10, range=(0.0, 1.0))[0] / max(len(pits), 1)
++    return float(np.max(np.abs(bins - 0.1)))
++
++
++def randomized_pit_from_law(law: Mapping[int, float], realized: int,
++                            rng: np.random.Generator) -> float:
++    below = sum(p for v, p in law.items() if v < realized)
++    equal = float(law.get(realized, 0.0))
++    return float(below + float(rng.random()) * equal)
++
++
++# ---------------------------------------------------------------------------
++# Pure gate-verdict helpers (synthetic-record testable).
++# ---------------------------------------------------------------------------
++
++def assemble_count_gate(fold_rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
++    """Fold rule for the deviance gates (G-TD / G-FG): candidate better
++    pooled AND in at least MIN_FOLD_WINS of the folds."""
++    y = np.concatenate([np.asarray(f["y"], dtype=float) for f in fold_rows])
++    cand = np.concatenate([np.asarray(f["cand"], dtype=float) for f in fold_rows])
++    base = np.concatenate([np.asarray(f["base"], dtype=float) for f in fold_rows])
++    cand_dev = poisson_deviance(y, cand)
++    base_dev = poisson_deviance(y, base)
++    wins = sum(1 for f in fold_rows if f["fold_win"])
++    folds = [{
++        "validation_season": f["validation_season"],
++        "n_team_rows": f["n_team_rows"],
++        "candidate_poisson_deviance": f["candidate_poisson_deviance"],
++        "intercept_baseline_poisson_deviance": f["intercept_baseline_poisson_deviance"],
++        "fold_win": bool(f["fold_win"]),
++    } for f in fold_rows]
++    return {
++        "pooled_candidate_poisson_deviance": cand_dev,
++        "pooled_intercept_baseline_poisson_deviance": base_dev,
++        "pooled_improvement": base_dev - cand_dev,
++        "fold_wins": wins,
++        "folds_total": len(fold_rows),
++        "minimum_fold_wins": MIN_FOLD_WINS,
++        "pass": bool(cand_dev < base_dev and wins >= MIN_FOLD_WINS),
++        "folds": folds,
++    }
++
++
++def assemble_rare_gate(candidate_ll: float, baseline_ll: float, n: int) -> dict[str, Any]:
++    return {
++        "metric": "pooled Poisson log score, def_st_touchdowns + safeties",
++        "candidate_pooled_log_score": float(candidate_ll),
++        "league_rate_baseline_pooled_log_score": float(baseline_ll),
++        "n_team_rows": int(n),
++        "no_harm_tolerance": RARE_TOLERANCE,
++        "pass": bool(candidate_ll >= baseline_ll - RARE_TOLERANCE),
++    }
++
++
++def assemble_joint_gate(
++    fold_rows: Sequence[Mapping[str, Any]],
++    *,
++    leg_ii_prime_available: bool = True,
++    leg_ii_prime_unavailable_reason: str | None = None,
++) -> dict[str, Any]:
++    """G-JOINT: the candidate must beat BOTH runnable legs, pooled and in
++    >= MIN_FOLD_WINS folds per leg. The discrete_v2 leg is recorded
++    UNEVALUATED and plays no part in the verdict."""
++    total_games = sum(f["n_games"] for f in fold_rows)
++    cand_pooled = sum(f["candidate_mean_log_score"] * f["n_games"] for f in fold_rows) / total_games
++    base_i_pooled = sum(f["baseline_i_mean_log_score"] * f["n_games"] for f in fold_rows) / total_games
++    wins_i = sum(1 for f in fold_rows if f["fold_win_vs_baseline_i"])
++    leg_i = {
++        "pooled_candidate_mean_log_score": cand_pooled,
++        "pooled_baseline_mean_log_score": base_i_pooled,
++        "fold_wins": wins_i,
++        "folds_total": len(fold_rows),
++        "pass_vs_baseline_i": bool(cand_pooled > base_i_pooled and wins_i >= MIN_FOLD_WINS),
++        "folds": list(fold_rows),
++    }
++    if not leg_ii_prime_available:
++        return {
++            "baseline_i_league_empirical_pmf": leg_i,
++            "baseline_ii_prime_independent_marginals": fail_gate(
++                leg_ii_prime_unavailable_reason or "COMPARATOR_II_PRIME_NOT_RUNNABLE"),
++            "baseline_ii_frozen_discrete_v2_grid": dict(DISCRETE_V2_LEG),
++            "pass": False,
++            "verdict_reason": (
++                "A required comparison (ii') could not be run; per the frozen "
++                "rule the gate FAILS with the reason recorded."),
++        }
++    prime_pooled = sum(f["baseline_ii_prime_mean_log_score"] * f["n_games"] for f in fold_rows) / total_games
++    wins_prime = sum(1 for f in fold_rows if f["fold_win_vs_baseline_ii_prime"])
++    leg_prime = {
++        "construction": (
++            "Independent-marginals composition of the candidate's own "
++            "post-component PMF: P(h, a) = P^H(h) * P^A(a), same PMF floor."),
++        "governance": (
++            "Dependence-value test derived from the candidate's own PMF "
++            "(Amendment 1). NOT an independent external benchmark; this leg "
++            "must not be represented as one."),
++        "pooled_candidate_mean_log_score": cand_pooled,
++        "pooled_baseline_mean_log_score": prime_pooled,
++        "fold_wins": wins_prime,
++        "folds_total": len(fold_rows),
++        "pass_vs_baseline_ii_prime": bool(
++            cand_pooled > prime_pooled and wins_prime >= MIN_FOLD_WINS),
++    }
++    passed = bool(leg_i["pass_vs_baseline_i"] and leg_prime["pass_vs_baseline_ii_prime"])
++    return {
++        "baseline_i_league_empirical_pmf": leg_i,
++        "baseline_ii_prime_independent_marginals": leg_prime,
++        "baseline_ii_frozen_discrete_v2_grid": dict(DISCRETE_V2_LEG),
++        "pass": passed,
++    }
++
++
++def assemble_cal_gate(total_pits: Sequence[float], margin_pits: Sequence[float]) -> dict[str, Any]:
++    total_arr = np.asarray(total_pits, dtype=float)
++    margin_arr = np.asarray(margin_pits, dtype=float)
++    slope = _decile_slope(total_arr)
++    margin_dev = _decile_max_deviation(margin_arr)
++    return {
++        "total_pit_decile_slope": slope,
++        "total_pit_slope_bounds": list(CAL_SLOPE_BOUNDS),
++        "margin_pit_max_decile_deviation": margin_dev,
++        "margin_pit_deviation_bound": CAL_MARGIN_DEV_BOUND,
++        "n_games": int(len(total_arr)),
++        "pass": bool(CAL_SLOPE_BOUNDS[0] <= slope <= CAL_SLOPE_BOUNDS[1]
++                     and margin_dev <= CAL_MARGIN_DEV_BOUND),
++    }
++
++
++def assemble_key_gate(
++    candidate_mass: Mapping[int, Sequence[float]],
++    skeleton_mass: Mapping[int, Sequence[float]],
++    realized_margins: Sequence[int],
++) -> dict[str, Any]:
++    realized_arr = np.asarray(realized_margins)
++    detail: dict[str, Any] = {}
++    skeleton_detail: dict[str, Any] = {}
++    key_pass = True
++    for k in K3_KEYS:
++        model_p = float(np.mean(candidate_mass[k]))
++        realized_freq = float(np.mean(realized_arr == k))
++        err = abs(model_p - realized_freq)
++        detail[str(k)] = {
++            "model_probability": model_p, "realized_frequency": realized_freq,
++            "abs_error": err, "pass": bool(err <= KEY_ABS_BOUND),
++        }
++        key_pass = key_pass and err <= KEY_ABS_BOUND
++        skel_p = float(np.mean(skeleton_mass[k]))
++        skeleton_detail[str(k)] = {
++            "model_probability": skel_p, "realized_frequency": realized_freq,
++            "abs_error": abs(skel_p - realized_freq),
++        }
++    return {
++        "keys": detail,
++        "bound_each": KEY_ABS_BOUND,
++        "pass": bool(key_pass),
++        "skeleton_diagnostic": {
++            "keys": skeleton_detail,
++            "note": ("Skeleton (pre-component) key errors are diagnostics "
++                     "only; the gate consumes the candidate PMF."),
++        },
++    }
++
++
++def assemble_period_gate(
++    family_scores: Mapping[str, Mapping[int, Mapping[str, float]]],
++    family_baselines: Mapping[str, Mapping[int, Mapping[str, float]]],
++    *,
++    validation_seasons: Sequence[int] = VALIDATION_SEASONS,
++) -> dict[str, Any]:
++    out: dict[str, Any] = {}
++    for fam in family_scores:
++        folds = []
++        wins = 0
++        cand_sum = 0.0
++        base_sum = 0.0
++        n_sum = 0
++        for season in validation_seasons:
++            c = family_scores[fam][season]
++            b = family_baselines[fam][season]
++            win = c["candidate_mean_log_score"] > b["baseline_mean_log_score"]
++            wins += int(win)
++            cand_sum += c["candidate_mean_log_score"] * c["n"]
++            base_sum += b["baseline_mean_log_score"] * b["n"]
++            n_sum += c["n"]
++            folds.append({
++                "validation_season": season,
++                "n_period_observations": c["n"],
++                "candidate_mean_log_score": c["candidate_mean_log_score"],
++                "baseline_mean_log_score": b["baseline_mean_log_score"],
++                "fold_win": bool(win),
++            })
++        cand_pooled = cand_sum / n_sum if n_sum else 0.0
++        base_pooled = base_sum / n_sum if n_sum else 0.0
++        out[fam] = {
++            "pooled_candidate_mean_log_score": cand_pooled,
++            "pooled_baseline_mean_log_score": base_pooled,
++            "fold_wins": wins,
++            "folds_total": len(validation_seasons),
++            "minimum_fold_wins": MIN_FOLD_WINS,
++            "pass": bool(cand_pooled > base_pooled and wins >= MIN_FOLD_WINS),
++            "folds": folds,
++        }
++    return out
++
++
++# ---------------------------------------------------------------------------
++# Evaluation driver. Mirrors attempt-1's two-pass structure with the
++# preregistered attempt-2 ordering: fold fits with per-fold nested sigma
++# selection inside each training window (Amendment 2; section 6 governs)
++# -> per-fold K3 estimation from TRAINING games only -> evaluation
++# simulation. Estimation strictly precedes evaluation simulation within
++# every fold.
++# ---------------------------------------------------------------------------
++
++def _rate_lookup(rows: Sequence[Mapping[str, Any]],
++                 rates: Sequence[tuple[float, float]]) -> dict[tuple[str, str], tuple[float, float]]:
++    return {(str(r["game_id"]), str(r["team"])): rates[i] for i, r in enumerate(rows)}
++
++
++def run_development_evaluation_v2(
++    rows: Sequence[Mapping[str, Any]],
++    *,
++    paths: int = PATHS_PER_GAME,
++    config: ModelFormConfig = V2_CONFIG,
++    validation_seasons: Sequence[int] = VALIDATION_SEASONS,
++    fold_min_games: int = FOLD_MIN_GAMES,
++) -> dict[str, Any]:
++    rows = list(rows)
++    if paths < MIN_PATHS_FOR_SCORED_OUTPUT:
++        raise NotRunError(
++            f"PATHS_BELOW_SCORED_MINIMUM:{paths}<{MIN_PATHS_FOR_SCORED_OUTPUT} "
++            "— attempt NOT_RUN (pre-scoring)")
++    folds_split: dict[int, tuple[list, list]] = {}
++    for season in validation_seasons:
++        train = [r for r in rows if int(r["season"]) < season]
++        valid = [r for r in rows if int(r["season"]) == season]
++        n_games = len(game_pairs(valid)) if valid else 0
++        if n_games < fold_min_games:
++            raise NotRunError(
++                f"FOLD_BELOW_MINIMUM:{season}:{n_games}<{fold_min_games} "
++                "— attempt NOT_RUN (data failure)")
++        folds_split[season] = (train, valid)
++
++    fold_bundles: dict[int, dict[str, Any]] = {}
++    fold_meta: dict[int, dict[str, Any]] = {}
++    fold_rate_maps: dict[int, dict[str, Any]] = {}
++    sigma_by_fold: dict[int, float] = {}
++    sigma_selection: dict[int, dict[str, Any]] = {}
++    td_folds: list[dict[str, Any]] = []
++    fg_folds: list[dict[str, Any]] = []
++    rare_candidate_ll = 0.0
++    rare_baseline_ll = 0.0
++    rare_n = 0
++    fg_exclusions = {"attempts_missing_distance": 0, "makes_missing_distance": 0}
++    zero_model_counts = {"fg_gate_rows": 0, "k3_training_games": 0,
++                         "validation_games": 0}
++    fg_exclusions_by_fold: list[dict[str, Any]] = []
++    band_pooled = {
++        "realized_attempts": [0] * 5, "realized_makes": [0] * 5,
++        "expected_attempts": [0.0] * 5, "expected_makes": [0.0] * 5,
++        "expected_opportunity_total": 0.0, "n_team_rows": 0,
++    }
++    band_folds: list[dict[str, Any]] = []
++
++    # Pass 1 - fold fits and mean-based gates (TD / FG / RARE).
++    for season in validation_seasons:
++        train, valid = folds_split[season]
++        train_seasons = sorted({int(r["season"]) for r in train})
++        if len(train_seasons) < 2:
++            # Amendment 2 section 2.5 fail-closed, raised before any fit
++            # or scoring touches this fold: no inner fold can form, and
++            # there is no fallback to validation data, ever.
++            raise NotRunError(
++                f"SIGMA_SELECTION_NO_INNER_FOLD:{season}: training window "
++                f"seasons {train_seasons} cannot form an inner fold "
++                "- attempt NOT_RUN (pre-scoring abort, Amendment 2 "
++                "section 2.5 fail-closed)")
++        bundle = fit_fold_bundle(train, config)
++        fold_bundles[season] = bundle
++        try:
++            fold_sigma, fold_sigma_detail = select_sigma_nested_v2(
++                train, bundle)
++        except ScoreCountsG2V2Error as exc:
++            if str(exc).startswith("SIGMA_SELECTION"):
++                raise NotRunError(
++                    f"{exc} - attempt NOT_RUN (pre-scoring abort, "
++                    "Amendment 2 section 2.5 fail-closed)") from exc
++            raise
++        sigma_by_fold[season] = fold_sigma
++        sigma_selection[season] = fold_sigma_detail
++        eval_rates, train_rates = fold_rare_rates(bundle, train, valid)
++        full_map = _rate_lookup(valid, eval_rates)
++        train_map = _rate_lookup(train, train_rates)
++        period_maps: dict[int, dict[tuple[str, str], tuple[float, float]]] = {}
++        period_train_maps: dict[int, dict[tuple[str, str], tuple[float, float]]] = {}
++        for q in (1, 2, 3, 4):
++            ev_q, tr_q = fold_rare_rates(
++                bundle, train, valid,
++                def_field=f"q{q}_def_td", saf_field=f"q{q}_safeties")
++            period_maps[q] = _rate_lookup(valid, ev_q)
++            period_train_maps[q] = _rate_lookup(train, tr_q)
++        fold_rate_maps[season] = {
++            "full": full_map, "train_full": train_map,
++            "period": period_maps, "period_train": period_train_maps,
++        }
++        fold_meta[season] = {
++            "validation_season": season,
++            "training_seasons": sorted({int(r["season"]) for r in train}),
++            "n_team_rows": len(valid),
++            "n_games": len(game_pairs(valid)),
++            "td_alpha": bundle["td_alpha"],
++            "fg_opportunity_alpha": bundle["fg_alpha"],
++            "thetas": {k: str(v) for k, v in bundle["thetas"].items()},
++            "rare_prior": str(bundle["rare_prior"]),
++            "sigma": fold_sigma,
++        }
++        for target, kind, store in (
++            ("offense_touchdowns", "td", td_folds),
++            ("made_field_goals", "fg", fg_folds),
++        ):
++            scored = valid
++            if kind == "fg":
++                # ZERO_MODEL_ROW rows (no league band context yet) cannot
++                # be priced by the banded construction: excluded + counted.
++                scored = [r for r in valid if row_has_band_context(r, config)]
++                zero_model_counts["fg_gate_rows"] += len(valid) - len(scored)
++            y = np.asarray([float(r[target]) for r in scored], dtype=float)
++            if kind == "td":
++                cand = np.asarray(
++                    [heritage_predict_mean(bundle["td_model"], r) for r in scored],
++                    dtype=float)
++            else:
++                cand = np.asarray(
++                    [banded_made_fg_mean(bundle["fg_opportunity_model"], r, config)
++                     for r in scored], dtype=float)
++            base_mean = max(float(np.mean([float(r[target]) for r in train])), 1e-12)
++            base = np.full_like(y, base_mean)
++            cand_dev = poisson_deviance(y, cand)
++            base_dev = poisson_deviance(y, base)
++            store.append({
++                "validation_season": season, "n_team_rows": len(scored),
++                "candidate_poisson_deviance": cand_dev,
++                "intercept_baseline_poisson_deviance": base_dev,
++                "fold_win": bool(cand_dev < base_dev),
++                "y": y, "cand": cand, "base": base,
++            })
++        train_rare_mean = float(np.mean(
++            [float(r["def_st_touchdowns"]) + float(r["safeties"]) for r in train]))
++        fold_excl = {"attempts_missing_distance": 0, "makes_missing_distance": 0}
++        fold_band = {
++            "realized_attempts": [0] * 5, "realized_makes": [0] * 5,
++            "expected_attempts": [0.0] * 5, "expected_makes": [0.0] * 5,
++            "expected_opportunity_total": 0.0, "n_team_rows": 0,
++        }
++        for r in valid:
++            y = float(r["def_st_touchdowns"]) + float(r["safeties"])
++            d_rate, s_rate = full_map[(str(r["game_id"]), str(r["team"]))]
++            rare_candidate_ll += poisson_logpmf(y, d_rate + s_rate)
++            rare_baseline_ll += poisson_logpmf(y, max(train_rare_mean, 1e-12))
++            rare_n += 1
++            fold_excl["attempts_missing_distance"] += int(r["fg_attempts_missing_distance"])
++            fold_excl["makes_missing_distance"] += int(r["fg_makes_missing_distance"])
++            detail = banded_made_fg_detail(bundle["fg_opportunity_model"], r, config)
++            fold_band["expected_opportunity_total"] += detail["opportunity_mean"]
++            fold_band["n_team_rows"] += 1
++            for b in range(5):
++                fold_band["realized_attempts"][b] += int(r["fg_att_band"][b])
++                fold_band["realized_makes"][b] += int(r["fg_made_band"][b])
++                fold_band["expected_attempts"][b] += detail["bands"][b]["expected_attempts"]
++                fold_band["expected_makes"][b] += detail["bands"][b]["expected_makes"]
++        fg_exclusions["attempts_missing_distance"] += fold_excl["attempts_missing_distance"]
++        fg_exclusions["makes_missing_distance"] += fold_excl["makes_missing_distance"]
++        fg_exclusions_by_fold.append({"validation_season": season, **fold_excl})
++        for key in band_pooled:
++            if isinstance(band_pooled[key], list):
++                band_pooled[key] = [a + b for a, b in zip(band_pooled[key], fold_band[key])]
++            else:
++                band_pooled[key] += fold_band[key]
++        band_folds.append({"validation_season": season, **fold_band})
++
++    # Pass 1.5 - K3 estimation per fold, TRAINING games only. This completes
++    # for every fold before any evaluation game is simulated.
++    k3_folds: dict[int, Any] = {}
++    if config.k3_enabled:
++        for season in validation_seasons:
++            train, _valid = folds_split[season]
++            bundle = fold_bundles[season]
++            sigma = sigma_by_fold[season]
++            train_map = fold_rate_maps[season]["train_full"]
++            skeleton_pmfs: list[dict[tuple[int, int], float]] = []
++            realized_margins: list[int] = []
++            for gid, (home, away) in sorted(game_pairs(train).items()):
++                if not (row_has_band_context(home, config)
++                        and row_has_band_context(away, config)):
++                    # ZERO_MODEL_ROW games cannot be simulated; excluded
++                    # from lambda estimation entirely (counted).
++                    zero_model_counts["k3_training_games"] += 1
++                    continue
++                sim = simulate_full_game_v2(
++                    bundle, game_id=gid, home_row=home, away_row=away,
++                    home_rates=train_map[(gid, str(home["team"]))],
++                    away_rates=train_map[(gid, str(away["team"]))],
++                    sigma=sigma, paths=paths)
++                counts = pmf_counts(sim["home_score"], sim["away_score"])
++                skeleton_pmfs.append(pmf_from_counts(counts, paths))
++                realized_margins.append(
++                    realized_final_score(home) - realized_final_score(away))
++            k3 = estimate_k3_lambdas(skeleton_pmfs, realized_margins)
++            bundle["k3"] = k3
++            k3_folds[season] = {
++                "lambdas": {str(k): v for k, v in k3["lambdas"].items()},
++                "detail": k3["detail"],
++                "n_training_games": k3["n_training_games"],
++                "estimation_scope": "TRAINING_GAMES_ONLY",
++            }
++
++    # Pass 2 - simulation-based gates (JOINT / CAL / KEY / PERIOD).
++    period_families = ("FIRST_HALF", "SECOND_HALF", "QUARTER")
++    joint_folds: list[dict[str, Any]] = []
++    period_scores: dict[str, dict[int, dict[str, float]]] = {f: {} for f in period_families}
++    period_baselines: dict[str, dict[int, dict[str, float]]] = {f: {} for f in period_families}
++    total_pits: list[float] = []
++    margin_pits: list[float] = []
++    key_model_mass = {k: [] for k in K3_KEYS}
++    key_skeleton_mass = {k: [] for k in K3_KEYS}
++    key_realized: list[int] = []
++
++    for season in validation_seasons:
++        bundle = fold_bundles[season]
++        sigma = sigma_by_fold[season]
++        train, valid = folds_split[season]
++        maps = fold_rate_maps[season]
++        train_pairs = game_pairs(train)
++        valid_pairs = game_pairs(valid)
++
++        base_counts: dict[tuple[int, int], int] = {}
++        for home, away in train_pairs.values():
++            key = (realized_final_score(home), realized_final_score(away))
++            base_counts[key] = base_counts.get(key, 0) + 1
++        base_total = sum(base_counts.values())
++        base_period: dict[str, dict[tuple[int, int], int]] = {f: {} for f in period_families}
++        base_period_total: dict[str, int] = {f: 0 for f in period_families}
++        for home, away in train_pairs.values():
++            for fam in period_families:
++                if fam == "QUARTER":
++                    realized = [((int(home[f"q{q}_points"]), int(away[f"q{q}_points"])))
++                                 for q in (1, 2, 3, 4)]
++                elif fam == "FIRST_HALF":
++                    realized = [(int(home["q1_points"]) + int(home["q2_points"]),
++                                 int(away["q1_points"]) + int(away["q2_points"]))]
++                else:
++                    realized = [(int(home["q3_points"]) + int(home["q4_points"]),
++                                 int(away["q3_points"]) + int(away["q4_points"]))]
++                for pair_key in realized:
++                    base_period[fam][pair_key] = base_period[fam].get(pair_key, 0) + 1
++                    base_period_total[fam] += 1
++
++        cand_joint = 0.0
++        base_joint = 0.0
++        prime_joint = 0.0
++        fam_cand: dict[str, list[float]] = {f: [] for f in period_families}
++        fam_base: dict[str, list[float]] = {f: [] for f in period_families}
++        lambdas = bundle["k3"]["lambdas"] if config.k3_enabled else None
++
++        scored_games = 0
++        for gid, (home, away) in sorted(valid_pairs.items()):
++            if not (row_has_band_context(home, config)
++                    and row_has_band_context(away, config)):
++                zero_model_counts["validation_games"] += 1
++                continue
++            scored_games += 1
++            realized = (realized_final_score(home), realized_final_score(away))
++            sim = simulate_full_game_v2(
++                bundle, game_id=gid, home_row=home, away_row=away,
++                home_rates=maps["full"][(gid, str(home["team"]))],
++                away_rates=maps["full"][(gid, str(away["team"]))],
++                sigma=sigma, paths=paths)
++            counts = pmf_counts(sim["home_score"], sim["away_score"])
++            skeleton_pmf = pmf_from_counts(counts, paths)
++            candidate_pmf = apply_k3(skeleton_pmf, lambdas) if lambdas else skeleton_pmf
++            cand_joint += log_score_pmf(candidate_pmf, realized, paths)
++            base_joint += log_score(base_counts, base_total, realized, paths)
++            prime_pmf = independent_marginals_pmf(candidate_pmf)
++            prime_joint += log_score_pmf(prime_pmf, realized, paths)
++
++            cal_rng = rng_for_v2(gid, "CAL")
++            total_law: dict[int, float] = {}
++            for (h, a), p in candidate_pmf.items():
++                total_law[h + a] = total_law.get(h + a, 0.0) + p
++            m_law = margin_law(candidate_pmf)
++            total_pits.append(randomized_pit_from_law(total_law, sum(realized), cal_rng))
++            margin_pits.append(randomized_pit_from_law(
++                m_law, realized[0] - realized[1], cal_rng))
++            skel_law = margin_law(skeleton_pmf)
++            for k in K3_KEYS:
++                key_model_mass[k].append(float(m_law.get(k, 0.0)))
++                key_skeleton_mass[k].append(float(skel_law.get(k, 0.0)))
++            key_realized.append(realized[0] - realized[1])
++
++            home_period = {q: maps["period"][q][(gid, str(home["team"]))] for q in (1, 2, 3, 4)}
++            away_period = {q: maps["period"][q][(gid, str(away["team"]))] for q in (1, 2, 3, 4)}
++            psim = simulate_period_game_v2(
++                bundle, game_id=gid, home_row=home, away_row=away,
++                home_period_rates=home_period, away_period_rates=away_period,
++                sigma=sigma, paths=paths)
++            fam_pairs: dict[str, list[tuple[Any, Any, tuple[int, int]]]] = {
++                "FIRST_HALF": [(psim["first_half_home"], psim["first_half_away"],
++                                (int(home["q1_points"]) + int(home["q2_points"]),
++                                 int(away["q1_points"]) + int(away["q2_points"])))],
++                "SECOND_HALF": [(psim["second_half_home"], psim["second_half_away"],
++                                 (int(home["q3_points"]) + int(home["q4_points"]),
++                                  int(away["q3_points"]) + int(away["q4_points"])))],
++                "QUARTER": [
++                    (psim["home_points"][q], psim["away_points"][q],
++                     (int(home[f"q{q}_points"]), int(away[f"q{q}_points"])))
++                    for q in (1, 2, 3, 4)
++                ],
++            }
++            for fam in period_families:
++                for h_arr, a_arr, realized_pair in fam_pairs[fam]:
++                    pc = pmf_counts(h_arr, a_arr)
++                    fam_cand[fam].append(log_score(pc, paths, realized_pair, paths))
++                    fam_base[fam].append(log_score(
++                        base_period[fam], base_period_total[fam], realized_pair, paths))
++
++        n_games = scored_games
++        joint_folds.append({
++            "validation_season": season,
++            "n_games": n_games,
++            "candidate_mean_log_score": cand_joint / n_games,
++            "baseline_i_mean_log_score": base_joint / n_games,
++            "baseline_ii_prime_mean_log_score": prime_joint / n_games,
++            "fold_win_vs_baseline_i": bool(cand_joint > base_joint),
++            "fold_win_vs_baseline_ii_prime": bool(cand_joint > prime_joint),
++        })
++        for fam in period_families:
++            period_scores[fam][season] = {
++                "candidate_mean_log_score": float(np.mean(fam_cand[fam])) if fam_cand[fam] else 0.0,
++                "n": len(fam_cand[fam]),
++            }
++            period_baselines[fam][season] = {
++                "baseline_mean_log_score": float(np.mean(fam_base[fam])) if fam_base[fam] else 0.0,
++                "n": len(fam_base[fam]),
++            }
++
++    g_td = assemble_count_gate(td_folds)
++    g_fg = assemble_count_gate(fg_folds)
++    g_rare = assemble_rare_gate(rare_candidate_ll, rare_baseline_ll, rare_n)
++    g_joint = assemble_joint_gate(joint_folds)
++    g_cal = assemble_cal_gate(total_pits, margin_pits)
++    g_key = assemble_key_gate(key_model_mass, key_skeleton_mass, key_realized)
++    g_period = assemble_period_gate(
++        period_scores, period_baselines, validation_seasons=validation_seasons)
++
++    full_game_pass = bool(
++        g_td["pass"] and g_fg["pass"] and g_rare["pass"]
++        and g_joint["pass"] and g_cal["pass"] and g_key["pass"]
++    )
++    return {
++        "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G2_DEVELOPMENT_GATE_V1",
++        "attempt_number": ATTEMPT_NUMBER,
++        "label": "DEVELOPMENT — already-exposed 2018-2025 window; NOT forward evidence",
++        "validation_seasons": list(validation_seasons),
++        "all_targets_must_pass": True,
++        "sigma_by_fold": {str(s): sigma_by_fold[s] for s in validation_seasons},
++        "sigma_selection": {str(s): sigma_selection[s] for s in validation_seasons},
++        "sigma_selection_rule": "AMENDMENT_2_NESTED_TRAINING_WINDOW_ONLY",
++        "fold_meta": [fold_meta[s] for s in validation_seasons],
++        "k3_folds": {str(s): k3_folds[s] for s in validation_seasons} if config.k3_enabled else {},
++        "gates": {
++            "G_TD": g_td,
++            "G_FG": g_fg,
++            "G_RARE": g_rare,
++            "G_JOINT": g_joint,
++            "G_CAL": g_cal,
++            "G_KEY": g_key,
++            "G_PERIOD": g_period,
++        },
++        "fg_exclusions": fg_exclusions,
++        "fg_exclusions_by_fold": fg_exclusions_by_fold,
++        "zero_model_row_exclusions": zero_model_counts,
++        "fg_band_detail": {
++            "bands": ["0-29", "30-39", "40-49", "50-59", "60+"],
++            "construction": (
++                "Realized counts are the validation rows' distance-evidenced FG "
++                "attempts/makes per band. Expected attempts per band = fold "
++                "opportunity mean x PIT band share (attempt 2: decayed-PIT "
++                "shares/rates, section 2.3); expected makes = expected attempts "
++                "x band conversion rate. Opportunity and conversion are reported "
++                "separately; no gate consumes this table."
++            ),
++            "pooled": band_pooled,
++            "folds": band_folds,
++        },
++        "full_game_pass": full_game_pass,
++        "market_data_used": False,
++    }
++
++
++# ---------------------------------------------------------------------------
++# Result record + fit artifact writers (attempt-1 shapes, attempt-2 fields).
++# Writing a real result record is execution; these writers exist for the
++# governed path and are exercised by tests only on synthetic records.
++# ---------------------------------------------------------------------------
++
++def build_attempt2_result_record(
++    *,
++    evaluation: Mapping[str, Any] | None,
++    status: str,
++    attempt_consumed: bool,
++    reason: str | None = None,
++    preregistration_sha256: str | None = None,
++    preregistration_commit_sha: str | None = None,
++    code_identity_sha256: str | None = None,
++    source_manifest_sha256: str | None = None,
++    training_team_rows: int | None = None,
++    runner_provenance: Mapping[str, Any] | None = None,
++    schedule_score_cross_check: Mapping[str, Any] | None = None,
++) -> dict[str, Any]:
++    passing: list[str] = []
++    failing: list[str] = []
++    period_results: dict[str, Any] = {}
++    if evaluation is not None:
++        gates = evaluation["gates"]
++        for name in ("G_TD", "G_FG", "G_RARE", "G_JOINT", "G_CAL", "G_KEY"):
++            (passing if gates[name]["pass"] else failing).append(name)
++        period_results = {
++            fam: {"pass": detail["pass"]}
++            for fam, detail in gates["G_PERIOD"].items()
++        }
++    record: dict[str, Any] = {
++        "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G2_ATTEMPT_RESULT_V1",
++        "family": "NFL_SCORE_COUNTS_G2",
++        "attempt_number": ATTEMPT_NUMBER,
++        "attempt_budget": ATTEMPT_BUDGET,
++        "attempt_consumed": bool(attempt_consumed),
++        "attempts_remaining_after_this_result": (
++            ATTEMPT_BUDGET - ATTEMPTS_CONSUMED_BEFORE - (1 if attempt_consumed else 0)),
++        "status": status,
++        "authority": dict(AUTHORITY),
++        "preregistration_commit_sha": preregistration_commit_sha,
++        "preregistration_sha256": preregistration_sha256,
++        "code_identity_sha256": code_identity_sha256,
++        "source_manifest_sha256": source_manifest_sha256,
++        "training_team_rows": training_team_rows,
++        "evaluation": dict(evaluation) if evaluation is not None else None,
++        "passing_gates": passing,
++        "failing_gates": failing,
++        "period_gate_results": period_results,
++        "runner_provenance": dict(runner_provenance) if runner_provenance else None,
++        "schedule_score_cross_check": (
++            dict(schedule_score_cross_check) if schedule_score_cross_check else None),
++        "market_data_used": False,
++    }
++    if reason is not None:
++        record["reason"] = reason
++    return record
++
++
++def not_run_record(reason: str, **identity: Any) -> dict[str, Any]:
++    """Pre-scoring NOT_RUN: attempt not consumed, no gate evaluated."""
++    return build_attempt2_result_record(
++        evaluation=None, status="NOT_RUN", attempt_consumed=False,
++        reason=reason, **identity)
++
++
++def write_result_record(record: Mapping[str, Any], path: Any) -> str:
++    from pathlib import Path
++    p = Path(path)
++    p.parent.mkdir(parents=True, exist_ok=True)
++    payload = json.dumps(record, indent=2, sort_keys=True, ensure_ascii=True) + "\n"
++    p.write_text(payload, encoding="utf-8")
++    return sha256(payload.encode("utf-8")).hexdigest()
++
++
++def build_attempt2_fit_artifact(
++    rows: Sequence[Mapping[str, Any]],
++    *,
++    evaluation: Mapping[str, Any],
++    source_manifest_sha256: str,
++    code_identity: str,
++    preregistration_sha256: str,
++    config: ModelFormConfig = V2_CONFIG,
++    paths: int = PATHS_PER_GAME,
++) -> dict[str, Any]:
++    """Development fit artifact mirroring attempt-1's shape, refit on the
++    full development window, with the attempt-2 selections recorded."""
++    from dataclasses import asdict
++    rows = list(rows)
++    bundle = fit_fold_bundle(rows, config)
++    # The artifact's own window is the full development window as training;
++    # its sigma is selected by the same Amendment 2 nested rule inside
++    # that window. The evaluation's per-fold sigmas are recorded below.
++    sigma, _sigma_detail = select_sigma_nested_v2(rows, bundle)
++    pairs = game_pairs(rows)
++    n = len(rows)
++    def_rate = float(np.mean([float(r["def_st_touchdowns"]) for r in rows]))
++    safety_rate = float(np.mean([float(r["safeties"]) for r in rows]))
++    pat = sum(float(r["pat_made"]) for r in rows)
++    two = sum(float(r["two_point_made"]) for r in rows)
++    no = sum(float(r["no_conversion"]) for r in rows)
++    total_conv = pat + two + no
++    conv = (pat / total_conv, two / total_conv, no / total_conv)
++
++    k3_record = None
++    if config.k3_enabled:
++        _ev, train_rates = fold_rare_rates(bundle, rows, [])
++        train_map = _rate_lookup(rows, train_rates)
++        skeleton_pmfs: list[dict[tuple[int, int], float]] = []
++        realized_margins: list[int] = []
++        for gid, (home, away) in sorted(pairs.items()):
++            if not (row_has_band_context(home, config)
++                    and row_has_band_context(away, config)):
++                continue  # ZERO_MODEL_ROW: excluded from estimation
++            sim = simulate_full_game_v2(
++                bundle, game_id=gid, home_row=home, away_row=away,
++                home_rates=train_map[(gid, str(home["team"]))],
++                away_rates=train_map[(gid, str(away["team"]))],
++                sigma=sigma, paths=paths)
++            counts = pmf_counts(sim["home_score"], sim["away_score"])
++            skeleton_pmfs.append(pmf_from_counts(counts, paths))
++            realized_margins.append(
++                realized_final_score(home) - realized_final_score(away))
++        k3 = estimate_k3_lambdas(skeleton_pmfs, realized_margins)
++        bundle["k3"] = k3
++        k3_record = {
++            "lambdas": {str(k): v for k, v in k3["lambdas"].items()},
++            "detail": k3["detail"],
++            "n_training_games": k3["n_training_games"],
++            "estimation_scope": "FULL_DEVELOPMENT_WINDOW_AS_TRAINING",
++        }
++
++    artifact: dict[str, Any] = {
++        "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G2_ATTEMPT_FIT_V1",
++        "family": "NFL_SCORE_COUNTS_G2",
++        "attempt_number": ATTEMPT_NUMBER,
++        "status": (
++            "DEVELOPMENT_ATTEMPT_PASS" if evaluation["full_game_pass"]
++            else "DEVELOPMENT_ATTEMPT_FAIL"
++        ),
++        "fit_window": {
++            "seasons": sorted({int(r["season"]) for r in rows}),
++            "team_row_count": n,
++            "game_count": len(pairs),
++        },
++        "preregistration_sha256": preregistration_sha256,
++        "code_identity": code_identity,
++        "source_manifest_sha256": source_manifest_sha256,
++        "rng_identity": {
++            "bit_generator": "NUMPY_PCG64",
++            "root_seed_literal": ROOT_SEED_LITERAL_V2,
++            "root_seed_sha256": ROOT_SEED_SHA256_V2,
++            "paths_per_game": PATHS_PER_GAME,
++        },
++        "sigma": float(sigma),
++        "sigma_by_fold": dict(evaluation["sigma_by_fold"]),
++        "sigma_selection_rule": "AMENDMENT_2_NESTED_TRAINING_WINDOW_ONLY",
++        "td_model": asdict(bundle["td_model"]),
++        "fg_opportunity_model": asdict(bundle["fg_opportunity_model"]),
++        "period_models": {
++            str(q): {
++                "td_model": asdict(bundle["period"][q]["td_model"]),
++                "fg_model": asdict(bundle["period"][q]["fg_model"]),
++            }
++            for q in (1, 2, 3, 4)
++        },
++        "thetas": {k: str(v) for k, v in bundle["thetas"].items()},
++        "rare_prior_selection": {
++            "selected": str(bundle["rare_prior"]),
++            "cv_scores": bundle["rare_cv_scores"],
++        },
++        "k3": k3_record,
++        "league_priors": {
++            "def_st_td_rate": def_rate,
++            "safety_rate": safety_rate,
++            "conversion_probabilities": [float(v) for v in conv],
++        },
++        "development_gate": dict(evaluation),
++        "fg_detail_sample": {
++            "construction": "made_fg_mean = opportunity_mean * SUM_b(share_b * rate_b), bands 0-29/30-39/40-49/50-59/60+, EB prior 25 attempts, attempt 2: decayed-PIT shares/rates (0.85 recursion)",
++        },
++        "authority": dict(AUTHORITY),
++    }
++    canonical = json.dumps(artifact, sort_keys=True, separators=(",", ":"),
++                           ensure_ascii=True).encode("utf-8")
++    artifact["artifact_sha256"] = sha256(canonical).hexdigest()
++    return artifact
++
++
++__all__ = [
++    "RARE_TOLERANCE", "CAL_SLOPE_BOUNDS", "CAL_MARGIN_DEV_BOUND",
++    "KEY_ABS_BOUND", "MIN_FOLD_WINS", "FOLD_MIN_GAMES",
++    "ATTEMPT_BUDGET", "ATTEMPTS_CONSUMED_BEFORE", "AUTHORITY",
++    "DISCRETE_V2_LEG", "NotRunError", "fail_gate",
++    "randomized_pit_from_law",
++    "assemble_count_gate", "assemble_rare_gate", "assemble_joint_gate",
++    "assemble_cal_gate", "assemble_key_gate", "assemble_period_gate",
++    "run_development_evaluation_v2",
++    "build_attempt2_result_record", "not_run_record", "write_result_record",
++    "build_attempt2_fit_artifact",
++]
+diff --git a/sportsedge/research/nfl_score_counts_g2_v2.py b/sportsedge/research/nfl_score_counts_g2_v2.py
+new file mode 100644
+index 000000000..484c69f86
+--- /dev/null
++++ b/sportsedge/research/nfl_score_counts_g2_v2.py
+@@ -0,0 +1,1381 @@
++"""NFL_SCORE_COUNTS_G2 attempt 2 - model form v2 (IMPLEMENTATION ONLY).
++
++Implements the model form frozen for design in
++``~/workspace/sportsedge/g2_attempt2_preregistration_20261013/PREREGISTRATION.md``
++(SHA-256 bb35cafcdc34ed2d39632ebf564af2de0879daa8e4bdc90434789aa684555a70),
++under owner ruling J1 + K3 (issue #2131, Oct 13 2026):
++
++* C1: FG leg rebuilt - decayed-PIT band shares/conversion rates (0.85
++  recursion), opportunity model on 12 features (attempt-1 10 + own/opponent
++  FG attempt volume).
++* C2: negative-binomial dispersion on the offensive-TD and made-FG draws,
++  per-leg theta selected by training-window expanding-season CV.
++* C3: rare-score EB prior strength selected per fold by training-window CV
++  from {25, 100, 400, LEAGUE_ONLY}.
++* C4: alpha grid restored to the heritage/SPEC grid {0.1, 1, 10, 100, 1000}.
++* C5b/K3: fitted key-mass component (preregistration section 4) - estimated
++  inside each training fold from training games only, applied to the
++  full-game PMF only, skeleton preserved.
++
++EXECUTION STATUS: attempt 2 is NOT authorized and NOT spent (owner NO-GO for
++execution, Oct 13 2026). This module contains model mathematics only; the
++governed runner (scripts/run_nfl_score_counts_g2_attempt2.py) refuses to run
++by construction. Nothing here reads real game data, touches any holdout, or
++creates model probability for any card. Research only; authority block all
++false, exactly as attempt 1.
++"""
++from __future__ import annotations
++
++from collections import defaultdict, deque
++from dataclasses import dataclass
++from hashlib import sha256
++from math import exp, inf, lgamma, log
++from typing import Any, Mapping, Sequence
++
++import numpy as np
++
++from sportsedge.sports.nfl.score_counts_g1 import (
++    FEATURE_NAMES,
++    PoissonRidge,
++    choose_alpha as heritage_choose_alpha,
++    fit_poisson_ridge as heritage_fit_poisson_ridge,
++    predict_mean as heritage_predict_mean,
++)
++
++FAMILY = "NFL_SCORE_COUNTS_G2"
++ATTEMPT_NUMBER = 2
++ATTEMPT_BUDGET = 3
++
++ROOT_SEED_LITERAL_V2 = "SportsEdge|NFL_SCORE_COUNTS_G2|ATTEMPT_2|ROOT_SEED"
++ROOT_SEED_SHA256_V2 = sha256(ROOT_SEED_LITERAL_V2.encode("utf-8")).hexdigest()
++ROOT_SEED_UINT64_V2 = int.from_bytes(
++    sha256(ROOT_SEED_LITERAL_V2.encode("utf-8")).digest()[:8], "little")
++
++PATHS_PER_GAME = 50000
++MIN_PATHS_FOR_SCORED_OUTPUT = 10000
++VALIDATION_SEASONS = (2021, 2022, 2023, 2024, 2025)
++DEVELOPMENT_SEASONS = tuple(range(2018, 2026))
++
++ALPHA_GRID_V2 = (0.1, 1.0, 10.0, 100.0, 1000.0)
++ALPHA_GRID_V1_TRUNCATED = (0.1, 1.0, 10.0, 100.0)
++SIGMA_GRID = (0.0, 0.10, 0.20, 0.30)
++THETA_GRID = (5.0, 10.0, 20.0, 50.0, 200.0, inf)
++RARE_PRIOR_GRID: tuple = (25.0, 100.0, 400.0, "LEAGUE_ONLY")
++RARE_PRIOR_DEFAULT = 25.0
++
++FG_BANDS = ((0, 29), (30, 39), (40, 49), (50, 59), (60, None))
++FG_BAND_PRIOR_ATTEMPTS = 25.0
++DECAY = 0.85
++LOOKBACK_GAMES = 8
++
++FG_OPPORTUNITY_FEATURES_V1 = (
++    "fg_rz_trips_per_game",
++    "fg_drives35_per_game",
++    "fg_drives25_per_game",
++    "opp_fg_rz_trips_allowed_per_game",
++    "opp_fg_drives35_allowed_per_game",
++    "opp_fg_drives25_allowed_per_game",
++    "off_plays_per_game",
++    "off_turnover_rate",
++    "opp_takeaway_rate",
++    "home_indicator",
++)
++FG_OPPORTUNITY_FEATURES_V2 = FG_OPPORTUNITY_FEATURES_V1 + (
++    "fg_attempts_per_game",
++    "opp_fg_attempts_allowed_per_game",
++)
++
++# K3 key-mass component (preregistration section 4.2, frozen).
++K3_KEYS = (-7, -3, 3, 7)
++K3_WINDOWS = {-7: (-9, -8, -6, -5), -3: (-4, -2, -1), 3: (1, 2, 4), 7: (5, 6, 8, 9)}
++K3_LAMBDA_MAX = 0.50
++
++
++class ScoreCountsG2V2Error(ValueError):
++    """Raised for frozen-contract violations inside the v2 implementation."""
++
++
++class ZeroModelRow(ScoreCountsG2V2Error):
++    """ZERO_MODEL_ROW semantics (preregistration sections 2.1/2.3): the row
++    cannot be priced because no league context exists."""
++
++
++@dataclass(frozen=True)
++class ModelFormConfig:
++    """Switches that reduce v2 to the attempt-1 model form (spec-gated).
++
++    The attempt-2 root seed is NOT switched: section 2.1 freezes a new root
++    seed for attempt separation, so pathwise equality with attempt 1 is
++    impossible by design; equivalence holds for the pre-simulation
++    quantities (shares, rates, means, selections) under V1_COMPAT_CONFIG.
++    """
++    decayed_fg_shares: bool = True
++    alpha_grid: tuple = ALPHA_GRID_V2
++    theta_grid: tuple = THETA_GRID
++    rare_prior_mode: str = "CV"          # or "FIXED" with rare_prior_fixed
++    rare_prior_fixed: float = RARE_PRIOR_DEFAULT
++    k3_enabled: bool = True
++    opportunity_features: tuple = FG_OPPORTUNITY_FEATURES_V2
++
++
++V2_CONFIG = ModelFormConfig()
++V1_COMPAT_CONFIG = ModelFormConfig(
++    decayed_fg_shares=False,
++    alpha_grid=ALPHA_GRID_V1_TRUNCATED,
++    theta_grid=(inf,),
++    rare_prior_mode="FIXED",
++    rare_prior_fixed=RARE_PRIOR_DEFAULT,
++    k3_enabled=False,
++    opportunity_features=FG_OPPORTUNITY_FEATURES_V1,
++)
++
++
++def child_seed_v2(game_id: str, *, root_seed: int = ROOT_SEED_UINT64_V2) -> int:
++    gid = str(game_id or "").strip()
++    if not gid:
++        raise ScoreCountsG2V2Error("GAME_ID_REQUIRED")
++    digest = sha256(f"{root_seed}:{gid}".encode("utf-8")).digest()
++    return int.from_bytes(digest[:8], "little", signed=False)
++
++
++def rng_for_v2(game_id: str, stream: str, *, root_seed: int = ROOT_SEED_UINT64_V2):
++    seed = child_seed_v2(f"{game_id}|{stream}", root_seed=root_seed)
++    return np.random.Generator(np.random.PCG64(np.random.SeedSequence(seed)))
++
++
++def poisson_deviance(y: np.ndarray, mu: np.ndarray) -> float:
++    mu = np.clip(np.asarray(mu, dtype=float), 1e-12, None)
++    y = np.asarray(y, dtype=float)
++    term = np.where(y > 0, y * np.log(y / mu) - (y - mu), mu)
++    return float(2.0 * np.mean(term))
++
++
++def poisson_logpmf(y: float, lam: float) -> float:
++    lam = max(float(lam), 1e-12)
++    return float(y * log(lam) - lam - lgamma(y + 1.0))
++
++
++# ---------------------------------------------------------------------------
++# Poisson ridge for non-heritage feature sets (attempt-1 G2 fitter semantics,
++# carried verbatim: G1's fitter validates names against its frozen allowlist,
++# so new feature sets need this equivalent estimator).
++# ---------------------------------------------------------------------------
++
++def _matrix(rows: Sequence[Mapping[str, Any]], feature_names: Sequence[str]) -> np.ndarray:
++    out = []
++    for idx, row in enumerate(rows):
++        vals = []
++        for name in feature_names:
++            value = row.get(name)
++            if value in (None, ""):
++                raise ScoreCountsG2V2Error(f"row[{idx}].{name}:REQUIRED")
++            vals.append(float(value))
++        out.append(vals)
++    return np.asarray(out, dtype=float)
++
++
++def _target(rows: Sequence[Mapping[str, Any]], field: str) -> np.ndarray:
++    vals = []
++    for idx, row in enumerate(rows):
++        value = float(row.get(field))
++        if value < 0 or abs(value - round(value)) > 1e-9:
++            raise ScoreCountsG2V2Error(f"row[{idx}].{field}:NONNEGATIVE_INTEGER_REQUIRED")
++        vals.append(value)
++    return np.asarray(vals, dtype=float)
++
++
++def fit_poisson_ridge_v2(
++    rows: Sequence[Mapping[str, Any]],
++    *,
++    target: str,
++    alpha: float,
++    feature_names: Sequence[str],
++    max_iter: int = 100,
++    tol: float = 1e-10,
++) -> PoissonRidge:
++    x_raw = _matrix(rows, feature_names)
++    y = _target(rows, target)
++    mean = np.mean(x_raw, axis=0)
++    scale = np.std(x_raw, axis=0, ddof=0)
++    scale = np.where(scale < 1e-9, 1.0, scale)
++    x = (x_raw - mean) / scale
++    design = np.column_stack([np.ones(x.shape[0]), x])
++    beta = np.zeros(design.shape[1], dtype=float)
++    beta[0] = log(max(float(np.mean(y)), 1e-6))
++    penalty = np.zeros(design.shape[1], dtype=float)
++    penalty[1:] = float(alpha)
++    for _ in range(max_iter):
++        eta = np.clip(design @ beta, -20.0, 20.0)
++        mu = np.exp(eta)
++        grad = design.T @ (mu - y) + penalty * beta
++        hess = design.T @ (design * mu[:, None]) + np.diag(penalty)
++        hess += np.eye(hess.shape[0]) * 1e-10
++        step = np.linalg.solve(hess, grad)
++        beta_next = beta - step
++        if float(np.max(np.abs(beta_next - beta))) <= tol:
++            beta = beta_next
++            break
++        beta = beta_next
++    return PoissonRidge(
++        target=str(target),
++        alpha=float(alpha),
++        feature_names=tuple(str(n) for n in feature_names),
++        mean=tuple(float(v) for v in mean),
++        scale=tuple(float(v) for v in scale),
++        intercept=float(beta[0]),
++        coefficients=tuple(float(v) for v in beta[1:]),
++    )
++
++
++def predict_mean_v2(model: PoissonRidge, row: Mapping[str, Any]) -> float:
++    x = np.asarray([float(row[name]) for name in model.feature_names], dtype=float)
++    mean = np.asarray(model.mean, dtype=float)
++    scale = np.asarray(model.scale, dtype=float)
++    beta = np.asarray(model.coefficients, dtype=float)
++    eta = float(model.intercept + ((x - mean) / scale) @ beta)
++    return float(exp(max(-20.0, min(20.0, eta))))
++
++
++def choose_alpha_v2(
++    rows: Sequence[Mapping[str, Any]],
++    *,
++    target: str,
++    feature_names: Sequence[str],
++    alphas: Sequence[float] = ALPHA_GRID_V2,
++) -> tuple[float, dict[float, float]]:
++    """Expanding-season CV on mean Poisson deviance (attempt-1 semantics);
++    ties break to the smaller alpha (min by (score, alpha))."""
++    seasons = sorted({int(r["season"]) for r in rows})
++    if len(seasons) < 3:
++        raise ScoreCountsG2V2Error("AT_LEAST_THREE_DEVELOPMENT_SEASONS_REQUIRED")
++    scores: dict[float, list[float]] = {float(a): [] for a in alphas}
++    for validation_season in seasons[1:]:
++        train = [r for r in rows if int(r["season"]) < validation_season]
++        valid = [r for r in rows if int(r["season"]) == validation_season]
++        if not train or not valid:
++            continue
++        y = _target(valid, target)
++        for alpha in scores:
++            model = fit_poisson_ridge_v2(train, target=target, alpha=alpha,
++                                         feature_names=feature_names)
++            mu = np.asarray([predict_mean_v2(model, r) for r in valid], dtype=float)
++            scores[alpha].append(poisson_deviance(y, mu))
++    means = {a: float(np.mean(v)) if v else float("inf") for a, v in scores.items()}
++    best = min(means, key=lambda a: (means[a], a))
++    return float(best), means
++
++
++# ---------------------------------------------------------------------------
++# FG band accumulators: decayed-PIT (v2, section 2.3) and cumulative
++# full-history (attempt-1 semantics, used only under V1_COMPAT_CONFIG).
++# A team's accumulator updates once per completed team-game of that team:
++# acc <- decay * acc + counts_j (chronological order). League accumulators
++# are the elementwise sum over teams of their current accumulators.
++# ---------------------------------------------------------------------------
++
++class BandBook:
++    def __init__(self, *, decayed: bool, decay: float = DECAY):
++        self.decayed = bool(decayed)
++        self.decay = float(decay)
++        self.team_att: dict[str, list[float]] = defaultdict(lambda: [0.0] * 5)
++        self.team_made: dict[str, list[float]] = defaultdict(lambda: [0.0] * 5)
++
++    def snapshot(self, team: str) -> dict[str, list[float]]:
++        league_att = [0.0] * 5
++        league_made = [0.0] * 5
++        for t, att in self.team_att.items():
++            made = self.team_made[t]
++            for b in range(5):
++                league_att[b] += att[b]
++                league_made[b] += made[b]
++        return {
++            "team_attempts": list(self.team_att[str(team)]),
++            "team_makes": list(self.team_made[str(team)]),
++            "league_attempts": league_att,
++            "league_makes": league_made,
++        }
++
++    def update(self, team: str, att_band: Sequence[float], made_band: Sequence[float]) -> None:
++        team = str(team)
++        factor = self.decay if self.decayed else 1.0
++        att = self.team_att[team]
++        made = self.team_made[team]
++        for b in range(5):
++            att[b] = factor * att[b] + float(att_band[b])
++            made[b] = factor * made[b] + float(made_band[b])
++
++
++def band_shares_rates_v2(snapshot: Mapping[str, Sequence[float]]) -> tuple[list[float], list[float]]:
++    """Decayed-PIT shares/rates (preregistration section 2.3, frozen).
++
++    share_b = (A_b + 25 * league_share_b) / (A_tot + 25);
++    rate_b  = (M_b + 25 * league_rate_b) / (A_b + 25).
++    Fallbacks: LA_tot = 0 -> ZERO_MODEL_ROW; LA_b = 0 -> league_rate_b is the
++    pooled decayed league make rate over all bands.
++    """
++    team_att = [float(v) for v in snapshot["team_attempts"]]
++    team_made = [float(v) for v in snapshot["team_makes"]]
++    league_att = [float(v) for v in snapshot["league_attempts"]]
++    league_made = [float(v) for v in snapshot["league_makes"]]
++    la_tot = sum(league_att)
++    if la_tot <= 0:
++        raise ZeroModelRow("ZERO_MODEL_ROW:NO_LEAGUE_BAND_CONTEXT")
++    a_tot = sum(team_att)
++    pooled_rate = sum(league_made) / la_tot
++    shares: list[float] = []
++    rates: list[float] = []
++    for b in range(5):
++        league_share = league_att[b] / la_tot
++        shares.append((team_att[b] + FG_BAND_PRIOR_ATTEMPTS * league_share)
++                      / (a_tot + FG_BAND_PRIOR_ATTEMPTS))
++        league_rate = (league_made[b] / league_att[b]) if league_att[b] > 0 else pooled_rate
++        rates.append((team_made[b] + FG_BAND_PRIOR_ATTEMPTS * league_rate)
++                     / (team_att[b] + FG_BAND_PRIOR_ATTEMPTS))
++    return shares, rates
++
++
++def band_shares_rates_v1(snapshot: Mapping[str, Sequence[float]]) -> tuple[list[float], list[float]]:
++    """Attempt-1 formula verbatim (full-history counts; league_share fallback
++    0.2, league_rate fallback 0.0). Used only under V1_COMPAT_CONFIG."""
++    team_att = [float(v) for v in snapshot["team_attempts"]]
++    team_made = [float(v) for v in snapshot["team_makes"]]
++    league_att = [float(v) for v in snapshot["league_attempts"]]
++    league_made = [float(v) for v in snapshot["league_makes"]]
++    total_league = sum(league_att)
++    total_team = sum(team_att)
++    shares: list[float] = []
++    rates: list[float] = []
++    for b in range(5):
++        league_share = (league_att[b] / total_league) if total_league > 0 else 0.2
++        shares.append((team_att[b] + FG_BAND_PRIOR_ATTEMPTS * league_share)
++                      / (total_team + FG_BAND_PRIOR_ATTEMPTS))
++        league_rate = (league_made[b] / league_att[b]) if league_att[b] > 0 else 0.0
++        rates.append((team_made[b] + FG_BAND_PRIOR_ATTEMPTS * league_rate)
++                     / (team_att[b] + FG_BAND_PRIOR_ATTEMPTS))
++    return shares, rates
++
++
++def band_snapshot_from_row(row: Mapping[str, Any], *, decayed: bool) -> dict[str, list[float]]:
++    prefix = "decayed" if decayed else "pit"
++    return {
++        "team_attempts": [float(v) for v in row[f"{prefix}_team_band_attempts"]],
++        "team_makes": [float(v) for v in row[f"{prefix}_team_band_makes"]],
++        "league_attempts": [float(v) for v in row[f"{prefix}_league_band_attempts"]],
++        "league_makes": [float(v) for v in row[f"{prefix}_league_band_makes"]],
++    }
++
++
++def band_shares_rates(row: Mapping[str, Any], config: ModelFormConfig) -> tuple[list[float], list[float]]:
++    snap = band_snapshot_from_row(row, decayed=config.decayed_fg_shares)
++    if config.decayed_fg_shares:
++        return band_shares_rates_v2(snap)
++    return band_shares_rates_v1(snap)
++
++
++def row_has_band_context(row: Mapping[str, Any], config: ModelFormConfig) -> bool:
++    """False exactly when the row is a ZERO_MODEL_ROW under section 2.3:
++    no league band context exists yet (only possible in the development
++    window's first kickoff batch). The evaluation driver excludes such
++    rows/games from scoring and counts the exclusions; the mathematics
++    itself stays fail-closed (band_shares_rates_v2 raises)."""
++    snap = band_snapshot_from_row(row, decayed=config.decayed_fg_shares)
++    return sum(float(v) for v in snap["league_attempts"]) > 0
++
++
++def banded_made_fg_mean(opportunity_model: PoissonRidge, row: Mapping[str, Any],
++                        config: ModelFormConfig) -> float:
++    opportunity = predict_mean_v2(opportunity_model, row)
++    shares, rates = band_shares_rates(row, config)
++    return float(opportunity * sum(s * r for s, r in zip(shares, rates)))
++
++
++def banded_made_fg_detail(opportunity_model: PoissonRidge, row: Mapping[str, Any],
++                          config: ModelFormConfig) -> dict[str, Any]:
++    opportunity = predict_mean_v2(opportunity_model, row)
++    shares, rates = band_shares_rates(row, config)
++    bands = []
++    for b, (lo, hi) in enumerate(FG_BANDS):
++        bands.append({
++            "band": f"{lo}-{hi}" if hi is not None else f"{lo}+",
++            "expected_attempts": float(opportunity * shares[b]),
++            "conversion_rate": float(rates[b]),
++            "expected_makes": float(opportunity * shares[b] * rates[b]),
++        })
++    return {"opportunity_mean": float(opportunity), "bands": bands,
++            "made_fg_mean": float(sum(b["expected_makes"] for b in bands))}
++
++
++# ---------------------------------------------------------------------------
++# Row enrichment: heritage rows + G2 aggregates -> v2 model rows.
++# Ordering discipline is attempt-1's, TIGHTENED at exactly one point per
++# preregistration section 2.3 ("kickoff strictly before") and the Oct 13
++# audit: games sharing a kickoff timestamp (heritage field game_start_ts,
++# required, fail-closed) are batched - every game in a kickoff batch is
++# emitted from the pre-batch state and updates apply only after the batch,
++# so tied games never contribute to each other's inputs. Attempt 1 updated
++# accumulators game-by-game in arrival order. Emits BOTH band snapshots:
++# cumulative full-history (pit_*, attempt-1) and decayed (decayed_*, v2).
++# Total FG attempts per team-game: agg["fg_attempts_total"] when the
++# aggregate carries it (count of field_goal_attempt-flagged rows); otherwise
++# derived as distance-evidenced attempts + missing-distance attempts (the
++# attempt-1 aggregate's attempt rows all carry field_goal_result).
++# ---------------------------------------------------------------------------
++
++def _weighted(values: Sequence[float]) -> float:
++    if not values:
++        return 0.0
++    n = len(values)
++    weights = [DECAY ** (n - 1 - i) for i in range(n)]
++    return float(sum(w * v for w, v in zip(weights, values)) / sum(weights))
++
++
++def _agg_total_attempts(agg: Mapping[str, Any]) -> int:
++    if agg.get("fg_attempts_total") is not None:
++        return int(agg["fg_attempts_total"])
++    return int(sum(agg["fg_att_band"])) + int(agg["fg_att_missing_dist"])
++
++
++def _game_start_ts(pair: Sequence[Mapping[str, Any]], gid: str) -> str:
++    """The heritage rows' kickoff field. Required (fail-closed): without a
++    kickoff, the strictly-before accumulation rule of section 2.3 cannot be
++    enforced."""
++    values = {str(r.get("game_start_ts") or "").strip() for r in pair}
++    if len(values) != 1 or not next(iter(values)):
++        raise ScoreCountsG2V2Error(f"GAME_START_TS_REQUIRED:{gid}")
++    return next(iter(values))
++
++
++def build_g2_rows_v2(
++    heritage_rows: Sequence[Mapping[str, Any]],
++    g2_agg: Mapping[tuple[str, str], Mapping[str, Any]],
++) -> list[dict[str, Any]]:
++    rows = [dict(r) for r in heritage_rows]
++    games: list[tuple[str, list[dict[str, Any]]]] = []
++    for row in rows:
++        gid = str(row["game_id"])
++        if games and games[-1][0] == gid:
++            games[-1][1].append(row)
++        else:
++            games.append((gid, [row]))
++
++    hist: dict[str, deque] = defaultdict(lambda: deque(maxlen=LOOKBACK_GAMES))
++    decayed_book = BandBook(decayed=True)
++    cumulative_book = BandBook(decayed=False)
++
++    def _emit_game(gid: str, pair: list[dict[str, Any]]) -> list[dict[str, Any]]:
++        if len(pair) != 2:
++            raise ScoreCountsG2V2Error(f"GAME_PAIR_REQUIRED:{gid}:{len(pair)}")
++        enriched: list[dict[str, Any]] = []
++        for row in pair:
++            team = str(row["team"])
++            opp = str(row["opponent"])
++            own_hist = list(hist[team])
++            opp_hist = list(hist[opp])
++            row["fg_rz_trips_per_game"] = _weighted([h["rz_trips"] for h in own_hist])
++            row["fg_drives35_per_game"] = _weighted([h["drives35"] for h in own_hist])
++            row["fg_drives25_per_game"] = _weighted([h["drives25"] for h in own_hist])
++            row["opp_fg_rz_trips_allowed_per_game"] = _weighted([h["def_rz_trips"] for h in opp_hist])
++            row["opp_fg_drives35_allowed_per_game"] = _weighted([h["def_drives35"] for h in opp_hist])
++            row["opp_fg_drives25_allowed_per_game"] = _weighted([h["def_drives25"] for h in opp_hist])
++            row["fg_attempts_per_game"] = _weighted([h["fg_attempts_total"] for h in own_hist])
++            row["opp_fg_attempts_allowed_per_game"] = _weighted(
++                [h["fg_attempts_allowed"] for h in opp_hist])
++            snap_d = decayed_book.snapshot(team)
++            snap_c = cumulative_book.snapshot(team)
++            row["decayed_team_band_attempts"] = snap_d["team_attempts"]
++            row["decayed_team_band_makes"] = snap_d["team_makes"]
++            row["decayed_league_band_attempts"] = snap_d["league_attempts"]
++            row["decayed_league_band_makes"] = snap_d["league_makes"]
++            row["pit_team_band_attempts"] = [int(v) for v in snap_c["team_attempts"]]
++            row["pit_team_band_makes"] = [int(v) for v in snap_c["team_makes"]]
++            row["pit_league_band_attempts"] = [int(v) for v in snap_c["league_attempts"]]
++            row["pit_league_band_makes"] = [int(v) for v in snap_c["league_makes"]]
++            for q in (1, 2, 3, 4):
++                row[f"q{q}_off_td_per_game"] = _weighted([h["quarters"][q]["off_td"] for h in own_hist])
++                row[f"q{q}_off_fg_per_game"] = _weighted([h["quarters"][q]["made_fg"] for h in own_hist])
++                row[f"q{q}_def_td_allowed_per_game"] = _weighted(
++                    [h["def_quarters"][q]["off_td_allowed"] for h in opp_hist])
++                row[f"q{q}_fg_allowed_per_game"] = _weighted(
++                    [h["def_quarters"][q]["fg_allowed"] for h in opp_hist])
++            agg = g2_agg.get((gid, team))
++            if agg is None:
++                raise ScoreCountsG2V2Error(f"G2_AGGREGATE_MISSING:{gid}:{team}")
++            row["fg_att_band"] = [int(v) for v in agg["fg_att_band"]]
++            row["fg_made_band"] = [int(v) for v in agg["fg_made_band"]]
++            row["fg_attempts_with_distance"] = int(sum(agg["fg_att_band"]))
++            row["fg_attempts_missing_distance"] = int(agg["fg_att_missing_dist"])
++            row["fg_makes_missing_distance"] = int(agg["fg_made_missing_dist"])
++            row["fg_attempts_total"] = _agg_total_attempts(agg)
++            for q in (1, 2, 3, 4):
++                qq = agg["quarters"][q]
++                row[f"q{q}_off_td"] = int(qq["off_td"])
++                row[f"q{q}_made_fg"] = int(qq["made_fg"])
++                row[f"q{q}_def_td"] = int(qq["def_td"])
++                row[f"q{q}_safeties"] = int(qq["safeties"])
++                row[f"q{q}_points"] = int(
++                    6 * (qq["off_td"] + qq["def_td"]) + qq["pat"] + 2 * qq["two_pt"]
++                    + 3 * qq["made_fg"] + 2 * qq["safeties"])
++            enriched.append(row)
++        return enriched
++
++    def _apply_updates(gid: str, pair: list[dict[str, Any]]) -> None:
++        # Update history + band books only after the whole game is emitted.
++        totals = {str(r["team"]): int(r["fg_attempts_total"]) for r in pair}
++        for row in pair:
++            team = str(row["team"])
++            opp = str(row["opponent"])
++            agg = g2_agg[(gid, team)]
++            entry = dict(agg)
++            entry["fg_attempts_total"] = totals[team]
++            entry["fg_attempts_allowed"] = totals[opp]
++            hist[team].append(entry)
++            decayed_book.update(team, agg["fg_att_band"], agg["fg_made_band"])
++            cumulative_book.update(team, agg["fg_att_band"], agg["fg_made_band"])
++
++    # Same-kickoff batching (section 2.3 + audit item 1): accumulators
++    # include exactly the team-games with kickoff STRICTLY BEFORE the target
++    # game's kickoff. Games sharing a kickoff timestamp are all emitted from
++    # the pre-batch state and their updates apply only after the whole batch
++    # is emitted; the game_id ordering inside a batch is processing order
++    # only and never an information flow.
++    out: list[dict[str, Any]] = []
++    idx = 0
++    while idx < len(games):
++        ts = _game_start_ts(games[idx][1], games[idx][0])
++        batch: list[tuple[str, list[dict[str, Any]]]] = []
++        while idx < len(games) and _game_start_ts(games[idx][1], games[idx][0]) == ts:
++            batch.append(games[idx])
++            idx += 1
++        for gid, pair in batch:
++            out.extend(_emit_game(gid, pair))
++        for gid, pair in batch:
++            _apply_updates(gid, pair)
++    return out
++
++
++# ---------------------------------------------------------------------------
++# Rare-score legs: PIT empirical-Bayes rates + CV-selected prior (C3).
++# Rates are computed from strictly-prior games only: state is seeded by the
++# training rows (in order) and each evaluation game is scored before its own
++# outcomes enter the state. The prior SELECTION uses training rows only.
++# ---------------------------------------------------------------------------
++
++def _pairs(rows: Sequence[Mapping[str, Any]]) -> list[tuple[str, list[Mapping[str, Any]]]]:
++    games: list[tuple[str, list[Mapping[str, Any]]]] = []
++    for row in rows:
++        gid = str(row["game_id"])
++        if games and games[-1][0] == gid:
++            games[-1][1].append(row)
++        else:
++            games.append((gid, [row]))
++    return games
++
++
++def league_rare_rates(rows: Sequence[Mapping[str, Any]], *,
++                      def_field: str = "def_st_touchdowns",
++                      saf_field: str = "safeties") -> tuple[float, float]:
++    n = len(rows)
++    if n == 0:
++        return 0.0, 0.0
++    def_rate = sum(float(r[def_field]) for r in rows) / n
++    saf_rate = sum(float(r[saf_field]) for r in rows) / n
++    return float(def_rate), float(saf_rate)
++
++
++def pit_eb_rates(
++    train_rows: Sequence[Mapping[str, Any]],
++    eval_rows: Sequence[Mapping[str, Any]],
++    *,
++    prior: float,
++    def_field: str = "def_st_touchdowns",
++    saf_field: str = "safeties",
++) -> list[tuple[float, float]]:
++    """Per-eval-row (def_rate, saf_rate) under EB prior `prior`.
++
++    rate = (team_events + prior * league_rate) / (team_games + prior), with
++    league and team counts over strictly-prior team-games (training rows
++    first, then earlier evaluation games in chronological order).
++    """
++    team_events: dict[str, list[float]] = defaultdict(lambda: [0.0, 0.0, 0.0])
++    league = [0.0, 0.0, 0.0]  # def events, saf events, team-games
++
++    def _update(row: Mapping[str, Any]) -> None:
++        team = str(row["team"])
++        d = float(row[def_field])
++        s = float(row[saf_field])
++        te = team_events[team]
++        te[0] += d
++        te[1] += s
++        te[2] += 1.0
++        league[0] += d
++        league[1] += s
++        league[2] += 1.0
++
++    def _batches(rows: Sequence[Mapping[str, Any]]) -> list[list[tuple[str, list]]]:
++        """Consecutive games grouped by kickoff (game_start_ts). Same-kickoff
++        games never contribute to each other's rates: rates for a whole batch
++        are computed from the pre-batch state, then the batch's outcomes
++        update the state. Rows without a kickoff form singleton batches."""
++        grouped: list[list[tuple[str, list]]] = []
++        last_ts: str | None = None
++        for gid, pair in _pairs(rows):
++            ts = str(pair[0].get("game_start_ts") or "")
++            if grouped and ts and ts == last_ts:
++                grouped[-1].append((gid, pair))
++            else:
++                grouped.append([(gid, pair)])
++            last_ts = ts
++        return grouped
++
++    for batch in _batches(train_rows):
++        for _gid, pair in batch:
++            for row in pair:
++                _update(row)
++    out: list[tuple[float, float]] = []
++    for batch in _batches(eval_rows):
++        for _gid, pair in batch:
++            for row in pair:
++                team = str(row["team"])
++                te = team_events[team]
++                league_def = league[0] / league[2] if league[2] else 0.0
++                league_saf = league[1] / league[2] if league[2] else 0.0
++                def_rate = (te[0] + prior * league_def) / (te[2] + prior)
++                saf_rate = (te[1] + prior * league_saf) / (te[2] + prior)
++                out.append((float(def_rate), float(saf_rate)))
++        for _gid, pair in batch:
++            for row in pair:
++                _update(row)
++    return out
++
++
++def select_rare_prior(
++    train_rows: Sequence[Mapping[str, Any]],
++    config: ModelFormConfig,
++) -> tuple[Any, dict[str, float]]:
++    """Per-fold prior selection (section 2.4): expanding-season CV inside the
++    training window on the rare-event Poisson log score; pooled mean over
++    held-out training games; ties break to the LARGER prior (LEAGUE_ONLY
++    counts as largest). Selection never touches the validation fold."""
++    if config.rare_prior_mode == "FIXED":
++        return config.rare_prior_fixed, {}
++    seasons = sorted({int(r["season"]) for r in train_rows})
++    if len(seasons) < 2:
++        raise ScoreCountsG2V2Error("RARE_PRIOR_CV_REQUIRES_TWO_SEASONS")
++    totals: dict[Any, list[float]] = {p: [0.0, 0.0] for p in RARE_PRIOR_GRID}  # ll, n
++    for vs in seasons[1:]:
++        inner_train = [r for r in train_rows if int(r["season"]) < vs]
++        inner_valid = [r for r in train_rows if int(r["season"]) == vs]
++        if not inner_train or not inner_valid:
++            continue
++        league_def, league_saf = league_rare_rates(inner_train)
++        league_only_lam = league_def + league_saf
++        for prior in RARE_PRIOR_GRID:
++            if prior == "LEAGUE_ONLY":
++                lams = [league_only_lam] * len(inner_valid)
++            else:
++                rates = pit_eb_rates(inner_train, inner_valid, prior=float(prior))
++                lams = [d + s for d, s in rates]
++            ll = 0.0
++            for row, lam in zip(inner_valid, lams):
++                y = float(row["def_st_touchdowns"]) + float(row["safeties"])
++                ll += poisson_logpmf(y, lam)
++            totals[prior][0] += ll
++            totals[prior][1] += len(inner_valid)
++    scores = {
++        str(p): (v[0] / v[1] if v[1] else float("-inf")) for p, v in totals.items()
++    }
++    rank = {p: i for i, p in enumerate(RARE_PRIOR_GRID)}
++    best = max(RARE_PRIOR_GRID, key=lambda p: (scores[str(p)], rank[p]))
++    return best, scores
++
++
++# ---------------------------------------------------------------------------
++# Negative-binomial dispersion (C2, preregistration section 3).
++# ---------------------------------------------------------------------------
++
++def nb_logpmf(y: float, mu: float, theta: float) -> float:
++    if theta == inf:
++        return poisson_logpmf(y, mu)
++    mu = max(float(mu), 1e-12)
++    theta = float(theta)
++    out = (lgamma(y + theta) - lgamma(theta) - lgamma(y + 1.0)
++           + theta * log(theta / (theta + mu)))
++    if y > 0:
++        out += y * log(mu / (theta + mu))
++    return float(out)
++
++
++def draw_count(rng: np.random.Generator, mu: Any, theta: float) -> np.ndarray:
++    """NB draw with variance mu + mu^2/theta; theta = inf is exactly the
++    attempt-1 Poisson draw (same generator call)."""
++    mu_arr = np.asarray(mu, dtype=float)
++    if theta == inf:
++        return rng.poisson(mu_arr)
++    theta = float(theta)
++    return rng.negative_binomial(theta, theta / (theta + mu_arr))
++
++
++def select_theta_cv(
++    inner_folds: Sequence[tuple[Sequence[float], Sequence[float]]],
++    grid: Sequence[float] = THETA_GRID,
++) -> tuple[float, dict[str, float]]:
++    """Pooled mean NB log-pmf over held-out training games (section 3);
++    ties break to the larger theta (least dispersion)."""
++    scores: dict[str, float] = {}
++    for theta in grid:
++        ll = 0.0
++        n = 0
++        for mus, ys in inner_folds:
++            for mu, y in zip(mus, ys):
++                ll += nb_logpmf(float(y), float(mu), float(theta))
++                n += 1
++        scores[str(theta)] = ll / n if n else float("-inf")
++    best = max(grid, key=lambda t: (scores[str(t)], float(t)))
++    return float(best), scores
++
++
++def period_feature_names(quarter: int) -> tuple[str, ...]:
++    return (
++        f"q{quarter}_off_td_per_game",
++        f"q{quarter}_off_fg_per_game",
++        f"q{quarter}_def_td_allowed_per_game",
++        f"q{quarter}_fg_allowed_per_game",
++        "off_plays_per_game",
++        "home_indicator",
++    )
++
++
++def _fit_leg_mean(rows: Sequence[Mapping[str, Any]], leg: str,
++                  config: ModelFormConfig, alpha: float):
++    """Fit one leg's mean model on `rows` at a GIVEN alpha; returns the
++    predict function. Alpha selection itself lives in fit_fold_bundle (the
++    leg's frozen CV procedure on the full training window)."""
++    if leg == "TD":
++        model = heritage_fit_poisson_ridge(
++            rows, target="offense_touchdowns", alpha=float(alpha),
++            feature_names=FEATURE_NAMES)
++        return lambda r: heritage_predict_mean(model, r)
++    if leg == "FG":
++        model = fit_poisson_ridge_v2(
++            rows, target="fg_attempts_with_distance", alpha=float(alpha),
++            feature_names=config.opportunity_features)
++        return lambda r: banded_made_fg_mean(model, r, config)
++    if leg.startswith("TD_Q"):
++        q = int(leg[-1])
++        model = fit_poisson_ridge_v2(rows, target=f"q{q}_off_td",
++                                     alpha=float(alpha),
++                                     feature_names=period_feature_names(q))
++        return lambda r: predict_mean_v2(model, r)
++    if leg.startswith("FG_Q"):
++        q = int(leg[-1])
++        model = fit_poisson_ridge_v2(rows, target=f"q{q}_made_fg",
++                                     alpha=float(alpha),
++                                     feature_names=period_feature_names(q))
++        return lambda r: predict_mean_v2(model, r)
++    raise ScoreCountsG2V2Error(f"UNKNOWN_LEG:{leg}")
++
++
++def _leg_target(leg: str) -> str:
++    if leg == "TD":
++        return "offense_touchdowns"
++    if leg == "FG":
++        return "made_field_goals"
++    if leg.startswith("TD_Q"):
++        return f"q{leg[-1]}_off_td"
++    if leg.startswith("FG_Q"):
++        return f"q{leg[-1]}_made_fg"
++    raise ScoreCountsG2V2Error(f"UNKNOWN_LEG:{leg}")
++
++
++def select_theta_for_leg(
++    train_rows: Sequence[Mapping[str, Any]], leg: str,
++    config: ModelFormConfig, *, mean_alpha: float,
++) -> tuple[float, dict[str, float]]:
++    """Per-fold, per-leg theta by expanding-season CV inside the training
++    window only (section 3). The mean fit does not involve theta: inner
++    mean models are fit at the leg's training-window alpha (the frozen
++    alpha-selection procedure's output for this fold), so the inner
++    windows - which can hold fewer than the heritage selector's 3-season
++    floor - need no nested alpha selection, and the theta comparison is
++    over identical means for every candidate theta."""
++    if tuple(config.theta_grid) == (inf,):
++        return inf, {}
++    seasons = sorted({int(r["season"]) for r in train_rows})
++    if len(seasons) < 2:
++        raise ScoreCountsG2V2Error("THETA_CV_REQUIRES_TWO_SEASONS")
++    target = _leg_target(leg)
++    inner_folds: list[tuple[list[float], list[float]]] = []
++    for vs in seasons[1:]:
++        inner_train = [r for r in train_rows if int(r["season"]) < vs]
++        inner_valid = [r for r in train_rows if int(r["season"]) == vs]
++        if not inner_train or not inner_valid:
++            continue
++        predict = _fit_leg_mean(inner_train, leg, config, mean_alpha)
++        mus = [predict(r) for r in inner_valid]
++        ys = [float(r[target]) for r in inner_valid]
++        inner_folds.append((mus, ys))
++    return select_theta_cv(inner_folds, config.theta_grid)
++
++
++# ---------------------------------------------------------------------------
++# Simulation. Structure mirrors attempt-1 simulate_full_game /
++# simulate_period_game exactly (single shared mean-preserving lognormal
++# latent per path; identical draw order), with two preregistered changes:
++# the offensive-TD and made-FG draws are negative-binomial with the fitted
++# per-leg theta (theta = inf reproduces the attempt-1 Poisson draw through
++# the same generator call), and the rare-score rates are supplied by the
++# caller (fold-selected prior, section 2.4) instead of read from row fields.
++# ---------------------------------------------------------------------------
++
++def _conversions_g2(rng: np.random.Generator, touchdowns: np.ndarray,
++                    probabilities: tuple[float, float, float]) -> tuple[np.ndarray, np.ndarray]:
++    pat_p, two_p, no_p = probabilities
++    pats = rng.binomial(touchdowns, pat_p)
++    remaining = touchdowns - pats
++    mass = two_p + no_p
++    p_two = 0.0 if mass <= 0 else two_p / mass
++    twos = rng.binomial(remaining, p_two)
++    return pats.astype(int), twos.astype(int)
++
++
++def _conversion_probs(row: Mapping[str, Any]) -> tuple[float, float, float]:
++    return (
++        float(row["conversion_pat_p"]), float(row["conversion_two_p"]),
++        float(row["conversion_no_p"]),
++    )
++
++
++def _latent(rng: np.random.Generator, sigma: float, paths: int) -> np.ndarray:
++    if sigma == 0.0:
++        return np.ones(paths)
++    return rng.lognormal(mean=-0.5 * sigma * sigma, sigma=sigma, size=paths)
++
++
++def simulate_full_game_v2(
++    bundle: Mapping[str, Any], *, game_id: str,
++    home_row: Mapping[str, Any], away_row: Mapping[str, Any],
++    home_rates: tuple[float, float], away_rates: tuple[float, float],
++    sigma: float, paths: int = PATHS_PER_GAME,
++) -> dict[str, Any]:
++    config: ModelFormConfig = bundle["config"]
++    rng = rng_for_v2(game_id, "FULL")
++    td_model = bundle["td_model"]
++    fg_model = bundle["fg_opportunity_model"]
++    h_td = heritage_predict_mean(td_model, home_row)
++    a_td = heritage_predict_mean(td_model, away_row)
++    h_fg = banded_made_fg_mean(fg_model, home_row, config)
++    a_fg = banded_made_fg_mean(fg_model, away_row, config)
++    latent = _latent(rng, sigma, paths)
++    theta_td = float(bundle["thetas"]["TD"])
++    theta_fg = float(bundle["thetas"]["FG"])
++    h_off = draw_count(rng, h_td * latent, theta_td)
++    a_off = draw_count(rng, a_td * latent, theta_td)
++    h_fg_n = draw_count(rng, h_fg * latent, theta_fg)
++    a_fg_n = draw_count(rng, a_fg * latent, theta_fg)
++    h_dst = rng.poisson(float(home_rates[0]), size=paths)
++    a_dst = rng.poisson(float(away_rates[0]), size=paths)
++    h_saf = rng.poisson(float(home_rates[1]), size=paths)
++    a_saf = rng.poisson(float(away_rates[1]), size=paths)
++    h_td_tot = h_off + h_dst
++    a_td_tot = a_off + a_dst
++    h_pat, h_two = _conversions_g2(rng, h_td_tot, _conversion_probs(home_row))
++    a_pat, a_two = _conversions_g2(rng, a_td_tot, _conversion_probs(away_row))
++    home_score = 6 * h_td_tot + h_pat + 2 * h_two + 3 * h_fg_n + 2 * h_saf
++    away_score = 6 * a_td_tot + a_pat + 2 * a_two + 3 * a_fg_n + 2 * a_saf
++    return {
++        "home_score": home_score, "away_score": away_score,
++        "means": {"home_td": h_td, "away_td": a_td, "home_fg": h_fg, "away_fg": a_fg},
++    }
++
++
++def simulate_period_game_v2(
++    bundle: Mapping[str, Any], *, game_id: str,
++    home_row: Mapping[str, Any], away_row: Mapping[str, Any],
++    home_period_rates: Mapping[int, tuple[float, float]],
++    away_period_rates: Mapping[int, tuple[float, float]],
++    sigma: float, paths: int = PATHS_PER_GAME,
++) -> dict[str, Any]:
++    """Per-quarter path set on ONE shared latent; halves are quarter sums.
++    Period legs use their own fitted thetas (section 2.6 + section 3)."""
++    rng = rng_for_v2(game_id, "PERIOD")
++    latent = _latent(rng, sigma, paths)
++    home_points: dict[int, np.ndarray] = {}
++    away_points: dict[int, np.ndarray] = {}
++    for q in (1, 2, 3, 4):
++        pm = bundle["period"][q]
++        theta_td = float(bundle["thetas"][f"TD_Q{q}"])
++        theta_fg = float(bundle["thetas"][f"FG_Q{q}"])
++        h_td = draw_count(rng, predict_mean_v2(pm["td_model"], home_row) * latent, theta_td)
++        a_td = draw_count(rng, predict_mean_v2(pm["td_model"], away_row) * latent, theta_td)
++        h_fg = draw_count(rng, predict_mean_v2(pm["fg_model"], home_row) * latent, theta_fg)
++        a_fg = draw_count(rng, predict_mean_v2(pm["fg_model"], away_row) * latent, theta_fg)
++        h_dst = rng.poisson(float(home_period_rates[q][0]), size=paths)
++        a_dst = rng.poisson(float(away_period_rates[q][0]), size=paths)
++        h_saf = rng.poisson(float(home_period_rates[q][1]), size=paths)
++        a_saf = rng.poisson(float(away_period_rates[q][1]), size=paths)
++        h_tot = h_td + h_dst
++        a_tot = a_td + a_dst
++        h_pat, h_two = _conversions_g2(rng, h_tot, _conversion_probs(home_row))
++        a_pat, a_two = _conversions_g2(rng, a_tot, _conversion_probs(away_row))
++        home_points[q] = 6 * h_tot + h_pat + 2 * h_two + 3 * h_fg + 2 * h_saf
++        away_points[q] = 6 * a_tot + a_pat + 2 * a_two + 3 * a_fg + 2 * a_saf
++    return {
++        "home_points": home_points, "away_points": away_points,
++        "first_half_home": home_points[1] + home_points[2],
++        "first_half_away": away_points[1] + away_points[2],
++        "second_half_home": home_points[3] + home_points[4],
++        "second_half_away": away_points[3] + away_points[4],
++    }
++
++
++# ---------------------------------------------------------------------------
++# PMF helpers (attempt-1 semantics verbatim).
++# ---------------------------------------------------------------------------
++
++def realized_final_score(row: Mapping[str, Any]) -> int:
++    return int(
++        6 * (int(row["offense_touchdowns"]) + int(row["def_st_touchdowns"]))
++        + int(row["pat_made"]) + 2 * int(row["two_point_made"])
++        + 3 * int(row["made_field_goals"]) + 2 * int(row["safeties"])
++    )
++
++
++def game_pairs(rows: Sequence[Mapping[str, Any]]) -> dict[str, tuple[Mapping[str, Any], Mapping[str, Any]]]:
++    grouped: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
++    for row in rows:
++        grouped[str(row["game_id"])].append(row)
++    out = {}
++    for gid, pair in grouped.items():
++        if len(pair) != 2:
++            raise ScoreCountsG2V2Error(f"GAME_PAIR_REQUIRED:{gid}:{len(pair)}")
++        home = [r for r in pair if float(r["home_indicator"]) == 1.0]
++        away = [r for r in pair if float(r["home_indicator"]) == 0.0]
++        if len(home) != 1 or len(away) != 1:
++            raise ScoreCountsG2V2Error(f"HOME_AWAY_PAIR_REQUIRED:{gid}")
++        out[gid] = (home[0], away[0])
++    return out
++
++
++def pmf_counts(home: np.ndarray, away: np.ndarray) -> dict[tuple[int, int], int]:
++    keys, counts = np.unique(
++        np.asarray(home, dtype=int) * 1000 + np.asarray(away, dtype=int), return_counts=True
++    )
++    return {(int(k) // 1000, int(k) % 1000): int(c) for k, c in zip(keys, counts)}
++
++
++def pmf_from_counts(counts: Mapping[tuple[int, int], int], total: int) -> dict[tuple[int, int], float]:
++    if total <= 0:
++        raise ScoreCountsG2V2Error("PMF_TOTAL_REQUIRED")
++    return {k: v / total for k, v in counts.items()}
++
++
++def log_score(counts: Mapping[tuple[int, int], int], total: int, realized: tuple[int, int],
++              paths: int) -> float:
++    p = counts.get(realized, 0) / total if total else 0.0
++    floor = 0.5 / paths
++    return float(log(max(p, floor)))
++
++
++def log_score_pmf(pmf: Mapping[tuple[int, int], float], realized: tuple[int, int],
++                  paths: int) -> float:
++    floor = 0.5 / paths
++    return float(log(max(float(pmf.get(realized, 0.0)), floor)))
++
++
++def randomized_pit(samples: np.ndarray, realized: int, rng: np.random.Generator) -> float:
++    below = float(np.mean(samples < realized))
++    equal = float(np.mean(samples == realized))
++    return below + float(rng.random()) * equal
++
++
++def joint_distribution_sha256(counts: Mapping[tuple[int, int], int]) -> str:
++    import json as _json
++    canonical = _json.dumps(
++        [[h, a, int(c)] for (h, a), c in sorted(counts.items())],
++        separators=(",", ":")).encode("utf-8")
++    return sha256(canonical).hexdigest()
++
++
++# ---------------------------------------------------------------------------
++# K3 fitted key-mass component (preregistration section 4). Estimation uses
++# the fold's TRAINING games only: the fold model simulates its own training
++# games (skeleton PMFs), and lambda is estimated from those simulations plus
++# the training games' realized margins. Application moves mass from each
++# key's frozen source window toward the key itself, one-directionally,
++# preserving total probability and within-margin composition exactly.
++# ---------------------------------------------------------------------------
++
++def margin_law(pmf: Mapping[tuple[int, int], float]) -> dict[int, float]:
++    out: dict[int, float] = defaultdict(float)
++    for (h, a), p in pmf.items():
++        out[int(h) - int(a)] += float(p)
++    return dict(out)
++
++
++def estimate_k3_lambdas(
++    skeleton_pmfs: Sequence[Mapping[tuple[int, int], float]],
++    realized_margins: Sequence[int],
++) -> dict[str, Any]:
++    if len(skeleton_pmfs) != len(realized_margins) or not skeleton_pmfs:
++        raise ScoreCountsG2V2Error("K3_ESTIMATION_INPUTS_REQUIRED")
++    laws = [margin_law(p) for p in skeleton_pmfs]
++    n = len(laws)
++    lambdas: dict[int, float] = {}
++    detail: dict[str, Any] = {}
++    for k in K3_KEYS:
++        s_key = sum(law.get(k, 0.0) for law in laws) / n
++        s_win = sum(sum(law.get(m, 0.0) for m in K3_WINDOWS[k]) for law in laws) / n
++        r_key = sum(1 for m in realized_margins if int(m) == k) / n
++        if s_win <= 0.0:
++            lam = 0.0
++        else:
++            lam = min(max((r_key - s_key) / s_win, 0.0), K3_LAMBDA_MAX)
++        lambdas[k] = float(lam)
++        detail[str(k)] = {
++            "skeleton_mean_key_mass": float(s_key),
++            "skeleton_mean_window_mass": float(s_win),
++            "realized_key_fraction": float(r_key),
++            "lambda": float(lam),
++        }
++    return {"lambdas": lambdas, "detail": detail, "n_training_games": n}
++
++
++def apply_k3(
++    pmf: Mapping[tuple[int, int], float],
++    lambdas: Mapping[int, float],
++) -> dict[tuple[int, int], float]:
++    """Apply the frozen transfer. Windows and keys are mutually disjoint
++    across keys, so per-key transfers do not interact. Corner rule: if the
++    skeleton mass at the key is exactly 0 (or the window mass is 0), no
++    transfer occurs for that (game, key)."""
++    out = {cell: float(p) for cell, p in pmf.items()}
++    margins = {cell: cell[0] - cell[1] for cell in out}
++    for k in K3_KEYS:
++        lam = float(lambdas.get(k, 0.0))
++        if lam <= 0.0:
++            continue
++        window_cells = [c for c in out if margins[c] in K3_WINDOWS[k]]
++        key_cells = [c for c in out if margins[c] == k]
++        s_win = sum(out[c] for c in window_cells)
++        s_key = sum(out[c] for c in key_cells)
++        if s_win <= 0.0 or s_key <= 0.0:
++            continue
++        removed = lam * s_win
++        for c in window_cells:
++            out[c] = out[c] * (1.0 - lam)
++        for c in key_cells:
++            out[c] = out[c] + removed * (out[c] / s_key)
++    return out
++
++
++def independent_marginals_pmf(
++    pmf: Mapping[tuple[int, int], float],
++) -> dict[tuple[int, int], float]:
++    """Comparator (ii'): the candidate's own marginals composed independently,
++    P(h, a) = P^H(h) * P^A(a). A dependence-value test derived from the
++    candidate's own PMF (Amendment 1) - NOT an external benchmark."""
++    mh: dict[int, float] = defaultdict(float)
++    ma: dict[int, float] = defaultdict(float)
++    for (h, a), p in pmf.items():
++        mh[int(h)] += float(p)
++        ma[int(a)] += float(p)
++    return {(h, a): ph * pa for h, ph in mh.items() for a, pa in ma.items()}
++
++
++# ---------------------------------------------------------------------------
++# Fold fitting: every selection (alpha, theta, rare prior) happens inside
++# the training window. Sigma follows the attempt-1 placement (heritage OOF
++# over the fitted fold models).
++# ---------------------------------------------------------------------------
++
++def fit_fold_bundle(
++    train_rows: Sequence[Mapping[str, Any]],
++    config: ModelFormConfig = V2_CONFIG,
++) -> dict[str, Any]:
++    train_rows = list(train_rows)
++    td_alpha, td_cv = heritage_choose_alpha(
++        train_rows, target="offense_touchdowns", alphas=config.alpha_grid,
++        feature_names=FEATURE_NAMES)
++    td_model = heritage_fit_poisson_ridge(
++        train_rows, target="offense_touchdowns", alpha=float(td_alpha),
++        feature_names=FEATURE_NAMES)
++    fg_alpha, fg_cv = choose_alpha_v2(
++        train_rows, target="fg_attempts_with_distance",
++        feature_names=config.opportunity_features, alphas=config.alpha_grid)
++    fg_model = fit_poisson_ridge_v2(
++        train_rows, target="fg_attempts_with_distance", alpha=float(fg_alpha),
++        feature_names=config.opportunity_features)
++    period: dict[int, dict[str, Any]] = {}
++    for q in (1, 2, 3, 4):
++        names = period_feature_names(q)
++        td_a, _ = choose_alpha_v2(train_rows, target=f"q{q}_off_td",
++                                  feature_names=names, alphas=config.alpha_grid)
++        fg_a, _ = choose_alpha_v2(train_rows, target=f"q{q}_made_fg",
++                                  feature_names=names, alphas=config.alpha_grid)
++        period[q] = {
++            "td_model": fit_poisson_ridge_v2(train_rows, target=f"q{q}_off_td",
++                                             alpha=float(td_a), feature_names=names),
++            "fg_model": fit_poisson_ridge_v2(train_rows, target=f"q{q}_made_fg",
++                                             alpha=float(fg_a), feature_names=names),
++            "td_alpha": float(td_a), "fg_alpha": float(fg_a),
++        }
++    leg_alphas = {"TD": float(td_alpha), "FG": float(fg_alpha)}
++    for q in (1, 2, 3, 4):
++        leg_alphas[f"TD_Q{q}"] = period[q]["td_alpha"]
++        leg_alphas[f"FG_Q{q}"] = period[q]["fg_alpha"]
++    thetas: dict[str, float] = {}
++    theta_scores: dict[str, Any] = {}
++    for leg in ("TD", "FG", "TD_Q1", "TD_Q2", "TD_Q3", "TD_Q4",
++                "FG_Q1", "FG_Q2", "FG_Q3", "FG_Q4"):
++        theta, scores = select_theta_for_leg(
++            train_rows, leg, config, mean_alpha=leg_alphas[leg])
++        thetas[leg] = float(theta)
++        theta_scores[leg] = scores
++    rare_prior, rare_scores = select_rare_prior(train_rows, config)
++    return {
++        "config": config,
++        "td_model": td_model, "td_alpha": float(td_alpha), "td_cv_scores": td_cv,
++        "fg_opportunity_model": fg_model, "fg_alpha": float(fg_alpha),
++        "fg_cv_scores": fg_cv,
++        "period": period,
++        "thetas": thetas, "theta_cv_scores": theta_scores,
++        "rare_prior": rare_prior, "rare_cv_scores": rare_scores,
++        "train_game_ids": sorted({str(r["game_id"]) for r in train_rows}),
++        "train_row_count": len(train_rows),
++    }
++
++
++def fold_rare_rates(
++    bundle: Mapping[str, Any],
++    train_rows: Sequence[Mapping[str, Any]],
++    eval_rows: Sequence[Mapping[str, Any]],
++    *,
++    def_field: str = "def_st_touchdowns",
++    saf_field: str = "safeties",
++) -> tuple[list[tuple[float, float]], list[tuple[float, float]]]:
++    """(eval_rates, train_rates) under the fold's selected prior, aligned
++    with the input row order. LEAGUE_ONLY reduces to the training-window
++    league-rate construction itself (the G-RARE baseline construction), so
++    the comparison passes by equality when CV selects it (section 2.4)."""
++    prior = bundle["rare_prior"]
++    if prior == "LEAGUE_ONLY":
++        const = league_rare_rates(train_rows, def_field=def_field, saf_field=saf_field)
++        return [const] * len(eval_rows), [const] * len(train_rows)
++    train_rates = pit_eb_rates((), train_rows, prior=float(prior),
++                               def_field=def_field, saf_field=saf_field)
++    eval_rates = pit_eb_rates(train_rows, eval_rows, prior=float(prior),
++                              def_field=def_field, saf_field=saf_field)
++    return eval_rates, train_rates
++
++
++def select_sigma_oof_v2(
++    rows: Sequence[Mapping[str, Any]],
++    fold_bundles: Mapping[int, Mapping[str, Any]],
++    *,
++    validation_seasons: Sequence[int] = VALIDATION_SEASONS,
++) -> tuple[float, dict[str, Any]]:
++    """Heritage sigma selection (attempt-1 placement and construction):
++    OOF residual product vs lognormal-implied covariance, using each fold's
++    fitted models on that fold's validation rows; ties to the smaller sigma.
++    Under C2 the same selection operates over the NB marginals (the mean
++    construction is unchanged).
++
++    SUPERSEDED for attempt 2 by Amendment 2 (owner ruling, Oct 13 2026;
++    preregistration section 6 governs): this pooled-across-validation-folds
++    placement reads validation rows and is retained only as attempt 1's
++    historical construction. The attempt-2 evaluation driver uses
++    select_sigma_nested_v2, which reads training rows only."""
++    residual_rows: list[dict[str, float]] = []
++    for season in validation_seasons:
++        bundle = fold_bundles[season]
++        config: ModelFormConfig = bundle["config"]
++        valid = [r for r in rows if int(r["season"]) == season]
++        for gid, (home, away) in sorted(game_pairs(valid).items()):
++            h_mu = heritage_predict_mean(bundle["td_model"], home) + banded_made_fg_mean(
++                bundle["fg_opportunity_model"], home, config)
++            a_mu = heritage_predict_mean(bundle["td_model"], away) + banded_made_fg_mean(
++                bundle["fg_opportunity_model"], away, config)
++            h_obs = float(home["offense_touchdowns"]) + float(home["made_field_goals"])
++            a_obs = float(away["offense_touchdowns"]) + float(away["made_field_goals"])
++            residual_rows.append({
++                "home_mu": h_mu, "away_mu": a_mu,
++                "residual_product": (h_obs - h_mu) * (a_obs - a_mu),
++            })
++    mse: dict[float, float] = {}
++    for sigma in SIGMA_GRID:
++        implied_factor = exp(float(sigma) ** 2) - 1.0
++        errors = [
++            (r["residual_product"] - r["home_mu"] * r["away_mu"] * implied_factor) ** 2
++            for r in residual_rows
++        ]
++        mse[float(sigma)] = float(np.mean(np.asarray(errors, dtype=float)))
++    best = min(mse, key=lambda s: (mse[s], s))
++    return float(best), {
++        "metric": "MSE_RESIDUAL_PRODUCT_VS_LOGNORMAL_IMPLIED_COVARIANCE",
++        "sigma_grid": list(SIGMA_GRID),
++        "mse_by_sigma": {str(k): mse[k] for k in sorted(mse)},
++        "selected_sigma": float(best),
++        "oof_game_count": len(residual_rows),
++    }
++
++
++def select_sigma_nested_v2(
++    train_rows: Sequence[Mapping[str, Any]],
++    bundle: Mapping[str, Any],
++) -> tuple[float, dict[str, Any]]:
++    """Sigma selection under Amendment 2 (preregistration section 2.5 as
++    amended; section 6 governs): nested expanding-window selection INSIDE
++    one outer fold's training window.
++
++    Inner folds: the inner validation season is each training season after
++    the first; inner TD and banded-FG models are refits on the training
++    seasons strictly before the inner validation season, at the outer
++    fold's selected alphas (the section-3 inner-fit convention — every
++    sigma candidate is scored over identical means). The statistic is
++    attempt 1's residual-product MSE in the same form (observed residual
++    product vs mu_h * mu_a * (exp(sigma^2) - 1)), computed on the inner
++    out-of-fold residuals pooled across inner folds; the grid and the
++    tie-break to the smaller sigma are unchanged.
++
++    Validation rows are not an input to this function at all: the only
++    rows it receives are the outer fold's training rows. Inner games whose
++    rows lack band context (ZERO_MODEL_ROW) are excluded from the
++    statistic and counted, per the driver's exclude-and-count policy.
++
++    Fail-closed (Amendment 2 section 2.5): a training window with fewer
++    than two seasons cannot form an inner fold, and a window whose inner
++    folds yield no usable game cannot select — both raise
++    ScoreCountsG2V2Error with a SIGMA_SELECTION_* code, which the
++    evaluation driver converts to a pre-scoring NOT_RUN. There is no
++    fallback to validation data, ever."""
++    config: ModelFormConfig = bundle["config"]
++    train_rows = list(train_rows)
++    seasons = sorted({int(r["season"]) for r in train_rows})
++    if len(seasons) < 2:
++        raise ScoreCountsG2V2Error(
++            "SIGMA_SELECTION_NO_INNER_FOLD: training window seasons "
++            f"{seasons} cannot form an inner fold - fail closed "
++            "(Amendment 2 section 2.5); no validation-data fallback")
++    residual_rows: list[dict[str, float]] = []
++    inner_folds: list[dict[str, Any]] = []
++    excluded_zero_model = 0
++    for inner_season in seasons[1:]:
++        inner_train = [r for r in train_rows if int(r["season"]) < inner_season]
++        inner_valid = [r for r in train_rows if int(r["season"]) == inner_season]
++        td_model = fit_poisson_ridge_v2(
++            inner_train, target="offense_touchdowns",
++            alpha=float(bundle["td_alpha"]), feature_names=FEATURE_NAMES)
++        fg_model = fit_poisson_ridge_v2(
++            inner_train, target="fg_attempts_with_distance",
++            alpha=float(bundle["fg_alpha"]),
++            feature_names=config.opportunity_features)
++        n_games = 0
++        for gid, (home, away) in sorted(game_pairs(inner_valid).items()):
++            if not (row_has_band_context(home, config)
++                    and row_has_band_context(away, config)):
++                excluded_zero_model += 1
++                continue
++            h_mu = heritage_predict_mean(td_model, home) + banded_made_fg_mean(
++                fg_model, home, config)
++            a_mu = heritage_predict_mean(td_model, away) + banded_made_fg_mean(
++                fg_model, away, config)
++            h_obs = float(home["offense_touchdowns"]) + float(home["made_field_goals"])
++            a_obs = float(away["offense_touchdowns"]) + float(away["made_field_goals"])
++            residual_rows.append({
++                "home_mu": h_mu, "away_mu": a_mu,
++                "residual_product": (h_obs - h_mu) * (a_obs - a_mu),
++            })
++            n_games += 1
++        inner_folds.append({
++            "inner_validation_season": inner_season,
++            "inner_training_seasons": [s for s in seasons if s < inner_season],
++            "n_games": n_games,
++        })
++    if not residual_rows:
++        raise ScoreCountsG2V2Error(
++            "SIGMA_SELECTION_NO_INNER_GAMES: inner folds formed but no "
++            "usable inner game - fail closed (Amendment 2 section 2.5); "
++            "no validation-data fallback")
++    mse: dict[float, float] = {}
++    for sigma in SIGMA_GRID:
++        implied_factor = exp(float(sigma) ** 2) - 1.0
++        errors = [
++            (r["residual_product"] - r["home_mu"] * r["away_mu"] * implied_factor) ** 2
++            for r in residual_rows
++        ]
++        mse[float(sigma)] = float(np.mean(np.asarray(errors, dtype=float)))
++    best = min(mse, key=lambda s: (mse[s], s))
++    return float(best), {
++        "metric": "MSE_RESIDUAL_PRODUCT_VS_LOGNORMAL_IMPLIED_COVARIANCE",
++        "selection_rule": "AMENDMENT_2_NESTED_TRAINING_WINDOW_ONLY",
++        "sigma_grid": list(SIGMA_GRID),
++        "mse_by_sigma": {str(k): mse[k] for k in sorted(mse)},
++        "selected_sigma": float(best),
++        "oof_game_count": len(residual_rows),
++        "inner_folds": inner_folds,
++        "inner_games_excluded_zero_model_row": excluded_zero_model,
++    }
++
++
++def fitted_values_digest(bundle: Mapping[str, Any]) -> str:
++    """Canonical digest of every fitted value in a fold bundle (model
++    parameters, alphas, thetas, rare-prior choice, K3 lambdas when present).
++    Used by the leakage-resistance tests: the digest must be bit-identical
++    under any permutation/corruption of evaluation-fold outcomes."""
++    import dataclasses
++    import json as _json
++
++    def _model(m: Any) -> Any:
++        return dataclasses.asdict(m) if dataclasses.is_dataclass(m) else str(m)
++
++    payload = {
++        "td_alpha": bundle["td_alpha"],
++        "fg_alpha": bundle["fg_alpha"],
++        "td_model": _model(bundle["td_model"]),
++        "fg_model": _model(bundle["fg_opportunity_model"]),
++        "period": {
++            str(q): {
++                "td_alpha": bundle["period"][q]["td_alpha"],
++                "fg_alpha": bundle["period"][q]["fg_alpha"],
++                "td_model": _model(bundle["period"][q]["td_model"]),
++                "fg_model": _model(bundle["period"][q]["fg_model"]),
++            } for q in (1, 2, 3, 4)
++        },
++        "thetas": {k: str(v) for k, v in bundle["thetas"].items()},
++        "rare_prior": str(bundle["rare_prior"]),
++        "k3_lambdas": (
++            {str(k): v for k, v in bundle["k3"]["lambdas"].items()}
++            if bundle.get("k3") else None
++        ),
++    }
++    canonical = _json.dumps(payload, sort_keys=True, separators=(",", ":"),
++                            ensure_ascii=True).encode("utf-8")
++    return sha256(canonical).hexdigest()
++
++
++__all__ = [
++    "FAMILY", "ATTEMPT_NUMBER", "ATTEMPT_BUDGET",
++    "ROOT_SEED_LITERAL_V2", "ROOT_SEED_SHA256_V2", "ROOT_SEED_UINT64_V2",
++    "PATHS_PER_GAME", "MIN_PATHS_FOR_SCORED_OUTPUT", "VALIDATION_SEASONS",
++    "DEVELOPMENT_SEASONS", "ALPHA_GRID_V2", "ALPHA_GRID_V1_TRUNCATED",
++    "SIGMA_GRID", "THETA_GRID", "RARE_PRIOR_GRID",
++    "FG_BANDS", "FG_OPPORTUNITY_FEATURES_V1", "FG_OPPORTUNITY_FEATURES_V2",
++    "K3_KEYS", "K3_WINDOWS", "K3_LAMBDA_MAX",
++    "ModelFormConfig", "V2_CONFIG", "V1_COMPAT_CONFIG",
++    "ScoreCountsG2V2Error", "ZeroModelRow",
++    "child_seed_v2", "rng_for_v2", "poisson_deviance", "poisson_logpmf",
++    "fit_poisson_ridge_v2", "predict_mean_v2", "choose_alpha_v2",
++    "BandBook", "band_shares_rates_v2", "band_shares_rates_v1",
++    "band_snapshot_from_row", "band_shares_rates", "row_has_band_context",
++    "banded_made_fg_mean",
++    "banded_made_fg_detail", "build_g2_rows_v2",
++    "league_rare_rates", "pit_eb_rates", "select_rare_prior",
++    "nb_logpmf", "draw_count", "select_theta_cv", "select_theta_for_leg",
++    "period_feature_names", "simulate_full_game_v2", "simulate_period_game_v2",
++    "realized_final_score", "game_pairs", "pmf_counts", "pmf_from_counts",
++    "log_score", "log_score_pmf", "randomized_pit", "joint_distribution_sha256",
++    "margin_law", "estimate_k3_lambdas", "apply_k3", "independent_marginals_pmf",
++    "fit_fold_bundle", "fold_rare_rates", "select_sigma_oof_v2",
++    "select_sigma_nested_v2",
++    "fitted_values_digest",
++]
