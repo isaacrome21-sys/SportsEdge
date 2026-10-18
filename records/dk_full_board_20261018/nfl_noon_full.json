@@ -1,0 +1,1422 @@
+{
+  "sport": "NFL",
+  "capture": "DraftKings full board - noon window (7 games)",
+  "date": "2026-10-18",
+  "pregame_window_ct": "~10:55-11:30 AM CT, Sun Oct 18 2026",
+  "server_clock_note": "server clock ~11:30 CT at final capture",
+  "second_half_lines_note": "2nd-half lines NOT offered pregame on any game",
+  "notation": "(O xxx / U yyy) = over price / under price; TD +A/B/C = Anytime/First/2+ TD prices",
+  "games": {
+    "NYJ@NE": {
+      "matchup": "New York Jets @ New England Patriots",
+      "main_lines": {
+        "captured_ct": "11:18-19 re-verify",
+        "away": {"team": "NYJ", "spread_line": 7.5, "spread_price": -115, "ml": 275},
+        "home": {"team": "NE", "spread_line": -7.5, "spread_price": -105, "ml": -345},
+        "total": {"line": 43.5, "over": -102, "under": -118}
+      },
+      "team_totals": {
+        "captured_ct": "11:15-11:17",
+        "NE": {"line": 25.5, "over": -115, "under": -110},
+        "NYJ": {"line": 16.5, "over": -130, "under": 100}
+      },
+      "first_half": {
+        "spread": {"away_line": 3.5, "away_price": 105, "home_line": -3.5, "home_price": -125},
+        "total": {"line": 21.5, "over": -105, "under": -115},
+        "ml": {"away": 195, "home": -238}
+      },
+      "alt_spread_ladder": {
+        "note": "Endpoints + key rungs as reported (away/home prices); full 1-point rung tables live in the capture report; main line not a row.",
+        "rungs": [
+          {"away_line": -14.5, "away_price": 1280, "home_price": -10000},
+          {"away_line": -7.5, "away_price": 670, "home_price": -1600},
+          {"away_line": -2.5, "away_price": 306, "home_price": -467},
+          {"away_line": -1.5, "away_price": 277, "home_price": -412},
+          {"away_line": 1.5, "away_price": 220, "home_price": -313},
+          {"away_line": 3.5, "away_price": 150, "home_price": -203},
+          {"away_line": 6.5, "away_price": 109, "home_price": -145},
+          {"away_line": 8.5, "away_price": -133, "home_price": 100},
+          {"away_line": 31.5, "away_price": -10000, "home_price": 1260}
+        ]
+      },
+      "alt_total_ladder": {
+        "note": "Endpoints + anchors as reported; full 1-point rung tables live in the capture report; 43.5 main total absent as a rung.",
+        "rungs": [
+          {"total": 22.5, "over": -10000, "under": 1240},
+          {"total": 42.5, "over": -126, "under": -105},
+          {"total": 44.5, "over": 107, "under": -142},
+          {"total": 67.5, "over": 1300, "under": -10000}
+        ]
+      },
+      "player_props": {
+        "captured_ct": "11:07-09",
+        "quarterbacks": "Maye (NE), Geno Smith (NYJ)",
+        "passing": {
+          "pass_yards": [
+            {"player": "Maye", "line": 233.5, "over": -111, "under": -113},
+            {"player": "Geno Smith", "line": 210.5, "over": -111, "under": -113}
+          ],
+          "pass_tds": [
+            {"player": "Maye", "line": 1.5, "over": -145, "under": 113},
+            {"player": "Geno Smith", "line": 0.5, "over": -270, "under": 207}
+          ],
+          "interceptions": [
+            {"player": "Maye", "line": 0.5, "over": 122, "under": -156},
+            {"player": "Geno Smith", "line": 0.5, "over": -119, "under": -107}
+          ],
+          "attempts": [
+            {"player": "Geno Smith", "line": 30.5, "over": -121, "under": -105},
+            {"player": "Maye", "line": 30.5, "over": -113, "under": -113}
+          ],
+          "completions": [
+            {"player": "Geno Smith", "line": 21.5, "over": 102, "under": -130},
+            {"player": "Maye", "line": 19.5, "over": -135, "under": 106}
+          ],
+          "pass_rush_yards": [
+            {"player": "Maye", "line": 264.5, "over": -114, "under": -112},
+            {"player": "Geno Smith", "line": 222.5, "over": -112, "under": -114}
+          ],
+          "longest_completion": [
+            {"player": "Maye", "line": 40.5, "over": -109, "under": -118},
+            {"player": "Geno Smith", "line": 31.5, "over": -116, "under": -111}
+          ]
+        },
+        "receiving_yards": [
+          {"player": "G.Wilson", "line": 72.5, "over": -110, "under": -114},
+          {"player": "A.J.Brown", "line": 51.5, "over": -114, "under": -110},
+          {"player": "Doubs", "line": 30.5, "over": -110, "under": -114},
+          {"player": "H.Henry", "line": 25.5, "over": -116, "under": -108},
+          {"player": "Douglas", "line": 20.5, "over": -115, "under": -109},
+          {"player": "Sadiq", "line": 20.5, "over": -112, "under": -112},
+          {"player": "Stevenson", "line": 20.5, "over": -110, "under": -114},
+          {"player": "Patrick", "line": 15.5, "over": -117, "under": -108},
+          {"player": "B.Allen", "line": 14.5, "over": -117, "under": -107},
+          {"player": "Cooper", "line": 14.5, "over": -116, "under": -108},
+          {"player": "M.Taylor", "line": 13.5, "over": -115, "under": -109},
+          {"player": "Raridon", "line": 13.5, "over": -114, "under": -110},
+          {"player": "Henderson", "line": 5.5, "over": -115, "under": -109}
+        ],
+        "receptions": [
+          {"player": "G.Wilson", "line": 6.5, "over": 116, "under": -149},
+          {"player": "A.J.Brown", "line": 3.5, "over": -145, "under": 114},
+          {"player": "Stevenson", "line": 3.5, "over": 140, "under": -179},
+          {"player": "H.Henry", "line": 2.5, "over": -127, "under": 100},
+          {"player": "B.Allen", "line": 2.5, "over": -121, "under": -105},
+          {"player": "Doubs", "line": 2.5, "over": -111, "under": -115},
+          {"player": "Sadiq", "line": 2.5, "over": 119, "under": -153},
+          {"player": "Douglas", "line": 1.5, "over": -185, "under": 144},
+          {"player": "M.Taylor", "line": 1.5, "over": -153, "under": 120},
+          {"player": "Patrick", "line": 1.5, "over": -108, "under": -118},
+          {"player": "Cooper", "line": 1.5, "over": -107, "under": -119},
+          {"player": "Raridon", "line": 1.5, "over": 102, "under": -131},
+          {"player": "Henderson", "line": 1.5, "over": 171, "under": -221}
+        ],
+        "longest_reception": [
+          {"player": "G.Wilson", "line": 22.5, "over": -111, "under": -117},
+          {"player": "A.J.Brown", "line": 21.5, "over": -119, "under": -109},
+          {"player": "Doubs", "line": 17.5, "over": -108, "under": -120},
+          {"player": "Douglas", "line": 13.5, "over": -121, "under": -107},
+          {"player": "H.Henry", "line": 13.5, "over": -109, "under": -119},
+          {"player": "Raridon", "line": 12.5, "over": -120, "under": -108},
+          {"player": "Patrick", "line": 12.5, "over": -114, "under": -113},
+          {"player": "Sadiq", "line": 12.5, "over": -112, "under": -116},
+          {"player": "Cooper", "line": 11.5, "over": -117, "under": -111},
+          {"player": "Stevenson", "line": 10.5, "over": -120, "under": -108},
+          {"player": "M.Taylor", "line": 9.5, "over": -115, "under": -113},
+          {"player": "B.Allen", "line": 8.5, "over": -107, "under": -121}
+        ],
+        "rushing_yards": [
+          {"player": "B.Allen", "line": 65.5, "over": -115, "under": -109},
+          {"player": "Stevenson", "line": 54.5, "over": -115, "under": -109},
+          {"player": "Henderson", "line": 28.5, "over": -110, "under": -114},
+          {"player": "Maye", "line": 27.5, "over": -109, "under": -115},
+          {"player": "Geno Smith", "line": 8.5, "over": -109, "under": -115},
+          {"player": "I.Davis", "line": 6.5, "over": -101, "under": -124}
+        ],
+        "rushing_attempts": [
+          {"player": "B.Allen", "line": 16.5, "over": -115, "under": -111},
+          {"player": "Stevenson", "line": 14.5, "over": -105, "under": -122},
+          {"player": "Henderson", "line": 7.5, "over": -102, "under": -125},
+          {"player": "Maye", "line": 5.5, "over": -127, "under": 100}
+        ],
+        "rush_rec_yards": [
+          {"player": "B.Allen", "line": 85.5, "over": -114, "under": -112},
+          {"player": "Stevenson", "line": 80.5, "over": -111, "under": -114},
+          {"player": "Henderson", "line": 38.5, "over": -114, "under": -112}
+        ],
+        "longest_rush": [
+          {"player": "B.Allen", "line": 14.5, "over": -116, "under": -112},
+          {"player": "Maye", "line": 12.5, "over": -120, "under": -108},
+          {"player": "Stevenson", "line": 12.5, "over": -113, "under": -114},
+          {"player": "Henderson", "line": 10.5, "over": -115, "under": -113},
+          {"player": "Geno Smith", "line": 6.5, "over": -105, "under": -123}
+        ],
+        "td_scorers": [
+          {"player": "Stevenson", "anytime": -110, "first": 475, "two_plus": 550},
+          {"player": "B.Allen", "anytime": 140, "first": 800, "two_plus": 1000},
+          {"player": "A.J.Brown", "anytime": 150, "first": 750, "two_plus": 1100},
+          {"player": "G.Wilson", "anytime": 225, "first": 1400, "two_plus": 2000},
+          {"player": "H.Henry", "anytime": 265, "first": 1200, "two_plus": 2500},
+          {"player": "Doubs", "anytime": 265, "first": 1200, "two_plus": 2500},
+          {"player": "Henderson", "anytime": 300, "first": 1400, "two_plus": 2800},
+          {"player": "Maye", "anytime": 330, "first": 1500, "two_plus": 3500},
+          {"player": "Douglas", "anytime": 450, "first": 2200, "two_plus": 5500},
+          {"player": "Raridon", "anytime": 450, "first": 2000, "two_plus": 5000},
+          {"player": "NE D/ST", "anytime": 475, "first": 2200, "two_plus": 4500},
+          {"player": "Sadiq", "anytime": 500, "first": 3000, "two_plus": 6000},
+          {"player": "NYJ D/ST", "anytime": 600, "first": 2500, "two_plus": 6000},
+          {"player": "Chism", "anytime": 600, "first": 2800, "two_plus": 7500},
+          {"player": "Cooper", "anytime": 600, "first": 3500, "two_plus": 8000},
+          {"player": "M.Taylor", "anytime": 800, "first": 4000, "two_plus": 10000},
+          {"player": "Patrick", "anytime": 800, "first": 4000, "two_plus": 11000},
+          {"player": "I.Davis", "anytime": 850, "first": 3500, "two_plus": 10000},
+          {"player": "K.Williams", "anytime": 1000, "first": 4000, "two_plus": 11000},
+          {"player": "I.Williams", "anytime": 1200, "first": 5500, "two_plus": 14000},
+          {"player": "G.Smith", "anytime": 1200, "first": 5500, "two_plus": 15000},
+          {"player": "Kiner", "anytime": 1500, "first": 7000, "two_plus": 16000},
+          {"player": "Ruckert", "anytime": 2000, "first": 9000, "two_plus": 20000},
+          {"player": "Latu", "anytime": 2800, "first": 10000, "two_plus": 20000},
+          {"player": "Nwangwu", "anytime": 2800, "first": 8000, "two_plus": 20000},
+          {"player": "Beck", "anytime": 3000, "first": 12000, "two_plus": 25000},
+          {"player": "Woods", "anytime": 3500, "first": 13000, "two_plus": 25000},
+          {"player": "McClain", "anytime": 4500, "first": 15000, "two_plus": 25000},
+          {"player": "No TD", "anytime": 9000, "first": null, "two_plus": null}
+        ]
+      },
+      "defense_special_teams": {
+        "captured_ct": "11:28-29",
+        "sacks": [
+          {"player": "David Bailey", "one_plus": -135, "two_plus": 361, "three_plus": 1260},
+          {"player": "Will McDonald IV", "one_plus": 113, "two_plus": 600, "three_plus": null},
+          {"player": "Elijah Ponder", "one_plus": 141, "two_plus": 780, "three_plus": null},
+          {"player": "Jowon Briggs", "one_plus": 181, "two_plus": 1040, "three_plus": null},
+          {"player": "Kingsley Enagbare", "one_plus": 185, "two_plus": 1060, "three_plus": null},
+          {"player": "Christian Barmore", "one_plus": 197, "two_plus": 1180, "three_plus": null},
+          {"player": "Gabe Jacas", "one_plus": 222, "two_plus": 1320, "three_plus": null},
+          {"player": "Dre'Mont Jones", "one_plus": 242, "two_plus": 1500, "three_plus": null},
+          {"player": "Robert Spillane", "one_plus": 362, "two_plus": null, "three_plus": null},
+          {"player": "Jamien Sherwood", "one_plus": 374, "two_plus": null, "three_plus": null},
+          {"player": "Milton Williams", "one_plus": 420, "two_plus": null, "three_plus": null},
+          {"player": "T'Vondre Sweat", "one_plus": 492, "two_plus": null, "three_plus": null},
+          {"player": "Harrison Phillips", "one_plus": 579, "two_plus": null, "three_plus": null}
+        ],
+        "tackles_assists": [
+          {"player": "Demario Davis", "line": 7.5, "over": -132, "under": 102},
+          {"player": "Jamien Sherwood", "line": 7.5, "over": -128, "under": -101},
+          {"player": "Minkah Fitzpatrick", "line": 5.5, "over": -121, "under": -107},
+          {"player": "David Bailey", "line": 4.5, "over": -101, "under": -128},
+          {"player": "Azareye'h Thomas", "line": 4.5, "over": 100, "under": -130},
+          {"player": "Jarvis Brownlee Jr.", "line": 3.5, "over": -164, "under": 126},
+          {"player": "Brandon Stephens", "line": 3.5, "over": -117, "under": -111}
+        ],
+        "fg_made": [
+          {"kicker": "Andres Borregales", "one_plus": -700, "two_plus": -138, "three_plus": 248, "four_plus": 780, "five_plus": null},
+          {"kicker": "Jason Sanders", "one_plus": -495, "two_plus": -102, "three_plus": 332, "four_plus": 1080, "five_plus": null}
+        ],
+        "game_specials": [
+          {"description": "Each team 1+ rush & 1+ pass TD", "price": 340},
+          {"description": "1+ FG each quarter", "price": 425},
+          {"description": "Each team score all 4 quarters", "price": 950},
+          {"description": "Each team 1+ TD & 1+ FG each half", "price": 1500},
+          {"description": "Each team 2+ rush & 2+ pass TDs", "price": 8000},
+          {"description": "Each team 1+ TD each quarter", "price": 10000},
+          {"description": "2+ FGs each quarter", "price": 20000},
+          {"description": "Each team 1+ rush & 1+ pass TD each half", "price": 35000}
+        ]
+      }
+    },
+    "CAR@PHI": {
+      "matchup": "Carolina Panthers @ Philadelphia Eagles",
+      "main_lines": {
+        "captured_ct": "11:18-19 re-verify",
+        "away": {"team": "CAR", "spread_line": -3, "spread_price": -112, "ml": -162},
+        "home": {"team": "PHI", "spread_line": 3, "spread_price": -108, "ml": 136},
+        "total": {"line": 39.5, "over": -112, "under": -108}
+      },
+      "team_totals": {
+        "captured_ct": "11:15-11:17",
+        "CAR": {"line": 20.5, "over": -115, "under": -115},
+        "PHI": {"line": 17.5, "over": -115, "under": -110}
+      },
+      "first_half": {
+        "spread": {"away_line": -2.5, "away_price": -110, "home_line": 2.5, "home_price": -110},
+        "total": {"line": 19.5, "over": -115, "under": -105},
+        "ml": {"away": -155, "home": 130}
+      },
+      "alt_spread_ladder": {
+        "note": "Endpoints + key rungs as reported (away/home prices); full 1-point rung tables live in the capture report; main line not a row.",
+        "rungs": [
+          {"away_line": -26.5, "away_price": 1240, "home_price": -10000},
+          {"away_line": -7.5, "away_price": 177, "home_price": -244},
+          {"away_line": -3.5, "away_price": 100, "home_price": -132},
+          {"away_line": -2.5, "away_price": -137, "home_price": 103},
+          {"away_line": 1.5, "away_price": -196, "home_price": 145},
+          {"away_line": 3.5, "away_price": -295, "home_price": 209},
+          {"away_line": 20.5, "away_price": -10000, "home_price": 1300}
+        ]
+      },
+      "alt_total_ladder": {
+        "note": "Endpoints + anchors as reported; full 1-point rung tables live in the capture report.",
+        "rungs": [
+          {"total": 19.5, "over": -10000, "under": 1300},
+          {"total": 38.5, "over": -126, "under": -105},
+          {"total": 40.5, "over": 105, "under": -140},
+          {"total": 61.5, "over": 1280, "under": -10000}
+        ]
+      },
+      "player_props": {
+        "captured_ct": "11:05-07",
+        "quarterbacks": "B.Young (CAR), McKee (PHI)",
+        "passing": {
+          "pass_yards": [
+            {"player": "B.Young", "line": 234.5, "over": -113, "under": -111},
+            {"player": "McKee", "line": 201.5, "over": -112, "under": -112}
+          ],
+          "pass_tds": [
+            {"player": "B.Young", "line": 1.5, "over": 132, "under": -169},
+            {"player": "McKee", "line": 0.5, "over": -258, "under": 198}
+          ],
+          "interceptions": [
+            {"player": "B.Young", "line": 0.5, "over": -120, "under": -106},
+            {"player": "McKee", "line": 0.5, "over": -150, "under": 118}
+          ],
+          "attempts": [
+            {"player": "B.Young", "line": 34.5, "over": -116, "under": -110},
+            {"player": "McKee", "line": 31.5, "over": -123, "under": -103}
+          ],
+          "completions": [
+            {"player": "B.Young", "line": 20.5, "over": -132, "under": 104},
+            {"player": "McKee", "line": 19.5, "over": 105, "under": -134}
+          ],
+          "pass_rush_yards": [
+            {"player": "B.Young", "line": 248.5, "over": -113, "under": -113},
+            {"player": "McKee", "line": 210.5, "over": -114, "under": -112}
+          ],
+          "longest_completion": [
+            {"player": "B.Young", "line": 36.5, "over": -118, "under": -110},
+            {"player": "McKee", "line": 31.5, "over": -118, "under": -110}
+          ]
+        },
+        "receiving_yards": [
+          {"player": "McMillan", "line": 65.5, "over": -111, "under": -113},
+          {"player": "Coker", "line": 57.5, "over": -110, "under": -114},
+          {"player": "D.Smith", "line": 55.5, "over": -115, "under": -109},
+          {"player": "Goedert", "line": 36.5, "over": -109, "under": -115},
+          {"player": "Wicks", "line": 28.5, "over": -115, "under": -109},
+          {"player": "Waller", "line": 24.5, "over": -112, "under": -112},
+          {"player": "Lemon", "line": 20.5, "over": -108, "under": -116},
+          {"player": "Hubbard", "line": 15.5, "over": -116, "under": -108},
+          {"player": "Tremayne", "line": 13.5, "over": -113, "under": -111},
+          {"player": "Tremble", "line": 12.5, "over": -106, "under": -118},
+          {"player": "Pierce", "line": 8.5, "over": -119, "under": -105}
+        ],
+        "receptions": [
+          {"player": "McMillan", "line": 5.5, "over": 115, "under": -147},
+          {"player": "Coker", "line": 4.5, "over": -149, "under": 116},
+          {"player": "D.Smith", "line": 4.5, "over": -147, "under": 115},
+          {"player": "Goedert", "line": 3.5, "over": -167, "under": 130},
+          {"player": "Waller", "line": 2.5, "over": -142, "under": 112},
+          {"player": "Wicks", "line": 2.5, "over": -130, "under": 102},
+          {"player": "Hubbard", "line": 2.5, "over": -114, "under": -112},
+          {"player": "Lemon", "line": 2.5, "over": 114, "under": -145},
+          {"player": "Tremble", "line": 1.5, "over": -149, "under": 117},
+          {"player": "Pierce", "line": 1.5, "over": -132, "under": 103},
+          {"player": "Tremayne", "line": 1.5, "over": 104, "under": -133}
+        ],
+        "longest_reception": [
+          {"player": "McMillan", "line": 23.5, "over": -112, "under": -115},
+          {"player": "Coker", "line": 21.5, "over": -104, "under": -125},
+          {"player": "D.Smith", "line": 20.5, "over": -116, "under": -111},
+          {"player": "Wicks", "line": 16.5, "over": -113, "under": -115},
+          {"player": "Goedert", "line": 15.5, "over": -120, "under": -108},
+          {"player": "Waller", "line": 13.5, "over": -101, "under": -128},
+          {"player": "Lemon", "line": 12.5, "over": -111, "under": -116},
+          {"player": "Tremayne", "line": 11.5, "over": -106, "under": -122},
+          {"player": "Hubbard", "line": 8.5, "over": -133, "under": 103},
+          {"player": "Pierce", "line": 8.5, "over": -108, "under": -119}
+        ],
+        "rushing_yards": [
+          {"player": "Hubbard", "line": 71.5, "over": -110, "under": -114},
+          {"player": "Pierce", "line": 51.5, "over": -111, "under": -113},
+          {"player": "Blue", "line": 17.5, "over": -108, "under": -116},
+          {"player": "B.Young", "line": 9.5, "over": -118, "under": -106},
+          {"player": "McKee", "line": 6.5, "over": -110, "under": -114}
+        ],
+        "rushing_attempts": [
+          {"player": "Hubbard", "line": 18.5, "over": -102, "under": -125},
+          {"player": "Pierce", "line": 14.5, "over": -103, "under": -123}
+        ],
+        "rush_rec_yards": [
+          {"player": "Hubbard", "line": 91.5, "over": -111, "under": -115},
+          {"player": "Pierce", "line": 64.5, "over": -113, "under": -112}
+        ],
+        "longest_rush": [
+          {"player": "Hubbard", "line": 14.5, "over": -117, "under": -110},
+          {"player": "Pierce", "line": 13.5, "over": -102, "under": -127},
+          {"player": "B.Young", "line": 7.5, "over": -122, "under": -106}
+        ],
+        "td_scorers": [
+          {"player": "Hubbard", "anytime": -115, "first": 425, "two_plus": 500},
+          {"player": "Pierce", "anytime": 155, "first": 700, "two_plus": 1100},
+          {"player": "McMillan", "anytime": 200, "first": 900, "two_plus": 1700},
+          {"player": "D.Smith", "anytime": 250, "first": 1200, "two_plus": 2200},
+          {"player": "Coker", "anytime": 255, "first": 1100, "two_plus": 2200},
+          {"player": "Goedert", "anytime": 275, "first": 1300, "two_plus": 2800},
+          {"player": "Waller", "anytime": 350, "first": 1500, "two_plus": 3500},
+          {"player": "Wicks", "anytime": 475, "first": 2000, "two_plus": 6000},
+          {"player": "Blue", "anytime": 475, "first": 2000, "two_plus": 6500},
+          {"player": "B.Young", "anytime": 500, "first": 2000, "two_plus": 6500},
+          {"player": "PHI D/ST", "anytime": 550, "first": 2200, "two_plus": 5000},
+          {"player": "CAR D/ST", "anytime": 550, "first": 2500, "two_plus": 5500},
+          {"player": "Lemon", "anytime": 650, "first": 2800, "two_plus": 7500},
+          {"player": "Tremble", "anytime": 800, "first": 3000, "two_plus": 9000},
+          {"player": "Metchie", "anytime": 850, "first": 3000, "two_plus": 10000},
+          {"player": "McKee", "anytime": 950, "first": 3500, "two_plus": 11000},
+          {"player": "Tremayne", "anytime": 1000, "first": 3500, "two_plus": 13000},
+          {"player": "Evans", "anytime": 1100, "first": 4000, "two_plus": 14000},
+          {"player": "D.Cooper", "anytime": 1200, "first": 4500, "two_plus": 13000},
+          {"player": "Tyus", "anytime": 1200, "first": 4500, "two_plus": 14000},
+          {"player": "Mundt", "anytime": 1400, "first": 5000, "two_plus": 19000},
+          {"player": "Etienne", "anytime": 1500, "first": 4500, "two_plus": 16000},
+          {"player": "Steele", "anytime": 1700, "first": 6000, "two_plus": 18000},
+          {"player": "D.Moore", "anytime": 1900, "first": 6500, "two_plus": 20000},
+          {"player": "Jenkins", "anytime": 2500, "first": 8000, "two_plus": 20000},
+          {"player": "Covey", "anytime": 2500, "first": 9000, "two_plus": 20000},
+          {"player": "Franks", "anytime": 3000, "first": 10000, "two_plus": 25000},
+          {"player": "E.Moore", "anytime": 3500, "first": 11000, "two_plus": 25000},
+          {"player": "No TD", "anytime": 6000, "first": null, "two_plus": null}
+        ]
+      },
+      "defense_special_teams": {
+        "captured_ct": "11:26-28",
+        "sacks": [
+          {"player": "Nolan Smith", "one_plus": 151, "two_plus": 830, "three_plus": null},
+          {"player": "Jaelan Phillips", "one_plus": 185, "two_plus": 1060, "three_plus": null},
+          {"player": "Jalen Carter", "one_plus": 192, "two_plus": 1080, "three_plus": null},
+          {"player": "Princely Umanmielen", "one_plus": 234, "two_plus": 1400, "three_plus": null},
+          {"player": "Patrick Jones II", "one_plus": 363, "two_plus": null, "three_plus": null},
+          {"player": "Jordan Davis", "one_plus": 378, "two_plus": null, "three_plus": null},
+          {"player": "Moro Ojomo", "one_plus": 387, "two_plus": null, "three_plus": null},
+          {"player": "Arnold Ebiketie", "one_plus": 399, "two_plus": null, "three_plus": null},
+          {"player": "Derrick Brown", "one_plus": 445, "two_plus": null, "three_plus": null}
+        ],
+        "tackles_assists": [
+          {"player": "Zack Baun", "line": 8.5, "over": 109, "under": -141},
+          {"player": "Devin Lloyd", "line": 7.5, "over": -118, "under": -110},
+          {"player": "Bobby Okereke", "line": 7.5, "over": 109, "under": -141},
+          {"player": "Cooper DeJean", "line": 5.5, "over": -102, "under": -127},
+          {"player": "Trevon Moehrig", "line": 5.5, "over": 110, "under": -142},
+          {"player": "Nick Scott", "line": 4.5, "over": -156, "under": 120},
+          {"player": "Andrew Mukuba", "line": 4.5, "over": -135, "under": 104},
+          {"player": "Will Lee III", "line": 4.5, "over": 105, "under": -136},
+          {"player": "Quinyon Mitchell", "line": 4.5, "over": 125, "under": -163},
+          {"player": "Tariq Woolen", "line": 3.5, "over": -147, "under": 114},
+          {"player": "Jalen Carter", "line": 2.5, "over": -146, "under": 113}
+        ],
+        "fg_made": [
+          {"kicker": "Ryan Fitzgerald", "one_plus": -537, "two_plus": -111, "three_plus": 321, "four_plus": 1040, "five_plus": null},
+          {"kicker": "Jake Elliott", "one_plus": -413, "two_plus": 116, "three_plus": 398, "four_plus": null, "five_plus": null, "note": "4+ NOT OFFERED"}
+        ],
+        "game_specials": [
+          {"description": "1+ FG each quarter", "price": 390},
+          {"description": "Each team 1+ rush & 1+ pass TD", "price": 425},
+          {"description": "Each team score all 4 quarters", "price": 1300},
+          {"description": "Each team 1+ TD & 1+ FG each half", "price": 1800},
+          {"description": "Each team 2+ rush & 2+ pass TDs", "price": 10000},
+          {"description": "2+ FGs each quarter", "price": 15000},
+          {"description": "Each team 1+ TD each quarter", "price": 17000}
+        ]
+      }
+    },
+    "TEN@IND": {
+      "matchup": "Tennessee Titans @ Indianapolis Colts",
+      "main_lines": {
+        "captured_ct": "11:18-19 re-verify",
+        "away": {"team": "TEN", "spread_line": 6.5, "spread_price": -115, "ml": 235},
+        "home": {"team": "IND", "spread_line": -6.5, "spread_price": -105, "ml": -290},
+        "total": {"line": 43.5, "over": -112, "under": -108}
+      },
+      "team_totals": {
+        "captured_ct": "11:15-11:17",
+        "IND": {"line": 24.5, "over": -120, "under": -110},
+        "TEN": {"line": 18.5, "over": -115, "under": -115}
+      },
+      "first_half": {
+        "spread": {"away_line": 3.5, "away_price": -105, "home_line": -3.5, "home_price": -115},
+        "total": {"line": 21.5, "over": -108, "under": -112},
+        "ml": {"away": 190, "home": -230}
+      },
+      "alt_spread_ladder": {
+        "note": "Endpoints + key rungs as reported (away/home prices); full 1-point rung tables live in the capture report; main line not a row.",
+        "rungs": [
+          {"away_line": -14.5, "away_price": 1260, "home_price": -10000},
+          {"away_line": -7.5, "away_price": 640, "home_price": -1420},
+          {"away_line": -3.5, "away_price": 368, "home_price": -594},
+          {"away_line": 1.5, "away_price": 189, "home_price": -263},
+          {"away_line": 3.5, "away_price": 121, "home_price": -161},
+          {"away_line": 7.5, "away_price": -151, "home_price": 113},
+          {"away_line": 29.5, "away_price": -10000, "home_price": 1260}
+        ]
+      },
+      "alt_total_ladder": {
+        "note": "Endpoints + anchors as reported; full 1-point rung tables live in the capture report.",
+        "rungs": [
+          {"total": 23.5, "over": -10000, "under": 1200},
+          {"total": 42.5, "over": -140, "under": 105},
+          {"total": 44.5, "over": -102, "under": -130},
+          {"total": 66.5, "over": 1220, "under": -10000}
+        ]
+      },
+      "player_props": {
+        "captured_ct": "11:09-10",
+        "quarterbacks": "D.Jones (IND), C.Ward (TEN)",
+        "passing": {
+          "pass_yards": [
+            {"player": "D.Jones", "line": 225.5, "over": -111, "under": -113},
+            {"player": "C.Ward", "line": 203.5, "over": -112, "under": -112}
+          ],
+          "pass_tds": [
+            {"player": "D.Jones", "line": 1.5, "over": 113, "under": -145},
+            {"player": "C.Ward", "line": 0.5, "over": -252, "under": 194}
+          ],
+          "interceptions": [
+            {"player": "D.Jones", "line": 0.5, "over": 102, "under": -129},
+            {"player": "C.Ward", "line": 0.5, "over": -115, "under": -111}
+          ],
+          "attempts": [
+            {"player": "C.Ward", "line": 31.5, "over": -123, "under": -104},
+            {"player": "D.Jones", "line": 30.5, "over": -118, "under": -108}
+          ],
+          "completions": [
+            {"player": "D.Jones", "line": 20.5, "over": -111, "under": -115},
+            {"player": "C.Ward", "line": 19.5, "over": -126, "under": -101}
+          ],
+          "pass_rush_yards": [
+            {"player": "D.Jones", "line": 235.5, "over": -111, "under": -114},
+            {"player": "C.Ward", "line": 219.5, "over": -112, "under": -113}
+          ],
+          "longest_completion": [
+            {"player": "D.Jones", "line": 33.5, "over": -116, "under": -112},
+            {"player": "C.Ward", "line": 32.5, "over": -120, "under": -108}
+          ]
+        },
+        "receiving_yards": [
+          {"player": "Downs", "line": 53.5, "over": -112, "under": -112},
+          {"player": "Tate", "line": 49.5, "over": -114, "under": -110},
+          {"player": "K.Allen", "line": 48.5, "over": -112, "under": -112},
+          {"player": "W.Robinson", "line": 40.5, "over": -110, "under": -114},
+          {"player": "Treadwell", "line": 26.5, "over": -113, "under": -111},
+          {"player": "J.Taylor", "line": 19.5, "over": -107, "under": -117},
+          {"player": "Helm", "line": 15.5, "over": -111, "under": -113},
+          {"player": "Ayomanor", "line": 15.5, "over": -110, "under": -114},
+          {"player": "Spears", "line": 13.5, "over": -117, "under": -107},
+          {"player": "Alie-Cox", "line": 13.5, "over": -114, "under": -110},
+          {"player": "Ridley", "line": 13.5, "over": -109, "under": -115},
+          {"player": "Pollard", "line": 8.5, "over": -118, "under": -106},
+          {"player": "Ogletree", "line": 8.5, "over": -107, "under": -118}
+        ],
+        "receptions": [
+          {"player": "Downs", "line": 4.5, "over": -147, "under": 116},
+          {"player": "K.Allen", "line": 4.5, "over": -137, "under": 108},
+          {"player": "W.Robinson", "line": 4.5, "over": -104, "under": -122},
+          {"player": "Tate", "line": 4.5, "over": 107, "under": -137},
+          {"player": "J.Taylor", "line": 2.5, "over": -149, "under": 116},
+          {"player": "Treadwell", "line": 2.5, "over": 107, "under": -136},
+          {"player": "Spears", "line": 2.5, "over": 112, "under": -143},
+          {"player": "Helm", "line": 2.5, "over": 136, "under": -174},
+          {"player": "Alie-Cox", "line": 1.5, "over": -174, "under": 136},
+          {"player": "Pollard", "line": 1.5, "over": -127, "under": -101},
+          {"player": "Ogletree", "line": 1.5, "over": 121, "under": -154},
+          {"player": "Ayomanor", "line": 1.5, "over": 123, "under": -157},
+          {"player": "Ridley", "line": 1.5, "over": 133, "under": -171}
+        ],
+        "longest_reception": [
+          {"player": "Downs", "line": 20.5, "over": -104, "under": -124},
+          {"player": "Tate", "line": 19.5, "over": -111, "under": -117},
+          {"player": "K.Allen", "line": 18.5, "over": -116, "under": -112},
+          {"player": "W.Robinson", "line": 16.5, "over": -119, "under": -109},
+          {"player": "Treadwell", "line": 16.5, "over": -114, "under": -113},
+          {"player": "Ayomanor", "line": 12.5, "over": -120, "under": -108},
+          {"player": "J.Taylor", "line": 10.5, "over": -107, "under": -121},
+          {"player": "Helm", "line": 9.5, "over": -117, "under": -110},
+          {"player": "Ridley", "line": 9.5, "over": -110, "under": -117},
+          {"player": "Spears", "line": 8.5, "over": -111, "under": -116},
+          {"player": "Pollard", "line": 7.5, "over": -129, "under": 100}
+        ],
+        "rushing_yards": [
+          {"player": "J.Taylor", "line": 89.5, "over": -111, "under": -113},
+          {"player": "Pollard", "line": 57.5, "over": -113, "under": -111},
+          {"player": "McGowan", "line": 14.5, "over": -110, "under": -114},
+          {"player": "Spears", "line": 13.5, "over": -115, "under": -110},
+          {"player": "C.Ward", "line": 13.5, "over": -108, "under": -117},
+          {"player": "D.Jones", "line": 6.5, "over": -122, "under": -103}
+        ],
+        "rushing_attempts": [
+          {"player": "J.Taylor", "line": 19.5, "over": -123, "under": -104},
+          {"player": "Pollard", "line": 14.5, "over": -130, "under": 102}
+        ],
+        "rush_rec_yards": [
+          {"player": "J.Taylor", "line": 112.5, "over": -113, "under": -112},
+          {"player": "Pollard", "line": 70.5, "over": -116, "under": -110},
+          {"player": "Spears", "line": 31.5, "over": -113, "under": -113}
+        ],
+        "longest_rush": [
+          {"player": "J.Taylor", "line": 17.5, "over": -122, "under": -106},
+          {"player": "Pollard", "line": 13.5, "over": -117, "under": -111},
+          {"player": "C.Ward", "line": 8.5, "over": -102, "under": -127},
+          {"player": "D.Jones", "line": 5.5, "over": -125, "under": -104}
+        ],
+        "td_scorers_captured_ct": "11:14",
+        "td_scorers": [
+          {"player": "J.Taylor", "anytime": -260, "first": 255, "two_plus": 210},
+          {"player": "Pollard", "anytime": 155, "first": 850, "two_plus": 1200},
+          {"player": "Downs", "anytime": 185, "first": 900, "two_plus": 1500},
+          {"player": "K.Allen", "anytime": 220, "first": 1000, "two_plus": 2000},
+          {"player": "Tate", "anytime": 300, "first": 1900, "two_plus": 3000},
+          {"player": "Alie-Cox", "anytime": 400, "first": 1700, "two_plus": 4500},
+          {"player": "W.Robinson", "anytime": 425, "first": 2500, "two_plus": 5000},
+          {"player": "C.Ward", "anytime": 475, "first": 2500, "two_plus": 5500},
+          {"player": "D.Jones", "anytime": 500, "first": 2200, "two_plus": 5500},
+          {"player": "Treadwell", "anytime": 500, "first": 2200, "two_plus": 6000},
+          {"player": "IND D/ST", "anytime": 500, "first": 2500, "two_plus": 5000},
+          {"player": "Spears", "anytime": 550, "first": 2800, "two_plus": 6500},
+          {"player": "Ayomanor", "anytime": 600, "first": 3500, "two_plus": 7000},
+          {"player": "Helm", "anytime": 650, "first": 3500, "two_plus": 8000},
+          {"player": "TEN D/ST", "anytime": 650, "first": 2500, "two_plus": 7000},
+          {"player": "McGowan", "anytime": 700, "first": 3500, "two_plus": 9000},
+          {"player": "Ogletree", "anytime": 700, "first": 2800, "two_plus": 8000},
+          {"player": "Ridley", "anytime": 900, "first": 5000, "two_plus": 11000},
+          {"player": "Dike", "anytime": 1000, "first": 5000, "two_plus": 13000},
+          {"player": "Bellinger", "anytime": 1200, "first": 5500, "two_plus": 14000},
+          {"player": "Mallory", "anytime": 1400, "first": 6500, "two_plus": 17000},
+          {"player": "Burks", "anytime": 2000, "first": 7500, "two_plus": 20000},
+          {"player": "Giddens", "anytime": 2500, "first": 8000, "two_plus": null, "note": "2+ NOT OFFERED"},
+          {"player": "Gould", "anytime": 2500, "first": 9000, "two_plus": 20000},
+          {"player": "Chestnut", "anytime": 3500, "first": 11000, "two_plus": 25000},
+          {"player": "Martin-Robinson", "anytime": 3500, "first": 11000, "two_plus": null, "note": "2+ NOT OFFERED"},
+          {"player": "No TD", "anytime": 10000, "first": null, "two_plus": null}
+        ]
+      },
+      "defense_special_teams": {
+        "captured_ct": "11:23-26",
+        "sacks": [
+          {"player": "DeForest Buckner", "one_plus": 144, "two_plus": 770, "three_plus": null},
+          {"player": "Jeffery Simmons", "one_plus": 174, "two_plus": 990, "three_plus": null},
+          {"player": "Laiatu Latu", "one_plus": 212, "two_plus": 1300, "three_plus": null},
+          {"player": "Jacob Martin", "one_plus": 224, "two_plus": 1320, "three_plus": null},
+          {"player": "Jermaine Johnson II", "one_plus": 248, "two_plus": 1500, "three_plus": null},
+          {"player": "John Franklin-Myers", "one_plus": 258, "two_plus": 1680, "three_plus": null},
+          {"player": "Grover Stewart", "one_plus": 550, "two_plus": null, "three_plus": null},
+          {"player": "J.T. Tuimoloau", "one_plus": 556, "two_plus": null, "three_plus": null},
+          {"player": "Jerry Tillery", "one_plus": 584, "two_plus": null, "three_plus": null}
+        ],
+        "tackles_assists": [
+          {"player": "Anthony Hill Jr.", "line": 8.5, "over": 112, "under": -145},
+          {"player": "Akeem Davis-Gaither", "line": 7.5, "over": 100, "under": -130},
+          {"player": "Amani Hooker", "line": 5.5, "over": -155, "under": 120},
+          {"player": "Cody Barton", "line": 4.5, "over": -157, "under": 121},
+          {"player": "Justin Walley", "line": 4.5, "over": -128, "under": -101},
+          {"player": "Jeffery Simmons", "line": 4.5, "over": -115, "under": -113},
+          {"player": "Camryn Bynum", "line": 4.5, "over": 100, "under": -129},
+          {"player": "DeForest Buckner", "line": 4.5, "over": 102, "under": -132},
+          {"player": "Adari Haulcy", "line": 4.5, "over": 119, "under": -154},
+          {"player": "Charvarius Ward", "line": 3.5, "over": -126, "under": -103},
+          {"player": "Marcus Harris (TEN)", "line": 3.5, "over": -111, "under": -117},
+          {"player": "Sauce Gardner", "line": 3.5, "over": 113, "under": -146},
+          {"player": "Grover Stewart", "line": 2.5, "over": -151, "under": 116}
+        ],
+        "fg_made": [
+          {"kicker": "Spencer Shrader", "one_plus": -860, "two_plus": -160, "three_plus": 210, "four_plus": 670, "five_plus": null, "note": "5+ not offered"},
+          {"kicker": "Joey Slye", "one_plus": -403, "two_plus": 115, "three_plus": 400, "four_plus": null, "five_plus": null, "note": "4+ NOT OFFERED"}
+        ],
+        "game_specials": [
+          {"description": "Each team 1+ rush & 1+ pass TD", "price": 260},
+          {"description": "Each team score all 4 quarters", "price": 850},
+          {"description": "Each team 1+ TD & 1+ FG each half", "price": 1600},
+          {"description": "Each team 2+ rush & 2+ pass TDs", "price": 5000},
+          {"description": "Each team 1+ TD each quarter", "price": 10000},
+          {"description": "Each team 1+ rush & 1+ pass TD each half", "price": 15000}
+        ]
+      }
+    },
+    "BAL@CLE": {
+      "matchup": "Baltimore Ravens @ Cleveland Browns",
+      "main_lines": {
+        "captured_ct": "11:18-19 re-verify",
+        "away": {"team": "BAL", "spread_line": -3, "spread_price": -118, "ml": -170},
+        "home": {"team": "CLE", "spread_line": 3, "spread_price": -102, "ml": 142},
+        "total": {"line": 39.5, "over": -112, "under": -108}
+      },
+      "team_totals": {
+        "captured_ct": "11:15-11:17",
+        "BAL": {"line": 20.5, "over": -120, "under": -110},
+        "CLE": {"line": 17.5, "over": -115, "under": -110}
+      },
+      "first_half": {
+        "spread": {"away_line": -2.5, "away_price": -108, "home_line": 2.5, "home_price": -112},
+        "total": {"line": 19.5, "over": -120, "under": 100},
+        "ml": {"away": -155, "home": 130}
+      },
+      "alt_spread_ladder": {
+        "note": "Endpoints + key rungs as reported (away/home prices); full 1-point rung tables live in the capture report; main line not a row.",
+        "rungs": [
+          {"away_line": -26.5, "away_price": 1200, "home_price": -10000},
+          {"away_line": -7.5, "away_price": 168, "home_price": -230},
+          {"away_line": -3.5, "away_price": -104, "home_price": -127},
+          {"away_line": -2.5, "away_price": -140, "home_price": 105},
+          {"away_line": 1.5, "away_price": -196, "home_price": 145},
+          {"away_line": 3.5, "away_price": -295, "home_price": 209},
+          {"away_line": 20.5, "away_price": -10000, "home_price": 1240}
+        ]
+      },
+      "alt_total_ladder": {
+        "note": "Endpoints + anchors as reported; full 1-point rung tables live in the capture report.",
+        "rungs": [
+          {"total": 20.5, "over": -10000, "under": 1200},
+          {"total": 38.5, "over": -133, "under": 100},
+          {"total": 40.5, "over": -101, "under": -132},
+          {"total": 62.5, "over": 1300, "under": -10000}
+        ]
+      },
+      "player_props": {
+        "captured_ct": "11:11-12",
+        "quarterbacks": "Huntley (BAL), Watson (CLE)",
+        "passing": {
+          "pass_yards": [
+            {"player": "Watson", "line": 202.5, "over": -114, "under": -110},
+            {"player": "Huntley", "line": 168.5, "over": -113, "under": -111}
+          ],
+          "pass_tds": [
+            {"player": "Watson", "line": 1.5, "over": 165, "under": -213},
+            {"player": "Huntley", "line": 1.5, "over": 196, "under": -255}
+          ],
+          "interceptions": [
+            {"player": "Huntley", "line": 0.5, "over": 102, "under": -130},
+            {"player": "Watson", "line": 0.5, "over": -121, "under": -105}
+          ],
+          "attempts": [
+            {"player": "Watson", "line": 31.5, "over": -111, "under": -115},
+            {"player": "Huntley", "line": 26.5, "over": -109, "under": -117}
+          ],
+          "completions": [
+            {"player": "Watson", "line": 19.5, "over": 105, "under": -134},
+            {"player": "Huntley", "line": 17.5, "over": 107, "under": -136}
+          ],
+          "pass_rush_yards": [
+            {"player": "Watson", "line": 236.5, "over": -114, "under": -112},
+            {"player": "Huntley", "line": 198.5, "over": -112, "under": -113}
+          ],
+          "longest_completion": [
+            {"player": "Watson", "line": 34.5, "over": -107, "under": -120},
+            {"player": "Huntley", "line": 29.5, "over": -118, "under": -109}
+          ]
+        },
+        "receiving_yards": [
+          {"player": "Flowers", "line": 58.5, "over": -113, "under": -111},
+          {"player": "Boston", "line": 51.5, "over": -113, "under": -111},
+          {"player": "Concepcion", "line": 39.5, "over": -115, "under": -109},
+          {"player": "Fannin Jr.", "line": 37.5, "over": -114, "under": -110},
+          {"player": "Andrews", "line": 28.5, "over": -112, "under": -112},
+          {"player": "Bateman", "line": 20.5, "over": -113, "under": -111},
+          {"player": "McLaughlin", "line": 16.5, "over": -107, "under": -117},
+          {"player": "Jeudy", "line": 15.5, "over": -115, "under": -109},
+          {"player": "J.Hill", "line": 10.5, "over": -113, "under": -111},
+          {"player": "Lane", "line": 9.5, "over": -116, "under": -108},
+          {"player": "Estime", "line": 9.5, "over": -112, "under": -112},
+          {"player": "Henry", "line": 7.5, "over": -108, "under": -116},
+          {"player": "Cuevas", "line": 6.5, "over": -112, "under": -112}
+        ],
+        "receptions": [
+          {"player": "Flowers", "line": 5.5, "over": 109, "under": -139},
+          {"player": "Concepcion", "line": 4.5, "over": -102, "under": -125},
+          {"player": "Fannin Jr.", "line": 4.5, "over": 112, "under": -143},
+          {"player": "Boston", "line": 3.5, "over": -108, "under": -118},
+          {"player": "Andrews", "line": 3.5, "over": -101, "under": -126},
+          {"player": "McLaughlin", "line": 2.5, "over": -134, "under": 105},
+          {"player": "Bateman", "line": 1.5, "over": -164, "under": 128},
+          {"player": "Estime", "line": 1.5, "over": -140, "under": 110},
+          {"player": "J.Hill", "line": 1.5, "over": -126, "under": -102},
+          {"player": "Jeudy", "line": 1.5, "over": 108, "under": -138},
+          {"player": "Lane", "line": 1.5, "over": 123, "under": -157},
+          {"player": "Henry", "line": 1.5, "over": 133, "under": -170},
+          {"player": "Cuevas", "line": 0.5, "over": -185, "under": 144}
+        ],
+        "longest_reception": [
+          {"player": "Boston", "line": 24.5, "over": -103, "under": -125},
+          {"player": "Flowers", "line": 21.5, "over": -124, "under": -105},
+          {"player": "Concepcion", "line": 17.5, "over": -114, "under": -114},
+          {"player": "Fannin Jr.", "line": 15.5, "over": -119, "under": -109},
+          {"player": "Jeudy", "line": 13.5, "over": -106, "under": -122},
+          {"player": "Bateman", "line": 12.5, "over": -123, "under": -105},
+          {"player": "Andrews", "line": 12.5, "over": -119, "under": -109},
+          {"player": "Lane", "line": 8.5, "over": -115, "under": -112},
+          {"player": "J.Hill", "line": 8.5, "over": -106, "under": -122}
+        ],
+        "rushing_yards": [
+          {"player": "Henry", "line": 91.5, "over": -110, "under": -114},
+          {"player": "McLaughlin", "line": 34.5, "over": -110, "under": -114},
+          {"player": "Watson", "line": 30.5, "over": -113, "under": -111},
+          {"player": "Huntley", "line": 25.5, "over": -115, "under": -109},
+          {"player": "Estime", "line": 19.5, "over": -107, "under": -117},
+          {"player": "J.Hill", "line": 12.5, "over": -114, "under": -110}
+        ],
+        "rushing_attempts": [
+          {"player": "Henry", "line": 20.5, "over": -125, "under": -102},
+          {"player": "Watson", "line": 6.5, "over": -104, "under": -123},
+          {"player": "Huntley", "line": 4.5, "over": -141, "under": 111}
+        ],
+        "rush_rec_yards": [
+          {"player": "Henry", "line": 102.5, "over": -112, "under": -113},
+          {"player": "McLaughlin", "line": 54.5, "over": -113, "under": -113},
+          {"player": "Estime", "line": 32.5, "over": -113, "under": -113},
+          {"player": "J.Hill", "line": 26.5, "over": -115, "under": -111}
+        ],
+        "longest_rush": [
+          {"player": "Henry", "line": 18.5, "over": -111, "under": -117},
+          {"player": "Huntley", "line": 12.5, "over": 100, "under": -130},
+          {"player": "Watson", "line": 11.5, "over": -128, "under": -101},
+          {"player": "McLaughlin", "line": 10.5, "over": -108, "under": -120},
+          {"player": "Estime", "line": 7.5, "over": -128, "under": -101},
+          {"player": "J.Hill", "line": 7.5, "over": 105, "under": -136}
+        ],
+        "td_scorers_captured_ct": "11:14",
+        "td_scorers": [
+          {"player": "D.Henry", "anytime": -160, "first": 350, "two_plus": 340},
+          {"player": "Flowers", "anytime": 210, "first": 950, "two_plus": 1800},
+          {"player": "Boston", "anytime": 215, "first": 1100, "two_plus": 1700},
+          {"player": "Fannin Jr.", "anytime": 225, "first": 1100, "two_plus": 2000},
+          {"player": "McLaughlin", "anytime": 240, "first": 1000, "two_plus": 2000},
+          {"player": "Andrews", "anytime": 240, "first": 1000, "two_plus": 2200},
+          {"player": "Concepcion", "anytime": 340, "first": 1400, "two_plus": 3000},
+          {"player": "Estime", "anytime": 425, "first": 1700, "two_plus": 4500},
+          {"player": "Huntley", "anytime": 425, "first": 1800, "two_plus": 4000},
+          {"player": "Watson", "anytime": 450, "first": 1900, "two_plus": 5000},
+          {"player": "BAL D/ST", "anytime": 500, "first": 2200, "two_plus": 5000},
+          {"player": "Bateman", "anytime": 550, "first": 2200, "two_plus": 7000},
+          {"player": "CLE D/ST", "anytime": 600, "first": 2200, "two_plus": 6000},
+          {"player": "Lane", "anytime": 650, "first": 2200, "two_plus": 9000},
+          {"player": "J.Hill", "anytime": 700, "first": 2800, "two_plus": 8000},
+          {"player": "Jeudy", "anytime": 750, "first": 3000, "two_plus": 9000},
+          {"player": "Cuevas", "anytime": 1100, "first": 4000, "two_plus": 12000},
+          {"player": "Whiteheart", "anytime": 1200, "first": 4500, "two_plus": 13000},
+          {"player": "Walker", "anytime": 1500, "first": 5000, "two_plus": 18000},
+          {"player": "Bond", "anytime": 1800, "first": 6000, "two_plus": 19000},
+          {"player": "Wester", "anytime": 1900, "first": 6000, "two_plus": 20000},
+          {"player": "Wallace", "anytime": 2200, "first": 8000, "two_plus": 20000},
+          {"player": "Burton", "anytime": 2500, "first": 9000, "two_plus": 25000},
+          {"player": "Corley", "anytime": 3000, "first": 9000, "two_plus": 20000},
+          {"player": "Vannett", "anytime": 3000, "first": 9000, "two_plus": 20000},
+          {"player": "Ali", "anytime": 4000, "first": 13000, "two_plus": 25000},
+          {"player": "Ryan", "anytime": 4000, "first": 11000, "two_plus": 25000},
+          {"player": "No TD", "anytime": 6500, "first": null, "two_plus": null}
+        ]
+      },
+      "defense_special_teams": {
+        "captured_ct": "11:20-22",
+        "sacks": [
+          {"player": "Trey Hendrickson", "one_plus": -115, "two_plus": 438, "three_plus": 1660},
+          {"player": "Jared Verse", "one_plus": 149, "two_plus": 810, "three_plus": null},
+          {"player": "Isaiah McGuire", "one_plus": 196, "two_plus": 1100, "three_plus": null},
+          {"player": "Maliek Collins", "one_plus": 203, "two_plus": 1200, "three_plus": null},
+          {"player": "Tavius Robinson", "one_plus": 196, "two_plus": 1220, "three_plus": null},
+          {"player": "Quincy Williams", "one_plus": 244, "two_plus": 1460, "three_plus": null},
+          {"player": "Calais Campbell", "one_plus": 251, "two_plus": 1540, "three_plus": null},
+          {"player": "Nnamdi Madubuike", "one_plus": 250, "two_plus": 1540, "three_plus": null},
+          {"player": "Mike Green", "one_plus": 294, "two_plus": 1920, "three_plus": null}
+        ],
+        "tackles_assists": [
+          {"player": "Roquan Smith", "line": 7.5, "over": -146, "under": 113},
+          {"player": "Quincy Williams", "line": 7.5, "over": -140, "under": 108},
+          {"player": "Kyle Hamilton", "line": 6.5, "over": 112, "under": -145},
+          {"player": "Grant Delpit", "line": 5.5, "over": -109, "under": -119},
+          {"player": "Tyson Campbell", "line": 5.5, "over": 101, "under": -131},
+          {"player": "Ronnie Hickman", "line": 5.5, "over": 108, "under": -140},
+          {"player": "Malaki Starks", "line": 4.5, "over": -133, "under": 103},
+          {"player": "Denzel Ward", "line": 4.5, "over": 120, "under": -156},
+          {"player": "Marlon Humphrey", "line": 3.5, "over": -157, "under": 121},
+          {"player": "Nate Wiggins", "line": 3.5, "over": -121, "under": -107},
+          {"player": "Jared Verse", "line": 3.5, "over": 100, "under": -130},
+          {"player": "Maliek Collins", "line": 3.5, "over": 108, "under": -140}
+        ],
+        "fg_made": [
+          {"kicker": "Tyler Loop", "one_plus": -750, "two_plus": -153, "three_plus": 205, "four_plus": 590, "five_plus": null},
+          {"kicker": "Andre Szmyt", "one_plus": -620, "two_plus": -125, "three_plus": 256, "four_plus": 810, "five_plus": null}
+        ],
+        "game_specials": [
+          {"description": "Each team 1+ rush & 1+ pass TD", "price": 400},
+          {"description": "1+ FG each quarter", "price": 450},
+          {"description": "Each team score all 4 quarters", "price": 1400},
+          {"description": "Each team 1+ TD & 1+ FG each half", "price": 1800},
+          {"description": "Each team 2+ rush & 2+ pass TDs", "price": 10000},
+          {"description": "Each team 1+ TD each quarter", "price": 15000},
+          {"description": "2+ FGs each quarter", "price": 20000}
+        ]
+      }
+    },
+    "PIT@TB": {
+      "matchup": "Pittsburgh Steelers @ Tampa Bay Buccaneers",
+      "main_lines": {
+        "captured_ct": "11:18-19 re-verify",
+        "away": {"team": "PIT", "spread_line": -2.5, "spread_price": -108, "ml": -142},
+        "home": {"team": "TB", "spread_line": 2.5, "spread_price": -112, "ml": 120},
+        "total": {"line": 38.5, "over": -108, "under": -112}
+      },
+      "team_totals": {
+        "captured_ct": "11:15-11:17",
+        "PIT": {"line": 19.5, "over": -125, "under": 100},
+        "TB": {"line": 17.5, "over": -115, "under": -110}
+      },
+      "first_half": {
+        "spread": {"away_line": -0.5, "away_price": -102, "home_line": 0.5, "home_price": -118},
+        "total": {"line": 18.5, "over": -122, "under": 102},
+        "ml": {"away": -122, "home": 102}
+      },
+      "alt_spread_ladder": {
+        "note": "Endpoints + key rungs as reported (away/home prices); full 1-point rung tables live in the capture report; main line not a row.",
+        "rungs": [
+          {"away_line": -24.5, "away_price": 1240, "home_price": -10000},
+          {"away_line": -7.5, "away_price": 210, "home_price": -296},
+          {"away_line": -3.5, "away_price": 120, "home_price": -160},
+          {"away_line": -1.5, "away_price": -124, "home_price": -107},
+          {"away_line": 1.5, "away_price": -161, "home_price": 121},
+          {"away_line": 3.5, "away_price": -248, "home_price": 180},
+          {"away_line": 20.5, "away_price": -10000, "home_price": 1220}
+        ]
+      },
+      "alt_total_ladder": {
+        "note": "Endpoints + anchors as reported; full 1-point rung tables live in the capture report.",
+        "rungs": [
+          {"total": 19.5, "over": -10000, "under": 1160},
+          {"total": 37.5, "over": -122, "under": -109},
+          {"total": 39.5, "over": 104, "under": -139},
+          {"total": 60.5, "over": 1240, "under": -10000}
+        ]
+      },
+      "player_props": {
+        "captured_ct": "11:12-13",
+        "quarterbacks": "Rodgers (PIT), J.Daniels (TB)",
+        "passing": {
+          "pass_yards": [
+            {"player": "Rodgers", "line": 221.5, "over": -111, "under": -113},
+            {"player": "J.Daniels", "line": 171.5, "over": -113, "under": -111}
+          ],
+          "pass_tds": [
+            {"player": "Rodgers", "line": 1.5, "over": 146, "under": -187},
+            {"player": "J.Daniels", "line": 0.5, "over": -210, "under": 163}
+          ],
+          "interceptions": [
+            {"player": "Rodgers", "line": 0.5, "over": -101, "under": -127},
+            {"player": "J.Daniels", "line": 0.5, "over": -120, "under": -106}
+          ],
+          "attempts": [
+            {"player": "Rodgers", "line": 34.5, "over": -119, "under": -107},
+            {"player": "J.Daniels", "line": 28.5, "over": -109, "under": -117}
+          ],
+          "completions": [
+            {"player": "Rodgers", "line": 21.5, "over": 101, "under": -129},
+            {"player": "J.Daniels", "line": 17.5, "over": -126, "under": -101}
+          ],
+          "pass_rush_yards": [
+            {"player": "Rodgers", "line": 224.5, "over": -112, "under": -113},
+            {"player": "J.Daniels", "line": 210.5, "over": -113, "under": -113}
+          ],
+          "longest_completion": [
+            {"player": "Rodgers", "line": 36.5, "over": -116, "under": -111},
+            {"player": "J.Daniels", "line": 29.5, "over": -110, "under": -118}
+          ]
+        },
+        "receiving_yards": [
+          {"player": "Metcalf", "line": 50.5, "over": -110, "under": -114},
+          {"player": "Bernard", "line": 43.5, "over": -109, "under": -115},
+          {"player": "Egbuka", "line": 36.5, "over": -114, "under": -110},
+          {"player": "Freiermuth", "line": 33.5, "over": -111, "under": -113},
+          {"player": "Warren", "line": 28.5, "over": -113, "under": -111},
+          {"player": "Godwin", "line": 27.5, "over": -109, "under": -115},
+          {"player": "Otton", "line": 26.5, "over": -114, "under": -110},
+          {"player": "Washington", "line": 26.5, "over": -108, "under": -116},
+          {"player": "Hurst", "line": 12.5, "over": -108, "under": -117},
+          {"player": "Gainwell", "line": 11.5, "over": -116, "under": -108},
+          {"player": "Irving", "line": 10.5, "over": -116, "under": -108},
+          {"player": "Dowdle", "line": 7.5, "over": -115, "under": -109}
+        ],
+        "receptions": [
+          {"player": "Bernard", "line": 4.5, "over": 122, "under": -156},
+          {"player": "Metcalf", "line": 3.5, "over": -165, "under": 129},
+          {"player": "Egbuka", "line": 3.5, "over": -131, "under": 103},
+          {"player": "Warren", "line": 3.5, "over": -126, "under": -101},
+          {"player": "Freiermuth", "line": 3.5, "over": -103, "under": -124},
+          {"player": "Otton", "line": 3.5, "over": 118, "under": -151},
+          {"player": "Godwin", "line": 3.5, "over": 127, "under": -162},
+          {"player": "Washington", "line": 2.5, "over": -128, "under": 100},
+          {"player": "Gainwell", "line": 2.5, "over": 119, "under": -152},
+          {"player": "Irving", "line": 1.5, "over": -190, "under": 148},
+          {"player": "Dowdle", "line": 1.5, "over": 104, "under": -132},
+          {"player": "Hurst", "line": 1.5, "over": 161, "under": -207}
+        ],
+        "longest_reception": [
+          {"player": "Metcalf", "line": 22.5, "over": -124, "under": -105},
+          {"player": "Bernard", "line": 18.5, "over": -122, "under": -106},
+          {"player": "Egbuka", "line": 16.5, "over": -120, "under": -108},
+          {"player": "Freiermuth", "line": 15.5, "over": -106, "under": -123},
+          {"player": "Washington", "line": 14.5, "over": -118, "under": -109},
+          {"player": "Godwin", "line": 14.5, "over": -106, "under": -122},
+          {"player": "Otton", "line": 12.5, "over": -123, "under": -105},
+          {"player": "Warren", "line": 11.5, "over": -125, "under": -103},
+          {"player": "Hurst", "line": 11.5, "over": -110, "under": -118},
+          {"player": "Gainwell", "line": 7.5, "over": -120, "under": -108},
+          {"player": "Irving", "line": 7.5, "over": -116, "under": -112},
+          {"player": "Dowdle", "line": 7.5, "over": -103, "under": -126}
+        ],
+        "rushing_yards": [
+          {"player": "Irving", "line": 67.5, "over": -112, "under": -111},
+          {"player": "Warren", "line": 60.5, "over": -112, "under": -112},
+          {"player": "J.Daniels", "line": 34.5, "over": -113, "under": -111},
+          {"player": "Dowdle", "line": 17.5, "over": -118, "under": -107},
+          {"player": "Gainwell", "line": 14.5, "over": -107, "under": -118},
+          {"player": "Rodgers", "line": 0.5, "over": -109, "under": -115}
+        ],
+        "rushing_attempts": [
+          {"player": "Irving", "line": 15.5, "over": -123, "under": -104},
+          {"player": "Warren", "line": 13.5, "over": -129, "under": 101},
+          {"player": "J.Daniels", "line": 6.5, "over": -120, "under": -106},
+          {"player": "Dowdle", "line": 6.5, "over": -104, "under": -123}
+        ],
+        "rush_rec_yards": [
+          {"player": "Warren", "line": 93.5, "over": -112, "under": -114},
+          {"player": "Irving", "line": 82.5, "over": -116, "under": -110},
+          {"player": "Gainwell", "line": 29.5, "over": -115, "under": -111},
+          {"player": "Dowdle", "line": 28.5, "over": -115, "under": -111}
+        ],
+        "longest_rush": [
+          {"player": "Irving", "line": 14.5, "over": -113, "under": -115},
+          {"player": "Warren", "line": 14.5, "over": -110, "under": -118},
+          {"player": "J.Daniels", "line": 12.5, "over": -110, "under": -117},
+          {"player": "Dowdle", "line": 6.5, "over": -131, "under": 101},
+          {"player": "Gainwell", "line": 6.5, "over": -117, "under": -111}
+        ],
+        "td_scorers_captured_ct": "~10:58",
+        "td_scorers": [
+          {"player": "Warren", "anytime": 125, "first": 550, "two_plus": 800},
+          {"player": "Irving", "anytime": 160, "first": 650, "two_plus": 1200},
+          {"player": "Metcalf", "anytime": 195, "first": 950, "two_plus": 1600},
+          {"player": "Egbuka", "anytime": 285, "first": 1200, "two_plus": 2800},
+          {"player": "Bernard", "anytime": 310, "first": 1300, "two_plus": 3000},
+          {"player": "Washington", "anytime": 370, "first": 1600, "two_plus": 3500},
+          {"player": "J.Daniels", "anytime": 380, "first": 1400, "two_plus": 3500},
+          {"player": "Gainwell", "anytime": 390, "first": 1500, "two_plus": 4000},
+          {"player": "Freiermuth", "anytime": 400, "first": 1600, "two_plus": 4000},
+          {"player": "Dowdle", "anytime": 425, "first": 1600, "two_plus": 4000},
+          {"player": "Godwin", "anytime": 475, "first": 2000, "two_plus": 5500},
+          {"player": "PIT D/ST", "anytime": 550, "first": 2200, "two_plus": 5500},
+          {"player": "Otton", "anytime": 550, "first": 2000, "two_plus": 6500},
+          {"player": "Hurst", "anytime": 550, "first": 2200, "two_plus": 7000},
+          {"player": "TB D/ST", "anytime": 600, "first": 2200, "two_plus": 6000},
+          {"player": "T.Johnson", "anytime": 700, "first": 2500, "two_plus": 8000},
+          {"player": "B.Smith (PIT)", "anytime": 1300, "first": 5000, "two_plus": 16000},
+          {"player": "Rodgers", "anytime": 1500, "first": 5000, "two_plus": 17000},
+          {"player": "Tonyan", "anytime": 1900, "first": 6500, "two_plus": 17000},
+          {"player": "Wetjen", "anytime": 1900, "first": 6000, "two_plus": 19000},
+          {"player": "K.Johnson", "anytime": 2200, "first": 8000, "two_plus": 20000},
+          {"player": "B.Johnson (PIT)", "anytime": 2500, "first": 8000, "two_plus": 20000},
+          {"player": "J.Williams", "anytime": 3000, "first": 10000, "two_plus": 25000},
+          {"player": "Durham", "anytime": 3500, "first": 9000, "two_plus": 20000},
+          {"player": "Homer", "anytime": 3500, "first": 10000, "two_plus": 25000},
+          {"player": "Sharp", "anytime": 4000, "first": 11000, "two_plus": 25000},
+          {"player": "Nichols", "anytime": 4000, "first": 12000, "two_plus": 25000},
+          {"player": "Kieft", "anytime": 5000, "first": 12000, "two_plus": 25000},
+          {"player": "Nowakowski", "anytime": 5000, "first": 13000, "two_plus": 25000},
+          {"player": "No TD", "anytime": 5000, "first": null, "two_plus": null}
+        ]
+      },
+      "defense_special_teams": {
+        "captured_ct": "11:20",
+        "sacks": [
+          {"player": "T.J. Watt", "one_plus": 113, "two_plus": 587, "three_plus": null},
+          {"player": "Alex Highsmith", "one_plus": 118, "two_plus": 600, "three_plus": null},
+          {"player": "YaYa Diaby", "one_plus": 278, "two_plus": 1760, "three_plus": null},
+          {"player": "Calijah Kancey", "one_plus": 383, "two_plus": null, "three_plus": null},
+          {"player": "Rueben Bain", "one_plus": 411, "two_plus": null, "three_plus": null}
+        ],
+        "tackles_assists": [
+          {"player": "Payton Wilson", "line": 7.5, "over": -114, "under": -114},
+          {"player": "Patrick Queen", "line": 7.5, "over": -109, "under": -119},
+          {"player": "Jaquan Brisker", "line": 6.5, "over": -114, "under": -114},
+          {"player": "Alex Anzalone", "line": 5.5, "over": -138, "under": 106},
+          {"player": "Tykee Smith", "line": 5.5, "over": -114, "under": -113},
+          {"player": "Jacob Parrish", "line": 5.5, "over": 124, "under": -162},
+          {"player": "Ifeatu Melifonwu", "line": 4.5, "over": 112, "under": -145},
+          {"player": "Zyon McCollum", "line": 3.5, "over": 102, "under": -133},
+          {"player": "Asante Samuel", "line": 3.5, "over": 103, "under": -134}
+        ],
+        "fg_made": [
+          {"kicker": "Chase McLaughlin", "one_plus": -640, "two_plus": -130, "three_plus": 248, "four_plus": 780, "five_plus": null},
+          {"kicker": "Chris Boswell", "one_plus": -670, "two_plus": -136, "three_plus": 250, "four_plus": 810, "five_plus": null}
+        ],
+        "game_specials": [
+          {"description": "1+ FG each quarter", "price": 370},
+          {"description": "Each team 1+ rush & 1+ pass TD", "price": 475},
+          {"description": "Each team score all 4 quarters", "price": 1200},
+          {"description": "Each team 1+ TD & 1+ FG each half", "price": 1800},
+          {"description": "Each team 2+ rush & 2+ pass TDs", "price": 12000},
+          {"description": "2+ FGs each quarter", "price": 15000},
+          {"description": "Each team 1+ TD each quarter", "price": 15000}
+        ]
+      }
+    },
+    "NO@NYG": {
+      "matchup": "New Orleans Saints @ New York Giants",
+      "main_lines": {
+        "captured_ct": "11:18-19 re-verify",
+        "away": {"team": "NO", "spread_line": -1.5, "spread_price": 105, "ml": -108},
+        "home": {"team": "NYG", "spread_line": 1.5, "spread_price": -125, "ml": -112},
+        "total": {"line": 46.5, "over": -105, "under": -115}
+      },
+      "team_totals": {
+        "captured_ct": "11:15-11:17",
+        "NO": {"line": 22.5, "over": -130, "under": 100},
+        "NYG": {"line": 22.5, "over": -125, "under": 100}
+      },
+      "first_half": {
+        "spread": {"away_line": 0.5, "away_price": -122, "home_line": -0.5, "home_price": 102},
+        "total": {"line": 22.5, "over": -112, "under": -108},
+        "ml": {"away": -105, "home": -115}
+      },
+      "alt_spread_ladder": {
+        "note": "Endpoints + key rungs as reported (away/home prices); full 1-point rung tables live in the capture report; main line not a row.",
+        "rungs": [
+          {"away_line": -25.5, "away_price": 1280, "home_price": -10000},
+          {"away_line": -7.5, "away_price": 235, "home_price": -338},
+          {"away_line": -3.5, "away_price": 139, "home_price": -187},
+          {"away_line": -2.5, "away_price": 106, "home_price": -141},
+          {"away_line": 1.5, "away_price": -131, "home_price": -102},
+          {"away_line": 3.5, "away_price": -192, "home_price": 142},
+          {"away_line": 25.5, "away_price": -10000, "home_price": 1300}
+        ]
+      },
+      "alt_total_ladder": {
+        "note": "Endpoints + anchors as reported; full 1-point rung tables live in the capture report.",
+        "rungs": [
+          {"total": 24.5, "over": -10000, "under": 1280},
+          {"total": 45.5, "over": -122, "under": -108},
+          {"total": 47.5, "over": 105, "under": -140},
+          {"total": 70.5, "over": 1240, "under": -10000}
+        ]
+      },
+      "player_props": {
+        "captured_ct": "11:13-14",
+        "quarterbacks": "Shough (NO), Winston (NYG)",
+        "passing": {
+          "pass_yards": [
+            {"player": "Shough", "line": 226.5, "over": -113, "under": -111},
+            {"player": "Winston", "line": 220.5, "over": -112, "under": -112}
+          ],
+          "pass_tds": [
+            {"player": "Shough", "line": 1.5, "over": -102, "under": -125},
+            {"player": "Winston", "line": 1.5, "over": 110, "under": -141}
+          ],
+          "interceptions": [
+            {"player": "Shough", "line": 0.5, "over": -140, "under": 110},
+            {"player": "Winston", "line": 0.5, "over": -153, "under": 120}
+          ],
+          "attempts": [
+            {"player": "Shough", "line": 35.5, "over": -110, "under": -115},
+            {"player": "Winston", "line": 31.5, "over": -123, "under": -103}
+          ],
+          "completions": [
+            {"player": "Shough", "line": 22.5, "over": -117, "under": -109},
+            {"player": "Winston", "line": 19.5, "over": -118, "under": -108}
+          ],
+          "pass_rush_yards": [
+            {"player": "Shough", "line": 243.5, "over": -112, "under": -114},
+            {"player": "Winston", "line": 229.5, "over": -114, "under": -112}
+          ],
+          "longest_completion": [
+            {"player": "Winston", "line": 36.5, "over": -119, "under": -109},
+            {"player": "Shough", "line": 36.5, "over": -117, "under": -111}
+          ]
+        },
+        "receiving_yards": [
+          {"player": "Olave", "line": 77.5, "over": -113, "under": -111},
+          {"player": "Nabers", "line": 72.5, "over": -110, "under": -114},
+          {"player": "Likely", "line": 53.5, "over": -114, "under": -110},
+          {"player": "Vele", "line": 42.5, "over": -115, "under": -110},
+          {"player": "JuwanJohnson", "line": 40.5, "over": -115, "under": -109},
+          {"player": "Fields", "line": 24.5, "over": -110, "under": -114},
+          {"player": "Mooney", "line": 20.5, "over": -114, "under": -110},
+          {"player": "Lance", "line": 13.5, "over": -108, "under": -116},
+          {"player": "Kamara", "line": 10.5, "over": -116, "under": -108},
+          {"player": "Fant", "line": 10.5, "over": -109, "under": -115},
+          {"player": "Skattebo", "line": 7.5, "over": -115, "under": -109},
+          {"player": "K.Miller", "line": 3.5, "over": -112, "under": -112}
+        ],
+        "receptions": [
+          {"player": "Olave", "line": 6.5, "over": 114, "under": -145},
+          {"player": "Nabers", "line": 5.5, "over": -144, "under": 113},
+          {"player": "Likely", "line": 5.5, "over": 100, "under": -127},
+          {"player": "JuwanJohnson", "line": 4.5, "over": 122, "under": -156},
+          {"player": "Vele", "line": 4.5, "over": 124, "under": -159},
+          {"player": "Kamara", "line": 2.5, "over": -102, "under": -125},
+          {"player": "Fields", "line": 1.5, "over": -170, "under": 133},
+          {"player": "Mooney", "line": 1.5, "over": -142, "under": 112},
+          {"player": "Skattebo", "line": 1.5, "over": 109, "under": -139},
+          {"player": "Lance", "line": 1.5, "over": 112, "under": -142},
+          {"player": "Fant", "line": 1.5, "over": 112, "under": -143},
+          {"player": "K.Miller", "line": 0.5, "over": -195, "under": 152}
+        ],
+        "longest_reception": [
+          {"player": "Nabers", "line": 25.5, "over": -111, "under": -117},
+          {"player": "Olave", "line": 24.5, "over": -115, "under": -112},
+          {"player": "Likely", "line": 19.5, "over": -119, "under": -109},
+          {"player": "Vele", "line": 18.5, "over": -122, "under": -106},
+          {"player": "JuwanJohnson", "line": 18.5, "over": -110, "under": -118},
+          {"player": "Fields", "line": 16.5, "over": -122, "under": -106},
+          {"player": "Mooney", "line": 15.5, "over": -113, "under": -115},
+          {"player": "Lance", "line": 10.5, "over": -115, "under": -113},
+          {"player": "Fant", "line": 8.5, "over": -109, "under": -119}
+        ],
+        "rushing_yards": [
+          {"player": "Skattebo", "line": 41.5, "over": -114, "under": -110},
+          {"player": "K.Miller", "line": 36.5, "over": -111, "under": -113},
+          {"player": "N.Harris", "line": 35.5, "over": -115, "under": -109},
+          {"player": "Kamara", "line": 23.5, "over": -114, "under": -110},
+          {"player": "Shough", "line": 12.5, "over": -111, "under": -113},
+          {"player": "Donaldson", "line": 11.5, "over": -110, "under": -114},
+          {"player": "Winston", "line": 5.5, "over": -109, "under": -115},
+          {"player": "McCarthy", "line": 2.5, "over": -116, "under": -108}
+        ],
+        "rushing_attempts": [
+          {"player": "Skattebo", "line": 11.5, "over": 100, "under": -128},
+          {"player": "K.Miller", "line": 9.5, "over": 103, "under": -131}
+        ],
+        "rush_rec_yards": [
+          {"player": "Skattebo", "line": 55.5, "over": -116, "under": -110},
+          {"player": "K.Miller", "line": 43.5, "over": -114, "under": -112},
+          {"player": "Kamara", "line": 38.5, "over": -115, "under": -110}
+        ],
+        "longest_rush": [
+          {"player": "Skattebo", "line": 12.5, "over": -102, "under": -127},
+          {"player": "K.Miller", "line": 12.5, "over": -102, "under": -127},
+          {"player": "N.Harris", "line": 11.5, "over": -115, "under": -113},
+          {"player": "Kamara", "line": 8.5, "over": -119, "under": -109},
+          {"player": "Shough", "line": 7.5, "over": -127, "under": -102},
+          {"player": "Winston", "line": 5.5, "over": -117, "under": -111}
+        ],
+        "td_scorers_captured_ct": "~10:57",
+        "td_scorers": [
+          {"player": "Skattebo", "anytime": 115, "first": 600, "two_plus": 750},
+          {"player": "Nabers", "anytime": 150, "first": 900, "two_plus": 1100},
+          {"player": "Olave", "anytime": 150, "first": 950, "two_plus": 1100},
+          {"player": "Likely", "anytime": 165, "first": 950, "two_plus": 1300},
+          {"player": "K.Miller", "anytime": 175, "first": 1000, "two_plus": 1300},
+          {"player": "JuwanJohnson", "anytime": 260, "first": 1400, "two_plus": 2500},
+          {"player": "N.Harris", "anytime": 265, "first": 1300, "two_plus": 2200},
+          {"player": "Kamara", "anytime": 270, "first": 1400, "two_plus": 2200},
+          {"player": "Vele", "anytime": 275, "first": 1500, "two_plus": 2500},
+          {"player": "Shough", "anytime": 340, "first": 1700, "two_plus": 3500},
+          {"player": "Fields", "anytime": 450, "first": 2500, "two_plus": 5500},
+          {"player": "NO D/ST", "anytime": 475, "first": 2200, "two_plus": 4500},
+          {"player": "Donaldson", "anytime": 500, "first": 2800, "two_plus": 5500},
+          {"player": "NYG D/ST", "anytime": 550, "first": 2500, "two_plus": 6000},
+          {"player": "Mooney", "anytime": 650, "first": 3000, "two_plus": 7000},
+          {"player": "Lance", "anytime": 650, "first": 3000, "two_plus": 8000},
+          {"player": "Tracy", "anytime": 750, "first": 3000, "two_plus": 8000},
+          {"player": "Winston", "anytime": 750, "first": 4000, "two_plus": 7500},
+          {"player": "Fant", "anytime": 750, "first": 3500, "two_plus": 10000},
+          {"player": "Singletary", "anytime": 850, "first": 3500, "two_plus": 10000},
+          {"player": "Manhertz", "anytime": 1100, "first": 7500, "two_plus": 14000},
+          {"player": "McCarthy", "anytime": 1100, "first": 5500, "two_plus": 12000},
+          {"player": "C.Jones", "anytime": 1300, "first": 8000, "two_plus": 17000},
+          {"player": "Delp", "anytime": 1700, "first": 9000, "two_plus": 19000},
+          {"player": "Fidone", "anytime": 2000, "first": 9000, "two_plus": 20000},
+          {"player": "B.Brown", "anytime": 2000, "first": 8000, "two_plus": 18000},
+          {"player": "Ricard", "anytime": 2200, "first": 8000, "two_plus": 20000},
+          {"player": "Tillman", "anytime": 3000, "first": 11000, "two_plus": 25000},
+          {"player": "Welch", "anytime": 3500, "first": 12000, "two_plus": 25000},
+          {"player": "No TD", "anytime": 13000, "first": null, "two_plus": null}
+        ]
+      },
+      "defense_special_teams": {
+        "captured_ct": "11:19-20",
+        "sacks": [
+          {"player": "Chase Young", "one_plus": -117, "two_plus": 430, "three_plus": 1560},
+          {"player": "Abdul Carter", "one_plus": 118, "two_plus": 610, "three_plus": null},
+          {"player": "Kayvon Thibodeaux", "one_plus": 154, "two_plus": 860, "three_plus": null},
+          {"player": "Carl Granderson", "one_plus": 166, "two_plus": 920, "three_plus": null},
+          {"player": "Darius Alexander", "one_plus": 195, "two_plus": 1160, "three_plus": null},
+          {"player": "Shelby Harris", "one_plus": 226, "two_plus": 1340, "three_plus": null},
+          {"player": "D.J. Reader", "one_plus": 282, "two_plus": 1760, "three_plus": null},
+          {"player": "Cameron Jordan", "one_plus": 362, "two_plus": null, "three_plus": null},
+          {"player": "Tyree Wilson", "one_plus": 424, "two_plus": null, "three_plus": null}
+        ],
+        "tackles_assists": [
+          {"player": "Tremaine Edmunds", "line": 8.5, "over": -126, "under": -103},
+          {"player": "Arvell Reese", "line": 8.5, "over": -117, "under": -111},
+          {"player": "Danny Stutsman", "line": 7.5, "over": -131, "under": 101},
+          {"player": "Pete Werner", "line": 7.5, "over": -126, "under": -102},
+          {"player": "Justin Reid", "line": 5.5, "over": 112, "under": -146},
+          {"player": "Julian Blackmon", "line": 4.5, "over": -163, "under": 125},
+          {"player": "Jevon Holland", "line": 4.5, "over": -147, "under": 113},
+          {"player": "Deonte Banks", "line": 4.5, "over": -145, "under": 112},
+          {"player": "Greg Newsome", "line": 4.5, "over": -138, "under": 106},
+          {"player": "Dru Phillips", "line": 4.5, "over": -112, "under": -115},
+          {"player": "Kool-Aid McKinstry", "line": 4.5, "over": 101, "under": -131},
+          {"player": "Kayvon Thibodeaux", "line": 2.5, "over": -131, "under": 101}
+        ],
+        "fg_made": [
+          {"kicker": "Daniel Carlson", "one_plus": -680, "two_plus": -152, "three_plus": 195, "four_plus": 510, "five_plus": 1320},
+          {"kicker": "Dominic Zvada", "one_plus": -780, "two_plus": -153, "three_plus": 226, "four_plus": 700, "five_plus": null, "note": "5+ NOT offered"}
+        ],
+        "game_specials": [
+          {"description": "Each team 1+ rush & 1+ pass TD", "price": 220},
+          {"description": "1+ FG each quarter", "price": 425},
+          {"description": "Each team score all 4 quarters", "price": 700},
+          {"description": "Each team 1+ TD & 1+ FG each half", "price": 1200},
+          {"description": "Each team 2+ rush & 2+ pass TDs", "price": 4500},
+          {"description": "Each team 1+ TD each quarter", "price": 7500},
+          {"description": "2+ FGs each quarter", "price": 12000},
+          {"description": "Each team 1+ rush & 1+ pass TD each half", "price": 12000}
+        ]
+      }
+    },
+    "CHI@ATL": {
+      "matchup": "Chicago Bears @ Atlanta Falcons",
+      "main_lines": {
+        "captured_ct": "banked",
+        "away": {"team": "CHI", "spread_line": -1.5, "spread_price": -108, "ml": -118},
+        "home": {"team": "ATL", "spread_line": 1.5, "spread_price": -112, "ml": -102},
+        "total": {"line": 51.5, "over": -108, "under": -112}
+      },
+      "team_totals": {
+        "captured_ct": "11:15-11:17",
+        "ATL": {"line": 25.5, "over": -120, "under": -110},
+        "CHI": {"line": 26.5, "over": -125, "under": -105}
+      },
+      "first_half": {
+        "spread": {"away_line": -0.5, "away_price": 102, "home_line": 0.5, "home_price": -122},
+        "total": {"line": 25.5, "over": -112, "under": -108},
+        "ml": {"away": -112, "home": -108}
+      },
+      "banked_earlier_note": "CHI@ATL alternate spread/total ladders, TD scorers, and passing yards/TDs/INTs/attempts were banked earlier and live in nfl_noon_partial.json; not repeated here.",
+      "player_props": {
+        "captured_ct": "10:55-56",
+        "passing": {
+          "completions": [
+            {"player": "Penix", "line": 19.5, "over": -128, "under": 100},
+            {"player": "Williams", "line": 19.5, "over": -126, "under": -101}
+          ],
+          "pass_rush_yards": [
+            {"player": "Williams", "line": 257.5, "over": -114, "under": -112},
+            {"player": "Penix", "line": 241.5, "over": -112, "under": -113}
+          ],
+          "longest_completion": [
+            {"player": "Penix", "line": 38.5, "over": -108, "under": -119},
+            {"player": "Williams", "line": 37.5, "over": -108, "under": -120}
+          ]
+        },
+        "receiving_yards": [
+          {"player": "London", "line": 90.5, "over": -113, "under": -111},
+          {"player": "Burden", "line": 53.5, "over": -115, "under": -109},
+          {"player": "Odunze", "line": 44.5, "over": -112, "under": -111},
+          {"player": "Loveland", "line": 37.5, "over": -113, "under": -111},
+          {"player": "Pitts", "line": 31.5, "over": -110, "under": -114},
+          {"player": "B.Robinson", "line": 30.5, "over": -109, "under": -115},
+          {"player": "Raymond", "line": 28.5, "over": -114, "under": -110},
+          {"player": "Dotson", "line": 23.5, "over": -109, "under": -115},
+          {"player": "Swift", "line": 16.5, "over": -109, "under": -115},
+          {"player": "Branch", "line": 9.5, "over": -117, "under": -107},
+          {"player": "Kmet", "line": 9.5, "over": -108, "under": -116},
+          {"player": "R.Johnson", "line": 6.5, "over": -103, "under": -122}
+        ],
+        "receptions": [
+          {"player": "London", "line": 6.5, "over": 121, "under": -154},
+          {"player": "Burden", "line": 4.5, "over": -112, "under": -114},
+          {"player": "B.Robinson", "line": 3.5, "over": -106, "under": -120},
+          {"player": "Loveland", "line": 3.5, "over": -105, "under": -121},
+          {"player": "Odunze", "line": 3.5, "over": 128, "under": -163},
+          {"player": "Pitts", "line": 3.5, "over": 137, "under": -176},
+          {"player": "Raymond", "line": 2.5, "over": -166, "under": 130},
+          {"player": "Swift", "line": 2.5, "over": -103, "under": -124},
+          {"player": "Dotson", "line": 1.5, "over": -171, "under": 134},
+          {"player": "Branch", "line": 1.5, "over": 129, "under": -165},
+          {"player": "R.Johnson", "line": 1.5, "over": 141, "under": -182},
+          {"player": "Kmet", "line": 1.5, "over": 161, "under": -207}
+        ],
+        "longest_reception": [
+          {"player": "London", "line": 29.5, "over": -107, "under": -121},
+          {"player": "Odunze", "line": 22.5, "over": -123, "under": -105},
+          {"player": "Burden", "line": 21.5, "over": -112, "under": -116},
+          {"player": "Loveland", "line": 18.5, "over": -107, "under": -121},
+          {"player": "Raymond", "line": 17.5, "over": -107, "under": -121},
+          {"player": "Pitts", "line": 15.5, "over": -112, "under": -115},
+          {"player": "Dotson", "line": 15.5, "over": -106, "under": -122},
+          {"player": "B.Robinson", "line": 14.5, "over": -106, "under": -122},
+          {"player": "Swift", "line": 9.5, "over": -114, "under": -114},
+          {"player": "Kmet", "line": 8.5, "over": -107, "under": -121}
+        ],
+        "rushing_yards": [
+          {"player": "B.Robinson", "line": 96.5, "over": -112, "under": -112},
+          {"player": "Swift", "line": 62.5, "over": -115, "under": -109},
+          {"player": "B.Robinson Jr.", "line": 32.5, "over": -109, "under": -115},
+          {"player": "R.Johnson", "line": 20.5, "over": -116, "under": -108},
+          {"player": "Williams", "line": 19.5, "over": -108, "under": -116},
+          {"player": "Burden", "line": 6.5, "over": -109, "under": -115},
+          {"player": "Penix", "line": 2.5, "over": -113, "under": -111}
+        ],
+        "rushing_attempts": [
+          {"player": "B.Robinson", "line": 18.5, "over": -111, "under": -115},
+          {"player": "Swift", "line": 15.5, "over": -115, "under": -110},
+          {"player": "B.Robinson Jr.", "line": 8.5, "over": 109, "under": -139},
+          {"player": "Williams", "line": 4.5, "over": -142, "under": 111}
+        ],
+        "rush_rec_yards": [
+          {"player": "B.Robinson", "line": 131.5, "over": -115, "under": -111},
+          {"player": "Swift", "line": 84.5, "over": -114, "under": -112},
+          {"player": "Burden", "line": 63.5, "over": -115, "under": -111},
+          {"player": "R.Johnson", "line": 31.5, "over": -110, "under": -116}
+        ],
+        "longest_rush": [
+          {"player": "B.Robinson", "line": 21.5, "over": -111, "under": -116},
+          {"player": "Swift", "line": 14.5, "over": -117, "under": -110}
+        ]
+      },
+      "defense_special_teams": {
+        "captured_ct": "11:29-30",
+        "sacks": [
+          {"player": "Austin Booker", "one_plus": 193, "two_plus": 1120, "three_plus": null},
+          {"player": "Za'Darius Smith", "one_plus": 223, "two_plus": 1320, "three_plus": null},
+          {"player": "Cameron Thomas", "one_plus": 242, "two_plus": 1440, "three_plus": null},
+          {"player": "Samson Ebukam", "one_plus": 236, "two_plus": 1480, "three_plus": null},
+          {"player": "Zach Harrison", "one_plus": 282, "two_plus": null, "three_plus": null},
+          {"player": "Gervon Dexter", "one_plus": 313, "two_plus": null, "three_plus": null},
+          {"player": "Grady Jarrett", "one_plus": 395, "two_plus": null, "three_plus": null},
+          {"player": "Devin Bush", "one_plus": 430, "two_plus": null, "three_plus": null},
+          {"player": "Kentavius Street", "one_plus": 526, "two_plus": null, "three_plus": null}
+        ],
+        "tackles_assists": [
+          {"player": "Devin Bush", "line": 8.5, "over": 100, "under": -130},
+          {"player": "Dillon Thieneman", "line": 7.5, "over": -118, "under": -110},
+          {"player": "Divine Deablo", "line": 6.5, "over": -102, "under": -128},
+          {"player": "Xavier Watts", "line": 5.5, "over": -137, "under": 106},
+          {"player": "Jessie Bates", "line": 5.5, "over": -119, "under": -109},
+          {"player": "Mike Hughes", "line": 5.5, "over": 108, "under": -140},
+          {"player": "Austin Booker", "line": 3.5, "over": -113, "under": -114},
+          {"player": "Grady Jarrett", "line": 2.5, "over": -164, "under": 126}
+        ],
+        "fg_made": [
+          {"kicker": "Cairo Santos", "one_plus": -640, "two_plus": -129, "three_plus": 255, "four_plus": 840, "five_plus": null},
+          {"kicker": "Nick Folk", "one_plus": -560, "two_plus": -113, "three_plus": 314, "four_plus": 1020, "five_plus": null}
+        ],
+        "game_specials": [
+          {"description": "Each team 1+ rush TD & 1+ pass TD", "price": 125},
+          {"description": "Each team score in all 4 quarters", "price": 475},
+          {"description": "1+ FG in each quarter", "price": 600},
+          {"description": "Each team 1+ TD & 1+ FG each half", "price": 1100},
+          {"description": "Each team 2+ rush TDs & 2+ pass TDs", "price": 1900},
+          {"description": "Each team 1+ TD each quarter", "price": 3000},
+          {"description": "Each team 1+ rush & 1+ pass TD each half", "price": 6500},
+          {"description": "2+ FGs each quarter", "price": 25000}
+        ]
+      }
+    }
+  }
+}
