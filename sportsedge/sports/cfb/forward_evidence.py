@@ -84,13 +84,30 @@ def _verify_raw(root: Path, rel_value: Any, expected_value: Any) -> str | None:
     return None
 
 
-def _nearest(rows: list[dict[str, Any]], target: float) -> dict[str, Any] | None:
-    if not rows:
+def _nearest(
+    rows: list[dict[str, Any]],
+    target: float,
+    *,
+    early_only: bool = False,
+) -> dict[str, Any] | None:
+    """Choose nearest evidence, optionally forbidding observations after target.
+
+    ``lead_minutes`` counts backward from kickoff.  Therefore an observation is
+    at-or-before a T-minus target only when ``lead_minutes >= target``.  Market
+    evidence uses this asymmetric rule so a T-55 row can never satisfy a frozen
+    T-60 decision target.  Weather retains nearest-prestart behavior.
+    """
+    candidates = rows
+    if early_only:
+        candidates = [row for row in rows if float(row["lead_minutes"]) >= target]
+    if not candidates:
         return None
     return min(
-        rows,
+        candidates,
         key=lambda row: (
-            abs(float(row["lead_minutes"]) - target),
+            (float(row["lead_minutes"]) - target)
+            if early_only
+            else abs(float(row["lead_minutes"]) - target),
             str(row["captured_at"]),
             str(row.get("capture_id") or row.get("observation_id") or ""),
         ),
@@ -201,8 +218,16 @@ def audit_cfb_forward_market_weather_evidence(
     units: list[dict[str, Any]] = []
     for identity, candidate_groups in sorted(by_identity.items()):
         event_id, book, market = identity
-        decision = _nearest([g for g in candidate_groups if g["window"] == "decision"], DECISION_TARGET_MINUTES)
-        close = _nearest([g for g in candidate_groups if g["window"] in {"close", "t0_prestart"}], CLOSE_TARGET_MINUTES)
+        decision = _nearest(
+            [g for g in candidate_groups if g["window"] == "decision"],
+            DECISION_TARGET_MINUTES,
+            early_only=True,
+        )
+        close = _nearest(
+            [g for g in candidate_groups if g["window"] in {"close", "t0_prestart"}],
+            CLOSE_TARGET_MINUTES,
+            early_only=True,
+        )
         if decision is None or close is None:
             continue
         if decision["captured_at"] >= close["captured_at"] or decision["team_pair"] != close["team_pair"]:
@@ -222,6 +247,8 @@ def audit_cfb_forward_market_weather_evidence(
                 "decision_target_minutes": DECISION_TARGET_MINUTES,
                 "close_target_minutes": CLOSE_TARGET_MINUTES,
                 "weather_target_minutes": WEATHER_TARGET_MINUTES,
+                "market_direction": "EARLY_ONLY_AT_OR_BEFORE_TARGET",
+                "weather_direction": "NEAREST_PRESTART",
                 "tie_break": "captured_at_then_identity_ascending",
             },
             "decision": {"capture_id": decision["capture_id"], "lead_minutes": decision["lead_minutes"], "raw_sha256": decision["raw_sha256"], "raw_path": decision["raw_path"]},
