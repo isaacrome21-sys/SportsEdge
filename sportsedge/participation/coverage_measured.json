@@ -1,0 +1,1813 @@
+{
+  "generated_at_utc": "2026-10-12T22:46:05Z",
+  "method": "measured from nflverse source files; see coverage.py docstring",
+  "seasons": [
+    {
+      "season": 2012,
+      "denominator_team_games_reg": 512,
+      "signals": {
+        "S1_STARTER_ACTUAL": {
+          "availability_class": "UNAVAILABLE_OR_AMBIGUOUS",
+          "timing_evidence": "NONE",
+          "counts": {
+            "SOURCE_FILE_EMPTY": 512
+          },
+          "starter_identified_pct": 0.0,
+          "backup_start_games": 0,
+          "cell_notes": "Starter = QB with most offensive snaps (ties fail closed). Post-game actual: retrospective by construction; prior games' starters are legitimate inputs for later games under the completion-window safeguard."
+        },
+        "S2_SNAP_COUNTS": {
+          "availability_class": "UNAVAILABLE_OR_AMBIGUOUS",
+          "timing_evidence": "NONE",
+          "counts": {
+            "SOURCE_FILE_EMPTY": 512
+          },
+          "prior_game_complete_pct": 0.0,
+          "cell_notes": "Source carries NO timestamps; publication lag is documented (~1 day, PFR) but NOT measured from this source. Classified retrospectively per owner rule."
+        },
+        "S3_INJURY_DESIGNATIONS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "PRIMARY_QB_UNDETERMINED": 512
+          },
+          "qb_designation_determinable_pct": 0.0,
+          "qb_designation_strict_row_pct": 0.0,
+          "primary_qb_designations": {},
+          "questionable_qb_cases": 0,
+          "rows_missing_gsis": 0,
+          "observation_lag_evidence": {
+            "basis": "date_modified bookkeeping timestamp vs kickoff (UNTRUSTED as publication proof -- foundation S3 risk 2; classification rests on cadence)",
+            "hours_before_kickoff": null,
+            "rows_with_modified_ts": 0,
+            "rows_modified_after_kickoff": 0
+          },
+          "cell_notes": "Final-report rule: designations are public pre-kickoff by league cadence (24-48h). No revision history exists; date_modified is the feed's bookkeeping, not a publication receipt."
+        },
+        "S4_PRACTICE_STATUS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "ROWS_WITH_PRACTICE_STATUS": 5266,
+            "ROWS_TOTAL": 5266,
+            "CLASS_DNP": 1250,
+            "CLASS_LP": 1399,
+            "CLASS_FP": 2520,
+            "CLASS_OTHER": 97
+          },
+          "rows_with_practice_status_pct": 100.0,
+          "cell_notes": "Weekly snapshot only; per-day progression is NOT reconstructible (forward-capture class). Restricted use."
+        },
+        "S5_ROSTER_RESERVE": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "PRIMARY_QB_UNDETERMINED": 512
+          },
+          "qb_reserve_determinable_pct": 0.0,
+          "observation_lag_evidence": {
+            "basis": "weekly snapshot granularity under prior-week lag rule; lag = kickoff minus snapshot week-conclusion bound, in days",
+            "days": null
+          },
+          "cell_notes": "Status codes are a coarse bucket (RES/PUP/...); reserve SUBTYPE rides on opaque status_description_abbr codes with no in-file codebook and is unresolved. Snapshot compilation time inside the week is unknown -- prior-week rule is the conservative consequence (Week 1 uncovered)."
+        },
+        "S6_DEPTH_CHARTS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB2_NOT_IDENTIFIED": 32,
+            "QB2_IDENTIFIED_PRIOR_WEEK": 480
+          },
+          "qb2_prior_week_pct": 93.75,
+          "cell_notes": "Backup identity only; prior-week chart under lag rule. Snap evidence outranks chart evidence where they differ."
+        },
+        "S7_GAME_DAY_INACTIVES": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No trustworthy timestamped historical archive exists. Schema support built; zero historical records, by design. Excluded from any historical feature set."
+        },
+        "S8_REPORT_REVISIONS": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No structured timestamped historical archive exists. Schema support built; zero historical records, by design."
+        }
+      },
+      "combined_s3_s5_qb_coverage_pct": 0.0,
+      "cross_check_s3_s5": {
+        "population_reserve_player_weeks": 2389,
+        "consistent": 2214,
+        "conflict_designation_q_or_d_while_reserve": 175,
+        "conflict_played_snaps_while_reserve": 0,
+        "reverse_out_but_active_and_played": 0,
+        "consistent_pct": 92.67
+      }
+    },
+    {
+      "season": 2013,
+      "denominator_team_games_reg": 512,
+      "signals": {
+        "S1_STARTER_ACTUAL": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "STARTER_IDENTIFIED": 512,
+            "STARTER_IDENTITY_SCHEDULE_CORROBORATED": 52,
+            "STARTER_IDENTITY_UNRESOLVED": 2
+          },
+          "starter_identified_pct": 100.0,
+          "backup_start_games": 43,
+          "cell_notes": "Starter = QB with most offensive snaps (ties fail closed). Post-game actual: retrospective by construction; prior games' starters are legitimate inputs for later games under the completion-window safeguard."
+        },
+        "S2_SNAP_COUNTS": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "SOURCE_FILE_EMPTY": 32,
+            "PRIOR_GAME_SNAPS_COMPLETE": 480
+          },
+          "prior_game_complete_pct": 93.75,
+          "cell_notes": "Source carries NO timestamps; publication lag is documented (~1 day, PFR) but NOT measured from this source. Classified retrospectively per owner rule."
+        },
+        "S3_INJURY_DESIGNATIONS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "PRIMARY_QB_UNDETERMINED": 32,
+            "QB_ROW_PRESENT": 61,
+            "QB_NOT_ON_REPORT_TEAM_WEEK_PRESENT": 368,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 51
+          },
+          "qb_designation_determinable_pct": 83.79,
+          "qb_designation_strict_row_pct": 11.91,
+          "primary_qb_designations": {
+            "Probable": 45,
+            "NONE_NOT_REPORTED": 368,
+            "Out": 12,
+            "Questionable": 4
+          },
+          "questionable_qb_cases": 4,
+          "rows_missing_gsis": 0,
+          "observation_lag_evidence": {
+            "basis": "date_modified bookkeeping timestamp vs kickoff (UNTRUSTED as publication proof -- foundation S3 risk 2; classification rests on cadence)",
+            "hours_before_kickoff": {
+              "n": 61,
+              "min": 37.19,
+              "p10": 53.27,
+              "median": 56.12,
+              "p90": 60.27,
+              "max": 62.29
+            },
+            "rows_with_modified_ts": 61,
+            "rows_modified_after_kickoff": 0
+          },
+          "cell_notes": "Final-report rule: designations are public pre-kickoff by league cadence (24-48h). No revision history exists; date_modified is the feed's bookkeeping, not a publication receipt."
+        },
+        "S4_PRACTICE_STATUS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "ROWS_WITH_PRACTICE_STATUS": 4913,
+            "ROWS_TOTAL": 4913,
+            "CLASS_DNP": 1129,
+            "CLASS_FP": 2360,
+            "CLASS_LP": 1286,
+            "CLASS_OTHER": 138
+          },
+          "rows_with_practice_status_pct": 100.0,
+          "cell_notes": "Weekly snapshot only; per-day progression is NOT reconstructible (forward-capture class). Restricted use."
+        },
+        "S5_ROSTER_RESERVE": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "PRIMARY_QB_UNDETERMINED": 32,
+            "QB_FOUND_IN_PRIOR_SNAPSHOT": 429,
+            "QB_ON_RESERVE_IN_PRIOR_SNAPSHOT": 14,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 51
+          },
+          "qb_reserve_determinable_pct": 83.79,
+          "observation_lag_evidence": {
+            "basis": "weekly snapshot granularity under prior-week lag rule; lag = kickoff minus snapshot week-conclusion bound, in days",
+            "days": {
+              "n": 429,
+              "min": 1.23,
+              "p10": 4.21,
+              "median": 4.25,
+              "p90": 4.56,
+              "max": 5.56
+            }
+          },
+          "cell_notes": "Status codes are a coarse bucket (RES/PUP/...); reserve SUBTYPE rides on opaque status_description_abbr codes with no in-file codebook and is unresolved. Snapshot compilation time inside the week is unknown -- prior-week rule is the conservative consequence (Week 1 uncovered)."
+        },
+        "S6_DEPTH_CHARTS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB2_NOT_IDENTIFIED": 34,
+            "QB2_IDENTIFIED_PRIOR_WEEK": 478
+          },
+          "qb2_prior_week_pct": 93.36,
+          "cell_notes": "Backup identity only; prior-week chart under lag rule. Snap evidence outranks chart evidence where they differ."
+        },
+        "S7_GAME_DAY_INACTIVES": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No trustworthy timestamped historical archive exists. Schema support built; zero historical records, by design. Excluded from any historical feature set."
+        },
+        "S8_REPORT_REVISIONS": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No structured timestamped historical archive exists. Schema support built; zero historical records, by design."
+        }
+      },
+      "combined_s3_s5_qb_coverage_pct": 83.79,
+      "cross_check_s3_s5": {
+        "population_reserve_player_weeks": 1878,
+        "consistent": 1249,
+        "conflict_designation_q_or_d_while_reserve": 184,
+        "conflict_played_snaps_while_reserve": 483,
+        "reverse_out_but_active_and_played": 0,
+        "consistent_pct": 66.51
+      }
+    },
+    {
+      "season": 2014,
+      "denominator_team_games_reg": 512,
+      "signals": {
+        "S1_STARTER_ACTUAL": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "STARTER_IDENTIFIED": 511,
+            "STARTER_IDENTITY_SCHEDULE_CORROBORATED": 50,
+            "STARTER_IDENTITY_UNRESOLVED": 4,
+            "STARTER_AMBIGUOUS_TIE": 1
+          },
+          "starter_identified_pct": 99.8,
+          "backup_start_games": 51,
+          "cell_notes": "Starter = QB with most offensive snaps (ties fail closed). Post-game actual: retrospective by construction; prior games' starters are legitimate inputs for later games under the completion-window safeguard."
+        },
+        "S2_SNAP_COUNTS": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "PRIOR_GAME_SNAPS_COMPLETE": 512
+          },
+          "prior_game_complete_pct": 100.0,
+          "cell_notes": "Source carries NO timestamps; publication lag is documented (~1 day, PFR) but NOT measured from this source. Classified retrospectively per owner rule."
+        },
+        "S3_INJURY_DESIGNATIONS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_NOT_ON_REPORT_TEAM_WEEK_PRESENT": 388,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 51,
+            "QB_ROW_PRESENT": 72,
+            "PRIMARY_QB_UNDETERMINED": 1
+          },
+          "qb_designation_determinable_pct": 89.84,
+          "qb_designation_strict_row_pct": 14.06,
+          "primary_qb_designations": {
+            "NONE_NOT_REPORTED": 388,
+            "Probable": 51,
+            "Questionable": 12,
+            "NONE_ON_REPORT": 3,
+            "Out": 5,
+            "Doubtful": 1
+          },
+          "questionable_qb_cases": 12,
+          "rows_missing_gsis": 0,
+          "observation_lag_evidence": {
+            "basis": "date_modified bookkeeping timestamp vs kickoff (UNTRUSTED as publication proof -- foundation S3 risk 2; classification rests on cadence)",
+            "hours_before_kickoff": {
+              "n": 72,
+              "min": 35.59,
+              "p10": 38.36,
+              "median": 55.13,
+              "p90": 60.43,
+              "max": 111.34
+            },
+            "rows_with_modified_ts": 72,
+            "rows_modified_after_kickoff": 0
+          },
+          "cell_notes": "Final-report rule: designations are public pre-kickoff by league cadence (24-48h). No revision history exists; date_modified is the feed's bookkeeping, not a publication receipt."
+        },
+        "S4_PRACTICE_STATUS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "ROWS_WITH_PRACTICE_STATUS": 4912,
+            "ROWS_TOTAL": 4912,
+            "CLASS_DNP": 1328,
+            "CLASS_FP": 2282,
+            "CLASS_LP": 1179,
+            "CLASS_OTHER": 123
+          },
+          "rows_with_practice_status_pct": 100.0,
+          "cell_notes": "Weekly snapshot only; per-day progression is NOT reconstructible (forward-capture class). Restricted use."
+        },
+        "S5_ROSTER_RESERVE": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_FOUND_IN_PRIOR_SEASON_SNAPSHOT": 30,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 51,
+            "QB_FOUND_IN_PRIOR_SNAPSHOT": 430,
+            "QB_ON_RESERVE_IN_PRIOR_SNAPSHOT": 28,
+            "PRIMARY_QB_UNDETERMINED": 1
+          },
+          "qb_reserve_determinable_pct": 89.84,
+          "observation_lag_evidence": {
+            "basis": "weekly snapshot granularity under prior-week lag rule; lag = kickoff minus snapshot week-conclusion bound, in days",
+            "days": {
+              "n": 460,
+              "min": 1.23,
+              "p10": 4.21,
+              "median": 4.25,
+              "p90": 5.52,
+              "max": 251.56
+            }
+          },
+          "cell_notes": "Status codes are a coarse bucket (RES/PUP/...); reserve SUBTYPE rides on opaque status_description_abbr codes with no in-file codebook and is unresolved. Snapshot compilation time inside the week is unknown -- prior-week rule is the conservative consequence (Week 1 uncovered)."
+        },
+        "S6_DEPTH_CHARTS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB2_NOT_IDENTIFIED": 65,
+            "QB2_IDENTIFIED_PRIOR_WEEK": 447
+          },
+          "qb2_prior_week_pct": 87.3,
+          "cell_notes": "Backup identity only; prior-week chart under lag rule. Snap evidence outranks chart evidence where they differ."
+        },
+        "S7_GAME_DAY_INACTIVES": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No trustworthy timestamped historical archive exists. Schema support built; zero historical records, by design. Excluded from any historical feature set."
+        },
+        "S8_REPORT_REVISIONS": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No structured timestamped historical archive exists. Schema support built; zero historical records, by design."
+        }
+      },
+      "combined_s3_s5_qb_coverage_pct": 89.84,
+      "cross_check_s3_s5": {
+        "population_reserve_player_weeks": 2225,
+        "consistent": 1551,
+        "conflict_designation_q_or_d_while_reserve": 165,
+        "conflict_played_snaps_while_reserve": 542,
+        "reverse_out_but_active_and_played": 0,
+        "consistent_pct": 69.71
+      }
+    },
+    {
+      "season": 2015,
+      "denominator_team_games_reg": 512,
+      "signals": {
+        "S1_STARTER_ACTUAL": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "STARTER_IDENTIFIED": 512,
+            "STARTER_IDENTITY_SCHEDULE_CORROBORATED": 26,
+            "STARTER_IDENTITY_UNRESOLVED": 4
+          },
+          "starter_identified_pct": 100.0,
+          "backup_start_games": 64,
+          "cell_notes": "Starter = QB with most offensive snaps (ties fail closed). Post-game actual: retrospective by construction; prior games' starters are legitimate inputs for later games under the completion-window safeguard."
+        },
+        "S2_SNAP_COUNTS": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "PRIOR_GAME_SNAPS_COMPLETE": 512
+          },
+          "prior_game_complete_pct": 100.0,
+          "cell_notes": "Source carries NO timestamps; publication lag is documented (~1 day, PFR) but NOT measured from this source. Classified retrospectively per owner rule."
+        },
+        "S3_INJURY_DESIGNATIONS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_NOT_ON_REPORT_TEAM_WEEK_PRESENT": 396,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 30,
+            "QB_ROW_PRESENT": 86
+          },
+          "qb_designation_determinable_pct": 94.14,
+          "qb_designation_strict_row_pct": 16.8,
+          "primary_qb_designations": {
+            "NONE_NOT_REPORTED": 396,
+            "Out": 8,
+            "Probable": 68,
+            "Questionable": 10
+          },
+          "questionable_qb_cases": 10,
+          "rows_missing_gsis": 0,
+          "observation_lag_evidence": {
+            "basis": "date_modified bookkeeping timestamp vs kickoff (UNTRUSTED as publication proof -- foundation S3 risk 2; classification rests on cadence)",
+            "hours_before_kickoff": {
+              "n": 86,
+              "min": 36.06,
+              "p10": 49.36,
+              "median": 55.05,
+              "p90": 58.43,
+              "max": 63.12
+            },
+            "rows_with_modified_ts": 86,
+            "rows_modified_after_kickoff": 0
+          },
+          "cell_notes": "Final-report rule: designations are public pre-kickoff by league cadence (24-48h). No revision history exists; date_modified is the feed's bookkeeping, not a publication receipt."
+        },
+        "S4_PRACTICE_STATUS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "ROWS_WITH_PRACTICE_STATUS": 5009,
+            "ROWS_TOTAL": 5009,
+            "CLASS_DNP": 1348,
+            "CLASS_LP": 1284,
+            "CLASS_FP": 2323,
+            "CLASS_OTHER": 54
+          },
+          "rows_with_practice_status_pct": 100.0,
+          "cell_notes": "Weekly snapshot only; per-day progression is NOT reconstructible (forward-capture class). Restricted use."
+        },
+        "S5_ROSTER_RESERVE": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_FOUND_IN_PRIOR_SEASON_SNAPSHOT": 27,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 30,
+            "QB_FOUND_IN_PRIOR_SNAPSHOT": 455,
+            "QB_ON_RESERVE_IN_PRIOR_SNAPSHOT": 27
+          },
+          "qb_reserve_determinable_pct": 94.14,
+          "observation_lag_evidence": {
+            "basis": "weekly snapshot granularity under prior-week lag rule; lag = kickoff minus snapshot week-conclusion bound, in days",
+            "days": {
+              "n": 482,
+              "min": 1.23,
+              "p10": 4.21,
+              "median": 4.25,
+              "p90": 5.52,
+              "max": 258.6
+            }
+          },
+          "cell_notes": "Status codes are a coarse bucket (RES/PUP/...); reserve SUBTYPE rides on opaque status_description_abbr codes with no in-file codebook and is unresolved. Snapshot compilation time inside the week is unknown -- prior-week rule is the conservative consequence (Week 1 uncovered)."
+        },
+        "S6_DEPTH_CHARTS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB2_NOT_IDENTIFIED": 35,
+            "QB2_IDENTIFIED_PRIOR_WEEK": 477
+          },
+          "qb2_prior_week_pct": 93.16,
+          "cell_notes": "Backup identity only; prior-week chart under lag rule. Snap evidence outranks chart evidence where they differ."
+        },
+        "S7_GAME_DAY_INACTIVES": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No trustworthy timestamped historical archive exists. Schema support built; zero historical records, by design. Excluded from any historical feature set."
+        },
+        "S8_REPORT_REVISIONS": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No structured timestamped historical archive exists. Schema support built; zero historical records, by design."
+        }
+      },
+      "combined_s3_s5_qb_coverage_pct": 94.14,
+      "cross_check_s3_s5": {
+        "population_reserve_player_weeks": 2512,
+        "consistent": 1561,
+        "conflict_designation_q_or_d_while_reserve": 221,
+        "conflict_played_snaps_while_reserve": 776,
+        "reverse_out_but_active_and_played": 1,
+        "consistent_pct": 62.14
+      }
+    },
+    {
+      "season": 2016,
+      "denominator_team_games_reg": 512,
+      "signals": {
+        "S1_STARTER_ACTUAL": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "STARTER_IDENTIFIED": 512,
+            "STARTER_IDENTITY_SCHEDULE_CORROBORATED": 18
+          },
+          "starter_identified_pct": 100.0,
+          "backup_start_games": 56,
+          "cell_notes": "Starter = QB with most offensive snaps (ties fail closed). Post-game actual: retrospective by construction; prior games' starters are legitimate inputs for later games under the completion-window safeguard."
+        },
+        "S2_SNAP_COUNTS": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "PRIOR_GAME_SNAPS_COMPLETE": 512
+          },
+          "prior_game_complete_pct": 100.0,
+          "cell_notes": "Source carries NO timestamps; publication lag is documented (~1 day, PFR) but NOT measured from this source. Classified retrospectively per owner rule."
+        },
+        "S3_INJURY_DESIGNATIONS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_NOT_ON_REPORT_TEAM_WEEK_PRESENT": 378,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 22,
+            "QB_ROW_PRESENT": 112
+          },
+          "qb_designation_determinable_pct": 95.7,
+          "qb_designation_strict_row_pct": 21.88,
+          "primary_qb_designations": {
+            "NONE_NOT_REPORTED": 378,
+            "NONE_ON_REPORT": 87,
+            "Doubtful": 3,
+            "Out": 9,
+            "Questionable": 13
+          },
+          "questionable_qb_cases": 13,
+          "rows_missing_gsis": 0,
+          "observation_lag_evidence": {
+            "basis": "date_modified bookkeeping timestamp vs kickoff (UNTRUSTED as publication proof -- foundation S3 risk 2; classification rests on cadence)",
+            "hours_before_kickoff": {
+              "n": 112,
+              "min": 28.14,
+              "p10": 36.4,
+              "median": 55.32,
+              "p90": 61.85,
+              "max": 104.84
+            },
+            "rows_with_modified_ts": 112,
+            "rows_modified_after_kickoff": 0
+          },
+          "cell_notes": "Final-report rule: designations are public pre-kickoff by league cadence (24-48h). No revision history exists; date_modified is the feed's bookkeeping, not a publication receipt."
+        },
+        "S4_PRACTICE_STATUS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "ROWS_WITH_PRACTICE_STATUS": 4928,
+            "ROWS_TOTAL": 4928,
+            "CLASS_FP": 2081,
+            "CLASS_DNP": 1537,
+            "CLASS_LP": 1310
+          },
+          "rows_with_practice_status_pct": 100.0,
+          "cell_notes": "Weekly snapshot only; per-day progression is NOT reconstructible (forward-capture class). Restricted use."
+        },
+        "S5_ROSTER_RESERVE": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_FOUND_IN_PRIOR_SEASON_SNAPSHOT": 27,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 22,
+            "QB_FOUND_IN_PRIOR_SNAPSHOT": 463
+          },
+          "qb_reserve_determinable_pct": 95.7,
+          "observation_lag_evidence": {
+            "basis": "weekly snapshot granularity under prior-week lag rule; lag = kickoff minus snapshot week-conclusion bound, in days",
+            "days": {
+              "n": 490,
+              "min": 1.23,
+              "p10": 3.39,
+              "median": 4.25,
+              "p90": 11.25,
+              "max": 251.6
+            }
+          },
+          "cell_notes": "Status codes are a coarse bucket (RES/PUP/...); reserve SUBTYPE rides on opaque status_description_abbr codes with no in-file codebook and is unresolved. Snapshot compilation time inside the week is unknown -- prior-week rule is the conservative consequence (Week 1 uncovered)."
+        },
+        "S6_DEPTH_CHARTS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB2_NOT_IDENTIFIED": 32,
+            "QB2_IDENTIFIED_PRIOR_WEEK": 480
+          },
+          "qb2_prior_week_pct": 93.75,
+          "cell_notes": "Backup identity only; prior-week chart under lag rule. Snap evidence outranks chart evidence where they differ."
+        },
+        "S7_GAME_DAY_INACTIVES": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No trustworthy timestamped historical archive exists. Schema support built; zero historical records, by design. Excluded from any historical feature set."
+        },
+        "S8_REPORT_REVISIONS": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No structured timestamped historical archive exists. Schema support built; zero historical records, by design."
+        }
+      },
+      "combined_s3_s5_qb_coverage_pct": 95.7,
+      "cross_check_s3_s5": {
+        "population_reserve_player_weeks": 4397,
+        "consistent": 4377,
+        "conflict_designation_q_or_d_while_reserve": 9,
+        "conflict_played_snaps_while_reserve": 12,
+        "reverse_out_but_active_and_played": 0,
+        "consistent_pct": 99.55
+      }
+    },
+    {
+      "season": 2017,
+      "denominator_team_games_reg": 512,
+      "signals": {
+        "S1_STARTER_ACTUAL": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "STARTER_IDENTIFIED": 512,
+            "STARTER_IDENTITY_SCHEDULE_CORROBORATED": 22,
+            "STARTER_IDENTITY_UNRESOLVED": 2
+          },
+          "starter_identified_pct": 100.0,
+          "backup_start_games": 56,
+          "cell_notes": "Starter = QB with most offensive snaps (ties fail closed). Post-game actual: retrospective by construction; prior games' starters are legitimate inputs for later games under the completion-window safeguard."
+        },
+        "S2_SNAP_COUNTS": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "PRIOR_GAME_SNAPS_COMPLETE": 512
+          },
+          "prior_game_complete_pct": 100.0,
+          "cell_notes": "Source carries NO timestamps; publication lag is documented (~1 day, PFR) but NOT measured from this source. Classified retrospectively per owner rule."
+        },
+        "S3_INJURY_DESIGNATIONS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_NOT_ON_REPORT_TEAM_WEEK_PRESENT": 394,
+            "QB_ROW_PRESENT": 93,
+            "TEAM_WEEK_ABSENT_FROM_SOURCE": 1,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 24
+          },
+          "qb_designation_determinable_pct": 95.12,
+          "qb_designation_strict_row_pct": 18.16,
+          "primary_qb_designations": {
+            "NONE_NOT_REPORTED": 394,
+            "NONE_ON_REPORT": 77,
+            "Out": 4,
+            "Questionable": 12
+          },
+          "questionable_qb_cases": 12,
+          "rows_missing_gsis": 0,
+          "observation_lag_evidence": {
+            "basis": "date_modified bookkeeping timestamp vs kickoff (UNTRUSTED as publication proof -- foundation S3 risk 2; classification rests on cadence)",
+            "hours_before_kickoff": {
+              "n": 93,
+              "min": 33.61,
+              "p10": 52.0,
+              "median": 54.64,
+              "p90": 61.2,
+              "max": 84.93
+            },
+            "rows_with_modified_ts": 93,
+            "rows_modified_after_kickoff": 0
+          },
+          "cell_notes": "Final-report rule: designations are public pre-kickoff by league cadence (24-48h). No revision history exists; date_modified is the feed's bookkeeping, not a publication receipt."
+        },
+        "S4_PRACTICE_STATUS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "ROWS_WITH_PRACTICE_STATUS": 4949,
+            "ROWS_TOTAL": 4949,
+            "CLASS_FP": 2340,
+            "CLASS_DNP": 1386,
+            "CLASS_LP": 1223
+          },
+          "rows_with_practice_status_pct": 100.0,
+          "cell_notes": "Weekly snapshot only; per-day progression is NOT reconstructible (forward-capture class). Restricted use."
+        },
+        "S5_ROSTER_RESERVE": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_FOUND_IN_PRIOR_SEASON_SNAPSHOT": 31,
+            "QB_FOUND_IN_PRIOR_SNAPSHOT": 457,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 24
+          },
+          "qb_reserve_determinable_pct": 95.31,
+          "observation_lag_evidence": {
+            "basis": "weekly snapshot granularity under prior-week lag rule; lag = kickoff minus snapshot week-conclusion bound, in days",
+            "days": {
+              "n": 488,
+              "min": 1.23,
+              "p10": 4.21,
+              "median": 4.25,
+              "p90": 11.25,
+              "max": 257.21
+            }
+          },
+          "cell_notes": "Status codes are a coarse bucket (RES/PUP/...); reserve SUBTYPE rides on opaque status_description_abbr codes with no in-file codebook and is unresolved. Snapshot compilation time inside the week is unknown -- prior-week rule is the conservative consequence (Week 1 uncovered)."
+        },
+        "S6_DEPTH_CHARTS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB2_NOT_IDENTIFIED": 32,
+            "QB2_IDENTIFIED_PRIOR_WEEK": 480
+          },
+          "qb2_prior_week_pct": 93.75,
+          "cell_notes": "Backup identity only; prior-week chart under lag rule. Snap evidence outranks chart evidence where they differ."
+        },
+        "S7_GAME_DAY_INACTIVES": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No trustworthy timestamped historical archive exists. Schema support built; zero historical records, by design. Excluded from any historical feature set."
+        },
+        "S8_REPORT_REVISIONS": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No structured timestamped historical archive exists. Schema support built; zero historical records, by design."
+        }
+      },
+      "combined_s3_s5_qb_coverage_pct": 95.12,
+      "cross_check_s3_s5": {
+        "population_reserve_player_weeks": 4613,
+        "consistent": 4604,
+        "conflict_designation_q_or_d_while_reserve": 7,
+        "conflict_played_snaps_while_reserve": 2,
+        "reverse_out_but_active_and_played": 0,
+        "consistent_pct": 99.8
+      }
+    },
+    {
+      "season": 2018,
+      "denominator_team_games_reg": 512,
+      "signals": {
+        "S1_STARTER_ACTUAL": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "STARTER_IDENTIFIED": 511,
+            "STARTER_AMBIGUOUS_TIE": 1,
+            "STARTER_IDENTITY_SCHEDULE_CORROBORATED": 19
+          },
+          "starter_identified_pct": 99.8,
+          "backup_start_games": 47,
+          "cell_notes": "Starter = QB with most offensive snaps (ties fail closed). Post-game actual: retrospective by construction; prior games' starters are legitimate inputs for later games under the completion-window safeguard."
+        },
+        "S2_SNAP_COUNTS": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "PRIOR_GAME_SNAPS_COMPLETE": 512
+          },
+          "prior_game_complete_pct": 100.0,
+          "cell_notes": "Source carries NO timestamps; publication lag is documented (~1 day, PFR) but NOT measured from this source. Classified retrospectively per owner rule."
+        },
+        "S3_INJURY_DESIGNATIONS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_NOT_ON_REPORT_TEAM_WEEK_PRESENT": 385,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 18,
+            "PRIMARY_QB_UNDETERMINED": 1,
+            "QB_ROW_PRESENT": 108
+          },
+          "qb_designation_determinable_pct": 96.29,
+          "qb_designation_strict_row_pct": 21.09,
+          "primary_qb_designations": {
+            "NONE_NOT_REPORTED": 385,
+            "Questionable": 13,
+            "NONE_ON_REPORT": 89,
+            "Out": 2,
+            "Doubtful": 4
+          },
+          "questionable_qb_cases": 13,
+          "rows_missing_gsis": 0,
+          "observation_lag_evidence": {
+            "basis": "date_modified bookkeeping timestamp vs kickoff (UNTRUSTED as publication proof -- foundation S3 risk 2; classification rests on cadence)",
+            "hours_before_kickoff": {
+              "n": 108,
+              "min": 29.59,
+              "p10": 51.87,
+              "median": 54.62,
+              "p90": 60.65,
+              "max": 100.37
+            },
+            "rows_with_modified_ts": 108,
+            "rows_modified_after_kickoff": 0
+          },
+          "cell_notes": "Final-report rule: designations are public pre-kickoff by league cadence (24-48h). No revision history exists; date_modified is the feed's bookkeeping, not a publication receipt."
+        },
+        "S4_PRACTICE_STATUS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "ROWS_WITH_PRACTICE_STATUS": 4961,
+            "ROWS_TOTAL": 4961,
+            "CLASS_FP": 2401,
+            "CLASS_DNP": 1309,
+            "CLASS_LP": 1236,
+            "CLASS_OTHER": 15
+          },
+          "rows_with_practice_status_pct": 100.0,
+          "cell_notes": "Weekly snapshot only; per-day progression is NOT reconstructible (forward-capture class). Restricted use."
+        },
+        "S5_ROSTER_RESERVE": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_FOUND_IN_PRIOR_SEASON_SNAPSHOT": 31,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 18,
+            "QB_FOUND_IN_PRIOR_SNAPSHOT": 462,
+            "PRIMARY_QB_UNDETERMINED": 1
+          },
+          "qb_reserve_determinable_pct": 96.29,
+          "observation_lag_evidence": {
+            "basis": "weekly snapshot granularity under prior-week lag rule; lag = kickoff minus snapshot week-conclusion bound, in days",
+            "days": {
+              "n": 493,
+              "min": 1.23,
+              "p10": 4.21,
+              "median": 4.25,
+              "p90": 11.25,
+              "max": 251.6
+            }
+          },
+          "cell_notes": "Status codes are a coarse bucket (RES/PUP/...); reserve SUBTYPE rides on opaque status_description_abbr codes with no in-file codebook and is unresolved. Snapshot compilation time inside the week is unknown -- prior-week rule is the conservative consequence (Week 1 uncovered)."
+        },
+        "S6_DEPTH_CHARTS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB2_NOT_IDENTIFIED": 34,
+            "QB2_IDENTIFIED_PRIOR_WEEK": 478
+          },
+          "qb2_prior_week_pct": 93.36,
+          "cell_notes": "Backup identity only; prior-week chart under lag rule. Snap evidence outranks chart evidence where they differ."
+        },
+        "S7_GAME_DAY_INACTIVES": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No trustworthy timestamped historical archive exists. Schema support built; zero historical records, by design. Excluded from any historical feature set."
+        },
+        "S8_REPORT_REVISIONS": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No structured timestamped historical archive exists. Schema support built; zero historical records, by design."
+        }
+      },
+      "combined_s3_s5_qb_coverage_pct": 96.29,
+      "cross_check_s3_s5": {
+        "population_reserve_player_weeks": 4324,
+        "consistent": 4314,
+        "conflict_designation_q_or_d_while_reserve": 10,
+        "conflict_played_snaps_while_reserve": 0,
+        "reverse_out_but_active_and_played": 0,
+        "consistent_pct": 99.77
+      }
+    },
+    {
+      "season": 2019,
+      "denominator_team_games_reg": 512,
+      "signals": {
+        "S1_STARTER_ACTUAL": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "STARTER_IDENTIFIED": 510,
+            "STARTER_IDENTITY_SCHEDULE_CORROBORATED": 32,
+            "STARTER_AMBIGUOUS_TIE": 2,
+            "STARTER_IDENTITY_UNRESOLVED": 6
+          },
+          "starter_identified_pct": 99.61,
+          "backup_start_games": 54,
+          "cell_notes": "Starter = QB with most offensive snaps (ties fail closed). Post-game actual: retrospective by construction; prior games' starters are legitimate inputs for later games under the completion-window safeguard."
+        },
+        "S2_SNAP_COUNTS": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "PRIOR_GAME_SNAPS_COMPLETE": 512
+          },
+          "prior_game_complete_pct": 100.0,
+          "cell_notes": "Source carries NO timestamps; publication lag is documented (~1 day, PFR) but NOT measured from this source. Classified retrospectively per owner rule."
+        },
+        "S3_INJURY_DESIGNATIONS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_NOT_ON_REPORT_TEAM_WEEK_PRESENT": 370,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 36,
+            "QB_ROW_PRESENT": 104,
+            "PRIMARY_QB_UNDETERMINED": 2
+          },
+          "qb_designation_determinable_pct": 92.58,
+          "qb_designation_strict_row_pct": 20.31,
+          "primary_qb_designations": {
+            "NONE_NOT_REPORTED": 370,
+            "Out": 5,
+            "NONE_ON_REPORT": 84,
+            "Questionable": 15
+          },
+          "questionable_qb_cases": 15,
+          "rows_missing_gsis": 0,
+          "observation_lag_evidence": {
+            "basis": "date_modified bookkeeping timestamp vs kickoff (UNTRUSTED as publication proof -- foundation S3 risk 2; classification rests on cadence)",
+            "hours_before_kickoff": {
+              "n": 104,
+              "min": 29.56,
+              "p10": 51.95,
+              "median": 54.65,
+              "p90": 59.65,
+              "max": 108.37
+            },
+            "rows_with_modified_ts": 104,
+            "rows_modified_after_kickoff": 0
+          },
+          "cell_notes": "Final-report rule: designations are public pre-kickoff by league cadence (24-48h). No revision history exists; date_modified is the feed's bookkeeping, not a publication receipt."
+        },
+        "S4_PRACTICE_STATUS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "ROWS_WITH_PRACTICE_STATUS": 5202,
+            "ROWS_TOTAL": 5202,
+            "CLASS_DNP": 1486,
+            "CLASS_LP": 1257,
+            "CLASS_FP": 2433,
+            "CLASS_OTHER": 26
+          },
+          "rows_with_practice_status_pct": 100.0,
+          "cell_notes": "Weekly snapshot only; per-day progression is NOT reconstructible (forward-capture class). Restricted use."
+        },
+        "S5_ROSTER_RESERVE": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_FOUND_IN_PRIOR_SEASON_SNAPSHOT": 30,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 36,
+            "QB_FOUND_IN_PRIOR_SNAPSHOT": 444,
+            "PRIMARY_QB_UNDETERMINED": 2
+          },
+          "qb_reserve_determinable_pct": 92.58,
+          "observation_lag_evidence": {
+            "basis": "weekly snapshot granularity under prior-week lag rule; lag = kickoff minus snapshot week-conclusion bound, in days",
+            "days": {
+              "n": 474,
+              "min": 1.23,
+              "p10": 4.21,
+              "median": 4.25,
+              "p90": 11.25,
+              "max": 251.6
+            }
+          },
+          "cell_notes": "Status codes are a coarse bucket (RES/PUP/...); reserve SUBTYPE rides on opaque status_description_abbr codes with no in-file codebook and is unresolved. Snapshot compilation time inside the week is unknown -- prior-week rule is the conservative consequence (Week 1 uncovered)."
+        },
+        "S6_DEPTH_CHARTS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB2_NOT_IDENTIFIED": 38,
+            "QB2_IDENTIFIED_PRIOR_WEEK": 474
+          },
+          "qb2_prior_week_pct": 92.58,
+          "cell_notes": "Backup identity only; prior-week chart under lag rule. Snap evidence outranks chart evidence where they differ."
+        },
+        "S7_GAME_DAY_INACTIVES": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No trustworthy timestamped historical archive exists. Schema support built; zero historical records, by design. Excluded from any historical feature set."
+        },
+        "S8_REPORT_REVISIONS": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No structured timestamped historical archive exists. Schema support built; zero historical records, by design."
+        }
+      },
+      "combined_s3_s5_qb_coverage_pct": 92.58,
+      "cross_check_s3_s5": {
+        "population_reserve_player_weeks": 4709,
+        "consistent": 4697,
+        "conflict_designation_q_or_d_while_reserve": 7,
+        "conflict_played_snaps_while_reserve": 6,
+        "reverse_out_but_active_and_played": 0,
+        "consistent_pct": 99.75
+      }
+    },
+    {
+      "season": 2020,
+      "denominator_team_games_reg": 512,
+      "signals": {
+        "S1_STARTER_ACTUAL": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "STARTER_IDENTIFIED": 512,
+            "STARTER_IDENTITY_SCHEDULE_CORROBORATED": 5,
+            "STARTER_IDENTITY_UNRESOLVED": 2
+          },
+          "starter_identified_pct": 100.0,
+          "backup_start_games": 68,
+          "cell_notes": "Starter = QB with most offensive snaps (ties fail closed). Post-game actual: retrospective by construction; prior games' starters are legitimate inputs for later games under the completion-window safeguard."
+        },
+        "S2_SNAP_COUNTS": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "PRIOR_GAME_SNAPS_COMPLETE": 512
+          },
+          "prior_game_complete_pct": 100.0,
+          "cell_notes": "Source carries NO timestamps; publication lag is documented (~1 day, PFR) but NOT measured from this source. Classified retrospectively per owner rule."
+        },
+        "S3_INJURY_DESIGNATIONS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_NOT_ON_REPORT_TEAM_WEEK_PRESENT": 422,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 9,
+            "TEAM_WEEK_ABSENT_FROM_SOURCE": 1,
+            "QB_ROW_PRESENT": 80
+          },
+          "qb_designation_determinable_pct": 98.05,
+          "qb_designation_strict_row_pct": 15.62,
+          "primary_qb_designations": {
+            "NONE_NOT_REPORTED": 422,
+            "NONE_ON_REPORT": 52,
+            "Out": 10,
+            "Questionable": 15,
+            "Doubtful": 3
+          },
+          "questionable_qb_cases": 15,
+          "rows_missing_gsis": 0,
+          "observation_lag_evidence": {
+            "basis": "date_modified bookkeeping timestamp vs kickoff (UNTRUSTED as publication proof -- foundation S3 risk 2; classification rests on cadence)",
+            "hours_before_kickoff": {
+              "n": 80,
+              "min": 28.95,
+              "p10": 52.69,
+              "median": 55.09,
+              "p90": 61.25,
+              "max": 151.68
+            },
+            "rows_with_modified_ts": 80,
+            "rows_modified_after_kickoff": 0
+          },
+          "cell_notes": "Final-report rule: designations are public pre-kickoff by league cadence (24-48h). No revision history exists; date_modified is the feed's bookkeeping, not a publication receipt."
+        },
+        "S4_PRACTICE_STATUS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "ROWS_WITH_PRACTICE_STATUS": 5414,
+            "ROWS_TOTAL": 5414,
+            "CLASS_DNP": 1567,
+            "CLASS_FP": 2462,
+            "CLASS_LP": 1356,
+            "CLASS_OTHER": 29
+          },
+          "rows_with_practice_status_pct": 100.0,
+          "cell_notes": "Weekly snapshot only; per-day progression is NOT reconstructible (forward-capture class). Restricted use."
+        },
+        "S5_ROSTER_RESERVE": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_FOUND_IN_PRIOR_SEASON_SNAPSHOT": 28,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 9,
+            "QB_FOUND_IN_PRIOR_SNAPSHOT": 475
+          },
+          "qb_reserve_determinable_pct": 98.24,
+          "observation_lag_evidence": {
+            "basis": "weekly snapshot granularity under prior-week lag rule; lag = kickoff minus snapshot week-conclusion bound, in days",
+            "days": {
+              "n": 503,
+              "min": 0.56,
+              "p10": 2.56,
+              "median": 4.25,
+              "p90": 10.35,
+              "max": 258.59
+            }
+          },
+          "cell_notes": "Status codes are a coarse bucket (RES/PUP/...); reserve SUBTYPE rides on opaque status_description_abbr codes with no in-file codebook and is unresolved. Snapshot compilation time inside the week is unknown -- prior-week rule is the conservative consequence (Week 1 uncovered)."
+        },
+        "S6_DEPTH_CHARTS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB2_NOT_IDENTIFIED": 33,
+            "QB2_IDENTIFIED_PRIOR_WEEK": 479
+          },
+          "qb2_prior_week_pct": 93.55,
+          "cell_notes": "Backup identity only; prior-week chart under lag rule. Snap evidence outranks chart evidence where they differ."
+        },
+        "S7_GAME_DAY_INACTIVES": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No trustworthy timestamped historical archive exists. Schema support built; zero historical records, by design. Excluded from any historical feature set."
+        },
+        "S8_REPORT_REVISIONS": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No structured timestamped historical archive exists. Schema support built; zero historical records, by design."
+        }
+      },
+      "combined_s3_s5_qb_coverage_pct": 98.05,
+      "cross_check_s3_s5": {
+        "population_reserve_player_weeks": 4815,
+        "consistent": 4779,
+        "conflict_designation_q_or_d_while_reserve": 36,
+        "conflict_played_snaps_while_reserve": 0,
+        "reverse_out_but_active_and_played": 0,
+        "consistent_pct": 99.25
+      }
+    },
+    {
+      "season": 2021,
+      "denominator_team_games_reg": 544,
+      "signals": {
+        "S1_STARTER_ACTUAL": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "STARTER_IDENTIFIED": 544,
+            "STARTER_IDENTITY_SCHEDULE_CORROBORATED": 10,
+            "STARTER_IDENTITY_UNRESOLVED": 1
+          },
+          "starter_identified_pct": 100.0,
+          "backup_start_games": 84,
+          "cell_notes": "Starter = QB with most offensive snaps (ties fail closed). Post-game actual: retrospective by construction; prior games' starters are legitimate inputs for later games under the completion-window safeguard."
+        },
+        "S2_SNAP_COUNTS": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "PRIOR_GAME_SNAPS_COMPLETE": 542,
+            "PRIOR_GAME_SNAPS_INCOMPLETE": 2
+          },
+          "prior_game_complete_pct": 99.63,
+          "cell_notes": "Source carries NO timestamps; publication lag is documented (~1 day, PFR) but NOT measured from this source. Classified retrospectively per owner rule."
+        },
+        "S3_INJURY_DESIGNATIONS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_NOT_ON_REPORT_TEAM_WEEK_PRESENT": 414,
+            "QB_ROW_PRESENT": 120,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 10
+          },
+          "qb_designation_determinable_pct": 98.16,
+          "qb_designation_strict_row_pct": 22.06,
+          "primary_qb_designations": {
+            "NONE_NOT_REPORTED": 414,
+            "Out": 8,
+            "NONE_ON_REPORT": 93,
+            "Questionable": 16,
+            "Doubtful": 3
+          },
+          "questionable_qb_cases": 16,
+          "rows_missing_gsis": 0,
+          "observation_lag_evidence": {
+            "basis": "date_modified bookkeeping timestamp vs kickoff (UNTRUSTED as publication proof -- foundation S3 risk 2; classification rests on cadence)",
+            "hours_before_kickoff": {
+              "n": 120,
+              "min": 18.67,
+              "p10": 45.0,
+              "median": 47.26,
+              "p90": 53.62,
+              "max": 145.67
+            },
+            "rows_with_modified_ts": 120,
+            "rows_modified_after_kickoff": 0
+          },
+          "cell_notes": "Final-report rule: designations are public pre-kickoff by league cadence (24-48h). No revision history exists; date_modified is the feed's bookkeeping, not a publication receipt."
+        },
+        "S4_PRACTICE_STATUS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "ROWS_WITH_PRACTICE_STATUS": 5348,
+            "ROWS_TOTAL": 5348,
+            "CLASS_FP": 2266,
+            "CLASS_DNP": 1662,
+            "CLASS_LP": 1377,
+            "CLASS_OTHER": 43
+          },
+          "rows_with_practice_status_pct": 100.0,
+          "cell_notes": "Weekly snapshot only; per-day progression is NOT reconstructible (forward-capture class). Restricted use."
+        },
+        "S5_ROSTER_RESERVE": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_FOUND_IN_PRIOR_SEASON_SNAPSHOT": 31,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 10,
+            "QB_FOUND_IN_PRIOR_SNAPSHOT": 503
+          },
+          "qb_reserve_determinable_pct": 98.16,
+          "observation_lag_evidence": {
+            "basis": "weekly snapshot granularity under prior-week lag rule; lag = kickoff minus snapshot week-conclusion bound, in days",
+            "days": {
+              "n": 534,
+              "min": 0.56,
+              "p10": 3.38,
+              "median": 4.25,
+              "p90": 11.25,
+              "max": 251.51
+            }
+          },
+          "cell_notes": "Status codes are a coarse bucket (RES/PUP/...); reserve SUBTYPE rides on opaque status_description_abbr codes with no in-file codebook and is unresolved. Snapshot compilation time inside the week is unknown -- prior-week rule is the conservative consequence (Week 1 uncovered)."
+        },
+        "S6_DEPTH_CHARTS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB2_NOT_IDENTIFIED": 38,
+            "QB2_IDENTIFIED_PRIOR_WEEK": 506
+          },
+          "qb2_prior_week_pct": 93.01,
+          "cell_notes": "Backup identity only; prior-week chart under lag rule. Snap evidence outranks chart evidence where they differ."
+        },
+        "S7_GAME_DAY_INACTIVES": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No trustworthy timestamped historical archive exists. Schema support built; zero historical records, by design. Excluded from any historical feature set."
+        },
+        "S8_REPORT_REVISIONS": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No structured timestamped historical archive exists. Schema support built; zero historical records, by design."
+        }
+      },
+      "combined_s3_s5_qb_coverage_pct": 98.16,
+      "cross_check_s3_s5": {
+        "population_reserve_player_weeks": 6089,
+        "consistent": 6060,
+        "conflict_designation_q_or_d_while_reserve": 29,
+        "conflict_played_snaps_while_reserve": 0,
+        "reverse_out_but_active_and_played": 2,
+        "consistent_pct": 99.52
+      }
+    },
+    {
+      "season": 2022,
+      "denominator_team_games_reg": 542,
+      "signals": {
+        "S1_STARTER_ACTUAL": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "STARTER_IDENTIFIED": 540,
+            "STARTER_IDENTITY_SCHEDULE_CORROBORATED": 46,
+            "STARTER_IDENTITY_UNRESOLVED": 6,
+            "STARTER_AMBIGUOUS_TIE": 2
+          },
+          "starter_identified_pct": 99.63,
+          "backup_start_games": 77,
+          "cell_notes": "Starter = QB with most offensive snaps (ties fail closed). Post-game actual: retrospective by construction; prior games' starters are legitimate inputs for later games under the completion-window safeguard."
+        },
+        "S2_SNAP_COUNTS": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "PRIOR_GAME_SNAPS_COMPLETE": 542
+          },
+          "prior_game_complete_pct": 100.0,
+          "cell_notes": "Source carries NO timestamps; publication lag is documented (~1 day, PFR) but NOT measured from this source. Classified retrospectively per owner rule."
+        },
+        "S3_INJURY_DESIGNATIONS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_NOT_ON_REPORT_TEAM_WEEK_PRESENT": 378,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 47,
+            "QB_ROW_PRESENT": 112,
+            "TEAM_WEEK_ABSENT_FROM_SOURCE": 3,
+            "PRIMARY_QB_UNDETERMINED": 2
+          },
+          "qb_designation_determinable_pct": 90.41,
+          "qb_designation_strict_row_pct": 20.66,
+          "primary_qb_designations": {
+            "NONE_NOT_REPORTED": 378,
+            "NONE_ON_REPORT": 77,
+            "Out": 15,
+            "Questionable": 18,
+            "Doubtful": 2
+          },
+          "questionable_qb_cases": 18,
+          "rows_missing_gsis": 0,
+          "observation_lag_evidence": {
+            "basis": "date_modified bookkeeping timestamp vs kickoff (UNTRUSTED as publication proof -- foundation S3 risk 2; classification rests on cadence)",
+            "hours_before_kickoff": {
+              "n": 112,
+              "min": 24.85,
+              "p10": 44.1,
+              "median": 46.77,
+              "p90": 52.51,
+              "max": 94.46
+            },
+            "rows_with_modified_ts": 112,
+            "rows_modified_after_kickoff": 0
+          },
+          "cell_notes": "Final-report rule: designations are public pre-kickoff by league cadence (24-48h). No revision history exists; date_modified is the feed's bookkeeping, not a publication receipt."
+        },
+        "S4_PRACTICE_STATUS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "ROWS_WITH_PRACTICE_STATUS": 5450,
+            "ROWS_TOTAL": 5450,
+            "CLASS_DNP": 1700,
+            "CLASS_FP": 2280,
+            "CLASS_LP": 1443,
+            "CLASS_OTHER": 27
+          },
+          "rows_with_practice_status_pct": 100.0,
+          "cell_notes": "Weekly snapshot only; per-day progression is NOT reconstructible (forward-capture class). Restricted use."
+        },
+        "S5_ROSTER_RESERVE": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_FOUND_IN_PRIOR_SEASON_SNAPSHOT": 30,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 47,
+            "QB_FOUND_IN_PRIOR_SNAPSHOT": 463,
+            "PRIMARY_QB_UNDETERMINED": 2
+          },
+          "qb_reserve_determinable_pct": 90.96,
+          "observation_lag_evidence": {
+            "basis": "weekly snapshot granularity under prior-week lag rule; lag = kickoff minus snapshot week-conclusion bound, in days",
+            "days": {
+              "n": 493,
+              "min": 1.23,
+              "p10": 3.39,
+              "median": 4.25,
+              "p90": 11.25,
+              "max": 244.51
+            }
+          },
+          "cell_notes": "Status codes are a coarse bucket (RES/PUP/...); reserve SUBTYPE rides on opaque status_description_abbr codes with no in-file codebook and is unresolved. Snapshot compilation time inside the week is unknown -- prior-week rule is the conservative consequence (Week 1 uncovered)."
+        },
+        "S6_DEPTH_CHARTS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB2_NOT_IDENTIFIED": 41,
+            "QB2_IDENTIFIED_PRIOR_WEEK": 501
+          },
+          "qb2_prior_week_pct": 92.44,
+          "cell_notes": "Backup identity only; prior-week chart under lag rule. Snap evidence outranks chart evidence where they differ."
+        },
+        "S7_GAME_DAY_INACTIVES": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No trustworthy timestamped historical archive exists. Schema support built; zero historical records, by design. Excluded from any historical feature set."
+        },
+        "S8_REPORT_REVISIONS": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No structured timestamped historical archive exists. Schema support built; zero historical records, by design."
+        }
+      },
+      "combined_s3_s5_qb_coverage_pct": 90.41,
+      "cross_check_s3_s5": {
+        "population_reserve_player_weeks": 4979,
+        "consistent": 4965,
+        "conflict_designation_q_or_d_while_reserve": 14,
+        "conflict_played_snaps_while_reserve": 0,
+        "reverse_out_but_active_and_played": 0,
+        "consistent_pct": 99.72
+      }
+    },
+    {
+      "season": 2023,
+      "denominator_team_games_reg": 544,
+      "signals": {
+        "S1_STARTER_ACTUAL": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "STARTER_IDENTIFIED": 543,
+            "STARTER_IDENTITY_SCHEDULE_CORROBORATED": 12,
+            "STARTER_AMBIGUOUS_TIE": 1,
+            "STARTER_IDENTITY_UNRESOLVED": 1
+          },
+          "starter_identified_pct": 99.82,
+          "backup_start_games": 71,
+          "cell_notes": "Starter = QB with most offensive snaps (ties fail closed). Post-game actual: retrospective by construction; prior games' starters are legitimate inputs for later games under the completion-window safeguard."
+        },
+        "S2_SNAP_COUNTS": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "PRIOR_GAME_SNAPS_COMPLETE": 544
+          },
+          "prior_game_complete_pct": 100.0,
+          "cell_notes": "Source carries NO timestamps; publication lag is documented (~1 day, PFR) but NOT measured from this source. Classified retrospectively per owner rule."
+        },
+        "S3_INJURY_DESIGNATIONS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_NOT_ON_REPORT_TEAM_WEEK_PRESENT": 429,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 18,
+            "QB_ROW_PRESENT": 95,
+            "TEAM_WEEK_ABSENT_FROM_SOURCE": 1,
+            "PRIMARY_QB_UNDETERMINED": 1
+          },
+          "qb_designation_determinable_pct": 96.32,
+          "qb_designation_strict_row_pct": 17.46,
+          "primary_qb_designations": {
+            "NONE_NOT_REPORTED": 429,
+            "NONE_ON_REPORT": 63,
+            "Questionable": 21,
+            "Out": 8,
+            "Doubtful": 3
+          },
+          "questionable_qb_cases": 21,
+          "rows_missing_gsis": 0,
+          "observation_lag_evidence": {
+            "basis": "date_modified bookkeeping timestamp vs kickoff (UNTRUSTED as publication proof -- foundation S3 risk 2; classification rests on cadence)",
+            "hours_before_kickoff": {
+              "n": 95,
+              "min": 28.61,
+              "p10": 44.18,
+              "median": 46.95,
+              "p90": 52.87,
+              "max": 55.28
+            },
+            "rows_with_modified_ts": 95,
+            "rows_modified_after_kickoff": 0
+          },
+          "cell_notes": "Final-report rule: designations are public pre-kickoff by league cadence (24-48h). No revision history exists; date_modified is the feed's bookkeeping, not a publication receipt."
+        },
+        "S4_PRACTICE_STATUS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "ROWS_WITH_PRACTICE_STATUS": 5451,
+            "ROWS_TOTAL": 5451,
+            "CLASS_FP": 2448,
+            "CLASS_DNP": 1555,
+            "CLASS_LP": 1415,
+            "CLASS_OTHER": 33
+          },
+          "rows_with_practice_status_pct": 100.0,
+          "cell_notes": "Weekly snapshot only; per-day progression is NOT reconstructible (forward-capture class). Restricted use."
+        },
+        "S5_ROSTER_RESERVE": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_FOUND_IN_PRIOR_SEASON_SNAPSHOT": 26,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 18,
+            "QB_FOUND_IN_PRIOR_SNAPSHOT": 499,
+            "PRIMARY_QB_UNDETERMINED": 1
+          },
+          "qb_reserve_determinable_pct": 96.51,
+          "observation_lag_evidence": {
+            "basis": "weekly snapshot granularity under prior-week lag rule; lag = kickoff minus snapshot week-conclusion bound, in days",
+            "days": {
+              "n": 525,
+              "min": 1.23,
+              "p10": 4.06,
+              "median": 4.25,
+              "p90": 11.21,
+              "max": 244.51
+            }
+          },
+          "cell_notes": "Status codes are a coarse bucket (RES/PUP/...); reserve SUBTYPE rides on opaque status_description_abbr codes with no in-file codebook and is unresolved. Snapshot compilation time inside the week is unknown -- prior-week rule is the conservative consequence (Week 1 uncovered)."
+        },
+        "S6_DEPTH_CHARTS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB2_NOT_IDENTIFIED": 39,
+            "QB2_IDENTIFIED_PRIOR_WEEK": 505
+          },
+          "qb2_prior_week_pct": 92.83,
+          "cell_notes": "Backup identity only; prior-week chart under lag rule. Snap evidence outranks chart evidence where they differ."
+        },
+        "S7_GAME_DAY_INACTIVES": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No trustworthy timestamped historical archive exists. Schema support built; zero historical records, by design. Excluded from any historical feature set."
+        },
+        "S8_REPORT_REVISIONS": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No structured timestamped historical archive exists. Schema support built; zero historical records, by design."
+        }
+      },
+      "combined_s3_s5_qb_coverage_pct": 96.32,
+      "cross_check_s3_s5": {
+        "population_reserve_player_weeks": 4689,
+        "consistent": 4583,
+        "conflict_designation_q_or_d_while_reserve": 106,
+        "conflict_played_snaps_while_reserve": 0,
+        "reverse_out_but_active_and_played": 0,
+        "consistent_pct": 97.74
+      }
+    },
+    {
+      "season": 2024,
+      "denominator_team_games_reg": 544,
+      "signals": {
+        "S1_STARTER_ACTUAL": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "STARTER_IDENTIFIED": 544,
+            "STARTER_IDENTITY_UNRESOLVED": 1
+          },
+          "starter_identified_pct": 100.0,
+          "backup_start_games": 72,
+          "cell_notes": "Starter = QB with most offensive snaps (ties fail closed). Post-game actual: retrospective by construction; prior games' starters are legitimate inputs for later games under the completion-window safeguard."
+        },
+        "S2_SNAP_COUNTS": {
+          "availability_class": "AVAILABLE_ONLY_RETROSPECTIVELY",
+          "timing_evidence": "NONE",
+          "counts": {
+            "PRIOR_GAME_SNAPS_COMPLETE": 544
+          },
+          "prior_game_complete_pct": 100.0,
+          "cell_notes": "Source carries NO timestamps; publication lag is documented (~1 day, PFR) but NOT measured from this source. Classified retrospectively per owner rule."
+        },
+        "S3_INJURY_DESIGNATIONS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_NOT_ON_REPORT_TEAM_WEEK_PRESENT": 421,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 2,
+            "TEAM_WEEK_ABSENT_FROM_SOURCE": 1,
+            "QB_ROW_PRESENT": 120
+          },
+          "qb_designation_determinable_pct": 99.45,
+          "qb_designation_strict_row_pct": 22.06,
+          "primary_qb_designations": {
+            "NONE_NOT_REPORTED": 421,
+            "NONE_ON_REPORT": 96,
+            "Note": 1,
+            "Questionable": 14,
+            "Out": 4,
+            "Doubtful": 5
+          },
+          "questionable_qb_cases": 14,
+          "rows_missing_gsis": 0,
+          "observation_lag_evidence": {
+            "basis": "date_modified bookkeeping timestamp vs kickoff (UNTRUSTED as publication proof -- foundation S3 risk 2; classification rests on cadence)",
+            "hours_before_kickoff": {
+              "n": 120,
+              "min": 22.99,
+              "p10": 44.98,
+              "median": 47.49,
+              "p90": 53.42,
+              "max": 92.84
+            },
+            "rows_with_modified_ts": 120,
+            "rows_modified_after_kickoff": 0
+          },
+          "cell_notes": "Final-report rule: designations are public pre-kickoff by league cadence (24-48h). No revision history exists; date_modified is the feed's bookkeeping, not a publication receipt."
+        },
+        "S4_PRACTICE_STATUS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "ROWS_WITH_PRACTICE_STATUS": 5954,
+            "ROWS_TOTAL": 5954,
+            "CLASS_DNP": 1501,
+            "CLASS_LP": 1450,
+            "CLASS_FP": 2966,
+            "CLASS_OTHER": 37
+          },
+          "rows_with_practice_status_pct": 100.0,
+          "cell_notes": "Weekly snapshot only; per-day progression is NOT reconstructible (forward-capture class). Restricted use."
+        },
+        "S5_ROSTER_RESERVE": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB_FOUND_IN_PRIOR_SEASON_SNAPSHOT": 31,
+            "QB_IDENTITY_UNRESOLVED_NO_GSIS_BRIDGE": 2,
+            "QB_FOUND_IN_PRIOR_SNAPSHOT": 511
+          },
+          "qb_reserve_determinable_pct": 99.63,
+          "observation_lag_evidence": {
+            "basis": "weekly snapshot granularity under prior-week lag rule; lag = kickoff minus snapshot week-conclusion bound, in days",
+            "days": {
+              "n": 542,
+              "min": 0.25,
+              "p10": 3.55,
+              "median": 4.25,
+              "p90": 11.25,
+              "max": 244.51
+            }
+          },
+          "cell_notes": "Status codes are a coarse bucket (RES/PUP/...); reserve SUBTYPE rides on opaque status_description_abbr codes with no in-file codebook and is unresolved. Snapshot compilation time inside the week is unknown -- prior-week rule is the conservative consequence (Week 1 uncovered)."
+        },
+        "S6_DEPTH_CHARTS": {
+          "availability_class": "AVAILABLE_HISTORICALLY",
+          "timing_evidence": "CADENCE_INFERRED",
+          "counts": {
+            "QB2_NOT_IDENTIFIED": 50,
+            "QB2_IDENTIFIED_PRIOR_WEEK": 494
+          },
+          "qb2_prior_week_pct": 90.81,
+          "cell_notes": "Backup identity only; prior-week chart under lag rule. Snap evidence outranks chart evidence where they differ."
+        },
+        "S7_GAME_DAY_INACTIVES": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No trustworthy timestamped historical archive exists. Schema support built; zero historical records, by design. Excluded from any historical feature set."
+        },
+        "S8_REPORT_REVISIONS": {
+          "availability_class": "FORWARD_CAPTURE_ONLY",
+          "counts": {},
+          "cell_notes": "No structured timestamped historical archive exists. Schema support built; zero historical records, by design."
+        }
+      },
+      "combined_s3_s5_qb_coverage_pct": 99.45,
+      "cross_check_s3_s5": {
+        "population_reserve_player_weeks": 5184,
+        "consistent": 5048,
+        "conflict_designation_q_or_d_while_reserve": 136,
+        "conflict_played_snaps_while_reserve": 0,
+        "reverse_out_but_active_and_played": 1,
+        "consistent_pct": 97.38
+      }
+    }
+  ],
+  "gates": {
+    "primary_fitting_2019_2024": {
+      "seasons": [
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024
+      ],
+      "team_games": 3198,
+      "gate_s3_s5_qb_coverage_ge_95pct": {
+        "value_pct": 95.84,
+        "threshold_pct": 95.0,
+        "pass": true
+      },
+      "gate_s2_snap_completeness_ge_95pct": {
+        "value_pct": 99.94,
+        "threshold_pct": 95.0,
+        "pass": true,
+        "denominator_note": "team-games with an in-sequence prior game"
+      },
+      "gate_backup_start_games_ge_150": {
+        "value": 426,
+        "threshold": 150,
+        "pass": true
+      },
+      "gate_questionable_qb_cases_ge_100": {
+        "value": 99,
+        "threshold": 100,
+        "pass": false
+      }
+    },
+    "extended_2012_2018": {
+      "seasons": [
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018
+      ],
+      "team_games": 3584,
+      "gate_s3_s5_qb_coverage_ge_95pct": {
+        "value_pct": 79.27,
+        "threshold_pct": 95.0,
+        "pass": false
+      },
+      "gate_s2_snap_completeness_ge_95pct": {
+        "value_pct": 84.82,
+        "threshold_pct": 95.0,
+        "pass": false,
+        "denominator_note": "team-games with an in-sequence prior game"
+      },
+      "gate_backup_start_games_ge_150": {
+        "value": 317,
+        "threshold": 150,
+        "pass": true
+      },
+      "gate_questionable_qb_cases_ge_100": {
+        "value": 64,
+        "threshold": 100,
+        "pass": false
+      }
+    },
+    "all_2012_2024": {
+      "seasons": [
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024
+      ],
+      "team_games": 6782,
+      "gate_s3_s5_qb_coverage_ge_95pct": {
+        "value_pct": 87.08,
+        "threshold_pct": 95.0,
+        "pass": false
+      },
+      "gate_s2_snap_completeness_ge_95pct": {
+        "value_pct": 91.95,
+        "threshold_pct": 95.0,
+        "pass": false,
+        "denominator_note": "team-games with an in-sequence prior game"
+      },
+      "gate_backup_start_games_ge_150": {
+        "value": 743,
+        "threshold": 150,
+        "pass": true
+      },
+      "gate_questionable_qb_cases_ge_100": {
+        "value": 163,
+        "threshold": 100,
+        "pass": true
+      }
+    }
+  },
+  "feasibility_verdicts": {
+    "primary_qb_id (S1/S2)": {
+      "verdict": "FEASIBLE",
+      "measured_pct": 99.84,
+      "basis": "starter identification rate, fitting corpora pooled",
+      "restrictions": "snap-derived starter (max offensive snaps); ties fail closed; 2012 unavailable at the named source (header-only file), so extended corpora effectively start 2013"
+    },
+    "qb_designation (S3)": {
+      "verdict": "FEASIBLE",
+      "measured_pct": 95.84,
+      "basis": "determinable = report row present (any status) or team-week present in the injuries file",
+      "restrictions": "final-report cadence rule (cadence-inferred timing, no per-record publication receipt); no revision history; strict explicit-designation rows are a minority of team-games because healthy QBs carry no designation"
+    },
+    "qb_reserve (S5)": {
+      "verdict": "FEASIBLE",
+      "measured_pct": 96.03,
+      "basis": "primary QB found in a prior-week roster snapshot",
+      "restrictions": "prior-week lag rule strictly applied (Week 1 team-games uncovered); reserve subtype unresolved (opaque status_description_abbr codes, no codebook)"
+    },
+    "qb_practice_final (S4)": {
+      "verdict": "FEASIBLE_WITH_NAMED_RESTRICTIONS",
+      "measured_pct": null,
+      "basis": "practice_status presence among injury-report rows (see per-season S4 counts)",
+      "restrictions": "weekly snapshot only; per-day progression not reconstructible; optional feature -- drop at design freeze if its value cannot be isolated (foundation S4)"
+    },
+    "backup_qb_id (S1/S6)": {
+      "verdict": "FEASIBLE",
+      "measured_pct": 92.53,
+      "basis": "prior-week depth-chart QB2 identified rate; snap evidence (most recent fill-in starter) outranks the chart",
+      "restrictions": "chart snapshot day inside the week is untimestamped; lag rule mandatory"
+    },
+    "absent_share_off/def (S2 x S3/S5)": {
+      "verdict": "FEASIBLE",
+      "measured_pct": 99.94,
+      "basis": "prior-game snap completeness gate metric",
+      "restrictions": "trailing shares from completed games only, under the completion-window safeguard; same-game snaps never features"
+    },
+    "game_day_inactives (S7)": {
+      "verdict": "NOT_FEASIBLE",
+      "measured_pct": 0.0,
+      "basis": "no trustworthy timestamped historical archive exists",
+      "restrictions": "forward-capture only; excluded from V2 per the parity rule and the owner's decision"
+    },
+    "report_revisions (S8)": {
+      "verdict": "NOT_FEASIBLE",
+      "measured_pct": 0.0,
+      "basis": "no structured timestamped historical archive exists",
+      "restrictions": "forward-capture only; excluded from V2"
+    }
+  },
+  "sensitivity_schedule_corroborated_bridge": {
+    "method": "Starter identity additionally resolved when the snap-derived starter's name exactly equals the schedule's listed QB name for the same game/team (two independent sources agreeing). Strict pfr->gsis bridge remains the headline; this is a sensitivity, NOT the headline, because name matching has caused production identity incidents in this project.",
+    "pooled_primary_fitting_2019_2024": {
+      "combined_s3_s5_qb_coverage_pct": 99.12,
+      "questionable_qb_cases": 105,
+      "vs_strict_headline": {
+        "combined_s3_s5_qb_coverage_pct": 95.84,
+        "questionable_qb_cases": 99
+      }
+    },
+    "per_season_bridge_recoveries": {
+      "2019": 32,
+      "2020": 5,
+      "2021": 10,
+      "2022": 50,
+      "2023": 12,
+      "2024": 0
+    },
+    "implication": "The preregistration S8 Questionable-QB estimator gate (>=100) fails by one case (99) under the strict bridge and passes (105) under the corroborated bridge. The shortfall is an identity-resolution artifact, not a data-availability failure. Adopting the corroborated bridge is an owner decision at lock time."
+  }
+}
