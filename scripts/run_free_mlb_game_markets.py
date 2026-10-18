@@ -17,7 +17,7 @@ def main() -> int:
     p.add_argument("--out", default="artifacts/free_mlb_game_markets.json")
     args = p.parse_args()
     now = datetime.now(timezone.utc)
-    schedule = fetch_schedule(args.date, now=now)
+    schedule = fetch_schedule(args.date)  # retrieved_at = post-fetch receipt clock; caller time is not a receipt claim
     routed = acquire_mlb_game_markets_free_first(
         schedule=schedule,
         now=now,

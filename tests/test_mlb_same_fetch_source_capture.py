@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -89,8 +89,9 @@ class SameFetchSourceCaptureTest(unittest.TestCase):
         opener = _Opener(self.schedule_raw, self.boxscore_raw)
         observed = datetime(2026, 9, 13, 17, 30, tzinfo=timezone.utc)
         with tempfile.TemporaryDirectory() as td:
-            with capture_mlb_source_bytes(Path(td), clock=lambda: observed) as capture:
-                games = fetch_schedule("2026-09-13", opener=opener, now=observed)
+            with patch("sportsedge.mlb_source._trusted_now", lambda: observed), \
+                    capture_mlb_source_bytes(Path(td), clock=lambda: observed) as capture:
+                games = fetch_schedule("2026-09-13", opener=opener)
                 box = fetch_boxscore(777001, opener=opener)
 
             self.assertEqual(101, games[0].away_probable_pitcher_id)
@@ -126,17 +127,17 @@ class SameFetchSourceCaptureTest(unittest.TestCase):
                 events.append("body_received")
                 return super().read()
 
-        class ReceiptClock(datetime):
-            @staticmethod
-            def now(tz):
-                events.append("clock_read")
-                return observed
+        def trusted():
+            events.append("clock_read")
+            return observed
 
-        with patch("sportsedge.mlb_source.datetime", ReceiptClock):
+        with patch("sportsedge.mlb_source._trusted_now", trusted):
             games = fetch_schedule(
                 "2026-09-13", opener=lambda *a, **kw: DelayedResponse(raw)
             )
-        self.assertEqual(["body_received", "clock_read"], events)
+        # trusted fetch-start reads (schedule + transport), body, then trusted receipt
+        self.assertEqual(["clock_read", "clock_read", "body_received", "clock_read"], events)
+        self.assertEqual("clock_read", events[-1])  # receipt read after the body
         self.assertEqual(observed.isoformat(), games[0].retrieved_at)
 
     def test_schedule_explicitly_requests_postseason_and_preserves_world_series(self):
@@ -148,10 +149,132 @@ class SameFetchSourceCaptureTest(unittest.TestCase):
         self.assertEqual("W", games[0].game_type)
         self.assertEqual(1, len(opener.calls))
 
+    def test_direct_recorder_cannot_self_anchor_to_year_2000(self):
+        from sportsedge.mlb_source import MLBSourceCapture, MLBSourceError
+        now = datetime(2026, 10, 13, 17, 0, tzinfo=timezone.utc)
+        fake = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            recorder = MLBSourceCapture(Path(td), clock=lambda: fake)
+            with patch("sportsedge.mlb_source._trusted_now", lambda: now):
+                with self.assertRaisesRegex(MLBSourceError, "RECEIPT_STALE_OR_REPLAYED"):
+                    recorder.record(url="https://x/api/v1/schedule", raw=b"{}",
+                                    fetch_started_at=fake, received_at=fake)
+            self.assertEqual([], recorder.records)
+            self.assertEqual([], list(Path(td).iterdir()))
+
+    def test_direct_recorder_rejects_future_independent_anchor(self):
+        from sportsedge.mlb_source import MLBSourceCapture, MLBSourceError
+        now = datetime(2026, 10, 13, 17, 0, tzinfo=timezone.utc)
+        future = now + timedelta(hours=1)
+        with tempfile.TemporaryDirectory() as td:
+            recorder = MLBSourceCapture(Path(td), clock=lambda: future)
+            with patch("sportsedge.mlb_source._trusted_now", lambda: now):
+                with self.assertRaisesRegex(MLBSourceError, "RECEIPT_FUTURE_VS_SYSTEM_ANCHOR"):
+                    recorder.record(url="https://x/api/v1/schedule", raw=b"{}",
+                                    fetch_started_at=future, received_at=future)
+            self.assertEqual([], recorder.records)
+
+    def test_direct_recorder_rejects_stale_and_repeated_receipts(self):
+        from sportsedge.mlb_source import MLBSourceCapture, MLBSourceError
+        now = datetime(2026, 10, 13, 17, 0, tzinfo=timezone.utc)
+        prior = now - timedelta(minutes=2)
+        with tempfile.TemporaryDirectory() as td:
+            recorder = MLBSourceCapture(Path(td), clock=lambda: prior)
+            with patch("sportsedge.mlb_source._trusted_now", lambda: now):
+                with self.assertRaisesRegex(MLBSourceError, "RECEIPT_STALE_OR_REPLAYED"):
+                    recorder.record(url="https://x/api/v1/schedule", raw=b"{}",
+                                    fetch_started_at=prior, received_at=prior)
+            current = MLBSourceCapture(Path(td), clock=lambda: now)
+            with patch("sportsedge.mlb_source._trusted_now", lambda: now):
+                current.record(url="https://x/api/v1/schedule", raw=b"{}",
+                               fetch_started_at=now, received_at=now)
+                with self.assertRaisesRegex(MLBSourceError, "RECEIPT_DUPLICATE_REPLAY"):
+                    current.record(url="https://x/api/v1/schedule", raw=b"{}",
+                                   fetch_started_at=now, received_at=now)
+            self.assertEqual(1, len(current.records))
+
+    def test_direct_recorder_requires_independent_clock_anchor(self):
+        from sportsedge.mlb_source import MLBSourceCapture, MLBSourceError
+        now = datetime(2026, 10, 13, 17, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            recorder = MLBSourceCapture(Path(td), clock=lambda: now)
+            with patch("sportsedge.mlb_source._trusted_now", lambda: None):
+                with self.assertRaisesRegex(MLBSourceError, "RECEIPT_ANCHOR_UNAVAILABLE"):
+                    recorder.record(url="https://x/api/v1/schedule", raw=b"{}",
+                                    fetch_started_at=now, received_at=now)
+            self.assertEqual([], recorder.records)
+            self.assertEqual([], list(Path(td).iterdir()))
+
+    def test_journal_unchained_extra_metadata_fails_closed(self):
+        from sportsedge import mlb_source as ms
+        observed = datetime(2026, 10, 13, 17, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with patch("sportsedge.mlb_source._trusted_now", lambda: observed):
+                rec = ms.MLBSourceCapture(root, clock=lambda: observed)
+                rec.record(url="https://x/api/v1/schedule", raw=b"{}",
+                           fetch_started_at=observed, received_at=observed)
+            journal = root / ms.RECEIPT_JOURNAL_NAME
+            entry = json.loads(journal.read_text().strip())
+            entry["unhashed_extra"] = "attacker-added"
+            journal.write_text(json.dumps(entry) + "\n")
+            with self.assertRaisesRegex(ms.MLBSourceError, "RECEIPT_JOURNAL_SCHEMA_DRIFT"):
+                ms.verify_receipt_journal(root, verifier_now=observed)
+
+    def test_journal_duplicate_json_key_fails_closed(self):
+        from sportsedge import mlb_source as ms
+        observed = datetime(2026, 10, 13, 17, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with patch("sportsedge.mlb_source._trusted_now", lambda: observed):
+                rec = ms.MLBSourceCapture(root, clock=lambda: observed)
+                rec.record(url="https://x/api/v1/schedule", raw=b"{}",
+                           fetch_started_at=observed, received_at=observed)
+            journal = root / ms.RECEIPT_JOURNAL_NAME
+            text = journal.read_text()
+            original = '"url":"https://x/api/v1/schedule"'
+            self.assertIn(original, text)
+            journal.write_text(text.replace(original, original + "," + original, 1))
+            with self.assertRaisesRegex(ms.MLBSourceError, "RECEIPT_JOURNAL_DUPLICATE_JSON_KEY"):
+                ms.verify_receipt_journal(root, verifier_now=observed)
+
+    def test_journal_unterminated_final_record_fails_closed(self):
+        from sportsedge import mlb_source as ms
+        observed = datetime(2026, 10, 13, 17, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with patch("sportsedge.mlb_source._trusted_now", lambda: observed):
+                rec = ms.MLBSourceCapture(root, clock=lambda: observed)
+                rec.record(url="https://x/api/v1/schedule", raw=b"{}",
+                           fetch_started_at=observed, received_at=observed)
+            journal = root / ms.RECEIPT_JOURNAL_NAME
+            self.assertTrue(journal.read_bytes().endswith(b"\n"))
+            journal.write_bytes(journal.read_bytes()[:-1])
+            with self.assertRaisesRegex(ms.MLBSourceError, "RECEIPT_JOURNAL_UNTERMINATED"):
+                ms.verify_receipt_journal(root, verifier_now=observed)
+
+    def test_journal_resigned_parent_path_fails_closed(self):
+        from sportsedge import mlb_source as ms
+        observed = datetime(2026, 10, 13, 17, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with patch("sportsedge.mlb_source._trusted_now", lambda: observed):
+                rec = ms.MLBSourceCapture(root, clock=lambda: observed)
+                rec.record(url="https://x/api/v1/schedule", raw=b"{}",
+                           fetch_started_at=observed, received_at=observed)
+            journal = root / ms.RECEIPT_JOURNAL_NAME
+            entry = json.loads(journal.read_text().strip())
+            entry["file_name"] = "../outside.json"
+            entry["record_sha256"] = ms._record_hash(entry)
+            journal.write_text(json.dumps(entry) + "\n")
+            with self.assertRaisesRegex(ms.MLBSourceError, "RECEIPT_RAW_PATH_UNSAFE"):
+                ms.verify_receipt_journal(root, verifier_now=observed)
+
     def test_capture_is_opt_in(self):
         opener = _Opener(self.schedule_raw, self.boxscore_raw)
         observed = datetime(2026, 9, 13, 17, 30, tzinfo=timezone.utc)
-        fetch_schedule("2026-09-13", opener=opener, now=observed)
+        with patch("sportsedge.mlb_source._trusted_now", lambda: observed):
+            fetch_schedule("2026-09-13", opener=opener)
         fetch_boxscore(777001, opener=opener)
         self.assertEqual(2, len(opener.calls))
         self.assertTrue(all(response.read_count == 1 for response in opener.responses))
