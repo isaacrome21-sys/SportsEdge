@@ -1,0 +1,2064 @@
+{
+  "archive_type": "MLB_PROP_PIT_QUOTES",
+  "captured_at": "2026-10-18T01:07:49.649846+00:00",
+  "event_failure_count": 0,
+  "event_failures": [],
+  "evidence_class": "LIVE_PROVIDER_QUOTE_ARCHIVE",
+  "identity_policy": {
+    "automatic_identity_binding_required_later": true,
+    "participant_name_is_canonical_player_id": false,
+    "provider_event_is_canonical_game_id": false,
+    "zero_or_multiple_identity_matches_fail_closed": true
+  },
+  "market_counts": {
+    "BATTER_BB": 0,
+    "BATTER_K": 0,
+    "DOUBLES": 0,
+    "EITHER_PITCHER_BB": 0,
+    "EITHER_PITCHER_ER": 0,
+    "EITHER_PITCHER_HITS_ALLOWED": 0,
+    "EXTRA_BASE_HITS": 0,
+    "HITS": 0,
+    "HITS_RUNS_RBIS": 0,
+    "HITS_RUNS_STOLEN_BASES": 0,
+    "HITS_STOLEN_BASES": 0,
+    "HITS_WALKS_STOLEN_BASES": 0,
+    "HOME_RUNS": 0,
+    "PITCHER_BB": 0,
+    "PITCHER_ER": 0,
+    "PITCHER_HITS_ALLOWED": 0,
+    "PITCHER_HITS_WALKS_ER": 0,
+    "PITCHER_K": 0,
+    "PITCHER_OUTS": 0,
+    "RBI": 0,
+    "RUNS": 0,
+    "RUNS_RBIS": 0,
+    "SINGLES": 0,
+    "STOLEN_BASES": 0,
+    "TOTAL_BASES": 0,
+    "TRIPLES": 0
+  },
+  "payload_sha256": "e351fc3f072ed5eff3cb9e90ec258cad60122ce6c067f3c9c32f712588e9fe0f",
+  "pit_target_quote_count": 0,
+  "provider": "DRAFTKINGS_WEB_RESEARCH",
+  "provider_failure_count": 0,
+  "provider_failures": [],
+  "provider_quote_count": 248,
+  "quotes": [],
+  "rejected_target_count": 248,
+  "rejected_targets": [
+    {
+      "entity_name": "Nick Martinez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "PITCHER_K",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.164746+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nick Martinez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "PITCHER_K",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.164746+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nick Martinez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "PITCHER_HITS_ALLOWED",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.164746+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nick Martinez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "PITCHER_HITS_ALLOWED",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.164746+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nick Martinez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "PITCHER_BB",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.164746+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nick Martinez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "PITCHER_BB",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.164746+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nick Martinez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "PITCHER_ER",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.164746+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nick Martinez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "PITCHER_ER",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.164746+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nick Martinez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "PITCHER_HITS_WALKS_ER",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.164746+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nick Martinez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "PITCHER_HITS_WALKS_ER",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.164746+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonathan Aranda",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonathan Aranda",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chase DeLauter",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chase DeLauter",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jose Ramirez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "STOLEN_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jose Ramirez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "STOLEN_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chase DeLauter",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chase DeLauter",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Yandy Diaz",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Yandy Diaz",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Yandy Diaz",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Yandy Diaz",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chase DeLauter",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chase DeLauter",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Yandy Diaz",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "TOTAL_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Yandy Diaz",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "TOTAL_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chase DeLauter",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chase DeLauter",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Yandy Diaz",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Yandy Diaz",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chandler Simpson",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "STOLEN_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chandler Simpson",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "STOLEN_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Steven Kwan",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Steven Kwan",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jo Adell",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jo Adell",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Steven Kwan",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Steven Kwan",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Yandy Diaz",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Yandy Diaz",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chase DeLauter",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "TOTAL_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chase DeLauter",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "TOTAL_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jo Adell",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jo Adell",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonathan Aranda",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonathan Aranda",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Taylor Walls",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "STOLEN_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Taylor Walls",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "STOLEN_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonathan Aranda",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonathan Aranda",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chase DeLauter",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chase DeLauter",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jose Ramirez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jose Ramirez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Steven Kwan",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Steven Kwan",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Steven Kwan",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "TOTAL_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Steven Kwan",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "TOTAL_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Junior Caminero",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Junior Caminero",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Steven Kwan",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Steven Kwan",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Brayan Rocchio",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "STOLEN_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Brayan Rocchio",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "STOLEN_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Victor Mesa Jr.",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Victor Mesa Jr.",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jose Ramirez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jose Ramirez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chase DeLauter",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chase DeLauter",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonathan Aranda",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonathan Aranda",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonathan Aranda",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "TOTAL_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonathan Aranda",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "TOTAL_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nathaniel Lowe",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nathaniel Lowe",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Victor Mesa Jr.",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Victor Mesa Jr.",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Richie Palacios",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "STOLEN_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Richie Palacios",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "STOLEN_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chandler Simpson",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chandler Simpson",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nathaniel Lowe",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nathaniel Lowe",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Junior Caminero",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Junior Caminero",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Victor Mesa Jr.",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Victor Mesa Jr.",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Victor Mesa Jr.",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "TOTAL_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Victor Mesa Jr.",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "TOTAL_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jose Ramirez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jose Ramirez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jose Ramirez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jose Ramirez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Victor Mesa Jr.",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "STOLEN_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Victor Mesa Jr.",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "STOLEN_BASES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Yandy Diaz",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Yandy Diaz",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Junior Caminero",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Junior Caminero",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jo Adell",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jo Adell",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chandler Simpson",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chandler Simpson",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Victor Mesa Jr.",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Victor Mesa Jr.",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chandler Simpson",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chandler Simpson",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jose Ramirez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jose Ramirez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Travis Bazzana",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Travis Bazzana",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonathan Aranda",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonathan Aranda",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jose Ramirez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jose Ramirez",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Yandy Diaz",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Yandy Diaz",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jo Adell",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jo Adell",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jo Adell",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jo Adell",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chandler Simpson",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chandler Simpson",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chandler Simpson",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chandler Simpson",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jo Adell",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jo Adell",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Travis Bazzana",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Travis Bazzana",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Junior Caminero",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Junior Caminero",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nathaniel Lowe",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nathaniel Lowe",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonathan Aranda",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonathan Aranda",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nathaniel Lowe",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nathaniel Lowe",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Junior Caminero",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Junior Caminero",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chandler Simpson",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Chandler Simpson",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nathaniel Lowe",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nathaniel Lowe",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Junior Caminero",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Junior Caminero",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Patrick Bailey",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Patrick Bailey",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Taylor Walls",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Taylor Walls",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nathaniel Lowe",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Nathaniel Lowe",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Liam Hicks",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Liam Hicks",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Taylor Walls",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Taylor Walls",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Taylor Walls",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Taylor Walls",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Victor Mesa Jr.",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Victor Mesa Jr.",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Richie Palacios",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Richie Palacios",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Travis Bazzana",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Travis Bazzana",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Taylor Walls",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Taylor Walls",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Travis Bazzana",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Travis Bazzana",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Travis Bazzana",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Travis Bazzana",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Brayan Rocchio",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Brayan Rocchio",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Travis Bazzana",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Travis Bazzana",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Taylor Walls",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Taylor Walls",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Patrick Bailey",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Patrick Bailey",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Brayan Rocchio",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Brayan Rocchio",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Brayan Rocchio",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Brayan Rocchio",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonny DeLuca",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonny DeLuca",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Brayan Rocchio",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Brayan Rocchio",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Brayan Rocchio",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Brayan Rocchio",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Brayan Rocchio",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Brayan Rocchio",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Liam Hicks",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Liam Hicks",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Liam Hicks",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Liam Hicks",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Richie Palacios",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Richie Palacios",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Liam Hicks",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Liam Hicks",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Patrick Bailey",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Patrick Bailey",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonny DeLuca",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonny DeLuca",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Patrick Bailey",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Patrick Bailey",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Richie Palacios",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Richie Palacios",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Steven Kwan",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Steven Kwan",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Victor Mesa Jr.",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Victor Mesa Jr.",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Liam Hicks",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Liam Hicks",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Petey Halpin",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Petey Halpin",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Richie Palacios",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Richie Palacios",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonny DeLuca",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonny DeLuca",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Liam Hicks",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Liam Hicks",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Patrick Bailey",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Patrick Bailey",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Richie Palacios",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Richie Palacios",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Steven Kwan",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Steven Kwan",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonny DeLuca",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonny DeLuca",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Patrick Bailey",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Patrick Bailey",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Taylor Walls",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Taylor Walls",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonny DeLuca",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonny DeLuca",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonny DeLuca",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Jonny DeLuca",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Richie Palacios",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Richie Palacios",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RBI",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Petey Halpin",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Petey Halpin",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS_RUNS_RBIS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Petey Halpin",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Petey Halpin",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "SINGLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Petey Halpin",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Petey Halpin",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "DOUBLES",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Petey Halpin",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Petey Halpin",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "RUNS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Petey Halpin",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    },
+    {
+      "entity_name": "Petey Halpin",
+      "first_pitch_at": "2026-10-18T00:08:19+00:00",
+      "market": "HITS",
+      "provider_event_id": "34839994",
+      "quote_retrieved_at": "2026-10-18T01:07:49.476629+00:00",
+      "reason": "NOT_PREGAME"
+    }
+  ],
+  "schema_version": 2,
+  "target_markets": [
+    "BATTER_BB",
+    "BATTER_K",
+    "DOUBLES",
+    "EITHER_PITCHER_BB",
+    "EITHER_PITCHER_ER",
+    "EITHER_PITCHER_HITS_ALLOWED",
+    "EXTRA_BASE_HITS",
+    "HITS",
+    "HITS_RUNS_RBIS",
+    "HITS_RUNS_STOLEN_BASES",
+    "HITS_STOLEN_BASES",
+    "HITS_WALKS_STOLEN_BASES",
+    "HOME_RUNS",
+    "PITCHER_BB",
+    "PITCHER_ER",
+    "PITCHER_HITS_ALLOWED",
+    "PITCHER_HITS_WALKS_ER",
+    "PITCHER_K",
+    "PITCHER_OUTS",
+    "RBI",
+    "RUNS",
+    "RUNS_RBIS",
+    "SINGLES",
+    "STOLEN_BASES",
+    "TOTAL_BASES",
+    "TRIPLES"
+  ]
+}
