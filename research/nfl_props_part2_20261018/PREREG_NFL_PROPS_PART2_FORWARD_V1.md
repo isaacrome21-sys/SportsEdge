@@ -87,8 +87,9 @@ player's own prior same-season games:
 - **Closing capture:** the final pre-kickoff capture for each game
   supplies that game's closing prices. Close attachment matches on
   (game, player, market, line) and records both closing prices + the
-  closing capture timestamp. A close row timestamped at/after kickoff is
-  not a close (see §4.5).
+  closing capture timestamp. A close row timestamped at/after kickoff, or
+  more than 60 minutes before kickoff, is not a close, and a close at a
+  different line than the entry is `LINE_MOVED` (see §4.5).
 
 ## 3. Scoring
 
@@ -149,7 +150,16 @@ that close cannot be read:
   count**, is **left out of the CLV average**, and is **never filled in
   from another time or source**.
 - The **share of CLV_MISSING rows per market is reported with every
-  readout**.
+  readout**, broken down by reason.
+- **A close is readable only if** it is the same game, player, market, and
+  **line** as the entry, carries both prices, and is captured **before
+  kickoff and no more than 60 minutes before kickoff**. Every CLV_MISSING
+  row carries exactly one reason: `NO_CLOSE_ROW` (nothing for that
+  player/market in the close capture), `LINE_MOVED` (the market closed at a
+  different line), `CLOSE_SINGLE_SIDED`, `CLOSE_NOT_PREKICKOFF`, or
+  `CLOSE_STALE` (captured more than 60 minutes before kickoff). A moved
+  line is never repriced to the closing line and never read from an
+  alternate ladder.
 - If **more than 20% of a market's rows are CLV_MISSING**, that market's
   CLV verdict is **INSUFFICIENT_CLOSE_DATA**, whatever its row count
   (its calibration results may still be reported — a calibration report,
@@ -230,6 +240,15 @@ prospective evidence.
   (see §header and the published-card evidence record for the London
   fixture). They are graded as history and never counted toward this
   test's sample, its gates, or its verdicts.
+
+**Pre-pricing amendment (Oct 18, 2026, ~16:10 CT, owner-authorized, before
+any row was priced):** review found that close matching treated a moved
+line as an unexplained missing close, and that any pre-kickoff capture,
+however early, counted as the close. §2 and §4.5 now define a readable
+close (same line, both prices, captured within the 60 minutes before
+kickoff) and require one named reason per CLV_MISSING row, reported by
+reason. The 20% INSUFFICIENT_CLOSE_DATA trip is unchanged and counts all
+reasons together.
 
 *Frozen Oct 18, 2026. Owner ruling: Isaac (sample-size option C with both
 amendments and the missing-close rule, confirmed in the main chat

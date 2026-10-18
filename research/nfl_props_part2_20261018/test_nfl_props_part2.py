@@ -158,6 +158,69 @@ def test_missing_close_labeled_and_scored_correctly(tmp_path):
     assert expected_clv > 0  # close moved toward the model's side
 
 
+def _attach(tmp_path, rows, close_rows):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "priced_rows.json").write_text(json.dumps({"run": {}, "rows": rows}))
+    close_path = tmp_path / "close.json"
+    close_path.write_text(json.dumps({"season": 2026, "week": 5, "rows": close_rows}))
+    summary = pricing.attach_close(run_dir, close_path)
+    payload = json.loads((run_dir / "priced_rows.json").read_text())
+    return summary, {r["player_id"]: r for r in payload["rows"]}
+
+
+def _close(pid, line=45.5, captured="2026-10-22T19:00:00-05:00", over=-130, under=110):
+    return {"game_id": "G1", "player_id": pid, "market": "REC_YDS", "line": line,
+            "over_price": over, "under_price": under, "captured_at": captured,
+            "kickoff": "2026-10-22T19:20:00-05:00"}
+
+
+def test_moved_line_is_line_moved_never_repriced(tmp_path):
+    # P_A's market closed at 47.5 (entry 45.5); P_B has no market at all.
+    summary, by = _attach(tmp_path, [_priced_row("P_A", "G1"), _priced_row("P_B", "G1")],
+                          [_close("P_A", line=47.5)])
+    assert summary == {"readable": 0, "clv_missing": 2}
+    assert by["P_A"]["clv_missing_reason"] == "LINE_MOVED"
+    assert by["P_A"]["close_novig_p_over"] is None  # never repriced to the new line
+    assert by["P_B"]["clv_missing_reason"] == "NO_CLOSE_ROW"
+
+
+def test_close_freshness_boundary_60_minutes(tmp_path):
+    # kickoff 19:20 -> 18:20 is exactly 60 min (readable); 18:19 is 61 min (stale)
+    summary, by = _attach(
+        tmp_path,
+        [_priced_row("P_A", "G1"), _priced_row("P_B", "G1"), _priced_row("P_C", "G1")],
+        [_close("P_A", captured="2026-10-22T18:20:00-05:00"),
+         _close("P_B", captured="2026-10-22T18:19:00-05:00"),
+         _close("P_C", captured="2026-10-22T19:20:00-05:00")])
+    assert by["P_A"]["close_status"] == "READABLE"
+    assert by["P_B"]["clv_missing_reason"] == "CLOSE_STALE"
+    assert by["P_C"]["clv_missing_reason"] == "CLOSE_NOT_PREKICKOFF"
+    assert summary == {"readable": 1, "clv_missing": 2}
+
+
+def test_single_sided_close_reason(tmp_path):
+    _, by = _attach(tmp_path, [_priced_row("P_A", "G1")], [_close("P_A", under=None)])
+    assert by["P_A"]["clv_missing_reason"] == "CLOSE_SINGLE_SIDED"
+
+
+def test_missing_share_reported_by_reason():
+    rows = []
+    for i, reason in enumerate(["LINE_MOVED", "LINE_MOVED", "CLOSE_STALE", None, None]):
+        row = _priced_row(f"P{i}", f"G{i}")
+        if reason:
+            row["close_status"] = "CLV_MISSING"
+            row["clv_missing_reason"] = reason
+        else:
+            row["close_status"] = "READABLE"
+            nv_o, nv_u = pricing.devig_pair(-110, -110)
+            row["close_novig_p_over"], row["close_novig_p_under"] = nv_o, nv_u
+        rows.append(scoring.score_row(EV, row, [40.0, 50.0, 60.0], 60.0, GRID))
+    agg = scoring.aggregate_market(EV, rows, slates_completed=1, passing_graded_rows=0)
+    assert agg["clv_missing_rows"] == 3
+    assert agg["clv_missing_by_reason"] == {"CLOSE_STALE": 1, "LINE_MOVED": 2}
+
+
 # ---------- (c) the >20% CLV_MISSING rule flips the market verdict ----------
 
 def _scored_market(n_rows=100, n_missing=21, n_games=40):
@@ -215,7 +278,8 @@ def test_frozen_prereg_terms_present():
         assert term in text, term
     for term in ("4 full slates", "50 graded passing-yards rows",
                  "40 distinct games per market", "100 graded rows", "20%",
-                 "1–3, 4–5, 6–9, 10+", "w ≥ 0.43", "0.25 ≤ w <"):
+                 "1–3, 4–5, 6–9, 10+", "w ≥ 0.43", "0.25 ≤ w <",
+                 "LINE_MOVED", "CLOSE_STALE", "no more than 60 minutes before kickoff"):
         assert term in text, term
     # the boundary: Oct 18 rows are historical, never prospective
     assert "never prospective entries" in text
