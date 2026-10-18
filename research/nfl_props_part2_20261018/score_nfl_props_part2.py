@@ -171,6 +171,11 @@ def aggregate_market(ev, rows: list, *, slates_completed: int,
         "distinct_games": len({r["game_id"] for r in graded}),
         "clv_missing_rows": len(missing),
         "clv_missing_share": share_missing,
+        "clv_missing_by_reason": {
+            reason: sum(1 for r in missing
+                        if (r.get("clv_missing_reason") or "UNSPECIFIED") == reason)
+            for reason in sorted({r.get("clv_missing_reason") or "UNSPECIFIED" for r in missing})
+        },
         "clv": ({"mean": clv_stats["mean"], "ci95_lo": clv_stats["ci95_lo"],
                  "ci95_hi": clv_stats["ci95_hi"], "n": clv_stats["n"],
                  "n_games_clustered": clv_stats["n_blocks"]} if clv_stats else None),
