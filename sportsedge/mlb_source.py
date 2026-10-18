@@ -1,9 +1,11 @@
 from __future__ import annotations
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
+from dataclasses import replace, dataclass, asdict
+from datetime import datetime, timedelta, timezone
 import hashlib
+import uuid
+import time as _time
 import json
 from pathlib import Path
 import re
@@ -43,6 +45,45 @@ class GameSnapshot:
     official_date: str | None = None
     detailed_status: str | None = None
     game_type: str | None = None
+    # Caller's own timestamp (e.g. run as-of); never receipt evidence. Bounded in fetch_schedule.
+    caller_asserted_at: str | None = None
+
+
+RECEIPT_CLOCK_SKEW = timedelta(seconds=5)
+# A claimed fetch receipt older than this cannot be certified by the current
+# independent system clock. This is a transport-ingestion limit, not evidence
+# that data were present at a historical game as-of instant.
+RECEIPT_ANCHOR_MAX_AGE = timedelta(seconds=30)
+RECEIPT_MAX_FETCH_SPAN = timedelta(seconds=30)
+
+
+def _trusted_now() -> datetime:
+    """Trusted system clock for fetch start / receipt. Not injectable by callers or
+    recorders; only tests monkeypatch this module attribute."""
+    return _DATETIME.fromtimestamp(_time.time_ns() / 1e9, tz=timezone.utc)
+
+
+_utc_clock = _trusted_now  # backward-compatible name; same trusted source
+
+
+_DATETIME = datetime  # unpatched type for isinstance checks
+
+
+def _aware(value: Any, label: str) -> datetime:
+    if not isinstance(value, _DATETIME) or value.tzinfo is None or value.utcoffset() is None:
+        raise MLBSourceError(f"{label} must be a timezone-aware datetime")
+    return value.astimezone(timezone.utc)
+
+
+def bound_caller_time(value: datetime, *, fetch_started_at: datetime, received_at: datetime,
+                      skew: timedelta = RECEIPT_CLOCK_SKEW) -> datetime:
+    """Fail closed unless fetch_started_at <= value <= received_at + skew."""
+    v = _aware(value, "caller-supplied time")
+    if v < fetch_started_at:
+        raise MLBSourceError("CALLER_TIME_BEFORE_FETCH_START")
+    if v > received_at + skew:
+        raise MLBSourceError("CALLER_TIME_IN_FUTURE")
+    return v
 
 
 @dataclass(frozen=True)
@@ -55,6 +96,143 @@ class MLBSourceCaptureRecord:
     path: str
     byte_length: int
     game_pk: int | None = None
+    # Persisted receipt bounds from the trusted module clock. observed_at_utc is
+    # ALWAYS equal to received_at_utc (post-read completion), never earlier.
+    fetch_started_at_utc: str | None = None
+    received_at_utc: str | None = None
+    # Non-evidentiary: the injectable recorder clock's own assertion, kept only
+    # for diagnostics. Never used as a receipt or PIT time.
+    recorder_clock_assertion_utc: str | None = None
+    receipt_nonce: str | None = None
+    prev_record_sha256: str | None = None
+    record_sha256: str | None = None
+
+
+RECEIPT_JOURNAL_NAME = "receipt_journal.jsonl"
+GENESIS_SHA256 = "0" * 64
+RECEIPT_PLAUSIBLE_FLOOR = datetime(2020, 1, 1, tzinfo=timezone.utc)
+_HASHED_FIELDS = (
+    "sequence", "source_kind", "url", "observed_at_utc", "sha256", "file_name",
+    "byte_length", "game_pk", "fetch_started_at_utc", "received_at_utc",
+    "recorder_clock_assertion_utc", "receipt_nonce", "prev_record_sha256",
+)
+
+
+def _record_hash(entry: dict[str, Any]) -> str:
+    body = {k: entry.get(k) for k in _HASHED_FIELDS}
+    return hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def _parse_utc(value: Any, label: str) -> datetime:
+    if not isinstance(value, str) or not value:
+        raise MLBSourceError(f"RECEIPT_FIELD_MISSING:{label}")
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise MLBSourceError(f"RECEIPT_FIELD_INVALID:{label}") from exc
+    if dt.tzinfo is None:
+        raise MLBSourceError(f"RECEIPT_FIELD_NAIVE:{label}")
+    return dt.astimezone(timezone.utc)
+
+
+def verify_receipt_journal(root: str | Path, *, verifier_now: datetime | None = None) -> list[dict[str, Any]]:
+    """Independently re-verify a persisted capture directory (fresh process / restart).
+
+    Fails closed on: missing fields, broken hash chain, edited entries, raw byte
+    tamper, observed != received, received < fetch start, fetch span over the limit,
+    implausible (pre-2020 or future vs verifier clock) receipts, duplicate nonces or
+    duplicate receipt tuples. The chain is local tamper-evidence only; it is NOT an
+    external, independently anchored timestamp.
+    """
+    root = Path(root)
+    journal = root / RECEIPT_JOURNAL_NAME
+    if not journal.exists():
+        return []
+    # A half-written final JSON record may parse as a complete object, but the
+    # next append would concatenate two lines. Reject such an archive as-is.
+    journal_bytes = journal.read_bytes()
+    if not journal_bytes or not journal_bytes.endswith(b"\n"):
+        raise MLBSourceError("RECEIPT_JOURNAL_UNTERMINATED")
+    now = _aware(verifier_now, "verifier clock") if verifier_now is not None else _aware(_trusted_now(), "verifier clock")
+    entries: list[dict[str, Any]] = []
+    prev = GENESIS_SHA256
+    nonces: set[str] = set()
+    keys: set[tuple[str, str, str, str]] = set()
+    expected_keys = set(_HASHED_FIELDS) | {"record_sha256"}
+    for lineno, line in enumerate(journal_bytes.decode("utf-8").splitlines(), start=1):
+        if not line.strip():
+            raise MLBSourceError(f"RECEIPT_JOURNAL_BLANK_LINE:{lineno}")
+        def unique_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+            data = {}
+            for key, value in pairs:
+                if key in data:
+                    raise MLBSourceError(f"RECEIPT_JOURNAL_DUPLICATE_JSON_KEY:{lineno}")
+                data[key] = value
+            return data
+        try:
+            entry = json.loads(line, object_pairs_hook=unique_pairs,
+                               parse_constant=lambda value: (_ for _ in ()).throw(
+                                   MLBSourceError("RECEIPT_JOURNAL_NONFINITE_NUMBER")))
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise MLBSourceError(f"RECEIPT_JOURNAL_CORRUPT:{lineno}") from exc
+        if type(entry) is not dict:
+            raise MLBSourceError(f"RECEIPT_JOURNAL_SCHEMA_DRIFT:{lineno}")
+        # Missing evidentiary fields retain their dedicated failure code.
+        # Unexpected additional fields are still refused rather than silently
+        # ignored by the fixed-field hash.
+        for field in _HASHED_FIELDS + ("record_sha256",):
+            if field not in entry:
+                raise MLBSourceError(f"RECEIPT_FIELD_MISSING:{field}")
+        if set(entry) != expected_keys:
+            raise MLBSourceError(f"RECEIPT_JOURNAL_SCHEMA_DRIFT:{lineno}")
+        for field in _HASHED_FIELDS + ("record_sha256",):
+            if field not in entry or (entry[field] is None and field not in ("game_pk", "recorder_clock_assertion_utc")):
+                raise MLBSourceError(f"RECEIPT_FIELD_MISSING:{field}")
+        if entry["sequence"] != lineno:
+            raise MLBSourceError("RECEIPT_SEQUENCE_GAP")
+        if entry["prev_record_sha256"] != prev:
+            raise MLBSourceError("RECEIPT_CHAIN_BROKEN")
+        if _record_hash(entry) != entry["record_sha256"]:
+            raise MLBSourceError("RECEIPT_RECORD_TAMPERED")
+        start = _parse_utc(entry["fetch_started_at_utc"], "fetch_started_at_utc")
+        received = _parse_utc(entry["received_at_utc"], "received_at_utc")
+        observed = _parse_utc(entry["observed_at_utc"], "observed_at_utc")
+        if observed != received:
+            raise MLBSourceError("RECEIPT_OBSERVED_NOT_POST_READ")
+        if received < start:
+            raise MLBSourceError("RECEIPT_CLOCK_WENT_BACKWARDS")
+        if received - start > RECEIPT_MAX_FETCH_SPAN:
+            raise MLBSourceError("RECEIPT_FETCH_SPAN_UNBOUNDED")
+        if start < RECEIPT_PLAUSIBLE_FLOOR:
+            raise MLBSourceError("RECEIPT_IMPLAUSIBLY_OLD")
+        if received > now + RECEIPT_CLOCK_SKEW:
+            raise MLBSourceError("RECEIPT_FUTURE_VS_VERIFIER")
+        key = (entry["url"], entry["sha256"], entry["fetch_started_at_utc"], entry["received_at_utc"])
+        if entry["receipt_nonce"] in nonces or key in keys:
+            raise MLBSourceError("RECEIPT_DUPLICATE_REPLAY")
+        nonces.add(entry["receipt_nonce"]); keys.add(key)
+        filename = entry["file_name"]
+        if (not isinstance(filename, str) or not filename or len(filename) > 180
+                or Path(filename).name != filename or chr(92) in filename):
+            raise MLBSourceError("RECEIPT_RAW_PATH_UNSAFE")
+        raw_path = root / filename
+        if raw_path.is_symlink():
+            raise MLBSourceError("RECEIPT_RAW_PATH_UNSAFE")
+        if not raw_path.exists():
+            raise MLBSourceError("RECEIPT_RAW_BYTES_MISSING")
+        raw = raw_path.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != entry["sha256"] or len(raw) != entry["byte_length"]:
+            raise MLBSourceError("RECEIPT_RAW_BYTES_TAMPERED")
+        prev = entry["record_sha256"]
+        entries.append(entry)
+    return entries
+
+
+def receipt_supports_as_of(entry: dict[str, Any], as_of: datetime) -> bool:
+    """A receipt can only evidence pregame availability if bytes were received at or
+    before ``as_of``. A schedule fetched today for an old game is never as-of proof."""
+    received = _parse_utc(entry.get("received_at_utc") if isinstance(entry, dict) else None, "received_at_utc")
+    return received <= _aware(as_of, "as_of")
 
 
 class MLBSourceCapture:
@@ -67,8 +245,19 @@ class MLBSourceCapture:
 
     def __init__(self, root: Path, *, clock: Callable[[], datetime] | None = None):
         self.root = Path(root)
-        self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.clock = clock or (lambda: _trusted_now())
         self.records: list[MLBSourceCaptureRecord] = []
+        self._used_receipts: set[tuple[str, str, str, str]] = set()
+        self._used_nonces: set[str] = set()
+        self._prev_sha = GENESIS_SHA256
+        self._sequence = 0
+        # Restart: reload and re-verify persisted state so a new recorder at the
+        # same root cannot re-admit a receipt tuple already in the journal.
+        for entry in verify_receipt_journal(self.root):
+            self._used_receipts.add((entry["url"], entry["sha256"], entry["fetch_started_at_utc"], entry["received_at_utc"]))
+            self._used_nonces.add(entry["receipt_nonce"])
+            self._prev_sha = entry["record_sha256"]
+            self._sequence = entry["sequence"]
 
     @staticmethod
     def _identity(url: str) -> tuple[str, int | None]:
@@ -79,14 +268,45 @@ class MLBSourceCapture:
             return "MLB_STATSAPI_BOXSCORE", int(match.group(1))
         return "MLB_STATSAPI_OTHER", None
 
-    def record(self, *, url: str, raw: bytes) -> MLBSourceCaptureRecord:
-        observed = self.clock()
-        if not isinstance(observed, datetime) or observed.tzinfo is None or observed.utcoffset() is None:
+    def record(self, *, url: str, raw: bytes, fetch_started_at: datetime,
+               received_at: datetime) -> MLBSourceCaptureRecord:
+        """Require an independent system-time anchor, not the recorder clock.
+
+        Caller-provided fetch bounds alone are not evidence. Reject stale,
+        future, implausibly long and duplicate receipt claims before writing.
+        This still is not a signed cross-process PIT receipt or proof of a
+        historical sportsbook/StatsAPI state; all capture remains research.
+        """
+        try:
+            observed = _aware(self.clock(), "source capture clock")
+        except MLBSourceError:
             raise MLBSourceError("source capture clock must return timezone-aware datetime")
-        observed = observed.astimezone(timezone.utc)
+        start = _aware(fetch_started_at, "trusted fetch start")
+        receipt = _aware(received_at, "trusted receipt")
+        if receipt < start:
+            raise MLBSourceError("RECEIPT_CLOCK_WENT_BACKWARDS")
+        bound_caller_time(observed, fetch_started_at=start, received_at=receipt)
+        try:
+            anchor = _aware(_trusted_now(), "independent system receipt anchor")
+        except Exception as exc:
+            raise MLBSourceError("RECEIPT_ANCHOR_UNAVAILABLE") from exc
+        if receipt > anchor + RECEIPT_CLOCK_SKEW:
+            raise MLBSourceError("RECEIPT_FUTURE_VS_SYSTEM_ANCHOR")
+        if receipt < anchor - RECEIPT_ANCHOR_MAX_AGE:
+            raise MLBSourceError("RECEIPT_STALE_OR_REPLAYED")
+        if receipt - start > RECEIPT_MAX_FETCH_SPAN:
+            raise MLBSourceError("RECEIPT_FETCH_SPAN_UNBOUNDED")
         source_kind, game_pk = self._identity(url)
         digest = hashlib.sha256(raw).hexdigest()
-        sequence = len(self.records) + 1
+        receipt_key = (url, digest, start.isoformat(), receipt.isoformat())
+        if receipt_key in self._used_receipts:
+            raise MLBSourceError("RECEIPT_DUPLICATE_REPLAY")
+        if start < RECEIPT_PLAUSIBLE_FLOOR:
+            raise MLBSourceError("RECEIPT_IMPLAUSIBLY_OLD")
+        nonce = uuid.uuid4().hex
+        while nonce in self._used_nonces:
+            nonce = uuid.uuid4().hex
+        sequence = self._sequence + 1
         suffix = f"game_{game_pk}" if game_pk is not None else source_kind.lower()
         name = f"{sequence:04d}_{suffix}_{digest}.json"
         destination = self.root / name
@@ -94,22 +314,42 @@ class MLBSourceCapture:
         if destination.exists() and destination.read_bytes() != raw:
             raise MLBSourceError("immutable raw source capture collision")
         destination.write_bytes(raw)
+        entry = {
+            "sequence": sequence, "source_kind": source_kind, "url": url,
+            # Canonical observation == trusted post-read completion. Never earlier.
+            "observed_at_utc": receipt.isoformat(), "sha256": digest, "file_name": name,
+            "byte_length": len(raw), "game_pk": game_pk,
+            "fetch_started_at_utc": start.isoformat(), "received_at_utc": receipt.isoformat(),
+            "recorder_clock_assertion_utc": observed.isoformat(), "receipt_nonce": nonce,
+            "prev_record_sha256": self._prev_sha,
+        }
+        entry["record_sha256"] = _record_hash(entry)
+        with open(self.root / RECEIPT_JOURNAL_NAME, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(entry, sort_keys=True, separators=(",", ":")) + "\n")
+            fh.flush()
         record = MLBSourceCaptureRecord(
-            sequence=sequence,
-            source_kind=source_kind,
-            url=url,
-            observed_at_utc=observed.isoformat(),
-            sha256=digest,
-            path=str(destination),
-            byte_length=len(raw),
-            game_pk=game_pk,
+            sequence=sequence, source_kind=source_kind, url=url,
+            observed_at_utc=entry["observed_at_utc"], sha256=digest, path=str(destination),
+            byte_length=len(raw), game_pk=game_pk,
+            fetch_started_at_utc=entry["fetch_started_at_utc"], received_at_utc=entry["received_at_utc"],
+            recorder_clock_assertion_utc=entry["recorder_clock_assertion_utc"], receipt_nonce=nonce,
+            prev_record_sha256=entry["prev_record_sha256"], record_sha256=entry["record_sha256"],
         )
         self.records.append(record)
+        self._used_receipts.add(receipt_key)
+        self._used_nonces.add(nonce)
+        self._prev_sha = entry["record_sha256"]
+        self._sequence = sequence
         return record
 
     def manifest(self) -> dict[str, Any]:
         return {
             "schema": "MLB_SAME_FETCH_PIT_SOURCE_CAPTURE_V1",
+            "receipt_schema_version": 2,
+            "receipt_journal": RECEIPT_JOURNAL_NAME,
+            "receipt_chain_head_sha256": self._prev_sha,
+            "receipt_time_semantics": "OBSERVED_EQUALS_TRUSTED_POST_READ_RECEIPT",
+            "external_time_anchor": False,
             "capture_semantics": "SAME_RESPONSE_BYTES_CONSUMED_BY_MODEL",
             "promotion_authority": False,
             "retroactive_point_in_time_claim": False,
@@ -138,15 +378,16 @@ def capture_mlb_source_bytes(
 
 
 def _get_json(url: str, opener: Callable = urlopen) -> dict[str, Any]:
+    recorder = _ACTIVE_SOURCE_CAPTURE.get()
+    started = _trusted_now()
     try:
         with opener(url, timeout=15) as r:
             raw = r.read()
         if not isinstance(raw, (bytes, bytearray)):
             raise MLBSourceError("MLB response body must be bytes")
         raw_bytes = bytes(raw)
-        recorder = _ACTIVE_SOURCE_CAPTURE.get()
         if recorder is not None:
-            recorder.record(url=url, raw=raw_bytes)
+            recorder.record(url=url, raw=raw_bytes, fetch_started_at=started, received_at=_trusted_now())
         return json.loads(raw_bytes.decode("utf-8"))
     except MLBSourceError:
         raise
@@ -267,16 +508,22 @@ def parse_schedule(payload: dict[str, Any], retrieved_at: datetime) -> list[Game
 
 
 def fetch_schedule(date_iso: str, opener: Callable = urlopen, now: datetime | None = None) -> list[GameSnapshot]:
-    # Read the default receipt clock only after the response has arrived.
-    # Explicit `now` remains a caller-supplied timestamp for compatibility;
-    # it is not independent proof of when the source became available.
+    """retrieved_at is ALWAYS the post-fetch clock. A caller-supplied ``now`` is kept
+    only as ``caller_asserted_at`` and must satisfy fetch_start <= now <= receipt + skew."""
     url = (
         f"{BASE}/api/v1/schedule?sportId=1&date={date_iso}"
         "&gameType=R,F,D,L,W,A,S,E&hydrate=probablePitcher,team"
     )
+    fetch_started_at = _aware(_trusted_now(), "receipt clock")
     payload = _get_json(url, opener)
-    retrieved_at = now if now is not None else datetime.now(timezone.utc)
-    return parse_schedule(payload, retrieved_at)
+    retrieved_at = _aware(_trusted_now(), "receipt clock")
+    if retrieved_at < fetch_started_at:
+        raise MLBSourceError("RECEIPT_CLOCK_WENT_BACKWARDS")
+    games = parse_schedule(payload, retrieved_at)
+    if now is None:
+        return games
+    asserted = bound_caller_time(now, fetch_started_at=fetch_started_at, received_at=retrieved_at).isoformat()
+    return [replace(g, caller_asserted_at=asserted) for g in games]
 
 
 def parse_confirmed_lineup(boxscore: dict[str, Any], side: str) -> list[dict[str, Any]]:
