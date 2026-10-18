@@ -84,13 +84,14 @@ Remaining blockers: original input snapshots, exact fitting and pool rules, pred
 
 Source: user's relayed correction of a separate verification summary titled "✅ Ping — the MySpariEdge pull cleared verification", with reported read window "8:47–9:19 AM CT". The original note/link and underlying source rows were not recovered by this session. The quoted window is preserved as reported, not asserted as an independently verified capture interval. User states the pull already cleared; no watch is requested or created.
 
-### Claims withdrawn or quarantined
+### Corrected interpretation (updated from source-verification result relayed by user)
 - **Tuten:** our published mean is n/a. The reported external value 67.2 has no published own-model mean to match. Withdraw "identical to our μ to the decimal" and "same mean, opposite conclusion" for Tuten. A later scratch-session value, if recovered, must be labeled unpublished and cannot replace n/a in the original card.
-- **Collins yardage:** reported external mean 67.5, line 72.5 and "under 46.9%" have unresolved side/line/distribution binding. Do not silently flip the probability or infer a corrected line. Exclude this tuple from evidence for the mean-versus-median explanation until the underlying source is checked. Mean below the line alone does not prove under >50% for every possible distribution, but the tuple needs verification under the claimed model.
-
+- **Collins yardage:** source verified and row transcribed correctly, per the verification result supplied by the user: external projection 67.5, line 72.5, displayed Model % 46.9%. Their Model % is a calibrated win/hit rate for the chosen side, not the per-row predictive-distribution probability P(yards < 72.5). Exclude it from distribution-probability and mean-versus-median comparisons for this metric-definition reason, not pending transcription verification. Do not flip it to an over probability or use it to confirm our EV. This session records the supplied verification result; it did not independently reopen the original source.
 ### Retained historical comparisons, attributed to the user-reported summary
-- Washington receptions UNDER 4.5: reported agreement across the two model outputs.
-- Collins receptions UNDER 5.5: reported agreement across the two model outputs.
+- Washington receptions UNDER 4.5: agreement on side across the two model outputs.
+- Collins receptions UNDER 5.5: agreement on side across the two model outputs.
 - Marks: external projection reportedly 50.1 versus our published 42.2; consistent with the existing backup-weeks / lead-role flag, not proof that role blindness caused the difference.
+
+The matching displayed 55.2% on both reception rows, as reported by the user, is consistent with a shared calibration-bucket value (same market/direction and similar gap); the bucket assignment is an inference, not an independently established implementation detail. The finding is **agreement on side**, not independent agreement or two independent probability estimates. Neither comparison independently confirms our EV.
 
 These are descriptive cross-model comparisons, not a verified demonstration of statistical independence, predictive accuracy, causality, or promotion eligibility. Their underlying MySpariEdge source remains uninspected in this session. Preserve them separately from independently source-verified observations. No prospective rows, model changes, retrospective mean imputation or grading changes.
