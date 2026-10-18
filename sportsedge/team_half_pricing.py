@@ -16,7 +16,7 @@ from artifacts import free_models as engine
 from sportsedge.research_three_sport_bridge import price_three_sport_research
 
 DERIVATIVES = frozenset({
-    "TEAM_TOTAL", "TOTAL_1H", "SPREAD_1H", "TEAM_TOTAL_1H",
+    "TEAM_TOTAL", "TOTAL_1H", "SPREAD_1H", "TEAM_TOTAL_1H", "ML_1H",
     "F5_TOTAL", "F5_TEAM_TOTAL",
 })
 TEAM_MARKETS = frozenset({"TEAM_TOTAL","TEAM_TOTAL_1H","F5_TEAM_TOTAL"})
@@ -148,12 +148,20 @@ def _estimate(row,scored,now):
         raise ValueError("DERIVATIVE_MARKET_UNSUPPORTED")
     if market in {"F5_TOTAL","F5_TEAM_TOTAL"} and sport!="MLB":
         raise ValueError("F5_MLB_ONLY")
-    if market in {"TOTAL_1H","SPREAD_1H","TEAM_TOTAL_1H"} and sport not in {"NFL","CFB"}:
+    if market in {"TOTAL_1H","SPREAD_1H","TEAM_TOTAL_1H","ML_1H"} and sport not in {"NFL","CFB"}:
         raise ValueError("FOOTBALL_FIRST_HALF_ONLY")
-    if side not in ({"HOME","AWAY"} if market=="SPREAD_1H" else {"OVER","UNDER"}):
+    if side not in ({"HOME","AWAY"} if market in {"SPREAD_1H","ML_1H"} else {"OVER","UNDER"}):
         raise ValueError("MARKET_SELECTION_UNSUPPORTED")
-    line=engine.numeric(row.get("line"),"DERIVATIVE_LINE")
-    if market not in {"SPREAD_1H"} and line<0:
+    if market=="ML_1H":
+        # A moneyline has no threshold: an absent line, or an explicit
+        # zero stamped by intake, is the only admissible shape. A nonzero
+        # line is a different market and fails closed.
+        if row.get("line") is not None and engine.numeric(row.get("line"),"DERIVATIVE_LINE")!=0:
+            raise ValueError("MONEYLINE_LINE_NOT_APPLICABLE")
+        line=None
+    else:
+        line=engine.numeric(row.get("line"),"DERIVATIVE_LINE")
+    if market not in {"SPREAD_1H"} and line is not None and line<0:
         raise ValueError("NEGATIVE_TOTAL_LINE")
     period=market in PERIOD_MARKETS
     scale=(5/9 if market.startswith("F5_") else .50 if period else 1.0)
@@ -176,6 +184,15 @@ def _estimate(row,scored,now):
             p,push=_poisson_outcome(mean,side,line)
         else:
             p,push=_normal_outcome(mean,sd_t*sqrt(scale),side,line)
+    elif market=="ML_1H":
+        # The moneyline is the SAME 1H margin distribution the spread
+        # pricer integrates, evaluated at a zero threshold: win is the
+        # mass above the continuity band, push is the mass on an exactly
+        # tied half (the (-0.5, +0.5] margin band, as for integer spread
+        # lines), loss is the remaining mass. No separate model, no
+        # full-game probability, no period multiplier on a probability.
+        mean=(h-a) if side=="HOME" else (a-h)
+        p,push=_normal_outcome(mean,sd_m*sqrt(scale),side,0.0,spread=True)
     else:
         mean=(h-a) if side=="HOME" else (a-h)
         p,push=_normal_outcome(mean,sd_m*sqrt(scale),side,line,spread=True)
@@ -211,6 +228,19 @@ def _quote_line_matches(market,quote_line,row_line):
     (a different threshold, or the same threshold unsigned) is a different
     market and must never be paired into a no-vig price.
     """
+    if market=="ML_1H":
+        # Moneyline quotes carry no threshold; an absent line and an
+        # explicit zero are the same no-line state. A nonzero line on
+        # either side is not this market and must never pair into a
+        # no-vig price.
+        def _no_line(value):
+            if value is None:
+                return True
+            try:
+                return float(value)==0.0
+            except (TypeError,ValueError):
+                return False
+        return _no_line(quote_line) and _no_line(row_line)
     try:
         q=float(quote_line); r=float(row_line)
     except (TypeError,ValueError):
@@ -255,7 +285,10 @@ def price_team_half_rows(rows:Sequence[Mapping],*,now=None,getter=None):
                     continue
                 quotes.append({
                     "sport":model["sport"],"game_id":model["game_id"],
-                    "market":model["market"],"line":q.get("line"),
+                    "market":model["market"],
+                    # The bridge requires a null line for moneylines; an
+                    # intake-stamped zero must not reach it as a line.
+                    "line":None if model["market"]=="ML_1H" else q.get("line"),
                     "selection":str(q.get("side") or q.get("selection") or "").upper(),
                     "odds":q.get("odds",q.get("price")),
                     "book":q.get("book") or "draftkings",
