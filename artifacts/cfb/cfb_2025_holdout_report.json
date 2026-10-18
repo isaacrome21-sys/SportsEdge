@@ -1,0 +1,10 @@
+{
+  "contract": "CFB_2025_LAST_STORED_CLOSE_HOLDOUT_V1",
+  "status": "HOLD_PENDING",
+  "phone_card_status": "NO_MODEL:CFB_2025_HOLDOUT_INCOMPLETE",
+  "saturday_pricing_allowed": false,
+  "promotion_authority": false,
+  "blocker": "CFB_2025_HOLDOUT_BUNDLE_NOT_MATERIALIZED",
+  "close_semantics": "LAST_STORED_CLOSE_NOT_TIMESTAMPED_SNAPSHOT",
+  "n_rows": 0
+}
