@@ -127,9 +127,8 @@ Ruled: option **C** (slate-based floor), **with both amendments** —
   its pricing run covered that game day's full DK board in the four
   markets — no partial-day pricing), AND
 - **50 graded passing-yards rows** in the accumulated sample, AND
-- **40 distinct games** contributing graded rows to the market under
-  review (rows from one game share one game script; the games floor is
-  per market).
+- **40 distinct games per market** (distinct games contributing graded
+  rows to that market; rows from one game share one game script).
 
 ### 4.2 Per-market verdicts
 Verdicts are issued per market, never pooled across markets.

@@ -214,12 +214,17 @@ def test_frozen_prereg_terms_present():
                  "ROLE POOLS", "HISTORICAL", "POOLED", "WITHIN-PLAYER"):
         assert term in text, term
     for term in ("4 full slates", "50 graded passing-yards rows",
-                 "40 distinct games", "100 graded rows", "20%",
+                 "40 distinct games per market", "100 graded rows", "20%",
                  "1–3, 4–5, 6–9, 10+", "w ≥ 0.43", "0.25 ≤ w <"):
         assert term in text, term
     # the boundary: Oct 18 rows are historical, never prospective
     assert "never prospective entries" in text
     assert "never in the prospective sample" in text
+    # owner fix (Oct 18): every threshold is an exact number — no hedging
+    # qualifier on any threshold anywhere in the frozen document
+    for hedge in ("~40", "~50", "~100", "~20", "about 40", "about 50",
+                  "approximately", "around 40", "roughly"):
+        assert hedge not in text, hedge
 
 
 def test_under_rate_stratification_buckets():
