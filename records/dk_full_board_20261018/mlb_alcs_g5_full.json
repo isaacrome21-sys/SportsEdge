@@ -1,0 +1,723 @@
+{
+  "capture": {
+    "date": "2026-10-18",
+    "scope": "MLB full-board capture — one game on today's DraftKings MLB board",
+    "source": "DraftKings Sportsbook, signed-out board",
+    "status": "COMPLETE",
+    "timezone": "America/Chicago",
+    "capture_window_ct": "~10:54-11:06 AM",
+    "note": "Values are LAST-OBSERVED prices. Small drift occurred ~10:55 to ~11:04 AM CT on some alt-total rungs and prop prices; the values recorded here are the final ones."
+  },
+  "game": {
+    "competition": "ALCS Game 5",
+    "matchup": "TB Rays @ CLE Guardians",
+    "away": "Tampa Bay Rays",
+    "home": "Cleveland Guardians",
+    "venue": "Progressive Field",
+    "date_label": "Sun Oct 18, 2026",
+    "first_pitch_ct": "4:10 PM (DK page header)",
+    "event_url": "https://sportsbook.draftkings.com/event/tb-rays-%40-cle-guardians/34848446",
+    "starters": {"TB": "Drew Rasmussen", "CLE": "Parker Messick"}
+  },
+  "game_lines": {
+    "capture_time_ct": "~10:55 AM",
+    "run_line": {"TB": {"line": -1.5, "price": 135}, "CLE": {"line": 1.5, "price": -164}},
+    "total": {"line": 6.5, "over": -102, "under": -118},
+    "moneyline": {"TB": -132, "CLE": 110}
+  },
+  "alt_totals": [
+    {"line": 3.5, "over": -481, "under": 323},
+    {"line": 4, "over": -425, "under": 293},
+    {"line": 4.5, "over": -291, "under": 212},
+    {"line": 5, "over": -229, "under": 172},
+    {"line": 5.5, "over": -151, "under": 116},
+    {"line": 6, "over": -127, "under": -102},
+    {"line": 7, "over": 126, "under": -164},
+    {"line": 7.5, "over": 154, "under": -203},
+    {"line": 8, "over": 189, "under": -256},
+    {"line": 8.5, "over": 209, "under": -286},
+    {"line": 9, "over": 290, "under": -420},
+    {"line": 9.5, "over": 322, "under": -478},
+    {"line": 10, "over": 411, "under": -660},
+    {"line": 10.5, "over": 432, "under": -710},
+    {"line": 11, "over": 600, "under": -1200},
+    {"line": 11.5, "over": 630, "under": -1300}
+  ],
+  "alt_run_line": [
+    {"tb_line": -5.5, "tb_price": 740, "cle_line": 5.5, "cle_price": -1720},
+    {"tb_line": -5, "tb_price": 710, "cle_line": 5, "cle_price": -1600},
+    {"tb_line": -4.5, "tb_price": 505, "cle_line": 4.5, "cle_price": -890},
+    {"tb_line": -4, "tb_price": 474, "cle_line": 4, "cle_price": -810},
+    {"tb_line": -3.5, "tb_price": 337, "cle_line": 3.5, "cle_price": -507},
+    {"tb_line": -3, "tb_price": 304, "cle_line": 3, "cle_price": -445},
+    {"tb_line": -2.5, "tb_price": 216, "cle_line": 2.5, "cle_price": -296},
+    {"tb_line": -2, "tb_price": 182, "cle_line": 2, "cle_price": -245},
+    {"tb_line": -1, "tb_price": -101, "cle_line": 1, "cle_price": -129},
+    {"tb_line": 1, "tb_price": -242, "cle_line": -1, "cle_price": 180},
+    {"tb_line": 1.5, "tb_price": -333, "cle_line": -1.5, "cle_price": 239},
+    {"tb_line": 2, "tb_price": -547, "cle_line": -2, "cle_price": 358},
+    {"tb_line": 2.5, "tb_price": -630, "cle_line": -2.5, "cle_price": 397},
+    {"tb_line": 3, "tb_price": -1180, "cle_line": -3, "cle_price": 600},
+    {"tb_line": 3.5, "tb_price": -1300, "cle_line": -3.5, "cle_price": 640},
+    {"tb_line": 4, "tb_price": -2700, "cle_line": -4, "cle_price": 900}
+  ],
+  "first_5_innings": {
+    "moneyline": {"TB": -135, "CLE": 105},
+    "run_line": [
+      {"tb_line": -1.5, "tb_price": 210, "cle_line": 1.5, "cle_price": -280},
+      {"tb_line": -0.5, "tb_price": 110, "cle_line": 0.5, "cle_price": -140},
+      {"tb_line": 0.5, "tb_price": -210, "cle_line": -0.5, "cle_price": 160},
+      {"tb_line": 1.5, "tb_price": -425, "cle_line": -1.5, "cle_price": 300}
+    ],
+    "totals": [
+      {"line": 2.5, "over": -166, "under": 130},
+      {"line": 3.5, "over": 110, "under": -140},
+      {"line": 4.5, "over": 190, "under": -250}
+    ],
+    "team_totals": [
+      {"team": "CLE", "line": 1.5, "over": 120, "under": -154},
+      {"team": "TB", "line": 1.5, "over": -110, "under": -120}
+    ],
+    "both_teams_to_score_x_plus_runs": [
+      {"threshold": "1+", "price": -110},
+      {"threshold": "2+", "price": 310},
+      {"threshold": "3+", "price": 800},
+      {"threshold": "4+", "price": 2000},
+      {"threshold": "5+", "price": 5000},
+      {"threshold": "6+", "price": 13000},
+      {"threshold": "7+", "price": 25000}
+    ],
+    "winning_margin": [
+      {"team": "TB", "margin": "1", "price": 425},
+      {"team": "TB", "margin": "2", "price": 600},
+      {"team": "TB", "margin": "3+", "price": 370},
+      {"result": "Tie", "price": 320},
+      {"team": "CLE", "margin": "1", "price": 475},
+      {"team": "CLE", "margin": "2", "price": 700},
+      {"team": "CLE", "margin": "3+", "price": 550}
+    ],
+    "home_run_in_period": {"yes": -140, "no": 110}
+  },
+  "first_inning": {
+    "total_runs": [
+      {"line": 0.5, "over": 125, "under": -165, "note": "O0.5 = YRFI / U0.5 = NRFI"},
+      {"line": 1.5, "over": 330, "under": -450}
+    ],
+    "result_3way": {"TB": 320, "Tie": -190, "CLE": 400},
+    "run_line": [
+      {"tb_line": -1.5, "tb_price": 650, "cle_line": 1.5, "cle_price": -1600},
+      {"tb_line": -0.5, "tb_price": 300, "cle_line": 0.5, "cle_price": -450},
+      {"tb_line": 0.5, "tb_price": -600, "cle_line": -0.5, "cle_price": 380},
+      {"tb_line": 1.5, "tb_price": -2500, "cle_line": -1.5, "cle_price": 850}
+    ],
+    "total_runs_odd_even": {"odd": 230, "even": -340}
+  },
+  "first_3_innings": {
+    "moneyline": {"TB": -135, "CLE": 105},
+    "run_line": [
+      {"tb_line": -1.5, "tb_price": 310, "cle_line": 1.5, "cle_price": -445},
+      {"tb_line": -0.5, "tb_price": 150, "cle_line": 0.5, "cle_price": -195},
+      {"tb_line": 0.5, "tb_price": -250, "cle_line": -0.5, "cle_price": 190},
+      {"tb_line": 1.5, "tb_price": -660, "cle_line": -1.5, "cle_price": 420}
+    ],
+    "totals": [
+      {"line": 0.5, "over": -395, "under": 280},
+      {"line": 1.5, "over": -135, "under": 105},
+      {"line": 2.5, "over": 160, "under": -210}
+    ],
+    "team_totals": [
+      {"team": "CLE", "line": 0.5, "over": -115, "under": -115},
+      {"team": "TB", "line": 0.5, "over": -135, "under": 105}
+    ],
+    "both_teams_to_score_x_plus_runs": [
+      {"threshold": "1+", "price": 225},
+      {"threshold": "2+", "price": 850},
+      {"threshold": "3+", "price": 2800},
+      {"threshold": "4+", "price": 7000},
+      {"threshold": "5+", "price": 18000}
+    ],
+    "winning_margin": [
+      {"team": "TB", "margin": "1", "price": 400},
+      {"team": "TB", "margin": "2", "price": 700},
+      {"team": "TB", "margin": "3+", "price": 600},
+      {"result": "Tie", "price": 180},
+      {"team": "CLE", "margin": "1", "price": 450},
+      {"team": "CLE", "margin": "2", "price": 800},
+      {"team": "CLE", "margin": "3+", "price": 850}
+    ],
+    "home_run_in_period": {"yes": 140, "no": -180}
+  },
+  "first_7_innings": {
+    "moneyline": {"TB": -140, "CLE": 110},
+    "run_line": [
+      {"tb_line": -1.5, "tb_price": 165, "cle_line": 1.5, "cle_price": -215},
+      {"tb_line": -0.5, "tb_price": -105, "cle_line": 0.5, "cle_price": -125},
+      {"tb_line": 0.5, "tb_price": -188, "cle_line": -0.5, "cle_price": 145},
+      {"tb_line": 1.5, "tb_price": -345, "cle_line": -1.5, "cle_price": 250}
+    ],
+    "totals": [
+      {"line": 3.5, "over": -215, "under": 165},
+      {"line": 4.5, "over": -120, "under": -110},
+      {"line": 5.5, "over": 135, "under": -175}
+    ],
+    "team_totals": [
+      {"team": "CLE", "line": 1.5, "over": -154, "under": 120},
+      {"team": "TB", "line": 2.5, "over": 100, "under": -130}
+    ],
+    "both_teams_to_score_x_plus_runs": [
+      {"threshold": "1+", "price": -230},
+      {"threshold": "2+", "price": 145},
+      {"threshold": "3+", "price": 370},
+      {"threshold": "4+", "price": 850},
+      {"threshold": "5+", "price": 2000},
+      {"threshold": "6+", "price": 4000},
+      {"threshold": "7+", "price": 10000},
+      {"threshold": "8+", "price": 18000},
+      {"threshold": "9+", "price": 25000}
+    ],
+    "winning_margin": [
+      {"team": "TB", "margin": "1", "price": 500},
+      {"team": "TB", "margin": "2", "price": 650},
+      {"team": "TB", "margin": "3+", "price": 270},
+      {"result": "Tie", "price": 450},
+      {"team": "CLE", "margin": "1", "price": 550},
+      {"team": "CLE", "margin": "2", "price": 700},
+      {"team": "CLE", "margin": "3+", "price": 400}
+    ],
+    "home_run_in_period": {"yes": -250, "no": 190}
+  },
+  "innings_tab": {
+    "note": "Per-inning run totals (O/U at 0.5 and 1.5) and per-inning winner 3-way, innings 2-9.",
+    "innings": {
+      "2nd": {"runs_totals": [{"line": 0.5, "over": 145, "under": -195}, {"line": 1.5, "over": 390, "under": -575}], "winner_3way": {"TB": 380, "Tie": -225, "CLE": 425}},
+      "3rd": {"runs_totals": [{"line": 0.5, "over": 140, "under": -185}, {"line": 1.5, "over": 360, "under": -525}], "winner_3way": {"TB": 360, "Tie": -215, "CLE": 425}},
+      "4th": {"runs_totals": [{"line": 0.5, "over": 135, "under": -185}, {"line": 1.5, "over": 360, "under": -525}], "winner_3way": {"TB": 360, "Tie": -215, "CLE": 425}},
+      "5th": {"runs_totals": [{"line": 0.5, "over": 140, "under": -185}, {"line": 1.5, "over": 360, "under": -525}], "winner_3way": {"TB": 350, "Tie": -210, "CLE": 425}},
+      "6th": {"runs_totals": [{"line": 0.5, "over": 135, "under": -180}, {"line": 1.5, "over": 350, "under": -500}], "winner_3way": {"TB": 350, "Tie": -205, "CLE": 425}},
+      "7th": {"runs_totals": [{"line": 0.5, "over": 130, "under": -180}, {"line": 1.5, "over": 340, "under": -500}], "winner_3way": {"TB": 350, "Tie": -200, "CLE": 400}},
+      "8th": {"runs_totals": [{"line": 0.5, "over": 130, "under": -175}, {"line": 1.5, "over": 330, "under": -475}], "winner_3way": {"TB": 350, "Tie": -195, "CLE": 380}},
+      "9th": {"runs_totals": [{"line": 0.5, "over": 170, "under": -235}, {"line": 1.5, "over": 450, "under": -700}], "winner_3way": {"TB": 330, "Tie": -265, "CLE": 600}}
+    }
+  },
+  "first_of_game": {
+    "first_run_team": {"TB": -170, "CLE": 130},
+    "first_hr_type": {"1_run": -115, "2_run": 250, "3_run": 800, "grand_slam": 3500, "none": 275},
+    "first_scoring_play_total_runs": [
+      {"runs": 1, "price": -500},
+      {"runs": 2, "price": 390},
+      {"runs": 3, "price": 2000},
+      {"runs": 4, "price": 10000}
+    ]
+  },
+  "team_totals": {
+    "main": [
+      {"team": "CLE", "line": 2.5, "over": -130, "under": 100},
+      {"team": "TB", "line": 3.5, "over": 100, "under": -130}
+    ],
+    "team_runs_odd_even": [
+      {"team": "CLE", "odd": -105, "even": -130},
+      {"team": "TB", "odd": -110, "even": -125}
+    ],
+    "alt": {
+      "CLE": [
+        {"line": 0.5, "over": -1000, "under": 550},
+        {"line": 1.5, "over": -295, "under": 205},
+        {"line": 3.5, "over": 145, "under": -205},
+        {"line": 4.5, "over": 265, "under": -400},
+        {"line": 5.5, "over": 450, "under": -750},
+        {"line": 6.5, "over": 800, "under": -1600},
+        {"line": 7.5, "over": 1300, "under": -3000},
+        {"line": 8.5, "over": 2200, "under": -8000}
+      ],
+      "TB": [
+        {"line": 0.5, "over": -1400, "under": 700},
+        {"line": 1.5, "over": -400, "under": 270},
+        {"line": 2.5, "over": -190, "under": 135},
+        {"line": 4.5, "over": 165, "under": -235},
+        {"line": 5.5, "over": 270, "under": -400},
+        {"line": 6.5, "over": 450, "under": -750},
+        {"line": 7.5, "over": 700, "under": -1400},
+        {"line": 8.5, "over": 1100, "under": -2500},
+        {"line": 9.5, "over": 1800, "under": -5000}
+      ]
+    }
+  },
+  "pitcher_props": {
+    "strikeouts_milestones_x_plus": [
+      {"pitcher": "Drew Rasmussen", "team": "TB", "prices": {"3+": -1560, "4+": -491, "5+": -202, "6+": 107, "7+": 221, "8+": 455, "9+": 940, "10+": 1720}},
+      {"pitcher": "Parker Messick", "team": "CLE", "prices": {"2+": -3600, "3+": -790, "4+": -295, "5+": -133, "6+": 157, "7+": 321, "8+": 630, "9+": 1260}}
+    ],
+    "strikeouts_ou": [
+      {"pitcher": "Drew Rasmussen", "team": "TB", "line": 5.5, "over": 107, "under": -137},
+      {"pitcher": "Parker Messick", "team": "CLE", "line": 4.5, "over": -130, "under": 102}
+    ],
+    "outs_recorded_ou": [
+      {"pitcher": "Drew Rasmussen", "team": "TB", "line": 17.5, "over": -145, "under": 109},
+      {"pitcher": "Parker Messick", "team": "CLE", "line": 15.5, "over": 126, "under": -167}
+    ],
+    "hits_allowed_x_or_fewer": {
+      "note": "Capture group header: 'Hits allowed (X or fewer)'. Threshold labels preserved exactly as captured.",
+      "pitchers": [
+        {"pitcher": "Drew Rasmussen", "team": "TB", "prices": {"1": 950, "2": 405, "3": 188, "4": -111, "5": -235, "6": -525, "7": -1400}},
+        {"pitcher": "Parker Messick", "team": "CLE", "prices": {"1": 950, "2": 404, "3": 189, "4": -108, "5": -216, "6": -456, "7": -1100, "8": -3800}}
+      ]
+    },
+    "earned_runs_allowed_x_or_fewer": {
+      "note": "Capture group header: 'ER allowed (X or fewer)'. Threshold labels preserved exactly as captured; bare numbers and explicit '≤' forms both appear in the source.",
+      "pitchers": [
+        {"pitcher": "Drew Rasmussen", "team": "TB", "prices": {"0": 235, "≤1": -122, "2": -297, "3": -720, "4": -2200}},
+        {"pitcher": "Parker Messick", "team": "CLE", "prices": {"0": 255, "≤1": -110, "2": -247, "3": -581, "4": -1480}}
+      ]
+    },
+    "walks_allowed_x_or_fewer": {
+      "note": "Capture group header: 'Walks allowed (X or fewer)'. Threshold labels preserved exactly as captured; bare numbers and explicit '≤' forms both appear in the source.",
+      "pitchers": [
+        {"pitcher": "Drew Rasmussen", "team": "TB", "prices": {"0": 212, "≤1": -206, "2": -920}},
+        {"pitcher": "Parker Messick", "team": "CLE", "prices": {"0": 303, "≤1": -139, "2": -499, "3": -2600}}
+      ]
+    }
+  },
+  "batter_props": {
+    "home_runs": {
+      "note": "Prices are 1+ HR / 2+ HR. null = not offered for that player.",
+      "players": [
+        {"player": "Caminero", "one_plus": 437, "two_plus": 4600},
+        {"player": "Y.Diaz", "one_plus": 610, "two_plus": 7100},
+        {"player": "J.Ramirez", "one_plus": 690, "two_plus": 9000},
+        {"player": "Adell", "one_plus": 780, "two_plus": 9900},
+        {"player": "DeLauter", "one_plus": 930, "two_plus": 10000},
+        {"player": "Aranda", "one_plus": 940, "two_plus": 10000},
+        {"player": "DeLuca", "one_plus": 1080, "two_plus": 10000},
+        {"player": "N.Lowe", "one_plus": 870, "two_plus": 10000},
+        {"player": "Bazzana", "one_plus": 870, "two_plus": 10000},
+        {"player": "Mesa Jr", "one_plus": 890, "two_plus": 10000},
+        {"player": "P.Bailey", "one_plus": 990, "two_plus": null},
+        {"player": "Rocchio", "one_plus": 1100, "two_plus": 10000},
+        {"player": "L.Hicks", "one_plus": 1260, "two_plus": null},
+        {"player": "Halpin", "one_plus": 1280, "two_plus": null},
+        {"player": "Walls", "one_plus": 1400, "two_plus": null},
+        {"player": "Williamson", "one_plus": 1620, "two_plus": null},
+        {"player": "Kwan", "one_plus": 1620, "two_plus": null},
+        {"player": "Simpson", "one_plus": 3000, "two_plus": null}
+      ]
+    },
+    "hits": {
+      "note": "Prices are 1+ / 2+ / 3+ / 4+ hits. null = not offered for that player.",
+      "players": [
+        {"player": "Y.Diaz", "one_plus": -243, "two_plus": 220, "three_plus": 1000, "four_plus": 3900},
+        {"player": "Simpson", "one_plus": -249, "two_plus": 219, "three_plus": 1020, "four_plus": 4500},
+        {"player": "Kwan", "one_plus": -219, "two_plus": 256, "three_plus": 1220, "four_plus": null},
+        {"player": "Aranda", "one_plus": -192, "two_plus": 287, "three_plus": 1320, "four_plus": null},
+        {"player": "Caminero", "one_plus": -198, "two_plus": 276, "three_plus": 1320, "four_plus": null},
+        {"player": "DeLuca", "one_plus": -188, "two_plus": 292, "three_plus": 1360, "four_plus": null},
+        {"player": "J.Ramirez", "one_plus": -184, "two_plus": 313, "three_plus": 1540, "four_plus": null},
+        {"player": "DeLauter", "one_plus": -184, "two_plus": 298, "three_plus": 1580, "four_plus": null},
+        {"player": "Adell", "one_plus": -178, "two_plus": 329, "three_plus": 1700, "four_plus": null},
+        {"player": "Williamson", "one_plus": -162, "two_plus": 336, "three_plus": 1720, "four_plus": null},
+        {"player": "L.Hicks", "one_plus": -150, "two_plus": 354, "three_plus": 1840, "four_plus": null},
+        {"player": "N.Lowe", "one_plus": -143, "two_plus": 423, "three_plus": 2300, "four_plus": null},
+        {"player": "Bazzana", "one_plus": -133, "two_plus": 434, "three_plus": 2300, "four_plus": null},
+        {"player": "Mesa Jr", "one_plus": -138, "two_plus": 469, "three_plus": 2700, "four_plus": null},
+        {"player": "Rocchio", "one_plus": -123, "two_plus": 498, "three_plus": 2800, "four_plus": null},
+        {"player": "P.Bailey", "one_plus": -112, "two_plus": 537, "three_plus": 2800, "four_plus": null},
+        {"player": "Halpin", "one_plus": -110, "two_plus": 548, "three_plus": 3000, "four_plus": null},
+        {"player": "Walls", "one_plus": 104, "two_plus": 670, "three_plus": 3700, "four_plus": null}
+      ]
+    },
+    "total_bases": {
+      "note": "Prices are 2+ / 3+ / 4+ / 5+ total bases. null = not offered for that player.",
+      "players": [
+        {"player": "Caminero", "two_plus": 135, "three_plus": 258, "four_plus": 351, "five_plus": 740},
+        {"player": "Y.Diaz", "two_plus": 128, "three_plus": 277, "four_plus": 431, "five_plus": 850},
+        {"player": "J.Ramirez", "two_plus": 163, "three_plus": 337, "four_plus": 511, "five_plus": 1060},
+        {"player": "Adell", "two_plus": 164, "three_plus": 360, "four_plus": 556, "five_plus": 1160},
+        {"player": "DeLauter", "two_plus": 172, "three_plus": 395, "four_plus": 640, "five_plus": 1300},
+        {"player": "Aranda", "two_plus": 170, "three_plus": 385, "four_plus": 620, "five_plus": 1300},
+        {"player": "DeLuca", "two_plus": 165, "three_plus": 376, "four_plus": 670, "five_plus": null},
+        {"player": "N.Lowe", "two_plus": 209, "three_plus": 445, "four_plus": 670, "five_plus": null},
+        {"player": "Bazzana", "two_plus": 213, "three_plus": 452, "four_plus": 670, "five_plus": null},
+        {"player": "Mesa Jr", "two_plus": 224, "three_plus": 484, "four_plus": 720, "five_plus": null},
+        {"player": "P.Bailey", "two_plus": 252, "three_plus": 533, "four_plus": 780, "five_plus": null},
+        {"player": "Kwan", "two_plus": 161, "three_plus": 415, "four_plus": 810, "five_plus": null},
+        {"player": "Rocchio", "two_plus": 244, "three_plus": 554, "four_plus": 840, "five_plus": null},
+        {"player": "L.Hicks", "two_plus": 217, "three_plus": 511, "four_plus": 890, "five_plus": null},
+        {"player": "Williamson", "two_plus": 199, "three_plus": 510, "four_plus": 940, "five_plus": null},
+        {"player": "Halpin", "two_plus": 281, "three_plus": 630, "four_plus": 950, "five_plus": null},
+        {"player": "Walls", "two_plus": 299, "three_plus": 680, "four_plus": 1020, "five_plus": null},
+        {"player": "Simpson", "two_plus": 161, "three_plus": 449, "four_plus": 1060, "five_plus": null}
+      ]
+    },
+    "rbis": {
+      "note": "Prices are 1+ / 2+ RBIs. null = not offered for that player.",
+      "players": [
+        {"player": "Caminero", "one_plus": 191, "two_plus": 567},
+        {"player": "DeLuca", "one_plus": 234, "two_plus": 700},
+        {"player": "Mesa Jr", "one_plus": 221, "two_plus": 730},
+        {"player": "Y.Diaz", "one_plus": 224, "two_plus": 740},
+        {"player": "Adell", "one_plus": 236, "two_plus": 750},
+        {"player": "J.Ramirez", "one_plus": 269, "two_plus": 840},
+        {"player": "DeLauter", "one_plus": 251, "two_plus": 880},
+        {"player": "Aranda", "one_plus": 281, "two_plus": 900},
+        {"player": "N.Lowe", "one_plus": 291, "two_plus": 910},
+        {"player": "L.Hicks", "one_plus": 295, "two_plus": 960},
+        {"player": "Bazzana", "one_plus": 316, "two_plus": 960},
+        {"player": "Simpson", "one_plus": 265, "two_plus": 970},
+        {"player": "Williamson", "one_plus": 290, "two_plus": 990},
+        {"player": "P.Bailey", "one_plus": 346, "two_plus": 1080},
+        {"player": "Rocchio", "one_plus": 358, "two_plus": 1100},
+        {"player": "Walls", "one_plus": 397, "two_plus": 1180},
+        {"player": "Halpin", "one_plus": 398, "two_plus": 1220},
+        {"player": "Kwan", "one_plus": 367, "two_plus": null}
+      ]
+    },
+    "stolen_bases": {
+      "note": "Prices are 1+ / 2+ stolen bases. null = not offered for that player.",
+      "players": [
+        {"player": "Simpson", "one_plus": 293, "two_plus": 2100},
+        {"player": "Walls", "one_plus": 346, "two_plus": 2300},
+        {"player": "DeLuca", "one_plus": 381, "two_plus": 2700},
+        {"player": "J.Ramirez", "one_plus": 411, "two_plus": 3100},
+        {"player": "Rocchio", "one_plus": 509, "two_plus": 3900},
+        {"player": "Williamson", "one_plus": 534, "two_plus": 4100},
+        {"player": "Mesa Jr", "one_plus": 554, "two_plus": 4300},
+        {"player": "Kwan", "one_plus": 620, "two_plus": 4800},
+        {"player": "Bazzana", "one_plus": 950, "two_plus": 5800},
+        {"player": "DeLauter", "one_plus": 800, "two_plus": null},
+        {"player": "Adell", "one_plus": 960, "two_plus": null},
+        {"player": "Halpin", "one_plus": 990, "two_plus": null},
+        {"player": "Y.Diaz", "one_plus": 1880, "two_plus": null},
+        {"player": "Aranda", "one_plus": 1900, "two_plus": null},
+        {"player": "Caminero", "one_plus": 1940, "two_plus": null},
+        {"player": "L.Hicks", "one_plus": 2100, "two_plus": null},
+        {"player": "P.Bailey", "one_plus": 2800, "two_plus": null}
+      ]
+    },
+    "extra_base_hits": {
+      "note": "Prices are 1+ XBH, and 2+ XBH where listed. null = not offered for that player.",
+      "players": [
+        {"player": "Caminero", "one_plus": 189, "two_plus": 1360},
+        {"player": "Y.Diaz", "one_plus": 210, "two_plus": 1640},
+        {"player": "Adell", "one_plus": 234, "two_plus": null},
+        {"player": "J.Ramirez", "one_plus": 246, "two_plus": null},
+        {"player": "DeLuca", "one_plus": 263, "two_plus": null},
+        {"player": "DeLauter", "one_plus": 277, "two_plus": null},
+        {"player": "Aranda", "one_plus": 284, "two_plus": null},
+        {"player": "Bazzana", "one_plus": 296, "two_plus": null},
+        {"player": "N.Lowe", "one_plus": 297, "two_plus": null},
+        {"player": "Mesa Jr", "one_plus": 305, "two_plus": null},
+        {"player": "Kwan", "one_plus": 317, "two_plus": null},
+        {"player": "Williamson", "one_plus": 345, "two_plus": null},
+        {"player": "Rocchio", "one_plus": 350, "two_plus": null},
+        {"player": "P.Bailey", "one_plus": 354, "two_plus": null},
+        {"player": "L.Hicks", "one_plus": 364, "two_plus": null},
+        {"player": "Walls", "one_plus": 402, "two_plus": null},
+        {"player": "Halpin", "one_plus": 408, "two_plus": null},
+        {"player": "Simpson", "one_plus": 418, "two_plus": null}
+      ]
+    },
+    "hits_runs_rbis": {
+      "note": "Prices are 1+ / 2+ / 3+ / 4+ / 5+ hits+runs+RBIs. null = not offered for that player.",
+      "players": [
+        {"player": "Caminero", "one_plus": -252, "two_plus": 100, "three_plus": 190, "four_plus": 353, "five_plus": 640},
+        {"player": "Y.Diaz", "one_plus": -308, "two_plus": -114, "three_plus": 182, "four_plus": 353, "five_plus": 650},
+        {"player": "DeLuca", "one_plus": -231, "two_plus": 108, "three_plus": 232, "four_plus": 452, "five_plus": 860},
+        {"player": "Aranda", "one_plus": -248, "two_plus": 109, "three_plus": 239, "four_plus": 476, "five_plus": 920},
+        {"player": "J.Ramirez", "one_plus": -219, "two_plus": 119, "three_plus": 254, "four_plus": 500, "five_plus": 950},
+        {"player": "Simpson", "one_plus": -304, "two_plus": -107, "three_plus": 229, "four_plus": 496, "five_plus": 990},
+        {"player": "Adell", "one_plus": -212, "two_plus": 119, "three_plus": 259, "four_plus": 505, "five_plus": 1000},
+        {"player": "DeLauter", "one_plus": -235, "two_plus": 120, "three_plus": 266, "four_plus": 532, "five_plus": 1060},
+        {"player": "Kwan", "one_plus": -267, "two_plus": 108, "three_plus": 260, "four_plus": 568, "five_plus": 1180},
+        {"player": "Mesa Jr", "one_plus": -184, "two_plus": 143, "three_plus": 299, "four_plus": 594, "five_plus": 1180},
+        {"player": "L.Hicks", "one_plus": -179, "two_plus": 139, "three_plus": 308, "four_plus": 630, "five_plus": 1220},
+        {"player": "N.Lowe", "one_plus": -169, "two_plus": 145, "three_plus": 313, "four_plus": 620, "five_plus": 1240},
+        {"player": "Williamson", "one_plus": -195, "two_plus": 131, "three_plus": 294, "four_plus": 610, "five_plus": 1280},
+        {"player": "Bazzana", "one_plus": -159, "two_plus": 160, "three_plus": 329, "four_plus": 670, "five_plus": 1280},
+        {"player": "P.Bailey", "one_plus": -133, "two_plus": 186, "three_plus": 383, "four_plus": 790, "five_plus": null},
+        {"player": "Rocchio", "one_plus": -146, "two_plus": 177, "three_plus": 391, "four_plus": 810, "five_plus": null},
+        {"player": "Halpin", "one_plus": -125, "two_plus": 196, "three_plus": 440, "four_plus": 900, "five_plus": null},
+        {"player": "Walls", "one_plus": -120, "two_plus": 202, "three_plus": 451, "four_plus": 920, "five_plus": null}
+      ]
+    },
+    "hits_runs_sb": {
+      "note": "Prices are 1+ / 2+ / 3+ / 4+ hits+runs+stolen bases. null = not offered for that player.",
+      "players": [
+        {"player": "Simpson", "one_plus": -320, "two_plus": -106, "three_plus": 240, "four_plus": 548},
+        {"player": "Y.Diaz", "one_plus": -310, "two_plus": -101, "three_plus": 270, "four_plus": 620},
+        {"player": "DeLuca", "one_plus": -251, "two_plus": 112, "three_plus": 293, "four_plus": null},
+        {"player": "J.Ramirez", "one_plus": -233, "two_plus": 113, "three_plus": 305, "four_plus": null},
+        {"player": "Kwan", "one_plus": -273, "two_plus": 112, "three_plus": 305, "four_plus": null},
+        {"player": "Caminero", "one_plus": -254, "two_plus": 116, "three_plus": 330, "four_plus": null},
+        {"player": "Aranda", "one_plus": -249, "two_plus": 124, "three_plus": 355, "four_plus": null},
+        {"player": "DeLauter", "one_plus": -237, "two_plus": 133, "three_plus": 380, "four_plus": null},
+        {"player": "Williamson", "one_plus": -199, "two_plus": 142, "three_plus": 382, "four_plus": null},
+        {"player": "Adell", "one_plus": -212, "two_plus": 137, "three_plus": 406, "four_plus": null},
+        {"player": "Mesa Jr", "one_plus": -173, "two_plus": 160, "three_plus": 473, "four_plus": null},
+        {"player": "Walls", "one_plus": -135, "two_plus": 178, "three_plus": 487, "four_plus": null},
+        {"player": "Rocchio", "one_plus": -150, "two_plus": 172, "three_plus": 489, "four_plus": null},
+        {"player": "L.Hicks", "one_plus": -178, "two_plus": 170, "three_plus": 496, "four_plus": null},
+        {"player": "Bazzana", "one_plus": -159, "two_plus": 177, "three_plus": 518, "four_plus": null},
+        {"player": "Halpin", "one_plus": -128, "two_plus": 212, "three_plus": 640, "four_plus": null},
+        {"player": "P.Bailey", "one_plus": -130, "two_plus": 222, "three_plus": null, "four_plus": null}
+      ]
+    },
+    "hits_walks_sb": {
+      "note": "Prices are 1+ / 2+ / 3+ hits+walks+stolen bases. null = not offered for that player.",
+      "players": [
+        {"player": "Simpson", "one_plus": -404, "two_plus": 104, "three_plus": 323},
+        {"player": "DeLuca", "one_plus": -334, "two_plus": 127, "three_plus": 400},
+        {"player": "Y.Diaz", "one_plus": -505, "two_plus": 104, "three_plus": 403},
+        {"player": "Caminero", "one_plus": -510, "two_plus": 107, "three_plus": 415},
+        {"player": "Kwan", "one_plus": -378, "two_plus": 128, "three_plus": 445},
+        {"player": "J.Ramirez", "one_plus": -311, "two_plus": 142, "three_plus": 448},
+        {"player": "DeLauter", "one_plus": -367, "two_plus": 133, "three_plus": 499},
+        {"player": "Aranda", "one_plus": -397, "two_plus": 133, "three_plus": 503},
+        {"player": "Williamson", "one_plus": -257, "two_plus": 166, "three_plus": 551},
+        {"player": "Walls", "one_plus": -177, "two_plus": 205, "three_plus": 650},
+        {"player": "Adell", "one_plus": -290, "two_plus": 169, "three_plus": null},
+        {"player": "L.Hicks", "one_plus": -256, "two_plus": 196, "three_plus": null},
+        {"player": "Mesa Jr", "one_plus": -236, "two_plus": 203, "three_plus": null},
+        {"player": "Bazzana", "one_plus": -223, "two_plus": 212, "three_plus": null},
+        {"player": "Rocchio", "one_plus": -189, "two_plus": 225, "three_plus": null},
+        {"player": "Halpin", "one_plus": -158, "two_plus": 287, "three_plus": null},
+        {"player": "P.Bailey", "one_plus": -182, "two_plus": 289, "three_plus": null}
+      ]
+    },
+    "runs": {
+      "note": "Prices are 1+ / 2+ runs scored. null = not offered for that player.",
+      "players": [
+        {"player": "Y.Diaz", "one_plus": 120, "two_plus": 710},
+        {"player": "Caminero", "one_plus": 133, "two_plus": 830},
+        {"player": "Aranda", "one_plus": 148, "two_plus": 940},
+        {"player": "Kwan", "one_plus": 167, "two_plus": 1100},
+        {"player": "DeLuca", "one_plus": 167, "two_plus": 1160},
+        {"player": "J.Ramirez", "one_plus": 168, "two_plus": 1100},
+        {"player": "Simpson", "one_plus": 178, "two_plus": 1200},
+        {"player": "DeLauter", "one_plus": 182, "two_plus": null},
+        {"player": "Adell", "one_plus": 193, "two_plus": null},
+        {"player": "N.Lowe", "one_plus": 210, "two_plus": null},
+        {"player": "Williamson", "one_plus": 216, "two_plus": null},
+        {"player": "Mesa Jr", "one_plus": 216, "two_plus": null},
+        {"player": "L.Hicks", "one_plus": 220, "two_plus": null},
+        {"player": "Walls", "one_plus": 234, "two_plus": null},
+        {"player": "Bazzana", "one_plus": 235, "two_plus": null},
+        {"player": "Rocchio", "one_plus": 236, "two_plus": null},
+        {"player": "P.Bailey", "one_plus": 261, "two_plus": null},
+        {"player": "Halpin", "one_plus": 275, "two_plus": null}
+      ]
+    },
+    "walks": {
+      "note": "Prices are 1+ / 2+ walks. null = not offered for that player.",
+      "players": [
+        {"player": "Caminero", "one_plus": 123, "two_plus": 790},
+        {"player": "Y.Diaz", "one_plus": 166, "two_plus": 1160},
+        {"player": "Aranda", "one_plus": 174, "two_plus": 1180},
+        {"player": "DeLauter", "one_plus": 188, "two_plus": null},
+        {"player": "Kwan", "one_plus": 241, "two_plus": null},
+        {"player": "DeLuca", "one_plus": 249, "two_plus": null},
+        {"player": "L.Hicks", "one_plus": 260, "two_plus": null},
+        {"player": "N.Lowe", "one_plus": 267, "two_plus": null},
+        {"player": "J.Ramirez", "one_plus": 283, "two_plus": null},
+        {"player": "Walls", "one_plus": 284, "two_plus": null},
+        {"player": "Bazzana", "one_plus": 291, "two_plus": null},
+        {"player": "Adell", "one_plus": 295, "two_plus": null},
+        {"player": "Mesa Jr", "one_plus": 296, "two_plus": null},
+        {"player": "Simpson", "one_plus": 303, "two_plus": null},
+        {"player": "P.Bailey", "one_plus": 317, "two_plus": null},
+        {"player": "Williamson", "one_plus": 324, "two_plus": null},
+        {"player": "Rocchio", "one_plus": 403, "two_plus": null},
+        {"player": "Halpin", "one_plus": 452, "two_plus": null}
+      ]
+    }
+  },
+  "first_plate_appearance": {
+    "exact_result": {
+      "note": "1st plate appearance exact result. Columns: Out / Strikeout / Walk-HBP / Single / Double / Triple / HR / Reached on Error.",
+      "players": [
+        {"player": "Adell", "out": 110, "strikeout": 200, "walk_hbp": 1100, "single": 550, "double": 1500, "triple": 7500, "home_run": 1700, "reached_on_error": 4500},
+        {"player": "Vilade", "out": 120, "strikeout": 205, "walk_hbp": 750, "single": 550, "double": 1500, "triple": 7500, "home_run": 2000, "reached_on_error": 4000},
+        {"player": "Bazzana", "out": -110, "strikeout": 270, "walk_hbp": 850, "single": 550, "double": 1500, "triple": 6500, "home_run": 2500, "reached_on_error": 4500},
+        {"player": "Fortes", "out": -140, "strikeout": 390, "walk_hbp": 1100, "single": 450, "double": 1400, "triple": 8000, "home_run": 3000, "reached_on_error": 4000},
+        {"player": "Halpin", "out": -120, "strikeout": 265, "walk_hbp": 1100, "single": 500, "double": 1500, "triple": 6000, "home_run": 2800, "reached_on_error": 4500},
+        {"player": "Rocchio", "out": -140, "strikeout": 370, "walk_hbp": 1000, "single": 475, "double": 1400, "triple": 6500, "home_run": 2800, "reached_on_error": 4000},
+        {"player": "Y.Diaz", "out": -115, "strikeout": 360, "walk_hbp": 950, "single": 400, "double": 1300, "triple": 8000, "home_run": 2200, "reached_on_error": 4500},
+        {"player": "J.Ramirez", "out": -130, "strikeout": 360, "walk_hbp": 950, "single": 500, "double": 1400, "triple": 6000, "home_run": 2000, "reached_on_error": 4500},
+        {"player": "N.Lowe", "out": 105, "strikeout": 235, "walk_hbp": 800, "single": 550, "double": 1500, "triple": 8000, "home_run": 2200, "reached_on_error": 5000},
+        {"player": "DeLauter", "out": -110, "strikeout": 330, "walk_hbp": 800, "single": 475, "double": 1400, "triple": 7000, "home_run": 2200, "reached_on_error": 4000},
+        {"player": "Kwan", "out": -145, "strikeout": 475, "walk_hbp": 950, "single": 360, "double": 1700, "triple": 6500, "home_run": 4000, "reached_on_error": 5000},
+        {"player": "Mesa Jr", "out": 105, "strikeout": 225, "walk_hbp": 850, "single": 550, "double": 1500, "triple": 6500, "home_run": 2200, "reached_on_error": 4000},
+        {"player": "P.Bailey", "out": 115, "strikeout": 190, "walk_hbp": 1000, "single": 550, "double": 1600, "triple": 6500, "home_run": 2500, "reached_on_error": 4500},
+        {"player": "Aranda", "out": 120, "strikeout": 200, "walk_hbp": 850, "single": 475, "double": 1600, "triple": 8000, "home_run": 2500, "reached_on_error": 4500},
+        {"player": "Walls", "out": 100, "strikeout": 215, "walk_hbp": 900, "single": 550, "double": 1800, "triple": 7000, "home_run": 4000, "reached_on_error": 4000},
+        {"player": "DeLuca", "out": -110, "strikeout": 260, "walk_hbp": 1200, "single": 450, "double": 1400, "triple": 6500, "home_run": 3000, "reached_on_error": 4000},
+        {"player": "Williamson", "out": -120, "strikeout": 310, "walk_hbp": 1000, "single": 450, "double": 1600, "triple": 7500, "home_run": 3500, "reached_on_error": 3500},
+        {"player": "Caminero", "out": 105, "strikeout": 270, "walk_hbp": 700, "single": 500, "double": 1400, "triple": 8000, "home_run": 1700, "reached_on_error": 4000}
+      ]
+    },
+    "on_base": {
+      "note": "Reaches base in 1st plate appearance, Yes / No.",
+      "players": [
+        {"player": "Adell", "yes": 220, "no": -300},
+        {"player": "Vilade", "yes": 195, "no": -265},
+        {"player": "Bazzana", "yes": 200, "no": -270},
+        {"player": "Fortes", "yes": 200, "no": -270},
+        {"player": "Halpin", "yes": 230, "no": -320},
+        {"player": "Rocchio", "yes": 210, "no": -285},
+        {"player": "Y.Diaz", "yes": 185, "no": -248},
+        {"player": "J.Ramirez", "yes": 195, "no": -265},
+        {"player": "DeLauter", "yes": 176, "no": -234},
+        {"player": "N.Lowe", "yes": 210, "no": -285},
+        {"player": "Kwan", "yes": 195, "no": -265},
+        {"player": "P.Bailey", "yes": 220, "no": -300},
+        {"player": "Aranda", "yes": 200, "no": -270},
+        {"player": "Mesa Jr", "yes": 210, "no": -285},
+        {"player": "DeLuca", "yes": 210, "no": -285},
+        {"player": "Walls", "yes": 230, "no": -320},
+        {"player": "Williamson", "yes": 200, "no": -270},
+        {"player": "Caminero", "yes": 170, "no": -225}
+      ]
+    }
+  },
+  "either_batter_hr": {
+    "note": "Either listed batter to hit 1+ / 2+ HRs. Pair names exactly as captured.",
+    "pairs": [
+      {"pair": "Bazzana or Aranda", "one_plus": 420, "two_plus": 6100},
+      {"pair": "Aranda or J.Ramirez", "one_plus": 370, "two_plus": 5200},
+      {"pair": "Bazzana or J.Ramirez", "one_plus": 355, "two_plus": 5100},
+      {"pair": "J.Ramirez or Y.Diaz", "one_plus": 296, "two_plus": 4000},
+      {"pair": "Caminero or Aranda", "one_plus": 273, "two_plus": 3200},
+      {"pair": "DeLauter or Aranda", "one_plus": 446, "two_plus": 5900},
+      {"pair": "Bazzana or Caminero", "one_plus": 263, "two_plus": 3200},
+      {"pair": "DeLauter or J.Ramirez", "one_plus": 373, "two_plus": 4900},
+      {"pair": "DeLauter or Y.Diaz", "one_plus": 349, "two_plus": 4500},
+      {"pair": "DeLauter or Caminero", "one_plus": 273, "two_plus": 3200},
+      {"pair": "Bazzana or DeLauter", "one_plus": 423, "two_plus": 5900},
+      {"pair": "Caminero or Y.Diaz", "one_plus": 229, "two_plus": 2700},
+      {"pair": "Caminero or J.Ramirez", "one_plus": 242, "two_plus": 3000},
+      {"pair": "Aranda or Y.Diaz", "one_plus": 343, "two_plus": 4300},
+      {"pair": "Bazzana or Y.Diaz", "one_plus": 339, "two_plus": 4500}
+    ]
+  },
+  "combined_hr": {
+    "note": "Both listed batters combined HR milestones, 1+ / 2+. Pair names exactly as captured.",
+    "pairs": [
+      {"pair": "Caminero & Aranda", "one_plus": 266, "two_plus": 1900},
+      {"pair": "Caminero & Y.Diaz", "one_plus": 223, "two_plus": 1520},
+      {"pair": "Caminero & J.Ramirez", "one_plus": 237, "two_plus": 1620},
+      {"pair": "DeLauter & J.Ramirez", "one_plus": 362, "two_plus": 2700},
+      {"pair": "Bazzana & J.Ramirez", "one_plus": 345, "two_plus": 2700},
+      {"pair": "DeLauter & Aranda", "one_plus": 421, "two_plus": 3300},
+      {"pair": "Bazzana & Aranda", "one_plus": 407, "two_plus": 3200},
+      {"pair": "Bazzana & Y.Diaz", "one_plus": 330, "two_plus": 2400},
+      {"pair": "J.Ramirez & Y.Diaz", "one_plus": 288, "two_plus": 2100},
+      {"pair": "DeLauter & Caminero", "one_plus": 266, "two_plus": 1820},
+      {"pair": "Bazzana & DeLauter", "one_plus": 409, "two_plus": 3200},
+      {"pair": "Bazzana & Caminero", "one_plus": 257, "two_plus": 1900},
+      {"pair": "DeLauter & Y.Diaz", "one_plus": 339, "two_plus": 2500},
+      {"pair": "Aranda & Y.Diaz", "one_plus": 333, "two_plus": 2400},
+      {"pair": "Aranda & J.Ramirez", "one_plus": 359, "two_plus": 2700}
+    ]
+  },
+  "game_props": {
+    "race_to_x_runs": {
+      "note": "Prices are TB / Neither / CLE.",
+      "races": [
+        {"target": 3, "TB": -115, "neither": 400, "CLE": 160},
+        {"target": 4, "TB": 125, "neither": 165, "CLE": 225},
+        {"target": 5, "TB": 195, "neither": -125, "CLE": 350},
+        {"target": 6, "TB": 300, "neither": -240, "CLE": 550},
+        {"target": 7, "TB": 475, "neither": -450, "CLE": 900}
+      ]
+    },
+    "highest_scoring_inning_team": {"TB": -150, "CLE": 110},
+    "winning_margin": [
+      {"margin": "1", "TB": 450, "CLE": 340},
+      {"margin": "2", "TB": 550, "CLE": 700},
+      {"margin": "3", "TB": 750, "CLE": 1000},
+      {"margin": "4+", "TB": 330, "CLE": 650}
+    ],
+    "total_home_runs": {"line": 1.5, "over": 115, "under": -160},
+    "total_strikeouts_thrown": {"line": 15.5, "over": -105, "under": -130},
+    "cle_to_bat_bottom_9th": {"yes": -220, "no": 160}
+  },
+  "correct_score": {
+    "note": "Score is winner's runs first, as captured; prices are TB / CLE per the capture header (TB price = Tampa Bay wins by that score, CLE price = Cleveland wins by that score).",
+    "scores": [
+      {"score": "1-0", "tb_price": 2200, "cle_price": 1900},
+      {"score": "2-0", "tb_price": 2200, "cle_price": 2200},
+      {"score": "2-1", "tb_price": 1600, "cle_price": 1200},
+      {"score": "3-0", "tb_price": 2200, "cle_price": 2500},
+      {"score": "3-1", "tb_price": 1600, "cle_price": 1800},
+      {"score": "3-2", "tb_price": 1500, "cle_price": 1200},
+      {"score": "4-0", "tb_price": 2500, "cle_price": 3000},
+      {"score": "4-1", "tb_price": 2000, "cle_price": 2500},
+      {"score": "4-2", "tb_price": 1800, "cle_price": 2200},
+      {"score": "4-3", "tb_price": 1900, "cle_price": 1600},
+      {"score": "5-0", "tb_price": 2800, "cle_price": 4000},
+      {"score": "5-1", "tb_price": 2500, "cle_price": 3500},
+      {"score": "5-2", "tb_price": 2500, "cle_price": 2800},
+      {"score": "5-3", "tb_price": 2500, "cle_price": 3000},
+      {"score": "5-4", "tb_price": 2500, "cle_price": 2200},
+      {"score": "6-0", "tb_price": 3500, "cle_price": 4500},
+      {"score": "6-1", "tb_price": 3000, "cle_price": 4500},
+      {"score": "6-2", "tb_price": 2800, "cle_price": 4000},
+      {"score": "6-3", "tb_price": 3000, "cle_price": 3500},
+      {"score": "6-4", "tb_price": 3000, "cle_price": 4500},
+      {"score": "6-5", "tb_price": 3500, "cle_price": 3000},
+      {"score": "7-0", "tb_price": 4500, "cle_price": 6500},
+      {"score": "7-1", "tb_price": 3500, "cle_price": 5000},
+      {"score": "7-2", "tb_price": 3500, "cle_price": 5000},
+      {"score": "7-3", "tb_price": 4000, "cle_price": 5500},
+      {"score": "7-4", "tb_price": 4000, "cle_price": 5500},
+      {"score": "7-5", "tb_price": 4500, "cle_price": 5500},
+      {"score": "7-6", "tb_price": 5500, "cle_price": 4500},
+      {"score": "8-0", "tb_price": 5500, "cle_price": 8000},
+      {"score": "8-1", "tb_price": 5000, "cle_price": 6000},
+      {"score": "8-2", "tb_price": 4500, "cle_price": 6000},
+      {"score": "8-3", "tb_price": 5000, "cle_price": 7000},
+      {"score": "8-4", "tb_price": 5500, "cle_price": 8000},
+      {"score": "8-5", "tb_price": 6000, "cle_price": 7500},
+      {"score": "8-6", "tb_price": 7000, "cle_price": 7500},
+      {"score": "8-7", "tb_price": 7500, "cle_price": 7000},
+      {"score": "9-0", "tb_price": 6500, "cle_price": 10000},
+      {"score": "9-1", "tb_price": 6000, "cle_price": 9000},
+      {"score": "9-2", "tb_price": 6000, "cle_price": 8000},
+      {"score": "9-3", "tb_price": 6000, "cle_price": 8000},
+      {"score": "9-4", "tb_price": 6500, "cle_price": 10000},
+      {"score": "9-5", "tb_price": 7000, "cle_price": 10000},
+      {"score": "9-6", "tb_price": 9000, "cle_price": 11000},
+      {"score": "9-7", "tb_price": 9000, "cle_price": 12000},
+      {"score": "9-8", "tb_price": 10000, "cle_price": 9000}
+    ],
+    "win_scoring_10_plus": [
+      {"team": "TB", "price": 1500},
+      {"team": "CLE", "price": 2800}
+    ]
+  },
+  "sgp": {
+    "available": true,
+    "quick_sgp_button": true,
+    "prebuilt_cards": [
+      {"name": "Knock Knock", "price": 575},
+      {"name": "The Big Bat Four", "price": 2500},
+      {"name": "Believeland", "price": 1400},
+      {"name": "Rays Up", "price": 1100},
+      {"name": "The Run Producers", "price": 2500},
+      {"name": "Playoff Production Pair", "price": 750},
+      {"name": "Caminero Calling", "price": 500},
+      {"name": "Keep the Hits Coming", "price": 313}
+    ],
+    "eligible_groups": ["Hits", "ML", "Strikeouts Thrown", "F5", "Run Line", "Total Bases", "RBIs", "HRs", "Singles", "Doubles"],
+    "team_filters": ["TB", "CLE", "Mixed"],
+    "odds_band_filters": "+200 to +10000"
+  },
+  "named_not_enumerated": {
+    "note": "Sections that rendered on the page; their prices were NOT transcribed.",
+    "sections": [
+      "Pitcher tab — Hits+Walks+ER, Hits Allowed O/U, ER Allowed O/U, Walks Allowed O/U, Hits+Walks+ER O/U, To Record a Win (main formats captured above)",
+      "Batter tab — Singles, Doubles, Triples, Batter Ks, Runs+RBIs, Hits+SB, O/U-format sections (Hits, TB, RBIs, HRR, Runs, Singles, Doubles, Walks, SB), HRs 1st 5 Innings",
+      "Innings tab — per-inning Run Line + per-inning Props",
+      "Either/Combined tab — either/combined versions of Hits, TB, SB, Singles, Doubles, Triples, RBIs, Pitcher Ks, Hits Allowed, ER, Walks (HR versions transcribed)",
+      "Plate Appearance tab — pitcher-batter matchup lines beyond 1st-PA"
+    ]
+  }
+}
