@@ -17,6 +17,8 @@ import unicodedata
 ROOT = "https://statsapi.mlb.com/api/v1"
 
 
+from .mlb_source_identity import MLBSourceIdentityError, check_split_identity, refuse_conflicting_game_pk
+
 class MissingMLBBatterHistory(ValueError):
     pass
 
@@ -241,6 +243,11 @@ class MLBBatterPublicSource:
         if not splits:
             raise MissingMLBBatterHistory("MLB_BATTER_GAMELOG_EMPTY")
 
+        try:
+            for row in splits:
+                check_split_identity(row, expected_player_id=ident)
+        except MLBSourceIdentityError as exc:
+            raise MissingMLBBatterHistory("SOURCE_IDENTITY_" + str(exc)) from exc
         hist = []
         for row in splits:
             try:
@@ -287,6 +294,10 @@ class MLBBatterPublicSource:
             except (ValueError, KeyError, TypeError, MissingMLBBatterHistory):
                 continue
 
+        try:
+            refuse_conflicting_game_pk((pk, {"date": day.isoformat(), **st}) for day, pk, st in hist)
+        except MLBSourceIdentityError as exc:
+            raise MissingMLBBatterHistory("SOURCE_IDENTITY_" + str(exc)) from exc
         hist.sort(key=lambda x: (x[0], x[1]), reverse=True)
         latest = []
         seen = set()
