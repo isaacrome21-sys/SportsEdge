@@ -19,5 +19,10 @@ jobs:
         run: python -m pip install --disable-pip-version-check -r requirements-test.txt
       - name: Compile production and test modules
         run: python -m compileall -q sportsedge scripts tests
+      - name: Snapshot working tree before tests
+        run: python scripts/check_clean_tree.py --snapshot "${RUNNER_TEMP}/clean_tree_baseline.txt"
       - name: Run full test suite
         run: python -m pytest -q tests
+      - name: Verify tests left the working tree clean
+        if: always()
+        run: python scripts/check_clean_tree.py --check "${RUNNER_TEMP}/clean_tree_baseline.txt"

@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -109,19 +110,20 @@ class RunAutoCfbResilientTest(unittest.TestCase):
     def test_zero_quotes_is_the_only_infrastructure_block(self):
         env = dict(os.environ)
         env["CFB_MANUAL_BOARD_JSON"] = "[]"
-        out = ROOT / "artifacts" / "live_cfb_card_test.json"
-        proc = subprocess.run(
-            [sys.executable, "scripts/run_auto_cfb_resilient.py", "--output", str(out)],
-            cwd=ROOT,
-            env=env,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        self.assertEqual(proc.returncode, 2)
-        payload = json.loads(out.read_text(encoding="utf-8"))
-        self.assertEqual(payload["run_status"], "BLOCKED_NO_ODDS")
-        self.assertEqual(payload["funnel"]["odds_rows_fetched"], 0)
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "live_cfb_card_test.json"
+            proc = subprocess.run(
+                [sys.executable, "scripts/run_auto_cfb_resilient.py", "--output", str(out)],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(proc.returncode, 2)
+            payload = json.loads(out.read_text(encoding="utf-8"))
+            self.assertEqual(payload["run_status"], "BLOCKED_NO_ODDS")
+            self.assertEqual(payload["funnel"]["odds_rows_fetched"], 0)
         workflow = (ROOT / ".github/workflows/cfb-auto.yml").read_text(encoding="utf-8")
         self.assertIn("scripts/run_auto_cfb_resilient.py", workflow)
         self.assertIn("CFB_AUTO_FORCED_PROMOTION_BLOCK", workflow)
