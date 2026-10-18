@@ -22,6 +22,10 @@ class FakeAllMarketSource(MLBAllMarketHistorySource):
             "extra_base_hits": 0,
         }] * 10
 
+    def hitter_joint_prior_history(self, *, player_id, target_date):
+        # Hermetic: no live MLB Stats API call from a unit test.
+        return []
+
     def pitcher_joint_history(self, *, player_id, target_date):
         return [{"strikeouts": 6, "outs": 18, "earned_runs": 2, "hits_allowed": 5, "walks_allowed": 2}] * 5
 
