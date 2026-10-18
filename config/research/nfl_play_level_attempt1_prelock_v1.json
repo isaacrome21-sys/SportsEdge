@@ -1,0 +1,124 @@
+{
+  "schema": "SPORTSEDGE_NFL_PLAY_LEVEL_ATTEMPT1_PRELOCK_V1",
+  "status": "FROZEN_BEFORE_ATTEMPT1_SCORING",
+  "frozen_date": "2026-10-01",
+  "generation_policy": "config/research/nfl_play_level_research_generation_v1.json",
+  "generation_id": "NFL_PLAY_LEVEL_EPA_CPOE_G1",
+  "attempt_number": 1,
+  "attempt_id": "NFL_PLAY_LEVEL_EPA_CPOE_G1_ATTEMPT_1",
+  "candidate_role": "RESEARCH_SHADOW_ONLY",
+  "baseline": {
+    "owner": "NFL_RESEARCH_ATTEMPT_9_RECENCY_0_85",
+    "mean_model": "FROZEN_ATTEMPT9_RAW_MARGIN_TOTAL",
+    "baseline_refit_allowed": false,
+    "production_replacement_allowed": false
+  },
+  "data_windows": {
+    "development_seasons": [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023],
+    "validation_season": 2024,
+    "diagnostic_season": 2025,
+    "2026_role": "EXPOSED_SHARED_SEASON_SHADOW_ONLY_NOT_SELECTION_OR_PROMOTION_EVIDENCE",
+    "game_type": "REG",
+    "postseason_included": false,
+    "validation_can_be_reused_after_scoring": false,
+    "diagnostic_can_rescue_validation_failure": false,
+    "fresh_final_holdout_claimed": false
+  },
+  "source_contract": {
+    "primary": "nflverse play-by-play plus PIT-safe roster/depth/inactive inputs already permitted by repository source policy",
+    "market_data_as_features": false,
+    "closing_lines_use": "EVALUATION_BENCHMARK_ONLY",
+    "capper_public_split_features": false,
+    "target_game_plays_allowed": false,
+    "same_week_later_game_rows_allowed": false,
+    "feature_cutoff": "STRICTLY_BEFORE_TARGET_KICKOFF",
+    "qb_identity_rule": "QB feature is present only when starter identity has a PIT receipt known before target kickoff; otherwise the QB feature and any candidate requiring it fail closed for that game. Never infer starter from postgame participation."
+  },
+  "candidate": {
+    "model_family": "RIDGE_RESIDUAL_CORRECTION_AROUND_ATTEMPT9_MEANS",
+    "targets": ["HOME_MARGIN", "GAME_TOTAL"],
+    "feature_window": {
+      "unit": "TEAM_GAMES",
+      "lookback_games": 8,
+      "decay_per_game": 0.85,
+      "minimum_prior_team_games": 4,
+      "cross_season_carry_allowed": true,
+      "target_game_excluded": true
+    },
+    "features": [
+      "OFFENSE_EPA_PER_PLAY",
+      "DEFENSE_EPA_ALLOWED_PER_PLAY",
+      "OFFENSE_SUCCESS_RATE",
+      "DEFENSE_SUCCESS_RATE_ALLOWED",
+      "OFFENSE_PASS_EPA_PER_DROPBACK",
+      "DEFENSE_PASS_EPA_ALLOWED_PER_DROPBACK",
+      "OFFENSE_RUSH_EPA_PER_RUSH",
+      "DEFENSE_RUSH_EPA_ALLOWED_PER_RUSH",
+      "NEUTRAL_DOWN_PASS_OE_FROM_NFLVERSE_XPASS",
+      "OFFENSIVE_PLAYS_PER_GAME_PACE",
+      "STARTING_QB_DROPBACK_EPA_SHRUNK",
+      "STARTING_QB_CPOE_SHRUNK"
+    ],
+    "qb_shrinkage": {
+      "prior": "POSITION_SEASON_MEAN_FROM_DEVELOPMENT_ONLY",
+      "pseudo_dropbacks": 100,
+      "minimum_prior_dropbacks": 20
+    },
+    "margin_transform": "HOME_MINUS_AWAY feature contrasts plus frozen Attempt9 margin mean",
+    "total_transform": "HOME_PLUS_AWAY feature levels plus frozen Attempt9 total mean",
+    "standardization": "TRAINING_FOLD_ONLY",
+    "ridge_alpha_grid": [0.1, 1.0, 10.0, 100.0],
+    "alpha_selection": "EXPANDING_SEASON_CV_ON_DEVELOPMENT_ONLY",
+    "development_cv_validation_seasons": [2019, 2020, 2021, 2022, 2023],
+    "probability_shape": {
+      "family": "NORMAL_RESIDUAL",
+      "residual_scale_fit": "DEVELOPMENT_ONLY_OUT_OF_FOLD_RESIDUAL_SD",
+      "integer_spread_or_total_pricing": false,
+      "discrete_key_mass_owner": "NFL_DISCRETE_V2",
+      "moneyline_pricing": false
+    }
+  },
+  "evaluation": {
+    "primary_metric": "EQUAL_WEIGHT_MEAN_OF_MARGIN_AND_TOTAL_LOG_LOSS",
+    "probability_rows": "HALF_POINT_CLOSE_LINES_ONLY",
+    "market_prices_used_in_fit": false,
+    "comparison_rows": "IDENTICAL_GAME_MARKET_ROWS_FOR_ATTEMPT1_AND_ATTEMPT9",
+    "secondary_metrics": [
+      "MARGIN_RMSE",
+      "TOTAL_RMSE",
+      "BRIER",
+      "ECE",
+      "CALIBRATION_SLOPE",
+      "CALIBRATION_INTERCEPT"
+    ],
+    "validation_pass_rules": {
+      "pooled_log_loss_must_beat_attempt9": true,
+      "margin_log_loss_max_regression": 0.002,
+      "total_log_loss_max_regression": 0.002,
+      "at_least_one_market_log_loss_improvement_min": 0.005,
+      "margin_rmse_must_not_worsen": true,
+      "total_rmse_must_not_worsen": true,
+      "calibration_slope_min": 0.90,
+      "calibration_slope_max": 1.10,
+      "calibration_intercept_abs_max": 0.03,
+      "ece_max": 0.025
+    },
+    "multiple_comparison": "BONFERRONI_WITHIN_DECLARED_FIVE_ATTEMPT_GENERATION",
+    "2025_diagnostic_rule": "REPORT_ONLY; MAY_NOT RESCUE, RETUNE, REORDER, OR REDEFINE ATTEMPT1"
+  },
+  "failure_and_next_attempt": {
+    "validation_failure_spends_attempt": true,
+    "attempt1_retune_on_2024_forbidden": true,
+    "next_attempt_requires_new_prelock_before_scoring": true,
+    "maximum_generation_attempts": 5
+  },
+  "authority": {
+    "changes_production_model": false,
+    "creates_model_p": false,
+    "promotion_authority": false,
+    "truth_gate_authority": false,
+    "official_authority": false,
+    "staking_authority": false,
+    "2026_owner_changes": false
+  }
+}
