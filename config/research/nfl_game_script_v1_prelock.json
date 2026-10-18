@@ -1,0 +1,105 @@
+{
+  "schema": "SPORTSEDGE_NFL_GAME_SCRIPT_V1_PRELOCK",
+  "status": "FROZEN_BEFORE_SCORING",
+  "frozen_date": "2026-10-01",
+  "candidate_role": "RESEARCH_SHADOW_ONLY",
+  "objective": "Learn market-blind pass/rush workload multipliers conditional on the same simulated final-margin path used by the unified NFL model.",
+  "source": {
+    "provider": "nflverse",
+    "dataset": "nflfastR play-by-play",
+    "uri_template": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_{season}.csv",
+    "exact_raw_sha256_required": true,
+    "retrieved_at_required": true,
+    "market_columns_allowed_as_features": false,
+    "raw_extra_columns_ignored_by_whitelist": true,
+    "model_fields": [
+      "season",
+      "season_type",
+      "game_id",
+      "posteam",
+      "posteam_type",
+      "home_score",
+      "away_score",
+      "pass_attempt",
+      "rush_attempt",
+      "qb_scramble",
+      "qb_kneel"
+    ]
+  },
+  "fit_window": {
+    "seasons": [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024],
+    "season_type": "REG",
+    "postseason_included": false
+  },
+  "validation_window": {
+    "season": 2025,
+    "season_type": "REG",
+    "one_look": true,
+    "not_fresh_promotion_evidence": true,
+    "cannot_tune_v1_after_scoring": true,
+    "2026_role": "FORWARD_SHADOW_ONLY"
+  },
+  "play_classification": {
+    "qb_kneel": "EXCLUDE",
+    "qb_scramble": "RUSH",
+    "otherwise_pass_attempt_1": "PASS",
+    "otherwise_rush_attempt_1": "RUSH",
+    "otherwise": "IGNORE",
+    "pass_rush_double_count_allowed": false
+  },
+  "normalization": {
+    "unit": "TEAM_GAME",
+    "reference": "LEAVE_ONE_OUT_TEAM_SEASON_MEAN",
+    "minimum_team_season_games": 8,
+    "reason": "Produce relative script multipliers that can be applied to a team-specific pregame workload baseline."
+  },
+  "margin_buckets": [
+    {"id": "LE_NEG15", "min": null, "max": -15},
+    {"id": "NEG14_NEG8", "min": -14, "max": -8},
+    {"id": "NEG7_NEG1", "min": -7, "max": -1},
+    {"id": "TIE", "min": 0, "max": 0},
+    {"id": "POS1_POS7", "min": 1, "max": 7},
+    {"id": "POS8_POS14", "min": 8, "max": 14},
+    {"id": "GE15", "min": 15, "max": null}
+  ],
+  "estimator": {
+    "pass_multiplier": "ARITHMETIC_MEAN_OF_GAME_PASS_COUNT_DIVIDED_BY_LEAVE_ONE_OUT_TEAM_SEASON_PASS_MEAN",
+    "rush_multiplier": "ARITHMETIC_MEAN_OF_GAME_RUSH_COUNT_DIVIDED_BY_LEAVE_ONE_OUT_TEAM_SEASON_RUSH_MEAN",
+    "minimum_team_games_per_bucket": 100,
+    "shrinkage": "NONE",
+    "monotonic_constraint": false,
+    "post_fit_clipping": false,
+    "downstream_valid_multiplier_range": [0.4, 1.8],
+    "out_of_range_behavior": "FAIL_CLOSED"
+  },
+  "validation_application": {
+    "pregame_baseline": "STRICTLY_PRIOR_8_TEAM_GAMES_EXP_DECAY_0.85",
+    "apply_multiplier_by": "REALIZED_FINAL_MARGIN_FOR_HELDOUT_JOINT_DISTRIBUTION_TEST_ONLY",
+    "baseline_comparator": "NO_SCRIPT_MULTIPLIER_1.0",
+    "primary_metric": "EQUAL_WEIGHT_MEAN_OF_PASS_AND_RUSH_MAE",
+    "pass_rules": {
+      "combined_mae_relative_improvement_min": 0.01,
+      "pass_mae_must_not_worsen": true,
+      "rush_mae_must_not_worsen": true,
+      "pass_mean_error_abs_max_plays": 1.5,
+      "rush_mean_error_abs_max_plays": 1.5
+    },
+    "failure_spends_validation_window": true,
+    "no_post_result_retune": true
+  },
+  "integration_boundary": {
+    "this_prelock_changes_unified_engine": false,
+    "future_integration_requires_separate_pr": true,
+    "sampled_total_continues_to_control_overall_pace": true,
+    "fitted_script_controls_pass_vs_rush_mix_only": true
+  },
+  "authority": {
+    "changes_attempt9_owner": false,
+    "creates_model_p": false,
+    "truth_gate_authority": false,
+    "official_authority": false,
+    "promotion_authority": false,
+    "staking_authority": false,
+    "backfill_authority": false
+  }
+}
