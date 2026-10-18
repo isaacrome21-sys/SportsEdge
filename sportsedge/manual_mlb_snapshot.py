@@ -37,7 +37,7 @@ def resolve_game(snapshot: Mapping[str, Any], opener=urlopen):
     start = parse_timestamp(_text(g.get("scheduled_start_ct"), "scheduled_start_ct"))
     captured = parse_timestamp(_text(snapshot.get("captured_at"), "captured_at")).astimezone(timezone.utc)
     game_number = int(g["game_number"]) if g.get("game_number") is not None else None
-    rows = fetch_schedule(start.astimezone(CT).date().isoformat(), opener=opener, now=captured)
+    rows = fetch_schedule(start.astimezone(CT).date().isoformat(), opener=opener)  # retrieved_at = post-fetch receipt clock; run as-of time is not a receipt claim
     matches = []
     for r in rows:
         if str(r.away_name) != away or str(r.home_name) != home: continue
