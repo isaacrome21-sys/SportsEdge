@@ -1,0 +1,36 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "blocked_count": 2,
+  "blockers": [
+    {
+      "entity_name": "Drew Rasmussen",
+      "observed_at": "2026-10-18T05:58:30.098419+00:00",
+      "provider_event_id": "34848446",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    },
+    {
+      "entity_name": "Parker Messick",
+      "observed_at": "2026-10-18T05:58:30.098419+00:00",
+      "provider_event_id": "34848446",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    }
+  ],
+  "eligible_quote_units": 2,
+  "observed_at_utc": "2026-10-18T06:00:04.357567+00:00",
+  "predictions_created": 0,
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-18/props_20261018T055830.432850Z.json",
+  "run_attempt": "1",
+  "run_id": "39102411866",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_RUN_V1",
+  "selection_drops": {
+    "selected_units": 8
+  },
+  "settlements_created": 0,
+  "status": "OK",
+  "summary_sha256": "74d71cb71f1c134122a3fbd54db07bb7d14d4e279763f921c633e0b69a3f3017"
+}
