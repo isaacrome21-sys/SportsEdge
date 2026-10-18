@@ -1,0 +1,73 @@
+name: auto-nhl
+
+on:
+  workflow_dispatch:
+    inputs:
+      board_json:
+        description: "User-supplied NHL board JSON. Required; no sportsbook API is used."
+        required: true
+        type: string
+  pull_request:
+    paths:
+      - scripts/run_auto_nhl_resilient.py
+      - scripts/render_nhl_auto_card.py
+      - tests/test_run_auto_nhl_resilient.py
+      - .github/workflows/auto-nhl.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auto-nhl
+  cancel-in-progress: false
+
+jobs:
+  run-card:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Test NHL card emit
+        if: github.event_name == 'pull_request'
+        run: python -m unittest tests.test_run_auto_nhl_resilient -v
+      - name: Run NHL card against screenshot-supplied lines
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          NHL_MANUAL_BOARD_JSON: ${{ inputs.board_json }}
+        run: |
+          set +e
+          python scripts/run_auto_nhl_resilient.py --output artifacts/live_nhl_card.json
+          rc=$?
+          set -e
+          python - << 'PY'
+          import json
+          from pathlib import Path
+          card = json.loads(Path("artifacts/live_nhl_card.json").read_text())
+          if card.get("odds_api_called") is not False:
+              raise SystemExit("NHL_AUTO_ODDS_API_GUARD_FAILED")
+          if card.get("run_status") == "BLOCKED_NO_ODDS":
+              raise SystemExit("NHL_AUTO_ZERO_QUOTES")
+          bets = [
+              row for row in card.get("results") or []
+              if row.get("model_p") is not None and row.get("edge") is not None and float(row["edge"]) > 0
+          ]
+          if int((card.get("funnel") or {}).get("bets_emitted") or 0) != len(bets):
+              raise SystemExit("NHL_AUTO_BET_EMIT_MISMATCH")
+          print(f"NHL_AUTO_CARD_OK rows={len(card.get('results') or [])} bets={len(bets)}")
+          PY
+          python scripts/render_nhl_auto_card.py --engine-output artifacts/live_nhl_card.json --out-dir artifacts/nhl_myspari
+          exit $rc
+      - name: Upload NHL auto card
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: live-nhl-card
+          path: |
+            artifacts/live_nhl_card.json
+            artifacts/nhl_myspari/
+          if-no-files-found: error
+          retention-days: 14
