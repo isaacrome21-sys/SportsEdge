@@ -1,0 +1,47 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "candidate_p_over": 0.5882423919659509,
+  "candidate_p_push": 0.0,
+  "candidate_p_under": 0.41175760803404915,
+  "context_proof": {
+    "confirmed_lineup": "PRESENT",
+    "max_age_seconds": 1200,
+    "path": "runtime/mlb-context/runs/39152070212/2026-10-18/game_849817.json",
+    "plate_umpire": "PRESENT",
+    "retrieved_at": "2026-10-18T18:00:04.094659+00:00"
+  },
+  "entity_name": "Parker Messick",
+  "evaluation_run_id": 37603403636,
+  "first_pitch_at_utc": "2026-10-18T21:10:00+00:00",
+  "fit_sha256": "70a31ff9b995a2d54df87feb2d51e2518fa9cd8593bf6c047970e08557b6ecea",
+  "game_pk": 849817,
+  "line": 4.5,
+  "market": "PITCHER_K",
+  "market_fair_p_over": 0.5330897279740154,
+  "observed_at_utc": "2026-10-18T18:09:56.628485+00:00",
+  "over_odds": -130,
+  "pitcher_id": 800048,
+  "pitcher_team_id": 114,
+  "predicted_k_per_batter_faced": 0.22286834058981536,
+  "projected_batters_faced": 23,
+  "provider_event_id": "34848446",
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-18/props_20261018T180957.386568Z.json",
+  "receipt_sha256": "b679a1b302bf392a893e2db035f7434b68dd079eaf70e198f555efb01d17a480",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_PREDICTION_V1",
+  "statcast_proof": {
+    "head_sha": "b7ab18e9c9696f382e34acc7790872a1c7c37ac7",
+    "manifest_path": "runtime/statcast/runs/39152776892/2026-10-18/manifest.json",
+    "pitcher_row_sha256": "8208152ea4f1e7b3d29125c0d619663100f9ab2135c3772b355f9f43269b0871",
+    "pitchers_path": "runtime/statcast/runs/39152776892/2026-10-18/pitchers.json",
+    "provenance_path": "runtime/statcast/runs/39152776892/2026-10-18/provenance.json",
+    "retrieved_at": "2026-10-18T18:09:24.118576+00:00",
+    "run_id": "39152776892"
+  },
+  "status": "CAPTURED_PROSPECTIVE",
+  "under_odds": 102
+}
