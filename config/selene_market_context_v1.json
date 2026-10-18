@@ -1,0 +1,67 @@
+{
+  "schema_version": "SELENE_MARKET_CONTEXT_V1",
+  "status": "ACTIVE_CONTEXT_ONLY",
+  "source": {
+    "provider": "SELENE_CONTEXT",
+    "name": "Selene",
+    "url": "https://app.seleneodds.com",
+    "capture_mode": "MANUAL_BROWSER",
+    "automation_policy": "DISABLED_UNTIL_DOCUMENTED_API_AND_GOVERNED_INTEGRATION"
+  },
+  "scope": ["MLB", "NBA", "NHL", "NFL", "NCAAB", "NCAAF", "TENNIS"],
+  "allowed_uses": [
+    "CURRENT_PRICE_CONTEXT",
+    "BEST_PRICE_DISCOVERY",
+    "LINE_HISTORY_CONTEXT",
+    "DEVIG_CROSSCHECK",
+    "EV_CROSSCHECK",
+    "MAKER_RADAR_COMMENTARY"
+  ],
+  "fair_value_policy": {
+    "role": "INDEPENDENT_BENCHMARK_ONLY",
+    "may_replace_sportsedge_model_probability": false,
+    "may_create_sportsedge_edge": false,
+    "may_create_sportsedge_ev": false
+  },
+  "authority": {
+    "runtime_wager_authority": false,
+    "model_p_authority": false,
+    "truth_gate_authority": false,
+    "promotion_authority": false,
+    "staking_authority": false,
+    "official_authority": false,
+    "can_mutate_probabilities": false,
+    "can_mutate_thresholds": false,
+    "can_mutate_staking": false,
+    "can_bypass_truth_gate": false
+  },
+  "provenance_required": [
+    "source_url",
+    "captured_at_utc",
+    "event_id_or_matchup",
+    "market",
+    "side_or_outcome",
+    "displayed_odds",
+    "bookmaker_or_exchange",
+    "selene_view"
+  ],
+  "selene_views": [
+    "LINE_SHOPPING",
+    "LINE_HISTORY",
+    "DEVIG_CALCULATOR",
+    "EXPECTED_VALUE_CALCULATOR",
+    "MAKER_RADAR",
+    "VALUE_FEED",
+    "OTHER"
+  ],
+  "rules": {
+    "manual_capture_must_be_pit_timestamped": true,
+    "unlabeled_book_or_exchange_price_rejected": true,
+    "capture_time_must_not_be_represented_as_source_native_quote_time": true,
+    "no_silent_runtime_injection": true,
+    "no_selene_fair_value_as_model_probability": true,
+    "no_selene_suggested_stake_as_sportsedge_stake": true,
+    "no_selene_signal_as_vote": true,
+    "reject_uncaptured_prestart_claims": true
+  }
+}
