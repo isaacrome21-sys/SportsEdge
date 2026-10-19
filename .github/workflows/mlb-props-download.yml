@@ -2,22 +2,41 @@ name: MLB Props Download
 
 on:
   workflow_dispatch:
+    inputs:
+      max_rows:
+        description: "Maximum matching MLB prop rows to save in this run"
+        required: true
+        default: "200000"
+        type: string
+
+permissions:
+  contents: read
 
 jobs:
   download:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      - name: Install deps
-        run: pip install datasets pandas pyarrow
-      - name: Run download script
-        run: python scripts/download_mlb_props.py
-      - name: Upload artifact
+          python-version: "3.11"
+      - name: Install free data dependencies
+        run: python -m pip install datasets pandas pyarrow
+      - name: Stream MLB prop lines
+        env:
+          MAX_ROWS: ${{ inputs.max_rows }}
+          HF_HUB_DISABLE_TELEMETRY: "1"
+        run: |
+          mkdir -p artifacts/mlb-props
+          python scripts/download_mlb_props.py \
+            --max-rows "$MAX_ROWS" \
+            --out artifacts/mlb-props
+      - name: Upload filtered MLB prop lines
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: mlb-props-filtered
-          path: mlb_props_filtered.parquet
+          path: artifacts/mlb-props/*.csv.gz
           if-no-files-found: warn
+          retention-days: 14
