@@ -144,6 +144,17 @@ How to read it: verdict labels are preserved **exactly as recorded** (DOES_NOT_B
 - **Current status:** research-only; wired into nothing; not merged. Branch `research/mlb-pitcher-early-exit-v1-20261018` @ `8e2033fd5`.
 - **Sources:** `docs/MLB_PITCHER_EARLY_EXIT_CASE_CHECK_V1.md`; `docs/MLB_PITCHER_EARLY_EXIT_CORRECTION_NOTE_V1.md` (commit `96a1ecae`, blob `35ad7585`); SportsEdge #2409 comment `6267887116`.
 
+## 9. NBA moneyline — ratings model vs de-vigged market (reproduced; corroboration only)
+
+- **Recorded result:** Brier diff (model − market) **+0.011664 [+0.008653, +0.014651]**, n = 4,374 games, 666 date clusters (2022-23..2025-26; cluster bootstrap, seed 20261017, 2,000 resamples).
+- **Reproduction status: reproduced by the session** from preserved artifacts (script, database and model fingerprinted in the record folder). The Oct 19 rerun reproduced the stored figure exactly.
+- **Subset:** games where the spread favorite and the moneyline favorite agree (spread = 0 counted as agreeing), 2022-23 through 2025-26. This is a data-quality filter, and it shapes what the 4,374 games mean.
+- **Vs model baseline:** not applicable. The figure is the model's win probability (Normal margin, sd fitted 2010-11..2021-22) compared with the market.
+- **Vs market baseline:** the market is the de-vigged two-way moneyline from `OddsData.sqlite` (`ML_Home` / `ML_Away`). **Vintage unestablished:** the database has no timestamps, so closing versus opening is unknown. Under the acceptance bar, these are lines of unknown vintage.
+- **Verdict:** corroborates a moneyline accuracy gap. It is **not** a beat-the-close verdict. The same script's flat-ROI rows at the quoted moneyline are NO_EDGE on both thresholds (−2.72% at edge ≥ 0.02; −1.53% at edge ≥ 0.04).
+- **Current status:** research record only; nothing wired; no card path.
+- **Sources:** `records/nba_moneyline_20261019/` on branch `records/nba-moneyline-record-20261019` (`bt_nba_lines.py` b002355d, `common.py` 5c0212e5, `nba_lines_results.json` 808977b0, `FINGERPRINT.md`; database sha256 `4a803d41…`, model sha256 `16e33047…`).
+
 ---
 
 ## How to check a new idea against this ledger
