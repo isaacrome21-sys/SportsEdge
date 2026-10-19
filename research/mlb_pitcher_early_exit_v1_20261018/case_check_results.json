@@ -1,0 +1,442 @@
+{
+ "build": "MLB_PITCHER_EARLY_EXIT_V1_CASE_CHECK",
+ "status": "RESEARCH_ONLY_NOT_WIRED_NO_PRICING_IMPACT",
+ "data_source": "MLB StatsAPI (statsapi.mlb.com), free public",
+ "fetched_at_utc": "2026-10-19T03:38:07Z",
+ "fingerprint_gate": [
+  {
+   "pitcher_id": 607192,
+   "stat": "strikeouts",
+   "side": "over",
+   "line": 6.5,
+   "recorded_p": 0.808,
+   "reconstructed_p": 0.807692,
+   "count": 10,
+   "match": true
+  },
+  {
+   "pitcher_id": 607192,
+   "stat": "outs",
+   "side": "over",
+   "line": 14.5,
+   "recorded_p": 0.808,
+   "reconstructed_p": 0.807692,
+   "count": 10,
+   "match": true
+  },
+  {
+   "pitcher_id": 607192,
+   "stat": "walks",
+   "side": "under",
+   "line": 2.5,
+   "recorded_p": 0.731,
+   "reconstructed_p": 0.730769,
+   "count": 9,
+   "match": true
+  },
+  {
+   "pitcher_id": 607192,
+   "stat": "hits",
+   "side": "under",
+   "line": 3.5,
+   "recorded_p": 0.577,
+   "reconstructed_p": 0.576923,
+   "count": 7,
+   "match": true
+  },
+  {
+   "pitcher_id": 607192,
+   "stat": "earned_runs",
+   "side": "over",
+   "line": 1.5,
+   "recorded_p": 0.654,
+   "reconstructed_p": 0.653846,
+   "count": 8,
+   "match": true
+  },
+  {
+   "pitcher_id": 675660,
+   "stat": "strikeouts",
+   "side": "over",
+   "line": 2.5,
+   "recorded_p": 0.8077,
+   "reconstructed_p": 0.807692,
+   "count": 10,
+   "match": true
+  },
+  {
+   "pitcher_id": 675660,
+   "stat": "outs",
+   "side": "over",
+   "line": 7.5,
+   "recorded_p": 0.962,
+   "reconstructed_p": 0.961538,
+   "count": 12,
+   "match": true
+  },
+  {
+   "pitcher_id": 675660,
+   "stat": "hits",
+   "side": "over",
+   "line": 2.5,
+   "recorded_p": 0.962,
+   "reconstructed_p": 0.961538,
+   "count": 12,
+   "match": true
+  },
+  {
+   "pitcher_id": 675660,
+   "stat": "earned_runs",
+   "side": "over",
+   "line": 0.5,
+   "recorded_p": 0.962,
+   "reconstructed_p": 0.961538,
+   "count": 12,
+   "match": true
+  }
+ ],
+ "historical_pool": {
+  "seasons": {
+   "2023": 4860,
+   "2024": 4854,
+   "2025": 4860
+  },
+  "n_starts": 14574,
+  "state_counts": {
+   "HOOK": 2662,
+   "LEASH": 1095,
+   "NORMAL": 10817
+  },
+  "missing_pitches": 0,
+  "weights": {
+   "HOOK": 0.18265404144366681,
+   "LEASH": 0.07513379991766159,
+   "NORMAL": 0.7422121586386716
+  },
+  "lambda_league": 0.30994738050253384
+ },
+ "sanity": {
+  "hook_early_mass": 0.5897821187077386,
+  "leash_early_mass": 0.8648401826484018,
+  "hook_band_masses_1_4": {
+   "1": 0.027798647633358375,
+   "2": 0.07325319308790383,
+   "3": 0.18031555221637866,
+   "4": 0.3084147257700977
+  },
+  "leash_band_masses_1_4": {
+   "1": 0.2885844748858447,
+   "2": 0.2356164383561644,
+   "3": 0.1872146118721461,
+   "4": 0.15342465753424656
+  },
+  "mixture_early_mass": 0.28688074653492524,
+  "pooled_early_mass": 0.2868807465349211,
+  "nonzero_early_mass_both": true,
+  "band_check_within_0_05": true
+ },
+ "cases": [
+  {
+   "case": "A_unit3_hook",
+   "pitcher": "Tyler Glasnow",
+   "pitcher_id": 607192,
+   "unit": 3,
+   "line": 6.5,
+   "realized_k": 6,
+   "realized_outs": 13,
+   "realized_pitches": 79,
+   "pool": [
+    {
+     "date": "2026-04-04",
+     "outs": 18,
+     "strikeouts": 9,
+     "hits": 4,
+     "runs": 2,
+     "earned_runs": 2,
+     "walks": 2,
+     "pitches": 101
+    },
+    {
+     "date": "2026-04-10",
+     "outs": 18,
+     "strikeouts": 7,
+     "hits": 5,
+     "runs": 4,
+     "earned_runs": 4,
+     "walks": 1,
+     "pitches": 100
+    },
+    {
+     "date": "2026-04-17",
+     "outs": 21,
+     "strikeouts": 7,
+     "hits": 2,
+     "runs": 1,
+     "earned_runs": 1,
+     "walks": 2,
+     "pitches": 92
+    },
+    {
+     "date": "2026-04-23",
+     "outs": 24,
+     "strikeouts": 9,
+     "hits": 1,
+     "runs": 0,
+     "earned_runs": 0,
+     "walks": 1,
+     "pitches": 105
+    },
+    {
+     "date": "2026-04-29",
+     "outs": 17,
+     "strikeouts": 9,
+     "hits": 3,
+     "runs": 2,
+     "earned_runs": 2,
+     "walks": 6,
+     "pitches": 92
+    },
+    {
+     "date": "2026-05-06",
+     "outs": 3,
+     "strikeouts": 2,
+     "hits": 1,
+     "runs": 1,
+     "earned_runs": 1,
+     "walks": 0,
+     "pitches": 19
+    },
+    {
+     "date": "2026-08-25",
+     "outs": 15,
+     "strikeouts": 7,
+     "hits": 6,
+     "runs": 3,
+     "earned_runs": 3,
+     "walks": 0,
+     "pitches": 89
+    },
+    {
+     "date": "2026-08-30",
+     "outs": 21,
+     "strikeouts": 6,
+     "hits": 2,
+     "runs": 1,
+     "earned_runs": 1,
+     "walks": 1,
+     "pitches": 85
+    },
+    {
+     "date": "2026-09-05",
+     "outs": 18,
+     "strikeouts": 8,
+     "hits": 6,
+     "runs": 4,
+     "earned_runs": 4,
+     "walks": 3,
+     "pitches": 96
+    },
+    {
+     "date": "2026-09-12",
+     "outs": 12,
+     "strikeouts": 7,
+     "hits": 5,
+     "runs": 4,
+     "earned_runs": 4,
+     "walks": 4,
+     "pitches": 91
+    },
+    {
+     "date": "2026-09-18",
+     "outs": 18,
+     "strikeouts": 10,
+     "hits": 3,
+     "runs": 2,
+     "earned_runs": 2,
+     "walks": 2,
+     "pitches": 98
+    },
+    {
+     "date": "2026-09-24",
+     "outs": 19,
+     "strikeouts": 11,
+     "hits": 3,
+     "runs": 3,
+     "earned_runs": 3,
+     "walks": 2,
+     "pitches": 91
+    }
+   ],
+   "lambda_pitcher": 0.45098039215686275,
+   "existing_p_at_realized": 0.07692307692307693,
+   "existing_log_score": -2.5649493574615367,
+   "existing_log_score_is_neg_inf": false,
+   "component_p_at_realized": 0.12143545598419798,
+   "component_log_score": -2.108372383819811,
+   "existing_crps": 1.1893491124260356,
+   "component_crps": 0.836436817645766,
+   "realized_exit_band": 4,
+   "component_exit_band_mass": 0.15712913407437903
+  },
+  {
+   "case": "B_unit4_leash",
+   "pitcher": "Shane Drohan",
+   "pitcher_id": 675660,
+   "unit": 4,
+   "line": 2.5,
+   "realized_k": 1,
+   "realized_outs": 3,
+   "realized_pitches": 25,
+   "pool": [
+    {
+     "date": "2026-07-06",
+     "outs": 18,
+     "strikeouts": 2,
+     "hits": 6,
+     "runs": 3,
+     "earned_runs": 1,
+     "walks": 2,
+     "pitches": 85
+    },
+    {
+     "date": "2026-07-11",
+     "outs": 19,
+     "strikeouts": 6,
+     "hits": 5,
+     "runs": 3,
+     "earned_runs": 3,
+     "walks": 0,
+     "pitches": 83
+    },
+    {
+     "date": "2026-07-18",
+     "outs": 18,
+     "strikeouts": 9,
+     "hits": 5,
+     "runs": 3,
+     "earned_runs": 3,
+     "walks": 1,
+     "pitches": 90
+    },
+    {
+     "date": "2026-07-24",
+     "outs": 18,
+     "strikeouts": 6,
+     "hits": 6,
+     "runs": 5,
+     "earned_runs": 5,
+     "walks": 2,
+     "pitches": 92
+    },
+    {
+     "date": "2026-07-31",
+     "outs": 18,
+     "strikeouts": 7,
+     "hits": 4,
+     "runs": 2,
+     "earned_runs": 2,
+     "walks": 1,
+     "pitches": 86
+    },
+    {
+     "date": "2026-08-07",
+     "outs": 15,
+     "strikeouts": 4,
+     "hits": 9,
+     "runs": 6,
+     "earned_runs": 6,
+     "walks": 4,
+     "pitches": 94
+    },
+    {
+     "date": "2026-08-13",
+     "outs": 16,
+     "strikeouts": 5,
+     "hits": 3,
+     "runs": 3,
+     "earned_runs": 3,
+     "walks": 3,
+     "pitches": 85
+    },
+    {
+     "date": "2026-08-23",
+     "outs": 15,
+     "strikeouts": 5,
+     "hits": 8,
+     "runs": 2,
+     "earned_runs": 2,
+     "walks": 3,
+     "pitches": 83
+    },
+    {
+     "date": "2026-08-29",
+     "outs": 15,
+     "strikeouts": 6,
+     "hits": 6,
+     "runs": 1,
+     "earned_runs": 1,
+     "walks": 1,
+     "pitches": 99
+    },
+    {
+     "date": "2026-09-04",
+     "outs": 12,
+     "strikeouts": 5,
+     "hits": 5,
+     "runs": 6,
+     "earned_runs": 6,
+     "walks": 2,
+     "pitches": 78
+    },
+    {
+     "date": "2026-09-12",
+     "outs": 11,
+     "strikeouts": 4,
+     "hits": 5,
+     "runs": 5,
+     "earned_runs": 5,
+     "walks": 2,
+     "pitches": 60
+    },
+    {
+     "date": "2026-09-24",
+     "outs": 8,
+     "strikeouts": 2,
+     "hits": 3,
+     "runs": 1,
+     "earned_runs": 1,
+     "walks": 2,
+     "pitches": 47
+    }
+   ],
+   "lambda_pitcher": 0.3333333333333333,
+   "existing_p_at_realized": 0.0,
+   "existing_log_score": null,
+   "existing_log_score_is_neg_inf": true,
+   "component_p_at_realized": 0.050767349581991035,
+   "component_log_score": -2.9805018557977627,
+   "existing_crps": 2.9023668639053257,
+   "component_crps": 2.7259704992543123,
+   "realized_exit_band": 1,
+   "component_exit_band_mass": 0.02682859887470838
+  }
+ ],
+ "summed_log_score_existing": null,
+ "summed_log_score_existing_is_neg_inf": true,
+ "summed_log_score_component": -5.088874239617574,
+ "verdict": "CASE_CHECK_PASS",
+ "verdict_basis": {
+  "summed_log_score_better": true,
+  "realized_exit_band_mass_nonzero_both": true
+ },
+ "data_cache_sha256": {
+  "gamelog_2026_607192.json": "e4e703f3c9f1dee34f1ca0d461213f7024877a85cdd0b2e7f3f65639ba834371",
+  "gamelog_2026_675660.json": "1f6baa4b6b425f9af385ddb406bbd93d061751a25fb8b2750c4ef64cd5c3ca40",
+  "season_pitching_2023.json": "7b9ee6e0d3b8de2f9e87f57d2d37090c925b29fe69b6ff9514ab3f6a0b5c30f9",
+  "season_pitching_2024.json": "aa768ac3258613c3e82311d55611f5ab8b179e6801c1c57310530151c3cb3b89",
+  "season_pitching_2025.json": "96e5362564c34b0450a76ea2883c79dce507f4a2bb8996f3b79388b1edd0759a",
+  "starts_2023.csv": "be0563618a519e6bf751f00b605c1049a92c5ad052cd8a15844116d9a17c9937",
+  "starts_2024.csv": "3a13c674c9977c117ac30a1c1a7798f11605c1f487cea312a48466aa41857973",
+  "starts_2025.csv": "5d7d29968cbe3c8e0f453204750ed41d2234a372737cab88ec77e103c4dcd956"
+ }
+}
