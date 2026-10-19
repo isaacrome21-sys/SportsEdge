@@ -12,6 +12,19 @@ from .context_providers import StadiumRecord
 REGISTRY_FILENAME = "stadiums_2026.json"
 
 
+def _field_bearing_deg(value: Any) -> float | None:
+    """Registry v2026.2+: an unverified bearing is JSON null (unknown).
+
+    Unknown stays unknown (None) end to end; it is never coerced to 0.0,
+    which would silently assert a due-north field orientation.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise NFLContextError("field bearing invalid")
+    return float(value)
+
+
 def load_stadium_registry(path: str | Path | None = None) -> dict[str, Any]:
     registry_path = Path(path) if path is not None else Path(__file__).with_name(REGISTRY_FILENAME)
     raw = registry_path.read_bytes()
@@ -36,7 +49,7 @@ def load_stadium_registry(path: str | Path | None = None) -> dict[str, Any]:
             team_ids=tuple(str(x) for x in (raw_row.get("team_ids") or [])),
             lat=float(raw_row.get("lat")),
             lon=float(raw_row.get("lon")),
-            field_bearing_deg=float(raw_row.get("field_bearing_deg")),
+            field_bearing_deg=_field_bearing_deg(raw_row.get("field_bearing_deg")),
             roof_type=str(raw_row.get("roof_type") or ""),
             timezone_name=str(raw_row.get("timezone") or ""),
             typical_home_kickoff_hour_local=float(raw_row.get("typical_home_kickoff_hour_local")),

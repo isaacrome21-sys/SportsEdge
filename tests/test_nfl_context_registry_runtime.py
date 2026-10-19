@@ -73,7 +73,7 @@ def _fixture_opener(req, timeout=20):
 
 def test_stadium_registry_is_hash_bound_and_covers_all_teams():
     registry = load_stadium_registry()
-    assert registry["version"] == "2026.1"
+    assert registry["version"] == "2026.2"
     assert len(registry["registry_sha256"]) == 64
     assert len(registry["stadiums"]) == 30
     assert len(registry["team_to_stadium"]) == 32
