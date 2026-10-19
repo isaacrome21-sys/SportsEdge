@@ -9,12 +9,10 @@ Status: owner rulings recorded Oct 18, 2026. Capture owner: Muse, pending Muse's
 
 ## Scope
 - **Thursday, Oct 22, 2026, New England at Chicago, 7:15 PM CT kickoff:** full available DraftKings board for that game, entry capture and close capture.
-- **All other games:** a predeclared prioritized subset, entry and close:
+- **All other games:** the predeclared subset, entry and close:
   - the four scored NFL prop markets: passing yards, rushing yards, receiving yards, receptions
   - the anytime TD Yes board
   - main game lines: moneyline, spread, total
-  - starting-QB markets and high-usage players
-  - commonly offered props, plus alternate ladders where feasible
 - **NBA:** game lines plus points, rebounds, assists and common combination props.
 - **College basketball:** the complete available game-line board first (moneylines, spreads, totals, team totals), then available player props.
 
