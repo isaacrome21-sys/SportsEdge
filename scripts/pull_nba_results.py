@@ -1,34 +1,23 @@
-#!/usr/bin/env python3
-"""Pull NBA player game logs (PTS etc.) via nba_api. Seasons one at a time with pause.
-Draft: has not been run from this environment."""
-from nba_api.stats.endpoints import playergamelog
-import pandas as pd
-import time
-import sys
+"""Pull per-game player stats (PTS/REB/AST) from stats.nba.com via nba_api. Read-only."""
+import argparse, os, time
+from nba_api.stats.endpoints import playergamelogs
 
-SEASONS = ["2023-24", "2024-25", "2025-26"]  # adjust as needed
+COLS = ["PLAYER_ID", "PLAYER_NAME", "TEAM_ABBREVIATION", "GAME_ID",
+        "GAME_DATE", "MATCHUP", "MIN", "PTS", "REB", "AST"]
 
-def main():
-    all_logs = []
-    for season in SEASONS:
-        print(f"Pulling {season}...")
-        try:
-            # Example: pull for a known player; expand to roster or league in production
-            log = playergamelog.PlayerGameLog(player_id="2544", season=season)  # LeBron as smoke test
-            df = log.get_data_frames()[0]
-            df["season"] = season
-            all_logs.append(df)
-            print(f"  {len(df)} games")
-        except Exception as e:
-            print(f"  Failed {season}: {e}")
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--seasons", required=True)
+    ap.add_argument("--out", required=True)
+    args = ap.parse_args()
+    os.makedirs(args.out, exist_ok=True)
+    for season in [s.strip() for s in args.seasons.split(",") if s.strip()]:
+        df = playergamelogs.PlayerGameLogs(season_nullable=season, timeout=60).get_data_frames()[0]
+        out = os.path.join(args.out, f"nba_player_games_{season}.csv")
+        df[[c for c in COLS if c in df.columns]].to_csv(out, index=False)
+        print(f"{season}: {len(df)} player-games -> {out}")
         time.sleep(3)
-    
-    if all_logs:
-        out = pd.concat(all_logs, ignore_index=True)
-        out.to_parquet("nba_player_logs.parquet", index=False)
-        print(f"Saved {len(out)} rows to nba_player_logs.parquet")
-    else:
-        print("No data pulled")
+    return 0
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

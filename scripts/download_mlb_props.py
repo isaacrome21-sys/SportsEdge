@@ -1,49 +1,43 @@
-#!/usr/bin/env python3
-"""Stream SmartStake/mlb-player-props and save strikeouts/hits/total-bases lines.
-Draft: prints schema on first run. Caps at 2M rows."""
+"""Stream SmartStake/mlb-player-props and keep strikeout / hit / total-base lines.
+Read-only data pull. Prints the schema first so the filter can be checked.
+Output is gzipped CSV, never committed to the repo.
+"""
+import argparse, csv, gzip, os, sys
 from datasets import load_dataset
-import pandas as pd
-import sys
 
-def main():
-    print("Loading streaming dataset...")
+KEYWORDS = ("strikeout", "hit", "total_bases", "total bases")
+
+def keep(row) -> bool:
+    text = " ".join(str(row.get(k, "")) for k in ("market", "market_name", "prop")).lower()
+    return any(k in text for k in KEYWORDS)
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--max-rows", type=int, default=2_000_000)
+    ap.add_argument("--out", required=True)
+    args = ap.parse_args()
+    os.makedirs(args.out, exist_ok=True)
     ds = load_dataset("SmartStake/mlb-player-props", split="train", streaming=True)
-    
-    # Print schema from first batch
-    first = list(ds.take(100))
-    if not first:
-        print("Empty dataset")
-        return
-    df_first = pd.DataFrame(first)
-    print("Schema columns:", df_first.columns.tolist())
-    print(df_first.head(3).to_string())
-    
-    # Keyword filter (adjust after first run if needed)
-    keywords = ["strikeout", "k's", "hits", "total bases", "tb", "bases"]
-    market_cols = [c for c in df_first.columns if c.lower() in ("market", "market_name", "prop")]
-    if not market_cols:
-        print("No market column found. Update filter.")
-        return
-    market_col = market_cols[0]
-    
-    print(f"Filtering on {market_col} for {keywords}")
-    rows = []
-    cap = 2_000_000
-    for i, row in enumerate(ds):
-        if i >= cap:
-            break
-        market = str(row.get(market_col, "")).lower()
-        if any(k in market for k in keywords):
-            rows.append(row)
-        if len(rows) % 100000 == 0 and rows:
-            print(f"Collected {len(rows)} matching rows...")
-    
-    if rows:
-        out = pd.DataFrame(rows)
-        out.to_parquet("mlb_props_filtered.parquet", index=False)
-        print(f"Saved {len(out)} rows to mlb_props_filtered.parquet")
-    else:
-        print("No matching rows")
+    first = next(iter(ds))
+    print("SCHEMA:", sorted(first.keys()))
+    fields = list(first.keys())
+    path = os.path.join(args.out, "mlb_props_targets.csv.gz")
+    kept = seen = 0
+    with gzip.open(path, "wt", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=fields, extrasaction="ignore")
+        w.writeheader()
+        from itertools import chain
+        for row in chain([first], ds):
+            seen += 1
+            if keep(row):
+                w.writerow(row)
+                kept += 1
+            if args.max_rows and kept >= args.max_rows:
+                break
+            if seen % 5_000_000 == 0:
+                print(f"scanned {seen:,} kept {kept:,}", file=sys.stderr)
+    print(f"DONE scanned={seen} kept={kept} file={path}")
+    return 0
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
