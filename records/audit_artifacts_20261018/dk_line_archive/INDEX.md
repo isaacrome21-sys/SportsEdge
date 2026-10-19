@@ -5,3 +5,4 @@ Timestamped line captures for forward-test scoring against our own captured line
 | Date | Capture time (CT) | Sport | Games | Rows | Status | File |
 |---|---|---|---|---|---|---|
 | 2026-10-19 | 10:53 | NBA | 0 | 0 | CAPTURE_FAILED — DraftKings unreachable (geo/IP block; API 403; board did not render) after two genuine attempts; board existence unknown, no lines captured or fabricated | ~/workspace/sportsedge/dk_line_archive/nba/2026-10-19/1053_ct.json |
+| 2026-10-19 | 11:54 | NBA | 14 | 582 | MANUAL_CAPTURE (owner-directed, via main browser) — covers Tue Oct 20 (3) + Wed Oct 21 (11) boards; no games Mon Oct 19 (NO_BOARD today); team totals not displayed on league board | ~/workspace/sportsedge/dk_line_archive/nba/2026-10-19/1154_ct.json |
