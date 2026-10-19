@@ -5,7 +5,7 @@
 - `bt_nba_lines.py`: the Oct 18 sweep script, byte-identical to the run that wrote `nba_lines_results.json`.
 - `common.py`: the helper it imports, byte-identical.
 - `nba_lines_results.json`: the results of that run (byte-identical, blob `808977b0`).
-- This file: the fingerprint of the input database. The database itself is not in the repo.
+- This file: the fingerprints of the input database and the imported model. The database itself is not in the repo.
 
 ## Result (moneyline, model vs de-vigged market, 2022-23..2025-26)
 
@@ -48,10 +48,18 @@
   - "2024-25" 1326; odds_2025-26 554
   - (The script reads `_new` tables where they exist; the 2023-24 plain and new counts differ, as the results file's `audit` block records.)
 
+## Model fingerprint (imported by the script)
+
+- Module: `sportsedge/sports/nba/ratings_model.py`
+- sha256: `16e3304718703bcf4ba901fd9bb97b4712d3994d1314f93d93dc19e4bd63ad20`
+- git blob: `3d7cae254157f91d70b82f066adb30a292417ec5`
+- Checkout: `nba_track/wt`, HEAD `9a57a8add` (merge of PR #2394). The module is unmodified there: the committed blob equals the working copy.
+- The commit `a7bf4c748` cited in the totals diagnosis is **not** in this checkout. The sha256 match establishes that the file bytes are identical to the pinned module, whichever commit they came from.
+
 ## Reproduction
 
 1. Place `OddsData.sqlite` where the script's `DB` path points, and verify its sha256 above.
-2. The script imports `sportsedge.sports.nba.ratings_model` from a repo checkout (`REPO` in the script). That module is **not** in this record and its version is not pinned here.
+2. Place `ratings_model.py` where the script's `REPO` path points, and verify its sha256 above. The module's own imports are not fingerprinted here.
 3. Paths in the script are session-local (under the Oct 18 scratchpad). Edit `DB`, `REPO` and the `sys.path` line before running elsewhere.
 4. Expected output: `ML Brier diff (model - market): 0.01166` with the mean and CI above.
 
