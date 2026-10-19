@@ -26,8 +26,7 @@ def main() -> int:
     with gzip.open(path, "wt", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=fields, extrasaction="ignore")
         w.writeheader()
-        from itertools import chain
-        for row in chain([first], ds):
+        for row in ds:
             seen += 1
             if keep(row):
                 w.writerow(row)
