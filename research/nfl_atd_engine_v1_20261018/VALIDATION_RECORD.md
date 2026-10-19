@@ -108,8 +108,9 @@ data current at pricing time.
 - Hand check: 12 scored player-games recomputed from the raw CSVs by
   `handcheck_nfl_atd.py` (imports nothing from the engine) — **ALL MATCH**
   (model_p, pool_p, raw_p, outcome, tolerance 1e-9).
-- Determinism: scorer rerun is byte-identical (results sha256
-  `a46d29828b52a63c27bd6bde6a401b21d51a574d6772b682536d6162d9fe84a0b`).
+- Determinism: scorer reruns (three separate processes) are byte-identical
+  to the committed results file (sha256
+  `8d45de850bf357607f7d90f5b687d506b8709c3261e7304a76402d018445b46b`).
 - The registry entry is untouched: registration is not an engine, this
   branch admits nothing, and governance state (eligible/promotable/
   validation_status) is exactly as registered.
