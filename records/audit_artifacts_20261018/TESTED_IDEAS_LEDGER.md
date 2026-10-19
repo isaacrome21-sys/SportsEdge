@@ -1,6 +1,6 @@
 # SportsEdge — Tested Ideas Ledger
 
-**What this is:** the single reconciled record of every measured SportsEdge framework in scope — its recorded verdict, its numbers against the model baseline and against the market baseline (shown separately), and its current status. **As of October 18, 2026.** **Rule: a new challenger must be checked against this ledger before it is built — if the construction, or a close variant of it, already has a verdict here, that verdict governs until new evidence on new data says otherwise.**
+**What this is:** the single reconciled record of every measured SportsEdge framework in scope — its recorded verdict, its numbers against the model baseline and against the market baseline (shown separately), and its current status. **As of October 19, 2026.** **Rule: a new challenger must be checked against this ledger before it is built — if the construction, or a close variant of it, already has a verdict here, that verdict governs until new evidence on new data says otherwise.**
 
 How to read it: verdict labels are preserved **exactly as recorded** (DOES_NOT_BEAT_*, SCREEN, PASS, etc. — never paraphrased into something stronger). "Model baseline" = the existing model or statistical baseline the test itself used. "Market baseline" = real book/closing prices. Where a test never faced prices, that is stated outright — a calibration result is not a market result. Every figure names its record source. Nothing in this ledger is a validated play; validated families remain **zero**.
 
@@ -38,6 +38,8 @@ How to read it: verdict labels are preserved **exactly as recorded** (DOES_NOT_B
 - **Sources:** `~/MEMORY.md` (Oct 14 challengers); `backtest_program_20261017/MATRIX.md` row M1.
 
 ## 3. The NFL Elo pair (entered under their own recorded names)
+
+**Ruling (Isaac, main chat, Oct 19 ~07:38 CT):** `sportsedge/backtest/elo.py` and `sportsedge/ratings/elo.py` stay separate. If unification is ever wanted, it is its own preregistered change with its own verdict.
 
 ### 3a. NFL sides Elo v1
 
@@ -132,6 +134,15 @@ How to read it: verdict labels are preserved **exactly as recorded** (DOES_NOT_B
 - **Verification on record:** independently reproduced (fresh worktrees, full reproduction) — 2024 frozen-arm reproduction max |Δ| = **0.0**, hand check 864 cells PASS, results file hash `d827f294…f464` reproduced exactly; the HA leg is a knife-edge (CI upper **+0.00004**) on the pre-fixed seed. (The Oct 17 program matrix carries the repair as REPORTED_BRANCH, not reproduced by the program; the reproduction above is Rocky's, per MEMORY.md.)
 - **Current status: EITHER_PITCHER is CLOSED as research-only.** The family was renamed **EITHER_PITCHER_MARGINAL_TAIL_ERROR** on main (#2362); pricing remains refused.
 - **Sources:** `backtest_program_20261017/MATRIX.md` row M31 (branch `research/either-pitcher-shrunk-marginals-prereg-20261017` @ `ec72c2079`); `backtest_program_20261017/REPORT.md` §2; `~/MEMORY.md` (Oct 15 rulings, Oct 17 update).
+
+## 8. MLB pitcher early-exit V1 — component (research-only)
+
+- **Recorded verdict: CASE_CHECK_PASS** — on **n = 2** (Glasnow, Drohan). A case check, **not validation**.
+- **Vs model baseline:** no baseline comparison is recorded in the case-check record.
+- **Vs market baseline: NOT MEASURED.**
+- **Prereg-before-code order: builder-attested, not repo-verifiable.** The case-check record cites a prereg-only commit `6f2217716`; that commit is not in the repo. The primary branch has a single squashed commit `8e2033fd5` above `main`, which contains the prereg, the component, and the case check together. The freeze-order copy's prereg commit `a093907438` is timestamped 2026-10-19 03:51:41Z, after `8e2033fd5` (03:49:18Z). The prereg content hash `d9b276a4…` is unchanged and was not independently verified here.
+- **Current status:** research-only; wired into nothing; not merged. Branch `research/mlb-pitcher-early-exit-v1-20261018` @ `8e2033fd5`.
+- **Sources:** `docs/MLB_PITCHER_EARLY_EXIT_CASE_CHECK_V1.md`; `docs/MLB_PITCHER_EARLY_EXIT_CORRECTION_NOTE_V1.md` (commit `96a1ecae`, blob `35ad7585`); SportsEdge #2409 comment `6267887116`.
 
 ---
 
