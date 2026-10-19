@@ -1,6 +1,6 @@
 # MySpariEdge Methodology Audit — Oct 18, 2026
 
-- **Author:** Rocky (Muse lane)
+- **Author:** Rocky — Isaac's main-chat agent (the Muse / captures lane). Sole reader and author of this audit.
 - **Date of underlying read:** October 18, 2026 — 21 MySpariEdge models/tools read that day (public and member pages; member access via Isaac's sign-in, completed by Isaac himself).
 - **Delivered:** to Isaac in the main chat on the evening of Oct 18, 2026.
 - **Status:** RESEARCH CONTEXT ONLY. This audit is research context, **not** evidence about SportsEdge models. All MySpariEdge numbers are source-labeled wherever used and are never blended into SportsEdge numbers. SportsEdge prices bind only to paired DraftKings captures.
@@ -52,7 +52,7 @@ Inputs are listed, and projections freeze at lineup lock — but weights, formul
 
 ---
 
-## Standing conclusions (Isaac's, adopted Oct 18, 2026)
+## Standing conclusions (adopted by Isaac in the main chat, Oct 18, 2026 — as recorded in the author's main-chat record)
 
 1. This audit is **research context, NOT evidence about SportsEdge models**. A competitor's weak disclosure says nothing about whether SportsEdge's constructions win or lose; SportsEdge verdicts come only from SportsEdge's own tests against prices.
 2. **All MySpariEdge numbers stay source-labeled, never blended** into SportsEdge numbers, prices, or EV estimates.
