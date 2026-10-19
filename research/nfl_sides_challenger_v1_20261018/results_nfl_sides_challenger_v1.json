@@ -1,0 +1,94 @@
+{
+ "calibration_fit_on_2010_2017_only": {
+  "a": 0.6253040461826342,
+  "alpha": 0.05917754433814731,
+  "b": 0.04000991740746749,
+  "beta": 0.005522478079270874,
+  "fit_n": 2136,
+  "fit_n_logistic": 2131
+ },
+ "challenger_constants": {
+  "hfa": 48.0,
+  "k": 20.0,
+  "regress": 0.3333333333333333,
+  "start": 1500.0,
+  "stream_seasons": [
+   1999,
+   2025
+  ]
+ },
+ "corpus_sha256": "a484c6ae884d03b11ab14f9fb3ed9ee8ca7168f3a22550e74f566532c4c6b284",
+ "elo_v1_reference_published": {
+  "moneyline_full_set": "delta +0.0274 [+0.0188, +0.0356], n=2219, DOES_NOT_BEAT_CLOSE"
+ },
+ "label": "SCREEN",
+ "prereg_sha256": "9c758ab12da3c97461acda004c3a0b7bd1a85f1f403d4092a91c2085398bde43",
+ "research_only": true,
+ "results": {
+  "ats_disagreement_gt_3pts": {
+   "candidate_cover_rate": 0.5183673469387755,
+   "n_candidates": 749,
+   "n_decided": 735,
+   "n_pushes_excluded": 14
+  },
+  "delta_challenger_minus_elo_v1": {
+   "ci95_hi": 0.002226404414086884,
+   "ci95_lo": -3.1276364012841744e-05,
+   "mean": 0.0010929807562590074,
+   "n": 2119,
+   "n_blocks": 141
+  },
+  "delta_challenger_minus_market": {
+   "ci95_hi": 0.03792279270726151,
+   "ci95_lo": 0.020980177650190945,
+   "mean": 0.02916324533856479,
+   "n": 2119,
+   "n_blocks": 141
+  },
+  "delta_elo_v1_minus_market_descriptive": {
+   "ci95_hi": 0.03671327861775949,
+   "ci95_lo": 0.01993024293864679,
+   "mean": 0.028070264582305784,
+   "n": 2119,
+   "n_blocks": 141
+  },
+  "favorite_underdog_diagnostic": {
+   "favorite_backed": {
+    "challenger_logloss": 0.6561320535741767,
+    "delta_challenger_minus_market": {
+     "ci95_hi": 0.08293709726157088,
+     "ci95_lo": -0.011166713319921345,
+     "mean": 0.035732206729220624,
+     "n": 179,
+     "n_blocks": 108
+    },
+    "n": 179
+   },
+   "favorite_share_of_non_pickem": 0.2389853137516689,
+   "n_candidates": 749,
+   "n_favorite_backed": 179,
+   "n_pickem_candidates": 0,
+   "n_underdog_backed": 570,
+   "underdog_backed": {
+    "challenger_logloss": 0.64483502170143,
+    "delta_challenger_minus_market": {
+     "ci95_hi": 0.10167731953478124,
+     "ci95_lo": 0.049468570357028056,
+     "mean": 0.07627119446507394,
+     "n": 570,
+     "n_blocks": 140
+    },
+    "n": 570
+   },
+   "underdog_share_of_non_pickem": 0.7610146862483311
+  },
+  "logloss": {
+   "CHALLENGER": 0.637887084199653,
+   "ELO_V1": 0.636794103443394,
+   "MARKET": 0.6087238388610883
+  },
+  "n": 2119,
+  "verdict_vs_close": "DOES_NOT_BEAT_CLOSE",
+  "verdict_vs_elo_v1": "DOES_NOT_BEAT_ELO_V1"
+ }
+}
