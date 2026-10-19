@@ -1,0 +1,30 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "blocked_count": 1,
+  "blockers": [
+    {
+      "entity_name": "Freddy Peralta",
+      "observed_at": "2026-10-19T10:49:55.929023+00:00",
+      "provider_event_id": "34860409",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    }
+  ],
+  "eligible_quote_units": 1,
+  "observed_at_utc": "2026-10-19T10:51:41.268260+00:00",
+  "predictions_created": 0,
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-19/props_20261019T104956.638121Z.json",
+  "run_attempt": "1",
+  "run_id": "39240327023",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_RUN_V1",
+  "selection_drops": {
+    "selected_units": 4
+  },
+  "settlements_created": 0,
+  "status": "OK",
+  "summary_sha256": "9c7186861427d0a69eb61d80b791dad1aa68c27f1473843e1171ff59a06ba6f2"
+}
