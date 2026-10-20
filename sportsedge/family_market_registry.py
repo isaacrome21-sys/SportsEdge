@@ -13,6 +13,21 @@ Form 2 identity path (enforced per-fixture in
 ``sportsedge.registry_gate``); PLAY remains impossible and the CFB
 historical evaluation HOLD is untouched. Every other CFB family, and
 every NBA/CBB family, stays BLOCKED exactly as before.
+
+Owner directive 2026-10-20 ("Build the engines"): the four NBA
+player-prop families with a calibrated construction on record —
+points, rebounds, assists, and PRA (the Oct 17 B5/B6/B7 calibration
+and the Oct 18 B8 extension; calibration vs league climatology
+baselines only, no market leg) — are REGISTERED_RESEARCH_ONLY /
+NOT_VALIDATED (eligible False, promotable False) with the engine
+built in ``sportsedge.nba_prop_empirical``. Their rows may price as
+research-only LEANs ("unvalidated estimate") only when the engine's
+own sufficiency gate is met (>= 10 point-in-time prior games; the
+gate in ``sportsedge.registry_gate`` verifies the engine stamp on
+the row). NBA has no Form 2 identity concept; none is imported.
+Every other NBA family (threes, steals, blocks, turnovers,
+double-double, team totals, quarters, exotics) and every NBA game
+market stays BLOCKED exactly as before, and CBB is unchanged.
 """
 from __future__ import annotations
 
@@ -83,6 +98,31 @@ REGISTRATION_VALIDATION_STATUS = "NOT_VALIDATED"
 # three). Team totals and player props are deliberately NOT registered
 # here -- they stay BLOCKED.
 CFB_RESEARCH_REGISTERED_FAMILIES = frozenset({"moneyline", "spread", "total"})
+# NBA player-prop families registered research-only by the 2026-10-20
+# "Build the engines" directive: exactly the families whose calibrated
+# construction the Oct 17/18 backtest programs scored BEATS_BASELINE
+# (calibration class) and whose engine is built in
+# sportsedge.nba_prop_empirical. Aliases are the canonical intake
+# spellings for these families; keys resolve only for sport == "NBA".
+NBA_ALIASES = {"PLAYER_POINTS": "player_points", "POINTS": "player_points",
+               "PTS": "player_points", "PLAYER_PTS": "player_points",
+               "PLAYER_REBOUNDS": "player_rebounds",
+               "REBOUNDS": "player_rebounds", "REB": "player_rebounds",
+               "PLAYER_REB": "player_rebounds",
+               "PLAYER_ASSISTS": "player_assists",
+               "ASSISTS": "player_assists", "AST": "player_assists",
+               "PLAYER_AST": "player_assists",
+               "PLAYER_PRA": "player_pra", "PRA": "player_pra",
+               "PTS_REB_AST": "player_pra",
+               "POINTS_REBOUNDS_ASSISTS": "player_pra",
+               "PLAYER_POINTS_REBOUNDS_ASSISTS": "player_pra"}
+NBA_RESEARCH_REGISTERED_FAMILIES = frozenset({
+    "player_points", "player_rebounds", "player_assists", "player_pra"})
+# The pricing condition carried on the registered NBA decisions: the
+# registered engine's sufficiency gate (point-in-time prior-game
+# minimum) verified from the engine stamp on the row. Deliberately
+# distinct from the CFB Form 2 identity condition.
+NBA_PROP_PRICING_CONDITION = "ENGINE_SUFFICIENCY_MET"
 EVALUATION_SCOPES = frozenset({"HISTORICAL", "FORWARD_ONLY"})
 CFB_EVALUATION_SCOPE = {
     "moneyline": "HISTORICAL", "spread": "HISTORICAL",
@@ -127,6 +167,31 @@ def family_market_decision(sport, market):
     family = ALIASES.get(key)
     if sport == "CFB":
         family = CFB_ALIASES.get(key, family)
+    if sport == "NBA":
+        family = NBA_ALIASES.get(key, family)
+    if sport == "NBA" and family in NBA_RESEARCH_REGISTERED_FAMILIES:
+        # "Build the engines" registration (2026-10-20): research
+        # pricing only, gated per-row on the registered engine's
+        # sufficiency stamp by the runtime gate. The blocker/reason
+        # fields keep naming the refusal that applies whenever that
+        # condition is not met, so existing fail-closed consumers see
+        # no change for unproven rows. Registration is not validation:
+        # no market test exists for these families (calibration vs
+        # climatology baselines only), and the forward path is the
+        # preregistered forward test vs captured DK lines.
+        return {
+            "sport": sport, "market": family,
+            "state": REGISTRATION_STATE_RESEARCH_ONLY,
+            "registration_state": REGISTRATION_STATE_RESEARCH_ONLY,
+            "blocker": "NO_VALIDATION",
+            "reason": "FAMILY_REGISTRY_NOT_VALIDATED",
+            "validation_status": REGISTRATION_VALIDATION_STATUS,
+            "evaluation_scope": "UNSPECIFIED",
+            "research_only": True, "official_authority": False,
+            "model_p_authority": False, "staking_authority": False,
+            "eligible": False, "promotable": False,
+            "pricing_condition": NBA_PROP_PRICING_CONDITION,
+        }
     if sport == "CFB" and family in CFB_RESEARCH_REGISTERED_FAMILIES:
         # Option B registration (2026-10-20): research pricing only,
         # gated per-fixture on satisfied Form 2 identity by the runtime
