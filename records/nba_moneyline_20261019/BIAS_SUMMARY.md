@@ -6,7 +6,7 @@ Lines come from `OddsData.sqlite`, vintage unestablished. This is an accuracy di
 
 ## Spread, favorite-oriented (negative = less extreme than the favorite's line)
 
-| |Line| band | n | model − line | model − actual | line − actual |
+| Spread size band | n | model − line | model − actual | line − actual |
 |---|---|---|---|---|
 | all | 4,374 | −1.65 [−1.77, −1.54] | −1.15 [−1.56, −0.74] | +0.50 [+0.11, +0.88] |
 | 0–3 | 856 | −1.09 [−1.29, −0.88] | −0.38 [−1.41, +0.66] | +0.71 [−0.30, +1.71] |
