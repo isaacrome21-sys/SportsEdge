@@ -1,0 +1,26 @@
+{
+  "games_parsed": 310,
+  "games_scored": 186,
+  "scoring_dates": 35,
+  "first_scored": "2025-01-11",
+  "last_scored": "2025-04-10",
+  "min_train": 120,
+  "embargo_days": 1,
+  "seed": 20261017,
+  "resamples": 2000,
+  "brier_candidate": 0.23374,
+  "brier_baseline": 0.24826,
+  "delta": -0.01452,
+  "ci95_game_clustered": [
+    -0.0266,
+    -0.0021
+  ],
+  "ci95_date_clustered": [
+    -0.02582,
+    -0.00263
+  ],
+  "mae_margin": 11.814,
+  "mae_total": 14.043,
+  "market_leg": "MISSING",
+  "rows_sha256": "86495d8703d475d58f30a1812b869762226acc5ee93c2ec50fb91be13ed7dc88"
+}
