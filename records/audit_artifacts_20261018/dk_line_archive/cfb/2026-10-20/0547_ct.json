@@ -1,0 +1,181 @@
+{
+ "status": "CAPTURED",
+ "capture_type": "MANUAL_CAPTURE_RELAYED_REQUEST",
+ "sport": "CFB",
+ "league": "NCAAF",
+ "archive_date": "2026-10-20",
+ "capture_start_ct": "2026-10-20T05:47:00-05:00",
+ "capture_end_ct": "2026-10-20T05:49:00-05:00",
+ "captured_at": "2026-10-20T05:47:00-05:00",
+ "source": "DraftKings",
+ "source_access": "signed out",
+ "source_view": "College Football league board, Game Lines, Today section (rendered pages only; no API calls)",
+ "scope": {
+  "markets": [
+   "spread",
+   "moneyline",
+   "total"
+  ],
+  "note": "Game lines only per request. No player props, team totals, or futures."
+ },
+ "family_status_note": "PRICE RECORD ONLY. Every CFB family is BLOCKED / FAMILY_REGISTRY_NOT_VALIDATED behind the registry gate (no owner ruling this week). A captured price is not a priced row and carries no lean, EV, or model number.",
+ "egress_ip_hash": "58dccefbe38a",
+ "egress_ip_changed": true,
+ "egress_ip_note": "first recorded run under the egress-state protocol",
+ "attempt_timeline": [
+  {
+   "attempt": 0,
+   "time_ct": "2026-10-20 05:47",
+   "action": "egress IP read in-session (value held locally only)",
+   "outcome": "recorded as salted hash"
+  },
+  {
+   "attempt": 1,
+   "time_ct": "2026-10-20 05:47",
+   "action": "opened College Football board (assignment URL redirected to Football hub; used the College Football nav link to the NCAAF league board)",
+   "outcome": "skeleton loaders, populated after ~45s wait; 0 reloads used"
+  },
+  {
+   "attempt": 2,
+   "time_ct": "2026-10-20 05:48-05:49",
+   "action": "read full Today section",
+   "outcome": "3 games, all rows displayed"
+  }
+ ],
+ "games_count": 3,
+ "rows_count": 18,
+ "games": [
+  {
+   "away": "Middle Tennessee",
+   "home": "FIU",
+   "start_time_ct": "2026-10-20 18:00",
+   "start_time_as_displayed": "Today 6:00 PM",
+   "rows": [
+    {
+     "market": "spread",
+     "side": "Middle Tennessee",
+     "line": 10,
+     "price": -110
+    },
+    {
+     "market": "spread",
+     "side": "FIU",
+     "line": -10,
+     "price": -110
+    },
+    {
+     "market": "moneyline",
+     "side": "Middle Tennessee",
+     "line": null,
+     "price": 300
+    },
+    {
+     "market": "moneyline",
+     "side": "FIU",
+     "line": null,
+     "price": -380
+    },
+    {
+     "market": "total",
+     "side": "over",
+     "line": 45.5,
+     "price": -105
+    },
+    {
+     "market": "total",
+     "side": "under",
+     "line": 45.5,
+     "price": -115
+    }
+   ]
+  },
+  {
+   "away": "Missouri State",
+   "home": "Delaware",
+   "start_time_ct": "2026-10-20 18:00",
+   "start_time_as_displayed": "Today 6:00 PM",
+   "rows": [
+    {
+     "market": "spread",
+     "side": "Missouri State",
+     "line": 3,
+     "price": -112
+    },
+    {
+     "market": "spread",
+     "side": "Delaware",
+     "line": -3,
+     "price": -108
+    },
+    {
+     "market": "moneyline",
+     "side": "Missouri State",
+     "line": null,
+     "price": 130
+    },
+    {
+     "market": "moneyline",
+     "side": "Delaware",
+     "line": null,
+     "price": -155
+    },
+    {
+     "market": "total",
+     "side": "over",
+     "line": 52.5,
+     "price": -110
+    },
+    {
+     "market": "total",
+     "side": "under",
+     "line": 52.5,
+     "price": -110
+    }
+   ]
+  },
+  {
+   "away": "South Alabama",
+   "home": "Marshall",
+   "start_time_ct": "2026-10-20 18:30",
+   "start_time_as_displayed": "Today 6:30 PM",
+   "rows": [
+    {
+     "market": "spread",
+     "side": "South Alabama",
+     "line": -3,
+     "price": -112
+    },
+    {
+     "market": "spread",
+     "side": "Marshall",
+     "line": 3,
+     "price": -108
+    },
+    {
+     "market": "moneyline",
+     "side": "South Alabama",
+     "line": null,
+     "price": -162
+    },
+    {
+     "market": "moneyline",
+     "side": "Marshall",
+     "line": null,
+     "price": 136
+    },
+    {
+     "market": "total",
+     "side": "over",
+     "line": 65.5,
+     "price": -108
+    },
+    {
+     "market": "total",
+     "side": "under",
+     "line": 65.5,
+     "price": -112
+    }
+   ]
+  }
+ ]
+}

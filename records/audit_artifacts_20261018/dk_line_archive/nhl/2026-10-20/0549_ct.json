@@ -1,0 +1,529 @@
+{
+ "status": "CAPTURED",
+ "capture_type": "MANUAL_CAPTURE_RELAYED_REQUEST",
+ "sport": "NHL",
+ "league": "NHL",
+ "archive_date": "2026-10-20",
+ "capture_start_ct": "2026-10-20T05:49:00-05:00",
+ "capture_end_ct": "2026-10-20T05:50:00-05:00",
+ "captured_at": "2026-10-20T05:49:00-05:00",
+ "source": "DraftKings",
+ "source_access": "signed out",
+ "source_view": "NHL league board, Game Lines, Today section (rendered pages only; no API calls)",
+ "scope": {
+  "markets": [
+   "spread (puck line)",
+   "moneyline",
+   "total"
+  ],
+  "note": "Game lines only. No player props or futures."
+ },
+ "family_status_note": "PRICE RECORD ONLY. NHL is PARKED by owner ruling (Oct 18 backtest: NO EDGE; the earlier validation claim retired). These rows carry no model number, no lean, and no EV.",
+ "egress_ip_hash": "7b27e74c7c8c",
+ "egress_ip_changed": true,
+ "attempt_timeline": [
+  {
+   "attempt": 0,
+   "time_ct": "2026-10-20 05:49",
+   "action": "egress IP read in-session (value held locally only)",
+   "outcome": "recorded as salted hash"
+  },
+  {
+   "attempt": 1,
+   "time_ct": "2026-10-20 05:49",
+   "action": "opened NHL league board",
+   "outcome": "populated on first load; 0 reloads"
+  }
+ ],
+ "notes": [
+  "Colorado @ New Jersey puck-line prices ticked during the capture window (initially +225 / -278, settled at +235 / -290 as recorded)."
+ ],
+ "games_count": 11,
+ "rows_count": 66,
+ "games": [
+  {
+   "away": "San Jose Sharks",
+   "home": "Montreal Canadiens",
+   "start_time_ct": "2026-10-20 18:10",
+   "start_time_as_displayed": "Today 18:10 CT (as listed)",
+   "rows": [
+    {
+     "market": "spread",
+     "side": "San Jose Sharks",
+     "line": 1.5,
+     "price": -142
+    },
+    {
+     "market": "spread",
+     "side": "Montreal Canadiens",
+     "line": -1.5,
+     "price": 120
+    },
+    {
+     "market": "moneyline",
+     "side": "San Jose Sharks",
+     "line": null,
+     "price": 170
+    },
+    {
+     "market": "moneyline",
+     "side": "Montreal Canadiens",
+     "line": null,
+     "price": -205
+    },
+    {
+     "market": "total",
+     "side": "over",
+     "line": 6.5,
+     "price": -115
+    },
+    {
+     "market": "total",
+     "side": "under",
+     "line": 6.5,
+     "price": -105
+    }
+   ]
+  },
+  {
+   "away": "Los Angeles Kings",
+   "home": "Washington Capitals",
+   "start_time_ct": "2026-10-20 18:10",
+   "start_time_as_displayed": "Today 18:10 CT (as listed)",
+   "rows": [
+    {
+     "market": "spread",
+     "side": "Los Angeles Kings",
+     "line": 1.5,
+     "price": -192
+    },
+    {
+     "market": "spread",
+     "side": "Washington Capitals",
+     "line": -1.5,
+     "price": 160
+    },
+    {
+     "market": "moneyline",
+     "side": "Los Angeles Kings",
+     "line": null,
+     "price": 130
+    },
+    {
+     "market": "moneyline",
+     "side": "Washington Capitals",
+     "line": null,
+     "price": -155
+    },
+    {
+     "market": "total",
+     "side": "over",
+     "line": 5.5,
+     "price": -120
+    },
+    {
+     "market": "total",
+     "side": "under",
+     "line": 5.5,
+     "price": 100
+    }
+   ]
+  },
+  {
+   "away": "Toronto Maple Leafs",
+   "home": "Columbus Blue Jackets",
+   "start_time_ct": "2026-10-20 18:10",
+   "start_time_as_displayed": "Today 18:10 CT (as listed)",
+   "rows": [
+    {
+     "market": "spread",
+     "side": "Toronto Maple Leafs",
+     "line": 1.5,
+     "price": -192
+    },
+    {
+     "market": "spread",
+     "side": "Columbus Blue Jackets",
+     "line": -1.5,
+     "price": 160
+    },
+    {
+     "market": "moneyline",
+     "side": "Toronto Maple Leafs",
+     "line": null,
+     "price": 136
+    },
+    {
+     "market": "moneyline",
+     "side": "Columbus Blue Jackets",
+     "line": null,
+     "price": -162
+    },
+    {
+     "market": "total",
+     "side": "over",
+     "line": 6.5,
+     "price": 100
+    },
+    {
+     "market": "total",
+     "side": "under",
+     "line": 6.5,
+     "price": -120
+    }
+   ]
+  },
+  {
+   "away": "Colorado Avalanche",
+   "home": "New Jersey Devils",
+   "start_time_ct": "2026-10-20 18:10",
+   "start_time_as_displayed": "Today 18:10 CT (as listed)",
+   "rows": [
+    {
+     "market": "spread",
+     "side": "Colorado Avalanche",
+     "line": -1.5,
+     "price": 235
+    },
+    {
+     "market": "spread",
+     "side": "New Jersey Devils",
+     "line": 1.5,
+     "price": -290
+    },
+    {
+     "market": "moneyline",
+     "side": "Colorado Avalanche",
+     "line": null,
+     "price": -110
+    },
+    {
+     "market": "moneyline",
+     "side": "New Jersey Devils",
+     "line": null,
+     "price": -110
+    },
+    {
+     "market": "total",
+     "side": "over",
+     "line": 6.5,
+     "price": 105
+    },
+    {
+     "market": "total",
+     "side": "under",
+     "line": 6.5,
+     "price": -125
+    }
+   ]
+  },
+  {
+   "away": "Anaheim Ducks",
+   "home": "New York Islanders",
+   "start_time_ct": "2026-10-20 18:10",
+   "start_time_as_displayed": "Today 18:10 CT (as listed)",
+   "rows": [
+    {
+     "market": "spread",
+     "side": "Anaheim Ducks",
+     "line": 1.5,
+     "price": -192
+    },
+    {
+     "market": "spread",
+     "side": "New York Islanders",
+     "line": -1.5,
+     "price": 160
+    },
+    {
+     "market": "moneyline",
+     "side": "Anaheim Ducks",
+     "line": null,
+     "price": 130
+    },
+    {
+     "market": "moneyline",
+     "side": "New York Islanders",
+     "line": null,
+     "price": -155
+    },
+    {
+     "market": "total",
+     "side": "over",
+     "line": 5.5,
+     "price": -135
+    },
+    {
+     "market": "total",
+     "side": "under",
+     "line": 5.5,
+     "price": 114
+    }
+   ]
+  },
+  {
+   "away": "Boston Bruins",
+   "home": "Dallas Stars",
+   "start_time_ct": "2026-10-20 19:10",
+   "start_time_as_displayed": "Today 19:10 CT (as listed)",
+   "rows": [
+    {
+     "market": "spread",
+     "side": "Boston Bruins",
+     "line": 1.5,
+     "price": -180
+    },
+    {
+     "market": "spread",
+     "side": "Dallas Stars",
+     "line": -1.5,
+     "price": 150
+    },
+    {
+     "market": "moneyline",
+     "side": "Boston Bruins",
+     "line": null,
+     "price": 142
+    },
+    {
+     "market": "moneyline",
+     "side": "Dallas Stars",
+     "line": null,
+     "price": -170
+    },
+    {
+     "market": "total",
+     "side": "over",
+     "line": 5.5,
+     "price": -118
+    },
+    {
+     "market": "total",
+     "side": "under",
+     "line": 5.5,
+     "price": -102
+    }
+   ]
+  },
+  {
+   "away": "Winnipeg Jets",
+   "home": "St. Louis Blues",
+   "start_time_ct": "2026-10-20 19:10",
+   "start_time_as_displayed": "Today 19:10 CT (as listed)",
+   "rows": [
+    {
+     "market": "spread",
+     "side": "Winnipeg Jets",
+     "line": 1.5,
+     "price": -218
+    },
+    {
+     "market": "spread",
+     "side": "St. Louis Blues",
+     "line": -1.5,
+     "price": 180
+    },
+    {
+     "market": "moneyline",
+     "side": "Winnipeg Jets",
+     "line": null,
+     "price": 124
+    },
+    {
+     "market": "moneyline",
+     "side": "St. Louis Blues",
+     "line": null,
+     "price": -148
+    },
+    {
+     "market": "total",
+     "side": "over",
+     "line": 5.5,
+     "price": -120
+    },
+    {
+     "market": "total",
+     "side": "under",
+     "line": 5.5,
+     "price": 100
+    }
+   ]
+  },
+  {
+   "away": "Minnesota Wild",
+   "home": "Edmonton Oilers",
+   "start_time_ct": "2026-10-20 20:10",
+   "start_time_as_displayed": "Today 20:10 CT (as listed)",
+   "rows": [
+    {
+     "market": "spread",
+     "side": "Minnesota Wild",
+     "line": 1.5,
+     "price": -225
+    },
+    {
+     "market": "spread",
+     "side": "Edmonton Oilers",
+     "line": -1.5,
+     "price": 185
+    },
+    {
+     "market": "moneyline",
+     "side": "Minnesota Wild",
+     "line": null,
+     "price": 114
+    },
+    {
+     "market": "moneyline",
+     "side": "Edmonton Oilers",
+     "line": null,
+     "price": -135
+    },
+    {
+     "market": "total",
+     "side": "over",
+     "line": 6.5,
+     "price": 100
+    },
+    {
+     "market": "total",
+     "side": "under",
+     "line": 6.5,
+     "price": -120
+    }
+   ]
+  },
+  {
+   "away": "Detroit Red Wings",
+   "home": "Seattle Kraken",
+   "start_time_ct": "2026-10-20 20:50",
+   "start_time_as_displayed": "Today 20:50 CT (as listed)",
+   "rows": [
+    {
+     "market": "spread",
+     "side": "Detroit Red Wings",
+     "line": 1.5,
+     "price": -265
+    },
+    {
+     "market": "spread",
+     "side": "Seattle Kraken",
+     "line": -1.5,
+     "price": 215
+    },
+    {
+     "market": "moneyline",
+     "side": "Detroit Red Wings",
+     "line": null,
+     "price": -105
+    },
+    {
+     "market": "moneyline",
+     "side": "Seattle Kraken",
+     "line": null,
+     "price": -115
+    },
+    {
+     "market": "total",
+     "side": "over",
+     "line": 6.5,
+     "price": -105
+    },
+    {
+     "market": "total",
+     "side": "under",
+     "line": 6.5,
+     "price": -115
+    }
+   ]
+  },
+  {
+   "away": "Carolina Hurricanes",
+   "home": "Vancouver Canucks",
+   "start_time_ct": "2026-10-20 21:10",
+   "start_time_as_displayed": "Today 21:10 CT (as listed)",
+   "rows": [
+    {
+     "market": "spread",
+     "side": "Carolina Hurricanes",
+     "line": -1.5,
+     "price": -115
+    },
+    {
+     "market": "spread",
+     "side": "Vancouver Canucks",
+     "line": 1.5,
+     "price": -105
+    },
+    {
+     "market": "moneyline",
+     "side": "Carolina Hurricanes",
+     "line": null,
+     "price": -298
+    },
+    {
+     "market": "moneyline",
+     "side": "Vancouver Canucks",
+     "line": null,
+     "price": 240
+    },
+    {
+     "market": "total",
+     "side": "over",
+     "line": 6.5,
+     "price": -108
+    },
+    {
+     "market": "total",
+     "side": "under",
+     "line": 6.5,
+     "price": -112
+    }
+   ]
+  },
+  {
+   "away": "Tampa Bay Lightning",
+   "home": "Vegas Golden Knights",
+   "start_time_ct": "2026-10-20 21:40",
+   "start_time_as_displayed": "Today 21:40 CT (as listed)",
+   "rows": [
+    {
+     "market": "spread",
+     "side": "Tampa Bay Lightning",
+     "line": 1.5,
+     "price": -270
+    },
+    {
+     "market": "spread",
+     "side": "Vegas Golden Knights",
+     "line": -1.5,
+     "price": 220
+    },
+    {
+     "market": "moneyline",
+     "side": "Tampa Bay Lightning",
+     "line": null,
+     "price": -105
+    },
+    {
+     "market": "moneyline",
+     "side": "Vegas Golden Knights",
+     "line": null,
+     "price": -115
+    },
+    {
+     "market": "total",
+     "side": "over",
+     "line": 6.5,
+     "price": 105
+    },
+    {
+     "market": "total",
+     "side": "under",
+     "line": 6.5,
+     "price": -125
+    }
+   ]
+  }
+ ]
+}

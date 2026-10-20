@@ -1,0 +1,378 @@
+{
+ "status": "PARTIAL_CAPTURE",
+ "capture_type": "MANUAL_CAPTURE_RELAYED_REQUEST",
+ "sport": "NBA",
+ "league": "NBA",
+ "archive_date": "2026-10-20",
+ "capture_start_ct": "2026-10-20T05:37:29-05:00",
+ "capture_end_ct": "2026-10-20T06:23:00-05:00",
+ "captured_at": "2026-10-20T05:37:29-05:00",
+ "source": "DraftKings",
+ "source_access": "signed out",
+ "source_view": "NBA league board + event pages (rendered pages only; no API calls)",
+ "completeness": {
+  "games_on_board": 14,
+  "games_with_complete_board_lines_in_this_record": 6,
+  "games_partial_or_missing": [
+   "Boston Celtics @ Detroit Pistons (Oct 20)",
+   "Philadelphia 76ers @ New York Knicks (Oct 20)",
+   "Oklahoma City @ San Antonio Spurs (Oct 20)",
+   "Milwaukee Bucks @ Washington Wizards (Oct 21) \u2014 event-page spread only: Washington -4.5 -115 / Milwaukee +4.5 -105 (the league board showed the favorites reversed; the event-page read is recorded here as the fragment, unresolved)",
+   "Atlanta Hawks @ Orlando Magic (Oct 21)",
+   "Chicago Bulls @ Toronto Raptors (Oct 21)",
+   "Minnesota Timberwolves @ Miami Heat (Oct 21)",
+   "Utah Jazz @ Memphis Grizzlies (Oct 21)"
+  ],
+  "today_games_note": "NONE of today's three games (Oct 20) were transcribed in this run before the interruption. The freshest COMPLETE records for them are the Oct 19 captures already on this branch: nba/2026-10-19/1154_ct.json (manual, 582 rows) and nba/2026-10-19/1721_ct.json (scheduled evening capture, 158 rows incl. team totals).",
+  "props_note": "No player-prop VALUES were transcribed in this run for any game (two games' prop tables were counted only). Prop rows for Oct 20-21 games exist in the Oct 19 captures named above."
+ },
+ "attempt_timeline": [
+  {
+   "attempt": 1,
+   "window_ct": "2026-10-20 05:37-06:12",
+   "egress_ip_hash": "9d5f5a2a1043",
+   "route": "league board + event pages, rendered only",
+   "outcome": "board loaded on first attempt; 11 of 14 games read in whole or part; Akamai Access Denied bot wall closed event pages at ~05:58; run ended with narrative report \u2014 most values not transcribed"
+  },
+  {
+   "attempt": 2,
+   "window_ct": "2026-10-20 06:13-06:23",
+   "egress_ip_hash": "e4a4d13dfcf5",
+   "route": "league board, rendered only, protocol reload ladder (2 reloads >=3 min apart)",
+   "outcome": "CAPTURE_FAILED \u2014 board never populated ('NO AVAILABLE BETS'), second reload landed on Akamai Access Denied; this window's egress was a NON-US address (geo-denied by DraftKings). Zero data."
+  }
+ ],
+ "diagnosis_note": "The browser fleet egresses through a rotating pool, including non-US exits. A window that draws a non-US exit is geo-denied by DraftKings outright; US exits pass or fail by the filter's scoring of that address. This is the DK_ROUTE_INTERMITTENT_403 mechanism, now observed from both sides.",
+ "games": [
+  {
+   "away": "Dallas Mavericks",
+   "home": "Houston Rockets",
+   "date": "2026-10-21",
+   "start_time_as_displayed": "Oct 21 (as listed)",
+   "rows": [
+    {
+     "market": "spread",
+     "side": "Dallas Mavericks",
+     "line": 8.5,
+     "price": -105
+    },
+    {
+     "market": "spread",
+     "side": "Houston Rockets",
+     "line": -8.5,
+     "price": -115
+    },
+    {
+     "market": "moneyline",
+     "side": "Dallas Mavericks",
+     "line": null,
+     "price": 295
+    },
+    {
+     "market": "moneyline",
+     "side": "Houston Rockets",
+     "line": null,
+     "price": -375
+    },
+    {
+     "market": "total",
+     "side": "over",
+     "line": 229.5,
+     "price": -115
+    },
+    {
+     "market": "total",
+     "side": "under",
+     "line": 229.5,
+     "price": -105
+    },
+    {
+     "market": "team_total",
+     "side": "Dallas Mavericks over",
+     "line": 110.5,
+     "price": -102
+    },
+    {
+     "market": "team_total",
+     "side": "Dallas Mavericks under",
+     "line": 110.5,
+     "price": -118
+    },
+    {
+     "market": "team_total",
+     "side": "Houston Rockets over",
+     "line": 119.5,
+     "price": -115
+    },
+    {
+     "market": "team_total",
+     "side": "Houston Rockets under",
+     "line": 119.5,
+     "price": -105
+    }
+   ],
+   "board_lines_complete": true,
+   "read_source": "event page, 05:55-05:57 CT",
+   "note": "Player props were displayed and counted (Points 12, Rebounds 11, Assists 7, PRA 7) but their values were not transcribed before the run was interrupted \u2014 prop rows are NOT in this record."
+  },
+  {
+   "away": "Indiana Pacers",
+   "home": "New Orleans Pelicans",
+   "date": "2026-10-21",
+   "start_time_as_displayed": "Oct 21 (as listed)",
+   "rows": [
+    {
+     "market": "spread",
+     "side": "Indiana Pacers",
+     "line": -3.5,
+     "price": -110
+    },
+    {
+     "market": "spread",
+     "side": "New Orleans Pelicans",
+     "line": 3.5,
+     "price": -110
+    },
+    {
+     "market": "moneyline",
+     "side": "Indiana Pacers",
+     "line": null,
+     "price": -162
+    },
+    {
+     "market": "moneyline",
+     "side": "New Orleans Pelicans",
+     "line": null,
+     "price": 136
+    },
+    {
+     "market": "total",
+     "side": "over",
+     "line": 240.5,
+     "price": -108
+    },
+    {
+     "market": "total",
+     "side": "under",
+     "line": 240.5,
+     "price": -112
+    },
+    {
+     "market": "team_total",
+     "side": "Indiana Pacers over",
+     "line": 121.5,
+     "price": -118
+    },
+    {
+     "market": "team_total",
+     "side": "Indiana Pacers under",
+     "line": 121.5,
+     "price": -102
+    },
+    {
+     "market": "team_total",
+     "side": "New Orleans Pelicans over",
+     "line": 118.5,
+     "price": -110
+    },
+    {
+     "market": "team_total",
+     "side": "New Orleans Pelicans under",
+     "line": 118.5,
+     "price": -110
+    }
+   ],
+   "board_lines_complete": true,
+   "read_source": "event page, 05:55-05:57 CT",
+   "note": "Player props displayed and counted (Points 12, Rebounds 12, Assists 9, PRA 9) but values not transcribed \u2014 prop rows are NOT in this record."
+  },
+  {
+   "away": "Golden State Warriors",
+   "home": "Los Angeles Lakers",
+   "date": "2026-10-21",
+   "start_time_as_displayed": "Oct 21 9:10 PM",
+   "rows": [
+    {
+     "market": "spread",
+     "side": "Golden State Warriors",
+     "line": 5.5,
+     "price": -102
+    },
+    {
+     "market": "spread",
+     "side": "Los Angeles Lakers",
+     "line": -5.5,
+     "price": -118
+    },
+    {
+     "market": "moneyline",
+     "side": "Golden State Warriors",
+     "line": null,
+     "price": 185
+    },
+    {
+     "market": "moneyline",
+     "side": "Los Angeles Lakers",
+     "line": null,
+     "price": -225
+    },
+    {
+     "market": "total",
+     "side": "over",
+     "line": 234.5,
+     "price": -110
+    },
+    {
+     "market": "total",
+     "side": "under",
+     "line": 234.5,
+     "price": -110
+    }
+   ],
+   "board_lines_complete": true,
+   "read_source": "league board re-read, 06:08 CT",
+   "note": "Event page showed 'NO AVAILABLE BETS \u2014 all markets pulled' on two renders (05:58-06:10 CT): no team totals or props exist for this game in this record."
+  },
+  {
+   "away": "Phoenix Suns",
+   "home": "Portland Trail Blazers",
+   "date": "2026-10-21",
+   "start_time_as_displayed": "Oct 21 9:10 PM",
+   "rows": [
+    {
+     "market": "spread",
+     "side": "Phoenix Suns",
+     "line": 3.5,
+     "price": -105
+    },
+    {
+     "market": "spread",
+     "side": "Portland Trail Blazers",
+     "line": -3.5,
+     "price": -115
+    },
+    {
+     "market": "moneyline",
+     "side": "Phoenix Suns",
+     "line": null,
+     "price": 140
+    },
+    {
+     "market": "moneyline",
+     "side": "Portland Trail Blazers",
+     "line": null,
+     "price": -166
+    },
+    {
+     "market": "total",
+     "side": "over",
+     "line": 232.5,
+     "price": -115
+    },
+    {
+     "market": "total",
+     "side": "under",
+     "line": 232.5,
+     "price": -105
+    }
+   ],
+   "board_lines_complete": true,
+   "read_source": "league board re-read, 06:08 CT",
+   "note": "Event page not reached (bot wall). No team totals or props in this record."
+  },
+  {
+   "away": "Sacramento Kings",
+   "home": "Los Angeles Clippers",
+   "date": "2026-10-21",
+   "start_time_as_displayed": "Oct 21 9:40 PM",
+   "rows": [
+    {
+     "market": "spread",
+     "side": "Sacramento Kings",
+     "line": 4.5,
+     "price": -115
+    },
+    {
+     "market": "spread",
+     "side": "Los Angeles Clippers",
+     "line": -4.5,
+     "price": -105
+    },
+    {
+     "market": "moneyline",
+     "side": "Sacramento Kings",
+     "line": null,
+     "price": 150
+    },
+    {
+     "market": "moneyline",
+     "side": "Los Angeles Clippers",
+     "line": null,
+     "price": -180
+    },
+    {
+     "market": "total",
+     "side": "over",
+     "line": 228.5,
+     "price": -110
+    },
+    {
+     "market": "total",
+     "side": "under",
+     "line": 228.5,
+     "price": -110
+    }
+   ],
+   "board_lines_complete": true,
+   "read_source": "league board re-read, 06:08 CT",
+   "note": "Event page not reached (bot wall). No team totals or props in this record."
+  },
+  {
+   "away": "Charlotte Hornets",
+   "home": "Brooklyn Nets",
+   "date": "2026-10-21",
+   "start_time_as_displayed": "Oct 21 (as listed)",
+   "rows": [
+    {
+     "market": "spread",
+     "side": "Charlotte Hornets",
+     "line": 2.5,
+     "price": -105
+    },
+    {
+     "market": "spread",
+     "side": "Brooklyn Nets",
+     "line": -2.5,
+     "price": -115
+    },
+    {
+     "market": "moneyline",
+     "side": "Charlotte Hornets",
+     "line": null,
+     "price": 114
+    },
+    {
+     "market": "moneyline",
+     "side": "Brooklyn Nets",
+     "line": null,
+     "price": -135
+    },
+    {
+     "market": "total",
+     "side": "over",
+     "line": 219.5,
+     "price": -112
+    },
+    {
+     "market": "total",
+     "side": "under",
+     "line": 219.5,
+     "price": -108
+    }
+   ],
+   "board_lines_complete": true,
+   "read_source": "league board re-read, 06:08 CT",
+   "note": "CONFLICT UNRESOLVED: this game's event page earlier showed Charlotte +1.5 -102 / Brooklyn -1.5 -118. The board re-read (06:08) showed 2.5. Rows here are the 06:08 board read; the discrepancy is recorded, not resolved."
+  }
+ ]
+}

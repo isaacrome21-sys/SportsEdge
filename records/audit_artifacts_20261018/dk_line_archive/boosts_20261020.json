@@ -1,0 +1,52 @@
+{
+ "capture_type": "PUBLIC_PROMOS_READ",
+ "source": "DraftKings promos page + league boards",
+ "source_access": "signed out",
+ "capture_start_ct": "2026-10-20T05:49:00-05:00",
+ "capture_end_ct": "2026-10-20T05:52:00-05:00",
+ "caveat": "Signed-out public view only. Account-targeted offers are invisible to this read.",
+ "items": [
+  {
+   "name": "BOS @ DET 50% SGP Boost",
+   "type": "profit boost token (SGP)",
+   "terms": "50% profit boost, 3+ leg SGP on BOS@DET 10/20/2026, total odds +300 or longer, single-use, limit 1, expires at end of game, max limits apply (no dollar max stated)"
+  },
+  {
+   "name": "PHI @ NYK 50% SGP Boost",
+   "type": "profit boost token (SGP)",
+   "terms": "same structure, PHI@NYK 10/20/2026"
+  },
+  {
+   "name": "OKC @ SAS 50% SGP Boost",
+   "type": "profit boost token (SGP)",
+   "terms": "same structure, OKC@SAS 10/20/2026"
+  },
+  {
+   "name": "NBA Threes Bet & Get (x3 games)",
+   "type": "bet & get (not a boost)",
+   "terms": "$1 in Bonus Bets per 3PT made in the named Oct 20 game"
+  },
+  {
+   "name": "NHL Goalscorer 30% Profit Boost",
+   "type": "profit boost token",
+   "terms": "30% on any NHL Goalscorer single/parlay/SGP/SGPx, total odds +100 or longer, valid through end of final NHL game 10/20/2026, single-use, limit 1"
+  },
+  {
+   "name": "King of the Court",
+   "type": "promo (not a boost)",
+   "terms": "share of $5M Bonus Bets, Oct 21 NBA"
+  },
+  {
+   "name": "Champions League 30% Profit Boost",
+   "type": "profit boost",
+   "terms": "soccer; not used by tonight's card"
+  },
+  {
+   "name": "NBA League Pass Bet and Get / Refer a Friend / Discord",
+   "type": "program promos",
+   "terms": "not bet boosts"
+  }
+ ],
+ "board_badges": "No boost badges or boosted-price rows were attached to any game row on the NBA, NCAAF, or NHL boards in this read.",
+ "cfb_note": "No college-football-specific promotions were present."
+}
