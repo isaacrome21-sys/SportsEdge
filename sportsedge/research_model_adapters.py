@@ -181,6 +181,7 @@ def mlb_batter_to_bridge_rows(
     features: Mapping[str, Any], prior_game_times_utc: Sequence[str],
     source_as_of_utc: str, as_of_utc: str, kickoff_utc: str,
     home_team: str, away_team: str,
+    prior_game_ids: Sequence[str] | None = None,
 ) -> list[dict]:
     """Empirical batter result from verified prior game logs.
 
@@ -188,6 +189,13 @@ def mlb_batter_to_bridge_rows(
     matching prior_game_times_utc. Lineup confirmation is not required for
     the research pricer (game log does not prove today's lineup). No league
     prior. Statcast not yet consumed.
+
+    When the collector also supplies *prior_game_ids* (one gamePk per
+    history row), duplicate detection keys on game identity: two distinct
+    games sharing a start stamp are not a duplicate, and one game counted
+    twice blocks even under two different stamps. The leak arm (every
+    prior start strictly before the source as-of) applies either way.
+    Without ids, the legacy timestamp-distinctness check is kept.
     """
     try:
         model_time, game_time = _guard_time(
@@ -207,7 +215,17 @@ def mlb_batter_to_bridge_rows(
             raise ValueError("TIMESTAMP_EACH_PRIOR_GAME_REQUIRED")
         source_time = _timestamp(source_as_of_utc, "SOURCE_AS_OF")
         past = [_timestamp(t, "PRIOR_GAME") for t in prior_game_times_utc]
-        if len(set(past)) != len(past) or not all(t < source_time for t in past):
+        if not all(t < source_time for t in past):
+            raise ValueError("HISTORY_LEAK_OR_DUPLICATE_GAME")
+        prior_ids: list[str] | None = None
+        if prior_game_ids is not None:
+            if (not isinstance(prior_game_ids, (list, tuple))
+                    or len(prior_game_ids) != len(history)):
+                raise ValueError("GAME_ID_EACH_PRIOR_GAME_REQUIRED")
+            prior_ids = [_text(g, "PRIOR_GAME_ID") for g in prior_game_ids]
+            if len(set(prior_ids)) != len(prior_ids):
+                raise ValueError("HISTORY_LEAK_OR_DUPLICATE_GAME")
+        elif len(set(past)) != len(past):
             raise ValueError("HISTORY_LEAK_OR_DUPLICATE_GAME")
         outcome = price_batter_market(
             market=market, side=side, line=line, pa_history=history)
@@ -226,8 +244,11 @@ def mlb_batter_to_bridge_rows(
             p=outcome["model_p"], push=outcome["push_p"],
             as_of_utc=model_time, kickoff_utc=game_time,
             model_source=outcome["engine"],
-            model_input_hash=_digest({"features": features, "prior_game_times_utc": list(prior_game_times_utc),
-                                      "source_as_of_utc": source_as_of_utc}),
+            model_input_hash=_digest({
+                "features": features,
+                "prior_game_times_utc": list(prior_game_times_utc),
+                **({"prior_game_ids": prior_ids} if prior_ids is not None else {}),
+                "source_as_of_utc": source_as_of_utc}),
             player_id=player_id, line=line,
             home_team=home_team, away_team=away_team)]
     except (BatterEmpiricalError, ValueError, KeyError, TypeError) as exc:
