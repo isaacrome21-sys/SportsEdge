@@ -140,7 +140,15 @@
       "offer_status": "OFFERED_FIXTURE_OBSERVED",
       "one_sided_no_vig": "UNAVAILABLE",
       "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
-      "evidence_group": "NFL_PROP_PASS_PLUS_RUSH_YARDS_V2"
+      "evidence_group": "NFL_PROP_PASS_PLUS_RUSH_YARDS_V2",
+      "engine": "NFL_PROP_ENGINES_V1 (sportsedge.nfl_prop_engines_v1 price entry: pass_plus_rush_yards; research engine, not governance-admitted)",
+      "engine_screen": {
+        "label": "SCREEN",
+        "vintage": "2020-2025",
+        "verdict": "CALIBRATED_CANDIDATE",
+        "n": 2360,
+        "results": "research/nfl_prop_engines_20261020/screen_results_v1.json"
+      }
     },
     "rushing_yards": {
       "status": "RESEARCH_ONLY",
@@ -236,7 +244,15 @@
       "offer_status": "OFFERED_FIXTURE_OBSERVED",
       "one_sided_no_vig": "UNAVAILABLE",
       "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
-      "evidence_group": "NFL_PROP_RUSH_PLUS_REC_YARDS_V2"
+      "evidence_group": "NFL_PROP_RUSH_PLUS_REC_YARDS_V2",
+      "engine": "NFL_PROP_ENGINES_V1 (sportsedge.nfl_prop_engines_v1 price entry: rush_plus_rec_yards; research engine, not governance-admitted)",
+      "engine_screen": {
+        "label": "SCREEN",
+        "vintage": "2020-2025",
+        "verdict": "CALIBRATED_CANDIDATE",
+        "n": 5557,
+        "results": "research/nfl_prop_engines_20261020/screen_results_v1.json"
+      }
     },
     "receiving_yards": {
       "status": "RESEARCH_ONLY",
@@ -312,7 +328,15 @@
       "one_sided_no_vig": "UNAVAILABLE",
       "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
       "registration_note": "No pricer exists for targets anywhere in the repository; the governance surface lists no bound provider targets settlement market.",
-      "evidence_group": "NFL_PROP_TARGETS_V2"
+      "evidence_group": "NFL_PROP_TARGETS_V2",
+      "engine": "NFL_PROP_ENGINES_V1 (sportsedge.nfl_prop_engines_v1 price entry: targets; research engine, not governance-admitted)",
+      "engine_screen": {
+        "label": "SCREEN",
+        "vintage": "2020-2025",
+        "verdict": "CALIBRATED_CANDIDATE",
+        "n": 8264,
+        "results": "research/nfl_prop_engines_20261020/screen_results_v1.json"
+      }
     },
     "anytime_td": {
       "status": "RESEARCH_ONLY",
@@ -368,7 +392,15 @@
       "one_sided_no_vig": "UNAVAILABLE",
       "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
       "registration_note": "No P(two or more TDs) pricer exists; the >=1 anytime model is not extended to >=2.",
-      "evidence_group": "NFL_PROP_TWO_PLUS_TD_V2"
+      "evidence_group": "NFL_PROP_TWO_PLUS_TD_V2",
+      "engine": "NFL_PROP_ENGINES_V1 (sportsedge.nfl_prop_engines_v1 price entry: two_plus_td; research engine, not governance-admitted)",
+      "engine_screen": {
+        "label": "SCREEN",
+        "vintage": "2020-2025",
+        "verdict": "DOES_NOT_BEAT_BASELINE",
+        "n": 13557,
+        "results": "research/nfl_prop_engines_20261020/screen_results_v1.json"
+      }
     },
     "fg_made": {
       "status": "RESEARCH_ONLY",
@@ -387,7 +419,16 @@
       "offer_status": "OFFERED_FIXTURE_OBSERVED",
       "one_sided_no_vig": "UNAVAILABLE",
       "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
-      "evidence_group": "NFL_PROP_FG_MADE_V2"
+      "evidence_group": "NFL_PROP_FG_MADE_V2",
+      "engine": "NFL_PROP_ENGINES_V1 (sportsedge.nfl_prop_engines_v1 price entry: fg_made; research engine, not governance-admitted)",
+      "engine_screen": {
+        "label": "SCREEN_NOT_RUNNABLE",
+        "vintage": "2020-2025",
+        "verdict": "SCREEN_NOT_RUNNABLE_SANCTIONED_VINTAGE",
+        "reason": "kicking/defensive outcome columns exist only in sp_2025 of the sanctioned snapshot",
+        "diagnostic": "2025-only diagnostic: does not beat both baselines",
+        "results": "research/nfl_prop_engines_20261020/screen_results_v1.json"
+      }
     },
     "kicking_points": {
       "status": "RESEARCH_ONLY",
@@ -406,7 +447,16 @@
       "offer_status": "OFFERED_FIXTURE_OBSERVED",
       "one_sided_no_vig": "UNAVAILABLE",
       "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
-      "evidence_group": "NFL_PROP_KICKING_POINTS_V2"
+      "evidence_group": "NFL_PROP_KICKING_POINTS_V2",
+      "engine": "NFL_PROP_ENGINES_V1 (sportsedge.nfl_prop_engines_v1 price entry: kicking_points; research engine, not governance-admitted)",
+      "engine_screen": {
+        "label": "SCREEN_NOT_RUNNABLE",
+        "vintage": "2020-2025",
+        "verdict": "SCREEN_NOT_RUNNABLE_SANCTIONED_VINTAGE",
+        "reason": "kicking/defensive outcome columns exist only in sp_2025 of the sanctioned snapshot",
+        "diagnostic": "2025-only diagnostic: does not beat both baselines",
+        "results": "research/nfl_prop_engines_20261020/screen_results_v1.json"
+      }
     },
     "xp_made": {
       "status": "RESEARCH_ONLY",
@@ -425,7 +475,16 @@
       "offer_status": "OFFERED_FIXTURE_OBSERVED",
       "one_sided_no_vig": "UNAVAILABLE",
       "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
-      "evidence_group": "NFL_PROP_XP_MADE_V2"
+      "evidence_group": "NFL_PROP_XP_MADE_V2",
+      "engine": "NFL_PROP_ENGINES_V1 (sportsedge.nfl_prop_engines_v1 price entry: xp_made; research engine, not governance-admitted)",
+      "engine_screen": {
+        "label": "SCREEN_NOT_RUNNABLE",
+        "vintage": "2020-2025",
+        "verdict": "SCREEN_NOT_RUNNABLE_SANCTIONED_VINTAGE",
+        "reason": "kicking/defensive outcome columns exist only in sp_2025 of the sanctioned snapshot",
+        "diagnostic": "2025-only diagnostic: beats both baselines",
+        "results": "research/nfl_prop_engines_20261020/screen_results_v1.json"
+      }
     },
     "player_sacks": {
       "status": "RESEARCH_ONLY",
@@ -442,7 +501,16 @@
       "one_sided_no_vig": "UNAVAILABLE",
       "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
       "registration_note": "derivative pricers exist only over attributed simulation paths (core/simulate), which the canonical path does not emit; no defensive player props were shown on the inspected DraftKings board (#2265 fixture census), so no offered status is claimed.",
-      "evidence_group": "NFL_PROP_PLAYER_SACKS_V2"
+      "evidence_group": "NFL_PROP_PLAYER_SACKS_V2",
+      "engine": "NFL_PROP_ENGINES_V1 (sportsedge.nfl_prop_engines_v1 price entry: player_sacks; research engine, not governance-admitted)",
+      "engine_screen": {
+        "label": "SCREEN_NOT_RUNNABLE",
+        "vintage": "2020-2025",
+        "verdict": "SCREEN_NOT_RUNNABLE_SANCTIONED_VINTAGE",
+        "reason": "kicking/defensive outcome columns exist only in sp_2025 of the sanctioned snapshot",
+        "diagnostic": "2025-only diagnostic: does not beat both baselines",
+        "results": "research/nfl_prop_engines_20261020/screen_results_v1.json"
+      }
     },
     "tackles_assists": {
       "status": "RESEARCH_ONLY",
@@ -459,7 +527,16 @@
       "one_sided_no_vig": "UNAVAILABLE",
       "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
       "registration_note": "derivative pricers exist only over attributed simulation paths (core/simulate), which the canonical path does not emit; not observed on the inspected board (#2265 fixture census).",
-      "evidence_group": "NFL_PROP_TACKLES_ASSISTS_V2"
+      "evidence_group": "NFL_PROP_TACKLES_ASSISTS_V2",
+      "engine": "NFL_PROP_ENGINES_V1 (sportsedge.nfl_prop_engines_v1 price entry: tackles_assists; research engine, not governance-admitted)",
+      "engine_screen": {
+        "label": "SCREEN_NOT_RUNNABLE",
+        "vintage": "2020-2025",
+        "verdict": "SCREEN_NOT_RUNNABLE_SANCTIONED_VINTAGE",
+        "reason": "kicking/defensive outcome columns exist only in sp_2025 of the sanctioned snapshot",
+        "diagnostic": "2025-only diagnostic: beats both baselines",
+        "results": "research/nfl_prop_engines_20261020/screen_results_v1.json"
+      }
     },
     "player_interceptions": {
       "status": "RESEARCH_ONLY",
@@ -476,7 +553,16 @@
       "one_sided_no_vig": "UNAVAILABLE",
       "quote_history": "QUOTE_HISTORY_UNAVAILABLE",
       "registration_note": "derivative pricers exist only over attributed simulation paths (core/simulate), which the canonical path does not emit; not observed on the inspected board (#2265 fixture census). Defensive interceptions are a distinct family from quarterback interceptions thrown.",
-      "evidence_group": "NFL_PROP_PLAYER_INTERCEPTIONS_V2"
+      "evidence_group": "NFL_PROP_PLAYER_INTERCEPTIONS_V2",
+      "engine": "NFL_PROP_ENGINES_V1 (sportsedge.nfl_prop_engines_v1 price entry: player_interceptions; research engine, not governance-admitted)",
+      "engine_screen": {
+        "label": "SCREEN_NOT_RUNNABLE",
+        "vintage": "2020-2025",
+        "verdict": "SCREEN_NOT_RUNNABLE_SANCTIONED_VINTAGE",
+        "reason": "kicking/defensive outcome columns exist only in sp_2025 of the sanctioned snapshot",
+        "diagnostic": "2025-only diagnostic: does not beat both baselines",
+        "results": "research/nfl_prop_engines_20261020/screen_results_v1.json"
+      }
     }
   }
 }
