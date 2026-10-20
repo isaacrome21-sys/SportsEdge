@@ -1,0 +1,48 @@
+{
+ "distinct_games": 181,
+ "total_test_appearances": 653,
+ "duplicate_appearances": 472,
+ "candidate": {
+  "brier": 0.2382650758207155,
+  "log_loss": 0.6690535505091267,
+  "brier_ci95_cluster": [
+   0.22406444405151102,
+   0.25287586678875057
+  ],
+  "mean_p_home": 0.5657526653077348
+ },
+ "naive": {
+  "brier": 0.24767580088739172,
+  "log_loss": 0.6884884482362219,
+  "brier_ci95_cluster": [
+   0.2391344870825545,
+   0.2563950410621264
+  ],
+  "mean_p_home": 0.5599626197088398
+ },
+ "delta_candidate_minus_naive": {
+  "brier": -0.009410725066676237,
+  "brier_ci95_cluster": [
+   -0.020531657154741482,
+   0.0017255558594264117
+  ],
+  "log_loss": -0.019434897727095175,
+  "logloss_ci95_cluster": [
+   -0.04248756538251015,
+   0.0038590949058642824
+  ]
+ },
+ "home_win_base_rate": 0.5469613259668509,
+ "repro_overlapping": {
+  "candidate": {
+   "n": 1306,
+   "brier": 0.23644706936163576,
+   "log_loss": 0.6651761524870661
+  },
+  "existing": {
+   "n": 1306,
+   "brier": 0.2472835805039909,
+   "log_loss": 0.687709180656379
+  }
+ }
+}
