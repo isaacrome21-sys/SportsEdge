@@ -155,6 +155,17 @@ How to read it: verdict labels are preserved **exactly as recorded** (DOES_NOT_B
 - **Current status:** research record only; nothing wired; no card path.
 - **Sources:** `records/nba_moneyline_20261019/` on branch `records/nba-moneyline-record-20261019` (`bt_nba_lines.py` b002355d, `common.py` 5c0212e5, `nba_lines_results.json` 808977b0, `FINGERPRINT.md`; database sha256 `4a803d41…`, model sha256 `16e33047…`).
 
+## 10. NBA spread and total — ratings model vs line (accuracy gap; same run as §9)
+
+- **Recorded result (RMSE, points, same 4,374 games as §9):** spread — model **13.83** vs line **13.30**; total — model **21.46** vs line **20.72**. The line is more accurate on both markets.
+- **Flat-ROI at the quoted line (date-clustered CI):** spread — −3.5% [−7.3, +0.3] at edge ≥ 2 (n = 2,528), −4.9% [−10.5, +0.3] at ≥ 4 (n = 1,233), −5.7% [−13.6, +1.8] at ≥ 6 (n = 534). Total — −8.1% [−11.5, −4.5] at ≥ 2 (n = 2,946), −8.1% [−12.4, −3.6] at ≥ 4 (n = 1,816), −10.7% [−16.1, −5.6] at ≥ 6 (n = 1,053). All NO_EDGE; the total rows lose with CIs excluding 0.
+- **Reproduction status:** same script, database and model as §9; the Oct 19 rerun reproduced the stored file exactly.
+- **Vs market baseline:** lines from `OddsData.sqlite`, **vintage unestablished** (no timestamps). Market never measured at the close.
+- **Verdict:** **accuracy gap first**, both markets. Not a beat-the-close verdict.
+- **Not covered:** signed bias by season and scoring band (not in the stored results); team totals (no team-total column in the database). Both remain open.
+- **Current status:** research record only; nothing wired; no card path.
+- **Sources:** `records/nba_moneyline_20261019/nba_lines_results.json` (blob 808977b0) on branch `records/nba-moneyline-record-20261019`, keys `rmse`, `spread`, `total`.
+
 ---
 
 ## How to check a new idea against this ledger
