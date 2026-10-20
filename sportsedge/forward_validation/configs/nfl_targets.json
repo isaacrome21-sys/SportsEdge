@@ -1,0 +1,25 @@
+{
+ "status": "DRAFT \u2014 NOT FROZEN",
+ "sport": "NFL",
+ "family": "TARGETS",
+ "markets": [
+  "TARGETS"
+ ],
+ "engine_id": "NFL_PROP_ENGINES_V1",
+ "model_version": "nfl_prop_engines_v1@8b2775008",
+ "market_form": "TWO_SIDED",
+ "sides": [
+  "OVER",
+  "UNDER"
+ ],
+ "over_side": "OVER",
+ "min_rows": 100,
+ "min_events": 40,
+ "min_slates": 4,
+ "max_clv_missing_share": 0.2,
+ "clv_beats_threshold": 0.0,
+ "close_max_age_minutes": 60,
+ "capture_scope": "NO_MARKET",
+ "capture_note": "NO_MARKET_AT_DK \u2014 the targets market was verified ABSENT at DraftKings (Oct 17 matrix, N55). No entry or close capture can exist until DraftKings lists the market or the owner authorizes another book's captures as this test's price source. Until then the family accumulates zero rows: its state is INSUFFICIENT_SAMPLE by market absence (program-map verdict: NO_MARKET_TEST_EXISTS), which is a market fact, not a model result.",
+ "prereg_draft": "research/forward_validation_program_20261020/drafts/PREREG_NFL_TARGETS_FORWARD_V1_DRAFT.md"
+}
