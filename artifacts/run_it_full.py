@@ -19,6 +19,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from artifacts import free_models as engine
 from sportsedge.mlb_phone_pitcher_pricing import phone_pitcher_rows, blocked
 from sportsedge.mlb_phone_batter_pricing import phone_batter_rows
+from sportsedge.nba_phone_prop_pricing import (
+    nba_prop_family_for_market, phone_nba_prop_rows)
 from sportsedge.mlb_phone_first_inning_pricing import (
     phone_first_inning_rows, FIRST_INNING_PHONE_MARKETS)
 from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
@@ -545,6 +547,7 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
     coverage_indices, coverage_input = [], []
     f5_indices, f5_input = [], []
     registry_gated = {}  # local prop index -> registry blocker row
+    nba_prop_pending = set()  # local prop index -> NBA prop engine lane
     intake_gated = {}  # local prop index -> intake contract refusal row
     # Only CFB game-identity evidence may continue through prepricing.
     # The registry still blocks its pricer, output probabilities and plays.
@@ -642,6 +645,19 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
                 game_indices.append(i)
                 games.append(line)
                 family_game_gated[len(games) - 1] = gate
+                continue
+            # NBA prop engines (2026-10-20): the four registered NBA
+            # prop families (PTS/REB/AST/PRA) are priced by the
+            # empirical engine lane below, which itself carries the
+            # registration stamp and enforces the registry gate's
+            # engine-sufficiency condition. Every other gated row
+            # keeps the family blocker row exactly as before.
+            if (line["sport"] == "NBA"
+                    and (nba_prop_family_for_market(raw_market) is not None
+                         or nba_prop_family_for_market(market) is not None)):
+                prop_indices.append(i)
+                props.append(line)
+                nba_prop_pending.add(len(props) - 1)
                 continue
             # Every other blocked family/market (including CFB props,
             # NBA/CBB, Illinois schools) is refused before any pricer.
@@ -878,6 +894,7 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
     deriv_pos, deriv_input = [], []
     deriv_originals = {}  # local -> intake market, for ruling-translated rows
     td_pos, td_input = [], []
+    nba_pos, nba_input = [], []
     others = {}
     for local, line in enumerate(props):
         if local in registry_gated:
@@ -885,6 +902,10 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
             continue
         if local in intake_gated:
             others[local] = intake_gated[local]
+            continue
+        if local in nba_prop_pending:
+            nba_pos.append(local)
+            nba_input.append(line)
             continue
         market = str(line.get("market") or "").upper()
         if line["sport"] == "NFL" and market in _NFL_RULING_DERIVATIVE_TRANSLATION:
@@ -1026,6 +1047,16 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
         batter_input, now=prop_clock, getter=getter if auto_context else (lambda url: None))
     first_results, first_receipts = phone_first_inning_rows(
         first_input, now=prop_clock, getter=getter if auto_context else (lambda url: None))
+    # NBA prop engine lane (2026-10-20): prices the four registered
+    # NBA prop families from the operator-supplied game-log store
+    # (SPORTSEDGE_NBA_PROP_STORE_DIR); with no store the lane fails
+    # closed per row with NBA_PROP_HISTORY_STORE_UNAVAILABLE. Called
+    # only when NBA prop rows were routed, so non-NBA cards gain no
+    # NBA receipts.
+    nba_results, nba_receipts = [], []
+    if nba_input:
+        nba_results, nba_receipts = phone_nba_prop_rows(
+            nba_input, now=prop_clock, min_ev=min_ev)
     # F5 stage: quote binding + settlement-basis gate + strictly-prior
     # feature assembly, then the F5 deployment gate. With auto_context
     # off, fetching is disabled and binding fails closed on the fixture
@@ -1241,6 +1272,8 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
         raise ValueError("BATTER_RESULT_COUNT_MISMATCH")
     if len(first_results) != len(first_input):
         raise ValueError("FIRST_INNING_RESULT_COUNT_MISMATCH")
+    if len(nba_results) != len(nba_input):
+        raise ValueError("NBA_PROP_RESULT_COUNT_MISMATCH")
     modeled_props = [None]*len(props)
     for local, result in zip(pitcher_pos, pitcher_results):
         modeled_props[local] = result
@@ -1281,6 +1314,8 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
     for local, result in zip(nfl_pos, nfl_results):
         modeled_props[local] = result
     for local, result in zip(cfb_pos, cfb_results):
+        modeled_props[local] = result
+    for local, result in zip(nba_pos, nba_results):
         modeled_props[local] = result
     for local, result in zip(teamhalf_pos, teamhalf_results):
         modeled_props[local] = result
@@ -1372,7 +1407,8 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
                               + gt3_receipts + f5d_receipts
                               + hits_receipts
                               + teamhalf_receipts
-                              + deriv_receipts + td_receipts)
+                              + deriv_receipts + td_receipts
+                              + nba_receipts)
     card["prop_model_status"] = {
         "pitcher_engine":"MLB_PITCHER_JOINT_EMPIRICAL_BAYES",
         "batter_engine":"MLB_BATTER_EMPIRICAL_GAMELOG",
@@ -1400,6 +1436,7 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
         "statcast":"NOT_WIRED",
         "next_gen":"NOT_WIRED",
         "nfl_cfb_player":"ESPN_NAMED_GAMES_ONLY_PARTICIPATION_NOT_VERIFIED",
+        "nba_prop_engine":"NBA_PROP_EMPIRICAL_V1_REGISTERED_RESEARCH_ONLY_NOT_VALIDATED",
     }
 
     audit, totals = [], Counter()
