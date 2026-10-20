@@ -162,9 +162,20 @@ How to read it: verdict labels are preserved **exactly as recorded** (DOES_NOT_B
 - **Reproduction status:** same script, database and model as §9; the Oct 19 rerun reproduced the stored file exactly.
 - **Vs market baseline:** lines from `OddsData.sqlite`, **vintage unestablished** (no timestamps). Market never measured at the close.
 - **Verdict:** **accuracy gap first**, both markets. Not a beat-the-close verdict.
-- **Not covered:** signed bias by season and scoring band (not in the stored results); team totals (no team-total column in the database). Both remain open.
+- **Bias diagnosis (added Oct 19, `BIAS_SUMMARY.md` and `bias_nba.py` blob c1663890, same folder):** both gaps are compression toward the middle. Spread: the model is 1.65 points less extreme than the line on favorites [−1.77, −1.54], and short of actual margins by 2.66 on 11+ point favorites; by-season home-margin bias is near zero every season. Total: model − line is +2.72 below a 215 line and −1.89 at 235+. Same shape as the NFL #2384 compression signature.
+- **Not covered:** team totals (no team-total column in the database). Open.
 - **Current status:** research record only; nothing wired; no card path.
 - **Sources:** `records/nba_moneyline_20261019/nba_lines_results.json` (blob 808977b0) on branch `records/nba-moneyline-record-20261019`, keys `rmse`, `spread`, `total`.
+
+## 11. NBA player props — market never measured
+
+- **Markets:** points, rebounds, assists, PRA, other combos, threes, steals, blocks, turnovers, double-double.
+- **Recorded verdict: none.** No historical prop prices exist in the repo or the session, so no model has been scored against a price. Each market's status is **market never measured**.
+- **Model baseline:** none recorded. No prop model has been scored against a statistical baseline either.
+- **Forward-test requirement (per market):** (1) a model frozen and preregistered before the first capture it is scored on; (2) our own timestamped DK captures at entry and close, per Capture Spec V1, with every missed capture recorded and not reconstructed; (3) scoring once the sample reaches the existing `common.py` floor (200 bets, 10 date clusters) or a threshold fixed in that prereg.
+- **Capture status (Oct 19):** points, rebounds, assists and PRA are in this week's capture scope. The first board is `dk_line_archive/nba/2026-10-19/1154_ct.json` (manual, owner-directed; Oct 20–21 games), and it has no close capture yet. Other combos, threes, steals, blocks, turnovers and double-double are out of scope this week (#2406), so they have no captures.
+- **Current status:** no model, no verdict, no card path.
+- **Sources:** #2409 Claude lane item 2; `records/audit_artifacts_20261018/dk_line_archive/INDEX.md` on `records/audit-artifacts-20261018` @ 997cbbd33.
 
 ---
 
