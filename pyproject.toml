@@ -17,4 +17,5 @@ dev = [
   "requests==2.32.5",
   "Pillow==12.3.0",
   "pandas==2.2.3",
+  "scipy==1.17.0",
 ]
