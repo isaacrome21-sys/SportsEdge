@@ -1,7 +1,18 @@
 """Independent family-level research gate; not a replacement for canonical Phase-1 coverage.
 
 Call before any CFB/NBA/CBB pricer and after existing sport-specific exclusions.
-The caller must enforce the returned BLOCKED decision; no activation authority.
+The caller must enforce the returned decision; no activation authority.
+
+Owner ruling 2026-10-20 (CFB registry gate decision packet, Option B):
+the CFB game families with working pricing paths -- moneyline, spread,
+total -- are REGISTERED_RESEARCH_ONLY / NOT_VALIDATED (eligible False,
+promotable False), mirroring the NFL prop registration (#2371). Their
+rows may price and publish as research-only LEANs ("unvalidated
+estimate") only when the fixture's identity is satisfied under the
+Form 2 identity path (enforced per-fixture in
+``sportsedge.registry_gate``); PLAY remains impossible and the CFB
+historical evaluation HOLD is untouched. Every other CFB family, and
+every NBA/CBB family, stays BLOCKED exactly as before.
 """
 from __future__ import annotations
 
@@ -64,6 +75,14 @@ CFB_PLAYER_FAMILIES = frozenset({
     "player_rush_attempts", "player_receiving_yards", "player_receptions",
     "player_rush_plus_rec_yards", "player_pass_plus_rush_yards",
 })
+REGISTRATION_STATE_RESEARCH_ONLY = "REGISTERED_RESEARCH_ONLY"
+REGISTRATION_VALIDATION_STATUS = "NOT_VALIDATED"
+# CFB families registered research-only by the 2026-10-20 Option B
+# ruling: exactly the game families with an existing pricing path (the
+# phone game engine prices all three; the CFB run machine prices all
+# three). Team totals and player props are deliberately NOT registered
+# here -- they stay BLOCKED.
+CFB_RESEARCH_REGISTERED_FAMILIES = frozenset({"moneyline", "spread", "total"})
 EVALUATION_SCOPES = frozenset({"HISTORICAL", "FORWARD_ONLY"})
 CFB_EVALUATION_SCOPE = {
     "moneyline": "HISTORICAL", "spread": "HISTORICAL",
@@ -108,6 +127,27 @@ def family_market_decision(sport, market):
     family = ALIASES.get(key)
     if sport == "CFB":
         family = CFB_ALIASES.get(key, family)
+    if sport == "CFB" and family in CFB_RESEARCH_REGISTERED_FAMILIES:
+        # Option B registration (2026-10-20): research pricing only,
+        # gated per-fixture on satisfied Form 2 identity by the runtime
+        # gate. The blocker/reason fields keep naming the refusal that
+        # applies whenever that per-fixture condition is not met, so
+        # existing fail-closed consumers see no change for unproven
+        # fixtures. Registration is not validation and not evaluation:
+        # evaluation_scope is unchanged and the evaluation HOLD stands.
+        return {
+            "sport": sport, "market": family,
+            "state": REGISTRATION_STATE_RESEARCH_ONLY,
+            "registration_state": REGISTRATION_STATE_RESEARCH_ONLY,
+            "blocker": "NO_VALIDATION",
+            "reason": "FAMILY_REGISTRY_NOT_VALIDATED",
+            "validation_status": REGISTRATION_VALIDATION_STATUS,
+            "evaluation_scope": CFB_EVALUATION_SCOPE.get(family, "UNREGISTERED"),
+            "research_only": True, "official_authority": False,
+            "model_p_authority": False, "staking_authority": False,
+            "eligible": False, "promotable": False,
+            "pricing_condition": "FORM2_IDENTITY_SATISFIED_BOTH_TEAMS",
+        }
     return {
         "sport": sport, "market": family or str(market or ""),
         "state": "BLOCKED",
@@ -129,8 +169,9 @@ def cfb_evaluation_admissible(market, requested_scope) -> tuple[bool, str]:
     requested scope equals that family's declared scope. HISTORICAL evaluation of a
     FORWARD_ONLY family (team totals) is refused. Unknown or missing scope, unknown
     market and non-string input are refused. Never confers PLAY/pricing authority:
-    admissibility is about which evidence may be *evaluated*, and every family
-    decision remains state BLOCKED / UNVALIDATED.
+    admissibility is about which evidence may be *evaluated*. (The CFB game
+    families' 2026-10-20 research registration changes their pricing state,
+    not their evaluation scope or this admissibility check.)
     """
     if not isinstance(requested_scope, str) or requested_scope not in EVALUATION_SCOPES:
         return False, "EVALUATION_SCOPE_INVALID"

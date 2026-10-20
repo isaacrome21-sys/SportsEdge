@@ -118,7 +118,9 @@ class MLBBatterPublicSource:
         start is independently verified from the free StatsAPI schedule for
         that date. Unverifiable doubleheader games are dropped (never given
         invented times); the downstream HISTORY_LEAK_OR_DUPLICATE_GAME gate
-        is unchanged and still rejects any true duplicate or post-as-of game.
+        keys duplicate detection on the gamePks returned alongside these
+        stamps (prior_game_ids), so a verified start that happens to equal
+        another game's stamp can no longer masquerade as a duplicate game.
         Returns None if any game had to be dropped (caller re-selects).
         """
         per_day = {}
@@ -317,6 +319,7 @@ class MLBBatterPublicSource:
             "away_team": away,
             "kickoff_utc": kickoff.isoformat(), "source_as_of_utc": now.isoformat(),
             "prior_game_times_utc": dates,
+            "prior_game_ids": [str(pk) for _, pk, _ in latest],
             "features": {"pa_history": [stats for _, _, stats in latest]},
             "lineup_verified": lineup_verified,
             "lineup_status": ("PUBLIC_BOXSCORE_STARTER_VERIFIED" if lineup_verified
