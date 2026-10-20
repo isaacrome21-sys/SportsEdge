@@ -1,6 +1,6 @@
 {
-  "captured_at": "2026-10-20T13:35:52.201691+00:00",
-  "immutable_file": "artifacts/prop_odds/2026-10-20/props_20261020T133552.201691Z.json",
+  "captured_at": "2026-10-20T18:29:37.025385+00:00",
+  "immutable_file": "artifacts/prop_odds/2026-10-20/props_20261020T182937.025385Z.json",
   "market_counts": {
     "BATTER_BB": 0,
     "BATTER_K": 0,
@@ -29,7 +29,7 @@
     "TOTAL_BASES": 2,
     "TRIPLES": 0
   },
-  "payload_sha256": "dce5a7148abc4da89be474792a90748d04e91ea97e2b765893dc03fa24412c10",
+  "payload_sha256": "387c4c860ba439b54f8be0bc006945146b8b2943cf6bf121a82bafbf0825c435",
   "pit_target_quote_count": 234,
   "schema_version": 2
 }
