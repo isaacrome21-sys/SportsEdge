@@ -233,3 +233,21 @@ def test_determinism_without_modifying_input_or_producing_clv_verdict():
     assert x == old
     assert all("CLV" not in k for k in a if k != "diagnostic_rows")
     assert a["countable_prospective_rows"] == 0
+
+
+@pytest.mark.parametrize("field,bad", [
+    ("market", []), ("market", {"selection": "TOTAL"}),
+])
+def test_hostile_unhashable_market_identity_refuses_safely(field, bad):
+    x = fixture()
+    x[field] = bad
+    with pytest.raises(GameLinePreflightError, match="MARKET_OUT_OF_SCOPE"):
+        audit(x)
+
+
+def test_hostile_nonstring_quote_side_refuses_safely():
+    x = fixture()
+    x["entry"]["quotes"][0]["side"] = ["OVER"]
+    with pytest.raises(GameLinePreflightError,
+                       match="DUPLICATE_OR_UNKNOWN_QUOTE_SIDE"):
+        audit(x)
