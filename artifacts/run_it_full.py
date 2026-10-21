@@ -38,7 +38,8 @@ from sportsedge.canonical_coverage import (
     blocked_row_for as coverage_blocked_row, coverage_summary,
     resolve_market as coverage_resolve_market, BLOCKED as COVERAGE_BLOCKED)
 from sportsedge.registry_gate import (
-    FAMILY_SPORTS as FAMILY_GATE_SPORTS, family_gate_row)
+    FAMILY_SPORTS as FAMILY_GATE_SPORTS, family_gate_row,
+    research_pricing_allowed, research_pricing_stamp)
 from sportsedge.mlb_f5_quote_binding import (
     F5_MARKET_ALIASES as F5_INTAKE_ALIASES, F5_MARKETS as F5_CANONICAL_MARKETS,
     phone_f5_binding_rows)
@@ -302,6 +303,58 @@ def _registry_blocked_row(sport, markets, line):
     return None
 
 
+def _cfb_research_pricing_allowed(line, stage):
+    """Option B proceed decision (owner ruling, 2026-10-20).
+
+    A family-gated CFB game row may proceed to the engine only when
+    the PRE-PRICING STAGE's Form 2 verdicts satisfy identity for BOTH
+    teams of its fixture. The probe handed to the registry gate
+    carries the stage's verdict map and nothing else: identity fields
+    found on the intake line itself are untrusted, are stripped from
+    the probe, and are never consulted -- the stage is the only
+    producer of ``qb_form2_identities`` this runner trusts (the same
+    system-stamped-only rule as ``availability_status``, issue #2158).
+    """
+    if not isinstance(stage, dict):
+        return False
+    probe = dict(line)
+    probe.pop("identity_status", None)
+    probe.pop("qb_form2_identities", None)
+    verdicts = stage.get("qb_form2_identities")
+    if isinstance(verdicts, dict) and verdicts:
+        probe["qb_form2_identities"] = verdicts
+    return research_pricing_allowed(
+        line.get("sport"), line.get("market"), probe)
+
+
+def _evaluated_research_row_allowed(sport, raw, result):
+    """Defense-in-depth companion to the Option B wiring.
+
+    An evaluated row that reached a pricer through the family gate
+    keeps its price at the final registry re-check only when the
+    SYSTEM-STAMPED Form 2 evidence on the row itself -- placed there
+    from the pre-pricing stage, never from intake -- satisfies
+    ``research_pricing_allowed`` for the row's market. The probe's
+    verdict map comes from the evaluated row; any identity field on
+    the raw intake row is stripped and never consulted. The gate's
+    registration stamp is applied only after this check passes, so
+    its ``registry_enforced`` flag can never serve as the permission.
+    """
+    if not isinstance(result, dict):
+        return False
+    verdicts = result.get("qb_form2_identities")
+    if not isinstance(verdicts, dict) or not verdicts:
+        return False
+    probe = dict(raw) if isinstance(raw, dict) else {}
+    probe["sport"] = sport
+    probe.pop("identity_status", None)
+    probe["qb_form2_identities"] = verdicts
+    first = next((str(n).strip() for n in (
+        raw.get("market") if isinstance(raw, dict) else None,
+        result.get("market")) if n and str(n).strip()), "")
+    return research_pricing_allowed(sport, first, probe)
+
+
 def _team_totals_intake_refusal(line):
     """MLB TEAM_TOTALS game-lane intake contract.
 
@@ -550,7 +603,12 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
     nba_prop_pending = set()  # local prop index -> NBA prop engine lane
     intake_gated = {}  # local prop index -> intake contract refusal row
     # Only CFB game-identity evidence may continue through prepricing.
-    # The registry still blocks its pricer, output probabilities and plays.
+    # The registry still blocks its pricer, output probabilities and
+    # plays UNLESS the pre-pricing stage satisfies Form 2 identity for
+    # both teams (Option B research registration, 2026-10-20): then the
+    # game prices as a registered research row. Plays stay impossible
+    # (registration is research-only; the availability gate below
+    # forces such rows research-only as well).
     family_game_gated = {}  # game position -> precomputed registry blocker
     for i, raw in enumerate(rows):
         if not isinstance(raw, dict):
@@ -638,7 +696,11 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
         if gate is not None:
             # Preserve the CFB identity evidence path only for game markets
             # that are not excluded Illinois-college fixtures. These rows
-            # MUST stop after prepricing, and never enter engine.run().
+            # continue through prepricing; after it, a fixture whose
+            # Form 2 identity the stage satisfies for both teams proceeds
+            # to engine.run() as a registered research row (Option B),
+            # and every other such row stops at the precomputed registry
+            # refusal below and never enters engine.run().
             if (line["sport"] == "CFB"
                     and market in {"ML", "SPREAD", "TOTAL"}
                     and gate.get("blocker") != "ILLINOIS_COLLEGE_EXCLUDED"):
@@ -759,10 +821,17 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
         # Strip any user-supplied prepricing_adjustments (never trusted).
         # availability_status is likewise system-stamped ONLY (from the
         # pre-pricing stage): an intake row must never forge it in
-        # either direction (issue #2158).
+        # either direction (issue #2158). Form 2 identity evidence is
+        # system-produced ONLY by the same stage: an intake row must
+        # never forge qb_form2_identities / identity_status either --
+        # the registry gate's Option B pass condition reads exactly
+        # those fields, so they are stripped here and re-stamped from
+        # the stage onto any row that prices through the gate.
         for line in games:
             line.pop("prepricing_adjustments", None)
             line.pop("availability_status", None)
+            line.pop("qb_form2_identities", None)
+            line.pop("identity_status", None)
         # Pre-pricing factor-ingestion stage: verified pulls BEFORE pricing.
         stages = stage_games(
             games, now=clock,
@@ -775,6 +844,7 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
         game_results = [None] * len(games)
         clear_lines = []
         clear_game_pos = []
+        research_game_pos = set()  # family-gated games admitted to price (Option B)
         for gpos, (line, st) in enumerate(zip(games, stages)):
             if st["blocked"]:
                 game_results[gpos] = _prepricing_blocked_row(
@@ -791,9 +861,20 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
                 "factors": list(st["factors"]) if isinstance(st.get("factors"), list) else [],
             }
             if gpos in family_game_gated:
-                # Evidence-only: record positive QB identity/factor audit,
-                # but never hand any adjustment, probability or game row
-                # to the model. No CFB market can produce a candidate.
+                # Option B wiring (owner ruling, 2026-10-20): when the
+                # pre-pricing stage's Form 2 verdicts satisfy identity
+                # for BOTH teams, the fixture proceeds to the engine
+                # and prices as a registered research row (its evidence
+                # and the registry stamp are stamped onto the priced
+                # row below). Every other family-gated game keeps the
+                # exact precomputed registry refusal: its positive QB
+                # identity/factor audit is recorded above, but no
+                # adjustment, probability or game row reaches the model.
+                if _cfb_research_pricing_allowed(line, st):
+                    research_game_pos.add(gpos)
+                    clear_lines.append(line)
+                    clear_game_pos.append(gpos)
+                    continue
                 gate_row = dict(family_game_gated[gpos])
                 gate_row["input_index"] = game_indices[gpos]
                 game_results[gpos] = gate_row
@@ -836,6 +917,18 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
             stage_availability = stages[gpos].get("availability_status")
             if stage_availability:
                 priced[pos]["availability_status"] = stage_availability
+            if gpos in research_game_pos:
+                # System-stamped Form 2 identity evidence (trusted
+                # stage output only, exactly like availability above):
+                # the priced research row carries the verdicts that
+                # admitted it, so the defense-in-depth registry
+                # re-check below can re-derive its permission from
+                # evidence on the row itself. The registration stamp
+                # is applied by that re-check, never here, so the
+                # stamp's registry_enforced flag cannot pre-empt it.
+                verdicts = stages[gpos].get("qb_form2_identities")
+                if isinstance(verdicts, dict) and verdicts:
+                    priced[pos]["qb_form2_identities"] = verdicts
             game_results[gpos] = priced[pos]
         priced_games = game_results
         # Option 3: Prepricing audit for transparency (separate from user context audit)
@@ -1363,6 +1456,17 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
         ], {**raw, "sport": sport})
         if gate is None or result.get("registry_enforced"):
             continue
+        if _evaluated_research_row_allowed(sport, raw, result):
+            # Option B: the row priced through the family gate on
+            # system-stamped Form 2 evidence (re-derived here from
+            # the evidence on the row, not from any intake field and
+            # not from the stamp). It keeps its price and receives
+            # the registry's research registration stamp.
+            stamp = research_pricing_stamp(
+                sport, result.get("market") or raw.get("market"))
+            if stamp:
+                result.update(stamp)
+            continue
         gate["input_index"] = i
         evaluated[i] = gate
         if i in prop_local:
@@ -1388,6 +1492,32 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
         "availability_unverified_max_surface": "RESEARCH_ONLY",
     })
     card["evaluated_rows"] = evaluated
+    # Registry gate stamp for this runner's own gate routing (the
+    # intake gate, the post-prepricing substitution and the re-check
+    # above), mirroring the shape sportsedge.registry_gate.gate_and_stamp
+    # writes for its consumers. Present whenever the family gate acted
+    # on this card; family_state names the research-pricing state when
+    # any CFB row priced under the Option B registration, so the stamp
+    # reflects what the gate actually did. (The card is NOT routed
+    # through gate_payload wholesale: gate_payload's per-row recursion
+    # replaces priced nested sub-structures of engine rows -- e.g.
+    # pricing_lanes -- with blocker rows, which would corrupt the
+    # priced rows this wiring exists to deliver.)
+    if any(isinstance(r, dict)
+           and r.get("registry_module") == "sportsedge.registry_gate"
+           for r in evaluated):
+        research_priced = sum(
+            1 for r in evaluated
+            if isinstance(r, dict)
+            and r.get("registry_disposition")
+            == "RESEARCH_PRICING_ALLOWED_FORM2_IDENTITY_SATISFIED")
+        card["registry_gate"] = {
+            "runner": "artifacts/run_it_full.py",
+            "module": "sportsedge.registry_gate",
+            "family_state": ("BLOCKED_WITH_CFB_RESEARCH_PRICING"
+                             if research_priced else "BLOCKED"),
+            "research_priced": research_priced,
+        }
     card.setdefault("summary",{})
     card["summary"]["rows"] = len(rows)
     card["summary"]["status_counts"] = dict(sorted(Counter(
