@@ -7,6 +7,7 @@ is NOT a proven price/edge even when the research view is computable.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from math import isfinite
 
 from sportsedge.nhl_rate_v1_card import (
     final_score_distribution, resolve_team, total_probs,
@@ -48,10 +49,20 @@ def nhl_research_snapshot(*, away, home, event_id, event_start,
                 "research_only": True, "play_authority": False}
     if away_id == home_id:
         raise ValueError("NHL_FIXTURE_SAME_CANONICAL_TEAM")
+    # float("nan") compares neither above nor below any final goal total:
+    # without validation, total_probs would falsely report 100% PUSH.
+    if isinstance(total_line, bool):
+        raise ValueError("NHL_TOTAL_LINE_INVALID")
+    try:
+        checked_line = float(total_line)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("NHL_TOTAL_LINE_INVALID") from exc
+    if not isfinite(checked_line) or checked_line <= 0:
+        raise ValueError("NHL_TOTAL_LINE_INVALID")
     fsd = final_score_distribution(away_id, home_id)
     home_win = sum(p for (hg, ag), p in fsd["dist"].items() if hg > ag)
     away_win = sum(p for (hg, ag), p in fsd["dist"].items() if ag > hg)
-    over, push, under = total_probs(fsd, total_line)
+    over, push, under = total_probs(fsd, checked_line)
     return {"version": VERSION, "sport": "NHL",
             "status": "RESEARCH_PROJECTION",
             "engine_ref": "sportsedge.nhl_rate_v1_card.final_score_distribution",
@@ -59,7 +70,7 @@ def nhl_research_snapshot(*, away, home, event_id, event_start,
             "event_id": str(event_id), "fixture_source_ref": str(fixture_source_ref),
             "as_of_utc": clock.isoformat(), "start_utc": start.isoformat(),
             "p_home_win": home_win, "p_away_win": away_win,
-            "total_line": float(total_line), "p_over": over,
+            "total_line": checked_line, "p_over": over,
             "p_push": push, "p_under": under,
             "book_quote_status": "NOT_READ_NO_DK_PRICES",
             "market_validation": "NOT_VERIFIED",
