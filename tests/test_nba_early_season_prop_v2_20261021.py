@@ -96,8 +96,9 @@ def test_history_missing_genuine_tipoff_is_refused():
 
 def test_utc_tipoff_date_must_match_chicago_local_game_date():
     records = history()
-    records[0]["tipoff"] = "2025-01-02T02:00:00Z"
-    records[0]["observed_at"] = "2025-01-02T04:00:00Z"
+    # Jan 2 08:00 UTC is Jan 2 02:00 CST, not the Jan 1 game_date.
+    records[0]["tipoff"] = "2025-01-02T08:00:00Z"
+    records[0]["observed_at"] = "2025-01-02T10:00:00Z"
     try:
         read(records)
     except ValueError as e:
