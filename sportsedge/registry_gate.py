@@ -21,6 +21,17 @@ of its fixture (see ``form2_identity_satisfied``). Unresolved, stale or
 missing identity evidence leaves the row blocked exactly as before;
 the Illinois exclusion still fires first; CFB player-prop and
 team-total families, and all NBA/CBB families, are unchanged.
+
+Owner directive 2026-10-20 ("Build the engines"): the NBA points /
+rebounds / assists / PRA families are REGISTERED_RESEARCH_ONLY /
+NOT_VALIDATED with the engine built in
+``sportsedge.nba_prop_empirical``. A priced row in one of those four
+families -- and only those -- keeps its pricing keys through this
+gate when the row carries the registered engine's sufficiency stamp
+(see ``nba_engine_sufficiency_met``): the engine priced the row from
+>= 10 point-in-time prior games. NBA has no Form 2 identity concept
+and none is imported here; NBA game markets and every other NBA/CBB
+family are unchanged.
 """
 from __future__ import annotations
 
@@ -100,12 +111,57 @@ def form2_identity_satisfied(row) -> bool:
     return row.get("identity_status") == FORM2_IDENTITY_SATISFIED_STATUS
 
 
+# The registered NBA prop engine and its sufficiency floor, mirroring
+# sportsedge.nba_prop_empirical (ENGINE_ID / MIN_PRIOR_GAMES). Defined
+# locally so this gate stays import-light; the engine's stamp on a
+# priced row is the evidence this gate verifies — the same
+# row-carried-evidence posture as the Form 2 identity shapes above.
+NBA_PROP_ENGINE_ID = "NBA_PROP_EMPIRICAL_V1"
+NBA_PROP_MIN_PRIOR_GAMES = 10
+
+
+def nba_engine_sufficiency_met(row) -> bool:
+    """True when a row carries the registered NBA prop engine's stamp
+    with sufficiency met: the engine priced the row from at least
+    ``NBA_PROP_MIN_PRIOR_GAMES`` point-in-time prior games. Any other
+    shape — missing stamp, a different engine, a non-integer or
+    below-floor prior count, sufficiency not literally True — is not
+    met. Fail closed."""
+    if not isinstance(row, dict):
+        return False
+    stamp = row.get("nba_prop_engine")
+    if not isinstance(stamp, dict):
+        return False
+    if stamp.get("engine_id") != NBA_PROP_ENGINE_ID:
+        return False
+    if stamp.get("sufficiency_met") is not True:
+        return False
+    n = stamp.get("n_prior")
+    return (isinstance(n, int) and not isinstance(n, bool)
+            and n >= NBA_PROP_MIN_PRIOR_GAMES)
+
+
 def research_pricing_allowed(sport, market, row) -> bool:
-    """Option B pass condition: a REGISTERED_RESEARCH_ONLY family whose
-    fixture identity is satisfied under the Form 2 path, on a fixture
-    the Illinois exclusion does not claim. Everything else stays gated.
+    """Pass conditions for REGISTERED_RESEARCH_ONLY families:
+
+    * CFB moneyline/spread/total (Option B): fixture identity
+      satisfied under the Form 2 path, on a fixture the Illinois
+      exclusion does not claim.
+    * NBA points/rebounds/assists/PRA ("Build the engines"): the
+      registered engine's sufficiency stamp on the row.
+
+    Everything else stays gated.
     """
-    if str(sport or "").upper() != "CFB" or not isinstance(row, dict):
+    sport = str(sport or "").upper()
+    if not isinstance(row, dict):
+        return False
+    if sport == "NBA":
+        decision = family_market_decision(sport, market)
+        if (decision is None
+                or decision.get("state") != "REGISTERED_RESEARCH_ONLY"):
+            return False
+        return nba_engine_sufficiency_met(row)
+    if sport != "CFB":
         return False
     if illinois_exclusion(sport, row):
         return False
@@ -117,6 +173,10 @@ def research_pricing_allowed(sport, market, row) -> bool:
 
 def _research_pricing_stamp(decision):
     """Registration metadata stamped on a row the gate lets price."""
+    if decision.get("pricing_condition") == "ENGINE_SUFFICIENCY_MET":
+        disposition = "RESEARCH_PRICING_ALLOWED_ENGINE_SUFFICIENCY_MET"
+    else:
+        disposition = "RESEARCH_PRICING_ALLOWED_FORM2_IDENTITY_SATISFIED"
     return {
         "family_decision": decision,
         "coverage_market": decision["market"],
@@ -127,7 +187,7 @@ def _research_pricing_stamp(decision):
         "model_p_authority": False, "staking_authority": False,
         "registry_enforced": True,
         "registry_module": "sportsedge.registry_gate",
-        "registry_disposition": "RESEARCH_PRICING_ALLOWED_FORM2_IDENTITY_SATISFIED",
+        "registry_disposition": disposition,
     }
 
 
@@ -142,6 +202,12 @@ def family_gate_row(sport, market, row=None):
     reason = excluded or decision["reason"]
     if excluded:
         suffix = ": " + decision["reason"]
+    elif (decision.get("state") == "REGISTERED_RESEARCH_ONLY"
+          and decision.get("pricing_condition") == "ENGINE_SUFFICIENCY_MET"):
+        suffix = (": family registry state REGISTERED_RESEARCH_ONLY, "
+                  "validation NOT_VALIDATED; research pricing requires "
+                  "the registered engine's sufficiency gate "
+                  "(>= 10 point-in-time prior games)")
     elif decision.get("state") == "REGISTERED_RESEARCH_ONLY":
         suffix = (": family registry state REGISTERED_RESEARCH_ONLY, "
                   "validation NOT_VALIDATED; research pricing requires "
@@ -194,12 +260,15 @@ def gate_payload(obj, default_sport=None, *, _sport=None, stats=None):
             stats["checked"] += 1
             market = _row_market(obj) or "UNSPECIFIED"
             if research_pricing_allowed(sport, market, obj):
-                # Option B (2026-10-20): a CFB moneyline/spread/total
-                # row whose fixture identity is satisfied under the
-                # Form 2 path keeps its pricing keys, stamped with the
-                # research registration. Nested values are still gated
-                # on their own merits.
+                # A REGISTERED_RESEARCH_ONLY row whose per-family
+                # pricing condition is met (CFB: satisfied Form 2
+                # identity for both teams; NBA props: the registered
+                # engine's sufficiency stamp) keeps its pricing keys,
+                # stamped with the research registration. Nested values
+                # are still gated on their own merits.
                 stats["research_priced"] = stats.get("research_priced", 0) + 1
+                sport_key = f"research_priced_{str(sport).lower()}"
+                stats[sport_key] = stats.get(sport_key, 0) + 1
                 res = {k: gate_payload(v, None, _sport=sport, stats=stats)
                        for k, v in obj.items()}
                 res.update(_research_pricing_stamp(
@@ -225,11 +294,20 @@ def gate_payload(obj, default_sport=None, *, _sport=None, stats=None):
 def gate_and_stamp(payload, default_sport, runner: str):
     gated, stats = gate_payload(payload, default_sport)
     if isinstance(gated, dict):
+        cfb_priced = bool(stats.get("research_priced_cfb"))
+        nba_priced = bool(stats.get("research_priced_nba"))
+        if cfb_priced and nba_priced:
+            family_state = "BLOCKED_WITH_CFB_AND_NBA_RESEARCH_PRICING"
+        elif nba_priced:
+            family_state = "BLOCKED_WITH_NBA_RESEARCH_PRICING"
+        elif cfb_priced or stats.get("research_priced"):
+            family_state = "BLOCKED_WITH_CFB_RESEARCH_PRICING"
+        else:
+            family_state = "BLOCKED"
         gated["registry_gate"] = {
             "runner": runner,
             "module": "sportsedge.registry_gate",
-            "family_state": ("BLOCKED_WITH_CFB_RESEARCH_PRICING"
-                             if stats.get("research_priced") else "BLOCKED"),
+            "family_state": family_state,
             **stats}
     return gated
 
