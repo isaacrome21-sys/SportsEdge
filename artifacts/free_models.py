@@ -1343,6 +1343,15 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
         # new side model beats closing lines under its own preregistration.
         status = NFL_SIDE_WATCH_STATUS
         reason = "NFL_SIDE_MODEL_UNVALIDATED:PRIOR_COMPRESSION_TOWARD_EVEN:ISSUE_2384"
+    elif sport == "NBA" and market in ("ML", "SPREAD", "TOTAL"):
+        # Oct 21: the historical market-accuracy checks failed for all
+        # three NBA game families (NBA game-line forward prereg DRAFT).
+        # A 10+ point projection gap against the book is a diagnostic,
+        # not a validated edge. Preserve the model and receipt, but do
+        # not let these rows rise to positive-EV research candidates.
+        status = "WATCH_NBA_GAME_FAILED_VALIDATION"
+        reason = ("NBA_GAME_MARKET_FAILED_ACCURACY_TEST:"
+                  "NO_AUTHORIZED_NEW_CANDIDATE_OR_MARKET_SCREEN")
     elif price < -165:
         status = "PRICE_CAP"
     elif primary["ev_per_dollar"] >= min_ev:
@@ -1384,7 +1393,9 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
             "context_quality": "HEURISTIC_UNVALIDATED",
             "independent_projection": lane_a,
             "market_anchor": anchor,
-            "model_validation": "NOT_PROVEN_VS_CLOSE",
+            "model_validation": ("FAILED_VALIDATION" if sport == "NBA"
+                                 and market in ("ML", "SPREAD", "TOTAL")
+                                 else "NOT_PROVEN_VS_CLOSE"),
             "validated_profitability": False,
             "research_only": True,
             "model_p_authority": False, "official_authority": False,
@@ -1668,7 +1679,8 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
             continue
         if row.get("status") in {"WATCH_NFL_NO_VERIFIED_CONTEXT",
                                  "WATCH_NFL_TOTAL_PRIOR_ONLY",
-                                 NFL_SIDE_WATCH_STATUS}:
+                                 NFL_SIDE_WATCH_STATUS,
+                                 "WATCH_NBA_GAME_FAILED_VALIDATION"}:
             watchlist.append(row)
             continue
         # Repair 3: a stale quote cannot support a research candidate, even
@@ -1701,7 +1713,8 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
     for r in all_rows:
         if r.get("status") in {"WATCH_NFL_NO_VERIFIED_CONTEXT",
                               "WATCH_NFL_TOTAL_PRIOR_ONLY",
-                              NFL_SIDE_WATCH_STATUS}:
+                              NFL_SIDE_WATCH_STATUS,
+                              "WATCH_NBA_GAME_FAILED_VALIDATION"}:
             continue
         lanes = r.get("pricing_lanes") or {}
         lane_b = lanes.get("lane_b_anchored") or {}
@@ -1719,8 +1732,43 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
     edges = [r for r in all_rows
              if r["status"] == POSITIVE_EV_STATUS and is_play_eligible(r)]
     edges.sort(key=lambda r: (-r["ev_per_dollar"], r["game"], r["selection"]))
+    # Concentration is diagnosed over apparent positive-gap model
+    # research signals, NOT independent profitable positions. The
+    # already-failed NBA game markets never enter recommendation/PLAY.
+    nba_game_rows = [r for r in all_rows
+                     if r.get("sport") == "NBA"
+                     and r.get("market") in {"ML", "SPREAD", "TOTAL"}]
+    nba_total_signals = [
+        r for r in nba_game_rows
+        if r.get("market") == "TOTAL"
+        and isinstance(r.get("independent_projection"), dict)
+        and r["independent_projection"].get("ev_per_dollar", -1) >= min_ev
+        and r.get("selection", "").split(" ", 1)[0] in {"OVER", "UNDER"}
+    ]
+    nba_under_count = sum(r["selection"].startswith("UNDER ")
+                          for r in nba_total_signals)
+    nba_over_count = len(nba_total_signals) - nba_under_count
+    nba_integrity = {
+        "family_validation": "FAILED_VALIDATION",
+        "game_rows": len(nba_game_rows),
+        "game_families": ["ML", "SPREAD", "TOTAL"],
+        "apparent_positive_gap_total_rows": len(nba_total_signals),
+        "under_rows": nba_under_count,
+        "over_rows": nba_over_count,
+        "distinct_games": len({r.get("game") for r in nba_total_signals}),
+        "same_direction_concentration": (
+            len(nba_total_signals) >= 3
+            and (nba_under_count == 0 or nba_over_count == 0)),
+        "interpretation": (
+            "TOTAL rows share a failed model family: same-direction "
+            "quotes are one systematic model-level diagnostic, never "
+            "independent market edges. Full rows remain auditable."),
+        "positive_ev_candidate_authority": False,
+        "research_only": True,
+    }
     primary_lane = LANE_A if lane == "A" else LANE_B
     return {"schema": "SPORTSEDGE_FREE_RESEARCH_CARD_V1",
+            "nba_game_card_integrity": nba_integrity,
             "as_of_utc": as_of.isoformat(),
             "wall_utc": wall.isoformat(),
             "primary_lane": primary_lane,
