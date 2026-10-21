@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from sportsedge.nhl_rate_v1_card import (
-    final_score_distribution, total_probs,
+    final_score_distribution, resolve_team, total_probs,
 )
 
 VERSION = "CFB_NHL_COVERAGE_RESEARCH_V1"
@@ -38,11 +38,17 @@ def nhl_research_snapshot(*, away, home, event_id, event_start,
                 "research_only": True, "play_authority": False}
     if not away or not home or str(away).casefold() == str(home).casefold():
         raise ValueError("NHL_FIXTURE_TEAMS_INVALID")
-    fsd = final_score_distribution(away, home)
-    if fsd is None:
+    # Raw aliases such as "Flyers" and "Philadelphia Flyers" differ as
+    # strings but resolve to the SAME NHL franchise. Never simulate or
+    # display a fictitious self-game as a legitimate fixture.
+    away_id, home_id = resolve_team(away), resolve_team(home)
+    if away_id is None or home_id is None:
         return {"version": VERSION, "sport": "NHL",
                 "status": "REFUSED", "reason": "NHL_STATIC_RATE_TEAM_ID_UNMAPPED",
                 "research_only": True, "play_authority": False}
+    if away_id == home_id:
+        raise ValueError("NHL_FIXTURE_SAME_CANONICAL_TEAM")
+    fsd = final_score_distribution(away_id, home_id)
     home_win = sum(p for (hg, ag), p in fsd["dist"].items() if hg > ag)
     away_win = sum(p for (hg, ag), p in fsd["dist"].items() if ag > hg)
     over, push, under = total_probs(fsd, total_line)
