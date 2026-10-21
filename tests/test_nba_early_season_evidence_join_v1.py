@@ -108,3 +108,28 @@ def test_join_rejects_claimed_finalization_before_tipoff():
     e[0]["finalized_at"]="2026-01-10T00:29:59Z"
     with pytest.raises(ValueError,match="FINAL_STATE_CHRONOLOGY_INVALID"):
         join_nba_boxscore_evidence(b,e,r)
+
+
+def test_join_uses_chicago_local_date_for_season_membership():
+    b,e,r=fixtures()
+    # 2026-10-01 00:30 UTC is Sep 30 19:30 Chicago, outside
+    # the 2026-27 regular season even though UTC month is October.
+    b[0]["SEASON"]="2026-27"
+    e[0]["tipoff"]="2026-10-01T00:30:00Z"
+    e[0]["finalized_at"]="2026-10-01T04:50:00Z"
+    e[0]["result_observed_at"]="2026-10-01T05:00:00Z"
+    r[0]["observed_at"]="2026-09-30T22:00:00Z"
+    with pytest.raises(ValueError,match="SEASON_TIPOFF_INCONSISTENT"):
+        join_nba_boxscore_evidence(b,e,r)
+
+
+def test_valid_join_preserves_final_receipt_and_role_witness_for_audit():
+    b,e,r=fixtures()
+    row=join_nba_boxscore_evidence(b,e,r)["rows"][0]
+    assert row["event_state"]=="FINAL"
+    assert row["result_state"]=="FINAL"
+    assert row["finalized_at"]=="2026-01-10T04:50:00+00:00"
+    assert row["observed_at"]=="2026-01-10T05:00:00+00:00"
+    assert row["role_observed_at"]=="2026-01-09T22:00:00+00:00"
+    assert row["role_source_ref"]=="roster-receipt"
+    assert row["receipt_authentication"]=="NOT_ESTABLISHED_BY_CALLER_FIELDS"
