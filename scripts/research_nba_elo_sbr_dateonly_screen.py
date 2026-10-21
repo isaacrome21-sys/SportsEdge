@@ -193,12 +193,28 @@ def evaluate_date_only(raw, *, first=HOLDOUT_FIRST, last=HOLDOUT_LAST,
         "price_capture_timestamp": "UNKNOWN",
         "market_reference_authority": "INDICATIVE_NOT_ADMITTED",
         "validation_status": "HISTORICAL_RESEARCH_ONLY_UNVALIDATED",
+        "spread_indicative_reference_screen":_indicative_side_verdict(
+            _rmse(spread, "margin_error"),_rmse(spread, "spread_error")),
+        "moneyline_indicative_reference_screen":_indicative_side_verdict(
+            _mean(money, "ml_brier"),_mean(money, "market_ml_brier")),
+        "candidate_card_source_eligible":False,
+        "screen_verdict_authority":"RESEARCH_DIAGNOSTIC_ONLY",
         "model_parameters": "DECLARED_FROZEN_FOR_THIS_DIAGNOSTIC_UNTUNED",
         "play_authority": False,
     }
     if include_rows:
         rep["rows"] = results
     return rep
+
+
+
+def _indicative_side_verdict(model_metric, reference_metric):
+    """No hypothetical good result can confer quote provenance or PLAY."""
+    if model_metric is None or reference_metric is None:
+        return "REFERENCE_UNMEASURED"
+    if model_metric >= reference_metric:
+        return "FAILED_INDICATIVE_REFERENCE_NOT_A_CARD_SOURCE"
+    return "BETTER_INDICATIVE_ONLY_SOURCE_NOT_ADMITTED"
 
 
 def main(argv=None):
