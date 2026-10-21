@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import json
 import math
+from datetime import datetime
 from pathlib import Path
 
 SOURCE_COMMIT = "1a820e50c6fbd0276cde073c22bfffae78930868"
@@ -57,6 +58,10 @@ def normalize(raw):
             season,day = int(x["season"]),int(float(x["date"]))
         except (TypeError,ValueError,KeyError) as e:
             raise ValueError("NBA_DATE_ONLY_SEASON_OR_DATE_INVALID") from e
+        try:
+            datetime.strptime(str(day), "%Y%m%d")
+        except ValueError as e:
+            raise ValueError("NBA_DATE_ONLY_CALENDAR_DATE_INVALID") from e
         key=(day,home,away)
         if key in seen:
             raise ValueError("NBA_DATE_ONLY_DUPLICATE_FIXTURE")
