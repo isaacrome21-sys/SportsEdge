@@ -9,16 +9,13 @@ from zoneinfo import ZoneInfo
 import json
 
 from sportsedge.nfl_lines_intake import NflLinesIntakeError, parse_nfl_lines, tickets_to_dict
+from sportsedge.mlb_issue_body import IssueLinesError, extract_issue_lines
 
 CHICAGO = ZoneInfo("America/Chicago")
 
 
 def _body_lines(body: str) -> str:
-    marker = "### Lines"
-    if marker in body:
-        body = body.split(marker, 1)[1]
-        body = body.split("\n### ", 1)[0]
-    return body.replace("```text", "").replace("```", "")
+    return extract_issue_lines(body, sport="NFL")
 
 
 def main() -> int:
@@ -30,13 +27,13 @@ def main() -> int:
     args = ap.parse_args()
     observed = datetime.fromisoformat(args.observed_at.replace("Z", "+00:00")).astimezone(CHICAGO)
     slate = observed.date().isoformat()
-    body = _body_lines(Path(args.body_file).read_text(encoding="utf-8"))
     try:
+        body = _body_lines(Path(args.body_file).read_text(encoding="utf-8"))
         tickets = parse_nfl_lines(body)
         payload = tickets_to_dict(tickets, observed_at=observed.isoformat())
         payload["slate"] = slate
         payload["issue"] = args.issue
-    except NflLinesIntakeError as exc:
+    except (NflLinesIntakeError, IssueLinesError) as exc:
         Path("intake_error.txt").write_text(str(exc), encoding="utf-8")
         print(f"INTAKE_FAILED: {exc}")
         return 2

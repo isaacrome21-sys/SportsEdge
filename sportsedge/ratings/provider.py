@@ -153,7 +153,10 @@ class RatingProvider:
             raise RatingError("RATINGS_STORE_UNREADABLE:" + str(path)) from exc
         if not isinstance(payload, dict) or payload.get("version") != 1:
             raise RatingError("RATINGS_STORE_VERSION_INVALID:" + str(path))
-        tracker = EloTracker.from_dict(payload.get("tracker") or {})
+        try:
+            tracker = EloTracker.from_dict(payload.get("tracker") or {})
+        except EloError as exc:
+            raise RatingError("RATINGS_STORE_INVALID:" + str(path) + ":" + str(exc)) from exc
         return cls(tracker.sport, tracker)
 
 

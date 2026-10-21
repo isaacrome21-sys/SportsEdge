@@ -30,7 +30,7 @@ from __future__ import annotations
 from bisect import bisect_left
 from datetime import datetime
 from math import isfinite
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 from . import params
 
@@ -220,8 +220,8 @@ class EloTracker:
             "teams": {
                 team: {
                     "dates": [d.isoformat() for d in self._dates[team]],
-                    "ratings": self._ratings[team],
-                    "seasons": self._seasons[team],
+                    "ratings": list(self._ratings[team]),
+                    "seasons": list(self._seasons[team]),
                 }
                 for team in self._ratings
             },
@@ -229,6 +229,8 @@ class EloTracker:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "EloTracker":
+        if not isinstance(data, Mapping):
+            raise EloError("TRACKER_DATA_INVALID")
         try:
             tracker = cls(data["sport"])
         except KeyError as exc:
@@ -238,8 +240,22 @@ class EloTracker:
             raise EloError("TRACKER_TEAMS_INVALID")
         for team, blob in teams.items():
             key = _key(team)
+            if not key or key in tracker._dates:
+                raise EloError("TRACKER_TEAM_INVALID_OR_DUPLICATE:" + key)
+            if not isinstance(blob, Mapping):
+                raise EloError("TRACKER_HISTORY_INVALID:" + key)
+            if any(not isinstance(blob.get(field, []), (list, tuple))
+                   for field in ("dates", "ratings", "seasons")):
+                raise EloError("TRACKER_HISTORY_INVALID:" + key)
             dates = [_clock(d, "TRACKER_DATE") for d in blob.get("dates", [])]
-            ratings = [float(r) for r in blob.get("ratings", [])]
+            raw_ratings = blob.get("ratings", [])
+            try:
+                ratings = [float(r) for r in raw_ratings]
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise EloError("TRACKER_RATING_INVALID:" + key) from exc
+            if any(isinstance(r, bool) for r in raw_ratings) or any(
+                    not isfinite(r) for r in ratings):
+                raise EloError("TRACKER_RATING_INVALID:" + key)
             seasons = [str(s) for s in blob.get("seasons", [])]
             if not (len(dates) == len(ratings) == len(seasons)):
                 raise EloError("TRACKER_HISTORY_MISMATCH:" + key)
