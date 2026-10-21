@@ -1,0 +1,4185 @@
+{
+ "archive_date": "2026-10-20",
+ "capture_type": "SCHEDULED_EVENING_CAPTURE",
+ "status": "CAPTURED",
+ "capture_start_ct": "2026-10-20T17:22:00-05:00",
+ "capture_end_ct": "2026-10-20T19:49:00-05:00",
+ "captured_at": "2026-10-20T17:22:00-05:00",
+ "source": "DraftKings",
+ "source_access": "signed out",
+ "source_view": "NBA league board + per-game Team Props team totals + Points/Rebounds/Assists/Combos (PRA) O/U tables, rendered pages only; no API calls",
+ "sport": "NBA",
+ "scope": {
+  "game_dates_requested": [
+   "2026-10-20",
+   "2026-10-21"
+  ],
+  "game_lines": [
+   "spread",
+   "moneyline",
+   "total",
+   "team_totals"
+  ],
+  "player_props": [
+   "points",
+   "rebounds",
+   "assists",
+   "pra"
+  ],
+  "excluded": [
+   "threes",
+   "steals",
+   "blocks",
+   "turnovers",
+   "double_double",
+   "CBB (out this week per issue #2406)",
+   "milestone ladders (one-sided, no under price)"
+  ]
+ },
+ "board_note": "Board loaded fully priced on Attempt 1; no reloads needed; no bot wall or Access Denied encountered. 13 games captured: 2 on Tue 2026-10-20, 11 on Wed 2026-10-21. The third game from the morning board (BOS @ DET, 14:00 CT tip) was no longer listed as a pregame board game in the evening. Several event pages displayed slate-wide player pools; player names transcribed exactly as displayed on the rendered pages. Odds tick continuously; later per-game views showed small drifts from the 17:23 board snapshot - the timed board and section snapshots in this file are the captures of record and were not overwritten.",
+ "attempt_timeline": [
+  {
+   "attempt": 1,
+   "start_ct": "2026-10-20T17:22:00-05:00",
+   "route": "league board + per-game pages, rendered only",
+   "outcome": "CAPTURED - board loaded fully populated with prices on first try; no reloads used"
+  }
+ ],
+ "egress_ip_hash": "ba7701e98f28",
+ "egress_ip_changed": true,
+ "games_count": 13,
+ "rows_count": 557,
+ "rows_count_definition": "Per game: spread + moneyline + total (3 rows) + team totals (2 rows) + player-prop O/U rows. Prop rows total 492; game-line rows 39; team-total rows 26; total 557.",
+ "games": [
+  {
+   "game_date": "2026-10-20",
+   "start_time_ct": "18:00",
+   "away": "PHI",
+   "away_name": "Philadelphia 76ers",
+   "home": "NYK",
+   "home_name": "New York Knicks",
+   "spread": {
+    "away_line": 4.5,
+    "away_price": -112,
+    "home_line": -4.5,
+    "home_price": -108,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "moneyline": {
+    "away_price": 145,
+    "home_price": -175,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "total": {
+    "line": 231.5,
+    "over_price": -105,
+    "under_price": -115,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "team_totals": [
+    {
+     "team": "New York Knicks",
+     "line": 117.5,
+     "over_price": -112,
+     "under_price": -108,
+     "captured_at": "2026-10-20T17:34:00-05:00"
+    },
+    {
+     "team": "Philadelphia 76ers",
+     "line": 113.5,
+     "over_price": -112,
+     "under_price": -108,
+     "captured_at": "2026-10-20T17:34:00-05:00"
+    }
+   ],
+   "player_props": {
+    "points": [
+     {
+      "player": "Jalen Brunson",
+      "line": 26.5,
+      "over_price": -111,
+      "under_price": -115,
+      "captured_at": "2026-10-20T17:26:00-05:00"
+     },
+     {
+      "player": "Joel Embiid",
+      "line": 22.5,
+      "over_price": -112,
+      "under_price": -114,
+      "captured_at": "2026-10-20T17:26:00-05:00"
+     },
+     {
+      "player": "Tyrese Maxey",
+      "line": 21.5,
+      "over_price": -111,
+      "under_price": -114,
+      "captured_at": "2026-10-20T17:26:00-05:00"
+     },
+     {
+      "player": "Jaylen Brown",
+      "line": 21.5,
+      "over_price": -105,
+      "under_price": -121,
+      "captured_at": "2026-10-20T17:26:00-05:00"
+     },
+     {
+      "player": "Karl-Anthony Towns",
+      "line": 18.5,
+      "over_price": -111,
+      "under_price": -114,
+      "captured_at": "2026-10-20T17:26:00-05:00"
+     },
+     {
+      "player": "OG Anunoby",
+      "line": 17.5,
+      "over_price": -112,
+      "under_price": -114,
+      "captured_at": "2026-10-20T17:26:00-05:00"
+     },
+     {
+      "player": "LeBron James",
+      "line": 15.5,
+      "over_price": -125,
+      "under_price": -102,
+      "captured_at": "2026-10-20T17:26:00-05:00"
+     },
+     {
+      "player": "Mikal Bridges",
+      "line": 13.5,
+      "over_price": -108,
+      "under_price": -118,
+      "captured_at": "2026-10-20T17:26:00-05:00"
+     },
+     {
+      "player": "VJ Edgecombe",
+      "line": 12.5,
+      "over_price": -101,
+      "under_price": -126,
+      "captured_at": "2026-10-20T17:26:00-05:00"
+     },
+     {
+      "player": "Josh Hart",
+      "line": 11.5,
+      "over_price": 100,
+      "under_price": -128,
+      "captured_at": "2026-10-20T17:26:00-05:00"
+     },
+     {
+      "player": "Landry Shamet",
+      "line": 7.5,
+      "over_price": -110,
+      "under_price": -116,
+      "captured_at": "2026-10-20T17:26:00-05:00"
+     },
+     {
+      "player": "Anfernee Simons",
+      "line": 7.5,
+      "over_price": -106,
+      "under_price": -120,
+      "captured_at": "2026-10-20T17:26:00-05:00"
+     },
+     {
+      "player": "Andre Drummond",
+      "line": 5.5,
+      "over_price": -125,
+      "under_price": -102,
+      "captured_at": "2026-10-20T17:26:00-05:00"
+     }
+    ],
+    "rebounds": [
+     {
+      "player": "Karl-Anthony Towns",
+      "line": 11.5,
+      "over_price": -117,
+      "under_price": -113,
+      "captured_at": "2026-10-20T17:29:00-05:00"
+     },
+     {
+      "player": "Joel Embiid",
+      "line": 7.5,
+      "over_price": -127,
+      "under_price": -104,
+      "captured_at": "2026-10-20T17:29:00-05:00"
+     },
+     {
+      "player": "Josh Hart",
+      "line": 7.5,
+      "over_price": -119,
+      "under_price": -110,
+      "captured_at": "2026-10-20T17:29:00-05:00"
+     },
+     {
+      "player": "Andre Drummond",
+      "line": 6.5,
+      "over_price": -115,
+      "under_price": -114,
+      "captured_at": "2026-10-20T17:29:00-05:00"
+     },
+     {
+      "player": "LeBron James",
+      "line": 6.5,
+      "over_price": 101,
+      "under_price": -133,
+      "captured_at": "2026-10-20T17:29:00-05:00"
+     },
+     {
+      "player": "Jaylen Brown",
+      "line": 5.5,
+      "over_price": -145,
+      "under_price": 110,
+      "captured_at": "2026-10-20T17:29:00-05:00"
+     },
+     {
+      "player": "OG Anunoby",
+      "line": 5.5,
+      "over_price": 118,
+      "under_price": -156,
+      "captured_at": "2026-10-20T17:29:00-05:00"
+     },
+     {
+      "player": "VJ Edgecombe",
+      "line": 4.5,
+      "over_price": -150,
+      "under_price": 114,
+      "captured_at": "2026-10-20T17:29:00-05:00"
+     },
+     {
+      "player": "Mikal Bridges",
+      "line": 3.5,
+      "over_price": -109,
+      "under_price": -121,
+      "captured_at": "2026-10-20T17:29:00-05:00"
+     },
+     {
+      "player": "Jalen Brunson",
+      "line": 3.5,
+      "over_price": 106,
+      "under_price": -139,
+      "captured_at": "2026-10-20T17:29:00-05:00"
+     },
+     {
+      "player": "Tyrese Maxey",
+      "line": 3.5,
+      "over_price": 113,
+      "under_price": -149,
+      "captured_at": "2026-10-20T17:29:00-05:00"
+     }
+    ],
+    "assists": [
+     {
+      "player": "LeBron James",
+      "line": 7.5,
+      "over_price": -117,
+      "under_price": -112,
+      "captured_at": "2026-10-20T17:30:00-05:00"
+     },
+     {
+      "player": "Jalen Brunson",
+      "line": 6.5,
+      "over_price": -114,
+      "under_price": -116,
+      "captured_at": "2026-10-20T17:30:00-05:00"
+     },
+     {
+      "player": "Karl-Anthony Towns",
+      "line": 4.5,
+      "over_price": -131,
+      "under_price": 100,
+      "captured_at": "2026-10-20T17:30:00-05:00"
+     },
+     {
+      "player": "Tyrese Maxey",
+      "line": 4.5,
+      "over_price": -128,
+      "under_price": -103,
+      "captured_at": "2026-10-20T17:30:00-05:00"
+     },
+     {
+      "player": "Josh Hart",
+      "line": 4.5,
+      "over_price": 109,
+      "under_price": -144,
+      "captured_at": "2026-10-20T17:30:00-05:00"
+     },
+     {
+      "player": "Jaylen Brown",
+      "line": 3.5,
+      "over_price": 106,
+      "under_price": -140,
+      "captured_at": "2026-10-20T17:30:00-05:00"
+     },
+     {
+      "player": "Joel Embiid",
+      "line": 3.5,
+      "over_price": 112,
+      "under_price": -148,
+      "captured_at": "2026-10-20T17:30:00-05:00"
+     },
+     {
+      "player": "Mikal Bridges",
+      "line": 3.5,
+      "over_price": 132,
+      "under_price": -175,
+      "captured_at": "2026-10-20T17:30:00-05:00"
+     },
+     {
+      "player": "VJ Edgecombe",
+      "line": 2.5,
+      "over_price": -112,
+      "under_price": -117,
+      "captured_at": "2026-10-20T17:30:00-05:00"
+     },
+     {
+      "player": "OG Anunoby",
+      "line": 1.5,
+      "over_price": -153,
+      "under_price": 116,
+      "captured_at": "2026-10-20T17:30:00-05:00"
+     }
+    ],
+    "pra": [
+     {
+      "player": "Jalen Brunson",
+      "line": 36.5,
+      "over_price": -118,
+      "under_price": -112,
+      "captured_at": "2026-10-20T17:31:00-05:00"
+     },
+     {
+      "player": "Karl-Anthony Towns",
+      "line": 35.5,
+      "over_price": -113,
+      "under_price": -116,
+      "captured_at": "2026-10-20T17:31:00-05:00"
+     },
+     {
+      "player": "Joel Embiid",
+      "line": 33.5,
+      "over_price": -110,
+      "under_price": -120,
+      "captured_at": "2026-10-20T17:31:00-05:00"
+     },
+     {
+      "player": "Jaylen Brown",
+      "line": 30.5,
+      "over_price": -110,
+      "under_price": -120,
+      "captured_at": "2026-10-20T17:31:00-05:00"
+     },
+     {
+      "player": "LeBron James",
+      "line": 29.5,
+      "over_price": -105,
+      "under_price": -125,
+      "captured_at": "2026-10-20T17:31:00-05:00"
+     },
+     {
+      "player": "Tyrese Maxey",
+      "line": 28.5,
+      "over_price": -123,
+      "under_price": -107,
+      "captured_at": "2026-10-20T17:31:00-05:00"
+     },
+     {
+      "player": "OG Anunoby",
+      "line": 24.5,
+      "over_price": -117,
+      "under_price": -113,
+      "captured_at": "2026-10-20T17:31:00-05:00"
+     },
+     {
+      "player": "Josh Hart",
+      "line": 23.5,
+      "over_price": -116,
+      "under_price": -113,
+      "captured_at": "2026-10-20T17:31:00-05:00"
+     },
+     {
+      "player": "Mikal Bridges",
+      "line": 20.5,
+      "over_price": -108,
+      "under_price": -121,
+      "captured_at": "2026-10-20T17:31:00-05:00"
+     },
+     {
+      "player": "VJ Edgecombe",
+      "line": 19.5,
+      "over_price": -116,
+      "under_price": -113,
+      "captured_at": "2026-10-20T17:31:00-05:00"
+     }
+    ]
+   },
+   "note": "PRA volatility note: on re-reads at 17:31-17:32 CT, seconds after the first expanded snapshot recorded here, prices had already ticked (e.g. Embiid PRA to 32.5). The first expanded snapshot is the capture of record for that section. Player names transcribed exactly as displayed; this event page displayed a slate-wide player pool in prior captures as well."
+  },
+  {
+   "game_date": "2026-10-20",
+   "start_time_ct": "20:30",
+   "away": "OKC",
+   "away_name": "Oklahoma City Thunder",
+   "home": "SAS",
+   "home_name": "San Antonio Spurs",
+   "spread": {
+    "away_line": -1.5,
+    "away_price": -108,
+    "home_line": 1.5,
+    "home_price": -112,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "moneyline": {
+    "away_price": -118,
+    "home_price": -102,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "total": {
+    "line": 230.5,
+    "over_price": -110,
+    "under_price": -110,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "team_totals": [
+    {
+     "team": "Oklahoma City Thunder",
+     "line": 115.5,
+     "over_price": -122,
+     "under_price": 102,
+     "captured_at": "2026-10-20T17:45:00-05:00"
+    },
+    {
+     "team": "San Antonio Spurs",
+     "line": 114.5,
+     "over_price": -122,
+     "under_price": 102,
+     "captured_at": "2026-10-20T17:45:00-05:00"
+    }
+   ],
+   "player_props": {
+    "points": [
+     {
+      "player": "Shai Gilgeous-Alexander",
+      "line": 30.5,
+      "over_price": -104,
+      "under_price": -123,
+      "captured_at": "2026-10-20T17:36:00-05:00"
+     },
+     {
+      "player": "Victor Wembanyama",
+      "line": 25.5,
+      "over_price": -116,
+      "under_price": -110,
+      "captured_at": "2026-10-20T17:36:00-05:00"
+     },
+     {
+      "player": "Jalen Williams",
+      "line": 18.5,
+      "over_price": -115,
+      "under_price": -111,
+      "captured_at": "2026-10-20T17:36:00-05:00"
+     },
+     {
+      "player": "Stephon Castle",
+      "line": 16.5,
+      "over_price": -110,
+      "under_price": -116,
+      "captured_at": "2026-10-20T17:36:00-05:00"
+     },
+     {
+      "player": "Dylan Harper",
+      "line": 15.5,
+      "over_price": -117,
+      "under_price": -109,
+      "captured_at": "2026-10-20T17:36:00-05:00"
+     },
+     {
+      "player": "De'Aaron Fox",
+      "line": 14.5,
+      "over_price": -120,
+      "under_price": -106,
+      "captured_at": "2026-10-20T17:36:00-05:00"
+     },
+     {
+      "player": "Chet Holmgren",
+      "line": 12.5,
+      "over_price": -117,
+      "under_price": -109,
+      "captured_at": "2026-10-20T17:36:00-05:00"
+     },
+     {
+      "player": "Devin Vassell",
+      "line": 12.5,
+      "over_price": -103,
+      "under_price": -124,
+      "captured_at": "2026-10-20T17:36:00-05:00"
+     },
+     {
+      "player": "Ajay Mitchell",
+      "line": 11.5,
+      "over_price": -117,
+      "under_price": -109,
+      "captured_at": "2026-10-20T17:36:00-05:00"
+     },
+     {
+      "player": "Jared McCain",
+      "line": 9.5,
+      "over_price": -116,
+      "under_price": -110,
+      "captured_at": "2026-10-20T17:36:00-05:00"
+     },
+     {
+      "player": "Julian Champagnie",
+      "line": 8.5,
+      "over_price": -129,
+      "under_price": 101,
+      "captured_at": "2026-10-20T17:36:00-05:00"
+     },
+     {
+      "player": "Cason Wallace",
+      "line": 8.5,
+      "over_price": -123,
+      "under_price": -103,
+      "captured_at": "2026-10-20T17:36:00-05:00"
+     },
+     {
+      "player": "Keldon Johnson",
+      "line": 8.5,
+      "over_price": -115,
+      "under_price": -111,
+      "captured_at": "2026-10-20T17:36:00-05:00"
+     },
+     {
+      "player": "Isaiah Hartenstein",
+      "line": 7.5,
+      "over_price": -118,
+      "under_price": -108,
+      "captured_at": "2026-10-20T17:36:00-05:00"
+     }
+    ],
+    "rebounds": [
+     {
+      "player": "Victor Wembanyama",
+      "line": 11.5,
+      "over_price": -119,
+      "under_price": -111,
+      "captured_at": "2026-10-20T17:37:00-05:00"
+     },
+     {
+      "player": "Isaiah Hartenstein",
+      "line": 8.5,
+      "over_price": -122,
+      "under_price": -108,
+      "captured_at": "2026-10-20T17:37:00-05:00"
+     },
+     {
+      "player": "Chet Holmgren",
+      "line": 7.5,
+      "over_price": -127,
+      "under_price": -103,
+      "captured_at": "2026-10-20T17:37:00-05:00"
+     },
+     {
+      "player": "Stephon Castle",
+      "line": 5.5,
+      "over_price": 105,
+      "under_price": -138,
+      "captured_at": "2026-10-20T17:37:00-05:00"
+     },
+     {
+      "player": "Dylan Harper",
+      "line": 4.5,
+      "over_price": -147,
+      "under_price": 112,
+      "captured_at": "2026-10-20T17:37:00-05:00"
+     },
+     {
+      "player": "Julian Champagnie",
+      "line": 4.5,
+      "over_price": -125,
+      "under_price": -106,
+      "captured_at": "2026-10-20T17:37:00-05:00"
+     },
+     {
+      "player": "Jalen Williams",
+      "line": 4.5,
+      "over_price": -121,
+      "under_price": -109,
+      "captured_at": "2026-10-20T17:37:00-05:00"
+     },
+     {
+      "player": "Shai Gilgeous-Alexander",
+      "line": 3.5,
+      "over_price": -161,
+      "under_price": 122,
+      "captured_at": "2026-10-20T17:37:00-05:00"
+     },
+     {
+      "player": "Devin Vassell",
+      "line": 3.5,
+      "over_price": -141,
+      "under_price": 107,
+      "captured_at": "2026-10-20T17:37:00-05:00"
+     },
+     {
+      "player": "Keldon Johnson",
+      "line": 3.5,
+      "over_price": -133,
+      "under_price": 101,
+      "captured_at": "2026-10-20T17:37:00-05:00"
+     },
+     {
+      "player": "De'Aaron Fox",
+      "line": 3.5,
+      "over_price": -104,
+      "under_price": -126,
+      "captured_at": "2026-10-20T17:37:00-05:00"
+     },
+     {
+      "player": "Cason Wallace",
+      "line": 3.5,
+      "over_price": -103,
+      "under_price": -127,
+      "captured_at": "2026-10-20T17:37:00-05:00"
+     },
+     {
+      "player": "Ajay Mitchell",
+      "line": 2.5,
+      "over_price": -164,
+      "under_price": 124,
+      "captured_at": "2026-10-20T17:37:00-05:00"
+     },
+     {
+      "player": "Jared McCain",
+      "line": 2.5,
+      "over_price": 126,
+      "under_price": -167,
+      "captured_at": "2026-10-20T17:37:00-05:00"
+     }
+    ],
+    "assists": [
+     {
+      "player": "Stephon Castle",
+      "line": 6.5,
+      "over_price": -119,
+      "under_price": -111,
+      "captured_at": "2026-10-20T17:41:00-05:00"
+     },
+     {
+      "player": "Shai Gilgeous-Alexander",
+      "line": 6.5,
+      "over_price": 101,
+      "under_price": -133,
+      "captured_at": "2026-10-20T17:41:00-05:00"
+     },
+     {
+      "player": "De'Aaron Fox",
+      "line": 4.5,
+      "over_price": -152,
+      "under_price": 115,
+      "captured_at": "2026-10-20T17:41:00-05:00"
+     },
+     {
+      "player": "Jalen Williams",
+      "line": 4.5,
+      "over_price": -119,
+      "under_price": -110,
+      "captured_at": "2026-10-20T17:41:00-05:00"
+     },
+     {
+      "player": "Dylan Harper",
+      "line": 4.5,
+      "over_price": 122,
+      "under_price": -161,
+      "captured_at": "2026-10-20T17:41:00-05:00"
+     },
+     {
+      "player": "Victor Wembanyama",
+      "line": 3.5,
+      "over_price": 125,
+      "under_price": -165,
+      "captured_at": "2026-10-20T17:41:00-05:00"
+     },
+     {
+      "player": "Ajay Mitchell",
+      "line": 2.5,
+      "over_price": -168,
+      "under_price": 127,
+      "captured_at": "2026-10-20T17:41:00-05:00"
+     },
+     {
+      "player": "Cason Wallace",
+      "line": 2.5,
+      "over_price": -120,
+      "under_price": -110,
+      "captured_at": "2026-10-20T17:41:00-05:00"
+     },
+     {
+      "player": "Isaiah Hartenstein",
+      "line": 2.5,
+      "over_price": -104,
+      "under_price": -126,
+      "captured_at": "2026-10-20T17:41:00-05:00"
+     },
+     {
+      "player": "Devin Vassell",
+      "line": 2.5,
+      "over_price": 116,
+      "under_price": -153,
+      "captured_at": "2026-10-20T17:41:00-05:00"
+     },
+     {
+      "player": "Chet Holmgren",
+      "line": 1.5,
+      "over_price": 120,
+      "under_price": -158,
+      "captured_at": "2026-10-20T17:41:00-05:00"
+     },
+     {
+      "player": "Jared McCain",
+      "line": 1.5,
+      "over_price": 148,
+      "under_price": -197,
+      "captured_at": "2026-10-20T17:41:00-05:00"
+     }
+    ],
+    "pra": [
+     {
+      "player": "Victor Wembanyama",
+      "line": 41.5,
+      "over_price": -110,
+      "under_price": -120,
+      "captured_at": "2026-10-20T17:43:00-05:00"
+     },
+     {
+      "player": "Shai Gilgeous-Alexander",
+      "line": 40.5,
+      "over_price": -118,
+      "under_price": -112,
+      "captured_at": "2026-10-20T17:43:00-05:00"
+     },
+     {
+      "player": "Stephon Castle",
+      "line": 28.5,
+      "over_price": -124,
+      "under_price": -106,
+      "captured_at": "2026-10-20T17:43:00-05:00"
+     },
+     {
+      "player": "Jalen Williams",
+      "line": 28.5,
+      "over_price": -113,
+      "under_price": -116,
+      "captured_at": "2026-10-20T17:43:00-05:00"
+     },
+     {
+      "player": "Dylan Harper",
+      "line": 25.5,
+      "over_price": -109,
+      "under_price": -121,
+      "captured_at": "2026-10-20T17:43:00-05:00"
+     },
+     {
+      "player": "De'Aaron Fox",
+      "line": 23.5,
+      "over_price": -123,
+      "under_price": -107,
+      "captured_at": "2026-10-20T17:43:00-05:00"
+     },
+     {
+      "player": "Chet Holmgren",
+      "line": 22.5,
+      "over_price": -107,
+      "under_price": -122,
+      "captured_at": "2026-10-20T17:43:00-05:00"
+     },
+     {
+      "player": "Isaiah Hartenstein",
+      "line": 18.5,
+      "over_price": -127,
+      "under_price": -103,
+      "captured_at": "2026-10-20T17:43:00-05:00"
+     },
+     {
+      "player": "Devin Vassell",
+      "line": 18.5,
+      "over_price": -122,
+      "under_price": -108,
+      "captured_at": "2026-10-20T17:43:00-05:00"
+     },
+     {
+      "player": "Ajay Mitchell",
+      "line": 17.5,
+      "over_price": -125,
+      "under_price": -105,
+      "captured_at": "2026-10-20T17:43:00-05:00"
+     },
+     {
+      "player": "Cason Wallace",
+      "line": 15.5,
+      "over_price": -113,
+      "under_price": -116,
+      "captured_at": "2026-10-20T17:43:00-05:00"
+     },
+     {
+      "player": "Jared McCain",
+      "line": 13.5,
+      "over_price": -108,
+      "under_price": -122,
+      "captured_at": "2026-10-20T17:43:00-05:00"
+     }
+    ]
+   },
+   "note": "Alex Caruso appeared only in milestone ladders for this game and is excluded."
+  },
+  {
+   "game_date": "2026-10-21",
+   "start_time_ct": "18:10",
+   "away": "MIL",
+   "away_name": "Milwaukee Bucks",
+   "home": "WAS",
+   "home_name": "Washington Wizards",
+   "spread": {
+    "away_line": 4.5,
+    "away_price": -108,
+    "home_line": -4.5,
+    "home_price": -112,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "moneyline": {
+    "away_price": 150,
+    "home_price": -180,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "total": {
+    "line": 239.5,
+    "over_price": -105,
+    "under_price": -115,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "team_totals": [
+    {
+     "team": "Milwaukee Bucks",
+     "line": 117.5,
+     "over_price": -108,
+     "under_price": -112,
+     "captured_at": "2026-10-20T17:54:00-05:00"
+    },
+    {
+     "team": "Washington Wizards",
+     "line": 121.5,
+     "over_price": -115,
+     "under_price": -105,
+     "captured_at": "2026-10-20T17:54:00-05:00"
+    }
+   ],
+   "player_props": {
+    "points": [
+     {
+      "player": "Tyler Herro",
+      "line": 22.5,
+      "over_price": -121,
+      "under_price": -105,
+      "captured_at": "2026-10-20T17:47:00-05:00"
+     },
+     {
+      "player": "Anthony Davis",
+      "line": 21.5,
+      "over_price": -102,
+      "under_price": -125,
+      "captured_at": "2026-10-20T17:47:00-05:00"
+     },
+     {
+      "player": "Trae Young",
+      "line": 19.5,
+      "over_price": -103,
+      "under_price": -124,
+      "captured_at": "2026-10-20T17:47:00-05:00"
+     },
+     {
+      "player": "Ryan Rollins",
+      "line": 17.5,
+      "over_price": -106,
+      "under_price": -121,
+      "captured_at": "2026-10-20T17:47:00-05:00"
+     },
+     {
+      "player": "Alexandre Sarr",
+      "line": 14.5,
+      "over_price": -101,
+      "under_price": -127,
+      "captured_at": "2026-10-20T17:47:00-05:00"
+     },
+     {
+      "player": "Kyshawn George",
+      "line": 13.5,
+      "over_price": -107,
+      "under_price": -119,
+      "captured_at": "2026-10-20T17:47:00-05:00"
+     },
+     {
+      "player": "Jaime Jaquez Jr.",
+      "line": 12.5,
+      "over_price": -115,
+      "under_price": -111,
+      "captured_at": "2026-10-20T17:47:00-05:00"
+     },
+     {
+      "player": "Myles Turner",
+      "line": 11.5,
+      "over_price": -102,
+      "under_price": -125,
+      "captured_at": "2026-10-20T17:47:00-05:00"
+     },
+     {
+      "player": "Kyle Kuzma",
+      "line": 10.5,
+      "over_price": -111,
+      "under_price": -114,
+      "captured_at": "2026-10-20T17:47:00-05:00"
+     }
+    ],
+    "rebounds": [
+     {
+      "player": "Anthony Davis",
+      "line": 11.5,
+      "over_price": -101,
+      "under_price": -131,
+      "captured_at": "2026-10-20T17:48:00-05:00"
+     },
+     {
+      "player": "Alexandre Sarr",
+      "line": 7.5,
+      "over_price": 111,
+      "under_price": -146,
+      "captured_at": "2026-10-20T17:48:00-05:00"
+     },
+     {
+      "player": "Myles Turner",
+      "line": 4.5,
+      "over_price": -114,
+      "under_price": -115,
+      "captured_at": "2026-10-20T17:48:00-05:00"
+     },
+     {
+      "player": "Jaime Jaquez Jr.",
+      "line": 4.5,
+      "over_price": -108,
+      "under_price": -122,
+      "captured_at": "2026-10-20T17:48:00-05:00"
+     },
+     {
+      "player": "Tyler Herro",
+      "line": 4.5,
+      "over_price": 113,
+      "under_price": -148,
+      "captured_at": "2026-10-20T17:48:00-05:00"
+     },
+     {
+      "player": "Kyshawn George",
+      "line": 4.5,
+      "over_price": 116,
+      "under_price": -153,
+      "captured_at": "2026-10-20T17:48:00-05:00"
+     },
+     {
+      "player": "Ryan Rollins",
+      "line": 4.5,
+      "over_price": 120,
+      "under_price": -159,
+      "captured_at": "2026-10-20T17:48:00-05:00"
+     },
+     {
+      "player": "Kyle Kuzma",
+      "line": 3.5,
+      "over_price": -147,
+      "under_price": 111,
+      "captured_at": "2026-10-20T17:48:00-05:00"
+     },
+     {
+      "player": "Trae Young",
+      "line": 2.5,
+      "over_price": 106,
+      "under_price": -140,
+      "captured_at": "2026-10-20T17:48:00-05:00"
+     }
+    ],
+    "assists": [
+     {
+      "player": "Trae Young",
+      "line": 9.5,
+      "over_price": -120,
+      "under_price": -110,
+      "captured_at": "2026-10-20T17:51:00-05:00"
+     },
+     {
+      "player": "Ryan Rollins",
+      "line": 5.5,
+      "over_price": -105,
+      "under_price": -126,
+      "captured_at": "2026-10-20T17:51:00-05:00"
+     },
+     {
+      "player": "Tyler Herro",
+      "line": 4.5,
+      "over_price": 102,
+      "under_price": -135,
+      "captured_at": "2026-10-20T17:51:00-05:00"
+     },
+     {
+      "player": "Jaime Jaquez Jr.",
+      "line": 3.5,
+      "over_price": -129,
+      "under_price": -102,
+      "captured_at": "2026-10-20T17:51:00-05:00"
+     },
+     {
+      "player": "Kyshawn George",
+      "line": 3.5,
+      "over_price": 112,
+      "under_price": -147,
+      "captured_at": "2026-10-20T17:51:00-05:00"
+     },
+     {
+      "player": "Anthony Davis",
+      "line": 2.5,
+      "over_price": -177,
+      "under_price": 134,
+      "captured_at": "2026-10-20T17:51:00-05:00"
+     },
+     {
+      "player": "Kyle Kuzma",
+      "line": 2.5,
+      "over_price": 140,
+      "under_price": -186,
+      "captured_at": "2026-10-20T17:51:00-05:00"
+     },
+     {
+      "player": "Alexandre Sarr",
+      "line": 1.5,
+      "over_price": -192,
+      "under_price": 145,
+      "captured_at": "2026-10-20T17:51:00-05:00"
+     }
+    ],
+    "pra": [
+     {
+      "player": "Anthony Davis",
+      "line": 35.5,
+      "over_price": -121,
+      "under_price": -109,
+      "captured_at": "2026-10-20T17:52:00-05:00"
+     },
+     {
+      "player": "Tyler Herro",
+      "line": 31.5,
+      "over_price": -121,
+      "under_price": -109,
+      "captured_at": "2026-10-20T17:52:00-05:00"
+     },
+     {
+      "player": "Trae Young",
+      "line": 31.5,
+      "over_price": -117,
+      "under_price": -112,
+      "captured_at": "2026-10-20T17:52:00-05:00"
+     },
+     {
+      "player": "Ryan Rollins",
+      "line": 27.5,
+      "over_price": -108,
+      "under_price": -121,
+      "captured_at": "2026-10-20T17:52:00-05:00"
+     },
+     {
+      "player": "Alexandre Sarr",
+      "line": 23.5,
+      "over_price": -117,
+      "under_price": -113,
+      "captured_at": "2026-10-20T17:52:00-05:00"
+     },
+     {
+      "player": "Jaime Jaquez Jr.",
+      "line": 21.5,
+      "over_price": -111,
+      "under_price": -119,
+      "captured_at": "2026-10-20T17:52:00-05:00"
+     },
+     {
+      "player": "Kyshawn George",
+      "line": 21.5,
+      "over_price": -108,
+      "under_price": -122,
+      "captured_at": "2026-10-20T17:52:00-05:00"
+     },
+     {
+      "player": "Kyle Kuzma",
+      "line": 16.5,
+      "over_price": -127,
+      "under_price": -103,
+      "captured_at": "2026-10-20T17:52:00-05:00"
+     }
+    ]
+   },
+   "note": "Tre Johnson, Bilal Coulibaly, AJ Green milestone-only where noted in capture."
+  },
+  {
+   "game_date": "2026-10-21",
+   "start_time_ct": "18:10",
+   "away": "ATL",
+   "away_name": "Atlanta Hawks",
+   "home": "ORL",
+   "home_name": "Orlando Magic",
+   "spread": {
+    "away_line": 3.5,
+    "away_price": -115,
+    "home_line": -3.5,
+    "home_price": -105,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "moneyline": {
+    "away_price": 120,
+    "home_price": -142,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "total": {
+    "line": 236.5,
+    "over_price": -105,
+    "under_price": -115,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "team_totals": [
+    {
+     "team": "Atlanta Hawks",
+     "line": 116.5,
+     "over_price": -112,
+     "under_price": -108,
+     "captured_at": "2026-10-20T17:55:00-05:00"
+    },
+    {
+     "team": "Orlando Magic",
+     "line": 119.5,
+     "over_price": -108,
+     "under_price": -112,
+     "captured_at": "2026-10-20T17:55:00-05:00"
+    }
+   ],
+   "player_props": {
+    "points": [
+     {
+      "player": "Paolo Banchero",
+      "line": 21.5,
+      "over_price": -123,
+      "under_price": -104,
+      "captured_at": "2026-10-20T17:56:00-05:00"
+     },
+     {
+      "player": "Franz Wagner",
+      "line": 21.5,
+      "over_price": -112,
+      "under_price": -114,
+      "captured_at": "2026-10-20T17:56:00-05:00"
+     },
+     {
+      "player": "Jalen Johnson",
+      "line": 20.5,
+      "over_price": -120,
+      "under_price": -106,
+      "captured_at": "2026-10-20T17:56:00-05:00"
+     },
+     {
+      "player": "Nickeil Alexander-Walker",
+      "line": 19.5,
+      "over_price": -103,
+      "under_price": -123,
+      "captured_at": "2026-10-20T17:56:00-05:00"
+     },
+     {
+      "player": "Desmond Bane",
+      "line": 18.5,
+      "over_price": -123,
+      "under_price": -103,
+      "captured_at": "2026-10-20T17:56:00-05:00"
+     },
+     {
+      "player": "CJ McCollum",
+      "line": 16.5,
+      "over_price": -125,
+      "under_price": -102,
+      "captured_at": "2026-10-20T17:56:00-05:00"
+     },
+     {
+      "player": "Jalen Suggs",
+      "line": 13.5,
+      "over_price": -117,
+      "under_price": -109,
+      "captured_at": "2026-10-20T17:56:00-05:00"
+     },
+     {
+      "player": "Onyeka Okongwu",
+      "line": 13.5,
+      "over_price": -112,
+      "under_price": -113,
+      "captured_at": "2026-10-20T17:56:00-05:00"
+     },
+     {
+      "player": "Dyson Daniels",
+      "line": 10.5,
+      "over_price": -115,
+      "under_price": -111,
+      "captured_at": "2026-10-20T17:56:00-05:00"
+     },
+     {
+      "player": "Wendell Carter Jr.",
+      "line": 9.5,
+      "over_price": -125,
+      "under_price": -102,
+      "captured_at": "2026-10-20T17:56:00-05:00"
+     }
+    ],
+    "rebounds": [
+     {
+      "player": "Jalen Johnson",
+      "line": 10.5,
+      "over_price": 100,
+      "under_price": -131,
+      "captured_at": "2026-10-20T17:57:00-05:00"
+     },
+     {
+      "player": "Paolo Banchero",
+      "line": 8.5,
+      "over_price": -112,
+      "under_price": -118,
+      "captured_at": "2026-10-20T17:57:00-05:00"
+     },
+     {
+      "player": "Onyeka Okongwu",
+      "line": 7.5,
+      "over_price": 103,
+      "under_price": -135,
+      "captured_at": "2026-10-20T17:57:00-05:00"
+     },
+     {
+      "player": "Dyson Daniels",
+      "line": 6.5,
+      "over_price": -144,
+      "under_price": 109,
+      "captured_at": "2026-10-20T17:57:00-05:00"
+     },
+     {
+      "player": "Wendell Carter Jr.",
+      "line": 6.5,
+      "over_price": -134,
+      "under_price": 102,
+      "captured_at": "2026-10-20T17:57:00-05:00"
+     },
+     {
+      "player": "Franz Wagner",
+      "line": 5.5,
+      "over_price": 100,
+      "under_price": -131,
+      "captured_at": "2026-10-20T17:57:00-05:00"
+     },
+     {
+      "player": "Desmond Bane",
+      "line": 4.5,
+      "over_price": 110,
+      "under_price": -145,
+      "captured_at": "2026-10-20T17:57:00-05:00"
+     },
+     {
+      "player": "Jalen Suggs",
+      "line": 3.5,
+      "over_price": 108,
+      "under_price": -143,
+      "captured_at": "2026-10-20T17:57:00-05:00"
+     },
+     {
+      "player": "CJ McCollum",
+      "line": 3.5,
+      "over_price": 125,
+      "under_price": -165,
+      "captured_at": "2026-10-20T17:57:00-05:00"
+     },
+     {
+      "player": "Nickeil Alexander-Walker",
+      "line": 2.5,
+      "over_price": -171,
+      "under_price": 130,
+      "captured_at": "2026-10-20T17:57:00-05:00"
+     }
+    ],
+    "assists": [
+     {
+      "player": "Jalen Johnson",
+      "line": 6.5,
+      "over_price": -145,
+      "under_price": 110,
+      "captured_at": "2026-10-20T18:04:00-05:00"
+     },
+     {
+      "player": "Franz Wagner",
+      "line": 5.5,
+      "over_price": 114,
+      "under_price": -151,
+      "captured_at": "2026-10-20T18:04:00-05:00"
+     },
+     {
+      "player": "Paolo Banchero",
+      "line": 5.5,
+      "over_price": 115,
+      "under_price": -152,
+      "captured_at": "2026-10-20T18:04:00-05:00"
+     },
+     {
+      "player": "Dyson Daniels",
+      "line": 4.5,
+      "over_price": -137,
+      "under_price": 104,
+      "captured_at": "2026-10-20T18:04:00-05:00"
+     },
+     {
+      "player": "Jalen Suggs",
+      "line": 4.5,
+      "over_price": -116,
+      "under_price": -113,
+      "captured_at": "2026-10-20T18:04:00-05:00"
+     },
+     {
+      "player": "CJ McCollum",
+      "line": 3.5,
+      "over_price": 123,
+      "under_price": -162,
+      "captured_at": "2026-10-20T18:04:00-05:00"
+     },
+     {
+      "player": "Desmond Bane",
+      "line": 3.5,
+      "over_price": 131,
+      "under_price": -173,
+      "captured_at": "2026-10-20T18:04:00-05:00"
+     },
+     {
+      "player": "Nickeil Alexander-Walker",
+      "line": 2.5,
+      "over_price": -167,
+      "under_price": 126,
+      "captured_at": "2026-10-20T18:04:00-05:00"
+     },
+     {
+      "player": "Onyeka Okongwu",
+      "line": 2.5,
+      "over_price": 126,
+      "under_price": -167,
+      "captured_at": "2026-10-20T18:04:00-05:00"
+     }
+    ],
+    "pra": [
+     {
+      "player": "Jalen Johnson",
+      "line": 39.5,
+      "over_price": -107,
+      "under_price": -123,
+      "captured_at": "2026-10-20T18:09:00-05:00"
+     },
+     {
+      "player": "Paolo Banchero",
+      "line": 36.5,
+      "over_price": -107,
+      "under_price": -123,
+      "captured_at": "2026-10-20T18:09:00-05:00"
+     },
+     {
+      "player": "Franz Wagner",
+      "line": 32.5,
+      "over_price": -116,
+      "under_price": -114,
+      "captured_at": "2026-10-20T18:09:00-05:00"
+     },
+     {
+      "player": "Desmond Bane",
+      "line": 26.5,
+      "over_price": -118,
+      "under_price": -111,
+      "captured_at": "2026-10-20T18:09:00-05:00"
+     },
+     {
+      "player": "Nickeil Alexander-Walker",
+      "line": 25.5,
+      "over_price": -118,
+      "under_price": -112,
+      "captured_at": "2026-10-20T18:09:00-05:00"
+     },
+     {
+      "player": "CJ McCollum",
+      "line": 23.5,
+      "over_price": -117,
+      "under_price": -112,
+      "captured_at": "2026-10-20T18:09:00-05:00"
+     },
+     {
+      "player": "Onyeka Okongwu",
+      "line": 23.5,
+      "over_price": -110,
+      "under_price": -119,
+      "captured_at": "2026-10-20T18:09:00-05:00"
+     },
+     {
+      "player": "Dyson Daniels",
+      "line": 22.5,
+      "over_price": -127,
+      "under_price": -104,
+      "captured_at": "2026-10-20T18:09:00-05:00"
+     },
+     {
+      "player": "Jalen Suggs",
+      "line": 22.5,
+      "over_price": -104,
+      "under_price": -127,
+      "captured_at": "2026-10-20T18:09:00-05:00"
+     }
+    ]
+   },
+   "note": "Wendell Carter Jr. not offered for Assists O/U or PRA O/U."
+  },
+  {
+   "game_date": "2026-10-21",
+   "start_time_ct": "18:40",
+   "away": "MIN",
+   "away_name": "Minnesota Timberwolves",
+   "home": "MIA",
+   "home_name": "Miami Heat",
+   "spread": {
+    "away_line": 1.5,
+    "away_price": -115,
+    "home_line": -1.5,
+    "home_price": -105,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "moneyline": {
+    "away_price": -102,
+    "home_price": -118,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "total": {
+    "line": 243.5,
+    "over_price": -105,
+    "under_price": -115,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "team_totals": [
+    {
+     "team": "Miami Heat",
+     "line": 121.5,
+     "over_price": -112,
+     "under_price": -108,
+     "captured_at": "2026-10-20T18:11:00-05:00"
+    },
+    {
+     "team": "Minnesota Timberwolves",
+     "line": 121.5,
+     "over_price": -105,
+     "under_price": -115,
+     "captured_at": "2026-10-20T18:11:00-05:00"
+    }
+   ],
+   "player_props": {
+    "points": [
+     {
+      "player": "Anthony Edwards",
+      "line": 28.5,
+      "over_price": -112,
+      "under_price": -114,
+      "captured_at": "2026-10-20T18:12:00-05:00"
+     },
+     {
+      "player": "Giannis Antetokounmpo",
+      "line": 28.5,
+      "over_price": -111,
+      "under_price": -115,
+      "captured_at": "2026-10-20T18:12:00-05:00"
+     },
+     {
+      "player": "LaMelo Ball",
+      "line": 19.5,
+      "over_price": -111,
+      "under_price": -115,
+      "captured_at": "2026-10-20T18:12:00-05:00"
+     },
+     {
+      "player": "Bam Adebayo",
+      "line": 17.5,
+      "over_price": -101,
+      "under_price": -126,
+      "captured_at": "2026-10-20T18:12:00-05:00"
+     },
+     {
+      "player": "Jaden McDaniels",
+      "line": 15.5,
+      "over_price": -114,
+      "under_price": -112,
+      "captured_at": "2026-10-20T18:12:00-05:00"
+     },
+     {
+      "player": "Andrew Wiggins",
+      "line": 13.5,
+      "over_price": -114,
+      "under_price": -112,
+      "captured_at": "2026-10-20T18:12:00-05:00"
+     },
+     {
+      "player": "Ayo Dosunmu",
+      "line": 12.5,
+      "over_price": -103,
+      "under_price": -123,
+      "captured_at": "2026-10-20T18:12:00-05:00"
+     },
+     {
+      "player": "Jonathan Kuminga",
+      "line": 12.5,
+      "over_price": 100,
+      "under_price": -128,
+      "captured_at": "2026-10-20T18:12:00-05:00"
+     },
+     {
+      "player": "Pelle Larsson",
+      "line": 11.5,
+      "over_price": -107,
+      "under_price": -120,
+      "captured_at": "2026-10-20T18:12:00-05:00"
+     },
+     {
+      "player": "Bobby Portis",
+      "line": 11.5,
+      "over_price": -105,
+      "under_price": -121,
+      "captured_at": "2026-10-20T18:12:00-05:00"
+     },
+     {
+      "player": "Klay Thompson",
+      "line": 10.5,
+      "over_price": -128,
+      "under_price": 100,
+      "captured_at": "2026-10-20T18:12:00-05:00"
+     },
+     {
+      "player": "Rudy Gobert",
+      "line": 9.5,
+      "over_price": -125,
+      "under_price": -102,
+      "captured_at": "2026-10-20T18:12:00-05:00"
+     },
+     {
+      "player": "Tim Hardaway Jr.",
+      "line": 9.5,
+      "over_price": -122,
+      "under_price": -104,
+      "captured_at": "2026-10-20T18:12:00-05:00"
+     },
+     {
+      "player": "Davion Mitchell",
+      "line": 8.5,
+      "over_price": -121,
+      "under_price": -105,
+      "captured_at": "2026-10-20T18:12:00-05:00"
+     },
+     {
+      "player": "Joan Beringer",
+      "line": 7.5,
+      "over_price": -101,
+      "under_price": -126,
+      "captured_at": "2026-10-20T18:12:00-05:00"
+     }
+    ],
+    "rebounds": [
+     {
+      "player": "Rudy Gobert",
+      "line": 11.5,
+      "over_price": -104,
+      "under_price": -126,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     },
+     {
+      "player": "Giannis Antetokounmpo",
+      "line": 10.5,
+      "over_price": -122,
+      "under_price": -107,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     },
+     {
+      "player": "Bam Adebayo",
+      "line": 9.5,
+      "over_price": 106,
+      "under_price": -140,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     },
+     {
+      "player": "Bobby Portis",
+      "line": 5.5,
+      "over_price": -145,
+      "under_price": 110,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     },
+     {
+      "player": "Jonathan Kuminga",
+      "line": 5.5,
+      "over_price": -108,
+      "under_price": -122,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     },
+     {
+      "player": "Anthony Edwards",
+      "line": 5.5,
+      "over_price": 119,
+      "under_price": -158,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     },
+     {
+      "player": "LaMelo Ball",
+      "line": 4.5,
+      "over_price": -143,
+      "under_price": 108,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     },
+     {
+      "player": "Joan Beringer",
+      "line": 4.5,
+      "over_price": -140,
+      "under_price": 106,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     },
+     {
+      "player": "Jaden McDaniels",
+      "line": 4.5,
+      "over_price": -126,
+      "under_price": -104,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     },
+     {
+      "player": "Andrew Wiggins",
+      "line": 4.5,
+      "over_price": 116,
+      "under_price": -152,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     },
+     {
+      "player": "Pelle Larsson",
+      "line": 3.5,
+      "over_price": 114,
+      "under_price": -150,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     },
+     {
+      "player": "Ayo Dosunmu",
+      "line": 2.5,
+      "over_price": -150,
+      "under_price": 114,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     },
+     {
+      "player": "Davion Mitchell",
+      "line": 2.5,
+      "over_price": 108,
+      "under_price": -142,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     },
+     {
+      "player": "Klay Thompson",
+      "line": 2.5,
+      "over_price": 112,
+      "under_price": -148,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     }
+    ],
+    "assists": [
+     {
+      "player": "LaMelo Ball",
+      "line": 8.5,
+      "over_price": 102,
+      "under_price": -134,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     },
+     {
+      "player": "Giannis Antetokounmpo",
+      "line": 6.5,
+      "over_price": -130,
+      "under_price": -102,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     },
+     {
+      "player": "Davion Mitchell",
+      "line": 5.5,
+      "over_price": -132,
+      "under_price": 100,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     },
+     {
+      "player": "Anthony Edwards",
+      "line": 3.5,
+      "over_price": -110,
+      "under_price": -120,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     },
+     {
+      "player": "Ayo Dosunmu",
+      "line": 3.5,
+      "over_price": 113,
+      "under_price": -149,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     },
+     {
+      "player": "Pelle Larsson",
+      "line": 3.5,
+      "over_price": 117,
+      "under_price": -154,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     },
+     {
+      "player": "Bam Adebayo",
+      "line": 2.5,
+      "over_price": -156,
+      "under_price": 118,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     },
+     {
+      "player": "Jaden McDaniels",
+      "line": 2.5,
+      "over_price": 119,
+      "under_price": -157,
+      "captured_at": "2026-10-20T18:15:00-05:00"
+     }
+    ],
+    "pra": [
+     {
+      "player": "Giannis Antetokounmpo",
+      "line": 46.5,
+      "over_price": -120,
+      "under_price": -110,
+      "captured_at": "2026-10-20T18:16:00-05:00"
+     },
+     {
+      "player": "Anthony Edwards",
+      "line": 37.5,
+      "over_price": -118,
+      "under_price": -112,
+      "captured_at": "2026-10-20T18:16:00-05:00"
+     },
+     {
+      "player": "LaMelo Ball",
+      "line": 33.5,
+      "over_price": -114,
+      "under_price": -115,
+      "captured_at": "2026-10-20T18:16:00-05:00"
+     },
+     {
+      "player": "Bam Adebayo",
+      "line": 29.5,
+      "over_price": -119,
+      "under_price": -111,
+      "captured_at": "2026-10-20T18:16:00-05:00"
+     },
+     {
+      "player": "Jaden McDaniels",
+      "line": 23.5,
+      "over_price": -108,
+      "under_price": -122,
+      "captured_at": "2026-10-20T18:16:00-05:00"
+     },
+     {
+      "player": "Andrew Wiggins",
+      "line": 20.5,
+      "over_price": -106,
+      "under_price": -125,
+      "captured_at": "2026-10-20T18:16:00-05:00"
+     },
+     {
+      "player": "Ayo Dosunmu",
+      "line": 18.5,
+      "over_price": -114,
+      "under_price": -115,
+      "captured_at": "2026-10-20T18:16:00-05:00"
+     },
+     {
+      "player": "Pelle Larsson",
+      "line": 18.5,
+      "over_price": -106,
+      "under_price": -124,
+      "captured_at": "2026-10-20T18:16:00-05:00"
+     },
+     {
+      "player": "Davion Mitchell",
+      "line": 17.5,
+      "over_price": -112,
+      "under_price": -117,
+      "captured_at": "2026-10-20T18:16:00-05:00"
+     }
+    ]
+   },
+   "note": "This event page displayed a slate-wide player pool; names transcribed exactly as displayed. Tim Hardaway Jr. not offered for Rebounds O/U; Andrew Wiggins milestone-only for Assists."
+  },
+  {
+   "game_date": "2026-10-21",
+   "start_time_ct": "18:40",
+   "away": "CHI",
+   "away_name": "Chicago Bulls",
+   "home": "TOR",
+   "home_name": "Toronto Raptors",
+   "spread": {
+    "away_line": 9.5,
+    "away_price": -110,
+    "home_line": -9.5,
+    "home_price": -110,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "moneyline": {
+    "away_price": 330,
+    "home_price": -425,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "total": {
+    "line": 236.5,
+    "over_price": -112,
+    "under_price": -108,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "team_totals": [
+    {
+     "team": "Chicago Bulls",
+     "line": 113.5,
+     "over_price": -105,
+     "under_price": -115,
+     "captured_at": "2026-10-20T18:21:00-05:00"
+    },
+    {
+     "team": "Toronto Raptors",
+     "line": 123.5,
+     "over_price": -110,
+     "under_price": -110,
+     "captured_at": "2026-10-20T18:21:00-05:00"
+    }
+   ],
+   "player_props": {
+    "points": [
+     {
+      "player": "Kawhi Leonard",
+      "line": 24.5,
+      "over_price": -125,
+      "under_price": -102,
+      "captured_at": "2026-10-20T18:22:00-05:00"
+     },
+     {
+      "player": "Scottie Barnes",
+      "line": 18.5,
+      "over_price": -124,
+      "under_price": -103,
+      "captured_at": "2026-10-20T18:22:00-05:00"
+     },
+     {
+      "player": "Norman Powell",
+      "line": 18.5,
+      "over_price": -118,
+      "under_price": -108,
+      "captured_at": "2026-10-20T18:22:00-05:00"
+     },
+     {
+      "player": "RJ Barrett",
+      "line": 18.5,
+      "over_price": -114,
+      "under_price": -112,
+      "captured_at": "2026-10-20T18:22:00-05:00"
+     },
+     {
+      "player": "Caleb Wilson",
+      "line": 16.5,
+      "over_price": -110,
+      "under_price": -115,
+      "captured_at": "2026-10-20T18:22:00-05:00"
+     },
+     {
+      "player": "Matas Buzelis",
+      "line": 15.5,
+      "over_price": -120,
+      "under_price": -106,
+      "captured_at": "2026-10-20T18:22:00-05:00"
+     },
+     {
+      "player": "Immanuel Quickley",
+      "line": 15.5,
+      "over_price": -107,
+      "under_price": -119,
+      "captured_at": "2026-10-20T18:22:00-05:00"
+     },
+     {
+      "player": "Josh Giddey",
+      "line": 14.5,
+      "over_price": -118,
+      "under_price": -108,
+      "captured_at": "2026-10-20T18:22:00-05:00"
+     }
+    ],
+    "rebounds": [
+     {
+      "player": "Scottie Barnes",
+      "line": 7.5,
+      "over_price": -101,
+      "under_price": -130,
+      "captured_at": "2026-10-20T18:23:00-05:00"
+     },
+     {
+      "player": "Josh Giddey",
+      "line": 7.5,
+      "over_price": 108,
+      "under_price": -142,
+      "captured_at": "2026-10-20T18:23:00-05:00"
+     },
+     {
+      "player": "Caleb Wilson",
+      "line": 6.5,
+      "over_price": -122,
+      "under_price": -108,
+      "captured_at": "2026-10-20T18:23:00-05:00"
+     },
+     {
+      "player": "Kawhi Leonard",
+      "line": 6.5,
+      "over_price": 101,
+      "under_price": -133,
+      "captured_at": "2026-10-20T18:23:00-05:00"
+     },
+     {
+      "player": "RJ Barrett",
+      "line": 5.5,
+      "over_price": -102,
+      "under_price": -130,
+      "captured_at": "2026-10-20T18:23:00-05:00"
+     },
+     {
+      "player": "Matas Buzelis",
+      "line": 5.5,
+      "over_price": 101,
+      "under_price": -133,
+      "captured_at": "2026-10-20T18:23:00-05:00"
+     },
+     {
+      "player": "Immanuel Quickley",
+      "line": 3.5,
+      "over_price": -143,
+      "under_price": 109,
+      "captured_at": "2026-10-20T18:23:00-05:00"
+     },
+     {
+      "player": "Norman Powell",
+      "line": 2.5,
+      "over_price": -163,
+      "under_price": 124,
+      "captured_at": "2026-10-20T18:23:00-05:00"
+     }
+    ],
+    "assists": [
+     {
+      "player": "Josh Giddey",
+      "line": 9.5,
+      "over_price": 105,
+      "under_price": -138,
+      "captured_at": "2026-10-20T18:27:00-05:00"
+     },
+     {
+      "player": "Immanuel Quickley",
+      "line": 5.5,
+      "over_price": -148,
+      "under_price": 112,
+      "captured_at": "2026-10-20T18:27:00-05:00"
+     },
+     {
+      "player": "Scottie Barnes",
+      "line": 5.5,
+      "over_price": -132,
+      "under_price": 100,
+      "captured_at": "2026-10-20T18:27:00-05:00"
+     },
+     {
+      "player": "RJ Barrett",
+      "line": 3.5,
+      "over_price": 125,
+      "under_price": -165,
+      "captured_at": "2026-10-20T18:27:00-05:00"
+     },
+     {
+      "player": "Kawhi Leonard",
+      "line": 3.5,
+      "over_price": 131,
+      "under_price": -174,
+      "captured_at": "2026-10-20T18:27:00-05:00"
+     },
+     {
+      "player": "Caleb Wilson",
+      "line": 2.5,
+      "over_price": -132,
+      "under_price": 101,
+      "captured_at": "2026-10-20T18:27:00-05:00"
+     }
+    ],
+    "pra": [
+     {
+      "player": "Kawhi Leonard",
+      "line": 34.5,
+      "over_price": -119,
+      "under_price": -111,
+      "captured_at": "2026-10-20T18:29:00-05:00"
+     },
+     {
+      "player": "Scottie Barnes",
+      "line": 32.5,
+      "over_price": -118,
+      "under_price": -112,
+      "captured_at": "2026-10-20T18:29:00-05:00"
+     },
+     {
+      "player": "Josh Giddey",
+      "line": 31.5,
+      "over_price": -113,
+      "under_price": -117,
+      "captured_at": "2026-10-20T18:29:00-05:00"
+     },
+     {
+      "player": "RJ Barrett",
+      "line": 27.5,
+      "over_price": -117,
+      "under_price": -112,
+      "captured_at": "2026-10-20T18:29:00-05:00"
+     },
+     {
+      "player": "Caleb Wilson",
+      "line": 26.5,
+      "over_price": -109,
+      "under_price": -120,
+      "captured_at": "2026-10-20T18:29:00-05:00"
+     },
+     {
+      "player": "Immanuel Quickley",
+      "line": 25.5,
+      "over_price": -116,
+      "under_price": -113,
+      "captured_at": "2026-10-20T18:29:00-05:00"
+     },
+     {
+      "player": "Norman Powell",
+      "line": 24.5,
+      "over_price": -113,
+      "under_price": -116,
+      "captured_at": "2026-10-20T18:29:00-05:00"
+     },
+     {
+      "player": "Matas Buzelis",
+      "line": 23.5,
+      "over_price": -113,
+      "under_price": -117,
+      "captured_at": "2026-10-20T18:29:00-05:00"
+     }
+    ]
+   },
+   "note": "Slate-wide displayed names transcribed exactly as shown. Matas Buzelis and Norman Powell not offered for Assists O/U."
+  },
+  {
+   "game_date": "2026-10-21",
+   "start_time_ct": "18:40",
+   "away": "CHA",
+   "away_name": "Charlotte Hornets",
+   "home": "BKN",
+   "home_name": "Brooklyn Nets",
+   "spread": {
+    "away_line": 2.5,
+    "away_price": -110,
+    "home_line": -2.5,
+    "home_price": -110,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "moneyline": {
+    "away_price": 120,
+    "home_price": -142,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "total": {
+    "line": 218.5,
+    "over_price": -112,
+    "under_price": -108,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "team_totals": [
+    {
+     "team": "Charlotte Hornets",
+     "line": 108.5,
+     "over_price": -105,
+     "under_price": -115,
+     "captured_at": "2026-10-20T18:47:00-05:00"
+    },
+    {
+     "team": "Brooklyn Nets",
+     "line": 110.5,
+     "over_price": -105,
+     "under_price": -115,
+     "captured_at": "2026-10-20T18:47:00-05:00"
+    }
+   ],
+   "player_props": {
+    "points": [
+     {
+      "player": "Brandon Miller",
+      "line": 24.5,
+      "over_price": -105,
+      "under_price": -121,
+      "captured_at": "2026-10-20T18:50:00-05:00"
+     },
+     {
+      "player": "Michael Porter Jr.",
+      "line": 22.5,
+      "over_price": -106,
+      "under_price": -120,
+      "captured_at": "2026-10-20T18:50:00-05:00"
+     },
+     {
+      "player": "Julius Randle",
+      "line": 19.5,
+      "over_price": -108,
+      "under_price": -118,
+      "captured_at": "2026-10-20T18:50:00-05:00"
+     },
+     {
+      "player": "Naz Reid",
+      "line": 16.5,
+      "over_price": -124,
+      "under_price": -103,
+      "captured_at": "2026-10-20T18:50:00-05:00"
+     },
+     {
+      "player": "Egor Demin",
+      "line": 11.5,
+      "over_price": -127,
+      "under_price": -101,
+      "captured_at": "2026-10-20T18:50:00-05:00"
+     },
+     {
+      "player": "Day'Ron Sharpe",
+      "line": 10.5,
+      "over_price": -127,
+      "under_price": 100,
+      "captured_at": "2026-10-20T18:50:00-05:00"
+     }
+    ],
+    "rebounds": [
+     {
+      "player": "Day'Ron Sharpe",
+      "line": 7.5,
+      "over_price": -140,
+      "under_price": 107,
+      "captured_at": "2026-10-20T18:56:00-05:00"
+     },
+     {
+      "player": "Naz Reid",
+      "line": 7.5,
+      "over_price": 109,
+      "under_price": -144,
+      "captured_at": "2026-10-20T18:56:00-05:00"
+     },
+     {
+      "player": "Julius Randle",
+      "line": 6.5,
+      "over_price": -149,
+      "under_price": 113,
+      "captured_at": "2026-10-20T18:56:00-05:00"
+     },
+     {
+      "player": "Michael Porter Jr.",
+      "line": 6.5,
+      "over_price": 107,
+      "under_price": -140,
+      "captured_at": "2026-10-20T18:56:00-05:00"
+     },
+     {
+      "player": "Brandon Miller",
+      "line": 5.5,
+      "over_price": 112,
+      "under_price": -148,
+      "captured_at": "2026-10-20T18:56:00-05:00"
+     },
+     {
+      "player": "Egor Demin",
+      "line": 3.5,
+      "over_price": -111,
+      "under_price": -119,
+      "captured_at": "2026-10-20T18:56:00-05:00"
+     }
+    ],
+    "assists": [
+     {
+      "player": "Julius Randle",
+      "line": 4.5,
+      "over_price": -147,
+      "under_price": 112,
+      "captured_at": "2026-10-20T19:01:00-05:00"
+     },
+     {
+      "player": "Egor Demin",
+      "line": 3.5,
+      "over_price": -146,
+      "under_price": 111,
+      "captured_at": "2026-10-20T19:01:00-05:00"
+     },
+     {
+      "player": "Brandon Miller",
+      "line": 3.5,
+      "over_price": -130,
+      "under_price": -101,
+      "captured_at": "2026-10-20T19:01:00-05:00"
+     },
+     {
+      "player": "Day'Ron Sharpe",
+      "line": 2.5,
+      "over_price": -158,
+      "under_price": 120,
+      "captured_at": "2026-10-20T19:01:00-05:00"
+     },
+     {
+      "player": "Naz Reid",
+      "line": 2.5,
+      "over_price": 112,
+      "under_price": -147,
+      "captured_at": "2026-10-20T19:01:00-05:00"
+     },
+     {
+      "player": "Michael Porter Jr.",
+      "line": 2.5,
+      "over_price": 124,
+      "under_price": -164,
+      "captured_at": "2026-10-20T19:01:00-05:00"
+     }
+    ],
+    "pra": [
+     {
+      "player": "Brandon Miller",
+      "line": 33.5,
+      "over_price": -117,
+      "under_price": -113,
+      "captured_at": "2026-10-20T19:04:00-05:00"
+     },
+     {
+      "player": "Julius Randle",
+      "line": 31.5,
+      "over_price": -120,
+      "under_price": -110,
+      "captured_at": "2026-10-20T19:04:00-05:00"
+     },
+     {
+      "player": "Michael Porter Jr.",
+      "line": 30.5,
+      "over_price": -125,
+      "under_price": -106,
+      "captured_at": "2026-10-20T19:04:00-05:00"
+     },
+     {
+      "player": "Naz Reid",
+      "line": 26.5,
+      "over_price": -121,
+      "under_price": -108,
+      "captured_at": "2026-10-20T19:04:00-05:00"
+     },
+     {
+      "player": "Day'Ron Sharpe",
+      "line": 22.5,
+      "over_price": -115,
+      "under_price": -114,
+      "captured_at": "2026-10-20T19:04:00-05:00"
+     },
+     {
+      "player": "Egor Demin",
+      "line": 19.5,
+      "over_price": -122,
+      "under_price": -108,
+      "captured_at": "2026-10-20T19:04:00-05:00"
+     }
+    ]
+   }
+  },
+  {
+   "game_date": "2026-10-21",
+   "start_time_ct": "19:10",
+   "away": "IND",
+   "away_name": "Indiana Pacers",
+   "home": "NO",
+   "home_name": "New Orleans Pelicans",
+   "spread": {
+    "away_line": -3.5,
+    "away_price": -115,
+    "home_line": 3.5,
+    "home_price": -105,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "moneyline": {
+    "away_price": -162,
+    "home_price": 136,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "total": {
+    "line": 239.5,
+    "over_price": -112,
+    "under_price": -108,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "team_totals": [
+    {
+     "team": "Indiana Pacers",
+     "line": 121.5,
+     "over_price": -112,
+     "under_price": -108,
+     "captured_at": "2026-10-20T19:09:00-05:00"
+    },
+    {
+     "team": "New Orleans Pelicans",
+     "line": 118.5,
+     "over_price": -105,
+     "under_price": -115,
+     "captured_at": "2026-10-20T19:09:00-05:00"
+    }
+   ],
+   "player_props": {
+    "points": [
+     {
+      "player": "Pascal Siakam",
+      "line": 20.5,
+      "over_price": -119,
+      "under_price": -107,
+      "captured_at": "2026-10-20T19:10:00-05:00"
+     },
+     {
+      "player": "Zion Williamson",
+      "line": 20.5,
+      "over_price": -114,
+      "under_price": -112,
+      "captured_at": "2026-10-20T19:10:00-05:00"
+     },
+     {
+      "player": "Trey Murphy III",
+      "line": 19.5,
+      "over_price": -119,
+      "under_price": -107,
+      "captured_at": "2026-10-20T19:10:00-05:00"
+     },
+     {
+      "player": "Tyrese Haliburton",
+      "line": 19.5,
+      "over_price": -105,
+      "under_price": -122,
+      "captured_at": "2026-10-20T19:10:00-05:00"
+     },
+     {
+      "player": "Dejounte Murray",
+      "line": 16.5,
+      "over_price": -120,
+      "under_price": -106,
+      "captured_at": "2026-10-20T19:10:00-05:00"
+     },
+     {
+      "player": "Ivica Zubac",
+      "line": 14.5,
+      "over_price": -120,
+      "under_price": -106,
+      "captured_at": "2026-10-20T19:10:00-05:00"
+     },
+     {
+      "player": "Andrew Nembhard",
+      "line": 13.5,
+      "over_price": -109,
+      "under_price": -116,
+      "captured_at": "2026-10-20T19:10:00-05:00"
+     },
+     {
+      "player": "Bennedict Mathurin",
+      "line": 12.5,
+      "over_price": -125,
+      "under_price": -102,
+      "captured_at": "2026-10-20T19:10:00-05:00"
+     },
+     {
+      "player": "Kelly Oubre Jr.",
+      "line": 12.5,
+      "over_price": -111,
+      "under_price": -115,
+      "captured_at": "2026-10-20T19:10:00-05:00"
+     },
+     {
+      "player": "Herbert Jones",
+      "line": 8.5,
+      "over_price": -103,
+      "under_price": -124,
+      "captured_at": "2026-10-20T19:10:00-05:00"
+     },
+     {
+      "player": "Yves Missi",
+      "line": 6.5,
+      "over_price": -121,
+      "under_price": -106,
+      "captured_at": "2026-10-20T19:10:00-05:00"
+     }
+    ],
+    "rebounds": [
+     {
+      "player": "Ivica Zubac",
+      "line": 11.5,
+      "over_price": -101,
+      "under_price": -130,
+      "captured_at": "2026-10-20T19:11:00-05:00"
+     },
+     {
+      "player": "Yves Missi",
+      "line": 7.5,
+      "over_price": -102,
+      "under_price": -129,
+      "captured_at": "2026-10-20T19:11:00-05:00"
+     },
+     {
+      "player": "Pascal Siakam",
+      "line": 6.5,
+      "over_price": 104,
+      "under_price": -137,
+      "captured_at": "2026-10-20T19:11:00-05:00"
+     },
+     {
+      "player": "Dejounte Murray",
+      "line": 6.5,
+      "over_price": 105,
+      "under_price": -138,
+      "captured_at": "2026-10-20T19:11:00-05:00"
+     },
+     {
+      "player": "Zion Williamson",
+      "line": 5.5,
+      "over_price": -133,
+      "under_price": 101,
+      "captured_at": "2026-10-20T19:11:00-05:00"
+     },
+     {
+      "player": "Trey Murphy III",
+      "line": 5.5,
+      "over_price": 103,
+      "under_price": -135,
+      "captured_at": "2026-10-20T19:11:00-05:00"
+     },
+     {
+      "player": "Kelly Oubre Jr.",
+      "line": 4.5,
+      "over_price": 108,
+      "under_price": -142,
+      "captured_at": "2026-10-20T19:11:00-05:00"
+     },
+     {
+      "player": "Bennedict Mathurin",
+      "line": 3.5,
+      "over_price": -158,
+      "under_price": 120,
+      "captured_at": "2026-10-20T19:11:00-05:00"
+     },
+     {
+      "player": "Tyrese Haliburton",
+      "line": 3.5,
+      "over_price": -108,
+      "under_price": -122,
+      "captured_at": "2026-10-20T19:11:00-05:00"
+     },
+     {
+      "player": "Andrew Nembhard",
+      "line": 2.5,
+      "over_price": -148,
+      "under_price": 112,
+      "captured_at": "2026-10-20T19:11:00-05:00"
+     },
+     {
+      "player": "Herbert Jones",
+      "line": 2.5,
+      "over_price": -136,
+      "under_price": 103,
+      "captured_at": "2026-10-20T19:11:00-05:00"
+     }
+    ],
+    "assists": [
+     {
+      "player": "Tyrese Haliburton",
+      "line": 8.5,
+      "over_price": -121,
+      "under_price": -109,
+      "captured_at": "2026-10-20T19:12:00-05:00"
+     },
+     {
+      "player": "Dejounte Murray",
+      "line": 6.5,
+      "over_price": -134,
+      "under_price": 102,
+      "captured_at": "2026-10-20T19:12:00-05:00"
+     },
+     {
+      "player": "Andrew Nembhard",
+      "line": 5.5,
+      "over_price": -150,
+      "under_price": 114,
+      "captured_at": "2026-10-20T19:12:00-05:00"
+     },
+     {
+      "player": "Pascal Siakam",
+      "line": 3.5,
+      "over_price": 112,
+      "under_price": -147,
+      "captured_at": "2026-10-20T19:12:00-05:00"
+     },
+     {
+      "player": "Trey Murphy III",
+      "line": 3.5,
+      "over_price": 113,
+      "under_price": -149,
+      "captured_at": "2026-10-20T19:12:00-05:00"
+     },
+     {
+      "player": "Zion Williamson",
+      "line": 2.5,
+      "over_price": -160,
+      "under_price": 121,
+      "captured_at": "2026-10-20T19:12:00-05:00"
+     },
+     {
+      "player": "Herbert Jones",
+      "line": 2.5,
+      "over_price": 108,
+      "under_price": -143,
+      "captured_at": "2026-10-20T19:12:00-05:00"
+     },
+     {
+      "player": "Ivica Zubac",
+      "line": 2.5,
+      "over_price": 111,
+      "under_price": -146,
+      "captured_at": "2026-10-20T19:12:00-05:00"
+     },
+     {
+      "player": "Bennedict Mathurin",
+      "line": 1.5,
+      "over_price": -152,
+      "under_price": 115,
+      "captured_at": "2026-10-20T19:12:00-05:00"
+     }
+    ],
+    "pra": [
+     {
+      "player": "Tyrese Haliburton",
+      "line": 31.5,
+      "over_price": -121,
+      "under_price": -108,
+      "captured_at": "2026-10-20T19:13:00-05:00"
+     },
+     {
+      "player": "Pascal Siakam",
+      "line": 30.5,
+      "over_price": -124,
+      "under_price": -106,
+      "captured_at": "2026-10-20T19:13:00-05:00"
+     },
+     {
+      "player": "Dejounte Murray",
+      "line": 30.5,
+      "over_price": -110,
+      "under_price": -119,
+      "captured_at": "2026-10-20T19:13:00-05:00"
+     },
+     {
+      "player": "Zion Williamson",
+      "line": 29.5,
+      "over_price": -123,
+      "under_price": -107,
+      "captured_at": "2026-10-20T19:13:00-05:00"
+     },
+     {
+      "player": "Ivica Zubac",
+      "line": 29.5,
+      "over_price": -106,
+      "under_price": -124,
+      "captured_at": "2026-10-20T19:13:00-05:00"
+     },
+     {
+      "player": "Trey Murphy III",
+      "line": 28.5,
+      "over_price": -121,
+      "under_price": -109,
+      "captured_at": "2026-10-20T19:13:00-05:00"
+     },
+     {
+      "player": "Andrew Nembhard",
+      "line": 22.5,
+      "over_price": -116,
+      "under_price": -113,
+      "captured_at": "2026-10-20T19:13:00-05:00"
+     },
+     {
+      "player": "Bennedict Mathurin",
+      "line": 19.5,
+      "over_price": -108,
+      "under_price": -122,
+      "captured_at": "2026-10-20T19:13:00-05:00"
+     },
+     {
+      "player": "Herbert Jones",
+      "line": 13.5,
+      "over_price": -126,
+      "under_price": -105,
+      "captured_at": "2026-10-20T19:13:00-05:00"
+     }
+    ]
+   }
+  },
+  {
+   "game_date": "2026-10-21",
+   "start_time_ct": "19:10",
+   "away": "UTA",
+   "away_name": "Utah Jazz",
+   "home": "MEM",
+   "home_name": "Memphis Grizzlies",
+   "spread": {
+    "away_line": 1.5,
+    "away_price": -115,
+    "home_line": -1.5,
+    "home_price": -105,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "moneyline": {
+    "away_price": -102,
+    "home_price": -118,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "total": {
+    "line": 239.5,
+    "over_price": -112,
+    "under_price": -108,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "team_totals": [
+    {
+     "team": "Memphis Grizzlies",
+     "line": 119.5,
+     "over_price": -110,
+     "under_price": -110,
+     "captured_at": "2026-10-20T19:15:00-05:00"
+    },
+    {
+     "team": "Utah Jazz",
+     "line": 119.5,
+     "over_price": -105,
+     "under_price": -115,
+     "captured_at": "2026-10-20T19:15:00-05:00"
+    }
+   ],
+   "player_props": {
+    "points": [
+     {
+      "player": "Lauri Markkanen",
+      "line": 21.5,
+      "over_price": -121,
+      "under_price": -105,
+      "captured_at": "2026-10-20T19:16:00-05:00"
+     },
+     {
+      "player": "Ty Jerome",
+      "line": 20.5,
+      "over_price": -104,
+      "under_price": -123,
+      "captured_at": "2026-10-20T19:16:00-05:00"
+     },
+     {
+      "player": "Keyonte George",
+      "line": 19.5,
+      "over_price": -115,
+      "under_price": -111,
+      "captured_at": "2026-10-20T19:16:00-05:00"
+     },
+     {
+      "player": "Jaren Jackson Jr.",
+      "line": 18.5,
+      "over_price": -110,
+      "under_price": -116,
+      "captured_at": "2026-10-20T19:16:00-05:00"
+     },
+     {
+      "player": "Cameron Boozer",
+      "line": 17.5,
+      "over_price": -105,
+      "under_price": -121,
+      "captured_at": "2026-10-20T19:16:00-05:00"
+     },
+     {
+      "player": "Darryn Peterson",
+      "line": 13.5,
+      "over_price": -118,
+      "under_price": -108,
+      "captured_at": "2026-10-20T19:16:00-05:00"
+     },
+     {
+      "player": "Cedric Coward",
+      "line": 13.5,
+      "over_price": -115,
+      "under_price": -111,
+      "captured_at": "2026-10-20T19:16:00-05:00"
+     },
+     {
+      "player": "Zach Edey",
+      "line": 12.5,
+      "over_price": -107,
+      "under_price": -119,
+      "captured_at": "2026-10-20T19:16:00-05:00"
+     },
+     {
+      "player": "Jaylen Wells",
+      "line": 10.5,
+      "over_price": -115,
+      "under_price": -110,
+      "captured_at": "2026-10-20T19:16:00-05:00"
+     },
+     {
+      "player": "Jaxson Hayes",
+      "line": 7.5,
+      "over_price": -111,
+      "under_price": -115,
+      "captured_at": "2026-10-20T19:16:00-05:00"
+     }
+    ],
+    "rebounds": [
+     {
+      "player": "Zach Edey",
+      "line": 10.5,
+      "over_price": -106,
+      "under_price": -124,
+      "captured_at": "2026-10-20T19:18:00-05:00"
+     },
+     {
+      "player": "Cameron Boozer",
+      "line": 7.5,
+      "over_price": -133,
+      "under_price": 101,
+      "captured_at": "2026-10-20T19:18:00-05:00"
+     },
+     {
+      "player": "Lauri Markkanen",
+      "line": 6.5,
+      "over_price": -124,
+      "under_price": -106,
+      "captured_at": "2026-10-20T19:18:00-05:00"
+     },
+     {
+      "player": "Jaren Jackson Jr.",
+      "line": 5.5,
+      "over_price": -143,
+      "under_price": 108,
+      "captured_at": "2026-10-20T19:18:00-05:00"
+     },
+     {
+      "player": "Cedric Coward",
+      "line": 5.5,
+      "over_price": -130,
+      "under_price": -101,
+      "captured_at": "2026-10-20T19:18:00-05:00"
+     },
+     {
+      "player": "Jaxson Hayes",
+      "line": 5.5,
+      "over_price": -117,
+      "under_price": -112,
+      "captured_at": "2026-10-20T19:18:00-05:00"
+     },
+     {
+      "player": "Darryn Peterson",
+      "line": 4.5,
+      "over_price": 112,
+      "under_price": -148,
+      "captured_at": "2026-10-20T19:18:00-05:00"
+     },
+     {
+      "player": "Keyonte George",
+      "line": 3.5,
+      "over_price": -155,
+      "under_price": 117,
+      "captured_at": "2026-10-20T19:18:00-05:00"
+     },
+     {
+      "player": "Ty Jerome",
+      "line": 3.5,
+      "over_price": 119,
+      "under_price": -157,
+      "captured_at": "2026-10-20T19:18:00-05:00"
+     },
+     {
+      "player": "Jaylen Wells",
+      "line": 3.5,
+      "over_price": 128,
+      "under_price": -170,
+      "captured_at": "2026-10-20T19:18:00-05:00"
+     }
+    ],
+    "assists": [
+     {
+      "player": "Ty Jerome",
+      "line": 6.5,
+      "over_price": -142,
+      "under_price": 108,
+      "captured_at": "2026-10-20T19:21:00-05:00"
+     },
+     {
+      "player": "Keyonte George",
+      "line": 6.5,
+      "over_price": -113,
+      "under_price": -116,
+      "captured_at": "2026-10-20T19:21:00-05:00"
+     },
+     {
+      "player": "Cameron Boozer",
+      "line": 3.5,
+      "over_price": -140,
+      "under_price": 106,
+      "captured_at": "2026-10-20T19:21:00-05:00"
+     },
+     {
+      "player": "Cedric Coward",
+      "line": 3.5,
+      "over_price": 118,
+      "under_price": -156,
+      "captured_at": "2026-10-20T19:21:00-05:00"
+     },
+     {
+      "player": "Darryn Peterson",
+      "line": 2.5,
+      "over_price": -128,
+      "under_price": -103,
+      "captured_at": "2026-10-20T19:21:00-05:00"
+     },
+     {
+      "player": "Lauri Markkanen",
+      "line": 2.5,
+      "over_price": 119,
+      "under_price": -158,
+      "captured_at": "2026-10-20T19:21:00-05:00"
+     },
+     {
+      "player": "Jaren Jackson Jr.",
+      "line": 1.5,
+      "over_price": -180,
+      "under_price": 136,
+      "captured_at": "2026-10-20T19:21:00-05:00"
+     }
+    ],
+    "pra": [
+     {
+      "player": "Lauri Markkanen",
+      "line": 31.5,
+      "over_price": -109,
+      "under_price": -121,
+      "captured_at": "2026-10-20T19:22:00-05:00"
+     },
+     {
+      "player": "Ty Jerome",
+      "line": 30.5,
+      "over_price": -124,
+      "under_price": -106,
+      "captured_at": "2026-10-20T19:22:00-05:00"
+     },
+     {
+      "player": "Keyonte George",
+      "line": 30.5,
+      "over_price": -118,
+      "under_price": -112,
+      "captured_at": "2026-10-20T19:22:00-05:00"
+     },
+     {
+      "player": "Cameron Boozer",
+      "line": 29.5,
+      "over_price": -117,
+      "under_price": -112,
+      "captured_at": "2026-10-20T19:22:00-05:00"
+     },
+     {
+      "player": "Jaren Jackson Jr.",
+      "line": 26.5,
+      "over_price": -123,
+      "under_price": -107,
+      "captured_at": "2026-10-20T19:22:00-05:00"
+     },
+     {
+      "player": "Cedric Coward",
+      "line": 23.5,
+      "over_price": -106,
+      "under_price": -124,
+      "captured_at": "2026-10-20T19:22:00-05:00"
+     },
+     {
+      "player": "Darryn Peterson",
+      "line": 20.5,
+      "over_price": -127,
+      "under_price": -104,
+      "captured_at": "2026-10-20T19:22:00-05:00"
+     }
+    ]
+   }
+  },
+  {
+   "game_date": "2026-10-21",
+   "start_time_ct": "19:40",
+   "away": "DAL",
+   "away_name": "Dallas Mavericks",
+   "home": "HOU",
+   "home_name": "Houston Rockets",
+   "spread": {
+    "away_line": 8.5,
+    "away_price": -105,
+    "home_line": -8.5,
+    "home_price": -115,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "moneyline": {
+    "away_price": 295,
+    "home_price": -375,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "total": {
+    "line": 230.5,
+    "over_price": -102,
+    "under_price": -118,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "team_totals": [
+    {
+     "team": "Dallas Mavericks",
+     "line": 109.5,
+     "over_price": -110,
+     "under_price": -110,
+     "captured_at": "2026-10-20T19:24:00-05:00"
+    },
+    {
+     "team": "Houston Rockets",
+     "line": 119.5,
+     "over_price": -108,
+     "under_price": -112,
+     "captured_at": "2026-10-20T19:24:00-05:00"
+    }
+   ],
+   "player_props": {
+    "points": [
+     {
+      "player": "Kevin Durant",
+      "line": 23.5,
+      "over_price": -124,
+      "under_price": -103,
+      "captured_at": "2026-10-20T19:25:00-05:00"
+     },
+     {
+      "player": "Cooper Flagg",
+      "line": 21.5,
+      "over_price": -106,
+      "under_price": -120,
+      "captured_at": "2026-10-20T19:25:00-05:00"
+     },
+     {
+      "player": "Kyrie Irving",
+      "line": 19.5,
+      "over_price": -124,
+      "under_price": -103,
+      "captured_at": "2026-10-20T19:25:00-05:00"
+     },
+     {
+      "player": "Alperen Sengun",
+      "line": 19.5,
+      "over_price": -105,
+      "under_price": -122,
+      "captured_at": "2026-10-20T19:25:00-05:00"
+     },
+     {
+      "player": "Amen Thompson",
+      "line": 17.5,
+      "over_price": -113,
+      "under_price": -113,
+      "captured_at": "2026-10-20T19:25:00-05:00"
+     },
+     {
+      "player": "Fred VanVleet",
+      "line": 13.5,
+      "over_price": -104,
+      "under_price": -123,
+      "captured_at": "2026-10-20T19:25:00-05:00"
+     },
+     {
+      "player": "P.J. Washington",
+      "line": 13.5,
+      "over_price": -102,
+      "under_price": -125,
+      "captured_at": "2026-10-20T19:25:00-05:00"
+     },
+     {
+      "player": "Jabari Smith Jr.",
+      "line": 12.5,
+      "over_price": -123,
+      "under_price": -104,
+      "captured_at": "2026-10-20T19:25:00-05:00"
+     },
+     {
+      "player": "Max Christie",
+      "line": 10.5,
+      "over_price": -109,
+      "under_price": -117,
+      "captured_at": "2026-10-20T19:25:00-05:00"
+     },
+     {
+      "player": "Daniel Gafford",
+      "line": 9.5,
+      "over_price": -134,
+      "under_price": 105,
+      "captured_at": "2026-10-20T19:25:00-05:00"
+     },
+     {
+      "player": "Tari Eason",
+      "line": 9.5,
+      "over_price": -121,
+      "under_price": -105,
+      "captured_at": "2026-10-20T19:25:00-05:00"
+     },
+     {
+      "player": "Reed Sheppard",
+      "line": 9.5,
+      "over_price": -104,
+      "under_price": -123,
+      "captured_at": "2026-10-20T19:25:00-05:00"
+     }
+    ],
+    "rebounds": [
+     {
+      "player": "Alperen Sengun",
+      "line": 9.5,
+      "over_price": -104,
+      "under_price": -126,
+      "captured_at": "2026-10-20T19:26:00-05:00"
+     },
+     {
+      "player": "Amen Thompson",
+      "line": 8.5,
+      "over_price": 109,
+      "under_price": -144,
+      "captured_at": "2026-10-20T19:26:00-05:00"
+     },
+     {
+      "player": "Daniel Gafford",
+      "line": 6.5,
+      "over_price": -126,
+      "under_price": -105,
+      "captured_at": "2026-10-20T19:26:00-05:00"
+     },
+     {
+      "player": "Cooper Flagg",
+      "line": 6.5,
+      "over_price": -102,
+      "under_price": -128,
+      "captured_at": "2026-10-20T19:26:00-05:00"
+     },
+     {
+      "player": "P.J. Washington",
+      "line": 6.5,
+      "over_price": 109,
+      "under_price": -143,
+      "captured_at": "2026-10-20T19:26:00-05:00"
+     },
+     {
+      "player": "Jabari Smith Jr.",
+      "line": 5.5,
+      "over_price": -112,
+      "under_price": -118,
+      "captured_at": "2026-10-20T19:26:00-05:00"
+     },
+     {
+      "player": "Kevin Durant",
+      "line": 5.5,
+      "over_price": -107,
+      "under_price": -123,
+      "captured_at": "2026-10-20T19:26:00-05:00"
+     },
+     {
+      "player": "Tari Eason",
+      "line": 5.5,
+      "over_price": 107,
+      "under_price": -141,
+      "captured_at": "2026-10-20T19:26:00-05:00"
+     },
+     {
+      "player": "Kyrie Irving",
+      "line": 3.5,
+      "over_price": -122,
+      "under_price": -108,
+      "captured_at": "2026-10-20T19:26:00-05:00"
+     },
+     {
+      "player": "Fred VanVleet",
+      "line": 3.5,
+      "over_price": 121,
+      "under_price": -160,
+      "captured_at": "2026-10-20T19:26:00-05:00"
+     },
+     {
+      "player": "Max Christie",
+      "line": 3.5,
+      "over_price": 122,
+      "under_price": -162,
+      "captured_at": "2026-10-20T19:26:00-05:00"
+     }
+    ],
+    "assists": [
+     {
+      "player": "Fred VanVleet",
+      "line": 5.5,
+      "over_price": 104,
+      "under_price": -137,
+      "captured_at": "2026-10-20T19:27:00-05:00"
+     },
+     {
+      "player": "Cooper Flagg",
+      "line": 4.5,
+      "over_price": -154,
+      "under_price": 117,
+      "captured_at": "2026-10-20T19:27:00-05:00"
+     },
+     {
+      "player": "Alperen Sengun",
+      "line": 4.5,
+      "over_price": -147,
+      "under_price": 112,
+      "captured_at": "2026-10-20T19:27:00-05:00"
+     },
+     {
+      "player": "Kyrie Irving",
+      "line": 4.5,
+      "over_price": -135,
+      "under_price": 103,
+      "captured_at": "2026-10-20T19:27:00-05:00"
+     },
+     {
+      "player": "Amen Thompson",
+      "line": 4.5,
+      "over_price": -118,
+      "under_price": -111,
+      "captured_at": "2026-10-20T19:27:00-05:00"
+     },
+     {
+      "player": "Kevin Durant",
+      "line": 4.5,
+      "over_price": 121,
+      "under_price": -159,
+      "captured_at": "2026-10-20T19:27:00-05:00"
+     },
+     {
+      "player": "Reed Sheppard",
+      "line": 2.5,
+      "over_price": 120,
+      "under_price": -159,
+      "captured_at": "2026-10-20T19:27:00-05:00"
+     }
+    ],
+    "pra": [
+     {
+      "player": "Kevin Durant",
+      "line": 34.5,
+      "over_price": -106,
+      "under_price": -124,
+      "captured_at": "2026-10-20T19:28:00-05:00"
+     },
+     {
+      "player": "Alperen Sengun",
+      "line": 33.5,
+      "over_price": -123,
+      "under_price": -107,
+      "captured_at": "2026-10-20T19:28:00-05:00"
+     },
+     {
+      "player": "Cooper Flagg",
+      "line": 33.5,
+      "over_price": -112,
+      "under_price": -118,
+      "captured_at": "2026-10-20T19:28:00-05:00"
+     },
+     {
+      "player": "Amen Thompson",
+      "line": 30.5,
+      "over_price": -120,
+      "under_price": -110,
+      "captured_at": "2026-10-20T19:28:00-05:00"
+     },
+     {
+      "player": "Kyrie Irving",
+      "line": 28.5,
+      "over_price": -119,
+      "under_price": -111,
+      "captured_at": "2026-10-20T19:28:00-05:00"
+     },
+     {
+      "player": "Fred VanVleet",
+      "line": 21.5,
+      "over_price": -127,
+      "under_price": -103,
+      "captured_at": "2026-10-20T19:28:00-05:00"
+     },
+     {
+      "player": "Reed Sheppard",
+      "line": 13.5,
+      "over_price": -126,
+      "under_price": -105,
+      "captured_at": "2026-10-20T19:28:00-05:00"
+     }
+    ]
+   },
+   "note": "Reed Sheppard not offered for Rebounds O/U."
+  },
+  {
+   "game_date": "2026-10-21",
+   "start_time_ct": "21:10",
+   "away": "GS",
+   "away_name": "Golden State Warriors",
+   "home": "LAL",
+   "home_name": "Los Angeles Lakers",
+   "spread": {
+    "away_line": 6.5,
+    "away_price": -115,
+    "home_line": -6.5,
+    "home_price": -105,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "moneyline": {
+    "away_price": 185,
+    "home_price": -225,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "total": {
+    "line": 234.5,
+    "over_price": -105,
+    "under_price": -115,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "team_totals": [
+    {
+     "team": "Golden State Warriors",
+     "line": 114.5,
+     "over_price": -102,
+     "under_price": -118,
+     "captured_at": "2026-10-20T19:30:00-05:00"
+    },
+    {
+     "team": "Los Angeles Lakers",
+     "line": 120.5,
+     "over_price": -115,
+     "under_price": -105,
+     "captured_at": "2026-10-20T19:30:00-05:00"
+    }
+   ],
+   "player_props": {
+    "points": [
+     {
+      "player": "Luka Doncic",
+      "line": 32.5,
+      "over_price": -119,
+      "under_price": -107,
+      "captured_at": "2026-10-20T19:31:00-05:00"
+     },
+     {
+      "player": "Austin Reaves",
+      "line": 24.5,
+      "over_price": -111,
+      "under_price": -115,
+      "captured_at": "2026-10-20T19:31:00-05:00"
+     },
+     {
+      "player": "Stephen Curry",
+      "line": 24.5,
+      "over_price": -107,
+      "under_price": -119,
+      "captured_at": "2026-10-20T19:31:00-05:00"
+     },
+     {
+      "player": "Yaxel Lendeborg",
+      "line": 13.5,
+      "over_price": -125,
+      "under_price": -102,
+      "captured_at": "2026-10-20T19:31:00-05:00"
+     },
+     {
+      "player": "Gui Santos",
+      "line": 12.5,
+      "over_price": -116,
+      "under_price": -109,
+      "captured_at": "2026-10-20T19:31:00-05:00"
+     },
+     {
+      "player": "Sandro Mamukelashvili",
+      "line": 11.5,
+      "over_price": -103,
+      "under_price": -123,
+      "captured_at": "2026-10-20T19:31:00-05:00"
+     },
+     {
+      "player": "Walker Kessler",
+      "line": 10.5,
+      "over_price": -128,
+      "under_price": 100,
+      "captured_at": "2026-10-20T19:31:00-05:00"
+     },
+     {
+      "player": "Quentin Grimes",
+      "line": 10.5,
+      "over_price": -108,
+      "under_price": -118,
+      "captured_at": "2026-10-20T19:31:00-05:00"
+     },
+     {
+      "player": "Draymond Green",
+      "line": 7.5,
+      "over_price": -125,
+      "under_price": -102,
+      "captured_at": "2026-10-20T19:31:00-05:00"
+     },
+     {
+      "player": "Matisse Thybulle",
+      "line": 6.5,
+      "over_price": 101,
+      "under_price": -129,
+      "captured_at": "2026-10-20T19:31:00-05:00"
+     }
+    ],
+    "rebounds": [
+     {
+      "player": "Walker Kessler",
+      "line": 10.5,
+      "over_price": -129,
+      "under_price": -102,
+      "captured_at": "2026-10-20T19:32:00-05:00"
+     },
+     {
+      "player": "Luka Doncic",
+      "line": 7.5,
+      "over_price": -106,
+      "under_price": -124,
+      "captured_at": "2026-10-20T19:32:00-05:00"
+     },
+     {
+      "player": "Yaxel Lendeborg",
+      "line": 7.5,
+      "over_price": 107,
+      "under_price": -141,
+      "captured_at": "2026-10-20T19:32:00-05:00"
+     },
+     {
+      "player": "Gui Santos",
+      "line": 5.5,
+      "over_price": -125,
+      "under_price": -105,
+      "captured_at": "2026-10-20T19:32:00-05:00"
+     },
+     {
+      "player": "Draymond Green",
+      "line": 5.5,
+      "over_price": -124,
+      "under_price": -106,
+      "captured_at": "2026-10-20T19:32:00-05:00"
+     },
+     {
+      "player": "Sandro Mamukelashvili",
+      "line": 5.5,
+      "over_price": -108,
+      "under_price": -121,
+      "captured_at": "2026-10-20T19:32:00-05:00"
+     },
+     {
+      "player": "Austin Reaves",
+      "line": 4.5,
+      "over_price": -139,
+      "under_price": 106,
+      "captured_at": "2026-10-20T19:32:00-05:00"
+     },
+     {
+      "player": "Stephen Curry",
+      "line": 3.5,
+      "over_price": 112,
+      "under_price": -147,
+      "captured_at": "2026-10-20T19:32:00-05:00"
+     },
+     {
+      "player": "Quentin Grimes",
+      "line": 3.5,
+      "over_price": 114,
+      "under_price": -150,
+      "captured_at": "2026-10-20T19:32:00-05:00"
+     },
+     {
+      "player": "Matisse Thybulle",
+      "line": 2.5,
+      "over_price": -136,
+      "under_price": 103,
+      "captured_at": "2026-10-20T19:32:00-05:00"
+     }
+    ],
+    "assists": [
+     {
+      "player": "Luka Doncic",
+      "line": 7.5,
+      "over_price": -139,
+      "under_price": 106,
+      "captured_at": "2026-10-20T19:33:00-05:00"
+     },
+     {
+      "player": "Draymond Green",
+      "line": 6.5,
+      "over_price": 112,
+      "under_price": -147,
+      "captured_at": "2026-10-20T19:33:00-05:00"
+     },
+     {
+      "player": "Austin Reaves",
+      "line": 5.5,
+      "over_price": -139,
+      "under_price": 105,
+      "captured_at": "2026-10-20T19:33:00-05:00"
+     },
+     {
+      "player": "Stephen Curry",
+      "line": 4.5,
+      "over_price": -114,
+      "under_price": -115,
+      "captured_at": "2026-10-20T19:33:00-05:00"
+     },
+     {
+      "player": "Gui Santos",
+      "line": 3.5,
+      "over_price": 128,
+      "under_price": -170,
+      "captured_at": "2026-10-20T19:33:00-05:00"
+     },
+     {
+      "player": "Yaxel Lendeborg",
+      "line": 2.5,
+      "over_price": -156,
+      "under_price": 118,
+      "captured_at": "2026-10-20T19:33:00-05:00"
+     }
+    ],
+    "pra": [
+     {
+      "player": "Luka Doncic",
+      "line": 48.5,
+      "over_price": -119,
+      "under_price": -110,
+      "captured_at": "2026-10-20T19:35:00-05:00"
+     },
+     {
+      "player": "Austin Reaves",
+      "line": 35.5,
+      "over_price": -116,
+      "under_price": -113,
+      "captured_at": "2026-10-20T19:35:00-05:00"
+     },
+     {
+      "player": "Stephen Curry",
+      "line": 32.5,
+      "over_price": -114,
+      "under_price": -115,
+      "captured_at": "2026-10-20T19:35:00-05:00"
+     },
+     {
+      "player": "Yaxel Lendeborg",
+      "line": 24.5,
+      "over_price": -118,
+      "under_price": -111,
+      "captured_at": "2026-10-20T19:35:00-05:00"
+     },
+     {
+      "player": "Gui Santos",
+      "line": 22.5,
+      "over_price": -105,
+      "under_price": -126,
+      "captured_at": "2026-10-20T19:35:00-05:00"
+     },
+     {
+      "player": "Draymond Green",
+      "line": 20.5,
+      "over_price": -110,
+      "under_price": -119,
+      "captured_at": "2026-10-20T19:35:00-05:00"
+     }
+    ]
+   },
+   "note": "Quentin Grimes, Walker Kessler, Sandro Mamukelashvili, Matisse Thybulle milestone-only for Assists and PRA. This event page displayed a slate-wide player pool; names transcribed exactly as displayed."
+  },
+  {
+   "game_date": "2026-10-21",
+   "start_time_ct": "21:10",
+   "away": "PHO",
+   "away_name": "Phoenix Suns",
+   "home": "POR",
+   "home_name": "Portland Trail Blazers",
+   "spread": {
+    "away_line": 3.5,
+    "away_price": -105,
+    "home_line": -3.5,
+    "home_price": -115,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "moneyline": {
+    "away_price": 140,
+    "home_price": -166,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "total": {
+    "line": 232.5,
+    "over_price": -112,
+    "under_price": -108,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "team_totals": [
+    {
+     "team": "Phoenix Suns",
+     "line": 114.5,
+     "over_price": -110,
+     "under_price": -110,
+     "captured_at": "2026-10-20T19:37:00-05:00"
+    },
+    {
+     "team": "Portland Trail Blazers",
+     "line": 116.5,
+     "over_price": -112,
+     "under_price": -108,
+     "captured_at": "2026-10-20T19:37:00-05:00"
+    }
+   ],
+   "player_props": {
+    "points": [
+     {
+      "player": "Devin Booker",
+      "line": 24.5,
+      "over_price": -114,
+      "under_price": -112,
+      "captured_at": "2026-10-20T19:41:00-05:00"
+     },
+     {
+      "player": "Deni Avdija",
+      "line": 22.5,
+      "over_price": -103,
+      "under_price": -124,
+      "captured_at": "2026-10-20T19:41:00-05:00"
+     },
+     {
+      "player": "Damian Lillard",
+      "line": 19.5,
+      "over_price": -114,
+      "under_price": -112,
+      "captured_at": "2026-10-20T19:41:00-05:00"
+     },
+     {
+      "player": "Jalen Green",
+      "line": 19.5,
+      "over_price": -111,
+      "under_price": -115,
+      "captured_at": "2026-10-20T19:41:00-05:00"
+     },
+     {
+      "player": "Ja Morant",
+      "line": 18.5,
+      "over_price": -118,
+      "under_price": -108,
+      "captured_at": "2026-10-20T19:41:00-05:00"
+     },
+     {
+      "player": "Dillon Brooks",
+      "line": 17.5,
+      "over_price": -106,
+      "under_price": -120,
+      "captured_at": "2026-10-20T19:41:00-05:00"
+     },
+     {
+      "player": "Miles Bridges",
+      "line": 14.5,
+      "over_price": -123,
+      "under_price": -103,
+      "captured_at": "2026-10-20T19:41:00-05:00"
+     },
+     {
+      "player": "Collin Gillespie",
+      "line": 11.5,
+      "over_price": -101,
+      "under_price": -126,
+      "captured_at": "2026-10-20T19:41:00-05:00"
+     },
+     {
+      "player": "Toumani Camara",
+      "line": 10.5,
+      "over_price": -126,
+      "under_price": -101,
+      "captured_at": "2026-10-20T19:41:00-05:00"
+     },
+     {
+      "player": "Donovan Clingan",
+      "line": 10.5,
+      "over_price": -108,
+      "under_price": -118,
+      "captured_at": "2026-10-20T19:41:00-05:00"
+     },
+     {
+      "player": "Khaman Maluach",
+      "line": 9.5,
+      "over_price": -108,
+      "under_price": -118,
+      "captured_at": "2026-10-20T19:41:00-05:00"
+     }
+    ],
+    "rebounds": [
+     {
+      "player": "Donovan Clingan",
+      "line": 11.5,
+      "over_price": -112,
+      "under_price": -117,
+      "captured_at": "2026-10-20T19:42:00-05:00"
+     },
+     {
+      "player": "Khaman Maluach",
+      "line": 8.5,
+      "over_price": -134,
+      "under_price": 102,
+      "captured_at": "2026-10-20T19:42:00-05:00"
+     },
+     {
+      "player": "Deni Avdija",
+      "line": 6.5,
+      "over_price": -112,
+      "under_price": -118,
+      "captured_at": "2026-10-20T19:42:00-05:00"
+     },
+     {
+      "player": "Miles Bridges",
+      "line": 6.5,
+      "over_price": 116,
+      "under_price": -153,
+      "captured_at": "2026-10-20T19:42:00-05:00"
+     },
+     {
+      "player": "Jalen Green",
+      "line": 4.5,
+      "over_price": -115,
+      "under_price": -115,
+      "captured_at": "2026-10-20T19:42:00-05:00"
+     },
+     {
+      "player": "Toumani Camara",
+      "line": 4.5,
+      "over_price": -110,
+      "under_price": -119,
+      "captured_at": "2026-10-20T19:42:00-05:00"
+     },
+     {
+      "player": "Devin Booker",
+      "line": 3.5,
+      "over_price": -151,
+      "under_price": 115,
+      "captured_at": "2026-10-20T19:42:00-05:00"
+     },
+     {
+      "player": "Dillon Brooks",
+      "line": 3.5,
+      "over_price": -150,
+      "under_price": 114,
+      "captured_at": "2026-10-20T19:42:00-05:00"
+     },
+     {
+      "player": "Collin Gillespie",
+      "line": 3.5,
+      "over_price": -131,
+      "under_price": -101,
+      "captured_at": "2026-10-20T19:42:00-05:00"
+     },
+     {
+      "player": "Damian Lillard",
+      "line": 3.5,
+      "over_price": -108,
+      "under_price": -122,
+      "captured_at": "2026-10-20T19:42:00-05:00"
+     },
+     {
+      "player": "Ja Morant",
+      "line": 3.5,
+      "over_price": 123,
+      "under_price": -163,
+      "captured_at": "2026-10-20T19:42:00-05:00"
+     }
+    ],
+    "assists": [
+     {
+      "player": "Devin Booker",
+      "line": 6.5,
+      "over_price": 115,
+      "under_price": -151,
+      "captured_at": "2026-10-20T19:43:00-05:00"
+     },
+     {
+      "player": "Damian Lillard",
+      "line": 5.5,
+      "over_price": 119,
+      "under_price": -157,
+      "captured_at": "2026-10-20T19:43:00-05:00"
+     },
+     {
+      "player": "Ja Morant",
+      "line": 5.5,
+      "over_price": 121,
+      "under_price": -160,
+      "captured_at": "2026-10-20T19:43:00-05:00"
+     },
+     {
+      "player": "Deni Avdija",
+      "line": 4.5,
+      "over_price": -126,
+      "under_price": -104,
+      "captured_at": "2026-10-20T19:43:00-05:00"
+     },
+     {
+      "player": "Jalen Green",
+      "line": 3.5,
+      "over_price": -131,
+      "under_price": 100,
+      "captured_at": "2026-10-20T19:43:00-05:00"
+     },
+     {
+      "player": "Collin Gillespie",
+      "line": 3.5,
+      "over_price": -126,
+      "under_price": -104,
+      "captured_at": "2026-10-20T19:43:00-05:00"
+     },
+     {
+      "player": "Miles Bridges",
+      "line": 2.5,
+      "over_price": -131,
+      "under_price": 100,
+      "captured_at": "2026-10-20T19:43:00-05:00"
+     },
+     {
+      "player": "Toumani Camara",
+      "line": 1.5,
+      "over_price": -176,
+      "under_price": 133,
+      "captured_at": "2026-10-20T19:43:00-05:00"
+     },
+     {
+      "player": "Dillon Brooks",
+      "line": 1.5,
+      "over_price": -161,
+      "under_price": 122,
+      "captured_at": "2026-10-20T19:43:00-05:00"
+     }
+    ],
+    "pra": [
+     {
+      "player": "Devin Booker",
+      "line": 35.5,
+      "over_price": -111,
+      "under_price": -119,
+      "captured_at": "2026-10-20T19:44:00-05:00"
+     },
+     {
+      "player": "Deni Avdija",
+      "line": 33.5,
+      "over_price": -124,
+      "under_price": -106,
+      "captured_at": "2026-10-20T19:44:00-05:00"
+     },
+     {
+      "player": "Damian Lillard",
+      "line": 28.5,
+      "over_price": -116,
+      "under_price": -114,
+      "captured_at": "2026-10-20T19:44:00-05:00"
+     },
+     {
+      "player": "Jalen Green",
+      "line": 28.5,
+      "over_price": -106,
+      "under_price": -124,
+      "captured_at": "2026-10-20T19:44:00-05:00"
+     },
+     {
+      "player": "Ja Morant",
+      "line": 27.5,
+      "over_price": -113,
+      "under_price": -116,
+      "captured_at": "2026-10-20T19:44:00-05:00"
+     },
+     {
+      "player": "Miles Bridges",
+      "line": 24.5,
+      "over_price": -104,
+      "under_price": -126,
+      "captured_at": "2026-10-20T19:44:00-05:00"
+     },
+     {
+      "player": "Dillon Brooks",
+      "line": 23.5,
+      "over_price": -118,
+      "under_price": -112,
+      "captured_at": "2026-10-20T19:44:00-05:00"
+     },
+     {
+      "player": "Collin Gillespie",
+      "line": 18.5,
+      "over_price": -125,
+      "under_price": -105,
+      "captured_at": "2026-10-20T19:44:00-05:00"
+     },
+     {
+      "player": "Toumani Camara",
+      "line": 17.5,
+      "over_price": -122,
+      "under_price": -108,
+      "captured_at": "2026-10-20T19:44:00-05:00"
+     }
+    ]
+   },
+   "note": "This event page displayed a slate-wide player pool; names transcribed exactly as displayed."
+  },
+  {
+   "game_date": "2026-10-21",
+   "start_time_ct": "21:40",
+   "away": "SAC",
+   "away_name": "Sacramento Kings",
+   "home": "LAC",
+   "home_name": "Los Angeles Clippers",
+   "spread": {
+    "away_line": 5.5,
+    "away_price": -110,
+    "home_line": -5.5,
+    "home_price": -110,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "moneyline": {
+    "away_price": 160,
+    "home_price": -192,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "total": {
+    "line": 228.5,
+    "over_price": -110,
+    "under_price": -110,
+    "captured_at": "2026-10-20T17:23:00-05:00"
+   },
+   "team_totals": [
+    {
+     "team": "Sacramento Kings",
+     "line": 111.5,
+     "over_price": -110,
+     "under_price": -110,
+     "captured_at": "2026-10-20T19:46:00-05:00"
+    },
+    {
+     "team": "Los Angeles Clippers",
+     "line": 116.5,
+     "over_price": -112,
+     "under_price": -108,
+     "captured_at": "2026-10-20T19:46:00-05:00"
+    }
+   ],
+   "player_props": {
+    "points": [
+     {
+      "player": "Darius Garland",
+      "line": 23.5,
+      "over_price": -108,
+      "under_price": -118,
+      "captured_at": "2026-10-20T19:46:00-05:00"
+     },
+     {
+      "player": "Rui Hachimura",
+      "line": 19.5,
+      "over_price": -107,
+      "under_price": -119,
+      "captured_at": "2026-10-20T19:46:00-05:00"
+     },
+     {
+      "player": "Zach LaVine",
+      "line": 18.5,
+      "over_price": -110,
+      "under_price": -116,
+      "captured_at": "2026-10-20T19:46:00-05:00"
+     },
+     {
+      "player": "Domantas Sabonis",
+      "line": 17.5,
+      "over_price": -117,
+      "under_price": -109,
+      "captured_at": "2026-10-20T19:46:00-05:00"
+     },
+     {
+      "player": "Darius Acuff Jr.",
+      "line": 17.5,
+      "over_price": -114,
+      "under_price": -112,
+      "captured_at": "2026-10-20T19:46:00-05:00"
+     },
+     {
+      "player": "De'Andre Hunter",
+      "line": 13.5,
+      "over_price": -120,
+      "under_price": -106,
+      "captured_at": "2026-10-20T19:46:00-05:00"
+     },
+     {
+      "player": "Keaton Wagler",
+      "line": 13.5,
+      "over_price": -120,
+      "under_price": -106,
+      "captured_at": "2026-10-20T19:46:00-05:00"
+     },
+     {
+      "player": "Derrick Jones Jr.",
+      "line": 12.5,
+      "over_price": -128,
+      "under_price": 100,
+      "captured_at": "2026-10-20T19:46:00-05:00"
+     },
+     {
+      "player": "Keegan Murray",
+      "line": 12.5,
+      "over_price": -111,
+      "under_price": -115,
+      "captured_at": "2026-10-20T19:46:00-05:00"
+     },
+     {
+      "player": "Isaiah Jackson",
+      "line": 10.5,
+      "over_price": -112,
+      "under_price": -114,
+      "captured_at": "2026-10-20T19:46:00-05:00"
+     },
+     {
+      "player": "Kris Dunn",
+      "line": 8.5,
+      "over_price": -105,
+      "under_price": -121,
+      "captured_at": "2026-10-20T19:46:00-05:00"
+     }
+    ],
+    "rebounds": [
+     {
+      "player": "Domantas Sabonis",
+      "line": 12.5,
+      "over_price": -109,
+      "under_price": -121,
+      "captured_at": "2026-10-20T19:47:00-05:00"
+     },
+     {
+      "player": "Isaiah Jackson",
+      "line": 7.5,
+      "over_price": -119,
+      "under_price": -111,
+      "captured_at": "2026-10-20T19:47:00-05:00"
+     },
+     {
+      "player": "Rui Hachimura",
+      "line": 5.5,
+      "over_price": -118,
+      "under_price": -111,
+      "captured_at": "2026-10-20T19:47:00-05:00"
+     },
+     {
+      "player": "Keegan Murray",
+      "line": 4.5,
+      "over_price": -138,
+      "under_price": 105,
+      "captured_at": "2026-10-20T19:47:00-05:00"
+     },
+     {
+      "player": "De'Andre Hunter",
+      "line": 4.5,
+      "over_price": 110,
+      "under_price": -144,
+      "captured_at": "2026-10-20T19:47:00-05:00"
+     },
+     {
+      "player": "Derrick Jones Jr.",
+      "line": 4.5,
+      "over_price": 110,
+      "under_price": -145,
+      "captured_at": "2026-10-20T19:47:00-05:00"
+     },
+     {
+      "player": "Keaton Wagler",
+      "line": 3.5,
+      "over_price": -140,
+      "under_price": 106,
+      "captured_at": "2026-10-20T19:47:00-05:00"
+     },
+     {
+      "player": "Kris Dunn",
+      "line": 3.5,
+      "over_price": -126,
+      "under_price": -104,
+      "captured_at": "2026-10-20T19:47:00-05:00"
+     },
+     {
+      "player": "Zach LaVine",
+      "line": 3.5,
+      "over_price": -120,
+      "under_price": -110,
+      "captured_at": "2026-10-20T19:47:00-05:00"
+     },
+     {
+      "player": "Darius Garland",
+      "line": 2.5,
+      "over_price": -175,
+      "under_price": 133,
+      "captured_at": "2026-10-20T19:47:00-05:00"
+     },
+     {
+      "player": "Darius Acuff Jr.",
+      "line": 2.5,
+      "over_price": 102,
+      "under_price": -134,
+      "captured_at": "2026-10-20T19:47:00-05:00"
+     }
+    ],
+    "assists": [
+     {
+      "player": "Darius Garland",
+      "line": 8.5,
+      "over_price": 104,
+      "under_price": -136,
+      "captured_at": "2026-10-20T19:48:00-05:00"
+     },
+     {
+      "player": "Domantas Sabonis",
+      "line": 5.5,
+      "over_price": 103,
+      "under_price": -136,
+      "captured_at": "2026-10-20T19:48:00-05:00"
+     },
+     {
+      "player": "Darius Acuff Jr.",
+      "line": 4.5,
+      "over_price": -139,
+      "under_price": 105,
+      "captured_at": "2026-10-20T19:48:00-05:00"
+     },
+     {
+      "player": "Kris Dunn",
+      "line": 4.5,
+      "over_price": 108,
+      "under_price": -143,
+      "captured_at": "2026-10-20T19:48:00-05:00"
+     },
+     {
+      "player": "Keaton Wagler",
+      "line": 3.5,
+      "over_price": 116,
+      "under_price": -153,
+      "captured_at": "2026-10-20T19:48:00-05:00"
+     },
+     {
+      "player": "Zach LaVine",
+      "line": 2.5,
+      "over_price": -109,
+      "under_price": -121,
+      "captured_at": "2026-10-20T19:48:00-05:00"
+     },
+     {
+      "player": "De'Andre Hunter",
+      "line": 2.5,
+      "over_price": 121,
+      "under_price": -160,
+      "captured_at": "2026-10-20T19:48:00-05:00"
+     },
+     {
+      "player": "Derrick Jones Jr.",
+      "line": 1.5,
+      "over_price": -140,
+      "under_price": 106,
+      "captured_at": "2026-10-20T19:48:00-05:00"
+     },
+     {
+      "player": "Rui Hachimura",
+      "line": 1.5,
+      "over_price": 103,
+      "under_price": -135,
+      "captured_at": "2026-10-20T19:48:00-05:00"
+     }
+    ],
+    "pra": [
+     {
+      "player": "Domantas Sabonis",
+      "line": 36.5,
+      "over_price": -109,
+      "under_price": -120,
+      "captured_at": "2026-10-20T19:49:00-05:00"
+     },
+     {
+      "player": "Darius Garland",
+      "line": 34.5,
+      "over_price": -124,
+      "under_price": -106,
+      "captured_at": "2026-10-20T19:49:00-05:00"
+     },
+     {
+      "player": "Rui Hachimura",
+      "line": 26.5,
+      "over_price": -117,
+      "under_price": -112,
+      "captured_at": "2026-10-20T19:49:00-05:00"
+     },
+     {
+      "player": "Darius Acuff Jr.",
+      "line": 25.5,
+      "over_price": -108,
+      "under_price": -122,
+      "captured_at": "2026-10-20T19:49:00-05:00"
+     },
+     {
+      "player": "Zach LaVine",
+      "line": 24.5,
+      "over_price": -125,
+      "under_price": -105,
+      "captured_at": "2026-10-20T19:49:00-05:00"
+     },
+     {
+      "player": "Keaton Wagler",
+      "line": 21.5,
+      "over_price": -111,
+      "under_price": -119,
+      "captured_at": "2026-10-20T19:49:00-05:00"
+     },
+     {
+      "player": "De'Andre Hunter",
+      "line": 20.5,
+      "over_price": -121,
+      "under_price": -109,
+      "captured_at": "2026-10-20T19:49:00-05:00"
+     },
+     {
+      "player": "Derrick Jones Jr.",
+      "line": 19.5,
+      "over_price": -112,
+      "under_price": -118,
+      "captured_at": "2026-10-20T19:49:00-05:00"
+     },
+     {
+      "player": "Keegan Murray",
+      "line": 19.5,
+      "over_price": -109,
+      "under_price": -121,
+      "captured_at": "2026-10-20T19:49:00-05:00"
+     },
+     {
+      "player": "Kris Dunn",
+      "line": 16.5,
+      "over_price": -119,
+      "under_price": -110,
+      "captured_at": "2026-10-20T19:49:00-05:00"
+     }
+    ]
+   },
+   "note": "Keegan Murray milestone-only for Assists; Isaiah Jackson milestone-only for PRA. This event page displayed a slate-wide player pool; names transcribed exactly as displayed."
+  }
+ ]
+}
