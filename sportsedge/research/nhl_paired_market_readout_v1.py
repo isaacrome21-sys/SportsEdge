@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from math import isclose, isfinite
 
 from sportsedge.nhl_rate_v1_card import (
-    final_score_distribution, no_vig, puck_line_probs, total_probs,
+    final_score_distribution, no_vig, puck_line_probs, resolve_team, total_probs,
 )
 
 VERSION = "NHL_RATE_V1_PAIRED_RESEARCH_READOUT_V1"
@@ -115,9 +115,14 @@ def nhl_paired_market_readout(*, away, home, event_id, event_start,
     span = abs((stamps[0] - stamps[1]).total_seconds())
     if span > MAX_PAIR_SPAN_SECONDS:
         raise ValueError("NHL_MARKET_PAIR_CAPTURE_SPAN_EXCEEDED")
-    fsd = final_score_distribution(away, home)
-    if fsd is None:
+    # The caller's different-looking display names can alias the same team.
+    # Validate the canonical matchup BEFORE generating any market readout.
+    away_id, home_id = resolve_team(away), resolve_team(home)
+    if away_id is None or home_id is None:
         raise ValueError("NHL_RATE_MODEL_TEAM_UNMAPPED")
+    if away_id == home_id:
+        raise ValueError("NHL_FIXTURE_SAME_CANONICAL_TEAM")
+    fsd = final_score_distribution(away_id, home_id)
     if m == "MONEYLINE":
         first, second = "AWAY", "HOME"
         if any(v["line"] is not None for v in sides.values()):
