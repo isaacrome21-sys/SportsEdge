@@ -42,6 +42,7 @@ def _fixtures(sport):
         "home": "NYK" if sport == "NBA" else "CHI",
         "away": "BOS" if sport == "NBA" else "GB",
         "season": 2026, "week": 7,
+        "player_id_map": {"p1": "p1", "p2": "p2"},
         "target_date": "2026-10-20",
     }}
 
