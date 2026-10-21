@@ -18,7 +18,10 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
 from typing import Iterable, Mapping
+
+from sportsedge.mlb_issue_body import IssueLinesError, extract_issue_lines
 
 from .ratings_model import NBARatings, NBARatingsParams, replay
 
@@ -105,12 +108,14 @@ def _american(tok: str, raw: str) -> int:
     if t.lower() in ("even", "ev"):
         return 100
     try:
-        v = int(float(t))
-    except ValueError as exc:
+        number = Decimal(t)
+    except InvalidOperation as exc:
         raise NBALinesError(f"NBA_ODDS_INVALID:{raw}") from exc
-    if -100 < v < 100:
+    if (not number.is_finite() or not math.isfinite(float(number))
+            or number != number.to_integral_value()
+            or -100 < number < 100):
         raise NBALinesError(f"NBA_ODDS_INVALID:{raw}")
-    return v
+    return int(number)
 
 
 def _line(tok: str, raw: str) -> float:
@@ -118,18 +123,22 @@ def _line(tok: str, raw: str) -> float:
     if t.lower() in ("pk", "pick"):
         return 0.0
     try:
-        return float(t)
+        value = float(t)
     except ValueError as exc:
         raise NBALinesError(f"NBA_LINE_INVALID:{raw}") from exc
+    if not math.isfinite(value):
+        raise NBALinesError(f"NBA_LINE_INVALID:{raw}")
+    return value
 
 
 _PRICE_RE = re.compile(r"(?<![\w.])[+\-−–]?\d{3,4}(?![\w.])|\beven\b", re.I)
 
 
 def parse_lines(body: str) -> list[Game]:
-    if "### Lines" in body:
-        body = body.split("### Lines", 1)[1].split("\n### ", 1)[0]
-    body = body.replace("```text", "").replace("```", "")
+    try:
+        body = extract_issue_lines(body, sport="NBA")
+    except IssueLinesError as exc:
+        raise NBALinesError(str(exc)) from exc
     games: list[Game] = []
     cur: Game | None = None
     for raw in body.splitlines():
@@ -138,7 +147,10 @@ def parse_lines(body: str) -> list[Game]:
             continue
         if "@" in line and not re.match(r"^(ml|moneyline|spread|sp|total|ou|o/u)\b", line, re.I):
             a, h = [p.strip() for p in line.split("@", 1)]
-            cur = Game(team_abbr(a), team_abbr(h), line)
+            away, home = team_abbr(a), team_abbr(h)
+            if away == home:
+                raise NBALinesError(f"NBA_TEAMS_IDENTICAL:{line}")
+            cur = Game(away, home, line)
             games.append(cur)
             continue
         if cur is None:
