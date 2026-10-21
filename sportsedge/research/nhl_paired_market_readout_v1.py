@@ -144,6 +144,14 @@ def nhl_paired_market_readout(*, away, home, event_id, event_start,
         model_a, push, model_b = puck_line_probs(fsd, common_line)
     if not isclose(model_a + model_b + push, 1.0, abs_tol=1e-8):
         raise ValueError("NHL_PROBABILITY_MASS_NONCONSERVATION")
+    # Book prices on two-sided markets with possible pushes are quoted
+    # on RESOLVED bets. Comparing no-vig P(side | not push) directly against
+    # unconditional P(side) makes both sides look falsely overpriced when
+    # push mass is present. Preserve both model distributions explicitly.
+    resolved_mass = model_a + model_b
+    if resolved_mass <= 0:
+        raise ValueError("NHL_MODEL_NO_RESOLVED_OUTCOME_MASS")
+    conditional_a, conditional_b = model_a / resolved_mass, model_b / resolved_mass
     nv_a, nv_b = no_vig(sides[first]["odds"], sides[second]["odds"])
     return {
         "schema": VERSION, "sport": "NHL", "status": "UNVALIDATED_MARKET_DIAGNOSTIC",
@@ -156,8 +164,12 @@ def nhl_paired_market_readout(*, away, home, event_id, event_start,
         "first_side": first, "second_side": second,
         "quoted": {first: sides[first], second: sides[second]},
         "rate_v1_model": {first: model_a, "PUSH": push, second: model_b},
+        "rate_v1_conditional_on_no_push": {first: conditional_a,
+                                           second: conditional_b},
         "same_book_no_vig": {first: nv_a, second: nv_b},
-        "model_minus_no_vig": {first: model_a - nv_a, second: model_b - nv_b},
+        "model_minus_no_vig": {first: conditional_a - nv_a,
+                               second: conditional_b - nv_b},
+        "comparison_basis": "RESOLVED_WAGER_CONDITIONAL_NOT_RAW_MASS",
         "distribution_ref": "NHL_RATE_V1_STATIC_PRIORS_UNVALIDATED",
         "quote_authentication": "OPERATOR_DECLARATION_NOT_INDEPENDENTLY_VERIFIED",
         "gap_is_not_edge": True, "official_authority": False,
