@@ -19,8 +19,8 @@ A structural `STRUCTURAL_CANDIDATE_UNVERIFIED`, **never a validated bookmaker ma
 **Security**: API key stays in environment and request, never in stdout, exceptions or output file; exceptions are sanitized type/code only because provider requires API key in query URL. Raw response body and IP not persisted. CLI has hardcoded HTTPS provider host; only a single fixture request per execution. A synthetic `--response-json` mode allows offline validation without key. A nonzero BLOCKED result is produced when credential absent/denied.
 
 ## Artifacts (Git blob SHA-1)
-* `scripts/oddspapi_history_admission.py`: `16e1c5b9a6df494b92a603f2ebc3253ed9da38c8`
-* `tests/test_oddspapi_history_admission.py`: `db803321b46bab93e094b002dbb78a3d044bbe72`
+* `sportsedge/oddspapi_history_admission.py`: `16e1c5b9a6df494b92a603f2ebc3253ed9da38c8`
+* `tests/test_oddspapi_history_admission.py`: `092c2b8fb1edb8ab66e935923e2dbeaa570f67d9`
 
 ## CLI contract (after key provision)
 
@@ -29,7 +29,7 @@ The operator must first supply **separately verified** local `anchor.json` with 
 ```bash
 # No key is ever supplied on a command line.
 export SPORTSEDGE_ODDSPAPI_KEY="<secret from account>"
-python scripts/oddspapi_history_admission.py \
+python sportsedge/oddspapi_history_admission.py \
   --fixture-anchor-json anchor.json \
   --market-map-json map.json \
   --output-json candidate.json
@@ -42,3 +42,6 @@ Offline synthetic test path: add `--response-json fixture-envelope.json`. The ou
 **Offline suite authored, NOT independently executed.** Host CI and Rocky must verify exact head, programmatic market-ID parsing against a real **non-secret** fixture response sample, session/credential handling, no query URL in exceptions, and all hostile tests. No 2025 backtest is possible through this archive: historical fixtures preceding 2026-01-01 are explicitly refused.
 
 **Not proven:** key/account authority; provider fixtures/market IDs for the desired DK market; quote executable status and league fixture matching; actual first play; closed market timing; provider history completeness across fixtures; remaining historical paired-side coverage; market-baseline ruling's precise admissibility rule. No record or gate/registry mutation. Do not claim an admitted close or edge from this harness. As account captcha is owned by the user, the builder does not attempt bypass. The harness runs **upon explicit CLI invocation after a credential is supplied**; it does NOT automatically schedule itself when a secret appears.
+
+## CI mapping repair — 2026-10-20
+Original head `13eb7e14` passed automation-core/full-discovery but failed `freeze-reconciliation-hold`: path `scripts/oddspapi_history_admission.py` was an unmapped governance surface. No exemption or frozen registry was altered. The same source bytes were moved into the already governed `sportsedge/oddspapi_history_admission.py` package; test import and CLI syntax above changed accordingly, and unmapped script deleted. This is a builder repair, **NOT verified** until the updated head receives full fresh CI and freeze inventory clearance. The normalized market baseline remains NOT_ADMITTED.
