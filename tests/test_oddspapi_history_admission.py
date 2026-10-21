@@ -6,7 +6,7 @@ from urllib.error import HTTPError
 
 import pytest
 
-from scripts import oddspapi_history_admission as H
+from sportsedge import oddspapi_history_admission as H
 
 ANCHOR = {
     "fixtureId": "id10000012345",
