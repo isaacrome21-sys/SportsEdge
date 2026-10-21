@@ -2,8 +2,6 @@
 
 These tests are NOT a historical or against-close validation screen.
 """
-from dataclasses import replace
-
 import pytest
 
 from sportsedge.f5_distribution import F5Distribution
