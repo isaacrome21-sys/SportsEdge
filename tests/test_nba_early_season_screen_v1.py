@@ -60,3 +60,23 @@ def test_transfer_is_blocked_not_faked_eligibility():
     x=screen_early_prop_mae(h,t,stat="points")
     assert x["scored"]==0
     assert x["blocked"]["WATCH_TRANSFER_NOT_MODELED"]==4
+
+
+def test_target_slated_on_wrong_chicago_date_refuses():
+    h,t=rows()
+    # The supplied tip remains Oct 1 at 15:00 Central, but the declared
+    # target day is Oct 2. Do not allow this to shift prior exclusions.
+    t[0]["game_date"]="2026-10-02"
+    with pytest.raises(ValueError,match="TARGET_LOCAL_DATE_MISMATCH"):
+        screen_early_prop_mae(h,t,stat="points")
+
+
+def test_utc_next_day_still_chicago_local_previous_day():
+    h,t=rows()
+    # 00:30Z Oct 2 is 19:30 CT Oct 1. An actual local Oct 1 target is
+    # admissible, provided its decision and receipt bracket the tip.
+    t[0]["tipoff"]="2026-10-02T00:30:00Z"
+    t[0]["decision_as_of"]="2026-10-02T00:20:00Z"
+    t[0]["observed_at"]="2026-10-02T03:00:00Z"
+    x=screen_early_prop_mae(h,t,stat="points")
+    assert x["scored"]==4
