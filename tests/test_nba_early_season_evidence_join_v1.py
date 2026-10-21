@@ -9,6 +9,8 @@ def fixtures():
          "MIN":"31:30","PTS":"24","REB":"5","AST":"6"}
     event={"event_id":"ESPN123","tipoff":"2026-01-10T00:30:00Z",
            "result_observed_at":"2026-01-10T05:00:00Z",
+           "finalized_at":"2026-01-10T04:50:00Z",
+           "event_state":"FINAL","result_state":"FINAL",
            "source_ref":"preserved-event-receipt"}
     role={"player_id":"99","team_abbreviation":"NY","position":"G",
           "observed_at":"2026-01-09T22:00:00Z","source_ref":"roster-receipt"}
@@ -82,4 +84,27 @@ def test_join_invalid_minutes_and_stats_refuse():
     b[0]["MIN"]="30:00"
     b[0]["REB"]="-1"
     with pytest.raises(ValueError,match="REB_INVALID"):
+        join_nba_boxscore_evidence(b,e,r)
+
+
+def test_join_requires_explicit_final_state_not_merely_post_tip_receipt():
+    b,e,r=fixtures()
+    e[0]["result_observed_at"]="2026-01-10T00:30:01Z"
+    e[0]["finalized_at"]="2026-01-10T00:30:01Z"
+    del e[0]["event_state"]
+    with pytest.raises(ValueError,match="FINAL_STATE_WITNESS_MISSING"):
+        join_nba_boxscore_evidence(b,e,r)
+
+
+def test_join_rejects_result_receipt_before_finalization():
+    b,e,r=fixtures()
+    e[0]["finalized_at"]="2026-01-10T05:01:00Z"
+    with pytest.raises(ValueError,match="FINAL_STATE_CHRONOLOGY_INVALID"):
+        join_nba_boxscore_evidence(b,e,r)
+
+
+def test_join_rejects_claimed_finalization_before_tipoff():
+    b,e,r=fixtures()
+    e[0]["finalized_at"]="2026-01-10T00:29:59Z"
+    with pytest.raises(ValueError,match="FINAL_STATE_CHRONOLOGY_INVALID"):
         join_nba_boxscore_evidence(b,e,r)
