@@ -134,9 +134,16 @@ def join_nba_boxscore_evidence(boxes, event_receipts, player_roles):
         eligible=sorted((z for z in roles.get((pid,team),[]) if z[0]<tip),key=lambda z:z[0])
         if not eligible:
             raise ValueError("NBA_EARLY_JOIN_PREGAME_ROLE_RECEIPT_MISSING")
-        if len({z[1] for z in eligible})>1:
-            raise ValueError("NBA_EARLY_JOIN_CONFLICTING_PLAYER_ROLE")
-        role_receipt,position,role_ref=eligible[-1]
+        # Older receipts may be legitimately superseded as a player's listed
+        # position changes. Only evidence tied for the latest pretip instant
+        # must agree; otherwise choosing one would depend on input order.
+        latest_role_time=eligible[-1][0]
+        latest_roles=[z for z in eligible if z[0]==latest_role_time]
+        latest_claims={(z[1],z[2]) for z in latest_roles}
+        if len(latest_claims)>1:
+            raise ValueError("NBA_EARLY_JOIN_AMBIGUOUS_LATEST_PLAYER_ROLE")
+        position,role_ref=next(iter(latest_claims))
+        role_receipt=latest_role_time
         minutes=_minutes(box.get("MIN"))
         pts=_count(box.get("PTS"),"NBA_EARLY_JOIN_PTS")
         reb=_count(box.get("REB"),"NBA_EARLY_JOIN_REB")

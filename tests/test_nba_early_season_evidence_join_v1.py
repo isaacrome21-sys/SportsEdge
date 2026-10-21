@@ -133,3 +133,28 @@ def test_valid_join_preserves_final_receipt_and_role_witness_for_audit():
     assert row["role_observed_at"]=="2026-01-09T22:00:00+00:00"
     assert row["role_source_ref"]=="roster-receipt"
     assert row["receipt_authentication"]=="NOT_ESTABLISHED_BY_CALLER_FIELDS"
+
+
+def test_newer_pretip_role_receipt_supersedes_older_position():
+    b,e,r=fixtures()
+    r.insert(0, {
+        "player_id":"99", "team_abbreviation":"NY", "position":"G",
+        "observed_at":"2026-01-09T18:00:00Z",
+        "source_ref":"older-roster-receipt",
+    })
+    r[1]["position"]="F"
+    row=join_nba_boxscore_evidence(b,e,r)["rows"][0]
+    assert row["position"]=="F"
+    assert row["role_observed_at"]=="2026-01-09T22:00:00+00:00"
+    assert row["role_source_ref"]=="roster-receipt"
+
+
+def test_same_latest_instant_conflicting_role_evidence_fails_closed():
+    b,e,r=fixtures()
+    r.append({
+        "player_id":"99", "team_abbreviation":"NY", "position":"F",
+        "observed_at":"2026-01-09T22:00:00Z",
+        "source_ref":"conflicting-roster-receipt",
+    })
+    with pytest.raises(ValueError,match="AMBIGUOUS_LATEST_PLAYER_ROLE"):
+        join_nba_boxscore_evidence(b,e,r)
