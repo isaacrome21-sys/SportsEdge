@@ -197,6 +197,12 @@ def postgame_score_path_labels(packet: Mapping[str, Any]) -> MLBScoringPathLabel
         # is not an ordinary completed MLB path.
         raise MLBScoringPathError("EXTRA_INNING_REGULATION_TIE_INVARIANT")
     bottom9 = "9_BOTTOM" in played_keys
+    home_before_bottom_ninth = sum(
+        counts["HOME"] for inning, counts in inning_runs.items()
+        if inning < 9)
+    away_after_top_ninth = through9["AWAY"]
+    if bottom9 and home_before_bottom_ninth > away_after_top_ninth:
+        raise MLBScoringPathError("HOME_LED_AFTER_TOP_NINTH_CANNOT_BAT")
     if not bottom9 and (count_home <= count_away or extra):
         raise MLBScoringPathError("NINTH_HOME_HALF_OMISSION_INVALID")
     highs = {"AWAY": 0, "HOME": 0}
