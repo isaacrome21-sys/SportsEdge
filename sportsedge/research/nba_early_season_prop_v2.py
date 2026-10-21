@@ -67,6 +67,14 @@ def project_early_prop(records, *, player_id, target_team_id, target_season,
     if prev != year-1 or not isfinite(threshold) or threshold < 0:
         raise ValueError("NBA_EARLY_PROP_INPUT_INVALID")
     clock = _aware(as_of)
+    # The league season is indexed by its opening year, not the year of
+    # every included game. Check both target and history against Chicago
+    # local dates; otherwise mislabeled January games can inflate priors.
+    def belongs_to_season(day, start_year):
+        return ((day.year == start_year and day.month >= 10) or
+                (day.year == start_year + 1 and day.month <= 6))
+    if not belongs_to_season(target, year):
+        raise ValueError("NBA_EARLY_PROP_TARGET_SEASON_DATE_MISMATCH")
     curr, older, prior_teams, current_teams = [], [], set(), set()
     excluded_future = 0
     ids = set()
@@ -113,6 +121,8 @@ def project_early_prop(records, *, player_id, target_team_id, target_season,
             raise ValueError("NBA_EARLY_PROP_PREGAME_ROLE_RECEIPT_REQUIRED")
         if tipoff.astimezone(_SLATE_TZ).date() != local_date:
             raise ValueError("NBA_EARLY_PROP_LOCAL_GAME_DATE_MISMATCH")
+        if not belongs_to_season(local_date, season):
+            raise ValueError("NBA_EARLY_PROP_HISTORY_SEASON_DATE_MISMATCH")
         value, minutes = _stat(row, stat)
         if local_date >= target or tipoff >= clock or available >= clock:
             excluded_future += 1
