@@ -1,8 +1,11 @@
 """No authority from copyable files; exact row conservation and price/timestamp tests."""
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+import hashlib
+import json
 import pytest
 
+from scripts.audit_nba_capture_ledger import main as audit_cli_main
 from sportsedge.forward_validation.nba_full_board_ledger import build_nba_props_entry_ledger
 from sportsedge.nba_phone_prop_pricing import ENGINE_ID
 from sportsedge.validation.nba_forward_capture_proof import (
@@ -43,6 +46,9 @@ def test_capture_only_does_not_invent_forward_records():
     assert result["status"] == "CAPTURE_STRUCTURE_ONLY_NO_LEDGER"
     assert result["verified_model_family_count"] == 0
     assert result["forward_validation_credit"] == "NONE"
+    assert result["canonical_raw_json_sha256"] == _sha(raw)
+    assert "raw_file_bytes_sha256" not in result  # API never receives physical bytes
+    assert "raw_capture_sha256" not in result  # ambiguous old name retired
 
 
 def test_real_builder_produced_ledger_reconciles_without_promoting():
@@ -113,3 +119,41 @@ def test_missing_pair_cannot_masquerade_as_ledger_pair():
     raw["lines"][1]["capture_id"] = "other-capture"
     with pytest.raises(NbaCaptureAuditError, match="PAIR_TO_CAPTURE_JOIN_AMBIGUOUS"):
         audit_capture(raw, ledger)
+
+
+def test_semantic_digest_is_not_a_raw_byte_digest(tmp_path):
+    raw, ledger = fixture()
+    canonical = json.dumps(raw, sort_keys=True, separators=(",", ":"))
+    pretty = json.dumps(raw, indent=2, ensure_ascii=True)
+    assert canonical != pretty
+    p1, p2 = tmp_path / "compact.json", tmp_path / "pretty.json"
+    p1.write_text(canonical, encoding="utf-8")
+    p2.write_text(pretty, encoding="utf-8")
+    out1, out2 = tmp_path / "audit1.json", tmp_path / "audit2.json"
+    assert audit_cli_main(["--raw-board", str(p1), "--out", str(out1)]) == 0
+    assert audit_cli_main(["--raw-board", str(p2), "--out", str(out2)]) == 0
+    a = json.loads(out1.read_text())
+    b = json.loads(out2.read_text())
+    assert a["canonical_raw_json_sha256"] == b["canonical_raw_json_sha256"]
+    assert a["raw_file_bytes_sha256"] != b["raw_file_bytes_sha256"]
+    assert a["raw_file_bytes_sha256"] == hashlib.sha256(p1.read_bytes()).hexdigest()
+    assert b["raw_file_bytes_sha256"] == hashlib.sha256(p2.read_bytes()).hexdigest()
+    assert a["verified_market_admission"] is False
+    assert a["forward_validation_credit"] == "NONE"
+    assert b["play_authority"] is False
+
+
+def test_ledger_reconciliation_cli_keeps_file_and_semantic_digests_separate(tmp_path):
+    raw, ledger = fixture()
+    r = tmp_path / "raw.json"
+    l = tmp_path / "ledger.json"
+    o = tmp_path / "report.json"
+    r.write_bytes(json.dumps(raw, indent=4).encode("utf-8"))
+    l.write_text(json.dumps(ledger), encoding="utf-8")
+    assert audit_cli_main(["--raw-board", str(r), "--ledger", str(l), "--out", str(o)]) == 0
+    report = json.loads(o.read_text())
+    assert report["raw_file_bytes_sha256"] == hashlib.sha256(r.read_bytes()).hexdigest()
+    assert report["canonical_raw_json_sha256"] == _sha(raw)
+    assert report["ledger_sha256"] == ledger["ledger_sha256"]
+    assert report["forward_validation_credit"].startswith("NONE")
+    assert report["provider_quote_authentication"] == "NOT_ESTABLISHED_FROM_INPUT"
