@@ -54,8 +54,16 @@ def test_refuse_quotes_after_tip():
 
 def test_no_future_outcome_contaminates_older_ratings():
     data=rows()
-    result=chronological_side_screen(data)
-    data[0]["observed_at"]=data[-1]["observed_at"]
+    # Delaying game 0's result until after the entire slate correctly
+    # changes the warmup count. Comparing to the original score count is
+    # WRONG: a previously available prior became unavailable by design.
+    delayed_result_at=data[-1]["observed_at"]
+    without_first=chronological_side_screen(data[1:])
+    data[0]["observed_at"]=delayed_result_at
     altered=chronological_side_screen(data)
-    assert result["games_scored"]==altered["games_scored"]
+    # For every target whose features precede the deferred result,
+    # the projection must match completely excluding the unobserved game.
+    assert altered["games_scored"]==without_first["games_scored"]
+    assert altered["candidate_margin_rmse"]==without_first["candidate_margin_rmse"]
+    assert altered["candidate_ml_brier"]==without_first["candidate_ml_brier"]
     assert altered["market_admission"]=="NOT_VERIFIED"
