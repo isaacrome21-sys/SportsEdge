@@ -29,7 +29,7 @@ The F5-derived readout's grammar and Jeffreys half-cell prior are reused. Every 
 
 ## Files (Git blob SHA-1, not SHA-256)
 * `sportsedge/mlb_m50_terminal_score_readouts.py`: `3f31af14280cd2b38550ac4658f04963b14082e7`
-* `tests/test_mlb_m50_terminal_score_readouts.py`: `58c44b619264256e3dab816ddeb1f0a1d4ace998`
+* `tests/test_mlb_m50_terminal_score_readouts.py`: `92c53d90cd6f0bc06134d1b57e2eb2813a7698db`
 * `research/mlb_m50_terminal_score_20261020/SCREEN_SPEC_DRAFT.md`: `a8642d998f08e11b797bb3ee3d9a036e157a62eb`
 
 ## For independent verifier (Rocky)
