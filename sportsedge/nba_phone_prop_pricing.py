@@ -34,8 +34,10 @@ from __future__ import annotations
 import csv
 import glob
 import os
+import re
 import unicodedata
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from .family_market_registry import (
     NBA_RESEARCH_REGISTERED_FAMILIES, family_market_decision)
@@ -46,6 +48,14 @@ FAMILY_TO_STAT = {"player_points": "points", "player_rebounds": "rebounds",
                   "player_assists": "assists", "player_pra": "pra"}
 STORE_ENV_VAR = "SPORTSEDGE_NBA_PROP_STORE_DIR"
 QUOTE_FRESH_SECONDS = 180
+
+# The capture pipeline's slate timezone: the DK archive and slate
+# dates are CT-anchored, so a UTC tipoff instant is reduced to its
+# Chicago calendar date (see _target_date).
+_SLATE_TZ = ZoneInfo("America/Chicago")
+_BARE_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_DATE_KEYS = ("kickoff", "commence_time", "start_time", "game_start",
+              "tipoff", "game_date", "date")
 
 STORE_UNAVAILABLE = "NBA_PROP_HISTORY_STORE_UNAVAILABLE"
 IDENTITY_MISSING = "NBA_PROP_PLAYER_IDENTITY_MISSING"
@@ -89,15 +99,65 @@ def _parse_instant(value):
     return dt.astimezone(timezone.utc)
 
 
+def _parse_aware(value):
+    """``value`` as an aware datetime in its OWN offset, or None.
+
+    Same acceptance rules as ``_parse_instant`` (datetime objects and
+    ISO strings; a value carrying no offset is not an instant), but the
+    stated offset is preserved instead of normalized to UTC.
+    """
+    if isinstance(value, datetime):
+        dt = value
+    elif isinstance(value, str) and value.strip():
+        try:
+            dt = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    else:
+        return None
+    if dt.tzinfo is None or dt.utcoffset() is None:
+        return None
+    return dt
+
+
 def _target_date(row):
-    for key in ("kickoff", "commence_time", "start_time", "game_start",
-                "tipoff", "game_date", "date"):
-        value = row.get(key)
+    """The target game's LOCAL calendar date for the PIT slices.
+
+    ``GameLogStore.price``'s contract: ``target_date`` is the target
+    game's calendar date, and every slice admits only games with
+    ``game_date < target_date`` — where the store's game dates are
+    local calendar dates (``game_dates.csv``). An instant tipoff must
+    therefore be reduced to a calendar date in the timezone the
+    instant is anchored to, never in UTC: taking the UTC date (the
+    pre-fix behavior) rolls every tip at/after 19:00 CT to the next
+    day and admits same-day finals into the player, pool, and league
+    prior slices.
+
+    Preference order over the row's date-bearing keys:
+
+    (a) a bare date (``YYYY-MM-DD``) on any key is already the game's
+        local calendar date — return it unchanged;
+    (b) an instant carrying a non-UTC offset — the calendar date in
+        that offset;
+    (c) a UTC instant — convert it to America/Chicago (the capture
+        pipeline's slate timezone; the DK archive and slate dates
+        are CT-anchored) and take that date.
+    """
+    values = [row.get(key) for key in _DATE_KEYS]
+    for value in values:
+        if isinstance(value, str) and _BARE_DATE_RE.match(value.strip()):
+            try:
+                return date.fromisoformat(value.strip())
+            except ValueError:
+                continue
+    for value in values:
         if value is None:
             continue
-        instant = _parse_instant(value)
-        if instant is not None:
-            return instant.date()
+        aware = _parse_aware(value)
+        if aware is not None:
+            if aware.utcoffset() == timedelta(0):
+                return aware.astimezone(_SLATE_TZ).date()
+            return aware.date()
         if isinstance(value, str) and len(value.strip()) >= 10:
             try:
                 return datetime.fromisoformat(value.strip()[:10]).date()
