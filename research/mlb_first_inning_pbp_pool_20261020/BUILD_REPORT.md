@@ -15,14 +15,25 @@ Requires both halves completely played, final completed official game, verified 
 No calibrated probability distribution, runner, market pricing, odds, eligibility, frozen report or gate change. The existing M21 `FIRST_INNING_PITCHER_K_PBP_POOL_UNBUILT` and `FIRST_INNING_BATTERS_TO_PLATE_PBP_POOL_UNBUILT` canonical gates remain untouched until independently verified pool and chronological evaluation. Full-game/resume/correct-scoring revisions remain unproven.
 
 ## Exact code identities (Git blob SHA-1)
-* `sportsedge/mlb_first_inning_pbp_pool.py`: `84d6445b23c72beecdf32cd3165b5443ecf60008`
-* `tests/test_mlb_first_inning_pbp_pool.py`: `3af222ebe431836af02ae8de445616ade35526cd`
+* `sportsedge/mlb_first_inning_pbp_pool.py`: `1d7b3f8f56fcab7ff81d101318113aad6dd159ca`
+* `tests/test_mlb_first_inning_pbp_pool.py`: `2149311ce626bccf8c7818f05c899a89f6bd491e`
 * `research/mlb_first_inning_pbp_pool_20261020/SCREEN_SPEC_DRAFT.md`: `e8b526898ab3754882d89150d43d820d459fd24d`
 
 ## Tests, screens, holds
-11 parameterized synthetic test functions authored: credited K count, PA team half routing, future/duplicate games, missing subject start, invalid/omitted PAs, half sequence, impossible timestamp, insufficient source, fingerprint and M21 gate hold. **No passing test result independently claimed**; hosted CI + Rocky must verify exact head, derive checks from raw actual StatsAPI PBP, compare old-suite failure set to base.
+12 synthetic test functions authored (including two parametrized collision cases): credited K count, PA team half routing, future/duplicate games, missing subject start, invalid/omitted PAs, half sequence, impossible timestamp, insufficient source, fingerprint and M21 gate hold. **No passing test result independently claimed**; hosted CI + Rocky must verify exact head, derive checks from raw actual StatsAPI PBP, compare old-suite failure set to base.
 
 The first-screen draft is `research/mlb_first_inning_pbp_pool_20261020/SCREEN_SPEC_DRAFT.md` (UNFROZEN, UNRUN). No actual 2025 PIT source manifest supplied and no paired historical DK K/BTP quotes certified. Verdict remains `INSUFFICIENT_DATA` / `NO_MARKET_TEST` without the evidence, never PLAY.
+
+## 2026-10-21 held-repair delta (builder only)
+Opposing teams cannot carry the same starting-pitcher ID. The previous
+packet parser checked each starter's first PA in isolation and permitted a
+single pitcher ID to be declared for both halves; under such input, a
+PITCHER_K subject could have the wrong first-inning scope. Both PITCHER_K
+and TEAM_BTP packet parses now refuse it with the named
+`PBP_STARTER_IDENTITY_COLLISION` error before any counting. The two
+synthetic regression cases use otherwise complete-looking packets. No
+source verification, market-test, or engine promotion is asserted.
+**Hosted exact-head CI and Rocky independent verification remain required.**
 
 ## Rocky handoff
 Cross-check first-inning official scorer/source records, including pitcher changes and a strikeout overturned on review; ensure atBatIndex normalization is verified against independent original PBP and ten *actual starter* games, not coerced rows. Prove all gamePk, timestamps, PA counts and team halves match, and gate/registry/RUN IT sources are byte-identical. Keep draft; fresh CI on current main and explicit screen-data pins before any modeling gate review.
