@@ -12,6 +12,9 @@ def history(nowteam="A", current_games=1, future=False):
                       "season": season, "game_date": day.date().isoformat(),
                       "tipoff": (day + timedelta(hours=20)).isoformat(),
                       "observed_at": (day + timedelta(hours=23)).isoformat(),
+                      "finalized_at": (day + timedelta(hours=22)).isoformat(),
+                      "role_observed_at": (day + timedelta(hours=19)).isoformat(),
+                      "event_state": "FINAL", "result_state": "FINAL",
                       "source_ref": "gamelog", "position": "G",
                       "team_id": team, "minutes": 30,
                       "points": 20 if season==2025 else 32,
@@ -20,6 +23,9 @@ def history(nowteam="A", current_games=1, future=False):
         r.append({"player_id":"p1","game_id":"after","season":2026,
                   "game_date":"2026-10-25","tipoff":"2026-10-25T20:00:00Z",
                   "observed_at":"2026-10-25T23:00:00Z",
+                  "finalized_at":"2026-10-25T22:00:00Z",
+                  "role_observed_at":"2026-10-25T19:00:00Z",
+                  "event_state":"FINAL","result_state":"FINAL",
                   "source_ref":"gamelog","position":"G","team_id":"A",
                   "minutes":30,"points":150,"rebounds":30,"assists":30})
     return r
@@ -99,6 +105,7 @@ def test_utc_tipoff_date_must_match_chicago_local_game_date():
     # Jan 2 08:00 UTC is Jan 2 02:00 CST, not the Jan 1 game_date.
     records[0]["tipoff"] = "2025-01-02T08:00:00Z"
     records[0]["observed_at"] = "2025-01-02T10:00:00Z"
+    records[0]["finalized_at"] = "2025-01-02T09:00:00Z"
     try:
         read(records)
     except ValueError as e:
