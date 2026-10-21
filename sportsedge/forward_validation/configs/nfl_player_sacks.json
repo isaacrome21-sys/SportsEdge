@@ -1,0 +1,25 @@
+{
+ "status": "DRAFT \u2014 NOT FROZEN",
+ "sport": "NFL",
+ "family": "PLAYER_SACKS",
+ "markets": [
+  "PLAYER_SACKS"
+ ],
+ "engine_id": "NFL_PROP_ENGINES_V1",
+ "model_version": "nfl_prop_engines_v1@8b2775008",
+ "market_form": "TWO_SIDED",
+ "sides": [
+  "OVER",
+  "UNDER"
+ ],
+ "over_side": "OVER",
+ "min_rows": 100,
+ "min_events": 40,
+ "min_slates": 4,
+ "max_clv_missing_share": 0.2,
+ "clv_beats_threshold": 0.0,
+ "close_max_age_minutes": 60,
+ "capture_scope": "NO_MARKET",
+ "capture_note": "NO_MARKET_AT_DK_IN_VERIFIED_SAMPLES \u2014 defensive player props were verified absent at DraftKings in the Oct 17 matrix samples (N54). Rows can accumulate only in weeks where DraftKings actually lists this market; until then the family sits at zero rows (program-map verdict: NO_MARKET_TEST_EXISTS on current evidence).",
+ "prereg_draft": "research/forward_validation_program_20261020/drafts/PREREG_NFL_PLAYER_SACKS_FORWARD_V1_DRAFT.md"
+}

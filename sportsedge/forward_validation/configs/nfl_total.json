@@ -1,0 +1,25 @@
+{
+ "status": "DRAFT \u2014 NOT FROZEN",
+ "sport": "NFL",
+ "family": "TOTAL",
+ "markets": [
+  "TOTAL"
+ ],
+ "engine_id": "FREE_MODELS_GAME",
+ "model_version": "FREE_MODELS_GAME:LANE_A_INDEPENDENT",
+ "market_form": "TWO_SIDED",
+ "sides": [
+  "OVER",
+  "UNDER"
+ ],
+ "over_side": "OVER",
+ "min_rows": 100,
+ "min_events": 40,
+ "min_slates": null,
+ "max_clv_missing_share": 0.2,
+ "clv_beats_threshold": 0.0,
+ "close_max_age_minutes": 60,
+ "capture_scope": "IN_SPEC",
+ "capture_note": "Capture Spec V1 includes main game lines (moneyline, spread, total) in the predeclared subset for every NFL game, entry and close. Rows can accumulate from the first slate priced after this preregistration is frozen.",
+ "prereg_draft": "research/forward_validation_program_20261020/drafts/PREREG_NFL_TOTAL_FORWARD_V1_DRAFT.md"
+}
