@@ -106,3 +106,11 @@ def test_refuse_quote_pair_older_than_150_second_capture_span():
     kwargs["quote_rows"][1]["captured_at"] = NOW.isoformat()
     with pytest.raises(ValueError, match="PAIR_CAPTURE_SPAN_EXCEEDED"):
         nhl_paired_market_readout(**kwargs)
+
+
+def test_refuse_same_canonical_team_under_different_aliases():
+    kwargs = case("TOTAL", line=6.5)
+    kwargs["away"] = "Flyers"
+    kwargs["home"] = "Philadelphia Flyers"
+    with pytest.raises(ValueError, match="NHL_FIXTURE_SAME_CANONICAL_TEAM"):
+        nhl_paired_market_readout(**kwargs)
