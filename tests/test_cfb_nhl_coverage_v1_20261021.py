@@ -49,3 +49,17 @@ def test_cfb_operator_provided_evidence_is_not_authenticated_by_strings():
           qb_manifest_pin="asserted", paired_dk_capture_ref="asserted")
     assert v["status"] == "EVIDENCE_SUBMITTED_NOT_INDEPENDENTLY_VERIFIED"
     assert v["authority"] == "NONE"
+
+
+def test_nhl_canonical_alias_self_matchup_refuses():
+    import pytest
+    for away, home in [
+        ("Flyers", "Philadelphia Flyers"),
+        ("PHI", "Philadelphia Flyers"),
+        ("Sabres", "Buffalo Sabres"),
+    ]:
+        with pytest.raises(ValueError, match="NHL_FIXTURE_SAME_CANONICAL_TEAM"):
+            nhl_research_snapshot(
+                away=away, home=home, event_id="bad-self-matchup",
+                event_start=START, as_of=T,
+                fixture_source_ref="operator-supplied-only")
