@@ -1,0 +1,36 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "blocked_count": 2,
+  "blockers": [
+    {
+      "entity_name": "Drew Rasmussen",
+      "observed_at": "2026-10-21T18:41:29.081458+00:00",
+      "provider_event_id": "34865951",
+      "reason": "ValueError:SUBJECT_UNRESOLVED:Drew Rasmussen"
+    },
+    {
+      "entity_name": "Jacob Misiorowski",
+      "observed_at": "2026-10-21T18:41:29.081458+00:00",
+      "provider_event_id": "34865951",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    }
+  ],
+  "eligible_quote_units": 2,
+  "observed_at_utc": "2026-10-21T18:43:22.498454+00:00",
+  "predictions_created": 0,
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-21/props_20261021T184130.371662Z.json",
+  "run_attempt": "1",
+  "run_id": "39655074452",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_RUN_V1",
+  "selection_drops": {
+    "selected_units": 8
+  },
+  "settlements_created": 0,
+  "status": "OK",
+  "summary_sha256": "9c1fb45fa28be825cf08814c0f7bc7c5984a904806c7d022c5d8cd42715ba96e"
+}
