@@ -194,3 +194,33 @@ def test_v2_requires_pregame_role_receipt():
         assert "PREGAME_ROLE_RECEIPT_REQUIRED" in str(e)
     else:
         assert False, "postgame roster cannot establish a pregame role"
+
+
+def test_prior_game_with_wrong_league_season_cannot_enter_pool():
+    records=history()
+    # This observed Jan 2025 game belongs to 2024-25, not the 2025-26
+    # prior season declared on the record. Receipt order is otherwise valid.
+    row=records[0]
+    row["game_date"]="2025-01-01"
+    row["tipoff"]="2025-01-01T20:00:00Z"
+    row["finalized_at"]="2025-01-01T22:00:00Z"
+    row["observed_at"]="2025-01-01T23:00:00Z"
+    row["role_observed_at"]="2025-01-01T19:00:00Z"
+    try:
+        read(records)
+    except ValueError as e:
+        assert "HISTORY_SEASON_DATE_MISMATCH" in str(e)
+    else:
+        assert False, "mislabeled prior NBA season accepted"
+
+
+def test_target_season_cannot_be_outside_league_calendar():
+    try:
+        project_early_prop(
+            history(), player_id="p1",target_team_id="A",
+            target_season=2026,target_date="2027-07-01",
+            as_of="2027-07-01T17:00:00Z",stat="points",line=22.5)
+    except ValueError as e:
+        assert "TARGET_SEASON_DATE_MISMATCH" in str(e)
+    else:
+        assert False, "July target not within the declared NBA league season"
