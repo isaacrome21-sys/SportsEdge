@@ -107,7 +107,7 @@ def _capture(raw: Any, *, event: str, market: str,
         if not isinstance(q, Mapping) or set(q) != QUOTE_FIELDS:
             raise GameLinePreflightError("QUOTE_CONTRACT_MISMATCH")
         side = q.get("side")
-        if side not in allowed or side in seen:
+        if not isinstance(side, str) or side not in allowed or side in seen:
             raise GameLinePreflightError("DUPLICATE_OR_UNKNOWN_QUOTE_SIDE")
         value = _price(q.get("american_odds"))
         at = _utc(q.get("quote_at_utc"), "QUOTE")
@@ -181,7 +181,7 @@ def audit_nba_game_line_capture_preflight(payload: Mapping[str, Any]) -> dict:
             raise GameLinePreflightError("FIXTURE_CONTRACT_MISMATCH")
         event = _id(f.get("event_id"), "EVENT")
         market = f.get("market")
-        if market not in MARKETS:
+        if not isinstance(market, str) or market not in MARKETS:
             raise GameLinePreflightError("MARKET_OUT_OF_SCOPE")
         key = (event, market)
         if key in keys:
