@@ -65,7 +65,7 @@ def project_early_prop(records, *, player_id, target_team_id, target_season,
     if prev != year-1 or not isfinite(threshold) or threshold < 0:
         raise ValueError("NBA_EARLY_PROP_INPUT_INVALID")
     clock = _aware(as_of)
-    curr, older, prior_teams = [], [], set()
+    curr, older, prior_teams, current_teams = [], [], set(), set()
     excluded_future = 0
     ids = set()
     for row in records:
@@ -108,6 +108,7 @@ def project_early_prop(records, *, player_id, target_team_id, target_season,
             continue
         if season == year:
             curr.append(value)
+            current_teams.add(played_for)
         else:
             older.append(value)
             prior_teams.add(played_for)
@@ -139,7 +140,11 @@ def project_early_prop(records, *, player_id, target_team_id, target_season,
         mean_current = 0.0
     mean_old = sum(older)/len(older)
     mean = weight_current*mean_current + (1-weight_current)*mean_old
-    transfer = bool(prior_teams and (prior_teams != {team}))
+    # Prior-season changes and same-season trades both change player role,
+    # usage and minutes assumptions. A V2 empirical mixture cannot prove
+    # stability merely because the old season used the target team.
+    transfer = bool((prior_teams and prior_teams != {team}) or
+                    (current_teams and current_teams != {team}))
     return {"engine_id": ENGINE,
             "status": "WATCH_TRANSFER_NOT_MODELED" if transfer else "RESEARCH_PROJECTION",
             "player_id": pid, "stat": stat, "line": threshold,
@@ -148,7 +153,8 @@ def project_early_prop(records, *, player_id, target_team_id, target_season,
             "current_season_prior_games": len(curr),
             "previous_season_games": len(older),
             "previous_season": prev, "target_season": year,
-            "previous_team_ids": sorted(prior_teams), "target_team_id": team,
+            "previous_team_ids": sorted(prior_teams),
+            "current_team_ids": sorted(current_teams), "target_team_id": team,
             "transfer_unmodeled": transfer, "future_rows_excluded": excluded_future,
             "as_of_utc": clock.isoformat(),
             "market_test": "NOT_RUN", "availability": "NOT_WIRED",
