@@ -117,6 +117,8 @@ def test_blocked_and_watch_rows_stay_visible_but_do_not_count():
     ("capture_id", None, "CAPTURE_OR_EVENT_ID_MISSING"),
     ("event_id", None, "CAPTURE_OR_EVENT_ID_MISSING"),
     ("book", "otherbook", "BOOK_NOT_DRAFTKINGS"),
+    ("book", None, "BOOK_NOT_DRAFTKINGS"),
+    ("book", "", "BOOK_NOT_DRAFTKINGS"),
     ("commence_time", "2026-10-22T19:30:00-05:00", "EVENT_OUTSIDE_SLATE"),
     ("quote_captured_at", START, "ENTRY_NOT_PRE_EVENT"),
 ])
@@ -169,6 +171,31 @@ def test_preboundary_and_poststart_recording_refuse_or_exclude():
     assert exc.value.reason == "SLATE_BEFORE_PROSPECTIVE_BOUNDARY"
     out = build(recorded_at="2026-10-21T19:31:00-05:00")
     assert out["ledger"] == [] and out["accounting"]["late_rows"] == 2
+
+
+
+def test_recorded_before_capture_is_not_prospective_evidence():
+    out = build(recorded_at="2026-10-21T15:59:00-05:00")
+    assert out["ledger"] == []
+    assert out["accounting"]["noncausal_rows"] == 2
+    assert {r["reason"] for r in out["rejected"]} == {
+        "RECORDED_BEFORE_CAPTURE"
+    }
+
+
+def test_recording_exactly_at_event_start_is_excluded():
+    out = build(recorded_at=START)
+    assert out["ledger"] == []
+    assert out["accounting"]["late_rows"] == 2
+    assert {r["reason"] for r in out["rejected"]} == {
+        "ENTRY_NOT_PRE_EVENT"
+    }
+
+
+def test_recording_at_capture_with_other_offset_is_countable():
+    out = build(recorded_at="2026-10-21T21:00:00Z")
+    assert out["accounting"]["ledger_rows"] == 1
+    assert out["accounting"]["noncausal_rows"] == 0
 
 
 def test_mutating_return_does_not_change_stable_rebuild():
