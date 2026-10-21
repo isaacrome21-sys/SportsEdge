@@ -27,6 +27,8 @@ def rows():
                         "tipoff":(dt+timedelta(hours=20)).isoformat(),
                         "decision_as_of":(dt+timedelta(hours=19,minutes=55)).isoformat(),
                         "observed_at":(dt+timedelta(hours=23)).isoformat(),
+                        "finalized_at":(dt+timedelta(hours=22)).isoformat(),
+                        "event_state":"FINAL","result_state":"FINAL",
                         "source_ref":"scorelog","minutes":30,
                         "points":30,"rebounds":5,"assists":5})
     return history,targets
@@ -81,5 +83,20 @@ def test_utc_next_day_still_chicago_local_previous_day():
     t[0]["tipoff"]="2026-10-02T00:30:00Z"
     t[0]["decision_as_of"]="2026-10-02T00:20:00Z"
     t[0]["observed_at"]="2026-10-02T03:00:00Z"
+    t[0]["finalized_at"]="2026-10-02T02:30:00Z"
     x=screen_early_prop_mae(h,t,stat="points")
     assert x["scored"]==4
+
+
+def test_screen_refuses_target_without_final_state():
+    h,t=rows()
+    t[0].pop("event_state")
+    with pytest.raises(ValueError,match="FINAL_WITNESS_REQUIRED"):
+        screen_early_prop_mae(h,t,stat="points")
+
+
+def test_screen_refuses_target_final_receipt_before_finalization():
+    h,t=rows()
+    t[0]["finalized_at"]="2026-10-02T06:00:00Z"
+    with pytest.raises(ValueError,match="FINAL_CHRONOLOGY_INVALID"):
+        screen_early_prop_mae(h,t,stat="points")
