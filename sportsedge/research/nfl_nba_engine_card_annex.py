@@ -88,6 +88,13 @@ def _pair_ok(rows, row, *, at, event_id, sport, market, player_id, line, default
         return "TWO_SIDED_OU_REQUIRED"
     if str(row.get("book") or row.get("bookmaker") or "").upper() not in {"DRAFTKINGS", "DK"}:
         return "DRAFTKINGS_QUOTE_REQUIRED"
+    try:
+        raw_price = float(row.get("odds_american", row.get(
+            "american_odds", row.get("odds"))))
+        if not math.isfinite(raw_price) or raw_price == 0:
+            return "FINITE_DK_ODDS_REQUIRED"
+    except (ValueError, TypeError):
+        return "FINITE_DK_ODDS_REQUIRED"
     if str(row.get("source_quote_form") or "").upper() in {"MILESTONE_LADDER", "YES_ONLY"}:
         return "NATIVE_TWO_SIDED_QUOTES_REQUIRED"
     matching = []
@@ -165,6 +172,8 @@ def build_annex(rows, evaluated, *, at, default_sport=None, history=None,
     history_pin_ok = {sport: _pins_ok(history.get(sport), pins,
                                   sport.lower() + "_history_sha256")
                       for sport in ("NFL", "NBA")}
+    nfl_typed_history = None
+    engine_cache = {}
     for index, row, sport, market in candidate:
         def refuse(reason):
             result["readouts"].append(_refused(index, sport, market, reason))
@@ -217,6 +226,12 @@ def build_annex(rows, evaluated, *, at, default_sport=None, history=None,
             if not player_id:
                 refuse("PLAYER_ID_UNBOUND")
                 continue
+            # A captured name/id alone cannot certify athlete participation.
+            # The operator-pinned fixture binds DK player IDs to nflverse IDs.
+            model_player_id = (fixture.get("player_id_map") or {}).get(player_id)
+            if not isinstance(model_player_id, str) or not model_player_id:
+                refuse("NFL_PLAYER_FIXTURE_IDENTITY_UNBOUND")
+                continue
             if not isinstance(fixture.get("season"), int) or not isinstance(
                     fixture.get("week"), int) or fixture["week"] < 1:
                 refuse("NFL_PIT_SEASON_WEEK_UNVERIFIED")
@@ -227,12 +242,19 @@ def build_annex(rows, evaluated, *, at, default_sport=None, history=None,
                 from sportsedge.nfl_prop_engines_v1 import price_nfl_prop
                 # JSON file keys become strings, while the merged v1 engine
                 # looks up integer seasons and (week, position, stat) tuples.
-                typed = {int(y): {pid: [(int(g[0]), g[1], g[2]) for g in games]
-                                   for pid, games in players.items()}
-                         for y, players in history["NFL"].items()}
-                estimate = price_nfl_prop(
-                    NFL_FAMILIES[market], player_id, line,
-                    typed, fixture["season"], fixture["week"])
+                if nfl_typed_history is None:
+                    nfl_typed_history = {
+                        int(y): {pid: [(int(g[0]), g[1], g[2])
+                                       for g in games]
+                                 for pid, games in players.items()}
+                        for y, players in history["NFL"].items()}
+                key = (sport, NFL_FAMILIES[market], model_player_id, line,
+                       fixture["season"], fixture["week"])
+                if key not in engine_cache:
+                    engine_cache[key] = price_nfl_prop(
+                        NFL_FAMILIES[market], model_player_id, line,
+                        nfl_typed_history, fixture["season"], fixture["week"])
+                estimate = engine_cache[key]
             except Exception as exc:
                 refuse("NFL_ENGINE_FAILED:" + type(exc).__name__)
                 continue
@@ -247,6 +269,11 @@ def build_annex(rows, evaluated, *, at, default_sport=None, history=None,
                           "prior_games": estimate.get("games_logged")}
         else:
             home, away = fixture.get("home"), fixture.get("away")
+            if market in {"TEAM_TOTAL", "TEAM_TOTALS",
+                          "TEAM_QUARTER_TOTAL", "TEAM_HALF_TOTAL"} and (
+                    row.get("team") not in {home, away}):
+                refuse("NBA_TEAM_SELECTION_UNBOUND")
+                continue
             if not home or not away or home == away or not isinstance(
                     fixture.get("season"), int) or not fixture.get("target_date"):
                 refuse("NBA_FIXTURE_IDENTITY_INCOMPLETE")
@@ -255,10 +282,14 @@ def build_annex(rows, evaluated, *, at, default_sport=None, history=None,
                 # The operator supplies the league-local game date.
                 # UTC calendar date can differ from the local fixture date.
                 from sportsedge.nba_team_period_engine import price_game
-                estimate = price_game(
-                    history["NBA"], home, away, season=fixture["season"],
-                    target_date=fixture["target_date"],
-                    period_source=nba_period_source)
+                key = (sport, home, away, fixture["season"],
+                       fixture["target_date"], str(nba_period_source))
+                if key not in engine_cache:
+                    engine_cache[key] = price_game(
+                        history["NBA"], home, away, season=fixture["season"],
+                        target_date=fixture["target_date"],
+                        period_source=nba_period_source)
+                estimate = engine_cache[key]
             except Exception as exc:
                 refuse("NBA_ENGINE_FAILED:" + type(exc).__name__)
                 continue
