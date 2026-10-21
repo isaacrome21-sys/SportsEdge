@@ -1,8 +1,9 @@
 """Read-only proof audit for an NBA full-board capture and optional ledger.
 
 This MUST NOT mint forward units, Model_P, validated families or betting
-authority. The hash identifies the caller's bytes, not the authenticity
-of a sportsbook capture. Missing or mismatched evidence fails visibly.
+authority. A canonical-JSON digest identifies parsed CONTENT, not raw source-file bytes
+or sportsbook origin. Only the CLI, which reads actual bytes, can report a
+separate raw file-byte digest. Missing or mismatched evidence fails visibly.
 """
 from __future__ import annotations
 
@@ -119,7 +120,7 @@ def audit_capture(raw_doc, ledger_doc=None):
             duplicate += 1
     result = {
         "schema": SCHEMA, "status": "CAPTURE_STRUCTURE_ONLY_NO_LEDGER",
-        "raw_capture_sha256": _sha(raw_doc),
+        "canonical_raw_json_sha256": _sha(raw_doc),
         "total_raw_rows": len(rows), "in_scope_rows": len(in_scope),
         "out_of_scope_rows": out_of_scope,
         "complete_pair_shape_groups": complete,
