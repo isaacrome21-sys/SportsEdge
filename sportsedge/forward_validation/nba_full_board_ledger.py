@@ -188,7 +188,7 @@ def build_nba_props_entry_ledger(
             rejected.append(_reject(index, raw, priced, "CAPTURE_OR_EVENT_ID_MISSING"))
             counts["identity_rejected_rows"] += 1
             continue
-        if str(raw.get("book") or "draftkings").lower() not in {
+        if str(raw.get("book") or "").strip().lower() not in {
             "draftkings", "dk"
         }:
             rejected.append(_reject(index, raw, priced, "BOOK_NOT_DRAFTKINGS"))
@@ -205,7 +205,11 @@ def build_nba_props_entry_ledger(
             rejected.append(_reject(index, raw, priced, "EVENT_OUTSIDE_SLATE"))
             counts["wrong_slate_rows"] += 1
             continue
-        if captured >= start or recorded > start:
+        if recorded < captured:
+            rejected.append(_reject(index, raw, priced, "RECORDED_BEFORE_CAPTURE"))
+            counts["noncausal_rows"] += 1
+            continue
+        if captured >= start or recorded >= start:
             rejected.append(_reject(index, raw, priced, "ENTRY_NOT_PRE_EVENT"))
             counts["late_rows"] += 1
             continue
@@ -309,7 +313,7 @@ def build_nba_props_entry_ledger(
     accounting = {key: int(counts.get(key, 0)) for key in (
         "raw_rows", "in_scope_rows", "out_of_scope_rows",
         "identity_rejected_rows", "book_rejected_rows", "wrong_slate_rows",
-        "late_rows", "blocked_rows", "watch_rows", "priced_side_rows",
+        "late_rows", "noncausal_rows", "blocked_rows", "watch_rows", "priced_side_rows",
         "unpaired_priced_rows", "paired_quote_sets", "ledger_rows",
         "picked_rows", "passed_rows",
     )}
