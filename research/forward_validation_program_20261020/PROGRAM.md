@@ -203,8 +203,8 @@ frozen Oct 17 calibration construction (BEATS_BASELINE on the ESPN
 snapshot, n=16,818: PTS CRPS 3.5653 vs 4.9724; REB 1.4413 vs 1.7707;
 AST 1.0055 vs 1.3678; PRA 4.7082 vs 6.9463), wiring the engines,
 registering the four families research-only, and writing the draft
-preregistration (`PREREG_NBA_PROPS_FORWARD_V1_DRAFT`, DRAFT — not
-frozen). DK captures for these families are already in Capture Spec
+preregistration (`PREREG_NBA_PROPS_FORWARD_V1`, FROZEN
+2026-10-20 by owner ruling; first countable slate Wed Oct 21, 2026). DK captures for these families are already in Capture Spec
 V1's NBA scope and accrue twice daily. This program's map entry is
 the complete record; the draft itself lives with the sibling build.
 
