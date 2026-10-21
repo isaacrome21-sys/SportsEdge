@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
+from math import isfinite
 from typing import Any
 
 
@@ -28,11 +30,23 @@ class NhlGameTicket:
 
 def _american(token: str) -> int:
     try:
-        value = int(float(token.strip()))
-    except ValueError as exc:
+        number = Decimal(token.strip())
+    except InvalidOperation as exc:
         raise NhlLinesIntakeError(f"NHL_INTAKE_ODDS_INVALID:{token}") from exc
-    if -100 < value < 100:
+    if (not number.is_finite() or not isfinite(float(number))
+            or number != number.to_integral_value()
+            or -100 < number < 100):
         raise NhlLinesIntakeError(f"NHL_INTAKE_ODDS_INVALID:{token}")
+    return int(number)
+
+
+def _line_value(token: str, raw: str) -> float:
+    try:
+        value = float(token)
+    except ValueError as exc:
+        raise NhlLinesIntakeError(f"NHL_INTAKE_LINE_INVALID:{raw}") from exc
+    if not isfinite(value):
+        raise NhlLinesIntakeError(f"NHL_INTAKE_LINE_INVALID:{raw}")
     return value
 
 
@@ -47,6 +61,8 @@ def parse_nhl_lines(body: str) -> list[NhlGameTicket]:
             away, home = [p.strip() for p in line.split("@", 1)]
             if not away or not home:
                 raise NhlLinesIntakeError(f"NHL_INTAKE_HEADER_INVALID:{line}")
+            if away.casefold() == home.casefold():
+                raise NhlLinesIntakeError(f"NHL_INTAKE_TEAMS_IDENTICAL:{line}")
             current = NhlGameTicket(away=away, home=home, header=line)
             games.append(current)
             continue
@@ -61,15 +77,18 @@ def parse_nhl_lines(body: str) -> list[NhlGameTicket]:
         elif kind in {"pl", "puck", "puckline"}:
             if len(parts) != 4:
                 raise NhlLinesIntakeError(f"NHL_INTAKE_ONE_SIDED_OR_MALFORMED:{line}")
-            current.markets.append(NhlMarketLine("PUCK_LINE", float(parts[1]), _american(parts[2]), _american(parts[3]), line))
+            current.markets.append(NhlMarketLine("PUCK_LINE", _line_value(parts[1], line), _american(parts[2]), _american(parts[3]), line))
         elif kind in {"total", "ou"}:
             if len(parts) != 4:
                 raise NhlLinesIntakeError(f"NHL_INTAKE_ONE_SIDED_OR_MALFORMED:{line}")
-            current.markets.append(NhlMarketLine("TOTAL", float(parts[1]), _american(parts[2]), _american(parts[3]), line))
+            current.markets.append(NhlMarketLine("TOTAL", _line_value(parts[1], line), _american(parts[2]), _american(parts[3]), line))
         else:
             raise NhlLinesIntakeError(f"NHL_INTAKE_UNRECOGNIZED:{line}")
     if not games:
         raise NhlLinesIntakeError("NHL_INTAKE_NO_GAMES")
+    for game in games:
+        if not game.markets:
+            raise NhlLinesIntakeError(f"NHL_INTAKE_GAME_WITHOUT_MARKETS:{game.header}")
     return games
 
 

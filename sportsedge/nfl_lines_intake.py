@@ -6,6 +6,8 @@ prices but never turns those prices into model inputs.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
+from math import isfinite
 import shlex
 from typing import Any
 
@@ -67,19 +69,24 @@ class NflGameTicket:
 def _american(token: str) -> int:
     text = token.strip()
     try:
-        value = int(float(text))
-    except ValueError as exc:
+        number = Decimal(text)
+    except InvalidOperation as exc:
         raise NflLinesIntakeError(f"NFL_INTAKE_ODDS_INVALID:{token}") from exc
-    if -100 < value < 100:
+    if (not number.is_finite() or not isfinite(float(number))
+            or number != number.to_integral_value()
+            or -100 < number < 100):
         raise NflLinesIntakeError(f"NFL_INTAKE_ODDS_INVALID:{token}")
-    return value
+    return int(number)
 
 
 def _line_value(token: str, raw: str) -> float:
     try:
-        return float(token)
+        value = float(token)
     except ValueError as exc:
         raise NflLinesIntakeError(f"NFL_INTAKE_LINE_INVALID:{raw}") from exc
+    if not isfinite(value):
+        raise NflLinesIntakeError(f"NFL_INTAKE_LINE_INVALID:{raw}")
+    return value
 
 
 def _header(line: str) -> tuple[str, str] | None:
@@ -89,9 +96,12 @@ def _header(line: str) -> tuple[str, str] | None:
     if not away or not home:
         raise NflLinesIntakeError(f"NFL_INTAKE_HEADER_INVALID:{line}")
     try:
-        return resolve_team(away), resolve_team(home)
+        away_team, home_team = resolve_team(away), resolve_team(home)
     except NflTeamAliasError as exc:
         raise NflLinesIntakeError(str(exc)) from exc
+    if away_team == home_team:
+        raise NflLinesIntakeError(f"NFL_INTAKE_TEAMS_IDENTICAL:{line}")
+    return away_team, home_team
 
 
 def _prop_market(token: str) -> str:
@@ -209,6 +219,9 @@ def parse_nfl_lines(body: str) -> list[NflGameTicket]:
         raise NflLinesIntakeError(f"NFL_INTAKE_UNRECOGNIZED:{line}")
     if not games:
         raise NflLinesIntakeError("NFL_INTAKE_NO_GAMES")
+    for game in games:
+        if not game.markets:
+            raise NflLinesIntakeError(f"NFL_INTAKE_GAME_WITHOUT_MARKETS:{game.header}")
     return games
 
 
