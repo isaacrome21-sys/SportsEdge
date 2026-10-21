@@ -55,3 +55,25 @@ Exact changed blobs:
 Existing builder tests mentioned elsewhere in this PR predate this delta;
 do not transfer their green claim to the new head. No new real capture or
 forward-validation evidence was produced by this code change.
+
+## Oct 21 hosted CI diagnostic and exact-head refusal-order repair
+
+Hosted GitHub Actions on previous head `bd51ce890cde4b253bb5dcd34d044e7b5a07d4d9`
+reported **9,051 passed, 1 failed, 5 skipped, 105 warnings, and 951 subtests passed**
+in the `pytest-discovery` suite (180.38 s). The full `automation-core` job
+failed on the same single test, while seven of nine visible workflow runs passed.
+
+The exact failure was
+`test_identity_book_slate_and_pre_event_fail_closed[quote_captured_at-2026-10-21T19:30:00-05:00-ENTRY_NOT_PRE_EVENT]`:
+expected rejection `ENTRY_NOT_PRE_EVENT`, observed `RECORDED_BEFORE_CAPTURE`.
+The prior implementation tested `recorded_at < captured_at` before
+`captured_at >= event_start or recorded_at >= event_start`.
+
+**Correction:** preserve all original fail-closed inequalities, but test the
+late/at-tip condition first so the existing negative-control test identifies
+an at-tip quote as `ENTRY_NOT_PRE_EVENT`; only strictly pre-event quotes
+can be labeled `RECORDED_BEFORE_CAPTURE`. No prospective row is admitted
+by this reorder that was formerly rejected. An existing pytest case covers
+the exact precedence. No new tests, gating, engine or frozen spec changes.
+The new revision needs hosted CI and Rocky's independent exact-head review;
+do not transfer the previous 87-pass builder result or claim new tests passed.

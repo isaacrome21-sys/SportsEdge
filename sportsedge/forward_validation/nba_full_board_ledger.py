@@ -205,13 +205,16 @@ def build_nba_props_entry_ledger(
             rejected.append(_reject(index, raw, priced, "EVENT_OUTSIDE_SLATE"))
             counts["wrong_slate_rows"] += 1
             continue
-        if recorded < captured:
-            rejected.append(_reject(index, raw, priced, "RECORDED_BEFORE_CAPTURE"))
-            counts["noncausal_rows"] += 1
-            continue
+        # A quote at/after tip is categorically late even when the
+        # operator recording timestamp is earlier than the quote.
+        # Preserve that classification before testing causal chronology.
         if captured >= start or recorded >= start:
             rejected.append(_reject(index, raw, priced, "ENTRY_NOT_PRE_EVENT"))
             counts["late_rows"] += 1
+            continue
+        if recorded < captured:
+            rejected.append(_reject(index, raw, priced, "RECORDED_BEFORE_CAPTURE"))
+            counts["noncausal_rows"] += 1
             continue
         if priced.get("status") not in PRICED_STATUSES:
             reason = (
