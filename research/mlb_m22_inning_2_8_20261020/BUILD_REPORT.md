@@ -20,7 +20,7 @@ No canonical deployment: `sportsedge.mlb_per_inning_gates` untouched. New readou
 
 ## Test and screen state
 
-* 13 pytest functions with parameterized test sets **authored**, not yet independently run or green-claimed. Tests cover seven innings, three-way TIE mass conservation, opposite signed run-line coherence, both totals rungs, duplicate gamePk, target leakage, future timestamps, same-day PIT fence, missing played half, official game length, source SHA, missing league sample for m30, invalid run inputs, zero game samples, hash binding, unsupported ninth and canonical gate hold.
+* 16 pytest functions with parameterized test sets **authored**, not yet independently run or green-claimed. Tests cover seven innings, three-way TIE mass conservation, opposite signed run-line coherence, both totals rungs, duplicate gamePk, target leakage, future timestamps, same-day PIT fence, missing played half, official game length, source SHA, missing league sample for m30, invalid run inputs, zero game samples, hash binding, unsupported ninth and canonical gate hold.
 * `SCREEN_SPEC_DRAFT.md` documents proposed one-shot 2025 PIT chrono evaluation against league-by-inning climatology, with Brier/log loss and block-bootstrap confidence intervals. **UNRUN**. No score metrics, sample N, mean result, truth gate or admissible market edges asserted. Owner must first admit a complete historical source manifest with observed-at lineage, before any historical evaluations. No data backfill.
 * No third-party runtime deps changed.
 
