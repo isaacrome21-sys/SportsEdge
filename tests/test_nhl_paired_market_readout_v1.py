@@ -114,3 +114,20 @@ def test_refuse_same_canonical_team_under_different_aliases():
     kwargs["home"] = "Philadelphia Flyers"
     with pytest.raises(ValueError, match="NHL_FIXTURE_SAME_CANONICAL_TEAM"):
         nhl_paired_market_readout(**kwargs)
+
+
+@pytest.mark.parametrize("market,line", [("TOTAL", 6.0), ("PUCK_LINE", 1.0)])
+def test_integer_push_lines_compare_conditional_model_to_no_vig(market, line):
+    result = nhl_paired_market_readout(**case(market, line=line))
+    raw = result["rate_v1_model"]
+    conditional = result["rate_v1_conditional_on_no_push"]
+    market_nv = result["same_book_no_vig"]
+    assert raw["PUSH"] > 0.0
+    assert abs(sum(raw.values()) - 1.0) < 1e-8
+    assert abs(sum(conditional.values()) - 1.0) < 1e-8
+    assert result["comparison_basis"] == "RESOLVED_WAGER_CONDITIONAL_NOT_RAW_MASS"
+    for side in conditional:
+        assert conditional[side] > raw[side]
+        assert result["model_minus_no_vig"][side] == pytest.approx(
+            conditional[side] - market_nv[side])
+    assert result["play_authority"] is False
