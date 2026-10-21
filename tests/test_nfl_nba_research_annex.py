@@ -157,6 +157,16 @@ def test_run_full_annex_does_not_mutate_existing_card_surfaces():
                           annex_history={"NFL": _nfl_history()},
                           annex_fixtures=_fixtures("NFL"),
                           annex_pins=_kwargs("NFL", _nfl_history())["pins"])
+    baseline_annex = plain.pop("nfl_nba_engine_research_annex")
+    # The new annex intentionally exists even without operator evidence:
+    # it fails closed on each family. Strip the annex from BOTH cards
+    # before comparing their pre-existing canonical surfaces.
+    assert baseline_annex["readouts"]
+    assert all(r["status"] == "REFUSED"
+               and r["reason"] == "OPERATOR_FIXTURE_PIN_MISSING_OR_MISMATCH"
+               for r in baseline_annex["readouts"])
     annex = with_annex.pop("nfl_nba_engine_research_annex")
     assert annex["readouts"]
+    assert all(r["status"] == "RESEARCH_ESTIMATE_UNVALIDATED"
+               for r in annex["readouts"])
     assert with_annex == plain
