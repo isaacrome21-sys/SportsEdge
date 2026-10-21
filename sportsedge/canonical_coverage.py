@@ -490,6 +490,198 @@ def _with_nfl_registration(sport, resolution):
     return merged
 
 
+REGISTERED_RESEARCH_ONLY = "REGISTERED_RESEARCH_ONLY"
+FAILED_VALIDATION = "FAILED_VALIDATION"
+
+# ---------------------------------------------------------------------
+# Family-registry surfacing (truth-in-labeling).  The family branch of
+# resolve_market used to hardcode state BLOCKED for every CFB/NBA/CBB
+# market, so a surface consulting this authority refused outright even
+# for families the family registry of record
+# (sportsedge.family_market_registry) had already registered
+# research-only, while the phone lane priced the same families as
+# labeled research through sportsedge.registry_gate.  The helpers below
+# surface each family's TRUE recorded state.  Nothing here grants
+# pricing: research-pricing permission lives only in
+# sportsedge.registry_gate (per-row pricing conditions), eligible and
+# promotable stay False everywhere, and no validation state changes.
+
+# NBA game lines carry a recorded FAILED_VALIDATION verdict -- an
+# accuracy gap vs the close (NBA market readiness verdict 2026-10-18;
+# tested-ideas ledger sections 9-10; research/
+# forward_validation_program_20261020/PROGRAM.md).  The odds vintage
+# was untimestamped, so it is an accuracy-gap verdict, not a
+# beat-the-close verdict.  These families are not NOT_VALIDATED by
+# omission and are not research-pricing-eligible as validated
+# candidates; any successor is a NEW model version scored forward only.
+_NBA_GAME_LINE_FAILURES = {
+    "moneyline": ("moneyline Brier diff (model - market) +0.0117, "
+                  "95% CI [0.0087, 0.0147], n=4,374 games"),
+    "spread": "spread RMSE model 13.83 vs line 13.30",
+    "total": "game-total RMSE model 21.46 vs line 20.72",
+}
+_NBA_RATINGS_ENGINE = ("NBA_RATINGS_RAW (sportsedge/sports/nba/"
+                       "ratings_model.py, committed defaults; the "
+                       "owner-decided test subject)")
+
+# NBA team-total and period-total forms (the forms the #2422 engine
+# builds).  PR #2422 built the engine and recorded NO registration or
+# eligibility change: the families stay unregistered and BLOCKED, with
+# calibration evidence only and no market test in existence.
+_NBA_TEAM_PERIOD_ENGINE = ("NBA_TEAM_PERIOD_RATINGS_V1 (sportsedge."
+                           "nba_team_period_engine; Oct 18 calibration "
+                           "construction, no market leg)")
+_QTR_CAL = ("quarter-total calibration BEATS_BASELINE vs climatology "
+            "baselines only (MAE 4.6103 vs B1 4.7070 / B2 4.7099, "
+            "n=62,024 team-quarters)")
+_AGG_CAL = ("an exact mechanical sum of the scored team-quarter "
+            "primitives (first-screen aggregation in the #2422 build, "
+            "not separately scored by the Oct 18 sweep)")
+_NBA_TEAM_PERIOD_FORMS = {
+    "team_total": ("team_total",
+                   "TEAM_TOTAL calibration BEATS_BASELINE vs "
+                   "climatology baselines only (MAE 8.9975 vs "
+                   "B1 9.5411 / B2 9.8275, n=15,506 team-games)"),
+    "team_totals": ("team_total",
+                    "TEAM_TOTAL calibration BEATS_BASELINE vs "
+                    "climatology baselines only (MAE 8.9975 vs "
+                    "B1 9.5411 / B2 9.8275, n=15,506 team-games)"),
+    "team_quarter_total": ("team_quarter_total",
+                           "TEAM_QUARTER_TOTAL " + _QTR_CAL),
+    "game_quarter_total": ("game_quarter_total",
+                           "GAME_QUARTER_TOTAL is " + _AGG_CAL),
+    "quarter_total": ("quarter_total", "This form carries the " + _QTR_CAL),
+    "first_quarter_total": ("first_quarter_total",
+                            "This form carries the " + _QTR_CAL),
+    "second_quarter_total": ("second_quarter_total",
+                             "This form carries the " + _QTR_CAL),
+    "third_quarter_total": ("third_quarter_total",
+                            "This form carries the " + _QTR_CAL),
+    "fourth_quarter_total": ("fourth_quarter_total",
+                             "This form carries the " + _QTR_CAL),
+    "team_half_total": ("team_half_total", "TEAM_HALF_TOTAL is " + _AGG_CAL),
+    "game_half_total": ("game_half_total", "GAME_HALF_TOTAL is " + _AGG_CAL),
+    "half_total": ("half_total", "This form is " + _AGG_CAL),
+    "first_half_total": ("first_half_total", "This form is " + _AGG_CAL),
+    "second_half_total": ("second_half_total", "This form is " + _AGG_CAL),
+}
+
+
+def _family_key(name):
+    """Canonical family key (mirror of family_market_registry._canon_key,
+    lower-cased): upper-case, hyphens/spaces/dots -> underscores."""
+    out = str(name or "").strip().upper()
+    for ch in "- .":
+        out = out.replace(ch, "_")
+    while "__" in out:
+        out = out.replace("__", "_")
+    return out.lower()
+
+
+def _family_engine(sport, family):
+    """The registered engine of record for a REGISTERED_RESEARCH_ONLY
+    family decision, per the family registry's own statements."""
+    if sport == "NBA":
+        return ("NBA_PROP_EMPIRICAL_V1 (sportsedge.nba_prop_empirical; "
+                "research pricing gated by sportsedge.registry_gate on "
+                "the engine sufficiency stamp)")
+    if sport == "CFB":
+        return ("FREE_MODELS_GAME (artifacts/free_models.calculate; "
+                "research pricing gated by sportsedge.registry_gate on "
+                "satisfied Form 2 identity for both teams)")
+    return None
+
+
+def _family_resolution(sport, raw_market, family):
+    """Resolution for a CFB/NBA/CBB family decision, surfacing the
+    family's true recorded state (see the surfacing note above)."""
+    market = family["market"]
+    if sport == "NBA" and market in _NBA_GAME_LINE_FAILURES:
+        return {
+            "sport": sport, "market": market, "state": FAILED_VALIDATION,
+            "engine": _NBA_RATINGS_ENGINE, "blocker": "NO_VALIDATION",
+            "detail": ("FAILED_VALIDATION: accuracy gap vs the close "
+                       "-- " + _NBA_GAME_LINE_FAILURES[market] + " "
+                       "(NBA market readiness verdict 2026-10-18; "
+                       "tested-ideas ledger sections 9-10). The family "
+                       "was tested against the market and failed; it "
+                       "is not research-pricing-eligible as a validated "
+                       "candidate, and any successor is a new model "
+                       "version scored forward only. (family-level "
+                       "registry, sportsedge.family_market_registry; "
+                       "research-only)"),
+            "validation_status": FAILED_VALIDATION,
+            "family_registry": True,
+            "registration_state": "UNREGISTERED",
+            "eligible": False, "promotable": False,
+            "research_only": True, "official_authority": False,
+            "model_p_authority": False, "staking_authority": False,
+        }
+    if family.get("state") == REGISTERED_RESEARCH_ONLY:
+        return {
+            "sport": sport, "market": market,
+            "state": REGISTERED_RESEARCH_ONLY,
+            "engine": _family_engine(sport, family),
+            "blocker": family["blocker"],
+            "detail": (family["reason"] + ": family registry state "
+                       "REGISTERED_RESEARCH_ONLY / NOT_VALIDATED "
+                       "(eligible=false, promotable=false); "
+                       "registration is not validation -- rows may "
+                       "price as research-only LEANs (\"unvalidated "
+                       "estimate\") only through "
+                       "sportsedge.registry_gate when the family's "
+                       "pricing condition is met (" +
+                       str(family.get("pricing_condition")) + "); this "
+                       "coverage lookup grants no pricing by itself. "
+                       "(family-level registry, "
+                       "sportsedge.family_market_registry; "
+                       "research-only)"),
+            "validation_status": family["validation_status"],
+            "family_registry": True,
+            "registration_state": family["registration_state"],
+            "pricing_condition": family.get("pricing_condition"),
+            "evaluation_scope": family.get("evaluation_scope"),
+            "eligible": False, "promotable": False,
+            "research_only": True, "official_authority": False,
+            "model_p_authority": False, "staking_authority": False,
+        }
+    if (sport == "NBA" and family.get("reason") == "FAMILY_MARKET_UNREGISTERED"
+            and _family_key(raw_market) in _NBA_TEAM_PERIOD_FORMS):
+        form, calibration = _NBA_TEAM_PERIOD_FORMS[_family_key(raw_market)]
+        return {
+            "sport": sport, "market": form, "state": BLOCKED,
+            "engine": _NBA_TEAM_PERIOD_ENGINE, "blocker": "NO_VALIDATION",
+            "detail": ("FAMILY_NOT_REGISTERED: an engine exists "
+                       "(NBA_TEAM_PERIOD_RATINGS_V1), but PR #2422 "
+                       "recorded NO registration or eligibility change "
+                       "for this family and no market test exists for "
+                       "it (readiness verdict NO_MARKET_TEST / NO-GO "
+                       "for play, 2026-10-18; period outcomes are "
+                       "NO_DATA on the maintained sportsdataverse path "
+                       "and period lines are outside the DK capture "
+                       "scope). " + calibration + ". The family stays "
+                       "BLOCKED / NOT_VALIDATED (eligible=false, "
+                       "promotable=false) until a registration ruling "
+                       "and a forward test exist. (family-level "
+                       "registry, sportsedge.family_market_registry; "
+                       "research-only)"),
+            "validation_status": "NOT_VALIDATED",
+            "family_registry": True,
+            "registration_state": "UNREGISTERED",
+            "eligible": False, "promotable": False,
+            "research_only": True, "official_authority": False,
+            "model_p_authority": False, "staking_authority": False,
+        }
+    return {
+        "sport": sport, "market": market, "state": BLOCKED,
+        "engine": None, "blocker": family["blocker"],
+        "detail": family["reason"] + " (family-level registry, "
+                  "sportsedge.family_market_registry; research-only)",
+        "validation_status": family["validation_status"],
+        "family_registry": True,
+    }
+
+
 def resolve_market(sport, market):
     """Resolution for a matrix market name or a canonical intake alias."""
     sport = str(sport or "").upper()
@@ -510,18 +702,18 @@ def resolve_market(sport, market):
         return extension
     # t134 (#2219): CFB/NBA/CBB resolve through the isolated family
     # registry so the canonical lookup can never return None (= pass
-    # through) for them. Always BLOCKED; not part of the 89-market matrix.
+    # through) for them; not part of the 89-market matrix. The
+    # resolution surfaces the family's true recorded state:
+    # REGISTERED_RESEARCH_ONLY for families the registry has registered
+    # (registration is not validation and grants no pricing here),
+    # FAILED_VALIDATION for the NBA game lines (their recorded
+    # accuracy-gap verdict), engined-but-unregistered for the NBA
+    # team/period totals (#2422 recorded no registration change), and
+    # BLOCKED with the registry's exact reason for everything else.
     from sportsedge.family_market_registry import family_market_decision
     family = family_market_decision(sport, market)
     if family is not None:
-        return {
-            "sport": sport, "market": family["market"], "state": BLOCKED,
-            "engine": None, "blocker": family["blocker"],
-            "detail": family["reason"] + " (family-level registry, "
-                      "sportsedge.family_market_registry; research-only)",
-            "validation_status": family["validation_status"],
-            "family_registry": True,
-        }
+        return _family_resolution(sport, market, family)
     return None
 
 

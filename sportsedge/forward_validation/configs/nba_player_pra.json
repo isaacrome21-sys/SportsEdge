@@ -1,0 +1,27 @@
+{
+ "status": "FROZEN — PREREG_NBA_PROPS_FORWARD_V1 (2026-10-20)",
+ "sport": "NBA",
+ "family": "player_pra",
+ "markets": [
+  "player_pra"
+ ],
+ "engine_id": "NBA_PROP_EMPIRICAL_V1",
+ "model_version": "NBA_PROP_EMPIRICAL_V1",
+ "market_form": "TWO_SIDED",
+ "sides": [
+  "OVER",
+  "UNDER"
+ ],
+ "over_side": "OVER",
+ "min_rows": 100,
+ "min_events": 40,
+ "min_slates": 4,
+ "max_clv_missing_share": 0.2,
+ "clv_beats_threshold": 0.0,
+ "close_max_age_minutes": 60,
+ "capture_scope": "IN_SPEC",
+ "capture_note": "Capture Spec V1 NBA scope: game lines + PTS/REB/AST + common combos, entry and close, from the twice-daily DraftKings capture jobs live since Oct 19, 2026. PRA counts only on slates where combo lines were actually captured (prereg §2): a PRA row without a captured two-sided combo quote is not an entry — at entry the paired-quote admission refuses it, and at close a one-sided combo quote yields CLOSE_SINGLE_SIDED. Frozen boundary (prereg §4): the first countable slate is Wednesday Oct 21, 2026; every capture and game on or before Oct 20, 2026 is historical record, never a prospective entry.",
+ "prereg": "research/nba_props_forward_20261020/PREREG_NBA_PROPS_FORWARD_V1.md",
+ "prereg_sha256": "54363908b1e2332a57af9b9263ac2f398438c81b2d366442b80667086657bc79",
+ "picked_beats_passed_required": true
+}

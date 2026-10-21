@@ -50,6 +50,17 @@ one of the five frozen reasons (NO_CLOSE_ROW, LINE_MOVED,
 CLOSE_SINGLE_SIDED, CLOSE_NOT_PREKICKOFF, CLOSE_STALE) — the row stays in
 win/loss and out of the CLV average, and its close is never backfilled.
 
+A config whose preregistration is already frozen may pin it by path +
+sha256 (``prereg`` / ``prereg_sha256``); the pin is stamped on every
+verdict record so a readout names the exact frozen text it was scored
+under. A config may also declare ``picked_beats_passed_required``
+(frozen NBA props prereg §5/§9): the verdict sample is then the
+market's classified engine rows — PICKED (runner-surfaced research
+candidates) and PASSED (engine-priced, not picked) — the CLV leg is
+the picked rows, and BEATS_MARKET additionally requires the picked
+mean CLV to exceed the passed mean CLV. See nba_props.py for that
+family's §2/§5 input screening.
+
 This module does not price anything and does not read any family's engine.
 Family adapters produce the priced records; this evaluator only judges
 them, exactly as score_nfl_props_part2.py judges the Part 2 runner's rows.
@@ -114,6 +125,9 @@ class FamilyConfig:
     capture_scope: str = ""
     capture_note: str = ""
     prereg_draft: str = ""
+    prereg: str = ""
+    prereg_sha256: str = ""
+    picked_beats_passed_required: bool = False
     sha256: str = ""
 
     def validate(self) -> None:
@@ -136,6 +150,10 @@ class FamilyConfig:
                 "CONFIG_INVALID", {"field": "minimums",
                                    "min_rows": self.min_rows,
                                    "min_events": self.min_events})
+        if self.prereg_sha256 and len(self.prereg_sha256) != 64:
+            raise ForwardValidationRefusal(
+                "CONFIG_INVALID", {"field": "prereg_sha256",
+                                   "value": self.prereg_sha256})
 
 
 def load_config(path) -> FamilyConfig:
@@ -420,7 +438,8 @@ def calibration_deciles(rows: list) -> list:
 
 def _verdict(cfg: FamilyConfig, *, sample_rows: int, distinct_events: int,
              slates_completed: int | None, clv_missing_share: float,
-             clv_ci_lo: float | None) -> tuple[str, dict]:
+             clv_ci_lo: float | None,
+             picked_beats_passed: bool | None = None) -> tuple[str, dict]:
     gates = {
         "min_rows": {"required": cfg.min_rows, "actual": sample_rows,
                      "pass": sample_rows >= cfg.min_rows},
@@ -437,7 +456,8 @@ def _verdict(cfg: FamilyConfig, *, sample_rows: int, distinct_events: int,
         return "INSUFFICIENT_SAMPLE", gates
     if clv_missing_share > cfg.max_clv_missing_share:
         return "INSUFFICIENT_CLOSE_DATA", gates
-    if clv_ci_lo is not None and clv_ci_lo > cfg.clv_beats_threshold:
+    if clv_ci_lo is not None and clv_ci_lo > cfg.clv_beats_threshold \
+            and picked_beats_passed is not False:
         return "BEATS_MARKET", gates
     return "DOES_NOT_BEAT_MARKET", gates
 
@@ -459,6 +479,7 @@ def evaluate_family(cfg: FamilyConfig, entry_rows: list, close_rows: list,
         "sport": cfg.sport, "family": cfg.family,
         "engine_id": cfg.engine_id, "model_version": cfg.model_version,
         "config_status": cfg.status, "config_sha256": cfg.sha256,
+        "prereg": cfg.prereg, "prereg_sha256": cfg.prereg_sha256,
         "market_form": cfg.market_form,
         "excluded": {**excluded, "unscored_rows": []},
         "markets": {},
@@ -480,8 +501,31 @@ def evaluate_family(cfg: FamilyConfig, entry_rows: list, close_rows: list,
     return record
 
 
+def _runner_disposition(row: dict) -> str | None:
+    """The runner's picked/passed stamp on a priced row, for configs that
+    declare ``picked_beats_passed_required`` (frozen NBA props prereg §5).
+    PICKED = the runner surfaced the row as a research candidate
+    (``RESEARCH_CANDIDATE_NOT_VALIDATED`` in the pricing lane's own
+    vocabulary); PASSED = engine-priced but not surfaced
+    (``PRICED_RESEARCH``). A row may carry the stamp either as an explicit
+    ``disposition`` field or as the lane's ``status`` field. Anything else
+    is unclassified — never guessed."""
+    d = str(row.get("disposition") or "").upper()
+    if d in ("PICKED", "PASSED"):
+        return d
+    status = str(row.get("status") or "")
+    if status == "RESEARCH_CANDIDATE_NOT_VALIDATED":
+        return "PICKED"
+    if status == "PRICED_RESEARCH":
+        return "PASSED"
+    return None
+
+
 def _aggregate_market(cfg: FamilyConfig, graded: list, *,
                       slates_completed: int | None) -> dict:
+    if cfg.picked_beats_passed_required and cfg.market_form == "TWO_SIDED":
+        return _aggregate_market_picked_passed(
+            cfg, graded, slates_completed=slates_completed)
     if cfg.market_form == "YES_ONLY":
         sample = [r for r in graded if r["selected_side"] == "YES"]
     else:
@@ -524,6 +568,103 @@ def _aggregate_market(cfg: FamilyConfig, graded: list, *,
             for reason in sorted({r.get("clv_missing_reason") or "UNSPECIFIED"
                                   for r in missing})},
         "clv": clv_stats,
+        "win_loss": {"wins": wins, "losses": losses, "pushes": pushes,
+                     "win_rate_ex_pushes": (wins / (wins + losses))
+                     if (wins + losses) else None},
+        "logloss_model": (float(sum(r["logloss_model"] for r in ll) / len(ll))
+                          if ll else None),
+        "logloss_market_entry": (float(sum(r["logloss_market_entry"] for r in ll) / len(ll))
+                                 if ll else None),
+        "brier_model": (float(sum(r["brier_model"] for r in ll) / len(ll))
+                        if ll else None),
+        "crps_candidate": (float(sum(crps_c) / len(crps_c)) if crps_c else None),
+        "crps_baseline": (float(sum(crps_b) / len(crps_b)) if crps_b else None),
+        "calibration_deciles": calibration_deciles(graded),
+        "rows": graded,
+    }
+
+
+def _aggregate_market_picked_passed(cfg: FamilyConfig, graded: list, *,
+                                    slates_completed: int | None) -> dict:
+    """Picked/passed verdict mode (frozen NBA props prereg §5/§9; opt-in
+    via ``picked_beats_passed_required``, TWO_SIDED only).
+
+    The verdict sample is the market's classified engine rows: PICKED
+    (the runner surfaced the row as a research candidate) and PASSED
+    (engine-priced, not picked). The §4 gates and the §8 CLV_MISSING
+    share bind on that sample. CLV (§6) is the per-row selected-side CLV
+    the generic path computes; the §9 CLV leg is the PICKED rows' mean
+    with its game-clustered 95% CI, and BEATS_MARKET additionally
+    requires the picked mean CLV to exceed the passed mean CLV —
+    beating only one of the market or the model's own passes is not
+    beating the market. Rows with no runner disposition are reported
+    unclassified and enter no denominator. Win/loss, log loss, Brier
+    and the calibration deciles remain over ALL graded rows (the §9
+    calibration leg covers picked and passed alike)."""
+    picked, passed, unclassified = [], [], []
+    for r in graded:
+        d = _runner_disposition(r)
+        if d == "PICKED":
+            picked.append(r)
+        elif d == "PASSED":
+            passed.append(r)
+        else:
+            unclassified.append(r.get("row_id"))
+    sample = picked + passed
+    missing = [r for r in sample if r.get("close_status") == "CLV_MISSING"]
+    n_sample = len(sample)
+    share_missing = (len(missing) / n_sample) if n_sample else 0.0
+    picked_clv_rows = [r for r in picked if r.get("clv") is not None]
+    clv_stats = None
+    if picked_clv_rows:
+        s = stats.boot([r["clv"] for r in picked_clv_rows],
+                       [r["event_id"] for r in picked_clv_rows])
+        clv_stats = {"mean": s["mean"], "ci95_lo": s["ci95_lo"],
+                     "ci95_hi": s["ci95_hi"], "n": s["n"],
+                     "n_events_clustered": s["n_blocks"]}
+    passed_clv_rows = [r for r in passed if r.get("clv") is not None]
+    passed_clv = None
+    if passed_clv_rows:
+        passed_clv = {
+            "mean": float(sum(r["clv"] for r in passed_clv_rows)
+                          / len(passed_clv_rows)),
+            "n": len(passed_clv_rows)}
+    picked_beats_passed = bool(
+        clv_stats is not None and passed_clv is not None
+        and clv_stats["mean"] > passed_clv["mean"])
+    distinct_events = len({r["event_id"] for r in sample})
+    verdict, gates = _verdict(
+        cfg, sample_rows=n_sample, distinct_events=distinct_events,
+        slates_completed=slates_completed, clv_missing_share=share_missing,
+        clv_ci_lo=(clv_stats["ci95_lo"] if clv_stats else None),
+        picked_beats_passed=picked_beats_passed)
+    wins = sum(1 for r in graded if r.get("selected_result") == "WIN")
+    losses = sum(1 for r in graded if r.get("selected_result") == "LOSS")
+    pushes = sum(1 for r in graded if r.get("outcome_side") == "PUSH")
+    ll = [r for r in graded if r.get("logloss_model") is not None]
+    crps_c = [r["crps_candidate"] for r in graded if r.get("crps_candidate") is not None]
+    crps_b = [r["crps_baseline"] for r in graded if r.get("crps_baseline") is not None]
+    return {
+        "verdict": verdict,
+        "gates": gates,
+        "graded_rows": len(graded),
+        "verdict_sample_rows": n_sample,
+        "picked_rows": len(picked),
+        "passed_rows": len(passed),
+        "unclassified_rows": unclassified,
+        "distinct_events": distinct_events,
+        "distinct_events_all_graded": len({r["event_id"] for r in graded}),
+        "slates_completed": slates_completed,
+        "clv_missing_rows": len(missing),
+        "clv_missing_share": share_missing,
+        "clv_missing_by_reason": {
+            reason: sum(1 for r in missing
+                        if (r.get("clv_missing_reason") or "UNSPECIFIED") == reason)
+            for reason in sorted({r.get("clv_missing_reason") or "UNSPECIFIED"
+                                  for r in missing})},
+        "clv": clv_stats,
+        "clv_passed": passed_clv,
+        "picked_beats_passed": picked_beats_passed,
         "win_loss": {"wins": wins, "losses": losses, "pushes": pushes,
                      "win_rate_ex_pushes": (wins / (wins + losses))
                      if (wins + losses) else None},
