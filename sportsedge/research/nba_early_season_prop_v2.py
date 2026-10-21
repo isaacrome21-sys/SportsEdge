@@ -33,18 +33,20 @@ def _aware(x):
 
 
 def _stat(row, stat):
+    # Every component must be a real nonnegative game observation. Summing
+    # PRA first can mask a negative constituent (e.g. -2 PTS + 20 REB),
+    # yielding an apparently valid combined stat; bool is not a stat.
+    names = ("points", "rebounds", "assists") if stat == "pra" else (stat,)
     try:
-        if stat == "pra":
-            values = [float(row[s]) for s in ("points", "rebounds", "assists")]
-            v = sum(values)
-        else:
-            v = float(row[stat])
-        m = float(row["minutes"])
+        raw = [row[s] for s in (*names, "minutes")]
+        if any(isinstance(x, bool) for x in raw):
+            raise ValueError("boolean stat")
+        vals = [float(x) for x in raw]
     except (TypeError, ValueError, KeyError) as e:
         raise ValueError("NBA_EARLY_PROP_STATS_INVALID") from e
-    if not isfinite(v) or v < 0 or not isfinite(m) or m < 0:
+    if any(not isfinite(x) or x < 0 for x in vals):
         raise ValueError("NBA_EARLY_PROP_STATS_INVALID")
-    return v, m
+    return sum(vals[:-1]), vals[-1]
 
 
 def project_early_prop(records, *, player_id, target_team_id, target_season,
