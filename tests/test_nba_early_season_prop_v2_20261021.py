@@ -128,3 +128,27 @@ def test_same_season_stable_team_keeps_research_only_status():
     assert out["status"] == "RESEARCH_PROJECTION"
     assert out["transfer_unmodeled"] is False
     assert out["research_only"] is True
+
+
+def test_pra_rejects_negative_component_even_when_sum_is_positive():
+    records=history()
+    records[0]["points"]=-2
+    records[0]["rebounds"]=50
+    try:
+        read(records,stat="pra")
+    except ValueError as e:
+        assert "NBA_EARLY_PROP_STATS_INVALID" in str(e)
+    else:
+        assert False, "negative player points must never disappear inside PRA"
+
+
+def test_prop_rejects_boolean_stats_and_minutes():
+    for name in ("points","minutes"):
+        records=history()
+        records[0][name]=True
+        try:
+            read(records,stat="points")
+        except ValueError as e:
+            assert "NBA_EARLY_PROP_STATS_INVALID" in str(e)
+        else:
+            assert False, "a boolean is not a box score component"
