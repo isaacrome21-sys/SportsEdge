@@ -21,7 +21,7 @@
 ## File identity (Git blobs, not SHA-256)
 * `artifacts/run_it_full.py`: `a5799b6ffae10215b8ee09c084b26d60f35f2ded`
 * `sportsedge/research/nfl_nba_engine_card_annex.py`: `38fd57f086e51fef571713fb5bf56657891c5ab1`
-* `tests/test_nfl_nba_research_annex.py`: `735967106bbb6969221d83d6521a89916b70a107`
+* `tests/test_nfl_nba_research_annex.py`: `b15dda19d360f98d9d3b61e03b7c764374239030`
 
 ## Remains unproven
 * Hosted CI and independent test reproduction on the **exact PR head**.
@@ -29,3 +29,11 @@
 * Source independence for operator-supplied pins, correctness/completeness of histories, and NBA period-fit archival provenance.
 * Regression byte-parity on the supported full phone-card corpus; the synthetic parity test is not a substitute.
 * No eligibility release or production rollout authorized.
+
+## CI test-only correction — 2026-10-20
+
+Original head `fd17ffc9` had 1 pytest failure: `test_run_full_annex_does_not_mutate_existing_card_surfaces`. Hosted automation-core and full-discovery-honesty found 8650 passing tests, five skipped and one failing. Root cause was a **test assertion mismatch**: with-operator-evidence card had its annex popped, while the no-operator-evidence baseline kept a mandatory fail-closed annex (`OPERATOR_FIXTURE_PIN_MISSING_OR_MISMATCH`). The baseline annex is expected and is not a canonical surface mutation.
+
+Only `tests/test_nfl_nba_research_annex.py` was changed at `6f710cf3`: require the no-pin baseline to contain named refusals, require operator-pinned annex to have researched outputs, then exclude the annex from **both** cards before comparing every other field. No production module, threshold, eligibility, gate, or model code modified.
+
+This is builder-diagnosed, not verifier-admitted. **New head must pass fresh CI and independent Rocky verification** before any merge. The CI failures on the original head are not waived.
