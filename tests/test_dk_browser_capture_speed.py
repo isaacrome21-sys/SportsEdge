@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from scripts.diagnose_dk_browser_capture_speed import (
+from sportsedge.dk_browser_capture_speed_diag import (
     CaptureDiagError, diagnose_capture_timing, VERSION,
 )
 
