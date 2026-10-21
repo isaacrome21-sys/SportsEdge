@@ -191,6 +191,20 @@ def _research_pricing_stamp(decision):
     }
 
 
+def research_pricing_stamp(sport, market):
+    """Registration metadata for a row pricing under the Option B
+    research registration -- the same stamp ``gate_payload`` applies.
+
+    Returns None unless the family is REGISTERED_RESEARCH_ONLY. This
+    renders the stamp for a pass decision already taken by the caller
+    (see ``research_pricing_allowed``); it is not itself a permission.
+    """
+    decision = family_market_decision(sport, market)
+    if decision is None or decision.get("state") != "REGISTERED_RESEARCH_ONLY":
+        return None
+    return _research_pricing_stamp(decision)
+
+
 def family_gate_row(sport, market, row=None):
     """Blocked card row for a CFB/NBA/CBB line, or None for other sports."""
     sport = str(sport or "").upper()
