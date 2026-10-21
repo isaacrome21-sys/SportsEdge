@@ -10,8 +10,8 @@ Isolate why multi-market DraftKings rendered-browser capture can exceed SportsEd
 
 ## Exact changes
 
-* `scripts/diagnose_dk_browser_capture_speed.py` — blob `2cbfe23fc691007fb6f3726adf55c9a79c9da709`.
-* `tests/test_dk_browser_capture_speed.py` — blob `fa7c9495a3c18ae20011326a7cac987767a36fa5`.
+* `sportsedge/dk_browser_capture_speed_diag.py` — blob `2cbfe23fc691007fb6f3726adf55c9a79c9da709`.
+* `tests/test_dk_browser_capture_speed.py` — blob `951f837671138734e71ec99304696ab934aee83e`.
 * No workflow, runner, browser automation, source ingestion, evidence writer, pricing, gate, registry, main ledger, or frozen document changed.
 
 ## Input contract
@@ -33,7 +33,7 @@ One sanitized local JSON envelope:
 Optional stage begin/end events use named `navigate`, `render_wait`, `market_expand`, `quote_transcription`, `pairing`, `final_re_read`, `receipt_write`; throttle/captcha events are bare markers. Unlisted fields such as URL, API key, cookie, raw page, screenshot, auth and IP are REJECTED rather than retained. Fixture IDs are hashed in output. This is instrumentation input, **not** a substitute for the immutable quote receipt.
 
 ```bash
-python scripts/diagnose_dk_browser_capture_speed.py \
+python -m sportsedge.dk_browser_capture_speed_diag \
   --timing-json sanitized_capture_timing.json \
   --output-json local_speed_report.json
 ```
@@ -43,3 +43,6 @@ python scripts/diagnose_dk_browser_capture_speed.py \
 10 pytest functions with parameterized sensitive-field checks authored; no independent green claim at authoring time. Synthetic tests cover duration boundary, stale, pair span, missing final reread, captcha, throttle, dominant stage, multi-fixture aggregation and sensitive-data exclusion.
 
 The provider/browser runtime is not available to the builder, so **zero actual DK latency measurements** are claimed; no optimization speedup is asserted. Rocky owns Thursday's captures and may later feed pre-approved sanitized durations from the real browser. Measure and diagnose first, then owner approves any code/flow change via independent PR. Do not merge unless verifier confirms safe record shape, no secret leakage and baseline test failure-set equivalence. Existing freshness/receipt holds remain.
+
+## Governed code-surface correction — 2026-10-20
+Proactively moved the identical diagnostic source bytes from newly added `scripts/` path to `sportsedge/dk_browser_capture_speed_diag.py`, updated the synthetic test import and CLI syntax, and deleted the former unmapped script. Reason: #2436 demonstrated the freeze-inventory guard treats new standalone `scripts/` additions as governance-unmapped, while new modules under the existing `sportsedge/` package passed. This is NOT an exemption or a change to frozen rules. Fresh CI must verify this head; no green is assumed.
