@@ -43,7 +43,10 @@ def test_join_output_is_consumable_by_distinct_v2_only():
     joined=join_nba_boxscore_evidence(*_observations())
     assert joined["joined"] == 9
     assert joined["receipt_authentication"] == "NOT_ESTABLISHED_BY_CALLER_FIELDS"
-    assert all(g["finalized_at"] and g["role_observed_at"] for g in joined["rows"])
+    assert all(
+        g["finalized_at"] and g["role_observed_at"] and g["role_source_ref"]
+        for g in joined["rows"]
+    )
     candidate=project_early_prop(
         joined["rows"], player_id="99", target_team_id="NY",
         target_season=2026, target_date="2026-10-21",

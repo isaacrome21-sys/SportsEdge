@@ -15,6 +15,7 @@ def rows():
                             "observed_at":(t+timedelta(hours=23)).isoformat(),
                             "finalized_at":(t+timedelta(hours=22)).isoformat(),
                             "role_observed_at":(t+timedelta(hours=19)).isoformat(),
+                            "role_source_ref":"pregame-roster-receipt",
                             "event_state":"FINAL","result_state":"FINAL",
                             "source_ref":"scorelog","team_id":"A","position":"G",
                             "minutes":30,"points":pts,"rebounds":5,"assists":5})

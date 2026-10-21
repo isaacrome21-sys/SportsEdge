@@ -83,10 +83,16 @@ def project_early_prop(records, *, player_id, target_team_id, target_season,
             continue
         gid = str(row.get("game_id") or "").strip()
         src = str(row.get("source_ref") or "").strip()
+        role_src = str(row.get("role_source_ref") or "").strip()
         position = str(row.get("position") or "").strip()
         played_for = str(row.get("team_id") or "").strip()
         if not gid or not src or not position or not played_for:
             raise ValueError("NBA_EARLY_PROP_HISTORY_PROVENANCE_REQUIRED")
+        # A pretip timestamp alone is not a roster witness. Preserve the
+        # distinct caller-supplied roster source required by the evidence
+        # join; this is structural provenance, not provider authentication.
+        if not role_src:
+            raise ValueError("NBA_EARLY_PROP_ROLE_SOURCE_REQUIRED")
         season = int(row.get("season"))
         if season not in (year, prev):
             continue

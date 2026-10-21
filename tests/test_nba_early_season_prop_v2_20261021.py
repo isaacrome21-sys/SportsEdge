@@ -1,4 +1,7 @@
 from datetime import datetime, timedelta, timezone
+
+import pytest
+
 from sportsedge.research.nba_early_season_prop_v2 import project_early_prop
 
 
@@ -14,6 +17,7 @@ def history(nowteam="A", current_games=1, future=False):
                       "observed_at": (day + timedelta(hours=23)).isoformat(),
                       "finalized_at": (day + timedelta(hours=22)).isoformat(),
                       "role_observed_at": (day + timedelta(hours=19)).isoformat(),
+                      "role_source_ref": "pregame-roster-receipt",
                       "event_state": "FINAL", "result_state": "FINAL",
                       "source_ref": "gamelog", "position": "G",
                       "team_id": team, "minutes": 30,
@@ -25,6 +29,7 @@ def history(nowteam="A", current_games=1, future=False):
                   "observed_at":"2026-10-25T23:00:00Z",
                   "finalized_at":"2026-10-25T22:00:00Z",
                   "role_observed_at":"2026-10-25T19:00:00Z",
+                  "role_source_ref":"pregame-roster-receipt",
                   "event_state":"FINAL","result_state":"FINAL",
                   "source_ref":"gamelog","position":"G","team_id":"A",
                   "minutes":30,"points":150,"rebounds":30,"assists":30})
@@ -194,6 +199,14 @@ def test_v2_requires_pregame_role_receipt():
         assert "PREGAME_ROLE_RECEIPT_REQUIRED" in str(e)
     else:
         assert False, "postgame roster cannot establish a pregame role"
+
+
+@pytest.mark.parametrize("bad", [None, "", "   "])
+def test_v2_requires_distinct_named_roster_source(bad):
+    records = history()
+    records[0]["role_source_ref"] = bad
+    with pytest.raises(ValueError, match="ROLE_SOURCE_REQUIRED"):
+        read(records)
 
 
 def test_prior_game_with_wrong_league_season_cannot_enter_pool():
