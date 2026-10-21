@@ -10,3 +10,5 @@ Timestamped line captures for forward-test scoring against our own captured line
 2026-10-20 | 05:37 CT | NBA | 6 of 14 games (board lines; PARTIAL — bot wall + geo-denied retry; today's 3 games NOT in this file, freshest complete = 2026-10-19 1721_ct) | dk_line_archive/nba/2026-10-20/0537_ct.json
 2026-10-20 | 05:47 CT | CFB | 3 games, 18 rows (game lines only; BLOCKED / FAMILY_REGISTRY_NOT_VALIDATED price record) | dk_line_archive/cfb/2026-10-20/0547_ct.json
 2026-10-20 | 05:49 CT | NHL | 11 games, 66 rows (game lines only; PARKED price record) | dk_line_archive/nhl/2026-10-20/0549_ct.json
+2026-10-20 | 10:23 CT | NBA | 14 games, 619 rows (CAPTURED, scheduled AM job — attempt 1, no reloads; Oct 20 + Oct 21 boards; game lines + team totals + 549 PTS/REB/AST/PRA props) | dk_line_archive/nba/2026-10-20/1023_ct.json
+2026-10-20 | 17:22 CT | NBA | 13 games, 557 rows (CAPTURED, scheduled PM job — attempt 1, no reloads; Oct 20 + Oct 21 boards; game lines + team totals + 492 PTS/REB/AST/PRA props) | dk_line_archive/nba/2026-10-20/1722_ct.json
