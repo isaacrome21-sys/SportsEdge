@@ -266,6 +266,7 @@
         "docs/mlb_2027_pit_feature_leakage_freeze.md",
         "docs/mlb_historical_dk_replay_audit.md",
         "docs/nrfi_durable_evidence_recovery.md",
+        "docs/oddspapi/ADMISSION_PROTOCOL_DRAFT.md",
         "docs/shared_acquisition_contract.md",
         "scripts/archive_mlb_pit_lineup_starters.py",
         "scripts/archive_raw_game_odds_paired.py",
