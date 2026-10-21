@@ -81,7 +81,16 @@ def screen_early_prop_mae(records, targets, *, stat):
         if tip.astimezone(ZoneInfo("America/Chicago")).date()!=declared_date:
             raise ValueError("NBA_EARLY_SCREEN_TARGET_LOCAL_DATE_MISMATCH")
         actual=_stat(tgt,stat)
-        if float(tgt.get("minutes") or 0)<=0:
+        raw_minutes=tgt.get("minutes")
+        if isinstance(raw_minutes,bool):
+            raise ValueError("NBA_EARLY_SCREEN_TARGET_MINUTES_INVALID")
+        try:
+            minutes=float(raw_minutes)
+        except (TypeError,ValueError) as e:
+            raise ValueError("NBA_EARLY_SCREEN_TARGET_MINUTES_INVALID") from e
+        if not isfinite(minutes) or minutes<0:
+            raise ValueError("NBA_EARLY_SCREEN_TARGET_MINUTES_INVALID")
+        if minutes==0:
             blocked["TARGET_DNP"]=blocked.get("TARGET_DNP",0)+1
             continue
         out=project_early_prop(history,player_id=player,target_team_id=team,
