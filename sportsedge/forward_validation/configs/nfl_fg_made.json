@@ -1,0 +1,25 @@
+{
+ "status": "DRAFT \u2014 NOT FROZEN",
+ "sport": "NFL",
+ "family": "FG_MADE",
+ "markets": [
+  "FG_MADE"
+ ],
+ "engine_id": "NFL_PROP_ENGINES_V1",
+ "model_version": "nfl_prop_engines_v1@8b2775008",
+ "market_form": "TWO_SIDED",
+ "sides": [
+  "OVER",
+  "UNDER"
+ ],
+ "over_side": "OVER",
+ "min_rows": 100,
+ "min_events": 40,
+ "min_slates": 4,
+ "max_clv_missing_share": 0.2,
+ "clv_beats_threshold": 0.0,
+ "close_max_age_minutes": 60,
+ "capture_scope": "EXPANSION_REQUIRED",
+ "capture_note": "EXPANSION_REQUIRED \u2014 Capture Spec V1's per-game subset covers only the four Part 2 markets, the anytime-TD Yes board, and main game lines. This family's lines must be added to the per-game capture subset (paired entry + close), or captured under a full-board capture of that game declared before kickoff.",
+ "prereg_draft": "research/forward_validation_program_20261020/drafts/PREREG_NFL_FG_MADE_FORWARD_V1_DRAFT.md"
+}

@@ -1,0 +1,1066 @@
+{
+ "K": 3.0,
+ "already_engined": {
+  "anytime_td": "engine v1, branch feat/nfl-atd-engine-v1-20261018",
+  "attempts": "Part 2B (PR #2415)",
+  "completions": "Part 2B (PR #2415)",
+  "passing_tds": "Part 2B shadow (PR #2415)",
+  "passing_yards": "Part 2 frozen evaluator (main)",
+  "receiving_yards": "Part 2 frozen evaluator (main)",
+  "receptions": "Part 2 frozen evaluator (main)",
+  "rush_attempts": "Part 2B (PR #2415)",
+  "rush_yards": "alias of rushing_yards \u2014 Part 2 frozen evaluator",
+  "rushing_yards": "Part 2 frozen evaluator (main)"
+ },
+ "data_dir": "/home/hatch/workspace/sportsedge/backtest_program_20261017/lanes/nfl/data",
+ "data_sha256": {
+  "games.csv": "a484c6ae884d03b11ab14f9fb3ed9ee8ca7168f3a22550e74f566532c4c6b284",
+  "ps_2018.csv.gz": "15730d75271ec10affc412b50b22fc8e3d6ce8f442d377936f65bc0044ef15bf",
+  "ps_2019.csv.gz": "d143b91c62380bed1587fe390e594d0e5555e8ebac81fcc7212ad7224115caf2",
+  "ps_2020.csv.gz": "e23a81d6ed3c94bd2dd14a5ee3ed94584a69e67fdb985c1ba0de4ccbc5a2bdcc",
+  "ps_2021.csv.gz": "a2fb266576a1bde5d7978005a5f6ccf83e3c023234da500d38cf6a14f40a01c8",
+  "ps_2022.csv.gz": "2b7dca6814993b9fd6ad3d4fdc56131663311bbe83281126e1ac441620d824ba",
+  "ps_2023.csv.gz": "b7590543f3c81dceb17d7577a1dce7b8ff1a9aacf0f562e3d7bbc7e60f37bc9b",
+  "ps_2024.csv.gz": "629b77e0c88d361f8b5c4a850e7866013aa670b7a5a94b7f1d0c591adf18f971",
+  "sp_2025.csv.gz": "c7401e321bdb369443f3280b9acd74ba6e16d82e710383bf1c01acabfebeac0b"
+ },
+ "families": {
+  "fg_made": {
+   "count": true,
+   "cv_from_diagnostic": 0.7623909456579233,
+   "diagnostic": {
+    "crps": {
+     "B1": 0.756214919457856,
+     "B2": 0.699476996735969,
+     "CANDIDATE": 0.7009263235921214
+    },
+    "cv": 0.7623909456579233,
+    "cv_source": "2025_WEEKS_LE_8_POOLED_RATIO",
+    "delta_vs_B1": {
+     "ci95_hi": -0.03772840872833911,
+     "ci95_lo": -0.0734818068932794,
+     "mean": -0.05528859586573462,
+     "n": 280,
+     "n_blocks": 10
+    },
+    "delta_vs_B2": {
+     "ci95_hi": 0.022763051761578952,
+     "ci95_lo": -0.026725136747811285,
+     "mean": 0.001449326856152487,
+     "n": 280,
+     "n_blocks": 10
+    },
+    "diagnostic_beats_both_baselines": false,
+    "label": "DIAGNOSTIC_PARTIAL_VINTAGE_2025_ONLY",
+    "n": 280,
+    "n_train_ratios": 102,
+    "over_line_deciles": [
+     {
+      "mean_p_over": 0.2050596962387126,
+      "n": 28,
+      "realized_over": 0.17857142857142858
+     },
+     {
+      "mean_p_over": 0.24985747257083266,
+      "n": 28,
+      "realized_over": 0.21428571428571427
+     },
+     {
+      "mean_p_over": 0.2700848006096667,
+      "n": 28,
+      "realized_over": 0.21428571428571427
+     },
+     {
+      "mean_p_over": 0.2935478506436587,
+      "n": 28,
+      "realized_over": 0.14285714285714285
+     },
+     {
+      "mean_p_over": 0.3371331526606804,
+      "n": 28,
+      "realized_over": 0.42857142857142855
+     },
+     {
+      "mean_p_over": 0.3780233786187262,
+      "n": 28,
+      "realized_over": 0.39285714285714285
+     },
+     {
+      "mean_p_over": 0.4133874740987176,
+      "n": 28,
+      "realized_over": 0.6071428571428571
+     },
+     {
+      "mean_p_over": 0.4435962835351187,
+      "n": 28,
+      "realized_over": 0.5357142857142857
+     },
+     {
+      "mean_p_over": 0.47232022545096264,
+      "n": 28,
+      "realized_over": 0.4642857142857143
+     },
+     {
+      "mean_p_over": 0.5263881539609846,
+      "n": 28,
+      "realized_over": 0.5714285714285714
+     }
+    ],
+    "pit_hist": [
+     0,
+     24,
+     22,
+     2,
+     45,
+     35,
+     21,
+     44,
+     38,
+     49
+    ],
+    "scored_weeks": ">= 9"
+   },
+   "family": "fg_made",
+   "market": "FG_MADE",
+   "role": "fg_att",
+   "screen_vintage": "NOT_RUNNABLE",
+   "stat": "fg_made",
+   "thr": 1.0,
+   "verdict": "SCREEN_NOT_RUNNABLE_SANCTIONED_VINTAGE",
+   "verdict_reason": "kicking/defensive outcome columns exist only in sp_2025; the ps files for 2020-2024 carry no such columns, so the 2020-2025 screen has no outcomes to score"
+  },
+  "kicking_points": {
+   "count": true,
+   "cv_from_diagnostic": 0.5527661614477732,
+   "diagnostic": {
+    "crps": {
+     "B1": 2.2824264228280615,
+     "B2": 2.18486831398065,
+     "CANDIDATE": 2.1463515932148516
+    },
+    "cv": 0.5527661614477732,
+    "cv_source": "2025_WEEKS_LE_8_POOLED_RATIO",
+    "delta_vs_B1": {
+     "ci95_hi": -0.07836380706431534,
+     "ci95_lo": -0.19476727682305517,
+     "mean": -0.1360748296132096,
+     "n": 284,
+     "n_blocks": 10
+    },
+    "delta_vs_B2": {
+     "ci95_hi": 0.04058025202910122,
+     "ci95_lo": -0.12342372967753087,
+     "mean": -0.03851672076579878,
+     "n": 284,
+     "n_blocks": 10
+    },
+    "diagnostic_beats_both_baselines": false,
+    "label": "DIAGNOSTIC_PARTIAL_VINTAGE_2025_ONLY",
+    "n": 284,
+    "n_train_ratios": 103,
+    "over_line_deciles": [
+     {
+      "mean_p_over": 0.27719500954351295,
+      "n": 28,
+      "realized_over": 0.25
+     },
+     {
+      "mean_p_over": 0.3266775039484808,
+      "n": 28,
+      "realized_over": 0.35714285714285715
+     },
+     {
+      "mean_p_over": 0.3638110309739789,
+      "n": 29,
+      "realized_over": 0.4482758620689655
+     },
+     {
+      "mean_p_over": 0.3869578321017321,
+      "n": 28,
+      "realized_over": 0.39285714285714285
+     },
+     {
+      "mean_p_over": 0.40608832141964274,
+      "n": 29,
+      "realized_over": 0.4482758620689655
+     },
+     {
+      "mean_p_over": 0.42363026472144594,
+      "n": 28,
+      "realized_over": 0.35714285714285715
+     },
+     {
+      "mean_p_over": 0.4489955460186149,
+      "n": 28,
+      "realized_over": 0.6071428571428571
+     },
+     {
+      "mean_p_over": 0.47562156520161636,
+      "n": 29,
+      "realized_over": 0.5862068965517241
+     },
+     {
+      "mean_p_over": 0.5011113036500795,
+      "n": 28,
+      "realized_over": 0.6071428571428571
+     },
+     {
+      "mean_p_over": 0.5798865716709554,
+      "n": 29,
+      "realized_over": 0.5517241379310345
+     }
+    ],
+    "pit_hist": [
+     22,
+     13,
+     31,
+     23,
+     30,
+     30,
+     27,
+     40,
+     33,
+     35
+    ],
+    "scored_weeks": ">= 9"
+   },
+   "family": "kicking_points",
+   "market": "KICKING_POINTS",
+   "role": "kick_attempts",
+   "screen_vintage": "NOT_RUNNABLE",
+   "stat": "kicking_points",
+   "thr": 2.0,
+   "verdict": "SCREEN_NOT_RUNNABLE_SANCTIONED_VINTAGE",
+   "verdict_reason": "kicking/defensive outcome columns exist only in sp_2025; the ps files for 2020-2024 carry no such columns, so the 2020-2025 screen has no outcomes to score"
+  },
+  "pass_plus_rush_yards": {
+   "count": false,
+   "crps": {
+    "B1": 50.95805799356022,
+    "B2": 48.30319101674791,
+    "CANDIDATE": 47.00003142193758
+   },
+   "cv": 0.3394648769258099,
+   "cv_source": "TRAIN_2018_2019_POOLED_RATIO",
+   "delta_vs_B1": {
+    "ci95_hi": -3.165731031246869,
+    "ci95_lo": -4.798420296502869,
+    "mean": -3.9580265716226353,
+    "n": 2360,
+    "n_blocks": 89
+   },
+   "delta_vs_B2": {
+    "ci95_hi": -0.6245090912119377,
+    "ci95_lo": -2.028568000956905,
+    "mean": -1.3031595948103303,
+    "n": 2360,
+    "n_blocks": 89
+   },
+   "family": "pass_plus_rush_yards",
+   "market": "PASS_RUSH_YDS",
+   "n": 2360,
+   "n_train_ratios": 725,
+   "over_line_deciles": [
+    {
+     "mean_p_over": 0.3065599816350139,
+     "n": 236,
+     "realized_over": 0.3220338983050847
+    },
+    {
+     "mean_p_over": 0.3708751893059872,
+     "n": 236,
+     "realized_over": 0.3432203389830508
+    },
+    {
+     "mean_p_over": 0.39640143165257324,
+     "n": 236,
+     "realized_over": 0.4025423728813559
+    },
+    {
+     "mean_p_over": 0.41490521128827257,
+     "n": 236,
+     "realized_over": 0.4279661016949153
+    },
+    {
+     "mean_p_over": 0.434082822082006,
+     "n": 236,
+     "realized_over": 0.4745762711864407
+    },
+    {
+     "mean_p_over": 0.4542043786624136,
+     "n": 236,
+     "realized_over": 0.5042372881355932
+    },
+    {
+     "mean_p_over": 0.4784416045532898,
+     "n": 236,
+     "realized_over": 0.4745762711864407
+    },
+    {
+     "mean_p_over": 0.5123309611996767,
+     "n": 236,
+     "realized_over": 0.5423728813559322
+    },
+    {
+     "mean_p_over": 0.5544978328834204,
+     "n": 236,
+     "realized_over": 0.5635593220338984
+    },
+    {
+     "mean_p_over": 0.6848934878785742,
+     "n": 236,
+     "realized_over": 0.711864406779661
+    }
+   ],
+   "pit_hist": [
+    277,
+    198,
+    189,
+    227,
+    223,
+    264,
+    286,
+    271,
+    260,
+    165
+   ],
+   "role": "attempts",
+   "screen_vintage": "2020-2025",
+   "stat": "pass_plus_rush_yards",
+   "thr": 20.0,
+   "verdict": "CALIBRATED_CANDIDATE"
+  },
+  "player_interceptions": {
+   "count": true,
+   "cv_from_diagnostic": 5.087225461942819,
+   "diagnostic": {
+    "crps": {
+     "B1": 0.06768517854570481,
+     "B2": 0.06341705291833424,
+     "CANDIDATE": 0.06431462947392748
+    },
+    "cv": 5.087225461942819,
+    "cv_source": "2025_WEEKS_LE_8_POOLED_RATIO",
+    "delta_vs_B1": {
+     "ci95_hi": -0.0020514999012182433,
+     "ci95_lo": -0.00504020126088057,
+     "mean": -0.003370549071777334,
+     "n": 2484,
+     "n_blocks": 10
+    },
+    "delta_vs_B2": {
+     "ci95_hi": 0.0017030415526535282,
+     "ci95_lo": 0.00021212871169193565,
+     "mean": 0.000897576555593233,
+     "n": 2484,
+     "n_blocks": 10
+    },
+    "diagnostic_beats_both_baselines": false,
+    "label": "DIAGNOSTIC_PARTIAL_VINTAGE_2025_ONLY",
+    "n": 2484,
+    "n_train_ratios": 909,
+    "over_line_deciles": [
+     {
+      "mean_p_over": 0.01130153997226621,
+      "n": 248,
+      "realized_over": 0.05241935483870968
+     },
+     {
+      "mean_p_over": 0.012897862940116966,
+      "n": 248,
+      "realized_over": 0.028225806451612902
+     },
+     {
+      "mean_p_over": 0.01418826274570891,
+      "n": 249,
+      "realized_over": 0.06827309236947791
+     },
+     {
+      "mean_p_over": 0.015775815387134785,
+      "n": 248,
+      "realized_over": 0.05241935483870968
+     },
+     {
+      "mean_p_over": 0.017693380248429206,
+      "n": 249,
+      "realized_over": 0.040160642570281124
+     },
+     {
+      "mean_p_over": 0.02295736564831116,
+      "n": 248,
+      "realized_over": 0.05241935483870968
+     },
+     {
+      "mean_p_over": 0.04936662169369346,
+      "n": 248,
+      "realized_over": 0.07661290322580645
+     },
+     {
+      "mean_p_over": 0.056772488329861065,
+      "n": 249,
+      "realized_over": 0.08032128514056225
+     },
+     {
+      "mean_p_over": 0.06508344744652222,
+      "n": 248,
+      "realized_over": 0.07661290322580645
+     },
+     {
+      "mean_p_over": 0.07913857850934262,
+      "n": 249,
+      "realized_over": 0.12449799196787148
+     }
+    ],
+    "pit_hist": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     2484
+    ],
+    "scored_weeks": ">= 9"
+   },
+   "family": "player_interceptions",
+   "market": "PLAYER_INTERCEPTIONS",
+   "role": "def_tackles_total",
+   "screen_vintage": "NOT_RUNNABLE",
+   "stat": "def_interceptions",
+   "thr": 3.0,
+   "verdict": "SCREEN_NOT_RUNNABLE_SANCTIONED_VINTAGE",
+   "verdict_reason": "kicking/defensive outcome columns exist only in sp_2025; the ps files for 2020-2024 carry no such columns, so the 2020-2025 screen has no outcomes to score"
+  },
+  "player_sacks": {
+   "count": true,
+   "cv_from_diagnostic": 3.342510697542686,
+   "diagnostic": {
+    "crps": {
+     "B1": 0.13055906476169607,
+     "B2": 0.13615737974929548,
+     "CANDIDATE": 0.13042088732398685
+    },
+    "cv": 3.342510697542686,
+    "cv_source": "2025_WEEKS_LE_8_POOLED_RATIO",
+    "delta_vs_B1": {
+     "ci95_hi": 0.003890971519256015,
+     "ci95_lo": -0.0038908825689774225,
+     "mean": -0.0001381774377092278,
+     "n": 3942,
+     "n_blocks": 10
+    },
+    "delta_vs_B2": {
+     "ci95_hi": -0.004469472777173041,
+     "ci95_lo": -0.006906205720895099,
+     "mean": -0.005736492425308626,
+     "n": 3942,
+     "n_blocks": 10
+    },
+    "diagnostic_beats_both_baselines": false,
+    "label": "DIAGNOSTIC_PARTIAL_VINTAGE_2025_ONLY",
+    "n": 3942,
+    "n_train_ratios": 1384,
+    "over_line_deciles": [
+     {
+      "mean_p_over": 0.025332209226404792,
+      "n": 394,
+      "realized_over": 0.02284263959390863
+     },
+     {
+      "mean_p_over": 0.03131629972995846,
+      "n": 394,
+      "realized_over": 0.03553299492385787
+     },
+     {
+      "mean_p_over": 0.038008280159807006,
+      "n": 394,
+      "realized_over": 0.04314720812182741
+     },
+     {
+      "mean_p_over": 0.04542764593690705,
+      "n": 394,
+      "realized_over": 0.04060913705583756
+     },
+     {
+      "mean_p_over": 0.06563344594146556,
+      "n": 395,
+      "realized_over": 0.04556962025316456
+     },
+     {
+      "mean_p_over": 0.09034040449951002,
+      "n": 394,
+      "realized_over": 0.09137055837563451
+     },
+     {
+      "mean_p_over": 0.10423567911859792,
+      "n": 394,
+      "realized_over": 0.11928934010152284
+     },
+     {
+      "mean_p_over": 0.11790908220863491,
+      "n": 394,
+      "realized_over": 0.1218274111675127
+     },
+     {
+      "mean_p_over": 0.13585713243560738,
+      "n": 394,
+      "realized_over": 0.1802030456852792
+     },
+     {
+      "mean_p_over": 0.1612113304758531,
+      "n": 395,
+      "realized_over": 0.28607594936708863
+     }
+    ],
+    "pit_hist": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     10,
+     1240,
+     2692
+    ],
+    "scored_weeks": ">= 9"
+   },
+   "family": "player_sacks",
+   "market": "PLAYER_SACKS",
+   "role": "def_tackles_total",
+   "screen_vintage": "NOT_RUNNABLE",
+   "stat": "def_sacks",
+   "thr": 2.0,
+   "verdict": "SCREEN_NOT_RUNNABLE_SANCTIONED_VINTAGE",
+   "verdict_reason": "kicking/defensive outcome columns exist only in sp_2025; the ps files for 2020-2024 carry no such columns, so the 2020-2025 screen has no outcomes to score"
+  },
+  "rush_plus_rec_yards": {
+   "count": false,
+   "crps": {
+    "B1": 23.707536891559993,
+    "B2": 23.998305773129562,
+    "CANDIDATE": 22.061050365934985
+   },
+   "cv": 0.61546264843949,
+   "cv_source": "TRAIN_2018_2019_POOLED_RATIO",
+   "delta_vs_B1": {
+    "ci95_hi": -1.3822173264074122,
+    "ci95_lo": -1.9217498192619973,
+    "mean": -1.6464865256250076,
+    "n": 5557,
+    "n_blocks": 89
+   },
+   "delta_vs_B2": {
+    "ci95_hi": -1.714757007917889,
+    "ci95_lo": -2.1398039240520386,
+    "mean": -1.9372554071945793,
+    "n": 5557,
+    "n_blocks": 89
+   },
+   "family": "rush_plus_rec_yards",
+   "market": "RUSH_REC_YDS",
+   "n": 5557,
+   "n_train_ratios": 1846,
+   "over_line_deciles": [
+    {
+     "mean_p_over": 0.28443885721299705,
+     "n": 555,
+     "realized_over": 0.2954954954954955
+    },
+    {
+     "mean_p_over": 0.34542510228466095,
+     "n": 556,
+     "realized_over": 0.35611510791366907
+    },
+    {
+     "mean_p_over": 0.37893064766659074,
+     "n": 556,
+     "realized_over": 0.381294964028777
+    },
+    {
+     "mean_p_over": 0.4064634278788097,
+     "n": 555,
+     "realized_over": 0.42342342342342343
+    },
+    {
+     "mean_p_over": 0.4325116628534642,
+     "n": 556,
+     "realized_over": 0.43884892086330934
+    },
+    {
+     "mean_p_over": 0.4571138183015859,
+     "n": 556,
+     "realized_over": 0.4550359712230216
+    },
+    {
+     "mean_p_over": 0.48312725091198766,
+     "n": 555,
+     "realized_over": 0.5477477477477477
+    },
+    {
+     "mean_p_over": 0.5181379659005756,
+     "n": 556,
+     "realized_over": 0.49280575539568344
+    },
+    {
+     "mean_p_over": 0.5762983886544613,
+     "n": 556,
+     "realized_over": 0.5431654676258992
+    },
+    {
+     "mean_p_over": 0.7204273280739152,
+     "n": 556,
+     "realized_over": 0.5827338129496403
+    }
+   ],
+   "pit_hist": [
+    693,
+    485,
+    484,
+    518,
+    559,
+    577,
+    596,
+    645,
+    588,
+    412
+   ],
+   "role": "carries_plus_targets",
+   "screen_vintage": "2020-2025",
+   "stat": "rush_plus_rec_yards",
+   "thr": 8.0,
+   "verdict": "CALIBRATED_CANDIDATE"
+  },
+  "tackles_assists": {
+   "count": true,
+   "cv_from_diagnostic": 0.5582266415821654,
+   "diagnostic": {
+    "crps": {
+     "B1": 1.4976183727837253,
+     "B2": 1.6446324343917642,
+     "CANDIDATE": 1.4441656956275388
+    },
+    "cv": 0.5582266415821654,
+    "cv_source": "2025_WEEKS_LE_8_POOLED_RATIO",
+    "delta_vs_B1": {
+     "ci95_hi": -0.03876779200778502,
+     "ci95_lo": -0.0670249257028318,
+     "mean": -0.05345267715618656,
+     "n": 2484,
+     "n_blocks": 10
+    },
+    "delta_vs_B2": {
+     "ci95_hi": -0.1617065215256435,
+     "ci95_lo": -0.2348225637760501,
+     "mean": -0.20046673876422547,
+     "n": 2484,
+     "n_blocks": 10
+    },
+    "diagnostic_beats_both_baselines": true,
+    "label": "DIAGNOSTIC_PARTIAL_VINTAGE_2025_ONLY",
+    "n": 2484,
+    "n_train_ratios": 909,
+    "over_line_deciles": [
+     {
+      "mean_p_over": 0.2768942104245829,
+      "n": 248,
+      "realized_over": 0.2661290322580645
+     },
+     {
+      "mean_p_over": 0.3380051217434289,
+      "n": 248,
+      "realized_over": 0.35080645161290325
+     },
+     {
+      "mean_p_over": 0.36862956725234797,
+      "n": 249,
+      "realized_over": 0.3654618473895582
+     },
+     {
+      "mean_p_over": 0.3928762810385133,
+      "n": 248,
+      "realized_over": 0.42338709677419356
+     },
+     {
+      "mean_p_over": 0.4158861521771032,
+      "n": 249,
+      "realized_over": 0.43775100401606426
+     },
+     {
+      "mean_p_over": 0.4410647562051577,
+      "n": 248,
+      "realized_over": 0.40725806451612906
+     },
+     {
+      "mean_p_over": 0.4680750558148722,
+      "n": 248,
+      "realized_over": 0.3548387096774194
+     },
+     {
+      "mean_p_over": 0.4993295278535009,
+      "n": 249,
+      "realized_over": 0.5140562248995983
+     },
+     {
+      "mean_p_over": 0.5399288333412694,
+      "n": 248,
+      "realized_over": 0.4314516129032258
+     },
+     {
+      "mean_p_over": 0.6726205823845629,
+      "n": 249,
+      "realized_over": 0.5261044176706827
+     }
+    ],
+    "pit_hist": [
+     116,
+     270,
+     207,
+     269,
+     247,
+     253,
+     266,
+     277,
+     298,
+     281
+    ],
+    "scored_weeks": ">= 9"
+   },
+   "family": "tackles_assists",
+   "market": "TACKLES_ASSISTS",
+   "role": "def_tackles_total",
+   "screen_vintage": "NOT_RUNNABLE",
+   "stat": "def_tackles_total",
+   "thr": 3.0,
+   "verdict": "SCREEN_NOT_RUNNABLE_SANCTIONED_VINTAGE",
+   "verdict_reason": "kicking/defensive outcome columns exist only in sp_2025; the ps files for 2020-2024 carry no such columns, so the 2020-2025 screen has no outcomes to score"
+  },
+  "targets": {
+   "count": true,
+   "crps": {
+    "B1": 1.786975118733388,
+    "B2": 1.8647523779802748,
+    "CANDIDATE": 1.6742564075651267
+   },
+   "cv": 0.5154214950660674,
+   "cv_source": "TRAIN_2018_2019_POOLED_RATIO",
+   "delta_vs_B1": {
+    "ci95_hi": -0.09376378408107072,
+    "ci95_lo": -0.13310466803545623,
+    "mean": -0.11271871116826097,
+    "n": 8264,
+    "n_blocks": 89
+   },
+   "delta_vs_B2": {
+    "ci95_hi": -0.17491435670865974,
+    "ci95_lo": -0.20596485641610524,
+    "mean": -0.190495970415148,
+    "n": 8264,
+    "n_blocks": 89
+   },
+   "family": "targets",
+   "market": "TARGETS",
+   "n": 8264,
+   "n_train_ratios": 2679,
+   "over_line_deciles": [
+    {
+     "mean_p_over": 0.2609625608586405,
+     "n": 826,
+     "realized_over": 0.25786924939467315
+    },
+    {
+     "mean_p_over": 0.3262801448261439,
+     "n": 826,
+     "realized_over": 0.324455205811138
+    },
+    {
+     "mean_p_over": 0.3607712980340353,
+     "n": 827,
+     "realized_over": 0.34099153567110035
+    },
+    {
+     "mean_p_over": 0.388644441420781,
+     "n": 826,
+     "realized_over": 0.3789346246973366
+    },
+    {
+     "mean_p_over": 0.4154289200678927,
+     "n": 827,
+     "realized_over": 0.3941958887545345
+    },
+    {
+     "mean_p_over": 0.4441138660669436,
+     "n": 826,
+     "realized_over": 0.45036319612590797
+    },
+    {
+     "mean_p_over": 0.4727429921487512,
+     "n": 826,
+     "realized_over": 0.44794188861985473
+    },
+    {
+     "mean_p_over": 0.5036358173266258,
+     "n": 827,
+     "realized_over": 0.4570737605804111
+    },
+    {
+     "mean_p_over": 0.5454422113679038,
+     "n": 826,
+     "realized_over": 0.48184019370460046
+    },
+    {
+     "mean_p_over": 0.6502234880471012,
+     "n": 827,
+     "realized_over": 0.5743651753325272
+    }
+   ],
+   "pit_hist": [
+    598,
+    793,
+    667,
+    820,
+    822,
+    851,
+    968,
+    937,
+    943,
+    865
+   ],
+   "role": "targets",
+   "screen_vintage": "2020-2025",
+   "stat": "targets",
+   "thr": 4.0,
+   "verdict": "CALIBRATED_CANDIDATE"
+  },
+  "two_plus_td": {
+   "count": true,
+   "crps": {
+    "B1": 0.2843869998838144,
+    "B2": 0.26716146995748963,
+    "CANDIDATE": 0.26648996823876697
+   },
+   "cv": 2.0900151188652436,
+   "cv_source": "TRAIN_2018_2019_POOLED_RATIO",
+   "delta_vs_B1": {
+    "ci95_hi": -0.0139866869383705,
+    "ci95_lo": -0.021902051217415997,
+    "mean": -0.017897031645047447,
+    "n": 13557,
+    "n_blocks": 89
+   },
+   "delta_vs_B2": {
+    "ci95_hi": 0.0007441745243072484,
+    "ci95_lo": -0.002212865361292645,
+    "mean": -0.0006715017187226514,
+    "n": 13557,
+    "n_blocks": 89
+   },
+   "family": "two_plus_td",
+   "market": "TWO_PLUS_TD",
+   "n": 13557,
+   "n_train_ratios": 4081,
+   "over_line_deciles": [
+    {
+     "mean_p_over": 0.10348577016939382,
+     "n": 1355,
+     "realized_over": 0.16309963099630997
+    },
+    {
+     "mean_p_over": 0.13799909524769516,
+     "n": 1356,
+     "realized_over": 0.14970501474926254
+    },
+    {
+     "mean_p_over": 0.15961540151935752,
+     "n": 1356,
+     "realized_over": 0.18952802359882007
+    },
+    {
+     "mean_p_over": 0.18258918303124733,
+     "n": 1355,
+     "realized_over": 0.2007380073800738
+    },
+    {
+     "mean_p_over": 0.20952461881150752,
+     "n": 1356,
+     "realized_over": 0.22935103244837757
+    },
+    {
+     "mean_p_over": 0.22569906860795563,
+     "n": 1356,
+     "realized_over": 0.25073746312684364
+    },
+    {
+     "mean_p_over": 0.23898691151686646,
+     "n": 1355,
+     "realized_over": 0.2701107011070111
+    },
+    {
+     "mean_p_over": 0.2513944555499864,
+     "n": 1356,
+     "realized_over": 0.2949852507374631
+    },
+    {
+     "mean_p_over": 0.2672659769586335,
+     "n": 1356,
+     "realized_over": 0.3230088495575221
+    },
+    {
+     "mean_p_over": 0.29201455318914005,
+     "n": 1356,
+     "realized_over": 0.38495575221238937
+    }
+   ],
+   "pit_hist": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    859,
+    5807,
+    3813,
+    3078
+   ],
+   "role": "carries_plus_targets",
+   "screen_vintage": "2020-2025",
+   "stat": "touchdowns_scored",
+   "thr": 4.0,
+   "verdict": "DOES_NOT_BEAT_BASELINE"
+  },
+  "xp_made": {
+   "count": true,
+   "cv_from_diagnostic": 0.6313842815461064,
+   "diagnostic": {
+    "crps": {
+     "B1": 0.830491011091845,
+     "B2": 0.8019670278369785,
+     "CANDIDATE": 0.7789303016305248
+    },
+    "cv": 0.6313842815461064,
+    "cv_source": "2025_WEEKS_LE_8_POOLED_RATIO",
+    "delta_vs_B1": {
+     "ci95_hi": -0.03281115000711771,
+     "ci95_lo": -0.0725079775286667,
+     "mean": -0.051560709461320325,
+     "n": 285,
+     "n_blocks": 10
+    },
+    "delta_vs_B2": {
+     "ci95_hi": -0.003487694285078031,
+     "ci95_lo": -0.04277465382022043,
+     "mean": -0.02303672620645377,
+     "n": 285,
+     "n_blocks": 10
+    },
+    "diagnostic_beats_both_baselines": true,
+    "label": "DIAGNOSTIC_PARTIAL_VINTAGE_2025_ONLY",
+    "n": 285,
+    "n_train_ratios": 102,
+    "over_line_deciles": [
+     {
+      "mean_p_over": 0.2094301749974665,
+      "n": 28,
+      "realized_over": 0.21428571428571427
+     },
+     {
+      "mean_p_over": 0.2616648633198786,
+      "n": 29,
+      "realized_over": 0.27586206896551724
+     },
+     {
+      "mean_p_over": 0.30319798498099926,
+      "n": 28,
+      "realized_over": 0.21428571428571427
+     },
+     {
+      "mean_p_over": 0.33427077061150595,
+      "n": 29,
+      "realized_over": 0.3103448275862069
+     },
+     {
+      "mean_p_over": 0.36708828340475624,
+      "n": 28,
+      "realized_over": 0.42857142857142855
+     },
+     {
+      "mean_p_over": 0.3966474040606033,
+      "n": 29,
+      "realized_over": 0.4827586206896552
+     },
+     {
+      "mean_p_over": 0.42205681781153775,
+      "n": 28,
+      "realized_over": 0.32142857142857145
+     },
+     {
+      "mean_p_over": 0.4511185067055308,
+      "n": 29,
+      "realized_over": 0.4827586206896552
+     },
+     {
+      "mean_p_over": 0.4859281859714149,
+      "n": 28,
+      "realized_over": 0.5714285714285714
+     },
+     {
+      "mean_p_over": 0.5521637635358004,
+      "n": 29,
+      "realized_over": 0.5172413793103449
+     }
+    ],
+    "pit_hist": [
+     13,
+     14,
+     28,
+     21,
+     23,
+     31,
+     36,
+     39,
+     35,
+     45
+    ],
+    "scored_weeks": ">= 9"
+   },
+   "family": "xp_made",
+   "market": "XP_MADE",
+   "role": "pat_att",
+   "screen_vintage": "NOT_RUNNABLE",
+   "stat": "pat_made",
+   "thr": 1.0,
+   "verdict": "SCREEN_NOT_RUNNABLE_SANCTIONED_VINTAGE",
+   "verdict_reason": "kicking/defensive outcome columns exist only in sp_2025; the ps files for 2020-2024 carry no such columns, so the 2020-2025 screen has no outcomes to score"
+  }
+ },
+ "label": "SCREEN \u2014 calibration screen on USED data (2020-2025 vintage, as the Part 2 screen). An entry ticket, not validation.",
+ "not_built": {
+  "first_td": {
+   "reason": "canonical coverage resolves first_td NO_DATA (NO_VERIFIED_FIRST_SCORING_ATTRIBUTION); the gap is first-scoring attribution data, not an engine.",
+   "verdict": "NOT_BUILT_RESOLVES_NO_DATA_NOT_NO_ENGINE"
+  },
+  "interceptions": {
+   "reason": "owner ruling: interceptions are OUT of the Part 2B scope; the pricer refuses MARKET_OUT_OF_SCOPE_2B.",
+   "verdict": "NOT_BUILT_SCOPE_RULED"
+  },
+  "longest_completion": {
+   "reason": "no per-game longest-play outcome exists in any sanctioned snapshot file (game logs carry sums and counts, never a max); a game-log engine would have to fabricate its outcome. An in-repo play-by-play research engine (nfl_longest_plays_empirical) exists but sits outside this build's data mandate and remains governance-unadmitted.",
+   "verdict": "ENGINE_NOT_BUILT_NO_OUTCOME_DATA_IN_SANCTIONED_SNAPSHOT"
+  },
+  "longest_reception": {
+   "reason": "no per-game longest-play outcome exists in any sanctioned snapshot file (game logs carry sums and counts, never a max); a game-log engine would have to fabricate its outcome. An in-repo play-by-play research engine (nfl_longest_plays_empirical) exists but sits outside this build's data mandate and remains governance-unadmitted.",
+   "verdict": "ENGINE_NOT_BUILT_NO_OUTCOME_DATA_IN_SANCTIONED_SNAPSHOT"
+  },
+  "longest_rush": {
+   "reason": "no per-game longest-play outcome exists in any sanctioned snapshot file (game logs carry sums and counts, never a max); a game-log engine would have to fabricate its outcome. An in-repo play-by-play research engine (nfl_longest_plays_empirical) exists but sits outside this build's data mandate and remains governance-unadmitted.",
+   "verdict": "ENGINE_NOT_BUILT_NO_OUTCOME_DATA_IN_SANCTIONED_SNAPSHOT"
+  }
+ },
+ "resamples": 2000,
+ "seed": 20261017
+}

@@ -1,0 +1,368 @@
+"""Phone-only NBA player-prop intake: user odds, independently held history.
+
+The user's JSON supplies quotes and player display names, never a
+probability or history. Pricing comes solely from
+``sportsedge.nba_prop_empirical`` (the Oct 17/18 calibration
+construction: a player's point-in-time prior same-season game logs,
+smoothed k=5 toward the per-position league pool) over a game-log
+store the operator supplies locally — the verified sportsdataverse
+box-score pull shape (``scripts/pull_nba_results.py``), joined with
+game dates and roster positions from sidecar files. Nothing is
+fetched at pricing time and nothing is read from the intake row
+beyond the quote and the player's display name.
+
+Store directory contract (``SPORTSEDGE_NBA_PROP_STORE_DIR`` or the
+``store_dir`` argument):
+
+* ``nba_player_games_*.csv`` — one or more pull-output files
+  (PLAYER_ID / PLAYER_NAME / GAME_ID / MIN / PTS / REB / AST).
+* ``game_dates.csv`` — GAME_ID,GAME_DATE for every game in the pull
+  (the asset carries no dates; a row whose game has no date cannot
+  be point-in-time ordered and is dropped by the engine's store).
+* ``positions.csv`` — PLAYER_ID,POSITION roster abbreviations
+  (G / F / C, compounds like G-F resolve by first character, exactly
+  as in the calibration programs). A player with no verified
+  position is outside the construction's universe and cannot price.
+
+With no store available, every row in the four registered families
+fails closed with NBA_PROP_HISTORY_STORE_UNAVAILABLE. Research only:
+the families are REGISTERED_RESEARCH_ONLY / NOT_VALIDATED, no market
+test exists, and no row here can become a PLAY.
+"""
+from __future__ import annotations
+
+import csv
+import glob
+import os
+import unicodedata
+from datetime import datetime, timezone
+
+from .family_market_registry import (
+    NBA_RESEARCH_REGISTERED_FAMILIES, family_market_decision)
+from .nba_prop_empirical import (
+    ENGINE_ID, GameLogStore, records_from_boxscore_rows)
+
+FAMILY_TO_STAT = {"player_points": "points", "player_rebounds": "rebounds",
+                  "player_assists": "assists", "player_pra": "pra"}
+STORE_ENV_VAR = "SPORTSEDGE_NBA_PROP_STORE_DIR"
+QUOTE_FRESH_SECONDS = 180
+
+STORE_UNAVAILABLE = "NBA_PROP_HISTORY_STORE_UNAVAILABLE"
+IDENTITY_MISSING = "NBA_PROP_PLAYER_IDENTITY_MISSING"
+PLAYER_NOT_IN_STORE = "NBA_PROP_PLAYER_NOT_IN_STORE"
+IDENTITY_AMBIGUOUS = "NBA_PROP_PLAYER_IDENTITY_AMBIGUOUS"
+TARGET_DATE_UNVERIFIED = "NBA_PROP_TARGET_DATE_UNVERIFIED"
+LINE_MISSING = "NBA_PROP_LINE_MISSING"
+SIDE_UNVERIFIED = "NBA_PROP_SIDE_UNVERIFIED"
+QUOTE_PRICE_MISSING = "NBA_PROP_QUOTE_PRICE_MISSING"
+
+
+def nba_prop_family_for_market(market):
+    """Canonical registered NBA prop family for an intake spelling,
+    or None. Single source of truth: the family registry."""
+    decision = family_market_decision("NBA", market)
+    if decision is None:
+        return None
+    family = decision.get("market")
+    return family if family in NBA_RESEARCH_REGISTERED_FAMILIES else None
+
+
+def _norm_name(name) -> str:
+    text = unicodedata.normalize("NFKD", str(name or ""))
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    return " ".join("".join(c.lower() if c.isalnum() else " "
+                            for c in text).split())
+
+
+def _parse_instant(value):
+    if isinstance(value, datetime):
+        dt = value
+    elif isinstance(value, str) and value.strip():
+        try:
+            dt = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    else:
+        return None
+    if dt.tzinfo is None or dt.utcoffset() is None:
+        return None
+    return dt.astimezone(timezone.utc)
+
+
+def _target_date(row):
+    for key in ("kickoff", "commence_time", "start_time", "game_start",
+                "tipoff", "game_date", "date"):
+        value = row.get(key)
+        if value is None:
+            continue
+        instant = _parse_instant(value)
+        if instant is not None:
+            return instant.date()
+        if isinstance(value, str) and len(value.strip()) >= 10:
+            try:
+                return datetime.fromisoformat(value.strip()[:10]).date()
+            except ValueError:
+                continue
+    return None
+
+
+def _american_to_decimal(odds):
+    try:
+        value = float(str(odds).strip())
+    except (TypeError, ValueError):
+        return None
+    if value == 0:
+        return None
+    return 1.0 + (value / 100.0 if value > 0 else 100.0 / abs(value))
+
+
+def _fair_american(p_win: float, p_lose: float):
+    denom = p_win + p_lose
+    if denom <= 0:
+        return None
+    p = p_win / denom
+    if p <= 0.0 or p >= 1.0:
+        return None
+    if p >= 0.5:
+        return -round(100.0 * p / (1.0 - p))
+    return round(100.0 * (1.0 - p) / p)
+
+
+# ---------- store loading -----------------------------------------------------
+
+_STORE_CACHE: dict = {}
+
+
+def load_store_from_dir(store_dir):
+    """(store, receipt) or (None, reason). Reads only local files the
+    operator supplied; never fetches."""
+    if not store_dir:
+        return None, STORE_UNAVAILABLE
+    key = os.path.abspath(str(store_dir))
+    if key in _STORE_CACHE:
+        return _STORE_CACHE[key]
+    result = _load_store_uncached(key)
+    _STORE_CACHE[key] = result
+    return result
+
+
+def _load_store_uncached(key):
+    try:
+        pull_files = sorted(glob.glob(os.path.join(key, "nba_player_games_*.csv")))
+        dates_path = os.path.join(key, "game_dates.csv")
+        positions_path = os.path.join(key, "positions.csv")
+        if not pull_files or not os.path.exists(dates_path) \
+                or not os.path.exists(positions_path):
+            return None, STORE_UNAVAILABLE
+        rows = []
+        for path in pull_files:
+            with open(path, newline="", encoding="utf-8") as fh:
+                rows.extend(dict(r) for r in csv.DictReader(fh))
+        game_dates = {}
+        with open(dates_path, newline="", encoding="utf-8") as fh:
+            for r in csv.DictReader(fh):
+                rr = {str(k).strip().upper(): v for k, v in r.items()}
+                gid = str(rr.get("GAME_ID") or "").strip()
+                gdate = str(rr.get("GAME_DATE") or rr.get("DATE") or "").strip()
+                if gid and gdate:
+                    game_dates[gid] = gdate
+        positions = {}
+        with open(positions_path, newline="", encoding="utf-8") as fh:
+            for r in csv.DictReader(fh):
+                rr = {str(k).strip().upper(): v for k, v in r.items()}
+                pid = str(rr.get("PLAYER_ID") or "").strip()
+                pos = str(rr.get("POSITION") or rr.get("POS") or "").strip()
+                if pid and pos:
+                    positions[pid] = pos
+        if not rows or not game_dates or not positions:
+            return None, STORE_UNAVAILABLE
+        records = records_from_boxscore_rows(rows, game_dates, positions)
+        store = GameLogStore(records)
+        if not store.player_ids():
+            return None, STORE_UNAVAILABLE
+        receipt = {
+            "source": "SPORTSEDGE_NBA_PROP_STORE_DIR",
+            "status": "NBA_PROP_STORE_LOADED",
+            "store_dir": key,
+            "pull_files": [os.path.basename(p) for p in pull_files],
+            "players": len(store.player_ids()),
+            "records_kept": store.counters["records_kept"],
+            "store_counters": dict(store.counters),
+            "engine_id": ENGINE_ID,
+        }
+        return store, receipt
+    except (OSError, UnicodeDecodeError, csv.Error, TypeError, ValueError):
+        return None, STORE_UNAVAILABLE
+
+
+def _resolve_store(store, store_dir):
+    if store is not None:
+        return store, {"source": "SPORTSEDGE_NBA_PROP_STORE_OBJECT",
+                       "status": "NBA_PROP_STORE_SUPPLIED",
+                       "players": len(store.player_ids()),
+                       "records_kept": store.counters["records_kept"],
+                       "engine_id": ENGINE_ID}
+    directory = store_dir or os.environ.get(STORE_ENV_VAR)
+    loaded, receipt_or_reason = load_store_from_dir(directory)
+    if loaded is None:
+        return None, receipt_or_reason
+    return loaded, receipt_or_reason
+
+
+# ---------- row pricing ---------------------------------------------------------
+
+def _blocked(row, family, reason):
+    return {"status": "NO_MODEL_OR_MARKET", "reason": str(reason)[:180],
+            "blocker": str(reason),
+            "sport": "NBA", "market": row.get("market"),
+            "coverage_market": family,
+            "selection": row.get("side") or row.get("selection"),
+            "player_name": row.get("player_name") or row.get("label"),
+            "research_only": True, "official_authority": False,
+            "model_p_authority": False, "staking_authority": False,
+            "registry_enforced": True,
+            "registry_module": "sportsedge.registry_gate",
+            "family_decision": family_market_decision(
+                "NBA", row.get("market"))}
+
+
+def phone_nba_prop_rows(rows, *, now=None, store=None, store_dir=None,
+                        min_ev=0.02):
+    """Price NBA PTS/REB/AST/PRA rows through the empirical engine.
+
+    Returns (outputs, receipts), one output per input row, in order.
+    Every output is either a priced research row (registration +
+    engine stamps, INDEPENDENT provenance) or a fail-closed blocked
+    row naming its reason.
+    """
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("NOW_TIMEZONE_REQUIRED")
+    resolved_store, receipt = _resolve_store(store, store_dir)
+    receipts = [receipt] if isinstance(receipt, dict) else [{
+        "source": "SPORTSEDGE_NBA_PROP_STORE_DIR",
+        "status": "NBA_PROP_STORE_UNAVAILABLE",
+        "reason": receipt}]
+    name_index = {}
+    if resolved_store is not None:
+        for pid in resolved_store.player_ids():
+            name_index.setdefault(
+                _norm_name(resolved_store.player_name(pid)), set()).add(pid)
+    outputs = []
+    for row in rows:
+        family = nba_prop_family_for_market(row.get("market"))
+        if family is None:
+            outputs.append(_blocked(row, None, "NBA_PROP_MARKET_NOT_SUPPORTED"))
+            continue
+        if resolved_store is None:
+            outputs.append(_blocked(row, family, STORE_UNAVAILABLE))
+            continue
+        name = str(row.get("player_name") or row.get("label") or "").strip()
+        if not name:
+            outputs.append(_blocked(row, family, IDENTITY_MISSING))
+            continue
+        candidates = name_index.get(_norm_name(name), set())
+        if not candidates:
+            outputs.append(_blocked(row, family, PLAYER_NOT_IN_STORE))
+            continue
+        if len(candidates) > 1:
+            outputs.append(_blocked(row, family, IDENTITY_AMBIGUOUS))
+            continue
+        player_id = next(iter(candidates))
+        target = _target_date(row)
+        if target is None:
+            outputs.append(_blocked(row, family, TARGET_DATE_UNVERIFIED))
+            continue
+        try:
+            line = float(row["line"])
+        except (KeyError, TypeError, ValueError):
+            outputs.append(_blocked(row, family, LINE_MISSING))
+            continue
+        side = str(row.get("side") or row.get("selection") or "").upper()
+        if side not in {"OVER", "UNDER"}:
+            outputs.append(_blocked(row, family, SIDE_UNVERIFIED))
+            continue
+        decimal = _american_to_decimal(row.get("odds", row.get("price")))
+        if decimal is None:
+            outputs.append(_blocked(row, family, QUOTE_PRICE_MISSING))
+            continue
+        priced = resolved_store.price(
+            player_id, FAMILY_TO_STAT[family], line, target)
+        if priced.get("status") != "PRICED":
+            outputs.append(_blocked(row, family, priced.get("reason")))
+            continue
+        p_win = priced["p_over"] if side == "OVER" else priced["p_under"]
+        p_lose = priced["p_under"] if side == "OVER" else priced["p_over"]
+        ev = p_win * (decimal - 1.0) - p_lose
+        quote_ts = _parse_instant(
+            row.get("quote_captured_at") or row.get("captured_at"))
+        if quote_ts is None:
+            freshness = "NO_TIMESTAMP_ON_ROW"
+            stale = False
+        else:
+            age = (now - quote_ts).total_seconds()
+            stale = age > QUOTE_FRESH_SECONDS or age < 0
+            freshness = "STALE_OR_FUTURE" if stale else "CURRENT"
+        if stale:
+            status = "WATCH_QUOTE_NOT_CURRENT"
+        elif ev >= min_ev:
+            status = "RESEARCH_CANDIDATE_NOT_VALIDATED"
+        else:
+            status = "PRICED_RESEARCH"
+        decision = family_market_decision("NBA", row.get("market"))
+        outputs.append({
+            "status": status,
+            "sport": "NBA",
+            "market": row.get("market"),
+            "coverage_market": family,
+            "selection": side,
+            "side": side,
+            "player_name": priced["player_name"],
+            "player_id": player_id,
+            "line": line,
+            "odds": row.get("odds", row.get("price")),
+            "book": row.get("book") or "draftkings",
+            "quote_captured_at": row.get("quote_captured_at")
+                                 or row.get("captured_at"),
+            "quote_freshness": freshness,
+            "model_p": p_win,
+            "model_probability": p_win,
+            "model_source": ENGINE_ID,
+            "p_over": priced["p_over"], "p_under": priced["p_under"],
+            "p_push": priced["p_push"],
+            "fair_american": _fair_american(p_win, p_lose),
+            "ev_per_dollar": ev,
+            "lean_label": "UNVALIDATED_ESTIMATE",
+            "pricing_provenance": {
+                "lane": "INDEPENDENT", "mechanism": None,
+                "source": "NBA_PROP_EMPIRICAL_V1_MARKET_BLIND",
+                "engine_lane": None, "play_eligible": False},
+            "nba_prop_engine": {
+                "engine_id": ENGINE_ID,
+                "sufficiency_met": True,
+                "n_prior": priced["n_prior"],
+                "pool_n": priced["pool_n"],
+                "pool_source": priced["pool_source"],
+                "b1_fallback_to_b2": priced["b1_fallback_to_b2"],
+                "weight_player": priced["weight_player"],
+                "weight_pool": priced["weight_pool"],
+                "k_smooth": priced["k_smooth"],
+                "model_mean": priced["model_mean"],
+                "position_group": priced["position_group"],
+                "history_basis": priced["history_basis"],
+                "participation_feed": priced["participation_feed"],
+                "limitation": priced["limitation"],
+                "construction": priced["construction"],
+            },
+            "family_decision": decision,
+            "registration_state": decision["registration_state"],
+            "validation_status": decision["validation_status"],
+            "eligible": False, "promotable": False,
+            "research_only": True, "official_authority": False,
+            "model_p_authority": False, "staking_authority": False,
+            "registry_enforced": True,
+            "registry_module": "sportsedge.registry_gate",
+            "registry_disposition":
+                "RESEARCH_PRICING_ALLOWED_ENGINE_SUFFICIENCY_MET",
+        })
+    return outputs, receipts
