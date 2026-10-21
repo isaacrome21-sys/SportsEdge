@@ -16,6 +16,10 @@ from .core import (  # noqa: F401
     evaluate_family,
     load_config,
 )
+from .nba_props import (  # noqa: F401
+    evaluate_nba_props,
+    load_nba_config,
+)
 
 __all__ = [
     "CLV_MISSING_REASONS",
@@ -24,5 +28,7 @@ __all__ = [
     "ForwardValidationRefusal",
     "config_from_dict",
     "evaluate_family",
+    "evaluate_nba_props",
     "load_config",
+    "load_nba_config",
 ]

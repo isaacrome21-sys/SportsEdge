@@ -33,6 +33,8 @@ One JSON config per family in `configs/`:
 | `close_max_age_minutes` | A close captured earlier than this before event start is `CLOSE_STALE` (Capture Spec: 60; exactly 60:00 is readable). |
 | `status` | `DRAFT — NOT FROZEN` until the owner freezes the family's preregistration. A verdict record stamps the config status and sha256, so a draft-config readout can never present as a frozen verdict. |
 | `capture_scope`, `capture_note`, `prereg_draft` | Where the family's lines are captured today and the path to its draft preregistration. |
+| `prereg`, `prereg_sha256` | For an already-frozen family: the frozen preregistration's path and sha256. Stamped on every verdict record, so a readout names the exact frozen text it was scored under. |
+| `picked_beats_passed_required` | Frozen picked/passed verdict mode (NBA props §9; TWO_SIDED only). The verdict sample is the market's classified engine rows — PICKED (runner-surfaced research candidates) and PASSED (engine-priced, not picked) — the CLV leg is the picked rows, and `BEATS_MARKET` additionally requires picked mean CLV > passed mean CLV. Rows with no runner disposition are reported unclassified and enter no denominator. |
 
 ## Record contracts
 
@@ -110,3 +112,21 @@ the passed rows' CLV is reported alongside for the picked-vs-passed read.
 
 **No verdict creates a PLAY.** A `BEATS_MARKET` verdict is evidence for
 an owner ruling, exactly as in the frozen tests.
+
+## Frozen family: NBA player props (PTS / REB / AST / PRA)
+
+The four NBA prop families are declared in `configs/nba_player_*.json`
+under the **frozen** preregistration
+`research/nba_props_forward_20261020/PREREG_NBA_PROPS_FORWARD_V1.md`
+(sha256 `54363908…f86657bc79`, frozen 2026-10-20 by owner ruling) —
+§12 of that document names this package as its evaluator, and the
+configs pin it by path + sha256. Score them only through
+`sportsedge.forward_validation.nba_props.evaluate_nba_props` (with
+`load_nba_config`, which verifies the pin), never through the generic
+entry point: the wrapper applies the prereg's §2 scope refusal
+(`MARKET_OUT_OF_SCOPE`) and §5 engine-provenance screen (engine
+stamp, `sufficiency_met`, `n_prior` ≥ 10, pool source, store
+provenance, declared participation limitation) before the framework's
+admission, and the configs declare the §9 picked/passed mode above.
+Prospective counting begins with the Wednesday Oct 21, 2026 slate;
+everything on or before the freeze date is historical record.
