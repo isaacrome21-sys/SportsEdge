@@ -83,6 +83,9 @@ def evaluate_calendar_archive(raw, *, begin=BEGIN_HOLDOUT, end=END_HOLDOUT):
             "paired_candidate_ss":0.0,"paired_climatology_ss":0.0,
             "paired_market_ss":0.0,"under":0,"over":0,"tie":0}
     dates=set()
+    # Predeclared all-seasons diagnostic: never select winning sub-cohorts
+    # for PLAY. Every season uses exactly the fixed V2 forecast and reference.
+    seasons={}
     for i,game in enumerate(rows):
         if not begin<=game["season"]<=end:
             continue
@@ -119,6 +122,18 @@ def evaluate_calendar_archive(raw, *, begin=BEGIN_HOLDOUT, end=END_HOLDOUT):
         totals["climatology_ss"]+=base_ss
         market=game["market"]
         if market is not None and 170<=market<=270:
+            b=seasons.setdefault(game["season"], {"season":game["season"],
+                "paired_games":0,"model_squared_error":0.0,
+                "reference_squared_error":0.0,"model_under_reference":0,
+                "model_over_reference":0,"model_equal_reference":0,
+                "signed_model_minus_reference_total_sum":0.0})
+            b["paired_games"]+=1
+            b["model_squared_error"]+=model_ss
+            b["reference_squared_error"]+=(market-actual)**2
+            b["model_under_reference"]+=int(predicted<market)
+            b["model_over_reference"]+=int(predicted>market)
+            b["model_equal_reference"]+=int(predicted==market)
+            b["signed_model_minus_reference_total_sum"]+=predicted-market
             totals["paired"]+=1
             totals["paired_candidate_ss"]+=model_ss
             totals["paired_climatology_ss"]+=base_ss
@@ -145,6 +160,23 @@ def evaluate_calendar_archive(raw, *, begin=BEGIN_HOLDOUT, end=END_HOLDOUT):
         "model_scored_games":totals["scored"],
         "paired_games":totals["paired"],
         "paired_distinct_dates":len(dates),
+        "all_seasons_indicative_breakdown":[{
+            "season":b["season"],"paired_games":b["paired_games"],
+            "candidate_rmse":math.sqrt(b["model_squared_error"]/b["paired_games"]),
+            "indicative_reference_rmse":math.sqrt(
+                b["reference_squared_error"]/b["paired_games"]),
+            "signed_model_minus_reference_mean":
+                b["signed_model_minus_reference_total_sum"]/b["paired_games"],
+            "model_under_reference":b["model_under_reference"],
+            "model_over_reference":b["model_over_reference"],
+            "model_equal_reference":b["model_equal_reference"],
+            "indicative_reference_screen":_indicative_reference_verdict(
+                math.sqrt(b["model_squared_error"]/b["paired_games"]),
+                math.sqrt(b["reference_squared_error"]/b["paired_games"])),
+            "market_admission":"NOT_VERIFIED",
+            "eligible_for_card":False}
+            for _,b in sorted(seasons.items())],
+        "subcohort_selection_authority":"NONE_PREDECLARED_DESCRIPTIVE_ONLY",
         "candidate_rmse_all":rmse("candidate_ss","scored"),
         "climatology_rmse_all":rmse("climatology_ss","scored"),
         "candidate_rmse_paired":rmse("paired_candidate_ss","paired"),
