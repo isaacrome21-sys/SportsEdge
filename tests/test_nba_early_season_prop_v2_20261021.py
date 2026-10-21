@@ -10,14 +10,16 @@ def history(nowteam="A", current_games=1, future=False):
                            tzinfo=timezone.utc) + timedelta(days=i)
             r.append({"player_id": "p1", "game_id": str(season)+"-"+str(i),
                       "season": season, "game_date": day.date().isoformat(),
-                      "observed_at": (day + timedelta(hours=6)).isoformat(),
+                      "tipoff": (day + timedelta(hours=20)).isoformat(),
+                      "observed_at": (day + timedelta(hours=23)).isoformat(),
                       "source_ref": "gamelog", "position": "G",
                       "team_id": team, "minutes": 30,
                       "points": 20 if season==2025 else 32,
                       "rebounds": 6, "assists": 7})
     if future:
         r.append({"player_id":"p1","game_id":"after","season":2026,
-                  "game_date":"2026-10-25","observed_at":"2026-10-25T22:00:00Z",
+                  "game_date":"2026-10-25","tipoff":"2026-10-25T20:00:00Z",
+                  "observed_at":"2026-10-25T23:00:00Z",
                   "source_ref":"gamelog","position":"G","team_id":"A",
                   "minutes":30,"points":150,"rebounds":30,"assists":30})
     return r
@@ -68,3 +70,37 @@ def test_missing_last_season_does_not_invent_prior():
     out = read(history()[10:])
     assert out["status"] == "REFUSED"
     assert out["reason"] == "NBA_EARLY_PROP_PRIOR_SEASON_HISTORY_INSUFFICIENT"
+
+
+def test_result_receipt_predating_tipoff_is_refused_not_a_prior():
+    records = history()
+    records[0]["observed_at"] = "2025-01-01T19:00:00Z"
+    try:
+        read(records)
+    except ValueError as e:
+        assert "RESULT_RECEIPT_NOT_AFTER_TIPOFF" in str(e)
+    else:
+        assert False, "unplayed result entered historical pool"
+
+
+def test_history_missing_genuine_tipoff_is_refused():
+    records = history()
+    del records[0]["tipoff"]
+    try:
+        read(records)
+    except ValueError as e:
+        assert "HISTORY_TIPOFF_REQUIRED" in str(e)
+    else:
+        assert False, "calendar label alone is not a pregame event witness"
+
+
+def test_utc_tipoff_date_must_match_chicago_local_game_date():
+    records = history()
+    records[0]["tipoff"] = "2025-01-02T02:00:00Z"
+    records[0]["observed_at"] = "2025-01-02T04:00:00Z"
+    try:
+        read(records)
+    except ValueError as e:
+        assert "LOCAL_GAME_DATE_MISMATCH" in str(e)
+    else:
+        assert False, "wrong local date accepted as evidence"
