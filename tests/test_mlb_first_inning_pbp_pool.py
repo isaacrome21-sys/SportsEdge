@@ -121,7 +121,7 @@ def test_duplicate_gamepk_or_future_target_game_refused():
      "PBP_PA_RESULT_UNVERIFIED"),
     (lambda p: p["plate_appearances"][0].update({"inning": 2}),
      "CROSS_GAME_OR_NONFIRST_PA"),
-    (lambda p: p["plate_appearances"][2].update({"half": "BOTTOM"}),
+    (lambda p: p["plate_appearances"][4].update({"half": "TOP"}),
      "PBP_FIRST_INNING_HALF_ORDER"),
 ])
 def test_corrupted_pa_sequence_or_credit_refused(mutation, error):
