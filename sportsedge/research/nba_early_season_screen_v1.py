@@ -6,7 +6,8 @@ market admission, V1 forward-row creation or promotion.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from zoneinfo import ZoneInfo
 from statistics import mean
 from math import isfinite
 
@@ -64,6 +65,14 @@ def screen_early_prop_mae(records, targets, *, stat):
             raise ValueError("NBA_EARLY_SCREEN_TEMPORAL_ORDER_INVALID")
         year=int(tgt["season"])
         target_date=str(tgt.get("game_date") or "")
+        try:
+            declared_date=date.fromisoformat(target_date)
+        except (TypeError, ValueError) as e:
+            raise ValueError("NBA_EARLY_SCREEN_TARGET_GAME_DATE_INVALID") from e
+        # A caller's slate-date string must never move the target across
+        # the prior-history cutoff. Midnight UTC may be previous-day Chicago.
+        if tip.astimezone(ZoneInfo("America/Chicago")).date()!=declared_date:
+            raise ValueError("NBA_EARLY_SCREEN_TARGET_LOCAL_DATE_MISMATCH")
         actual=_stat(tgt,stat)
         if float(tgt.get("minutes") or 0)<=0:
             blocked["TARGET_DNP"]=blocked.get("TARGET_DNP",0)+1
