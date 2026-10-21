@@ -10,6 +10,9 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 from math import isfinite
+from zoneinfo import ZoneInfo
+
+_SLATE_TZ = ZoneInfo("America/Chicago")
 
 
 ENGINE = "NBA_EARLY_SEASON_PROP_EMPIRICAL_CHALLENGER_V2"
@@ -85,9 +88,20 @@ def project_early_prop(records, *, player_id, target_team_id, target_season,
             local_date = date.fromisoformat(str(row["game_date"]))
         except (TypeError, ValueError, KeyError) as e:
             raise ValueError("NBA_EARLY_PROP_GAME_DATE_INVALID") from e
+        # Previous-season results must have an actual game start, not merely
+        # a caller-declared calendar date and result timestamp. Without this
+        # chronological witness, a future outcome can be labeled 'available'
+        # before it happened and leak into the model's prior pool.
+        if row.get("tipoff") is None:
+            raise ValueError("NBA_EARLY_PROP_HISTORY_TIPOFF_REQUIRED")
+        tipoff = _aware(row["tipoff"])
         available = _aware(row.get("observed_at"))
+        if available <= tipoff:
+            raise ValueError("NBA_EARLY_PROP_RESULT_RECEIPT_NOT_AFTER_TIPOFF")
+        if tipoff.astimezone(_SLATE_TZ).date() != local_date:
+            raise ValueError("NBA_EARLY_PROP_LOCAL_GAME_DATE_MISMATCH")
         value, minutes = _stat(row, stat)
-        if local_date >= target or available >= clock:
+        if local_date >= target or tipoff >= clock or available >= clock:
             excluded_future += 1
             continue
         if minutes == 0:
