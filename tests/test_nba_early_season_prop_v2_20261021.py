@@ -105,3 +105,26 @@ def test_utc_tipoff_date_must_match_chicago_local_game_date():
         assert "LOCAL_GAME_DATE_MISMATCH" in str(e)
     else:
         assert False, "wrong local date accepted as evidence"
+
+
+
+def test_same_season_team_change_must_be_transfer_watch_not_clean_projection():
+    records = history(nowteam="A", current_games=2)
+    # Previous season was with target A, but the first current-season
+    # game occurred on another club. Prior implementation saw no trade.
+    current = [x for x in records if x["season"] == 2026]
+    current[0]["team_id"] = "B"
+    out = read(records)
+    assert out["status"] == "WATCH_TRANSFER_NOT_MODELED"
+    assert out["transfer_unmodeled"] is True
+    assert out["previous_team_ids"] == ["A"]
+    assert out["current_team_ids"] == ["A", "B"]
+    assert out["play_authority"] is False
+
+
+def test_same_season_stable_team_keeps_research_only_status():
+    out = read(history(nowteam="A", current_games=2))
+    assert out["current_team_ids"] == ["A"]
+    assert out["status"] == "RESEARCH_PROJECTION"
+    assert out["transfer_unmodeled"] is False
+    assert out["research_only"] is True
