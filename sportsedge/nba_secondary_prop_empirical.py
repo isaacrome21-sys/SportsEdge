@@ -234,6 +234,11 @@ def research_nba_secondary_readout(
         raise NBASecondaryError("INVALID_MIXTURE_PROBABILITY_MASS")
     material_rows = sorted([
         {"game_id": r["game_id"], "player_id": r["player_id"],
+         "team_id": r["team_id"],
+         "season_start_year": r["season_start_year"],
+         "position_group": r["position_group"],
+         "minutes": r["minutes"],
+         "game_start_utc": r["game_start"].isoformat(),
          "source_sha256": r["snapshot_sha256"],
          "observed_at_utc": r["observed"].isoformat(),
          "stats": {stat: r[stat] for stat in STATS}}
