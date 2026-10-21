@@ -497,14 +497,16 @@ class PinnedHappyPathTests(AdapterCase):
         self.assertTrue(all(e["disposition"] == loader.IGNORED
                             for e in manifest_entries))
 
-    def test_run_full_pinned_archive_cannot_bypass_family_registry(self):
-        # Registry x Form 2 seam (owner ruling, Oct 14 2026): #2224
-        # refuses PRICING at the output boundary, not evidence
-        # collection. The pinned archive IS admitted against the game
-        # rows and the prepricing audit IS produced (the evidence
-        # path); the emitted row is still the registry refusal -- the
-        # archive cannot create an eligible CFB market while the
-        # family remains UNVALIDATED.
+    def test_run_full_pinned_archive_prices_research_only_through_registry(self):
+        # Registry x Form 2 seam (owner rulings Oct 14 + Oct 20 2026):
+        # the pinned archive IS admitted against the game rows and the
+        # prepricing audit IS produced (the evidence path); pricing
+        # then happens THROUGH the registry's Option B research
+        # registration -- never around it. The emitted row is a priced
+        # research row carrying the registration stamp (eligible and
+        # promotable stay False) and the availability gate's
+        # research-only forcing; the archive creates no eligibility,
+        # and without the pin nothing prices (see the no-pin test).
         pin = self._pinned_two_team_archive()
         card = full.run_full({"lines": [cfb_row()]}, now=NOW,
                              getter=lambda url: cfb_mapping().get(url, {}),
@@ -517,12 +519,25 @@ class PinnedHappyPathTests(AdapterCase):
         (entry,) = card["prepricing_factor_audit"]["by_input_index"]
         self.assertFalse(entry["blocked"])
         (row,) = card["evaluated_rows"]
-        self.assertEqual(row["status"], "NO_MODEL_OR_MARKET")
-        self.assertEqual(row["blocker"], "NO_VALIDATION")
+        self.assertNotEqual(row["status"], "NO_MODEL_OR_MARKET")
+        self.assertIsNotNone(row["estimate_p"])
+        self.assertIsNotNone(row["ev_per_dollar"])
+        self.assertEqual(row["registration_state"],
+                         "REGISTERED_RESEARCH_ONLY")
+        self.assertEqual(row["validation_status"], "NOT_VALIDATED")
+        self.assertIs(row["eligible"], False)
+        self.assertIs(row["promotable"], False)
+        self.assertEqual(
+            row["registry_disposition"],
+            "RESEARCH_PRICING_ALLOWED_FORM2_IDENTITY_SATISFIED")
         self.assertIs(row["registry_enforced"], True)
-        for key in ("model_p", "probability", "fair_odds",
-                    "ev_per_dollar", "fair_price", "edge"):
-            self.assertIsNone(row.get(key), key)
+        self.assertEqual(row["availability_status"],
+                         qe.AVAILABILITY_UNVERIFIED)
+        self.assertEqual(
+            row["play_blocked_reason"],
+            "QB_AVAILABILITY_UNVERIFIED_CANNOT_SURFACE_AS_PLAY")
+        self.assertEqual(card["registry_gate"]["family_state"],
+                         "BLOCKED_WITH_CFB_RESEARCH_PRICING")
         self.assertEqual(card["edges"], [])
         self.assertEqual(card["independent_candidates"], [])
         self.assertEqual(card["prop_candidates"], [])
@@ -631,7 +646,7 @@ class MultiPinnedArchiveTests(AdapterCase):
         return (self.combined_manifest([first])[1],
                 self.combined_manifest([second])[1])
 
-    def test_independent_per_team_pins_compose_with_registry_still_blocked(self):
+    def test_independent_per_team_pins_compose_and_price_research_only(self):
         pin_a, pin_b = self._two_team_pins()
         mapping, audit = loader.load_form2_bundle_manifests(
             self.dir, [cfb_row()], manifest_sha256s=[pin_a, pin_b])
@@ -649,14 +664,21 @@ class MultiPinnedArchiveTests(AdapterCase):
             ["2393", "48"])
         (prepricing,) = card["prepricing_factor_audit"]["by_input_index"]
         self.assertFalse(prepricing["blocked"])
+        # Composed pins satisfy identity for both teams: the row
+        # prices through the Option B research registration (stamp,
+        # eligible False), never as an eligible market.
         (row,) = card["evaluated_rows"]
-        self.assertEqual(row["status"], "NO_MODEL_OR_MARKET")
-        self.assertEqual(row["blocker"], "NO_VALIDATION")
+        self.assertNotEqual(row["status"], "NO_MODEL_OR_MARKET")
+        self.assertIsNotNone(row["estimate_p"])
+        self.assertIsNotNone(row["ev_per_dollar"])
+        self.assertEqual(row["registration_state"],
+                         "REGISTERED_RESEARCH_ONLY")
+        self.assertEqual(row["validation_status"], "NOT_VALIDATED")
+        self.assertIs(row["eligible"], False)
+        self.assertIs(row["promotable"], False)
         self.assertTrue(row["registry_enforced"])
         self.assertFalse(card["edges"])
         self.assertFalse(card["prop_candidates"])
-        for field in ("model_p", "ev_per_dollar", "probability", "fair_odds"):
-            self.assertIsNone(row.get(field))
 
     def test_one_bad_pin_poisoned_composite_never_partially_admits(self):
         pin_a, _ = self._two_team_pins()

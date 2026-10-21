@@ -1,0 +1,204 @@
+{
+ "kind": "CALIBRATION_ONLY_NO_MARKET_LEG",
+ "evidence_label": "SCREEN_20261020",
+ "spec_sha256": "cc96783ffeac0074607a3d1869e4a6bea381f0c8ba3188395ad1d851a705fd00",
+ "archive_sha256": "0c9858489d224c54dcf2f2d1b70c3a122675381d35ae03ce0a81204f739f0e98",
+ "archive_rows_total": 13903,
+ "archive_rows_unparseable": 0,
+ "archive_games_used": 13903,
+ "period_fit": {
+  "version": "NBA_PERIOD_FIT_V1:310b42f5bc41",
+  "quarter_shares": [
+   0.2525352114107637,
+   0.25281879324241774,
+   0.24805990386677548,
+   0.24658609148004307
+  ],
+  "fit_span": "seasons<=2014"
+ },
+ "ratings_params": "NBARatingsParams committed defaults",
+ "score_seasons": [
+  2015,
+  2016,
+  2017,
+  2018,
+  2019,
+  2020,
+  2021
+ ],
+ "TEAM_TOTAL": {
+  "n": 15506,
+  "mae_candidate": 8.997503714921931,
+  "mae_b1_team_mean": 9.541065873429673,
+  "mae_b2_league_mean": 9.827527505227916,
+  "rmse_candidate": 11.351417806104639,
+  "rmse_b1_team_mean": 12.01624366219368,
+  "rmse_b2_league_mean": 12.35002877554945,
+  "paired_delta_mae_vs_b1": -0.543562158507741,
+  "ci95_vs_b1": [
+   -0.6163967374900376,
+   -0.4740145844575205
+  ],
+  "paired_delta_mae_vs_b2": -0.830023790305985,
+  "ci95_vs_b2": [
+   -0.9156968360519246,
+   -0.7410516093363494
+  ],
+  "blocks_iso_weeks": 214,
+  "verdict": "CALIBRATED_CANDIDATE",
+  "provenance": "REPRODUCTION_OF_OCT18_B4"
+ },
+ "TEAM_QUARTER_TOTAL": {
+  "n": 62024,
+  "mae_candidate": 4.610337156696957,
+  "mae_b1_team_mean": 4.707035747257401,
+  "mae_b2_league_mean": 4.709949794424178,
+  "rmse_candidate": 5.772026561641697,
+  "rmse_b1_team_mean": 5.8908417214579725,
+  "rmse_b2_league_mean": 5.895951909733801,
+  "paired_delta_mae_vs_b1": -0.09669859056044411,
+  "ci95_vs_b1": [
+   -0.10952908067694062,
+   -0.08388218397638102
+  ],
+  "paired_delta_mae_vs_b2": -0.09961263772722,
+  "ci95_vs_b2": [
+   -0.11100037976594168,
+   -0.08804259816223461
+  ],
+  "blocks_iso_weeks": 214,
+  "verdict": "CALIBRATED_CANDIDATE",
+  "provenance": "REPRODUCTION_OF_OCT18_B11",
+  "per_quarter_mae": {
+   "1": {
+    "n": 15506,
+    "mae_candidate": 4.573581805658817,
+    "mae_b1": 4.720115577597096,
+    "mae_b2": 4.745975780823791
+   },
+   "2": {
+    "n": 15506,
+    "mae_candidate": 4.548644838195401,
+    "mae_b1": 4.650542060943121,
+    "mae_b2": 4.656625004022107
+   },
+   "3": {
+    "n": 15506,
+    "mae_candidate": 4.620515427584048,
+    "mae_b1": 4.705620045070099,
+    "mae_b2": 4.727173746397394
+   },
+   "4": {
+    "n": 15506,
+    "mae_candidate": 4.6986065553495635,
+    "mae_b1": 4.75186530541929,
+    "mae_b2": 4.710024646453417
+   }
+  }
+ },
+ "GAME_QUARTER_TOTAL": {
+  "n": 31012,
+  "mae_candidate": 6.6518164638389745,
+  "mae_b1_team_mean": 6.748328768270572,
+  "mae_b2_league_mean": 6.813515245174382,
+  "rmse_candidate": 8.350484413682342,
+  "rmse_b1_team_mean": 8.479893563510199,
+  "rmse_b2_league_mean": 8.553557068413483,
+  "paired_delta_mae_vs_b1": -0.0965123044315969,
+  "ci95_vs_b1": [
+   -0.12116695113696303,
+   -0.07265987749247328
+  ],
+  "paired_delta_mae_vs_b2": -0.16169878133540572,
+  "ci95_vs_b2": [
+   -0.18744785273710024,
+   -0.13592490781617847
+  ],
+  "blocks_iso_weeks": 214,
+  "verdict": "CALIBRATED_CANDIDATE",
+  "provenance": "FIRST_SCREEN_AGGREGATION"
+ },
+ "TEAM_HALF_TOTAL": {
+  "n": 31012,
+  "mae_candidate": 6.454114487494156,
+  "mae_b1_team_mean": 6.635801646521085,
+  "mae_b2_league_mean": 6.722848621344681,
+  "rmse_candidate": 8.076778234715308,
+  "rmse_b1_team_mean": 8.330594950934085,
+  "rmse_b2_league_mean": 8.431393963026506,
+  "paired_delta_mae_vs_b1": -0.18168715902692809,
+  "ci95_vs_b1": [
+   -0.2101263597829639,
+   -0.1541091520318686
+  ],
+  "paired_delta_mae_vs_b2": -0.2687341338505241,
+  "ci95_vs_b2": [
+   -0.2995207237054086,
+   -0.23992133172915972
+  ],
+  "blocks_iso_weeks": 214,
+  "verdict": "CALIBRATED_CANDIDATE",
+  "provenance": "FIRST_SCREEN_AGGREGATION"
+ },
+ "GAME_HALF_TOTAL": {
+  "n": 15506,
+  "mae_candidate": 9.7481047132323,
+  "mae_b1_team_mean": 9.951174142201687,
+  "mae_b2_league_mean": 10.195724114514501,
+  "rmse_candidate": 12.243976279179794,
+  "rmse_b1_team_mean": 12.507760670539033,
+  "rmse_b2_league_mean": 12.803652650400803,
+  "paired_delta_mae_vs_b1": -0.203069428969387,
+  "ci95_vs_b1": [
+   -0.262544310582445,
+   -0.14608720767671057
+  ],
+  "paired_delta_mae_vs_b2": -0.44761940128220384,
+  "ci95_vs_b2": [
+   -0.5155224276747745,
+   -0.3777490553533018
+  ],
+  "blocks_iso_weeks": 214,
+  "verdict": "CALIBRATED_CANDIDATE",
+  "provenance": "FIRST_SCREEN_AGGREGATION"
+ },
+ "parity_vs_oct18_published": {
+  "TEAM_TOTAL": {
+   "max_abs_diff": 0,
+   "diffs": {
+    "n": 0,
+    "mae_candidate": 0.0,
+    "mae_b1_team_mean": 0.0,
+    "mae_b2_league_mean": 0.0,
+    "rmse_candidate": 0.0,
+    "paired_delta_mae_vs_b1": 0.0,
+    "paired_delta_mae_vs_b2": 0.0,
+    "blocks_iso_weeks": 0,
+    "ci95_vs_b1": 0.0,
+    "ci95_vs_b2": 0.0
+   }
+  },
+  "TEAM_QUARTER_TOTAL": {
+   "max_abs_diff": 0,
+   "diffs": {
+    "n": 0,
+    "mae_candidate": 0.0,
+    "mae_b1_team_mean": 0.0,
+    "mae_b2_league_mean": 0.0,
+    "rmse_candidate": 0.0,
+    "paired_delta_mae_vs_b1": 0.0,
+    "paired_delta_mae_vs_b2": 0.0,
+    "blocks_iso_weeks": 0,
+    "ci95_vs_b1": 0.0,
+    "ci95_vs_b2": 0.0
+   }
+  },
+  "period_fit_version": {
+   "mine": "NBA_PERIOD_FIT_V1:310b42f5bc41",
+   "published": "NBA_PERIOD_FIT_V1:310b42f5bc41",
+   "match": true
+  },
+  "quarter_shares_max_abs_diff": 0.0,
+  "per_quarter_mae_max_abs_diff": 0
+ }
+}

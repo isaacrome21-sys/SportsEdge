@@ -1,0 +1,25 @@
+{
+ "status": "DRAFT \u2014 NOT FROZEN",
+ "sport": "MLB",
+ "family": "RUNS_RBIS",
+ "markets": [
+  "RUNS_RBIS"
+ ],
+ "engine_id": "MLB_BATTER_EMPIRICAL_GAMELOG",
+ "model_version": "mlb_batter_empirical_game_log_v1",
+ "market_form": "TWO_SIDED",
+ "sides": [
+  "OVER",
+  "UNDER"
+ ],
+ "over_side": "OVER",
+ "min_rows": 150,
+ "min_events": 40,
+ "min_slates": null,
+ "max_clv_missing_share": 0.2,
+ "clv_beats_threshold": 0.0,
+ "close_max_age_minutes": 60,
+ "capture_scope": "OPERATIVE_CAPTURE",
+ "capture_note": "Operative paired DraftKings capture for the game: an ENTRY capture before first pitch and a CLOSE capture that is the last capture before first pitch and no more than 60 minutes before it (the Capture Spec V1 close rule applied to first pitch). The archived MLB_PROP_PIT quote archive is the corpus of the pitcher promotion preregistration (docs/MLB_PITCHER_PROP_PROMOTION_PREREG.md) and is NOT this test's price source.",
+ "prereg_draft": "research/forward_validation_program_20261020/drafts/PREREG_MLB_RUNS_RBIS_FORWARD_V1_DRAFT.md"
+}

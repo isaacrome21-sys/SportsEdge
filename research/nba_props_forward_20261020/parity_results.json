@@ -1,0 +1,247 @@
+{
+ "kind": "PARITY_REPRODUCTION",
+ "engine_id": "NBA_PROP_EMPIRICAL_V1",
+ "snapshot": "/home/hatch/workspace/sportsedge/backtest_program_20261017/lanes/nba",
+ "unit_checks": {
+  "brute_force_crps_max_abs_delta": 7.105427357601002e-15,
+  "engine_vs_numpy_pool_helpers_max_abs_delta": 0.0
+ },
+ "counters_reproduced_vs_published": {
+  "athletes_enumerated": {
+   "reproduced": 541,
+   "published": 541,
+   "delta": 0
+  },
+  "decode_failures": {
+   "reproduced": 155,
+   "published": 155,
+   "delta": 0
+  },
+  "dnp_rows_minutes0": {
+   "reproduced": 9,
+   "published": 9,
+   "delta": 0
+  },
+  "players_no_position": {
+   "reproduced": 0,
+   "published": 0,
+   "delta": 0
+  },
+  "players_no_regseason_games": {
+   "reproduced": 162,
+   "published": 162,
+   "delta": 0
+  },
+  "players_in_universe_U": {
+   "reproduced": 379,
+   "published": 379,
+   "delta": 0
+  },
+  "scored_player_games": {
+   "reproduced": 16818,
+   "published": 16818,
+   "delta": 0
+  },
+  "b1_fallback_to_b2_count": {
+   "reproduced": 0,
+   "published": 0,
+   "delta": 0
+  },
+  "players_meeting_min_total_20": {
+   "reproduced": 341,
+   "published": 341,
+   "delta": 0
+  },
+  "game_dates": {
+   "reproduced": 171,
+   "published": 171,
+   "delta": 0
+  }
+ },
+ "stats": {
+  "points": {
+   "published_source": "nba_props_calibration.json",
+   "mean_crps_candidate": {
+    "published": 3.565315154399988,
+    "reproduced": 3.565315154399988,
+    "delta": 0.0
+   },
+   "mean_crps_b1_position": {
+    "published": 4.972441817534814,
+    "reproduced": 4.972441817534814,
+    "delta": 0.0
+   },
+   "mean_crps_b2_overall": {
+    "published": 4.9986696196548595,
+    "reproduced": 4.9986696196548595,
+    "delta": 0.0
+   },
+   "paired_delta_vs_b1": {
+    "published": -1.4071266631348267,
+    "reproduced": -1.4071266631348267,
+    "delta": 0.0
+   },
+   "paired_delta_vs_b2": {
+    "published": -1.4333544652548724,
+    "reproduced": -1.4333544652548724,
+    "delta": 0.0
+   },
+   "ci95_vs_b1_published": [
+    -1.493372710218747,
+    -1.3028829826298385
+   ],
+   "ci95_vs_b1_reproduced": [
+    -1.493372710218747,
+    -1.3028829826298383
+   ],
+   "ci95_vs_b2_published": [
+    -1.5232500743465733,
+    -1.3242977903454418
+   ],
+   "ci95_vs_b2_reproduced": [
+    -1.5232500743465733,
+    -1.3242977903454418
+   ]
+  },
+  "rebounds": {
+   "published_source": "nba_props_calibration.json",
+   "mean_crps_candidate": {
+    "published": 1.4413305624741377,
+    "reproduced": 1.4413305624741377,
+    "delta": 0.0
+   },
+   "mean_crps_b1_position": {
+    "published": 1.770671900034048,
+    "reproduced": 1.770671900034048,
+    "delta": 0.0
+   },
+   "mean_crps_b2_overall": {
+    "published": 1.916055993808005,
+    "reproduced": 1.916055993808005,
+    "delta": 0.0
+   },
+   "paired_delta_vs_b1": {
+    "published": -0.3293413375599103,
+    "reproduced": -0.32934133755991024,
+    "delta": 5.551115123125783e-17
+   },
+   "paired_delta_vs_b2": {
+    "published": -0.4747254313338671,
+    "reproduced": -0.4747254313338671,
+    "delta": 0.0
+   },
+   "ci95_vs_b1_published": [
+    -0.3547653585819224,
+    -0.3024284772393658
+   ],
+   "ci95_vs_b1_reproduced": [
+    -0.3547653585819224,
+    -0.3024284772393658
+   ],
+   "ci95_vs_b2_published": [
+    -0.5042539015861839,
+    -0.44335527501794636
+   ],
+   "ci95_vs_b2_reproduced": [
+    -0.5042539015861839,
+    -0.44335527501794636
+   ]
+  },
+  "assists": {
+   "published_source": "nba_props_calibration.json",
+   "mean_crps_candidate": {
+    "published": 1.0054994421144787,
+    "reproduced": 1.0054994421144787,
+    "delta": 0.0
+   },
+   "mean_crps_b1_position": {
+    "published": 1.3677751421138902,
+    "reproduced": 1.3677751421138902,
+    "delta": 0.0
+   },
+   "mean_crps_b2_overall": {
+    "published": 1.4313414684075143,
+    "reproduced": 1.4313414684075143,
+    "delta": 0.0
+   },
+   "paired_delta_vs_b1": {
+    "published": -0.36227569999941145,
+    "reproduced": -0.36227569999941145,
+    "delta": 0.0
+   },
+   "paired_delta_vs_b2": {
+    "published": -0.42584202629303575,
+    "reproduced": -0.4258420262930357,
+    "delta": 5.551115123125783e-17
+   },
+   "ci95_vs_b1_published": [
+    -0.3838279662048824,
+    -0.33956225666716117
+   ],
+   "ci95_vs_b1_reproduced": [
+    -0.38382796620488235,
+    -0.33956225666716117
+   ],
+   "ci95_vs_b2_published": [
+    -0.44740190225859616,
+    -0.40272735803718757
+   ],
+   "ci95_vs_b2_reproduced": [
+    -0.44740190225859616,
+    -0.40272735803718757
+   ]
+  },
+  "pra": {
+   "published_source": "nba_extension_results.json",
+   "mean_crps_candidate": {
+    "published": 4.708175069261127,
+    "reproduced": 4.708175069261127,
+    "delta": 0.0
+   },
+   "mean_crps_b1_position": {
+    "published": 6.946324427281485,
+    "reproduced": 6.946324427281485,
+    "delta": 0.0
+   },
+   "mean_crps_b2_overall": {
+    "published": 6.9633331227758175,
+    "reproduced": 6.9633331227758175,
+    "delta": 0.0
+   },
+   "paired_delta_vs_b1": {
+    "published": -2.2381493580203564,
+    "reproduced": -2.2381493580203564,
+    "delta": 0.0
+   },
+   "paired_delta_vs_b2": {
+    "published": -2.2551580535146893,
+    "reproduced": -2.2551580535146893,
+    "delta": 0.0
+   },
+   "ci95_vs_b1_published": [
+    -2.372357042842381,
+    -2.0805732408864297
+   ],
+   "ci95_vs_b1_reproduced": [
+    -2.372357042842381,
+    -2.0805732408864297
+   ],
+   "ci95_vs_b2_published": [
+    -2.3909732813700586,
+    -2.095443741853901
+   ],
+   "ci95_vs_b2_reproduced": [
+    -2.3909732813700586,
+    -2.0954437418539014
+   ]
+  }
+ },
+ "per_game_crps_comparison": {
+  "oct18_csv": {
+   "rows_matched": 16818,
+   "max_abs_delta_crps_cand": 7.105427357601002e-15
+  }
+ },
+ "max_abs_mean_delta": 5.551115123125783e-17,
+ "parity_status": "REPRODUCED"
+}
