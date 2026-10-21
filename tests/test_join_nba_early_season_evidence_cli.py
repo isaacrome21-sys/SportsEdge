@@ -18,6 +18,8 @@ def fixture(tmp_path):
     e.write_text(json.dumps({"events":[{"event_id":"game123",
          "tipoff":"2026-01-11T00:30:00Z",
          "result_observed_at":"2026-01-11T04:00:00Z",
+         "finalized_at":"2026-01-11T03:50:00Z",
+         "event_state":"FINAL","result_state":"FINAL",
          "source_ref":"external-gamelog-receipt"}]}))
     p=tmp_path/"roles.json"
     p.write_text(json.dumps({"roles":[{"player_id":"123",
@@ -65,3 +67,15 @@ def test_raw_byte_digest_changes_without_claiming_provider_authentication(tmp_pa
     assert first["rows"]==second["rows"]
     assert first["input_byte_sha256"]["event_manifest"]!=second["input_byte_sha256"]["event_manifest"]
     assert first["receipt_authentication"]==second["receipt_authentication"]=="NOT_ESTABLISHED_BY_CALLER_FIELDS"
+
+
+def test_cli_explicit_final_receipt_required_and_no_output_on_failure(tmp_path):
+    b,e,p=fixture(tmp_path)
+    manifest=json.loads(e.read_text())
+    del manifest["events"][0]["result_state"]
+    e.write_text(json.dumps(manifest))
+    output=tmp_path/"unverified.json"
+    with pytest.raises(ValueError,match="FINAL_STATE_WITNESS_MISSING"):
+        main(["--box-csv",str(b),"--event-manifest",str(e),
+              "--role-manifest",str(p),"--out",str(output)])
+    assert not output.exists()
