@@ -16,10 +16,10 @@ New isolated `sportsedge.forward_validation.nba_game_lines_preflight.audit_nba_g
 
 ## Exact new files (Git blob SHA-1)
 
-* `sportsedge/forward_validation/nba_game_lines_preflight.py`: `6b00992a4cf1b1fdd61c708ea427ea08d415a90f`.
-* `tests/test_nba_game_lines_preflight.py`: `38ce9e44229ecd933d04f4e0f4d02f06d64bf370`.
+* `sportsedge/forward_validation/nba_game_lines_preflight.py`: `c4dac94726938b61e8d58df8e53067753e7e1236`.
+* `tests/test_nba_game_lines_preflight.py`: `995a7b1336ec2300abb676d937351fc35c714f2f`.
 
-18 synthetic pytest functions (some parameterized) authored, no independent passing execution yet. Must run exact-head unit and repo-wide suites and compare with base. Tests include five CLV missing reasons, exact 60-minute boundary, post-start refusal, noncontiguous/out-of-window quote pair, conflicting simultaneous closes, one-sided bookmaker, spoofed owner approval, duplicate records and zero countable results.
+20 synthetic pytest functions (some parameterized) authored, no independent passing execution yet. Must run exact-head unit and repo-wide suites and compare with base. Tests include five CLV missing reasons, exact 60-minute boundary, post-start refusal, noncontiguous/out-of-window quote pair, conflicting simultaneous closes, one-sided bookmaker, spoofed owner approval, duplicate records and zero countable results.
 
 ## Necessary evidence before NBA game-line validation can start
 
@@ -31,3 +31,7 @@ New isolated `sportsedge.forward_validation.nba_game_lines_preflight.audit_nba_g
 ## Rocky verifier handoff
 
 Independently hand-score fixtures with last close at 60:00 vs 60:01, posttip-only closes, single-sided moneyline/total close, line moves, ambiguity and bogus source/market IDs. Confirm output cannot claim freeze even with user-injected flags. Check diff touches only two new files and this report; no bypass, no pricing, no capture behavior change. Require real exact-head hosted CI and failure-set equivalence. No merge or model/family promotion by builder.
+
+## Builder correction on latest head
+
+The builder found an adversarial schema edge before independent verification: a list/dict in `market` or a list in `quote.side` could otherwise raise an unhandled Python `TypeError`. This was corrected to the existing fail-closed codes `MARKET_OUT_OF_SCOPE` and `DUPLICATE_OR_UNKNOWN_QUOTE_SIDE`, with two additional synthetic test functions. No capture paths, model family statuses or frozen documents changed. Full current-head CI and the final PR diff must still be independently verified.
