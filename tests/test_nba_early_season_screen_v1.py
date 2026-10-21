@@ -13,6 +13,9 @@ def rows():
                             "season":year,"game_date":t.date().isoformat(),
                             "tipoff":(t+timedelta(hours=20)).isoformat(),
                             "observed_at":(t+timedelta(hours=23)).isoformat(),
+                            "finalized_at":(t+timedelta(hours=22)).isoformat(),
+                            "role_observed_at":(t+timedelta(hours=19)).isoformat(),
+                            "event_state":"FINAL","result_state":"FINAL",
                             "source_ref":"scorelog","team_id":"A","position":"G",
                             "minutes":30,"points":pts,"rebounds":5,"assists":5})
     targets=[]
