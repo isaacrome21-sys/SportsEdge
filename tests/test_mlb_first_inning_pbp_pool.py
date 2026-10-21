@@ -95,6 +95,22 @@ def test_incomplete_future_or_unpinned_packet_refused(field, value, error):
         _build(rows)
 
 
+
+@pytest.mark.parametrize("kind,subject", [
+    ("PITCHER_K", 10),
+    ("TEAM_BTP", 1),
+])
+def test_opposing_starting_pitcher_identity_collision_refused(kind, subject):
+    """Even complete-looking PA packets cannot assign one ID to both starters."""
+    rows = _packets()
+    rows[0]["away_starter_pitcher_id"] = rows[0]["home_starter_pitcher_id"]
+    rows[0]["plate_appearances"][3]["pitcher_id"] = 10
+    with pytest.raises(
+        FirstInningPBPPoolError, match="PBP_STARTER_IDENTITY_COLLISION"
+    ):
+        _build(rows, kind=kind, subject=subject)
+
+
 def test_duplicate_gamepk_or_future_target_game_refused():
     rows = _packets()
     rows[1]["game_pk"] = rows[0]["game_pk"]
