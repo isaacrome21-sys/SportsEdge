@@ -17,6 +17,9 @@ from pathlib import Path
 from sportsedge.research.cfb_nhl_coverage_v1 import (
     nhl_research_snapshot,cfb_readiness,
 )
+from sportsedge.research.nhl_paired_market_readout_v1 import (
+    nhl_paired_market_readout,
+)
 
 
 def run_payload(raw):
@@ -46,6 +49,27 @@ def run_payload(raw):
                 result=nhl_research_snapshot(
                     **common,fixture_source_ref=g.get("fixture_source_ref"),
                     total_line=g.get("total_line",5.5))
+                # Explicit OPT-IN only: no synthetic book lines are produced
+                # when paired_markets is missing. A caller's capture/source
+                # strings remain *declarations*, never verified evidence.
+                if "paired_markets" in g:
+                    markets=g["paired_markets"]
+                    if not isinstance(markets,list) or not markets:
+                        raise ValueError("NHL_PAIRED_MARKETS_NONEMPTY_LIST_REQUIRED")
+                    if len({str(m.get("market") or "").upper()
+                            for m in markets if isinstance(m,dict)}) != len(markets):
+                        raise ValueError("NHL_DUPLICATE_MARKET_PAIR")
+                    paired=[]
+                    for m in markets:
+                        if not isinstance(m,dict):
+                            raise ValueError("NHL_PAIRED_MARKET_OBJECT_REQUIRED")
+                        paired.append(nhl_paired_market_readout(
+                            **common,
+                            fixture_source_ref=g.get("fixture_source_ref"),
+                            quote_source_ref=m.get("quote_source_ref"),
+                            capture_id=m.get("capture_id"),market=m.get("market"),
+                            quote_rows=m.get("quote_rows"),book=m.get("book","DraftKings")))
+                    result={**result,"paired_market_diagnostics":paired}
             else:
                 result=cfb_readiness(
                     **common,qb_manifest_pin=g.get("qb_manifest_pin"),
