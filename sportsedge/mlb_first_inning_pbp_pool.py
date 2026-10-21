@@ -113,6 +113,8 @@ def build_first_inning_pa_pool(
             raise FirstInningPBPPoolError("PBP_TEAM_IDENTITY_COLLISION")
         home_starter = _int(p.get("home_starter_pitcher_id"), "HOME_STARTER")
         away_starter = _int(p.get("away_starter_pitcher_id"), "AWAY_STARTER")
+        if home_starter == away_starter:
+            raise FirstInningPBPPoolError("PBP_STARTER_IDENTITY_COLLISION")
         game_start = _utc(p.get("game_start_utc"), "PBP_GAME_START")
         completed = _utc(p.get("completed_at_utc"), "PBP_GAME_COMPLETED")
         observed = _utc(p.get("observed_at_utc"), "PBP_OBSERVED")
