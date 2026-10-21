@@ -1,0 +1,9 @@
+{
+  "eligible_for_forward_evaluation": true,
+  "event_name": "schedule",
+  "head_branch": "main",
+  "head_sha": "7d3c8d656fd2fbfa9e65b4d361c6c1551c4705b3",
+  "ref": "refs/heads/main",
+  "run_id": "39660560363",
+  "schema": "SPORTSEDGE_STATCAST_MAIN_PROVENANCE_V1"
+}
