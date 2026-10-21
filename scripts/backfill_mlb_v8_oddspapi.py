@@ -124,6 +124,42 @@ def _metadata(*, endpoint: str, params: dict[str, Any], headers: dict[str, str],
     }
 
 
+class ArchiveIntegrityError(RuntimeError):
+    """Stable, secret-free cached evidence refusal; no automatic overwrite."""
+
+
+def _verified_cached_raw(
+    raw_path: Path, meta_path: Path, *, endpoint: str, params: dict[str, Any],
+) -> bytes | None:
+    """Return cached bytes only when the on-disk SHA-256 sidecar matches.
+
+    A partial/tampered cached pair is evidence of an interrupted or modified
+    archive; NEVER re-download over it or mark the fixture/history completed.
+    The source timestamp/retrieval fields cannot replace the raw-byte hash.
+    """
+    raw_exists = raw_path.exists()
+    meta_exists = meta_path.exists()
+    if not raw_exists and not meta_exists:
+        return None
+    if not (raw_path.is_file() and meta_path.is_file()):
+        raise ArchiveIntegrityError("ODDSPAPI_CACHE_PARTIAL_OR_NONFILE")
+    try:
+        raw = raw_path.read_bytes()
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, UnicodeError):
+        raise ArchiveIntegrityError("ODDSPAPI_CACHE_UNREADABLE") from None
+    if not isinstance(meta, dict) or (
+        meta.get("source") != "ODDSPAPI_HISTORICAL"
+        or meta.get("endpoint") != endpoint
+        or meta.get("request_params_secret_free") != params
+        or meta.get("payload_sha256") != _sha(raw)
+        or type(meta.get("bytes")) is not int
+        or meta["bytes"] != len(raw)
+    ):
+        raise ArchiveIntegrityError("ODDSPAPI_CACHE_METADATA_OR_SHA_MISMATCH")
+    return raw
+
+
 def _dates(start: str, end: str) -> Iterable[tuple[date, date]]:
     cur = date.fromisoformat(start)
     stop = date.fromisoformat(end)
@@ -181,9 +217,6 @@ def _archive_fixtures(
     window_key = _fixture_window_key(start, last)
     path = root / "fixtures" / f"fixtures_{window_key}.json"
     meta_path = root / "fixtures" / f"fixtures_{window_key}.meta.json"
-    if path.is_file():
-        return [x for x in _fixture_rows(path.read_bytes()) if _is_mlb_fixture(x)], False
-
     params = {
         "sportId": SPORT_ID,
         "from": start.isoformat(),
@@ -191,6 +224,15 @@ def _archive_fixtures(
         "statusId": 2,
         "hasOdds": "true",
     }
+    cached = _verified_cached_raw(
+        path, meta_path, endpoint="/v4/fixtures", params=params)
+    if cached is not None:
+        try:
+            return [x for x in _fixture_rows(cached) if _is_mlb_fixture(x)], False
+        except (ValueError, UnicodeError, TypeError):
+            raise ArchiveIntegrityError("ODDSPAPI_CACHE_FIXTURES_INVALID") from None
+    if window_key in state.get("fixture_windows_completed", []):
+        raise ArchiveIntegrityError("ODDSPAPI_COMPLETED_FIXTURE_BYTES_MISSING")
     raw, headers = _request("/fixtures", key=key, params=params)
     rows = _fixture_rows(raw)
     _atomic(path, raw)
@@ -256,8 +298,27 @@ def collect(
                 fingerprint = f"{fid}|{group_key}"
                 raw_path = fixture_dir / f"history_{'_'.join(group)}.json"
                 meta_path = fixture_dir / f"history_{'_'.join(group)}.meta.json"
-                if fingerprint in completed_history and raw_path.is_file() and meta_path.is_file():
+                params = {"fixtureId": fid, "bookmakers": group_key}
+                cached = _verified_cached_raw(
+                    raw_path, meta_path,
+                    endpoint="/v4/historical-odds", params=params)
+                if cached is not None:
+                    try:
+                        valid_cache = _history_payload_valid(cached, fid)
+                    except (ValueError, UnicodeError, TypeError):
+                        valid_cache = False
+                    if not valid_cache:
+                        raise ArchiveIntegrityError("ODDSPAPI_CACHE_HISTORY_FIXTURE_INVALID")
+                    if fingerprint not in completed_history:
+                        # Crash between durable bytes/sidecar and state write:
+                        # preserve immutable bytes and recover state instead
+                        # of repeating the API request or overwriting evidence.
+                        completed_history.add(fingerprint)
+                        state["history_completed"] = sorted(completed_history)
+                        _save_state(state_path, state)
                     continue
+                if fingerprint in completed_history:
+                    raise ArchiveIntegrityError("ODDSPAPI_COMPLETED_HISTORY_BYTES_MISSING")
                 if history_requests >= max_history_requests:
                     _save_state(state_path, state)
                     return {
@@ -268,7 +329,6 @@ def collect(
                         "mlb_fixtures_discovered": len(fixtures_seen),
                         "history_fingerprints_completed": len(completed_history),
                     }
-                params = {"fixtureId": fid, "bookmakers": group_key}
                 raw, headers = _request("/historical-odds", key=key, params=params)
                 if not _history_payload_valid(raw, fid):
                     raise RuntimeError(f"ODDSPAPI_HISTORY_PAYLOAD_INVALID:{fid}:{group_key}")
@@ -281,6 +341,19 @@ def collect(
                 _save_state(state_path, state)
                 if cooldown_seconds:
                     time.sleep(cooldown_seconds)
+    except ArchiveIntegrityError as exc:
+        reason = str(exc)  # sanitized code, never a secret, path or raw JSON
+        state.setdefault("failures", []).append({
+            "at": datetime.now(timezone.utc).isoformat(), "reason": reason,
+        })
+        _save_state(state_path, state)
+        return {
+            "status": "BLOCKED_LOCAL_ARCHIVE_INTEGRITY",
+            "reason": reason,
+            "fixture_requests": fixture_requests,
+            "history_requests": history_requests,
+            "archived_files": archived_files,
+        }
     except HTTPError as exc:
         body = ""
         try:
