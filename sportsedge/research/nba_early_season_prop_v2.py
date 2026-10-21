@@ -100,6 +100,17 @@ def project_early_prop(records, *, player_id, target_team_id, target_season,
         available = _aware(row.get("observed_at"))
         if available <= tipoff:
             raise ValueError("NBA_EARLY_PROP_RESULT_RECEIPT_NOT_AFTER_TIPOFF")
+        # Do not drop the final-state witness at the history->model seam.
+        # A result "receipt" just one second after tipoff is insufficient
+        # without explicit final status and a distinct finalization time.
+        if row.get("event_state") != "FINAL" or row.get("result_state") != "FINAL":
+            raise ValueError("NBA_EARLY_PROP_FINAL_WITNESS_REQUIRED")
+        finalized = _aware(row.get("finalized_at"))
+        if finalized <= tipoff or available < finalized:
+            raise ValueError("NBA_EARLY_PROP_FINAL_WITNESS_CHRONOLOGY_INVALID")
+        role_observed = _aware(row.get("role_observed_at"))
+        if role_observed >= tipoff:
+            raise ValueError("NBA_EARLY_PROP_PREGAME_ROLE_RECEIPT_REQUIRED")
         if tipoff.astimezone(_SLATE_TZ).date() != local_date:
             raise ValueError("NBA_EARLY_PROP_LOCAL_GAME_DATE_MISMATCH")
         value, minutes = _stat(row, stat)
