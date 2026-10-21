@@ -159,3 +159,38 @@ def test_prop_rejects_boolean_stats_and_minutes():
             assert "NBA_EARLY_PROP_STATS_INVALID" in str(e)
         else:
             assert False, "a boolean is not a box score component"
+
+
+def test_v2_rejects_missing_claimed_final_state_even_with_posttip_time():
+    records = history()
+    records[0]["observed_at"] = "2025-01-01T20:00:01Z"
+    records[0]["finalized_at"] = "2025-01-01T20:00:01Z"
+    records[0].pop("event_state")
+    try:
+        read(records)
+    except ValueError as e:
+        assert "FINAL_WITNESS_REQUIRED" in str(e)
+    else:
+        assert False, "posttip +1 second cannot establish a completed game"
+
+
+def test_v2_rejects_claimed_final_result_receipt_before_finalization():
+    records = history()
+    records[0]["finalized_at"] = "2025-01-02T01:00:00Z"
+    try:
+        read(records)
+    except ValueError as e:
+        assert "FINAL_WITNESS_CHRONOLOGY_INVALID" in str(e)
+    else:
+        assert False, "final score unavailable before finalization"
+
+
+def test_v2_requires_pregame_role_receipt():
+    records = history()
+    records[0]["role_observed_at"] = "2025-01-02T01:00:00Z"
+    try:
+        read(records)
+    except ValueError as e:
+        assert "PREGAME_ROLE_RECEIPT_REQUIRED" in str(e)
+    else:
+        assert False, "postgame roster cannot establish a pregame role"
