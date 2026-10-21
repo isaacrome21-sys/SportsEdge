@@ -1,0 +1,25 @@
+{
+ "status": "DRAFT \u2014 NOT FROZEN",
+ "sport": "CFB",
+ "family": "TOTAL",
+ "markets": [
+  "TOTAL"
+ ],
+ "engine_id": "FREE_MODELS_GAME",
+ "model_version": "FREE_MODELS_GAME:LANE_A_INDEPENDENT",
+ "market_form": "TWO_SIDED",
+ "sides": [
+  "OVER",
+  "UNDER"
+ ],
+ "over_side": "OVER",
+ "min_rows": 100,
+ "min_events": 40,
+ "min_slates": null,
+ "max_clv_missing_share": 0.2,
+ "clv_beats_threshold": 0.0,
+ "close_max_age_minutes": 60,
+ "capture_scope": "EXPANSION_REQUIRED",
+ "capture_note": "NOT_IN_CAPTURE_SPEC \u2014 Capture Spec V1 has no CFB section. Expansion required before any row can count: add CFB game lines (moneyline, spread, total, both sides) to the capture program with paired ENTRY and CLOSE captures per game under the spec's timing rules, following the pattern the spec sets for CBB. The Oct 20, 2026 CFB reads were price records only (single read, no close) and can never enter this test.",
+ "prereg_draft": "research/forward_validation_program_20261020/drafts/PREREG_CFB_TOTAL_FORWARD_V1_DRAFT.md"
+}
