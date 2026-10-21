@@ -1,4 +1,5 @@
 """The date-only archive screen refuses claims it cannot prove."""
+from datetime import date,timedelta
 import pytest
 from scripts.research_nba_v2_sbr_dateonly_screen import (
     evaluate_calendar_archive, verify_archive_blob, SOURCE_BLOB_SHA1
@@ -8,7 +9,8 @@ from scripts.research_nba_v2_sbr_dateonly_screen import (
 def synthetic():
     out=[]
     for i in range(70):
-        out.append({"season":2015,"date":20150101+i,
+        day=int((date(2015,1,1)+timedelta(days=i)).strftime("%Y%m%d"))
+        out.append({"season":2015,"date":day,
             "home_team":"A" if i%2 else "B",
             "away_team":"B" if i%2 else "A",
             "home_final":"110","away_final":"100",
@@ -41,6 +43,13 @@ def test_duplicate_game_refuses():
     raw=synthetic()
     with pytest.raises(ValueError,match="DUPLICATE_FIXTURE"):
         evaluate_calendar_archive(raw+[raw[0]],begin=2015,end=2015)
+
+
+def test_non_calendar_day_refuses():
+    data=synthetic()
+    data[0]["date"]=20150165
+    with pytest.raises(ValueError,match="CALENDAR_DATE_INVALID"):
+        evaluate_calendar_archive(data,begin=2015,end=2015)
 
 
 def test_incorrect_bytes_cannot_be_called_source_pin():
