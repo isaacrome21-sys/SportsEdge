@@ -5,7 +5,7 @@ from sportsedge.research.nba_early_season_screen_v1 import screen_early_prop_mae
 
 def rows():
     history=[]
-    for year,base,n,pts in [(2025,datetime(2025,1,1,tzinfo=timezone.utc),15,20),
+    for year,base,n,pts in [(2025,datetime(2025,10,1,tzinfo=timezone.utc),15,20),
                             (2026,datetime(2026,10,1,tzinfo=timezone.utc),4,30)]:
         for i in range(n):
             t=base+timedelta(days=i)
