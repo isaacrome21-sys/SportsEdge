@@ -11,7 +11,8 @@ def rows():
             t=base+timedelta(days=i)
             history.append({"player_id":"p1","game_id":f"{year}-{i}",
                             "season":year,"game_date":t.date().isoformat(),
-                            "observed_at":(t+timedelta(hours=6)).isoformat(),
+                            "tipoff":(t+timedelta(hours=20)).isoformat(),
+                            "observed_at":(t+timedelta(hours=23)).isoformat(),
                             "source_ref":"scorelog","team_id":"A","position":"G",
                             "minutes":30,"points":pts,"rebounds":5,"assists":5})
     targets=[]
@@ -20,9 +21,9 @@ def rows():
         targets.append({"player_id":"p1","game_id":f"2026-{i}",
                         "team_id":"A","season":2026,
                         "game_date":dt.date().isoformat(),
-                        "tipoff":dt.isoformat(),
-                        "decision_as_of":(dt-timedelta(minutes=5)).isoformat(),
-                        "observed_at":(dt+timedelta(hours=6)).isoformat(),
+                        "tipoff":(dt+timedelta(hours=20)).isoformat(),
+                        "decision_as_of":(dt+timedelta(hours=19,minutes=55)).isoformat(),
+                        "observed_at":(dt+timedelta(hours=23)).isoformat(),
                         "source_ref":"scorelog","minutes":30,
                         "points":30,"rebounds":5,"assists":5})
     return history,targets
