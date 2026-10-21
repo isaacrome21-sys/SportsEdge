@@ -8,6 +8,21 @@ Supported events are functions solely of the FINAL (away, home) score:
 both-teams-to-score 1+..9+, final correct score, final winning margin,
 and a selected team's final run parity.
 
+IMPORTANT CONSTRUCTION / SETTLEMENT LIMITATION: The source full-game
+joint is the independent PRODUCT of the away and home final-score
+marginals. In the reviewed reference joint this assigns 0.1933
+(19.33%) to tied final-score cells, although an official MLB final
+game cannot end tied (true final-tie event probability 0). The
+WINNING_MARGIN TIE readout returns 0.1775 (17.75%) from that artifact
+after settlement-mass stabilization. The WINNING_MARGIN TIE bucket
+and all exact tied FINAL-score cells inherit this nonphysical mass.
+The frozen research screen will score the unchanged eleven-class
+WINNING_MARGIN partition against actual untied finals: observed TIE=0;
+retain the model's TIE probability as-is and penalize it through the
+full multiclass Brier/log loss, without deleting or renormalizing the
+bucket. Tied CORRECT_SCORE cells likewise receive zero observed wins.
+These figures are reviewed reference values, not a historical test.
+
 EXTRA_INNINGS is intentionally unsupported: a final score, including
 extra-innings runs, does not disclose whether the clubs were tied after
 nine innings. Likewise, no scoring-order, inning or play-event market can

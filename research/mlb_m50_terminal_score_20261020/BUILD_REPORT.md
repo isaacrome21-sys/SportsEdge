@@ -14,6 +14,12 @@ One existing full-game distribution produces four *terminal score* readout famil
 
 The F5-derived readout's grammar and Jeffreys half-cell prior are reused. Every output preserves the existing full-game distribution SHA, has a new readout SHA, `RESEARCH_ESTIMATE_UNVALIDATED`, `eligible=false`, and `NO_MARKET_TEST`. No changes to engines, data dependencies, registry, quote binding, RUN IT, card labels, or historical records.
 
+## Independent-final-marginal tie artifact — measured disclosure
+
+The source score joint is the **independent product of the two final-score marginals**, not a coherent terminal-score model conditioned on baseball's no-final-tie rule. In the reviewed reference joint, the sum of **tied final-score cells is 0.1933 (19.33%)**. The derived `WINNING_MARGIN` **TIE** readout is **0.1775 (17.75%)**, a posterior-stabilized expression of that same artifact, **not** an actual tie probability. An official MLB final score cannot be tied: the real final-tie event probability is **0**. The eleven-way `WINNING_MARGIN` **TIE bucket** and exact tied `CORRECT_SCORE` cells (including 0-0 and 1-1) inherit the nonphysical mass; no historical validation should treat it as signal. Both 0.1933 and 0.1775 are figures from the reviewed reference case, **not** a claim of population calibration or an executed screen.
+
+**Frozen-screen scoring decision:** retain the unmodified eleven-way candidate probabilities, **including its TIE bucket**, for complete-partition multiclass Brier and log loss. For each verified official final, the observed `WINNING_MARGIN=TIE` indicator is **0** and the observed winning-margin class is the actual untied margin. Therefore the nonphysical predicted TIE mass is penalized under proper scoring; **do not collapse TIE, redistribute its probability, renormalize other bins, or silently ignore its loss**. For the correct-score frozen partition, exact tied-final cells also have observed indicator **0**; retain and penalize their predictions. This is a disclosure/scoring rule only: no source joint, readout, frozen selection list, engine, or eligibility changes.
+
 ## Honest exclusions
 * EXTRA_INNINGS: final score does **not** disclose whether tied after nine.
 * RACE_TO_RUNS, inning timing, bottom-of-ninth, first scoring play, etc.: ordered score/play path required.

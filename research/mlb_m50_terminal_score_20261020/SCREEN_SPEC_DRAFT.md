@@ -6,6 +6,12 @@
 
 **Prerequisite evidence**: independently pinned, deduplicated gamePk, UTC scheduled first pitch, source observed-at timestamp, completed inning/final score, away/home team identity and score-revision audit from the already sanctioned StatsAPI source. Reject any game with mismatched team identity, duplicate gamePk, observed-at after test start, missing as-of pin, negative final runs, or historical game with unverified completion time. A source hash and feature SHA per game are required before evaluation. No backfill of refused evidence.
 
+## Explicit decision on the frozen TIE cell (set before screen)
+
+The source `GameTotalDistribution` full-game joint is the **independent product of two final-score marginals**. In the reviewed reference, tied final-score cells total **0.1933**, creating the `WINNING_MARGIN TIE` posterior readout **0.1775**. These represent a **model artifact**, not possible MLB settlement: the probability of an official tied final is **0**. The `WINNING_MARGIN` **TIE** bucket and exact tied `CORRECT_SCORE` cells inherit this impossible mass.
+
+**Scoring rule:** preserve the full frozen **eleven-class** `WINNING_MARGIN` partition including **TIE**. Against each verified completed official MLB final, set the observed TIE indicator to **0** and mark only the actual untied margin as **1**; compute multiclass Brier and log loss with the *unchanged* model probability vector, explicitly penalizing the TIE prediction. Do **not** strip TIE, renormalize HOME/AWAY bins, mask the TIE penalty, or treat TIE as a push. Apply the same zero-observed-indicator rule to tied `CORRECT_SCORE` exact cells in the frozen seven-way partition. Report tie-mass fraction and TIE readout alongside both proper scores and the baseline deltas. This is scoring protocol, **not** a code change or a historical result; the 2025 screen is still UNRUN.
+
 ## One-shot scoring, set before inspecting results
 Four independent family readouts share one fixed full-game joint. No per-family hyperparameter tuning or retraining.
 
