@@ -69,7 +69,7 @@ def join_nba_boxscore_evidence(boxes, event_receipts, player_roles):
 
     boxes: genuine Results Pull rows PLAYER_ID/GAME_ID/TEAM_ABBREVIATION/
            SEASON ('2025-26')/SEASON_TYPE_ID ('2')/MIN/PTS/REB/AST.
-    event_receipts: rows event_id, tipoff, result_observed_at, source_ref.
+    event_receipts: rows event_id, tipoff, finalized_at, result_observed_at,\n        event_state=FINAL, result_state=FINAL, source_ref.
         result_observed_at MUST be a preserved receipt, not a reconstructed
         historical timestamp.
     player_roles: rows player_id, team_abbreviation, position,
@@ -85,6 +85,13 @@ def join_nba_boxscore_evidence(boxes, event_receipts, player_roles):
         observed=_ts(src.get("result_observed_at"),"NBA_EARLY_JOIN_FINAL_RECEIPT")
         if observed<=tip:
             raise ValueError("NBA_EARLY_JOIN_FINAL_RECEIPT_NOT_AFTER_TIP")
+        # A timestamp after tipoff alone does not prove final-result availability.
+        # Caller-supplied final-state evidence remains unauthenticated.
+        if src.get("event_state") != "FINAL" or src.get("result_state") != "FINAL":
+            raise ValueError("NBA_EARLY_JOIN_FINAL_STATE_WITNESS_MISSING")
+        finalized=_ts(src.get("finalized_at"),"NBA_EARLY_JOIN_FINALIZED_AT")
+        if finalized<=tip or observed<finalized:
+            raise ValueError("NBA_EARLY_JOIN_FINAL_STATE_CHRONOLOGY_INVALID")
         es[gid]=(tip,observed,_named(src.get("source_ref"),"NBA_EARLY_JOIN_EVENT_SOURCE"))
     roles={}
     for src in player_roles:
