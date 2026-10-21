@@ -7,6 +7,8 @@ from typing import get_type_hints
 import pytest
 
 from scripts import intake_nfl_lines_issue, intake_nhl_lines_issue, run_nba_lines_issue
+from sportsedge.mlb_issue_body import extract_issue_lines
+from sportsedge.mlb_lines_intake import parse_lines as parse_mlb_lines
 from sportsedge.nfl_lines_intake import NflLinesIntakeError, parse_nfl_lines
 from sportsedge.nhl_lines_intake import NhlLinesIntakeError, parse_nhl_lines
 from sportsedge.ratings.elo import EloTracker
@@ -78,6 +80,19 @@ def test_fenced_issue_ignores_source_notes_but_checks_its_market(module, parse, 
     assert len(read(body)[0].markets) == 1
     with pytest.raises(error):
         read(body.replace("ML +120 -140", "ML +120"))
+
+
+@pytest.mark.parametrize("parse,extract,first,second", [
+    (parse_lines, lambda value: value, "Celtics @ Knicks", "Thunder @ Spurs"),
+    (parse_nfl_lines, intake_nfl_lines_issue._body_lines, "Chiefs @ Ravens", "Bills @ Jets"),
+    (parse_nhl_lines, intake_nhl_lines_issue._body_lines, "Rangers @ Bruins", "Penguins @ Flyers"),
+    (parse_mlb_lines, extract_issue_lines, "Cubs @ Reds", "Phillies @ Braves"),
+])
+def test_all_fenced_games_are_retained(parse, extract, first, second):
+    body = (f"### Lines\n```text\n{first}\nML +120 -140\n```\n"
+            "Source note from 2026-10-20.\n"
+            f"```\n{second}\nML +110 -130\n```\n")
+    assert len(parse(extract(body))) == 2
 
 
 @pytest.mark.parametrize("module,header,prefix", [
