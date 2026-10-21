@@ -190,20 +190,19 @@ def _fair_american(p_win: float, p_lose: float):
 
 # ---------- store loading -----------------------------------------------------
 
-_STORE_CACHE: dict = {}
-
-
 def load_store_from_dir(store_dir):
-    """(store, receipt) or (None, reason). Reads only local files the
-    operator supplied; never fetches."""
+    """Read the operator's current local NBA store, or fail closed.
+
+    The old process-global cache retained a negative load forever after an
+    initially empty/incomplete directory and also retained SUCCESS after
+    the same path received new games. Both violate the declared PIT source
+    snapshot used for prospective pricing. A pricing batch calls this once,
+    so reload per batch rather than trusting the previous invocation's
+    directory contents. No synthetic data or cross-season fallback.
+    """
     if not store_dir:
         return None, STORE_UNAVAILABLE
-    key = os.path.abspath(str(store_dir))
-    if key in _STORE_CACHE:
-        return _STORE_CACHE[key]
-    result = _load_store_uncached(key)
-    _STORE_CACHE[key] = result
-    return result
+    return _load_store_uncached(os.path.abspath(str(store_dir)))
 
 
 def _load_store_uncached(key):
