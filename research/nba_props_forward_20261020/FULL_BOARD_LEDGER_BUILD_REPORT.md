@@ -32,3 +32,26 @@ supply the captured board and point-in-time store to the CLI.
 Verification command:
 
 `python -m pytest tests/test_nba_full_board_ledger_20261021.py tests/test_nba_prop_engines_20261020.py tests/test_nba_props_forward_evaluator_20261020.py -q`
+
+## Oct 21 causal/provenance hardening delta
+
+Following code-path inspection of the draft, missing/empty sportsbook identifiers
+no longer default to DraftKings. Only explicitly declared DK/draftkings book rows
+can become ledger entries. Prospective times must satisfy the causal order
+`quote_captured_at <= recorded_at < event_start` in absolute UTC.
+Rows recorded before capture are separately accounted as
+`RECORDED_BEFORE_CAPTURE` (`noncausal_rows`); tip-time or later records
+remain `ENTRY_NOT_PRE_EVENT`. Five negative/boundary regression cases were
+added, including missing/empty book, recorded-before-capture, equality at tip,
+and equal capture/recording instants across different UTC offsets.
+
+Exact changed blobs:
+- `sportsedge/forward_validation/nba_full_board_ledger.py`:
+  `3f66b51695870746086a92bfcb253ff11067ac3d`
+- `tests/test_nba_full_board_ledger_20261021.py`:
+  `754b919a96d3fa054d85948a7f4727d74c49eca0`
+
+**New head requires fresh hosted CI and Rocky independent reproduction.**
+Existing builder tests mentioned elsewhere in this PR predate this delta;
+do not transfer their green claim to the new head. No new real capture or
+forward-validation evidence was produced by this code change.
