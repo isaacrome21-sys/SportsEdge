@@ -19,7 +19,7 @@ The missing first-TD settlement evidence layer, `sportsedge/nfl_first_td_pbp_evi
 * `sportsedge/nfl_first_td_pbp_evidence.py`: `4ac628b78813489bba518dfe3a69b23d4b586060`
 * `tests/test_nfl_first_td_pbp_evidence.py`: `78f7af2a14e4c5816be01709ba956975014a2004`
 
-Synthetic offline suite authored, not independent execution claimed; 5 pytest test functions including parameterized 11 hostile cases, receiver-vs-QB attribution and defensive-return case. No backend engine, odds intake, runner, gate, label, eligibility or frozen document modified. No historical test, EV/ROI/CLV, nor market-baseline verdict.
+Synthetic offline suite authored, not independent execution claimed; 6 pytest test functions including parameterized 11 hostile cases, receiver-vs-QB attribution and defensive-return case. No backend engine, odds intake, runner, gate, label, eligibility or frozen document modified. No historical test, EV/ROI/CLV, nor market-baseline verdict.
 
 ## What remains to finish the NFL packet
 
