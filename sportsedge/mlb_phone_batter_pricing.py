@@ -74,6 +74,7 @@ def phone_batter_rows(rows, *, now=None, getter=None):
             market=market, side=side, line=line,
             features=verified["features"],
             prior_game_times_utc=verified["prior_game_times_utc"],
+            prior_game_ids=verified.get("prior_game_ids"),
             source_as_of_utc=verified["source_as_of_utc"], as_of_utc=now_utc,
             kickoff_utc=verified["kickoff_utc"],
             home_team=home, away_team=away,

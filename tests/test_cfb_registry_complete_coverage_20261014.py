@@ -7,6 +7,12 @@ FORWARD_ONLY, mirroring team_total -- their refusal reason is now the accurate
 FAMILY_REGISTRY_NOT_VALIDATED instead of FAMILY_MARKET_UNREGISTERED. Player
 markets with no engine path (anytime TD, longest-play, kicking, defensive)
 stay UNREGISTERED / NO_ENGINE. Nothing becomes priced or playable.
+Registration update 2026-10-20 (decision packet Option B): moneyline /
+spread / total are REGISTERED_RESEARCH_ONLY / NOT_VALIDATED -- still
+never PLAY -- and a priced row in those families survives the gate only
+with satisfied Form 2 identity evidence for both teams (the rows in
+this file carry none, so every gate assertion below still blocks). All
+other families are exactly as the 2026-10-14 registration left them.
 """
 from __future__ import annotations
 
@@ -148,7 +154,15 @@ def test_derived_markets_do_not_inherit_full_game_family(key):
 @pytest.mark.parametrize("key", ALL_KEYS)
 def test_every_cfb_path_blocked_never_play_never_priced(key):
     d = family_market_decision("CFB", key)
-    assert d["state"] == "BLOCKED" and d["validation_status"] == "UNVALIDATED"
+    if d["market"] in {"moneyline", "spread", "total"}:
+        # Option B registration (2026-10-20): research-only, NOT
+        # validated, never PLAY -- and the identity-less priced row
+        # below is still refused by the gate.
+        assert d["state"] == "REGISTERED_RESEARCH_ONLY"
+        assert d["validation_status"] == "NOT_VALIDATED"
+        assert d["eligible"] is False and d["promotable"] is False
+    else:
+        assert d["state"] == "BLOCKED" and d["validation_status"] == "UNVALIDATED"
     assert not (d["official_authority"] or d["model_p_authority"] or d["staking_authority"])
     row = {"sport": "CFB", "market": key, "home": "Ohio State", "away": "Michigan",
            "model_p": 0.61, "ev": 0.04, "fair_american": -150, "stake": 1.0, "status": "PLAY",
@@ -206,7 +220,9 @@ def test_historical_game_lines_admissible_for_evaluation_only(market):
     ok, why = cfb_evaluation_admissible(market, "HISTORICAL")
     assert ok and why.startswith("ADMISSIBLE")
     assert cfb_evaluation_admissible(market, "FORWARD_ONLY")[0] is False
-    assert family_market_decision("CFB", market)["state"] == "BLOCKED"   # still no PLAY
+    d = family_market_decision("CFB", market)
+    assert d["state"] == "REGISTERED_RESEARCH_ONLY"  # research-only; still no PLAY
+    assert d["eligible"] is False and d["promotable"] is False
 
 
 @pytest.mark.parametrize("market", ["TEAM_TOTAL", "team_totals", "Team Totals"])

@@ -722,10 +722,14 @@ class RunnerWiringTests(LoaderCase):
         self.assertEqual(entry["block_reason"],
                          "BLOCKED_PREPRICING_QB_IDENTITY_UNVERIFIED")
 
-    # -- Pricing refusal (the #2224 property, kept and strengthened) -
-    # For the SAME composed runs as above, no CFB row may emit as
-    # priced: the registry refusal is stamped at the output boundary
-    # and every candidate surface stays empty.
+    # -- Pricing through the registry (Option B, Oct 20 2026) -------
+    # The #2224 refusal property survives for every UNPROVEN fixture
+    # (test_run_full_registry_refusal_without_bundles below, and the
+    # no-pin adapter tests). For the pinned, identity-satisfied
+    # fixture the Oct 20 ruling supersedes refusal-at-the-boundary:
+    # the game prices through the registry's research registration,
+    # stamped ineligible, availability-forced research-only, and no
+    # candidate surface carries it as a play.
 
     @staticmethod
     def _assert_registry_refusal(card):
@@ -745,25 +749,62 @@ class RunnerWiringTests(LoaderCase):
         assert card["prop_candidates"] == []
         assert card["prop_watchlist"] == []
 
-    def test_run_full_registry_refusal_stamps_every_emitted_row(self):
-        # Archive admission can succeed while market pricing is forbidden.
-        self._assert_registry_refusal(self._pinned_card())
+    def test_run_full_pinned_card_prices_research_rows_only(self):
+        # Archive admission succeeds AND the fixture's identity is
+        # satisfied: the emitted row prices through the registry's
+        # research registration -- stamped, ineligible, and absent
+        # from every play surface.
+        card = self._pinned_card()
+        (row,) = card["evaluated_rows"]
+        self.assertNotEqual(row["status"], "NO_MODEL_OR_MARKET")
+        self.assertIsNotNone(row["estimate_p"])
+        self.assertIsNotNone(row["ev_per_dollar"])
+        self.assertEqual(row["registration_state"],
+                         "REGISTERED_RESEARCH_ONLY")
+        self.assertEqual(row["validation_status"], "NOT_VALIDATED")
+        self.assertIs(row["eligible"], False)
+        self.assertIs(row["promotable"], False)
+        self.assertIs(row["registry_enforced"], True)
+        self.assertIs(row["research_only"], True)
+        self.assertEqual(card["edges"], [])
+        self.assertEqual(card["independent_candidates"], [])
+        # The priced row may sit on the engine's independent
+        # WATCHLIST -- a research surface -- but only wearing its
+        # research-only forcing: availability-unverified, play-blocked.
+        for watch_row in card["independent_watchlist"]:
+            self.assertIs(watch_row["availability_research_only"], True)
+            self.assertEqual(
+                watch_row["play_blocked_reason"],
+                "QB_AVAILABILITY_UNVERIFIED_CANNOT_SURFACE_AS_PLAY")
+        self.assertEqual(card["prop_candidates"], [])
+        self.assertEqual(card["prop_watchlist"], [])
 
-    def test_pinned_cfb_identity_reaches_stage_but_never_game_pricer(self):
+    def test_pinned_cfb_identity_reaches_stage_and_game_pricer(self):
+        # Option B wiring: on satisfied identity the game pricer IS
+        # reached -- with exactly the staged CFB line -- and its row
+        # emits as registered research (never a play).
         pin, raw = self._pinned_archive()
         with patch.object(full.engine, "run",
-                          side_effect=AssertionError("CFB_GAME_PRICER_REACHED")):
+                          wraps=full.engine.run) as engine_run:
             card = full.run_full({"lines": [cfb_row()]}, now=NOW,
                                  getter=self._lenient_getter(),
                                  form2_bundles_dir=self.dir,
                                  form2_manifest_sha256=pin,
                                  form2_manifest_bytes=raw)
+        engine_run.assert_called_once()
+        (priced_lines,) = engine_run.call_args.args[:1]
+        self.assertEqual([l["market"] for l in priced_lines["lines"]],
+                         ["SPREAD"])
         self.assertEqual(
             card["qb_form2_bundle_loader_audit"]["admitted_team_ids"],
             ["2393", "48"])
         (stage,) = card["prepricing_factor_audit"]["by_input_index"]
         self.assertFalse(stage["blocked"])
-        self._assert_registry_refusal(card)
+        (row,) = card["evaluated_rows"]
+        self.assertEqual(
+            row["registry_disposition"],
+            "RESEARCH_PRICING_ALLOWED_FORM2_IDENTITY_SATISFIED")
+        self.assertIs(row["eligible"], False)
 
     def test_run_full_registry_refusal_without_bundles(self):
         # Prepricing blocks this fixture at the QB gate; the emitted
@@ -774,17 +815,18 @@ class RunnerWiringTests(LoaderCase):
 
     def test_run_full_form2_game_is_research_only_end_to_end(self):
         # Issue #2158, asserted on the composed runner under the
-        # registry seam: bundles arrive through the loader and the stage
-        # satisfies identity via Form 2 (audit entry NOT blocked --
-        # the game is NOT priced), and the availability label
-        # rides the prepricing audit. The emitted row itself is the
-        # registry refusal (research-only, play-blocked by refusal,
-        # every actionable surface empty); the availability guard's
-        # row-level demotion is pinned separately by
-        # tests/test_availability_research_only_gate_20261013.py.
+        # registry seam as wired by Option B (Oct 20 2026): bundles
+        # arrive through the loader and the stage satisfies identity
+        # via Form 2 (audit entry NOT blocked), the game prices, and
+        # the availability guard's row-level demotion now lands on
+        # the emitted priced row itself: AVAILABILITY_UNVERIFIED
+        # rides the row, the row is stamped research-only and
+        # play-blocked, and every actionable surface stays empty of
+        # it. (The guard's unit behavior is also pinned separately by
+        # tests/test_availability_research_only_gate_20261013.py.)
         card = self._pinned_card()
         (entry,) = card["prepricing_factor_audit"]["by_input_index"]
-        self.assertFalse(entry["blocked"])  # identity stage only; no pricer
+        self.assertFalse(entry["blocked"])  # identity stage satisfied
         self.assertEqual(
             card["qb_form2_bundle_loader_audit"]["admitted_team_ids"],
             ["2393", "48"])
@@ -793,11 +835,21 @@ class RunnerWiringTests(LoaderCase):
         self.assertEqual(len(rows), 1)
         (row,) = rows
         self.assertIs(row["research_only"], True)
-        self.assertEqual(row["blocker"], "NO_VALIDATION")
+        self.assertNotEqual(row["status"], "NO_MODEL_OR_MARKET")
+        self.assertIsNotNone(row["estimate_p"])
+        self.assertEqual(row["availability_status"],
+                         "AVAILABILITY_UNVERIFIED_NO_TEAM_INJURY_REPORT")
+        self.assertIs(row["availability_research_only"], True)
+        self.assertEqual(
+            row["play_blocked_reason"],
+            "QB_AVAILABILITY_UNVERIFIED_CANNOT_SURFACE_AS_PLAY")
+        self.assertIs(row["eligible"], False)
         self.assertEqual(
             card["play_gate"]["availability_unverified_max_surface"],
             "RESEARCH_ONLY")
-        self._assert_registry_refusal(card)
+        self.assertEqual(card["edges"], [])
+        self.assertEqual(card["independent_candidates"], [])
+        self.assertEqual(card["prop_candidates"], [])
 
 class SealedArchiveManifestTests(LoaderCase):
     """End-to-end writer composition: per-team preserves sealed by

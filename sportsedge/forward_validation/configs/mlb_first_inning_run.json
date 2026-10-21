@@ -1,0 +1,25 @@
+{
+ "status": "DRAFT \u2014 NOT FROZEN",
+ "sport": "MLB",
+ "family": "FIRST_INNING_RUN",
+ "markets": [
+  "NRFI_YRFI"
+ ],
+ "engine_id": "MLB_FIRST_INNING_BINARY",
+ "model_version": "mlb_first_inning_binary_v1",
+ "market_form": "TWO_SIDED",
+ "sides": [
+  "YRFI",
+  "NRFI"
+ ],
+ "over_side": "YRFI",
+ "min_rows": 150,
+ "min_events": 100,
+ "min_slates": null,
+ "max_clv_missing_share": 0.2,
+ "clv_beats_threshold": 0.0,
+ "close_max_age_minutes": 60,
+ "capture_scope": "OPERATIVE_CAPTURE",
+ "capture_note": "Operative paired DraftKings capture for the game: an ENTRY capture before first pitch and a CLOSE capture that is the last capture before first pitch and no more than 60 minutes before it (the Capture Spec V1 close rule applied to first pitch). The archived MLB_PROP_PIT quote archive is the corpus of the pitcher promotion preregistration (docs/MLB_PITCHER_PROP_PROMOTION_PREREG.md) and is NOT this test's price source.",
+ "prereg_draft": "research/forward_validation_program_20261020/drafts/PREREG_MLB_FIRST_INNING_RUN_FORWARD_V1_DRAFT.md"
+}

@@ -12,7 +12,9 @@ class CfbFamilyScopeTests(unittest.TestCase):
                 row = family_market_decision('CFB', market)
                 self.assertEqual(row['market'], family)
                 self.assertEqual(row['evaluation_scope'], 'HISTORICAL')
-                self.assertEqual(row['state'], 'BLOCKED')
+                # Registered research-only by the 2026-10-20 Option B
+                # ruling; evaluation scope/admissibility unchanged.
+                self.assertEqual(row['state'], 'REGISTERED_RESEARCH_ONLY')
                 self.assertEqual(row['blocker'], 'NO_VALIDATION')
 
     def test_team_totals_forward_only_and_unvalidated(self):

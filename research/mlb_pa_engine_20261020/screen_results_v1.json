@@ -1,0 +1,249 @@
+{
+ "label": "RESEARCH_EVIDENCE \u2014 engine screen on the sanctioned 2025 vintage, scored through the engine's code path. NOT a market verdict, NOT validation, NOT a promotion input.",
+ "evidence_state": "EXECUTED_20261020",
+ "engine": "mlb_plate_appearance_engine_v1",
+ "construction": "M49_PA_SHRUNK_EMPIRICAL_K50",
+ "spec": {
+  "sha256": "2e2cb70d69607f9320dc9b6cd3b19e1fd71c98c4281515affe93e81eede3f84f",
+  "verified_on_disk": true
+ },
+ "data": {
+  "pool_file": "pool_2025.jsonl.gz",
+  "pool_dir": "/home/hatch/workspace/sportsedge/mlb_pbp_pool_20261016",
+  "pool_sha256_gz": "699ac96ad44d0534bf054460990a567aa30f69d9875762899b386ef15a059120",
+  "manifest_pit_rule": "pool game G feeds target T only if G.game_completed_date < T.game_date",
+  "rows": 182784,
+  "games": 2428,
+  "outcome_class_counts": {
+   "OUT_IN_PLAY": 81090,
+   "STRIKEOUT": 40613,
+   "WALK": 14817,
+   "HIT_SINGLE": 26095,
+   "HIT_DOUBLE": 7737,
+   "HIT_BY_PITCH": 1927,
+   "SAC_FLY": 1306,
+   "HOME_RUN": 5649,
+   "INTENT_WALK": 556,
+   "SAC_BUNT": 560,
+   "REACH_ON_ERROR": 1008,
+   "FIELDERS_CHOICE": 712,
+   "HIT_TRIPLE": 628,
+   "INTERFERENCE": 86
+  },
+  "source": "MLB StatsAPI playByPlay + boxscore (statsapi.mlb.com)"
+ },
+ "population": {
+  "scoring_season": 2025,
+  "batter_games_seen": 48794,
+  "eligible_batter_games": 39771,
+  "ineligible_batter_games_by_month": {
+   "2025-03": 1330,
+   "2025-04": 4297,
+   "2025-05": 1095,
+   "2025-06": 774,
+   "2025-07": 505,
+   "2025-08": 591,
+   "2025-09": 431
+  },
+  "scored_pas": 152053,
+  "first_pa_scored": 39771,
+  "engine_pool_spot_checks_passed": 64
+ },
+ "construction_primary_six_category": {
+  "n_pa": 152053,
+  "mean_logloss_candidate": 1.4320460700144333,
+  "mean_logloss_league": 1.4428307687972144,
+  "mean_logloss_raw_empirical": 1.4487261782094865,
+  "dLogLoss_vs_league": {
+   "delta": -0.010784698782780858,
+   "ci95": [
+    -0.012307805254050104,
+    -0.009178849274422717
+   ],
+   "entirely_below_zero": true
+  },
+  "dLogLoss_vs_raw": {
+   "delta": -0.01668010819505283,
+   "ci95": [
+    -0.022720790263895275,
+    -0.011759071129077306
+   ],
+   "entirely_below_zero": true
+  },
+  "beats_both_baselines": true
+ },
+ "construction_verdict_record_label": "BEATS_BASELINE",
+ "families": {
+  "PLATE_APPEARANCE_RESULT": {
+   "population": "1st-PA subset (batter_pa_number == 1) of eligible batter-games, same distributions",
+   "n_pa": 39771,
+   "mean_logloss_candidate": 1.4315598623411165,
+   "mean_logloss_league": 1.4416336557057805,
+   "mean_logloss_raw_empirical": 1.4511247631183364,
+   "dLogLoss_vs_league": {
+    "delta": -0.010073793364663672,
+    "ci95": [
+     -0.012481571338969193,
+     -0.00740235630319137
+    ],
+    "entirely_below_zero": true
+   },
+   "dLogLoss_vs_raw": {
+    "delta": -0.019564900777219642,
+    "ci95": [
+     -0.02771306646280425,
+     -0.013181313254842788
+    ],
+    "entirely_below_zero": true
+   },
+   "beats_both_baselines": true,
+   "screen_verdict": "CALIBRATED_CANDIDATE"
+  },
+  "PLATE_APPEARANCE_ON_BASE": {
+   "population": "1st-PA subset; binary reached := category in {BB_HBP, SINGLE, XBH, HR} (spec section 4); paired bootstrap per the spec's machinery",
+   "n_pa": 39771,
+   "mean_logloss_candidate": 0.6180912767813278,
+   "mean_logloss_league": 0.617800733404771,
+   "mean_logloss_raw_empirical": 0.6195386965846361,
+   "dLogLoss_vs_league": {
+    "delta": 0.00029054337655682585,
+    "ci95": [
+     -0.00048007830104114096,
+     0.0010583037102351418
+    ],
+    "entirely_below_zero": false
+   },
+   "dLogLoss_vs_raw": {
+    "delta": -0.0014474198033081454,
+    "ci95": [
+     -0.0019044787881460621,
+     -0.001023644719182716
+    ],
+    "entirely_below_zero": true
+   },
+   "beats_both_baselines": false,
+   "screen_verdict": "DOES_NOT_BEAT_BASELINE",
+   "all_pa_binary_descriptive": {
+    "n_pa": 152053,
+    "mean_binary_logloss_candidate": 0.6246096369415904,
+    "mean_binary_logloss_league": 0.6247492784243911,
+    "mean_binary_logloss_raw_empirical": 0.6259372335518726,
+    "mean_brier_candidate": 0.21651976456615984,
+    "mean_brier_league": 0.21658682251228528
+   }
+  },
+  "PLATE_APPEARANCE_GROUPED_RESULT": {
+   "screen_verdict": "NO_DATA",
+   "reason": "PLATE_APPEARANCE_SELECTION_SET_UNVERIFIED \u2014 DraftKings' exact 3-way partition of PA outcomes is not in the catalog evidence and no partition is invented here; the engine refuses this form (PLATE_APPEARANCE_GROUPED_PARTITION_UNVERIFIED) until a partition is verified, at which point it is a deterministic coarsening of the priced six-category distribution."
+  }
+ },
+ "candidate_category_calibration_descriptive": {
+  "K": {
+   "realized_share": 0.21833176589741735,
+   "mean_p_cand_on_category_rows": 0.22671852809750168
+  },
+  "BB_HBP": {
+   "realized_share": 0.09479589353712192,
+   "mean_p_cand_on_category_rows": 0.10375835722128596
+  },
+  "SINGLE": {
+   "realized_share": 0.1445614358151434,
+   "mean_p_cand_on_category_rows": 0.14780941850796014
+  },
+  "XBH": {
+   "realized_share": 0.045977389462884655,
+   "mean_p_cand_on_category_rows": 0.04715545535380483
+  },
+  "HR": {
+   "realized_share": 0.03183758294805101,
+   "mean_p_cand_on_category_rows": 0.03559848014444552
+  },
+  "OTHER": {
+   "realized_share": 0.4644959323393817,
+   "mean_p_cand_on_category_rows": 0.4692347112586916
+  }
+ },
+ "bootstrap": {
+  "blocks": "ISO calendar weeks of game_date",
+  "resamples": 2000,
+  "seed": 20261017,
+  "ci": "95% percentile of block-bootstrap paired means"
+ },
+ "parity_with_oct17_record": {
+  "record_path": "/home/hatch/workspace/sportsedge/backtest_program_20261017/lanes/mlb/results/mlb_m49_pa_results.json",
+  "compared": true,
+  "figures": {
+   "primary.mean_logloss_candidate": {
+    "screen": 1.4320460700144333,
+    "record": 1.4320460700144333,
+    "abs_diff": 0.0
+   },
+   "primary.dLogLoss_vs_league.delta": {
+    "screen": -0.010784698782780858,
+    "record": -0.010784698782780858,
+    "abs_diff": 0.0
+   },
+   "primary.dLogLoss_vs_league.ci95_lo": {
+    "screen": -0.012307805254050104,
+    "record": -0.012307805254050104,
+    "abs_diff": 0.0
+   },
+   "primary.dLogLoss_vs_league.ci95_hi": {
+    "screen": -0.009178849274422717,
+    "record": -0.009178849274422717,
+    "abs_diff": 0.0
+   },
+   "primary.dLogLoss_vs_raw.delta": {
+    "screen": -0.01668010819505283,
+    "record": -0.01668010819505283,
+    "abs_diff": 0.0
+   },
+   "first_pa.dLogLoss_vs_league.delta": {
+    "screen": -0.010073793364663672,
+    "record": -0.010073793364663672,
+    "abs_diff": 0.0
+   },
+   "first_pa.dLogLoss_vs_raw.delta": {
+    "screen": -0.019564900777219642,
+    "record": -0.019564900777219642,
+    "abs_diff": 0.0
+   },
+   "binary_all.mean_binary_logloss_candidate": {
+    "screen": 0.6246096369415904,
+    "record": 0.6246096369415903,
+    "abs_diff": 1.1102230246251565e-16
+   }
+  },
+  "max_abs_diff": 1.1102230246251565e-16,
+  "population": {
+   "batter_games_seen": 48794,
+   "record_batter_games_seen": 48794,
+   "eligible_batter_games": 39771,
+   "record_eligible_batter_games": 39771,
+   "scored_pas": 152053,
+   "record_scored_pas": 152053,
+   "first_pa_scored": 39771,
+   "record_first_pa_scored": 39771,
+   "ineligible_by_month": {
+    "2025-03": 1330,
+    "2025-04": 4297,
+    "2025-05": 1095,
+    "2025-06": 774,
+    "2025-07": 505,
+    "2025-08": 591,
+    "2025-09": 431
+   },
+   "record_ineligible_by_month": {
+    "2025-03": 1330,
+    "2025-04": 4297,
+    "2025-05": 1095,
+    "2025-06": 774,
+    "2025-07": 505,
+    "2025-08": 591,
+    "2025-09": 431
+   }
+  },
+  "population_exact": true
+ },
+ "generated_at_utc": "2026-10-20T23:34:32.679900+00:00"
+}
