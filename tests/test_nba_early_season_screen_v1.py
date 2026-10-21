@@ -100,3 +100,19 @@ def test_screen_refuses_target_final_receipt_before_finalization():
     t[0]["finalized_at"]="2026-10-02T06:00:00Z"
     with pytest.raises(ValueError,match="FINAL_CHRONOLOGY_INVALID"):
         screen_early_prop_mae(h,t,stat="points")
+
+
+@pytest.mark.parametrize("bad",[float("nan"),float("inf"),-1,True,None,"unknown"])
+def test_screen_refuses_invalid_target_minutes_instead_of_scoring(bad):
+    h,t=rows()
+    t[0]["minutes"]=bad
+    with pytest.raises(ValueError,match="TARGET_MINUTES_INVALID"):
+        screen_early_prop_mae(h,t,stat="points")
+
+
+def test_screen_distinguishes_valid_zero_minute_dnp():
+    h,t=rows()
+    t[0]["minutes"]=0
+    out=screen_early_prop_mae(h,t,stat="points")
+    assert out["blocked"]["TARGET_DNP"]==1
+    assert out["scored"]==3
