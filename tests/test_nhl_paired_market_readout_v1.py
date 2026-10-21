@@ -1,5 +1,4 @@
 """NHL paired quote market readout: no invented sides, time, or PLAY."""
-from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import pytest
 
