@@ -228,7 +228,9 @@ def build_annex(rows, evaluated, *, at, default_sport=None, history=None,
                 continue
             # A captured name/id alone cannot certify athlete participation.
             # The operator-pinned fixture binds DK player IDs to nflverse IDs.
-            model_player_id = (fixture.get("player_id_map") or {}).get(player_id)
+            player_map = fixture.get("player_id_map")
+            model_player_id = (player_map.get(player_id)
+                               if isinstance(player_map, dict) else None)
             if not isinstance(model_player_id, str) or not model_player_id:
                 refuse("NFL_PLAYER_FIXTURE_IDENTITY_UNBOUND")
                 continue
@@ -269,9 +271,13 @@ def build_annex(rows, evaluated, *, at, default_sport=None, history=None,
                           "prior_games": estimate.get("games_logged")}
         else:
             home, away = fixture.get("home"), fixture.get("away")
+            if not isinstance(home, str) or not isinstance(away, str) or (
+                    not home or not away or home == away):
+                refuse("NBA_FIXTURE_IDENTITY_INCOMPLETE")
+                continue
             if market in {"TEAM_TOTAL", "TEAM_TOTALS",
                           "TEAM_QUARTER_TOTAL", "TEAM_HALF_TOTAL"} and (
-                    row.get("team") not in {home, away}):
+                    row.get("team") not in (home, away)):
                 refuse("NBA_TEAM_SELECTION_UNBOUND")
                 continue
             if not home or not away or home == away or not isinstance(
