@@ -63,3 +63,13 @@ def test_nhl_canonical_alias_self_matchup_refuses():
                 away=away, home=home, event_id="bad-self-matchup",
                 event_start=START, as_of=T,
                 fixture_source_ref="operator-supplied-only")
+
+def test_nhl_snapshot_rejects_invalid_total_lines_instead_of_push_mass():
+    import pytest
+    for invalid in [float("nan"), float("inf"), float("-inf"), None, 0, -1, True, "garbage"]:
+        with pytest.raises(ValueError, match="NHL_TOTAL_LINE_INVALID"):
+            nhl_research_snapshot(
+                away="Flyers", home="Sabres", event_id="invalid-total",
+                event_start=START, as_of=T,
+                fixture_source_ref="fixture-operator-path",
+                total_line=invalid)
