@@ -6,7 +6,7 @@ def history(nowteam="A", current_games=1, future=False):
     r = []
     for season, count, team in [(2025, 12, nowteam), (2026, current_games, "A")]:
         for i in range(count):
-            day = datetime(season, 1 if season==2025 else 10, 1,
+            day = datetime(season, 10, 1,
                            tzinfo=timezone.utc) + timedelta(days=i)
             r.append({"player_id": "p1", "game_id": str(season)+"-"+str(i),
                       "season": season, "game_date": day.date().isoformat(),
@@ -80,7 +80,7 @@ def test_missing_last_season_does_not_invent_prior():
 
 def test_result_receipt_predating_tipoff_is_refused_not_a_prior():
     records = history()
-    records[0]["observed_at"] = "2025-01-01T19:00:00Z"
+    records[0]["observed_at"] = "2025-10-01T19:00:00Z"
     try:
         read(records)
     except ValueError as e:
@@ -102,10 +102,10 @@ def test_history_missing_genuine_tipoff_is_refused():
 
 def test_utc_tipoff_date_must_match_chicago_local_game_date():
     records = history()
-    # Jan 2 08:00 UTC is Jan 2 02:00 CST, not the Jan 1 game_date.
-    records[0]["tipoff"] = "2025-01-02T08:00:00Z"
-    records[0]["observed_at"] = "2025-01-02T10:00:00Z"
-    records[0]["finalized_at"] = "2025-01-02T09:00:00Z"
+    # Oct 2 08:00 UTC is Oct 2 03:00 CDT, not the Oct 1 game_date.
+    records[0]["tipoff"] = "2025-10-02T08:00:00Z"
+    records[0]["observed_at"] = "2025-10-02T10:00:00Z"
+    records[0]["finalized_at"] = "2025-10-02T09:00:00Z"
     try:
         read(records)
     except ValueError as e:
@@ -163,8 +163,8 @@ def test_prop_rejects_boolean_stats_and_minutes():
 
 def test_v2_rejects_missing_claimed_final_state_even_with_posttip_time():
     records = history()
-    records[0]["observed_at"] = "2025-01-01T20:00:01Z"
-    records[0]["finalized_at"] = "2025-01-01T20:00:01Z"
+    records[0]["observed_at"] = "2025-10-01T20:00:01Z"
+    records[0]["finalized_at"] = "2025-10-01T20:00:01Z"
     records[0].pop("event_state")
     try:
         read(records)
@@ -176,7 +176,7 @@ def test_v2_rejects_missing_claimed_final_state_even_with_posttip_time():
 
 def test_v2_rejects_claimed_final_result_receipt_before_finalization():
     records = history()
-    records[0]["finalized_at"] = "2025-01-02T01:00:00Z"
+    records[0]["finalized_at"] = "2025-10-02T01:00:00Z"
     try:
         read(records)
     except ValueError as e:
@@ -187,7 +187,7 @@ def test_v2_rejects_claimed_final_result_receipt_before_finalization():
 
 def test_v2_requires_pregame_role_receipt():
     records = history()
-    records[0]["role_observed_at"] = "2025-01-02T01:00:00Z"
+    records[0]["role_observed_at"] = "2025-10-02T01:00:00Z"
     try:
         read(records)
     except ValueError as e:
