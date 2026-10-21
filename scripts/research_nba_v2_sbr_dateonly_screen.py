@@ -155,7 +155,26 @@ def evaluate_calendar_archive(raw, *, begin=BEGIN_HOLDOUT, end=END_HOLDOUT):
             if totals["paired"] else None),
         "model_under_reference":totals["under"],
         "model_over_reference":totals["over"],
-        "model_equal_reference":totals["tie"]}
+        "model_equal_reference":totals["tie"],
+        "indicative_reference_screen":_indicative_reference_verdict(
+            rmse("paired_candidate_ss","paired"),rmse("paired_market_ss","paired")),
+        "candidate_card_source_eligible":False,
+        "market_admission":"NOT_VERIFIED",
+        "screen_verdict_authority":"RESEARCH_DIAGNOSTIC_ONLY"}
+
+
+
+def _indicative_reference_verdict(candidate_rmse, reference_rmse):
+    """Report the *diagnostic* screen, never confer admission or PLAY.
+
+    Equality is not outperformance. Even a better score would remain
+    unadmitted until the source's quote-vintage/book requirements are met.
+    """
+    if candidate_rmse is None or reference_rmse is None:
+        return "REFERENCE_UNMEASURED"
+    if candidate_rmse >= reference_rmse:
+        return "FAILED_INDICATIVE_REFERENCE_NOT_A_CARD_SOURCE"
+    return "BETTER_INDICATIVE_ONLY_SOURCE_NOT_ADMITTED"
 
 
 def main(argv=None):
