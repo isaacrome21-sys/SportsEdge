@@ -80,23 +80,42 @@ def _pins_ok(data, pins, key):
         return False
 
 
-def _pair_ok(rows, row, *, at, event_id, sport, market, player_id, line):
+def _pair_ok(rows, row, *, at, event_id, sport, market, player_id, line, default_sport):
     """Check a REAL two-sided DraftKings pair; never imply a missing side."""
     def side(r):
         return str(r.get("selection") or r.get("side") or "").upper()
     if side(row) not in {"OVER", "UNDER"}:
         return "TWO_SIDED_OU_REQUIRED"
+    if str(row.get("book") or row.get("bookmaker") or "").upper() not in {"DRAFTKINGS", "DK"}:
+        return "DRAFTKINGS_QUOTE_REQUIRED"
+    if str(row.get("source_quote_form") or "").upper() in {"MILESTONE_LADDER", "YES_ONLY"}:
+        return "NATIVE_TWO_SIDED_QUOTES_REQUIRED"
     matching = []
     for other in rows:
         if not isinstance(other, dict):
             continue
-        if _sport(other, None) != sport or _name(other) != market:
+        if _sport(other, default_sport) != sport or _name(other) != market:
             continue
         if str(other.get("event_id") or other.get("book_event_id") or "") != event_id:
             continue
         if str(other.get("player_id") or "") != player_id:
             continue
-        if str(other.get("line")) != str(line):
+        try:
+            if float(other.get("line")) != float(line):
+                continue
+        except (TypeError, ValueError):
+            continue
+        if str(other.get("team") or "") != str(row.get("team") or ""):
+            continue
+        if str(other.get("source_quote_form") or "").upper() in {
+                "MILESTONE_LADDER", "YES_ONLY"}:
+            continue
+        try:
+            price = float(other.get("odds_american", other.get(
+                "american_odds", other.get("odds"))))
+            if not math.isfinite(price) or price == 0:
+                continue
+        except (ValueError, TypeError):
             continue
         book = str(other.get("book") or other.get("bookmaker") or "").upper()
         if book not in {"DRAFTKINGS", "DK"}:
@@ -189,7 +208,8 @@ def build_annex(rows, evaluated, *, at, default_sport=None, history=None,
             continue
         pair_reason = _pair_ok(rows, row, at=clock, event_id=event_id,
                                sport=sport, market=market,
-                               player_id=player_id, line=row.get("line"))
+                               player_id=player_id, line=row.get("line"),
+                               default_sport=default_sport)
         if pair_reason:
             refuse(pair_reason)
             continue
@@ -205,9 +225,14 @@ def build_annex(rows, evaluated, *, at, default_sport=None, history=None,
                 # The v1 engine excludes >= target week; earlier-season
                 # pool fallback is already part of its frozen construction.
                 from sportsedge.nfl_prop_engines_v1 import price_nfl_prop
+                # JSON file keys become strings, while the merged v1 engine
+                # looks up integer seasons and (week, position, stat) tuples.
+                typed = {int(y): {pid: [(int(g[0]), g[1], g[2]) for g in games]
+                                   for pid, games in players.items()}
+                         for y, players in history["NFL"].items()}
                 estimate = price_nfl_prop(
                     NFL_FAMILIES[market], player_id, line,
-                    history["NFL"], fixture["season"], fixture["week"])
+                    typed, fixture["season"], fixture["week"])
             except Exception as exc:
                 refuse("NFL_ENGINE_FAILED:" + type(exc).__name__)
                 continue
@@ -227,10 +252,8 @@ def build_annex(rows, evaluated, *, at, default_sport=None, history=None,
                 refuse("NBA_FIXTURE_IDENTITY_INCOMPLETE")
                 continue
             try:
-                if str(fixture["target_date"]) != _instant(
-                        fixture["start_time"]).date().isoformat():
-                    refuse("NBA_TARGET_DATE_MISMATCH")
-                    continue
+                # The operator supplies the league-local game date.
+                # UTC calendar date can differ from the local fixture date.
                 from sportsedge.nba_team_period_engine import price_game
                 estimate = price_game(
                     history["NBA"], home, away, season=fixture["season"],
