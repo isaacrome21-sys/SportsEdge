@@ -40,7 +40,7 @@ python -m sportsedge.dk_browser_capture_speed_diag \
 
 ## Verification state and owner handoff
 
-10 pytest functions with parameterized sensitive-field checks authored; no independent green claim at authoring time. Synthetic tests cover duration boundary, stale, pair span, missing final reread, captcha, throttle, dominant stage, multi-fixture aggregation and sensitive-data exclusion.
+9 pytest functions with parameterized sensitive-field checks authored; no independent green claim at authoring time. Synthetic tests cover duration boundary, stale, pair span, missing final reread, captcha, throttle, dominant stage, multi-fixture aggregation and sensitive-data exclusion.
 
 The provider/browser runtime is not available to the builder, so **zero actual DK latency measurements** are claimed; no optimization speedup is asserted. Rocky owns Thursday's captures and may later feed pre-approved sanitized durations from the real browser. Measure and diagnose first, then owner approves any code/flow change via independent PR. Do not merge unless verifier confirms safe record shape, no secret leakage and baseline test failure-set equivalence. Existing freshness/receipt holds remain.
 
