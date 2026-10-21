@@ -484,7 +484,9 @@ def _as_of_instant(as_of):
 def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=None,
              auto_context=True, min_ev=0.02, lane="A", allow_manual_context=False,
              td_cache_dir=None, td_opener=None, form2_bundles_dir=None,
-             form2_manifest_sha256=None, form2_manifest_bytes=None):
+             form2_manifest_sha256=None, form2_manifest_bytes=None,
+             annex_history=None, annex_fixtures=None, annex_pins=None,
+             annex_period_source=None):
     """Separate real game, pitcher, and batter models, preserving original row order.
 
     Issues are UNTRUSTED odds intake: NEVER use submitted features,
@@ -1645,6 +1647,15 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
                 "section_failure": (
                     f"ANNEX_BUILD_FAILED:{type(exc).__name__}:{exc}")[:300],
             }
+    # Independent operator evidence, NEVER read from the untrusted lines payload.
+    # Research projections are annex-only and cannot mutate any row or surface.
+    from sportsedge.research.nfl_nba_engine_card_annex import build_annex
+    research_annex = build_annex(
+        rows, evaluated, at=prop_clock, default_sport=default_sport,
+        history=annex_history, fixtures=annex_fixtures, pins=annex_pins,
+        nba_period_source=annex_period_source)
+    if research_annex is not None:
+        card["nfl_nba_engine_research_annex"] = research_annex
     # Optional operator-captured fixture-specific DraftKings tab census.
     # This is DIAGNOSTICS ONLY, not a trusted quote, model, registry
     # eligibility switch, or evidence of book-offered wagers.
@@ -1677,6 +1688,14 @@ def main(argv=None):
                         "QB_IDENTITY_EVIDENCE bundles (CFB); read locally "
                         "through the archive module, never fetched. "
                         "Admission requires --form2-manifest-sha256")
+    p.add_argument("--annex-history-json", type=Path,
+                   help="Operator history file; not accepted from line intake")
+    p.add_argument("--annex-fixtures-json", type=Path,
+                   help="Operator-bound event/fixture identity JSON")
+    p.add_argument("--annex-pins-json", type=Path,
+                   help="Independent SHA-256 pins for operator history and fixtures")
+    p.add_argument("--annex-period-source", nargs=2, metavar=("SOURCE", "VERSION"),
+                   help="Frozen NBA period-fit source/version (operator evidence)")
     p.add_argument("--form2-manifest-sha256", action="append",
                    help="External pin: Form 2 archive manifest SHA-256 "
                         "from an independent channel, not the archive root. "
@@ -1690,6 +1709,14 @@ def main(argv=None):
                     lane=args.lane, allow_manual_context=args.allow_manual_context,
                     as_of=args.as_of, historical=args.historical,
                     form2_bundles_dir=args.form2_bundles_dir,
+                    annex_history=(json.loads(args.annex_history_json.read_text(
+                        encoding="utf-8")) if args.annex_history_json else None),
+                    annex_fixtures=(json.loads(args.annex_fixtures_json.read_text(
+                        encoding="utf-8")) if args.annex_fixtures_json else None),
+                    annex_pins=(json.loads(args.annex_pins_json.read_text(
+                        encoding="utf-8")) if args.annex_pins_json else None),
+                    annex_period_source=(tuple(args.annex_period_source)
+                                         if args.annex_period_source else None),
                     form2_manifest_sha256=(
                         args.form2_manifest_sha256[0]
                         if args.form2_manifest_sha256
