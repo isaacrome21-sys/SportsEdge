@@ -19,7 +19,7 @@ New isolated `sportsedge.forward_validation.nba_game_lines_preflight.audit_nba_g
 * `sportsedge/forward_validation/nba_game_lines_preflight.py`: `6b00992a4cf1b1fdd61c708ea427ea08d415a90f`.
 * `tests/test_nba_game_lines_preflight.py`: `38ce9e44229ecd933d04f4e0f4d02f06d64bf370`.
 
-22 synthetic pytest functions (some parameterized) authored, no independent passing execution yet. Must run exact-head unit and repo-wide suites and compare with base. Tests include five CLV missing reasons, exact 60-minute boundary, post-start refusal, noncontiguous/out-of-window quote pair, conflicting simultaneous closes, one-sided bookmaker, spoofed owner approval, duplicate records and zero countable results.
+18 synthetic pytest functions (some parameterized) authored, no independent passing execution yet. Must run exact-head unit and repo-wide suites and compare with base. Tests include five CLV missing reasons, exact 60-minute boundary, post-start refusal, noncontiguous/out-of-window quote pair, conflicting simultaneous closes, one-sided bookmaker, spoofed owner approval, duplicate records and zero countable results.
 
 ## Necessary evidence before NBA game-line validation can start
 
