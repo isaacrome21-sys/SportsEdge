@@ -92,7 +92,8 @@ def join_nba_boxscore_evidence(boxes, event_receipts, player_roles):
         finalized=_ts(src.get("finalized_at"),"NBA_EARLY_JOIN_FINALIZED_AT")
         if finalized<=tip or observed<finalized:
             raise ValueError("NBA_EARLY_JOIN_FINAL_STATE_CHRONOLOGY_INVALID")
-        es[gid]=(tip,observed,_named(src.get("source_ref"),"NBA_EARLY_JOIN_EVENT_SOURCE"))
+        es[gid]=(tip,finalized,observed,
+                 _named(src.get("source_ref"),"NBA_EARLY_JOIN_EVENT_SOURCE"))
     roles={}
     for src in player_roles:
         pid=_named(src.get("player_id"),"NBA_EARLY_JOIN_ROLE_PLAYER")
@@ -122,11 +123,13 @@ def join_nba_boxscore_evidence(boxes, event_receipts, player_roles):
         ids.add(key)
         if gid not in es:
             raise ValueError("NBA_EARLY_JOIN_EVENT_RECEIPT_MISSING:"+gid)
-        tip,final_receipt,src=es[gid]
-        # NBA season labels identify the league season *starting* this year;
-        # game dates can cross into the following calendar year.
-        if not ((tip.year==season and tip.month>=10) or
-                (tip.year==season+1 and tip.month<=6)):
+        tip,finalized,final_receipt,src=es[gid]
+        # League season and our emitted game_date must refer to the SAME
+        # Chicago-local calendar day. A UTC Oct 1 00:30 tip is still Sep 30
+        # in Chicago and must not be mislabeled as new regular-season data.
+        local_day=tip.astimezone(_CST).date()
+        if not ((local_day.year==season and local_day.month>=10) or
+                (local_day.year==season+1 and local_day.month<=6)):
             raise ValueError("NBA_EARLY_JOIN_SEASON_TIPOFF_INCONSISTENT")
         eligible=sorted((z for z in roles.get((pid,team),[]) if z[0]<tip),key=lambda z:z[0])
         if not eligible:
@@ -140,8 +143,16 @@ def join_nba_boxscore_evidence(boxes, event_receipts, player_roles):
         ast=_count(box.get("AST"),"NBA_EARLY_JOIN_AST")
         result.append({
             "player_id":pid,"game_id":gid,"season":season,
-            "game_date":tip.astimezone(_CST).date().isoformat(),
+            "game_date":local_day.isoformat(),
             "tipoff":tip.isoformat(),"observed_at":final_receipt.isoformat(),
+            # Retain the asserted provenance that made structural eligibility
+            # pass. The parser's own digest alone cannot authenticate a
+            # provider; downstream audits must still verify this witness.
+            "event_state":"FINAL","result_state":"FINAL",
+            "finalized_at":finalized.isoformat(),
+            "role_observed_at":role_receipt.isoformat(),
+            "role_source_ref":role_ref,
+            "receipt_authentication":"NOT_ESTABLISHED_BY_CALLER_FIELDS",
             "source_ref":src+"|role:"+role_ref,
             "team_id":team,"position":position,"minutes":minutes,
             "points":pts,"rebounds":reb,"assists":ast,
