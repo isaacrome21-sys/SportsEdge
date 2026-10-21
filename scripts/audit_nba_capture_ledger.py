@@ -10,6 +10,7 @@ attestation from caller strings, historical results or a file digest.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -30,11 +31,15 @@ def main(argv=None):
     ap.add_argument("--out", required=True)
     args = ap.parse_args(argv)
     try:
-        raw = json.loads(Path(args.raw_board).read_text(encoding="utf-8"))
+        # Hash the EXACT submitted file bytes separately from semantic JSON.
+        # This proves byte identity only; it never authenticates book origin.
+        raw_file_bytes = Path(args.raw_board).read_bytes()
+        raw = json.loads(raw_file_bytes)
         ledger = (json.loads(Path(args.ledger).read_text(encoding="utf-8"))
                   if args.ledger is not None else None)
         report = audit_capture(raw, ledger)
-    except (OSError, json.JSONDecodeError, NbaCaptureAuditError) as exc:
+        report["raw_file_bytes_sha256"] = hashlib.sha256(raw_file_bytes).hexdigest()
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, NbaCaptureAuditError) as exc:
         print(f"NBA_CAPTURE_AUDIT_FAILED:{exc}", file=sys.stderr)
         return 2
     out = Path(args.out)
