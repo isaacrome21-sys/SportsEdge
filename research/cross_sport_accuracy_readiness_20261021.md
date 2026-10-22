@@ -75,8 +75,9 @@ measures path count, price freshness and push handling — not probability
 calibration. A 99 or 100 therefore did **not** establish a 99–100% chance.
 
 This change fixes that **presentation failure only**, on the generic PNG
-path: keep raw sources/odds/estimates intact, show at most RESEARCH rows,
-withhold numeric SCORE and show **NO VERIFIED PLAYS**. Raw caller-provided
+path: keep raw sources/odds/estimates/EV intact in source JSON, show at most
+RESEARCH rows, withhold numeric SCORE, unvalidated model probabilities,
+EV and edge in the shareable graphic, and show **NO VERIFIED PLAYS**. Raw caller-provided
 approval flags cannot bypass that graphic boundary; it has no authenticated
 owner/verdict binding. It does **not** alter model estimates, card engines,
 other renderers, archived studies, or market eligibility.
