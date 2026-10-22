@@ -23,7 +23,9 @@ def rows():
     for i in range(4):
         dt=datetime(2026,10,1,tzinfo=timezone.utc)+timedelta(days=i)
         targets.append({"player_id":"p1","game_id":f"2026-{i}",
-                        "team_id":"A","season":2026,
+                        "team_id":"A","season":2026,"position":"G",
+                        "role_observed_at":(dt+timedelta(hours=18)).isoformat(),
+                        "role_source_ref":"pregame-roster-receipt",
                         "game_date":dt.date().isoformat(),
                         "tipoff":(dt+timedelta(hours=20)).isoformat(),
                         "decision_as_of":(dt+timedelta(hours=19,minutes=55)).isoformat(),
@@ -117,3 +119,24 @@ def test_screen_distinguishes_valid_zero_minute_dnp():
     out=screen_early_prop_mae(h,t,stat="points")
     assert out["blocked"]["TARGET_DNP"]==1
     assert out["scored"]==3
+
+
+def test_screen_refuses_target_without_pregame_role_source():
+    h,t=rows()
+    t[0].pop("role_source_ref")
+    with pytest.raises(ValueError,match="TARGET_ROLE_PROVENANCE_REQUIRED"):
+        screen_early_prop_mae(h,t,stat="points")
+
+
+def test_screen_refuses_target_role_receipt_at_or_after_tipoff():
+    h,t=rows()
+    t[0]["role_observed_at"]=t[0]["tipoff"]
+    with pytest.raises(ValueError,match="TARGET_PREGAME_ROLE_REQUIRED"):
+        screen_early_prop_mae(h,t,stat="points")
+
+
+def test_screen_refuses_target_without_position():
+    h,t=rows()
+    t[0].pop("position")
+    with pytest.raises(ValueError,match="TARGET_ROLE_PROVENANCE_REQUIRED"):
+        screen_early_prop_mae(h,t,stat="points")
