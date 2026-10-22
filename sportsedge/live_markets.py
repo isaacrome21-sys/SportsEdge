@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from math import isfinite
 from typing import Iterable
 
 
@@ -56,14 +57,25 @@ class LiveMarketQuote:
             raise LiveMarketError("unsupported sport")
         if self.market not in SPORT_LIVE_MARKETS[self.sport]:
             raise LiveMarketError(f"unsupported {self.sport} live market: {self.market}")
-        if not all((self.event_id, self.book, self.contract_key, self.focal_selection, self.opposite_selection, self.provider)):
+        identity = (
+            self.event_id, self.book, self.contract_key,
+            self.focal_selection, self.opposite_selection, self.provider,
+        )
+        if any(not isinstance(value, str) or not value.strip() for value in identity):
             raise LiveMarketError("quote identity/provenance fields are required")
-        if self.source_as_of.tzinfo is None or self.retrieved_at.tzinfo is None:
-            raise LiveMarketError("quote timestamps must be timezone-aware")
+        if self.focal_selection.strip().casefold() == self.opposite_selection.strip().casefold():
+            raise LiveMarketError("opposing selections must be distinct")
+        for stamp in (self.source_as_of, self.retrieved_at):
+            if (not isinstance(stamp, datetime) or stamp.tzinfo is None
+                    or stamp.utcoffset() is None):
+                raise LiveMarketError("quote timestamps must be timezone-aware")
         if self.source_as_of > self.retrieved_at:
             raise LiveMarketError("quote source_as_of cannot be after retrieved_at")
         for odds in (self.focal_odds, self.opposite_odds):
-            if odds is not None and -100 < float(odds) < 100:
+            if odds is None:
+                continue  # A missing side is a named quote gap, not a ready pair.
+            if (isinstance(odds, bool) or not isinstance(odds, (int, float))
+                    or not isfinite(float(odds)) or -100 < float(odds) < 100):
                 raise LiveMarketError("invalid American odds")
 
     @property
