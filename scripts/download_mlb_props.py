@@ -25,8 +25,6 @@ def keep(row) -> bool:
     return any(k in text for k in KEYWORDS)
 
 def main() -> int:
-    from datasets import load_dataset  # Optional network dependency; keep() remains offline-testable.
-
     ap = argparse.ArgumentParser()
     ap.add_argument("--max-rows", type=int, default=2_000_000)
     ap.add_argument("--month", default="", help="Optional exact settled SmartStake partition, e.g. 2026-04")
@@ -38,6 +36,8 @@ def main() -> int:
         source_options = dataset_options(args.month)
     except ValueError as exc:
         ap.error(str(exc))
+    from datasets import load_dataset  # Optional network dependency, only after input validation.
+
     os.makedirs(args.out, exist_ok=True)
     ds = load_dataset("SmartStake/mlb-player-props", split="train", streaming=True, **source_options)
     first = next(iter(ds))
