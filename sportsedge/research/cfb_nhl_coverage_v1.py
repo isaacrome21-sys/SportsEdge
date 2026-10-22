@@ -86,6 +86,7 @@ def cfb_readiness(*, away, home, event_id, event_start, as_of,
     start, clock = _clock(event_start), _clock(as_of)
     if clock >= start:
         return {"version": VERSION, "sport": "CFB", "status": "REFUSED",
+                "event_id": str(event_id),
                 "reason": "CFB_EVENT_ALREADY_STARTED", "research_only": True,
                 "play_authority": False}
     absent = []
@@ -94,6 +95,7 @@ def cfb_readiness(*, away, home, event_id, event_start, as_of,
     if not str(paired_dk_capture_ref or "").strip():
         absent.append("CFB_PAIRED_DK_CAPTURE_MISSING")
     return {"version": VERSION, "sport": "CFB",
+            "event_id": str(event_id),
             "status": "EVIDENCE_INTAKE_MISSING" if absent else
                       "EVIDENCE_SUBMITTED_NOT_INDEPENDENTLY_VERIFIED",
             "missing": absent,
