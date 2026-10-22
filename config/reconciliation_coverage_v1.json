@@ -452,6 +452,7 @@
     "sportsedge/sports/mlb/provider_market_catalog.py": "MLB_PROVIDER_CATALOG_NO_ACTIVE_BUNDLE",
     "sportsedge/sports/nba/binding.py": "NBA_NO_ACTIVE_BUNDLE",
     "sportsedge/sports/nba/integrated_engine.py": "NBA_NO_ACTIVE_BUNDLE",
+    "sportsedge/sports/nba/live_status_gate.py": "NBA_LIVE_STATE_RESEARCH_ONLY_REFUSAL_GATE_NO_ACTIVE_BUNDLE_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "sportsedge/sports/nba/sportsdataverse_training_source.py": "NBA_NO_ACTIVE_BUNDLE",
     "sportsedge/sports/nfl/defensive_context.py": "NFL_RUNTIME_CONTEXT_NO_ACTIVE_MODEL_BUNDLE",
     "sportsedge/sports/nfl/market_context_props.py": "NFL_RESEARCH_PLAYER_CONTEXT_ADAPTER_NO_ACTIVE_BUNDLE",
