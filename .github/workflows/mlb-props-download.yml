@@ -8,6 +8,11 @@ on:
         required: true
         default: "200000"
         type: string
+      month:
+        description: "Optional settled archive partition: 2026-03, 2026-04, 2026-05, or 2026-06 (blank scans entire dataset)"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -26,11 +31,13 @@ jobs:
       - name: Stream MLB prop lines
         env:
           MAX_ROWS: ${{ inputs.max_rows }}
+          MLB_MONTH: ${{ inputs.month }}
           HF_HUB_DISABLE_TELEMETRY: "1"
         run: |
           mkdir -p artifacts/mlb-props
           python scripts/download_mlb_props.py \
             --max-rows "$MAX_ROWS" \
+            --month "$MLB_MONTH" \
             --out artifacts/mlb-props
       - name: Upload filtered MLB prop lines
         if: always()
