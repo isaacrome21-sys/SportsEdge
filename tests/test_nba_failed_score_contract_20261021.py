@@ -78,7 +78,7 @@ def test_all_under_diagnostics_are_visible_without_fake_99s():
     visible = render_card(card)
     assert "failed-model diagnostics, no 0–100 Score" in visible
     assert "11 UNDER / 0 OVER" in visible
-    assert visible.count("WATCH_NBA_GAME_FAILED_VALIDATION") == 11
+    assert visible.count(" | WATCH_NBA_GAME_FAILED_VALIDATION | — |") == 11
     assert "99/100" not in visible
     assert "| 99 |" not in visible
     assert "Raw diagnostic selection" in visible
