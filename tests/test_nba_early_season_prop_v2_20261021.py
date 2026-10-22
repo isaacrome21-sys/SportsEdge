@@ -19,7 +19,7 @@ def history(nowteam="A", current_games=1, future=False):
                       "role_observed_at": (day + timedelta(hours=19)).isoformat(),
                       "role_source_ref": "pregame-roster-receipt",
                       "event_state": "FINAL", "result_state": "FINAL",
-                      "source_ref": "gamelog", "position": "G",
+                      "source_ref": "gamelog", "event_source_ref": "gamelog", "position": "G",
                       "team_id": team, "minutes": 30,
                       "points": 20 if season==2025 else 32,
                       "rebounds": 6, "assists": 7})
