@@ -112,6 +112,14 @@ def test_outcome_non_numeric_or_nonfinite_value_refused(bad):
     assert ei.value.reason == "OUTCOME_VALUE_INVALID"
 
 
+def test_outcome_unrepresentable_int_refused_not_overflow():
+    # JSON parses arbitrary-precision integers; 10**400 cannot become a
+    # float. It must be a named refusal, not a raw OverflowError.
+    with pytest.raises(ForwardValidationRefusal) as ei:
+        evaluate_family(_cfg(), [_row()], [], [_outcome(10 ** 400)])
+    assert ei.value.reason == "OUTCOME_VALUE_INVALID"
+
+
 @pytest.mark.parametrize("bad_record", [
     {"subject_id": "P1", "market": "SYNTH", "value": 27},          # no event
     {"event_id": "E1", "subject_id": "P1", "value": 27},            # no market

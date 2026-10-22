@@ -516,13 +516,24 @@ def _index_outcomes(outcomes: list) -> dict:
                 "OUTCOME_RECORD_INVALID", {"outcome": repr(o)[:200]})
         key = (o["event_id"], o.get("subject_id"), o["market"])
         value = o["value"]
-        if isinstance(value, bool) or not isinstance(value, (int, float)) \
-                or not math.isfinite(value):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ForwardValidationRefusal(
+                "OUTCOME_VALUE_INVALID", {"key": key, "value": repr(value)})
+        try:
+            finite = math.isfinite(value)
+            fvalue = float(value)
+        except OverflowError:
+            # An int too large to represent as a float (reachable from
+            # JSON, which parses arbitrary-precision integers) is refused
+            # by name, never a raw OverflowError mid-run.
+            raise ForwardValidationRefusal(
+                "OUTCOME_VALUE_INVALID", {"key": key, "value": repr(value)})
+        if not finite:
             raise ForwardValidationRefusal(
                 "OUTCOME_VALUE_INVALID", {"key": key, "value": repr(value)})
         if key in realized:
             raise ForwardValidationRefusal("OUTCOME_DUPLICATE", {"key": key})
-        realized[key] = float(value)
+        realized[key] = fvalue
     return realized
 
 
