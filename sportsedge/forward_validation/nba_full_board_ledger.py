@@ -17,7 +17,8 @@ import hashlib
 import json
 import math
 from collections import Counter, defaultdict
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from sportsedge.nba_phone_prop_pricing import (
     ENGINE_ID,
@@ -49,13 +50,24 @@ def _instant(value: object, reason: str) -> datetime:
 
 
 def _declared_date(value: object, reason: str) -> date:
-    """Calendar date in the timestamp's declared offset (the slate clock)."""
+    """Event's CT slate date, matching the independently repaired pricer.
+
+    The DK capture/slate pipeline is America/Chicago anchored. A UTC/Z
+    instant represents the same physical tipoff but its UTC calendar date
+    may be one day later; without conversion, a valid 19:30 CT Oct 21 tip
+    (2026-10-22T00:30:00Z) is rejected as EVENT_OUTSIDE_SLATE. Preserve
+    an explicitly declared non-UTC offset's local calendar date, exactly
+    as phone_nba_prop_pricing._target_date does. Never infer an absent
+    timezone, change a stored timestamp or relax pre-event chronology.
+    """
     try:
         dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except (TypeError, ValueError):
         raise NbaFullBoardLedgerError(reason, value)
     if dt.tzinfo is None or dt.utcoffset() is None:
         raise NbaFullBoardLedgerError(reason, value)
+    if dt.utcoffset() == timedelta(0):
+        return dt.astimezone(ZoneInfo("America/Chicago")).date()
     return dt.date()
 
 
