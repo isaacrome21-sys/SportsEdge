@@ -1,0 +1,1567 @@
+{
+  "canonical_by_sport": {
+    "MLB": 38,
+    "NFL": 51
+  },
+  "canonical_market_count": 89,
+  "canonical_markets": [
+    {
+      "blocker": null,
+      "forward_test_config": "mlb_batter_bb.json",
+      "market": "BATTER_BB",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": "mlb_batter_k.json",
+      "market": "BATTER_K",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": "mlb_doubles.json",
+      "market": "DOUBLES",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "EITHER_PITCHER_BB",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "EITHER_PITCHER_ER",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "EITHER_PITCHER_HITS_ALLOWED",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": "mlb_extra_base_hits.json",
+      "market": "EXTRA_BASE_HITS",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_VALIDATION",
+      "forward_test_config": null,
+      "market": "F5_MONEYLINE",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_VALIDATION",
+      "forward_test_config": null,
+      "market": "F5_RUN_LINE",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_VALIDATION",
+      "forward_test_config": null,
+      "market": "F5_TEAM_TOTALS",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_VALIDATION",
+      "forward_test_config": null,
+      "market": "F5_TOTALS",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "FIRST_HOME_RUN",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": "mlb_hits.json",
+      "market": "HITS",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": "mlb_hits_runs_rbis.json",
+      "market": "HITS_RUNS_RBIS",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "HITS_RUNS_STOLEN_BASES",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "HITS_STOLEN_BASES",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "HITS_WALKS_STOLEN_BASES",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": "mlb_home_runs.json",
+      "market": "HOME_RUNS",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": "mlb_moneyline.json",
+      "market": "MONEYLINE",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": null,
+      "market": "NRFI",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "NO_FORWARD_TEST_CONFIG",
+      "registry_validation_status": "UNVALIDATED",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": null,
+      "market": "PITCHER_BB",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "NO_FORWARD_TEST_CONFIG",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": null,
+      "market": "PITCHER_ER",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "NO_FORWARD_TEST_CONFIG",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": null,
+      "market": "PITCHER_HITS_ALLOWED",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "NO_FORWARD_TEST_CONFIG",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_QUOTE",
+      "forward_test_config": null,
+      "market": "PITCHER_HITS_WALKS_ER",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": null,
+      "market": "PITCHER_K",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "NO_FORWARD_TEST_CONFIG",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": "mlb_pitcher_outs.json",
+      "market": "PITCHER_OUTS",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "PITCHER_RECORD_WIN",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": "mlb_rbi.json",
+      "market": "RBI",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": "mlb_runs.json",
+      "market": "RUNS",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": "mlb_runs_rbis.json",
+      "market": "RUNS_RBIS",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": "mlb_run_line.json",
+      "market": "RUN_LINE",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": "mlb_singles.json",
+      "market": "SINGLES",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_QUOTE",
+      "forward_test_config": null,
+      "market": "STOLEN_BASES",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": "mlb_team_totals.json",
+      "market": "TEAM_TOTALS",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": "mlb_totals.json",
+      "market": "TOTALS",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": "mlb_total_bases.json",
+      "market": "TOTAL_BASES",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": "mlb_triples.json",
+      "market": "TRIPLES",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": null,
+      "market": "YRFI",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "NO_FORWARD_TEST_CONFIG",
+      "registry_validation_status": "UNVALIDATED",
+      "sport": "MLB",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "alternate_spread",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "alternate_total",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "anytime_td",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "attempts",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "both_teams_to_score_n",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "completions",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "defensive_special_teams_td",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": "nfl_fg_made.json",
+      "market": "fg_made",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "first_half_moneyline",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "first_half_spread",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "first_half_total",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "first_score",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_DATA",
+      "forward_test_config": null,
+      "market": "first_td",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "interceptions",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": "nfl_kicking_points.json",
+      "market": "kicking_points",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "largest_lead",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "longest_completion",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "longest_fg_made",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "longest_reception",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "longest_rush",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": "nfl_moneyline.json",
+      "market": "moneyline",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": "nfl_pass_plus_rush_yards.json",
+      "market": "pass_plus_rush_yards",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "passing_tds",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "passing_yards",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": "nfl_player_interceptions.json",
+      "market": "player_interceptions",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": "nfl_player_sacks.json",
+      "market": "player_sacks",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "quarter_moneyline",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "quarter_spread",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "quarter_total",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "race_to_n_points",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "receiving_yards",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "receptions",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "rush_attempts",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": "nfl_rush_plus_rec_yards.json",
+      "market": "rush_plus_rec_yards",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "rush_yards",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "rushing_yards",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "safety",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "second_half_moneyline",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "second_half_spread",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "second_half_total",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": "nfl_spread.json",
+      "market": "spread",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": "nfl_tackles_assists.json",
+      "market": "tackles_assists",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": "nfl_targets.json",
+      "market": "targets",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "team_sacks",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "team_total",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "team_turnovers",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": null,
+      "forward_test_config": "nfl_total.json",
+      "market": "total",
+      "play_authority_from_readiness": false,
+      "pricing_path": "PRICED_PATH",
+      "readiness": "RESEARCH_PRICED_NOT_VALIDATED",
+      "registry_validation_status": "UNVALIDATED",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "total_touchdowns",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": "nfl_two_plus_td.json",
+      "market": "two_plus_td",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": null,
+      "market": "winning_margin_band",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "forward_test_config": "nfl_xp_made.json",
+      "market": "xp_made",
+      "play_authority_from_readiness": false,
+      "pricing_path": "BLOCKED",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "registry_validation_status": "NOT_RUN",
+      "sport": "NFL",
+      "validated_accuracy_in_this_audit": false
+    }
+  ],
+  "canonical_missing_forward_config_count": 58,
+  "canonical_priced_path_count": 27,
+  "evaluated_priced_outcomes": 0,
+  "forward_config_states": {
+    "CFB": {
+      "DRAFT_NOT_FROZEN": 3
+    },
+    "MLB": {
+      "DRAFT_NOT_FROZEN": 19
+    },
+    "NBA": {
+      "FROZEN_NO_VERDICT_ATTACHED": 4
+    },
+    "NFL": {
+      "DRAFT_NOT_FROZEN": 13
+    }
+  },
+  "forward_family_config_count": 39,
+  "forward_family_configs": [
+    {
+      "capture_scope": "EXPANSION_REQUIRED",
+      "engine_id": "FREE_MODELS_GAME",
+      "family": "MONEYLINE",
+      "file": "sportsedge/forward_validation/configs/cfb_moneyline.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "MONEYLINE"
+      ],
+      "model_version": "FREE_MODELS_GAME:LANE_A_INDEPENDENT",
+      "play_authority_from_config": false,
+      "sport": "CFB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "EXPANSION_REQUIRED",
+      "engine_id": "FREE_MODELS_GAME",
+      "family": "SPREAD",
+      "file": "sportsedge/forward_validation/configs/cfb_spread.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "SPREAD"
+      ],
+      "model_version": "FREE_MODELS_GAME:LANE_A_INDEPENDENT",
+      "play_authority_from_config": false,
+      "sport": "CFB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "EXPANSION_REQUIRED",
+      "engine_id": "FREE_MODELS_GAME",
+      "family": "TOTAL",
+      "file": "sportsedge/forward_validation/configs/cfb_total.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "TOTAL"
+      ],
+      "model_version": "FREE_MODELS_GAME:LANE_A_INDEPENDENT",
+      "play_authority_from_config": false,
+      "sport": "CFB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "OPERATIVE_CAPTURE",
+      "engine_id": "MLB_BATTER_EMPIRICAL_GAMELOG",
+      "family": "BATTER_BB",
+      "file": "sportsedge/forward_validation/configs/mlb_batter_bb.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "BATTER_BB"
+      ],
+      "model_version": "mlb_batter_empirical_game_log_v1",
+      "play_authority_from_config": false,
+      "sport": "MLB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "OPERATIVE_CAPTURE",
+      "engine_id": "MLB_BATTER_EMPIRICAL_GAMELOG",
+      "family": "BATTER_K",
+      "file": "sportsedge/forward_validation/configs/mlb_batter_k.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "BATTER_K"
+      ],
+      "model_version": "mlb_batter_empirical_game_log_v1",
+      "play_authority_from_config": false,
+      "sport": "MLB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "OPERATIVE_CAPTURE",
+      "engine_id": "MLB_BATTER_EMPIRICAL_GAMELOG",
+      "family": "DOUBLES",
+      "file": "sportsedge/forward_validation/configs/mlb_doubles.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "DOUBLES"
+      ],
+      "model_version": "mlb_batter_empirical_game_log_v1",
+      "play_authority_from_config": false,
+      "sport": "MLB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "OPERATIVE_CAPTURE",
+      "engine_id": "MLB_BATTER_EMPIRICAL_GAMELOG",
+      "family": "EXTRA_BASE_HITS",
+      "file": "sportsedge/forward_validation/configs/mlb_extra_base_hits.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "EXTRA_BASE_HITS"
+      ],
+      "model_version": "mlb_batter_empirical_game_log_v1",
+      "play_authority_from_config": false,
+      "sport": "MLB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "OPERATIVE_CAPTURE",
+      "engine_id": "MLB_FIRST_INNING_BINARY",
+      "family": "FIRST_INNING_RUN",
+      "file": "sportsedge/forward_validation/configs/mlb_first_inning_run.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "NRFI_YRFI"
+      ],
+      "model_version": "mlb_first_inning_binary_v1",
+      "play_authority_from_config": false,
+      "sport": "MLB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "OPERATIVE_CAPTURE",
+      "engine_id": "MLB_BATTER_EMPIRICAL_GAMELOG",
+      "family": "HITS",
+      "file": "sportsedge/forward_validation/configs/mlb_hits.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "HITS"
+      ],
+      "model_version": "mlb_batter_empirical_game_log_v1",
+      "play_authority_from_config": false,
+      "sport": "MLB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "OPERATIVE_CAPTURE",
+      "engine_id": "MLB_BATTER_EMPIRICAL_GAMELOG",
+      "family": "HITS_RUNS_RBIS",
+      "file": "sportsedge/forward_validation/configs/mlb_hits_runs_rbis.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "HITS_RUNS_RBIS"
+      ],
+      "model_version": "mlb_batter_empirical_game_log_v1",
+      "play_authority_from_config": false,
+      "sport": "MLB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "OPERATIVE_CAPTURE",
+      "engine_id": "MLB_BATTER_EMPIRICAL_GAMELOG",
+      "family": "HOME_RUNS",
+      "file": "sportsedge/forward_validation/configs/mlb_home_runs.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "HOME_RUNS"
+      ],
+      "model_version": "mlb_batter_empirical_game_log_v1",
+      "play_authority_from_config": false,
+      "sport": "MLB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "OPERATIVE_CAPTURE",
+      "engine_id": "FREE_MODELS_GAME",
+      "family": "MONEYLINE",
+      "file": "sportsedge/forward_validation/configs/mlb_moneyline.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "MONEYLINE"
+      ],
+      "model_version": "FREE_MODELS_GAME:LANE_A_INDEPENDENT",
+      "play_authority_from_config": false,
+      "sport": "MLB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "OPERATIVE_CAPTURE",
+      "engine_id": "MLB_PITCHER_JOINT_EMPIRICAL_BAYES",
+      "family": "PITCHER_OUTS",
+      "file": "sportsedge/forward_validation/configs/mlb_pitcher_outs.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "PITCHER_OUTS"
+      ],
+      "model_version": "mlb_pitcher_joint_empirical_bayes_v1",
+      "play_authority_from_config": false,
+      "sport": "MLB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "OPERATIVE_CAPTURE",
+      "engine_id": "MLB_BATTER_EMPIRICAL_GAMELOG",
+      "family": "RBI",
+      "file": "sportsedge/forward_validation/configs/mlb_rbi.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "RBI"
+      ],
+      "model_version": "mlb_batter_empirical_game_log_v1",
+      "play_authority_from_config": false,
+      "sport": "MLB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "OPERATIVE_CAPTURE",
+      "engine_id": "FREE_MODELS_GAME",
+      "family": "RUN_LINE",
+      "file": "sportsedge/forward_validation/configs/mlb_run_line.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "RUN_LINE"
+      ],
+      "model_version": "FREE_MODELS_GAME:LANE_A_INDEPENDENT",
+      "play_authority_from_config": false,
+      "sport": "MLB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "OPERATIVE_CAPTURE",
+      "engine_id": "MLB_BATTER_EMPIRICAL_GAMELOG",
+      "family": "RUNS",
+      "file": "sportsedge/forward_validation/configs/mlb_runs.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "RUNS"
+      ],
+      "model_version": "mlb_batter_empirical_game_log_v1",
+      "play_authority_from_config": false,
+      "sport": "MLB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "OPERATIVE_CAPTURE",
+      "engine_id": "MLB_BATTER_EMPIRICAL_GAMELOG",
+      "family": "RUNS_RBIS",
+      "file": "sportsedge/forward_validation/configs/mlb_runs_rbis.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "RUNS_RBIS"
+      ],
+      "model_version": "mlb_batter_empirical_game_log_v1",
+      "play_authority_from_config": false,
+      "sport": "MLB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "OPERATIVE_CAPTURE",
+      "engine_id": "MLB_BATTER_EMPIRICAL_GAMELOG",
+      "family": "SINGLES",
+      "file": "sportsedge/forward_validation/configs/mlb_singles.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "SINGLES"
+      ],
+      "model_version": "mlb_batter_empirical_game_log_v1",
+      "play_authority_from_config": false,
+      "sport": "MLB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "OPERATIVE_CAPTURE",
+      "engine_id": "FREE_MODELS_GAME",
+      "family": "TEAM_TOTALS",
+      "file": "sportsedge/forward_validation/configs/mlb_team_totals.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "TEAM_TOTALS"
+      ],
+      "model_version": "FREE_MODELS_GAME:LANE_A_INDEPENDENT",
+      "play_authority_from_config": false,
+      "sport": "MLB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "OPERATIVE_CAPTURE",
+      "engine_id": "MLB_BATTER_EMPIRICAL_GAMELOG",
+      "family": "TOTAL_BASES",
+      "file": "sportsedge/forward_validation/configs/mlb_total_bases.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "TOTAL_BASES"
+      ],
+      "model_version": "mlb_batter_empirical_game_log_v1",
+      "play_authority_from_config": false,
+      "sport": "MLB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "OPERATIVE_CAPTURE",
+      "engine_id": "FREE_MODELS_GAME",
+      "family": "TOTALS",
+      "file": "sportsedge/forward_validation/configs/mlb_totals.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "TOTALS"
+      ],
+      "model_version": "FREE_MODELS_GAME:LANE_A_INDEPENDENT",
+      "play_authority_from_config": false,
+      "sport": "MLB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "OPERATIVE_CAPTURE",
+      "engine_id": "MLB_BATTER_EMPIRICAL_GAMELOG",
+      "family": "TRIPLES",
+      "file": "sportsedge/forward_validation/configs/mlb_triples.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "TRIPLES"
+      ],
+      "model_version": "mlb_batter_empirical_game_log_v1",
+      "play_authority_from_config": false,
+      "sport": "MLB",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "IN_SPEC",
+      "engine_id": "NBA_PROP_EMPIRICAL_V1",
+      "family": "player_assists",
+      "file": "sportsedge/forward_validation/configs/nba_player_assists.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "player_assists"
+      ],
+      "model_version": "NBA_PROP_EMPIRICAL_V1",
+      "play_authority_from_config": false,
+      "sport": "NBA",
+      "state": "FROZEN_NO_VERDICT_ATTACHED"
+    },
+    {
+      "capture_scope": "IN_SPEC",
+      "engine_id": "NBA_PROP_EMPIRICAL_V1",
+      "family": "player_points",
+      "file": "sportsedge/forward_validation/configs/nba_player_points.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "player_points"
+      ],
+      "model_version": "NBA_PROP_EMPIRICAL_V1",
+      "play_authority_from_config": false,
+      "sport": "NBA",
+      "state": "FROZEN_NO_VERDICT_ATTACHED"
+    },
+    {
+      "capture_scope": "IN_SPEC",
+      "engine_id": "NBA_PROP_EMPIRICAL_V1",
+      "family": "player_pra",
+      "file": "sportsedge/forward_validation/configs/nba_player_pra.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "player_pra"
+      ],
+      "model_version": "NBA_PROP_EMPIRICAL_V1",
+      "play_authority_from_config": false,
+      "sport": "NBA",
+      "state": "FROZEN_NO_VERDICT_ATTACHED"
+    },
+    {
+      "capture_scope": "IN_SPEC",
+      "engine_id": "NBA_PROP_EMPIRICAL_V1",
+      "family": "player_rebounds",
+      "file": "sportsedge/forward_validation/configs/nba_player_rebounds.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "player_rebounds"
+      ],
+      "model_version": "NBA_PROP_EMPIRICAL_V1",
+      "play_authority_from_config": false,
+      "sport": "NBA",
+      "state": "FROZEN_NO_VERDICT_ATTACHED"
+    },
+    {
+      "capture_scope": "EXPANSION_REQUIRED",
+      "engine_id": "NFL_PROP_ENGINES_V1",
+      "family": "FG_MADE",
+      "file": "sportsedge/forward_validation/configs/nfl_fg_made.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "FG_MADE"
+      ],
+      "model_version": "nfl_prop_engines_v1@8b2775008",
+      "play_authority_from_config": false,
+      "sport": "NFL",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "EXPANSION_REQUIRED",
+      "engine_id": "NFL_PROP_ENGINES_V1",
+      "family": "KICKING_POINTS",
+      "file": "sportsedge/forward_validation/configs/nfl_kicking_points.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "KICKING_POINTS"
+      ],
+      "model_version": "nfl_prop_engines_v1@8b2775008",
+      "play_authority_from_config": false,
+      "sport": "NFL",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "IN_SPEC",
+      "engine_id": "FREE_MODELS_GAME",
+      "family": "MONEYLINE",
+      "file": "sportsedge/forward_validation/configs/nfl_moneyline.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "MONEYLINE"
+      ],
+      "model_version": "FREE_MODELS_GAME:LANE_A_INDEPENDENT",
+      "play_authority_from_config": false,
+      "sport": "NFL",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "EXPANSION_REQUIRED",
+      "engine_id": "NFL_PROP_ENGINES_V1",
+      "family": "PASS_PLUS_RUSH_YARDS",
+      "file": "sportsedge/forward_validation/configs/nfl_pass_plus_rush_yards.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "PASS_PLUS_RUSH_YARDS"
+      ],
+      "model_version": "nfl_prop_engines_v1@8b2775008",
+      "play_authority_from_config": false,
+      "sport": "NFL",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "NO_MARKET",
+      "engine_id": "NFL_PROP_ENGINES_V1",
+      "family": "PLAYER_INTERCEPTIONS",
+      "file": "sportsedge/forward_validation/configs/nfl_player_interceptions.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "PLAYER_INTERCEPTIONS"
+      ],
+      "model_version": "nfl_prop_engines_v1@8b2775008",
+      "play_authority_from_config": false,
+      "sport": "NFL",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "NO_MARKET",
+      "engine_id": "NFL_PROP_ENGINES_V1",
+      "family": "PLAYER_SACKS",
+      "file": "sportsedge/forward_validation/configs/nfl_player_sacks.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "PLAYER_SACKS"
+      ],
+      "model_version": "nfl_prop_engines_v1@8b2775008",
+      "play_authority_from_config": false,
+      "sport": "NFL",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "EXPANSION_REQUIRED",
+      "engine_id": "NFL_PROP_ENGINES_V1",
+      "family": "RUSH_PLUS_REC_YARDS",
+      "file": "sportsedge/forward_validation/configs/nfl_rush_plus_rec_yards.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "RUSH_PLUS_REC_YARDS"
+      ],
+      "model_version": "nfl_prop_engines_v1@8b2775008",
+      "play_authority_from_config": false,
+      "sport": "NFL",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "IN_SPEC",
+      "engine_id": "FREE_MODELS_GAME",
+      "family": "SPREAD",
+      "file": "sportsedge/forward_validation/configs/nfl_spread.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "SPREAD"
+      ],
+      "model_version": "FREE_MODELS_GAME:LANE_A_INDEPENDENT",
+      "play_authority_from_config": false,
+      "sport": "NFL",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "NO_MARKET",
+      "engine_id": "NFL_PROP_ENGINES_V1",
+      "family": "TACKLES_ASSISTS",
+      "file": "sportsedge/forward_validation/configs/nfl_tackles_assists.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "TACKLES_ASSISTS"
+      ],
+      "model_version": "nfl_prop_engines_v1@8b2775008",
+      "play_authority_from_config": false,
+      "sport": "NFL",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "NO_MARKET",
+      "engine_id": "NFL_PROP_ENGINES_V1",
+      "family": "TARGETS",
+      "file": "sportsedge/forward_validation/configs/nfl_targets.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "TARGETS"
+      ],
+      "model_version": "nfl_prop_engines_v1@8b2775008",
+      "play_authority_from_config": false,
+      "sport": "NFL",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "IN_SPEC",
+      "engine_id": "FREE_MODELS_GAME",
+      "family": "TOTAL",
+      "file": "sportsedge/forward_validation/configs/nfl_total.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "TOTAL"
+      ],
+      "model_version": "FREE_MODELS_GAME:LANE_A_INDEPENDENT",
+      "play_authority_from_config": false,
+      "sport": "NFL",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "EXPANSION_REQUIRED",
+      "engine_id": "NFL_PROP_ENGINES_V1",
+      "family": "TWO_PLUS_TD",
+      "file": "sportsedge/forward_validation/configs/nfl_two_plus_td.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "TWO_PLUS_TD"
+      ],
+      "model_version": "nfl_prop_engines_v1@8b2775008",
+      "play_authority_from_config": false,
+      "sport": "NFL",
+      "state": "DRAFT_NOT_FROZEN"
+    },
+    {
+      "capture_scope": "EXPANSION_REQUIRED",
+      "engine_id": "NFL_PROP_ENGINES_V1",
+      "family": "XP_MADE",
+      "file": "sportsedge/forward_validation/configs/nfl_xp_made.json",
+      "independent_model_accuracy_verdict": "NOT_EVALUATED_BY_THIS_AUDIT",
+      "markets": [
+        "XP_MADE"
+      ],
+      "model_version": "nfl_prop_engines_v1@8b2775008",
+      "play_authority_from_config": false,
+      "sport": "NFL",
+      "state": "DRAFT_NOT_FROZEN"
+    }
+  ],
+  "no_backfill_or_registry_changes": true,
+  "paired_quoted_outcomes": 0,
+  "play_authority_conferred": false,
+  "schema": "SPORTSEDGE_CROSS_SPORT_ACCURACY_READINESS_V1",
+  "scope_limits": [
+    "CANONICAL_MLB_NFL_89_MARKETS_PLUS_FORWARD_CONFIGS",
+    "NO_NEW_PIT_ENTRY_CLOSE_OUTCOME_DATA_SUPPLIED",
+    "NOT_ALL_DECLARED_NBA_CFB_CBB_NHL_UFC_PGA_MARKETS_HAVE_MACHINE_TEST_CONFIGS",
+    "CONFIG_FROZEN_IS_NOT_A_BEATS_MARKET_VERDICT",
+    "QUALIFICATION_SCORE_0_TO_100_IS_NOT_PREDICTION_ACCURACY"
+  ],
+  "status": "STRUCTURAL_AND_PROVENANCE_AUDIT_ONLY",
+  "validated_families_conferred": 0
+}
