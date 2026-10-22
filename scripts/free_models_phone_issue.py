@@ -2,6 +2,7 @@
 """Strict issue intake and research-only phone summary. Zero sportsbook calls."""
 from __future__ import annotations
 import argparse
+import math
 import json
 from pathlib import Path
 import re
@@ -68,6 +69,17 @@ def render_card(card, *, run_url="", intake_at=""):
     rows = card.get("edges") or []
     projections = card.get("independent_candidates") or []
     watchlist = card.get("independent_watchlist") or []
+    # A failed NBA market family can retain a model gap without carrying
+    # numeric Score/100 or a ranked-pick identity. Preserve every source
+    # row in the diagnostic section, including stale-quote failures.
+    nba_diagnostics = [
+        row for row in card.get("evaluated_rows") or []
+        if row.get("sport") == "NBA"
+        and row.get("market") in {"ML", "SPREAD", "TOTAL"}
+        and row.get("score_status") == "WITHHELD_FAILED_NBA_GAME_VALIDATION"
+    ]
+    watchlist = [row for row in watchlist
+                 if row.get("score_status") != "WITHHELD_FAILED_NBA_GAME_VALIDATION"]
     # Lane B is always computed and labeled separately; it is only a research
     # hypothesis until it proves itself out-of-sample.
     anchored_rows = card.get("lane_b_edges") or []
@@ -104,6 +116,38 @@ def render_card(card, *, run_url="", intake_at=""):
         )
     if not projections:
         lines.append("| — | No qualifying independent research candidates on this board | — | — | — | — | — | — |")
+    if nba_diagnostics:
+        integrity = card.get("nba_game_card_integrity") or {}
+        lines += [
+            "",
+            "**NBA game lines — failed-model diagnostics, no 0–100 Score**",
+            "Market-accuracy validation failed for NBA ML/spread/totals. "
+            "These are source projections, not recommended picks or proven EV; "
+            "a large difference from the DK line does not earn a score.",
+            f"Apparent positive-gap totals: {integrity.get('under_rows', 0)} UNDER / "
+            f"{integrity.get('over_rows', 0)} OVER. "
+            + ("All in one direction — systematic model warning, not independent edges."
+               if integrity.get("same_direction_concentration") else
+               "Directions are descriptive, not evidence of an edge."),
+            "",
+            "| Game | Raw diagnostic selection | DK line | Model raw total | Quote status | Score |",
+            "| --- | --- | ---: | ---: | --- | ---: |",
+        ]
+        for row in nba_diagnostics:
+            projection = row.get("independent_projection") or {}
+            raw_total = (projection.get("projected_total")
+                         if row.get("market") == "TOTAL" else None)
+            raw_total_text = (f"{float(raw_total):.1f}" if isinstance(raw_total, (float, int))
+                              and not isinstance(raw_total, bool) and math.isfinite(raw_total)
+                              else "—")
+            lines.append(
+                f"| {safe(row.get('game'))} | {safe(row.get('selection'))} "
+                f"({safe(row.get('market'))}) | "
+                f"{safe(row.get('line'))} | {raw_total_text} | "
+                f"{safe(row.get('status'))} | — |"
+            )
+        lines.append("Every row remains in the full JSON record with its original "
+                     "projection, direction, quote and source receipt.")
     lines += ["", "**Projection watchlist (not qualifying):**"]
     for row in watchlist[:8]:
         estimate = row["independent_projection"]

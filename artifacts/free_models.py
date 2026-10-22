@@ -1402,6 +1402,15 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
             "staking_authority": False, "sharp_reference_compared": False}
     if reason is not None:
         result["reason"] = reason
+    if sport == "NBA" and market in ("ML", "SPREAD", "TOTAL"):
+        # A failed-market-family projection gap cannot carry a quality
+        # score or tier, even as WATCH. Retain the model, quote, line
+        # and direction verbatim for diagnostic reconstruction.
+        # A higher-priority stale-quote status does not restore a score.
+        result["score"] = None
+        result["score_0_100"] = None
+        result["score_status"] = "WITHHELD_FAILED_NBA_GAME_VALIDATION"
+        result["score_authority"] = False
     return result
 
 
@@ -1764,6 +1773,8 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
             "quotes are one systematic model-level diagnostic, never "
             "independent market edges. Full rows remain auditable."),
         "positive_ev_candidate_authority": False,
+        "numeric_quality_scores_allowed": False,
+        "score_policy": "WITHHELD_FAILED_NBA_GAME_VALIDATION",
         "research_only": True,
     }
     primary_lane = LANE_A if lane == "A" else LANE_B
