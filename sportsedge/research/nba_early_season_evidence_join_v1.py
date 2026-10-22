@@ -143,6 +143,8 @@ def join_nba_boxscore_evidence(boxes, event_receipts, player_roles):
         if len(latest_claims)>1:
             raise ValueError("NBA_EARLY_JOIN_AMBIGUOUS_LATEST_PLAYER_ROLE")
         position,role_ref=next(iter(latest_claims))
+        if role_ref == src:
+            raise ValueError("NBA_EARLY_JOIN_EVENT_ROLE_SOURCES_NOT_DISTINCT")
         role_receipt=latest_role_time
         minutes=_minutes(box.get("MIN"))
         pts=_count(box.get("PTS"),"NBA_EARLY_JOIN_PTS")
