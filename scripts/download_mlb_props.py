@@ -3,15 +3,16 @@ Read-only data pull. Prints the schema first so the filter can be checked.
 Output is gzipped CSV, never committed to the repo.
 """
 import argparse, csv, gzip, os, sys
-from datasets import load_dataset
 
-KEYWORDS = ("strikeout", "hit", "total_bases", "total bases")
+KEYWORDS = ("strikeout", "hit", "total_bases", "total bases", "player bases")
 
 def keep(row) -> bool:
     text = " ".join(str(row.get(k, "")) for k in ("market", "market_name", "prop")).lower()
     return any(k in text for k in KEYWORDS)
 
 def main() -> int:
+    from datasets import load_dataset  # Optional network dependency; keep() remains offline-testable.
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--max-rows", type=int, default=2_000_000)
     ap.add_argument("--out", required=True)

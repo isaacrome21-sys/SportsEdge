@@ -495,8 +495,6 @@ def test_runner_blocks_nba_prop_without_store(monkeypatch):
 
 
 def test_runner_prices_nba_prop_with_store(tmp_path, monkeypatch):
-    import sportsedge.nba_phone_prop_pricing as phone
-    phone._STORE_CACHE.clear()
     pull = tmp_path / "nba_player_games_2026.csv"
     with open(pull, "w", newline="") as fh:
         w = csv.writer(fh)
@@ -536,8 +534,6 @@ def test_runner_prices_nba_prop_with_store(tmp_path, monkeypatch):
 
 
 def test_runner_blocks_nba_prop_on_sufficiency(tmp_path, monkeypatch):
-    import sportsedge.nba_phone_prop_pricing as phone
-    phone._STORE_CACHE.clear()
     pull = tmp_path / "nba_player_games_2026.csv"
     with open(pull, "w", newline="") as fh:
         w = csv.writer(fh)
