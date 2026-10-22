@@ -1,0 +1,36 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "blocked_count": 2,
+  "blockers": [
+    {
+      "entity_name": "Jacob Misiorowski",
+      "observed_at": "2026-10-22T22:22:59.537409+00:00",
+      "provider_event_id": "34865951",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    },
+    {
+      "entity_name": "Nick Martinez",
+      "observed_at": "2026-10-22T22:22:59.537409+00:00",
+      "provider_event_id": "34865951",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    }
+  ],
+  "eligible_quote_units": 2,
+  "observed_at_utc": "2026-10-22T22:24:55.557615+00:00",
+  "predictions_created": 0,
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-22/props_20261022T222300.682332Z.json",
+  "run_attempt": "1",
+  "run_id": "39864599594",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_RUN_V1",
+  "selection_drops": {
+    "selected_units": 8
+  },
+  "settlements_created": 0,
+  "status": "OK",
+  "summary_sha256": "d7cd9e01ccc61c2179c442d204438e42ad33fe16cb25f2465a82f4a82e950164"
+}
