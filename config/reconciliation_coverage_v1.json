@@ -426,6 +426,7 @@
     "scripts/probe_mlb_v7_finalization_sources.py": "LEGACY_SOURCE_PROBE_ONLY_NO_ACTIVE_BUNDLE",
     "scripts/probe_public_weather_forecast.py": "WEATHER_PROBE_CONTEXT_ONLY_NO_ACTIVE_BUNDLE",
     "scripts/render_nhl_myspari_card.py": "NHL_RESEARCH_CARD_NO_ACTIVE_BUNDLE",
+    "scripts/research_nba_totals_pair_mean_v3_screen.py": "NBA_HISTORICAL_DATE_ONLY_FAILED_RESEARCH_SCREEN_NO_ACTIVE_BUNDLE_NO_ADMITTED_MARKET_OR_MODEL_PROMOTION_AUTHORITY",
     "scripts/research_nba_v2_sbr_dateonly_screen.py": "NBA_HISTORICAL_DATE_ONLY_RESEARCH_SCREEN_NO_ACTIVE_BUNDLE_NO_ADMITTED_MARKET_OR_MODEL_PROMOTION_AUTHORITY",
     "scripts/research_nfl_team_total_backtest.py": "RESEARCH_BACKTEST_NO_ACTIVE_BUNDLE",
     "scripts/run_cfb_auto.py": "CFB_GAME_RUNTIME_BLOCKED_WITHOUT_ACTIVE_MODEL_BUNDLE",
