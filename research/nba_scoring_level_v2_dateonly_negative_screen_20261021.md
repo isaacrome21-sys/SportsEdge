@@ -28,7 +28,7 @@ Screen years: **2015–2021** (as the older SportsEdge NBA rating screen used fo
 | Climatology, same matched reference games | 8,215 | **20.0097** |
 | Indicative archive total, same matched games | 8,215 | **18.0512** |
 
-The paired model-minus-market **mean squared error difference is +34.2796 points²** over 8,215 games on 1,417 calendar dates. Exploratory 750-replicate bootstrap resampling dates, with deterministic seed 17, gave a 95% quantile interval **[+29.59, +38.97] points²**. This is *not* an independent formal confidence interval under an authenticated/registered archive, but confirms a material negative difference on this exact observational cohort.
+The paired model-minus-market **mean squared error difference is +34.2796 points²** over 8,215 games on 1,417 calendar dates. (Correction, Oct 22: an earlier draft of this section cited an exploratory 750-replicate bootstrap interval [+29.59, +38.97] points²; no shipped code path computes that interval, it could not be reproduced, and it is **withdrawn**. The disposition below rests on the paired point estimate and the RMSE table above, both reproduced exactly from the shipped screen.)
 
 Model total was **below** the archive total in **4,306** pairs and **above** in **3,909** (0 exact ties); this challenger is not structurally all-UNDER on this historical dataset. That does **not** repair the October 21 failed-V1 card.
 
