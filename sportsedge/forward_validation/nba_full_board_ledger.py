@@ -177,22 +177,49 @@ def build_nba_props_entry_ledger(
             raise NbaFullBoardLedgerError(
                 "RAW_PRICED_MARKET_MISMATCH", {"input_index": index}
             )
+        # Join-echo rule: a priced row must echo the raw row's side, line,
+        # and price exactly.  An unpriced row (blocked / watch) is not
+        # required to echo keys it never emitted -- the pricer's blocked
+        # constructor carries no side/line/odds -- so an ABSENT echo key on
+        # an unpriced row flows through to the rejection accounting below.
+        # A PRESENT echo key that disagrees with the raw row refuses the
+        # board for priced and unpriced rows alike.
+        is_priced = priced.get("status") in PRICED_STATUSES
         side = _norm_side(raw)
-        if side not in {"OVER", "UNDER"} or priced.get("side") != side:
+        if side not in {"OVER", "UNDER"}:
             raise NbaFullBoardLedgerError(
                 "RAW_PRICED_SIDE_MISMATCH", {"input_index": index}
             )
-        if _finite(raw.get("line"), "LINE_INVALID") != _finite(
-            priced.get("line"), "RAW_PRICED_LINE_MISMATCH"
-        ):
+        if "side" in priced:
+            if priced.get("side") != side:
+                raise NbaFullBoardLedgerError(
+                    "RAW_PRICED_SIDE_MISMATCH", {"input_index": index}
+                )
+        elif is_priced:
+            raise NbaFullBoardLedgerError(
+                "RAW_PRICED_SIDE_MISMATCH", {"input_index": index}
+            )
+        if "line" in priced:
+            if _finite(raw.get("line"), "LINE_INVALID") != _finite(
+                priced.get("line"), "RAW_PRICED_LINE_MISMATCH"
+            ):
+                raise NbaFullBoardLedgerError(
+                    "RAW_PRICED_LINE_MISMATCH", {"input_index": index}
+                )
+        elif is_priced:
             raise NbaFullBoardLedgerError(
                 "RAW_PRICED_LINE_MISMATCH", {"input_index": index}
             )
         raw_price = raw.get("odds", raw.get("price"))
-        priced_price = priced.get("odds", priced.get("price"))
-        if _finite(raw_price, "PRICE_INVALID") != _finite(
-            priced_price, "RAW_PRICED_PRICE_MISMATCH"
-        ):
+        if "odds" in priced or "price" in priced:
+            priced_price = priced.get("odds", priced.get("price"))
+            if _finite(raw_price, "PRICE_INVALID") != _finite(
+                priced_price, "RAW_PRICED_PRICE_MISMATCH"
+            ):
+                raise NbaFullBoardLedgerError(
+                    "RAW_PRICED_PRICE_MISMATCH", {"input_index": index}
+                )
+        elif is_priced:
             raise NbaFullBoardLedgerError(
                 "RAW_PRICED_PRICE_MISMATCH", {"input_index": index}
             )
