@@ -41,6 +41,11 @@ refused, never partially scored, when:
   - MODEL_PROBABILITY_INVALID / PRICE_INVALID: a priced row's model
     probabilities or entry prices are missing, out of range, or (for
     two-sided markets) do not sum to 1.
+  - OUTCOME_RECORD_INVALID / OUTCOME_VALUE_INVALID / OUTCOME_DUPLICATE:
+    a realized-outcome record is malformed (missing event_id / market /
+    value), its value is not a real finite number (bool, string, NaN,
+    +/-inf, None are refused, never coerced), or two records share one
+    (event, subject, market) key.
 
 Per-row dispositions that are NOT run refusals (frozen Part 2 mechanics):
 an entry captured at/after event start is excluded per row
@@ -416,24 +421,109 @@ def _score_row(cfg: FamilyConfig, row: dict, value: float) -> dict:
     return out
 
 
+CALIBRATION_MIN_ROWS = 10
+
+
 def calibration_deciles(rows: list) -> list:
     """Part 2 convention: deciles of the model's reference-side probability
     vs its realized rate (pushes excluded). The last entry is the extreme
-    (top) decile, reported for the overconfidence check."""
+    (top) decile, reported for the overconfidence check.
+
+    Buckets are formed over the ranked rows WITHOUT splitting a tie
+    block: rows sharing one p_reference always land in the same bucket,
+    even when that makes bucket sizes uneven. Rank-slicing split ties by
+    input order, which made the reported per-bucket error an artifact of
+    row order — a perfectly calibrated all-tied sample (p = 0.5, half
+    realized) reported apparent error 0.50 in every bucket when the
+    realized-0 rows happened to sort first, and 0.00 when interleaved.
+    Each entry carries its bucket index and [p_min, p_max] range so the
+    top bucket is identified by identity, not by list position alone.
+    Below CALIBRATION_MIN_ROWS eligible rows no deciles are emitted:
+    with (near-)single-row buckets every realized rate is 0 or 1 by
+    construction and the apparent errors are meaningless."""
     elig = [r for r in rows if r.get("reference_realized") is not None]
-    if not elig:
+    if len(elig) < CALIBRATION_MIN_ROWS:
         return []
     order = sorted(elig, key=lambda r: r["p_reference"])
-    out = []
+    n = len(order)
+    parts = []
+    start = 0
     for k in range(10):
-        part = order[k * len(order) // 10:(k + 1) * len(order) // 10]
-        if not part:
-            continue
+        end = (k + 1) * n // 10
+        while 0 < end < n and order[end]["p_reference"] == order[end - 1]["p_reference"]:
+            end += 1
+        if end > start:
+            parts.append(order[start:end])
+            start = end
+        if start >= n:
+            break
+    out = []
+    for idx, part in enumerate(parts):
+        ps = [r["p_reference"] for r in part]
         out.append({
-            "mean_p": float(sum(r["p_reference"] for r in part) / len(part)),
+            "bucket": idx,
+            "p_min": float(min(ps)),
+            "p_max": float(max(ps)),
+            "mean_p": float(sum(ps) / len(part)),
             "realized_rate": float(sum(r["reference_realized"] for r in part) / len(part)),
             "n": len(part)})
     return out
+
+
+def _crps_summary(graded: list) -> dict:
+    """CRPS candidate-vs-baseline over the MATCHED cohort only: the rows
+    carrying BOTH fields. The two means previously ran over
+    independently filtered row sets, so they could describe different
+    games while reading as a like-for-like comparison, with no counts
+    reported to reveal it. ``crps_paired_delta`` is the mean of the
+    per-row (candidate - baseline) differences over the same matched
+    rows (negative favors the candidate)."""
+    matched = [r for r in graded
+               if r.get("crps_candidate") is not None
+               and r.get("crps_baseline") is not None]
+    if not matched:
+        return {"crps_candidate": None, "crps_baseline": None,
+                "crps_n_matched": 0, "crps_paired_delta": None}
+    cand = [float(r["crps_candidate"]) for r in matched]
+    base = [float(r["crps_baseline"]) for r in matched]
+    return {
+        "crps_candidate": float(sum(cand) / len(cand)),
+        "crps_baseline": float(sum(base) / len(base)),
+        "crps_n_matched": len(matched),
+        "crps_paired_delta": float(
+            sum(c - b for c, b in zip(cand, base)) / len(matched)),
+    }
+
+
+def _index_outcomes(outcomes: list) -> dict:
+    """Validate and index realized outcomes by (event, subject, market).
+
+    Outcomes are unguarded external data: a value that is not a real,
+    finite number (bool, string, NaN, +/-inf, None) is REFUSED, never
+    coerced — bare float() coercion previously let "27" score, let NaN
+    fall through both comparisons and silently score as a PUSH (the row
+    vanished from win/loss, log loss and calibration), and let inf score
+    as a win. A record missing event_id / market / value is refused
+    instead of raising a raw KeyError/TypeError mid-run, and duplicate
+    records for one key are refused instead of silently overwriting
+    (last-wins). Per-market scale rules (integrality, non-negativity)
+    belong to adapters/configs above this floor."""
+    realized = {}
+    for o in outcomes:
+        if not isinstance(o, dict) or "event_id" not in o \
+                or "market" not in o or "value" not in o:
+            raise ForwardValidationRefusal(
+                "OUTCOME_RECORD_INVALID", {"outcome": repr(o)[:200]})
+        key = (o["event_id"], o.get("subject_id"), o["market"])
+        value = o["value"]
+        if isinstance(value, bool) or not isinstance(value, (int, float)) \
+                or not math.isfinite(value):
+            raise ForwardValidationRefusal(
+                "OUTCOME_VALUE_INVALID", {"key": key, "value": repr(value)})
+        if key in realized:
+            raise ForwardValidationRefusal("OUTCOME_DUPLICATE", {"key": key})
+        realized[key] = float(value)
+    return realized
 
 
 def _verdict(cfg: FamilyConfig, *, sample_rows: int, distinct_events: int,
@@ -471,8 +561,7 @@ def evaluate_family(cfg: FamilyConfig, entry_rows: list, close_rows: list,
     ForwardValidationRefusal on any fail-closed condition."""
     prospective, excluded = _admit_rows(cfg, entry_rows)
     close_index, close_seen = _index_closes(close_rows)
-    realized = {(o["event_id"], o.get("subject_id"), o["market"]): float(o["value"])
-                for o in outcomes}
+    realized = _index_outcomes(outcomes)
     record = {
         "label": "FORWARD VALIDATION — verdict record (framework v1; "
                  "rules generalized from frozen NFL props Part 2 §3–§4)",
@@ -550,8 +639,6 @@ def _aggregate_market(cfg: FamilyConfig, graded: list, *,
     losses = sum(1 for r in graded if r.get("selected_result") == "LOSS")
     pushes = sum(1 for r in graded if r.get("outcome_side") == "PUSH")
     ll = [r for r in graded if r.get("logloss_model") is not None]
-    crps_c = [r["crps_candidate"] for r in graded if r.get("crps_candidate") is not None]
-    crps_b = [r["crps_baseline"] for r in graded if r.get("crps_baseline") is not None]
     return {
         "verdict": verdict,
         "gates": gates,
@@ -577,8 +664,7 @@ def _aggregate_market(cfg: FamilyConfig, graded: list, *,
                                  if ll else None),
         "brier_model": (float(sum(r["brier_model"] for r in ll) / len(ll))
                         if ll else None),
-        "crps_candidate": (float(sum(crps_c) / len(crps_c)) if crps_c else None),
-        "crps_baseline": (float(sum(crps_b) / len(crps_b)) if crps_b else None),
+        **_crps_summary(graded),
         "calibration_deciles": calibration_deciles(graded),
         "rows": graded,
     }
@@ -642,8 +728,6 @@ def _aggregate_market_picked_passed(cfg: FamilyConfig, graded: list, *,
     losses = sum(1 for r in graded if r.get("selected_result") == "LOSS")
     pushes = sum(1 for r in graded if r.get("outcome_side") == "PUSH")
     ll = [r for r in graded if r.get("logloss_model") is not None]
-    crps_c = [r["crps_candidate"] for r in graded if r.get("crps_candidate") is not None]
-    crps_b = [r["crps_baseline"] for r in graded if r.get("crps_baseline") is not None]
     return {
         "verdict": verdict,
         "gates": gates,
@@ -674,8 +758,7 @@ def _aggregate_market_picked_passed(cfg: FamilyConfig, graded: list, *,
                                  if ll else None),
         "brier_model": (float(sum(r["brier_model"] for r in ll) / len(ll))
                         if ll else None),
-        "crps_candidate": (float(sum(crps_c) / len(crps_c)) if crps_c else None),
-        "crps_baseline": (float(sum(crps_b) / len(crps_b)) if crps_b else None),
+        **_crps_summary(graded),
         "calibration_deciles": calibration_deciles(graded),
         "rows": graded,
     }
