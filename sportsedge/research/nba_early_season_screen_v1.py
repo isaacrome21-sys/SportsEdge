@@ -63,6 +63,15 @@ def screen_early_prop_mae(records, targets, *, stat):
         observed=_clock(tgt.get("observed_at"),"NBA_EARLY_SCREEN_RESULT")
         if not decision<tip<observed:
             raise ValueError("NBA_EARLY_SCREEN_TEMPORAL_ORDER_INVALID")
+        # The held-out target needs its own pregame roster/role receipt too;
+        # prior-history provenance cannot establish the target team's identity.
+        target_position=str(tgt.get("position") or "").strip()
+        target_role_source=str(tgt.get("role_source_ref") or "").strip()
+        if not target_position or not target_role_source:
+            raise ValueError("NBA_EARLY_SCREEN_TARGET_ROLE_PROVENANCE_REQUIRED")
+        target_role_observed=_clock(tgt.get("role_observed_at"),"NBA_EARLY_SCREEN_TARGET_ROLE")
+        if target_role_observed>=tip:
+            raise ValueError("NBA_EARLY_SCREEN_TARGET_PREGAME_ROLE_REQUIRED")
         # The held-out actual is a final box score, not an in-game snapshot.
         # Preserve the same chronology used by the joined prior-game input.
         if tgt.get("event_state") != "FINAL" or tgt.get("result_state") != "FINAL":
