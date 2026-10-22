@@ -107,9 +107,15 @@ def as_rows(payload: dict, sport: str):
             out.append(row)
     for row in out:
         row["price"] = val(row, "price_american", "american_odds")
-        row["est"] = val(row, "estimate_p", "model_p")
-        row["ev"] = val(row, "ev_per_dollar", "expected_roi")
-        row["edge_value"] = val(row, "edge_probability_points", "edge")
+        row["raw_estimate"] = val(row, "estimate_p", "model_p")
+        row["raw_ev"] = val(row, "ev_per_dollar", "expected_roi")
+        row["raw_edge_value"] = val(row, "edge_probability_points", "edge")
+        # In a shareable PNG an untested +40% EV or 95% win chance is just
+        # as deceptive as a 99/100 score. Those values remain in source JSON
+        # for audit and must not be promoted by this generic visual path.
+        row["est"] = None
+        row["ev"] = None
+        row["edge_value"] = None
         # Score B in NFL/MLB is operational qualification (PIT, quote age,
         # simulation path coverage), not calibrated forecast accuracy.
         # Neither an upstream BEST/BET label nor caller-controlled flags
@@ -119,7 +125,8 @@ def as_rows(payload: dict, sport: str):
         row["score_status"] = "WITHHELD_UNVALIDATED_PREDICTION_ACCURACY"
         row["status"] = "LEAN"
         row["reason"] = "RESEARCH_NOT_VALIDATED_FOR_PLAY: " + str(row.get("reason") or "")
-        if row["price"] is None or row["est"] is None or row["ev"] is None or row["edge_value"] is None:
+        if (row["price"] is None or row["raw_estimate"] is None
+                or row["raw_ev"] is None or row["raw_edge_value"] is None):
             row["status"] = "LEAN"
             row["reason"] = "INCOMPLETE_DATA " + str(row.get("reason") or "")
     def num(v):
@@ -175,8 +182,8 @@ def tile(draw, r, left, top, number, *, best):
              475, fill=WHITE, face=font(25,bold=True))
     draw.text((left+518,top+62),fmt_odds(r.get("price")),fill=GOLD,font=font(24,bold=True))
     draw.line((left+22,top+107,left+633,top+107),fill="#2D4562",width=2)
-    values = [("ESTIMATE",fmt_prob(r.get("est"))),("EV",fmt_pct(r.get("ev"))),
-              ("EDGE",fmt_pct(r.get("edge_value"))),
+    values = [("ESTIMATE","WITHHELD"),("EV","WITHHELD"),
+              ("EDGE","WITHHELD"),
               ("SCORE",str(r.get("score_value")) if r.get("score_value") is not None else "WITHHELD")]
     for i,(label,value) in enumerate(values):
         x = left+25+i*156
