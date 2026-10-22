@@ -63,7 +63,7 @@ def run_auto_joint_mlb(
         projected_raw = _snapshot_list("PROJECTED_LINEUP", _http_json(projected_lineups_url, opener=opener, token=provider_token))
     projected = _projected_index(projected_raw)
 
-    schedule = fetch_schedule(slate_date_ct, opener=opener, now=current)
+    schedule = fetch_schedule(slate_date_ct, opener=opener)  # retrieved_at = post-fetch receipt clock; run as-of time is not a receipt claim
     snapshots = {str(g.game_pk): g for g in schedule}
     games = []
     game_failures: dict[str, str] = {}
