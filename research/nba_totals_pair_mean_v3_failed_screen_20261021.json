@@ -1,0 +1,140 @@
+{
+  "all_seasons": [
+    {
+      "indicative_reference_rmse": 17.546198081154493,
+      "over": 569,
+      "paired_games": 1222,
+      "season": 2015,
+      "signed_model_minus_reference_mean": -0.38199204196703646,
+      "tie": 0,
+      "under": 653,
+      "v2_rmse": 18.29963631181535,
+      "v3_rmse": 18.570269285098323
+    },
+    {
+      "indicative_reference_rmse": 17.24248798636087,
+      "over": 541,
+      "paired_games": 1194,
+      "season": 2016,
+      "signed_model_minus_reference_mean": -0.7296280805910375,
+      "tie": 0,
+      "under": 653,
+      "v2_rmse": 18.128260822997344,
+      "v3_rmse": 18.66287022590173
+    },
+    {
+      "indicative_reference_rmse": 17.96974681197868,
+      "over": 614,
+      "paired_games": 1233,
+      "season": 2017,
+      "signed_model_minus_reference_mean": -0.1053640540655811,
+      "tie": 0,
+      "under": 619,
+      "v2_rmse": 18.703141218653325,
+      "v3_rmse": 19.031711534258406
+    },
+    {
+      "indicative_reference_rmse": 18.440772530001773,
+      "over": 536,
+      "paired_games": 1224,
+      "season": 2018,
+      "signed_model_minus_reference_mean": -1.0979060690537958,
+      "tie": 0,
+      "under": 688,
+      "v2_rmse": 19.450181365224477,
+      "v3_rmse": 19.86325675027351
+    },
+    {
+      "indicative_reference_rmse": 19.016176587708827,
+      "over": 552,
+      "paired_games": 1072,
+      "season": 2019,
+      "signed_model_minus_reference_mean": 0.028561770240224073,
+      "tie": 0,
+      "under": 520,
+      "v2_rmse": 19.81495908268234,
+      "v3_rmse": 20.014218811655198
+    },
+    {
+      "indicative_reference_rmse": 18.27851920403862,
+      "over": 578,
+      "paired_games": 1067,
+      "season": 2020,
+      "signed_model_minus_reference_mean": 0.3693675993516533,
+      "tie": 0,
+      "under": 489,
+      "v2_rmse": 19.12784440176555,
+      "v3_rmse": 19.441744429241567
+    },
+    {
+      "indicative_reference_rmse": 17.93843378012112,
+      "over": 618,
+      "paired_games": 1203,
+      "season": 2021,
+      "signed_model_minus_reference_mean": 0.11861295226516717,
+      "tie": 0,
+      "under": 585,
+      "v2_rmse": 19.36605525525188,
+      "v3_rmse": 19.56537246177283
+    }
+  ],
+  "bootstrap": {
+    "clusters": "calendar_day",
+    "draws": 750,
+    "seed": 17
+  },
+  "chronology": "STRICT_EARLIER_CALENDAR_DATES_ONLY",
+  "climatology_rmse_paired": 20.009733989328613,
+  "disposition": "EXPLORATORY_NOT_BETTER_THAN_V2",
+  "eligible_for_card": false,
+  "holdout_seasons": [
+    2015,
+    2021
+  ],
+  "indicative_reference_rmse_paired": 18.05123313379557,
+  "model_formula": "2*rolling_league_mean+0.5*(four_shrunk_team_effects)",
+  "model_p_authority": false,
+  "normalized_rows": 13893,
+  "over_rows": 4008,
+  "paired_dates": 1417,
+  "paired_games": 8215,
+  "parameters": {
+    "minimum_league_games": 30,
+    "minimum_team_games": 5,
+    "pair_mean_weight": 0.5,
+    "prior_games": 450,
+    "shrink_games": 20.0
+  },
+  "play_authority": false,
+  "promotion_authority": false,
+  "quote_observed_at": "UNKNOWN",
+  "real_game_tipoff": "UNKNOWN",
+  "reference_admission": "INDICATIVE_DATE_ONLY_NOT_ADMITTED",
+  "reference_bookmaker": "UNKNOWN",
+  "result_available_at": "UNKNOWN",
+  "reused_cohort": true,
+  "scored_games": 8877,
+  "screen": "NBA_TOTALS_PAIR_MEAN_V3_DATE_ONLY_EXPLORATORY",
+  "source_blob_sha1": "f5ba0d4f8f729236fdd8883a65189f2d6443338c",
+  "source_commit": "1a820e50c6fbd0276cde073c22bfffae78930868",
+  "source_git_blob_verified": true,
+  "source_path": "data/nba_archive_10Y.json",
+  "source_rows": 13903,
+  "staking_authority": false,
+  "tie_rows": 0,
+  "under_rows": 4207,
+  "v2_rmse_paired": 18.977001389677074,
+  "v3_minus_reference_day_bootstrap_95pct": [
+    41.25848642987159,
+    51.977575384361494
+  ],
+  "v3_minus_reference_mean_squared_error": 46.647590420625974,
+  "v3_minus_v2_day_bootstrap_95pct": [
+    10.01265756616758,
+    14.484079406849242
+  ],
+  "v3_minus_v2_mean_squared_error": 12.368026327459466,
+  "v3_rmse_all": 19.264867776004085,
+  "v3_rmse_paired": 19.300119379715376,
+  "validated_market_beat": false
+}

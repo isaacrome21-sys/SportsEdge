@@ -23,7 +23,8 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "artifacts"))
 
 from sportsedge.family_market_registry import family_market_decision
-from sportsedge.nba_phone_prop_pricing import phone_nba_prop_rows
+from sportsedge.nba_phone_prop_pricing import (
+    _target_date, phone_nba_prop_rows)
 from sportsedge.nba_prop_empirical import (
     ENGINE_ID, GameLogStore, MixtureDistribution, empirical_crps,
     records_from_boxscore_rows)
@@ -494,8 +495,6 @@ def test_runner_blocks_nba_prop_without_store(monkeypatch):
 
 
 def test_runner_prices_nba_prop_with_store(tmp_path, monkeypatch):
-    import sportsedge.nba_phone_prop_pricing as phone
-    phone._STORE_CACHE.clear()
     pull = tmp_path / "nba_player_games_2026.csv"
     with open(pull, "w", newline="") as fh:
         w = csv.writer(fh)
@@ -535,8 +534,6 @@ def test_runner_prices_nba_prop_with_store(tmp_path, monkeypatch):
 
 
 def test_runner_blocks_nba_prop_on_sufficiency(tmp_path, monkeypatch):
-    import sportsedge.nba_phone_prop_pricing as phone
-    phone._STORE_CACHE.clear()
     pull = tmp_path / "nba_player_games_2026.csv"
     with open(pull, "w", newline="") as fh:
         w = csv.writer(fh)
@@ -584,3 +581,75 @@ def test_runner_nba_game_market_row_unchanged():
     assert rows, "NBA game row vanished"
     assert all(r.get("status") == "NO_MODEL_OR_MARKET" for r in rows)
     assert all(r.get("blocker") == "NO_VALIDATION" for r in rows)
+
+
+# ------------------------------------------------------- target-date rule
+# _target_date must yield the target game's LOCAL calendar date:
+# GameLogStore slices are strictly game_date < target_date over
+# local dates. The pre-fix code took the instant's UTC date, so any
+# tip at/after 19:00 CT rolled to the next day and same-day finals
+# entered the prior slices.
+
+@pytest.mark.parametrize("value,expected", [
+    # An evening CT tip keeps its own calendar date.
+    ("2026-10-21T18:30:00-05:00", date(2026, 10, 21)),
+    # 19:00 CT is 00:00 UTC the next day — pre-fix: 2026-10-22.
+    ("2026-10-21T19:00:00-05:00", date(2026, 10, 21)),
+    # A 21:00 CT tip is 02:00 UTC the next day — pre-fix: 2026-10-22.
+    ("2026-10-21T21:00:00-05:00", date(2026, 10, 21)),
+    # A Pacific tip: 19:30 -07:00 is 02:30 UTC the next day; the
+    # date is taken in the instant's own offset — pre-fix: 2026-10-22.
+    ("2026-10-21T19:30:00-07:00", date(2026, 10, 21)),
+    # A UTC instant is reduced in America/Chicago, not UTC: 00:30
+    # UTC on Oct 22 is 19:30 CT on Oct 21 — pre-fix: 2026-10-22.
+    ("2026-10-22T00:30:00+00:00", date(2026, 10, 21)),
+    ("2026-10-22T01:00:00Z", date(2026, 10, 21)),
+])
+def test_target_date_instant_uses_its_own_anchor(value, expected):
+    assert _target_date({"tipoff": value}) == expected
+    assert _target_date({"commence_time": value}) == expected
+
+
+def test_target_date_bare_game_date_governs():
+    # A bare game_date is already the local calendar date and governs
+    # regardless of other keys: the commence_time here would resolve
+    # (via Chicago) to Oct 20 on its own.
+    row = {"commence_time": "2026-10-21T04:30:00+00:00",
+           "game_date": "2026-10-21"}
+    assert _target_date(row) == date(2026, 10, 21)
+    assert _target_date({"game_date": "2026-10-21"}) == date(2026, 10, 21)
+    assert _target_date({"date": "2026-10-21"}) == date(2026, 10, 21)
+
+
+def test_evening_tip_excludes_same_day_finals_from_all_slices():
+    # End-to-end through the phone pricer: an Oct 21 early-game final
+    # already in the store must not enter the player, pool, or league
+    # prior slices when pricing a 21:00 CT Oct 21 game. (Oct 21 is
+    # day 20 from D0 = Oct 1.)
+    records = guard_history(12, pts=20)
+    records.append(game("p1", "Test Guard", "G", 20, 60,
+                        gid="oct21-early-final"))
+    records.append(game("g0", "Guard 0", "G", 20, 60,
+                        gid="oct21-pool-final"))
+    store = GameLogStore(records)
+    row = {"sport": "NBA", "market": "PLAYER_POINTS",
+           "player_name": "Test Guard", "side": "OVER", "line": 19.5,
+           "odds": -110, "tipoff": "2026-10-21T21:00:00-05:00",
+           "quote_captured_at": "2026-10-22T01:59:00+00:00"}
+    now = datetime(2026, 10, 22, 1, 59, 30, tzinfo=timezone.utc)
+    outputs, _ = phone_nba_prop_rows([row], now=now, store=store)
+    (out,) = outputs
+    assert out["status"] in {"PRICED_RESEARCH",
+                             "RESEARCH_CANDIDATE_NOT_VALIDATED"}
+    engine = out["nba_prop_engine"]
+    assert engine["n_prior"] == 12
+    direct = store.price("p1", "points", 19.5, date(2026, 10, 21))
+    assert engine["pool_n"] == direct["pool_n"] == 48
+    assert engine["model_mean"] == direct["model_mean"]
+    # The probe shape, pinned: sliced at the pre-fix target date
+    # (Oct 22), the same store WOULD have counted both same-day
+    # finals — n_prior 13 and a shifted mean.
+    buggy = store.price("p1", "points", 19.5, date(2026, 10, 22))
+    assert buggy["n_prior"] == 13
+    assert buggy["pool_n"] == 50
+    assert buggy["model_mean"] > direct["model_mean"]

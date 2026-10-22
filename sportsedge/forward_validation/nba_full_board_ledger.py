@@ -17,7 +17,8 @@ import hashlib
 import json
 import math
 from collections import Counter, defaultdict
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from sportsedge.nba_phone_prop_pricing import (
     ENGINE_ID,
@@ -49,13 +50,24 @@ def _instant(value: object, reason: str) -> datetime:
 
 
 def _declared_date(value: object, reason: str) -> date:
-    """Calendar date in the timestamp's declared offset (the slate clock)."""
+    """Event's CT slate date, matching the independently repaired pricer.
+
+    The DK capture/slate pipeline is America/Chicago anchored. A UTC/Z
+    instant represents the same physical tipoff but its UTC calendar date
+    may be one day later; without conversion, a valid 19:30 CT Oct 21 tip
+    (2026-10-22T00:30:00Z) is rejected as EVENT_OUTSIDE_SLATE. Preserve
+    an explicitly declared non-UTC offset's local calendar date, exactly
+    as phone_nba_prop_pricing._target_date does. Never infer an absent
+    timezone, change a stored timestamp or relax pre-event chronology.
+    """
     try:
         dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except (TypeError, ValueError):
         raise NbaFullBoardLedgerError(reason, value)
     if dt.tzinfo is None or dt.utcoffset() is None:
         raise NbaFullBoardLedgerError(reason, value)
+    if dt.utcoffset() == timedelta(0):
+        return dt.astimezone(ZoneInfo("America/Chicago")).date()
     return dt.date()
 
 
@@ -165,22 +177,49 @@ def build_nba_props_entry_ledger(
             raise NbaFullBoardLedgerError(
                 "RAW_PRICED_MARKET_MISMATCH", {"input_index": index}
             )
+        # Join-echo rule: a priced row must echo the raw row's side, line,
+        # and price exactly.  An unpriced row (blocked / watch) is not
+        # required to echo keys it never emitted -- the pricer's blocked
+        # constructor carries no side/line/odds -- so an ABSENT echo key on
+        # an unpriced row flows through to the rejection accounting below.
+        # A PRESENT echo key that disagrees with the raw row refuses the
+        # board for priced and unpriced rows alike.
+        is_priced = priced.get("status") in PRICED_STATUSES
         side = _norm_side(raw)
-        if side not in {"OVER", "UNDER"} or priced.get("side") != side:
+        if side not in {"OVER", "UNDER"}:
             raise NbaFullBoardLedgerError(
                 "RAW_PRICED_SIDE_MISMATCH", {"input_index": index}
             )
-        if _finite(raw.get("line"), "LINE_INVALID") != _finite(
-            priced.get("line"), "RAW_PRICED_LINE_MISMATCH"
-        ):
+        if "side" in priced:
+            if priced.get("side") != side:
+                raise NbaFullBoardLedgerError(
+                    "RAW_PRICED_SIDE_MISMATCH", {"input_index": index}
+                )
+        elif is_priced:
+            raise NbaFullBoardLedgerError(
+                "RAW_PRICED_SIDE_MISMATCH", {"input_index": index}
+            )
+        if "line" in priced:
+            if _finite(raw.get("line"), "LINE_INVALID") != _finite(
+                priced.get("line"), "RAW_PRICED_LINE_MISMATCH"
+            ):
+                raise NbaFullBoardLedgerError(
+                    "RAW_PRICED_LINE_MISMATCH", {"input_index": index}
+                )
+        elif is_priced:
             raise NbaFullBoardLedgerError(
                 "RAW_PRICED_LINE_MISMATCH", {"input_index": index}
             )
         raw_price = raw.get("odds", raw.get("price"))
-        priced_price = priced.get("odds", priced.get("price"))
-        if _finite(raw_price, "PRICE_INVALID") != _finite(
-            priced_price, "RAW_PRICED_PRICE_MISMATCH"
-        ):
+        if "odds" in priced or "price" in priced:
+            priced_price = priced.get("odds", priced.get("price"))
+            if _finite(raw_price, "PRICE_INVALID") != _finite(
+                priced_price, "RAW_PRICED_PRICE_MISMATCH"
+            ):
+                raise NbaFullBoardLedgerError(
+                    "RAW_PRICED_PRICE_MISMATCH", {"input_index": index}
+                )
+        elif is_priced:
             raise NbaFullBoardLedgerError(
                 "RAW_PRICED_PRICE_MISMATCH", {"input_index": index}
             )

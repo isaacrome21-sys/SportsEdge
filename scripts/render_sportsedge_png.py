@@ -73,7 +73,13 @@ def text_fit(draw, x, y, raw, maximum, *, fill, face):
 
 
 def as_rows(payload: dict, sport: str):
-    """Take only priced engine-produced candidates; never infer probabilities."""
+    """Show research prices, never convert a label into validation/PLAY.
+
+    This generic graphic renderer has no independent verdict/owner-approval
+    binding. Even a producer-supplied BET, ACTIONABLE, 99/100 or alleged
+    approval is not evidence of market accuracy. Keep each raw row in its
+    source artifact; the illustration may show it only as a diagnostic.
+    """
     out = []
     if sport == "NFL" and isinstance(payload.get("games"), list):
         for game in payload["games"]:
@@ -101,11 +107,26 @@ def as_rows(payload: dict, sport: str):
             out.append(row)
     for row in out:
         row["price"] = val(row, "price_american", "american_odds")
-        row["est"] = val(row, "estimate_p", "model_p")
-        row["ev"] = val(row, "ev_per_dollar", "expected_roi")
-        row["edge_value"] = val(row, "edge_probability_points", "edge")
-        row["score_value"] = val(row, "score_0_100", "confidence_score")
-        if row["price"] is None or row["est"] is None or row["ev"] is None or row["edge_value"] is None:
+        row["raw_estimate"] = val(row, "estimate_p", "model_p")
+        row["raw_ev"] = val(row, "ev_per_dollar", "expected_roi")
+        row["raw_edge_value"] = val(row, "edge_probability_points", "edge")
+        # In a shareable PNG an untested +40% EV or 95% win chance is just
+        # as deceptive as a 99/100 score. Those values remain in source JSON
+        # for audit and must not be promoted by this generic visual path.
+        row["est"] = None
+        row["ev"] = None
+        row["edge_value"] = None
+        # Score B in NFL/MLB is operational qualification (PIT, quote age,
+        # simulation path coverage), not calibrated forecast accuracy.
+        # Neither an upstream BEST/BET label nor caller-controlled flags
+        # can elevate it to a trustworthy 0-100 prediction score.
+        row["raw_qualification_score"] = val(row, "score_0_100", "confidence_score")
+        row["score_value"] = None
+        row["score_status"] = "WITHHELD_UNVALIDATED_PREDICTION_ACCURACY"
+        row["status"] = "LEAN"
+        row["reason"] = "RESEARCH_NOT_VALIDATED_FOR_PLAY: " + str(row.get("reason") or "")
+        if (row["price"] is None or row["raw_estimate"] is None
+                or row["raw_ev"] is None or row["raw_edge_value"] is None):
             row["status"] = "LEAN"
             row["reason"] = "INCOMPLETE_DATA " + str(row.get("reason") or "")
     def num(v):
@@ -161,9 +182,9 @@ def tile(draw, r, left, top, number, *, best):
              475, fill=WHITE, face=font(25,bold=True))
     draw.text((left+518,top+62),fmt_odds(r.get("price")),fill=GOLD,font=font(24,bold=True))
     draw.line((left+22,top+107,left+633,top+107),fill="#2D4562",width=2)
-    values = [("ESTIMATE",fmt_prob(r.get("est"))),("EV",fmt_pct(r.get("ev"))),
-              ("EDGE",fmt_pct(r.get("edge_value"))),
-              ("SCORE",str(r.get("score_value")) if r.get("score_value") is not None else "MISSING")]
+    values = [("ESTIMATE","WITHHELD"),("EV","WITHHELD"),
+              ("EDGE","WITHHELD"),
+              ("SCORE",str(r.get("score_value")) if r.get("score_value") is not None else "WITHHELD")]
     for i,(label,value) in enumerate(values):
         x = left+25+i*156
         draw.text((x,top+118),label,fill=SOFT,font=font(13,bold=True))
@@ -183,7 +204,7 @@ def render(payload, sport, output: Path, mascots: Path):
     d=ImageDraw.Draw(image)
     d.rectangle((0,0,W,11),fill=CYAN)
     d.text((45,37),"SPORTSEDGE",fill=WHITE,font=font(57,bold=True))
-    d.text((48,105),f"{sport}   |   BEST PLAYS  /  TOP LEANS",fill=CYAN,font=font(22,bold=True))
+    d.text((48,105),f"{sport}   |   UNVALIDATED RESEARCH DIAGNOSTICS",fill=CYAN,font=font(22,bold=True))
     games = payload.get("games") if isinstance(payload.get("games"),list) else []
     matchups = sorted({str(row.get("matchup") or "") for row in rows if row.get("matchup")})
     # The first game is NOT the whole NFL slate. Its context and mascots
@@ -227,20 +248,20 @@ def render(payload, sport, output: Path, mascots: Path):
         elif isinstance(v,list):
             v=", ".join(map(str,v[:2])) if v else None
         text_fit(d,x,253,v if v is not None else "MISSING",255,fill=WHITE if v is not None else RED,face=font(16,bold=True))
-    d.text((46,317),f"BEST PLAYS   {len(best)}",fill=GOLD,font=font(26,bold=True))
-    d.text((733,317),f"TOP LEANS   {len(leans)}",fill=CYAN,font=font(26,bold=True))
+    d.text((46,317),f"VERIFIED PLAYS   {len(best)}",fill=GOLD,font=font(26,bold=True))
+    d.text((733,317),f"RESEARCH ROWS   {len(leans)}",fill=CYAN,font=font(26,bold=True))
     for n,r in enumerate(best):
         tile(d,r,44,365+n*249,n+1,best=True)
     for n,r in enumerate(leans):
         tile(d,r,730,365+n*249,n+1,best=False)
     if not best:
-        d.text((67,421),"NO QUALIFIED +EV ROWS",fill=SOFT,font=font(26,bold=True))
+        d.text((67,421),"NO VERIFIED PLAYS",fill=SOFT,font=font(26,bold=True))
     if not leans:
-        d.text((750,421),"NO MODELED LEANS",fill=SOFT,font=font(26,bold=True))
+        d.text((750,421),"NO RESEARCH ROWS",fill=SOFT,font=font(26,bold=True))
     d.line((44,1400,1395,1400),fill="#375A74",width=3)
     d.text((48,1418),"SOURCE: SPORTSEDGE ENGINE CARD  |  MISSING IS NOT ZERO",fill=SOFT,font=font(18,bold=True))
-    d.text((48,1455),"ORDER: EXPECTED VALUE > EDGE > IDENTITY   |   SCORE = DISPLAY ONLY",fill=SOFT,font=font(17))
-    d.text((48,1491),"No imported logo, context, statistic, or probability is fabricated.",fill=SOFT,font=font(17))
+    d.text((48,1455),"UNVALIDATED ESTIMATES ARE NOT PICKS   |   0–100 SCORES WITHHELD",fill=SOFT,font=font(17))
+    d.text((48,1491),"Research-only; no independently verified market edge or PLAY authority.",fill=SOFT,font=font(17))
     output.parent.mkdir(parents=True,exist_ok=True)
     image.save(output,format="PNG",optimize=True)
     return {"sport":sport,"best":len(best),"leans":len(leans),"output":str(output)}
