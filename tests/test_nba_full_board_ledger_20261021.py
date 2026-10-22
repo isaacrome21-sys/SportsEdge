@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from datetime import datetime, timezone
 
 import pytest
 
@@ -8,6 +9,7 @@ from sportsedge.forward_validation.nba_full_board_ledger import (
     NbaFullBoardLedgerError,
     build_nba_props_entry_ledger,
 )
+from sportsedge.nba_phone_prop_pricing import phone_nba_prop_rows
 
 CAPTURED = "2026-10-21T16:00:00-05:00"
 RECORDED = "2026-10-21T16:00:20-05:00"
@@ -198,6 +200,59 @@ def test_recording_at_capture_with_other_offset_is_countable():
     assert out["accounting"]["noncausal_rows"] == 0
 
 
+def test_real_pricer_blocked_board_flows_into_ledger_accounting():
+    # End-to-end regression: the pricer's blocked constructor emits no
+    # side/line/odds echo keys.  Feeding its ACTUAL output for a board
+    # priced with the history store unavailable (the production blocked
+    # path) must complete the ledger with the rows in rejection
+    # accounting, not refuse the board with RAW_PRICED_*_MISMATCH.
+    raws = [raw(player_name="Player One"), raw("UNDER", player_name="Player One"),
+            raw(player_name="Player Two", capture_id="cap-2"),
+            raw("UNDER", player_name="Player Two", capture_id="cap-2")]
+    outputs, receipts = phone_nba_prop_rows(
+        raws,
+        now=datetime(2026, 10, 21, 21, 0, tzinfo=timezone.utc),
+        store=None, store_dir="/nonexistent-dir")
+    assert receipts[0]["status"] == "NBA_PROP_STORE_UNAVAILABLE"
+    assert [o["status"] for o in outputs] == ["NO_MODEL_OR_MARKET"] * 4
+    assert all("side" not in o and "line" not in o and "odds" not in o
+               for o in outputs)
+    out = build(raws, outputs)
+    assert out["ledger"] == []
+    assert out["accounting"]["raw_rows"] == 4
+    assert out["accounting"]["blocked_rows"] == 4
+    assert out["accounting"]["conservation_ok"] is True
+    assert {r["reason"] for r in out["rejected"]} == {"UNPRICED_NOT_COUNTABLE"}
+    assert {r["pricing_blocker"] for r in out["rejected"]} == {
+        "NBA_PROP_HISTORY_STORE_UNAVAILABLE"}
+
+
+@pytest.mark.parametrize("drop,reason", [
+    ("side", "RAW_PRICED_SIDE_MISMATCH"),
+    ("line", "RAW_PRICED_LINE_MISMATCH"),
+    ("odds", "RAW_PRICED_PRICE_MISMATCH"),
+])
+def test_priced_row_missing_echo_key_still_refuses(drop, reason):
+    first = priced()
+    del first[drop]
+    with pytest.raises(NbaFullBoardLedgerError) as exc:
+        build(priceds=[first, priced("UNDER", "PRICED_RESEARCH")])
+    assert exc.value.reason == reason
+
+
+@pytest.mark.parametrize("overrides,reason", [
+    ({"side": "UNDER"}, "RAW_PRICED_SIDE_MISMATCH"),
+    ({"line": 25.5}, "RAW_PRICED_LINE_MISMATCH"),
+    ({"odds": -115}, "RAW_PRICED_PRICE_MISMATCH"),
+])
+def test_unpriced_row_with_mismatched_echo_key_still_refuses(overrides, reason):
+    first = priced(status="NO_MODEL_OR_MARKET", player_id=None, **overrides)
+    second = priced("UNDER", "NO_MODEL_OR_MARKET", player_id=None)
+    with pytest.raises(NbaFullBoardLedgerError) as exc:
+        build(priceds=[first, second])
+    assert exc.value.reason == reason
+
+
 def test_mutating_return_does_not_change_stable_rebuild():
     first = build()
     mutated = copy.deepcopy(first)
@@ -205,3 +260,45 @@ def test_mutating_return_does_not_change_stable_rebuild():
     second = build()
     assert second["ledger"][0]["entry_prices"]["OVER"] == -110
     assert second["ledger_sha256"] == first["ledger_sha256"]
+
+
+# Oct 21 composed-main cross-PR audit: #2459's phone pricer already uses the
+# CT local slate date, but the merged ledger initially took UTC's literal
+# date and refused otherwise valid evening games. Nothing in these tests
+# supplies real prospective player data or changes the frozen V1 engine.
+@pytest.mark.parametrize("start", [
+    "2026-10-22T00:30:00Z",       # Oct21 19:30 CDT
+    "2026-10-22T00:30:00+00:00",  # explicit UTC offset
+    "2026-10-21T19:30:00-05:00",  # same fixture, declared CT offset
+    "2026-10-22T02:30:00Z",       # Oct21 21:30 CDT
+])
+def test_utc_tipoff_same_ct_slate_pairs_and_matches_pricer(start):
+    from datetime import date
+    from sportsedge.nba_phone_prop_pricing import _target_date
+    assert _target_date({"commence_time": start}) == date(2026, 10, 21)
+    a, b = raw(commence_time=start), raw("UNDER", commence_time=start)
+    out = build(raws=[a, b])
+    assert out["accounting"]["ledger_rows"] == 1
+    assert out["accounting"]["wrong_slate_rows"] == 0
+    assert out["ledger"][0]["label"] == "PROSPECTIVE"
+    assert out["ledger"][0]["eligible"] is False
+
+
+@pytest.mark.parametrize("start", [
+    "2026-10-21T00:30:00Z",   # Oct20 19:30 CDT, too EARLY a slate
+    "2026-10-23T00:30:00Z",   # Oct22 19:30 CDT, following slate
+    "2026-10-22T19:30:00-05:00",  # explicit Oct22 local
+])
+def test_other_ct_slate_utc_values_still_fail_closed(start):
+    a, b = raw(commence_time=start), raw("UNDER", commence_time=start)
+    out = build(raws=[a, b])
+    assert out["ledger"] == []
+    assert out["accounting"]["wrong_slate_rows"] == 2
+    assert {r["reason"] for r in out["rejected"]} == {"EVENT_OUTSIDE_SLATE"}
+
+
+def test_naive_utc_start_remains_invalid_without_offset():
+    with pytest.raises(NbaFullBoardLedgerError) as err:
+        build(raws=[raw(commence_time="2026-10-22T00:30:00"),
+                    raw("UNDER", commence_time="2026-10-22T00:30:00")])
+    assert err.value.reason == "EVENT_START_INVALID"
