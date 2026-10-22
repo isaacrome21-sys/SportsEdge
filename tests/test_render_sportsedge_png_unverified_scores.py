@@ -33,7 +33,9 @@ def test_cross_sport_unverified_99_never_becomes_best_or_quality_score(sport, ma
     assert rows[0]["raw_qualification_score"] in (99, 100)
     assert "RESEARCH_NOT_VALIDATED_FOR_PLAY" in rows[0]["reason"]
     # No silent inversion, odds fabrication or rewrite of underlying estimates.
-    assert rows[0]["est"] == (row.get("estimate_p") or row.get("model_p"))
+    assert rows[0]["est"] is None and rows[0]["ev"] is None
+    assert rows[0]["edge_value"] is None
+    assert rows[0]["raw_estimate"] == (row.get("estimate_p") or row.get("model_p"))
     assert rows[0]["price"] == (row.get("price_american") or row.get("american_odds"))
 
 
@@ -49,6 +51,7 @@ def test_untrusted_input_flags_cannot_self_approve():
     assert len(rows) == 1
     assert rows[0]["status"] == "LEAN"
     assert rows[0]["score_value"] is None
+    assert rows[0]["est"] is None and rows[0]["ev"] is None
     assert raw["status"] == "BET"  # audited source unchanged
     assert raw["score_0_100"] == 100
 
