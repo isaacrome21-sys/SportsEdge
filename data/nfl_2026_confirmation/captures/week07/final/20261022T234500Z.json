@@ -1,0 +1,71 @@
+{
+  "authority_footer": "NOT Model_P / NOT Truth Gate / NOT OFFICIAL",
+  "book": "draftkings",
+  "capture_kind": "FINAL",
+  "games": [
+    {
+      "away_team": "NE Patriots",
+      "book": "draftkings",
+      "book_last_update": null,
+      "commence_time": "2026-10-23T00:15:00Z",
+      "event_id": "34118033",
+      "home_team": "CHI Bears",
+      "observed_at_utc": "2026-10-22T23:45:00Z",
+      "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+      "spread": {
+        "away_point": 3,
+        "away_price": -112,
+        "home_point": -3,
+        "home_price": -108,
+        "market_last_update": null,
+        "status": "OK"
+      },
+      "total": {
+        "market_last_update": null,
+        "over_price": -120,
+        "point": 50.5,
+        "status": "OK",
+        "under_price": 100
+      },
+      "week": 7
+    }
+  ],
+  "hashes": {
+    "config_sha256": "883e6b3df15745847d5424c40b80cc6fc88916b62594e29c5afcac0fc1f6e842",
+    "policy_sha256": "f81e5bb1f10440adb50e0fc1e9bd0f204ab008147c31ad62d8601bf75c2529ba",
+    "script_sha256": "c50e43bf53fcf4f91c7b72cf9c9c09be42c288bb82f262ff8224ff0c0e2f12c7",
+    "workflow_sha256": "6a0d1381d3a080970fc67db6993d3510602aea15e3a7bde12c4b0f6bdbb23c38"
+  },
+  "markets": [
+    "spreads",
+    "totals"
+  ],
+  "no_backfill": true,
+  "promotion_authority": false,
+  "provider": "DRAFTKINGS_DIRECT_WEB",
+  "retrieved_at_utc": "2026-10-22T23:45:00Z",
+  "run": {
+    "github_event_name": "schedule",
+    "github_run_attempt": "1",
+    "github_run_id": "39871099384",
+    "github_sha": "d7fc9743ee604d55796d9a4c35712189f98169f1"
+  },
+  "run_started_utc": "2026-10-22T23:45:00Z",
+  "schedule": {
+    "expected_game_count": 1,
+    "expected_kickoffs": {
+      "2026-10-23T00:15:00Z": 1
+    },
+    "matching_semantics": "KICKOFF_UTC_MULTIPLICITY",
+    "sha256": "f54f0bbcf1b9a973dbe93558eb6e741c5dd16473bd0fd55da1d5a7eeae44bc8f",
+    "source": "nflverse/nfldata data/games.csv"
+  },
+  "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+  "transport": {
+    "raw_relative_path": "raw/draftkings-direct/1b4f4e37cc380b6d66c2b52934c1c865c26d44b5f573bf7e8866dccdb12eecf9.json",
+    "raw_sha256": "1b4f4e37cc380b6d66c2b52934c1c865c26d44b5f573bf7e8866dccdb12eecf9",
+    "server_date_header": "Thu, 22 Oct 2026 23:45:00 GMT",
+    "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/492"
+  },
+  "week": 7
+}
