@@ -35,7 +35,7 @@ or attempt budget is changed.
 Exact per-market structural detail is emitted deterministically by
 `scripts/audit_cross_sport_accuracy_readiness.py` into the versioned JSON
 report (`research/cross_sport_accuracy_readiness_20261021.json`, SHA-256
-`9aaed9421c57ca1b632b3b4ad1d4cb670e6c17df8a183d5955916a88e6ea`).
+`9aaed9421c57ca1b632b3b4ad1d4cb670e6c17df8a183d5955916a88e6b4e8ea`).
 The script verifies the actual frozen prereg SHA-256 when a config is
 marked FROZEN; DRAFT strings containing the word “FROZEN” do not pass.
 
