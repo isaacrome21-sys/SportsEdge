@@ -161,6 +161,7 @@ def join_nba_boxscore_evidence(boxes, event_receipts, player_roles):
             "finalized_at":finalized.isoformat(),
             "role_observed_at":role_receipt.isoformat(),
             "role_source_ref":role_ref,
+            "event_source_ref":src,
             "receipt_authentication":"NOT_ESTABLISHED_BY_CALLER_FIELDS",
             "source_ref":src+"|role:"+role_ref,
             "team_id":team,"position":position,"minutes":minutes,
