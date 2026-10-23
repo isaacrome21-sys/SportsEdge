@@ -117,6 +117,23 @@ def test_missing_pair_stale_and_untrusted_book_refuse():
     assert untrusted["readouts"][0]["reason"] == "DRAFTKINGS_QUOTE_REQUIRED"
 
 
+def test_stale_future_or_malformed_source_row_cannot_borrow_fresh_pair():
+    # Three matching rows: the first is invalid, but the other two form a
+    # valid DK two-sided pair. All three inputs are independently assessed.
+    fresh = _quotes("NFL", "TARGETS", player_id="p1")
+    for bad_stamp in ("2026-10-20T19:50:00Z",
+                      "2026-10-20T20:00:01Z", "not-an-instant"):
+        bad = dict(fresh[0], quote_captured_at=bad_stamp)
+        rows = [bad] + fresh
+        out = build_annex(rows, [{}] * len(rows),
+                          **_kwargs("NFL", _nfl_history()))
+        assert out["readouts"][0]["status"] == "REFUSED"
+        assert out["readouts"][0]["reason"] == "DK_SOURCE_ROW_STALE_OR_FUTURE"
+        for readout in out["readouts"][1:]:
+            assert readout["status"] == "RESEARCH_ESTIMATE_UNVALIDATED"
+            assert readout["eligible"] is False
+
+
 def test_fixture_bound_and_tennessee_blocked():
     rows = _quotes("NFL", "TARGETS", player_id="p1")
     kw = _kwargs("NFL", _nfl_history())
