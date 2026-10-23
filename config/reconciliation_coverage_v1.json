@@ -361,6 +361,7 @@
     ".github/workflows/football-public-splits.yml": "FOOTBALL_CONTEXT_ONLY_NO_ACTIVE_BUNDLE",
     ".github/workflows/mlb-cfb-prop-engine-governance.yml": "RESEARCH_BUILD_ORDER_ONLY_NO_ACTIVE_BUNDLE",
     ".github/workflows/mlb-development-v2.yml": "RESEARCH_MODEL_DEVELOPMENT_ONLY_NO_ACTIVE_BUNDLE",
+    ".github/workflows/nba-cdn-admission-probe.yml": "PROVIDER_DIAGNOSTIC_PROBE_NO_ACTIVE_BUNDLE",
     ".github/workflows/odds-api-auth-diagnostic.yml": "AUTH_DIAGNOSTIC_ONLY_NO_ACTIVE_BUNDLE",
     ".github/workflows/v7-backfill-source-readiness.yml": "LEGACY_RESEARCH_SOURCE_READINESS_NO_ACTIVE_BUNDLE",
     "config/active_evidence_windows_v1.json": "ACTIVE_EVIDENCE_WINDOW_OPERATIONAL_REGISTRY_NO_MODEL_OR_PROMOTION_AUTHORITY",
