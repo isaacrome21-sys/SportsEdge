@@ -1,264 +1,282 @@
-"""v1.1 re-audit (eb9d47aa NOT CLEARED): server-side provenance, fixed
-verdict path on a records branch, CLOSE_TIMESTAMP_INVALID. RED first.
-Run: python3 -m unittest test_nfl_atd_v11_provenance -v
+"""v1.1 provenance (re-audit of 9105b4e6, rulings A-G). RED first: these
+assert behaviour.  Run: python3 -m unittest test_nfl_atd_v11_provenance -v
 """
 import json
-import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
 import atd_provenance as pv
 import score_nfl_atd_forward as sc
+from fake_github_api import FakeGitHub, ledger_to_records, records_worktree
 from test_nfl_atd_v11_scorer import _ledger
 
-SHA = "a" * 64
-SSHA = "b" * 64
-CAP = "2026-10-25T11:00:00-05:00"   # 16:00Z
-KO = "2026-10-25T12:00:00-05:00"    # 17:00Z
+BR = pv.RECORDS_BRANCH
+SHA, SSHA = "a" * 64, "b" * 64
+CAP = "2026-10-25T16:00:00Z"
+KO = "2026-10-25T17:00:00Z"
 
 
-class FakeAPI:
-    """Stands in for the GitHub REST API (contents, commits?path=, and the
-    repository activity endpoint with server-side push timestamps)."""
-    def __init__(self):
-        self.files = {}        # (branch, path) -> (content, add_commit)
-        self.pushes = []       # {"ref", "after", "timestamp"}
-
-    def put(self, branch, path, content, commit, pushed_at):
-        self.files[(branch, path)] = (content, commit)
-        if pushed_at is not None:
-            self.pushes.append({"ref": f"refs/heads/{branch}",
-                                "after": commit, "timestamp": pushed_at,
-                                "activity_type": "push"})
-
-    def get_file(self, branch, path):
-        f = self.files.get((branch, path))
-        return None if f is None else f[0]
-
-    def file_commits(self, branch, path):
-        f = self.files.get((branch, path))
-        return [] if f is None else [f[1]]
-
-    def push_activities(self, branch):
-        return [p for p in self.pushes if p["ref"] == f"refs/heads/{branch}"]
+def fetch(api, sha, t="2026-10-25T15:00:00Z", **kw):
+    return api.commit(BR, {pv.fetch_record_path(sha): json.dumps({"sha256": sha})}, t, **kw)
 
 
-def fetch_rec(sha, name="stats_player_week_2026.csv.gz"):
-    return json.dumps({"file": name, "sha256": sha,
-                       "fetched_at": "2026-10-25T14:00:00+00:00"})
+def ev_for(api, commit):
+    return next(e for e in api.events if e["after"] == commit)
 
 
-class TestConstants(unittest.TestCase):
-    def test_fixed_names(self):
-        self.assertEqual(pv.RECORDS_BRANCH, "records/nfl-atd-v1-1")
-        self.assertEqual(pv.VERDICT_PATH, "nfl_atd_v1_1/VERDICT.json")
-        self.assertEqual(pv.fetch_record_path(SHA), f"nfl_atd_v1_1/fetch/{SHA}.json")
-        self.assertEqual(pv.run_record_path("2026-W8-SUN"),
-                         "nfl_atd_v1_1/runs/2026-W8-SUN.json")
-        self.assertEqual(pv.SERVER_TIME_SOURCE,
-                         "GET /repos/{owner}/{repo}/activity (activity_type=push, timestamp)")
+def run_rec(api, sid="S1", t="2026-10-25T16:30:00Z", cap=CAP, ko=KO, rows=None,
+            stored=True):
+    fp = {}
+    for name, s in (("stats", SHA), ("schedule", SSHA)):
+        c = api.file_commits(BR, pv.fetch_record_path(s))
+        fp[name] = {"event": ev_for(api, c[0])} if (stored and c) else {}
+    rec = {"slate_id": sid, "captured_at": cap, "first_kickoff": ko,
+           "stats_sha256": SHA, "schedule_sha256": SSHA,
+           "fetch_provenance": fp, "rows": rows or []}
+    return api.commit(BR, {pv.run_record_path(sid): json.dumps(rec)}, t)
 
 
-class TestFetchProvenance(unittest.TestCase):
+class TestConstantsG(unittest.TestCase):
+    def test_repo_lowercase(self):
+        self.assertEqual(pv.REPO, "sportsedge")
+        self.assertEqual(pv.OWNER, "isaacrome21-sys")
+
+
+class TestRecordProofA(unittest.TestCase):
     def setUp(self):
-        self.api = FakeAPI()
+        self.api = FakeGitHub()
+        self.path = pv.fetch_record_path(SHA)
 
-    def put_fetch(self, sha=SHA, pushed="2026-10-25T15:00:00Z", rec_sha=None):
-        self.api.put(pv.RECORDS_BRANCH, pv.fetch_record_path(sha),
-                     fetch_rec(rec_sha or sha), "c" + sha[:7], pushed)
-
-    def code(self, **kw):
+    def code(self, stored=None):
         with self.assertRaises(pv.ProvenanceFailed) as cm:
-            pv.verify_fetch(self.api, kw.get("sha", SHA), CAP)
+            pv.prove_record(self.api, self.path, stored_event=stored)
         return cm.exception.code
 
-    def test_ok(self):
-        self.put_fetch()
-        t = pv.verify_fetch(self.api, SHA, CAP)
-        self.assertEqual(t["server_pushed_at"], "2026-10-25T15:00:00+00:00")
-        self.assertEqual(t["source"], pv.SERVER_TIME_SOURCE)
+    def test_single_commit_live_proof(self):
+        c = fetch(self.api, SHA)
+        p = pv.prove_record(self.api, self.path)
+        self.assertEqual(p["commit"], c)
+        self.assertEqual(p["pushed_at"], "2026-10-25T15:00:00+00:00")
+        self.assertEqual(p["proof_source"], "live_activity")
+        self.assertEqual(set(p["event"]), {"id", "before", "after", "timestamp",
+                                           "activity_type"})
+
+    def test_edited_record_refused(self):
+        fetch(self.api, SHA)
+        self.api.commit(BR, {self.path: json.dumps({"sha256": SHA, "x": 1})},
+                        "2026-10-25T15:05:00Z")
+        self.assertEqual(self.code(), "RECORD_NOT_SINGLE_COMMIT")
+
+    def test_deleted_and_readded_refused(self):
+        fetch(self.api, SHA)
+        self.api.commit(BR, {self.path: None}, "2026-10-25T15:05:00Z")
+        fetch(self.api, SHA, "2026-10-25T15:06:00Z")
+        self.assertEqual(self.code(), "RECORD_NOT_SINGLE_COMMIT")
+
+    def test_blob_mismatch_refused(self):
+        fetch(self.api, SHA)
+        # head blob differs although history shows one commit (rewrite)
+        self.api.trees[self.api.heads[BR]][self.path] = "tampered"
+        self.assertEqual(self.code(), "RECORD_BLOB_MISMATCH")
+
+    def test_force_push_refused(self):
+        c = fetch(self.api, SHA)
+        self.api.push_event(BR, c, c, "2026-10-25T15:10:00Z", kind="force_push")
+        self.assertEqual(self.code(), "RECORDS_BRANCH_REWRITTEN")
+
+    def test_branch_deletion_refused(self):
+        c = fetch(self.api, SHA)
+        self.api.push_event(BR, c, "0" * 40, "2026-10-25T15:10:00Z",
+                            kind="branch_deletion")
+        self.assertEqual(self.code(), "RECORDS_BRANCH_REWRITTEN")
+
+    def test_multi_commit_push_refused_G(self):
+        fetch(self.api, SHA, n_commits=2)
+        self.assertEqual(self.code(), "PUSH_NOT_SINGLE_COMMIT")
 
     def test_not_on_branch(self):
-        self.assertEqual(self.code(), "FETCH_RECORD_NOT_ON_BRANCH")
+        self.assertEqual(self.code(), "RECORD_NOT_ON_BRANCH")
 
-    def test_hash_mismatch(self):
-        self.put_fetch(rec_sha="d" * 64)
-        self.assertEqual(self.code(), "FETCH_RECORD_HASH_MISMATCH")
+    def test_stored_event_accepted_when_live_gone_F(self):
+        c = fetch(self.api, SHA)
+        ev = dict(ev_for(self.api, c))
+        self.api.events.clear()                       # aged out (~90 days)
+        self.assertEqual(self.code(), "PUSH_UNPROVEN")
+        p = pv.prove_record(self.api, self.path, stored_event=ev)
+        self.assertEqual(p["proof_source"], "stored_event_commit_checked")
+        self.assertEqual(p["pushed_at"], "2026-10-25T15:00:00+00:00")
 
-    def test_no_server_push_event(self):
-        self.put_fetch(pushed=None)
-        self.assertEqual(self.code(), "FETCH_PUSH_UNPROVEN")
+    def test_stored_event_cross_checked_F(self):
+        c = fetch(self.api, SHA)
+        ev = dict(ev_for(self.api, c))
+        self.api.events.clear()
+        self.assertEqual(self.code(dict(ev, after="f" * 40)), "STORED_EVENT_MISMATCH")
+        self.assertEqual(self.code(dict(ev, before="f" * 40)), "STORED_EVENT_MISMATCH")
+        self.assertEqual(self.code({"after": c}), "API_MALFORMED")
 
-    def test_pushed_after_capture(self):
-        self.put_fetch(pushed="2026-10-25T16:00:00Z")   # == capture
-        self.assertEqual(self.code(), "FETCH_PUSH_NOT_BEFORE_CAPTURE")
+    def test_malformed_api_is_coded_G(self):
+        fetch(self.api, SHA)
+        for m in ("activities", "file_commits", "get_file"):
+            with self.subTest(method=m):
+                self.api.malformed = {m}
+                self.assertEqual(self.code(), "API_MALFORMED")
+        self.api.malformed = set()
 
-    def test_committer_date_ignored(self):
-        # Only the server activity timestamp is consulted; a record whose
-        # content claims an early time but was pushed late fails.
-        self.put_fetch(pushed="2026-10-25T18:00:00Z")
-        self.assertEqual(self.code(), "FETCH_PUSH_NOT_BEFORE_CAPTURE")
+    def test_raising_api_is_coded(self):
+        class Boom(FakeGitHub):
+            def activities(self, b):
+                raise OSError("network down")
+        self.api = Boom()
+        fetch(self.api, SHA)
+        self.assertEqual(self.code(), "API_UNAVAILABLE")
 
 
-def slate(sid="2026-W8-SUN", cap=CAP, ko=KO):
-    return {"slate_id": sid, "captured_at": cap, "first_kickoff": ko,
-            "stats_sha256": SHA, "schedule_sha256": SSHA, "rows": []}
-
-
-class TestSlateStatus(unittest.TestCase):
+class TestFetchAndSlateC(unittest.TestCase):
     def setUp(self):
-        self.api = FakeAPI()
-        for s, t in ((SHA, "2026-10-25T15:00:00Z"), (SSHA, "2026-10-25T15:01:00Z")):
-            self.api.put(pv.RECORDS_BRANCH, pv.fetch_record_path(s),
-                         fetch_rec(s), "c" + s[:7], t)
+        self.api = FakeGitHub()
+        fetch(self.api, SHA, "2026-10-25T15:00:00Z")
+        fetch(self.api, SSHA, "2026-10-25T15:01:00Z")
 
-    def put_run(self, pushed):
-        self.api.put(pv.RECORDS_BRANCH, pv.run_record_path("2026-W8-SUN"),
-                     "{}", "run1", pushed)
+    def test_pricer_gate(self):
+        out = pv.require_fetch_provenance(self.api, {"stats": SHA, "schedule": SSHA}, CAP)
+        self.assertEqual(out["stats"]["event"]["timestamp"], "2026-10-25T15:00:00Z")
+        with self.assertRaises(pv.ProvenanceFailed) as cm:
+            pv.require_fetch_provenance(self.api, {"stats": "c" * 64}, CAP)
+        self.assertEqual(cm.exception.code, "FETCH_RECORD_NOT_ON_BRANCH")
+
+    def test_fetch_record_hash_mismatch(self):
+        self.api.commit(BR, {pv.fetch_record_path("d" * 64): json.dumps({"sha256": SHA})},
+                        "2026-10-25T15:02:00Z")
+        with self.assertRaises(pv.ProvenanceFailed) as cm:
+            pv.verify_fetch(self.api, "d" * 64, CAP)
+        self.assertEqual(cm.exception.code, "FETCH_RECORD_HASH_MISMATCH")
 
     def test_counts(self):
-        self.put_run("2026-10-25T16:30:00Z")
-        st = pv.slate_status(self.api, slate())
-        self.assertEqual(st["status"], "COUNTS")
-        self.assertEqual(st["run_server_pushed_at"], "2026-10-25T16:30:00+00:00")
+        run_rec(self.api)
+        st = pv.load_slate(self.api, "S1")
+        self.assertEqual(st["status"], "COUNTS", st["reasons"])
+        self.assertEqual(st["run_proof"]["pushed_at"], "2026-10-25T16:30:00+00:00")
 
-    def test_run_pushed_at_kickoff_is_screen(self):
-        self.put_run("2026-10-25T17:00:00Z")
-        st = pv.slate_status(self.api, slate())
+    def test_run_push_before_capture_is_screen(self):
+        run_rec(self.api, t="2026-10-25T15:59:00Z")
+        st = pv.load_slate(self.api, "S1")
+        self.assertIn("RUN_PUSH_BEFORE_CAPTURE", st["reasons"])
+
+    def test_run_push_at_kickoff_is_screen(self):
+        run_rec(self.api, t=KO)
+        self.assertIn("RUN_PUSH_NOT_BEFORE_KICKOFF", pv.load_slate(self.api, "S1")["reasons"])
+
+    def test_fetch_after_capture_screen(self):
+        run_rec(self.api, cap="2026-10-25T14:00:00Z", t="2026-10-25T16:30:00Z")
+        self.assertIn("FETCH_PUSH_NOT_BEFORE_CAPTURE",
+                      pv.load_slate(self.api, "S1")["reasons"])
+
+    def test_fetch_push_must_precede_run_push(self):
+        # run pushed, THEN a new fetch record for a hash it cites
+        self.api2 = FakeGitHub()
+        fetch(self.api2, SSHA, "2026-10-25T15:01:00Z")
+        rec = {"slate_id": "S1", "captured_at": "2026-10-25T16:00:00Z",
+               "first_kickoff": "2026-10-25T18:00:00Z", "stats_sha256": SHA,
+               "schedule_sha256": SSHA, "fetch_provenance": {}, "rows": []}
+        self.api2.commit(BR, {pv.run_record_path("S1"): json.dumps(rec)}, "2026-10-25T16:20:00Z")
+        fetch(self.api2, SHA, "2026-10-25T16:40:00Z")
+        st = pv.load_slate(self.api2, "S1")
         self.assertEqual(st["status"], "SCREEN")
-        self.assertIn("RUN_PUSH_NOT_BEFORE_KICKOFF", st["reasons"])
+        self.assertIn("FETCH_PUSH_NOT_BEFORE_RUN_PUSH", st["reasons"])
 
-    def test_no_run_record_is_screen(self):
-        st = pv.slate_status(self.api, slate())
-        self.assertEqual(st["status"], "SCREEN")
-        self.assertIn("RUN_RECORD_NOT_ON_BRANCH", st["reasons"])
+    def test_run_record_edited_screen(self):
+        run_rec(self.api)
+        run_rec(self.api, t="2026-10-25T16:40:00Z")
+        self.assertIn("RUN_RECORD_NOT_SINGLE_COMMIT", pv.load_slate(self.api, "S1")["reasons"])
 
-    def test_fetch_after_capture_is_screen(self):
-        self.put_run("2026-10-25T16:30:00Z")
-        st = pv.slate_status(self.api, slate(cap="2026-10-25T09:00:00-05:00"))
-        self.assertEqual(st["status"], "SCREEN")
-        self.assertIn("FETCH_PUSH_NOT_BEFORE_CAPTURE", st["reasons"])
+    def test_missing_run_record_screen(self):
+        self.assertIn("RUN_RECORD_NOT_ON_BRANCH", pv.load_slate(self.api, "S9")["reasons"])
 
+    def test_malformed_run_record_screen(self):
+        self.api.commit(BR, {pv.run_record_path("S1"): "{not json"}, "2026-10-25T16:30:00Z")
+        self.assertIn("RUN_RECORD_MALFORMED", pv.load_slate(self.api, "S1")["reasons"])
 
-class TestCloseTimestampInvalid(unittest.TestCase):
-    K = "2026-10-25T17:00:00Z"
-
-    def test_unparseable_capture_for_player_not_skipped(self):
-        caps = [{"game_id": "g1", "player_id": "P", "yes_price": 200,
-                 "captured_at": "2026-10-25T16:30:00Z"},
-                {"game_id": "g1", "player_id": "P", "yes_price": 150,
-                 "captured_at": "garbage"}]
-        self.assertEqual(sc.find_close(caps, "g1", "P", self.K),
-                         "CLOSE_TIMESTAMP_INVALID")
-        caps[1]["captured_at"] = None
-        self.assertEqual(sc.find_close(caps, "g1", "P", self.K),
-                         "CLOSE_TIMESTAMP_INVALID")
-
-    def test_other_players_bad_timestamp_irrelevant(self):
-        caps = [{"game_id": "g1", "player_id": "P", "yes_price": 200,
-                 "captured_at": "2026-10-25T16:30:00Z"},
-                {"game_id": "g1", "player_id": "Q", "yes_price": 150,
-                 "captured_at": "garbage"}]
-        self.assertEqual(sc.find_close(caps, "g1", "P", self.K)["yes_price"], 200)
+    def test_stored_fetch_events_used_when_live_gone(self):
+        run_rec(self.api)
+        keep = [e for e in self.api.events
+                if e["after"] == self.api.file_commits(BR, pv.run_record_path("S1"))[0]]
+        self.api.events[:] = keep                      # fetch events aged out
+        st = pv.load_slate(self.api, "S1")
+        self.assertEqual(st["status"], "COUNTS", st["reasons"])
 
 
-def git(cwd, *a):
-    return subprocess.run(["git", *a], cwd=cwd, check=True, capture_output=True,
-                          text=True).stdout.strip()
-
-
-class TestVerdictOnRecordsBranch(unittest.TestCase):
-    """Real git: a bare 'origin' and a worktree on the records branch."""
+class TestReviewB_DE(unittest.TestCase):
     def setUp(self):
-        t = Path(tempfile.mkdtemp())
-        self.origin = t / "origin.git"
-        git(t, "init", "-q", "--bare", str(self.origin))
-        self.wt = t / "wt"
-        git(t, "init", "-q", "-b", pv.RECORDS_BRANCH, str(self.wt))
-        git(self.wt, "config", "user.email", "t@t"); git(self.wt, "config", "user.name", "t")
-        (self.wt / "README").write_text("records\n")
-        git(self.wt, "add", "."); git(self.wt, "commit", "-qm", "init")
-        git(self.wt, "remote", "add", "origin", str(self.origin))
-        git(self.wt, "push", "-q", "origin", pv.RECORDS_BRANCH)
-        self.api = FakeAPI()
+        self.api = FakeGitHub()
+        self.wt = records_worktree()
 
-    def led(self):
-        led = _ledger(5, 14, 3, clv=0.02)
-        for s in led:
-            s.update(captured_at=CAP, first_kickoff=KO,
-                     stats_sha256=SHA, schedule_sha256=SSHA)
-        return led
+    def publish(self, led):
+        return ledger_to_records(self.api, led)
 
-    def counts_all(self):
-        return lambda api, s: {"status": "COUNTS", "reasons": []}
-
-    def test_verdict_staged_at_fixed_path_not_counted_until_pushed(self):
-        v = sc.review(self.led(), records_worktree=self.wt, api=self.api,
-                      slate_status=self.counts_all())
+    def test_rows_and_hashes_come_from_pushed_records(self):
+        ids, caps, setl = self.publish(_ledger(5, 14, 3, clv=0.02))
+        v = sc.review(ids, records_worktree=self.wt, api=self.api,
+                      captures=caps, settlements=setl)
         self.assertEqual(v["status"], "REVIEWED")
-        self.assertTrue((self.wt / pv.VERDICT_PATH).exists())
-        self.assertEqual(v["record_state"], "STAGED_NOT_COUNTED")
-        self.assertFalse(sc.verdict_counts(self.wt))
-        git(self.wt, "add", "."); git(self.wt, "commit", "-qm", "verdict")
-        self.assertFalse(sc.verdict_counts(self.wt))    # committed, not pushed
-        git(self.wt, "push", "-q", "origin", pv.RECORDS_BRANCH)
-        self.assertTrue(sc.verdict_counts(self.wt))
+        self.assertEqual(v["verdict"], "BEATS_MARKET")
+        self.assertEqual(v["review_slate"], "2026-W4")
+        want = [self.api.get_file(BR, pv.run_record_path(s)) for s in ids[:4]]
+        self.assertEqual(v["inputs_sha256"], sc.inputs_sha256(want))
 
-    def test_refuses_if_verdict_on_origin(self):
-        sc.review(self.led(), records_worktree=self.wt, api=self.api,
-                  slate_status=self.counts_all())
-        git(self.wt, "add", "."); git(self.wt, "commit", "-qm", "v")
-        git(self.wt, "push", "-q", "origin", pv.RECORDS_BRANCH)
-        # fresh worktree that never saw the file locally
-        t2 = Path(tempfile.mkdtemp()) / "wt2"
-        git(t2.parent, "clone", "-q", "-b", pv.RECORDS_BRANCH, str(self.origin), str(t2))
-        (t2 / pv.VERDICT_PATH).unlink()
-        with self.assertRaises(sc.ReviewAlreadyRecorded):
-            sc.review(self.led(), records_worktree=t2, api=self.api,
-                      slate_status=self.counts_all())
-
-    def test_refuses_wrong_branch_or_non_git_dir(self):
-        git(self.wt, "checkout", "-q", "-b", "other")
-        with self.assertRaises(sc.RecordsLocationRefused):
-            sc.review(self.led(), records_worktree=self.wt, api=self.api,
-                      slate_status=self.counts_all())
-        with self.assertRaises(sc.RecordsLocationRefused):
-            sc.review(self.led(), records_worktree=tempfile.mkdtemp(),
-                      api=self.api, slate_status=self.counts_all())
-
-    def test_records_dir_argument_gone(self):
+    def test_caller_cannot_pass_rows(self):
         with self.assertRaises(TypeError):
-            sc.review(self.led(), records_dir=tempfile.mkdtemp())
+            sc.review(_ledger(5, 14, 3), records_worktree=self.wt, api=self.api)
 
-    def test_screen_slates_excluded(self):
-        led = self.led()
-        def st(api, s):
-            return ({"status": "SCREEN", "reasons": ["X"]} if s["slate_id"] == "2026-W1"
-                    else {"status": "COUNTS", "reasons": []})
-        v = sc.review(led, records_worktree=self.wt, api=self.api, slate_status=st)
-        self.assertEqual(v["screen_slates"], ["2026-W1"])
-        self.assertEqual(v["review_slate"], "2026-W5")   # W1 not counted
+    def test_unknown_slate_is_screen(self):
+        ids, caps, setl = self.publish(_ledger(4, 14, 3, clv=0.02))
+        v = sc.review(["nope"] + ids, records_worktree=self.wt, api=self.api,
+                      captures=caps, settlements=setl)
+        self.assertEqual(v["screen_slates"], ["nope"])
 
-    def test_default_slate_status_is_provenance(self):
-        v = sc.review(self.led(), records_worktree=self.wt, api=self.api)
-        self.assertEqual(v["status"], "NO_REVIEW_GATES_NOT_MET")  # all SCREEN
-        self.assertEqual(len(v["screen_slates"]), 5)
+    def test_verdict_existence_via_api(self):
+        ids, caps, setl = self.publish(_ledger(5, 14, 3, clv=0.02))
+        self.api.commit(BR, {pv.VERDICT_PATH: "{}"}, "2026-11-20T00:00:00Z")
+        with self.assertRaises(sc.ReviewAlreadyRecorded):
+            sc.review(ids, records_worktree=self.wt, api=self.api,
+                      captures=caps, settlements=setl)
 
+    def test_verdict_ever_committed_then_deleted_refused(self):
+        ids, caps, setl = self.publish(_ledger(5, 14, 3, clv=0.02))
+        self.api.commit(BR, {pv.VERDICT_PATH: "{}"}, "2026-11-20T00:00:00Z")
+        self.api.commit(BR, {pv.VERDICT_PATH: None}, "2026-11-20T00:01:00Z")
+        with self.assertRaises(sc.ReviewAlreadyRecorded):
+            sc.review(ids, records_worktree=self.wt, api=self.api,
+                      captures=caps, settlements=setl)
 
-class TestPricerRefusesWithoutProvenance(unittest.TestCase):
-    def test_refuses(self):
-        api = FakeAPI()
-        with self.assertRaises(pv.ProvenanceFailed):
-            pv.require_fetch_provenance(api, {"stats": SHA, "schedule": SSHA}, CAP)
+    def test_origin_url_enforced(self):
+        ids, caps, setl = self.publish(_ledger(5, 14, 3, clv=0.02))
+        for url in ("https://github.com/someone/sportsedge.git", "/tmp/origin.git"):
+            with self.subTest(url=url):
+                with self.assertRaises(sc.RecordsLocationRefused):
+                    sc.review(ids, records_worktree=records_worktree(url),
+                              api=self.api, captures=caps, settlements=setl)
+        for url in ("git@github.com:isaacrome21-sys/SportsEdge.git",
+                    "https://github.com/isaacrome21-sys/sportsedge"):
+            with self.subTest(url=url):
+                v = sc.review(ids, records_worktree=records_worktree(url),
+                              api=self.api, captures=caps, settlements=setl)
+                self.assertEqual(v["status"], "REVIEWED")
 
-    def test_ok(self):
-        api = FakeAPI()
-        for s in (SHA, SSHA):
-            api.put(pv.RECORDS_BRANCH, pv.fetch_record_path(s), fetch_rec(s),
-                    "c" + s[:7], "2026-10-25T15:00:00Z")
-        out = pv.require_fetch_provenance(api, {"stats": SHA, "schedule": SSHA}, CAP)
-        self.assertEqual(set(out), {"stats", "schedule"})
+    def test_verdict_counts_only_when_pushed_single_commit(self):
+        ids, caps, setl = self.publish(_ledger(5, 14, 3, clv=0.02))
+        sc.review(ids, records_worktree=self.wt, api=self.api,
+                  captures=caps, settlements=setl)
+        self.assertTrue((self.wt / pv.VERDICT_PATH).exists())
+        self.assertFalse(sc.verdict_counts(self.api))
+        self.api.commit(BR, {pv.VERDICT_PATH: (self.wt / pv.VERDICT_PATH).read_text()},
+                        "2026-11-20T00:00:00Z")
+        self.assertTrue(sc.verdict_counts(self.api))
+
+    def test_close_timestamp_invalid_still_applies(self):
+        caps = [{"game_id": "g1", "player_id": "P", "yes_price": 200,
+                 "captured_at": "garbage"}]
+        self.assertEqual(sc.find_close(caps, "g1", "P", KO), "CLOSE_TIMESTAMP_INVALID")
 
 
 if __name__ == "__main__":
