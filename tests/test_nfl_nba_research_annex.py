@@ -111,7 +111,7 @@ def test_missing_pair_stale_and_untrusted_book_refuse():
     old = [dict(r, quote_captured_at="2026-10-20T19:45:00Z")
            for r in rows]
     stale = build_annex(old, [{}, {}], **kw)
-    assert stale["readouts"][0]["reason"] == "DK_PAIR_MISSING_OR_STALE"
+    assert stale["readouts"][0]["reason"] == "DK_SOURCE_ROW_STALE_OR_FUTURE"
     fake = [dict(r, book="OtherBook") for r in rows]
     untrusted = build_annex(fake, [{}, {}], **kw)
     assert untrusted["readouts"][0]["reason"] == "DRAFTKINGS_QUOTE_REQUIRED"
