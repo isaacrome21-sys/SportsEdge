@@ -60,6 +60,29 @@ def data_record_path(sha256: str, ext: str = "csv") -> str:
     return f"{ROOT}/data/{sha256}.{ext}"
 
 
+FREEZE_PATH = f"{ROOT}/FREEZE.json"
+FREEZE_KEYS = ("pricer_sha256", "scorer_sha256", "provenance_sha256", "prereg_sha256")
+
+
+def load_freeze(api, stored_event=None) -> dict:
+    """The FREEZE pins: a single-commit record on the records branch (never
+    hardcoded in code, so no self-hash loop). Returns the pins + pushed_at."""
+    try:
+        p = prove_record(api, FREEZE_PATH, stored_event)
+    except ProvenanceFailed as e:
+        code = e.code if e.code.startswith(("API_", "RECORDS_")) else \
+            "FREEZE_" + e.code.replace("RECORD_", "", 1)
+        raise ProvenanceFailed(code, e.detail)
+    try:
+        body = json.loads(p["content"])
+        out = {k: body[k] for k in FREEZE_KEYS}
+        if not all(isinstance(v, str) and re.fullmatch(r"[0-9a-f]{64}", v) for v in out.values()):
+            raise ValueError
+    except (ValueError, KeyError, TypeError):
+        raise ProvenanceFailed("FREEZE_MALFORMED", FREEZE_PATH)
+    return dict(out, pushed_at=p["pushed_at"], commit=p["commit"], event=p["event"])
+
+
 def board_record_path(sha256: str, season, week) -> str:
     """Board capture record (pricer input), filed under its season-week."""
     return f"{ROOT}/boards/{int(season)}-W{int(week)}/{sha256}.json"
@@ -478,6 +501,14 @@ def load_slate(api, slate_id) -> dict:
     if any(k not in declared for k in refs):
         out["reasons"].append("RUN_REFUSAL_CODE_UNDECLARED")
     run_t = _t(rp["pushed_at"])
+    try:
+        fpv = rec.get("fetch_provenance") if isinstance(rec.get("fetch_provenance"), dict) else {}
+        fev = (fpv.get("freeze") or {}).get("event") if isinstance(fpv.get("freeze"), dict) else None
+        fz = load_freeze(api, fev)
+        if run_t <= _t(fz["pushed_at"]):
+            out["reasons"].append("RUN_PUSH_NOT_AFTER_FREEZE")
+    except ProvenanceFailed as e:
+        out["reasons"].append(e.code)
     if run_t < cap:
         out["reasons"].append("RUN_PUSH_BEFORE_CAPTURE")
     if run_t >= ko:

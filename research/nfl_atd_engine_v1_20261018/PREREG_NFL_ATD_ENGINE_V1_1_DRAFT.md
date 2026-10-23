@@ -171,8 +171,26 @@ Selection, edge, settlement: locked #2399 Rules 1, 2, 3, 7, 8, 9.
   REVIEW_INTERPRETER_MISMATCH unless every cited run record's
   `python_version` (recorded by the pricer with `platform`) equals its own.
   The guard runs in every public scoring entry point (`review`,
-  `score_slate_rows`, `verdict_counts`). A verdict counts only if pushed at
-  the fixed path with `"binding": true`. The env-only test switch
+  `score_slate_rows`, `verdict_counts`). Interpreter check: after
+  load_slate, on COUNTS slates only. The CLI pushes nothing; the owner
+  pushes the staged verdict.
+- FREEZE (re-audit of 65e27e20). Pins live in `nfl_atd_v1_1/FREEZE.json`
+  on the records branch, a single-commit record (never hardcoded in code,
+  avoiding the self-hash loop) holding `pricer_sha256`, `scorer_sha256`,
+  `provenance_sha256` (atd_provenance.py) and `prereg_sha256` (this file).
+  Missing/malformed → FREEZE_NOT_ON_BRANCH / FREEZE_MALFORMED. Every run
+  record's push must come after FREEZE's push (else SCREEN,
+  RUN_PUSH_NOT_AFTER_FREEZE); the pricer refuses unless its own sha equals
+  FREEZE's (FREEZE_PRICER_MISMATCH) and stores FREEZE's push event.
+- **A verdict counts only if** (1) the verdict's `pricer_sha256` and
+  `scorer_sha256` equal FREEZE's and so do the locally running scorer's and
+  pricer's, and (2) `review()` re-run in dry mode (writes nothing) on the
+  verdict's `slate_ids` with now = its `reviewed_at` reproduces the pushed
+  verdict exactly in canonical JSON. Otherwise **VERDICT_UNVERIFIED** and
+  it does not count; a self-asserted `"binding": true` is never enough.
+  This is **fail-closed**: the fixed verdict path is single-use, so a forged
+  or unverifiable pushed verdict blocks the review rather than counting. It
+  voids the forward test, and recovery needs an owner ruling. The env-only test switch
   (`ATD_TEST_FAKE_STATE`) writes a `"binding": false` verdict to
   `TEST_NONBINDING_VERDICT.json`, never the fixed path, and the CLI then
   refuses with REVIEW_NOT_BINDING_TEST_SWITCH; such verdicts never count.

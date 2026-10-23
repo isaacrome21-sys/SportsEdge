@@ -189,20 +189,48 @@ def _verdict_ever_existed(api) -> bool:
     return head is not None or len(commits) > 0
 
 
-def verdict_counts(api) -> bool:
-    """A verdict counts only once pushed to the records branch as a proven
-    single-commit record at the fixed path, and only if it is binding."""
+def verify_verdict(api) -> dict:
+    """A pushed verdict counts only if (1) FREEZE.json exists, the verdict's
+    pricer/scorer shas equal FREEZE's and so do the locally running ones, and
+    (2) a dry review() with now = the verdict's reviewed_at reproduces it
+    exactly in canonical JSON. Otherwise VERDICT_UNVERIFIED (fail-closed:
+    the fixed path is then used, so a forged verdict blocks the review)."""
     _review_env_guard()
     try:
         p = pv.prove_record(api, VERDICT_PATH)
-        try:
-            return json.loads(p["content"]).get("binding") is True
-        except (ValueError, AttributeError):
-            return False
     except pv.ProvenanceFailed as e:
         if e.code == "RECORD_NOT_ON_BRANCH":
-            return False
-        raise
+            return {"counts": False, "code": "NO_VERDICT"}
+        return {"counts": False, "code": "VERDICT_UNVERIFIED", "detail": e.code}
+
+    def no(detail):
+        return {"counts": False, "code": "VERDICT_UNVERIFIED", "detail": detail}
+    try:
+        v = json.loads(p["content"])
+        fz = pv.load_freeze(api)
+    except pv.ProvenanceFailed as e:
+        return no(e.code)
+    except ValueError:
+        return no("verdict unreadable")
+    if not isinstance(v, dict) or v.get("binding") is not True:
+        return no("not binding")
+    loc = local_shas()
+    for k in ("pricer_sha256", "scorer_sha256"):
+        if v.get(k) != fz[k] or loc[k] != fz[k]:
+            return no(f"{k} != FREEZE")
+    try:
+        from datetime import datetime
+        again = review(v["slate_ids"], records_worktree=None, api=api, _dry=True,
+                       _now=datetime.fromisoformat(v["reviewed_at"]))
+    except Exception as e:            # any failure to re-derive -> unverified
+        return no(f"re-derivation failed: {type(e).__name__}")
+    if pv.canonical_json(again) != pv.canonical_json(v):
+        return no("re-derived verdict differs")
+    return {"counts": True, "code": None}
+
+
+def verdict_counts(api) -> bool:
+    return verify_verdict(api)["counts"]
 
 
 def _score_rows(rows, closes, settlements):
@@ -276,6 +304,22 @@ def _review_env_guard():
         raise ReviewEnvUntrusted(f"REVIEW_ENV_UNTRUSTED: {', '.join(probs)}")
 
 
+def local_shas() -> dict:
+    """shas of the code running now, compared with FREEZE.json."""
+    import price_nfl_atd_board_v11 as pr
+    here = Path(__file__).resolve().parent
+
+    def h(n):
+        return hashlib.sha256((here / n).read_bytes()).hexdigest()
+    return {"pricer_sha256": pr.pricer_sha256(), "scorer_sha256": h("score_nfl_atd_forward.py"),
+            "provenance_sha256": h("atd_provenance.py"),
+            "prereg_sha256": h("PREREG_NFL_ATD_ENGINE_V1_1_DRAFT.md")}
+
+
+class ReviewInterpreterMismatch(Exception):
+    code = "REVIEW_INTERPRETER_MISMATCH"
+
+
 def _env_record() -> dict:
     import hashlib
     import platform
@@ -286,7 +330,8 @@ def _env_record() -> dict:
             "platform": platform.platform()}
 
 
-def review(slate_ids, *, records_worktree, api, _binding=True):
+def review(slate_ids, *, records_worktree, api, _binding=True, _dry=False, _now=None,
+           _check_interpreter=False):
     """Single review, reading ONLY records on the records-branch head: each
     slate's rows/hashes from its pushed run record, close captures from
     proven closes/<sha>.json records, settlements from hash-matched
@@ -296,15 +341,22 @@ def review(slate_ids, *, records_worktree, api, _binding=True):
     is staged create-only at the fixed path; it counts only once pushed."""
     _review_env_guard()                 # first: before token, worktree, API
     pv.require_token(api)
-    wt = _check_worktree(records_worktree)
     vpath = VERDICT_PATH if _binding else NONBINDING_VERDICT_PATH
-    if _verdict_ever_existed(api) or (wt / VERDICT_PATH).exists() or (wt / vpath).exists():
-        raise ReviewAlreadyRecorded(f"{pv.RECORDS_BRANCH}:{VERDICT_PATH}")
-    now = _utcnow()
+    if not _dry:   # dry mode (verdict re-derivation) writes and checks nothing local
+        wt = _check_worktree(records_worktree)
+        if _verdict_ever_existed(api) or (wt / VERDICT_PATH).exists() or (wt / vpath).exists():
+            raise ReviewAlreadyRecorded(f"{pv.RECORDS_BRANCH}:{VERDICT_PATH}")
+    now = _now if _now is not None else _utcnow()
     loaded, screen = [], []
     for sid in slate_ids:
         st = pv.load_slate(api, sid)
         (loaded if st["status"] == "COUNTS" else screen).append(st if st["status"] == "COUNTS" else sid)
+    if _check_interpreter:              # after load_slate, COUNTS slates only
+        import platform
+        bad = [st["slate_id"] for st in loaded
+               if st["record"].get("python_version") != platform.python_version()]
+        if bad:
+            raise ReviewInterpreterMismatch(f"REVIEW_INTERPRETER_MISMATCH: {bad}")
     refusals_by_slate = {st["slate_id"]: st.get("refusals", {}) for st in loaded}
     games = _games(loaded)
     closes = pv.load_closes(api, games)
@@ -327,7 +379,9 @@ def review(slate_ids, *, records_worktree, api, _binding=True):
                      refusals_by_slate={k: refusals_by_slate[k] for k in proofs},
                      records_branch=pv.RECORDS_BRANCH, verdict_path=VERDICT_PATH,
                      run_proofs=proofs, reviewed_at=now.isoformat(), **_env_record(),
-                     binding=bool(_binding))
+                     binding=bool(_binding), slate_ids=list(slate_ids))
+            if _dry:
+                return v
             path = wt / vpath
             path.parent.mkdir(parents=True, exist_ok=True)
             try:
@@ -378,9 +432,9 @@ def main(argv=None) -> int:
     --records-worktree DIR SLATE_ID... Runs review() in this fresh process.
     GITHUB_TOKEN is read from the environment by GitHubAPI and never printed.
     Prints one JSON line {verdict_path, refusal, binding}. Refuses
-    (REVIEW_INTERPRETER_MISMATCH) unless every cited run record's
-    python_version equals this interpreter's.
-    Test switch (environment only): ATD_TEST_FAKE_STATE=<pickled FakeGitHub>
+    (REVIEW_INTERPRETER_MISMATCH) unless every COUNTS slate's run record
+    python_version equals this interpreter's (checked after load_slate).
+    Pushes nothing. Test switch (environment only): ATD_TEST_FAKE_STATE=<FakeGitHub JSON>
     (+ optional ATD_TEST_NOW) patches the fake in; the verdict is then
     written NON-BINDING to NONBINDING_VERDICT_PATH and the CLI refuses with
     REVIEW_NOT_BINDING_TEST_SWITCH."""
@@ -401,10 +455,9 @@ def main(argv=None) -> int:
     binding = not fake_state
     try:
         if fake_state:
-            import pickle
             from unittest import mock
             import fake_github_api as fk
-            api = pickle.loads(Path(fake_state).read_bytes())
+            api = fk.FakeGitHub.from_json(Path(fake_state).read_text())
             mock.patch.object(pv, "replayers", fk.fake_replayers).start()
             mock.patch.object(sys.modules[__name__], "_review_env_guard", lambda: None).start()
             if os.environ.get("ATD_TEST_NOW"):
@@ -413,20 +466,11 @@ def main(argv=None) -> int:
                 mock.patch.object(sys.modules[__name__], "_utcnow", lambda: t).start()
         else:
             api = pv.GitHubAPI()
-        here = platform.python_version()
-        for sid in args.slate_ids:
-            body = api.get_file(pv.RECORDS_BRANCH, pv.run_record_path(sid))
-            if body is None:
-                continue                    # review marks it SCREEN
-            try:
-                rv = json.loads(body).get("python_version")
-            except (ValueError, AttributeError):
-                rv = None
-            if rv != here:
-                return emit("REVIEW_INTERPRETER_MISMATCH")
         mod = sys.modules[__name__]
         v = mod.review(args.slate_ids, records_worktree=args.records_worktree, api=api,
-                       _binding=binding)
+                       _binding=binding, _check_interpreter=True)
+    except ReviewInterpreterMismatch:
+        return emit("REVIEW_INTERPRETER_MISMATCH")
     except pv.ProvenanceFailed as e:
         return emit(e.code)
     except ReviewEnvUntrusted:

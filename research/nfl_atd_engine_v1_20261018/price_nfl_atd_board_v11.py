@@ -175,6 +175,9 @@ def main() -> int:
     # capture; the board capture and the player-data pins before the run.
     try:
         api = pv.GitHubAPI()
+        fz = pv.load_freeze(api)            # run records must follow FREEZE
+        if fz["pricer_sha256"] != pricer_sha256():
+            raise pv.ProvenanceFailed("FREEZE_PRICER_MISMATCH", "local pricer != FREEZE")
         prov = pv.require_fetch_provenance(api, shas, board.get("captured_at"))
         bp = pv.prove_record(api, pv.board_record_path(bsha, board["season"], board["week"]))
         pdp = {n: pv.load_data_record(api, h, "csv.gz", require_fetch=False)
@@ -217,6 +220,8 @@ def main() -> int:
                                     "data_event": v["data_event"],
                                     "data_pushed_at": v["data_pushed_at"]}
                                 for k, v in prov.items()} | {
+                  "freeze": {"event": fz["event"], "commit": fz["commit"],
+                             "pushed_at": fz["pushed_at"]},
                   "board": {"event": bp["event"], "commit": bp["commit"],
                             "pushed_at": bp["pushed_at"]},
                   "player_data": {n: {"event": d["event"], "commit": d["commit"],
