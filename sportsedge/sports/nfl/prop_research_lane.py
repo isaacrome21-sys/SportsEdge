@@ -215,6 +215,14 @@ def prepare_role_snapshot(
         _reject_realized_same_game_fields(row, where=f"history[{i}]")
         if str(row.get("game_id") or "") == game_id:
             raise PropResearchLaneError(f"SAME_GAME_HISTORY_FORBIDDEN:{i}")
+        # A source may omit entity_id when the caller already scoped its query.
+        # But a supplied, contradictory player identity cannot contribute
+        # attempts or targets to another player's role projection.
+        if "entity_id" in row and (
+            not isinstance(row["entity_id"], str)
+            or row["entity_id"].strip() != entity_id
+        ):
+            raise PropResearchLaneError(f"PIT_HISTORY_ENTITY_ID_MISMATCH:{i}")
         clean_history.append(
             {
                 key: row[key]
@@ -227,6 +235,16 @@ def prepare_role_snapshot(
         raise PropResearchLaneError("PROJECTED_ROLE_INVALID")
     _known_at(projected_role, where="projected_role", as_of=cutoff)
     _reject_realized_same_game_fields(projected_role, where="projected_role")
+    if "entity_id" in projected_role and (
+        not isinstance(projected_role["entity_id"], str)
+        or projected_role["entity_id"].strip() != entity_id
+    ):
+        raise PropResearchLaneError("PIT_PROJECTED_ROLE_ENTITY_ID_MISMATCH")
+    if "game_id" in projected_role and (
+        not isinstance(projected_role["game_id"], str)
+        or projected_role["game_id"].strip() != game_id
+    ):
+        raise PropResearchLaneError("PIT_PROJECTED_ROLE_GAME_ID_MISMATCH")
     clean_prior = {
         key: projected_role[key]
         for key in ("pass_attempts", "rush_attempts", "targets")
