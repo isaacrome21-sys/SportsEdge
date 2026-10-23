@@ -27,8 +27,19 @@ def test_repo_surface_declares_all_active_sports_and_live_lane():
     report = audit_surface()
     assert report["status"] == "PASS"
     assert {row["sport"] for row in report["sports"]} == {
-        "MLB", "NFL", "CFB", "PGA", "UFC", "LIVE"
+        "MLB", "NFL", "CFB", "NBA", "PGA", "UFC", "LIVE"
     }
+
+
+def test_registered_nba_scope_is_explicitly_blocked_until_validation():
+    result = execute_surface(scope=("NBA",))
+    assert result["overall_status"] == "BLOCKED"
+    assert result["scope"] == ["NBA"]
+    row = result["results"][0]
+    assert row["sport"] == "NBA"
+    assert row["status"] == "BLOCKED"
+    assert row["official_bets"] == 0
+    assert "NOT_VALIDATED" in row["blocker"]
 
 
 def test_run_it_cli_executes_by_path_from_repo_root(tmp_path):
