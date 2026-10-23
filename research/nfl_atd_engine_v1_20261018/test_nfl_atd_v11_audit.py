@@ -85,9 +85,8 @@ class TestFetchedAt(Base):
         with self.assertRaises(rf.RefreshFailed) as cm:
             self.load()
         self.assertEqual(cm.exception.code, "REFRESH_STALE")
-        # exactly 72h before: allowed (stats must still be complete then)
-        self.write_stats(_stats(("2026_06_DAL_GB", "2026_06_BAL_NYJ")),
-                         fetched="2026-10-22T11:00:00-05:00")
+        # exactly 72h before: inside the window (synthetic file is complete)
+        self.write_stats(_stats(), fetched="2026-10-22T11:00:00-05:00")
         out = self.load(cap="2026-10-25T11:00:00-05:00")
         self.assertTrue(out)
 

@@ -7,6 +7,7 @@ import hashlib
 import json
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 import atd_refresh as rf
@@ -64,11 +65,22 @@ class RefreshCase(unittest.TestCase):
             w.writeheader()
             w.writerows(_games())
 
+    def stamp(self, fetched_at="2026-10-25T08:00:00-05:00"):
+        """Simulate the download step: sidecar sha256 + clock fetched_at."""
+        orig = rf._utcnow
+        rf._utcnow = lambda: datetime.fromisoformat(fetched_at).astimezone(timezone.utc)
+        try:
+            for f in (self.stats, self.sched):
+                if f.exists():
+                    rf.record_download(f, source="test")
+        finally:
+            rf._utcnow = orig
+
     def load(self, captured_at="2026-10-25T11:00:00-05:00",
              fetched_at="2026-10-25T08:00:00-05:00", **kw):
+        self.stamp(fetched_at)
         return rf.load_current_season(self.stats, self.sched, season=2026,
-                                      captured_at=captured_at,
-                                      fetched_at=fetched_at, **kw)
+                                      captured_at=captured_at, **kw)
 
 
 class TestPointInTime(RefreshCase):
@@ -125,11 +137,12 @@ class TestFailClosed(RefreshCase):
             self.load(fetched_at="2026-10-20T08:00:00-05:00")
         self.assertEqual(cm.exception.code, "REFRESH_STALE")
 
-    def test_fetch_after_capture_is_allowed_but_point_in_time(self):
-        out = self.load(captured_at="2026-10-22T19:00:00-05:00",
-                        fetched_at="2026-10-23T09:00:00-05:00")
-        self.assertNotIn("2026_07_MIA_BUF",
-                         {a["game_id"] for a in out["appearances"]})
+    def test_fetch_after_capture_fails(self):
+        # Audit: fetched_at must be <= captured_at (two-sided window).
+        with self.assertRaises(rf.RefreshFailed) as cm:
+            self.load(captured_at="2026-10-22T19:00:00-05:00",
+                      fetched_at="2026-10-23T09:00:00-05:00")
+        self.assertEqual(cm.exception.code, "REFRESH_FETCHED_AFTER_CAPTURE")
 
     def test_unknown_game_id_fails(self):
         rows = _stats() + [dict(_stats()[0], game_id="2026_06_XXX_YYY")]
@@ -139,7 +152,7 @@ class TestFailClosed(RefreshCase):
         self.assertEqual(cm.exception.code, "REFRESH_SCHEDULE_MISMATCH")
 
     def test_missing_timestamps_fail(self):
-        for kw in ({"captured_at": None}, {"fetched_at": "x"}):
+        for kw in ({"captured_at": None}, {"captured_at": "x"}):
             with self.subTest(**{k: repr(v) for k, v in kw.items()}):
                 with self.assertRaises(rf.RefreshFailed) as cm:
                     self.load(**kw)
@@ -150,6 +163,15 @@ class TestFailClosed(RefreshCase):
 
 
 class TestRunRecord(RefreshCase):
+    def setUp(self):
+        super().setUp()
+        self.stamp()
+        self._orig = rf._utcnow
+        rf._utcnow = lambda: datetime(2026, 10, 25, 16, 30, tzinfo=timezone.utc)
+
+    def tearDown(self):
+        rf._utcnow = self._orig
+
     def test_sha_recorded_before_pricing(self):
         events = []
         rec_path = self.tmp / "run_record.json"
@@ -160,7 +182,7 @@ class TestRunRecord(RefreshCase):
 
         rf.run_slate(stats_path=self.stats, schedule_path=self.sched,
                      season=2026, captured_at="2026-10-25T11:00:00-05:00",
-                     fetched_at="2026-10-25T08:00:00-05:00",
+                     kickoff="2026-10-25T12:00:00-05:00",
                      run_record_path=rec_path, base_data=None, pricer=pricer)
         self.assertEqual(len(events), 1)
         rec = events[0][1]
@@ -180,7 +202,7 @@ class TestRunRecord(RefreshCase):
         with self.assertRaises(rf.RefreshFailed):
             rf.run_slate(stats_path=self.stats, schedule_path=self.sched,
                          season=2026, captured_at="2026-10-25T11:00:00-05:00",
-                         fetched_at="2026-10-25T08:00:00-05:00",
+                         kickoff="2026-10-25T12:00:00-05:00",
                          run_record_path=rec_path, base_data=None,
                          pricer=lambda d: called.append(1))
         self.assertEqual(called, [])

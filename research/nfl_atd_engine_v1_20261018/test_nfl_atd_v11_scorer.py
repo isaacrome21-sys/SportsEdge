@@ -1,6 +1,7 @@
 """v1.1 (B) forward scorer tests (#2399 Rules 4-6). RED first.
 Run: python3 -m unittest test_nfl_atd_v11_scorer -v
 """
+import tempfile
 import unittest
 
 import score_nfl_atd_forward as sc
@@ -16,34 +17,34 @@ def entry(pid, sel, price, game="g1", week=8, kickoff=KO):
 
 class TestRule4Close(unittest.TestCase):
     def test_last_capture_within_60(self):
-        caps = [{"player_id": "a", "yes_price": 200,
+        caps = [{"game_id": "g1", "player_id": "a", "yes_price": 200,
                  "captured_at": "2026-10-25T10:30:00-05:00"},
-                {"player_id": "a", "yes_price": 150,
+                {"game_id": "g1", "player_id": "a", "yes_price": 150,
                  "captured_at": "2026-10-25T11:50:00-05:00"},
-                {"player_id": "a", "yes_price": 100,
+                {"game_id": "g1", "player_id": "a", "yes_price": 100,
                  "captured_at": "2026-10-25T12:00:00-05:00"}]  # at KO: no
-        c = sc.find_close(caps, "a", KO)
+        c = sc.find_close(caps, "g1", "a", KO)
         self.assertEqual(c["yes_price"], 150)
 
     def test_stale_and_missing(self):
-        caps = [{"player_id": "a", "yes_price": 200,
+        caps = [{"game_id": "g1", "player_id": "a", "yes_price": 200,
                  "captured_at": "2026-10-25T10:59:00-05:00"}]
-        self.assertEqual(sc.find_close(caps, "a", KO), "CLOSE_STALE")
-        self.assertEqual(sc.find_close([], "a", KO), "NO_CLOSE_ROW")
-        ok = [{"player_id": "a", "yes_price": 200,
+        self.assertEqual(sc.find_close(caps, "g1", "a", KO), "CLOSE_STALE")
+        self.assertEqual(sc.find_close([], "g1", "a", KO), "NO_CLOSE_ROW")
+        ok = [{"game_id": "g1", "player_id": "a", "yes_price": 200,
                "captured_at": "2026-10-25T11:00:00-05:00"}]  # exactly 60
-        self.assertEqual(sc.find_close(ok, "a", KO)["yes_price"], 200)
+        self.assertEqual(sc.find_close(ok, "g1", "a", KO)["yes_price"], 200)
 
     def test_clv_sign(self):
-        caps = [{"player_id": "a", "yes_price": 150,
+        caps = [{"game_id": "g1", "player_id": "a", "yes_price": 150,
                  "captured_at": "2026-10-25T11:50:00-05:00"}]
-        r = sc.score_row(entry("a", "YES", 200), caps, {"a": 1})
+        r = sc.score_row(entry("a", "YES", 200), caps, {("g1", "a"): 1})
         self.assertAlmostEqual(r["clv"], sc.implied(150) - sc.implied(200))
         self.assertGreater(r["clv"], 0)
         self.assertEqual(r["outcome"], 1)
 
     def test_clv_missing_row_keeps_outcome(self):
-        r = sc.score_row(entry("a", "YES", 200), [], {"a": 0})
+        r = sc.score_row(entry("a", "YES", 200), [], {("g1", "a"): 0})
         self.assertEqual(r["clv_status"], "CLV_MISSING")
         self.assertEqual(r["clv_reason"], "NO_CLOSE_ROW")
         self.assertIsNone(r["clv"])
@@ -52,7 +53,7 @@ class TestRule4Close(unittest.TestCase):
     def test_unpriced_rows_not_scored(self):
         r = sc.score_row({"status": "UNPRICED", "reason": "X",
                           "player_id": "a", "game_id": "g1", "week": 8},
-                         [], {"a": 1})
+                         [], {("g1", "a"): 1})
         self.assertIsNone(r)
 
     def test_unsettled_row_refused(self):
@@ -101,47 +102,48 @@ def _ledger(n_weeks, games_per_week, picks_per_game, clv=0.01):
 
 class TestRule6Gates(unittest.TestCase):
     def test_gates_not_met(self):
-        v = sc.review(_ledger(3, 14, 4))  # 3 weeks only
+        v = sc.review(_ledger(3, 14, 4), records_dir=tempfile.mkdtemp())  # 3 weeks only
         self.assertEqual(v["status"], "NO_REVIEW_GATES_NOT_MET")
-        v = sc.review(_ledger(4, 9, 5))   # 36 games
+        v = sc.review(_ledger(4, 9, 5), records_dir=tempfile.mkdtemp())   # 36 games
         self.assertEqual(v["status"], "NO_REVIEW_GATES_NOT_MET")
-        v = sc.review(_ledger(4, 12, 3))  # 144 picks
+        v = sc.review(_ledger(4, 12, 3), records_dir=tempfile.mkdtemp())  # 144 picks
         self.assertEqual(v["status"], "NO_REVIEW_GATES_NOT_MET")
 
     def test_single_review_at_first_slate_meeting_gates(self):
         led = _ledger(6, 14, 3)  # gates met at week 4 (56 games, 168 picks)
-        v = sc.review(led)
+        v = sc.review(led, records_dir=tempfile.mkdtemp())
         self.assertEqual(v["status"], "REVIEWED")
         self.assertEqual(v["review_slate"], "2026-W4")
         self.assertEqual(v["n_picked"], 168)
         self.assertEqual(v["n_games"], 56)
         # Later slates do not enter the sample of record.
-        self.assertEqual(v, sc.review(led[:4]))
+        self.assertEqual(v, sc.review(led[:4], records_dir=tempfile.mkdtemp()))
 
     def test_games_minimum_not_cap(self):
-        v = sc.review(_ledger(4, 20, 2))  # 80 games > 40, 160 picks
+        v = sc.review(_ledger(4, 20, 2), records_dir=tempfile.mkdtemp())  # 80 games > 40, 160 picks
         self.assertEqual(v["n_games"], 80)
 
     def test_no_rerun_after_record(self):
         led = _ledger(5, 14, 3)
-        v = sc.review(led)
+        d = tempfile.mkdtemp()
+        sc.review(led, records_dir=d)
         with self.assertRaises(sc.ReviewAlreadyRecorded):
-            sc.review(led, prior_verdict=v)
+            sc.review(led, records_dir=d)
 
     def test_beats_market(self):
-        self.assertEqual(sc.review(_ledger(4, 14, 3, clv=0.02))["verdict"],
+        self.assertEqual(sc.review(_ledger(4, 14, 3, clv=0.02), records_dir=tempfile.mkdtemp())["verdict"],
                          "BEATS_MARKET")
-        self.assertEqual(sc.review(_ledger(4, 14, 3, clv=-0.02))["verdict"],
+        self.assertEqual(sc.review(_ledger(4, 14, 3, clv=-0.02), records_dir=tempfile.mkdtemp())["verdict"],
                          "DOES_NOT_BEAT_MARKET")
 
     def test_clustered_ci_present(self):
-        v = sc.review(_ledger(4, 14, 3, clv=0.02))
+        v = sc.review(_ledger(4, 14, 3, clv=0.02), records_dir=tempfile.mkdtemp())
         lo, hi = v["clv_picked_ci95"]
         self.assertLess(lo, v["clv_picked_mean"])
         self.assertGreater(hi, v["clv_picked_mean"])
 
     def test_labels_never_play(self):
-        v = sc.review(_ledger(4, 14, 3, clv=0.02))
+        v = sc.review(_ledger(4, 14, 3, clv=0.02), records_dir=tempfile.mkdtemp())
         self.assertEqual(v["status_label"], "RESEARCH_ONLY")
         self.assertFalse(v["promotable"])
 
