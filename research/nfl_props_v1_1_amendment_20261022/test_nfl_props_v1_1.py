@@ -203,3 +203,9 @@ def test_close_without_timestamp_fails_closed():
     cl = close(1, [260.5]); del cl[0]["captured_at"]
     with pytest.raises(ValueError):
         one(cl)
+
+
+def test_line_moved_with_two_sided_entry_line_close_is_hard_error():
+    cl = close(1, [250.5]) + close(1, [260.5])
+    with pytest.raises(ValueError, match="entry line"):
+        one(cl)
