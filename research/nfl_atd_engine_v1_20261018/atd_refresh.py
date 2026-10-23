@@ -184,6 +184,40 @@ def load_current_season(stats_path, schedule_path, *, season: int,
             "schedule_fetched_at": sfet.isoformat()}
 
 
+def schedule_kickoff(schedule_path, season, game_teams, board_kickoff) -> dict:
+    """Cross-check a board's kickoff against the pinned schedule: exactly one
+    REG game of `season` with these two teams within a day of the board
+    kickoff, whose ET kickoff is the same instant. Else
+    KICKOFF_SCHEDULE_MISMATCH. Returns {game_id, kickoff (UTC ISO), week}."""
+    try:
+        bko = eng.parse_timestamp(board_kickoff)
+    except ValueError:
+        bko = None
+    if bko is None:
+        raise RefreshFailed("KICKOFF_SCHEDULE_MISMATCH", "board kickoff unreadable")
+    teams = set(game_teams or [])
+    hits = []
+    with open(schedule_path, newline="") as fh:
+        for r in csv.DictReader(fh):
+            if int(r["season"]) != int(season) or r["game_type"] != "REG":
+                continue
+            if {r["away_team"], r["home_team"]} != teams:
+                continue
+            try:
+                ko = datetime.strptime(f'{r["gameday"]} {r["gametime"]}',
+                                       "%Y-%m-%d %H:%M").replace(tzinfo=SCHEDULE_TZ)
+            except ValueError:
+                raise RefreshFailed("REFRESH_FAILED", f"gametime {r['game_id']}")
+            if abs(ko - bko) <= timedelta(days=1):
+                hits.append((r, ko))
+    if len(hits) != 1 or hits[0][1] != bko:
+        raise RefreshFailed("KICKOFF_SCHEDULE_MISMATCH",
+                            f"{sorted(teams)} {board_kickoff}: {len(hits)} candidate(s)")
+    r, ko = hits[0]
+    return {"game_id": r["game_id"], "week": int(r["week"]),
+            "kickoff": ko.astimezone(timezone.utc).isoformat()}
+
+
 def merge_into(data: dict, apps: list, names: dict) -> dict:
     """Append current-season appearances to engine data (same shapes as
     atd_engine.load_data) and refresh each player's meta to his latest

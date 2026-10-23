@@ -55,12 +55,22 @@ def run_record_path(slate_id: str) -> str:
     return f"{ROOT}/runs/{slate_id}.json"
 
 
-def close_record_path(sha256: str) -> str:
-    return f"{ROOT}/closes/{sha256}.json"
+def week_dir(season, week) -> str:
+    return f"{int(season)}-W{int(week)}"
 
 
-def settlement_data_path(sha256: str) -> str:
-    return f"{ROOT}/settlements/{sha256}.json"
+def close_record_path(sha256: str, season, week) -> str:
+    return f"{ROOT}/closes/{week_dir(season, week)}/{sha256}.json"
+
+
+def settlement_data_path(sha256: str, season, week) -> str:
+    return f"{ROOT}/settlements/{week_dir(season, week)}/{sha256}.json"
+
+
+def require_token(api):
+    """Review and pricing need an authenticated client (rule 5)."""
+    if not getattr(api, "authenticated", False):
+        raise ProvenanceFailed("GITHUB_TOKEN_MISSING", "set GITHUB_TOKEN")
 
 
 class ProvenanceFailed(Exception):
@@ -91,7 +101,18 @@ class GitHubAPI:
     """Read-only REST client (anonymous for the public repo, or $GITHUB_TOKEN)."""
     def __init__(self, owner=OWNER, repo=REPO, token=None):
         self.base = f"https://api.github.com/repos/{owner}/{repo}"
-        self.token = token if token is not None else os.environ.get("GITHUB_TOKEN")
+        tok = token if token is not None else os.environ.get("GITHUB_TOKEN")
+        if not tok:
+            raise ProvenanceFailed("GITHUB_TOKEN_MISSING", "set GITHUB_TOKEN")
+        self._token = tok           # never printed, logged or recorded
+        self.authenticated = True
+
+    def __repr__(self):
+        return f"GitHubAPI({self.base}, token=<redacted>)"
+
+    @property
+    def token(self):
+        return self._token
 
     def _req(self, url):
         req = urllib.request.Request(url, headers={
@@ -132,11 +153,21 @@ class GitHubAPI:
                 return out
             page += 1
 
-    def list_dir(self, ref, path):
-        js = self._contents(ref, path)
-        if js is None:
-            return []
-        return [e["name"] for e in js]
+    def git_tree(self, ref):
+        """GET /git/trees/{tree}?recursive=1 for the ref's head commit."""
+        c, _ = self._req(f"{self.base}/commits/{quote(ref, safe='')}")
+        if c is None:
+            return {"truncated": False, "tree": []}
+        js, _ = self._req(f"{self.base}/git/trees/{c['commit']['tree']['sha']}?recursive=1")
+        return js
+
+    def activity_page(self, branch, cursor=None):
+        """One page of the activity API; cursor = next-page URL (Link)."""
+        url = cursor or (f"{self.base}/activity?ref={quote('refs/heads/' + branch, safe='')}"
+                         f"&per_page=100")
+        js, h = self._req(url)
+        m = re.search(r'<([^>]+)>;\s*rel="next"', (h or {}).get("Link") or "")
+        return js or [], (m.group(1) if m else None)
 
     def commit_info(self, sha):
         js, _ = self._req(f"{self.base}/commits/{sha}")
@@ -158,10 +189,22 @@ class GitHubAPI:
 _EV_KEYS = ("id", "before", "after", "timestamp", "activity_type")
 
 
+MAX_ACTIVITY_PAGES = 10000
+
+
 def _events(api):
-    evs = _call(api.activities, RECORDS_BRANCH)
-    if not isinstance(evs, list):
-        raise ProvenanceFailed("API_MALFORMED", "activities not a list")
+    """Every activity event for the records branch, following pagination."""
+    evs, cursor = [], None
+    for _ in range(MAX_ACTIVITY_PAGES):
+        page = _call(api.activity_page, RECORDS_BRANCH, cursor)
+        if not (isinstance(page, tuple) and len(page) == 2 and isinstance(page[0], list)):
+            raise ProvenanceFailed("API_MALFORMED", "activity page")
+        evs += page[0]
+        cursor = page[1]
+        if cursor is None:
+            break
+    else:
+        raise ProvenanceFailed("API_MALFORMED", "activity pagination did not end")
     out = []
     for e in evs:
         if not isinstance(e, dict) or not all(k in e for k in _EV_KEYS):
@@ -204,6 +247,11 @@ def prove_record(api, path, stored_event=None) -> dict:
     b_head = _call(api.blob_sha, RECORDS_BRANCH, path)
     if b_commit is None or b_commit != b_head:
         raise ProvenanceFailed("RECORD_BLOB_MISMATCH", path)
+    if any(e["after"] == c and e["activity_type"] == "branch_creation" for e in events) or (
+            isinstance(stored_event, dict) and stored_event.get("after") == c
+            and stored_event.get("activity_type") == "branch_creation"):
+        raise ProvenanceFailed("RECORD_IN_BRANCH_CREATION",
+                               f"{path}: branch_creation push carries no provable push")
     parent = _only_parent(api, c)
     live = [e for e in events if e["after"] == c and e["activity_type"] == "push"]
     if live:
@@ -252,6 +300,7 @@ def verify_fetch(api, sha256, captured_at, stored_event=None):
 
 def require_fetch_provenance(api, shas: dict, captured_at) -> dict:
     """Pricer gate; returns proofs incl. the raw events to store (rule F)."""
+    require_token(api)
     return {name: verify_fetch(api, sha, captured_at) for name, sha in shas.items()}
 
 
@@ -275,8 +324,17 @@ def load_slate(api, slate_id) -> dict:
         shas = {"stats": rec["stats_sha256"], "schedule": rec["schedule_sha256"]}
         stored = rec.get("fetch_provenance") or {}
         rows = rec["rows"]
-        if rec.get("slate_id") != slate_id or not isinstance(rows, list):
-            raise ValueError("slate_id/rows")
+        season = int(rec["season"])
+        sched = rec["schedule_kickoffs"]
+        if rec.get("slate_id") != slate_id or not isinstance(rows, list) \
+                or not isinstance(sched, dict):
+            raise ValueError("slate_id/rows/schedule_kickoffs")
+        for r in rows:
+            if r.get("status") == "PRICED":
+                s_ko = sched.get(r["game_id"])
+                if s_ko is None or _t(s_ko) != _t(r["kickoff"]):
+                    out["reasons"].append("ROW_KICKOFF_SCHEDULE_MISMATCH")
+                    break
     except (ValueError, KeyError, TypeError):
         out["reasons"].append("RUN_RECORD_MALFORMED")
         return out
@@ -298,44 +356,77 @@ def load_slate(api, slate_id) -> dict:
         except ProvenanceFailed as e:
             out["reasons"].append(e.code)
     out["record"] = rec
+    out["season"] = season
     out["reasons"] = sorted(set(out["reasons"]))
     out["status"] = "SCREEN" if out["reasons"] else "COUNTS"
     return out
 
 
-def _list(api, sub):
-    names = _call(api.list_dir, RECORDS_BRANCH, f"{ROOT}/{sub}")
-    if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
-        raise ProvenanceFailed("API_MALFORMED", f"list_dir {sub}")
-    return sorted(n for n in names if n.endswith(".json"))
+def _tree_paths(api, sub):
+    """Record paths under ROOT/sub via the git trees API; refuse truncation."""
+    js = _call(api.git_tree, RECORDS_BRANCH)
+    if not isinstance(js, dict) or not isinstance(js.get("tree"), list):
+        raise ProvenanceFailed("API_MALFORMED", "git tree")
+    if js.get("truncated"):
+        raise ProvenanceFailed("API_TREE_TRUNCATED", "git tree truncated")
+    pre = f"{ROOT}/{sub}/"
+    out = []
+    for e in js["tree"]:
+        if not isinstance(e, dict) or not isinstance(e.get("path"), str):
+            raise ProvenanceFailed("API_MALFORMED", "git tree entry")
+        if e.get("type") == "blob" and e["path"].startswith(pre):
+            rest = e["path"][len(pre):].split("/")
+            m = re.fullmatch(r"(\d{4})-W(\d{1,2})", rest[0]) if len(rest) == 2 else None
+            if not m or not rest[1].endswith(".json"):
+                raise ProvenanceFailed(
+                    "CLOSE_RECORD_UNPROVEN" if sub == "closes" else "SETTLEMENT_MISFILED",
+                    f"bad record path {e['path']}")
+            out.append((e["path"], int(m.group(1)), int(m.group(2)), rest[1][:-5]))
+    return sorted(out)
 
 
 def _sha_text(s: str) -> str:
     return hashlib.sha256(s.encode()).hexdigest()
 
 
-def load_closes(api) -> dict:
-    """Close captures ONLY from single-commit records closes/<sha256>.json
-    (sha256 of the file content). A record is proven iff its server push is
-    >= its captured_at (and every entry's captured_at) and <= kickoff + 15
-    min. Any unproven record for a game marks the WHOLE game unproven."""
+def load_closes(api, games: dict) -> dict:
+    """Close captures ONLY from single-commit records
+    closes/<season>-W<week>/<sha256>.json. games: {game_id: {kickoff,
+    season, week}} from the counted run-record rows (their kickoffs were
+    cross-checked against the pinned schedule). Refuses the review
+    (CLOSE_RECORD_UNPROVEN) on any record it cannot parse or attribute to a
+    game, or filed under the wrong season-week; refuses
+    (CLOSE_KICKOFF_CONFLICT) if a record's kickoff differs from the row
+    kickoff. A record is proven iff its server push is >= its captured_at,
+    <= ROW kickoff + 15 min, and every entry is < kickoff and <= the push.
+    Any unproven record marks the whole game unproven."""
     out = {"captures": [], "unproven_games": [], "unproven_records": [],
            "kickoffs": {}, "records": []}
-    bad_games = set()
-    for name in _list(api, "closes"):
-        path = f"{ROOT}/closes/{name}"
-        game = None
+    bad = set()
+    for path, season, week, sha in _tree_paths(api, "closes"):
+        head = _call(api.get_file, RECORDS_BRANCH, path)
         try:
-            head = _call(api.get_file, RECORDS_BRANCH, path)
-            try:
-                body = json.loads(head)
-                game = body.get("game_id")
-            except (TypeError, ValueError, AttributeError):
-                body = None
+            body = json.loads(head)
+            game = body["game_id"]
+            if not isinstance(game, str) or not isinstance(body.get("captures"), list):
+                raise ValueError
+        except (TypeError, ValueError, KeyError, AttributeError):
+            raise ProvenanceFailed("CLOSE_RECORD_UNPROVEN", f"unattributable {path}")
+        if game not in games:
+            continue
+        g = games[game]
+        if (season, week) != (int(g["season"]), int(g["week"])):
+            raise ProvenanceFailed("CLOSE_RECORD_UNPROVEN", f"misfiled {path}")
+        ko = _t(g["kickoff"])
+        try:
+            if _t(body["kickoff"]) != ko:
+                raise ProvenanceFailed("CLOSE_KICKOFF_CONFLICT", path)
+        except (ValueError, TypeError, KeyError):
+            raise ProvenanceFailed("CLOSE_KICKOFF_CONFLICT", f"{path}: kickoff unreadable")
+        try:
             p = prove_record(api, path)
-            if _sha_text(p["content"]) != name[:-5] or body is None:
+            if _sha_text(p["content"]) != sha:
                 raise ProvenanceFailed("CLOSE_RECORD_HASH_MISMATCH", path)
-            ko = _t(body["kickoff"])
             push = _t(p["pushed_at"])
             if push < _t(body["captured_at"]) or push > ko + CLOSE_PUSH_GRACE:
                 raise ProvenanceFailed("CLOSE_PUSH_OUTSIDE_WINDOW", path)
@@ -344,52 +435,66 @@ def load_closes(api) -> dict:
                     ct = _t(c.get("captured_at"))
                 except (ValueError, TypeError):
                     continue        # surfaces as CLOSE_TIMESTAMP_INVALID when scored
-                if ct > push:
-                    raise ProvenanceFailed("CLOSE_PUSH_OUTSIDE_WINDOW", f"{path}: entry after push")
-            if game in out["kickoffs"] and out["kickoffs"][game] != body["kickoff"]:
-                raise ProvenanceFailed("CLOSE_KICKOFF_CONFLICT", path)
-            out["kickoffs"][game] = body["kickoff"]
-            out["captures"] += [dict(c, game_id=game) for c in body["captures"]]
-            out["records"].append({"path": path, "commit": p["commit"],
-                                   "pushed_at": p["pushed_at"], "sha256": name[:-5]})
-        except (ProvenanceFailed, KeyError, TypeError, ValueError, AttributeError) as e:
-            if isinstance(e, ProvenanceFailed) and e.code.startswith(("API_", "RECORDS_")):
+                if ct >= ko or ct > push:
+                    raise ProvenanceFailed("CLOSE_ENTRY_OUTSIDE_WINDOW", path)
+        except ProvenanceFailed as e:
+            if e.code.startswith(("API_", "RECORDS_")):
                 raise
-            out["unproven_records"].append(path)
-            if isinstance(game, str):
-                bad_games.add(game)
-    out["captures"] = [c for c in out["captures"] if c["game_id"] not in bad_games]
-    out["unproven_games"] = sorted(bad_games)
+            out["unproven_records"].append({"path": path, "code": e.code})
+            bad.add(game)
+            continue
+        except (KeyError, TypeError, ValueError, AttributeError):
+            out["unproven_records"].append({"path": path, "code": "CLOSE_RECORD_MALFORMED"})
+            bad.add(game)
+            continue
+        out["kickoffs"][game] = g["kickoff"]
+        out["captures"] += [dict(c, game_id=game) for c in body["captures"]]
+        out["records"].append({"path": path, "commit": p["commit"],
+                               "pushed_at": p["pushed_at"], "sha256": sha})
+    out["captures"] = [c for c in out["captures"] if c["game_id"] not in bad]
+    out["unproven_games"] = sorted(bad)
     return out
 
 
-def load_settlements(api, game_kickoffs: dict, now) -> dict:
-    """Settlements ONLY from settlements/<sha>.json data records whose sha256
-    matches a fetch record fetch/<sha>.json (hash-matched like the stats),
-    pushed AFTER the final (kickoff + 4 h) of the last covered game and
-    BEFORE the review time. Conflicting values refuse (SETTLEMENT_CONFLICT)."""
+def load_settlements(api, games: dict, now) -> dict:
+    """Settlements ONLY from settlements/<season>-W<week>/<sha>.json data
+    records whose sha256 matches a fetch record fetch/<sha>.json. Both the
+    data record's push and the fetch record's push must be after the final
+    (kickoff + 4 h) of the last covered game and before the review time; the
+    covered games must belong to the record's season-week. Duplicate keys in
+    one record, or disagreeing records, refuse (SETTLEMENT_CONFLICT)."""
     merged, used, refused = {}, [], []
-    for name in _list(api, "settlements"):
-        sha, path = name[:-5], f"{ROOT}/settlements/{name}"
+    for path, season, week, sha in _tree_paths(api, "settlements"):
         try:
             dp = prove_record(api, path)
             if _sha_text(dp["content"]) != sha:
                 raise ProvenanceFailed("SETTLEMENT_HASH_MISMATCH", path)
-            fp = verify_fetch(api, sha, None)
             body = json.loads(dp["content"])
-            vals = {(r["game_id"], r["player_id"]): r["td"] for r in body["settlements"]}
+            vals = {}
+            for r in body["settlements"]:
+                k = (r["game_id"], r["player_id"])
+                if k in vals:
+                    raise ProvenanceFailed("SETTLEMENT_CONFLICT", f"duplicate {k} in {path}")
+                vals[k] = r["td"]
             if any(v not in (0, 1) or isinstance(v, bool) for v in vals.values()):
                 raise ProvenanceFailed("SETTLEMENT_MALFORMED", path)
-            covered = [_t(game_kickoffs[g]) for g, _ in vals if g in game_kickoffs]
+            covered = {g for g, _ in vals if g in games}
             if not covered:
                 continue
+            if any((int(games[g]["season"]), int(games[g]["week"])) != (season, week)
+                   for g in covered):
+                raise ProvenanceFailed("SETTLEMENT_MISFILED", path)
+            final = max(_t(games[g]["kickoff"]) for g in covered) + FINAL_BUFFER
+            if _t(dp["pushed_at"]) <= final:
+                raise ProvenanceFailed("SETTLEMENT_DATA_PUSH_BEFORE_FINAL", path)
+            fp = verify_fetch(api, sha, None)
             push = _t(fp["pushed_at"])
-            if push <= max(covered) + FINAL_BUFFER:
+            if push <= final:
                 raise ProvenanceFailed("SETTLEMENT_PUSH_BEFORE_FINAL", path)
-            if push >= now:
+            if push >= now or _t(dp["pushed_at"]) >= now:
                 raise ProvenanceFailed("SETTLEMENT_PUSH_NOT_BEFORE_REVIEW", path)
         except ProvenanceFailed as e:
-            if e.code.startswith(("API_", "RECORDS_")):
+            if e.code.startswith(("API_", "RECORDS_")) or e.code == "SETTLEMENT_CONFLICT":
                 raise
             refused.append({"path": path, "code": e.code})
             continue
@@ -400,5 +505,6 @@ def load_settlements(api, game_kickoffs: dict, now) -> dict:
             if k in merged and merged[k] != v:
                 raise ProvenanceFailed("SETTLEMENT_CONFLICT", f"{k}")
             merged[k] = v
-        used.append({"path": path, "sha256": sha, "fetch_pushed_at": fp["pushed_at"]})
+        used.append({"path": path, "sha256": sha, "data_pushed_at": dp["pushed_at"],
+                     "fetch_pushed_at": fp["pushed_at"]})
     return {"settlements": merged, "records": used, "refused": refused}

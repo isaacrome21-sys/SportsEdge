@@ -38,10 +38,18 @@ def main() -> int:
     shas = {"stats": rf._sha(Path(args.stats_2026)),
             "schedule": rf._sha(Path(args.schedule))}
     try:
+        sk = rf.schedule_kickoff(Path(args.schedule), int(board["season"]),
+                                 board.get("game_teams"), board.get("kickoff"))
+    except rf.RefreshFailed as e:
+        print(f"FAILED_CLOSED {e.code}")
+        return 2
+    try:
         prov = pv.require_fetch_provenance(pv.GitHubAPI(), shas,
                                            board.get("captured_at"))
     except (pv.ProvenanceFailed, ValueError, TypeError, OSError) as e:
-        print(f"FAILED_CLOSED {getattr(e, 'code', 'PROVENANCE_UNAVAILABLE')}: {e}")
+        # code + detail only; the token is never part of either
+        print(f"FAILED_CLOSED {getattr(e, 'code', 'PROVENANCE_UNAVAILABLE')}: "
+              f"{getattr(e, 'detail', type(e).__name__)}")
         return 2
     base = eng.load_data(Path(args.player_data))
 
@@ -79,6 +87,9 @@ def main() -> int:
     # capture/kickoff and the raw fetch activity events (rule F).
     rr = json.loads(Path(args.run_record).read_text())
     rr.update(slate_id=board.get("slate_id"), captured_at=board.get("captured_at"),
+              season=int(board["season"]),
+              schedule_kickoffs={board["game_id"]: board.get("kickoff")},
+              schedule_game={"board_game_id": board["game_id"], **sk},
               first_kickoff=board.get("kickoff"), stats_sha256=shas["stats"],
               schedule_sha256=shas["schedule"],
               fetch_provenance={k: {"event": v["event"], "commit": v["commit"],

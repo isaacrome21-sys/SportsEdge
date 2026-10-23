@@ -215,15 +215,22 @@ def _score_rows(rows, closes, settlements):
     return out
 
 
+def _games(loaded):
+    return {r["game_id"]: {"kickoff": r["kickoff"], "season": st["season"],
+                           "week": r["week"]}
+            for st in loaded for r in st["record"]["rows"] if r.get("status") == "PRICED"}
+
+
 def score_slate_rows(api, slate_id):
     """Score one COUNTS slate entirely from branch records."""
+    pv.require_token(api)
     st = pv.load_slate(api, slate_id)
     if st["status"] != "COUNTS":
         return []
     rows = st["record"]["rows"]
-    kos = {r["game_id"]: r["kickoff"] for r in rows if r.get("status") == "PRICED"}
-    closes = pv.load_closes(api)
-    setl = pv.load_settlements(api, kos, _utcnow())
+    games = _games([st])
+    closes = pv.load_closes(api, games)
+    setl = pv.load_settlements(api, games, _utcnow())
     return _score_rows(rows, closes, setl["settlements"])
 
 
@@ -235,6 +242,7 @@ def review(slate_ids, *, records_worktree, api):
     records branch whose origin is the SportsEdge repo, and if the verdict
     path has EVER had a commit (API). SCREEN slates are excluded. The verdict
     is staged create-only at the fixed path; it counts only once pushed."""
+    pv.require_token(api)
     wt = _check_worktree(records_worktree)
     if _verdict_ever_existed(api) or (wt / VERDICT_PATH).exists():
         raise ReviewAlreadyRecorded(f"{pv.RECORDS_BRANCH}:{VERDICT_PATH}")
@@ -243,10 +251,9 @@ def review(slate_ids, *, records_worktree, api):
     for sid in slate_ids:
         st = pv.load_slate(api, sid)
         (loaded if st["status"] == "COUNTS" else screen).append(st if st["status"] == "COUNTS" else sid)
-    kos = {r["game_id"]: r["kickoff"] for st in loaded for r in st["record"]["rows"]
-           if r.get("status") == "PRICED"}
-    closes = pv.load_closes(api)
-    setl = pv.load_settlements(api, kos, now)
+    games = _games(loaded)
+    closes = pv.load_closes(api, games)
+    setl = pv.load_settlements(api, games, now)
     inputs = {"run_records": [], "closes": closes["records"],
               "closes_unproven": closes["unproven_records"],
               "settlements": setl["records"], "settlements_refused": setl["refused"]}
@@ -260,6 +267,7 @@ def review(slate_ids, *, records_worktree, api):
         if len(weeks) >= MIN_WEEKS and len(picked) >= MIN_PICKED and len(games) >= MIN_GAMES:
             v = _verdict(acc, sid)
             v.update(inputs_sha256=inputs_sha256(inputs), inputs=inputs,
+                     n_unsettled=sum(r["outcome_status"] == "UNSETTLED" for r in acc),
                      n_slates=len(inputs["run_records"]), screen_slates=screen,
                      records_branch=pv.RECORDS_BRANCH, verdict_path=VERDICT_PATH,
                      run_proofs=proofs, reviewed_at=now.isoformat())
@@ -275,6 +283,7 @@ def review(slate_ids, *, records_worktree, api):
     weeks, picked, games = _gates(acc)
     return {"status": "NO_REVIEW_GATES_NOT_MET", "n_weeks": len(weeks),
             "n_picked": len(picked), "n_games": len(games),
+            "n_unsettled": sum(r["outcome_status"] == "UNSETTLED" for r in acc),
             "screen_slates": screen,
             "status_label": "RESEARCH_ONLY", "promotable": False}
 
