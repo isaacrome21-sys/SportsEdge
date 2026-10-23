@@ -411,7 +411,7 @@ def require_fetch_provenance(api, shas: dict, captured_at) -> dict:
     return out
 
 
-def load_slate(api, slate_id) -> dict:
+def load_slate(api, slate_id, now=None) -> dict:
     """Load a slate ONLY from its pushed run record at the branch head (rule
     B) and decide COUNTS / SCREEN (rules A, C, F)."""
     path = run_record_path(slate_id)
@@ -422,6 +422,9 @@ def load_slate(api, slate_id) -> dict:
     except ProvenanceFailed as e:
         out["reasons"].append(e.code if e.code.startswith(("API_", "RECORDS_"))
                               else "RUN_" + e.code)
+        return out
+    if now is not None and _t(rp["pushed_at"]) > now:
+        out["reasons"].append("RUN_RECORD_NOT_ON_BRANCH")   # not yet pushed as of now
         return out
     out["run_proof"] = {k: v for k, v in rp.items() if k != "content"}
     out["content"] = rp["content"]
@@ -640,7 +643,20 @@ def _sha_text(s: str) -> str:
     return hashlib.sha256(s.encode()).hexdigest()
 
 
-def load_closes(api, games: dict) -> dict:
+def _pushed_after(api, path, now) -> bool:
+    """True iff the record's proven push is after `now` (review as-of time):
+    such a record is treated as non-existent."""
+    if now is None:
+        return False
+    try:
+        return _t(prove_record(api, path)["pushed_at"]) > now
+    except ProvenanceFailed as e:
+        if e.code.startswith(("API_", "RECORDS_")):
+            raise
+        return False
+
+
+def load_closes(api, games: dict, now=None) -> dict:
     """Close captures ONLY from single-commit records
     closes/<season>-W<week>/<sha256>.json. games: {game_id: {kickoff,
     season, week}} from the counted run-record rows (their kickoffs were
@@ -655,6 +671,8 @@ def load_closes(api, games: dict) -> dict:
            "kickoffs": {}, "records": []}
     bad = set()
     for path, season, week, sha in _tree_paths(api, "closes"):
+        if _pushed_after(api, path, now):
+            continue
         head = _call(api.get_file, RECORDS_BRANCH, path)
         try:
             body = json.loads(head)
@@ -716,6 +734,8 @@ def load_settlements(api, games: dict, now) -> dict:
     one record, or disagreeing records, refuse (SETTLEMENT_CONFLICT)."""
     merged, used, refused = {}, [], []
     for path, season, week, sha in _tree_paths(api, "settlements"):
+        if _pushed_after(api, path, now):
+            continue                     # non-existent as of now
         try:
             dp = prove_record(api, path)
             if _sha_text(dp["content"]) != sha:
@@ -740,9 +760,11 @@ def load_settlements(api, games: dict, now) -> dict:
                 raise ProvenanceFailed("SETTLEMENT_DATA_PUSH_BEFORE_FINAL", path)
             fp = verify_fetch(api, sha, None)
             push = _t(fp["pushed_at"])
+            if push > now:               # fetch record did not exist as of now
+                raise ProvenanceFailed("FETCH_RECORD_NOT_ON_BRANCH", path)
             if push <= final:
                 raise ProvenanceFailed("SETTLEMENT_PUSH_BEFORE_FINAL", path)
-            if push >= now or _t(dp["pushed_at"]) >= now:
+            if push > now or _t(dp["pushed_at"]) > now:
                 raise ProvenanceFailed("SETTLEMENT_PUSH_NOT_BEFORE_REVIEW", path)
         except ProvenanceFailed as e:
             if e.code.startswith(("API_", "RECORDS_")) or e.code == "SETTLEMENT_CONFLICT":

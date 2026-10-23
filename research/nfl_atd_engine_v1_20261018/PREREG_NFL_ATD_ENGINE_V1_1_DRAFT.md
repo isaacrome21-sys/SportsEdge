@@ -182,11 +182,18 @@ Selection, edge, settlement: locked #2399 Rules 1, 2, 3, 7, 8, 9.
   record's push must come after FREEZE's push (else SCREEN,
   RUN_PUSH_NOT_AFTER_FREEZE); the pricer refuses unless its own sha equals
   FREEZE's (FREEZE_PRICER_MISMATCH) and stores FREEZE's push event.
-- **A verdict counts only if** (1) the verdict's `pricer_sha256` and
-  `scorer_sha256` equal FREEZE's and so do the locally running scorer's and
-  pricer's, and (2) `review()` re-run in dry mode (writes nothing) on the
+- FREEZE.json is pushed by Grok under the owner's delegation, after the
+  re-audit clears; no owner action is needed.
+- As-of review: `review(now)` treats every record whose proven push is
+  after now (run, close, settlement data and their fetch records) as
+  non-existent; refused lists only cover records pushed at or before now,
+  so records pushed later never alter re-derivation.
+- **A verdict counts only if** (1) all four pins in the verdict
+  (`pricer_sha256`, `scorer_sha256`, `provenance_sha256`, `prereg_sha256`)
+  equal FREEZE's and so do the locally running files', and (2) `review()` re-run in dry mode (writes nothing) on the
   verdict's `slate_ids` with now = its `reviewed_at` reproduces the pushed
-  verdict exactly in canonical JSON. Otherwise **VERDICT_UNVERIFIED** and
+  verdict exactly in canonical JSON, excluding the `proof_source` labels
+  (live vs stored); every proof must still succeed via either source. Otherwise **VERDICT_UNVERIFIED** and
   it does not count; a self-asserted `"binding": true` is never enough.
   This is **fail-closed**: the fixed verdict path is single-use, so a forged
   or unverifiable pushed verdict blocks the review rather than counting. It

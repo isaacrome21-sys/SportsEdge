@@ -215,7 +215,7 @@ def verify_verdict(api) -> dict:
     if not isinstance(v, dict) or v.get("binding") is not True:
         return no("not binding")
     loc = local_shas()
-    for k in ("pricer_sha256", "scorer_sha256"):
+    for k in pv.FREEZE_KEYS:
         if v.get(k) != fz[k] or loc[k] != fz[k]:
             return no(f"{k} != FREEZE")
     try:
@@ -224,9 +224,19 @@ def verify_verdict(api) -> dict:
                        _now=datetime.fromisoformat(v["reviewed_at"]))
     except Exception as e:            # any failure to re-derive -> unverified
         return no(f"re-derivation failed: {type(e).__name__}")
-    if pv.canonical_json(again) != pv.canonical_json(v):
+    if pv.canonical_json(_strip_proof_source(again)) != pv.canonical_json(_strip_proof_source(v)):
         return no("re-derived verdict differs")
     return {"counts": True, "code": None}
+
+
+def _strip_proof_source(o):
+    """proof_source (live vs stored) may change as activity ages; the proof
+    itself must still succeed via either source, so only the label is dropped."""
+    if isinstance(o, dict):
+        return {k: _strip_proof_source(x) for k, x in o.items() if k != "proof_source"}
+    if isinstance(o, list):
+        return [_strip_proof_source(x) for x in o]
+    return o
 
 
 def verdict_counts(api) -> bool:
@@ -324,8 +334,7 @@ def _env_record() -> dict:
     import hashlib
     import platform
     import price_nfl_atd_board_v11 as pr
-    return {"pricer_sha256": pr.pricer_sha256(),
-            "scorer_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+    return {**local_shas(),
             "python_version": platform.python_version(),
             "platform": platform.platform()}
 
@@ -349,7 +358,7 @@ def review(slate_ids, *, records_worktree, api, _binding=True, _dry=False, _now=
     now = _now if _now is not None else _utcnow()
     loaded, screen = [], []
     for sid in slate_ids:
-        st = pv.load_slate(api, sid)
+        st = pv.load_slate(api, sid, now=now)
         (loaded if st["status"] == "COUNTS" else screen).append(st if st["status"] == "COUNTS" else sid)
     if _check_interpreter:              # after load_slate, COUNTS slates only
         import platform
@@ -359,7 +368,7 @@ def review(slate_ids, *, records_worktree, api, _binding=True, _dry=False, _now=
             raise ReviewInterpreterMismatch(f"REVIEW_INTERPRETER_MISMATCH: {bad}")
     refusals_by_slate = {st["slate_id"]: st.get("refusals", {}) for st in loaded}
     games = _games(loaded)
-    closes = pv.load_closes(api, games)
+    closes = pv.load_closes(api, games, now=now)
     setl = pv.load_settlements(api, games, now)
     inputs = {"run_records": [], "closes": closes["records"],
               "closes_unproven": closes["unproven_records"],
