@@ -38,6 +38,8 @@ from __future__ import annotations
 import math
 from typing import Any, Iterable, Mapping
 
+from sportsedge.screen_only_guard import require_screen_only
+
 ENGINE_ID = "NFL_SITUATIONAL_EMPIRICAL"
 ENGINE_VERSION = "nfl_situational_empirical_v1_20261023"
 GOVERNANCE = {"state": "SCREEN", "validation_status": "NOT_VALIDATED",
@@ -50,6 +52,9 @@ RARE_SHRINK_G = 30.0
 MIN_TEAM_GAMES = 3
 LEAD_BETA = 0.5
 LEAD_REF = 3.0
+# SCREEN_WORSE_THAN_NAIVE in research/grok_nfl_situational_screen_20261023/
+# screen_results_v1.json and v2.json; refused with a coded NAIVE_FAIL.
+NAIVE_FAIL_FAMILIES = frozenset({"LARGEST_LEAD", "BOTH_TEAMS_TO_SCORE_N_10"})
 _INT = ("season", "home_pts", "away_pts", "largest_lead", "safety_h", "safety_a",
         "dst_td_h", "dst_td_a")
 
@@ -116,8 +121,30 @@ def _rating(pit, team, season, fh, fa, shrink):
     return (f + shrink * tot) / (w + shrink), (a + shrink * tot) / (w + shrink), tot
 
 
+def _family_key(family, n):
+    return family if family != "BOTH_TEAMS_TO_SCORE_N" else f"{family}_{n}"
+
+
 def price_situational(history: Iterable[Mapping[str, Any]], *, family: str, date: str,
                       season: int, home: str, away: str, n: int | None = None) -> dict:
+    """Pricing entry point: NAIVE_FAIL families refuse with a coded error."""
+    if family in FAMILIES and _family_key(family, n) in NAIVE_FAIL_FAMILIES:
+        raise NflSituationalError(f"NAIVE_FAIL:{_family_key(family, n)}")
+    return _price(history, family=family, date=date, season=season, home=home, away=away, n=n)
+
+
+def price_situational_unrestricted(history: Iterable[Mapping[str, Any]], *, family: str,
+                                   date: str, season: int, home: str, away: str,
+                                   n: int | None = None) -> dict:
+    """Screen-only: all families incl. NAIVE_FAIL. Guarded by screen_only()."""
+    require_screen_only("price_situational_unrestricted")
+    out = _price(history, family=family, date=date, season=season, home=home, away=away, n=n)
+    out["screen_only_unrestricted"] = True
+    return out
+
+
+def _price(history: Iterable[Mapping[str, Any]], *, family: str, date: str,
+           season: int, home: str, away: str, n: int | None = None) -> dict:
     if family not in FAMILIES:
         raise NflSituationalError(f"UNKNOWN_FAMILY:{family}")
     if isinstance(season, bool) or not isinstance(season, int):
