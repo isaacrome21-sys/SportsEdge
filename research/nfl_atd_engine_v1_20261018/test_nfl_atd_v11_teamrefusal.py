@@ -86,6 +86,10 @@ class TestReviewSide(unittest.TestCase):
         src = inspect.getsource(sc.review)
         self.assertIn("refusals_by_slate", src)
 
+# port (re-audit 8d86e7a9): the fake pricer is patched in by fixture, never
+# registered on import.
+from fake_github_api import module_fixtures as _mf
+setUpModule, tearDownModule = _mf(guard=False)
 
 if __name__ == "__main__":
     unittest.main()
