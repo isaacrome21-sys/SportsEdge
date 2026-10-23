@@ -104,7 +104,26 @@ def _league(hist, season, key):
     return h, a
 
 
+def _finite_num(v) -> bool:
+    return (isinstance(v, (int, float)) and not isinstance(v, bool)
+            and math.isfinite(v))
+
+
+def _check_inputs(hist, home, away, season, key):
+    if home == away:
+        raise NflGameScoringError(f"HOME_EQUALS_AWAY:{home!r}")
+    if not isinstance(season, int) or isinstance(season, bool):
+        raise NflGameScoringError(f"SEASON_INVALID:{season!r}")
+    for r in hist:
+        if r.get("season") not in (season, season - 1):
+            continue
+        for f in (f"home_{key}", f"away_{key}"):
+            if not _finite_num(r.get(f)):
+                raise NflGameScoringError(f"HISTORY_VALUE_INVALID:{f}:{r.get(f)!r}")
+
+
 def expected(hist, home, away, season, key):
+    _check_inputs(hist, home, away, season, key)
     lh, la = _league(hist, season, key)
     lm = (lh + la) / 2.0
     if lm <= 0:
@@ -255,7 +274,7 @@ def fit_race(train: Sequence[tuple], n_iter: int = 200) -> tuple:
 
 
 def race_probs(mu: float, fit: tuple, p_neither: float) -> dict:
-    if not (isinstance(mu, (int, float)) and math.isfinite(mu)):
+    if not _finite_num(mu):
         raise NflGameScoringError(f"RACE_MU_NONFINITE:{mu!r}")
     if not all(isinstance(x, (int, float)) and math.isfinite(x) for x in fit):
         raise NflGameScoringError("RACE_FIT_NONFINITE")
