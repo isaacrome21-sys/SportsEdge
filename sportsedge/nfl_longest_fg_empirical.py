@@ -41,7 +41,7 @@ ENGINE_ID = "NFL_LONGEST_FG_EMPIRICAL"
 ENGINE_VERSION = "nfl_longest_fg_empirical_v1_20261022"
 GOVERNANCE_STATE = "RESEARCH_UNSCREENED"
 TOP_BAND_ASSUMED_MAX = 66.0
-LINE_MIN, LINE_MAX = 17.0, 70.0
+LINE_MIN, LINE_MAX = 17.0, 65.5  # max = last half-point line < TOP_BAND_ASSUMED_MAX
 # Shortest physically possible FG (ball at the 1, +10 end zone, +7 snap).
 # The league prior's lowest band is supported on [MIN_FG_DISTANCE, 29].
 MIN_FG_DISTANCE = 18.0
