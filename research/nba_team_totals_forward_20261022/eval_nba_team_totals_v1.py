@@ -27,6 +27,9 @@ FROZEN_DOC_SHA256 = (
 AMENDMENT_DOC = HERE / "AMENDMENT_1.md"
 AMENDMENT_1_SHA256 = (
     "7f5e55ef946d699069502b5ec3448e0cb66cb373733202bb437589e23f56e8d6")
+AMENDMENT2_DOC = HERE / "AMENDMENT_2.md"
+AMENDMENT_2_SHA256 = (
+    "2e6f98d1e9ef01bf347ad404ff378a3f157c7f14291d36a8eb92af3133f38a8a")
 CT = ZoneInfo("America/Chicago")
 ENGINE_ID = "NBA_TEAM_PERIOD_RATINGS_V1"
 PINNED_ENGINE_SHA256 = (
@@ -89,6 +92,9 @@ def verify_amendment() -> bool:
     h = hashlib.sha256(AMENDMENT_DOC.read_bytes()).hexdigest()
     if h != AMENDMENT_1_SHA256:
         raise RuntimeError(f"AMENDMENT_1_HASH_MISMATCH {h}")
+    h = hashlib.sha256(AMENDMENT2_DOC.read_bytes()).hexdigest()
+    if h != AMENDMENT_2_SHA256:
+        raise RuntimeError(f"AMENDMENT_2_HASH_MISMATCH {h}")
     return True
 
 
@@ -203,8 +209,8 @@ def move_direction(side, entry_line, lines):
 
 
 def close_status(closes, game, team, entry_line, tip):
-    """§7: the close is the LAST capture (A3). A capture holding any quote
-    at/after tipoff is still a capture: if last, CLOSE_NOT_PRETIP (F5).
+    """§7: the close is the last capture with a pre-tip quote (A3,
+    AMENDMENT_2). If it straddles tip -> CLOSE_NOT_PRETIP (F5).
     Main-line quotes only; a missing main flag invalidates the close."""
     out = {"reason": None, "moved": False, "close_line": None,
            "close_lines": [], "p_over": None}
@@ -220,8 +226,13 @@ def close_status(closes, game, team, entry_line, tip):
     caps = defaultdict(list)
     for c in cands:
         caps[c.get("capture_id")].append(c)
-    last = max(caps.values(),
-               key=lambda g: max(_t(c["captured_at"]) for c in g))
+    # AMENDMENT_2: close = last capture with >=1 pre-tip quote; fully
+    # post-tip captures are ignored; a straddling close is not rescued.
+    pre = [g for g in caps.values()
+           if any(_t(c["captured_at"]) < tip for c in g)]
+    if not pre:
+        return {**out, "reason": "CLOSE_NOT_PRETIP"}
+    last = max(pre, key=lambda g: max(_t(c["captured_at"]) for c in g))
     if any(_t(c["captured_at"]) >= tip for c in last):
         return {**out, "reason": "CLOSE_NOT_PRETIP"}
     earliest = min(_t(c["captured_at"]) for c in last)

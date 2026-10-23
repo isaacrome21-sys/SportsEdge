@@ -87,3 +87,13 @@ hashes and raises on mismatch.
 
 `SPEC_HASHES_DRAFT.txt` is superseded by `SPEC_HASHES.txt`
 (see `SPEC_HASHES_SUPERSEDED_NOTE.md`).
+
+## AMENDMENT_2 (2026-10-22, re-audit of 2d2094b7)
+
+`AMENDMENT_2.md` (sha256
+`2e6f98d1e9ef01bf347ad404ff378a3f157c7f14291d36a8eb92af3133f38a8a`, prereg
+branch `01d91eae`; no new codes) narrows F5: the close is the last capture
+with at least one pre-tip quote; if it also has a quote at/after tip →
+`CLOSE_NOT_PRETIP` (earlier captures never rescue it); fully post-tip
+captures are ignored; no pre-tip capture → `CLOSE_NOT_PRETIP`.
+`verify_amendment()` checks both amendment hashes.
