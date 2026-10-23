@@ -1,13 +1,8 @@
 name: direct-dk-market-archive-contract
 
 on:
-  pull_request:
-    paths:
-      - 'sportsedge/draftkings_game_market_source.py'
-      - 'scripts/capture_direct_dk_closing_lines.py'
-      - 'tests/test_direct_dk_game_market_source.py'
-      - 'tests/test_capture_direct_dk_closing_lines.py'
-      - '.github/workflows/direct-dk-market-archive-contract.yml'
+  # Grok ruling 2026-10-23 (t234u; owner invariant: DK rendered pages only): this job
+  # makes a live DraftKings API request in CI, so it runs only on manual workflow_dispatch.
   workflow_dispatch:
 
 permissions:
