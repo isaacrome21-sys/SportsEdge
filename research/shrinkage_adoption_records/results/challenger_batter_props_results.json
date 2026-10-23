@@ -1,0 +1,3124 @@
+{
+ "label": "RESEARCH_EVIDENCE \u2014 retrospective calibration evaluation. NOT a market verdict, NOT validation, NOT a promotion input.",
+ "family": "MLB batter props challenger (Model Fix Lane, family 1)",
+ "prereg": {
+  "path": "/home/hatch/workspace/sportsedge/model_fix_20261014/specs/PREREG_BATTER_PROPS.md",
+  "sha256": "58a7977c6cce4be3bf601f4e9e9574e85c2bc68a8f1a3b6d1d8e08e1d1a65e3b",
+  "spec_hashes_record": {
+   "recorded_token": "58a7977c6cce4be3bf601f4e9e9574e85c2bc68a8f1a3b6d1a65e3b",
+   "recorded_token_length": 55,
+   "record_matches_true_sha256": false,
+   "amendment": "specs/AMENDMENT_BATTER_PROPS_SPEC_HASH_RECORD.md"
+  }
+ },
+ "repo": {
+  "main": "2a713380c7d49733577c238a126f487382634040",
+  "phase2_main": "12999fc227b6bce3f781749f99918d52c2080b9d",
+  "evaluand_identity": {
+   "sportsedge/mlb_batter_empirical.py": {
+    "phase2_12999fc22_sha256": "88914925126a938b5f551a855921959a35d9c26337dbef9b8e79a51365754918",
+    "main_2a713380c_sha256": "88914925126a938b5f551a855921959a35d9c26337dbef9b8e79a51365754918",
+    "byte_identical": true
+   },
+   "sportsedge/mlb_public_batter_history.py": {
+    "phase2_12999fc22_sha256": "1449d8510e1d513758230f3d07ceb23e675b956df746ae83c7a891e14983fed8",
+    "main_2a713380c_sha256": "1449d8510e1d513758230f3d07ceb23e675b956df746ae83c7a891e14983fed8",
+    "byte_identical": true
+   },
+   "sportsedge/pitcher_joint_engine.py": {
+    "phase2_12999fc22_sha256": "fee2dd8535c9a3a4aefa8e0dfa6ffa4a2894c91fb896d5f2bb9e574e8b32fc48",
+    "main_2a713380c_sha256": "fee2dd8535c9a3a4aefa8e0dfa6ffa4a2894c91fb896d5f2bb9e574e8b32fc48",
+    "byte_identical": true
+   },
+   "sportsedge/mlb_public_pitcher_history.py": {
+    "phase2_12999fc22_sha256": "c648dc922182bb6372f8b074dc452458ef8e141b0aa2271b2972ff19f22a96a6",
+    "main_2a713380c_sha256": "c648dc922182bb6372f8b074dc452458ef8e141b0aa2271b2972ff19f22a96a6",
+    "byte_identical": true
+   }
+  },
+  "engine": "sportsedge/mlb_batter_empirical.py price_batter_market (mlb_batter_empirical_game_log_v1)",
+  "pool_contract": "sportsedge/mlb_public_batter_history.py MLBBatterPublicSource.prior_games"
+ },
+ "challenger": {
+  "construction": "P(v) = (count_H(v) + K * L_s(d)(v)) / (n + K), K=25; H = ALL same-season prior games PA>=1 (no 30-game cap); L = expanding season-to-date empirical distribution over all starting batters' prior games (Phase 2 B2 construction)",
+  "K": 25
+ },
+ "split": {
+  "case": "SINGLE_SPLIT",
+  "test_season": 2026,
+  "design_seasons": [
+   2024,
+   2025
+  ],
+  "sealed_window": "not applicable to 2026 (prereg section 4)"
+ },
+ "acquisition": {
+  "manifest": "/home/hatch/workspace/tmp/bt_data/ACQUISITION_2026_DONE.json",
+  "failures": [],
+  "players_2026": 1511,
+  "gamelog_urls": 1511,
+  "schedule_urls": 12,
+  "boxscores": {
+   "games_total": 2430,
+   "fetched_this_run": 2430,
+   "failures": {}
+  },
+  "missing_gamelog_payloads_in_cache": 0
+ },
+ "parity": {
+  "n_samples": 28,
+  "n_equal": 28,
+  "mismatches": 0,
+  "passed": true,
+  "comparison_scope": "evaluator pool (production collector semantics, prereg section 2) vs production MLBBatterPublicSource.prior_games pa_history, exact list-of-dicts equality. Sealed window declared not applicable to 2026 (prereg section 4).",
+  "live_fetches": [
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-14",
+    "fetched_at_utc": "2026-10-15T03:13:23.589562+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-13",
+    "fetched_at_utc": "2026-10-15T03:13:24.427462+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/822942/boxscore",
+    "fetched_at_utc": "2026-10-15T03:13:24.886416+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-16",
+    "fetched_at_utc": "2026-10-15T03:13:25.577861+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-17",
+    "fetched_at_utc": "2026-10-15T03:13:26.024937+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/824436/boxscore",
+    "fetched_at_utc": "2026-10-15T03:13:26.519452+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-17",
+    "fetched_at_utc": "2026-10-15T03:13:26.965445+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-18",
+    "fetched_at_utc": "2026-10-15T03:13:27.606886+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/823465/boxscore",
+    "fetched_at_utc": "2026-10-15T03:13:28.173898+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-28",
+    "fetched_at_utc": "2026-10-15T03:13:28.657027+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-29",
+    "fetched_at_utc": "2026-10-15T03:13:29.093542+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/823022/boxscore",
+    "fetched_at_utc": "2026-10-15T03:13:29.579828+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-23",
+    "fetched_at_utc": "2026-10-15T03:13:30.125813+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-22",
+    "fetched_at_utc": "2026-10-15T03:13:30.822191+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/824720/boxscore",
+    "fetched_at_utc": "2026-10-15T03:13:31.299141+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-29",
+    "fetched_at_utc": "2026-10-15T03:13:32.012561+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-30",
+    "fetched_at_utc": "2026-10-15T03:13:32.488647+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/825016/boxscore",
+    "fetched_at_utc": "2026-10-15T03:13:32.943648+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-04",
+    "fetched_at_utc": "2026-10-15T03:13:33.520092+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-13",
+    "fetched_at_utc": "2026-10-15T03:13:34.228602+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-14",
+    "fetched_at_utc": "2026-10-15T03:13:34.731441+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/823789/boxscore",
+    "fetched_at_utc": "2026-10-15T03:13:35.198689+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-04",
+    "fetched_at_utc": "2026-10-15T03:13:35.627806+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-05",
+    "fetched_at_utc": "2026-10-15T03:13:36.158703+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/824066/boxscore",
+    "fetched_at_utc": "2026-10-15T03:13:36.596089+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-06",
+    "fetched_at_utc": "2026-10-15T03:13:37.235319+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-05",
+    "fetched_at_utc": "2026-10-15T03:13:37.745983+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/822892/boxscore",
+    "fetched_at_utc": "2026-10-15T03:13:38.221108+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-28",
+    "fetched_at_utc": "2026-10-15T03:13:39.027327+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-29",
+    "fetched_at_utc": "2026-10-15T03:13:39.550054+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/823582/boxscore",
+    "fetched_at_utc": "2026-10-15T03:13:40.316596+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-26",
+    "fetched_at_utc": "2026-10-15T03:13:41.093565+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-27",
+    "fetched_at_utc": "2026-10-15T03:13:41.644286+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/822761/boxscore",
+    "fetched_at_utc": "2026-10-15T03:13:42.226920+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-26",
+    "fetched_at_utc": "2026-10-15T03:13:42.712048+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-27",
+    "fetched_at_utc": "2026-10-15T03:13:43.160448+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/822960/boxscore",
+    "fetched_at_utc": "2026-10-15T03:13:43.629060+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-09",
+    "fetched_at_utc": "2026-10-15T03:13:44.264739+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-10",
+    "fetched_at_utc": "2026-10-15T03:13:44.576157+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/823482/boxscore",
+    "fetched_at_utc": "2026-10-15T03:13:45.174149+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-22",
+    "fetched_at_utc": "2026-10-15T03:13:45.797388+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-21",
+    "fetched_at_utc": "2026-10-15T03:13:46.562059+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/824044/boxscore",
+    "fetched_at_utc": "2026-10-15T03:13:47.175587+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-05",
+    "fetched_at_utc": "2026-10-15T03:13:47.632086+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-04",
+    "fetched_at_utc": "2026-10-15T03:13:48.239054+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/824806/boxscore",
+    "fetched_at_utc": "2026-10-15T03:13:48.707587+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-18",
+    "fetched_at_utc": "2026-10-15T03:13:49.111544+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-17",
+    "fetched_at_utc": "2026-10-15T03:13:49.846907+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/824331/boxscore",
+    "fetched_at_utc": "2026-10-15T03:13:50.331006+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-16",
+    "fetched_at_utc": "2026-10-15T03:13:50.955927+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-17",
+    "fetched_at_utc": "2026-10-15T03:13:51.418580+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/823427/boxscore",
+    "fetched_at_utc": "2026-10-15T03:13:52.018743+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-23",
+    "fetched_at_utc": "2026-10-15T03:13:52.743106+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-22",
+    "fetched_at_utc": "2026-10-15T03:13:53.055929+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/824315/boxscore",
+    "fetched_at_utc": "2026-10-15T03:13:53.566913+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-28",
+    "fetched_at_utc": "2026-10-15T03:13:54.217589+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-28",
+    "fetched_at_utc": "2026-10-15T03:13:55.241993+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-29",
+    "fetched_at_utc": "2026-10-15T03:13:55.931106+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/823275/boxscore",
+    "fetched_at_utc": "2026-10-15T03:13:56.538069+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-14",
+    "fetched_at_utc": "2026-10-15T03:13:57.114979+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-15",
+    "fetched_at_utc": "2026-10-15T03:13:57.680919+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/823007/boxscore",
+    "fetched_at_utc": "2026-10-15T03:13:58.322807+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-17",
+    "fetched_at_utc": "2026-10-15T03:13:58.978735+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-07",
+    "fetched_at_utc": "2026-10-15T03:13:59.420442+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-06",
+    "fetched_at_utc": "2026-10-15T03:14:00.056568+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/824351/boxscore",
+    "fetched_at_utc": "2026-10-15T03:14:00.448005+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-04",
+    "fetched_at_utc": "2026-10-15T03:14:01.049234+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-29",
+    "fetched_at_utc": "2026-10-15T03:14:01.518322+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-28",
+    "fetched_at_utc": "2026-10-15T03:14:01.930039+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/823312/boxscore",
+    "fetched_at_utc": "2026-10-15T03:14:02.452144+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-31",
+    "fetched_at_utc": "2026-10-15T03:14:03.045434+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-01",
+    "fetched_at_utc": "2026-10-15T03:14:03.626050+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/824510/boxscore",
+    "fetched_at_utc": "2026-10-15T03:14:04.182477+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-24",
+    "fetched_at_utc": "2026-10-15T03:14:04.715358+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-23",
+    "fetched_at_utc": "2026-10-15T03:14:05.238363+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/823786/boxscore",
+    "fetched_at_utc": "2026-10-15T03:14:05.740748+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-25",
+    "fetched_at_utc": "2026-10-15T03:14:06.441098+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-24",
+    "fetched_at_utc": "2026-10-15T03:14:07.054734+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/822869/boxscore",
+    "fetched_at_utc": "2026-10-15T03:14:07.696165+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-11",
+    "fetched_at_utc": "2026-10-15T03:14:08.425484+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-12",
+    "fetched_at_utc": "2026-10-15T03:14:08.999264+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/824883/boxscore",
+    "fetched_at_utc": "2026-10-15T03:14:09.521537+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-29",
+    "fetched_at_utc": "2026-10-15T03:14:10.036300+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-24",
+    "fetched_at_utc": "2026-10-15T03:14:10.443613+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-23",
+    "fetched_at_utc": "2026-10-15T03:14:10.775173+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/823220/boxscore",
+    "fetched_at_utc": "2026-10-15T03:14:11.213205+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-30",
+    "fetched_at_utc": "2026-10-15T03:14:11.726161+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-25",
+    "fetched_at_utc": "2026-10-15T03:14:12.277718+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-24",
+    "fetched_at_utc": "2026-10-15T03:14:12.612567+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/game/823031/boxscore",
+    "fetched_at_utc": "2026-10-15T03:14:13.135831+00:00",
+    "purpose": "parity_fixture_resolution"
+   },
+   {
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-07",
+    "fetched_at_utc": "2026-10-15T03:14:13.899734+00:00",
+    "purpose": "parity_fixture_resolution"
+   }
+  ],
+  "samples": [
+   {
+    "n": 1,
+    "gamePk": 822942,
+    "season": 2026,
+    "date": "2026-08-14",
+    "batter_id": 680700,
+    "batter_name": "Richie Palacios",
+    "away": "Baltimore Orioles",
+    "home": "Tampa Bay Rays",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 2,
+    "gamePk": 824436,
+    "season": 2026,
+    "date": "2026-05-17",
+    "batter_id": 680574,
+    "batter_name": "Matt McLain",
+    "away": "Cincinnati Reds",
+    "home": "Cleveland Guardians",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 3,
+    "gamePk": 823465,
+    "season": 2026,
+    "date": "2026-05-18",
+    "batter_id": 592663,
+    "batter_name": "J.T. Realmuto",
+    "away": "Cincinnati Reds",
+    "home": "Philadelphia Phillies",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 28,
+    "evaluator_pool_games": 28,
+    "pools_equal": true
+   },
+   {
+    "n": 4,
+    "gamePk": 823022,
+    "season": 2026,
+    "date": "2026-07-29",
+    "batter_id": 608324,
+    "batter_name": "Alex Bregman",
+    "away": "Chicago Cubs",
+    "home": "St. Louis Cardinals",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 5,
+    "gamePk": 824720,
+    "season": 2026,
+    "date": "2026-08-23",
+    "batter_id": 655316,
+    "batter_name": "Andruw Monasterio",
+    "away": "San Francisco Giants",
+    "home": "Boston Red Sox",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 6,
+    "gamePk": 825016,
+    "season": 2026,
+    "date": "2026-04-30",
+    "batter_id": 672580,
+    "batter_name": "Maikel Garcia",
+    "away": "Kansas City Royals",
+    "home": "Athletics",
+    "dh_pool": true,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 28,
+    "evaluator_pool_games": 28,
+    "pools_equal": true
+   },
+   {
+    "n": 7,
+    "gamePk": 823789,
+    "season": 2026,
+    "date": "2026-05-14",
+    "batter_id": 686217,
+    "batter_name": "Sal Frelick",
+    "away": "San Diego Padres",
+    "home": "Milwaukee Brewers",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 8,
+    "gamePk": 824066,
+    "season": 2026,
+    "date": "2026-09-05",
+    "batter_id": 686555,
+    "batter_name": "Isaac Collins",
+    "away": "Toronto Blue Jays",
+    "home": "Kansas City Royals",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 9,
+    "gamePk": 822892,
+    "season": 2026,
+    "date": "2026-06-05",
+    "batter_id": 677649,
+    "batter_name": "Ezequiel Duran",
+    "away": "Cleveland Guardians",
+    "home": "Texas Rangers",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 10,
+    "gamePk": 823582,
+    "season": 2026,
+    "date": "2026-08-29",
+    "batter_id": 669397,
+    "batter_name": "Nick Allen",
+    "away": "Houston Astros",
+    "home": "New York Mets",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 11,
+    "gamePk": 822761,
+    "season": 2026,
+    "date": "2026-09-27",
+    "batter_id": 543807,
+    "batter_name": "George Springer",
+    "away": "Cincinnati Reds",
+    "home": "Toronto Blue Jays",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 12,
+    "gamePk": 822960,
+    "season": 2026,
+    "date": "2026-06-27",
+    "batter_id": 691406,
+    "batter_name": "Junior Caminero",
+    "away": "Arizona Diamondbacks",
+    "home": "Tampa Bay Rays",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 13,
+    "gamePk": 823482,
+    "season": 2026,
+    "date": "2026-04-10",
+    "batter_id": 672695,
+    "batter_name": "Geraldo Perdomo",
+    "away": "Arizona Diamondbacks",
+    "home": "Philadelphia Phillies",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 13,
+    "evaluator_pool_games": 13,
+    "pools_equal": true
+   },
+   {
+    "n": 14,
+    "gamePk": 824044,
+    "season": 2026,
+    "date": "2026-04-22",
+    "batter_id": 672724,
+    "batter_name": "Oswald Peraza",
+    "away": "Toronto Blue Jays",
+    "home": "Los Angeles Angels",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 21,
+    "evaluator_pool_games": 21,
+    "pools_equal": true
+   },
+   {
+    "n": 15,
+    "gamePk": 824806,
+    "season": 2026,
+    "date": "2026-08-05",
+    "batter_id": 691723,
+    "batter_name": "Coby Mayo",
+    "away": "Los Angeles Angels",
+    "home": "Baltimore Orioles",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 16,
+    "gamePk": 824331,
+    "season": 2026,
+    "date": "2026-07-18",
+    "batter_id": 681198,
+    "batter_name": "TJ Rumfield",
+    "away": "Cincinnati Reds",
+    "home": "Colorado Rockies",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 17,
+    "gamePk": 823427,
+    "season": 2026,
+    "date": "2026-08-17",
+    "batter_id": 682663,
+    "batter_name": "Agust\u00edn Ram\u00edrez",
+    "away": "Miami Marlins",
+    "home": "Philadelphia Phillies",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 18,
+    "gamePk": 824315,
+    "season": 2026,
+    "date": "2026-08-23",
+    "batter_id": 663993,
+    "batter_name": "Nathaniel Lowe",
+    "away": "Cleveland Guardians",
+    "home": "Colorado Rockies",
+    "dh_pool": true,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 19,
+    "gamePk": 823275,
+    "season": 2026,
+    "date": "2026-07-28",
+    "batter_id": 678662,
+    "batter_name": "Ezequiel Tovar",
+    "away": "Colorado Rockies",
+    "home": "San Diego Padres",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 20,
+    "gamePk": 823007,
+    "season": 2026,
+    "date": "2026-09-15",
+    "batter_id": 676475,
+    "batter_name": "Alec Burleson",
+    "away": "San Francisco Giants",
+    "home": "St. Louis Cardinals",
+    "dh_pool": true,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 21,
+    "gamePk": 824351,
+    "season": 2026,
+    "date": "2026-06-06",
+    "batter_id": 592885,
+    "batter_name": "Christian Yelich",
+    "away": "Milwaukee Brewers",
+    "home": "Colorado Rockies",
+    "dh_pool": true,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 22,
+    "gamePk": 823312,
+    "season": 2026,
+    "date": "2026-04-29",
+    "batter_id": 609280,
+    "batter_name": "Miguel Andujar",
+    "away": "Chicago Cubs",
+    "home": "San Diego Padres",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 19,
+    "evaluator_pool_games": 19,
+    "pools_equal": true
+   },
+   {
+    "n": 23,
+    "gamePk": 824510,
+    "season": 2026,
+    "date": "2026-06-01",
+    "batter_id": 686681,
+    "batter_name": "Michael Massey",
+    "away": "Kansas City Royals",
+    "home": "Cincinnati Reds",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 24,
+    "gamePk": 823786,
+    "season": 2026,
+    "date": "2026-05-24",
+    "batter_id": 694192,
+    "batter_name": "Jackson Chourio",
+    "away": "Los Angeles Dodgers",
+    "home": "Milwaukee Brewers",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 16,
+    "evaluator_pool_games": 16,
+    "pools_equal": true
+   },
+   {
+    "n": 25,
+    "gamePk": 822869,
+    "season": 2026,
+    "date": "2026-07-25",
+    "batter_id": 663728,
+    "batter_name": "Cal Raleigh",
+    "away": "Seattle Mariners",
+    "home": "Texas Rangers",
+    "dh_pool": false,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 26,
+    "gamePk": 824883,
+    "season": 2026,
+    "date": "2026-08-12",
+    "batter_id": 643289,
+    "batter_name": "Mauricio Dub\u00f3n",
+    "away": "New York Mets",
+    "home": "Atlanta Braves",
+    "dh_pool": true,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 27,
+    "gamePk": 823220,
+    "season": 2026,
+    "date": "2026-05-24",
+    "batter_id": 650333,
+    "batter_name": "Luis Arraez",
+    "away": "Chicago White Sox",
+    "home": "San Francisco Giants",
+    "dh_pool": true,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   },
+   {
+    "n": 28,
+    "gamePk": 823031,
+    "season": 2026,
+    "date": "2026-07-24",
+    "batter_id": 671056,
+    "batter_name": "Iv\u00e1n Herrera",
+    "away": "Cincinnati Reds",
+    "home": "St. Louis Cardinals",
+    "dh_pool": true,
+    "production_error": null,
+    "evaluator_reason": null,
+    "production_pool_games": 30,
+    "evaluator_pool_games": 30,
+    "pools_equal": true
+   }
+  ]
+ },
+ "unit_checks": {
+  "pmf_sums_to_1": {
+   "trials": 300,
+   "max_abs_dev": 1.1102230246251565e-16,
+   "tol": 1e-12,
+   "passed": true
+  },
+  "k_to_0_reduces_to_uncapped_empirical": {
+   "trials": 300,
+   "max_abs_dev": 0.0,
+   "passed": true
+  },
+  "crps_pmf_matches_crps_counter_on_empirical": {
+   "trials": 300,
+   "max_abs_dev": 4.440892098500626e-16,
+   "passed": true
+  },
+  "n_zero_cannot_occur": {
+   "note": "fixture eligibility requires the production pool gates (>=10 games, >=20 PA) on the <=30-game pool; the uncapped history H is a superset, so n >= 10 for every scored fixture; asserted again in the scoring loop.",
+   "passed": true
+  },
+  "all_passed": true
+ },
+ "population": {
+  "fixtures_scored_total": 38511,
+  "exclusions": {
+   "POOL_GAMES_LT_10": 5184,
+   "NOT_A_STARTER": 5919,
+   "POOL_PA_LT_20": 10
+  },
+  "exclusion_reason_precedence": "NOT_A_STARTER -> POOL_GAMES_LT_10 -> POOL_PA_LT_20 (prereg section 4 transposing Phase 2; sealed window not applicable)",
+  "boxscore_unavailable_games": [],
+  "games_with_starter_count_ne_18": {
+   "823490": 0
+  },
+  "boxscore_batting_appearances_without_gamelog_row": 2082,
+  "universe_note": "Universe = gameLog rows (PA>=1 parse, as production retains) matched to regular-season schedule games; boxscore batting appearances with no gameLog row are counted separately and enter neither fixtures nor NOT_A_STARTER."
+ },
+ "baseline_implementations": {
+  "note": "B1/B2 exactly as implemented in Phase 2 eval_batter_props.py (raw uncapped empirical frequency/distribution; B1 dedups by gamePk, no doubleheader re-selection). Implementing lines quoted verbatim:",
+  "quoted_lines": [
+   {
+    "file": "/home/hatch/workspace/sportsedge/backtest_program_20261014/scripts/eval_batter_props.py",
+    "line": 809,
+    "text": "p_b1 = (n1 - c1.get(0, 0)) / n1"
+   },
+   {
+    "file": "/home/hatch/workspace/sportsedge/backtest_program_20261014/scripts/eval_batter_props.py",
+    "line": 810,
+    "text": "p_b2 = (n2 - c2.get(0, 0)) / n2"
+   },
+   {
+    "file": "/home/hatch/workspace/sportsedge/backtest_program_20261014/scripts/eval_batter_props.py",
+    "line": 853,
+    "text": "crps_b1 = crps_from_counter(c1, n1, y)"
+   },
+   {
+    "file": "/home/hatch/workspace/sportsedge/backtest_program_20261014/scripts/eval_batter_props.py",
+    "line": 854,
+    "text": "crps_b2 = crps_from_counter(c2, n2, y)"
+   }
+  ]
+ },
+ "conventions": [
+  "LOG_LOSS_FLOOR: probabilities clipped to [1e-6, 1-1e-6] (Phase 2 convention).",
+  "CHALLENGER_CRPS: computed from the challenger PMF via E|X-y| - 0.5*E|X-X'|, unit-checked to agree with Phase 2's crps_from_counter on empirical PMFs to <1e-12.",
+  "CHALLENGER_N: per-stat n = number of uncapped prior games with a recorded value for that stat (equals |H| whenever the stat field is present, as in production rows).",
+  "CALIBRATION_BINS: ten equal-width bins [0,0.1)...[0.9,1.0], as Phase 2."
+ ],
+ "engine_pricer_errors_by_stat": {},
+ "outcome_field_missing_by_stat": {},
+ "support_misses": {
+  "BATTER_DOUBLES:engine": 158,
+  "BATTER_DOUBLES:B1": 116,
+  "BATTER_WALKS:engine": 36,
+  "BATTER_WALKS:B1": 32,
+  "BATTER_RBIS:engine": 37,
+  "BATTER_RBIS:B1": 37,
+  "BATTER_RUNS:engine": 17,
+  "BATTER_RUNS:B1": 17,
+  "HITS_RUNS_RBIS:engine": 3,
+  "HITS_RUNS_RBIS:B1": 3,
+  "BATTER_SINGLES:engine": 4,
+  "BATTER_SINGLES:B1": 4,
+  "BATTER_HITS:engine": 1,
+  "BATTER_HITS:B1": 1,
+  "BATTER_TOTAL_BASES:engine": 1,
+  "BATTER_TOTAL_BASES:B1": 1
+ },
+ "challenger_pmf_sum_max_abs_dev_over_scored_fixtures": 2.220446049250313e-16,
+ "bootstrap": {
+  "blocks": "ISO calendar weeks of fixture date",
+  "resamples": 2000,
+  "seed": 20261015,
+  "ci": "95% percentile of block-bootstrap paired means"
+ },
+ "stats": {
+  "BATTER_HITS": {
+   "form": "OU_0.5",
+   "value_key": "hits",
+   "metrics": {
+    "n": 38511,
+    "brier_eng": 0.24410285241147456,
+    "brier_ch": 0.23673990150290927,
+    "brier_b1": 0.24111264833917126,
+    "brier_b2": 0.2377211344831013,
+    "ll_eng": 0.6835346102130627,
+    "ll_ch": 0.6663284880755527,
+    "ll_b1": 0.6765301877801798,
+    "ll_b2": 0.668388677618025
+   },
+   "paired_deltas": {
+    "dBrier_ch_vs_FROZEN": {
+     "delta": -0.007362950908565249,
+     "ci95": [
+      -0.008278799055243887,
+      -0.006522000270948756
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_ch_vs_B1": {
+     "delta": -0.004372746836262,
+     "ci95": [
+      -0.005543405427658952,
+      -0.0033345542022972857
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_ch_vs_B2": {
+     "delta": -0.0009812329801920793,
+     "ci95": [
+      -0.001565885687086285,
+      -0.00040729045372777794
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_FROZEN": {
+     "delta": -0.017206122137510025,
+     "ci95": [
+      -0.019273262851573006,
+      -0.015277908623492513
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_B1": {
+     "delta": -0.010201699704627252,
+     "ci95": [
+      -0.013129038498984728,
+      -0.00770548920980702
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_B2": {
+     "delta": -0.002060189542472369,
+     "ci95": [
+      -0.0032450703572376605,
+      -0.0008593369366351035
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_FROZEN_vs_B1": {
+     "delta": 0.0029902040723032482,
+     "ci95": [
+      0.0021992336398429803,
+      0.0037957942437555257
+     ],
+     "entirely_below_zero": false
+    },
+    "dBrier_FROZEN_vs_B2": {
+     "delta": 0.00638171792837317,
+     "ci95": [
+      0.005115987695986306,
+      0.007635572025302147
+     ],
+     "entirely_below_zero": false
+    }
+   },
+   "verdict": "ADOPT-CANDIDATE",
+   "calibration_deciles_challenger": [
+    {
+     "bin": "[0.0,0.1)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.1,0.2)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.2,0.3)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.3,0.4)",
+     "n": 71,
+     "mean_predicted": 0.37515982016917565,
+     "observed_rate": 0.43661971830985913
+    },
+    {
+     "bin": "[0.4,0.5)",
+     "n": 2688,
+     "mean_predicted": 0.47098221766957676,
+     "observed_rate": 0.5219494047619048
+    },
+    {
+     "bin": "[0.5,0.6)",
+     "n": 16980,
+     "mean_predicted": 0.5569939793465934,
+     "observed_rate": 0.5852767962308598
+    },
+    {
+     "bin": "[0.6,0.7)",
+     "n": 17080,
+     "mean_predicted": 0.6414880795403011,
+     "observed_rate": 0.6447892271662764
+    },
+    {
+     "bin": "[0.7,0.8)",
+     "n": 1692,
+     "mean_predicted": 0.7188364808442675,
+     "observed_rate": 0.6802600472813238
+    },
+    {
+     "bin": "[0.8,0.9)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.9,1.0]",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    }
+   ],
+   "calibration_deciles_frozen": [
+    {
+     "bin": "[0.0,0.1)",
+     "n": 10,
+     "mean_predicted": 0.08167499167499168,
+     "observed_rate": 0.3
+    },
+    {
+     "bin": "[0.1,0.2)",
+     "n": 60,
+     "mean_predicted": 0.1541108545027309,
+     "observed_rate": 0.5833333333333334
+    },
+    {
+     "bin": "[0.2,0.3)",
+     "n": 422,
+     "mean_predicted": 0.2519908658964232,
+     "observed_rate": 0.45734597156398105
+    },
+    {
+     "bin": "[0.3,0.4)",
+     "n": 1928,
+     "mean_predicted": 0.34919500178559765,
+     "observed_rate": 0.546161825726141
+    },
+    {
+     "bin": "[0.4,0.5)",
+     "n": 5362,
+     "mean_predicted": 0.4411832783107192,
+     "observed_rate": 0.5637821708317792
+    },
+    {
+     "bin": "[0.5,0.6)",
+     "n": 10624,
+     "mean_predicted": 0.5376756164179156,
+     "observed_rate": 0.5904555722891566
+    },
+    {
+     "bin": "[0.6,0.7)",
+     "n": 11636,
+     "mean_predicted": 0.6350204339131873,
+     "observed_rate": 0.6344104503265727
+    },
+    {
+     "bin": "[0.7,0.8)",
+     "n": 6876,
+     "mean_predicted": 0.7282449721207591,
+     "observed_rate": 0.6595404304828388
+    },
+    {
+     "bin": "[0.8,0.9)",
+     "n": 1525,
+     "mean_predicted": 0.8181265506541219,
+     "observed_rate": 0.6537704918032787
+    },
+    {
+     "bin": "[0.9,1.0]",
+     "n": 68,
+     "mean_predicted": 0.9296589039857296,
+     "observed_rate": 0.6176470588235294
+    }
+   ]
+  },
+  "BATTER_TOTAL_BASES": {
+   "form": "OU_0.5",
+   "value_key": "total_bases",
+   "metrics": {
+    "n": 38511,
+    "brier_eng": 0.24410285241147456,
+    "brier_ch": 0.23673990150290927,
+    "brier_b1": 0.24111264833917126,
+    "brier_b2": 0.2377211344831013,
+    "ll_eng": 0.6835346102130627,
+    "ll_ch": 0.6663284880755527,
+    "ll_b1": 0.6765301877801798,
+    "ll_b2": 0.668388677618025
+   },
+   "paired_deltas": {
+    "dBrier_ch_vs_FROZEN": {
+     "delta": -0.007362950908565249,
+     "ci95": [
+      -0.008278799055243887,
+      -0.006522000270948756
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_ch_vs_B1": {
+     "delta": -0.004372746836262,
+     "ci95": [
+      -0.005543405427658952,
+      -0.0033345542022972857
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_ch_vs_B2": {
+     "delta": -0.0009812329801920793,
+     "ci95": [
+      -0.001565885687086285,
+      -0.00040729045372777794
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_FROZEN": {
+     "delta": -0.017206122137510025,
+     "ci95": [
+      -0.019273262851573006,
+      -0.015277908623492513
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_B1": {
+     "delta": -0.010201699704627252,
+     "ci95": [
+      -0.013129038498984728,
+      -0.00770548920980702
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_B2": {
+     "delta": -0.002060189542472369,
+     "ci95": [
+      -0.0032450703572376605,
+      -0.0008593369366351035
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_FROZEN_vs_B1": {
+     "delta": 0.0029902040723032482,
+     "ci95": [
+      0.0021992336398429803,
+      0.0037957942437555257
+     ],
+     "entirely_below_zero": false
+    },
+    "dBrier_FROZEN_vs_B2": {
+     "delta": 0.00638171792837317,
+     "ci95": [
+      0.005115987695986306,
+      0.007635572025302147
+     ],
+     "entirely_below_zero": false
+    }
+   },
+   "verdict": "ADOPT-CANDIDATE",
+   "calibration_deciles_challenger": [
+    {
+     "bin": "[0.0,0.1)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.1,0.2)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.2,0.3)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.3,0.4)",
+     "n": 71,
+     "mean_predicted": 0.37515982016917565,
+     "observed_rate": 0.43661971830985913
+    },
+    {
+     "bin": "[0.4,0.5)",
+     "n": 2688,
+     "mean_predicted": 0.47098221766957676,
+     "observed_rate": 0.5219494047619048
+    },
+    {
+     "bin": "[0.5,0.6)",
+     "n": 16980,
+     "mean_predicted": 0.5569939793465934,
+     "observed_rate": 0.5852767962308598
+    },
+    {
+     "bin": "[0.6,0.7)",
+     "n": 17080,
+     "mean_predicted": 0.6414880795403011,
+     "observed_rate": 0.6447892271662764
+    },
+    {
+     "bin": "[0.7,0.8)",
+     "n": 1692,
+     "mean_predicted": 0.7188364808442675,
+     "observed_rate": 0.6802600472813238
+    },
+    {
+     "bin": "[0.8,0.9)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.9,1.0]",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    }
+   ],
+   "calibration_deciles_frozen": [
+    {
+     "bin": "[0.0,0.1)",
+     "n": 10,
+     "mean_predicted": 0.08167499167499168,
+     "observed_rate": 0.3
+    },
+    {
+     "bin": "[0.1,0.2)",
+     "n": 60,
+     "mean_predicted": 0.1541108545027309,
+     "observed_rate": 0.5833333333333334
+    },
+    {
+     "bin": "[0.2,0.3)",
+     "n": 422,
+     "mean_predicted": 0.2519908658964232,
+     "observed_rate": 0.45734597156398105
+    },
+    {
+     "bin": "[0.3,0.4)",
+     "n": 1928,
+     "mean_predicted": 0.34919500178559765,
+     "observed_rate": 0.546161825726141
+    },
+    {
+     "bin": "[0.4,0.5)",
+     "n": 5362,
+     "mean_predicted": 0.4411832783107192,
+     "observed_rate": 0.5637821708317792
+    },
+    {
+     "bin": "[0.5,0.6)",
+     "n": 10624,
+     "mean_predicted": 0.5376756164179156,
+     "observed_rate": 0.5904555722891566
+    },
+    {
+     "bin": "[0.6,0.7)",
+     "n": 11636,
+     "mean_predicted": 0.6350204339131873,
+     "observed_rate": 0.6344104503265727
+    },
+    {
+     "bin": "[0.7,0.8)",
+     "n": 6876,
+     "mean_predicted": 0.7282449721207591,
+     "observed_rate": 0.6595404304828388
+    },
+    {
+     "bin": "[0.8,0.9)",
+     "n": 1525,
+     "mean_predicted": 0.8181265506541219,
+     "observed_rate": 0.6537704918032787
+    },
+    {
+     "bin": "[0.9,1.0]",
+     "n": 68,
+     "mean_predicted": 0.9296589039857296,
+     "observed_rate": 0.6176470588235294
+    }
+   ]
+  },
+  "BATTER_RBIS": {
+   "form": "OU_0.5",
+   "value_key": "rbi",
+   "metrics": {
+    "n": 38511,
+    "brier_eng": 0.21447148013739037,
+    "brier_ch": 0.20859251133694273,
+    "brier_b1": 0.21169419957435337,
+    "brier_b2": 0.20903130686140475,
+    "ll_eng": 0.6350934918454904,
+    "ll_ch": 0.6077614912455571,
+    "ll_b1": 0.6272582838506043,
+    "ll_b2": 0.6088251435443974
+   },
+   "paired_deltas": {
+    "dBrier_ch_vs_FROZEN": {
+     "delta": -0.005878968800447673,
+     "ci95": [
+      -0.006603348701140192,
+      -0.005211351103194073
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_ch_vs_B1": {
+     "delta": -0.0031016882374106263,
+     "ci95": [
+      -0.004139412027939224,
+      -0.002199144745039405
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_ch_vs_B2": {
+     "delta": -0.0004387955244620252,
+     "ci95": [
+      -0.0010128011901909418,
+      0.00017657256404863628
+     ],
+     "entirely_below_zero": false
+    },
+    "dLogLoss_ch_vs_FROZEN": {
+     "delta": -0.02733200059993314,
+     "ci95": [
+      -0.03353000525440421,
+      -0.022236717127713915
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_B1": {
+     "delta": -0.019496792605047143,
+     "ci95": [
+      -0.02659526347382654,
+      -0.013416458224543943
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_B2": {
+     "delta": -0.00106365229884032,
+     "ci95": [
+      -0.0024401967111307063,
+      0.00045213072602823457
+     ],
+     "entirely_below_zero": false
+    },
+    "dBrier_FROZEN_vs_B1": {
+     "delta": 0.002777280563037045,
+     "ci95": [
+      0.002037472987828115,
+      0.0035289053534598483
+     ],
+     "entirely_below_zero": false
+    },
+    "dBrier_FROZEN_vs_B2": {
+     "delta": 0.005440173275985645,
+     "ci95": [
+      0.004420742310798247,
+      0.006530484849926989
+     ],
+     "entirely_below_zero": false
+    }
+   },
+   "verdict": "KEEP FROZEN",
+   "calibration_deciles_challenger": [
+    {
+     "bin": "[0.0,0.1)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.1,0.2)",
+     "n": 1438,
+     "mean_predicted": 0.18347317152501227,
+     "observed_rate": 0.2211404728789986
+    },
+    {
+     "bin": "[0.2,0.3)",
+     "n": 20105,
+     "mean_predicted": 0.2603630356827784,
+     "observed_rate": 0.27868689380751055
+    },
+    {
+     "bin": "[0.3,0.4)",
+     "n": 16252,
+     "mean_predicted": 0.33683732840581043,
+     "observed_rate": 0.3249446222003446
+    },
+    {
+     "bin": "[0.4,0.5)",
+     "n": 716,
+     "mean_predicted": 0.41850356352680723,
+     "observed_rate": 0.3547486033519553
+    },
+    {
+     "bin": "[0.5,0.6)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.6,0.7)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.7,0.8)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.8,0.9)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.9,1.0]",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    }
+   ],
+   "calibration_deciles_frozen": [
+    {
+     "bin": "[0.0,0.1)",
+     "n": 871,
+     "mean_predicted": 0.05501585216101312,
+     "observed_rate": 0.2261768082663605
+    },
+    {
+     "bin": "[0.1,0.2)",
+     "n": 5311,
+     "mean_predicted": 0.14815199224278247,
+     "observed_rate": 0.25475428356241764
+    },
+    {
+     "bin": "[0.2,0.3)",
+     "n": 13018,
+     "mean_predicted": 0.23964191474638477,
+     "observed_rate": 0.29121216776770625
+    },
+    {
+     "bin": "[0.3,0.4)",
+     "n": 12694,
+     "mean_predicted": 0.3318161242975375,
+     "observed_rate": 0.3073893177879313
+    },
+    {
+     "bin": "[0.4,0.5)",
+     "n": 5325,
+     "mean_predicted": 0.4257697210652937,
+     "observed_rate": 0.3327699530516432
+    },
+    {
+     "bin": "[0.5,0.6)",
+     "n": 1143,
+     "mean_predicted": 0.5209683909235057,
+     "observed_rate": 0.3350831146106737
+    },
+    {
+     "bin": "[0.6,0.7)",
+     "n": 134,
+     "mean_predicted": 0.620011213334703,
+     "observed_rate": 0.3805970149253731
+    },
+    {
+     "bin": "[0.7,0.8)",
+     "n": 15,
+     "mean_predicted": 0.7123665223665223,
+     "observed_rate": 0.4666666666666667
+    },
+    {
+     "bin": "[0.8,0.9)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.9,1.0]",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    }
+   ]
+  },
+  "BATTER_RUNS": {
+   "form": "OU_0.5",
+   "value_key": "runs",
+   "metrics": {
+    "n": 38511,
+    "brier_eng": 0.24229348967884295,
+    "brier_ch": 0.23528248335749435,
+    "brier_b1": 0.23925774938957106,
+    "brier_b2": 0.23622733060566317,
+    "ll_eng": 0.6864240102948598,
+    "ll_ch": 0.6634463616732522,
+    "ll_b1": 0.6789066117251029,
+    "ll_b2": 0.6653481345380915
+   },
+   "paired_deltas": {
+    "dBrier_ch_vs_FROZEN": {
+     "delta": -0.007011006321348611,
+     "ci95": [
+      -0.008214221747006098,
+      -0.005973706844862376
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_ch_vs_B1": {
+     "delta": -0.003975266032076747,
+     "ci95": [
+      -0.005520485497239279,
+      -0.0027868278089476493
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_ch_vs_B2": {
+     "delta": -0.0009448472481688165,
+     "ci95": [
+      -0.0015336343463400338,
+      -0.0002942290059189575
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_FROZEN": {
+     "delta": -0.022977648621607383,
+     "ci95": [
+      -0.02980549904051727,
+      -0.017869031118661317
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_B1": {
+     "delta": -0.015460250051850654,
+     "ci95": [
+      -0.023167816924732014,
+      -0.009769882219986833
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_B2": {
+     "delta": -0.001901772864839209,
+     "ci95": [
+      -0.0032018838453389594,
+      -0.0005156065048064608
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_FROZEN_vs_B1": {
+     "delta": 0.0030357402892718655,
+     "ci95": [
+      0.002139991989115164,
+      0.0039080354462560285
+     ],
+     "entirely_below_zero": false
+    },
+    "dBrier_FROZEN_vs_B2": {
+     "delta": 0.006066159073179799,
+     "ci95": [
+      0.004700846600882899,
+      0.007684913076929974
+     ],
+     "entirely_below_zero": false
+    }
+   },
+   "verdict": "ADOPT-CANDIDATE",
+   "calibration_deciles_challenger": [
+    {
+     "bin": "[0.0,0.1)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.1,0.2)",
+     "n": 10,
+     "mean_predicted": 0.1895870306109801,
+     "observed_rate": 0.3
+    },
+    {
+     "bin": "[0.2,0.3)",
+     "n": 4385,
+     "mean_predicted": 0.277075940586752,
+     "observed_rate": 0.32451539338654506
+    },
+    {
+     "bin": "[0.3,0.4)",
+     "n": 21435,
+     "mean_predicted": 0.3529958751742594,
+     "observed_rate": 0.36599020293911827
+    },
+    {
+     "bin": "[0.4,0.5)",
+     "n": 12094,
+     "mean_predicted": 0.4407560120968058,
+     "observed_rate": 0.43087481395733424
+    },
+    {
+     "bin": "[0.5,0.6)",
+     "n": 586,
+     "mean_predicted": 0.51980784603083,
+     "observed_rate": 0.4180887372013652
+    },
+    {
+     "bin": "[0.6,0.7)",
+     "n": 1,
+     "mean_predicted": 0.6033840630834282,
+     "observed_rate": 0.0
+    },
+    {
+     "bin": "[0.7,0.8)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.8,0.9)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.9,1.0]",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    }
+   ],
+   "calibration_deciles_frozen": [
+    {
+     "bin": "[0.0,0.1)",
+     "n": 313,
+     "mean_predicted": 0.061483343510934305,
+     "observed_rate": 0.2939297124600639
+    },
+    {
+     "bin": "[0.1,0.2)",
+     "n": 1975,
+     "mean_predicted": 0.1542555732433275,
+     "observed_rate": 0.3351898734177215
+    },
+    {
+     "bin": "[0.2,0.3)",
+     "n": 7351,
+     "mean_predicted": 0.24333226860900448,
+     "observed_rate": 0.3411780710107468
+    },
+    {
+     "bin": "[0.3,0.4)",
+     "n": 11890,
+     "mean_predicted": 0.33713882517241234,
+     "observed_rate": 0.3704793944491169
+    },
+    {
+     "bin": "[0.4,0.5)",
+     "n": 10650,
+     "mean_predicted": 0.4312847928516576,
+     "observed_rate": 0.407981220657277
+    },
+    {
+     "bin": "[0.5,0.6)",
+     "n": 5060,
+     "mean_predicted": 0.5250628886702191,
+     "observed_rate": 0.4225296442687747
+    },
+    {
+     "bin": "[0.6,0.7)",
+     "n": 1168,
+     "mean_predicted": 0.6202871512498118,
+     "observed_rate": 0.4546232876712329
+    },
+    {
+     "bin": "[0.7,0.8)",
+     "n": 94,
+     "mean_predicted": 0.7237332483317181,
+     "observed_rate": 0.4574468085106383
+    },
+    {
+     "bin": "[0.8,0.9)",
+     "n": 10,
+     "mean_predicted": 0.8035397935397934,
+     "observed_rate": 0.3
+    },
+    {
+     "bin": "[0.9,1.0]",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    }
+   ]
+  },
+  "HITS_RUNS_RBIS": {
+   "form": "OU_0.5",
+   "value_key": "hits_runs_rbis",
+   "metrics": {
+    "n": 38511,
+    "brier_eng": 0.2236538240521642,
+    "brier_ch": 0.21663845820657085,
+    "brier_b1": 0.220634087325423,
+    "brier_b2": 0.21767519586633696,
+    "ll_eng": 0.6424784629954123,
+    "ll_ch": 0.6246319350309858,
+    "ll_b1": 0.6348484322203793,
+    "ll_b2": 0.6270394514390552
+   },
+   "paired_deltas": {
+    "dBrier_ch_vs_FROZEN": {
+     "delta": -0.0070153658455933115,
+     "ci95": [
+      -0.007857847330044746,
+      -0.006319360957318619
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_ch_vs_B1": {
+     "delta": -0.0039956291188521014,
+     "ci95": [
+      -0.005128151295590395,
+      -0.0030339547341774725
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_ch_vs_B2": {
+     "delta": -0.0010367376597661048,
+     "ci95": [
+      -0.0015426542580009408,
+      -0.0005123254768470498
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_FROZEN": {
+     "delta": -0.017846527964426484,
+     "ci95": [
+      -0.02023012274692836,
+      -0.01595397782905029
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_B1": {
+     "delta": -0.01021649718939344,
+     "ci95": [
+      -0.01349533571604208,
+      -0.007550048846664847
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_B2": {
+     "delta": -0.0024075164080693467,
+     "ci95": [
+      -0.0035411441955403708,
+      -0.0012549949906741872
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_FROZEN_vs_B1": {
+     "delta": 0.0030197367267412126,
+     "ci95": [
+      0.0023067785259100228,
+      0.0037409188242497667
+     ],
+     "entirely_below_zero": false
+    },
+    "dBrier_FROZEN_vs_B2": {
+     "delta": 0.005978628185827217,
+     "ci95": [
+      0.004906592396950652,
+      0.0072090468695367085
+     ],
+     "entirely_below_zero": false
+    }
+   },
+   "verdict": "ADOPT-CANDIDATE",
+   "calibration_deciles_challenger": [
+    {
+     "bin": "[0.0,0.1)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.1,0.2)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.2,0.3)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.3,0.4)",
+     "n": 6,
+     "mean_predicted": 0.3876847164774239,
+     "observed_rate": 0.6666666666666666
+    },
+    {
+     "bin": "[0.4,0.5)",
+     "n": 302,
+     "mean_predicted": 0.47968731384932406,
+     "observed_rate": 0.5596026490066225
+    },
+    {
+     "bin": "[0.5,0.6)",
+     "n": 5425,
+     "mean_predicted": 0.5699813424426279,
+     "observed_rate": 0.6173271889400922
+    },
+    {
+     "bin": "[0.6,0.7)",
+     "n": 20976,
+     "mean_predicted": 0.6526609858223559,
+     "observed_rate": 0.6712433257055682
+    },
+    {
+     "bin": "[0.7,0.8)",
+     "n": 11640,
+     "mean_predicted": 0.7342522957097858,
+     "observed_rate": 0.7276632302405498
+    },
+    {
+     "bin": "[0.8,0.9)",
+     "n": 162,
+     "mean_predicted": 0.8094516215931016,
+     "observed_rate": 0.7098765432098766
+    },
+    {
+     "bin": "[0.9,1.0]",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    }
+   ],
+   "calibration_deciles_frozen": [
+    {
+     "bin": "[0.0,0.1)",
+     "n": 4,
+     "mean_predicted": 0.07808441558441559,
+     "observed_rate": 0.5
+    },
+    {
+     "bin": "[0.1,0.2)",
+     "n": 28,
+     "mean_predicted": 0.16141892071513922,
+     "observed_rate": 0.6071428571428571
+    },
+    {
+     "bin": "[0.2,0.3)",
+     "n": 101,
+     "mean_predicted": 0.2521131812276497,
+     "observed_rate": 0.5247524752475248
+    },
+    {
+     "bin": "[0.3,0.4)",
+     "n": 648,
+     "mean_predicted": 0.35050152753729846,
+     "observed_rate": 0.5787037037037037
+    },
+    {
+     "bin": "[0.4,0.5)",
+     "n": 2457,
+     "mean_predicted": 0.4432707446236088,
+     "observed_rate": 0.6105006105006106
+    },
+    {
+     "bin": "[0.5,0.6)",
+     "n": 7100,
+     "mean_predicted": 0.5423294255227783,
+     "observed_rate": 0.6456338028169014
+    },
+    {
+     "bin": "[0.6,0.7)",
+     "n": 11904,
+     "mean_predicted": 0.637861514320289,
+     "observed_rate": 0.6738911290322581
+    },
+    {
+     "bin": "[0.7,0.8)",
+     "n": 10890,
+     "mean_predicted": 0.7320807531910528,
+     "observed_rate": 0.7082644628099174
+    },
+    {
+     "bin": "[0.8,0.9)",
+     "n": 4866,
+     "mean_predicted": 0.8228113245776362,
+     "observed_rate": 0.729140978216194
+    },
+    {
+     "bin": "[0.9,1.0]",
+     "n": 513,
+     "mean_predicted": 0.9150187102489029,
+     "observed_rate": 0.7270955165692008
+    }
+   ]
+  },
+  "BATTER_SINGLES": {
+   "form": "OU_0.5",
+   "value_key": "singles",
+   "metrics": {
+    "n": 38511,
+    "brier_eng": 0.25364760205937553,
+    "brier_ch": 0.24637215997699763,
+    "brier_b1": 0.25047406887629126,
+    "brier_b2": 0.24773636205626992,
+    "ll_eng": 0.7044946707341952,
+    "ll_ch": 0.6859258619598947,
+    "ll_b1": 0.6971378120702627,
+    "ll_b2": 0.6886134597917836
+   },
+   "paired_deltas": {
+    "dBrier_ch_vs_FROZEN": {
+     "delta": -0.007275442082377897,
+     "ci95": [
+      -0.00835304557751478,
+      -0.006341894932654009
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_ch_vs_B1": {
+     "delta": -0.004101908899293647,
+     "ci95": [
+      -0.005499239325538605,
+      -0.0030211861126632467
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_ch_vs_B2": {
+     "delta": -0.0013642020792722746,
+     "ci95": [
+      -0.0019539666046712867,
+      -0.0007482620506183528
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_FROZEN": {
+     "delta": -0.018568808774300637,
+     "ci95": [
+      -0.0214197826885722,
+      -0.016086014914435308
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_B1": {
+     "delta": -0.01121195011036791,
+     "ci95": [
+      -0.01471671757457195,
+      -0.008279130449440815
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_B2": {
+     "delta": -0.0026875978318888433,
+     "ci95": [
+      -0.003919586528227179,
+      -0.001426539379293233
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_FROZEN_vs_B1": {
+     "delta": 0.0031735331830842497,
+     "ci95": [
+      0.002333119545590359,
+      0.004082377358892635
+     ],
+     "entirely_below_zero": false
+    },
+    "dBrier_FROZEN_vs_B2": {
+     "delta": 0.00591124000310562,
+     "ci95": [
+      0.004683640303484636,
+      0.007290004878124078
+     ],
+     "entirely_below_zero": false
+    }
+   },
+   "verdict": "ADOPT-CANDIDATE",
+   "calibration_deciles_challenger": [
+    {
+     "bin": "[0.0,0.1)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.1,0.2)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.2,0.3)",
+     "n": 459,
+     "mean_predicted": 0.2778986762253189,
+     "observed_rate": 0.33769063180827885
+    },
+    {
+     "bin": "[0.3,0.4)",
+     "n": 9787,
+     "mean_predicted": 0.36742643701238553,
+     "observed_rate": 0.40216613875549195
+    },
+    {
+     "bin": "[0.4,0.5)",
+     "n": 21560,
+     "mean_predicted": 0.44718354983779035,
+     "observed_rate": 0.45556586270871985
+    },
+    {
+     "bin": "[0.5,0.6)",
+     "n": 6418,
+     "mean_predicted": 0.532334613881082,
+     "observed_rate": 0.5182299781863509
+    },
+    {
+     "bin": "[0.6,0.7)",
+     "n": 287,
+     "mean_predicted": 0.6158568573763495,
+     "observed_rate": 0.6027874564459931
+    },
+    {
+     "bin": "[0.7,0.8)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.8,0.9)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.9,1.0]",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    }
+   ],
+   "calibration_deciles_frozen": [
+    {
+     "bin": "[0.0,0.1)",
+     "n": 87,
+     "mean_predicted": 0.06718154782501864,
+     "observed_rate": 0.3103448275862069
+    },
+    {
+     "bin": "[0.1,0.2)",
+     "n": 723,
+     "mean_predicted": 0.15457275350662944,
+     "observed_rate": 0.3775933609958506
+    },
+    {
+     "bin": "[0.2,0.3)",
+     "n": 3665,
+     "mean_predicted": 0.24917754385772156,
+     "observed_rate": 0.4038199181446112
+    },
+    {
+     "bin": "[0.3,0.4)",
+     "n": 9275,
+     "mean_predicted": 0.34097571620707984,
+     "observed_rate": 0.4186522911051213
+    },
+    {
+     "bin": "[0.4,0.5)",
+     "n": 12026,
+     "mean_predicted": 0.4345184947828567,
+     "observed_rate": 0.45476467653417596
+    },
+    {
+     "bin": "[0.5,0.6)",
+     "n": 8396,
+     "mean_predicted": 0.52951998530606,
+     "observed_rate": 0.4752262982372558
+    },
+    {
+     "bin": "[0.6,0.7)",
+     "n": 3603,
+     "mean_predicted": 0.6253530915097013,
+     "observed_rate": 0.5240077713016931
+    },
+    {
+     "bin": "[0.7,0.8)",
+     "n": 650,
+     "mean_predicted": 0.7211767168510695,
+     "observed_rate": 0.5446153846153846
+    },
+    {
+     "bin": "[0.8,0.9)",
+     "n": 75,
+     "mean_predicted": 0.8171837818408688,
+     "observed_rate": 0.5333333333333333
+    },
+    {
+     "bin": "[0.9,1.0]",
+     "n": 11,
+     "mean_predicted": 0.915817894226985,
+     "observed_rate": 0.7272727272727273
+    }
+   ]
+  },
+  "BATTER_DOUBLES": {
+   "form": "OU_0.5",
+   "value_key": "doubles",
+   "metrics": {
+    "n": 38511,
+    "brier_eng": 0.1347793306622666,
+    "brier_ch": 0.13098999216785923,
+    "brier_b1": 0.1330432909761345,
+    "brier_b2": 0.13043743206722178,
+    "ll_eng": 0.4912038061924949,
+    "ll_ch": 0.4321018329738623,
+    "ll_b1": 0.4723061529029928,
+    "ll_b2": 0.42996844866495526
+   },
+   "paired_deltas": {
+    "dBrier_ch_vs_FROZEN": {
+     "delta": -0.003789338494407392,
+     "ci95": [
+      -0.0043520763075677055,
+      -0.0033300826300758433
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_ch_vs_B1": {
+     "delta": -0.0020532988082752985,
+     "ci95": [
+      -0.0028331104585794177,
+      -0.001391054513039865
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_ch_vs_B2": {
+     "delta": 0.0005525601006374738,
+     "ci95": [
+      0.0002571568060890774,
+      0.0008427506268242753
+     ],
+     "entirely_below_zero": false
+    },
+    "dLogLoss_ch_vs_FROZEN": {
+     "delta": -0.05910197321863255,
+     "ci95": [
+      -0.08134029601158704,
+      -0.04307355037276652
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_B1": {
+     "delta": -0.040204319929130476,
+     "ci95": [
+      -0.06421111454826095,
+      -0.02240063388657137
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_B2": {
+     "delta": 0.0021333843089070695,
+     "ci95": [
+      0.0009922628844745741,
+      0.0032665587548371265
+     ],
+     "entirely_below_zero": false
+    },
+    "dBrier_FROZEN_vs_B1": {
+     "delta": 0.0017360396861320945,
+     "ci95": [
+      0.0012812007805648772,
+      0.002187030558588235
+     ],
+     "entirely_below_zero": false
+    },
+    "dBrier_FROZEN_vs_B2": {
+     "delta": 0.004341898595044863,
+     "ci95": [
+      0.0037248323203298984,
+      0.005051759128603268
+     ],
+     "entirely_below_zero": false
+    }
+   },
+   "verdict": "KEEP FROZEN",
+   "calibration_deciles_challenger": [
+    {
+     "bin": "[0.0,0.1)",
+     "n": 2308,
+     "mean_predicted": 0.08762580989775252,
+     "observed_rate": 0.134315424610052
+    },
+    {
+     "bin": "[0.1,0.2)",
+     "n": 32939,
+     "mean_predicted": 0.1507075381219125,
+     "observed_rate": 0.15534776404869607
+    },
+    {
+     "bin": "[0.2,0.3)",
+     "n": 3262,
+     "mean_predicted": 0.21561950692332302,
+     "observed_rate": 0.15695892090741875
+    },
+    {
+     "bin": "[0.3,0.4)",
+     "n": 2,
+     "mean_predicted": 0.3093378124044483,
+     "observed_rate": 0.0
+    },
+    {
+     "bin": "[0.4,0.5)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.5,0.6)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.6,0.7)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.7,0.8)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.8,0.9)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.9,1.0]",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    }
+   ],
+   "calibration_deciles_frozen": [
+    {
+     "bin": "[0.0,0.1)",
+     "n": 8128,
+     "mean_predicted": 0.05196281425469468,
+     "observed_rate": 0.13693405511811024
+    },
+    {
+     "bin": "[0.1,0.2)",
+     "n": 18986,
+     "mean_predicted": 0.13692399469164876,
+     "observed_rate": 0.15806383651111344
+    },
+    {
+     "bin": "[0.2,0.3)",
+     "n": 10049,
+     "mean_predicted": 0.22470541165416522,
+     "observed_rate": 0.1612100706537964
+    },
+    {
+     "bin": "[0.3,0.4)",
+     "n": 1250,
+     "mean_predicted": 0.3187289817815846,
+     "observed_rate": 0.1488
+    },
+    {
+     "bin": "[0.4,0.5)",
+     "n": 84,
+     "mean_predicted": 0.41699955518892245,
+     "observed_rate": 0.17857142857142858
+    },
+    {
+     "bin": "[0.5,0.6)",
+     "n": 12,
+     "mean_predicted": 0.5264554889554889,
+     "observed_rate": 0.3333333333333333
+    },
+    {
+     "bin": "[0.6,0.7)",
+     "n": 2,
+     "mean_predicted": 0.6076923076923078,
+     "observed_rate": 0.0
+    },
+    {
+     "bin": "[0.7,0.8)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.8,0.9)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.9,1.0]",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    }
+   ]
+  },
+  "BATTER_WALKS": {
+   "form": "OU_0.5",
+   "value_key": "walks",
+   "metrics": {
+    "n": 38511,
+    "brier_eng": 0.21094020761717538,
+    "brier_ch": 0.20536533257706274,
+    "brier_b1": 0.20809757362520379,
+    "brier_b2": 0.20991423896784814,
+    "ll_eng": 0.6260909971396972,
+    "ll_ch": 0.5997986733383447,
+    "ll_b1": 0.6167487032230617,
+    "ll_b2": 0.6106806859354074
+   },
+   "paired_deltas": {
+    "dBrier_ch_vs_FROZEN": {
+     "delta": -0.005574875040112651,
+     "ci95": [
+      -0.006410346054092639,
+      -0.004838733212580842
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_ch_vs_B1": {
+     "delta": -0.002732241048141035,
+     "ci95": [
+      -0.0037476167336317956,
+      -0.0019364384530941073
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_ch_vs_B2": {
+     "delta": -0.004548906390785398,
+     "ci95": [
+      -0.005105945474680316,
+      -0.003971559729535297
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_FROZEN": {
+     "delta": -0.026292323801352435,
+     "ci95": [
+      -0.03264306763021648,
+      -0.02087593801376122
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_B1": {
+     "delta": -0.016950029884717065,
+     "ci95": [
+      -0.023590250735455228,
+      -0.01158570755910272
+     ],
+     "entirely_below_zero": true
+    },
+    "dLogLoss_ch_vs_B2": {
+     "delta": -0.01088201259706267,
+     "ci95": [
+      -0.012277919576833825,
+      -0.009473034482656063
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier_FROZEN_vs_B1": {
+     "delta": 0.0028426339919716145,
+     "ci95": [
+      0.0021668784957438853,
+      0.0034867067649206143
+     ],
+     "entirely_below_zero": false
+    },
+    "dBrier_FROZEN_vs_B2": {
+     "delta": 0.0010259686493272484,
+     "ci95": [
+      -0.00016706228708663622,
+      0.002286303305534521
+     ],
+     "entirely_below_zero": false
+    }
+   },
+   "verdict": "ADOPT-CANDIDATE",
+   "calibration_deciles_challenger": [
+    {
+     "bin": "[0.0,0.1)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.1,0.2)",
+     "n": 2899,
+     "mean_predicted": 0.17778887861244186,
+     "observed_rate": 0.18282166264229044
+    },
+    {
+     "bin": "[0.2,0.3)",
+     "n": 16478,
+     "mean_predicted": 0.25709184758921316,
+     "observed_rate": 0.25816239834931426
+    },
+    {
+     "bin": "[0.3,0.4)",
+     "n": 15315,
+     "mean_predicted": 0.3427661561717779,
+     "observed_rate": 0.33411687887691804
+    },
+    {
+     "bin": "[0.4,0.5)",
+     "n": 3512,
+     "mean_predicted": 0.4347529379987134,
+     "observed_rate": 0.42625284738041
+    },
+    {
+     "bin": "[0.5,0.6)",
+     "n": 303,
+     "mean_predicted": 0.525165656717757,
+     "observed_rate": 0.48184818481848185
+    },
+    {
+     "bin": "[0.6,0.7)",
+     "n": 4,
+     "mean_predicted": 0.6027081277078727,
+     "observed_rate": 0.5
+    },
+    {
+     "bin": "[0.7,0.8)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.8,0.9)",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    },
+    {
+     "bin": "[0.9,1.0]",
+     "n": 0,
+     "mean_predicted": null,
+     "observed_rate": null
+    }
+   ],
+   "calibration_deciles_frozen": [
+    {
+     "bin": "[0.0,0.1)",
+     "n": 1574,
+     "mean_predicted": 0.055583887223637746,
+     "observed_rate": 0.18360864040660738
+    },
+    {
+     "bin": "[0.1,0.2)",
+     "n": 6664,
+     "mean_predicted": 0.14362687713119632,
+     "observed_rate": 0.22433973589435774
+    },
+    {
+     "bin": "[0.2,0.3)",
+     "n": 11434,
+     "mean_predicted": 0.23799407147846877,
+     "observed_rate": 0.2820535245758265
+    },
+    {
+     "bin": "[0.3,0.4)",
+     "n": 10127,
+     "mean_predicted": 0.332882777505094,
+     "observed_rate": 0.3133208255159475
+    },
+    {
+     "bin": "[0.4,0.5)",
+     "n": 5640,
+     "mean_predicted": 0.4296651165244602,
+     "observed_rate": 0.3680851063829787
+    },
+    {
+     "bin": "[0.5,0.6)",
+     "n": 2402,
+     "mean_predicted": 0.5264141349060116,
+     "observed_rate": 0.4121565362198168
+    },
+    {
+     "bin": "[0.6,0.7)",
+     "n": 539,
+     "mean_predicted": 0.624007608044557,
+     "observed_rate": 0.4359925788497217
+    },
+    {
+     "bin": "[0.7,0.8)",
+     "n": 114,
+     "mean_predicted": 0.7230286368739288,
+     "observed_rate": 0.49122807017543857
+    },
+    {
+     "bin": "[0.8,0.9)",
+     "n": 16,
+     "mean_predicted": 0.8094696969696971,
+     "observed_rate": 0.4375
+    },
+    {
+     "bin": "[0.9,1.0]",
+     "n": 1,
+     "mean_predicted": 0.9,
+     "observed_rate": 0.0
+    }
+   ]
+  },
+  "BATTER_HOME_RUNS": {
+   "form": "LADDER_CRPS",
+   "value_key": "home_runs",
+   "metrics": {
+    "n": 38511,
+    "crps_eng": 0.1141443675325391,
+    "crps_ch": 0.11131347064426503,
+    "crps_b1": 0.11275257102407807,
+    "crps_b2": 0.11227913025398678,
+    "brier05_eng": 0.10601826594208578,
+    "brier05_ch": 0.10339069286885132,
+    "brier05_b1": 0.10473072678800761,
+    "brier05_b2": 0.10438886093962445,
+    "brier15_eng": 0.00772472610871277,
+    "brier15_ch": 0.0075320990734092,
+    "brier15_b1": 0.007627642381202128,
+    "brier15_b2": 0.007500885994165412
+   },
+   "paired_deltas": {
+    "dCRPS_ch_vs_FROZEN": {
+     "delta": -0.002830896888274072,
+     "ci95": [
+      -0.0032269732523250785,
+      -0.0024619496067710377
+     ],
+     "entirely_below_zero": true
+    },
+    "dCRPS_ch_vs_B1": {
+     "delta": -0.0014391003798130235,
+     "ci95": [
+      -0.001956109712813638,
+      -0.0010264347718936342
+     ],
+     "entirely_below_zero": true
+    },
+    "dCRPS_ch_vs_B2": {
+     "delta": -0.000965659609721738,
+     "ci95": [
+      -0.0012300366083902072,
+      -0.0007242077352555235
+     ],
+     "entirely_below_zero": true
+    },
+    "dCRPS_FROZEN_vs_B1": {
+     "delta": 0.00139179650846105,
+     "ci95": [
+      0.0009908100333461119,
+      0.0017886991732577232
+     ],
+     "entirely_below_zero": false
+    },
+    "dCRPS_FROZEN_vs_B2": {
+     "delta": 0.0018652372785523325,
+     "ci95": [
+      0.0013368606451303845,
+      0.002407702132098703
+     ],
+     "entirely_below_zero": false
+    },
+    "dBrier05_ch_vs_FROZEN": {
+     "delta": -0.0026275730732344617,
+     "ci95": [
+      -0.0030265765192182227,
+      -0.00226155478844401
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier15_ch_vs_FROZEN": {
+     "delta": -0.00019262703530356927,
+     "ci95": [
+      -0.0002231074347228536,
+      -0.00016696501942916873
+     ],
+     "entirely_below_zero": true
+    }
+   },
+   "verdict": "ADOPT-CANDIDATE",
+   "threshold_brier_note": "Brier at 0.5/1.5 descriptive; gate is CRPS-only per prereg section 6."
+  },
+  "BATTER_EXTRA_BASE_HITS": {
+   "form": "LADDER_CRPS",
+   "value_key": "doubles+triples+home_runs",
+   "metrics": {
+    "n": 38511,
+    "crps_eng": 0.2394551679312986,
+    "crps_ch": 0.23332627649442095,
+    "crps_b1": 0.23664599021501873,
+    "crps_b2": 0.23405480209184976,
+    "brier05_eng": 0.20075986109577276,
+    "brier05_ch": 0.19558595761768371,
+    "brier05_b1": 0.19843870463756416,
+    "brier05_b2": 0.19638236930190237,
+    "brier15_eng": 0.035054722563948,
+    "brier15_ch": 0.034181034137717364,
+    "brier15_b1": 0.03461148864406011,
+    "brier15_b2": 0.034126740320698484
+   },
+   "paired_deltas": {
+    "dCRPS_ch_vs_FROZEN": {
+     "delta": -0.00612889143687766,
+     "ci95": [
+      -0.0070246553004255155,
+      -0.005321627744960853
+     ],
+     "entirely_below_zero": true
+    },
+    "dCRPS_ch_vs_B1": {
+     "delta": -0.0033197137205977886,
+     "ci95": [
+      -0.004506747717549345,
+      -0.002299042219696276
+     ],
+     "entirely_below_zero": true
+    },
+    "dCRPS_ch_vs_B2": {
+     "delta": -0.0007285255974288478,
+     "ci95": [
+      -0.001161007291063246,
+      -0.0002720967266844849
+     ],
+     "entirely_below_zero": true
+    },
+    "dCRPS_FROZEN_vs_B1": {
+     "delta": 0.0028091777162798713,
+     "ci95": [
+      0.002048117629511115,
+      0.0036071950997771203
+     ],
+     "entirely_below_zero": false
+    },
+    "dCRPS_FROZEN_vs_B2": {
+     "delta": 0.00540036583944881,
+     "ci95": [
+      0.00433967761447611,
+      0.006573960637739547
+     ],
+     "entirely_below_zero": false
+    },
+    "dBrier05_ch_vs_FROZEN": {
+     "delta": -0.005173903478089084,
+     "ci95": [
+      -0.0059941871151407795,
+      -0.0044060247479240505
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier15_ch_vs_FROZEN": {
+     "delta": -0.0008736884262306423,
+     "ci95": [
+      -0.000971603405006331,
+      -0.0007788152639498051
+     ],
+     "entirely_below_zero": true
+    }
+   },
+   "verdict": "ADOPT-CANDIDATE",
+   "threshold_brier_note": "Brier at 0.5/1.5 descriptive; gate is CRPS-only per prereg section 6."
+  },
+  "BATTER_TRIPLES": {
+   "form": "LADDER_CRPS",
+   "value_key": "triples",
+   "metrics": {
+    "n": 38511,
+    "crps_eng": 0.01532660136506305,
+    "crps_ch": 0.01490594175658813,
+    "crps_b1": 0.015105230774618747,
+    "crps_b2": 0.014892647050212348,
+    "brier05_eng": 0.015112232121411209,
+    "brier05_ch": 0.014696875808256408,
+    "brier05_b1": 0.014894585229483026,
+    "brier05_b2": 0.014684941827155549,
+    "brier15_eng": 0.00021436924365184087,
+    "brier15_ch": 0.00020906594833172123,
+    "brier15_b1": 0.00021064554513571985,
+    "brier15_b2": 0.00020770522305679827
+   },
+   "paired_deltas": {
+    "dCRPS_ch_vs_FROZEN": {
+     "delta": -0.00042065960847492055,
+     "ci95": [
+      -0.0004728371623008401,
+      -0.00036887816724269436
+     ],
+     "entirely_below_zero": true
+    },
+    "dCRPS_ch_vs_B1": {
+     "delta": -0.00019928901803061664,
+     "ci95": [
+      -0.0002707308826073046,
+      -0.00014015965750500207
+     ],
+     "entirely_below_zero": true
+    },
+    "dCRPS_ch_vs_B2": {
+     "delta": 1.3294706375780044e-05,
+     "ci95": [
+      -3.229411187040404e-05,
+      5.639591688319225e-05
+     ],
+     "entirely_below_zero": false
+    },
+    "dCRPS_FROZEN_vs_B1": {
+     "delta": 0.0002213705904443039,
+     "ci95": [
+      0.00016190281735004665,
+      0.0002781513301405375
+     ],
+     "entirely_below_zero": false
+    },
+    "dCRPS_FROZEN_vs_B2": {
+     "delta": 0.00043395431485070146,
+     "ci95": [
+      0.0003554618013372852,
+      0.0005088894948535314
+     ],
+     "entirely_below_zero": false
+    },
+    "dBrier05_ch_vs_FROZEN": {
+     "delta": -0.00041535631315480094,
+     "ci95": [
+      -0.00046761577910661446,
+      -0.00036380907424012635
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier15_ch_vs_FROZEN": {
+     "delta": -5.303295320119609e-06,
+     "ci95": [
+      -6.477023116962378e-06,
+      -4.2325584768473214e-06
+     ],
+     "entirely_below_zero": true
+    }
+   },
+   "verdict": "KEEP FROZEN",
+   "threshold_brier_note": "Brier at 0.5/1.5 descriptive; gate is CRPS-only per prereg section 6."
+  },
+  "BATTER_STRIKEOUTS": {
+   "form": "LADDER_CRPS",
+   "value_key": "strikeouts",
+   "metrics": {
+    "n": 38511,
+    "crps_eng": 0.4537128209441093,
+    "crps_ch": 0.4432721390482889,
+    "crps_b1": 0.4489571654688314,
+    "crps_b2": 0.4569152363671767,
+    "brier05_eng": 0.2357733149116393,
+    "brier05_ch": 0.23007564434607403,
+    "brier05_b1": 0.23317307376889662,
+    "brier05_b2": 0.23831336787463275,
+    "brier15_eng": 0.16884827505284156,
+    "brier15_ch": 0.1653549778756982,
+    "brier15_b1": 0.16726517710571268,
+    "brier15_b2": 0.1704328911313414
+   },
+   "paired_deltas": {
+    "dCRPS_ch_vs_FROZEN": {
+     "delta": -0.010440681895820368,
+     "ci95": [
+      -0.01212172428062326,
+      -0.00903976772259152
+     ],
+     "entirely_below_zero": true
+    },
+    "dCRPS_ch_vs_B1": {
+     "delta": -0.0056850264205424005,
+     "ci95": [
+      -0.007738043971866587,
+      -0.004117575006095319
+     ],
+     "entirely_below_zero": true
+    },
+    "dCRPS_ch_vs_B2": {
+     "delta": -0.013643097318887737,
+     "ci95": [
+      -0.014670779848175086,
+      -0.01255586633890938
+     ],
+     "entirely_below_zero": true
+    },
+    "dCRPS_FROZEN_vs_B1": {
+     "delta": 0.004755655475277972,
+     "ci95": [
+      0.003732352854274727,
+      0.0058214802982058415
+     ],
+     "entirely_below_zero": false
+    },
+    "dCRPS_FROZEN_vs_B2": {
+     "delta": -0.0032024154230673708,
+     "ci95": [
+      -0.005486722782874594,
+      -0.0006008402453430611
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier05_ch_vs_FROZEN": {
+     "delta": -0.005697670565565314,
+     "ci95": [
+      -0.006705732095863463,
+      -0.004648352621834271
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier15_ch_vs_FROZEN": {
+     "delta": -0.0034932971771433675,
+     "ci95": [
+      -0.004157029752920054,
+      -0.0029271894648980456
+     ],
+     "entirely_below_zero": true
+    }
+   },
+   "verdict": "ADOPT-CANDIDATE",
+   "threshold_brier_note": "Brier at 0.5/1.5 descriptive; gate is CRPS-only per prereg section 6."
+  },
+  "BATTER_RUNS_RBIS": {
+   "form": "LADDER_CRPS",
+   "value_key": "runs+rbi",
+   "metrics": {
+    "n": 38511,
+    "crps_eng": 0.6393427896303283,
+    "crps_ch": 0.6214954338012734,
+    "crps_b1": 0.6310496467806553,
+    "crps_b2": 0.6228831065192475,
+    "brier05_eng": 0.2564783211850321,
+    "brier05_ch": 0.24912875139655197,
+    "brier05_b1": 0.25321893807774787,
+    "brier05_b2": 0.24983084453576945,
+    "brier15_eng": 0.18870256627374415,
+    "brier15_ch": 0.1833321842914017,
+    "brier15_b1": 0.18614103555833367,
+    "brier15_b2": 0.18400578313659596
+   },
+   "paired_deltas": {
+    "dCRPS_ch_vs_FROZEN": {
+     "delta": -0.017847355829055077,
+     "ci95": [
+      -0.020141760191965417,
+      -0.015891114254138392
+     ],
+     "entirely_below_zero": true
+    },
+    "dCRPS_ch_vs_B1": {
+     "delta": -0.009554212979382014,
+     "ci95": [
+      -0.01291862359811721,
+      -0.006887248361528718
+     ],
+     "entirely_below_zero": true
+    },
+    "dCRPS_ch_vs_B2": {
+     "delta": -0.0013876727179741803,
+     "ci95": [
+      -0.002433808841238861,
+      -0.0002929242150367391
+     ],
+     "entirely_below_zero": true
+    },
+    "dCRPS_FROZEN_vs_B1": {
+     "delta": 0.00829314284967307,
+     "ci95": [
+      0.006217661613009288,
+      0.010308641635672534
+     ],
+     "entirely_below_zero": false
+    },
+    "dCRPS_FROZEN_vs_B2": {
+     "delta": 0.016459683111080908,
+     "ci95": [
+      0.013911430950433545,
+      0.019460821144844622
+     ],
+     "entirely_below_zero": false
+    },
+    "dBrier05_ch_vs_FROZEN": {
+     "delta": -0.007349569788480159,
+     "ci95": [
+      -0.008719908501657152,
+      -0.006293740741144931
+     ],
+     "entirely_below_zero": true
+    },
+    "dBrier15_ch_vs_FROZEN": {
+     "delta": -0.00537038198234248,
+     "ci95": [
+      -0.006004419822140875,
+      -0.004735141814466775
+     ],
+     "entirely_below_zero": true
+    }
+   },
+   "verdict": "ADOPT-CANDIDATE",
+   "threshold_brier_note": "Brier at 0.5/1.5 descriptive; gate is CRPS-only per prereg section 6."
+  }
+ },
+ "generated_at_utc": "2026-10-15T03:16:41.805463+00:00"
+}

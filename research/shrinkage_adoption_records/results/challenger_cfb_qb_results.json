@@ -1,0 +1,315 @@
+{
+ "prereg": {
+  "path": "model_fix_20261014/specs/PREREG_CFB_QB.md",
+  "sha256": "319629eee535bba913953c9178c6f4216476c453ff2231627647ae2fde85ca25",
+  "locked_sha256_in_SPEC_HASHES": "319629eee535bba913953c9178c6f4216476c453ff2231627647ae2fde85ca25"
+ },
+ "label": "RESEARCH_EVIDENCE \u2014 not a market verdict, not validation",
+ "evaluand": {
+  "builder": "sportsedge/research/cfb_qb_passing_distribution.py",
+  "origin_main": "2a713380c7d49733577c238a126f487382634040",
+  "local_clone_head": "12999fc227b6bce3f781749f99918d52c2080b9d",
+  "builder_sha256": "163c2c5652691031b41790d3034fabf4391434e2c6bd3058c1bdbc701a049916",
+  "byte_identical_origin_main_vs_phase2_evaluand": true,
+  "paths": 20000,
+  "builder_seed": 20261014
+ },
+ "challenger": {
+  "gamma": 0.25,
+  "gamma_values_scored": [
+   0.25
+  ],
+  "construction": "F_chal(k) = 0.25*F_frozen(k) + 0.75*F_B2(k), k=0..800 \u2014 the exact pooled-mixture distribution of the preregistered per-path draw; B2 sample generated per fixture with default_rng(20261014), 20,000 paths (Phase 2 seed policy)"
+ },
+ "assembly": {
+  "source": "ESPN game summaries from disk cache ~/workspace/tmp/bt_data/espn_cfb (summary_*.json) \u2014 the assembly the Phase 2 implementation actually used (spec \u00a72(b) fallback per its amendment); 2022-2023 runway scoreboards+summaries acquired by the same transport (groups=80) before scoring in this lane",
+  "audit_gamelog_crosscheck_2024": [
+   {
+    "event_id": "401628460",
+    "athlete_id": 102597,
+    "assembled_att_comp_yards": [
+     26,
+     20,
+     250
+    ],
+    "gamelog_att_comp_yards": [
+     26,
+     20,
+     250
+    ],
+    "match": true
+   },
+   {
+    "event_id": "401677094",
+    "athlete_id": 4429463,
+    "assembled_att_comp_yards": [
+     1,
+     1,
+     7
+    ],
+    "gamelog_att_comp_yards": [
+     1,
+     1,
+     7
+    ],
+    "match": true
+   },
+   {
+    "event_id": "401628467",
+    "athlete_id": 4432762,
+    "assembled_att_comp_yards": [
+     38,
+     23,
+     244
+    ],
+    "gamelog_att_comp_yards": [
+     38,
+     23,
+     244
+    ],
+    "match": true
+   },
+   {
+    "event_id": "401677094",
+    "athlete_id": 4595341,
+    "assembled_att_comp_yards": [
+     1,
+     1,
+     17
+    ],
+    "gamelog_att_comp_yards": null,
+    "match": false
+   },
+   {
+    "event_id": "401628584",
+    "athlete_id": 4685497,
+    "assembled_att_comp_yards": [
+     40,
+     26,
+     291
+    ],
+    "gamelog_att_comp_yards": [
+     40,
+     26,
+     291
+    ],
+    "match": true
+   },
+   {
+    "event_id": "401628466",
+    "athlete_id": 4715345,
+    "assembled_att_comp_yards": [
+     18,
+     6,
+     76
+    ],
+    "gamelog_att_comp_yards": [
+     18,
+     6,
+     76
+    ],
+    "match": true
+   },
+   {
+    "event_id": "401636616",
+    "athlete_id": 4870857,
+    "assembled_att_comp_yards": [
+     23,
+     15,
+     181
+    ],
+    "gamelog_att_comp_yards": [
+     23,
+     15,
+     181
+    ],
+    "match": true
+   },
+   {
+    "event_id": "401643730",
+    "athlete_id": 4915980,
+    "assembled_att_comp_yards": [
+     35,
+     17,
+     172
+    ],
+    "gamelog_att_comp_yards": [
+     35,
+     17,
+     172
+    ],
+    "match": true
+   },
+   {
+    "event_id": "401634182",
+    "athlete_id": 5081856,
+    "assembled_att_comp_yards": [
+     22,
+     13,
+     122
+    ],
+    "gamelog_att_comp_yards": [
+     22,
+     13,
+     122
+    ],
+    "match": true
+   },
+   {
+    "event_id": "401643762",
+    "athlete_id": 5126474,
+    "assembled_att_comp_yards": [
+     22,
+     13,
+     162
+    ],
+    "gamelog_att_comp_yards": [
+     22,
+     13,
+     162
+    ],
+    "match": true
+   }
+  ],
+  "audit_exact": "9/10"
+ },
+ "fbs_derivation": {
+  "method": "derive_fbs_teams.py method transposed to 2024: NCAA.com official FBS standings school list matched to corpus team payloads (scripts/derive_fbs_teams_2024.py); 2024 list = Phase 2's 2025 list (136) minus Delaware and Missouri State (first FBS seasons 2025)",
+  "count_2024": 134
+ },
+ "collins_gate": "PASSED",
+ "collins_detail": {
+  "mean": 174.4278,
+  "sd": 91.1813998969088,
+  "shares": {
+   "150": 0.58345,
+   "200": 0.41355,
+   "250": 0.2346,
+   "300": 0.09125
+  }
+ },
+ "tripwire": {
+  "append_fixture_changes_or_refuses": 10,
+  "post_asof_identical": 10,
+  "of": 10
+ },
+ "identity_note": "plurality over ALL prior team games in the record set; ties broken by smallest athlete id (production/Phase 2 rule, unchanged)",
+ "split": "SINGLE_SPLIT 2024 (fixtures Aug-Dec 2024); priors reach into 2022-2024 via ESPN summary assembly",
+ "population": {
+  "candidates": 1695,
+  "scored": 417,
+  "exclusions": {
+   "ROLE_NOT_MATERIALIZED": 1191,
+   "ILLINOIS_EXCLUDED": 74,
+   "BUILDER_REFUSAL:QB_DISTRIBUTION_PRIOR_GAME_FIELD_INVALID:qb_passin": 13
+  },
+  "role_not_materialized_rate_of_candidates": 0.7026548672566372
+ },
+ "crps": {
+  "frozen": 47.82124886697243,
+  "challenger": 44.34289494639685,
+  "b1": 47.77650971538786,
+  "b2": 44.91607703219425
+ },
+ "ci_challenger_minus_frozen": [
+  -4.861799222030977,
+  -2.142089610519945
+ ],
+ "ci_challenger_minus_b1": [
+  -4.779079455342449,
+  -2.0556706122949526
+ ],
+ "ci_challenger_minus_b2": [
+  -0.9671159139725464,
+  -0.17200995203063277
+ ],
+ "coverage_p5_p95": {
+  "frozen": 0.947242206235012,
+  "challenger": 0.935251798561151,
+  "b1": 0.8896882494004796,
+  "b2": 0.8872901678657075
+ },
+ "pit_histogram": {
+  "frozen": [
+   12,
+   21,
+   42,
+   54,
+   49,
+   53,
+   54,
+   51,
+   42,
+   39
+  ],
+  "challenger": [
+   35,
+   34,
+   61,
+   37,
+   36,
+   53,
+   49,
+   42,
+   35,
+   35
+  ],
+  "b1": [
+   17,
+   30,
+   47,
+   46,
+   46,
+   48,
+   43,
+   42,
+   46,
+   52
+  ],
+  "b2": [
+   43,
+   51,
+   48,
+   34,
+   43,
+   43,
+   41,
+   44,
+   35,
+   35
+  ]
+ },
+ "pit_note": "PIT value = arm CDF at realized y (discrete CDF form)",
+ "threshold_brier": {
+  "frozen": {
+   "150": 0.1482727320023981,
+   "200": 0.22311595890287772,
+   "250": 0.22314324590527576,
+   "300": 0.1368504506294964
+  },
+  "challenger": {
+   "150": 0.12601786739133694,
+   "200": 0.20778887021020684,
+   "250": 0.2243492903016337,
+   "300": 0.13867254432216727
+  },
+  "b1": {
+   "150": 0.1409536577880053,
+   "200": 0.22141195561377686,
+   "250": 0.22866255932495466,
+   "300": 0.1381941172729676
+  },
+  "b2": {
+   "150": 0.12680897424460433,
+   "200": 0.21032337309352517,
+   "250": 0.22972773880095923,
+   "300": 0.14171327864508393
+  }
+ },
+ "gate_verdict": "ADOPT-CANDIDATE",
+ "bootstrap": {
+  "method": "ISO-week block bootstrap",
+  "resamples": 2000,
+  "seed": 20261015
+ }
+}

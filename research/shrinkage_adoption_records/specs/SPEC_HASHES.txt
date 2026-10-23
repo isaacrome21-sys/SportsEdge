@@ -1,0 +1,6 @@
+58a7977c6cce4be3bf601f4e9e9574e85c2bc68a8f1a3b6d1a65e3b  PREREG_BATTER_PROPS.md
+319629eee535bba913953c9178c6f4216476c453ff2231627647ae2fde85ca25  PREREG_CFB_QB.md
+378a60071ba12895288bf419208855f3f319b3e397e0c48321257f81a824155c  PREREG_F5.md
+17b62221d554ca434fff1e62c458a570758d8b14c1c96bd0707d458706d3e3c9  PREREG_FIRST_INNING.md
+9628b9626ccd42ed04f836f32ed51aa62d0eeca6b72deac782e1ef8622c5a41c  PREREG_PITCHER_UNDERCARD.md
+2026-10-14 (America/Chicago evening) — all five preregistrations hashed before any challenger was built or scored. Frozen evaluand: origin/main 2a713380c7d49733577c238a126f487382634040; all nine evaluand files verified byte-identical to the Phase 2 evaluand at 12999fc227b6bce3f781749f99918d52c2080b9d.
