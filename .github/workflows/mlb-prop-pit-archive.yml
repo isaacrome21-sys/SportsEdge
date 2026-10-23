@@ -1,21 +1,9 @@
 name: mlb-prop-pit-archive
 
 on:
+  # Grok ruling 2026-10-23 (t234u; owner invariant: DK rendered pages only): this job
+  # reaches a DraftKings API URL builder, so it runs only on manual workflow_dispatch.
   workflow_dispatch:
-  schedule:
-    - cron: '17 * * * *'
-  pull_request:
-    paths:
-      - 'scripts/archive_mlb_prop_odds.py'
-      - 'sportsedge/draftkings_prop_source.py'
-      - 'tests/test_archive_mlb_prop_odds.py'
-      - '.github/workflows/mlb-prop-pit-archive.yml'
-  push:
-    paths:
-      - 'scripts/archive_mlb_prop_odds.py'
-      - 'sportsedge/draftkings_prop_source.py'
-      - 'tests/test_archive_mlb_prop_odds.py'
-      - '.github/workflows/mlb-prop-pit-archive.yml'
 
 permissions:
   contents: write

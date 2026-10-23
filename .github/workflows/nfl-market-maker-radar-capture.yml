@@ -5,55 +5,9 @@ name: nfl-market-maker-radar-capture
 # cannot be reconstructed honestly later. Persistence is not execution evidence.
 
 on:
+  # Grok ruling 2026-10-23 (t234u; owner invariant: DK rendered pages only): this job
+  # reaches a DraftKings API URL builder, so it runs only on manual workflow_dispatch.
   workflow_dispatch:
-  schedule:
-    - cron: '*/5 * * * *'
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/capture_nfl_market_maker_radar.py'
-      - 'scripts/capture_nfl_market_maker_radar_v2.py'
-      - 'scripts/normalize_pinnacle_nfl_markets.py'
-      - 'scripts/normalize_fanduel_nfl_markets.py'
-      - 'sportsedge/draftkings_game_market_source.py'
-      - 'scripts/analyze_market_maker_radar.py'
-      - 'scripts/analyze_market_maker_radar_v2.py'
-      - 'scripts/recheck_market_maker_candidate_persistence.py'
-      - 'scripts/log_market_maker_execution_attempt.py'
-      - 'scripts/evaluate_market_maker_execution_pilot.py'
-      - 'scripts/settle_market_maker_candidate_ledger.py'
-      - 'scripts/settle_market_maker_candidate_ledger_v2.py'
-      - 'config/market_maker_radar_v1.json'
-      - 'config/market_maker_radar_v2.json'
-      - 'config/workflow_cron_policy_v1.json'
-      - '.github/workflows/nfl-market-maker-radar-capture.yml'
-  pull_request:
-    paths:
-      - 'scripts/capture_nfl_market_maker_radar.py'
-      - 'scripts/capture_nfl_market_maker_radar_v2.py'
-      - 'tests/test_capture_nfl_market_maker_radar.py'
-      - 'tests/test_capture_nfl_market_maker_radar_v2.py'
-      - 'scripts/normalize_pinnacle_nfl_markets.py'
-      - 'scripts/normalize_fanduel_nfl_markets.py'
-      - 'sportsedge/draftkings_game_market_source.py'
-      - 'scripts/analyze_market_maker_radar.py'
-      - 'scripts/analyze_market_maker_radar_v2.py'
-      - 'scripts/recheck_market_maker_candidate_persistence.py'
-      - 'scripts/log_market_maker_execution_attempt.py'
-      - 'scripts/evaluate_market_maker_execution_pilot.py'
-      - 'scripts/settle_market_maker_candidate_ledger.py'
-      - 'scripts/settle_market_maker_candidate_ledger_v2.py'
-      - 'tests/test_market_maker_radar.py'
-      - 'tests/test_market_maker_radar_v2.py'
-      - 'tests/test_market_maker_candidate_settlement.py'
-      - 'tests/test_market_maker_candidate_settlement_v2.py'
-      - 'tests/test_market_maker_candidate_persistence.py'
-      - 'tests/test_market_maker_execution_attempts.py'
-      - 'tests/test_nfl_market_maker_radar_workflow.py'
-      - 'config/market_maker_radar_v1.json'
-      - 'config/market_maker_radar_v2.json'
-      - 'config/workflow_cron_policy_v1.json'
-      - '.github/workflows/nfl-market-maker-radar-capture.yml'
 
 permissions:
   contents: write
