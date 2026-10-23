@@ -253,13 +253,6 @@ def dk_block(monkeypatch):
     monkeypatch.setattr(socket.socket, "connect", connect)
     monkeypatch.setattr(socket.socket, "connect_ex", connect_ex)
     monkeypatch.setattr(socket.socket, "sendto", sendto)
-    # children: dead proxy for proxy-aware tools, socket jail for every child Python
-    for var in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy",
-                "all_proxy", "FTP_PROXY", "ftp_proxy"):
-        monkeypatch.setenv(var, DEAD_PROXY)
-    monkeypatch.setenv("NO_PROXY", ""); monkeypatch.setenv("no_proxy", "")
-    pp = os.environ.get("PYTHONPATH", "")
-    monkeypatch.setenv("PYTHONPATH", os.pathsep.join(p for p in (str(JAIL_DIR), pp) if p))
     monkeypatch.setattr(urllib.request, "urlopen", urlopen)
 
     real_popen_init = subprocess.Popen.__init__
@@ -268,9 +261,25 @@ def dk_block(monkeypatch):
     blocked_child = [sys.executable, "-c",
                      "import sys;sys.stderr.write('LIVE_NETWORK_BLOCKED\\n');sys.exit(97)"]
 
+    def child_env(base):
+        # children only (never this process, so in-process DK calls still hit the socket
+        # guard instead of a proxy): dead proxy for proxy-aware tools, jail for child Python
+        env = dict(os.environ if base is None else base)
+        for var in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy",
+                    "all_proxy", "FTP_PROXY", "ftp_proxy"):
+            env[var] = DEAD_PROXY
+        env["NO_PROXY"] = env["no_proxy"] = ""
+        pp = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = os.pathsep.join(p for p in (str(JAIL_DIR), pp) if p)
+        return env
+
     def popen_init(self, args, *a, **k):
         if _dk_cmd(args):
             refuse("subprocess", args)
+        if len(a) > 9:
+            a = a[:9] + (child_env(a[9]),) + a[10:]
+        else:
+            k["env"] = child_env(k.get("env"))
         shell = k.get("shell", False) or (len(a) > 8 and a[8])
         if prefix:                      # every child runs in an empty network namespace
             if shell:
