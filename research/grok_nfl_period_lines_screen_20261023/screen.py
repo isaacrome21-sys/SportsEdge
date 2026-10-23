@@ -1,7 +1,11 @@
 """Held-out season screen vs naive earlier-season pool. No quotes, no holdout spend."""
 import csv, json, math, random, sys
 sys.path.insert(0, sys.argv[1] if len(sys.argv) > 1 else ".")
-from nfl_period_lines_empirical import price_period, PERIODS, NflPeriodLinesError, _pmf
+import os as _os
+sys.path.insert(0, _os.path.dirname(_os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else '.')))
+from sportsedge.screen_only_guard import screen_only as _screen_only
+_SCREEN_GUARD = _screen_only(); _SCREEN_GUARD.__enter__()  # screen process: guarded pricer allowed
+from sportsedge.nfl_period_lines_empirical import price_period_unrestricted as price_period, PERIODS, NflPeriodLinesError, _pmf
 TABLE = sys.argv[2] if len(sys.argv) > 2 else "period_table.csv"
 rows = []
 for r in csv.DictReader(open(TABLE)):

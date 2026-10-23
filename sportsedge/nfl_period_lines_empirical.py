@@ -31,6 +31,8 @@ from __future__ import annotations
 import math
 from typing import Any, Iterable, Mapping
 
+from sportsedge.screen_only_guard import require_screen_only
+
 ENGINE_ID = "NFL_PERIOD_LINES_EMPIRICAL"
 ENGINE_VERSION = "nfl_period_lines_empirical_v1_20261023"
 GOVERNANCE = {"state": "SCREEN", "validation_status": "NOT_VALIDATED",
@@ -98,9 +100,8 @@ def _shift(pmf: dict, d: float) -> dict:
 def price_period(history: Iterable[Mapping[str, Any]], *, date: str, season: int,
                  home: str, away: str, period: str) -> dict:
     """Priced output with NAIVE_FAIL families removed and coded."""
-    out = price_period_unrestricted(history, date=date, season=season, home=home,
-                                    away=away, period=period)
-    del out["screen_only_unrestricted"]
+    out = _price_period(history, date=date, season=season, home=home,
+                        away=away, period=period)
     refused = {}
     for market, key in (("moneyline", "moneyline_3way"), ("total", "total_pmf")):
         fam = f"{period.upper()}_{market.upper()}"
@@ -113,7 +114,15 @@ def price_period(history: Iterable[Mapping[str, Any]], *, date: str, season: int
 
 def price_period_unrestricted(history: Iterable[Mapping[str, Any]], *, date: str, season: int,
                               home: str, away: str, period: str) -> dict:
-    """Screen-only: every family, including NAIVE_FAIL ones. Never for pricing."""
+    """Screen-only: every family, including NAIVE_FAIL ones. Guarded by screen_only()."""
+    require_screen_only("price_period_unrestricted")
+    out = _price_period(history, date=date, season=season, home=home, away=away, period=period)
+    out["screen_only_unrestricted"] = True
+    return out
+
+
+def _price_period(history: Iterable[Mapping[str, Any]], *, date: str, season: int,
+                  home: str, away: str, period: str) -> dict:
     if period not in PERIODS:
         raise NflPeriodLinesError(f"UNKNOWN_PERIOD:{period}")
     if isinstance(season, bool) or not isinstance(season, int):
@@ -156,8 +165,7 @@ def price_period_unrestricted(history: Iterable[Mapping[str, Any]], *, date: str
           "away": sum(p for k, p in m_pmf.items() if k < 0)}
     return {"engine_id": ENGINE_ID, "engine_version": ENGINE_VERSION, "period": period,
             "mu_home": mu_h, "mu_away": mu_a, "margin_pmf": m_pmf, "total_pmf": t_pmf,
-            "moneyline_3way": ml, "governance": dict(GOVERNANCE),
-            "screen_only_unrestricted": True}
+            "moneyline_3way": ml, "governance": dict(GOVERNANCE)}
 
 
 def _floor_at_zero(pmf: dict) -> dict:
@@ -188,6 +196,10 @@ def total_probs(priced: dict, line) -> dict:
 def spread_probs(priced: dict, home_line) -> dict:
     """Home spread (e.g. -3.5): P(home covers / push / away covers)."""
     L = _line(home_line)
+    ml_refusal = priced.get("refused", {}).get("moneyline")
+    if ml_refusal and abs(L) == 0.5:
+        # A +/-0.5 spread settles exactly like a 2-way moneyline (tie to one side).
+        raise NflPeriodLinesError(ml_refusal)
     pmf = priced["margin_pmf"]
     return {"home": sum(p for k, p in pmf.items() if k + L > 0),
             "push": sum(p for k, p in pmf.items() if k + L == 0),
