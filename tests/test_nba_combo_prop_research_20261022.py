@@ -54,3 +54,22 @@ def test_refusals(args, reason):
     out = C.price_combo(store(), *args)
     assert out["status"] == "REFUSED" and out["reason"] == reason
     assert "p_over" not in out
+
+
+@pytest.mark.parametrize("line,detail", [(True, "LINE_BOOL"), (False, "LINE_BOOL"),
+                                         (-0.5, "LINE_NEGATIVE"), (-30, "LINE_NEGATIVE"),
+                                         ("-1.5", "LINE_NEGATIVE")])
+def test_bool_and_negative_lines_refuse(line, detail):
+    out = C.price_combo(store(), "A", "pa", line, date(2024, 12, 30))
+    assert out["status"] == "REFUSED"
+    assert out["reason"] == v1.REFUSAL_LINE_INVALID and out["detail"] == detail
+    assert out["play_allowed"] is False
+
+
+def test_sources_record_date_clustered_cis():
+    import json
+    s = json.loads((ROOT / "research/grok_nba_combo_props_20261022/SOURCES.json").read_text())
+    ci = s["date_clustered_ci95"]
+    assert ci["pr"] == [-1.924, -1.716]
+    assert ci["pa"] == [-2.029, -1.825]
+    assert ci["ra"] == [-0.789, -0.706]

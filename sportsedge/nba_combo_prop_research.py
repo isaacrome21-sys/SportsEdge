@@ -49,12 +49,18 @@ def price_combo(store, player_id, combo: str, line, target_date) -> dict:
             "participation_feed": "NOT_WIRED"}
     if combo not in COMBOS:
         return {**base, "status": "REFUSED", "reason": "NBA_COMBO_UNSUPPORTED"}
+    if isinstance(line, bool):
+        return {**base, "status": "REFUSED", "reason": v1.REFUSAL_LINE_INVALID,
+                "detail": "LINE_BOOL"}
     try:
         line = float(line)
     except (TypeError, ValueError):
         return {**base, "status": "REFUSED", "reason": v1.REFUSAL_LINE_INVALID}
     if not math.isfinite(line):
         return {**base, "status": "REFUSED", "reason": v1.REFUSAL_LINE_INVALID}
+    if line < 0:
+        return {**base, "status": "REFUSED", "reason": v1.REFUSAL_LINE_INVALID,
+                "detail": "LINE_NEGATIVE"}
     target = v1._as_date(target_date)
     if target is None:
         return {**base, "status": "REFUSED", "reason": v1.REFUSAL_LINE_INVALID,
