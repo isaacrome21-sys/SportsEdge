@@ -35,10 +35,11 @@ Research only.
 """
 from __future__ import annotations
 
+import hashlib
 import math
 from typing import Any, Iterable, Mapping
 
-from sportsedge.screen_only_guard import require_screen_only
+from sportsedge.screen_only_guard import ScreenOnlyGuardError, checked_require, lock_module, require_screen_only
 
 ENGINE_ID = "NFL_SITUATIONAL_EMPIRICAL"
 ENGINE_VERSION = "nfl_situational_empirical_v1_20261023"
@@ -55,6 +56,16 @@ LEAD_REF = 3.0
 # SCREEN_WORSE_THAN_NAIVE in research/grok_nfl_situational_screen_20261023/
 # screen_results_v1.json and v2.json; refused with a coded NAIVE_FAIL.
 NAIVE_FAIL_FAMILIES = frozenset({"LARGEST_LEAD", "BOTH_TEAMS_TO_SCORE_N_10"})
+# t256: pinned sha256 of the sorted family list; every read is checked (ruling C).
+_NAIVE_FAIL_SHA256 = "355a0139548e437ebc3d126f1db466d3725e9f2d25f190192f478618857faeaa"
+
+
+def _naive_fail():
+    v = globals().get("NAIVE_FAIL_FAMILIES")
+    if not isinstance(v, frozenset) or hashlib.sha256(
+            "\n".join(sorted(v)).encode()).hexdigest() != _NAIVE_FAIL_SHA256:
+        raise ScreenOnlyGuardError("SCREEN_ONLY_GUARD:NAIVE_FAIL_FAMILIES_TAMPERED")
+    return v
 _INT = ("season", "home_pts", "away_pts", "largest_lead", "safety_h", "safety_a",
         "dst_td_h", "dst_td_a")
 
@@ -135,7 +146,7 @@ def price_situational_unrestricted(history: Iterable[Mapping[str, Any]], *, fami
                                    date: str, season: int, home: str, away: str,
                                    n: int | None = None) -> dict:
     """Screen-only: all families incl. NAIVE_FAIL. Guarded by screen_only()."""
-    require_screen_only("price_situational_unrestricted")
+    checked_require("price_situational_unrestricted")
     out = _price(history, family=family, date=date, season=season, home=home, away=away, n=n,
                  allow_refused=True)
     out["screen_only_unrestricted"] = True
@@ -150,10 +161,10 @@ def _price(history: Iterable[Mapping[str, Any]], *, family: str, date: str,
     if not isinstance(allow_refused, bool):
         raise NflSituationalError("ALLOW_REFUSED_MUST_BE_BOOL")
     if allow_refused:
-        require_screen_only("_price(allow_refused=True)")
+        checked_require("_price(allow_refused=True)")
     if family not in FAMILIES:
         raise NflSituationalError(f"UNKNOWN_FAMILY:{family}")
-    if not allow_refused and _family_key(family, n) in NAIVE_FAIL_FAMILIES:
+    if not allow_refused and _family_key(family, n) in _naive_fail():
         raise NflSituationalError(f"NAIVE_FAIL:{_family_key(family, n)}")
     if isinstance(season, bool) or not isinstance(season, int):
         raise NflSituationalError("SEASON_REQUIRED_INT")
@@ -229,3 +240,8 @@ def lead_over_under(priced: dict, line) -> dict:
     return {"over": sum(p for k, p in pmf.items() if k > line),
             "push": sum(p for k, p in pmf.items() if k == line),
             "under": sum(p for k, p in pmf.items() if k < line)}
+
+
+# t256: refuse rebinding the guard hook and the refused-family set (rulings B, C).
+lock_module(__name__, {"NAIVE_FAIL_FAMILIES", "_NAIVE_FAIL_SHA256", "_naive_fail",
+                       require_screen_only.__name__, checked_require.__name__, lock_module.__name__})
