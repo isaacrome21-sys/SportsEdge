@@ -122,3 +122,27 @@ Frozen lane files (`nfl-2026-line-capture.yml`, its tests and config) stay byte-
 to main 53a636af. Residual: a non-Python child that opens raw sockets under an obfuscated
 binary name is caught only when the namespace jail is available. Not self-cleared; needs
 independent review.
+
+## 2026-10-23e — network jail re-execs the guarded session under `unshare -rn` (t259)
+
+The t258 audit (NOT CLEARED on 7b099d35) found four bypasses: (1) `_socket.socket().connect`;
+(2) `importlib.reload(socket)` then `create_connection`; (3) `os.posix_spawn` of curl, which
+skips the subprocess wrapper; (4) in fallback mode, a renamed curl run with `--noproxy '*'`.
+Ruling:
+
+- Layer 1 (isolation): `tests/net_jail/run_jailed.py` re-launches pytest under `unshare -rn`
+  (loopback brought up, `/proc/net/dev` must show only `lo`, `SPORTSEDGE_NET_JAILED=1`).
+  The `net_jail` fixture re-runs the module's live bypass tests once in that jailed session
+  and requires each to pass there; inside the jail it re-checks the interface list, so the
+  env var alone cannot fake isolation. In-process tricks have no route out.
+- Without unshare the live bypass tests SKIP with `NET_JAIL_UNAVAILABLE`; they never claim
+  isolation, and the wrapper exits 3 with the same marker.
+- Layer 2 (in-process): `_socket.socket`/`SocketType`/`getaddrinfo` are patched (also covers a
+  reloaded `socket`), and `os.posix_spawn`/`posix_spawnp`, `os.spawn*` and `os.exec*` refuse
+  network binaries and DK commands. Network binaries are also identified by file content, so a
+  renamed copy of curl is refused.
+- One test per bypass, run both jailed and in-process; probes target example.com only, never DK.
+
+The frozen lane stays byte-identical to main 53a636af. Residual: the layer-2 patches stop
+mistakes, not a determined in-process attacker (e.g. ctypes syscalls); only layer 1 is isolation,
+and it exists only where unshare is permitted. Not self-cleared; needs independent review.

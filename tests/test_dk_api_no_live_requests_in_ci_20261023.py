@@ -129,6 +129,35 @@ def _unshare_prefix():
     return _UNSHARE or None
 
 
+_NET_BIN_DIGESTS = None
+
+
+def _file_digest(path):
+    import hashlib
+    try:
+        with open(path, "rb") as fh:
+            return hashlib.sha256(fh.read()).hexdigest()
+    except OSError:
+        return None
+
+
+def _is_net_binary_file(path) -> bool:
+    """t259: a renamed copy of curl/wget/nc/... is still that binary (match by content)."""
+    global _NET_BIN_DIGESTS
+    if _NET_BIN_DIGESTS is None:
+        found = {shutil.which(b) for b in _NET_BINARIES} - {None}
+        _NET_BIN_DIGESTS = {os.path.realpath(p) for p in found} | {d for d in map(_file_digest, found) if d}
+    if not path:
+        return False
+    path = os.fspath(path)
+    if isinstance(path, bytes):
+        path = path.decode("utf-8", "ignore")
+    full = path if os.sep in path else (shutil.which(path) or path)
+    if os.path.basename(os.path.realpath(full)) in _NET_BINARIES or os.path.realpath(full) in _NET_BIN_DIGESTS:
+        return True
+    return os.path.isfile(full) and _file_digest(full) in _NET_BIN_DIGESTS
+
+
 def _fallback_net_cmd(args) -> bool:
     """Without a namespace: refuse any child that names a network binary or raw /dev/tcp,
     or shell text running a Python that ignores PYTHONPATH/site (-I/-E/-S)."""
@@ -140,6 +169,8 @@ def _fallback_net_cmd(args) -> bool:
         text = " ".join(toks)
     names = {os.path.basename(t) for t in toks if t}
     if names & _NET_BINARIES or "/dev/tcp/" in text or "/dev/udp/" in text:
+        return True
+    if not isinstance(args, (bytes, str)) and toks and _is_net_binary_file(toks[0]):
         return True
     if isinstance(args, (bytes, str)):   # shell text cannot be rewritten: refuse -I/-E/-S
         return any(os.path.basename(t).startswith("python") for t in toks) and bool(
@@ -254,6 +285,81 @@ def dk_block(monkeypatch):
     monkeypatch.setattr(socket.socket, "connect_ex", connect_ex)
     monkeypatch.setattr(socket.socket, "sendto", sendto)
     monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+
+    # t259 layer 2: the C-level _socket module (covers _socket.socket() and a reloaded
+    # socket module, which rebuilds itself from _socket) and every os spawn/exec entry.
+    import _socket
+    real_raw = _socket.socket
+
+    class _GuardedRawSocket(real_raw):
+        __slots__ = ()   # a reloaded socket.py adds __weakref__ itself
+        def connect(self, address):
+            if _inet(self, address):
+                check("_socket.connect", address[0])
+            return super().connect(address)
+
+        def connect_ex(self, address):
+            if _inet(self, address):
+                check("_socket.connect_ex", address[0])
+            return super().connect_ex(address)
+
+        def sendto(self, data, *args):
+            if _inet(self, args[-1]):
+                check("_socket.sendto", args[-1][0])
+            return super().sendto(data, *args)
+
+    real_raw_gai = _socket.getaddrinfo
+
+    def raw_gai(host, *a, **k):
+        check("_socket.getaddrinfo", host)
+        return real_raw_gai(host, *a, **k)
+
+    monkeypatch.setattr(_socket, "socket", _GuardedRawSocket)
+    monkeypatch.setattr(_socket, "SocketType", _GuardedRawSocket)
+    monkeypatch.setattr(_socket, "getaddrinfo", raw_gai)
+
+    def exec_check(fn, path, argv):
+        argv = [os.fsdecode(a) for a in (argv or ())]
+        path = os.fsdecode(path)
+        pre = _unshare_prefix()
+        if pre and argv[:len(pre)] == pre:
+            return                                  # already wrapped in the empty namespace
+        if _dk_cmd([path, *argv]):
+            refuse(fn, [path, *argv])
+        if _fallback_net_cmd([path, *argv]) or _fallback_net_cmd(argv):
+            refuse_net(fn, [path, *argv])
+
+    def _wrap(fn, has_mode):
+        real = getattr(os, fn)
+
+        def guarded(*a, **k):
+            off = 1 if has_mode else 0
+            exec_check(fn, a[off], a[off + 1] if len(a) > off + 1 else k.get("argv", ()))
+            return real(*a, **k)
+        monkeypatch.setattr(os, fn, guarded)
+
+    for fn in ("posix_spawn", "posix_spawnp", "execv", "execve", "execvp", "execvpe"):
+        if hasattr(os, fn):
+            _wrap(fn, False)
+    for fn in ("spawnv", "spawnve", "spawnvp", "spawnvpe"):
+        if hasattr(os, fn):
+            _wrap(fn, True)
+    def _wrap_l(fn, has_mode, env_last):
+        real = getattr(os, fn)
+
+        def guarded(*a):
+            off = 1 if has_mode else 0
+            argv = a[off + 1:-1] if env_last else a[off + 1:]
+            exec_check(fn, a[off], argv)
+            return real(*a)
+        monkeypatch.setattr(os, fn, guarded)
+
+    for fn, has_mode, env_last in (("execl", False, False), ("execle", False, True),
+                                   ("execlp", False, False), ("execlpe", False, True),
+                                   ("spawnl", True, False), ("spawnle", True, True),
+                                   ("spawnlp", True, False), ("spawnlpe", True, True)):
+        if hasattr(os, fn):
+            _wrap_l(fn, has_mode, env_last)
 
     real_popen_init = subprocess.Popen.__init__
 
@@ -399,6 +505,52 @@ def test_guarded_list_matches_workflows():
 # host (or a pure function), so neither the RED run nor any CI run ever touches DraftKings.
 import shutil
 
+_JAIL_RESULTS = {}
+
+
+def _load_run_jailed():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("_run_jailed", JAIL_DIR / "run_jailed.py")
+    mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+    return mod
+
+
+class _Jail:
+    def __init__(self, delegated):
+        self.delegated = delegated
+
+
+@pytest.fixture
+def net_jail(request):
+    """Layer 1. Inside the jail: assert only loopback exists, then run the bypass for real.
+    Outside: re-launch this module's jailed bypass tests once in a pytest session under
+    `unshare -rn` and require this test to have passed there. No unshare -> SKIP with
+    NET_JAIL_UNAVAILABLE (never a pass)."""
+    if os.environ.get("SPORTSEDGE_NET_JAILED") == "1":
+        ifaces = _load_run_jailed().interfaces()
+        assert ifaces == ["lo"], f"NET_JAIL_BROKEN: interfaces {ifaces}"
+        return _Jail(False)
+    rj = _load_run_jailed()
+    if rj.unshare_prefix() is None:
+        pytest.skip("NET_JAIL_UNAVAILABLE: unshare -rn not permitted here; isolation not claimed")
+    if not _JAIL_RESULTS:
+        import tempfile
+        import xml.etree.ElementTree as ET
+        with tempfile.TemporaryDirectory() as td:
+            xml = os.path.join(td, "jail.xml")
+            r = subprocess.run(rj.jailed_argv([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
+                                               __file__, "-k", "bypass and jailed", f"--junitxml={xml}"]),
+                               cwd=ROOT, env=rj.jailed_env(), capture_output=True, text=True, timeout=600)
+            _JAIL_RESULTS["_out"] = r.stdout[-3000:] + r.stderr[-1000:]
+            if os.path.exists(xml):
+                for tc in ET.parse(xml).iter("testcase"):
+                    bad = [c.tag for c in tc if c.tag in ("failure", "error", "skipped")]
+                    _JAIL_RESULTS[tc.get("name")] = bad[0] if bad else "passed"
+    got = _JAIL_RESULTS.get(request.node.name)
+    assert got == "passed", f"jailed run: {request.node.name} -> {got}\n{_JAIL_RESULTS.get('_out')}"
+    return _Jail(True)
+
+
 _PROBE = "example.com"   # stands in for any host: the jail must block ALL egress
 
 
@@ -479,8 +631,8 @@ def test_bypasses_also_blocked_in_no_namespace_fallback_mode():
     if os.environ.get("SPORTSEDGE_NET_JAIL_FORCE_FALLBACK") == "1":
         pytest.skip("already the fallback run")
     env = {**os.environ, "SPORTSEDGE_NET_JAIL_FORCE_FALLBACK": "1"}
-    k = ("child or openssl or nc_ or bash or percent or non_loopback or literal or proxy "
-         "or loopback or curl_and_wget or low_level")
+    k = ("(child or openssl or nc_ or bash or percent or non_loopback or literal or proxy "
+         "or loopback or curl_and_wget or low_level) and not jailed")
     r = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", __file__,
                         "-k", k], cwd=ROOT, env=env, capture_output=True, text=True, timeout=600)
     assert r.returncode == 0, r.stdout[-2000:]
@@ -639,6 +791,6 @@ def test_jailed_session_has_only_loopback():
     if run_jailed.unshare_prefix() is None:
         pytest.skip("NET_JAIL_UNAVAILABLE")
     r = subprocess.run(run_jailed.jailed_argv([sys.executable, "-c",
-                       "import os;print(sorted(os.listdir('/sys/class/net')))"]),
+                       run_jailed._IFACES]),
                        capture_output=True, text=True, timeout=60)
     assert r.stdout.strip() == "['lo']", r.stdout + r.stderr
