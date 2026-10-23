@@ -21,10 +21,24 @@ Selection, edge, settlement: locked #2399 Rules 1, 2, 3, 7, 8, 9.
 ## 2. (A) Current-season refresh — dated data rule
 - Source: official nflverse `stats_player_week_<season>` (2026 file) plus
   nflverse `games.csv` schedule (gameday/gametime in ET).
-- Cadence: one refresh per slate, fetched no more than **72 h** before the
-  entry capture (fetch after capture is allowed; point-in-time still applies).
-- Point-in-time: a 2026 appearance is used only if its game has a result in
-  the schedule AND kickoff + **4 h** <= entry `captured_at`.
+- Download step: `atd_refresh.py URL DEST` fetches each file and writes a
+  sidecar `<file>.fetch.json` with its sha256 and `fetched_at` taken from
+  the wall clock at download. `fetched_at` is never a CLI/caller argument; a
+  missing sidecar is REFRESH_FETCH_RECORD_MISSING and a sidecar whose sha256
+  doesn't match the file is REFRESH_FETCH_RECORD_MISMATCH.
+- Cadence (two-sided window, owner ruling): for both the stats file and the
+  schedule, `captured_at − 72 h <= fetched_at <= captured_at`. Fetched after
+  the entry capture ⇒ REFRESH_FETCHED_AFTER_CAPTURE; more than 72 h before ⇒
+  REFRESH_STALE.
+- Pricing-run time: the run's own start time (wall clock, recorded as
+  `run_started_at`) must be strictly before kickoff, else RUN_AFTER_KICKOFF.
+- Point-in-time (owner: 4 h buffer kept): a 2026 appearance is used only if
+  its game has a result in the schedule AND kickoff + **4 h** <= entry
+  `captured_at`.
+- Integrity: (player_id, game_id) must be unique in the stats file; a
+  duplicate ⇒ REFRESH_FAILED. A blank or "TBD" schedule gametime (or any
+  unparseable gameday/gametime) ⇒ REFRESH_FAILED — the refresh does not guess
+  a kickoff.
 - Same construction as the calibration replay: earlier 2026 weeks enter the
   evidence window and the current-season pool exactly as earlier weeks did
   in the replay; player meta (team for the team-in-game check) updates to the
@@ -34,7 +48,9 @@ Selection, edge, settlement: locked #2399 Rules 1, 2, 3, 7, 8, 9.
   (status `REFRESH_OK_PRICING_STARTED`, then `PRICED`).
 - Fail closed (run refused, status `FAILED_CLOSED`, no rows priced):
   `REFRESH_MISSING`, `REFRESH_FAILED` (unreadable), `REFRESH_STALE`
-  (fetch > 72 h old, or a completed game absent from the stats file),
+  (fetch > 72 h before capture, or a completed game absent from the stats
+  file), `REFRESH_FETCHED_AFTER_CAPTURE`, `REFRESH_FETCH_RECORD_MISSING`,
+  `REFRESH_FETCH_RECORD_MISMATCH`, `RUN_AFTER_KICKOFF`,
   `REFRESH_SCHEDULE_MISMATCH` (stats game_id not in schedule),
   `REFRESH_TIMESTAMP_INVALID`. **There is no 2025-only fallback.**
 
@@ -60,25 +76,37 @@ UNPRICED_TIMESTAMP_MISSING, UNPRICED_TIMESTAMP_UNPARSEABLE.
 code but undeclared. Declaring them is an owner item, done by freezing this.)
 
 ## 5. (B) Forward scorer (`score_nfl_atd_forward.py`), #2399 Rules 4–6
-- Rule 4 CLV = implied(close Yes) − implied(entry Yes); close = last Yes
-  capture strictly before kickoff and within 60 min of it; else CLV_MISSING
-  NO_CLOSE_ROW / CLOSE_STALE. Raw implied, no de-vig. CLV_MISSING rows keep
-  their win/loss.
-- Rule 5 cut drift: per game, drift = mean CLV over all CLV-scored rows
-  (picked + passed); clv_adj = clv − drift; games with |drift| > 0.02 flagged.
-- BEATS_MARKET iff picked mean CLV game-clustered 95% CI lower bound > 0 AND
-  picked mean clv_adj > 0 AND picked mean CLV > passed mean CLV.
+- Rule 4 CLV = implied(close Yes) − implied(entry Yes). Captures and
+  settlements match on (game_id, player_id). Close = the LATEST capture
+  strictly before kickoff; if it is more than 60 min before kickoff ⇒
+  CLV_MISSING CLOSE_STALE; if its price is invalid ⇒ CLV_MISSING
+  CLOSE_LATEST_INVALID (no fallback to an earlier capture); none ⇒
+  NO_CLOSE_ROW. Raw implied, no de-vig. CLV_MISSING rows keep their win/loss.
+- Rule 5 cut drift (formula owner-confirmed): per game, drift = mean CLV over
+  all CLV-scored rows (picked + passed); clv_adj = clv − drift; games with
+  |drift| > 0.02 flagged. Note: in a game whose scored rows are all picked,
+  clv_adj sums to 0 for that game by construction, so such games contribute
+  nothing to mean picked clv_adj.
+- INSUFFICIENT_CLOSE_DATA (owner ruling): if more than 20% of graded picked
+  rows are CLV_MISSING (all reasons together), the verdict is
+  INSUFFICIENT_CLOSE_DATA. Exactly 20% does not trip.
+- BEATS_MARKET iff not INSUFFICIENT_CLOSE_DATA AND picked mean CLV
+  game-clustered 95% CI lower bound > 0 AND picked mean clv_adj > 0 AND
+  picked mean CLV > passed mean CLV.
 - Rule 6 gates: >= 4 distinct weeks AND >= 150 graded picked rows AND >= 40
   distinct games (a minimum, per the clarification memo). **One review**, at
   the first slate close where all gates are met; that accumulated sample is
-  the sample of record; later rows never enter it and no review is rerun
-  unless a new version preregisters it (scorer raises ReviewAlreadyRecorded).
+  the sample of record. The verdict is written create-only (O_EXCL) to
+  `<records_dir>/NFL_ATD_V1_1_VERDICT.json` with the sha256 of the slate
+  inputs used. The scorer checks that file before any review and refuses
+  (ReviewAlreadyRecorded) if it exists, whatever inputs the caller passes. No
+  review is rerun unless a new version preregisters it.
+- Multiple testing: a family-wise correction is a **program-level PLAY rule**
+  (owner ruling), applied when PLAY eligibility is decided across families;
+  it is not applied inside this family's scorer.
 
-## 6. Open owner items
-1. Freeze (commit + tree + timestamp) — required before any row counts.
-2. Confirm the 4 h completion buffer and 72 h refresh bound.
-3. Confirm Rule 5 operationalisation (mean-CLV drift, 0.02 flag) — #2399
-   names the check but not its formula.
-4. Whether an INSUFFICIENT_CLOSE_DATA trip (as in Part 2) applies; #2399
-   doesn't state one, so none is implemented — missing-close counts are reported.
-5. Multiple-testing correction across families (not in #2399).
+## 6. Owner rulings recorded (t228 delegate, Oct 22, 2026)
+4 h completion buffer kept; 72 h window two-sided; >20% picked CLV_MISSING ⇒
+INSUFFICIENT_CLOSE_DATA; Rule 5 formula confirmed; multiple-testing
+correction is program-level. Remaining owner item: the freeze itself
+(commit + tree + timestamp) — required before any row counts.

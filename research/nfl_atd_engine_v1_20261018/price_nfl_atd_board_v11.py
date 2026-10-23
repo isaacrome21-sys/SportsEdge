@@ -6,8 +6,9 @@ price. A missing/failed/stale refresh exits non-zero; never 2025-only.
 
 Usage:
   python3 price_nfl_atd_board_v11.py --player-data DIR --stats-2026 FILE \
-      --schedule games.csv --fetched-at ISO --board FILE --out FILE \
-      --run-record FILE
+      --schedule games.csv --board FILE --out FILE --run-record FILE
+fetched_at is never a CLI argument: it is read from each file's download
+sidecar (<file>.fetch.json, written by `python3 atd_refresh.py URL DEST`).
 """
 from __future__ import annotations
 
@@ -21,7 +22,7 @@ import atd_refresh as rf
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    for a in ("--player-data", "--stats-2026", "--schedule", "--fetched-at",
+    for a in ("--player-data", "--stats-2026", "--schedule",
               "--board", "--out", "--run-record"):
         ap.add_argument(a, required=True)
     args = ap.parse_args()
@@ -46,7 +47,7 @@ def main() -> int:
                             schedule_path=Path(args.schedule),
                             season=int(board["season"]),
                             captured_at=board.get("captured_at"),
-                            fetched_at=args.fetched_at,
+                            kickoff=board.get("kickoff"),
                             run_record_path=Path(args.run_record),
                             base_data=base, pricer=pricer,
                             extra_record={"data_sha256": pins,

@@ -2,7 +2,12 @@
 
 DRAFT, pending owner freeze. The official nflverse stats_player_week_<season>
 file enters the evidence once per slate (declared cadence: one refresh per
-slate, fetched no more than REFRESH_MAX_AGE_HOURS before the entry capture).
+slate; the download step records sha256 + fetched_at (wall clock) in a
+sidecar beside the file; fetched_at must satisfy
+captured_at - REFRESH_MAX_AGE_HOURS <= fetched_at <= captured_at, for both
+the stats file and the schedule). The pricing run's own start time must be
+strictly before kickoff. Duplicate (player_id, game_id) rows, or a blank/TBD
+schedule gametime, fail the refresh (REFRESH_FAILED).
 Point-in-time: a current-season appearance is used only if its game is
 completed before the entry capture time, where completed means the
 schedule (nflverse games.csv) shows a result AND kickoff + COMPLETION_BUFFER
@@ -21,7 +26,8 @@ import csv
 import gzip
 import hashlib
 import json
-from datetime import datetime, timedelta
+import urllib.request
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -37,6 +43,46 @@ class RefreshFailed(Exception):
         super().__init__(f"{code}: {detail}")
         self.code = code
         self.detail = detail
+
+
+def _utcnow() -> datetime:
+    """Wall clock (UTC). The only source of fetched_at and run_started_at."""
+    return datetime.now(timezone.utc)
+
+
+def sidecar_path(path) -> Path:
+    return Path(str(path) + ".fetch.json")
+
+
+def record_download(path, *, source: str) -> dict:
+    """Download step's record, written beside the file: its sha256 and the
+    fetch time taken from the clock at download (never a caller argument)."""
+    rec = {"file": Path(path).name, "sha256": _sha(path), "source": source,
+           "fetched_at": _utcnow().isoformat()}
+    sidecar_path(path).write_text(json.dumps(rec, indent=1, sort_keys=True) + "\n")
+    return rec
+
+
+def download(url: str, dest) -> dict:
+    """Fetch an official nflverse file and record it (sha256 + fetched_at)."""
+    dest = Path(dest)
+    with urllib.request.urlopen(url, timeout=120) as r:
+        dest.write_bytes(r.read())
+    return record_download(dest, source=url)
+
+
+def _fetch_record(path) -> datetime:
+    sc = sidecar_path(path)
+    if not sc.exists():
+        raise RefreshFailed("REFRESH_FETCH_RECORD_MISSING", str(sc))
+    try:
+        rec = json.loads(sc.read_text())
+        t = datetime.fromisoformat(rec["fetched_at"])
+    except (ValueError, KeyError, TypeError) as e:
+        raise RefreshFailed("REFRESH_FETCH_RECORD_MISSING", f"unreadable {sc}: {e}")
+    if t.tzinfo is None or rec.get("sha256") != _sha(path):
+        raise RefreshFailed("REFRESH_FETCH_RECORD_MISMATCH", str(sc))
+    return t
 
 
 def _sha(path: Path) -> str:
@@ -62,6 +108,7 @@ def _schedule(path: Path, season: int) -> dict:
             for r in csv.DictReader(fh):
                 if int(r["season"]) != season or r["game_type"] != "REG":
                     continue
+                # blank / "TBD" gametime raises ValueError -> REFRESH_FAILED
                 ko = datetime.strptime(f'{r["gameday"]} {r["gametime"]}',
                                        "%Y-%m-%d %H:%M").replace(tzinfo=SCHEDULE_TZ)
                 out[r["game_id"]] = {"kickoff": ko,
@@ -74,19 +121,26 @@ def _schedule(path: Path, season: int) -> dict:
 
 
 def load_current_season(stats_path, schedule_path, *, season: int,
-                        captured_at, fetched_at) -> dict:
+                        captured_at) -> dict:
     cap = _ts(captured_at, "captured_at")
-    fet = _ts(fetched_at, "fetched_at")
     stats_path = Path(stats_path)
     if not stats_path.exists():
         raise RefreshFailed("REFRESH_MISSING", str(stats_path))
-    if cap - fet > timedelta(hours=REFRESH_MAX_AGE_HOURS):
-        raise RefreshFailed("REFRESH_STALE",
-                            f"fetched {fet.isoformat()} > {REFRESH_MAX_AGE_HOURS}h before capture")
+    if not Path(schedule_path).exists():
+        raise RefreshFailed("REFRESH_MISSING", f"schedule {schedule_path}")
+    fet = _fetch_record(stats_path)
+    sfet = _fetch_record(schedule_path)
+    for name, t in (("stats", fet), ("schedule", sfet)):
+        if t > cap:
+            raise RefreshFailed("REFRESH_FETCHED_AFTER_CAPTURE",
+                                f"{name} fetched {t.isoformat()} after capture")
+        if cap - t > timedelta(hours=REFRESH_MAX_AGE_HOURS):
+            raise RefreshFailed("REFRESH_STALE",
+                                f"{name} fetched {t.isoformat()} > {REFRESH_MAX_AGE_HOURS}h before capture")
     sched = _schedule(schedule_path, season)
     done = {g for g, s in sched.items()
             if s["has_result"] and s["kickoff"] + COMPLETION_BUFFER <= cap}
-    apps, names, seen_games = [], {}, set()
+    apps, names, seen_games, keys = [], {}, set(), set()
     try:
         with gzip.open(stats_path, "rt") as fh:
             for r in csv.DictReader(fh):
@@ -96,6 +150,11 @@ def load_current_season(stats_path, schedule_path, *, season: int,
                 if gid not in sched:
                     raise RefreshFailed("REFRESH_SCHEDULE_MISMATCH", gid)
                 seen_games.add(gid)
+                key = (r["player_id"], gid)
+                if key in keys:
+                    raise RefreshFailed("REFRESH_FAILED",
+                                        f"duplicate player-game row {key}")
+                keys.add(key)
                 if gid not in done:
                     continue  # point-in-time: not completed before capture
                 f = eng._f
@@ -121,7 +180,8 @@ def load_current_season(stats_path, schedule_path, *, season: int,
             "completed_games": sorted(done),
             "stats_sha256": _sha(stats_path),
             "schedule_sha256": _sha(schedule_path),
-            "captured_at": cap.isoformat(), "fetched_at": fet.isoformat()}
+            "captured_at": cap.isoformat(), "fetched_at": fet.isoformat(),
+            "schedule_fetched_at": sfet.isoformat()}
 
 
 def merge_into(data: dict, apps: list, names: dict) -> dict:
@@ -147,20 +207,28 @@ def _write(path: Path, rec: dict):
     Path(path).write_text(json.dumps(rec, indent=1, sort_keys=True) + "\n")
 
 
-def run_slate(*, stats_path, schedule_path, season, captured_at, fetched_at,
+def run_slate(*, stats_path, schedule_path, season, captured_at, kickoff,
               run_record_path, base_data, pricer, extra_record=None):
-    """Refresh -> write run record with sha256 -> price. Fails closed."""
+    """Refresh -> write run record with sha256 -> price. Fails closed.
+    The run's own start time (wall clock) must be strictly before kickoff."""
+    started = _utcnow()
     rec = {"engine": "nfl_atd_v1.1", "season": season,
-           "captured_at": captured_at, **(extra_record or {})}
+           "captured_at": captured_at, "kickoff": kickoff,
+           "run_started_at": started.isoformat(), **(extra_record or {})}
     try:
+        ko = _ts(kickoff, "kickoff")
+        if started >= ko:
+            raise RefreshFailed("RUN_AFTER_KICKOFF",
+                                f"run {started.isoformat()} >= kickoff {ko.isoformat()}")
         cur = load_current_season(stats_path, schedule_path, season=season,
-                                  captured_at=captured_at, fetched_at=fetched_at)
+                                  captured_at=captured_at)
     except RefreshFailed as e:
         rec.update(status="FAILED_CLOSED", failure=e.code, detail=e.detail)
         _write(run_record_path, rec)
         raise
     rec["refresh"] = {k: cur[k] for k in ("stats_sha256", "schedule_sha256",
-                                          "fetched_at", "completed_games")}
+                                          "fetched_at", "schedule_fetched_at",
+                                          "completed_games")}
     rec["refresh"]["n_current_season_appearances"] = len(cur["appearances"])
     rec["status"] = "REFRESH_OK_PRICING_STARTED"
     _write(run_record_path, rec)          # hash on record BEFORE pricing
@@ -171,3 +239,10 @@ def run_slate(*, stats_path, schedule_path, season, captured_at, fetched_at,
     rec["status"] = "PRICED"
     _write(run_record_path, rec)
     return result
+
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) != 3:
+        raise SystemExit("usage: python3 atd_refresh.py URL DEST")
+    print(json.dumps(download(sys.argv[1], sys.argv[2]), indent=1))

@@ -11,18 +11,26 @@ Rule 6  review gates: >= 4 distinct weeks AND >= 150 graded picked rows AND
         >= 40 distinct games (a minimum, per the clarification memo). One
         review only, at the first slate close where all gates are met; that
         accumulated sample is the sample of record. Game-clustered CIs.
+INSUFFICIENT_CLOSE_DATA if > 20% of picked rows are CLV_MISSING (owner).
+Multiple-testing correction is a program-level PLAY rule, not applied here.
 Nothing here can open PLAY: output is RESEARCH_ONLY.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import math
+import os
 from datetime import timedelta
+from pathlib import Path
 
 import atd_engine as eng
 
 CLOSE_WINDOW = timedelta(minutes=60)
 MIN_WEEKS, MIN_PICKED, MIN_GAMES = 4, 150, 40
 DRIFT_FLAG = 0.02
+MAX_PICKED_CLV_MISSING = 0.20  # > 20% of picked rows CLV_MISSING -> INSUFFICIENT_CLOSE_DATA
+VERDICT_FILE = "NFL_ATD_V1_1_VERDICT.json"
 Z95 = 1.959963984540054
 
 
@@ -37,46 +45,59 @@ def implied(price) -> float:
     return eng.raw_implied(p)
 
 
-def find_close(captures, pid, kickoff):
+def find_close(captures, game_id, pid, kickoff):
+    """Captures and settlements match on (game_id, player_id). The close is
+    the LATEST capture strictly before kickoff; if its price is invalid the
+    row is CLOSE_LATEST_INVALID (no fallback to an earlier capture)."""
     ko = eng.parse_timestamp(kickoff)
     before = []
     for c in captures:
-        if c.get("player_id") != pid:
+        if c.get("player_id") != pid or c.get("game_id") != game_id:
             continue
         try:
             t = eng.parse_timestamp(c.get("captured_at"))
         except ValueError:
             continue
-        if t is None or t >= ko or eng.parse_american(c.get("yes_price")) is None:
+        if t is None or t >= ko:
             continue
         before.append((t, c))
     if not before:
         return "NO_CLOSE_ROW"
     t, c = max(before, key=lambda x: x[0])
-    return c if ko - t <= CLOSE_WINDOW else "CLOSE_STALE"
+    if ko - t > CLOSE_WINDOW:
+        return "CLOSE_STALE"
+    if eng.parse_american(c.get("yes_price")) is None:
+        return "CLOSE_LATEST_INVALID"
+    return c
 
 
 def score_row(row, captures, settlements):
+    """settlements: {(game_id, player_id): 0 | 1}."""
     if row.get("status") != "PRICED":
         return None
-    pid = row["player_id"]
+    pid, gid = row["player_id"], row["game_id"]
     out = {"player_id": pid, "selection": row["selection"],
-           "game_id": row["game_id"], "week": row["week"],
+           "game_id": gid, "week": row["week"],
            "raw_implied": row["raw_implied"]}
-    close = find_close(captures, pid, row["kickoff"])
+    close = find_close(captures, gid, pid, row["kickoff"])
     if isinstance(close, str):
         out.update(clv=None, clv_status="CLV_MISSING", clv_reason=close)
     else:
         out.update(clv=implied(close["yes_price"]) - row["raw_implied"],
                    clv_status="OK", close_price=close["yes_price"])
-    if pid in settlements and settlements[pid] in (0, 1):
-        out.update(outcome=settlements[pid], outcome_status="SETTLED")
+    s = settlements.get((gid, pid))
+    if s in (0, 1) and not isinstance(s, bool):
+        out.update(outcome=s, outcome_status="SETTLED")
     else:
         out.update(outcome=None, outcome_status="UNSETTLED")
     return out
 
 
 def cut_drift_adjust(rows):
+    """Rule 5 (owner-confirmed): drift_g = mean CLV over all CLV-scored rows
+    of game g, picked and passed; clv_adj = clv - drift_g. NOTE: in a game
+    whose scored rows are all picked, the picked clv_adj sums to 0 for that
+    game by construction, so such games add nothing to mean clv_adj."""
     games = {}
     for r in rows:
         if r.get("clv_status") == "OK":
@@ -113,15 +134,34 @@ def _gates(rows):
     return ({r["week"] for r in graded}, picked, {r["game_id"] for r in graded})
 
 
-def review(slates, prior_verdict=None):
-    if prior_verdict is not None and prior_verdict.get("status") == "REVIEWED":
-        raise ReviewAlreadyRecorded(prior_verdict.get("review_slate"))
-    acc = []
+def inputs_sha256(slates) -> str:
+    return hashlib.sha256(json.dumps(slates, sort_keys=True, default=str)
+                          .encode()).hexdigest()
+
+
+def review(slates, *, records_dir):
+    """Single review. The verdict file in records_dir is checked BEFORE any
+    review and written create-only (O_EXCL); if it exists the scorer refuses,
+    whatever slates are passed."""
+    path = Path(records_dir) / VERDICT_FILE
+    if path.exists():
+        raise ReviewAlreadyRecorded(str(path))
+    acc, used = [], []
     for s in slates:
+        used.append(s)
         acc.extend(dict(r) for r in s["rows"])
         weeks, picked, games = _gates(acc)
         if len(weeks) >= MIN_WEEKS and len(picked) >= MIN_PICKED and len(games) >= MIN_GAMES:
-            return _verdict(acc, s["slate_id"])
+            v = _verdict(acc, s["slate_id"])
+            v["inputs_sha256"] = inputs_sha256(used)
+            v["n_slates"] = len(used)
+            try:
+                fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o444)
+            except FileExistsError:
+                raise ReviewAlreadyRecorded(str(path))
+            with os.fdopen(fd, "w") as fh:
+                fh.write(json.dumps(v, indent=1, sort_keys=True) + "\n")
+            return v
     weeks, picked, games = _gates(acc)
     return {"status": "NO_REVIEW_GATES_NOT_MET", "n_weeks": len(weeks),
             "n_picked": len(picked), "n_games": len(games),
@@ -138,10 +178,13 @@ def _verdict(rows, slate_id):
     m, ci = clustered_mean_ci(pk, "clv")
     m_adj, ci_adj = clustered_mean_ci(pk, "clv_adj")
     m_pass = sum(r["clv"] for r in ps) / len(ps) if ps else None
+    missing_frac = (len(picked) - len(pk)) / len(picked)
     beats = (ci[0] is not None and ci[0] > 0 and m_adj is not None and m_adj > 0
              and (m_pass is None or m > m_pass))
     return {"status": "REVIEWED", "review_slate": slate_id,
-            "verdict": "BEATS_MARKET" if beats else "DOES_NOT_BEAT_MARKET",
+            "verdict": ("INSUFFICIENT_CLOSE_DATA" if missing_frac > MAX_PICKED_CLV_MISSING
+                        else "BEATS_MARKET" if beats else "DOES_NOT_BEAT_MARKET"),
+            "picked_clv_missing_frac": missing_frac,
             "n_weeks": len(weeks), "n_picked": len(picked), "n_games": len(games),
             "n_picked_clv_missing": len(picked) - len(pk),
             "clv_picked_mean": m, "clv_picked_ci95": list(ci),
