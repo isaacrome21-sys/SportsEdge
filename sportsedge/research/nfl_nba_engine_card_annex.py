@@ -97,6 +97,16 @@ def _pair_ok(rows, row, *, at, event_id, sport, market, player_id, line, default
         return "FINITE_DK_ODDS_REQUIRED"
     if str(row.get("source_quote_form") or "").upper() in {"MILESTONE_LADDER", "YES_ONLY"}:
         return "NATIVE_TWO_SIDED_QUOTES_REQUIRED"
+    # Validate the specific row being printed, even if other fresh rows
+    # can independently form a pair. Never launder an old/future quote
+    # into a research readout through a same-side duplicate.
+    try:
+        source_stamp = _instant(row.get("quote_captured_at"))
+    except (TypeError, ValueError):
+        return "DK_SOURCE_ROW_STALE_OR_FUTURE"
+    source_age = (at - source_stamp).total_seconds()
+    if source_age < 0 or source_age > 180:
+        return "DK_SOURCE_ROW_STALE_OR_FUTURE"
     matching = []
     for other in rows:
         if not isinstance(other, dict):
