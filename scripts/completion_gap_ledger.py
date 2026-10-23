@@ -35,24 +35,41 @@ REMOTE_REPO = "isaacrome21-sys/sportsedge"
 _HEX = frozenset("0123456789abcdef")
 
 
-def _github_resolver(branch: str, sha: str) -> str:
-    """'on_branch' if sha is the head of, or an ancestor of, the remote branch."""
+REMOTE_ATTEMPTS = 4
+REMOTE_BACKOFF_S = 2.0
+
+
+def _github_resolver(branch: str, sha: str, *, sleep=None) -> str:
+    """'on_branch' if sha is the head of, or an ancestor of, the remote branch.
+
+    Unauthenticated rate-limit 403s are retried a bounded number of times;
+    anything still unavailable fails closed with REMOTE_CHECK_UNAVAILABLE.
+    """
+    import time
     import urllib.error
     import urllib.parse
     import urllib.request
+    sleep = sleep or time.sleep
     url = (f"https://api.github.com/repos/{REMOTE_REPO}/compare/"
            f"{sha}...{urllib.parse.quote(branch, safe='/')}")
-    req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json"})
-    try:
-        with urllib.request.urlopen(req, timeout=30) as r:
-            status = json.load(r).get("status")
-    except urllib.error.HTTPError as e:
-        if e.code in (404, 422):
-            return "missing"
-        raise LedgerRefusal(f"REMOTE_CHECK_UNAVAILABLE:{e.code}") from None
-    except OSError:
-        raise LedgerRefusal("REMOTE_CHECK_UNAVAILABLE") from None
-    return "on_branch" if status in ("identical", "ahead") else "missing"
+    req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json",
+                                               "User-Agent": "sportsedge-completion-gap-ledger/1"})
+    for attempt in range(REMOTE_ATTEMPTS):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                status = json.load(r).get("status")
+            return "on_branch" if status in ("identical", "ahead") else "missing"
+        except urllib.error.HTTPError as e:
+            if e.code in (404, 422):
+                return "missing"
+            limited = e.code in (403, 429) and e.headers.get("x-ratelimit-remaining") == "0"
+            if not limited or attempt == REMOTE_ATTEMPTS - 1:
+                raise LedgerRefusal(f"REMOTE_CHECK_UNAVAILABLE:{e.code}") from None
+        except OSError:
+            if attempt == REMOTE_ATTEMPTS - 1:
+                raise LedgerRefusal("REMOTE_CHECK_UNAVAILABLE") from None
+        sleep(REMOTE_BACKOFF_S * (attempt + 1))
+    raise LedgerRefusal("REMOTE_CHECK_UNAVAILABLE")
 
 
 def verify_branch_shas(policy: dict, *, resolver=None) -> list:
