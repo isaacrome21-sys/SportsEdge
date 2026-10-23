@@ -96,7 +96,7 @@ def canonical_json(obj) -> bytes:
 
 def replayers() -> dict:
     """The only replayer: the pricer whose code hashes to pricer_sha256()."""
-    import price_nfl_atd_board_v11 as pr
+    import price_nfl_atd_board_v12 as pr
     return {pr.pricer_sha256(): pr.replay}
 
 
@@ -499,7 +499,7 @@ def load_slate(api, slate_id, now=None) -> dict:
             refs[r.get("reason")] = refs.get(r.get("reason"), 0) + 1
     out["refusals"] = refs
     import atd_engine as eng
-    import price_nfl_atd_board_v11 as pr
+    import price_nfl_atd_board_v12 as pr
     declared = set(eng.DECLARED_UNPRICED_REASONS) | set(pr.DECLARED_PRICER_REFUSALS)
     if any(k not in declared for k in refs):
         out["reasons"].append("RUN_REFUSAL_CODE_UNDECLARED")

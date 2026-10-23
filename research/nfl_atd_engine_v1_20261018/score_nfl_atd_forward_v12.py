@@ -305,7 +305,7 @@ class ReviewEnvUntrusted(Exception):
 
 
 def _review_env_problems(replayers_fn, original_fn, modules) -> list:
-    import price_nfl_atd_board_v11 as pr
+    import price_nfl_atd_board_v12 as pr
     out = []
     if replayers_fn is not original_fn:
         out.append("replayers_patched")
@@ -330,7 +330,7 @@ def _review_env_guard():
 
 def local_shas() -> dict:
     """shas of the code running now, compared with FREEZE.json."""
-    import price_nfl_atd_board_v11 as pr
+    import price_nfl_atd_board_v12 as pr
     here = Path(__file__).resolve().parent
 
     def h(n):
@@ -362,7 +362,7 @@ class ReviewInterpreterMismatch(Exception):
 def _env_record() -> dict:
     import hashlib
     import platform
-    import price_nfl_atd_board_v11 as pr
+    import price_nfl_atd_board_v12 as pr
     return {**local_shas(),
             "python_version": platform.python_version(),
             "platform": platform.platform()}
