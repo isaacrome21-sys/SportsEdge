@@ -346,10 +346,11 @@ def _index_closes(close_rows: list) -> tuple[dict, set]:
         line = _finite_number(raw.get("line"), reason="LINE_INVALID",
                               row_id="close", field="line")
         key = (raw["event_id"], raw.get("subject_id"), raw["market"], line)
-        # Validate every supplied capture, even when it does not match an
-        # entry or is overwritten by another capture of the same key.
+        # Validate every supplied capture, including unmatched records.
         _parse_ts(raw["captured_at"], row_id=f"close:{key}",
                   field_name="captured_at")
+        if key in by_key:
+            raise ForwardValidationRefusal("CLOSE_DUPLICATE", {"key": key})
         by_key[key] = raw
         seen.add((raw["event_id"], raw.get("subject_id"), raw["market"]))
     return by_key, seen
