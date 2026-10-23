@@ -563,11 +563,7 @@ def test_f4_slate_date_is_tipoff_ct_date():
 
 # F5 post-tip capture is the last capture; main-line closes only
 def test_f5_post_tip_capture_blocks_close():
-    q = (close_quotes("g1", "Tg1", 110.5, t=TIP0 - timedelta(minutes=10),
-                      cap="C1")
-         + close_quotes("g1", "Tg1", 110.5, t=TIP0 + timedelta(minutes=1),
-                        cap="C2"))
-    assert _close_reason(q) == "CLOSE_NOT_PRETIP"
+    # fully post-tip-only case superseded by AMENDMENT_2 (see test_a2_*)
     q = (close_quotes("g1", "Tg1", 110.5, t=TIP0 - timedelta(minutes=10),
                       cap="C1")
          + close_quotes("g1", "Tg1", 110.5, t=TIP0 - timedelta(seconds=30),
@@ -598,3 +594,36 @@ def test_minor_missing_capture_id():
     c2 = [dict(q) for q in cls]; c2[0]["capture_id"] = None
     assert _ev(rows, ents, c2, res)["clv_missing"].get(
         "CLOSE_CAPTURE_ID_MISSING") == 1
+
+
+# ---------------------------------------------------------------------------
+# Re-audit round 2: AMENDMENT_2.md narrows the post-tip rule to straddling
+# captures; fully post-tip captures are ignored (frozen §7).
+def test_amendment2_pinned():
+    import hashlib
+    txt = (HERE / "AMENDMENT_2.md").read_bytes()
+    assert hashlib.sha256(txt).hexdigest() == ev.AMENDMENT_2_SHA256
+    assert ev.verify_amendment() is True
+    assert b"adds no codes" in txt.lower()
+
+
+def test_a2_fully_post_tip_capture_ignored():
+    q = (close_quotes("g1", "Tg1", 110.5, t=TIP0 - timedelta(minutes=10),
+                      cap="C1")
+         + close_quotes("g1", "Tg1", 110.5, t=TIP0 + timedelta(minutes=1),
+                        cap="C2"))
+    st = ev.close_status(q, "g1", "Tg1", 110.5, TIP0)
+    assert st["reason"] is None and st["close_line"] == 110.5
+    only_post = close_quotes("g1", "Tg1", 110.5,
+                             t=TIP0 + timedelta(minutes=1), cap="C2")
+    assert _close_reason(only_post) == "CLOSE_NOT_PRETIP"
+
+
+def test_a2_straddling_last_capture_not_rescued():
+    q = (close_quotes("g1", "Tg1", 110.5, t=TIP0 - timedelta(minutes=10),
+                      cap="C1")
+         + close_quotes("g1", "Tg1", 110.5, t=TIP0 - timedelta(seconds=30),
+                        span=60, cap="C2")
+         + close_quotes("g1", "Tg1", 110.5, t=TIP0 + timedelta(minutes=2),
+                        cap="C3"))
+    assert _close_reason(q) == "CLOSE_NOT_PRETIP"
