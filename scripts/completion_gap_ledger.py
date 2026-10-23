@@ -88,17 +88,71 @@ def _cited(policy: dict, key: str, sport: str, market: str):
     return rec
 
 
+_SCOPE_SECTIONS = ("Question", "Scope", "Data (fixed now)")
+
+
+def _repo_file(rel) -> Path:
+    if not isinstance(rel, str) or not rel or Path(rel).is_absolute():
+        raise LedgerRefusal(f"COVERING_INSTRUMENT_PATH_ESCAPE:{rel}")
+    root = ROOT.resolve()
+    path = (root / rel).resolve()
+    if not path.is_relative_to(root):
+        raise LedgerRefusal(f"COVERING_INSTRUMENT_PATH_ESCAPE:{rel}")
+    return path
+
+
+def _section_of(text: str, needle: str):
+    """(H1 title, enclosing H2 heading) of the first occurrence of needle."""
+    i = text.find(needle)
+    if i < 0:
+        return None, None
+    title, section = "", None
+    for line in text[:i].splitlines():
+        if line.startswith("# "):
+            title = line[2:]
+        elif line.startswith("## "):
+            section = line[3:].strip()
+    return title, section
+
+
+def _check_marker(ref: dict, path: Path, market: str) -> None:
+    text = path.read_text(encoding="utf-8")
+    if ref["needle"] not in text:
+        raise LedgerRefusal(f"COVERING_INSTRUMENT_NOT_FOUND:{market}:{ref['path']}")
+    if ref["marker"] == "FREEZE":
+        try:
+            status = json.loads(text).get("status")
+        except (ValueError, AttributeError):
+            raise LedgerRefusal(f"COVERING_INSTRUMENT_NOT_A_MARKER:{market}:{ref['path']}") from None
+        ok = (isinstance(status, str) and status.startswith("FROZEN")
+              and ref["needle"] == f'"status": "{status}"' and market in text)
+    else:
+        title, section = _section_of(text, ref["needle"])
+        ok = ("pre-registration" in (title or "").lower() and section in _SCOPE_SECTIONS
+              and market in ref["needle"] and "out of scope" not in ref["needle"].lower())
+    if not ok:
+        raise LedgerRefusal(f"COVERING_INSTRUMENT_NOT_A_MARKER:{market}:{ref['path']}")
+
+
 def _covering(policy: dict, sport: str, market: str):
-    refs = policy.get("covered_by_frozen_instrument", {}).get(sport, {}).get(market)
+    table = policy.get("covered_by_frozen_instrument", {})
+    if not isinstance(table, dict) or not isinstance(table.get(sport, {}), dict):
+        raise LedgerRefusal("COVERING_INSTRUMENT_CITATION_MALFORMED:TABLE")
+    refs = table.get(sport, {}).get(market)
     if refs is None:
         return None
     if not isinstance(refs, list) or not refs:
-        raise LedgerRefusal(f"COVERING_INSTRUMENT_CITATION_REQUIRED:{market}")
+        raise LedgerRefusal(f"COVERING_INSTRUMENT_CITATION_MALFORMED:{market}")
     out = []
     for ref in refs:
-        path = ROOT / ref["path"]
-        if not path.is_file() or ref["needle"] not in path.read_text(encoding="utf-8"):
+        if (not isinstance(ref, dict) or set(ref) != {"path", "needle", "marker"}
+                or not isinstance(ref["needle"], str) or not ref["needle"]
+                or not isinstance(ref["path"], str) or ref["marker"] not in ("SCOPE", "FREEZE")):
+            raise LedgerRefusal(f"COVERING_INSTRUMENT_CITATION_MALFORMED:{market}")
+        path = _repo_file(ref["path"])
+        if not path.is_file():
             raise LedgerRefusal(f"COVERING_INSTRUMENT_NOT_FOUND:{market}:{ref['path']}")
+        _check_marker(ref, path, market)
         out.append(ref["path"])
     return out
 
@@ -133,12 +187,6 @@ def classify(row: dict, policy: dict) -> dict | None:
         if readiness != "NO_FORWARD_TEST_CONFIG":
             raise LedgerRefusal(f"UNKNOWN_READINESS:{readiness}")
         area, status = "INFRASTRUCTURE", "BUILDABLE_NEEDS_SIBLING_RECONCILIATION"
-        covered = _covering(policy, row["sport"], row["market"])
-        if covered:
-            return {"sport": row["sport"], "market": row["market"], "blocker": blocker,
-                    "readiness": readiness, "score_area": area,
-                    "status": "COVERED_BY_COMMITTED_FROZEN_INSTRUMENT",
-                    "engine_ref": None, "record": covered}
     elif blocker in _BLOCKERS:
         area, status = _BLOCKERS[blocker]
         if blocker == "NO_ENGINE":
@@ -152,6 +200,10 @@ def classify(row: dict, policy: dict) -> dict | None:
         status, record = "BLOCKED_RULING_6_FOCUS_PAUSE", paused
     elif held and area != "VALIDATION":
         status, record = "BLOCKED_OWNER_HOLD", held
+    elif readiness == "NO_FORWARD_TEST_CONFIG":
+        covered = _covering(policy, row["sport"], row["market"])
+        if covered:
+            status, record = "COVERED_BY_COMMITTED_FROZEN_INSTRUMENT", covered
     return {"sport": row["sport"], "market": row["market"], "blocker": blocker,
             "readiness": readiness, "score_area": area, "status": status,
             "engine_ref": engine_ref, "record": record}

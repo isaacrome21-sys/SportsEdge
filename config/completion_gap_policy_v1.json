@@ -3,28 +3,33 @@
     "MLB": {
       "PITCHER_BB": [
         {
+          "marker": "SCOPE",
           "needle": "Pitcher props (PITCHER_K, PITCHER_BB, PITCHER_ER, PITCHER_HITS_ALLOWED)",
           "path": "docs/MLB_PITCHER_PROP_PROMOTION_PREREG.md"
         }
       ],
       "PITCHER_ER": [
         {
+          "marker": "SCOPE",
           "needle": "Pitcher props (PITCHER_K, PITCHER_BB, PITCHER_ER, PITCHER_HITS_ALLOWED)",
           "path": "docs/MLB_PITCHER_PROP_PROMOTION_PREREG.md"
         }
       ],
       "PITCHER_HITS_ALLOWED": [
         {
+          "marker": "SCOPE",
           "needle": "Pitcher props (PITCHER_K, PITCHER_BB, PITCHER_ER, PITCHER_HITS_ALLOWED)",
           "path": "docs/MLB_PITCHER_PROP_PROMOTION_PREREG.md"
         }
       ],
       "PITCHER_K": [
         {
+          "marker": "SCOPE",
           "needle": "Pitcher props (PITCHER_K, PITCHER_BB, PITCHER_ER, PITCHER_HITS_ALLOWED)",
           "path": "docs/MLB_PITCHER_PROP_PROMOTION_PREREG.md"
         },
         {
+          "marker": "FREEZE",
           "needle": "\"status\": \"FROZEN_BEFORE_FIRST_PROSPECTIVE_PREDICTION\"",
           "path": "config/research/mlb_pitcher_k_forward_validation_v1.json"
         }
