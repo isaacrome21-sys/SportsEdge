@@ -739,6 +739,7 @@
     }
   ],
   "play_authority_conferred": false,
+  "remote_shas_verified": true,
   "schema": "SPORTSEDGE_COMPLETION_GAP_LEDGER_V1",
   "scope": "CANONICAL_MLB_NFL_MARKETS_ONLY",
   "score_points_awarded": null,

@@ -227,10 +227,16 @@ def classify(row: dict, policy: dict) -> dict | None:
             "engine_ref": engine_ref, "record": record}
 
 
-def gap_ledger(*, root: Path = ROOT) -> dict:
+def gap_ledger(*, root: Path = ROOT, offline: bool = False) -> dict:
+    """Build the ledger. Verifies grok-branch SHAs against the remote unless
+    offline=True is passed explicitly; the output records which happened."""
+    if not isinstance(offline, bool):
+        raise LedgerRefusal("OFFLINE_FLAG_MUST_BE_BOOL")
     policy = json.loads((root / "config" / "completion_gap_policy_v1.json").read_text(encoding="utf-8"))
     if policy.get("schema") != "SPORTSEDGE_COMPLETION_GAP_POLICY_V2":
         raise LedgerRefusal("POLICY_SCHEMA")
+    if not offline:
+        verify_branch_shas(policy)
     report = accuracy_readiness(root=root)
     if report.get("validated_families_conferred") != 0 or report.get("play_authority_conferred") is not False:
         raise LedgerRefusal("UPSTREAM_CONFERS_AUTHORITY")
@@ -245,6 +251,7 @@ def gap_ledger(*, root: Path = ROOT) -> dict:
         "score_points_awarded": None,
         "validated_families_conferred": 0,
         "play_authority_conferred": False,
+        "remote_shas_verified": not offline,
     }
 
 
@@ -264,10 +271,7 @@ def main() -> int:
         raise LedgerRefusal("OFFLINE_AND_VERIFY_REMOTE_CONFLICT")
     if a.offline:
         print("REMOTE_SHAS_NOT_VERIFIED_OFFLINE", file=sys.stderr)
-    else:
-        policy = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
-        verify_branch_shas(policy)
-    text = render(gap_ledger())
+    text = render(gap_ledger(offline=a.offline))
     if a.out:
         a.out.write_bytes(text.encode("utf-8"))
     else:
