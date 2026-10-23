@@ -15,6 +15,7 @@ from test_nfl_atd_v11_scorer import _ledger
 BR = pv.RECORDS_BRANCH
 KO = "2026-10-25T17:00:00Z"
 NOW = datetime(2026, 11, 30, tzinfo=timezone.utc)
+GAMES = {"g1": {"kickoff": KO, "season": 2026, "week": 8}}
 
 
 def one_slate(api):
@@ -47,47 +48,49 @@ class Base(unittest.TestCase):
 
 class TestClosePaths(Base):
     def test_paths(self):
-        self.assertEqual(pv.close_record_path("c" * 64), f"nfl_atd_v1_1/closes/{'c' * 64}.json")
-        self.assertEqual(pv.settlement_data_path("c" * 64),
-                         f"nfl_atd_v1_1/settlements/{'c' * 64}.json")
+        self.assertEqual(pv.close_record_path("c" * 64, 2026, 8),
+                         f"nfl_atd_v1_1/closes/2026-W8/{'c' * 64}.json")
+        self.assertEqual(pv.settlement_data_path("c" * 64, 2026, 8),
+                         f"nfl_atd_v1_1/settlements/2026-W8/{'c' * 64}.json")
 
     def test_proven_close_used(self):
         publish_close(self.api, "g1", KO, "2026-10-25T16:30:00Z", CAPS, "2026-10-25T16:40:00Z")
-        closes = pv.load_closes(self.api)
+        closes = pv.load_closes(self.api, GAMES)
         self.assertEqual(closes["unproven_games"], [])
         self.assertEqual(len(closes["captures"]), 2)
         self.assertEqual(closes["captures"][0]["game_id"], "g1")
 
     def test_pushed_before_captured_at_unproven(self):
         publish_close(self.api, "g1", KO, "2026-10-25T16:30:00Z", CAPS, "2026-10-25T16:29:00Z")
-        self.assertEqual(pv.load_closes(self.api)["unproven_games"], ["g1"])
+        self.assertEqual(pv.load_closes(self.api, GAMES)["unproven_games"], ["g1"])
 
     def test_capture_entry_later_than_push_unproven(self):
         caps = [dict(CAPS[0], captured_at="2026-10-25T16:50:00Z")]
         publish_close(self.api, "g1", KO, "2026-10-25T16:30:00Z", caps, "2026-10-25T16:40:00Z")
-        self.assertEqual(pv.load_closes(self.api)["unproven_games"], ["g1"])
+        self.assertEqual(pv.load_closes(self.api, GAMES)["unproven_games"], ["g1"])
 
     def test_push_window_kickoff_plus_15(self):
         publish_close(self.api, "g1", KO, "2026-10-25T16:30:00Z", CAPS, "2026-10-25T17:15:00Z")
-        self.assertEqual(pv.load_closes(self.api)["unproven_games"], [])
+        self.assertEqual(pv.load_closes(self.api, GAMES)["unproven_games"], [])
         api2 = FakeGitHub()
         publish_close(api2, "g1", KO, "2026-10-25T16:30:00Z", CAPS, "2026-10-25T17:15:01Z")
-        self.assertEqual(pv.load_closes(api2)["unproven_games"], ["g1"])
+        self.assertEqual(pv.load_closes(api2, GAMES)["unproven_games"], ["g1"])
 
     def test_filename_must_be_content_sha(self):
         body = json.dumps({"game_id": "g1", "kickoff": KO,
                            "captured_at": "2026-10-25T16:30:00Z", "captures": CAPS})
-        self.api.commit(BR, {pv.close_record_path("d" * 64): body}, "2026-10-25T16:40:00Z")
-        self.assertEqual(pv.load_closes(self.api)["unproven_games"], ["g1"])
+        self.api.commit(BR, {pv.close_record_path("d" * 64, 2026, 8): body}, "2026-10-25T16:40:00Z")
+        self.assertEqual(pv.load_closes(self.api, GAMES)["unproven_games"], ["g1"])
 
     def test_edited_close_unproven(self):
         sha = publish_close(self.api, "g1", KO, "2026-10-25T16:30:00Z", CAPS,
                             "2026-10-25T16:40:00Z")
-        self.api.commit(BR, {pv.close_record_path(sha): "{}"}, "2026-10-25T16:45:00Z")
-        out = pv.load_closes(self.api)
-        self.assertEqual(out["unproven_games"], [])   # game unknown after edit
-        self.assertEqual(out["unproven_records"], [pv.close_record_path(sha)])
-        self.assertEqual(out["captures"], [])
+        self.api.commit(BR, {pv.close_record_path(sha, 2026, 8): "{}"}, "2026-10-25T16:45:00Z")
+        # Ruling 2 (re-audit of 4ece6f6a): an edited record that can no
+        # longer be attributed to a game now refuses the whole review.
+        with self.assertRaises(pv.ProvenanceFailed) as cm:
+            pv.load_closes(self.api, GAMES)
+        self.assertEqual(cm.exception.code, "CLOSE_RECORD_UNPROVEN")
 
     def test_unproven_close_makes_every_game_row_missing(self):
         publish_close(self.api, "g1", KO, "2026-10-25T16:30:00Z", CAPS, "2026-10-25T16:40:00Z")
@@ -122,18 +125,18 @@ class TestSettlements(Base):
     def test_settlement_hash_mismatch_not_used(self):
         body = json.dumps({"settlements": [{"game_id": "g1", "player_id": "a", "td": 1}]})
         sha = hashlib.sha256(body.encode()).hexdigest()
-        self.api.commit(BR, {pv.settlement_data_path(sha): body + " "}, "2026-10-26T12:00:00Z")
+        self.api.commit(BR, {pv.settlement_data_path(sha, 2026, 8): body + " "}, "2026-10-26T12:00:00Z")
         self.api.commit(BR, {pv.fetch_record_path(sha): json.dumps({"sha256": sha})},
                         "2026-10-26T12:00:00Z")
-        st = pv.load_settlements(self.api, {"g1": KO}, NOW)
+        st = pv.load_settlements(self.api, GAMES, NOW)
         self.assertEqual(st["settlements"], {})
         self.assertEqual(st["refused"][0]["code"], "SETTLEMENT_HASH_MISMATCH")
 
     def test_settlement_without_fetch_record_not_used(self):
         body = json.dumps({"settlements": [{"game_id": "g1", "player_id": "a", "td": 1}]})
         sha = hashlib.sha256(body.encode()).hexdigest()
-        self.api.commit(BR, {pv.settlement_data_path(sha): body}, "2026-10-26T12:00:00Z")
-        st = pv.load_settlements(self.api, {"g1": KO}, NOW)
+        self.api.commit(BR, {pv.settlement_data_path(sha, 2026, 8): body}, "2026-10-26T12:00:00Z")
+        st = pv.load_settlements(self.api, GAMES, NOW)
         self.assertEqual(st["settlements"], {})
         self.assertEqual(st["refused"][0]["code"], "FETCH_RECORD_NOT_ON_BRANCH")
 
@@ -141,7 +144,7 @@ class TestSettlements(Base):
         publish_settlements(self.api, {("g1", "a"): 1}, "2026-10-26T12:00:00Z")
         publish_settlements(self.api, {("g1", "a"): 0}, "2026-10-26T13:00:00Z")
         with self.assertRaises(pv.ProvenanceFailed) as cm:
-            pv.load_settlements(self.api, {"g1": KO}, NOW)
+            pv.load_settlements(self.api, GAMES, NOW)
         self.assertEqual(cm.exception.code, "SETTLEMENT_CONFLICT")
 
 

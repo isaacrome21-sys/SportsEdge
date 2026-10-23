@@ -31,7 +31,8 @@ def run_rec(api, sid="S1", t="2026-10-25T16:30:00Z", cap=CAP, ko=KO, rows=None,
     for name, s in (("stats", SHA), ("schedule", SSHA)):
         c = api.file_commits(BR, pv.fetch_record_path(s))
         fp[name] = {"event": ev_for(api, c[0])} if (stored and c) else {}
-    rec = {"slate_id": sid, "captured_at": cap, "first_kickoff": ko,
+    rec = {"slate_id": sid, "captured_at": cap, "first_kickoff": ko, "season": 2026,
+           "schedule_kickoffs": {},
            "stats_sha256": SHA, "schedule_sha256": SSHA,
            "fetch_provenance": fp, "rows": rows or []}
     return api.commit(BR, {pv.run_record_path(sid): json.dumps(rec)}, t)
@@ -126,7 +127,7 @@ class TestRecordProofA(unittest.TestCase):
 
     def test_raising_api_is_coded(self):
         class Boom(FakeGitHub):
-            def activities(self, b):
+            def activity_page(self, b, cursor=None):
                 raise OSError("network down")
         self.api = Boom()
         fetch(self.api, SHA)
@@ -177,7 +178,8 @@ class TestFetchAndSlateC(unittest.TestCase):
         # run pushed, THEN a new fetch record for a hash it cites
         self.api2 = FakeGitHub()
         fetch(self.api2, SSHA, "2026-10-25T15:01:00Z")
-        rec = {"slate_id": "S1", "captured_at": "2026-10-25T16:00:00Z",
+        rec = {"slate_id": "S1", "captured_at": "2026-10-25T16:00:00Z", "season": 2026,
+               "schedule_kickoffs": {},
                "first_kickoff": "2026-10-25T18:00:00Z", "stats_sha256": SHA,
                "schedule_sha256": SSHA, "fetch_provenance": {}, "rows": []}
         self.api2.commit(BR, {pv.run_record_path("S1"): json.dumps(rec)}, "2026-10-25T16:20:00Z")
