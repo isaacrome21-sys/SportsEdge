@@ -176,6 +176,7 @@
         "branch": "grok/t249-period-quarter-spreads-refused-20261023",
         "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
         "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "main_blob_differs": false,
         "merged_to_main": false,
         "refusals": "none",
         "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
@@ -194,6 +195,7 @@
         "branch": "grok/t249-period-quarter-spreads-refused-20261023",
         "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
         "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "main_blob_differs": false,
         "merged_to_main": false,
         "refusals": "none",
         "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
@@ -212,6 +214,7 @@
         "branch": "grok/t249-period-quarter-spreads-refused-20261023",
         "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
         "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "main_blob_differs": false,
         "merged_to_main": false,
         "refusals": "none",
         "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
@@ -330,6 +333,7 @@
         "branch": "grok/t249-period-quarter-spreads-refused-20261023",
         "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
         "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "main_blob_differs": false,
         "merged_to_main": false,
         "refusals": "Q1-Q4 NAIVE_FAIL:Qn_MONEYLINE",
         "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
@@ -348,6 +352,7 @@
         "branch": "grok/t249-period-quarter-spreads-refused-20261023",
         "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
         "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "main_blob_differs": false,
         "merged_to_main": false,
         "refusals": "Q1-Q4 NAIVE_FAIL:Qn_MONEYLINE_DERIVABLE (Grok ruling 2026-10-23 Option 1)",
         "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
@@ -366,6 +371,7 @@
         "branch": "grok/t249-period-quarter-spreads-refused-20261023",
         "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
         "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "main_blob_differs": false,
         "merged_to_main": false,
         "refusals": "Q1/Q3/Q4 NAIVE_FAIL:Qn_TOTAL; Q2 priced",
         "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
@@ -444,6 +450,7 @@
         "branch": "grok/t249-period-quarter-spreads-refused-20261023",
         "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
         "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "main_blob_differs": false,
         "merged_to_main": false,
         "refusals": "none",
         "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
@@ -462,6 +469,7 @@
         "branch": "grok/t249-period-quarter-spreads-refused-20261023",
         "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
         "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "main_blob_differs": false,
         "merged_to_main": false,
         "refusals": "none",
         "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
@@ -480,6 +488,7 @@
         "branch": "grok/t249-period-quarter-spreads-refused-20261023",
         "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
         "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "main_blob_differs": false,
         "merged_to_main": false,
         "refusals": "none",
         "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
