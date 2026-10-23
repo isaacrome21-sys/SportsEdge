@@ -177,24 +177,11 @@ def _price_period(history: Iterable[Mapping[str, Any]], *, date: str, season: in
         for key in ("moneyline_3way", "margin_pmf", "mu_home", "mu_away"):
             del out[key]
         refused["moneyline"] = f"NAIVE_FAIL:{ml_fam}"
-        out["spread_quote"] = _SpreadQuote(period, m_pmf)
+        # Grok ruling 2026-10-23 (Option 1): any public quarter spread plus the public
+        # history pins the one-parameter margin shift (bisection) and so the moneyline.
+        refused["spread"] = f"NAIVE_FAIL:{ml_fam}_DERIVABLE"
     out["refused"] = refused
     return out
-
-
-class _SpreadQuote:
-    """Opaque spread state for a NAIVE_FAIL-moneyline quarter. Only margins with
-    |k| >= 1.5 are kept individually; mass on (-1.5, 1.5) is pooled into one number, so
-    P(home), P(tie), P(away) cannot be recovered. Read it only through spread_probs."""
-    __slots__ = ("period", "tails", "core")
-
-    def __init__(self, period, m_pmf):
-        self.period = period
-        self.tails = tuple(sorted((k, p) for k, p in m_pmf.items() if abs(k) >= 1.5))
-        self.core = math.fsum(p for k, p in m_pmf.items() if abs(k) < 1.5)
-
-    def __repr__(self):
-        return f"<SpreadQuote {self.period}>"
 
 
 def _period_of(priced) -> str:
@@ -240,17 +227,9 @@ def spread_probs(priced: dict, home_line) -> dict:
     period = _period_of(priced)
     ml_fam = f"{period.upper()}_MONEYLINE"
     if ml_fam in NAIVE_FAIL_FAMILIES:
-        if abs(L) <= 1.0:
-            # |line| <= 1 (pick'em, +/-0.5, +/-1) restates the refused moneyline.
-            raise NflPeriodLinesError(f"NAIVE_FAIL:{ml_fam}")
-        q = priced.get("spread_quote")
-        if not isinstance(q, _SpreadQuote) or q.period != period:
-            raise NflPeriodLinesError(f"SPREAD_QUOTE_MISSING:{period}")
-        # |L| >= 1.5 puts the whole pooled core on one side of the line.
-        home = math.fsum(p for k, p in q.tails if k + L > 0) + (q.core if L > 0 else 0.0)
-        away = math.fsum(p for k, p in q.tails if k + L < 0) + (q.core if L < 0 else 0.0)
-        push = math.fsum(p for k, p in q.tails if k + L == 0)
-        return {"home": home, "push": push, "away": away}
+        # Every quarter spread is refused (Grok ruling 2026-10-23, Option 1): with the
+        # public history, any spread price rebuilds the refused moneyline.
+        raise NflPeriodLinesError(f"NAIVE_FAIL:{ml_fam}_DERIVABLE")
     if "margin_pmf" not in priced:
         raise NflPeriodLinesError("MARGIN_PMF_MISSING")
     pmf = priced["margin_pmf"]
