@@ -349,7 +349,7 @@ def test_partial_slate_not_full():
 def test_adverse_sign_test_first():
     # all picks OVER (mean line+4), all closes move down -> adverse
     rows, ents, cls, res, dates = _big(
-        8, 12, mean_fn=lambda i: 114.5, final_fn=lambda i: 130.0,
+        12, 12, mean_fn=lambda i: 114.5, final_fn=lambda i: 130.0,
         close_line_fn=lambda i: 108.5 if i % 3 == 0 else 110.5)
     out = ev.evaluate(rows, ents, cls, res, full_slates(dates), [], cfg())
     assert out["verdict"] == "DOES_NOT_BEAT_MARKET"
@@ -359,7 +359,7 @@ def test_adverse_sign_test_first():
 def test_majority_moved_insufficient_close():
     # half up half down -> sign test not adverse; >50% moved
     rows, ents, cls, res, dates = _big(
-        8, 12, mean_fn=lambda i: 114.5, final_fn=lambda i: 130.0,
+        30, 12, mean_fn=lambda i: 114.5, final_fn=lambda i: 130.0,
         close_line_fn=lambda i: 112.5 if i % 4 in (0, 1) else
         (108.5 if i % 4 == 2 else 110.5))
     out = ev.evaluate(rows, ents, cls, res, full_slates(dates), [], cfg())
@@ -376,7 +376,7 @@ def test_zero_moved_sign_test_not_run():
 
 def test_over_20pct_invalid_close():
     rows, ents, cls, res, dates = _big(
-        8, 12, mean_fn=lambda i: 114.5, final_fn=lambda i: 114.5)
+        10, 12, mean_fn=lambda i: 114.5, final_fn=lambda i: 114.5)
     drop = {r["team"] for j, r in enumerate(rows) if j % 4 == 0}
     cls = [c for c in cls if c["team"] not in drop]
     out = ev.evaluate(rows, ents, cls, res, full_slates(dates), [], cfg())
@@ -415,3 +415,13 @@ def test_devig_and_bonferroni_level():
     assert abs(ev.ci_level(9) - (1 - 0.05 / 9)) < 1e-12
     assert ev.sign_test_p(0, 0) is None
     assert abs(ev.sign_test_p(5, 5) - 0.5 ** 5) < 1e-12
+
+
+# §9 frozen settings: only k>=9, seed 20261022, 10,000 resamples are binding
+def test_binding_flag():
+    o = ev.evaluate([], [], [], {}, {}, [], cfg())
+    assert o["binding"] is False  # 400 resamples in tests
+    o = ev.evaluate([], [], [], {}, {}, [], {"first_counted_slate": "x"})
+    assert o["binding"] is True and o["resamples"] == 10_000
+    o = ev.evaluate([], [], [], {}, {}, [], cfg(resamples=10_000, k=8))
+    assert o["binding"] is False
