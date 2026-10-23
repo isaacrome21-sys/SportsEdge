@@ -78,11 +78,21 @@ class FakeGitHub:
     def get_file(self, ref, path):
         if "get_file" in self.malformed:
             return 12345
-        return self.trees.get(self._ref(ref), {}).get(path)
+        c = self.trees.get(self._ref(ref), {}).get(path)
+        return c.decode("utf-8", "replace") if isinstance(c, bytes) else c
 
     def blob_sha(self, ref, path):
         c = self.trees.get(self._ref(ref), {}).get(path)
-        return None if c is None else hashlib.sha1(c.encode()).hexdigest()
+        if c is None:
+            return None
+        return hashlib.sha1(c if isinstance(c, bytes) else c.encode()).hexdigest()
+
+    def get_file_bytes(self, ref, path):
+        """Raw bytes via the git blobs API (no 1 MB contents limit)."""
+        if "get_file_bytes" in self.malformed:
+            return "not bytes"
+        c = self.trees.get(self._ref(ref), {}).get(path)
+        return None if c is None else (c if isinstance(c, bytes) else c.encode())
 
     def file_commits(self, branch, path):
         if "file_commits" in self.malformed:
@@ -141,16 +151,48 @@ def records_worktree(origin_url="https://github.com/isaacrome21-sys/SportsEdge.g
     return t
 
 
+def publish_data(api, body, pushed_at, name="schedule", ext="csv"):
+    """Push a hash-named data record data/<sha>.<ext> (single commit) and its
+    fetch record fetch/<sha>.json; idempotent per sha. Returns sha."""
+    import atd_provenance as pv
+    raw = body.encode() if isinstance(body, str) else body
+    sha = hashlib.sha256(raw).hexdigest()
+    br = pv.RECORDS_BRANCH
+    if api.get_file_bytes(br, pv.data_record_path(sha, ext)) is None:
+        api.commit(br, {pv.data_record_path(sha, ext): body}, pushed_at)
+        api.commit(br, {pv.fetch_record_path(sha): json.dumps({"sha256": sha, "kind": name})},
+                   pushed_at)
+    return sha
+
+
+def schedule_csv(games):
+    """nflverse games.csv rows for {game_id: (away, home, week, kickoff_iso)}."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    lines = ["game_id,season,game_type,week,gameday,weekday,gametime,away_team,home_team,result"]
+    for g, (away, home, week, ko) in sorted(games.items()):
+        et = datetime.fromisoformat(ko.replace("Z", "+00:00")).astimezone(ZoneInfo("America/New_York"))
+        lines.append(f"{g},2026,REG,{week},{et:%Y-%m-%d},Sunday,{et:%H:%M},{away},{home},")
+    return "\n".join(lines) + "\n"
+
+
 def ledger_to_records(api, ledger, captured_at="2026-10-25T16:00:00Z",
-                      kickoff="2026-10-25T17:00:00Z"):
-    """Publish a pre-scored test ledger as pushed fetch + run records, and
-    derive the captures/settlements that reproduce each row's clv/outcome."""
+                      kickoff="2026-10-25T17:00:00Z", schedule_ko=None,
+                      first_kickoff=None):
+    """Publish a pre-scored test ledger as pushed data + fetch + run records,
+    and derive the captures/settlements that reproduce each row's clv/outcome.
+    Rows claim `kickoff`; the pushed schedule says `schedule_ko` (default:
+    the same), so a forged run record can be modelled."""
     import atd_provenance as pv
     br = pv.RECORDS_BRANCH
-    st, sc_ = "a" * 64, "b" * 64
-    if api.get_file(br, pv.fetch_record_path(st)) is None:
-        for s, t in ((st, "2026-10-25T15:00:00Z"), (sc_, "2026-10-25T15:01:00Z")):
-            api.commit(br, {pv.fetch_record_path(s): json.dumps({"sha256": s})}, t)
+    games = {}
+    for s_ in ledger:
+        for r in s_["rows"]:
+            games[r["game_id"]] = (f"A{r['game_id']}", f"H{r['game_id']}", r["week"],
+                                   schedule_ko or kickoff)
+    st = publish_data(api, b"\x1f\x8b fake stats gz bytes", "2026-10-25T15:00:00Z",
+                      name="stats", ext="csv.gz")
+    sc_ = publish_data(api, schedule_csv(games), "2026-10-25T15:01:00Z")
     events = {s: next(e for e in api.events
                       if e["after"] == api.file_commits(br, pv.fetch_record_path(s))[0])
               for s in (st, sc_)}
@@ -172,8 +214,10 @@ def ledger_to_records(api, ledger, captured_at="2026-10-25T16:00:00Z",
                 settlements[(r["game_id"], r["player_id"])] = r["outcome"]
         rec = {"slate_id": slate["slate_id"], "captured_at": captured_at,
                "season": 2026,
+               "game_teams": {r["game_id"]: list(games[r["game_id"]][:2]) for r in slate["rows"]},
                "schedule_kickoffs": {r["game_id"]: kickoff for r in slate["rows"]},
-               "first_kickoff": kickoff, "stats_sha256": st, "schedule_sha256": sc_,
+               "first_kickoff": first_kickoff or kickoff,
+               "stats_sha256": st, "schedule_sha256": sc_,
                "fetch_provenance": {"stats": {"event": events[st]},
                                     "schedule": {"event": events[sc_]}},
                "rows": rows}
