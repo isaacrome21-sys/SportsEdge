@@ -79,7 +79,7 @@
       "active_from_meaning": "INDEPENDENT_OPERATIONAL_LIVENESS_GUARD_START_ONLY_NOT_V2_EVIDENCE_CLOCK_RESET",
       "evidence_clock_rule": "Promotion Evidence Policy V2 and the frozen lane bindings remain authoritative for evidence chronology; this liveness registration does not relabel or backfill any earlier row.",
       "acquisition_authority": ".github/workflows/mlb-moneyline-forward-evidence.yml",
-      "provider_dependency": "DRAFTKINGS_DIRECT_WEB_PLUS_MLB_STATSAPI",
+      "provider_dependency": "DRAFTKINGS_RENDERED_PAGE_PLUS_MLB_STATSAPI",
       "persistence_root": "data/mlb_forward_decisions",
       "liveness_mode": "RECENT_DUE_T30_MUST_HAVE_CONTRACT_VALID_DURABLE_PAPER_TERMINAL",
       "independent_liveness_authority": ".github/workflows/active-evidence-window-liveness.yml",
@@ -90,7 +90,7 @@
         "workflow_run:",
         "mlb-game-context-refresh",
         "scripts/capture_mlb_moneyline_model_p.py",
-        "scripts/capture_mlb_direct_paired_ml.py",
+        "scripts/capture_mlb_rendered_paired_ml.py",
         "scripts/capture_mlb_moneyline_paper_decisions.py",
         "data/mlb_forward_decisions"
       ],

@@ -154,7 +154,9 @@ def report(root=None):
 
 
 DK_API_WORKFLOWS = ("draftkings-prop-provider-probe.yml", "mlb-prop-pit-archive.yml",
-                    "nfl-market-maker-radar-capture.yml", "mlb-moneyline-forward-evidence.yml",
+                    "nfl-market-maker-radar-capture.yml",
+                    # mlb-moneyline-forward-evidence.yml left this list in t269: it now captures from
+                    # the rendered page and is covered by test_scheduled_workflow_reaches_no_dk_api_module.
                     "nfl-dk-direct-confirmation-capture.yml",
                     "sportsedge-auto-dk-four-sports.yml",
                     # live DK API request in CI (not mocked): dispatch-only (ruling 2026-10-23b)
