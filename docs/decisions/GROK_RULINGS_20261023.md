@@ -98,3 +98,27 @@ auto-triggered workflows reach a DK-API module; each was classified by reading i
 urllib, requests, subprocess curl/wget and os.system level, and the hosts' resolved IPs
 where they resolve. The earlier projection-config edit for nfl-2026-line-capture is
 reverted (ruling 2026-10-23c). No credits spent; no collector run.
+
+## 2026-10-23d — DK no-live-request guard becomes a whole-process network jail (t258)
+
+The t255 audit (CLEARED, LOW) found the curl/wget block matched command text only: a
+child Python process, `openssl s_client`, `nc` and a percent-encoded host
+(`api.%64raftkings.com`) got through, and the IP block was empty offline. Ruling: the
+guard in `tests/test_dk_api_no_live_requests_in_ci_20261023.py` now blocks ALL non-loopback
+network access for the test process and its children, not just DraftKings names:
+
+- In process: `getaddrinfo`, `create_connection`, `socket.connect`/`connect_ex`/`sendto`
+  refuse every non-loopback host or IP (`LIVE_NETWORK_BLOCKED`); DK names, including
+  percent-encoded ones, still raise `LIVE_DK_REQUEST_BLOCKED`. No dependence on resolved IPs.
+- Children: every child runs under `unshare -rn` (empty network namespace) where the runner
+  allows it. Otherwise the fallback is a dead proxy (`*_PROXY=http://127.0.0.1:9`, empty
+  `NO_PROXY`), `tests/net_jail/sitecustomize.py` on `PYTHONPATH` jailing every child Python
+  (`-I`/`-E`/`-S` children are rewritten to load the jail first), and refusal of children that
+  name a network binary (openssl, nc/ncat/netcat, socat, telnet, ssh, curl, wget, …) or `/dev/tcp`.
+- Each audit bypass has a test, the bypass tests run in both modes, and every probe
+  targets a non-DK host, so neither the RED run nor CI ever contacts DraftKings.
+
+Frozen lane files (`nfl-2026-line-capture.yml`, its tests and config) stay byte-identical
+to main 53a636af. Residual: a non-Python child that opens raw sockets under an obfuscated
+binary name is caught only when the namespace jail is available. Not self-cleared; needs
+independent review.

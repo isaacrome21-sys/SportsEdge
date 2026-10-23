@@ -7,6 +7,7 @@ import importlib
 import io
 import os
 import re
+import shutil
 import subprocess
 import socket
 import sys
@@ -80,7 +81,102 @@ class DraftKingsBlocked(OSError):
 def _is_dk(host) -> bool:
     if isinstance(host, bytes):
         host = host.decode("ascii", "ignore")
-    return isinstance(host, str) and ("draftkings" in host.lower() or host in (_DK_IPS or ()))
+    if not isinstance(host, str):
+        return False
+    for _ in range(3):   # t258: api.%64raftkings.com (and double encoding) is still DK
+        host = urllib.parse.unquote(host)
+    return "draftkings" in host.lower() or host in (_DK_IPS or ())
+
+
+# t258: the guard jails the WHOLE test process and its children, not just DK names.
+JAIL_DIR = ROOT / "tests" / "net_jail"
+DEAD_PROXY = "http://127.0.0.1:9"
+_NET_BINARIES = {"curl", "wget", "nc", "ncat", "netcat", "socat", "telnet", "ssh", "scp",
+                 "sftp", "rsync", "ftp", "openssl", "gnutls-cli", "aria2c", "httpie", "http"}
+_UNSHARE = None
+
+
+def _is_local(host) -> bool:
+    import ipaddress
+    if isinstance(host, bytes):
+        host = host.decode("ascii", "ignore")
+    if host is None or host == "":
+        return True
+    if not isinstance(host, str):
+        return False
+    if host.lower() in ("localhost", "localhost.localdomain", "ip6-localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(host.split("%")[0]).is_loopback
+    except ValueError:
+        return False
+
+
+def _unshare_prefix():
+    """['unshare','-rn'] if an unprivileged empty network namespace works here, else None."""
+    global _UNSHARE
+    if os.environ.get("SPORTSEDGE_NET_JAIL_FORCE_FALLBACK") == "1":
+        return None
+    if _UNSHARE is None:
+        _UNSHARE = []
+        exe = shutil.which("unshare")
+        if exe:
+            try:
+                if subprocess.run([exe, "-rn", "true"], capture_output=True, timeout=10).returncode == 0:
+                    _UNSHARE = [exe, "-rn"]
+            except (OSError, subprocess.SubprocessError):
+                pass
+    return _UNSHARE or None
+
+
+def _fallback_net_cmd(args) -> bool:
+    """Without a namespace: refuse any child that names a network binary or raw /dev/tcp,
+    or shell text running a Python that ignores PYTHONPATH/site (-I/-E/-S)."""
+    if isinstance(args, (bytes, str)):
+        text = args.decode() if isinstance(args, bytes) else args
+        toks = re.split(r"[\s;&|()`'\"<>]+", text)
+    else:
+        toks = [a.decode() if isinstance(a, bytes) else str(a) for a in args]
+        text = " ".join(toks)
+    names = {os.path.basename(t) for t in toks if t}
+    if names & _NET_BINARIES or "/dev/tcp/" in text or "/dev/udp/" in text:
+        return True
+    if isinstance(args, (bytes, str)):   # shell text cannot be rewritten: refuse -I/-E/-S
+        return any(os.path.basename(t).startswith("python") for t in toks) and bool(
+            {"-I", "-E", "-S"} & set(toks))
+    return False
+
+
+_JAIL_BOOT = ("import sys,runpy;runpy.run_path({jail!r}+'/sitecustomize.py',run_name='_sportsedge_net_jail');"
+              "sys.argv={argv!r};")
+
+
+def _jail_isolated_python(args):
+    """Argv-list Python child with -I/-E/-S ignores PYTHONPATH/site and so the sitecustomize
+    jail: rewrite it to load the jail first, keeping its flags. None -> refuse."""
+    if isinstance(args, (bytes, str)) or not args:
+        return args
+    args = [a.decode() if isinstance(a, bytes) else str(a) for a in args]
+    if not os.path.basename(args[0]).startswith("python"):
+        return args
+    i, flags = 1, []
+    while i < len(args) and args[i].startswith("-") and args[i] not in ("-c", "-m", "-"):
+        flags.append(args[i]); i += 1
+    if not {"-I", "-E", "-S"} & {"-" + ch for f in flags for ch in f[1:]}:
+        return args
+    if i >= len(args) or args[i] == "-":
+        return None
+    jail = str(JAIL_DIR)
+    if args[i] == "-c":
+        boot = _JAIL_BOOT.format(jail=jail, argv=["-c", *args[i + 2:]])
+        code = boot + f"exec(compile({args[i + 1]!r},'<string>','exec'),{{'__name__':'__main__'}})"
+    elif args[i] == "-m":
+        boot = _JAIL_BOOT.format(jail=jail, argv=[args[i + 1], *args[i + 2:]])
+        code = boot + f"runpy.run_module({args[i + 1]!r},run_name='__main__',alter_sys=True)"
+    else:
+        boot = _JAIL_BOOT.format(jail=jail, argv=args[i:])
+        code = boot + f"runpy.run_path({args[i]!r},run_name='__main__')"
+    return [args[0], *flags, "-c", code]
 
 
 def _dk_cmd(args) -> bool:
@@ -106,20 +202,43 @@ def dk_block(monkeypatch):
 
     real_gai, real_cc, real_connect = socket.getaddrinfo, socket.create_connection, socket.socket.connect
 
-    def gai(host, *a, **k):
+    def refuse_net(where, host):
+        attempts.append((where, str(host)))
+        raise DraftKingsBlocked(f"LIVE_NETWORK_BLOCKED:{where}:{host}")
+
+    def check(where, host):
         if _is_dk(host):
-            refuse("getaddrinfo", host)
+            refuse(where, host)
+        if not _is_local(host):
+            refuse_net(where, host)
+
+    def gai(host, *a, **k):
+        check("getaddrinfo", host)
         return real_gai(host, *a, **k)
 
     def cc(address, *a, **k):
-        if _is_dk(address[0]):
-            refuse("create_connection", address[0])
+        check("create_connection", address[0])
         return real_cc(address, *a, **k)
 
+    def _inet(sock, address):
+        return sock.family in (socket.AF_INET, socket.AF_INET6) and isinstance(address, tuple)
+
     def connect(self, address):
-        if isinstance(address, tuple) and _is_dk(address[0]):
-            refuse("socket.connect", address[0])
+        if _inet(self, address):
+            check("socket.connect", address[0])
         return real_connect(self, address)
+
+    real_connect_ex, real_sendto = socket.socket.connect_ex, socket.socket.sendto
+
+    def connect_ex(self, address):
+        if _inet(self, address):
+            check("socket.connect_ex", address[0])
+        return real_connect_ex(self, address)
+
+    def sendto(self, data, *args):
+        if _inet(self, args[-1]):
+            check("socket.sendto", args[-1][0])
+        return real_sendto(self, data, *args)
 
     real_urlopen = urllib.request.urlopen
 
@@ -132,21 +251,49 @@ def dk_block(monkeypatch):
     monkeypatch.setattr(socket, "getaddrinfo", gai)
     monkeypatch.setattr(socket, "create_connection", cc)
     monkeypatch.setattr(socket.socket, "connect", connect)
+    monkeypatch.setattr(socket.socket, "connect_ex", connect_ex)
+    monkeypatch.setattr(socket.socket, "sendto", sendto)
+    # children: dead proxy for proxy-aware tools, socket jail for every child Python
+    for var in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy",
+                "all_proxy", "FTP_PROXY", "ftp_proxy"):
+        monkeypatch.setenv(var, DEAD_PROXY)
+    monkeypatch.setenv("NO_PROXY", ""); monkeypatch.setenv("no_proxy", "")
+    pp = os.environ.get("PYTHONPATH", "")
+    monkeypatch.setenv("PYTHONPATH", os.pathsep.join(p for p in (str(JAIL_DIR), pp) if p))
     monkeypatch.setattr(urllib.request, "urlopen", urlopen)
 
     real_popen_init = subprocess.Popen.__init__
 
+    prefix = _unshare_prefix()
+    blocked_child = [sys.executable, "-c",
+                     "import sys;sys.stderr.write('LIVE_NETWORK_BLOCKED\\n');sys.exit(97)"]
+
     def popen_init(self, args, *a, **k):
         if _dk_cmd(args):
             refuse("subprocess", args)
+        shell = k.get("shell", False) or (len(a) > 8 and a[8])
+        if prefix:                      # every child runs in an empty network namespace
+            if shell:
+                k["shell"] = False
+                args = prefix + ["/bin/sh", "-c", args if isinstance(args, (str, bytes)) else " ".join(map(str, args))]
+                if len(a) > 8:
+                    a = a[:8] + (False,) + a[9:]
+            else:
+                args = prefix + ([args] if isinstance(args, (str, bytes)) else list(args))
+        else:
+            jailed = None if shell else _jail_isolated_python(args)
+            if (shell or jailed is not None) and not _fallback_net_cmd(args):
+                args = jailed if jailed is not None else args
+            else:
+                attempts.append(("subprocess-fallback", str(args)))
+                args, k["shell"] = list(blocked_child), False
+                k.pop("executable", None)
         return real_popen_init(self, args, *a, **k)
-
-    real_system = os.system
 
     def system(cmd):
         if _dk_cmd(cmd):
             refuse("os.system", cmd)
-        return real_system(cmd)
+        return subprocess.call(cmd, shell=True)
 
     monkeypatch.setattr(subprocess.Popen, "__init__", popen_init)
     monkeypatch.setattr(os, "system", system)
@@ -315,3 +462,39 @@ def test_loopback_still_allowed(dk_block):
         socket.create_connection(srv.getsockname(), timeout=5).close()
     finally:
         srv.close()
+
+
+def test_bypasses_also_blocked_in_no_namespace_fallback_mode():
+    """Runners without unprivileged user namespaces get the fallback jail (dead proxy,
+    child-Python sitecustomize, network-binary refusal); the same bypass tests must pass."""
+    if os.environ.get("SPORTSEDGE_NET_JAIL_FORCE_FALLBACK") == "1":
+        pytest.skip("already the fallback run")
+    env = {**os.environ, "SPORTSEDGE_NET_JAIL_FORCE_FALLBACK": "1"}
+    k = ("child or openssl or nc_ or bash or percent or non_loopback or literal or proxy "
+         "or loopback or curl_and_wget or low_level")
+    r = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", __file__,
+                        "-k", k], cwd=ROOT, env=env, capture_output=True, text=True, timeout=600)
+    assert r.returncode == 0, r.stdout[-2000:]
+    assert " passed" in r.stdout and " failed" not in r.stdout
+
+
+def test_fallback_detector_flags_each_audit_bypass():
+    for cmd in (["openssl", "s_client", "-connect", "x:443"], ["nc", "x", "443"],
+                "bash -c 'exec 3<>/dev/tcp/x/443'", ["/usr/bin/ncat", "x", "443"],
+                f"{sys.executable} -I -c pass", "socat - TCP:x:443",
+                ["curl", "https://api.%64raftkings.com/"]):
+        assert _fallback_net_cmd(cmd), cmd
+    for cmd in (["true"], "echo ok", [sys.executable, "-c", "pass"], ["git", "status"]):
+        assert not _fallback_net_cmd(cmd), cmd
+
+
+def test_fallback_isolated_python_child_is_jailed_not_skipped(tmp_path):
+    script = tmp_path / "probe.py"
+    script.write_text("import socket,sys\ntry:\n    socket.create_connection(('example.com',443),5)\n"
+                      "    print('CONNECTED')\nexcept OSError as e:\n    print('BLOCKED', e)\n"
+                      "print('ARGV', sys.argv[1:])\n", encoding="utf-8")
+    for argv in ([sys.executable, "-I", str(script), "a"], [sys.executable, "-I", "-S", str(script), "a"],
+                 [sys.executable, "-E", "-c", script.read_text(encoding="utf-8"), "a"]):
+        r = subprocess.run(_jail_isolated_python(argv), capture_output=True, text=True, timeout=60)
+        assert "LIVE_NETWORK_BLOCKED" in r.stdout and "CONNECTED" not in r.stdout, r.stdout + r.stderr
+        assert "ARGV ['a']" in r.stdout
