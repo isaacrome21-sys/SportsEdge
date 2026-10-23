@@ -60,6 +60,7 @@ def audit_nfl_prop_volume_bias(rows: Sequence[Mapping[str, Any]]) -> dict[str, A
         raise ValueError("ROWS_REQUIRED")
 
     seen: set[tuple[str, str, str]] = set()
+    event_starts: dict[str, datetime] = {}
     groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
     by_market: dict[str, list[dict[str, Any]]] = defaultdict(list)
     normalized: list[dict[str, Any]] = []
@@ -84,6 +85,10 @@ def audit_nfl_prop_volume_bias(rows: Sequence[Mapping[str, Any]]) -> dict[str, A
         if raw.get("result_status") != "FINAL":
             raise ValueError("FINAL_RESULT_REQUIRED")
         kickoff = _time(raw.get("event_start"), "EVENT_START")
+        known_kickoff = event_starts.get(event)
+        if known_kickoff is not None and known_kickoff != kickoff:
+            raise ValueError("CONFLICTING_GAME_START")
+        event_starts[event] = kickoff
         entry = _time(raw.get("entry_captured_at"), "ENTRY_CAPTURED_AT")
         quote = _time(raw.get("quote_captured_at"), "QUOTE_CAPTURED_AT")
         result_time = _time(raw.get("result_captured_at"), "RESULT_CAPTURED_AT")
@@ -91,7 +96,7 @@ def audit_nfl_prop_volume_bias(rows: Sequence[Mapping[str, Any]]) -> dict[str, A
             raise ValueError("NOT_PROSPECTIVE_PREGAME_PAIR")
         if (entry - quote).total_seconds() > MAX_CAPTURE_AGE_SECONDS:
             raise ValueError("QUOTE_STALE_AT_ENTRY")
-        if result_time < kickoff:
+        if result_time <= kickoff:
             raise ValueError("RESULT_BEFORE_GAME_START")
 
         projected = _number(raw.get("projected_mean"), "PROJECTED_MEAN")
