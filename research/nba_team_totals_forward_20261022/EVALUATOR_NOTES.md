@@ -54,3 +54,36 @@ Three RED fixtures under-sized the sample for the §4 gates (moved or
 invalid-close rows don't count toward the 150 valid-CLV rows): slate counts
 raised 8→12, 8→30, 8→10. No assertion changed. One test added
 (`test_binding_flag`).
+
+## Audit round 1 fixes (2026-10-22) and AMENDMENT_1
+
+New refusal/CLV-missing codes are declared in `AMENDMENT_1.md`
+(sha256 `7f5e55ef946d699069502b5ec3448e0cb66cb373733202bb437589e23f56e8d6`,
+first committed on the prereg branch at `15b8fce8`; ruling by Grok under
+owner delegation t234u; effective before the first counted slate). The
+evaluator's code list = frozen §8 + AMENDMENT_1; `evaluate()` verifies both
+hashes and raises on mismatch.
+
+- **F1** Rows keyed on (game_id, team); every duplicate copy is
+  `DUPLICATE_ROW`. Conflicting prices within one capture/line/side:
+  entry → `ENTRY_QUOTE_CONFLICT`; close → that line invalid
+  (`CLOSE_QUOTE_CONFLICT`). Identical repeats are not conflicts.
+- **F2** `binding` requires doc + amendment hash OK and
+  `len(clock_ids) == k` (distinct ids), plus k ≥ 9, frozen seed, 10,000.
+- **F3** Each row parsed alone: bad/zoneless tipoff or priced_at, or
+  non-finite b1/b2 → `ROW_MALFORMED`; bad entry quote time →
+  `QUOTE_TIMESTAMP_INVALID`; bad close quote time →
+  `CLOSE_TIMESTAMP_INVALID`; non-finite line → `PRICE_INVALID`;
+  non-finite final → `RESULT_UNAVAILABLE`.
+- **F4** 0 ≤ priced_at − entry quote ≤ 180 s (`PRICED_BEFORE_QUOTE` /
+  `QUOTE_STALE_180S`); slate_date must equal tipoff's America/Chicago date
+  (`SLATE_DATE_MISMATCH`).
+- **F5** The last capture is chosen over all captures; if it holds any
+  quote at/after tip → `CLOSE_NOT_PRETIP` (an earlier pre-tip capture never
+  rescues it). Only `is_main=true` close quotes are used; a non-boolean or
+  missing flag in the last capture → `CLOSE_MAIN_FLAG_MISSING`.
+- **Minor** Missing capture_id: entry → `CAPTURE_ID_MISSING` (refusal);
+  close → `CLOSE_CAPTURE_ID_MISSING`. `PUSH` count omitted before review.
+
+`SPEC_HASHES_DRAFT.txt` is superseded by `SPEC_HASHES.txt`
+(see `SPEC_HASHES_SUPERSEDED_NOTE.md`).

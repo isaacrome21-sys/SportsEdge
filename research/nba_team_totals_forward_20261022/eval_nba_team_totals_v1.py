@@ -16,6 +16,7 @@ import math
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import numpy as np
 
@@ -23,6 +24,10 @@ HERE = Path(__file__).resolve().parent
 FROZEN_DOC = HERE / "PREREG_NBA_TEAM_TOTALS_FORWARD_V1_DRAFT.md"
 FROZEN_DOC_SHA256 = (
     "0274e8cd248ed56a43c445c3d23e96e04eb218f4abcafb2ebe4041448ef55504")
+AMENDMENT_DOC = HERE / "AMENDMENT_1.md"
+AMENDMENT_1_SHA256 = (
+    "7f5e55ef946d699069502b5ec3448e0cb66cb373733202bb437589e23f56e8d6")
+CT = ZoneInfo("America/Chicago")
 ENGINE_ID = "NBA_TEAM_PERIOD_RATINGS_V1"
 PINNED_ENGINE_SHA256 = (
     "9060b972f9d1f69696db7f75569ab175884e02ff7b6ea81fb9817c6f390bc6de")
@@ -58,10 +63,19 @@ EVAL_REFUSALS = {
     "PRICE_INVALID", "ENGINE_PROVENANCE_MISSING", "HISTORY_HASH_MISMATCH",
     "QUOTE_STALE_180S",
 }
-DECLARED_REFUSALS = RUNNER_REFUSALS | ENGINE_REFUSALS | EVAL_REFUSALS
+# AMENDMENT_1.md (2026-10-22, effective before the first counted slate)
+AMEND1_REFUSALS = {
+    "DUPLICATE_ROW", "ENTRY_QUOTE_CONFLICT", "ROW_MALFORMED",
+    "QUOTE_TIMESTAMP_INVALID", "CAPTURE_ID_MISSING", "PRICED_BEFORE_QUOTE",
+    "SLATE_DATE_MISMATCH",
+}
+AMEND1_CLV = {"CLOSE_QUOTE_CONFLICT", "CLOSE_TIMESTAMP_INVALID",
+              "CLOSE_CAPTURE_ID_MISSING", "CLOSE_MAIN_FLAG_MISSING"}
+DECLARED_REFUSALS = (RUNNER_REFUSALS | ENGINE_REFUSALS | EVAL_REFUSALS
+                     | AMEND1_REFUSALS)
 CLV_MISSING = {"NO_CLOSE_ROW", "LINE_MOVED", "CLOSE_SINGLE_SIDED",
                "CLOSE_NOT_PRETIP", "CLOSE_STALE", "PAIR_SPAN_EXCEEDED",
-               "QUOTE_STALE_180S"}
+               "QUOTE_STALE_180S"} | AMEND1_CLV
 
 
 def verify_frozen_doc() -> bool:
@@ -69,6 +83,31 @@ def verify_frozen_doc() -> bool:
     if h != FROZEN_DOC_SHA256:
         raise RuntimeError(f"FROZEN_DOC_HASH_MISMATCH {h}")
     return True
+
+
+def verify_amendment() -> bool:
+    h = hashlib.sha256(AMENDMENT_DOC.read_bytes()).hexdigest()
+    if h != AMENDMENT_1_SHA256:
+        raise RuntimeError(f"AMENDMENT_1_HASH_MISMATCH {h}")
+    return True
+
+
+def _num(x):
+    return (not isinstance(x, bool) and isinstance(x, (int, float))
+            and math.isfinite(x))
+
+
+def _tok(s):
+    """Parsed aware timestamp, or None if unparseable/zoneless (F3)."""
+    try:
+        return _t(s)
+    except (TypeError, ValueError):
+        return None
+
+
+def _has_cap(q):
+    c = q.get("capture_id")
+    return c is not None and str(c) != ""
 
 
 def _t(s):
@@ -117,10 +156,17 @@ def sign_test_p(adverse, n):
 
 
 def select_entry(quotes, game, team):
-    """§5: first DK ENTRY capture for the game/team at the main line."""
-    cands = [q for q in quotes if q.get("game_id") == game
-             and q.get("team") == team and q.get("designation") == "ENTRY"
-             and q.get("book") == "DraftKings" and q.get("is_main") is True]
+    """§5: first DK ENTRY capture for the game/team at the main line.
+    Returns None (no quotes), or a dict; dict["error"] carries a refusal
+    code for malformed/conflicting quotes (F1, F3, minor)."""
+    allq = [q for q in quotes if q.get("game_id") == game
+            and q.get("team") == team and q.get("designation") == "ENTRY"
+            and q.get("book") == "DraftKings"]
+    if any(not _has_cap(q) for q in allq):
+        return {"error": "CAPTURE_ID_MISSING"}
+    if any(_tok(q.get("captured_at")) is None for q in allq):
+        return {"error": "QUOTE_TIMESTAMP_INVALID"}
+    cands = [q for q in allq if q.get("is_main") is True]
     if not cands:
         return None
     caps = defaultdict(list)
@@ -128,16 +174,23 @@ def select_entry(quotes, game, team):
         caps[q.get("capture_id")].append(q)
     first = min(caps.values(), key=lambda g: min(_t(q["captured_at"])
                                                  for q in g))
-    by_line = defaultdict(dict)
+    cid = first[0].get("capture_id")
+    if any(not _num(q.get("line")) for q in first):
+        return {"error": "PRICE_INVALID", "capture_id": cid}
+    seen = defaultdict(list)
     for q in first:
-        by_line[q.get("line")][q.get("side")] = q
+        seen[(float(q["line"]), q.get("side"))].append(q)
+    if any(len({repr(x.get("price")) for x in g}) > 1
+           for g in seen.values()):
+        return {"error": "ENTRY_QUOTE_CONFLICT", "capture_id": cid}
+    by_line = defaultdict(dict)
+    for (ln, side), g in seen.items():
+        by_line[ln][side] = g[0]
     two = [ln for ln, s in by_line.items() if {"OVER", "UNDER"} <= set(s)]
     if len(two) != 1:  # A2: none or several main lines -> not a clean entry
-        return {"line": None, "capture_id": first[0].get("capture_id"),
-                "sides": None}
+        return {"line": None, "capture_id": cid, "sides": None}
     ln = two[0]
-    return {"line": ln, "capture_id": first[0].get("capture_id"),
-            "sides": by_line[ln]}
+    return {"line": ln, "capture_id": cid, "sides": by_line[ln]}
 
 
 def move_direction(side, entry_line, lines):
@@ -150,7 +203,9 @@ def move_direction(side, entry_line, lines):
 
 
 def close_status(closes, game, team, entry_line, tip):
-    """§7: the close is the LAST capture before tipoff (A3)."""
+    """§7: the close is the LAST capture (A3). A capture holding any quote
+    at/after tipoff is still a capture: if last, CLOSE_NOT_PRETIP (F5).
+    Main-line quotes only; a missing main flag invalidates the close."""
     out = {"reason": None, "moved": False, "close_line": None,
            "close_lines": [], "p_over": None}
     cands = [c for c in closes if c.get("game_id") == game
@@ -158,20 +213,32 @@ def close_status(closes, game, team, entry_line, tip):
              and c.get("book") == "DraftKings"]
     if not cands:
         return {**out, "reason": "NO_CLOSE_ROW"}
+    if any(not _has_cap(c) for c in cands):
+        return {**out, "reason": "CLOSE_CAPTURE_ID_MISSING"}
+    if any(_tok(c.get("captured_at")) is None for c in cands):
+        return {**out, "reason": "CLOSE_TIMESTAMP_INVALID"}
     caps = defaultdict(list)
     for c in cands:
         caps[c.get("capture_id")].append(c)
-    pre = [g for g in caps.values()
-           if all(_t(c["captured_at"]) < tip for c in g)]
-    if not pre:
+    last = max(caps.values(),
+               key=lambda g: max(_t(c["captured_at"]) for c in g))
+    if any(_t(c["captured_at"]) >= tip for c in last):
         return {**out, "reason": "CLOSE_NOT_PRETIP"}
-    last = max(pre, key=lambda g: max(_t(c["captured_at"]) for c in g))
     earliest = min(_t(c["captured_at"]) for c in last)
     if (tip - earliest).total_seconds() > CLOSE_WINDOW_S:
         return {**out, "reason": "CLOSE_STALE"}
+    if any(not isinstance(c.get("is_main"), bool) for c in last):
+        return {**out, "reason": "CLOSE_MAIN_FLAG_MISSING"}
+    main = [c for c in last if c["is_main"] is True and _num(c.get("line"))]
+    seen = defaultdict(list)
+    for c in main:
+        seen[(float(c["line"]), c.get("side"))].append(c)
+    conflict = {ln for (ln, _), g in seen.items()
+                if len({repr(x.get("price")) for x in g}) > 1}
     by_line = defaultdict(dict)
-    for c in last:
-        by_line[c.get("line")][c.get("side")] = c
+    for (ln, side), g in seen.items():
+        if ln not in conflict:
+            by_line[ln][side] = g[0]
     valid, span_bad = {}, set()
     for ln, s in by_line.items():
         if not {"OVER", "UNDER"} <= set(s):
@@ -187,6 +254,8 @@ def close_status(closes, game, team, entry_line, tip):
     if entry_line in valid:
         return {**out, "close_line": entry_line, "close_lines": [entry_line],
                 "p_over": valid[entry_line]}
+    if entry_line in conflict:
+        return {**out, "reason": "CLOSE_QUOTE_CONFLICT"}
     if entry_line in span_bad:
         return {**out, "reason": "PAIR_SPAN_EXCEEDED"}
     if valid:
@@ -198,6 +267,8 @@ def close_status(closes, game, team, entry_line, tip):
                 "p_over": valid[cl]}
     if span_bad:
         return {**out, "reason": "PAIR_SPAN_EXCEEDED"}
+    if conflict:
+        return {**out, "reason": "CLOSE_QUOTE_CONFLICT"}
     return {**out, "reason": "CLOSE_SINGLE_SIDED"}
 
 
@@ -212,44 +283,56 @@ def _norm_engine_code(code):
 
 
 def _row_check(r, entry_quotes):
-    """Returns (refusal_code | None, entry, mean)."""
+    """Returns (refusal_code | None, entry, mean, tip). Each row is parsed
+    on its own: a malformed field refuses only this row (F3)."""
     if r.get("market", "TEAM_TOTAL") != "TEAM_TOTAL":
-        return "MARKET_OUT_OF_SCOPE", None, None
+        return "MARKET_OUT_OF_SCOPE", None, None, None
     if r.get("runner_refusal"):
-        return _norm_engine_code(r["runner_refusal"]), None, None
+        return _norm_engine_code(r["runner_refusal"]), None, None, None
     eng = r.get("engine") or {}
     if eng.get("status") == "REFUSED":
-        return _norm_engine_code(eng.get("reason")), None, None
+        return _norm_engine_code(eng.get("reason")), None, None, None
     mean = eng.get("mean")
     if (eng.get("engine_id") != ENGINE_ID or eng.get("status") != "PRICED"
             or eng.get("sufficiency_met") is not True
             or not isinstance(mean, (int, float)) or not math.isfinite(mean)
             or not eng.get("priors")):
-        return "ENGINE_PROVENANCE_MISSING", None, None
+        return "ENGINE_PROVENANCE_MISSING", None, None, None
     # A7: any pin mismatch fails the run-record proof (§11)
     if (r.get("engine_sha256") != PINNED_ENGINE_SHA256
             or r.get("runner_sha256") != PINNED_RUNNER_SHA256
             or r.get("history_hash_recorded_before_pricing") is not True):
-        return "HISTORY_HASH_MISMATCH", None, None
+        return "HISTORY_HASH_MISMATCH", None, None, None
+    if not (_num(eng.get("b1_team_mean")) and _num(eng.get("b2_league_mean"))):
+        return "ROW_MALFORMED", None, None, None
+    tip, pat = _tok(r.get("tipoff")), _tok(r.get("priced_at"))
+    if tip is None or pat is None:
+        return "ROW_MALFORMED", None, None, None
     if r.get("team") not in (r.get("home"), r.get("away")):
-        return "NBA_TEAM_SELECTION_UNBOUND", None, None
+        return "NBA_TEAM_SELECTION_UNBOUND", None, None, None
+    if str(r.get("slate_date")) != tip.astimezone(CT).date().isoformat():
+        return "SLATE_DATE_MISMATCH", None, None, None
     e = select_entry(entry_quotes, r["game_id"], r["team"])
     if e is None:
-        return "DK_PAIR_MISSING_OR_STALE", None, None
+        return "DK_PAIR_MISSING_OR_STALE", None, None, None
+    if e.get("error"):
+        return e["error"], None, None, None
     if e["line"] is None:
-        return "ENTRY_SINGLE_SIDED", None, None
+        return "ENTRY_SINGLE_SIDED", None, None, None
     o, u = e["sides"]["OVER"], e["sides"]["UNDER"]
     if not (_price_ok(o.get("price")) and _price_ok(u.get("price"))) or \
             not isinstance(e["line"], (int, float)):
-        return "PRICE_INVALID", None, None
-    to, tu, tip = _t(o["captured_at"]), _t(u["captured_at"]), _t(r["tipoff"])
+        return "PRICE_INVALID", None, None, None
+    to, tu = _t(o["captured_at"]), _t(u["captured_at"])
     if to >= tip or tu >= tip:
-        return "ENTRY_NOT_PRETIP", None, None
+        return "ENTRY_NOT_PRETIP", None, None, None
     if abs((to - tu).total_seconds()) > ENTRY_PAIR_SPAN_S:
-        return "DK_PAIR_CAPTURE_SPAN_EXCEEDED", None, None
-    if (_t(r["priced_at"]) - min(to, tu)).total_seconds() > FRESH_S:
-        return "QUOTE_STALE_180S", None, None
-    return None, e, float(mean)
+        return "DK_PAIR_CAPTURE_SPAN_EXCEEDED", None, None, None
+    if pat < max(to, tu):  # F4: 0 <= priced_at - quote time
+        return "PRICED_BEFORE_QUOTE", None, None, None
+    if (pat - min(to, tu)).total_seconds() > FRESH_S:
+        return "QUOTE_STALE_180S", None, None, None
+    return None, e, float(mean), tip
 
 
 def _cluster_ci(values, clusters, seed, resamples, k):
@@ -273,25 +356,34 @@ def evaluate(rows, entry_quotes, close_quotes, results, slates,
     first = config.get("first_counted_slate")
     if not first:
         raise ValueError("FIRST_COUNTED_SLATE_REQUIRED")
+    doc_ok = verify_frozen_doc() and verify_amendment()  # F2: raises if bad
     k = int(config.get("k", FROZEN_K))
     seed = int(config.get("seed", FROZEN_SEED))
     B = int(config.get("resamples", FROZEN_RESAMPLES))
+    clocks = config.get("clock_ids")
+    clocks_ok = (isinstance(clocks, (list, tuple))
+                 and len(set(map(str, clocks))) == len(clocks) == k)
     out = {"evaluator": "EVAL_NBA_TEAM_TOTALS_V1",
            "frozen_doc_sha256": FROZEN_DOC_SHA256,
-           "k": k, "clock_ids": config.get("clock_ids"), "seed": seed,
+           "amendment_1_sha256": AMENDMENT_1_SHA256, "doc_hash_ok": doc_ok,
+           "k": k, "clock_ids": clocks, "seed": seed,
            "resamples": B,
-           "binding": (k >= FROZEN_K and seed == FROZEN_SEED
-                       and B == FROZEN_RESAMPLES),
+           "binding": (doc_ok is True and clocks_ok and k >= FROZEN_K
+                       and seed == FROZEN_SEED and B == FROZEN_RESAMPLES),
            "play_authority": False, "eligible": False}
     refusals, excluded, clv_missing = Counter(), Counter(), Counter()
     undeclared = Counter()
     counts = Counter(engine_priced_rows=0, historical_not_counted=0)
     recs = []
+    keys = Counter((r.get("game_id"), r.get("team")) for r in rows)
     for r in rows:
         if str(r.get("slate_date")) < str(first):
             counts["historical_not_counted"] += 1
             continue
-        code, e, mean = _row_check(r, entry_quotes)
+        if keys[(r.get("game_id"), r.get("team"))] > 1:
+            code, e, mean, tip = "DUPLICATE_ROW", None, None, None  # F1
+        else:
+            code, e, mean, tip = _row_check(r, entry_quotes)
         if code:
             if code in DECLARED_REFUSALS:
                 refusals[code] += 1
@@ -305,22 +397,20 @@ def evaluate(rows, entry_quotes, close_quotes, results, slates,
             excluded["VOID"] += 1
             continue
         y = ((res or {}).get("points") or {}).get(r["team"])
-        if status != "FINAL" or not isinstance(y, (int, float)):
+        if status != "FINAL" or not _num(y):
             excluded["RESULT_UNAVAILABLE"] += 1
             continue
         line = float(e["line"])
         gap = mean - line
         grp, side = classify(gap)
-        cs = close_status(close_quotes, r["game_id"], r["team"], line,
-                          _t(r["tipoff"]))
+        cs = close_status(close_quotes, r["game_id"], r["team"], line, tip)
         if cs["reason"]:
             clv_missing[cs["reason"]] += 1
         elif cs["moved"]:
             clv_missing["LINE_MOVED"] += 1
         if gap == 0:
             excluded["GAP_ZERO"] += 1
-        if y == line:
-            excluded["PUSH"] += 1
+        # PUSH (y == line) is reported only at review (outcome information)
         p_entry = no_vig(e["sides"]["OVER"]["price"],
                          e["sides"]["UNDER"]["price"])
         recs.append({"slate": str(r["slate_date"]), "game": r["game_id"],
@@ -365,6 +455,7 @@ def evaluate(rows, entry_quotes, close_quotes, results, slates,
     counts["full_slates"] = gates_at["full_slates"]
     counts["sample_rows"] = len(S)  # scoreable rows through review slate
     out["review_slate"] = review
+    out["excluded"]["PUSH"] = sum(1 for x in S if x["y"] == x["line"])
     out["gates_at_review"] = gates_at
     m = {}
     picked = [x for x in S if x["group"] == "PICKED" and x["side"]]
