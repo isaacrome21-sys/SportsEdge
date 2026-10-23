@@ -178,7 +178,7 @@ def schedule_csv(games):
 
 def ledger_to_records(api, ledger, captured_at="2026-10-25T16:00:00Z",
                       kickoff="2026-10-25T17:00:00Z", schedule_ko=None,
-                      first_kickoff=None):
+                      first_kickoff=None, teams_override=None, player_team=None):
     """Publish a pre-scored test ledger as pushed data + fetch + run records,
     and derive the captures/settlements that reproduce each row's clv/outcome.
     Rows claim `kickoff`; the pushed schedule says `schedule_ko` (default:
@@ -190,8 +190,15 @@ def ledger_to_records(api, ledger, captured_at="2026-10-25T16:00:00Z",
         for r in s_["rows"]:
             games[r["game_id"]] = (f"A{r['game_id']}", f"H{r['game_id']}", r["week"],
                                    schedule_ko or kickoff)
-    st = publish_data(api, b"\x1f\x8b fake stats gz bytes", "2026-10-25T15:00:00Z",
-                      name="stats", ext="csv.gz")
+    # stats data record: real gzip CSV; each player on his game's home team
+    # unless player_team overrides ({pid: team}, None = absent from stats)
+    import gzip
+    pteam = {r["player_id"]: f"H{r['game_id']}" for s_ in ledger for r in s_["rows"]}
+    pteam.update(player_team or {})
+    lines = ["player_id,season,season_type,week,recent_team"] + [
+        f"{p},2026,REG,7,{t}" for p, t in sorted(pteam.items()) if t is not None]
+    st = publish_data(api, gzip.compress(("\n".join(lines) + "\n").encode(), mtime=0),
+                      "2026-10-25T15:00:00Z", name="stats", ext="csv.gz")
     sc_ = publish_data(api, schedule_csv(games), "2026-10-25T15:01:00Z")
     events = {s: next(e for e in api.events
                       if e["after"] == api.file_commits(br, pv.fetch_record_path(s))[0])
@@ -214,7 +221,8 @@ def ledger_to_records(api, ledger, captured_at="2026-10-25T16:00:00Z",
                 settlements[(r["game_id"], r["player_id"])] = r["outcome"]
         rec = {"slate_id": slate["slate_id"], "captured_at": captured_at,
                "season": 2026,
-               "game_teams": {r["game_id"]: list(games[r["game_id"]][:2]) for r in slate["rows"]},
+               "game_teams": {r["game_id"]: list((teams_override or {}).get(
+                   r["game_id"], games[r["game_id"]][:2])) for r in slate["rows"]},
                "schedule_kickoffs": {r["game_id"]: kickoff for r in slate["rows"]},
                "first_kickoff": first_kickoff or kickoff,
                "stats_sha256": st, "schedule_sha256": sc_,
