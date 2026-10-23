@@ -1,8 +1,12 @@
 """Held-out season screen vs naive earlier-season frequencies. No quotes, no holdout spend."""
 import csv, json, math, random, sys
 sys.path.insert(0, sys.argv[1] if len(sys.argv) > 1 else ".")
-from week_cluster_bootstrap import cluster_ci, week_key
-from nfl_situational_empirical import price_situational, BOTH_NS, NflSituationalError
+import os as _os
+sys.path.insert(0, _os.path.dirname(_os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else '.')))
+from sportsedge.screen_only_guard import screen_only as _screen_only
+_SCREEN_GUARD = _screen_only(); _SCREEN_GUARD.__enter__()  # screen process: guarded pricer allowed
+from sportsedge.week_cluster_bootstrap import cluster_ci, week_key
+from sportsedge.nfl_situational_empirical import price_situational_unrestricted as price_situational, BOTH_NS, NflSituationalError
 TABLE = sys.argv[2] if len(sys.argv) > 2 else "situational_table.csv"
 S = ("game_id", "date", "home", "away", "first_score")
 rows = [{k: (v if k in S else int(v)) for k, v in r.items()} for r in csv.DictReader(open(TABLE))]
