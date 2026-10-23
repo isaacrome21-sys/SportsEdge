@@ -136,7 +136,7 @@ reported at review alongside the verdict.
 - Engine stamp required: `engine_id = NBA_TEAM_PERIOD_RATINGS_V1`,
   `status = PRICED`, `sufficiency_met = true`, priors recorded. Rows
   without engine provenance are excluded and reported.
-- **Pick rule (pending owner confirmation at freeze, §12):** `gap = mean − entry_line`.
+- **Pick rule (ruled under delegation, §12):** `gap = mean − entry_line`.
   PICKED OVER if `gap ≥ +2.0` points, PICKED UNDER if `gap ≤ −2.0`;
   otherwise PASSED. One row per team per game. Changing the threshold
   after the freeze is a new version.
@@ -288,7 +288,7 @@ promotability; any change is an owner ruling.
 - [ ] Independent re-review of this revision by a checker who did not
       draft it, returning CLEARED; bootstrap seed and the k clock-ID
       list recorded in the freeze record.
-- [ ] Owner confirms ±2.0 pick threshold and the team-totals exception to the focus pause, at freeze.
+- [x] ±2.0 pick threshold and the team-totals exception to the focus pause, ruled by Grok under the owner's explicit delegation of rulings (Oct 22, 2026, 9:32 PM CT). Freeze still requires an independent CLEARED review.
 - [ ] Forward evaluator lands, hash-pinned to this document, and is
       independently reviewed, before the first counted slate.
 - [ ] Owner freezes; k recorded. The freeze record names the first
