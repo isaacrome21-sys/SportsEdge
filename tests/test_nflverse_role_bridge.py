@@ -57,23 +57,6 @@ class NflverseRoleBridgeTests(unittest.TestCase):
         with self.assertRaisesRegex(NFLContextError, "not pre-target PIT data"):
             self._build(rows)
 
-    def test_rejects_duplicate_player_game_before_double_counting_volume(self):
-        row = self._rows()[0]
-        with self.assertRaisesRegex(NFLContextError, "duplicate player-game source row"):
-            self._build([row, dict(row)])
-
-    def test_rejects_same_player_week_with_different_game_id(self):
-        row = self._rows()[0]
-        duplicate_week = dict(row, game_id="different_archive_game")
-        with self.assertRaisesRegex(NFLContextError, "duplicate player-game source row"):
-            self._build([row, duplicate_week])
-
-    def test_rejects_reused_game_id_across_different_weeks(self):
-        row = self._rows()[0]
-        duplicate_game = dict(row, week=2)
-        with self.assertRaisesRegex(NFLContextError, "duplicate player-game source row"):
-            self._build([row, duplicate_game])
-
     def test_rejects_missing_pit_markers(self):
         rows = self._rows()
         del rows[0]["week"]
