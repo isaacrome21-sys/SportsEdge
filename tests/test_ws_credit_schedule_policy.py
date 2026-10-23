@@ -13,14 +13,13 @@ PARKED = {
     ".github/workflows/mlb-deadman.yml",
     ".github/workflows/mlb-v8-evidence.yml",
     ".github/workflows/mlb-v8-replay-backfill.yml",
+    # Grok ruling 2026-10-23 (t234u, DK rendered pages only): dispatch-only.
+    ".github/workflows/nfl-2026-line-capture.yml",
 }
-
-DK_API_MANUAL_ONLY = {".github/workflows/nfl-2026-line-capture.yml"}
 
 SCHEDULED_PAID = {
     ".github/workflows/football-nfl-forward-clv-collection.yml",
     ".github/workflows/ev-tracker.yml",
-    ".github/workflows/nfl-2026-line-capture.yml",
 }
 
 
@@ -46,11 +45,6 @@ def test_remaining_authorities_still_have_schedules() -> None:
             assert "schedule:" not in text
             assert "contents: write" not in text
             assert "secrets." not in text
-        elif path in DK_API_MANUAL_ONLY:
-            # Grok ruling 2026-10-23 (t234u, DK rendered pages only): still an allowed
-            # paid consumer in the projection, but manual workflow_dispatch only.
-            assert "workflow_dispatch:" in text, path
-            assert "schedule:" not in text, path
         else:
             assert "schedule:" in text, path
 
@@ -70,9 +64,11 @@ def test_projection_matches_workflow_authority() -> None:
     assert set(policy["parked_dispatch_only_workflows"]) == PARKED
     assert set(policy["invariants"]["allowed_scheduled_paid_consumers"]) == SCHEDULED_PAID
     assert policy["invariants"]["mlb_scheduled_paid_workflows"] == 0
-    assert policy["invariants"]["legacy_nfl_2026_line_capture_scheduled"] is True
+    # Policy-text correction (Grok ruling 2026-10-23): matches the dispatch-only workflow.
+    assert policy["invariants"]["legacy_nfl_2026_line_capture_scheduled"] is False
     capture = policy["scheduled_consumers"]["nfl_2026_confirmation_capture"]
     assert capture["workflow"] == ".github/workflows/nfl-2026-line-capture.yml"
+    assert capture["scheduled"] is False and capture["cron"] is None
     assert capture["idle_paid_requests"] == 0
     assert capture["worst_case_weekly_credits"] is None
     assert capture["bound_status"] == "NOT_INFERRED_PROVIDER_CREDIT_CONTRACT_NOT_ENCODED"

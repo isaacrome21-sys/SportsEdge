@@ -155,7 +155,9 @@ def report(root=None):
 DK_API_WORKFLOWS = ("draftkings-prop-provider-probe.yml", "mlb-prop-pit-archive.yml",
                     "nfl-market-maker-radar-capture.yml", "mlb-moneyline-forward-evidence.yml",
                     "nfl-2026-line-capture.yml", "nfl-dk-direct-confirmation-capture.yml",
-                    "sportsedge-auto-dk-four-sports.yml")
+                    "sportsedge-auto-dk-four-sports.yml",
+                    # live DK API request in CI (not mocked): dispatch-only (ruling 2026-10-23b)
+                    "direct-dk-market-archive-contract.yml", "dk-nba-nhl-category-probe.yml")
 WF = ROOT / ".github" / "workflows"
 
 
