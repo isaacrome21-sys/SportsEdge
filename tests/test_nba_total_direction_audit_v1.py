@@ -72,6 +72,21 @@ def test_many_unders_warns_without_changing_rows_or_reclassifying_anything():
     assert audit["model_p_authority"] is False
 
 
+def test_october_style_all_under_slate_warns_before_multi_date_bias_threshold():
+    rows = [row(i, day=0, model=220, market=238.5, actual=230)
+            for i in range(11)]
+    audit = audit_total_directions(screen(rows))
+    assert audit["one_direction_warning"] is False  # one slate is not a trend
+    assert audit["single_slate_concentration_warnings"] == [
+        {"slate_date_ct": "2026-10-21", "under": 11,
+         "over": 0, "non_tie": 11, "direction": "ALL_UNDER"}
+    ]
+
+    mixed = rows + [row(99, day=0, model=242, market=238.5, actual=230)]
+    assert audit_total_directions(screen(mixed))[
+        "single_slate_concentration_warnings"] == []
+
+
 def test_no_paired_market_is_not_zero_and_cannot_establish_edge():
     audit = audit_total_directions(screen([row(1, market=None)]))
     assert audit["paired_rows"] == 0
