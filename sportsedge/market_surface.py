@@ -135,6 +135,10 @@ def build_market_grid(
     now: datetime,
 ) -> tuple[CoverageSlot, ...]:
     feature_failures = feature_failures or {}
+    # ``specs`` is part of a Cartesian game x market declaration.  Materialize
+    # it once so callers may safely pass a one-shot iterable without silently
+    # losing every market after the first game.
+    market_specs = tuple(specs)
     offered_by_game_market: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
     for quote in quotes:
         key = (str(quote.get("game_id")), str(quote.get("market")))
@@ -147,7 +151,7 @@ def build_market_grid(
 
     out: list[CoverageSlot] = []
     for game_id, first_pitch in games:
-        for spec in specs:
+        for spec in market_specs:
             offered = offered_by_game_market.get((str(game_id), spec.market), [])
             if not offered:
                 acquisition, retry, reason = classify_absent_market(spec, now=now, first_pitch=first_pitch)
