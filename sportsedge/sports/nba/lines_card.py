@@ -9,9 +9,9 @@ Input (issue body, one block per game; away first, like DK):
 
 Model: ``ratings_model`` replayed over completed games (ESPN results) gives a
 margin and total; probabilities come from normal residuals with the holdout
-residual SDs. Labels: a market is a BET only if listed in ``VALIDATED_MARKETS``
-(filled only from a passing out-of-sample backtest). Today it is empty, so
-every positive-EV side is a LEAN.
+residual SDs. No market passed the out-of-sample test. This legacy issue-card
+surface therefore shows apparent positive-EV rows as WATCH diagnostics, never
+as LEAN or BET. Totals use zero model weight and are especially not a model edge.
 """
 from __future__ import annotations
 
@@ -258,10 +258,17 @@ def price_game(g: Game, ratings: NBARatings) -> tuple[float, float, list[Row]]:
             ev = p * dec(price) - 1
             if ev <= 0:
                 label = "PASS"
+            elif mk.market == "TOTAL" and W_TOTAL == 0.0:
+                # The priced total is exactly the offered line. A positive
+                # number here can come from asymmetric prices alone; the raw
+                # ratings total contributes *zero* probability information.
+                label = "WATCH_NO_MODEL_TOTAL"
             elif mk.market in VALIDATED_MARKETS:
                 label = "BET"
             else:
-                label = "LEAN"
+                # This model failed the market benchmark. A price comparison
+                # cannot establish predictive skill or a tradable edge.
+                label = "WATCH_FAILED_VALIDATION"
             rows.append(Row(name, mk.market, side, price, p, q, ev, label))
     return raw_m, raw_t, rows
 
@@ -270,8 +277,9 @@ def render(games: list[Game], ratings: NBARatings, *, observed: str, results_not
     out = ["# SportsEdge NBA card", "",
            f"Lines observed {observed}. {results_note}",
            f"**Validated markets: {', '.join(VALIDATED_MARKETS) or 'NONE'}** — {BACKTEST_NOTE} "
-           "Edges use a market-anchored fair line (raw model gets ~6% weight on spreads/ML, 0% on totals), "
-           "so most sides PASS after the vig. LEAN = positive EV but not a proven bet.", ""]
+           "Apparent EV uses a market-anchored line (raw model gets ~6% weight on spreads/ML, 0% on totals). "
+           "The total probability is 50/50 at the quoted line: any positive total EV is price-derived, "
+           "not model skill. Failed/unvalidated family signals are WATCH diagnostics, not LEANs or bets.", ""]
     all_rows = []
     for g in games:
         m, t, rows = price_game(g, ratings)
@@ -290,12 +298,25 @@ def render(games: list[Game], ratings: NBARatings, *, observed: str, results_not
                        f"{(r.model_p - r.novig_p) * 100:+.1f} pts | {r.ev:+.1%} | {r.label} |")
         out.append("")
     bets = [r for r in all_rows if r.label == "BET"]
-    leans = sorted((r for r in all_rows if r.label == "LEAN"), key=lambda r: -r.ev)[:5]
+    watches = sorted((r for r in all_rows if r.label.startswith("WATCH_")),
+                     key=lambda r: -r.ev)
+    total_watches = [r for r in watches if r.market == "TOTAL"]
+    under_count = sum(r.side.startswith("Under ") for r in total_watches)
+    over_count = sum(r.side.startswith("Over ") for r in total_watches)
+    out.append(f"**Unvalidated total signals: UNDER {under_count}, OVER {over_count}.** "
+               "Counts describe this quoted board, not independent betting opportunities. "
+               "No balancing or side inversion is applied.")
+    if len(total_watches) >= 3 and (under_count == 0 or over_count == 0):
+        out.append("**One-direction warning:** the apparent total signals all point "
+                   "the same way; investigate the model/price baseline before acting.")
+    out.append("")
     out.append("## Bets")
     out.append("\n".join(f"- {r.side} {fmt_am(r.price)} (EV {r.ev:+.1%})" for r in bets) or "- None. No NBA market has passed out-of-sample validation.")
     out.append("")
-    out.append("## Top leans (not bets)")
-    out.append("\n".join(f"- {r.side} {fmt_am(r.price)} — fair {r.model_p:.1%} vs no-vig {r.novig_p:.1%}" for r in leans) or "- None.")
+    out.append("## Top research WATCH diagnostics (not bets or LEANs)")
+    out.append("\n".join(f"- {r.side} {fmt_am(r.price)} — apparent fair {r.model_p:.1%} "
+                         f"vs no-vig {r.novig_p:.1%} · {r.label}"
+                         for r in watches[:5]) or "- None.")
     return "\n".join(out) + "\n"
 
 
