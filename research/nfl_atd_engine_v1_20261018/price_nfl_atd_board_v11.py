@@ -175,9 +175,9 @@ def main() -> int:
     try:
         api = pv.GitHubAPI()
         prov = pv.require_fetch_provenance(api, shas, board.get("captured_at"))
-        pv.prove_record(api, pv.board_record_path(bsha, board["season"], board["week"]))
-        for n, h in pins.items():
-            pv.load_data_record(api, h, "csv.gz", require_fetch=False)
+        bp = pv.prove_record(api, pv.board_record_path(bsha, board["season"], board["week"]))
+        pdp = {n: pv.load_data_record(api, h, "csv.gz", require_fetch=False)
+               for n, h in pins.items()}
     except (pv.ProvenanceFailed, ValueError, TypeError, OSError, KeyError) as e:
         # code + detail only; the token is never part of either
         print(f"FAILED_CLOSED {getattr(e, 'code', 'PROVENANCE_UNAVAILABLE')}: "
@@ -213,7 +213,11 @@ def main() -> int:
                                     "pushed_at": v["pushed_at"],
                                     "data_event": v["data_event"],
                                     "data_pushed_at": v["data_pushed_at"]}
-                                for k, v in prov.items()},
+                                for k, v in prov.items()} | {
+                  "board": {"event": bp["event"], "commit": bp["commit"],
+                            "pushed_at": bp["pushed_at"]},
+                  "player_data": {n: {"event": d["event"], "commit": d["commit"],
+                                      "pushed_at": d["pushed_at"]} for n, d in pdp.items()}},
               refusals=refusals, rows=rows)
     Path(args.run_record).write_text(json.dumps(rr, indent=1, sort_keys=True) + "\n")
     out = {"label": "NFL ANYTIME TD ENGINE V1.1 (DRAFT) — board pricing",

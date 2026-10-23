@@ -526,6 +526,9 @@ def _replay_check(api, rec, rows, run_t, sch, sd, out):
     except (KeyError, TypeError, ValueError):
         out["reasons"].append("RUN_RECORD_MALFORMED")
         return
+    stored = rec.get("fetch_provenance") if isinstance(rec.get("fetch_provenance"), dict) else {}
+    bev = (stored.get("board") or {}).get("event") if isinstance(stored.get("board"), dict) else None
+    pdev = stored.get("player_data") if isinstance(stored.get("player_data"), dict) else {}
     reg = replayers()
     if psha not in reg:
         out["reasons"].append("RUN_PRICER_SHA_MISMATCH")
@@ -537,7 +540,7 @@ def _replay_check(api, rec, rows, run_t, sch, sd, out):
     board = None
     bpath = board_record_path(str(inp["board"]), rec["season"], week)
     try:
-        bp = prove_record(api, bpath)
+        bp = prove_record(api, bpath, bev)
         if _sha_text(bp["content"]) != inp["board"]:
             raise ProvenanceFailed("RECORD_HASH_MISMATCH", bpath)
         if _t(bp["pushed_at"]) >= run_t:
@@ -557,7 +560,9 @@ def _replay_check(api, rec, rows, run_t, sch, sd, out):
     pd = {}
     for name, sha in sorted(pins.items()):
         try:
-            d = load_data_record(api, sha, "csv.gz", require_fetch=False)
+            d = load_data_record(api, sha, "csv.gz", (pdev.get(name) or {}).get("event")
+                                 if isinstance(pdev.get(name), dict) else None,
+                                 require_fetch=False)
             if _t(d["pushed_at"]) >= run_t:
                 out["reasons"].append("INPUT_PUSH_NOT_BEFORE_RUN_PUSH")
             pd[name] = d["bytes"]
