@@ -25,12 +25,22 @@ ACCEPTED RESIDUAL (Grok ruling D, 2026-10-23): an in-process Python guard
 cannot stop a determined caller (closure/``__dict__``/frame reflection,
 ctypes, editing files). This guard prevents MISTAKES, not determined bypasses.
 Cheap tamper detection is still tested.
+
+t257 (auditor round 3): entry from a non-main thread is refused unless that
+thread already carries a verified entry context; research helpers may only run
+callables defined in genuine research/ or tests/ files
+(``require_research_callable``); ``__class__`` assignment on locked modules is
+refused, and ``checked_require``/``verify_naive_fail`` assert the module type is
+still LockedModule. NAIVE_FAIL sha256 pins live here, outside the pricers.
 """
 from __future__ import annotations
 
 import linecache
 import os
+import functools
+import hashlib
 import sys
+import threading
 import types
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -125,6 +135,8 @@ def _make():
 
     @contextmanager
     def screen_only():
+        if threading.current_thread() is not threading.main_thread() and not state.get():
+            raise ScreenOnlyGuardError("SCREEN_ONLY_GUARD:ENTRY_FROM_NON_MAIN_THREAD")
         entry = _entering_frame()
         if entry is None or not _allowed_file(entry.f_code.co_filename):
             where = "?" if entry is None else entry.f_code.co_filename
@@ -167,24 +179,78 @@ _PINNED_ENTER = screen_only
 
 
 def checked_require(what: str) -> None:
-    """Pricers call this: refuses if the guard function was replaced."""
+    """Pricers call this: refuses if the guard function was replaced or a module
+    lock was removed (module class swapped away from LockedModule)."""
     mod = sys.modules.get(__name__)
+    caller = sys._getframe(1).f_globals.get("__name__", "")
+    for m in (mod, sys.modules.get(caller) if caller in _PINNED_NAIVE_FAIL_SHA256 else mod):
+        if type(m) is not LockedModule:
+            raise ScreenOnlyGuardError(f"SCREEN_ONLY_GUARD:MODULE_UNLOCKED:{what}")
     fn = getattr(mod, "require_screen_only", None)
     if fn is not _PINNED_REQUIRE or getattr(mod, "screen_only", None) is not _PINNED_ENTER:
         raise ScreenOnlyGuardError(f"SCREEN_ONLY_GUARD:GUARD_TAMPERED:{what}")
     _PINNED_REQUIRE(what)
 
 
+_PINNED_NAIVE_FAIL_SHA256 = types.MappingProxyType({
+    "sportsedge.nfl_period_lines_empirical":
+        "ec535bb6e87d2f3fa9b6cd3988a625f3f5183c51f9edc7b33e086855935df678",
+    "sportsedge.nfl_situational_empirical":
+        "355a0139548e437ebc3d126f1db466d3725e9f2d25f190192f478618857faeaa",
+})
+
+
+def verify_naive_fail(modname: str, value):
+    """Every pricer read of NAIVE_FAIL_FAMILIES goes through here (pin held in
+    the guard, not in the module it guards)."""
+    if type(sys.modules.get(modname)) is not LockedModule:
+        raise ScreenOnlyGuardError("SCREEN_ONLY_GUARD:MODULE_UNLOCKED:NAIVE_FAIL_FAMILIES")
+    pin = _PINNED_NAIVE_FAIL_SHA256.get(modname)
+    if pin is None or not isinstance(value, frozenset) or hashlib.sha256(
+            "\n".join(sorted(value)).encode()).hexdigest() != pin:
+        raise ScreenOnlyGuardError("SCREEN_ONLY_GUARD:NAIVE_FAIL_FAMILIES_TAMPERED")
+    return value
+
+
+def require_research_callable(fn):
+    """A research helper may run only callables defined in a genuine research/
+    or tests/ file. Partials, bound methods and ``__wrapped__`` are unwrapped."""
+    seen = 0
+    while seen < 32:
+        seen += 1
+        if isinstance(fn, functools.partial):
+            fn = fn.func
+        elif hasattr(fn, "__func__"):
+            fn = fn.__func__
+        elif hasattr(fn, "__wrapped__"):
+            fn = fn.__wrapped__
+        else:
+            break
+    code = getattr(fn, "__code__", None)
+    fname = getattr(code, "co_filename", "")
+    ok = code is not None and _allowed_file(fname) and os.path.isfile(fname)
+    if ok:
+        linecache.checkcache(fname)
+        line = "".join(linecache.getline(fname, code.co_firstlineno + k) for k in range(6))
+        ok = ("lambda" in line) if code.co_name == "<lambda>" else (f"def {code.co_name}" in line)
+    if not ok:
+        raise ScreenOnlyGuardError(f"SCREEN_ONLY_GUARD:CALLABLE_NOT_RESEARCH:{Path(fname or '?').name}")
+    return fn
+
+
 class LockedModule(types.ModuleType):
-    """Refuse rebinding/deleting the names listed in ``__locked__``."""
+    """Refuse rebinding/deleting the names listed in ``__locked__`` and refuse
+    ``__class__`` assignment (no unlocking by module-class swap)."""
 
     def __setattr__(self, name, value):
+        if name == "__class__":
+            raise ScreenOnlyGuardError("SCREEN_ONLY_GUARD:LOCKED_ATTRIBUTE:__class__")
         if name in self.__dict__.get("__locked__", ()):
             raise ScreenOnlyGuardError(f"SCREEN_ONLY_GUARD:LOCKED_ATTRIBUTE:{name}")
         super().__setattr__(name, value)
 
     def __delattr__(self, name):
-        if name in self.__dict__.get("__locked__", ()):
+        if name == "__class__" or name in self.__dict__.get("__locked__", ()):
             raise ScreenOnlyGuardError(f"SCREEN_ONLY_GUARD:LOCKED_ATTRIBUTE:{name}")
         super().__delattr__(name)
 
@@ -196,4 +262,6 @@ def lock_module(name: str, names) -> None:
 
 
 lock_module(__name__, {"screen_only", "require_screen_only", "checked_require",
-                       "_PINNED_REQUIRE", "_PINNED_ENTER", "lock_module", "__locked__"})
+                       "_PINNED_REQUIRE", "_PINNED_ENTER", "lock_module", "__locked__",
+                       "verify_naive_fail", "require_research_callable",
+                       "_PINNED_NAIVE_FAIL_SHA256", "LockedModule"})
