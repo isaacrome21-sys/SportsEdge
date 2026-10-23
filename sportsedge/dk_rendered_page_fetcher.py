@@ -18,10 +18,15 @@ Contract
   DOM snapshot (``page.content()``), truncated to whole seconds.
 * ``page_html_sha256`` is the sha256 of the exact UTF-8 HTML snapshot parsed.
 * Team assignment comes from each market's own pair: every market on a game
-  card must have exactly two buttons (same DK market id); the first button of
-  the pair in DOM order is the away side (the card's first team row) and the
-  second the home side. Totals sides come from the button's own O/U title.
-  A card where any market lacks exactly two sides is refused whole.
+  card must have exactly two buttons (same DK market id). The DOM position in
+  the pair (first = away row), the button-ID side suffix (_3 = away, _1 = home;
+  totals Over = _1, Under = _3) and, for spreads/totals, the ID-encoded line
+  (N300 = -3, P300 = +3, O4450 = 44.5) must all agree with the parsed button;
+  any mismatch or unknown suffix is refused (SIDE_SUFFIX_MISMATCH,
+  SIDE_SUFFIX_UNKNOWN, LINE_ID_MISMATCH, TOTAL_SIDE_ID_MISMATCH). A card where
+  any market lacks exactly two sides is refused whole.
+* Page URLs carry no query string, fragment or ``;`` path parameters.
+* The browser path is resolved with realpath before the allowlist check.
 * Lines must be finite multiples of 0.5; prices must be integer American odds
   with 100 <= |price| <= 50000. Anything else is an explicit refusal. A row
   refused for its line carries no price. Nothing is filled in.
@@ -35,6 +40,7 @@ Contract
 from __future__ import annotations
 
 import math
+import os
 import re
 from datetime import datetime, timezone
 from typing import Any, Callable
@@ -46,10 +52,14 @@ SPORTSBOOK = "draftkings"
 ALLOWED_HOST = "sportsbook.draftkings.com"
 ALLOWED_PATH_PREFIXES = ("/leagues/",)
 ALLOWED_BROWSER_PATHS = ("/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/opt/google/chrome/chrome")
+# Symlinks are resolved first; the resolved file must be one of these real Chrome files.
+ALLOWED_BROWSER_REALPATHS = ("/opt/google/chrome/google-chrome", "/opt/google/chrome/chrome")
 DEFAULT_BROWSER_PATH = "/usr/bin/google-chrome"
 _API_PATH_TOKENS = ("api", "sportscontent", "eventgroups", "graphql", "v1", "v2", "v3", "v4", "v5")
 _MARKETS = {"HC": "spreads", "OU": "totals", "ML": "h2h"}
-_BTN = re.compile(r"component-builder-market-button-(\d+)-0([A-Z]{2})(\d+)")
+_BTN = re.compile(r"component-builder-market-button-(\d+)-0([A-Z]{2})(\d+)(?:([NPOU])(\d+))?_(\d+)$")
+# Button-ID side suffix: _3 = away (first team row), _1 = home. Totals: Over = _1, Under = _3.
+_SIDE_SUFFIX = {"away": "3", "home": "1", "Over": "1", "Under": "3"}
 MAX_ABS_PRICE = 50000
 MAX_ABS_POINT = 200.0
 
@@ -79,7 +89,9 @@ def assert_rendered_page_url(url: str) -> str:
     segs = [s for s in re.split(r"[/?&=]", full) if s]
     if any(t in segs for t in _API_PATH_TOKENS) or "/api" in full or "sportscontent" in full:
         raise DkApiUrlRefused("API_PATH")
-    if ".json" in full or re.search(r"(^|&)format=", query):
+    if parts.query or parts.fragment or "?" in str(url) or "#" in str(url):
+        raise DkApiUrlRefused("QUERY_OR_FRAGMENT_NOT_ALLOWED")
+    if ".json" in full or ";" in path or "format" in path or "fmt" in path:
         raise DkApiUrlRefused("DATA_FORMAT_REQUEST")
     if not any(path.startswith(p) for p in ALLOWED_PATH_PREFIXES) or ".." in path:
         raise DkApiUrlRefused("PATH_NOT_ALLOWLISTED")
@@ -119,6 +131,29 @@ def _point(text: str | None) -> tuple[float | None, str | None]:
     if not math.isfinite(v) or abs(v) > MAX_ABS_POINT or (v * 2) != int(v * 2):
         return None, "POINT_NOT_HALF_STEP"
     return v, None
+
+
+def _id_consistency(m, market: str, outcome: str, position_side: str, point: float | None) -> str | None:
+    """The DOM position, the button-ID side suffix and the ID-encoded line must all agree."""
+    suffix, letter, digits = m.group(6), m.group(4), m.group(5)
+    if suffix not in ("1", "3"):
+        return "SIDE_SUFFIX_UNKNOWN"
+    if market == "totals":
+        if suffix != _SIDE_SUFFIX[outcome] or letter != outcome[0]:
+            return "TOTAL_SIDE_ID_MISMATCH"
+        if digits is None or point is None or int(digits) != round(point * 100):
+            return "LINE_ID_MISMATCH"
+        return None
+    if suffix != _SIDE_SUFFIX[position_side]:
+        return "SIDE_SUFFIX_MISMATCH"
+    if market == "spreads":
+        if letter not in ("N", "P") or digits is None or point is None:
+            return "LINE_ID_MISMATCH"
+        if int(digits) != round(abs(point) * 100) or (point != 0 and (letter == "N") != (point < 0)):
+            return "LINE_ID_MISMATCH"
+    elif letter is not None:
+        return "LINE_ID_MISMATCH"
+    return None
 
 
 def _teams(card) -> list[str]:
@@ -161,7 +196,7 @@ def parse_rendered_board(html: str, *, page_url: str, observed_at: datetime | No
             if not m or m.group(2) not in _MARKETS:
                 bad = "UNKNOWN_MARKET_CODE"
                 break
-            pairs.setdefault((m.group(1), _MARKETS[m.group(2)], m.group(3)), []).append(b)
+            pairs.setdefault((m.group(1), _MARKETS[m.group(2)], m.group(3)), []).append((b, m))
         if bad is None and any(len(v) != 2 for v in pairs.values()):
             bad = "MARKET_NOT_TWO_SIDED"
         if bad is None and len({k[1] for k in pairs}) != len(pairs):
@@ -171,7 +206,7 @@ def parse_rendered_board(html: str, *, page_url: str, observed_at: datetime | No
             continue
         for (event_id, market, _mid), pair in pairs.items():
             sides = []
-            for idx, b in enumerate(pair):
+            for idx, (b, m) in enumerate(pair):
                 title = b.select_one('[data-testid="button-title-market-board"]')
                 pts = b.select_one('[data-testid="button-points-market-board"]')
                 odds = b.select_one('[data-testid="button-odds-market-board"]')
@@ -196,6 +231,8 @@ def parse_rendered_board(html: str, *, page_url: str, observed_at: datetime | No
                         row["point"], refusal = _point(pts.get_text() if pts else None)
                     if refusal is None:
                         row["price_american"], refusal = _price(odds.get_text() if odds else None)
+                if refusal is None:
+                    refusal = _id_consistency(m, market, outcome, "away" if idx == 0 else "home", row["point"])
                 if refusal:
                     row.update(status="REFUSED", refusal=refusal, price_american=None,
                                point=row["point"] if refusal.startswith("PRICE") else None)
@@ -225,25 +262,60 @@ def parse_rendered_board(html: str, *, page_url: str, observed_at: datetime | No
     }
 
 
-def to_capture_markets(output: dict[str, Any]) -> list[dict[str, Any]]:
+DK_BOARD_TEAM_FULL_NAMES = {
+    "ARI Cardinals": "Arizona Cardinals", "ATL Falcons": "Atlanta Falcons", "BAL Ravens": "Baltimore Ravens",
+    "BUF Bills": "Buffalo Bills", "CAR Panthers": "Carolina Panthers", "CHI Bears": "Chicago Bears",
+    "CIN Bengals": "Cincinnati Bengals", "CLE Browns": "Cleveland Browns", "DAL Cowboys": "Dallas Cowboys",
+    "DEN Broncos": "Denver Broncos", "DET Lions": "Detroit Lions", "GB Packers": "Green Bay Packers",
+    "HOU Texans": "Houston Texans", "IND Colts": "Indianapolis Colts", "JAX Jaguars": "Jacksonville Jaguars",
+    "KC Chiefs": "Kansas City Chiefs", "LA Chargers": "Los Angeles Chargers", "LA Rams": "Los Angeles Rams",
+    "LV Raiders": "Las Vegas Raiders", "MIA Dolphins": "Miami Dolphins", "MIN Vikings": "Minnesota Vikings",
+    "NE Patriots": "New England Patriots", "NO Saints": "New Orleans Saints", "NY Giants": "New York Giants",
+    "NY Jets": "New York Jets", "PHI Eagles": "Philadelphia Eagles", "PIT Steelers": "Pittsburgh Steelers",
+    "SEA Seahawks": "Seattle Seahawks", "SF 49ers": "San Francisco 49ers", "TB Buccaneers": "Tampa Bay Buccaneers",
+    "TEN Titans": "Tennessee Titans", "WAS Commanders": "Washington Commanders",
+}
+EVENT_MATCH_REQUIREMENT = (
+    "commence_time is NOT on the DK board card and is carried as None. Before any capture use, each "
+    "event must be matched one-to-one to the official schedule by (home_team, away_team) full names; "
+    "an unmatched or ambiguous event is refused. No time is inferred.")
+
+
+def to_capture_markets(output: dict[str, Any]) -> dict[str, Any]:
     """Adapt OK rows to the market shape read by nfl_2026_line_capture spread_row/total_row.
 
-    Returns one record per event: {event_id, home_team, away_team, markets:{key:{outcomes, last_update}}}.
-    ``last_update`` is None (no provider quote time on the page). Refused rows are never passed on.
+    Team labels are mapped to full names via DK_BOARD_TEAM_FULL_NAMES (the names spread_row is
+    called with); an event with an unmapped label is refused, never guessed. ``commence_time`` is
+    None and ``event_match_requirement`` states the schedule-matching rule. ``last_update`` is None
+    (no provider quote time on the page). Refused rows are never passed on.
+    Returns {"events": [...], "refused_events": [...], "event_match_requirement": str}.
     """
     events: dict[str, dict[str, Any]] = {}
+    refused: dict[str, dict[str, Any]] = {}
     for r in output["rows"]:
         if r.get("status") != "OK":
             continue
-        ev = events.setdefault(r["provider_event_id"], {
-            "event_id": r["provider_event_id"], "home_team": r["home_team"], "away_team": r["away_team"],
+        eid = r["provider_event_id"]
+        home = DK_BOARD_TEAM_FULL_NAMES.get(r["home_team"])
+        away = DK_BOARD_TEAM_FULL_NAMES.get(r["away_team"])
+        if home is None or away is None:
+            refused[eid] = {"event_id": eid, "home_team_label": r["home_team"], "away_team_label": r["away_team"],
+                            "refusal": "TEAM_NAME_UNMAPPED"}
+            continue
+        full = {r["home_team"]: home, r["away_team"]: away}
+        ev = events.setdefault(eid, {
+            "event_id": eid, "home_team": home, "away_team": away,
+            "home_team_label": r["home_team"], "away_team_label": r["away_team"],
+            "commence_time": None, "commence_time_status": "NOT_ON_BOARD_CARD",
+            "event_match_requirement": EVENT_MATCH_REQUIREMENT,
             "observed_at_utc": r["observed_at_utc"], "source_class": SOURCE_CLASS, "markets": {}})
         mk = ev["markets"].setdefault(r["market"], {"key": r["market"], "last_update": None, "outcomes": []})
-        out = {"name": r["outcome"], "price": r["price_american"]}
+        out = {"name": full.get(r["outcome"], r["outcome"]), "price": r["price_american"]}
         if r["point"] is not None:
             out["point"] = r["point"]
         mk["outcomes"].append(out)
-    return list(events.values())
+    return {"events": list(events.values()), "refused_events": list(refused.values()),
+            "event_match_requirement": EVENT_MATCH_REQUIREMENT}
 
 
 def _browser_path(explicit: str | None) -> str:
@@ -251,6 +323,8 @@ def _browser_path(explicit: str | None) -> str:
     path = explicit or os.environ.get("SPORTSEDGE_BROWSER_PATH") or DEFAULT_BROWSER_PATH
     if path not in ALLOWED_BROWSER_PATHS:
         raise BrowserBinaryRefused("BROWSER_PATH_NOT_ALLOWLISTED")
+    if os.path.realpath(path) not in ALLOWED_BROWSER_REALPATHS:
+        raise BrowserBinaryRefused("BROWSER_REALPATH_NOT_ALLOWLISTED")
     return path
 
 
@@ -264,6 +338,7 @@ def _render_with_browser(url: str, *, timeout_ms: int = 60000, settle_ms: int = 
     if not os.environ.get("DISPLAY"):
         raise HeadedDisplayUnavailable("DISPLAY_NOT_SET")
     path = _browser_path(executable_path)
+    real = os.path.realpath(path)
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
@@ -286,7 +361,7 @@ def _render_with_browser(url: str, *, timeout_ms: int = 60000, settle_ms: int = 
     except DkApiUrlRefused as exc:
         raise DkApiUrlRefused("FINAL_URL_" + str(exc)) from None
     return {"html": html, "observed_at": observed, "final_url": final_url,
-            "browser": {"path": path, "version": version, "headless": False}}
+            "browser": {"path": path, "realpath": real, "version": version, "headless": False}}
 
 
 def fetch_rendered_board(url: str, *, sport_key: str = "americanfootball_nfl", **render_kw: Any) -> dict[str, Any]:
