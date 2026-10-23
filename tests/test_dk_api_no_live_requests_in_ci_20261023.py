@@ -507,3 +507,138 @@ def test_fallback_isolated_python_child_is_jailed_not_skipped(tmp_path):
         r = subprocess.run(_jail_isolated_python(argv), capture_output=True, text=True, timeout=60)
         assert "LIVE_NETWORK_BLOCKED" in r.stdout and "CONNECTED" not in r.stdout, r.stdout + r.stderr
         assert "ARGV ['a']" in r.stdout
+
+
+# ---- t259: audit bypasses of the t258 jail (7b099d35), one test per bypass -------------
+# Layer 1 (isolation): the bypass runs inside a pytest session re-launched under
+# `unshare -rn` (empty network namespace). Without unshare these tests SKIP with
+# NET_JAIL_UNAVAILABLE instead of claiming isolation. Layer 2 (in-process): _socket,
+# os.posix_spawn*/spawn*/exec* are patched too. Probes target example.com only, never DK.
+
+def test_bypass1_raw__socket_connect_jailed(net_jail):
+    if net_jail.delegated:
+        return
+    r = _child_py(f"import _socket;s=_socket.socket();s.settimeout(5);s.connect(({_PROBE!r},443));print('CONNECTED')")
+    assert "CONNECTED" not in r.stdout and r.returncode != 0
+    import _socket
+    s = _socket.socket(); s.settimeout(5)
+    try:
+        with pytest.raises(OSError):
+            s.connect((_PROBE, 443))
+    finally:
+        s.close()
+
+
+def test_bypass1_raw__socket_connect_in_process_refused(dk_block):
+    import _socket
+    s = _socket.socket(); s.settimeout(5)
+    try:
+        with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED"):
+            s.connect((_PROBE, 443))
+    finally:
+        s.close()
+
+
+def _reload_socket_and_connect():
+    saved = dict(socket.__dict__)
+    try:
+        fresh = importlib.reload(socket)
+        return fresh.create_connection((_PROBE, 443), timeout=5)
+    finally:
+        socket.__dict__.clear(); socket.__dict__.update(saved)
+
+
+def test_bypass2_reload_socket_create_connection_jailed(net_jail):
+    if net_jail.delegated:
+        return
+    with pytest.raises(OSError):
+        _reload_socket_and_connect().close()
+
+
+def test_bypass2_reload_socket_create_connection_in_process_refused(dk_block):
+    with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED"):
+        _reload_socket_and_connect().close()
+
+
+def _posix_spawn_curl():
+    curl = shutil.which("curl")
+    if curl is None:
+        pytest.skip("curl not installed")
+    r, w = os.pipe()
+    try:
+        pid = os.posix_spawn(curl, [curl, "-sS", "-m", "5", "-o", "/dev/null", "-w", "%{http_code}",
+                                    f"https://{_PROBE}/"], dict(os.environ),
+                             file_actions=[(os.POSIX_SPAWN_DUP2, w, 1)])
+        os.close(w); w = -1
+        _, status = os.waitpid(pid, 0)
+        return os.read(r, 100).decode(), os.waitstatus_to_exitcode(status)
+    finally:
+        os.close(r)
+        if w >= 0:
+            os.close(w)
+
+
+def test_bypass3_posix_spawn_curl_jailed(net_jail):
+    if net_jail.delegated:
+        return
+    out, code = _posix_spawn_curl()
+    assert code != 0 and out in ("", "000"), (out, code)
+
+
+def test_bypass3_posix_spawn_and_exec_family_refused_in_process(dk_block):
+    curl = shutil.which("curl") or "/usr/bin/curl"
+    for fn, call in (("posix_spawn", lambda: os.posix_spawn(curl, [curl, f"https://{_PROBE}/"], {})),
+                     ("posix_spawnp", lambda: os.posix_spawnp("curl", ["curl", f"https://{_PROBE}/"], {})),
+                     ("spawnv", lambda: os.spawnv(os.P_WAIT, curl, [curl, f"https://{_PROBE}/"])),
+                     ("spawnlp", lambda: os.spawnlp(os.P_WAIT, "curl", "curl", f"https://{_PROBE}/")),
+                     ("execv", lambda: os.execv(curl, [curl, f"https://{_PROBE}/"])),
+                     ("execvpe", lambda: os.execvpe("curl", ["curl", f"https://{_PROBE}/"], {}))):
+        with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED"):
+            call()
+        assert any(fn in w for w, _ in dk_block), fn
+
+
+def _renamed_curl(tmp_path):
+    curl = shutil.which("curl")
+    if curl is None:
+        pytest.skip("curl not installed")
+    dst = tmp_path / "fetchtool"
+    shutil.copy2(curl, dst)
+    return str(dst)
+
+
+def test_bypass4_renamed_curl_noproxy_jailed(net_jail, tmp_path):
+    if net_jail.delegated:
+        return
+    r = subprocess.run([_renamed_curl(tmp_path), "--noproxy", "*", "-sS", "-m", "5", "-o", "/dev/null",
+                        "-w", "%{http_code}", f"https://{_PROBE}/"], capture_output=True, text=True, timeout=30)
+    assert r.returncode != 0 and r.stdout in ("", "000"), r.stdout
+
+
+def test_bypass4_renamed_curl_refused_by_content_in_fallback(tmp_path):
+    assert _fallback_net_cmd([_renamed_curl(tmp_path), "--noproxy", "*", f"https://{_PROBE}/"])
+
+
+def test_fallback_mode_skips_live_tests_with_net_jail_unavailable():
+    """No namespace -> the live bypass tests must SKIP (NET_JAIL_UNAVAILABLE), never pass."""
+    if os.environ.get("SPORTSEDGE_NET_JAIL_FORCE_FALLBACK") == "1" or os.environ.get("SPORTSEDGE_NET_JAILED") == "1":
+        pytest.skip("nested run")
+    env = {**os.environ, "SPORTSEDGE_NET_JAIL_FORCE_FALLBACK": "1"}
+    r = subprocess.run([sys.executable, "-m", "pytest", "-q", "-rs", "-p", "no:cacheprovider", __file__,
+                        "-k", "bypass and jailed"], cwd=ROOT, env=env, capture_output=True, text=True, timeout=600)
+    assert r.returncode == 0, r.stdout[-2000:]
+    assert "4 skipped" in r.stdout and " passed" not in r.stdout, r.stdout[-2000:]
+    assert r.stdout.count("NET_JAIL_UNAVAILABLE") >= 4, r.stdout[-2000:]
+
+
+def test_jailed_session_has_only_loopback():
+    """The re-exec wrapper really runs pytest in an empty network namespace."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("_run_jailed", JAIL_DIR / "run_jailed.py")
+    run_jailed = importlib.util.module_from_spec(spec); spec.loader.exec_module(run_jailed)
+    if run_jailed.unshare_prefix() is None:
+        pytest.skip("NET_JAIL_UNAVAILABLE")
+    r = subprocess.run(run_jailed.jailed_argv([sys.executable, "-c",
+                       "import os;print(sorted(os.listdir('/sys/class/net')))"]),
+                       capture_output=True, text=True, timeout=60)
+    assert r.stdout.strip() == "['lo']", r.stdout + r.stderr
