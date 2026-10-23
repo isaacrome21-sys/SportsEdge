@@ -3,7 +3,9 @@ import math
 import pytest
 
 from sportsedge.nfl_situational_empirical import (
-    GOVERNANCE, NflSituationalError, lead_over_under, price_situational)
+    GOVERNANCE, NflSituationalError, lead_over_under, price_situational,
+    price_situational_unrestricted)
+from sportsedge.screen_only_guard import screen_only
 
 
 def _g(date, season, home, away, hp, ap, first="H", lead=7, sh=0, sa=0, dh=0, da=0):
@@ -24,9 +26,12 @@ def _hist():
 
 
 def price(family, **kw):
+    """Behavioural tests of the construction run through the guarded screen pricer
+    (LARGEST_LEAD and n=10 are NAIVE_FAIL on the pricing entry point)."""
     a = dict(date="2024-10-01", season=2024, home="AAA", away="BBB")
     a.update(kw)
-    return price_situational(_hist(), family=family, **a)
+    with screen_only():
+        return price_situational_unrestricted(_hist(), family=family, **a)
 
 
 @pytest.mark.parametrize("fam,n", [("SAFETY", None), ("DST_TD", None), ("FIRST_SCORE", None),
@@ -60,8 +65,10 @@ def test_both_teams_monotone_in_n():
 def test_future_rows_do_not_leak():
     leak = _hist() + [_g("2024-10-02", 2024, "BBB", "AAA", 70, 0, "H", 70, 3, 3, 3, 3)]
     for fam, n in (("SAFETY", None), ("FIRST_SCORE", None), ("BOTH_TEAMS_TO_SCORE_N", 20)):
-        assert price_situational(leak, family=fam, date="2024-10-01", season=2024,
-                                 home="AAA", away="BBB", n=n) == price(fam, n=n)
+        with screen_only():
+            got = price_situational_unrestricted(leak, family=fam, date="2024-10-01",
+                                                 season=2024, home="AAA", away="BBB", n=n)
+        assert got == price(fam, n=n)
 
 
 @pytest.mark.parametrize("kw,msg", [
