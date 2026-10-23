@@ -102,7 +102,8 @@ class TestScorerWired(unittest.TestCase):
         api.publish_freeze(self.sc.local_shas())
         self.assertIsNotNone(api.get_file("records/nfl-atd-v1-2", "nfl_atd_v1_2/FREEZE.json"))
         self.assertIsNone(api.get_file("records/nfl-atd-v1-1", "nfl_atd_v1_1/FREEZE.json"))
-        self.assertEqual(self.pv.load_freeze(api), self.sc.local_shas())
+        fz = self.pv.load_freeze(api)
+        self.assertEqual({k: fz[k] for k in self.pv.FREEZE_KEYS}, self.sc.local_shas())
 
     def test_v11_freeze_location_not_read(self):
         api = fk.FakeGitHub(freeze=False)

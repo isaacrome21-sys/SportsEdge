@@ -144,7 +144,11 @@ class TestPreWriteFreeze(Env):
                 self.assert_refused(*v12_world({k: "0" * 64}))
 
     def test_v11_freeze_refuses_v12_scorer(self):
-        api = FakeGitHub()                       # FREEZE pins the v1.1 scorer
+        import hashlib                           # FREEZE pins the v1.1 scorer/provenance
+        h = lambda n: hashlib.sha256((HERE / n).read_bytes()).hexdigest()
+        api = FakeGitHub(freeze=False)
+        api.publish_freeze(dict(sc.local_shas(), scorer_sha256=h("score_nfl_atd_forward.py"),
+                                provenance_sha256=h("atd_provenance.py")))
         ids = ledger_to_branch(api, _ledger(4, 14, 3, clv=0.02))
         self.assert_refused(api, ids, records_worktree())
 

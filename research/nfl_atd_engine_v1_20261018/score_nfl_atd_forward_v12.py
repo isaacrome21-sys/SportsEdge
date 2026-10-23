@@ -28,7 +28,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import atd_engine as eng
-import atd_provenance as pv
+import atd_provenance_v12 as pv   # t236: v1.2's own records area
 
 CLOSE_WINDOW = timedelta(minutes=60)
 MIN_WEEKS, MIN_PICKED, MIN_GAMES = 4, 150, 40
@@ -41,7 +41,7 @@ Z95 = 1.959963984540054
 
 
 def _utcnow():
-    return datetime.now(timezone.utc)
+    return datetime.now(timezone.utc).replace(microsecond=0)   # t236: whole seconds
 
 
 class ReviewAlreadyRecorded(Exception):
@@ -336,7 +336,7 @@ def local_shas() -> dict:
     def h(n):
         return hashlib.sha256((here / n).read_bytes()).hexdigest()
     return {"pricer_sha256": pr.pricer_sha256(), "scorer_sha256": h("score_nfl_atd_forward_v12.py"),
-            "provenance_sha256": h("atd_provenance.py"),
+            "provenance_sha256": h("atd_provenance_v12.py"),
             "prereg_sha256": h("PREREG_NFL_ATD_ENGINE_V1_1_DRAFT.md")}
 
 
