@@ -58,7 +58,8 @@ def main() -> int:
         rows = []
         for raw in board["rows"]:
             rows.append(eng.price_board_row(data, idx, {
-                "game_id": board["game_id"], "player_name": raw.get("player_name"),
+                "game_id": sk["game_id"], "board_game_id": board["game_id"],
+                "player_name": raw.get("player_name"),
                 "player_id": raw.get("player_id"), "game_teams": board["game_teams"],
                 "yes_price": raw.get("yes_price"),
                 "captured_at": board.get("captured_at"), "kickoff": board.get("kickoff"),
@@ -88,8 +89,8 @@ def main() -> int:
     rr = json.loads(Path(args.run_record).read_text())
     rr.update(slate_id=board.get("slate_id"), captured_at=board.get("captured_at"),
               season=int(board["season"]),
-              schedule_kickoffs={board["game_id"]: board.get("kickoff")},
-              game_teams={board["game_id"]: list(board["game_teams"])},
+              schedule_kickoffs={sk["game_id"]: board.get("kickoff")},
+              game_teams={sk["game_id"]: list(board["game_teams"])},
               schedule_game={"board_game_id": board["game_id"], **sk},
               first_kickoff=board.get("kickoff"), stats_sha256=shas["stats"],
               schedule_sha256=shas["schedule"],

@@ -118,7 +118,14 @@ Selection, edge, settlement: locked #2399 Rules 1, 2, 3, 7, 8, 9.
   ROW_KICKOFF_SCHEDULE_MISMATCH. The run record's own `schedule_kickoffs`
   is informational and never trusted. `first_kickoff` must equal the
   earliest recomputed kickoff (else FIRST_KICKOFF_MISMATCH) and the run push
-  must be before it. All close windows (close record checks and the
+  must be before it. Each row is bound to its game and player (re-audit of
+  5150203a): the pricer stores the nflverse schedule game_id resolved from
+  the pinned schedule as the row's game_id, and at review the matched
+  schedule game_id must equal it (else ROW_GAME_ID_MISMATCH); the player's
+  team, taken from his latest REG week of the season in the pinned stats
+  data record, must be one of the matched game's two teams, and a player
+  not found there is refused (else ROW_PLAYER_TEAM_MISMATCH); either makes
+  the slate SCREEN. All close windows (close record checks and the
   Rule 4 60-min window) use the recomputed kickoff.
 - Close captures: each close capture file is its own single-commit record
   named by the sha256 of its content, filed under the game's season-week.

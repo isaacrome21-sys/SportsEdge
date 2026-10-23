@@ -332,6 +332,23 @@ def load_data_record(api, sha256, ext="csv", stored_event=None, fetch_event=None
     return p
 
 
+def stats_teams(gz_bytes, season) -> dict:
+    """{player_id: team} from the pinned stats data record: the team on the
+    player's latest REG week of `season`."""
+    import csv
+    import gzip
+    import io
+    best = {}
+    for r in csv.DictReader(io.StringIO(gzip.decompress(gz_bytes).decode())):
+        if r.get("season_type") != "REG" or int(r["season"]) != int(season):
+            continue
+        w = int(r["week"])
+        team = r.get("recent_team") or r.get("team") or ""
+        if r["player_id"] not in best or w >= best[r["player_id"]][0]:
+            best[r["player_id"]] = (w, team)
+    return {p: t for p, (w, t) in best.items()}
+
+
 def require_fetch_provenance(api, shas: dict, captured_at) -> dict:
     """Pricer gate: each input needs its data record AND fetch record on the
     branch, both pushed before capture. Returns proofs (events to store)."""
@@ -388,6 +405,16 @@ def load_slate(api, slate_id) -> dict:
         sch = load_data_record(api, shas["schedule"], "csv", ev.get("data_event"), ev.get("event"))
     except ProvenanceFailed as e:
         out["reasons"].append(e.code)
+    pteams = None
+    try:
+        ev = (stored.get("stats") or {}) if isinstance(stored, dict) else {}
+        sd = load_data_record(api, shas["stats"], DATA_EXT["stats"],
+                              ev.get("data_event"), ev.get("event"))
+        pteams = stats_teams(sd["bytes"], season)
+    except ProvenanceFailed as e:
+        out["reasons"].append(e.code)
+    except (OSError, ValueError, KeyError, EOFError):
+        out["reasons"].append("DATA_RECORD_MALFORMED")
     if sch is not None:
         import tempfile
         import atd_refresh as rf
@@ -399,11 +426,17 @@ def load_slate(api, slate_id) -> dict:
                     k = rf.schedule_kickoff(fh.name, season, teams.get(r["game_id"]), r["kickoff"])
                     if "week" in r and int(k["week"]) != int(r["week"]):
                         raise rf.RefreshFailed("KICKOFF_SCHEDULE_MISMATCH", r["game_id"])
+                    if k["game_id"] != r["game_id"]:
+                        out["reasons"].append("ROW_GAME_ID_MISMATCH")
+                        continue
+                    if pteams is not None and pteams.get(r.get("player_id")) \
+                            not in set(teams.get(r["game_id"]) or []):
+                        out["reasons"].append("ROW_PLAYER_TEAM_MISMATCH")
                     if kos.setdefault(r["game_id"], k["kickoff"]) != k["kickoff"]:
                         raise rf.RefreshFailed("KICKOFF_SCHEDULE_MISMATCH", r["game_id"])
                 except (rf.RefreshFailed, ValueError, KeyError, TypeError):
                     out["reasons"].append("ROW_KICKOFF_SCHEDULE_MISMATCH")
-        if kos and "ROW_KICKOFF_SCHEDULE_MISMATCH" not in out["reasons"]:
+        if kos and not {"ROW_KICKOFF_SCHEDULE_MISMATCH", "ROW_GAME_ID_MISMATCH"} & set(out["reasons"]):
             earliest = min(_t(v) for v in kos.values())
             if earliest != ko:
                 out["reasons"].append("FIRST_KICKOFF_MISMATCH")
