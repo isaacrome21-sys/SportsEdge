@@ -13,13 +13,26 @@ from pathlib import Path
 _ids = itertools.count(1000)
 
 
+ZERO = "0" * 40
+
+
 class FakeGitHub:
-    def __init__(self):
+    """init_records=True creates the records branch with a dummy first
+    commit (a branch_creation event, as GitHub reports it), so records are
+    always later pushes. page_size models activity pagination."""
+    def __init__(self, init_records=True, page_size=2, authenticated=True):
         self.trees = {"root": {}}
         self.parents = {"root": []}
         self.heads = {}
         self.events = []
         self.malformed = set()   # method names returning junk
+        self.page_size = page_size
+        self.authenticated = authenticated
+        self.truncated = False
+        if init_records:
+            import atd_provenance as pv
+            self.commit(pv.RECORDS_BRANCH, {"README.md": "records branch (dummy first commit)\n"},
+                        "2026-10-01T00:00:00Z")
 
     def _new(self, branch, tree):
         parent = self.heads.get(branch, "root")
@@ -32,6 +45,7 @@ class FakeGitHub:
     def commit(self, branch, files: dict, pushed_at=None, *, n_commits=1):
         """Commit files (path -> content or None to delete). With pushed_at,
         push the commit(s) as ONE push event (n_commits > 1 = multi-commit push)."""
+        new_branch = branch not in self.heads
         start = self.heads.get(branch, "root")
         for i in range(n_commits):
             tree = dict(self.trees[self.heads.get(branch, "root")])
@@ -45,7 +59,10 @@ class FakeGitHub:
                 tree[f"filler{i}"] = str(i)
             sha, _ = self._new(branch, tree)
         if pushed_at is not None:
-            self.push_event(branch, start, sha, pushed_at)
+            if new_branch:
+                self.push_event(branch, ZERO, sha, pushed_at, kind="branch_creation")
+            else:
+                self.push_event(branch, start, sha, pushed_at)
         return sha
 
     def push_event(self, branch, before, after, ts, kind="push"):
@@ -77,6 +94,23 @@ class FakeGitHub:
                 out.append(sha)
             sha = p
         return out
+
+    def git_tree(self, ref):
+        """GET /git/trees/{ref}?recursive=1 shape."""
+        if "git_tree" in self.malformed:
+            return {"tree": "junk"}
+        files = self.trees.get(self._ref(ref), {})
+        return {"truncated": self.truncated,
+                "tree": [{"path": p, "type": "blob"} for p in sorted(files)]}
+
+    def activity_page(self, branch, cursor=None):
+        """One page of GET /activity (newest first); returns (items, next)."""
+        if "activities" in self.malformed or "activity_page" in self.malformed:
+            return [{"oops": 1}], None
+        evs = [e for e in reversed(self.events) if e["ref"] == f"refs/heads/{branch}"]
+        i = cursor or 0
+        nxt = i + self.page_size
+        return [dict(e) for e in evs[i:nxt]], (nxt if nxt < len(evs) else None)
 
     def list_dir(self, ref, path):
         if "list_dir" in self.malformed:
@@ -137,6 +171,8 @@ def ledger_to_records(api, ledger, captured_at="2026-10-25T16:00:00Z",
             if r.get("outcome_status") == "SETTLED":
                 settlements[(r["game_id"], r["player_id"])] = r["outcome"]
         rec = {"slate_id": slate["slate_id"], "captured_at": captured_at,
+               "season": 2026,
+               "schedule_kickoffs": {r["game_id"]: kickoff for r in slate["rows"]},
                "first_kickoff": kickoff, "stats_sha256": st, "schedule_sha256": sc_,
                "fetch_provenance": {"stats": {"event": events[st]},
                                     "schedule": {"event": events[sc_]}},
@@ -147,26 +183,30 @@ def ledger_to_records(api, ledger, captured_at="2026-10-25T16:00:00Z",
     return ids, captures, settlements
 
 
-def publish_close(api, game_id, kickoff, captured_at, captures, pushed_at):
-    """Push one close-capture file as its own record closes/<sha256>.json."""
+def publish_close(api, game_id, kickoff, captured_at, captures, pushed_at,
+                  season=2026, week=8, raw=None):
+    """Push one close-capture file as its own record
+    closes/<season>-W<week>/<sha256>.json (raw: exact body to publish)."""
     import atd_provenance as pv
-    body = json.dumps({"game_id": game_id, "kickoff": kickoff,
-                       "captured_at": captured_at, "captures": captures},
-                      sort_keys=True)
+    body = raw if raw is not None else json.dumps(
+        {"game_id": game_id, "kickoff": kickoff, "captured_at": captured_at,
+         "captures": captures}, sort_keys=True)
     sha = hashlib.sha256(body.encode()).hexdigest()
-    api.commit(pv.RECORDS_BRANCH, {pv.close_record_path(sha): body}, pushed_at)
+    api.commit(pv.RECORDS_BRANCH, {pv.close_record_path(sha, season, week): body}, pushed_at)
     return sha
 
 
-def publish_settlements(api, settlements, pushed_at, data_pushed_at=None):
-    """Push a settlement data file (settlements/<sha>.json) and its fetch
-    record (fetch/<sha>.json); returns the sha."""
+def publish_settlements(api, settlements, pushed_at, data_pushed_at=None,
+                        season=2026, week=8, rows=None):
+    """Push a settlement data file (settlements/<season>-W<week>/<sha>.json)
+    and its fetch record (fetch/<sha>.json); returns the sha. `rows` gives
+    the raw settlement list (e.g. with duplicate keys)."""
     import atd_provenance as pv
-    body = json.dumps({"settlements": [
-        {"game_id": g, "player_id": p, "td": v}
-        for (g, p), v in sorted(settlements.items())]}, sort_keys=True)
+    rows = rows if rows is not None else [
+        {"game_id": g, "player_id": p, "td": v} for (g, p), v in sorted(settlements.items())]
+    body = json.dumps({"settlements": rows}, sort_keys=True)
     sha = hashlib.sha256(body.encode()).hexdigest()
-    api.commit(pv.RECORDS_BRANCH, {pv.settlement_data_path(sha): body},
+    api.commit(pv.RECORDS_BRANCH, {pv.settlement_data_path(sha, season, week): body},
                data_pushed_at or pushed_at)
     api.commit(pv.RECORDS_BRANCH,
                {pv.fetch_record_path(sha): json.dumps({"sha256": sha, "kind": "settlements"})},
@@ -179,6 +219,7 @@ def ledger_to_branch(api, ledger, close_pushed="2026-10-25T16:58:00Z",
     """ledger_to_records + publish the derived closes (one record per game)
     and settlements on the branch, so review reads nothing from the caller."""
     ids, caps, setl = ledger_to_records(api, ledger)
+    week_of = {r["game_id"]: r["week"] for s in ledger for r in s["rows"]}
     by_game = {}
     for c in caps:
         by_game.setdefault(c["game_id"], []).append(
@@ -186,7 +227,10 @@ def ledger_to_branch(api, ledger, close_pushed="2026-10-25T16:58:00Z",
              "captured_at": c["captured_at"]})
     for g, cs in sorted(by_game.items()):
         publish_close(api, g, "2026-10-25T17:00:00Z", "2026-10-25T16:30:00Z", cs,
-                      close_pushed)
-    if setl:
-        publish_settlements(api, setl, settle_pushed)
+                      close_pushed, week=week_of[g])
+    by_week = {}
+    for (g, p), v in setl.items():
+        by_week.setdefault(week_of[g], {})[(g, p)] = v
+    for w, part in sorted(by_week.items()):
+        publish_settlements(api, part, settle_pushed, week=w)
     return ids
