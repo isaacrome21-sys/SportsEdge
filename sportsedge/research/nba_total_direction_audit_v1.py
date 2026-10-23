@@ -8,16 +8,18 @@ to change a forecast, and there is no post-hoc OVER/UNDER balancing.
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime
 from math import isfinite
 from random import Random
 from statistics import mean
+from zoneinfo import ZoneInfo
 
 from .nba_totals_chronological_screen_v1 import SCREEN
 
 AUDIT = "NBA_TOTAL_DIRECTION_AUDIT_V1"
 BOOTSTRAP_SEED = 17
 BOOTSTRAP_DRAWS = 500
+SLATE_ZONE = ZoneInfo("America/Chicago")
 
 
 def _number(value, label):
@@ -39,7 +41,9 @@ def _date(value):
         raise ValueError("NBA_TOTAL_BIAS_EVENT_START_INVALID") from exc
     if t.tzinfo is None or t.utcoffset() is None:
         raise ValueError("NBA_TOTAL_BIAS_EVENT_START_NAIVE")
-    return t.astimezone(timezone.utc).date().isoformat()
+    # SportsEdge NBA slates use Chicago game dates; UTC would split late
+    # evening games off from their local slate and distort day clusters.
+    return t.astimezone(SLATE_ZONE).date().isoformat()
 
 
 def _cluster_interval(rows, key):
