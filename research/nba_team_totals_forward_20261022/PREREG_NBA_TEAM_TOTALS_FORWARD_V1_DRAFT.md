@@ -190,6 +190,8 @@ with the §9 game-clustered, Bonferroni-adjusted lower bound > 0.
 2. Else, if more than 50% of PICKED rows are moved rows, the verdict is
    `INSUFFICIENT_CLOSE_DATA`.
 
+If there are zero moved picked rows, the sign test isn't run and rule 1 doesn't apply.
+
 Only if neither applies: `BEATS_MARKET` requires **6a AND 6b AND 6c AND
 6d**.
 
