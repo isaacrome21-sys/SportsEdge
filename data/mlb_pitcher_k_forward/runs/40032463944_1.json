@@ -1,0 +1,23 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "blocked_count": 0,
+  "blockers": [],
+  "eligible_quote_units": 2,
+  "observed_at_utc": "2026-10-23T22:17:06.841734+00:00",
+  "predictions_created": 2,
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-23/props_20261023T221522.838320Z.json",
+  "run_attempt": "1",
+  "run_id": "40032463944",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_RUN_V1",
+  "selection_drops": {
+    "selected_units": 8
+  },
+  "settlements_created": 0,
+  "status": "OK",
+  "summary_sha256": "f858f275302ff3be68c4e763217183dbb6ba6c08cb2a8e5488da2a33d4eefa23"
+}
