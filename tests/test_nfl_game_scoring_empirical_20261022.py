@@ -82,3 +82,83 @@ def test_governance_and_screen_artifacts():
     assert res["label"] == "SCREEN"
     for name in ("team_total", "total_touchdowns", "winning_margin_band", "race_to_n_points"):
         assert resolve_market("NFL", name)["state"] == "BLOCKED"
+
+
+# --- v1.1 hardening: coded refusals ---------------------------------------
+
+def _price(h=None, **kw):
+    args = {"home": "AAA", "away": "BBB", "season": 2024, "date": "2024-10-30", **kw}
+    return E.price_tds(hist() if h is None else h, **args)
+
+
+@pytest.mark.parametrize("d", ["2024-02-30", "2024-13-01", "2024/10/30", "20241030",
+                               "2024-10-3x", None, 20241030])
+def test_bad_game_date_refuses_with_code(d):
+    with pytest.raises(E.NflGameScoringError, match="^GAME_DATE_INVALID"):
+        _price(date=d)
+
+
+def test_home_equals_away_refuses():
+    with pytest.raises(E.NflGameScoringError, match="^HOME_EQUALS_AWAY"):
+        _price(home="AAA", away="AAA")
+
+
+def test_duplicate_game_id_refuses():
+    h = hist()
+    with pytest.raises(E.NflGameScoringError, match="^HISTORY_DUPLICATE_GAME_ID"):
+        _price(h + [dict(h[0])])
+
+
+@pytest.mark.parametrize("season,d", [(2023, "2024-10-30"), (2025, "2024-10-30"),
+                                      (2024, "2024-01-07")])
+def test_season_date_mismatch_refuses(season, d):
+    with pytest.raises(E.NflGameScoringError, match="^SEASON_DATE_MISMATCH"):
+        _price(season=season, date=d)
+
+
+def test_january_playoff_date_maps_to_previous_season():
+    out = _price(date="2025-01-12")
+    assert out["state"] == "SCREEN"
+
+
+def test_history_season_date_mismatch_refuses():
+    h = hist(); h[0] = {**h[0], "season": 2023}
+    with pytest.raises(E.NflGameScoringError, match="^HISTORY_SEASON_DATE_MISMATCH"):
+        _price(h)
+
+
+def test_history_bad_date_refuses():
+    h = hist(); h[0] = {**h[0], "date": "2024-09-31"}
+    with pytest.raises(E.NflGameScoringError, match="^HISTORY_DATE_INVALID"):
+        _price(h)
+
+
+@pytest.mark.parametrize("field", ["home_td", "away_td", "home_pts", "away_pts"])
+@pytest.mark.parametrize("bad", ["MISSING", None, float("nan"), float("inf"), "3", True, -1])
+def test_missing_or_nonfinite_history_values_refuse(field, bad):
+    h = hist(); r = dict(h[0])
+    if bad == "MISSING":
+        del r[field]
+    else:
+        r[field] = bad
+    h[0] = r
+    with pytest.raises(E.NflGameScoringError, match=f"^HISTORY_VALUE_INVALID:{field}"):
+        _price(h)
+
+
+@pytest.mark.parametrize("field", ["home", "away", "game_id", "season"])
+def test_missing_history_identity_refuses(field):
+    h = hist(); r = dict(h[0]); del r[field]; h[0] = r
+    with pytest.raises(E.NflGameScoringError, match=f"^HISTORY_VALUE_INVALID:{field}"):
+        _price(h)
+
+
+@pytest.mark.parametrize("mu", [float("nan"), float("inf"), float("-inf")])
+def test_race_probs_nonfinite_mean_refuses(mu):
+    with pytest.raises(E.NflGameScoringError, match="^RACE_MU_NONFINITE"):
+        E.race_probs(mu, (0.1, 0.0), 0.1)
+
+
+def test_race_probs_nan_neither_refuses():
+    with pytest.raises(E.NflGameScoringError, match="^RACE_NEITHER_INVALID"):
+        E.race_probs(1.0, (0.1, 0.0), float("nan"))

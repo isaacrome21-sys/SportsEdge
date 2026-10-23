@@ -31,6 +31,7 @@ play_allowed=false.  Not in any owner registry.  Research only.
 from __future__ import annotations
 
 import math
+from datetime import date as _date
 from typing import Any, Iterable, Mapping, Sequence
 
 ENGINE_ID = "NFL_GAME_SCORING_EMPIRICAL"
@@ -117,8 +118,63 @@ def expected(hist, home, away, season, key):
             la * out[away][0] * out[home][1])
 
 
+def _parse_date(d, code: str) -> _date:
+    """Strict YYYY-MM-DD via date.fromisoformat (round-trip checked)."""
+    try:
+        if not isinstance(d, str) or len(d) != 10:
+            raise ValueError
+        out = _date.fromisoformat(d)
+        if out.isoformat() != d:
+            raise ValueError
+    except ValueError:
+        raise NflGameScoringError(
+            f"{code}:{d!r} (GAME_DATE_REQUIRED_YYYY-MM-DD)") from None
+    return out
+
+
+def season_for_date(d: _date) -> int:
+    """NFL season label: games Mar-Dec belong to that year; Jan-Feb
+    (late regular season / playoffs) to the previous year."""
+    return d.year if d.month >= 3 else d.year - 1
+
+
+def _is_int(v) -> bool:
+    return isinstance(v, int) and not isinstance(v, bool)
+
+
+def _validate_history(history) -> list:
+    rows, seen = list(history), set()
+    for r in rows:
+        for f in ("game_id", "home", "away"):
+            if not isinstance(r.get(f), str) or not r.get(f):
+                raise NflGameScoringError(f"HISTORY_VALUE_INVALID:{f}")
+        if not _is_int(r.get("season")):
+            raise NflGameScoringError("HISTORY_VALUE_INVALID:season")
+        for f in ("home_td", "away_td", "home_pts", "away_pts"):
+            v = r.get(f)
+            ok = (_is_int(v) or (isinstance(v, float) and math.isfinite(v)
+                                 and v == math.floor(v)))
+            if not ok or v < 0:
+                raise NflGameScoringError(f"HISTORY_VALUE_INVALID:{f}:{v!r}")
+        if r["game_id"] in seen:
+            raise NflGameScoringError(f"HISTORY_DUPLICATE_GAME_ID:{r['game_id']}")
+        seen.add(r["game_id"])
+        if r["home"] == r["away"]:
+            raise NflGameScoringError(f"HISTORY_HOME_EQUALS_AWAY:{r['game_id']}")
+        d = _parse_date(r.get("date"), "HISTORY_DATE_INVALID")
+        if season_for_date(d) != r["season"]:
+            raise NflGameScoringError(
+                f"HISTORY_SEASON_DATE_MISMATCH:{r['game_id']}")
+    return rows
+
+
 def price_tds(history, *, home, away, season, date) -> dict:
-    hist = _pit(history, date)
+    d = _parse_date(date, "GAME_DATE_INVALID")
+    if home == away:
+        raise NflGameScoringError(f"HOME_EQUALS_AWAY:{home!r}")
+    if not _is_int(season) or season_for_date(d) != season:
+        raise NflGameScoringError(f"SEASON_DATE_MISMATCH:{season!r}:{date}")
+    hist = _pit(_validate_history(history), date)
     lh, la = expected(hist, home, away, season, "td")
     ph, pa = _poisson(lh), _poisson(la)
     tot = _poisson(lh + la)
@@ -199,6 +255,10 @@ def fit_race(train: Sequence[tuple], n_iter: int = 200) -> tuple:
 
 
 def race_probs(mu: float, fit: tuple, p_neither: float) -> dict:
+    if not (isinstance(mu, (int, float)) and math.isfinite(mu)):
+        raise NflGameScoringError(f"RACE_MU_NONFINITE:{mu!r}")
+    if not all(isinstance(x, (int, float)) and math.isfinite(x) for x in fit):
+        raise NflGameScoringError("RACE_FIT_NONFINITE")
     if not (0.0 <= p_neither < 1.0):
         raise NflGameScoringError("RACE_NEITHER_INVALID")
     ph = _logistic(fit[0] * mu + fit[1])
