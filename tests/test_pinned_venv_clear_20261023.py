@@ -39,9 +39,8 @@ def test_t267_default_venv_is_per_run_mktemp_and_printed(tmp_path):
     assert r1.returncode == 0 and r2.returncode == 0, (r1.stderr, r2.stderr)
     made = sorted(p for p in tmp_path.iterdir() if p.name.startswith("sportsedge-venv-pinned-"))
     assert len(made) == 2, made  # a fresh directory per run
-    for p, r in zip(made, sorted([r1, r2], key=lambda r: r.stdout)):
-        assert (p / "pyvenv.cfg").is_file()
     for p in made:
+        assert (p / "pyvenv.cfg").is_file()
         assert str(p) in (r1.stdout + r2.stdout)
 
 
