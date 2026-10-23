@@ -78,6 +78,13 @@ class FakeGitHub:
             sha = p
         return out
 
+    def list_dir(self, ref, path):
+        if "list_dir" in self.malformed:
+            return "junk"
+        pre = path.rstrip("/") + "/"
+        return sorted({p[len(pre):].split("/")[0]
+                       for p in self.trees.get(self._ref(ref), {}) if p.startswith(pre)})
+
     def commit_info(self, sha):
         if sha not in self.parents:
             return None
@@ -138,3 +145,48 @@ def ledger_to_records(api, ledger, captured_at="2026-10-25T16:00:00Z",
                    f"2026-10-25T16:{10 + k % 40:02d}:00Z")
         ids.append(slate["slate_id"])
     return ids, captures, settlements
+
+
+def publish_close(api, game_id, kickoff, captured_at, captures, pushed_at):
+    """Push one close-capture file as its own record closes/<sha256>.json."""
+    import atd_provenance as pv
+    body = json.dumps({"game_id": game_id, "kickoff": kickoff,
+                       "captured_at": captured_at, "captures": captures},
+                      sort_keys=True)
+    sha = hashlib.sha256(body.encode()).hexdigest()
+    api.commit(pv.RECORDS_BRANCH, {pv.close_record_path(sha): body}, pushed_at)
+    return sha
+
+
+def publish_settlements(api, settlements, pushed_at, data_pushed_at=None):
+    """Push a settlement data file (settlements/<sha>.json) and its fetch
+    record (fetch/<sha>.json); returns the sha."""
+    import atd_provenance as pv
+    body = json.dumps({"settlements": [
+        {"game_id": g, "player_id": p, "td": v}
+        for (g, p), v in sorted(settlements.items())]}, sort_keys=True)
+    sha = hashlib.sha256(body.encode()).hexdigest()
+    api.commit(pv.RECORDS_BRANCH, {pv.settlement_data_path(sha): body},
+               data_pushed_at or pushed_at)
+    api.commit(pv.RECORDS_BRANCH,
+               {pv.fetch_record_path(sha): json.dumps({"sha256": sha, "kind": "settlements"})},
+               pushed_at)
+    return sha
+
+
+def ledger_to_branch(api, ledger, close_pushed="2026-10-25T16:58:00Z",
+                     settle_pushed="2026-10-26T12:00:00Z"):
+    """ledger_to_records + publish the derived closes (one record per game)
+    and settlements on the branch, so review reads nothing from the caller."""
+    ids, caps, setl = ledger_to_records(api, ledger)
+    by_game = {}
+    for c in caps:
+        by_game.setdefault(c["game_id"], []).append(
+            {"player_id": c["player_id"], "yes_price": c["yes_price"],
+             "captured_at": c["captured_at"]})
+    for g, cs in sorted(by_game.items()):
+        publish_close(api, g, "2026-10-25T17:00:00Z", "2026-10-25T16:30:00Z", cs,
+                      close_pushed)
+    if setl:
+        publish_settlements(api, setl, settle_pushed)
+    return ids
