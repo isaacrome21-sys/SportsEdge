@@ -237,3 +237,81 @@ def test_guarded_list_matches_workflows():
         for m in mods:
             stem = m.split(".")[-1]
             assert stem in text or "test_nfl*.py" in text or "test_football*.py" in text, (name, m)
+
+
+# --- t258: bypasses found by the t255 audit (LOW). Every check below targets a NON-DK
+# host (or a pure function), so neither the RED run nor any CI run ever touches DraftKings.
+import shutil
+
+_PROBE = "example.com"   # stands in for any host: the jail must block ALL egress
+
+
+def _child_py(code):
+    return subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=30)
+
+
+def test_child_python_process_cannot_connect(dk_block):
+    r = _child_py(f"import socket;socket.create_connection(({_PROBE!r},443),5);print('CONNECTED')")
+    assert "CONNECTED" not in r.stdout and r.returncode != 0, r.stdout
+
+
+def test_child_python_urlopen_cannot_reach_network(dk_block):
+    r = _child_py(f"import urllib.request;urllib.request.urlopen('https://{_PROBE}/',timeout=5);print('CONNECTED')")
+    assert "CONNECTED" not in r.stdout and r.returncode != 0
+
+
+@pytest.mark.skipif(shutil.which("openssl") is None, reason="openssl not installed")
+def test_openssl_s_client_cannot_connect(dk_block):
+    r = subprocess.run(["openssl", "s_client", "-connect", f"{_PROBE}:443", "-brief"],
+                       input="", capture_output=True, text=True, timeout=30)
+    assert "CONNECTION ESTABLISHED" not in (r.stdout + r.stderr) and r.returncode != 0
+
+
+@pytest.mark.skipif(shutil.which("nc") is None, reason="nc not installed")
+def test_nc_cannot_connect(dk_block):
+    r = subprocess.run(["nc", "-z", "-w", "5", _PROBE, "443"], capture_output=True, timeout=30)
+    assert r.returncode != 0
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="bash not installed")
+def test_bash_dev_tcp_cannot_connect(dk_block):
+    r = subprocess.run(f"bash -c 'exec 3<>/dev/tcp/{_PROBE}/443 && echo CONNECTED'",
+                       shell=True, capture_output=True, text=True, timeout=30)
+    assert "CONNECTED" not in r.stdout
+
+
+@pytest.mark.skipif(shutil.which("curl") is None, reason="curl not installed")
+def test_curl_percent_encoded_host_cannot_connect(dk_block):
+    r = subprocess.run(["curl", "-sS", "-m", "5", "-o", "/dev/null", "-w", "%{http_code}",
+                        "https://ex%61mple.com/"], capture_output=True, text=True, timeout=30)
+    assert r.returncode != 0 or r.stdout in ("", "000")
+
+
+def test_percent_encoded_dk_host_detected():
+    assert _is_dk("api.%64raftkings.com")
+    assert _is_dk("API.%44RAFTKINGS.COM")
+    assert _is_dk(b"sportsbook.%64%72aftkings.com")
+
+
+def test_in_process_any_non_loopback_host_refused(dk_block):
+    with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED"):
+        socket.create_connection((_PROBE, 443), timeout=5)
+
+
+def test_literal_ip_refused_even_when_dk_ips_unresolved(dk_block, monkeypatch):
+    monkeypatch.setattr(sys.modules[__name__], "_DK_IPS", frozenset())
+    with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED"):
+        socket.create_connection(("203.0.113.7", 443), timeout=5)   # TEST-NET-3
+
+
+def test_children_inherit_dead_proxy_env(dk_block):
+    r = _child_py("import os;print(os.environ.get('HTTPS_PROXY',''),os.environ.get('ALL_PROXY',''))")
+    assert r.stdout.split() == ["http://127.0.0.1:9", "http://127.0.0.1:9"]
+
+
+def test_loopback_still_allowed(dk_block):
+    srv = socket.socket(); srv.bind(("127.0.0.1", 0)); srv.listen(1)
+    try:
+        socket.create_connection(srv.getsockname(), timeout=5).close()
+    finally:
+        srv.close()
