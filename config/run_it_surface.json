@@ -31,6 +31,16 @@
       "blocker": "CFB_FROZEN_GAME_PLUS_LIVE_SOURCES_REQUIRED_FOR_GAME_MODEL_P;CFB_PROPS_NO_ENGINE",
       "notes": "RUN IT executes the canonical CFB game lane. PLAYER_PROPS lane is intentionally emitted as blocked NO_ENGINE and is not executed while the authoritative prop surface declares CFB NO_ENGINE. Frozen prop research artifacts have no promotion authority and cannot create bettor-facing CFB prop Model_P."
     },
+    "NBA": {
+      "lane": "PREGAME_GAME_AND_PLAYER_RESEARCH",
+      "automatic_command": null,
+      "library_entrypoint": "sportsedge.sports.nba.integrated_engine",
+      "market_surface": "sportsedge/family_market_registry.py",
+      "governance_source": "sportsedge/registry_gate.py",
+      "automatic_completeness": "RESEARCH_ONLY_NO_OFFICIAL_MODEL_P",
+      "blocker": "NBA_AUTOMATIC_PRICED_CAPTURE_NOT_WIRED;NBA_GAME_AND_PROP_FAMILIES_NOT_VALIDATED",
+      "notes": "Explicit NBA scope must report its blocker, never RUN_IT_SCOPE_UNKNOWN or an empty success. NBA prop research models do not have official Model_P/PLAY authority. Supplied lines may be evaluated on the canonical --lines research route without changing this hold."
+    },
     "PGA": {
       "lane": "PREGAME_AND_LIVE_MODEL",
       "automatic_command": null,
