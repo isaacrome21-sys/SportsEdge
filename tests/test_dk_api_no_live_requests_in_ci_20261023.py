@@ -794,3 +794,90 @@ def test_jailed_session_has_only_loopback():
                        run_jailed._IFACES]),
                        capture_output=True, text=True, timeout=60)
     assert r.stdout.strip() == "['lo']", r.stdout + r.stderr
+
+
+# ---- t260: audit-hook layer (sys.addaudithook) for routes that reach the real C socket ----
+# socket.socket.__bases__[0] and _socket.socket.__mro__[1] are the unpatched C type; the
+# audit events socket.connect/getaddrinfo/sendto/bind, subprocess.Popen and os.posix_spawn
+# fire inside C, so the hook refuses them. One test per route; probes use example.com only.
+
+def _net_audit():
+    return sys.modules["sportsedge_net_audit"]
+
+
+def test_audit_hook_installed_for_whole_session_and_gated_off_outside_guard():
+    st = _net_audit().STATE
+    assert st.installed and not st.active
+    st.hook("socket.connect", (None, (_PROBE, 443)))   # inactive: must not raise
+
+
+def test_route_bases0_connect_refused_by_audit_hook(dk_block):
+    s = socket.socket.__bases__[0](socket.AF_INET, socket.SOCK_STREAM); s.settimeout(5)
+    try:
+        with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED:audit:socket.connect"):
+            s.connect((_PROBE, 443))
+    finally:
+        s.close()
+
+
+def test_route_mro1_connect_refused_by_audit_hook(dk_block):
+    import _socket
+    s = _socket.socket.__mro__[1](socket.AF_INET, socket.SOCK_STREAM); s.settimeout(5)
+    try:
+        with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED:audit:socket.connect"):
+            s.connect((_PROBE, 443))
+    finally:
+        s.close()
+
+
+def test_route_reload_socket_refused_by_audit_hook_alone():
+    """Hook only (no monkeypatch layer): reload(socket)+create_connection is still refused."""
+    with _net_audit().active():
+        with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED:audit:socket.getaddrinfo"):
+            _reload_socket_and_connect().close()
+
+
+def test_route_raw_c_getaddrinfo_refused_by_audit_hook(dk_block):
+    import importlib.util
+    spec = importlib.util.find_spec("_socket")
+    fresh = importlib.util.module_from_spec(spec)        # a new, unpatched _socket instance
+    with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED:audit:socket.getaddrinfo"):
+        fresh.getaddrinfo(_PROBE, 443)
+
+
+def test_route_bases0_sendto_refused_by_audit_hook(dk_block):
+    s = socket.socket.__bases__[0](socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED:audit:socket.sendto"):
+            s.sendto(b"x", (_PROBE, 9))
+    finally:
+        s.close()
+
+
+def test_route_bases0_bind_non_loopback_refused_loopback_allowed(dk_block):
+    s = socket.socket.__bases__[0](socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED:audit:socket.bind"):
+            s.bind(("0.0.0.0", 0))
+    finally:
+        s.close()
+    s = socket.socket.__bases__[0](socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("127.0.0.1", 0))
+    finally:
+        s.close()
+
+
+def test_route_posix_module_posix_spawn_refused_by_audit_hook(dk_block):
+    import posix
+    curl = shutil.which("curl") or "/usr/bin/curl"
+    with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED:audit:os.posix_spawn"):
+        posix.posix_spawn(curl, [curl, "-m", "5", f"https://{_PROBE}/"], {})
+
+
+def test_route_unwrapped_popen_refused_by_audit_hook_alone():
+    with _net_audit().active():
+        with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED:audit:subprocess.Popen"):
+            subprocess.run(["curl", "-m", "5", f"https://{_PROBE}/"], capture_output=True, timeout=30)
+        with pytest.raises(DraftKingsBlocked, match="LIVE_DK_REQUEST_BLOCKED:audit:subprocess.Popen"):
+            subprocess.run(["true", "https://api.%64raftkings.com/"], capture_output=True, timeout=30)
