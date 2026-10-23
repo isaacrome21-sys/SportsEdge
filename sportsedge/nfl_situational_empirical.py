@@ -128,8 +128,6 @@ def _family_key(family, n):
 def price_situational(history: Iterable[Mapping[str, Any]], *, family: str, date: str,
                       season: int, home: str, away: str, n: int | None = None) -> dict:
     """Pricing entry point: NAIVE_FAIL families refuse with a coded error."""
-    if family in FAMILIES and _family_key(family, n) in NAIVE_FAIL_FAMILIES:
-        raise NflSituationalError(f"NAIVE_FAIL:{_family_key(family, n)}")
     return _price(history, family=family, date=date, season=season, home=home, away=away, n=n)
 
 
@@ -138,15 +136,25 @@ def price_situational_unrestricted(history: Iterable[Mapping[str, Any]], *, fami
                                    n: int | None = None) -> dict:
     """Screen-only: all families incl. NAIVE_FAIL. Guarded by screen_only()."""
     require_screen_only("price_situational_unrestricted")
-    out = _price(history, family=family, date=date, season=season, home=home, away=away, n=n)
+    out = _price(history, family=family, date=date, season=season, home=home, away=away, n=n,
+                 allow_refused=True)
     out["screen_only_unrestricted"] = True
     return out
 
 
 def _price(history: Iterable[Mapping[str, Any]], *, family: str, date: str,
-           season: int, home: str, away: str, n: int | None = None) -> dict:
+           season: int, home: str, away: str, n: int | None = None,
+           allow_refused: bool = False) -> dict:
+    """Single pricing path. NAIVE_FAIL families refuse here unless allow_refused=True,
+    which is only honoured inside screen_only()."""
+    if not isinstance(allow_refused, bool):
+        raise NflSituationalError("ALLOW_REFUSED_MUST_BE_BOOL")
+    if allow_refused:
+        require_screen_only("_price(allow_refused=True)")
     if family not in FAMILIES:
         raise NflSituationalError(f"UNKNOWN_FAMILY:{family}")
+    if not allow_refused and _family_key(family, n) in NAIVE_FAIL_FAMILIES:
+        raise NflSituationalError(f"NAIVE_FAIL:{_family_key(family, n)}")
     if isinstance(season, bool) or not isinstance(season, int):
         raise NflSituationalError("SEASON_REQUIRED_INT")
     _date(date, "GAME")
