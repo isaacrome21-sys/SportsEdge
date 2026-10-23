@@ -17,6 +17,7 @@ import json
 from pathlib import Path
 
 import atd_engine as eng
+import atd_provenance as pv
 import atd_refresh as rf
 
 
@@ -28,6 +29,17 @@ def main() -> int:
     args = ap.parse_args()
     pins = eng.check_data_pins(Path(args.player_data))
     board = json.loads(Path(args.board).read_text())
+    # Server-side fetch provenance (re-audit #1): refuse unless each data
+    # file's sha256 matches a fetch record on the records branch whose push
+    # GitHub timestamps strictly before the entry capture.
+    shas = {"stats": rf._sha(Path(args.stats_2026)),
+            "schedule": rf._sha(Path(args.schedule))}
+    try:
+        prov = pv.require_fetch_provenance(pv.GitHubAPI(), shas,
+                                           board.get("captured_at"))
+    except (pv.ProvenanceFailed, ValueError, TypeError, OSError) as e:
+        print(f"FAILED_CLOSED {getattr(e, 'code', 'PROVENANCE_UNAVAILABLE')}: {e}")
+        return 2
     base = eng.load_data(Path(args.player_data))
 
     def pricer(data):
@@ -51,7 +63,12 @@ def main() -> int:
                             run_record_path=Path(args.run_record),
                             base_data=base, pricer=pricer,
                             extra_record={"data_sha256": pins,
-                                          "game_id": board["game_id"]})
+                                          "game_id": board["game_id"],
+                                          "slate_id": board.get("slate_id"),
+                                          "fetch_provenance": prov,
+                                          "push_to": f"{pv.RECORDS_BRANCH}:"
+                                                     f"{pv.run_record_path(board.get('slate_id'))}",
+                                          "counts_only_if": "run record pushed (server time) before first kickoff"})
     except rf.RefreshFailed as e:
         print(f"FAILED_CLOSED {e.code}: {e.detail}")
         return 2

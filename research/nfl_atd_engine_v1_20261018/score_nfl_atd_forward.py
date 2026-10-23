@@ -21,20 +21,26 @@ import hashlib
 import json
 import math
 import os
+import subprocess
 from datetime import timedelta
 from pathlib import Path
 
 import atd_engine as eng
+import atd_provenance as pv
 
 CLOSE_WINDOW = timedelta(minutes=60)
 MIN_WEEKS, MIN_PICKED, MIN_GAMES = 4, 150, 40
 DRIFT_FLAG = 0.02
 MAX_PICKED_CLV_MISSING = 0.20  # > 20% of picked rows CLV_MISSING -> INSUFFICIENT_CLOSE_DATA
-VERDICT_FILE = "NFL_ATD_V1_1_VERDICT.json"
+VERDICT_PATH = pv.VERDICT_PATH      # fixed: on pv.RECORDS_BRANCH only
 Z95 = 1.959963984540054
 
 
 class ReviewAlreadyRecorded(Exception):
+    pass
+
+
+class RecordsLocationRefused(Exception):
     pass
 
 
@@ -57,8 +63,11 @@ def find_close(captures, game_id, pid, kickoff):
         try:
             t = eng.parse_timestamp(c.get("captured_at"))
         except ValueError:
-            continue
-        if t is None or t >= ko:
+            t = None
+        if t is None:
+            # never skipped: an untimed capture could be the true close
+            return "CLOSE_TIMESTAMP_INVALID"
+        if t >= ko:
             continue
         before.append((t, c))
     if not before:
@@ -139,32 +148,76 @@ def inputs_sha256(slates) -> str:
                           .encode()).hexdigest()
 
 
-def review(slates, *, records_dir):
-    """Single review. The verdict file in records_dir is checked BEFORE any
-    review and written create-only (O_EXCL); if it exists the scorer refuses,
-    whatever slates are passed."""
-    path = Path(records_dir) / VERDICT_FILE
-    if path.exists():
-        raise ReviewAlreadyRecorded(str(path))
-    acc, used = [], []
+def _git(wt, *a, check=True):
+    return subprocess.run(["git", *a], cwd=wt, capture_output=True, text=True,
+                          check=check)
+
+
+def _check_worktree(wt):
+    wt = Path(wt)
+    r = _git(wt, "rev-parse", "--abbrev-ref", "HEAD", check=False)
+    if r.returncode != 0 or r.stdout.strip() != pv.RECORDS_BRANCH:
+        raise RecordsLocationRefused(
+            f"{wt} is not a checkout of {pv.RECORDS_BRANCH}")
+    top = _git(wt, "rev-parse", "--show-toplevel").stdout.strip()
+    if Path(top).resolve() != wt.resolve():
+        raise RecordsLocationRefused(f"{wt} is not the worktree root")
+    return wt
+
+
+def _on_origin(wt) -> bool:
+    _git(wt, "fetch", "-q", "origin", pv.RECORDS_BRANCH)
+    r = _git(wt, "cat-file", "-e", f"origin/{pv.RECORDS_BRANCH}:{VERDICT_PATH}",
+             check=False)
+    if r.returncode != 0:
+        # fetch into FETCH_HEAD when no remote-tracking ref is configured
+        r = _git(wt, "cat-file", "-e", f"FETCH_HEAD:{VERDICT_PATH}", check=False)
+    return r.returncode == 0
+
+
+def verdict_counts(records_worktree) -> bool:
+    """A verdict counts only once committed AND pushed to origin's records
+    branch at the fixed path."""
+    return _on_origin(_check_worktree(records_worktree))
+
+
+def review(slates, *, records_worktree, api, slate_status=None):
+    """Single review. Refuses unless records_worktree is a checkout of the
+    records branch; fetches origin and refuses if the verdict already exists
+    there (or locally), whatever slates are passed. Slates whose server-side
+    provenance fails are SCREEN and excluded. The verdict is staged
+    create-only at the fixed path; it counts only after commit + push."""
+    wt = _check_worktree(records_worktree)
+    if _on_origin(wt) or (wt / VERDICT_PATH).exists():
+        raise ReviewAlreadyRecorded(f"{pv.RECORDS_BRANCH}:{VERDICT_PATH}")
+    status_fn = slate_status or pv.slate_status
+    acc, used, screen = [], [], []
     for s in slates:
+        st = status_fn(api, s)
+        if st["status"] != "COUNTS":
+            screen.append(s["slate_id"])
+            continue
         used.append(s)
         acc.extend(dict(r) for r in s["rows"])
         weeks, picked, games = _gates(acc)
         if len(weeks) >= MIN_WEEKS and len(picked) >= MIN_PICKED and len(games) >= MIN_GAMES:
             v = _verdict(acc, s["slate_id"])
-            v["inputs_sha256"] = inputs_sha256(used)
-            v["n_slates"] = len(used)
+            v.update(inputs_sha256=inputs_sha256(used), n_slates=len(used),
+                     screen_slates=screen, records_branch=pv.RECORDS_BRANCH,
+                     verdict_path=VERDICT_PATH)
+            path = wt / VERDICT_PATH
+            path.parent.mkdir(parents=True, exist_ok=True)
             try:
                 fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o444)
             except FileExistsError:
                 raise ReviewAlreadyRecorded(str(path))
             with os.fdopen(fd, "w") as fh:
                 fh.write(json.dumps(v, indent=1, sort_keys=True) + "\n")
-            return v
+            return dict(v, record_state="STAGED_NOT_COUNTED")
     weeks, picked, games = _gates(acc)
     return {"status": "NO_REVIEW_GATES_NOT_MET", "n_weeks": len(weeks),
             "n_picked": len(picked), "n_games": len(games),
+            "screen_slates": screen,
             "status_label": "RESEARCH_ONLY", "promotable": False}
 
 

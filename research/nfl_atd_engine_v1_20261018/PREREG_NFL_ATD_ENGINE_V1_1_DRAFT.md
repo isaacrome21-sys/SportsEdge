@@ -54,6 +54,29 @@ Selection, edge, settlement: locked #2399 Rules 1, 2, 3, 7, 8, 9.
   `REFRESH_SCHEDULE_MISMATCH` (stats game_id not in schedule),
   `REFRESH_TIMESTAMP_INVALID`. **There is no 2025-only fallback.**
 
+## 2b. Server-side provenance (re-audit rulings)
+- Records branch (fixed): `records/nfl-atd-v1-1`. Fixed paths:
+  fetch records `nfl_atd_v1_1/fetch/<data sha256>.json`; run records
+  `nfl_atd_v1_1/runs/<slate_id>.json`; verdict `nfl_atd_v1_1/VERDICT.json`.
+- Server-side time source: GitHub repository activity API,
+  `GET /repos/{owner}/{repo}/activity` (activity_type=push), field
+  `timestamp`, for the push whose `after` equals the commit that added the
+  record file (commits API `?path=`, oldest). Client-set author/committer
+  dates are never used. No matching push event ⇒ UNPROVEN (fails closed).
+  Because the activity API lists only recent history, each slate's proof is
+  checked and recorded at run time.
+- Pricer: refuses (FAILED_CLOSED) unless the stats and schedule files'
+  sha256 each match a fetch record on the records branch whose push time is
+  strictly before the entry capture (FETCH_RECORD_NOT_ON_BRANCH,
+  FETCH_RECORD_HASH_MISMATCH, FETCH_PUSH_UNPROVEN,
+  FETCH_PUSH_NOT_BEFORE_CAPTURE). The proofs are written into the run record.
+- Run record: must be pushed to its fixed path; its server push time is the
+  proof that pricing happened before kickoff.
+- **A slate counts only if** its fetch records show server push times
+  before capture AND its run record shows a server push time before the
+  slate's first kickoff. Otherwise the slate is **SCREEN** and is excluded
+  from the forward sample (listed in the verdict as `screen_slates`).
+
 ## 3. Row-level fail-closed rules (t227 fixes)
 Order: timing → not-a-player → price → identity → engine. Exactly one reason.
 - `captured_at >= kickoff` ⇒ UNPRICED_CAPTURED_AFTER_KICKOFF; missing ⇒
@@ -96,11 +119,17 @@ code but undeclared. Declaring them is an owner item, done by freezing this.)
 - Rule 6 gates: >= 4 distinct weeks AND >= 150 graded picked rows AND >= 40
   distinct games (a minimum, per the clarification memo). **One review**, at
   the first slate close where all gates are met; that accumulated sample is
-  the sample of record. The verdict is written create-only (O_EXCL) to
-  `<records_dir>/NFL_ATD_V1_1_VERDICT.json` with the sha256 of the slate
-  inputs used. The scorer checks that file before any review and refuses
-  (ReviewAlreadyRecorded) if it exists, whatever inputs the caller passes. No
-  review is rerun unless a new version preregisters it.
+  the sample of record. The scorer runs only in a git checkout of
+  `records/nfl-atd-v1-1` (any other location ⇒ RecordsLocationRefused). It
+  fetches origin and refuses (ReviewAlreadyRecorded) if
+  `nfl_atd_v1_1/VERDICT.json` exists on origin's records branch (or
+  locally), whatever inputs the caller passes. The verdict, with the sha256
+  of the slate inputs used, is staged create-only at that path and **counts
+  only once committed and pushed** to origin. No review is rerun unless a new
+  version preregisters it.
+- CLOSE_TIMESTAMP_INVALID: any capture for that (game_id, player_id) with a
+  missing or unparseable timestamp ⇒ CLV_MISSING CLOSE_TIMESTAMP_INVALID; it
+  is never skipped.
 - Multiple testing: a family-wise correction is a **program-level PLAY rule**
   (owner ruling), applied when PLAY eligibility is decided across families;
   it is not applied inside this family's scorer.
