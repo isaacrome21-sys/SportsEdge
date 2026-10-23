@@ -146,3 +146,35 @@ Ruling:
 The frozen lane stays byte-identical to main 53a636af. Residual: the layer-2 patches stop
 mistakes, not a determined in-process attacker (e.g. ctypes syscalls); only layer 1 is isolation,
 and it exists only where unshare is permitted. Not self-cleared; needs independent review.
+
+## 2026-10-23f — session-wide network audit hook (t260)
+
+The t259 audit (NOT CLEARED on b16ff0f5) found in-process routes to the unpatched C socket
+type: `socket.socket.__bases__[0]().connect`, `_socket.socket.__mro__[1]()`, and ctypes
+`connect`. Ruling:
+
+- `tests/net_jail/audit_hook.py` registers one `sys.addaudithook` at session start
+  (`tests/conftest.py` `pytest_configure`). It handles `socket.connect`, `socket.getaddrinfo`,
+  `socket.sendto`, `socket.bind` (non-loopback; `0.0.0.0`/`""` counts as non-loopback),
+  `subprocess.Popen`, `os.posix_spawn`, `os.exec` and `os.spawn` (network-binary, renamed
+  network-binary-by-content and DK checks). Audit hooks cannot be removed, so it is gated by a
+  session flag checked inside the hook; it is active only while the `dk_block` guard (or an
+  explicit `active()` block) is in force and is a no-op for every other test.
+- Because the events fire inside C, the `__bases__[0]`, `__mro__[1]`, fresh-`_socket`
+  getaddrinfo, reload(socket), `posix.posix_spawn` and un-wrapped Popen routes are refused.
+  One test per route, all probing example.com only.
+- Layer 1 (`unshare -rn` re-exec, t259) is unchanged and remains the only real isolation.
+
+Documented residuals:
+
+- **ctypes / raw syscalls:** `ctypes` calls to libc `socket`/`connect` (or any foreign code)
+  raise no audit event and bypass layers 2 and 3. Only the `unshare -rn` jail contains them;
+  where unshare is unavailable the live tests skip with `NET_JAIL_UNAVAILABLE`.
+- **Unix sockets at filesystem paths:** AF_UNIX connects/binds (e.g. `/var/run/docker.sock`,
+  a local proxy socket) are not refused by the hook and are not removed by a network
+  namespace, so a local daemon could relay traffic out. Not claimed as blocked.
+- **Pre-hook DNS:** for a hostname, C resolves the name before `socket.connect`/`sendto` fire
+  their audit event, so outside the jail one DNS query for the probe host can leave before the
+  refusal. No TCP/UDP payload reaches the host.
+
+Frozen lane files stay byte-identical to main 53a636af. Not self-cleared; needs independent review.

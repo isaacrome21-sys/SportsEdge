@@ -220,8 +220,85 @@ def _dk_cmd(args) -> bool:
         "draftkings" in text or any(ip in text for ip in (_DK_IPS or ())))
 
 
+def _audit_args_list(args):
+    if args is None:
+        return []
+    if isinstance(args, (str, bytes, os.PathLike)):
+        return [os.fsdecode(args)]
+    return [os.fsdecode(a) if isinstance(a, (bytes, os.PathLike)) else str(a) for a in args]
+
+
+def _audit_check(event, args):
+    """t260 audit-hook checker: non-loopback socket ops and network/DK child processes."""
+    def deny(host):
+        where = f"audit:{event}"
+        if _is_dk(host if isinstance(host, (str, bytes)) else str(host)):
+            raise DraftKingsBlocked(f"LIVE_DK_REQUEST_BLOCKED:{where}:{host}")
+        raise DraftKingsBlocked(f"LIVE_NETWORK_BLOCKED:{where}:{host}")
+
+    if event == "socket.getaddrinfo":
+        host = args[0]
+        if _is_dk(host) or not _is_local(host):
+            deny(host)
+        return
+    if event.startswith("socket."):
+        addr = args[-1]
+        if isinstance(addr, tuple) and addr and isinstance(addr[0], (str, bytes)):
+            host = addr[0]
+            if event == "socket.bind" and host in ("", b""):
+                deny("0.0.0.0")
+            if _is_dk(host) or not _is_local(host):
+                deny(host)
+        return                                  # AF_UNIX paths: documented residual
+    if event == "subprocess.Popen":
+        exe, argv = args[0], _audit_args_list(args[1])
+    elif event == "os.posix_spawn":
+        exe, argv = args[0], _audit_args_list(args[1])
+    else:                                       # os.exec / os.spawn: (path, args, env) / (mode, path, args, env)
+        off = 1 if event == "os.spawn" else 0
+        exe, argv = args[off], _audit_args_list(args[off + 1])
+    pre = _unshare_prefix()
+    if pre and argv[:len(pre)] == pre:
+        return                                  # already inside the empty namespace
+    full = ([os.fsdecode(exe)] if exe is not None else []) + argv
+    if _dk_cmd(full) or any(_is_dk(urllib.parse.urlsplit(a).hostname) for a in full if "://" in a):
+        raise DraftKingsBlocked(f"LIVE_DK_REQUEST_BLOCKED:audit:{event}:{full}")
+    shell_text = argv[2:3] if len(argv) >= 3 and argv[1] == "-c" and os.path.basename(argv[0]) in ("sh", "bash", "dash") else []
+    if _fallback_net_cmd(full) or (exe is not None and _is_net_binary_file(exe)) or any(
+            _fallback_net_cmd(t) for t in shell_text):
+        raise DraftKingsBlocked(f"LIVE_NETWORK_BLOCKED:audit:{event}:{full}")
+
+
+def _net_audit_state():
+    st = sys.modules.get("sportsedge_net_audit")
+    if st is None:                               # run without tests/conftest.py
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("sportsedge_net_audit", JAIL_DIR / "audit_hook.py")
+        st = importlib.util.module_from_spec(spec)
+        sys.modules["sportsedge_net_audit"] = st
+        spec.loader.exec_module(st)
+    st.install()
+    st.STATE.checker = _audit_check
+    return st
+
+
+_net_audit_state()
+
+
 @pytest.fixture
 def dk_block(monkeypatch):
+    global _DK_IPS
+    if _DK_IPS is None:          # resolve before the audit hook goes active (as in t259)
+        _DK_IPS = _resolve_dk_ips()
+    _ctx = _net_audit_state().active()
+    _ctx.__enter__()
+    try:
+        yield from _dk_block_body(monkeypatch)
+    finally:
+        _ctx.__exit__(None, None, None)
+
+
+def _dk_block_body(monkeypatch):
     global _DK_IPS
     if _DK_IPS is None:
         _DK_IPS = _resolve_dk_ips()
@@ -425,7 +502,7 @@ def dk_block(monkeypatch):
         pass
     monkeypatch.chdir(ROOT)
     monkeypatch.syspath_prepend(str(ROOT))
-    return attempts
+    yield attempts
 
 
 def test_guard_blocks_a_real_dk_fetch(dk_block):
@@ -801,6 +878,15 @@ def test_jailed_session_has_only_loopback():
 # audit events socket.connect/getaddrinfo/sendto/bind, subprocess.Popen and os.posix_spawn
 # fire inside C, so the hook refuses them. One test per route; probes use example.com only.
 
+def _route_refused(event):
+    """Outside the jail the audit hook must refuse. Inside the empty namespace C resolves the
+    hostname before the audit event fires, so name-resolution failure is the refusal there."""
+    import contextlib
+    if os.environ.get("SPORTSEDGE_NET_JAILED") == "1":
+        return pytest.raises((DraftKingsBlocked, socket.gaierror))
+    return pytest.raises(DraftKingsBlocked, match=f"LIVE_NETWORK_BLOCKED:audit:{event}")
+
+
 def _net_audit():
     return sys.modules["sportsedge_net_audit"]
 
@@ -814,7 +900,7 @@ def test_audit_hook_installed_for_whole_session_and_gated_off_outside_guard():
 def test_route_bases0_connect_refused_by_audit_hook(dk_block):
     s = socket.socket.__bases__[0](socket.AF_INET, socket.SOCK_STREAM); s.settimeout(5)
     try:
-        with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED:audit:socket.connect"):
+        with _route_refused("socket.connect"):
             s.connect((_PROBE, 443))
     finally:
         s.close()
@@ -824,7 +910,7 @@ def test_route_mro1_connect_refused_by_audit_hook(dk_block):
     import _socket
     s = _socket.socket.__mro__[1](socket.AF_INET, socket.SOCK_STREAM); s.settimeout(5)
     try:
-        with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED:audit:socket.connect"):
+        with _route_refused("socket.connect"):
             s.connect((_PROBE, 443))
     finally:
         s.close()
@@ -848,7 +934,7 @@ def test_route_raw_c_getaddrinfo_refused_by_audit_hook(dk_block):
 def test_route_bases0_sendto_refused_by_audit_hook(dk_block):
     s = socket.socket.__bases__[0](socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED:audit:socket.sendto"):
+        with _route_refused("socket.sendto"):
             s.sendto(b"x", (_PROBE, 9))
     finally:
         s.close()
