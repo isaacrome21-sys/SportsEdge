@@ -31,6 +31,48 @@ class LedgerRefusal(ValueError):
     pass
 
 
+REMOTE_REPO = "isaacrome21-sys/sportsedge"
+_HEX = frozenset("0123456789abcdef")
+
+
+def _github_resolver(branch: str, sha: str) -> str:
+    """'on_branch' if sha is the head of, or an ancestor of, the remote branch."""
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+    url = (f"https://api.github.com/repos/{REMOTE_REPO}/compare/"
+           f"{sha}...{urllib.parse.quote(branch, safe='/')}")
+    req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            status = json.load(r).get("status")
+    except urllib.error.HTTPError as e:
+        if e.code in (404, 422):
+            return "missing"
+        raise LedgerRefusal(f"REMOTE_CHECK_UNAVAILABLE:{e.code}") from None
+    except OSError:
+        raise LedgerRefusal("REMOTE_CHECK_UNAVAILABLE") from None
+    return "on_branch" if status in ("identical", "ahead") else "missing"
+
+
+def verify_branch_shas(policy: dict, *, resolver=None) -> list:
+    """Check every grok_branch_engines SHA is a real commit on its remote branch."""
+    resolver = resolver or _github_resolver
+    pairs = set()
+    for sport, entries in policy.get("grok_branch_engines", {}).items():
+        for market, e in entries.items():
+            branch, sha = e.get("branch"), e.get("sha")
+            if not isinstance(branch, str) or not branch.startswith("grok/"):
+                raise LedgerRefusal(f"GROK_BRANCH_REQUIRED:{market}")
+            if not isinstance(sha, str) or len(sha) != 40 or not set(sha) <= _HEX:
+                raise LedgerRefusal(f"GROK_BRANCH_SHA_MALFORMED:{market}")
+            pairs.add((branch, sha))
+    for branch, sha in sorted(pairs):
+        if resolver(branch, sha) != "on_branch":
+            raise LedgerRefusal(f"GROK_BRANCH_SHA_NOT_ON_REMOTE:{branch}@{sha}")
+    return sorted(pairs)
+
+
 _PRICED_OR_CONFIG = ("RESEARCH_PRICED_NOT_VALIDATED", "NO_FORWARD_TEST_CONFIG")
 
 
@@ -122,7 +164,12 @@ def render(ledger: dict) -> str:
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--out", type=Path)
+    p.add_argument("--verify-remote", action="store_true",
+                   help="check grok-branch engine SHAs against the real remote first")
     a = p.parse_args()
+    if a.verify_remote:
+        policy = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
+        verify_branch_shas(policy)
     text = render(gap_ledger())
     if a.out:
         a.out.write_bytes(text.encode("utf-8"))

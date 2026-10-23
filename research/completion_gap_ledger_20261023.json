@@ -10,10 +10,9 @@
     "BLOCKED_MISSING_QUOTE": 2,
     "BLOCKED_OWNER_HOLD": 3,
     "BLOCKED_RULING_6_FOCUS_PAUSE": 2,
-    "BUILDABLE": 5,
     "BUILDABLE_NEEDS_SIBLING_RECONCILIATION": 4,
     "ENGINE_EXISTS_NOT_WIRED": 41,
-    "ENGINE_ON_GROK_BRANCH_NOT_MERGED": 6
+    "ENGINE_ON_GROK_BRANCH_NOT_MERGED": 11
   },
   "gaps": [
     {
@@ -55,56 +54,6 @@
       "score_area": "ENGINES",
       "sport": "MLB",
       "status": "BLOCKED_OWNER_HOLD"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "engine_ref": null,
-      "market": "both_teams_to_score_n",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "record": null,
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "engine_ref": null,
-      "market": "defensive_special_teams_td",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "record": null,
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "engine_ref": null,
-      "market": "first_score",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "record": null,
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "engine_ref": null,
-      "market": "largest_lead",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "record": null,
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "engine_ref": null,
-      "market": "safety",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "record": null,
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
     },
     {
       "blocker": "NO_ENGINE",
@@ -519,6 +468,58 @@
     {
       "blocker": "NO_ENGINE",
       "engine_ref": {
+        "branch": "grok/t243-nfl-situational-20261023",
+        "sha": "a5012ea8ce0cfc45f9b95801c8803d1ab7d24a2b"
+      },
+      "market": "both_teams_to_score_n",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_ON_GROK_BRANCH_NOT_MERGED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": {
+        "branch": "grok/t243-nfl-situational-20261023",
+        "sha": "a5012ea8ce0cfc45f9b95801c8803d1ab7d24a2b"
+      },
+      "market": "defensive_special_teams_td",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_ON_GROK_BRANCH_NOT_MERGED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": {
+        "branch": "grok/t243-nfl-situational-20261023",
+        "sha": "a5012ea8ce0cfc45f9b95801c8803d1ab7d24a2b"
+      },
+      "market": "first_score",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_ON_GROK_BRANCH_NOT_MERGED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": {
+        "branch": "grok/t243-nfl-situational-20261023",
+        "sha": "a5012ea8ce0cfc45f9b95801c8803d1ab7d24a2b"
+      },
+      "market": "largest_lead",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_ON_GROK_BRANCH_NOT_MERGED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": {
         "branch": "grok/t235-nfl-longest-fg-red-first-20261023",
         "sha": "96dd3ef24643228961dd926f20ffe56c7aff0408"
       },
@@ -536,6 +537,19 @@
         "sha": "69ee54ec9bbbe0927e8dda064f40693d8c136a21"
       },
       "market": "race_to_n_points",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_ON_GROK_BRANCH_NOT_MERGED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": {
+        "branch": "grok/t243-nfl-situational-20261023",
+        "sha": "a5012ea8ce0cfc45f9b95801c8803d1ab7d24a2b"
+      },
+      "market": "safety",
       "readiness": "NO_CANONICAL_PRICING_PATH",
       "record": null,
       "score_area": "ENGINES",

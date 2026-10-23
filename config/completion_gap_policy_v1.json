@@ -25,6 +25,22 @@
   },
   "grok_branch_engines": {
     "NFL": {
+      "both_teams_to_score_n": {
+        "branch": "grok/t243-nfl-situational-20261023",
+        "sha": "a5012ea8ce0cfc45f9b95801c8803d1ab7d24a2b"
+      },
+      "defensive_special_teams_td": {
+        "branch": "grok/t243-nfl-situational-20261023",
+        "sha": "a5012ea8ce0cfc45f9b95801c8803d1ab7d24a2b"
+      },
+      "first_score": {
+        "branch": "grok/t243-nfl-situational-20261023",
+        "sha": "a5012ea8ce0cfc45f9b95801c8803d1ab7d24a2b"
+      },
+      "largest_lead": {
+        "branch": "grok/t243-nfl-situational-20261023",
+        "sha": "a5012ea8ce0cfc45f9b95801c8803d1ab7d24a2b"
+      },
       "longest_fg_made": {
         "branch": "grok/t235-nfl-longest-fg-red-first-20261023",
         "sha": "96dd3ef24643228961dd926f20ffe56c7aff0408"
@@ -32,6 +48,10 @@
       "race_to_n_points": {
         "branch": "grok/t235-nfl-game-scoring-red-first-20261023",
         "sha": "69ee54ec9bbbe0927e8dda064f40693d8c136a21"
+      },
+      "safety": {
+        "branch": "grok/t243-nfl-situational-20261023",
+        "sha": "a5012ea8ce0cfc45f9b95801c8803d1ab7d24a2b"
       },
       "team_sacks": {
         "branch": "grok/t242-nfl-team-defense-counts-20261023",
