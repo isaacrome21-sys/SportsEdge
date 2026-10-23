@@ -18,17 +18,18 @@ def _fake(status_by_pair):
 
 
 def _pairs():
-    return {(e["branch"], e["sha"]) for s in POLICY["grok_branch_engines"].values() for e in s.values()}
+    return {(e["branch"], e["sha"]) for key in ("grok_branch_engines", "grok_branch_screen_engines")
+            for s in POLICY[key].values() for e in s.values()}
 
 
 def test_all_recorded_pairs_pass_when_resolver_confirms():
-    res = verify_branch_shas(POLICY, resolver=_fake({p: "on_branch" for p in _pairs()}))
+    res = verify_branch_shas(POLICY, resolver=_fake({p: "head" for p in _pairs()}))
     assert res == sorted(_pairs())
 
 
 def test_sha_not_on_branch_refuses():
     pairs = _pairs(); first = sorted(pairs)[0]
-    fake = {p: "on_branch" for p in pairs}; fake[first] = "missing"
+    fake = {p: "head" for p in pairs}; fake[first] = "missing"
     with pytest.raises(LedgerRefusal, match="GROK_BRANCH_SHA_NOT_ON_REMOTE"):
         verify_branch_shas(POLICY, resolver=_fake(fake))
 
@@ -36,7 +37,8 @@ def test_sha_not_on_branch_refuses():
 def test_forty_hex_lookalike_refuses():
     bad = json.loads(json.dumps(POLICY))
     bad["grok_branch_engines"]["NFL"]["team_sacks"]["sha"] = "f" * 40
-    fake = {p: "on_branch" for p in _pairs()}
+    bad["grok_branch_engines"]["NFL"]["team_sacks"]["cleared_head_sha"] = "f" * 40
+    fake = {p: "head" for p in _pairs()}
     with pytest.raises(LedgerRefusal, match="GROK_BRANCH_SHA_NOT_ON_REMOTE"):
         verify_branch_shas(bad, resolver=_fake(fake))
 
@@ -53,7 +55,7 @@ def test_branch_must_be_grok():
     bad = json.loads(json.dumps(POLICY))
     bad["grok_branch_engines"]["NFL"]["team_sacks"]["branch"] = "main"
     with pytest.raises(LedgerRefusal, match="GROK_BRANCH_REQUIRED"):
-        verify_branch_shas(bad, resolver=lambda b, s: "on_branch")
+        verify_branch_shas(bad, resolver=lambda b, s: "head")
 
 
 @pytest.mark.skipif(os.environ.get("SPORTSEDGE_LEDGER_REMOTE_CHECK") != "1",
