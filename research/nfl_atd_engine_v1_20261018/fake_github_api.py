@@ -305,10 +305,33 @@ def fake_replay(inputs, *, now, fetched_at):
     return json.loads(inputs["board"])["rows"]
 
 
-def _register_fake():
-    import atd_provenance as pv
-    if hasattr(pv, "EXTRA_REPLAYERS"):
-        pv.EXTRA_REPLAYERS[FAKE_PRICER_SHA] = fake_replay
+def fake_replayers():
+    """Stand-in for pv.replayers inside test fixtures only (never registered
+    on import): the fake pricer plus the real one."""
+    import price_nfl_atd_board_v11 as pr
+    return {FAKE_PRICER_SHA: fake_replay, pr.pricer_sha256(): pr.replay}
+
+
+def module_fixtures(*, guard):
+    """(setUpModule, tearDownModule) for a test module that uses the fake
+    pricer: patches pv.replayers via unittest.mock.patch.object, and, if
+    guard=True, explicitly patches the review environment guard too."""
+    from unittest import mock
+    patchers = []
+
+    def setup():
+        import atd_provenance as pv
+        patchers.append(mock.patch.object(pv, "replayers", fake_replayers))
+        if guard:
+            import score_nfl_atd_forward as sc
+            patchers.append(mock.patch.object(sc, "_review_env_guard", lambda: None))
+        for p in patchers:
+            p.start()
+
+    def teardown():
+        while patchers:
+            patchers.pop().stop()
+    return setup, teardown
 
 
 def publish_board(api, board: dict, pushed_at):
@@ -445,5 +468,3 @@ class synthetic_world:
         api.commit(br, {pv.run_record_path("W1"): json.dumps(rec, sort_keys=True)}, run_at)
         return rec
 
-
-_register_fake()
