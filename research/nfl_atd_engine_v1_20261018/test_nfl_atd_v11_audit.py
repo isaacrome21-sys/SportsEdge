@@ -226,6 +226,10 @@ class TestReviewOnce(unittest.TestCase):
         sc.cut_drift_adjust(rows)
         self.assertAlmostEqual(sum(r["clv_adj"] for r in rows), 0.0)
 
+# port (re-audit 8d86e7a9): the fake pricer is patched in by fixture, never
+# registered on import; review tests patch the env guard explicitly.
+from fake_github_api import module_fixtures as _mf
+setUpModule, tearDownModule = _mf(guard=True)
 
 if __name__ == "__main__":
     unittest.main()
