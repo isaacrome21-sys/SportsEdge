@@ -1,0 +1,259 @@
+{
+ "base_rate": 0.21257814110050147,
+ "baselines": {
+  "POOL": {
+   "brier": 0.1658718158118637,
+   "logloss": 0.5128677315476812
+  },
+  "RAW": {
+   "brier": 0.16259007333160203,
+   "logloss": 0.6550800707245762
+  }
+ },
+ "bootstrap": {
+  "cluster": "season|week|team_pair",
+  "resamples": 2000,
+  "seed": 20261018
+ },
+ "comparisons": {
+  "POOL": {
+   "delta_brier": -0.008789221716733634,
+   "delta_brier_ci95": [
+    -0.009599472083733058,
+    -0.008005745588138217
+   ],
+   "delta_logloss": -0.024801177579696312,
+   "delta_logloss_ci95": [
+    -0.02696601717997045,
+    -0.022657347438740295
+   ],
+   "verdict": "BEATS_BASELINE"
+  },
+  "RAW": {
+   "delta_brier": -0.00550747923647198,
+   "delta_brier_ci95": [
+    -0.0064127005958940385,
+    -0.0045822501775067736
+   ],
+   "delta_logloss": -0.1670135167565914,
+   "delta_logloss_ci95": [
+    -0.18391258464178886,
+    -0.14965187396070828
+   ],
+   "verdict": "BEATS_BASELINE"
+  }
+ },
+ "construction": {
+  "K_A": 10.0,
+  "half_life_games": 8.0,
+  "max_evidence_games": 16,
+  "min_games": 4,
+  "pool_min_games": 200
+ },
+ "data_sha256": {
+  "ps_2018.csv.gz": "15730d75271ec10affc412b50b22fc8e3d6ce8f442d377936f65bc0044ef15bf",
+  "ps_2019.csv.gz": "d143b91c62380bed1587fe390e594d0e5555e8ebac81fcc7212ad7224115caf2",
+  "ps_2020.csv.gz": "e23a81d6ed3c94bd2dd14a5ee3ed94584a69e67fdb985c1ba0de4ccbc5a2bdcc",
+  "ps_2021.csv.gz": "a2fb266576a1bde5d7978005a5f6ccf83e3c023234da500d38cf6a14f40a01c8",
+  "ps_2022.csv.gz": "2b7dca6814993b9fd6ad3d4fdc56131663311bbe83281126e1ac441620d824ba",
+  "ps_2023.csv.gz": "b7590543f3c81dceb17d7577a1dce7b8ff1a9aacf0f562e3d7bbc7e60f37bc9b",
+  "ps_2024.csv.gz": "629b77e0c88d361f8b5c4a850e7866013aa670b7a5a94b7f1d0c591adf18f971",
+  "sp_2025.csv.gz": "c7401e321bdb369443f3280b9acd74ba6e16d82e710383bf1c01acabfebeac0b"
+ },
+ "deciles": [
+  {
+   "decile": 1,
+   "mean_model_p": 0.09337215862484963,
+   "n": 2911,
+   "realized_rate": 0.09103400893163861
+  },
+  {
+   "decile": 2,
+   "mean_model_p": 0.12502492875518692,
+   "n": 2911,
+   "realized_rate": 0.11714187564410855
+  },
+  {
+   "decile": 3,
+   "mean_model_p": 0.1465953250181038,
+   "n": 2912,
+   "realized_rate": 0.13427197802197802
+  },
+  {
+   "decile": 4,
+   "mean_model_p": 0.16637881706222818,
+   "n": 2911,
+   "realized_rate": 0.1511508072827207
+  },
+  {
+   "decile": 5,
+   "mean_model_p": 0.18691030432517236,
+   "n": 2912,
+   "realized_rate": 0.18063186813186813
+  },
+  {
+   "decile": 6,
+   "mean_model_p": 0.208816115533767,
+   "n": 2911,
+   "realized_rate": 0.19443490209549982
+  },
+  {
+   "decile": 7,
+   "mean_model_p": 0.23346795244301025,
+   "n": 2911,
+   "realized_rate": 0.2260391618000687
+  },
+  {
+   "decile": 8,
+   "mean_model_p": 0.2634791663093903,
+   "n": 2912,
+   "realized_rate": 0.2644230769230769
+  },
+  {
+   "decile": 9,
+   "mean_model_p": 0.3053702495167842,
+   "n": 2911,
+   "realized_rate": 0.32840948127791136
+  },
+  {
+   "decile": 10,
+   "mean_model_p": 0.39279012322919016,
+   "n": 2912,
+   "realized_rate": 0.4381868131868132
+  }
+ ],
+ "engine": {
+  "brier": 0.15708259409513006,
+  "logloss": 0.4880665539679849
+ },
+ "handcheck_rows": [
+  {
+   "model_p": 0.10280934335310972,
+   "pid": "00-0019596",
+   "pool_p": 0.12393887945670629,
+   "raw_p": 0.125,
+   "season": 2020,
+   "week": 1,
+   "y": 1
+  },
+  {
+   "model_p": 0.11552346835221856,
+   "pid": "00-0020531",
+   "pool_p": 0.12393887945670629,
+   "raw_p": 0.09090909090909091,
+   "season": 2020,
+   "week": 1,
+   "y": 0
+  },
+  {
+   "model_p": 0.20546249619840748,
+   "pid": "00-0022127",
+   "pool_p": 0.1793372319688109,
+   "raw_p": 0.25,
+   "season": 2020,
+   "week": 1,
+   "y": 0
+  },
+  {
+   "model_p": 0.2224503659078445,
+   "pid": "00-0022921",
+   "pool_p": 0.20724346076458752,
+   "raw_p": 0.25,
+   "season": 2020,
+   "week": 1,
+   "y": 0
+  },
+  {
+   "model_p": 0.06510562734194207,
+   "pid": "00-0022942",
+   "pool_p": 0.12393887945670629,
+   "raw_p": 0.0,
+   "season": 2020,
+   "week": 1,
+   "y": 0
+  },
+  {
+   "model_p": 0.08919093607219904,
+   "pid": "00-0023459",
+   "pool_p": 0.12393887945670629,
+   "raw_p": 0.0625,
+   "season": 2020,
+   "week": 1,
+   "y": 0
+  },
+  {
+   "model_p": 0.17185397944456524,
+   "pid": "00-0023500",
+   "pool_p": 0.2546897546897547,
+   "raw_p": 0.13333333333333333,
+   "season": 2020,
+   "week": 1,
+   "y": 0
+  },
+  {
+   "model_p": 0.20536768826990215,
+   "pid": "00-0023682",
+   "pool_p": 0.12393887945670629,
+   "raw_p": 0.26666666666666666,
+   "season": 2020,
+   "week": 1,
+   "y": 0
+  },
+  {
+   "model_p": 0.3240420825683136,
+   "pid": "00-0025394",
+   "pool_p": 0.2546897546897547,
+   "raw_p": 0.3333333333333333,
+   "season": 2020,
+   "week": 1,
+   "y": 0
+  },
+  {
+   "model_p": 0.16268374169107444,
+   "pid": "00-0025396",
+   "pool_p": 0.20724346076458752,
+   "raw_p": 0.13333333333333333,
+   "season": 2020,
+   "week": 1,
+   "y": 0
+  },
+  {
+   "model_p": 0.11799239764772966,
+   "pid": "00-0025418",
+   "pool_p": 0.1793372319688109,
+   "raw_p": 0.07142857142857142,
+   "season": 2020,
+   "week": 1,
+   "y": 1
+  },
+  {
+   "model_p": 0.1262919265597941,
+   "pid": "00-0026035",
+   "pool_p": 0.20724346076458752,
+   "raw_p": 0.06666666666666667,
+   "season": 2020,
+   "week": 1,
+   "y": 0
+  }
+ ],
+ "label": "NFL ANYTIME TD ENGINE V1 \u2014 calibration leg (frozen plan \u00a73)",
+ "mean_model_p": 0.2122253534326838,
+ "n_gated_out": {
+  "UNPRICED_INSUFFICIENT_GAMES": 8570,
+  "UNPRICED_POSITION_GROUP_NOT_POOLED": 7642
+ },
+ "n_scored": 29114,
+ "prereg": "PREREG_NFL_ATD_ENGINE_V1.md",
+ "prereg_sha256": "c3907b08041ccd36827aedc7cb3de57c172d41269dde76fbd28a82cd8565e099",
+ "scored_seasons": [
+  2020,
+  2021,
+  2022,
+  2023,
+  2024,
+  2025
+ ],
+ "st_only_td_rows_in_scored_population": 54,
+ "status_label": "RESEARCH_ONLY",
+ "validation_status": "NOT_VALIDATED"
+}
