@@ -13,6 +13,7 @@ from collections import Counter
 from pathlib import Path
 
 from scripts.audit_cross_sport_accuracy_readiness import accuracy_readiness
+from sportsedge.canonical_coverage import MARKET_RESOLUTIONS
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY_PATH = ROOT / "config" / "completion_gap_policy_v1.json"
@@ -30,10 +31,45 @@ class LedgerRefusal(ValueError):
     pass
 
 
+_PRICED_OR_CONFIG = ("RESEARCH_PRICED_NOT_VALIDATED", "NO_FORWARD_TEST_CONFIG")
+
+
+def _cited(policy: dict, key: str, sport: str, market: str):
+    entries = policy.get(key, {}).get(sport, {})
+    if not isinstance(entries, dict):
+        raise LedgerRefusal(f"RECORD_CITATION_REQUIRED:{key}")
+    if market not in entries:
+        return None
+    rec = entries[market]
+    if not isinstance(rec, str) or "#" not in rec or not rec.split("#", 1)[0]:
+        raise LedgerRefusal(f"RECORD_CITATION_REQUIRED:{key}:{market}")
+    return rec
+
+
+def _engine(row: dict, policy: dict):
+    code = policy.get("existing_engine_code", {}).get(row["sport"], {}).get(row["market"])
+    if code is not None:
+        text = (ROOT / code["path"]).read_text(encoding="utf-8")
+        if code["needle"] not in text:
+            raise LedgerRefusal(f"ENGINE_CODE_NOT_FOUND:{row['market']}")
+        return "ENGINE_EXISTS_NOT_WIRED", f"{code['path']} {code['needle']}"
+    res = MARKET_RESOLUTIONS.get((row["sport"], row["market"])) or {}
+    if res.get("engine"):
+        return "ENGINE_EXISTS_NOT_WIRED", res["engine"]
+    branch = policy.get("grok_branch_engines", {}).get(row["sport"], {}).get(row["market"])
+    if branch is not None:
+        return "ENGINE_ON_GROK_BRANCH_NOT_MERGED", dict(branch)
+    return "BUILDABLE", None
+
+
 def classify(row: dict, policy: dict) -> dict | None:
     if row.get("validated_accuracy_in_this_audit") is not False:
         raise LedgerRefusal("INPUT_CLAIMS_VALIDATION")
     blocker, readiness = row.get("blocker"), row.get("readiness")
+    if (blocker is None) != (readiness in _PRICED_OR_CONFIG) or (
+            blocker is not None and readiness != "NO_CANONICAL_PRICING_PATH"):
+        raise LedgerRefusal(f"BLOCKER_READINESS_CONTRADICTION:{blocker}:{readiness}")
+    engine_ref = None
     if blocker is None:
         if readiness == "RESEARCH_PRICED_NOT_VALIDATED":
             return None
@@ -42,21 +78,25 @@ def classify(row: dict, policy: dict) -> dict | None:
         area, status = "INFRASTRUCTURE", "BUILDABLE_NEEDS_SIBLING_RECONCILIATION"
     elif blocker in _BLOCKERS:
         area, status = _BLOCKERS[blocker]
+        if blocker == "NO_ENGINE":
+            status, engine_ref = _engine(row, policy)
     else:
         raise LedgerRefusal(f"UNKNOWN_BLOCKER:{blocker}")
-    paused = row["market"] in policy.get("paused_markets", {}).get(row["sport"], [])
-    if paused and status.startswith("BUILDABLE"):
-        status = "BLOCKED_RULING_6_FOCUS_PAUSE"
-    held = row["market"] in policy.get("owner_held_markets", {}).get(row["sport"], [])
-    if held and status.startswith("BUILDABLE"):
-        status = "BLOCKED_OWNER_HOLD"
+    record = None
+    paused = _cited(policy, "paused_markets", row["sport"], row["market"])
+    held = _cited(policy, "owner_held_markets", row["sport"], row["market"])
+    if paused and area != "VALIDATION":
+        status, record = "BLOCKED_RULING_6_FOCUS_PAUSE", paused
+    elif held and area != "VALIDATION":
+        status, record = "BLOCKED_OWNER_HOLD", held
     return {"sport": row["sport"], "market": row["market"], "blocker": blocker,
-            "readiness": readiness, "score_area": area, "status": status}
+            "readiness": readiness, "score_area": area, "status": status,
+            "engine_ref": engine_ref, "record": record}
 
 
 def gap_ledger(*, root: Path = ROOT) -> dict:
     policy = json.loads((root / "config" / "completion_gap_policy_v1.json").read_text(encoding="utf-8"))
-    if policy.get("schema") != "SPORTSEDGE_COMPLETION_GAP_POLICY_V1":
+    if policy.get("schema") != "SPORTSEDGE_COMPLETION_GAP_POLICY_V2":
         raise LedgerRefusal("POLICY_SCHEMA")
     report = accuracy_readiness(root=root)
     if report.get("validated_families_conferred") != 0 or report.get("play_authority_conferred") is not False:
@@ -75,13 +115,17 @@ def gap_ledger(*, root: Path = ROOT) -> dict:
     }
 
 
+def render(ledger: dict) -> str:
+    return json.dumps(ledger, indent=2, sort_keys=True) + "\n"
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--out", type=Path)
     a = p.parse_args()
-    text = json.dumps(gap_ledger(), indent=2, sort_keys=True) + "\n"
+    text = render(gap_ledger())
     if a.out:
-        a.out.write_text(text, encoding="utf-8")
+        a.out.write_bytes(text.encode("utf-8"))
     else:
         print(text, end="")
     return 0

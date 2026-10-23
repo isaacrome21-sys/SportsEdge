@@ -10,550 +10,706 @@
     "BLOCKED_MISSING_QUOTE": 2,
     "BLOCKED_OWNER_HOLD": 3,
     "BLOCKED_RULING_6_FOCUS_PAUSE": 2,
-    "BUILDABLE": 52,
-    "BUILDABLE_NEEDS_SIBLING_RECONCILIATION": 4
+    "BUILDABLE": 5,
+    "BUILDABLE_NEEDS_SIBLING_RECONCILIATION": 4,
+    "ENGINE_EXISTS_NOT_WIRED": 41,
+    "ENGINE_ON_GROK_BRANCH_NOT_MERGED": 6
   },
   "gaps": [
     {
       "blocker": "NO_DATA",
+      "engine_ref": null,
       "market": "first_td",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
       "score_area": "ENGINES",
       "sport": "NFL",
       "status": "BLOCKED_MISSING_DATA"
     },
     {
       "blocker": "NO_ENGINE",
+      "engine_ref": "PITCHER_JOINT_ENGINE either branch (research complex only; gated EITHER_PITCHER_MARGINAL_TAIL_ERROR)",
       "market": "EITHER_PITCHER_BB",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": "docs/decisions/GROK_RULINGS_20261023.md#owner-hold-either-pitcher-20261015",
       "score_area": "ENGINES",
       "sport": "MLB",
       "status": "BLOCKED_OWNER_HOLD"
     },
     {
       "blocker": "NO_ENGINE",
+      "engine_ref": "PITCHER_JOINT_ENGINE either branch (research complex only; gated EITHER_PITCHER_MARGINAL_TAIL_ERROR)",
       "market": "EITHER_PITCHER_ER",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": "docs/decisions/GROK_RULINGS_20261023.md#owner-hold-either-pitcher-20261015",
       "score_area": "ENGINES",
       "sport": "MLB",
       "status": "BLOCKED_OWNER_HOLD"
     },
     {
       "blocker": "NO_ENGINE",
+      "engine_ref": "PITCHER_JOINT_ENGINE either branch (research complex only; gated EITHER_PITCHER_MARGINAL_TAIL_ERROR)",
       "market": "EITHER_PITCHER_HITS_ALLOWED",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": "docs/decisions/GROK_RULINGS_20261023.md#owner-hold-either-pitcher-20261015",
       "score_area": "ENGINES",
       "sport": "MLB",
       "status": "BLOCKED_OWNER_HOLD"
     },
     {
       "blocker": "NO_ENGINE",
-      "market": "FIRST_HOME_RUN",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "MLB",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "HITS_RUNS_STOLEN_BASES",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "MLB",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "HITS_STOLEN_BASES",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "MLB",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "HITS_WALKS_STOLEN_BASES",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "MLB",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "PITCHER_RECORD_WIN",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "MLB",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "alternate_spread",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "alternate_total",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "anytime_td",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "attempts",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
+      "engine_ref": null,
       "market": "both_teams_to_score_n",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
       "score_area": "ENGINES",
       "sport": "NFL",
       "status": "BUILDABLE"
     },
     {
       "blocker": "NO_ENGINE",
-      "market": "completions",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
+      "engine_ref": null,
       "market": "defensive_special_teams_td",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
       "score_area": "ENGINES",
       "sport": "NFL",
       "status": "BUILDABLE"
     },
     {
       "blocker": "NO_ENGINE",
-      "market": "fg_made",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "first_half_moneyline",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "first_half_spread",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "first_half_total",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
+      "engine_ref": null,
       "market": "first_score",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
       "score_area": "ENGINES",
       "sport": "NFL",
       "status": "BUILDABLE"
     },
     {
       "blocker": "NO_ENGINE",
-      "market": "interceptions",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "kicking_points",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
+      "engine_ref": null,
       "market": "largest_lead",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
       "score_area": "ENGINES",
       "sport": "NFL",
       "status": "BUILDABLE"
     },
     {
       "blocker": "NO_ENGINE",
-      "market": "longest_completion",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "longest_fg_made",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "longest_reception",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "longest_rush",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "pass_plus_rush_yards",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "passing_tds",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "passing_yards",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "player_interceptions",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "player_sacks",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "quarter_moneyline",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "quarter_spread",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "quarter_total",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "race_to_n_points",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "receiving_yards",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "receptions",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "rush_attempts",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "rush_plus_rec_yards",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "rush_yards",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "rushing_yards",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
+      "engine_ref": null,
       "market": "safety",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
       "score_area": "ENGINES",
       "sport": "NFL",
       "status": "BUILDABLE"
     },
     {
       "blocker": "NO_ENGINE",
+      "engine_ref": "FIRST_HR_ORDER_ENGINE lineup-order candidate v1 (research complex only; gated FIRST_HOME_RUN_ABSENT_ON_ENUMERATED_BOARD)",
+      "market": "FIRST_HOME_RUN",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "MLB",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "HITTER_JOINT_ENGINE (snapshot contract only)",
+      "market": "HITS_RUNS_STOLEN_BASES",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "MLB",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "HITTER_JOINT_ENGINE (snapshot contract only)",
+      "market": "HITS_STOLEN_BASES",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "MLB",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "HITTER_JOINT_ENGINE (snapshot contract only)",
+      "market": "HITS_WALKS_STOLEN_BASES",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "MLB",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "PITCHER_RECORD_WIN_ENGINE credit-state candidate v2 (research complex only; gated PITCHER_RECORD_WIN_OFFERING_UNVERIFIED)",
+      "market": "PITCHER_RECORD_WIN",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "MLB",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "ALTERNATE_DERIVATIVE (core/simulate/markets.derive_alternate_markets, wired)",
+      "market": "alternate_spread",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "ALTERNATE_DERIVATIVE (core/simulate/markets.derive_alternate_markets, wired)",
+      "market": "alternate_total",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "NFL_ANYTIME_TD_NFLVERSE (nfl_anytime_td.estimate_anytime_td, wired, not admitted)",
+      "market": "anytime_td",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; verified ESPN gamelogs; watch-only per row because participation is not verified from gamelog)",
+      "market": "attempts",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; verified ESPN gamelogs; watch-only per row because participation is not verified from gamelog)",
+      "market": "completions",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "NFL_KICKING_EMPIRICAL (nfl_kicking_empirical.estimate_kicking, wired, not admitted)",
+      "market": "fg_made",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "PERIOD_DERIVATIVE (core/simulate/markets.derive_period_markets, wired)",
+      "market": "first_half_moneyline",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "PERIOD_DERIVATIVE (core/simulate/markets.derive_period_markets, wired)",
+      "market": "first_half_spread",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "PERIOD_DERIVATIVE (core/simulate/markets.derive_period_markets, wired)",
+      "market": "first_half_total",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; verified ESPN gamelogs; watch-only per row because participation is not verified from gamelog)",
+      "market": "interceptions",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "NFL_KICKING_EMPIRICAL (nfl_kicking_empirical.estimate_kicking, wired, not admitted)",
+      "market": "kicking_points",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "NFL_LONGEST_PLAYS_EMPIRICAL (nfl_longest_plays_empirical.estimate_longest_plays, wired, not admitted)",
+      "market": "longest_completion",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "NFL_LONGEST_PLAYS_EMPIRICAL (nfl_longest_plays_empirical.estimate_longest_plays, wired, not admitted)",
+      "market": "longest_reception",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "NFL_LONGEST_PLAYS_EMPIRICAL (nfl_longest_plays_empirical.estimate_longest_plays, wired, not admitted)",
+      "market": "longest_rush",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; verified ESPN gamelogs; watch-only per row because participation is not verified from gamelog)",
+      "market": "pass_plus_rush_yards",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; verified ESPN gamelogs; watch-only per row because participation is not verified from gamelog)",
+      "market": "passing_tds",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; verified ESPN gamelogs; watch-only per row because participation is not verified from gamelog)",
+      "market": "passing_yards",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "sportsedge/nfl_prop_engines_v1.py \"player_interceptions\": {",
+      "market": "player_interceptions",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "sportsedge/nfl_prop_engines_v1.py \"player_sacks\": {",
+      "market": "player_sacks",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "PERIOD_DERIVATIVE (core/simulate/markets.derive_period_markets, wired)",
+      "market": "quarter_moneyline",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "PERIOD_DERIVATIVE (core/simulate/markets.derive_period_markets, wired)",
+      "market": "quarter_spread",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "PERIOD_DERIVATIVE (core/simulate/markets.derive_period_markets, wired)",
+      "market": "quarter_total",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; verified ESPN gamelogs; watch-only per row because participation is not verified from gamelog)",
+      "market": "receiving_yards",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; verified ESPN gamelogs; watch-only per row because participation is not verified from gamelog)",
+      "market": "receptions",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; verified ESPN gamelogs; watch-only per row because participation is not verified from gamelog)",
+      "market": "rush_attempts",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; verified ESPN gamelogs; watch-only per row because participation is not verified from gamelog)",
+      "market": "rush_plus_rec_yards",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; verified ESPN gamelogs; watch-only per row because participation is not verified from gamelog)",
+      "market": "rush_yards",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "NFL_PLAYER_EMPIRICAL (nfl_phone_player_pricing -> nfl_player_empirical; verified ESPN gamelogs; watch-only per row because participation is not verified from gamelog)",
+      "market": "rushing_yards",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": "PERIOD_DERIVATIVE (core/simulate/markets.derive_period_markets, wired)",
       "market": "second_half_moneyline",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
       "score_area": "ENGINES",
       "sport": "NFL",
-      "status": "BUILDABLE"
+      "status": "ENGINE_EXISTS_NOT_WIRED"
     },
     {
       "blocker": "NO_ENGINE",
+      "engine_ref": "PERIOD_DERIVATIVE (core/simulate/markets.derive_period_markets, wired)",
       "market": "second_half_spread",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
       "score_area": "ENGINES",
       "sport": "NFL",
-      "status": "BUILDABLE"
+      "status": "ENGINE_EXISTS_NOT_WIRED"
     },
     {
       "blocker": "NO_ENGINE",
+      "engine_ref": "PERIOD_DERIVATIVE (core/simulate/markets.derive_period_markets, wired)",
       "market": "second_half_total",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
       "score_area": "ENGINES",
       "sport": "NFL",
-      "status": "BUILDABLE"
+      "status": "ENGINE_EXISTS_NOT_WIRED"
     },
     {
       "blocker": "NO_ENGINE",
+      "engine_ref": "sportsedge/nfl_prop_engines_v1.py \"tackles_assists\": {",
       "market": "tackles_assists",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
       "score_area": "ENGINES",
       "sport": "NFL",
-      "status": "BUILDABLE"
+      "status": "ENGINE_EXISTS_NOT_WIRED"
     },
     {
       "blocker": "NO_ENGINE",
+      "engine_ref": "sportsedge/nfl_prop_engines_v1.py \"targets\": {",
       "market": "targets",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
       "score_area": "ENGINES",
       "sport": "NFL",
-      "status": "BUILDABLE"
+      "status": "ENGINE_EXISTS_NOT_WIRED"
     },
     {
       "blocker": "NO_ENGINE",
-      "market": "team_sacks",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
+      "engine_ref": "NFL_TEAM_TOTAL_DERIVATIVE (sports/nfl/team_totals.price_nfl_team_totals, wired)",
       "market": "team_total",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
       "score_area": "ENGINES",
       "sport": "NFL",
-      "status": "BUILDABLE"
+      "status": "ENGINE_EXISTS_NOT_WIRED"
     },
     {
       "blocker": "NO_ENGINE",
-      "market": "team_turnovers",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
-      "market": "total_touchdowns",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
+      "engine_ref": "sportsedge/nfl_prop_engines_v1.py \"two_plus_td\": {",
       "market": "two_plus_td",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
       "score_area": "ENGINES",
       "sport": "NFL",
-      "status": "BUILDABLE"
+      "status": "ENGINE_EXISTS_NOT_WIRED"
     },
     {
       "blocker": "NO_ENGINE",
-      "market": "winning_margin_band",
-      "readiness": "NO_CANONICAL_PRICING_PATH",
-      "score_area": "ENGINES",
-      "sport": "NFL",
-      "status": "BUILDABLE"
-    },
-    {
-      "blocker": "NO_ENGINE",
+      "engine_ref": "NFL_KICKING_EMPIRICAL (nfl_kicking_empirical.estimate_kicking, wired, not admitted)",
       "market": "xp_made",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
       "score_area": "ENGINES",
       "sport": "NFL",
-      "status": "BUILDABLE"
+      "status": "ENGINE_EXISTS_NOT_WIRED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": {
+        "branch": "grok/t235-nfl-longest-fg-red-first-20261023",
+        "sha": "96dd3ef24643228961dd926f20ffe56c7aff0408"
+      },
+      "market": "longest_fg_made",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_ON_GROK_BRANCH_NOT_MERGED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": {
+        "branch": "grok/t235-nfl-game-scoring-red-first-20261023",
+        "sha": "69ee54ec9bbbe0927e8dda064f40693d8c136a21"
+      },
+      "market": "race_to_n_points",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_ON_GROK_BRANCH_NOT_MERGED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": {
+        "branch": "grok/t242-nfl-team-defense-counts-20261023",
+        "sha": "de12685491ccb3139c6ca5f84b1f326aba671494"
+      },
+      "market": "team_sacks",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_ON_GROK_BRANCH_NOT_MERGED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": {
+        "branch": "grok/t242-nfl-team-defense-counts-20261023",
+        "sha": "de12685491ccb3139c6ca5f84b1f326aba671494"
+      },
+      "market": "team_turnovers",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_ON_GROK_BRANCH_NOT_MERGED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": {
+        "branch": "grok/t235-nfl-game-scoring-red-first-20261023",
+        "sha": "69ee54ec9bbbe0927e8dda064f40693d8c136a21"
+      },
+      "market": "total_touchdowns",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_ON_GROK_BRANCH_NOT_MERGED"
+    },
+    {
+      "blocker": "NO_ENGINE",
+      "engine_ref": {
+        "branch": "grok/t235-nfl-game-scoring-red-first-20261023",
+        "sha": "69ee54ec9bbbe0927e8dda064f40693d8c136a21"
+      },
+      "market": "winning_margin_band",
+      "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
+      "score_area": "ENGINES",
+      "sport": "NFL",
+      "status": "ENGINE_ON_GROK_BRANCH_NOT_MERGED"
     },
     {
       "blocker": "NO_QUOTE",
+      "engine_ref": null,
       "market": "PITCHER_HITS_WALKS_ER",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
       "score_area": "INFRASTRUCTURE",
       "sport": "MLB",
       "status": "BLOCKED_MISSING_QUOTE"
     },
     {
       "blocker": "NO_QUOTE",
+      "engine_ref": null,
       "market": "STOLEN_BASES",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
       "score_area": "INFRASTRUCTURE",
       "sport": "MLB",
       "status": "BLOCKED_MISSING_QUOTE"
     },
     {
       "blocker": null,
+      "engine_ref": null,
       "market": "NRFI",
       "readiness": "NO_FORWARD_TEST_CONFIG",
+      "record": "docs/decisions/GROK_RULINGS_20261023.md#ruling-6-focus-pause",
       "score_area": "INFRASTRUCTURE",
       "sport": "MLB",
       "status": "BLOCKED_RULING_6_FOCUS_PAUSE"
     },
     {
       "blocker": null,
+      "engine_ref": null,
       "market": "YRFI",
       "readiness": "NO_FORWARD_TEST_CONFIG",
+      "record": "docs/decisions/GROK_RULINGS_20261023.md#ruling-6-focus-pause",
       "score_area": "INFRASTRUCTURE",
       "sport": "MLB",
       "status": "BLOCKED_RULING_6_FOCUS_PAUSE"
     },
     {
       "blocker": null,
+      "engine_ref": null,
       "market": "PITCHER_BB",
       "readiness": "NO_FORWARD_TEST_CONFIG",
+      "record": null,
       "score_area": "INFRASTRUCTURE",
       "sport": "MLB",
       "status": "BUILDABLE_NEEDS_SIBLING_RECONCILIATION"
     },
     {
       "blocker": null,
+      "engine_ref": null,
       "market": "PITCHER_ER",
       "readiness": "NO_FORWARD_TEST_CONFIG",
+      "record": null,
       "score_area": "INFRASTRUCTURE",
       "sport": "MLB",
       "status": "BUILDABLE_NEEDS_SIBLING_RECONCILIATION"
     },
     {
       "blocker": null,
+      "engine_ref": null,
       "market": "PITCHER_HITS_ALLOWED",
       "readiness": "NO_FORWARD_TEST_CONFIG",
+      "record": null,
       "score_area": "INFRASTRUCTURE",
       "sport": "MLB",
       "status": "BUILDABLE_NEEDS_SIBLING_RECONCILIATION"
     },
     {
       "blocker": null,
+      "engine_ref": null,
       "market": "PITCHER_K",
       "readiness": "NO_FORWARD_TEST_CONFIG",
+      "record": null,
       "score_area": "INFRASTRUCTURE",
       "sport": "MLB",
       "status": "BUILDABLE_NEEDS_SIBLING_RECONCILIATION"
     },
     {
       "blocker": "NO_VALIDATION",
+      "engine_ref": null,
       "market": "F5_MONEYLINE",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
       "score_area": "VALIDATION",
       "sport": "MLB",
       "status": "BLOCKED_FORWARD_VERDICT_REQUIRED"
     },
     {
       "blocker": "NO_VALIDATION",
+      "engine_ref": null,
       "market": "F5_RUN_LINE",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
       "score_area": "VALIDATION",
       "sport": "MLB",
       "status": "BLOCKED_FORWARD_VERDICT_REQUIRED"
     },
     {
       "blocker": "NO_VALIDATION",
+      "engine_ref": null,
       "market": "F5_TEAM_TOTALS",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
       "score_area": "VALIDATION",
       "sport": "MLB",
       "status": "BLOCKED_FORWARD_VERDICT_REQUIRED"
     },
     {
       "blocker": "NO_VALIDATION",
+      "engine_ref": null,
       "market": "F5_TOTALS",
       "readiness": "NO_CANONICAL_PRICING_PATH",
+      "record": null,
       "score_area": "VALIDATION",
       "sport": "MLB",
       "status": "BLOCKED_FORWARD_VERDICT_REQUIRED"
