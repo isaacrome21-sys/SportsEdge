@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.fixture(autouse=True)
 def _no_network_main_check(monkeypatch, request):
-    if "real_verified" not in request.node.name and "asks_main" not in request.node.name:
-        monkeypatch.setattr(L, "_main_has_file", lambda path: False)
+    if not any(k in request.node.name for k in ("real_verified", "asks_main", "merge_state")):
+        monkeypatch.setattr(L, "_main_merge_state", lambda path, head: "NOT_ON_MAIN")
 
 
 def test_library_default_verifies(monkeypatch):
@@ -107,24 +107,49 @@ def test_policy_points_at_current_heads():
         assert s[m]["engine_file"] == "sportsedge/nfl_period_lines_empirical.py"
 
 
-def test_every_entry_cites_cleared_head_equal_to_sha_and_engine_file():
+def test_every_entry_cites_cleared_head_and_engine_file():
     for key, sport, m, e in _entries():
-        assert e["cleared_head_sha"] == e["sha"], (key, m)
+        assert len(e["cleared_head_sha"]) == 40, (key, m)
         assert e["engine_file"].startswith("sportsedge/") and e["engine_file"].endswith(".py")
 
 
-def test_sha_differing_from_cleared_head_refuses():
+def test_cleared_head_is_checked_against_remote_head_not_against_sha():
+    """No tautology: equal sha/cleared_head_sha is not enough, the remote must agree."""
+    asked = []
+
+    def resolver(branch, sha):
+        asked.append(sha)
+        return "ancestor" if sha == SIT[1] else "head"
+    with pytest.raises(L.LedgerRefusal, match="GROK_BRANCH_SHA_NOT_HEAD"):
+        L.verify_branch_shas(POLICY, resolver=resolver, file_resolver=lambda f, s: True)
+    assert SIT[1] in asked
+
+
+def test_engine_sha_may_be_ancestor_of_cleared_head():
+    bad = json.loads(json.dumps(POLICY))
+    for *_, e in L._grok_entries(bad):
+        if e["branch"] == SIT[0]:
+            e["cleared_head_sha"] = "a" * 40
+    st = {"a" * 40: "head"}
+    L.verify_branch_shas(bad, resolver=lambda b, s: st.get(s, "ancestor") if b == SIT[0] else "head",
+                         file_resolver=lambda f, s: True)
+
+
+def test_cleared_head_not_remote_head_refuses():
     bad = json.loads(json.dumps(POLICY))
     bad["grok_branch_engines"]["NFL"]["safety"]["cleared_head_sha"] = "a" * 40
-    with pytest.raises(L.LedgerRefusal, match="GROK_BRANCH_SHA_NOT_CLEARED_HEAD:safety"):
-        L.verify_branch_shas(bad, resolver=lambda b, s: "head")
+    real = {SIT[1]: "head"}
+    with pytest.raises(L.LedgerRefusal, match="GROK_BRANCH_SHA_NOT_ON_REMOTE"):
+        L.verify_branch_shas(bad, resolver=lambda b, s: real.get(s, "missing") if b == SIT[0] else "head",
+                             file_resolver=lambda f, s: True)
 
 
-def test_missing_cleared_head_refuses():
+@pytest.mark.parametrize("bad_head", [None, "abc", "g" * 40])
+def test_malformed_cleared_head_refuses(bad_head):
     bad = json.loads(json.dumps(POLICY))
-    del bad["grok_branch_screen_engines"]["NFL"]["quarter_total"]["cleared_head_sha"]
-    with pytest.raises(L.LedgerRefusal, match="GROK_BRANCH_SHA_NOT_CLEARED_HEAD:quarter_total"):
-        L.verify_branch_shas(bad, resolver=lambda b, s: "head")
+    bad["grok_branch_screen_engines"]["NFL"]["quarter_total"]["cleared_head_sha"] = bad_head
+    with pytest.raises(L.LedgerRefusal, match="CLEARED_HEAD_SHA_MALFORMED:quarter_total"):
+        L.verify_branch_shas(bad, resolver=lambda b, s: pytest.fail("looked up"))
 
 
 def test_ancestor_of_head_is_not_enough():
@@ -164,8 +189,8 @@ def test_engine_merged_into_main_gets_its_own_status():
 def test_online_ledger_asks_main_for_every_engine_file(monkeypatch):
     asked = []
     monkeypatch.setattr(L, "verify_branch_shas", lambda policy, **kw: [])
-    monkeypatch.setattr(L, "_main_has_file",
-                        lambda path: asked.append(path) or path.endswith("team_defense_counts_empirical.py"))
+    monkeypatch.setattr(L, "_main_merge_state", lambda path, head: asked.append(path) or (
+        "MERGED_SAME_BLOB" if path.endswith("team_defense_counts_empirical.py") else "NOT_ON_MAIN"))
     led = L.gap_ledger()
     files = {e["engine_file"] for _, _, _, e in _entries()}
     assert files <= set(asked)
@@ -175,7 +200,7 @@ def test_online_ledger_asks_main_for_every_engine_file(monkeypatch):
 
 
 def test_offline_ledger_never_asks_main(monkeypatch):
-    monkeypatch.setattr(L, "_main_has_file", lambda path: pytest.fail("asked main offline"))
+    monkeypatch.setattr(L, "_main_merge_state", lambda path, head: pytest.fail("asked main offline"))
     assert L.gap_ledger(offline=True)["remote_shas_verified"] is False
 
 
@@ -188,7 +213,42 @@ def test_period_rows_cite_screen_engine():
     assert "MONEYLINE_DERIVABLE" in st["quarter_spread"]["screen_engine"]["refusals"]
 
 
-def test_rulings_doc_is_t249_copy_base():
-    text = (ROOT / "docs" / "decisions" / "GROK_RULINGS_20261023.md").read_bytes()
-    assert hashlib.sha256(text).hexdigest() == (
-        "afa310851a189b565b35dc3df1f6748102bb2f6bf83a66d65edb343fb25bc513")
+REQUIRED_RULING_ANCHORS = ("ruling-6-focus-pause", "owner-hold-either-pitcher-20261015",
+                           "mlb-pitcher-infrastructure-gaps-are-already-covered-2026-10-23",
+                           "quarter-spreads-refused-as-moneyline-derivable-2026-10-23")
+
+
+def _anchor(heading):
+    import re
+    return re.sub(r"[^a-z0-9 -]", "", heading.strip().lower()).replace(" ", "-")
+
+
+def test_rulings_doc_contains_every_required_section_anchor():
+    text = (ROOT / "docs" / "decisions" / "GROK_RULINGS_20261023.md").read_text(encoding="utf-8")
+    anchors = {_anchor(l[3:]) for l in text.splitlines() if l.startswith("## ")}
+    assert set(REQUIRED_RULING_ANCHORS) <= anchors, set(REQUIRED_RULING_ANCHORS) - anchors
+    cited = {v.split("#", 1)[1] for key in ("paused_markets", "owner_held_markets")
+             for ms in POLICY.get(key, {}).values() for v in ms.values() if "#" in str(v)}
+    assert cited <= anchors, cited - anchors
+
+
+def _blob_world(main_blob, head_blob):
+    def blob(path, ref):
+        return main_blob if ref == "main" else head_blob
+    return blob
+
+
+@pytest.mark.parametrize("main,head,want", [("b1", "b1", "MERGED_SAME_BLOB"),
+                                            ("b2", "b1", "ON_MAIN_DIFFERENT_BLOB"),
+                                            (None, "b1", "NOT_ON_MAIN")])
+def test_main_merge_state_compares_blob_with_cleared_head(monkeypatch, main, head, want):
+    monkeypatch.setattr(L, "_blob_sha", _blob_world(main, head))
+    assert L._main_merge_state("sportsedge/x.py", "c" * 40) == want
+
+
+def test_main_file_with_different_blob_is_not_called_merged(monkeypatch):
+    monkeypatch.setattr(L, "verify_branch_shas", lambda policy, **kw: [])
+    monkeypatch.setattr(L, "_main_merge_state", lambda path, head: (
+        "ON_MAIN_DIFFERENT_BLOB" if path.endswith("nfl_situational_empirical.py") else "NOT_ON_MAIN"))
+    st = {g["market"]: g for g in L.gap_ledger()["gaps"] if g["sport"] == "NFL"}
+    assert st["safety"]["status"] == "ENGINE_ON_MAIN_DIFFERS_FROM_CLEARED_HEAD"
