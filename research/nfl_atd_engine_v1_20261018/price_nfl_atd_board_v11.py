@@ -21,6 +21,10 @@ import atd_provenance as pv
 import atd_refresh as rf
 
 
+# Pricer-level refusal codes (prereg §4); separate from the engine's
+# DECLARED_UNPRICED_REASONS. The pricer emits no others.
+DECLARED_PRICER_REFUSALS = ("PLAYER_TEAM_UNRESOLVED",)
+
 _KEEP_ON_REFUSAL = ("family", "label", "status_label", "promotable", "game_id",
                     "board_game_id", "player_name", "player_id", "yes_price",
                     "captured_at", "kickoff")
@@ -38,7 +42,7 @@ def player_team_refusal(rows, pteams, game_teams) -> int:
             continue
         keep = {k: v for k, v in r.items() if k in _KEEP_ON_REFUSAL or k in LABEL_KEYS}
         r.clear()
-        r.update(keep, status="UNPRICED", reason="PLAYER_TEAM_UNRESOLVED")
+        r.update(keep, status="UNPRICED", reason=DECLARED_PRICER_REFUSALS[0])
         n += 1
     return n
 

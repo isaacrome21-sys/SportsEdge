@@ -448,6 +448,11 @@ def load_slate(api, slate_id) -> dict:
         if isinstance(r, dict) and r.get("status") == "UNPRICED":
             refs[r.get("reason")] = refs.get(r.get("reason"), 0) + 1
     out["refusals"] = refs
+    import atd_engine as eng
+    import price_nfl_atd_board_v11 as pr
+    declared = set(eng.DECLARED_UNPRICED_REASONS) | set(pr.DECLARED_PRICER_REFUSALS)
+    if any(k not in declared for k in refs):
+        out["reasons"].append("RUN_REFUSAL_CODE_UNDECLARED")
     run_t = _t(rp["pushed_at"])
     if run_t < cap:
         out["reasons"].append("RUN_PUSH_BEFORE_CAPTURE")

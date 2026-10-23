@@ -182,6 +182,14 @@ UNPRICED_TIMESTAMP_MISSING, UNPRICED_TIMESTAMP_UNPARSEABLE.
 (v1 prereg declared only four; UNPRICED_POOL_UNAVAILABLE was emitted by v1
 code but undeclared. Declaring them is an owner item, done by freezing this.)
 
+Pricer-level refusals (`DECLARED_PRICER_REFUSALS` in
+`price_nfl_atd_board_v11.py`, a separate list; the pricer emits no others):
+PLAYER_TEAM_UNRESOLVED (player absent from the pinned stats, or his latest
+stats team not in the game; see §2b). At review, a run record containing
+any UNPRICED reason not in DECLARED_UNPRICED_REASONS or
+DECLARED_PRICER_REFUSALS makes the slate SCREEN
+(RUN_REFUSAL_CODE_UNDECLARED).
+
 ## 5. (B) Forward scorer (`score_nfl_atd_forward.py`), #2399 Rules 4–6
 - Rule 4 CLV = implied(close Yes) − implied(entry Yes). Captures and
   settlements match on (game_id, player_id). Close = the LATEST capture
