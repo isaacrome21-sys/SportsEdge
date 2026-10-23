@@ -99,11 +99,27 @@ Selection, edge, settlement: locked #2399 Rules 1, 2, 3, 7, 8, 9.
   the raw fetch events.
 - (C) Ordering: fetch push < run-record push, and
   captured_at <= run-record push < first kickoff.
-- Kickoffs: the pricer cross-checks the board kickoff against the pinned
-  schedule (same teams, same instant; KICKOFF_SCHEDULE_MISMATCH refuses)
-  and writes `schedule_kickoffs` into the run record. At review every priced
-  row's kickoff must equal it (else the slate is SCREEN,
-  ROW_KICKOFF_SCHEDULE_MISMATCH). All close windows use that row kickoff.
+- Data records (re-audit of 87236180): the schedule and the stats file are
+  each pushed as a hash-named single-commit data record
+  `data/<sha256>.csv` (schedule) / `data/<sha256>.csv.gz` (stats; gzip
+  bytes, so `.csv.gz` not `.csv` — flagged deviation from the ruling's
+  wording), matched to `fetch/<sha256>.json` exactly as settlements are.
+  Bytes are read through the git blobs API (the schedule is ~2.2 MB, over
+  the contents API's 1 MB limit) and must hash to the sha
+  (DATA_RECORD_HASH_MISMATCH); missing → DATA_RECORD_NOT_ON_BRANCH; edited →
+  DATA_RECORD_NOT_SINGLE_COMMIT. The pricer refuses unless both data
+  records and both fetch records are pushed before capture
+  (DATA_PUSH_NOT_BEFORE_CAPTURE); at review the same is SCREEN.
+- Kickoffs: the run record stores `game_teams` per board game. At review
+  `load_slate` loads the schedule data record by the run record's
+  `schedule_sha256` from the branch and **recomputes** every priced row's
+  kickoff with `schedule_kickoff` (same teams, within a day, same instant,
+  same week). Any failure or difference → SCREEN,
+  ROW_KICKOFF_SCHEDULE_MISMATCH. The run record's own `schedule_kickoffs`
+  is informational and never trusted. `first_kickoff` must equal the
+  earliest recomputed kickoff (else FIRST_KICKOFF_MISMATCH) and the run push
+  must be before it. All close windows (close record checks and the
+  Rule 4 60-min window) use the recomputed kickoff.
 - Close captures: each close capture file is its own single-commit record
   named by the sha256 of its content, filed under the game's season-week.
   A close record that cannot be parsed, has no game, or is filed under the

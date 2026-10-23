@@ -215,8 +215,15 @@ def _score_rows(rows, closes, settlements):
     return out
 
 
+def _rows(st):
+    """Priced rows with kickoff REPLACED by the schedule-recomputed kickoff
+    (load_slate), so close windows never use the run record's claim."""
+    return [dict(r, kickoff=st["kickoffs"][r["game_id"]]) if r.get("status") == "PRICED" else r
+            for r in st["record"]["rows"]]
+
+
 def _games(loaded):
-    return {r["game_id"]: {"kickoff": r["kickoff"], "season": st["season"],
+    return {r["game_id"]: {"kickoff": st["kickoffs"][r["game_id"]], "season": st["season"],
                            "week": r["week"]}
             for st in loaded for r in st["record"]["rows"] if r.get("status") == "PRICED"}
 
@@ -227,7 +234,7 @@ def score_slate_rows(api, slate_id):
     st = pv.load_slate(api, slate_id)
     if st["status"] != "COUNTS":
         return []
-    rows = st["record"]["rows"]
+    rows = _rows(st)
     games = _games([st])
     closes = pv.load_closes(api, games)
     setl = pv.load_settlements(api, games, _utcnow())
@@ -262,7 +269,7 @@ def review(slate_ids, *, records_worktree, api):
         sid = st["slate_id"]
         inputs["run_records"].append(st["content"])
         proofs[sid] = st["run_proof"]
-        acc += _score_rows(st["record"]["rows"], closes, setl["settlements"])
+        acc += _score_rows(_rows(st), closes, setl["settlements"])
         weeks, picked, games = _gates(acc)
         if len(weeks) >= MIN_WEEKS and len(picked) >= MIN_PICKED and len(games) >= MIN_GAMES:
             v = _verdict(acc, sid)

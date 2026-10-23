@@ -55,6 +55,14 @@ def run_record_path(slate_id: str) -> str:
     return f"{ROOT}/runs/{slate_id}.json"
 
 
+def data_record_path(sha256: str, ext: str = "csv") -> str:
+    """Hash-named data record (schedule .csv, stats .csv.gz)."""
+    return f"{ROOT}/data/{sha256}.{ext}"
+
+
+DATA_EXT = {"schedule": "csv", "stats": "csv.gz"}
+
+
 def week_dir(season, week) -> str:
     return f"{int(season)}-W{int(week)}"
 
@@ -137,6 +145,14 @@ class GitHubAPI:
         if js is None:
             return None
         return base64.b64decode(js["content"]).decode()
+
+    def get_file_bytes(self, ref, path):
+        """Raw bytes via the git blobs API (contents API caps at 1 MB)."""
+        js = self._contents(ref, path)
+        if js is None:
+            return None
+        b, _ = self._req(f"{self.base}/git/blobs/{js['sha']}")
+        return None if b is None else base64.b64decode(b["content"])
 
     def blob_sha(self, ref, path):
         js = self._contents(ref, path)
@@ -229,14 +245,15 @@ def _only_parent(api, sha):
     return parents[0]
 
 
-def prove_record(api, path, stored_event=None) -> dict:
-    """Prove a record's single commit and its server push time (rules A, F, G)."""
+def prove_record(api, path, stored_event=None, binary=False) -> dict:
+    """Prove a record's single commit and its server push time (rules A, F, G).
+    binary=True reads the head as bytes via the blobs API (data records)."""
     events = _events(api)                           # refuses rewrites first
     commits = _call(api.file_commits, RECORDS_BRANCH, path)
     if not isinstance(commits, list) or not all(isinstance(c, str) for c in commits):
         raise ProvenanceFailed("API_MALFORMED", "file_commits")
-    head = _call(api.get_file, RECORDS_BRANCH, path)
-    if head is not None and not isinstance(head, str):
+    head = _call(api.get_file_bytes if binary else api.get_file, RECORDS_BRANCH, path)
+    if head is not None and not isinstance(head, bytes if binary else str):
         raise ProvenanceFailed("API_MALFORMED", "get_file")
     if not commits:
         raise ProvenanceFailed("RECORD_NOT_ON_BRANCH", path)
@@ -298,10 +315,36 @@ def verify_fetch(api, sha256, captured_at, stored_event=None):
     return p
 
 
+def load_data_record(api, sha256, ext="csv", stored_event=None, fetch_event=None):
+    """A hash-named single-commit data record data/<sha>.<ext> whose bytes
+    hash to sha256, matched to fetch/<sha>.json (as settlements are).
+    Returns the data proof with 'bytes' and 'fetch' (fetch-record proof)."""
+    path = data_record_path(sha256, ext)
+    try:
+        p = prove_record(api, path, stored_event, binary=True)
+    except ProvenanceFailed as e:
+        code = e.code if e.code.startswith(("API_", "RECORDS_")) else "DATA_" + e.code
+        raise ProvenanceFailed(code, e.detail)
+    if hashlib.sha256(p["content"]).hexdigest() != sha256:
+        raise ProvenanceFailed("DATA_RECORD_HASH_MISMATCH", path)
+    p["fetch"] = verify_fetch(api, sha256, None, fetch_event)
+    p["bytes"] = p.pop("content")
+    return p
+
+
 def require_fetch_provenance(api, shas: dict, captured_at) -> dict:
-    """Pricer gate; returns proofs incl. the raw events to store (rule F)."""
+    """Pricer gate: each input needs its data record AND fetch record on the
+    branch, both pushed before capture. Returns proofs (events to store)."""
     require_token(api)
-    return {name: verify_fetch(api, sha, captured_at) for name, sha in shas.items()}
+    out = {}
+    for name, sha in shas.items():
+        d = load_data_record(api, sha, DATA_EXT.get(name, "csv"))
+        f = d.pop("fetch")
+        d.pop("bytes")
+        if captured_at is not None and max(_t(d["pushed_at"]), _t(f["pushed_at"])) >= _t(captured_at):
+            raise ProvenanceFailed("DATA_PUSH_NOT_BEFORE_CAPTURE", name)
+        out[name] = dict(f, data_event=d["event"], data_pushed_at=d["pushed_at"])
+    return out
 
 
 def load_slate(api, slate_id) -> dict:
@@ -325,19 +368,48 @@ def load_slate(api, slate_id) -> dict:
         stored = rec.get("fetch_provenance") or {}
         rows = rec["rows"]
         season = int(rec["season"])
-        sched = rec["schedule_kickoffs"]
+        teams = rec["game_teams"]
         if rec.get("slate_id") != slate_id or not isinstance(rows, list) \
-                or not isinstance(sched, dict):
-            raise ValueError("slate_id/rows/schedule_kickoffs")
-        for r in rows:
-            if r.get("status") == "PRICED":
-                s_ko = sched.get(r["game_id"])
-                if s_ko is None or _t(s_ko) != _t(r["kickoff"]):
-                    out["reasons"].append("ROW_KICKOFF_SCHEDULE_MISMATCH")
-                    break
+                or not isinstance(teams, dict):
+            raise ValueError("slate_id/rows/game_teams")
+        priced = [r for r in rows if r.get("status") == "PRICED"]
+        for r in priced:
+            _t(r["kickoff"]), r["game_id"]
+        # the run-record field schedule_kickoffs is informational only
     except (ValueError, KeyError, TypeError):
         out["reasons"].append("RUN_RECORD_MALFORMED")
         return out
+    # kickoffs are recomputed from the pushed schedule data record, never
+    # taken from the run record (ruling 87236180)
+    kos = {}
+    sch = None
+    try:
+        ev = (stored.get("schedule") or {}) if isinstance(stored, dict) else {}
+        sch = load_data_record(api, shas["schedule"], "csv", ev.get("data_event"), ev.get("event"))
+    except ProvenanceFailed as e:
+        out["reasons"].append(e.code)
+    if sch is not None:
+        import tempfile
+        import atd_refresh as rf
+        with tempfile.NamedTemporaryFile(suffix=".csv") as fh:
+            fh.write(sch["bytes"])
+            fh.flush()
+            for r in priced:
+                try:
+                    k = rf.schedule_kickoff(fh.name, season, teams.get(r["game_id"]), r["kickoff"])
+                    if "week" in r and int(k["week"]) != int(r["week"]):
+                        raise rf.RefreshFailed("KICKOFF_SCHEDULE_MISMATCH", r["game_id"])
+                    if kos.setdefault(r["game_id"], k["kickoff"]) != k["kickoff"]:
+                        raise rf.RefreshFailed("KICKOFF_SCHEDULE_MISMATCH", r["game_id"])
+                except (rf.RefreshFailed, ValueError, KeyError, TypeError):
+                    out["reasons"].append("ROW_KICKOFF_SCHEDULE_MISMATCH")
+        if kos and "ROW_KICKOFF_SCHEDULE_MISMATCH" not in out["reasons"]:
+            earliest = min(_t(v) for v in kos.values())
+            if earliest != ko:
+                out["reasons"].append("FIRST_KICKOFF_MISMATCH")
+            ko = earliest
+        out["schedule_data_proof"] = {k: v for k, v in sch.items() if k not in ("bytes", "fetch")}
+    out["kickoffs"] = kos
     run_t = _t(rp["pushed_at"])
     if run_t < cap:
         out["reasons"].append("RUN_PUSH_BEFORE_CAPTURE")
@@ -347,6 +419,13 @@ def load_slate(api, slate_id) -> dict:
         ev = (stored.get(name) or {}).get("event") if isinstance(stored, dict) else None
         try:
             fp = verify_fetch(api, sha, None, ev)
+            if name == "stats":     # schedule data record already loaded above
+                dp = load_data_record(api, sha, DATA_EXT[name],
+                                      (stored.get(name) or {}).get("data_event"), ev)
+                if _t(dp["pushed_at"]) >= cap:
+                    out["reasons"].append("DATA_PUSH_NOT_BEFORE_CAPTURE")
+            elif sch is not None and _t(sch["pushed_at"]) >= cap:
+                out["reasons"].append("DATA_PUSH_NOT_BEFORE_CAPTURE")
             ft = _t(fp["pushed_at"])
             if ft >= cap:
                 out["reasons"].append("FETCH_PUSH_NOT_BEFORE_CAPTURE")

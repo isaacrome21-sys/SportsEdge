@@ -89,11 +89,14 @@ def main() -> int:
     rr.update(slate_id=board.get("slate_id"), captured_at=board.get("captured_at"),
               season=int(board["season"]),
               schedule_kickoffs={board["game_id"]: board.get("kickoff")},
+              game_teams={board["game_id"]: list(board["game_teams"])},
               schedule_game={"board_game_id": board["game_id"], **sk},
               first_kickoff=board.get("kickoff"), stats_sha256=shas["stats"],
               schedule_sha256=shas["schedule"],
               fetch_provenance={k: {"event": v["event"], "commit": v["commit"],
-                                    "pushed_at": v["pushed_at"]}
+                                    "pushed_at": v["pushed_at"],
+                                    "data_event": v["data_event"],
+                                    "data_pushed_at": v["data_pushed_at"]}
                                 for k, v in prov.items()},
               rows=rows)
     Path(args.run_record).write_text(json.dumps(rr, indent=1, sort_keys=True) + "\n")
