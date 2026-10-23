@@ -5,8 +5,10 @@ a repo module -- transitively, via AST imports, `python -m`, `python path.py`, i
 `python - <<PY` heredocs and `unittest` targets -- whose source builds a DraftKings API URL
 (`/sites/US-SB/api`, `sportsbook-nash.draftkings.com/api`, `api.draftkings.com`).
 
-Grok ruling 2026-10-23 (under t234u): all seven DK-API workflows are manual-only
+Grok ruling 2026-10-23 (under t234u): the DK-API workflows are manual-only
 (workflow_dispatch); cron, push, pull_request and workflow_run triggers are removed.
+Exception (ruling 2026-10-23c): the frozen nfl-2026-line-capture lane is untouched and
+listed as FROZEN_LANE_EXCEPTION_OWNER_DECISION (reported, not failed).
 No source module deleted; no collector run.
 """
 import pytest
@@ -154,10 +156,17 @@ def report(root=None):
 
 DK_API_WORKFLOWS = ("draftkings-prop-provider-probe.yml", "mlb-prop-pit-archive.yml",
                     "nfl-market-maker-radar-capture.yml", "mlb-moneyline-forward-evidence.yml",
-                    "nfl-2026-line-capture.yml", "nfl-dk-direct-confirmation-capture.yml",
+                    "nfl-dk-direct-confirmation-capture.yml",
                     "sportsedge-auto-dk-four-sports.yml",
                     # live DK API request in CI (not mocked): dispatch-only (ruling 2026-10-23b)
                     "direct-dk-market-archive-contract.yml", "dk-nba-nhl-category-probe.yml")
+# Grok ruling 2026-10-23c: frozen lanes never change mid-clock. nfl-2026-line-capture is a
+# frozen confirmation lane (market-provider frozen-exclusion gate) that still reaches a DK
+# API builder on cron. It is reported, not failed, until the owner decides.
+FROZEN_LANE_EXCEPTION_OWNER_DECISION = ("nfl-2026-line-capture.yml",)
+FROZEN_PATHS = ("scripts/nfl_2026_line_capture.py", "config/nfl_2026_capture.json",
+                ".github/workflows/nfl-2026-line-capture.yml")
+MAIN_BASE = "53a636afdda137f2bc7292282c961c86f1a2d9d4"
 WF = ROOT / ".github" / "workflows"
 
 
@@ -165,9 +174,43 @@ def _scheduled_workflows():
     return sorted(p.name for p in WF.glob("*.y*ml") if scheduled(p.read_text(encoding="utf-8")))
 
 
-@pytest.mark.parametrize("name", _scheduled_workflows())
+@pytest.mark.parametrize("name", [n for n in _scheduled_workflows()
+                                  if n not in FROZEN_LANE_EXCEPTION_OWNER_DECISION])
 def test_scheduled_workflow_reaches_no_dk_api_module(name):
     assert report().get(name) == [], report().get(name)
+
+
+@pytest.mark.parametrize("name", FROZEN_LANE_EXCEPTION_OWNER_DECISION)
+def test_frozen_lane_exception_is_reported_not_failed(name):
+    """Reported: still scheduled and still reaching a DK API builder (owner decision)."""
+    import warnings
+    text = (WF / name).read_text(encoding="utf-8")
+    hits = report_one(text)
+    assert scheduled(text) and hits, "exception no longer needed; remove it from the list"
+    warnings.warn(f"FROZEN_LANE_EXCEPTION_OWNER_DECISION:{name}:{hits}")
+
+
+def _git(*args):
+    import subprocess
+    r = subprocess.run(["git", *args], cwd=ROOT, capture_output=True)
+    return r.returncode, r.stdout
+
+
+@pytest.mark.parametrize("path", FROZEN_PATHS)
+def test_frozen_lane_paths_byte_identical_to_main_base(path):
+    code, blob = _git("show", f"{MAIN_BASE}:{path}")
+    if code != 0:
+        pytest.skip("main base commit not in this clone's history")
+    assert (ROOT / path).read_bytes() == blob, path
+
+
+def test_market_provider_frozen_exclusion_gate():
+    """Same check as market-provider-contract.yml: no frozen path in the branch diff."""
+    code, out = _git("diff", "--name-only", f"{MAIN_BASE}...HEAD")
+    if code != 0:
+        pytest.skip("main base commit not in this clone's history")
+    changed = set(out.decode().split())
+    assert not changed & set(FROZEN_PATHS), changed & set(FROZEN_PATHS)
 
 
 @pytest.mark.parametrize("name", DK_API_WORKFLOWS)

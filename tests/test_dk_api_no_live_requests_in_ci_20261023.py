@@ -5,6 +5,9 @@ every socket, urllib and requests entry point patched to refuse any *draftkings*
 """
 import importlib
 import io
+import os
+import re
+import subprocess
 import socket
 import sys
 import unittest
@@ -19,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # workflow -> DK-importing test modules it runs on push/pull_request/workflow_run/issues
 GUARDED = {
     "market-maker-radar.yml": ["tests.test_capture_nfl_market_maker_radar"],
+    "collection-runtime-contract.yml": ["tests.test_archive_mlb_prop_odds"],
     "mlb-additional-odds-contract.yml": ["tests.test_mlb_quote_source_coverage"],
     "mlb-additional-pit-archive.yml": ["tests.test_mlb_quote_source_coverage"],
     "football-nfl-promotion-evidence.yml": [
@@ -44,7 +48,29 @@ GUARDED = {
 # imports tests/test_football_all_props_finish.py (pytest-style; unittest collects 0 tests).
 IMPORT_ONLY_SCRIPTS = {"nfl-lines-issue.yml": ["scripts.render_nfl_myspari_card"],
                        "football-nfl-promotion-evidence.yml": ["tests.test_football_all_props_finish"]}
+# collection-runtime-contract also runs `python -I scripts/archive_mlb_prop_odds.py --self-test`
+SELF_TESTS = {"collection-runtime-contract.yml": [("scripts.archive_mlb_prop_odds", "_self_test")]}
 MODULES = sorted({m for ms in GUARDED.values() for m in ms})
+DK_HOSTS = ("sportsbook-nash.draftkings.com", "sportsbook.draftkings.com", "api.draftkings.com")
+
+
+def _resolve_dk_ips():
+    """Best effort: IPs the DK hosts resolve to now, so a hard-coded IP is refused too."""
+    ips = set()
+    old = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(3)
+    try:
+        for h in DK_HOSTS:
+            try:
+                ips |= {ai[4][0] for ai in socket.getaddrinfo(h, 443)}
+            except OSError:
+                pass
+    finally:
+        socket.setdefaulttimeout(old)
+    return frozenset(ips)
+
+
+_DK_IPS = None
 
 
 class DraftKingsBlocked(OSError):
@@ -54,11 +80,24 @@ class DraftKingsBlocked(OSError):
 def _is_dk(host) -> bool:
     if isinstance(host, bytes):
         host = host.decode("ascii", "ignore")
-    return isinstance(host, str) and "draftkings" in host.lower()
+    return isinstance(host, str) and ("draftkings" in host.lower() or host in (_DK_IPS or ()))
+
+
+def _dk_cmd(args) -> bool:
+    if isinstance(args, (bytes, str)):
+        parts = [args.decode() if isinstance(args, bytes) else args]
+    else:
+        parts = [a.decode() if isinstance(a, bytes) else str(a) for a in args]
+    text = " ".join(parts).lower()
+    return bool(re.search(r"\b(curl|wget)\b", text)) and (
+        "draftkings" in text or any(ip in text for ip in (_DK_IPS or ())))
 
 
 @pytest.fixture
 def dk_block(monkeypatch):
+    global _DK_IPS
+    if _DK_IPS is None:
+        _DK_IPS = _resolve_dk_ips()
     attempts = []
 
     def refuse(where, host):
@@ -94,6 +133,23 @@ def dk_block(monkeypatch):
     monkeypatch.setattr(socket, "create_connection", cc)
     monkeypatch.setattr(socket.socket, "connect", connect)
     monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+
+    real_popen_init = subprocess.Popen.__init__
+
+    def popen_init(self, args, *a, **k):
+        if _dk_cmd(args):
+            refuse("subprocess", args)
+        return real_popen_init(self, args, *a, **k)
+
+    real_system = os.system
+
+    def system(cmd):
+        if _dk_cmd(cmd):
+            refuse("os.system", cmd)
+        return real_system(cmd)
+
+    monkeypatch.setattr(subprocess.Popen, "__init__", popen_init)
+    monkeypatch.setattr(os, "system", system)
     try:
         import requests
         real_req = requests.sessions.Session.request
@@ -125,6 +181,35 @@ def test_guard_blocks_low_level_socket(dk_block):
         socket.getaddrinfo("api.draftkings.com", 443)
 
 
+def test_guard_blocks_curl_and_wget(dk_block):
+    for cmd in (["curl", "-s", "https://sportsbook-nash.draftkings.com/api/x"],
+                "wget -q https://api.draftkings.com/contests/v1/contests/1",
+                ["/usr/bin/curl", "https://sportsbook.draftkings.com/sites/US-SB/api/v5"]):
+        with pytest.raises(DraftKingsBlocked):
+            subprocess.run(cmd, shell=isinstance(cmd, str))
+    with pytest.raises(DraftKingsBlocked):
+        os.system("curl https://api.draftkings.com/x")
+    assert len(dk_block) == 4
+    assert subprocess.run(["true"]).returncode == 0   # unrelated commands still run
+
+
+def test_guard_blocks_resolved_dk_ips(dk_block):
+    if not _DK_IPS:
+        pytest.skip("DK hosts did not resolve here; IP blocking not exercisable")
+    ip = sorted(_DK_IPS)[0]
+    with pytest.raises(DraftKingsBlocked):
+        socket.create_connection((ip, 443), timeout=1)
+    with pytest.raises(DraftKingsBlocked):
+        subprocess.run(["curl", f"https://{ip}/"])
+
+
+@pytest.mark.parametrize("wf,mod,fn", [(w, m, f) for w, xs in SELF_TESTS.items() for m, f in xs])
+def test_ci_self_test_makes_no_live_dk_request(dk_block, wf, mod, fn):
+    sys.modules.pop(mod, None)
+    assert getattr(importlib.import_module(mod), fn)() == 0
+    assert dk_block == []
+
+
 @pytest.mark.parametrize("module", MODULES)
 def test_ci_test_module_makes_no_live_dk_request(dk_block, module):
     suite = unittest.defaultTestLoader.loadTestsFromName(module)
@@ -144,7 +229,8 @@ def test_import_only_script_makes_no_live_dk_request_on_import(dk_block, module)
 
 def test_guarded_list_matches_workflows():
     wf = ROOT / ".github" / "workflows"
-    for name, mods in {**GUARDED, **IMPORT_ONLY_SCRIPTS}.items():
+    for name, mods in {**GUARDED, **IMPORT_ONLY_SCRIPTS,
+                       **{w: [m for m, _ in xs] for w, xs in SELF_TESTS.items()}}.items():
         text = (wf / name).read_text(encoding="utf-8")
         assert "draftkings" not in "".join(
             l for l in text.splitlines() if "curl" in l).lower(), name
