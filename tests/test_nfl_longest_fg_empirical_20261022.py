@@ -86,3 +86,38 @@ def test_canonical_path_still_blocked_and_registry_state():
         assert fam["state"] == "RESEARCH_UNSCREENED"
         assert fam["eligible"] is False and fam["play_allowed"] is False
         assert fam["validation_status"] == "NOT_VALIDATED"
+
+
+# --- coherence / edge refusals (v1.1 hardening) ---------------------------
+
+def _p(line, **kw):
+    return eng.price_longest_fg(games(**kw), kicker_id="K1", kickoff=KO,
+                                line=line)
+
+
+def test_line_below_min_fg_distance_has_zero_made_not_over():
+    out = _p(17.5)
+    assert out["p_made_fg_not_longer_than_line"] == 0.0
+    assert out["p_made_longer_than_line"] == pytest.approx(
+        1.0 - out["p_no_made_fg"], abs=1e-15)
+
+
+@pytest.mark.parametrize("line", [17.5, 25.5, 33.5, 44.5, 52.5, 60.5, 65.5])
+def test_single_construction_is_coherent(line):
+    out = _p(line)
+    over = out["p_made_longer_than_line"]
+    notover = out["p_made_fg_not_longer_than_line"]
+    none = out["p_no_made_fg"]
+    assert min(over, notover, none) >= 0.0
+    assert over + notover + none == pytest.approx(1.0, abs=1e-12)
+    # P(any make) is line-independent under the single construction
+    assert over + notover == pytest.approx(1.0 - _p(30.5)["p_no_made_fg"],
+                                           abs=1e-12)
+
+
+@pytest.mark.parametrize("line", [66.5, 69.5])
+def test_above_support_is_coded_refusal_not_degenerate(line):
+    with pytest.raises(eng.NflLongestFgError,
+                       match="^LONGEST_FG_LINE_ABOVE_SUPPORT") as ei:
+        _p(line)
+    assert "DEGENERATE" not in str(ei.value)

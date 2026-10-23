@@ -42,6 +42,9 @@ ENGINE_VERSION = "nfl_longest_fg_empirical_v1_20261022"
 GOVERNANCE_STATE = "RESEARCH_UNSCREENED"
 TOP_BAND_ASSUMED_MAX = 66.0
 LINE_MIN, LINE_MAX = 17.0, 70.0
+# Shortest physically possible FG (ball at the 1, +10 end zone, +7 snap).
+# The league prior's lowest band is supported on [MIN_FG_DISTANCE, 29].
+MIN_FG_DISTANCE = 18.0
 
 
 class NflLongestFgError(ValueError):
@@ -50,7 +53,7 @@ class NflLongestFgError(ValueError):
 
 def _frac_beyond(lo: float, hi: float, line: float) -> float:
     hi = TOP_BAND_ASSUMED_MAX if hi >= 999 else float(hi) + 1.0
-    lo = float(lo)
+    lo = max(float(lo), MIN_FG_DISTANCE)
     if line < lo:
         return 1.0
     if line >= hi:
@@ -69,6 +72,9 @@ def price_longest_fg(games: Iterable[Mapping[str, Any]], *, kicker_id: str,
     if line != math.floor(line) + 0.5:
         # integer lines would need a push rule we have not verified
         raise NflLongestFgError(f"LONGEST_FG_LINE_NOT_HALF_POINT:{line}")
+    if line >= TOP_BAND_ASSUMED_MAX:
+        # beyond the declared support of the league distance prior
+        raise NflLongestFgError(f"LONGEST_FG_LINE_ABOVE_SUPPORT:{line}")
     games = list(games)
     try:
         base = k.estimate_kicking(games, kicker_id=kicker_id, kickoff=kickoff)
@@ -93,21 +99,29 @@ def price_longest_fg(games: Iterable[Mapping[str, Any]], *, kicker_id: str,
     rates = [(made[i] + k.BAND_SHRINK_ATT * lr) / (att[i] + k.BAND_SHRINK_ATT)
              for i, (_lo, _hi, lr, _lm) in enumerate(bands)]
     mix_total = math.fsum(b[3] for b in bands)
-    emp = math.fsum(rates[b] for d, b in dists if d > line)
-    lg = math.fsum((lm / mix_total) * rates[i] * _frac_beyond(lo, hi, line)
-                   for i, (lo, hi, _lr, lm) in enumerate(bands))
-    q = (emp + k.MIX_SHRINK_ATT * lg) / (n_att + k.MIX_SHRINK_ATT)
+
+    def q_of(L: float) -> float:
+        # per attempt P(made AND distance > L): ONE construction for all
+        # three outputs; q_of(-inf) is the per-attempt make probability.
+        emp = math.fsum(rates[b] for d, b in dists if d > L)
+        lg = math.fsum((lm / mix_total) * rates[i] * _frac_beyond(lo, hi, L)
+                       for i, (lo, hi, _lr, lm) in enumerate(bands))
+        return (emp + k.MIX_SHRINK_ATT * lg) / (n_att + k.MIX_SHRINK_ATT)
+
+    m = q_of(-math.inf)
+    q = q_of(line)
+    if not (0.0 < q <= m < 1.0):
+        raise NflLongestFgError(f"LONGEST_FG_NO_SUPPORT:{line}")
     # attempt-count PMF: same shrunk construction as the kicking engine
     counts = [len(g.get("fg_attempts") or ()) for g in rows]
     pmf = k._shrunk_count_pmf(counts, k.LEAGUE_FG_ATTEMPT_COUNTS)
-    p_none_beyond = math.fsum(p * (1.0 - q) ** n for n, p in pmf.items())
-    p_over = 1.0 - p_none_beyond
-    p_any_make = 1.0 - math.fsum(p * (1.0 - base["p_attempt_make"]) ** n
-                                 for n, p in pmf.items())
-    p_no_made = 1.0 - p_any_make
-    p_under_given_made = p_any_make - p_over
-    if not (0.0 < p_over < 1.0) or p_under_given_made < -1e-12:
-        raise NflLongestFgError("LONGEST_FG_DEGENERATE_PROBABILITY")
+    p_no_made = math.fsum(p * (1.0 - m) ** n for n, p in pmf.items())
+    p_not_over = (0.0 if q == m else
+                  math.fsum(p * ((1.0 - q) ** n - (1.0 - m) ** n)
+                            for n, p in pmf.items()))
+    p_over = 1.0 - p_no_made - p_not_over
+    if not (0.0 < p_over < 1.0):
+        raise NflLongestFgError(f"LONGEST_FG_NO_SUPPORT:{line}")
     return {
         "status": "RESEARCH_ONLY", "governance": GOVERNANCE_STATE,
         "validation_status": "NOT_VALIDATED", "eligible": False,
@@ -116,7 +130,7 @@ def price_longest_fg(games: Iterable[Mapping[str, Any]], *, kicker_id: str,
         "as_of_kickoff": base["as_of_kickoff"], "line": line,
         "games_used": base["games_used"], "fg_attempts_used": n_att,
         "p_made_longer_than_line": p_over,
-        "p_made_fg_not_longer_than_line": max(0.0, p_under_given_made),
+        "p_made_fg_not_longer_than_line": p_not_over,
         "p_no_made_fg": p_no_made,
         "settlement_basis": "UNVERIFIED_NO_MADE_FG_CASE_NOT_FOLDED",
     }
