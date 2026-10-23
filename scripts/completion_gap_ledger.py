@@ -122,8 +122,9 @@ def _require_cited_is_head(e: dict, market: str) -> None:
 
 def verify_branch_shas(policy: dict, *, resolver=None, file_resolver=None) -> list:
     """For every grok-branch entry: cleared_head_sha must be exactly the remote branch
-    HEAD, the cited engine sha must be on that branch (the head or an ancestor), and the
-    engine_file must exist at the cited sha."""
+    HEAD, the cited engine sha must equal cleared_head_sha (so it is that HEAD; an
+    ancestor is refused by _require_cited_is_head), and the engine_file must exist at
+    the cited sha."""
     resolver = resolver or _github_resolver
     heads, shas, files = set(), set(), set()
     for _key, _sport, market, e in _grok_entries(policy):
