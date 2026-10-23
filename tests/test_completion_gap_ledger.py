@@ -14,11 +14,13 @@ def _row(market, sport="NFL", blocker=None, readiness="NO_CANONICAL_PRICING_PATH
             "validated_accuracy_in_this_audit": False}
 
 
-POLICY = {"paused_markets": {"MLB": ["F5_TOTALS", "NRFI"]}, "schema": "SPORTSEDGE_COMPLETION_GAP_POLICY_V1"}
+POLICY = {"paused_markets": {"MLB": {"F5_TOTALS": "docs/decisions/GROK_RULINGS_20261023.md#ruling-6-focus-pause",
+                                    "NRFI": "docs/decisions/GROK_RULINGS_20261023.md#ruling-6-focus-pause"}},
+          "schema": "SPORTSEDGE_COMPLETION_GAP_POLICY_V2"}
 
 
 def test_no_engine_is_engines_gap_and_buildable_unless_paused():
-    g = classify(_row("anytime_td", blocker="NO_ENGINE"), POLICY)
+    g = classify(_row("safety", blocker="NO_ENGINE"), POLICY)
     assert (g["score_area"], g["status"]) == ("ENGINES", "BUILDABLE")
 
 
@@ -74,5 +76,5 @@ def test_committed_ledger_matches_regeneration():
 
 
 def test_owner_held_market_is_blocked():
-    pol = {"paused_markets": {}, "owner_held_markets": {"MLB": ["EITHER_PITCHER_ER"]}}
+    pol = {"paused_markets": {}, "owner_held_markets": {"MLB": {"EITHER_PITCHER_ER": "docs/decisions/GROK_RULINGS_20261023.md#owner-hold-either-pitcher-20261015"}}}
     assert classify(_row("EITHER_PITCHER_ER", "MLB", blocker="NO_ENGINE"), pol)["status"] == "BLOCKED_OWNER_HOLD"
