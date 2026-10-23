@@ -121,15 +121,21 @@ def _schedule(path: Path, season: int) -> dict:
 
 
 def load_current_season(stats_path, schedule_path, *, season: int,
-                        captured_at) -> dict:
+                        captured_at, fetched_at=None) -> dict:
+    """fetched_at: optional {"stats": iso, "schedule": iso} injected by the
+    replay (server push times of the data records) instead of sidecars."""
     cap = _ts(captured_at, "captured_at")
     stats_path = Path(stats_path)
     if not stats_path.exists():
         raise RefreshFailed("REFRESH_MISSING", str(stats_path))
     if not Path(schedule_path).exists():
         raise RefreshFailed("REFRESH_MISSING", f"schedule {schedule_path}")
-    fet = _fetch_record(stats_path)
-    sfet = _fetch_record(schedule_path)
+    if fetched_at is not None:
+        fet = _ts(fetched_at["stats"], "stats fetched_at")
+        sfet = _ts(fetched_at["schedule"], "schedule fetched_at")
+    else:
+        fet = _fetch_record(stats_path)
+        sfet = _fetch_record(schedule_path)
     for name, t in (("stats", fet), ("schedule", sfet)):
         if t > cap:
             raise RefreshFailed("REFRESH_FETCHED_AFTER_CAPTURE",
@@ -242,10 +248,12 @@ def _write(path: Path, rec: dict):
 
 
 def run_slate(*, stats_path, schedule_path, season, captured_at, kickoff,
-              run_record_path, base_data, pricer, extra_record=None):
+              run_record_path, base_data, pricer, extra_record=None,
+              now=None, fetched_at=None):
     """Refresh -> write run record with sha256 -> price. Fails closed.
-    The run's own start time (wall clock) must be strictly before kickoff."""
-    started = _utcnow()
+    The run's start time must be strictly before kickoff; `now` is injected
+    by the replay (never the wall clock there)."""
+    started = now if now is not None else _utcnow()
     rec = {"engine": "nfl_atd_v1.1", "season": season,
            "captured_at": captured_at, "kickoff": kickoff,
            "run_started_at": started.isoformat(), **(extra_record or {})}
@@ -255,7 +263,7 @@ def run_slate(*, stats_path, schedule_path, season, captured_at, kickoff,
             raise RefreshFailed("RUN_AFTER_KICKOFF",
                                 f"run {started.isoformat()} >= kickoff {ko.isoformat()}")
         cur = load_current_season(stats_path, schedule_path, season=season,
-                                  captured_at=captured_at)
+                                  captured_at=captured_at, fetched_at=fetched_at)
     except RefreshFailed as e:
         rec.update(status="FAILED_CLOSED", failure=e.code, detail=e.detail)
         _write(run_record_path, rec)

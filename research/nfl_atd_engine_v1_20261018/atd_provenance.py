@@ -60,6 +60,27 @@ def data_record_path(sha256: str, ext: str = "csv") -> str:
     return f"{ROOT}/data/{sha256}.{ext}"
 
 
+def board_record_path(sha256: str, season, week) -> str:
+    """Board capture record (pricer input), filed under its season-week."""
+    return f"{ROOT}/boards/{int(season)}-W{int(week)}/{sha256}.json"
+
+
+def canonical_json(obj) -> bytes:
+    """Canonical JSON for the replay comparison."""
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=False, allow_nan=False).encode()
+
+
+# Replayers by pricer sha256. The real frozen pricer is added lazily (its
+# sha is computed from its code); EXTRA_REPLAYERS is a test hook only.
+EXTRA_REPLAYERS: dict = {}
+
+
+def replayers() -> dict:
+    import price_nfl_atd_board_v11 as pr
+    return {**EXTRA_REPLAYERS, pr.pricer_sha256(): pr.replay}
+
+
 DATA_EXT = {"schedule": "csv", "stats": "csv.gz"}
 
 
@@ -315,7 +336,8 @@ def verify_fetch(api, sha256, captured_at, stored_event=None):
     return p
 
 
-def load_data_record(api, sha256, ext="csv", stored_event=None, fetch_event=None):
+def load_data_record(api, sha256, ext="csv", stored_event=None, fetch_event=None,
+                     require_fetch=True):
     """A hash-named single-commit data record data/<sha>.<ext> whose bytes
     hash to sha256, matched to fetch/<sha>.json (as settlements are).
     Returns the data proof with 'bytes' and 'fetch' (fetch-record proof)."""
@@ -327,7 +349,7 @@ def load_data_record(api, sha256, ext="csv", stored_event=None, fetch_event=None
         raise ProvenanceFailed(code, e.detail)
     if hashlib.sha256(p["content"]).hexdigest() != sha256:
         raise ProvenanceFailed("DATA_RECORD_HASH_MISMATCH", path)
-    p["fetch"] = verify_fetch(api, sha256, None, fetch_event)
+    p["fetch"] = verify_fetch(api, sha256, None, fetch_event) if require_fetch else None
     p["bytes"] = p.pop("content")
     return p
 
@@ -344,8 +366,11 @@ def stats_teams(gz_bytes, season) -> dict:
             continue
         w = int(r["week"])
         team = r.get("recent_team") or r.get("team") or ""
-        if r["player_id"] not in best or w >= best[r["player_id"]][0]:
+        cur = best.get(r["player_id"])
+        if cur is None or w > cur[0]:
             best[r["player_id"]] = (w, team)
+        elif w == cur[0] and cur[1] != team:
+            best[r["player_id"]] = (w, None)    # same-week tie, different teams
     return {p: t for p, (w, t) in best.items()}
 
 
@@ -405,7 +430,7 @@ def load_slate(api, slate_id) -> dict:
         sch = load_data_record(api, shas["schedule"], "csv", ev.get("data_event"), ev.get("event"))
     except ProvenanceFailed as e:
         out["reasons"].append(e.code)
-    pteams = None
+    pteams, sd = None, None
     try:
         ev = (stored.get("stats") or {}) if isinstance(stored, dict) else {}
         sd = load_data_record(api, shas["stats"], DATA_EXT["stats"],
@@ -477,11 +502,80 @@ def load_slate(api, slate_id) -> dict:
             out[f"{name}_fetch_proof"] = fp
         except ProvenanceFailed as e:
             out["reasons"].append(e.code)
+    _replay_check(api, rec, rows, run_t, sch, sd, out)
     out["record"] = rec
     out["season"] = season
     out["reasons"] = sorted(set(out["reasons"]))
     out["status"] = "SCREEN" if out["reasons"] else "COUNTS"
     return out
+
+
+def _replay_check(api, rec, rows, run_t, sch, sd, out):
+    """Full replay (re-audit of 353147d5): load every pricer input from its
+    single-commit branch record (each pushed before the run record), re-run
+    the sha-verified pricer on exactly those bytes with injected time (the
+    run push) and require canonical-JSON-identical rows."""
+    try:
+        inp = rec["inputs"]
+        psha = rec["pricer_sha256"]
+        week = int(rec["week"])
+        pins = inp["player_data"]
+        if not isinstance(pins, dict) or inp["stats"] != rec["stats_sha256"] \
+                or inp["schedule"] != rec["schedule_sha256"]:
+            raise ValueError
+    except (KeyError, TypeError, ValueError):
+        out["reasons"].append("RUN_RECORD_MALFORMED")
+        return
+    reg = replayers()
+    if psha not in reg:
+        out["reasons"].append("RUN_PRICER_SHA_MISMATCH")
+        return
+    ok = sch is not None and sd is not None
+    for p in (sch, sd):
+        if p is not None and _t(p["pushed_at"]) >= run_t:
+            out["reasons"].append("INPUT_PUSH_NOT_BEFORE_RUN_PUSH")
+    board = None
+    bpath = board_record_path(str(inp["board"]), rec["season"], week)
+    try:
+        bp = prove_record(api, bpath)
+        if _sha_text(bp["content"]) != inp["board"]:
+            raise ProvenanceFailed("RECORD_HASH_MISMATCH", bpath)
+        if _t(bp["pushed_at"]) >= run_t:
+            out["reasons"].append("INPUT_PUSH_NOT_BEFORE_RUN_PUSH")
+        board = json.loads(bp["content"])
+        if any(str(board.get(k)) != str(rec.get(k))
+               for k in ("slate_id", "season", "week", "captured_at")):
+            out["reasons"].append("RUN_BOARD_MISMATCH")
+        out["board_proof"] = {k: v for k, v in bp.items() if k != "content"}
+    except ProvenanceFailed as e:
+        out["reasons"].append(e.code if e.code.startswith(("API_", "RECORDS_"))
+                              else "BOARD_" + e.code)
+        ok = False
+    except (ValueError, AttributeError):
+        out["reasons"].append("RUN_BOARD_MISMATCH")
+        ok = False
+    pd = {}
+    for name, sha in sorted(pins.items()):
+        try:
+            d = load_data_record(api, sha, "csv.gz", require_fetch=False)
+            if _t(d["pushed_at"]) >= run_t:
+                out["reasons"].append("INPUT_PUSH_NOT_BEFORE_RUN_PUSH")
+            pd[name] = d["bytes"]
+        except ProvenanceFailed as e:
+            out["reasons"].append(e.code)
+            ok = False
+    if not ok:
+        return
+    try:
+        got = reg[psha]({"board": bp["content"].encode(), "stats": sd["bytes"],
+                         "schedule": sch["bytes"], "player_data": pd},
+                        now=run_t, fetched_at={"stats": sd["pushed_at"],
+                                               "schedule": sch["pushed_at"]})
+        same = canonical_json(got) == canonical_json(rows)
+    except Exception:                       # replay failed closed -> differs
+        same = False
+    if not same:
+        out["reasons"].append("RUN_REPLAY_MISMATCH")
 
 
 def _tree_paths(api, sub):

@@ -135,6 +135,27 @@ Selection, edge, settlement: locked #2399 Rules 1, 2, 3, 7, 8, 9.
   on outcomes. A PRICED row that fails the check at review can only come
   from a forged record, so it still makes the slate SCREEN. All close windows (close record checks and the
   Rule 4 60-min window) use the recomputed kickoff.
+- Full replay (re-audit of 353147d5). Every pricer input is a
+  single-commit record on the records branch pushed before the run record
+  (INPUT_PUSH_NOT_BEFORE_RUN_PUSH): the board capture
+  `boards/<season>-W<week>/<sha>.json` (BOARD_RECORD_NOT_ON_BRANCH, …),
+  the stats and schedule data records, and each player-data pin file as
+  `data/<sha>.csv.gz` (no fetch record; hash = the SPEC_HASHES pin). The
+  run record carries `pricer_sha256` (sha256 over the pricer code files
+  `atd_engine.py, atd_refresh.py, atd_provenance.py,
+  price_nfl_atd_board_v11.py` and the pin list) and `inputs` (board,
+  stats, schedule and player-data shas). Board slate_id/season/week/
+  captured_at must equal the run record's (RUN_BOARD_MISMATCH). At review
+  the pricer whose sha matches (else RUN_PRICER_SHA_MISMATCH) is re-run on
+  exactly those record bytes, with time injected (now = the run record's
+  server push time; fetched_at = the data records' server push times) and
+  no other network or wall-clock input. Its rows must equal the run
+  record's rows byte-for-byte in canonical JSON (sorted keys, compact,
+  UTF-8, no NaN) or the slate is SCREEN with **RUN_REPLAY_MISMATCH**. This
+  subsumes the refusal and priced-value checks; the specific checks above
+  stay as clearer codes. Owner item at freeze: the pricer sha is then the
+  frozen one, and any later code change makes old records unreplayable
+  (SCREEN), by design.
 - Close captures: each close capture file is its own single-commit record
   named by the sha256 of its content, filed under the game's season-week.
   A close record that cannot be parsed, has no game, or is filed under the
@@ -189,6 +210,17 @@ stats team not in the game; see §2b). At review, a run record containing
 any UNPRICED reason not in DECLARED_UNPRICED_REASONS or
 DECLARED_PRICER_REFUSALS makes the slate SCREEN
 (RUN_REFUSAL_CODE_UNDECLARED).
+
+**Systematic exclusion (declared).** Refused upfront, before pricing, as
+PLAYER_TEAM_UNRESOLVED: players with no 2026 stats (rookies, newly
+signed, injured-all-season, Week 1), players traded after the last stats
+week (latest stats team not in the game), and players whose latest stats
+week shows two different teams (same-week tie; deterministic, independent
+of row order). An engine UNPRICED_PLAYER_TEAM_MISMATCH that also fails the
+stats-team check is reported as PLAYER_TEAM_UNRESOLVED. This is a
+systematic exclusion of these player classes from the forward test: the
+verdict says nothing about them, and they are fixed by pinned data before
+capture, so they are not outcome-dependent selection.
 
 ## 5. (B) Forward scorer (`score_nfl_atd_forward.py`), #2399 Rules 4–6
 - Rule 4 CLV = implied(close Yes) − implied(entry Yes). Captures and

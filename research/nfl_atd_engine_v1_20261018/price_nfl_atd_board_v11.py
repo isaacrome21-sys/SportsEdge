@@ -38,7 +38,10 @@ def player_team_refusal(rows, pteams, game_teams) -> int:
     before capture and cannot depend on outcomes."""
     gt, n = set(game_teams or []), 0
     for r in rows:
-        if r.get("status") != "PRICED" or pteams.get(r.get("player_id")) in gt:
+        # PRICED rows, and engine team mismatches (so the outcome does not
+        # depend on stats row order when a same-week tie exists)
+        eligible = r.get("status") == "PRICED" or r.get("reason") == "UNPRICED_PLAYER_TEAM_MISMATCH"
+        if not eligible or pteams.get(r.get("player_id")) in gt:
             continue
         keep = {k: v for k, v in r.items() if k in _KEEP_ON_REFUSAL or k in LABEL_KEYS}
         r.clear()
@@ -50,38 +53,46 @@ def player_team_refusal(rows, pteams, game_teams) -> int:
 LABEL_KEYS = tuple(getattr(eng, "LABELS", {}).keys())
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    for a in ("--player-data", "--stats-2026", "--schedule",
-              "--board", "--out", "--run-record"):
-        ap.add_argument(a, required=True)
-    args = ap.parse_args()
-    pins = eng.check_data_pins(Path(args.player_data))
-    board = json.loads(Path(args.board).read_text())
-    if not board.get("slate_id"):
-        print("FAILED_CLOSED SLATE_ID_MISSING")
-        return 2
-    # Server-side fetch provenance (re-audit #1): refuse unless each data
-    # file's sha256 matches a fetch record on the records branch whose push
-    # GitHub timestamps strictly before the entry capture.
-    shas = {"stats": rf._sha(Path(args.stats_2026)),
-            "schedule": rf._sha(Path(args.schedule))}
+PRICER_FILES = ("atd_engine.py", "atd_refresh.py", "atd_provenance.py",
+                "price_nfl_atd_board_v11.py")
+
+
+def pricer_sha256() -> str:
+    """sha256 of the frozen pricer: its code files and the data pin list."""
+    import hashlib
+    h = hashlib.sha256()
+    here = Path(__file__).resolve().parent
+    for n in PRICER_FILES:
+        b = (here / n).read_bytes()
+        h.update(f"{n}\0{len(b)}\0".encode() + b)
+    b = Path(eng.PART2_HASHES).read_bytes()
+    h.update(f"PINS\0{len(b)}\0".encode() + b)
+    return h.hexdigest()
+
+
+class PricingFailed(Exception):
+    def __init__(self, code, detail=""):
+        super().__init__(f"{code}: {detail}")
+        self.code, self.detail = code, detail
+
+
+def price_core(board, stats_path, schedule_path, player_data, *, now,
+               fetched_at=None, run_record_path=None, extra_record=None):
+    """The pricer proper, shared by pricing and the review replay. Pure in
+    its inputs: files + board + injected `now` (+ fetched_at). Returns
+    (rows, meta)."""
+    import tempfile
     try:
-        sk = rf.schedule_kickoff(Path(args.schedule), int(board["season"]),
+        pins = eng.check_data_pins(Path(player_data))
+    except SystemExit as e:
+        raise PricingFailed("DATA_PIN_FAILED", str(e))
+    try:
+        sk = rf.schedule_kickoff(Path(schedule_path), int(board["season"]),
                                  board.get("game_teams"), board.get("kickoff"))
     except rf.RefreshFailed as e:
-        print(f"FAILED_CLOSED {e.code}")
-        return 2
-    try:
-        prov = pv.require_fetch_provenance(pv.GitHubAPI(), shas,
-                                           board.get("captured_at"))
-    except (pv.ProvenanceFailed, ValueError, TypeError, OSError) as e:
-        # code + detail only; the token is never part of either
-        print(f"FAILED_CLOSED {getattr(e, 'code', 'PROVENANCE_UNAVAILABLE')}: "
-              f"{getattr(e, 'detail', type(e).__name__)}")
-        return 2
-    base = eng.load_data(Path(args.player_data))
-    pteams = pv.stats_teams(Path(args.stats_2026).read_bytes(), int(board["season"]))
+        raise PricingFailed(e.code, e.detail)
+    base = eng.load_data(Path(player_data))
+    pteams = pv.stats_teams(Path(stats_path).read_bytes(), int(board["season"]))
     refusals = {"PLAYER_TEAM_UNRESOLVED": 0}
 
     def pricer(data):
@@ -99,29 +110,100 @@ def main() -> int:
             rows, pteams, board["game_teams"])
         return rows
 
+    with tempfile.TemporaryDirectory() as td:
+        rrp = Path(run_record_path) if run_record_path else Path(td) / "run.json"
+        try:
+            rows = rf.run_slate(stats_path=Path(stats_path), schedule_path=Path(schedule_path),
+                                season=int(board["season"]),
+                                captured_at=board.get("captured_at"),
+                                kickoff=board.get("kickoff"), run_record_path=rrp,
+                                base_data=base, pricer=pricer,
+                                extra_record=extra_record, now=now, fetched_at=fetched_at)
+        except rf.RefreshFailed as e:
+            raise PricingFailed(e.code, e.detail)
+        refresh = json.loads(rrp.read_text())
+    return rows, {"sk": sk, "pins": pins, "refusals": refusals, "refresh": refresh}
+
+
+def replay(inputs: dict, *, now, fetched_at):
+    """Re-run the pricer on exactly the branch records' bytes (review)."""
+    import tempfile
+    from datetime import datetime
+    if isinstance(now, str):
+        now = datetime.fromisoformat(now)
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        (td / "pd").mkdir()
+        for n, b in inputs["player_data"].items():
+            if "/" in n or n.startswith("."):
+                raise PricingFailed("REPLAY_INPUT_INVALID", n)
+            (td / "pd" / n).write_bytes(b)
+        (td / "stats.csv.gz").write_bytes(inputs["stats"])
+        (td / "games.csv").write_bytes(inputs["schedule"])
+        board = json.loads(inputs["board"])
+        rows, _ = price_core(board, td / "stats.csv.gz", td / "games.csv", td / "pd",
+                             now=now, fetched_at=fetched_at)
+    return rows
+
+
+def _sha_file(p):
+    import hashlib
+    return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    for a in ("--player-data", "--stats-2026", "--schedule",
+              "--board", "--out", "--run-record"):
+        ap.add_argument(a, required=True)
+    args = ap.parse_args()
+    board = json.loads(Path(args.board).read_text())
+    if not board.get("slate_id"):
+        print("FAILED_CLOSED SLATE_ID_MISSING")
+        return 2
+    shas = {"stats": rf._sha(Path(args.stats_2026)),
+            "schedule": rf._sha(Path(args.schedule))}
+    bsha = _sha_file(args.board)
     try:
-        rows = rf.run_slate(stats_path=Path(args.stats_2026),
-                            schedule_path=Path(args.schedule),
-                            season=int(board["season"]),
-                            captured_at=board.get("captured_at"),
-                            kickoff=board.get("kickoff"),
-                            run_record_path=Path(args.run_record),
-                            base_data=base, pricer=pricer,
-                            extra_record={"data_sha256": pins,
-                                          "game_id": board["game_id"],
-                                          "slate_id": board.get("slate_id"),
-                                          "fetch_provenance": prov,
-                                          "push_to": f"{pv.RECORDS_BRANCH}:"
-                                                     f"{pv.run_record_path(board.get('slate_id'))}",
-                                          "counts_only_if": "run record pushed (server time) before first kickoff"})
-    except rf.RefreshFailed as e:
+        pins = eng.check_data_pins(Path(args.player_data))
+    except SystemExit as e:
+        print(f"FAILED_CLOSED {e}")
+        return 2
+    # Every pricer input must already be a single-commit branch record
+    # (re-audit of 353147d5): stats/schedule data + fetch records before
+    # capture; the board capture and the player-data pins before the run.
+    try:
+        api = pv.GitHubAPI()
+        prov = pv.require_fetch_provenance(api, shas, board.get("captured_at"))
+        pv.prove_record(api, pv.board_record_path(bsha, board["season"], board["week"]))
+        for n, h in pins.items():
+            pv.load_data_record(api, h, "csv.gz", require_fetch=False)
+    except (pv.ProvenanceFailed, ValueError, TypeError, OSError, KeyError) as e:
+        # code + detail only; the token is never part of either
+        print(f"FAILED_CLOSED {getattr(e, 'code', 'PROVENANCE_UNAVAILABLE')}: "
+              f"{getattr(e, 'detail', type(e).__name__)}")
+        return 2
+    try:
+        rows, meta = price_core(
+            board, args.stats_2026, args.schedule, args.player_data,
+            now=rf._utcnow(), run_record_path=Path(args.run_record),
+            extra_record={"data_sha256": pins, "game_id": board["game_id"],
+                          "slate_id": board.get("slate_id"), "fetch_provenance": prov,
+                          "push_to": f"{pv.RECORDS_BRANCH}:"
+                                     f"{pv.run_record_path(board.get('slate_id'))}",
+                          "counts_only_if": "run record pushed (server time) before first kickoff"})
+    except PricingFailed as e:
         print(f"FAILED_CLOSED {e.code}: {e.detail}")
         return 2
+    sk, refusals = meta["sk"], meta["refusals"]
     # Run record = the slate's sole source at review (rule B): rows, hashes,
     # capture/kickoff and the raw fetch activity events (rule F).
     rr = json.loads(Path(args.run_record).read_text())
     rr.update(slate_id=board.get("slate_id"), captured_at=board.get("captured_at"),
-              season=int(board["season"]),
+              season=int(board["season"]), week=int(board["week"]),
+              pricer_sha256=pricer_sha256(),
+              inputs={"board": bsha, "stats": shas["stats"],
+                      "schedule": shas["schedule"], "player_data": pins},
               schedule_kickoffs={sk["game_id"]: board.get("kickoff")},
               game_teams={sk["game_id"]: list(board["game_teams"])},
               schedule_game={"board_game_id": board["game_id"], **sk},
