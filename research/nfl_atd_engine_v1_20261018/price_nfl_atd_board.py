@@ -50,7 +50,7 @@ def main() -> int:
             "player_name": raw.get("player_name"),
             "player_id": raw.get("player_id"),
             "game_teams": board["game_teams"],
-            "yes_price": raw["yes_price"],
+            "yes_price": raw.get("yes_price"),
             "captured_at": board.get("captured_at"),
             "kickoff": board.get("kickoff"),
             "season": int(board["season"]), "week": int(board["week"]),

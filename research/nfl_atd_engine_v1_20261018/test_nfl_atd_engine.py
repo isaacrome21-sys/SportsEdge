@@ -36,7 +36,10 @@ class TestOddsAndRules(unittest.TestCase):
 
     def test_rule1_boundary_is_pass(self):
         # YES iff model_p > implied, strictly (locked Rule 1).
-        data = {"by_player": {}, "by_season": {}, "meta": {}}
+        data = {"by_player": {}, "by_season": {},
+                "meta": {"p1": {"display_name": "X Y", "team": "DAL",
+                                "position_group": "RB", "last_season": 2025,
+                                "last_week": 18}}}
         # Build a stub through price_board_row with a fixed engine price:
         orig = eng.price_player
         try:
@@ -46,7 +49,8 @@ class TestOddsAndRules(unittest.TestCase):
                 "pool_source": "TEST", "position_group": "RB"}
             row = {"game_id": "g", "player_name": "X Y", "player_id": "p1",
                    "game_teams": ["DAL", "GB"], "yes_price": 300,
-                   "captured_at": "t", "kickoff": "k", "season": 2026,
+                   "captured_at": "2026-10-25T11:00:00-05:00",
+                   "kickoff": "2026-10-25T12:00:00-05:00", "season": 2026,
                    "week": 7}
             out = eng.price_board_row(data, {}, row)
             self.assertAlmostEqual(out["raw_implied"], 0.25)

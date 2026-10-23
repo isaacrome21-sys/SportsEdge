@@ -19,8 +19,11 @@ from __future__ import annotations
 import csv
 import gzip
 import hashlib
+import math
 import re
 from collections import defaultdict
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -36,6 +39,26 @@ REQUIRED_FILES = (
     "ps_2018.csv.gz", "ps_2019.csv.gz", "ps_2020.csv.gz", "ps_2021.csv.gz",
     "ps_2022.csv.gz", "ps_2023.csv.gz", "ps_2024.csv.gz", "sp_2025.csv.gz",
 )
+
+# Every UNPRICED reason the engine can emit (fail-closed contract). The
+# prereg (PREREG_NFL_ATD_ENGINE_V1.md §2) names only INSUFFICIENT_GAMES,
+# POSITION_GROUP_NOT_POOLED, NAME_UNRESOLVED and NOT_A_PLAYER_ROW; declaring
+# the rest in the prereg is an OWNER ITEM (the prereg is hash-pinned and is
+# not edited here).
+DECLARED_UNPRICED_REASONS = (
+    "UNPRICED_INSUFFICIENT_GAMES",
+    "UNPRICED_POSITION_GROUP_NOT_POOLED",
+    "UNPRICED_POOL_UNAVAILABLE",
+    "UNPRICED_NAME_UNRESOLVED",
+    "UNPRICED_NOT_A_PLAYER_ROW",
+    "UNPRICED_PLAYER_ID_UNKNOWN",
+    "UNPRICED_PLAYER_TEAM_MISMATCH",
+    "UNPRICED_INVALID_PRICE",
+    "UNPRICED_CAPTURED_AFTER_KICKOFF",
+    "UNPRICED_TIMESTAMP_MISSING",
+    "UNPRICED_TIMESTAMP_UNPARSEABLE",
+)
+MAX_ABS_AMERICAN = 100000  # sanity bound on a quoted American price
 
 FAMILY = "anytime_td"
 LABELS = {"status_label": "RESEARCH_ONLY", "validation_status": "NOT_VALIDATED",
@@ -236,6 +259,76 @@ def raw_implied(american_price: float) -> float:
     raise ValueError("american price of 0 is not a price")
 
 
+def parse_american(v):
+    """A valid American price as float, else None. Valid: finite number (or
+    numeric string such as "+600"), |price| in [100, MAX_ABS_AMERICAN].
+    Booleans, 0, null, NaN/inf and the dead zone (-100, 100) are invalid."""
+    if isinstance(v, bool) or v is None:
+        return None
+    if isinstance(v, str):
+        v = v.strip()
+        if not re.fullmatch(r"[+-]?\d+(\.\d+)?", v):
+            return None
+    elif not isinstance(v, (int, float)):
+        return None
+    try:
+        price = float(v)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(price) or not 100 <= abs(price) <= MAX_ABS_AMERICAN:
+        return None
+    return price
+
+
+_ZONES = {"CT": "America/Chicago", "CDT": "America/Chicago",
+          "CST": "America/Chicago", "ET": "America/New_York",
+          "EDT": "America/New_York", "EST": "America/New_York",
+          "UTC": "UTC", "Z": "UTC"}
+_HOUSE_RE = re.compile(
+    r"(\d{4}-\d{2}-\d{2}) +(\d{1,2}:\d{2}) *([AaPp][Mm]) +([A-Za-z]+)")
+
+
+def parse_timestamp(v):
+    """Timezone-aware datetime, or None if missing; raises ValueError if
+    present but unparseable or zone-less (a naive time is never assumed).
+    Accepts ISO 8601 with an offset/Z, or the capture house format
+    'YYYY-MM-DD H:MM AM/PM CT'."""
+    if v is None or (isinstance(v, str) and not v.strip()):
+        return None
+    if not isinstance(v, str):
+        raise ValueError("timestamp is not a string")
+    s = v.strip()
+    m = _HOUSE_RE.fullmatch(s)
+    if m:
+        zone = _ZONES.get(m.group(4).upper())
+        if zone is None:
+            raise ValueError("unknown zone")
+        dt = datetime.strptime(f"{m.group(1)} {m.group(2)} {m.group(3).upper()}",
+                               "%Y-%m-%d %I:%M %p")
+        return dt.replace(tzinfo=ZoneInfo(zone))
+    try:
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00") if s.endswith("Z") else s)
+    except ValueError:
+        raise ValueError("unparseable timestamp")
+    if dt.tzinfo is None or dt.utcoffset() is None:
+        raise ValueError("timestamp has no zone")
+    return dt
+
+
+def timing_refusal(captured_at, kickoff):
+    """None if the row was captured strictly before kickoff, else the
+    UNPRICED reason."""
+    try:
+        cap, ko = parse_timestamp(captured_at), parse_timestamp(kickoff)
+    except ValueError:
+        return "UNPRICED_TIMESTAMP_UNPARSEABLE"
+    if cap is None or ko is None:
+        return "UNPRICED_TIMESTAMP_MISSING"
+    if cap >= ko:
+        return "UNPRICED_CAPTURED_AFTER_KICKOFF"
+    return None
+
+
 def is_not_a_player_row(name: str) -> bool:
     n = (name or "").strip().lower()
     return n == "no touchdown scorer" or "d/st" in n
@@ -251,16 +344,36 @@ def price_board_row(data: dict, idx: dict, row: dict) -> dict:
         "player_id": row.get("player_id"), "yes_price": row.get("yes_price"),
         "captured_at": row.get("captured_at"), "kickoff": row.get("kickoff"),
     }
-    if is_not_a_player_row(row.get("player_name") or ""):
-        out.update(status="UNPRICED", reason="UNPRICED_NOT_A_PLAYER_ROW")
+    def refuse(reason, **extra):
+        out.update(status="UNPRICED", reason=reason, **extra)
         return out
+
+    # Order: timing, not-a-player, price, identity, engine. Exactly one
+    # named reason per row; a bad row never raises.
+    reason = timing_refusal(row.get("captured_at"), row.get("kickoff"))
+    if reason:
+        return refuse(reason)
+    if is_not_a_player_row(row.get("player_name") or ""):
+        return refuse("UNPRICED_NOT_A_PLAYER_ROW")
+    price = parse_american(row.get("yes_price"))
+    if price is None:
+        return refuse("UNPRICED_INVALID_PRICE")
+    game_teams = row.get("game_teams") or []
     pid = row.get("player_id")
-    if not pid:
+    if pid:
+        # Same team-in-game rule as name resolution: the player's most
+        # recent team in the snapshot must be one of the game's teams.
+        m = data["meta"].get(pid)
+        if m is None:
+            return refuse("UNPRICED_PLAYER_ID_UNKNOWN")
+        if m["team"] not in game_teams:
+            return refuse("UNPRICED_PLAYER_TEAM_MISMATCH",
+                          data_team=m["team"])
+    else:
         pid = resolve_name(data, idx, row.get("player_name") or "",
-                           row.get("game_teams") or [])
+                           game_teams)
         if not pid:
-            out.update(status="UNPRICED", reason="UNPRICED_NAME_UNRESOLVED")
-            return out
+            return refuse("UNPRICED_NAME_UNRESOLVED")
         out["player_id"] = pid
     season, week = int(row["season"]), int(row["week"])
     priced = price_player(data, pid, season, week)
@@ -268,7 +381,7 @@ def price_board_row(data: dict, idx: dict, row: dict) -> dict:
         out.update(status="UNPRICED", reason=priced["reason"],
                    prior_games=priced.get("prior_games"))
         return out
-    imp = raw_implied(row["yes_price"])
+    imp = raw_implied(price)
     p = priced["model_p"]
     out.update(status="PRICED", model_p=p, raw_implied=imp,
                edge=p / imp - 1.0,
