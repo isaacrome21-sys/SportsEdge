@@ -33,7 +33,7 @@ BOOKMAKERS = (
 MARKETS = ("h2h", "spreads", "totals")
 CHICAGO = ZoneInfo("America/Chicago")
 API = "https://api.the-odds-api.com/v4/sports"
-MAX_MARKET_AGE_SECONDS = 600
+MAX_MARKET_AGE_SECONDS = 180  # Strict 3-minute user quote freshness contract.
 # Preserve the existing NFL-confirmation quota reservation on shared keys.
 DEFAULT_RESERVE = 76
 # Preserve at least one future NFL and CFB 3-market poll before optional MLB/NBA.
@@ -213,7 +213,10 @@ def events_to_board(sport, events, now):
                     target["spread"]=[peer["line"],peer["away"],peer["home"]]
                 elif market=="totals":
                     target["total"]=[peer["line"],peer["over"],peer["under"]]
-                target["observed_at"]=peer["observed_at"]
+                # Different markets can have different provider receipt times.
+                # An aggregate stamp must never inherit only the LAST market.
+                target.setdefault("observed_at_by_market", {})[market] = peer["observed_at"]
+                target["observed_at"] = min(target["observed_at_by_market"].values())
             ref=_fair_context(dk,peers,market)
             ref.update(provider_event_id=ev.get("id"),market_key=market,
                        dk_observed_at=dk["observed_at"],dk_line=dk.get("line"))
@@ -273,7 +276,11 @@ def cfb_compact(games):
              "quote_source":"THE_ODDS_API_DK_AUTO",
              "book_quote_receipt_verified":True,
              "peers":g.get("peer_books") or [],
-             "quote_captured_at":next(iter(g["markets"].values()))["observed_at"]}
+             # Conservative composite timestamp: no individual line may be
+             # younger than the stamp used by the downstream card.
+             "quote_captured_at":min(v["observed_at"] for v in m.values()),
+             "quote_observed_at_by_market":{k:v["observed_at"] for k,v in m.items()},
+             "quote_timestamp_source":"PROVIDER_LAST_UPDATE"}
         if "h2h" in m: row["ml"]=[m["h2h"]["away"],m["h2h"]["home"]]
         if "spreads" in m: row["spread"]=[m["spreads"]["line"],m["spreads"]["away"],m["spreads"]["home"]]
         if "totals" in m: row["total"]=[m["totals"]["line"],m["totals"]["over"],m["totals"]["under"]]
