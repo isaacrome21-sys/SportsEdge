@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
+
 from sportsedge import nba_prop_empirical as v1
 
 ENGINE_ID = "NBA_COMBO_PROP_RESEARCH_V1"
@@ -49,18 +51,22 @@ def price_combo(store, player_id, combo: str, line, target_date) -> dict:
             "participation_feed": "NOT_WIRED"}
     if combo not in COMBOS:
         return {**base, "status": "REFUSED", "reason": "NBA_COMBO_UNSUPPORTED"}
-    if isinstance(line, bool):
-        return {**base, "status": "REFUSED", "reason": v1.REFUSAL_LINE_INVALID,
-                "detail": "LINE_BOOL"}
+    bad = lambda det: {**base, "status": "REFUSED",
+                       "reason": v1.REFUSAL_LINE_INVALID, "detail": det}
+    if isinstance(line, (bool, np.bool_)):
+        return bad("LINE_BOOL")
+    if not isinstance(line, (int, float, str)):
+        return bad("LINE_TYPE")
+    if isinstance(line, str) and (not line.strip() or line != line.strip()):
+        return bad("LINE_WHITESPACE")
     try:
         line = float(line)
     except (TypeError, ValueError):
         return {**base, "status": "REFUSED", "reason": v1.REFUSAL_LINE_INVALID}
     if not math.isfinite(line):
         return {**base, "status": "REFUSED", "reason": v1.REFUSAL_LINE_INVALID}
-    if line < 0:
-        return {**base, "status": "REFUSED", "reason": v1.REFUSAL_LINE_INVALID,
-                "detail": "LINE_NEGATIVE"}
+    if line <= 0:  # also catches -0.0
+        return bad("LINE_NONPOSITIVE")
     target = v1._as_date(target_date)
     if target is None:
         return {**base, "status": "REFUSED", "reason": v1.REFUSAL_LINE_INVALID,
