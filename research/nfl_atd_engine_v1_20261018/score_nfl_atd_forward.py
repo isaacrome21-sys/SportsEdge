@@ -23,7 +23,7 @@ import math
 import os
 import re
 import subprocess
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import atd_engine as eng
@@ -35,6 +35,10 @@ DRIFT_FLAG = 0.02
 MAX_PICKED_CLV_MISSING = 0.20  # > 20% of picked rows CLV_MISSING -> INSUFFICIENT_CLOSE_DATA
 VERDICT_PATH = pv.VERDICT_PATH      # fixed: on pv.RECORDS_BRANCH only
 Z95 = 1.959963984540054
+
+
+def _utcnow():
+    return datetime.now(timezone.utc)
 
 
 class ReviewAlreadyRecorded(Exception):
@@ -195,36 +199,70 @@ def verdict_counts(api) -> bool:
         raise
 
 
-def review(slate_ids, *, records_worktree, api, captures, settlements):
-    """Single review. Slates are named by id; their rows and data hashes are
-    read ONLY from each pushed run record at the records-branch head (never
-    from the caller). Refuses unless records_worktree is a checkout of the
+def _score_rows(rows, closes, settlements):
+    out = []
+    for e in rows:
+        if e.get("status") != "PRICED":
+            continue
+        g = e["game_id"]
+        if g in closes["unproven_games"] or (
+                g in closes["kickoffs"] and closes["kickoffs"][g] != e["kickoff"]):
+            r = score_row(e, [], settlements)
+            r.update(clv=None, clv_status="CLV_MISSING", clv_reason="CLOSE_RECORD_UNPROVEN")
+        else:
+            r = score_row(e, closes["captures"], settlements)
+        out.append(r)
+    return out
+
+
+def score_slate_rows(api, slate_id):
+    """Score one COUNTS slate entirely from branch records."""
+    st = pv.load_slate(api, slate_id)
+    if st["status"] != "COUNTS":
+        return []
+    rows = st["record"]["rows"]
+    kos = {r["game_id"]: r["kickoff"] for r in rows if r.get("status") == "PRICED"}
+    closes = pv.load_closes(api)
+    setl = pv.load_settlements(api, kos, _utcnow())
+    return _score_rows(rows, closes, setl["settlements"])
+
+
+def review(slate_ids, *, records_worktree, api):
+    """Single review, reading ONLY records on the records-branch head: each
+    slate's rows/hashes from its pushed run record, close captures from
+    proven closes/<sha>.json records, settlements from hash-matched
+    settlement records. Refuses unless records_worktree is a checkout of the
     records branch whose origin is the SportsEdge repo, and if the verdict
-    path has EVER had a commit (checked via the API). SCREEN slates are
-    excluded. The verdict is staged create-only at the fixed path; it counts
-    only once pushed (verdict_counts). Caller-supplied captures/settlements
-    only score the recorded rows."""
+    path has EVER had a commit (API). SCREEN slates are excluded. The verdict
+    is staged create-only at the fixed path; it counts only once pushed."""
     wt = _check_worktree(records_worktree)
     if _verdict_ever_existed(api) or (wt / VERDICT_PATH).exists():
         raise ReviewAlreadyRecorded(f"{pv.RECORDS_BRANCH}:{VERDICT_PATH}")
-    acc, used, screen, proofs = [], [], [], {}
+    now = _utcnow()
+    loaded, screen = [], []
     for sid in slate_ids:
         st = pv.load_slate(api, sid)
-        if st["status"] != "COUNTS":
-            screen.append(sid)
-            continue
-        used.append(st["content"])
+        (loaded if st["status"] == "COUNTS" else screen).append(st if st["status"] == "COUNTS" else sid)
+    kos = {r["game_id"]: r["kickoff"] for st in loaded for r in st["record"]["rows"]
+           if r.get("status") == "PRICED"}
+    closes = pv.load_closes(api)
+    setl = pv.load_settlements(api, kos, now)
+    inputs = {"run_records": [], "closes": closes["records"],
+              "closes_unproven": closes["unproven_records"],
+              "settlements": setl["records"], "settlements_refused": setl["refused"]}
+    acc, proofs = [], {}
+    for st in loaded:
+        sid = st["slate_id"]
+        inputs["run_records"].append(st["content"])
         proofs[sid] = st["run_proof"]
-        for e in st["record"]["rows"]:
-            r = score_row(e, captures, settlements)
-            if r is not None:
-                acc.append(r)
+        acc += _score_rows(st["record"]["rows"], closes, setl["settlements"])
         weeks, picked, games = _gates(acc)
         if len(weeks) >= MIN_WEEKS and len(picked) >= MIN_PICKED and len(games) >= MIN_GAMES:
             v = _verdict(acc, sid)
-            v.update(inputs_sha256=inputs_sha256(used), n_slates=len(used),
-                     screen_slates=screen, records_branch=pv.RECORDS_BRANCH,
-                     verdict_path=VERDICT_PATH, run_proofs=proofs)
+            v.update(inputs_sha256=inputs_sha256(inputs), inputs=inputs,
+                     n_slates=len(inputs["run_records"]), screen_slates=screen,
+                     records_branch=pv.RECORDS_BRANCH, verdict_path=VERDICT_PATH,
+                     run_proofs=proofs, reviewed_at=now.isoformat())
             path = wt / VERDICT_PATH
             path.parent.mkdir(parents=True, exist_ok=True)
             try:

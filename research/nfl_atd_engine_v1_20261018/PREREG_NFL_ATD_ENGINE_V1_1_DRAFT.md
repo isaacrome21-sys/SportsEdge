@@ -58,7 +58,10 @@ Selection, edge, settlement: locked #2399 Rules 1, 2, 3, 7, 8, 9.
 - Repo `isaacrome21-sys/sportsedge`. Records branch (fixed):
   `records/nfl-atd-v1-1`. Fixed paths: fetch records
   `nfl_atd_v1_1/fetch/<data sha256>.json`; run records
-  `nfl_atd_v1_1/runs/<slate_id>.json`; verdict `nfl_atd_v1_1/VERDICT.json`.
+  `nfl_atd_v1_1/runs/<slate_id>.json`; close captures
+  `nfl_atd_v1_1/closes/<sha256 of file>.json`; settlement data
+  `nfl_atd_v1_1/settlements/<sha256>.json` (+ its fetch record
+  `fetch/<sha256>.json`); verdict `nfl_atd_v1_1/VERDICT.json`.
 - Server-side time: the GitHub repository activity API,
   `GET /repos/{owner}/{repo}/activity`, event fields `id, before, after,
   timestamp, activity_type`, for the `push` event whose `after` is the
@@ -87,6 +90,20 @@ Selection, edge, settlement: locked #2399 Rules 1, 2, 3, 7, 8, 9.
   the raw fetch events.
 - (C) Ordering: fetch push < run-record push, and
   captured_at <= run-record push < first kickoff.
+- Close captures: each close capture file is its own single-commit record
+  named by the sha256 of its content (CLOSE_RECORD_HASH_MISMATCH otherwise).
+  Its server push must be >= its `captured_at` (and every entry's
+  `captured_at`) and <= its kickoff + **15 min**; its kickoff must match the
+  run record's kickoff for that game. If ANY close record for a game fails,
+  every row on that game is CLV_MISSING with reason **CLOSE_RECORD_UNPROVEN**.
+- Settlements: a settlement data record is used only if its sha256 matches
+  a fetch record (hash-matched like the stats; SETTLEMENT_HASH_MISMATCH,
+  FETCH_RECORD_NOT_ON_BRANCH otherwise) whose push is AFTER the final
+  (kickoff + 4 h) of the last game it covers (SETTLEMENT_PUSH_BEFORE_FINAL)
+  and BEFORE the review time (SETTLEMENT_PUSH_NOT_BEFORE_REVIEW). Refused
+  files are listed in the verdict; their rows stay UNSETTLED (ungraded).
+  Two used files disagreeing on a (game_id, player_id) refuse the review
+  (SETTLEMENT_CONFLICT).
 - **A slate counts only if** all of the above hold on server-side times;
   otherwise it is **SCREEN** and excluded (listed as `screen_slates`).
 - Recommended, owner action: branch protection on `records/*` forbidding
@@ -137,8 +154,11 @@ code but undeclared. Declaring them is an owner item, done by freezing this.)
   the first slate close where all gates are met; that accumulated sample is
   the sample of record. (B) `review()` takes slate ids only: each slate's
   rows and data hashes are read from its pushed run record at the
-  records-branch head, never from the caller (callers supply only the close
-  captures and settlements that score those rows). (D/E) It runs only in a
+  records-branch head; close captures and settlements are read only from
+  their proven records on the branch head (§2b). Nothing scoring-relevant
+  comes from the caller: passing rows, captures or settlements raises
+  TypeError. The verdict lists every close/settlement record used or
+  refused, and `inputs_sha256` covers all of them. (D/E) It runs only in a
   checkout of `records/nfl-atd-v1-1` whose `origin` is
   `github.com/isaacrome21-sys/sportsedge` (RecordsLocationRefused otherwise),
   and refuses (ReviewAlreadyRecorded) if the API shows `VERDICT.json` at the

@@ -27,12 +27,13 @@ records/* forbidding force-push and deletion.
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import re
 import urllib.error
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import quote
 
 OWNER, REPO = "isaacrome21-sys", "sportsedge"
@@ -42,6 +43,8 @@ ROOT = "nfl_atd_v1_1"
 VERDICT_PATH = f"{ROOT}/VERDICT.json"
 SERVER_TIME_SOURCE = "GET /repos/{owner}/{repo}/activity (activity_type=push, timestamp)"
 REWRITE_TYPES = {"force_push", "branch_deletion"}
+CLOSE_PUSH_GRACE = timedelta(minutes=15)   # close push <= kickoff + 15 min
+FINAL_BUFFER = timedelta(hours=4)          # game final = kickoff + 4 h (same as refresh)
 
 
 def fetch_record_path(sha256: str) -> str:
@@ -50,6 +53,14 @@ def fetch_record_path(sha256: str) -> str:
 
 def run_record_path(slate_id: str) -> str:
     return f"{ROOT}/runs/{slate_id}.json"
+
+
+def close_record_path(sha256: str) -> str:
+    return f"{ROOT}/closes/{sha256}.json"
+
+
+def settlement_data_path(sha256: str) -> str:
+    return f"{ROOT}/settlements/{sha256}.json"
 
 
 class ProvenanceFailed(Exception):
@@ -120,6 +131,12 @@ class GitHubAPI:
             if len(js) < 100:
                 return out
             page += 1
+
+    def list_dir(self, ref, path):
+        js = self._contents(ref, path)
+        if js is None:
+            return []
+        return [e["name"] for e in js]
 
     def commit_info(self, sha):
         js, _ = self._req(f"{self.base}/commits/{sha}")
@@ -284,3 +301,104 @@ def load_slate(api, slate_id) -> dict:
     out["reasons"] = sorted(set(out["reasons"]))
     out["status"] = "SCREEN" if out["reasons"] else "COUNTS"
     return out
+
+
+def _list(api, sub):
+    names = _call(api.list_dir, RECORDS_BRANCH, f"{ROOT}/{sub}")
+    if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
+        raise ProvenanceFailed("API_MALFORMED", f"list_dir {sub}")
+    return sorted(n for n in names if n.endswith(".json"))
+
+
+def _sha_text(s: str) -> str:
+    return hashlib.sha256(s.encode()).hexdigest()
+
+
+def load_closes(api) -> dict:
+    """Close captures ONLY from single-commit records closes/<sha256>.json
+    (sha256 of the file content). A record is proven iff its server push is
+    >= its captured_at (and every entry's captured_at) and <= kickoff + 15
+    min. Any unproven record for a game marks the WHOLE game unproven."""
+    out = {"captures": [], "unproven_games": [], "unproven_records": [],
+           "kickoffs": {}, "records": []}
+    bad_games = set()
+    for name in _list(api, "closes"):
+        path = f"{ROOT}/closes/{name}"
+        game = None
+        try:
+            head = _call(api.get_file, RECORDS_BRANCH, path)
+            try:
+                body = json.loads(head)
+                game = body.get("game_id")
+            except (TypeError, ValueError, AttributeError):
+                body = None
+            p = prove_record(api, path)
+            if _sha_text(p["content"]) != name[:-5] or body is None:
+                raise ProvenanceFailed("CLOSE_RECORD_HASH_MISMATCH", path)
+            ko = _t(body["kickoff"])
+            push = _t(p["pushed_at"])
+            if push < _t(body["captured_at"]) or push > ko + CLOSE_PUSH_GRACE:
+                raise ProvenanceFailed("CLOSE_PUSH_OUTSIDE_WINDOW", path)
+            for c in body["captures"]:
+                try:
+                    ct = _t(c.get("captured_at"))
+                except (ValueError, TypeError):
+                    continue        # surfaces as CLOSE_TIMESTAMP_INVALID when scored
+                if ct > push:
+                    raise ProvenanceFailed("CLOSE_PUSH_OUTSIDE_WINDOW", f"{path}: entry after push")
+            if game in out["kickoffs"] and out["kickoffs"][game] != body["kickoff"]:
+                raise ProvenanceFailed("CLOSE_KICKOFF_CONFLICT", path)
+            out["kickoffs"][game] = body["kickoff"]
+            out["captures"] += [dict(c, game_id=game) for c in body["captures"]]
+            out["records"].append({"path": path, "commit": p["commit"],
+                                   "pushed_at": p["pushed_at"], "sha256": name[:-5]})
+        except (ProvenanceFailed, KeyError, TypeError, ValueError, AttributeError) as e:
+            if isinstance(e, ProvenanceFailed) and e.code.startswith(("API_", "RECORDS_")):
+                raise
+            out["unproven_records"].append(path)
+            if isinstance(game, str):
+                bad_games.add(game)
+    out["captures"] = [c for c in out["captures"] if c["game_id"] not in bad_games]
+    out["unproven_games"] = sorted(bad_games)
+    return out
+
+
+def load_settlements(api, game_kickoffs: dict, now) -> dict:
+    """Settlements ONLY from settlements/<sha>.json data records whose sha256
+    matches a fetch record fetch/<sha>.json (hash-matched like the stats),
+    pushed AFTER the final (kickoff + 4 h) of the last covered game and
+    BEFORE the review time. Conflicting values refuse (SETTLEMENT_CONFLICT)."""
+    merged, used, refused = {}, [], []
+    for name in _list(api, "settlements"):
+        sha, path = name[:-5], f"{ROOT}/settlements/{name}"
+        try:
+            dp = prove_record(api, path)
+            if _sha_text(dp["content"]) != sha:
+                raise ProvenanceFailed("SETTLEMENT_HASH_MISMATCH", path)
+            fp = verify_fetch(api, sha, None)
+            body = json.loads(dp["content"])
+            vals = {(r["game_id"], r["player_id"]): r["td"] for r in body["settlements"]}
+            if any(v not in (0, 1) or isinstance(v, bool) for v in vals.values()):
+                raise ProvenanceFailed("SETTLEMENT_MALFORMED", path)
+            covered = [_t(game_kickoffs[g]) for g, _ in vals if g in game_kickoffs]
+            if not covered:
+                continue
+            push = _t(fp["pushed_at"])
+            if push <= max(covered) + FINAL_BUFFER:
+                raise ProvenanceFailed("SETTLEMENT_PUSH_BEFORE_FINAL", path)
+            if push >= now:
+                raise ProvenanceFailed("SETTLEMENT_PUSH_NOT_BEFORE_REVIEW", path)
+        except ProvenanceFailed as e:
+            if e.code.startswith(("API_", "RECORDS_")):
+                raise
+            refused.append({"path": path, "code": e.code})
+            continue
+        except (KeyError, TypeError, ValueError, AttributeError):
+            refused.append({"path": path, "code": "SETTLEMENT_MALFORMED"})
+            continue
+        for k, v in vals.items():
+            if k in merged and merged[k] != v:
+                raise ProvenanceFailed("SETTLEMENT_CONFLICT", f"{k}")
+            merged[k] = v
+        used.append({"path": path, "sha256": sha, "fetch_pushed_at": fp["pushed_at"]})
+    return {"settlements": merged, "records": used, "refused": refused}
