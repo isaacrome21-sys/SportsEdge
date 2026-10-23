@@ -64,9 +64,12 @@ def _source_stamp(player, asof):
         stamps.append(utc_time(player.get("bookmakerChangedAt")))
     if any(x is None for x in stamps):
         return None
-    oldest = min(stamps)
-    age = (asof - oldest).total_seconds()
-    return oldest if 0 <= age <= MAX_AGE_SECONDS else None
+    ages = [(asof - stamp).total_seconds() for stamp in stamps]
+    # BOTH provider timestamps must be admissible; an impossible future
+    # bookmaker stamp cannot hide behind an otherwise old changedAt.
+    if any(age < 0 or age > MAX_AGE_SECONDS for age in ages):
+        return None
+    return min(stamps)
 
 
 def _american_fair(over, under):
@@ -99,7 +102,7 @@ def normalize_fixture(raw, fixture_id, *, asof):
         raise IntakeRefusal("BOOKMAKER_DATA_MISSING")
     pairs = []
     for book, book_data in sorted(all_books.items()):
-        if not isinstance(book_data, dict) or book_data.get("suspended") is True:
+        if not isinstance(book_data, dict) or book_data.get("suspended") is not False:
             continue
         if book_data.get("bookmakerIsActive") is not True:
             continue
@@ -243,7 +246,6 @@ def collect(fixtures, books, *, max_billable=0, reserve=DEFAULT_RESERVE,
         account = request("/account", {}, key)
         if account_remaining(account) <= reserve:
             raise IntakeRefusal("QUOTA_RESERVE_WOULD_BE_BREACHED")
-        asof = now()
         # Book slugs are explicit, bounded, and not fetched from arbitrary HTML.
         raw = request("/odds", {"fixtureId": fixture_id,
                                 "bookmakers": ",".join(books), "verbosity": 3}, key)
