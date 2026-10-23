@@ -1,4 +1,4 @@
-"""NFL props v1.1 moved-line amendment — DRAFT, not frozen.
+"""NFL props v1.1 moved-line amendment — FROZEN 2026-10-22 (see FREEZE_RECORD_20261022.md).
 
 Overlay for Part 2 (#2396) and 2B (#2415). The frozen v1 pricers/scorers are
 untouched; this module consumes their scored rows plus the close capture.
@@ -101,10 +101,12 @@ def annotate_moved(rows: list, close_capture: dict) -> list:
             o["v11_bucket"], o["v11_reason"], o["move_direction"] = "READABLE", None, None
         elif st == "CLV_MISSING" and reason == "LINE_MOVED":
             key = (r["game_id"], r["player_id"], r["market"])
-            if any(float(c["line"]) == float(r["line"]) and _two_sided(c)
-                   for c in closes_by.get(key, [])):
-                raise ValueError(f"row {r.get('row_id')}: v1 LINE_MOVED but capture has a "
-                                 "two-sided close at the entry line")
+            same_line = [c for c in closes_by.get(key, [])
+                         if float(c["line"]) == float(r["line"])]
+            assert not any(_two_sided(c) for c in same_line), (
+                f"row {r.get('row_id')}: labeled LINE_MOVED but a two-sided close "
+                f"exists at the entry line {r['line']} — inconsistent record "
+                f"(unmodified v1 cannot produce this; guards hand-edited records)")
             others = [c for c in closes_by.get(key, []) if float(c["line"]) != float(r["line"])]
             bucket, why, info = recheck_moved(r, others)
             o["v11_bucket"], o["v11_reason"], o["clv"] = bucket, why, None
