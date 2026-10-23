@@ -17,7 +17,6 @@ from pathlib import Path
 import ast
 import re
 import textwrap
-from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PAT = re.compile(r"sites/US-SB/api|sportsbook-nash\.draftkings\.com/api|api\.draftkings\.com")
 
