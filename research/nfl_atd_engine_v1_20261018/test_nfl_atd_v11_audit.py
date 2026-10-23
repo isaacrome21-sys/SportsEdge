@@ -12,7 +12,7 @@ from pathlib import Path
 import atd_refresh as rf
 import score_nfl_atd_forward as sc
 from test_nfl_atd_v11_refresh import SCHED_COLS, STAT_COLS, _games, _gz, _stats
-from test_nfl_atd_v11_scorer import _ledger
+from test_nfl_atd_v11_scorer import _ledger, _review, records_wt
 
 CAP = "2026-10-25T11:00:00-05:00"
 
@@ -165,36 +165,37 @@ class TestCloseAndKeys(unittest.TestCase):
 
 class TestReviewOnce(unittest.TestCase):
     def setUp(self):
-        self.rec = Path(tempfile.mkdtemp())
+        self.rec = records_wt()
 
     def test_verdict_written_create_only_with_input_hash(self):
         led = _ledger(5, 14, 3, clv=0.02)
-        v = sc.review(led, records_dir=self.rec)
-        p = self.rec / sc.VERDICT_FILE
+        v = _review(led, self.rec)
+        p = self.rec / sc.VERDICT_PATH
         on_disk = json.loads(p.read_text())
         self.assertEqual(on_disk["verdict"], v["verdict"])
         self.assertEqual(on_disk["inputs_sha256"], sc.inputs_sha256(led[:4]))
 
     def test_refuses_if_verdict_exists_regardless_of_args(self):
         led = _ledger(5, 14, 3, clv=0.02)
-        sc.review(led, records_dir=self.rec)
+        _review(led, self.rec)
         for args in (led, led[:4], _ledger(6, 20, 3, clv=-0.02)):
             with self.assertRaises(sc.ReviewAlreadyRecorded):
-                sc.review(args, records_dir=self.rec)
+                _review(args, self.rec)
 
     def test_checked_before_review(self):
-        (self.rec / sc.VERDICT_FILE).write_text("{}")
+        (self.rec / sc.VERDICT_PATH).parent.mkdir(parents=True)
+        (self.rec / sc.VERDICT_PATH).write_text("{}")
         with self.assertRaises(sc.ReviewAlreadyRecorded):
-            sc.review([], records_dir=self.rec)
+            _review([], self.rec)
 
     def test_records_dir_required(self):
         with self.assertRaises(TypeError):
             sc.review(_ledger(5, 14, 3))
 
     def test_gates_not_met_writes_nothing(self):
-        v = sc.review(_ledger(3, 14, 3), records_dir=self.rec)
+        v = _review(_ledger(3, 14, 3), self.rec)
         self.assertEqual(v["status"], "NO_REVIEW_GATES_NOT_MET")
-        self.assertFalse((self.rec / sc.VERDICT_FILE).exists())
+        self.assertFalse((self.rec / sc.VERDICT_PATH).exists())
 
     def test_insufficient_close_data(self):
         led = _ledger(4, 14, 3, clv=0.02)
@@ -204,7 +205,7 @@ class TestReviewOnce(unittest.TestCase):
                 if r["selection"] == "YES" and n < 35:   # 35/168 = 20.8%
                     r.update(clv=None, clv_status="CLV_MISSING",
                              clv_reason="NO_CLOSE_ROW"); n += 1
-        v = sc.review(led, records_dir=self.rec)
+        v = _review(led, self.rec)
         self.assertEqual(v["verdict"], "INSUFFICIENT_CLOSE_DATA")
 
     def test_twenty_percent_exactly_not_tripped(self):
@@ -215,7 +216,7 @@ class TestReviewOnce(unittest.TestCase):
                 if r["selection"] == "YES" and n < 48:
                     r.update(clv=None, clv_status="CLV_MISSING",
                              clv_reason="NO_CLOSE_ROW"); n += 1
-        v = sc.review(led, records_dir=self.rec)
+        v = _review(led, self.rec)
         self.assertNotEqual(v["verdict"], "INSUFFICIENT_CLOSE_DATA")
 
     def test_all_picked_game_clv_adj_zero(self):
