@@ -267,6 +267,9 @@ def build_annex(rows, evaluated, *, at, default_sport=None, history=None,
                           "family": NFL_FAMILIES[market],
                           "mean": estimate.get("mu"),
                           "p_over": estimate.get("p_over"),
+                          # Integer count lines have P(push)>0. Keep the
+                          # settlement mass visible: UNDER is not 1-OVER.
+                          "p_push": estimate.get("p_push"),
                           "p_under": estimate.get("p_under"),
                           "prior_games": estimate.get("games_logged")}
         else:
