@@ -179,3 +179,76 @@ def test_live_smoke_nfl_game_lines():
     assert out["source_uri"] == URL and len(out["page_html_sha256"]) == 64
     assert out["observed_at_utc"].endswith("Z")
     assert out["rows"], out["page_status"]
+
+
+# ---- headed browser, stock user-agent (ruling 2026-10-23) ------------------
+class _FakePage:
+    def __init__(self, log): self.log = log
+    def goto(self, url, **k): self.log.append(("goto", url))
+    def wait_for_selector(self, *a, **k): pass
+    def evaluate(self, *a, **k): self.log.append(("evaluate", a)); return "x"
+    def content(self): return "<html></html>"
+
+
+class _FakeBrowser:
+    def __init__(self, log): self.log = log
+    def new_page(self, **k): self.log.append(("new_page", k)); return _FakePage(self.log)
+    def new_context(self, **k): self.log.append(("new_context", k)); return self
+    def close(self): pass
+
+
+class _FakePW:
+    def __init__(self, log):
+        self.log = log
+        self.chromium = self
+    def launch(self, **k): self.log.append(("launch", k)); return _FakeBrowser(self.log)
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+
+
+def _install_fake_pw(monkeypatch, log):
+    import sys, types
+    mod = types.ModuleType("playwright.sync_api")
+    mod.sync_playwright = lambda: _FakePW(log)
+    monkeypatch.setitem(sys.modules, "playwright", types.ModuleType("playwright"))
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", mod)
+
+
+def test_browser_is_headed_and_never_sets_user_agent(monkeypatch):
+    log = []
+    _install_fake_pw(monkeypatch, log)
+    monkeypatch.setenv("DISPLAY", ":99")
+    f._render_with_browser(URL)
+    launch = [k for n, k in log if n == "launch"]
+    assert launch and launch[0].get("headless") is False
+    for name, kw in log:
+        if name in ("new_page", "new_context", "launch"):
+            assert "user_agent" not in kw and "userAgent" not in kw
+            assert not any("user-agent" in str(a).lower() for a in kw.get("args", []))
+    assert not any(n == "evaluate" for n, _ in log)
+    assert ("goto", URL) in log
+
+
+def test_headed_render_refused_without_display(monkeypatch):
+    log = []
+    _install_fake_pw(monkeypatch, log)
+    monkeypatch.delenv("DISPLAY", raising=False)
+    with pytest.raises(f.HeadedDisplayUnavailable):
+        f._render_with_browser(URL)
+    assert log == []
+
+
+def test_module_source_never_touches_user_agent():
+    src = Path(f.__file__).read_text().lower()
+    for token in ("user_agent", "useragent", "user-agent", "headlesschrome"):
+        assert token not in src
+
+
+def test_playwright_only_in_research_requirements():
+    root = Path(__file__).resolve().parents[1]
+    research = (root / "requirements-research.txt").read_text().lower()
+    assert any(l.strip().startswith("playwright") for l in research.splitlines())
+    for main in ("requirements.txt", "requirements-test.txt"):
+        p = root / main
+        if p.exists():
+            assert "playwright" not in p.read_text().lower()
