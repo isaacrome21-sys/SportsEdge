@@ -97,10 +97,27 @@ class NFLPropVolumeAuditTests(unittest.TestCase):
     def test_results_are_postgame_receipted_not_presented_as_pregame_facts(self):
         with self.assertRaisesRegex(ValueError, "RESULT_BEFORE_GAME_START"):
             audit_nfl_prop_volume_bias([row(result_captured_at="2026-10-22T18:16:00-05:00")])
+        with self.assertRaisesRegex(ValueError, "RESULT_BEFORE_GAME_START"):
+            audit_nfl_prop_volume_bias([row(result_captured_at="2026-10-22T19:15:00-05:00")])
         with self.assertRaisesRegex(ValueError, "RESULT_CAPTURED_AT_TIMEZONE_REQUIRED"):
             audit_nfl_prop_volume_bias([row(result_captured_at="2026-10-22T23:00:00")])
         with self.assertRaisesRegex(ValueError, "FINAL_RESULT_REQUIRED"):
             audit_nfl_prop_volume_bias([row(result_status="LIVE")])
+
+    def test_one_game_id_must_have_consistent_kickoff_across_props(self):
+        with self.assertRaisesRegex(ValueError, "CONFLICTING_GAME_START"):
+            audit_nfl_prop_volume_bias([
+                row(),
+                row(player_id="player-2", quote_id="second-q",
+                    event_start="2026-10-22T19:16:00-05:00"),
+            ])
+        # Equivalent timezone representations describe the same absolute event.
+        valid = audit_nfl_prop_volume_bias([
+            row(),
+            row(player_id="player-2", quote_id="second-q",
+                event_start="2026-10-23T00:15:00Z"),
+        ])
+        self.assertEqual(valid["overall"]["distinct_games"], 1)
 
     def test_nan_missing_bool_and_negative_results_fail_not_zero_fill(self):
         for field, invalid, reason in [
