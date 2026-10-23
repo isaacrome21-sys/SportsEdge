@@ -9,9 +9,12 @@ Not a sandbox: ctypes/raw syscalls never raise audit events (documented residual
 """
 import contextlib
 import sys
+import threading
 
 _EVENTS = {"socket.connect", "socket.getaddrinfo", "socket.sendto", "socket.bind",
-           "subprocess.Popen", "os.posix_spawn", "os.exec", "os.spawn"}
+           # every CPython process-launch audit event (t261)
+           "subprocess.Popen", "os.posix_spawn", "os.exec", "os.spawn", "os.system",
+           "os.startfile", "pty.spawn", "os.fork", "os.forkpty"}
 
 
 class _State:
@@ -23,14 +26,18 @@ class _State:
     def active(self):
         return self.active_depth > 0
 
+    _local = threading.local()          # per-thread reentrancy guard (t261: no global gate drop)
+
     def hook(self, event, args):
         if self.active_depth <= 0 or event not in _EVENTS or self.checker is None:
             return
-        self.active_depth -= 1          # no re-entry while checking
+        if getattr(self._local, "busy", False):
+            return                      # an event raised by this thread's own check
+        self._local.busy = True
         try:
             self.checker(event, args)
         finally:
-            self.active_depth += 1
+            self._local.busy = False
 
 
 STATE = _State()

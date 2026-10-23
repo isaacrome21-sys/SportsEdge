@@ -250,7 +250,21 @@ def _audit_check(event, args):
             if _is_dk(host) or not _is_local(host):
                 deny(host)
         return                                  # AF_UNIX paths: documented residual
-    if event == "subprocess.Popen":
+    if event in ("os.fork", "os.forkpty"):
+        return                                  # no new program; its exec/spawn is checked
+    if event == "os.system":
+        cmd = os.fsdecode(args[0]) if args and args[0] is not None else ""
+        if _dk_cmd(cmd) or _is_dk(cmd) or any(_is_dk(urllib.parse.urlsplit(t).hostname)
+                                               for t in cmd.split() if "://" in t):
+            raise DraftKingsBlocked(f"LIVE_DK_REQUEST_BLOCKED:audit:{event}:{cmd}")
+        if _fallback_net_cmd(cmd):
+            raise DraftKingsBlocked(f"LIVE_NETWORK_BLOCKED:audit:{event}:{cmd}")
+        return
+    if event == "pty.spawn":
+        exe, argv = None, _audit_args_list(args[0])
+    elif event == "os.startfile":
+        exe, argv = args[0], _audit_args_list(args[2]) if len(args) > 2 and args[2] else []
+    elif event == "subprocess.Popen":
         exe, argv = args[0], _audit_args_list(args[1])
     elif event == "os.posix_spawn":
         exe, argv = args[0], _audit_args_list(args[1])

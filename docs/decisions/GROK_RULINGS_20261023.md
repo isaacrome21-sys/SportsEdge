@@ -178,3 +178,25 @@ Documented residuals:
   refusal. No TCP/UDP payload reaches the host.
 
 Frozen lane files stay byte-identical to main 53a636af. Not self-cleared; needs independent review.
+
+## 2026-10-23g — os.system audit route, all process-launch events, thread-safe gate (t261)
+
+The t260 audit (NOT CLEARED on 02a924cb) found `posix.system('curl ...')` escaped inside
+`dk_block`: it skips the `os.system` monkeypatch and `os.system` was not a hooked audit event.
+Ruling:
+
+- `os.system` is now hooked; its command text goes through `_fallback_net_cmd` (network
+  binaries, `/dev/tcp`, isolated-Python flags) and the DK checks (including percent-encoded hosts).
+- Every CPython process-launch audit event is hooked: `os.exec`, `os.spawn`,
+  `os.posix_spawn`, `subprocess.Popen`, `os.system`, `os.startfile`, `pty.spawn`, plus
+  `os.fork`/`os.forkpty`, which launch no new program and whose later exec/spawn is checked.
+  A test asserts this set is a subset of the hook's `_EVENTS`; a `posix.system` repro test is added.
+- Thread race (LOW): the hook no longer decrements the global `active_depth` while checking,
+  which briefly switched it off for other threads. A thread-local reentrancy guard is used instead.
+- Correction to the 2026-10-23f "Pre-hook DNS" residual: the wording "one DNS query for the
+  probe host" was wrong. Corrected: **every hostname connect or sendto sends a DNS query**
+  before the audit event fires (C resolves the name first). No TCP/UDP payload reaches the
+  host; inside the `unshare -rn` jail the query has no route out.
+
+ctypes and AF_UNIX filesystem-path residuals from 2026-10-23f stand. Frozen lane files stay
+byte-identical to main 53a636af. Not self-cleared; needs independent review.
