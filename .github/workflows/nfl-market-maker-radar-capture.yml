@@ -6,8 +6,10 @@ name: nfl-market-maker-radar-capture
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '*/5 * * * *'
+  # schedule: DISABLED by grok/t250 proposal (owner invariant: DK rendered pages only;
+  # this job reaches a DraftKings API URL builder). workflow_dispatch kept. Owner decides.
+  # schedule:
+  #   - cron: '*/5 * * * *'
   push:
     branches: [main]
     paths:

@@ -2,9 +2,11 @@ name: draftkings-prop-provider-probe
 
 on:
   workflow_dispatch:
-  schedule:
-    # Quote discovery only. Never Model_P. Never official.
-    - cron: "7,37 * * * *"
+  # schedule: DISABLED by grok/t250 proposal (owner invariant: DK rendered pages only;
+  # this job reaches a DraftKings API URL builder). workflow_dispatch kept. Owner decides.
+  # schedule:
+  #   # Quote discovery only. Never Model_P. Never official.
+  #   - cron: "7,37 * * * *"
   push:
     paths:
       - 'sportsedge/draftkings_prop_source.py'
