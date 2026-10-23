@@ -162,3 +162,39 @@ def test_race_probs_nonfinite_mean_refuses(mu):
 def test_race_probs_nan_neither_refuses():
     with pytest.raises(E.NflGameScoringError, match="^RACE_NEITHER_INVALID"):
         E.race_probs(1.0, (0.1, 0.0), float("nan"))
+
+
+# --- v1.2 nits -------------------------------------------------------------
+
+import numpy as _np
+
+
+@pytest.mark.parametrize("mu", [True, False, _np.bool_(True), "1.0", None])
+def test_race_probs_bool_or_nonnumeric_mu_refuses(mu):
+    with pytest.raises(E.NflGameScoringError, match="^RACE_MU_NONFINITE"):
+        E.race_probs(mu, (0.1, 0.0), 0.1)
+
+
+@pytest.mark.parametrize("fn", ["expected", "margin_mu"])
+def test_expected_and_margin_mu_refuse_home_equals_away(fn):
+    args = (hist(), "AAA", "AAA", 2024) + (("td",) if fn == "expected" else ())
+    if fn == "margin_mu":
+        args = (hist(), "AAA", "AAA", 2024)
+    with pytest.raises(E.NflGameScoringError, match="^HOME_EQUALS_AWAY"):
+        getattr(E, fn)(*args)
+
+
+@pytest.mark.parametrize("fn", ["expected", "margin_mu"])
+@pytest.mark.parametrize("field,bad", [("home_td", float("nan")), ("away_pts", float("inf")),
+                                       ("home_pts", None), ("away_td", True)])
+def test_expected_and_margin_mu_refuse_nonfinite(fn, field, bad):
+    h = hist()
+    for r in h:  # poison every row so the key used by either fn is hit
+        r[field] = bad
+        if field.endswith("_td"):
+            r[field.replace("_td", "_pts")] = bad
+        else:
+            r[field.replace("_pts", "_td")] = bad
+    args = (h, "AAA", "BBB", 2024) + (("td",) if fn == "expected" else ())
+    with pytest.raises(E.NflGameScoringError, match="^HISTORY_VALUE_INVALID"):
+        getattr(E, fn)(*args)
