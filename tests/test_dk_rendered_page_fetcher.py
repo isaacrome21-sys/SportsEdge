@@ -111,32 +111,34 @@ def _btn(code, title="", pts="", odds=None):
     return f'<button data-testid="component-builder-market-button-999-{code}">{t}{p}{o}</button>'
 
 
+def _all(out):
+    return out["rows"] + out["refused_rows"]
+
+
 def test_missing_price_is_refusal_not_filled():
-    html = _card(_btn("0HC1N300_3", pts="-3") + _btn("0HC1P300_1", pts="+3", odds="−110"))
-    rows = _parse(html)["rows"]
-    away = [r for r in rows if r["outcome"] == "AWAY Team"][0]
-    assert away["status"] == "REFUSED" and away["refusal"] == "PRICE_MISSING"
-    assert away["price_american"] is None
-    home = [r for r in rows if r["outcome"] == "HOME Team"][0]
-    assert home["status"] == "OK" and home["price_american"] == -110
+    out = _parse(_card(_btn("0HC1N300_3", pts="-3") + _btn("0HC1P300_1", pts="+3", odds="−110")))
+    assert out["rows"] == []
+    by = {r["outcome"]: r for r in out["refused_rows"]}
+    assert by["AWAY Team"]["refusal"] == "PRICE_MISSING" and by["AWAY Team"]["price_american"] is None
+    assert by["HOME Team"]["refusal"] == "PAIR_HAS_REFUSED_SIDE"
 
 
 def test_unparseable_price_and_missing_point_are_refusals():
-    html = _card(_btn("0HC1N300_3", pts="-3", odds="EVENS?") + _btn("0HC1P300_1", odds="+100"))
-    rows = {r["outcome"]: r for r in _parse(html)["rows"]}
-    assert rows["AWAY Team"]["refusal"] == "PRICE_UNPARSEABLE" and rows["AWAY Team"]["price_american"] is None
-    assert rows["HOME Team"]["refusal"] == "POINT_MISSING" and rows["HOME Team"]["point"] is None
+    out = _parse(_card(_btn("0HC1N300_3", pts="-3", odds="EVENS?") + _btn("0HC1P300_1", odds="+100")))
+    by = {r["outcome"]: r for r in out["refused_rows"]}
+    assert by["AWAY Team"]["refusal"] == "PRICE_UNPARSEABLE_OR_OUT_OF_RANGE" and by["AWAY Team"]["price_american"] is None
+    assert by["HOME Team"]["refusal"] == "POINT_MISSING" and by["HOME Team"]["point"] is None
+    assert out["rows"] == []
 
 
 def test_even_price_text_parsed_only_when_explicit():
-    html = _card(_btn("0ML1_3", odds="EVEN") + _btn("0ML1_1", odds="+100"))
-    rows = {r["outcome"]: r for r in _parse(html)["rows"]}
+    rows = {r["outcome"]: r for r in _parse(_card(_btn("0ML1_3", odds="EVEN") + _btn("0ML1_1", odds="+100")))["rows"]}
     assert rows["AWAY Team"]["price_american"] == 100 and rows["HOME Team"]["price_american"] == 100
 
 
 def test_unknown_market_code_refused():
-    rows = _parse(_card(_btn("0ZZ1_3", odds="+100") + _btn("0ZZ1_1", odds="+100")))["rows"]
-    assert rows and all(r["status"] == "REFUSED" and r["refusal"] == "UNKNOWN_MARKET_CODE" for r in rows)
+    out = _parse(_card(_btn("0ZZ1_3", odds="+100") + _btn("0ZZ1_1", odds="+100")))
+    assert out["rows"] == [] and out["card_refusals"] == [{"refusal": "UNKNOWN_MARKET_CODE", "card_index": 0}]
 
 
 def test_card_without_two_teams_refused():
@@ -165,51 +167,65 @@ def test_parser_offline_no_network(monkeypatch):
     assert _parse(FIX.read_text())["rows"]
 
 
-def test_fetch_uses_real_clock_after_render(monkeypatch):
+def test_fetch_passes_render_time_and_final_url(monkeypatch):
     calls = []
-    monkeypatch.setattr(f, "_render_with_browser", lambda url, **k: calls.append(url) or FIX.read_text())
-    monkeypatch.setattr(f, "_utcnow", lambda: T)
+    def fake(url, **k):
+        calls.append(url)
+        return {"html": FIX.read_text(), "observed_at": T, "final_url": URL,
+                "browser": {"path": "/usr/bin/google-chrome", "version": "1.0", "headless": False}}
+    monkeypatch.setattr(f, "_render_with_browser", fake)
     out = f.fetch_rendered_board(URL)
     assert calls == [URL] and out["observed_at_utc"] == "2026-10-23T15:45:07Z"
+    assert out["final_url"] == URL and out["browser"]["path"] == "/usr/bin/google-chrome"
 
 
 @pytest.mark.skipif(os.environ.get("SPORTSEDGE_LIVE_FETCH") != "1", reason="live smoke only with SPORTSEDGE_LIVE_FETCH=1")
 def test_live_smoke_nfl_game_lines():
     out = f.fetch_rendered_board(URL)
     assert out["source_uri"] == URL and len(out["page_html_sha256"]) == 64
-    assert out["observed_at_utc"].endswith("Z")
+    assert out["observed_at_utc"].endswith("Z") and out["final_url"]
     assert out["rows"], out["page_status"]
 
 
 # ---- headed browser, stock user-agent (ruling 2026-10-23) ------------------
 class _FakePage:
-    def __init__(self, log): self.log = log
-    def goto(self, url, **k): self.log.append(("goto", url))
+    def __init__(self, log, final_url=None):
+        self.log = log
+        self.url = final_url
+    def goto(self, url, **k):
+        self.log.append(("goto", url))
+        self.url = self.url or url
     def wait_for_selector(self, *a, **k): pass
     def evaluate(self, *a, **k): self.log.append(("evaluate", a)); return "x"
-    def content(self): return "<html></html>"
+    def content(self):
+        self.log.append(("content", None))
+        return "<html></html>"
 
 
 class _FakeBrowser:
-    def __init__(self, log): self.log = log
-    def new_page(self, **k): self.log.append(("new_page", k)); return _FakePage(self.log)
+    version = "130.0.0.0"
+    def __init__(self, log, final_url=None):
+        self.log = log
+        self.final_url = final_url
+    def new_page(self, **k): self.log.append(("new_page", k)); return _FakePage(self.log, self.final_url)
     def new_context(self, **k): self.log.append(("new_context", k)); return self
-    def close(self): pass
+    def close(self): self.log.append(("close", None))
 
 
 class _FakePW:
-    def __init__(self, log):
+    def __init__(self, log, final_url=None):
         self.log = log
+        self.final_url = final_url
         self.chromium = self
-    def launch(self, **k): self.log.append(("launch", k)); return _FakeBrowser(self.log)
+    def launch(self, **k): self.log.append(("launch", k)); return _FakeBrowser(self.log, self.final_url)
     def __enter__(self): return self
     def __exit__(self, *a): return False
 
 
-def _install_fake_pw(monkeypatch, log):
+def _install_fake_pw(monkeypatch, log, final_url=None):
     import sys, types
     mod = types.ModuleType("playwright.sync_api")
-    mod.sync_playwright = lambda: _FakePW(log)
+    mod.sync_playwright = lambda: _FakePW(log, final_url)
     monkeypatch.setitem(sys.modules, "playwright", types.ModuleType("playwright"))
     monkeypatch.setitem(sys.modules, "playwright.sync_api", mod)
 
@@ -218,6 +234,7 @@ def test_browser_is_headed_and_never_sets_user_agent(monkeypatch):
     log = []
     _install_fake_pw(monkeypatch, log)
     monkeypatch.setenv("DISPLAY", ":99")
+    monkeypatch.delenv("SPORTSEDGE_BROWSER_PATH", raising=False)
     f._render_with_browser(URL)
     launch = [k for n, k in log if n == "launch"]
     assert launch and launch[0].get("headless") is False
@@ -252,3 +269,116 @@ def test_playwright_only_in_research_requirements():
         p = root / main
         if p.exists():
             assert "playwright" not in p.read_text().lower()
+
+
+# ---- auditor findings on 564edbb9 (one test per finding) -------------------
+def test_finding1_team_from_market_pair_not_button_position():
+    # Auditor repro: HC A -3, OU O 45, HC B +3, OU U 45, ML B +130 (5 buttons).
+    html = _card(_btn("0HC7N300_3", pts="-3", odds="-110") + _btn("0OU7O4500_1", title="O", pts="45", odds="-110")
+                 + _btn("0HC7P300_1", pts="+3", odds="-110") + _btn("0OU7U4500_3", title="U", pts="45", odds="-110")
+                 + _btn("0ML7_1", odds="+130"))
+    out = _parse(html)
+    assert out["rows"] == [] and out["card_refusals"] == [{"refusal": "MARKET_NOT_TWO_SIDED", "card_index": 0}]
+    # Same card with the ML pair completed: spreads must split A/B by the market's own pair.
+    html2 = html.replace("</div></body>", _btn("0ML7_3", odds="-150") + "</div></body>")
+    rows = _parse(html2)["rows"]
+    sp = {r["outcome"]: r["point"] for r in rows if r["market"] == "spreads"}
+    assert sp == {"AWAY Team": -3.0, "HOME Team": 3.0}
+
+
+@pytest.mark.parametrize("bad", [
+    "https://sportsbook.draftkings.com/leagues/football/nfl?format=json",
+    "https://sportsbook.draftkings.com/leagues/football/nfl.json",
+    "https://sportsbook.draftkings.com/static/board.json",
+    "https://sportsbook.draftkings.com/",
+    "https://sportsbook.draftkings.com/event/x/1",
+    "https://sportsbook.draftkings.com/leagues/../api/x",
+])
+def test_finding2_guard_allowlist_and_final_url(bad, monkeypatch):
+    with pytest.raises(f.DkApiUrlRefused):
+        f.assert_rendered_page_url(bad)
+    log = []
+    _install_fake_pw(monkeypatch, log, final_url="https://sportsbook-nash.draftkings.com/api/sportscontent/x")
+    monkeypatch.setenv("DISPLAY", ":99")
+    monkeypatch.delenv("SPORTSEDGE_BROWSER_PATH", raising=False)
+    with pytest.raises(f.DkApiUrlRefused):
+        f._render_with_browser(URL)
+    log2 = []
+    _install_fake_pw(monkeypatch, log2)
+    assert f._render_with_browser(URL)["final_url"] == URL
+
+
+def _capture_module():
+    import importlib.util
+    root = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location("_nfl_cap_for_test", root / "scripts" / "nfl_2026_line_capture.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_finding3_adapter_runs_through_real_capture_consumer():
+    cap = _capture_module()
+    html = FIX.read_text().replace("</body>", _card(_btn("0HC9N300_3", pts="-3") + _btn("0HC9P300_1", pts="+3", odds="-110"))
+                                   .replace("<html><body>", "").replace("</body></html>", "") + "</body>")
+    out = _parse(html)
+    assert all(r["status"] == "OK" for r in out["rows"])
+    assert out["refused_rows"] and all(r["status"] == "REFUSED" for r in out["refused_rows"])
+    events = f.to_capture_markets(out)
+    assert {e["event_id"] for e in events} == {r["provider_event_id"] for r in out["rows"]}
+    assert "999" not in {e["event_id"] for e in events}
+    for e in events:
+        s = cap.spread_row(e["markets"].get("spreads"), e["home_team"], e["away_team"])
+        t = cap.total_row(e["markets"].get("totals"))
+        assert s["status"] == "OK" and t["status"] == "OK"
+        assert s["market_last_update"] is None and t["market_last_update"] is None
+    pit = next(e for e in events if e["event_id"] == "34118009")
+    s = cap.spread_row(pit["markets"]["spreads"], pit["home_team"], pit["away_team"])
+    assert (s["away_point"], s["away_price"], s["home_point"], s["home_price"]) == (-3.0, -118, 3.0, -102)
+    # a side refused for a missing line drops its price
+    o2 = _parse(_card(_btn("0HC1N300_3", odds="-110") + _btn("0HC1P300_1", pts="+3", odds="-110")))
+    miss = [r for r in o2["refused_rows"] if r["refusal"] == "POINT_MISSING"][0]
+    assert miss["price_american"] is None and miss["point"] is None
+
+
+@pytest.mark.parametrize("pts,odds,reason", [
+    ("-3.25", "-110", "POINT_NOT_HALF_STEP"), ("-3.3", "-110", "POINT_NOT_HALF_STEP"),
+    ("nan", "-110", "POINT_UNPARSEABLE"), ("inf", "-110", "POINT_UNPARSEABLE"), ("-1e3", "-110", "POINT_UNPARSEABLE"),
+    ("-3", "-99", "PRICE_UNPARSEABLE_OR_OUT_OF_RANGE"), ("-3", "+99999", "PRICE_UNPARSEABLE_OR_OUT_OF_RANGE"),
+    ("-3", "+050", "PRICE_UNPARSEABLE_OR_OUT_OF_RANGE"),
+])
+def test_finding4_line_step_and_price_range(pts, odds, reason):
+    out = _parse(_card(_btn("0HC1N300_3", pts=pts, odds=odds) + _btn("0HC1P300_1", pts="+3", odds="-110")))
+    away = next(r for r in out["refused_rows"] if r["outcome"] == "AWAY Team")
+    assert away["refusal"] == reason and away["price_american"] is None
+    assert out["rows"] == []
+
+
+def test_finding5_observed_at_taken_right_after_snapshot(monkeypatch):
+    log = []
+    _install_fake_pw(monkeypatch, log)
+    monkeypatch.setenv("DISPLAY", ":99")
+    monkeypatch.delenv("SPORTSEDGE_BROWSER_PATH", raising=False)
+    def clock():
+        log.append(("clock", None))
+        return T
+    r = f._render_with_browser(URL, clock=clock)
+    names = [n for n, _ in log]
+    assert names.index("clock") == names.index("content") + 1
+    assert names.index("clock") < names.index("close")
+    assert r["observed_at"] == T
+
+
+def test_finding6_browser_binary_allowlist_and_recorded(monkeypatch):
+    log = []
+    _install_fake_pw(monkeypatch, log)
+    monkeypatch.setenv("DISPLAY", ":99")
+    monkeypatch.setenv("SPORTSEDGE_BROWSER_PATH", "/tmp/not-chrome")
+    with pytest.raises(f.BrowserBinaryRefused):
+        f._render_with_browser(URL)
+    assert log == []
+    monkeypatch.setenv("SPORTSEDGE_BROWSER_PATH", "/usr/bin/google-chrome")
+    r = f._render_with_browser(URL)
+    launch = [k for n, k in log if n == "launch"][0]
+    assert launch["executable_path"] == "/usr/bin/google-chrome"
+    assert r["browser"] == {"path": "/usr/bin/google-chrome", "version": "130.0.0.0", "headless": False}
