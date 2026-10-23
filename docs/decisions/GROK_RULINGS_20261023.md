@@ -62,3 +62,26 @@ pull_request (and, on mlb-moneyline-forward-evidence, workflow_run) triggers rem
 only workflow_dispatch remains. No source module is deleted and no collector was run.
 Guard: `tests/test_dk_api_scheduled_workflow_guard_20261023.py`. Proposal branch
 grok/t250-dk-api-guard-20261023; merging stays with the owner.
+
+## Auto-triggered DK-importing CI jobs classified (2026-10-23)
+
+Grok ruling dated Oct 23, 2026, under t234u (DK rendered pages only). The
+mlb-moneyline-forward-evidence `workflow_run` removal stands. Eleven further
+auto-triggered workflows reach a DK-API module; each was classified by reading its code:
+
+- Live DraftKings API request in CI, no mock: `direct-dk-market-archive-contract`
+  (inline `fetch_board` probe on pull_request) and `dk-nba-nhl-category-probe`
+  (`scripts/probe_dk_game_lines_categories.py` on push to main). Both are now
+  workflow_dispatch-only.
+- Import-only / fixtures or mocks, no DK network: `market-maker-radar`,
+  `mlb-additional-odds-contract`, `mlb-additional-pit-archive` (its live archive job is
+  already dispatch-only and uses the Odds API, not DK), `nfl-lines-issue` (DK dfs modules
+  reached only via the `sportsedge.dfs` package import; it fetches ESPN/nflverse),
+  `football-nfl-promotion-evidence`, `nfl-v2-nested-diagnostic`, `nfl-v2h-first-readout`,
+  `nfl-v2i-first-readout`, `nfl-v2j-first-readout`. Triggers unchanged; guarded by
+  `tests/test_dk_api_no_live_requests_in_ci_20261023.py`, which runs their DK-importing
+  test modules with socket/urllib/requests patched to refuse any draftkings host.
+
+Policy-text correction: `config/odds_api_request_projection_v3.json` now records
+nfl-2026-line-capture as not scheduled (dispatch-only), matching the workflow. No credits
+spent; no collector run.

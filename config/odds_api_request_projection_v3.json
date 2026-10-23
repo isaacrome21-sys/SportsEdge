@@ -6,11 +6,10 @@
   "invariants": {
     "mlb_scheduled_paid_workflows": 0,
     "mlb_scheduled_rescue_dispatchers": 0,
-    "legacy_nfl_2026_line_capture_scheduled": true,
+    "legacy_nfl_2026_line_capture_scheduled": false,
     "allowed_scheduled_paid_consumers": [
       ".github/workflows/football-nfl-forward-clv-collection.yml",
-      ".github/workflows/ev-tracker.yml",
-      ".github/workflows/nfl-2026-line-capture.yml"
+      ".github/workflows/ev-tracker.yml"
     ],
     "provider_credit_math_is_not_inferred_when_the_provider_contract_is_not_encoded": true,
     "credential_values_are_never_logged": true
@@ -21,7 +20,8 @@
     ".github/workflows/mlb-additional-pit-archive.yml",
     ".github/workflows/mlb-deadman.yml",
     ".github/workflows/mlb-v8-evidence.yml",
-    ".github/workflows/mlb-v8-replay-backfill.yml"
+    ".github/workflows/mlb-v8-replay-backfill.yml",
+    ".github/workflows/nfl-2026-line-capture.yml"
   ],
   "scheduled_consumers": {
     "football_nfl_forward_clv": {
@@ -49,7 +49,9 @@
     },
     "nfl_2026_confirmation_capture": {
       "workflow": ".github/workflows/nfl-2026-line-capture.yml",
-      "cron": "3,13,23,33,43,53 * * * *",
+      "scheduled": false,
+      "cron": null,
+      "schedule_note": "Policy-text correction 2026-10-23 (Grok ruling under t234u, DK rendered pages only): the workflow is workflow_dispatch-only on grok/t250; it was previously polled at 3,13,23,33,43,53 * * * *. No credits spent by this change.",
       "idle_paid_requests": 0,
       "schedule_gate": "Free nflverse schedule data must place the run inside the frozen Tuesday opener or pre-kickoff final capture window before the paid capture step can execute.",
       "worst_case_weekly_credits": null,
