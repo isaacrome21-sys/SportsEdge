@@ -50,6 +50,10 @@ class NFLPropVolumeAuditTests(unittest.TestCase):
             (1, 1, 1),
         )
         self.assertEqual(result["game_clusters"]["CHI@NE-20261022"]["prop_rows"], 2)
+        self.assertEqual(result["overall"]["direction_outcomes"]["UNDER"],
+                         {"hit": 0, "loss": 1, "push": 0})
+        self.assertEqual(result["overall"]["direction_outcomes"]["OVER"],
+                         {"hit": 0, "loss": 1, "push": 0})
         self.assertAlmostEqual(result["overall"]["mean_model_minus_actual"],
                                (-68 + 9 - 43.5) / 3)
         self.assertFalse(result["overall"]["one_direction_warning"])
@@ -118,6 +122,24 @@ class NFLPropVolumeAuditTests(unittest.TestCase):
         self.assertEqual(result["overall"]["published_direction_mismatches"], 1)
         with self.assertRaisesRegex(ValueError, "PUBLISHED_SIDE_INVALID"):
             audit_nfl_prop_volume_bias([row(published_side="PLAY")])
+
+    def test_hit_loss_push_counts_are_descriptive_not_bet_profit(self):
+        items = [
+            row(player_id="under-hit", projected_mean=240, line=250.5,
+                actual=220, published_side="UNDER"),
+            row(player_id="over-hit", projected_mean=260, line=250.5,
+                actual=270, published_side="OVER"),
+            row(player_id="under-push", projected_mean=240, line=250,
+                actual=250, published_side="UNDER"),
+            row(player_id="over-push", projected_mean=260, line=250,
+                actual=250, published_side="OVER"),
+        ]
+        got = audit_nfl_prop_volume_bias(items)
+        self.assertEqual(got["overall"]["direction_outcomes"]["UNDER"],
+                         {"hit": 1, "loss": 0, "push": 1})
+        self.assertEqual(got["overall"]["direction_outcomes"]["OVER"],
+                         {"hit": 1, "loss": 0, "push": 1})
+        self.assertFalse(got["play_authority"])
 
     def test_required_provenance_and_nfl_scope(self):
         for overrides, reason in [
