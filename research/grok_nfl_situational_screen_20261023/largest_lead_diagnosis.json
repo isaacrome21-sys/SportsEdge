@@ -1,0 +1,12 @@
+{
+ "label": "DIAGNOSTIC_ONLY_NOT_ADOPTED_NO_RETUNING",
+ "mean_abs_shift": 1.3843,
+ "mean_shift": 0.7742,
+ "model_smoothed": 3.49498,
+ "model_v1": 3.6174,
+ "n": 1871,
+ "naive_smoothed": 3.22854,
+ "naive_unsmoothed": 3.33817,
+ "zero_mass_games": 17,
+ "zero_mass_loss": 0.18829
+}
