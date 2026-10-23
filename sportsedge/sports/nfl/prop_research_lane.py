@@ -351,12 +351,24 @@ class PropResearchCard:
     ledger_namespace: str = PROP_LEDGER_NAMESPACE
     authority_footer: str = AUTHORITY_FOOTER
 
+    @property
+    def shared_game_script_cluster_count(self) -> int:
+        """All components in this single-game card share game-script risk.
+
+        The legacy ``independent_exposure_count`` is a distinct
+        player/component count, not a count of statistically independent
+        bets, plays, simulations or realized game-script scenarios.
+        """
+        return 1 if self.rows else 0
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "schema": self.schema,
             "game_id": self.game_id,
             "rows": [asdict(row) for row in self.rows],
             "independent_exposure_count": self.independent_exposure_count,
+            "shared_game_script_cluster_count": self.shared_game_script_cluster_count,
+            "exposure_count_limit": "PLAYER_COMPONENT_GROUPS_NOT_INDEPENDENT_GAME_SCRIPT_BETS",
             "ledger_namespace": self.ledger_namespace,
             "authority_footer": self.authority_footer,
         }
@@ -371,7 +383,14 @@ class PropResearchCard:
                 f"{row.price_american:+d}  EV {row.ev_per_dollar * 100:+.1f}% "
                 f"[{row.component}]"
             )
-        lines.append(f"Independent exposure groups: {self.independent_exposure_count}")
+        lines.append(
+            f"Player/component exposure groups: {self.independent_exposure_count} "
+            "(not independent game-script positions)"
+        )
+        lines.append(
+            f"Shared game-script clusters: {self.shared_game_script_cluster_count} "
+            "(descriptive only; no grading or pricing change)"
+        )
         lines.append(self.authority_footer)
         return "\n".join(lines)
 
@@ -435,6 +454,8 @@ def build_prop_ledger_record(card: PropResearchCard, *, generated_at: Any) -> di
         "card_schema": card.schema,
         "rows": [asdict(row) for row in card.rows],
         "independent_exposure_count": card.independent_exposure_count,
+        "shared_game_script_cluster_count": card.shared_game_script_cluster_count,
+        "exposure_count_limit": "PLAYER_COMPONENT_GROUPS_NOT_INDEPENDENT_GAME_SCRIPT_BETS",
         "exposure_groups": sorted({row.exposure_group_id for row in card.rows}),
         "authority": {
             "model_p": False,
