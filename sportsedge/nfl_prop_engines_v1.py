@@ -294,6 +294,32 @@ def p_over_for(mu: float, cv: float, count: bool, line: float, grid) \
     return 1.0 - float(np.interp(line, grid, cdf))
 
 
+def settlement_probabilities(mu: float, cv: float, count: bool,
+                             line: float, grid) -> tuple[float, float, float]:
+    """Return raw ``(over, push, under)`` settlement mass.
+
+    Count distributions have real push mass at integer lines.  That mass
+    must not be assigned to UNDER via ``1 - p_over``.  Half-lines and the
+    continuous yardage construction have no point mass at the line.
+    """
+    cdf = candidate_cdf(mu, cv, count, grid)
+    if not count:
+        under = float(np.interp(line, grid, cdf))
+        return 1.0 - under, 0.0, under
+
+    threshold = int(math.floor(line))
+    index = threshold - GRID_LO
+    if index < 0 or index >= len(cdf):
+        raise ValueError("NFL_PROP_ENGINE_LINE_OUTSIDE_MODEL_GRID")
+    at_threshold = float(cdf[index])
+    over = 1.0 - at_threshold
+    if not float(line).is_integer():
+        return over, 0.0, at_threshold
+    below = 0.0 if index == 0 else float(cdf[index - 1])
+    push = at_threshold - below
+    return over, push, below
+
+
 def fair_american(p: float):
     if p <= 0.0 or p >= 1.0:
         return None
@@ -334,8 +360,8 @@ def _price_with_built(family: str, cfg: dict, view: dict, seasons: dict,
         return {**base, "status": "NOT_PRICED", "reason": "CV_NOT_SCREENED"}
     prior_values = [float(g[2][cfg["stat"]]) for g in priors]
     mu = float(mu_for(prior_values, pool))
-    p_over = float(p_over_for(mu, float(cfg["cv"]), cfg["count"],
-                              float(line), grid))
+    p_over, p_push, p_under = settlement_probabilities(
+        mu, float(cfg["cv"]), cfg["count"], float(line), grid)
     out = {**base, "status": "PRICED", "reason": "QUALIFIED",
            "mu": mu, "cv": float(cfg["cv"]), "cv_source": cfg["cv_source"],
            "shrink_weight": float(K / (len(priors) + K)),
@@ -344,9 +370,20 @@ def _price_with_built(family: str, cfg: dict, view: dict, seasons: dict,
     if offer_form == "YES_ONLY":
         out.update(p_yes=p_over, fair_yes_american=fair_american(p_over))
     else:
-        out.update(p_over=p_over, p_under=1.0 - p_over,
-                   fair_over_american=fair_american(p_over),
-                   fair_under_american=fair_american(1.0 - p_over))
+        resolved = p_over + p_under
+        if resolved <= 0.0:
+            return {**base, "status": "NOT_PRICED",
+                    "reason": "NO_RESOLVED_OUTCOME_MASS"}
+        fair_over = p_over / resolved
+        fair_under = p_under / resolved
+        out.update(
+            p_over=p_over,
+            p_push=p_push,
+            p_under=p_under,
+            fair_over_american=fair_american(fair_over),
+            fair_under_american=fair_american(fair_under),
+            fair_probability_basis="CONDITIONAL_ON_NON_PUSH",
+        )
     return out
 
 
