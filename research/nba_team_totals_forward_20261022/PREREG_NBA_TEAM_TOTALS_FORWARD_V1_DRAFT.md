@@ -9,7 +9,9 @@ document (or a successor). Rows produced before the freeze are
 historical record, never prospective entries. Nothing in this draft
 changes any family's registration, eligibility, or validation state.**
 
-- Status: `DRAFT_NOT_IN_FORCE` (pending independent review + owner freeze)
+- Status: `DRAFT_NOT_IN_FORCE` (revision 2: applies all edits of the
+  NOT CLEARED independent review of `82b880ed`; pending re-review +
+  owner freeze)
 - Date drafted: 2026-10-22
 - Family in scope: NBA team total points (`TEAM_TOTAL`), registered
   2026-10-22 by owner ruling as `REGISTERED_RESEARCH_ONLY /
@@ -79,6 +81,25 @@ line, side, American price, book=DraftKings, `captured_at` with zone,
 ENTRY/CLOSE designation, source view, entered_by. No fabricated,
 retroactive, or backfilled prices.
 
+**Settlement source.** Final team points (including OT, matching DK
+settlement) come from the maintained sportsdataverse NBA team-boxscores
+asset (the engine's own history path, `games_from_team_boxscores()`),
+joined on game_id. If that asset lacks a final for a game at review,
+the row is `RESULT_UNAVAILABLE`: excluded and counted, never filled.
+
+**Void and push.** A postponed, suspended-and-not-completed, or
+cancelled game is **void**: all its rows are excluded from every arm and
+counted in a `VOID` report. A final score equal to a row's line is a
+**push**: excluded from hit-rate (§6d) and the accuracy arms are
+unaffected; pushes are counted and reported.
+
+**Full slate.** A slate is full when both its ENTRY and CLOSE capture
+jobs ran for that game date and every game on the date's DK board was
+captured (games with no DK team-total offer count as captured and go to
+the missing-offer report). A slate with a failed or partial capture job
+does not count toward the slate gate (its valid rows still count toward
+row and game gates).
+
 **Missing-offer games.** When DraftKings offers no team total for a
 game (e.g. the 2026-10-22 PM capture: none for 2 of 14 games), the
 game is listed per slate in a `MISSING_OFFER` report with the capture
@@ -106,40 +127,60 @@ reported at review alongside the verdict.
 
 - League NBA, family `TEAM_TOTAL`, `team` bound to the fixture's home or
   away team (else `NBA_TEAM_SELECTION_UNBOUND`).
-- Side OVER/UNDER; numeric line; numeric American price; both sides of
-  the entry pair captured.
+- **Entry definition.** The entry is the **first DK capture designated
+  ENTRY for the game**, at the **main team-total line** (DK's primary
+  line for that team, not an alternate). Later ENTRY captures and all
+  alternate lines are ignored; they never replace or add rows.
+- Side OVER/UNDER; numeric line; finite American price; both sides of
+  the entry pair captured (runner refusals, §8).
 - Engine stamp required: `engine_id = NBA_TEAM_PERIOD_RATINGS_V1`,
   `status = PRICED`, `sufficiency_met = true`, priors recorded. Rows
   without engine provenance are excluded and reported.
-- **Pick rule (fixed now):** `gap = mean − entry_line`. PICKED OVER if
-  `gap ≥ +2.0` points, PICKED UNDER if `gap ≤ −2.0`; otherwise PASSED.
-  One pick per team per game. *(Owner confirm: the engine emits a mean
-  only, no distribution; this threshold rule is the drafted choice
-  instead of an invented probability model. Changing it after the freeze
-  is a new version.)*
+- **Pick rule (owner-confirmed 2026-10-22):** `gap = mean − entry_line`.
+  PICKED OVER if `gap ≥ +2.0` points, PICKED UNDER if `gap ≤ −2.0`;
+  otherwise PASSED. One row per team per game. Changing the threshold
+  after the freeze is a new version.
 
-## 6. Primary test (both legs required)
+## 6. Primary test (all four legs required)
 
-**6a. Accuracy vs the market baseline (governing).** On every
-engine-priced row with a valid close (§7), paired per row against the
-final team points:
+**Row set.** All legs use the same engine-priced rows. A row whose close
+fails validity (§7; validity is checked **before** any moved
+classification) is excluded from 6a–6d and counts toward the
+insufficient-close limit: if >20% of engine-priced rows lack a valid
+close, the verdict is `INSUFFICIENT_CLOSE_DATA`.
 
-- `ΔMAE_mkt = MAE(engine mean) − MAE(DK close line)`
-- Required: the upper bound of the (Bonferroni-adjusted, §9)
-  game-clustered CI of `ΔMAE_mkt` lies **below 0**. Squared error (RMSE)
-  difference is reported alongside with the same CI.
+**6a. Accuracy vs the market baseline (governing).** On the same rows
+in both arms, paired per row against final team points:
 
-**6b. Accuracy vs the ratings construction's baselines.** Same rows,
-same CI: the engine must also beat the emitted naive baselines
-`home/away_team_mean` (B1) and `league_mean` (B2) — the baselines its
-historical screen beat. Failing this means the construction lost its
-own historical edge forward.
+- `ΔMAE_mkt = MAE(engine mean) − MAE(close line)`, where the close line
+  is **the line of that row's valid close** (§7), which may differ from
+  the entry line.
+- Required: the upper bound of the §9 interval for `ΔMAE_mkt` lies
+  **below 0**. RMSE difference is reported alongside with the same
+  interval.
 
-**6c. CLV on picks.** Mean CLV on PICKED rows > 0 with the adjusted
-CI lower bound above 0, AND picked mean CLV > passed mean CLV.
+**6b. Accuracy vs the construction's own baselines.** Same rows, same
+interval: the engine must beat the emitted `home/away_team_mean` (B1)
+and `league_mean` (B2) — the baselines its historical screen beat.
 
-`BEATS_MARKET` requires 6a AND 6b AND 6c. Calibration-style reporting
-(hit rates by gap bucket) is secondary and never substitutes.
+**6c. CLV.** Every row is scored on side `sign(gap)` (OVER if gap > 0,
+UNDER if gap < 0; gap = 0 rows excluded and counted). Required: mean
+CLV on PICKED rows > 0 with the §9 lower bound above 0, AND picked mean
+CLV > mean CLV of PASSED rows scored on their `sign(gap)` side. CLV is
+computed only on rows whose valid close is at the entry line. **Moved
+rows** (valid two-sided pre-tip close only at a different line) are
+reported separately: count, and a one-sided exact sign test of
+favorable vs adverse movement relative to the picked side (direction
+from the latest qualifying close; a row whose qualifying close lines
+straddle the entry line counts as adverse), as in NFL props v1.1.
+
+**6d. Hit rate vs the market.** On PICKED rows with a valid close:
+`hit − p_close`, where `p_close` is the vig-free close probability of
+the picked side. Required: mean `hit − p_close` > 0 with the §9
+game-clustered, Bonferroni-adjusted lower bound > 0. Pushes are
+excluded from this leg and counted.
+
+`BEATS_MARKET` requires **6a AND 6b AND 6c AND 6d**.
 
 ## 7. CLV and close validity (capture rules)
 
@@ -147,13 +188,20 @@ CI lower bound above 0, AND picked mean CLV > passed mean CLV.
   each from a real matched two-sided pair at the **same line**.
 - **Close:** the last capture before tipoff and **no more than 60:00
   before** tipoff (exactly 60:00 is valid; at/after tipoff is not a close).
-- **Pairing:** both sides of a pair must come from captures within a
-  **≤150-second** span.
-- **Freshness:** any quote older than **180 seconds** at the time it is
-  bound is refused (`QUOTE_STALE_180S`), never priced or paired.
-- Validity checks (timing, two-sidedness, freshness) run **before** any
-  line-moved classification; a row with no valid close is a capture
-  failure, never a "moved" row.
+- **Pairing (close):** both sides of a close pair must come from
+  captures within a **≤150-second** span; wider is `PAIR_SPAN_EXCEEDED`
+  (CLV-missing).
+- **Entry pairing (declared, stricter):** the pinned runner
+  (`nfl_nba_engine_card_annex.py`, sha256 `28edafba…`) refuses an entry
+  pair whose sides are more than **120 seconds** apart
+  (`DK_PAIR_CAPTURE_SPAN_EXCEEDED`). Such a row is an **entry refusal**
+  (§8): never priced, not a CLV-missing row, and not in the 20% limit.
+  This draft does not change the runner.
+- **Freshness:** any quote older than **180 seconds** when bound is
+  refused (`QUOTE_STALE_180S`).
+- Validity checks (timing, two-sidedness, freshness, span) run
+  **before** any moved classification; a row with no valid close is a
+  capture failure, never a moved row.
 - "Final" means final among records committed at review time; later
   commits never rewrite a pairing.
 
@@ -166,8 +214,9 @@ close exists only at a different line), `CLOSE_SINGLE_SIDED`,
 `CLOSE_NOT_PRETIP`, `CLOSE_STALE` (>60:00), `PAIR_SPAN_EXCEEDED`
 (>150 s), `QUOTE_STALE_180S`.
 
-**Insufficient-close rule:** if >20% of engine-priced rows are
-CLV-missing, the verdict is `INSUFFICIENT_CLOSE_DATA`.
+**Insufficient-close rule:** per §6, >20% of engine-priced rows without
+a valid close gives `INSUFFICIENT_CLOSE_DATA`. Void, push, and
+`RESULT_UNAVAILABLE` rows are counted and reported (§3).
 
 Engine/runner refusals (row never priced, counted and reported):
 `NBA_TEAM_PERIOD_TEAM_NOT_IN_HISTORY`,
@@ -175,22 +224,28 @@ Engine/runner refusals (row never priced, counted and reported):
 `NBA_TEAM_PERIOD_INSUFFICIENT_LEAGUE_PRIORS`,
 `NBA_TEAM_PERIOD_TARGET_INVALID`, `NBA_FIXTURE_IDENTITY_INCOMPLETE`,
 `NBA_TEAM_SELECTION_UNBOUND`, `NBA_ENGINE_FAILED:<type>`,
+`DK_PAIR_MISSING_OR_STALE`, `TWO_SIDED_OU_REQUIRED`,
+`DRAFTKINGS_QUOTE_REQUIRED`, `FINITE_DK_ODDS_REQUIRED`,
+`NATIVE_TWO_SIDED_QUOTES_REQUIRED`, `DK_PAIR_CAPTURE_SPAN_EXCEEDED`
+(the six pinned-runner entry refusals),
 `MARKET_OUT_OF_SCOPE`, `ENTRY_NOT_PRETIP`, `ENTRY_SINGLE_SIDED`,
 `PRICE_INVALID`, `ENGINE_PROVENANCE_MISSING`, `HISTORY_HASH_MISMATCH`.
 Any code not listed here that appears at review is itself a defect and
 blocks the verdict (`UNDECLARED_REFUSAL_CODE`). A malformed row is
 refused alone; it never aborts the slate.
 
-## 9. Multiple testing
+## 9. Multiple testing and intervals
 
-Bonferroni: every CI in §6 is computed at level `1 − α/k`, α = 0.05,
-where **k = the number of active forward clocks at this test's review
-date**, counting this test from its freeze date. k is recorded at freeze
-and at review; the larger is used. Intervals are clustered by game.
+- All intervals: **game-cluster bootstrap, 10,000 resamples**, seed fixed
+  and recorded at freeze, **two-sided at level 1 − α/k**, α = 0.05.
+- **k** = the number of forward clocks whose counting windows overlap
+  this test's window, counting this test from its freeze date. The list
+  of clock IDs is recorded at freeze and again at review; the larger k
+  is used.
 
 ## 10. Verdicts
 
-- `BEATS_MARKET` — §6a, §6b, §6c all hold.
+- `BEATS_MARKET` — §6a, §6b, §6c, §6d all hold.
 - `DOES_NOT_BEAT_MARKET` — any of them fails. **Per §0, a failure of
   6a is the expected-risk outcome and is recorded as such, not
   explained away.**
@@ -214,8 +269,14 @@ promotability; any change is an owner ruling.
 ## 12. Freeze checklist (owner)
 
 - [ ] Independent review by a checker who did not draft this document.
-- [ ] Owner confirms §5 pick threshold (±2.0 points).
+- [x] Owner confirmed §5 pick threshold (±2.0 points), 2026-10-22.
 - [ ] Forward evaluator lands, hash-pinned to this document, before the
       first counted slate.
 - [ ] Owner freezes; k recorded; first counted slate named.
-- [ ] Owner ruling on the focus pause (2026-10-22) permits this freeze.
+- [x] Focus pause (2026-10-22): owner ruled freeze is allowed for
+      families with a merged engine and an already-captured market;
+      team totals qualifies.
+- [ ] Re-review of this revision (all §3/§5/§6a–6d/§7/§8/§9 edits
+      from the `82b880ed` NOT CLEARED review) by a checker who did not
+      draft it, returning CLEARED; bootstrap seed and k clock-ID list
+      recorded in the freeze record.
