@@ -1,0 +1,3 @@
+# t263: frozen v2k runtime pin (sportsedge/sports/nfl/NFL_V2K_DEVELOPMENT_VALIDATION_PREATTEMPT_V1.json runtime.numpy).
+# Use with: pip install -c constraints/v2k-runtime.txt -r requirements-test.txt
+numpy==2.5.3
