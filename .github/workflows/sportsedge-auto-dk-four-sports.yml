@@ -2,40 +2,8 @@ name: sportsedge-auto-dk-four-sports
 
 # Owner receives automatic sportsbook intake and cards without pasted lines.
 on:
-  schedule:
-    - cron: '17 10 * * *'
-    # Sunday 10:17 AM CT during DST (9:17 AM CT in standard time).
-    # Reserve-aware NFL-only quote refresh before the main afternoon slate.
-    - cron: '17 15 * * 0'
-  # Immediately run one guarded live capture when this workflow merges to main;
-  # avoid repeated paid API calls from unrelated repository commits.
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/collect_auto_dk_four_sports.py'
-      - 'scripts/run_auto_dk_cards.py'
-      - 'scripts/render_auto_dk_phone_summary.py'
-      - 'scripts/render_sportsedge_png.py'
-      - 'scripts/collect_nfl_auto_props.py'
-      - 'scripts/fallback_nfl_direct_dk.py'
-      - 'sportsedge/sports/nfl/auto_slate.py'
-      - '.github/workflows/sportsedge-auto-dk-four-sports.yml'
-  pull_request:
-    paths:
-      - 'scripts/render_auto_dk_phone_summary.py'
-      - 'tests/test_auto_dk_phone_summary.py'
-      - 'scripts/render_sportsedge_png.py'
-      - 'tests/test_sportsedge_png.py'
-      - 'scripts/collect_nfl_auto_props.py'
-      - 'tests/test_nfl_auto_props.py'
-      - 'scripts/fallback_nfl_direct_dk.py'
-      - 'tests/test_nfl_direct_fallback.py'
-      - 'sportsedge/sports/nfl/auto_slate.py'
-      - 'tests/test_nfl_auto_slate.py'
-      - 'scripts/collect_auto_dk_four_sports.py'
-      - 'scripts/run_auto_dk_cards.py'
-      - 'tests/test_auto_dk_four_sports.py'
-      - '.github/workflows/sportsedge-auto-dk-four-sports.yml'
+  # Grok ruling 2026-10-23 (t234u; owner invariant: DK rendered pages only): this job
+  # reaches a DraftKings API URL builder, so it runs only on manual workflow_dispatch.
   workflow_dispatch:
     inputs:
       sports:

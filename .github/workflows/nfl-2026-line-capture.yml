@@ -1,6 +1,8 @@
 name: NFL 2026 line capture
 
 on:
+  # Grok ruling 2026-10-23 (t234u; owner invariant: DK rendered pages only): this job
+  # reaches a DraftKings API URL builder, so it runs only on manual workflow_dispatch.
   workflow_dispatch:
     inputs:
       mode:
@@ -8,40 +10,6 @@ on:
         type: choice
         options: [check, capture]
         default: check
-  pull_request:
-    paths:
-      - 'scripts/nfl_2026_line_capture.py'
-      - 'scripts/audit_nfl_2026_capture_gaps.py'
-      - 'scripts/stamp_nfl_2026_capture_quarantine.py'
-      - 'scripts/odds_api_quota_guard.py'
-      - 'scripts/nfl_2026_provider_preflight.py'
-      - 'scripts/nfl_direct_dk_preflight.py'
-      - 'sportsedge/nfl_direct_capture_source.py'
-      - 'sportsedge/draftkings_game_market_source.py'
-      - 'sportsedge/nfl_confirmation_schedule.py'
-      - 'tests/test_nfl_direct_capture_source.py'
-      - 'tests/test_nfl_2026_direct_capture_wiring.py'
-      - 'tests/test_nfl_confirmation_schedule.py'
-      - 'tests/test_nfl_direct_dk_preflight.py'
-      - 'tests/test_nfl_2026_capture_gap_audit.py'
-      - 'tests/test_nfl_2026_provider_budget.py'
-      - 'config/nfl_2026_capture.json'
-      - 'config/nfl_research_search_policy_v1.json'
-      - 'config/nfl_2026_capture_adjudication.json'
-      - 'config/nfl_2026_provider_budget_v1.json'
-      - 'docs/nfl_direct_capture_source_contract_v1.md'
-      - '.github/workflows/nfl-2026-line-capture.yml'
-  # Frozen confirmation evidence is independent of the forward-CLV collector.
-  # Ten-minute polling is gated against the free nflverse schedule. Direct
-  # DraftKings web JSON is primary; the paid provider is whole-source fallback.
-  # Split cron entries preserve scheduler-delay-safe hourly health identity.
-  schedule:
-    - cron: '3 * * * *'
-    - cron: '13 * * * *'
-    - cron: '23 * * * *'
-    - cron: '33 * * * *'
-    - cron: '43 * * * *'
-    - cron: '53 * * * *'
 
 permissions:
   contents: write
