@@ -1,0 +1,22 @@
+{
+  "schema": "SPORTSEDGE_COMPLETION_GAP_POLICY_V1",
+  "note": "Ruling #6 focus pause (Oct 22, 2026): MLB game-line commissioning, NHL attempt 2 and NBA secondary props are paused. Only MLB game-line markets appear in the canonical 89-market scope.",
+  "paused_markets": {
+    "MLB": [
+      "F5_MONEYLINE",
+      "F5_RUN_LINE",
+      "F5_TEAM_TOTALS",
+      "F5_TOTALS",
+      "NRFI",
+      "YRFI"
+    ]
+  },
+  "owner_held_markets": {
+    "MLB": [
+      "EITHER_PITCHER_BB",
+      "EITHER_PITCHER_ER",
+      "EITHER_PITCHER_HITS_ALLOWED"
+    ]
+  },
+  "owner_held_note": "Owner ruling Oct 15, 2026: EITHER_PITCHER pricing stays refused until the underlying pitcher marginals are repaired."
+}
