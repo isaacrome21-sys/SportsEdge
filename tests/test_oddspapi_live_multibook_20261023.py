@@ -162,11 +162,23 @@ class OddsPapiTests(unittest.TestCase):
         with TemporaryDirectory() as folder:
             result=m.collect(["f1","f2"],["draftkings"],
                              max_billable=2,out_dir=folder,key="secret",
-                             request=provider,clock=lambda:NOW)
+                             request=provider,clock=lambda:NOW,pause=lambda seconds:None)
             self.assertEqual(result["calls"],2)
             self.assertEqual(seen,["/account","/odds","/account","/odds"])
         with self.assertRaisesRegex(m.IntakeRefusal,"BILLABLE_LIMIT_BELOW"):
             m.collect(["f1","f2"],["draftkings"],max_billable=1,key="secret",out_dir="unused")
+
+    def test_account_polls_are_paced_for_provider_cooldown(self):
+        sleeps=[]
+        def provider(endpoint,params,key):
+            if endpoint=="/account":
+                return account()
+            return fixture(params["fixtureId"])
+        with TemporaryDirectory() as folder:
+            m.collect(["f1","f2"],["draftkings"],max_billable=2,
+                      out_dir=folder,key="secret",request=provider,
+                      clock=lambda:NOW,pause=sleeps.append)
+        self.assertEqual(sleeps,[1.05])
 
     def test_reject_invalid_selection_and_unverified_book_count(self):
         for bad in (["x","x"],["bad!"],[]):
