@@ -1,0 +1,47 @@
+{
+ "label": "SCREEN",
+ "season": "2024-25 REG",
+ "counters": {
+  "records_in": 26444,
+  "records_kept": 25241,
+  "excluded_no_position": 1103,
+  "excluded_dnp_minutes0": 100,
+  "excluded_no_date": 0,
+  "excluded_invalid": 0
+ },
+ "families": {
+  "pr": {
+   "n": 20123,
+   "model_crps": 4.2106,
+   "baseline_crps": 6.0371,
+   "delta": -1.8265,
+   "ci95": [
+    -1.8859,
+    -1.7726
+   ],
+   "verdict": "SCREEN_BEATS_CLIMATOLOGY"
+  },
+  "pa": {
+   "n": 20123,
+   "model_crps": 3.8454,
+   "baseline_crps": 5.778,
+   "delta": -1.9326,
+   "ci95": [
+    -1.9943,
+    -1.8749
+   ],
+   "verdict": "SCREEN_BEATS_CLIMATOLOGY"
+  },
+  "ra": {
+   "n": 20123,
+   "model_crps": 1.9629,
+   "baseline_crps": 2.712,
+   "delta": -0.7491,
+   "ci95": [
+    -0.7733,
+    -0.7233
+   ],
+   "verdict": "SCREEN_BEATS_CLIMATOLOGY"
+  }
+ }
+}
