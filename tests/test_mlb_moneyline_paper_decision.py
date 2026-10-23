@@ -128,6 +128,38 @@ class MLBMoneylinePaperDecisionTest(unittest.TestCase):
                 now=now,
             )
 
+    def test_direct_dk_city_abbreviations_match_full_statsapi_clubs(self):
+        now = datetime(2026, 10, 23, 23, 27, tzinfo=timezone.utc)
+        start = now + timedelta(minutes=33)
+        pred = prediction(now, start)
+        pred.update(home_team="Milwaukee Brewers", away_team="Tampa Bay Rays")
+        dk = quote(start, now - timedelta(minutes=1))
+        dk.update(home_team="MIL Brewers", away_team="TB Rays")
+        result = freeze_paper_decision(prediction=pred, quotes=[dk], now=now)
+        self.assertIn(result["status"], {"PAPER_BET_FROZEN", "PAPER_PASS_FROZEN"})
+        self.assertEqual(result["decision_provider_event_id"], "dk-123")
+        self.assertIs(result["promotion_authority"], False)
+
+    def test_direct_dk_abbreviations_do_not_cross_bind_opponents(self):
+        now = datetime(2026, 10, 23, 23, 27, tzinfo=timezone.utc)
+        start = now + timedelta(minutes=33)
+        pred = prediction(now, start)
+        pred.update(home_team="Milwaukee Brewers", away_team="Tampa Bay Rays")
+        dk = quote(start, now - timedelta(minutes=1))
+        dk.update(home_team="TB Rays", away_team="MIL Brewers")
+        result = freeze_paper_decision(prediction=pred, quotes=[dk], now=now)
+        self.assertEqual(result["status"], "WAITING_FOR_ADMISSIBLE_DECISION_QUOTE")
+
+    def test_unknown_or_conflicting_dk_abbreviation_fails_closed(self):
+        now = datetime(2026, 10, 23, 23, 27, tzinfo=timezone.utc)
+        start = now + timedelta(minutes=33)
+        pred = prediction(now, start)
+        pred.update(home_team="Milwaukee Brewers", away_team="Tampa Bay Rays")
+        dk = quote(start, now - timedelta(minutes=1))
+        dk.update(home_team="MIL Rays", away_team="TB Rays")
+        result = freeze_paper_decision(prediction=pred, quotes=[dk], now=now)
+        self.assertEqual(result["status"], "WAITING_FOR_ADMISSIBLE_DECISION_QUOTE")
+
     def test_public_api_has_no_settlement_or_outcome_input(self):
         params = set(inspect.signature(freeze_paper_decision).parameters)
         self.assertNotIn("settlement", params)
