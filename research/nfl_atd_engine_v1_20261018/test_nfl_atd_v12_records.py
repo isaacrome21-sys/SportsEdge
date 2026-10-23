@@ -19,7 +19,8 @@ _OLD = []
 
 
 def setUpModule():
-    _OLD.append(fk.use_modules("atd_provenance_v12", "score_nfl_atd_forward_v12"))
+    _OLD.append(fk.use_modules("atd_provenance_v12", "score_nfl_atd_forward_v12",
+                               "price_nfl_atd_board_v12"))
 
 
 def tearDownModule():
@@ -63,12 +64,13 @@ class TestOwnRecordsArea(unittest.TestCase):
 
     def test_otherwise_a_copy(self):
         a = (HERE / "atd_provenance.py").read_text().replace("nfl_atd_v1_1", "nfl_atd_v1_2") \
-            .replace("nfl-atd-v1-1", "nfl-atd-v1-2")
+            .replace("nfl-atd-v1-1", "nfl-atd-v1-2") \
+            .replace("price_nfl_atd_board_v11", "price_nfl_atd_board_v12")   # t236b
         b = (HERE / "atd_provenance_v12.py").read_text()
         self.assertEqual(a, b)
 
     def test_own_replayer_identity(self):
-        import price_nfl_atd_board_v11 as pr
+        import price_nfl_atd_board_v12 as pr
         self.assertIs(self.pv._ORIGINAL_REPLAYERS, self.pv.replayers)
         self.assertEqual(set(self.pv.replayers()), {pr.pricer_sha256()})
 

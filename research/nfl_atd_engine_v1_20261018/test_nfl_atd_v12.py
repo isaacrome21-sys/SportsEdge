@@ -30,7 +30,8 @@ _OLD = []
 
 
 def setUpModule():
-    _OLD.append(fk.use_modules("atd_provenance_v12", "score_nfl_atd_forward_v12"))
+    _OLD.append(fk.use_modules("atd_provenance_v12", "score_nfl_atd_forward_v12",
+                               "price_nfl_atd_board_v12"))
 
 
 def tearDownModule():

@@ -23,17 +23,22 @@ import importlib
 # tests switch them via use_modules() (t236) and restore on teardown.
 PROVENANCE_MODULE = "atd_provenance"
 SCORER_MODULE = "score_nfl_atd_forward"
+PRICER_MODULE = "price_nfl_atd_board_v11"
 
 
 def _pv():
     return importlib.import_module(PROVENANCE_MODULE)
 
 
-def use_modules(provenance, scorer):
-    """Point the fake at another provenance/scorer pair; returns the old pair."""
-    global PROVENANCE_MODULE, SCORER_MODULE
-    old = (PROVENANCE_MODULE, SCORER_MODULE)
-    PROVENANCE_MODULE, SCORER_MODULE = provenance, scorer
+def _pr():
+    return importlib.import_module(PRICER_MODULE)
+
+
+def use_modules(provenance, scorer, pricer="price_nfl_atd_board_v11"):
+    """Point the fake at another provenance/scorer/pricer; returns the old triple."""
+    global PROVENANCE_MODULE, SCORER_MODULE, PRICER_MODULE
+    old = (PROVENANCE_MODULE, SCORER_MODULE, PRICER_MODULE)
+    PROVENANCE_MODULE, SCORER_MODULE, PRICER_MODULE = provenance, scorer, pricer
     return old
 
 
@@ -372,7 +377,7 @@ def fake_replay(inputs, *, now, fetched_at):
 def fake_replayers():
     """Stand-in for pv.replayers inside test fixtures only (never registered
     on import): the fake pricer plus the real one."""
-    import price_nfl_atd_board_v11 as pr
+    pr = _pr()
     return {FAKE_PRICER_SHA: fake_replay, pr.pricer_sha256(): pr.replay}
 
 
@@ -500,7 +505,7 @@ class synthetic_world:
                 board_at="2026-10-25T16:10:00Z", skip=(), edit=None):
         """Push data/fetch/board records then a run record carrying `rows`."""
         pv = _pv()
-        import price_nfl_atd_board_v11 as pr
+        pr = _pr()
         br = pv.RECORDS_BRANCH
         st = publish_data(api, self.stats, "2026-10-25T15:00:00Z", "stats", "csv.gz")
         sc = publish_data(api, self.schedule.decode(), "2026-10-25T15:01:00Z")
