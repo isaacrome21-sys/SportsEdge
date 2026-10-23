@@ -8,7 +8,9 @@ from datetime import date, timedelta
 import pytest
 
 from scripts.audit_nba_total_directions import main
-from sportsedge.research.nba_total_direction_audit_v1 import audit_total_directions
+from sportsedge.research.nba_total_direction_audit_v1 import (
+    _date, audit_total_directions,
+)
 from sportsedge.research.nba_totals_chronological_screen_v1 import (
     SCREEN, chronological_total_screen,
 )
@@ -77,6 +79,11 @@ def test_no_paired_market_is_not_zero_and_cannot_establish_edge():
     assert audit["mean_model_minus_market"] is None
     assert audit["model_vs_market_day_bootstrap_95pct"] is None
     assert audit["one_direction_warning"] is False
+
+
+def test_late_nba_tipoffs_cluster_by_chicago_slate_date_not_utc_day():
+    assert _date("2026-10-23T02:00:00Z") == "2026-10-22"
+    assert _date("2026-10-23T23:00:00Z") == "2026-10-23"
 
 
 @pytest.mark.parametrize("mutate, code", [
