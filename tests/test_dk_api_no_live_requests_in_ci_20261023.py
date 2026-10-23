@@ -625,8 +625,6 @@ def test_guarded_list_matches_workflows():
 
 # --- t258: bypasses found by the t255 audit (LOW). Every check below targets a NON-DK
 # host (or a pure function), so neither the RED run nor any CI run ever touches DraftKings.
-import shutil
-
 _JAIL_RESULTS = {}
 
 
@@ -1081,7 +1079,7 @@ def test_gate_not_dropped_for_other_threads_while_one_thread_checks():
 
 
 # ---- t262: every socket.* audit event, _posixsubprocess.fork_exec, jail for DK tests -------
-_DOCS_EVENTS = JAIL_DIR / "cpython_3_13_audit_events.txt"
+_DOCS_EVENTS = JAIL_DIR / "cpython_3_12_audit_events.txt"
 
 
 def _docs_events(prefix=""):
@@ -1091,7 +1089,7 @@ def _docs_events(prefix=""):
 
 
 def test_docs_event_list_matches_running_python_series():
-    assert sys.version_info[:2] == (3, 13), "re-vendor the audit events table for this Python"
+    assert sys.version_info[:2] == (3, 12), "re-vendor the audit events table for this Python"
     assert {"socket.connect", "socket.sendmsg", "os.system", "subprocess.Popen"} <= _docs_events()
 
 

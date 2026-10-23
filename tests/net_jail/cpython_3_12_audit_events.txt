@@ -1,17 +1,11 @@
-# CPython 3.13 audit events table, vendored from https://docs.python.org/3.13/library/audit_events.html
+# CPython 3.12 audit events table, vendored from https://docs.python.org/3.12/library/audit_events.html
 # (retrieved 2026-10-23; one event name per line). Used by the t262 guard tests.
 _thread.start_new_thread
-_winapi.CreateFile
-_winapi.CreateJunction
-_winapi.CreateNamedPipe
-_winapi.CreatePipe
-_winapi.CreateProcess
-_winapi.OpenProcess
-_winapi.TerminateProcess
 array.__new__
 builtins.breakpoint
 builtins.id
 builtins.input
+builtins.input/result
 code.__new__
 compile
 cpython.PyInterpreterState_Clear
@@ -23,14 +17,15 @@ cpython.run_interactivehook
 cpython.run_module
 cpython.run_startup
 cpython.run_stdin
-ctypes.PyObj_FromPtr
 ctypes.addressof
 ctypes.call_function
 ctypes.cdata
+ctypes.cdata/buffer
 ctypes.create_string_buffer
 ctypes.create_unicode_buffer
 ctypes.dlopen
 ctypes.dlsym
+ctypes.dlsym/handle
 ctypes.get_errno
 ctypes.get_last_error
 ctypes.set_errno
@@ -51,6 +46,7 @@ gc.get_objects
 gc.get_referents
 gc.get_referrers
 glob.glob
+glob.glob/2
 http.client.connect
 http.client.send
 imaplib.open
@@ -63,6 +59,8 @@ mmap.__new__
 msvcrt.get_osfhandle
 msvcrt.locking
 msvcrt.open_osfhandle
+nntplib.connect
+nntplib.putline
 object.__delattr__
 object.__getattr__
 object.__setattr__
@@ -97,6 +95,7 @@ os.scandir
 os.setxattr
 os.spawn
 os.startfile
+os.startfile/2
 os.symlink
 os.system
 os.truncate
@@ -139,6 +138,7 @@ socket.sendmsg
 socket.sendto
 socket.sethostname
 sqlite3.connect
+sqlite3.connect/handle
 sqlite3.enable_load_extension
 sqlite3.load_extension
 subprocess.Popen
@@ -148,7 +148,6 @@ sys._getframe
 sys._getframemodulename
 sys.addaudithook
 sys.excepthook
-sys.monitoring.register_callback
 sys.set_asyncgen_hooks_finalizer
 sys.set_asyncgen_hooks_firstiter
 sys.setprofile
@@ -158,9 +157,10 @@ syslog.closelog
 syslog.openlog
 syslog.setlogmask
 syslog.syslog
+telnetlib.Telnet.open
+telnetlib.Telnet.write
 tempfile.mkdtemp
 tempfile.mkstemp
-time.sleep
 urllib.Request
 webbrowser.open
 winreg.ConnectRegistry
@@ -174,9 +174,18 @@ winreg.EnumValue
 winreg.ExpandEnvironmentStrings
 winreg.LoadKey
 winreg.OpenKey
+winreg.OpenKey/result
 winreg.PyHKEY.Detach
 winreg.QueryInfoKey
 winreg.QueryReflectionKey
 winreg.QueryValue
 winreg.SaveKey
 winreg.SetValue
+_winapi.CreateFile
+_winapi.CreateJunction
+_winapi.CreateNamedPipe
+_winapi.CreatePipe
+_winapi.CreateProcess
+_winapi.OpenProcess
+_winapi.TerminateProcess
+ctypes.PyObj_FromPtr
