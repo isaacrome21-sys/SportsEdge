@@ -178,7 +178,8 @@ def schedule_csv(games):
 
 def ledger_to_records(api, ledger, captured_at="2026-10-25T16:00:00Z",
                       kickoff="2026-10-25T17:00:00Z", schedule_ko=None,
-                      first_kickoff=None, teams_override=None, player_team=None):
+                      first_kickoff=None, teams_override=None, player_team=None,
+                      python_version=None):
     """Publish a pre-scored test ledger as pushed data + fetch + run records,
     and derive the captures/settlements that reproduce each row's clv/outcome.
     Rows claim `kickoff`; the pushed schedule says `schedule_ko` (default:
@@ -225,6 +226,8 @@ def ledger_to_records(api, ledger, captured_at="2026-10-25T16:00:00Z",
         bsha = publish_board(api, board, f"2026-10-25T16:0{k % 10}:30Z")
         rec = {"slate_id": slate["slate_id"], "captured_at": captured_at,
                "season": 2026, "week": wk, "pricer_sha256": FAKE_PRICER_SHA,
+               "python_version": python_version or __import__("platform").python_version(),
+               "platform": __import__("platform").platform(),
                "inputs": {"board": bsha, "stats": st, "schedule": sc_, "player_data": {}},
                "game_teams": {r["game_id"]: list((teams_override or {}).get(
                    r["game_id"], games[r["game_id"]][:2])) for r in slate["rows"]},
@@ -272,10 +275,10 @@ def publish_settlements(api, settlements, pushed_at, data_pushed_at=None,
 
 
 def ledger_to_branch(api, ledger, close_pushed="2026-10-25T16:58:00Z",
-                     settle_pushed="2026-10-26T12:00:00Z"):
+                     settle_pushed="2026-10-26T12:00:00Z", **kw):
     """ledger_to_records + publish the derived closes (one record per game)
     and settlements on the branch, so review reads nothing from the caller."""
-    ids, caps, setl = ledger_to_records(api, ledger)
+    ids, caps, setl = ledger_to_records(api, ledger, **kw)
     week_of = {r["game_id"]: r["week"] for s in ledger for r in s["rows"]}
     by_game = {}
     for c in caps:
