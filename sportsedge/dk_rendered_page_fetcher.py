@@ -319,7 +319,6 @@ def to_capture_markets(output: dict[str, Any]) -> dict[str, Any]:
 
 
 def _browser_path(explicit: str | None) -> str:
-    import os
     path = explicit or os.environ.get("SPORTSEDGE_BROWSER_PATH") or DEFAULT_BROWSER_PATH
     if path not in ALLOWED_BROWSER_PATHS:
         raise BrowserBinaryRefused("BROWSER_PATH_NOT_ALLOWLISTED")
@@ -332,7 +331,6 @@ def _render_with_browser(url: str, *, timeout_ms: int = 60000, settle_ms: int = 
                          executable_path: str | None = None,
                          clock: Callable[[], datetime] | None = None) -> dict[str, Any]:
     """Render in a normal HEADED Chrome on $DISPLAY with the browser's stock identity."""
-    import os
 
     clock = clock or _utcnow
     if not os.environ.get("DISPLAY"):
