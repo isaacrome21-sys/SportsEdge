@@ -16,7 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
-import atd_provenance as pv
+import atd_provenance_v12 as pv          # t236: v1.2 has its own records area
+import fake_github_api as fk
 import score_nfl_atd_forward_v12 as sc
 from fake_github_api import FakeGitHub, fake_replayers, ledger_to_branch, records_worktree
 from test_nfl_atd_v11_scorer import _ledger
@@ -25,6 +26,15 @@ BR = pv.RECORDS_BRANCH
 HERE = Path(__file__).resolve().parent
 NOW_US = datetime(2026, 11, 30, 0, 0, 0, 654321, tzinfo=timezone.utc)
 NOW_S = NOW_US.replace(microsecond=0)
+_OLD = []
+
+
+def setUpModule():
+    _OLD.append(fk.use_modules("atd_provenance_v12", "score_nfl_atd_forward_v12"))
+
+
+def tearDownModule():
+    fk.use_modules(*_OLD.pop())
 
 
 def v12_world(freeze_override=None, freeze=True):
@@ -194,6 +204,9 @@ class TestV11Untouched(unittest.TestCase):
                          "000e8f8685c76b814ccf878d50aa8a8c13afafc06e5279f95ab132e5c074b649")
         self.assertEqual(h("atd_provenance.py"),
                          "48f0c18aba1c8ea540e0665d385aa7e0da20b8598d87e2c2500f950569e814e0")
+        import price_nfl_atd_board_v11 as pr
+        self.assertEqual(pr.pricer_sha256(),
+                         "c054c372a6984b65697aad859111fab941faaf51948045f47ee6674ecc4f8a89")
 
 
 if __name__ == "__main__":

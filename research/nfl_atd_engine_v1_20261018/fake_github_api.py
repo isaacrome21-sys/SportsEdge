@@ -16,6 +16,27 @@ _ids = itertools.count(1000)
 ZERO = "0" * 40
 
 
+
+import importlib
+
+# Which provenance/scorer modules the fake targets. Defaults are v1.1; v1.2
+# tests switch them via use_modules() (t236) and restore on teardown.
+PROVENANCE_MODULE = "atd_provenance"
+SCORER_MODULE = "score_nfl_atd_forward"
+
+
+def _pv():
+    return importlib.import_module(PROVENANCE_MODULE)
+
+
+def use_modules(provenance, scorer):
+    """Point the fake at another provenance/scorer pair; returns the old pair."""
+    global PROVENANCE_MODULE, SCORER_MODULE
+    old = (PROVENANCE_MODULE, SCORER_MODULE)
+    PROVENANCE_MODULE, SCORER_MODULE = provenance, scorer
+    return old
+
+
 class FakeGitHub:
     """init_records=True creates the records branch with a dummy first
     commit (a branch_creation event, as GitHub reports it), so records are
@@ -31,7 +52,7 @@ class FakeGitHub:
         self.authenticated = authenticated
         self.truncated = False
         if init_records:
-            import atd_provenance as pv
+            pv = _pv()
             self.commit(pv.RECORDS_BRANCH, {"README.md": "records branch (dummy first commit)\n"},
                         "2026-10-01T00:00:00Z")
             if freeze:
@@ -39,8 +60,8 @@ class FakeGitHub:
 
     def publish_freeze(self, shas=None, pushed_at="2026-10-01T00:01:00Z"):
         """FREEZE.json pins (default: the shas of the code running now)."""
-        import atd_provenance as pv
-        import score_nfl_atd_forward as sc
+        pv = _pv()
+        sc = importlib.import_module(SCORER_MODULE)
         body = dict(sc.local_shas() if hasattr(sc, "local_shas") else {}, **(shas or {}))
         return self.commit(pv.RECORDS_BRANCH,
                            {getattr(pv, "FREEZE_PATH", "nfl_atd_v1_1/FREEZE.json"):
@@ -183,7 +204,7 @@ class FakeGitHub:
 def records_worktree(origin_url="https://github.com/isaacrome21-sys/SportsEdge.git"):
     """Local git checkout on the records branch whose origin URL is the real
     repo (never contacted: verdict existence is checked via the injected API)."""
-    import atd_provenance as pv
+    pv = _pv()
     t = Path(tempfile.mkdtemp())
     g = lambda *a: subprocess.run(["git", *a], cwd=t, check=True, capture_output=True)
     g("init", "-q", "-b", pv.RECORDS_BRANCH, ".")
@@ -194,7 +215,7 @@ def records_worktree(origin_url="https://github.com/isaacrome21-sys/SportsEdge.g
 def publish_data(api, body, pushed_at, name="schedule", ext="csv"):
     """Push a hash-named data record data/<sha>.<ext> (single commit) and its
     fetch record fetch/<sha>.json; idempotent per sha. Returns sha."""
-    import atd_provenance as pv
+    pv = _pv()
     raw = body.encode() if isinstance(body, str) else body
     sha = hashlib.sha256(raw).hexdigest()
     br = pv.RECORDS_BRANCH
@@ -224,7 +245,7 @@ def ledger_to_records(api, ledger, captured_at="2026-10-25T16:00:00Z",
     and derive the captures/settlements that reproduce each row's clv/outcome.
     Rows claim `kickoff`; the pushed schedule says `schedule_ko` (default:
     the same), so a forged run record can be modelled."""
-    import atd_provenance as pv
+    pv = _pv()
     br = pv.RECORDS_BRANCH
     games = {}
     for s_ in ledger:
@@ -287,7 +308,7 @@ def publish_close(api, game_id, kickoff, captured_at, captures, pushed_at,
                   season=2026, week=8, raw=None):
     """Push one close-capture file as its own record
     closes/<season>-W<week>/<sha256>.json (raw: exact body to publish)."""
-    import atd_provenance as pv
+    pv = _pv()
     body = raw if raw is not None else json.dumps(
         {"game_id": game_id, "kickoff": kickoff, "captured_at": captured_at,
          "captures": captures}, sort_keys=True)
@@ -301,7 +322,7 @@ def publish_settlements(api, settlements, pushed_at, data_pushed_at=None,
     """Push a settlement data file (settlements/<season>-W<week>/<sha>.json)
     and its fetch record (fetch/<sha>.json); returns the sha. `rows` gives
     the raw settlement list (e.g. with duplicate keys)."""
-    import atd_provenance as pv
+    pv = _pv()
     rows = rows if rows is not None else [
         {"game_id": g, "player_id": p, "td": v} for (g, p), v in sorted(settlements.items())]
     body = json.dumps({"settlements": rows}, sort_keys=True)
@@ -363,7 +384,7 @@ def module_fixtures(*, guard):
     patchers = []
 
     def setup():
-        import atd_provenance as pv
+        pv = _pv()
         patchers.append(mock.patch.object(pv, "replayers", fake_replayers))
         if guard:
             import score_nfl_atd_forward as sc
@@ -379,7 +400,7 @@ def module_fixtures(*, guard):
 
 def publish_board(api, board: dict, pushed_at):
     """Push a board capture record boards/<season>-W<week>/<sha>.json."""
-    import atd_provenance as pv
+    pv = _pv()
     body = json.dumps(board, sort_keys=True)
     sha = hashlib.sha256(body.encode()).hexdigest()
     p = pv.board_record_path(sha, board["season"], board["week"])
@@ -391,7 +412,7 @@ def publish_board(api, board: dict, pushed_at):
 def republish_run(api, rec, slate_id, pushed_at, board_pushed_at=None):
     """Push a hand-edited run record WITH a board record that replays to its
     rows (fake pricer), i.e. an honest record for those rows."""
-    import atd_provenance as pv
+    pv = _pv()
     rec = dict(rec, slate_id=slate_id)
     b = {"slate_id": slate_id, "season": rec["season"], "week": rec["week"],
          "captured_at": rec["captured_at"], "rows": rec["rows"]}
@@ -478,7 +499,7 @@ class synthetic_world:
     def publish(self, api, rows, *, pricer_sha=None, run_at="2026-10-25T16:30:00Z",
                 board_at="2026-10-25T16:10:00Z", skip=(), edit=None):
         """Push data/fetch/board records then a run record carrying `rows`."""
-        import atd_provenance as pv
+        pv = _pv()
         import price_nfl_atd_board_v11 as pr
         br = pv.RECORDS_BRANCH
         st = publish_data(api, self.stats, "2026-10-25T15:00:00Z", "stats", "csv.gz")
