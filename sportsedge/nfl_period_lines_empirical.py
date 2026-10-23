@@ -32,7 +32,7 @@ import hashlib
 import math
 from typing import Any, Iterable, Mapping
 
-from sportsedge.screen_only_guard import ScreenOnlyGuardError, checked_require, lock_module, require_screen_only
+from sportsedge.screen_only_guard import ScreenOnlyGuardError, checked_require, lock_module, require_screen_only, verify_naive_fail
 
 ENGINE_ID = "NFL_PERIOD_LINES_EMPIRICAL"
 ENGINE_VERSION = "nfl_period_lines_empirical_v1_20261023"
@@ -46,16 +46,12 @@ MIN_TEAM_GAMES = 3
 # screen_results_v1.json; they refuse with a coded NAIVE_FAIL instead of pricing.
 NAIVE_FAIL_FAMILIES = frozenset({"Q1_MONEYLINE", "Q2_MONEYLINE", "Q3_MONEYLINE",
                                  "Q4_MONEYLINE", "Q1_TOTAL", "Q3_TOTAL", "Q4_TOTAL"})
-# t256: pinned sha256 of the sorted family list; every read is checked (ruling C).
-_NAIVE_FAIL_SHA256 = "ec535bb6e87d2f3fa9b6cd3988a625f3f5183c51f9edc7b33e086855935df678"
+# t257: the sha256 pin lives in the guard (outside this module); every read is
+# checked there, and the module must still be a LockedModule (ruling C).
 
 
 def _naive_fail():
-    v = globals().get("NAIVE_FAIL_FAMILIES")
-    if not isinstance(v, frozenset) or hashlib.sha256(
-            "\n".join(sorted(v)).encode()).hexdigest() != _NAIVE_FAIL_SHA256:
-        raise ScreenOnlyGuardError("SCREEN_ONLY_GUARD:NAIVE_FAIL_FAMILIES_TAMPERED")
-    return v
+    return verify_naive_fail(__name__, globals().get("NAIVE_FAIL_FAMILIES"))
 
 
 class NflPeriodLinesError(ValueError):
@@ -250,5 +246,5 @@ def spread_probs(priced: dict, home_line) -> dict:
 
 
 # t256: refuse rebinding the guard hook and the refused-family set (rulings B, C).
-lock_module(__name__, {"NAIVE_FAIL_FAMILIES", "_NAIVE_FAIL_SHA256", "_naive_fail",
+lock_module(__name__, {"NAIVE_FAIL_FAMILIES", "_naive_fail", verify_naive_fail.__name__,
                        require_screen_only.__name__, checked_require.__name__, lock_module.__name__})
