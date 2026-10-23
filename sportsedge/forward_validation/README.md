@@ -62,6 +62,12 @@ One JSON config per family in `configs/`:
   (the framework averages them when present; it never invents
   distribution math of its own).
 - YES_ONLY rows carry `model_p: {"YES": p}` and `entry_prices: {"YES": price}`.
+- Entry probabilities, entry odds, matching close odds, and entry/close lines
+  must be finite numeric values (numeric strings remain supported; booleans
+  are refused). Invalid lines use `LINE_INVALID`; invalid probabilities and
+  odds use `MODEL_PROBABILITY_INVALID` and `PRICE_INVALID`. Odds must produce
+  a finite decimal payout greater than one. Numerically equal line spellings
+  share one prospective-row identity and cannot inflate the sample count.
 - A record written after its event started must carry `label:
   "HISTORICAL"`; historical records are counted and excluded from all
   verdict math. An unlabeled post-start record refuses the run.
@@ -76,11 +82,17 @@ One JSON config per family in `configs/`:
 Closes match entries on (event, subject, market, line). A close at a
 different line is `LINE_MOVED`, never repriced.
 
+Supply one selected final close record per (event, subject, market, line).
+Repeated identities refuse the run with `CLOSE_DUPLICATE`, including exact
+copies. The adapter must explicitly select the final close under its capture
+contract before evaluation; file order cannot select a quote or overwrite
+evidence. This evaluator does not resolve raw capture histories.
+
 All entry and close timestamps require an explicit UTC offset (`Z` is
 accepted). Date-only values and naive local times are refused; the evaluator
 never guesses a timezone. Invalid entry clocks use `RECORD_MISSING_TIMESTAMP`,
 and invalid close clocks use `CLOSE_RECORD_MISSING_TIMESTAMP`. Every supplied
-close is checked before indexing, including unmatched or overwritten rows.
+close is checked before indexing, including unmatched or duplicate rows.
 
 **Outcome record**: `{"event_id", "subject_id", "market", "value"}` —
 the realized value on the line scale, from the family's declared

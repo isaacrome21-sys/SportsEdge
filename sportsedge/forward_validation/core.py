@@ -224,8 +224,10 @@ def _admit_rows(cfg: FamilyConfig, rows: list) -> tuple[list, dict]:
                 "MODEL_VERSION_MISMATCH",
                 {"row_id": row_id, "found": row.get("model_version"),
                  "frozen": cfg.model_version})
+        line = _finite_number(row.get("line"), reason="LINE_INVALID",
+                              row_id=row_id, field="line")
         key = (row.get("event_id"), row.get("subject_id"), row.get("market"),
-               row.get("line"), row.get("model_version"))
+               line, row.get("model_version"))
         if key in seen:
             raise ForwardValidationRefusal(
                 "DUPLICATE_PROSPECTIVE_ROW",
@@ -240,42 +242,52 @@ def _admit_rows(cfg: FamilyConfig, rows: list) -> tuple[list, dict]:
                          "late_entry_rows": late_entries}
 
 
+def _finite_number(value, *, reason: str, row_id: str, field: str) -> float:
+    """Preserve numeric-string compatibility, but never accept bool/nonfinite."""
+    try:
+        if isinstance(value, bool):
+            raise ValueError("boolean is not numeric evidence")
+        number = float(value)
+        if not math.isfinite(number):
+            raise ValueError("nonfinite numeric evidence")
+        return number
+    except (TypeError, ValueError, OverflowError):
+        raise ForwardValidationRefusal(
+            reason, {"row_id": row_id, "field": field, "value": repr(value)[:200]})
+
+
+def _check_price(value, *, row_id: str, field: str) -> None:
+    number = _finite_number(value, reason="PRICE_INVALID", row_id=row_id, field=field)
+    try:
+        decimal = stats.american_to_decimal(number)
+        if not math.isfinite(decimal) or decimal <= 1.0:
+            raise ValueError("price cannot represent a finite payout")
+    except (TypeError, ValueError, OverflowError):
+        raise ForwardValidationRefusal(
+            "PRICE_INVALID", {"row_id": row_id, "field": field, "value": repr(value)[:200]})
+
+
 def _check_probabilities_and_prices(cfg: FamilyConfig, row: dict) -> None:
     row_id = row.get("row_id") or "<no row_id>"
-    mp = row.get("model_p") or {}
-    prices = row.get("entry_prices") or {}
-    if cfg.market_form == "YES_ONLY":
-        p = mp.get("YES")
-        if p is None or not (0.0 < float(p) < 1.0):
-            raise ForwardValidationRefusal(
-                "MODEL_PROBABILITY_INVALID", {"row_id": row_id, "model_p": mp})
-        if prices.get("YES") is None:
-            raise ForwardValidationRefusal(
-                "PRICE_INVALID", {"row_id": row_id, "entry_prices": prices})
-        return
+    mp = row.get("model_p")
+    prices = row.get("entry_prices")
+    if not isinstance(mp, dict):
+        raise ForwardValidationRefusal("MODEL_PROBABILITY_INVALID", {"row_id": row_id})
+    if not isinstance(prices, dict):
+        raise ForwardValidationRefusal("PRICE_INVALID", {"row_id": row_id})
     total = 0.0
     for side in cfg.sides:
-        p = mp.get(side)
-        if p is None or not (0.0 <= float(p) <= 1.0):
+        p = _finite_number(mp.get(side), reason="MODEL_PROBABILITY_INVALID",
+                           row_id=row_id, field=f"model_p.{side}")
+        valid = (0.0 < p < 1.0) if cfg.market_form == "YES_ONLY" else (0.0 <= p <= 1.0)
+        if not valid:
             raise ForwardValidationRefusal(
-                "MODEL_PROBABILITY_INVALID",
-                {"row_id": row_id, "side": side, "model_p": mp})
-        total += float(p)
-        price = prices.get(side)
-        if price is None:
-            raise ForwardValidationRefusal(
-                "PRICE_INVALID", {"row_id": row_id, "side": side,
-                                  "entry_prices": prices})
-        try:
-            stats.american_to_decimal(price)
-        except (TypeError, ValueError):
-            raise ForwardValidationRefusal(
-                "PRICE_INVALID", {"row_id": row_id, "side": side,
-                                  "price": price})
-    if abs(total - 1.0) > 1e-6:
+                "MODEL_PROBABILITY_INVALID", {"row_id": row_id, "side": side})
+        total += p
+        _check_price(prices.get(side), row_id=row_id, field=f"entry_prices.{side}")
+    if cfg.market_form == "TWO_SIDED" and abs(total - 1.0) > 1e-6:
         raise ForwardValidationRefusal(
-            "MODEL_PROBABILITY_INVALID",
-            {"row_id": row_id, "sum": total, "model_p": mp})
+            "MODEL_PROBABILITY_INVALID", {"row_id": row_id, "sum": total})
 
 
 # --------------------------------------------------------------------------
@@ -292,7 +304,14 @@ def _attach_close(cfg: FamilyConfig, row: dict, close_index: dict,
     kickoff = _parse_ts(row["event_start"], row_id=row.get("row_id", "?"),
                         field_name="event_start")
     reason = None
-    prices = (raw or {}).get("prices") or {}
+    prices = (raw or {}).get("prices")
+    if prices is None:
+        prices = {}
+    if not isinstance(prices, dict):
+        raise ForwardValidationRefusal("PRICE_INVALID", {"row_id": f"close:{key}"})
+    for side in cfg.sides:
+        if prices.get(side) is not None:
+            _check_price(prices[side], row_id=f"close:{key}", field=f"prices.{side}")
     if raw is None:
         reason = ("LINE_MOVED"
                   if (row["event_id"], row.get("subject_id"), row["market"])
@@ -324,12 +343,14 @@ def _index_closes(close_rows: list) -> tuple[dict, set]:
                 "CLOSE_RECORD_MISSING_TIMESTAMP",
                 {"close_row": {k: raw.get(k) for k in
                                 ("event_id", "subject_id", "market", "line")}})
-        key = (raw["event_id"], raw.get("subject_id"), raw["market"],
-               float(raw["line"]))
-        # Validate every supplied capture, even when it does not match an
-        # entry or is overwritten by another capture of the same key.
+        line = _finite_number(raw.get("line"), reason="LINE_INVALID",
+                              row_id="close", field="line")
+        key = (raw["event_id"], raw.get("subject_id"), raw["market"], line)
+        # Validate every supplied capture, including unmatched records.
         _parse_ts(raw["captured_at"], row_id=f"close:{key}",
                   field_name="captured_at")
+        if key in by_key:
+            raise ForwardValidationRefusal("CLOSE_DUPLICATE", {"key": key})
         by_key[key] = raw
         seen.add((raw["event_id"], raw.get("subject_id"), raw["market"]))
     return by_key, seen
