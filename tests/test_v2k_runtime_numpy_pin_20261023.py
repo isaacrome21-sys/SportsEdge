@@ -47,3 +47,8 @@ def test_venv_helper_uses_constraints():
     sh = (ROOT / "scripts" / "make_pinned_test_venv.sh").read_text(encoding="utf-8")
     assert "-c constraints/v2k-runtime.txt" in sh
     assert "-r requirements-test.txt" in sh
+
+
+def test_pinned_venv_dir_is_gitignored():
+    lines = {l.strip() for l in (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()}
+    assert ".venv-pinned/" in lines
