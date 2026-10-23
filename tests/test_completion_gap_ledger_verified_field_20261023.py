@@ -125,19 +125,23 @@ def test_cleared_head_is_checked_against_remote_head_not_against_sha():
     assert SIT[1] in asked
 
 
-def test_engine_sha_may_be_ancestor_of_cleared_head():
+def test_engine_sha_older_than_cleared_head_refuses():
+    # t257: superseded the t256 ancestor allowance (audit repro a5012ea8 < ea53ee16).
     bad = json.loads(json.dumps(POLICY))
     for *_, e in L._grok_entries(bad):
         if e["branch"] == SIT[0]:
             e["cleared_head_sha"] = "a" * 40
     st = {"a" * 40: "head"}
-    L.verify_branch_shas(bad, resolver=lambda b, s: st.get(s, "ancestor") if b == SIT[0] else "head",
-                         file_resolver=lambda f, s: True)
+    with pytest.raises(L.LedgerRefusal, match="CITED_SHA_NOT_CLEARED_HEAD"):
+        L.verify_branch_shas(bad, resolver=lambda b, s: st.get(s, "ancestor") if b == SIT[0] else "head",
+                             file_resolver=lambda f, s: True)
 
 
 def test_cleared_head_not_remote_head_refuses():
     bad = json.loads(json.dumps(POLICY))
-    bad["grok_branch_engines"]["NFL"]["safety"]["cleared_head_sha"] = "a" * 40
+    for *_, e in L._grok_entries(bad):
+        if e["branch"] == SIT[0]:
+            e["sha"] = e["cleared_head_sha"] = "a" * 40
     real = {SIT[1]: "head"}
     with pytest.raises(L.LedgerRefusal, match="GROK_BRANCH_SHA_NOT_ON_REMOTE"):
         L.verify_branch_shas(bad, resolver=lambda b, s: real.get(s, "missing") if b == SIT[0] else "head",
