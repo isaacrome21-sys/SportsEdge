@@ -15,6 +15,7 @@ import re
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from time import sleep as _sleep
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -91,7 +92,8 @@ def normalize_fixture(raw, fixture_id, *, asof):
     if not isinstance(raw, dict) or raw.get("fixtureId") != fixture_id:
         raise IntakeRefusal("FIXTURE_ID_MISMATCH")
     start = utc_time(raw.get("startTime"))
-    if start is None or start <= asof or raw.get("statusId") != 0:
+    status = raw.get("statusId")
+    if start is None or start <= asof or isinstance(status, bool) or status != 0:
         raise IntakeRefusal("NOT_PROSPECTIVE_PREGAME_FIXTURE")
     if raw.get("hasOdds") is not True:
         return {"fixture_id": fixture_id, "status": "NO_ODDS",
@@ -222,7 +224,8 @@ def validate_selection(fixtures, books):
 
 
 def collect(fixtures, books, *, max_billable=0, reserve=DEFAULT_RESERVE,
-            out_dir=None, key=None, request=safe_request, clock=None):
+            out_dir=None, key=None, request=safe_request, clock=None,
+            pause=_sleep):
     """Explicit per-run budget, independent free quota check BEFORE EACH call."""
     validate_selection(fixtures, books)
     if isinstance(max_billable, bool) or not isinstance(max_billable, int) or max_billable < 0:
@@ -242,7 +245,11 @@ def collect(fixtures, books, *, max_billable=0, reserve=DEFAULT_RESERVE,
     out_dir = Path(out_dir)
     now = clock or (lambda: datetime.now(timezone.utc))
     results = []
-    for fixture_id in fixtures:
+    for index, fixture_id in enumerate(fixtures):
+        if index:
+            # /account has a 1000ms provider cooldown; avoid a second free
+            # preflight colliding with the preceding fixture's check.
+            pause(1.05)
         account = request("/account", {}, key)
         if account_remaining(account) <= reserve:
             raise IntakeRefusal("QUOTA_RESERVE_WOULD_BE_BREACHED")
