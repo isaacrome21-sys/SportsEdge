@@ -1,0 +1,220 @@
+{
+ "label": "SCREEN",
+ "engine": "nfl_longest_fg_empirical_v1_20261022",
+ "baseline": "earlier-seasons share of kicker-games with longest made FG > line",
+ "metric": "mean binary log loss (lower better); delta = model - baseline",
+ "outcome_rule": "no made FG counts as not-over (DK settlement unverified)",
+ "inputs_sha256": {
+  "games.csv": "81d3de72f038c312030ff51f34621b6d068ad52aa5ab788312bbff5abb3f0ade",
+  "pbp_2018.csv.gz": "d37899610b397b96a90da6902827de5b46c5457b93e0e16d5f95a8eb524e4a7d",
+  "pbp_2019.csv.gz": "b764668137052be23745953cbc33fa17e537a70c81e9b73785a19a15e7288216",
+  "pbp_2020.csv.gz": "bc954b5780e325df4faa255fac092585c981a4de5d2f553a8a4e0a3c8b3a3cf2",
+  "pbp_2021.csv.gz": "e8743a568f99667a8bdcd29ba12224ee1782ad2b7916bee78ee335c099383739",
+  "pbp_2022.csv.gz": "0c69a71eb39498956c7b1d5c1ca52ce7fe679934a95d1af249facb5ea9829ea4",
+  "pbp_2023.csv.gz": "4649804ee0f0a40b41e51ec75a1ce921949d7fab5459213488656b92f78560e8",
+  "pbp_2024.csv.gz": "23370d5d10f8104d80d46a1fc5e61f4f6f5a3263fe96fe2dd629913cfcb08c06",
+  "pbp_2025.csv.gz": "2f135887790a013fd004e609e37096bb4816d5cc80b9f19122e1bad478961978"
+ },
+ "kicker_games_built": 4409,
+ "refused_row_lines": {
+  "LONGEST_FG_UPSTREAM:KICKING_HISTORY_INSUFFICIENT": 976
+ },
+ "lines": {
+  "40.5": {
+   "n": 3465,
+   "base_rate_observed": 0.4973,
+   "model_ll": 0.69771,
+   "base_ll": 0.69519,
+   "delta": 0.00252,
+   "ci95": [
+    -0.00291,
+    0.00825
+   ],
+   "seasons_model_better": 1,
+   "per_season_delta": {
+    "2019": 0.00296,
+    "2020": 0.0066,
+    "2021": 0.00514,
+    "2022": 0.00498,
+    "2023": 0.00818,
+    "2024": 0.00212,
+    "2025": -0.01243
+   },
+   "calibration_quintiles_[mean_p,obs_rate,n]": [
+    [
+     0.4051,
+     0.4661,
+     693
+    ],
+    [
+     0.4646,
+     0.4877,
+     693
+    ],
+    [
+     0.5014,
+     0.4935,
+     693
+    ],
+    [
+     0.5391,
+     0.5022,
+     693
+    ],
+    [
+     0.598,
+     0.5368,
+     693
+    ]
+   ],
+   "verdict": "SCREEN_INCONCLUSIVE"
+  },
+  "44.5": {
+   "n": 3465,
+   "base_rate_observed": 0.3818,
+   "model_ll": 0.66474,
+   "base_ll": 0.66757,
+   "delta": -0.00284,
+   "ci95": [
+    -0.00962,
+    0.00361
+   ],
+   "seasons_model_better": 4,
+   "per_season_delta": {
+    "2019": 0.00706,
+    "2020": 0.00406,
+    "2021": -0.00111,
+    "2022": -0.00714,
+    "2023": 0.01014,
+    "2024": -0.01196,
+    "2025": -0.01979
+   },
+   "calibration_quintiles_[mean_p,obs_rate,n]": [
+    [
+     0.2983,
+     0.329,
+     693
+    ],
+    [
+     0.3554,
+     0.3781,
+     693
+    ],
+    [
+     0.3923,
+     0.3449,
+     693
+    ],
+    [
+     0.4328,
+     0.404,
+     693
+    ],
+    [
+     0.501,
+     0.4531,
+     693
+    ]
+   ],
+   "verdict": "SCREEN_INCONCLUSIVE"
+  },
+  "47.5": {
+   "n": 3465,
+   "base_rate_observed": 0.2941,
+   "model_ll": 0.60479,
+   "base_ll": 0.60994,
+   "delta": -0.00515,
+   "ci95": [
+    -0.01206,
+    0.00167
+   ],
+   "seasons_model_better": 4,
+   "per_season_delta": {
+    "2019": 0.01284,
+    "2020": -0.00048,
+    "2021": 0.0025,
+    "2022": -0.01721,
+    "2023": 0.00857,
+    "2024": -0.02321,
+    "2025": -0.01677
+   },
+   "calibration_quintiles_[mean_p,obs_rate,n]": [
+    [
+     0.2122,
+     0.2569,
+     693
+    ],
+    [
+     0.2628,
+     0.2597,
+     693
+    ],
+    [
+     0.2994,
+     0.2727,
+     693
+    ],
+    [
+     0.3413,
+     0.3146,
+     693
+    ],
+    [
+     0.4156,
+     0.3665,
+     693
+    ]
+   ],
+   "verdict": "SCREEN_INCONCLUSIVE"
+  },
+  "50.5": {
+   "n": 3465,
+   "base_rate_observed": 0.2017,
+   "model_ll": 0.49783,
+   "base_ll": 0.50747,
+   "delta": -0.00964,
+   "ci95": [
+    -0.01635,
+    -0.00276
+   ],
+   "seasons_model_better": 5,
+   "per_season_delta": {
+    "2019": 0.01283,
+    "2020": 0.004,
+    "2021": -0.00624,
+    "2022": -0.03126,
+    "2023": -0.00254,
+    "2024": -0.02735,
+    "2025": -0.01347
+   },
+   "calibration_quintiles_[mean_p,obs_rate,n]": [
+    [
+     0.1286,
+     0.1544,
+     693
+    ],
+    [
+     0.1706,
+     0.1659,
+     693
+    ],
+    [
+     0.2029,
+     0.1948,
+     693
+    ],
+    [
+     0.2417,
+     0.2222,
+     693
+    ],
+    [
+     0.309,
+     0.2713,
+     693
+    ]
+   ],
+   "verdict": "SCREEN_BEATS_NAIVE"
+  }
+ }
+}
