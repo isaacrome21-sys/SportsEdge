@@ -1,5 +1,6 @@
 """Synthetic-only regression probes for the operator-pinned RUN IT annex."""
 from datetime import datetime, timezone
+from unittest.mock import patch
 
 from sportsedge.research.nfl_nba_engine_card_annex import (
     build_annex, content_hash,
@@ -65,6 +66,32 @@ def test_nfl_targets_real_engine_priced_without_gate_lift():
         assert readout["eligible"] is False
         assert readout["play_authority"] is False
         assert 0 <= readout["projection"]["p_over"] <= 1
+
+
+def test_nfl_count_push_mass_survives_research_annex_without_authority():
+    # The repaired NFL O/U engine no longer folds an integer-line push into
+    # the UNDER side. Do not silently drop that mass at the annex boundary.
+    rows = _quotes("NFL", "TARGETS", player_id="p1")
+    for row in rows:
+        row["line"] = 9.0
+    synthetic_engine = {
+        "status": "PRICED", "engine": "NFL_PROP_ENGINES_V1",
+        "mu": 9.1, "p_over": 0.4, "p_push": 0.1,
+        "p_under": 0.5, "games_logged": 6,
+    }
+    with patch("sportsedge.nfl_prop_engines_v1.price_nfl_prop",
+               return_value=synthetic_engine):
+        result = build_annex(rows, [{"status": "BLOCKED"}] * 2,
+                             **_kwargs("NFL", _nfl_history()))
+    assert len(result["readouts"]) == 2
+    for readout in result["readouts"]:
+        probs = readout["projection"]
+        assert (probs["p_over"], probs["p_push"], probs["p_under"]) == \
+            (0.4, 0.1, 0.5)
+        assert sum(probs[key] for key in ("p_over", "p_push", "p_under")) == 1.0
+        assert readout["status"] == "RESEARCH_ESTIMATE_UNVALIDATED"
+        assert readout["eligible"] is False
+        assert readout["play_authority"] is False
 
 
 def test_history_pin_mismatch_fail_closed():
