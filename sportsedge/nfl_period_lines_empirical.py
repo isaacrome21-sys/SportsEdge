@@ -39,6 +39,10 @@ PERIODS = ("q1", "q2", "q3", "q4", "h1", "h2")
 PREV_W = 0.5
 SHRINK_G = 6.0
 MIN_TEAM_GAMES = 3
+# Families SCREEN_WORSE_THAN_NAIVE in research/grok_nfl_period_lines_screen_20261023/
+# screen_results_v1.json; they refuse with a coded NAIVE_FAIL instead of pricing.
+NAIVE_FAIL_FAMILIES = frozenset({"Q1_MONEYLINE", "Q2_MONEYLINE", "Q3_MONEYLINE",
+                                 "Q4_MONEYLINE", "Q1_TOTAL", "Q3_TOTAL", "Q4_TOTAL"})
 
 
 class NflPeriodLinesError(ValueError):
@@ -93,6 +97,23 @@ def _shift(pmf: dict, d: float) -> dict:
 
 def price_period(history: Iterable[Mapping[str, Any]], *, date: str, season: int,
                  home: str, away: str, period: str) -> dict:
+    """Priced output with NAIVE_FAIL families removed and coded."""
+    out = price_period_unrestricted(history, date=date, season=season, home=home,
+                                    away=away, period=period)
+    del out["screen_only_unrestricted"]
+    refused = {}
+    for market, key in (("moneyline", "moneyline_3way"), ("total", "total_pmf")):
+        fam = f"{period.upper()}_{market.upper()}"
+        if fam in NAIVE_FAIL_FAMILIES:
+            del out[key]
+            refused[market] = f"NAIVE_FAIL:{fam}"
+    out["refused"] = refused
+    return out
+
+
+def price_period_unrestricted(history: Iterable[Mapping[str, Any]], *, date: str, season: int,
+                              home: str, away: str, period: str) -> dict:
+    """Screen-only: every family, including NAIVE_FAIL ones. Never for pricing."""
     if period not in PERIODS:
         raise NflPeriodLinesError(f"UNKNOWN_PERIOD:{period}")
     if isinstance(season, bool) or not isinstance(season, int):
@@ -135,7 +156,8 @@ def price_period(history: Iterable[Mapping[str, Any]], *, date: str, season: int
           "away": sum(p for k, p in m_pmf.items() if k < 0)}
     return {"engine_id": ENGINE_ID, "engine_version": ENGINE_VERSION, "period": period,
             "mu_home": mu_h, "mu_away": mu_a, "margin_pmf": m_pmf, "total_pmf": t_pmf,
-            "moneyline_3way": ml, "governance": dict(GOVERNANCE)}
+            "moneyline_3way": ml, "governance": dict(GOVERNANCE),
+            "screen_only_unrestricted": True}
 
 
 def _floor_at_zero(pmf: dict) -> dict:
@@ -156,6 +178,8 @@ def _line(v) -> float:
 def total_probs(priced: dict, line) -> dict:
     """P(over / push / under) for a period total line."""
     L = _line(line)
+    if "total_pmf" not in priced:
+        raise NflPeriodLinesError(priced.get("refused", {}).get("total", "TOTAL_PMF_MISSING"))
     pmf = priced["total_pmf"]
     return {"over": sum(p for k, p in pmf.items() if k > L), "push": pmf.get(L, 0.0) if L.is_integer() else 0.0,
             "under": sum(p for k, p in pmf.items() if k < L)}
