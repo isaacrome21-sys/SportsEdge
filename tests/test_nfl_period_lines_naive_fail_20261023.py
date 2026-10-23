@@ -43,8 +43,10 @@ def test_non_failed_totals_still_price(period):
 
 @pytest.mark.parametrize("period", ["q1", "q2", "q3", "q4", "h1", "h2"])
 def test_spreads_not_refused(period):
+    # +/-0.5 quarter spreads restate the refused moneyline (see the guard tests);
+    # other lines still price.
     p = price_period(_hist(), period=period, **KW)
-    assert sum(spread_probs(p, -0.5).values()) == pytest.approx(1.0)
+    assert sum(spread_probs(p, -1.5).values()) == pytest.approx(1.0)
 
 
 def test_halves_keep_moneyline():
@@ -52,6 +54,8 @@ def test_halves_keep_moneyline():
 
 
 def test_unrestricted_is_for_screens_and_not_play_eligible():
-    p = price_period_unrestricted(_hist(), period="q1", **KW)
+    from sportsedge.screen_only_guard import screen_only
+    with screen_only():
+        p = price_period_unrestricted(_hist(), period="q1", **KW)
     assert "moneyline_3way" in p and p["governance"]["play_allowed"] is False
     assert p["screen_only_unrestricted"] is True
