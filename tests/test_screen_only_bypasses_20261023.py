@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ALLOWED_TOPS = {"research", "tests"}
 SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", "build", "dist"}
 GUARD_REL = Path("sportsedge/screen_only_guard.py")
-OK_IMPORTS = {"require_screen_only", "ScreenOnlyGuardError"}
+OK_IMPORTS = {"require_screen_only", "ScreenOnlyGuardError", "checked_require", "lock_module"}  # t256: pricers call the guard via checked_require
 
 
 def _hits(src: str) -> list:
@@ -111,15 +111,21 @@ def test_bypass4_monkeypatch_is_detected_and_leaked_flag_refused():
     assert "2:MONKEYPATCH:require_screen_only" in _hits(src)
     assert "1:STRING:require_screen_only" in _hits("setattr(m, 'require_screen_only', print)\n")
     assert "1:REBIND:require_screen_only" in _hits("require_screen_only = print\n")
-    # a research module that enters at import and never exits: once its frame is
-    # gone, production code calling the pricer is refused at pricing time.
-    ns = _run_as("research/leak_probe.py", "cm = screen_only()\ncm.__enter__()\nrequire_screen_only('in-frame')\n",
-                 {"screen_only": screen_only, "require_screen_only": require_screen_only})
+    # a screen that enters and never exits: once its frame is gone, production
+    # code calling the pricer is refused at pricing time. (t256: the entry must
+    # now be a genuine file, so the leak is made from this test file.)
+    cm = _leak_from_tests()
     try:
-        with pytest.raises(ScreenOnlyGuardError, match="STACK_CHECK_FAILED"):
+        with pytest.raises(ScreenOnlyGuardError, match="STACK_CHECK_FAILED|FOREIGN_FRAME_BETWEEN_ENTRY_AND_PRICER"):
             _run_as("sportsedge/evil_after_leak.py", "require_screen_only('bypass4')\n")
     finally:
-        ns["cm"].__exit__(None, None, None)
+        cm.__exit__(None, None, None)
+
+
+def _leak_from_tests():
+    cm = screen_only(); cm.__enter__()
+    require_screen_only("in-frame")
+    return cm
 
 
 # --- bypass 5: files the detector cannot parse -----------------------------
