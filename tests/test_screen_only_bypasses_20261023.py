@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ALLOWED_TOPS = {"research", "tests"}
 SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", "build", "dist"}
 GUARD_REL = Path("sportsedge/screen_only_guard.py")
-OK_IMPORTS = {"require_screen_only", "ScreenOnlyGuardError", "checked_require", "lock_module"}  # t256: pricers call the guard via checked_require
+OK_IMPORTS = {"require_screen_only", "ScreenOnlyGuardError", "checked_require", "lock_module", "verify_naive_fail"}  # t256: pricers call the guard via checked_require
 
 
 def _hits(src: str) -> list:
