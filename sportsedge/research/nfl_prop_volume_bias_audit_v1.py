@@ -123,6 +123,19 @@ def audit_nfl_prop_volume_bias(rows: Sequence[Mapping[str, Any]]) -> dict[str, A
         counts = Counter(r["side"] for r in items)
         directional = counts["UNDER"] + counts["OVER"]
         independent_games = len({r["event_id"] for r in items})
+        direction_outcomes = {
+            side: {
+                "hit": sum(bool(r["under_realized"] if side == "UNDER" else r["over_realized"])
+                           for r in items if r["side"] == side),
+                "push": sum(not r["under_realized"] and not r["over_realized"]
+                            for r in items if r["side"] == side),
+            }
+            for side in ("UNDER", "OVER")
+        }
+        for side in ("UNDER", "OVER"):
+            direction_outcomes[side]["loss"] = (
+                counts[side] - direction_outcomes[side]["hit"] - direction_outcomes[side]["push"]
+            )
         return {
             "rows": len(items),
             "distinct_games": independent_games,
@@ -130,6 +143,7 @@ def audit_nfl_prop_volume_bias(rows: Sequence[Mapping[str, Any]]) -> dict[str, A
             "over": counts["OVER"],
             "tie": counts["TIE"],
             "under_share": counts["UNDER"] / directional if directional else None,
+            "direction_outcomes": direction_outcomes,
             "mean_model_minus_actual": mean(r["model_minus_actual"] for r in items) if items else None,
             "mean_model_minus_market": mean(r["model_minus_market"] for r in items) if items else None,
             "published_direction_mismatches": sum(not r["published_side_agrees"] for r in items),
