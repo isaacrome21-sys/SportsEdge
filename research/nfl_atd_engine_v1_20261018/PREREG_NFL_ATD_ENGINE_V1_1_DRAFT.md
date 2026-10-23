@@ -164,7 +164,18 @@ Selection, edge, settlement: locked #2399 Rules 1, 2, 3, 7, 8, 9.
   `pricer_sha256`, `scorer_sha256` (of score_nfl_atd_forward.py),
   `python_version` and `platform`. The binding review runs the frozen code
   from its CLI, in a fresh process, on the same interpreter version as the
-  pricer; in-process monkeypatching is out of scope.
+  pricer; in-process monkeypatching is out of scope. CLI:
+  `python3 score_nfl_atd_forward.py --records-worktree DIR SLATE_ID...`
+  (GITHUB_TOKEN from the environment, never printed); it prints one JSON
+  line `{verdict_path, refusal, binding}` and refuses with
+  REVIEW_INTERPRETER_MISMATCH unless every cited run record's
+  `python_version` (recorded by the pricer with `platform`) equals its own.
+  The guard runs in every public scoring entry point (`review`,
+  `score_slate_rows`, `verdict_counts`). A verdict counts only if pushed at
+  the fixed path with `"binding": true`. The env-only test switch
+  (`ATD_TEST_FAKE_STATE`) writes a `"binding": false` verdict to
+  `TEST_NONBINDING_VERDICT.json`, never the fixed path, and the CLI then
+  refuses with REVIEW_NOT_BINDING_TEST_SWITCH; such verdicts never count.
 - Close captures: each close capture file is its own single-commit record
   named by the sha256 of its content, filed under the game's season-week.
   A close record that cannot be parsed, has no game, or is filed under the

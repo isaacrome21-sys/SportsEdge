@@ -34,6 +34,8 @@ MIN_WEEKS, MIN_PICKED, MIN_GAMES = 4, 150, 40
 DRIFT_FLAG = 0.02
 MAX_PICKED_CLV_MISSING = 0.20  # > 20% of picked rows CLV_MISSING -> INSUFFICIENT_CLOSE_DATA
 VERDICT_PATH = pv.VERDICT_PATH      # fixed: on pv.RECORDS_BRANCH only
+# Written only under the env-only test switch; never the binding path.
+NONBINDING_VERDICT_PATH = f"{pv.ROOT}/TEST_NONBINDING_VERDICT.json"
 Z95 = 1.959963984540054
 
 
@@ -189,10 +191,14 @@ def _verdict_ever_existed(api) -> bool:
 
 def verdict_counts(api) -> bool:
     """A verdict counts only once pushed to the records branch as a proven
-    single-commit record at the fixed path."""
+    single-commit record at the fixed path, and only if it is binding."""
+    _review_env_guard()
     try:
-        pv.prove_record(api, VERDICT_PATH)
-        return True
+        p = pv.prove_record(api, VERDICT_PATH)
+        try:
+            return json.loads(p["content"]).get("binding") is True
+        except (ValueError, AttributeError):
+            return False
     except pv.ProvenanceFailed as e:
         if e.code == "RECORD_NOT_ON_BRANCH":
             return False
@@ -230,6 +236,7 @@ def _games(loaded):
 
 def score_slate_rows(api, slate_id):
     """Score one COUNTS slate entirely from branch records."""
+    _review_env_guard()
     pv.require_token(api)
     st = pv.load_slate(api, slate_id)
     if st["status"] != "COUNTS":
@@ -279,7 +286,7 @@ def _env_record() -> dict:
             "platform": platform.platform()}
 
 
-def review(slate_ids, *, records_worktree, api):
+def review(slate_ids, *, records_worktree, api, _binding=True):
     """Single review, reading ONLY records on the records-branch head: each
     slate's rows/hashes from its pushed run record, close captures from
     proven closes/<sha>.json records, settlements from hash-matched
@@ -290,7 +297,8 @@ def review(slate_ids, *, records_worktree, api):
     _review_env_guard()                 # first: before token, worktree, API
     pv.require_token(api)
     wt = _check_worktree(records_worktree)
-    if _verdict_ever_existed(api) or (wt / VERDICT_PATH).exists():
+    vpath = VERDICT_PATH if _binding else NONBINDING_VERDICT_PATH
+    if _verdict_ever_existed(api) or (wt / VERDICT_PATH).exists() or (wt / vpath).exists():
         raise ReviewAlreadyRecorded(f"{pv.RECORDS_BRANCH}:{VERDICT_PATH}")
     now = _utcnow()
     loaded, screen = [], []
@@ -318,8 +326,9 @@ def review(slate_ids, *, records_worktree, api):
                      n_slates=len(inputs["run_records"]), screen_slates=screen,
                      refusals_by_slate={k: refusals_by_slate[k] for k in proofs},
                      records_branch=pv.RECORDS_BRANCH, verdict_path=VERDICT_PATH,
-                     run_proofs=proofs, reviewed_at=now.isoformat(), **_env_record())
-            path = wt / VERDICT_PATH
+                     run_proofs=proofs, reviewed_at=now.isoformat(), **_env_record(),
+                     binding=bool(_binding))
+            path = wt / vpath
             path.parent.mkdir(parents=True, exist_ok=True)
             try:
                 fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o444)
@@ -362,3 +371,77 @@ def _verdict(rows, slate_id):
             "picked_mean_implied": sum(r["raw_implied"] for r in picked) / len(picked),
             "games_cut_drift_flagged": sorted(g for g, d in drift.items() if d["drifted"]),
             "status_label": "RESEARCH_ONLY", "promotable": False}
+
+
+def main(argv=None) -> int:
+    """CLI (binding review): python3 score_nfl_atd_forward.py
+    --records-worktree DIR SLATE_ID... Runs review() in this fresh process.
+    GITHUB_TOKEN is read from the environment by GitHubAPI and never printed.
+    Prints one JSON line {verdict_path, refusal, binding}. Refuses
+    (REVIEW_INTERPRETER_MISMATCH) unless every cited run record's
+    python_version equals this interpreter's.
+    Test switch (environment only): ATD_TEST_FAKE_STATE=<pickled FakeGitHub>
+    (+ optional ATD_TEST_NOW) patches the fake in; the verdict is then
+    written NON-BINDING to NONBINDING_VERDICT_PATH and the CLI refuses with
+    REVIEW_NOT_BINDING_TEST_SWITCH."""
+    import argparse
+    import platform
+    import sys
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--records-worktree", required=True)
+    ap.add_argument("slate_ids", nargs="+")
+    args = ap.parse_args(argv)
+
+    def emit(refusal, verdict_path=None, binding=False, rc=2):
+        print(json.dumps({"verdict_path": verdict_path, "refusal": refusal,
+                          "binding": binding}))
+        return rc
+
+    fake_state = os.environ.get("ATD_TEST_FAKE_STATE")
+    binding = not fake_state
+    try:
+        if fake_state:
+            import pickle
+            from unittest import mock
+            import fake_github_api as fk
+            api = pickle.loads(Path(fake_state).read_bytes())
+            mock.patch.object(pv, "replayers", fk.fake_replayers).start()
+            mock.patch.object(sys.modules[__name__], "_review_env_guard", lambda: None).start()
+            if os.environ.get("ATD_TEST_NOW"):
+                from datetime import datetime
+                t = datetime.fromisoformat(os.environ["ATD_TEST_NOW"])
+                mock.patch.object(sys.modules[__name__], "_utcnow", lambda: t).start()
+        else:
+            api = pv.GitHubAPI()
+        here = platform.python_version()
+        for sid in args.slate_ids:
+            body = api.get_file(pv.RECORDS_BRANCH, pv.run_record_path(sid))
+            if body is None:
+                continue                    # review marks it SCREEN
+            try:
+                rv = json.loads(body).get("python_version")
+            except (ValueError, AttributeError):
+                rv = None
+            if rv != here:
+                return emit("REVIEW_INTERPRETER_MISMATCH")
+        mod = sys.modules[__name__]
+        v = mod.review(args.slate_ids, records_worktree=args.records_worktree, api=api,
+                       _binding=binding)
+    except pv.ProvenanceFailed as e:
+        return emit(e.code)
+    except ReviewEnvUntrusted:
+        return emit("REVIEW_ENV_UNTRUSTED")
+    except ReviewAlreadyRecorded:
+        return emit("REVIEW_ALREADY_RECORDED")
+    except RecordsLocationRefused:
+        return emit("RECORDS_LOCATION_REFUSED")
+    if v.get("record_state") != "STAGED_NOT_COUNTED":
+        return emit(v.get("status", "NO_REVIEW_GATES_NOT_MET"))
+    vf = str(Path(args.records_worktree) / (VERDICT_PATH if binding else NONBINDING_VERDICT_PATH))
+    if not binding:
+        return emit("REVIEW_NOT_BINDING_TEST_SWITCH", vf, False, rc=3)
+    return emit(None, vf, True, rc=0)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

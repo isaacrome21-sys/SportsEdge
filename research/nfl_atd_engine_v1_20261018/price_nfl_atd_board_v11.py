@@ -13,6 +13,7 @@ sidecar (<file>.fetch.json, written by `python3 atd_refresh.py URL DEST`).
 from __future__ import annotations
 
 import argparse
+import platform
 import json
 from pathlib import Path
 
@@ -202,6 +203,8 @@ def main() -> int:
     rr.update(slate_id=board.get("slate_id"), captured_at=board.get("captured_at"),
               season=int(board["season"]), week=int(board["week"]),
               pricer_sha256=pricer_sha256(),
+              python_version=platform.python_version(),
+              platform=platform.platform(),
               inputs={"board": bsha, "stats": shas["stats"],
                       "schedule": shas["schedule"], "player_data": pins},
               schedule_kickoffs={sk["game_id"]: board.get("kickoff")},
