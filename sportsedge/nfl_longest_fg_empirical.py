@@ -63,10 +63,10 @@ def _frac_beyond(lo: float, hi: float, line: float) -> float:
 
 def price_longest_fg(games: Iterable[Mapping[str, Any]], *, kicker_id: str,
                      kickoff: datetime, line: float) -> dict[str, Any]:
-    try:
-        line = float(line)
-    except (TypeError, ValueError):
-        raise NflLongestFgError("LONGEST_FG_LINE_INVALID") from None
+    # t235: real numbers only (np.floating subclasses float); never str/bytes/bool
+    if isinstance(line, bool) or not isinstance(line, (int, float)):
+        raise NflLongestFgError("LONGEST_FG_LINE_INVALID")
+    line = float(line)
     if not math.isfinite(line) or not (LINE_MIN <= line <= LINE_MAX):
         raise NflLongestFgError(f"LONGEST_FG_LINE_OUT_OF_RANGE:{line}")
     if line != math.floor(line) + 0.5:
