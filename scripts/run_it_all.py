@@ -6,6 +6,7 @@ import argparse
 from collections import Counter
 from datetime import datetime, timezone
 import json
+import math
 from pathlib import Path
 import sys
 
@@ -24,6 +25,17 @@ RESEARCH_STATUSES = frozenset({
     "RESEARCH_POSITIVE_EV_UNVALIDATED", "RESEARCH_CANDIDATE_NOT_VALIDATED",
     "RESEARCH_EDGE", "PRICED_RESEARCH",
 })
+
+
+def _has_probability(row: dict) -> bool:
+    def valid(value):
+        return (isinstance(value, (int, float)) and not isinstance(value, bool)
+                and math.isfinite(value) and 0 <= value <= 1)
+
+    if any(valid(row.get(key)) for key in ("estimate_p", "model_probability")):
+        return True
+    probs = row.get("model_probabilities")
+    return isinstance(probs, dict) and any(valid(value) for value in probs.values())
 
 
 def _supplied_line_run(
@@ -82,13 +94,12 @@ def _supplied_line_run(
                    if source_sport == sport]
         counts = Counter(str(row.get("status") or "MISSING_STATUS")
                          for row in matched)
-        modeled = sum(
-            any(row.get(key) is not None for key in (
-                "estimate_p", "model_probability", "model_probabilities"))
-            for row in matched
-        )
+        modeled = sum(_has_probability(row) for row in matched)
         research = sum(str(row.get("status")) in RESEARCH_STATUSES
                        for row in matched)
+        blockers = Counter(str(row.get("blocker") or row.get("reason") or
+                               row.get("status") or "UNKNOWN")
+                           for row in matched if not _has_probability(row))
         blocker = ("NO_SUPPLIED_LINES_FOR_SPORT" if not matched else
                    "NO_CANONICAL_MODEL_RESULT" if not modeled else
                    "RESEARCH_MODEL_NOT_ADMITTED_FOR_PLAY")
@@ -99,6 +110,7 @@ def _supplied_line_run(
             "model_rows": modeled, "research_candidates": research,
             "official_bets": 0, "verified_plays": [],
             "blocker": blocker, "status_counts": dict(sorted(counts.items())),
+            "unpriced_reason_counts": dict(sorted(blockers.items())),
         })
 
     card_output.parent.mkdir(parents=True, exist_ok=True)
