@@ -1,0 +1,478 @@
+"""CBB (men's college basketball) research-only foundation: coherent joint box-score path + settlement + terminal map.
+
+RESEARCH_ONLY / NO_VALIDATION. Not fitted to real data, not validated, not wired
+to the canonical RUN IT path, no odds or probabilities for live markets.
+
+Coherence contract (every simulated path):
+  * each scoring event belongs to one player on one team (2PT, 3PT or FT);
+  * player points == 2*FG2 + 3*FG3 + FT; team points == sum of player points;
+  * two 20-minute halves sum to regulation; OT periods (5 min) are appended only
+    while tied, and the game never ends tied;
+  * settlement: moneyline, spread, total, team total and player props include
+    OT; 1H excludes OT; 2H includes OT.
+  * Owner exclusion: no Illinois college team may be simulated, settled or
+    carried on a card. Any Illinois school (name list or frozen ESPN-id registry
+    in ``artifacts.free_models``) yields BLOCKED_BY_AUTHORIZATION /
+    ILLINOIS_COLLEGE_EXCLUDED before any other work.
+"""
+from __future__ import annotations
+
+import math
+import random
+from dataclasses import dataclass, field
+
+STATUS = "RESEARCH_ONLY"
+VALIDATION = "NO_VALIDATION"
+SPORT = "CBB"
+TERMINALS = frozenset({
+    "VERIFIED_EDGE_ELIGIBLE", "VALIDATED_FOR_FORWARD", "RESEARCH_ONLY",
+    "NO_VALIDATION", "NO_ENGINE", "NO_DATA", "NO_QUOTE", "NO_SETTLEMENT",
+    "NOT_OFFERED", "BLOCKED_BY_AUTHORIZATION",
+})
+_ALLOWED = TERMINALS - {"VERIFIED_EDGE_ELIGIBLE", "VALIDATED_FOR_FORWARD"}
+REG_PERIODS = 2          # halves
+REG_PERIOD_MIN = 20.0
+OT_MIN = 5.0
+MAX_OT = 10              # refuse rather than loop forever on degenerate input
+EVENT_POINTS = {"FG2": 2, "FG3": 3, "FT": 1}
+
+
+import re as _re
+import unicodedata as _ud
+
+# Confusables -> Latin (Cyrillic / Greek lookalikes), applied after NFKC.
+_CONFUSABLE = str.maketrans({
+    "а": "a", "в": "b", "е": "e", "ё": "e", "к": "k", "м": "m", "н": "h", "о": "o",
+    "р": "p", "с": "c", "т": "t", "у": "y", "х": "x", "і": "i", "ї": "i", "ј": "j",
+    "ѕ": "s", "ԁ": "d", "ӏ": "l", "ɩ": "i", "ᴅ": "d",
+    "А": "A", "В": "B", "Е": "E", "К": "K", "М": "M", "Н": "H", "О": "O", "Р": "P",
+    "С": "C", "Т": "T", "У": "Y", "Х": "X", "І": "I", "Ј": "J", "Ѕ": "S", "Ԁ": "D",
+    "α": "a", "β": "b", "ε": "e", "ι": "i", "κ": "k", "ν": "v", "ο": "o", "ρ": "p",
+    "τ": "t", "υ": "u", "χ": "x", "Α": "A", "Β": "B", "Ε": "E", "Ι": "I", "Κ": "K",
+    "Μ": "M", "Ν": "N", "Ο": "O", "Ρ": "P", "Τ": "T", "Χ": "X", "Υ": "Y", "Ζ": "Z",
+})
+_INVISIBLE = _re.compile("[\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180e"
+                         "\u200b-\u200f\u202a-\u202e\u2060-\u2064\u206a-\u206f\ufeff]")
+
+
+def _fold(name):
+    """NFKC, strip zero-width/format chars, map confusables, drop accents."""
+    t = _ud.normalize("NFKC", str(name))
+    t = _INVISIBLE.sub("", t).translate(_CONFUSABLE)
+    t = "".join(c for c in _ud.normalize("NFKD", t) if not _ud.combining(c))
+    return t
+
+
+def _norm(name, *, split_camel=False):
+    t = _fold(name)
+    if split_camel:
+        t = _re.sub(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", " ", t)
+    t = t.lower().replace("_", " ")
+    t = _re.sub(r"[^a-z0-9 ]", " ", t)
+    return " ".join(t.split())
+
+
+def _collapse(name):
+    return _re.sub(r"[^a-z]", "", _norm(name))
+
+
+# Expanded alias list (mascot forms, abbreviations, sportsbook spellings). The
+# shared name list in artifacts.free_models missed these forms (#2350 audit).
+IL_COLLEGE_ALIASES = frozenset({
+    "ill", "illini", "fighting illini", "illinois st", "ilst", "ill st",
+    "illinois state univ", "redbirds",
+    "niu", "n illinois", "northern ill", "northern illinois univ",
+    "siu", "s illinois", "southern ill", "southern illinois univ", "salukis",
+    "siue", "siue cougars", "siu edwardsville cougars", "southern illinois edwardsville",
+    "southern illinois edwardsville cougars", "siu e",
+    "eiu", "e illinois", "eastern ill", "wiu", "w illinois", "western ill",
+    "northwestern wildcats", "nw wildcats",
+    "depaul", "depaul blue demons", "blue demons",
+    "loyola il", "loyola il ramblers", "loyola ramblers", "loyola chicago ramblers",
+    "loyola chi", "loyola of chicago", "luc",
+    "bradley", "bradley braves", "brad",
+    "uic", "uic flames", "illinois chicago flames", "univ of illinois chicago",
+    "university of illinois chicago", "university of illinois at chicago",
+    "chicago st", "chicago st cougars", "chicago state univ", "chst",
+})
+# Any name containing one of these whole tokens is Illinois (fail closed).
+# "ill" covers "Ill." / "(Ill.)" forms; the abbreviations are Illinois-only.
+_IL_TOKENS = frozenset({
+    "illinois", "illini", "ill", "chicago",
+    "uiuc", "niu", "siu", "siue", "eiu", "wiu", "uic", "luc", "ilst", "chst",
+    "depaul", "dep", "bradley", "brad", "salukis", "redbirds", "leathernecks",
+    "ramblers", "illinoisstate", "illst", "il", "edwardsville",
+})
+# Multi-word forms that need no Illinois token ("U of I", mascots, ...).
+_IL_PHRASES = frozenset({
+    "il state", "il st", "chi state", "chi st", "n western", "nwestern",
+    "saint xavier", "st xavier", "saint xavier cougars", "st xavier cougars",
+    "lewis", "lewis flyers", "lewis university", "siu edwardsville",
+    "u of i", "northwestern", "northwestern wildcats", "northwestern university", "nwu",
+    "blue demons", "fighting illini",
+})
+_FILLER = frozenset({"university", "univ", "the", "of", "at", "college"})
+
+
+def _excluded_keys():
+    from artifacts.free_models import IL_COLLEGE_ESPN_IDS, IL_COLLEGE_NAMES
+    names = {_norm(n) for n in IL_COLLEGE_NAMES}
+    names |= {_norm(n) for n in IL_COLLEGE_ESPN_IDS.values()}
+    return names, {str(k) for k in IL_COLLEGE_ESPN_IDS}
+
+
+def _strip(n):
+    return " ".join(t for t in n.split() if t not in _FILLER)
+
+
+def _canon_id(ident):
+    raw = str(ident).strip()
+    if raw.endswith(".0"):
+        raw = raw[:-2]
+    return raw.lstrip("0") if raw.isdigit() else raw
+
+
+@__import__("functools").lru_cache(maxsize=1)
+def _match_keys():
+    names, ids = _excluded_keys()
+    names = frozenset(_norm(x) for x in names | IL_COLLEGE_ALIASES | _IL_PHRASES)
+    stripped = frozenset({_strip(x) for x in names} - {""})
+    collapsed = frozenset({_collapse(x) for x in names | stripped} - {""})
+    return names, stripped, collapsed, frozenset(ids)
+
+
+def illinois_excluded(*identities) -> bool:
+    """True when any team name or ESPN id is an Illinois college (fail closed).
+    Matching is Unicode-hardened (NFKC, zero-width/confusable stripping,
+    Cyrillic/Greek -> Latin), splits underscores and camelCase, and also
+    compares a letters-only collapsed form against every known form."""
+    names, stripped, collapsed, ids = _match_keys()
+    for ident in identities:
+        if ident is None:
+            continue
+        if _canon_id(_fold(ident)) in ids:
+            return True
+        for n in {_norm(ident), _norm(ident, split_camel=True)}:
+            toks = n.split()
+            if n in names or _strip(n) in stripped:
+                return True
+            if any(t in _IL_TOKENS for t in toks):
+                return True
+            if toks[:1] == ["northwestern"] and not ({"state", "st"} & set(toks)):
+                return True
+        c = _collapse(ident)
+        if c and (c in collapsed or _collapse(_strip(_norm(ident))) in collapsed):
+            return True
+    return False
+
+
+# ESPN-id registry for admission. artifacts.free_models carries only the frozen
+# ILLINOIS registry; no verified non-Illinois CBB id registry exists in the repo,
+# so every real (numeric) non-Illinois id is UNREGISTERED and fails closed until
+# one is frozen. Only explicitly synthetic research-fixture ids are admitted, each
+# bound to exactly one team_id (they cannot collide with numeric ESPN ids).
+CBB_ADMITTED_ESPN_IDS = {f"SYN-{k:04d}": tid for k, tid in
+                         ((1, "HOM"), (2, "AWY"), (3, "AWY2"), (4, "TEAM_X"))}
+
+
+def check_espn_id(team_id, espn_id):
+    if not isinstance(espn_id, str) or not espn_id.strip():
+        raise FoundationError("CBB_ESPN_ID_MISSING", str(team_id))
+    bound = CBB_ADMITTED_ESPN_IDS.get(espn_id.strip())
+    if bound is None:
+        raise FoundationError("CBB_ESPN_ID_UNREGISTERED", repr(espn_id))
+    if bound != team_id:
+        raise FoundationError("CBB_ESPN_ID_NAME_CONFLICT", f"{espn_id}->{bound}!={team_id}")
+
+
+class FoundationError(ValueError):
+    def __init__(self, code: str, detail: str = ""):
+        super().__init__(f"{code}: {detail}" if detail else code)
+        self.code = code
+
+
+def _num(name, v, *, positive=False):
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        raise FoundationError(f"{SPORT}_INPUT_NOT_NUMERIC", name)
+    if not math.isfinite(v):
+        raise FoundationError(f"{SPORT}_INPUT_NONFINITE", name)
+    if v < 0 or (positive and v == 0):
+        raise FoundationError(f"{SPORT}_INPUT_NEGATIVE", name)
+    return float(v)
+
+
+@dataclass(frozen=True)
+class PlayerInput:
+    player_id: str
+    # expected scoring events per 40 team-minutes while the team plays
+    fg2_per40: float
+    fg3_per40: float
+    ft_per40: float
+
+
+@dataclass(frozen=True)
+class TeamInput:
+    team_id: str
+    players: tuple            # tuple[PlayerInput]
+    espn_id: str | None = None
+    display_name: str | None = None
+
+    def validate(self):
+        if illinois_excluded(self.team_id, self.espn_id, self.display_name):
+            raise FoundationError("ILLINOIS_COLLEGE_EXCLUDED", str(self.team_id))
+        # Fail closed: without a verified ESPN id the exclusion cannot be
+        # enforced on the frozen id registry, so the team is refused.
+        check_espn_id(self.team_id, self.espn_id)
+        if not isinstance(self.team_id, str) or not self.team_id.strip():
+            raise FoundationError(f"{SPORT}_TEAM_ID_MISSING")
+        if not self.players:
+            raise FoundationError(f"{SPORT}_ROSTER_EMPTY", self.team_id)
+        ids = [p.player_id for p in self.players]
+        if any(not isinstance(i, str) or not i.strip() for i in ids):
+            raise FoundationError(f"{SPORT}_PLAYER_ID_MISSING", self.team_id)
+        if len(set(ids)) != len(ids):
+            raise FoundationError(f"{SPORT}_PLAYER_DUPLICATE", self.team_id)
+        for p in self.players:
+            for k in ("fg2_per40", "fg3_per40", "ft_per40"):
+                _num(f"{p.player_id}.{k}", getattr(p, k))
+
+    @property
+    def roster(self):
+        return {p.player_id for p in self.players}
+
+
+@dataclass(frozen=True)
+class Event:
+    team_id: str
+    player_id: str
+    period: int        # 1..4 regulation, 5+ OT
+    kind: str          # FG2 / FG3 / FT
+
+
+@dataclass
+class GamePath:
+    home_id: str
+    away_id: str
+    events: list = field(default_factory=list)
+    periods_played: int = REG_PERIODS
+    # (home TeamInput, away TeamInput) bound by simulate_game; settle() needs
+    # rosters to run check_path and refuses a path without them (fail closed).
+    teams: tuple | None = field(default=None, repr=False, compare=False)
+
+    def points(self, team_id, periods=None):
+        return sum(EVENT_POINTS[e.kind] for e in self.events if e.team_id == team_id
+                   and (periods is None or e.period in periods))
+
+    def player_points(self, pid):
+        return sum(EVENT_POINTS[e.kind] for e in self.events if e.player_id == pid)
+
+    def player_count(self, pid, kind):
+        return sum(1 for e in self.events if e.player_id == pid and e.kind == kind)
+
+    def final_score(self):
+        return self.points(self.home_id), self.points(self.away_id)
+
+
+def _poisson(rng, lam):
+    # Knuth for small lam, normal approximation guard for large lam
+    if lam <= 0:
+        return 0
+    if lam > 60:
+        return max(0, int(round(rng.gauss(lam, math.sqrt(lam)))))
+    L, k, p = math.exp(-lam), 0, 1.0
+    while True:
+        p *= rng.random()
+        if p <= L:
+            return k
+        k += 1
+
+
+def _period(rng, path, team, period, minutes):
+    frac = minutes / 40.0
+    for p in team.players:
+        for kind, rate in (("FG2", p.fg2_per40), ("FG3", p.fg3_per40), ("FT", p.ft_per40)):
+            for _ in range(_poisson(rng, rate * frac)):
+                path.events.append(Event(team.team_id, p.player_id, period, kind))
+
+
+def simulate_game(home: TeamInput, away: TeamInput, rng: random.Random) -> GamePath:
+    home.validate()
+    away.validate()
+    if home.team_id == away.team_id:
+        raise FoundationError(f"{SPORT}_TEAM_IDENTITY_COLLISION", home.team_id)
+    both = home.roster & away.roster
+    if both:
+        raise FoundationError(f"{SPORT}_PLAYER_ON_BOTH_TEAMS", sorted(both)[0])
+    if not isinstance(rng, random.Random):
+        raise FoundationError(f"{SPORT}_RNG_REQUIRED")
+    path = GamePath(home.team_id, away.team_id)
+    for q in range(1, REG_PERIODS + 1):
+        for t in (home, away):
+            _period(rng, path, t, q, REG_PERIOD_MIN)
+    period = REG_PERIODS
+    while path.points(home.team_id) == path.points(away.team_id):
+        period += 1
+        if period - REG_PERIODS > MAX_OT:
+            raise FoundationError(f"{SPORT}_OT_DID_NOT_RESOLVE")
+        for t in (home, away):
+            _period(rng, path, t, period, OT_MIN)
+    path.periods_played = period
+    check_path(path, home, away)
+    path.teams = (home, away)
+    return path
+
+
+def check_path(path: GamePath, home: TeamInput, away: TeamInput):
+    rosters = {home.team_id: home.roster, away.team_id: away.roster}
+    if {path.home_id, path.away_id} != set(rosters):
+        raise FoundationError(f"{SPORT}_PATH_TEAM_MISMATCH")
+    if not isinstance(path.periods_played, int) or path.periods_played < REG_PERIODS:
+        raise FoundationError(f"{SPORT}_PERIODS_INVALID")
+    for e in path.events:
+        if e.team_id not in rosters:
+            raise FoundationError(f"{SPORT}_EVENT_UNKNOWN_TEAM", str(e.team_id))
+        if e.player_id not in rosters[e.team_id]:
+            raise FoundationError(f"{SPORT}_PLAYER_NOT_ON_TEAM", str(e.player_id))
+        if e.kind not in EVENT_POINTS:
+            raise FoundationError(f"{SPORT}_EVENT_KIND_INVALID", str(e.kind))
+        if not isinstance(e.period, int) or not 1 <= e.period <= path.periods_played:
+            raise FoundationError(f"{SPORT}_PERIOD_INVALID", str(e.period))
+    for t, roster in rosters.items():
+        if path.points(t) != sum(path.player_points(p) for p in roster):
+            raise FoundationError(f"{SPORT}_PLAYER_TEAM_POINTS_MISMATCH", t)
+    # OT periods only exist if the score was tied entering each of them
+    for p in range(REG_PERIODS, path.periods_played):
+        upto = tuple(range(1, p + 1))
+        if path.points(path.home_id, upto) != path.points(path.away_id, upto):
+            raise FoundationError(f"{SPORT}_OT_AFTER_DECIDED_GAME", str(p + 1))
+    h, a = path.final_score()
+    if h == a:
+        raise FoundationError(f"{SPORT}_GAME_ENDED_TIED")
+    return True
+
+
+def _ou(value, line):
+    if isinstance(line, bool) or not isinstance(line, (int, float)) or not math.isfinite(line):
+        raise FoundationError(f"{SPORT}_LINE_NONFINITE", repr(line))
+    return "OVER" if value > line else "UNDER" if value < line else "PUSH"
+
+
+SEGMENTS = {"1H": (1,)}
+
+
+def _segment(path, segment):
+    if segment == "GAME":
+        return None
+    if segment == "2H":                          # includes OT
+        return tuple(range(2, path.periods_played + 1))
+    if segment in SEGMENTS:
+        return SEGMENTS[segment]
+    raise FoundationError(f"{SPORT}_SEGMENT_INVALID", str(segment))
+
+
+def settle(path: GamePath, market: str, *, selection=None, line=None,
+           segment="GAME", player_id=None, team_id=None, home=None, away=None):
+    """Fail closed: check_path runs on the path's rosters before settlement."""
+    if illinois_excluded(path.home_id, path.away_id):
+        raise FoundationError("ILLINOIS_COLLEGE_EXCLUDED")
+    if path.final_score()[0] == path.final_score()[1]:
+        raise FoundationError(f"{SPORT}_GAME_ENDED_TIED")   # empty or tied path
+    if home is not None or away is not None:
+        if home is None or away is None:
+            raise FoundationError(f"{SPORT}_PATH_ROSTERS_MISSING", "need home and away")
+        teams = (home, away)
+    else:
+        teams = path.teams
+    if not teams:
+        raise FoundationError(f"{SPORT}_PATH_ROSTERS_MISSING")
+    for t in teams:
+        if illinois_excluded(t.team_id, t.espn_id, t.display_name):
+            raise FoundationError("ILLINOIS_COLLEGE_EXCLUDED", str(t.team_id))
+        check_espn_id(t.team_id, t.espn_id)
+    check_path(path, *teams)
+    rosters = {t.team_id: t.roster for t in teams}
+    per = _segment(path, segment)
+    h, a = path.points(path.home_id, per), path.points(path.away_id, per)
+    sides = (path.home_id, path.away_id)
+    if market == "MONEYLINE":
+        if selection not in sides:
+            raise FoundationError(f"{SPORT}_SELECTION_IDENTITY_MISMATCH", str(selection))
+        if h == a:     # only possible for a segment; 2-way segment ML pushes
+            return "PUSH"
+        return "WIN" if (selection == path.home_id) == (h > a) else "LOSE"
+    if market == "SPREAD":
+        if selection not in sides:
+            raise FoundationError(f"{SPORT}_SELECTION_IDENTITY_MISMATCH", str(selection))
+        m = (h - a) if selection == path.home_id else (a - h)
+        _ou(0, line)   # validates the line before arithmetic
+        return {"OVER": "WIN", "UNDER": "LOSE", "PUSH": "PUSH"}[_ou(m + line, 0)]
+    if market == "TOTAL":
+        return _ou(h + a, line)
+    if market == "TEAM_TOTAL":
+        if selection not in sides:
+            raise FoundationError(f"{SPORT}_SELECTION_IDENTITY_MISMATCH", str(selection))
+        return _ou(h if selection == path.home_id else a, line)
+    if market == "GOES_TO_OT":
+        if selection not in ("YES", "NO"):
+            raise FoundationError(f"{SPORT}_SELECTION_IDENTITY_MISMATCH", str(selection))
+        return "WIN" if (selection == "YES") == (path.periods_played > REG_PERIODS) else "LOSE"
+    if market in ("PLAYER_POINTS", "PLAYER_THREES"):
+        if segment != "GAME":
+            raise FoundationError(f"{SPORT}_PLAYER_SEGMENT_NOT_SUPPORTED", segment)
+        if team_id not in sides:
+            raise FoundationError(f"{SPORT}_TEAM_IDENTITY_MISMATCH", str(team_id))
+        if not isinstance(player_id, str) or not player_id:
+            raise FoundationError(f"{SPORT}_PLAYER_ID_MISSING")
+        if player_id not in rosters.get(team_id, ()):   # ghost player: not rostered
+            raise FoundationError(f"{SPORT}_PLAYER_IDENTITY_MISMATCH", str(player_id))
+        if any(e.player_id == player_id and e.team_id != team_id for e in path.events):
+            raise FoundationError(f"{SPORT}_PLAYER_IDENTITY_MISMATCH", str(player_id))
+        v = path.player_points(player_id) if market == "PLAYER_POINTS" \
+            else path.player_count(player_id, "FG3")
+        return _ou(v, line)
+    raise FoundationError(f"{SPORT}_MARKET_NO_SETTLEMENT", market)
+
+
+def settle_player_prop(path, home, away, market, player_id, line, team_id):
+    rosters = {home.team_id: home.roster, away.team_id: away.roster}
+    if team_id not in rosters:
+        raise FoundationError(f"{SPORT}_TEAM_IDENTITY_MISMATCH", str(team_id))
+    if player_id not in rosters[team_id]:
+        raise FoundationError(f"{SPORT}_PLAYER_IDENTITY_MISMATCH", str(player_id))
+    return settle(path, market, player_id=player_id, line=line, team_id=team_id,
+                  home=home, away=away)
+
+
+_SIM = "joint scoring-event skeleton + settlement; caller-supplied rates, no fit, no backtest"
+MARKET_TERMINALS = {
+    "MONEYLINE": ("RESEARCH_ONLY", _SIM),
+    "SPREAD": ("RESEARCH_ONLY", _SIM),
+    "TOTAL": ("RESEARCH_ONLY", _SIM),
+    "TEAM_TOTAL": ("RESEARCH_ONLY", _SIM),
+    "QUARTER_MARKETS": ("NOT_OFFERED", "men's college basketball is played in halves"),
+    "HALF_MARKETS": ("RESEARCH_ONLY", _SIM + "; 1H excludes OT, 2H includes OT"),
+    "GOES_TO_OT": ("RESEARCH_ONLY", _SIM),
+    "PLAYER_POINTS": ("RESEARCH_ONLY", _SIM),
+    "PLAYER_THREES": ("RESEARCH_ONLY", _SIM),
+    "PLAYER_REBOUNDS": ("RESEARCH_ONLY", _SIM + "; props layer: rebounds reconcile with live misses"),
+    "PLAYER_ASSISTS": ("RESEARCH_ONLY", _SIM + "; props layer: assists only on teammate made FG"),
+    "PLAYER_PRA": ("RESEARCH_ONLY", _SIM + "; props layer combos PRA/PR/PA/RA"),
+    "PLAYER_STEALS_BLOCKS": ("RESEARCH_ONLY", _SIM + "; props layer: steals<=opp TOV, blocks<=opp misses"),
+    "PLAYER_TURNOVERS": ("RESEARCH_ONLY", _SIM + "; props layer, independent Poisson placeholder"),
+    "DOUBLE_DOUBLE": ("RESEARCH_ONLY", _SIM + "; props layer"),
+    "FIRST_BASKET": ("NO_SETTLEMENT", "first-basket ordering/settlement not encoded"),
+    "WINNING_MARGIN": ("NO_SETTLEMENT", "band settlement not encoded"),
+    "RACE_TO_POINTS": ("RESEARCH_ONLY", _SIM + "; props layer random within-period timeline"),
+    "SERIES_FUTURES": ("NOT_OFFERED", "outside this foundation's scope"),
+}
+for _m, (_t, _r) in MARKET_TERMINALS.items():
+    assert _t in _ALLOWED, (_m, _t)
+
+
+def market_terminal(market: str, *teams):
+    """One terminal per market; an Illinois college on either side overrides it."""
+    t, reason = MARKET_TERMINALS.get(market, ("NO_ENGINE", "market not inventoried"))
+    if illinois_excluded(*teams):
+        t, reason = "BLOCKED_BY_AUTHORIZATION", "ILLINOIS_COLLEGE_EXCLUDED"
+    return {"sport": SPORT, "market": market, "terminal": t, "reason": reason,
+            "validation": VALIDATION, "probability": None, "price": None, "ev": None}
