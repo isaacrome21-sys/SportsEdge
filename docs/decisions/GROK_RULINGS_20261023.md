@@ -57,11 +57,21 @@ run a module that builds a DraftKings API URL (`/sites/US-SB/api`,
 `sportsbook-nash.draftkings.com/api`): draftkings-prop-provider-probe,
 mlb-prop-pit-archive, nfl-market-maker-radar-capture, mlb-moneyline-forward-evidence,
 nfl-2026-line-capture, nfl-dk-direct-confirmation-capture and
-sportsedge-auto-dk-four-sports. On all seven the cron lines are deleted and the push,
+sportsedge-auto-dk-four-sports. On six of them (all but the frozen nfl-2026-line-capture, see the exception below) the cron lines are deleted and the push,
 pull_request (and, on mlb-moneyline-forward-evidence, workflow_run) triggers removed;
 only workflow_dispatch remains. No source module is deleted and no collector was run.
 Guard: `tests/test_dk_api_scheduled_workflow_guard_20261023.py`. Proposal branch
 grok/t250-dk-api-guard-20261023; merging stays with the owner.
+
+Exception, Grok ruling 2026-10-23c (frozen tests never change mid-clock; not relaxable):
+`nfl-2026-line-capture` is a frozen confirmation lane. Its workflow,
+`scripts/nfl_2026_line_capture.py` and `config/nfl_2026_capture.json` stay
+byte-identical to main 53a636af, and so do `tests/test_nfl_2026_capture_contract.py`,
+`tests/test_ws_credit_schedule_policy.py` and its entry in
+`config/odds_api_request_projection_v3.json` (still scheduled). The DK guard lists it as
+`FROZEN_LANE_EXCEPTION_OWNER_DECISION`: reported (it still reaches a DK API builder on
+cron), not failed, until the owner decides. The market-provider frozen-exclusion gate
+passes. The other six DK-API workflows stay manual-only.
 
 ## Auto-triggered DK-importing CI jobs classified (2026-10-23)
 
@@ -82,6 +92,9 @@ auto-triggered workflows reach a DK-API module; each was classified by reading i
   `tests/test_dk_api_no_live_requests_in_ci_20261023.py`, which runs their DK-importing
   test modules with socket/urllib/requests patched to refuse any draftkings host.
 
-Policy-text correction: `config/odds_api_request_projection_v3.json` now records
-nfl-2026-line-capture as not scheduled (dispatch-only), matching the workflow. No credits
-spent; no collector run.
+`collection-runtime-contract` (pull_request) was added to the mock-guarded set: its
+`tests/test_archive_mlb_prop_odds.py` patches `fetch_mlb_prop_quotes`, and its
+`--self-test` is synthetic. The network guard refuses draftkings hosts at socket,
+urllib, requests, subprocess curl/wget and os.system level, and the hosts' resolved IPs
+where they resolve. The earlier projection-config edit for nfl-2026-line-capture is
+reverted (ruling 2026-10-23c). No credits spent; no collector run.
