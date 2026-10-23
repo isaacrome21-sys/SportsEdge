@@ -57,8 +57,10 @@ def test_refusals(args, reason):
 
 
 @pytest.mark.parametrize("line,detail", [(True, "LINE_BOOL"), (False, "LINE_BOOL"),
-                                         (-0.5, "LINE_NEGATIVE"), (-30, "LINE_NEGATIVE"),
-                                         ("-1.5", "LINE_NEGATIVE")])
+                                         (-0.5, "LINE_NONPOSITIVE"), (-30, "LINE_NONPOSITIVE"),
+                                         ("-1.5", "LINE_NONPOSITIVE"), (0, "LINE_NONPOSITIVE"),
+                                         (0.0, "LINE_NONPOSITIVE"), (-0.0, "LINE_NONPOSITIVE"),
+                                         ("0", "LINE_NONPOSITIVE"), ("-0.0", "LINE_NONPOSITIVE")])
 def test_bool_and_negative_lines_refuse(line, detail):
     out = C.price_combo(store(), "A", "pa", line, date(2024, 12, 30))
     assert out["status"] == "REFUSED"
@@ -73,3 +75,27 @@ def test_sources_record_date_clustered_cis():
     assert ci["pr"] == [-1.924, -1.716]
     assert ci["pa"] == [-2.029, -1.825]
     assert ci["ra"] == [-0.789, -0.706]
+
+
+import numpy as np
+
+
+@pytest.mark.parametrize("line,detail", [
+    (np.bool_(True), "LINE_BOOL"), (np.bool_(False), "LINE_BOOL"),
+    (b"27.5", "LINE_TYPE"), ([27.5], "LINE_TYPE"), (None, "LINE_TYPE"),
+    (np.int64(27), "LINE_TYPE"), (complex(27.5), "LINE_TYPE"),
+    (" 27.5", "LINE_WHITESPACE"), ("27.5 ", "LINE_WHITESPACE"),
+    ("\t27.5\n", "LINE_WHITESPACE"), ("", "LINE_WHITESPACE"), ("   ", "LINE_WHITESPACE"),
+])
+def test_line_type_and_whitespace_refused(line, detail):
+    out = C.price_combo(store(), "A", "pa", line, date(2024, 12, 30))
+    assert out["status"] == "REFUSED"
+    assert out["reason"] == v1.REFUSAL_LINE_INVALID and out["detail"] == detail
+    assert out["play_allowed"] is False
+
+
+@pytest.mark.parametrize("line", [27.5, 27, "27.5", np.float64(27.5)])
+def test_valid_line_types_price(line):
+    out = C.price_combo(store(), "A", "pa", line, date(2024, 12, 30))
+    assert out["status"] == "PRICED" and out["line"] in (27.0, 27.5)
+    assert type(out["line"]) is float
