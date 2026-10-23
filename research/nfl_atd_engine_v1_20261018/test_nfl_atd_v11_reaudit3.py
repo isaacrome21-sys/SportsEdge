@@ -286,6 +286,10 @@ class TestToken(Clock):
             pv.require_fetch_provenance(api, {"stats": "a" * 64}, "2026-10-25T16:00:00Z")
         self.assertEqual(cm.exception.code, "GITHUB_TOKEN_MISSING")
 
+# port (re-audit 8d86e7a9): the fake pricer is patched in by fixture, never
+# registered on import; review tests patch the env guard explicitly.
+from fake_github_api import module_fixtures as _mf
+setUpModule, tearDownModule = _mf(guard=True)
 
 if __name__ == "__main__":
     unittest.main()

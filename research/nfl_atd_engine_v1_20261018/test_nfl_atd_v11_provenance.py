@@ -311,6 +311,10 @@ class TestReviewB_DE(unittest.TestCase):
                  "captured_at": "garbage"}]
         self.assertEqual(sc.find_close(caps, "g1", "P", KO), "CLOSE_TIMESTAMP_INVALID")
 
+# port (re-audit 8d86e7a9): the fake pricer is patched in by fixture, never
+# registered on import; review tests patch the env guard explicitly.
+from fake_github_api import module_fixtures as _mf
+setUpModule, tearDownModule = _mf(guard=True)
 
 if __name__ == "__main__":
     unittest.main()
