@@ -20,7 +20,8 @@ class FakeGitHub:
     """init_records=True creates the records branch with a dummy first
     commit (a branch_creation event, as GitHub reports it), so records are
     always later pushes. page_size models activity pagination."""
-    def __init__(self, init_records=True, page_size=2, authenticated=True):
+    def __init__(self, init_records=True, page_size=2, authenticated=True, freeze=True,
+                 freeze_shas=None, freeze_at="2026-10-01T00:01:00Z"):
         self.trees = {"root": {}}
         self.parents = {"root": []}
         self.heads = {}
@@ -33,6 +34,45 @@ class FakeGitHub:
             import atd_provenance as pv
             self.commit(pv.RECORDS_BRANCH, {"README.md": "records branch (dummy first commit)\n"},
                         "2026-10-01T00:00:00Z")
+            if freeze:
+                self.publish_freeze(freeze_shas, freeze_at)
+
+    def publish_freeze(self, shas=None, pushed_at="2026-10-01T00:01:00Z"):
+        """FREEZE.json pins (default: the shas of the code running now)."""
+        import atd_provenance as pv
+        import score_nfl_atd_forward as sc
+        body = dict(sc.local_shas() if hasattr(sc, "local_shas") else {}, **(shas or {}))
+        return self.commit(pv.RECORDS_BRANCH,
+                           {getattr(pv, "FREEZE_PATH", "nfl_atd_v1_1/FREEZE.json"):
+                            json.dumps(body, sort_keys=True)}, pushed_at)
+
+    # --- JSON state for the CLI test switch (no pickle) ---------------------
+    def to_json(self) -> str:
+        import base64
+
+        def enc(v):
+            return {"b64": base64.b64encode(v).decode()} if isinstance(v, bytes) else v
+        return json.dumps({"trees": {k: {p: enc(c) for p, c in t.items()}
+                                     for k, t in self.trees.items()},
+                           "parents": self.parents, "heads": self.heads,
+                           "events": self.events, "malformed": sorted(self.malformed),
+                           "page_size": self.page_size, "authenticated": self.authenticated,
+                           "truncated": self.truncated}, sort_keys=True)
+
+    @classmethod
+    def from_json(cls, text):
+        import base64
+        d = json.loads(text)
+        api = cls(init_records=False)
+
+        def dec(v):
+            return base64.b64decode(v["b64"]) if isinstance(v, dict) else v
+        api.trees = {k: {p: dec(c) for p, c in t.items()} for k, t in d["trees"].items()}
+        api.parents, api.heads, api.events = d["parents"], d["heads"], d["events"]
+        api.malformed = set(d["malformed"])
+        api.page_size, api.authenticated, api.truncated = (
+            d["page_size"], d["authenticated"], d["truncated"])
+        return api
 
     def _new(self, branch, tree):
         parent = self.heads.get(branch, "root")
