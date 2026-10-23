@@ -9,9 +9,8 @@ document (or a successor). Rows produced before the freeze are
 historical record, never prospective entries. Nothing in this draft
 changes any family's registration, eligibility, or validation state.**
 
-- Status: `DRAFT_NOT_IN_FORCE` (revision 2: applies all edits of the
-  NOT CLEARED independent review of `82b880ed`; pending re-review +
-  owner freeze)
+- Status: `DRAFT_NOT_IN_FORCE` (revision 3: applies the NOT CLEARED reviews of
+  `82b880ed` and `355db10d`; pending re-review + owner freeze)
 - Date drafted: 2026-10-22
 - Family in scope: NBA team total points (`TEAM_TOTAL`), registered
   2026-10-22 by owner ruling as `REGISTERED_RESEARCH_ONLY /
@@ -111,7 +110,8 @@ reported at review alongside the verdict.
 ## 4. Slates and gates (minimums) and the single review
 
 - A slate is one NBA game date's captured board. Counting starts at
-  zero with the first slate priced after the freeze.
+  zero with the first slate priced after the freeze **and** after the
+  forward evaluator is pinned and independently reviewed (§12).
 - Gates are **minimums**: ≥4 full slates AND ≥150 engine-priced rows
   with valid CLV pairing AND ≥40 distinct games AND ≥50 picked rows.
 - **The verdict review happens once, at the first slate close where all
@@ -136,7 +136,7 @@ reported at review alongside the verdict.
 - Engine stamp required: `engine_id = NBA_TEAM_PERIOD_RATINGS_V1`,
   `status = PRICED`, `sufficiency_met = true`, priors recorded. Rows
   without engine provenance are excluded and reported.
-- **Pick rule (owner-confirmed 2026-10-22):** `gap = mean − entry_line`.
+- **Pick rule (pending owner confirmation at freeze, §12):** `gap = mean − entry_line`.
   PICKED OVER if `gap ≥ +2.0` points, PICKED UNDER if `gap ≤ −2.0`;
   otherwise PASSED. One row per team per game. Changing the threshold
   after the freeze is a new version.
@@ -174,13 +174,24 @@ favorable vs adverse movement relative to the picked side (direction
 from the latest qualifying close; a row whose qualifying close lines
 straddle the entry line counts as adverse), as in NFL props v1.1.
 
-**6d. Hit rate vs the market.** On PICKED rows with a valid close:
+**6d. Hit rate vs the market.** Only PICKED rows whose valid close is
+**at the entry line**; the hit is graded **at the entry line**. Metric:
 `hit − p_close`, where `p_close` is the vig-free close probability of
-the picked side. Required: mean `hit − p_close` > 0 with the §9
-game-clustered, Bonferroni-adjusted lower bound > 0. Pushes are
-excluded from this leg and counted.
+the picked side from the two-sided close pair at the entry line. For
+whole-number lines, `p_close` is the two-sided no-vig probability with
+pushes removed (i.e. conditional on no push), and pushes are excluded
+from the leg and counted (`PUSH`). Required: mean `hit − p_close` > 0
+with the §9 game-clustered, Bonferroni-adjusted lower bound > 0.
 
-`BEATS_MARKET` requires **6a AND 6b AND 6c AND 6d**.
+**Moved-row rules (matching NFL props v1.1), checked first, in order:**
+1. If the one-sided exact sign test of adverse vs favorable moved
+   PICKED rows gives p < α/k in the adverse direction, the verdict is
+   `DOES_NOT_BEAT_MARKET` regardless of 6a–6d.
+2. Else, if more than 50% of PICKED rows are moved rows, the verdict is
+   `INSUFFICIENT_CLOSE_DATA`.
+
+Only if neither applies: `BEATS_MARKET` requires **6a AND 6b AND 6c AND
+6d**.
 
 ## 7. CLV and close validity (capture rules)
 
@@ -213,6 +224,12 @@ CLV-missing: `NO_CLOSE_ROW`, `LINE_MOVED` (valid two-sided pre-tip
 close exists only at a different line), `CLOSE_SINGLE_SIDED`,
 `CLOSE_NOT_PRETIP`, `CLOSE_STALE` (>60:00), `PAIR_SPAN_EXCEEDED`
 (>150 s), `QUOTE_STALE_180S`.
+
+**Excluded-and-counted codes (row not scored in the affected legs;
+each counted and reported at review):** `RESULT_UNAVAILABLE` (no final
+in the settlement source, §3), `VOID` (postponed/suspended/cancelled
+game, §3), `PUSH` (final equals the graded line; excluded from 6d),
+`GAP_ZERO` (mean equals entry line; excluded from 6c).
 
 **Insufficient-close rule:** per §6, >20% of engine-priced rows without
 a valid close gives `INSUFFICIENT_CLOSE_DATA`. Void, push, and
@@ -268,15 +285,13 @@ promotability; any change is an owner ruling.
 
 ## 12. Freeze checklist (owner)
 
-- [ ] Independent review by a checker who did not draft this document.
-- [x] Owner confirmed §5 pick threshold (±2.0 points), 2026-10-22.
-- [ ] Forward evaluator lands, hash-pinned to this document, before the
-      first counted slate.
-- [ ] Owner freezes; k recorded; first counted slate named.
-- [x] Focus pause (2026-10-22): owner ruled freeze is allowed for
-      families with a merged engine and an already-captured market;
-      team totals qualifies.
-- [ ] Re-review of this revision (all §3/§5/§6a–6d/§7/§8/§9 edits
-      from the `82b880ed` NOT CLEARED review) by a checker who did not
-      draft it, returning CLEARED; bootstrap seed and k clock-ID list
-      recorded in the freeze record.
+- [ ] Independent re-review of this revision by a checker who did not
+      draft it, returning CLEARED; bootstrap seed and the k clock-ID
+      list recorded in the freeze record.
+- [ ] Owner confirms ±2.0 pick threshold and the team-totals exception to the focus pause, at freeze.
+- [ ] Forward evaluator lands, hash-pinned to this document, and is
+      independently reviewed, before the first counted slate.
+- [ ] Owner freezes; k recorded. The freeze record names the first
+      counted slate as **"first slate priced after the evaluator is
+      pinned and reviewed"**. No primary metrics (§6) are computed on
+      forward rows before then.
