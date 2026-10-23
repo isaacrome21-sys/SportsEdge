@@ -167,13 +167,43 @@ def _price_period(history: Iterable[Mapping[str, Any]], *, date: str, season: in
     if allow_refused:
         return out
     refused = {}
-    for market, key in (("moneyline", "moneyline_3way"), ("total", "total_pmf")):
-        fam = f"{period.upper()}_{market.upper()}"
-        if fam in NAIVE_FAIL_FAMILIES:
+    if f"{period.upper()}_TOTAL" in NAIVE_FAIL_FAMILIES:
+        del out["total_pmf"]
+        refused["total"] = f"NAIVE_FAIL:{period.upper()}_TOTAL"
+    ml_fam = f"{period.upper()}_MONEYLINE"
+    if ml_fam in NAIVE_FAIL_FAMILIES:
+        # Everything that can rebuild the refused moneyline goes: the 3-way price, the
+        # full margin pmf, and the team means (mean shift + public history = margin pmf).
+        for key in ("moneyline_3way", "margin_pmf", "mu_home", "mu_away"):
             del out[key]
-            refused[market] = f"NAIVE_FAIL:{fam}"
+        refused["moneyline"] = f"NAIVE_FAIL:{ml_fam}"
+        out["spread_quote"] = _SpreadQuote(period, m_pmf)
     out["refused"] = refused
     return out
+
+
+class _SpreadQuote:
+    """Opaque spread state for a NAIVE_FAIL-moneyline quarter. Only margins with
+    |k| >= 1.5 are kept individually; mass on (-1.5, 1.5) is pooled into one number, so
+    P(home), P(tie), P(away) cannot be recovered. Read it only through spread_probs."""
+    __slots__ = ("period", "tails", "core")
+
+    def __init__(self, period, m_pmf):
+        self.period = period
+        self.tails = tuple(sorted((k, p) for k, p in m_pmf.items() if abs(k) >= 1.5))
+        self.core = math.fsum(p for k, p in m_pmf.items() if abs(k) < 1.5)
+
+    def __repr__(self):
+        return f"<SpreadQuote {self.period}>"
+
+
+def _period_of(priced) -> str:
+    if not isinstance(priced, Mapping) or "period" not in priced:
+        raise NflPeriodLinesError("PERIOD_MISSING")
+    period = priced["period"]
+    if not isinstance(period, str) or period not in PERIODS:
+        raise NflPeriodLinesError(f"UNKNOWN_PERIOD:{period!r}")
+    return period
 
 
 def _floor_at_zero(pmf: dict) -> dict:
@@ -194,6 +224,9 @@ def _line(v) -> float:
 def total_probs(priced: dict, line) -> dict:
     """P(over / push / under) for a period total line."""
     L = _line(line)
+    period = _period_of(priced)
+    if f"{period.upper()}_TOTAL" in NAIVE_FAIL_FAMILIES and not priced.get("screen_only_unrestricted"):
+        raise NflPeriodLinesError(f"NAIVE_FAIL:{period.upper()}_TOTAL")
     if "total_pmf" not in priced:
         raise NflPeriodLinesError(priced.get("refused", {}).get("total", "TOTAL_PMF_MISSING"))
     pmf = priced["total_pmf"]
@@ -204,10 +237,22 @@ def total_probs(priced: dict, line) -> dict:
 def spread_probs(priced: dict, home_line) -> dict:
     """Home spread (e.g. -3.5): P(home covers / push / away covers)."""
     L = _line(home_line)
-    ml_fam = f"{str(priced.get('period', '')).upper()}_MONEYLINE"
-    if ml_fam in NAIVE_FAIL_FAMILIES and abs(L) <= 1.0:
-        # |line| <= 1 (pick'em, +/-0.5, +/-1) restates the refused moneyline.
-        raise NflPeriodLinesError(f"NAIVE_FAIL:{ml_fam}")
+    period = _period_of(priced)
+    ml_fam = f"{period.upper()}_MONEYLINE"
+    if ml_fam in NAIVE_FAIL_FAMILIES:
+        if abs(L) <= 1.0:
+            # |line| <= 1 (pick'em, +/-0.5, +/-1) restates the refused moneyline.
+            raise NflPeriodLinesError(f"NAIVE_FAIL:{ml_fam}")
+        q = priced.get("spread_quote")
+        if not isinstance(q, _SpreadQuote) or q.period != period:
+            raise NflPeriodLinesError(f"SPREAD_QUOTE_MISSING:{period}")
+        # |L| >= 1.5 puts the whole pooled core on one side of the line.
+        home = math.fsum(p for k, p in q.tails if k + L > 0) + (q.core if L > 0 else 0.0)
+        away = math.fsum(p for k, p in q.tails if k + L < 0) + (q.core if L < 0 else 0.0)
+        push = math.fsum(p for k, p in q.tails if k + L == 0)
+        return {"home": home, "push": push, "away": away}
+    if "margin_pmf" not in priced:
+        raise NflPeriodLinesError("MARGIN_PMF_MISSING")
     pmf = priced["margin_pmf"]
     return {"home": sum(p for k, p in pmf.items() if k + L > 0),
             "push": sum(p for k, p in pmf.items() if k + L == 0),
