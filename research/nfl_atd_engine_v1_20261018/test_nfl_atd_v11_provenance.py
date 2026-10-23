@@ -76,8 +76,9 @@ class TestRecordProofA(unittest.TestCase):
 
     def test_blob_mismatch_refused(self):
         fetch(self.api, SHA)
-        # head blob differs although history shows one commit (rewrite)
-        self.api.trees[self.api.heads[BR]][self.path] = "tampered"
+        # head blob differs from the proven commit's blob (rewrite)
+        orig = self.api.blob_sha
+        self.api.blob_sha = lambda ref, path: "f" * 40 if ref == BR else orig(ref, path)
         self.assertEqual(self.code(), "RECORD_BLOB_MISMATCH")
 
     def test_force_push_refused(self):
@@ -187,7 +188,7 @@ class TestFetchAndSlateC(unittest.TestCase):
 
     def test_run_record_edited_screen(self):
         run_rec(self.api)
-        run_rec(self.api, t="2026-10-25T16:40:00Z")
+        run_rec(self.api, t="2026-10-25T16:40:00Z", rows=[{"edited": 1}])
         self.assertIn("RUN_RECORD_NOT_SINGLE_COMMIT", pv.load_slate(self.api, "S1")["reasons"])
 
     def test_missing_run_record_screen(self):

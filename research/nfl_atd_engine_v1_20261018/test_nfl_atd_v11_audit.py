@@ -173,7 +173,8 @@ class TestReviewOnce(unittest.TestCase):
         p = self.rec / sc.VERDICT_PATH
         on_disk = json.loads(p.read_text())
         self.assertEqual(on_disk["verdict"], v["verdict"])
-        self.assertEqual(on_disk["inputs_sha256"], sc.inputs_sha256(led[:4]))
+        self.assertEqual(on_disk["inputs_sha256"], v["inputs_sha256"])
+        self.assertEqual(on_disk["n_slates"], 4)
 
     def test_refuses_if_verdict_exists_regardless_of_args(self):
         led = _ledger(5, 14, 3, clv=0.02)

@@ -12,26 +12,18 @@ KO = "2026-10-25T12:00:00-05:00"
 
 
 def records_wt():
-    """Temp bare origin + worktree on the records branch (real git)."""
-    import atd_provenance as pv
-    t = Path(tempfile.mkdtemp())
-    g = lambda cwd, *a: subprocess.run(["git", *a], cwd=cwd, check=True,
-                                       capture_output=True)
-    g(t, "init", "-q", "--bare", "o.git")
-    g(t, "init", "-q", "-b", pv.RECORDS_BRANCH, "wt")
-    wt = t / "wt"
-    g(wt, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q",
-      "--allow-empty", "-m", "init")
-    g(wt, "remote", "add", "origin", str(t / "o.git"))
-    g(wt, "push", "-q", "origin", pv.RECORDS_BRANCH)
-    return wt
+    from fake_github_api import records_worktree
+    return records_worktree()
 
 
-def _review(led, wt=None):
-    """Review with every slate's provenance treated as COUNTS (provenance
-    itself is tested in test_nfl_atd_v11_provenance)."""
-    return sc.review(led, records_worktree=wt or records_wt(), api=None,
-                     slate_status=lambda api, s: {"status": "COUNTS", "reasons": []})
+def _review(led, wt=None, api=None):
+    """Publish the ledger as pushed records on an injected FakeGitHub and
+    review it by slate id (rows come from the pushed run records)."""
+    from fake_github_api import FakeGitHub, ledger_to_records
+    api = api or FakeGitHub()
+    ids, caps, setl = ledger_to_records(api, led)
+    return sc.review(ids, records_worktree=wt or records_wt(), api=api,
+                     captures=caps, settlements=setl)
 
 
 def entry(pid, sel, price, game="g1", week=8, kickoff=KO):
@@ -142,7 +134,8 @@ class TestRule6Gates(unittest.TestCase):
         self.assertEqual(v["n_picked"], 168)
         self.assertEqual(v["n_games"], 56)
         # Later slates do not enter the sample of record.
-        self.assertEqual(v, _review(led[:4]))
+        strip = lambda d: {k: x for k, x in d.items() if k not in ("run_proofs", "inputs_sha256")}
+        self.assertEqual(strip(v), strip(_review(led[:4])))
 
     def test_games_minimum_not_cap(self):
         v = _review(_ledger(4, 20, 2))  # 80 games > 40, 160 picks
