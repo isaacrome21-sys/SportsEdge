@@ -8,6 +8,7 @@ no play authority. Validation gaps are never buildable.
 from __future__ import annotations
 
 import argparse
+import sys
 import json
 from collections import Counter
 from pathlib import Path
@@ -255,9 +256,15 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--out", type=Path)
     p.add_argument("--verify-remote", action="store_true",
-                   help="check grok-branch engine SHAs against the real remote first")
+                   help="(default) check grok-branch engine SHAs against the real remote")
+    p.add_argument("--offline", action="store_true",
+                   help="explicit opt-out: skip the remote SHA check (output is unverified)")
     a = p.parse_args()
-    if a.verify_remote:
+    if a.offline and a.verify_remote:
+        raise LedgerRefusal("OFFLINE_AND_VERIFY_REMOTE_CONFLICT")
+    if a.offline:
+        print("REMOTE_SHAS_NOT_VERIFIED_OFFLINE", file=sys.stderr)
+    else:
         policy = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
         verify_branch_shas(policy)
     text = render(gap_ledger())
