@@ -206,6 +206,61 @@ def test_pit_role_equal_availability_ties_have_stable_game_id_order():
     assert one.role.target_mean == two.role.target_mean
 
 
+@pytest.mark.parametrize("wrong_entity", ["another-player", " ", 123])
+def test_pit_role_rejects_history_from_a_different_or_invalid_player(wrong_entity):
+    with pytest.raises(PropResearchLaneError, match="PIT_HISTORY_ENTITY_ID_MISMATCH"):
+        prepare_role_snapshot(
+            root=ROOT,
+            game_id="game-2",
+            entity_id="rb1",
+            kickoff_at="2026-09-21T18:00:00Z",
+            as_of="2026-09-21T17:00:00Z",
+            history=[_history(entity_id=wrong_entity, rush_attempts=30)],
+            projected_role=_prior(rush_attempts=10),
+        )
+
+
+@pytest.mark.parametrize("wrong_entity", ["another-player", " ", 123])
+def test_pit_role_rejects_projected_role_for_a_different_or_invalid_player(wrong_entity):
+    with pytest.raises(PropResearchLaneError, match="PIT_PROJECTED_ROLE_ENTITY_ID_MISMATCH"):
+        prepare_role_snapshot(
+            root=ROOT,
+            game_id="game-2",
+            entity_id="rb1",
+            kickoff_at="2026-09-21T18:00:00Z",
+            as_of="2026-09-21T17:00:00Z",
+            history=[_history(rush_attempts=8)],
+            projected_role=_prior(entity_id=wrong_entity, rush_attempts=10),
+        )
+
+
+def test_pit_role_rejects_projected_role_belonging_to_another_game():
+    with pytest.raises(PropResearchLaneError, match="PIT_PROJECTED_ROLE_GAME_ID_MISMATCH"):
+        prepare_role_snapshot(
+            root=ROOT,
+            game_id="game-2",
+            entity_id="rb1",
+            kickoff_at="2026-09-21T18:00:00Z",
+            as_of="2026-09-21T17:00:00Z",
+            history=[_history()],
+            projected_role=_prior(game_id="game-3", rush_attempts=10),
+        )
+
+
+def test_matching_player_and_game_identity_remains_admissible():
+    role = prepare_role_snapshot(
+        root=ROOT,
+        game_id="game-2",
+        entity_id="rb1",
+        kickoff_at="2026-09-21T18:00:00Z",
+        as_of="2026-09-21T17:00:00Z",
+        history=[_history(entity_id="rb1")],
+        projected_role=_prior(entity_id="rb1"),
+    )
+    assert role.game_id == "game-2"
+    assert role.role.entity_id == "rb1"
+
+
 def test_valid_pit_role_binds_context_hash_and_simulates():
     prepared = prepare_role_snapshot(
         root=ROOT,
