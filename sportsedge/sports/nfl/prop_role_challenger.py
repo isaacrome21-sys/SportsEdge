@@ -161,7 +161,15 @@ def stabilize_role(
             hist_mean * hist_weight + prior * shrink_games
         ) / max(hist_weight + shrink_games, 1e-12)
 
-    source = "HISTORY_BLEND" if used_history >= min_history_games else "PROJECTED_ROLE"
+    # Sparse observations are already included in the shrunk mean above.
+    # Calling that result PROJECTED_ROLE hides real observed usage (including
+    # potentially one anomalous low-volume game) from research diagnostics.
+    if used_history == 0:
+        source = "PROJECTED_ROLE"
+    elif used_history < min_history_games:
+        source = "SPARSE_HISTORY_BLEND"
+    else:
+        source = "HISTORY_BLEND"
     return RoleProjection(
         entity_id=entity_id,
         pass_attempt_mean=max(0.0, estimates["pass_attempts"] * availability),
@@ -464,6 +472,8 @@ def diagnostic_tags(
     tags: list[str] = []
     if role.source == "PROJECTED_ROLE":
         tags.append("PROJECTED_ROLE")
+    elif role.source == "SPARSE_HISTORY_BLEND":
+        tags.append("SPARSE_HISTORY_BLEND")
     if role.history_games < 3:
         tags.append("LOW_TRAILING_SAMPLE")
     wind = football_context.get("wind_mph")
