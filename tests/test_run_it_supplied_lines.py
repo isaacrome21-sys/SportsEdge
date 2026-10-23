@@ -77,6 +77,28 @@ def test_explicit_scope_reports_missing_sports(tmp_path, monkeypatch):
         "MLB": "NO_CANONICAL_MODEL_RESULT",
         "NBA": "NO_SUPPLIED_LINES_FOR_SPORT",
     }
+    mlb = next(r for r in report["results"] if r["sport"] == "MLB")
+    assert mlb["unpriced_reason_counts"] == {"NO_MODEL_OR_MARKET": 1}
+
+
+@pytest.mark.parametrize("bad_probability", [True, -0.1, 1.01, float("nan"), "0.99"])
+def test_invalid_probability_cannot_mark_sport_model_ready(
+    tmp_path, monkeypatch, bad_probability,
+):
+    from artifacts import run_it_full
+
+    monkeypatch.setattr(run_it_full, "run_full", lambda *a, **k: {
+        "evaluated_rows": [{"status": "RESEARCH_EDGE",
+                            "estimate_p": bad_probability,
+                            "blocker": "MODEL_PROBABILITY_INVALID"}]})
+    report = _supplied_line_run(
+        _lines(tmp_path, [{"sport": "MLB"}]),
+        requested_scope=None, no_fetch=True, as_of=None,
+        card_output=tmp_path / "card.json")
+    assert report["overall_status"] == "BLOCKED"
+    assert report["results"][0]["model_rows"] == 0
+    assert report["results"][0]["unpriced_reason_counts"] == {
+        "MODEL_PROBABILITY_INVALID": 1}
 
 
 @pytest.mark.parametrize("rows,scope,as_of,expected", [
