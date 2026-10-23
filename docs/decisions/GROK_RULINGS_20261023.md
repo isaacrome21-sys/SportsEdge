@@ -200,3 +200,29 @@ Ruling:
 
 ctypes and AF_UNIX filesystem-path residuals from 2026-10-23f stand. Frozen lane files stay
 byte-identical to main 53a636af. Not self-cleared; needs independent review.
+
+## 2026-10-23h — all socket.* audit events, _posixsubprocess.fork_exec, in-process bar (t262)
+
+The t261 audit (NOT CLEARED on e122a9fd) found `socket.sendmsg` unhooked and
+`_posixsubprocess.fork_exec` launching curl with no check. Changes:
+
+- The hook now covers every `socket.*` event in the CPython 3.13 audit events table
+  (vendored at `tests/net_jail/cpython_3_13_audit_events.txt` from docs.python.org):
+  `connect`, `sendto`, `sendmsg`, `bind` and `getnameinfo` get address checks (non-loopback or DK
+  refused; `sendmsg` with no address is allowed); `getaddrinfo`, `gethostbyname` and
+  `gethostbyaddr` get host checks; `__new__`, `gethostname`, `getservbyname`, `getservbyport` and
+  `sethostname` carry no peer address and are allowed. A test derives the `socket.*` names from
+  the vendored table and asserts every one is handled, and it fails if Python is not 3.13.
+- Layer 2 monkeypatches `_posixsubprocess.fork_exec` (and `subprocess._fork_exec`, its import-time
+  alias). Its argv goes through the network-binary, renamed-binary-by-content and DK checks;
+  children already wrapped in `unshare -rn` are allowed. The auditor's repro is a test.
+
+**Grok ruling (bar for the in-process layers):** the in-process layers (monkeypatches plus
+audit hook) are held to the bar of public stdlib APIs plus the one known private launcher,
+`_posixsubprocess.fork_exec`. Other private C internals (ctypes, raw syscalls, and other
+`_`-prefixed C modules) are documented residuals contained only by the `unshare -rn` jail. The
+guarded DK tests must run in the jail where it is available, and a test now re-runs them there;
+where it is unavailable the live tests skip with `NET_JAIL_UNAVAILABLE`.
+
+The ctypes, AF_UNIX-path and DNS residuals (2026-10-23f/g) stand. Frozen lane files stay
+byte-identical to main 53a636af. Not self-cleared; needs independent review.

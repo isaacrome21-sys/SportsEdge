@@ -241,8 +241,19 @@ def _audit_check(event, args):
         if _is_dk(host) or not _is_local(host):
             deny(host)
         return
-    if event.startswith("socket."):
+    if event in ("socket.gethostbyname", "socket.gethostbyaddr"):
+        host = args[0]
+        if _is_dk(host) or not _is_local(host):
+            deny(host)
+        return
+    if event in ("socket.__new__", "socket.gethostname", "socket.getservbyname",
+                 "socket.getservbyport", "socket.sethostname"):
+        return                                  # no peer address (local table/namespace ops)
+    if event == "socket.getnameinfo":
+        addr = args[0]
+    elif event.startswith("socket."):           # connect / sendto / sendmsg / bind: (self, address)
         addr = args[-1]
+    if event.startswith("socket."):
         if isinstance(addr, tuple) and addr and isinstance(addr[0], (str, bytes)):
             host = addr[0]
             if event == "socket.bind" and host in ("", b""):
@@ -451,6 +462,26 @@ def _dk_block_body(monkeypatch):
                                    ("spawnlp", True, False), ("spawnlpe", True, True)):
         if hasattr(os, fn):
             _wrap_l(fn, has_mode, env_last)
+
+    # t262: the one known private launcher. subprocess binds it at import as _fork_exec.
+    import _posixsubprocess
+    real_fork_exec = _posixsubprocess.fork_exec
+
+    def fork_exec(args, executable_list, *rest):
+        argv = _audit_args_list(args)
+        pre = _unshare_prefix()
+        if not (pre and argv[:len(pre)] == pre):
+            exe = os.fsdecode(executable_list[0]) if executable_list else (argv[0] if argv else "")
+            if _dk_cmd([exe, *argv]) or any(_is_dk(urllib.parse.urlsplit(a).hostname) for a in argv if "://" in a):
+                refuse("_posixsubprocess.fork_exec", argv)
+            if _fallback_net_cmd([exe, *argv]) or _fallback_net_cmd(argv) or _is_net_binary_file(exe):
+                refuse_net("_posixsubprocess.fork_exec", argv)
+        return real_fork_exec(args, executable_list, *rest)
+
+    fork_exec._sportsedge_net_guard = True
+    monkeypatch.setattr(_posixsubprocess, "fork_exec", fork_exec)
+    if hasattr(subprocess, "_fork_exec"):
+        monkeypatch.setattr(subprocess, "_fork_exec", fork_exec)
 
     real_popen_init = subprocess.Popen.__init__
 

@@ -12,6 +12,10 @@ import sys
 import threading
 
 _EVENTS = {"socket.connect", "socket.getaddrinfo", "socket.sendto", "socket.bind",
+           # every other socket.* event in the CPython 3.13 audit table (t262)
+           "socket.sendmsg", "socket.__new__", "socket.gethostbyaddr", "socket.gethostbyname",
+           "socket.gethostname", "socket.getnameinfo", "socket.getservbyname",
+           "socket.getservbyport", "socket.sethostname",
            # every CPython process-launch audit event (t261)
            "subprocess.Popen", "os.posix_spawn", "os.exec", "os.spawn", "os.system",
            "os.startfile", "pty.spawn", "os.fork", "os.forkpty"}
