@@ -113,6 +113,13 @@ def _hex40(v) -> bool:
     return isinstance(v, str) and len(v) == 40 and set(v) <= _HEX
 
 
+def _require_cited_is_head(e: dict, market: str) -> None:
+    """The cited engine sha must BE the independently cleared head: an older ancestor
+    may still carry behaviour the cleared head refuses (t256 audit: a5012ea8)."""
+    if e.get("sha") != e.get("cleared_head_sha"):
+        raise LedgerRefusal(f"CITED_SHA_NOT_CLEARED_HEAD:{market}")
+
+
 def verify_branch_shas(policy: dict, *, resolver=None, file_resolver=None) -> list:
     """For every grok-branch entry: cleared_head_sha must be exactly the remote branch
     HEAD, the cited engine sha must be on that branch (the head or an ancestor), and the
@@ -127,6 +134,7 @@ def verify_branch_shas(policy: dict, *, resolver=None, file_resolver=None) -> li
             raise LedgerRefusal(f"GROK_BRANCH_SHA_MALFORMED:{market}")
         if not _hex40(head):
             raise LedgerRefusal(f"CLEARED_HEAD_SHA_MALFORMED:{market}")
+        _require_cited_is_head(e, market)
         f = e.get("engine_file")
         if not isinstance(f, str) or not f.startswith("sportsedge/") or not f.endswith(".py"):
             raise LedgerRefusal(f"ENGINE_FILE_REQUIRED:{market}")
@@ -244,6 +252,7 @@ def _engine(row: dict, policy: dict, merged_files=frozenset(), main_differs=froz
         return "ENGINE_EXISTS_NOT_WIRED", res["engine"]
     branch = policy.get("grok_branch_engines", {}).get(row["sport"], {}).get(row["market"])
     if branch is not None:
+        _require_cited_is_head(branch, row["market"])
         if branch.get("engine_file") in merged_files:
             return "ENGINE_MERGED_TO_MAIN_NOT_WIRED", dict(branch)
         if branch.get("engine_file") in main_differs:
@@ -287,6 +296,8 @@ def classify(row: dict, policy: dict, *, merged_files=frozenset(), main_differs=
            "readiness": readiness, "score_area": area, "status": status,
            "engine_ref": engine_ref, "record": record}
     screen = policy.get("grok_branch_screen_engines", {}).get(row["sport"], {}).get(row["market"])
+    if screen is not None:
+        _require_cited_is_head(screen, row["market"])
     if screen is not None:  # annotation only: never changes status
         out["screen_engine"] = {**screen, "merged_to_main": screen["engine_file"] in merged_files,
                                 "main_blob_differs": screen["engine_file"] in main_differs}
