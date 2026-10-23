@@ -147,6 +147,65 @@ def test_future_known_role_or_history_is_rejected():
         )
 
 
+def test_pit_role_rejects_duplicate_prior_game_as_double_counted_usage():
+    with pytest.raises(PropResearchLaneError, match="PIT_HISTORY_GAME_ID_DUPLICATE"):
+        prepare_role_snapshot(
+            root=ROOT,
+            game_id="game-2",
+            entity_id="rb1",
+            kickoff_at="2026-09-21T18:00:00Z",
+            as_of="2026-09-21T17:00:00Z",
+            history=[_history(rush_attempts=2), _history(rush_attempts=22)],
+            projected_role=_prior(rush_attempts=10),
+        )
+
+
+def test_pit_role_rejects_missing_prior_game_identity():
+    without_id = _history()
+    del without_id["game_id"]
+    with pytest.raises(PropResearchLaneError, match="PIT_HISTORY_GAME_ID_REQUIRED"):
+        prepare_role_snapshot(
+            root=ROOT,
+            game_id="game-2",
+            entity_id="rb1",
+            kickoff_at="2026-09-21T18:00:00Z",
+            as_of="2026-09-21T17:00:00Z",
+            history=[without_id],
+            projected_role=_prior(rush_attempts=10),
+        )
+
+
+def test_pit_role_weights_latest_available_history_independent_of_input_order():
+    history = [
+        _history(game_id="game-a", known_at="2026-09-18T20:00:00Z", rush_attempts=2),
+        _history(game_id="game-b", known_at="2026-09-19T20:00:00Z", rush_attempts=20),
+        _history(game_id="game-c", known_at="2026-09-20T20:00:00Z", rush_attempts=4),
+    ]
+    kwargs = dict(root=ROOT, game_id="game-2", entity_id="rb1",
+                  kickoff_at="2026-09-21T18:00:00Z",
+                  as_of="2026-09-21T17:00:00Z",
+                  projected_role=_prior(rush_attempts=10))
+    forward = prepare_role_snapshot(history=history, **kwargs)
+    backward = prepare_role_snapshot(history=list(reversed(history)), **kwargs)
+    assert forward.role.rush_attempt_mean == backward.role.rush_attempt_mean
+    assert forward.role.history_games == backward.role.history_games == 3
+
+
+def test_pit_role_equal_availability_ties_have_stable_game_id_order():
+    history = [
+        _history(game_id="game-z", known_at="2026-09-20T20:00:00Z", targets=18),
+        _history(game_id="game-a", known_at="2026-09-20T20:00:00Z", targets=1),
+        _history(game_id="game-m", known_at="2026-09-19T20:00:00Z", targets=8),
+    ]
+    kwargs = dict(root=ROOT, game_id="game-2", entity_id="wr1",
+                  kickoff_at="2026-09-21T18:00:00Z",
+                  as_of="2026-09-21T17:00:00Z",
+                  projected_role=_prior(targets=9))
+    one = prepare_role_snapshot(history=history, **kwargs)
+    two = prepare_role_snapshot(history=list(reversed(history)), **kwargs)
+    assert one.role.target_mean == two.role.target_mean
+
+
 def test_valid_pit_role_binds_context_hash_and_simulates():
     prepared = prepare_role_snapshot(
         root=ROOT,

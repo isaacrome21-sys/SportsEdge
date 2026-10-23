@@ -207,21 +207,38 @@ def prepare_role_snapshot(
     if cutoff >= kickoff:
         raise PropResearchLaneError("ROLE_ASOF_MUST_PRECEDE_KICKOFF")
 
-    clean_history: list[dict[str, Any]] = []
+    # stabilize_role applies exponential recency weights in list order.
+    # Caller order is not a chronology receipt: normalize by each prior
+    # game's known-at timestamp, and never count the same historical game
+    # twice toward the role sample or the >=min_history threshold.
+    ordered_history: list[tuple[datetime, str, dict[str, Any]]] = []
+    seen_history_games: set[str] = set()
     for i, row in enumerate(history):
         if not isinstance(row, Mapping):
             raise PropResearchLaneError(f"PIT_HISTORY_ROW_INVALID:{i}")
-        _known_at(row, where=f"history[{i}]", as_of=cutoff)
+        available_at = _known_at(row, where=f"history[{i}]", as_of=cutoff)
         _reject_realized_same_game_fields(row, where=f"history[{i}]")
-        if str(row.get("game_id") or "") == game_id:
+        prior_game_id = row.get("game_id")
+        if not isinstance(prior_game_id, str) or not prior_game_id.strip():
+            raise PropResearchLaneError(f"PIT_HISTORY_GAME_ID_REQUIRED:{i}")
+        prior_game_id = prior_game_id.strip()
+        if prior_game_id == game_id:
             raise PropResearchLaneError(f"SAME_GAME_HISTORY_FORBIDDEN:{i}")
-        clean_history.append(
-            {
+        if prior_game_id in seen_history_games:
+            raise PropResearchLaneError(f"PIT_HISTORY_GAME_ID_DUPLICATE:{prior_game_id}")
+        seen_history_games.add(prior_game_id)
+        ordered_history.append(
+            (available_at, prior_game_id, {
                 key: row[key]
                 for key in ("pass_attempts", "rush_attempts", "targets")
                 if key in row
-            }
+            })
         )
+    # Equal availability timestamps (e.g. one publisher batch) use a stable
+    # identity tie-break. This does not pretend to know an unavailable game
+    # start time; it only prevents caller iteration order influencing output.
+    clean_history = [metrics for _, _, metrics in sorted(ordered_history,
+                                                       key=lambda part: (part[0], part[1]))]
 
     if not isinstance(projected_role, Mapping):
         raise PropResearchLaneError("PROJECTED_ROLE_INVALID")
