@@ -203,8 +203,12 @@ def price_tds(history, *, home, away, season, date) -> dict:
 
 
 def p_over(pmf: Sequence[float], line: float) -> float:
-    if not (math.isfinite(line) and line == math.floor(line) + 0.5 and line > 0):
+    if not (_finite_num(line) and line == math.floor(line) + 0.5 and line > 0):
         raise NflGameScoringError("LINE_MUST_BE_POSITIVE_HALF_POINT")
+    if int(math.floor(line)) + 1 >= len(pmf):
+        # t235: beyond the pmf support (tail folded into the last cell) the
+        # answer would be a manufactured exact 0.0 -> refuse.
+        raise NflGameScoringError(f"LINE_ABOVE_SUPPORT:{line}")
     return math.fsum(pmf[int(math.floor(line)) + 1:])
 
 
@@ -232,6 +236,13 @@ def residuals(history, season_before: int, mu_fn) -> list:
 def margin_band_probs(mu: float, res: Sequence[float]) -> dict:
     """{('H'|'A', lo, hi): p} plus 'TIE'; empirical residual shift,
     rounded to integer margins."""
+    if not _finite_num(mu):
+        raise NflGameScoringError(f"MARGIN_MU_NONFINITE:{mu!r}")
+    res = list(res)
+    if len(res) < 100:                       # same floor as residuals()
+        raise NflGameScoringError("RESIDUAL_POOL_INSUFFICIENT")
+    if not all(_finite_num(e) for e in res):
+        raise NflGameScoringError("RESIDUAL_VALUE_INVALID")
     counts: dict = {}
     for e in res:
         m = int(round(mu + e))
@@ -276,9 +287,9 @@ def fit_race(train: Sequence[tuple], n_iter: int = 200) -> tuple:
 def race_probs(mu: float, fit: tuple, p_neither: float) -> dict:
     if not _finite_num(mu):
         raise NflGameScoringError(f"RACE_MU_NONFINITE:{mu!r}")
-    if not all(isinstance(x, (int, float)) and math.isfinite(x) for x in fit):
+    if not (isinstance(fit, tuple) and len(fit) == 2 and all(_finite_num(x) for x in fit)):
         raise NflGameScoringError("RACE_FIT_NONFINITE")
-    if not (0.0 <= p_neither < 1.0):
+    if not (_finite_num(p_neither) and 0.0 <= p_neither < 1.0):
         raise NflGameScoringError("RACE_NEITHER_INVALID")
     ph = _logistic(fit[0] * mu + fit[1])
     return {"H": (1 - p_neither) * ph, "A": (1 - p_neither) * (1 - ph),
