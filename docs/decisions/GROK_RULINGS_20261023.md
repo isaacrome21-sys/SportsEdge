@@ -31,3 +31,20 @@ by `config/research/mlb_pitcher_k_forward_validation_v1.json`
 instruments" for this set. No new forward-test config is built; neither frozen instrument
 is modified. Status COVERED_BY_COMMITTED_FROZEN_INSTRUMENT is structural only: no score
 points, nothing validated, play_allowed false.
+
+## Quarter spreads refused as moneyline-derivable (2026-10-23)
+
+Grok ruling, Option 1, dated Oct 23, 2026, on the t248 NOT CLEARED finding. In
+`sportsedge/nfl_period_lines_empirical.py` the quarter margin pmf is the public
+history's pooled margin pmf moved by one shift. Any public quarter spread price (even
++/-1.5) plus that history pins the shift by bisection, and so rebuilds the refused
+NAIVE_FAIL quarter moneyline exactly. Every Q1-Q4 spread is therefore refused with
+`NAIVE_FAIL:Qn_MONEYLINE_DERIVABLE`; all quarter spreads were inconclusive versus naive
+in the screens anyway, so no screen-supported market is lost. Public Q1-Q4 output carries
+only identifiers, governance and refusal codes, plus the Q2 total and its `total_pmf`
+(Q2_TOTAL was not refused); margin pmfs, team means and refused total pmfs are dropped.
+H1/H2 are unchanged. Screens run through the guarded unrestricted path and reproduce
+byte for byte. Test: `tests/test_nfl_period_lines_bisection_rebuild_20261023.py` runs
+the bisection rebuild against every public output. Ledger: no status changes (its
+quarter rows track the wired PERIOD_DERIVATIVE engine, not this screen engine). SCREEN /
+NOT_VALIDATED, play_allowed false; nothing validated.

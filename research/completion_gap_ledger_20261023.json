@@ -172,6 +172,14 @@
       "readiness": "NO_CANONICAL_PRICING_PATH",
       "record": null,
       "score_area": "ENGINES",
+      "screen_engine": {
+        "branch": "grok/t249-period-quarter-spreads-refused-20261023",
+        "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
+        "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "merged_to_main": false,
+        "refusals": "none",
+        "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
+      },
       "sport": "NFL",
       "status": "ENGINE_EXISTS_NOT_WIRED"
     },
@@ -182,6 +190,14 @@
       "readiness": "NO_CANONICAL_PRICING_PATH",
       "record": null,
       "score_area": "ENGINES",
+      "screen_engine": {
+        "branch": "grok/t249-period-quarter-spreads-refused-20261023",
+        "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
+        "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "merged_to_main": false,
+        "refusals": "none",
+        "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
+      },
       "sport": "NFL",
       "status": "ENGINE_EXISTS_NOT_WIRED"
     },
@@ -192,6 +208,14 @@
       "readiness": "NO_CANONICAL_PRICING_PATH",
       "record": null,
       "score_area": "ENGINES",
+      "screen_engine": {
+        "branch": "grok/t249-period-quarter-spreads-refused-20261023",
+        "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
+        "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "merged_to_main": false,
+        "refusals": "none",
+        "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
+      },
       "sport": "NFL",
       "status": "ENGINE_EXISTS_NOT_WIRED"
     },
@@ -302,6 +326,14 @@
       "readiness": "NO_CANONICAL_PRICING_PATH",
       "record": null,
       "score_area": "ENGINES",
+      "screen_engine": {
+        "branch": "grok/t249-period-quarter-spreads-refused-20261023",
+        "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
+        "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "merged_to_main": false,
+        "refusals": "Q1-Q4 NAIVE_FAIL:Qn_MONEYLINE",
+        "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
+      },
       "sport": "NFL",
       "status": "ENGINE_EXISTS_NOT_WIRED"
     },
@@ -312,6 +344,14 @@
       "readiness": "NO_CANONICAL_PRICING_PATH",
       "record": null,
       "score_area": "ENGINES",
+      "screen_engine": {
+        "branch": "grok/t249-period-quarter-spreads-refused-20261023",
+        "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
+        "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "merged_to_main": false,
+        "refusals": "Q1-Q4 NAIVE_FAIL:Qn_MONEYLINE_DERIVABLE (Grok ruling 2026-10-23 Option 1)",
+        "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
+      },
       "sport": "NFL",
       "status": "ENGINE_EXISTS_NOT_WIRED"
     },
@@ -322,6 +362,14 @@
       "readiness": "NO_CANONICAL_PRICING_PATH",
       "record": null,
       "score_area": "ENGINES",
+      "screen_engine": {
+        "branch": "grok/t249-period-quarter-spreads-refused-20261023",
+        "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
+        "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "merged_to_main": false,
+        "refusals": "Q1/Q3/Q4 NAIVE_FAIL:Qn_TOTAL; Q2 priced",
+        "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
+      },
       "sport": "NFL",
       "status": "ENGINE_EXISTS_NOT_WIRED"
     },
@@ -392,6 +440,14 @@
       "readiness": "NO_CANONICAL_PRICING_PATH",
       "record": null,
       "score_area": "ENGINES",
+      "screen_engine": {
+        "branch": "grok/t249-period-quarter-spreads-refused-20261023",
+        "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
+        "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "merged_to_main": false,
+        "refusals": "none",
+        "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
+      },
       "sport": "NFL",
       "status": "ENGINE_EXISTS_NOT_WIRED"
     },
@@ -402,6 +458,14 @@
       "readiness": "NO_CANONICAL_PRICING_PATH",
       "record": null,
       "score_area": "ENGINES",
+      "screen_engine": {
+        "branch": "grok/t249-period-quarter-spreads-refused-20261023",
+        "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
+        "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "merged_to_main": false,
+        "refusals": "none",
+        "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
+      },
       "sport": "NFL",
       "status": "ENGINE_EXISTS_NOT_WIRED"
     },
@@ -412,6 +476,14 @@
       "readiness": "NO_CANONICAL_PRICING_PATH",
       "record": null,
       "score_area": "ENGINES",
+      "screen_engine": {
+        "branch": "grok/t249-period-quarter-spreads-refused-20261023",
+        "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
+        "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "merged_to_main": false,
+        "refusals": "none",
+        "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
+      },
       "sport": "NFL",
       "status": "ENGINE_EXISTS_NOT_WIRED"
     },
@@ -468,8 +540,10 @@
     {
       "blocker": "NO_ENGINE",
       "engine_ref": {
-        "branch": "grok/t243-nfl-situational-20261023",
-        "sha": "a5012ea8ce0cfc45f9b95801c8803d1ab7d24a2b"
+        "branch": "grok/t247-situational-price-guard-20261023",
+        "cleared_head_sha": "ea53ee161a7b8f32cced1c44f7322e795e4ddcbf",
+        "engine_file": "sportsedge/nfl_situational_empirical.py",
+        "sha": "ea53ee161a7b8f32cced1c44f7322e795e4ddcbf"
       },
       "market": "both_teams_to_score_n",
       "readiness": "NO_CANONICAL_PRICING_PATH",
@@ -481,8 +555,10 @@
     {
       "blocker": "NO_ENGINE",
       "engine_ref": {
-        "branch": "grok/t243-nfl-situational-20261023",
-        "sha": "a5012ea8ce0cfc45f9b95801c8803d1ab7d24a2b"
+        "branch": "grok/t247-situational-price-guard-20261023",
+        "cleared_head_sha": "ea53ee161a7b8f32cced1c44f7322e795e4ddcbf",
+        "engine_file": "sportsedge/nfl_situational_empirical.py",
+        "sha": "ea53ee161a7b8f32cced1c44f7322e795e4ddcbf"
       },
       "market": "defensive_special_teams_td",
       "readiness": "NO_CANONICAL_PRICING_PATH",
@@ -494,8 +570,10 @@
     {
       "blocker": "NO_ENGINE",
       "engine_ref": {
-        "branch": "grok/t243-nfl-situational-20261023",
-        "sha": "a5012ea8ce0cfc45f9b95801c8803d1ab7d24a2b"
+        "branch": "grok/t247-situational-price-guard-20261023",
+        "cleared_head_sha": "ea53ee161a7b8f32cced1c44f7322e795e4ddcbf",
+        "engine_file": "sportsedge/nfl_situational_empirical.py",
+        "sha": "ea53ee161a7b8f32cced1c44f7322e795e4ddcbf"
       },
       "market": "first_score",
       "readiness": "NO_CANONICAL_PRICING_PATH",
@@ -507,8 +585,10 @@
     {
       "blocker": "NO_ENGINE",
       "engine_ref": {
-        "branch": "grok/t243-nfl-situational-20261023",
-        "sha": "a5012ea8ce0cfc45f9b95801c8803d1ab7d24a2b"
+        "branch": "grok/t247-situational-price-guard-20261023",
+        "cleared_head_sha": "ea53ee161a7b8f32cced1c44f7322e795e4ddcbf",
+        "engine_file": "sportsedge/nfl_situational_empirical.py",
+        "sha": "ea53ee161a7b8f32cced1c44f7322e795e4ddcbf"
       },
       "market": "largest_lead",
       "readiness": "NO_CANONICAL_PRICING_PATH",
@@ -521,6 +601,8 @@
       "blocker": "NO_ENGINE",
       "engine_ref": {
         "branch": "grok/t235-nfl-longest-fg-red-first-20261023",
+        "cleared_head_sha": "96dd3ef24643228961dd926f20ffe56c7aff0408",
+        "engine_file": "sportsedge/nfl_longest_fg_empirical.py",
         "sha": "96dd3ef24643228961dd926f20ffe56c7aff0408"
       },
       "market": "longest_fg_made",
@@ -534,6 +616,8 @@
       "blocker": "NO_ENGINE",
       "engine_ref": {
         "branch": "grok/t235-nfl-game-scoring-red-first-20261023",
+        "cleared_head_sha": "69ee54ec9bbbe0927e8dda064f40693d8c136a21",
+        "engine_file": "sportsedge/nfl_game_scoring_empirical.py",
         "sha": "69ee54ec9bbbe0927e8dda064f40693d8c136a21"
       },
       "market": "race_to_n_points",
@@ -546,8 +630,10 @@
     {
       "blocker": "NO_ENGINE",
       "engine_ref": {
-        "branch": "grok/t243-nfl-situational-20261023",
-        "sha": "a5012ea8ce0cfc45f9b95801c8803d1ab7d24a2b"
+        "branch": "grok/t247-situational-price-guard-20261023",
+        "cleared_head_sha": "ea53ee161a7b8f32cced1c44f7322e795e4ddcbf",
+        "engine_file": "sportsedge/nfl_situational_empirical.py",
+        "sha": "ea53ee161a7b8f32cced1c44f7322e795e4ddcbf"
       },
       "market": "safety",
       "readiness": "NO_CANONICAL_PRICING_PATH",
@@ -559,8 +645,10 @@
     {
       "blocker": "NO_ENGINE",
       "engine_ref": {
-        "branch": "grok/t242-nfl-team-defense-counts-20261023",
-        "sha": "de12685491ccb3139c6ca5f84b1f326aba671494"
+        "branch": "grok/t244-team-defense-cluster-20261023",
+        "cleared_head_sha": "9c2b0af35601711d1c2c79327e341f9435310ff5",
+        "engine_file": "sportsedge/nfl_team_defense_counts_empirical.py",
+        "sha": "9c2b0af35601711d1c2c79327e341f9435310ff5"
       },
       "market": "team_sacks",
       "readiness": "NO_CANONICAL_PRICING_PATH",
@@ -572,8 +660,10 @@
     {
       "blocker": "NO_ENGINE",
       "engine_ref": {
-        "branch": "grok/t242-nfl-team-defense-counts-20261023",
-        "sha": "de12685491ccb3139c6ca5f84b1f326aba671494"
+        "branch": "grok/t244-team-defense-cluster-20261023",
+        "cleared_head_sha": "9c2b0af35601711d1c2c79327e341f9435310ff5",
+        "engine_file": "sportsedge/nfl_team_defense_counts_empirical.py",
+        "sha": "9c2b0af35601711d1c2c79327e341f9435310ff5"
       },
       "market": "team_turnovers",
       "readiness": "NO_CANONICAL_PRICING_PATH",
@@ -586,6 +676,8 @@
       "blocker": "NO_ENGINE",
       "engine_ref": {
         "branch": "grok/t235-nfl-game-scoring-red-first-20261023",
+        "cleared_head_sha": "69ee54ec9bbbe0927e8dda064f40693d8c136a21",
+        "engine_file": "sportsedge/nfl_game_scoring_empirical.py",
         "sha": "69ee54ec9bbbe0927e8dda064f40693d8c136a21"
       },
       "market": "total_touchdowns",
@@ -599,6 +691,8 @@
       "blocker": "NO_ENGINE",
       "engine_ref": {
         "branch": "grok/t235-nfl-game-scoring-red-first-20261023",
+        "cleared_head_sha": "69ee54ec9bbbe0927e8dda064f40693d8c136a21",
+        "engine_file": "sportsedge/nfl_game_scoring_empirical.py",
         "sha": "69ee54ec9bbbe0927e8dda064f40693d8c136a21"
       },
       "market": "winning_margin_band",

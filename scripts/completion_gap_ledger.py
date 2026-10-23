@@ -40,29 +40,22 @@ REMOTE_ATTEMPTS = 4
 REMOTE_BACKOFF_S = 2.0
 
 
-def _github_resolver(branch: str, sha: str, *, sleep=None) -> str:
-    """'on_branch' if sha is the head of, or an ancestor of, the remote branch.
-
-    Unauthenticated rate-limit 403s are retried a bounded number of times;
-    anything still unavailable fails closed with REMOTE_CHECK_UNAVAILABLE.
-    """
+def _github_get(url: str, *, sleep=None):
+    """(http_status, json_or_None). 404/422 -> (code, None). Rate-limit 403/429 retried
+    a bounded number of times; anything else unavailable fails closed."""
     import time
     import urllib.error
-    import urllib.parse
     import urllib.request
     sleep = sleep or time.sleep
-    url = (f"https://api.github.com/repos/{REMOTE_REPO}/compare/"
-           f"{sha}...{urllib.parse.quote(branch, safe='/')}")
     req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json",
                                                "User-Agent": "sportsedge-completion-gap-ledger/1"})
     for attempt in range(REMOTE_ATTEMPTS):
         try:
             with urllib.request.urlopen(req, timeout=30) as r:
-                status = json.load(r).get("status")
-            return "on_branch" if status in ("identical", "ahead") else "missing"
+                return 200, json.load(r)
         except urllib.error.HTTPError as e:
             if e.code in (404, 422):
-                return "missing"
+                return e.code, None
             limited = e.code in (403, 429) and e.headers.get("x-ratelimit-remaining") == "0"
             if not limited or attempt == REMOTE_ATTEMPTS - 1:
                 raise LedgerRefusal(f"REMOTE_CHECK_UNAVAILABLE:{e.code}") from None
@@ -73,21 +66,66 @@ def _github_resolver(branch: str, sha: str, *, sleep=None) -> str:
     raise LedgerRefusal("REMOTE_CHECK_UNAVAILABLE")
 
 
-def verify_branch_shas(policy: dict, *, resolver=None) -> list:
-    """Check every grok_branch_engines SHA is a real commit on its remote branch."""
+def _github_resolver(branch: str, sha: str, *, sleep=None) -> str:
+    """'head' only if sha IS the remote branch HEAD (compare status identical);
+    'ancestor' if the branch has moved past it; otherwise 'missing'."""
+    import urllib.parse
+    code, body = _github_get(f"https://api.github.com/repos/{REMOTE_REPO}/compare/"
+                             f"{sha}...{urllib.parse.quote(branch, safe='/')}", sleep=sleep)
+    status = (body or {}).get("status") if code == 200 else None
+    return {"identical": "head", "ahead": "ancestor"}.get(status, "missing")
+
+
+def _repo_has_file(path: str, ref: str) -> bool:
+    import urllib.parse
+    code, _ = _github_get(f"https://api.github.com/repos/{REMOTE_REPO}/contents/"
+                          f"{urllib.parse.quote(path)}?ref={urllib.parse.quote(ref, safe='')}")
+    return code == 200
+
+
+def _main_has_file(path: str) -> bool:
+    """True if the engine file exists on main, i.e. the engine has been merged."""
+    return _repo_has_file(path, "main")
+
+
+_GROK_KEYS = ("grok_branch_engines", "grok_branch_screen_engines")
+
+
+def _grok_entries(policy: dict):
+    for key in _GROK_KEYS:
+        for sport, entries in policy.get(key, {}).items():
+            for market, e in entries.items():
+                yield key, sport, market, e
+
+
+def verify_branch_shas(policy: dict, *, resolver=None, file_resolver=None) -> list:
+    """Every cited SHA must equal its cleared_head_sha and be exactly the remote
+    branch HEAD; the cited engine_file must exist at that SHA."""
     resolver = resolver or _github_resolver
-    pairs = set()
-    for sport, entries in policy.get("grok_branch_engines", {}).items():
-        for market, e in entries.items():
-            branch, sha = e.get("branch"), e.get("sha")
-            if not isinstance(branch, str) or not branch.startswith("grok/"):
-                raise LedgerRefusal(f"GROK_BRANCH_REQUIRED:{market}")
-            if not isinstance(sha, str) or len(sha) != 40 or not set(sha) <= _HEX:
-                raise LedgerRefusal(f"GROK_BRANCH_SHA_MALFORMED:{market}")
-            pairs.add((branch, sha))
+    pairs, files = set(), set()
+    for _key, _sport, market, e in _grok_entries(policy):
+        branch, sha = e.get("branch"), e.get("sha")
+        if not isinstance(branch, str) or not branch.startswith("grok/"):
+            raise LedgerRefusal(f"GROK_BRANCH_REQUIRED:{market}")
+        if not isinstance(sha, str) or len(sha) != 40 or not set(sha) <= _HEX:
+            raise LedgerRefusal(f"GROK_BRANCH_SHA_MALFORMED:{market}")
+        if e.get("cleared_head_sha") != sha:
+            raise LedgerRefusal(f"GROK_BRANCH_SHA_NOT_CLEARED_HEAD:{market}")
+        f = e.get("engine_file")
+        if not isinstance(f, str) or not f.startswith("sportsedge/") or not f.endswith(".py"):
+            raise LedgerRefusal(f"ENGINE_FILE_REQUIRED:{market}")
+        pairs.add((branch, sha)); files.add((f, sha))
     for branch, sha in sorted(pairs):
-        if resolver(branch, sha) != "on_branch":
+        got = resolver(branch, sha)
+        if got == "ancestor":
+            raise LedgerRefusal(f"GROK_BRANCH_SHA_NOT_HEAD:{branch}@{sha}")
+        if got != "head":
             raise LedgerRefusal(f"GROK_BRANCH_SHA_NOT_ON_REMOTE:{branch}@{sha}")
+    if file_resolver is not None or resolver is _github_resolver:
+        has = file_resolver or _repo_has_file
+        for f, sha in sorted(files):
+            if not has(f, sha):
+                raise LedgerRefusal(f"ENGINE_FILE_NOT_AT_SHA:{f}@{sha}")
     return sorted(pairs)
 
 
@@ -175,7 +213,7 @@ def _covering(policy: dict, sport: str, market: str):
     return out
 
 
-def _engine(row: dict, policy: dict):
+def _engine(row: dict, policy: dict, merged_files=frozenset()):
     code = policy.get("existing_engine_code", {}).get(row["sport"], {}).get(row["market"])
     if code is not None:
         text = (ROOT / code["path"]).read_text(encoding="utf-8")
@@ -187,11 +225,13 @@ def _engine(row: dict, policy: dict):
         return "ENGINE_EXISTS_NOT_WIRED", res["engine"]
     branch = policy.get("grok_branch_engines", {}).get(row["sport"], {}).get(row["market"])
     if branch is not None:
+        if branch.get("engine_file") in merged_files:
+            return "ENGINE_MERGED_TO_MAIN_NOT_WIRED", dict(branch)
         return "ENGINE_ON_GROK_BRANCH_NOT_MERGED", dict(branch)
     return "BUILDABLE", None
 
 
-def classify(row: dict, policy: dict) -> dict | None:
+def classify(row: dict, policy: dict, *, merged_files=frozenset()) -> dict | None:
     if row.get("validated_accuracy_in_this_audit") is not False:
         raise LedgerRefusal("INPUT_CLAIMS_VALIDATION")
     blocker, readiness = row.get("blocker"), row.get("readiness")
@@ -208,7 +248,7 @@ def classify(row: dict, policy: dict) -> dict | None:
     elif blocker in _BLOCKERS:
         area, status = _BLOCKERS[blocker]
         if blocker == "NO_ENGINE":
-            status, engine_ref = _engine(row, policy)
+            status, engine_ref = _engine(row, policy, merged_files)
     else:
         raise LedgerRefusal(f"UNKNOWN_BLOCKER:{blocker}")
     record = None
@@ -222,9 +262,13 @@ def classify(row: dict, policy: dict) -> dict | None:
         covered = _covering(policy, row["sport"], row["market"])
         if covered:
             status, record = "COVERED_BY_COMMITTED_FROZEN_INSTRUMENT", covered
-    return {"sport": row["sport"], "market": row["market"], "blocker": blocker,
-            "readiness": readiness, "score_area": area, "status": status,
-            "engine_ref": engine_ref, "record": record}
+    out = {"sport": row["sport"], "market": row["market"], "blocker": blocker,
+           "readiness": readiness, "score_area": area, "status": status,
+           "engine_ref": engine_ref, "record": record}
+    screen = policy.get("grok_branch_screen_engines", {}).get(row["sport"], {}).get(row["market"])
+    if screen is not None:  # annotation only: never changes status
+        out["screen_engine"] = {**screen, "merged_to_main": screen["engine_file"] in merged_files}
+    return out
 
 
 def gap_ledger(*, root: Path = ROOT, offline: bool = False) -> dict:
@@ -235,12 +279,15 @@ def gap_ledger(*, root: Path = ROOT, offline: bool = False) -> dict:
     policy = json.loads((root / "config" / "completion_gap_policy_v1.json").read_text(encoding="utf-8"))
     if policy.get("schema") != "SPORTSEDGE_COMPLETION_GAP_POLICY_V2":
         raise LedgerRefusal("POLICY_SCHEMA")
+    merged = frozenset()
     if not offline:
         verify_branch_shas(policy)
+        merged = frozenset(f for f in sorted({e["engine_file"] for *_, e in _grok_entries(policy)})
+                           if _main_has_file(f))
     report = accuracy_readiness(root=root)
     if report.get("validated_families_conferred") != 0 or report.get("play_authority_conferred") is not False:
         raise LedgerRefusal("UPSTREAM_CONFERS_AUTHORITY")
-    gaps = [g for g in (classify(r, policy) for r in report["canonical_markets"]) if g]
+    gaps = [g for g in (classify(r, policy, merged_files=merged) for r in report["canonical_markets"]) if g]
     gaps.sort(key=lambda g: (g["score_area"], g["status"], g["sport"], g["market"]))
     return {
         "schema": SCHEMA,

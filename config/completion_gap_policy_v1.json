@@ -63,52 +63,141 @@
   "grok_branch_engines": {
     "NFL": {
       "both_teams_to_score_n": {
-        "branch": "grok/t243-nfl-situational-20261023",
-        "sha": "a5012ea8ce0cfc45f9b95801c8803d1ab7d24a2b"
+        "branch": "grok/t247-situational-price-guard-20261023",
+        "cleared_head_sha": "ea53ee161a7b8f32cced1c44f7322e795e4ddcbf",
+        "engine_file": "sportsedge/nfl_situational_empirical.py",
+        "sha": "ea53ee161a7b8f32cced1c44f7322e795e4ddcbf"
       },
       "defensive_special_teams_td": {
-        "branch": "grok/t243-nfl-situational-20261023",
-        "sha": "a5012ea8ce0cfc45f9b95801c8803d1ab7d24a2b"
+        "branch": "grok/t247-situational-price-guard-20261023",
+        "cleared_head_sha": "ea53ee161a7b8f32cced1c44f7322e795e4ddcbf",
+        "engine_file": "sportsedge/nfl_situational_empirical.py",
+        "sha": "ea53ee161a7b8f32cced1c44f7322e795e4ddcbf"
       },
       "first_score": {
-        "branch": "grok/t243-nfl-situational-20261023",
-        "sha": "a5012ea8ce0cfc45f9b95801c8803d1ab7d24a2b"
+        "branch": "grok/t247-situational-price-guard-20261023",
+        "cleared_head_sha": "ea53ee161a7b8f32cced1c44f7322e795e4ddcbf",
+        "engine_file": "sportsedge/nfl_situational_empirical.py",
+        "sha": "ea53ee161a7b8f32cced1c44f7322e795e4ddcbf"
       },
       "largest_lead": {
-        "branch": "grok/t243-nfl-situational-20261023",
-        "sha": "a5012ea8ce0cfc45f9b95801c8803d1ab7d24a2b"
+        "branch": "grok/t247-situational-price-guard-20261023",
+        "cleared_head_sha": "ea53ee161a7b8f32cced1c44f7322e795e4ddcbf",
+        "engine_file": "sportsedge/nfl_situational_empirical.py",
+        "sha": "ea53ee161a7b8f32cced1c44f7322e795e4ddcbf"
       },
       "longest_fg_made": {
         "branch": "grok/t235-nfl-longest-fg-red-first-20261023",
+        "cleared_head_sha": "96dd3ef24643228961dd926f20ffe56c7aff0408",
+        "engine_file": "sportsedge/nfl_longest_fg_empirical.py",
         "sha": "96dd3ef24643228961dd926f20ffe56c7aff0408"
       },
       "race_to_n_points": {
         "branch": "grok/t235-nfl-game-scoring-red-first-20261023",
+        "cleared_head_sha": "69ee54ec9bbbe0927e8dda064f40693d8c136a21",
+        "engine_file": "sportsedge/nfl_game_scoring_empirical.py",
         "sha": "69ee54ec9bbbe0927e8dda064f40693d8c136a21"
       },
       "safety": {
-        "branch": "grok/t243-nfl-situational-20261023",
-        "sha": "a5012ea8ce0cfc45f9b95801c8803d1ab7d24a2b"
+        "branch": "grok/t247-situational-price-guard-20261023",
+        "cleared_head_sha": "ea53ee161a7b8f32cced1c44f7322e795e4ddcbf",
+        "engine_file": "sportsedge/nfl_situational_empirical.py",
+        "sha": "ea53ee161a7b8f32cced1c44f7322e795e4ddcbf"
       },
       "team_sacks": {
-        "branch": "grok/t242-nfl-team-defense-counts-20261023",
-        "sha": "de12685491ccb3139c6ca5f84b1f326aba671494"
+        "branch": "grok/t244-team-defense-cluster-20261023",
+        "cleared_head_sha": "9c2b0af35601711d1c2c79327e341f9435310ff5",
+        "engine_file": "sportsedge/nfl_team_defense_counts_empirical.py",
+        "sha": "9c2b0af35601711d1c2c79327e341f9435310ff5"
       },
       "team_turnovers": {
-        "branch": "grok/t242-nfl-team-defense-counts-20261023",
-        "sha": "de12685491ccb3139c6ca5f84b1f326aba671494"
+        "branch": "grok/t244-team-defense-cluster-20261023",
+        "cleared_head_sha": "9c2b0af35601711d1c2c79327e341f9435310ff5",
+        "engine_file": "sportsedge/nfl_team_defense_counts_empirical.py",
+        "sha": "9c2b0af35601711d1c2c79327e341f9435310ff5"
       },
       "total_touchdowns": {
         "branch": "grok/t235-nfl-game-scoring-red-first-20261023",
+        "cleared_head_sha": "69ee54ec9bbbe0927e8dda064f40693d8c136a21",
+        "engine_file": "sportsedge/nfl_game_scoring_empirical.py",
         "sha": "69ee54ec9bbbe0927e8dda064f40693d8c136a21"
       },
       "winning_margin_band": {
         "branch": "grok/t235-nfl-game-scoring-red-first-20261023",
+        "cleared_head_sha": "69ee54ec9bbbe0927e8dda064f40693d8c136a21",
+        "engine_file": "sportsedge/nfl_game_scoring_empirical.py",
         "sha": "69ee54ec9bbbe0927e8dda064f40693d8c136a21"
       }
     }
   },
-  "note": "Every pause/hold entry cites its record. ENGINE_EXISTS_NOT_WIRED = engine code on main (canonical_coverage engine reference or existing_engine_code) but blocked on the canonical path. ENGINE_ON_GROK_BRANCH_NOT_MERGED = engine only on an unmerged grok/ branch; merging is the owner's call.",
+  "grok_branch_screen_engines": {
+    "NFL": {
+      "first_half_moneyline": {
+        "branch": "grok/t249-period-quarter-spreads-refused-20261023",
+        "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
+        "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "refusals": "none",
+        "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
+      },
+      "first_half_spread": {
+        "branch": "grok/t249-period-quarter-spreads-refused-20261023",
+        "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
+        "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "refusals": "none",
+        "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
+      },
+      "first_half_total": {
+        "branch": "grok/t249-period-quarter-spreads-refused-20261023",
+        "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
+        "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "refusals": "none",
+        "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
+      },
+      "quarter_moneyline": {
+        "branch": "grok/t249-period-quarter-spreads-refused-20261023",
+        "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
+        "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "refusals": "Q1-Q4 NAIVE_FAIL:Qn_MONEYLINE",
+        "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
+      },
+      "quarter_spread": {
+        "branch": "grok/t249-period-quarter-spreads-refused-20261023",
+        "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
+        "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "refusals": "Q1-Q4 NAIVE_FAIL:Qn_MONEYLINE_DERIVABLE (Grok ruling 2026-10-23 Option 1)",
+        "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
+      },
+      "quarter_total": {
+        "branch": "grok/t249-period-quarter-spreads-refused-20261023",
+        "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
+        "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "refusals": "Q1/Q3/Q4 NAIVE_FAIL:Qn_TOTAL; Q2 priced",
+        "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
+      },
+      "second_half_moneyline": {
+        "branch": "grok/t249-period-quarter-spreads-refused-20261023",
+        "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
+        "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "refusals": "none",
+        "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
+      },
+      "second_half_spread": {
+        "branch": "grok/t249-period-quarter-spreads-refused-20261023",
+        "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
+        "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "refusals": "none",
+        "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
+      },
+      "second_half_total": {
+        "branch": "grok/t249-period-quarter-spreads-refused-20261023",
+        "cleared_head_sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd",
+        "engine_file": "sportsedge/nfl_period_lines_empirical.py",
+        "refusals": "none",
+        "sha": "2399e92bbcf4793620d6d79b4b09184377c0f6bd"
+      }
+    }
+  },
+  "note": "Every pause/hold entry cites its record. ENGINE_EXISTS_NOT_WIRED = engine code on main (canonical_coverage engine reference or existing_engine_code) but blocked on the canonical path. ENGINE_ON_GROK_BRANCH_NOT_MERGED = engine only on an unmerged grok/ branch; merging is the owner's call. Each grok-branch entry's sha must equal its cleared_head_sha and be exactly the remote branch HEAD (cleared_head_sha records the head cited for this ledger; the ledger itself asserts no clearance). ENGINE_MERGED_TO_MAIN_NOT_WIRED = the cited engine_file exists on main (checked online). grok_branch_screen_engines annotate rows whose status comes from a main engine; they never change status.",
   "owner_held_markets": {
     "MLB": {
       "EITHER_PITCHER_BB": "docs/decisions/GROK_RULINGS_20261023.md#owner-hold-either-pitcher-20261015",
