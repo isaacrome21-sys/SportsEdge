@@ -1,28 +1,50 @@
 """Guard so screen-only (unrestricted) pricers cannot run outside a screen.
 
 Unrestricted pricers include families that failed their naive screen. They may
-run only inside ``with screen_only():`` entered from a file under ``research/``
-or ``tests/``; anywhere else they refuse with SCREEN_ONLY_GUARD.
+run only inside ``with screen_only():`` entered from a real file under
+``research/`` or ``tests/``; anywhere else they refuse with SCREEN_ONLY_GUARD.
 
-Hardening (t255, fixes the fresh auditor's five t253/t254 bypasses):
-* ``screen_only()`` walks the call stack and refuses unless the entering file
-  (first frame outside this module and contextlib) is under research/ or tests/.
-* The live state is held in a closure, not a module attribute. ``_ACTIVE`` is
-  kept only as an inert decoy: setting it from outside opens nothing.
-* ``require_screen_only()`` re-walks the stack at pricing time: the recorded
-  entry frame must still be on the current stack and still be under
-  research/ or tests/. A flag left set after the screen frame is gone refuses.
+Checks (t255 + t256, fixing the fresh auditor's bypasses):
+* Entry: the entering frame (first frame outside this module/contextlib) must be
+  a file under research/ or tests/ that EXISTS on disk, whose globals are a real
+  imported module's (or __main__'s) and name that same file, and whose real source line at the frame's current line
+  calls screen_only (defeats ``compile(src, "research/fake.py")`` spoofs).
+  Every frame ABOVE the entry that lives in the repo must also be under
+  research/ or tests/, so a research/ helper called from sportsedge/ or
+  scripts/ is refused.
+* State lives in a closure; ``_ACTIVE`` is an inert decoy.
+* Pricing time: the recorded entry frame must still be on the live stack and
+  every repo frame between the entry and the pricer must be under research/ or
+  tests/, or be guard / registered pricer internals (a sportsedge/ lambda
+  passed into a research helper is refused).
+* This module refuses attribute replacement of its public names, and pricers
+  call ``checked_require()`` which compares the guard function to a pinned
+  reference.
+
+ACCEPTED RESIDUAL (Grok ruling D, 2026-10-23): an in-process Python guard
+cannot stop a determined caller (closure/``__dict__``/frame reflection,
+ctypes, editing files). This guard prevents MISTAKES, not determined bypasses.
+Cheap tamper detection is still tested.
 """
 from __future__ import annotations
 
+import linecache
+import os
 import sys
+import types
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[1]
 _ALLOWED_TOPS = ("research", "tests")
+_NON_REPO_TOPS = (".venv", "venv", "site-packages")
 _THIS = str(Path(__file__).resolve())
+PRICER_INTERNALS = frozenset({
+    "sportsedge/nfl_period_lines_empirical.py",
+    "sportsedge/nfl_situational_empirical.py",
+    "sportsedge/week_cluster_bootstrap.py",
+})
 
 # Inert decoy kept so old code that pokes the attribute gets no effect.
 _ACTIVE: ContextVar[bool] = ContextVar("sportsedge_screen_only_decoy", default=False)
@@ -32,14 +54,18 @@ class ScreenOnlyGuardError(RuntimeError):
     pass
 
 
-def _allowed_file(filename: str) -> bool:
+def _rel(filename: str):
     if not filename or filename.startswith("<"):
-        return False
+        return None
     try:
-        rel = Path(filename).resolve().relative_to(_ROOT)
+        return Path(filename).resolve().relative_to(_ROOT)
     except (ValueError, OSError):
-        return False
-    return len(rel.parts) > 1 and rel.parts[0] in _ALLOWED_TOPS
+        return None
+
+
+def _allowed_file(filename: str) -> bool:
+    rel = _rel(filename)
+    return rel is not None and len(rel.parts) > 1 and rel.parts[0] in _ALLOWED_TOPS
 
 
 def _is_internal(frame) -> bool:
@@ -49,7 +75,42 @@ def _is_internal(frame) -> bool:
             return True
     except OSError:
         pass
-    return fn.endswith(("contextlib.py",))
+    return fn.endswith("contextlib.py")
+
+
+def _repo_frame_ok(frame, *, pricer_ok: bool) -> bool:
+    rel = _rel(frame.f_code.co_filename)
+    if rel is None or rel.parts[0] in _NON_REPO_TOPS:
+        return True  # stdlib / site-packages / pytest machinery
+    if rel.parts[0] in _ALLOWED_TOPS or _is_internal(frame):
+        return True
+    return pricer_ok and rel.as_posix() in PRICER_INTERNALS
+
+
+def _genuine(frame) -> bool:
+    fn = frame.f_code.co_filename
+    if not os.path.isfile(fn):
+        return False
+    gfile = frame.f_globals.get("__file__")
+    try:
+        if not gfile or Path(gfile).resolve() != Path(fn).resolve():
+            return False
+    except OSError:
+        return False
+    mod = sys.modules.get(frame.f_globals.get("__name__", ""))
+    if mod is None or getattr(mod, "__dict__", None) is not frame.f_globals:
+        return False  # globals must belong to a real imported module (or __main__)
+    linecache.checkcache(fn)
+    if "screen_only" not in linecache.getline(fn, frame.f_lineno):
+        return False
+    name = frame.f_code.co_name
+    if name not in ("<module>", "<lambda>") and not name.startswith("<"):
+        if f"def {name}" not in linecache.getline(fn, frame.f_code.co_firstlineno):
+            # decorated defs: firstlineno is the decorator line; scan a few lines
+            first = frame.f_code.co_firstlineno
+            if not any(f"def {name}" in linecache.getline(fn, first + k) for k in range(1, 6)):
+                return False
+    return True
 
 
 def _entering_frame():
@@ -68,6 +129,14 @@ def _make():
         if entry is None or not _allowed_file(entry.f_code.co_filename):
             where = "?" if entry is None else entry.f_code.co_filename
             raise ScreenOnlyGuardError(f"SCREEN_ONLY_GUARD:ENTRY_OUTSIDE_RESEARCH_OR_TESTS:{Path(where).name}")
+        if not _genuine(entry):
+            raise ScreenOnlyGuardError("SCREEN_ONLY_GUARD:ENTRY_NOT_GENUINE_FILE")
+        f = entry.f_back
+        while f is not None:
+            if not _repo_frame_ok(f, pricer_ok=False):
+                raise ScreenOnlyGuardError(
+                    f"SCREEN_ONLY_GUARD:ENTERED_FROM_OUTSIDE_RESEARCH_OR_TESTS:{Path(f.f_code.co_filename).name}")
+            f = f.f_back
         token = state.set(state.get() + (entry,))
         try:
             yield
@@ -78,13 +147,14 @@ def _make():
         entries = state.get()
         if not entries:
             raise ScreenOnlyGuardError(f"SCREEN_ONLY_GUARD:{what}")
-        live = set()
-        f = sys._getframe(1)
-        while f is not None:
-            live.add(id(f))
-            f = f.f_back
         entry = entries[-1]
-        if id(entry) not in live or not _allowed_file(entry.f_code.co_filename):
+        f = sys._getframe(1)
+        while f is not None and f is not entry:
+            if not _repo_frame_ok(f, pricer_ok=True):
+                raise ScreenOnlyGuardError(
+                    f"SCREEN_ONLY_GUARD:FOREIGN_FRAME_BETWEEN_ENTRY_AND_PRICER:{Path(f.f_code.co_filename).name}:{what}")
+            f = f.f_back
+        if f is None or not _allowed_file(entry.f_code.co_filename):
             raise ScreenOnlyGuardError(f"SCREEN_ONLY_GUARD:STACK_CHECK_FAILED:{what}")
 
     return screen_only, require_screen_only
@@ -92,3 +162,38 @@ def _make():
 
 screen_only, require_screen_only = _make()
 del _make
+_PINNED_REQUIRE = require_screen_only
+_PINNED_ENTER = screen_only
+
+
+def checked_require(what: str) -> None:
+    """Pricers call this: refuses if the guard function was replaced."""
+    mod = sys.modules.get(__name__)
+    fn = getattr(mod, "require_screen_only", None)
+    if fn is not _PINNED_REQUIRE or getattr(mod, "screen_only", None) is not _PINNED_ENTER:
+        raise ScreenOnlyGuardError(f"SCREEN_ONLY_GUARD:GUARD_TAMPERED:{what}")
+    _PINNED_REQUIRE(what)
+
+
+class LockedModule(types.ModuleType):
+    """Refuse rebinding/deleting the names listed in ``__locked__``."""
+
+    def __setattr__(self, name, value):
+        if name in self.__dict__.get("__locked__", ()):
+            raise ScreenOnlyGuardError(f"SCREEN_ONLY_GUARD:LOCKED_ATTRIBUTE:{name}")
+        super().__setattr__(name, value)
+
+    def __delattr__(self, name):
+        if name in self.__dict__.get("__locked__", ()):
+            raise ScreenOnlyGuardError(f"SCREEN_ONLY_GUARD:LOCKED_ATTRIBUTE:{name}")
+        super().__delattr__(name)
+
+
+def lock_module(name: str, names) -> None:
+    mod = sys.modules[name]
+    mod.__dict__["__locked__"] = frozenset(names)
+    mod.__class__ = LockedModule
+
+
+lock_module(__name__, {"screen_only", "require_screen_only", "checked_require",
+                       "_PINNED_REQUIRE", "_PINNED_ENTER", "lock_module", "__locked__"})

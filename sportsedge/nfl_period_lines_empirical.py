@@ -28,10 +28,11 @@ Research only.
 """
 from __future__ import annotations
 
+import hashlib
 import math
 from typing import Any, Iterable, Mapping
 
-from sportsedge.screen_only_guard import require_screen_only
+from sportsedge.screen_only_guard import ScreenOnlyGuardError, checked_require, lock_module, require_screen_only
 
 ENGINE_ID = "NFL_PERIOD_LINES_EMPIRICAL"
 ENGINE_VERSION = "nfl_period_lines_empirical_v1_20261023"
@@ -45,6 +46,16 @@ MIN_TEAM_GAMES = 3
 # screen_results_v1.json; they refuse with a coded NAIVE_FAIL instead of pricing.
 NAIVE_FAIL_FAMILIES = frozenset({"Q1_MONEYLINE", "Q2_MONEYLINE", "Q3_MONEYLINE",
                                  "Q4_MONEYLINE", "Q1_TOTAL", "Q3_TOTAL", "Q4_TOTAL"})
+# t256: pinned sha256 of the sorted family list; every read is checked (ruling C).
+_NAIVE_FAIL_SHA256 = "ec535bb6e87d2f3fa9b6cd3988a625f3f5183c51f9edc7b33e086855935df678"
+
+
+def _naive_fail():
+    v = globals().get("NAIVE_FAIL_FAMILIES")
+    if not isinstance(v, frozenset) or hashlib.sha256(
+            "\n".join(sorted(v)).encode()).hexdigest() != _NAIVE_FAIL_SHA256:
+        raise ScreenOnlyGuardError("SCREEN_ONLY_GUARD:NAIVE_FAIL_FAMILIES_TAMPERED")
+    return v
 
 
 class NflPeriodLinesError(ValueError):
@@ -120,7 +131,7 @@ def _price_period(history: Iterable[Mapping[str, Any]], *, date: str, season: in
     if not isinstance(allow_refused, bool):
         raise NflPeriodLinesError("ALLOW_REFUSED_MUST_BE_BOOL")
     if allow_refused:
-        require_screen_only("_price_period(allow_refused=True)")
+        checked_require("_price_period(allow_refused=True)")
     if period not in PERIODS:
         raise NflPeriodLinesError(f"UNKNOWN_PERIOD:{period}")
     if isinstance(season, bool) or not isinstance(season, int):
@@ -167,11 +178,11 @@ def _price_period(history: Iterable[Mapping[str, Any]], *, date: str, season: in
     if allow_refused:
         return out
     refused = {}
-    if f"{period.upper()}_TOTAL" in NAIVE_FAIL_FAMILIES:
+    if f"{period.upper()}_TOTAL" in _naive_fail():
         del out["total_pmf"]
         refused["total"] = f"NAIVE_FAIL:{period.upper()}_TOTAL"
     ml_fam = f"{period.upper()}_MONEYLINE"
-    if ml_fam in NAIVE_FAIL_FAMILIES:
+    if ml_fam in _naive_fail():
         # Everything that can rebuild the refused moneyline goes: the 3-way price, the
         # full margin pmf, and the team means (mean shift + public history = margin pmf).
         for key in ("moneyline_3way", "margin_pmf", "mu_home", "mu_away"):
@@ -212,7 +223,7 @@ def total_probs(priced: dict, line) -> dict:
     """P(over / push / under) for a period total line."""
     L = _line(line)
     period = _period_of(priced)
-    if f"{period.upper()}_TOTAL" in NAIVE_FAIL_FAMILIES and not priced.get("screen_only_unrestricted"):
+    if f"{period.upper()}_TOTAL" in _naive_fail() and not priced.get("screen_only_unrestricted"):
         raise NflPeriodLinesError(f"NAIVE_FAIL:{period.upper()}_TOTAL")
     if "total_pmf" not in priced:
         raise NflPeriodLinesError(priced.get("refused", {}).get("total", "TOTAL_PMF_MISSING"))
@@ -226,7 +237,7 @@ def spread_probs(priced: dict, home_line) -> dict:
     L = _line(home_line)
     period = _period_of(priced)
     ml_fam = f"{period.upper()}_MONEYLINE"
-    if ml_fam in NAIVE_FAIL_FAMILIES:
+    if ml_fam in _naive_fail():
         # Every quarter spread is refused (Grok ruling 2026-10-23, Option 1): with the
         # public history, any spread price rebuilds the refused moneyline.
         raise NflPeriodLinesError(f"NAIVE_FAIL:{ml_fam}_DERIVABLE")
@@ -236,3 +247,8 @@ def spread_probs(priced: dict, home_line) -> dict:
     return {"home": sum(p for k, p in pmf.items() if k + L > 0),
             "push": sum(p for k, p in pmf.items() if k + L == 0),
             "away": sum(p for k, p in pmf.items() if k + L < 0)}
+
+
+# t256: refuse rebinding the guard hook and the refused-family set (rulings B, C).
+lock_module(__name__, {"NAIVE_FAIL_FAMILIES", "_NAIVE_FAIL_SHA256", "_naive_fail",
+                       require_screen_only.__name__, checked_require.__name__, lock_module.__name__})
