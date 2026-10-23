@@ -1,0 +1,29 @@
+# Candidate A (NBA CDN) admission battery - probe only.
+# Raw provider payloads are uploaded as a run artifact ONLY and are never
+# committed. A green run means the battery executed; the admission verdict
+# lives in the artifact's verdict.json (passing is not admission - design
+# section 6 still requires independent verification and an owner ruling).
+name: nba-cdn-admission-probe
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  battery:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Run NBA CDN admission battery (Candidate A, PR #2474 design)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 research/nba_props_forward_20261020/nba_cdn_admission_battery.py \
+            --out nba_cdn_admission_evidence
+      - name: Upload admission evidence artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nba-cdn-admission-evidence
+          path: nba_cdn_admission_evidence
+          if-no-files-found: error
