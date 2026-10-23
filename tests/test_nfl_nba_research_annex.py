@@ -1,5 +1,6 @@
 """Synthetic-only regression probes for the operator-pinned RUN IT annex."""
 from datetime import datetime, timezone
+from unittest.mock import patch
 
 from sportsedge.research.nfl_nba_engine_card_annex import (
     build_annex, content_hash,
@@ -67,6 +68,32 @@ def test_nfl_targets_real_engine_priced_without_gate_lift():
         assert 0 <= readout["projection"]["p_over"] <= 1
 
 
+def test_nfl_count_push_mass_survives_research_annex_without_authority():
+    # The repaired NFL O/U engine no longer folds an integer-line push into
+    # the UNDER side. Do not silently drop that mass at the annex boundary.
+    rows = _quotes("NFL", "TARGETS", player_id="p1")
+    for row in rows:
+        row["line"] = 9.0
+    synthetic_engine = {
+        "status": "PRICED", "engine": "NFL_PROP_ENGINES_V1",
+        "mu": 9.1, "p_over": 0.4, "p_push": 0.1,
+        "p_under": 0.5, "games_logged": 6,
+    }
+    with patch("sportsedge.nfl_prop_engines_v1.price_nfl_prop",
+               return_value=synthetic_engine):
+        result = build_annex(rows, [{"status": "BLOCKED"}] * 2,
+                             **_kwargs("NFL", _nfl_history()))
+    assert len(result["readouts"]) == 2
+    for readout in result["readouts"]:
+        probs = readout["projection"]
+        assert (probs["p_over"], probs["p_push"], probs["p_under"]) == \
+            (0.4, 0.1, 0.5)
+        assert sum(probs[key] for key in ("p_over", "p_push", "p_under")) == 1.0
+        assert readout["status"] == "RESEARCH_ESTIMATE_UNVALIDATED"
+        assert readout["eligible"] is False
+        assert readout["play_authority"] is False
+
+
 def test_history_pin_mismatch_fail_closed():
     rows = _quotes("NFL", "TARGETS", player_id="p1")
     kw = _kwargs("NFL", _nfl_history())
@@ -84,10 +111,41 @@ def test_missing_pair_stale_and_untrusted_book_refuse():
     old = [dict(r, quote_captured_at="2026-10-20T19:45:00Z")
            for r in rows]
     stale = build_annex(old, [{}, {}], **kw)
-    assert stale["readouts"][0]["reason"] == "DK_PAIR_MISSING_OR_STALE"
+    assert stale["readouts"][0]["reason"] == "DK_SOURCE_ROW_STALE_OR_FUTURE"
     fake = [dict(r, book="OtherBook") for r in rows]
     untrusted = build_annex(fake, [{}, {}], **kw)
     assert untrusted["readouts"][0]["reason"] == "DRAFTKINGS_QUOTE_REQUIRED"
+
+
+def test_source_row_must_have_its_own_close_opposite_quote():
+    # A separate perfectly paired OVER/UNDER cannot rescue an early
+    # same-side row captured 150 seconds from the opposite side.
+    fresh = [dict(row, quote_captured_at="2026-10-20T19:59:30Z")
+             for row in _quotes("NFL", "TARGETS", player_id="p1")]
+    early = dict(fresh[0], quote_captured_at="2026-10-20T19:57:00Z")
+    rows = [early] + fresh
+    out = build_annex(rows, [{}] * 3, **_kwargs("NFL", _nfl_history()))
+    assert out["readouts"][0]["status"] == "REFUSED"
+    assert out["readouts"][0]["reason"] == "DK_PAIR_CAPTURE_SPAN_EXCEEDED"
+    assert all(r["status"] == "RESEARCH_ESTIMATE_UNVALIDATED"
+               for r in out["readouts"][1:])
+
+
+def test_stale_future_or_malformed_source_row_cannot_borrow_fresh_pair():
+    # Three matching rows: the first is invalid, but the other two form a
+    # valid DK two-sided pair. All three inputs are independently assessed.
+    fresh = _quotes("NFL", "TARGETS", player_id="p1")
+    for bad_stamp in ("2026-10-20T19:50:00Z",
+                      "2026-10-20T20:00:01Z", "not-an-instant"):
+        bad = dict(fresh[0], quote_captured_at=bad_stamp)
+        rows = [bad] + fresh
+        out = build_annex(rows, [{}] * len(rows),
+                          **_kwargs("NFL", _nfl_history()))
+        assert out["readouts"][0]["status"] == "REFUSED"
+        assert out["readouts"][0]["reason"] == "DK_SOURCE_ROW_STALE_OR_FUTURE"
+        for readout in out["readouts"][1:]:
+            assert readout["status"] == "RESEARCH_ESTIMATE_UNVALIDATED"
+            assert readout["eligible"] is False
 
 
 def test_fixture_bound_and_tennessee_blocked():

@@ -97,6 +97,16 @@ def _pair_ok(rows, row, *, at, event_id, sport, market, player_id, line, default
         return "FINITE_DK_ODDS_REQUIRED"
     if str(row.get("source_quote_form") or "").upper() in {"MILESTONE_LADDER", "YES_ONLY"}:
         return "NATIVE_TWO_SIDED_QUOTES_REQUIRED"
+    # Validate the specific row being printed, even if other fresh rows
+    # can independently form a pair. Never launder an old/future quote
+    # into a research readout through a same-side duplicate.
+    try:
+        source_stamp = _instant(row.get("quote_captured_at"))
+    except (TypeError, ValueError):
+        return "DK_SOURCE_ROW_STALE_OR_FUTURE"
+    source_age = (at - source_stamp).total_seconds()
+    if source_age < 0 or source_age > 180:
+        return "DK_SOURCE_ROW_STALE_OR_FUTURE"
     matching = []
     for other in rows:
         if not isinstance(other, dict):
@@ -139,7 +149,11 @@ def _pair_ok(rows, row, *, at, event_id, sport, market, player_id, line, default
     unders = [s for side_name, s in matching if side_name == "UNDER"]
     if not overs or not unders:
         return "DK_PAIR_MISSING_OR_STALE"
-    if min(abs((o - u).total_seconds()) for o in overs for u in unders) > 120:
+    # A different valid pair must not rehabilitate this input row. The
+    # opposite side must be captured within 120s of this very source quote.
+    opposite_stamps = unders if side(row) == "OVER" else overs
+    if min(abs((source_stamp - stamp).total_seconds())
+           for stamp in opposite_stamps) > 120:
         return "DK_PAIR_CAPTURE_SPAN_EXCEEDED"
     return None
 
@@ -267,6 +281,9 @@ def build_annex(rows, evaluated, *, at, default_sport=None, history=None,
                           "family": NFL_FAMILIES[market],
                           "mean": estimate.get("mu"),
                           "p_over": estimate.get("p_over"),
+                          # Integer count lines have P(push)>0. Keep the
+                          # settlement mass visible: UNDER is not 1-OVER.
+                          "p_push": estimate.get("p_push"),
                           "p_under": estimate.get("p_under"),
                           "prior_games": estimate.get("games_logged")}
         else:
