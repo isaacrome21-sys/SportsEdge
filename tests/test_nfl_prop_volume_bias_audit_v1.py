@@ -54,8 +54,14 @@ class NFLPropVolumeAuditTests(unittest.TestCase):
                          {"hit": 0, "loss": 1, "push": 0})
         self.assertEqual(result["overall"]["direction_outcomes"]["OVER"],
                          {"hit": 0, "loss": 1, "push": 0})
-        self.assertAlmostEqual(result["overall"]["mean_model_minus_actual"],
-                               (-68 + 9 - 43.5) / 3)
+        # Passing yards and rush attempts have incompatible units.
+        self.assertIsNone(result["overall"]["mean_model_minus_actual"])
+        self.assertIsNone(result["overall"]["mean_model_minus_market"])
+        self.assertEqual(result["overall"]["mean_error_scope"], "MIXED_MARKETS_NOT_COMPARABLE")
+        self.assertAlmostEqual(result["by_market"]["PASSING_YARDS"]["mean_model_minus_actual"],
+                               (-68 - 43.5) / 2)
+        self.assertEqual(result["by_market"]["RUSH_ATTEMPTS"]["mean_model_minus_actual"], 9)
+        self.assertEqual(result["by_market"]["PASSING_YARDS"]["mean_error_scope"], "PER_MARKET")
         self.assertFalse(result["overall"]["one_direction_warning"])
         self.assertFalse(result["forward_validation_counted"])
         self.assertFalse(result["model_p_authority"])
@@ -93,6 +99,8 @@ class NFLPropVolumeAuditTests(unittest.TestCase):
         entry = row(quote_captured_at="2026-10-22T23:12:00Z")
         result = audit_nfl_prop_volume_bias([entry])
         self.assertEqual(result["overall"]["rows"], 1)
+        self.assertEqual(result["overall"]["mean_error_scope"], "PER_MARKET")
+        self.assertEqual(result["overall"]["mean_model_minus_actual"], -68)
 
     def test_results_are_postgame_receipted_not_presented_as_pregame_facts(self):
         with self.assertRaisesRegex(ValueError, "RESULT_BEFORE_GAME_START"):
@@ -175,6 +183,7 @@ class NFLPropVolumeAuditTests(unittest.TestCase):
         self.assertEqual(result["overall"]["rows"], 0)
         self.assertIsNone(result["overall"]["under_share"])
         self.assertIsNone(result["overall"]["mean_model_minus_actual"])
+        self.assertEqual(result["overall"]["mean_error_scope"], "NO_ROWS")
         self.assertEqual(result["market_admission"], "NOT_VERIFIED")
         self.assertTrue(result["research_only"])
 
