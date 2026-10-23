@@ -1,8 +1,8 @@
-# NFL props v1.1 — moved-line amendment (DRAFT, NOT FROZEN)
+# NFL props v1.1 — moved-line amendment (FROZEN 2026-10-22)
 
 Applies to: Part 2 (`PREREG_NFL_PROPS_PART2_FORWARD_V1.md`, #2396) and 2B
 (`PREREG_NFL_PROPS_PART2B_FORWARD_V1.md`, #2415). Owner ruling #1, 2026-10-22.
-The v1 documents and records are not edited. Status: draft for owner freeze.
+The v1 documents and records are not edited. Status: FROZEN by Rocky (Muse) at 2026-10-22 21:25:35 CDT (2026-10-23T02:25:35Z) — owner ruling #1 (2026-10-22) as amended by the owner the same evening; package cleared by independent re-review at commit 69274a7b9b650abb2ca03c191731eb08b0b64c71 with two minor notes, both applied in the freeze delta (see FREEZE_RECORD_20261022.md). Filename retains DRAFT because the cleared review cites this path; this status line and the freeze record govern.
 
 ## 1. Scope and effective date
 - Governs only rows whose kickoff is strictly after the v1.1 freeze timestamp.
@@ -28,6 +28,9 @@ The v1 documents and records are not edited. Status: draft for owner freeze.
   but none pre-kickoff) → CLOSE_STALE (two-sided pre-kickoff but all too old).
   A close without a timestamp is a hard error.
 - Direction uses only the final (latest) qualifying pre-kickoff capture.
+  A later capture that does not qualify — for example a later one-sided
+  close — is ignored for direction; it does not displace the latest
+  qualifying close.
 - CAPTURE_FAILURE: NO_CLOSE_ROW, CLOSE_SINGLE_SIDED, CLOSE_STALE, CLOSE_NOT_PREKICKOFF.
 - Any other close state is a hard error (fail closed).
 
