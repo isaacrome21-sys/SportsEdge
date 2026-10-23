@@ -14,7 +14,13 @@ if [ "$VENV_ABS" = "$REPO" ] || [ "${VENV_ABS#"$REPO"/}" != "$VENV_ABS" ]; then
   echo "VENV_INSIDE_REPO_REFUSED:$VENV_ABS" >&2
   exit 2
 fi
-python3 -m venv "$VENV_ABS"
+# --clear: never reuse an existing venv (stale extra packages would survive).
+python3 -m venv --clear "$VENV_ABS"
+if [ "${SPORTSEDGE_PINNED_VENV_CREATE_ONLY:-}" = "1" ]; then
+  # Test hook: stop after (re)creating the venv; skips the network install.
+  echo "venv (create-only): $VENV_ABS"
+  exit 0
+fi
 "$VENV_ABS/bin/python" -m pip install --disable-pip-version-check -q \
   -c constraints/v2k-runtime.txt -r requirements-test.txt
 "$VENV_ABS/bin/python" - <<'PY'
