@@ -1,0 +1,52 @@
+{
+ "alpha_bonferroni": 0.025,
+ "baseline": "naive empirical pmf of strictly earlier seasons, +0.5 Laplace on 0..MAX_COUNT",
+ "bootstrap_reps": 2000,
+ "families": {
+  "TEAM_SACKS": {
+   "ci_bonferroni": [
+    -0.02868,
+    -0.00067
+   ],
+   "delta": -0.01462,
+   "model_ll": 1.88967,
+   "n": 3742,
+   "naive_ll": 1.90428,
+   "per_season_delta": {
+    "2019": -0.00774,
+    "2020": -0.05874,
+    "2021": -0.0048,
+    "2022": -0.00225,
+    "2023": -0.01009,
+    "2024": -0.01247,
+    "2025": -0.00838
+   },
+   "seasons_model_better": 7,
+   "verdict": "SCREEN_BEATS_NAIVE"
+  },
+  "TEAM_TURNOVERS": {
+   "ci_bonferroni": [
+    -0.00562,
+    0.01425
+   ],
+   "delta": 0.00439,
+   "model_ll": 1.47848,
+   "n": 3742,
+   "naive_ll": 1.47409,
+   "per_season_delta": {
+    "2019": -0.00293,
+    "2020": 0.00405,
+    "2021": 0.00394,
+    "2022": 0.02729,
+    "2023": 0.00448,
+    "2024": -0.00532,
+    "2025": -0.00119
+   },
+   "seasons_model_better": 3,
+   "verdict": "SCREEN_INCONCLUSIVE"
+  }
+ },
+ "label": "SCREEN",
+ "metric": "mean log loss per team-game (lower is better); delta = model - naive",
+ "refused": {}
+}
