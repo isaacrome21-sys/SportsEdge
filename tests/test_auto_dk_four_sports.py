@@ -62,6 +62,38 @@ class AutoOddsTests(unittest.TestCase):
         self.assertFalse(m.events_to_board("NFL",[stale],NOW))
         self.assertFalse(m.events_to_board("NFL",[event("NFL",NOW)],NOW))
 
+    def test_180_second_quote_limit_is_inclusive_and_181_fails_closed(self):
+        at_limit=event("NFL")
+        at_limit["bookmakers"][0]["last_update"]=(NOW-timedelta(seconds=180)).isoformat()
+        self.assertEqual(len(m.events_to_board("NFL",[at_limit],NOW)),1)
+        beyond=event("NFL")
+        beyond["bookmakers"][0]["last_update"]=(NOW-timedelta(seconds=181)).isoformat()
+        self.assertFalse(m.events_to_board("NFL",[beyond],NOW))
+        future=event("NFL")
+        future["bookmakers"][0]["last_update"]=(NOW+timedelta(seconds=1)).isoformat()
+        self.assertFalse(m.events_to_board("NFL",[future],NOW))
+
+    def test_cfb_mixed_market_stamps_are_preserved_not_laundered(self):
+        item=event("CFB")
+        dk=item["bookmakers"][0]
+        stamps={"h2h":NOW-timedelta(seconds=10),
+                "spreads":NOW-timedelta(seconds=90),
+                "totals":NOW-timedelta(seconds=150)}
+        for market in dk["markets"]:
+            market["last_update"]=stamps[market["key"]].isoformat()
+        peer=json.loads(json.dumps(dk))
+        peer["key"]="pinnacle"
+        item["bookmakers"].append(peer)
+        game=m.events_to_board("CFB",[item],NOW)[0]
+        compact=m.cfb_compact([game])[0]
+        self.assertEqual(compact["quote_captured_at"],stamps["totals"].isoformat())
+        self.assertEqual(compact["quote_timestamp_source"],"PROVIDER_LAST_UPDATE")
+        self.assertEqual(compact["quote_observed_at_by_market"],
+                         {k:stamp.isoformat() for k,stamp in stamps.items()})
+        self.assertEqual(compact["peers"][0]["observed_at"],stamps["totals"].isoformat())
+        self.assertEqual(compact["peers"][0]["observed_at_by_market"],
+                         {k:stamp.isoformat() for k,stamp in stamps.items()})
+
     def test_missing_book_does_not_invent_prices(self):
         item=event("MLB")
         item["bookmakers"][0]["key"]="fanduel"
