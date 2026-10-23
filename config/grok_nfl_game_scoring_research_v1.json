@@ -1,0 +1,17 @@
+{
+ "schema_version": "grok_nfl_game_scoring_research_v1",
+ "authority": "Grok lane research proposal; NOT an owner registration. Owner registries untouched.",
+ "engine": "sportsedge.nfl_game_scoring_empirical:NFL_GAME_SCORING_EMPIRICAL",
+ "families": [
+  {"family": "team_total_touchdowns", "dk_market_key": "TEAM_TOTAL_TOUCHDOWNS"},
+  {"family": "total_touchdowns", "dk_market_key": "TOTAL_TOUCHDOWNS"},
+  {"family": "winning_margin_band", "dk_market_key": "WINNING_MARGIN"},
+  {"family": "race_to_n_points", "dk_market_key": "RACE_TO_POINTS"}
+ ],
+ "state": "SCREEN",
+ "validation_status": "NOT_VALIDATED",
+ "eligible": false,
+ "play_allowed": false,
+ "screen": "research/grok_nfl_game_scoring_screen_20261022/screen_results_v1.json (vs naive earlier-season baseline only; NO market comparison, which is the bar that matters)",
+ "open_items": ["no historical DK quotes admitted for a market screen", "DK settlement rules (OT, race-to-N 'neither') unverified", "no prereg/freeze/clock", "canonical_coverage stays BLOCKED"]
+}
