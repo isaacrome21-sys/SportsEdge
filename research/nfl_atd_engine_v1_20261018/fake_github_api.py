@@ -219,8 +219,13 @@ def ledger_to_records(api, ledger, captured_at="2026-10-25T16:00:00Z",
                                  "yes_price": price, "captured_at": "2026-10-25T16:30:00Z"})
             if r.get("outcome_status") == "SETTLED":
                 settlements[(r["game_id"], r["player_id"])] = r["outcome"]
+        wk = slate["rows"][0]["week"] if slate["rows"] else 8
+        board = {"slate_id": slate["slate_id"], "season": 2026, "week": wk,
+                 "captured_at": captured_at, "rows": rows}
+        bsha = publish_board(api, board, f"2026-10-25T16:0{k % 10}:30Z")
         rec = {"slate_id": slate["slate_id"], "captured_at": captured_at,
-               "season": 2026,
+               "season": 2026, "week": wk, "pricer_sha256": FAKE_PRICER_SHA,
+               "inputs": {"board": bsha, "stats": st, "schedule": sc_, "player_data": {}},
                "game_teams": {r["game_id"]: list((teams_override or {}).get(
                    r["game_id"], games[r["game_id"]][:2])) for r in slate["rows"]},
                "schedule_kickoffs": {r["game_id"]: kickoff for r in slate["rows"]},
@@ -286,3 +291,156 @@ def ledger_to_branch(api, ledger, close_pushed="2026-10-25T16:58:00Z",
     for w, part in sorted(by_week.items()):
         publish_settlements(api, part, settle_pushed, week=w)
     return ids
+
+
+# ---------------------------------------------------------------------------
+# Replay (re-audit of 353147d5). Synthetic legacy ledgers cannot be real
+# pricer output, so they cite FAKE_PRICER_SHA, whose registered test
+# replayer re-derives rows from the pushed board record (still a genuine
+# byte-identical check). Real-pricer tests use synthetic_world() below.
+FAKE_PRICER_SHA = "f" * 64
+
+
+def fake_replay(inputs, *, now, fetched_at):
+    return json.loads(inputs["board"])["rows"]
+
+
+def _register_fake():
+    import atd_provenance as pv
+    if hasattr(pv, "EXTRA_REPLAYERS"):
+        pv.EXTRA_REPLAYERS[FAKE_PRICER_SHA] = fake_replay
+
+
+def publish_board(api, board: dict, pushed_at):
+    """Push a board capture record boards/<season>-W<week>/<sha>.json."""
+    import atd_provenance as pv
+    body = json.dumps(board, sort_keys=True)
+    sha = hashlib.sha256(body.encode()).hexdigest()
+    p = pv.board_record_path(sha, board["season"], board["week"])
+    if api.get_file(pv.RECORDS_BRANCH, p) is None:
+        api.commit(pv.RECORDS_BRANCH, {p: body}, pushed_at)
+    return sha
+
+
+def republish_run(api, rec, slate_id, pushed_at, board_pushed_at=None):
+    """Push a hand-edited run record WITH a board record that replays to its
+    rows (fake pricer), i.e. an honest record for those rows."""
+    import atd_provenance as pv
+    rec = dict(rec, slate_id=slate_id)
+    b = {"slate_id": slate_id, "season": rec["season"], "week": rec["week"],
+         "captured_at": rec["captured_at"], "rows": rec["rows"]}
+    rec["inputs"] = dict(rec["inputs"], board=publish_board(
+        api, b, board_pushed_at or pushed_at.replace(":00Z", ":30Z")))
+    api.commit(pv.RECORDS_BRANCH, {pv.run_record_path(slate_id): json.dumps(rec)}, pushed_at)
+    return rec
+
+
+class synthetic_world:
+    """Tiny self-consistent world for the REAL pricer: one pinned player-data
+    file (pins patched to it), 2026 stats weeks 1-7 (KC v LV, 40 WRs a side
+    + a few named players), schedule incl. week 8, and a week-8 board.
+    Use as a context manager (patches eng.REQUIRED_FILES / PART2_HASHES)."""
+    CAP, KO = "2026-10-25T16:00:00Z", "2026-10-25T17:00:00Z"
+
+    def __init__(self, board_rows=None):
+        import gzip
+        import tempfile
+        from pathlib import Path
+        self.dir = Path(tempfile.mkdtemp())
+        hdr = ("player_id,player_display_name,position_group,season,season_type,week,"
+               "recent_team,opponent_team,game_id,rushing_tds,receiving_tds,special_teams_tds")
+        hist = [hdr]
+        for w in range(1, 18):
+            for pid, team in (("P1", "KC"), ("P2", "LV"), ("TR", "KC"), ("OLD", "KC")):
+                hist.append(f"{pid},{pid} Name,WR,2025,REG,{w},{team},XX,,"
+                            f"0,{1 if w % 3 == 0 else 0},0")
+        self.player_data = {"ps_2025.csv.gz": gzip.compress(("\n".join(hist) + "\n").encode(), mtime=0)}
+        games, cur = [], [hdr]
+        for w in range(1, 9):
+            home, away = ("KC", "LV") if w % 2 else ("LV", "KC")
+            gid = f"2026_{w:02d}_{away}_{home}"
+            day = f"2026-{(9 if w <= 3 else 10):02d}-{[0, 7, 14, 21, 28, 5, 12, 19, 25][w]:02d}"
+            games.append(f"{gid},2026,REG,{w},{day},Sunday,13:00,{away},{home},"
+                         f"{'' if w == 8 else '3'}")
+            if w == 8:
+                continue
+            for team in ("KC", "LV"):
+                opp = "LV" if team == "KC" else "KC"
+                for i in range(40):
+                    cur.append(f"F{team}{i},F{team}{i} Name,WR,2026,REG,{w},{team},{opp},{gid},"
+                               f"0,{1 if (i + w) % 4 == 0 else 0},0")
+            cur.append(f"P1,P1 Name,WR,2026,REG,{w},KC,LV,{gid},0,{w % 2},0")
+            cur.append(f"P2,P2 Name,WR,2026,REG,{w},LV,KC,{gid},0,0,0")
+            # TR: tied latest week on two teams (different games) -> unresolved
+            cur.append(f"TR,TR Name,WR,2026,REG,{w},KC,LV,{gid},0,0,0")
+        cur.append("TR,TR Name,WR,2026,REG,7,DEN,KC,2026_07_KC_LV_X,0,0,0")
+        games.append("2026_07_KC_LV_X,2026,REG,7,2026-10-12,Monday,20:15,KC,DEN,7")
+        self.stats = gzip.compress(("\n".join(cur) + "\n").encode(), mtime=0)
+        self.schedule = ("game_id,season,game_type,week,gameday,weekday,gametime,away_team,"
+                         "home_team,result\n" + "\n".join(games) + "\n").encode()
+        self.board = {"slate_id": "W1", "season": 2026, "week": 8,
+                      "game_id": "board-kc-lv", "game_teams": ["KC", "LV"],
+                      "kickoff": self.KO, "captured_at": self.CAP,
+                      "rows": board_rows or [
+                          {"player_id": "P1", "player_name": "P1 Name", "yes_price": 250},
+                          {"player_id": "P2", "player_name": "P2 Name", "yes_price": 400},
+                          {"player_id": "OLD", "player_name": "OLD Name", "yes_price": 300},
+                          {"player_id": "TR", "player_name": "TR Name", "yes_price": 300},
+                          {"player_id": "ZZ", "player_name": "Nobody", "yes_price": 300}]}
+
+    def __enter__(self):
+        import atd_engine as eng
+        pf = self.dir / "SPEC_HASHES.txt"
+        pf.write_text("".join(f"{hashlib.sha256(b).hexdigest()} {n}\n"
+                              for n, b in self.player_data.items()))
+        self._saved = (eng.REQUIRED_FILES, eng.PART2_HASHES)
+        eng.REQUIRED_FILES, eng.PART2_HASHES = tuple(self.player_data), pf
+        return self
+
+    def __exit__(self, *a):
+        import atd_engine as eng
+        eng.REQUIRED_FILES, eng.PART2_HASHES = self._saved
+
+    def inputs(self):
+        return {"board": json.dumps(self.board, sort_keys=True).encode(),
+                "stats": self.stats, "schedule": self.schedule,
+                "player_data": dict(self.player_data)}
+
+    def publish(self, api, rows, *, pricer_sha=None, run_at="2026-10-25T16:30:00Z",
+                board_at="2026-10-25T16:10:00Z", skip=(), edit=None):
+        """Push data/fetch/board records then a run record carrying `rows`."""
+        import atd_provenance as pv
+        import price_nfl_atd_board_v11 as pr
+        br = pv.RECORDS_BRANCH
+        st = publish_data(api, self.stats, "2026-10-25T15:00:00Z", "stats", "csv.gz")
+        sc = publish_data(api, self.schedule.decode(), "2026-10-25T15:01:00Z")
+        pins = {}
+        for n, b in self.player_data.items():
+            sha = hashlib.sha256(b).hexdigest()
+            pins[n] = sha
+            if "player_data" not in skip:
+                api.commit(br, {pv.data_record_path(sha, "csv.gz"): b}, "2026-10-25T15:02:00Z")
+        bsha = hashlib.sha256(self.inputs()["board"]).hexdigest()
+        if "board" not in skip:
+            api.commit(br, {pv.board_record_path(bsha, 2026, 8): self.inputs()["board"].decode()},
+                       board_at)
+        ev = {s: next(e for e in api.events
+                      if e["after"] == api.file_commits(br, pv.fetch_record_path(s))[0])
+              for s in (st, sc)}
+        rows = json.loads(json.dumps(rows))
+        if edit:
+            edit(rows)
+        gid = next((r["game_id"] for r in rows if r.get("game_id")), "2026_08_LV_KC")
+        rec = {"slate_id": "W1", "captured_at": self.CAP, "season": 2026, "week": 8,
+               "first_kickoff": self.KO, "game_teams": {gid: ["KC", "LV"]},
+               "schedule_kickoffs": {gid: self.KO},
+               "stats_sha256": st, "schedule_sha256": sc,
+               "pricer_sha256": pricer_sha or pr.pricer_sha256(),
+               "inputs": {"board": bsha, "stats": st, "schedule": sc, "player_data": pins},
+               "fetch_provenance": {"stats": {"event": ev[st]}, "schedule": {"event": ev[sc]}},
+               "rows": rows}
+        api.commit(br, {pv.run_record_path("W1"): json.dumps(rec, sort_keys=True)}, run_at)
+        return rec
+
+
+_register_fake()
