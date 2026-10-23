@@ -1,16 +1,18 @@
 # PREREGISTRATION — NBA Team Totals Forward Test V1
 
-# DRAFT — NOT FROZEN — NOT IN FORCE — NO GAMES COUNT
+# FROZEN — 2026-10-22 21:34:21 CT (2026-10-23T02:34:21Z)
 
-**This document is a draft pending (1) an independent review by a
-checker who did not write it and (2) the owner's freeze. No game,
-row, or capture counts toward this test until the owner freezes this
-document (or a successor). Rows produced before the freeze are
-historical record, never prospective entries. Nothing in this draft
-changes any family's registration, eligibility, or validation state.**
+**Frozen with no term change from the CLEARED draft (sha256
+`4cf7e364a945c77ef316bfbd3bd04edf9ce51618e1eec5b6a16b9c354cc042e9`);
+only the status lines and §12 checklist ticks differ. Freeze record:
+`FREEZE_RECORD.md` beside this file. Rulings by Grok under owner
+delegation, message t234u, Oct 22 2026 9:32 PM CT. No row counts
+before the first slate priced after the evaluator is pinned and
+reviewed. Nothing in this freeze changes any family's registration,
+eligibility, or validation state.**
 
-- Status: `DRAFT_NOT_IN_FORCE` (revision 3: applies the NOT CLEARED reviews of
-  `82b880ed` and `355db10d`; pending re-review + owner freeze)
+- Status: `FROZEN_IN_FORCE` (frozen 2026-10-22 21:34:21 CT; independent
+  re-review CLEARED `ec9adcfa`; counting not yet started — §12)
 - Date drafted: 2026-10-22
 - Family in scope: NBA team total points (`TEAM_TOTAL`), registered
   2026-10-22 by owner ruling as `REGISTERED_RESEARCH_ONLY /
@@ -287,13 +289,13 @@ promotability; any change is an owner ruling.
 
 ## 12. Freeze checklist (owner)
 
-- [ ] Independent re-review of this revision by a checker who did not
-      draft it, returning CLEARED; bootstrap seed and the k clock-ID
+- [x] Independent re-review of this revision by a checker who did not
+      draft it, returning CLEARED (`ec9adcfa`, CLEARED); bootstrap seed and the k clock-ID
       list recorded in the freeze record.
 - [x] ±2.0 pick threshold and the team-totals exception to the focus pause, ruled by Grok under the owner's explicit delegation of rulings (Oct 22, 2026, 9:32 PM CT). Freeze still requires an independent CLEARED review.
 - [ ] Forward evaluator lands, hash-pinned to this document, and is
       independently reviewed, before the first counted slate.
-- [ ] Owner freezes; k recorded. The freeze record names the first
+- [x] Frozen 2026-10-22 21:34:21 CT by ruling under delegation; k recorded in `FREEZE_RECORD.md`. The freeze record names the first
       counted slate as **"first slate priced after the evaluator is
       pinned and reviewed"**. No primary metrics (§6) are computed on
       forward rows before then.
