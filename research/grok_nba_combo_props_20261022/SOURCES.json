@@ -1,0 +1,60 @@
+{
+ "retrieved_at_ct": "2026-10-22T21:20-05:00",
+ "cost": "free public GitHub release; no credits",
+ "file": {
+  "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2025.parquet",
+  "bytes": 610289,
+  "sha256": "e89f7fbc1124092c715b722e6d72d9dd1b9d28776ca6888b508fd2831cd705e2"
+ },
+ "screen_results_sha256": "928a8a6a555b823f5047d7045695a87f22f9c3677f31f2ca022c1797a8300e52",
+ "caveats": [
+  "single season (2024-25), same population family as the Oct 17 V1 program",
+  "iid player-game bootstrap ci95 in screen_results_v1.json is optimistic; date-clustered ci95 recorded in date_clustered_ci95",
+  "baseline is climatology only; no market leg (no historical DK combo lines)",
+  "1103 rows excluded for no G/F/C position group (V1 universe rule)"
+ ],
+ "governance": {
+  "state": "SCREEN",
+  "registration": "UNREGISTERED",
+  "validation_status": "NOT_VALIDATED",
+  "eligible": false,
+  "play_allowed": false
+ },
+ "date_clustered_ci95": {
+  "pr": [
+   -1.924,
+   -1.716
+  ],
+  "pa": [
+   -2.029,
+   -1.825
+  ],
+  "ra": [
+   -0.789,
+   -0.706
+  ]
+ },
+ "date_clustered_ci_method": {
+  "cluster": "game_date (whole slates resampled); delta = model CRPS - climatology CRPS, same rows as screen.py",
+  "source": "independent audit (values as recorded above)",
+  "builder_reproduction": {
+   "B": 2000,
+   "seed": 20261022,
+   "clusters": 148,
+   "pr": [
+    -1.922,
+    -1.714
+   ],
+   "pa": [
+    -2.027,
+    -1.824
+   ],
+   "ra": [
+    -0.787,
+    -0.708
+   ],
+   "note": "agrees with the audit values within bootstrap Monte-Carlo error"
+  },
+  "reading": "all three exclude 0 under date clustering; still SCREEN only, single season, NOT_VALIDATED"
+ }
+}

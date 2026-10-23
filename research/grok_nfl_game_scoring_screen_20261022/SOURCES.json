@@ -1,0 +1,207 @@
+{
+ "retrieved_at_ct": "2026-10-22T21:15:10-05:00",
+ "cost": "free public GitHub release downloads; no credits, no API keys",
+ "files": {
+  "games.csv": {
+   "url": "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv",
+   "bytes": 2186351,
+   "sha256": "81d3de72f038c312030ff51f34621b6d068ad52aa5ab788312bbff5abb3f0ade"
+  },
+  "pbp_2018.csv.gz": {
+   "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2018.csv.gz",
+   "bytes": 17920627,
+   "sha256": "d37899610b397b96a90da6902827de5b46c5457b93e0e16d5f95a8eb524e4a7d"
+  },
+  "pbp_2019.csv.gz": {
+   "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2019.csv.gz",
+   "bytes": 17992849,
+   "sha256": "b764668137052be23745953cbc33fa17e537a70c81e9b73785a19a15e7288216"
+  },
+  "pbp_2020.csv.gz": {
+   "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2020.csv.gz",
+   "bytes": 18143553,
+   "sha256": "bc954b5780e325df4faa255fac092585c981a4de5d2f553a8a4e0a3c8b3a3cf2"
+  },
+  "pbp_2021.csv.gz": {
+   "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2021.csv.gz",
+   "bytes": 19022201,
+   "sha256": "e8743a568f99667a8bdcd29ba12224ee1782ad2b7916bee78ee335c099383739"
+  },
+  "pbp_2022.csv.gz": {
+   "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2022.csv.gz",
+   "bytes": 19093961,
+   "sha256": "0c69a71eb39498956c7b1d5c1ca52ce7fe679934a95d1af249facb5ea9829ea4"
+  },
+  "pbp_2023.csv.gz": {
+   "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2023.csv.gz",
+   "bytes": 19169807,
+   "sha256": "4649804ee0f0a40b41e51ec75a1ce921949d7fab5459213488656b92f78560e8"
+  },
+  "pbp_2024.csv.gz": {
+   "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2024.csv.gz",
+   "bytes": 19362351,
+   "sha256": "23370d5d10f8104d80d46a1fc5e61f4f6f5a3263fe96fe2dd629913cfcb08c06"
+  },
+  "pbp_2025.csv.gz": {
+   "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2025.csv.gz",
+   "bytes": 19105296,
+   "sha256": "2f135887790a013fd004e609e37096bb4816d5cc80b9f19122e1bad478961978"
+  }
+ },
+ "derived": {
+  "game_table.csv": {
+   "sha256": "73d5b4a965e6894282936d5c87abd4112c893c6029ef65433b48b4d8a6822d48",
+   "rows": 2227,
+   "cross_check": "final scores from pbp vs nfldata games.csv: 0 mismatches of 2227",
+   "note": "not committed (derived); rebuild with build_game_table.py"
+  }
+ },
+ "screen_results_sha256": "0f7b21a1d2dc6002f31fa6db6cdf659591440bb2beb398ec9451dd6cb075dd0a",
+ "week_clustered_ci": {
+  "script": "cluster_ci.py",
+  "script_sha256": "afe3af223883167f78be578feeef454a03402350d6152333713cf1f725a42184",
+  "results": "cluster_ci_results_v1.json",
+  "results_sha256": "d7952f085bf46896f4780184b9c56835c0abd567d58626620522d4f9601f17db",
+  "method": "cluster bootstrap over whole (season, week) slates, B=10000, seed 20261022; same per-game deltas as screen.py (screen_results_v1.json unchanged, sha 0f7b21a1...)",
+  "bonferroni": "alpha=0.05/12 across the 12 screened tests, two-sided week-clustered interval",
+  "families": {
+   "TEAM_TOTAL_TOUCHDOWNS": {
+    "ci95_week_clustered": [
+     -0.04156,
+     -0.01842
+    ],
+    "ci_bonferroni_week_clustered": [
+     -0.04719,
+     -0.01351
+    ],
+    "passes_bonferroni": true
+   },
+   "TOTAL_TOUCHDOWNS": {
+    "ci95_week_clustered": [
+     -0.04199,
+     -0.01161
+    ],
+    "ci_bonferroni_week_clustered": [
+     -0.0486,
+     -0.00487
+    ],
+    "passes_bonferroni": true
+   },
+   "TEAM_TD_OU_1.5": {
+    "ci95_week_clustered": [
+     -0.02332,
+     -0.00499
+    ],
+    "ci_bonferroni_week_clustered": [
+     -0.02761,
+     -0.00076
+    ],
+    "passes_bonferroni": true
+   },
+   "TEAM_TD_OU_2.5": {
+    "ci95_week_clustered": [
+     -0.04007,
+     -0.02309
+    ],
+    "ci_bonferroni_week_clustered": [
+     -0.04313,
+     -0.01983
+    ],
+    "passes_bonferroni": true
+   },
+   "TOTAL_TD_OU_4.5": {
+    "ci95_week_clustered": [
+     -0.02132,
+     0.00295
+    ],
+    "ci_bonferroni_week_clustered": [
+     -0.02613,
+     0.00831
+    ],
+    "passes_bonferroni": false
+   },
+   "TOTAL_TD_OU_5.5": {
+    "ci95_week_clustered": [
+     -0.0233,
+     -0.00159
+    ],
+    "ci_bonferroni_week_clustered": [
+     -0.02736,
+     0.00357
+    ],
+    "passes_bonferroni": false
+   },
+   "WINNING_MARGIN": {
+    "ci95_week_clustered": [
+     -0.07848,
+     -0.03395
+    ],
+    "ci_bonferroni_week_clustered": [
+     -0.09002,
+     -0.02349
+    ],
+    "passes_bonferroni": true
+   },
+   "RACE_TO_10": {
+    "ci95_week_clustered": [
+     -0.02215,
+     -0.00602
+    ],
+    "ci_bonferroni_week_clustered": [
+     -0.02611,
+     -0.00247
+    ],
+    "passes_bonferroni": true
+   },
+   "RACE_TO_15": {
+    "ci95_week_clustered": [
+     -0.04401,
+     -0.02104
+    ],
+    "ci_bonferroni_week_clustered": [
+     -0.04914,
+     -0.01503
+    ],
+    "passes_bonferroni": true
+   },
+   "RACE_TO_20": {
+    "ci95_week_clustered": [
+     -0.05295,
+     -0.02903
+    ],
+    "ci_bonferroni_week_clustered": [
+     -0.0582,
+     -0.02422
+    ],
+    "passes_bonferroni": true
+   },
+   "RACE_TO_25": {
+    "ci95_week_clustered": [
+     -0.06406,
+     -0.03678
+    ],
+    "ci_bonferroni_week_clustered": [
+     -0.07045,
+     -0.03064
+    ],
+    "passes_bonferroni": true
+   },
+   "RACE_TO_30": {
+    "ci95_week_clustered": [
+     -0.06157,
+     -0.03307
+    ],
+    "ci_bonferroni_week_clustered": [
+     -0.06732,
+     -0.02731
+    ],
+    "passes_bonferroni": true
+   }
+  },
+  "notes": [
+   "TOTAL_TD_OU_5.5: the iid ci95 upper bound (-0.00052) and week-clustered ci95 [-0.0233,-0.00159] exclude 0, but the Bonferroni alpha/12 week-clustered interval [-0.02736,0.00357] includes 0: it FAILS Bonferroni across the 12 tests and its screen-level SCREEN_BEATS_NAIVE label must not be read as a multiplicity-corrected result.",
+   "TOTAL_TD_OU_4.5 remains inconclusive (ci95 includes 0).",
+   "SCREEN only: NOT_VALIDATED, play_allowed=false; no market comparison."
+  ]
+ }
+}

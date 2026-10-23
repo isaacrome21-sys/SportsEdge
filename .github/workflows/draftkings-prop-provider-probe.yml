@@ -1,14 +1,9 @@
 name: draftkings-prop-provider-probe
 
 on:
+  # Grok ruling 2026-10-23 (t234u; owner invariant: DK rendered pages only): this job
+  # reaches a DraftKings API URL builder, so it runs only on manual workflow_dispatch.
   workflow_dispatch:
-  schedule:
-    # Quote discovery only. Never Model_P. Never official.
-    - cron: "7,37 * * * *"
-  push:
-    paths:
-      - 'sportsedge/draftkings_prop_source.py'
-      - '.github/workflows/draftkings-prop-provider-probe.yml'
 
 permissions:
   contents: write

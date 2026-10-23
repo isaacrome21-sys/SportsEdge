@@ -1,0 +1,3 @@
+# Research-only dependencies (not used by the main/test install).
+# DK rendered-page fetcher: sportsedge/dk_rendered_page_fetcher.py
+playwright>=1.40

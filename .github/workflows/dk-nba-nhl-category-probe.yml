@@ -5,18 +5,9 @@ name: dk-nba-nhl-category-probe
 # performs one live probe and uploads raw bytes plus a diagnostic status report.
 
 on:
+  # Grok ruling 2026-10-23 (t234u; owner invariant: DK rendered pages only): this job
+  # makes a live DraftKings API request in CI, so it runs only on manual workflow_dispatch.
   workflow_dispatch:
-  pull_request:
-    paths:
-      - 'scripts/probe_dk_game_lines_categories.py'
-      - 'tests/test_dk_game_lines_category_probe.py'
-      - '.github/workflows/dk-nba-nhl-category-probe.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/probe_dk_game_lines_categories.py'
-      - 'tests/test_dk_game_lines_category_probe.py'
-      - '.github/workflows/dk-nba-nhl-category-probe.yml'
 
 permissions:
   contents: read
