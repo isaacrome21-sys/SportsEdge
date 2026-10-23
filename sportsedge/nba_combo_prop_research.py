@@ -49,7 +49,7 @@ def price_combo(store, player_id, combo: str, line, target_date) -> dict:
     base = {"engine_id": ENGINE_ID, "derived_from": v1.ENGINE_ID,
             "combo": combo, **GOVERNANCE,
             "participation_feed": "NOT_WIRED"}
-    if combo not in COMBOS:
+    if not isinstance(combo, str) or combo not in COMBOS:  # t235: never a TypeError
         return {**base, "status": "REFUSED", "reason": "NBA_COMBO_UNSUPPORTED"}
     bad = lambda det: {**base, "status": "REFUSED",
                        "reason": v1.REFUSAL_LINE_INVALID, "detail": det}
