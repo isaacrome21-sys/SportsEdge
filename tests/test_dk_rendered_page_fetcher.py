@@ -280,7 +280,7 @@ def test_finding1_team_from_market_pair_not_button_position():
     out = _parse(html)
     assert out["rows"] == [] and out["card_refusals"] == [{"refusal": "MARKET_NOT_TWO_SIDED", "card_index": 0}]
     # Same card with the ML pair completed: spreads must split A/B by the market's own pair.
-    html2 = html.replace("</div></body>", _btn("0ML7_3", odds="-150") + "</div></body>")
+    html2 = html.replace(_btn("0ML7_1", odds="+130"), _btn("0ML7_3", odds="-150") + _btn("0ML7_1", odds="+130"))
     rows = _parse(html2)["rows"]
     sp = {r["outcome"]: r["point"] for r in rows if r["market"] == "spreads"}
     assert sp == {"AWAY Team": -3.0, "HOME Team": 3.0}
@@ -324,7 +324,7 @@ def test_finding3_adapter_runs_through_real_capture_consumer():
     out = _parse(html)
     assert all(r["status"] == "OK" for r in out["rows"])
     assert out["refused_rows"] and all(r["status"] == "REFUSED" for r in out["refused_rows"])
-    events = f.to_capture_markets(out)
+    events = f.to_capture_markets(out)["events"]
     assert {e["event_id"] for e in events} == {r["provider_event_id"] for r in out["rows"]}
     assert "999" not in {e["event_id"] for e in events}
     for e in events:
@@ -335,6 +335,7 @@ def test_finding3_adapter_runs_through_real_capture_consumer():
     pit = next(e for e in events if e["event_id"] == "34118009")
     s = cap.spread_row(pit["markets"]["spreads"], pit["home_team"], pit["away_team"])
     assert (s["away_point"], s["away_price"], s["home_point"], s["home_price"]) == (-3.0, -118, 3.0, -102)
+    assert pit["home_team"] == "New Orleans Saints" and pit["away_team"] == "Pittsburgh Steelers"
     # a side refused for a missing line drops its price
     o2 = _parse(_card(_btn("0HC1N300_3", odds="-110") + _btn("0HC1P300_1", pts="+3", odds="-110")))
     miss = [r for r in o2["refused_rows"] if r["refusal"] == "POINT_MISSING"][0]
@@ -381,4 +382,101 @@ def test_finding6_browser_binary_allowlist_and_recorded(monkeypatch):
     r = f._render_with_browser(URL)
     launch = [k for n, k in log if n == "launch"][0]
     assert launch["executable_path"] == "/usr/bin/google-chrome"
-    assert r["browser"] == {"path": "/usr/bin/google-chrome", "version": "130.0.0.0", "headless": False}
+    assert r["browser"]["path"] == "/usr/bin/google-chrome" and r["browser"]["version"] == "130.0.0.0"
+    assert r["browser"]["headless"] is False
+
+
+# ---- auditor findings on d77603eb -------------------------------------------
+def _real_card_buttons():
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(FIX.read_text(), "lxml")
+    card = soup.select('[data-testid="market-mapping-template-210"]')[0]
+    return card
+
+
+def test_d776_high_swapped_button_order_refused_not_silently_swapped():
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(FIX.read_text(), "lxml")
+    card = soup.select('[data-testid="market-mapping-template-210"]')[0]
+    btns = card.select('button[data-testid^="component-builder-market-button-"]')
+    parent = btns[0].parent
+    for b in btns:
+        b.extract()
+    # swap the two rows: home row buttons first, away row second
+    for b in btns[3:] + btns[:3]:
+        parent.append(b)
+    out = _parse(str(soup))
+    kept = [r for r in out["rows"] if r["provider_event_id"] == "34118009"]
+    # team-sided markets are refused; totals map from their own O/U title + ID, so they stay correct
+    assert {r["market"] for r in kept} <= {"totals"}
+    assert {(r["outcome"], r["point"], r["price_american"]) for r in kept} <= {("Over", 44.5, -110), ("Under", 44.5, -110)}
+    refused = [r for r in out["refused_rows"] if r["provider_event_id"] == "34118009"]
+    assert refused and {r["refusal"] for r in refused} >= {"SIDE_SUFFIX_MISMATCH"}
+    # untouched original maps PIT -3/-118 and NO +3/-102
+    ok = {(r["market"], r["outcome"]): r for r in _parse(FIX.read_text())["rows"] if r["provider_event_id"] == "34118009"}
+    assert ok[("spreads", "PIT Steelers")]["price_american"] == -118 and ok[("spreads", "NO Saints")]["price_american"] == -102
+
+
+@pytest.mark.parametrize("code_a,pts_a,code_h,pts_h,reason", [
+    ("0HC1N300_3", "+3", "0HC1P300_1", "-3", "LINE_ID_MISMATCH"),   # sign in ID contradicts parsed line
+    ("0HC1N350_3", "-3", "0HC1P300_1", "+3", "LINE_ID_MISMATCH"),   # magnitude contradicts
+    ("0HC1N300_2", "-3", "0HC1P300_1", "+3", "SIDE_SUFFIX_UNKNOWN"),
+    ("0HC1N300_1", "-3", "0HC1P300_3", "+3", "SIDE_SUFFIX_MISMATCH"),
+])
+def test_d776_spread_id_sign_and_suffix_must_match(code_a, pts_a, code_h, pts_h, reason):
+    out = _parse(_card(_btn(code_a, pts=pts_a, odds="-110") + _btn(code_h, pts=pts_h, odds="-110")))
+    assert out["rows"] == []
+    assert reason in {r["refusal"] for r in out["refused_rows"]}
+
+
+def test_d776_total_id_side_and_line_must_match():
+    out = _parse(_card(_btn("0OU1U4500_1", title="O", pts="45", odds="-110") + _btn("0OU1O4500_3", title="U", pts="45", odds="-110")))
+    assert out["rows"] == [] and "TOTAL_SIDE_ID_MISMATCH" in {r["refusal"] for r in out["refused_rows"]}
+    out = _parse(_card(_btn("0OU1O4450_1", title="O", pts="45", odds="-110") + _btn("0OU1U4450_3", title="U", pts="45", odds="-110")))
+    assert out["rows"] == [] and "LINE_ID_MISMATCH" in {r["refusal"] for r in out["refused_rows"]}
+
+
+@pytest.mark.parametrize("bad", [
+    "https://sportsbook.draftkings.com/leagues/football/nfl;format=json",
+    "https://sportsbook.draftkings.com/leagues/football/nfl?fmt=json",
+    "https://sportsbook.draftkings.com/leagues/football/nfl?output=json",
+    "https://sportsbook.draftkings.com/leagues/football/nfl?category=game-lines",
+    "https://sportsbook.draftkings.com/leagues/football/nfl#format=json",
+    "https://sportsbook.draftkings.com/leagues/football/nfl/format/json",
+])
+def test_d776_guard_refuses_any_query_and_format_like(bad):
+    with pytest.raises(f.DkApiUrlRefused):
+        f.assert_rendered_page_url(bad)
+
+
+def test_d776_browser_symlink_resolved_before_allowlist(monkeypatch, tmp_path):
+    log = []
+    _install_fake_pw(monkeypatch, log)
+    monkeypatch.setenv("DISPLAY", ":99")
+    evil = tmp_path / "evil"
+    evil.write_text("#!/bin/sh\n")
+    import os as _os
+    real_rp = _os.path.realpath
+    monkeypatch.setattr(_os.path, "realpath", lambda p, *a, **k: str(evil) if p == "/usr/bin/google-chrome" else real_rp(p, *a, **k))
+    monkeypatch.setenv("SPORTSEDGE_BROWSER_PATH", "/usr/bin/google-chrome")
+    with pytest.raises(f.BrowserBinaryRefused):
+        f._render_with_browser(URL)
+    assert log == []
+
+
+def test_d776_adapter_full_names_unmapped_refused_and_commence_none():
+    cap = _capture_module()
+    html = _card(_btn("0ML1_3", odds="+120") + _btn("0ML1_1", odds="-140"))
+    res = f.to_capture_markets(_parse(html))
+    assert res["events"] == []
+    assert res["refused_events"] == [{"event_id": "999", "home_team_label": "HOME Team",
+                                      "away_team_label": "AWAY Team", "refusal": "TEAM_NAME_UNMAPPED"}]
+    res = f.to_capture_markets(_parse(FIX.read_text()))
+    assert res["refused_events"] == [] and res["event_match_requirement"]
+    for e in res["events"]:
+        assert e["commence_time"] is None and e["commence_time_status"] == "NOT_ON_BOARD_CARD"
+        assert e["event_match_requirement"] == res["event_match_requirement"]
+        assert e["home_team"] in f.DK_BOARD_TEAM_FULL_NAMES.values()
+        sp = cap.spread_row(e["markets"]["spreads"], e["home_team"], e["away_team"])
+        assert sp["status"] == "OK"
+    assert len(set(f.DK_BOARD_TEAM_FULL_NAMES.values())) == 32
