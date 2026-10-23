@@ -104,19 +104,15 @@ def test_hash_lock_detects_changed_provenance(capture, tmp_path):
     assert capture.lock_status(local_cfg, changed, now, create=False) == "MISMATCH:script_sha256"
 
 
-def test_workflow_keeps_polling_but_gates_paid_capture():
+def test_workflow_is_manual_only_but_keeps_paid_capture_gates():
+    # Grok ruling 2026-10-23 (t234u, owner invariant DK rendered pages only): the job
+    # reaches a DraftKings API URL builder, so its cron and push/pull_request triggers
+    # are removed; only workflow_dispatch remains. The capture gates stay in place.
     text = WORKFLOW.read_text()
-    assert "schedule:" in text
-
-    # The frozen lane polls every ten minutes at :03/:13/:23/:33/:43/:53.
-    # The cron may be expressed as one combined entry or six equivalent entries;
-    # the contract is the polling instants, not the YAML spelling.
-    combined = "cron: '3,13,23,33,43,53 * * * *'" in text
-    split = all(
-        f"cron: '{minute} * * * *'" in text
-        for minute in (3, 13, 23, 33, 43, 53)
-    )
-    assert combined or split
+    assert "workflow_dispatch:" in text
+    assert "schedule:" not in text
+    assert "cron" not in text
+    assert "\n  push:" not in text and "\n  pull_request:" not in text
 
     assert "Gate scheduled run to a frozen capture window using free schedule data" in text
     assert "steps.due.outputs.due == 'true'" in text

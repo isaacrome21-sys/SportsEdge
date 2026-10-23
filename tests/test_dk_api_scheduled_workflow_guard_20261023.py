@@ -5,10 +5,9 @@ a repo module -- transitively, via AST imports, `python -m`, `python path.py`, i
 `python - <<PY` heredocs and `unittest` targets -- whose source builds a DraftKings API URL
 (`/sites/US-SB/api`, `sportsbook-nash.draftkings.com/api`, `api.draftkings.com`).
 
-Proposal branch grok/t250: cron is disabled (commented, workflow_dispatch kept) only on
-the three workflows the owner named. Four further scheduled workflows also reach a DK API
-module; they are listed in OWNER_DECISION_PENDING as strict xfails so the gap stays
-visible and the marker must be removed once they are resolved. No source module deleted.
+Grok ruling 2026-10-23 (under t234u): all seven DK-API workflows are manual-only
+(workflow_dispatch); cron, push, pull_request and workflow_run triggers are removed.
+No source module deleted; no collector run.
 """
 import pytest
 from pathlib import Path
@@ -22,6 +21,28 @@ PAT = re.compile(r"sites/US-SB/api|sportsbook-nash\.draftkings\.com/api|api\.dra
 
 def scheduled(text):
     return bool(re.search(r"^\s*-\s*cron\s*:", "\n".join(l for l in text.splitlines() if not l.lstrip().startswith("#")), re.M))
+
+def on_triggers(text):
+    """Top-level keys of the workflow `on:` block (comments ignored)."""
+    keys, inside = [], False
+    for line in text.splitlines():
+        if line.lstrip().startswith("#") or not line.strip():
+            continue
+        if re.match(r"^(on|\"on\"|'on'|true)\s*:", line):
+            inside = True
+            continue
+        if inside:
+            if not line.startswith(" "):
+                break
+            m = re.match(r"^  ([A-Za-z_][\w-]*)\s*:", line)
+            if m:
+                keys.append(m.group(1))
+    return keys
+
+
+def auto_triggered(text):
+    return scheduled(text) or any(k != "workflow_dispatch" for k in on_triggers(text))
+
 
 def entries(text):
     lines = [l for l in text.splitlines() if not l.lstrip().startswith("#")]
@@ -96,6 +117,20 @@ def closure(seeds):
             stack.append(g)
     return seen, edges
 
+def report_one(text):
+    seeds = set()
+    for kind, v in entries(text):
+        if kind == "inline":
+            seeds |= imports(None, v)
+        elif kind == "module":
+            f = mod_file(v); f and seeds.add(f)
+        else:
+            f = ROOT / v; f.is_file() and seeds.add(f)
+    seen, _ = closure(seeds)
+    return sorted(str(f.relative_to(ROOT)) for f in seen
+                  if PAT.search(f.read_text(encoding="utf-8", errors="ignore")))
+
+
 def report(root=None):
     res = {}
     for wf in sorted((ROOT / ".github" / "workflows").glob("*.y*ml")):
@@ -117,11 +152,10 @@ def report(root=None):
 
 
 
-DISABLED_BY_T250 = ("draftkings-prop-provider-probe.yml", "mlb-prop-pit-archive.yml",
-                    "nfl-market-maker-radar-capture.yml")
-OWNER_DECISION_PENDING = ("mlb-moneyline-forward-evidence.yml", "nfl-2026-line-capture.yml",
-                          "nfl-dk-direct-confirmation-capture.yml",
-                          "sportsedge-auto-dk-four-sports.yml")
+DK_API_WORKFLOWS = ("draftkings-prop-provider-probe.yml", "mlb-prop-pit-archive.yml",
+                    "nfl-market-maker-radar-capture.yml", "mlb-moneyline-forward-evidence.yml",
+                    "nfl-2026-line-capture.yml", "nfl-dk-direct-confirmation-capture.yml",
+                    "sportsedge-auto-dk-four-sports.yml")
 WF = ROOT / ".github" / "workflows"
 
 
@@ -129,39 +163,49 @@ def _scheduled_workflows():
     return sorted(p.name for p in WF.glob("*.y*ml") if scheduled(p.read_text(encoding="utf-8")))
 
 
-def _params():
-    out = []
-    for name in _scheduled_workflows():
-        marks = []
-        if name in OWNER_DECISION_PENDING:
-            marks.append(pytest.mark.xfail(strict=True, reason="OWNER_DECISION_PENDING: scheduled "
-                                           "workflow reaches a DK API module; not in t250 scope"))
-        out.append(pytest.param(name, marks=marks, id=name))
-    return out
-
-
-@pytest.mark.parametrize("name", _params())
+@pytest.mark.parametrize("name", _scheduled_workflows())
 def test_scheduled_workflow_reaches_no_dk_api_module(name):
     assert report().get(name) == [], report().get(name)
 
 
-@pytest.mark.parametrize("name", DISABLED_BY_T250)
-def test_named_workflows_have_no_active_cron_but_keep_dispatch(name):
+@pytest.mark.parametrize("name", DK_API_WORKFLOWS)
+def test_dk_api_workflow_is_dispatch_only(name):
+    """Grok ruling 2026-10-23 (t234u): manual workflow_dispatch is the only trigger left;
+    cron lines are deleted, not commented."""
     text = (WF / name).read_text(encoding="utf-8")
-    assert not scheduled(text)
-    assert "\n  workflow_dispatch:" in text
+    assert on_triggers(text) == ["workflow_dispatch"], on_triggers(text)
+    assert "cron" not in text
+    assert not auto_triggered(text)
 
 
-def test_detector_positive_control(tmp_path):
-    text = (WF / "draftkings-prop-provider-probe.yml").read_text(encoding="utf-8")
-    live = re.sub(r"#\s*- cron:", "- cron:", text)
-    assert scheduled(live)
+@pytest.mark.parametrize("name", DK_API_WORKFLOWS)
+def test_dk_api_workflow_still_reaches_dk_module_so_it_must_stay_manual(name):
+    """Guards against the list going stale: each still imports a DK API builder."""
+    text = (WF / name).read_text(encoding="utf-8")
     seeds = set()
-    for kind, v in entries(live):
+    for kind, v in entries(text):
         if kind == "inline":
             seeds |= imports(None, v)
+        elif kind == "module":
+            f = mod_file(v); f and seeds.add(f)
+        else:
+            f = ROOT / v; f.is_file() and seeds.add(f)
     seen, _ = closure(seeds)
-    assert ROOT / "sportsedge" / "draftkings_prop_source.py" in seen
+    assert any(PAT.search(f.read_text(encoding="utf-8", errors="ignore")) for f in seen)
+
+
+def test_trigger_parser():
+    t = "on:\n  workflow_dispatch:\n  # push:\n  push:\n    branches: [main]\njobs:\n  a:\n"
+    assert on_triggers(t) == ["workflow_dispatch", "push"]
+    assert auto_triggered(t) and not auto_triggered("on:\n  workflow_dispatch:\njobs:\n")
+
+
+def test_detector_positive_control():
+    live = ("on:\n  schedule:\n    - cron: '1 * * * *'\njobs:\n  j:\n    steps:\n      - run: |\n"
+            "          python - <<'PY'\n          from sportsedge.draftkings_prop_source import x\n"
+            "          PY\n")
+    assert scheduled(live)
+    assert "sportsedge/draftkings_prop_source.py" in report_one(live)
 
 
 def test_commented_cron_is_not_scheduled():

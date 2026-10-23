@@ -15,6 +15,8 @@ PARKED = {
     ".github/workflows/mlb-v8-replay-backfill.yml",
 }
 
+DK_API_MANUAL_ONLY = {".github/workflows/nfl-2026-line-capture.yml"}
+
 SCHEDULED_PAID = {
     ".github/workflows/football-nfl-forward-clv-collection.yml",
     ".github/workflows/ev-tracker.yml",
@@ -44,6 +46,11 @@ def test_remaining_authorities_still_have_schedules() -> None:
             assert "schedule:" not in text
             assert "contents: write" not in text
             assert "secrets." not in text
+        elif path in DK_API_MANUAL_ONLY:
+            # Grok ruling 2026-10-23 (t234u, DK rendered pages only): still an allowed
+            # paid consumer in the projection, but manual workflow_dispatch only.
+            assert "workflow_dispatch:" in text, path
+            assert "schedule:" not in text, path
         else:
             assert "schedule:" in text, path
 
