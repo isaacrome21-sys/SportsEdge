@@ -47,7 +47,7 @@ for season in range(2018, 2026):
             count_rows.append(cr)
 for name, rows in (("period_table.csv", period_rows), ("team_count_table.csv", count_rows)):
     with open(f"{OUT}/{name}", "w", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=list(rows[0])); w.writeheader(); w.writerows(rows)
+        w = csv.DictWriter(fh, fieldnames=list(rows[0]), lineterminator="\n"); w.writeheader(); w.writerows(rows)
     sources[name] = sha(f"{OUT}/{name}")
 json.dump(sources, open(f"{OUT}/SOURCES.json", "w"), indent=1, sort_keys=True)
 print(len(period_rows), len(count_rows))
