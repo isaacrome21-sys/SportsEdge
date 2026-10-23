@@ -18,9 +18,10 @@ def row(i, side="OVER", line=250.5, status="READABLE", reason=None, game="G1",
             "selected_result": result, "clv": clv if status == "READABLE" else None}
 
 
-def close(i, lines, market="PASS_YDS", game="G1"):
+def close(i, lines, market="PASS_YDS", game="G1", at="2026-10-25T16:30:00Z",
+          over=-110, under=-110):
     return [{"game_id": game, "player_id": f"p{i}", "market": market, "line": l,
-             "over_price": -110, "under_price": -110} for l in lines]
+             "over_price": over, "under_price": under, "captured_at": at} for l in lines]
 
 
 # --- move direction (no repricing, no model) ---
@@ -145,3 +146,60 @@ def test_freeze_must_precede_sunday_deadline():
     with pytest.raises(ValueError):
         v11.validate_freeze_ts("2026-10-25T17:00:01Z")
     v11.validate_freeze_ts("2026-10-25T16:59:59Z")
+
+
+# --- audit fix (NOT CLEARED on e7718590): re-check v1 LINE_MOVED closes ---
+MOVED = dict(status="CLV_MISSING", reason="LINE_MOVED")
+
+
+def one(cl):
+    return v11.annotate_moved([row(1, **MOVED)], {"rows": cl})[0]
+
+
+def test_post_kickoff_other_line_is_capture_failure():
+    o = one(close(1, [260.5], at="2026-10-25T19:00:00Z"))
+    assert o["v11_bucket"] == "CAPTURE_FAILURE" and o["v11_reason"] == "CLOSE_NOT_PREKICKOFF"
+
+
+def test_stale_other_line_is_capture_failure():
+    o = one(close(1, [260.5], at="2026-10-25T15:59:00Z"))  # 61 min before kickoff
+    assert o["v11_bucket"] == "CAPTURE_FAILURE" and o["v11_reason"] == "CLOSE_STALE"
+
+
+def test_single_sided_other_line_is_capture_failure():
+    o = one(close(1, [260.5], over=None))
+    assert o["v11_bucket"] == "CAPTURE_FAILURE" and o["v11_reason"] == "CLOSE_SINGLE_SIDED"
+
+
+def test_no_other_line_rows_is_capture_failure():
+    o = one([])
+    assert o["v11_bucket"] == "CAPTURE_FAILURE" and o["v11_reason"] == "NO_CLOSE_ROW"
+
+
+def test_precedence_single_sided_then_not_prekickoff_then_stale():
+    cl = close(1, [260.5], over=None) + close(1, [262.5], at="2026-10-25T19:00:00Z")
+    assert one(cl)["v11_reason"] == "CLOSE_NOT_PREKICKOFF"
+    cl += close(1, [264.5], at="2026-10-25T15:00:00Z")
+    assert one(cl)["v11_reason"] == "CLOSE_STALE"
+
+
+def test_auditor_repro_postkick_single_sided_counts_against_20pct():
+    o = one(close(1, [255.5], over=None, at="2026-10-25T19:00:00Z"))
+    agg = v11.aggregate_v11([o] * 10, sample_gate=None, primary_clv_beats=True)
+    assert agg["verdict"] == "INSUFFICIENT_CLOSE_DATA"
+
+
+def test_direction_from_final_qualifying_capture_only():
+    cl = (close(1, [240.5], at="2026-10-25T16:10:00Z")      # earlier qualifying: adverse
+          + close(1, [260.5], at="2026-10-25T16:50:00Z")    # final qualifying: favorable
+          + close(1, [230.5], at="2026-10-25T17:30:00Z")    # post-kickoff: ignored
+          + close(1, [220.5], at="2026-10-25T16:55:00Z", under=None))  # one-sided: ignored
+    o = one(cl)
+    assert o["v11_bucket"] == "LINE_MOVED" and o["move_direction"] == "FAVORABLE"
+    assert o["v11_close_captured_at"] == "2026-10-25T16:50:00Z"
+
+
+def test_close_without_timestamp_fails_closed():
+    cl = close(1, [260.5]); del cl[0]["captured_at"]
+    with pytest.raises(ValueError):
+        one(cl)
