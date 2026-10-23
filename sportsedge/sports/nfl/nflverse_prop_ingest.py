@@ -109,10 +109,15 @@ def build_nflverse_prop_opportunity_provider(
         _assert_rows_before_target(rows, label=label, target_season=target_season, target_week=target_week)
 
     snap_acc: dict[str, dict[str, Any]] = {}
+    seen_snap_games: set[tuple[str, int, int]] = set()
     for row in snap_rows:
         pid = str(row.get("player_id") or row.get("gsis_id") or "").strip()
         if not pid:
             continue
+        identity = (pid, int(row["season"]), int(row["week"]))
+        if identity in seen_snap_games:
+            raise NFLContextError(f"duplicate snap player-game source row:{pid}")
+        seen_snap_games.add(identity)
         acc = snap_acc.setdefault(pid, {
             "team": str(row.get("team") or "").upper(),
             "position": str(row.get("position") or "").upper(),
@@ -143,10 +148,15 @@ def build_nflverse_prop_opportunity_provider(
 
     stats: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     meta: dict[str, dict[str, str]] = {}
+    seen_stat_games: set[tuple[str, int, int]] = set()
     for row in player_rows:
         pid = str(row.get("player_id") or row.get("gsis_id") or "").strip()
         if not pid:
             continue
+        identity = (pid, int(row["season"]), int(row["week"]))
+        if identity in seen_stat_games:
+            raise NFLContextError(f"duplicate stat player-game source row:{pid}")
+        seen_stat_games.add(identity)
         meta[pid] = {
             "team": str(row.get("team") or row.get("recent_team") or "").upper(),
             "position": str(row.get("position") or "").upper(),
