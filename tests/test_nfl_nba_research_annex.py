@@ -117,6 +117,20 @@ def test_missing_pair_stale_and_untrusted_book_refuse():
     assert untrusted["readouts"][0]["reason"] == "DRAFTKINGS_QUOTE_REQUIRED"
 
 
+def test_source_row_must_have_its_own_close_opposite_quote():
+    # A separate perfectly paired OVER/UNDER cannot rescue an early
+    # same-side row captured 150 seconds from the opposite side.
+    fresh = [dict(row, quote_captured_at="2026-10-20T19:59:30Z")
+             for row in _quotes("NFL", "TARGETS", player_id="p1")]
+    early = dict(fresh[0], quote_captured_at="2026-10-20T19:57:00Z")
+    rows = [early] + fresh
+    out = build_annex(rows, [{}] * 3, **_kwargs("NFL", _nfl_history()))
+    assert out["readouts"][0]["status"] == "REFUSED"
+    assert out["readouts"][0]["reason"] == "DK_PAIR_CAPTURE_SPAN_EXCEEDED"
+    assert all(r["status"] == "RESEARCH_ESTIMATE_UNVALIDATED"
+               for r in out["readouts"][1:])
+
+
 def test_stale_future_or_malformed_source_row_cannot_borrow_fresh_pair():
     # Three matching rows: the first is invalid, but the other two form a
     # valid DK two-sided pair. All three inputs are independently assessed.
