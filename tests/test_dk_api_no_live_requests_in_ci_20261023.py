@@ -1047,3 +1047,98 @@ def test_gate_not_dropped_for_other_threads_while_one_thread_checks():
                 release.set(); t.join(10)
     finally:
         st.checker = real
+
+
+# ---- t262: every socket.* audit event, _posixsubprocess.fork_exec, jail for DK tests -------
+_DOCS_EVENTS = JAIL_DIR / "cpython_3_13_audit_events.txt"
+
+
+def _docs_events(prefix=""):
+    names = [l.strip() for l in _DOCS_EVENTS.read_text(encoding="utf-8").splitlines()
+             if l.strip() and not l.startswith("#")]
+    return {n for n in names if n.startswith(prefix)}
+
+
+def test_docs_event_list_matches_running_python_series():
+    assert sys.version_info[:2] == (3, 13), "re-vendor the audit events table for this Python"
+    assert {"socket.connect", "socket.sendmsg", "os.system", "subprocess.Popen"} <= _docs_events()
+
+
+def test_every_documented_socket_audit_event_is_handled():
+    docs = _docs_events("socket.")
+    assert len(docs) >= 13, docs
+    missing = docs - set(_net_audit()._EVENTS)
+    assert not missing, missing
+
+
+def test_every_documented_process_launch_event_is_handled():
+    launch = {e for e in _docs_events() if e in _CPYTHON_PROCESS_LAUNCH_EVENTS or e.startswith(
+        ("os.exec", "os.spawn", "os.posix_spawn", "os.fork", "pty.", "subprocess."))} | {"os.system", "os.startfile"}
+    assert not (launch - set(_net_audit()._EVENTS))
+
+
+def test_socket_name_and_address_events_refuse_non_loopback():
+    st = _net_audit().STATE
+    with _net_audit().active():
+        for event, args in (("socket.sendmsg", (None, (_PROBE, 9))),
+                            ("socket.gethostbyname", (_PROBE,)),
+                            ("socket.gethostbyaddr", ("203.0.113.7",)),
+                            ("socket.getnameinfo", ((_PROBE, 443),))):
+            with pytest.raises(DraftKingsBlocked, match=f"LIVE_NETWORK_BLOCKED:audit:{event}"):
+                st.hook(event, args)
+        for event, args in (("socket.sendmsg", (None, None)), ("socket.sendmsg", (None, ("127.0.0.1", 9))),
+                            ("socket.gethostbyname", ("localhost",)), ("socket.__new__", (None, 2, 1, 0)),
+                            ("socket.gethostname", ()), ("socket.getservbyname", ("https", "tcp")),
+                            ("socket.getservbyport", (443, "tcp"))):
+            st.hook(event, args)
+
+
+def test_real_sendmsg_refused_inside_dk_block(dk_block):
+    s = socket.socket.__bases__[0](socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED"):
+            s.sendmsg([b"x"], [], 0, ("203.0.113.7", 9))      # TEST-NET-3 literal, no DNS
+    finally:
+        s.close()
+
+
+def _fork_exec_curl():
+    import _posixsubprocess
+    curl = shutil.which("curl") or "/usr/bin/curl"
+    errr, errw = os.pipe()
+    try:
+        pid = _posixsubprocess.fork_exec(
+            [curl, "-sS", "-m", "5", "-o", "/dev/null", f"https://{_PROBE}/"], [os.fsencode(curl)],
+            True, (errw,), None, None, -1, -1, -1, -1, -1, -1, errr, errw, False, False,
+            -1, None, None, -1, -1, None, False)
+        os.close(errw); errw = -1
+        os.waitpid(pid, 0)
+        return pid
+    finally:
+        os.close(errr)
+        if errw >= 0:
+            os.close(errw)
+
+
+def test_auditor_repro_posixsubprocess_fork_exec_curl_refused(dk_block):
+    with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED:_posixsubprocess.fork_exec"):
+        _fork_exec_curl()
+
+
+def test_subprocess_module_fork_exec_alias_is_guarded_too(dk_block):
+    import _posixsubprocess
+    assert subprocess._fork_exec is _posixsubprocess.fork_exec
+    assert getattr(subprocess._fork_exec, "_sportsedge_net_guard", False)
+    assert subprocess.run(["true"]).returncode == 0          # ordinary children still run
+
+
+def test_guarded_dk_tests_run_inside_jail_where_available():
+    if os.environ.get("SPORTSEDGE_NET_JAILED") == "1" or os.environ.get("SPORTSEDGE_NET_JAIL_FORCE_FALLBACK") == "1":
+        pytest.skip("nested run")
+    rj = _load_run_jailed()
+    if rj.unshare_prefix() is None:
+        pytest.skip("NET_JAIL_UNAVAILABLE")
+    r = subprocess.run(rj.jailed_argv([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
+                                       __file__, "-k", "guard_blocks or makes_no_live_dk_request"]),
+                       cwd=ROOT, env=rj.jailed_env(), capture_output=True, text=True, timeout=600)
+    assert r.returncode == 0 and " passed" in r.stdout and " failed" not in r.stdout, r.stdout[-2000:]
