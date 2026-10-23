@@ -18,6 +18,16 @@ The v1 documents and records are not edited. Status: draft for owner freeze.
   FAVORABLE (all close lines moved toward the pick: up for OVER, down for UNDER),
   ADVERSE (all moved away), AMBIGUOUS (close lines on both sides of entry),
   NO_PICK (no determinate pick). Stays in win/loss.
+- A row is LINE_MOVED only if the close capture holds a readable two-sided,
+  pre-kickoff close at the new line, captured no more than 60 minutes
+  (v1 CLOSE_MAX_AGE_MINUTES) before kickoff. v1's `attach_close` labels
+  LINE_MOVED before its timestamp and two-sided checks, so v1.1 re-checks every
+  v1 LINE_MOVED row against the closes at other lines. If none qualifies, the row
+  is a CAPTURE_FAILURE with reason, by precedence: NO_CLOSE_ROW (no other-line
+  close) → CLOSE_SINGLE_SIDED (none two-sided) → CLOSE_NOT_PREKICKOFF (two-sided
+  but none pre-kickoff) → CLOSE_STALE (two-sided pre-kickoff but all too old).
+  A close without a timestamp is a hard error.
+- Direction uses only the final (latest) qualifying pre-kickoff capture.
 - CAPTURE_FAILURE: NO_CLOSE_ROW, CLOSE_SINGLE_SIDED, CLOSE_STALE, CLOSE_NOT_PREKICKOFF.
 - Any other close state is a hard error (fail closed).
 
@@ -26,7 +36,9 @@ The v1 documents and records are not edited. Status: draft for owner freeze.
 2. CAPTURE_FAILURE share > 20% of graded rows → INSUFFICIENT_CLOSE_DATA.
 3. Required co-test: exact one-sided binomial sign test on the moved bucket,
    H0 p=0.5, H1 adverse > favorable, α = 0.05; AMBIGUOUS counts as adverse,
-   NO_PICK excluded. Rejection → DOES_NOT_BEAT_MARKET
+   NO_PICK excluded. Counting AMBIGUOUS as adverse makes the test
+   conservative against the family: under a true null its real
+   false-rejection rate is above the nominal 5%. Rejection → DOES_NOT_BEAT_MARKET
    (reason MOVED_BUCKET_ADVERSE_SIGN_TEST).
 4. LINE_MOVED share > 50% of graded rows → LOW_COVERAGE: reported, cannot open PLAY alone.
 5. v1 primary CLV test on READABLE rows passes → BEATS_MARKET; else DOES_NOT_BEAT_MARKET.

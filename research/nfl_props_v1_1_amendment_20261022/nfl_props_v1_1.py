@@ -27,6 +27,7 @@ LOW_COVERAGE_LIMIT = 0.50
 FREEZE_DEADLINE = datetime(2026, 10, 25, 17, 0, 0, tzinfo=timezone.utc)
 CAPTURE_FAILURE_REASONS = frozenset(
     {"NO_CLOSE_ROW", "CLOSE_SINGLE_SIDED", "CLOSE_STALE", "CLOSE_NOT_PREKICKOFF"})
+CLOSE_MAX_AGE_MINUTES = 60  # frozen v1 value (Part 2 :44, 2B :55)
 SAMPLE_GATES = frozenset({"INSUFFICIENT_SAMPLE", "REVIEW_NOT_OPEN"})
 
 
@@ -50,24 +51,66 @@ def move_direction(side: str, entry_line: float, close_lines) -> str:
     return "FAVORABLE" if (up == (side == "OVER")) else "ADVERSE"
 
 
+def _two_sided(c: dict) -> bool:
+    return c.get("over_price") is not None and c.get("under_price") is not None
+
+
+def recheck_moved(row: dict, other_line_closes: list) -> tuple[str, str | None, dict | None]:
+    """Re-check a v1 LINE_MOVED row (v1 attach_close assigns LINE_MOVED
+    before its timestamp / two-sided checks). Returns (bucket, reason, info).
+    A row is moved only if >=1 close at another line is two-sided,
+    pre-kickoff and within CLOSE_MAX_AGE_MINUTES. Otherwise, precedence
+    (best close found wins, mirroring v1's check order):
+      no other-line close           -> NO_CLOSE_ROW
+      none two-sided                -> CLOSE_SINGLE_SIDED
+      two-sided but none pre-kickoff -> CLOSE_NOT_PREKICKOFF
+      two-sided pre-kickoff, all too old -> CLOSE_STALE
+    Direction uses only the final (latest captured_at) qualifying capture."""
+    kickoff = _ts(row["kickoff"])
+    for c in other_line_closes:
+        if "captured_at" not in c or c["captured_at"] is None:
+            raise ValueError(f"row {row.get('row_id')}: close without captured_at")
+    if not other_line_closes:
+        return "CAPTURE_FAILURE", "NO_CLOSE_ROW", None
+    two = [c for c in other_line_closes if _two_sided(c)]
+    if not two:
+        return "CAPTURE_FAILURE", "CLOSE_SINGLE_SIDED", None
+    pre = [c for c in two if _ts(c["captured_at"]) < kickoff]
+    if not pre:
+        return "CAPTURE_FAILURE", "CLOSE_NOT_PREKICKOFF", None
+    ok = [c for c in pre
+          if (kickoff - _ts(c["captured_at"])).total_seconds() <= CLOSE_MAX_AGE_MINUTES * 60]
+    if not ok:
+        return "CAPTURE_FAILURE", "CLOSE_STALE", None
+    last = max(_ts(c["captured_at"]) for c in ok)
+    final = [c for c in ok if _ts(c["captured_at"]) == last]
+    return "LINE_MOVED", "LINE_MOVED", {
+        "captured_at": final[0]["captured_at"], "lines": sorted({float(c["line"]) for c in final})}
+
+
 def annotate_moved(rows: list, close_capture: dict) -> list:
-    lines_by = {}
+    closes_by = {}
     for c in close_capture.get("rows", []):
-        lines_by.setdefault((c["game_id"], c["player_id"], c["market"]), []).append(c["line"])
+        closes_by.setdefault((c["game_id"], c["player_id"], c["market"]), []).append(c)
     out = []
     for r in rows:
         o = dict(r)
+        o["v11_close_captured_at"] = None
         st, reason = r.get("close_status"), r.get("clv_missing_reason")
         if st == "READABLE":
-            o["v11_bucket"], o["move_direction"] = "READABLE", None
+            o["v11_bucket"], o["v11_reason"], o["move_direction"] = "READABLE", None, None
         elif st == "CLV_MISSING" and reason == "LINE_MOVED":
             key = (r["game_id"], r["player_id"], r["market"])
-            o["v11_bucket"] = "LINE_MOVED"
-            o["move_direction"] = move_direction(r.get("selected_side"), r["line"],
-                                                 lines_by.get(key, []))
-            o["clv"] = None
+            others = [c for c in closes_by.get(key, []) if float(c["line"]) != float(r["line"])]
+            bucket, why, info = recheck_moved(r, others)
+            o["v11_bucket"], o["v11_reason"], o["clv"] = bucket, why, None
+            if info:
+                o["move_direction"] = move_direction(r.get("selected_side"), r["line"], info["lines"])
+                o["v11_close_captured_at"] = info["captured_at"]
+            else:
+                o["move_direction"] = None
         elif st == "CLV_MISSING" and reason in CAPTURE_FAILURE_REASONS:
-            o["v11_bucket"], o["move_direction"] = "CAPTURE_FAILURE", None
+            o["v11_bucket"], o["v11_reason"], o["move_direction"] = "CAPTURE_FAILURE", reason, None
         else:
             raise ValueError(f"row {r.get('row_id')}: unclassifiable close {st}/{reason}")
         out.append(o)
