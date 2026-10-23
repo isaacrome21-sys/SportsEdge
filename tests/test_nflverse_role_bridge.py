@@ -51,6 +51,23 @@ class NflverseRoleBridgeTests(unittest.TestCase):
         self.assertAlmostEqual(out["team_scoring"]["CHI"]["rushing_tds"], 1.0)
         self.assertAlmostEqual(out["team_scoring"]["CHI"]["pass_td_share"], 2 / 3)
 
+    def test_rejects_duplicate_player_game_before_double_counting_volume(self):
+        row = self._rows()[0]
+        with self.assertRaisesRegex(NFLContextError, "duplicate player-game source row"):
+            self._build([row, dict(row)])
+
+    def test_rejects_same_player_week_with_different_game_id(self):
+        row = self._rows()[0]
+        duplicate_week = dict(row, game_id="different_archive_game")
+        with self.assertRaisesRegex(NFLContextError, "duplicate player-game source row"):
+            self._build([row, duplicate_week])
+
+    def test_rejects_reused_game_id_across_different_weeks(self):
+        row = self._rows()[0]
+        duplicate_game = dict(row, week=2)
+        with self.assertRaisesRegex(NFLContextError, "duplicate player-game source row"):
+            self._build([row, duplicate_game])
+
     def test_rejects_target_week_row(self):
         rows = self._rows()
         rows[0] = dict(rows[0], week=3)
