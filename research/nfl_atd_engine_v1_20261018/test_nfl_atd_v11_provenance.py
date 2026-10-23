@@ -27,7 +27,11 @@ def ev_for(api, commit):
 
 # Ported (re-audit of 87236180): slates now need real hash-named data
 # records; TestFetchAndSlateC publishes them and passes their shas here.
-STATS_BODY, SCHED_BODY = b"\x1f\x8bstats", "game_id,season,game_type,week,gameday,gametime,away_team,home_team\n"
+# (port, re-audit 5150203a: load_slate now parses the stats record, so it
+# must be real gzip CSV)
+import gzip
+STATS_BODY = gzip.compress(b"player_id,season,season_type,week,recent_team\n", mtime=0)
+SCHED_BODY = ( "game_id,season,game_type,week,gameday,gametime,away_team,home_team\n")
 
 
 def run_rec(api, sid="S1", t="2026-10-25T16:30:00Z", cap=CAP, ko=KO, rows=None,
