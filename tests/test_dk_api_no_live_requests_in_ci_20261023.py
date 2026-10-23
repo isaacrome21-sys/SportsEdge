@@ -625,7 +625,6 @@ def test_guarded_list_matches_workflows():
 
 # --- t258: bypasses found by the t255 audit (LOW). Every check below targets a NON-DK
 # host (or a pure function), so neither the RED run nor any CI run ever touches DraftKings.
-import shutil
 
 _JAIL_RESULTS = {}
 
