@@ -5,7 +5,6 @@ env-only test switch that can never produce a binding verdict. RED first.
 import inspect
 import json
 import os
-import pickle
 import subprocess
 import sys
 import tempfile
@@ -24,8 +23,9 @@ SCORER = HERE / "score_nfl_atd_forward.py"
 
 def run_cli(api, ids, wt, extra_env=None, switch=True):
     d = tempfile.mkdtemp()
-    st = Path(d) / "fake_state.pickle"
-    st.write_bytes(pickle.dumps(api))
+    # port (re-audit 65e27e20): the test switch state is JSON, not pickle
+    st = Path(d) / "fake_state.json"
+    st.write_text(api.to_json())
     env = {k: v for k, v in os.environ.items() if k != "GITHUB_TOKEN"}
     env["PYTHONPATH"] = str(HERE)
     if switch:
@@ -93,12 +93,14 @@ class TestBindingCount(unittest.TestCase):
         with mock.patch.object(sc, "_review_env_guard", lambda: None):
             self.assertFalse(sc.verdict_counts(api))
 
-    def test_binding_verdict_counts(self):
+    def test_self_asserted_binding_does_not_count(self):
+        # port (re-audit 65e27e20): a bare {"binding": true} used to count;
+        # it is exactly the forgery now refused (VERDICT_UNVERIFIED)
         api = FakeGitHub()
         api.commit(pv.RECORDS_BRANCH, {sc.VERDICT_PATH: json.dumps({"binding": True})},
                    "2026-11-30T00:00:00Z")
         with mock.patch.object(sc, "_review_env_guard", lambda: None):
-            self.assertTrue(sc.verdict_counts(api))
+            self.assertFalse(sc.verdict_counts(api))
 
 
 class TestGuardEverywhere(unittest.TestCase):

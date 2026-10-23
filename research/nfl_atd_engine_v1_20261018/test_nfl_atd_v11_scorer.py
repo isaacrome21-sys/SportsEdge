@@ -139,7 +139,7 @@ class TestRule6Gates(unittest.TestCase):
         self.assertEqual(v["n_picked"], 168)
         self.assertEqual(v["n_games"], 56)
         # Later slates do not enter the sample of record.
-        strip = lambda d: {k: x for k, x in d.items() if k not in ("run_proofs", "inputs_sha256", "inputs")}
+        strip = lambda d: {k: x for k, x in d.items() if k not in ("run_proofs", "inputs_sha256", "inputs", "slate_ids")}  # port: slate_ids = review input list
         self.assertEqual(strip(v), strip(_review(led[:4])))
 
     def test_games_minimum_not_cap(self):

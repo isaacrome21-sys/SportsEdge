@@ -49,6 +49,9 @@ def run_rec(api, sid="S1", t="2026-10-25T16:30:00Z", cap=CAP, ko=KO, rows=None,
     from fake_github_api import FAKE_PRICER_SHA, publish_board
     bsha = publish_board(api, {"slate_id": sid, "season": 2026, "week": 8,
                                "captured_at": cap, "rows": rows or []}, "2026-10-25T15:10:00Z")
+    fzc = api.file_commits(BR, pv.FREEZE_PATH)   # port: store FREEZE event too
+    if stored and fzc:
+        fp["freeze"] = {"event": ev_for(api, fzc[0])}
     bc = api.file_commits(BR, pv.board_record_path(bsha, 2026, 8))
     if stored and bc:
         fp["board"] = {"event": ev_for(api, bc[0])}
