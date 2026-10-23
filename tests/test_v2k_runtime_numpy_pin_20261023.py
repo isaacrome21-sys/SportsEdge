@@ -52,3 +52,19 @@ def test_venv_helper_uses_constraints():
 def test_pinned_venv_dir_is_gitignored():
     lines = {l.strip() for l in (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()}
     assert ".venv-pinned/" in lines
+
+
+def test_venv_helper_default_path_is_outside_repo():
+    sh = (ROOT / "scripts" / "make_pinned_test_venv.sh").read_text(encoding="utf-8")
+    assert '${TMPDIR:-/tmp}/sportsedge-venv-pinned' in sh
+    assert 'VENV="${1:-.venv-pinned}"' not in sh
+
+
+def test_venv_helper_refuses_in_repo_paths(tmp_path):
+    import subprocess
+    for bad in (".venv-pinned", str(ROOT / ".venv-pinned"), "tests/../x", str(ROOT)):
+        r = subprocess.run(["bash", str(ROOT / "scripts" / "make_pinned_test_venv.sh"), bad],
+                           cwd=ROOT, capture_output=True, text=True, timeout=60)
+        assert r.returncode != 0, bad
+        assert "VENV_INSIDE_REPO_REFUSED" in r.stderr, bad
+        assert not (ROOT / ".venv-pinned").exists()
