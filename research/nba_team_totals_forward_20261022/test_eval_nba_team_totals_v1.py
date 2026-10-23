@@ -43,7 +43,7 @@ def entry_quotes(game, team, line, *, t, over=-110, under=-110,
 
 
 def close_quotes(game, team, line, *, t, over=-110, under=-110, span=0,
-                 cap="C1", sides=("OVER", "UNDER")):
+                 cap="C1", sides=("OVER", "UNDER"), main=True):
     out = []
     for s in sides:
         out.append({"game_id": game, "team": team, "line": line, "side": s,
@@ -51,7 +51,7 @@ def close_quotes(game, team, line, *, t, over=-110, under=-110, span=0,
                     "captured_at": iso(t + (timedelta(seconds=span)
                                             if s == "UNDER" else timedelta())),
                     "designation": "CLOSE", "book": "DraftKings",
-                    "capture_id": cap})
+                    "capture_id": cap, "is_main": main})
     return out
 
 
@@ -259,7 +259,8 @@ def test_excluded_and_counted():
                       [], cfg())
     x = out["excluded"]
     assert x["VOID"] == 1 and x["RESULT_UNAVAILABLE"] == 1
-    assert x["PUSH"] == 1 and x["GAP_ZERO"] == 1
+    assert x["GAP_ZERO"] == 1
+    assert "PUSH" not in x  # audit minor: PUSH hidden until review
 
 
 # §3 missing offers reported, never backfilled or counted
@@ -421,7 +422,179 @@ def test_devig_and_bonferroni_level():
 def test_binding_flag():
     o = ev.evaluate([], [], [], {}, {}, [], cfg())
     assert o["binding"] is False  # 400 resamples in tests
-    o = ev.evaluate([], [], [], {}, {}, [], {"first_counted_slate": "x"})
+    o = ev.evaluate([], [], [], {}, {}, [], {"first_counted_slate": "x",
+                                             "clock_ids": CLOCKS9})
     assert o["binding"] is True and o["resamples"] == 10_000
     o = ev.evaluate([], [], [], {}, {}, [], cfg(resamples=10_000, k=8))
     assert o["binding"] is False
+
+
+# ---------------------------------------------------------------------------
+# Audit round 1 fixes (F1-F5 + minors). AMENDMENT_1.md declares new codes.
+CLOCKS9 = [f"CLOCK_{i}" for i in range(9)]
+AMEND_CODES = {"DUPLICATE_ROW", "ENTRY_QUOTE_CONFLICT", "ROW_MALFORMED",
+               "QUOTE_TIMESTAMP_INVALID", "CAPTURE_ID_MISSING",
+               "PRICED_BEFORE_QUOTE", "SLATE_DATE_MISMATCH"}
+AMEND_CLV = {"CLOSE_QUOTE_CONFLICT", "CLOSE_TIMESTAMP_INVALID",
+             "CLOSE_CAPTURE_ID_MISSING", "CLOSE_MAIN_FLAG_MISSING"}
+
+
+def _ev(rows, ents, cls, res, **kw):
+    return ev.evaluate(rows, ents, cls, res, full_slates(["2026-11-01"]),
+                       [], cfg(**kw))
+
+
+def test_amendment_pinned_and_codes_declared():
+    import hashlib
+    txt = (HERE / "AMENDMENT_1.md").read_bytes()
+    assert hashlib.sha256(txt).hexdigest() == ev.AMENDMENT_1_SHA256
+    for c in AMEND_CODES | AMEND_CLV:
+        assert f"`{c}`".encode() in txt
+    assert AMEND_CODES <= ev.DECLARED_REFUSALS
+    assert AMEND_CLV <= ev.CLV_MISSING
+    assert ev.verify_amendment() is True
+
+
+# F1 duplicates: every copy refused
+def test_f1_duplicate_row_refuses_every_copy():
+    rows, ents, cls, res = one_game("g1", 115, 110.5, 112)
+    rows = rows + [dict(rows[0])]
+    out = _ev(rows, ents, cls, res)
+    assert out["refusals"].get("DUPLICATE_ROW") == 2
+    assert out["counts"]["engine_priced_rows"] == 0
+
+
+# F1 conflicting entry quotes within one capture/line/side
+def test_f1_entry_quote_conflict():
+    rows, ents, cls, res = one_game("g1", 115, 110.5, 112)
+    bad = dict(ents[0]); bad["price"] = -150
+    out = _ev(rows, ents + [bad], cls, res)
+    assert out["refusals"].get("ENTRY_QUOTE_CONFLICT") == 1
+    # identical repeat is not a conflict
+    out = _ev(rows, ents + [dict(ents[0])], cls, res)
+    assert out["counts"]["engine_priced_rows"] == 1
+
+
+# F1 conflicting close quotes invalidate that pair
+def test_f1_close_quote_conflict():
+    t = TIP0 - timedelta(minutes=5)
+    q = close_quotes("g1", "Tg1", 110.5, t=t)
+    bad = dict(q[1]); bad["price"] = +120
+    assert _close_reason(q + [bad]) == "CLOSE_QUOTE_CONFLICT"
+
+
+# F2 evaluate verifies the frozen doc
+def test_f2_evaluate_calls_verify(monkeypatch):
+    monkeypatch.setattr(ev, "FROZEN_DOC_SHA256", "0" * 64)
+    with pytest.raises(RuntimeError):
+        ev.evaluate([], [], [], {}, {}, [], cfg())
+
+
+def test_f2_binding_requires_clock_ids_len_k():
+    base = {"first_counted_slate": "x"}
+    assert ev.evaluate([], [], [], {}, {}, [], base)["binding"] is False
+    o = ev.evaluate([], [], [], {}, {}, [], {**base,
+                                             "clock_ids": CLOCKS9[:8]})
+    assert o["binding"] is False
+    o = ev.evaluate([], [], [], {}, {}, [], {**base, "clock_ids": CLOCKS9})
+    assert o["binding"] is True and o["doc_hash_ok"] is True
+
+
+# F3 malformed timestamp refuses only that row
+def test_f3_malformed_row_timestamp_isolated():
+    a = one_game("g1", 115, 110.5, 112)
+    b = one_game("g2", 115, 110.5, 112)
+    rows, ents, cls, res = merge(a, b)
+    rows[0]["tipoff"] = "not-a-time"
+    out = _ev(rows, ents, cls, res)
+    assert out["refusals"].get("ROW_MALFORMED") == 1
+    assert out["counts"]["engine_priced_rows"] == 1
+    rows[0]["tipoff"] = "2026-11-02T00:00:00"  # zoneless
+    out = _ev(rows, ents, cls, res)
+    assert out["refusals"].get("ROW_MALFORMED") == 1
+
+
+def test_f3_bad_quote_timestamps():
+    rows, ents, cls, res = one_game("g1", 115, 110.5, 112)
+    e2 = [dict(q) for q in ents]; e2[0]["captured_at"] = "garbage"
+    out = _ev(rows, e2, cls, res)
+    assert out["refusals"].get("QUOTE_TIMESTAMP_INVALID") == 1
+    c2 = [dict(q) for q in cls]; c2[1]["captured_at"] = "garbage"
+    out = _ev(rows, ents, c2, res)
+    assert out["clv_missing"].get("CLOSE_TIMESTAMP_INVALID") == 1
+
+
+def test_f3_nonfinite_fields():
+    rows, ents, cls, res = one_game("g1", 115, 110.5, float("nan"))
+    out = _ev(rows, ents, cls, res)
+    assert out["excluded"].get("RESULT_UNAVAILABLE") == 1
+    for fld in ("b1_team_mean", "b2_league_mean"):
+        rows, ents, cls, res = one_game("g1", 115, 110.5, 112)
+        rows[0]["engine"][fld] = float("inf")
+        assert _ev(rows, ents, cls, res)["refusals"].get(
+            "ROW_MALFORMED") == 1
+    rows, ents, cls, res = one_game("g1", 115, 110.5, 112)
+    for q in ents:
+        q["line"] = float("nan")
+    assert _ev(rows, ents, cls, res)["refusals"].get("PRICE_INVALID") == 1
+
+
+# F4 priced_at window and slate date
+def test_f4_priced_before_quote():
+    et = TIP0 - timedelta(hours=5)
+    rows = [priced("g1", "Tg1", 115, priced_at=et - timedelta(seconds=1))]
+    out = _ev(rows, entry_quotes("g1", "Tg1", 110.5, t=et), [], {})
+    assert out["refusals"].get("PRICED_BEFORE_QUOTE") == 1
+    rows = [priced("g1", "Tg1", 115, priced_at=et + timedelta(seconds=181))]
+    out = _ev(rows, entry_quotes("g1", "Tg1", 110.5, t=et), [], {})
+    assert out["refusals"].get("QUOTE_STALE_180S") == 1
+    rows = [priced("g1", "Tg1", 115, priced_at=et + timedelta(seconds=180))]
+    out = _ev(rows, entry_quotes("g1", "Tg1", 110.5, t=et), [], {})
+    assert out["counts"]["engine_priced_rows"] == 1
+
+
+def test_f4_slate_date_is_tipoff_ct_date():
+    # TIP0 = 2026-11-02 00:00Z = 2026-11-01 18:00 CT
+    rows, ents, cls, res = one_game("g1", 115, 110.5, 112,
+                                    slate="2026-11-02")
+    out = _ev(rows, ents, cls, res)
+    assert out["refusals"].get("SLATE_DATE_MISMATCH") == 1
+
+
+# F5 post-tip capture is the last capture; main-line closes only
+def test_f5_post_tip_capture_blocks_close():
+    q = (close_quotes("g1", "Tg1", 110.5, t=TIP0 - timedelta(minutes=10),
+                      cap="C1")
+         + close_quotes("g1", "Tg1", 110.5, t=TIP0 + timedelta(minutes=1),
+                        cap="C2"))
+    assert _close_reason(q) == "CLOSE_NOT_PRETIP"
+    q = (close_quotes("g1", "Tg1", 110.5, t=TIP0 - timedelta(minutes=10),
+                      cap="C1")
+         + close_quotes("g1", "Tg1", 110.5, t=TIP0 - timedelta(seconds=30),
+                        span=60, cap="C2"))  # straddles tip
+    assert _close_reason(q) == "CLOSE_NOT_PRETIP"
+
+
+def test_f5_main_line_close_only():
+    t = TIP0 - timedelta(minutes=5)
+    q = (close_quotes("g1", "Tg1", 110.5, t=t)
+         + close_quotes("g1", "Tg1", 112.5, t=t, main=False))
+    st = ev.close_status(q, "g1", "Tg1", 110.5, TIP0)
+    assert st["reason"] is None and not st["moved"]
+    st = ev.close_status(close_quotes("g1", "Tg1", 112.5, t=t, main=False)
+                         + close_quotes("g1", "Tg1", 108.5, t=t),
+                         "g1", "Tg1", 112.5, TIP0)
+    assert st["moved"] and st["close_lines"] == [108.5]
+    q = close_quotes("g1", "Tg1", 110.5, t=t)
+    del q[0]["is_main"]
+    assert _close_reason(q) == "CLOSE_MAIN_FLAG_MISSING"
+
+
+# Minor: missing capture_id
+def test_minor_missing_capture_id():
+    rows, ents, cls, res = one_game("g1", 115, 110.5, 112)
+    e2 = [dict(q) for q in ents]; del e2[0]["capture_id"]
+    assert _ev(rows, e2, cls, res)["refusals"].get("CAPTURE_ID_MISSING") == 1
+    c2 = [dict(q) for q in cls]; c2[0]["capture_id"] = None
+    assert _ev(rows, ents, c2, res)["clv_missing"].get(
+        "CLOSE_CAPTURE_ID_MISSING") == 1
