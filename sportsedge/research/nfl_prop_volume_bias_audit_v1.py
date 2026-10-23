@@ -128,6 +128,9 @@ def audit_nfl_prop_volume_bias(rows: Sequence[Mapping[str, Any]]) -> dict[str, A
         counts = Counter(r["side"] for r in items)
         directional = counts["UNDER"] + counts["OVER"]
         independent_games = len({r["event_id"] for r in items})
+        # Yards, catches and counts are different units: an average across
+        # market families has no statistical interpretation.
+        error_units_comparable = len({r["market"] for r in items}) <= 1
         direction_outcomes = {
             side: {
                 "hit": sum(bool(r["under_realized"] if side == "UNDER" else r["over_realized"])
@@ -149,8 +152,13 @@ def audit_nfl_prop_volume_bias(rows: Sequence[Mapping[str, Any]]) -> dict[str, A
             "tie": counts["TIE"],
             "under_share": counts["UNDER"] / directional if directional else None,
             "direction_outcomes": direction_outcomes,
-            "mean_model_minus_actual": mean(r["model_minus_actual"] for r in items) if items else None,
-            "mean_model_minus_market": mean(r["model_minus_market"] for r in items) if items else None,
+            "mean_model_minus_actual": (mean(r["model_minus_actual"] for r in items)
+                                        if items and error_units_comparable else None),
+            "mean_model_minus_market": (mean(r["model_minus_market"] for r in items)
+                                        if items and error_units_comparable else None),
+            "mean_error_scope": ("NO_ROWS" if not items else
+                                 "PER_MARKET" if error_units_comparable else
+                                 "MIXED_MARKETS_NOT_COMPARABLE"),
             "published_direction_mismatches": sum(not r["published_side_agrees"] for r in items),
             "one_direction_warning": (
                 directional >= 20 and independent_games >= 5
