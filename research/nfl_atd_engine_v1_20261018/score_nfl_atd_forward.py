@@ -241,6 +241,44 @@ def score_slate_rows(api, slate_id):
     return _score_rows(rows, closes, setl["settlements"])
 
 
+class ReviewEnvUntrusted(Exception):
+    code = "REVIEW_ENV_UNTRUSTED"
+
+
+def _review_env_problems(replayers_fn, original_fn, modules) -> list:
+    import price_nfl_atd_board_v11 as pr
+    out = []
+    if replayers_fn is not original_fn:
+        out.append("replayers_patched")
+    if "fake_github_api" in modules:
+        out.append("fake_module_loaded")
+    try:
+        keys = set(replayers_fn())
+    except Exception:
+        keys = None
+    if keys != {pr.pricer_sha256()}:
+        out.append("replayer_keys")
+    return out
+
+
+def _review_env_guard():
+    """Refuse unless the replay registry is the untouched production one."""
+    import sys
+    probs = _review_env_problems(pv.replayers, pv._ORIGINAL_REPLAYERS, sys.modules)
+    if probs:
+        raise ReviewEnvUntrusted(f"REVIEW_ENV_UNTRUSTED: {', '.join(probs)}")
+
+
+def _env_record() -> dict:
+    import hashlib
+    import platform
+    import price_nfl_atd_board_v11 as pr
+    return {"pricer_sha256": pr.pricer_sha256(),
+            "scorer_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            "python_version": platform.python_version(),
+            "platform": platform.platform()}
+
+
 def review(slate_ids, *, records_worktree, api):
     """Single review, reading ONLY records on the records-branch head: each
     slate's rows/hashes from its pushed run record, close captures from
@@ -249,6 +287,7 @@ def review(slate_ids, *, records_worktree, api):
     records branch whose origin is the SportsEdge repo, and if the verdict
     path has EVER had a commit (API). SCREEN slates are excluded. The verdict
     is staged create-only at the fixed path; it counts only once pushed."""
+    _review_env_guard()                 # first: before token, worktree, API
     pv.require_token(api)
     wt = _check_worktree(records_worktree)
     if _verdict_ever_existed(api) or (wt / VERDICT_PATH).exists():
@@ -279,7 +318,7 @@ def review(slate_ids, *, records_worktree, api):
                      n_slates=len(inputs["run_records"]), screen_slates=screen,
                      refusals_by_slate={k: refusals_by_slate[k] for k in proofs},
                      records_branch=pv.RECORDS_BRANCH, verdict_path=VERDICT_PATH,
-                     run_proofs=proofs, reviewed_at=now.isoformat())
+                     run_proofs=proofs, reviewed_at=now.isoformat(), **_env_record())
             path = wt / VERDICT_PATH
             path.parent.mkdir(parents=True, exist_ok=True)
             try:

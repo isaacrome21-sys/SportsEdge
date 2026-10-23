@@ -71,14 +71,13 @@ def canonical_json(obj) -> bytes:
                       ensure_ascii=False, allow_nan=False).encode()
 
 
-# Replayers by pricer sha256. The real frozen pricer is added lazily (its
-# sha is computed from its code); EXTRA_REPLAYERS is a test hook only.
-EXTRA_REPLAYERS: dict = {}
-
-
 def replayers() -> dict:
+    """The only replayer: the pricer whose code hashes to pricer_sha256()."""
     import price_nfl_atd_board_v11 as pr
-    return {**EXTRA_REPLAYERS, pr.pricer_sha256(): pr.replay}
+    return {pr.pricer_sha256(): pr.replay}
+
+
+_ORIGINAL_REPLAYERS = replayers     # identity checked by the review guard
 
 
 DATA_EXT = {"schedule": "csv", "stats": "csv.gz"}

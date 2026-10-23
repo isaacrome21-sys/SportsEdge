@@ -156,6 +156,15 @@ Selection, edge, settlement: locked #2399 Rules 1, 2, 3, 7, 8, 9.
   stay as clearer codes. Owner item at freeze: the pricer sha is then the
   frozen one, and any later code change makes old records unreplayable
   (SCREEN), by design.
+- Review environment (re-audit of 8d86e7a9). The only replayer is the
+  pricer whose code hashes to `pricer_sha256()`; there is no registration
+  hook. `review()` first refuses with **REVIEW_ENV_UNTRUSTED** if
+  `replayers` is not the original function, `fake_github_api` is loaded, or
+  the replayer keys are not exactly `{pricer_sha256()}`. The verdict records
+  `pricer_sha256`, `scorer_sha256` (of score_nfl_atd_forward.py),
+  `python_version` and `platform`. The binding review runs the frozen code
+  from its CLI, in a fresh process, on the same interpreter version as the
+  pricer; in-process monkeypatching is out of scope.
 - Close captures: each close capture file is its own single-commit record
   named by the sha256 of its content, filed under the game's season-week.
   A close record that cannot be parsed, has no game, or is filed under the
