@@ -158,3 +158,37 @@ def audit_nfl_prop_volume_bias(rows: Sequence[Mapping[str, Any]]) -> dict[str, A
         "play_authority": False,
         "research_only": True,
     }
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Read an independently joined postgame artifact and print JSON.
+
+    From the repo root::
+
+        python -m sportsedge.research.nfl_prop_volume_bias_audit_v1 --input joined_rows.json
+
+    Input must declare source_type=JOINED_POSTGAME_DIAGNOSTIC_INPUT and
+    research_only=true. No missing source receipt is fetched or synthesized.
+    """
+    import argparse
+    import json
+    from pathlib import Path
+
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("--input", required=True, help="Existing timestamped postgame join JSON")
+    args = parser.parse_args(argv)
+    try:
+        payload = json.loads(Path(args.input).read_text(encoding="utf-8"))
+        if (not isinstance(payload, dict)
+                or payload.get("source_type") != "JOINED_POSTGAME_DIAGNOSTIC_INPUT"
+                or payload.get("research_only") is not True):
+            raise ValueError("RESEARCH_POSTGAME_JOIN_REQUIRED")
+        report = audit_nfl_prop_volume_bias(payload.get("rows"))
+    except (OSError, ValueError, TypeError) as exc:
+        parser.error(str(exc))
+    print(json.dumps(report, sort_keys=True, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
