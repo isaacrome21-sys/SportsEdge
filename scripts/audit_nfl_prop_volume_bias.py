@@ -6,6 +6,9 @@ pregame model/quote receipts joined to later results, plus the declarations
 ``source_type=JOINED_POSTGAME_DIAGNOSTIC_INPUT`` and ``research_only=true``.
 The script fetches no live data, never fills in missing receipts, and never
 produces a PLAY, Model_P, historical backfill, or forward-count admission.
+
+From the repository root:
+    python -m scripts.audit_nfl_prop_volume_bias --input joined_postgame_rows.json
 """
 from __future__ import annotations
 
