@@ -59,9 +59,18 @@ Selection, edge, settlement: locked #2399 Rules 1, 2, 3, 7, 8, 9.
   `records/nfl-atd-v1-1`. Fixed paths: fetch records
   `nfl_atd_v1_1/fetch/<data sha256>.json`; run records
   `nfl_atd_v1_1/runs/<slate_id>.json`; close captures
-  `nfl_atd_v1_1/closes/<sha256 of file>.json`; settlement data
-  `nfl_atd_v1_1/settlements/<sha256>.json` (+ its fetch record
-  `fetch/<sha256>.json`); verdict `nfl_atd_v1_1/VERDICT.json`.
+  `nfl_atd_v1_1/closes/<season>-W<week>/<sha256 of file>.json`; settlement
+  data `nfl_atd_v1_1/settlements/<season>-W<week>/<sha256>.json` (+ its
+  fetch record `fetch/<sha256>.json`); verdict `nfl_atd_v1_1/VERDICT.json`.
+  Close and settlement records are enumerated with the git trees API
+  (`/git/trees/<tree>?recursive=1`); a truncated tree refuses
+  (API_TREE_TRUNCATED).
+- Access: review and pricing require `GITHUB_TOKEN` (GITHUB_TOKEN_MISSING
+  otherwise). The token is never printed, logged or written to any record.
+- Branch creation: the first commit on the records branch must be a dummy
+  (e.g. README). A record whose commit arrived in a `branch_creation` push
+  is unproven (RECORD_IN_BRANCH_CREATION), live or stored. Activity results
+  are read across every page (Link pagination).
 - Server-side time: the GitHub repository activity API,
   `GET /repos/{owner}/{repo}/activity`, event fields `id, before, after,
   timestamp, activity_type`, for the `push` event whose `after` is the
@@ -90,20 +99,31 @@ Selection, edge, settlement: locked #2399 Rules 1, 2, 3, 7, 8, 9.
   the raw fetch events.
 - (C) Ordering: fetch push < run-record push, and
   captured_at <= run-record push < first kickoff.
+- Kickoffs: the pricer cross-checks the board kickoff against the pinned
+  schedule (same teams, same instant; KICKOFF_SCHEDULE_MISMATCH refuses)
+  and writes `schedule_kickoffs` into the run record. At review every priced
+  row's kickoff must equal it (else the slate is SCREEN,
+  ROW_KICKOFF_SCHEDULE_MISMATCH). All close windows use that row kickoff.
 - Close captures: each close capture file is its own single-commit record
-  named by the sha256 of its content (CLOSE_RECORD_HASH_MISMATCH otherwise).
-  Its server push must be >= its `captured_at` (and every entry's
-  `captured_at`) and <= its kickoff + **15 min**; its kickoff must match the
-  run record's kickoff for that game. If ANY close record for a game fails,
-  every row on that game is CLV_MISSING with reason **CLOSE_RECORD_UNPROVEN**.
-- Settlements: a settlement data record is used only if its sha256 matches
-  a fetch record (hash-matched like the stats; SETTLEMENT_HASH_MISMATCH,
-  FETCH_RECORD_NOT_ON_BRANCH otherwise) whose push is AFTER the final
-  (kickoff + 4 h) of the last game it covers (SETTLEMENT_PUSH_BEFORE_FINAL)
-  and BEFORE the review time (SETTLEMENT_PUSH_NOT_BEFORE_REVIEW). Refused
-  files are listed in the verdict; their rows stay UNSETTLED (ungraded).
-  Two used files disagreeing on a (game_id, player_id) refuse the review
-  (SETTLEMENT_CONFLICT).
+  named by the sha256 of its content, filed under the game's season-week.
+  A close record that cannot be parsed, has no game, or is filed under the
+  wrong season-week **refuses the review** (CLOSE_RECORD_UNPROVEN); a
+  kickoff in it that differs from the row kickoff **refuses the review**
+  (CLOSE_KICKOFF_CONFLICT). Otherwise its server push must be >= its
+  `captured_at` and <= the row kickoff + **15 min**, and every entry must be
+  strictly before kickoff and no later than the push. If ANY close record
+  for a game fails these, every row on that game is CLV_MISSING with reason
+  **CLOSE_RECORD_UNPROVEN**.
+- Settlements: a settlement data record (filed under its games'
+  season-week, else SETTLEMENT_MISFILED) is used only if its sha256 matches
+  a fetch record (SETTLEMENT_HASH_MISMATCH, FETCH_RECORD_NOT_ON_BRANCH
+  otherwise). Both the data record's own push and the fetch record's push
+  must be AFTER the final (kickoff + 4 h) of the last game it covers
+  (SETTLEMENT_DATA_PUSH_BEFORE_FINAL / SETTLEMENT_PUSH_BEFORE_FINAL) and
+  BEFORE the review time (SETTLEMENT_PUSH_NOT_BEFORE_REVIEW). Refused files
+  are listed in the verdict; their rows stay UNSETTLED. A duplicate
+  (game_id, player_id) inside one record, or two used records disagreeing,
+  refuse the review (SETTLEMENT_CONFLICT). The verdict reports `n_unsettled`.
 - **A slate counts only if** all of the above hold on server-side times;
   otherwise it is **SCREEN** and excluded (listed as `screen_slates`).
 - Recommended, owner action: branch protection on `records/*` forbidding
