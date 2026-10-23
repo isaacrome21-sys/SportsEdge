@@ -140,7 +140,6 @@ def build_nflverse_prop_role_payloads(
     totals: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     meta: dict[str, dict[str, str]] = {}
     samples: dict[str, set[str]] = defaultdict(set)
-    player_weeks: set[tuple[str, int, int]] = set()
     for index, row in enumerate(player_rows):
         pid = str(row.get("player_id") or row.get("gsis_id") or "").strip()
         if not pid:
@@ -154,13 +153,8 @@ def build_nflverse_prop_role_payloads(
         current = {"team": team, "position": position, "player": name}
         if prior is not None and (prior["team"] != team or prior["position"] != position):
             raise NFLContextError(f"conflicting player identity:{pid}")
-        week_key = (pid, int(row["season"]), int(row["week"]))
-        sample_key = _sample_key(row, index)
-        if week_key in player_weeks or sample_key in samples[pid]:
-            raise NFLContextError(f"duplicate player-game source row:{pid}")
-        player_weeks.add(week_key)
         meta[pid] = current
-        samples[pid].add(sample_key)
+        samples[pid].add(_sample_key(row, index))
         for field in _COUNT_FIELDS:
             totals[pid][field] += _number(row.get(field), field)
 
