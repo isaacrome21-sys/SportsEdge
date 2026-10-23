@@ -83,10 +83,17 @@ RAW_COLUMNS = (
 
 
 def _f(v):
+    # A column existing in the CSV header is not evidence that every row
+    # contains an observed value. Treat blanks, malformed cells, and nonfinite
+    # values as missing rather than manufacturing zero-stat games that bias
+    # research usage/pool means downward. An explicit numeric 0 stays zero.
+    if v is None or (isinstance(v, str) and not v.strip()):
+        return None
     try:
-        return float(v)
+        value = float(v)
     except (TypeError, ValueError):
-        return 0.0
+        return None
+    return value if math.isfinite(value) else None
 
 
 def _derive(row: dict) -> dict:

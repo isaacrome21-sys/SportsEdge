@@ -204,6 +204,41 @@ def test_loader_column_presence_no_zero_fill(tmp_path):
     assert out25["status"] != "NOT_QUALIFIED"
 
 
+def test_loader_preserves_missing_cells_in_present_columns_as_missing(tmp_path):
+    fields = ["player_id", "position", "season", "week", "season_type",
+              "targets", "receptions", "receiving_yards"]
+    target_values = ["8", "", "not-a-number", "8", "0", "8", "8"]
+    rows = [dict(player_id="W1", position="WR", season=2024, week=w,
+                 season_type="REG", targets=target, receptions=4,
+                 receiving_yards=40)
+            for w, target in enumerate(target_values, 1)]
+    _write_csv(tmp_path / "ps_2024.csv.gz", fields, rows)
+    data = eng.load_player_data(tmp_path)
+    by_week = {week: stats for week, _, stats in data[2024]["W1"]}
+    assert by_week[2]["targets"] is None
+    assert by_week[3]["targets"] is None
+    assert by_week[5]["targets"] == 0.0  # explicitly recorded zero is real
+    family_games = eng.family_view(data, eng.FAMILIES["targets"])[2024]["W1"]
+    assert [week for week, _, _ in family_games] == [1, 4, 5, 6, 7]
+
+
+def test_loader_missing_kicker_stat_propagates_through_derived_points(tmp_path):
+    fields = ["player_id", "position", "season", "week", "season_type",
+              "fg_made", "fg_att", "pat_made", "pat_att"]
+    rows = [dict(player_id="K1", position="K", season=2025, week=w,
+                 season_type="REG", fg_made=fg, fg_att=2,
+                 pat_made=3, pat_att=3)
+            for w, fg in [(1, ""), (2, "0"), (3, "2")]]
+    _write_csv(tmp_path / "sp_2025.csv.gz", fields, rows)
+    data = eng.load_player_data(tmp_path)
+    by_week = {week: stats for week, _, stats in data[2025]["K1"]}
+    assert by_week[1]["fg_made"] is None
+    assert by_week[1]["kicking_points"] is None
+    assert by_week[2]["fg_made"] == 0.0
+    assert by_week[2]["kicking_points"] == 3.0
+    assert by_week[3]["kicking_points"] == 9.0
+
+
 # ------------------------------------------------------------ registry
 
 def test_registry_states_unchanged_and_engine_pointers():
