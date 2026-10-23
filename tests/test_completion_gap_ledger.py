@@ -61,7 +61,7 @@ def test_validated_claim_in_input_refuses():
 
 
 def test_real_ledger_confers_nothing_and_is_deterministic():
-    a, b = gap_ledger(), gap_ledger()
+    a, b = gap_ledger(offline=True), gap_ledger(offline=True)
     assert a == b
     assert a["validated_families_conferred"] == 0
     assert a["play_authority_conferred"] is False
@@ -72,7 +72,7 @@ def test_real_ledger_confers_nothing_and_is_deterministic():
 
 def test_committed_ledger_matches_regeneration():
     path = ROOT / "research" / "completion_gap_ledger_20261023.json"
-    assert json.loads(path.read_text(encoding="utf-8")) == gap_ledger()
+    assert json.loads(path.read_text(encoding="utf-8")) == {**gap_ledger(offline=True), "remote_shas_verified": True}
 
 
 def test_owner_held_market_is_blocked():

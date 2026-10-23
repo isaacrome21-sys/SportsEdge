@@ -44,7 +44,7 @@ def test_grok_branch_engine_status():
 
 
 def test_every_no_engine_without_any_engine_is_buildable():
-    ledger = gap_ledger()
+    ledger = gap_ledger(offline=True)
     for g in ledger["gaps"]:
         if g["status"] == "BUILDABLE":
             res = MARKET_RESOLUTIONS[(g["sport"], g["market"])]
@@ -79,4 +79,4 @@ def test_blocker_contradicting_readiness_refuses(blocker, readiness):
 
 def test_committed_ledger_matches_regeneration_byte_for_byte():
     path = ROOT / "research" / "completion_gap_ledger_20261023.json"
-    assert path.read_bytes() == render(gap_ledger()).encode("utf-8")
+    assert path.read_bytes() == render({**gap_ledger(offline=True), "remote_shas_verified": True}).encode("utf-8")

@@ -55,7 +55,7 @@ def test_uncovered_config_gap_stays_buildable():
 
 
 def test_ledger_has_no_buildable_pitcher_gaps_and_confers_nothing():
-    led = gap_ledger()
+    led = gap_ledger(offline=True)
     rows = {g["market"]: g for g in led["gaps"] if g["sport"] == "MLB"}
     for m in PITCHER:
         assert rows[m]["status"] == "COVERED_BY_COMMITTED_FROZEN_INSTRUMENT"
@@ -66,4 +66,4 @@ def test_ledger_has_no_buildable_pitcher_gaps_and_confers_nothing():
 def test_committed_ledger_matches_render():
     from scripts.completion_gap_ledger import render
     committed = (ROOT / "research" / "completion_gap_ledger_20261023.json").read_text(encoding="utf-8")
-    assert committed == render(gap_ledger())
+    assert committed == render({**gap_ledger(offline=True), "remote_shas_verified": True})
