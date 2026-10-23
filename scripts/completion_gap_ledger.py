@@ -46,6 +46,21 @@ def _cited(policy: dict, key: str, sport: str, market: str):
     return rec
 
 
+def _covering(policy: dict, sport: str, market: str):
+    refs = policy.get("covered_by_frozen_instrument", {}).get(sport, {}).get(market)
+    if refs is None:
+        return None
+    if not isinstance(refs, list) or not refs:
+        raise LedgerRefusal(f"COVERING_INSTRUMENT_CITATION_REQUIRED:{market}")
+    out = []
+    for ref in refs:
+        path = ROOT / ref["path"]
+        if not path.is_file() or ref["needle"] not in path.read_text(encoding="utf-8"):
+            raise LedgerRefusal(f"COVERING_INSTRUMENT_NOT_FOUND:{market}:{ref['path']}")
+        out.append(ref["path"])
+    return out
+
+
 def _engine(row: dict, policy: dict):
     code = policy.get("existing_engine_code", {}).get(row["sport"], {}).get(row["market"])
     if code is not None:
@@ -76,6 +91,12 @@ def classify(row: dict, policy: dict) -> dict | None:
         if readiness != "NO_FORWARD_TEST_CONFIG":
             raise LedgerRefusal(f"UNKNOWN_READINESS:{readiness}")
         area, status = "INFRASTRUCTURE", "BUILDABLE_NEEDS_SIBLING_RECONCILIATION"
+        covered = _covering(policy, row["sport"], row["market"])
+        if covered:
+            return {"sport": row["sport"], "market": row["market"], "blocker": blocker,
+                    "readiness": readiness, "score_area": area,
+                    "status": "COVERED_BY_COMMITTED_FROZEN_INSTRUMENT",
+                    "engine_ref": None, "record": covered}
     elif blocker in _BLOCKERS:
         area, status = _BLOCKERS[blocker]
         if blocker == "NO_ENGINE":

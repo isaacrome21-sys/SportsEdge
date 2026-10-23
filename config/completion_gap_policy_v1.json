@@ -1,4 +1,36 @@
 {
+  "covered_by_frozen_instrument": {
+    "MLB": {
+      "PITCHER_BB": [
+        {
+          "needle": "Pitcher props (PITCHER_K, PITCHER_BB, PITCHER_ER, PITCHER_HITS_ALLOWED)",
+          "path": "docs/MLB_PITCHER_PROP_PROMOTION_PREREG.md"
+        }
+      ],
+      "PITCHER_ER": [
+        {
+          "needle": "Pitcher props (PITCHER_K, PITCHER_BB, PITCHER_ER, PITCHER_HITS_ALLOWED)",
+          "path": "docs/MLB_PITCHER_PROP_PROMOTION_PREREG.md"
+        }
+      ],
+      "PITCHER_HITS_ALLOWED": [
+        {
+          "needle": "Pitcher props (PITCHER_K, PITCHER_BB, PITCHER_ER, PITCHER_HITS_ALLOWED)",
+          "path": "docs/MLB_PITCHER_PROP_PROMOTION_PREREG.md"
+        }
+      ],
+      "PITCHER_K": [
+        {
+          "needle": "Pitcher props (PITCHER_K, PITCHER_BB, PITCHER_ER, PITCHER_HITS_ALLOWED)",
+          "path": "docs/MLB_PITCHER_PROP_PROMOTION_PREREG.md"
+        },
+        {
+          "needle": "\"status\": \"FROZEN_BEFORE_FIRST_PROSPECTIVE_PREDICTION\"",
+          "path": "config/research/mlb_pitcher_k_forward_validation_v1.json"
+        }
+      ]
+    }
+  },
   "existing_engine_code": {
     "NFL": {
       "player_interceptions": {

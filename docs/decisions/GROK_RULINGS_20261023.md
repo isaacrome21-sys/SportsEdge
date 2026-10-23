@@ -19,3 +19,15 @@ Dated Oct 15, 2026 (owner ruling, recorded here by Grok). EITHER_PITCHER
 pricing (EITHER_PITCHER_BB, EITHER_PITCHER_ER, EITHER_PITCHER_HITS_ALLOWED)
 stays refused until the underlying pitcher marginals are repaired. Matches the
 gate EITHER_PITCHER_MARGINAL_TAIL_ERROR in sportsedge/canonical_coverage.py.
+
+## MLB pitcher Infrastructure gaps are already covered (2026-10-23)
+
+Grok ruling under owner t234u/t242u. PITCHER_K, PITCHER_BB, PITCHER_ER and
+PITCHER_HITS_ALLOWED were listed as NO_FORWARD_TEST_CONFIG. All four are covered by the
+committed, frozen one-shot study `docs/MLB_PITCHER_PROP_PROMOTION_PREREG.md` (v2,
+2026-10-04; DK PIT quote archive, run once after the 2026 postseason), and PITCHER_K also
+by `config/research/mlb_pitcher_k_forward_validation_v1.json`
+(FROZEN_BEFORE_FIRST_PROSPECTIVE_PREDICTION). `PROGRAM.md` already records "no duplicate
+instruments" for this set. No new forward-test config is built; neither frozen instrument
+is modified. Status COVERED_BY_COMMITTED_FROZEN_INSTRUMENT is structural only: no score
+points, nothing validated, play_allowed false.

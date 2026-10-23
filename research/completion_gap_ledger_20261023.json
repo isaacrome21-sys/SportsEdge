@@ -11,7 +11,7 @@
     "BLOCKED_OWNER_HOLD": 3,
     "BLOCKED_RULING_6_FOCUS_PAUSE": 2,
     "BUILDABLE": 5,
-    "BUILDABLE_NEEDS_SIBLING_RECONCILIATION": 4,
+    "COVERED_BY_COMMITTED_FROZEN_INSTRUMENT": 4,
     "ENGINE_EXISTS_NOT_WIRED": 41,
     "ENGINE_ON_GROK_BRANCH_NOT_MERGED": 6
   },
@@ -639,40 +639,49 @@
       "engine_ref": null,
       "market": "PITCHER_BB",
       "readiness": "NO_FORWARD_TEST_CONFIG",
-      "record": null,
+      "record": [
+        "docs/MLB_PITCHER_PROP_PROMOTION_PREREG.md"
+      ],
       "score_area": "INFRASTRUCTURE",
       "sport": "MLB",
-      "status": "BUILDABLE_NEEDS_SIBLING_RECONCILIATION"
+      "status": "COVERED_BY_COMMITTED_FROZEN_INSTRUMENT"
     },
     {
       "blocker": null,
       "engine_ref": null,
       "market": "PITCHER_ER",
       "readiness": "NO_FORWARD_TEST_CONFIG",
-      "record": null,
+      "record": [
+        "docs/MLB_PITCHER_PROP_PROMOTION_PREREG.md"
+      ],
       "score_area": "INFRASTRUCTURE",
       "sport": "MLB",
-      "status": "BUILDABLE_NEEDS_SIBLING_RECONCILIATION"
+      "status": "COVERED_BY_COMMITTED_FROZEN_INSTRUMENT"
     },
     {
       "blocker": null,
       "engine_ref": null,
       "market": "PITCHER_HITS_ALLOWED",
       "readiness": "NO_FORWARD_TEST_CONFIG",
-      "record": null,
+      "record": [
+        "docs/MLB_PITCHER_PROP_PROMOTION_PREREG.md"
+      ],
       "score_area": "INFRASTRUCTURE",
       "sport": "MLB",
-      "status": "BUILDABLE_NEEDS_SIBLING_RECONCILIATION"
+      "status": "COVERED_BY_COMMITTED_FROZEN_INSTRUMENT"
     },
     {
       "blocker": null,
       "engine_ref": null,
       "market": "PITCHER_K",
       "readiness": "NO_FORWARD_TEST_CONFIG",
-      "record": null,
+      "record": [
+        "docs/MLB_PITCHER_PROP_PROMOTION_PREREG.md",
+        "config/research/mlb_pitcher_k_forward_validation_v1.json"
+      ],
       "score_area": "INFRASTRUCTURE",
       "sport": "MLB",
-      "status": "BUILDABLE_NEEDS_SIBLING_RECONCILIATION"
+      "status": "COVERED_BY_COMMITTED_FROZEN_INSTRUMENT"
     },
     {
       "blocker": "NO_VALIDATION",
