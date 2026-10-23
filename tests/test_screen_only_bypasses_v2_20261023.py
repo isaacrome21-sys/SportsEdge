@@ -73,16 +73,20 @@ def test_bypass5_static_no_research_imports_from_sportsedge_or_scripts(tmp_path)
 def test_bypass5_helper_entered_from_production_is_refused(caller):
     h = _helper()
     with pytest.raises(ScreenOnlyGuardError, match="ENTERED_FROM_OUTSIDE_RESEARCH_OR_TESTS"):
-        _run_as(caller, "h.run_in_screen(lambda: require_screen_only('bypass5'))\n",
-                {"h": h, "require_screen_only": require_screen_only})
+        _run_as(caller, "h.probe()\n", {"h": h})  # t257: helper takes no callables
 
 
 def test_bypass5_foreign_lambda_between_entry_and_pricer_is_refused():
-    h = _helper()
+    # t257: run_in_screen was removed; a sportsedge/ lambda is refused by
+    # require_research_callable, and a foreign frame between entry and pricer
+    # is still refused by the pricing-time stack walk.
     ns = _run_as("sportsedge/evil_lambda.py", "fn = lambda: g.checked_require('bypass5-lambda')\n", {"g": g})
+    with pytest.raises(ScreenOnlyGuardError, match="CALLABLE_NOT_RESEARCH"):
+        g.require_research_callable(ns["fn"])
     with pytest.raises(ScreenOnlyGuardError, match="FOREIGN_FRAME_BETWEEN_ENTRY_AND_PRICER"):
-        h.run_in_screen(ns["fn"])
-    assert h.run_in_screen(lambda: g.checked_require("legit-lambda")) is None
+        with screen_only():
+            ns["fn"]()
+    assert _helper().probe() == "PROBE_OK"
 
 
 # --- (A) filename spoof ------------------------------------------------------
