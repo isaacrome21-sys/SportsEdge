@@ -443,6 +443,11 @@ def load_slate(api, slate_id) -> dict:
             ko = earliest
         out["schedule_data_proof"] = {k: v for k, v in sch.items() if k not in ("bytes", "fetch")}
     out["kickoffs"] = kos
+    refs = {}
+    for r in rows:
+        if isinstance(r, dict) and r.get("status") == "UNPRICED":
+            refs[r.get("reason")] = refs.get(r.get("reason"), 0) + 1
+    out["refusals"] = refs
     run_t = _t(rp["pushed_at"])
     if run_t < cap:
         out["reasons"].append("RUN_PUSH_BEFORE_CAPTURE")

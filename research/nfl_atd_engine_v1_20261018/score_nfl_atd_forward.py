@@ -258,6 +258,7 @@ def review(slate_ids, *, records_worktree, api):
     for sid in slate_ids:
         st = pv.load_slate(api, sid)
         (loaded if st["status"] == "COUNTS" else screen).append(st if st["status"] == "COUNTS" else sid)
+    refusals_by_slate = {st["slate_id"]: st.get("refusals", {}) for st in loaded}
     games = _games(loaded)
     closes = pv.load_closes(api, games)
     setl = pv.load_settlements(api, games, now)
@@ -276,6 +277,7 @@ def review(slate_ids, *, records_worktree, api):
             v.update(inputs_sha256=inputs_sha256(inputs), inputs=inputs,
                      n_unsettled=sum(r["outcome_status"] == "UNSETTLED" for r in acc),
                      n_slates=len(inputs["run_records"]), screen_slates=screen,
+                     refusals_by_slate={k: refusals_by_slate[k] for k in proofs},
                      records_branch=pv.RECORDS_BRANCH, verdict_path=VERDICT_PATH,
                      run_proofs=proofs, reviewed_at=now.isoformat())
             path = wt / VERDICT_PATH
@@ -291,7 +293,7 @@ def review(slate_ids, *, records_worktree, api):
     return {"status": "NO_REVIEW_GATES_NOT_MET", "n_weeks": len(weeks),
             "n_picked": len(picked), "n_games": len(games),
             "n_unsettled": sum(r["outcome_status"] == "UNSETTLED" for r in acc),
-            "screen_slates": screen,
+            "screen_slates": screen, "refusals_by_slate": refusals_by_slate,
             "status_label": "RESEARCH_ONLY", "promotable": False}
 
 

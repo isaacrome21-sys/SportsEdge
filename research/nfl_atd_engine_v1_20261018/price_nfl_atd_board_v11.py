@@ -21,6 +21,31 @@ import atd_provenance as pv
 import atd_refresh as rf
 
 
+_KEEP_ON_REFUSAL = ("family", "label", "status_label", "promotable", "game_id",
+                    "board_game_id", "player_name", "player_id", "yes_price",
+                    "captured_at", "kickoff")
+
+
+def player_team_refusal(rows, pteams, game_teams) -> int:
+    """Refuse (before any price is recorded) every PRICED row whose player is
+    absent from the pinned stats or whose latest stats team is not one of
+    the game's two teams: UNPRICED / PLAYER_TEAM_UNRESOLVED. Mutates rows;
+    returns the refusal count. Pinned data only, so the refusal set is fixed
+    before capture and cannot depend on outcomes."""
+    gt, n = set(game_teams or []), 0
+    for r in rows:
+        if r.get("status") != "PRICED" or pteams.get(r.get("player_id")) in gt:
+            continue
+        keep = {k: v for k, v in r.items() if k in _KEEP_ON_REFUSAL or k in LABEL_KEYS}
+        r.clear()
+        r.update(keep, status="UNPRICED", reason="PLAYER_TEAM_UNRESOLVED")
+        n += 1
+    return n
+
+
+LABEL_KEYS = tuple(getattr(eng, "LABELS", {}).keys())
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     for a in ("--player-data", "--stats-2026", "--schedule",
@@ -52,6 +77,8 @@ def main() -> int:
               f"{getattr(e, 'detail', type(e).__name__)}")
         return 2
     base = eng.load_data(Path(args.player_data))
+    pteams = pv.stats_teams(Path(args.stats_2026).read_bytes(), int(board["season"]))
+    refusals = {"PLAYER_TEAM_UNRESOLVED": 0}
 
     def pricer(data):
         idx = eng.build_name_index(data)
@@ -64,6 +91,8 @@ def main() -> int:
                 "yes_price": raw.get("yes_price"),
                 "captured_at": board.get("captured_at"), "kickoff": board.get("kickoff"),
                 "season": int(board["season"]), "week": int(board["week"])}))
+        refusals["PLAYER_TEAM_UNRESOLVED"] += player_team_refusal(
+            rows, pteams, board["game_teams"])
         return rows
 
     try:
@@ -99,9 +128,10 @@ def main() -> int:
                                     "data_event": v["data_event"],
                                     "data_pushed_at": v["data_pushed_at"]}
                                 for k, v in prov.items()},
-              rows=rows)
+              refusals=refusals, rows=rows)
     Path(args.run_record).write_text(json.dumps(rr, indent=1, sort_keys=True) + "\n")
     out = {"label": "NFL ANYTIME TD ENGINE V1.1 (DRAFT) — board pricing",
+           "refusals": refusals,
            "status_label": "RESEARCH_ONLY", "validation_status": "NOT_VALIDATED",
            "run_record": str(args.run_record), "game_id": board["game_id"],
            "n_rows": len(rows),

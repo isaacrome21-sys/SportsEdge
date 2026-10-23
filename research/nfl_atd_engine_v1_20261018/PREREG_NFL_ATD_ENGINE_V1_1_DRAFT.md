@@ -125,7 +125,15 @@ Selection, edge, settlement: locked #2399 Rules 1, 2, 3, 7, 8, 9.
   team, taken from his latest REG week of the season in the pinned stats
   data record, must be one of the matched game's two teams, and a player
   not found there is refused (else ROW_PLAYER_TEAM_MISMATCH); either makes
-  the slate SCREEN. All close windows (close record checks and the
+  the slate SCREEN. The pricer applies the same stats-team check before
+  pricing (Oct 22 ruling): a player not found in the pinned stats, or whose
+  latest stats team is not in the game (rookies, players without stats
+  yet, stale trades), is refused UNPRICED / PLAYER_TEAM_UNRESOLVED in the
+  run record and is never priced or counted; the per-slate refusal counts
+  are recorded (`refusals`) and reported at review (`refusals_by_slate`).
+  Refusals are fixed by pinned data before capture, so they cannot depend
+  on outcomes. A PRICED row that fails the check at review can only come
+  from a forged record, so it still makes the slate SCREEN. All close windows (close record checks and the
   Rule 4 60-min window) use the recomputed kickoff.
 - Close captures: each close capture file is its own single-commit record
   named by the sha256 of its content, filed under the game's season-week.
