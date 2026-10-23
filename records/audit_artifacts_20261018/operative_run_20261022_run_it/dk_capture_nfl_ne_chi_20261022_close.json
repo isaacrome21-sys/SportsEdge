@@ -1,0 +1,698 @@
+{
+  "status": "CAPTURED",
+  "capture_type": "CLOSE_CAPTURE_BACKSTOP",
+  "capture_flag": "CLOSE",
+  "sport": "NFL",
+  "source": "DraftKings",
+  "source_access": "signed out",
+  "source_view": "NFL event page, rendered pages only; no API calls; signed out",
+  "event": "New England Patriots @ Chicago Bears",
+  "event_id": 34118033,
+  "event_url": "https://sportsbook.draftkings.com/event/ne-patriots-%40-chi-bears/34118033",
+  "kickoff_ct": "2026-10-22T19:15:00-05:00",
+  "season": 2026,
+  "week": 7,
+  "game_id": "2026_07_NE_CHI",
+  "capture_start_ct": "2026-10-22T18:35:48-05:00",
+  "capture_end_ct": "2026-10-22T18:40:04-05:00",
+  "entered_by": "Rocky (Muse)",
+  "egress_ip_hash": null,
+  "egress_ip_hash_method": "unavailable from the rendered-page browser session for this capture; no hash reported by the capturing session and no raw IP stored in this record",
+  "attempt_timeline": [
+    {
+      "attempt": 1,
+      "start_ct": "2026-10-22T18:35:48-05:00",
+      "route": "event page, rendered only",
+      "outcome": "CAPTURED - full board read in-window 18:35:48-18:40:04 CT; no section CAPTURE_FAILED; no fallback attempt was used"
+    }
+  ],
+  "game_lines": {
+    "moneyline": {
+      "away_price": 130,
+      "home_price": -155,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    "spread": {
+      "away_line": 3.0,
+      "away_price": -112,
+      "home_line": -3.0,
+      "home_price": -108,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    "total": {
+      "line": 50.5,
+      "over_price": -120,
+      "under_price": 100,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    }
+  },
+  "player_props": {
+    "passing_yards": [
+      {
+        "player": "Drake Maye",
+        "line": 249.5,
+        "over_price": -113,
+        "under_price": -111,
+        "captured_at": "2026-10-22T18:36:34-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Caleb Williams",
+        "line": 247.5,
+        "over_price": -113,
+        "under_price": -111,
+        "captured_at": "2026-10-22T18:36:34-05:00",
+        "flag": "CLOSE"
+      }
+    ],
+    "passing_touchdowns": [
+      {
+        "player": "Caleb Williams",
+        "line": 1.5,
+        "over_price": -167,
+        "under_price": 130,
+        "captured_at": "2026-10-22T18:36:51-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Drake Maye",
+        "line": 1.5,
+        "over_price": -128,
+        "under_price": 100,
+        "captured_at": "2026-10-22T18:36:51-05:00",
+        "flag": "CLOSE"
+      }
+    ],
+    "interceptions": [
+      {
+        "player": "Caleb Williams",
+        "line": 0.5,
+        "over_price": -101,
+        "under_price": -126,
+        "captured_at": "2026-10-22T18:37:15-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Drake Maye",
+        "line": 0.5,
+        "over_price": -128,
+        "under_price": 100,
+        "captured_at": "2026-10-22T18:37:15-05:00",
+        "flag": "CLOSE"
+      }
+    ],
+    "pass_attempts": [
+      {
+        "player": "Caleb Williams",
+        "line": 32.5,
+        "over_price": -128,
+        "under_price": 101,
+        "captured_at": "2026-10-22T18:37:36-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Drake Maye",
+        "line": 31.5,
+        "over_price": -105,
+        "under_price": -122,
+        "captured_at": "2026-10-22T18:37:36-05:00",
+        "flag": "CLOSE"
+      }
+    ],
+    "pass_completions": [
+      {
+        "player": "Caleb Williams",
+        "line": 21.5,
+        "over_price": -104,
+        "under_price": -123,
+        "captured_at": "2026-10-22T18:37:47-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Drake Maye",
+        "line": 20.5,
+        "over_price": -122,
+        "under_price": -105,
+        "captured_at": "2026-10-22T18:37:47-05:00",
+        "flag": "CLOSE"
+      }
+    ],
+    "rushing_yards": [
+      {
+        "player": "D'Andre Swift",
+        "line": 63.5,
+        "over_price": -110,
+        "under_price": -114,
+        "captured_at": "2026-10-22T18:38:16-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Rhamondre Stevenson",
+        "line": 45.5,
+        "over_price": -110,
+        "under_price": -114,
+        "captured_at": "2026-10-22T18:38:16-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Drake Maye",
+        "line": 28.5,
+        "over_price": -113,
+        "under_price": -111,
+        "captured_at": "2026-10-22T18:38:16-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Roschon Johnson",
+        "line": 26.5,
+        "over_price": -116,
+        "under_price": -108,
+        "captured_at": "2026-10-22T18:38:16-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "TreVeyon Henderson",
+        "line": 24.5,
+        "over_price": -110,
+        "under_price": -114,
+        "captured_at": "2026-10-22T18:38:16-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Caleb Williams",
+        "line": 17.5,
+        "over_price": -116,
+        "under_price": -108,
+        "captured_at": "2026-10-22T18:38:16-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Corey Kiner",
+        "line": 14.5,
+        "over_price": -111,
+        "under_price": -113,
+        "captured_at": "2026-10-22T18:38:16-05:00",
+        "flag": "CLOSE"
+      }
+    ],
+    "rush_attempts": [
+      {
+        "player": "D'Andre Swift",
+        "line": 14.5,
+        "over_price": -114,
+        "under_price": -112,
+        "captured_at": "2026-10-22T18:38:28-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Rhamondre Stevenson",
+        "line": 11.5,
+        "over_price": 108,
+        "under_price": -138,
+        "captured_at": "2026-10-22T18:38:28-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Roschon Johnson",
+        "line": 6.5,
+        "over_price": -144,
+        "under_price": 113,
+        "captured_at": "2026-10-22T18:38:28-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "TreVeyon Henderson",
+        "line": 6.5,
+        "over_price": 103,
+        "under_price": -131,
+        "captured_at": "2026-10-22T18:38:28-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Drake Maye",
+        "line": 5.5,
+        "over_price": -109,
+        "under_price": -117,
+        "captured_at": "2026-10-22T18:38:28-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Caleb Williams",
+        "line": 4.5,
+        "over_price": 123,
+        "under_price": -158,
+        "captured_at": "2026-10-22T18:38:28-05:00",
+        "flag": "CLOSE"
+      }
+    ],
+    "receiving_yards": [
+      {
+        "player": "A.J. Brown",
+        "line": 70.5,
+        "over_price": -110,
+        "under_price": -114,
+        "captured_at": "2026-10-22T18:38:49-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Luther Burden III",
+        "line": 57.5,
+        "over_price": -112,
+        "under_price": -112,
+        "captured_at": "2026-10-22T18:38:49-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Colston Loveland",
+        "line": 44.5,
+        "over_price": -111,
+        "under_price": -113,
+        "captured_at": "2026-10-22T18:38:49-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Rome Odunze",
+        "line": 42.5,
+        "over_price": -114,
+        "under_price": -110,
+        "captured_at": "2026-10-22T18:38:49-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Demario Douglas",
+        "line": 39.5,
+        "over_price": -114,
+        "under_price": -110,
+        "captured_at": "2026-10-22T18:38:49-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Hunter Henry",
+        "line": 35.5,
+        "over_price": -113,
+        "under_price": -111,
+        "captured_at": "2026-10-22T18:38:49-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Kalif Raymond",
+        "line": 23.5,
+        "over_price": -114,
+        "under_price": -110,
+        "captured_at": "2026-10-22T18:38:49-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "D'Andre Swift",
+        "line": 21.5,
+        "over_price": -109,
+        "under_price": -115,
+        "captured_at": "2026-10-22T18:38:49-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Kyle Williams",
+        "line": 19.5,
+        "over_price": -114,
+        "under_price": -110,
+        "captured_at": "2026-10-22T18:38:49-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Efton Chism III",
+        "line": 18.5,
+        "over_price": -109,
+        "under_price": -115,
+        "captured_at": "2026-10-22T18:38:49-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Rhamondre Stevenson",
+        "line": 17.5,
+        "over_price": -113,
+        "under_price": -111,
+        "captured_at": "2026-10-22T18:38:49-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Eli Raridon",
+        "line": 15.5,
+        "over_price": -115,
+        "under_price": -109,
+        "captured_at": "2026-10-22T18:38:49-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Cole Kmet",
+        "line": 8.5,
+        "over_price": -114,
+        "under_price": -110,
+        "captured_at": "2026-10-22T18:38:49-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Roschon Johnson",
+        "line": 6.5,
+        "over_price": -115,
+        "under_price": -109,
+        "captured_at": "2026-10-22T18:38:49-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "TreVeyon Henderson",
+        "line": 3.5,
+        "over_price": -117,
+        "under_price": -108,
+        "captured_at": "2026-10-22T18:38:49-05:00",
+        "flag": "CLOSE"
+      }
+    ],
+    "receptions": [
+      {
+        "player": "A.J. Brown",
+        "line": 5.5,
+        "over_price": 107,
+        "under_price": -137,
+        "captured_at": "2026-10-22T18:39:05-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Luther Burden III",
+        "line": 4.5,
+        "over_price": -143,
+        "under_price": 112,
+        "captured_at": "2026-10-22T18:39:05-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Colston Loveland",
+        "line": 4.5,
+        "over_price": 129,
+        "under_price": -165,
+        "captured_at": "2026-10-22T18:39:05-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Demario Douglas",
+        "line": 3.5,
+        "over_price": 103,
+        "under_price": -132,
+        "captured_at": "2026-10-22T18:39:05-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Hunter Henry",
+        "line": 3.5,
+        "over_price": 119,
+        "under_price": -152,
+        "captured_at": "2026-10-22T18:39:05-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Rome Odunze",
+        "line": 3.5,
+        "over_price": 119,
+        "under_price": -151,
+        "captured_at": "2026-10-22T18:39:05-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "D'Andre Swift",
+        "line": 2.5,
+        "over_price": -152,
+        "under_price": 119,
+        "captured_at": "2026-10-22T18:39:05-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Rhamondre Stevenson",
+        "line": 2.5,
+        "over_price": -113,
+        "under_price": -113,
+        "captured_at": "2026-10-22T18:39:05-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Kalif Raymond",
+        "line": 2.5,
+        "over_price": -112,
+        "under_price": -114,
+        "captured_at": "2026-10-22T18:39:05-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Efton Chism III",
+        "line": 1.5,
+        "over_price": -117,
+        "under_price": -109,
+        "captured_at": "2026-10-22T18:39:05-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Eli Raridon",
+        "line": 1.5,
+        "over_price": 107,
+        "under_price": -137,
+        "captured_at": "2026-10-22T18:39:05-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Roschon Johnson",
+        "line": 1.5,
+        "over_price": 121,
+        "under_price": -154,
+        "captured_at": "2026-10-22T18:39:05-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Kyle Williams",
+        "line": 1.5,
+        "over_price": 144,
+        "under_price": -185,
+        "captured_at": "2026-10-22T18:39:05-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "Cole Kmet",
+        "line": 1.5,
+        "over_price": 165,
+        "under_price": -213,
+        "captured_at": "2026-10-22T18:39:05-05:00",
+        "flag": "CLOSE"
+      },
+      {
+        "player": "TreVeyon Henderson",
+        "line": 0.5,
+        "over_price": -192,
+        "under_price": 149,
+        "captured_at": "2026-10-22T18:39:05-05:00",
+        "flag": "CLOSE"
+      }
+    ]
+  },
+  "anytime_touchdown_yes": [
+    {
+      "player": "D'Andre Swift",
+      "yes_price": -160,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Rhamondre Stevenson",
+      "yes_price": -105,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "A.J. Brown",
+      "yes_price": 140,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Rome Odunze",
+      "yes_price": 160,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Colston Loveland",
+      "yes_price": 175,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Luther Burden III",
+      "yes_price": 185,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Hunter Henry",
+      "yes_price": 200,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Roschon Johnson",
+      "yes_price": 245,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Demario Douglas",
+      "yes_price": 300,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Caleb Williams",
+      "yes_price": 370,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "TreVeyon Henderson",
+      "yes_price": 370,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Drake Maye",
+      "yes_price": 370,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Kalif Raymond",
+      "yes_price": 425,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Efton Chism III",
+      "yes_price": 425,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Eli Raridon",
+      "yes_price": 450,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Cole Kmet",
+      "yes_price": 500,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Kyle Williams",
+      "yes_price": 600,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Corey Kiner",
+      "yes_price": 850,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Sam Roush",
+      "yes_price": 900,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Zavion Thomas",
+      "yes_price": 1400,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Jahdae Walker",
+      "yes_price": 1500,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Zavier Scott",
+      "yes_price": 2200,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Cameron Latu",
+      "yes_price": 3500,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "player": "Tanner Arkin",
+      "yes_price": 4000,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE"
+    }
+  ],
+  "anytime_touchdown_nonplayer_rows": [
+    {
+      "entry": "CHI Bears D/ST",
+      "yes_price": 550,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE",
+      "row_type": "non_player"
+    },
+    {
+      "entry": "NE Patriots D/ST",
+      "yes_price": 600,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE",
+      "row_type": "non_player"
+    },
+    {
+      "entry": "No Touchdown Scorer",
+      "yes_price": 18000,
+      "captured_at": "2026-10-22T18:35:48-05:00",
+      "flag": "CLOSE",
+      "row_type": "non_player"
+    }
+  ],
+  "rows_count": 80,
+  "rows_count_definition": "Game lines 3 (spread + moneyline + total) + two-sided prop rows 53 (passing_yards 2, passing_touchdowns 2 SHADOW, interceptions 2, pass_attempts 2, pass_completions 2, rushing_yards 7, rush_attempts 6, receiving_yards 15, receptions 15) + anytime-TD Yes player rows 24 = 80. Non-player ATD rows (2 D/ST + No Touchdown Scorer) recorded separately, not counted.",
+  "coverage": {
+    "part2": {
+      "PASS_YDS": 2,
+      "RUSH_YDS": 7,
+      "REC_YDS": 15,
+      "RECEPTIONS": 15,
+      "total": 39
+    },
+    "part2b_scored": {
+      "RUSH_ATTEMPTS": 6,
+      "PASS_ATTEMPTS": 2,
+      "COMPLETIONS": 2,
+      "total": 10
+    },
+    "part2b_shadow": {
+      "PASS_TDS": 2
+    },
+    "anytime_td_yes_players": 24,
+    "game_lines": 3,
+    "extra_recorded_not_scored": {
+      "INTERCEPTIONS": 2
+    }
+  },
+  "notes": [
+    "CLOSE capture taken by the 18:17 CT close-window backstop job (nfl-tnf-close-window-backstop-20261022) because no in-window CLOSE capture existed by ~18:35 CT (re-checked 18:19 and 18:34 CT: only the 16:53 ENTRY record was on file).",
+    "All timestamps are the capture's own true read times (DraftKings Server Time, America/Chicago, to the second) as reported by the capturing browser session; nothing retimestamped. Capture window 18:35:48-18:40:04 CT is inside the frozen close window [18:15, 19:15) CT and pre-kickoff (19:15 CT).",
+    "Game lines re-verified identical at 18:39:51 CT and anytime-TD board re-verified identical at 18:39:36 CT; no price or line changed between duplicate reads during this capture.",
+    "Passing TDs are recorded SHADOW-only under Part 2B; interceptions are recorded as captured but are OUT under Part 2B and not scored rows.",
+    "Named gap (same as entry): Corey Kiner is listed in Rushing Yards O/U and on the anytime-TD board but was NOT listed in Rush Attempts O/U at close capture time - no rush-attempts row exists for him in this record; nothing fabricated.",
+    "Egress hash unavailable for this capture: the capturing browser session could not determine its egress IP from the rendered pages, so egress_ip_hash is null; no raw IP is stored anywhere in this record."
+  ]
+}

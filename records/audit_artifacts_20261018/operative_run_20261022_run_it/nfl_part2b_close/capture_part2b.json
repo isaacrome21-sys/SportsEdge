@@ -1,0 +1,153 @@
+{
+  "season": 2026,
+  "week": 7,
+  "capture_flag": "CLOSE",
+  "entered_by": "Rocky (Muse)",
+  "source_capture": "dk_capture_nfl_ne_chi_20261022_close.json",
+  "rows": [
+    {
+      "game_id": "2026_07_NE_CHI",
+      "player_id": "00-0039918",
+      "player_name": "Caleb Williams",
+      "market": "PASS_TDS",
+      "line": 1.5,
+      "over_price": -167,
+      "under_price": 130,
+      "captured_at": "2026-10-22T18:36:51-05:00",
+      "kickoff": "2026-10-22T19:15:00-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "game_id": "2026_07_NE_CHI",
+      "player_id": "00-0039851",
+      "player_name": "Drake Maye",
+      "market": "PASS_TDS",
+      "line": 1.5,
+      "over_price": -128,
+      "under_price": 100,
+      "captured_at": "2026-10-22T18:36:51-05:00",
+      "kickoff": "2026-10-22T19:15:00-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "game_id": "2026_07_NE_CHI",
+      "player_id": "00-0039918",
+      "player_name": "Caleb Williams",
+      "market": "PASS_ATTEMPTS",
+      "line": 32.5,
+      "over_price": -128,
+      "under_price": 101,
+      "captured_at": "2026-10-22T18:37:36-05:00",
+      "kickoff": "2026-10-22T19:15:00-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "game_id": "2026_07_NE_CHI",
+      "player_id": "00-0039851",
+      "player_name": "Drake Maye",
+      "market": "PASS_ATTEMPTS",
+      "line": 31.5,
+      "over_price": -105,
+      "under_price": -122,
+      "captured_at": "2026-10-22T18:37:36-05:00",
+      "kickoff": "2026-10-22T19:15:00-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "game_id": "2026_07_NE_CHI",
+      "player_id": "00-0039918",
+      "player_name": "Caleb Williams",
+      "market": "COMPLETIONS",
+      "line": 21.5,
+      "over_price": -104,
+      "under_price": -123,
+      "captured_at": "2026-10-22T18:37:47-05:00",
+      "kickoff": "2026-10-22T19:15:00-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "game_id": "2026_07_NE_CHI",
+      "player_id": "00-0039851",
+      "player_name": "Drake Maye",
+      "market": "COMPLETIONS",
+      "line": 20.5,
+      "over_price": -122,
+      "under_price": -105,
+      "captured_at": "2026-10-22T18:37:47-05:00",
+      "kickoff": "2026-10-22T19:15:00-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "game_id": "2026_07_NE_CHI",
+      "player_id": "00-0036275",
+      "player_name": "D'Andre Swift",
+      "market": "RUSH_ATTEMPTS",
+      "line": 14.5,
+      "over_price": -114,
+      "under_price": -112,
+      "captured_at": "2026-10-22T18:38:28-05:00",
+      "kickoff": "2026-10-22T19:15:00-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "game_id": "2026_07_NE_CHI",
+      "player_id": "00-0036875",
+      "player_name": "Rhamondre Stevenson",
+      "market": "RUSH_ATTEMPTS",
+      "line": 11.5,
+      "over_price": 108,
+      "under_price": -138,
+      "captured_at": "2026-10-22T18:38:28-05:00",
+      "kickoff": "2026-10-22T19:15:00-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "game_id": "2026_07_NE_CHI",
+      "player_id": "00-0039021",
+      "player_name": "Roschon Johnson",
+      "market": "RUSH_ATTEMPTS",
+      "line": 6.5,
+      "over_price": -144,
+      "under_price": 113,
+      "captured_at": "2026-10-22T18:38:28-05:00",
+      "kickoff": "2026-10-22T19:15:00-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "game_id": "2026_07_NE_CHI",
+      "player_id": "00-0040734",
+      "player_name": "TreVeyon Henderson",
+      "market": "RUSH_ATTEMPTS",
+      "line": 6.5,
+      "over_price": 103,
+      "under_price": -131,
+      "captured_at": "2026-10-22T18:38:28-05:00",
+      "kickoff": "2026-10-22T19:15:00-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "game_id": "2026_07_NE_CHI",
+      "player_id": "00-0039851",
+      "player_name": "Drake Maye",
+      "market": "RUSH_ATTEMPTS",
+      "line": 5.5,
+      "over_price": -109,
+      "under_price": -117,
+      "captured_at": "2026-10-22T18:38:28-05:00",
+      "kickoff": "2026-10-22T19:15:00-05:00",
+      "flag": "CLOSE"
+    },
+    {
+      "game_id": "2026_07_NE_CHI",
+      "player_id": "00-0039918",
+      "player_name": "Caleb Williams",
+      "market": "RUSH_ATTEMPTS",
+      "line": 4.5,
+      "over_price": 123,
+      "under_price": -158,
+      "captured_at": "2026-10-22T18:38:28-05:00",
+      "kickoff": "2026-10-22T19:15:00-05:00",
+      "flag": "CLOSE"
+    }
+  ]
+}
