@@ -117,7 +117,19 @@ def test_single_construction_is_coherent(line):
 
 @pytest.mark.parametrize("line", [66.5, 69.5])
 def test_above_support_is_coded_refusal_not_degenerate(line):
+    # LINE_MAX=65.5: lines past the supported range are OUT_OF_RANGE
     with pytest.raises(eng.NflLongestFgError,
-                       match="^LONGEST_FG_LINE_ABOVE_SUPPORT") as ei:
+                       match="^LONGEST_FG_LINE_OUT_OF_RANGE") as ei:
         _p(line)
     assert "DEGENERATE" not in str(ei.value)
+
+
+def test_documented_range_matches_support():
+    assert eng.LINE_MAX == 65.5 and eng.LINE_MAX < eng.TOP_BAND_ASSUMED_MAX
+    assert _p(65.5)["p_made_longer_than_line"] > 0
+
+
+@pytest.mark.parametrize("line", [66.5, 70.0, 70.5])
+def test_above_line_max_is_out_of_range(line):
+    with pytest.raises(eng.NflLongestFgError, match="^LONGEST_FG_LINE_OUT_OF_RANGE"):
+        _p(line)
