@@ -35,7 +35,7 @@ def test_half_point_quarter_spread_refused(period, line):
 
 
 @pytest.mark.parametrize("period", ["q1", "q2", "q3", "q4"])
-@pytest.mark.parametrize("line", [1.5, -1.5, 0, 3.5, -7])
+@pytest.mark.parametrize("line", [1.5, -1.5, 3.5, -7])  # |line|<=1 refused (guard v2)
 def test_other_quarter_spreads_still_price(period, line):
     p = price_period(_hist(), period=period, **KW)
     assert sum(spread_probs(p, line).values()) == pytest.approx(1.0)
