@@ -149,7 +149,11 @@ def _pair_ok(rows, row, *, at, event_id, sport, market, player_id, line, default
     unders = [s for side_name, s in matching if side_name == "UNDER"]
     if not overs or not unders:
         return "DK_PAIR_MISSING_OR_STALE"
-    if min(abs((o - u).total_seconds()) for o in overs for u in unders) > 120:
+    # A different valid pair must not rehabilitate this input row. The
+    # opposite side must be captured within 120s of this very source quote.
+    opposite_stamps = unders if side(row) == "OVER" else overs
+    if min(abs((source_stamp - stamp).total_seconds())
+           for stamp in opposite_stamps) > 120:
         return "DK_PAIR_CAPTURE_SPAN_EXCEEDED"
     return None
 
