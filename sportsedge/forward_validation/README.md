@@ -62,6 +62,12 @@ One JSON config per family in `configs/`:
   (the framework averages them when present; it never invents
   distribution math of its own).
 - YES_ONLY rows carry `model_p: {"YES": p}` and `entry_prices: {"YES": price}`.
+- Entry probabilities, entry odds, matching close odds, and entry/close lines
+  must be finite numeric values (numeric strings remain supported; booleans
+  are refused). Invalid lines use `LINE_INVALID`; invalid probabilities and
+  odds use `MODEL_PROBABILITY_INVALID` and `PRICE_INVALID`. Odds must produce
+  a finite decimal payout greater than one. Numerically equal line spellings
+  share one prospective-row identity and cannot inflate the sample count.
 - A record written after its event started must carry `label:
   "HISTORICAL"`; historical records are counted and excluded from all
   verdict math. An unlabeled post-start record refuses the run.
