@@ -54,28 +54,44 @@ Selection, edge, settlement: locked #2399 Rules 1, 2, 3, 7, 8, 9.
   `REFRESH_SCHEDULE_MISMATCH` (stats game_id not in schedule),
   `REFRESH_TIMESTAMP_INVALID`. **There is no 2025-only fallback.**
 
-## 2b. Server-side provenance (re-audit rulings)
-- Records branch (fixed): `records/nfl-atd-v1-1`. Fixed paths:
-  fetch records `nfl_atd_v1_1/fetch/<data sha256>.json`; run records
+## 2b. Server-side provenance (re-audit rulings A–G)
+- Repo `isaacrome21-sys/sportsedge`. Records branch (fixed):
+  `records/nfl-atd-v1-1`. Fixed paths: fetch records
+  `nfl_atd_v1_1/fetch/<data sha256>.json`; run records
   `nfl_atd_v1_1/runs/<slate_id>.json`; verdict `nfl_atd_v1_1/VERDICT.json`.
-- Server-side time source: GitHub repository activity API,
-  `GET /repos/{owner}/{repo}/activity` (activity_type=push), field
-  `timestamp`, for the push whose `after` equals the commit that added the
-  record file (commits API `?path=`, oldest). Client-set author/committer
-  dates are never used. No matching push event ⇒ UNPROVEN (fails closed).
-  Because the activity API lists only recent history, each slate's proof is
-  checked and recorded at run time.
-- Pricer: refuses (FAILED_CLOSED) unless the stats and schedule files'
-  sha256 each match a fetch record on the records branch whose push time is
-  strictly before the entry capture (FETCH_RECORD_NOT_ON_BRANCH,
-  FETCH_RECORD_HASH_MISMATCH, FETCH_PUSH_UNPROVEN,
-  FETCH_PUSH_NOT_BEFORE_CAPTURE). The proofs are written into the run record.
-- Run record: must be pushed to its fixed path; its server push time is the
-  proof that pricing happened before kickoff.
-- **A slate counts only if** its fetch records show server push times
-  before capture AND its run record shows a server push time before the
-  slate's first kickoff. Otherwise the slate is **SCREEN** and is excluded
-  from the forward sample (listed in the verdict as `screen_slates`).
+- Server-side time: the GitHub repository activity API,
+  `GET /repos/{owner}/{repo}/activity`, event fields `id, before, after,
+  timestamp, activity_type`, for the `push` event whose `after` is the
+  record's commit. Author/committer dates are never used.
+- (A) Immutable records: a record path must have exactly one commit ever
+  (commits API `?path=`), with no edit, delete or re-add
+  (RECORD_NOT_SINGLE_COMMIT). Its blob at that commit must equal its blob
+  at the branch head (RECORD_BLOB_MISMATCH). Any `force_push` or
+  `branch_deletion` activity on the records branch refuses everything
+  (RECORDS_BRANCH_REWRITTEN).
+- (G) One commit per push: the push event's `before` must equal the record
+  commit's only parent (PUSH_NOT_SINGLE_COMMIT). Malformed or failing API
+  responses are coded refusals (API_MALFORMED, API_UNAVAILABLE).
+- (F) Retention: the activity API keeps roughly **90 days** of events. The
+  pricer stores the raw fetch push events in the run record at run time. At
+  review, a proof is a live activity match OR the stored event cross-checked
+  against the commits API (its `after` = the record's single commit, its
+  `before` = that commit's only parent) (STORED_EVENT_MISMATCH otherwise).
+  The run record's own push must be matched live, so a slate must be
+  reviewed within ~90 days of its run or it is SCREEN.
+- Pricer: refuses (FAILED_CLOSED) unless the stats and schedule sha256 each
+  match a proven fetch record pushed strictly before the entry capture
+  (FETCH_RECORD_NOT_ON_BRANCH, FETCH_RECORD_HASH_MISMATCH,
+  FETCH_PUSH_UNPROVEN, FETCH_PUSH_NOT_BEFORE_CAPTURE, …). It refuses without
+  a `slate_id`. The run record holds rows, data hashes, capture/kickoff and
+  the raw fetch events.
+- (C) Ordering: fetch push < run-record push, and
+  captured_at <= run-record push < first kickoff.
+- **A slate counts only if** all of the above hold on server-side times;
+  otherwise it is **SCREEN** and excluded (listed as `screen_slates`).
+- Recommended, owner action: branch protection on `records/*` forbidding
+  force-push and deletion. Not enforceable from this code; the activity
+  check above detects violations after the fact.
 
 ## 3. Row-level fail-closed rules (t227 fixes)
 Order: timing → not-a-player → price → identity → engine. Exactly one reason.
@@ -119,14 +135,17 @@ code but undeclared. Declaring them is an owner item, done by freezing this.)
 - Rule 6 gates: >= 4 distinct weeks AND >= 150 graded picked rows AND >= 40
   distinct games (a minimum, per the clarification memo). **One review**, at
   the first slate close where all gates are met; that accumulated sample is
-  the sample of record. The scorer runs only in a git checkout of
-  `records/nfl-atd-v1-1` (any other location ⇒ RecordsLocationRefused). It
-  fetches origin and refuses (ReviewAlreadyRecorded) if
-  `nfl_atd_v1_1/VERDICT.json` exists on origin's records branch (or
-  locally), whatever inputs the caller passes. The verdict, with the sha256
-  of the slate inputs used, is staged create-only at that path and **counts
-  only once committed and pushed** to origin. No review is rerun unless a new
-  version preregisters it.
+  the sample of record. (B) `review()` takes slate ids only: each slate's
+  rows and data hashes are read from its pushed run record at the
+  records-branch head, never from the caller (callers supply only the close
+  captures and settlements that score those rows). (D/E) It runs only in a
+  checkout of `records/nfl-atd-v1-1` whose `origin` is
+  `github.com/isaacrome21-sys/sportsedge` (RecordsLocationRefused otherwise),
+  and refuses (ReviewAlreadyRecorded) if the API shows `VERDICT.json` at the
+  head OR any commit ever touching that path. The verdict, with the sha256
+  of the run-record contents used and their proofs, is staged create-only at
+  the fixed path and **counts only once pushed** as a proven single-commit
+  record. No review is rerun unless a new version preregisters it.
 - CLOSE_TIMESTAMP_INVALID: any capture for that (game_id, player_id) with a
   missing or unparseable timestamp ⇒ CLV_MISSING CLOSE_TIMESTAMP_INVALID; it
   is never skipped.

@@ -29,6 +29,9 @@ def main() -> int:
     args = ap.parse_args()
     pins = eng.check_data_pins(Path(args.player_data))
     board = json.loads(Path(args.board).read_text())
+    if not board.get("slate_id"):
+        print("FAILED_CLOSED SLATE_ID_MISSING")
+        return 2
     # Server-side fetch provenance (re-audit #1): refuse unless each data
     # file's sha256 matches a fetch record on the records branch whose push
     # GitHub timestamps strictly before the entry capture.
@@ -72,6 +75,17 @@ def main() -> int:
     except rf.RefreshFailed as e:
         print(f"FAILED_CLOSED {e.code}: {e.detail}")
         return 2
+    # Run record = the slate's sole source at review (rule B): rows, hashes,
+    # capture/kickoff and the raw fetch activity events (rule F).
+    rr = json.loads(Path(args.run_record).read_text())
+    rr.update(slate_id=board.get("slate_id"), captured_at=board.get("captured_at"),
+              first_kickoff=board.get("kickoff"), stats_sha256=shas["stats"],
+              schedule_sha256=shas["schedule"],
+              fetch_provenance={k: {"event": v["event"], "commit": v["commit"],
+                                    "pushed_at": v["pushed_at"]}
+                                for k, v in prov.items()},
+              rows=rows)
+    Path(args.run_record).write_text(json.dumps(rr, indent=1, sort_keys=True) + "\n")
     out = {"label": "NFL ANYTIME TD ENGINE V1.1 (DRAFT) — board pricing",
            "status_label": "RESEARCH_ONLY", "validation_status": "NOT_VALIDATED",
            "run_record": str(args.run_record), "game_id": board["game_id"],

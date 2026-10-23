@@ -21,6 +21,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import subprocess
 from datetime import timedelta
 from pathlib import Path
@@ -153,58 +154,77 @@ def _git(wt, *a, check=True):
                           check=check)
 
 
+def _canonical_url(url: str) -> str:
+    u = url.strip().lower()
+    u = re.sub(r"^(https?://|ssh://)?(git@)?", "", u)
+    u = u.replace("github.com:", "github.com/")
+    return re.sub(r"(\.git)?/?$", "", u)
+
+
 def _check_worktree(wt):
     wt = Path(wt)
-    r = _git(wt, "rev-parse", "--abbrev-ref", "HEAD", check=False)
+    r = _git(wt, "symbolic-ref", "--short", "HEAD", check=False)
     if r.returncode != 0 or r.stdout.strip() != pv.RECORDS_BRANCH:
-        raise RecordsLocationRefused(
-            f"{wt} is not a checkout of {pv.RECORDS_BRANCH}")
+        raise RecordsLocationRefused(f"{wt} is not a checkout of {pv.RECORDS_BRANCH}")
     top = _git(wt, "rev-parse", "--show-toplevel").stdout.strip()
     if Path(top).resolve() != wt.resolve():
         raise RecordsLocationRefused(f"{wt} is not the worktree root")
+    u = _git(wt, "remote", "get-url", "origin", check=False)
+    if u.returncode != 0 or _canonical_url(u.stdout) != pv.ORIGIN_CANONICAL:
+        raise RecordsLocationRefused(f"origin is not {pv.ORIGIN_CANONICAL}")
     return wt
 
 
-def _on_origin(wt) -> bool:
-    _git(wt, "fetch", "-q", "origin", pv.RECORDS_BRANCH)
-    r = _git(wt, "cat-file", "-e", f"origin/{pv.RECORDS_BRANCH}:{VERDICT_PATH}",
-             check=False)
-    if r.returncode != 0:
-        # fetch into FETCH_HEAD when no remote-tracking ref is configured
-        r = _git(wt, "cat-file", "-e", f"FETCH_HEAD:{VERDICT_PATH}", check=False)
-    return r.returncode == 0
+def _verdict_ever_existed(api) -> bool:
+    head = pv._call(api.get_file, pv.RECORDS_BRANCH, VERDICT_PATH)
+    commits = pv._call(api.file_commits, pv.RECORDS_BRANCH, VERDICT_PATH)
+    if not isinstance(commits, list) or (head is not None and not isinstance(head, str)):
+        raise pv.ProvenanceFailed("API_MALFORMED", "verdict lookup")
+    return head is not None or len(commits) > 0
 
 
-def verdict_counts(records_worktree) -> bool:
-    """A verdict counts only once committed AND pushed to origin's records
-    branch at the fixed path."""
-    return _on_origin(_check_worktree(records_worktree))
+def verdict_counts(api) -> bool:
+    """A verdict counts only once pushed to the records branch as a proven
+    single-commit record at the fixed path."""
+    try:
+        pv.prove_record(api, VERDICT_PATH)
+        return True
+    except pv.ProvenanceFailed as e:
+        if e.code == "RECORD_NOT_ON_BRANCH":
+            return False
+        raise
 
 
-def review(slates, *, records_worktree, api, slate_status=None):
-    """Single review. Refuses unless records_worktree is a checkout of the
-    records branch; fetches origin and refuses if the verdict already exists
-    there (or locally), whatever slates are passed. Slates whose server-side
-    provenance fails are SCREEN and excluded. The verdict is staged
-    create-only at the fixed path; it counts only after commit + push."""
+def review(slate_ids, *, records_worktree, api, captures, settlements):
+    """Single review. Slates are named by id; their rows and data hashes are
+    read ONLY from each pushed run record at the records-branch head (never
+    from the caller). Refuses unless records_worktree is a checkout of the
+    records branch whose origin is the SportsEdge repo, and if the verdict
+    path has EVER had a commit (checked via the API). SCREEN slates are
+    excluded. The verdict is staged create-only at the fixed path; it counts
+    only once pushed (verdict_counts). Caller-supplied captures/settlements
+    only score the recorded rows."""
     wt = _check_worktree(records_worktree)
-    if _on_origin(wt) or (wt / VERDICT_PATH).exists():
+    if _verdict_ever_existed(api) or (wt / VERDICT_PATH).exists():
         raise ReviewAlreadyRecorded(f"{pv.RECORDS_BRANCH}:{VERDICT_PATH}")
-    status_fn = slate_status or pv.slate_status
-    acc, used, screen = [], [], []
-    for s in slates:
-        st = status_fn(api, s)
+    acc, used, screen, proofs = [], [], [], {}
+    for sid in slate_ids:
+        st = pv.load_slate(api, sid)
         if st["status"] != "COUNTS":
-            screen.append(s["slate_id"])
+            screen.append(sid)
             continue
-        used.append(s)
-        acc.extend(dict(r) for r in s["rows"])
+        used.append(st["content"])
+        proofs[sid] = st["run_proof"]
+        for e in st["record"]["rows"]:
+            r = score_row(e, captures, settlements)
+            if r is not None:
+                acc.append(r)
         weeks, picked, games = _gates(acc)
         if len(weeks) >= MIN_WEEKS and len(picked) >= MIN_PICKED and len(games) >= MIN_GAMES:
-            v = _verdict(acc, s["slate_id"])
+            v = _verdict(acc, sid)
             v.update(inputs_sha256=inputs_sha256(used), n_slates=len(used),
                      screen_slates=screen, records_branch=pv.RECORDS_BRANCH,
-                     verdict_path=VERDICT_PATH)
+                     verdict_path=VERDICT_PATH, run_proofs=proofs)
             path = wt / VERDICT_PATH
             path.parent.mkdir(parents=True, exist_ok=True)
             try:

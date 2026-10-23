@@ -1,34 +1,47 @@
 """NFL anytime-TD v1.1 — server-side provenance (DRAFT, pending owner freeze).
 
 Records live on ONE named records branch at fixed paths:
-  fetch records  nfl_atd_v1_1/fetch/<data sha256>.json   (one per data file)
+  fetch records  nfl_atd_v1_1/fetch/<data sha256>.json
   run records    nfl_atd_v1_1/runs/<slate_id>.json
   verdict        nfl_atd_v1_1/VERDICT.json
-A record's time is the GitHub SERVER-SIDE timestamp of the push that
-delivered the commit adding it, read from the repository activity API
-(GET /repos/{owner}/{repo}/activity, activity_type=push, field `timestamp`,
-matched on `after` == the commit that added the file). Client-set author /
-committer dates are never consulted. If no such push event is found the
-time is UNPROVEN and fails closed (note: the activity API only lists recent
-history, so proofs must be taken and recorded at run time).
-
-Rules: the pricer refuses unless every data file's sha256 matches a fetch
-record on the branch whose push is server-timed strictly before the entry
-capture. A slate COUNTS only if its fetch records are pushed before capture
-and its run record is pushed before the slate's first kickoff; else SCREEN.
+Rules (re-audit rulings A-G):
+ A  a record path has exactly ONE commit ever (no edit, delete or re-add);
+    the blob at that commit equals the blob at the branch head; any
+    force_push or branch_deletion activity on the records branch refuses.
+ C  fetch push < run push, and captured_at <= run push < first kickoff.
+ F  server time = GitHub repository activity API event
+    (GET /repos/{owner}/{repo}/activity: id, before, after, timestamp,
+    activity_type) whose `after` is the record's commit. The raw fetch
+    events are stored in the run record at run time; at review a live match
+    OR the stored event cross-checked against the commits API (after == the
+    record's single commit, before == its only parent) is accepted. The
+    activity API keeps roughly 90 days of history; past that only stored
+    events can prove a time. The run record's own push must be proven live
+    (review within ~90 days of the slate) or the slate is SCREEN.
+ G  one commit per push: the event's `before` must be the commit's only
+    parent. Malformed / failing API responses are coded refusals.
+Client-set author / committer dates are never consulted.
+Recommended (owner action, not enforceable here): branch protection on
+records/* forbidding force-push and deletion.
 """
 from __future__ import annotations
 
+import base64
 import json
 import os
+import re
+import urllib.error
 import urllib.request
 from datetime import datetime
+from urllib.parse import quote
 
-OWNER, REPO = "isaacrome21-sys", "SportsEdge"
+OWNER, REPO = "isaacrome21-sys", "sportsedge"
+ORIGIN_CANONICAL = f"github.com/{OWNER}/{REPO}"
 RECORDS_BRANCH = "records/nfl-atd-v1-1"
 ROOT = "nfl_atd_v1_1"
 VERDICT_PATH = f"{ROOT}/VERDICT.json"
 SERVER_TIME_SOURCE = "GET /repos/{owner}/{repo}/activity (activity_type=push, timestamp)"
+REWRITE_TYPES = {"force_push", "branch_deletion"}
 
 
 def fetch_record_path(sha256: str) -> str:
@@ -52,119 +65,222 @@ def _t(s) -> datetime:
     return t
 
 
+def _call(fn, *a):
+    try:
+        return fn(*a)
+    except ProvenanceFailed:
+        raise
+    except (OSError, urllib.error.URLError) as e:
+        raise ProvenanceFailed("API_UNAVAILABLE", f"{getattr(fn, '__name__', fn)}: {e}")
+    except (ValueError, KeyError, TypeError, AttributeError) as e:
+        raise ProvenanceFailed("API_MALFORMED", f"{getattr(fn, '__name__', fn)}: {e}")
+
+
 class GitHubAPI:
-    """Minimal read-only REST client. Uses $GITHUB_TOKEN if set (raises the
-    rate limit); otherwise anonymous (public repo)."""
+    """Read-only REST client (anonymous for the public repo, or $GITHUB_TOKEN)."""
     def __init__(self, owner=OWNER, repo=REPO, token=None):
         self.base = f"https://api.github.com/repos/{owner}/{repo}"
         self.token = token if token is not None else os.environ.get("GITHUB_TOKEN")
 
-    def _get(self, url, raw=False):
+    def _req(self, url):
         req = urllib.request.Request(url, headers={
-            "Accept": "application/vnd.github.raw" if raw else "application/vnd.github+json",
+            "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
             **({"Authorization": f"Bearer {self.token}"} if self.token else {})})
         try:
-            with urllib.request.urlopen(req, timeout=60) as r:
-                b = r.read()
+            r = urllib.request.urlopen(req, timeout=60)
         except urllib.error.HTTPError as e:
-            if e.code == 404:
-                return None
+            if e.code in (404, 409):
+                return None, {}
             raise
-        return b.decode() if raw else json.loads(b)
+        with r:
+            return json.loads(r.read()), r.headers
 
-    def get_file(self, branch, path):
-        from urllib.parse import quote
-        return self._get(f"{self.base}/contents/{quote(path)}?ref={quote(branch, safe='')}", raw=True)
+    def _contents(self, ref, path):
+        js, _ = self._req(f"{self.base}/contents/{quote(path)}?ref={quote(ref, safe='')}")
+        return js
+
+    def get_file(self, ref, path):
+        js = self._contents(ref, path)
+        if js is None:
+            return None
+        return base64.b64decode(js["content"]).decode()
+
+    def blob_sha(self, ref, path):
+        js = self._contents(ref, path)
+        return None if js is None else js["sha"]
 
     def file_commits(self, branch, path):
-        from urllib.parse import quote
         out, page = [], 1
         while True:
-            js = self._get(f"{self.base}/commits?sha={quote(branch, safe='')}"
-                           f"&path={quote(path)}&per_page=100&page={page}") or []
+            js, _ = self._req(f"{self.base}/commits?sha={quote(branch, safe='')}"
+                              f"&path={quote(path)}&per_page=100&page={page}")
+            js = js or []
             out += [c["sha"] for c in js]
             if len(js) < 100:
-                return out          # newest first; last = commit that added it
+                return out
             page += 1
 
-    def push_activities(self, branch):
-        """All push activities for the ref, following Link rel=next."""
-        import re
-        from urllib.parse import quote
+    def commit_info(self, sha):
+        js, _ = self._req(f"{self.base}/commits/{sha}")
+        return js
+
+    def activities(self, branch):
+        """ALL activity types for the ref (push, force_push, branch_deletion…)."""
         url = (f"{self.base}/activity?ref={quote('refs/heads/' + branch, safe='')}"
-               f"&activity_type=push&per_page=100")
+               f"&per_page=100")
         out = []
         while url:
-            req = urllib.request.Request(url, headers={
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-                **({"Authorization": f"Bearer {self.token}"} if self.token else {})})
-            with urllib.request.urlopen(req, timeout=60) as r:
-                out += json.loads(r.read())
-                m = re.search(r'<([^>]+)>;\s*rel="next"', r.headers.get("Link") or "")
+            js, h = self._req(url)
+            out += js or []
+            m = re.search(r'<([^>]+)>;\s*rel="next"', (h or {}).get("Link") or "")
             url = m.group(1) if m else None
         return out
 
 
-def server_pushed_at(api, branch, path):
-    """Server timestamp of the push whose `after` is the commit that added
-    `path` on `branch`; None if unproven."""
-    commits = api.file_commits(branch, path)
-    if not commits:
-        return None
-    added = commits[-1]
-    times = [_t(p["timestamp"]) for p in api.push_activities(branch)
-             if p.get("after") == added and p.get("activity_type", "push") == "push"]
-    return min(times) if times else None
+_EV_KEYS = ("id", "before", "after", "timestamp", "activity_type")
 
 
-def verify_fetch(api, sha256, captured_at):
-    path = fetch_record_path(sha256)
-    content = api.get_file(RECORDS_BRANCH, path)
-    if content is None:
-        raise ProvenanceFailed("FETCH_RECORD_NOT_ON_BRANCH", path)
+def _events(api):
+    evs = _call(api.activities, RECORDS_BRANCH)
+    if not isinstance(evs, list):
+        raise ProvenanceFailed("API_MALFORMED", "activities not a list")
+    out = []
+    for e in evs:
+        if not isinstance(e, dict) or not all(k in e for k in _EV_KEYS):
+            raise ProvenanceFailed("API_MALFORMED", f"activity event {e!r}")
+        _t(e["timestamp"])
+        out.append({k: e[k] for k in _EV_KEYS})
+    bad = [e for e in out if e["activity_type"] in REWRITE_TYPES]
+    if bad:
+        raise ProvenanceFailed("RECORDS_BRANCH_REWRITTEN",
+                               f"{bad[0]['activity_type']} id={bad[0]['id']}")
+    return out
+
+
+def _only_parent(api, sha):
+    info = _call(api.commit_info, sha)
     try:
-        rec = json.loads(content)
+        parents = [p["sha"] for p in info["parents"]]
+    except (TypeError, KeyError) as e:
+        raise ProvenanceFailed("API_MALFORMED", f"commit {sha}: {e}")
+    if len(parents) != 1:
+        raise ProvenanceFailed("PUSH_NOT_SINGLE_COMMIT", f"{sha} has {len(parents)} parents")
+    return parents[0]
+
+
+def prove_record(api, path, stored_event=None) -> dict:
+    """Prove a record's single commit and its server push time (rules A, F, G)."""
+    events = _events(api)                           # refuses rewrites first
+    commits = _call(api.file_commits, RECORDS_BRANCH, path)
+    if not isinstance(commits, list) or not all(isinstance(c, str) for c in commits):
+        raise ProvenanceFailed("API_MALFORMED", "file_commits")
+    head = _call(api.get_file, RECORDS_BRANCH, path)
+    if head is not None and not isinstance(head, str):
+        raise ProvenanceFailed("API_MALFORMED", "get_file")
+    if not commits:
+        raise ProvenanceFailed("RECORD_NOT_ON_BRANCH", path)
+    if len(commits) != 1 or head is None:
+        raise ProvenanceFailed("RECORD_NOT_SINGLE_COMMIT", f"{path}: {len(commits)} commits")
+    c = commits[0]
+    b_commit = _call(api.blob_sha, c, path)
+    b_head = _call(api.blob_sha, RECORDS_BRANCH, path)
+    if b_commit is None or b_commit != b_head:
+        raise ProvenanceFailed("RECORD_BLOB_MISMATCH", path)
+    parent = _only_parent(api, c)
+    live = [e for e in events if e["after"] == c and e["activity_type"] == "push"]
+    if live:
+        ev = min(live, key=lambda e: _t(e["timestamp"]))
+        if ev["before"] != parent:
+            raise ProvenanceFailed("PUSH_NOT_SINGLE_COMMIT",
+                                   f"push {ev['id']} before={ev['before']} parent={parent}")
+        src = "live_activity"
+    elif stored_event is not None:
+        if not isinstance(stored_event, dict) or not all(k in stored_event for k in _EV_KEYS):
+            raise ProvenanceFailed("API_MALFORMED", "stored event incomplete")
+        ev = {k: stored_event[k] for k in _EV_KEYS}
+        if ev["after"] != c or ev["before"] != parent or ev["activity_type"] != "push":
+            raise ProvenanceFailed("STORED_EVENT_MISMATCH", f"{path}")
+        src = "stored_event_commit_checked"
+    else:
+        raise ProvenanceFailed("PUSH_UNPROVEN", path)
+    try:
+        t = _t(ev["timestamp"])
     except ValueError:
-        raise ProvenanceFailed("FETCH_RECORD_HASH_MISMATCH", "unreadable record")
-    if rec.get("sha256") != sha256:
+        raise ProvenanceFailed("API_MALFORMED", "event timestamp")
+    return {"path": path, "commit": c, "event": ev, "pushed_at": t.isoformat(),
+            "proof_source": src, "source": SERVER_TIME_SOURCE, "content": head}
+
+
+def verify_fetch(api, sha256, captured_at, stored_event=None):
+    path = fetch_record_path(sha256)
+    try:
+        p = prove_record(api, path, stored_event)
+    except ProvenanceFailed as e:
+        code = e.code if e.code.startswith(("API_", "RECORDS_")) else "FETCH_" + e.code
+        raise ProvenanceFailed(code, e.detail)
+    try:
+        rec = json.loads(p["content"])
+        ok = rec.get("sha256") == sha256
+    except (ValueError, AttributeError):
+        ok = False
+    if not ok:
         raise ProvenanceFailed("FETCH_RECORD_HASH_MISMATCH", path)
-    t = server_pushed_at(api, RECORDS_BRANCH, path)
-    if t is None:
-        raise ProvenanceFailed("FETCH_PUSH_UNPROVEN", path)
-    if t >= _t(captured_at):
+    if captured_at is not None and _t(p["pushed_at"]) >= _t(captured_at):
         raise ProvenanceFailed("FETCH_PUSH_NOT_BEFORE_CAPTURE",
-                               f"{path} pushed {t.isoformat()} >= capture {captured_at}")
-    return {"path": path, "branch": RECORDS_BRANCH, "record": rec,
-            "server_pushed_at": t.isoformat(), "source": SERVER_TIME_SOURCE}
+                               f"{path} pushed {p['pushed_at']} >= capture {captured_at}")
+    p.pop("content")
+    return p
 
 
 def require_fetch_provenance(api, shas: dict, captured_at) -> dict:
-    """Pricer gate: every data file (name -> sha256) must be proven."""
+    """Pricer gate; returns proofs incl. the raw events to store (rule F)."""
     return {name: verify_fetch(api, sha, captured_at) for name, sha in shas.items()}
 
 
-def slate_status(api, slate) -> dict:
-    """COUNTS iff fetch records pushed before capture AND run record pushed
-    before the slate's first kickoff (server-side times); else SCREEN."""
-    reasons, out = [], {}
-    for k in ("stats_sha256", "schedule_sha256"):
+def load_slate(api, slate_id) -> dict:
+    """Load a slate ONLY from its pushed run record at the branch head (rule
+    B) and decide COUNTS / SCREEN (rules A, C, F)."""
+    path = run_record_path(slate_id)
+    out = {"slate_id": slate_id, "status": "SCREEN", "reasons": [], "record": None,
+           "content": None}
+    try:
+        rp = prove_record(api, path)
+    except ProvenanceFailed as e:
+        out["reasons"].append(e.code if e.code.startswith(("API_", "RECORDS_"))
+                              else "RUN_" + e.code)
+        return out
+    out["run_proof"] = {k: v for k, v in rp.items() if k != "content"}
+    out["content"] = rp["content"]
+    try:
+        rec = json.loads(rp["content"])
+        cap, ko = _t(rec["captured_at"]), _t(rec["first_kickoff"])
+        shas = {"stats": rec["stats_sha256"], "schedule": rec["schedule_sha256"]}
+        stored = rec.get("fetch_provenance") or {}
+        rows = rec["rows"]
+        if rec.get("slate_id") != slate_id or not isinstance(rows, list):
+            raise ValueError("slate_id/rows")
+    except (ValueError, KeyError, TypeError):
+        out["reasons"].append("RUN_RECORD_MALFORMED")
+        return out
+    run_t = _t(rp["pushed_at"])
+    if run_t < cap:
+        out["reasons"].append("RUN_PUSH_BEFORE_CAPTURE")
+    if run_t >= ko:
+        out["reasons"].append("RUN_PUSH_NOT_BEFORE_KICKOFF")
+    for name, sha in shas.items():
+        ev = (stored.get(name) or {}).get("event") if isinstance(stored, dict) else None
         try:
-            out[k + "_fetch"] = verify_fetch(api, slate[k], slate["captured_at"])
-        except (ProvenanceFailed, KeyError, ValueError) as e:
-            reasons.append(getattr(e, "code", "FETCH_RECORD_NOT_ON_BRANCH"))
-    path = run_record_path(slate["slate_id"])
-    if api.get_file(RECORDS_BRANCH, path) is None:
-        reasons.append("RUN_RECORD_NOT_ON_BRANCH")
-    else:
-        t = server_pushed_at(api, RECORDS_BRANCH, path)
-        if t is None:
-            reasons.append("RUN_PUSH_UNPROVEN")
-        else:
-            out["run_server_pushed_at"] = t.isoformat()
-            if t >= _t(slate["first_kickoff"]):
-                reasons.append("RUN_PUSH_NOT_BEFORE_KICKOFF")
-    return {"slate_id": slate["slate_id"],
-            "status": "SCREEN" if reasons else "COUNTS",
-            "reasons": sorted(set(reasons)), "source": SERVER_TIME_SOURCE, **out}
+            fp = verify_fetch(api, sha, None, ev)
+            ft = _t(fp["pushed_at"])
+            if ft >= cap:
+                out["reasons"].append("FETCH_PUSH_NOT_BEFORE_CAPTURE")
+            if ft >= run_t:
+                out["reasons"].append("FETCH_PUSH_NOT_BEFORE_RUN_PUSH")
+            out[f"{name}_fetch_proof"] = fp
+        except ProvenanceFailed as e:
+            out["reasons"].append(e.code)
+    out["record"] = rec
+    out["reasons"] = sorted(set(out["reasons"]))
+    out["status"] = "SCREEN" if out["reasons"] else "COUNTS"
+    return out
