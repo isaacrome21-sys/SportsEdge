@@ -36,7 +36,7 @@ def _games():
              home_team="NYJ", result="7"),
         dict(game_id="2026_07_MIA_BUF", season=2026, game_type="REG", week=7,
              gameday="2026-10-22", gametime="20:15", away_team="MIA",
-             home_team="BUF", result=""),
+             home_team="BUF", result="3"),
     ]
 
 

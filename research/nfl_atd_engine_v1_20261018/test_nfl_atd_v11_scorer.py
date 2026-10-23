@@ -88,7 +88,7 @@ def _ledger(n_weeks, games_per_week, picks_per_game, clv=0.01):
             for i in range(picks_per_game):
                 rows.append({"player_id": f"{gid}y{i}", "selection": "YES",
                              "game_id": gid, "week": w + 1,
-                             "clv": clv + (0.001 * (i % 3)), "clv_status": "OK",
+                             "clv": clv + 0.001 * (i % 3) + 0.002 * (g % 5), "clv_status": "OK",
                              "outcome": i % 2, "outcome_status": "SETTLED",
                              "raw_implied": 0.3})
             rows.append({"player_id": f"{gid}p", "selection": "PASS",
