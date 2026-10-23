@@ -2,6 +2,8 @@
 where the quarter moneyline is NAIVE_FAIL (a ±0.5 spread is a moneyline restated)."""
 import pytest
 
+from sportsedge import nfl_period_lines_empirical as E
+
 from sportsedge.nfl_period_lines_empirical import (
     NflPeriodLinesError, price_period, price_period_unrestricted, spread_probs)
 from sportsedge.screen_only_guard import ScreenOnlyGuardError, screen_only
@@ -35,10 +37,12 @@ def test_half_point_quarter_spread_refused(period, line):
 
 
 @pytest.mark.parametrize("period", ["q1", "q2", "q3", "q4"])
-@pytest.mark.parametrize("line", [1.5, -1.5, 3.5, -7])  # |line|<=1 refused (guard v2)
-def test_other_quarter_spreads_still_price(period, line):
+@pytest.mark.parametrize("line", [1.5, -1.5, 3.5, -7])
+def test_other_quarter_spreads_refused_derivable(period, line):
+    # Grok ruling 2026-10-23 Option 1: every quarter spread rebuilds the moneyline.
     p = price_period(_hist(), period=period, **KW)
-    assert sum(spread_probs(p, line).values()) == pytest.approx(1.0)
+    with pytest.raises(E.NflPeriodLinesError, match=f"NAIVE_FAIL:{period.upper()}_MONEYLINE_DERIVABLE"):
+        spread_probs(p, line)
 
 
 @pytest.mark.parametrize("line", [0.5, -0.5])

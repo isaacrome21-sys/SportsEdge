@@ -19,9 +19,11 @@ def test_quarter_spread_within_one_point_refused(period, line):
 
 @pytest.mark.parametrize("period", ["q1", "q2", "q3", "q4"])
 @pytest.mark.parametrize("line", [1.5, -1.5, 2, -3.5, 7])
-def test_quarter_spread_beyond_one_point_prices(period, line):
+def test_quarter_spread_beyond_one_point_refused_derivable(period, line):
+    # Grok ruling 2026-10-23 Option 1 supersedes the |line|>1 carve-out.
     p = E.price_period(_hist(), period=period, **KW)
-    assert sum(E.spread_probs(p, line).values()) == pytest.approx(1.0)
+    with pytest.raises(E.NflPeriodLinesError, match=f"NAIVE_FAIL:{period.upper()}_MONEYLINE_DERIVABLE"):
+        E.spread_probs(p, line)
 
 
 @pytest.mark.parametrize("line", [0, 0.5, -1])

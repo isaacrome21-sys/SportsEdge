@@ -41,12 +41,18 @@ def test_non_failed_totals_still_price(period):
     assert sum(total_probs(p, 10.5).values()) == pytest.approx(1.0)
 
 
-@pytest.mark.parametrize("period", ["q1", "q2", "q3", "q4", "h1", "h2"])
-def test_spreads_not_refused(period):
-    # +/-0.5 quarter spreads restate the refused moneyline (see the guard tests);
-    # other lines still price.
+@pytest.mark.parametrize("period", ["h1", "h2"])
+def test_half_spreads_not_refused(period):
     p = price_period(_hist(), period=period, **KW)
     assert sum(spread_probs(p, -1.5).values()) == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("period", ["q1", "q2", "q3", "q4"])
+def test_quarter_spreads_refused_derivable(period):
+    # Grok ruling 2026-10-23 Option 1.
+    p = price_period(_hist(), period=period, **KW)
+    with pytest.raises(NflPeriodLinesError, match=f"NAIVE_FAIL:{period.upper()}_MONEYLINE_DERIVABLE"):
+        spread_probs(p, -1.5)
 
 
 def test_halves_keep_moneyline():
