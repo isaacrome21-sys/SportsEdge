@@ -199,6 +199,18 @@ def test_different_players_are_distinct_exposure_groups():
         ],
     )
     assert card.independent_exposure_count == 2
+    assert card.shared_game_script_cluster_count == 1
+    public = card.to_dict()
+    assert public["shared_game_script_cluster_count"] == 1
+    assert public["exposure_count_limit"] == "PLAYER_COMPONENT_GROUPS_NOT_INDEPENDENT_GAME_SCRIPT_BETS"
+    assert "not independent game-script positions" in card.render()
+
+
+def test_empty_research_card_has_zero_game_script_clusters():
+    card = build_prop_research_card(game_id="game-2", evaluations=[])
+    assert card.independent_exposure_count == 0
+    assert card.shared_game_script_cluster_count == 0
+    assert card.to_dict()["shared_game_script_cluster_count"] == 0
 
 
 def test_prop_card_and_ledger_are_separate_from_game_market_lane(tmp_path):
@@ -215,6 +227,8 @@ def test_prop_card_and_ledger_are_separate_from_game_market_lane(tmp_path):
     record = build_prop_ledger_record(card, generated_at="2026-09-21T17:00:00Z")
     assert record["lane"] == "NFL_PROP_RESEARCH_ONLY"
     assert record["independent_exposure_count"] == 1
+    assert record["shared_game_script_cluster_count"] == 1
+    assert record["exposure_count_limit"] == "PLAYER_COMPONENT_GROUPS_NOT_INDEPENDENT_GAME_SCRIPT_BETS"
     assert not any(record["authority"].values())
     rel = prop_ledger_relative_path(record)
     assert rel.startswith(PROP_LEDGER_NAMESPACE + "/")
