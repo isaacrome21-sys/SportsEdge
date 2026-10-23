@@ -76,6 +76,12 @@ One JSON config per family in `configs/`:
 Closes match entries on (event, subject, market, line). A close at a
 different line is `LINE_MOVED`, never repriced.
 
+All entry and close timestamps require an explicit UTC offset (`Z` is
+accepted). Date-only values and naive local times are refused; the evaluator
+never guesses a timezone. Invalid entry clocks use `RECORD_MISSING_TIMESTAMP`,
+and invalid close clocks use `CLOSE_RECORD_MISSING_TIMESTAMP`. Every supplied
+close is checked before indexing, including unmatched or overwritten rows.
+
 **Outcome record**: `{"event_id", "subject_id", "market", "value"}` —
 the realized value on the line scale, from the family's declared
 results source.

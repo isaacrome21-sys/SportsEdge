@@ -99,14 +99,19 @@ class ForwardValidationRefusal(Exception):
 
 
 def _parse_ts(value, *, row_id: str, field_name: str) -> datetime:
+    reason = ("CLOSE_RECORD_MISSING_TIMESTAMP" if field_name == "captured_at"
+              else "RECORD_MISSING_TIMESTAMP")
     if value is None:
         raise ForwardValidationRefusal(
-            "RECORD_MISSING_TIMESTAMP", {"row_id": row_id, "field": field_name})
+            reason, {"row_id": row_id, "field": field_name})
     try:
-        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if parsed.utcoffset() is None:
+            raise ValueError("timestamp requires an explicit UTC offset")
+        return parsed
     except ValueError:
         raise ForwardValidationRefusal(
-            "RECORD_MISSING_TIMESTAMP",
+            reason,
             {"row_id": row_id, "field": field_name, "value": value})
 
 
@@ -321,6 +326,10 @@ def _index_closes(close_rows: list) -> tuple[dict, set]:
                                 ("event_id", "subject_id", "market", "line")}})
         key = (raw["event_id"], raw.get("subject_id"), raw["market"],
                float(raw["line"]))
+        # Validate every supplied capture, even when it does not match an
+        # entry or is overwritten by another capture of the same key.
+        _parse_ts(raw["captured_at"], row_id=f"close:{key}",
+                  field_name="captured_at")
         by_key[key] = raw
         seen.add((raw["event_id"], raw.get("subject_id"), raw["market"]))
     return by_key, seen
