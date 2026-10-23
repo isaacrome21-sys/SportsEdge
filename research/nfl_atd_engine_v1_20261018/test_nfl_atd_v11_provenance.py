@@ -8,7 +8,7 @@ from pathlib import Path
 
 import atd_provenance as pv
 import score_nfl_atd_forward as sc
-from fake_github_api import FakeGitHub, ledger_to_records, records_worktree
+from fake_github_api import FakeGitHub, ledger_to_branch, records_worktree
 from test_nfl_atd_v11_scorer import _ledger
 
 BR = pv.RECORDS_BRANCH
@@ -208,47 +208,50 @@ class TestFetchAndSlateC(unittest.TestCase):
 
 
 class TestReviewB_DE(unittest.TestCase):
+    def tearDown(self):
+        sc._utcnow = self._now
+
     def setUp(self):
+        from datetime import datetime, timezone
+        self._now = sc._utcnow
+        sc._utcnow = lambda: datetime(2026, 11, 30, tzinfo=timezone.utc)
         self.api = FakeGitHub()
         self.wt = records_worktree()
 
     def publish(self, led):
-        return ledger_to_records(self.api, led)
+        return ledger_to_branch(self.api, led), None, None
 
     def test_rows_and_hashes_come_from_pushed_records(self):
         ids, caps, setl = self.publish(_ledger(5, 14, 3, clv=0.02))
-        v = sc.review(ids, records_worktree=self.wt, api=self.api,
-                      captures=caps, settlements=setl)
+        v = sc.review(ids, records_worktree=self.wt, api=self.api)
         self.assertEqual(v["status"], "REVIEWED")
         self.assertEqual(v["verdict"], "BEATS_MARKET")
         self.assertEqual(v["review_slate"], "2026-W4")
         want = [self.api.get_file(BR, pv.run_record_path(s)) for s in ids[:4]]
-        self.assertEqual(v["inputs_sha256"], sc.inputs_sha256(want))
+        self.assertEqual(v["inputs"]["run_records"], want)
+        self.assertEqual(v["inputs_sha256"], sc.inputs_sha256(v["inputs"]))
 
     def test_caller_cannot_pass_rows(self):
         with self.assertRaises(TypeError):
-            sc.review(_ledger(5, 14, 3), records_worktree=self.wt, api=self.api)
+            sc.review(["S1"], records_worktree=self.wt, api=self.api, rows=[])
 
     def test_unknown_slate_is_screen(self):
         ids, caps, setl = self.publish(_ledger(4, 14, 3, clv=0.02))
-        v = sc.review(["nope"] + ids, records_worktree=self.wt, api=self.api,
-                      captures=caps, settlements=setl)
+        v = sc.review(["nope"] + ids, records_worktree=self.wt, api=self.api)
         self.assertEqual(v["screen_slates"], ["nope"])
 
     def test_verdict_existence_via_api(self):
         ids, caps, setl = self.publish(_ledger(5, 14, 3, clv=0.02))
         self.api.commit(BR, {pv.VERDICT_PATH: "{}"}, "2026-11-20T00:00:00Z")
         with self.assertRaises(sc.ReviewAlreadyRecorded):
-            sc.review(ids, records_worktree=self.wt, api=self.api,
-                      captures=caps, settlements=setl)
+            sc.review(ids, records_worktree=self.wt, api=self.api)
 
     def test_verdict_ever_committed_then_deleted_refused(self):
         ids, caps, setl = self.publish(_ledger(5, 14, 3, clv=0.02))
         self.api.commit(BR, {pv.VERDICT_PATH: "{}"}, "2026-11-20T00:00:00Z")
         self.api.commit(BR, {pv.VERDICT_PATH: None}, "2026-11-20T00:01:00Z")
         with self.assertRaises(sc.ReviewAlreadyRecorded):
-            sc.review(ids, records_worktree=self.wt, api=self.api,
-                      captures=caps, settlements=setl)
+            sc.review(ids, records_worktree=self.wt, api=self.api)
 
     def test_origin_url_enforced(self):
         ids, caps, setl = self.publish(_ledger(5, 14, 3, clv=0.02))
@@ -256,18 +259,17 @@ class TestReviewB_DE(unittest.TestCase):
             with self.subTest(url=url):
                 with self.assertRaises(sc.RecordsLocationRefused):
                     sc.review(ids, records_worktree=records_worktree(url),
-                              api=self.api, captures=caps, settlements=setl)
+                              api=self.api)
         for url in ("git@github.com:isaacrome21-sys/SportsEdge.git",
                     "https://github.com/isaacrome21-sys/sportsedge"):
             with self.subTest(url=url):
                 v = sc.review(ids, records_worktree=records_worktree(url),
-                              api=self.api, captures=caps, settlements=setl)
+                              api=self.api)
                 self.assertEqual(v["status"], "REVIEWED")
 
     def test_verdict_counts_only_when_pushed_single_commit(self):
         ids, caps, setl = self.publish(_ledger(5, 14, 3, clv=0.02))
-        sc.review(ids, records_worktree=self.wt, api=self.api,
-                  captures=caps, settlements=setl)
+        sc.review(ids, records_worktree=self.wt, api=self.api)
         self.assertTrue((self.wt / pv.VERDICT_PATH).exists())
         self.assertFalse(sc.verdict_counts(self.api))
         self.api.commit(BR, {pv.VERDICT_PATH: (self.wt / pv.VERDICT_PATH).read_text()},

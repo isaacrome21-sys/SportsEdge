@@ -17,13 +17,18 @@ def records_wt():
 
 
 def _review(led, wt=None, api=None):
-    """Publish the ledger as pushed records on an injected FakeGitHub and
-    review it by slate id (rows come from the pushed run records)."""
-    from fake_github_api import FakeGitHub, ledger_to_records
+    """Publish the ledger (run records, closes, settlements) on an injected
+    FakeGitHub; review reads only those branch records."""
+    from datetime import datetime, timezone
+    from fake_github_api import FakeGitHub, ledger_to_branch
     api = api or FakeGitHub()
-    ids, caps, setl = ledger_to_records(api, led)
-    return sc.review(ids, records_worktree=wt or records_wt(), api=api,
-                     captures=caps, settlements=setl)
+    ids = ledger_to_branch(api, led)
+    orig = sc._utcnow
+    sc._utcnow = lambda: datetime(2026, 11, 30, tzinfo=timezone.utc)
+    try:
+        return sc.review(ids, records_worktree=wt or records_wt(), api=api)
+    finally:
+        sc._utcnow = orig
 
 
 def entry(pid, sel, price, game="g1", week=8, kickoff=KO):
@@ -134,7 +139,7 @@ class TestRule6Gates(unittest.TestCase):
         self.assertEqual(v["n_picked"], 168)
         self.assertEqual(v["n_games"], 56)
         # Later slates do not enter the sample of record.
-        strip = lambda d: {k: x for k, x in d.items() if k not in ("run_proofs", "inputs_sha256")}
+        strip = lambda d: {k: x for k, x in d.items() if k not in ("run_proofs", "inputs_sha256", "inputs")}
         self.assertEqual(strip(v), strip(_review(led[:4])))
 
     def test_games_minimum_not_cap(self):
