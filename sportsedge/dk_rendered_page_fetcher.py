@@ -31,7 +31,9 @@ Contract
   with 100 <= |price| <= 50000. Anything else is an explicit refusal. A row
   refused for its line carries no price. Nothing is filled in.
 * ``rows`` holds only OK, two-sided pairs; refused sides are in
-  ``refused_rows``. The board card carries no kickoff time, so
+  ``refused_rows``. Team names come from the ``cb-market__label-inner`` span
+  when present (never the pitcher sub-label); a card showing a live score is
+  refused whole (LIVE_IN_PROGRESS_CARD). The board card carries no kickoff time, so
   ``commence_time`` is None (``NOT_ON_BOARD_CARD``); ``book_last_update`` is None.
 * ``to_capture_markets`` adapts rows to the market shape consumed by
   ``scripts/nfl_2026_line_capture.py`` ``spread_row`` / ``total_row``.
@@ -159,8 +161,13 @@ def _id_consistency(m, market: str, outcome: str, position_side: str, point: flo
 def _teams(card) -> list[str]:
     teams: list[str] = []
     for a in card.select('a[data-testid="lp-nav-link"]'):
-        sp = a.find_all("span")
-        name = sp[-1].get_text(strip=True) if sp else ""
+        inner = a.select_one("span.cb-market__label-inner")
+        if inner is not None:
+            # The team label; sub-labels (MLB probable pitcher) and scores are other spans.
+            name = inner.get_text(strip=True)
+        else:
+            sp = a.find_all("span")
+            name = sp[-1].get_text(strip=True) if sp else ""
         if name and (not teams or teams[-1] != name):
             teams.append(name)
     return teams
@@ -187,6 +194,10 @@ def parse_rendered_board(html: str, *, page_url: str, observed_at: datetime | No
             continue  # layout wrapper with no market content
         if len(teams) != 2:
             card_refusals.append({"refusal": "TEAMS_NOT_FOUND", "card_index": ci})
+            continue
+        if card.select_one(".cb-market__scoreboard-team-score") is not None:
+            # In-play card: live prices are not pregame screen inputs.
+            card_refusals.append({"refusal": "LIVE_IN_PROGRESS_CARD", "card_index": ci})
             continue
         away, home = teams
         pairs: dict[tuple[str, str, str], list] = {}
