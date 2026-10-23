@@ -60,7 +60,7 @@ class TestRealPricerReplay(unittest.TestCase):
     def test_world_prices_and_refuses(self):
         by = {r["player_id"]: r for r in self.rows}
         self.assertEqual(by["P1"]["status"], "PRICED", by["P1"])
-        self.assertEqual(by["P1"]["game_id"], "2026_08_LV_KC")
+        self.assertEqual(by["P1"]["game_id"], "2026_08_KC_LV")
         self.assertEqual(by["OLD"]["reason"], "PLAYER_TEAM_UNRESOLVED")   # no 2026 stats
         self.assertEqual(by["TR"]["reason"], "PLAYER_TEAM_UNRESOLVED")    # same-week tie
 
@@ -95,7 +95,7 @@ class TestRealPricerReplay(unittest.TestCase):
         def edit(rows):
             for r in rows:
                 if r["player_id"] == "P1":
-                    r["p_model"] = r["p_model"] + 0.05
+                    r["model_p"] = r["model_p"] + 0.05
         st = self.load(edit=edit)
         self.assertEqual(st["status"], "SCREEN")
         self.assertIn("RUN_REPLAY_MISMATCH", st["reasons"])
