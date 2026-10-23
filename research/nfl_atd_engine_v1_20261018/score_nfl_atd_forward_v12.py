@@ -219,13 +219,19 @@ def verify_verdict(api) -> dict:
     for k in pv.FREEZE_KEYS:
         if v.get(k) != fz[k] or loc[k] != fz[k]:
             return no(f"{k} != FREEZE")
+    import platform
+    # v1.2: the interpreter check is explicit and fail-closed (a missing or
+    # different python_version never verifies); the platform string is
+    # recorded but excluded from the comparison (_strip_volatile).
+    if not isinstance(v.get("python_version"), str) or v["python_version"] != platform.python_version():
+        return no("interpreter mismatch")
     try:
         from datetime import datetime
         again = review(v["slate_ids"], records_worktree=None, api=api, _dry=True,
                        _now=datetime.fromisoformat(v["reviewed_at"]))
     except Exception as e:            # any failure to re-derive -> unverified
         return no(f"re-derivation failed: {type(e).__name__}")
-    if pv.canonical_json(_strip_proof_source(again)) != pv.canonical_json(_strip_proof_source(v)):
+    if pv.canonical_json(_strip_volatile(again)) != pv.canonical_json(_strip_volatile(v)):
         return no("re-derived verdict differs")
     return {"counts": True, "code": None}
 
@@ -238,6 +244,13 @@ def _strip_proof_source(o):
     if isinstance(o, list):
         return [_strip_proof_source(x) for x in o]
     return o
+
+
+def _strip_volatile(v):
+    """v1.2: proof_source labels anywhere, and the top-level platform string
+    only. python_version is NOT stripped (checked above and compared)."""
+    o = _strip_proof_source(v)
+    return {k: x for k, x in o.items() if k != "platform"} if isinstance(o, dict) else o
 
 
 def verdict_counts(api) -> bool:
@@ -327,6 +340,21 @@ def local_shas() -> dict:
             "prereg_sha256": h("PREREG_NFL_ATD_ENGINE_V1_1_DRAFT.md")}
 
 
+class ReviewFreezeMismatch(Exception):
+    code = "REVIEW_FREEZE_MISMATCH"
+
+
+def _require_freeze_match(api):
+    """v1.2 pre-write check: refuse unless every FREEZE.json pin equals the
+    hash of the code running now. A missing/unproven FREEZE raises
+    pv.ProvenanceFailed (fail-closed)."""
+    fz = pv.load_freeze(api)
+    loc = local_shas()
+    bad = [k for k in pv.FREEZE_KEYS if loc.get(k) != fz.get(k)]
+    if bad:
+        raise ReviewFreezeMismatch(f"REVIEW_FREEZE_MISMATCH: {bad}")
+
+
 class ReviewInterpreterMismatch(Exception):
     code = "REVIEW_INTERPRETER_MISMATCH"
 
@@ -356,7 +384,8 @@ def review(slate_ids, *, records_worktree, api, _binding=True, _dry=False, _now=
         wt = _check_worktree(records_worktree)
         if _verdict_ever_existed(api) or (wt / VERDICT_PATH).exists() or (wt / vpath).exists():
             raise ReviewAlreadyRecorded(f"{pv.RECORDS_BRANCH}:{VERDICT_PATH}")
-    now = _now if _now is not None else _utcnow()
+        _require_freeze_match(api)      # v1.2: refuse early...
+    now = (_now if _now is not None else _utcnow()).replace(microsecond=0)   # v1.2
     loaded, screen = [], []
     for sid in slate_ids:
         st = pv.load_slate(api, sid, now=now)
@@ -392,6 +421,7 @@ def review(slate_ids, *, records_worktree, api, _binding=True, _dry=False, _now=
                      binding=bool(_binding), slate_ids=list(slate_ids))
             if _dry:
                 return v
+            _require_freeze_match(api)  # ...and again immediately before writing
             path = wt / vpath
             path.parent.mkdir(parents=True, exist_ok=True)
             try:
@@ -481,6 +511,8 @@ def main(argv=None) -> int:
                        _binding=binding, _check_interpreter=True)
     except ReviewInterpreterMismatch:
         return emit("REVIEW_INTERPRETER_MISMATCH")
+    except ReviewFreezeMismatch:
+        return emit("REVIEW_FREEZE_MISMATCH")
     except pv.ProvenanceFailed as e:
         return emit(e.code)
     except ReviewEnvUntrusted:
