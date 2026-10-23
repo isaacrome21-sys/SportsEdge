@@ -44,7 +44,17 @@ def run_rec(api, sid="S1", t="2026-10-25T16:30:00Z", cap=CAP, ko=KO, rows=None,
         d = api.file_commits(BR, pv.data_record_path(s, pv.DATA_EXT[name]))
         if stored and d:
             fp[name]["data_event"] = ev_for(api, d[0])
+    # port (re-audit 353147d5): run records now cite a pricer and a board
+    # input record; the fake pricer replays the board's rows
+    from fake_github_api import FAKE_PRICER_SHA, publish_board
+    bsha = publish_board(api, {"slate_id": sid, "season": 2026, "week": 8,
+                               "captured_at": cap, "rows": rows or []}, "2026-10-25T15:10:00Z")
+    bc = api.file_commits(BR, pv.board_record_path(bsha, 2026, 8))
+    if stored and bc:
+        fp["board"] = {"event": ev_for(api, bc[0])}
     rec = {"slate_id": sid, "captured_at": cap, "first_kickoff": ko, "season": 2026,
+           "week": 8, "pricer_sha256": FAKE_PRICER_SHA,
+           "inputs": {"board": bsha, "stats": SHA_, "schedule": SSHA_, "player_data": {}},
            "schedule_kickoffs": {}, "game_teams": {},
            "stats_sha256": SHA_, "schedule_sha256": SSHA_,
            "fetch_provenance": fp, "rows": rows or []}

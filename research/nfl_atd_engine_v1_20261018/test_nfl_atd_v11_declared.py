@@ -20,8 +20,10 @@ def slate_with_reason(reason):
     rec = json.loads(api.get_file(BR, pv.run_record_path("S1")))
     rec["rows"].append({"status": "UNPRICED", "reason": reason, "player_id": "z",
                         "game_id": "g1"})
-    api.commit(BR, {pv.run_record_path("S2"): json.dumps(dict(rec, slate_id="S2"))},
-               "2026-10-25T16:45:00Z")
+    # port (re-audit 353147d5): an edited run record needs a board record that
+    # replays to its rows, else RUN_REPLAY_MISMATCH (now the expected outcome)
+    from fake_github_api import republish_run
+    republish_run(api, rec, "S2", "2026-10-25T16:45:00Z")
     return pv.load_slate(api, "S2")
 
 

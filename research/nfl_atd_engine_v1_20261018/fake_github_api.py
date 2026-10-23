@@ -329,8 +329,11 @@ def republish_run(api, rec, slate_id, pushed_at, board_pushed_at=None):
     rec = dict(rec, slate_id=slate_id)
     b = {"slate_id": slate_id, "season": rec["season"], "week": rec["week"],
          "captured_at": rec["captured_at"], "rows": rec["rows"]}
+    from datetime import datetime, timedelta
+    before = (datetime.fromisoformat(pushed_at.replace("Z", "+00:00"))
+              - timedelta(seconds=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
     rec["inputs"] = dict(rec["inputs"], board=publish_board(
-        api, b, board_pushed_at or pushed_at.replace(":00Z", ":30Z")))
+        api, b, board_pushed_at or before))
     api.commit(pv.RECORDS_BRANCH, {pv.run_record_path(slate_id): json.dumps(rec)}, pushed_at)
     return rec
 

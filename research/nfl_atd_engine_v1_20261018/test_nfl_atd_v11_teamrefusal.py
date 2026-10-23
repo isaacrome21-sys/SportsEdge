@@ -48,7 +48,10 @@ class TestPricerRefusal(unittest.TestCase):
         self.assertEqual(rows[0]["reason"], "UNPRICED_INVALID_PRICE")
 
     def test_pricer_main_applies_check_and_records_count(self):
-        src = inspect.getsource(pr.main)
+        # port: the pricing logic moved from main into price_core (shared
+        # with the review replay); main calls price_core
+        src = inspect.getsource(pr.price_core)
+        self.assertIn("price_core(", inspect.getsource(pr.main))
         self.assertIn("player_team_refusal(", src)
         self.assertIn("pv.stats_teams(", src)
         self.assertIn('"PLAYER_TEAM_UNRESOLVED"', src)
@@ -65,8 +68,10 @@ class TestReviewSide(unittest.TestCase):
                 for k in ("raw_implied", "selection", "kickoff", "week"):
                     r.pop(k, None)
                 r.update(status="UNPRICED", reason="PLAYER_TEAM_UNRESOLVED")
-        api.commit(BR, {pv.run_record_path("S2"): json.dumps(dict(rec, slate_id="S2"))},
-                   "2026-10-25T16:45:00Z")
+        # port (re-audit 353147d5): an edited run record needs a board record that
+        # replays to its rows, else RUN_REPLAY_MISMATCH (now the expected outcome)
+        from fake_github_api import republish_run
+        republish_run(api, rec, "S2", "2026-10-25T16:45:00Z")
         st = pv.load_slate(api, "S2")
         self.assertEqual(st["status"], "COUNTS", st["reasons"])
         self.assertEqual(st["refusals"], {"PLAYER_TEAM_UNRESOLVED": 1})
