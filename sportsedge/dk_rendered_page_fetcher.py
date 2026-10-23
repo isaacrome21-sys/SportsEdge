@@ -8,7 +8,7 @@ Contract
 * Only public ``https://sportsbook.draftkings.com`` page URLs may be navigated
   to. Any DK API host or API-shaped path is refused by
   ``assert_rendered_page_url`` before a browser is launched. This module never
-  calls a DK API endpoint itself; it renders the page in a headless browser and
+  calls a DK API endpoint itself; it renders the page in a headed browser on the box display and
   parses the resulting DOM. (Requests the page's own scripts make while
   rendering are the page's behaviour, not calls made by SportsEdge.)
 * ``observed_at_utc`` is the real wall-clock time read immediately after the
@@ -163,22 +163,33 @@ def parse_rendered_board(html: str, *, page_url: str, observed_at: datetime | No
     }
 
 
+class HeadedDisplayUnavailable(RuntimeError):
+    """No X display: headed rendering is impossible, and headless is not used."""
+
+
 def _render_with_browser(url: str, *, timeout_ms: int = 60000, settle_ms: int = 30000,
                          executable_path: str | None = None) -> str:
+    """Render in a normal HEADED Chrome on $DISPLAY with the browser's stock identity.
+
+    Ruling 2026-10-23: the fetcher never sets or overrides the browser's
+    identity string and never runs headless to work around DK's handling of
+    headless browsers. If headed rendering shows no odds, the result is a
+    REFUSED_NO_MARKET_CARDS page, not a workaround.
+    """
+    import os
+
+    if not os.environ.get("DISPLAY"):
+        raise HeadedDisplayUnavailable("DISPLAY_NOT_SET")
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
-        import os
-        kw: dict[str, Any] = {"headless": True}
+        kw: dict[str, Any] = {"headless": False}
         executable_path = executable_path or os.environ.get("SPORTSEDGE_BROWSER_PATH")
         if executable_path:
             kw["executable_path"] = executable_path
         browser = p.chromium.launch(**kw)
         try:
-            # Headless Chrome advertises "HeadlessChrome", for which the board
-            # renders no market cards; present the browser's own UA without it.
-            ua = browser.new_page().evaluate("navigator.userAgent").replace("HeadlessChrome", "Chrome")
-            page = browser.new_page(user_agent=ua)
+            page = browser.new_page()
             page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
             try:
                 page.wait_for_selector('[data-testid="button-odds-market-board"]', timeout=settle_ms)
