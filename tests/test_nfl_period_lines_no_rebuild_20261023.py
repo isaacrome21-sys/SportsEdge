@@ -23,7 +23,7 @@ def _mixed():
 
 KW = dict(date="2024-10-01", season=2024, home="AAA", away="BBB")
 QUARTERS = ["q1", "q2", "q3", "q4"]
-SAFE_KEYS = {"engine_id", "engine_version", "period", "governance", "refused", "spread_quote"}
+SAFE_KEYS = {"engine_id", "engine_version", "period", "governance", "refused"}
 
 
 def _numbers(obj):
@@ -102,17 +102,12 @@ def test_no_field_rebuilds_refused_total(period):
 
 @pytest.mark.parametrize("period", QUARTERS)
 @pytest.mark.parametrize("line", [1.5, -1.5, 2, -2, 3.5, -7, 10.5])
-def test_checked_spreads_match_unrestricted_beyond_one(period, line):
+def test_every_quarter_spread_refused_derivable(period, line):
+    # Grok ruling 2026-10-23 Option 1 supersedes the tails-only spread quote.
     out = E.price_period(_hist(), period=period, **KW)
-    with screen_only():
-        full = E.price_period_unrestricted(_hist(), period=period, **KW)
-    got = E.spread_probs(out, line)
-    pmf = full["margin_pmf"]
-    want = {"home": sum(p for k, p in pmf.items() if k + line > 0),
-            "push": sum(p for k, p in pmf.items() if k + line == 0),
-            "away": sum(p for k, p in pmf.items() if k + line < 0)}
-    for side in want:
-        assert got[side] == pytest.approx(want[side], abs=1e-12)
+    assert "spread_quote" not in out
+    with pytest.raises(E.NflPeriodLinesError, match=f"NAIVE_FAIL:{period.upper()}_MONEYLINE_DERIVABLE"):
+        E.spread_probs(out, line)
 
 
 def test_halves_unchanged_full_output():
@@ -136,16 +131,3 @@ def test_missing_or_unknown_period_refused(fn, line, bad):
 def test_handbuilt_margin_pmf_without_period_refused():
     with pytest.raises(E.NflPeriodLinesError, match="PERIOD_MISSING"):
         E.spread_probs({"margin_pmf": {3: 1.0}}, 3.5)
-
-
-def test_spread_state_identical_when_only_moneyline_differs():
-    """Two margin pmfs that agree beyond +/-1 but have different moneylines must yield
-    indistinguishable public spread state: nothing in it identifies the moneyline."""
-    a = {-3: 0.2, -1: 0.1, 0: 0.2, 1: 0.1, 3: 0.4}
-    b = {-3: 0.2, -1: 0.25, 0: 0.0, 1: 0.15, 3: 0.4}
-    qa, qb = E._SpreadQuote("q1", a), E._SpreadQuote("q1", b)
-    assert sorted(_numbers(qa)) == pytest.approx(sorted(_numbers(qb)))
-    for line in (1.5, -1.5, 2.5, -3, 3, 7):
-        pa = E.spread_probs({"period": "q1", "spread_quote": qa}, line)
-        pb = E.spread_probs({"period": "q1", "spread_quote": qb}, line)
-        assert pa == pytest.approx(pb)
