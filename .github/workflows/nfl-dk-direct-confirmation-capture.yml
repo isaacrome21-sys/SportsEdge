@@ -1,20 +1,14 @@
 name: nfl-dk-direct-confirmation-capture
 
 on:
+  # Grok ruling 2026-10-23 (t234u; owner invariant: DK rendered pages only): this job
+  # reaches a DraftKings API URL builder, so it runs only on manual workflow_dispatch.
   workflow_dispatch:
     inputs:
       force:
         description: "Proof parsing/admission outside frozen windows without writing governed evidence"
         type: boolean
         default: false
-  pull_request:
-    paths:
-      - '.github/workflows/nfl-dk-direct-confirmation-capture.yml'
-      - 'scripts/capture_nfl_dk_confirmation.py'
-      - 'tests/test_capture_nfl_dk_confirmation.py'
-      - 'config/workflow_cron_policy_v1.json'
-  schedule:
-    - cron: "7,22,37,52 * * * *"
 
 permissions:
   contents: write
