@@ -967,3 +967,69 @@ def test_route_unwrapped_popen_refused_by_audit_hook_alone():
             subprocess.run(["curl", "-m", "5", f"https://{_PROBE}/"], capture_output=True, timeout=30)
         with pytest.raises(DraftKingsBlocked, match="LIVE_DK_REQUEST_BLOCKED:audit:subprocess.Popen"):
             subprocess.run(["true", "https://api.%64raftkings.com/"], capture_output=True, timeout=30)
+
+
+# ---- t261: os.system audit route, every process-launch event, thread-safe gating ----------
+# CPython process-launch audit events (sys audit events table, 3.8-3.13).
+_CPYTHON_PROCESS_LAUNCH_EVENTS = {"os.exec", "os.fork", "os.forkpty", "os.posix_spawn", "os.spawn",
+                                  "os.startfile", "os.system", "pty.spawn", "subprocess.Popen"}
+
+
+def test_every_cpython_process_launch_audit_event_is_hooked():
+    missing = _CPYTHON_PROCESS_LAUNCH_EVENTS - set(_net_audit()._EVENTS)
+    assert not missing, missing
+
+
+def test_posix_system_curl_refused_inside_dk_block(dk_block):
+    """Auditor repro: posix.system skips the os.system monkeypatch; the audit hook refuses it."""
+    import posix
+    with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED:audit:os.system"):
+        posix.system(f"curl -sS -m 5 -o /dev/null https://{_PROBE}/")
+
+
+def test_os_system_command_text_routed_through_fallback_detector():
+    import posix
+    with _net_audit().active():
+        with pytest.raises(DraftKingsBlocked, match="LIVE_DK_REQUEST_BLOCKED:audit:os.system"):
+            posix.system("true https://api.%64raftkings.com/")
+        with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED:audit:os.system"):
+            posix.system(f"bash -c 'exec 3<>/dev/tcp/{_PROBE}/443'")
+        assert posix.system("true") == 0
+
+
+def test_pty_spawn_and_startfile_events_checked():
+    st = _net_audit().STATE
+    with _net_audit().active():
+        with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED:audit:pty.spawn"):
+            st.hook("pty.spawn", (["curl", f"https://{_PROBE}/"],))
+        with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED:audit:os.startfile"):
+            st.hook("os.startfile", ("curl", "open"))
+        st.hook("os.fork", ())          # fork alone launches no new program
+
+
+def test_gate_not_dropped_for_other_threads_while_one_thread_checks():
+    """LOW race: a check in progress on one thread must not switch the hook off for others."""
+    import threading
+    st = _net_audit().STATE
+    entered, release = threading.Event(), threading.Event()
+    real = st.checker
+
+    def slow(event, args):
+        if args and args[-1] == ("hold.invalid", 1):
+            entered.set(); release.wait(10)
+            return
+        return real(event, args)
+
+    st.checker = slow
+    try:
+        with _net_audit().active():
+            t = threading.Thread(target=st.hook, args=("socket.connect", (None, ("hold.invalid", 1))))
+            t.start()
+            assert entered.wait(10)
+            try:
+                with pytest.raises(DraftKingsBlocked, match="LIVE_NETWORK_BLOCKED"):
+                    st.hook("socket.connect", (None, (_PROBE, 443)))
+            finally:
+                release.set(); t.join(10)
+    finally:
+        st.checker = real
