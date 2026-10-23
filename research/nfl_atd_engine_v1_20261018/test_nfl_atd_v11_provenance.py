@@ -8,7 +8,7 @@ from pathlib import Path
 
 import atd_provenance as pv
 import score_nfl_atd_forward as sc
-from fake_github_api import FakeGitHub, ledger_to_branch, records_worktree
+from fake_github_api import FakeGitHub, ledger_to_branch, records_worktree, publish_data
 from test_nfl_atd_v11_scorer import _ledger
 
 BR = pv.RECORDS_BRANCH
@@ -25,15 +25,24 @@ def ev_for(api, commit):
     return next(e for e in api.events if e["after"] == commit)
 
 
+# Ported (re-audit of 87236180): slates now need real hash-named data
+# records; TestFetchAndSlateC publishes them and passes their shas here.
+STATS_BODY, SCHED_BODY = b"\x1f\x8bstats", "game_id,season,game_type,week,gameday,gametime,away_team,home_team\n"
+
+
 def run_rec(api, sid="S1", t="2026-10-25T16:30:00Z", cap=CAP, ko=KO, rows=None,
-            stored=True):
+            stored=True, shas=(SHA, SSHA)):
+    SHA_, SSHA_ = shas
     fp = {}
-    for name, s in (("stats", SHA), ("schedule", SSHA)):
+    for name, s in (("stats", SHA_), ("schedule", SSHA_)):
         c = api.file_commits(BR, pv.fetch_record_path(s))
         fp[name] = {"event": ev_for(api, c[0])} if (stored and c) else {}
+        d = api.file_commits(BR, pv.data_record_path(s, pv.DATA_EXT[name]))
+        if stored and d:
+            fp[name]["data_event"] = ev_for(api, d[0])
     rec = {"slate_id": sid, "captured_at": cap, "first_kickoff": ko, "season": 2026,
-           "schedule_kickoffs": {},
-           "stats_sha256": SHA, "schedule_sha256": SSHA,
+           "schedule_kickoffs": {}, "game_teams": {},
+           "stats_sha256": SHA_, "schedule_sha256": SSHA_,
            "fetch_provenance": fp, "rows": rows or []}
     return api.commit(BR, {pv.run_record_path(sid): json.dumps(rec)}, t)
 
@@ -137,15 +146,18 @@ class TestRecordProofA(unittest.TestCase):
 class TestFetchAndSlateC(unittest.TestCase):
     def setUp(self):
         self.api = FakeGitHub()
-        fetch(self.api, SHA, "2026-10-25T15:00:00Z")
-        fetch(self.api, SSHA, "2026-10-25T15:01:00Z")
+        self.st = publish_data(self.api, STATS_BODY, "2026-10-25T15:00:00Z", "stats", "csv.gz")
+        self.sc = publish_data(self.api, SCHED_BODY, "2026-10-25T15:01:00Z")
+        self.shas = (self.st, self.sc)
+        _rr = run_rec
+        self.run_rec = lambda api, **kw: _rr(api, shas=self.shas, **kw)
 
     def test_pricer_gate(self):
-        out = pv.require_fetch_provenance(self.api, {"stats": SHA, "schedule": SSHA}, CAP)
+        out = pv.require_fetch_provenance(self.api, {"stats": self.st, "schedule": self.sc}, CAP)
         self.assertEqual(out["stats"]["event"]["timestamp"], "2026-10-25T15:00:00Z")
         with self.assertRaises(pv.ProvenanceFailed) as cm:
             pv.require_fetch_provenance(self.api, {"stats": "c" * 64}, CAP)
-        self.assertEqual(cm.exception.code, "FETCH_RECORD_NOT_ON_BRANCH")
+        self.assertEqual(cm.exception.code, "DATA_RECORD_NOT_ON_BRANCH")  # ported: data record first
 
     def test_fetch_record_hash_mismatch(self):
         self.api.commit(BR, {pv.fetch_record_path("d" * 64): json.dumps({"sha256": SHA})},
@@ -155,42 +167,44 @@ class TestFetchAndSlateC(unittest.TestCase):
         self.assertEqual(cm.exception.code, "FETCH_RECORD_HASH_MISMATCH")
 
     def test_counts(self):
-        run_rec(self.api)
+        self.run_rec(self.api)
         st = pv.load_slate(self.api, "S1")
         self.assertEqual(st["status"], "COUNTS", st["reasons"])
         self.assertEqual(st["run_proof"]["pushed_at"], "2026-10-25T16:30:00+00:00")
 
     def test_run_push_before_capture_is_screen(self):
-        run_rec(self.api, t="2026-10-25T15:59:00Z")
+        self.run_rec(self.api, t="2026-10-25T15:59:00Z")
         st = pv.load_slate(self.api, "S1")
         self.assertIn("RUN_PUSH_BEFORE_CAPTURE", st["reasons"])
 
     def test_run_push_at_kickoff_is_screen(self):
-        run_rec(self.api, t=KO)
+        self.run_rec(self.api, t=KO)
         self.assertIn("RUN_PUSH_NOT_BEFORE_KICKOFF", pv.load_slate(self.api, "S1")["reasons"])
 
     def test_fetch_after_capture_screen(self):
-        run_rec(self.api, cap="2026-10-25T14:00:00Z", t="2026-10-25T16:30:00Z")
+        self.run_rec(self.api, cap="2026-10-25T14:00:00Z", t="2026-10-25T16:30:00Z")
         self.assertIn("FETCH_PUSH_NOT_BEFORE_CAPTURE",
                       pv.load_slate(self.api, "S1")["reasons"])
 
     def test_fetch_push_must_precede_run_push(self):
         # run pushed, THEN a new fetch record for a hash it cites
         self.api2 = FakeGitHub()
-        fetch(self.api2, SSHA, "2026-10-25T15:01:00Z")
+        publish_data(self.api2, SCHED_BODY, "2026-10-25T15:01:00Z")
+        self.api2.commit(BR, {pv.data_record_path(self.st, "csv.gz"): STATS_BODY},
+                         "2026-10-25T15:02:00Z")
         rec = {"slate_id": "S1", "captured_at": "2026-10-25T16:00:00Z", "season": 2026,
-               "schedule_kickoffs": {},
-               "first_kickoff": "2026-10-25T18:00:00Z", "stats_sha256": SHA,
-               "schedule_sha256": SSHA, "fetch_provenance": {}, "rows": []}
+               "schedule_kickoffs": {}, "game_teams": {},
+               "first_kickoff": "2026-10-25T18:00:00Z", "stats_sha256": self.st,
+               "schedule_sha256": self.sc, "fetch_provenance": {}, "rows": []}
         self.api2.commit(BR, {pv.run_record_path("S1"): json.dumps(rec)}, "2026-10-25T16:20:00Z")
-        fetch(self.api2, SHA, "2026-10-25T16:40:00Z")
+        fetch(self.api2, self.st, "2026-10-25T16:40:00Z")
         st = pv.load_slate(self.api2, "S1")
         self.assertEqual(st["status"], "SCREEN")
         self.assertIn("FETCH_PUSH_NOT_BEFORE_RUN_PUSH", st["reasons"])
 
     def test_run_record_edited_screen(self):
-        run_rec(self.api)
-        run_rec(self.api, t="2026-10-25T16:40:00Z", rows=[{"edited": 1}])
+        self.run_rec(self.api)
+        self.run_rec(self.api, t="2026-10-25T16:40:00Z", rows=[{"edited": 1}])
         self.assertIn("RUN_RECORD_NOT_SINGLE_COMMIT", pv.load_slate(self.api, "S1")["reasons"])
 
     def test_missing_run_record_screen(self):
@@ -201,7 +215,7 @@ class TestFetchAndSlateC(unittest.TestCase):
         self.assertIn("RUN_RECORD_MALFORMED", pv.load_slate(self.api, "S1")["reasons"])
 
     def test_stored_fetch_events_used_when_live_gone(self):
-        run_rec(self.api)
+        self.run_rec(self.api)
         keep = [e for e in self.api.events
                 if e["after"] == self.api.file_commits(BR, pv.run_record_path("S1"))[0]]
         self.api.events[:] = keep                      # fetch events aged out

@@ -88,11 +88,16 @@ class TestCloseKickoff(Clock):
         one_slate(api)
         p = pv.run_record_path("S1")
         rec = json.loads(api.get_file(BR, p))
-        rec["schedule_kickoffs"]["g1"] = "2026-10-25T18:00:00Z"
+        # Ported (re-audit of 87236180): schedule_kickoffs is no longer
+        # trusted; forge the row kickoff (and first_kickoff) instead, and copy
+        # the data records the slate now needs.
+        for r in rec["rows"]:
+            if r["game_id"] == "g1":
+                r["kickoff"] = "2026-10-25T18:00:00Z"
         api2 = FakeGitHub()
         for path in api.trees[api.heads[BR]]:
-            if path.startswith("nfl_atd_v1_1/fetch/"):
-                api2.commit(BR, {path: api.get_file(BR, path)}, "2026-10-25T15:00:00Z")
+            if path.startswith(("nfl_atd_v1_1/data/", "nfl_atd_v1_1/fetch/")):
+                api2.commit(BR, {path: api.trees[api.heads[BR]][path]}, "2026-10-25T15:00:00Z")
         for name in ("stats", "schedule"):
             sha = rec[f"{name}_sha256"]
             c = api2.file_commits(BR, pv.fetch_record_path(sha))[0]
