@@ -87,6 +87,7 @@ def audit_total_directions(screen):
 
     seen = set()
     all_rows, paired = [], []
+    by_slate = defaultdict(lambda: {"UNDER": 0, "OVER": 0})
     directions = {"UNDER": {"rows": 0, "hit": 0, "loss": 0, "push": 0},
                   "OVER": {"rows": 0, "hit": 0, "loss": 0, "push": 0},
                   "TIE": {"rows": 0}}
@@ -122,6 +123,7 @@ def audit_total_directions(screen):
         side = "UNDER" if model < market else "OVER" if model > market else "TIE"
         directions[side]["rows"] += 1
         if side != "TIE":
+            by_slate[day][side] += 1
             outcome = "push" if actual == market else (
                 "hit" if (actual < market if side == "UNDER" else actual > market)
                 else "loss")
@@ -138,6 +140,15 @@ def audit_total_directions(screen):
     warning = (directional >= 20 and scored_dates >= 5
                and max(directions["UNDER"]["rows"], directions["OVER"]["rows"])
                / directional >= 0.8)
+    slate_warnings = [
+        {"slate_date_ct": day, "under": counts["UNDER"],
+         "over": counts["OVER"],
+         "non_tie": counts["UNDER"] + counts["OVER"],
+         "direction": "ALL_UNDER" if counts["OVER"] == 0 else "ALL_OVER"}
+        for day, counts in sorted(by_slate.items())
+        if counts["UNDER"] + counts["OVER"] >= 5
+        and (counts["UNDER"] == 0 or counts["OVER"] == 0)
+    ]
     return {"audit_id": AUDIT, "source_screen_id": SCREEN,
             "status": "RESEARCH_DIAGNOSTIC_ONLY",
             "all_model_rows": len(all_rows), "paired_rows": len(paired),
@@ -153,6 +164,8 @@ def audit_total_directions(screen):
             "model_vs_market_day_bootstrap_95pct": _cluster_interval(paired, "model_minus_market"),
             "one_direction_warning": warning,
             "warning_criteria": "AT_LEAST_20_NON_TIE_PAIRS_5_DATES_AND_80_PERCENT_ONE_DIRECTION",
+            "single_slate_concentration_warnings": slate_warnings,
+            "single_slate_warning_criteria": "AT_LEAST_5_NON_TIE_GAMES_ALL_ONE_DIRECTION_ON_CT_DATE",
             "market_admission": "NOT_VERIFIED",
             "no_betting_odds_or_roi": True,
             "source_receipts_reverified": False,
