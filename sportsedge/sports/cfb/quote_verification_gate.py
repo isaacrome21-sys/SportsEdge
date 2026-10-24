@@ -102,7 +102,14 @@ def _selection(q: Mapping[str, Any]):
 
 
 def verify_quote_pair(dk_quote: Optional[Mapping[str, Any]], independent: Optional[Mapping[str, Any]], *,
-                      now: datetime, allowlist: FrozenSet[str] = INDEPENDENT_SOURCE_ALLOWLIST) -> QuoteGateResult:
+                      now: datetime) -> QuoteGateResult:
+    """Production entry point: always uses the module allowlist (empty today)."""
+    return _verify_quote_pair_impl(dk_quote, independent, now=now, allowlist=INDEPENDENT_SOURCE_ALLOWLIST)
+
+
+def _verify_quote_pair_impl(dk_quote: Optional[Mapping[str, Any]], independent: Optional[Mapping[str, Any]], *,
+                            now: datetime, allowlist: FrozenSet[str]) -> QuoteGateResult:
+    """TEST-ONLY seam for exercising the pass path; production must call verify_quote_pair."""
     if not isinstance(now, datetime) or now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("NOW_MUST_BE_TZ_AWARE")
     now = now.astimezone(timezone.utc)
@@ -112,7 +119,10 @@ def verify_quote_pair(dk_quote: Optional[Mapping[str, Any]], independent: Option
         return _fail("INDEPENDENT_PRICE_UNAVAILABLE")
     if dk_quote.get("source") not in DK_RENDERED_SOURCES:
         return _fail("DK_SOURCE_NOT_RENDERED_PAGE")
-    labels = [_norm(independent.get(f)) for f in _LABEL_FIELDS]
+    raw_labels = [independent.get(f) for f in _LABEL_FIELDS]
+    if any(v is not None and not isinstance(v, str) for v in raw_labels):
+        return _fail("INDEPENDENT_SOURCE_LABEL_INVALID")
+    labels = [_norm(v) for v in raw_labels]
     if any(_is_espn_label(n) or _is_dk_label(n) for n in labels if n):
         return _fail("INDEPENDENT_SOURCE_NOT_INDEPENDENT")
     src = independent.get("source")
