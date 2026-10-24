@@ -2,7 +2,8 @@
 
 Does not emit PLAY, authenticate promotion, or override any existing gate.
 Callers pass the raw card dict and dated source rows; this returns a new dict
-with an added `starting_qb_identity` key.
+with an added `starting_qb_identity` key. Non-mapping input is rejected safely.
+The identity block always carries play_authority=False and promotion_authority=False.
 """
 from __future__ import annotations
 
@@ -20,8 +21,24 @@ def attach_starting_qb_identity(
     """Return a shallow copy of card with starting_qb_identity attached.
 
     Research-only. The assessment result is included for inspection but never
-    promotes the card to PLAY.
+    promotes the card to PLAY. Non-mapping cards return a minimal identity block.
     """
+    if not isinstance(card, Mapping):
+        return {
+            "starting_qb_identity": {
+                "schema_version": "SPORTSEDGE_CFB_STARTING_QB_CARD_IDENTITY_V1",
+                "home_qb": None,
+                "away_qb": None,
+                "matchup_identity_confidence": 0.0,
+                "matchup_identity_label": "UNKNOWN",
+                "binding_notes": "invalid_card_input",
+                "play_authority": False,
+                "promotion_authority": False,
+                "assessment_status": "PASS",
+                "assessment_reason": "INVALID_CARD_INPUT",
+            }
+        }
+
     home = str(card.get("home_team") or card.get("home") or "")
     away = str(card.get("away_team") or card.get("away") or "")
     game_id = card.get("game_id") or card.get("id")
