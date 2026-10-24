@@ -50,12 +50,14 @@ def test_one_card_preserves_ranked_research_only(tmp_path):
     out = tmp_path / "out"
     result = create_bundle(tmp_path, out, now=NOW, final_now=NOW,
                            adapter=adapter, screen_builder=screen_builder,
-                           png_writer=png)
+                           png_writer=png,
+                           markdown_renderer=lambda card, now: "Fresh final-clock research.")
     assert result["status"] == "RESEARCH_SCREEN_ONLY"
     assert result["ranked_research_screens"] == 1
     assert result["verified_plays"] == 0
     assert seen["rows"] == [sample]
     assert seen["clock"] == NOW
+    assert "Fresh final-clock research." in (out / "run_it_card.md").read_text()
     assert json.loads((out / "run_it_card.json").read_text())["evaluated_rows"] == []
 
 
@@ -70,7 +72,8 @@ def test_final_freshness_clock_is_after_slow_model_run(tmp_path):
         return {"unverified_model_value_screens": []}
     with patch("scripts.run_it_auto_board._utc_now", side_effect=[NOW, later]):
         create_bundle(tmp_path, tmp_path / "out", adapter=adapter,
-                      screen_builder=check, png_writer=fake_png)
+                      screen_builder=check, png_writer=fake_png,
+                      markdown_renderer=lambda card, now: "Verified at final clock.")
     assert observed == [("canonical", NOW), ("final", later)]
 
 
