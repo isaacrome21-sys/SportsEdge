@@ -128,8 +128,20 @@ def project(games):
         pending.clear()
 
     # JSON fixture inputs may be unordered; never admit future scores first.
-    for g in sorted(games, key=lambda x: (x["season"], x["start"], x["id"])):
-        kickoff = (g["season"], g["start"])
+    # Order and group by the parsed UTC instant, never the raw string: the same
+    # kickoff can be encoded differently ("Z" vs ".000Z" vs "-05:00").
+    def instant(game):
+        from datetime import datetime, timezone
+        start = game.get("start")
+        if not isinstance(start, str) or not start.strip():
+            raise ValueError(f"INVALID_FIXTURE_CLOCK id={game.get('id')}")
+        dt = datetime.fromisoformat(start.replace("Z", "+00:00"))  # ValueError if malformed
+        if dt.tzinfo is None or dt.utcoffset() is None:
+            raise ValueError(f"INVALID_FIXTURE_CLOCK naive id={game.get('id')}")
+        return dt.astimezone(timezone.utc)
+
+    keyed = [((g["season"], instant(g)), g) for g in games]
+    for kickoff, g in sorted(keyed, key=lambda kg: (kg[0], str(kg[1]["id"]))):
         if current_kickoff is not None and kickoff != current_kickoff:
             flush_pending()
         current_kickoff = kickoff
