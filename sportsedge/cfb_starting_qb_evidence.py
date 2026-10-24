@@ -31,6 +31,33 @@ SOURCE_WEIGHTS = {
     "UNKNOWN": 0.0,
 }
 
+# Without a source URL AND an aware observation time a row is unprovenanced
+# and can score no higher than a projection, whatever source it claims.
+UNPROVENANCED_CAP = SOURCE_WEIGHTS["PROJECTED_OR_OR_LISTED"]
+# A self-labelled official row whose page content was not checked by the
+# caller is capped below CONFIRMED (review flag 1 on PR #2528).
+OFFICIAL_UNVERIFIED_CAP = SOURCE_WEIGHTS["PRESS_BOX_OR_247_DEPTH_CHART"]
+
+# Derived Illinois exclusion (owner rule): never rely on the caller flag only.
+ILLINOIS_COLLEGE_TEAMS = frozenset({
+    "illinois", "illinois fighting illini", "northwestern",
+    "northwestern wildcats", "northern illinois", "niu",
+    "northern illinois huskies", "illinois state", "illinois state redbirds",
+    "southern illinois", "siu", "southern illinois salukis",
+    "eastern illinois", "eastern illinois panthers", "western illinois",
+    "western illinois leathernecks",
+})
+
+
+def _team_key(name: str | None) -> str:
+    import re
+    return re.sub(r"[^a-z0-9]+", " ", str(name or "").lower()).strip()
+
+
+def is_illinois_college_team(name: str | None) -> bool:
+    return _team_key(name) in ILLINOIS_COLLEGE_TEAMS
+
+
 CONFIDENCE_LABELS = (
     (0.90, "CONFIRMED"),
     (0.70, "HIGH"),
@@ -101,6 +128,7 @@ def score_starting_qb(
     observed_at: datetime | str | None = None,
     notes: str = "",
     illinois_college_team: bool = False,
+    content_verified: bool = False,
 ) -> StartingQBEvidence:
     """Normalize a single starting-QB observation into scored evidence.
 
@@ -111,8 +139,19 @@ def score_starting_qb(
     key = str(source or "").strip().upper()
     weight = SOURCE_WEIGHTS.get(key, 0.0)
     name = (starter_name or "").strip() or None
-    confidence = weight if name else 0.0
     observed = _aware(observed_at)
+    url = str(source_url or "").strip()
+    flags = []
+    if not (url.lower().startswith(("https://", "http://")) and observed):
+        weight = min(weight, UNPROVENANCED_CAP)
+        flags.append("UNPROVENANCED_CAPPED")
+    elif key == "OFFICIAL_TEAM_OR_CONFERENCE" and not content_verified:
+        weight = min(weight, OFFICIAL_UNVERIFIED_CAP)
+        flags.append("OFFICIAL_CONTENT_UNVERIFIED_CAPPED")
+    confidence = weight if name else 0.0
+    illinois = bool(illinois_college_team) or is_illinois_college_team(team) \
+        or is_illinois_college_team(opponent)
+    notes = " ".join([str(notes or "").strip()] + flags).strip()
     return StartingQBEvidence(
         schema_version=SCHEMA_VERSION,
         lane=LANE,
@@ -131,29 +170,38 @@ def score_starting_qb(
         confidence=round(confidence, 3),
         confidence_label=_label(confidence),
         notes=str(notes or "").strip(),
-        illinois_college_team=bool(illinois_college_team),
+        illinois_college_team=illinois,
         promotion_authority=False,
         play_authority=False,
     )
 
 
-def merge_evidence(rows: list[StartingQBEvidence]) -> StartingQBEvidence | None:
-    """Return the highest-confidence non-Illinois record for a team/game.
+def merge_evidence(rows: list[StartingQBEvidence], *, team: str | None = None,
+                   game_id: str | None = None) -> StartingQBEvidence | None:
+    """Return the best non-Illinois starter record for ONE team in ONE game.
 
-    Ties are broken by source weight, then by presence of an observed_at.
-    Returns None when no usable evidence exists.
+    Fail-closed (returns None) when: no usable row; rows span more than one
+    team or more than one game_id (after optional team/game_id filters);
+    or the top-confidence rows name different starters (a conflict is not
+    resolved by guessing). Ties on confidence prefer the newest observation.
     """
     usable = [r for r in rows if not r.illinois_college_team and r.starter_name]
+    if team is not None:
+        usable = [r for r in usable if _team_key(r.team) == _team_key(team)]
+    if game_id is not None:
+        usable = [r for r in usable if r.game_id == game_id]
     if not usable:
         return None
-    usable.sort(
-        key=lambda r: (
-            r.confidence,
-            1 if r.observed_at_utc else 0,
-        ),
-        reverse=True,
-    )
-    return usable[0]
+    if len({_team_key(r.team) for r in usable}) != 1:
+        return None
+    if len({r.game_id for r in usable}) != 1:
+        return None
+    top = max(r.confidence for r in usable)
+    best = [r for r in usable if r.confidence == top]
+    if len({_team_key(r.starter_name) for r in best}) != 1:
+        return None
+    best.sort(key=lambda r: r.observed_at_utc or "", reverse=True)
+    return best[0]
 
 
 __all__ = [
@@ -162,4 +210,5 @@ __all__ = [
     "StartingQBEvidence",
     "score_starting_qb",
     "merge_evidence",
+    "is_illinois_college_team",
 ]

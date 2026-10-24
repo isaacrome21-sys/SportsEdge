@@ -25,7 +25,7 @@ def from_source_rows(
     Expected keys (all optional except team + source):
       team, source, starter_name, starter_jersey, backup_name,
       opponent, game_id, season, week, source_url, observed_at, notes,
-      illinois_college_team
+      illinois_college_team, content_verified
     """
     out: list[StartingQBEvidence] = []
     for raw in rows:
@@ -47,6 +47,7 @@ def from_source_rows(
                 observed_at=observed,
                 notes=str(raw.get("notes") or ""),
                 illinois_college_team=bool(raw.get("illinois_college_team")),
+                content_verified=raw.get("content_verified") is True,
             )
         )
     return out
@@ -56,12 +57,16 @@ def best_for_team(
     rows: Iterable[Mapping[str, Any]],
     team: str,
     *,
+    game_id: str | None = None,
     default_observed_at: datetime | None = None,
 ) -> StartingQBEvidence | None:
-    """Return the highest-confidence usable starter for one team."""
+    """Best usable starter for one team, scoped to one game when given.
+
+    Without game_id the rows must all refer to a single game, otherwise the
+    merge fails closed rather than mixing fixtures.
+    """
     scored = from_source_rows(rows, default_observed_at=default_observed_at)
-    candidates = [r for r in scored if r.team.casefold() == str(team).casefold()]
-    return merge_evidence(candidates)
+    return merge_evidence(scored, team=team, game_id=game_id)
 
 
 __all__ = ["from_source_rows", "best_for_team"]
