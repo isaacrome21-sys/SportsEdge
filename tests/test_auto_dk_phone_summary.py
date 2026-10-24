@@ -13,10 +13,10 @@ sp.loader.exec_module(card)
 
 def test_nfl_ev_ranking_not_score_or_raw_price():
     payload={"games":[{"away":"CIN","home":"MIA","markets":[
-        {"market":"total","lean":{"selection":"Under","line":43.5,"price_american":-105,
+        {"market":"total","lean":{"engine_status":"RESEARCH_CANDIDATE_NOT_VALIDATED","selection":"Under","line":43.5,"price_american":-105,
          "estimate_p":.53,"edge_probability_points":.04,"ev_per_dollar":.03,
          "score_0_100":99,"lean_reason":"UNVALIDATED"}},
-        {"market":"total","lean":{"selection":"Over","line":43.5,"price_american":-108,
+        {"market":"total","lean":{"engine_status":"RESEARCH_CANDIDATE_NOT_VALIDATED","selection":"Over","line":43.5,"price_american":-108,
          "estimate_p":.55,"edge_probability_points":.05,"ev_per_dollar":.06,
          "score_0_100":10,"lean_reason":"UNVALIDATED"}}
     ]}]}
@@ -29,7 +29,7 @@ def test_cfb_missing_model_never_promotes_market_p_to_estimate():
     rows=card.candidates("CFB",{"results":[
       {"bet_status":"TRACK","market":"TOTAL","market_p":.60,
        "model_p":None,"american_odds":-110},
-      {"bet_status":"LEAN","matchup":"A @ B","market":"TOTAL","side":"OVER",
+      {"engine_status":"RESEARCH_CANDIDATE_NOT_VALIDATED","bet_status":"LEAN","matchup":"A @ B","market":"TOTAL","side":"OVER",
        "line":51.5,"american_odds":-110,"model_p":.55,"edge":.05,
        "expected_roi":.05,"reason":"MODEL_EDGE_NOT_VALIDATED_VS_CLOSE"}]})
     assert len(rows)==1
@@ -47,12 +47,12 @@ def test_phone_issue_summary_includes_actual_dk_rows_and_missing_notice():
                    "priced_rows":12}],"unmatched_games":1}
         }))
         (root/"nfl_card.json").write_text(json.dumps({"games":[
-          {"away":"CHI","home":"GB","commence_time":"2026-10-11T17:00:00Z","markets":[{"market":"total","quote_retrieved_at":"2026-10-11T13:59:00Z","lean":{
+          {"away":"CHI","home":"GB","commence_time":"2026-10-11T17:00:00Z","markets":[{"market":"total","quote_retrieved_at":"2026-10-11T13:59:00Z","lean":{"engine_status":"RESEARCH_CANDIDATE_NOT_VALIDATED",
             "selection":"Under","line":47.5,"price_american":-108,
             "estimate_p":.55,"edge_probability_points":.06,"ev_per_dollar":.07,
             "lean_reason":"LEAN_ONLY:NO_PROVEN_EDGE"}}]}]}))
         (root/"cfb_card.json").write_text(json.dumps({"results":[
-          {"bet_status":"LEAN","matchup":"Texas @ Oklahoma","market":"SPREAD",
+          {"engine_status":"RESEARCH_CANDIDATE_NOT_VALIDATED","bet_status":"LEAN","matchup":"Texas @ Oklahoma","market":"SPREAD",
            "side":"AWAY","line":4.5,"american_odds":-110,
            "model_p":.56,"edge":.04,"expected_roi":.066,
            "reason":"MODEL_EDGE_NOT_VALIDATED_VS_CLOSE"}]}))
@@ -79,7 +79,7 @@ def test_nfl_today_and_thursday_are_separate_date_sections():
           ]},"CFB":{"status":"NO_DK_GAMES","cards":[]}
         }))
         def simple_card(a,b,ev,kickoff):
-            return {"games":[{"away":a,"home":b,"commence_time":kickoff,"markets":[{"market":"total","lean":{
+            return {"games":[{"away":a,"home":b,"commence_time":kickoff,"markets":[{"market":"total","lean":{"engine_status":"RESEARCH_CANDIDATE_NOT_VALIDATED",
                 "selection":"Under","line":54.5,"price_american":-105,
                 "estimate_p":.54,"edge_probability_points":.04,
                 "ev_per_dollar":ev,"lean_reason":"TRACK_ONLY"}}]}]}
@@ -105,7 +105,7 @@ def test_nfl_london_game_started_is_not_a_pregame_candidate():
         def game(away,home,kickoff,side):
             return {"away":away,"home":home,"commence_time":kickoff,
                     "markets":[{"market":"total","quote_retrieved_at":"2026-10-11T13:00:00Z",
-                       "lean":{"selection":side,"line":42.5,"price_american":-110,
+                       "lean":{"engine_status":"RESEARCH_CANDIDATE_NOT_VALIDATED","selection":side,"line":42.5,"price_american":-110,
                        "estimate_p":.55,"edge_probability_points":.05,
                        "ev_per_dollar":.05,"lean_reason":"RESEARCH_ONLY"}}]}
         (root/"nfl.json").write_text(json.dumps({"games":[
@@ -127,7 +127,7 @@ def test_unknown_kickoff_not_listed_as_pregame_pick():
           "CFB":{"status":"NO_DK_GAMES","cards":[]}
         }))
         (root/"nfl.json").write_text(json.dumps({"games":[
-           {"away":"CIN","home":"MIA","markets":[{"market":"total","lean":{
+           {"away":"CIN","home":"MIA","markets":[{"market":"total","lean":{"engine_status":"RESEARCH_CANDIDATE_NOT_VALIDATED",
                 "selection":"Under","line":43.5,"price_american":-105,
                 "estimate_p":.53,"edge_probability_points":.04,"ev_per_dollar":.033}}]}
         ]}))
@@ -309,3 +309,14 @@ def test_radar_three_independent_books_required_and_straight_cap_enforced():
         row["markets"]["totals"]["over"]=-102
         row["reference"]["totals"]["peer_evidence"][2]["observed_at"]="2026-10-11T16:40:00Z"
         assert scan()==[]
+
+
+def test_bet_or_lean_without_engine_status_renders_watch_in_summary():
+    """Grok ruling 2026-10-24a/b."""
+    rows = card.candidates("CFB", {"results": [{"bet_status": "BET", "matchup": "A @ B", "market": "TOTAL",
+                                            "side": "OVER", "line": 50.5, "american_odds": -110,
+                                            "estimate_p": .55, "edge": 2, "expected_roi": .05}]})
+    assert [r["role"] for r in rows] == ["WATCH"]
+    rows = card.candidates("NFL", {"games": [{"away": "A", "home": "B", "markets": [{"market": "total",
+                              "lean": {"selection": "Over", "line": 43.5, "price_american": -110}}]}]})
+    assert rows and all(r["role"] == "WATCH" for r in rows)

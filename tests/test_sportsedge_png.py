@@ -14,14 +14,14 @@ SPEC.loader.exec_module(png)
 def test_all_three_sports_produce_actual_png_with_correct_dimensions():
     examples={
         "NFL":{"sport":"NFL","games":[{"away":"PHI","home":"JAX","markets":[
-            {"market":"total","lean":{"selection":"Over","line":41.5,"price_american":-110,
+            {"market":"total","lean":{"engine_status":"RESEARCH_CANDIDATE_NOT_VALIDATED","selection":"Over","line":41.5,"price_american":-110,
              "estimate_p":.56,"ev_per_dollar":.069,"edge_probability_points":.06}}]}]},
         "CFB":{"sport":"CFB","results":[{"matchup":"A @ B","market":"TOTAL","side":"OVER",
             "line":52.5,"american_odds":-110,"model_p":.55,"expected_roi":.05,
-            "edge":.04,"bet_status":"LEAN"}]},
+            "edge":.04,"engine_status":"RESEARCH_CANDIDATE_NOT_VALIDATED","bet_status":"LEAN"}]},
         "MLB":{"sport":"MLB","results":[{"matchup":"A @ B","market":"MONEYLINE","side":"AWAY",
             "american_odds":110,"estimate_p":.55,"ev_per_dollar":.155,"edge":.07,
-            "scored_status":"ACTIONABLE"}]}
+            "engine_status":"RESEARCH_CANDIDATE_NOT_VALIDATED","scored_status":"ACTIONABLE"}]}
     }
     with TemporaryDirectory() as t:
         for sport,card in examples.items():
@@ -36,7 +36,7 @@ def test_all_three_sports_produce_actual_png_with_correct_dimensions():
 def test_missing_model_is_not_promoted_to_best_or_zero_filled():
     card={"sport":"CFB","results":[{"matchup":"A @ B","market":"TOTAL",
            "side":"OVER","american_odds":-110,"model_p":None,
-           "expected_roi":None,"edge":None,"bet_status":"CANDIDATE"}]}
+           "expected_roi":None,"edge":None,"engine_status":"RESEARCH_CANDIDATE_NOT_VALIDATED","bet_status":"CANDIDATE"}]}
     rows=png.as_rows(card,"CFB")
     assert len(rows)==1
     assert rows[0]["status"]=="LEAN"
@@ -47,9 +47,9 @@ def test_missing_model_is_not_promoted_to_best_or_zero_filled():
 def test_ranking_is_ev_then_edge_and_score_never_controls_rank():
     card={"results":[
         {"matchup":"A @ B","market":"TOTAL","side":"OVER","american_odds":-110,
-         "estimate_p":.55,"ev_per_dollar":.07,"edge":.04,"confidence_score":10,"scored_status":"ACTIONABLE"},
+         "estimate_p":.55,"ev_per_dollar":.07,"edge":.04,"confidence_score":10,"engine_status":"RESEARCH_CANDIDATE_NOT_VALIDATED","scored_status":"ACTIONABLE"},
         {"matchup":"A @ B","market":"TOTAL","side":"UNDER","american_odds":-110,
-         "estimate_p":.55,"ev_per_dollar":.04,"edge":.09,"confidence_score":99,"scored_status":"ACTIONABLE"}
+         "estimate_p":.55,"ev_per_dollar":.04,"edge":.09,"confidence_score":99,"engine_status":"RESEARCH_CANDIDATE_NOT_VALIDATED","scored_status":"ACTIONABLE"}
     ]}
     out=png.as_rows(card,"MLB")
     assert [r["side"] for r in out]==["OVER","UNDER"]
@@ -64,7 +64,7 @@ def test_multigame_png_shows_actual_lean_matchup_never_first_game_false_context(
         return original(draw,x,y,raw,maximum,fill=fill,face=face)
     payload={"games":[
         {"away":"CHI","home":"GB","context":{"starters":"FIRST GAME QB ONLY"},"markets":[]},
-        {"away":"DET","home":"ARI","markets":[{"market":"total","lean":{
+        {"away":"DET","home":"ARI","markets":[{"market":"total","lean":{"engine_status":"RESEARCH_CANDIDATE_NOT_VALIDATED",
           "selection":"Under","line":54.5,"price_american":-102,
           "estimate_p":.529,"edge_probability_points":.048,
           "ev_per_dollar":.048,"lean_reason":"UNVALIDATED"}}]}
