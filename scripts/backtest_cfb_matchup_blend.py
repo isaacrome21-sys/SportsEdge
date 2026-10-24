@@ -202,6 +202,17 @@ def _main(argv=None):
     )]
     if missing:
         raise SystemExit(f"INCOMPLETE_EVALUATION missing paired seasons={missing}; no weight chosen")
+    # A single priced fixture per season is not a representative backtest.
+    # Keep this as a transparent minimum intake guard, not a validation claim.
+    MIN_PAIRED_GAMES_PER_SEASON = 100
+    thin = {season: sum(
+        r["season"] == season and r["spread"] is not None and r["total"] is not None
+        for r in rows
+    ) for season in seasons}
+    thin = {season: n for season, n in thin.items() if n < MIN_PAIRED_GAMES_PER_SEASON}
+    if thin:
+        raise SystemExit(f"INSUFFICIENT_EVALUATION_SAMPLE paired games by season={thin}; "
+                         f"minimum={MIN_PAIRED_GAMES_PER_SEASON}; no weight chosen")
     if not any(r["season"] < max(seasons) for r in rows) or not any(
         r["season"] == max(seasons) for r in rows
     ):
