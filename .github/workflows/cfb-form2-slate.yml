@@ -1,0 +1,126 @@
+name: cfb-form2-slate
+
+# Two-step CFB slate run (owner-triggered from the phone, no cron):
+#   issue opened  -> reads the JSON lines from a "[CFB FORM2]" issue, captures
+#                    QB_IDENTITY_EVIDENCE Form 2 bundles for every team, seals
+#                    one archive manifest and comments its CANDIDATE digest.
+#   /price <sha>  -> the operator comments that digest back (the
+#                    independent-channel pin the Form 2 contract requires),
+#                    found via the capture comment; the card is priced through the
+#                    canonical artifacts/run_it_full.py and posted to the issue.
+# Nothing here changes registry, validation, PLAY or staking authority.
+
+on:
+  issues:
+    types: [opened, edited]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  actions: read
+
+concurrency:
+  group: cfb-form2-slate-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    if: github.event_name == 'issues' && github.actor == github.repository_owner && startsWith(github.event.issue.title, '[CFB FORM2]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: .
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ISSUE: ${{ github.event.issue.number }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Parse issue lines
+        run: |
+          mkdir -p out
+          gh issue view "$ISSUE" --json body \
+            | jq '{issue: {title: "[FREE RUN IT] form2", body: .body}}' > out/event.json
+          python scripts/free_models_phone_issue.py --mode parse \
+            --event-json out/event.json --output out/lines.json
+      - name: Capture and seal Form 2 bundles
+        run: |
+          python scripts/capture_cfb_form2_slate.py --lines out/lines.json \
+            --archive out/archive --resolved-lines out/lines_resolved.json \
+            --report out/form2_report.json | tee out/summary.json
+      - name: Comment capture result
+        run: |
+          python - <<'PY'
+          import json
+          r = json.load(open("out/form2_report.json"))
+          ok = [t for t in r["teams"] if t["status"] == "CAPTURED"]
+          bad = [t for t in r["teams"] if t["status"] != "CAPTURED"]
+          g = [x for x in r["games"] if x["status"] != "RESOLVED"]
+          L = ["## CFB Form 2 capture", "",
+               f"Teams captured: **{len(ok)}/{len(r['teams'])}**", "",
+               f"Candidate sealed manifest SHA-256 (reply `/price <sha>` to price): `{r['sealed_manifest_sha256']}`",
+               "", f"Capture run id: `${{ github.run_id }}`", "",
+               "| Team | QB1 (OurLads, identity only) |", "| --- | --- |"]
+          L += [f"| {t['team']} | {t['qb1']} |" for t in ok]
+          if bad:
+              L += ["", "**Not captured (fail-closed):**"] + [f"- {t['team']}: {t['reason']}" for t in bad]
+          if g:
+              L += ["", "**Fixtures not resolved on ESPN:**"] + [f"- {x['game']}: {x['status']}" for x in g]
+          L += ["", "Availability unverified (Form 2 is identity-only). Research only."]
+          open("out/comment.md", "w").write("\n".join(L) + "\n")
+          PY
+          gh issue comment "$ISSUE" --body-file out/comment.md
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: cfb-form2-capture
+          path: out/
+          retention-days: 30
+
+  price:
+    if: github.event_name == 'issue_comment' && github.actor == github.repository_owner && startsWith(github.event.issue.title, '[CFB FORM2]') && startsWith(github.event.comment.body, '/price ')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: .
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ISSUE: ${{ github.event.issue.number }}
+      COMMENT: ${{ github.event.comment.body }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Download capture archive
+        run: |
+          PIN=$(printf '%s' "$COMMENT" | grep -Eo '[0-9a-f]{64}' | head -1)
+          [ -n "$PIN" ] || { echo "PIN_REQUIRED"; exit 1; }
+          echo "PIN=$PIN" >> "$GITHUB_ENV"
+          RUN=$(gh issue view "$ISSUE" --json comments --jq '.comments[].body' \
+                | grep -F "$PIN" -A3 | grep -Eo 'Capture run id: `[0-9]+`' | grep -Eo '[0-9]+' | tail -1)
+          [ -n "$RUN" ] || { echo "CAPTURE_RUN_FOR_PIN_NOT_FOUND"; exit 1; }
+          gh run download "$RUN" -n cfb-form2-capture -D out
+      - name: Price through canonical RUN IT with pinned Form 2 archive
+        run: |
+          python artifacts/run_it_full.py --lines out/lines_resolved.json \
+            --output out/card.json \
+            --form2-bundles-dir out/archive --form2-manifest-sha256 "$PIN" > /dev/null
+      - name: Render and post card
+        run: |
+          gh issue view "$ISSUE" --json body \
+            | jq '{issue: {title: "[FREE RUN IT] form2", body: .body}}' > out/event.json
+          python scripts/free_models_phone_issue.py --mode render \
+            --event-json out/event.json --card out/card.json --output out/card.md \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          jq -r '.[]' out/card.parts.json | while IFS= read -r page; do
+            gh issue comment "$ISSUE" --body-file "$page"
+          done
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: cfb-form2-price
+          path: out/
+          retention-days: 30
