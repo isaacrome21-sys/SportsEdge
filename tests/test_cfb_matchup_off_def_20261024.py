@@ -83,3 +83,10 @@ def test_opponent_adjustment_discounts_soft_schedules():
     adj_home, _ = fm.score_means("CFB", ctx)
     raw_home, _ = means((40, 20), (30, 30))
     assert adj_home < raw_home - 3   # 40 ppg vs 45-allowed defenses is ~23 adjusted
+
+
+def test_additive_not_averaged():
+    # 42-ppg offense vs a defense allowing 35: expect ~49 before shrink/HFA,
+    # not the averaged 38.5 that compressed every card.
+    h, a = means((42, 28), (28, 35))
+    assert h > 40
