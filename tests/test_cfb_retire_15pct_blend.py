@@ -68,3 +68,46 @@ def test_non_cfb_lane_b_unchanged():
     v = calc(dict(cfb(), sport="NFL", game="Detroit Lions @ Arizona Cardinals"))
     assert v["pricing_lanes"]["lane_b_anchored"]["lane"] == "LANE_B_ANCHORED"
     assert model.ANCHOR_WEIGHT == 0.15
+
+
+# --- Locked decisions (2026-10-24): market-only fallback; no model edge; injury/weather gated ---
+
+def _ctx(**kw):
+    c = {"home_rating": 6.0, "away_rating": -6.0, "home_injury_pts": 0.0, "away_injury_pts": 0.0,
+         "home_form": 0.0, "away_form": 0.0, "weather_total_adj": 0.0}
+    c.update(kw)
+    return c
+
+
+def mcalc(row):
+    return model.calculate(row, model.PublicContext(NOW), NOW, auto_context=False, allow_manual_context=True)
+
+
+@pytest.mark.parametrize("market,side,line", [("total", "OVER", 40.5), ("total", "UNDER", 70.5),
+                                              ("spread", "HOME", 10.5), ("h2h", "HOME", None)])
+def test_cfb_never_claims_model_edge_market_only_fallback(market, side, line):
+    row = cfb(market=market, side=side, line=line, odds=150, context=_ctx())
+    if market == "h2h":
+        row["opposite_odds"] = -180
+    v = mcalc(row)
+    assert v["status"] == "WATCH_CFB_MARKET_ONLY_NO_VALIDATED_WEIGHT"
+    assert "2026-10-23i" in v["reason"]
+
+
+@pytest.mark.parametrize("adj", [dict(home_injury_pts=-1.5), dict(away_injury_pts=-0.15),
+                                 dict(weather_total_adj=-0.8)])
+def test_unvalidated_injury_or_weather_adjustment_gate(adj):
+    status, reason = model.unvalidated_adjustment_gate(model.POSITIVE_EV_STATUS, None, _ctx(**adj))
+    assert status == "WATCH_UNVALIDATED_INJURY_WEATHER_ADJ"
+    assert reason.startswith("UNCALIBRATED_ADJUSTMENT:")
+
+
+def test_adjustment_gate_passthrough_when_zero_or_not_positive():
+    assert model.unvalidated_adjustment_gate(model.POSITIVE_EV_STATUS, None, _ctx()) == (model.POSITIVE_EV_STATUS, None)
+    assert model.unvalidated_adjustment_gate("BELOW_THRESHOLD", None, _ctx(weather_total_adj=-0.8)) == ("BELOW_THRESHOLD", None)
+
+
+def test_experimental_weight_grid_not_reachable_from_production():
+    src = MOD.read_text()
+    assert "backtest_cfb_matchup_blend" not in src
+    assert "WEIGHTS" not in src
