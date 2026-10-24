@@ -44,9 +44,47 @@ def test_prices_are_leans_not_bets_and_probabilities_sum():
     for i in range(0, len(rows), 2):
         assert abs(rows[i].model_p + rows[i + 1].model_p - 1) < 1e-9
         assert abs(rows[i].novig_p + rows[i + 1].novig_p - 1) < 1e-9
-    assert all(x.label in ("LEAN", "PASS") for x in rows)
+    assert all(x.label in ("WATCH_FAILED_VALIDATION", "WATCH_NO_MODEL_TOTAL", "PASS") for x in rows)
     card = render(games, r, observed="now", results_note="test")
     assert "Validated markets: NONE" in card and "| BET |" not in card
+    assert "Top research WATCH diagnostics" in card
+    assert "Unvalidated total signals: UNDER" in card
+
+
+def test_legacy_nba_market_anchored_total_cannot_be_a_lean_from_prices_alone():
+    # An asymmetric offer can report positive EV against a 50% probability
+    # even though the total model weight is exactly zero. Do not promote it.
+    games = parse_lines("Celtics @ Knicks\nTotal 238.5 +110 -120")
+    ratings = ratings_from_results(_results())
+    _, raw_total, rows = price_game(games[0], ratings)
+    assert raw_total != 238.5  # the model and the market may disagree
+    over, under = rows
+    assert over.model_p == pytest.approx(0.5)
+    assert under.model_p == pytest.approx(0.5)
+    assert over.ev > 0
+    assert over.label == "WATCH_NO_MODEL_TOTAL"
+    assert under.label == "PASS"
+    text = render(games, ratings, observed="synthetic", results_note="test")
+    assert "Unvalidated total signals: UNDER 0, OVER 1" in text
+    assert "not bets or LEANs" in text
+
+
+def test_legacy_nba_all_under_warning_is_diagnostic_not_a_pick():
+    # Market prices alone can put the same side on a whole board. Preserve
+    # direction/count but do not make three fraudulent positive-EV leans.
+    games = parse_lines("\n".join([
+        "Celtics @ Knicks", "Total 220.5 -120 +110",
+        "Lakers @ Warriors", "Total 240.5 -120 +110",
+        "Cavaliers @ Hawks", "Total 230.5 -120 +110",
+    ]))
+    ratings = ratings_from_results(_results())
+    rows = [row for game in games for row in price_game(game, ratings)[2]]
+    assert sum(row.label == "WATCH_NO_MODEL_TOTAL" for row in rows) == 3
+    assert all(row.label != "LEAN" for row in rows)
+    text = render(games, ratings, observed="synthetic", results_note="test")
+    assert "Unvalidated total signals: UNDER 3, OVER 0" in text
+    assert "One-direction warning" in text
+    assert "## Bets\n- None" in text
 
 
 def test_parse_events_and_fetch_chunks():

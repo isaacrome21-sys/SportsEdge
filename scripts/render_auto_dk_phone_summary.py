@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections import Counter
 from datetime import datetime, timezone
 from math import isfinite
 from statistics import median
@@ -96,6 +97,31 @@ def candidates(sport, payload):
     rows.sort(key=lambda x:(-n(x.get("ev")),-n(x.get("edge")),
                             str(x.get("matchup")),str(x.get("market")),str(x.get("side"))))
     return rows
+
+
+def candidate_direction_audit(rows):
+    """Describe displayed rows only; never infer hidden full-board coverage.
+
+    Repeated captures of one matchup do not become independent games. This is
+    a descriptive bias diagnostic, not a gate, model score, or EV adjustment.
+    """
+    roles=Counter(str(r.get("role") or "MISSING") for r in rows)
+    totals=[r for r in rows
+            if str(r.get("market") or "").lower() in {"total", "totals"}
+            and str(r.get("side") or "").strip().upper().startswith(("UNDER", "OVER"))]
+    direction=Counter("UNDER" if str(r["side"]).strip().upper().startswith("UNDER")
+                      else "OVER" for r in totals)
+    # Matchups are the available event identity in this presentation layer.
+    # Slate date disambiguates repeat meetings where the artifact supplies it.
+    distinct={(str(r.get("slate_date") or ""),str(r.get("matchup") or ""))
+              for r in totals if r.get("matchup")}
+    out=(f"Displayed label audit: BEST {roles['BEST']}, LEAN {roles['LEAN']}. "
+         f"Displayed TOTAL rows: UNDER {direction['UNDER']}, OVER {direction['OVER']} "
+         f"across {len(distinct)} distinct game/date identities.")
+    if len(distinct) >= 3 and (direction["UNDER"] == 0 or direction["OVER"] == 0):
+        out += (" **One-direction warning:** investigate model and price baselines; "
+                "these rows are not independent evidence of an edge.")
+    return out
 
 
 def row_text(r):
@@ -359,6 +385,8 @@ def render(root: Path, run_url: str, *, as_of_date: str | None = None,
             lines.append(f"Matched SDV games: {sum(int(x.get('priced_rows',0)) for x in cards)} modeled market rows; "
                          f"unmatched games: {state.get('unmatched_games','MISSING')}.")
         lines.append("Model status: "+", ".join(sorted(set(statuses))) if statuses else "Model status: MISSING")
+        lines.append(candidate_direction_audit(picked))
+        lines.append("LEAN means tracking/unvalidated, not a verified PLAY; no OVER/UNDER balancing is applied.")
         lines.append("")
         if sport=="NFL":
             # A Sunday phone card must not mix Thursday's future NFL slate into

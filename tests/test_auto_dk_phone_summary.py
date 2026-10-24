@@ -25,6 +25,23 @@ def test_nfl_ev_ranking_not_score_or_raw_price():
     assert all(r["role"]=="LEAN" for r in rows)
 
 
+def test_direction_audit_counts_lean_reasons_without_forcing_overs():
+    rows=[
+        {"role":"LEAN","market":"total","side":"Under","matchup":g,
+         "slate_date":"2026-10-25"}
+        for g in ("A @ B","C @ D","E @ F")]
+    rows.append({**rows[0], "slate_date":"2026-10-25"})  # repeated capture
+    report=card.candidate_direction_audit(rows)
+    assert "BEST 0, LEAN 4" in report
+    assert "UNDER 4, OVER 0 across 3 distinct" in report
+    assert "One-direction warning" in report
+    assert [r["side"] for r in rows]==["Under"]*4
+
+    mixed=[*rows,{"role":"LEAN","market":"TOTAL","side":"Over 48.5",
+                 "matchup":"G @ H", "slate_date":"2026-10-25"}]
+    assert "One-direction warning" not in card.candidate_direction_audit(mixed)
+
+
 def test_cfb_missing_model_never_promotes_market_p_to_estimate():
     rows=card.candidates("CFB",{"results":[
       {"bet_status":"TRACK","market":"TOTAL","market_p":.60,
@@ -66,6 +83,8 @@ def test_phone_issue_summary_includes_actual_dk_rows_and_missing_notice():
         assert "edge +6.0%" in result
         assert "estimate 56.0%" in result
         assert "out-of-sample validation" in result
+        assert "Displayed label audit: BEST 0, LEAN 1" in result
+        assert "LEAN means tracking/unvalidated" in result
         assert "unmatched games: 1" in result
         assert "/actions/runs/123" in result
 
