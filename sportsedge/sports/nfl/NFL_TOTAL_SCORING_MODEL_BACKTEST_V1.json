@@ -1,0 +1,86 @@
+{
+  "model_id": "nfl_total_opp_adj_scoring_rate_v1",
+  "data_source": "nflverse/nfldata data/games.csv (free public)",
+  "data_sha256": "ee246fd78b03a331e6d1b0f2b8478ce1bc37e06b5d85b045de7abd276ab6ab16",
+  "train_seasons": [
+    2012,
+    2013,
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020
+  ],
+  "test_seasons": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025,
+    2026
+  ],
+  "fit_params": {
+    "mu0": 22.0,
+    "k": 0.04,
+    "k_mu": 0.005,
+    "carry": 0.4,
+    "hfa": 1.8,
+    "dome": 1.0,
+    "wind_per_mph": 0.15,
+    "sigma": 13.631
+  },
+  "fit_note": "grid on 2014-2020 total MSE; 2012-13 burn-in; sigma from train residuals",
+  "n_test": 1442,
+  "pushes_excluded": true,
+  "brier_model": 0.25943,
+  "brier_market": 0.24986,
+  "brier_diff_mean": 0.00957,
+  "brier_diff_ci95": [
+    0.0053,
+    0.01366
+  ],
+  "logloss_model": 0.71271,
+  "logloss_market": 0.69287,
+  "mae_model": 10.728,
+  "mae_closing_total": 10.402,
+  "mae_diff_mean": 0.327,
+  "mae_diff_ci95": [
+    0.18632,
+    0.4659
+  ],
+  "ou_hit_rate_gap_ge_0_5": {
+    "n": 1246,
+    "hits": 611,
+    "rate": 0.4904,
+    "wilson95": [
+      0.4627,
+      0.5181
+    ]
+  },
+  "ou_hit_rate_gap_ge_3": {
+    "n": 410,
+    "hits": 189,
+    "rate": 0.461,
+    "wilson95": [
+      0.4133,
+      0.5094
+    ]
+  },
+  "calibration_obs_minus_pred_by_decile": [
+    0.118,
+    0.065,
+    -0.0149,
+    0.0245,
+    0.0403,
+    -0.0095,
+    -0.0923,
+    -0.1142,
+    -0.1102,
+    -0.246
+  ],
+  "max_abs_ev_at_minus110_raw_model": 0.5077,
+  "passes": false,
+  "research_only": true
+}
