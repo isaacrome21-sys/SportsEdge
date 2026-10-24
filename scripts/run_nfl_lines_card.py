@@ -274,6 +274,9 @@ def main() -> int:
             lean = max(qualified, key=lambda x: (x["ev_per_dollar"], x["edge_probability_points"])) if qualified else None
             if lean:
                 lean = {**lean, "lean_only": True,
+                        # Real engine status of this market-anchored residual
+                        # research lane (Grok ruling 2026-10-24b): not a pick.
+                        "engine_status": "RESEARCH_ONLY_MARKET_ANCHORED_RESIDUAL",
                         "lean_reason": "RESEARCH_ONLY:MARKET_ANCHORED_RESIDUAL_FORWARD_CLV_PENDING",
                         "score_0_100": qualification_role_score({
                             "model_ready": True, "pit_safe": True, "role_stable": True,

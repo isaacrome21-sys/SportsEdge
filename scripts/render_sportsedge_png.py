@@ -14,6 +14,19 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+import sys as _sys
+_ROOT = Path(__file__).resolve().parents[1]
+if str(_ROOT) not in _sys.path:
+    _sys.path.insert(0, str(_ROOT))
+from sportsedge.phone_display import is_pick_status  # noqa: E402  Grok ruling 2026-10-24a
+
+
+def _engine_pick(row) -> bool:
+    """Grok ruling 2026-10-24a: a BET/LEAN/ACTIONABLE label may display only
+    when the underlying engine status passes is_pick_status; missing, unknown
+    or non-pick engine statuses are shown as WATCH, never as a pick."""
+    return isinstance(row, dict) and is_pick_status(row.get("engine_status"))
+
 W, H = 1440, 1580
 BG = "#09111E"
 PANEL = "#111E31"
@@ -90,7 +103,7 @@ def as_rows(payload: dict, sport: str):
                         continue
                     row = dict(raw)
                     row["market"] = market.get("market")
-                    row["status"] = label
+                    row["status"] = label if _engine_pick(raw) else "WATCH"
                     row["matchup"] = f"{game.get('away', '?')} @ {game.get('home', '?')}"
                     row["reason"] = val(row, "lean_reason", "reason") or market.get("lean_block") or "MODEL_ESTIMATE"
                     out.append(row)
@@ -102,7 +115,8 @@ def as_rows(payload: dict, sport: str):
             if status not in {"ACTIONABLE", "BET", "LEAN", "CANDIDATE"}:
                 continue
             row = dict(raw)
-            row["status"] = "BEST" if status in {"ACTIONABLE", "BET"} else "LEAN"
+            row["status"] = (("BEST" if status in {"ACTIONABLE", "BET"} else "LEAN")
+                             if _engine_pick(raw) else "WATCH")
             row["matchup"] = val(raw, "matchup", "game_id") or "MATCHUP MISSING"
             out.append(row)
     for row in out:
@@ -123,9 +137,10 @@ def as_rows(payload: dict, sport: str):
         row["raw_qualification_score"] = val(row, "score_0_100", "confidence_score")
         row["score_value"] = None
         row["score_status"] = "WITHHELD_UNVALIDATED_PREDICTION_ACCURACY"
-        row["status"] = "LEAN"
+        if row["status"] != "WATCH":  # Grok ruling 2026-10-24a: WATCH never upgraded
+            row["status"] = "LEAN"
         row["reason"] = "RESEARCH_NOT_VALIDATED_FOR_PLAY: " + str(row.get("reason") or "")
-        if (row["price"] is None or row["raw_estimate"] is None
+        if row["status"] != "WATCH" and (row["price"] is None or row["raw_estimate"] is None
                 or row["raw_ev"] is None or row["raw_edge_value"] is None):
             row["status"] = "LEAN"
             row["reason"] = "INCOMPLETE_DATA " + str(row.get("reason") or "")

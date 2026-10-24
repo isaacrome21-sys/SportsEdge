@@ -14,6 +14,19 @@ from statistics import median
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import sys as _sys
+_ROOT = Path(__file__).resolve().parents[1]
+if str(_ROOT) not in _sys.path:
+    _sys.path.insert(0, str(_ROOT))
+from sportsedge.phone_display import is_pick_status  # noqa: E402  Grok ruling 2026-10-24a
+
+
+def _engine_pick(row) -> bool:
+    """Grok ruling 2026-10-24a: a BET/LEAN/ACTIONABLE label may display only
+    when the underlying engine status passes is_pick_status; missing, unknown
+    or non-pick engine statuses are shown as WATCH, never as a pick."""
+    return isinstance(row, dict) and is_pick_status(row.get("engine_status"))
+
 
 def _utc(value):
     try:
@@ -60,7 +73,7 @@ def candidates(sport, payload):
                     if not isinstance(r,dict):
                         continue
                     rows.append({
-                        "role":label,"matchup":f"{game.get('away','?')} @ {game.get('home','?')}",
+                        "role":label if _engine_pick(r) else "WATCH","matchup":f"{game.get('away','?')} @ {game.get('home','?')}",
                         "market":market.get("market"),"side":r.get("selection"),
                         "line":r.get("line"),"price":r.get("price_american"),
                         "estimate_p":r.get("estimate_p"),"edge":r.get("edge_probability_points"),
@@ -76,7 +89,7 @@ def candidates(sport, payload):
             if status not in {"BET","LEAN"}:
                 continue
             rows.append({
-                "role":"BEST" if status=="BET" else "LEAN",
+                "role":("BEST" if status=="BET" else "LEAN") if _engine_pick(r) else "WATCH",
                 "matchup":r.get("matchup"),"market":r.get("market"),
                 "side":r.get("side"),"line":r.get("line"),
                 "price":r.get("american_odds"),
@@ -86,7 +99,7 @@ def candidates(sport, payload):
                 "reason":r.get("reason") or "MISSING",
             })
     for r in rows:
-        if any(r.get(k) is None for k in ("estimate_p","edge","ev","price")):
+        if r["role"]!="WATCH" and any(r.get(k) is None for k in ("estimate_p","edge","ev","price")):
             r["role"]="LEAN"
             r["reason"]="UNPRICED_OR_UNMODELED:"+str(r["reason"])
     def n(x):

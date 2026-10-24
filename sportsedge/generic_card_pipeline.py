@@ -69,6 +69,14 @@ class GenericCardResult:
     offer_id: str | None = None
     raw_implied_probability: float | None = None
     market_no_vig_p_status: str | None = None
+    # Grok ruling 2026-10-24a/b: renderers display BET/LEAN only when the
+    # engine's real status passes is_pick_status. This pipeline's real engine
+    # status is its bet_status; it is copied verbatim, never mapped/upgraded.
+    engine_status: str | None = None
+
+    def __post_init__(self):
+        if self.engine_status is None:
+            object.__setattr__(self, "engine_status", self.bet_status)
 
 
 def _game_index(games):
