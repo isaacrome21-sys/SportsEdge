@@ -96,3 +96,22 @@ def test_settle_requires_close_and_valid_result():
     t.add(rec(), now=NOW)
     with pytest.raises(TrackerError):
         t.settle("r1", result="WIN", now=KO + timedelta(hours=4))
+
+
+def test_second_settle_rejected_already_settled():
+    t = ForwardTracker()
+    t.add(rec(), now=NOW)
+    t.close("r1", closing_odds=-120, closing_line=-3.5, now=KO + timedelta(minutes=1))
+    t.settle("r1", result="WIN", now=KO + timedelta(hours=4))
+    with pytest.raises(TrackerError, match="ALREADY_SETTLED"):
+        t.settle("r1", result="LOSS", now=KO + timedelta(hours=5))
+    assert t.summary()["roi_units"] == pytest.approx(100 / 110)
+
+
+def test_settle_verifies_recorded_close_time_not_before_kickoff():
+    t = ForwardTracker()
+    t.add(rec(), now=NOW)
+    t.close("r1", closing_odds=-120, closing_line=-3.5, now=KO + timedelta(minutes=1))
+    t.records["r1"]["closed_at"] = KO - timedelta(seconds=1)  # tampered close time
+    with pytest.raises(TrackerError, match="CLOSE_TIME_BEFORE_KICKOFF"):
+        t.settle("r1", result="WIN", now=KO + timedelta(hours=4))
