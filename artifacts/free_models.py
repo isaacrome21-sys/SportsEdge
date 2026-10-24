@@ -25,6 +25,7 @@ from sportsedge.quote_freshness import (
     check_quote_freshness,
     is_fresh as quote_is_fresh,
 )
+from sportsedge.sports.nfl import side_margin_model as nfl_side_model
 from sportsedge.pricing_provenance import (
     ANCHORED_PLAY_BLOCK,
     ANCHORED_WATCH_STATUS,
@@ -168,6 +169,19 @@ def poisson(lam, max_k=38):
     return [v / t for v in arr]
 
 
+def nfl_decompressed_ratings(home_rating, away_rating, home_margins, away_margins):
+    """Lane 1 (#2384): replace the compressed NFL side spread of the ratings.
+
+    The old per-team rating (0.12 * avg margin, capped at +/-3) compressed
+    every NFL side toward even. Re-center the home-minus-away rating gap on
+    the fitted ``side_margin_model.margin_rating_diff`` while preserving the
+    ratings' SUM, so NFL totals (Lane 2's scope) are exactly unchanged.
+    """
+    total = home_rating + away_rating
+    diff = nfl_side_model.margin_rating_diff(home_margins, away_margins)
+    return total / 2 + diff / 2, total / 2 - diff / 2
+
+
 def model_probability(sport, market, side, line, home_mean, away_mean, team_totals_team=None):
     """Return win, push, loss; account for pushes on integer lines."""
     if sport == "MLB":
@@ -196,6 +210,15 @@ def model_probability(sport, market, side, line, home_mean, away_mean, team_tota
             # Regulation tie split is a stated approximation, not true extra-inning pricing.
             win += push * 0.5
             push = 0.0
+        return bounded(win, 0, 1), bounded(push, 0, 1)
+    if sport == "NFL" and market in ("ML", "SPREAD"):
+        # Lane 1 (#2384): push-aware discrete margin model with empirical
+        # key-number weights (3/7 pushes) and NFL moneyline ties as a push.
+        # Receipt: artifacts/nfl_sides_lane1_backtest.json (research only).
+        if side not in {"HOME", "AWAY"}:
+            raise ValueError("NFL_SIDE_UNKNOWN")
+        win, push, _ = nfl_side_model.price_side(
+            market, side, line, home_mean - away_mean)
         return bounded(win, 0, 1), bounded(push, 0, 1)
     _, sd_total, sd_margin, _ = PRIORS[sport]
     if market == "TOTAL":
@@ -888,6 +911,7 @@ def context_for(sport, away, home, start, provider, row):
         return out, None, notes
     kickoff, competition = fixture
     cfb_units = {}
+    nfl_margins = {}
     for prefix, name in (("home", home), ("away", away)):
         team = provider.identify(sport, name)
         if team is None:
@@ -901,6 +925,7 @@ def context_for(sport, away, home, start, provider, row):
                 notes.append(prefix.upper() + "_REST_DAYS:" + str(round(days_rest, 2)))
             notes.append(prefix.upper() + "_HISTORY_COUNT:" + str(len(sample)))
             margins = [pf - pa for _, pf, pa in sample]
+            nfl_margins[prefix] = margins
             if sport == "CFB":
                 # Matchup model (Oct 24 2026 fix): keep each team's own
                 # points-for / points-against so the game projection is
@@ -945,6 +970,12 @@ def context_for(sport, away, home, start, provider, row):
             injury, status = provider.injury_points(sport, team)
             out[f"{prefix}_injury_pts"] = injury
             notes.append(prefix.upper() + "_INJURIES:" + status)
+    if sport == "NFL" and len(nfl_margins) == 2:
+        out["home_rating"], out["away_rating"] = (
+            round(x, 3) for x in nfl_decompressed_ratings(
+                out.get("home_rating", 0.0), out.get("away_rating", 0.0),
+                nfl_margins["home"], nfl_margins["away"]))
+        notes.append("NFL_SIDE_MARGIN_KEYNUM_V1_DECOMPRESSED")
     if sport == "CFB" and len(cfb_units) == 2:
         base, _, _, _ = PRIORS["CFB"]
         def shrink(value, n):  # 3-game pseudo-count toward the league prior

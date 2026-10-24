@@ -323,6 +323,20 @@ def reprice_football(state: FootballGameState, home_mean: float,
     if market == "TOTAL":
         model_p, push_p = _normal_market_probability(
             market, side, line, mean, sd)
+    elif state.sport == "NFL":
+        # Lane 1 (#2384): NFL sides price on the same key-number margin
+        # distribution as pregame (artifacts/free_models.model_probability),
+        # so the at-kickoff == pregame invariant holds exactly.
+        from sportsedge.sports.nfl import side_margin_model as nfl_side_model
+        home_final = margin_now + (home_mean - away_mean) * frac
+        nfl_sd = nfl_side_model.MARGIN_SD * scale
+        if not (nfl_sd > 0):
+            raise LiveRepriceError("NFL_SIDE_NO_TIME_REMAINING")
+        try:
+            model_p, push_p, _ = nfl_side_model.price_side(
+                market, side, line, home_final, sd=nfl_sd)
+        except ValueError as exc:
+            raise LiveRepriceError(str(exc)) from exc
     else:
         # mean is already oriented to the selected side, so the read-out
         # always uses the HOME-oriented branch with the original line
