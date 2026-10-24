@@ -108,11 +108,14 @@ def previous_kickoff(team_id, before):
     return max(prior)
 
 
-def ourlads_index():
+def ourlads_index(debug_dir=None):
     html = get(OURLADS_INDEX)
+    if debug_dir:
+        Path(debug_dir, "ourlads_index.html").write_text(html, encoding="utf-8")
     links = {}
-    for s, i in re.findall(r"/ncaa-football-depth-charts/depth-chart/([a-z0-9-]+)/(\d+)", html):
-        links.setdefault(s, f"{OURLADS_INDEX}depth-chart/{s}/{i}")
+    # Links may be absolute, root-relative or page-relative, any case.
+    for s, i in re.findall(r"depth-chart/([A-Za-z0-9-]+)/(\d+)", html):
+        links.setdefault(s.lower(), f"{OURLADS_INDEX}depth-chart/{s}/{i}")
     return links
 
 
@@ -144,10 +147,11 @@ def main(argv=None):
     dates = sorted({datetime.fromisoformat(r["commence_time"]).strftime("%Y%m%d")
                     for r in games.values()})
     events = [e for d in dates for e in scoreboard(d)]
-    links = ourlads_index()
+    links = ourlads_index(args.report.parent)
     args.archive.mkdir(parents=True, exist_ok=True)
 
-    report = {"games": [], "teams": [], "sealed_manifest_sha256": None}
+    report = {"games": [], "teams": [], "sealed_manifest_sha256": None,
+              "ourlads_index_links": len(links)}
     receipts, kickoff_fix = [], {}
     for (away, home), row in games.items():
         match = [e for e in events
@@ -195,6 +199,7 @@ def main(argv=None):
     args.report.write_text(json.dumps(report, indent=1), encoding="utf-8")
     ok = sum(t["status"] == "CAPTURED" for t in report["teams"])
     print(json.dumps({"teams_captured": ok, "teams_total": len(report["teams"]),
+                      "ourlads_index_links": len(links),
                       "sealed_manifest_sha256": report["sealed_manifest_sha256"]}))
     return 0
 
