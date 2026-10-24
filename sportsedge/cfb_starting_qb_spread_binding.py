@@ -2,7 +2,8 @@
 
 Does not authenticate model promotion, issue PLAY, override Illinois exclusion,
 or treat self-labeled sources as verified fact. Callers must supply dated rows
-with source_url for any claim above MODERATE.
+with source_url for any claim above MODERATE. Contradictory high-confidence
+starter names for the same team/game force the result to LOW.
 """
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ from typing import Any, Mapping
 
 from sportsedge.cfb_spread_price_gate import SpreadAssessment, assess_spread
 from sportsedge.cfb_starting_qb_evidence import StartingQBEvidence, merge_evidence
-from sportsedge.cfb_starting_qb_intake import best_for_team, from_source_rows
+from sportsedge.cfb_starting_qb_intake import from_source_rows
 
 
 @dataclass(frozen=True)
@@ -30,9 +31,31 @@ def _require_url_for_high(evidence: StartingQBEvidence | None) -> StartingQBEvid
     if evidence is None:
         return None
     if evidence.confidence >= 0.70 and not (evidence.source_url or "").strip():
-        # Downgrade self-labeled high/confirmed without URL
-        return replace(evidence, confidence=0.55, confidence_label="MODERATE", notes=(evidence.notes + " [URL_REQUIRED_FOR_HIGH]").strip())
+        return replace(
+            evidence,
+            confidence=0.55,
+            confidence_label="MODERATE",
+            notes=(evidence.notes + " [URL_REQUIRED_FOR_HIGH]").strip(),
+        )
     return evidence
+
+
+def _contradiction_penalty(candidates: list[StartingQBEvidence]) -> StartingQBEvidence | None:
+    if not candidates:
+        return None
+    high = [c for c in candidates if c.confidence >= 0.70 and c.starter_name]
+    names = {c.starter_name for c in high}
+    if len(names) > 1:
+        best = merge_evidence(candidates)
+        if best is None:
+            return None
+        return replace(
+            best,
+            confidence=0.25,
+            confidence_label="LOW",
+            notes=(best.notes + " [CONTRADICTORY_HIGH_CONFIDENCE_STARTERS]").strip(),
+        )
+    return merge_evidence(candidates)
 
 
 def bind_starting_qbs_to_spread(
@@ -48,25 +71,26 @@ def bind_starting_qbs_to_spread(
     """Attach best available starting-QB evidence to a spread assessment.
 
     Research-only. Illinois teams remain excluded by assess_spread.
-    High-confidence labels require a source_url.
+    High-confidence labels require a source_url. Contradictory high-confidence
+    names for the same scoped team force LOW.
     """
     scored = from_source_rows(source_rows)
-    # Scope by team + optional game/week when provided
+
     def _match(row: StartingQBEvidence, team: str) -> bool:
-        if row.team.casefold() != team.casefold():
+        if row.team.casefold() != str(team).casefold():
             return False
-        if game_id and row.game_id and row.game_id != game_id:
+        if game_id and row.game_id and str(row.game_id) != str(game_id):
             return False
-        if season is not None and row.season is not None and row.season != season:
+        if season is not None and row.season is not None and int(row.season) != int(season):
             return False
-        if week is not None and row.week is not None and row.week != week:
+        if week is not None and row.week is not None and int(row.week) != int(week):
             return False
         return True
 
     home_candidates = [r for r in scored if _match(r, home_team)]
     away_candidates = [r for r in scored if _match(r, away_team)]
-    home_qb = _require_url_for_high(merge_evidence(home_candidates))
-    away_qb = _require_url_for_high(merge_evidence(away_candidates))
+    home_qb = _require_url_for_high(_contradiction_penalty(home_candidates))
+    away_qb = _require_url_for_high(_contradiction_penalty(away_candidates))
 
     assessment = assess_spread(**assess_kwargs)
 
@@ -90,6 +114,8 @@ def bind_starting_qbs_to_spread(
         notes.append("away_qb_missing")
     if matchup_conf < 0.50:
         notes.append("matchup_identity_below_moderate")
+    if any("CONTRADICTORY" in (qb.notes or "") for qb in (home_qb, away_qb) if qb):
+        notes.append("contradictory_high_confidence_detected")
 
     return BoundSpreadAssessment(
         assessment=assessment,
