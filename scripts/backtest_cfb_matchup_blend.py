@@ -192,8 +192,19 @@ def _main(argv=None):
         Path(args.output).with_name("cfb_lines_games.json").write_text(json.dumps(games))
     # Explicitly reject unknown or incomplete fixture clocks. Lexicographic
     # sorting of blank kickoff timestamps can otherwise admit future scores.
-    invalid_clocks = [g.get("id") for g in games if not isinstance(g.get("start"), str)
-                      or not g["start"].strip()]
+    from datetime import datetime
+
+    def valid_kickoff(game):
+        start = game.get("start")
+        if not isinstance(start, str) or not start.strip():
+            return False
+        try:
+            dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
+            return dt.tzinfo is not None and dt.utcoffset() is not None
+        except ValueError:
+            return False
+
+    invalid_clocks = [g.get("id") for g in games if not valid_kickoff(g)]
     if invalid_clocks:
         raise SystemExit(f"INVALID_FIXTURE_CLOCKS games={invalid_clocks[:10]}; no weight chosen")
     rows = project(games)
