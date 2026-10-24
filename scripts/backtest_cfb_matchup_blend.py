@@ -38,8 +38,13 @@ def fetch(seasons, key):
     from sportsedge.sports.cfb.source import _auth, _cfbd_url, _json_get
     games = []
     for s in seasons:
-        data = _json_get(_cfbd_url("/lines", {"year": int(s), "seasonType": "regular"}),
-                         headers=_auth(key)) or []
+        try:
+            data = _json_get(_cfbd_url("/lines", {"year": int(s), "seasonType": "regular"}),
+                             headers=_auth(key)) or []
+        except Exception as exc:  # report and keep other seasons
+            print(f"FETCH_FAILED season={s}: {type(exc).__name__}: {exc}"[:400])
+            continue
+        print(f"fetched season={s} games={len(data)}")
         for g in data:
             if g.get("homeScore") is None or g.get("awayScore") is None:
                 continue
@@ -147,6 +152,14 @@ def score(rows, w):
 
 
 def main(argv=None):
+    try:
+        return _main(argv)
+    except BaseException as exc:  # stdout is what the workflow posts
+        print(f"BACKTEST_FAILED: {type(exc).__name__}: {exc}"[:600])
+        return 1
+
+
+def _main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--seasons", default="2024,2025,2026")
     ap.add_argument("--games-json")
@@ -156,7 +169,8 @@ def main(argv=None):
     if args.games_json:
         games = json.loads(Path(args.games_json).read_text())
     else:
-        key = os.environ.get("CFBD_API_KEY") or os.environ.get("SPORTSEDGE_CFBD_API_KEY") or ""
+        key = (os.environ.get("CFBD_API_KEY") or os.environ.get("SPORTSEDGE_CFBD_API_KEY")
+               or os.environ.get("CFBD_KEY") or "").strip()
         if not key:
             raise SystemExit("CFBD_API_KEY_REQUIRED")
         games = fetch(seasons, key)
