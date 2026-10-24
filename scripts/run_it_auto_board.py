@@ -91,7 +91,7 @@ def render_png(summary, rows, path: Path):
 
 def create_bundle(input_dir: Path, out_dir: Path, *, now=None,
                   max_games=None, adapter=None, screen_builder=None,
-                  png_writer=None, final_now=None):
+                  png_writer=None, final_now=None, markdown_renderer=None):
     """Bundle one canonical run; dependencies injectable for offline tests."""
     instant = _utc_now() if now is None else now
     if instant.tzinfo is None or instant.utcoffset() is None:
@@ -101,6 +101,9 @@ def create_bundle(input_dir: Path, out_dir: Path, *, now=None,
         from sportsedge.phone_display import build_current_value_screens
         screen_builder = build_current_value_screens
     png_writer = render_png if png_writer is None else png_writer
+    if markdown_renderer is None:
+        from sportsedge.phone_display import render_phone_card
+        markdown_renderer = render_phone_card
 
     audit, card, markdown = adapter(input_dir, now=instant, max_games=max_games)
     # This clock MUST be read after the potentially slow canonical run.
@@ -118,6 +121,9 @@ def create_bundle(input_dir: Path, out_dir: Path, *, now=None,
             if not isinstance(screen, dict) or not isinstance(
                     screen.get("unverified_model_value_screens"), list):
                 raise ValueError("SCREEN_SCHEMA_INVALID")
+            # Re-render text against the SAME final clock as the PNG. A
+            # markdown screen cannot outlive its quote while the PNG refuses.
+            markdown = markdown_renderer(card, now=actual_final)
         except (ValueError, TypeError, KeyError):
             status = "SCREEN_RENDER_REFUSED"
             screen = {"unverified_model_value_screens": [], "total_positive_screens": 0}
