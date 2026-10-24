@@ -56,6 +56,12 @@ def _metrics(row):
     return probability, ev, anchored
 
 
+# Sports whose raw model gaps are too noisy to price directly (owner rulings
+# Oct 24 2026): CFB (#2537/#2538 unvalidated) and NFL (#2384 sides compressed
+# toward even, totals placeholder). Rank and display by the Lane B blend.
+BLENDED_SPORTS = frozenset({"CFB", "NFL"})
+
+
 def _blended(row, sport):
     """Market-blended view (Lane B: DK line + 15% of the model's gap).
 
@@ -63,7 +69,7 @@ def _blended(row, sport):
     slate (+20-70% "EV"). Owner ruling Oct 24 2026: rank CFB by the
     market-blended EV instead. Display only; Lane A stays on the record.
     """
-    if sport != "CFB":
+    if sport not in BLENDED_SPORTS:
         return None
     lanes = row.get("pricing_lanes")
     lane_b = lanes.get("lane_b_anchored") if isinstance(lanes, dict) else None
@@ -84,6 +90,8 @@ def _model_version(row, sport):
     Owner ruling Oct 24 2026: every CFB card names its model version and each
     version is graded separately.
     """
+    if sport == "NFL":
+        return "NFL_SIDES_PRIOR_COMPRESSED_2384"
     if sport != "CFB":
         return None
     notes = [str(n) for n in (row.get("context_notes") or [])
@@ -337,10 +345,10 @@ def build_current_value_screens(card, *, max_rows=20, now=None):
         # display CFB by the #2539 market-blended probability at this quote;
         # raw model EV is kept only as a research column.
         blended_ev = None
-        if source["sport"] == "CFB":
-            blend = _blended(row, "CFB")
+        if source["sport"] in BLENDED_SPORTS:
+            blend = _blended(row, source["sport"])
             if blend is None:
-                exclusions["CFB_BLENDED_EV_UNAVAILABLE"] += 1
+                exclusions[source["sport"] + "_BLENDED_EV_UNAVAILABLE"] += 1
                 continue
             blended_ev = blend["probability"] * decimal_odds - 1
             if blended_ev <= 0:
@@ -438,7 +446,7 @@ def render_phone_card(card, *, run_url="", intake_at="", now=None):
         key=_rank_ev, reverse=True)
     if stale_ranked:
         lines += ["### Model value at the SUBMITTED prices · re-check line before betting", "",
-                  "Ranked by EV, highest first. CFB rows use the MARKET-BLENDED price (DK line plus 15% "
+                  "Ranked by EV, highest first. CFB and NFL rows use the MARKET-BLENDED price (DK line plus 15% "
                   "of the model's disagreement); raw model gaps are too noisy to bet directly.", "",
                   "| # | EV | Game | Selection | DK (submitted) | Model p | Model fair | Model |",
                   "| ---: | ---: | --- | --- | ---: | ---: | ---: | --- |"]
