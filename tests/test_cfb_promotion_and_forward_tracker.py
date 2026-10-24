@@ -115,3 +115,73 @@ def test_settle_verifies_recorded_close_time_not_before_kickoff():
     t.records["r1"]["closed_at"] = KO - timedelta(seconds=1)  # tampered close time
     with pytest.raises(TrackerError, match="CLOSE_TIME_BEFORE_KICKOFF"):
         t.settle("r1", result="WIN", now=KO + timedelta(hours=4))
+
+
+def _settled():
+    t = ForwardTracker()
+    t.add(rec(), now=NOW)
+    t.close("r1", closing_odds=-120, closing_line=-3.5, now=KO + timedelta(minutes=1))
+    t.settle("r1", result="WIN", now=KO + timedelta(hours=4))
+    return t
+
+
+def test_settlement_records_timestamp_and_audit_entry():
+    t = _settled()
+    r = t.records["r1"]
+    assert r["settled_at"] == KO + timedelta(hours=4)
+    assert [e["event"] for e in t.audit_history] == ["ADD", "CLOSE", "SETTLE"]
+
+
+def test_second_settle_changes_nothing():
+    t = _settled()
+    before = (t.records["r1"]["result"], t.records["r1"]["settled_at"], list(map(dict, t.audit_history)))
+    for res in ("LOSS", "WIN", "PUSH"):
+        with pytest.raises(TrackerError, match="ALREADY_SETTLED"):
+            t.settle("r1", result=res, now=KO + timedelta(hours=6))
+    after = (t.records["r1"]["result"], t.records["r1"]["settled_at"], list(map(dict, t.audit_history)))
+    assert before == after
+
+
+def test_audit_history_is_append_only_view():
+    t = _settled()
+    hist = t.audit_history
+    with pytest.raises((TypeError, AttributeError)):
+        hist.append({"event": "FORGED"})
+    with pytest.raises(TypeError):
+        hist[0]["event"] = "FORGED"
+    assert len(t.audit_history) == 3
+
+
+def test_correct_settlement_appends_traceable_entry():
+    t = _settled()
+    when = KO + timedelta(days=1)
+    t.correct_settlement("r1", result="LOSS", reason="stat correction", actor="auditor-1", now=when)
+    h = t.audit_history
+    assert len(h) == 4 and h[2]["event"] == "SETTLE" and h[2]["result"] == "WIN"  # original untouched
+    c = h[3]
+    assert c["event"] == "CORRECT_SETTLEMENT" and c["supersedes_seq"] == h[2]["seq"]
+    assert c["previous_result"] == "WIN" and c["result"] == "LOSS"
+    assert c["reason"] == "stat correction" and c["actor"] == "auditor-1" and c["at"] == when
+    assert t.records["r1"]["result"] == "LOSS"
+    assert t.summary()["roi_units"] == pytest.approx(-1.0)
+
+
+@pytest.mark.parametrize("bad", [dict(reason=""), dict(reason=None), dict(actor=""), dict(actor=None),
+                                 dict(now=None), dict(result="MAYBE"), dict(result="WIN")])
+def test_correct_settlement_rejects_untraceable_or_noop(bad):
+    t = _settled()
+    kw = dict(result="LOSS", reason="stat correction", actor="auditor-1", now=KO + timedelta(days=1))
+    kw.update(bad)
+    with pytest.raises(TrackerError):
+        t.correct_settlement("r1", **kw)
+    assert t.records["r1"]["result"] == "WIN" and len(t.audit_history) == 3
+
+
+def test_correct_settlement_requires_prior_settlement_and_monotonic_time():
+    t = ForwardTracker()
+    t.add(rec(), now=NOW)
+    with pytest.raises(TrackerError):
+        t.correct_settlement("r1", result="LOSS", reason="x", actor="a", now=KO + timedelta(days=1))
+    t2 = _settled()
+    with pytest.raises(TrackerError):
+        t2.correct_settlement("r1", result="LOSS", reason="x", actor="a", now=KO + timedelta(hours=3))
