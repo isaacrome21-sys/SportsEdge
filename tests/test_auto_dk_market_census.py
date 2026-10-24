@@ -3,6 +3,9 @@
 Purely offline: no credentials, sportsbook requests, prices or model results.
 """
 import unittest
+from pathlib import Path
+import subprocess
+import sys
 
 from scripts.audit_auto_dk_market_census import REQUIRED_FAMILIES, audit
 
@@ -55,6 +58,13 @@ class AutoDkMarketCensusTests(unittest.TestCase):
         self.assertEqual(report["status"], "INCOMPLETE")
         self.assertFalse(report["full_board_coverage_verified"])
         self.assertFalse(report["play_authority"])
+
+    def test_census_cli_imports_repository_from_script_directory(self):
+        root = Path(__file__).resolve().parents[1]
+        proc = subprocess.run([sys.executable, "scripts/audit_auto_dk_market_census.py"],
+                              cwd=root, text=True, capture_output=True, timeout=20)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(__import__("json").loads(proc.stdout)["status"], "INCOMPLETE")
 
     def test_missing_base_market_key_is_a_gap_not_an_inferred_price(self):
         report = audit(markets={"h2h"})
