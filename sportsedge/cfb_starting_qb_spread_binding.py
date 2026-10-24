@@ -4,6 +4,7 @@ Does not authenticate model promotion, issue PLAY, override Illinois exclusion,
 or treat self-labeled sources as verified fact. Callers must supply dated rows
 with source_url for any claim above MODERATE. Contradictory high-confidence
 starter names for the same team/game force the result to LOW.
+Returned QB records always have promotion_authority=False and play_authority=False.
 """
 from __future__ import annotations
 
@@ -25,6 +26,14 @@ class BoundSpreadAssessment:
     binding_notes: str
     play_authority: bool = False
     promotion_authority: bool = False
+
+
+def _force_zero_authority(evidence: StartingQBEvidence | None) -> StartingQBEvidence | None:
+    if evidence is None:
+        return None
+    if evidence.promotion_authority or evidence.play_authority:
+        return replace(evidence, promotion_authority=False, play_authority=False)
+    return evidence
 
 
 def _require_url_for_high(evidence: StartingQBEvidence | None) -> StartingQBEvidence | None:
@@ -72,12 +81,27 @@ def bind_starting_qbs_to_spread(
 
     Research-only. Illinois teams remain excluded by assess_spread.
     High-confidence labels require a source_url. Contradictory high-confidence
-    names for the same scoped team force LOW.
+    names for the same scoped team force LOW. Empty team names yield no QB.
     """
+    home = str(home_team or "").strip()
+    away = str(away_team or "").strip()
+    if not home or not away:
+        assessment = assess_spread(**assess_kwargs)
+        return BoundSpreadAssessment(
+            assessment=assessment,
+            home_qb=None,
+            away_qb=None,
+            matchup_identity_confidence=0.0,
+            matchup_identity_label="UNKNOWN",
+            binding_notes="empty_team_name",
+            play_authority=False,
+            promotion_authority=False,
+        )
+
     scored = from_source_rows(source_rows)
 
     def _match(row: StartingQBEvidence, team: str) -> bool:
-        if row.team.casefold() != str(team).casefold():
+        if row.team.casefold() != team.casefold():
             return False
         if game_id and row.game_id and str(row.game_id) != str(game_id):
             return False
@@ -87,10 +111,10 @@ def bind_starting_qbs_to_spread(
             return False
         return True
 
-    home_candidates = [r for r in scored if _match(r, home_team)]
-    away_candidates = [r for r in scored if _match(r, away_team)]
-    home_qb = _require_url_for_high(_contradiction_penalty(home_candidates))
-    away_qb = _require_url_for_high(_contradiction_penalty(away_candidates))
+    home_candidates = [r for r in scored if _match(r, home)]
+    away_candidates = [r for r in scored if _match(r, away)]
+    home_qb = _force_zero_authority(_require_url_for_high(_contradiction_penalty(home_candidates)))
+    away_qb = _force_zero_authority(_require_url_for_high(_contradiction_penalty(away_candidates)))
 
     assessment = assess_spread(**assess_kwargs)
 
