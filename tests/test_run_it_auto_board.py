@@ -1,6 +1,8 @@
 """Offline one-command RUN IT bundle; never fabricate a quote or PLAY."""
 from datetime import datetime, timedelta, timezone
 import json
+import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -108,3 +110,11 @@ def test_real_png_has_safety_banner_and_stable_dimensions(tmp_path):
     with Image.open(target) as im:
         assert im.format == "PNG"
         assert im.size == (1440, 1536)
+
+
+def test_one_command_cli_resolves_repo_without_pythonpath():
+    root = Path(__file__).resolve().parents[1]
+    proc = subprocess.run([sys.executable, "scripts/run_it_auto_board.py", "--help"],
+                          cwd=root, text=True, capture_output=True, timeout=20)
+    assert proc.returncode == 0, proc.stderr
+    assert "--input-dir" in proc.stdout and "--out-dir" in proc.stdout
