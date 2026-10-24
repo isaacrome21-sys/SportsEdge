@@ -45,7 +45,7 @@ UA = {"User-Agent": "SportsEdge-CFB-Form2/1"}
 # OurLads slugs that do not follow slugify(ESPN location).
 OURLADS_ALIASES = {
     "miami": ["miami-fl", "miami-florida", "miami"],
-    "miami oh": ["miami-oh", "miami-ohio"],
+    "miami oh": ["miami-oh", "miami-ohio", "miami-o", "miamioh"],
     "ucf": ["ucf", "central-florida"],
     "byu": ["byu", "brigham-young"],
     "smu": ["smu", "southern-methodist"],
@@ -65,6 +65,7 @@ OURLADS_ALIASES = {
     "north texas": ["north-texas"],
     "ucla": ["ucla"],
     "uconn": ["uconn", "connecticut"],
+    "utah state": ["utah-state", "utah-st", "utahst"],
 }
 
 
@@ -126,6 +127,12 @@ def ourlads_index(debug_dir=None):
     # Current OurLads index: depth-chart.aspx?s=<slug>&id=<id> (& may be &amp;).
     for s, i in re.findall(r"depth-chart\.aspx\?s=([A-Za-z0-9-]+)&(?:amp;)?id=(\d+)", html):
         links.setdefault(s.lower(), f"{OURLADS_INDEX}depth-chart.aspx?s={s}&id={i}")
+    # Anchor-text index: lets a team match by its displayed name when the
+    # slug is abbreviated (e.g. "utah-st", "miami-oh-").
+    for s, i, text in re.findall(
+            r"depth-chart\.aspx\?s=([A-Za-z0-9-]+)&(?:amp;)?id=(\d+)[^>]*>([^<]+)<", html):
+        links.setdefault("text:" + key(text),
+                         f"{OURLADS_INDEX}depth-chart.aspx?s={s}&id={i}")
     # Legacy path style, kept for compatibility.
     for s, i in re.findall(r"depth-chart/([A-Za-z0-9-]+)/(\d+)", html):
         links.setdefault(s.lower(), f"{OURLADS_INDEX}depth-chart/{s}/{i}")
@@ -146,6 +153,20 @@ def ourlads_url(links, intake_name, team):
     for c in cands:
         if c and c in links:
             return links[c]
+    names = [intake_name, team.get("location"), team.get("displayName"),
+             team.get("shortDisplayName")]
+    for n in names:
+        k = key(n)
+        for variant in (k, k.replace(" state", " st"), k.replace(" ", "")):
+            if variant and "text:" + variant in links:
+                return links["text:" + variant]
+    # Abbreviated slugs: unique slug whose letters equal the name's with
+    # "state" shortened to "st" (never a fuzzy guess across schools).
+    want = {key(n).replace(" state", " st").replace(" ", "") for n in names if n}
+    hits = {u for sl, u in links.items()
+            if not sl.startswith("text:") and sl.replace("-", "") in want}
+    if len(hits) == 1:
+        return hits.pop()
     raise ValueError(f"OURLADS_TEAM_NOT_FOUND [{OURLADS_DIAG}]")
 
 
