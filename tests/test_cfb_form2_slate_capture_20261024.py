@@ -125,3 +125,17 @@ def test_capture_slate_preserves_and_seals(tmp_path, monkeypatch):
     assert all(c["previous_game_kickoff_utc"] == "2026-10-17T16:00:00Z" for c in calls)
     assert all(c["kickoff_utc"] == "2026-10-24T16:00:00Z" for c in calls)
     assert all(t["status"] == "PRESERVED" for t in rep["teams"])
+
+
+def test_capture_slate_empty_qb_order_does_not_crash(tmp_path, monkeypatch):
+    """Auditor L2: an empty qb_order must not crash the slate."""
+    monkeypatch.setattr(sc._archive, "preserve_form2_bundle",
+                        lambda root, **kw: {"candidate_manifest_sha256": kw["team_id"].rjust(64, "0"),
+                                            "bundle_sha256": "c" * 64})
+    monkeypatch.setattr(sc._archive, "seal_form2_archive_manifest",
+                        lambda root, **kw: {"candidate_manifest_sha256": "d" * 64})
+    rep = sc.capture_slate([_event()], str(tmp_path), ourlads_index_html=INDEX,
+                           fetch_json=lambda u: _sched(("2026-10-17T16:00Z", True)),
+                           capture=lambda **kw: {"depth_snapshot": {"qb_order": []}},
+                           now=datetime(2026, 10, 24, 3, tzinfo=timezone.utc))
+    assert all(t["status"] == "PRESERVED" and t["qb1"] is None for t in rep["teams"])
