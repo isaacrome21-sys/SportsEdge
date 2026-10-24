@@ -155,11 +155,12 @@ def test_audit_history_is_append_only_view():
 def test_correct_settlement_appends_traceable_entry():
     t = _settled()
     when = KO + timedelta(days=1)
-    t.correct_settlement("r1", result="LOSS", reason="stat correction", actor="auditor-1", now=when)
+    t.correct_settlement("r1", supersedes_event_id=t.audit_history[2]["event_id"], result="LOSS",
+                         reason="stat correction", actor="auditor-1", now=when)
     h = t.audit_history
     assert len(h) == 4 and h[2]["event"] == "SETTLE" and h[2]["result"] == "WIN"  # original untouched
     c = h[3]
-    assert c["event"] == "CORRECT_SETTLEMENT" and c["supersedes_seq"] == h[2]["seq"]
+    assert c["event"] == "CORRECT_SETTLEMENT" and c["supersedes_event_id"] == h[2]["event_id"]
     assert c["previous_result"] == "WIN" and c["result"] == "LOSS"
     assert c["reason"] == "stat correction" and c["actor"] == "auditor-1" and c["at"] == when
     assert t.records["r1"]["result"] == "LOSS"
@@ -170,7 +171,8 @@ def test_correct_settlement_appends_traceable_entry():
                                  dict(now=None), dict(result="MAYBE"), dict(result="WIN")])
 def test_correct_settlement_rejects_untraceable_or_noop(bad):
     t = _settled()
-    kw = dict(result="LOSS", reason="stat correction", actor="auditor-1", now=KO + timedelta(days=1))
+    kw = dict(supersedes_event_id=t.audit_history[2]["event_id"], result="LOSS", reason="stat correction",
+              actor="auditor-1", now=KO + timedelta(days=1))
     kw.update(bad)
     with pytest.raises(TrackerError):
         t.correct_settlement("r1", **kw)
@@ -181,7 +183,71 @@ def test_correct_settlement_requires_prior_settlement_and_monotonic_time():
     t = ForwardTracker()
     t.add(rec(), now=NOW)
     with pytest.raises(TrackerError):
-        t.correct_settlement("r1", result="LOSS", reason="x", actor="a", now=KO + timedelta(days=1))
+        t.correct_settlement("r1", supersedes_event_id="r1:1", result="LOSS", reason="x", actor="a",
+                             now=KO + timedelta(days=1))
     t2 = _settled()
     with pytest.raises(TrackerError):
-        t2.correct_settlement("r1", result="LOSS", reason="x", actor="a", now=KO + timedelta(hours=3))
+        t2.correct_settlement("r1", supersedes_event_id=t2.audit_history[2]["event_id"], result="LOSS",
+                              reason="x", actor="a", now=KO + timedelta(hours=3))
+
+
+# --- Correction must reference the original settlement by event id (pt266u) ---
+import copy
+
+
+def _settle_event(t):
+    return [e for e in t.audit_history if e["event"] == "SETTLE"][0]
+
+
+def test_events_have_unique_ids():
+    t = _settled()
+    ids = [e["event_id"] for e in t.audit_history]
+    assert len(ids) == len(set(ids)) and all(isinstance(i, str) and i for i in ids)
+
+
+def test_correction_references_original_by_event_id_and_original_unchanged():
+    t = _settled()
+    orig = copy.deepcopy(dict(_settle_event(t)))
+    t.correct_settlement("r1", supersedes_event_id=orig["event_id"], result="LOSS",
+                         reason="stat correction", actor="auditor-1", now=KO + timedelta(days=1))
+    hist = t.audit_history
+    assert dict(_settle_event(t)) == orig  # deep-equal, never modified
+    corr = [e for e in hist if e["event"] == "CORRECT_SETTLEMENT"]
+    assert len(corr) == 1 and corr[0]["supersedes_event_id"] == orig["event_id"]
+    assert {e["event_id"] for e in hist} >= {orig["event_id"], corr[0]["event_id"]}
+    assert len(hist) == 4
+
+
+@pytest.mark.parametrize("ref", [None, "", "nonexistent", "r1:0", "r1:1"])
+def test_correction_with_bad_or_nonexistent_reference_refused(ref):
+    t = _settled()
+    before = copy.deepcopy([dict(e) for e in t.audit_history])
+    with pytest.raises(TrackerError):
+        t.correct_settlement("r1", supersedes_event_id=ref, result="LOSS", reason="x", actor="a",
+                             now=KO + timedelta(days=1))
+    assert [dict(e) for e in t.audit_history] == before and t.records["r1"]["result"] == "WIN"
+
+
+@pytest.mark.parametrize("missing", ["reason", "actor", "now"])
+def test_correction_missing_reason_actor_timestamp_refused(missing):
+    t = _settled()
+    kw = dict(supersedes_event_id=_settle_event(t)["event_id"], result="LOSS", reason="x", actor="a",
+              now=KO + timedelta(days=1))
+    kw.pop(missing)
+    with pytest.raises((TrackerError, TypeError)):
+        t.correct_settlement("r1", **kw)
+    assert t.records["r1"]["result"] == "WIN" and len(t.audit_history) == 3
+
+
+def test_second_correction_must_reference_latest_correction():
+    t = _settled()
+    sid = _settle_event(t)["event_id"]
+    t.correct_settlement("r1", supersedes_event_id=sid, result="LOSS", reason="x", actor="a",
+                         now=KO + timedelta(days=1))
+    with pytest.raises(TrackerError):  # stale reference to already-superseded original
+        t.correct_settlement("r1", supersedes_event_id=sid, result="PUSH", reason="y", actor="b",
+                             now=KO + timedelta(days=2))
+    cid = t.audit_history[-1]["event_id"]
+    t.correct_settlement("r1", supersedes_event_id=cid, result="PUSH", reason="y", actor="b",
+                         now=KO + timedelta(days=2))
+    assert len(t.audit_history) == 5 and t.records["r1"]["result"] == "PUSH"
