@@ -93,8 +93,14 @@ def _team(name, sub=""):
             f'<span class="cb-market__label-inner">{name}</span>{s}</div></a>')
 
 
-def _card(eid, away, home, ap, hp):
-    return (f'<div data-testid="market-mapping-template-210">{_team(away, "P1")}{_team(home, "P2")}'
+# t270c: unlabelled cards now refuse, so retention tests carry the board start label for
+# NOW + 32 min (2026-09-16T18:32Z) as Chrome renders it in America/Chicago.
+LABEL_T32 = "Wed Sep 16th 1:32 PM"
+
+
+def _card(eid, away, home, ap, hp, label=None):
+    st = f'<span data-testid="cb-start-time-{eid}">{label}</span>' if label else ""
+    return (f'<div data-testid="market-mapping-template-210">{st}{_team(away, "P1")}{_team(home, "P2")}'
             f'<button data-testid="component-builder-market-button-{eid}-0ML1_3">'
             f'<span data-testid="button-odds-market-board">{ap}</span></button>'
             f'<button data-testid="component-builder-market-button-{eid}-0ML1_1">'
@@ -130,7 +136,7 @@ def _run(tmp, cards, **kw):
 
 def test_retains_rendered_pair_bound_to_official_schedule(tmp_path):
     start = _pred(tmp_path / "p")
-    cap, r = _run(tmp_path, [_card(999, "TB Rays", "MIL Brewers", "+159", "−193")])
+    cap, r = _run(tmp_path, [_card(999, "TB Rays", "MIL Brewers", "+159", "−193", LABEL_T32)])
     assert r["status"] == "RETAINED", r
     row = json.loads(Path(r["paths"][0]).read_text())
     assert row["source_class"] == "DRAFTKINGS_RENDERED_PAGE_V1"
@@ -148,7 +154,7 @@ def test_retains_rendered_pair_bound_to_official_schedule(tmp_path):
 def test_record_is_admissible_to_frozen_paper_decision_matcher(tmp_path):
     from sportsedge.mlb_moneyline_paper_decision import _matching_quotes, _norm_team
     start = _pred(tmp_path / "p")
-    _, r = _run(tmp_path, [_card(999, "TB Rays", "MIL Brewers", "+159", "−193")])
+    _, r = _run(tmp_path, [_card(999, "TB Rays", "MIL Brewers", "+159", "−193", LABEL_T32)])
     row = json.loads(Path(r["paths"][0]).read_text())
     m = _matching_quotes(quotes=[row], home=_norm_team("Milwaukee Brewers"), away=_norm_team("Tampa Bay Rays"),
                          start=start, generated=NOW - timedelta(minutes=10), artifact=ART, freeze_now=NOW)
@@ -199,7 +205,7 @@ def test_started_game_never_captured(tmp_path):
 
 def test_same_observation_dedup_and_repeat_retained(tmp_path):
     _pred(tmp_path / "p")
-    c = [_card(999, "TB Rays", "MIL Brewers", "+159", "−193")]
+    c = [_card(999, "TB Rays", "MIL Brewers", "+159", "−193", LABEL_T32)]
     _, a = _run(tmp_path, c)
     _, b = _run(tmp_path, c)
     _, d = _run(tmp_path, c, observed=NOW + timedelta(minutes=3))
@@ -214,3 +220,11 @@ def test_default_fetch_uses_rendered_fetcher_with_allowlisted_page():
     assert "fetch_rendered_board" in src
     for bad in ("user_agent", "user-agent", "headless=True", "direct_web_capture_source", "draftkings_game_market_source"):
         assert bad not in src, bad
+
+
+def test_t270c_unlabelled_sole_card_refused(tmp_path):
+    _pred(tmp_path / "p")
+    with pytest.raises(Exception) as e:
+        _run(tmp_path, [_card(999, "TB Rays", "MIL Brewers", "+159", "−193")])
+    assert e.value.reason == "BLOCKED_ONE_SIDED"
+    assert not (tmp_path / "q").exists() or not any((tmp_path / "q").rglob("*.json"))

@@ -219,8 +219,18 @@ def test_sole_path_matching_label_is_verified(tmp_path):
     assert row["event_match_basis"] == "BOARD_START_LABEL_UNIQUE_ACROSS_OFFSETS"
 
 
-def test_sole_path_unlabelled_card_keeps_unverified_basis(tmp_path):
+def test_sole_path_unlabelled_g2_card_only_g1_schedule_refuses(tmp_path):
+    # t270c audit HIGH: one prediction (G1 9001), one card (G2 222) with NO label -> must refuse.
     _pred(tmp_path / "p", 9001, G1)
-    r = _run(tmp_path, [_card(111, "+159", "-193")])
-    row = json.loads(Path(r["paths"][0]).read_text())
-    assert row["event_match_basis"] == "SOLE_MATCHUP_ON_BOARD_AND_SCHEDULE_NO_LABEL"
+    err = _blocked(tmp_path, [_card(222, "+120", "-140")])
+    assert any(a.get("reason") == "NO_START_LABEL" for a in err.detail["anomalies"]), err.detail
+
+
+def test_sole_path_unlabelled_card_refuses_even_when_teams_match(tmp_path):
+    _pred(tmp_path / "p", 9001, G1)
+    _blocked(tmp_path, [_card(111, "+159", "-193")])
+
+
+def test_no_label_binding_path_removed():
+    src = SCRIPT.read_text(encoding="utf-8")
+    assert "SOLE_MATCHUP_ON_BOARD_AND_SCHEDULE" not in src
