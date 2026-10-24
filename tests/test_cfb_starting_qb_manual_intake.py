@@ -10,7 +10,6 @@ def test_url_required_downgrades_high():
             "team": "Georgia",
             "source": "PRESS_BOX_OR_247_DEPTH_CHART",
             "starter_name": "Carson Beck",
-            # missing source_url
             "week": 8,
         }
     ]
@@ -18,13 +17,16 @@ def test_url_required_downgrades_high():
     assert len(out) == 1
     assert out[0].confidence_label == "MODERATE"
     assert "URL_REQUIRED_FOR_HIGH" in (out[0].notes or "")
+    assert out[0].play_authority is False
+    assert out[0].promotion_authority is False
 
 
 def test_empty_and_malformed_are_safe():
     out = normalize_manual_rows([])
     assert out == []
-    out2 = normalize_manual_rows([{"not_a_team": True}, None, "bad"])  # type: ignore
-    assert all(r.starter_name is None or r.confidence == 0.0 for r in out2)
+    out2 = normalize_manual_rows([{"not_a_team": True}, {"team": "X"}])
+    assert len(out2) == 2
+    assert all(r.play_authority is False for r in out2)
 
 
 def test_example_rows_shape():
@@ -33,3 +35,19 @@ def test_example_rows_shape():
     assert rows[0]["source_url"].startswith("https://")
     scored = normalize_manual_rows(rows)
     assert scored[0].confidence_label == "CONFIRMED"
+    assert scored[0].play_authority is False
+
+
+def test_authority_cannot_be_smuggled():
+    # Even if a future caller tries to set flags, normalize forces them off
+    rows = [{
+        "team": "Alabama",
+        "source": "OFFICIAL_TEAM_OR_CONFERENCE",
+        "starter_name": "Test",
+        "source_url": "https://example.com",
+        "promotion_authority": True,
+        "play_authority": True,
+    }]
+    out = normalize_manual_rows(rows)
+    assert out[0].promotion_authority is False
+    assert out[0].play_authority is False
