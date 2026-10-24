@@ -178,6 +178,8 @@ def _main(argv=None):
     ap.add_argument("--output", default="artifacts/run_it/cfb_matchup_blend_backtest.json")
     args = ap.parse_args(argv)
     seasons = [int(x) for x in args.seasons.split(",")]
+    if len(seasons) < 2 or len(set(seasons)) != len(seasons) or seasons != sorted(seasons):
+        raise SystemExit("INVALID_EVALUATION_SEASONS: require >=2 unique ascending seasons")
     if args.games_json:
         games = json.loads(Path(args.games_json).read_text())
     else:
