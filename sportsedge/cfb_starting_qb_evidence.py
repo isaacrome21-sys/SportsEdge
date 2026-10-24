@@ -3,6 +3,7 @@
 Research-only. Does not authenticate model promotion, issue PLAY, or
 override Illinois-college exclusion. Callers supply dated source rows;
 this module normalizes them into a confidence-scored starter record.
+Every returned record has promotion_authority=False and play_authority=False.
 
 Sources (in decreasing verification strength):
   1. Official team athletics site or conference availability report
@@ -13,7 +14,7 @@ Sources (in decreasing verification strength):
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
@@ -21,7 +22,6 @@ from typing import Any, Mapping
 SCHEMA_VERSION = "SPORTSEDGE_CFB_STARTING_QB_EVIDENCE_V1"
 LANE = "CFB_STARTING_QB_EVIDENCE"
 
-# Evidence strength weights (higher = more verified)
 SOURCE_WEIGHTS = {
     "OFFICIAL_TEAM_OR_CONFERENCE": 1.00,
     "PRESS_BOX_OR_247_DEPTH_CHART": 0.85,
@@ -104,9 +104,8 @@ def score_starting_qb(
 ) -> StartingQBEvidence:
     """Normalize a single starting-QB observation into scored evidence.
 
-    source must be one of the SOURCE_WEIGHTS keys. Missing or unknown
-    source yields UNKNOWN confidence. Illinois college teams are flagged
-    but not filtered here (caller enforces exclusion).
+    Blank or whitespace-only starter_name yields confidence 0.0.
+    promotion_authority and play_authority are always False.
     """
     key = str(source or "").strip().upper()
     weight = SOURCE_WEIGHTS.get(key, 0.0)
@@ -141,7 +140,7 @@ def merge_evidence(rows: list[StartingQBEvidence]) -> StartingQBEvidence | None:
     """Return the highest-confidence non-Illinois record for a team/game.
 
     Ties are broken by source weight, then by presence of an observed_at.
-    Returns None when no usable evidence exists.
+    Returns None when no usable evidence exists. Result always has zero authority.
     """
     usable = [r for r in rows if not r.illinois_college_team and r.starter_name]
     if not usable:
@@ -153,7 +152,10 @@ def merge_evidence(rows: list[StartingQBEvidence]) -> StartingQBEvidence | None:
         ),
         reverse=True,
     )
-    return usable[0]
+    best = usable[0]
+    if best.promotion_authority or best.play_authority:
+        best = replace(best, promotion_authority=False, play_authority=False)
+    return best
 
 
 __all__ = [
