@@ -112,7 +112,7 @@ def test_settle_verifies_recorded_close_time_not_before_kickoff():
     t = ForwardTracker()
     t.add(rec(), now=NOW)
     t.close("r1", closing_odds=-120, closing_line=-3.5, now=KO + timedelta(minutes=1))
-    t.records["r1"]["closed_at"] = KO - timedelta(seconds=1)  # tampered close time
+    t._records["r1"]["closed_at"] = KO - timedelta(seconds=1)  # internal tamper (white-box)
     with pytest.raises(TrackerError, match="CLOSE_TIME_BEFORE_KICKOFF"):
         t.settle("r1", result="WIN", now=KO + timedelta(hours=4))
 
@@ -251,3 +251,50 @@ def test_second_correction_must_reference_latest_correction():
     t.correct_settlement("r1", supersedes_event_id=cid, result="PUSH", reason="y", actor="b",
                          now=KO + timedelta(days=2))
     assert len(t.audit_history) == 5 and t.records["r1"]["result"] == "PUSH"
+
+
+# --- t276 re-audit MEDIUM: records read-only; audit not externally mutable; summary from audit log ---
+
+def test_records_view_is_read_only():
+    t = _settled()
+    with pytest.raises(TypeError):
+        t.records["r1"] = {"result": "LOSS"}
+    with pytest.raises(TypeError):
+        t.records["r1"]["result"] = "LOSS"
+    with pytest.raises(TypeError):
+        del t.records["r1"]
+    with pytest.raises(AttributeError):
+        t.records = {}
+    assert t.records["r1"]["result"] == "WIN"
+
+
+def test_audit_log_not_replaceable():
+    t = _settled()
+    with pytest.raises(AttributeError):
+        t.audit_history = ()
+    snap = [dict(e) for e in t.audit_history]
+    snap[0]["event"] = "FORGED"
+    assert t.audit_history[0]["event"] == "ADD"
+
+
+def test_summary_derived_from_audit_log_ignores_record_tamper():
+    t = _settled()
+    good = t.summary()
+    t._records["r1"]["result"] = "LOSS"        # white-box tamper of derived state
+    t._records["r1"]["odds"] = 500.0
+    t._records["r1"]["closing_odds"] = 900.0
+    s = t.summary()
+    assert s["roi_units"] == pytest.approx(good["roi_units"]) == pytest.approx(100 / 110)
+    assert s["mean_clv_implied_prob"] == pytest.approx(good["mean_clv_implied_prob"])
+    assert s["audit_consistent"] is False      # divergence is flagged, not trusted
+
+
+def test_summary_flags_consistent_when_untampered():
+    assert _settled().summary()["audit_consistent"] is True
+
+
+def test_summary_uses_corrected_result_from_log():
+    t = _settled()
+    t.correct_settlement("r1", supersedes_event_id=t.audit_history[2]["event_id"], result="LOSS",
+                         reason="stat correction", actor="auditor-1", now=KO + timedelta(days=1))
+    assert t.summary()["roi_units"] == pytest.approx(-1.0)
