@@ -30,6 +30,7 @@ jobs:
           python-version: '3.12'
       - name: Run backtest
         run: |
+          set -o pipefail
           mkdir -p out
           python scripts/backtest_cfb_matchup_blend.py --seasons 2024,2025,2026 \
             --output out/cfb_matchup_blend_backtest.json 2>&1 | tee out/summary.txt
