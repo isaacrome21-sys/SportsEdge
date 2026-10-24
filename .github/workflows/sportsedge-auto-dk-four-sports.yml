@@ -111,7 +111,24 @@ jobs:
           fi
           python scripts/collect_auto_dk_four_sports.py --sports "${requested[@]}" --reserve 76
           cat artifacts/auto_dk/summary.md >> "$GITHUB_STEP_SUMMARY"
-      - name: Immediately screen paired DK game quotes on canonical research path
+      - name: Fast-first two-game value screen before the quote TTL expires
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          python scripts/run_auto_dk_live_value_card.py \
+            --input-dir artifacts/auto_dk \
+            --out-dir artifacts/auto_dk_cards/fast \
+            --max-games 2
+          test ! -f artifacts/auto_dk_cards/fast/current_value_card.md || cat artifacts/auto_dk_cards/fast/current_value_card.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish near-tip card immediately without waiting on the full-slate model
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sportsedge-fast-value-${{ github.run_id }}
+          path: artifacts/auto_dk_cards/fast/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Independently audit all paired quotes on the full canonical path
         continue-on-error: true
         timeout-minutes: 8
         run: |
@@ -170,6 +187,8 @@ jobs:
             echo "SportsEdge automatic DK board: $day"
             echo
             test ! -f artifacts/auto_dk/summary.md || cat artifacts/auto_dk/summary.md
+            echo
+            test ! -f artifacts/auto_dk_cards/fast/current_value_card.md || cat artifacts/auto_dk_cards/fast/current_value_card.md
             echo
             test ! -f artifacts/auto_dk_cards/current_value_card.md || cat artifacts/auto_dk_cards/current_value_card.md
             echo
