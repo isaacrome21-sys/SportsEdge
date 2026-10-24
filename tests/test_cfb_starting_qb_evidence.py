@@ -59,3 +59,22 @@ def test_illinois_excluded_from_merge():
         illinois_college_team=True,
     )
     assert merge_evidence([row]) is None
+
+
+def test_blank_name_zero_confidence():
+    row = score_starting_qb(team="Alabama", source="OFFICIAL_TEAM_OR_CONFERENCE", starter_name="   ")
+    assert row.starter_name is None
+    assert row.confidence == 0.0
+    assert row.confidence_label == "UNKNOWN"
+    assert row.play_authority is False
+    assert row.promotion_authority is False
+
+
+def test_merge_forces_zero_authority():
+    a = score_starting_qb(team="Alabama", source="OFFICIAL_TEAM_OR_CONFERENCE", starter_name="Milroe")
+    b = score_starting_qb(team="Alabama", source="PROJECTED_OR_OR_LISTED", starter_name="Backup")
+    best = merge_evidence([a, b])
+    assert best is not None
+    assert best.starter_name == "Milroe"
+    assert best.play_authority is False
+    assert best.promotion_authority is False
