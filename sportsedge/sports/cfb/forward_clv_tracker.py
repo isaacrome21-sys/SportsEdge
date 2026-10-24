@@ -8,6 +8,7 @@ settlement only after a close. Summaries never set play_allowed.
 from __future__ import annotations
 
 import math
+from types import MappingProxyType
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
@@ -50,6 +51,17 @@ def _profit(o: float) -> float:
 class ForwardTracker:
     def __init__(self) -> None:
         self.records: dict[str, dict] = {}
+        self._audit: list[dict] = []
+
+    @property
+    def audit_history(self) -> tuple:
+        """Append-only audit log; returned as an immutable view."""
+        return tuple(MappingProxyType(dict(e)) for e in self._audit)
+
+    def _log(self, event: str, rid: str, at: datetime, **extra: Any) -> dict:
+        entry = {"seq": len(self._audit), "event": event, "record_id": rid, "at": at, **extra}
+        self._audit.append(entry)
+        return entry
 
     def add(self, rec: Mapping[str, Any], *, now: datetime) -> None:
         now = _ts(now, "NOW")
@@ -70,7 +82,9 @@ class ForwardTracker:
         if now >= ko:
             raise TrackerError("REGISTERED_AFTER_KICKOFF")
         self.records[rid] = {**dict(rec), "odds": _odds(rec.get("odds"), "ODDS"), "_kickoff": ko,
-                             "closing_odds": None, "closed_at": None, "result": None}
+                             "closing_odds": None, "closed_at": None, "result": None,
+                             "settled_at": None, "settle_seq": None}
+        self._log("ADD", rid, now)
 
     def close(self, rid: str, *, closing_odds: Any, closing_line: Any, now: datetime) -> None:
         r = self.records.get(rid)
@@ -85,6 +99,7 @@ class ForwardTracker:
             raise TrackerError("CLOSING_LINE_MISMATCH")
         r["closing_odds"] = _odds(closing_odds, "CLOSING_ODDS")
         r["closed_at"] = now
+        self._log("CLOSE", rid, now, closing_odds=r["closing_odds"])
 
     def settle(self, rid: str, *, result: str, now: datetime) -> None:
         r = self.records.get(rid)
@@ -97,9 +112,33 @@ class ForwardTracker:
             raise TrackerError("CLOSE_TIME_BEFORE_KICKOFF")
         if result not in ("WIN", "LOSS", "PUSH"):
             raise TrackerError("RESULT_INVALID")
-        if _ts(now, "NOW") < r["_kickoff"]:
+        now = _ts(now, "NOW")
+        if now < r["_kickoff"]:
             raise TrackerError("SETTLE_BEFORE_KICKOFF")
-        r["result"] = result
+        entry = self._log("SETTLE", rid, now, result=result)
+        r["result"], r["settled_at"], r["settle_seq"] = result, now, entry["seq"]
+
+    def correct_settlement(self, rid: str, *, result: str, reason: Any, actor: Any, now: Any) -> None:
+        """Traceable correction: appends a CORRECT_SETTLEMENT entry referencing the
+        entry it supersedes; never edits or removes earlier audit entries."""
+        r = self.records.get(rid)
+        if r is None or r["result"] is None:
+            raise TrackerError("CORRECTION_REQUIRES_SETTLEMENT")
+        if not isinstance(reason, str) or not reason.strip():
+            raise TrackerError("CORRECTION_REASON_REQUIRED")
+        if not isinstance(actor, str) or not actor.strip():
+            raise TrackerError("CORRECTION_ACTOR_REQUIRED")
+        now = _ts(now, "NOW")
+        if result not in ("WIN", "LOSS", "PUSH"):
+            raise TrackerError("RESULT_INVALID")
+        if result == r["result"]:
+            raise TrackerError("CORRECTION_NO_CHANGE")
+        last = self._audit[r["settle_seq"]]["at"]
+        if now <= last:
+            raise TrackerError("CORRECTION_TIME_NOT_AFTER_SETTLEMENT")
+        entry = self._log("CORRECT_SETTLEMENT", rid, now, result=result, previous_result=r["result"],
+                          supersedes_seq=r["settle_seq"], reason=reason.strip(), actor=actor.strip())
+        r["result"], r["settle_seq"] = result, entry["seq"]
 
     def summary(self) -> dict:
         settled = [r for r in self.records.values() if r["result"]]
