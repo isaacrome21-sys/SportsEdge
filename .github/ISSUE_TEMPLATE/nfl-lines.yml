@@ -15,11 +15,21 @@ body:
 
         ```
         Chiefs @ Ravens
+        Captured 2026-10-25T11:58:30-05:00
         Spread +3.5 -110 -110
         Total 47.5 -108 -112
         ```
 
-        The issue time is an intake timestamp, not a sportsbook timestamp.
+        - First line of each game is just `Away @ Home` (nothing else on it).
+        - The next line is `Captured <time>`: when you read these prices off
+          DraftKings, as ISO 8601 with seconds and a timezone offset
+          (`-05:00` for Central daylight time, `-06:00` for Central standard, or `Z` for UTC).
+          No offset = intake fails. Missing = the card prints the lines but refuses research pricing.
+        - Research pricing needs the card to run within 180 seconds of `Captured`.
+          Older lines are refused as stale.
+        - Kickoff comes from the ESPN schedule (exactly one match), never from the paste.
+        - The issue time is an intake timestamp, not a sportsbook timestamp.
+          It is never used as the capture time.
         One-sided lines fail closed.
   - type: textarea
     id: lines
