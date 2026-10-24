@@ -113,16 +113,33 @@ def project(games):
         de = (sum(defs) + BASE * SHRINK_GAMES) / (n + SHRINK_GAMES)
         return off, de
 
+    # Games sharing a kickoff are simultaneous: evaluate all of them before
+    # admitting any result into the prior-game history.
+    pending = []
+    current_kickoff = None
+
+    def flush_pending():
+        for game in pending:
+            season = game["season"]
+            nh = len(hist[(season, game["away"])])
+            na = len(hist[(season, game["home"])])
+            hist[(season, game["home"])].append((game["hs"], game["as"], game["away"], nh))
+            hist[(season, game["away"])].append((game["as"], game["hs"], game["home"], na))
+        pending.clear()
+
     for g in games:
+        kickoff = (g["season"], g["start"])
+        if current_kickoff is not None and kickoff != current_kickoff:
+            flush_pending()
+        current_kickoff = kickoff
         s = g["season"]
         hu, au = unit(s, g["home"]), unit(s, g["away"])
         if hu and au and g["spread"] is not None:
             hp = hu[0] + au[1] - BASE + HFA / 2
             ap = au[0] + hu[1] - BASE - HFA / 2
             out.append({**g, "model_margin": hp - ap, "model_total": hp + ap})
-        nh, na = len(hist[(s, g["away"])]), len(hist[(s, g["home"])])
-        hist[(s, g["home"])].append((g["hs"], g["as"], g["away"], nh))
-        hist[(s, g["away"])].append((g["as"], g["hs"], g["home"], na))
+        pending.append(g)
+    flush_pending()
     return out
 
 
