@@ -54,7 +54,17 @@ OURLADS_ALIASES = {
     "florida atlantic": ["florida-atlantic", "fau"],
     "pittsburgh": ["pittsburgh", "pitt"],
     "unlv": ["unlv", "nevada-las-vegas"],
-    "usc": ["usc", "southern-california"],
+    "usc": ["usc", "southern-california", "southern-cal"],
+    "ole miss": ["ole-miss", "mississippi"],
+    "ul monroe": ["louisiana-monroe", "ul-monroe", "ulm"],
+    "louisiana": ["louisiana", "louisiana-lafayette", "ul-lafayette"],
+    "san jos state": ["san-jose-state"],
+    "texas a m": ["texas-am", "texas-a-m", "texas-a&m"],
+    "southern miss": ["southern-miss", "southern-mississippi"],
+    "utsa": ["utsa", "texas-san-antonio", "ut-san-antonio"],
+    "north texas": ["north-texas"],
+    "ucla": ["ucla"],
+    "uconn": ["uconn", "connecticut"],
 }
 
 
@@ -113,10 +123,20 @@ def ourlads_index(debug_dir=None):
     if debug_dir:
         Path(debug_dir, "ourlads_index.html").write_text(html, encoding="utf-8")
     links = {}
-    # Links may be absolute, root-relative or page-relative, any case.
+    # Current OurLads index: depth-chart.aspx?s=<slug>&id=<id> (& may be &amp;).
+    for s, i in re.findall(r"depth-chart\.aspx\?s=([A-Za-z0-9-]+)&(?:amp;)?id=(\d+)", html):
+        links.setdefault(s.lower(), f"{OURLADS_INDEX}depth-chart.aspx?s={s}&id={i}")
+    # Legacy path style, kept for compatibility.
     for s, i in re.findall(r"depth-chart/([A-Za-z0-9-]+)/(\d+)", html):
         links.setdefault(s.lower(), f"{OURLADS_INDEX}depth-chart/{s}/{i}")
+    global OURLADS_DIAG
+    hrefs = re.findall(r'href=["\']([^"\']*depth[^"\']*)["\']', html, re.I)
+    OURLADS_DIAG = (f"index_bytes={len(html)} links={len(links)} "
+                    f"depth_hrefs={len(hrefs)} sample={hrefs[:4]}")
     return links
+
+
+OURLADS_DIAG = ""
 
 
 def ourlads_url(links, intake_name, team):
@@ -126,7 +146,7 @@ def ourlads_url(links, intake_name, team):
     for c in cands:
         if c and c in links:
             return links[c]
-    raise ValueError("OURLADS_TEAM_NOT_FOUND")
+    raise ValueError(f"OURLADS_TEAM_NOT_FOUND [{OURLADS_DIAG}]")
 
 
 def main(argv=None):
