@@ -45,8 +45,8 @@ def card(*rows):
 ])
 def test_current_numbers_screen_every_sport_and_market_without_long_term_gate(sport, market):
     extra = {}
-    if sport == "CFB":
-        # Oct 24 2026 ruling: CFB screens require the #2539 market blend.
+    if sport in {"CFB", "NFL"}:
+        # Oct 24 2026 rulings: CFB and NFL screens require the market blend.
         extra["pricing_lanes"] = {"lane_b_anchored": {
             "estimate_p": .63, "ev_per_dollar": .155, "fair_american": -170}}
     data = card(row(sport=sport, market=market, **extra))
