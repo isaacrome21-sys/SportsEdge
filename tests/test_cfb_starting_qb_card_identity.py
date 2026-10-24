@@ -57,6 +57,7 @@ def test_attach_identity_to_card():
     assert ident["home_qb"]["name"] == "Jalen Milroe"
     assert ident["away_qb"]["name"] == "Carson Beck"
     assert ident["play_authority"] is False
+    assert ident["promotion_authority"] is False
     assert ident["matchup_identity_label"] in ("HIGH", "CONFIRMED")
 
 
@@ -85,3 +86,19 @@ def test_attach_handles_missing_and_contradictory():
     assert ident["home_qb"]["label"] == "LOW"
     assert "contradictory" in ident["binding_notes"]
     assert ident["play_authority"] is False
+
+
+def test_invalid_card_input_safe():
+    out = attach_starting_qb_identity(None, [], assess_kwargs=_kwargs())  # type: ignore
+    ident = out["starting_qb_identity"]
+    assert ident["binding_notes"] == "invalid_card_input"
+    assert ident["play_authority"] is False
+    assert ident["assessment_reason"] == "INVALID_CARD_INPUT"
+
+
+def test_identity_always_zero_authority():
+    card = {"home_team": "Alabama", "away_team": "Georgia", "game_id": "401", "week": 8}
+    out = attach_starting_qb_identity(card, [], assess_kwargs=_kwargs())
+    ident = out["starting_qb_identity"]
+    assert ident["play_authority"] is False
+    assert ident["promotion_authority"] is False
