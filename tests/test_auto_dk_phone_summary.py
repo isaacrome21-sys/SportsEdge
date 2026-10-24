@@ -309,3 +309,22 @@ def test_radar_three_independent_books_required_and_straight_cap_enforced():
         row["markets"]["totals"]["over"]=-102
         row["reference"]["totals"]["peer_evidence"][2]["observed_at"]="2026-10-11T16:40:00Z"
         assert scan()==[]
+
+
+def test_unpriced_prop_states_are_named_not_hidden():
+    with TemporaryDirectory() as temp:
+        root=Path(temp)
+        (root/"summary.json").write_text(json.dumps({
+          "NFL":{"status":"READY","cards":[
+             {"date":"2026-10-18","json":"nfl.json","state":"READY",
+              "props":{"status":"NO_PAIRED_DK_PROPS"}},
+             {"date":"2026-10-19","json":"nfl.json","state":"READY"}]},
+          "CFB":{"status":"NO_DK_GAMES","cards":[]}
+        }))
+        (root/"nfl.json").write_text(json.dumps({"games":[]}))
+        result=card.render(root,"https://github.com/example",
+                           asof=datetime(2026,10,18,15,10,tzinfo=timezone.utc),
+                           as_of_date="2026-10-18")
+        assert "2026-10-18: NO_PAIRED_DK_PROPS · no two-sided DK prop offers captured" in result
+        assert "2026-10-19: NOT_CAPTURED · no prop capture ran for this date" in result
+        assert "No supported priced research prop candidates." in result

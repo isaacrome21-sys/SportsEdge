@@ -397,8 +397,11 @@ def render(root: Path, run_url: str, *, as_of_date: str | None = None,
                 prop=item.get("props") or {}
                 state=str(prop.get("status") or "NOT_CAPTURED")
                 if state!="RESEARCH_ONLY":
-                    if state not in {"NOT_CAPTURED","NO_PAIRED_DK_PROPS"}:
-                        lines.append(f"- {item.get('date','DATE MISSING')}: {state} · {prop.get('reason') or 'SOURCE_UNAVAILABLE'}")
+                    # Every non-priced state is shown: a silent skip hid why the
+                    # board had no props (capture limits, no paired DK offers).
+                    plain={"NOT_CAPTURED":"no prop capture ran for this date",
+                           "NO_PAIRED_DK_PROPS":"no two-sided DK prop offers captured"}.get(state)
+                    lines.append(f"- {item.get('date','DATE MISSING')}: {state} · {prop.get('reason') or plain or 'SOURCE_UNAVAILABLE'}")
                     continue
                 candidate=root/Path(prop.get("json") or "").name
                 if not candidate.is_file():
