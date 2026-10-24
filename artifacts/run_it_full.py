@@ -17,6 +17,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from artifacts import free_models as engine
+from sportsedge.phone_display import is_pick_status
 from sportsedge.mlb_phone_pitcher_pricing import phone_pitcher_rows, blocked
 from sportsedge.mlb_phone_batter_pricing import phone_batter_rows
 from sportsedge.nba_phone_prop_pricing import (
@@ -1537,7 +1538,7 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
     card["summary"]["status_counts"] = dict(sorted(Counter(
         r.get("status") or "MISSING_STATUS" for r in evaluated).items()))
     card["prop_candidates"] = sorted(
-        [r for r in modeled_props if r.get("status")=="RESEARCH_CANDIDATE_NOT_VALIDATED"],
+        [r for r in modeled_props if is_pick_status(r.get("status"))],
         key=lambda r:-r["ev_per_dollar"])
     card["prop_watchlist"] = sorted(
         [r for r in modeled_props if r.get("status","").startswith("WATCH_")],

@@ -20,6 +20,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from sportsedge.phone_display import is_pick_status
 from sportsedge.quote_freshness import (
     MAX_QUOTE_AGE_SECONDS,
     check_quote_freshness,
@@ -1841,7 +1842,8 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
                                          r["game"], r["selection"]))
     lane_b_edges = []
     edges = [r for r in all_rows
-             if r["status"] == POSITIVE_EV_STATUS and is_play_eligible(r)]
+             if is_pick_status(r["status"]) and r["status"] == POSITIVE_EV_STATUS
+             and is_play_eligible(r)]
     edges.sort(key=lambda r: (-r["ev_per_dollar"], r["game"], r["selection"]))
     # Concentration is diagnosed over apparent positive-gap model
     # research signals, NOT independent profitable positions. The

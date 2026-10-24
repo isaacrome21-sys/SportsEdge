@@ -16,6 +16,20 @@ from sportsedge.handicap_explanations import handicap_explanation
 CANDIDATE_STATUSES = frozenset({
     "RESEARCH_POSITIVE_EV_UNVALIDATED", "RESEARCH_CANDIDATE_NOT_VALIDATED",
 })
+
+# Priced rows that are displayed but are never picks themselves.
+NON_PICK_PRICED_STATUSES = frozenset({"PRICE_CAP", "WATCH_PRICE_CAP", "BELOW_THRESHOLD", "WATCH_BELOW_EV_FLOOR"})
+
+
+def is_pick_status(status):
+    """Fail-closed allowlist: only canonical research-candidate statuses can be
+    displayed as candidates. Every WATCH_* status (incl.
+    WATCH_CFB_MARKET_ONLY_NO_VALIDATED_WEIGHT and
+    WATCH_UNVALIDATED_INJURY_WEATHER_ADJ), missing and unknown statuses are
+    non-picks."""
+    return isinstance(status, str) and status in CANDIDATE_STATUSES
+
+
 INTAKE_FIELDS = ("sport", "away", "home", "market", "side", "selection",
                  "player_name", "line", "period", "phase", "alternate",
                  "settlement_type", "kickoff", "commence_time", "book")
@@ -110,8 +124,7 @@ def _disposition(row, min_ev):
     if any("NO_FETCH_MANUAL_MODE" in str(note) for note in (notes or [])):
         return "WATCH", "priced", "Verified event and team inputs required"
     # Source/context/participation/deployment holds take precedence over EV.
-    allowed = CANDIDATE_STATUSES | {"PRICE_CAP", "WATCH_PRICE_CAP", "BELOW_THRESHOLD", "WATCH_BELOW_EV_FLOOR"}
-    if status not in allowed:
+    if not (is_pick_status(status) or status in NON_PICK_PRICED_STATUSES):
         return "WATCH", "priced", row.get("reason") or status
     projection = row.get("independent_projection")
     if isinstance(projection, dict) and projection.get("paired_market_status") != "EXACT_DK_TWO_SIDED_NO_VIG_RESEARCH":
@@ -253,8 +266,7 @@ def build_current_value_screens(card, *, max_rows=20, now=None):
                 {"NO_MODEL_OR_MARKET", "NO_ENGINE", "NO_QUOTE", "MISSING_STATUS"}):
             exclusions["BLOCKED_OR_UNPRICED"] += 1
             continue
-        if status not in CANDIDATE_STATUSES | {
-                "PASS", "BELOW_THRESHOLD", "WATCH_BELOW_EV_FLOOR", "PRICE_CAP", "WATCH_PRICE_CAP"}:
+        if not (is_pick_status(status) or status in NON_PICK_PRICED_STATUSES | {"PASS"}):
             exclusions["NONCANONICAL_RESEARCH_PRICE_STATUS"] += 1
             continue
         if status == "BLOCKED_IL_COLLEGE":

@@ -19,10 +19,10 @@ from scripts.render_sportsedge_png import as_rows
 def test_cross_sport_unverified_99_never_becomes_best_or_quality_score(sport, market, row):
     if sport == "NFL":
         payload = {"games": [{"home": "B", "away": "A",
-                              "markets": [{"market": market, "pick": row}]}]}
+                              "markets": [{"market": market, "pick": {**row, "engine_status": "RESEARCH_CANDIDATE_NOT_VALIDATED"}}]}]}
     else:
         raw = {**row, "market": market, "matchup": "A @ B",
-               "scored_status": "ACTIONABLE" if sport == "MLB" else None,
+               "engine_status":"RESEARCH_CANDIDATE_NOT_VALIDATED","scored_status": "ACTIONABLE" if sport == "MLB" else None,
                "bet_status": "BET" if sport == "CFB" else None}
         payload = {"results": [raw]}
     rows = as_rows(payload, sport)
@@ -41,6 +41,7 @@ def test_cross_sport_unverified_99_never_becomes_best_or_quality_score(sport, ma
 
 def test_untrusted_input_flags_cannot_self_approve():
     raw = {"market": "moneyline", "matchup": "A @ B", "status": "BET",
+           "engine_status": "RESEARCH_CANDIDATE_NOT_VALIDATED",
            "selection": "A", "score_0_100": 100,
            "price_american": -110, "estimate_p": 0.65,
            "ev_per_dollar": 0.2, "edge_probability_points": 0.1,
@@ -58,8 +59,21 @@ def test_untrusted_input_flags_cannot_self_approve():
 
 def test_nfl_lean_and_missing_data_are_still_non_picks():
     payload = {"games": [{"home": "B", "away": "A", "markets": [{
-        "market": "spread", "lean": {"selection": "B", "score_0_100": 99}}]}]}
+        "market": "spread", "lean": {"engine_status":"RESEARCH_CANDIDATE_NOT_VALIDATED","selection": "B", "score_0_100": 99}}]}]}
     rows = as_rows(payload, "NFL")
     assert len(rows) == 1 and rows[0]["status"] == "LEAN"
     assert rows[0]["score_value"] is None
     assert "INCOMPLETE_DATA" in rows[0]["reason"]
+
+
+def test_bet_or_lean_without_engine_status_renders_watch():
+    """Grok ruling 2026-10-24a/b: a producer BET/LEAN label without an engine
+    status that passes is_pick_status is shown as WATCH, never BEST/LEAN."""
+    for payload, sport in (({"rows": [{"market": "moneyline", "matchup": "A @ B", "status": "BET",
+                                       "selection": "A", "price_american": -110}]}, "MLB"),
+                           ({"results": [{"market": "SPREAD", "matchup": "A @ B", "bet_status": "LEAN",
+                                          "selection": "A", "american_odds": -110}]}, "CFB"),
+                           ({"games": [{"home": "B", "away": "A", "markets": [{
+                               "market": "spread", "lean": {"selection": "B"}}]}]}, "NFL")):
+        rows = as_rows(payload, sport)
+        assert rows and all(r["status"] == "WATCH" for r in rows)
