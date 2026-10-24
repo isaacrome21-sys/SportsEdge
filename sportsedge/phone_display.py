@@ -56,6 +56,12 @@ def _metrics(row):
     return probability, ev, anchored
 
 
+# Sports whose raw model gaps are too noisy to price directly (owner rulings
+# Oct 24 2026): CFB (#2537/#2538 unvalidated) and NFL (#2384 sides compressed
+# toward even, totals placeholder). Rank and display by the Lane B blend.
+BLENDED_SPORTS = frozenset({"CFB", "NFL"})
+
+
 def _blended(row, sport):
     """Market-blended view (Lane B: DK line + 15% of the model's gap).
 
@@ -63,7 +69,7 @@ def _blended(row, sport):
     slate (+20-70% "EV"). Owner ruling Oct 24 2026: rank CFB by the
     market-blended EV instead. Display only; Lane A stays on the record.
     """
-    if sport != "CFB":
+    if sport not in BLENDED_SPORTS:
         return None
     lanes = row.get("pricing_lanes")
     lane_b = lanes.get("lane_b_anchored") if isinstance(lanes, dict) else None
@@ -76,6 +82,25 @@ def _blended(row, sport):
     return {"probability": p, "ev": ev,
             "fair_odds": _number(lane_b.get("fair_american")),
             "weight": (lane_b.get("anchor") or {}).get("weight")}
+
+
+def _model_version(row, sport):
+    """Projection-model label so cards priced on different models stay distinct.
+
+    Owner ruling Oct 24 2026: every CFB card names its model version and each
+    version is graded separately.
+    """
+    if sport == "NFL":
+        return "NFL_SIDES_PRIOR_COMPRESSED_2384"
+    if sport != "CFB":
+        return None
+    notes = [str(n) for n in (row.get("context_notes") or [])
+             if not isinstance(row.get("context_notes"), str)]
+    if "CFB_OPPONENT_ADJUSTED_V1" in notes:
+        return "CFB_OPPONENT_ADJUSTED_V1"
+    if "CFB_MATCHUP_OFF_DEF_V1" in notes:
+        return "CFB_MATCHUP_OFF_DEF_V1"
+    return "CFB_PRE_OCT24_BASELINE"
 
 
 def _disposition(row, min_ev):
@@ -193,6 +218,7 @@ def build_phone_card(card):
                                   else row).get("fair_american")) if bucket in {"priced", "stale"} and not anchored else None,
             "source_status": row.get("status"),
             "blended": _blended(row, sport) if bucket in {"priced", "stale"} else None,
+            "model_version": _model_version(row, sport),
             "handicap": (analyses[index] if analyses is not None
                           and isinstance(analyses[index], dict)
                           and analyses[index].get("input_index") == index
@@ -315,6 +341,19 @@ def build_current_value_screens(card, *, max_rows=20, now=None):
         if ev <= 0:
             exclusions["NO_POSITIVE_ESTIMATED_EV"] += 1
             continue
+        # Owner ruling Oct 24 2026: CFB raw model EV is not a price. Rank and
+        # display CFB by the #2539 market-blended probability at this quote;
+        # raw model EV is kept only as a research column.
+        blended_ev = None
+        if source["sport"] in BLENDED_SPORTS:
+            blend = _blended(row, source["sport"])
+            if blend is None:
+                exclusions[source["sport"] + "_BLENDED_EV_UNAVAILABLE"] += 1
+                continue
+            blended_ev = blend["probability"] * decimal_odds - 1
+            if blended_ev <= 0:
+                exclusions["NO_POSITIVE_BLENDED_EV"] += 1
+                continue
         explanation = source.get("handicap") or {}
         factors = explanation.get("evidence") or []
         estimated_breakeven = (-price / (100 - price) if price < 0
@@ -329,6 +368,9 @@ def build_current_value_screens(card, *, max_rows=20, now=None):
             "book_raw_breakeven_p": round(estimated_breakeven, 6),
             "quote_age_at_finalization_seconds": round(total_age, 3),
             "raw_estimated_ev": ev,
+            "blended_ev": blended_ev,
+            "rank_ev": blended_ev if blended_ev is not None else ev,
+            "model_version": _model_version(row, source["sport"]),
             "original_model_reported_ev": reported_ev,
             "ev_repriced_at_current_quote": True,
             "prior_ev_differs_from_current_quote": (
@@ -341,7 +383,7 @@ def build_current_value_screens(card, *, max_rows=20, now=None):
             "status": "CURRENT_MODEL_VALUE_SCREEN_NOT_VERIFIED_PLAY",
             "can_be_official_play": False,
         })
-    results.sort(key=lambda x: -x["raw_estimated_ev"])
+    results.sort(key=lambda x: -x["rank_ev"])
     return {"schema": "SPORTSEDGE_CURRENT_VALUE_SCREEN_V1",
             "basis": "PREGAME_FRESH_INDEPENDENT_MODEL_VS_BOOK_ONLY",
             "finalized_at_utc": final_now.isoformat(),
@@ -363,8 +405,8 @@ def render_phone_card(card, *, run_url="", intake_at="", now=None):
              ""]
     lines += ["### Current priced value screens · NOT verified plays", "",
               "Ranked from independently priced pregame quotes. Quotes expire after 180 seconds; refresh before wagering. Model accuracy is not implied.", "",
-              "| Sport | Matchup / selection | Book | Model p | Raw EV | Estimated playable-to | Matchup case |",
-              "| --- | --- | ---: | ---: | ---: | ---: | --- |"]
+              "| Sport | Matchup / selection | Book | EV | Raw model EV (not a price) | Model | Estimated playable-to | Matchup case |",
+              "| --- | --- | ---: | ---: | ---: | --- | ---: | --- |"]
     for entry in current["unverified_model_value_screens"]:
         bet = " ".join(str(v) for v in (entry.get("player_name"), entry["market"], entry["selection"], entry.get("line")) if v is not None)
         why = "; ".join(str(x.get("name")) + " " + str(x.get("value"))
@@ -372,23 +414,30 @@ def render_phone_card(card, *, run_url="", intake_at="", now=None):
         if not why:
             why = "Matchup factors not yet source-backed"
         lines.append(f"| {_safe(entry['sport'])} | {_safe(entry['game'])}: {_safe(bet)} | "
-                     f"{_price(entry['odds'])} | {entry['model_estimate_p']*100:.1f}% | "
-                     f"{entry['raw_estimated_ev']*100:+.1f}% | "
+                     f"{_price(entry['odds'])} | {entry['rank_ev']*100:+.1f}% | "
+                     f"{entry['raw_estimated_ev']*100:+.1f}% | {_safe(entry.get('model_version') or '—')} | "
                      f"{_price(entry['research_playable_to'])} | {_safe(why)} |")
     if not current["unverified_model_value_screens"]:
-        lines.append("| — | No fresh independent positive-EV selection on this submitted board | — | — | — | — | — |")
+        lines.append("| — | No fresh independent positive-EV selection on this submitted board | — | — | — | — | — | — |")
     lines += ["", f"Last verified screen: {_safe(current['finalized_at_utc'])} UTC · Priced screens: {current['total_positive_screens']} · Verified PLAYs: 0 (this surface has no promotion authority).", ""]
     def _rank_ev(r):
         b = r.get("blended")
-        return b["ev"] if b else r.get("estimated_ev")
+        if b:
+            return b["ev"]
+        # CFB without a market blend has no displayable price (Oct 24 ruling).
+        return None if r.get("model_version") else r.get("estimated_ev")
 
     def _rank_p(r):
         b = r.get("blended")
-        return b["probability"] if b else r["probability"]
+        if b:
+            return b["probability"]
+        return None if r.get("model_version") else r["probability"]
 
     def _rank_fair(r):
         b = r.get("blended")
-        return b["fair_odds"] if b else r["fair_odds"]
+        if b:
+            return b["fair_odds"]
+        return None if r.get("model_version") else r["fair_odds"]
 
     stale_ranked = sorted(
         (r for r in view["selections"]
@@ -397,31 +446,34 @@ def render_phone_card(card, *, run_url="", intake_at="", now=None):
         key=_rank_ev, reverse=True)
     if stale_ranked:
         lines += ["### Model value at the SUBMITTED prices · re-check line before betting", "",
-                  "Ranked by EV, highest first. CFB rows use the MARKET-BLENDED price (DK line plus 15% "
+                  "Ranked by EV, highest first. CFB and NFL rows use the MARKET-BLENDED price (DK line plus 15% "
                   "of the model's disagreement); raw model gaps are too noisy to bet directly.", "",
-                  "| # | EV | Game | Selection | DK (submitted) | Model p | Model fair |",
-                  "| ---: | ---: | --- | --- | ---: | ---: | ---: |"]
+                  "| # | EV | Game | Selection | DK (submitted) | Model p | Model fair | Model |",
+                  "| ---: | ---: | --- | --- | ---: | ---: | ---: | --- |"]
         for rank, r in enumerate(stale_ranked[:30], 1):
             name = " ".join(str(x) for x in (r.get("player_name"), r["market"], r["selection"]) if x)
             if r.get("line") is not None and str(r["line"]) not in str(r["selection"]):
                 name += " " + str(r["line"])
             lines.append(f"| {rank} | {100*_rank_ev(r):+.1f}% | {_safe(r['game'])} | {_safe(name)} | "
-                         f"{_price(r['odds'])} | {100*_rank_p(r):.1f}% | {_price(_rank_fair(r))} |")
+                         f"{_price(r['odds'])} | {100*_rank_p(r):.1f}% | {_price(_rank_fair(r))} | "
+                         f"{_safe(r.get('model_version') or '—')} |")
         lines.append("")
     groups = defaultdict(list)
     for row in view["selections"]:
         groups[(str(row.get("kickoff") or ""), row["sport"], row["game"])].append(row)
     for (kickoff, sport, game), rows in sorted(groups.items()):
         lines += [f"### {_safe(sport)} · {_safe(game)}", "", f"Start: {_safe(kickoff)}", "",
-                  "| Selection / market | DK | Status | Est. probability | Est. fair | Est. EV | Reason |",
-                  "| --- | ---: | --- | ---: | ---: | ---: | --- |"]
+                  "| Selection / market | DK | Status | Est. probability | Est. fair | Est. EV | Raw model EV (not a price) | Reason |",
+                  "| --- | ---: | --- | ---: | ---: | ---: | ---: | --- |"]
         for row in rows:
-            p = "—" if row["probability"] is None else f"{100*row['probability']:.1f}%"
-            ev = "—" if row["estimated_ev"] is None else f"{100*row['estimated_ev']:+.1f}%"
+            p = "—" if _rank_p(row) is None else f"{100*_rank_p(row):.1f}%"
+            ev = "—" if _rank_ev(row) is None else f"{100*_rank_ev(row):+.1f}%"
+            raw = ("—" if not row.get("model_version") or row["estimated_ev"] is None
+                   else f"{100*row['estimated_ev']:+.1f}%")
             name = " ".join(str(x) for x in (row.get("player_name"), row["market"], row["selection"]) if x)
             if row.get("line") is not None and str(row["line"]) not in str(row["selection"]):
                 name += " " + str(row["line"])
-            lines.append(f"| {_safe(name)} | {_price(row['odds'])} | {row['status']} | {p} | {_price(row['fair_odds'])} | {ev} | {_safe(row['reason'])} |")
+            lines.append(f"| {_safe(name)} | {_price(row['odds'])} | {row['status']} | {p} | {_price(_rank_fair(row))} | {ev} | {raw} | {_safe(row['reason'])} |")
         described = [r for r in rows if r.get("handicap") and
                      r["handicap"].get("evidence")]
         if described:

@@ -513,7 +513,10 @@ def render_markdown(rows: Sequence[Mapping[str, Any]], *, header: str, notes: Se
     lines += ["", "## Full board", "",
              "| # | Game | Pick | Odds | Win p | Push p | Win p ex-push | Fair | Edge | EV/$ | Status |",
              "|---|---|---|---|---|---|---|---|---|---|---|"]
-    for i, r in enumerate(rows, 1):
+    # Lane 4 (#2447): the full board ranks by EV/$, highest first, regardless of
+    # status. Unpriced rows (no EV) stay on the board, last, with their reason.
+    board_rows = sorted(rows, key=quick_rank, reverse=True)
+    for i, r in enumerate(board_rows, 1):
         fair = r.get("fair_odds")
         ev = r.get("ev_per_dollar")
         odds = _f(r.get("american_odds"))
@@ -540,6 +543,7 @@ def render_markdown(rows: Sequence[Mapping[str, Any]], *, header: str, notes: Se
         )
     lines += ["", "_Win p = engine win probability; Push p = refund probability; Win p ex-push = Win p / (1 − Push p), "
               "the basis for Fair odds and Edge against the two-way no-vig price. EV/$ uses Win p with pushes refunded. "
+              "Rows rank by EV/$, highest first; unpriced rows are listed last with their reason. "
               "The internal qualification score is retained in the JSON/audit artifact but intentionally omitted from the final card._"]
     blocked = [r for r in rows if r.get("scored_status") in {"BLOCKED", "NO_MODEL"}]
     if blocked:
