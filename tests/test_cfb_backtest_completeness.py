@@ -49,3 +49,18 @@ def test_single_season_cannot_masquerade_as_out_of_sample(tmp_path):
     assert result.returncode != 0
     assert "INVALID_EVALUATION_SEASONS" in result.stdout
     assert not (tmp_path / "report.json").exists()
+
+
+def test_duplicate_or_reverse_seasons_rejected(tmp_path):
+    games = tmp_path / "games.json"
+    games.write_text("[]")
+    for seasons in ("2025,2025,2026", "2026,2024"):
+        report = tmp_path / "report.json"
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), "--games-json", str(games),
+             "--seasons", seasons, "--output", str(report)],
+            capture_output=True, text=True, cwd=ROOT, check=False,
+        )
+        assert result.returncode != 0
+        assert "INVALID_EVALUATION_SEASONS" in result.stdout
+        assert not report.exists()
