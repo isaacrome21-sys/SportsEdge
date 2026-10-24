@@ -1,0 +1,105 @@
+"""Forward-only CFB CLV/ROI tracker (research-only, no historical backfill).
+
+A record is accepted only if created within MAX_REGISTRATION_LAG_SECONDS of
+the tracker's wall clock, its quote capture is at/after its own creation and
+strictly before kickoff. Closing prices may be attached only after kickoff;
+settlement only after a close. Summaries never set play_allowed.
+"""
+from __future__ import annotations
+
+import math
+from datetime import datetime, timezone
+from typing import Any, Mapping
+
+MAX_REGISTRATION_LAG_SECONDS = 300
+
+
+class TrackerError(ValueError):
+    pass
+
+
+def _ts(v: Any, name: str) -> datetime:
+    if isinstance(v, datetime):
+        dt = v
+    elif isinstance(v, str) and v.strip():
+        try:
+            dt = datetime.fromisoformat(v.strip().replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise TrackerError(f"{name}_INVALID") from exc
+    else:
+        raise TrackerError(f"{name}_MISSING")
+    if dt.tzinfo is None or dt.utcoffset() is None:
+        raise TrackerError(f"{name}_NAIVE")
+    return dt.astimezone(timezone.utc)
+
+
+def _odds(v: Any, name: str) -> float:
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or -100 < v < 100:
+        raise TrackerError(f"{name}_INVALID")
+    return float(v)
+
+
+def _implied(o: float) -> float:
+    return 100 / (o + 100) if o > 0 else -o / (-o + 100)
+
+
+def _profit(o: float) -> float:
+    return o / 100 if o > 0 else 100 / -o
+
+
+class ForwardTracker:
+    def __init__(self) -> None:
+        self.records: dict[str, dict] = {}
+
+    def add(self, rec: Mapping[str, Any], *, now: datetime) -> None:
+        now = _ts(now, "NOW")
+        rid = rec.get("record_id")
+        if not isinstance(rid, str) or not rid:
+            raise TrackerError("RECORD_ID_MISSING")
+        if rid in self.records:
+            raise TrackerError("RECORD_ID_DUPLICATE")
+        created, cap, ko = _ts(rec.get("created_at"), "CREATED_AT"), _ts(rec.get("captured_at"), "CAPTURED_AT"), _ts(rec.get("kickoff"), "KICKOFF")
+        if created > now:
+            raise TrackerError("CREATED_IN_FUTURE")
+        if (now - created).total_seconds() > MAX_REGISTRATION_LAG_SECONDS:
+            raise TrackerError("HISTORICAL_BACKFILL_REJECTED")
+        if cap < created:
+            raise TrackerError("CAPTURE_BEFORE_CREATION")
+        if cap >= ko:
+            raise TrackerError("CAPTURE_AT_OR_AFTER_KICKOFF")
+        if now >= ko:
+            raise TrackerError("REGISTERED_AFTER_KICKOFF")
+        self.records[rid] = {**dict(rec), "odds": _odds(rec.get("odds"), "ODDS"), "_kickoff": ko,
+                             "closing_odds": None, "result": None}
+
+    def close(self, rid: str, *, closing_odds: Any, closing_line: Any, now: datetime) -> None:
+        r = self.records.get(rid)
+        if r is None:
+            raise TrackerError("UNKNOWN_RECORD")
+        if _ts(now, "NOW") < r["_kickoff"]:
+            raise TrackerError("CLOSE_BEFORE_KICKOFF")
+        if r["closing_odds"] is not None:
+            raise TrackerError("ALREADY_CLOSED")
+        if closing_line != r.get("line"):
+            raise TrackerError("CLOSING_LINE_MISMATCH")
+        r["closing_odds"] = _odds(closing_odds, "CLOSING_ODDS")
+
+    def settle(self, rid: str, *, result: str, now: datetime) -> None:
+        r = self.records.get(rid)
+        if r is None or r["closing_odds"] is None:
+            raise TrackerError("SETTLE_REQUIRES_CLOSE")
+        if result not in ("WIN", "LOSS", "PUSH"):
+            raise TrackerError("RESULT_INVALID")
+        if _ts(now, "NOW") < r["_kickoff"]:
+            raise TrackerError("SETTLE_BEFORE_KICKOFF")
+        r["result"] = result
+
+    def summary(self) -> dict:
+        settled = [r for r in self.records.values() if r["result"]]
+        closed = [r for r in self.records.values() if r["closing_odds"] is not None]
+        units = sum(_profit(r["odds"]) if r["result"] == "WIN" else (-1.0 if r["result"] == "LOSS" else 0.0) for r in settled)
+        clv = [_implied(r["closing_odds"]) - _implied(r["odds"]) for r in closed]
+        return {"n_records": len(self.records), "n_closed": len(closed), "n_settled": len(settled),
+                "roi_units": units, "roi_per_bet": units / len(settled) if settled else None,
+                "mean_clv_implied_prob": sum(clv) / len(clv) if clv else None,
+                "status_label": "SCREEN/NOT_VALIDATED", "play_allowed": False, "forward_only": True}
