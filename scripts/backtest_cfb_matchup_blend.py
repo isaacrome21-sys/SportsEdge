@@ -190,6 +190,12 @@ def _main(argv=None):
         games = fetch(seasons, key)
         Path(args.output).parent.mkdir(parents=True, exist_ok=True)
         Path(args.output).with_name("cfb_lines_games.json").write_text(json.dumps(games))
+    # Explicitly reject unknown or incomplete fixture clocks. Lexicographic
+    # sorting of blank kickoff timestamps can otherwise admit future scores.
+    invalid_clocks = [g.get("id") for g in games if not isinstance(g.get("start"), str)
+                      or not g["start"].strip()]
+    if invalid_clocks:
+        raise SystemExit(f"INVALID_FIXTURE_CLOCKS games={invalid_clocks[:10]}; no weight chosen")
     rows = project(games)
     by_season = defaultdict(list)
     for r in rows:
