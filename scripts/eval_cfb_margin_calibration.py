@@ -12,7 +12,10 @@ prices are used ONLY to score; the model inputs are point-in-time results
 Fit season 2024 (results only, never prices); evaluation season 2025.
 Output is SCREEN / NOT_VALIDATED; nothing here validates a family.
 """
-import argparse, json, math
+import argparse, json, math, os, sys
+
+# Runnable from anywhere without PYTHONPATH: put the repo root on sys.path.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from artifacts.free_models import CONTEXT_KEYS, PRIORS, model_probability, score_means
 
