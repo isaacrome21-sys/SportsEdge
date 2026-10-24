@@ -1,0 +1,47 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "candidate_p_over": 0.5207196908937898,
+  "candidate_p_push": 0.0,
+  "candidate_p_under": 0.4792803091062102,
+  "context_proof": {
+    "confirmed_lineup": "ABSENT",
+    "max_age_seconds": 1200,
+    "path": "runtime/mlb-context/runs/40102581302/2026-10-24/game_849802.json",
+    "plate_umpire": "ABSENT",
+    "retrieved_at": "2026-10-24T14:28:04.742136+00:00"
+  },
+  "entity_name": "Drew Rasmussen",
+  "evaluation_run_id": 37603403636,
+  "first_pitch_at_utc": "2026-10-25T00:00:00+00:00",
+  "fit_sha256": "70a31ff9b995a2d54df87feb2d51e2518fa9cd8593bf6c047970e08557b6ecea",
+  "game_pk": 849802,
+  "line": 5.5,
+  "market": "PITCHER_K",
+  "market_fair_p_over": 0.5749767565413734,
+  "observed_at_utc": "2026-10-24T14:36:05.621096+00:00",
+  "over_odds": -156,
+  "pitcher_id": 656876,
+  "pitcher_team_id": 139,
+  "predicted_k_per_batter_faced": 0.2497693694365749,
+  "projected_batters_faced": 23,
+  "provider_event_id": "34887981",
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-24/props_20261024T143606.135605Z.json",
+  "receipt_sha256": "4551068ca76abcc0bb660ab72dd007be6954afa49d1da846702a388a4de8a2d5",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_PREDICTION_V1",
+  "statcast_proof": {
+    "head_sha": "6bcc8322d606c0ae5b21339f6cd70b2ae5de97a5",
+    "manifest_path": "runtime/statcast/runs/40010205443/2026-10-23/manifest.json",
+    "pitcher_row_sha256": "048d991cee6470ae90b5638c6db2cf18f6b01af828cbac83c8ccec880a857084",
+    "pitchers_path": "runtime/statcast/runs/40010205443/2026-10-23/pitchers.json",
+    "provenance_path": "runtime/statcast/runs/40010205443/2026-10-23/provenance.json",
+    "retrieved_at": "2026-10-23T19:18:08.324756+00:00",
+    "run_id": "40010205443"
+  },
+  "status": "CAPTURED_PROSPECTIVE",
+  "under_odds": 122
+}
