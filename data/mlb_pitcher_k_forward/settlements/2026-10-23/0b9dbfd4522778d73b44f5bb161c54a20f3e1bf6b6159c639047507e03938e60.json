@@ -1,0 +1,23 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "candidate_brier": 0.07321232279749906,
+  "candidate_log_loss": 0.3155025066882038,
+  "candidate_minus_market_log_loss": -0.4697138600219162,
+  "game_pk": 849805,
+  "line": 6.5,
+  "market_brier": 0.29591312704578365,
+  "market_log_loss": 0.78521636671012,
+  "outcome_over": false,
+  "pitcher_id": 694819,
+  "prediction_sha256": "0b9dbfd4522778d73b44f5bb161c54a20f3e1bf6b6159c639047507e03938e60",
+  "realized_strikeouts": 3,
+  "receipt_sha256": "ed2aeb25cda8cbfe9770202293ec819aa76947e295665c6e7c608428d537edce",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_SETTLEMENT_V1",
+  "settled_at_utc": "2026-10-24T05:59:15.636983+00:00",
+  "status": "GRADED"
+}
