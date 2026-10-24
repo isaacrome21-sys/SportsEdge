@@ -101,3 +101,34 @@ def test_mlb_pitcher_ignores_missing_pitch_counts_no_fake_zero():
     pool = [{"strikeouts": 2, "outs": 15} for _ in range(6)]
     assert _pitcher_matchup_factors(
         pool, market="PITCHER_PITCHES", side="UNDER", line=70) == []
+
+@pytest.mark.parametrize("probability,minimum_profitable_price", [
+    (0.4, 151),      # Fair +150 is break-even; require +151.
+    (0.5, 101),      # EVEN is break-even; require +101.
+    (0.55, -122),    # Fair about -122.22; -122 is profitable.
+    (0.6, -149),     # Fair -150 is break-even; require -149.
+    (0.8, -399),     # Fair -400 is break-even; require -399.
+    (0.502, -100),   # American quotes have no prices from -99 to +99.
+])
+def test_positive_ev_playable_to_excludes_exact_fair_price(probability, minimum_profitable_price):
+    screen = handicap_explanation({
+        "sport": "CFB", "market": "SPREAD",
+        "model_probability": probability, "odds_american": -110,
+        "quote_freshness": {"code": QUOTE_FRESH},
+    }, straight_cap=-10000)["research_price_screen"]
+    price = screen["research_playable_to_positive_ev"]
+    assert price == minimum_profitable_price
+    decimal = 1 + (price / 100 if price > 0 else 100 / -price)
+    assert probability * decimal - 1 > 0
+    assert screen["authority"] == "RESEARCH_MATH_ONLY_NOT_A_VERIFIED_EDGE"
+
+
+def test_fractional_american_price_is_not_silently_truncated():
+    row = {"sport": "MLB", "market": "PITCHER_K", "model_probability": 0.6,
+           "odds_american": -110.5, "quote_freshness": {"code": QUOTE_FRESH}}
+    result = handicap_explanation(row)
+    assert result["research_price_screen"] is None
+    assert "NO_VALID_BOOK_PRICE" in result["missing"]
+    assert result["verified_play"] is False
+    # Integral-valued floats from JSON-normalizing pipelines remain accepted.
+    assert handicap_explanation({**row, "odds_american": -110.0})["research_price_screen"] is not None
