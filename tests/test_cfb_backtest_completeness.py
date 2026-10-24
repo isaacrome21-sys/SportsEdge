@@ -99,3 +99,20 @@ def test_missing_kickoff_clock_is_rejected(tmp_path):
     assert result.returncode != 0
     assert "INVALID_FIXTURE_CLOCKS" in result.stdout
     assert not report.exists()
+
+
+def test_malformed_or_naive_kickoff_rejected(tmp_path):
+    for clock in ("not-a-date", "2024-09-01T12:00:00"):
+        fixture = tmp_path / "games.json"
+        fixture.write_text(json.dumps([dict(season=2024, start=clock, id="bad-clock",
+                                            home="A", away="B", hs=28, **{"as": 21},
+                                            spread=0.0, total=49.0)]))
+        report = tmp_path / "report.json"
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), "--games-json", str(fixture),
+             "--seasons", "2024,2025", "--output", str(report)],
+            capture_output=True, text=True, cwd=ROOT, check=False,
+        )
+        assert result.returncode != 0
+        assert "INVALID_FIXTURE_CLOCKS" in result.stdout
+        assert not report.exists()
