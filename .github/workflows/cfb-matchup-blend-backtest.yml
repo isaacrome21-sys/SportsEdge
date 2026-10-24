@@ -7,7 +7,7 @@ name: cfb-matchup-blend-backtest
 on:
   push:
     branches: [main]
-    paths: ['scripts/backtest_cfb_matchup_blend.py']
+    paths: ['scripts/backtest_cfb_matchup_blend.py', '.github/workflows/cfb-matchup-blend-backtest.yml']
   workflow_dispatch:
 
 permissions:
