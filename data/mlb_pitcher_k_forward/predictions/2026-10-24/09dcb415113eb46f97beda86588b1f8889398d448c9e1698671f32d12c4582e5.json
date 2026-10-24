@@ -1,0 +1,47 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "candidate_p_over": 0.5726079399403268,
+  "candidate_p_push": 0.0,
+  "candidate_p_under": 0.4273920600596733,
+  "context_proof": {
+    "confirmed_lineup": "PRESENT",
+    "max_age_seconds": 1200,
+    "path": "runtime/mlb-context/runs/40130616386/2026-10-24/game_849802.json",
+    "plate_umpire": "PRESENT",
+    "retrieved_at": "2026-10-24T20:38:04.075882+00:00"
+  },
+  "entity_name": "Logan Henderson",
+  "evaluation_run_id": 37603403636,
+  "first_pitch_at_utc": "2026-10-25T00:00:00+00:00",
+  "fit_sha256": "70a31ff9b995a2d54df87feb2d51e2518fa9cd8593bf6c047970e08557b6ecea",
+  "game_pk": 849802,
+  "line": 4.5,
+  "market": "PITCHER_K",
+  "market_fair_p_over": 0.5400039315903282,
+  "observed_at_utc": "2026-10-24T20:54:30.070146+00:00",
+  "over_odds": -134,
+  "pitcher_id": 701656,
+  "pitcher_team_id": 158,
+  "predicted_k_per_batter_faced": 0.22856259182240998,
+  "projected_batters_faced": 22,
+  "provider_event_id": "34887981",
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-24/props_20261024T205430.708450Z.json",
+  "receipt_sha256": "09dcb415113eb46f97beda86588b1f8889398d448c9e1698671f32d12c4582e5",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_PREDICTION_V1",
+  "statcast_proof": {
+    "head_sha": "6cd73073f32ace779fe7fa162f2a100cefb0cdb1",
+    "manifest_path": "runtime/statcast/runs/40119531928/2026-10-24/manifest.json",
+    "pitcher_row_sha256": "9c7b91a578e6c3da95a57c3bec29c425fc115f70b5df7793652d637c81fc8351",
+    "pitchers_path": "runtime/statcast/runs/40119531928/2026-10-24/pitchers.json",
+    "provenance_path": "runtime/statcast/runs/40119531928/2026-10-24/provenance.json",
+    "retrieved_at": "2026-10-24T18:12:04.888540+00:00",
+    "run_id": "40119531928"
+  },
+  "status": "CAPTURED_PROSPECTIVE",
+  "under_odds": 105
+}
