@@ -155,7 +155,10 @@ def design(games, season, preds, rest, variant):
 
 
 def fit_stack(rows):
-    Xm = np.array([[1.0] + f for _, f, _ in rows]); ym = np.array([g["hs"] - g["as"] for g, _, _ in rows])
+    # t273c F1: the margin recalibration is fit on FBS-vs-FBS games only, so
+    # FBS-vs-FCS blowouts cannot leak home-field inflation into the intercept.
+    mrows = [r for r in rows if r[0].get("fbs_both")]
+    Xm = np.array([[1.0] + f for _, f, _ in mrows]); ym = np.array([g["hs"] - g["as"] for g, _, _ in mrows])
     Xt = np.array([[1.0] + f for _, _, f in rows]); yt = np.array([g["hs"] + g["as"] for g, _, _ in rows])
     wm = np.linalg.lstsq(Xm, ym, rcond=None)[0]; wt = np.linalg.lstsq(Xt, yt, rcond=None)[0]
     sdm = float(np.std(ym - Xm @ wm, ddof=Xm.shape[1])); sdt = float(np.std(yt - Xt @ wt, ddof=Xt.shape[1]))
@@ -192,7 +195,12 @@ def score(rows, lines, wm, wt, sdm, sdt, beta=None):
     m = collections.Counter(); cal = collections.defaultdict(lambda: [0, 0, 0.0])
     hits = {th: {"ats": [0, 0], "ou": [0, 0]} for th in (0.0, 2.5, 3.0, 5.0)}
     clv = {"spread": [0, 0], "total": [0, 0]}
+    diffs = {"spread": [], "total": [], "ml": []}
+    merr = collections.defaultdict(list)
     for g, fm, ft in rows:
+        Mx = float(np.dot([1.0] + fm, wm))
+        key = "neutral" if g.get("neutral") else ("fbs_vs_fbs" if g.get("fbs_both") else "non_fbs")
+        merr[key].append(Mx - (g["hs"] - g["as"]))
         ln = lines.get(g["gid"])
         if not ln:
             continue
@@ -202,6 +210,7 @@ def score(rows, lines, wm, wt, sdm, sdt, beta=None):
         if cov != 0:
             p = phi(beta["s"] * (M - cm) / sdm); y = cov > 0
             m["n_s"] += 1; m["b_s"] += (p - y) ** 2; m["b_s_mkt"] += 0.25
+            diffs["spread"].append((p - y) ** 2 - 0.25)
             b = min(9, int(p * 10)); cal[b][0] += 1; cal[b][1] += y; cal[b][2] += p
             m["dog"] += ((M > cm) == (ln["spread"] > 0))
             for th in hits:
@@ -210,12 +219,14 @@ def score(rows, lines, wm, wt, sdm, sdt, beta=None):
         if ov != 0:
             p = phi(beta["t"] * (T - ln["total"]) / sdt); y = ov > 0
             m["n_t"] += 1; m["b_t"] += (p - y) ** 2; m["b_t_mkt"] += 0.25; m["over"] += p > 0.5
+            diffs["total"].append((p - y) ** 2 - 0.25)
             for th in hits:
                 if abs(T - ln["total"]) >= th:
                     hits[th]["ou"][1] += 1; hits[th]["ou"][0] += ((T > ln["total"]) == y)
         if ln["ml_nv"] is not None and margin != 0:
             p = phi(M / sdm); y = margin > 0
             m["n_ml"] += 1; m["b_ml"] += (p - y) ** 2; m["b_ml_mkt"] += (ln["ml_nv"] - y) ** 2
+            diffs["ml"].append((p - y) ** 2 - (ln["ml_nv"] - y) ** 2)
         if ln["spread_open"] is not None and ln["spread_open"] != ln["spread"]:
             mv_home = ln["spread"] < ln["spread_open"]  # line moved toward home
             clv["spread"][1] += 1; clv["spread"][0] += ((M > -ln["spread_open"]) == mv_home)
@@ -233,8 +244,20 @@ def score(rows, lines, wm, wt, sdm, sdt, beta=None):
            "hits": {str(th): {k: {"hit": v[0], "n": v[1], "rate": round(v[0] / v[1], 3) if v[1] else None,
                                    "wilson95": wilson(v[0], v[1])} for k, v in d.items()} for th, d in hits.items()},
            "clv_agreement": {k: {"agree": v[0], "n": v[1], "rate": round(v[0] / v[1], 3) if v[1] else None,
-                                 "wilson95": wilson(v[0], v[1])} for k, v in clv.items()}}
+                                 "wilson95": wilson(v[0], v[1])} for k, v in clv.items()},
+           "mean_margin_error_pred_minus_actual": {k: {"n": len(v), "mean": round(sum(v) / len(v), 3)}
+                                                   for k, v in merr.items()},
+           "brier_diff_model_minus_market_ci95": {k: boot_ci(v) for k, v in diffs.items()}}
     return out
+
+
+def boot_ci(d, n=2000, seed=20261023):
+    """Paired bootstrap 95% CI of mean(model Brier - market Brier)."""
+    if not d:
+        return None
+    a = np.array(d); rng = np.random.default_rng(seed)
+    means = a[rng.integers(0, len(a), size=(n, len(a)))].mean(axis=1)
+    return [round(float(np.percentile(means, 2.5)), 5), round(float(np.percentile(means, 97.5)), 5)]
 
 
 def main():
@@ -284,6 +307,21 @@ def main():
         print("+".join(v), beta, o["brier_spread"], o["brier_spread_market"], o["brier_total"], o["brier_ml"],
               o["brier_ml_market"], flush=True)
     json.dump(report, open("t273_backtest.json", "w"), indent=1)
+    # Ruling 2026-10-23i: per-market gate metrics, recorded (never hand-set).
+    o = report["ablation"]["pts"]["oos_2025"]; ci = o["brier_diff_model_minus_market_ci95"]
+    gate = {"ruling": "2026-10-23i", "source": "scripts/cfb_calibration/backtest_opponent_ratings.py",
+            "split": "fit 2024 / score 2025 out of sample; market = closing no-vig",
+            "oos_2025_fbs_vs_fbs_mean_margin_error":
+                o["mean_margin_error_pred_minus_actual"]["fbs_vs_fbs"]["mean"],
+            "mean_margin_error_by_population": o["mean_margin_error_pred_minus_actual"],
+            "markets": {
+                "OPP:SPREAD": {"n": o["n_spread"], "model_brier": o["brier_spread"],
+                               "market_no_vig_brier": o["brier_spread_market"], "diff_ci95": ci["spread"]},
+                "OPP:TOTAL": {"n": o["n_total"], "model_brier": o["brier_total"],
+                              "market_no_vig_brier": o["brier_total_market"], "diff_ci95": ci["total"]},
+                "OPP:ML": {"n": o["n_ml"], "model_brier": o["brier_ml"],
+                           "market_no_vig_brier": o["brier_ml_market"], "diff_ci95": ci["ml"]}}}
+    json.dump(gate, open("cfb_market_gate_metrics.json", "w"), indent=1)
 
 
 if __name__ == "__main__":

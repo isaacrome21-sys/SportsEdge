@@ -1,5 +1,25 @@
 # CFB opponent-adjusted ratings (t273, 2026-10-24) — SCREEN / NOT_VALIDATED
 
+## t273c revision (re-audit fixes; SUPERSEDES t273b numbers below)
+
+* **F1:** margin recalibration now fit on FBS-vs-FBS 2024 games only:
+  margin = 0.8376 + 0.8318*gap, sd_margin 15.949 (sd_total 16.188 unchanged).
+  2025 OOS mean margin error (pred − actual): **FBS-vs-FBS +0.11 (n 753)**
+  (was −1.99); neutral −2.51 (n 55); non-FBS −15.67 (n 126 — the model badly
+  under-predicts FBS-vs-FCS margins; those are blocked anyway). beta (fit using
+  2024 closing lines): spread 0.02, total 0.42.
+* 2025 OOS Brier vs closing no-vig (paired bootstrap 95% CI of model − market):
+  spread 0.2499 vs 0.25 [−0.00032, +0.00018]; total 0.252 vs 0.25
+  [−0.0009, +0.00482]; ML 0.1795 vs 0.1693 [+0.00353, +0.01675].
+  **Does not beat the market in any market.**
+* ATS gap>=2.5: 296/566 = 0.523 [0.482–0.564]; >=3: 262/506 = 0.518 [0.474–0.561].
+  O/U >=2.5: 267/525 = 0.509 [0.466–0.551]; >=3: 232/455 = 0.510 [0.464–0.556].
+  CLV agreement spread 434/795 = 0.546 [0.511–0.580], total 469/832 = 0.564 [0.530–0.597].
+* **F2 / ruling 2026-10-23i:** every CFB market (opp-adjusted spread/total/ML,
+  t272 fallback, halves, team totals) is gated by `sportsedge/sports/cfb/market_gate.py`
+  from `docs/cfb_market_gate_metrics_20261023i.json`; all are currently blocked
+  (`WATCH_CFB_NOT_BETTER_THAN_MARKET`), numbers still shown. See GROK_RULINGS.md.
+
 ## t273b revision (audit fixes) — these numbers SUPERSEDE the t273 numbers below
 
 SCREEN / NOT_VALIDATED, play_allowed=false. **It does not beat the closing market.**
