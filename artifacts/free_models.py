@@ -1019,6 +1019,21 @@ ANCHOR_WEIGHT = 0.15  # non-CFB research prior only; RETIRED for CFB (t277)
 CFB_ANCHOR_WEIGHT = 0.0
 CFB_ANCHOR_WEIGHT_SOURCE = "OOS_GATE_RULING_2026-10-23i_MARKET_ONLY"
 CFB_LANE_B_STATUS = "RETIRED"
+CFB_MARKET_ONLY_STATUS = "WATCH_CFB_MARKET_ONLY_NO_VALIDATED_WEIGHT"
+UNVALIDATED_ADJ_STATUS = "WATCH_UNVALIDATED_INJURY_WEATHER_ADJ"
+_UNVALIDATED_ADJ_KEYS = ("home_injury_pts", "away_injury_pts", "weather_total_adj")
+
+
+def unvalidated_adjustment_gate(status, reason, context):
+    """Injury and weather deductions are UNCALIBRATED heuristics (locked
+    decision 2026-10-24). A row whose projection includes any nonzero one
+    may be displayed but can never be an actionable positive-EV candidate."""
+    if status != POSITIVE_EV_STATUS:
+        return status, reason
+    used = [k for k in _UNVALIDATED_ADJ_KEYS if (context or {}).get(k) not in (None, 0, 0.0)]
+    if not used:
+        return status, reason
+    return UNVALIDATED_ADJ_STATUS, "UNCALIBRATED_ADJUSTMENT:" + ",".join(used)
 POSITIVE_EV_STATUS = "RESEARCH_POSITIVE_EV_UNVALIDATED"
 NFL_SIDE_WATCH_STATUS = "WATCH_NFL_SIDE_UNVALIDATED"
 
@@ -1428,6 +1443,16 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
         status = "WATCH_NBA_GAME_FAILED_VALIDATION"
         reason = ("NBA_GAME_MARKET_FAILED_ACCURACY_TEST:"
                   "NO_AUTHORIZED_NEW_CANDIDATE_OR_MARKET_SCREEN")
+    elif sport == "CFB" and market in ("ML", "SPREAD", "TOTAL"):
+        # Locked decision 2026-10-24: no CFB market passes ruling
+        # 2026-10-23i and the 15% blend is retired, so the only
+        # evidence-backed CFB view is market-only. The model projection is
+        # shown for research but never claims an edge. (Card audit: CFB
+        # projected totals regress toward ~55 with slope 0.40 vs the line,
+        # so the over/under "lean" just tracks whether the line is low/high.)
+        status = CFB_MARKET_ONLY_STATUS
+        reason = ("CFB_NO_MARKET_PASSES_RULING_2026-10-23i:MARKET_ONLY_FALLBACK:"
+                  "15PCT_BLEND_RETIRED")
     elif price < -165:
         status = "PRICE_CAP"
     elif primary["ev_per_dollar"] >= min_ev:
@@ -1442,6 +1467,7 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
     # When the anchored Lane B view is the primary view, its +EV is
     # anchored research only -- it can never take the positive-EV play
     # status. Demote to a named WATCH status with the mechanism visible.
+    status, reason = unvalidated_adjustment_gate(status, reason, context)
     if pricing_lane == LANE_B and status == POSITIVE_EV_STATUS:
         status = ANCHORED_WATCH_STATUS
         reason = (ANCHORED_PLAY_BLOCK + ":"
