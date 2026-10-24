@@ -6,10 +6,12 @@ The original card remains the evidence record. Intake supplies identity only.
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from datetime import datetime, timezone
 from math import isfinite
 import re
 
 from sportsedge.quote_freshness import is_fresh
+from sportsedge.handicap_explanations import handicap_explanation
 
 CANDIDATE_STATUSES = frozenset({
     "RESEARCH_POSITIVE_EV_UNVALIDATED", "RESEARCH_CANDIDATE_NOT_VALIDATED",
@@ -191,13 +193,142 @@ def _price(value):
     return "—" if value is None else f"{value:+g}"
 
 
+def _parsed_utc(value):
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def build_current_value_screens(card, *, max_rows=20):
+    """Rank positive *independent* research prices, with no historical clock.
+
+    This is deliberately separate from PLAY/OFFICIAL promotion. A fresh quote
+    and a positive raw estimated EV can establish a *screen*, not establish
+    that the model is calibrated or that the bettor should stake a wager.
+    """
+    view = build_phone_card(card)
+    as_of = _parsed_utc(card.get("as_of_utc"))
+    results, exclusions = [], Counter()
+    raw_rows = card["evaluated_rows"]
+    for source, row in zip(view["selections"], raw_rows):
+        status = str(row.get("status") or "MISSING_STATUS")
+        if (status.startswith("BLOCKED") or status in
+                {"NO_MODEL_OR_MARKET", "NO_ENGINE", "NO_QUOTE", "MISSING_STATUS"}):
+            exclusions["BLOCKED_OR_UNPRICED"] += 1
+            continue
+        if status not in CANDIDATE_STATUSES | {
+                "PASS", "BELOW_THRESHOLD", "WATCH_BELOW_EV_FLOOR", "PRICE_CAP", "WATCH_PRICE_CAP"}:
+            exclusions["NONCANONICAL_RESEARCH_PRICE_STATUS"] += 1
+            continue
+        if status == "BLOCKED_IL_COLLEGE":
+            exclusions["ILLINOIS_COLLEGE_PROHIBITION"] += 1
+            continue
+        p, reported_ev, anchored = _metrics(row)
+        provenance = row.get("pricing_provenance")
+        if anchored or (not isinstance(provenance, dict)
+                        or provenance.get("lane") != "INDEPENDENT"):
+            exclusions["NO_INDEPENDENT_PROJECTION"] += 1
+            continue
+        independent_projection = row.get("independent_projection")
+        if (isinstance(independent_projection, dict) and
+                independent_projection.get("paired_market_status") !=
+                "EXACT_DK_TWO_SIDED_NO_VIG_RESEARCH"):
+            exclusions["OPPOSITE_SIDE_QUOTE_NOT_VERIFIED"] += 1
+            continue
+        notes = row.get("context_notes")
+        if notes is not None and not isinstance(notes, (list, tuple)):
+            exclusions["LIVE_CONTEXT_METADATA_MALFORMED"] += 1
+            continue
+        if any("NO_FETCH_MANUAL_MODE" in str(note) for note in (notes or [])):
+            exclusions["LIVE_CONTEXT_NOT_VERIFIED"] += 1
+            continue
+        if p is None:
+            exclusions["NO_MODEL_PROBABILITY"] += 1
+            continue
+        if not is_fresh(row.get("quote_freshness")):
+            exclusions["NO_VERIFIED_CURRENT_QUOTE"] += 1
+            continue
+        kickoff = _parsed_utc(source.get("kickoff"))
+        if as_of is None or kickoff is None or as_of >= kickoff:
+            exclusions["PREGAME_CLOCK_UNVERIFIED_OR_STARTED"] += 1
+            continue
+        price = source.get("odds")
+        if price is None or -100 < price < 100 or price < -165:
+            exclusions["MISSING_QUOTE_OR_PRICE_CAP"] += 1
+            continue
+        decimal_odds = 1 + (100 / -price if price < 0 else price / 100)
+        # A model's stored EV can refer to an earlier bookmaker price.
+        # Reprice from the actual current quote on *every* card render.
+        ev = p * decimal_odds - 1
+        if ev <= 0:
+            exclusions["NO_POSITIVE_ESTIMATED_EV"] += 1
+            continue
+        explanation = source.get("handicap") or {}
+        factors = explanation.get("evidence") or []
+        estimated_breakeven = (-price / (100 - price) if price < 0
+                               else 100 / (100 + price))
+        screen = (explanation.get("research_price_screen") or
+                  handicap_explanation(row).get("research_price_screen") or {})
+        results.append({
+            "game": source["game"], "sport": source["sport"],
+            "market": source["market"], "selection": source["selection"],
+            "player_name": source.get("player_name"), "line": source.get("line"),
+            "odds": price, "model_estimate_p": p,
+            "book_raw_breakeven_p": round(estimated_breakeven, 6),
+            "raw_estimated_ev": ev,
+            "original_model_reported_ev": reported_ev,
+            "ev_repriced_at_current_quote": True,
+            "prior_ev_differs_from_current_quote": (
+                reported_ev is not None and abs(reported_ev - ev) > .01),
+            "research_playable_to": screen.get("research_playable_to_positive_ev"),
+            "supporting_factors": [x for x in factors if x.get("direction") == "SUPPORTS"],
+            "opposing_factors": [x for x in factors if x.get("direction") == "OPPOSES"],
+            "coverage_warning": (None if factors else "MATCHUP_EXPLANATION_NOT_YET_SOURCED"),
+            "card_status": source["status"],
+            "status": "CURRENT_MODEL_VALUE_SCREEN_NOT_VERIFIED_PLAY",
+            "can_be_official_play": False,
+        })
+    results.sort(key=lambda x: -x["raw_estimated_ev"])
+    return {"schema": "SPORTSEDGE_CURRENT_VALUE_SCREEN_V1",
+            "basis": "PREGAME_FRESH_INDEPENDENT_MODEL_VS_BOOK_ONLY",
+            "historical_tests_required_to_display": False,
+            "verified_plays": 0,
+            "unverified_model_value_screens": results[:max_rows],
+            "total_positive_screens": len(results),
+            "exclusions": dict(sorted(exclusions.items()))}
+
+
 def render_phone_card(card, *, run_url="", intake_at=""):
     view = build_phone_card(card)
+    current = build_current_value_screens(card)
     coverage = view["coverage"]
     lines = ["## SportsEdge · RUN IT", "",
              f"Snapshot: {_safe(view['as_of_utc'])}",
              f"{coverage['input_rows']} selections · {coverage['distinct_market_families']} market families on this board.",
              ""]
+    lines += ["### Current priced value screens · NOT verified plays", "",
+              "Ranked from current pregame quotes and independent model estimates. No backtest waiting period; model accuracy is not implied.", "",
+              "| Sport | Matchup / selection | Book | Model p | Raw EV | Estimated playable-to | Matchup case |",
+              "| --- | --- | ---: | ---: | ---: | ---: | --- |"]
+    for entry in current["unverified_model_value_screens"]:
+        bet = " ".join(str(v) for v in (entry.get("player_name"), entry["market"], entry["selection"], entry.get("line")) if v is not None)
+        why = "; ".join(str(x.get("name")) + " " + str(x.get("value"))
+                        for x in entry["supporting_factors"])
+        if not why:
+            why = "Matchup factors not yet source-backed"
+        lines.append(f"| {_safe(entry['sport'])} | {_safe(entry['game'])}: {_safe(bet)} | "
+                     f"{_price(entry['odds'])} | {entry['model_estimate_p']*100:.1f}% | "
+                     f"{entry['raw_estimated_ev']*100:+.1f}% | "
+                     f"{_price(entry['research_playable_to'])} | {_safe(why)} |")
+    if not current["unverified_model_value_screens"]:
+        lines.append("| — | No fresh independent positive-EV selection on this submitted board | — | — | — | — | — |")
+    lines += ["", f"Priced screens: {current['total_positive_screens']} · Verified PLAYs: 0 (this surface has no promotion authority).", ""]
     groups = defaultdict(list)
     for row in view["selections"]:
         groups[(str(row.get("kickoff") or ""), row["sport"], row["game"])].append(row)
