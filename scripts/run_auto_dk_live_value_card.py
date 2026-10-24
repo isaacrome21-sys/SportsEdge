@@ -21,8 +21,16 @@ from sportsedge.auto_dk_canonical_intake import bind_capture, SUPPORTED_SPORTS
 
 
 def run_capture_directory(directory: Path, *, now: datetime, runner=None,
-                          render=None, max_games: int | None = None) -> tuple[dict, dict | None, str]:
-    """Build one current-value board from already-paid DK snapshot files."""
+                          render=None, max_games: int | None = None,
+                          form2_bundles_dir: Path | None = None,
+                          form2_manifest_sha256: str | None = None) -> tuple[dict, dict | None, str]:
+    """Build one current-value board from already-paid DK snapshot files.
+
+    form2_bundles_dir / form2_manifest_sha256 pass straight through to the
+    canonical runner's Form 2 loader. The pin is only ever the caller's
+    external value (CLI or runner config); it is never derived from the
+    archive or this run, so NO PIN means NO ADMISSION (CFB stays blocked).
+    """
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("CURRENT_DK_NOW_TIMEZONE_REQUIRED")
     if max_games is not None and (isinstance(max_games, bool)
@@ -86,8 +94,14 @@ def run_capture_directory(directory: Path, *, now: datetime, runner=None,
         return audit, None, ("## SportsEdge · Current value screen\n\n"
                              "No fresh paired DK game-market quotes in the existing capture.\n"
                              "Nothing is inferred or backfilled.\n")
+    extra = {}
+    if form2_bundles_dir is not None:
+        extra = {"form2_bundles_dir": form2_bundles_dir,
+                 "form2_manifest_sha256": form2_manifest_sha256}
+        audit["form2_bundles_dir_supplied"] = True
+        audit["form2_external_pin_supplied"] = form2_manifest_sha256 is not None
     card = runner({"lines": lines}, now=now, as_of=now.isoformat(),
-                  auto_context=True)
+                  auto_context=True, **extra)
     if (not isinstance(card, dict) or
             len(card.get("evaluated_rows") or []) != len(lines)):
         raise ValueError("CANONICAL_VALUE_CARD_ROW_COUNT_INVALID")
@@ -106,11 +120,18 @@ def main() -> int:
     parser.add_argument("--out-dir", type=Path, default=Path("artifacts/auto_dk_cards"))
     parser.add_argument("--max-games", type=int, default=None,
                         help="Process N earliest games first; account for every deferred event")
+    parser.add_argument("--form2-bundles-dir", type=Path, default=None)
+    parser.add_argument("--form2-manifest-sha256", default=None,
+                        help="EXTERNAL pin (owner-supplied); never computed here")
     args = parser.parse_args()
+    pin = args.form2_manifest_sha256 or None
+    if pin is not None and not (len(pin) == 64 and all(c in "0123456789abcdef" for c in pin)):
+        parser.error("form2-manifest-sha256 must be 64 lowercase hex")
     now = datetime.now(timezone.utc)
     try:
-        audit, card, markdown = run_capture_directory(args.input_dir, now=now,
-                                                      max_games=args.max_games)
+        audit, card, markdown = run_capture_directory(
+            args.input_dir, now=now, max_games=args.max_games,
+            form2_bundles_dir=args.form2_bundles_dir, form2_manifest_sha256=pin)
         result_code = 0
     except Exception as exc:
         # The source capture remains intact. Emit an explicit failure artifact

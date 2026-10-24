@@ -125,8 +125,14 @@ def ourlads_index(debug_dir=None):
         Path(debug_dir, "ourlads_index.html").write_text(html, encoding="utf-8")
     links = {}
     # Current OurLads index: depth-chart.aspx?s=<slug>&id=<id> (& may be &amp;).
-    for s, i in re.findall(r"depth-chart\.aspx\?s=([A-Za-z0-9-]+)&(?:amp;)?id=(\d+)", html):
-        links.setdefault(s.lower(), f"{OURLADS_INDEX}depth-chart.aspx?s={s}&id={i}")
+    # Some slugs carry a literal space ("utah state"); the key is hyphenated
+    # and the URL percent-encodes the space so urlopen can fetch it.
+    for s, i in re.findall(r"depth-chart\.aspx\?s=([A-Za-z0-9 -]+)&(?:amp;)?id=(\d+)", html):
+        s = s.strip()
+        if not s:
+            continue
+        links.setdefault(s.lower().replace(" ", "-"),
+                         f"{OURLADS_INDEX}depth-chart.aspx?s={s.replace(' ', '%20')}&id={i}")
     # Anchor-text index: lets a team match by its displayed name when the
     # slug is abbreviated (e.g. "utah-st", "miami-oh-").
     for s, i, text in re.findall(
@@ -170,15 +176,55 @@ def ourlads_url(links, intake_name, team):
     raise ValueError(f"OURLADS_TEAM_NOT_FOUND [{OURLADS_DIAG}]")
 
 
+def lines_from_auto_capture(snapshot):
+    """Form 2 capture lines from the automatic paid DK CFB capture.
+
+    Replaces the manual "[CFB FORM2]" issue paste: the fixtures come from the
+    already-captured DK board (no new sportsbook call). Only identity fields
+    move across; prices are not needed for Form 2 and none are invented.
+    """
+    if not isinstance(snapshot, dict) or str(snapshot.get("sport") or "").upper() != "CFB":
+        raise ValueError("AUTO_CAPTURE_NOT_CFB")
+    if snapshot.get("status") != "READY":
+        raise ValueError("AUTO_CAPTURE_NOT_READY")
+    games = snapshot.get("games")
+    if not isinstance(games, list):
+        raise ValueError("AUTO_CAPTURE_GAMES_NOT_LIST")
+    lines, seen = [], set()
+    for g in games:
+        if not isinstance(g, dict):
+            continue
+        away, home, ko = g.get("away"), g.get("home"), g.get("commence_time")
+        if not (isinstance(away, str) and isinstance(home, str) and isinstance(ko, str)
+                and away.strip() and home.strip() and away != home):
+            continue
+        try:
+            iso_z(ko)
+        except (ValueError, TypeError):
+            continue
+        if (away, home) in seen:
+            continue
+        seen.add((away, home))
+        lines.append({"sport": "CFB", "away": away, "home": home, "commence_time": ko})
+    return {"sport": "CFB", "lines": lines}
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
-    ap.add_argument("--lines", type=Path, required=True)
+    src = ap.add_mutually_exclusive_group(required=True)
+    src.add_argument("--lines", type=Path)
+    src.add_argument("--auto-dk-capture", type=Path,
+                     help="artifacts/auto_dk/cfb_odds.json from the automatic run")
     ap.add_argument("--archive", type=Path, required=True)
     ap.add_argument("--resolved-lines", type=Path, required=True)
     ap.add_argument("--report", type=Path, required=True)
     args = ap.parse_args(argv)
 
-    data = json.loads(args.lines.read_text(encoding="utf-8"))
+    if args.auto_dk_capture is not None:
+        data = lines_from_auto_capture(
+            json.loads(args.auto_dk_capture.read_text(encoding="utf-8")))
+    else:
+        data = json.loads(args.lines.read_text(encoding="utf-8"))
     rows = data["lines"] if isinstance(data, dict) else data
     sport = (data.get("sport") if isinstance(data, dict) else None) or "CFB"
     games = {}

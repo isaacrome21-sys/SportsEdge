@@ -134,8 +134,8 @@ def bind_capture(snapshot: Mapping[str, Any], *, now: datetime):
                                  "market": source_market,
                                  "reason": "PAIR_PRICE_OR_THRESHOLD_INVALID"})
                 continue
-            for side, threshold, odds in sides:
-                lines.append({
+            for index, (side, threshold, odds) in enumerate(sides):
+                row = {
                     "sport": sport, "away": away, "home": home,
                     "kickoff": kickoff.isoformat(),
                     "market": MARKET_TYPES[source_market],
@@ -144,5 +144,11 @@ def bind_capture(snapshot: Mapping[str, Any], *, now: datetime):
                     "quote_captured_at": observed.isoformat(),
                     "quote_timestamp_source": "PROVIDER_LAST_UPDATE",
                     "capture_event_id": event,
-                })
+                }
+                if source_market == "h2h":
+                    # Same DK market object, same observed_at: the paired
+                    # opposite price is a captured quote, not an assertion.
+                    # Lets the moneyline reach the Lane B no-vig anchor.
+                    row["opposite_odds"] = sides[1 - index][2]
+                lines.append(row)
     return lines, refusals
