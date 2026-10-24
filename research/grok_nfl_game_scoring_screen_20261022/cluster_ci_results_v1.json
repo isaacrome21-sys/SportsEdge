@@ -1,0 +1,177 @@
+{
+ "label": "SCREEN",
+ "cluster": "(season, week)",
+ "B": 10000,
+ "seed": 20261022,
+ "bonferroni_k": 12,
+ "families": {
+  "TEAM_TOTAL_TOUCHDOWNS": {
+   "n": 1871,
+   "clusters": 124,
+   "delta": -0.02981,
+   "ci95_week_clustered": [
+    -0.04156,
+    -0.01842
+   ],
+   "ci_bonferroni_week_clustered": [
+    -0.04719,
+    -0.01351
+   ],
+   "passes_bonferroni": true
+  },
+  "TOTAL_TOUCHDOWNS": {
+   "n": 1871,
+   "clusters": 124,
+   "delta": -0.02689,
+   "ci95_week_clustered": [
+    -0.04199,
+    -0.01161
+   ],
+   "ci_bonferroni_week_clustered": [
+    -0.0486,
+    -0.00487
+   ],
+   "passes_bonferroni": true
+  },
+  "TEAM_TD_OU_1.5": {
+   "n": 1871,
+   "clusters": 124,
+   "delta": -0.01401,
+   "ci95_week_clustered": [
+    -0.02332,
+    -0.00499
+   ],
+   "ci_bonferroni_week_clustered": [
+    -0.02761,
+    -0.00076
+   ],
+   "passes_bonferroni": true
+  },
+  "TEAM_TD_OU_2.5": {
+   "n": 1871,
+   "clusters": 124,
+   "delta": -0.03164,
+   "ci95_week_clustered": [
+    -0.04007,
+    -0.02309
+   ],
+   "ci_bonferroni_week_clustered": [
+    -0.04313,
+    -0.01983
+   ],
+   "passes_bonferroni": true
+  },
+  "TOTAL_TD_OU_4.5": {
+   "n": 1871,
+   "clusters": 124,
+   "delta": -0.00898,
+   "ci95_week_clustered": [
+    -0.02132,
+    0.00295
+   ],
+   "ci_bonferroni_week_clustered": [
+    -0.02613,
+    0.00831
+   ],
+   "passes_bonferroni": false
+  },
+  "TOTAL_TD_OU_5.5": {
+   "n": 1871,
+   "clusters": 124,
+   "delta": -0.01235,
+   "ci95_week_clustered": [
+    -0.0233,
+    -0.00159
+   ],
+   "ci_bonferroni_week_clustered": [
+    -0.02736,
+    0.00357
+   ],
+   "passes_bonferroni": false
+  },
+  "WINNING_MARGIN": {
+   "n": 1871,
+   "clusters": 124,
+   "delta": -0.05617,
+   "ci95_week_clustered": [
+    -0.07848,
+    -0.03395
+   ],
+   "ci_bonferroni_week_clustered": [
+    -0.09002,
+    -0.02349
+   ],
+   "passes_bonferroni": true
+  },
+  "RACE_TO_10": {
+   "n": 1871,
+   "clusters": 124,
+   "delta": -0.01416,
+   "ci95_week_clustered": [
+    -0.02215,
+    -0.00602
+   ],
+   "ci_bonferroni_week_clustered": [
+    -0.02611,
+    -0.00247
+   ],
+   "passes_bonferroni": true
+  },
+  "RACE_TO_15": {
+   "n": 1871,
+   "clusters": 124,
+   "delta": -0.03248,
+   "ci95_week_clustered": [
+    -0.04401,
+    -0.02104
+   ],
+   "ci_bonferroni_week_clustered": [
+    -0.04914,
+    -0.01503
+   ],
+   "passes_bonferroni": true
+  },
+  "RACE_TO_20": {
+   "n": 1871,
+   "clusters": 124,
+   "delta": -0.04122,
+   "ci95_week_clustered": [
+    -0.05295,
+    -0.02903
+   ],
+   "ci_bonferroni_week_clustered": [
+    -0.0582,
+    -0.02422
+   ],
+   "passes_bonferroni": true
+  },
+  "RACE_TO_25": {
+   "n": 1871,
+   "clusters": 124,
+   "delta": -0.05037,
+   "ci95_week_clustered": [
+    -0.06406,
+    -0.03678
+   ],
+   "ci_bonferroni_week_clustered": [
+    -0.07045,
+    -0.03064
+   ],
+   "passes_bonferroni": true
+  },
+  "RACE_TO_30": {
+   "n": 1615,
+   "clusters": 107,
+   "delta": -0.0475,
+   "ci95_week_clustered": [
+    -0.06157,
+    -0.03307
+   ],
+   "ci_bonferroni_week_clustered": [
+    -0.06732,
+    -0.02731
+   ],
+   "passes_bonferroni": true
+  }
+ }
+}

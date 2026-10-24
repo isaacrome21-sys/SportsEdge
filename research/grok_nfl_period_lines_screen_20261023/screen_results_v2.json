@@ -1,0 +1,412 @@
+{
+ "alpha_bonferroni": 0.002777777777777778,
+ "baseline": "naive empirical pmf of strictly earlier seasons",
+ "bootstrap": "week-clustered (season, week) paired percentile",
+ "bootstrap_reps": 2000,
+ "families": {
+  "H1_MONEYLINE": {
+   "ci_bonferroni": [
+    -0.03321,
+    0.01824
+   ],
+   "delta": -0.00599,
+   "model": 0.89371,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive": 0.89969,
+   "per_season_delta": {
+    "2019": -0.00451,
+    "2020": -0.04517,
+    "2021": 0.00237,
+    "2022": 0.05611,
+    "2023": -0.02315,
+    "2024": -0.03848,
+    "2025": 0.00894
+   },
+   "seasons_model_better": 4,
+   "verdict": "SCREEN_INCONCLUSIVE"
+  },
+  "H1_SPREAD": {
+   "ci_bonferroni": [
+    -0.30037,
+    -0.075
+   ],
+   "delta": -0.18442,
+   "model": 5.90014,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive": 6.08456,
+   "per_season_delta": {
+    "2019": -0.12978,
+    "2020": -0.35329,
+    "2021": -0.12625,
+    "2022": 0.01237,
+    "2023": -0.29017,
+    "2024": -0.22311,
+    "2025": -0.1867
+   },
+   "seasons_model_better": 6,
+   "verdict": "SCREEN_BEATS_NAIVE"
+  },
+  "H1_TOTAL": {
+   "ci_bonferroni": [
+    -0.11735,
+    0.06334
+   ],
+   "delta": -0.02866,
+   "model": 5.00925,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive": 5.03791,
+   "per_season_delta": {
+    "2019": -0.05878,
+    "2020": -0.0801,
+    "2021": 0.02291,
+    "2022": -0.11582,
+    "2023": -0.07486,
+    "2024": 0.12184,
+    "2025": -0.02096
+   },
+   "seasons_model_better": 5,
+   "verdict": "SCREEN_INCONCLUSIVE"
+  },
+  "H2_MONEYLINE": {
+   "ci_bonferroni": [
+    -0.01776,
+    0.02469
+   ],
+   "delta": 0.00419,
+   "model": 0.9186,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive": 0.91441,
+   "per_season_delta": {
+    "2019": -0.02201,
+    "2020": -0.00108,
+    "2021": -0.01464,
+    "2022": 0.00992,
+    "2023": 0.02632,
+    "2024": 0.01087,
+    "2025": 0.01811
+   },
+   "seasons_model_better": 3,
+   "verdict": "SCREEN_INCONCLUSIVE"
+  },
+  "H2_SPREAD": {
+   "ci_bonferroni": [
+    -0.24723,
+    -0.01197
+   ],
+   "delta": -0.11974,
+   "model": 5.36893,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive": 5.48868,
+   "per_season_delta": {
+    "2019": -0.38171,
+    "2020": -0.01927,
+    "2021": -0.25512,
+    "2022": 0.06554,
+    "2023": -0.00545,
+    "2024": -0.15141,
+    "2025": -0.0996
+   },
+   "seasons_model_better": 6,
+   "verdict": "SCREEN_BEATS_NAIVE"
+  },
+  "H2_TOTAL": {
+   "ci_bonferroni": [
+    -0.04879,
+    0.1209
+   ],
+   "delta": 0.04053,
+   "model": 5.63936,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive": 5.59884,
+   "per_season_delta": {
+    "2019": 0.15439,
+    "2020": -0.02985,
+    "2021": 0.13485,
+    "2022": -0.00166,
+    "2023": -0.05482,
+    "2024": 0.08484,
+    "2025": -0.00166
+   },
+   "seasons_model_better": 4,
+   "verdict": "SCREEN_INCONCLUSIVE"
+  },
+  "Q1_MONEYLINE": {
+   "ci_bonferroni": [
+    0.19437,
+    0.35371
+   ],
+   "delta": 0.27194,
+   "model": 1.33396,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive": 1.06201,
+   "per_season_delta": {
+    "2019": 0.27524,
+    "2020": 0.23535,
+    "2021": 0.26922,
+    "2022": 0.36438,
+    "2023": 0.189,
+    "2024": 0.26817,
+    "2025": 0.30064
+   },
+   "seasons_model_better": 0,
+   "verdict": "SCREEN_WORSE_THAN_NAIVE"
+  },
+  "Q1_SPREAD": {
+   "ci_bonferroni": [
+    -0.02567,
+    0.11701
+   ],
+   "delta": 0.04526,
+   "model": 3.76581,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive": 3.72055,
+   "per_season_delta": {
+    "2019": 0.03787,
+    "2020": 0.05593,
+    "2021": -0.01398,
+    "2022": 0.15418,
+    "2023": -0.06096,
+    "2024": 0.05513,
+    "2025": 0.08922
+   },
+   "seasons_model_better": 2,
+   "verdict": "SCREEN_INCONCLUSIVE"
+  },
+  "Q1_TOTAL": {
+   "ci_bonferroni": [
+    0.01373,
+    0.11568
+   ],
+   "delta": 0.06672,
+   "model": 3.17126,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive": 3.10454,
+   "per_season_delta": {
+    "2019": 0.08234,
+    "2020": 0.04255,
+    "2021": 0.00817,
+    "2022": 0.04712,
+    "2023": 0.04746,
+    "2024": 0.15327,
+    "2025": 0.08557
+   },
+   "seasons_model_better": 0,
+   "verdict": "SCREEN_WORSE_THAN_NAIVE"
+  },
+  "Q2_MONEYLINE": {
+   "ci_bonferroni": [
+    0.05527,
+    0.13315
+   ],
+   "delta": 0.09493,
+   "model": 1.08855,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive": 0.99361,
+   "per_season_delta": {
+    "2019": 0.08836,
+    "2020": 0.06649,
+    "2021": 0.08052,
+    "2022": 0.15289,
+    "2023": 0.10517,
+    "2024": 0.08213,
+    "2025": 0.08712
+   },
+   "seasons_model_better": 0,
+   "verdict": "SCREEN_WORSE_THAN_NAIVE"
+  },
+  "Q2_SPREAD": {
+   "ci_bonferroni": [
+    -0.11573,
+    0.06467
+   ],
+   "delta": -0.02479,
+   "model": 4.65139,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive": 4.67618,
+   "per_season_delta": {
+    "2019": 0.0273,
+    "2020": -0.03448,
+    "2021": -0.03146,
+    "2022": 0.03456,
+    "2023": -0.00522,
+    "2024": -0.04402,
+    "2025": -0.11749
+   },
+   "seasons_model_better": 5,
+   "verdict": "SCREEN_INCONCLUSIVE"
+  },
+  "Q2_TOTAL": {
+   "ci_bonferroni": [
+    -0.03289,
+    0.1101
+   ],
+   "delta": 0.04503,
+   "model": 3.90229,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive": 3.85726,
+   "per_season_delta": {
+    "2019": 0.00953,
+    "2020": 0.03579,
+    "2021": 0.1293,
+    "2022": 0.03208,
+    "2023": 0.01801,
+    "2024": 0.061,
+    "2025": 0.02684
+   },
+   "seasons_model_better": 0,
+   "verdict": "SCREEN_INCONCLUSIVE"
+  },
+  "Q3_MONEYLINE": {
+   "ci_bonferroni": [
+    0.10588,
+    0.23925
+   ],
+   "delta": 0.17554,
+   "model": 1.22238,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive": 1.04685,
+   "per_season_delta": {
+    "2019": 0.1545,
+    "2020": 0.17486,
+    "2021": 0.11628,
+    "2022": 0.23133,
+    "2023": 0.11972,
+    "2024": 0.25977,
+    "2025": 0.17122
+   },
+   "seasons_model_better": 0,
+   "verdict": "SCREEN_WORSE_THAN_NAIVE"
+  },
+  "Q3_SPREAD": {
+   "ci_bonferroni": [
+    -0.0841,
+    0.08847
+   ],
+   "delta": 0.0038,
+   "model": 3.81923,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive": 3.81542,
+   "per_season_delta": {
+    "2019": -0.10698,
+    "2020": 0.0866,
+    "2021": -0.07059,
+    "2022": 0.12836,
+    "2023": 0.02375,
+    "2024": -0.00436,
+    "2025": -0.03136
+   },
+   "seasons_model_better": 4,
+   "verdict": "SCREEN_INCONCLUSIVE"
+  },
+  "Q3_TOTAL": {
+   "ci_bonferroni": [
+    0.00852,
+    0.13567
+   ],
+   "delta": 0.07851,
+   "model": 3.38757,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive": 3.30906,
+   "per_season_delta": {
+    "2019": 0.12604,
+    "2020": 0.08386,
+    "2021": 0.07197,
+    "2022": 0.07007,
+    "2023": 0.01299,
+    "2024": 0.07528,
+    "2025": 0.11244
+   },
+   "seasons_model_better": 0,
+   "verdict": "SCREEN_WORSE_THAN_NAIVE"
+  },
+  "Q4_MONEYLINE": {
+   "ci_bonferroni": [
+    0.06458,
+    0.13672
+   ],
+   "delta": 0.10153,
+   "model": 1.1132,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive": 1.01168,
+   "per_season_delta": {
+    "2019": 0.07367,
+    "2020": 0.08246,
+    "2021": 0.06633,
+    "2022": 0.11164,
+    "2023": 0.09124,
+    "2024": 0.12985,
+    "2025": 0.15277
+   },
+   "seasons_model_better": 0,
+   "verdict": "SCREEN_WORSE_THAN_NAIVE"
+  },
+  "Q4_SPREAD": {
+   "ci_bonferroni": [
+    -0.02822,
+    0.11638
+   ],
+   "delta": 0.05038,
+   "model": 4.17443,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive": 4.12406,
+   "per_season_delta": {
+    "2019": -0.0531,
+    "2020": 0.12597,
+    "2021": -0.07179,
+    "2022": 0.12739,
+    "2023": 0.03404,
+    "2024": 0.07445,
+    "2025": 0.11432
+   },
+   "seasons_model_better": 2,
+   "verdict": "SCREEN_INCONCLUSIVE"
+  },
+  "Q4_TOTAL": {
+   "ci_bonferroni": [
+    0.00121,
+    0.14251
+   ],
+   "delta": 0.07387,
+   "model": 4.3428,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive": 4.26893,
+   "per_season_delta": {
+    "2019": 0.0961,
+    "2020": 0.00723,
+    "2021": 0.11651,
+    "2022": 0.09681,
+    "2023": 0.02383,
+    "2024": 0.07929,
+    "2025": 0.09477
+   },
+   "seasons_model_better": 0,
+   "verdict": "SCREEN_WORSE_THAN_NAIVE"
+  }
+ },
+ "label": "SCREEN",
+ "lower_is_better": true,
+ "metrics": {
+  "moneyline": "3-way log loss",
+  "spread": "RPS of margin pmf",
+  "total": "RPS of total pmf"
+ },
+ "refused": {}
+}

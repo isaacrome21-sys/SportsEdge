@@ -1,0 +1,210 @@
+{
+ "alpha_bonferroni": 0.005555555555555556,
+ "baseline": "naive frequency / pmf of strictly earlier seasons (+0.5 Laplace)",
+ "bootstrap": "week-clustered (season, week) paired percentile",
+ "bootstrap_reps": 2000,
+ "families": {
+  "BOTH_TEAMS_TO_SCORE_N_10": {
+   "ci_bonferroni": [
+    0.00075,
+    0.02605
+   ],
+   "delta": 0.01399,
+   "model_ll": 0.45373,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive_ll": 0.43974,
+   "per_season_delta": {
+    "2019": 0.01722,
+    "2020": 0.01451,
+    "2021": 0.01001,
+    "2022": 0.02415,
+    "2023": -0.0063,
+    "2024": 0.03086,
+    "2025": 0.00775
+   },
+   "seasons_model_better": 1,
+   "verdict": "SCREEN_WORSE_THAN_NAIVE"
+  },
+  "BOTH_TEAMS_TO_SCORE_N_15": {
+   "ci_bonferroni": [
+    -0.01448,
+    0.01014
+   ],
+   "delta": -0.00224,
+   "model_ll": 0.66372,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive_ll": 0.66595,
+   "per_season_delta": {
+    "2019": 0.0088,
+    "2020": -0.01199,
+    "2021": -0.01617,
+    "2022": -0.00204,
+    "2023": 0.00071,
+    "2024": 0.01229,
+    "2025": -0.00719
+   },
+   "seasons_model_better": 4,
+   "verdict": "SCREEN_INCONCLUSIVE"
+  },
+  "BOTH_TEAMS_TO_SCORE_N_20": {
+   "ci_bonferroni": [
+    -0.02317,
+    0.00734
+   ],
+   "delta": -0.00726,
+   "model_ll": 0.6676,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive_ll": 0.67486,
+   "per_season_delta": {
+    "2019": -0.00321,
+    "2020": -0.01246,
+    "2021": -0.0087,
+    "2022": -0.01094,
+    "2023": -0.01246,
+    "2024": 0.00172,
+    "2025": -0.00484
+   },
+   "seasons_model_better": 6,
+   "verdict": "SCREEN_INCONCLUSIVE"
+  },
+  "BOTH_TEAMS_TO_SCORE_N_25": {
+   "ci_bonferroni": [
+    -0.02312,
+    -0.00053
+   ],
+   "delta": -0.01123,
+   "model_ll": 0.4501,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive_ll": 0.46133,
+   "per_season_delta": {
+    "2019": -0.01644,
+    "2020": -0.02681,
+    "2021": -0.01582,
+    "2022": -0.00886,
+    "2023": -0.00449,
+    "2024": -0.00603,
+    "2025": -0.00139
+   },
+   "seasons_model_better": 7,
+   "verdict": "SCREEN_BEATS_NAIVE"
+  },
+  "BOTH_TEAMS_TO_SCORE_N_30": {
+   "ci_bonferroni": [
+    -0.01987,
+    -0.00112
+   ],
+   "delta": -0.01064,
+   "model_ll": 0.25785,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive_ll": 0.2685,
+   "per_season_delta": {
+    "2019": -0.02412,
+    "2020": 0.00062,
+    "2021": -0.01251,
+    "2022": -7e-05,
+    "2023": -0.00543,
+    "2024": -0.01368,
+    "2025": -0.0194
+   },
+   "seasons_model_better": 6,
+   "verdict": "SCREEN_BEATS_NAIVE"
+  },
+  "DST_TD": {
+   "ci_bonferroni": [
+    -0.00686,
+    0.00577
+   ],
+   "delta": -0.00078,
+   "model_ll": 0.54817,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive_ll": 0.54895,
+   "per_season_delta": {
+    "2019": -0.00246,
+    "2020": 0.00221,
+    "2021": 0.00245,
+    "2022": -0.00306,
+    "2023": -0.00134,
+    "2024": 0.0021,
+    "2025": -0.00529
+   },
+   "seasons_model_better": 4,
+   "verdict": "SCREEN_INCONCLUSIVE"
+  },
+  "FIRST_SCORE": {
+   "ci_bonferroni": [
+    -0.01355,
+    0.00187
+   ],
+   "delta": -0.00566,
+   "model_ll": 0.68706,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive_ll": 0.69272,
+   "per_season_delta": {
+    "2019": -0.00659,
+    "2020": 0.00069,
+    "2021": -0.00517,
+    "2022": -0.00538,
+    "2023": -0.01029,
+    "2024": -0.01053,
+    "2025": -0.00206
+   },
+   "seasons_model_better": 6,
+   "verdict": "SCREEN_INCONCLUSIVE"
+  },
+  "LARGEST_LEAD": {
+   "ci_bonferroni": [
+    0.28573,
+    0.4994
+   ],
+   "delta": 0.38886,
+   "model_ll": 3.6174,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive_ll": 3.22854,
+   "per_season_delta": {
+    "2019": 0.65574,
+    "2020": 0.19522,
+    "2021": 0.31921,
+    "2022": 0.38274,
+    "2023": 0.43451,
+    "2024": 0.32131,
+    "2025": 0.41755
+   },
+   "seasons_model_better": 0,
+   "verdict": "SCREEN_WORSE_THAN_NAIVE"
+  },
+  "SAFETY": {
+   "ci_bonferroni": [
+    -0.00465,
+    0.01242
+   ],
+   "delta": 0.00369,
+   "model_ll": 0.22024,
+   "n": 1871,
+   "n_week_clusters": 124,
+   "naive_ll": 0.21655,
+   "per_season_delta": {
+    "2019": -0.0041,
+    "2020": -0.00412,
+    "2021": 0.00476,
+    "2022": 0.00475,
+    "2023": 0.00156,
+    "2024": 0.00892,
+    "2025": 0.01317
+   },
+   "seasons_model_better": 2,
+   "verdict": "SCREEN_INCONCLUSIVE"
+  }
+ },
+ "label": "SCREEN",
+ "metric": "mean log loss per game (lower is better); delta = model - naive",
+ "naive_fallback": "earlier seasons only (v3)",
+ "refused": {}
+}

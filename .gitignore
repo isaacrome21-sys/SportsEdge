@@ -4,3 +4,4 @@ __pycache__/
 research/.cache_first_inning/
 # Live validation HTTP cache (reproducible from free endpoints; not committed)
 data/live_validation_cache/
+.venv-pinned/
