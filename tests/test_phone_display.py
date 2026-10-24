@@ -104,13 +104,13 @@ def test_anchored_lane_never_displays_independent_ev_as_its_own():
     {"code": "QUOTE_FRESHNESS_UNVERIFIED", "age_seconds": None},
     {},
 ])
-def test_explicit_nonfresh_evidence_defeats_legacy_recent_label(freshness):
+def test_explicit_nonfresh_evidence_preserves_submitted_price_metrics(freshness):
     row = result(quote_status="RECENT_CAPTURED_QUOTE",
                  quote_freshness=freshness)
     displayed = build_phone_card(card(row))["selections"][0]
     assert displayed["status"] == "REFRESH REQUIRED"
-    assert displayed["probability"] is None
-    assert displayed["estimated_ev"] is None
+    assert displayed["probability"] == row["model_probability"]
+    assert displayed["estimated_ev"] == row["ev_per_dollar"]
 
 
 def test_market_anchored_provenance_marker_alone_suppresses_metrics():
