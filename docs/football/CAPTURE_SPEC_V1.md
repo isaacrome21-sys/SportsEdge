@@ -1,6 +1,6 @@
 # DraftKings Capture Spec, V1
 
-Status: owner rulings recorded Oct 18, 2026. Capture owner: Muse, pending Muse's confirmation of access and acceptance.
+Status: owner rulings recorded Oct 18, 2026. Capture owner: Muse. Access and acceptance CONFIRMED by Muse in the owner's main chat, Oct 18, 2026 (access evidence: the Oct 18 full-board DraftKings capture committed on records/dk-full-board-20261018). This spec is IN EFFECT for Thu Oct 22, 2026.
 
 ## Ownership
 - Line-entry owner: Muse. Muse enters every capture by hand from DraftKings.
