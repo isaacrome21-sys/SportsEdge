@@ -96,9 +96,6 @@ def create_bundle(input_dir: Path, out_dir: Path, *, now=None,
     instant = _utc_now() if now is None else now
     if instant.tzinfo is None or instant.utcoffset() is None:
         raise ValueError("RUN_IT_CLOCK_REQUIRES_TIMEZONE")
-    actual_final = _utc_now() if final_now is None else final_now
-    if actual_final.tzinfo is None or actual_final.utcoffset() is None:
-        raise ValueError("RUN_IT_FINAL_CLOCK_REQUIRES_TIMEZONE")
     adapter = run_capture_directory if adapter is None else adapter
     if screen_builder is None:
         from sportsedge.phone_display import build_current_value_screens
@@ -106,6 +103,10 @@ def create_bundle(input_dir: Path, out_dir: Path, *, now=None,
     png_writer = render_png if png_writer is None else png_writer
 
     audit, card, markdown = adapter(input_dir, now=instant, max_games=max_games)
+    # This clock MUST be read after the potentially slow canonical run.
+    actual_final = _utc_now() if final_now is None else final_now
+    if actual_final.tzinfo is None or actual_final.utcoffset() is None:
+        raise ValueError("RUN_IT_FINAL_CLOCK_REQUIRES_TIMEZONE")
     if not isinstance(audit, dict) or card is not None and not isinstance(card, dict):
         raise ValueError("CANONICAL_BUNDLE_SCHEMA_INVALID")
     screen = {"unverified_model_value_screens": [], "total_positive_screens": 0}
