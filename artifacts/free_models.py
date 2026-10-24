@@ -1010,7 +1010,15 @@ def score_means(sport, context):
 # them as two separate models.
 LANE_A = "LANE_A_INDEPENDENT"
 LANE_B = "LANE_B_ANCHORED"
-ANCHOR_WEIGHT = 0.15
+ANCHOR_WEIGHT = 0.15  # non-CFB research prior only; RETIRED for CFB (t277)
+# CFB: the provisional 15% blend is RETIRED (user ruling 2026-10-24). The
+# 2023-25 chronological OOS backtest chose 0.1 (spread) / 0.0 (total) on
+# train and no weight beat the closing no-vig market, so the only
+# evidence-backed CFB weight is market-only. Lane B is never computed or
+# used for any CFB candidate until a market passes ruling 2026-10-23i.
+CFB_ANCHOR_WEIGHT = 0.0
+CFB_ANCHOR_WEIGHT_SOURCE = "OOS_GATE_RULING_2026-10-23i_MARKET_ONLY"
+CFB_LANE_B_STATUS = "RETIRED"
 POSITIVE_EV_STATUS = "RESEARCH_POSITIVE_EV_UNVALIDATED"
 NFL_SIDE_WATCH_STATUS = "WATCH_NFL_SIDE_UNVALIDATED"
 
@@ -1298,7 +1306,12 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
               "hypothesis": "UNVALIDATED_OUT_OF_SAMPLE_REQUIRED"}
     b_home_mean, b_away_mean = home_mean, away_mean
     lane_b_blocked = None
-    if market == "TOTAL":
+    if sport == "CFB":
+        anchor = {"status": CFB_LANE_B_STATUS, "weight": CFB_ANCHOR_WEIGHT,
+                  "weight_source": CFB_ANCHOR_WEIGHT_SOURCE,
+                  "hypothesis": "RETIRED_15PCT_BLEND_FAILED_OOS"}
+        lane_b_blocked = "CFB_15PCT_BLEND_RETIRED"
+    elif market == "TOTAL":
         anchored_total = line + ANCHOR_WEIGHT * (raw_total - line)
         shift = (anchored_total - raw_total) / 2
         b_home_mean += shift
@@ -1346,10 +1359,12 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
                 "uses_sportsbook_price_in_projection": True,
             })
     else:
-        lane_b = {"lane": LANE_B, "status": "LANE_B_UNAVAILABLE",
+        lane_b = {"lane": LANE_B,
+                  "status": ("LANE_B_RETIRED" if lane_b_blocked == "CFB_15PCT_BLEND_RETIRED"
+                             else "LANE_B_UNAVAILABLE"),
                   "reason": lane_b_blocked, "anchor": anchor,
                   "validated_vs_close": False, "validated_profitability": False}
-    if lane == "B" and lane_b.get("status") == "LANE_B_UNAVAILABLE":
+    if lane == "B" and lane_b.get("status") in {"LANE_B_UNAVAILABLE", "LANE_B_RETIRED"}:
         return {"status": lane_b["reason"], "game": f"{away} @ {home}",
                 "sport": sport, "pricing_lane": LANE_B,
                 "pricing_provenance": provenance_for_game_result(
