@@ -196,3 +196,31 @@ def test_conflicting_labels_for_one_event_id_are_dropped():
     extra = '<span data-testid="cb-start-time-111">Sat Oct 24th 7:08 PM</span>'
     b = _fetch([_card(111, "+159", "-193", CT_G1), extra])(URL, "baseball_mlb")
     assert all(r["board_start_time_text"] is None for r in b["rows"])
+
+
+# ---- t270 audit HIGH: the sole-matchup path must verify a present label ----
+
+def test_sole_path_g2_card_only_g1_schedule_refuses(tmp_path):
+    # Only G1 scheduled, only G2's card on the board: G2 prices must never bind to G1.
+    _pred(tmp_path / "p", 9001, G1)
+    _blocked(tmp_path, [_card(222, "+120", "-140", CT_G2)])
+
+
+def test_sole_path_unparseable_label_refuses(tmp_path):
+    _pred(tmp_path / "p", 9001, G1)
+    _blocked(tmp_path, [_card(111, "+159", "-193", "Game 1")])
+
+
+def test_sole_path_matching_label_is_verified(tmp_path):
+    _pred(tmp_path / "p", 9001, G1)
+    r = _run(tmp_path, [_card(111, "+159", "-193", CT_G1)])
+    row = json.loads(Path(r["paths"][0]).read_text())
+    assert row["game_pk"] == 9001
+    assert row["event_match_basis"] == "BOARD_START_LABEL_UNIQUE_ACROSS_OFFSETS"
+
+
+def test_sole_path_unlabelled_card_keeps_unverified_basis(tmp_path):
+    _pred(tmp_path / "p", 9001, G1)
+    r = _run(tmp_path, [_card(111, "+159", "-193")])
+    row = json.loads(Path(r["paths"][0]).read_text())
+    assert row["event_match_basis"] == "SOLE_MATCHUP_ON_BOARD_AND_SCHEDULE_NO_LABEL"
