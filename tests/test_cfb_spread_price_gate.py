@@ -15,6 +15,7 @@ def valid_args():
         side_quoted_at=NOW - timedelta(seconds=20),
         opposite_quoted_at=NOW - timedelta(seconds=30),
         as_of=NOW,
+        event_start=NOW + timedelta(hours=3),
         sportsbook="DraftKings",
         source_ref="capture://cfb/game-1/spread",
         cover_probability=.55,
@@ -28,8 +29,8 @@ def valid_args():
 
 def test_push_aware_ev_no_vig_and_playable_to():
     result = assess_spread(**valid_args())
-    assert result.status == "PLAY"
-    assert result.reason == "POSITIVE_EV_AND_MARKET_EDGE"
+    assert result.status == "WATCH"
+    assert result.reason == "POSITIVE_EV_MODEL_AUTHORITY_UNVERIFIED"
     assert result.expected_profit_per_unit > 0
     assert abs(result.conditional_cover - .55 / .95) < 1e-12
     assert abs(result.no_vig_market_cover - .5) < 1e-12
@@ -107,3 +108,26 @@ def test_nonpositive_ev_passes_with_diagnostics():
     assert result.expected_profit_per_unit < 0
     assert result.no_vig_market_cover == .5
     assert result.no_vig_edge < 0
+
+
+def test_caller_claims_and_arbitrary_id_cannot_promote_a_play():
+    result = assess_spread(**(valid_args() | {
+        "model_verified": True,
+        "model_market_blind": True,
+        "model_id": "USER_ASSERTED_WINNER",
+        "source_ref": "arbitrary://receipt",
+        "cover_probability": .75,
+        "push_probability": 0.0,
+        "loss_probability": .25,
+    }))
+    assert result.expected_profit_per_unit > 0
+    assert result.status == "WATCH"
+    assert result.reason == "POSITIVE_EV_MODEL_AUTHORITY_UNVERIFIED"
+
+
+def test_started_or_unverified_kickoff_is_not_priceable():
+    args = valid_args()
+    assert assess_spread(**(args | {"event_start": NOW})).reason == (
+        "EVENT_STARTED_OR_INVALID")
+    assert assess_spread(**(args | {"event_start": None})).reason == (
+        "EVENT_STARTED_OR_INVALID")
