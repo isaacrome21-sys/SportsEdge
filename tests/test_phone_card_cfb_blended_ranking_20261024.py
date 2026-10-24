@@ -43,3 +43,18 @@ def test_model_version_is_labeled():
     versions = [s["model_version"] for s in view["selections"]]
     assert versions == ["CFB_OPPONENT_ADJUSTED_V1", "CFB_PRE_OCT24_BASELINE"]
     assert "CFB_OPPONENT_ADJUSTED_V1" in render_phone_card(card(cfb("X", .2, .02)))
+
+
+def test_nfl_ranks_by_blended_ev_and_is_labeled():
+    big = {**cfb("Giants ML", raw_ev=1.13, blended_ev=.01), "sport": "NFL", "context_notes": []}
+    small = {**cfb("Ravens +2.5", raw_ev=.10, blended_ev=.03), "sport": "NFL", "context_notes": []}
+    text = render_phone_card(card(big, small))
+    ranked = text.split("re-check line before betting", 1)[1].split("### NFL", 1)[0]
+    assert ranked.index("Ravens") < ranked.index("Giants")
+    assert "+113.0%" not in ranked
+    assert "NFL_SIDES_PRIOR_COMPRESSED_2384" in ranked
+
+
+def test_nfl_without_blend_is_not_ranked():
+    row = {**cfb("Giants ML", raw_ev=1.13), "sport": "NFL", "context_notes": []}
+    assert "re-check line before betting" not in render_phone_card(card(row))
