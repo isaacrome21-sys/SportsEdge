@@ -153,7 +153,8 @@ def test_research_prop_surface_only_displays_real_selected_model_rows():
         (root/"nfl_prop.json").write_text(json.dumps({"selected_rows":[
            {"status":"PRICED","player":"Sample RB","market":"rushing_yards",
             "selection":"Sample RB Over","line":61.5,"price_american":-110,
-            "estimate_p":.58,"edge_probability_points":.06,"ev_per_dollar":.11},
+            "estimate_p":.58,"edge_probability_points":.06,"ev_per_dollar":.11,
+            "pricing_lanes":{"lane_b_anchored":{"estimate_p":.58,"ev_per_dollar":.11}}},
            {"status":"NO_MODEL","player":"Another RB","market":"rushing_yards",
             "selection":"Another RB Over","line":41.5,"price_american":-110,
             "estimate_p":None,"edge_probability_points":None,"ev_per_dollar":None}
@@ -309,3 +310,50 @@ def test_radar_three_independent_books_required_and_straight_cap_enforced():
         row["markets"]["totals"]["over"]=-102
         row["reference"]["totals"]["peer_evidence"][2]["observed_at"]="2026-10-11T16:40:00Z"
         assert scan()==[]
+
+
+def _prop_root(temp, prop_card, extra_cards=()):
+    root=Path(temp)
+    (root/"summary.json").write_text(json.dumps({
+      "NFL":{"status":"READY","cards":[
+         {"date":"2026-10-25","json":"nfl.json","state":"READY",
+          "props":{"status":"RESEARCH_ONLY","json":"nfl_prop.json"}},*extra_cards]},
+      "CFB":{"status":"NO_DK_GAMES","cards":[]}}))
+    (root/"nfl.json").write_text(json.dumps({"games":[]}))
+    (root/"nfl_prop.json").write_text(json.dumps(prop_card))
+    return root
+
+
+def test_lane3_zero_priced_props_say_why_with_top_block_reasons_and_sources():
+    from datetime import datetime,timezone
+    rows=[{"status":"NO_MODEL","reason":"rushing_yards nonnegative finite required","player":"A"}]*3+\
+         [{"status":"NO_MODEL","reason":"PROP_PLAYER_EXACT_MATCH_REQUIRED:B:matches=0","player":"B"}]
+    card_json={"rows":rows,"selected_rows":[],"source_status":{
+        "injuries":"AVAILABLE","player_stats":"AVAILABLE","depth":"AVAILABLE","schedule":"AVAILABLE"}}
+    with TemporaryDirectory() as temp:
+        root=_prop_root(temp,card_json,[{"date":"2026-10-26","state":"READY","props":{"status":"NO_PAIRED_DK_PROPS"}}])
+        out=card.render(root,"https://x",asof=datetime(2026,10,24,21,0,tzinfo=timezone.utc),as_of_date="2026-10-24")
+    assert "No supported priced research prop candidates." in out
+    assert "2026-10-25: 0 priced of 4 prop rows" in out
+    assert "rushing_yards nonnegative finite required ×3" in out
+    assert "PROP_PLAYER_EXACT_MATCH_REQUIRED ×1" in out
+    assert "2026-10-26: NO_PAIRED_DK_PROPS" in out
+    assert "Anytime TD: not priced" in out
+
+
+def test_lane3_nfl_prop_rows_rank_by_blended_ev_and_raw_ev_is_not_a_price():
+    from datetime import datetime,timezone
+    def r(player,raw,blend):
+        lane={"lane_b_anchored":{"estimate_p":.52,"ev_per_dollar":blend}} if blend is not None else None
+        return {"status":"PRICED","player":player,"market":"receptions","selection":player+" Under",
+                "line":3.5,"price_american":-110,"estimate_p":.7,"edge_probability_points":.2,
+                "ev_per_dollar":raw,"pricing_lanes":lane}
+    card_json={"rows":[],"selected_rows":[r("Raw Only",.56,None),r("Low",.30,.01),r("High",.10,.03),r("Neg",.4,-.01)]}
+    with TemporaryDirectory() as temp:
+        out=card.render(_prop_root(temp,card_json),"https://x",
+            asof=datetime(2026,10,24,21,0,tzinfo=timezone.utc),as_of_date="2026-10-24")
+    assert "Raw Only" not in out and "Neg receptions" not in out
+    assert out.index("High receptions")<out.index("Low receptions")
+    assert "blended EV +3.0%" in out and "raw model EV +10.0% (not a price)" in out
+    assert "score" not in out.lower().split("nfl player props")[1][:800]
+    assert "official" not in out.lower().split("nfl player props")[1][:800]
