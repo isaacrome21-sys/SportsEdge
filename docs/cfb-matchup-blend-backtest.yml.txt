@@ -1,0 +1,49 @@
+# STAGED: move to .github/workflows/cfb-matchup-blend-backtest.yml (delete this line)
+name: cfb-matchup-blend-backtest
+
+# Chronological backtest of the CFB matchup model vs CFBD closing lines and
+# the market-blend weight sweep (0.0-1.0). Runs on merge of the script, or on
+# demand; posts the summary to coordination issue #2447. Evaluation only.
+
+on:
+  push:
+    branches: [main]
+    paths: ['scripts/backtest_cfb_matchup_blend.py']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: .
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Run backtest
+        run: |
+          mkdir -p out
+          python scripts/backtest_cfb_matchup_blend.py --seasons 2024,2025,2026 \
+            --output out/cfb_matchup_blend_backtest.json | tee out/summary.txt
+          cat out/summary.txt >> "$GITHUB_STEP_SUMMARY"
+      - name: Post summary to #2447
+        if: always()
+        run: |
+          { echo "## CFB matchup model · blend-weight backtest"; echo; echo '```';
+            cat out/summary.txt 2>/dev/null || echo "run failed - see log";
+            echo '```'; echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"; } > out/comment.md
+          gh issue comment 2447 --body-file out/comment.md
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: cfb-matchup-blend-backtest
+          path: out/
+          retention-days: 30
