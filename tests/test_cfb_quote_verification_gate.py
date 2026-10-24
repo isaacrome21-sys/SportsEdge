@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from sportsedge.sports.cfb.quote_verification_gate import (
-    INDEPENDENT_SOURCE_ALLOWLIST, MAX_QUOTE_AGE_SECONDS, verify_quote_pair)
+    INDEPENDENT_SOURCE_ALLOWLIST, MAX_QUOTE_AGE_SECONDS, _verify_quote_pair_impl, verify_quote_pair)
 
 NOW = datetime(2026, 10, 24, 15, 0, tzinfo=timezone.utc)
 KO = "2026-10-24T16:00:00Z"
@@ -29,7 +29,7 @@ def ind(**kw):
 
 
 def v(d, i, **kw):
-    return verify_quote_pair(d, i, now=NOW, allowlist=kw.get("allowlist", TEST_ALLOW))
+    return _verify_quote_pair_impl(d, i, now=NOW, allowlist=kw.get("allowlist", TEST_ALLOW))
 
 
 def test_production_allowlist_is_empty_and_everything_unavailable():
@@ -115,14 +115,14 @@ def test_missing_or_naive_fields_fail_closed(bad):
 
 def test_after_kickoff_rejected():
     later = datetime(2026, 10, 24, 16, 0, 30, tzinfo=timezone.utc)
-    r = verify_quote_pair(dk(captured_at=later.isoformat()), ind(captured_at=later.isoformat()),
-                          now=later, allowlist=TEST_ALLOW)
+    r = _verify_quote_pair_impl(dk(captured_at=later.isoformat()), ind(captured_at=later.isoformat()),
+                                now=later, allowlist=TEST_ALLOW)
     assert r.reason == "KICKOFF_PASSED"
 
 
 def test_naive_now_rejected():
     with pytest.raises(ValueError):
-        verify_quote_pair(dk(), ind(), now=NOW.replace(tzinfo=None), allowlist=TEST_ALLOW)
+        _verify_quote_pair_impl(dk(), ind(), now=NOW.replace(tzinfo=None), allowlist=TEST_ALLOW)
 
 
 # --- Explicit negative coverage requested for re-audit (pt266u) ---
@@ -147,7 +147,7 @@ def test_neg_post_kickoff_capture_rejected(cap_offset):
     for d, i in ((dk(captured_at=cap), ind()), (dk(), ind(captured_at=cap))):
         assert not v(d, i).ok  # now < kickoff: capture is in the future
         late = ko + timedelta(seconds=cap_offset + 1)
-        assert not verify_quote_pair(d, i, now=late, allowlist=TEST_ALLOW).ok
+        assert not _verify_quote_pair_impl(d, i, now=late, allowlist=TEST_ALLOW).ok
 
 
 def test_neg_stale_both_sides_over_180s():
@@ -167,3 +167,30 @@ def test_neg_invalid_prices_rejected(odds):
 def test_neg_mismatched_game_market_side_rejected(bad):
     r = v(dk(), ind(**bad))
     assert not r.ok and r.reason in {"GAME_IDENTITY_MISMATCH", "MARKET_SELECTION_MISMATCH"}
+
+
+# --- t275 re-audit LOWs ---
+import inspect
+import subprocess
+from pathlib import Path
+
+
+def test_public_entrypoint_cannot_take_allowlist():
+    assert "allowlist" not in inspect.signature(verify_quote_pair).parameters
+    with pytest.raises(TypeError):
+        verify_quote_pair(dk(), ind(), now=NOW, allowlist=TEST_ALLOW)
+
+
+def test_no_production_call_site_uses_private_impl_or_allowlist():
+    root = Path(__file__).resolve().parents[1]
+    hits = subprocess.run(["git", "grep", "-l", "-e", "_verify_quote_pair_impl", "-e", "allowlist=",
+                           "--", "sportsedge", "artifacts", "scripts"], cwd=root,
+                          capture_output=True, text=True).stdout.split()
+    assert [h for h in hits if h != "sportsedge/sports/cfb/quote_verification_gate.py"] == []
+
+
+@pytest.mark.parametrize("field", ["source", "book", "provider"])
+@pytest.mark.parametrize("val", [123, 1.5, True, ["circa"], {"n": "x"}, b"circa"])
+def test_non_string_labels_fail_closed(field, val):
+    r = v(dk(), ind(**{field: val}))
+    assert not r.ok and r.reason == "INDEPENDENT_SOURCE_LABEL_INVALID"
