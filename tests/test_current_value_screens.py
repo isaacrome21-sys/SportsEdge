@@ -44,7 +44,12 @@ def card(*rows):
     ("UFC", "METHOD_OF_VICTORY"), ("PGA", "MATCHUP"),
 ])
 def test_current_numbers_screen_every_sport_and_market_without_long_term_gate(sport, market):
-    data = card(row(sport=sport, market=market))
+    extra = {}
+    if sport == "CFB":
+        # Oct 24 2026 ruling: CFB screens require the #2539 market blend.
+        extra["pricing_lanes"] = {"lane_b_anchored": {
+            "estimate_p": .63, "ev_per_dollar": .155, "fair_american": -170}}
+    data = card(row(sport=sport, market=market, **extra))
     result = screen(data)
     assert result["historical_tests_required_to_display"] is False
     assert result["total_positive_screens"] == 1
@@ -141,3 +146,9 @@ def test_quote_can_expire_during_slow_runner_without_appearing_current():
 def test_live_finalization_must_not_accept_future_or_naive_clock():
     with pytest.raises(ValueError, match="FINALIZATION_CLOCK_REQUIRED"):
         build_current_value_screens(card(row()), now=datetime(2026, 10, 23))
+
+
+def test_cfb_screen_without_market_blend_is_excluded():
+    result = screen(card(row(sport="CFB", market="TOTAL")))
+    assert result["total_positive_screens"] == 0
+    assert result["exclusions"]["CFB_BLENDED_EV_UNAVAILABLE"] == 1
