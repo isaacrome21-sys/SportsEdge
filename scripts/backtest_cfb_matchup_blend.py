@@ -127,7 +127,8 @@ def project(games):
             hist[(season, game["away"])].append((game["as"], game["hs"], game["home"], na))
         pending.clear()
 
-    for g in games:
+    # JSON fixture inputs may be unordered; never admit future scores first.
+    for g in sorted(games, key=lambda x: (x["season"], x["start"], x["id"])):
         kickoff = (g["season"], g["start"])
         if current_kickoff is not None and kickoff != current_kickoff:
             flush_pending()
