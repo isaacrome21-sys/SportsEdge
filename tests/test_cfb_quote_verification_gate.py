@@ -123,3 +123,47 @@ def test_after_kickoff_rejected():
 def test_naive_now_rejected():
     with pytest.raises(ValueError):
         verify_quote_pair(dk(), ind(), now=NOW.replace(tzinfo=None), allowlist=TEST_ALLOW)
+
+
+# --- Explicit negative coverage requested for re-audit (pt266u) ---
+
+@pytest.mark.parametrize("src", [None, "", "UNKNOWN_BOOK", "pinnacle", "circa"])
+def test_neg_unknown_or_missing_source_rejected_with_production_allowlist(src):
+    r = verify_quote_pair(dk(), ind(source=src), now=NOW)
+    assert not r.ok and r.reason == "INDEPENDENT_PRICE_UNAVAILABLE" and r.play_allowed is False
+
+
+@pytest.mark.parametrize("field", ["source", "book", "provider"])
+@pytest.mark.parametrize("alias", ["Draft-Kings", "DRAFT KINGS", "dkng", "DK Sportsbook", "draftkings.com", "DK"])
+def test_neg_dk_alias_in_any_field_rejected(field, alias):
+    r = v(dk(), ind(**{field: alias}), allowlist=TEST_ALLOW | {alias})
+    assert not r.ok and r.reason == "INDEPENDENT_SOURCE_NOT_INDEPENDENT"
+
+
+@pytest.mark.parametrize("cap_offset", [0, 1, 600])
+def test_neg_post_kickoff_capture_rejected(cap_offset):
+    ko = datetime(2026, 10, 24, 16, 0, tzinfo=timezone.utc)
+    cap = (ko + timedelta(seconds=cap_offset)).isoformat()
+    for d, i in ((dk(captured_at=cap), ind()), (dk(), ind(captured_at=cap))):
+        assert not v(d, i).ok  # now < kickoff: capture is in the future
+        late = ko + timedelta(seconds=cap_offset + 1)
+        assert not verify_quote_pair(d, i, now=late, allowlist=TEST_ALLOW).ok
+
+
+def test_neg_stale_both_sides_over_180s():
+    old = (NOW - timedelta(seconds=181)).isoformat()
+    assert v(dk(captured_at=old), ind()).reason == "DK_QUOTE_STALE"
+    assert v(dk(), ind(captured_at=old)).reason == "INDEPENDENT_QUOTE_STALE"
+
+
+@pytest.mark.parametrize("odds", [0, 99, -100 + 1, 1e400, float("-inf"), "+110", [], True, False])
+def test_neg_invalid_prices_rejected(odds):
+    assert not v(dk(odds=odds), ind()).ok
+    assert not v(dk(), ind(odds=odds)).ok
+
+
+@pytest.mark.parametrize("bad", [dict(away_team_id="999"), dict(kickoff="2026-10-25T16:00:00Z"),
+                                 dict(market="ML", side="HOME", line=None), dict(side="AWAY")])
+def test_neg_mismatched_game_market_side_rejected(bad):
+    r = v(dk(), ind(**bad))
+    assert not r.ok and r.reason in {"GAME_IDENTITY_MISMATCH", "MARKET_SELECTION_MISMATCH"}
