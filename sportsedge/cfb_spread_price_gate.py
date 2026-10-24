@@ -1,8 +1,8 @@
 """Fail-closed CFB spread pricing; no model-validation or promotion authority.
 
-The caller must supply a market-blind verified model probability and an exact,
-paired DraftKings spread quote.  This module validates the quote evidence and
-computes push-aware EV; it never manufactures either input.
+The caller may submit an independent projection and an exact paired quote.
+This helper computes push-aware EV but does not independently authenticate
+model promotion or provenance: it therefore cannot issue a PLAY.
 """
 from __future__ import annotations
 
@@ -63,6 +63,7 @@ def assess_spread(
     side_quoted_at: datetime | None,
     opposite_quoted_at: datetime | None,
     as_of: datetime | None,
+    event_start: datetime | None,
     sportsbook: str | None,
     source_ref: str | None,
     cover_probability: float | None,
@@ -106,8 +107,11 @@ def assess_spread(
     side_time = _utc_instant(side_quoted_at)
     opposite_time = _utc_instant(opposite_quoted_at)
     evaluation_time = _utc_instant(as_of)
+    kickoff_time = _utc_instant(event_start)
     if side_time is None or opposite_time is None or evaluation_time is None:
         return blocked("QUOTE_TIMESTAMP_INVALID")
+    if kickoff_time is None or kickoff_time <= evaluation_time:
+        return blocked("EVENT_STARTED_OR_INVALID")
     ages = (
         (evaluation_time - side_time).total_seconds(),
         (evaluation_time - opposite_time).total_seconds(),
@@ -148,7 +152,9 @@ def assess_spread(
     elif no_vig_edge <= 0:
         status, reason = "PASS", "NONPOSITIVE_MARKET_EDGE"
     else:
-        status, reason = "PLAY", "POSITIVE_EV_AND_MARKET_EDGE"
+        # Caller booleans and free-text model IDs cannot establish official
+        # registry approval. Preserve the arithmetic as a WATCH only.
+        status, reason = "WATCH", "POSITIVE_EV_MODEL_AUTHORITY_UNVERIFIED"
 
     return SpreadAssessment(
         status,
