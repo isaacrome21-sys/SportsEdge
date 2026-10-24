@@ -21,10 +21,13 @@ from sportsedge.auto_dk_canonical_intake import bind_capture, SUPPORTED_SPORTS
 
 
 def run_capture_directory(directory: Path, *, now: datetime, runner=None,
-                          render=None) -> tuple[dict, dict | None, str]:
+                          render=None, max_games: int | None = None) -> tuple[dict, dict | None, str]:
     """Build one current-value board from already-paid DK snapshot files."""
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("CURRENT_DK_NOW_TIMEZONE_REQUIRED")
+    if max_games is not None and (isinstance(max_games, bool)
+                                  or not isinstance(max_games, int) or max_games < 1):
+        raise ValueError("LIVE_MAX_GAMES_MUST_BE_POSITIVE_INTEGER")
     if runner is None:
         from artifacts.run_it_full import run_full as runner
     if render is None:
@@ -48,6 +51,25 @@ def run_capture_directory(directory: Path, *, now: datetime, runner=None,
         lines.extend(offers)
         receipts.extend(rejected)
         sport_counts[sport] = len(offers)
+    source_rows = len(lines)
+    source_sport_counts = dict(sport_counts)
+    if max_games is not None:
+        # Price the soonest-to-start complete games first. The slow full-slate
+        # audit runs separately; delaying the first current price until it
+        # finishes can consume the entire three-minute quote lifetime.
+        events = {}
+        for line in lines:
+            identity = (line["sport"], line["capture_event_id"])
+            events.setdefault(identity, line["kickoff"])
+        ordered = sorted(events, key=lambda k: (events[k], k))
+        selected = set(ordered[:max_games])
+        for sport, event in ordered[max_games:]:
+            receipts.append({"sport": sport, "capture_event_id": event,
+                             "reason": "DEFERRED_BY_FAST_PASS_GAME_CAP"})
+        lines = [line for line in lines if
+                 (line["sport"], line["capture_event_id"]) in selected]
+        sport_counts = {sport: sum(row["sport"] == sport for row in lines)
+                        for sport in ("NFL", "CFB", "MLB", "NBA")}
     audit = {"schema": "SPORTSEDGE_AUTO_DK_CANONICAL_V1",
              "generated_at_utc": now.astimezone(timezone.utc).isoformat(),
              "markets_in_source": ["h2h", "spreads", "totals"],
@@ -55,6 +77,9 @@ def run_capture_directory(directory: Path, *, now: datetime, runner=None,
              "new_sportsbook_calls": 0,
              "source_price_model_probability": None,
              "input_rows": len(lines), "rows_by_sport": sport_counts,
+             "source_rows": source_rows, "source_rows_by_sport": source_sport_counts,
+             "deferred_rows": source_rows - len(lines),
+             "fast_pass_game_cap": max_games,
              "capture_refusals": receipts,
              "status": "READY_FOR_CANONICAL_PRICE" if lines else "NO_FRESH_PAIRED_QUOTES"}
     if not lines:
@@ -79,10 +104,13 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-dir", type=Path, default=Path("artifacts/auto_dk"))
     parser.add_argument("--out-dir", type=Path, default=Path("artifacts/auto_dk_cards"))
+    parser.add_argument("--max-games", type=int, default=None,
+                        help="Process N earliest games first; account for every deferred event")
     args = parser.parse_args()
     now = datetime.now(timezone.utc)
     try:
-        audit, card, markdown = run_capture_directory(args.input_dir, now=now)
+        audit, card, markdown = run_capture_directory(args.input_dir, now=now,
+                                                      max_games=args.max_games)
         result_code = 0
     except Exception as exc:
         # The source capture remains intact. Emit an explicit failure artifact
