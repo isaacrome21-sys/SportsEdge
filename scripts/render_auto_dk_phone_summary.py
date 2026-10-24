@@ -422,6 +422,20 @@ def render(root: Path, run_url: str, *, as_of_date: str | None = None,
             if not found_any:
                 lines.append("No supported priced research prop candidates.")
             lines.append("")
+        elif sport=="CFB":
+            # Owner request Oct 24 2026: show CFB sides AND totals. A single
+            # EV-ranked top-5 let totals crowd every side off the phone card.
+            for role,title in (("BEST","Best Plays"),("LEAN","Top Leans")):
+                group=[r for r in picked if r["role"]==role]
+                totals=[r for r in group if "total" in str(r.get("market") or "").lower()]
+                sides=[r for r in group if r not in totals]
+                for label,view,cap in (("Sides (spread / moneyline)",sides,10),("Totals",totals,10)):
+                    lines.append(f"**{title} — {label}**")
+                    if view[:cap]:
+                        lines.extend(row_text(r) for r in view[:cap])
+                    else:
+                        lines.append("None with supported model pricing." if role=="BEST" else "No modeled leans.")
+                    lines.append("")
         else:
             for role,title in (("BEST","Best Plays"),("LEAN","Top Leans")):
                 lines.append(f"**{title}**")
