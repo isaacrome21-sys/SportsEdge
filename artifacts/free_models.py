@@ -956,8 +956,8 @@ def context_for(sport, away, home, start, provider, row):
         # Expected points = average of own offense and opponent's defense
         # allowed; *_rating is the deviation from the flat prior so
         # score_means/calculate stay in exact parity.
-        out["home_rating"] = round((h_off + a_def) / 2 - base, 3)
-        out["away_rating"] = round((a_off + h_def) / 2 - base, 3)
+        out["home_rating"] = round((h_off + a_def - base) - base, 3)
+        out["away_rating"] = round((a_off + h_def - base) - base, 3)
         out["home_form"] = 0.0
         out["away_form"] = 0.0
         notes.append("CFB_MATCHUP_OFF_DEF_V1")
