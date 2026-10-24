@@ -20,6 +20,48 @@ PITCHER_MARKETS = frozenset({
 })
 
 
+def _pitcher_matchup_factors(history_pool, *, market, side, line):
+    """Explain verified pitcher workload/form, never infer ground-ball style.
+
+    MLB game logs used by the pricer provide K, outs and sometimes pitches,
+    but NOT batted-ball profile or today's opponent-contact forecast.
+    """
+    if not isinstance(history_pool, list) or not history_pool:
+        return []
+    stats = [x for x in history_pool if isinstance(x, dict)]
+    if not stats:
+        return []
+    metric = {
+        "PITCHER_K": ("strikeouts", "Prior-start strikeouts per start"),
+        "PITCHER_OUTS": ("outs", "Prior-start outs per start"),
+        "PITCHER_HITS_ALLOWED": ("hits_allowed", "Prior-start hits allowed per start"),
+        "PITCHER_BB": ("walks_allowed", "Prior-start walks per start"),
+        "PITCHER_ER": ("earned_runs", "Prior-start earned runs per start"),
+        "PITCHER_PITCHES": ("pitches", "Prior-start pitch count"),
+    }.get(market)
+    if metric is None:
+        return []  # Combined markets require a joint explanation.
+    key, name = metric
+    values = [x[key] for x in stats if isinstance(x.get(key), int)
+              and not isinstance(x[key], bool) and x[key] >= 0]
+    if len(values) < 5:
+        return []
+    average = sum(values) / len(values)
+    side = str(side).upper()
+    if side == "UNDER":
+        direction = "SUPPORTS" if average < line else "OPPOSES" if average > line else "NEUTRAL"
+    elif side == "OVER":
+        direction = "SUPPORTS" if average > line else "OPPOSES" if average < line else "NEUTRAL"
+    else:
+        direction = "NEUTRAL"
+    return [{
+        "name": f"{name} (n={len(values)})",
+        "value": round(average, 2),
+        "source": "MLB StatsAPI pregame prior-start game logs",
+        "direction": direction,
+    }]
+
+
 def blocked(row, reason):
     return {"status": "NO_MODEL_OR_MARKET", "reason": str(reason)[:180],
             "sport": "MLB", "market": row.get("market"),
@@ -105,6 +147,9 @@ def phone_pitcher_rows(rows, *, now=None, getter=None):
         judged["player_name"] = verified["pitcher_name"]
         judged["pitcher_status"] = "PROBABLE_STARTER_ONLY_NOT_CONFIRMED"
         judged["prior_start_count"] = verified["prior_start_count"]
+        judged["handicap_factors"] = _pitcher_matchup_factors(
+            verified["features"].get("history_pool"),
+            market=market, side=side, line=line)
         judged["source"] = "FREE_MLB_STATSAPI_GAMELOG"
         judged["source_game_id"] = verified["game_id"]
         outputs.append(judged)
