@@ -40,6 +40,8 @@ on:
       - 'scripts/collect_auto_dk_four_sports.py'
       - 'scripts/run_auto_dk_cards.py'
       - 'tests/test_auto_dk_four_sports.py'
+      - 'tests/test_lane5_cfb_auto_form2_20261024.py'
+      - 'scripts/capture_cfb_form2_slate.py'
       - '.github/workflows/sportsedge-auto-dk-four-sports.yml'
   workflow_dispatch:
     inputs:
@@ -70,7 +72,7 @@ jobs:
         run: |
           python -m unittest tests.test_auto_dk_four_sports -v
           python -m pip install --disable-pip-version-check pytest==9.1.1 Pillow==12.3.0
-          python -m pytest -q tests/test_auto_dk_phone_summary.py tests/test_sportsedge_png.py tests/test_nfl_auto_props.py tests/test_nfl_direct_fallback.py tests/test_nfl_auto_slate.py tests/test_auto_dk_canonical_intake.py
+          python -m pytest -q tests/test_lane5_cfb_auto_form2_20261024.py tests/test_auto_dk_phone_summary.py tests/test_sportsedge_png.py tests/test_nfl_auto_props.py tests/test_nfl_direct_fallback.py tests/test_nfl_auto_slate.py tests/test_auto_dk_canonical_intake.py
   auto:
     if: github.repository_owner == 'isaacrome21-sys' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -136,6 +138,24 @@ jobs:
             --input-dir artifacts/auto_dk \
             --out-dir artifacts/auto_dk_cards
           test ! -f artifacts/auto_dk_cards/current_value_card.md || cat artifacts/auto_dk_cards/current_value_card.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Automatic CFB Form 2 QB identity capture (no manual issue)
+        # Lane 5 (#2447): fixtures come from the already-paid DK CFB capture;
+        # OurLads/ESPN are free. Identity-only, research-only. The sealed
+        # digest is a CANDIDATE: pricing admission still needs the external
+        # owner pin (loader contract), so nothing here self-admits Form 2.
+        if: ${{ always() && env.NFL_ONLY != 'true' }}
+        continue-on-error: true
+        timeout-minutes: 15
+        run: |
+          if [ -f artifacts/auto_dk/cfb_odds.json ]; then
+            mkdir -p artifacts/auto_dk_cards/cfb_form2
+            python scripts/capture_cfb_form2_slate.py \
+              --auto-dk-capture artifacts/auto_dk/cfb_odds.json \
+              --archive artifacts/auto_dk_cards/cfb_form2/archive \
+              --resolved-lines artifacts/auto_dk_cards/cfb_form2/lines_resolved.json \
+              --report artifacts/auto_dk_cards/cfb_form2/form2_report.json \
+              | tee artifacts/auto_dk_cards/cfb_form2/summary.json
+          fi
       - name: Free direct DK fallback on empty NFL API board only
         continue-on-error: true
         timeout-minutes: 3
@@ -194,6 +214,11 @@ jobs:
             echo
             test ! -f artifacts/auto_dk_cards/phone_summary.md || cat artifacts/auto_dk_cards/phone_summary.md
             echo
+            if [ -f artifacts/auto_dk_cards/cfb_form2/summary.json ]; then
+              echo "CFB Form 2 QB capture (identity-only; candidate digest, owner pin required to admit):"
+              cat artifacts/auto_dk_cards/cfb_form2/summary.json
+              echo
+            fi
             echo "Card JSON and PNGs: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             echo
             echo "Model probabilities and quote gaps are never fabricated."
