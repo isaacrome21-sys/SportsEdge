@@ -161,11 +161,14 @@ def build_phone_card(card):
             "line": row.get("line", source.get("line")),
             "odds": _number(row.get("odds_american", row.get("dk_odds"))),
             "status": label, "reason": reason,
-            "probability": probability if bucket == "priced" and not anchored else None,
-            "estimated_ev": ev if bucket == "priced" and not anchored else None,
+            # Stale-quote rows still carry the model's own probability and
+            # fair price: show them (EV is at the SUBMITTED price and is only
+            # a guide until the line is re-checked). Status stays REFRESH.
+            "probability": probability if bucket in {"priced", "stale"} and not anchored else None,
+            "estimated_ev": ev if bucket in {"priced", "stale"} and not anchored else None,
             "fair_odds": _number((row.get("independent_projection")
                                   if isinstance(row.get("independent_projection"), dict)
-                                  else row).get("fair_american")) if bucket == "priced" and not anchored else None,
+                                  else row).get("fair_american")) if bucket in {"priced", "stale"} and not anchored else None,
             "source_status": row.get("status"),
             "handicap": (analyses[index] if analyses is not None
                           and isinstance(analyses[index], dict)
@@ -352,6 +355,24 @@ def render_phone_card(card, *, run_url="", intake_at="", now=None):
     if not current["unverified_model_value_screens"]:
         lines.append("| — | No fresh independent positive-EV selection on this submitted board | — | — | — | — | — |")
     lines += ["", f"Last verified screen: {_safe(current['finalized_at_utc'])} UTC · Priced screens: {current['total_positive_screens']} · Verified PLAYs: 0 (this surface has no promotion authority).", ""]
+    stale_ranked = sorted(
+        (r for r in view["selections"]
+         if r["status"] == "REFRESH REQUIRED" and r.get("estimated_ev") is not None
+         and r["estimated_ev"] > 0),
+        key=lambda r: r["estimated_ev"], reverse=True)
+    if stale_ranked:
+        lines += ["### Model value at the SUBMITTED prices · re-check line before betting", "",
+                  "Ranked by EV, highest first. These quotes are older than the freshness window: "
+                  "bet only if DK still offers the line at or better than the fair price.", "",
+                  "| # | EV | Game | Selection | DK (submitted) | Model p | Model fair |",
+                  "| ---: | ---: | --- | --- | ---: | ---: | ---: |"]
+        for rank, r in enumerate(stale_ranked[:30], 1):
+            name = " ".join(str(x) for x in (r.get("player_name"), r["market"], r["selection"]) if x)
+            if r.get("line") is not None and str(r["line"]) not in str(r["selection"]):
+                name += " " + str(r["line"])
+            lines.append(f"| {rank} | {100*r['estimated_ev']:+.1f}% | {_safe(r['game'])} | {_safe(name)} | "
+                         f"{_price(r['odds'])} | {100*r['probability']:.1f}% | {_price(r['fair_odds'])} |")
+        lines.append("")
     groups = defaultdict(list)
     for row in view["selections"]:
         groups[(str(row.get("kickoff") or ""), row["sport"], row["game"])].append(row)
