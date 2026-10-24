@@ -13,7 +13,7 @@ for season in (2023,2024,2025):
         c=e["competitions"][0]
         if not c["status"]["type"].get("completed"): continue
         t={x["homeAway"]:x for x in c["competitors"]}
-        try: out[e["id"]]={"season":season,"date":e["date"],"neutral":c.get("neutralSite",False),"home":t["home"]["team"]["id"],"away":t["away"]["team"]["id"],"hs":float(t["home"]["score"]),"as":float(t["away"]["score"])}
+        try: out[e["id"]]={"season":season,"date":e["date"],"neutral":c.get("neutralSite",False),"home":t["home"]["team"]["id"],"away":t["away"]["team"]["id"],"hs":float(t["home"]["score"]),"as":float(t["away"]["score"]),"home_conf":str(t["home"]["team"].get("conferenceId")),"away_conf":str(t["away"]["team"].get("conferenceId"))}
         except Exception: pass
       time.sleep(0.2)
   print(season,len(out))

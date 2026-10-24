@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import numpy as np
-from sportsedge.sports.cfb.opponent_ratings import fit_ratings, predict, _when
+from sportsedge.sports.cfb.opponent_ratings import FBS_CONFERENCE_IDS, fit_ratings, predict, _when
 
 
 def phi(x):
@@ -42,7 +42,9 @@ def load():
         b = box.get(gid) or {}
         h, a = b.get(str(x["home"])) or {}, b.get(str(x["away"])) or {}
         games.append(dict(x, gid=gid, home=str(x["home"]), away=str(x["away"]),
-                          h_box=h, a_box=a))
+                          h_box=h, a_box=a,
+                          fbs_both=(x.get("home_conf") in FBS_CONFERENCE_IDS
+                                    and x.get("away_conf") in FBS_CONFERENCE_IDS)))
     L = collections.defaultdict(lambda: {"sp": [], "spo": [], "spp": [], "tot": [], "toto": [], "ml": collections.defaultdict(dict)})
     for r in csv.DictReader(gzip.open("cfb_line_odds.csv.gz", "rt")):
         if r["season"] not in ("2024.0", "2025.0") or not r["game_id"] or r["game_id"] not in R:
@@ -104,7 +106,10 @@ def season_preds(games, season, lam, rho, key=None, mu_prior=27.0, hfa_prior=3.0
                         mu_prior=prior["mu"] if prior else mu_prior,
                         hfa_prior=hfa_prior)
         for g in by_day[d]:
-            out[g["gid"]] = predict(r, g["home"], g["away"], neutral=bool(g.get("neutral")))
+            out[g["gid"]] = predict(r, g["home"], g["away"], neutral=bool(g.get("neutral")),
+                                    fbs_both=g["fbs_both"])
+        last = r
+    out["_hfa"] = (last["hfa"], last["hfa_non_fbs"]) if by_day else None
     return out
 
 
@@ -257,7 +262,10 @@ def main():
                                              hfa_prior=0.0)
     variants = [("pts",), ("pts", "eff"), ("pts", "eff", "pace"), ("pts", "eff", "pace", "to"),
                 ("pts", "eff", "pace", "to", "rest")]
-    report = {"lam": lam, "rho": rho, "status_label": "SCREEN", "validation": "NOT_VALIDATED",
+    report = {"lam": lam, "rho": rho,
+              "hfa_end_2024_fbs_vs_fbs": preds[2024]["pts"]["_hfa"][0],
+              "hfa_end_2024_non_fbs": preds[2024]["pts"]["_hfa"][1],
+              "hfa_end_2025_fbs_vs_fbs": preds[2025]["pts"]["_hfa"][0], "status_label": "SCREEN", "validation": "NOT_VALIDATED",
               "ablation": {}}
     for v in variants:
         if "eff" in v and not preds[2024].get("yards"):

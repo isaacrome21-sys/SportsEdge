@@ -1,5 +1,50 @@
 # CFB opponent-adjusted ratings (t273, 2026-10-24) — SCREEN / NOT_VALIDATED
 
+## t273b revision (audit fixes) — these numbers SUPERSEDE the t273 numbers below
+
+SCREEN / NOT_VALIDATED, play_allowed=false. **It does not beat the closing market.**
+
+1. **Card probabilities are calibrated.** For CFB spreads and totals priced by the
+   opponent-adjusted model, the card/candidate probability is
+   `Phi(beta * (model_mean - line) / sd)` — the raw probability shrunk toward the
+   no-vig line — with the FITTED sds (margin 16.919, total 16.188; not PRIORS 16.46).
+   **beta is fit using 2024 closing lines** (2024 outcomes regressed on the model's
+   standardized gap to the 2024 closing no-vig line): beta_spread = 0.04,
+   beta_total = 0.42. Closing lines are never a model input. The raw value is kept
+   as `raw_estimate_p`; `probability_basis = CFB_CALIBRATED_2024_BETA_TOWARD_LINE`.
+   Moneylines stay raw (fitted sd) and carry
+   `oos_2025_vs_market = {model_brier 0.1794, market_no_vig_brier 0.1693, WORSE_THAN_MARKET}`.
+2. **Home field is fit on FBS-vs-FBS games only.** Games involving a non-FBS team
+   (ESPN conferenceId outside {1,4,5,8,9,12,15,17,18,37,151}) get their own
+   `hfa_non_fbs` column. End-2024 fit: FBS HFA 3.06, non-FBS 7.24 (was a single
+   pooled ~5.0). End-2025 FBS HFA 3.20. Live pricing uses the non-FBS value only
+   when a team is not in the FBS set (`CFB_NON_FBS_MATCHUP_HFA`).
+3. **Fail-closed fetch.** If any week's ESPN scoreboard is missing/malformed,
+   `live_ratings` raises `CFB_RATINGS_FETCH_INCOMPLETE` and the engine falls back
+   to the t272 composition.
+
+Rerun (2024-fit, 2025 out of sample; grid best lam 1 / rho 1, at the grid edge):
+2024 recalibration margin = 2.3057 + 0.909*gap, total = 33.5954 + 0.3832*sum.
+
+| Variant | Spread Brier (cal) | Spread (raw) | Total (cal) | Total (raw) | ML Brier | beta s / t |
+|---|---|---|---|---|---|---|
+| closing no-vig | 0.25 | | 0.25 | | 0.1693 | |
+| pts (selected) | 0.2498 | 0.2671 | 0.252 | 0.2604 | 0.1794 | 0.04 / 0.42 |
+| pts+eff | 0.2498 | 0.2683 | 0.252 | 0.2603 | 0.18 | 0.04 / 0.42 |
+| pts+eff+pace | 0.2498 | 0.2683 | 0.2539 | 0.2585 | 0.18 | 0.04 / 0.69 |
+| pts+eff+pace+to | 0.2499 | 0.2667 | 0.2539 | 0.2585 | 0.1785 | 0.02 / 0.69 |
+| pts+eff+pace+to+rest | 0.2499 | 0.2657 | 0.2539 | 0.2585 | 0.1782 | 0.02 / 0.69 |
+
+No feature group improved calibrated spread or total Brier; points-only stays.
+2025 OOS (pts, n_spread 917): ATS gap>=2.5: 340/634 = 0.536 [0.497–0.575];
+gap>=3: 305/570 = 0.535 [0.494–0.576]; O/U gap>=2.5: 267/525 = 0.509 [0.466–0.551];
+gap>=3: 232/455 = 0.510 [0.464–0.556]. CLV agreement: spread 426/795 = 0.536
+[0.501–0.570], total 469/832 = 0.564 [0.530–0.597]. With beta_spread = 0.04 the
+calibrated spread probability is essentially the line: spread "edges" are vig-negative
+and should not produce candidates.
+
+## Original t273 (superseded numbers)
+
 **Bottom line: it does not beat the closing market out of sample.** Fit on
 2024 only, scored on 2025 (917 games with closing lines): spread-cover Brier
 0.2497 vs closing no-vig 0.25 (indistinguishable);
