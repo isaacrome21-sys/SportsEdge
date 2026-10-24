@@ -92,8 +92,9 @@ def _scoring(sport, home, away, kickoff, now, provider):
     if not any(flag in joined for flag in ("WEATHER:INDOOR_VERIFIED", "WEATHER:HEURISTIC_FORECAST")):
         raise ValueError("PUBLIC_VENUE_ENVIRONMENT_UNVERIFIED")
     base, sd_total, sd_margin, hfa = engine.PRIORS[sport]
-    hm = base + hfa/2 + ctx["home_rating"]
-    am = base - hfa/2 + ctx["away_rating"]
+    # t272b: one canonical composition (engine._base_means); the legacy
+    # base + hfa/2 + rating shortcut mis-scaled CFB ratings (91-pt totals).
+    hm, am = engine._base_means(sport, ctx)
     # These factor observations remain in the PIT context for audit but
     # are explicitly DISABLED in prices: MLB unvalidated pitcher adjustment,
     # and NFL/CFB recent-form. Keep separately verified football injuries.

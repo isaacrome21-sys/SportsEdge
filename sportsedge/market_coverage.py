@@ -34,6 +34,7 @@ from datetime import datetime, timezone
 from math import exp, pi, sqrt
 from typing import Any, Mapping
 
+from artifacts.free_models import _base_means as _engine_base_means
 from artifacts.free_models import (
     PRIORS,
     PublicContext,
@@ -238,9 +239,8 @@ def _base_means(row: Mapping[str, Any], *, now: datetime,
             context[key] = n
     if kickoff is None or kickoff <= now:
         raise MarketCoverageError("BLOCKED_KICKOFF_UNVERIFIED")
-    base, _, _, hfa = PRIORS[sport]
-    home_mean = base + hfa / 2 + context["home_rating"]
-    away_mean = base - hfa / 2 + context["away_rating"]
+    # t272b: one canonical composition shared with the engine.
+    home_mean, away_mean = _engine_base_means(sport, context)
     if sport == "MLB":
         # Owner Oct 13 disable ruling: ERA starting-pitcher heuristics are
         # observed research values, but have exactly ZERO pricing authority.
