@@ -142,3 +142,43 @@ def test_real_canonical_no_fetch_seam_cannot_create_an_actionable_value_screen()
     # Without independently fetched matchup context, even a nominal +EV
     # game model is not a current trusted priced opportunity.
     assert build_current_value_screens(card, now=NOW)["total_positive_screens"] == 0
+
+
+def test_fast_pass_prices_nearest_complete_game_and_accounts_for_deferred(tmp_path):
+    late_nfl = snapshot("NFL")
+    late_nfl["games"][0]["provider_event_id"] = "nfl-sunday"
+    late_nfl["games"][0]["commence_time"] = (
+        NOW + timedelta(days=2)).isoformat()
+    near_cfb = snapshot("CFB")
+    near_cfb["games"][0]["provider_event_id"] = "cfb-tonight"
+    near_cfb["games"][0]["commence_time"] = (
+        NOW + timedelta(minutes=45)).isoformat()
+    (tmp_path / "nfl_odds.json").write_text(json.dumps(late_nfl))
+    (tmp_path / "cfb_odds.json").write_text(json.dumps(near_cfb))
+    received = {}
+
+    def runner(payload, **kwargs):
+        received["rows"] = payload["lines"]
+        return {"evaluated_rows": [{} for _ in payload["lines"]]}
+
+    audit, card, markdown = run_capture_directory(
+        tmp_path, now=NOW, runner=runner,
+        render=lambda card, *, now: "near-tip preview", max_games=1)
+    assert card is not None and markdown == "near-tip preview"
+    assert audit["source_rows"] == 12
+    assert audit["input_rows"] == 6
+    assert audit["deferred_rows"] == 6
+    assert audit["fast_pass_game_cap"] == 1
+    assert audit["rows_by_sport"]["NFL"] == 0
+    assert audit["rows_by_sport"]["CFB"] == 6
+    assert all(row["sport"] == "CFB" for row in received["rows"])
+    assert len({row["capture_event_id"] for row in received["rows"]}) == 1
+    assert any(row.get("capture_event_id") == "nfl-sunday"
+               and row["reason"] == "DEFERRED_BY_FAST_PASS_GAME_CAP"
+               for row in audit["capture_refusals"])
+
+
+@pytest.mark.parametrize("bad", [0, -1, True, 1.5, "2"])
+def test_fast_pass_rejects_invalid_game_limit(tmp_path, bad):
+    with pytest.raises(ValueError, match="LIVE_MAX_GAMES_MUST_BE_POSITIVE_INTEGER"):
+        run_capture_directory(tmp_path, now=NOW, max_games=bad)
