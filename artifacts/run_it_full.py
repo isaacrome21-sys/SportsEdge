@@ -1494,6 +1494,18 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
         "availability_unverified_max_surface": "RESEARCH_ONLY",
     })
     card["evaluated_rows"] = evaluated
+    # Non-authoritative explanation seam shared by *all* sports/markets.
+    # Only factors explicitly emitted with source metadata are described;
+    # absent style/opponent inputs remain missing, never invented.
+    from sportsedge.handicap_explanations import handicap_explanation
+    card["handicap_explanations"] = [
+        {"input_index": index, **handicap_explanation(
+            result,
+            sport=str(raw.get("sport") or default_sport or "UNKNOWN"),
+            market=str(raw.get("market") or result.get("market") or "UNKNOWN"),
+        )}
+        for index, (raw, result) in enumerate(zip(rows, evaluated))
+    ]
     # Registry gate stamp for this runner's own gate routing (the
     # intake gate, the post-prepricing substitution and the re-check
     # above), mirroring the shape sportsedge.registry_gate.gate_and_stamp

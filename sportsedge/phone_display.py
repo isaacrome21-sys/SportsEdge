@@ -121,6 +121,10 @@ def build_phone_card(card):
     intake = card.get("selection_intake")
     if intake is not None and (not isinstance(intake, list) or len(intake) != len(rows)):
         raise ValueError("SELECTION_INTAKE_COUNT_MISMATCH")
+    analyses = card.get("handicap_explanations")
+    if analyses is not None and (not isinstance(analyses, list)
+                                 or len(analyses) != len(rows)):
+        raise ValueError("HANDICAP_EXPLANATION_COUNT_MISMATCH")
     floor = _number(card.get("min_ev", 0.02))
     if floor is None or not 0 <= floor <= 0.15:
         raise ValueError("INVALID_EDGE_FLOOR")
@@ -161,6 +165,10 @@ def build_phone_card(card):
                                   if isinstance(row.get("independent_projection"), dict)
                                   else row).get("fair_american")) if bucket == "priced" and not anchored else None,
             "source_status": row.get("status"),
+            "handicap": (analyses[index] if analyses is not None
+                          and isinstance(analyses[index], dict)
+                          and analyses[index].get("input_index") == index
+                          else None),
         })
     ledger = [{**dict(zip(("sport", "market", "period", "phase", "alternate", "settlement_type"), key)),
                **{k: counts[k] for k in ("priced", "blocked", "rejected", "stale")},
@@ -204,6 +212,16 @@ def render_phone_card(card, *, run_url="", intake_at=""):
             if row.get("line") is not None and str(row["line"]) not in str(row["selection"]):
                 name += " " + str(row["line"])
             lines.append(f"| {_safe(name)} | {_price(row['odds'])} | {row['status']} | {p} | {_price(row['fair_odds'])} | {ev} | {_safe(row['reason'])} |")
+        described = [r for r in rows if r.get("handicap") and
+                     r["handicap"].get("evidence")]
+        if described:
+            lines += ["", "**Matchup evidence (research; not independently verified)**"]
+            for r in described:
+                h = r["handicap"]
+                parts = [f"{e['name']}={e['value']} ({e['direction'].lower()}; {e['source']})"
+                         for e in h["evidence"]]
+                lines.append(f"- {_safe(r['selection'])}: " +
+                             _safe("; ".join(parts)))
         lines.append("")
     lines += ["### Board coverage", "", "Counts describe this submitted board; the full DraftKings catalog has not been verified.", "",
               "| Sport / market / period / phase / alternate / settlement | Priced | Blocked | Rejected | Refresh |",
