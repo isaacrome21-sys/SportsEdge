@@ -178,6 +178,8 @@ def _main(argv=None):
     ap.add_argument("--output", default="artifacts/run_it/cfb_matchup_blend_backtest.json")
     args = ap.parse_args(argv)
     seasons = [int(x) for x in args.seasons.split(",")]
+    if len(seasons) < 2 or len(set(seasons)) != len(seasons) or seasons != sorted(seasons):
+        raise SystemExit("INVALID_EVALUATION_SEASONS: require >=2 unique ascending seasons")
     if args.games_json:
         games = json.loads(Path(args.games_json).read_text())
     else:
@@ -188,10 +190,50 @@ def _main(argv=None):
         games = fetch(seasons, key)
         Path(args.output).parent.mkdir(parents=True, exist_ok=True)
         Path(args.output).with_name("cfb_lines_games.json").write_text(json.dumps(games))
+    # Explicitly reject unknown or incomplete fixture clocks. Lexicographic
+    # sorting of blank kickoff timestamps can otherwise admit future scores.
+    from datetime import datetime
+
+    def valid_kickoff(game):
+        start = game.get("start")
+        if not isinstance(start, str) or not start.strip():
+            return False
+        try:
+            dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
+            return dt.tzinfo is not None and dt.utcoffset() is not None
+        except ValueError:
+            return False
+
+    invalid_clocks = [g.get("id") for g in games if not valid_kickoff(g)]
+    if invalid_clocks:
+        raise SystemExit(f"INVALID_FIXTURE_CLOCKS games={invalid_clocks[:10]}; no weight chosen")
     rows = project(games)
     by_season = defaultdict(list)
     for r in rows:
         by_season[r["season"]].append(r)
+    # Fail closed even for --games-json inputs: a fetched season can contain
+    # records but zero eligible paired spread/total observations.
+    missing = [season for season in seasons if not any(
+        r["season"] == season and r["spread"] is not None and r["total"] is not None
+        for r in rows
+    )]
+    if missing:
+        raise SystemExit(f"INCOMPLETE_EVALUATION missing paired seasons={missing}; no weight chosen")
+    # A single priced fixture per season is not a representative backtest.
+    # Keep this as a transparent minimum intake guard, not a validation claim.
+    MIN_PAIRED_GAMES_PER_SEASON = 100
+    thin = {season: sum(
+        r["season"] == season and r["spread"] is not None and r["total"] is not None
+        for r in rows
+    ) for season in seasons}
+    thin = {season: n for season, n in thin.items() if n < MIN_PAIRED_GAMES_PER_SEASON}
+    if thin:
+        raise SystemExit(f"INSUFFICIENT_EVALUATION_SAMPLE paired games by season={thin}; "
+                         f"minimum={MIN_PAIRED_GAMES_PER_SEASON}; no weight chosen")
+    if not any(r["season"] < max(seasons) for r in rows) or not any(
+        r["season"] == max(seasons) for r in rows
+    ):
+        raise SystemExit("INCOMPLETE_EVALUATION training or holdout season absent; no weight chosen")
     report = {"seasons": seasons, "rows": len(rows), "per_season": {}}
     for s, rs in sorted(by_season.items()):
         report["per_season"][s] = [score(rs, w) for w in WEIGHTS]
