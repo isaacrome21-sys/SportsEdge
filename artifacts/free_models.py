@@ -971,6 +971,8 @@ def context_for(sport, away, home, start, provider, row):
             out[f"{prefix}_injury_pts"] = injury
             notes.append(prefix.upper() + "_INJURIES:" + status)
     if sport == "NFL" and len(nfl_margins) == 2:
+        out["home_rating_pre_nfl_side_v1"] = out.get("home_rating", 0.0)
+        out["away_rating_pre_nfl_side_v1"] = out.get("away_rating", 0.0)
         out["home_rating"], out["away_rating"] = (
             round(x, 3) for x in nfl_decompressed_ratings(
                 out.get("home_rating", 0.0), out.get("away_rating", 0.0),
