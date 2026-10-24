@@ -59,7 +59,8 @@ class ForwardTracker:
         return tuple(MappingProxyType(dict(e)) for e in self._audit)
 
     def _log(self, event: str, rid: str, at: datetime, **extra: Any) -> dict:
-        entry = {"seq": len(self._audit), "event": event, "record_id": rid, "at": at, **extra}
+        seq = len(self._audit)
+        entry = {"seq": seq, "event_id": f"{rid}:{seq}", "event": event, "record_id": rid, "at": at, **extra}
         self._audit.append(entry)
         return entry
 
@@ -118,12 +119,16 @@ class ForwardTracker:
         entry = self._log("SETTLE", rid, now, result=result)
         r["result"], r["settled_at"], r["settle_seq"] = result, now, entry["seq"]
 
-    def correct_settlement(self, rid: str, *, result: str, reason: Any, actor: Any, now: Any) -> None:
+    def correct_settlement(self, rid: str, *, supersedes_event_id: Any, result: str, reason: Any,
+                           actor: Any, now: Any) -> None:
         """Traceable correction: appends a CORRECT_SETTLEMENT entry referencing the
         entry it supersedes; never edits or removes earlier audit entries."""
         r = self.records.get(rid)
         if r is None or r["result"] is None:
             raise TrackerError("CORRECTION_REQUIRES_SETTLEMENT")
+        current = self._audit[r["settle_seq"]]
+        if not isinstance(supersedes_event_id, str) or supersedes_event_id != current["event_id"]:
+            raise TrackerError("CORRECTION_REFERENCE_INVALID")
         if not isinstance(reason, str) or not reason.strip():
             raise TrackerError("CORRECTION_REASON_REQUIRED")
         if not isinstance(actor, str) or not actor.strip():
@@ -137,7 +142,7 @@ class ForwardTracker:
         if now <= last:
             raise TrackerError("CORRECTION_TIME_NOT_AFTER_SETTLEMENT")
         entry = self._log("CORRECT_SETTLEMENT", rid, now, result=result, previous_result=r["result"],
-                          supersedes_seq=r["settle_seq"], reason=reason.strip(), actor=actor.strip())
+                          supersedes_event_id=current["event_id"], reason=reason.strip(), actor=actor.strip())
         r["result"], r["settle_seq"] = result, entry["seq"]
 
     def summary(self) -> dict:
