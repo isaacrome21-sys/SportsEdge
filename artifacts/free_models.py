@@ -50,7 +50,12 @@ CONTEXT_KEYS = {"NFL": ("home_rating", "away_rating", "home_injury_pts",
                         "rest_diff_adj"),
                 "CFB": ("home_rating", "away_rating", "home_injury_pts",
                         "away_injury_pts", "home_form", "away_form", "weather_total_adj",
-                        "rest_diff_adj", "home_total_rating", "away_total_rating"),
+                        "rest_diff_adj", "home_total_rating", "away_total_rating",
+                        # t273 opponent-adjusted composition (flag + league mean +
+                        # additive offense / defense-prevented ratings)
+                        "cfb_opp_adjusted", "cfb_league_mean_pts", "cfb_hfa",
+                        "home_off_rating", "home_def_rating",
+                        "away_off_rating", "away_def_rating"),
                 "NBA": ("home_rating", "away_rating", "home_injury_pts",
                         "away_injury_pts", "home_form", "away_form", "rest_adj"),
                 "MLB": ("home_rating", "away_rating", "home_pitcher_adj",
@@ -892,6 +897,19 @@ CFB_MARGIN_MODEL = {
 }
 
 
+# t273: opponent-adjusted ridge off/def ratings (sportsedge.sports.cfb.
+# opponent_ratings), recalibrated linearly on 2024 results only; scored out
+# of sample on 2025 (docs/CFB_OPPONENT_RATINGS_20261024.md). It does NOT
+# beat closing lines out of sample. SCREEN / NOT_VALIDATED.
+CFB_OPP_MODEL = {
+    "family": "CFB_OPPONENT_ADJUSTED_RIDGE_V1",
+    "margin_intercept": 1.0431, "margin_slope": 0.9098,
+    "total_intercept": 33.5954, "total_slope": 0.3832,
+    "sd_margin_2024": 16.791, "sd_total_2024": 16.188,
+    "status_label": "SCREEN", "validation": "NOT_VALIDATED",
+}
+
+
 def cfb_ratings_from_sample(sample):
     """Point-in-time CFB ratings from (date, points_for, points_against)."""
     if not sample:
@@ -904,11 +922,38 @@ def cfb_ratings_from_sample(sample):
             "total_rating": round(sum(totals) / len(totals), 3)}
 
 
+def _cfb_opp_ratings(provider, kickoff):
+    """Per-provider cached opponent-adjusted ratings; None on any failure
+    (fail closed to the t272 composition, never to invented ratings)."""
+    fetch = getattr(provider, "fetch", None)
+    if fetch is None or kickoff is None:
+        return None
+    cache = provider.__dict__.setdefault("_cfb_opp_cache", {})
+    key = kickoff.date().isoformat()
+    if key not in cache:
+        try:
+            from sportsedge.sports.cfb.opponent_ratings import live_ratings
+            r = live_ratings(fetch, kickoff)
+            cache[key] = r if r.get("n_games", 0) > 0 else None
+        except Exception:
+            cache[key] = None
+    return cache[key]
+
+
 def _base_means(sport, context):
     base, _, _, hfa = PRIORS[sport]
     if sport != "CFB":
         return (base + hfa / 2 + context["home_rating"],
                 base - hfa / 2 + context["away_rating"])
+    if context.get("cfb_opp_adjusted") == 1.0:
+        mu = context.get("cfb_league_mean_pts") or base
+        h = context.get("cfb_hfa", hfa)
+        rh = mu + h / 2 + context["home_off_rating"] - context["away_def_rating"]
+        ra = mu - h / 2 + context["away_off_rating"] - context["home_def_rating"]
+        c = CFB_OPP_MODEL
+        margin = c["margin_intercept"] + c["margin_slope"] * (rh - ra)
+        total = c["total_intercept"] + c["total_slope"] * (rh + ra)
+        return total / 2 + margin / 2, total / 2 - margin / 2
     envs = [v for v in (context.get("home_total_rating") or 0.0,
                         context.get("away_total_rating") or 0.0) if v > 0]
     if not envs:
@@ -950,6 +995,14 @@ def context_for(sport, away, home, start, provider, row):
                 cfb = cfb_ratings_from_sample(sample)
                 out[f"{prefix}_rating"] = cfb["rating"]
                 out[f"{prefix}_total_rating"] = cfb["total_rating"]
+                opp = _cfb_opp_ratings(provider, kickoff)
+                if opp is not None and str(team.get("id")) in opp["teams"]:
+                    t = opp["teams"][str(team.get("id"))]
+                    out[f"{prefix}_off_rating"] = round(t["off"], 3)
+                    out[f"{prefix}_def_rating"] = round(t["def"], 3)
+                    out["cfb_league_mean_pts"] = round(opp["mu"], 3)
+                    out["cfb_hfa"] = round(opp["hfa"], 3)
+                    notes.append(prefix.upper() + "_CFB_OPP_ADJUSTED_RATING")
             else:
                 out[f"{prefix}_rating"] = round(bounded(sum(margins) / len(margins) * 0.12, -cap, cap), 3)
             if sport in {"NFL", "CFB", "NBA"} and len(sample) >= 4:
@@ -961,6 +1014,12 @@ def context_for(sport, away, home, start, provider, row):
             injury, status = provider.injury_points(sport, team)
             out[f"{prefix}_injury_pts"] = injury
             notes.append(prefix.upper() + "_INJURIES:" + status)
+    if (sport == "CFB" and "HOME_CFB_OPP_ADJUSTED_RATING" in notes
+            and "AWAY_CFB_OPP_ADJUSTED_RATING" in notes):
+        out["cfb_opp_adjusted"] = 1.0
+        if competition and competition.get("neutralSite"):
+            out["cfb_hfa"] = 0.0
+            notes.append("CFB_NEUTRAL_SITE_HFA_ZERO")
     if sport in {"NFL", "CFB", "MLB"}:
         weather, status = provider.weather(sport, competition, kickoff,
                             latitude=row.get("venue_latitude"), longitude=row.get("venue_longitude"))
