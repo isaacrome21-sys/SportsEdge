@@ -190,3 +190,9 @@ def test_offset_dependent_mapping_refuses(tmp_path):
 def test_two_schedules_one_unlabelled_card_still_refuses(tmp_path):
     _ws(tmp_path)
     _blocked(tmp_path, [_card(111, "+159", "-193")])
+
+
+def test_conflicting_labels_for_one_event_id_are_dropped():
+    extra = '<span data-testid="cb-start-time-111">Sat Oct 24th 7:08 PM</span>'
+    b = _fetch([_card(111, "+159", "-193", CT_G1), extra])(URL, "baseball_mlb")
+    assert all(r["board_start_time_text"] is None for r in b["rows"])

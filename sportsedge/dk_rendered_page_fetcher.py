@@ -187,6 +187,13 @@ def parse_rendered_board(html: str, *, page_url: str, observed_at: datetime | No
     rows: list[dict[str, Any]] = []
     refused: list[dict[str, Any]] = []
     card_refusals: list[dict[str, Any]] = []
+    # Raw per-event start labels as rendered (browser-local zone, no year), keyed page-wide by the
+    # event id in the testid (DK renders the label in a sibling template, not the button card).
+    # Recorded verbatim only; never converted into commence_time. Conflicting labels -> None.
+    start_labels: dict[str, set[str]] = {}
+    for st in soup.select('[data-testid^="cb-start-time-"]'):
+        start_labels.setdefault(st.get("data-testid", "")[len("cb-start-time-"):], set()).add(
+            st.get_text(" ", strip=True))
     for ci, card in enumerate(cards):
         teams = _teams(card)
         buttons = card.select('button[data-testid^="component-builder-market-button-"]')
@@ -233,6 +240,8 @@ def parse_rendered_board(html: str, *, page_url: str, observed_at: datetime | No
                     "outcome": outcome, "selection": outcome, "point": None, "price_american": None,
                     "source_uri": page_url, "final_url": final_url, "observed_at_utc": obs,
                     "book_last_update": None, "status": "OK", "refusal": None,
+                    "board_start_time_text": (next(iter(start_labels[event_id]))
+                                              if len(start_labels.get(event_id, ())) == 1 else None),
                 }
                 refusal = None
                 if outcome is None:

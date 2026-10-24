@@ -7,9 +7,14 @@ identity, allowlisted public page URL). No API credentials; no DK API URL is bui
 
 The board card carries no start time, so each rendered event is matched one-to-one to an
 already-captured market-blind MLB forward prediction (MLB StatsAPI schedule) by the DK label
-nickname -> MLB team id table below and the prediction's home/away team ids. Unmapped labels,
-ambiguous matches (e.g. doubleheaders) and in-window games without a clean two-sided rendered
-moneyline block the run (BLOCKED_ONE_SIDED). Nothing is inferred or filled in.
+nickname -> MLB team id table below and the prediction's home/away team ids. When more than one
+scheduled game or rendered card shares the same away/home pair (doubleheaders, World Series G1/G2),
+a card is bound to a game only through the card's rendered start label (``cb-start-time-<event>``,
+browser-local zone, no year): the label must equal the game's StatsAPI start, and the resulting
+card->game binding must be the same under every candidate UTC offset at which any card matches.
+Missing/unparseable labels, offset-dependent bindings, unmapped labels and in-window games without
+a clean two-sided rendered moneyline block the run (BLOCKED_ONE_SIDED). Nothing is inferred or
+filled in; the label is never written as a start time.
 
 Snapshots are immutable and keyed by event, window, observation time and page-HTML hash, as
 in the direct capture, so the ledger can select the T30 decision quote and the close.
@@ -21,8 +26,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -42,6 +48,16 @@ DK_MLB_NICKNAME_TEAM_ID = {
     "Giants": 137, "Mariners": 136, "Cardinals": 138, "Rays": 139, "Rangers": 140, "Blue Jays": 141,
     "Nationals": 120,
 }
+
+
+# Candidate browser UTC offsets (minutes) for the rendered start label; 15-minute grid, -12h..+14h.
+LABEL_UTC_OFFSETS_MIN = tuple(range(-12 * 60, 14 * 60 + 1, 15))
+_MONTHS = {m: i for i, m in enumerate(("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep",
+                                       "oct", "nov", "dec"), 1)}
+_WEEKDAYS = {d: i for i, d in enumerate(("mon", "tue", "wed", "thu", "fri", "sat", "sun"))}
+_LABEL_RE = re.compile(
+    r"^(?:(?P<wd>mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?\s+(?P<mon>[a-z]{3})[a-z]*\.?\s+(?P<day>\d{1,2})(?:st|nd|rd|th)?"
+    r"|(?P<rel>today|tomorrow))\s+(?P<h>\d{1,2}):(?P<m>\d{2})\s*(?P<ap>[ap]m)$", re.I)
 
 
 class CaptureBlocked(RuntimeError):
@@ -70,6 +86,69 @@ def label_team_id(label: str) -> int | None:
     if len(parts) != 2:
         return None
     return DK_MLB_NICKNAME_TEAM_ID.get(parts[1].strip())
+
+
+def parse_start_label(text: Any) -> dict[str, Any] | None:
+    """Parse a DK board start label ('Fri Oct 23rd 7:08 PM', 'Today 7:08 PM'). None if not exact."""
+    m = _LABEL_RE.match(" ".join(str(text or "").split()))
+    if not m:
+        return None
+    h, mi = int(m.group("h")), int(m.group("m"))
+    if not (1 <= h <= 12 and 0 <= mi <= 59):
+        return None
+    out: dict[str, Any] = {"hour": h % 12 + (12 if m.group("ap").lower() == "pm" else 0), "minute": mi}
+    if m.group("rel"):
+        out["rel_days"] = 0 if m.group("rel").lower() == "today" else 1
+        return out
+    mon = _MONTHS.get(m.group("mon").lower())
+    day = int(m.group("day"))
+    if mon is None or not 1 <= day <= 31:
+        return None
+    out.update(weekday=_WEEKDAYS[m.group("wd").lower()[:3]], month=mon, day=day)
+    return out
+
+
+def _label_matches(lab: Mapping[str, Any], start: datetime, observed: datetime, offset_min: int) -> bool:
+    tz = timezone(timedelta(minutes=offset_min))
+    ls, lo = start.astimezone(tz), observed.astimezone(tz)
+    if (ls.hour, ls.minute) != (lab["hour"], lab["minute"]):
+        return False
+    if "rel_days" in lab:
+        return ls.date() == lo.date() + timedelta(days=lab["rel_days"])
+    return (ls.month, ls.day, ls.weekday()) == (lab["month"], lab["day"], lab["weekday"])
+
+
+def bind_by_start_label(preds: list[Mapping[str, Any]], cands: list[Mapping[str, Any]],
+                        observed: datetime) -> dict[int, Mapping[str, Any]] | None:
+    """Bind same-matchup cards to scheduled games by rendered start label, or None (refuse).
+
+    Every card must carry a parseable label. For each candidate offset, every card may match at
+    most one game and no game more than one card; the non-empty binding must be identical under
+    every offset at which any card matches. Otherwise the binding is ambiguous and refused.
+    """
+    labs = [parse_start_label(c.get("start_text")) for c in cands]
+    if not cands or any(lab is None for lab in labs):
+        return None
+    starts = []
+    for p in preds:
+        try:
+            starts.append((int(p["game_pk"]), _parse(p.get("event_start_ts"))))
+        except Exception:
+            return None
+    bindings = set()
+    for off in LABEL_UTC_OFFSETS_MIN:
+        mapping: dict[int, int] = {}
+        for ci, lab in enumerate(labs):
+            hits = [pk for pk, st in starts if _label_matches(lab, st, observed, off)]
+            if len(hits) > 1 or (hits and hits[0] in mapping):
+                return None
+            if hits:
+                mapping[hits[0]] = ci
+        if mapping:
+            bindings.add(frozenset(mapping.items()))
+    if len(bindings) != 1:
+        return None
+    return {pk: cands[ci] for pk, ci in next(iter(bindings))}
 
 
 def _predictions(root: str | Path) -> list[dict[str, Any]]:
@@ -117,8 +196,10 @@ def _rendered_pairs(board: Mapping[str, Any]) -> dict[tuple[int | None, int | No
         if home is None or away is None:
             continue
         key = (label_team_id(away_label), label_team_id(home_label))
+        texts = {r.get("board_start_time_text") for r in rows}
         pairs.setdefault(key, []).append({"event_id": eid, "home": home, "away": away,
-                                          "away_label": away_label, "home_label": home_label})
+                                          "away_label": away_label, "home_label": home_label,
+                                          "start_text": texts.pop() if len(texts) == 1 else None})
     return pairs
 
 
@@ -160,15 +241,20 @@ def capture(*, output_dir=DEFAULT_OUTPUT_DIR, prediction_root=DEFAULT_PREDICTION
         same_matchup = [p for p in _predictions(prediction_root)
                         if (p.get("away_team_id"), p.get("home_team_id")) == key]
         cands = pairs.get(key, [])
-        if len(same_matchup) != 1:
-            anomalies.append({"game_pk": game_pk, "capture_window": window, "reason": "AMBIGUOUS_SCHEDULE_MATCH"})
+        if not cands:
+            anomalies.append({"game_pk": game_pk, "capture_window": window, "reason": "NO_TWO_SIDED_RENDERED_MONEYLINE"})
             continue
-        if len(cands) != 1:
+        if len(same_matchup) == 1 and len(cands) == 1:
+            out_rows.append((game_pk, window, minutes_before, start, pred, cands[0], "SOLE_MATCHUP_ON_BOARD_AND_SCHEDULE"))
+            continue
+        bound = bind_by_start_label(same_matchup, cands, observed)
+        if bound is None or game_pk not in bound:
             anomalies.append({"game_pk": game_pk, "capture_window": window,
-                              "reason": "NO_TWO_SIDED_RENDERED_MONEYLINE" if not cands else "AMBIGUOUS_RENDERED_MATCH"})
+                              "reason": "AMBIGUOUS_SCHEDULE_MATCH" if len(same_matchup) != 1 else "AMBIGUOUS_RENDERED_MATCH",
+                              "board_start_labels": [c.get("start_text") for c in cands]})
             continue
-        c = cands[0]
-        out_rows.append((game_pk, window, minutes_before, start, pred, c))
+        out_rows.append((game_pk, window, minutes_before, start, pred, bound[game_pk],
+                         "BOARD_START_LABEL_UNIQUE_ACROSS_OFFSETS"))
     if anomalies:
         raise CaptureBlocked("BLOCKED_ONE_SIDED", {"anomalies": anomalies,
                                                    "unmapped_labels": sorted({lbl for k, v in pairs.items() if None in k
@@ -176,7 +262,7 @@ def capture(*, output_dir=DEFAULT_OUTPUT_DIR, prediction_root=DEFAULT_PREDICTION
     slate = observed.date().isoformat()
     base = Path(output_dir) / slate
     written, skipped = [], []
-    for game_pk, window, minutes_before, start, pred, c in out_rows:
+    for game_pk, window, minutes_before, start, pred, c, match_basis in out_rows:
         key = _snapshot_key(game_pk, c["event_id"], window, observed, raw_sha)
         path = base / f"{key}.json"
         if path.exists():
@@ -189,6 +275,7 @@ def capture(*, output_dir=DEFAULT_OUTPUT_DIR, prediction_root=DEFAULT_PREDICTION
             "home_team": pred["home_team"], "away_team": pred["away_team"],
             "home_team_id": pred.get("home_team_id"), "away_team_id": pred.get("away_team_id"),
             "home_team_label": c["home_label"], "away_team_label": c["away_label"],
+            "board_start_time_text": c.get("start_text"), "event_match_basis": match_basis,
             "scheduled_start_utc": start.isoformat(),
             "scheduled_start_source": "MLB_FORWARD_PREDICTION_EVENT_START_TS_STATSAPI",
             "observed_at_utc": board["observed_at_utc"], "capture_window": window,
