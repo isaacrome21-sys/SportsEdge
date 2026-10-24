@@ -71,6 +71,10 @@ def fetch(seasons, key):
                           "hs": float(g["homeScore"]), "as": float(g["awayScore"]),
                           "spread": spread, "total": total})
     games.sort(key=lambda g: (g["season"], g["start"], g["id"]))
+    got = {g["season"] for g in games}
+    missing = [s for s in seasons if int(s) not in got]
+    if missing:  # never choose a weight from a partial dataset
+        raise SystemExit(f"INCOMPLETE_DATA missing seasons={missing}; no weight chosen")
     return games
 
 
