@@ -54,7 +54,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: ${{ github.event_name == 'pull_request' && format('sportsedge-free-tests-{0}', github.run_id) || 'sportsedge-paid-odds-api' }}
+  group: sportsedge-paid-odds-api
   cancel-in-progress: false
 
 jobs:
