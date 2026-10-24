@@ -200,6 +200,10 @@ def _main(argv=None):
     )]
     if missing:
         raise SystemExit(f"INCOMPLETE_EVALUATION missing paired seasons={missing}; no weight chosen")
+    if not any(r["season"] < max(seasons) for r in rows) or not any(
+        r["season"] == max(seasons) for r in rows
+    ):
+        raise SystemExit("INCOMPLETE_EVALUATION training or holdout season absent; no weight chosen")
     report = {"seasons": seasons, "rows": len(rows), "per_season": {}}
     for s, rs in sorted(by_season.items()):
         report["per_season"][s] = [score(rs, w) for w in WEIGHTS]
