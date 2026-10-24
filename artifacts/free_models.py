@@ -364,6 +364,7 @@ class PublicContext:
         url = f"{ESPN}/{LEAGUES[sport]}/teams/{team['id']}/schedule?season={season}"
         schedule = self.fetch(url) or {}
         completed = []
+        opp_ids = []
         events = schedule.get("events")
         if not isinstance(events, list):
             return []  # fail closed: unverified schedule is no schedule
@@ -387,9 +388,18 @@ class PublicContext:
                     raw = p.get("score")
                     return numeric(raw.get("value", raw.get("displayValue")) if isinstance(raw, dict) else raw, "score")
                 completed.append((played, pts(own[0]), pts(enemy[0])))
+                opp_ids.append((played, str((enemy[0].get("team") or {}).get("id") or "")))
             except (ValueError, TypeError, AttributeError):
                 continue
-        return sorted(completed, reverse=True)[:5]
+        # Opponent ids for the same games (used only by the CFB matchup
+        # model's opponent adjustment; the return value is unchanged).
+        keep = sorted(completed, reverse=True)[:5]
+        dates = {g[0] for g in keep}
+        if not hasattr(self, "_opponents"):
+            self._opponents = {}
+        self._opponents[(sport, str(team["id"]), kickoff)] = {
+            d: o for d, o in opp_ids if d in dates and o}
+        return keep
 
     @staticmethod
     def _injury_group_id(group):
@@ -877,6 +887,7 @@ def context_for(sport, away, home, start, provider, row):
         notes.append("UNIQUE_FUTURE_ESPN_FIXTURE_MISSING")
         return out, None, notes
     kickoff, competition = fixture
+    cfb_units = {}
     for prefix, name in (("home", home), ("away", away)):
         team = provider.identify(sport, name)
         if team is None:
@@ -890,6 +901,39 @@ def context_for(sport, away, home, start, provider, row):
                 notes.append(prefix.upper() + "_REST_DAYS:" + str(round(days_rest, 2)))
             notes.append(prefix.upper() + "_HISTORY_COUNT:" + str(len(sample)))
             margins = [pf - pa for _, pf, pa in sample]
+            if sport == "CFB":
+                # Matchup model (Oct 24 2026 fix): keep each team's own
+                # points-for / points-against so the game projection is
+                # offense-vs-opposing-defense, instead of a +/-3-point capped
+                # margin nudge on a flat 28-28 prior (which compressed every
+                # spread toward 0 and pinned every total near 56).
+                n = len(sample)
+                base_pts = PRIORS["CFB"][0]
+                opps = (getattr(provider, "_opponents", {}) or {}).get(
+                    (sport, str(team.get("id") if isinstance(team, dict) else ""), kickoff), {})
+                offs, defs, adjusted = [], [], 0
+                for played, pf, pa in sample:
+                    o_pf = o_pa = None
+                    opp = opps.get(played)
+                    if opp:
+                        try:
+                            o_sample = provider.schedule(sport, {"id": opp}, played)
+                        except Exception:
+                            o_sample = []
+                        if o_sample:
+                            o_pf = sum(x[1] for x in o_sample) / len(o_sample)
+                            o_pa = sum(x[2] for x in o_sample) / len(o_sample)
+                    if o_pf is not None:
+                        # Scoring 35 on a defense that allows 40 is below
+                        # par; holding a 20-ppg offense to 20 is par.
+                        offs.append(pf - (o_pa - base_pts))
+                        defs.append(pa - (o_pf - base_pts))
+                        adjusted += 1
+                    else:
+                        offs.append(pf)
+                        defs.append(pa)
+                cfb_units[prefix] = (sum(offs) / n, sum(defs) / n, n)
+                notes.append(prefix.upper() + f"_OPP_ADJUSTED_GAMES:{adjusted}/{n}")
             cap = 5 if sport == "NBA" else (0.7 if sport == "MLB" else 3)
             out[f"{prefix}_rating"] = round(bounded(sum(margins) / len(margins) * 0.12, -cap, cap), 3)
             if sport in {"NFL", "CFB", "NBA"} and len(sample) >= 4:
@@ -901,6 +945,23 @@ def context_for(sport, away, home, start, provider, row):
             injury, status = provider.injury_points(sport, team)
             out[f"{prefix}_injury_pts"] = injury
             notes.append(prefix.upper() + "_INJURIES:" + status)
+    if sport == "CFB" and len(cfb_units) == 2:
+        base, _, _, _ = PRIORS["CFB"]
+        def shrink(value, n):  # 3-game pseudo-count toward the league prior
+            return (value * n + base * 3) / (n + 3)
+        h_off, h_def, hn = cfb_units["home"]
+        a_off, a_def, an = cfb_units["away"]
+        h_off, h_def = shrink(h_off, hn), shrink(h_def, hn)
+        a_off, a_def = shrink(a_off, an), shrink(a_def, an)
+        # Expected points = average of own offense and opponent's defense
+        # allowed; *_rating is the deviation from the flat prior so
+        # score_means/calculate stay in exact parity.
+        out["home_rating"] = round((h_off + a_def - base) - base, 3)
+        out["away_rating"] = round((a_off + h_def - base) - base, 3)
+        out["home_form"] = 0.0
+        out["away_form"] = 0.0
+        notes.append("CFB_MATCHUP_OFF_DEF_V1")
+        notes.append("CFB_OPPONENT_ADJUSTED_V1")
     if sport in {"NFL", "CFB", "MLB"}:
         weather, status = provider.weather(sport, competition, kickoff,
                             latitude=row.get("venue_latitude"), longitude=row.get("venue_longitude"))
