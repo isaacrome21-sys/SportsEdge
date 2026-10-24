@@ -184,10 +184,25 @@ def _main(argv=None):
         games = fetch(seasons, key)
         Path(args.output).parent.mkdir(parents=True, exist_ok=True)
         Path(args.output).with_name("cfb_lines_games.json").write_text(json.dumps(games))
+    # CFBD may fail one or more seasons while the others succeed. Never
+    # select a blend weight from a partial season pull or a zero-row run.
+    observed = {int(g["season"]) for g in games}
+    missing = sorted(set(seasons) - observed)
+    if missing:
+        raise ValueError(f"INCOMPLETE_CFBD_SEASONS missing={missing} requested={seasons}")
     rows = project(games)
     by_season = defaultdict(list)
     for r in rows:
         by_season[r["season"]].append(r)
+    # A successful HTTP response is not enough: require a usable sample
+    # in every requested season, for both spread and total evaluations.
+    for season in seasons:
+        rs = by_season[season]
+        n_spread = len(rs)
+        n_total = sum(r["total"] is not None for r in rs)
+        if n_spread < 30 or n_total < 30:
+            raise ValueError(f"INSUFFICIENT_BACKTEST_ROWS season={season} "
+                             f"spread={n_spread} total={n_total} minimum=30")
     report = {"seasons": seasons, "rows": len(rows), "per_season": {}}
     for s, rs in sorted(by_season.items()):
         report["per_season"][s] = [score(rs, w) for w in WEIGHTS]
