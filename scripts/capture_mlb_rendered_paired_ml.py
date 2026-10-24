@@ -12,6 +12,8 @@ scheduled game or rendered card shares the same away/home pair (doubleheaders, W
 a card is bound to a game only through the card's rendered start label (``cb-start-time-<event>``,
 browser-local zone, no year): the label must equal the game's StatsAPI start, and the resulting
 card->game binding must be the same under every candidate UTC offset at which any card matches.
+A sole card/game pair is also verified this way whenever the card renders a label; only a card
+with no label at all binds unverified (event_match_basis SOLE_MATCHUP_ON_BOARD_AND_SCHEDULE_NO_LABEL).
 Missing/unparseable labels, offset-dependent bindings, unmapped labels and in-window games without
 a clean two-sided rendered moneyline block the run (BLOCKED_ONE_SIDED). Nothing is inferred or
 filled in; the label is never written as a start time.
@@ -244,9 +246,13 @@ def capture(*, output_dir=DEFAULT_OUTPUT_DIR, prediction_root=DEFAULT_PREDICTION
         if not cands:
             anomalies.append({"game_pk": game_pk, "capture_window": window, "reason": "NO_TWO_SIDED_RENDERED_MONEYLINE"})
             continue
-        if len(same_matchup) == 1 and len(cands) == 1:
-            out_rows.append((game_pk, window, minutes_before, start, pred, cands[0], "SOLE_MATCHUP_ON_BOARD_AND_SCHEDULE"))
+        if len(same_matchup) == 1 and len(cands) == 1 and cands[0].get("start_text") is None:
+            # Unverified sole path: only for a card that renders no start label at all.
+            out_rows.append((game_pk, window, minutes_before, start, pred, cands[0],
+                             "SOLE_MATCHUP_ON_BOARD_AND_SCHEDULE_NO_LABEL"))
             continue
+        # Any present label (sole path included) must verify on the offset grid; a label that is
+        # unparseable or matches another day/time refuses (e.g. only G2's card vs G1's schedule).
         bound = bind_by_start_label(same_matchup, cands, observed)
         if bound is None or game_pk not in bound:
             anomalies.append({"game_pk": game_pk, "capture_window": window,
