@@ -192,6 +192,14 @@ def _main(argv=None):
     by_season = defaultdict(list)
     for r in rows:
         by_season[r["season"]].append(r)
+    # Fail closed even for --games-json inputs: a fetched season can contain
+    # records but zero eligible paired spread/total observations.
+    missing = [season for season in seasons if not any(
+        r["season"] == season and r["spread"] is not None and r["total"] is not None
+        for r in rows
+    )]
+    if missing:
+        raise SystemExit(f"INCOMPLETE_EVALUATION missing paired seasons={missing}; no weight chosen")
     report = {"seasons": seasons, "rows": len(rows), "per_season": {}}
     for s, rs in sorted(by_season.items()):
         report["per_season"][s] = [score(rs, w) for w in WEIGHTS]
