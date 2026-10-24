@@ -59,7 +59,52 @@ def _prob(value: Any, field: str = "model_p") -> float:
 
 def _norm_team(value: Any) -> str:
     text = re.sub(r"[^a-z0-9 ]+", " ", str(value or "").lower())
-    return " ".join(text.split())
+    normalized = " ".join(text.split())
+    # DraftKings direct-web commonly uses city abbreviations ("MIL Brewers",
+    # "TB Rays") where StatsAPI Model_P uses the complete franchise name.
+    # Only an *exact* known abbreviation + nickname is accepted; a bare city
+    # or shared nickname cannot be guessed into another opponent's identity.
+    abbreviated = {
+        "ari diamondbacks": "arizona diamondbacks",
+        "az diamondbacks": "arizona diamondbacks",
+        "atl braves": "atlanta braves",
+        "bal orioles": "baltimore orioles",
+        "bos red sox": "boston red sox",
+        "chc cubs": "chicago cubs",
+        "chw white sox": "chicago white sox",
+        "cws white sox": "chicago white sox",
+        "cin reds": "cincinnati reds",
+        "cle guardians": "cleveland guardians",
+        "col rockies": "colorado rockies",
+        "det tigers": "detroit tigers",
+        "hou astros": "houston astros",
+        "kc royals": "kansas city royals",
+        "kcr royals": "kansas city royals",
+        "laa angels": "los angeles angels",
+        "lad dodgers": "los angeles dodgers",
+        "mia marlins": "miami marlins",
+        "mil brewers": "milwaukee brewers",
+        "min twins": "minnesota twins",
+        "nym mets": "new york mets",
+        "nyy yankees": "new york yankees",
+        "oak athletics": "athletics",
+        "ath athletics": "athletics",
+        "phi phillies": "philadelphia phillies",
+        "pit pirates": "pittsburgh pirates",
+        "sd padres": "san diego padres",
+        "sdp padres": "san diego padres",
+        "sf giants": "san francisco giants",
+        "sfg giants": "san francisco giants",
+        "sea mariners": "seattle mariners",
+        "stl cardinals": "st louis cardinals",
+        "tb rays": "tampa bay rays",
+        "tbr rays": "tampa bay rays",
+        "tex rangers": "texas rangers",
+        "tor blue jays": "toronto blue jays",
+        "was nationals": "washington nationals",
+        "wsh nationals": "washington nationals",
+    }
+    return abbreviated.get(normalized, normalized)
 
 
 def _canonical_sha256(value: Mapping[str, Any]) -> str:
