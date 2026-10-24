@@ -1,0 +1,49 @@
+{
+ "ruling": "2026-10-23i",
+ "source": "scripts/cfb_calibration/backtest_opponent_ratings.py",
+ "split": "fit 2024 / score 2025 out of sample; market = closing no-vig",
+ "oos_2025_fbs_vs_fbs_mean_margin_error": 0.11,
+ "mean_margin_error_by_population": {
+  "neutral": {
+   "n": 55,
+   "mean": -2.505
+  },
+  "non_fbs": {
+   "n": 126,
+   "mean": -15.669
+  },
+  "fbs_vs_fbs": {
+   "n": 753,
+   "mean": 0.11
+  }
+ },
+ "markets": {
+  "OPP:SPREAD": {
+   "n": 917,
+   "model_brier": 0.2499,
+   "market_no_vig_brier": 0.25,
+   "diff_ci95": [
+    -0.00032,
+    0.00018
+   ]
+  },
+  "OPP:TOTAL": {
+   "n": 928,
+   "model_brier": 0.252,
+   "market_no_vig_brier": 0.25,
+   "diff_ci95": [
+    -0.0009,
+    0.00482
+   ]
+  },
+  "OPP:ML": {
+   "n": 864,
+   "model_brier": 0.1795,
+   "market_no_vig_brier": 0.1693,
+   "diff_ci95": [
+    0.00353,
+    0.01675
+   ]
+  }
+ }
+}

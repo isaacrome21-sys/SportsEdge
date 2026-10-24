@@ -221,6 +221,18 @@ def _quote_line_matches(market,quote_line,row_line):
     return q==r
 
 
+def apply_cfb_market_gate(priced,sport,market):
+    """Ruling 2026-10-23i: CFB halves/team totals are never candidates until
+    their recorded 2025 OOS Brier beats closing no-vig with a CI."""
+    from sportsedge.sports.cfb import market_gate
+    g=market_gate.gate(sport,market_gate.market_key(market,False))
+    if not g["allowed"] and priced.get("status") not in {"NO_MODEL_OR_MARKET"}:
+        priced["research_status_before_cfb_gate"]=priced.get("status")
+        priced["status"]=market_gate.BLOCK_STATUS
+        priced["reason"]=g["reason"]
+    return priced
+
+
 def price_team_half_rows(rows:Sequence[Mapping],*,now=None,getter=None):
     now=now or datetime.now(timezone.utc)
     if now.tzinfo is None or now.utcoffset() is None:
@@ -273,6 +285,7 @@ def price_team_half_rows(rows:Sequence[Mapping],*,now=None,getter=None):
             priced["source"]="FREE_ESPN_SCORE_DERIVATIVE_UNVALIDATED"
             if model["market"] in PERIOD_MARKETS and priced["status"]=="RESEARCH_CANDIDATE_NOT_VALIDATED":
                 priced["status"]="WATCH_UNFITTED_PERIOD_SPLIT"
+            priced=apply_cfb_market_gate(priced,model["sport"],model["market"])
             result.append(priced)
         except (KeyError,TypeError,ValueError,AttributeError) as exc:
             result.append(_fail(row,exc))

@@ -914,17 +914,20 @@ CFB_OPP_MODEL = {
     "family": "CFB_OPPONENT_ADJUSTED_RIDGE_V1",
     "total_intercept": 33.5954, "total_slope": 0.3832,
     # Refit 2024 (t273b): home field fit on FBS-vs-FBS games only.
-    "margin_intercept": 2.3057, "margin_slope": 0.909,
-    "sd_margin_2024": 16.919, "sd_total_2024": 16.188,
+    # t273c: margin recalibration fit on FBS-vs-FBS 2024 games only
+    # (2025 OOS FBS-vs-FBS mean margin error +0.11).
+    "recal_fit_population": "FBS_VS_FBS_2024",
+    "margin_intercept": 0.8376, "margin_slope": 0.8318,
+    "sd_margin_2024": 15.949, "sd_total_2024": 16.188,
     # Card probabilities use the FITTED sds, not PRIORS["CFB"].
-    "sd_margin": 16.919, "sd_total": 16.188,
+    "sd_margin": 15.949, "sd_total": 16.188,
     # Calibration slopes toward the no-vig line. NOTE: beta is fit using
     # 2024 CLOSING LINES (2024 outcomes vs 2024 closes). Closing lines are
     # never a model input; beta only shrinks toward the line being priced.
-    "beta_spread": 0.04, "beta_total": 0.42,
+    "beta_spread": 0.02, "beta_total": 0.42,
     "beta_fit_uses_2024_closing_lines": True,
     # Moneylines stay raw but are WORSE than the market out of sample.
-    "ml_oos_2025": {"model_brier": 0.1794, "market_no_vig_brier": 0.1693,
+    "ml_oos_2025": {"model_brier": 0.1795, "market_no_vig_brier": 0.1693,
                     "verdict": "WORSE_THAN_MARKET"},
     "status_label": "SCREEN", "validation": "NOT_VALIDATED",
 }
@@ -940,6 +943,15 @@ def cfb_ratings_from_sample(sample):
     return {"rating": round(bounded(sum(margins) / len(margins)
                                     * CFB_MARGIN_MODEL["k_margin"], -cap, cap), 3),
             "total_rating": round(sum(totals) / len(totals), 3)}
+
+
+CFB_GATE_STATUS = "WATCH_CFB_NOT_BETTER_THAN_MARKET"
+
+
+def _cfb_gate(market, context):
+    from sportsedge.sports.cfb import market_gate
+    return market_gate.gate("CFB", market_gate.market_key(
+        market, (context or {}).get("cfb_opp_adjusted") == 1.0))
 
 
 def _cfb_opp_ratings(provider, kickoff):
@@ -1520,6 +1532,11 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
         status = "WATCH_NBA_GAME_FAILED_VALIDATION"
         reason = ("NBA_GAME_MARKET_FAILED_ACCURACY_TEST:"
                   "NO_AUTHORIZED_NEW_CANDIDATE_OR_MARKET_SCREEN")
+    elif sport == "CFB" and not _cfb_gate(market, context)["allowed"]:
+        # Ruling 2026-10-23i: no CFB market is a candidate until its recorded
+        # 2025 OOS Brier beats closing no-vig with a CI. Numbers stay visible.
+        status = CFB_GATE_STATUS
+        reason = _cfb_gate(market, context)["reason"]
     elif price < -165:
         status = "PRICE_CAP"
     elif primary["ev_per_dollar"] >= min_ev:
@@ -1860,7 +1877,8 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
         if row.get("status") in {"WATCH_NFL_NO_VERIFIED_CONTEXT",
                                  "WATCH_NFL_TOTAL_PRIOR_ONLY",
                                  NFL_SIDE_WATCH_STATUS,
-                                 "WATCH_NBA_GAME_FAILED_VALIDATION"}:
+                                 "WATCH_NBA_GAME_FAILED_VALIDATION",
+                                 CFB_GATE_STATUS}:
             watchlist.append(row)
             continue
         # Repair 3: a stale quote cannot support a research candidate, even
