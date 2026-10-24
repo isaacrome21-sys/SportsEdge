@@ -6,7 +6,7 @@ grants PLAY authority. It applies to every sport and every market string.
 """
 from __future__ import annotations
 
-from math import ceil, isfinite
+from math import floor, isfinite
 from typing import Any, Mapping
 
 from sportsedge.quote_freshness import is_fresh
@@ -27,18 +27,34 @@ def _probability(row: Mapping[str, Any]) -> float | None:
 
 
 def _american(odds: float) -> int | None:
-    if odds >= 2:
-        return ceil(100 * (odds - 1))
-    if odds > 1:
-        return ceil(-100 / (odds - 1))
-    return None
+    """Worst valid integer American price with strictly positive EV.
+
+    A fair line is *zero* EV, not playable. American odds also have a gap
+    between -100 and +100, so round toward the next valid better price.
+    """
+    if not isfinite(odds) or odds <= 1:
+        return None
+    fair = 100 * (odds - 1) if odds >= 2 else -100 / (odds - 1)
+    price = floor(fair) + 1
+    if -99 <= price <= 99:
+        price = 100
+
+    def decimal_price(american: int) -> float:
+        return 1 + (american / 100 if american > 0 else 100 / -american)
+
+    # Floating-point inversion can land exactly on the zero-EV boundary.
+    # Adjust only toward a better price; never advertise a break-even line.
+    while decimal_price(price) <= odds:
+        price = 100 if price == -100 else price + 1
+    return price
 
 
 def _line_price(row: Mapping[str, Any]) -> int | None:
     for key in ("odds_american", "dk_odds", "odds"):
         value = row.get(key)
         if isinstance(value, (int, float)) and not isinstance(value, bool):
-            if isfinite(value) and (value <= -100 or value >= 100):
+            if (isfinite(value) and (value <= -100 or value >= 100)
+                    and (not isinstance(value, float) or value.is_integer())):
                 return int(value)
     return None
 
