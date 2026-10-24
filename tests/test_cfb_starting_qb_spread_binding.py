@@ -153,3 +153,40 @@ def test_wrong_game_id_excluded():
         assess_kwargs=_kwargs(),
     )
     assert bound.home_qb is None
+
+
+def test_empty_team_names_rejected():
+    bound = bind_starting_qbs_to_spread(
+        source_rows=[],
+        home_team="",
+        away_team="Georgia",
+        assess_kwargs=_kwargs(),
+    )
+    assert bound.home_qb is None
+    assert bound.away_qb is None
+    assert bound.binding_notes == "empty_team_name"
+    assert bound.play_authority is False
+
+
+def test_returned_qbs_always_zero_authority():
+    rows = [
+        {
+            "team": "Alabama",
+            "source": "OFFICIAL_TEAM_OR_CONFERENCE",
+            "starter_name": "Jalen Milroe",
+            "source_url": "https://rolltide.com",
+            "game_id": "401",
+            "week": 8,
+        }
+    ]
+    bound = bind_starting_qbs_to_spread(
+        source_rows=rows,
+        home_team="Alabama",
+        away_team="Georgia",
+        game_id="401",
+        week=8,
+        assess_kwargs=_kwargs(),
+    )
+    assert bound.home_qb is not None
+    assert bound.home_qb.play_authority is False
+    assert bound.home_qb.promotion_authority is False
