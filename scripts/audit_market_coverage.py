@@ -12,6 +12,48 @@ def _json(path: str):
     return json.loads((ROOT / path).read_text(encoding="utf-8"))
 
 
+def football_engine_capability(surface: dict) -> tuple[dict[str, dict], list[str]]:
+    """Disclose per-sport declared code paths separately from market validation.
+
+    IMPLEMENTED is a source declaration, *never* certified Model_P, market
+    admission, executable pricing, or a sportsbook quote. Invalid/omitted
+    states are exposed instead of quietly counted as available.
+    """
+    sports = surface.get("sports")
+    if not isinstance(sports, list) or not sports or len(sports) != len(set(sports)) or any(
+            not isinstance(s, str) or not s.strip() for s in sports):
+        raise ValueError("FOOTBALL_SPORTS_INVALID")
+    rows = surface.get("markets")
+    if not isinstance(rows, list):
+        raise ValueError("FOOTBALL_MARKETS_INVALID")
+    counts = {sport: {"implemented_markets": [], "no_engine_markets": [],
+                      "declared_market_count": len(rows),
+                      "engine_implemented_is_market_validated": False}
+              for sport in sports}
+    invalid = []
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            invalid.append(f"row:{index}")
+            continue
+        identity = f"{row.get('family')}:{row.get('market')}"
+        states = row.get("engine_state_by_sport")
+        for sport in sports:
+            state = states.get(sport) if isinstance(states, dict) else None
+            if state == "IMPLEMENTED":
+                counts[sport]["implemented_markets"].append(identity)
+            elif state == "NO_ENGINE":
+                counts[sport]["no_engine_markets"].append(identity)
+            else:
+                invalid.append(f"{sport}:{identity}:{state}")
+    for summary in counts.values():
+        summary["implemented_count"] = len(summary["implemented_markets"])
+        summary["no_engine_count"] = len(summary["no_engine_markets"])
+        summary["all_engines_present"] = (
+            summary["implemented_count"] == summary["declared_market_count"]
+        )
+    return counts, sorted(invalid)
+
+
 def main() -> int:
     failures: list[str] = []
     report: dict[str, object] = {}
@@ -38,6 +80,8 @@ def main() -> int:
         "missing_deployments": missing_deployments,
         "undeclared_deployments": undeclared_deployments,
         "eligible_market_count": sum(bool(row.get("eligible")) for row in deployments.values()),
+        "ineligible_market_count": sum(not bool(row.get("eligible")) for row in deployments.values()),
+        "declared_is_not_admitted": True,
     }
 
     football = _json("config/football_market_surface.json")
@@ -52,11 +96,20 @@ def main() -> int:
             invalid_engines.append(row.get("market"))
     if invalid_engines:
         failures.append("FOOTBALL_MARKET_ENGINE_CONTRACT_INVALID")
+    try:
+        capability_by_sport, invalid_states = football_engine_capability(football)
+    except ValueError:
+        capability_by_sport, invalid_states = {}, ["FOOTBALL_SURFACE_SHAPE_INVALID"]
+    if invalid_states:
+        failures.append("FOOTBALL_MARKET_ENGINE_STATE_INVALID")
     report["FOOTBALL"] = {
         "sports": football.get("sports", []),
         "declared_market_count": len(keys),
         "families": sorted({family for family, _ in keys}),
         "invalid_engine_rows": invalid_engines,
+        "invalid_engine_state_rows": invalid_states,
+        "by_sport_engine_capability": capability_by_sport,
+        "declared_engine_implementation_is_not_validation": True,
     }
 
     for sport, path in (("PGA", "config/pga_market_surface.json"), ("UFC", "config/ufc_market_surface.json")):
@@ -122,7 +175,20 @@ def main() -> int:
     if not report["LIVE"]["registry_present"]:
         failures.append("LIVE_MARKET_REGISTRY_MISSING")
 
-    payload = {"status": "PASS" if not failures else "FAIL", "failures": failures, "surfaces": report}
+    # PASS is limited to structural contracts. It must not be read as a
+    # 100%-ready or market-beating prediction system.
+    gaps = {"MLB_ineligible": report["MLB"]["ineligible_market_count"],
+            "football_no_engine_by_sport": {
+                sport: states["no_engine_count"]
+                for sport, states in capability_by_sport.items()}}
+    readiness = ("GAPS_PRESENT" if gaps["MLB_ineligible"] or
+                 any(gaps["football_no_engine_by_sport"].values()) else
+                 "NOT_VERIFIED_BY_STRUCTURAL_AUDIT")
+    payload = {"status": "PASS" if not failures else "FAIL",
+               "status_scope": "STRUCTURAL_REGISTRY_CONSISTENCY_ONLY",
+               "readiness_status": readiness, "readiness_gaps": gaps,
+               "does_not_grant_model_p_or_play": True,
+               "failures": failures, "surfaces": report}
     out = ROOT / "artifacts/run_it/market_coverage.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
