@@ -331,7 +331,6 @@ def _render_with_browser(url: str, *, timeout_ms: int = 60000, settle_ms: int = 
                          executable_path: str | None = None,
                          clock: Callable[[], datetime] | None = None) -> dict[str, Any]:
     """Render in a normal HEADED Chrome on $DISPLAY with the browser's stock identity."""
-
     clock = clock or _utcnow
     if not os.environ.get("DISPLAY"):
         raise HeadedDisplayUnavailable("DISPLAY_NOT_SET")
