@@ -70,24 +70,31 @@ class ForwardTracker:
         if now >= ko:
             raise TrackerError("REGISTERED_AFTER_KICKOFF")
         self.records[rid] = {**dict(rec), "odds": _odds(rec.get("odds"), "ODDS"), "_kickoff": ko,
-                             "closing_odds": None, "result": None}
+                             "closing_odds": None, "closed_at": None, "result": None}
 
     def close(self, rid: str, *, closing_odds: Any, closing_line: Any, now: datetime) -> None:
         r = self.records.get(rid)
         if r is None:
             raise TrackerError("UNKNOWN_RECORD")
-        if _ts(now, "NOW") < r["_kickoff"]:
+        now = _ts(now, "NOW")
+        if now < r["_kickoff"]:
             raise TrackerError("CLOSE_BEFORE_KICKOFF")
         if r["closing_odds"] is not None:
             raise TrackerError("ALREADY_CLOSED")
         if closing_line != r.get("line"):
             raise TrackerError("CLOSING_LINE_MISMATCH")
         r["closing_odds"] = _odds(closing_odds, "CLOSING_ODDS")
+        r["closed_at"] = now
 
     def settle(self, rid: str, *, result: str, now: datetime) -> None:
         r = self.records.get(rid)
         if r is None or r["closing_odds"] is None:
             raise TrackerError("SETTLE_REQUIRES_CLOSE")
+        if r["result"] is not None:
+            raise TrackerError("ALREADY_SETTLED")
+        closed_at = r.get("closed_at")
+        if not isinstance(closed_at, datetime) or closed_at.tzinfo is None or closed_at < r["_kickoff"]:
+            raise TrackerError("CLOSE_TIME_BEFORE_KICKOFF")
         if result not in ("WIN", "LOSS", "PUSH"):
             raise TrackerError("RESULT_INVALID")
         if _ts(now, "NOW") < r["_kickoff"]:
