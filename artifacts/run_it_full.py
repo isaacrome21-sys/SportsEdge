@@ -889,7 +889,10 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
             card = engine.run({"lines": clear_lines}, now=clock, as_of=as_of, historical=historical,
                               getter=getter, auto_context=auto_context, min_ev=min_ev,
                               lane=lane, allow_manual_context=allow_manual_context,
-                              prepricing_adjustments=[prepricing_by_index.get(gpos) for gpos in clear_game_pos])
+                              prepricing_adjustments=[prepricing_by_index.get(gpos) for gpos in clear_game_pos],
+                              # t272 (L4): a run on the live wall clock
+                              # re-measures quote age at pricing time.
+                              live_freshness=(now is None and not historical))
         else:
             # All games were blocked at prepricing or the registry; no
             # game engine should run. Keep the same empty-card contract.

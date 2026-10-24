@@ -39,7 +39,10 @@ LEAGUES = {"NFL": "football/nfl", "CFB": "football/college-football",
            "NBA": "basketball/nba", "MLB": "baseball/mlb"}
 # Explicit priors and heuristic variances; NOT fitted or calibrated.
 PRIORS = {"NFL": (22.0, 13.5, 13.7, 1.5),
-          "CFB": (28.0, 18.5, 19.0, 2.5),
+          # CFB (t272): sd_total/sd_margin/HFA are the 2024-season
+          # market-blind fit in CFB_MARGIN_MODEL below; base = half the
+          # 2024 mean game total (league-mean fallback). Still NOT validated.
+          "CFB": (27.05, 16.34, 16.46, 4.31),
           "NBA": (113.0, 19.0, 12.5, 2.0),
           "MLB": (4.4, None, None, 0.20)}
 CONTEXT_KEYS = {"NFL": ("home_rating", "away_rating", "home_injury_pts",
@@ -47,7 +50,7 @@ CONTEXT_KEYS = {"NFL": ("home_rating", "away_rating", "home_injury_pts",
                         "rest_diff_adj"),
                 "CFB": ("home_rating", "away_rating", "home_injury_pts",
                         "away_injury_pts", "home_form", "away_form", "weather_total_adj",
-                        "rest_diff_adj"),
+                        "rest_diff_adj", "home_total_rating", "away_total_rating"),
                 "NBA": ("home_rating", "away_rating", "home_injury_pts",
                         "away_injury_pts", "home_form", "away_form", "rest_adj"),
                 "MLB": ("home_rating", "away_rating", "home_pitcher_adj",
@@ -868,6 +871,58 @@ class PublicContext:
         return declared_weather_total_adj(wind, rain, sport), "HEURISTIC_FORECAST_NOT_CALIBRATED"
 
 
+# CFB margin/total model (t272 fix for margin compression; RESEARCH ONLY).
+# Diagnosis: the shared rating (0.12 x mean margin, capped at +/-3 points per
+# team) compressed CFB margins ~4.4x (fit k=0.53) and capped any matchup at
+# ~8.5 points, and adding each margin rating to that team's own points let
+# margin strength move the TOTAL. CFB now projects
+#   margin = HFA + k*(mean_margin_home - mean_margin_away)
+#   total  = a + b*mean(recent game totals of both teams)
+# with coefficients fitted market-blind (actual results only, never prices)
+# on the 2024 season and evaluated out-of-sample on 2025 closing lines
+# (docs/CFB_MARGIN_CALIBRATION_20261024.md). Unvalidated screen model.
+CFB_MARGIN_MODEL = {
+    "family": "FREE_TEAM_SCORE_HEURISTIC_UNVALIDATED",
+    "version": "CFB_MARGIN_TOTAL_FIT_2024_V1",
+    "hfa": 4.31, "k_margin": 0.532, "rating_cap": 24.0,
+    "total_intercept": 19.37, "total_slope": 0.6465,
+    "sd_margin": 16.46, "sd_total": 16.34,
+    "fit_season": 2024, "eval_season": 2025,
+    "status_label": "SCREEN", "validation": "NOT_VALIDATED",
+}
+
+
+def cfb_ratings_from_sample(sample):
+    """Point-in-time CFB ratings from (date, points_for, points_against)."""
+    if not sample:
+        return {"rating": 0.0, "total_rating": 0.0}
+    margins = [pf - pa for _, pf, pa in sample]
+    totals = [pf + pa for _, pf, pa in sample]
+    cap = CFB_MARGIN_MODEL["rating_cap"]
+    return {"rating": round(bounded(sum(margins) / len(margins)
+                                    * CFB_MARGIN_MODEL["k_margin"], -cap, cap), 3),
+            "total_rating": round(sum(totals) / len(totals), 3)}
+
+
+def _base_means(sport, context):
+    base, _, _, hfa = PRIORS[sport]
+    if sport != "CFB":
+        return (base + hfa / 2 + context["home_rating"],
+                base - hfa / 2 + context["away_rating"])
+    envs = [v for v in (context.get("home_total_rating") or 0.0,
+                        context.get("away_total_rating") or 0.0) if v > 0]
+    if not envs:
+        # No scoring-environment evidence: the shared composition (same
+        # margin = HFA + r_home - r_away; league-mean total when ratings
+        # are absent). Kept so the canonical live parity contract holds.
+        return (base + hfa / 2 + context["home_rating"],
+                base - hfa / 2 + context["away_rating"])
+    margin = hfa + context["home_rating"] - context["away_rating"]
+    total = (CFB_MARGIN_MODEL["total_intercept"]
+             + CFB_MARGIN_MODEL["total_slope"] * sum(envs) / len(envs))
+    return total / 2 + margin / 2, total / 2 - margin / 2
+
+
 def context_for(sport, away, home, start, provider, row):
     out = {k: 0.0 for k in CONTEXT_KEYS[sport]}
     notes = []
@@ -891,7 +946,12 @@ def context_for(sport, away, home, start, provider, row):
             notes.append(prefix.upper() + "_HISTORY_COUNT:" + str(len(sample)))
             margins = [pf - pa for _, pf, pa in sample]
             cap = 5 if sport == "NBA" else (0.7 if sport == "MLB" else 3)
-            out[f"{prefix}_rating"] = round(bounded(sum(margins) / len(margins) * 0.12, -cap, cap), 3)
+            if sport == "CFB":
+                cfb = cfb_ratings_from_sample(sample)
+                out[f"{prefix}_rating"] = cfb["rating"]
+                out[f"{prefix}_total_rating"] = cfb["total_rating"]
+            else:
+                out[f"{prefix}_rating"] = round(bounded(sum(margins) / len(margins) * 0.12, -cap, cap), 3)
             if sport in {"NFL", "CFB", "NBA"} and len(sample) >= 4:
                 trend = sum(margins[:2]) / 2 - sum(margins) / len(margins)
                 out[f"{prefix}_form"] = round(bounded(trend * 0.07, -1.5, 1.5), 3)
@@ -923,9 +983,7 @@ def score_means(sport, context):
     live repricing remains in parity with calculate().
     This helper restores the live_run_it import omitted by composition.
     """
-    base, _, _, hfa = PRIORS[sport]
-    home_mean = base + hfa / 2 + context["home_rating"]
-    away_mean = base - hfa / 2 + context["away_rating"]
+    home_mean, away_mean = _base_means(sport, context)
     if sport != "MLB":
         home_mean += context["home_injury_pts"]
         away_mean += context["away_injury_pts"]
@@ -995,7 +1053,8 @@ def _lane_view(lane, win, push, home_mean, away_mean, dec, raw_total,
 
 
 def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
-              lane="A", allow_manual_context=False, prepricing_adjustments=None):
+              lane="A", allow_manual_context=False, prepricing_adjustments=None,
+              freshness_clock=None):
     """Price one game row in two labeled lanes.
 
     lane="A" (default): the primary top-level view is LANE_A_INDEPENDENT.
@@ -1171,9 +1230,7 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
                 "model_p_authority": False, "official_authority": False,
                 "staking_authority": False,
             }
-    base, _, _, hfa = PRIORS[sport]
-    home_mean = base + hfa/2 + context["home_rating"]
-    away_mean = base - hfa/2 + context["away_rating"]
+    home_mean, away_mean = _base_means(sport, context)
     # Owner ruling (Oct 13, 2026): three unvalidated adjustments are
     # DISABLED_PENDING_INCREMENTAL_VALUE in canonical pricing until each
     # demonstrates incremental value in the harness against the retained
@@ -1212,7 +1269,12 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
     # Repair 3 (Oct 11 2026): quote freshness is checked centrally on every
     # pricing path. Only a verified-fresh capture can support a positive-EV
     # status; everything else is watch-only with an explicit code.
-    quote_freshness = check_quote_freshness(row.get("quote_captured_at"), now=now)
+    # t272 (auditor L4): in live runs the quote age is re-measured on the
+    # wall clock at PRICING time (after the slow context fetch), not on the
+    # run's start clock. Historical/explicit-clock runs keep ``now``.
+    quote_freshness = check_quote_freshness(
+        row.get("quote_captured_at"),
+        now=freshness_clock() if freshness_clock is not None else now)
     raw_margin, raw_total = home_mean-away_mean, home_mean+away_mean
     # ---- Lane A (independent): the model's own score means, no market input
     # in the probability. This is a simple unvalidated league/form/injury
@@ -1581,7 +1643,7 @@ def _paired_book_context(rows, evaluated, index):
 
 def run(payload, *, now=None, as_of=None, historical=False, getter=None,
         auto_context=True, min_ev=0.02, lane="A", allow_manual_context=False,
-        prepricing_adjustments=None):
+        prepricing_adjustments=None, live_freshness=False):
     """Build a research card. ``now`` is wall-clock execution time; ``as_of``
     is the point-in-time clock the pricing must respect (defaults to ``now``).
 
@@ -1641,7 +1703,10 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
             result = calculate(bound_row, provider, as_of, auto_context=auto_context,
                                min_ev=min_ev, lane=lane,
                                allow_manual_context=allow_manual_context,
-                               prepricing_adjustments=pp_adj)
+                               prepricing_adjustments=pp_adj,
+                               freshness_clock=(
+                                   (lambda: datetime.now(timezone.utc))
+                                   if live_freshness and not historical else None))
         except (ValueError, TypeError, KeyError, AttributeError) as exc:
             result = {"status": "BLOCKED_INVALID", "reason": str(exc)[:140]}
         # Trusted QB availability state (issue #2158): rides the

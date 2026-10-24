@@ -113,6 +113,14 @@ def previous_completed_kickoff(schedule_json, kickoff_utc):
     return _iso(best)
 
 
+def _qb1_name(bundle):
+    """Report-only QB1 label; never raises (auditor L2: empty qb_order)."""
+    snap = bundle.get("depth_snapshot") if isinstance(bundle, dict) else None
+    order = snap.get("qb_order") if isinstance(snap, dict) else None
+    first = order[0] if isinstance(order, list) and order else None
+    return first.get("name") if isinstance(first, dict) else None
+
+
 def _default_fetch_text(url):
     return _qe._fetch_text(url)
 
@@ -157,9 +165,7 @@ def capture_slate(events, archive_root, *, ourlads_index_html, fetch_json=None,
                 continue
             manifests.append(kept["candidate_manifest_sha256"])
             rec.update(status="PRESERVED", depth_url=url, previous_game_kickoff_utc=prev,
-                       bundle_sha256=kept["bundle_sha256"],
-                       qb1=(bundle.get("depth_snapshot") or {}).get("qb_order", [{}])[0].get("name")
-                       if isinstance(bundle.get("depth_snapshot"), dict) else None)
+                       bundle_sha256=kept["bundle_sha256"], qb1=_qb1_name(bundle))
     pin = None
     seal_error = None
     if manifests:
