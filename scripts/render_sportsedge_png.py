@@ -182,9 +182,10 @@ def tile(draw, r, left, top, number, *, best):
              475, fill=WHITE, face=font(25,bold=True))
     draw.text((left+518,top+62),fmt_odds(r.get("price")),fill=GOLD,font=font(24,bold=True))
     draw.line((left+22,top+107,left+633,top+107),fill="#2D4562",width=2)
+    # Owner ruling Oct 24 2026: no 0-100 score on cards; show the model version.
     values = [("ESTIMATE","WITHHELD"),("EV","WITHHELD"),
               ("EDGE","WITHHELD"),
-              ("SCORE",str(r.get("score_value")) if r.get("score_value") is not None else "WITHHELD")]
+              ("MODEL",str(val(r,"model_version") or "—"))]
     for i,(label,value) in enumerate(values):
         x = left+25+i*156
         draw.text((x,top+118),label,fill=SOFT,font=font(13,bold=True))
