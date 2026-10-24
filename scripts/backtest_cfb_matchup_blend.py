@@ -36,13 +36,21 @@ PROVIDERS = ("consensus", "DraftKings", "Bovada", "ESPN Bet", "William Hill (New
 
 def fetch(seasons, key):
     from sportsedge.sports.cfb.source import _auth, _cfbd_url, _json_get
+    import time
     games = []
-    for s in seasons:
-        try:
-            data = _json_get(_cfbd_url("/lines", {"year": int(s), "seasonType": "regular"}),
-                             headers=_auth(key)) or []
-        except Exception as exc:  # report and keep other seasons
-            print(f"FETCH_FAILED season={s}: {type(exc).__name__}: {exc}"[:400])
+    for idx, s in enumerate(seasons):
+        data = None
+        for attempt in range(3):  # CFBD 429/502: wait and retry the whole season
+            if idx or attempt:
+                time.sleep(60 if attempt == 0 else 120)
+            try:
+                data = _json_get(_cfbd_url("/lines", {"year": int(s), "seasonType": "regular"}),
+                                 headers=_auth(key), max_attempts=2) or []
+                break
+            except Exception as exc:
+                print(f"FETCH_RETRY season={s} attempt={attempt + 1}: {exc}"[:300])
+        if data is None:
+            print(f"FETCH_FAILED season={s}")
             continue
         print(f"fetched season={s} games={len(data)}")
         for g in data:
@@ -63,6 +71,10 @@ def fetch(seasons, key):
                           "hs": float(g["homeScore"]), "as": float(g["awayScore"]),
                           "spread": spread, "total": total})
     games.sort(key=lambda g: (g["season"], g["start"], g["id"]))
+    got = {g["season"] for g in games}
+    missing = [s for s in seasons if int(s) not in got]
+    if missing:  # never choose a weight from a partial dataset
+        raise SystemExit(f"INCOMPLETE_DATA missing seasons={missing}; no weight chosen")
     return games
 
 
@@ -174,6 +186,8 @@ def _main(argv=None):
         if not key:
             raise SystemExit("CFBD_API_KEY_REQUIRED")
         games = fetch(seasons, key)
+        Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.output).with_name("cfb_lines_games.json").write_text(json.dumps(games))
     rows = project(games)
     by_season = defaultdict(list)
     for r in rows:
