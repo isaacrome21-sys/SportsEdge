@@ -205,7 +205,7 @@ def _parsed_utc(value):
     return parsed.astimezone(timezone.utc)
 
 
-def build_current_value_screens(card, *, max_rows=20):
+def build_current_value_screens(card, *, max_rows=20, now=None):
     """Rank positive *independent* research prices, with no historical clock.
 
     This is deliberately separate from PLAY/OFFICIAL promotion. A fresh quote
@@ -214,6 +214,11 @@ def build_current_value_screens(card, *, max_rows=20):
     """
     view = build_phone_card(card)
     as_of = _parsed_utc(card.get("as_of_utc"))
+    final_now = now or datetime.now(timezone.utc)
+    if (not isinstance(final_now, datetime) or final_now.tzinfo is None
+            or final_now.utcoffset() is None):
+        raise ValueError("VALUE_SCREEN_FINALIZATION_CLOCK_REQUIRED")
+    final_now = final_now.astimezone(timezone.utc)
     results, exclusions = [], Counter()
     raw_rows = card["evaluated_rows"]
     for source, row in zip(view["selections"], raw_rows):
@@ -251,11 +256,26 @@ def build_current_value_screens(card, *, max_rows=20):
         if p is None:
             exclusions["NO_MODEL_PROBABILITY"] += 1
             continue
-        if not is_fresh(row.get("quote_freshness")):
+        freshness = row.get("quote_freshness")
+        if not is_fresh(freshness):
             exclusions["NO_VERIFIED_CURRENT_QUOTE"] += 1
             continue
+        # The quote's original freshness was calculated at model-as-of.
+        # Final card rendering may happen minutes later. Reapply the 180s
+        # limit against the real finalization clock without inventing a
+        # second capture or treating a frozen snapshot as a live offer.
+        age_at_capture = freshness.get("age_seconds")
+        if (as_of is None or not isinstance(age_at_capture, (int, float))
+                or isinstance(age_at_capture, bool) or not isfinite(age_at_capture)
+                or age_at_capture < 0):
+            exclusions["QUOTE_FINAL_FRESHNESS_NOT_PROVABLE"] += 1
+            continue
+        total_age = age_at_capture + (final_now - as_of).total_seconds()
+        if total_age < 0 or total_age > 180:
+            exclusions["QUOTE_EXPIRED_BEFORE_FINAL_CARD"] += 1
+            continue
         kickoff = _parsed_utc(source.get("kickoff"))
-        if as_of is None or kickoff is None or as_of >= kickoff:
+        if kickoff is None or final_now >= kickoff:
             exclusions["PREGAME_CLOCK_UNVERIFIED_OR_STARTED"] += 1
             continue
         price = source.get("odds")
@@ -281,6 +301,7 @@ def build_current_value_screens(card, *, max_rows=20):
             "player_name": source.get("player_name"), "line": source.get("line"),
             "odds": price, "model_estimate_p": p,
             "book_raw_breakeven_p": round(estimated_breakeven, 6),
+            "quote_age_at_finalization_seconds": round(total_age, 3),
             "raw_estimated_ev": ev,
             "original_model_reported_ev": reported_ev,
             "ev_repriced_at_current_quote": True,
@@ -297,6 +318,8 @@ def build_current_value_screens(card, *, max_rows=20):
     results.sort(key=lambda x: -x["raw_estimated_ev"])
     return {"schema": "SPORTSEDGE_CURRENT_VALUE_SCREEN_V1",
             "basis": "PREGAME_FRESH_INDEPENDENT_MODEL_VS_BOOK_ONLY",
+            "finalized_at_utc": final_now.isoformat(),
+            "max_quote_age_seconds": 180,
             "historical_tests_required_to_display": False,
             "verified_plays": 0,
             "unverified_model_value_screens": results[:max_rows],
@@ -304,16 +327,16 @@ def build_current_value_screens(card, *, max_rows=20):
             "exclusions": dict(sorted(exclusions.items()))}
 
 
-def render_phone_card(card, *, run_url="", intake_at=""):
+def render_phone_card(card, *, run_url="", intake_at="", now=None):
     view = build_phone_card(card)
-    current = build_current_value_screens(card)
+    current = build_current_value_screens(card, now=now)
     coverage = view["coverage"]
     lines = ["## SportsEdge · RUN IT", "",
              f"Snapshot: {_safe(view['as_of_utc'])}",
              f"{coverage['input_rows']} selections · {coverage['distinct_market_families']} market families on this board.",
              ""]
     lines += ["### Current priced value screens · NOT verified plays", "",
-              "Ranked from current pregame quotes and independent model estimates. No backtest waiting period; model accuracy is not implied.", "",
+              "Ranked from independently priced pregame quotes. Quotes expire after 180 seconds; refresh before wagering. Model accuracy is not implied.", "",
               "| Sport | Matchup / selection | Book | Model p | Raw EV | Estimated playable-to | Matchup case |",
               "| --- | --- | ---: | ---: | ---: | ---: | --- |"]
     for entry in current["unverified_model_value_screens"]:
@@ -328,7 +351,7 @@ def render_phone_card(card, *, run_url="", intake_at=""):
                      f"{_price(entry['research_playable_to'])} | {_safe(why)} |")
     if not current["unverified_model_value_screens"]:
         lines.append("| — | No fresh independent positive-EV selection on this submitted board | — | — | — | — | — |")
-    lines += ["", f"Priced screens: {current['total_positive_screens']} · Verified PLAYs: 0 (this surface has no promotion authority).", ""]
+    lines += ["", f"Last verified screen: {_safe(current['finalized_at_utc'])} UTC · Priced screens: {current['total_positive_screens']} · Verified PLAYs: 0 (this surface has no promotion authority).", ""]
     groups = defaultdict(list)
     for row in view["selections"]:
         groups[(str(row.get("kickoff") or ""), row["sport"], row["game"])].append(row)

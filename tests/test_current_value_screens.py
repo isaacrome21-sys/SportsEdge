@@ -1,5 +1,6 @@
 """Current-price screens are separate from proof of long-term model quality."""
 from copy import deepcopy
+from datetime import datetime, timezone
 
 import pytest
 
@@ -10,6 +11,11 @@ from sportsedge.quote_freshness import QUOTE_FRESH, QUOTE_STALE
 
 AS_OF = "2026-10-23T22:00:00Z"
 KICKOFF = "2026-10-23T23:00:00Z"
+NOW = datetime(2026, 10, 23, 22, 0, tzinfo=timezone.utc)
+
+
+def screen(c):
+    return build_current_value_screens(c, now=NOW)
 
 
 def row(**overrides):
@@ -39,7 +45,7 @@ def card(*rows):
 ])
 def test_current_numbers_screen_every_sport_and_market_without_long_term_gate(sport, market):
     data = card(row(sport=sport, market=market))
-    result = build_current_value_screens(data)
+    result = screen(data)
     assert result["historical_tests_required_to_display"] is False
     assert result["total_positive_screens"] == 1
     pick = result["unverified_model_value_screens"][0]
@@ -66,11 +72,11 @@ def test_estimated_value_ranking_and_explanations_on_phone_card():
         {"input_index": 1, **h},
     ]
     before = deepcopy(c)
-    result = build_current_value_screens(c)
+    result = screen(c)
     assert result["total_positive_screens"] == 2
     assert result["unverified_model_value_screens"][0]["player_name"] == "Nick Martinez"
     assert result["unverified_model_value_screens"][0]["supporting_factors"][0]["name"] == "prior-start strikeouts"
-    output = render_phone_card(c)
+    output = render_phone_card(c, now=NOW)
     assert "Current priced value screens" in output
     assert "Nick Martinez" in output and "prior-start strikeouts" in output
     assert "Verified PLAYs: 0" in output
@@ -92,32 +98,46 @@ def test_estimated_value_ranking_and_explanations_on_phone_card():
     ({"context_notes": ["NO_FETCH_MANUAL_MODE"]}, "LIVE_CONTEXT_NOT_VERIFIED"),
 ])
 def test_fail_closed_on_wrong_quote_context_and_authority(blocked, reason):
-    result = build_current_value_screens(card(row(**blocked)))
+    result = screen(card(row(**blocked)))
     assert result["total_positive_screens"] == 0
     assert result["exclusions"][reason] == 1
 
 
 def test_no_quote_is_not_an_edge_and_no_invented_pitch_to_contact():
-    result = build_current_value_screens(card(row(quote_freshness=None)))
+    result = screen(card(row(quote_freshness=None)))
     assert result["unverified_model_value_screens"] == []
-    assert "pitch to contact" not in render_phone_card(card(row())).lower()
+    assert "pitch to contact" not in render_phone_card(card(row()), now=NOW).lower()
 
 
 def test_moved_price_recomputes_ev_instead_of_trusting_old_reported_ev():
     # An earlier +15.5% estimate can become negative after a price change.
-    result = build_current_value_screens(card(row(dk_odds=-165)))
+    result = screen(card(row(dk_odds=-165)))
     assert result["total_positive_screens"] == 1
     pick = result["unverified_model_value_screens"][0]
     assert pick["raw_estimated_ev"] == pytest.approx(.63 * (1 + 100 / 165) - 1)
     assert pick["prior_ev_differs_from_current_quote"] is True
     # If the same model p were 60%, that changed price is now -3.6% EV.
-    assert build_current_value_screens(card(row(dk_odds=-165,
-                                                model_probability=.6)))["total_positive_screens"] == 0
+    assert screen(card(row(dk_odds=-165,
+                           model_probability=.6)))["total_positive_screens"] == 0
 
 
 def test_status_pass_from_old_quote_cannot_hide_new_positive_market_price():
-    result = build_current_value_screens(card(row(
+    result = screen(card(row(
         status="PASS", model_probability=.63,
         ev_per_dollar=-.1, dk_odds=-120)))
     assert result["total_positive_screens"] == 1
     assert result["unverified_model_value_screens"][0]["raw_estimated_ev"] == pytest.approx(.155)
+
+
+def test_quote_can_expire_during_slow_runner_without_appearing_current():
+    too_late = NOW.replace(minute=4)
+    out = build_current_value_screens(card(row()), now=too_late)
+    assert out["total_positive_screens"] == 0
+    assert out["exclusions"]["QUOTE_EXPIRED_BEFORE_FINAL_CARD"] == 1
+    assert "No fresh independent positive-EV" in render_phone_card(
+        card(row()), now=too_late)
+
+
+def test_live_finalization_must_not_accept_future_or_naive_clock():
+    with pytest.raises(ValueError, match="FINALIZATION_CLOCK_REQUIRED"):
+        build_current_value_screens(card(row()), now=datetime(2026, 10, 23))
