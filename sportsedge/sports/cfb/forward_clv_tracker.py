@@ -50,8 +50,13 @@ def _profit(o: float) -> float:
 
 class ForwardTracker:
     def __init__(self) -> None:
-        self.records: dict[str, dict] = {}
+        self._records: dict[str, dict] = {}
         self._audit: list[dict] = []
+
+    @property
+    def records(self) -> Mapping[str, Mapping[str, Any]]:
+        """Read-only view; mutate only through add/close/settle/correct_settlement."""
+        return MappingProxyType({k: MappingProxyType(dict(v)) for k, v in self._records.items()})
 
     @property
     def audit_history(self) -> tuple:
@@ -69,7 +74,7 @@ class ForwardTracker:
         rid = rec.get("record_id")
         if not isinstance(rid, str) or not rid:
             raise TrackerError("RECORD_ID_MISSING")
-        if rid in self.records:
+        if rid in self._records:
             raise TrackerError("RECORD_ID_DUPLICATE")
         created, cap, ko = _ts(rec.get("created_at"), "CREATED_AT"), _ts(rec.get("captured_at"), "CAPTURED_AT"), _ts(rec.get("kickoff"), "KICKOFF")
         if created > now:
@@ -82,13 +87,13 @@ class ForwardTracker:
             raise TrackerError("CAPTURE_AT_OR_AFTER_KICKOFF")
         if now >= ko:
             raise TrackerError("REGISTERED_AFTER_KICKOFF")
-        self.records[rid] = {**dict(rec), "odds": _odds(rec.get("odds"), "ODDS"), "_kickoff": ko,
+        self._records[rid] = {**dict(rec), "odds": _odds(rec.get("odds"), "ODDS"), "_kickoff": ko,
                              "closing_odds": None, "closed_at": None, "result": None,
                              "settled_at": None, "settle_seq": None}
-        self._log("ADD", rid, now)
+        self._log("ADD", rid, now, odds=self._records[rid]["odds"])
 
     def close(self, rid: str, *, closing_odds: Any, closing_line: Any, now: datetime) -> None:
-        r = self.records.get(rid)
+        r = self._records.get(rid)
         if r is None:
             raise TrackerError("UNKNOWN_RECORD")
         now = _ts(now, "NOW")
@@ -103,7 +108,7 @@ class ForwardTracker:
         self._log("CLOSE", rid, now, closing_odds=r["closing_odds"])
 
     def settle(self, rid: str, *, result: str, now: datetime) -> None:
-        r = self.records.get(rid)
+        r = self._records.get(rid)
         if r is None or r["closing_odds"] is None:
             raise TrackerError("SETTLE_REQUIRES_CLOSE")
         if r["result"] is not None:
@@ -123,7 +128,7 @@ class ForwardTracker:
                            actor: Any, now: Any) -> None:
         """Traceable correction: appends a CORRECT_SETTLEMENT entry referencing the
         entry it supersedes; never edits or removes earlier audit entries."""
-        r = self.records.get(rid)
+        r = self._records.get(rid)
         if r is None or r["result"] is None:
             raise TrackerError("CORRECTION_REQUIRES_SETTLEMENT")
         current = self._audit[r["settle_seq"]]
@@ -145,12 +150,29 @@ class ForwardTracker:
                           supersedes_event_id=current["event_id"], reason=reason.strip(), actor=actor.strip())
         r["result"], r["settle_seq"] = result, entry["seq"]
 
+    def _replay(self) -> dict[str, dict]:
+        """Rebuild ledger state solely from the append-only audit log."""
+        st: dict[str, dict] = {}
+        for e in self._audit:
+            rid = e["record_id"]
+            if e["event"] == "ADD":
+                st[rid] = {"odds": e["odds"], "closing_odds": None, "result": None}
+            elif e["event"] == "CLOSE":
+                st[rid]["closing_odds"] = e["closing_odds"]
+            elif e["event"] in ("SETTLE", "CORRECT_SETTLEMENT"):
+                st[rid]["result"] = e["result"]
+        return st
+
     def summary(self) -> dict:
-        settled = [r for r in self.records.values() if r["result"]]
-        closed = [r for r in self.records.values() if r["closing_odds"] is not None]
+        state = self._replay()
+        consistent = set(state) == set(self._records) and all(
+            self._records[k][f] == v[f] for k, v in state.items() for f in ("odds", "closing_odds", "result"))
+        settled = [r for r in state.values() if r["result"]]
+        closed = [r for r in state.values() if r["closing_odds"] is not None]
         units = sum(_profit(r["odds"]) if r["result"] == "WIN" else (-1.0 if r["result"] == "LOSS" else 0.0) for r in settled)
         clv = [_implied(r["closing_odds"]) - _implied(r["odds"]) for r in closed]
-        return {"n_records": len(self.records), "n_closed": len(closed), "n_settled": len(settled),
+        return {"n_records": len(state), "n_closed": len(closed), "n_settled": len(settled),
                 "roi_units": units, "roi_per_bet": units / len(settled) if settled else None,
                 "mean_clv_implied_prob": sum(clv) / len(clv) if clv else None,
+                "audit_consistent": consistent, "derived_from": "AUDIT_LOG",
                 "status_label": "SCREEN/NOT_VALIDATED", "play_allowed": False, "forward_only": True}
