@@ -27,3 +27,15 @@ def test_same_kickoff_does_not_use_other_games_final_score():
     assert len(same_time) == 2
     assert same_time[0]["model_margin"] == same_time[1]["model_margin"]
     assert same_time[0]["model_total"] == same_time[1]["model_total"]
+
+
+def test_unordered_json_games_match_chronological_projections():
+    games = []
+    for i in range(4):
+        for team in ("A", "B"):
+            games.append(dict(season=2026, start=f"2026-09-{i+1:02d}T12:00:00Z",
+                              id=f"{team}-{i}", home=team, away=f"{team}opp{i}",
+                              hs=28+i, **{"as": 21+i}, spread=0.0, total=49.0))
+    ordered = module.project(games)
+    reversed_input = module.project(list(reversed(games)))
+    assert ordered == reversed_input
