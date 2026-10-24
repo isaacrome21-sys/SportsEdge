@@ -215,7 +215,7 @@ def main() -> int:
             notes.append("Timestamp provenance: INTAKE_STAMPED at GitHub issue intake/edit time; not a sportsbook timestamp.")
         elif timestamp_sources:
             notes.append(f"Timestamp provenance: {', '.join(timestamp_sources)}.")
-    notes.append("Scores rank the available estimates; missing evaluations remain marked.")
+    notes.append("Rows rank by EV/$, highest first; missing evaluations remain marked.")
 
     if any("QUOTE_MOVE_NEEDS_CONFIRM" in (r.get("presentation_reason_codes") or ()) for r in rows):
         notes.append("NEEDS_CONFIRM: a price moved past the frozen screenshot-misread thresholds vs an earlier same-game board. Recheck the price before using this card.")
