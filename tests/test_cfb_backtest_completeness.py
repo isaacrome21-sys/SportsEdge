@@ -83,3 +83,19 @@ def test_one_paired_game_per_season_is_insufficient(tmp_path):
     assert result.returncode != 0
     assert "INSUFFICIENT_EVALUATION_SAMPLE" in result.stdout
     assert not (tmp_path / "report.json").exists()
+
+
+def test_missing_kickoff_clock_is_rejected(tmp_path):
+    fixture = tmp_path / "games.json"
+    fixture.write_text(json.dumps([dict(season=2024, start="", id="missing-clock",
+                                        home="A", away="B", hs=28, **{"as": 21},
+                                        spread=0.0, total=49.0)]))
+    report = tmp_path / "report.json"
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--games-json", str(fixture),
+         "--seasons", "2024,2025", "--output", str(report)],
+        capture_output=True, text=True, cwd=ROOT, check=False,
+    )
+    assert result.returncode != 0
+    assert "INVALID_FIXTURE_CLOCKS" in result.stdout
+    assert not report.exists()
