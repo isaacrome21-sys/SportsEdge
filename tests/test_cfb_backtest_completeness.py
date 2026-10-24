@@ -30,9 +30,22 @@ def test_unpriced_input_cannot_select_blend_weight(tmp_path):
     }]))
     result = subprocess.run(
         [sys.executable, str(SCRIPT), "--games-json", str(games),
-         "--seasons", "2026", "--output", str(tmp_path / "report.json")],
+         "--seasons", "2024,2026", "--output", str(tmp_path / "report.json")],
         capture_output=True, text=True, cwd=ROOT, check=False,
     )
     assert result.returncode != 0
     assert "INCOMPLETE_EVALUATION" in result.stdout
+    assert not (tmp_path / "report.json").exists()
+
+
+def test_single_season_cannot_masquerade_as_out_of_sample(tmp_path):
+    games = tmp_path / "games.json"
+    games.write_text("[]")
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--games-json", str(games),
+         "--seasons", "2026", "--output", str(tmp_path / "report.json")],
+        capture_output=True, text=True, cwd=ROOT, check=False,
+    )
+    assert result.returncode != 0
+    assert "INVALID_EVALUATION_SEASONS" in result.stdout
     assert not (tmp_path / "report.json").exists()
