@@ -26,7 +26,8 @@ GAME_MARKETS = frozenset({
 
 def _rank(row: dict) -> tuple[int, float]:
     try:
-        score = int(row.get("confidence_score") or 0)
+        value = row.get("edge_score")
+        score = int((value if value is not None else row.get("confidence_score")) or 0)
     except (TypeError, ValueError):
         score = 0
     try:
@@ -80,7 +81,8 @@ def main() -> int:
             "model_p": row.get("model_p"),
             "edge": row.get("edge"),
             "ev_per_dollar": row.get("ev_per_dollar"),
-            "score": row.get("confidence_score"),
+            "score": row.get("edge_score") if row.get("edge_score") is not None else row.get("confidence_score"),
+            "input_quality": row.get("confidence_score"),
             "status": row.get("scored_status") or row.get("status"),
         }
         print(json.dumps(out, sort_keys=True, separators=(",", ":")))

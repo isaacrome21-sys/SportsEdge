@@ -16,6 +16,7 @@ _STATUS_ORDER={"ACTIONABLE":0,"LEAN":1,"PASS":2,"BLOCKED":3,"NO_MODEL":4}
 _UNVERIFIED_REASON="UNVERIFIED_CONFIDENCE_PROVENANCE"
 MIN_CARD_EV=0.02
 EV_FLOOR_REASON="BELOW_MIN_CARD_EV_2PCT"
+INPUT_QUALITY_REASON="INPUT_QUALITY_GATE_FAILED"
 EMPIRICAL_SIDE_CONFLICT_REASON="EMPIRICAL_SIDE_CONFLICT"
 # Presentation-only plausibility guard. A >=10 percentage-point gap between the
 # model's push-conditioned probability and the paired-book no-vig probability is
@@ -79,6 +80,27 @@ def _star_rating(*, score: int, status: str, verified: bool) -> int:
     return 3
 
 
+def _edge_star_rating(*, score: int, status: str, verified: bool) -> int:
+    """Stars from the edge rating: 60+ = 5, 40-59 = 4, else 3."""
+    if status in {"LEAN", "BLOCKED", "NO_MODEL"} or not verified or score <= 0:
+        return 0
+    if score >= 60:
+        return 5
+    if score >= 40:
+        return 4
+    return 3
+
+
+def _rank_score(row: Mapping[str, Any]) -> int:
+    value = row.get("edge_score")
+    if value is None:
+        value = row.get("confidence_score")
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _other_team(side: str | None) -> str | None:
     return {"AWAY":"HOME","HOME":"AWAY"}.get(str(side or "").upper())
 
@@ -113,10 +135,7 @@ def _empirical_implied_team(row: Mapping[str, Any]) -> str | None:
 
 
 def _side_rank(row: Mapping[str, Any]) -> tuple[int,float]:
-    try:
-        score=int(row.get("confidence_score") or 0)
-    except (TypeError,ValueError):
-        score=0
+    score=_rank_score(row)
     try:
         ev=float(row.get("ev_per_dollar"))
     except (TypeError,ValueError):
@@ -156,6 +175,7 @@ def _apply_empirical_side_conflicts(rows: list[dict[str, Any]]) -> None:
 
 
 def build_mlb_scored_card(rows: Sequence[Any], *, actionable_only: bool=False) -> list[dict[str, Any]]:
+    from .mlb_edge_score import edge_strength_score, input_quality_passes
     out=[]
     for raw in rows:
         row=_dict(raw)
@@ -195,12 +215,33 @@ def build_mlb_scored_card(rows: Sequence[Any], *, actionable_only: bool=False) -
         row["scored_status"]=status
         row["edge_pct"]=None if edge is None else round(100*float(edge),2)
         row["ev_pct"]=None if ev is None else round(100*float(ev),2)
-        row["star_rating"]=_star_rating(score=row["confidence_score"], status=status, verified=verified)
+        # Owner ruling (Oct 24 2026): the qualification score is INPUT QUALITY,
+        # a pass/fail gate only; rank and stars come from the edge rating.
+        has_strength = row.get("edge_score") is not None
+        strength = int(row.get("edge_score") or 0) if has_strength else None
+        if strength is not None and verified and ev is not None:
+            strength = edge_strength_score(ev=ev, edge=edge, data_quality=row["confidence_score"])
+        row["edge_score"] = strength
+        row["input_quality_score"] = row["confidence_score"]
+        row["input_quality_pass"] = input_quality_passes(row["confidence_score"])
+        # Gate applies to rows from the current scorer (they carry edge_score);
+        # legacy rows keep their prior presentation contract.
+        if has_strength and status=="ACTIONABLE" and not row["input_quality_pass"]:
+            status="PASS"
+            row["scored_status"]=status
+            reasons=list(row.get("presentation_reason_codes") or ())
+            if INPUT_QUALITY_REASON not in reasons:
+                reasons.append(INPUT_QUALITY_REASON)
+            row["presentation_reason_codes"]=tuple(reasons)
+        if strength is None:
+            row["star_rating"]=_star_rating(score=row["confidence_score"], status=status, verified=verified)
+        else:
+            row["star_rating"]=_edge_star_rating(score=strength, status=status, verified=verified)
         out.append(row)
     _apply_empirical_side_conflicts(out)
     if actionable_only:
         out=[row for row in out if row["scored_status"]=="ACTIONABLE"]
-    return sorted(out,key=lambda r:(_STATUS_ORDER.get(r["scored_status"],9),-r["confidence_score"],-(r["ev_per_dollar"] if r.get("ev_per_dollar") is not None else -999)))
+    return sorted(out,key=lambda r:(_STATUS_ORDER.get(r["scored_status"],9),-_rank_score(r),-(r["ev_per_dollar"] if r.get("ev_per_dollar") is not None else -999)))
 
 
 def top_mlb_edges(rows: Sequence[Any], *, limit: int=10) -> list[dict[str, Any]]:

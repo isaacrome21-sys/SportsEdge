@@ -83,6 +83,36 @@ def qualification_score(*, n_paths: int, quote_age_seconds: float,
     return int(round(max(0.0, min(100.0, path_points + freshness_points + push_points))))
 
 
+EDGE_SCORE_LABEL = "SPORTSEDGE_EDGE_RATING_V1"
+EDGE_SCORE_FULL_EV = 0.08      # +8% EV earns the full EV component
+EDGE_SCORE_FULL_EDGE = 0.05    # +5pp no-vig edge earns the full edge component
+# Owner ruling (Oct 24 2026): Score B is renamed INPUT QUALITY and used only as
+# a pass/fail gate; picks are ranked by the separate edge rating below.
+INPUT_QUALITY_PASS = 80
+
+
+def input_quality_passes(input_quality: int) -> bool:
+    return int(input_quality) >= INPUT_QUALITY_PASS
+
+
+def edge_strength_score(*, ev: float | None, edge: float | None,
+                        data_quality: int) -> int:
+    """0-100 edge rating used to rank picks (70% EV, 30% no-vig edge).
+
+    Input quality is a gate, not a multiplier: a row that fails the gate
+    rates 0; a passing row is rated on its edge alone. Zero for
+    non-positive EV or edge. The edge comes from the current model and is
+    only as calibrated as that model; this is not a win probability.
+    """
+    if ev is None or edge is None or not input_quality_passes(data_quality):
+        return 0
+    ev, edge = float(ev), float(edge)
+    if not (isfinite(ev) and isfinite(edge)) or ev <= 0 or edge <= 0:
+        return 0
+    raw = 70.0 * min(1.0, ev / EDGE_SCORE_FULL_EV) + 30.0 * min(1.0, edge / EDGE_SCORE_FULL_EDGE)
+    return int(round(max(0.0, min(100.0, raw))))
+
+
 @dataclass(frozen=True)
 class MLBScoredEdge:
     status: str
@@ -96,6 +126,8 @@ class MLBScoredEdge:
     reason_codes: tuple[str, ...]
     confidence_provenance: str = MLB_EDGE_SCORE_PROVENANCE
     authority_footer: str = AUTHORITY_FOOTER
+    edge_score: int = 0
+    edge_score_label: str = EDGE_SCORE_LABEL
 
 
 def score_mlb_edge(
@@ -145,4 +177,6 @@ def score_mlb_edge(
     if rel == 0.0:
         score = 0
     status = "ACTIONABLE" if ev > min_actionable_ev and edge > 0 and rel > 0 else "PASS"
-    return MLBScoredEdge(status, score, p, p, market_p, fair_american_odds(p), edge, ev, tuple(reasons))
+    strength = edge_strength_score(ev=ev, edge=edge, data_quality=score)
+    return MLBScoredEdge(status, score, p, p, market_p, fair_american_odds(p), edge, ev,
+                         tuple(reasons), edge_score=strength)
