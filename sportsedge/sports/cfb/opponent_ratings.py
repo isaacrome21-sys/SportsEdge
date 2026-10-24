@@ -21,6 +21,10 @@ from datetime import datetime, timezone
 
 import numpy as np
 
+# ESPN conference ids of FBS conferences (ACC, Big 12, Big Ten, SEC, Pac-12,
+# C-USA, MAC, Mountain West, FBS Independents, Sun Belt, American).
+FBS_CONFERENCE_IDS = frozenset({"1", "4", "5", "8", "9", "12", "15", "17", "18", "37", "151"})
+
 STATUS = {"status_label": "SCREEN", "validation": "NOT_VALIDATED",
           "family": "CFB_OPPONENT_ADJUSTED_RIDGE_V1"}
 
@@ -45,14 +49,18 @@ def fit_ratings(games, *, as_of, lam=8.0, prior=None, rho=0.5,
     teams = sorted({t for x in used for t in (x["home"], x["away"])} | set(prior_teams))
     idx = {t: i for i, t in enumerate(teams)}
     n = len(teams)
-    p = 2 + 2 * n  # mu, H, off[n], def[n]
+    # mu, H (FBS-vs-FBS home field), off[n], def[n], H_non_fbs (any game
+    # involving a non-FBS team; keeps FBS-vs-FCS blowouts out of H).
+    p = 3 + 2 * n
+    hn = p - 1
     rows, y = [], []
     for x in used:
         hf = 0.0 if x.get("neutral") else 0.5
+        col = 1 if x.get("fbs_both", True) else hn
         for own, opp, pts, sgn in ((x["home"], x["away"], x["hs"], 1), (x["away"], x["home"], x["as"], -1)):
             r = np.zeros(p)
             r[0] = 1.0
-            r[1] = sgn * hf
+            r[col] = sgn * hf
             r[2 + idx[own]] = 1.0
             r[2 + n + idx[opp]] = -1.0
             rows.append(r)
@@ -66,18 +74,24 @@ def fit_ratings(games, *, as_of, lam=8.0, prior=None, rho=0.5,
     pen = np.full(p, float(lam))
     pen[0] = 1e-6
     pen[1] = float(lam_hfa)
+    target[hn] = hfa_prior
+    pen[hn] = float(lam_hfa)
     X = np.array(rows) if rows else np.zeros((0, p))
     Y = np.array(y) if y else np.zeros(0)
     A = X.T @ X + np.diag(pen)
     b = X.T @ Y + pen * target
     sol = np.linalg.solve(A, b)
-    out = {"mu": float(sol[0]), "hfa": float(sol[1]), "n_games": len(used),
+    out = {"mu": float(sol[0]), "hfa": float(sol[1]), "hfa_non_fbs": float(sol[hn]),
+           "n_games": len(used),
+           "fbs_teams": sorted({t for x in used if x.get("fbs_both", True)
+                                for t in (x["home"], x["away"])}),
            "as_of": cut.isoformat(),
            "teams": {t: {"off": float(sol[2 + i]), "def": float(sol[2 + n + i])}
                      for t, i in idx.items()},
            **STATUS}
     if not used:
         out["mu"], out["hfa"] = float(mu_prior), float(hfa_prior)
+        out["hfa_non_fbs"] = float(hfa_prior)
     return out
 
 
@@ -85,9 +99,9 @@ def team(r, t):
     return r["teams"].get(t, {"off": 0.0, "def": 0.0})
 
 
-def predict(r, home, away, neutral=False):
+def predict(r, home, away, neutral=False, fbs_both=True):
     h, a = team(r, home), team(r, away)
-    hf = 0.0 if neutral else r["hfa"] / 2
+    hf = 0.0 if neutral else (r["hfa"] if fbs_both else r.get("hfa_non_fbs", r["hfa"])) / 2
     return (r["mu"] + hf + h["off"] - a["def"], r["mu"] - hf + a["off"] - h["def"])
 
 
@@ -104,8 +118,12 @@ def _season_games(fetch, season):
     out = []
     for st, weeks in ((2, range(1, 17)), (3, range(1, 2))):
         for w in weeks:
-            board = fetch(SCOREBOARD.format(season=season, st=st, week=w)) or {}
-            for e in board.get("events") or []:
+            board = fetch(SCOREBOARD.format(season=season, st=st, week=w))
+            # Fail closed: one missing/garbled week would silently drop games
+            # and bias every rating; refuse the whole fit instead.
+            if not isinstance(board, dict) or not isinstance(board.get("events"), list):
+                raise ValueError(f"CFB_RATINGS_FETCH_INCOMPLETE:{season}:{st}:{w}")
+            for e in board["events"]:
                 try:
                     c = e["competitions"][0]
                     if not c["status"]["type"].get("completed"):
@@ -114,7 +132,9 @@ def _season_games(fetch, season):
                     out.append({"date": e["date"], "home": str(t["home"]["team"]["id"]),
                                 "away": str(t["away"]["team"]["id"]),
                                 "hs": float(t["home"]["score"]), "as": float(t["away"]["score"]),
-                                "neutral": bool(c.get("neutralSite"))})
+                                "neutral": bool(c.get("neutralSite")),
+                                "fbs_both": all(str(t[k]["team"].get("conferenceId")) in FBS_CONFERENCE_IDS
+                                                for k in ("home", "away"))})
                 except (KeyError, IndexError, TypeError, ValueError):
                     continue
     return out

@@ -176,8 +176,13 @@ def poisson(lam, max_k=38):
     return [v / t for v in arr]
 
 
-def model_probability(sport, market, side, line, home_mean, away_mean, team_totals_team=None):
-    """Return win, push, loss; account for pushes on integer lines."""
+def model_probability(sport, market, side, line, home_mean, away_mean, team_totals_team=None,
+                      sd_margin=None, sd_total=None, beta=None):
+    """Return win, push, loss; account for pushes on integer lines.
+
+    ``beta`` (spread/total only) shrinks the model mean toward the posted
+    line: P = Phi(beta * (mean - line) / sd), i.e. calibration toward the
+    no-vig line with a slope fit on 2024 outcomes vs 2024 closing lines."""
     if sport == "MLB":
         a, b = poisson(home_mean), poisson(away_mean)
         win = push = 0.0
@@ -205,7 +210,9 @@ def model_probability(sport, market, side, line, home_mean, away_mean, team_tota
             win += push * 0.5
             push = 0.0
         return bounded(win, 0, 1), bounded(push, 0, 1)
-    _, sd_total, sd_margin, _ = PRIORS[sport]
+    _, p_sd_total, p_sd_margin, _ = PRIORS[sport]
+    sd_total = sd_total or p_sd_total
+    sd_margin = sd_margin or p_sd_margin
     if market == "TOTAL":
         mean = home_mean + away_mean
         sd = sd_total
@@ -216,6 +223,8 @@ def model_probability(sport, market, side, line, home_mean, away_mean, team_tota
         sd = sd_margin
         sign = 1
         decision = -line if market == "SPREAD" else 0
+    if beta is not None and market in {"SPREAD", "TOTAL"}:
+        mean = decision + beta * (mean - decision)
     whole = market != "ML" and line is not None and float(line).is_integer()
     push = cdf(decision + 0.5, mean, sd) - cdf(decision - 0.5, mean, sd) if whole else 0.0
     cut = decision + (0.5 if whole else 0)
@@ -903,9 +912,20 @@ CFB_MARGIN_MODEL = {
 # beat closing lines out of sample. SCREEN / NOT_VALIDATED.
 CFB_OPP_MODEL = {
     "family": "CFB_OPPONENT_ADJUSTED_RIDGE_V1",
-    "margin_intercept": 1.0431, "margin_slope": 0.9098,
     "total_intercept": 33.5954, "total_slope": 0.3832,
-    "sd_margin_2024": 16.791, "sd_total_2024": 16.188,
+    # Refit 2024 (t273b): home field fit on FBS-vs-FBS games only.
+    "margin_intercept": 2.3057, "margin_slope": 0.909,
+    "sd_margin_2024": 16.919, "sd_total_2024": 16.188,
+    # Card probabilities use the FITTED sds, not PRIORS["CFB"].
+    "sd_margin": 16.919, "sd_total": 16.188,
+    # Calibration slopes toward the no-vig line. NOTE: beta is fit using
+    # 2024 CLOSING LINES (2024 outcomes vs 2024 closes). Closing lines are
+    # never a model input; beta only shrinks toward the line being priced.
+    "beta_spread": 0.04, "beta_total": 0.42,
+    "beta_fit_uses_2024_closing_lines": True,
+    # Moneylines stay raw but are WORSE than the market out of sample.
+    "ml_oos_2025": {"model_brier": 0.1794, "market_no_vig_brier": 0.1693,
+                    "verdict": "WORSE_THAN_MARKET"},
     "status_label": "SCREEN", "validation": "NOT_VALIDATED",
 }
 
@@ -977,6 +997,7 @@ def context_for(sport, away, home, start, provider, row):
         notes.append("UNIQUE_FUTURE_ESPN_FIXTURE_MISSING")
         return out, None, notes
     kickoff, competition = fixture
+    cfb_opp_seen, cfb_ids = None, {}
     for prefix, name in (("home", home), ("away", away)):
         team = provider.identify(sport, name)
         if team is None:
@@ -996,6 +1017,9 @@ def context_for(sport, away, home, start, provider, row):
                 out[f"{prefix}_rating"] = cfb["rating"]
                 out[f"{prefix}_total_rating"] = cfb["total_rating"]
                 opp = _cfb_opp_ratings(provider, kickoff)
+                if opp is not None:
+                    cfb_opp_seen = opp
+                    cfb_ids[prefix] = str(team.get("id"))
                 if opp is not None and str(team.get("id")) in opp["teams"]:
                     t = opp["teams"][str(team.get("id"))]
                     out[f"{prefix}_off_rating"] = round(t["off"], 3)
@@ -1017,6 +1041,10 @@ def context_for(sport, away, home, start, provider, row):
     if (sport == "CFB" and "HOME_CFB_OPP_ADJUSTED_RATING" in notes
             and "AWAY_CFB_OPP_ADJUSTED_RATING" in notes):
         out["cfb_opp_adjusted"] = 1.0
+        fbs = set((cfb_opp_seen or {}).get("fbs_teams") or [])
+        if not {cfb_ids.get("home"), cfb_ids.get("away")} <= fbs:
+            out["cfb_hfa"] = round(cfb_opp_seen.get("hfa_non_fbs", out["cfb_hfa"]), 3)
+            notes.append("CFB_NON_FBS_MATCHUP_HFA")
         if competition and competition.get("neutralSite"):
             out["cfb_hfa"] = 0.0
             notes.append("CFB_NEUTRAL_SITE_HFA_ZERO")
@@ -1338,9 +1366,27 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
     # ---- Lane A (independent): the model's own score means, no market input
     # in the probability. This is a simple unvalidated league/form/injury
     # heuristic, not a proven independent model or validated probability. ----
-    a_win, a_push = model_probability(
-        sport, market, side, line, home_mean, away_mean,
-        team_totals_team=team_totals_team)
+    cfb_opp = sport == "CFB" and context.get("cfb_opp_adjusted") == 1.0
+    cfb_extra = {}
+    if cfb_opp and market in {"SPREAD", "TOTAL", "ML"}:
+        c = CFB_OPP_MODEL
+        sds = dict(sd_margin=c["sd_margin"], sd_total=c["sd_total"])
+        raw_win, _ = model_probability(sport, market, side, line, home_mean, away_mean, **sds)
+        if market == "ML":
+            a_win, a_push = raw_win, 0.0
+            cfb_extra = {"probability_basis": "CFB_RAW_FITTED_SD_WORSE_THAN_MARKET",
+                         "oos_2025_vs_market": dict(c["ml_oos_2025"])}
+        else:
+            a_win, a_push = model_probability(
+                sport, market, side, line, home_mean, away_mean, **sds,
+                beta=c["beta_spread" if market == "SPREAD" else "beta_total"])
+            cfb_extra = {"probability_basis": "CFB_CALIBRATED_2024_BETA_TOWARD_LINE",
+                         "beta_fit_uses_2024_closing_lines": True}
+        cfb_extra["raw_estimate_p"] = round(raw_win, 6)
+    else:
+        a_win, a_push = model_probability(
+            sport, market, side, line, home_mean, away_mean,
+            team_totals_team=team_totals_team)
     lane_a = _lane_view(
         LANE_A, a_win, a_push, home_mean, away_mean, dec,
         raw_total, raw_margin,
@@ -1350,6 +1396,7 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
             # compares that probability against the quoted price afterwards.
             "uses_sportsbook_price_in_projection": False,
             "not_wagering_authority": True,
+            **cfb_extra,
         })
     # ---- Lane B (anchored): Lane A means shrunk ANCHOR_WEIGHT toward the
     # posted market line/total. 15% is an unfitted RESEARCH prior, not a
