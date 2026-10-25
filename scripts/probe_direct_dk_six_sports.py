@@ -109,6 +109,7 @@ def probe(*, fetcher=fetch_board, clock=lambda: datetime.now(timezone.utc), arch
                 "raw_size_bytes": len(board.raw),
                 "received_at_utc": board.received_at.isoformat(),
                 "market_selection_counts": market_inventory(board.payload),
+                "market_selection_status": "RESEARCH_ONLY_UNVERIFIED",
                 "market_catalog": sorted({str(m.get("name")).strip() for m in board.payload.get("markets", []) if isinstance(m, dict) and str(m.get("name") or "").strip()}) if isinstance(board.payload.get("markets"), list) else None,
                 "payload_markets": len(board.payload["markets"]) if isinstance(board.payload.get("markets"), list) else None,
                 "market_counts": dict(sorted(Counter(str(m.get("name")).strip() for m in board.payload.get("markets", []) if isinstance(m, dict) and str(m.get("name") or "").strip()).items())) if isinstance(board.payload.get("markets"), list) else None,
