@@ -6,8 +6,8 @@ import json
 
 import pytest
 
-from sportsedge.dfs.projections import load_projection_snapshot
-from sportsedge.dfs.types import DKPlayer
+from sportsedge.dfs.projections import ensure_projection_coverage, load_projection_snapshot
+from sportsedge.dfs.types import DKPlayer, Projection
 
 
 def player(player_id="42"):
@@ -85,3 +85,20 @@ def test_stats_path_with_nonfinite_component_is_refused(tmp_path):
 def test_stats_path_with_impossible_ownership_is_refused(tmp_path):
     with pytest.raises(ValueError, match="DFS_PROJECTION_OWNERSHIP_OUT_OF_RANGE:42"):
         read(tmp_path, [{"player_id": "42", "stats": {"receptions": 5, "ownership": 3.5}}])
+
+
+def test_direct_projection_map_also_rejects_nonfinite_and_id_mismatch():
+    with pytest.raises(ValueError, match="DFS_PROJECTION_NUMBER_INVALID:42:mean"):
+        ensure_projection_coverage([player()], {"42": Projection("42", float("nan"), 25)},
+                                   allow_dk_fppg_baseline=False)
+    with pytest.raises(ValueError, match="DFS_PROJECTION_PLAYER_ID_MISMATCH"):
+        ensure_projection_coverage([player()], {"42": Projection("99", 12, 20)},
+                                   allow_dk_fppg_baseline=False)
+
+
+@pytest.mark.parametrize("invalid", [float("inf"), float("nan"), True, -2.0])
+def test_malformed_dk_fppg_fallback_is_not_admitted(invalid):
+    p = DKPlayer("42", "Example Receiver", "DET", "GB", ("WR",), 5300,
+                 dk_fppg=invalid)
+    with pytest.raises(ValueError, match="DFS_(DK_FPPG_INVALID|PROJECTION_NUMBER_INVALID)"):
+        ensure_projection_coverage([p], {}, allow_dk_fppg_baseline=True)
