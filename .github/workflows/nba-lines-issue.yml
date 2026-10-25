@@ -5,12 +5,13 @@ on:
     types: [opened, edited]
 
 permissions:
-  contents: read
+  contents: write
   issues: write
+  pull-requests: write
 
 concurrency:
   group: nba-lines-issue-${{ github.event.issue.number }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   card:
@@ -31,11 +32,14 @@ jobs:
         id: card
         env:
           BODY: ${{ github.event.issue.body }}
+          TITLE: ${{ github.event.issue.title }}
           OBSERVED: ${{ github.event.issue.updated_at }}
         run: |
           set -euo pipefail
           printf '%s' "$BODY" > issue_body.txt
-          if PYTHONPATH=. python scripts/run_nba_lines_issue.py                --body-file issue_body.txt                --observed-at "$OBSERVED"                --issue "$ISSUE"                --out artifacts/nba/card.md; then
+          game_date=$(python -c 'import os,re; dates=set(re.findall(r"\b20[0-9]{2}-[0-9]{2}-[0-9]{2}\b", os.environ["TITLE"])); assert len(dates)==1, "NBA_EXPLICIT_EVENT_DATE_REQUIRED_IN_TITLE"; print(dates.pop())')
+          engine_id="NBA_LINES_CARD:$(git rev-parse HEAD:sportsedge/sports/nba/lines_card.py):$(git rev-parse HEAD:sportsedge/sports/nba/ratings_model.py)"
+          if PYTHONPATH=. python scripts/run_nba_lines_issue.py                --body-file issue_body.txt                --observed-at "$OBSERVED"                --issue "$ISSUE"                --out artifacts/nba/card.md --game-date "$game_date" --engine-id "$engine_id"; then
             gh issue comment "$ISSUE" --body-file artifacts/nba/card.md
           else
             if [[ -s intake_error.txt ]]; then
@@ -46,3 +50,29 @@ jobs:
             gh issue comment "$ISSUE" --body-file fail.md
             exit 1
           fi
+
+      - name: Persist NBA captures and picks through PR
+        run: |
+          set -euo pipefail
+          branch="evidence/nba/issue-${ISSUE}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"
+          destination="ledger/nba_captures/issue-${ISSUE}/run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"
+          mkdir -p "$destination"
+          cp artifacts/nba/captures.jsonl artifacts/nba/picks.json issue_body.txt "$destination/"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "$destination"
+          git commit -m "NBA paper evidence issue #${ISSUE} run ${GITHUB_RUN_ID}"
+          pushed=false
+          for attempt in 1 2 3; do
+            if git push origin "HEAD:refs/heads/$branch"; then pushed=true; break; fi
+            sleep 3
+          done
+          [ "$pushed" = true ] || exit 1
+          gh pr create --base main --head "$branch" --title "NBA paper evidence #${ISSUE} run ${GITHUB_RUN_ID}" --body "Immutable capture and pick evidence. Experimental, not countable; no promotion. Review and merge manually."
+      - name: Archive NBA evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nba-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/nba/
+          if-no-files-found: warn
