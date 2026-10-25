@@ -298,6 +298,16 @@ class ArmedWindowTests(unittest.TestCase):
         self.assertEqual(end2, datetime(2026, 9, 27, 17, 5, tzinfo=timezone.utc))
 
 
+class WorkflowConcurrencyContractTests(unittest.TestCase):
+    def test_pr_checks_cannot_occupy_serialized_live_capture_lock(self):
+        path = cap.ROOT / ".github/workflows/nfl-dk-direct-confirmation-capture.yml"
+        workflow = path.read_text(encoding="utf-8")
+        self.assertIn("github.event_name == 'pull_request'", workflow)
+        self.assertIn("format('pr-{0}', github.event.pull_request.number)", workflow)
+        self.assertIn("|| 'capture'", workflow)
+        self.assertIn("cancel-in-progress: false", workflow)
+
+
 class FetchBlockedTests(unittest.TestCase):
     def test_403_is_blocked_with_detail(self):
         def boom(*_a, **_k):
