@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import subprocess
 from datetime import datetime, timezone
 from math import isfinite
 from statistics import median
@@ -513,6 +515,16 @@ def main():
             bets=json.loads(args.bet_issues.read_text(encoding="utf-8"))
         except ValueError:
             bets=[]
+    elif os.environ.get("GH_TOKEN") and os.environ.get("GITHUB_REPOSITORY"):
+        # Read-only list of open [BET] issues; any failure just omits the section.
+        try:
+            out=subprocess.run(["gh","issue","list","--repo",os.environ["GITHUB_REPOSITORY"],
+                                "--state","open","--limit","200","--search","[BET] in:title",
+                                "--json","number,title,body"],
+                               capture_output=True,text=True,timeout=60,check=True).stdout
+            bets=json.loads(out or "[]")
+        except (OSError,ValueError,subprocess.SubprocessError):
+            bets=None
     args.output.parent.mkdir(parents=True,exist_ok=True)
     args.output.write_text(render(args.root,args.run_url,bet_issues=bets),encoding="utf-8")
 
