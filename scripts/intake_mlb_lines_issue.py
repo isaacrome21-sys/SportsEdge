@@ -19,7 +19,7 @@ from sportsedge.pipeline.intake import SharedIntakeError, parse_envelope  # noqa
 from sportsedge.mlb_source import fetch_schedule  # noqa: E402
 
 CHICAGO = ZoneInfo("America/Chicago")
-MAX_ISSUE_CAPTURE_RELAY_SECONDS = 180
+MAX_ISSUE_CAPTURE_RELAY_SECONDS = 1800
 
 
 def _issue_capture_at(captured_at: str | None, observed: datetime) -> datetime:
