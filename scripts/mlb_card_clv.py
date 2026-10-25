@@ -197,7 +197,12 @@ def compute_clv(
     teams = feed["gameData"]["teams"]
     names = {"away": teams["away"]["name"], "home": teams["home"]["name"]}
     start_text = str(feed.get("gameData", {}).get("datetime", {}).get("dateTime") or "")
-    first_pitch = datetime.fromisoformat(start_text.replace("Z", "+00:00")) if start_text else None
+    try:
+        first_pitch = datetime.fromisoformat(start_text.replace("Z", "+00:00")) if start_text else None
+    except ValueError:
+        first_pitch = None
+    if first_pitch is not None and first_pitch.tzinfo is None:
+        first_pitch = None
     entry_body = str(entry_issue.get("body") or "")
     entry_rows = issue_quotes(entry_body, entry_issue.get("title"))
     entry_at = parse_captured_at(entry_body)
