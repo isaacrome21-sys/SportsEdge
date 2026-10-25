@@ -50,11 +50,13 @@ def test_span_above_limit_refused_with_span_shown():
     m = build_capture_span_manifest(
         [_rec(finish="2026-10-22T17:23:31-05:00")])
     g = m["games"][0]
-    assert g["span_seconds"] == 151.0 and g["status"] == "FLAGGED_RESEARCH"\n    assert g["ladder_eligible"] is False
+    assert g["span_seconds"] == 151.0 and g["status"] == "FLAGGED_RESEARCH"
+    assert g["ladder_eligible"] is False
     assert m["accepted_event_ids"] == []
-    assert m["refused"] == []\n    assert m["flagged_research_event_ids"] == ["E1"]
-    assert m["status"] == "GAMES_REFUSED"
-    assert m["counts"]["refused_span"] == 1
+    assert m["refused"] == []
+    assert m["flagged_research_event_ids"] == ["E1"]
+    assert m["status"] == "GAMES_FLAGGED"
+    assert m["counts"]["flagged_research"] == 1
 
 
 def test_failed_capture_listed_not_dropped():
