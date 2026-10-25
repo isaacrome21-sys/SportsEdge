@@ -26,7 +26,9 @@
     ".github/workflows/draftkings-prop-provider-probe.yml",
     ".github/workflows/direct-dk-board-snapshot.yml",
     ".github/workflows/nfl-dk-direct-confirmation-capture.yml",
-    ".github/workflows/sportsedge-auto-dk-four-sports.yml"
+    ".github/workflows/sportsedge-auto-dk-four-sports.yml",
+    ".github/workflows/cfb-evidence-jobs.yml"
   ],
-  "live_odds_capture_reason": "Sportsedge-auto-dk-four-sports captures provider-timestamped two-sided DK and peer sportsbook market prices before games start. Live quote states cannot be reconstructed retrospectively; this is forward PIT-sensitive source evidence. A shared quota preflight and minimum reserve prevent paid requests below reserve. Model cards are derived outputs and cannot make stale captures valid."
+  "live_odds_capture_reason": "Sportsedge-auto-dk-four-sports captures provider-timestamped two-sided DK and peer sportsbook market prices before games start. Live quote states cannot be reconstructed retrospectively; this is forward PIT-sensitive source evidence. A shared quota preflight and minimum reserve prevent paid requests below reserve. Model cards are derived outputs and cannot make stale captures valid.",
+  "cfb_evidence_owner_authorization": "Owner work-list item 7, Oct 24 2026: near-kickoff DK board saves are irreversible PIT evidence; explicitly requested Sunday 12:00 UTC Fri/Sat finals capture and grading. Quota reserve unchanged; results via review PR, no automatic promotion or merge."
 }
