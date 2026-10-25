@@ -10,7 +10,8 @@ from sportsedge.nfl_final_receipts import bind_espn_final, scoreboard_url
 from sportsedge.nfl_paper_grader import (
     NflPaperError, capture_nfl_issue, grade_nfl_issue,
 )
-from sportsedge.line_snapshots import append_snapshot, build_snapshot, load_snapshots
+from sportsedge.line_snapshots import append_snapshot, build_snapshot, load_snapshots, _content_hash
+from sportsedge.nfl_lines_intake import parse_nfl_lines
 
 ISSUE = 742
 START = "2026-10-24T23:00:00Z"
@@ -102,12 +103,15 @@ def test_backfilled_after_kickoff_cannot_close_clv(tmp_path):
         stage(tmp_path, captured="2026-10-24T22:50:00Z",
               recorded="2026-10-24T23:05:00Z", chosen=False)
     first = load_snapshots("nfl", ISSUE, tmp_path)[0]
+    late_body = body("2026-10-24T22:55:00Z", "+145", "-165")
+    late_markets = parse_nfl_lines(late_body, title=TITLE)[0].markets
+    late_board = [dict(market=m.market, line=m.line, team=m.team,
+                       player=m.player, price_a=m.away_or_over_price,
+                       price_b=m.home_or_under_price) for m in late_markets]
     forged = build_snapshot(
         sport="nfl", issue_number=ISSUE,
-        body=body("2026-10-24T22:55:00Z", "+145", "-165"), title=TITLE,
-        game=first["game"],
-        board=[{"market": "moneyline", "line": None, "team": None,
-                "player": None, "price_a": 145, "price_b": -165}],
+        body=late_body, title=TITLE,
+        game=first["game"], board=late_board,
         picks=[], recorded_at="2026-10-24T23:05:00Z",
     )
     append_snapshot(forged, tmp_path)
@@ -189,3 +193,26 @@ def test_cli_refuses_source_bytes_not_matching_receipt(tmp_path):
                       "--source-raw", str(source), "--snapshot-root", str(tmp_path),
                       "--output", str(out)]) == 2
     assert not out.exists()
+
+
+def test_stored_snapshot_bad_digest_refused_before_grade(tmp_path):
+    snap = stage(tmp_path)
+    snap["board"][0]["price_b"] = -900
+    with pytest.raises(NflPaperError, match="DIGEST_MISMATCH"):
+        grade_nfl_issue([snap], FINAL)
+
+
+def test_rehashed_forged_board_still_refused_against_original_quote(tmp_path):
+    snap = stage(tmp_path)
+    snap["board"][0]["price_b"] = -900
+    snap["content_sha256"] = _content_hash(snap)
+    with pytest.raises(NflPaperError, match="BOARD_MISMATCH"):
+        grade_nfl_issue([snap], FINAL)
+
+
+def test_rehashed_forged_pick_price_still_refused(tmp_path):
+    snap = stage(tmp_path)
+    snap["picks"][0]["price"] = -900
+    snap["content_sha256"] = _content_hash(snap)
+    with pytest.raises(NflPaperError, match="PICK_PRICE_OR_LINE_MISMATCH"):
+        grade_nfl_issue([snap], FINAL)
