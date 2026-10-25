@@ -10,7 +10,7 @@ import io
 import json
 import sys
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
@@ -77,6 +77,8 @@ def archive_zip(
     observed = datetime.fromisoformat(received_at_utc)
     if observed.tzinfo is None:
         raise ValueError("RECEIPT_TIMESTAMP_MISSING_OFFSET")
+    if observed.utcoffset() != timedelta(0):
+        raise ValueError("RECEIPT_TIMESTAMP_NOT_UTC")
     digest = hashlib.sha256(data).hexdigest()
     output_dir.mkdir(parents=True, exist_ok=True)
     zip_path = output_dir / f"gameinfo_{digest}.zip"
