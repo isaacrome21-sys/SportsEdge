@@ -108,6 +108,10 @@ def test_workflow_writes_only_isolated_review_branch():
     workflow = Path(".github/workflows/mlb-lines-issue.yml").read_text(encoding="utf-8")
     assert "contents: write" in workflow
     assert "pull-requests: write" in workflow
+    assert "group: mlb-lines-issue-${{ github.event.issue.number }}" in workflow
+    assert "cancel-in-progress: false" in workflow
+    assert "mlb_snapshot_refusal.txt" in workflow
+    assert "MLB PAPER SNAPSHOT PUSH BLOCKED" in workflow
     assert "Preserve MLB PAPER snapshot via draft evidence PR" in workflow
     assert "--body-file issue_body.txt" in workflow
     assert "--card-md artifacts/mlb_myspari_ctx/card.md" in workflow
