@@ -153,6 +153,7 @@ jobs:
                --body-file issue_body.txt --title "$TITLE" \
                --card-md artifacts/mlb_myspari_ctx/card.md \
                --require-card-quote-match \
+               --bound-input-json "${{ steps.intake.outputs.path }}" \
                --root ledger/line_snapshots; then
             gh issue comment "$ISSUE" --body "MLB PAPER SNAPSHOT REFUSED: Captured time missing/invalid or later than recording. No new close or qualifying CLV receipt. See run logs."
             exit 0
