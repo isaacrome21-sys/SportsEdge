@@ -56,13 +56,16 @@ def probe(*, fetcher=fetch_board, clock=lambda: datetime.now(timezone.utc), arch
                     or board.received_at.tzinfo is None
                     or board.received_at.utcoffset() is None):
                 raise ValueError("DK_PROBE_SOURCE_IDENTITY_INVALID")
+            if not board.raw or not board.source_uri.startswith("https://sportsbook-nash.draftkings.com/"):
+                raise ValueError("DK_PROBE_SOURCE_URI_OR_RAW_INVALID")
             raw_archive = None
             if archive_dir is not None:
                 destination = Path(archive_dir) / (sport.lower() + "-" + hashlib.sha256(board.raw).hexdigest() + ".json")
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 if destination.exists() and destination.read_bytes() != board.raw:
                     raise ValueError("ARCHIVE_CONFLICT")
-                destination.write_bytes(board.raw)
+                if not destination.exists():
+                    destination.write_bytes(board.raw)
                 raw_archive = str(destination)
             result["sports"][sport] = {
                 "raw_archive": raw_archive,
