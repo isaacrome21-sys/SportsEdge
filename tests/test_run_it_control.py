@@ -27,8 +27,32 @@ def test_repo_surface_declares_all_active_sports_and_live_lane():
     report = audit_surface()
     assert report["status"] == "PASS"
     assert {row["sport"] for row in report["sports"]} == {
-        "MLB", "NFL", "CFB", "NBA", "PGA", "UFC", "LIVE"
+        "MLB", "NFL", "CFB", "NBA", "NHL", "CBB", "PGA", "UFC", "LIVE"
     }
+
+
+@pytest.mark.parametrize("sport,blocker", [
+    ("NHL", "NHL_AUTOMATIC_DK_SIX_SPORT_CAPTURE_NOT_WIRED"),
+    ("CBB", "CBB_FAMILY_REGISTRY_BLOCKED"),
+])
+def test_six_sport_run_it_never_silently_drops_nhl_or_cbb(sport, blocker):
+    report = execute_surface(scope=(sport,))
+    assert report["scope"] == [sport]
+    assert report["overall_status"] == "BLOCKED"
+    assert len(report["results"]) == 1
+    row = report["results"][0]
+    assert row["sport"] == sport
+    assert row["status"] == "BLOCKED"
+    assert row["official_bets"] == 0
+    assert blocker in row["blocker"]
+
+
+def test_all_six_requested_sports_have_an_explicit_lane():
+    report = execute_surface(scope=("NHL", "CBB", "NBA"))
+    assert set(report["scope"]) == {"NHL", "CBB", "NBA"}
+    assert {row["sport"] for row in report["results"]} == {"NHL", "CBB", "NBA"}
+    assert all(row["status"] == "BLOCKED" and row["official_bets"] == 0
+               for row in report["results"])
 
 
 def test_registered_nba_scope_is_explicitly_blocked_until_validation():
