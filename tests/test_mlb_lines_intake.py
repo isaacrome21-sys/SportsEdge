@@ -2,7 +2,7 @@ import unittest
 
 from sportsedge.engine_registry import resolve_manual_market_type
 from sportsedge.manual_quote import validate_manual_quote
-from sportsedge.mlb_lines_intake import LinesIntakeError, build_input, parse_lines
+from sportsedge.mlb_lines_intake import LinesIntakeError, build_input, parse_lines, parse_lines_with_warnings
 from sportsedge.mlb_source import GameSnapshot
 
 
@@ -152,7 +152,10 @@ class LinesIntakeTest(unittest.TestCase):
         with self.assertRaises(LinesIntakeError) as ctx:
             parse_lines("Red Sox @ Yankees\nML -140\nsomething weird")
         self.assertIn("line 2", str(ctx.exception))
-        self.assertIn("line 3", str(ctx.exception))
+        # Unknown text is now a warning (see #2578); one-sided prices still fail.
+        rows, warnings = parse_lines_with_warnings("Red Sox @ Yankees\nML +100 -120\nsomething weird")
+        self.assertEqual(len(rows), 1)
+        self.assertIn("line 3", warnings[0])
 
     def test_unknown_game_fails_closed(self):
         with self.assertRaises(LinesIntakeError):
