@@ -165,3 +165,12 @@ def test_future_close_capture_not_accepted():
                          feed=feed, entry_issue=entry, other_issues=[close])
     assert result[0]["clv_status"] == "NO_CLOSE_QUOTE"
     assert result[0]["clv_prob"] == ""
+
+
+def test_missing_first_pitch_refuses_clv():
+    feed = _feed()
+    feed["gameData"]["datetime"].pop("dateTime")
+    result = compute_clv(issue_number=100, picks=[CardRow(1, "Moneyline Home", -120, "ACTIONABLE")],
+                         feed=feed, entry_issue=ENTRY, other_issues=[CLOSE])
+    assert result[0]["clv_status"] == "NO_ENTRY_CAPTURE"
+    assert result[0]["clv_prob"] == ""
