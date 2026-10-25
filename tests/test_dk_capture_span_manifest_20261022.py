@@ -72,14 +72,17 @@ def test_failed_capture_listed_not_dropped():
 
 
 def test_span_is_per_game_not_slate_wide():
-    # A slow game refuses alone; the fast game still hands forward.
+    # A slow game is retained as flagged research; fast game remains eligible.
     m = build_capture_span_manifest([
         _rec("FAST", finish="2026-10-22T17:21:45-05:00"),
         _rec("SLOW", finish="2026-10-22T17:26:00-05:00"),
     ])
     assert m["accepted_event_ids"] == ["FAST"]
-    assert m["refused"][0]["event_id"] == "SLOW"
-    assert m["refused"][0]["span_seconds"] == 300.0
+    assert m["flagged_research_event_ids"] == ["SLOW"]
+    assert m["refused"] == []
+    slow = next(g for g in m["games"] if g["event_id"] == "SLOW")
+    assert slow["span_seconds"] == 300.0
+    assert slow["ladder_eligible"] is False
 
 
 def test_mixed_offsets_compute_the_same_span():
