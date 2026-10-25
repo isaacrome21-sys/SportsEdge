@@ -8,11 +8,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import subprocess
 from datetime import datetime, timezone
 from math import isfinite
 from statistics import median
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+try:
+    from bet_issue_crosscheck import render_crosscheck
+except ImportError:  # imported by path in tests
+    import sys as _sys
+    _sys.path.insert(0,str(Path(__file__).resolve().parent))
+    from bet_issue_crosscheck import render_crosscheck
 
 
 def _utc(value):
@@ -298,7 +307,7 @@ def nfl_market_price_radar(root: Path, now: datetime):
 
 
 def render(root: Path, run_url: str, *, as_of_date: str | None = None,
-           asof: datetime | None = None):
+           asof: datetime | None = None, bet_issues: list | None = None):
     now=asof or datetime.now(timezone.utc)
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("PREGAME_SNAPSHOT_REQUIRES_TIMEZONE")
@@ -326,6 +335,7 @@ def render(root: Path, run_url: str, *, as_of_date: str | None = None,
                 f"{candidate['method']} ({candidate['books']} book(s)) · PRICE_ONLY_NOT_MODEL_VALIDATED"
             )
     lines.append("")
+    auto_rows={}
     for sport in ("NFL","CFB"):
         state=summary.get(sport) or {}
         lines.append(f"### {sport} · {state.get('status') or 'MISSING'}")
@@ -358,6 +368,7 @@ def render(root: Path, run_url: str, *, as_of_date: str | None = None,
             lines.append("CFB model still requires out-of-sample validation; candidates are tracking only until then.")
             lines.append(f"Matched SDV games: {sum(int(x.get('priced_rows',0)) for x in cards)} modeled market rows; "
                          f"unmatched games: {state.get('unmatched_games','MISSING')}.")
+        auto_rows[sport]=list(picked)
         lines.append("Model status: "+", ".join(sorted(set(statuses))) if statuses else "Model status: MISSING")
         lines.append("")
         if sport=="NFL":
@@ -484,6 +495,8 @@ def render(root: Path, run_url: str, *, as_of_date: str | None = None,
                 else:
                     lines.append("None with supported model pricing." if role=="BEST" else "No modeled leans.")
                 lines.append("")
+    if bet_issues is not None:
+        lines.extend(render_crosscheck(bet_issues,auto_rows,as_of_date))
     lines.extend(["**Open the run for the full quotes, cards and PNG images (when available):**",run_url,"",
                   "Unavailable data stays MISSING. A directional lean is not a verified betting edge."])
     return "\n".join(lines)+"\n"
@@ -494,9 +507,26 @@ def main():
     ap.add_argument("--root",type=Path,default=Path("artifacts/auto_dk_cards"))
     ap.add_argument("--output",type=Path,default=Path("artifacts/auto_dk_cards/phone_summary.md"))
     ap.add_argument("--run-url",required=True)
+    ap.add_argument("--bet-issues",type=Path,help="JSON from gh issue list (open [BET] issues)")
     args=ap.parse_args()
+    bets=None
+    if args.bet_issues and args.bet_issues.is_file():
+        try:
+            bets=json.loads(args.bet_issues.read_text(encoding="utf-8"))
+        except ValueError:
+            bets=[]
+    elif os.environ.get("GH_TOKEN") and os.environ.get("GITHUB_REPOSITORY"):
+        # Read-only list of open [BET] issues; any failure just omits the section.
+        try:
+            out=subprocess.run(["gh","issue","list","--repo",os.environ["GITHUB_REPOSITORY"],
+                                "--state","open","--limit","200","--search","[BET] in:title",
+                                "--json","number,title,body"],
+                               capture_output=True,text=True,timeout=60,check=True).stdout
+            bets=json.loads(out or "[]")
+        except (OSError,ValueError,subprocess.SubprocessError):
+            bets=None
     args.output.parent.mkdir(parents=True,exist_ok=True)
-    args.output.write_text(render(args.root,args.run_url),encoding="utf-8")
+    args.output.write_text(render(args.root,args.run_url,bet_issues=bets),encoding="utf-8")
 
 
 if __name__=="__main__":
