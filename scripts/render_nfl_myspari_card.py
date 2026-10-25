@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 import json
 import os
@@ -249,6 +249,15 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
                 else:
                     why = "under the research EV/edge floors"
                 if ev > 0:
+                    captured = row.get("quote_retrieved_at")
+                    try:
+                        stamp = datetime.fromisoformat(str(captured).replace("Z", "+00:00"))
+                        valid_capture = stamp.tzinfo is not None
+                    except (ValueError, TypeError):
+                        valid_capture = False
+                    if not valid_capture:
+                        unpriced.append(f"- {label}: positive estimate withheld: offset-aware quote capture time required")
+                        continue
                     text = (f"- **POSITIVE EV — PAPER** {label}: {best.get('selection')}"
                             f" @ {fmt_price(best.get('price_american'))}"
                             f" · estimated EV {ev * 100:+.4g}%"

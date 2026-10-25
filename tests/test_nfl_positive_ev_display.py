@@ -4,6 +4,7 @@ from scripts.render_nfl_myspari_card import render
 
 def card(ev, **updates):
     row = dict(market='total',line=42.5,residual_mode=True,
+        quote_retrieved_at='2026-10-25T09:32:21-05:00',
         away_or_over_price=-112,home_or_under_price=-108,
         residual_research_prices=[dict(selection='OVER',price_american=-112,
                                       ev_per_dollar=ev)])
@@ -36,7 +37,13 @@ def test_original_quote_time_is_displayed():
     assert 'Captured: 2026-10-25T09:32:21-05:00' in card(.004,quote_retrieved_at='2026-10-25T09:32:21-05:00')
 
 def test_missing_capture_is_not_invented():
-    assert 'Captured: unavailable' in card(.004)
+    assert 'POSITIVE EV — PAPER' not in card(.004,quote_retrieved_at=None)
+    assert 'capture time required' in card(.004,quote_retrieved_at=None)
 
 def test_tiny_positive_not_rounded_to_zero():
     assert 'estimated EV +1e-06%' in card(.00000001)
+
+
+@pytest.mark.parametrize('stamp',['invalid','2026-10-25T09:32:21',''])
+def test_malformed_or_naive_capture_withholds_positive_candidate(stamp):
+    assert 'POSITIVE EV — PAPER' not in card(.004,quote_retrieved_at=stamp)
