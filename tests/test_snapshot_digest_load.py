@@ -32,3 +32,17 @@ def test_malformed_or_missing_digest_refused(tmp_path):
         path.write_text(line + "\n")
         with pytest.raises(SnapshotError, match=reason):
             load_snapshots("nfl", 991001, root=tmp_path)
+
+
+@pytest.mark.parametrize("change", [
+    {"sport": "mlb"}, {"issue_number": 991002}, {"issue_number": True},
+    {"schema": "unknown.snapshot.v0"},
+])
+def test_intact_digest_wrong_ledger_or_schema_refused(tmp_path, change):
+    record = sample()
+    record.update(change)
+    path = tmp_path / "nfl" / "991001.jsonl"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(record) + "\\n")
+    with pytest.raises(SnapshotError, match="SNAPSHOT_IDENTITY_MISMATCH"):
+        load_snapshots("nfl", 991001, root=tmp_path)
