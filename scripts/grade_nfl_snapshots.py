@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+from datetime import datetime
 from pathlib import Path
 
 from scripts.capture_nfl_final_scores import SCHEMA
@@ -24,6 +25,14 @@ def _team(value):
 
 
 def _pair(snapshot, pick, final):
+    # Bind the fixture date too: the same teams may meet again later.
+    game_start = (snapshot.get("game") or {}).get("start") or (snapshot.get("game") or {}).get("commence_time")
+    if not game_start:
+        raise ValueError("NFL_GRADE_SNAPSHOT_START_MISSING")
+    start = datetime.fromisoformat(str(game_start).replace("Z", "+00:00"))
+    final_start = datetime.fromisoformat(str(final["start_ts"]).replace("Z", "+00:00"))
+    if start.tzinfo is None or final_start.tzinfo is None or start != final_start:
+        raise ValueError("NFL_GRADE_FIXTURE_START_MISMATCH")
     # Parse the preserved original board; never substitute a caller's close.
     parse_envelope(snapshot["body"], "NFL", title=snapshot.get("title"))
     games = parse_issue(snapshot["body"], "NFL", title=snapshot.get("title")).games

@@ -18,7 +18,7 @@ def receipts():
         at = "2026-10-25T" + time + "Z"
         out.append(build_snapshot(sport="nfl", issue_number=7,
             body=f"Chicago Bears @ New England Patriots\nCaptured: {at}\nTotal 40.5 {prices}",
-            title=None, game={}, board=[], picks=picks, recorded_at=at))
+            title=None, game={"start": FINAL["start_ts"]}, board=[], picks=picks, recorded_at=at))
     return out
 
 
@@ -67,3 +67,11 @@ def test_invalid_evidence_never_counts(mutation, reason):
 def test_unusable_final_blocks(override):
     row = grade_snapshot_pick(receipts(), PICK["pick"], {**FINAL, **override})
     assert row["status"] == "BLOCKED" and row["units"] is None
+
+
+@pytest.mark.parametrize("start", [None, "2026-11-01T17:00:00Z"])
+def test_missing_or_other_fixture_start_blocks(start):
+    snaps = receipts()
+    snaps[1]["game"]["start"] = start
+    row = grade_snapshot_pick(snaps, PICK["pick"], FINAL)
+    assert row["status"] == "BLOCKED" and row["clv"] is None
