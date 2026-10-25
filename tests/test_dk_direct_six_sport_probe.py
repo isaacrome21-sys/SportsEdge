@@ -8,10 +8,11 @@ NOW = datetime(2026, 10, 25, tzinfo=timezone.utc)
 
 def test_unverified_sports_never_guess_endpoint():
     calls = []
+    result_fixture = {"events": [], "selections": [{"id": 1, "marketId": "A"}, {"id": 2, "marketId": "missing"}], "markets": [{"id": "A", "name": "Total"}, {"id": "B", "name": "Moneyline"}, {"id": "C", "name": "Total"}]}
     def fetch(key):
         calls.append(key)
         return SimpleNamespace(sport_key=key, source_uri="https://sportsbook-nash.draftkings.com/test",
-                               received_at=NOW, raw=json.dumps({"events": [], "selections": [{"id": 1, "marketId": "A"}, {"id": 2, "marketId": "missing"}], "markets": [{"id": "A", "name": "Total"}, {"id": "B", "name": "Moneyline"}, {"id": "C", "name": "Total"}]}).encode(), payload={"events": [], "selections": [{"id": 1, "marketId": "A"}, {"id": 2, "marketId": "missing"}], "markets": [{"id": "A", "name": "Total"}, {"id": "B", "name": "Moneyline"}, {"id": "C", "name": "Total"}]})
+                               received_at=NOW, raw=json.dumps(result_fixture).encode(), payload=result_fixture)
     result = probe(fetcher=fetch, clock=lambda: NOW)
     assert set(result["sports"]) == set(SPORTS)
     assert result["sports"]["NBA"]["status"] == "UNVERIFIED_MAPPING"
@@ -29,9 +30,9 @@ def test_unverified_sports_never_guess_endpoint():
     assert result["sports"]["NFL"]["duplicate_event_ids"] == 0
     assert result["sports"]["NFL"]["payload_markets"] == 3
     assert result["sports"]["NFL"]["market_counts"] == {"Moneyline": 1, "Total": 2}
-    assert result["sports"]["NFL"]["raw_size_bytes"] == len(json.dumps(fetch("americanfootball_nfl").payload).encode())
-    assert result["sports"]["NFL"]["raw_sha256"] == hashlib.sha256(json.dumps(fetch("americanfootball_nfl").payload).encode()).hexdigest()
-    assert len(calls) == 5
+    assert result["sports"]["NFL"]["raw_size_bytes"] == len(json.dumps(result_fixture).encode())
+    assert result["sports"]["NFL"]["raw_sha256"] == hashlib.sha256(json.dumps(result_fixture).encode()).hexdigest()
+    assert len(calls) == 3
     assert all(result["sports"][s]["status"] == "FETCHED" for s in ("NFL", "CFB", "MLB"))
 
 def test_failure_is_unavailable_not_fake_prices():
