@@ -12,7 +12,7 @@ evidence policy needs before any NBA game-market candidate can be judged:
 * ``closing_quote``: last capture strictly before tip for the same event /
   market / line.  Moved line, post-tip only, or missing -> explicit reason.
 * ``grade``: WIN/LOSS/PUSH from final score.
-* ``clv``: no-vig close probability minus the entry break-even probability,
+* ``clv``: no-vig close probability minus the entry no-vig probability,
   plus decimal-price CLV.  ``clv_summary`` aggregates per market.
 """
 from __future__ import annotations
@@ -137,10 +137,16 @@ def profit(pick: Mapping, result: str) -> float:
 
 
 def clv(pick: Mapping, close: Mapping) -> dict:
-    a, b = implied(close["american"]), implied(close["other_american"])
-    close_fair = a / (a + b)
+    # Compare no-vig to no-vig on BOTH sides of the same market. Comparing
+    # a no-vig close to the entry's raw break-even probability embeds the
+    # entry vig and reports negative CLV even when the market never moved.
+    entry_a, entry_b = implied(pick["american"]), implied(pick["other_american"])
+    close_a, close_b = implied(close["american"]), implied(close["other_american"])
+    entry_fair = entry_a / (entry_a + entry_b)
+    close_fair = close_a / (close_a + close_b)
     return {"close_american": close["american"], "close_fair_p": close_fair,
-            "clv_prob": close_fair - implied(pick["american"]),
+            "entry_fair_p": entry_fair,
+            "clv_prob": close_fair - entry_fair,
             "clv_price_pct": decimal(pick["american"]) / decimal(close["american"]) - 1.0}
 
 
