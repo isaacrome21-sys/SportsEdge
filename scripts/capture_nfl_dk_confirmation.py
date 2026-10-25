@@ -245,8 +245,12 @@ def determine_due(cfg: Mapping[str, Any], now: datetime, snapshot: Any, out_dir:
     return opener, final_expected
 
 
-def next_final_window(cfg: Mapping[str, Any], now: datetime, snapshot: Any, *, horizon_minutes: int = 35) -> tuple[datetime, datetime] | None:
-    """Return the earliest uncaptured FINAL window opening within the arm horizon."""
+def next_final_window(cfg: Mapping[str, Any], now: datetime, snapshot: Any, *, horizon_minutes: int = 50) -> tuple[datetime, datetime] | None:
+    """Return the earliest uncaptured FINAL window opening within the arm horizon.
+
+    Pre-arm long enough for a 45-minute early runner to survive a missing later
+    cron dispatch. Actual quote admission remains inside the frozen FINAL window.
+    """
     now = now.astimezone(timezone.utc)
     lead = timedelta(minutes=int(cfg["final_minutes_before_kickoff"]))
     width = timedelta(minutes=int(cfg["final_window_minutes"]))
