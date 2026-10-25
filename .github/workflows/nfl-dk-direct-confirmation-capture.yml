@@ -26,7 +26,7 @@ concurrency:
 jobs:
   capture:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 80
     env:
       PYTHONPATH: ${{ github.workspace }}
     steps:
