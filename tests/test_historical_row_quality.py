@@ -39,3 +39,11 @@ def test_unattributed_benchmark_fails():
 def test_naive_time_fails():
     assert "INVALID_DECISION_TS" in validate_historical_row({
         **BASE, "decision_ts": "2025-07-01T18:00:00"})
+
+
+def test_nan_model_probability_rejected():
+    assert "INVALID_MODEL_P" in validate_historical_row({**BASE, "model_p": float("nan")})
+
+
+def test_infinite_offered_price_rejected():
+    assert "INVALID_OFFERED_DECIMAL" in validate_historical_row({**BASE, "offered_decimal": float("inf")})
