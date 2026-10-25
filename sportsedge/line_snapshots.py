@@ -126,9 +126,23 @@ def load_snapshots(sport: str, issue_number: int, root: Path = SNAPSHOT_ROOT) ->
     if not path.exists():
         return []
     out = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if line.strip():
-            out.append(json.loads(line))
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except (ValueError, TypeError) as exc:
+            raise SnapshotError(f"SNAPSHOT_JSON_INVALID: line {number}") from exc
+        if not isinstance(record, dict):
+            raise SnapshotError(f"SNAPSHOT_RECORD_INVALID: line {number}")
+        if (record.get("schema") != SCHEMA or record.get("sport") != sport.lower()
+                or type(record.get("issue_number")) is not int
+                or record["issue_number"] != int(issue_number)):
+            raise SnapshotError(f"SNAPSHOT_IDENTITY_MISMATCH: line {number}")
+        digest = record.get("content_sha256")
+        if not isinstance(digest, str) or digest != _content_hash(record):
+            raise SnapshotError(f"SNAPSHOT_DIGEST_MISMATCH: line {number}")
+        out.append(record)
     return out
 
 
