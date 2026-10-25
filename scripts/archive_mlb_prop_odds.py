@@ -316,6 +316,8 @@ def persist_payload(
             "captured_at": captured.isoformat(),
             "payload_sha256": payload.get("payload_sha256"),
             "pit_target_quote_count": payload.get("pit_target_quote_count"),
+            "native_two_sided_pair_count": payload.get("native_two_sided_pair_count", 0),
+            "native_paired_quote_row_count": payload.get("native_paired_quote_row_count", 0),
             "market_counts": payload.get("market_counts"),
             "immutable_file": str(immutable),
         },
@@ -371,6 +373,8 @@ def main() -> int:
                 {
                     "status": status,
                     "pit_target_quote_count": payload["pit_target_quote_count"],
+                    "native_two_sided_pair_count": payload["native_two_sided_pair_count"],
+                    "native_paired_quote_row_count": payload["native_paired_quote_row_count"],
                     "target_market_count": len(payload["target_markets"]),
                     "market_counts": payload["market_counts"],
                     "provider_quote_count": payload["provider_quote_count"],
