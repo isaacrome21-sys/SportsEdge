@@ -63,6 +63,8 @@ def probe(*, fetcher=fetch_board, clock=lambda: datetime.now(timezone.utc), arch
                     or source.port not in (None, 443)
                     or source.username is not None or source.password is not None):
                 raise ValueError("DK_PROBE_SOURCE_URI_OR_RAW_INVALID")
+            if json.loads(board.raw) != board.payload:
+                raise ValueError("DK_PROBE_RAW_PAYLOAD_MISMATCH")
             raw_archive = None
             if archive_dir is not None:
                 destination = Path(archive_dir) / (sport.lower() + "-" + hashlib.sha256(board.raw).hexdigest() + ".json")
