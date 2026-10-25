@@ -22,9 +22,8 @@ def _finite_real(value: Any) -> bool:
 
 
 def american_to_decimal(price: int) -> float:
-    if isinstance(price, bool):
+    if type(price) is not int:
         raise PickRecordError(f"PICK_PRICE_INVALID:{price}")
-    price = int(price)
     if -100 < price < 100:
         raise PickRecordError(f"PICK_PRICE_INVALID:{price}")
     return 1 + (price / 100 if price > 0 else 100 / -price)
@@ -94,6 +93,6 @@ def make_pick(*, sport: str, market: str, selection: str, line: float | None, dk
     if ladder_status is None:
         from .ladder import status_for
         ladder_status = status_for(sport, market, ladder=ladder)
-    return PickRecord(sport.upper(), market, str(selection).upper(), line, int(dk_price),
+    return PickRecord(sport.upper(), market, str(selection).upper(), line, dk_price,
                       captured_at, float(model_p), engine, expected_value(model_p, dk_price),
                       ladder_status, game=game, subject=subject, opposite_price=opposite_price)
