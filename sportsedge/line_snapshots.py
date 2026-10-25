@@ -129,7 +129,7 @@ def load_snapshots(sport: str, issue_number: int, root: Path = SNAPSHOT_ROOT) ->
     for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         if line.strip():
             try:
-                record = json.loads(line)
+                record = json.loads(line, parse_constant=lambda token: (_ for _ in ()).throw(ValueError('NONFINITE_JSON_TOKEN:' + token)))
             except (ValueError, TypeError) as exc:
                 raise SnapshotError(f"SNAPSHOT_JSON_INVALID:{number}") from exc
             if not isinstance(record, dict) or not isinstance(record.get("content_sha256"), str):
