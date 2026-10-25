@@ -216,3 +216,32 @@ def test_rehashed_forged_pick_price_still_refused(tmp_path):
     snap["content_sha256"] = _content_hash(snap)
     with pytest.raises(NflPaperError, match="PICK_PRICE_OR_LINE_MISMATCH"):
         grade_nfl_issue([snap], FINAL)
+
+
+@pytest.mark.parametrize("bad", [-145.9, True, "-145.1", float("nan"), None])
+def test_engine_american_quote_must_be_exact_integer(tmp_path, bad):
+    result = engine()
+    result["games"][0]["markets"][0]["lean"]["price_american"] = bad
+    with pytest.raises(NflPaperError, match="PRICE_NOT_EXACT_INTEGER"):
+        capture_nfl_issue(body=body("2026-10-24T21:00:00Z"), title=TITLE,
+                          issue_number=ISSUE, game_start=START,
+                          recorded_at="2026-10-24T21:01:00Z",
+                          engine=result, root=tmp_path)
+    assert load_snapshots("nfl", ISSUE, tmp_path) == []
+
+
+def test_engine_exact_integer_string_quote_matches_capture(tmp_path):
+    result = engine()
+    result["games"][0]["markets"][0]["lean"]["price_american"] = "-145"
+    snap = capture_nfl_issue(body=body("2026-10-24T21:00:00Z"), title=TITLE,
+                             issue_number=ISSUE, game_start=START,
+                             recorded_at="2026-10-24T21:01:00Z",
+                             engine=result, root=tmp_path)
+    assert snap["picks"][0]["price"] == -145
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), True])
+def test_invalid_nfl_final_scores_refuse_without_grade(tmp_path, bad):
+    snap = stage(tmp_path)
+    with pytest.raises(NflPaperError, match="FINAL_SCORES_INVALID"):
+        grade_nfl_issue([snap], {**FINAL, "away_points": bad})
