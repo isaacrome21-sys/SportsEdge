@@ -14,6 +14,26 @@ SPORTS = {"NFL": "americanfootball_nfl", "NBA": "basketball_nba",
           "MLB": "baseball_mlb", "CFB": "americanfootball_ncaaf",
           "CBB": "basketball_ncaab", "NHL": "icehockey_nhl"}
 
+def selection_linkage(payload):
+    """Count selection-to-market links; never infer missing IDs or prices."""
+    markets = payload.get("markets")
+    selections = payload.get("selections")
+    if not isinstance(markets, list) or not isinstance(selections, list):
+        return None
+    ids = {str(m["id"]) for m in markets
+           if isinstance(m, dict) and m.get("id") is not None}
+    return {
+        "unlinked_selections": sum(
+            1 for x in selections if isinstance(x, dict)
+            and (x.get("marketId") is None or str(x["marketId"]) not in ids)),
+        "linked_selections": sum(
+            1 for x in selections if isinstance(x, dict)
+            and x.get("marketId") is not None and str(x["marketId"]) in ids),
+        "duplicate_market_ids": len([
+            m for m in markets if isinstance(m, dict) and m.get("id") is not None
+        ]) - len(ids),
+    }
+
 def probe(*, fetcher=fetch_board, clock=lambda: datetime.now(timezone.utc)):
     result = {"schema": "sportsedge.dk_direct_probe.v1",
               "captured_at_utc": clock().isoformat(), "sports": {}}
@@ -35,7 +55,7 @@ def probe(*, fetcher=fetch_board, clock=lambda: datetime.now(timezone.utc)):
                 "payload_markets": len(board.payload["markets"]) if isinstance(board.payload.get("markets"), list) else None,
                 "market_counts": dict(sorted(Counter(str(m.get("name")).strip() for m in board.payload.get("markets", []) if isinstance(m, dict) and str(m.get("name") or "").strip()).items())) if isinstance(board.payload.get("markets"), list) else None,
                 "payload_selections": len(board.payload["selections"]) if isinstance(board.payload.get("selections"), list) else None,
-                "unlinked_selections": sum(1 for x in board.payload.get("selections", []) if isinstance(x, dict) and str(x.get("marketId") or "") not in {str(m.get("id")) for m in board.payload.get("markets", []) if isinstance(m, dict) and m.get("id") is not None}) if isinstance(board.payload.get("selections"), list) and isinstance(board.payload.get("markets"), list) else None,
+                **(selection_linkage(board.payload) or {"unlinked_selections": None, "linked_selections": None, "duplicate_market_ids": None}),
                 "payload_events": len(board.payload["events"])
                     if isinstance(board.payload.get("events"), list) else None}
         except (DraftKingsGameMarketError, OSError, ValueError) as exc:
