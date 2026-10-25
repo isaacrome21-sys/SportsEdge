@@ -48,3 +48,22 @@ def test_records_blocked_and_accepted(tmp_path):
     blocked = tmp_path / "blocked.jsonl"
     assert run(source, accepted, blocked) == {"accepted": 1, "blocked": 1}
     assert json.loads(blocked.read_text())["reason"] == "RECEIPT_AFTER_DECISION"
+
+
+def test_rejects_future_decision():
+    from datetime import datetime, timedelta, timezone
+    r = row()
+    future = datetime.now(timezone.utc) + timedelta(days=1)
+    r["decision_ts"] = future.isoformat()
+    r["event_start_ts"] = (future + timedelta(hours=1)).isoformat()
+    assert admit(r) == "DECISION_IN_FUTURE"
+
+
+def test_rejects_duplicate_event_decision(tmp_path):
+    r = row()
+    source = tmp_path / "duplicate.jsonl"
+    source.write_text(json.dumps(r) + "\n" + json.dumps(r) + "\n")
+    accepted = tmp_path / "accepted.jsonl"
+    blocked = tmp_path / "blocked.jsonl"
+    assert run(source, accepted, blocked) == {"accepted": 1, "blocked": 1}
+    assert json.loads(blocked.read_text())["reason"] == "DUPLICATE_SELECTION_DECISION"
