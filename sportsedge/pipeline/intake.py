@@ -83,6 +83,11 @@ _MLB_PITCHER_SECTION = re.compile(
     r"^pitcher\s+props?\s*[—–:-]\s*(?P<name>.+?)\s*"
     r"(?:\([^()]*\))?\s*:\s*$", re.IGNORECASE,
 )
+_MLB_FIRST_INNING_PAIR = re.compile(
+    r"^(?P<first>YRFI|NRFI)\s+(?P<first_price>\S+)\s*/\s*"
+    r"(?P<second>YRFI|NRFI)\s+(?P<second_price>\S+)\s*$",
+    re.IGNORECASE,
+)
 
 
 def _norm_dash(text: str) -> str:
@@ -320,6 +325,26 @@ def parse_issue(body: str, sport: str, *, title: str | None = None,
             continue
         if sport == "MLB" and line.casefold().startswith("batter "):
             pitcher_subject = None  # batter ladder must bind its own subjects
+        if sport == "MLB" and re.match(r"^(YRFI|NRFI)\b", line, re.IGNORECASE):
+            pair = _MLB_FIRST_INNING_PAIR.fullmatch(line)
+            if pair is not None:
+                if current is None:
+                    raise SharedIntakeError(f"MLB_INTAKE_MARKET_BEFORE_GAME:{line}")
+                first, second = pair.group("first").upper(), pair.group("second").upper()
+                if {first, second} != {"YRFI", "NRFI"}:
+                    raise SharedIntakeError(f"MLB_INTAKE_FIRST_INNING_PAIR_INVALID:{line}")
+                quoted = {
+                    first: american(pair.group("first_price"), line, sport),
+                    second: american(pair.group("second_price"), line, sport),
+                }
+                current.markets.append(SharedMarket(
+                    "FIRST_INNING_TOTAL", "yes_no", 0.5, "OVER", quoted["YRFI"],
+                    "UNDER", quoted["NRFI"], line,
+                ))
+                continue
+            if "/" in line and re.search(r"\b(?:YRFI|NRFI)\b", line.split("/", 1)[1], re.IGNORECASE):
+                # A displayed YRFI/NRFI pair must provide *both* exact odds.
+                raise SharedIntakeError(f"MLB_INTAKE_FIRST_INNING_PAIR_INVALID:{line}")
         if sport == "MLB" and line.casefold().startswith("team totals:"):
             # Source format: `Team Totals: MIL 3.5 +100 -130; TB 3.5 -105 -125`.
             # Split only these explicitly paired offers; never infer a price.
