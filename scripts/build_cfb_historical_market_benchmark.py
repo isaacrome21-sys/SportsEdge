@@ -28,7 +28,11 @@ def build(*, contract_path: Path, cache_root: Path, output_path: Path) -> dict:
         allow_benchmark=True,
     )
     report = build_historical_market_benchmark(
-        iter_market_archive(contract_path=contract_path, cache_file=cached["cache_file"]),
+        iter_market_archive(
+            contract_path=contract_path,
+            cache_file=cached["cache_file"],
+            use="historical_market_coverage_profiling",
+        ),
         source_sha256=str(upstream.get("expected_sha256") or ""),
         expected_row_count=int(profile.get("row_count") or 0),
     )
