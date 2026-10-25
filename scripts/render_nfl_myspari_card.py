@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import date, datetime
+from math import isfinite
 from pathlib import Path
 import json
 import os
@@ -235,6 +236,9 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
                 unpriced.append(f"- {label}: {_plain_reason('NO_MODEL:PAIRED_RESIDUAL_PRICE_UNAVAILABLE')}")
                 continue
             ev = float(best.get("ev_per_dollar") or 0)
+            if not isfinite(ev):
+                unpriced.append(f"- {label}: invalid nonfinite estimated EV")
+                continue
             status = display_status({**row, **best})
             if chosen:
                 text = (f"- **{status}** {label}: {best['selection']} {best.get('line', '')} @ {fmt_price(best['price_american'])}"

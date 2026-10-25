@@ -47,3 +47,10 @@ def test_tiny_positive_not_rounded_to_zero():
 @pytest.mark.parametrize('stamp',['invalid','2026-10-25T09:32:21',''])
 def test_malformed_or_naive_capture_withholds_positive_candidate(stamp):
     assert 'POSITIVE EV — PAPER' not in card(.004,quote_retrieved_at=stamp)
+
+
+@pytest.mark.parametrize('ev',[float('nan'),float('inf'),float('-inf')])
+def test_nonfinite_estimate_never_reaches_candidate_card(ev):
+    text=card(ev)
+    assert 'POSITIVE EV — PAPER' not in text
+    assert 'invalid nonfinite estimated EV' in text
