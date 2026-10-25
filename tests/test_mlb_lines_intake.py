@@ -165,6 +165,46 @@ class LinesIntakeTest(unittest.TestCase):
         self.assertTrue(all(r["game_pk"] == 999999 for r in payload["rows"]))
         self.assertTrue(all(r["timestamp_source"] == "INTAKE_STAMPED" for r in payload["rows"]))
 
+    def test_issue_2685_full_paired_market_set_reaches_production_parser(self):
+        # Covers the live issue parser rather than only the shared parser.
+        body = "MIL Brewers @ TB Rays\n" + "\n".join([
+            "ML -105 -115", "RL -1.5 +170 / +1.5 -208", "Total 7 -110 -109",
+            *[f"Alt Total {line} {over} {under}" for line, over, under in [
+                (3.5, -690, 425), (4, -630, 394), (4.5, -407, 282),
+                (5, -334, 239), (5.5, -208, 157), (6, -180, 137),
+                (6.5, -145, 111), (7.5, 117, -153), (8, 142, -186),
+                (8.5, 159, -212), (9, 216, -297), (9.5, 246, -345),
+                (10, 310, -457), (10.5, 332, -497), (11, 465, -790),
+                (11.5, 495, -860),
+            ]],
+            "Alt RL -4.5 +620 / +4.5 -1260",
+            "Alt RL -2.5 +274 / +2.5 -391",
+            "Alt RL -1 +136 / +1 -178",
+            "Alt RL +1 -165 / -1 +126",
+            "Alt RL +1.5 -234 / -1.5 +175",
+            "Alt RL +5 -2500 / -5 +870",
+            "Team Totals: MIL 3.5 +100 -130; TB 3.5 -105 -125",
+            "F5 ML -105 -125", "F5 RL -0.5 +135 / +0.5 -175",
+            "F5 Total 3.5 -140 +110", "YRFI +100 / NRFI -130",
+            "Pitcher props — Freddy Peralta (TB):",
+            "K 4.5 -132 +104", "Outs 15.5 +114 -152", "Hits Allowed 4.5 +114 -152",
+            "ER Allowed 1.5 -127 -104", "Walks Allowed 1.5 -195 +146",
+            "Pitcher props — Robert Gasser (MIL):",
+            "K 3.5 -101 -127", "Outs 12.5 +108 -143", "Hits Allowed 3.5 -132 -101",
+            "ER Allowed 1.5 +116 -154", "Walks Allowed 1.5 +173 -234",
+            "Batter HR 1+: Junior Caminero +350; Jake Bauers +455",
+            "Batter HR 2+: Junior Caminero +3300; Jake Bauers +5500",
+            "Batter Hits (1+ / 2+ / 3+): Jackson Chourio -246/+219/+980; Yandy Diaz -256/+216/+1000",
+        ])
+        rows, warnings = parse_lines_with_warnings(body)
+        self.assertEqual(len(rows), 41)
+        self.assertEqual(sum(r.market_type == "GAME_TOTAL" for r in rows), 17)
+        self.assertEqual(sum(r.market_type == "RUN_LINE" for r in rows), 7)
+        self.assertEqual(sum(r.market_type == "TEAM_TOTAL" for r in rows), 2)
+        self.assertEqual(sum(r.market_type.startswith("PITCHER_") for r in rows), 10)
+        self.assertTrue(any("Batter HR 1+" in warning for warning in warnings))
+        self.assertFalse(any(r.market_type.startswith("BATTER_") for r in rows))
+
     def test_binary_player_markets_use_yes_no_without_invented_line(self):
         rows = parse_lines(
             "Red Sox @ Yankees\nCam Schlittler win +159 -223\nAaron Judge first HR +550 -900"
