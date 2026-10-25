@@ -139,3 +139,29 @@ def test_grade_issue_writes_clv_ledger_and_comment(tmp_path: Path):
     grade_issue(100, comments=[{"body": body}], feed=_feed(), ledger_path=tmp_path / "l.csv",
                 post_comment=False, issue=ENTRY, line_issues=[ENTRY, CLOSE], clv_ledger_path=clv_path)
     assert len(list(csv.DictReader(clv_path.open()))) == 1
+
+
+def test_missing_entry_capture_never_tracks_clv():
+    entry = dict(ENTRY)
+    entry["body"] = entry["body"].replace("Captured: 2026-10-24T22:20:00Z\\n", "")
+    result = compute_clv(issue_number=100, picks=[CardRow(1, "Moneyline Home", -120, "ACTIONABLE")],
+                         feed=_feed(), entry_issue=entry, other_issues=[CLOSE])
+    assert result[0]["clv_status"] == "NO_ENTRY_CAPTURE"
+    assert result[0]["clv_prob"] == ""
+
+
+def test_future_close_capture_not_accepted():
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    future = (now + timedelta(days=1)).isoformat()
+    entry = dict(ENTRY)
+    entry["body"] = entry["body"].replace("2026-10-24T22:20:00Z",
+        (now - timedelta(minutes=5)).isoformat())
+    feed = _feed()
+    feed["gameData"]["datetime"]["dateTime"] = (now + timedelta(days=2)).isoformat()
+    close = dict(CLOSE)
+    close["body"] = close["body"].replace("2026-10-24T23:50:00Z", future)
+    result = compute_clv(issue_number=100, picks=[CardRow(1, "Moneyline Home", -120, "ACTIONABLE")],
+                         feed=feed, entry_issue=entry, other_issues=[close])
+    assert result[0]["clv_status"] == "NO_CLOSE_QUOTE"
+    assert result[0]["clv_prob"] == ""
