@@ -19,7 +19,7 @@ cache-mode: write
 
 concurrency:
   group: mlb-lines-issue-${{ github.event.issue.number }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   card:
@@ -155,8 +155,9 @@ jobs:
                --require-card-quote-match \
                --bound-input-json "${{ steps.intake.outputs.path }}" \
                --max-capture-lag-seconds 180 \
-               --root ledger/line_snapshots; then
-            gh issue comment "$ISSUE" --body "MLB PAPER SNAPSHOT REFUSED: missing/stale Captured time, unmatched exact two-sided card quote, ambiguous game, or start/recording mismatch. No eligible entry/close or CLV recorded. See run logs."
+               --root ledger/line_snapshots 2>mlb_snapshot_refusal.txt; then
+            reason="$(tail -n 1 mlb_snapshot_refusal.txt | tr -cd '[:alnum:] _:+.-' | cut -c1-180)"
+            gh issue comment "$ISSUE" --body "MLB PAPER SNAPSHOT REFUSED: ${reason:-reason unavailable}. No eligible entry/close or CLV recorded. See run logs."
             exit 0
           fi
           path="ledger/line_snapshots/mlb/$ISSUE.jsonl"
@@ -166,7 +167,10 @@ jobs:
             exit 0
           fi
           git commit -m "evidence: append MLB paper snapshot for issue #$ISSUE"
-          git push origin "HEAD:refs/heads/$branch"
+          if ! git push origin "HEAD:refs/heads/$branch"; then
+            gh issue comment "$ISSUE" --body "MLB PAPER SNAPSHOT PUSH BLOCKED: conflicting evidence branch update. This capture was not saved; rerun the issue capture workflow after resolving the branch conflict. No eligible CLV recorded."
+            exit 1
+          fi
           existing="$(gh pr list --state open --head "$branch" --json number --jq '.[0].number // empty')"
           if [ -z "$existing" ]; then
             gh pr create --draft --base main --head "$branch" \
