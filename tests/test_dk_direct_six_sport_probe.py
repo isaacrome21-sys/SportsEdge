@@ -151,3 +151,15 @@ def test_nonfinite_raw_json_rejected():
         report = probe(fetcher=fetch, clock=lambda: NOW)
         assert all(report["sports"][sport]["status"] == "UNAVAILABLE"
                    for sport in ("NFL", "CFB", "MLB"))
+
+def test_existing_matching_archive_is_reused(tmp_path):
+    raw = b'{"events":[]}'
+    destination = tmp_path / ("nfl-" + hashlib.sha256(raw).hexdigest() + ".json")
+    destination.write_bytes(raw)
+    def fetch(key):
+        return SimpleNamespace(sport_key=key, raw=raw, payload={"events": []},
+                               source_uri="https://sportsbook-nash.draftkings.com/test",
+                               received_at=NOW)
+    report = probe(fetcher=fetch, clock=lambda: NOW, archive_dir=tmp_path)
+    assert report["sports"]["NFL"]["status"] == "FETCHED"
+    assert destination.read_bytes() == raw
