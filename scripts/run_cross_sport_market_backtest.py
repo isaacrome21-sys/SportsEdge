@@ -63,9 +63,33 @@ def _identity(row: dict[str, Any]) -> tuple[str, str]:
     return sport, market
 
 
+def _seasons_or_none(rows: list[dict[str, Any]]) -> set[int] | None:
+    """Require explicit integral season IDs without coercing floats/bools.
+
+    Invalid research rows may still be reported for diagnostics but must not
+    crash the entire audit or support an uncertainty estimate.
+    """
+    seasons: set[int] = set()
+    for row in rows:
+        value = row.get("season")
+        if type(value) is int:
+            season = value
+        elif isinstance(value, str) and value.strip().isdecimal():
+            season = int(value.strip())
+        else:
+            return None
+        if season < 1:
+            return None
+        seasons.add(season)
+    return seasons
+
+
 def _safe_pair(rows: list[dict[str, Any]], *, reps: int, seed: int):
     paired = [row for row in rows if row.get("benchmark_p") not in (None, "") and row.get("outcome") in (0, 1, True, False)]
-    if len({int(row["season"]) for row in paired}) < 2:
+    seasons = _seasons_or_none(paired)
+    if seasons is None:
+        return {"status": "UNAVAILABLE", "reason": "PAIRED_BENCHMARK_INVALID_SEASON"}
+    if len(seasons) < 2:
         return {"status": "UNAVAILABLE", "reason": "PAIRED_BENCHMARK_REQUIRES_MULTIPLE_SEASONS"}
     try:
         return {"status": "AVAILABLE", **paired_market_bootstrap(rows, reps=reps, seed=seed)}
@@ -75,7 +99,10 @@ def _safe_pair(rows: list[dict[str, Any]], *, reps: int, seed: int):
 
 def _safe_betting(rows: list[dict[str, Any]], *, reps: int, seed: int):
     selected = [row for row in rows if row.get("selected", True) is True and row.get("offered_decimal") not in (None, "")]
-    if len({int(row["season"]) for row in selected}) < 2:
+    seasons = _seasons_or_none(selected)
+    if seasons is None:
+        return {"status": "UNAVAILABLE", "reason": "BETTING_UNCERTAINTY_INVALID_SEASON"}
+    if len(seasons) < 2:
         return {"status": "UNAVAILABLE", "reason": "BETTING_UNCERTAINTY_REQUIRES_MULTIPLE_SEASONS"}
     try:
         return {"status": "AVAILABLE", **selected_betting_bootstrap(rows, reps=reps, seed=seed)}
