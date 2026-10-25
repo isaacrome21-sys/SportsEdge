@@ -1298,8 +1298,19 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
     anchor = {"status": "MARKET_ANCHORED_UNVALIDATED", "weight": anchor_weight,
               "hypothesis": "UNVALIDATED_OUT_OF_SAMPLE_REQUIRED"}
     b_home_mean, b_away_mean = home_mean, away_mean
-    lane_b_blocked = None
-    if market == "TOTAL":
+    # Owner ruling Oct 25 (#2447): CFB's unvalidated Lane B is retired,
+    # not merely given a zero residual weight. A zero-weight market anchor
+    # still emits bookmaker-derived P/EV (including paired no-vig ML) and
+    # must not be ranked or counted as an independent research candidate.
+    # Preserve Lane A diagnostics. Other sports retain their own lane rules.
+    lane_b_blocked = (
+        "CFB_LANE_B_RETIRED_NO_OOS_WIN"
+        if sport == "CFB" and market in ("ML", "SPREAD", "TOTAL")
+        else None
+    )
+    if lane_b_blocked is not None:
+        anchor["status"] = "RETIRED_NO_OUT_OF_SAMPLE_WIN"
+    elif market == "TOTAL":
         anchored_total = line + anchor_weight * (raw_total - line)
         shift = (anchored_total - raw_total) / 2
         b_home_mean += shift
