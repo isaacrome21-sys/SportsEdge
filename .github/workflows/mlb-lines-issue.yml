@@ -52,7 +52,7 @@ jobs:
       - name: Test MLB lines intake regression
         run: |
           python -m pip install --disable-pip-version-check pytest==9.1.1
-          PYTHONPATH=.runtime-deps:. python -m pytest -q tests/test_mlb_lines_issue2578.py
+          PYTHONPATH=.runtime-deps:. python -m pytest -q tests/test_mlb_lines_issue2578.py tests/test_manual_mlb_live_guards.py tests/test_mlb_issue_capture_paper_gate.py
 
       - name: Slate date
         id: day
@@ -68,7 +68,7 @@ jobs:
         id: intake
         env:
           BODY: ${{ github.event.issue.body }}
-          # Lines have no book timestamp: stamp at intake (last edit wins).
+          # GitHub issue update time is delivery evidence ONLY; body Captured: owns odds time.
           OBSERVED: ${{ github.event.issue.updated_at }}
         run: |
           printf '%s' "$BODY" > issue_body.txt
@@ -97,7 +97,7 @@ jobs:
       - name: Run SportsEdge engines
         run: |
           started=$(date +%s)
-          PYTHONPATH=.runtime-deps:. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.intake.outputs.path }}" --run-date "${{ steps.intake.outputs.slate }}" --max-age-minutes 60 --output artifacts/manual_mlb_snapshot_card.json
+          PYTHONPATH=.runtime-deps:. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.intake.outputs.path }}" --run-date "${{ steps.intake.outputs.slate }}" --max-age-minutes 30 --strict-live-quote-window --output artifacts/manual_mlb_snapshot_card.json
           echo "mlb_engine_seconds=$(( $(date +%s) - started ))"
 
       - name: Render PRE-CONTEXT audit artifact

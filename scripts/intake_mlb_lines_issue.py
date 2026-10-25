@@ -19,6 +19,36 @@ from sportsedge.pipeline.intake import SharedIntakeError, parse_envelope  # noqa
 from sportsedge.mlb_source import fetch_schedule  # noqa: E402
 
 CHICAGO = ZoneInfo("America/Chicago")
+MAX_ISSUE_CAPTURE_RELAY_SECONDS = 1800
+
+
+def _issue_capture_at(captured_at: str | None, observed: datetime) -> datetime:
+    """Use the real body timestamp; issue edits are delivery receipts, never odds capture."""
+    if not captured_at:
+        raise LinesIntakeError("MLB_CAPTURE_TIMESTAMP_REQUIRED")
+    try:
+        capture = datetime.fromisoformat(captured_at.replace("Z", "+00:00"))
+    except (TypeError, ValueError) as exc:
+        raise LinesIntakeError("MLB_CAPTURE_TIMESTAMP_INVALID") from exc
+    if capture.tzinfo is None or capture.utcoffset() is None:
+        raise LinesIntakeError("MLB_CAPTURE_TIMEZONE_REQUIRED")
+    span = (observed - capture).total_seconds()
+    if span < 0:
+        raise LinesIntakeError("MLB_CAPTURE_FUTURE_RELATIVE_TO_ISSUE")
+    if span > MAX_ISSUE_CAPTURE_RELAY_SECONDS:
+        raise LinesIntakeError("MLB_CAPTURE_RELAY_TOO_OLD")
+    return capture.astimezone(CHICAGO)
+
+
+def _stamp_captured_payload(payload: dict, capture: datetime, intake_at: datetime) -> dict:
+    """Persist distinct sportsbook and GitHub clocks; no intake-stamped odds."""
+    payload["captured_at"] = capture.isoformat()
+    payload["intake_observed_at"] = intake_at.isoformat()
+    for row in payload.get("rows") or []:
+        row["observed_at"] = capture.isoformat()
+        row["timestamp_source"] = "ISSUE_BODY_CAPTURED"
+        row["intake_observed_at"] = intake_at.isoformat()
+    return payload
 
 # Phone-issue research hooks (same pattern as the CFB {"backtest": ...} board):
 # a fenced body whose first line is "RESEARCH <name>" runs a pre-registered
@@ -127,16 +157,17 @@ def main() -> int:
     if directive:
         return run_research(directive, args.issue)
     try:
-        nxt = (observed.date() + timedelta(days=1)).isoformat()
-        schedule = list(fetch_schedule(slate)) + list(fetch_schedule(nxt))
-        # Shared envelope (sportsedge.pipeline.intake): <!-- --> notes dropped and the
-        # Captured line read with the same rules as every sport. MLB grammar is unchanged.
+        # Refuse missing/future/stale body captures BEFORE querying public schedule.
+        # GitHub issue.created_at/updated_at is never a substitute for a DK quote time.
         try:
             envelope = parse_envelope(body, "MLB", title=args.title)
         except SharedIntakeError as exc:
             raise LinesIntakeError(str(exc)) from exc
-        payload = build_bound_input(envelope.text, observed_at=observed.isoformat(), schedule=schedule, title=args.title)
-        payload["captured_at"] = envelope.captured_at
+        capture = _issue_capture_at(envelope.captured_at, observed)
+        nxt = (observed.date() + timedelta(days=1)).isoformat()
+        schedule = list(fetch_schedule(slate)) + list(fetch_schedule(nxt))
+        payload = build_bound_input(envelope.text, observed_at=capture.isoformat(), schedule=schedule, title=args.title)
+        _stamp_captured_payload(payload, capture, observed)
         payload["intake_warnings"] = list(payload.get("intake_warnings") or []) + envelope.warnings
         # Reuse the exact live schedule response that bound the phone text to MLB games.
         # This snapshot is run-local evidence only; it is not persisted as a cross-run cache.

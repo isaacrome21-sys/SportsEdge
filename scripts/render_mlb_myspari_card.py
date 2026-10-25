@@ -27,6 +27,27 @@ from sportsedge.mlb_quote_move_guard import apply_quote_move_guard  # noqa: E402
 
 
 PRE_CONTEXT_STATUS = "PRE-CONTEXT · NOT FINAL"
+MLB_LIVE_QUOTE_TTL_SECONDS = 1800.0
+PAPER_ONLY_REASON = "LANE7_MARKET_NOT_VERIFIED"
+
+
+def paper_only_mlb_rows(rows: list[dict]) -> list[dict]:
+    """No ACTIONABLE card labels without a verified per-market Lane 7 receipt.
+
+    No such evidence is wired into this manual-issue renderer. Fail closed:
+    retain underlying diagnostic EV/price in the artifact, never imply a PLAY.
+    """
+    guarded = []
+    for source in rows:
+        row = dict(source)
+        if str(row.get("scored_status") or row.get("status") or "").upper() == "ACTIONABLE":
+            row["status"] = "PAPER"
+            row["scored_status"] = "PAPER"
+            codes = tuple(row.get("presentation_reason_codes") or ())
+            if PAPER_ONLY_REASON not in codes:
+                row["presentation_reason_codes"] = codes + (PAPER_ONLY_REASON,)
+        guarded.append(row)
+    return guarded
 
 
 def _observed_at(payload: dict) -> datetime | None:
@@ -173,7 +194,10 @@ def main() -> int:
         names.setdefault(entity_id, team)
     now = datetime.fromisoformat(args.as_of) if args.as_of else datetime.now(timezone.utc)
     observed = _observed_at(payload)
-    age = max((now - observed).total_seconds(), 0.0) if observed else 0.0
+    # Missing or future-dated quote clocks cannot look fresh.
+    age = (now - observed).total_seconds() if observed else float("inf")
+    if age < 0:
+        age = float("inf")
 
     bundles, failures, team_sides = _load_context_bundles(args.context_dir)
     # Team-total entity IDs are team IDs, so bind them from canonical market
@@ -187,8 +211,12 @@ def main() -> int:
         if side in {"AWAY", "HOME"} and entity_id not in {None, ""}:
             team_sides.setdefault(str(entity_id), side)
 
-    rows = myspari_rows(payload, quote_age_seconds=age, names=names, team_sides=team_sides)
+    rows = myspari_rows(
+        payload, quote_age_seconds=age, quote_ttl_seconds=MLB_LIVE_QUOTE_TTL_SECONDS,
+        names=names, team_sides=team_sides,
+    )
     rows = apply_quote_move_guard(rows, _prior_rows(args.snapshot, args.prior_snapshot))
+    rows = paper_only_mlb_rows(rows)
     games = payload.get("games") or ([{"resolved_game": payload.get("resolved_game")}] if payload.get("resolved_game") else [])
     notes = []
     for g in games:
@@ -211,11 +239,11 @@ def main() -> int:
             for row in (snap_rows or [])
             if isinstance(row, dict) and row.get("timestamp_source")
         })
-        if timestamp_sources == ["INTAKE_STAMPED"]:
-            notes.append("Timestamp provenance: INTAKE_STAMPED at GitHub issue intake/edit time; not a sportsbook timestamp.")
-        elif timestamp_sources:
+        if timestamp_sources:
             notes.append(f"Timestamp provenance: {', '.join(timestamp_sources)}.")
-    notes.append("Rows rank by EV/$, highest first; missing evaluations remain marked.")
+    notes.append("PAPER ONLY: no MLB SPORT:MARKET is verified. Lane 7 requires 50 authentic graded picks, positive mean no-vig CLV and positive ROI.")
+    notes.append("1800-second quote TTL enforced at render; stale/future/unknown capture times never qualify.")
+    notes.append("Rows rank by research EV/$, highest first; missing evaluations remain marked.")
 
     if any("QUOTE_MOVE_NEEDS_CONFIRM" in (r.get("presentation_reason_codes") or ()) for r in rows):
         notes.append("NEEDS_CONFIRM: a price moved past the frozen screenshot-misread thresholds vs an earlier same-game board. Recheck the price before using this card.")
