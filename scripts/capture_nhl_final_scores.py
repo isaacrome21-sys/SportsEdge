@@ -119,13 +119,22 @@ def parse_scoreboard(payload: dict, *, date: str) -> list[dict]:
 
 def merge(existing: dict | None, rows: list[dict], *, date: str, captured_at: str) -> dict:
     _checked_date(date)
-    doc = existing or {"schema": SCHEMA, "date": date, "source": "NHL_OFFICIAL_API",
-                       "official": False, "games": []}
+    doc = existing if existing is not None else {
+        "schema": SCHEMA, "date": date, "source": "NHL_OFFICIAL_API",
+        "official": False, "games": [],
+    }
     if doc.get("schema") != SCHEMA:
         raise ValueError("NHL_FINALS_SCHEMA_INVALID")
     if doc.get("date") != date or doc.get("source") != "NHL_OFFICIAL_API":
         raise ValueError("NHL_FINALS_EXISTING_SOURCE_DATE_CONFLICT")
-    have = {g["game_id"]: g for g in doc["games"]}
+    games = doc.get("games")
+    if (not isinstance(games, list) or any(
+        not isinstance(g, dict) or not g.get("game_id") for g in games
+    )):
+        raise ValueError("NHL_FINALS_EXISTING_GAMES_INVALID")
+    have = {g["game_id"]: g for g in games}
+    if len(have) != len(games):
+        raise ValueError("NHL_FINALS_DUPLICATE_GAME_ID")
     added = 0
     for r in rows:
         old = have.get(r["game_id"])
