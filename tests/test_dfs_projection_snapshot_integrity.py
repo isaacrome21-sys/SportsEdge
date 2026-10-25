@@ -75,3 +75,13 @@ def test_ambiguous_team_name_requires_exact_dk_id(tmp_path):
     with pytest.raises(ValueError, match="DFS_PROJECTION_PLAYER_AMBIGUOUS"):
         read(tmp_path, [{"name": "Example Receiver", "team": "DET", "mean": 15}], roster)
     assert read(tmp_path, [{"player_id": "99", "mean": 16}], roster)["99"].mean == 16
+
+
+def test_stats_path_with_nonfinite_component_is_refused(tmp_path):
+    with pytest.raises(ValueError, match="DFS_PROJECTION_NUMBER_INVALID:42:mean"):
+        read(tmp_path, [{"player_id": "42", "stats": {"rec_yards": float("nan")}}])
+
+
+def test_stats_path_with_impossible_ownership_is_refused(tmp_path):
+    with pytest.raises(ValueError, match="DFS_PROJECTION_OWNERSHIP_OUT_OF_RANGE:42"):
+        read(tmp_path, [{"player_id": "42", "stats": {"receptions": 5, "ownership": 3.5}}])
