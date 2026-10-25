@@ -141,13 +141,21 @@ def ensure_projection_coverage(
     *,
     allow_dk_fppg_baseline: bool,
 ) -> dict[str, Projection]:
-    out = dict(projections)
+    out: dict[str, Projection] = {}
+    for pid, proj in projections.items():
+        if pid != proj.player_id:
+            raise ValueError(f"DFS_PROJECTION_PLAYER_ID_MISMATCH:{pid}:{proj.player_id}")
+        out[pid] = _validate_projection(proj)
     active = [p for p in players if not p.is_disabled]
     for p in active:
         if p.player_id in out:
             continue
         if allow_dk_fppg_baseline and p.dk_fppg is not None:
-            out[p.player_id] = dk_fppg_baseline(p)
+            if isinstance(p.dk_fppg, bool) or _finite_number(
+                p.dk_fppg, "dk_fppg", p.player_id
+            ) < 0:
+                raise ValueError(f"DFS_DK_FPPG_INVALID:{p.player_id}")
+            out[p.player_id] = _validate_projection(dk_fppg_baseline(p))
     usable = sum(1 for p in active if p.player_id in out)
     coverage = usable / max(1, len(active))
     if coverage < 0.90:
