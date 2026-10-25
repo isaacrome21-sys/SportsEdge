@@ -174,3 +174,17 @@ def test_missing_first_pitch_refuses_clv():
                          feed=feed, entry_issue=ENTRY, other_issues=[CLOSE])
     assert result[0]["clv_status"] == "NO_ENTRY_CAPTURE"
     assert result[0]["clv_prob"] == ""
+
+
+def test_future_entry_capture_refuses_clv():
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    entry = dict(ENTRY)
+    entry["body"] = entry["body"].replace("2026-10-24T22:20:00Z",
+        (now + timedelta(hours=1)).isoformat())
+    feed = _feed()
+    feed["gameData"]["datetime"]["dateTime"] = (now + timedelta(days=2)).isoformat()
+    result = compute_clv(issue_number=100, picks=[CardRow(1, "Moneyline Home", -120, "ACTIONABLE")],
+                         feed=feed, entry_issue=entry, other_issues=[CLOSE])
+    assert result[0]["clv_status"] == "NO_ENTRY_CAPTURE"
+    assert result[0]["clv_prob"] == ""
