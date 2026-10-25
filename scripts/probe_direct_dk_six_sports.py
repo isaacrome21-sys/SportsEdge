@@ -93,7 +93,7 @@ def probe(*, fetcher=fetch_board, clock=lambda: datetime.now(timezone.utc), arch
                 **(selection_linkage(board.payload) or {"unlinked_selections": None, "linked_selections": None, "duplicate_market_ids": None, "duplicate_event_ids": None, "markets_without_event": None}),
                 "payload_events": len(board.payload["events"])
                     if isinstance(board.payload.get("events"), list) else None}
-        except (DraftKingsGameMarketError, OSError, ValueError) as exc:
+        except (DraftKingsGameMarketError, OSError, ValueError, TypeError, AttributeError) as exc:
             result["sports"][sport] = {"status": "UNAVAILABLE",
                                        "reason": type(exc).__name__}
     return result
