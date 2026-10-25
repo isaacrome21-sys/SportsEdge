@@ -3,6 +3,7 @@
 All fixtures offline. An issue edit can never rejuvenate an old DK quote.
 """
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pytest
 
@@ -105,3 +106,13 @@ def test_strict_card_allows_fresh_quotes_for_tomorrows_bound_fixture():
         enforce_quote_window=True,
     )
     assert len(live) == 1 and blocked == []
+
+
+def test_issue_workflow_preserves_live_slate_date_guard():
+    workflow = (Path(__file__).resolve().parents[1] /
+                ".github/workflows/mlb-lines-issue.yml").read_text(encoding="utf-8")
+    command = next(line for line in workflow.splitlines()
+                   if "python scripts/run_manual_mlb_snapshot.py" in line)
+    assert '--run-date "${{ steps.intake.outputs.slate }}"' in command
+    assert "--max-age-minutes 30" in command
+    assert "--strict-live-quote-window" in command
