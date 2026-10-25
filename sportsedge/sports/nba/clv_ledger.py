@@ -92,8 +92,12 @@ def closing_quote(pick: Mapping, captures: Iterable[Mapping], *, tip_utc: str) -
     # different earlier capture happens to exist in the supplied board.
     if entry_time >= tip:
         return None, "ENTRY_NOT_PRETIP"
+    # Never borrow a closing price from a different quote provider.
+    if not pick.get("source"):
+        return None, "ENTRY_SOURCE_MISSING"
     same = [c for c in captures if c["event_id"] == pick["event_id"]
-            and c["market"] == pick["market"] and c["side"] == pick["side"]]
+            and c["market"] == pick["market"] and c["side"] == pick["side"]
+            and c.get("source") == pick["source"]]
     if not same:
         return None, "NO_CLOSE_ROW"
     pre = [c for c in same if _ts(c["captured_at"]) < tip]
