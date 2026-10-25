@@ -12,7 +12,7 @@ import argparse
 import hashlib
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
@@ -55,6 +55,8 @@ def archive_station_list(
     observation = datetime.fromisoformat(received_at_utc)
     if observation.tzinfo is None:
         raise ValueError("RECEIPT_TIMESTAMP_MISSING_OFFSET")
+    if observation.utcoffset() != timedelta(0):
+        raise ValueError("RECEIPT_TIMESTAMP_NOT_UTC")
     digest = hashlib.sha256(raw).hexdigest()
     output_dir.mkdir(parents=True, exist_ok=True)
     archive_path = output_dir / f"ghcnh-stations_{digest}.txt"
