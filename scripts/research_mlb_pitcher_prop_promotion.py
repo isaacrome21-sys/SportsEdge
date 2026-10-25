@@ -199,6 +199,17 @@ def select_units(payloads, *, cutoff: datetime | None = None) -> tuple[list[dict
                     or (cutoff is not None and first_pitch > cutoff)):
                 drops["not_eligible_time"] += 1
                 continue
+            # Pair-to-pair receipt span alone cannot make a stale quote fresh:
+            # two identical old receipts have span=0. Bound EACH receipt to
+            # the archive timestamp before the research promotion selector
+            # can count it as a pregame, fresh, two-sided observation.
+            quote_age_seconds = (archive_captured - retrieved).total_seconds()
+            if quote_age_seconds > 150:
+                if quote_age_seconds <= 300:
+                    drops["research_only_quote_age_151_to_300s"] += 1
+                else:
+                    drops["refused_quote_age_over_300s"] += 1
+                continue
             event_id = str(raw.get("provider_event_id") or "").strip()
             entity = str(raw.get("entity_name_normalized") or _person(raw.get("entity_name") or "")).strip()
             if not event_id or not entity:
