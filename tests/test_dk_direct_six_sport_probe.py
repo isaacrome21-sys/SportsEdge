@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from scripts.probe_direct_dk_six_sports import probe, SPORTS
+from scripts.probe_direct_dk_six_sports import probe, SPORTS, selection_linkage
 
 NOW = datetime(2026, 10, 25, tzinfo=timezone.utc)
 
@@ -21,6 +21,8 @@ def test_unverified_sports_never_guess_endpoint():
     assert result["sports"]["NFL"]["quote_timestamp_status"] == "UNVERIFIED"
     assert result["sports"]["NFL"]["payload_selections"] == 2
     assert result["sports"]["NFL"]["unlinked_selections"] == 1
+    assert result["sports"]["NFL"]["linked_selections"] == 1
+    assert result["sports"]["NFL"]["duplicate_market_ids"] == 0
     assert result["sports"]["NFL"]["payload_markets"] == 3
     assert result["sports"]["NFL"]["market_counts"] == {"Moneyline": 1, "Total": 2}
     assert result["sports"]["NFL"]["raw_size_bytes"] == len(b"synthetic-direct-dk-board")
@@ -34,3 +36,11 @@ def test_failure_is_unavailable_not_fake_prices():
     result = probe(fetcher=fail, clock=lambda: NOW)
     assert all(result["sports"][s]["status"] == "UNAVAILABLE" for s in ("NFL", "CFB", "MLB"))
     assert all("price" not in str(v).lower() for v in result["sports"].values())
+
+def test_duplicate_market_ids_are_detected():
+    payload = {"markets": [{"id": 10}, {"id": "10"}],
+               "selections": [{"marketId": 10}, {"marketId": "missing"}, {}]}
+    assert selection_linkage(payload) == {
+        "unlinked_selections": 2, "linked_selections": 1, "duplicate_market_ids": 1,
+    }
+    assert selection_linkage({"markets": None, "selections": []}) is None
