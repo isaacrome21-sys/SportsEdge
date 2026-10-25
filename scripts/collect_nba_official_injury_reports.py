@@ -97,6 +97,8 @@ def validate_pdf(contents: bytes) -> str:
 def _fetch(url: str, maximum: int) -> tuple[bytes, str]:
     req = Request(url, headers={"User-Agent": "SportsEdge-research-archive/1.0"})
     with urlopen(req, timeout=20) as response:
+        if response.geturl() != url:
+            raise ValueError("SOURCE_REDIRECT_NOT_ALLOWED")
         if response.status != 200:
             raise ValueError("HTTP_NOT_200")
         payload = response.read(maximum + 1)
@@ -118,6 +120,9 @@ def archive_pdf(
     The source filename is a hint, never proof of when information was available.
     """
     raw_sha = validate_pdf(pdf)
+    observed = datetime.fromisoformat(pdf_received_at_utc)
+    if observed.tzinfo is None:
+        raise ValueError("RECEIPT_TIMESTAMP_MISSING_OFFSET")
     output_dir.mkdir(parents=True, exist_ok=True)
     target = output_dir / f"{report['report_date_et']}_{raw_sha}.pdf"
     if target.exists():
@@ -150,9 +155,6 @@ def archive_pdf(
         "reason": "NO_PLAYER_EXTRACTION_OR_PIT_VERIFICATION",
     }
     # A duplicate PDF is not a duplicate observation: keep the new receipt time.
-    observed = datetime.fromisoformat(pdf_received_at_utc)
-    if observed.tzinfo is None:
-        raise ValueError("RECEIPT_TIMESTAMP_MISSING_OFFSET")
     stamp = observed.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     receipt_file = output_dir / f"{report['report_date_et']}_{stamp}_{raw_sha[:12]}.json"
     with receipt_file.open("x", encoding="utf-8") as handle:
