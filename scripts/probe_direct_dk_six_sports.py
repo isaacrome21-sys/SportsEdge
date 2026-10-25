@@ -63,7 +63,7 @@ def probe(*, fetcher=fetch_board, clock=lambda: datetime.now(timezone.utc), arch
                     or source.port not in (None, 443)
                     or source.username is not None or source.password is not None):
                 raise ValueError("DK_PROBE_SOURCE_URI_OR_RAW_INVALID")
-            if json.loads(board.raw) != board.payload:
+            if json.loads(board.raw, parse_constant=lambda value: (_ for _ in ()).throw(ValueError("NONFINITE_JSON"))) != board.payload:
                 raise ValueError("DK_PROBE_RAW_PAYLOAD_MISMATCH")
             raw_archive = None
             if archive_dir is not None:
