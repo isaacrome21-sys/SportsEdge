@@ -134,6 +134,9 @@ MLB = SportAdapter("MLB", _table({
     "nrfi": MarketSpec("FIRST_INNING_TOTAL", "yes_no", ("OVER", "UNDER"), False, swap=True, fixed_line=0.5),
     "k|ks|strikeouts": _ou("PITCHER_STRIKEOUTS", "player"),
     "outs": _ou("PITCHER_OUTS", "player"),
+    "hitsallowed|pitcherhitsallowed": _ou("PITCHER_HITS_ALLOWED", "player"),
+    "erallowed|earnedrunsallowed|pitcherearnedruns": _ou("PITCHER_ER", "player"),
+    "walksallowed|bballowed|pitcherwalks": _ou("PITCHER_BB", "player"),
     "hits": _ou("BATTER_HITS", "player"),
     "tb|totalbases": _ou("BATTER_TOTAL_BASES", "player"),
 }))
