@@ -204,6 +204,15 @@ def test_radar_requires_market_exact_fresh_peer_receipts():
             (root.parent/"auto_dk"/"nfl_odds.json").write_text(json.dumps(state))
             return card.nfl_market_price_radar(root,now)[0]
         assert len(scan()) == 1
+        # The owner wants every strictly positive EV estimate surfaced, even
+        # below the old 2% display floor. This is market-only research, not PLAY.
+        base["games"][0]["markets"]["totals"]["over"] = -105
+        lower = scan()
+        assert len(lower) == 1 and lower[0]["selection"] == "Over 45.5"
+        assert 0 < lower[0]["ev"] < 0.02
+        base["games"][0]["markets"]["totals"]["over"] = -115
+        assert scan() == []
+        base["games"][0]["markets"]["totals"]["over"] = 100
         assert scan(lambda ref: ref["peer_evidence"][0].update(observed_at="2026-10-11T16:45:00Z")) == []
         # Both timestamps are <10 minutes old, but three minutes apart;
         # a peer price this far from DK is not a paired price opportunity.
