@@ -22,7 +22,12 @@ def selection_linkage(payload):
         return None
     ids = {str(m["id"]) for m in markets
            if isinstance(m, dict) and m.get("id") is not None}
+    event_ids = {str(e["id"]) for e in payload.get("events", [])
+                 if isinstance(e, dict) and e.get("id") is not None} if isinstance(payload.get("events"), list) else None
     return {
+        "markets_without_event": sum(1 for m in markets if isinstance(m, dict)
+            and (m.get("eventId") is None or str(m["eventId"]) not in event_ids))
+            if event_ids is not None else None,
         "unlinked_selections": sum(
             1 for x in selections if isinstance(x, dict)
             and (x.get("marketId") is None or str(x["marketId"]) not in ids)),
