@@ -97,7 +97,7 @@ jobs:
       - name: Run SportsEdge engines
         run: |
           started=$(date +%s)
-          PYTHONPATH=.runtime-deps:. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.intake.outputs.path }}" --max-age-minutes 30 --strict-live-quote-window --output artifacts/manual_mlb_snapshot_card.json
+          PYTHONPATH=.runtime-deps:. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.intake.outputs.path }}" --run-date "${{ steps.intake.outputs.slate }}" --max-age-minutes 30 --strict-live-quote-window --output artifacts/manual_mlb_snapshot_card.json
           echo "mlb_engine_seconds=$(( $(date +%s) - started ))"
 
       - name: Render PRE-CONTEXT audit artifact
