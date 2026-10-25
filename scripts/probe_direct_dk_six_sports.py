@@ -79,6 +79,8 @@ def probe(*, fetcher=fetch_board, clock=lambda: datetime.now(timezone.utc), arch
                     or board.received_at.tzinfo is None
                     or board.received_at.utcoffset() is None):
                 raise ValueError("DK_PROBE_SOURCE_IDENTITY_INVALID")
+            if not isinstance(board.source_uri, str):
+                raise ValueError("DK_PROBE_SOURCE_URI_INVALID")
             source = urlsplit(board.source_uri)
             if (not board.raw or source.scheme != "https"
                     or source.hostname != "sportsbook-nash.draftkings.com"
