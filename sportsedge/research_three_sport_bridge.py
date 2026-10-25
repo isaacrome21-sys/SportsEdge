@@ -56,20 +56,32 @@ ODDS_CAP = -165
 EV_MIN = 0.02
 # Legacy bound name kept for backward compatibility; the single source of
 # truth is sportsedge.quote_freshness.MAX_QUOTE_AGE_SECONDS.
-MAX_AGE_SECONDS = MAX_QUOTE_AGE_SECONDS
+# Strict owner admission for this bridge. The shared legacy checker retains its
+# 180s default for other callers until they are independently migrated.
+MAX_AGE_SECONDS = 150
+RESEARCH_AGE_SECONDS = 300
+RESEARCH_AGED_QUOTE = "RESEARCH_AGED_QUOTE_150_TO_300S"
 
 
 def _bridge_quote_status(captured_at, *, now):
-    """Map the centralized freshness verdict onto this bridge's legacy labels.
+    """Admit <=150s, flag 150-300s research, refuse >300s quotes.
 
-    Labels are unchanged (STALE_QUOTE / RECENT_CAPTURED_QUOTE /
-    UNVERIFIED_QUOTE_FRESHNESS) so downstream consumers keep working; the
-    classification now comes from the one centralized check.
+    This research bridge applies the owner's stricter age gate without
+    silently changing the shared legacy checker's other consumers. The
+    exact elapsed time (not the checker's rounded display age) decides
+    the >300s refusal boundary.
     """
-    code = check_quote_freshness(captured_at, now=now)["code"]
+    verdict = check_quote_freshness(
+        captured_at, now=now, max_age_seconds=MAX_AGE_SECONDS)
+    code = verdict["code"]
     if code == QUOTE_FRESH:
         return "RECENT_CAPTURED_QUOTE"
-    if code in (QUOTE_STALE, QUOTE_FUTURE):
+    if code == QUOTE_STALE:
+        age = (now - _time(captured_at, "QUOTE_AS_OF")).total_seconds()
+        if age > RESEARCH_AGE_SECONDS:
+            raise ResearchQuoteError("QUOTE_OVER_300S_REFUSED")
+        return RESEARCH_AGED_QUOTE
+    if code == QUOTE_FUTURE:
         return "STALE_QUOTE"
     if code in (QUOTE_UNVERIFIED, QUOTE_INVALID):
         return "UNVERIFIED_QUOTE_FRESHNESS"
@@ -359,6 +371,8 @@ def price_three_sport_research(model_rows: Sequence[Mapping], quotes: Sequence[M
             other_freshness = _bridge_quote_status(other[4], now=now)
             freshness = ("RECENT_CAPTURED_QUOTE"
                          if own_freshness == other_freshness == "RECENT_CAPTURED_QUOTE"
+                         else RESEARCH_AGED_QUOTE
+                         if RESEARCH_AGED_QUOTE in (own_freshness, other_freshness)
                          else "STALE_QUOTE"
                          if "STALE_QUOTE" in (own_freshness, other_freshness)
                          else "UNVERIFIED_QUOTE_FRESHNESS")
