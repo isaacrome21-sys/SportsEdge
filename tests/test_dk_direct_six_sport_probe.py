@@ -1,3 +1,4 @@
+import hashlib
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from scripts.probe_direct_dk_six_sports import probe, SPORTS, selection_linkage
