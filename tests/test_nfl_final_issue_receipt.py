@@ -1,5 +1,6 @@
 """Pure FINAL receipt issue-routing tests; no sportsbook or GitHub network."""
 import hashlib
+import json
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 
@@ -9,7 +10,28 @@ from sportsedge.nfl_final_issue_receipt import FinalIssueRouteError, format_fina
 from sportsedge.pipeline.intake import parse_issue
 
 
-RAW = b'{"events":[],"markets":[],"selections":[]}'
+# A minimal directly parseable synthetic DK fixture; market lines must be
+# re-derived from these selections, not merely claimed by record.games.
+RAW = json.dumps({
+    "events": [{
+        "id": 34118009, "name": "PIT Steelers @ NO Saints",
+        "startEventDate": "2026-10-25T13:30:00Z",
+    }],
+    "markets": [
+        {"id": 101, "eventId": 34118009, "name": "Spread"},
+        {"id": 102, "eventId": 34118009, "name": "Total"},
+    ],
+    "selections": [
+        {"marketId": 101, "label": "PIT Steelers", "points": -3,
+         "displayOdds": {"american": "-112"}},
+        {"marketId": 101, "label": "NO Saints", "points": 3,
+         "displayOdds": {"american": "-108"}},
+        {"marketId": 102, "label": "Over 43.5", "points": 43.5,
+         "displayOdds": {"american": "-110"}},
+        {"marketId": 102, "label": "Under 43.5", "points": 43.5,
+         "displayOdds": {"american": "-110"}},
+    ],
+}, sort_keys=True, separators=(",", ":")).encode("utf-8")
 SHA = hashlib.sha256(RAW).hexdigest()
 RECEIVED = datetime(2026, 10, 25, 13, 5, tzinfo=timezone.utc)
 KICKOFF = datetime(2026, 10, 25, 13, 30, tzinfo=timezone.utc)
@@ -152,3 +174,55 @@ def test_no_duplicate_event_rows_and_no_future_claim():
     record["retrieved_at_utc"] = "2026-10-25T13:06:00Z"
     with pytest.raises(FinalIssueRouteError, match="ROUTE_RECEIPT_TIME_MISMATCH"):
         render(record=record)
+
+def test_raw_empty_markets_cannot_authorize_record_claims():
+    raw = b'{"events":[],"markets":[],"selections":[]}'
+    record = sample()
+    digest = hashlib.sha256(raw).hexdigest()
+    record["transport"]["raw_sha256"] = digest
+    record["transport"]["raw_relative_path"] = f"raw/draftkings-direct/{digest}.json"
+    with pytest.raises(FinalIssueRouteError, match="ROUTE_RAW_MARKET_PARSE_BLOCKED"):
+        render(record=record, raw=raw)
+
+
+def test_archived_record_market_cannot_disagree_with_raw_quotes():
+    record = sample()
+    record["games"][0]["spread"]["away_price"] = -900
+    with pytest.raises(FinalIssueRouteError, match="ROUTE_RAW_QUOTE_MISMATCH"):
+        render(record=record)
+
+
+def test_rehashed_raw_quote_change_still_refused():
+    payload = json.loads(RAW)
+    payload["selections"][0]["displayOdds"]["american"] = "-118"
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    record = sample()
+    digest = hashlib.sha256(raw).hexdigest()
+    record["transport"]["raw_sha256"] = digest
+    record["transport"]["raw_relative_path"] = f"raw/draftkings-direct/{digest}.json"
+    with pytest.raises(FinalIssueRouteError, match="ROUTE_RAW_QUOTE_MISMATCH"):
+        render(record=record, raw=raw)
+
+
+def test_raw_event_identity_and_kickoff_must_match_record():
+    payload = json.loads(RAW)
+    payload["events"][0]["startEventDate"] = "2026-10-25T14:30:00Z"
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    record = sample()
+    digest = hashlib.sha256(raw).hexdigest()
+    record["transport"]["raw_sha256"] = digest
+    record["transport"]["raw_relative_path"] = f"raw/draftkings-direct/{digest}.json"
+    with pytest.raises(FinalIssueRouteError, match="ROUTE_RAW_IDENTITY_OR_MARKET_MISMATCH"):
+        render(record=record, raw=raw)
+
+
+def test_duplicate_raw_event_id_is_unadmitted_even_with_valid_market():
+    payload = json.loads(RAW)
+    payload["events"].append(deepcopy(payload["events"][0]))
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    record = sample()
+    digest = hashlib.sha256(raw).hexdigest()
+    record["transport"]["raw_sha256"] = digest
+    record["transport"]["raw_relative_path"] = f"raw/draftkings-direct/{digest}.json"
+    with pytest.raises(FinalIssueRouteError, match="ROUTE_RAW_MARKET_PARSE_BLOCKED"):
+        render(record=record, raw=raw)
