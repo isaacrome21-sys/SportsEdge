@@ -452,6 +452,15 @@ def run(*, force: bool, as_of: datetime | None = None, write_missed_markers: boo
 
     try:
         board, date_header = fetch_once()
+        # now is the request START, not the observed quote time. A response
+        # completing after the frozen FINAL window must never be saved as close.
+        if final_expected:
+            at_receipt = final_expected_due_kickoffs(dict(cfg), board.received_at, snapshot)
+            if at_receipt != final_expected:
+                raise Blocked(
+                    "FINAL_RECEIPT_WINDOW_MISMATCH",
+                    f"request_started={iso_z(now)}; actual_receipt={iso_z(board.received_at)}",
+                )
         transport = board_transport(board)
         rows = game_rows_direct(transport, week_of=lambda dt: week_of(dt, cfg))
     except (Blocked, DirectCaptureError, ValueError) as exc:
