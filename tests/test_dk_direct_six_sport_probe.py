@@ -1,3 +1,4 @@
+import json
 import hashlib
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -10,7 +11,7 @@ def test_unverified_sports_never_guess_endpoint():
     def fetch(key):
         calls.append(key)
         return SimpleNamespace(sport_key=key, source_uri="https://sportsbook-nash.draftkings.com/test",
-                               received_at=NOW, raw=b"synthetic-direct-dk-board", payload={"events": [], "selections": [{"id": 1, "marketId": "A"}, {"id": 2, "marketId": "missing"}], "markets": [{"id": "A", "name": "Total"}, {"id": "B", "name": "Moneyline"}, {"id": "C", "name": "Total"}]})
+                               received_at=NOW, raw=json.dumps({"events": [], "selections": [{"id": 1, "marketId": "A"}, {"id": 2, "marketId": "missing"}], "markets": [{"id": "A", "name": "Total"}, {"id": "B", "name": "Moneyline"}, {"id": "C", "name": "Total"}]}).encode(), payload={"events": [], "selections": [{"id": 1, "marketId": "A"}, {"id": 2, "marketId": "missing"}], "markets": [{"id": "A", "name": "Total"}, {"id": "B", "name": "Moneyline"}, {"id": "C", "name": "Total"}]})
     result = probe(fetcher=fetch, clock=lambda: NOW)
     assert set(result["sports"]) == set(SPORTS)
     assert result["sports"]["NBA"]["status"] == "UNVERIFIED_MAPPING"
@@ -28,9 +29,9 @@ def test_unverified_sports_never_guess_endpoint():
     assert result["sports"]["NFL"]["duplicate_event_ids"] == 0
     assert result["sports"]["NFL"]["payload_markets"] == 3
     assert result["sports"]["NFL"]["market_counts"] == {"Moneyline": 1, "Total": 2}
-    assert result["sports"]["NFL"]["raw_size_bytes"] == len(b"synthetic-direct-dk-board")
-    assert result["sports"]["NFL"]["raw_sha256"] == hashlib.sha256(b"synthetic-direct-dk-board").hexdigest()
-    assert len(calls) == 3
+    assert result["sports"]["NFL"]["raw_size_bytes"] == len(json.dumps(fetch("americanfootball_nfl").payload).encode())
+    assert result["sports"]["NFL"]["raw_sha256"] == hashlib.sha256(json.dumps(fetch("americanfootball_nfl").payload).encode()).hexdigest()
+    assert len(calls) == 5
     assert all(result["sports"][s]["status"] == "FETCHED" for s in ("NFL", "CFB", "MLB"))
 
 def test_failure_is_unavailable_not_fake_prices():
@@ -130,3 +131,11 @@ def test_source_url_rejects_prefix_spoof_and_credentials():
         report = probe(fetcher=fetch, clock=lambda: NOW)
         assert all(report["sports"][sport]["status"] == "UNAVAILABLE"
                    for sport in ("NFL", "CFB", "MLB"))
+
+def test_raw_payload_mismatch_rejected():
+    def fetch(key):
+        return SimpleNamespace(sport_key=key, raw=b'{"events":[]}', payload={"events": [1]},
+                               source_uri="https://sportsbook-nash.draftkings.com/test", received_at=NOW)
+    report = probe(fetcher=fetch, clock=lambda: NOW)
+    assert all(report["sports"][sport]["status"] == "UNAVAILABLE"
+               for sport in ("NFL", "CFB", "MLB"))
