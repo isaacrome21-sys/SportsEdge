@@ -477,6 +477,12 @@ def run_composite(
         stamps += [p.get("captured_at") for p in pairs_by_game.get(key, [])]
         operative = operative_instant_for(
             stamps, override=overrides.get(key), game_label="|".join(key))
+        # Quote age uses real wall time, independently of feature/capture clocks.
+        from sportsedge.quote_freshness import check_quote_freshness, is_fresh
+        for stamp in stamps:
+            freshness = check_quote_freshness(stamp, now=wall, max_age_seconds=1800)
+            if not is_fresh(freshness):
+                raise CompositeRefusal("COMPOSITE_WALL_QUOTE_NOT_CURRENT:" + freshness["code"])
         sub_payload: dict[str, Any] = {"lines": [dict(r) for r in game_rows]}
         if default_sport:
             sub_payload["sport"] = default_sport
