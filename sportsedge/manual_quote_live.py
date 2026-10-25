@@ -84,11 +84,45 @@ def inspect_live_rows(rows, *, run_date: str | None, max_age_minutes: int | None
     return live, blocked, notes, violations
 
 
-def partition_live_rows(rows, *, run_date: str | None, max_age_minutes: int | None, as_of: datetime):
+def partition_live_rows(rows, *, run_date: str | None, max_age_minutes: int | None,
+                        as_of: datetime, enforce_quote_window: bool = False):
     live, blocked, notes, _violations = inspect_live_rows(
         rows, run_date=run_date, max_age_minutes=max_age_minutes, as_of=as_of,
     )
-    return live, blocked, notes
+    if not enforce_quote_window:
+        # Legacy deterministic replays retain their prior behavior. Live
+        # issue-triggered cards opt into the strict timestamp gate below.
+        return live, blocked, notes
+    now = _as_utc(as_of)
+    accepted = []
+    for index, row in enumerate(live):
+        reason = None
+        try:
+            observed = datetime.fromisoformat(str(row["observed_at"]).replace("Z", "+00:00"))
+            kickoff = datetime.fromisoformat(str(row["first_pitch_at"]).replace("Z", "+00:00"))
+            if observed.tzinfo is None or kickoff.tzinfo is None:
+                reason = "MANUAL_QUOTE_TIMEZONE_REQUIRED"
+            else:
+                age = (now - _as_utc(observed)).total_seconds()
+                if row.get("quote_note"):
+                    reason = "MANUAL_QUOTE_PREGAME_UNVERIFIED"
+                elif age < 0:
+                    reason = "MANUAL_QUOTE_FROM_FUTURE"
+                elif age > 60 * max_age_minutes:
+                    reason = "MANUAL_QUOTE_EXPIRED"
+                elif _as_utc(kickoff) <= now or _as_utc(observed) >= _as_utc(kickoff):
+                    reason = "MANUAL_QUOTE_GAME_STARTED"
+                elif run_date and _as_utc(kickoff).astimezone(CHICAGO_TZ).date().isoformat() != run_date:
+                    reason = "MANUAL_INPUT_DATE_MISMATCH"
+        except (ValueError, TypeError, KeyError):
+            reason = "MANUAL_QUOTE_CAPTURE_OR_KICKOFF_INVALID"
+        if reason:
+            blocked.append({"row": index, "game_id": str(row.get("game_id") or ""),
+                            "reason": reason})
+            notes.append({"row": index, "reason": reason})
+        else:
+            accepted.append(row)
+    return accepted, blocked, notes
 
 
 def validate_live_rows(rows, *, run_date: str | None, max_age_minutes: int | None, as_of: datetime) -> None:
