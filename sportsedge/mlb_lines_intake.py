@@ -245,9 +245,10 @@ def parse_lines_with_warnings(text: str, *, title: str | None = None) -> tuple[l
             warnings.append(f"line {n}: skipped unreadable/informational line '{line[:120]}'")
             continue
 
-        # "RL -1.5 +180 / +1.5 -221": both sides of one run line, away sign first.
+        # "RL -1.5 +180 / +1.5 -221" and DK "Alt RL" use the
+        # explicitly quoted away and home prices for opposite handicaps.
         match = re.fullmatch(
-            rf"((?:F5|first ?5|first five)\s+)?(?:RL|run ?line)\s+{_SIGNED_NUM}\s+{_PRICE}\s*/\s*{_SIGNED_NUM}\s+{_PRICE}",
+            rf"((?:F5|first ?5|first five)\s+)?(?:alt(?:ernate)?\s+)?(?:RL|run ?line)\s+{_SIGNED_NUM}\s+{_PRICE}\s*/\s*{_SIGNED_NUM}\s+{_PRICE}",
             line, flags=re.I,
         )
         if match:
@@ -277,7 +278,7 @@ def parse_lines_with_warnings(text: str, *, title: str | None = None) -> tuple[l
             rows.append(ParsedRow(away, home, "RUN_LINE", "AWAY", float(match[1]), _price(match[2]), "HOME", _price(match[3])))
             continue
 
-        match = re.fullmatch(rf"(?:total|o/?u|game total)\s+{_NUM}\s+{_PRICE}\s+{_PRICE}", line, flags=re.I)
+        match = re.fullmatch(rf"(?:alt(?:ernate)?\s+)?(?:total|o/?u|game total)\s+{_NUM}\s+{_PRICE}\s+{_PRICE}", line, flags=re.I)
         if match:
             rows.append(ParsedRow(away, home, "GAME_TOTAL", "OVER", float(match[1]), _price(match[2]), "UNDER", _price(match[3])))
             continue
@@ -355,7 +356,7 @@ def parse_lines_with_warnings(text: str, *, title: str | None = None) -> tuple[l
 
         # One-sided core-market quotes are a pricing error, never an informational note.
         match = re.fullmatch(
-            rf"(?:(?:F5|first ?5|first five)\s+)?(?:ML|moneyline|(?:RL|run ?line|total|o/?u|game total)\s+{_SIGNED_NUM}|YRFI|NRFI)\s+{_PRICE}",
+            rf"(?:(?:F5|first ?5|first five)\s+)?(?:alt(?:ernate)?\s+)?(?:ML|moneyline|(?:RL|run ?line|total|o/?u|game total)\s+{_SIGNED_NUM}|YRFI|NRFI)\s+{_PRICE}",
             line, flags=re.I,
         )
         if match:
@@ -437,5 +438,3 @@ def build_input(
                 raise LinesIntakeError(
                     f"TEAM_NOT_IN_GAME: '{row.team}' in {game.away_name} @ {game.home_name}"
                 )
-        out.append(record)
-    return {"rows": out}
