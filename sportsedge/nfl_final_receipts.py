@@ -104,13 +104,19 @@ def bind_espn_final(*, raw: bytes, source_url: str, fetched_at: str,
     }
 
 
-def fetch_espn_final(*, away: str, home: str, kickoff: str) -> dict:
-    """Fetch raw HTTP bytes once; preserve hash and *actual* post-fetch time."""
+def fetch_espn_final_with_bytes(*, away: str, home: str,
+                                kickoff: str) -> tuple[dict, bytes]:
+    """Fetch raw HTTP bytes once and retain them to verify the saved hash."""
     source_url = scoreboard_url(kickoff)
     req = Request(source_url, headers={"User-Agent": "SportsEdge-results/1.0"})
     with urlopen(req, timeout=30) as response:
         raw = response.read()
     fetched_at = datetime.now(timezone.utc).isoformat()
-    return bind_espn_final(raw=raw, source_url=source_url,
-                           fetched_at=fetched_at, away=away, home=home,
-                           kickoff=kickoff)
+    receipt = bind_espn_final(raw=raw, source_url=source_url,
+                              fetched_at=fetched_at, away=away, home=home,
+                              kickoff=kickoff)
+    return receipt, raw
+
+
+def fetch_espn_final(*, away: str, home: str, kickoff: str) -> dict:
+    return fetch_espn_final_with_bytes(away=away, home=home, kickoff=kickoff)[0]
