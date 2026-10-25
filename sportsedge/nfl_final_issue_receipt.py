@@ -71,9 +71,6 @@ def format_final_issue(
     existing_issue_body: str,
     *,
     now: datetime,
-    max_delivery_seconds: int = 180,
-    lead_minutes: int = 30,
-    window_minutes: int = 15,
 ) -> str:
     """Return replacement lines body only if all FINAL/identity gates pass.
 
@@ -138,11 +135,12 @@ def format_final_issue(
         raise FinalIssueRouteError("ROUTE_RECEIPT_TIME_MISMATCH")
     kickoff = _utc(game.get("commence_time"))
     delivered = _utc(now)
-    start = kickoff - timedelta(minutes=lead_minutes)
-    end = start + timedelta(minutes=window_minutes)
+    # Frozen NFL FINAL contract: opening at -30m, closing at -15m.
+    start = kickoff - timedelta(minutes=30)
+    end = start + timedelta(minutes=15)
     if not start <= received < end:
         raise FinalIssueRouteError("ROUTE_FINAL_RECEIPT_OUTSIDE_WINDOW")
-    if not received <= delivered < kickoff or not 0 <= (delivered - received).total_seconds() <= max_delivery_seconds:
+    if not received <= delivered < kickoff or not 0 <= (delivered - received).total_seconds() <= 180:
         raise FinalIssueRouteError("ROUTE_DELIVERY_STALE_OR_POSTSTART")
 
     spread = game.get("spread")
