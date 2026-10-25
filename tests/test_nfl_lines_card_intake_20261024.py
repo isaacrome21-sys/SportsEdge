@@ -104,10 +104,15 @@ def test_missing_capture_line_refuses_with_quote_timestamp_even_if_issue_time_fr
     assert "capture-time line missing" in md
 
 
-def test_capture_older_than_180_seconds_is_stale():
-    engine, md = _run(_ticket(_body(_iso(200))))
+def test_capture_older_than_30_minutes_is_stale():
+    engine, md = _run(_ticket(_body(_iso(1801))))
     assert engine["games"][0]["residual_research_error"] == "QUOTE_STALE"
-    assert "older than 180 seconds" in md
+    assert "older than 30 minutes" in md
+
+
+def test_capture_at_30_minutes_still_prices():
+    engine, _ = _run(_ticket(_body(_iso(1800))))
+    assert engine["games"][0]["residual_research_error"] is None
 
 
 @pytest.mark.parametrize("schedule,code", [
