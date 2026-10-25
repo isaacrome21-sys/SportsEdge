@@ -22,7 +22,7 @@ def test_unverified_sports_never_guess_endpoint():
     assert result["sports"]["NFL"]["payload_markets"] == 3
     assert result["sports"]["NFL"]["market_counts"] == {"Moneyline": 1, "Total": 2}
     assert result["sports"]["NFL"]["raw_size_bytes"] == len(b"synthetic-direct-dk-board")
-    assert len(result["sports"]["NFL"]["raw_sha256"]) == 64
+    assert result["sports"]["NFL"]["raw_sha256"] == hashlib.sha256(b"synthetic-direct-dk-board").hexdigest()
     assert len(calls) == 3
     assert all(result["sports"][s]["status"] == "FETCHED" for s in ("NFL", "CFB", "MLB"))
 
