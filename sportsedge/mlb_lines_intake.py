@@ -236,7 +236,9 @@ def parse_lines_with_warnings(text: str, *, title: str | None = None) -> tuple[l
                 if seg:
                     rows.append(ParsedRow(away, home, market, "OVER", float(seg[2]), _price(seg[3]), "UNDER", _price(seg[4]), team=seg[1].strip()))
                 else:
-                    warnings.append(f"line {n}: skipped team-total piece '{part.strip()}'")
+                    errors.append(
+                        f"line {n}: BLOCKED_PRICING_METHOD: incomplete paired team-total piece '{part.strip()}'"
+                    )
             continue
 
         if ";" in line or re.match(r"[^:]+:\s", line):
