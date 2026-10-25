@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+import re
 from typing import Any, Callable, Mapping
 from urllib.request import Request, urlopen
 
@@ -117,6 +118,32 @@ def _parse_start(value: Any) -> datetime:
     return dt.astimezone(timezone.utc)
 
 
+def _team_selection(label: str, away: str, home: str) -> str | None:
+    """Match a DK team choice only when the side is unambiguous.
+
+    Blank labels and shared substrings must never be silently assigned HOME.
+    Full team names take precedence; unique nickname tokens also allow labels
+    such as "Chiefs +3.5". Missing or ambiguous sides are refused.
+    """
+    choice = " ".join(str(label or "").casefold().split())
+    if not choice:
+        return None
+    a = " ".join(away.casefold().split())
+    h = " ".join(home.casefold().split())
+    full_away = choice == a or choice.startswith(a + " ")
+    full_home = choice == h or choice.startswith(h + " ")
+    if full_away != full_home:
+        return away if full_away else home
+    if full_away:
+        return None
+    words = set(re.findall(r"[a-z0-9]+", choice))
+    nick_away = bool(a.split()) and a.split()[-1] in words
+    nick_home = bool(h.split()) and h.split()[-1] in words
+    if nick_away == nick_home:
+        return None
+    return away if nick_away else home
+
+
 def normalize_board(board: RawDraftKingsBoard) -> list[dict[str, Any]]:
     payload = board.payload
     events = {str(e.get("id")): e for e in payload.get("events", []) if isinstance(e, Mapping) and e.get("id") is not None}
@@ -161,12 +188,7 @@ def normalize_board(board: RawDraftKingsBoard) -> list[dict[str, Any]]:
                 if low.startswith("over"): outcome = "Over"
                 elif low.startswith("under"): outcome = "Under"
             else:
-                if home in label or label in home: outcome = home
-                elif away in label or label in away: outcome = away
-                else:
-                    hm = home.split()[-1] in label if home.split() else False
-                    am = away.split()[-1] in label if away.split() else False
-                    if hm ^ am: outcome = home if hm else away
+                outcome = _team_selection(label, away, home)
             if outcome is None:
                 continue
             normalized.append({"outcome": outcome, "point": point, "price_american": price})
