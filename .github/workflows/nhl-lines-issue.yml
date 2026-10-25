@@ -12,7 +12,7 @@ cache-mode: write
 
 concurrency:
   group: nhl-lines-issue-${{ github.event.issue.number }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   card:
@@ -65,13 +65,31 @@ jobs:
             exit 1
           fi
           mkdir -p ledger/nhl_picks
-          cp "$source_file" "ledger/nhl_picks/issue-${ISSUE_NUMBER}.json"
+          cp "$source_file" "ledger/nhl_picks/issue-${ISSUE_NUMBER}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}.json"
           # Publish an isolated evidence branch, never push to protected main.
           # A unique run ID preserves earlier captures instead of overwriting them.
           evidence_branch="evidence/nhl/issue-${ISSUE_NUMBER}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- "ledger/nhl_picks/issue-${ISSUE_NUMBER}.json"
+          git add -- "ledger/nhl_picks/issue-${ISSUE_NUMBER}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}.json"
           git commit -m "Capture NHL research evidence issue #${ISSUE_NUMBER}"
-          git push origin "HEAD:refs/heads/${evidence_branch}"
+          pushed=false
+          for attempt in 1 2 3; do
+            if git push origin "HEAD:refs/heads/${evidence_branch}"; then
+              pushed=true
+              break
+            fi
+            sleep 3
+          done
+          [ "$pushed" = true ] || { echo "Evidence push failed" >&2; exit 1; }
           echo "Evidence saved on branch ${evidence_branch}; not merged to main"
+
+      - name: Archive NHL research evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nhl-picks-${{ github.event.issue.number }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/nhl_myspari/picks.json
+            issue_body.txt
+          if-no-files-found: warn
