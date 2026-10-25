@@ -23,7 +23,7 @@ This applies the same idea discussed for the NFL/fantasy management layer to the
 - Matchup (park factors, platoon, recent form)
 
 **Notes**
-Statcast quality is the strongest free tiebreaker for hitter props. Already partially aligned with existing pitcher-K Statcast work.
+Statcast quality is a candidate free tiebreaker for hitter props, pending paired-market chronological OOS tests. Already partially aligned with existing pitcher-K Statcast work.
 
 ## NBA
 **Free sources**
@@ -38,7 +38,7 @@ Statcast quality is the strongest free tiebreaker for hitter props. Already part
 - Pace + opponent DvP by position
 
 **Notes**
-Usage/minutes trend is the cleanest free signal for player props. See existing NBA feasibility notes.
+Usage/minutes trends are candidate free signals for player props, subject to missingness, source latency, and OOS validation. See existing NBA feasibility notes.
 
 ## CFB
 **Free sources**
@@ -52,7 +52,7 @@ Usage/minutes trend is the cleanest free signal for player props. See existing N
 - Matchup (SP+/FPI differential, weather, altitude — partially covered)
 
 **Notes**
-EPA/success trend is the strongest free quality+volume signal. CFB research is paused but data sources are not discarded.
+EPA/success trends are candidate quality and volume signals, not proven edges. CFB production blend weight remains 0%; research collection and testing may continue without promotion.
 
 ## NHL
 **Free sources**
@@ -66,7 +66,7 @@ EPA/success trend is the strongest free quality+volume signal. CFB research is p
 - Matchup (opponent defensive metrics, recent form)
 
 **Notes**
-TOI/PP-share is the clearest free usage signal. See NHL public baseline notes.
+TOI/PP-share is a candidate free usage signal requiring chronological validation. See NHL public baseline notes.
 
 ## Source eligibility and evidence discipline
 - Publicly viewable is not equivalent to permission for bulk collection, automated model training or commercial reuse. Check each provider's current terms and plan before ingestion; mark unavailable/premium-restricted features **RESEARCH_NOT_ADMITTED**.
