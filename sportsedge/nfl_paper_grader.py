@@ -85,6 +85,10 @@ def capture_nfl_issue(*, body: str, title: str, issue_number: int,
         raise NflPaperError("NFL_NOT_RECORDED_PREKICKOFF")
     if captured > recorded:
         raise NflPaperError("NFL_CAPTURE_FUTURE_OR_BACKDATED")
+    # Actual bookmaker capture is independent from relay/record time. The
+    # owner-approved quote-age limit is inclusive at exactly 1800 seconds.
+    if (recorded - captured).total_seconds() > 1800:
+        raise NflPaperError("NFL_CAPTURE_STALE_OVER_1800S")
 
     games = (engine or {}).get("games") or []
     if engine is not None and (
@@ -171,6 +175,15 @@ def _validate_snapshot(snap: dict) -> None:
         raise NflPaperError("NFL_SNAPSHOT_GAME_MISMATCH")
     if _time(snap.get("captured_at")) != _time(ticket.captured_at):
         raise NflPaperError("NFL_SNAPSHOT_CAPTURE_MISMATCH")
+    captured, recorded, start = (
+        _time(snap.get("captured_at")),
+        _time(snap.get("recorded_at")),
+        _time(game.get("start")),
+    )
+    if not (captured <= recorded < start and captured < start):
+        raise NflPaperError("NFL_SNAPSHOT_NOT_RECORDED_PREKICKOFF")
+    if (recorded - captured).total_seconds() > 1800:
+        raise NflPaperError("NFL_SNAPSHOT_CAPTURE_STALE_OVER_1800S")
     board = [
         dict(market=m.market, line=m.line, team=m.team, player=m.player,
              price_a=m.away_or_over_price, price_b=m.home_or_under_price)
@@ -204,6 +217,14 @@ def _validate_snapshot(snap: dict) -> None:
                 or pick["opposite_price"] != opposite
                 or pick.get("line") != expected_line):
             raise NflPaperError("NFL_SNAPSHOT_PICK_PRICE_OR_LINE_MISMATCH")
+        # A caller cannot re-key a priced selection by recomputing the
+        # unkeyed snapshot digest. Re-derive its canonical identity.
+        expected_key = _key(
+            ticket.away, ticket.home, pick["market"],
+            str(pick.get("subject") or ""), side, expected_line,
+        )
+        if pick.get("pick") != expected_key:
+            raise NflPaperError("NFL_SNAPSHOT_PICK_KEY_MISMATCH")
 
 
 def grade_nfl_issue(snapshots: list[dict], final: dict) -> list[dict]:
