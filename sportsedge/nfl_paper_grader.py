@@ -1,0 +1,215 @@
+"""Strict NFL PAPER capture, settlement and paired no-vig CLV.
+
+Only actual frozen-engine research leans are tracked, never promoted. Every
+unavailable quote, score or prop statistic fails closed without invented data.
+"""
+from __future__ import annotations
+
+import re
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+from sportsedge.line_snapshots import (
+    SNAPSHOT_ROOT, append_snapshot, build_snapshot, entry_and_close,
+)
+from sportsedge.nfl_lines_intake import parse_nfl_lines
+from sportsedge.pipeline.grading import (
+    FinalResult, GradeError, grade, no_vig_clv, units,
+)
+
+
+class NflPaperError(ValueError):
+    pass
+
+
+def _time(value: str | None) -> datetime:
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError) as exc:
+        raise NflPaperError("NFL_TIME_INVALID") from exc
+    if dt.tzinfo is None or dt.utcoffset() is None:
+        raise NflPaperError("NFL_TIME_OFFSET_REQUIRED")
+    return dt
+
+
+def _side_line(market: str, line: Any, selection: str) -> float | None:
+    if line is None:
+        return None
+    value = float(line)
+    return -value if market == "spread" and selection == "HOME" else value
+
+
+def _key(away: str, home: str, market: str, subject: str,
+         selection: str, line: float | None) -> str:
+    suffix = "" if line is None else f"{line:g}"
+    return f"{away}@{home}|{market}|{subject}|{selection}|{suffix}"
+
+
+def _selection(raw: Any, market: str, away: str, home: str) -> str:
+    value = str(raw or "").upper()
+    if market in {"moneyline", "spread"}:
+        if value in {"AWAY", away.upper()}:
+            return "AWAY"
+        if value in {"HOME", home.upper()}:
+            return "HOME"
+    elif value in {"OVER", "UNDER"}:
+        return value
+    raise NflPaperError("NFL_PICK_SELECTION_UNSUPPORTED")
+
+
+def capture_nfl_issue(*, body: str, title: str, issue_number: int,
+                      game_start: str, recorded_at: str, engine: dict | None = None,
+                      root: Path = SNAPSHOT_ROOT) -> dict:
+    """Append a real captured DK game without issue-time fallback or fake picks."""
+    tickets = parse_nfl_lines(body, title=title)
+    if len(tickets) != 1:
+        raise NflPaperError("NFL_ONE_GAME_PER_SNAPSHOT_REQUIRED")
+    ticket = tickets[0]
+    start, captured, recorded = (
+        _time(game_start), _time(ticket.captured_at), _time(recorded_at)
+    )
+    if not (captured < start and recorded < start):
+        raise NflPaperError("NFL_NOT_RECORDED_PREKICKOFF")
+    if captured > recorded:
+        raise NflPaperError("NFL_CAPTURE_FUTURE_OR_BACKDATED")
+
+    games = (engine or {}).get("games") or []
+    if engine is not None and (
+        len(games) != 1
+        or games[0].get("away") != ticket.away
+        or games[0].get("home") != ticket.home
+        or _time(games[0].get("commence_time")) != start
+    ):
+        raise NflPaperError("NFL_INDEPENDENT_SCHEDULE_MISMATCH")
+
+    board = [
+        dict(market=m.market, line=m.line, team=m.team, player=m.player,
+             price_a=m.away_or_over_price, price_b=m.home_or_under_price)
+        for m in ticket.markets
+    ]
+    picks = []
+    for row in (games[0].get("markets") or []) if games else []:
+        chosen = row.get("lean") or row.get("pick")
+        if not isinstance(chosen, dict):
+            continue
+        market = str(row.get("market") or "").lower()
+        selection = _selection(chosen.get("selection"), market, ticket.away, ticket.home)
+        matches = [
+            m for m in board
+            if m["market"] == market
+            and m["player"] == row.get("player")
+            and m["team"] == row.get("team")
+        ]
+        if len(matches) != 1:
+            raise NflPaperError("NFL_PICK_AMBIGUOUS_BOARD_PAIR")
+        matched = matches[0]
+        first = selection in {"AWAY", "OVER"}
+        price = matched["price_a"] if first else matched["price_b"]
+        opposite = matched["price_b"] if first else matched["price_a"]
+        if int(chosen.get("price_american")) != price:
+            raise NflPaperError("NFL_PICK_PRICE_DIFFERS_FROM_CAPTURE")
+        line = _side_line(market, matched["line"], selection)
+        chosen_line = chosen.get("line")
+        if chosen_line is not None and (line is None or float(chosen_line) != line):
+            raise NflPaperError("NFL_PICK_LINE_DIFFERS_FROM_CAPTURE")
+        subject = str(matched.get("player") or matched.get("team") or "")
+        picks.append(dict(
+            pick=_key(ticket.away, ticket.home, market, subject, selection, line),
+            market=market, selection=selection, line=line, subject=subject,
+            team=matched.get("team"), price=price, opposite_price=opposite,
+            status="PAPER",
+        ))
+
+    snap = build_snapshot(
+        sport="nfl", issue_number=issue_number, body=body, title=title,
+        game=dict(away=ticket.away, home=ticket.home, start=start.isoformat(),
+                  kickoff_source="INDEPENDENT_SCHEDULE"),
+        board=board, picks=picks, recorded_at=recorded_at,
+    )
+    append_snapshot(snap, root)
+    return snap
+
+
+def grade_nfl_issue(snapshots: list[dict], final: dict) -> list[dict]:
+    """Paper settlement; numeric CLV only from distinct eligible captured pairs."""
+    if not snapshots:
+        return []
+    if not (
+        str(final.get("url", "")).startswith("https://")
+        and re.fullmatch(r"[0-9a-fA-F]{64}", str(final.get("sha256", "")))
+        and final.get("fetched_at")
+    ):
+        raise NflPaperError("NFL_FINAL_RECEIPT_REQUIRED")
+    _time(final["fetched_at"])
+    away_points, home_points = final.get("away_points"), final.get("home_points")
+    if any(type(x) not in (int, float) or x < 0 or x != int(x)
+           for x in (away_points, home_points)):
+        raise NflPaperError("NFL_FINAL_SCORES_INVALID")
+    rows, seen = [], set()
+    for snap in snapshots:
+        game = snap.get("game") or {}
+        start = game.get("start")
+        if not start or game.get("away") != final.get("away") or game.get("home") != final.get("home"):
+            continue
+        if _time(final["fetched_at"]) <= _time(start):
+            raise NflPaperError("NFL_FINAL_RECEIPT_PREKICKOFF")
+        same_game = [
+            s for s in snapshots
+            if (s.get("game") or {}).get("away") == game["away"]
+            and (s.get("game") or {}).get("home") == game["home"]
+            and (s.get("game") or {}).get("start") == start
+        ]
+        for pick in snap.get("picks") or []:
+            ident = pick["pick"]
+            if ident in seen:
+                continue
+            seen.add(ident)
+            pair = entry_and_close(same_game, ident, start)
+            record = dict(
+                pick=ident, market=pick["market"], status="PAPER",
+                result="NO_VALID_ENTRY", units=None, clv_status=pair.status,
+                clv_prob=None, ladder_status="PAPER",
+            )
+            if pair.entry is None or pair.entry_pick is None:
+                rows.append(record)
+                continue
+            entry_pick = pair.entry_pick
+            family = entry_pick["market"]
+            if family not in {"moneyline", "spread", "total"}:
+                record["result"] = "NO_FINAL_STAT_OR_ENGINE"
+            else:
+                record["result"] = grade(
+                    entry_pick,
+                    FinalResult(away_score=away_points, home_score=home_points),
+                    family=family,
+                )
+                record["units"] = units(record["result"], int(entry_pick["price"]))
+            if pair.status != "OK" or pair.close is None:
+                rows.append(record)
+                continue
+            candidates = [
+                m for m in pair.close.get("board", [])
+                if m.get("market") == family
+                and str(m.get("player") or m.get("team") or "") == entry_pick.get("subject", "")
+            ]
+            if len(candidates) != 1:
+                record["clv_status"] = "NO_UNAMBIGUOUS_CLOSE_PAIR"
+                rows.append(record)
+                continue
+            close = candidates[0]
+            first = entry_pick["selection"] in {"AWAY", "OVER"}
+            close_price = int(close["price_a"] if first else close["price_b"])
+            opposite = int(close["price_b"] if first else close["price_a"])
+            close_line = _side_line(family, close.get("line"), entry_pick["selection"])
+            try:
+                record["clv_prob"] = no_vig_clv(
+                    int(entry_pick["price"]), int(entry_pick["opposite_price"]),
+                    close_price, opposite,
+                    entry_line=entry_pick.get("line"), close_line=close_line,
+                )
+                record["clv_status"] = "CLV_TRACKED_PAPER"
+            except (GradeError, ValueError, TypeError):
+                record["clv_status"] = "CLV_LINE_OR_PAIR_INVALID"
+            rows.append(record)
+    return rows
