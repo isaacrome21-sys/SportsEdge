@@ -95,3 +95,13 @@ def test_paper_guard_never_calls_an_unverified_market_actionable():
     assert PAPER_ONLY_REASON in rows[0]["presentation_reason_codes"]
     assert rows[1]["scored_status"] == "PASS"
     assert original[0]["status"] == "ACTIONABLE"  # pure, nonmutating
+
+
+def test_strict_card_allows_fresh_quotes_for_tomorrows_bound_fixture():
+    tomorrow = dict(BASE, first_pitch_at="2026-10-26T19:00:00-05:00")
+    live, blocked, _ = partition_live_rows(
+        [tomorrow], run_date=None, max_age_minutes=3,
+        as_of=datetime.fromisoformat("2026-10-25T10:01:00-05:00"),
+        enforce_quote_window=True,
+    )
+    assert len(live) == 1 and blocked == []
