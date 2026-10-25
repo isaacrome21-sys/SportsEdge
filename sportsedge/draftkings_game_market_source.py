@@ -132,6 +132,14 @@ def _team_selection(label: str, away: str, home: str) -> str | None:
     h = " ".join(home.casefold().split())
     full_away = choice == a or choice.startswith(a + " ")
     full_home = choice == h or choice.startswith(h + " ")
+    # A selection explicitly naming both sides is not a single-sided quote.
+    both_named = (
+        bool(a and h)
+        and re.search(r"(?<![a-z0-9])" + re.escape(a) + r"(?![a-z0-9])", choice)
+        and re.search(r"(?<![a-z0-9])" + re.escape(h) + r"(?![a-z0-9])", choice)
+    )
+    if both_named:
+        return None
     if full_away != full_home:
         return away if full_away else home
     if full_away:
