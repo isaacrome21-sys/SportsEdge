@@ -9,7 +9,7 @@ carried as an unchanged constant, not re-decided here.
 import pytest
 
 from sportsedge.dk_capture_span_manifest import (
-    QUOTE_MAX_AGE_S, SPAN_LIMIT_S, CaptureSpanManifestError,
+    QUOTE_MAX_AGE_S, SPAN_LIMIT_S, SPAN_RESEARCH_MAX_S, CaptureSpanManifestError,
     build_capture_span_manifest)
 
 T0 = "2026-10-22T17:21:00-05:00"
@@ -23,7 +23,7 @@ def _rec(event_id="E1", start=T0, finish="2026-10-22T17:23:00-05:00", **kw):
 
 
 def test_limits_are_the_standing_ruling_values():
-    assert SPAN_LIMIT_S == 150.0 and QUOTE_MAX_AGE_S == 180.0
+    assert SPAN_LIMIT_S == 150.0 and SPAN_RESEARCH_MAX_S == 300.0 and QUOTE_MAX_AGE_S == 1800.0
 
 
 def test_two_games_within_limit_all_accepted():
@@ -34,7 +34,7 @@ def test_two_games_within_limit_all_accepted():
     assert m["status"] == "ALL_GAMES_WITHIN_LIMIT"
     assert m["accepted_event_ids"] == ["E1", "E2"]
     assert m["refused"] == []
-    assert m["counts"] == {"games": 2, "ok": 2, "refused_span": 0, "failed": 0}
+    assert m["counts"] == {"games": 2, "ok": 2, "flagged_research": 0, "refused_span": 0, "failed": 0}
     spans = {g["event_id"]: g["span_seconds"] for g in m["games"]}
     assert spans == {"E1": 120.0, "E2": 90.0}
 
@@ -50,10 +50,9 @@ def test_span_above_limit_refused_with_span_shown():
     m = build_capture_span_manifest(
         [_rec(finish="2026-10-22T17:23:31-05:00")])
     g = m["games"][0]
-    assert g["span_seconds"] == 151.0 and g["status"] == "REFUSED_SPAN"
+    assert g["span_seconds"] == 151.0 and g["status"] == "FLAGGED_RESEARCH"\n    assert g["ladder_eligible"] is False
     assert m["accepted_event_ids"] == []
-    assert m["refused"] == [
-        {"event_id": "E1", "status": "REFUSED_SPAN", "span_seconds": 151.0}]
+    assert m["refused"] == []\n    assert m["flagged_research_event_ids"] == ["E1"]
     assert m["status"] == "GAMES_REFUSED"
     assert m["counts"]["refused_span"] == 1
 
@@ -115,3 +114,19 @@ def test_malformed_records_refused_by_name(records, code):
     with pytest.raises(CaptureSpanManifestError) as ei:
         build_capture_span_manifest(records)
     assert str(ei.value) == code
+
+
+@pytest.mark.parametrize("seconds,status,eligible", [
+    (150, "OK", True), (151, "FLAGGED_RESEARCH", False),
+    (300, "FLAGGED_RESEARCH", False), (301, "REFUSED_SPAN", False),
+])
+def test_capture_span_v2_boundaries(seconds, status, eligible):
+    from datetime import datetime, timedelta, timezone
+    start = datetime(2026, 10, 22, 22, 21, tzinfo=timezone.utc)
+    m = build_capture_span_manifest([_rec(
+        start=start.isoformat(),
+        finish=(start + timedelta(seconds=seconds)).isoformat())])
+    g = m["games"][0]
+    assert g["status"] == status
+    assert g["ladder_eligible"] is eligible
+    assert m["accepted_event_ids"] == (["E1"] if eligible else [])
