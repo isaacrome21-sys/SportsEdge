@@ -143,7 +143,7 @@ def test_grade_issue_writes_clv_ledger_and_comment(tmp_path: Path):
 
 def test_missing_entry_capture_never_tracks_clv():
     entry = dict(ENTRY)
-    entry["body"] = entry["body"].replace("Captured: 2026-10-24T22:20:00Z\\n", "")
+    entry["body"] = entry["body"].replace("Captured: 2026-10-24T22:20:00Z", "")
     result = compute_clv(issue_number=100, picks=[CardRow(1, "Moneyline Home", -120, "ACTIONABLE")],
                          feed=_feed(), entry_issue=entry, other_issues=[CLOSE])
     assert result[0]["clv_status"] == "NO_ENTRY_CAPTURE"
