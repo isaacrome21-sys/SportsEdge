@@ -156,7 +156,7 @@ jobs:
                --bound-input-json "${{ steps.intake.outputs.path }}" \
                --max-capture-lag-seconds 180 \
                --root ledger/line_snapshots; then
-            gh issue comment "$ISSUE" --body "MLB PAPER SNAPSHOT REFUSED: Captured time missing/invalid or later than recording. No new close or qualifying CLV receipt. See run logs."
+            gh issue comment "$ISSUE" --body "MLB PAPER SNAPSHOT REFUSED: missing/stale Captured time, unmatched exact two-sided card quote, ambiguous game, or start/recording mismatch. No eligible entry/close or CLV recorded. See run logs."
             exit 0
           fi
           path="ledger/line_snapshots/mlb/$ISSUE.jsonl"
