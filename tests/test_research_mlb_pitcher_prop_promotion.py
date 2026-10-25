@@ -44,6 +44,74 @@ def test_price_helpers_and_devig():
     assert not R.is_half_line(5.0)
 
 
+@pytest.mark.parametrize("invalid", [True, False, 0, 99, 110.5, "110.5", "NaN", float("inf"), None])
+def test_promotion_rejects_malformed_american_prices_without_integer_truncation(invalid):
+    with pytest.raises(ValueError, match="invalid American odds"):
+        R.american_to_decimal(invalid)
+    captured = "2026-10-04T20:00:00+00:00"
+    units, drops = R.select_units([_payload(captured, [
+        _quote("OVER", invalid, captured=captured),
+        _quote("UNDER", -110, captured=captured),
+    ])])
+    assert units == []
+    assert drops["not_exactly_one_valid_quote_each_side"] == 1
+
+
+def test_promotion_requires_two_unique_opposite_receipts():
+    captured = "2026-10-04T20:00:00+00:00"
+    over = _quote("OVER", -110, captured=captured)
+    under = _quote("UNDER", -110, captured=captured)
+    units, drops = R.select_units([_payload(captured, [over, dict(over), under])])
+    assert units == []
+    assert drops["not_exactly_one_valid_quote_each_side"] == 1
+
+
+def test_promotion_refuses_pair_older_than_150_seconds_apart():
+    over_time = "2026-10-04T20:00:00+00:00"
+    within = "2026-10-04T20:02:30+00:00"
+    beyond = "2026-10-04T20:02:31+00:00"
+    for under_time, expected in ((within, 1), (beyond, 0)):
+        units, drops = R.select_units([_payload(beyond, [
+            _quote("OVER", -110, captured=over_time),
+            _quote("UNDER", -115, captured=under_time),
+        ])])
+        assert len(units) == expected
+        if expected:
+            assert units[0]["paired_quote_capture_span_seconds"] == 150.0
+        else:
+            assert drops["paired_quote_capture_span_over_150s"] == 1
+
+
+def test_promotion_blocks_future_quote_and_archive_after_first_pitch():
+    old = "2026-10-04T20:00:00+00:00"
+    future = "2026-10-04T20:01:00+00:00"
+    quotes = [_quote("OVER", -110, captured=old), _quote("UNDER", -110, captured=future)]
+    units, drops = R.select_units([_payload(old, quotes)])
+    assert units == []
+    assert drops["not_eligible_time"] == 1
+
+    units, drops = R.select_units([_payload("2026-10-04T23:01:00+00:00", [
+        _quote("OVER", -110, captured=old), _quote("UNDER", -110, captured=old),
+    ])])
+    assert units == []
+    assert drops["not_eligible_time"] == 2
+
+
+def test_promotion_blocks_nonfinite_line_and_disagreeing_first_pitch():
+    captured = "2026-10-04T20:00:00+00:00"
+    bad_line = _quote("OVER", -110, captured=captured, line=float("nan"))
+    units, drops = R.select_units([_payload(captured, [bad_line])])
+    assert units == []
+    assert drops["integer_or_non_half_line"] == 1
+
+    over = _quote("OVER", -110, captured=captured)
+    under = _quote("UNDER", -110, captured=captured)
+    under["first_pitch_at"] = "2026-10-04T23:01:00+00:00"
+    units, drops = R.select_units([_payload(captured, [over, under])])
+    assert units == []
+    assert drops["first_pitch_disagreement"] == 1
+
+
 def test_cache_once_does_not_eagerly_reload_on_cache_hit():
     calls = []
     cache = {}
