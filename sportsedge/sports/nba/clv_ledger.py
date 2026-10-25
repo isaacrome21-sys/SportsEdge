@@ -87,20 +87,28 @@ def pick_row(capture: Mapping, *, model_p: float, engine_id: str) -> dict:
 
 def closing_quote(pick: Mapping, captures: Iterable[Mapping], *, tip_utc: str) -> tuple[dict | None, str]:
     tip = _ts(tip_utc)
+    entry_time = _ts(pick["captured_at"])
+    # A quote captured at or after tip is never a valid entry, even when a
+    # different earlier capture happens to exist in the supplied board.
+    if entry_time >= tip:
+        return None, "ENTRY_NOT_PRETIP"
     same = [c for c in captures if c["event_id"] == pick["event_id"]
             and c["market"] == pick["market"] and c["side"] == pick["side"]]
-    pre = [c for c in same if _ts(c["captured_at"]) < tip]
     if not same:
         return None, "NO_CLOSE_ROW"
+    pre = [c for c in same if _ts(c["captured_at"]) < tip]
     if not pre:
         return None, "CLOSE_NOT_PRETIP"
-    last_t = max(_ts(c["captured_at"]) for c in pre)
-    last = [c for c in pre if _ts(c["captured_at"]) == last_t]
+    # The entry capture must never grade against itself or an older quote.
+    # A closing observation is a separate, strictly later prestart snapshot.
+    later = [c for c in pre if _ts(c["captured_at"]) > entry_time]
+    if not later:
+        return None, "CLOSE_NOT_AFTER_ENTRY"
+    last_t = max(_ts(c["captured_at"]) for c in later)
+    last = [c for c in later if _ts(c["captured_at"]) == last_t]
     if len({(c["line"], c["american"]) for c in last}) > 1:
         return None, "CLOSE_AMBIGUOUS"
     close = last[0]
-    if _ts(pick["captured_at"]) > tip:
-        return None, "ENTRY_POST_TIP"
     if pick["market"] != "MONEYLINE" and close["line"] != pick["line"]:
         return None, "LINE_MOVED"
     return dict(close), "OK"
