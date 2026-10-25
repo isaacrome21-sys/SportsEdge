@@ -17,7 +17,7 @@ LADDER_PATH = Path(__file__).resolve().parents[2] / "config" / "market_ladder_st
 PAPER, STAKE_025, STAKE_05 = "PAPER", "STAKE_0_25U", "STAKE_0_5U"
 STATUSES = (PAPER, STAKE_025, STAKE_05)
 STAKE_UNITS = {PAPER: 0.0, STAKE_025: 0.25, STAKE_05: 0.5}
-MIN_GRADED = 150
+MIN_GRADED = 200  # Lane 7 gate: n>=200, mean no-vig CLV > 0, ROI > 0
 
 
 class LadderError(ValueError):
@@ -46,13 +46,19 @@ def stake_units(sport: str, market: str, *, ladder: Mapping[str, Any] | None = N
     return STAKE_UNITS[status_for(sport, market, ladder=ladder)]
 
 
-def evidence_supports(clv_values: Iterable[float], current: str = PAPER) -> str:
-    """Status the graded CLV evidence would support (report only, never applied).
+def evidence_supports(clv_values: Iterable[float], current: str = PAPER, *,
+                      units: Iterable[float] | None = None) -> str:
+    """Status the graded evidence would support (report only, never applied).
 
-    PAPER -> 0.25u needs >= 150 graded picks with mean no-vig CLV > 0.
-    0.25u -> 0.5u only if that still holds. Mean CLV <= 0 falls back to PAPER.
+    Same bar as the Lane 7 gate: PAPER -> 0.25u needs >= 200 graded picks in
+    this market with mean no-vig CLV > 0 AND realized ROI > 0 (``units`` is the
+    per-pick graded units, same picks as ``clv_values``). Missing or mismatched
+    ``units`` stays PAPER. 0.25u -> 0.5u only if all of that still holds.
     """
     values = list(clv_values)
-    if len(values) < MIN_GRADED or mean(values) <= 0:
+    results = list(units) if units is not None else []
+    if len(values) < MIN_GRADED or len(results) != len(values):
+        return PAPER
+    if mean(values) <= 0 or sum(results) <= 0:
         return PAPER
     return STAKE_05 if current in (STAKE_025, STAKE_05) else STAKE_025
