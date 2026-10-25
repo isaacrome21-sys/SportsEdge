@@ -37,7 +37,7 @@ def inspect_report(raw: bytes, season: int, season_type: str, week: int) -> dict
     official_url(season, season_type, week)
     if not raw or len(raw) > MAX_HTML_BYTES:
         raise ValueError("HTML_MISSING_OR_TOO_LARGE")
-    if b"\x00" in raw or raw.startswith((b"%PDF", b"PK\x03\\x04")):
+    if b"\x00" in raw or raw.startswith((b"%PDF", b"PK")):
         raise ValueError("NOT_HTML")
     try:
         html = raw.decode("utf-8-sig")
