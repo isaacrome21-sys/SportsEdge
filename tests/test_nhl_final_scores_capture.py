@@ -146,5 +146,27 @@ class FinalsCapture(unittest.TestCase):
                 C.load_finals(p)
 
 
+    def test_corrupt_empty_archive_is_not_treated_as_new(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            (d / "score.json").write_text(json.dumps({"games": []}))
+            out_dir = d / "nhl_finals"
+            out_dir.mkdir()
+            p = out_dir / f"{DATE}.json"
+            p.write_text("{}")
+            with self.assertRaisesRegex(ValueError, "NHL_FINALS_SCHEMA_INVALID"):
+                C.main(["capture", "--date", DATE, "--score-json", str(d / "score.json"),
+                        "--output-dir", str(out_dir)])
+            self.assertEqual(p.read_text(), "{}")
+
+    def test_existing_duplicate_ids_cannot_be_merged(self):
+        rows = C.parse_scoreboard({"games": [game(2026020101, "New York Rangers",
+                                                   "Boston Bruins", 3, 4)]}, date=DATE)
+        doc, _ = C.merge(None, rows, date=DATE, captured_at="t1")
+        doc["games"].append(dict(doc["games"][0]))
+        with self.assertRaisesRegex(ValueError, "DUPLICATE_GAME_ID"):
+            C.merge(doc, [], date=DATE, captured_at="t2")
+
+
 if __name__ == "__main__":
     unittest.main()
