@@ -64,3 +64,12 @@ def test_mismatched_source_sport_is_unavailable():
     result = probe(fetcher=wrong_sport, clock=lambda: NOW)
     assert result["sports"]["NFL"]["status"] == "UNAVAILABLE"
     assert result["sports"]["CFB"]["status"] == "UNAVAILABLE"
+
+def test_naive_receipt_time_is_unavailable():
+    def naive(key):
+        return SimpleNamespace(sport_key=key, raw=b"{}", payload={},
+                               source_uri="https://example.invalid",
+                               received_at=datetime(2026, 10, 25))
+    result = probe(fetcher=naive, clock=lambda: NOW)
+    assert all(result["sports"][sport]["status"] == "UNAVAILABLE"
+               for sport in ("NFL", "CFB", "MLB"))
