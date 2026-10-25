@@ -5,7 +5,7 @@ on:
     types: [opened, edited]
 
 permissions:
-  contents: read
+  contents: write
   issues: write
 
 concurrency:
@@ -46,3 +46,27 @@ jobs:
             gh issue comment "$ISSUE" --body-file fail.md
             exit 1
           fi
+
+      - name: Persist NBA research capture and card
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_UPDATED_AT: ${{ github.event.issue.updated_at }}
+        run: |
+          set -euo pipefail
+          test -s issue_body.txt
+          test -s artifacts/nba/card.md
+          dest="ledger/nba_captures/issue-${ISSUE_NUMBER}"
+          mkdir -p "$dest"
+          cp issue_body.txt "$dest/issue_body.txt"
+          cp artifacts/nba/card.md "$dest/card.md"
+          printf '%s\n' "$ISSUE_UPDATED_AT" > "$dest/issue_updated_at.txt"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "$dest"
+          if git diff --cached --quiet; then
+            echo "No NBA capture changes"
+            exit 0
+          fi
+          git commit -m "Record NBA research capture for issue #${ISSUE_NUMBER}"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
