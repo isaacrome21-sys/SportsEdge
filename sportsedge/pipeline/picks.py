@@ -106,11 +106,14 @@ class PickRecord:
 def make_pick(*, sport: str, market: str, selection: str, line: float | None, dk_price: int,
               captured_at: str, model_p: float, engine: str, ladder_status: str | None = None,
               game: str = "", subject: str | None = None, opposite_price: int | None = None,
-              ladder: Mapping[str, Any] | None = None) -> PickRecord:
+              ladder: Mapping[str, Any] | None = None,
+              span_seconds: float | None = None, capture_method: str | None = None,
+              span_tier: str | None = None) -> PickRecord:
     """Build a pick; ``ladder_status`` defaults to the market's own ladder entry."""
     if ladder_status is None:
         from .ladder import status_for
         ladder_status = status_for(sport, market, ladder=ladder)
     return PickRecord(sport.upper(), market, str(selection).upper(), line, int(dk_price),
                       captured_at, float(model_p), engine, expected_value(model_p, dk_price),
-                      ladder_status, game=game, subject=subject, opposite_price=opposite_price)
+                      ladder_status, game=game, subject=subject, opposite_price=opposite_price,
+                      span_seconds=span_seconds, capture_method=capture_method, span_tier=span_tier)
