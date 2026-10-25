@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from datetime import datetime
 from pathlib import Path
@@ -33,6 +34,15 @@ def _time(value: str | None) -> datetime:
     if dt.tzinfo is None or dt.utcoffset() is None:
         raise NflPaperError("NFL_TIME_OFFSET_REQUIRED")
     return dt
+
+
+def _exact_engine_price(value: Any) -> int:
+    """Never silently truncate an engine quote to an American integer."""
+    if type(value) is int:
+        return value
+    if isinstance(value, str) and re.fullmatch(r"[+-]?[0-9]+", value.strip()):
+        return int(value.strip())
+    raise NflPaperError("NFL_ENGINE_PRICE_NOT_EXACT_INTEGER")
 
 
 def _side_line(market: str, line: Any, selection: str) -> float | None:
@@ -109,12 +119,19 @@ def capture_nfl_issue(*, body: str, title: str, issue_number: int,
         first = selection in {"AWAY", "OVER"}
         price = matched["price_a"] if first else matched["price_b"]
         opposite = matched["price_b"] if first else matched["price_a"]
-        if int(chosen.get("price_american")) != price:
+        if _exact_engine_price(chosen.get("price_american")) != price:
             raise NflPaperError("NFL_PICK_PRICE_DIFFERS_FROM_CAPTURE")
         line = _side_line(market, matched["line"], selection)
         chosen_line = chosen.get("line")
-        if chosen_line is not None and (line is None or float(chosen_line) != line):
-            raise NflPaperError("NFL_PICK_LINE_DIFFERS_FROM_CAPTURE")
+        if chosen_line is not None:
+            try:
+                model_line = float(chosen_line)
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise NflPaperError("NFL_PICK_LINE_INVALID") from exc
+            if isinstance(chosen_line, bool) or not math.isfinite(model_line):
+                raise NflPaperError("NFL_PICK_LINE_INVALID")
+            if line is None or model_line != line:
+                raise NflPaperError("NFL_PICK_LINE_DIFFERS_FROM_CAPTURE")
         subject = str(matched.get("player") or matched.get("team") or "")
         picks.append(dict(
             pick=_key(ticket.away, ticket.home, market, subject, selection, line),
@@ -203,8 +220,8 @@ def grade_nfl_issue(snapshots: list[dict], final: dict) -> list[dict]:
         raise NflPaperError("NFL_FINAL_RECEIPT_REQUIRED")
     _time(final["fetched_at"])
     away_points, home_points = final.get("away_points"), final.get("home_points")
-    if any(type(x) not in (int, float) or x < 0 or x != int(x)
-           for x in (away_points, home_points)):
+    if any(type(x) not in (int, float) or not math.isfinite(x)
+           or x < 0 or x != int(x) for x in (away_points, home_points)):
         raise NflPaperError("NFL_FINAL_SCORES_INVALID")
     rows, seen = [], set()
     for snap in snapshots:
