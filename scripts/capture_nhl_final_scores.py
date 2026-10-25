@@ -41,7 +41,7 @@ COMPLETED_STATES = {"OFF", "FINAL"}
 
 def _checked_date(value: str) -> str:
     """Strict API date and path-component contract; no filesystem traversal."""
-    if not isinstance(value, str) or not re.fullmatch(r"\\d{4}-\\d{2}-\\d{2}", value):
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
         raise ValueError("NHL_FINALS_DATE_INVALID")
     try:
         if calendar_date.fromisoformat(value).isoformat() != value:
