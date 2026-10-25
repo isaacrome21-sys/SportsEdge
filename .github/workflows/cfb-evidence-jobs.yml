@@ -1,0 +1,98 @@
+name: cfb-evidence-jobs
+
+on:
+  schedule:
+    # Best effort near kickoff: delayed runners never manufacture a close.
+    - cron: '*/5 * * * *'
+    - cron: '0 12 * * 0'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'CFB evidence job'
+        type: choice
+        options: [close, weekend]
+        default: close
+
+permissions:
+  contents: write
+  pull-requests: write
+
+# Same quota lock as the existing paid collector. Reserve remains unchanged.
+concurrency:
+  group: sportsedge-paid-odds-api
+  cancel-in-progress: false
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: .
+      GH_TOKEN: ${{ github.token }}
+      SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+      SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+      SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+      SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Read previous unmerged evidence
+        run: |
+          set -euo pipefail
+          branch=automation/cfb-evidence-ledger
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            git fetch origin "$branch"
+            echo "EVIDENCE_EXPECTED=$(git rev-parse FETCH_HEAD)" >> "$GITHUB_ENV"
+            # Keep current main code while retaining evidence pending review.
+            for path in ledger/cfb_closes ledger/cfb_finals ledger/cfb_probation_graded; do
+              if git cat-file -e "FETCH_HEAD:$path" 2>/dev/null; then
+                git restore --source=FETCH_HEAD --worktree -- "$path"
+              fi
+            done
+          fi
+      - name: Capture or grade
+        env:
+          MODE: ${{ inputs.mode }}
+          CRON: ${{ github.event.schedule }}
+        run: |
+          set -euo pipefail
+          if [ "$CRON" = '0 12 * * 0' ] || [ "$MODE" = weekend ]; then
+            python scripts/cfb_evidence_jobs.py weekend --output "ledger/cfb_probation_graded/run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"
+          else
+            python scripts/cfb_evidence_jobs.py close --output ledger/cfb_closes
+          fi
+      - name: Persist evidence through review PR
+        run: |
+          set -euo pipefail
+          for path in ledger/cfb_closes ledger/cfb_finals ledger/cfb_probation_graded; do
+            if [ -d "$path" ]; then git add -- "$path"; fi
+          done
+          git diff --cached --quiet && exit 0
+          branch=automation/cfb-evidence-ledger
+          expected=${EVIDENCE_EXPECTED:-}
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'CFB: save pre-start boards and final-score grades'
+          pushed=false
+          for attempt in 1 2 3; do
+            if git push --force-with-lease="refs/heads/$branch:$expected" origin "HEAD:refs/heads/$branch"; then pushed=true; break; fi
+            sleep 3
+          done
+          [ "$pushed" = true ] || exit 1
+          existing=$(gh pr list --state open --head "$branch" --json number --jq '.[0].number // empty')
+          if [ -z "$existing" ]; then
+            gh pr create --base main --head "$branch" --title 'CFB: captured close boards and weekend grades' --body 'Paper evidence only. No promotion or entry-price changes. Review and merge manually.'
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: cfb-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ledger/cfb_closes/
+            ledger/cfb_finals/
+            ledger/cfb_probation_graded/
+          if-no-files-found: ignore
