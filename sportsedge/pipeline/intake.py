@@ -204,6 +204,10 @@ def _parse_market(line: str, game: SharedGame, adapter: SportAdapter, warnings: 
         return _unknown(line, n, sport, warnings, strict)
     if spec.subject is not None and not subject:
         raise SharedIntakeError(f"{sport}_INTAKE_SUBJECT_MISSING:{line}")
+    if subject and (";" in subject or any(_numeric(w) for w in subject.split())):
+        # Several players/teams packed on one line ("A 225.5 -113/-111; B 216.5 ...")
+        # would otherwise fold A's quote into B's name and keep only B's prices.
+        raise SharedIntakeError(f"{sport}_INTAKE_SUBJECT_MALFORMED:{line}")
     first = american(prices[0], line, sport)
     second = american(prices[1], line, sport)
     if spec.swap:
