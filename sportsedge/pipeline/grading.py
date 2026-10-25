@@ -51,7 +51,10 @@ def _cmp(value: float, line: float, positive: str) -> str:
 
 
 def grade(pick: PickRecord | Mapping, result: FinalResult, *, family: str) -> str:
-    sel = (pick.selection if isinstance(pick, PickRecord) else pick["selection"]).upper()
+    raw_selection = pick.selection if isinstance(pick, PickRecord) else pick.get("selection")
+    if not isinstance(raw_selection, str) or not raw_selection:
+        raise GradeError(f"GRADE_SELECTION_INVALID:{raw_selection!r}")
+    sel = raw_selection.upper()
     line = pick.line if isinstance(pick, PickRecord) else pick.get("line")
     if family in {"moneyline", "spread"}:
         if result.away_score is None or result.home_score is None:
@@ -82,17 +85,26 @@ def grade(pick: PickRecord | Mapping, result: FinalResult, *, family: str) -> st
             raise GradeError("GRADE_STAT_OR_LINE_MISSING")
         return _cmp(_real(result.stat, "STAT"), _real(line, "LINE"), sel)
     if family == "yes_no":
-        if line is not None and result.stat is not None:
-            if sel not in {"YES", "NO", "OVER", "UNDER"}:
-                raise GradeError(f"GRADE_SELECTION_INVALID:{sel}")
-            direction = "OVER" if sel in {"YES", "OVER"} else "UNDER"
-            return _cmp(_real(result.stat, "STAT"), _real(line, "LINE"), direction)
-        if result.occurred is None:
-            raise GradeError("GRADE_OCCURRED_MISSING")
         if sel not in {"YES", "NO", "OVER", "UNDER"}:
             raise GradeError(f"GRADE_SELECTION_INVALID:{sel}")
-        if not isinstance(result.occurred, bool):
+        # Validate every supplied result field even when the other path settles.
+        if result.occurred is not None and not isinstance(result.occurred, bool):
             raise GradeError("GRADE_OCCURRED_INVALID")
+        if result.stat is not None and line is not None:
+            stat = _real(result.stat, "STAT")
+            threshold = _real(line, "LINE")
+            if result.occurred is not None:
+                # Numeric and boolean finals must agree. A numeric push has no
+                # equivalent in a binary occurred flag, so refuse ambiguity.
+                if abs(stat - threshold) < _EPS or (stat > threshold) != result.occurred:
+                    raise GradeError("GRADE_BINARY_FINAL_CONFLICT")
+            direction = "OVER" if sel in {"YES", "OVER"} else "UNDER"
+            return _cmp(stat, threshold, direction)
+        if result.occurred is None:
+            raise GradeError("GRADE_OCCURRED_MISSING")
+        if result.stat is not None:
+            # Without a line, the numeric field cannot corroborate the flag.
+            raise GradeError("GRADE_BINARY_FINAL_UNCOMPARABLE")
         return WIN if result.occurred == (sel in {"YES", "OVER"}) else LOSS
     raise GradeError(f"GRADE_FAMILY_UNKNOWN:{family}")
 
