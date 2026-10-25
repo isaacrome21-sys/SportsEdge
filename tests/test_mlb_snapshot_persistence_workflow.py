@@ -1,4 +1,5 @@
 """MLB issue workflow evidence persistence contract; network-free."""
+import json
 from pathlib import Path
 
 from scripts.record_line_snapshot import main as record_snapshot
@@ -14,17 +15,22 @@ Total 7.5 -110 -110
 TITLE = "[MLB LINES] TB Rays @ MIL Brewers"
 
 
-def _run(tmp_path, body, *, card_price=-120):
+def _run(tmp_path, body, *, card_price=-120, bound=None):
     body_file = tmp_path / "body.txt"
     card_file = tmp_path / "card.md"
     body_file.write_text(body, encoding="utf-8")
     card_file.write_text(card(1, [("Moneyline Home", card_price, "ACTIONABLE")]), encoding="utf-8")
-    return record_snapshot([
+    args = [
         "--sport", "mlb", "--issue", "123456",
         "--body-file", str(body_file), "--title", TITLE,
         "--card-md", str(card_file), "--require-card-quote-match",
         "--root", str(tmp_path / "ledger"),
-    ])
+    ]
+    if bound is not None:
+        input_file = tmp_path / "bound.json"
+        input_file.write_text(json.dumps(bound), encoding="utf-8")
+        args.extend(["--bound-input-json", str(input_file)])
+    return record_snapshot(args)
 
 
 def test_real_captured_mlb_board_and_pick_append_once(tmp_path):
@@ -61,6 +67,28 @@ def test_missing_captured_never_emits_evidence(tmp_path):
     assert load_snapshots("mlb", 123456, tmp_path / "ledger") == []
 
 
+def _bound(*, pk=1, captured="2026-10-24T15:00:00-05:00",
+           first_pitch="2099-01-01T00:00:00+00:00"):
+    return {"captured_at": captured, "rows": [{
+        "game_pk": pk, "book": "draftkings",
+        "first_pitch_at": first_pitch,
+    }]}
+
+
+def test_bound_mlb_game_identity_and_clock_are_persisted(tmp_path):
+    assert _run(tmp_path, BODY, bound=_bound()) == 0
+    row = load_snapshots("mlb", 123456, tmp_path / "ledger")[0]
+    assert row["game"]["game_pk"] == 1
+    assert row["game"]["first_pitch_at"] == "2099-01-01T00:00:00+00:00"
+
+
+def test_wrong_card_game_or_schedule_capture_refused(tmp_path):
+    assert _run(tmp_path, BODY, bound=_bound(pk=2)) == 2
+    assert _run(tmp_path, BODY, bound=_bound(captured="2026-10-24T16:00:00-05:00")) == 2
+    assert _run(tmp_path, BODY, bound=_bound(first_pitch="2020-01-01T00:00:00+00:00")) == 2
+    assert load_snapshots("mlb", 123456, tmp_path / "ledger") == []
+
+
 def test_workflow_writes_only_isolated_review_branch():
     workflow = Path(".github/workflows/mlb-lines-issue.yml").read_text(encoding="utf-8")
     assert "contents: write" in workflow
@@ -69,6 +97,7 @@ def test_workflow_writes_only_isolated_review_branch():
     assert "--body-file issue_body.txt" in workflow
     assert "--card-md artifacts/mlb_myspari_ctx/card.md" in workflow
     assert "--require-card-quote-match" in workflow
+    assert "--bound-input-json" in workflow
     assert 'branch="automation/mlb-paper-snapshots-issue-$ISSUE"' in workflow
     assert "gh pr create --draft --base main --head" in workflow
     assert 'git push origin "HEAD:refs/heads/$branch"' in workflow
