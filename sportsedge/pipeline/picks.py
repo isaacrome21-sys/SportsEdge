@@ -50,9 +50,26 @@ class PickRecord:
     game: str = ""            # "Away @ Home"
     subject: str | None = None
     opposite_price: int | None = None   # paired side at capture (for no-vig CLV)
+    span_seconds: float | None = None
+    capture_method: str | None = None
+    span_tier: str | None = None
     schema: str = SCHEMA
 
     def __post_init__(self) -> None:
+        if self.capture_method is not None and self.capture_method not in ("PRIMARY_BROWSER", "FALLBACK"):
+            raise PickRecordError("PICK_CAPTURE_METHOD_INVALID")
+        if self.span_seconds is None:
+            if self.span_tier is not None:
+                raise PickRecordError("PICK_SPAN_REQUIRED")
+        else:
+            if not _finite_real(self.span_seconds) or not 0 <= self.span_seconds <= 300:
+                raise PickRecordError("PICK_SPAN_INVALID")
+            tier = "FULL" if self.span_seconds <= 150 else "RESEARCH"
+            if self.span_tier is not None and self.span_tier != tier:
+                raise PickRecordError("PICK_SPAN_TIER_MISMATCH")
+            object.__setattr__(self, "span_tier", tier)
+            if tier == "RESEARCH" and self.ladder_status != "PAPER":
+                raise PickRecordError("PICK_RESEARCH_SPAN_REQUIRES_PAPER")
         if self.sport not in SPORTS:
             raise PickRecordError(f"PICK_SPORT_INVALID:{self.sport}")
         if not self.market or not self.selection:
