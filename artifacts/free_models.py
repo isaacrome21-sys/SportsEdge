@@ -1294,12 +1294,13 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
     # ---- Lane B (anchored): Lane A means shrunk ANCHOR_WEIGHT toward the
     # posted market line/total. 15% is an unfitted RESEARCH prior, not a
     # learned edge; it must prove itself out-of-sample or be removed. ----
-    anchor = {"status": "MARKET_ANCHORED_UNVALIDATED", "weight": ANCHOR_WEIGHT,
+    anchor_weight = 0.0 if sport == "CFB" else ANCHOR_WEIGHT
+    anchor = {"status": "MARKET_ANCHORED_UNVALIDATED", "weight": anchor_weight,
               "hypothesis": "UNVALIDATED_OUT_OF_SAMPLE_REQUIRED"}
     b_home_mean, b_away_mean = home_mean, away_mean
     lane_b_blocked = None
     if market == "TOTAL":
-        anchored_total = line + ANCHOR_WEIGHT * (raw_total - line)
+        anchored_total = line + anchor_weight * (raw_total - line)
         shift = (anchored_total - raw_total) / 2
         b_home_mean += shift
         b_away_mean += shift
@@ -1313,7 +1314,7 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
     elif market == "SPREAD":
         market_home_margin = -line if side == "HOME" else line
         anchored_margin = (market_home_margin
-                           + ANCHOR_WEIGHT * (raw_margin - market_home_margin))
+                           + anchor_weight * (raw_margin - market_home_margin))
         shift = (anchored_margin - raw_margin) / 2
         b_home_mean += shift
         b_away_mean -= shift
@@ -1336,7 +1337,7 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
         team_totals_team=team_totals_team)
         if market == "ML":
             b_win = bounded(anchor["market_no_vig_p"]
-                            + ANCHOR_WEIGHT * (b_win - anchor["market_no_vig_p"]),
+                            + anchor_weight * (b_win - anchor["market_no_vig_p"]),
                             0, 1)
         lane_b = _lane_view(
             LANE_B, b_win, b_push, b_home_mean, b_away_mean, dec,
