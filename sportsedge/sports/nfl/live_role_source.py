@@ -47,6 +47,11 @@ def _utc(value: Any, field: str) -> datetime:
     return out.astimezone(timezone.utc)
 
 
+# Yardage legitimately goes negative in a single game (sacks, tackles for
+# loss, negative-yard catches). Counts (attempts, carries, TDs...) cannot.
+SIGNED_FIELDS = frozenset({"passing_yards", "rushing_yards", "receiving_yards"})
+
+
 def _number(value: Any, field: str) -> float:
     if value in (None, ""):
         return 0.0
@@ -56,7 +61,9 @@ def _number(value: Any, field: str) -> float:
         out = float(value)
     except (TypeError, ValueError) as exc:
         raise NFLContextError(f"{field} numeric required") from exc
-    if not isfinite(out) or out < 0:
+    if not isfinite(out):
+        raise NFLContextError(f"{field} finite required")
+    if out < 0 and field not in SIGNED_FIELDS:
         raise NFLContextError(f"{field} nonnegative finite required")
     return out
 
@@ -231,7 +238,11 @@ def _weighted_rate(
 ) -> float:
     num = sum(w * _number(row.get(numerator), numerator) for w, row in weighted)
     den = sum(w * _number(row.get(denominator), denominator) for w, row in weighted)
-    return num / den if den > 0 else 0.0
+    if den <= 0:
+        return 0.0
+    # A negative weighted yards-per rate is only possible on tiny samples;
+    # the role model needs a nonnegative rate, so floor it at zero.
+    return max(0.0, num / den)
 
 
 def _role_from_history(
