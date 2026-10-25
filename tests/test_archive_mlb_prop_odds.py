@@ -110,6 +110,8 @@ class ArchiveMLBPropOddsTests(unittest.TestCase):
             "captured_at": "2026-08-24T00:00:00+00:00",
             "payload_sha256": "a" * 64,
             "pit_target_quote_count": 1,
+            "native_two_sided_pair_count": 0,
+            "native_paired_quote_row_count": 0,
             "market_counts": {market: 0 for market in sorted(mod.TARGET_MARKETS)},
         }
         with tempfile.TemporaryDirectory() as td:
@@ -118,6 +120,9 @@ class ArchiveMLBPropOddsTests(unittest.TestCase):
             self.assertTrue(latest.exists())
             self.assertNotEqual(immutable, latest)
             self.assertIn("2026-08-24", str(immutable))
+            pointer = json.loads(latest.read_text(encoding="utf-8"))
+            self.assertEqual(pointer["native_two_sided_pair_count"], 0)
+            self.assertEqual(pointer["native_paired_quote_row_count"], 0)
 
     def test_build_archive_accepts_strictly_pregame_quote_and_preserves_identity_raw_material(self):
         snap = _snapshot(retrieved_at="2026-08-24T00:00:00Z", market="HITS")
