@@ -248,8 +248,14 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
                     why = "price-only edge; the model total points the other way"
                 else:
                     why = "under the research EV/edge floors"
-                text = (f"- **{status}** {label}: best side {best.get('selection')} research EV {ev * 100:+.1f}%"
-                        f" · no lean ({why})")
+                if ev > 0:
+                    text = (f"- **POSITIVE EV — PAPER** {label}: {best.get('selection')}"
+                            f" @ {fmt_price(best.get('price_american'))}"
+                            f" · estimated EV {ev * 100:+.2f}%"
+                            f" · model warning: {why} (NOT proven, not a bet)")
+                else:
+                    text = (f"- **{status}** {label}: best side {best.get('selection')} research EV {ev * 100:+.1f}%"
+                            f" · no lean ({why})")
             ranked.append((ev, text))
         per_game.append((game, team_totals, props))
     if ranked or unpriced:
