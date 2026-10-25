@@ -325,6 +325,20 @@ def test_player_stats_fetch_keeps_exact_byte_receipts():
     }]
 
 
+def build_signed(**overrides):
+    """V2 research parser only; the frozen live entry point is unchanged."""
+    from sportsedge.sports.nfl.live_role_source_v2_signed import build_live_team_model
+    kwargs = dict(
+        team="CHI", target_season=2026, target_week=4,
+        kickoff="2026-10-04T17:00:00Z",
+        observed_at="2026-10-01T18:00:00Z",
+        depth_rows=depth_rows(), player_rows=player_rows(),
+        lookback_games=8, decay=0.85,
+    )
+    kwargs.update(overrides)
+    return build_live_team_model(**kwargs)
+
+
 def test_negative_weekly_rushing_yards_in_role_history():
     """A legal minus-yard game must not reject the entire PIT player pool."""
     rows = player_rows()
@@ -332,7 +346,7 @@ def test_negative_weekly_rushing_yards_in_role_history():
         if row["player_id"] == "qb1" and row["week"] == 1:
             row["rushing_yards"] = -6
     baseline = build(decay=1.0)
-    actual = build(player_rows=rows, decay=1.0)
+    actual = build_signed(player_rows=rows, decay=1.0)
     rate = actual["qb"]["role_prior"]["rush_yards_per_attempt"]
     assert rate == pytest.approx((-6 + 26 + 30) / (5 + 6 + 7))
     assert rate < baseline["qb"]["role_prior"]["rush_yards_per_attempt"]
@@ -345,7 +359,7 @@ def test_signed_weekly_receiving_yards_in_residual_team_role():
     for row in rows:
         if row["player_id"] == "x1" and row["week"] == 1:
             row["receiving_yards"] = -3
-    actual = build(player_rows=rows, decay=1.0)
+    actual = build_signed(player_rows=rows, decay=1.0)
     other = {row["player"]: row for row in actual["skill_players"]}["CHI_OTHER"]
     # Other players x1 and x2 own 3 receptions in week 1, plus 3 each
     # in weeks 2 and 3. Their total receiving yards are 6, 27, 27.
@@ -355,7 +369,7 @@ def test_signed_weekly_receiving_yards_in_residual_team_role():
 
 
 def test_negative_counts_and_nonfinite_yards_remain_blocked():
-    from sportsedge.sports.nfl.live_role_source import _number
+    from sportsedge.sports.nfl.live_role_source_v2_signed import _number
 
     for field in ("attempts", "completions", "carries", "targets",
                   "receptions", "passing_tds", "rushing_tds",
