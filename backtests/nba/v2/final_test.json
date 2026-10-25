@@ -1,0 +1,28 @@
+{
+  "attempt": "A4_full_open_anchor",
+  "season": 2021,
+  "fit": {
+    "margin_beta": [0.2772, 0.1176, 0.0641, -0.4033, -0.3192, 0.0058, -0.2066, -2.7333, 0.8587],
+    "margin_sd": 12.341,
+    "total_beta": [7.3098, 0.1529, -0.2981, -0.0767, 0.1067, -1.7252, 0.8167],
+    "total_sd": 17.854,
+    "n_train": 10667,
+    "margin_cols": ["matchup_margin", "rest_diff", "b2b_diff", "three4_diff", "travel_diff", "miss_val_diff", "miss_min_diff", "-open_spread"],
+    "total_cols": ["matchup_total", "b2b_sum", "travel_sum", "miss_val_sum", "miss_min_sum", "open_total"]
+  },
+  "leakage_check": {
+    "rating_input_date_violations": 0,
+    "scramble_checked": 44,
+    "scramble_violations": 0,
+    "availability_rule": "same-day inputs limited to DND/NWT inactive codes and dressed list; DNP-coach/in-game injury treated as available"
+  },
+  "sbr_sha": "f5ba0d4f8f729236fdd8883a65189f2d6443338c",
+  "box_commit": "a5f108b5b1f08074d78b9e8e901926a9ce4c06c5",
+  "joined_games": 13717,
+  "sbr_games": 13893,
+  "markets": {
+    "moneyline": {"n": 1140, "brier_model": 0.20927579396018278, "brier_close_novig": 0.20793127754794763, "logloss_model": 0.6064440917692362, "logloss_close_novig": 0.6028279448763376, "calibration_model": {"slope": 1.0726969940946445, "intercept": -0.10258232552704619, "ece": 0.0215843364183372}, "calibration_close_novig": {"slope": 1.0096953610917996, "intercept": -0.10159834892558692, "ece": 0.02647142960383507}, "bets_ev_ge_2pct": 665, "roi_at_logged_price": 0.02830169930638318, "mean_clv": null, "clv_n": 0, "verdict": "LOSES_TO_CLOSE"},
+    "spread": {"n": 1014, "brier_model": 0.2529290944667654, "brier_close_novig": 0.25, "logloss_model": 0.6991299182863822, "logloss_close_novig": 0.6931471805599454, "calibration_model": {"slope": -0.06418048561812258, "intercept": -0.07561098317954944, "ece": 0.034087814627809916}, "bets_ev_ge_2pct": 158, "roi_at_logged_price": 0.19102416570771005, "mean_clv": 0.061246824614668696, "clv_n": 158, "verdict": "LOSES_TO_CLOSE"},
+    "total": {"n": 1017, "brier_model": 0.2579661921100618, "brier_close_novig": 0.25, "logloss_model": 0.7094715587368717, "logloss_close_novig": 0.6931471805599453, "calibration_model": {"slope": -0.26722370463648676, "intercept": 0.0453107965201315, "ece": 0.08836814029113191}, "bets_ev_ge_2pct": 65, "roi_at_logged_price": -0.0013986013986013563, "mean_clv": 0.06570528329275044, "clv_n": 65, "verdict": "LOSES_TO_CLOSE"}
+  }
+}

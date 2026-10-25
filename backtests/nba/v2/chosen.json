@@ -1,0 +1,1 @@
+{"attempt":"A4_full_open_anchor","rule":"min mean validation (logloss_model - logloss_close) over ML/spread/total","val_mean_gap":{"A1":0.0246,"A2":0.0244,"A3":0.0206,"A4":0.0055,"A5":0.0059},"chosen_before_final_test":true}
