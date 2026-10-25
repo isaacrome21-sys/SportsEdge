@@ -1,0 +1,6 @@
+{"american": -115, "captured_at": "2026-10-25T12:01:09-05:00", "event_id": "NBA:2026-10-25:ORL@NYK", "issue": 2621, "line": 7.5, "market": "SPREAD", "other_american": -105, "side": "AWAY", "source": "DK_ISSUE"}
+{"american": -105, "captured_at": "2026-10-25T12:01:09-05:00", "event_id": "NBA:2026-10-25:ORL@NYK", "issue": 2621, "line": -7.5, "market": "SPREAD", "other_american": -115, "side": "HOME", "source": "DK_ISSUE"}
+{"american": -105, "captured_at": "2026-10-25T12:01:09-05:00", "event_id": "NBA:2026-10-25:ORL@NYK", "issue": 2621, "line": 224.5, "market": "TOTAL", "other_american": -115, "side": "OVER", "source": "DK_ISSUE"}
+{"american": -115, "captured_at": "2026-10-25T12:01:09-05:00", "event_id": "NBA:2026-10-25:ORL@NYK", "issue": 2621, "line": 224.5, "market": "TOTAL", "other_american": -105, "side": "UNDER", "source": "DK_ISSUE"}
+{"american": 230, "captured_at": "2026-10-25T12:01:09-05:00", "event_id": "NBA:2026-10-25:ORL@NYK", "issue": 2621, "line": null, "market": "MONEYLINE", "other_american": -285, "side": "AWAY", "source": "DK_ISSUE"}
+{"american": -285, "captured_at": "2026-10-25T12:01:09-05:00", "event_id": "NBA:2026-10-25:ORL@NYK", "issue": 2621, "line": null, "market": "MONEYLINE", "other_american": 230, "side": "HOME", "source": "DK_ISSUE"}
