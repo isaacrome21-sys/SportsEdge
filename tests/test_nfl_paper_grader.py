@@ -295,3 +295,12 @@ def test_rehashed_changed_close_line_refuses_instead_of_counting_clv(tmp_path):
     close["content_sha256"] = _content_hash(close)
     with pytest.raises(NflPaperError, match="NFL_SNAPSHOT_BOARD_MISMATCH"):
         grade_nfl_issue([entry, close], FINAL)
+
+
+def test_rehashed_pick_subject_and_matching_forged_id_still_refused(tmp_path):
+    snap = stage(tmp_path)
+    snap["picks"][0]["subject"] = "Forged Person"
+    snap["picks"][0]["pick"] = "KC@BAL|moneyline|Forged Person|HOME|"
+    snap["content_sha256"] = _content_hash(snap)
+    with pytest.raises(NflPaperError, match="NFL_SNAPSHOT_PICK_SUBJECT_MISMATCH"):
+        grade_nfl_issue([snap], FINAL)
