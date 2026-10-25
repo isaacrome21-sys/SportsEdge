@@ -43,6 +43,6 @@ def test_intact_digest_wrong_ledger_or_schema_refused(tmp_path, change):
     record.update(change)
     path = tmp_path / "nfl" / "991001.jsonl"
     path.parent.mkdir(parents=True)
-    path.write_text(json.dumps(record) + "\\n")
+    path.write_text(json.dumps(record) + "\n")
     with pytest.raises(SnapshotError, match="SNAPSHOT_IDENTITY_MISMATCH"):
         load_snapshots("nfl", 991001, root=tmp_path)
