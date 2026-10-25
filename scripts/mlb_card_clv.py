@@ -21,7 +21,7 @@ import csv
 import re
 import unicodedata
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -201,9 +201,8 @@ def compute_clv(
     entry_body = str(entry_issue.get("body") or "")
     entry_rows = issue_quotes(entry_body, entry_issue.get("title"))
     entry_at = parse_captured_at(entry_body)
-    if entry_at is None and entry_issue.get("created_at"):
-        entry_at = datetime.fromisoformat(str(entry_issue["created_at"]).replace("Z", "+00:00"))
 
+    now = datetime.now(timezone.utc)
     closes: list[tuple[datetime, int, list[ParsedRow]]] = []
     for other in other_issues:
         number = int(other.get("number") or 0)
@@ -211,7 +210,7 @@ def compute_clv(
             continue
         body = str(other.get("body") or "")
         captured = parse_captured_at(body)
-        if captured is None or first_pitch is None or captured >= first_pitch:
+        if captured is None or first_pitch is None or captured >= first_pitch or captured > now:
             continue
         if entry_at is not None and captured <= entry_at:
             continue
@@ -228,6 +227,10 @@ def compute_clv(
             status=pick.status, price=f"{pick.price:+d}",
             entry_captured_at=entry_at.isoformat() if entry_at else "",
         )
+        if entry_at is None or entry_at > now or (first_pitch is not None and entry_at >= first_pitch):
+            record["clv_status"] = "NO_ENTRY_CAPTURE"
+            out.append(record)
+            continue
         key = pick_key(pick.pick, names)
         if key is None:
             record["clv_status"] = "UNMAPPED_MARKET"
