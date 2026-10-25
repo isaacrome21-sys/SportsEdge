@@ -25,6 +25,7 @@ def _snapshot(*, retrieved_at: str, market: str = "PITCHER_OUTS"):
         quotes=(
             {
                 "provider_event_id": "123",
+                "provider_offer_id": "offer-123",
                 "market": market,
                 "entity_name": "Player A",
                 "entity_name_normalized": "playera",
@@ -225,6 +226,8 @@ class ArchiveMLBPropOddsTests(unittest.TestCase):
         changes = (
             {"side": "OVER"},
             {"provider_event_id": "another-event"},
+            {"provider_offer_id": "another-offer"},
+            {"provider_offer_id": None},
             {"market": "PITCHER_K"},
             {"entity_name_normalized": "another-pitcher"},
             {"line": 18.5},
@@ -250,6 +253,61 @@ class ArchiveMLBPropOddsTests(unittest.TestCase):
         rows = [dict(base), dict(base), dict(base, side="UNDER", american_odds=-112)]
         self.assertEqual(mod._annotate_native_pairs(rows), 0)
         self.assertTrue(all(r["native_quote_pair_state"] == "UNPAIRED_OR_AMBIGUOUS" for r in rows))
+
+
+    def test_provider_native_pair_refuses_cross_offer_even_when_every_other_field_matches(self):
+        base = dict(_snapshot(retrieved_at="2026-08-24T00:00:00Z").quotes[0])
+        base["quote_retrieved_at"] = "2026-08-24T00:00:00+00:00"
+        over = dict(base, provider_offer_id="offer-A")
+        under = dict(base, side="UNDER", american_odds=-115, provider_offer_id="offer-B")
+        rows = [over, under]
+        self.assertEqual(mod._annotate_native_pairs(rows), 0)
+        self.assertTrue(all(r["native_quote_pair_state"] == "UNPAIRED_OR_AMBIGUOUS" for r in rows))
+        under["provider_offer_id"] = "offer-A"
+        self.assertEqual(mod._annotate_native_pairs(rows), 1)
+        self.assertTrue(all(r["native_quote_pair_state"] == "PAIRED_PROVIDER_NATIVE_ONLY" for r in rows))
+        over["provider_offer_id"] = None
+        under["provider_offer_id"] = None
+        self.assertEqual(mod._annotate_native_pairs(rows), 0)
+
+    def test_direct_v1_and_v5_parsers_preserve_real_offer_ids_not_inferred_counterparts(self):
+        from sportsedge.draftkings_prop_source import parse_category_payload, _parse_v5_eventgroup
+        now = datetime(2026, 8, 24, 0, 0, tzinfo=timezone.utc)
+        selection = {
+            "eventId": "123", "participants": [{"name": "Player A"}],
+            "label": "Over", "points": 6.5, "displayOdds": "-110",
+        }
+        v1 = parse_category_payload(
+            {"markets": [{"id": "v1-market-A", "name": "pitcher strikeouts", "eventId": "123"}],
+             "selections": [dict(selection, marketId="v1-market-A")]},
+            event_id=123, retrieved_at=now,
+        )
+        self.assertEqual(len(v1.quotes), 1, v1.failures)
+        self.assertEqual(v1.quotes[0]["provider_offer_id"], "v1-market-A")
+        v5 = _parse_v5_eventgroup(
+            {"eventGroup": {"offerCategories": [
+                {"offerSubcategoryDescriptors": [
+                    {"name": "pitcher strikeouts", "offerSubcategory": {
+                        "offers": [[{"id": "v5-offer-B", "label": "pitcher strikeouts",
+                                     "eventId": "123", "outcomes": [selection]}]]
+                    }}
+                ]}
+            ]}}, retrieved_at=now,
+        )
+        self.assertEqual(len(v5.quotes), 1, v5.failures)
+        self.assertEqual(v5.quotes[0]["provider_offer_id"], "v5-offer-B")
+        no_id = _parse_v5_eventgroup(
+            {"eventGroup": {"offerCategories": [
+                {"offerSubcategoryDescriptors": [
+                    {"name": "pitcher strikeouts", "offerSubcategory": {
+                        "offers": [[{"label": "pitcher strikeouts", "eventId": "123",
+                                     "outcomes": [selection]}]]
+                    }}
+                ]}
+            ]}}, retrieved_at=now,
+        )
+        self.assertEqual(len(no_id.quotes), 1, no_id.failures)
+        self.assertIsNone(no_id.quotes[0]["provider_offer_id"])
 
 
 if __name__ == "__main__":
