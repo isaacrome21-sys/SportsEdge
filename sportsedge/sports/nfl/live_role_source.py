@@ -31,6 +31,10 @@ COUNT_FIELDS = (
 DEFAULT_LOOKBACK_GAMES = 8
 DEFAULT_DECAY = 0.85
 
+# A real NFL weekly stat can contain negative yardage (notably rushing loss).
+# Volumes, scores and all other fields remain strictly nonnegative.
+SIGNED_YARD_FIELDS = frozenset({"passing_yards", "rushing_yards", "receiving_yards"})
+
 
 def _team(value: Any) -> str:
     raw = str(value or "").strip().upper()
@@ -56,7 +60,9 @@ def _number(value: Any, field: str) -> float:
         out = float(value)
     except (TypeError, ValueError) as exc:
         raise NFLContextError(f"{field} numeric required") from exc
-    if not isfinite(out) or out < 0:
+    if not isfinite(out):
+        raise NFLContextError(f"{field} finite required")
+    if out < 0 and field not in SIGNED_YARD_FIELDS:
         raise NFLContextError(f"{field} nonnegative finite required")
     return out
 
