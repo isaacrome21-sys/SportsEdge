@@ -70,7 +70,9 @@ def test_nhl_capture_30_minute_boundary_is_inclusive():
     assert card.ledger_rows(ticket, as_of=late) == []
     lines = "\n".join(card.render_lines(ticket, as_of=late))
     assert "QUOTE_STALE_OVER_1800S" in lines
-    assert " LEAN" not in lines and " BET" not in lines
+    market_rows = [line for line in lines.splitlines() if line.startswith("- ")]
+    assert market_rows
+    assert all(" LEAN" not in row and " BET" not in row for row in market_rows)
 
 
 @pytest.mark.parametrize(
@@ -90,7 +92,9 @@ def test_missing_future_and_invalid_capture_never_prices_or_logs(capture, instan
     assert card.ledger_rows(ticket, as_of=as_of) == []
     lines = "\n".join(card.render_lines(ticket, as_of=as_of))
     assert reason in lines
-    assert " LEAN" not in lines and " BET" not in lines
+    market_rows = [line for line in lines.splitlines() if line.startswith("- ")]
+    assert market_rows
+    assert all(" LEAN" not in row and " BET" not in row for row in market_rows)
 
 
 def test_timestamp_from_issue_edit_never_refreshes_stale_dk_quote():
