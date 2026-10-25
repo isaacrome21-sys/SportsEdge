@@ -219,9 +219,12 @@ def _validate_snapshot(snap: dict) -> None:
             raise NflPaperError("NFL_SNAPSHOT_PICK_PRICE_OR_LINE_MISMATCH")
         # A caller cannot re-key a priced selection by recomputing the
         # unkeyed snapshot digest. Re-derive its canonical identity.
+        expected_subject = str(quote.get("player") or quote.get("team") or "")
+        if pick.get("subject") != expected_subject:
+            raise NflPaperError("NFL_SNAPSHOT_PICK_SUBJECT_MISMATCH")
         expected_key = _key(
             ticket.away, ticket.home, pick["market"],
-            str(pick.get("subject") or ""), side, expected_line,
+            expected_subject, side, expected_line,
         )
         if pick.get("pick") != expected_key:
             raise NflPaperError("NFL_SNAPSHOT_PICK_KEY_MISMATCH")
