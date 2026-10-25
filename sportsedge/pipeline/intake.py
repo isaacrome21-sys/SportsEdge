@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import re
 import shlex
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from math import isfinite
@@ -238,7 +238,14 @@ def _parse_market(line: str, game: SharedGame, adapter: SportAdapter, warnings: 
     if spec.subject == "team" and subject:
         team = adapter.team(subject) if resolve_teams else subject
         if resolve_teams and team not in {game.away, game.home}:
-            raise SharedIntakeError(f"{sport}_INTAKE_TEAM_NOT_IN_GAME:{subject}")
+            # MLB DK issue header may say `MIL Brewers @ TB Rays` while its
+            # two team totals say `MIL` and `TB`. Match *only* a unique exact
+            # fixture prefix; a generic/ambiguous city is not enough.
+            candidates = [name for name in (game.away, game.home)
+                          if sport == "MLB" and name.split()[0].casefold() == subject.casefold()]
+            if len(candidates) != 1:
+                raise SharedIntakeError(f"{sport}_INTAKE_TEAM_NOT_IN_GAME:{subject}")
+            team = candidates[0]
     line_value = _number(number, line, sport) if number is not None else spec.fixed_line
     return SharedMarket(spec.market, spec.family, line_value, spec.sides[0], first,
                         spec.sides[1], second, line, subject=subject, team=team)
@@ -313,6 +320,25 @@ def parse_issue(body: str, sport: str, *, title: str | None = None,
             continue
         if sport == "MLB" and line.casefold().startswith("batter "):
             pitcher_subject = None  # batter ladder must bind its own subjects
+        if sport == "MLB" and line.casefold().startswith("team totals:"):
+            # Source format: `Team Totals: MIL 3.5 +100 -130; TB 3.5 -105 -125`.
+            # Split only these explicitly paired offers; never infer a price.
+            if current is None:
+                raise SharedIntakeError(f"MLB_INTAKE_TEAM_TOTAL_BEFORE_GAME:{line}")
+            sections = [part.strip() for part in line.split(":", 1)[1].split(";")]
+            if len(sections) != 2 or not all(sections):
+                raise SharedIntakeError(f"MLB_INTAKE_TEAM_TOTAL_PAIR_INVALID:{line}")
+            parsed = [
+                _parse_market("TT " + part, current, adapter, warnings, n,
+                              resolve_teams, strict_unknown)
+                for part in sections
+            ]
+            if any(m is None or m.family != "team_total" for m in parsed):
+                raise SharedIntakeError(f"MLB_INTAKE_TEAM_TOTAL_PAIR_INVALID:{line}")
+            if resolve_teams and {m.team for m in parsed} != {current.away, current.home}:
+                raise SharedIntakeError(f"MLB_INTAKE_TEAM_TOTAL_TEAMS_MISMATCH:{line}")
+            current.markets.extend(replace(m, raw=line) for m in parsed)
+            continue
         if current is None:
             title_header = parse_header(title or "")
             if not games and title_header:
