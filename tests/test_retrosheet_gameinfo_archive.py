@@ -104,3 +104,13 @@ def test_default_invocation_has_no_network_or_writes(
     assert main(["--output-dir", str(tmp_path)]) == 0
     assert "DISABLED_REQUIRES_LIVE" in capsys.readouterr().out
     assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("timestamp,reason", [
+    ("2026-10-25T03:00:01", "RECEIPT_TIMESTAMP_MISSING_OFFSET"),
+    ("2026-10-24T22:00:01-05:00", "RECEIPT_TIMESTAMP_NOT_UTC"),
+])
+def test_bad_capture_clock_has_no_write(tmp_path: Path, timestamp: str, reason: str) -> None:
+    with pytest.raises(ValueError, match=reason):
+        archive_zip(tmp_path, _sample_zip(), timestamp)
+    assert not list(tmp_path.iterdir())
