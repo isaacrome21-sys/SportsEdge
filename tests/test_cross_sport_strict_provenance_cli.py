@@ -1,5 +1,6 @@
 """CLI-level regression: strict historical provenance rejects hindsight odds."""
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -26,7 +27,8 @@ def _run(tmp_path, row):
     return subprocess.run(
         [sys.executable, str(SCRIPT), str(source), "--strict-provenance",
          "--output", str(tmp_path / "report.json"), "--bootstrap-reps", "10"],
-        cwd=SCRIPT.parents[1], capture_output=True, text=True, check=False,
+        cwd=SCRIPT.parents[1], env={**os.environ, "PYTHONPATH": str(SCRIPT.parents[1])},
+        capture_output=True, text=True, check=False,
     )
 
 
