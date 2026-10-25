@@ -19,6 +19,7 @@ from typing import Iterable
 from urllib.request import Request, urlopen
 
 from sportsedge.dfs.types import DKPlayer
+from sportsedge.nfl_team_aliases import NflTeamAliasError, resolve_team
 
 SOURCE_URL = "https://www.footballguys.com/percent-rostered-projections"
 MAX_RAW_BYTES = 2_000_000
@@ -129,16 +130,18 @@ def fetch_public_ownership(*, clock=None) -> tuple[dict, bytes]:
 
 
 def match_public_ownership(report: dict, players: Iterable[DKPlayer]) -> dict:
-    """Research join on exact unique name+position only; never guess a DK ID."""
+    """Exact unique player match; DST joins require three-way NFL team agreement."""
     if (report.get("status") != "RESEARCH_ONLY_UNVERIFIED"
             or report.get("schema") != "sportsedge.footballguys_ownership_research.v1"):
         raise PublicOwnershipError("FOOTBALLGUYS_RESEARCH_STATUS_REQUIRED")
     by_key: dict[tuple[str, str], list[DKPlayer]] = {}
+    defenses: list[DKPlayer] = []
     for player in players:
         for position in player.positions:
             by_key.setdefault((position, player.name.casefold()), []).append(player)
         if player.is_defense:
             by_key.setdefault(("DST", player.name.casefold()), []).append(player)
+            defenses.append(player)
     matches, blocked = [], []
     used_ids: set[str] = set()
     for row in report.get("players") or []:
@@ -147,7 +150,25 @@ def match_public_ownership(report: dict, players: Iterable[DKPlayer]) -> dict:
                 or not math.isfinite(value) or not 0 <= value <= 1):
             raise PublicOwnershipError("FOOTBALLGUYS_MATCH_OWNERSHIP_INVALID")
         key = (row["position"], row["name"].casefold())
-        candidates = {p.player_id: p for p in by_key.get(key, [])}
+        if row["position"] == "DST":
+            # Team nicknames in DK's upload ("Vikings") differ from the
+            # Footballguys full name ("Minnesota Vikings"). A single
+            # canonical team must be independently named by all three fields.
+            try:
+                source_team = resolve_team(row["name"])
+            except NflTeamAliasError:
+                source_team = None
+            candidates = {}
+            if source_team is not None:
+                for player in defenses:
+                    try:
+                        if (resolve_team(player.team) == source_team
+                                and resolve_team(player.name) == source_team):
+                            candidates[player.player_id] = player
+                    except NflTeamAliasError:
+                        continue
+        else:
+            candidates = {p.player_id: p for p in by_key.get(key, [])}
         if len(candidates) == 1:
             candidate = next(iter(candidates.values()))
             if candidate.player_id in used_ids:
