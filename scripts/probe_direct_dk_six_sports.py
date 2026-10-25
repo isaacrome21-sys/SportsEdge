@@ -72,7 +72,10 @@ def probe(*, fetcher=fetch_board, clock=lambda: datetime.now(timezone.utc), arch
                 if destination.exists() and destination.read_bytes() != board.raw:
                     raise ValueError("ARCHIVE_CONFLICT")
                 if not destination.exists():
-                    destination.write_bytes(board.raw)
+                    with destination.open("xb") as archive:
+                        archive.write(board.raw)
+                if destination.read_bytes() != board.raw:
+                    raise ValueError("ARCHIVE_VERIFY_FAILED")
                 raw_archive = str(destination)
             result["sports"][sport] = {
                 "raw_archive": raw_archive,
