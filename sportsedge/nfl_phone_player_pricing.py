@@ -102,7 +102,8 @@ def phone_nfl_player_rows(rows, *, now=None, getter=None):
                 "player_id": verified["player_id"],
                 "odds": another.get("odds", another.get("price")),
                 "book": another.get("book") or "draftkings",
-                "quote_captured_at": another.get("quote_captured_at"),
+                "quote_captured_at": (another.get("quote_captured_at")
+                                      or another.get("captured_at")),
             })
         judged = price_three_sport_research([p], quotes, as_of=now_utc)["rows"][0]
         judged["line"] = line
