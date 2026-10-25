@@ -40,7 +40,7 @@ jobs:
         run: git status --porcelain > audit-output/status-after.txt
       - name: Upload audit evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02e
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: full-repo-backtest-inventory-${{ github.run_id }}
           path: audit-output/
