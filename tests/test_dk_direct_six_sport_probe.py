@@ -9,7 +9,7 @@ def test_unverified_sports_never_guess_endpoint():
     def fetch(key):
         calls.append(key)
         return SimpleNamespace(source_uri="https://sportsbook-nash.draftkings.com/test",
-                               received_at=NOW, raw=b"synthetic-direct-dk-board", payload={"events": [], "markets": [{"name": "Total"}, {"name": "Moneyline"}, {"name": "Total"}]})
+                               received_at=NOW, raw=b"synthetic-direct-dk-board", payload={"events": [], "selections": [{"id": 1}, {"id": 2}], "markets": [{"name": "Total"}, {"name": "Moneyline"}, {"name": "Total"}]})
     result = probe(fetcher=fetch, clock=lambda: NOW)
     assert set(result["sports"]) == set(SPORTS)
     assert result["sports"]["NBA"]["status"] == "UNVERIFIED_MAPPING"
@@ -19,6 +19,7 @@ def test_unverified_sports_never_guess_endpoint():
     assert result["sports"]["NFL"]["quote_jurisdiction"] == "UNVERIFIED"
     assert result["sports"]["NFL"]["playable_in_user_jurisdiction"] is False
     assert result["sports"]["NFL"]["quote_timestamp_status"] == "UNVERIFIED"
+    assert result["sports"]["NFL"]["payload_selections"] == 2
     assert result["sports"]["NFL"]["payload_markets"] == 3
     assert result["sports"]["NFL"]["market_counts"] == {"Moneyline": 1, "Total": 2}
     assert result["sports"]["NFL"]["raw_size_bytes"] == len(b"synthetic-direct-dk-board")
