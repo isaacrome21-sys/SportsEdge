@@ -1,0 +1,284 @@
+{
+  "attempt": 3,
+  "bets_ev_ge_2pct": null,
+  "chronological_split_check": "PASS",
+  "clv": null,
+  "code_sha256": "5ea47765a725a753893ffca0e6e8436a03b6ef971cd5157f64d97fb5160dfb60",
+  "leakage_limit": "Same-day scores excluded by batched feature builder; retrospective source vintage and pregame availability not proven. Previously exposed data is not a newly sealed independent test.",
+  "market_verdict": "INSUFFICIENT_DATA",
+  "probability_metrics": null,
+  "production_changed": false,
+  "reason": "Score-only fit; no independently validated probability calibration for refits or authenticated entry/close pairs.",
+  "roi": null,
+  "seasons": [
+    {
+      "latest_season_holdout": false,
+      "margin": {
+        "actual_sd": 14.154442951952346,
+        "alpha": 10.0,
+        "bias": 2.1241725678648855,
+        "mae": 10.302811729401798,
+        "prediction_sd": 4.900323583635932,
+        "training_mean_baseline_mae": 11.148660646041321
+      },
+      "partial_season": false,
+      "season": 2020,
+      "test_n": 264,
+      "total": {
+        "actual_sd": 13.761119137198568,
+        "alpha": 0.1,
+        "bias": -1.3739311423166123,
+        "mae": 10.914651377572442,
+        "prediction_sd": 2.796609016948122,
+        "training_mean_baseline_mae": 11.25576486635858
+      },
+      "train_n": 2577,
+      "train_seasons": [
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019
+      ]
+    },
+    {
+      "latest_season_holdout": false,
+      "margin": {
+        "actual_sd": 15.283947930017472,
+        "alpha": 10.0,
+        "bias": 0.10399258560266765,
+        "mae": 11.15843961323096,
+        "prediction_sd": 5.6546861755539775,
+        "training_mean_baseline_mae": 12.035061783286093
+      },
+      "partial_season": false,
+      "season": 2021,
+      "test_n": 285,
+      "total": {
+        "actual_sd": 13.718438524684782,
+        "alpha": 0.1,
+        "bias": 0.4044248162193295,
+        "mae": 10.994500775040828,
+        "prediction_sd": 2.75752323984462,
+        "training_mean_baseline_mae": 11.069701180088554
+      },
+      "train_n": 2841,
+      "train_seasons": [
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020
+      ]
+    },
+    {
+      "latest_season_holdout": false,
+      "margin": {
+        "actual_sd": 12.397580309089886,
+        "alpha": 10.0,
+        "bias": 0.027254110337151895,
+        "mae": 9.049363685668018,
+        "prediction_sd": 4.527057993991447,
+        "training_mean_baseline_mae": 9.579843745776
+      },
+      "partial_season": false,
+      "season": 2022,
+      "test_n": 284,
+      "total": {
+        "actual_sd": 13.775963296592284,
+        "alpha": 0.1,
+        "bias": 1.0706288460020428,
+        "mae": 10.776213733477343,
+        "prediction_sd": 2.998561330615432,
+        "training_mean_baseline_mae": 11.220756400205456
+      },
+      "train_n": 3126,
+      "train_seasons": [
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021
+      ]
+    },
+    {
+      "latest_season_holdout": false,
+      "margin": {
+        "actual_sd": 14.378871165022018,
+        "alpha": 10.0,
+        "bias": -0.6456679626912648,
+        "mae": 10.48910216502208,
+        "prediction_sd": 4.958347551991836,
+        "training_mean_baseline_mae": 11.083611668467357
+      },
+      "partial_season": false,
+      "season": 2023,
+      "test_n": 285,
+      "total": {
+        "actual_sd": 13.680002051913256,
+        "alpha": 0.1,
+        "bias": 0.6666946663168762,
+        "mae": 10.528474672163807,
+        "prediction_sd": 3.0266658363703836,
+        "training_mean_baseline_mae": 10.958528579513299
+      },
+      "train_n": 3410,
+      "train_seasons": [
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022
+      ]
+    },
+    {
+      "latest_season_holdout": false,
+      "margin": {
+        "actual_sd": 14.442031950438782,
+        "alpha": 10.0,
+        "bias": 0.007583659703560012,
+        "mae": 10.269401420829555,
+        "prediction_sd": 5.397631255651825,
+        "training_mean_baseline_mae": 11.141652778766945
+      },
+      "partial_season": false,
+      "season": 2024,
+      "test_n": 285,
+      "total": {
+        "actual_sd": 13.183311124789121,
+        "alpha": 0.1,
+        "bias": -0.6181666842717971,
+        "mae": 9.862517997774148,
+        "prediction_sd": 3.058614079674292,
+        "training_mean_baseline_mae": 10.121334187973316
+      },
+      "train_n": 3695,
+      "train_seasons": [
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "latest_season_holdout": false,
+      "margin": {
+        "actual_sd": 14.132924783725548,
+        "alpha": 10.0,
+        "bias": -0.0074514238407689115,
+        "mae": 10.106758011447603,
+        "prediction_sd": 5.419791424237186,
+        "training_mean_baseline_mae": 11.001689147491845
+      },
+      "partial_season": false,
+      "season": 2025,
+      "test_n": 285,
+      "total": {
+        "actual_sd": 13.824145509818646,
+        "alpha": 0.1,
+        "bias": 0.30069609367881145,
+        "mae": 10.691569487223354,
+        "prediction_sd": 2.8532712894626173,
+        "training_mean_baseline_mae": 10.999419906550296
+      },
+      "train_n": 3980,
+      "train_seasons": [
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024
+      ]
+    },
+    {
+      "latest_season_holdout": true,
+      "margin": {
+        "actual_sd": 12.416621733551445,
+        "alpha": 10.0,
+        "bias": 2.4294706555432244,
+        "mae": 9.83577490236895,
+        "prediction_sd": 5.222236565492244,
+        "training_mean_baseline_mae": 9.883429328711964
+      },
+      "partial_season": true,
+      "season": 2026,
+      "test_n": 92,
+      "total": {
+        "actual_sd": 14.434537059200114,
+        "alpha": 0.1,
+        "bias": -0.950450683820815,
+        "mae": 11.642443640706839,
+        "prediction_sd": 2.7102285556987398,
+        "training_mean_baseline_mae": 12.003771853815179
+      },
+      "train_n": 4265,
+      "train_seasons": [
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025
+      ]
+    }
+  ],
+  "source_sha256": "00dc736e8afe7147322ef3f211fb13a0caaf09ed4f26d8fa3b57b6a171362a83",
+  "status": "RETROSPECTIVE_SCORE_DIAGNOSTIC_NOT_PIT_VALIDATION",
+  "tuning_performed": false
+}
