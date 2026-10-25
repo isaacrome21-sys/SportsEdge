@@ -94,10 +94,10 @@ jobs:
       - name: Persist strict NFL PAPER snapshot through draft PR
         if: steps.intake.outcome == 'success'
         env:
-          TITLE: \${{ github.event.issue.title }}
+          TITLE: ${{ github.event.issue.title }}
         run: |
           set -euo pipefail
-          branch="automation/nfl-paper-snapshots-issue-\${ISSUE}"
+          branch="automation/nfl-paper-snapshots-issue-${ISSUE}"
           git fetch origin main
           if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
             git fetch origin "$branch"
@@ -112,19 +112,19 @@ jobs:
             gh issue comment "$ISSUE" --body "NFL PAPER SNAPSHOT REFUSED: no independent pre-kickoff capture/quote receipt. No CLV or grade counted. See run logs."
             exit 0
           fi
-          git add -- "ledger/line_snapshots/nfl/\${ISSUE}.jsonl"
+          git add -- "ledger/line_snapshots/nfl/${ISSUE}.jsonl"
           if git diff --cached --quiet; then
             echo "No new NFL snapshot (idempotent)."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "evidence: append NFL paper snapshot for issue #\${ISSUE}"
+          git commit -m "evidence: append NFL paper snapshot for issue #${ISSUE}"
           git push origin "HEAD:refs/heads/$branch"
           existing="$(gh pr list --state open --head "$branch" --json number --jq '.[0].number // empty')"
           if [ -z "$existing" ]; then
             gh pr create --draft --base main --head "$branch" \
-              --title "NFL PAPER snapshots for lines issue #\${ISSUE}" \
+              --title "NFL PAPER snapshots for lines issue #${ISSUE}" \
               --body "Append-only pre-kickoff NFL capture evidence. PAPER only; no promotion. Merge only after receipt review."
           fi
       - name: Report engine failure
