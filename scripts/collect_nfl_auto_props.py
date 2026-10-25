@@ -166,17 +166,41 @@ def ticket_with_props(board,report,now):
     return tickets
 
 
+def nfl_season_for(start):
+    return start.year if start.month>=3 else start.year-1
+
+
+def write_injury_snapshot(board,out_dir,*,fetch=None):
+    from sportsedge.sports.nfl.injury_report_source import fetch_nflverse_injury_snapshot
+    from sportsedge.sports.nfl.context_autopull import NFLContextError
+    fetch=fetch or fetch_nflverse_injury_snapshot
+    seasons=sorted({nfl_season_for(t) for t in (iso_time(g.get("commence_time")) for g in board.get("games") or []) if t})
+    if len(seasons)!=1:
+        return {"status":"BLOCKED","reason":"INJURY_SNAPSHOT_SEASON_AMBIGUOUS"}
+    target=Path(out_dir)/"nfl_injury_snapshot.json"
+    try:
+        snap=fetch(season=seasons[0])
+    except NFLContextError as exc:
+        return {"status":"BLOCKED","reason":"INJURY_SNAPSHOT_"+str(exc)}
+    target.write_text(json.dumps(snap)+"\n",encoding="utf-8")
+    return {"status":"READY","path":str(target)}
+
+
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--game-odds",type=Path,default=Path("artifacts/auto_dk/nfl_odds.json"))
     ap.add_argument("--out-dir",type=Path,default=Path("artifacts/auto_dk_cards"))
     ap.add_argument("--max-games",type=int,default=MAX_GAMES)
     args=ap.parse_args()
-    now=datetime.now(timezone.utc)
     base=json.loads(args.game_odds.read_text(encoding="utf-8"))
     if base.get("sport")!="NFL" or base.get("status")!="READY":raise SystemExit("NFL_BASE_ODDS_REQUIRED")
-    report=collect(base,now,max_games=args.max_games)
     args.out_dir.mkdir(parents=True,exist_ok=True)
+    # Free nflverse injury bytes are captured BEFORE the ticket observation
+    # instant so their retrieval time is a valid PIT bound (nflverse dropped
+    # per-row date_modified). Failure leaves props fail-closed downstream.
+    write_injury_snapshot(base,args.out_dir)
+    now=datetime.now(timezone.utc)
+    report=collect(base,now,max_games=args.max_games)
     (args.out_dir/"nfl_prop_quote_report.json").write_text(json.dumps(report,indent=2)+"\n")
     for date,ticket in ticket_with_props(base,report,now).items():
         (args.out_dir/("nfl_prop_ticket_"+date+".json")).write_text(json.dumps(ticket,indent=2)+"\n")

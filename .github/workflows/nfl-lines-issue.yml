@@ -73,7 +73,10 @@ jobs:
 
           # No synthetic games or scoring history. If the public source is
           # unavailable, run the existing model in its NO_MODEL/no-history mode.
-          nfl_args=(--input "$input_path" --output artifacts/nfl_phone_card.json)
+          # Pricing clock is this run's time, never the issue edit time. Kickoff
+          # comes only from the ESPN public schedule (exactly one match).
+          nfl_args=(--input "$input_path" --output artifacts/nfl_phone_card.json \
+                    --as-of "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --fetch-espn-schedule)
           if [[ -s .cache/nfl-history/nflverse_games.json ]]; then
             nfl_args+=(--history .cache/nfl-history/nflverse_games.json)
           fi

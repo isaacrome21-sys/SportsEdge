@@ -22,6 +22,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from scripts.mlb_card_clv import (  # noqa: E402
+    CLV_LEDGER,
+    compute_clv,
+    summarize_clv,
+    upsert_clv_ledger,
+)
+from sportsedge.line_snapshots import SNAPSHOT_ROOT, load_snapshots  # noqa: E402
+
 GRADE_MARKER = "<!-- sportsedge-mlb-auto-grade:v1 issue={issue} -->"
 DEFAULT_REPO = "isaacrome21-sys/SportsEdge"
 DEFAULT_LEDGER = Path("ledger/mlb_ledger.csv")
@@ -82,6 +94,32 @@ def github_comments(repo: str, issue_number: int, token: str) -> list[dict[str, 
         if len(page) < 100:
             return comments
         page_number += 1
+
+
+def github_issue(repo: str, issue_number: int, token: str) -> dict[str, Any]:
+    owner, name = repo.split("/", 1)
+    return _request_json(
+        f"https://api.github.com/repos/{owner}/{name}/issues/{issue_number}", token=token
+    )
+
+
+def github_mlb_line_issues(repo: str, token: str, pages: int = 3) -> list[dict[str, Any]]:
+    """Recent [MLB LINES] issues (newest first); candidates for the DK close quote."""
+    owner, name = repo.split("/", 1)
+    out: list[dict[str, Any]] = []
+    for page_number in range(1, pages + 1):
+        page = _request_json(
+            f"https://api.github.com/repos/{owner}/{name}/issues"
+            f"?state=all&per_page=100&page={page_number}&sort=created&direction=desc",
+            token=token,
+        )
+        out.extend(
+            item for item in page
+            if "pull_request" not in item and str(item.get("title", "")).startswith("[MLB LINES]")
+        )
+        if len(page) < 100:
+            break
+    return out
 
 
 def post_github_comment(repo: str, issue_number: int, body: str, token: str) -> None:
@@ -499,6 +537,7 @@ def render_comment(
     feed: dict[str, Any],
     main: list[SettledRow],
     leans: list[SettledRow],
+    clv_records: list[dict[str, str]] | None = None,
 ) -> str:
     names = _team_names(feed)
     away, home = _runs(feed, "away"), _runs(feed, "home")
@@ -541,6 +580,26 @@ def render_comment(
             f"LEAN record: {lean_wins}-{lean_losses}-{lean_pushes}, "
             f"{lean_voids} void, {lean_unresolved} unresolved · "
             f"net {lean_net:+.2f}u (not main ledger).",
+        ]
+    if clv_records is not None:
+        tracked, mean = summarize_clv(clv_records)
+        lines += [
+            "",
+            "### CLV vs DraftKings close",
+            "| Play | Entry fair | Close fair | CLV | Status |",
+            "|---|---:|---:|---:|---|",
+        ]
+        for rec in clv_records:
+            entry = f"{float(rec['entry_fair_p']):.1%}" if rec["entry_fair_p"] else "-"
+            close = f"{float(rec['close_fair_p']):.1%}" if rec["close_fair_p"] else "-"
+            clv = f"{float(rec['clv_prob']) * 100:+.1f} pts" if rec["clv_prob"] else "-"
+            lines.append(f"| {rec['pick']} | {entry} | {close} | {clv} | {rec['clv_status']} |")
+        mean_text = f"{mean * 100:+.2f} pts" if mean is not None else "n/a"
+        lines += [
+            "",
+            f"CLV tracked {tracked}/{len(clv_records)} · mean {mean_text}. "
+            "Entry = first snapshot listing the pick; close = last snapshot with a "
+            "`Captured:` time before first pitch (ledger/line_snapshots).",
         ]
     lines += [
         "",
@@ -647,8 +706,15 @@ def grade_issue(
     feeds: dict[int, dict[str, Any]] | None = None,
     post_comment: bool = True,
     force_comment: bool = False,
+    issue: dict[str, Any] | None = None,
+    line_issues: list[dict[str, Any]] | None = None,
+    clv_ledger_path: Path | None = CLV_LEDGER,
+    snapshot_root: Path | None = SNAPSHOT_ROOT,
 ) -> str:
     token = token or os.environ.get("GITHUB_TOKEN")
+    # CLV issue lookups go to the network only in live mode (comments fetched
+    # here); callers that inject comments must inject issue/line_issues too.
+    live = comments is None
     if comments is None:
         if not token:
             raise RuntimeError("GITHUB_TOKEN is required to read issue comments")
@@ -703,7 +769,29 @@ def grade_issue(
             for row in game_rows
             if row.status == "LEAN"
         ]
-        rendered = render_comment(issue_number, game_feed, main, leans)
+        clv_records: list[dict[str, str]] | None = None
+        snapshots = load_snapshots("mlb", issue_number, snapshot_root) if snapshot_root else []
+        if clv_ledger_path is not None and snapshots:
+            clv_records = compute_clv(issue_number=issue_number, picks=game_rows,
+                                      feed=game_feed, entry_issue={}, snapshots=snapshots)
+            upsert_clv_ledger(clv_ledger_path, issue_number, game_pk, clv_records)
+        elif clv_ledger_path is not None:
+            if live and token and (issue is None or line_issues is None):
+                try:
+                    issue = issue or github_issue(repo, issue_number, token)
+                    line_issues = line_issues if line_issues is not None else github_mlb_line_issues(repo, token)
+                except RuntimeError as exc:  # CLV never blocks settlement
+                    print(f"CLV_SOURCE_UNAVAILABLE: {exc}", file=sys.stderr)
+            if issue is not None:
+                clv_records = compute_clv(
+                    issue_number=issue_number,
+                    picks=game_rows,
+                    feed=game_feed,
+                    entry_issue=issue,
+                    other_issues=line_issues or [],
+                )
+                upsert_clv_ledger(clv_ledger_path, issue_number, game_pk, clv_records)
+        rendered = render_comment(issue_number, game_feed, main, leans, clv_records)
         if index:
             marker_line = GRADE_MARKER.format(issue=issue_number) + "\n"
             if rendered.startswith(marker_line):
@@ -733,6 +821,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ledger", type=Path, default=DEFAULT_LEDGER)
     parser.add_argument("--no-comment", action="store_true")
     parser.add_argument("--force-comment", action="store_true")
+    parser.add_argument("--clv-ledger", type=Path, default=CLV_LEDGER)
     args = parser.parse_args(argv)
     result = grade_issue(
         args.issue_number,
@@ -740,6 +829,7 @@ def main(argv: list[str] | None = None) -> int:
         ledger_path=args.ledger,
         post_comment=not args.no_comment,
         force_comment=args.force_comment,
+        clv_ledger_path=args.clv_ledger,
     )
     print(result)
     return 0

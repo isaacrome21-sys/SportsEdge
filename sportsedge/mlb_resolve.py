@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from .mlb_lines_intake import LinesIntakeError, _match_team, parse_lines
+from .mlb_lines_intake import LinesIntakeError, _match_team, parse_lines_with_warnings
 from .mlb_source import GameSnapshot, parse_game_start
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
@@ -81,10 +81,12 @@ def build_bound_input(
     observed_at: str,
     schedule: list[GameSnapshot],
     book: str = "draftkings",
+    title: str | None = None,
 ) -> dict[str, Any]:
     now = datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
     out: list[dict[str, Any]] = []
-    for row in parse_lines(text):
+    parsed, warnings = parse_lines_with_warnings(text, title=title)
+    for row in parsed:
         try:
             game = resolve_game(row.away, row.home, schedule, now=now)
         except LinesIntakeError as exc:
@@ -110,4 +112,7 @@ def build_bound_input(
         }
         record.update(_player_fields(row, game))
         out.append(record)
-    return {"rows": out}
+    payload: dict[str, Any] = {"rows": out}
+    if warnings:
+        payload["intake_warnings"] = warnings
+    return payload
