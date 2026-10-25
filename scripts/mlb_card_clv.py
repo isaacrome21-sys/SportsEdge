@@ -227,7 +227,7 @@ def compute_clv(
             status=pick.status, price=f"{pick.price:+d}",
             entry_captured_at=entry_at.isoformat() if entry_at else "",
         )
-        if entry_at is None or entry_at > now or (first_pitch is not None and entry_at >= first_pitch):
+        if entry_at is None or first_pitch is None or entry_at > now or entry_at >= first_pitch:
             record["clv_status"] = "NO_ENTRY_CAPTURE"
             out.append(record)
             continue
