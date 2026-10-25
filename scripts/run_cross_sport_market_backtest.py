@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 from typing import Any, Iterable
 
+from sportsedge.research.historical_row_quality import validate_historical_row
 from sportsedge.research.betting_uncertainty import selected_betting_bootstrap
 from sportsedge.research.multi_market_backtest import (
     ResearchBacktestError,
@@ -49,6 +50,9 @@ def _load(paths: Iterable[Path]) -> list[dict[str, Any]]:
                     raise SystemExit(f"{path}:{line_no}: invalid JSON: {exc}") from exc
                 if not isinstance(value, dict):
                     raise SystemExit(f"{path}:{line_no}: each JSONL row must be an object")
+                problems = validate_historical_row(value)
+                if problems:
+                    raise SystemExit(f"{path}:{line_no}: historical row rejected: {','.join(problems)}")
                 rows.append(value)
     if not rows:
         raise SystemExit("historical input contains no rows")
