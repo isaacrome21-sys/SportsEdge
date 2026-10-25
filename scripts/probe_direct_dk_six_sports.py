@@ -68,7 +68,7 @@ def probe(*, fetcher=fetch_board, clock=lambda: datetime.now(timezone.utc)):
                 "payload_markets": len(board.payload["markets"]) if isinstance(board.payload.get("markets"), list) else None,
                 "market_counts": dict(sorted(Counter(str(m.get("name")).strip() for m in board.payload.get("markets", []) if isinstance(m, dict) and str(m.get("name") or "").strip()).items())) if isinstance(board.payload.get("markets"), list) else None,
                 "payload_selections": len(board.payload["selections"]) if isinstance(board.payload.get("selections"), list) else None,
-                **(selection_linkage(board.payload) or {"unlinked_selections": None, "linked_selections": None, "duplicate_market_ids": None}),
+                **(selection_linkage(board.payload) or {"unlinked_selections": None, "linked_selections": None, "duplicate_market_ids": None, "duplicate_event_ids": None, "markets_without_event": None}),
                 "payload_events": len(board.payload["events"])
                     if isinstance(board.payload.get("events"), list) else None}
         except (DraftKingsGameMarketError, OSError, ValueError) as exc:
