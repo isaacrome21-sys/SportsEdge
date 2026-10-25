@@ -117,6 +117,17 @@ def verify_mlb_game_binding(
     return {"game_pk": game_pk, "first_pitch_at": start.isoformat()}
 
 
+def verify_snapshot_lag(record: dict, max_seconds: int) -> None:
+    """Compare actual write-clock vs claimed quote capture; no stale retroactive eligibility."""
+    if max_seconds < 0:
+        raise SnapshotError("SNAPSHOT_LAG_LIMIT_INVALID")
+    captured = datetime.fromisoformat(record["captured_at"].replace("Z", "+00:00"))
+    recorded = datetime.fromisoformat(record["recorded_at"].replace("Z", "+00:00"))
+    lag = (recorded - captured).total_seconds()
+    if lag < 0 or lag > max_seconds:
+        raise SnapshotError("SNAPSHOT_CAPTURE_STALE_FOR_FORWARD_RECEIPT")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--sport", required=True)
@@ -129,6 +140,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--game-start", default=None)
     ap.add_argument("--bound-input-json", type=Path, default=None,
                     help="MLB: same-run MLB schedule-bounded intake JSON, unique game_pk and first-pitch required")
+    ap.add_argument("--max-capture-lag-seconds", type=int, default=None,
+                    help="Refuse forward evidence when Captured is older than write clock by this many seconds")
     ap.add_argument("--require-card-quote-match", action="store_true",
                     help="MLB: refuse any saved pick whose price disagrees with its captured two-sided issue line")
     ap.add_argument("--root", type=Path, default=SNAPSHOT_ROOT)
@@ -165,6 +178,8 @@ def main(argv: list[str] | None = None) -> int:
             sport=sport, issue_number=args.issue, body=body, title=args.title, game=game,
             board=board, picks=picks, recorded_at=recorded_at,
         )
+        if args.max_capture_lag_seconds is not None:
+            verify_snapshot_lag(record, args.max_capture_lag_seconds)
     except SnapshotError as exc:
         print(f"SNAPSHOT_REFUSED: {exc}", file=sys.stderr)
         return 2
