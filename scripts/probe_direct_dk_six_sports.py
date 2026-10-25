@@ -51,7 +51,9 @@ def probe(*, fetcher=fetch_board, clock=lambda: datetime.now(timezone.utc)):
             continue
         try:
             board = fetcher(key)
-            if board.sport_key != key or not isinstance(board.raw, bytes):
+            if (board.sport_key != key or not isinstance(board.raw, bytes)
+                    or board.received_at.tzinfo is None
+                    or board.received_at.utcoffset() is None):
                 raise ValueError("DK_PROBE_SOURCE_IDENTITY_INVALID")
             result["sports"][sport] = {
                 "status": "FETCHED", "source_uri": board.source_uri,
