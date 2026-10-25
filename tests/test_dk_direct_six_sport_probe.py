@@ -9,12 +9,14 @@ def test_unverified_sports_never_guess_endpoint():
     def fetch(key):
         calls.append(key)
         return SimpleNamespace(source_uri="https://sportsbook-nash.draftkings.com/test",
-                               received_at=NOW, payload={"events": []})
+                               received_at=NOW, payload={"events": [], "markets": [{"name": "Total"}, {"name": "Moneyline"}, {"name": "Total"}]})
     result = probe(fetcher=fetch, clock=lambda: NOW)
     assert set(result["sports"]) == set(SPORTS)
     assert result["sports"]["NBA"]["status"] == "UNVERIFIED_MAPPING"
     assert result["sports"]["CBB"]["status"] == "UNVERIFIED_MAPPING"
     assert result["sports"]["NHL"]["status"] == "UNVERIFIED_MAPPING"
+    assert result["sports"]["NFL"]["market_catalog"] == ["Moneyline", "Total"]
+    assert result["sports"]["NFL"]["payload_markets"] == 3
     assert len(calls) == 3
     assert all(result["sports"][s]["status"] == "FETCHED" for s in ("NFL", "CFB", "MLB"))
 
