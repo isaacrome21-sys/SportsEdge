@@ -43,6 +43,28 @@ def selection_linkage(payload):
         ]) - len(ids),
     }
 
+def market_inventory(payload):
+    """Research-only market/selection inventory, preserving source labels without prices."""
+    markets = payload.get("markets")
+    selections = payload.get("selections")
+    if not isinstance(markets, list) or not isinstance(selections, list):
+        return None
+    by_id = {}
+    for market in markets:
+        if isinstance(market, dict) and market.get("id") is not None:
+            by_id.setdefault(str(market["id"]), []).append(market)
+    counts = {}
+    for selection in selections:
+        if not isinstance(selection, dict) or selection.get("marketId") is None:
+            continue
+        matches = by_id.get(str(selection["marketId"]), [])
+        if len(matches) != 1:
+            continue
+        name = str(matches[0].get("name") or "").strip()
+        if name:
+            counts[name] = counts.get(name, 0) + 1
+    return dict(sorted(counts.items()))
+
 def probe(*, fetcher=fetch_board, clock=lambda: datetime.now(timezone.utc), archive_dir=None):
     result = {"schema": "sportsedge.dk_direct_probe.v1",
               "captured_at_utc": clock().isoformat(), "sports": {}}
@@ -86,6 +108,7 @@ def probe(*, fetcher=fetch_board, clock=lambda: datetime.now(timezone.utc), arch
                 "raw_sha256": hashlib.sha256(board.raw).hexdigest(),
                 "raw_size_bytes": len(board.raw),
                 "received_at_utc": board.received_at.isoformat(),
+                "market_selection_counts": market_inventory(board.payload),
                 "market_catalog": sorted({str(m.get("name")).strip() for m in board.payload.get("markets", []) if isinstance(m, dict) and str(m.get("name") or "").strip()}) if isinstance(board.payload.get("markets"), list) else None,
                 "payload_markets": len(board.payload["markets"]) if isinstance(board.payload.get("markets"), list) else None,
                 "market_counts": dict(sorted(Counter(str(m.get("name")).strip() for m in board.payload.get("markets", []) if isinstance(m, dict) and str(m.get("name") or "").strip()).items())) if isinstance(board.payload.get("markets"), list) else None,
