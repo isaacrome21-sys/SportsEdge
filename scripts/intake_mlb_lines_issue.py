@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sportsedge.mlb_issue_body import IssueLinesError, extract_issue_lines  # noqa: E402
 from sportsedge.mlb_lines_intake import LinesIntakeError  # noqa: E402
 from sportsedge.mlb_resolve import build_bound_input  # noqa: E402
+from sportsedge.pipeline.intake import SharedIntakeError, parse_envelope  # noqa: E402
 from sportsedge.mlb_source import fetch_schedule  # noqa: E402
 
 CHICAGO = ZoneInfo("America/Chicago")
@@ -128,7 +129,15 @@ def main() -> int:
     try:
         nxt = (observed.date() + timedelta(days=1)).isoformat()
         schedule = list(fetch_schedule(slate)) + list(fetch_schedule(nxt))
-        payload = build_bound_input(body, observed_at=observed.isoformat(), schedule=schedule, title=args.title)
+        # Shared envelope (sportsedge.pipeline.intake): <!-- --> notes dropped and the
+        # Captured line read with the same rules as every sport. MLB grammar is unchanged.
+        try:
+            envelope = parse_envelope(body, "MLB", title=args.title)
+        except SharedIntakeError as exc:
+            raise LinesIntakeError(str(exc)) from exc
+        payload = build_bound_input(envelope.text, observed_at=observed.isoformat(), schedule=schedule, title=args.title)
+        payload["captured_at"] = envelope.captured_at
+        payload["intake_warnings"] = list(payload.get("intake_warnings") or []) + envelope.warnings
         # Reuse the exact live schedule response that bound the phone text to MLB games.
         # This snapshot is run-local evidence only; it is not persisted as a cross-run cache.
         payload["schedule_snapshot"] = [asdict(game) for game in schedule]

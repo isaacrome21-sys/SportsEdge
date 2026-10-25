@@ -154,68 +154,19 @@ def _line(tok: str, raw: str) -> float:
 _PRICE_RE = re.compile(r"(?<![\w.])[+\-−–]?\d{3,4}(?![\w.])|\beven\b", re.I)
 
 
-def parse_lines(body: str) -> list[Game]:
+def parse_lines(body: str, *, title: str | None = None) -> list[Game]:
+    """Thin adapter over the shared parser (``sportsedge.pipeline.intake``)."""
+    from sportsedge.pipeline.intake import SharedIntakeError, parse_issue
     try:
-        body = extract_issue_lines(body, sport="NBA")
-    except IssueLinesError as exc:
+        board = parse_issue(body, "NBA", title=title, strict_unknown=True)
+    except SharedIntakeError as exc:
         raise NBALinesError(str(exc)) from exc
-    games: list[Game] = []
-    cur: Game | None = None
-    issue_captured: str | None = None
-    for raw in body.splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#") or line.startswith("<!--"):
-            continue
-        if line.upper().startswith("[NBA LINES]"):
-            continue
-        cm = _CAPTURED_RE.match(line)
-        if cm:
-            ts = parse_captured_at(cm.group(1), line)
-            if cur is None:
-                if issue_captured is not None:
-                    raise NBALinesError(f"NBA_CAPTURED_AT_DUPLICATE:{line}")
-                issue_captured = ts
-            else:
-                cur.captured_at = ts
-            continue
-        if "@" in line and not re.match(r"^(ml|moneyline|spread|sp|total|ou|o/u)\b", line, re.I):
-            a, h = [p.strip() for p in line.split("@", 1)]
-            away, home = team_abbr(a), team_abbr(h)
-            if away == home:
-                raise NBALinesError(f"NBA_TEAMS_IDENTICAL:{line}")
-            cur = Game(away, home, line, captured_at=issue_captured)
-            games.append(cur)
-            continue
-        if cur is None:
-            if not _PRICE_RE.search(line):
-                continue  # leading free-text note
-            raise NBALinesError(f"NBA_MARKET_BEFORE_GAME:{line}")
-        parts = line.replace(",", " ").split()
-        kind = parts[0].lower()
-        if kind in ("ml", "moneyline"):
-            if len(parts) != 3:
-                raise NBALinesError(f"NBA_ONE_SIDED_OR_MALFORMED:{line}")
-            cur.markets.append(Market("MONEYLINE", None, _american(parts[1], line), _american(parts[2], line), line))
-        elif kind in ("spread", "sp", "ps"):
-            if len(parts) != 4:
-                raise NBALinesError(f"NBA_ONE_SIDED_OR_MALFORMED:{line}")
-            cur.markets.append(Market("SPREAD", _line(parts[1], line), _american(parts[2], line), _american(parts[3], line), line))
-        elif kind in ("total", "ou", "o/u"):
-            if len(parts) != 4:
-                raise NBALinesError(f"NBA_ONE_SIDED_OR_MALFORMED:{line}")
-            cur.markets.append(Market("TOTAL", _line(parts[1], line), _american(parts[2], line), _american(parts[3], line), line))
-        elif not _PRICE_RE.search(line):
-            # Free-text note (no American price on the line) -- e.g. "Smoke test only."
-            # Market lines always carry prices, so a mistyped market still fails closed.
-            continue
-        else:
-            raise NBALinesError(f"NBA_UNRECOGNIZED:{line}")
-    if not games:
-        raise NBALinesError("NBA_NO_GAMES")
-    for g in games:
-        if not g.markets:
-            raise NBALinesError(f"NBA_GAME_WITHOUT_MARKETS:{g.header}")
-    return games
+    return [
+        Game(g.away, g.home, g.header,
+             markets=[Market(m.market, m.line, m.price_a, m.price_b, m.raw) for m in g.markets],
+             captured_at=g.captured_at)
+        for g in board.games
+    ]
 
 
 def dec(a: int) -> float:
