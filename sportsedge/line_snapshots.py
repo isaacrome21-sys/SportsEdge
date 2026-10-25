@@ -20,7 +20,7 @@ Rules (shared by every sport's grader / CLV code):
   guessed or post-start price.
 * Owner ruling (2026-10-25, entry-capture policy): a snapshot counts only if
   its ``recorded_at`` is an offset-aware time, its claimed ``Captured`` is not
-  later than ``recorded_at`` (+ ``CLOCK_SKEW``), and it was RECORDED before
+  later than ``recorded_at`` (zero tolerance), and it was RECORDED before
   game start (a pregame Captured appended after start is a backfill and is
   ignored). The close must be a distinct snapshot captured strictly after the
   entry; entry == close -> ``NO_DISTINCT_CLOSE`` (never a zero-CLV row).
@@ -38,7 +38,7 @@ from typing import Any, Iterable
 SNAPSHOT_ROOT = Path("ledger/line_snapshots")
 SCHEMA = "sportsedge.line_snapshot.v1"
 SPORTS = {"mlb", "nfl", "cfb", "nba", "nhl"}
-CLOCK_SKEW = timedelta(seconds=120)
+CLOCK_SKEW = timedelta(0)  # owner ruling: Captured must be <= recorded_at, no tolerance
 _CAPTURED = re.compile(r"^\s*captured\s*:?\s*(\S+)\s*$", re.I)
 
 

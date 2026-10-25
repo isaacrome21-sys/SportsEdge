@@ -94,3 +94,25 @@ def test_missing_malformed_or_naive_first_pitch_fails_closed(start, tmp_path):
                          other_issues=[CLOSE])[0]
     snap = compute_clv(issue_number=100, picks=PICK, feed=feed, entry_issue={}, snapshots=[])[0]
     assert legacy["clv_status"] == snap["clv_status"] == "NO_FIRST_PITCH"
+
+
+@pytest.mark.parametrize("ahead", [1, 119, 120, 121])
+def test_capture_even_one_second_after_recording_refused(ahead):
+    from datetime import timedelta as _td
+    rec = datetime(2026, 10, 24, 22, 0, tzinfo=timezone.utc)
+    cap = (rec + _td(seconds=ahead)).isoformat()
+    with pytest.raises(SnapshotError):
+        build_snapshot(sport="mlb", issue_number=1, body=body(cap, "+100 -120"), title=TITLE,
+                       game={}, board=[], picks=[], recorded_at=rec.isoformat())
+
+
+def test_capture_equal_to_recording_allowed():
+    build_snapshot(sport="mlb", issue_number=1, body=body("2026-10-24T22:00:00+00:00", "+100 -120"),
+                   title=TITLE, game={}, board=[], picks=[], recorded_at="2026-10-24T22:00:00+00:00")
+
+
+def test_forged_row_capture_after_recording_ignored(tmp_path):
+    _snap(tmp_path, "2026-10-24T22:20:00Z", "+100 -120", [ML], "2026-10-24T22:21:00Z")
+    snaps = load_snapshots("mlb", 100, tmp_path)
+    forged = dict(snaps[0], captured_at="2026-10-24T23:50:01+00:00", recorded_at="2026-10-24T23:50:00+00:00")
+    assert entry_and_close(snaps + [forged], "Moneyline Home", START).status == "NO_DISTINCT_CLOSE"
