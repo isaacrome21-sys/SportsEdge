@@ -86,7 +86,7 @@ def test_receipt_clock_must_be_timezone_aware(received_at) -> None:
         parse_public_ownership(HTML, received_at=received_at)
 
 
-def test_exact_name_position_match_only_and_unmatched_skipped() -> None:
+def test_exact_player_match_and_strict_canonical_defense_match() -> None:
     report = parse_public_ownership(HTML, received_at=WHEN)
     players = [
         _player("dk-1", "Jared Goff", "QB"),
@@ -96,9 +96,29 @@ def test_exact_name_position_match_only_and_unmatched_skipped() -> None:
     ]
     joined = match_public_ownership(report, players)
     assert joined["status"] == "RESEARCH_ONLY_UNVERIFIED"
-    assert {row["dk_player_id"] for row in joined["matched"]} == {"dk-1", "dk-2"}
+    assert {row["dk_player_id"] for row in joined["matched"]} == {"dk-1", "dk-2", "dk-3"}
     assert joined["blocked"] == []
     assert joined["source_sha256"] == report["raw_sha256"]
+
+
+def test_defense_join_requires_name_and_team_to_agree() -> None:
+    report = parse_public_ownership(HTML, received_at=WHEN)
+    mismatched = _player("wrong-team", "Vikings", "DST", "GB")
+    misleading = _player("wrong-name", "Packers", "DST", "MIN")
+    safe = match_public_ownership(report, [mismatched, misleading])
+    assert safe["matched"] == []
+    assert safe["blocked"] == []
+
+
+def test_two_distinct_dst_ids_remain_ambiguous() -> None:
+    report = parse_public_ownership(HTML, received_at=WHEN)
+    dupes = [_player("one", "Vikings", "DST", "MIN"),
+             _player("two", "Minnesota Vikings", "DST", "MIN")]
+    joined = match_public_ownership(report, dupes)
+    assert joined["matched"] == []
+    assert joined["blocked"] == [
+        {"name": "Minnesota Vikings", "position": "DST", "reason": "AMBIGUOUS_DK_ID"}
+    ]
 
 
 def test_ambiguous_player_id_never_guessed() -> None:
