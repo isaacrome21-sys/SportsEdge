@@ -53,4 +53,20 @@ def test_malformed_or_naive_capture_withholds_positive_candidate(stamp):
 def test_nonfinite_estimate_never_reaches_candidate_card(ev):
     text=card(ev)
     assert 'POSITIVE EV — PAPER' not in text
-    assert 'invalid nonfinite estimated EV' in text
+    assert 'POSITIVE EV — PAPER' not in text
+
+
+@pytest.mark.parametrize('ev',['bad',{},[],True,None,10**1000])
+def test_malformed_ev_does_not_crash_card(ev):
+    assert 'POSITIVE EV — PAPER' not in card(ev)
+
+@pytest.mark.parametrize('price',[None,True,-112.5,float('inf'),'bad',0])
+def test_invalid_selected_price_is_withheld(price):
+    choice=dict(selection='OVER',ev_per_dollar=.004,price_american=price)
+    assert 'POSITIVE EV — PAPER' not in card(.004,lean=choice)
+
+def test_valid_choice_survives_malformed_opposite():
+    choices=[dict(selection='OVER',ev_per_dollar='bad',price_american=-112),
+             dict(selection='UNDER',ev_per_dollar=.003,price_american=-108)]
+    text=card(.004,residual_research_prices=choices)
+    assert 'UNDER @ -108' in text

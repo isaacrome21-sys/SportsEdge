@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from datetime import date, datetime
 from math import isfinite
+from numbers import Real
 from pathlib import Path
 import json
 import os
@@ -43,6 +44,22 @@ def fmt_price(price: object) -> str:
     except (TypeError, ValueError):
         return str(price)
     return f"+{value}" if value > 0 else str(value)
+
+
+def _display_ev(choice: object) -> float | None:
+    """Validate economics before display; malformed candidates never break a card."""
+    if not isinstance(choice, dict):
+        return None
+    value = choice.get("ev_per_dollar")
+    price = choice.get("price_american")
+    if (isinstance(value, bool) or not isinstance(value, Real)
+            or type(price) is not int or -100 < price < 100):
+        return None
+    try:
+        ev = float(value)
+    except (ValueError, TypeError, OverflowError):
+        return None
+    return ev if isfinite(ev) else None
 
 
 def _track_note(row: dict) -> str | None:
@@ -231,13 +248,14 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
                 continue
             chosen = row.get("pick") or row.get("lean")
             choices = list(row.get("residual_research_prices") or [])
-            best = chosen or (max(choices, key=lambda x: float(x.get("ev_per_dollar") or 0)) if choices else None)
+            valid_choices = [choice for choice in choices if _display_ev(choice) is not None]
+            best = chosen or (max(valid_choices, key=_display_ev) if valid_choices else None)
             if best is None:
                 unpriced.append(f"- {label}: {_plain_reason('NO_MODEL:PAIRED_RESIDUAL_PRICE_UNAVAILABLE')}")
                 continue
-            ev = float(best.get("ev_per_dollar") or 0)
-            if not isfinite(ev):
-                unpriced.append(f"- {label}: invalid nonfinite estimated EV")
+            ev = _display_ev(best)
+            if ev is None:
+                unpriced.append(f"- {label}: invalid estimated EV or selected price")
                 continue
             status = display_status({**row, **best})
             if chosen:
