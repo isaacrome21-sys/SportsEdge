@@ -14,7 +14,7 @@ import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp, gate_text as _registry_gate_text  # noqa: E402  t134 family gate
+from sportsedge.registry_gate import family_gate_row, gate_text as _registry_gate_text  # noqa: E402
 from sportsedge.sports.nba.lines_card import (  # noqa: E402
     NBALinesError, parse_lines, ratings_from_results, render, team_abbr, price_game,
 )
@@ -143,16 +143,19 @@ def fetch_results(today: date, fetch=_get) -> tuple[list[dict], list[str]]:
 
 
 def evidence_rows(games, ratings, *, game_date, issue, engine_id):
-    """Export the same priced rows as the card, with an explicit event date."""
+    """Keep book captures, but never export model picks hidden by the family gate."""
     from sportsedge.sports.nba.clv_ledger import capture_rows, pick_row
     date.fromisoformat(game_date)  # Never infer event date from an issue edit.
     captures, picks = [], []
     for game in games:
         quotes = capture_rows([game], game_date=game_date, issue=issue)
+        captures.extend(quotes)
+        if any(family_gate_row("NBA", market.market) is not None
+               for market in game.markets):
+            continue
         _, _, priced = price_game(game, ratings)
         if len(quotes) != len(priced):
             raise ValueError("NBA_CAPTURE_CARD_ROW_MISMATCH")
-        captures.extend(quotes)
         for quote, row in zip(quotes, priced):
             if quote["market"] != row.market or quote["american"] != row.price:
                 raise ValueError("NBA_CAPTURE_CARD_IDENTITY_MISMATCH")
@@ -161,6 +164,40 @@ def evidence_rows(games, ratings, *, game_date, issue, engine_id):
                 pick.update(pick=row.side, price=row.price, card_status=row.label)
                 picks.append(pick)
     return captures, sorted(picks, key=lambda p: -p["ev_per_unit"])
+
+
+def blocked_quote_card(games, *, as_of: datetime) -> str:
+    """Display transcribed book quotes and blockers, never a gated model estimate.
+
+    The issue edit is not the quote clock. This path requires no ratings/history
+    and the quote table confers no freshness, pregame, or betting eligibility.
+    """
+    if as_of.tzinfo is None or as_of.utcoffset() is None:
+        raise ValueError("NBA_AUDIT_CLOCK_TIMEZONE_REQUIRED")
+    out = ["# SportsEdge NBA capture audit", "",
+           _registry_gate_text("", "NBA", "scripts/run_nba_lines_issue.py").strip(), "",
+           f"Audit clock: {as_of.isoformat()}.",
+           "Captured book quotes only; not model prices or recommendations. "
+           "Game start and current availability are not verified. "
+           "Editing an issue does not refresh its capture.", ""]
+    for game in games:
+        out.extend([f"### {game.away} @ {game.home}",
+                    f"Captured: {game.captured_at or 'MISSING'}"])
+        if game.captured_at:
+            stamp = datetime.fromisoformat(game.captured_at)
+            age = (as_of - stamp).total_seconds()
+            out.append(f"Capture age at audit: {age:.0f} seconds" if age >= 0
+                       else "Capture clock is in the future; quote unverified.")
+        out.extend(["", "| Captured market | Book quote | Model status |",
+                    "|---|---|---|"])
+        for market in game.markets:
+            gate = family_gate_row("NBA", market.market)
+            reason = gate["reason"].split(":", 1)[0] if gate else "NOT_PRICED"
+            line = "" if market.line is None else f" {market.line:+g}"
+            out.append(f"| {market.market}{line} | {market.p1:+d} / {market.p2:+d} | {reason} |")
+        out.append("")
+    out.extend(["Model picks exported: 0. Raw captures do not count as graded picks.", ""])
+    return "\n".join(out)
 
 
 def main() -> int:
@@ -180,6 +217,23 @@ def main() -> int:
         Path("intake_error.txt").write_text(str(exc) + "\n\nExpected per game:\nCeltics @ Knicks\nML +130 -155\nSpread +3.5 -110 -110\nTotal 224.5 -110 -110\n", encoding="utf-8")
         print(f"INTAKE_FAILED: {exc}")
         return 2
+    # Do not compute a model behind a blocked display and then export its
+    # picks through another artifact. Keep the raw captures reviewable instead.
+    if all(family_gate_row("NBA", market.market) is not None
+           for game in games for market in game.markets):
+        out = Path(args.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        if args.game_date:
+            if not args.engine_id:
+                raise ValueError("NBA_EVIDENCE_ENGINE_ID_REQUIRED")
+            captures, picks = evidence_rows(games, None, game_date=args.game_date,
+                                            issue=int(args.issue), engine_id=args.engine_id)
+            (out.parent / "captures.jsonl").write_text(
+                "".join(json.dumps(r, sort_keys=True) + "\n" for r in captures))
+            (out.parent / "picks.json").write_text(json.dumps(picks) + "\n")
+        out.write_text(blocked_quote_card(games, as_of=datetime.now(timezone.utc)), encoding="utf-8")
+        print(f"card={out}; model_status=FAMILY_REGISTRY_NOT_VALIDATED; picks=0")
+        return 0
     if args.results_file:
         results, errors = json.loads(Path(args.results_file).read_text(encoding="utf-8")), []
     else:
