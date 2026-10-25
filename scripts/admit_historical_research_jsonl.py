@@ -55,6 +55,8 @@ def admit(row: dict) -> str | None:
 def run(input_path: Path, accepted_path: Path, blocked_path: Path) -> dict:
     if accepted_path.resolve() == blocked_path.resolve() or input_path.resolve() in (accepted_path.resolve(), blocked_path.resolve()):
         raise ValueError("INPUT_AND_OUTPUT_PATHS_MUST_BE_DISTINCT")
+    if accepted_path.is_dir() or blocked_path.is_dir():
+        raise ValueError("OUTPUT_PATH_IS_DIRECTORY")
     accepted, blocked = [], []
     seen = set()
     with input_path.open(encoding="utf-8") as handle:
