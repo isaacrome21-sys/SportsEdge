@@ -80,6 +80,8 @@ def test_render_flags_1273_misreads_against_1256(tmp_path: Path, monkeypatch: py
     by_key = {(str(r["game_id"]), r["market"]): r for r in payload["rows"]}
     assert by_key[("849841", "MONEYLINE")]["scored_status"] == "NEEDS_CONFIRM"
     assert by_key[("849848", "TOTALS")]["scored_status"] == "NEEDS_CONFIRM"
-    assert by_key[("849846", "MONEYLINE")]["scored_status"] == "ACTIONABLE"
+    assert by_key[("849846", "MONEYLINE")]["scored_status"] == "PAPER"
+    assert all(row["scored_status"] != "ACTIONABLE" for row in payload["rows"])
+    assert "ACTIONABLE" not in text
     assert "NEEDS_CONFIRM" in text
     assert "screenshot-misread" in text
