@@ -1,0 +1,218 @@
+{
+  "attempt": 2,
+  "bets_ev_ge_2pct": null,
+  "brier_vs_close": null,
+  "calibration_intercept": null,
+  "calibration_slope": null,
+  "code_sha256": "5081abd25afcfbb7e3fa2f33689a7c677f2129a1cb210b74711fba9d5e0d7f4d",
+  "ece": null,
+  "evaluation": "Fixed 2010-2016 weights and 2017-2019 calibration, sequential 2020-2026 replay; not expanding-season refit or newly sealed holdout",
+  "latest_complete_season": 2025,
+  "latest_partial_season": 2026,
+  "leakage_check": "Feature routine batches dates before admitting outcomes; same-date excluded. Retrospective corrected source, not archived pregame features.",
+  "log_loss_vs_close": null,
+  "market_verdict": "INSUFFICIENT_DATA",
+  "mean_clv": null,
+  "model_p_artifact_sha256": "868d02e16443969407cd15494c1429a4e664f38847e8e2f1366f5a66708ec92e",
+  "promotion_authority": false,
+  "roi_at_logged_price": null,
+  "runtime_artifact_sha256": "effa86bea2b1e9043cf0f4adffa007910a3d59f979f3ae07bcac15c6c4712d10",
+  "seasons": [
+    {
+      "calibration_end_season": 2019,
+      "margin": {
+        "bias": 2.3741200103476774,
+        "calibrated_probability_mean_distance_from_half": 0.020782615446860428,
+        "mae": 10.347704894231514,
+        "noninteger_threshold_n": 127,
+        "outcome_sd": 14.154442951952346,
+        "prediction_sd": 4.963917406535039,
+        "probability_fraction_45_to_55pct": 0.952755905511811,
+        "raw_probability_mean_distance_from_half": 0.09168650491797875
+      },
+      "n": 264,
+      "partial_season": false,
+      "season": 2020,
+      "total": {
+        "bias": -1.2555834211632053,
+        "calibrated_probability_mean_distance_from_half": 0.028745677510992166,
+        "mae": 10.884444465646878,
+        "noninteger_threshold_n": 113,
+        "outcome_sd": 13.761119137198568,
+        "prediction_sd": 2.845525342554031,
+        "probability_fraction_45_to_55pct": 0.9380530973451328,
+        "raw_probability_mean_distance_from_half": 0.07243393562372379
+      },
+      "training_end_season": 2016
+    },
+    {
+      "calibration_end_season": 2019,
+      "margin": {
+        "bias": 0.594115430256772,
+        "calibrated_probability_mean_distance_from_half": 0.023523773844422488,
+        "mae": 11.174220010482957,
+        "noninteger_threshold_n": 144,
+        "outcome_sd": 15.283947930017472,
+        "prediction_sd": 5.643945425583412,
+        "probability_fraction_45_to_55pct": 0.9305555555555556,
+        "raw_probability_mean_distance_from_half": 0.09206422939490286
+      },
+      "n": 285,
+      "partial_season": false,
+      "season": 2021,
+      "total": {
+        "bias": 0.32382065451834513,
+        "calibrated_probability_mean_distance_from_half": 0.0324052405914415,
+        "mae": 10.996549412699993,
+        "noninteger_threshold_n": 122,
+        "outcome_sd": 13.718438524684782,
+        "prediction_sd": 2.8104200484495214,
+        "probability_fraction_45_to_55pct": 0.9098360655737705,
+        "raw_probability_mean_distance_from_half": 0.0634066465719619
+      },
+      "training_end_season": 2016
+    },
+    {
+      "calibration_end_season": 2019,
+      "margin": {
+        "bias": 0.49130794234315617,
+        "calibrated_probability_mean_distance_from_half": 0.022314425726346725,
+        "mae": 9.053108623314913,
+        "noninteger_threshold_n": 139,
+        "outcome_sd": 12.397580309089886,
+        "prediction_sd": 4.513354121552285,
+        "probability_fraction_45_to_55pct": 0.935251798561151,
+        "raw_probability_mean_distance_from_half": 0.0826408075099106
+      },
+      "n": 284,
+      "partial_season": false,
+      "season": 2022,
+      "total": {
+        "bias": 0.9318284213202879,
+        "calibrated_probability_mean_distance_from_half": 0.0344123781966563,
+        "mae": 10.760312755648483,
+        "noninteger_threshold_n": 134,
+        "outcome_sd": 13.775963296592284,
+        "prediction_sd": 3.1398751651465893,
+        "probability_fraction_45_to_55pct": 0.9626865671641791,
+        "raw_probability_mean_distance_from_half": 0.06893601869558565
+      },
+      "training_end_season": 2016
+    },
+    {
+      "calibration_end_season": 2019,
+      "margin": {
+        "bias": -0.212940651915106,
+        "calibrated_probability_mean_distance_from_half": 0.017176757680550925,
+        "mae": 10.51371973662181,
+        "noninteger_threshold_n": 147,
+        "outcome_sd": 14.378871165022018,
+        "prediction_sd": 4.9988233420487065,
+        "probability_fraction_45_to_55pct": 0.9795918367346939,
+        "raw_probability_mean_distance_from_half": 0.08220629074824228
+      },
+      "n": 285,
+      "partial_season": false,
+      "season": 2023,
+      "total": {
+        "bias": 0.564870873545626,
+        "calibrated_probability_mean_distance_from_half": 0.037651788399105685,
+        "mae": 10.510918722084082,
+        "noninteger_threshold_n": 156,
+        "outcome_sd": 13.680002051913256,
+        "prediction_sd": 3.0980057227171294,
+        "probability_fraction_45_to_55pct": 0.9487179487179487,
+        "raw_probability_mean_distance_from_half": 0.0639530263900721
+      },
+      "training_end_season": 2016
+    },
+    {
+      "calibration_end_season": 2019,
+      "margin": {
+        "bias": 0.4395477755018283,
+        "calibrated_probability_mean_distance_from_half": 0.023599782218192082,
+        "mae": 10.273313655380624,
+        "noninteger_threshold_n": 149,
+        "outcome_sd": 14.442031950438782,
+        "prediction_sd": 5.437960115350601,
+        "probability_fraction_45_to_55pct": 0.9194630872483222,
+        "raw_probability_mean_distance_from_half": 0.10090917722047629
+      },
+      "n": 285,
+      "partial_season": false,
+      "season": 2024,
+      "total": {
+        "bias": -0.5915407782777269,
+        "calibrated_probability_mean_distance_from_half": 0.04570991756054669,
+        "mae": 9.902141010191423,
+        "noninteger_threshold_n": 166,
+        "outcome_sd": 13.183311124789121,
+        "prediction_sd": 3.067882231464918,
+        "probability_fraction_45_to_55pct": 0.927710843373494,
+        "raw_probability_mean_distance_from_half": 0.06899800703298843
+      },
+      "training_end_season": 2016
+    },
+    {
+      "calibration_end_season": 2019,
+      "margin": {
+        "bias": 0.4691041717093707,
+        "calibrated_probability_mean_distance_from_half": 0.018691729558356362,
+        "mae": 10.13795320217572,
+        "noninteger_threshold_n": 214,
+        "outcome_sd": 14.132924783725548,
+        "prediction_sd": 5.434690994781582,
+        "probability_fraction_45_to_55pct": 0.9766355140186916,
+        "raw_probability_mean_distance_from_half": 0.08477001304083019
+      },
+      "n": 285,
+      "partial_season": false,
+      "season": 2025,
+      "total": {
+        "bias": 0.3624846774491236,
+        "calibrated_probability_mean_distance_from_half": 0.039330562732011916,
+        "mae": 10.694273336948838,
+        "noninteger_threshold_n": 285,
+        "outcome_sd": 13.824145509818646,
+        "prediction_sd": 2.8053556328803513,
+        "probability_fraction_45_to_55pct": 0.9508771929824561,
+        "raw_probability_mean_distance_from_half": 0.06968115392289255
+      },
+      "training_end_season": 2016
+    },
+    {
+      "calibration_end_season": 2019,
+      "margin": {
+        "bias": 2.7866557300663906,
+        "calibrated_probability_mean_distance_from_half": 0.017839616411375065,
+        "mae": 9.916692250429277,
+        "noninteger_threshold_n": 66,
+        "outcome_sd": 12.416621733551445,
+        "prediction_sd": 5.180565694746291,
+        "probability_fraction_45_to_55pct": 0.9545454545454546,
+        "raw_probability_mean_distance_from_half": 0.10168067342983726
+      },
+      "n": 92,
+      "partial_season": true,
+      "season": 2026,
+      "total": {
+        "bias": -0.9064886191648722,
+        "calibrated_probability_mean_distance_from_half": 0.03494320743726492,
+        "mae": 11.647662208036415,
+        "noninteger_threshold_n": 92,
+        "outcome_sd": 14.434537059200114,
+        "prediction_sd": 2.8423439733338633,
+        "probability_fraction_45_to_55pct": 0.9130434782608695,
+        "raw_probability_mean_distance_from_half": 0.08083292831429045
+      },
+      "training_end_season": 2016
+    }
+  ],
+  "source_sha256": "00dc736e8afe7147322ef3f211fb13a0caaf09ed4f26d8fa3b57b6a171362a83",
+  "status": "FROZEN_MODEL_RETROSPECTIVE_DIAGNOSTIC_NOT_PIT",
+  "unavailable": [
+    "authenticated paired closing provenance",
+    "logged entry quote/time",
+    "multi-season paired prop closes"
+  ]
+}
