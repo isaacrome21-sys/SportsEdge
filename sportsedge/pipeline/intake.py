@@ -16,8 +16,9 @@ Rules (identical for every sport):
   first market it applies to the whole board; after a header it applies to that
   game. Duplicates in the same scope and malformed values fail closed. A body
   without it parses, but ``captured_at`` is None and a warning is recorded.
-* A line with exactly one price fails closed (no side is ever invented). A
-  recognised market with the wrong shape fails closed.
+* A recognised binary market with exactly one price fails closed (no side is
+  ever invented). Unsupported one-sided offers are skipped with an explicit
+  warning in the default mode and refused in strict mode.
 * A line whose market label the sport adapter does not know is skipped with a
   warning (``SKIPPED_UNKNOWN``), never guessed.
 * Prices are transcribed only. Nothing here creates a probability.
