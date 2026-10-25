@@ -94,3 +94,25 @@ def test_missing_arrays_report_unknown_linkage_not_zero():
         for field in ("unlinked_selections", "linked_selections", "duplicate_market_ids",
                       "duplicate_event_ids", "markets_without_event"):
             assert field in row and row[field] is None
+
+def test_raw_archive_preserves_exact_bytes(tmp_path):
+    raw = b'{"events":[],"markets":[],"selections":[]}'
+    def fetch(key):
+        return SimpleNamespace(sport_key=key, raw=raw, payload={"events": [], "markets": [], "selections": []},
+                               source_uri="https://example.invalid", received_at=NOW)
+    report = probe(fetcher=fetch, clock=lambda: NOW, archive_dir=tmp_path)
+    for sport in ("NFL", "CFB", "MLB"):
+        row = report["sports"][sport]
+        assert row["status"] == "FETCHED"
+        assert (tmp_path / (sport.lower() + "-" + hashlib.sha256(raw).hexdigest() + ".json")).read_bytes() == raw
+
+def test_archive_conflict_fails_closed(tmp_path):
+    raw = b'{"events":[]}'
+    destination = tmp_path / ("nfl-" + hashlib.sha256(raw).hexdigest() + ".json")
+    destination.write_bytes(b"tampered")
+    def fetch(key):
+        return SimpleNamespace(sport_key=key, raw=raw, payload={"events": []},
+                               source_uri="https://example.invalid", received_at=NOW)
+    report = probe(fetcher=fetch, clock=lambda: NOW, archive_dir=tmp_path)
+    assert report["sports"]["NFL"]["status"] == "UNAVAILABLE"
+    assert destination.read_bytes() == b"tampered"
