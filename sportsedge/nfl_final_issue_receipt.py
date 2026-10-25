@@ -6,11 +6,14 @@ The caller must supply genuine raw bytes and an independently obtained wall cloc
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import re
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
+
+from sportsedge.nfl_direct_capture_source import DirectCaptureError, game_rows_direct
 
 
 class FinalIssueRouteError(ValueError):
@@ -155,6 +158,59 @@ def format_final_issue(
         raise FinalIssueRouteError("ROUTE_MARKET_POINTS_INVALID")
     away_price, home_price = _price(spread.get("away_price")), _price(spread.get("home_price"))
     over_price, under_price = _price(total.get("over_price")), _price(total.get("under_price"))
+    # A matching raw SHA alone does not bind the market prices to the raw board.
+    # Re-normalize the archived response using the same direct-source parser and
+    # refuse a record whose event, start, teams or quote differs at all.
+    try:
+        payload = json.loads(
+            raw_bytes,
+            parse_constant=lambda token: (_ for _ in ()).throw(ValueError(token)),
+        )
+        if not isinstance(payload, Mapping):
+            raise ValueError("RAW_ROOT_INVALID")
+        events = payload.get("events")
+        if not isinstance(events, list) or sum(
+            isinstance(event, Mapping) and str(event.get("id")) == event_id
+            for event in events
+        ) != 1:
+            raise ValueError("RAW_EVENT_NOT_UNIQUE")
+        direct_rows = game_rows_direct(
+            {
+                "sport_key": "americanfootball_nfl",
+                "source_uri": str(uri),
+                "raw_bytes": raw_bytes,
+                "raw_payload": payload,
+                "observed_at_utc": received.isoformat().replace("+00:00", "Z"),
+            },
+            week_of=lambda _kickoff: 0,
+        )
+    except (ValueError, TypeError, KeyError, OverflowError, DirectCaptureError) as exc:
+        raise FinalIssueRouteError("ROUTE_RAW_MARKET_PARSE_BLOCKED") from exc
+    raw_matches = [row for row in direct_rows if str(row.get("event_id")) == event_id]
+    if len(raw_matches) != 1:
+        raise FinalIssueRouteError("ROUTE_RAW_EVENT_MARKETS_NOT_UNIQUE")
+    direct_game = raw_matches[0]
+    if (
+        direct_game.get("away_team") != game.get("away_team")
+        or direct_game.get("home_team") != game.get("home_team")
+        or _utc(direct_game.get("commence_time")) != kickoff
+        or direct_game.get("spread", {}).get("status") != "OK"
+        or direct_game.get("total", {}).get("status") != "OK"
+    ):
+        raise FinalIssueRouteError("ROUTE_RAW_IDENTITY_OR_MARKET_MISMATCH")
+    derived_spread = direct_game["spread"]
+    derived_total = direct_game["total"]
+    if (
+        _point(derived_spread.get("away_point")) != away_point
+        or _point(derived_spread.get("home_point")) != home_point
+        or _price(derived_spread.get("away_price")) != away_price
+        or _price(derived_spread.get("home_price")) != home_price
+        or _point(derived_total.get("point")) != total_point
+        or _price(derived_total.get("over_price")) != over_price
+        or _price(derived_total.get("under_price")) != under_price
+    ):
+        raise FinalIssueRouteError("ROUTE_RAW_QUOTE_MISMATCH")
+
     captured = received.isoformat().replace("+00:00", "Z")
     return "\n".join([
         header,
