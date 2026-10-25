@@ -8,6 +8,7 @@ evidence would support; it never writes or promotes.
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from statistics import mean
@@ -46,19 +47,46 @@ def stake_units(sport: str, market: str, *, ladder: Mapping[str, Any] | None = N
     return STAKE_UNITS[status_for(sport, market, ladder=ladder)]
 
 
+def _finite_numbers(rows: Iterable[Any]) -> list[float] | None:
+    """Every row must be a real finite int/float. Anything else -> None.
+
+    Rejects NaN, +/-inf, bools, strings, None. One bad row voids the set,
+    because NaN/inf make ``mean() <= 0`` and ``sum() <= 0`` compare False.
+    """
+    out: list[float] = []
+    for value in rows:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        number = float(value)
+        if not math.isfinite(number):
+            return None
+        out.append(number)
+    return out
+
+
 def evidence_supports(clv_values: Iterable[float], current: str = PAPER, *,
                       units: Iterable[float] | None = None) -> str:
     """Status the graded evidence would support (report only, never applied).
 
     Same bar as the Lane 7 gate: PAPER -> 0.25u needs >= 200 graded picks in
     this market with mean no-vig CLV > 0 AND realized ROI > 0 (``units`` is the
-    per-pick graded units, same picks as ``clv_values``). Missing or mismatched
-    ``units`` stays PAPER. 0.25u -> 0.5u only if all of that still holds.
+    per-pick graded units, same picks as ``clv_values``). Missing, mismatched,
+    or non-finite rows stay PAPER. 0.25u -> 0.5u only if all of that still holds.
     """
-    values = list(clv_values)
-    results = list(units) if units is not None else []
+    if units is None:
+        return PAPER
+    values = _finite_numbers(clv_values)
+    results = _finite_numbers(units)
+    if values is None or results is None:
+        return PAPER
     if len(values) < MIN_GRADED or len(results) != len(values):
         return PAPER
-    if mean(values) <= 0 or sum(results) <= 0:
+    try:
+        clv_mean, units_total = mean(values), math.fsum(results)
+    except OverflowError:
+        return PAPER
+    if not (math.isfinite(clv_mean) and math.isfinite(units_total)):
+        return PAPER
+    if not (clv_mean > 0 and units_total > 0):
         return PAPER
     return STAKE_05 if current in (STAKE_025, STAKE_05) else STAKE_025
