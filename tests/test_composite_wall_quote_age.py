@@ -39,3 +39,25 @@ def test_later_stale_game_refuses_before_any_game_prices():
     with pytest.raises(CompositeRefusal, match="COMPOSITE_WALL_QUOTE_NOT_CURRENT"):
         run_composite({"lines": [first, second]}, now=now, run_full_fn=record_pricing)
     assert calls == []
+
+
+@pytest.mark.parametrize("invalid_capture", [
+    "2026-10-25T12:00:01Z",  # future relative to wall
+    "2026-10-25T11:29:59Z",  # 1801 seconds old
+    "2026-10-25T11:45:00",   # timezone missing
+])
+def test_later_invalid_game_never_partially_prices(invalid_capture):
+    now = datetime(2026, 10, 25, 12, tzinfo=timezone.utc)
+    base = dict(sport="NFL", kickoff="2026-10-25T18:00:00Z",
+                market="TOTAL", side="OVER", line=45.5, odds=-110)
+    first = dict(base, away="First Away", home="First Home",
+                 quote_captured_at="2026-10-25T11:45:00Z")
+    second = dict(base, away="Second Away", home="Second Home",
+                  quote_captured_at=invalid_capture)
+    calls = []
+    def spy(*args, **kwargs):
+        calls.append(True)
+        raise AssertionError("partial pricing")
+    with pytest.raises(CompositeRefusal):
+        run_composite({"lines": [first, second]}, now=now, run_full_fn=spy)
+    assert calls == []
