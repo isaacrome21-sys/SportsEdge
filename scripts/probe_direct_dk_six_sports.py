@@ -3,6 +3,7 @@
 from __future__ import annotations
 import argparse
 import json
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 from sportsedge.draftkings_game_market_source import (
@@ -23,6 +24,8 @@ def probe(*, fetcher=fetch_board, clock=lambda: datetime.now(timezone.utc)):
             board = fetcher(key)
             result["sports"][sport] = {
                 "status": "FETCHED", "source_uri": board.source_uri,
+                "raw_sha256": hashlib.sha256(board.raw).hexdigest(),
+                "raw_size_bytes": len(board.raw),
                 "received_at_utc": board.received_at.isoformat(),
                 "market_catalog": sorted({str(m.get("name")).strip() for m in board.payload.get("markets", []) if isinstance(m, dict) and str(m.get("name") or "").strip()}) if isinstance(board.payload.get("markets"), list) else None,
                 "payload_markets": len(board.payload["markets"]) if isinstance(board.payload.get("markets"), list) else None,
