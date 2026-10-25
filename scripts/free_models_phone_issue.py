@@ -91,7 +91,7 @@ def render_card(card, *, run_url="", intake_at=""):
         "",
         "**Unvalidated research estimates only — not proven +EV, OFFICIAL, Model_P or staking advice.**",
         "DK prices are user-supplied. Issue timestamps do not verify sportsbook quote freshness.",
-        "Model adjustments and the 15% market-anchor weight have not been proven against out-of-sample closes.",
+        "CFB residual weight is 0% by owner ruling; other sports retain their unvalidated research weights.",
         "",
         f"Run snapshot: {safe(card.get('as_of_utc'))} · Issue last updated: {safe(intake_at)}",
         f"Input rows: {int(summary.get('rows', 0))} · Primary pricing lane: {safe(primary_lane)} · "
@@ -161,7 +161,7 @@ def render_card(card, *, run_url="", intake_at=""):
         lines.append("- No additional priced model rows")
     lines += [
         "",
-        "**Conservative book-anchored research candidates (Lane B, 15% unfitted residual — hypothesis, not validated)**",
+        "**Conservative book-anchored research candidates (Lane B, CFB 0% residual; other sports unvalidated)**",
         "Lane B shrinks Lane A toward the posted line; it has not proven out-of-sample superiority.",
         "",
         "| Game | Research selection | DK | Lane | Estimate | Estimated EV |",

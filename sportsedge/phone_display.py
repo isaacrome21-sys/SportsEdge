@@ -63,7 +63,7 @@ BLENDED_SPORTS = frozenset({"CFB", "NFL"})
 
 
 def _blended(row, sport):
-    """Market-blended view (Lane B: DK line + 15% of the model's gap).
+    """Market-blended view (Lane B; declared per-sport residual weight).
 
     CFB raw matchup projections disagree with DK by 7-15 points on half a
     slate (+20-70% "EV"). Owner ruling Oct 24 2026: rank CFB by the
@@ -446,8 +446,8 @@ def render_phone_card(card, *, run_url="", intake_at="", now=None):
         key=_rank_ev, reverse=True)
     if stale_ranked:
         lines += ["### Model value at the SUBMITTED prices · re-check line before betting", "",
-                  "Ranked by EV, highest first. CFB and NFL rows use the MARKET-BLENDED price (DK line plus 15% "
-                  "of the model's disagreement); raw model gaps are too noisy to bet directly.", "",
+                  "Ranked by EV, highest first. CFB and NFL rows use the MARKET-BLENDED price (CFB residual weight 0%; NFL 15% "
+                  "of the model's disagreement); paper estimates, not validated wagering edges.", "",
                   "| # | EV | Game | Selection | DK (submitted) | Model p | Model fair | Model |",
                   "| ---: | ---: | --- | --- | ---: | ---: | ---: | --- |"]
         for rank, r in enumerate(stale_ranked[:30], 1):
