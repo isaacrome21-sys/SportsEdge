@@ -251,7 +251,8 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
                 if ev > 0:
                     text = (f"- **POSITIVE EV — PAPER** {label}: {best.get('selection')}"
                             f" @ {fmt_price(best.get('price_american'))}"
-                            f" · estimated EV {ev * 100:+.2f}%"
+                            f" · estimated EV {ev * 100:+.4g}%"
+                            f" · Captured: {row.get('quote_retrieved_at') or 'unavailable'}"
                             f" · model warning: {why} (NOT proven, not a bet)")
                 else:
                     text = (f"- **{status}** {label}: best side {best.get('selection')} research EV {ev * 100:+.1f}%"

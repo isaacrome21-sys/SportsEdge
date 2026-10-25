@@ -30,3 +30,13 @@ def test_model_warning_preserved():
 
 def test_stale_refusal_not_bypassed():
     assert 'POSITIVE EV — PAPER' not in card(.004,no_model='STALE_QUOTE')
+
+
+def test_original_quote_time_is_displayed():
+    assert 'Captured: 2026-10-25T09:32:21-05:00' in card(.004,quote_retrieved_at='2026-10-25T09:32:21-05:00')
+
+def test_missing_capture_is_not_invented():
+    assert 'Captured: unavailable' in card(.004)
+
+def test_tiny_positive_not_rounded_to_zero():
+    assert 'estimated EV +1e-06%' in card(.00000001)
