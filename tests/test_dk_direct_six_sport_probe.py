@@ -163,3 +163,11 @@ def test_existing_matching_archive_is_reused(tmp_path):
     report = probe(fetcher=fetch, clock=lambda: NOW, archive_dir=tmp_path)
     assert report["sports"]["NFL"]["status"] == "FETCHED"
     assert destination.read_bytes() == raw
+
+def test_malformed_transport_object_is_unavailable():
+    def malformed(key):
+        return SimpleNamespace(sport_key=key, raw=b"{}", payload={},
+                               source_uri=None, received_at=NOW)
+    result = probe(fetcher=malformed, clock=lambda: NOW)
+    assert all(result["sports"][sport]["status"] == "UNAVAILABLE"
+               for sport in ("NFL", "CFB", "MLB"))
