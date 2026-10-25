@@ -101,6 +101,26 @@ class Game:
     home: str
     header: str
     markets: list[Market] = field(default_factory=list)
+    # Sportsbook capture instant from the issue's ``Captured:`` line (issue-level,
+    # or a per-game override after the header). Never the GitHub issue time.
+    captured_at: str | None = None
+
+
+_CAPTURED_RE = re.compile(r"^captured\b\s*:?\s*(.*?)\s*$", re.I)
+
+
+def parse_captured_at(token: str, raw: str) -> str:
+    """ISO-8601 instant with explicit offset -> normalized isoformat; else NBALinesError."""
+    from datetime import datetime
+    if not token or " " in token or "T" not in token.upper():
+        raise NBALinesError(f"NBA_CAPTURED_AT_INVALID:{raw}")
+    try:
+        value = datetime.fromisoformat(token.replace("Z", "+00:00").replace("z", "+00:00"))
+    except ValueError as exc:
+        raise NBALinesError(f"NBA_CAPTURED_AT_INVALID:{raw}") from exc
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise NBALinesError(f"NBA_CAPTURED_AT_TZ_REQUIRED:{raw}")
+    return value.isoformat()
 
 
 def _american(tok: str, raw: str) -> int:
@@ -141,16 +161,29 @@ def parse_lines(body: str) -> list[Game]:
         raise NBALinesError(str(exc)) from exc
     games: list[Game] = []
     cur: Game | None = None
+    issue_captured: str | None = None
     for raw in body.splitlines():
         line = raw.strip()
         if not line or line.startswith("#") or line.startswith("<!--"):
+            continue
+        if line.upper().startswith("[NBA LINES]"):
+            continue
+        cm = _CAPTURED_RE.match(line)
+        if cm:
+            ts = parse_captured_at(cm.group(1), line)
+            if cur is None:
+                if issue_captured is not None:
+                    raise NBALinesError(f"NBA_CAPTURED_AT_DUPLICATE:{line}")
+                issue_captured = ts
+            else:
+                cur.captured_at = ts
             continue
         if "@" in line and not re.match(r"^(ml|moneyline|spread|sp|total|ou|o/u)\b", line, re.I):
             a, h = [p.strip() for p in line.split("@", 1)]
             away, home = team_abbr(a), team_abbr(h)
             if away == home:
                 raise NBALinesError(f"NBA_TEAMS_IDENTICAL:{line}")
-            cur = Game(away, home, line)
+            cur = Game(away, home, line, captured_at=issue_captured)
             games.append(cur)
             continue
         if cur is None:
