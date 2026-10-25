@@ -9,7 +9,7 @@ def test_research_does_not_make_fiftieth_pick():
     assert span_filtered_evidence_supports([record(event_id=f'event-{i}') for i in range(49)]+[record(200)])==PAPER
 
 def test_research_cannot_turn_losing_full_cohort_positive():
-    assert span_filtered_evidence_supports([record(units=-1) for _ in range(50)]+[record(200,units=1000) for _ in range(100)])==PAPER
+    assert span_filtered_evidence_supports([record(event_id=f'full-{i}',units=-1) for i in range(50)]+[record(200,event_id=f'research-{i}',units=1000) for i in range(100)])==PAPER
 
 def test_missing_provenance_and_mixed_markets_stay_paper():
     assert span_filtered_evidence_supports([record(capture_method=None) for _ in range(50)])==PAPER
@@ -32,3 +32,14 @@ def test_missing_event_identity_refuses():
 
 def test_malformed_row_refuses_without_crash():
     assert span_filtered_evidence_supports([None]) == PAPER
+
+
+def test_model_version_cohorts_do_not_combine():
+    rows = [record(event_id=f'event-{i}') for i in range(49)]
+    rows.append(record(event_id='event-49',engine='v2'))
+    assert span_filtered_evidence_supports(rows) == PAPER
+
+def test_repeated_capture_with_new_timestamp_still_refuses():
+    rows = [record(event_id=f'event-{i}') for i in range(50)]
+    rows.append(record(event_id='event-0',captured_at='2026-10-25T12:01:00Z'))
+    assert span_filtered_evidence_supports(rows) == PAPER
