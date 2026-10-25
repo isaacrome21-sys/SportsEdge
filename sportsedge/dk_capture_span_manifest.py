@@ -1,54 +1,27 @@
-"""Per-game capture-span manifest for parallel DraftKings capture.
+"""Research-only per-game capture-span accounting, version 2.
 
-The scheduled NBA captures are moving from one long sequential pass over
-the board to per-game captures run in parallel. This module is the
-repo-side accounting for that change: given one span record per game —
-event id, capture start, capture finish — it computes each game's span
-and rules on it under the standing capture-freshness ruling:
-
-  - a game's capture span may not exceed 150 seconds (the paired-quote
-    span bar; 150.0 is valid, anything above is refused);
-  - the 180-second quote-age freshness limit is unchanged and is still
-    enforced where quotes are consumed — this manifest neither relaxes
-    it nor substitutes for it.
-
-A game over the span limit is REFUSED_SPAN: it stays in the manifest
-with its span shown, is excluded from the accepted list, and is never
-silently dropped. A game whose capture did not finish is FAILED. Only
-OK games are handed forward for pricing; an evening card built from a
-manifest with refused games prices the accepted games only and never
-falls back silently to an earlier capture for the refused ones.
-
-Input is the dedicated span-record list the capture writes for this
-purpose (one record per game), NOT a raw capture game section:
-
-    {"event_id": ..., "capture_started_at": iso-with-tz,
-     "capture_finished_at": iso-with-tz or None,
-     "failure_reason": optional, only when the capture failed}
-
-Malformed records (missing event id, naive or unparseable timestamps,
-finish before start, duplicate event ids, a failure reason on a
-finished capture, unknown fields, an empty manifest) raise
-CaptureSpanManifestError — fail-closed, never partially evaluated.
-
-Inventory-only until the capture jobs adopt it: nothing imports this
-module in production yet, and it changes no pricing, ledger, evaluator,
-or capture behavior on its own. Research only; no play authority.
+<=150 seconds: eligible for downstream review; 150-300 seconds: retained
+and flagged for grading, never eligible for the promotion ladder; >300:
+refused. Quote wall age <=1800 seconds is a separate control enforced
+by quote consumers, not by this manifest. This module is inventory-only
+and does not authorize production pricing or promotions.
 """
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Mapping
 
-VERSION = "DK_CAPTURE_SPAN_MANIFEST_V1"
+VERSION = "DK_CAPTURE_SPAN_MANIFEST_V2"
 SPAN_LIMIT_S = 150.0
-QUOTE_MAX_AGE_S = 180.0
+QUOTE_MAX_AGE_S = 1800.0
+SPAN_RESEARCH_MAX_S = 300.0
 RECORD_FIELDS = frozenset({
     "event_id", "capture_started_at", "capture_finished_at",
     "failure_reason",
 })
 STATUS_OK = "OK"
 STATUS_REFUSED_SPAN = "REFUSED_SPAN"
+STATUS_FLAGGED = "FLAGGED_RESEARCH"
 STATUS_FAILED = "FAILED"
 
 
@@ -122,18 +95,26 @@ def build_capture_span_manifest(records: Any) -> dict[str, Any]:
                 raise CaptureSpanManifestError("CAPTURE_SPAN_CHRONOLOGY_INVALID")
             entry["span_seconds"] = span
             entry["status"] = (
-                STATUS_OK if span <= SPAN_LIMIT_S else STATUS_REFUSED_SPAN)
+                STATUS_OK if span <= SPAN_LIMIT_S else
+                STATUS_FLAGGED if span <= SPAN_RESEARCH_MAX_S else
+                STATUS_REFUSED_SPAN)
+            entry["ladder_eligible"] = span <= SPAN_LIMIT_S
+        if finished_raw is None:
+            entry["ladder_eligible"] = False
         games.append(entry)
     games.sort(key=lambda g: g["event_id"])
     accepted = [g["event_id"] for g in games if g["status"] == STATUS_OK]
+    flagged = [g["event_id"] for g in games if g["status"] == STATUS_FLAGGED]
     refused = [{
         "event_id": g["event_id"],
         "status": g["status"],
         "span_seconds": g["span_seconds"],
-    } for g in games if g["status"] != STATUS_OK]
+    } for g in games if g["status"] in (STATUS_REFUSED_SPAN, STATUS_FAILED)]
     return {
         "version": VERSION,
         "span_limit_seconds": SPAN_LIMIT_S,
+        "research_span_limit_seconds": SPAN_RESEARCH_MAX_S,
+        "flagged_research_event_ids": flagged,
         "quote_max_age_seconds": QUOTE_MAX_AGE_S,
         "games": games,
         "accepted_event_ids": accepted,
@@ -141,13 +122,14 @@ def build_capture_span_manifest(records: Any) -> dict[str, Any]:
         "counts": {
             "games": len(games),
             "ok": len(accepted),
+            "flagged_research": len(flagged),
             "refused_span": sum(
                 1 for g in games if g["status"] == STATUS_REFUSED_SPAN),
             "failed": sum(
                 1 for g in games if g["status"] == STATUS_FAILED),
         },
-        "status": ("ALL_GAMES_WITHIN_LIMIT" if not refused
-                   else "GAMES_REFUSED"),
+        "status": ("ALL_GAMES_WITHIN_LIMIT" if not refused and not flagged
+                   else "GAMES_FLAGGED" if not refused else "GAMES_REFUSED"),
         "research_only": True,
         "play_authority": False,
     }
