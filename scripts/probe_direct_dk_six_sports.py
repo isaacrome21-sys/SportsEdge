@@ -25,6 +25,9 @@ def selection_linkage(payload):
     event_ids = {str(e["id"]) for e in payload.get("events", [])
                  if isinstance(e, dict) and e.get("id") is not None} if isinstance(payload.get("events"), list) else None
     return {
+        "duplicate_event_ids": (len([e for e in payload["events"]
+            if isinstance(e, dict) and e.get("id") is not None]) - len(event_ids))
+            if event_ids is not None else None,
         "markets_without_event": sum(1 for m in markets if isinstance(m, dict)
             and (m.get("eventId") is None or str(m["eventId"]) not in event_ids))
             if event_ids is not None else None,
