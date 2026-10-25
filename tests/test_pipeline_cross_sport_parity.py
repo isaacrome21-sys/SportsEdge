@@ -162,11 +162,28 @@ def test_ladder_file_is_paper_everywhere_and_never_inherited():
     assert ladder.status_for("NFL", "total", ladder=fake) == "PAPER"
 
 
-def test_ladder_evidence_rule_reports_only():
-    assert ladder.evidence_supports([0.01] * 149) == "PAPER"
-    assert ladder.evidence_supports([0.01] * 150) == "STAKE_0_25U"
-    assert ladder.evidence_supports([0.01] * 150, current="STAKE_0_25U") == "STAKE_0_5U"
-    assert ladder.evidence_supports([-0.01] * 300, current="STAKE_0_5U") == "PAPER"
+def test_ladder_evidence_rule_matches_lane7_gate():
+    win = [0.9] * 200
+    assert ladder.evidence_supports([0.01] * 199, units=[0.9] * 199) == "PAPER"
+    assert ladder.evidence_supports([0.01] * 200) == "PAPER"                      # no ROI evidence
+    assert ladder.evidence_supports([0.01] * 200, units=[0.9] * 150) == "PAPER"   # mismatched
+    assert ladder.evidence_supports([0.01] * 200, units=[-1.0] * 200) == "PAPER"  # ROI <= 0
+    assert ladder.evidence_supports([-0.01] * 200, units=win) == "PAPER"          # CLV <= 0
+    assert ladder.evidence_supports([0.01] * 200, units=win) == "STAKE_0_25U"
+    assert ladder.evidence_supports([0.01] * 200, current="STAKE_0_25U", units=win) == "STAKE_0_5U"
+    assert ladder.evidence_supports([-0.01] * 300, current="STAKE_0_5U", units=[0.9] * 300) == "PAPER"
+
+
+@pytest.mark.parametrize("where", ["board", "after_header"])
+def test_envelope_second_capture_fails_closed(where):
+    other = "Captured: 2026-10-25T12:30:00-05:00"
+    if where == "board":
+        body = other + "\n" + muse("MLB", header=False)   # two captures, no header
+    else:
+        body = muse("MLB")
+        body = body.replace("ML +125 -145", other + "\nML +125 -145")
+    with pytest.raises(SharedIntakeError, match="CAPTURED_AT_DUPLICATE"):
+        parse_envelope(body, "MLB")
 
 
 def test_snapshot_hook_is_inert_without_store(monkeypatch):
