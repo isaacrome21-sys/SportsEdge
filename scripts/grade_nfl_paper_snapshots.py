@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import json
 from datetime import datetime
+from math import isfinite
 from pathlib import Path
 from typing import Any
 
@@ -86,7 +87,7 @@ def _final(finals: dict[str, Any], identity: tuple[str, str, str]) -> tuple[Fina
     return FinalResult(away_score=scores[0], home_score=scores[1]), start.isoformat()
 
 
-def _canonical_pick(rec: dict[str, Any]) -> tuple[str, str, str, str]:
+def _canonical_pick(rec: dict[str, Any]) -> tuple[str, str, str]:
     return (
         str(rec.get("market") or "").lower(),
         str(rec.get("subject") or "").strip(),
@@ -100,11 +101,17 @@ def _quote(rec: dict[str, Any], snap: dict[str, Any], *, label: str) -> PickReco
         raise NFLPaperGradeError(f"NFL_GRADE_{label}_PAIR_INCOMPLETE")
     if rec["price"] != rec["dk_price"]:
         raise NFLPaperGradeError(f"NFL_GRADE_{label}_PRICE_MISMATCH")
+    for field in ("line", "model_p", "ev"):
+        value = rec.get(field)
+        if (value is not None and
+                (type(value) not in (float, int) or not isfinite(value))):
+            raise NFLPaperGradeError(f"NFL_GRADE_{label}_NONFINITE_OR_NONNUMERIC_{field.upper()}")
     try:
         pick = PickRecord.from_dict(rec)
     except (PickRecordError, TypeError, ValueError, KeyError) as exc:
         raise NFLPaperGradeError(f"NFL_GRADE_{label}_PICK_INVALID") from exc
-    if pick.sport != "NFL" or _time(pick.captured_at) != _time(snap["captured_at"]):
+    if (pick.sport != "NFL" or pick.ladder_status != "PAPER"
+            or _time(pick.captured_at) != _time(snap["captured_at"])):
         raise NFLPaperGradeError(f"NFL_GRADE_{label}_IDENTITY_TIME_MISMATCH")
     return pick
 
@@ -122,13 +129,15 @@ def grade_issue(issue_number: int, snapshots: list[dict[str, Any]],
     if not snapshots:
         raise NFLPaperGradeError("NFL_GRADE_SNAPSHOTS_MISSING")
     identity = _identity(snapshots[0])
-    keys: dict[str, tuple[str, str, str, str]] = {}
+    keys: dict[str, tuple[str, str, str]] = {}
     for s in snapshots:
         if (s.get("sport") != "nfl" or s.get("issue_number") != issue_number
                 or s.get("content_sha256") != _content_hash(s)
                 or _identity(s) != identity):
             raise NFLPaperGradeError("NFL_GRADE_SNAPSHOT_IDENTITY_OR_HASH_INVALID")
         for rec in s.get("picks") or []:
+            if not isinstance(rec, dict):
+                raise NFLPaperGradeError("NFL_GRADE_PICK_RECORD_INVALID")
             key = " ".join(str(rec.get("pick") or "").lower().split())
             if not key:
                 raise NFLPaperGradeError("NFL_GRADE_PICK_KEY_MISSING")
@@ -168,7 +177,7 @@ def grade_issue(issue_number: int, snapshots: list[dict[str, Any]],
         clv_status, clv = pair.status, None
         if pair.status == "OK" and pair.close is not None:
             matching = [r for r in pair.close.get("picks") or []
-                        if str(r.get("pick") or "").strip().lower() == key.lower()]
+                        if " ".join(str(r.get("pick") or "").lower().split()) == key]
             if len(matching) != 1:
                 clv_status = "NFL_GRADE_NO_CLOSE_PICK_PAIR"
             else:
