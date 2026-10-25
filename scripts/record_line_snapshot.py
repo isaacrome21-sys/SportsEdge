@@ -84,6 +84,39 @@ def verify_mlb_card_quotes(body: str, title: str | None, picks: list[dict]) -> N
             raise SnapshotError(f"MLB_SNAPSHOT_CARD_PRICE_UNPAIRED:{label}")
 
 
+def verify_mlb_game_binding(
+    bound: dict, picks: list[dict], captured_at: str, recorded_at: str,
+) -> dict:
+    """Only a uniquely schedule-bound MLB game may carry a graded card receipt."""
+    if not isinstance(bound, dict) or not isinstance(bound.get("rows"), list) or not bound["rows"]:
+        raise SnapshotError("MLB_SNAPSHOT_BOUND_GAME_MISSING")
+    rows = bound["rows"]
+    if (any(not isinstance(r, dict) or type(r.get("game_pk")) is not int
+            or r.get("book") != "draftkings" for r in rows)
+            or len({r["game_pk"] for r in rows}) != 1):
+        raise SnapshotError("MLB_SNAPSHOT_BOUND_GAME_AMBIGUOUS")
+    game_pk = rows[0]["game_pk"]
+    if game_pk <= 0 or any(type(p.get("game_pk")) is not int or p["game_pk"] != game_pk
+                           for p in picks):
+        raise SnapshotError("MLB_SNAPSHOT_CARD_GAME_PK_MISMATCH")
+    starts = {r.get("first_pitch_at") for r in rows}
+    if len(starts) != 1 or not next(iter(starts)):
+        raise SnapshotError("MLB_SNAPSHOT_FIRST_PITCH_MISSING")
+    start_raw = next(iter(starts))
+    try:
+        start = datetime.fromisoformat(start_raw.replace("Z", "+00:00"))
+        captured = datetime.fromisoformat(captured_at.replace("Z", "+00:00"))
+        recorded = datetime.fromisoformat(recorded_at.replace("Z", "+00:00"))
+        source_capture = datetime.fromisoformat(str(bound["captured_at"]).replace("Z", "+00:00"))
+    except (KeyError, AttributeError, ValueError) as exc:
+        raise SnapshotError("MLB_SNAPSHOT_GAME_CLOCK_INVALID") from exc
+    if any(x.tzinfo is None or x.utcoffset() is None for x in (start, captured, recorded, source_capture)):
+        raise SnapshotError("MLB_SNAPSHOT_GAME_CLOCK_OFFSET_REQUIRED")
+    if source_capture != captured or not (captured < start and recorded < start):
+        raise SnapshotError("MLB_SNAPSHOT_START_OR_CAPTURE_MISMATCH")
+    return {"game_pk": game_pk, "first_pitch_at": start.isoformat()}
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--sport", required=True)
@@ -94,6 +127,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--picks-json", type=Path, default=None)
     ap.add_argument("--game-json", type=Path, default=None)
     ap.add_argument("--game-start", default=None)
+    ap.add_argument("--bound-input-json", type=Path, default=None,
+                    help="MLB: same-run MLB schedule-bounded intake JSON, unique game_pk and first-pitch required")
     ap.add_argument("--require-card-quote-match", action="store_true",
                     help="MLB: refuse any saved pick whose price disagrees with its captured two-sided issue line")
     ap.add_argument("--root", type=Path, default=SNAPSHOT_ROOT)
@@ -116,9 +151,19 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if sport == "mlb" and args.require_card_quote_match:
             verify_mlb_card_quotes(body, args.title, picks)
+        recorded_at = datetime.now(timezone.utc).isoformat()
+        if args.bound_input_json:
+            if sport != "mlb":
+                raise SnapshotError("BOUND_INPUT_MLB_ONLY")
+            bound = json.loads(args.bound_input_json.read_text(encoding="utf-8"))
+            from sportsedge.line_snapshots import parse_captured_at
+            captured = parse_captured_at(body)
+            if captured is None:
+                raise SnapshotError("MLB_SNAPSHOT_CAPTURE_MISSING")
+            game.update(verify_mlb_game_binding(bound, picks, captured.isoformat(), recorded_at))
         record = build_snapshot(
             sport=sport, issue_number=args.issue, body=body, title=args.title, game=game,
-            board=board, picks=picks, recorded_at=datetime.now(timezone.utc).isoformat(),
+            board=board, picks=picks, recorded_at=recorded_at,
         )
     except SnapshotError as exc:
         print(f"SNAPSHOT_REFUSED: {exc}", file=sys.stderr)
