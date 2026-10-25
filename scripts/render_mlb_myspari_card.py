@@ -239,9 +239,7 @@ def main() -> int:
             for row in (snap_rows or [])
             if isinstance(row, dict) and row.get("timestamp_source")
         })
-        if timestamp_sources == ["INTAKE_STAMPED"]:
-            notes.append("Timestamp provenance: INTAKE_STAMPED at GitHub issue intake/edit time; not a sportsbook timestamp.")
-        elif timestamp_sources:
+        if timestamp_sources:
             notes.append(f"Timestamp provenance: {', '.join(timestamp_sources)}.")
     notes.append("PAPER ONLY: no MLB SPORT:MARKET is verified. Lane 7 requires 50 authentic graded picks, positive mean no-vig CLV and positive ROI.")
     notes.append("1800-second quote TTL enforced at render; stale/future/unknown capture times never qualify.")
