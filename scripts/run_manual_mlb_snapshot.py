@@ -163,6 +163,8 @@ def main() -> int:
     p.add_argument("--history-cache-dir", default=".cache/mlb-history")
     p.add_argument("--run-date", help="Expected Chicago-local first-pitch date (YYYY-MM-DD)")
     p.add_argument("--max-age-minutes", type=int, default=30)
+    p.add_argument("--strict-live-quote-window", action="store_true",
+                   help="Fail closed on stale/future/post-start quotes (required for issue cards)")
     p.add_argument("--as-of", help="Override current time for deterministic regression tests")
     p.add_argument("--allow-stale", action="store_true", help="Regression fixtures only; bypass live date/recency gates")
     args = p.parse_args()
@@ -175,7 +177,8 @@ def main() -> int:
     if raw_rows is not None and not args.allow_stale:
         as_of = parse_timestamp(args.as_of) if args.as_of else datetime.now(timezone.utc)
         rows, blocked, notes = partition_live_rows(
-            raw_rows, run_date=args.run_date, max_age_minutes=args.max_age_minutes, as_of=as_of,
+            raw_rows, run_date=args.run_date, max_age_minutes=args.max_age_minutes,
+            as_of=as_of, enforce_quote_window=args.strict_live_quote_window,
         )
 
     schedule = _schedule_snapshot(snapshot)
