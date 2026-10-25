@@ -2,6 +2,11 @@
 import json
 from pathlib import Path
 
+import pytest
+
+from scripts.record_line_snapshot import verify_snapshot_lag
+from sportsedge.line_snapshots import SnapshotError
+
 from scripts.record_line_snapshot import main as record_snapshot
 from sportsedge.line_snapshots import load_snapshots
 from tests.test_mlb_card_clv import card
@@ -89,6 +94,16 @@ def test_wrong_card_game_or_schedule_capture_refused(tmp_path):
     assert load_snapshots("mlb", 123456, tmp_path / "ledger") == []
 
 
+def test_forward_capture_age_bound_rejects_stale_and_future_claims():
+    record = {"captured_at": "2026-10-25T16:00:00+00:00",
+              "recorded_at": "2026-10-25T16:02:59+00:00"}
+    verify_snapshot_lag(record, 180)
+    with pytest.raises(SnapshotError, match="STALE"):
+        verify_snapshot_lag({**record, "recorded_at": "2026-10-25T16:03:01+00:00"}, 180)
+    with pytest.raises(SnapshotError, match="STALE"):
+        verify_snapshot_lag({**record, "recorded_at": "2026-10-25T15:59:59+00:00"}, 180)
+
+
 def test_workflow_writes_only_isolated_review_branch():
     workflow = Path(".github/workflows/mlb-lines-issue.yml").read_text(encoding="utf-8")
     assert "contents: write" in workflow
@@ -98,6 +113,7 @@ def test_workflow_writes_only_isolated_review_branch():
     assert "--card-md artifacts/mlb_myspari_ctx/card.md" in workflow
     assert "--require-card-quote-match" in workflow
     assert "--bound-input-json" in workflow
+    assert "--max-capture-lag-seconds 180" in workflow
     assert 'branch="automation/mlb-paper-snapshots-issue-$ISSUE"' in workflow
     assert "gh pr create --draft --base main --head" in workflow
     assert 'git push origin "HEAD:refs/heads/$branch"' in workflow
