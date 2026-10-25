@@ -25,6 +25,8 @@ from sportsedge.nfl_card_game_info import (
     movement_lines,
     snapshot_marker,
 )
+from sportsedge.nfl_market_inventory_card import market_inventory_section
+
 # research_notes/nfl_team_total_prop_backtest_20261003.md
 TEAM_TOTAL_NOTE = (
     "TRACK ONLY (not a bet): team totals tested, no edge "
@@ -258,6 +260,10 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
         if unpriced:
             lines += ["", "Not priced:"] + unpriced
         lines.append("")
+    # Build the honest quote-side board first; this also fills full_board when absent.
+    # The catalog census includes every known family, even when no quote exists.
+    board_details = both_side_section(engine)
+    lines.append(market_inventory_section(engine.get("full_board") or {}))
     for game, team_totals, props in per_game:
         away, home = str(game.get("away")), str(game.get("home"))
         lines.append(f"### {away} @ {home}")
@@ -267,15 +273,13 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
             lines.append(f"- Team totals ({len(team_totals)}): {TEAM_TOTAL_NOTE}")
             lines += team_totals
         if props:
+            # The user requested ALL markets on the phone card. Never bury
+            # genuinely captured player props inside a collapsed details tag.
             lines += [
                 "",
-                f"<details><summary>Props ({len(props)}): TRACK ONLY (not a bet)</summary>",
-                "",
-                f"{PROP_NOTE}",
-                "",
+                f"#### Captured player props ({len(props)}): TRACK ONLY — NOT MODEL-PRICED",
+                PROP_NOTE,
                 *props,
-                "",
-                "</details>",
             ]
         why = why_lines(game)
         if why:
@@ -287,7 +291,7 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
                      "No historical residual validation or positive forward CLV; track only.")
     if engine.get("residual_research_policy"):
         lines.append("Residual adjustments are research-only: not validated, no picks, no staking.")
-    lines.append(both_side_section(engine))
+    lines.append(board_details)
     lines.append(snapshot_marker(engine, observed_at))
     return "\n".join(lines) + "\n"
 
