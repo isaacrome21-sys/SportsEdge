@@ -111,3 +111,39 @@ def test_real_compound_team_totals_preserve_both_quoted_prices_and_team_identity
 def test_compound_team_totals_refuse_incomplete_or_misbound_teams(line, error) -> None:
     with pytest.raises(SharedIntakeError, match=error):
         parse_issue(PREFIX + line, "MLB")
+
+
+def test_real_mlb_alt_lines_and_first_inning_pair_preserve_both_prices() -> None:
+    game = parse_issue(PREFIX + (
+        "Alt Total 3.5 -690 +425\n"
+        "Alt Total 11.5 +495 -860\n"
+        "Alt RL -4.5 +620 / +4.5 -1260\n"
+        "Alt RL +1.5 -234 / -1.5 +175\n"
+        "YRFI +100 / NRFI -130\n"
+    ), "MLB").games[0]
+    assert [(m.market, m.line, m.price_a, m.price_b, m.side_a, m.side_b)
+            for m in game.markets] == [
+        ("GAME_TOTAL", 3.5, -690, 425, "OVER", "UNDER"),
+        ("GAME_TOTAL", 11.5, 495, -860, "OVER", "UNDER"),
+        ("RUN_LINE", -4.5, 620, -1260, "AWAY", "HOME"),
+        ("RUN_LINE", 1.5, -234, 175, "AWAY", "HOME"),
+        ("FIRST_INNING_TOTAL", 0.5, 100, -130, "OVER", "UNDER"),
+    ]
+
+
+def test_first_inning_pair_handles_reverse_label_order_without_swapping_prices() -> None:
+    game = parse_issue(PREFIX + "NRFI -130 / YRFI +100", "MLB").games[0]
+    assert len(game.markets) == 1
+    assert (game.markets[0].price_a, game.markets[0].price_b) == (100, -130)
+
+
+@pytest.mark.parametrize("line", [
+    "YRFI +100 / NRFI",
+    "YRFI +100 / YRFI -130",
+    "NRFI -130 / NRFI +100",
+    "YRFI +100 / NRFI nan",
+    "YRFI +100 / NRFI -50",
+])
+def test_first_inning_pair_refuses_missing_duplicate_and_invalid_quotes(line) -> None:
+    with pytest.raises(SharedIntakeError, match="PAIR_INVALID|ODDS_INVALID"):
+        parse_issue(PREFIX + line, "MLB")
