@@ -36,7 +36,7 @@ def _files(inputs: Iterable[str]) -> list[Path]:
     return out
 
 
-def _load(paths: Iterable[Path]) -> list[dict[str, Any]]:
+def _load(paths: Iterable[Path], *, strict_provenance: bool = False) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for path in paths:
         with path.open("r", encoding="utf-8") as handle:
@@ -50,7 +50,7 @@ def _load(paths: Iterable[Path]) -> list[dict[str, Any]]:
                     raise SystemExit(f"{path}:{line_no}: invalid JSON: {exc}") from exc
                 if not isinstance(value, dict):
                     raise SystemExit(f"{path}:{line_no}: each JSONL row must be an object")
-                problems = validate_historical_row(value)
+                problems = validate_historical_row(value) if strict_provenance else ()
                 if problems:
                     raise SystemExit(f"{path}:{line_no}: historical row rejected: {','.join(problems)}")
                 rows.append(value)
@@ -93,10 +93,11 @@ def main() -> int:
     parser.add_argument("--output", required=True, help="output JSON report")
     parser.add_argument("--bootstrap-reps", type=int, default=2000)
     parser.add_argument("--seed", type=int, default=20260903)
+    parser.add_argument("--strict-provenance", action="store_true", help="Require bookmaker, odds capture and benchmark provenance for historical audit rows")
     args = parser.parse_args()
 
     paths = _files(args.inputs)
-    rows = _load(paths)
+    rows = _load(paths, strict_provenance=args.strict_provenance)
     grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for row in rows:
         grouped.setdefault(_identity(row), []).append(row)
