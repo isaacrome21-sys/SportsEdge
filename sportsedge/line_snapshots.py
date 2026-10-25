@@ -121,14 +121,56 @@ def build_snapshot(
     return record
 
 
+def _verify_stored_snapshot(
+    record: Any, *, sport: str, issue_number: int, line_number: int
+) -> dict[str, Any]:
+    """Fail closed on damaged/mismatched local data, NOT proof of capture time.
+
+    The digest is stored beside attacker-editable JSON. Verifying it catches
+    accidental or unaccompanied data changes but does not authenticate the
+    writer, recorded_at, or when the quote was actually observed.
+    """
+    where = f"{sport}/{issue_number}:{line_number}"
+    if not isinstance(record, dict):
+        raise SnapshotError(f"SNAPSHOT_RECORD_INVALID:{where}")
+    if record.get("schema") != SCHEMA:
+        raise SnapshotError(f"SNAPSHOT_SCHEMA_INVALID:{where}")
+    if (record.get("sport") != sport.lower()
+            or type(record.get("issue_number")) is not int
+            or record["issue_number"] != int(issue_number)):
+        raise SnapshotError(f"SNAPSHOT_IDENTITY_MISMATCH:{where}")
+    required = ("game", "captured_at", "board", "picks", "body", "content_sha256")
+    if any(key not in record for key in required):
+        raise SnapshotError(f"SNAPSHOT_FIELDS_MISSING:{where}")
+    if (not isinstance(record["game"], dict)
+            or not isinstance(record["captured_at"], str)
+            or not isinstance(record["board"], list)
+            or not isinstance(record["picks"], list)
+            or not isinstance(record["body"], str)):
+        raise SnapshotError(f"SNAPSHOT_FIELDS_INVALID:{where}")
+    digest = record["content_sha256"]
+    if not isinstance(digest, str) or digest != _content_hash(record):
+        raise SnapshotError(f"SNAPSHOT_DIGEST_MISMATCH:{where}")
+    return record
+
+
 def load_snapshots(sport: str, issue_number: int, root: Path = SNAPSHOT_ROOT) -> list[dict[str, Any]]:
     path = snapshot_path(sport, issue_number, root)
     if not path.exists():
         return []
     out = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if line.strip():
-            out.append(json.loads(line))
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            stored = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise SnapshotError(
+                f"SNAPSHOT_JSON_INVALID:{sport}/{issue_number}:{line_number}"
+            ) from exc
+        out.append(_verify_stored_snapshot(
+            stored, sport=sport, issue_number=issue_number, line_number=line_number
+        ))
     return out
 
 
