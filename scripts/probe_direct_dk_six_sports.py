@@ -7,6 +7,7 @@ import hashlib
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 from sportsedge.draftkings_game_market_source import (
     LEAGUE_IDS, VERIFIED_GAME_LINE_CATEGORY_IDS, DraftKingsGameMarketError, fetch_board,
 )
@@ -56,7 +57,11 @@ def probe(*, fetcher=fetch_board, clock=lambda: datetime.now(timezone.utc), arch
                     or board.received_at.tzinfo is None
                     or board.received_at.utcoffset() is None):
                 raise ValueError("DK_PROBE_SOURCE_IDENTITY_INVALID")
-            if not board.raw or not board.source_uri.startswith("https://sportsbook-nash.draftkings.com/"):
+            source = urlsplit(board.source_uri)
+            if (not board.raw or source.scheme != "https"
+                    or source.hostname != "sportsbook-nash.draftkings.com"
+                    or source.port not in (None, 443)
+                    or source.username is not None or source.password is not None):
                 raise ValueError("DK_PROBE_SOURCE_URI_OR_RAW_INVALID")
             raw_archive = None
             if archive_dir is not None:
