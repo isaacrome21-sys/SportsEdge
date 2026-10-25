@@ -90,3 +90,44 @@ def evidence_supports(clv_values: Iterable[float], current: str = PAPER, *,
     if not (clv_mean > 0 and units_total > 0):
         return PAPER
     return STAKE_05 if current in (STAKE_025, STAKE_05) else STAKE_025
+
+
+def span_filtered_evidence_supports(records: Iterable[Mapping[str, Any]], current: str = PAPER) -> str:
+    """Report-only span filter; authentic quote/final receipts are separate checks.
+
+    Missing span/method is never counted. Research rows may remain in the paper
+    ledger, but cannot inflate n, mean CLV or realized units here. Full rows
+    require explicit event IDs; repeated event/subject/selection observations
+    refuse the cohort even if their capture time or line differs.
+    """
+    from .picks import PickRecord, PickRecordError
+    values, results, identity, seen = [], [], None, set()
+    for row in records:
+        if not isinstance(row, Mapping):
+            return PAPER
+        try:
+            pick = PickRecord.from_dict(row)
+        except (PickRecordError, TypeError, ValueError, OverflowError):
+            return PAPER
+        key = (pick.sport, pick.market, pick.engine)
+        if identity is None:
+            identity = key
+        elif key != identity:
+            return PAPER  # no cross-market/version inheritance
+        if pick.span_tier != 'FULL' or pick.capture_method not in ('PRIMARY_BROWSER','FALLBACK'):
+            continue
+        event_id = row.get('event_id')
+        if not isinstance(event_id, str) or not event_id.strip():
+            return PAPER
+        # Multiple captures/lines of the same selection are one observation.
+        # Receipt authentication remains the caller's responsibility.
+        observation = (event_id.strip(), pick.subject, pick.selection)
+        try:
+            if observation in seen:
+                return PAPER
+            seen.add(observation)
+        except TypeError:
+            return PAPER
+        values.append(row.get('clv_prob'))
+        results.append(row.get('units'))
+    return evidence_supports(values, current, units=results)
