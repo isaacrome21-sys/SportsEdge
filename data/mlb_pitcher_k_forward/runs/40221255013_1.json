@@ -1,0 +1,36 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "blocked_count": 2,
+  "blockers": [
+    {
+      "entity_name": "Freddy Peralta",
+      "observed_at": "2026-10-25T18:26:02.810302+00:00",
+      "provider_event_id": "34893091",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    },
+    {
+      "entity_name": "Robert Gasser",
+      "observed_at": "2026-10-25T18:26:02.810302+00:00",
+      "provider_event_id": "34893091",
+      "reason": "PITContextError:PIT_CONTEXT_FRESH_SNAPSHOT_MISSING"
+    }
+  ],
+  "eligible_quote_units": 2,
+  "observed_at_utc": "2026-10-25T18:27:43.568504+00:00",
+  "predictions_created": 0,
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-25/props_20261025T182603.496728Z.json",
+  "run_attempt": "1",
+  "run_id": "40221255013",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_RUN_V1",
+  "selection_drops": {
+    "selected_units": 8
+  },
+  "settlements_created": 0,
+  "status": "OK",
+  "summary_sha256": "6214b81db5c91dc1775cee09ce114d74502fb3e4338eda7f5ce1252527290753"
+}
