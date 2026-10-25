@@ -183,3 +183,11 @@ def test_market_selection_inventory_excludes_ambiguous_market_ids():
     }
     assert market_inventory(payload) == {"Player Points": 2}
     assert market_inventory({"markets": [], "selections": None}) is None
+
+def test_non_string_source_uri_is_unavailable():
+    def fetch(key):
+        return SimpleNamespace(sport_key=key, source_uri=42, received_at=NOW,
+                               raw=b"{}", payload={})
+    report = probe(fetcher=fetch, clock=lambda: NOW)
+    assert all(report["sports"][sport]["status"] == "UNAVAILABLE"
+               for sport in ("NFL", "CFB", "MLB"))
