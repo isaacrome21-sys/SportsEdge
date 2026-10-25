@@ -116,3 +116,17 @@ def test_archive_conflict_fails_closed(tmp_path):
     report = probe(fetcher=fetch, clock=lambda: NOW, archive_dir=tmp_path)
     assert report["sports"]["NFL"]["status"] == "UNAVAILABLE"
     assert destination.read_bytes() == b"tampered"
+
+def test_source_url_rejects_prefix_spoof_and_credentials():
+    for url in (
+        "https://sportsbook-nash.draftkings.com.evil.invalid/board",
+        "https://sportsbook-nash.draftkings.com@evil.invalid/board",
+        "http://sportsbook-nash.draftkings.com/board",
+        "https://user:secret@sportsbook-nash.draftkings.com/board",
+    ):
+        def fetch(key):
+            return SimpleNamespace(sport_key=key, raw=b"{}", payload={},
+                                   source_uri=url, received_at=NOW)
+        report = probe(fetcher=fetch, clock=lambda: NOW)
+        assert all(report["sports"][sport]["status"] == "UNAVAILABLE"
+                   for sport in ("NFL", "CFB", "MLB"))
