@@ -5,7 +5,7 @@ on:
     types: [opened, edited]
 
 permissions:
-  contents: read
+  contents: write
   issues: write
 
 cache-mode: write
@@ -53,3 +53,26 @@ jobs:
             --out-dir artifacts/nhl_myspari
           gh issue comment "$ISSUE" --body-file artifacts/nhl_myspari/card.md
           echo "phone_card_seconds=$(( $(date +%s) - started ))"
+
+      - name: Persist NHL research picks
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          source_file=artifacts/nhl_myspari/picks.json
+          if [ ! -f "$source_file" ]; then
+            echo "Expected NHL picks file missing: $source_file" >&2
+            exit 1
+          fi
+          mkdir -p ledger/nhl_picks
+          cp "$source_file" "ledger/nhl_picks/issue-${ISSUE_NUMBER}.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "ledger/nhl_picks/issue-${ISSUE_NUMBER}.json"
+          if git diff --cached --quiet; then
+            echo "No NHL pick ledger changes to commit"
+            exit 0
+          fi
+          git commit -m "Record NHL research picks for issue #${ISSUE_NUMBER}"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
