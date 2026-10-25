@@ -31,6 +31,22 @@ def _ownership(value: Any, player_id: str) -> float | None:
     return number
 
 
+def _validate_projection(proj: Projection) -> Projection:
+    """Reject malformed scores even when generated from samples or stat rows."""
+    pid = proj.player_id
+    mean = _finite_number(proj.mean, "mean", pid)
+    floor = _finite_number(proj.floor, "floor", pid)
+    ceiling = _finite_number(proj.ceiling, "ceiling", pid)
+    if mean < 0 or not 0 <= floor <= mean <= ceiling:
+        raise ValueError(f"DFS_PROJECTION_QUANTILES_INVALID:{pid}")
+    if proj.stddev is not None and _finite_number(proj.stddev, "stddev", pid) < 0:
+        raise ValueError(f"DFS_PROJECTION_STDDEV_NEGATIVE:{pid}")
+    _ownership(proj.ownership, pid)
+    for name, value in proj.components.items():
+        _finite_number(value, f"component:{name}", pid)
+    return proj
+
+
 def _dt(value: Any) -> datetime | None:
     if not value:
         return None
@@ -76,15 +92,15 @@ def load_projection_snapshot(path: str | Path, players: Iterable[DKPlayer], spor
                 source=str(row.get("source") or "SPORTSEDGE_DISTRIBUTION"),
                 ownership=_ownership(row.get("ownership"), p.player_id),
             )
-            out[p.player_id] = Projection(
+            out[p.player_id] = _validate_projection(Projection(
                 **{**proj.__dict__, "updated_at": _dt(row.get("updated_at")) or snapshot_updated_at}
-            )
+            ))
             continue
         if isinstance(row.get("stats"), dict):
             proj = projection_from_stats(p, sport, row["stats"], source=str(row.get("source") or "SPORTSEDGE_STATS"))
-            out[p.player_id] = Projection(
+            out[p.player_id] = _validate_projection(Projection(
                 **{**proj.__dict__, "updated_at": _dt(row.get("updated_at")) or snapshot_updated_at}
-            )
+            ))
             continue
         mean = _finite_number(row.get("mean") if row.get("mean") is not None
                               else row.get("projection", 0.0), "mean", p.player_id)
@@ -104,7 +120,7 @@ def load_projection_snapshot(path: str | Path, players: Iterable[DKPlayer], spor
         components = row.get("components") or {}
         if not isinstance(components, dict):
             raise ValueError(f"DFS_PROJECTION_COMPONENTS_INVALID:{p.player_id}")
-        out[p.player_id] = Projection(
+        out[p.player_id] = _validate_projection(Projection(
             player_id=p.player_id,
             mean=mean,
             ceiling=max(mean, ceiling),
@@ -115,7 +131,7 @@ def load_projection_snapshot(path: str | Path, players: Iterable[DKPlayer], spor
             updated_at=_dt(row.get("updated_at")) or snapshot_updated_at,
             components={str(k): _finite_number(v, f"component:{k}", p.player_id)
                         for k, v in components.items()},
-        )
+        ))
     return out
 
 
