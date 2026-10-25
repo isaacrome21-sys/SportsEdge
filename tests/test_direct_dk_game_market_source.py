@@ -69,6 +69,15 @@ class DirectDKSourceTests(unittest.TestCase):
         self.assertFalse(any(r['market']=='h2h' for r in rows))
         self.assertEqual(len(rows),4)
 
+    def test_two_explicit_team_names_on_one_quote_are_ambiguous(self):
+        p=fixture()
+        for s in p['selections']:
+            if s['marketId']=='m1' and s['label']=='Home Team':
+                s['label']='Away Team / Home Team'
+        rows=normalize_board(self.board(p))
+        self.assertFalse(any(r['market']=='h2h' for r in rows))
+        self.assertEqual(len(rows),4)
+
     def test_unique_nicknames_and_full_spread_labels_are_valid(self):
         p=fixture()
         p['events'][0]['name']='Away Dragons @ Home Sharks'
