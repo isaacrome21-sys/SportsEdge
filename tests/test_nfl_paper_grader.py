@@ -5,6 +5,7 @@ import json
 import pytest
 
 from scripts.grade_nfl_paper_issue import main as grade_cli
+from sportsedge.nfl_final_receipts import bind_espn_final, scoreboard_url
 
 from sportsedge.nfl_paper_grader import (
     NflPaperError, capture_nfl_issue, grade_nfl_issue,
@@ -14,11 +15,17 @@ from sportsedge.line_snapshots import append_snapshot, build_snapshot, load_snap
 ISSUE = 742
 START = "2026-10-24T23:00:00Z"
 TITLE = "[NFL LINES] Chiefs @ Ravens"
-FINAL = {
-    "away": "KC", "home": "BAL", "away_points": 20, "home_points": 24,
-    "url": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=20261024",
-    "fetched_at": "2026-10-25T03:00:00Z", "sha256": "a" * 64,
-}
+RAW_FINAL = json.dumps({"events": [{
+    "id": "401123456", "date": START,
+    "status": {"type": {"completed": True, "name": "STATUS_FINAL"}},
+    "competitions": [{"competitors": [
+        {"homeAway": "away", "team": {"abbreviation": "KC"}, "score": "20"},
+        {"homeAway": "home", "team": {"abbreviation": "BAL"}, "score": "24"},
+    ]}],
+}]}).encode("utf-8")
+FINAL = bind_espn_final(raw=RAW_FINAL, source_url=scoreboard_url(START),
+                        fetched_at="2026-10-25T03:00:00Z",
+                        away="KC", home="BAL", kickoff=START)
 
 
 def body(captured: str, away: str = "+125", home: str = "-145") -> str:
@@ -147,9 +154,11 @@ def test_cli_capture_to_final_paper_ledger(tmp_path):
           away="+145", home="-165")
     receipt = tmp_path / "final_receipt.json"
     receipt.write_text(json.dumps(FINAL), encoding="utf-8")
+    source = tmp_path / "source.json"
+    source.write_bytes(RAW_FINAL)
     output = tmp_path / "paper_grade.json"
     code = grade_cli(["--issue", str(ISSUE), "--final-receipt", str(receipt),
-                      "--snapshot-root", str(tmp_path), "--output", str(output)])
+                      "--source-raw", str(source), "--snapshot-root", str(tmp_path), "--output", str(output)])
     assert code == 0
     saved = json.loads(output.read_text(encoding="utf-8"))
     assert saved["status"] == "PAPER"
@@ -161,7 +170,22 @@ def test_cli_refuses_unverified_final(tmp_path):
     stage(tmp_path)
     receipt = tmp_path / "bad_final.json"
     receipt.write_text(json.dumps({**FINAL, "url": ""}), encoding="utf-8")
+    source = tmp_path / "bad_source.json"
+    source.write_bytes(RAW_FINAL)
     output = tmp_path / "should_not_exist.json"
     assert grade_cli(["--issue", str(ISSUE), "--final-receipt", str(receipt),
-                      "--snapshot-root", str(tmp_path), "--output", str(output)]) == 2
+                      "--source-raw", str(source), "--snapshot-root", str(tmp_path), "--output", str(output)]) == 2
     assert not output.exists()
+
+
+def test_cli_refuses_source_bytes_not_matching_receipt(tmp_path):
+    stage(tmp_path)
+    receipt = tmp_path / "final.json"
+    receipt.write_text(json.dumps(FINAL), encoding="utf-8")
+    source = tmp_path / "tampered.json"
+    source.write_bytes(RAW_FINAL + b" ")
+    out = tmp_path / "should_not_grade.json"
+    assert grade_cli(["--issue", str(ISSUE), "--final-receipt", str(receipt),
+                      "--source-raw", str(source), "--snapshot-root", str(tmp_path),
+                      "--output", str(out)]) == 2
+    assert not out.exists()
