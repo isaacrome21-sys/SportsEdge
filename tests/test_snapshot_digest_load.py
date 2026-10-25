@@ -46,3 +46,11 @@ def test_intact_digest_wrong_ledger_or_schema_refused(tmp_path, change):
     path.write_text(json.dumps(record) + "\n")
     with pytest.raises(SnapshotError, match="SNAPSHOT_IDENTITY_MISMATCH"):
         load_snapshots("nfl", 991001, root=tmp_path)
+
+@pytest.mark.parametrize("token", ["NaN", "Infinity", "-Infinity"])
+def test_nonfinite_json_tokens_fail_closed(tmp_path, token):
+    path = tmp_path / "nfl" / "991001.jsonl"
+    path.parent.mkdir(parents=True)
+    path.write_text('{"board":[{"price":' + token + '}]}\\n'.replace('\\\\n', '\\n'))
+    with pytest.raises(SnapshotError, match="SNAPSHOT_JSON_INVALID"):
+        load_snapshots("nfl", 991001, root=tmp_path)
