@@ -36,6 +36,8 @@ def inspect_station_list(data: bytes) -> dict[str, object]:
         text = data.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
         raise ValueError("STATION_TEXT_ENCODING_UNVERIFIED") from exc
+    if text.lstrip().lower().startswith(("<!doctype", "<html", "<?xml")):
+        raise ValueError("NOT_STATION_TEXT")
     lines = [line for line in text.splitlines() if line.strip()]
     if len(lines) < MIN_STATION_LINES:
         raise ValueError("STATION_LIST_TOO_SHORT")
