@@ -16,6 +16,9 @@ def test_unverified_sports_never_guess_endpoint():
     assert result["sports"]["CBB"]["status"] == "UNVERIFIED_MAPPING"
     assert result["sports"]["NHL"]["status"] == "UNVERIFIED_MAPPING"
     assert result["sports"]["NFL"]["market_catalog"] == ["Moneyline", "Total"]
+    assert result["sports"]["NFL"]["quote_jurisdiction"] == "UNVERIFIED"
+    assert result["sports"]["NFL"]["playable_in_user_jurisdiction"] is False
+    assert result["sports"]["NFL"]["quote_timestamp_status"] == "UNVERIFIED"
     assert result["sports"]["NFL"]["payload_markets"] == 3
     assert result["sports"]["NFL"]["market_counts"] == {"Moneyline": 1, "Total": 2}
     assert result["sports"]["NFL"]["raw_size_bytes"] == len(b"synthetic-direct-dk-board")
