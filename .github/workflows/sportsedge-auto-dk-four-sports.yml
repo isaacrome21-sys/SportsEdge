@@ -72,7 +72,7 @@ jobs:
         run: |
           python -m unittest tests.test_auto_dk_four_sports -v
           python -m pip install --disable-pip-version-check pytest==9.1.1 Pillow==12.3.0
-          python -m pytest -q tests/test_lane5_cfb_auto_form2_20261024.py tests/test_auto_dk_phone_summary.py tests/test_sportsedge_png.py tests/test_nfl_auto_props.py tests/test_nfl_direct_fallback.py tests/test_nfl_auto_slate.py tests/test_auto_dk_canonical_intake.py
+          python -m pytest -q tests/test_lane5_cfb_auto_form2_20261024.py tests/test_auto_dk_phone_summary.py tests/test_sportsedge_png.py tests/test_nfl_auto_props.py tests/test_nfl_direct_fallback.py tests/test_nfl_auto_slate.py tests/test_auto_dk_canonical_intake.py tests/test_bet_issue_crosscheck.py tests/test_cfb_zero_blend_owner_20261024.py
   auto:
     if: github.repository_owner == 'isaacrome21-sys' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest

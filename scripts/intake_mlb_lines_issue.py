@@ -86,13 +86,29 @@ def run_research(name: str, issue: str) -> int:
     return 2
 
 
+def _event_issue_title() -> str | None:
+    """Issue title from the Actions event payload (header fallback, #2578)."""
+    import os
+
+    path = os.environ.get("GITHUB_EVENT_PATH")
+    if not path:
+        return None
+    try:
+        return (json.loads(Path(path).read_text(encoding="utf-8")).get("issue") or {}).get("title")
+    except (OSError, ValueError):
+        return None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--body-file", required=True)
     ap.add_argument("--observed-at", required=True, help="issue created/edited timestamp (ISO 8601)")
     ap.add_argument("--issue", required=True)
     ap.add_argument("--out-dir", default="manual_inputs/mlb")
+    ap.add_argument("--title", default=None, help="issue title; header fallback when the body has none")
     args = ap.parse_args()
+    if args.title is None:
+        args.title = _event_issue_title()
 
     observed = datetime.fromisoformat(args.observed_at.replace("Z", "+00:00")).astimezone(CHICAGO)
     slate = observed.date().isoformat()
@@ -112,7 +128,7 @@ def main() -> int:
     try:
         nxt = (observed.date() + timedelta(days=1)).isoformat()
         schedule = list(fetch_schedule(slate)) + list(fetch_schedule(nxt))
-        payload = build_bound_input(body, observed_at=observed.isoformat(), schedule=schedule)
+        payload = build_bound_input(body, observed_at=observed.isoformat(), schedule=schedule, title=args.title)
         # Reuse the exact live schedule response that bound the phone text to MLB games.
         # This snapshot is run-local evidence only; it is not persisted as a cross-run cache.
         payload["schedule_snapshot"] = [asdict(game) for game in schedule]
@@ -123,6 +139,11 @@ def main() -> int:
     out = Path(args.out_dir) / f"{slate}_issue{args.issue}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    warnings = payload.get("intake_warnings") or []
+    if warnings:
+        Path("intake_warnings.txt").write_text("\n".join(warnings) + "\n", encoding="utf-8")
+        for warning in warnings:
+            print(f"INTAKE_WARNING: {warning}", file=sys.stderr)
     print(f"path={out}")
     print(f"slate={slate}")
     return 0

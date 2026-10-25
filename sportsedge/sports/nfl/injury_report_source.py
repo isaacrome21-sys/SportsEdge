@@ -93,6 +93,75 @@ def fetch_nflverse_injuries(*, season: int, opener: Callable = urlopen) -> tuple
     return rows, uri, sha256(raw).hexdigest()
 
 
+# nflverse removed `date_modified` from injuries_{season}.csv in 2025. Without
+# a per-row timestamp no row can be proven known before a pricing time, so the
+# plain fetch above keeps failing closed. The snapshot path below records the
+# observed retrieval instant of the exact bytes as an upper bound on when every
+# row was known; it is captured BEFORE prop quotes are observed so the existing
+# PIT filter (`date_modified <= as_of`) still holds without any relaxation.
+SNAPSHOT_SCHEMA = "SPORTSEDGE_NFL_INJURY_SNAPSHOT_V1"
+RETRIEVAL_STAMP_SOURCE = "RETRIEVAL_TIME_UPPER_BOUND"
+SNAPSHOT_COLUMNS = REQUIRED_COLUMNS - {"date_modified"}
+
+
+def fetch_nflverse_injury_snapshot(*, season: int, now: Callable[[], datetime] | None = None,
+                                   opener: Callable = urlopen) -> dict[str, Any]:
+    uri = INJURY_URL.format(season=int(season))
+    req = Request(uri, headers={"User-Agent": "SportsEdge/1.0", "Accept": "text/csv"})
+    try:
+        with opener(req, timeout=20) as response:
+            raw = response.read()
+    except Exception as exc:
+        raise NFLContextError("NFLVERSE injury fetch failed") from exc
+    clock = now or (lambda: datetime.now(timezone.utc))
+    retrieved = _utc(clock(), "retrieved_at")
+    try:
+        rows = [dict(row) for row in csv.DictReader(StringIO(raw.decode("utf-8-sig")))]
+    except Exception as exc:
+        raise NFLContextError("NFLVERSE injury CSV invalid") from exc
+    if not rows:
+        raise NFLContextError("NFLVERSE injury CSV empty")
+    missing = SNAPSHOT_COLUMNS - set(rows[0])
+    if missing:
+        raise NFLContextError("NFLVERSE injury schema unsupported:" + ",".join(sorted(missing)))
+    has_row_stamp = "date_modified" in rows[0]
+    return {"schema": SNAPSHOT_SCHEMA, "season": int(season), "source_uri": uri,
+            "raw_sha256": sha256(raw).hexdigest(), "retrieved_at": retrieved.isoformat(),
+            "date_modified_source": "NFLVERSE_ROW" if has_row_stamp else RETRIEVAL_STAMP_SOURCE,
+            "raw_csv": raw.decode("utf-8-sig")}
+
+
+def load_injury_snapshot(snapshot: Mapping[str, Any], *, season: int, observed_at: Any) -> tuple[list[dict[str, Any]], str, str]:
+    """Verify a snapshot and return rows stamped no later than retrieval.
+
+    Fails closed on schema, season, hash, or a retrieval later than the
+    ticket observation (that would be post-PIT information).
+    """
+    if snapshot.get("schema") != SNAPSHOT_SCHEMA:
+        raise NFLContextError("NFL injury snapshot schema invalid")
+    if int(snapshot.get("season") or -1) != int(season):
+        raise NFLContextError("NFL injury snapshot season mismatch")
+    text = snapshot.get("raw_csv")
+    if not isinstance(text, str) or sha256(text.encode("utf-8")).hexdigest() != snapshot.get("raw_sha256"):
+        raise NFLContextError("NFL injury snapshot hash mismatch")
+    retrieved = _utc(snapshot.get("retrieved_at"), "retrieved_at")
+    if retrieved > _utc(observed_at, "observed_at"):
+        raise NFLContextError("NFL injury snapshot retrieved after observation")
+    rows = [dict(row) for row in csv.DictReader(StringIO(text))]
+    if not rows or SNAPSHOT_COLUMNS - set(rows[0]):
+        raise NFLContextError("NFL injury snapshot rows invalid")
+    source = snapshot.get("date_modified_source")
+    if source == RETRIEVAL_STAMP_SOURCE:
+        if "date_modified" in rows[0]:
+            raise NFLContextError("NFL injury snapshot stamp source inconsistent")
+        for row in rows:
+            row["date_modified"] = retrieved.isoformat()
+            row["date_modified_source"] = RETRIEVAL_STAMP_SOURCE
+    elif source != "NFLVERSE_ROW" or "date_modified" not in rows[0]:
+        raise NFLContextError("NFL injury snapshot stamp source invalid")
+    return rows, str(snapshot.get("source_uri")), str(snapshot.get("raw_sha256"))
+
+
 def build_pit_injury_inputs(
     *, rows: Iterable[Mapping[str, Any]], season: int, target_week: int,
     team_ids: Iterable[str], as_of: Any, source_uri: str, source_sha256: str,

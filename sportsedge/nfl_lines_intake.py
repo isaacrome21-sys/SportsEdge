@@ -6,8 +6,10 @@ prices but never turns those prices into model inputs.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from math import isfinite
+import re
 import shlex
 from typing import Any
 
@@ -64,6 +66,24 @@ class NflGameTicket:
     home: str
     header: str
     markets: list[NflMarketLine] = field(default_factory=list)
+    # Sportsbook capture instant from the game's own ``Captured`` line. Never
+    # derived from the GitHub issue's created/edited time.
+    captured_at: str | None = None
+
+
+CAPTURE_LINE_RE = re.compile(r"^captured\b\s*:?\s*(.*?)\s*$", re.I)
+
+
+def _captured_at(token: str, raw: str) -> str:
+    if not token or " " in token:
+        raise NflLinesIntakeError(f"NFL_INTAKE_CAPTURED_AT_INVALID:{raw}")
+    try:
+        value = datetime.fromisoformat(token.replace("Z", "+00:00").replace("z", "+00:00"))
+    except ValueError as exc:
+        raise NflLinesIntakeError(f"NFL_INTAKE_CAPTURED_AT_INVALID:{raw}") from exc
+    if "T" not in token.upper() or value.tzinfo is None or value.utcoffset() is None:
+        raise NflLinesIntakeError(f"NFL_INTAKE_CAPTURED_AT_TZ_REQUIRED:{raw}")
+    return value.isoformat()
 
 
 def _american(token: str) -> int:
@@ -118,6 +138,7 @@ def parse_nfl_lines(body: str) -> list[NflGameTicket]:
     Supported examples::
 
         Chiefs @ Ravens
+        Captured 2026-10-25T11:58:30-05:00
         ML +125 -145
         Spread +3.5 -110 -110
         Total 47.5 -108 -112
@@ -127,6 +148,10 @@ def parse_nfl_lines(body: str) -> list[NflGameTicket]:
 
     For spreads the entered line is the AWAY line, matching the legacy phone
     contract. Team-total and player-prop prices are OVER then UNDER.
+
+    ``Captured <ISO-8601 instant with offset>`` (one per game, after the header)
+    is when the prices were read off the sportsbook. It becomes every market's
+    ``quote_retrieved_at``. Without it the card refuses residual pricing.
     """
     games: list[NflGameTicket] = []
     current: NflGameTicket | None = None
@@ -141,6 +166,12 @@ def parse_nfl_lines(body: str) -> list[NflGameTicket]:
             continue
         if current is None:
             raise NflLinesIntakeError(f"NFL_INTAKE_MARKET_BEFORE_GAME:{line}")
+        capture = CAPTURE_LINE_RE.match(line)
+        if capture:
+            if current.captured_at is not None:
+                raise NflLinesIntakeError(f"NFL_INTAKE_CAPTURED_AT_DUPLICATE:{current.header}")
+            current.captured_at = _captured_at(capture.group(1), line)
+            continue
         try:
             parts = shlex.split(line.replace(",", " "))
         except ValueError as exc:
@@ -234,6 +265,7 @@ def tickets_to_dict(tickets: list[NflGameTicket], *, observed_at: str) -> dict[s
                 "away": g.away,
                 "home": g.home,
                 "header": g.header,
+                "captured_at": g.captured_at,
                 "markets": [
                     {
                         "market": m.market,
@@ -243,6 +275,7 @@ def tickets_to_dict(tickets: list[NflGameTicket], *, observed_at: str) -> dict[s
                         "raw": m.raw,
                         "team": m.team,
                         "player": m.player,
+                        **({"quote_retrieved_at": g.captured_at} if g.captured_at else {}),
                     }
                     for m in g.markets
                 ],
