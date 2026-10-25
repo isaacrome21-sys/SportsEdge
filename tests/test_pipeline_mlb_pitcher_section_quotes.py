@@ -87,3 +87,27 @@ def test_one_sided_hr_offer_is_explicitly_skipped_without_poisoning_paired_rows(
 def test_known_one_sided_moneyline_still_refuses_whole_board() -> None:
     with pytest.raises(SharedIntakeError, match="ONE_SIDED_OR_MALFORMED"):
         parse_issue(PREFIX + "ML +125", "MLB", resolve_teams=False)
+
+
+def test_real_compound_team_totals_preserve_both_quoted_prices_and_team_identity() -> None:
+    body = PREFIX + "Team Totals: MIL 3.5 +100 -130; TB 3.5 -105 -125"
+    game = parse_issue(body, "MLB").games[0]
+    assert len(game.markets) == 2
+    assert [(m.market, m.family, m.subject, m.team, m.line, m.price_a, m.price_b)
+            for m in game.markets] == [
+        ("TEAM_TOTAL", "team_total", "MIL", "MIL Brewers", 3.5, 100, -130),
+        ("TEAM_TOTAL", "team_total", "TB", "TB Rays", 3.5, -105, -125),
+    ]
+    assert all(m.raw == "Team Totals: MIL 3.5 +100 -130; TB 3.5 -105 -125"
+               for m in game.markets)
+
+
+@pytest.mark.parametrize("line,error", [
+    ("Team Totals: MIL 3.5 +100 -130", "TEAM_TOTAL_PAIR_INVALID"),
+    ("Team Totals: MIL 3.5 +100 -130; TB 3.5 -105", "ONE_SIDED_OR_MALFORMED"),
+    ("Team Totals: MIL 3.5 +100 -130; MIL 3.5 -105 -125", "TEAM_TOTAL_TEAMS_MISMATCH"),
+    ("Team Totals: MIL 3.5 +100 -130; NY 3.5 -105 -125", "TEAM_NOT_IN_GAME"),
+])
+def test_compound_team_totals_refuse_incomplete_or_misbound_teams(line, error) -> None:
+    with pytest.raises(SharedIntakeError, match=error):
+        parse_issue(PREFIX + line, "MLB")
