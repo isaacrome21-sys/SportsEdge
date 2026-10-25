@@ -41,6 +41,53 @@ def _side(name: str, market: str, win_p: float, push_p: float, odds: int, fair_p
     return f"{name} {odds:+d} p={graded:.3f} nv={fair_p:.3f} edge={edge:+.1%} ret={ret:+.1%} {tag}"
 
 
+def ledger_rows(ticket: dict) -> list[dict]:
+    """Pregame pick records for the CLV/grade pipeline. Fail closed.
+
+    One row per priced side whose EV clears FLOOR. Rows carry the DK price and
+    the board's own ``captured_at``; a game without one logs nothing (never the
+    issue time). Tag stays LEAN unless the market is in VALIDATED_BET_MARKETS.
+    Grading and closing capture are separate steps; these rows start ungraded.
+    """
+    rows: list[dict] = []
+    for game in ticket.get("games") or []:
+        away, home = str(game.get("away") or ""), str(game.get("home") or "")
+        captured = game.get("captured_at")
+        if not captured:
+            continue
+        fsd = final_score_distribution(away, home)
+        if fsd is None:
+            continue
+        for m in game.get("markets") or []:
+            market, line = str(m.get("market")), m.get("line")
+            if market not in PRICED or line is None:
+                continue
+            a_odds, h_odds = int(m["away_or_over_price"]), int(m["home_or_under_price"])
+            fair_a, fair_h = no_vig(a_odds, h_odds)
+            if market == "TOTAL":
+                pa, push, ph = total_probs(fsd, float(line))
+                sides = (("OVER", pa, a_odds, fair_a), ("UNDER", ph, h_odds, fair_h))
+            else:
+                pa, push, ph = puck_line_probs(fsd, float(line))
+                sides = ((f"AWAY {float(line):+g}", pa, a_odds, fair_a),
+                         (f"HOME {-float(line):+g}", ph, h_odds, fair_h))
+            for side, win_p, odds, fair in sides:
+                ret = ev_return(win_p, odds, push)
+                if ret < FLOOR:
+                    continue
+                rows.append({
+                    "sport": "NHL", "slate": ticket.get("slate"), "issue": ticket.get("issue"),
+                    "away": away, "home": home, "market": market, "line": float(line),
+                    "side": side, "price": odds, "captured_at": captured,
+                    "model_p": round(win_p, 6), "push_p": round(push, 6),
+                    "no_vig_p": round(fair, 6), "ev": round(ret, 6),
+                    "tag": "BET" if market in VALIDATED_BET_MARKETS else "LEAN",
+                    "owner": "nhl_rate_v1", "result": None, "close_price": None, "clv": None,
+                })
+    rows.sort(key=lambda r: -r["ev"])
+    return rows
+
+
 def price_row(market: str, line, away_odds, home_odds, fsd: dict | None) -> str:
     cap = capability_for(market)
     if cap.status == "NO_ENGINE":
@@ -100,6 +147,7 @@ def main() -> int:
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
     (out / "card.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (out / "picks.json").write_text(json.dumps(ledger_rows(ticket), indent=2) + "\n", encoding="utf-8")
     return 0
 
 
