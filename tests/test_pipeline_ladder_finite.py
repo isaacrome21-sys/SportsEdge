@@ -39,3 +39,9 @@ def test_gate_edges_stay_paper():
     assert ladder.evidence_supports(GOOD_CLV, units=GOOD_UNITS[:-1]) == ladder.PAPER
     assert ladder.evidence_supports([0.0] * n, units=GOOD_UNITS) == ladder.PAPER
     assert ladder.evidence_supports(GOOD_CLV, units=[0.0] * n) == ladder.PAPER
+
+
+def test_owner_gate_is_fifty():
+    assert ladder.MIN_GRADED == 50
+    assert ladder.evidence_supports([0.01] * 49, units=[0.1] * 49) == ladder.PAPER
+    assert ladder.evidence_supports([0.01] * 50, units=[0.1] * 50) == ladder.STAKE_025

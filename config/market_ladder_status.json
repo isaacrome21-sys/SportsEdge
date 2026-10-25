@@ -3,7 +3,7 @@
   "rules": {
     "default": "PAPER",
     "inheritance": "none: each SPORT:MARKET stands alone; a market missing here is PAPER",
-    "PAPER_to_STAKE_0_25U": "Lane 7 gate: at least 200 graded picks in this market with mean no-vig CLV > 0 and ROI > 0",
+    "PAPER_to_STAKE_0_25U": "Lane 7 gate: at least 50 graded picks (owner ruling 2026-10-25) in this market with mean no-vig CLV > 0 and ROI > 0",
     "STAKE_0_25U_to_STAKE_0_5U": "only if the same condition still holds after 0.25u",
     "change_process": "status changes are a reviewed PR that cites the graded ledger; code never writes this file"
   },

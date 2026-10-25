@@ -164,7 +164,7 @@ def test_ladder_file_is_paper_everywhere_and_never_inherited():
 
 def test_ladder_evidence_rule_matches_lane7_gate():
     win = [0.9] * 200
-    assert ladder.evidence_supports([0.01] * 199, units=[0.9] * 199) == "PAPER"
+    assert ladder.evidence_supports([0.01] * 49, units=[0.9] * 49) == "PAPER"       # n < 50
     assert ladder.evidence_supports([0.01] * 200) == "PAPER"                      # no ROI evidence
     assert ladder.evidence_supports([0.01] * 200, units=[0.9] * 150) == "PAPER"   # mismatched
     assert ladder.evidence_supports([0.01] * 200, units=[-1.0] * 200) == "PAPER"  # ROI <= 0

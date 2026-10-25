@@ -18,7 +18,7 @@ LADDER_PATH = Path(__file__).resolve().parents[2] / "config" / "market_ladder_st
 PAPER, STAKE_025, STAKE_05 = "PAPER", "STAKE_0_25U", "STAKE_0_5U"
 STATUSES = (PAPER, STAKE_025, STAKE_05)
 STAKE_UNITS = {PAPER: 0.0, STAKE_025: 0.25, STAKE_05: 0.5}
-MIN_GRADED = 200  # Lane 7 gate: n>=200, mean no-vig CLV > 0, ROI > 0
+MIN_GRADED = 50  # Lane 7 gate (owner ruling 2026-10-25): n>=50, mean no-vig CLV > 0, ROI > 0
 
 
 class LadderError(ValueError):
@@ -68,7 +68,7 @@ def evidence_supports(clv_values: Iterable[float], current: str = PAPER, *,
                       units: Iterable[float] | None = None) -> str:
     """Status the graded evidence would support (report only, never applied).
 
-    Same bar as the Lane 7 gate: PAPER -> 0.25u needs >= 200 graded picks in
+    Same bar as the Lane 7 gate: PAPER -> 0.25u needs >= 50 graded picks in
     this market with mean no-vig CLV > 0 AND realized ROI > 0 (``units`` is the
     per-pick graded units, same picks as ``clv_values``). Missing, mismatched,
     or non-finite rows stay PAPER. 0.25u -> 0.5u only if all of that still holds.
