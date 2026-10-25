@@ -65,7 +65,7 @@ def run(input_path: Path, accepted_path: Path, blocked_path: Path) -> dict:
                     raise ValueError("ROW_NOT_OBJECT")
                 reason = admit(row)
                 identity = (row.get("sport"), row.get("market"), row.get("event_id"),
-                            row.get("decision_ts"), row.get("selection"))
+                            row.get("decision_ts"))
                 if reason is None and identity in seen:
                     reason = "DUPLICATE_SELECTION_DECISION"
                 if reason:
