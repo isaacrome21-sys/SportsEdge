@@ -1,0 +1,22 @@
+[
+  {
+    "event_id": "NBA:2026-10-25:IND@BKN",
+    "market": "MONEYLINE",
+    "side": "HOME",
+    "line": null,
+    "american": 225,
+    "other_american": -278,
+    "captured_at": "2026-10-25T12:52:42-05:00",
+    "source": "DK_ISSUE",
+    "issue": 2635,
+    "engine_id": "NBA_LINES_CARD:8b53d5dc58f277a0f007ca3a2ad793f999cedad1:604ff932ba7ee8e7dabc94365c54ae1c22a06834",
+    "model_p": 0.3148046476890802,
+    "ev_per_unit": 0.023115104989510638,
+    "status": "EXPERIMENTAL",
+    "countable": false,
+    "ledger_version": "NBA_GAME_CLV_LEDGER_V0_EXPERIMENTAL",
+    "pick": "BKN ML",
+    "price": 225,
+    "card_status": "LEAN"
+  }
+]
