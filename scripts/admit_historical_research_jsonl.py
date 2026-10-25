@@ -53,6 +53,8 @@ def admit(row: dict) -> str | None:
 
 
 def run(input_path: Path, accepted_path: Path, blocked_path: Path) -> dict:
+    if accepted_path.resolve() == blocked_path.resolve() or input_path.resolve() in (accepted_path.resolve(), blocked_path.resolve()):
+        raise ValueError("INPUT_AND_OUTPUT_PATHS_MUST_BE_DISTINCT")
     accepted, blocked = [], []
     seen = set()
     with input_path.open(encoding="utf-8") as handle:
@@ -75,8 +77,6 @@ def run(input_path: Path, accepted_path: Path, blocked_path: Path) -> dict:
                     accepted.append(row)
             except (ValueError, TypeError) as exc:
                 blocked.append({"line": line_number, "reason": "INVALID_JSON:" + str(exc)})
-    if accepted_path.resolve() == blocked_path.resolve() or input_path.resolve() in (accepted_path.resolve(), blocked_path.resolve()):
-        raise ValueError("INPUT_AND_OUTPUT_PATHS_MUST_BE_DISTINCT")
     for path, records in ((accepted_path, accepted), (blocked_path, blocked)):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("".join(json.dumps(record, sort_keys=True) + "\n" for record in records), encoding="utf-8")
