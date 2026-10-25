@@ -2,7 +2,7 @@ import json
 import hashlib
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from scripts.probe_direct_dk_six_sports import probe, SPORTS, selection_linkage
+from scripts.probe_direct_dk_six_sports import probe, SPORTS, selection_linkage, market_inventory
 
 NOW = datetime(2026, 10, 25, tzinfo=timezone.utc)
 
@@ -171,3 +171,14 @@ def test_malformed_transport_object_is_unavailable():
     result = probe(fetcher=malformed, clock=lambda: NOW)
     assert all(result["sports"][sport]["status"] == "UNAVAILABLE"
                for sport in ("NFL", "CFB", "MLB"))
+
+def test_market_selection_inventory_excludes_ambiguous_market_ids():
+    payload = {
+        "markets": [{"id": 1, "name": "Player Points"},
+                    {"id": 2, "name": "Total"},
+                    {"id": "2", "name": "Total"}],
+        "selections": [{"marketId": 1}, {"marketId": "1"},
+                       {"marketId": 2}, {"marketId": "missing"}, {}],
+    }
+    assert market_inventory(payload) == {"Player Points": 2}
+    assert market_inventory({"markets": [], "selections": None}) is None
