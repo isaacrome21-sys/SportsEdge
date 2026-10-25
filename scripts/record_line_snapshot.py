@@ -57,6 +57,33 @@ def mlb_card_picks(card_md: str) -> list[dict]:
     return [{"game_pk": r.game_pk, "pick": r.pick, "price": r.price, "status": r.status} for r in rows]
 
 
+def verify_mlb_card_quotes(body: str, title: str | None, picks: list[dict]) -> None:
+    """Refuse a card-pick snapshot if any price lacks its exact paired issue quote.
+
+    Record price and source quote must agree on the selected side, market,
+    handicap and matchup. One game per issue; ambiguous boards cannot supply a
+    trustworthy pick/price association. Still allow an empty PAPER pick set.
+    """
+    from scripts.mlb_card_clv import find_quote, issue_quotes, pick_key
+
+    rows = issue_quotes(body, title)
+    if not rows:
+        raise SnapshotError("MLB_SNAPSHOT_NO_PARSEABLE_PAIR")
+    games = {(r.away, r.home) for r in rows}
+    if len(games) != 1:
+        raise SnapshotError("MLB_SNAPSHOT_GAME_AMBIGUOUS")
+    away, home = next(iter(games))
+    names = {"away": away, "home": home}
+    for pick in picks:
+        label, price = pick.get("pick"), pick.get("price")
+        if type(price) is not int:
+            raise SnapshotError(f"MLB_SNAPSHOT_CARD_PRICE_INVALID:{label}")
+        key = pick_key(str(label or ""), names)
+        quote = find_quote(rows, key, names) if key is not None else None
+        if quote is None or type(quote[0]) is not int or quote[0] != price:
+            raise SnapshotError(f"MLB_SNAPSHOT_CARD_PRICE_UNPAIRED:{label}")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--sport", required=True)
@@ -67,6 +94,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--picks-json", type=Path, default=None)
     ap.add_argument("--game-json", type=Path, default=None)
     ap.add_argument("--game-start", default=None)
+    ap.add_argument("--require-card-quote-match", action="store_true",
+                    help="MLB: refuse any saved pick whose price disagrees with its captured two-sided issue line")
     ap.add_argument("--root", type=Path, default=SNAPSHOT_ROOT)
     args = ap.parse_args(argv)
 
@@ -85,6 +114,8 @@ def main(argv: list[str] | None = None) -> int:
         game["start"] = args.game_start
     board = mlb_board(body, args.title) if sport == "mlb" else raw_board(body)
     try:
+        if sport == "mlb" and args.require_card_quote_match:
+            verify_mlb_card_quotes(body, args.title, picks)
         record = build_snapshot(
             sport=sport, issue_number=args.issue, body=body, title=args.title, game=game,
             board=board, picks=picks, recorded_at=datetime.now(timezone.utc).isoformat(),
