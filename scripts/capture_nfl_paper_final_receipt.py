@@ -17,7 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sportsedge.line_snapshots import SNAPSHOT_ROOT, load_snapshots
-from sportsedge.nfl_final_receipts import FinalReceiptError, fetch_espn_final
+from sportsedge.nfl_final_receipts import FinalReceiptError, fetch_espn_final_with_bytes
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -35,10 +35,14 @@ def main(argv: list[str] | None = None) -> int:
         if len(fixtures) != 1:
             raise FinalReceiptError("FINAL_ONE_CAPTURED_FIXTURE_REQUIRED")
         away, home, kickoff = next(iter(fixtures))
-        receipt = fetch_espn_final(away=away, home=home, kickoff=kickoff)
-        if args.out.exists():
+        receipt, raw = fetch_espn_final_with_bytes(away=away, home=home,
+                                                   kickoff=kickoff)
+        raw_path = Path(str(args.out) + ".raw.json")
+        if args.out.exists() or raw_path.exists():
             raise FinalReceiptError("FINAL_RECEIPT_ALREADY_EXISTS")
         args.out.parent.mkdir(parents=True, exist_ok=True)
+        with raw_path.open("xb") as source_file:
+            source_file.write(raw)
         with args.out.open("x", encoding="utf-8") as file:
             json.dump(receipt, file, sort_keys=True, indent=2)
             file.write("\n")
