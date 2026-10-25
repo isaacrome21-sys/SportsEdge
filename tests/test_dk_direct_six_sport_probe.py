@@ -23,6 +23,7 @@ def test_unverified_sports_never_guess_endpoint():
     assert result["sports"]["NFL"]["unlinked_selections"] == 1
     assert result["sports"]["NFL"]["linked_selections"] == 1
     assert result["sports"]["NFL"]["duplicate_market_ids"] == 0
+    assert result["sports"]["NFL"]["markets_without_event"] == 3
     assert result["sports"]["NFL"]["payload_markets"] == 3
     assert result["sports"]["NFL"]["market_counts"] == {"Moneyline": 1, "Total": 2}
     assert result["sports"]["NFL"]["raw_size_bytes"] == len(b"synthetic-direct-dk-board")
@@ -41,6 +42,7 @@ def test_duplicate_market_ids_are_detected():
     payload = {"markets": [{"id": 10}, {"id": "10"}],
                "selections": [{"marketId": 10}, {"marketId": "missing"}, {}]}
     assert selection_linkage(payload) == {
+        "markets_without_event": None,
         "unlinked_selections": 2, "linked_selections": 1, "duplicate_market_ids": 1,
     }
     assert selection_linkage({"markets": None, "selections": []}) is None
