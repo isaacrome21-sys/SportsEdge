@@ -35,7 +35,9 @@ def admit(row: dict) -> str | None:
         quote = timestamp(row["quote_receipt_ts"])
         decision = timestamp(row["decision_ts"])
         start = timestamp(row["event_start_ts"])
-        if decision > datetime.now(timezone.utc):\n            return "DECISION_IN_FUTURE"\n        if feature > decision or prediction > decision or quote > decision:
+        if decision > datetime.now(timezone.utc):
+            return "DECISION_IN_FUTURE"
+        if feature > decision or prediction > decision or quote > decision:
             return "RECEIPT_AFTER_DECISION"
         if decision >= start:
             return "DECISION_NOT_BEFORE_EVENT"
