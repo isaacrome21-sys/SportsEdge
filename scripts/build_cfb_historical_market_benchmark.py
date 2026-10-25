@@ -24,6 +24,7 @@ def build(*, contract_path: Path, cache_root: Path, output_path: Path) -> dict:
     cached = cache_market_archive(
         contract_path=contract_path,
         cache_root=cache_root,
+        use="historical_market_coverage_profiling",
         allow_benchmark=True,
     )
     report = build_historical_market_benchmark(
