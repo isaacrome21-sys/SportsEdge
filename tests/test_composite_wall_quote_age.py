@@ -21,3 +21,21 @@ def test_current_and_exact_thirty_minutes_reach_pricing(capture):
         raise RuntimeError("PRICE_REACHED")
     with pytest.raises(RuntimeError, match="PRICE_REACHED"):
         run_composite({"lines":[row]}, now=datetime(2026,10,25,12,tzinfo=timezone.utc), run_full_fn=reached)
+
+
+def test_later_stale_game_refuses_before_any_game_prices():
+    """A valid first game cannot be priced before a later invalid game."""
+    now = datetime(2026, 10, 25, 12, tzinfo=timezone.utc)
+    base = dict(sport="NFL", kickoff="2026-10-25T18:00:00Z",
+                market="TOTAL", side="OVER", line=45.5, odds=-110)
+    first = dict(base, away="First Away", home="First Home",
+                 quote_captured_at="2026-10-25T11:45:00Z")
+    second = dict(base, away="Second Away", home="Second Home",
+                  quote_captured_at="2026-10-25T11:29:59Z")
+    calls = []
+    def record_pricing(*args, **kwargs):
+        calls.append((args, kwargs))
+        raise AssertionError("partial pricing before whole-batch validation")
+    with pytest.raises(CompositeRefusal, match="COMPOSITE_WALL_QUOTE_NOT_CURRENT"):
+        run_composite({"lines": [first, second]}, now=now, run_full_fn=record_pricing)
+    assert calls == []
