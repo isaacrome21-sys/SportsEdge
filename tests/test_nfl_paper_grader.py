@@ -115,9 +115,8 @@ def test_backfilled_after_kickoff_cannot_close_clv(tmp_path):
         picks=[], recorded_at="2026-10-24T23:05:00Z",
     )
     append_snapshot(forged, tmp_path)
-    output = rows(tmp_path)[0]
-    assert output["clv_status"] == "NO_DISTINCT_CLOSE"
-    assert output["clv_prob"] is None
+    with pytest.raises(NflPaperError, match="NOT_RECORDED_PREKICKOFF"):
+        rows(tmp_path)
 
 
 def test_no_receipt_no_grade(tmp_path):
