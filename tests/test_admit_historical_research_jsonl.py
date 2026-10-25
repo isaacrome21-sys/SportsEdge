@@ -107,3 +107,16 @@ def test_rejects_output_directory(tmp_path):
     with pytest.raises(ValueError, match="OUTPUT_PATH_IS_DIRECTORY"):
         run(source, tmp_path, tmp_path / "blocked.jsonl")
     assert source.exists()
+
+
+def test_rejects_fractional_outcome_instead_of_truncating():
+    r = row()
+    r["outcome"] = 0.5
+    assert admit(r) == "OUTCOME_NOT_CANONICAL_BINARY"
+
+
+def test_rejects_string_and_boolean_outcomes():
+    for outcome in ("1", "0", True, False):
+        r = row()
+        r["outcome"] = outcome
+        assert admit(r) == "OUTCOME_NOT_CANONICAL_BINARY"
