@@ -1,15 +1,13 @@
-"""Per-game capture-span manifest (parallel DK capture accounting).
+"""Capture span two-tier policy: <=150 ladder, 151–300 PAPER only, >300 refused.
 
-Pins the standing freshness ruling at the manifest level: a game's
-capture span is valid at exactly 150.0s and refused above it, with the
-span shown; failed captures are listed, never dropped; malformed span
-records refuse the whole manifest by name. The 180s quote-age limit is
-carried as an unchanged constant, not re-decided here.
+The quote age <=1800s is a separate real wall-clock guard, not enforced
+by this inventory-only manifest. Failed/invalid captures never vanish.
 """
 import pytest
 
 from sportsedge.dk_capture_span_manifest import (
-    QUOTE_MAX_AGE_S, SPAN_LIMIT_S, CaptureSpanManifestError,
+    QUOTE_MAX_AGE_S, SPAN_LIMIT_S, RESEARCH_SPAN_LIMIT_S,
+    CaptureSpanManifestError,
     build_capture_span_manifest)
 
 T0 = "2026-10-22T17:21:00-05:00"
@@ -23,7 +21,8 @@ def _rec(event_id="E1", start=T0, finish="2026-10-22T17:23:00-05:00", **kw):
 
 
 def test_limits_are_the_standing_ruling_values():
-    assert SPAN_LIMIT_S == 150.0 and QUOTE_MAX_AGE_S == 180.0
+    assert SPAN_LIMIT_S == 150.0 and RESEARCH_SPAN_LIMIT_S == 300.0
+    assert QUOTE_MAX_AGE_S == 1800.0
 
 
 def test_two_games_within_limit_all_accepted():
@@ -34,7 +33,8 @@ def test_two_games_within_limit_all_accepted():
     assert m["status"] == "ALL_GAMES_WITHIN_LIMIT"
     assert m["accepted_event_ids"] == ["E1", "E2"]
     assert m["refused"] == []
-    assert m["counts"] == {"games": 2, "ok": 2, "refused_span": 0, "failed": 0}
+    assert m["counts"] == {"games": 2, "ok": 2, "flagged_research": 0,
+                           "refused_span": 0, "failed": 0}
     spans = {g["event_id"]: g["span_seconds"] for g in m["games"]}
     assert spans == {"E1": 120.0, "E2": 90.0}
 
@@ -44,18 +44,50 @@ def test_span_exactly_at_limit_is_ok():
         [_rec(finish="2026-10-22T17:23:30-05:00")])
     assert m["games"][0]["span_seconds"] == 150.0
     assert m["games"][0]["status"] == "OK"
+    assert m["games"][0]["ladder_eligible_by_span"] is True
 
 
-def test_span_above_limit_refused_with_span_shown():
+def test_151_seconds_retained_paper_research_without_ladder_credit():
     m = build_capture_span_manifest(
         [_rec(finish="2026-10-22T17:23:31-05:00")])
     g = m["games"][0]
-    assert g["span_seconds"] == 151.0 and g["status"] == "REFUSED_SPAN"
+    assert g["span_seconds"] == 151.0 and g["status"] == "FLAGGED_RESEARCH"
+    assert g["ladder_eligible_by_span"] is False
+    assert g["paper_research_by_span"] is True
     assert m["accepted_event_ids"] == []
-    assert m["refused"] == [
-        {"event_id": "E1", "status": "REFUSED_SPAN", "span_seconds": 151.0}]
-    assert m["status"] == "GAMES_REFUSED"
-    assert m["counts"]["refused_span"] == 1
+    assert m["research_event_ids"] == ["E1"]
+    assert m["refused"] == []
+    assert m["flagged"] == [
+        {"event_id": "E1", "status": "FLAGGED_RESEARCH",
+         "span_seconds": 151.0, "ladder_eligible": False}]
+    assert m["status"] == "GAMES_FLAGGED_RESEARCH"
+    assert m["counts"]["flagged_research"] == 1
+    assert m["counts"]["refused_span"] == 0
+
+
+@pytest.mark.parametrize("seconds,status", [
+    (150, "OK"), (151, "FLAGGED_RESEARCH"),
+    (300, "FLAGGED_RESEARCH"), (301, "REFUSED_SPAN"),
+])
+def test_exact_owner_span_boundaries(seconds, status):
+    from datetime import timedelta, datetime
+    start = datetime.fromisoformat(T0)
+    end = (start + timedelta(seconds=seconds)).isoformat()
+    m = build_capture_span_manifest([_rec(finish=end)])
+    game = m["games"][0]
+    assert game["span_seconds"] == float(seconds)
+    assert game["status"] == status
+    assert game["ladder_eligible_by_span"] is (seconds <= 150)
+    assert (game["event_id"] in m["accepted_event_ids"]) is (seconds <= 150)
+    assert (game["event_id"] in m["research_event_ids"]) is (150 < seconds <= 300)
+    assert (game["event_id"] in [r["event_id"] for r in m["refused"]]) is (seconds > 300)
+
+
+def test_manifest_does_not_pretend_to_verify_quote_wall_age():
+    m = build_capture_span_manifest([_rec()])
+    assert m["quote_max_age_seconds"] == 1800.0
+    assert m["quote_age_enforced_here"] is False
+    assert m["research_span_limit_seconds"] == 300.0
 
 
 def test_failed_capture_listed_not_dropped():
@@ -71,14 +103,19 @@ def test_failed_capture_listed_not_dropped():
 
 
 def test_span_is_per_game_not_slate_wide():
-    # A slow game refuses alone; the fast game still hands forward.
+    # Research-tier slow game stays visible but cannot enter ladder.
     m = build_capture_span_manifest([
         _rec("FAST", finish="2026-10-22T17:21:45-05:00"),
         _rec("SLOW", finish="2026-10-22T17:26:00-05:00"),
+        _rec("REFUSED", finish="2026-10-22T17:26:01-05:00"),
     ])
     assert m["accepted_event_ids"] == ["FAST"]
-    assert m["refused"][0]["event_id"] == "SLOW"
-    assert m["refused"][0]["span_seconds"] == 300.0
+    assert m["research_event_ids"] == ["SLOW"]
+    assert m["flagged"][0]["span_seconds"] == 300.0
+    assert m["refused"][0]["event_id"] == "REFUSED"
+    assert m["refused"][0]["span_seconds"] == 301.0
+    assert m["counts"]["ok"] == m["counts"]["flagged_research"] == 1
+    assert m["counts"]["refused_span"] == 1
 
 
 def test_mixed_offsets_compute_the_same_span():
