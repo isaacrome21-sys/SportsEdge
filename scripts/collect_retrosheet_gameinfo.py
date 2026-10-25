@@ -42,6 +42,8 @@ def inspect_zip(data: bytes) -> dict[str, object]:
             if len(candidates) != 1:
                 raise ValueError("GAMEINFO_MEMBER_MISSING_OR_AMBIGUOUS")
             member = candidates[0]
+            if sum(entry.file_size for entry in archive.infolist()) > MAX_CSV_BYTES:
+                raise ValueError("ARCHIVE_EXPANSION_TOO_LARGE")
             if member.file_size > MAX_CSV_BYTES:
                 raise ValueError("CSV_TOO_LARGE")
             if archive.testzip() is not None:
@@ -63,7 +65,7 @@ def inspect_zip(data: bytes) -> dict[str, object]:
                         count += 1
                     if count == 0:
                         raise ValueError("EMPTY_CSV")
-    except (zipfile.BadZipFile, EOFError, UnicodeError, csv.Error) as exc:
+    except (zipfile.BadZipFile, EOFError, UnicodeError, csv.Error, RuntimeError) as exc:
         raise ValueError("INVALID_ZIP_OR_CSV") from exc
     return {"member": member.filename, "columns": columns, "row_count": count}
 
