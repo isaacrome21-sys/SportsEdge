@@ -77,13 +77,16 @@ jobs:
           LEDGER_BRANCH: automation/mlb-auto-grade-ledger
         run: |
           set -euo pipefail
-          if git diff --quiet -- ledger/mlb_ledger.csv; then
+          git add -A -- ledger/mlb_ledger.csv
+          if [ -e ledger/mlb_clv_ledger.csv ] || git ls-files --error-unmatch -- ledger/mlb_clv_ledger.csv >/dev/null 2>&1; then
+            git add -A -- ledger/mlb_clv_ledger.csv
+          fi
+          if git diff --cached --quiet -- ledger/mlb_ledger.csv ledger/mlb_clv_ledger.csv; then
             echo "No ledger changes."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add ledger/mlb_ledger.csv
           git commit -m "ledger: record finalized MLB card grades"
           git push --force-with-lease origin "$LEDGER_BRANCH"
           existing="$(gh pr list --state open --head "$LEDGER_BRANCH" --json number --jq '.[0].number // empty')"
