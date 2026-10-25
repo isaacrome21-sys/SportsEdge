@@ -68,5 +68,7 @@ jobs:
             exit 0
           fi
           git commit -m "Record NBA research capture for issue #${ISSUE_NUMBER}"
-          git pull --rebase origin "${GITHUB_REF_NAME}"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          # Issue events check out the default branch; never push directly to protected main.
+          # Keep this as a review-only change until an append-only persistence path is approved.
+          echo "PERSISTENCE_REVIEW_REQUIRED: commit created locally; no protected-branch push attempted"
+          exit 1
