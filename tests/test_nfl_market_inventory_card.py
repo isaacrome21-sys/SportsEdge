@@ -55,6 +55,34 @@ class NFLMarketInventoryCardTests(unittest.TestCase):
         self.assertIn("QUOTED_NO_CATALOG_MODEL", page)
         self.assertIn("| passing_yards | 0 | BLOCKED:NO_ENGINE | NO_QUOTE |", page)
 
+    def test_phone_card_exposes_props_and_catalog_without_collapsing(self):
+        from unittest.mock import patch
+        from scripts.render_nfl_myspari_card import render
+
+        game = {
+            "away": "SF", "home": "ATL",
+            "markets": [{
+                "market": "passing_yards", "player": "Brock Purdy",
+                "line": 242.5, "away_or_over_price": -113,
+                "home_or_under_price": -111,
+                "raw": 'Prop "Brock Purdy" PassYards 242.5 -113 -111',
+            }],
+        }
+        engine = {
+            "games": [game],
+            "full_board": {"rows": [
+                _row("passing_yards", -113),
+                _row("passing_yards", -111),
+            ]},
+        }
+        with patch("scripts.render_nfl_myspari_card.snapshot_marker", return_value=""):
+            card = render(engine)
+        self.assertIn("### NFL all-market coverage — PAPER ONLY", card)
+        self.assertIn("#### Captured player props (1): TRACK ONLY", card)
+        self.assertIn('Prop "Brock Purdy" PassYards 242.5 -113 -111', card)
+        self.assertNotIn("<summary>Props", card)
+        self.assertIn("QUOTED_MODEL_BLOCKED:NO_ENGINE", card)
+
     def test_malformed_board_rows_do_not_crash(self):
         self.assertIn("**51 market types**", market_inventory_section({"rows": "bad"}))
         self.assertIn("**51 market types**", market_inventory_section({"rows": [None, "bad", {}]}))
