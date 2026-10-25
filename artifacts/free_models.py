@@ -1273,7 +1273,9 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
     # Repair 3 (Oct 11 2026): quote freshness is checked centrally on every
     # pricing path. Only a verified-fresh capture can support a positive-EV
     # status; everything else is watch-only with an explicit code.
-    quote_freshness = check_quote_freshness(row.get("quote_captured_at"), now=now)
+    quote_freshness = check_quote_freshness(
+        row.get("quote_captured_at"), now=now,
+        max_age_seconds=1800 if sport == "CFB" else MAX_QUOTE_AGE_SECONDS)
     raw_margin, raw_total = home_mean-away_mean, home_mean+away_mean
     # ---- Lane A (independent): the model's own score means, no market input
     # in the probability. This is a simple unvalidated league/form/injury
