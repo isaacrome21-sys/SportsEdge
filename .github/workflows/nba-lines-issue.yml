@@ -60,15 +60,12 @@ jobs:
           cp issue_body.txt "$dest/issue_body.txt"
           cp artifacts/nba/card.md "$dest/card.md"
           printf '%s\n' "$ISSUE_UPDATED_AT" > "$dest/issue_updated_at.txt"
+          # Publish an isolated evidence branch, never push to protected main.
+          # A unique run ID preserves earlier captures instead of overwriting them.
+          evidence_branch="evidence/nba/issue-${ISSUE_NUMBER}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- "$dest"
-          if git diff --cached --quiet; then
-            echo "No NBA capture changes"
-            exit 0
-          fi
-          git commit -m "Record NBA research capture for issue #${ISSUE_NUMBER}"
-          # Issue events check out the default branch; never push directly to protected main.
-          # Keep this as a review-only change until an append-only persistence path is approved.
-          echo "PERSISTENCE_REVIEW_REQUIRED: commit created locally; no protected-branch push attempted"
-          exit 1
+          git add -- "ledger/nba_captures/issue-${ISSUE_NUMBER}"
+          git commit -m "Capture NBA research evidence issue #${ISSUE_NUMBER}"
+          git push origin "HEAD:refs/heads/${evidence_branch}"
+          echo "Evidence saved on branch ${evidence_branch}; not merged to main"
