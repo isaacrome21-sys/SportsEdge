@@ -111,6 +111,23 @@ def test_noninteger_dk_pairs_block_settlement(bad_field, bad_value):
     assert row["result"] is None
 
 
+@pytest.mark.parametrize("field,value", [
+    ("line", float("nan")),
+    ("line", "3.5"),
+    ("ev", float("inf")),
+    ("model_p", float("nan")),
+])
+def test_nonfinite_or_ambiguous_model_receipt_blocks(field, value):
+    row = grade_issue(ISSUE, [_snap(EARLY, override={field: value})], _finals())[0]
+    assert row["status"] == "BLOCKED"
+    assert "NONFINITE_OR_NONNUMERIC" in row["reason"]
+
+
+def test_promoted_entry_receipt_not_included_as_research_settlement():
+    row = grade_issue(ISSUE, [_snap(EARLY, override={"ladder_status": "VERIFIED"})], _finals())[0]
+    assert row["status"] == "BLOCKED" and row["verified"] is False
+
+
 def test_real_line_move_keeps_result_but_blocks_price_clv():
     entry = _snap(EARLY)
     close = _snap(LATE, -120, +100, line=-4.5)
