@@ -184,7 +184,10 @@ def _parse_market(line: str, game: SharedGame, adapter: SportAdapter, warnings: 
     sport = adapter.sport
     toks = _tokens(line, sport)
     tail: list[str] = []
-    while toks and _numeric(toks[-1]) and len(tail) < 3:
+    # Many DK/Muse spread and puck-line boards include the *explicit*
+    # opposite handicap: `PL -1.5 +164 +1.5 -198`. Keep all four tokens
+    # so the paired spread is checked instead of silently skipped.
+    while toks and _numeric(toks[-1]) and len(tail) < 6:
         tail.insert(0, toks.pop())
     if not tail:
         warnings.append(f"line {n}: SKIPPED_NOTE '{line[:120]}'")
@@ -195,11 +198,19 @@ def _parse_market(line: str, game: SharedGame, adapter: SportAdapter, warnings: 
             raise SharedIntakeError(f"{sport}_INTAKE_ONE_SIDED_OR_MALFORMED:{line}")
         return _unknown(line, n, sport, warnings, strict)
     spec, subject = found
+    explicit_opposite = spec.family == "spread" and len(tail) == 4
     want = 3 if spec.needs_line else 2
-    if len(tail) != want:
+    if len(tail) != want and not explicit_opposite:
         raise SharedIntakeError(f"{sport}_INTAKE_ONE_SIDED_OR_MALFORMED:{line}")
     number = tail[0] if spec.needs_line else None
-    prices = tail[-2:]
+    if explicit_opposite:
+        first_line = _number(tail[0], line, sport)
+        second_line = _number(tail[2], line, sport)
+        if abs(first_line + second_line) > 1e-9:
+            raise SharedIntakeError(f"{sport}_INTAKE_SPREAD_PAIR_MISMATCH:{line}")
+        prices = [tail[1], tail[3]]
+    else:
+        prices = tail[-2:]
     if spec.subject is None and subject:
         return _unknown(line, n, sport, warnings, strict)
     if spec.subject is not None and not subject:
