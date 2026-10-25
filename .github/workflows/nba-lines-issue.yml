@@ -5,7 +5,7 @@ on:
     types: [opened, edited]
 
 permissions:
-  contents: read
+  contents: write
   issues: write
 
 concurrency:
@@ -46,3 +46,26 @@ jobs:
             gh issue comment "$ISSUE" --body-file fail.md
             exit 1
           fi
+
+      - name: Persist NBA research capture and card
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_UPDATED_AT: ${{ github.event.issue.updated_at }}
+        run: |
+          set -euo pipefail
+          test -s issue_body.txt
+          test -s artifacts/nba/card.md
+          dest="ledger/nba_captures/issue-${ISSUE_NUMBER}"
+          mkdir -p "$dest"
+          cp issue_body.txt "$dest/issue_body.txt"
+          cp artifacts/nba/card.md "$dest/card.md"
+          printf '%s\n' "$ISSUE_UPDATED_AT" > "$dest/issue_updated_at.txt"
+          # Publish an isolated evidence branch, never push to protected main.
+          # A unique run ID preserves earlier captures instead of overwriting them.
+          evidence_branch="evidence/nba/issue-${ISSUE_NUMBER}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "ledger/nba_captures/issue-${ISSUE_NUMBER}"
+          git commit -m "Capture NBA research evidence issue #${ISSUE_NUMBER}"
+          git push origin "HEAD:refs/heads/${evidence_branch}"
+          echo "Evidence saved on branch ${evidence_branch}; not merged to main"
