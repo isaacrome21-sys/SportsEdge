@@ -5,6 +5,7 @@ Do not infer timestamps or manufacture missing historical odds/model probabiliti
 from __future__ import annotations
 
 from datetime import datetime
+from math import isfinite
 from typing import Any
 
 
@@ -34,7 +35,22 @@ def validate_historical_row(row: dict[str, Any]) -> tuple[str, ...]:
     if "odds_captured_at" in times and "decision_ts" in times:
         if times["odds_captured_at"] > times["decision_ts"]:
             errors.append("ODDS_AFTER_DECISION")
+    for field in ("model_p", "benchmark_p"):
+        value = row.get(field)
+        if value is not None:
+            try:
+                probability = float(value)
+                if not isfinite(probability) or not 0.0 < probability < 1.0:
+                    raise ValueError("range")
+            except (TypeError, ValueError):
+                errors.append("INVALID_" + field.upper())
     if row.get("offered_decimal") is not None:
+        try:
+            offered = float(row["offered_decimal"])
+            if not isfinite(offered) or offered <= 1.0:
+                raise ValueError("range")
+        except (TypeError, ValueError):
+            errors.append("INVALID_OFFERED_DECIMAL")
         for field in ("bookmaker", "odds_captured_at"):
             if not row.get(field):
                 errors.append("OFFERED_ODDS_MISSING_" + field.upper())
