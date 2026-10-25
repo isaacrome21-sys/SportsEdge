@@ -58,7 +58,7 @@ jobs:
             "ledger/nfl_final_receipts/${ISSUE}.json" \
             "ledger/nfl_final_receipts/${ISSUE}.json.raw.json" \
             "ledger/nfl_paper_grades/${ISSUE}.json"
-          git commit -m "NFL PAPER grade issue ${ISSUE} with verified ESPN receipt"
+          git commit -m "NFL PAPER grade issue ${ISSUE} with source-bound ESPN receipt"
           git push origin "HEAD:refs/heads/${BRANCH}"
           gh pr create --draft --base main --head "$BRANCH" \
             --title "NFL PAPER grade receipt for [NFL LINES] #${ISSUE}" \
