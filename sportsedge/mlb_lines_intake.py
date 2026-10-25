@@ -438,3 +438,5 @@ def build_input(
                 raise LinesIntakeError(
                     f"TEAM_NOT_IN_GAME: '{row.team}' in {game.away_name} @ {game.home_name}"
                 )
+        out.append(record)
+    return {"rows": out}
