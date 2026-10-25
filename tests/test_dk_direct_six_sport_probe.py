@@ -8,7 +8,7 @@ def test_unverified_sports_never_guess_endpoint():
     calls = []
     def fetch(key):
         calls.append(key)
-        return SimpleNamespace(source_uri="https://sportsbook-nash.draftkings.com/test",
+        return SimpleNamespace(sport_key=key, source_uri="https://sportsbook-nash.draftkings.com/test",
                                received_at=NOW, raw=b"synthetic-direct-dk-board", payload={"events": [], "selections": [{"id": 1, "marketId": "A"}, {"id": 2, "marketId": "missing"}], "markets": [{"id": "A", "name": "Total"}, {"id": "B", "name": "Moneyline"}, {"id": "C", "name": "Total"}]})
     result = probe(fetcher=fetch, clock=lambda: NOW)
     assert set(result["sports"]) == set(SPORTS)
@@ -56,3 +56,11 @@ def test_duplicate_event_ids_are_detected():
     assert result["duplicate_event_ids"] == 1
     assert result["markets_without_event"] == 0
     assert result["linked_selections"] == 1
+
+def test_mismatched_source_sport_is_unavailable():
+    def wrong_sport(_):
+        return SimpleNamespace(sport_key="baseball_mlb", raw=b"{}", payload={},
+                               source_uri="https://example.invalid", received_at=NOW)
+    result = probe(fetcher=wrong_sport, clock=lambda: NOW)
+    assert result["sports"]["NFL"]["status"] == "UNAVAILABLE"
+    assert result["sports"]["CFB"]["status"] == "UNAVAILABLE"
