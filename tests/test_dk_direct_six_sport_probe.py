@@ -30,6 +30,7 @@ def test_unverified_sports_never_guess_endpoint():
     assert result["sports"]["NFL"]["duplicate_event_ids"] == 0
     assert result["sports"]["NFL"]["payload_markets"] == 3
     assert result["sports"]["NFL"]["market_counts"] == {"Moneyline": 1, "Total": 2}
+    assert result["sports"]["NFL"]["market_selection_status"] == "RESEARCH_ONLY_UNVERIFIED"
     assert result["sports"]["NFL"]["raw_size_bytes"] == len(json.dumps(result_fixture).encode())
     assert result["sports"]["NFL"]["raw_sha256"] == hashlib.sha256(json.dumps(result_fixture).encode()).hexdigest()
     assert len(calls) == 3
