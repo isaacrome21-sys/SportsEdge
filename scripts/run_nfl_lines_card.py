@@ -196,6 +196,31 @@ def _board_rows_from_games(games: list) -> list[dict]:
     return rows
 
 
+def _schedule_team(name: object) -> str | None:
+    from sportsedge.nfl_team_aliases import NflTeamAliasError, resolve_team
+    try:
+        return resolve_team(str(name or ""))
+    except NflTeamAliasError:
+        return None
+
+
+def schedule_kickoff(schedule: list, *, away: str, home: str) -> str:
+    """Kickoff for away@home from an independent schedule. Exactly one match or refuse."""
+    from sportsedge.nfl_public_schedule import _parse_iso
+    hits = [row for row in schedule or []
+            if isinstance(row, dict)
+            and _schedule_team(row.get("away_team")) == away
+            and _schedule_team(row.get("home_team")) == home]
+    if not hits:
+        raise ResidualQuoteError("SCHEDULE_KICKOFF:NO_MATCH")
+    if len(hits) != 1:
+        raise ResidualQuoteError("SCHEDULE_KICKOFF:AMBIGUOUS")
+    try:
+        return _parse_iso(str(hits[0]["commence_time"])).isoformat()
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ResidualQuoteError("SCHEDULE_KICKOFF:INVALID") from exc
+
+
 def attach_nfl_phone_board(payload: dict) -> dict:
     """Attach both sides of every prop, side, and total. Presentation only."""
     from sportsedge.football_full_board import board_from_machine_results, catalog_complete
@@ -217,12 +242,31 @@ def main() -> int:
     ap.add_argument("--input", required=True)
     ap.add_argument("--history", default="")
     ap.add_argument("--output", required=True)
+    ap.add_argument("--as-of", default="",
+                    help="pricing clock (the workflow passes its own run time); default: ticket observed_at for replay")
+    ap.add_argument("--schedule", default="",
+                    help="independent schedule JSON (fetch_nfl_events rows); kickoff comes only from here")
+    ap.add_argument("--fetch-espn-schedule", action="store_true",
+                    help="fetch the ESPN public scoreboard for kickoffs; fetch failure refuses pricing")
     args = ap.parse_args()
     ticket = json.loads(Path(args.input).read_text(encoding="utf-8"))
     history = _history_rows(json.loads(Path(args.history).read_text(encoding="utf-8")) if args.history else [])
     runtime = load_runtime()
     residual_policy = load_frozen_policy()
     asof = date.fromisoformat(str(ticket.get("slate") or date.today().isoformat()))
+    # Pricing clock. The issue's edit time is never a quote capture time; the
+    # workflow passes its run time so the 180 s quote TTL measures real age.
+    pricing_as_of = args.as_of or ticket.get("observed_at")
+    schedule: list | None = None
+    schedule_error: str | None = None
+    if args.schedule:
+        schedule = json.loads(Path(args.schedule).read_text(encoding="utf-8"))
+    elif args.fetch_espn_schedule:
+        try:
+            from sportsedge.nfl_public_schedule import fetch_nfl_events
+            schedule = fetch_nfl_events()
+        except Exception:  # noqa: BLE001 - any fetch failure refuses pricing
+            schedule, schedule_error = [], "SCHEDULE_KICKOFF:UNAVAILABLE"
     games_out = []
     for game in ticket.get("games") or []:
         feat = recency_features(history, home=str(game["home"]), away=str(game["away"]), asof=asof) if history else {"ok": False, "reason": "NO_MODEL:INSUFFICIENT_PRIOR_GAMES"}
@@ -232,17 +276,26 @@ def main() -> int:
         leans = []
         residual_rows = []
         residual_error = None
-        if feat.get("ok") and forecast is not None:
+        if schedule is not None:
+            # Independent kickoff only; a ticket-supplied time is discarded.
+            game = {**game, "commence_time": None}
+            try:
+                if schedule_error:
+                    raise ResidualQuoteError(schedule_error)
+                game["commence_time"] = schedule_kickoff(schedule, away=str(game["away"]), home=str(game["home"]))
+            except ResidualQuoteError as exc:
+                residual_error = str(exc)
+        if residual_error is None and feat.get("ok") and forecast is not None:
             try:
                 residual_rows = price_game(
                     game, raw_model_margin=forecast["margin"],
                     raw_model_total=forecast["total"],
-                    as_of=ticket.get("observed_at"),
+                    as_of=pricing_as_of,
                     policy=residual_policy,
                 )
             except ResidualQuoteError as exc:
                 residual_error = str(exc)
-        else:
+        elif residual_error is None:
             residual_error = str(feat.get("reason") or "NO_PRIOR_MODEL_HISTORY")
 
         for raw in game.get("markets") or []:
@@ -298,6 +351,7 @@ def main() -> int:
         "bet_proven_markets": sorted(BET_PROVEN_MARKETS),
         "residual_research_policy": "PRECOMMITTED_RESEARCH_PRIOR_NOT_HISTORICALLY_FITTED",
         "validated_markets": [],
+        "pricing_as_of": pricing_as_of,
         "empty_reason": None if any(g["picks"] for g in games_out) else (
             "No qualified bets: residual market-anchored prices are RESEARCH ONLY. "
             "Forward CLV evidence is pending; leans are not validated bets."

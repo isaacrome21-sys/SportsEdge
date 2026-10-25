@@ -115,9 +115,13 @@ def run_nfl(raw, out, now):
                     targeted_file=out/("nfl_prop_target_"+day+".json")
                     targeted_file.write_text(json.dumps(prop_ticket,indent=2)+"\n")
                     prop_card=out/("nfl_prop_research_"+day+".json")
-                    success,why=call(["scripts/run_nfl_unified_lines_card.py",
+                    prop_args=["scripts/run_nfl_unified_lines_card.py",
                         "--input",targeted_file,"--history",history,
-                        "--output",prop_card,"--n-sims","20000"],timeout=240)
+                        "--output",prop_card,"--n-sims","20000"]
+                    snapshot=out/"nfl_injury_snapshot.json"
+                    if snapshot.is_file():
+                        prop_args+=["--injury-snapshot",snapshot]
+                    success,why=call(prop_args,timeout=240)
                     if success and prop_card.is_file():
                         row=json.loads(prop_card.read_text(encoding="utf-8"))
                         entry["props"]={"status":"RESEARCH_ONLY",

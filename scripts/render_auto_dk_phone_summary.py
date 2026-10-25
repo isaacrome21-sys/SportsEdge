@@ -8,11 +8,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import subprocess
 from datetime import datetime, timezone
 from math import isfinite
 from statistics import median
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+try:
+    from bet_issue_crosscheck import render_crosscheck
+except ImportError:  # imported by path in tests
+    import sys as _sys
+    _sys.path.insert(0,str(Path(__file__).resolve().parent))
+    from bet_issue_crosscheck import render_crosscheck
 
 
 def _utc(value):
@@ -298,7 +307,7 @@ def nfl_market_price_radar(root: Path, now: datetime):
 
 
 def render(root: Path, run_url: str, *, as_of_date: str | None = None,
-           asof: datetime | None = None):
+           asof: datetime | None = None, bet_issues: list | None = None):
     now=asof or datetime.now(timezone.utc)
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("PREGAME_SNAPSHOT_REQUIRES_TIMEZONE")
@@ -326,6 +335,7 @@ def render(root: Path, run_url: str, *, as_of_date: str | None = None,
                 f"{candidate['method']} ({candidate['books']} book(s)) · PRICE_ONLY_NOT_MODEL_VALIDATED"
             )
     lines.append("")
+    auto_rows={}
     for sport in ("NFL","CFB"):
         state=summary.get(sport) or {}
         lines.append(f"### {sport} · {state.get('status') or 'MISSING'}")
@@ -358,6 +368,7 @@ def render(root: Path, run_url: str, *, as_of_date: str | None = None,
             lines.append("CFB model still requires out-of-sample validation; candidates are tracking only until then.")
             lines.append(f"Matched SDV games: {sum(int(x.get('priced_rows',0)) for x in cards)} modeled market rows; "
                          f"unmatched games: {state.get('unmatched_games','MISSING')}.")
+        auto_rows[sport]=list(picked)
         lines.append("Model status: "+", ".join(sorted(set(statuses))) if statuses else "Model status: MISSING")
         lines.append("")
         if sport=="NFL":
@@ -393,34 +404,73 @@ def render(root: Path, run_url: str, *, as_of_date: str | None = None,
             lines.extend(["**NFL player props — research-only paired DK offers**",
                           "These are not backtest-qualified bets; availability depends on PIT player roles and verified game identity."])
             found_any=False
+            notes=[]
             for item in cards:
                 prop=item.get("props") or {}
                 state=str(prop.get("status") or "NOT_CAPTURED")
+                day=item.get('date','DATE MISSING')
                 if state!="RESEARCH_ONLY":
-                    if state not in {"NOT_CAPTURED","NO_PAIRED_DK_PROPS"}:
-                        lines.append(f"- {item.get('date','DATE MISSING')}: {state} · {prop.get('reason') or 'SOURCE_UNAVAILABLE'}")
+                    if state=="NOT_CAPTURED":
+                        notes.append(f"- {day}: NOT_CAPTURED · no paired DK prop quotes for this date")
+                    elif state=="NO_PAIRED_DK_PROPS":
+                        notes.append(f"- {day}: NO_PAIRED_DK_PROPS · outside the per-run prop quote window (2 games, 26h)")
+                    else:
+                        notes.append(f"- {day}: {state} · {prop.get('reason') or 'SOURCE_UNAVAILABLE'}")
                     continue
                 candidate=root/Path(prop.get("json") or "").name
                 if not candidate.is_file():
                     lines.append("- Missing research artifact (not priced)")
                     continue
                 prop_card=json.loads(candidate.read_text(encoding="utf-8"))
-                chosen=[r for r in prop_card.get("selected_rows") or [] if
-                        r.get("status")=="PRICED" and
-                        r.get("price_american") is not None and
-                        r.get("estimate_p") is not None and
-                        r.get("ev_per_dollar") is not None and
-                        r.get("edge_probability_points") is not None]
-                chosen.sort(key=lambda r:(-float(r["ev_per_dollar"]),-float(r["edge_probability_points"]),
-                                          str(r.get("player")),str(r.get("market"))))
-                for r in chosen[:4]:
+                # NFL prop rows rank by the MARKET-BLENDED (Lane B) EV only
+                # (work order #2447, BLENDED_SPORTS). Raw model EV is shown
+                # as "not a price"; a row without a Lane B view is excluded.
+                chosen=[]
+                no_blend=0
+                for r in prop_card.get("selected_rows") or []:
+                    if not (r.get("status")=="PRICED" and r.get("price_american") is not None
+                            and r.get("estimate_p") is not None and r.get("ev_per_dollar") is not None):
+                        continue
+                    lanes=r.get("pricing_lanes")
+                    lane_b=lanes.get("lane_b_anchored") if isinstance(lanes,dict) else None
+                    try:
+                        b_ev=float(lane_b["ev_per_dollar"]); b_p=float(lane_b["estimate_p"])
+                    except (TypeError,KeyError,ValueError):
+                        no_blend+=1
+                        continue
+                    if not (isfinite(b_ev) and isfinite(b_p) and 0<=b_p<=1) or b_ev<=0:
+                        continue
+                    chosen.append((b_ev,b_p,r))
+                chosen.sort(key=lambda x:(-x[0],str(x[2].get("player")),str(x[2].get("market"))))
+                for b_ev,b_p,r in chosen[:4]:
                     found_any=True
                     lines.append(f"- {r.get('player') or 'PLAYER MISSING'} {r.get('market') or 'MARKET MISSING'} "
                         f"{r.get('selection') or 'SIDE MISSING'} {r.get('line') if r.get('line') is not None else 'MISSING'} · "
-                        f"DK {price(r.get('price_american'))} · estimate {pct(r.get('estimate_p'))} · "
-                        f"edge {pct(r.get('edge_probability_points'),True)} · EV {pct(r.get('ev_per_dollar'),True)} · RESEARCH ONLY")
+                        f"DK {price(r.get('price_american'))} · blended estimate {pct(b_p)} · "
+                        f"blended EV {pct(b_ev,True)} · raw model EV {pct(r.get('ev_per_dollar'),True)} (not a price) · RESEARCH ONLY")
+                if not chosen:
+                    rows=[r for r in prop_card.get("rows") or [] if r.get("player")]
+                    priced=sum(1 for r in rows if r.get("status")=="PRICED")
+                    reasons={}
+                    for r in rows:
+                        if r.get("status")=="PRICED":
+                            continue
+                        why=str(r.get("reason") or r.get("status") or "UNKNOWN")
+                        if why.startswith("PROP_PLAYER_EXACT_MATCH_REQUIRED"):
+                            why="PROP_PLAYER_EXACT_MATCH_REQUIRED"
+                        reasons[why]=reasons.get(why,0)+1
+                    top=sorted(reasons.items(),key=lambda kv:(-kv[1],kv[0]))[:3]
+                    detail="; ".join(f"{k} ×{v}" for k,v in top) or "no prop rows"
+                    if no_blend:
+                        detail+=f"; NFL_PROP_BLENDED_EV_UNAVAILABLE ×{no_blend}"
+                    missing=[f"{k} {v}" for k,v in sorted((prop_card.get("source_status") or {}).items())
+                             if not str(v).startswith(("AVAILABLE","NOT_REQUIRED"))]
+                    notes.append(f"- {day}: {priced} priced of {len(rows)} prop rows · {detail}"
+                                 +(" · sources: "+", ".join(missing) if missing else ""))
             if not found_any:
                 lines.append("No supported priced research prop candidates.")
+            lines.extend(notes)
+            lines.append("- Anytime TD: not priced · no anytime-TD engine on the auto prop path (frozen ATD v1.1 not wired here)")
             lines.append("")
         elif sport=="CFB":
             # Owner request Oct 24 2026: show CFB sides AND totals. A single
@@ -445,6 +495,8 @@ def render(root: Path, run_url: str, *, as_of_date: str | None = None,
                 else:
                     lines.append("None with supported model pricing." if role=="BEST" else "No modeled leans.")
                 lines.append("")
+    if bet_issues is not None:
+        lines.extend(render_crosscheck(bet_issues,auto_rows,as_of_date))
     lines.extend(["**Open the run for the full quotes, cards and PNG images (when available):**",run_url,"",
                   "Unavailable data stays MISSING. A directional lean is not a verified betting edge."])
     return "\n".join(lines)+"\n"
@@ -455,9 +507,26 @@ def main():
     ap.add_argument("--root",type=Path,default=Path("artifacts/auto_dk_cards"))
     ap.add_argument("--output",type=Path,default=Path("artifacts/auto_dk_cards/phone_summary.md"))
     ap.add_argument("--run-url",required=True)
+    ap.add_argument("--bet-issues",type=Path,help="JSON from gh issue list (open [BET] issues)")
     args=ap.parse_args()
+    bets=None
+    if args.bet_issues and args.bet_issues.is_file():
+        try:
+            bets=json.loads(args.bet_issues.read_text(encoding="utf-8"))
+        except ValueError:
+            bets=[]
+    elif os.environ.get("GH_TOKEN") and os.environ.get("GITHUB_REPOSITORY"):
+        # Read-only list of open [BET] issues; any failure just omits the section.
+        try:
+            out=subprocess.run(["gh","issue","list","--repo",os.environ["GITHUB_REPOSITORY"],
+                                "--state","open","--limit","200","--search","[BET] in:title",
+                                "--json","number,title,body"],
+                               capture_output=True,text=True,timeout=60,check=True).stdout
+            bets=json.loads(out or "[]")
+        except (OSError,ValueError,subprocess.SubprocessError):
+            bets=None
     args.output.parent.mkdir(parents=True,exist_ok=True)
-    args.output.write_text(render(args.root,args.run_url),encoding="utf-8")
+    args.output.write_text(render(args.root,args.run_url,bet_issues=bets),encoding="utf-8")
 
 
 if __name__=="__main__":

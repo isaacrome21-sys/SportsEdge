@@ -39,7 +39,9 @@ _PLAYER_STATS = {
     "walks allowed": "PITCHER_WALKS",
     "pitcher walks": "PITCHER_WALKS",
     "er": "PITCHER_EARNED_RUNS",
+    "er allowed": "PITCHER_EARNED_RUNS",
     "earned runs": "PITCHER_EARNED_RUNS",
+    "earned runs allowed": "PITCHER_EARNED_RUNS",
     "hits walks er": "PITCHER_HITS_WALKS_ER",
     "hits+walks+er": "PITCHER_HITS_WALKS_ER",
     "h+bb+er": "PITCHER_HITS_WALKS_ER",
@@ -118,10 +120,80 @@ def _aliases_pattern(values: Iterable[str]) -> str:
     return "|".join(sorted((re.escape(value) for value in values), key=len, reverse=True))
 
 
-def parse_lines(text: str) -> list[ParsedRow]:
+# MLB abbreviations people type in front of (or instead of) nicknames, e.g.
+# "TB Rays", "MIL Brewers". Values are MLB StatsAPI full names.
+TEAM_ABBR = {
+    "ari": "Arizona Diamondbacks", "az": "Arizona Diamondbacks",
+    "atl": "Atlanta Braves", "bal": "Baltimore Orioles", "bos": "Boston Red Sox",
+    "chc": "Chicago Cubs", "cws": "Chicago White Sox", "chw": "Chicago White Sox",
+    "cin": "Cincinnati Reds", "cle": "Cleveland Guardians", "col": "Colorado Rockies",
+    "det": "Detroit Tigers", "hou": "Houston Astros", "kc": "Kansas City Royals",
+    "kcr": "Kansas City Royals", "laa": "Los Angeles Angels", "lad": "Los Angeles Dodgers",
+    "mia": "Miami Marlins", "mil": "Milwaukee Brewers", "min": "Minnesota Twins",
+    "nym": "New York Mets", "nyy": "New York Yankees", "ath": "Athletics",
+    "oak": "Athletics", "phi": "Philadelphia Phillies", "pit": "Pittsburgh Pirates",
+    "sd": "San Diego Padres", "sdp": "San Diego Padres", "sea": "Seattle Mariners",
+    "sf": "San Francisco Giants", "sfg": "San Francisco Giants", "stl": "St. Louis Cardinals",
+    "tb": "Tampa Bay Rays", "tbr": "Tampa Bay Rays", "tex": "Texas Rangers",
+    "tor": "Toronto Blue Jays", "wsh": "Washington Nationals", "was": "Washington Nationals",
+    "wsn": "Washington Nationals",
+}
+
+_HEADER_SEP = re.compile(r"(?:@|\bat\b|\bvs\b\.?)", re.I)
+# Trailing series/game tags after the home team: "WS G2", "ALCS Game 5", "G1".
+_HEADER_SUFFIX = re.compile(
+    r"\s+(?:(?:WS|ALCS|NLCS|ALDS|NLDS|WC|wild ?card|world series)\b.*|G(?:ame)?\s*\d+\b.*)$", re.I
+)
+
+
+def _parse_header(line: str) -> tuple[str, str] | None:
+    """'TB Rays @ MIL Brewers — WS Game 2, Sat ... (DK event ...)' -> ('TB Rays', 'MIL Brewers').
+
+    Everything after an em/en dash, comma, paren or ' - ' is context and is dropped
+    before team matching. Returns None when the head is not an 'X @ Y' matchup."""
+    line = re.sub(r"^\[MLB LINES\]\s*", "", line.strip(), flags=re.I)
+    head = re.split(r"\s*[—–(,|]|\s+-\s+|:\s", line, 1)[0].strip()
+    if re.search(r"[+-]?\d{3}", head):
+        return None
+    match = re.fullmatch(r"(.+?)\s*(?:@|\bat\b|\bvs\b\.?)\s*(.+)", head, flags=re.I)
+    if not match:
+        return None
+    away = match.group(1).strip()
+    home = _HEADER_SUFFIX.sub("", match.group(2)).strip()
+    if not away or not home or _HEADER_SEP.search(home):
+        return None
+    return away, home
+
+
+_PITCHER_SECTION = re.compile(
+    r"pitcher\s+props?\s*[—–:-]+\s*([A-Za-z.' -]+?)\s*(?:\([^)]*\))?\s*:?$", re.I
+)
+# Prop lines that start with the stat; the active pitcher section supplies the name.
+_SECTION_STAT_START = re.compile(
+    r"(?:k|ks|strikeouts|outs|outs recorded|hits allowed|walks allowed|er|er allowed|earned runs"
+    r"|earned runs allowed|hits\+walks\+er|h\+bb\+er|hits walks er|win)\b", re.I
+)
+
+
+def _clean_line(line: str) -> str:
+    """Drop parenthetical extras ('(also: ...)', '(ladder: ...)') and Yes/No words."""
+    line = re.sub(r"\s*\([^)]*\)", "", line).strip()
+    line = re.sub(r"\bwin\s+yes\s+" + _PRICE + r"\s*/\s*no\s+" + _PRICE, r"win \1 \2", line, flags=re.I)
+    return " ".join(line.split())
+
+
+def parse_lines(text: str, *, title: str | None = None) -> list[ParsedRow]:
+    return parse_lines_with_warnings(text, title=title)[0]
+
+
+def parse_lines_with_warnings(text: str, *, title: str | None = None) -> tuple[list[ParsedRow], list[str]]:
+    """Parse phone lines. Unreadable informational lines become warnings and emit no
+    row; explicit one-sided prices still fail closed (no side is ever invented)."""
     rows: list[ParsedRow] = []
-    game: tuple[str, str] | None = None
+    game: tuple[str, str] | None = _parse_header(title) if title else None
+    subject: str | None = None
     errors: list[str] = []
+    warnings: list[str] = []
     player_stats = _aliases_pattern(_PLAYER_STATS)
     either_stats = _aliases_pattern(_EITHER_PITCHER_STATS)
 
@@ -130,14 +202,70 @@ def parse_lines(text: str) -> list[ParsedRow]:
         if not line or line.startswith("#") or line.startswith("_"):
             continue
 
-        header = re.fullmatch(r"(.+?)\s*(?:@|\bat\b|\bvs\b\.?)\s*(.+)", line, flags=re.I)
-        if header and not re.search(r"[+-]?\d{3}", line):
-            game = (header.group(1).strip(), header.group(2).strip())
+        header = _parse_header(line)
+        if header:
+            game = header
+            subject = None
             continue
         if game is None:
             errors.append(f"line {n}: no game header (e.g. 'Red Sox @ Yankees') before '{line}'")
             continue
         away, home = game
+
+        section = _PITCHER_SECTION.fullmatch(line)
+        if section:
+            subject = section.group(1).strip()
+            continue
+        if line.endswith(":") or re.match(r"(?:batter|h2h)\b", line, flags=re.I):
+            # A new non-pitcher section ends the pitcher subject.
+            subject = None
+            if line.endswith(":"):
+                continue
+
+        line = _clean_line(line)
+        if not line:
+            continue
+        if subject and _SECTION_STAT_START.match(line):
+            line = f"{subject} {line}"
+
+        match = re.fullmatch(rf"(F5\s+|first ?5\s+|first five\s+)?team totals?:\s*(.+)", line, flags=re.I)
+        if match:
+            market = "FIRST_FIVE_TEAM_TOTAL" if match[1] else "TEAM_TOTAL"
+            for part in match[2].split(";"):
+                seg = re.fullmatch(rf"\s*(.+?)\s+{_NUM}\s+{_PRICE}\s+{_PRICE}\s*", part, flags=re.I)
+                if seg:
+                    rows.append(ParsedRow(away, home, market, "OVER", float(seg[2]), _price(seg[3]), "UNDER", _price(seg[4]), team=seg[1].strip()))
+                else:
+                    warnings.append(f"line {n}: skipped team-total piece '{part.strip()}'")
+            continue
+
+        if ";" in line or re.match(r"[^:]+:\s", line):
+            # Multi-item "Label: a; b" sections are informational unless handled above;
+            # never let a label like "Team Total Hits: MIL ..." pose as a player name.
+            warnings.append(f"line {n}: skipped unreadable/informational line '{line[:120]}'")
+            continue
+
+        # "RL -1.5 +180 / +1.5 -221": both sides of one run line, away sign first.
+        match = re.fullmatch(
+            rf"((?:F5|first ?5|first five)\s+)?(?:RL|run ?line)\s+{_SIGNED_NUM}\s+{_PRICE}\s*/\s*{_SIGNED_NUM}\s+{_PRICE}",
+            line, flags=re.I,
+        )
+        if match:
+            if float(match[2]) != -float(match[4]):
+                warnings.append(f"line {n}: skipped run line with mismatched sides '{line}'")
+                continue
+            market = "FIRST_FIVE_RUN_LINE" if match[1] else "RUN_LINE"
+            rows.append(ParsedRow(away, home, market, "AWAY", float(match[2]), _price(match[3]), "HOME", _price(match[5])))
+            continue
+
+        match = re.fullmatch(rf"YRFI\s+{_PRICE}\s*/\s*NRFI\s+{_PRICE}", line, flags=re.I)
+        if match:
+            rows.append(ParsedRow(away, home, "FIRST_INNING_TOTAL", "OVER", 0.5, _price(match[1]), "UNDER", _price(match[2])))
+            continue
+        match = re.fullmatch(rf"NRFI\s+{_PRICE}\s*/\s*YRFI\s+{_PRICE}", line, flags=re.I)
+        if match:
+            rows.append(ParsedRow(away, home, "FIRST_INNING_TOTAL", "OVER", 0.5, _price(match[2]), "UNDER", _price(match[1])))
+            continue
 
         match = re.fullmatch(rf"(?:ML|moneyline)\s+{_PRICE}\s+{_PRICE}", line, flags=re.I)
         if match:
@@ -225,24 +353,40 @@ def parse_lines(text: str) -> list[ParsedRow]:
             )
             continue
 
-        errors.append(
-            f"line {n}: couldn't read '{line}' (use a supported market and both prices; "
-            "for run lines include the away line sign, e.g. 'RL +1.5 -190 +160' or 'RL -1.5 +160 -190')"
+        # One-sided core-market quotes are a pricing error, never an informational note.
+        match = re.fullmatch(
+            rf"(?:(?:F5|first ?5|first five)\s+)?(?:ML|moneyline|(?:RL|run ?line|total|o/?u|game total)\s+{_SIGNED_NUM}|YRFI|NRFI)\s+{_PRICE}",
+            line, flags=re.I,
         )
+        if match:
+            errors.append(
+                f"line {n}: BLOCKED_PRICING_METHOD: '{line}' (needs both prices)"
+            )
+            continue
+
+        warnings.append(f"line {n}: skipped unreadable/informational line '{line[:120]}'")
 
     if errors:
         raise LinesIntakeError("\n".join(errors))
     if not rows:
-        raise LinesIntakeError("no lines found")
-    return rows
+        detail = ("\n" + "\n".join(warnings)) if warnings else ""
+        raise LinesIntakeError("no lines found" + detail)
+    return rows, warnings
+
 
 
 def _match_team(name: str, full_names: Iterable[str]) -> list[str]:
     want = _norm(name)
+    tokens = want.split()
+    abbr_full = _norm(TEAM_ABBR[tokens[0]]) if tokens and tokens[0] in TEAM_ABBR else None
+    rest = " ".join(tokens[1:])
     hits: list[str] = []
     for full_name in full_names:
         full = _norm(full_name)
         if want and (full == want or full.endswith(" " + want) or full.startswith(want + " ")):
+            hits.append(full_name)
+        elif abbr_full and full == abbr_full and (not rest or full == rest or full.endswith(" " + rest)):
+            # "TB Rays" / "TB" -> Tampa Bay Rays; the nickname must agree when given.
             hits.append(full_name)
     return hits
 

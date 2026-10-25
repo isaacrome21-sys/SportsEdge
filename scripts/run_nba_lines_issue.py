@@ -24,7 +24,7 @@ if str(ROOT) not in sys.path:
 
 from sportsedge.registry_gate import gate_and_stamp as _registry_gate_and_stamp, gate_text as _registry_gate_text  # noqa: E402  t134 family gate
 from sportsedge.sports.nba.lines_card import (  # noqa: E402
-    NBALinesError, parse_lines, ratings_from_results, render, team_abbr,
+    NBALinesError, parse_lines, ratings_from_results, render, team_abbr, price_game,
 )
 
 CHICAGO = ZoneInfo("America/Chicago")
@@ -142,6 +142,27 @@ def fetch_results(today: date, fetch=_get) -> tuple[list[dict], list[str]]:
     return games, errors
 
 
+def evidence_rows(games, ratings, *, game_date, issue, engine_id):
+    """Export the same priced rows as the card, with an explicit event date."""
+    from sportsedge.sports.nba.clv_ledger import capture_rows, pick_row
+    date.fromisoformat(game_date)  # Never infer event date from an issue edit.
+    captures, picks = [], []
+    for game in games:
+        quotes = capture_rows([game], game_date=game_date, issue=issue)
+        _, _, priced = price_game(game, ratings)
+        if len(quotes) != len(priced):
+            raise ValueError("NBA_CAPTURE_CARD_ROW_MISMATCH")
+        captures.extend(quotes)
+        for quote, row in zip(quotes, priced):
+            if quote["market"] != row.market or quote["american"] != row.price:
+                raise ValueError("NBA_CAPTURE_CARD_IDENTITY_MISMATCH")
+            if row.ev >= 0.02:
+                pick = pick_row(quote, model_p=row.model_p, engine_id=engine_id)
+                pick.update(pick=row.side, price=row.price, card_status=row.label)
+                picks.append(pick)
+    return captures, sorted(picks, key=lambda p: -p["ev_per_unit"])
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--body-file", required=True)
@@ -149,6 +170,8 @@ def main() -> int:
     ap.add_argument("--issue", default="")
     ap.add_argument("--results-file", help="cached results JSON (skips ESPN)")
     ap.add_argument("--out", default="artifacts/nba/card.md")
+    ap.add_argument("--game-date", help="Explicit YYYY-MM-DD event date for evidence")
+    ap.add_argument("--engine-id", help="Version identity for recorded picks")
     args = ap.parse_args()
     observed = datetime.fromisoformat(args.observed_at.replace("Z", "+00:00")).astimezone(CHICAGO)
     try:
@@ -176,6 +199,14 @@ def main() -> int:
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(card, encoding="utf-8")
+    if args.game_date:
+        if not args.engine_id:
+            raise ValueError("NBA_EVIDENCE_ENGINE_ID_REQUIRED")
+        captures, picks = evidence_rows(games, ratings, game_date=args.game_date,
+                                        issue=int(args.issue), engine_id=args.engine_id)
+        (out.parent / "captures.jsonl").write_text(
+            "".join(json.dumps(r, sort_keys=True) + "\n" for r in captures))
+        (out.parent / "picks.json").write_text(json.dumps(picks, indent=2) + "\n")
     print(f"card={out}")
     return 0
 
