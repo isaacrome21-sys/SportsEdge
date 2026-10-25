@@ -1,7 +1,10 @@
 """NFL strict capture -> PAPER grade -> paired CLV tests (test fixtures only)."""
 from __future__ import annotations
 
+import json
 import pytest
+
+from scripts.grade_nfl_paper_issue import main as grade_cli
 
 from sportsedge.nfl_paper_grader import (
     NflPaperError, capture_nfl_issue, grade_nfl_issue,
@@ -135,3 +138,30 @@ def test_unpriced_prop_quote_does_not_invent_model_pick(tmp_path):
     assert any(r["market"] == "passing_yards" for r in snap["board"])
     assert snap["picks"] == []
     assert rows(tmp_path) == []
+
+
+def test_cli_capture_to_final_paper_ledger(tmp_path):
+    stage(tmp_path)
+    stage(tmp_path, captured="2026-10-24T22:30:00Z",
+          recorded="2026-10-24T22:31:00Z", chosen=False,
+          away="+145", home="-165")
+    receipt = tmp_path / "final_receipt.json"
+    receipt.write_text(json.dumps(FINAL), encoding="utf-8")
+    output = tmp_path / "paper_grade.json"
+    code = grade_cli(["--issue", str(ISSUE), "--final-receipt", str(receipt),
+                      "--snapshot-root", str(tmp_path), "--output", str(output)])
+    assert code == 0
+    saved = json.loads(output.read_text(encoding="utf-8"))
+    assert saved["status"] == "PAPER"
+    assert saved["final_receipt"]["sha256"] == FINAL["sha256"]
+    assert saved["rows"][0]["clv_status"] == "CLV_TRACKED_PAPER"
+
+
+def test_cli_refuses_unverified_final(tmp_path):
+    stage(tmp_path)
+    receipt = tmp_path / "bad_final.json"
+    receipt.write_text(json.dumps({**FINAL, "url": ""}), encoding="utf-8")
+    output = tmp_path / "should_not_exist.json"
+    assert grade_cli(["--issue", str(ISSUE), "--final-receipt", str(receipt),
+                      "--snapshot-root", str(tmp_path), "--output", str(output)]) == 2
+    assert not output.exists()
