@@ -82,6 +82,8 @@ def parse_scoreboard(payload: dict, *, date: str) -> list[dict]:
     for g in payload["games"]:
         if not isinstance(g, dict):
             raise ValueError("NHL_FINALS_GAME_INVALID")
+        if not g.get("gameState"):
+            raise ValueError("NHL_FINALS_GAME_STATE_MISSING")
         state = str(g.get("gameState") or "").upper()
         if state not in COMPLETED_STATES:
             continue
