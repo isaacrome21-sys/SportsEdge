@@ -19,3 +19,16 @@ def test_no_invented_capture_method():
     assert build_tiered_capture_span_manifest([row])['games'][0]['capture_method'] is None
     row['capture_method']='CLAIMED'
     with pytest.raises(CaptureSpanManifestError):build_tiered_capture_span_manifest([row])
+
+@pytest.mark.parametrize("method", [[], {}, True, 1])
+def test_malformed_method_refuses_with_policy_error(method):
+    row=dict(event_id="E",capture_started_at="2026-10-25T00:00:00Z",capture_finished_at="2026-10-25T00:01:00Z",capture_method=method)
+    with pytest.raises(CaptureSpanManifestError, match="CAPTURE_METHOD_INVALID"):
+        build_tiered_capture_span_manifest([row])
+
+def test_failed_capture_remains_failed_and_excluded():
+    row=dict(event_id="E",capture_started_at="2026-10-25T00:00:00Z",capture_finished_at=None,failure_reason="UNREACHABLE")
+    m=build_tiered_capture_span_manifest([row])
+    assert m["games"][0]["status"]=="FAILED"
+    assert not m["accepted_event_ids"] and not m["research_event_ids"]
+    assert m["games"][0]["ladder_eligible"] is False

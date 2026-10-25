@@ -16,7 +16,7 @@ def build_tiered_capture_span_manifest(records):
             raise CaptureSpanManifestError('UNEXPECTED_SPAN_RECORD_FIELDS')
         row = dict(record)
         method = row.pop('capture_method', None)
-        if method is not None and method not in METHODS:
+        if method is not None and (not isinstance(method, str) or method not in METHODS):
             raise CaptureSpanManifestError('CAPTURE_METHOD_INVALID')
         methods[str(row.get('event_id')).strip()] = method
         clean.append(row)
