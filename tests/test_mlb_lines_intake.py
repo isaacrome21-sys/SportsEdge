@@ -3,6 +3,7 @@ import unittest
 from sportsedge.engine_registry import resolve_manual_market_type
 from sportsedge.manual_quote import validate_manual_quote
 from sportsedge.mlb_lines_intake import LinesIntakeError, build_input, parse_lines, parse_lines_with_warnings
+from sportsedge.mlb_resolve import build_bound_input
 from sportsedge.mlb_source import GameSnapshot
 
 
@@ -114,6 +115,55 @@ class LinesIntakeTest(unittest.TestCase):
     def test_unsigned_run_line_remains_away_plus(self):
         row = parse_lines("Red Sox @ Yankees\nRL 1.5 -193 +159")[0]
         self.assertEqual(row.line, 1.5)
+
+    def test_real_mlb_alt_total_and_alt_run_line_pairs_are_not_dropped(self):
+        rows, warnings = parse_lines_with_warnings(
+            "MIL Brewers @ TB Rays\n"
+            "Alt Total 3.5 -690 +425\n"
+            "Alt Total 11.5 +495 -860\n"
+            "Alt RL -4.5 +620 / +4.5 -1260\n"
+            "Alt RL +1.5 -234 / -1.5 +175"
+        )
+        self.assertEqual(warnings, [])
+        self.assertEqual([
+            (r.market_type, r.side, r.line, r.price, r.paired_side, r.paired_price)
+            for r in rows
+        ], [
+            ("GAME_TOTAL", "OVER", 3.5, -690, "UNDER", 425),
+            ("GAME_TOTAL", "OVER", 11.5, 495, "UNDER", -860),
+            ("RUN_LINE", "AWAY", -4.5, 620, "HOME", -1260),
+            ("RUN_LINE", "AWAY", 1.5, -234, "HOME", 175),
+        ])
+
+    def test_alt_run_line_mismatched_handicaps_do_not_price(self):
+        rows, warnings = parse_lines_with_warnings(
+            "MIL Brewers @ TB Rays\nML -105 -115\nAlt RL -4.5 +620 / +3.5 -1260"
+        )
+        self.assertEqual(len(rows), 1)
+        self.assertTrue(any("mismatched sides" in warning for warning in warnings))
+
+    def test_alt_run_line_one_sided_quote_still_fails_closed(self):
+        with self.assertRaises(LinesIntakeError) as ctx:
+            parse_lines("MIL Brewers @ TB Rays\nAlt RL -4.5 +620")
+        self.assertIn("BLOCKED_PRICING_METHOD", str(ctx.exception))
+
+    def test_live_mlb_issue_binding_keeps_alt_market_rows_and_genuine_quote_prices(self):
+        body = (
+            "MIL Brewers @ TB Rays\nAlt Total 3.5 -690 +425\n"
+            "Alt RL -4.5 +620 / +4.5 -1260"
+        )
+        payload = build_bound_input(
+            body, observed_at="2026-10-25T12:16:08-05:00",
+            schedule=[_game(999999, "Milwaukee Brewers", "Tampa Bay Rays",
+                            "2026-10-25T23:00:00+00:00")],
+        )
+        self.assertEqual(len(payload["rows"]), 2)
+        self.assertEqual([r["market_type"] for r in payload["rows"]],
+                         ["GAME_TOTAL", "RUN_LINE"])
+        self.assertEqual([(r["price"], r["paired_price"]) for r in payload["rows"]],
+                         [(-690, 425), (620, -1260)])
+        self.assertTrue(all(r["game_pk"] == 999999 for r in payload["rows"]))
+        self.assertTrue(all(r["timestamp_source"] == "INTAKE_STAMPED" for r in payload["rows"]))
 
     def test_binary_player_markets_use_yes_no_without_invented_line(self):
         rows = parse_lines(
