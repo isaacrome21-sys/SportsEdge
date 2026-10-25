@@ -25,12 +25,14 @@ jobs:
         run: python scripts/probe_direct_dk_six_sports.py --help
       - name: Read-only direct source probe
         if: github.event_name == 'workflow_dispatch'
-        run: python scripts/probe_direct_dk_six_sports.py
+        run: python scripts/probe_direct_dk_six_sports.py --archive-dir artifacts/dk_direct/raw
       - name: Publish capture coverage report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: dk-direct-coverage-${{ github.run_id }}
-          path: artifacts/dk_direct/six_sport_probe.json
+          path: |
+            artifacts/dk_direct/six_sport_probe.json
+            artifacts/dk_direct/raw/
           if-no-files-found: warn
           retention-days: 14
