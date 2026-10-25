@@ -27,7 +27,7 @@ from sportsedge.mlb_quote_move_guard import apply_quote_move_guard  # noqa: E402
 
 
 PRE_CONTEXT_STATUS = "PRE-CONTEXT · NOT FINAL"
-MLB_LIVE_QUOTE_TTL_SECONDS = 180.0
+MLB_LIVE_QUOTE_TTL_SECONDS = 1800.0
 PAPER_ONLY_REASON = "LANE7_MARKET_NOT_VERIFIED"
 
 
@@ -244,7 +244,7 @@ def main() -> int:
         elif timestamp_sources:
             notes.append(f"Timestamp provenance: {', '.join(timestamp_sources)}.")
     notes.append("PAPER ONLY: no MLB SPORT:MARKET is verified. Lane 7 requires 50 authentic graded picks, positive mean no-vig CLV and positive ROI.")
-    notes.append("180-second quote TTL enforced at render; stale/future/unknown capture times never qualify.")
+    notes.append("1800-second quote TTL enforced at render; stale/future/unknown capture times never qualify.")
     notes.append("Rows rank by research EV/$, highest first; missing evaluations remain marked.")
 
     if any("QUOTE_MOVE_NEEDS_CONFIRM" in (r.get("presentation_reason_codes") or ()) for r in rows):
