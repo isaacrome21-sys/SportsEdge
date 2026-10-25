@@ -264,8 +264,11 @@ class ArmedWindowTests(unittest.TestCase):
         }
         # nflverse gametime is ET: 13:00 ET = 17:00 UTC, FINAL opens 16:30.
         with patch("sportsedge.nfl_confirmation_schedule.captured_final_kickoffs", return_value=Counter()):
-            self.assertIsNone(cap.next_final_window(cfg, datetime(2026, 9, 27, 15, 54, tzinfo=timezone.utc), RealSnapshot()))
-            start, end = cap.next_final_window(cfg, datetime(2026, 9, 27, 15, 55, tzinfo=timezone.utc), RealSnapshot())
+            self.assertIsNone(cap.next_final_window(cfg, datetime(2026, 9, 27, 15, 39, tzinfo=timezone.utc), RealSnapshot()))
+            start, end = cap.next_final_window(cfg, datetime(2026, 9, 27, 15, 40, tzinfo=timezone.utc), RealSnapshot())
+            # Old 35m horizon missed a 7:16 runner for an 8:00 window.
+            prearmed = cap.next_final_window(cfg, datetime(2026, 9, 27, 15, 46, tzinfo=timezone.utc), RealSnapshot())
+            self.assertEqual(prearmed, (start, end))
         self.assertEqual(start, datetime(2026, 9, 27, 16, 30, tzinfo=timezone.utc))
         self.assertEqual(end, datetime(2026, 9, 27, 16, 45, tzinfo=timezone.utc))
         with patch("sportsedge.nfl_confirmation_schedule.captured_final_kickoffs", return_value=Counter({"2026-09-27T17:00:00Z": 1})):
