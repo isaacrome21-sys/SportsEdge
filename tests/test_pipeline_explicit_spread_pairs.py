@@ -17,6 +17,8 @@ CAPTURED = "Captured: 2026-10-25T11:42:40-05:00"
     ("NFL", "Spread +3 -110 -3 -110", "spread", 3.0, -110, -110),
     ("CFB", "Spread -6.5 -112 +6.5 -108", "SPREAD", -6.5, -112, -108),
     ("MLB", "RL +1.5 -120 -1.5 +100", "RUN_LINE", 1.5, -120, 100),
+    ("MLB", "RL -1.5 +170 / +1.5 -208", "RUN_LINE", -1.5, 170, -208),
+    ("MLB", "F5 RL -0.5 +135 / +0.5 -175", "FIRST_FIVE_RUN_LINE", -0.5, 135, -175),
     ("NBA", "Spread -4.5 -108 +4.5 -112", "SPREAD", -4.5, -108, -112),
 ])
 def test_four_field_spread_pairs_keep_true_prices(
