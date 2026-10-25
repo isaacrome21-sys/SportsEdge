@@ -51,6 +51,6 @@ def test_intact_digest_wrong_ledger_or_schema_refused(tmp_path, change):
 def test_nonfinite_json_tokens_fail_closed(tmp_path, token):
     path = tmp_path / "nfl" / "991001.jsonl"
     path.parent.mkdir(parents=True)
-    path.write_text('{"board":[{"price":' + token + '}]}\\n'.replace('\\\\n', '\\n'))
+    path.write_text('{"board":[{"price":' + token + '}]}' + chr(10))
     with pytest.raises(SnapshotError, match="SNAPSHOT_JSON_INVALID"):
         load_snapshots("nfl", 991001, root=tmp_path)
