@@ -90,3 +90,28 @@ def evidence_supports(clv_values: Iterable[float], current: str = PAPER, *,
     if not (clv_mean > 0 and units_total > 0):
         return PAPER
     return STAKE_05 if current in (STAKE_025, STAKE_05) else STAKE_025
+
+
+def span_filtered_evidence_supports(records: Iterable[Mapping[str, Any]], current: str = PAPER) -> str:
+    """Report-only span filter; authentic quote/final receipts are separate checks.
+
+    Missing span/method is never counted. Research rows may remain in the paper
+    ledger, but cannot inflate n, mean CLV or realized units here.
+    """
+    from .picks import PickRecord, PickRecordError
+    values, results, identity = [], [], None
+    for row in records:
+        try:
+            pick = PickRecord.from_dict(row)
+        except (PickRecordError, TypeError, ValueError, OverflowError):
+            return PAPER
+        key = (pick.sport, pick.market, pick.engine)
+        if identity is None:
+            identity = key
+        elif key != identity:
+            return PAPER  # no cross-market/version inheritance
+        if pick.span_tier != 'FULL' or pick.capture_method not in ('PRIMARY_BROWSER','FALLBACK'):
+            continue
+        values.append(row.get('clv_prob'))
+        results.append(row.get('units'))
+    return evidence_supports(values, current, units=results)
