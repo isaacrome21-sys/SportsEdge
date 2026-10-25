@@ -98,3 +98,12 @@ def test_refuses_same_output_paths(tmp_path):
     with pytest.raises(ValueError, match="INPUT_AND_OUTPUT_PATHS_MUST_BE_DISTINCT"):
         run(source, output, output)
     assert not output.exists()
+
+
+def test_rejects_output_directory(tmp_path):
+    import pytest
+    source = tmp_path / "source.jsonl"
+    source.write_text(json.dumps(row()) + "\n")
+    with pytest.raises(ValueError, match="OUTPUT_PATH_IS_DIRECTORY"):
+        run(source, tmp_path, tmp_path / "blocked.jsonl")
+    assert source.exists()
