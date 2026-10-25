@@ -245,3 +245,53 @@ def test_invalid_nfl_final_scores_refuse_without_grade(tmp_path, bad):
     snap = stage(tmp_path)
     with pytest.raises(NflPaperError, match="FINAL_SCORES_INVALID"):
         grade_nfl_issue([snap], {**FINAL, "away_points": bad})
+
+
+def test_owner_30min_capture_to_record_boundary(tmp_path):
+    exact = stage(tmp_path, captured="2026-10-24T21:00:00Z",
+                  recorded="2026-10-24T21:30:00Z")
+    assert exact["captured_at"] == "2026-10-24T21:00:00+00:00"
+    assert len(grade_nfl_issue([exact], FINAL)) == 1
+
+
+def test_capture_posted_at_1801_seconds_is_ineligible(tmp_path):
+    with pytest.raises(NflPaperError, match="NFL_CAPTURE_STALE_OVER_1800S"):
+        stage(tmp_path, captured="2026-10-24T21:00:00Z",
+              recorded="2026-10-24T21:30:01Z")
+    assert load_snapshots("nfl", ISSUE, tmp_path) == []
+
+
+def test_stored_relay_age_mutation_stays_ineligible_for_grade(tmp_path):
+    snap = stage(tmp_path)
+    # The snapshot digest does not by itself bind recorded_at, so the grade
+    # path must independently enforce the owner's source-to-record bound.
+    snap["recorded_at"] = "2026-10-24T21:30:01Z"
+    with pytest.raises(NflPaperError, match="NFL_SNAPSHOT_CAPTURE_STALE_OVER_1800S"):
+        grade_nfl_issue([snap], FINAL)
+
+
+def test_rehashed_forged_pick_identifier_refuses_paper_grade(tmp_path):
+    snap = stage(tmp_path)
+    snap["picks"][0]["pick"] = "KC@BAL|moneyline||HOME|FORGED"
+    snap["content_sha256"] = _content_hash(snap)
+    with pytest.raises(NflPaperError, match="NFL_SNAPSHOT_PICK_KEY_MISMATCH"):
+        grade_nfl_issue([snap], FINAL)
+
+
+def test_rehashed_duplicate_source_captured_refused(tmp_path):
+    snap = stage(tmp_path)
+    snap["body"] += "\nCaptured: 2026-10-24T21:00:01Z"
+    snap["content_sha256"] = _content_hash(snap)
+    with pytest.raises(ValueError, match="CAPTURED"):
+        grade_nfl_issue([snap], FINAL)
+
+
+def test_rehashed_changed_close_line_refuses_instead_of_counting_clv(tmp_path):
+    entry = stage(tmp_path)
+    close = stage(tmp_path, captured="2026-10-24T22:30:00Z",
+                  recorded="2026-10-24T22:31:00Z", chosen=False,
+                  away="+145", home="-165")
+    close["body"] = close["body"].replace("Total 47.5", "Total 48.5")
+    close["content_sha256"] = _content_hash(close)
+    with pytest.raises(NflPaperError, match="NFL_SNAPSHOT_BOARD_MISMATCH"):
+        grade_nfl_issue([entry, close], FINAL)
