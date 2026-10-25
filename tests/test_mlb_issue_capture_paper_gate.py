@@ -1,4 +1,4 @@
-"""MLB issue quotes: original capture clock, 180s TTL, PAPER-only display.
+"""MLB issue quotes: original capture clock, 1800s TTL, PAPER-only display.
 
 All fixtures offline. An issue edit can never rejuvenate an old DK quote.
 """
@@ -15,16 +15,16 @@ from scripts.render_mlb_myspari_card import (
 from sportsedge.manual_quote_live import partition_live_rows
 
 CT = "-05:00"
-POSTED = datetime.fromisoformat("2026-10-25T07:03:00-05:00")
+POSTED = datetime.fromisoformat("2026-10-25T07:30:00-05:00")
 
 
-def test_capture_relay_zero_tolerance_and_180_second_boundary():
+def test_capture_relay_zero_tolerance_and_1800_second_boundary():
     capture = _issue_capture_at("2026-10-25T07:00:00-05:00", POSTED)
     assert capture.isoformat() == "2026-10-25T07:00:00-05:00"
     with pytest.raises(LinesIntakeError, match="MLB_CAPTURE_RELAY_TOO_OLD"):
         _issue_capture_at("2026-10-25T06:59:59-05:00", POSTED)
     with pytest.raises(LinesIntakeError, match="MLB_CAPTURE_FUTURE_RELATIVE_TO_ISSUE"):
-        _issue_capture_at("2026-10-25T07:03:01-05:00", POSTED)
+        _issue_capture_at("2026-10-25T07:30:01-05:00", POSTED)
     with pytest.raises(LinesIntakeError, match="MLB_CAPTURE_TIMESTAMP_REQUIRED"):
         _issue_capture_at(None, POSTED)
     with pytest.raises(LinesIntakeError, match="MLB_CAPTURE_TIMESTAMP_INVALID"):
@@ -62,15 +62,15 @@ BASE = {
 
 def _strict(row, as_of):
     return partition_live_rows(
-        [row], run_date="2026-10-25", max_age_minutes=3,
+        [row], run_date="2026-10-25", max_age_minutes=30,
         as_of=datetime.fromisoformat(as_of), enforce_quote_window=True,
     )
 
 
-def test_strict_card_admits_exact_180_seconds_only():
-    live, blocked, _ = _strict(dict(BASE), "2026-10-25T10:03:00-05:00")
+def test_strict_card_admits_exact_1800_seconds_only():
+    live, blocked, _ = _strict(dict(BASE), "2026-10-25T10:30:00-05:00")
     assert len(live) == 1 and blocked == []
-    live, blocked, _ = _strict(dict(BASE), "2026-10-25T10:03:01-05:00")
+    live, blocked, _ = _strict(dict(BASE), "2026-10-25T10:30:01-05:00")
     assert live == [] and blocked[0]["reason"] == "MANUAL_QUOTE_EXPIRED"
 
 
