@@ -140,3 +140,14 @@ def test_raw_payload_mismatch_rejected():
     report = probe(fetcher=fetch, clock=lambda: NOW)
     assert all(report["sports"][sport]["status"] == "UNAVAILABLE"
                for sport in ("NFL", "CFB", "MLB"))
+
+def test_nonfinite_raw_json_rejected():
+    for token in ("NaN", "Infinity", "-Infinity"):
+        def fetch(key):
+            return SimpleNamespace(sport_key=key, raw=('{"value":' + token + '}').encode(),
+                                   payload={"value": float("nan")},
+                                   source_uri="https://sportsbook-nash.draftkings.com/test",
+                                   received_at=NOW)
+        report = probe(fetcher=fetch, clock=lambda: NOW)
+        assert all(report["sports"][sport]["status"] == "UNAVAILABLE"
+                   for sport in ("NFL", "CFB", "MLB"))
