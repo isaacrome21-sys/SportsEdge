@@ -25,6 +25,9 @@ def probe(*, fetcher=fetch_board, clock=lambda: datetime.now(timezone.utc)):
             board = fetcher(key)
             result["sports"][sport] = {
                 "status": "FETCHED", "source_uri": board.source_uri,
+                "quote_jurisdiction": "UNVERIFIED",
+                "playable_in_user_jurisdiction": False,
+                "quote_timestamp_status": "UNVERIFIED",
                 "raw_sha256": hashlib.sha256(board.raw).hexdigest(),
                 "raw_size_bytes": len(board.raw),
                 "received_at_utc": board.received_at.isoformat(),
