@@ -66,7 +66,10 @@ def _final(finals: dict[str, Any], identity: tuple[str, str, str]) -> tuple[Fina
             or finals.get("source") != "ESPN_SCOREBOARD"):
         raise NFLPaperGradeError("NFL_GRADE_FINAL_SOURCE_INVALID")
     event_id, away, home = identity
-    matches = [g for g in finals.get("games", []) if str(g.get("game_id")) == event_id]
+    games = finals.get("games")
+    if not isinstance(games, list) or any(not isinstance(g, dict) for g in games):
+        raise NFLPaperGradeError("NFL_GRADE_FINAL_GAMES_INVALID")
+    matches = [g for g in games if str(g.get("game_id")) == event_id]
     if len(matches) != 1:
         raise NFLPaperGradeError("NFL_GRADE_FINAL_EVENT_MISSING_OR_DUPLICATE")
     game = matches[0]
@@ -88,7 +91,6 @@ def _canonical_pick(rec: dict[str, Any]) -> tuple[str, str, str, str]:
         str(rec.get("market") or "").lower(),
         str(rec.get("subject") or "").strip(),
         str(rec.get("selection") or "").upper(),
-        str(rec.get("line")),
     )
 
 
@@ -127,7 +129,7 @@ def grade_issue(issue_number: int, snapshots: list[dict[str, Any]],
                 or _identity(s) != identity):
             raise NFLPaperGradeError("NFL_GRADE_SNAPSHOT_IDENTITY_OR_HASH_INVALID")
         for rec in s.get("picks") or []:
-            key = str(rec.get("pick") or "").strip()
+            key = " ".join(str(rec.get("pick") or "").lower().split())
             if not key:
                 raise NFLPaperGradeError("NFL_GRADE_PICK_KEY_MISSING")
             canonical = _canonical_pick(rec)
