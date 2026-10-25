@@ -61,7 +61,7 @@ def test_duplicate_event_ids_are_detected():
 def test_mismatched_source_sport_is_unavailable():
     def wrong_sport(_):
         return SimpleNamespace(sport_key="baseball_mlb", raw=b"{}", payload={},
-                               source_uri="https://example.invalid", received_at=NOW)
+                               source_uri="https://sportsbook-nash.draftkings.com/test", received_at=NOW)
     result = probe(fetcher=wrong_sport, clock=lambda: NOW)
     assert result["sports"]["NFL"]["status"] == "UNAVAILABLE"
     assert result["sports"]["CFB"]["status"] == "UNAVAILABLE"
@@ -69,7 +69,7 @@ def test_mismatched_source_sport_is_unavailable():
 def test_naive_receipt_time_is_unavailable():
     def naive(key):
         return SimpleNamespace(sport_key=key, raw=b"{}", payload={},
-                               source_uri="https://example.invalid",
+                               source_uri="https://sportsbook-nash.draftkings.com/test",
                                received_at=datetime(2026, 10, 25))
     result = probe(fetcher=naive, clock=lambda: NOW)
     assert all(result["sports"][sport]["status"] == "UNAVAILABLE"
@@ -78,7 +78,7 @@ def test_naive_receipt_time_is_unavailable():
 def test_nonmapping_payload_is_unavailable():
     def bad_payload(key):
         return SimpleNamespace(sport_key=key, raw=b"[]", payload=[],
-                               source_uri="https://example.invalid", received_at=NOW)
+                               source_uri="https://sportsbook-nash.draftkings.com/test", received_at=NOW)
     result = probe(fetcher=bad_payload, clock=lambda: NOW)
     assert all(result["sports"][sport]["status"] == "UNAVAILABLE"
                for sport in ("NFL", "CFB", "MLB"))
@@ -86,7 +86,7 @@ def test_nonmapping_payload_is_unavailable():
 def test_missing_arrays_report_unknown_linkage_not_zero():
     def empty(key):
         return SimpleNamespace(sport_key=key, raw=b"{}", payload={},
-                               source_uri="https://example.invalid", received_at=NOW)
+                               source_uri="https://sportsbook-nash.draftkings.com/test", received_at=NOW)
     result = probe(fetcher=empty, clock=lambda: NOW)
     for sport in ("NFL", "CFB", "MLB"):
         row = result["sports"][sport]
@@ -99,7 +99,7 @@ def test_raw_archive_preserves_exact_bytes(tmp_path):
     raw = b'{"events":[],"markets":[],"selections":[]}'
     def fetch(key):
         return SimpleNamespace(sport_key=key, raw=raw, payload={"events": [], "markets": [], "selections": []},
-                               source_uri="https://example.invalid", received_at=NOW)
+                               source_uri="https://sportsbook-nash.draftkings.com/test", received_at=NOW)
     report = probe(fetcher=fetch, clock=lambda: NOW, archive_dir=tmp_path)
     for sport in ("NFL", "CFB", "MLB"):
         row = report["sports"][sport]
@@ -112,7 +112,7 @@ def test_archive_conflict_fails_closed(tmp_path):
     destination.write_bytes(b"tampered")
     def fetch(key):
         return SimpleNamespace(sport_key=key, raw=raw, payload={"events": []},
-                               source_uri="https://example.invalid", received_at=NOW)
+                               source_uri="https://sportsbook-nash.draftkings.com/test", received_at=NOW)
     report = probe(fetcher=fetch, clock=lambda: NOW, archive_dir=tmp_path)
     assert report["sports"]["NFL"]["status"] == "UNAVAILABLE"
     assert destination.read_bytes() == b"tampered"
