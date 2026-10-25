@@ -73,3 +73,11 @@ def test_naive_receipt_time_is_unavailable():
     result = probe(fetcher=naive, clock=lambda: NOW)
     assert all(result["sports"][sport]["status"] == "UNAVAILABLE"
                for sport in ("NFL", "CFB", "MLB"))
+
+def test_nonmapping_payload_is_unavailable():
+    def bad_payload(key):
+        return SimpleNamespace(sport_key=key, raw=b"[]", payload=[],
+                               source_uri="https://example.invalid", received_at=NOW)
+    result = probe(fetcher=bad_payload, clock=lambda: NOW)
+    assert all(result["sports"][sport]["status"] == "UNAVAILABLE"
+               for sport in ("NFL", "CFB", "MLB"))
