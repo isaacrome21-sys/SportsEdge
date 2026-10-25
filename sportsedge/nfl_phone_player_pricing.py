@@ -6,6 +6,7 @@ Research only. Stale quotes produce WATCH status. Next Gen tracking is not yet
 consumed. Lineup/participation is not confirmed from gamelog.
 """
 from __future__ import annotations
+from .phone_quote_identity import same_event_start
 from datetime import datetime, timezone
 
 from .nfl_public_player_history import NFLPlayerPublicSource, MissingNFLHistory
@@ -89,6 +90,8 @@ def phone_nfl_player_rows(rows, *, now=None, getter=None):
         }
         quotes = []
         for another in rows:
+            if not same_event_start(row, another):
+                continue
             if (str(another.get("away")) != away or
                 str(another.get("home")) != home or
                 str(another.get("player_name") or another.get("label") or "").strip() != name or
