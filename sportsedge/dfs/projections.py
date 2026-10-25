@@ -2,11 +2,33 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import json
+import math
 from pathlib import Path
 from typing import Any, Iterable
 
 from .scoring import dk_fppg_baseline, projection_from_samples, projection_from_stats
 from .types import DKPlayer, Projection
+
+
+def _finite_number(value: Any, field: str, player_id: str) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"DFS_PROJECTION_NUMBER_INVALID:{player_id}:{field}")
+    try:
+        number = float(value)
+    except (ValueError, TypeError, OverflowError) as exc:
+        raise ValueError(f"DFS_PROJECTION_NUMBER_INVALID:{player_id}:{field}") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"DFS_PROJECTION_NUMBER_INVALID:{player_id}:{field}")
+    return number
+
+
+def _ownership(value: Any, player_id: str) -> float | None:
+    if value is None:
+        return None
+    number = _finite_number(value, "ownership", player_id)
+    if not 0.0 <= number <= 1.0:
+        raise ValueError(f"DFS_PROJECTION_OWNERSHIP_OUT_OF_RANGE:{player_id}")
+    return number
 
 
 def _dt(value: Any) -> datetime | None:
@@ -25,8 +47,12 @@ def load_projection_snapshot(path: str | Path, players: Iterable[DKPlayer], spor
     rows = payload.get("players") if isinstance(payload, dict) else payload
     if not isinstance(rows, list):
         raise ValueError("DFS_PROJECTION_SNAPSHOT_SHAPE_INVALID")
-    by_id = {p.player_id: p for p in players}
-    by_name_team = {(p.name.casefold(), p.team): p for p in players}
+    pool = list(players)
+    by_id = {p.player_id: p for p in pool}
+    by_name_team: dict[tuple[str, str], DKPlayer | None] = {}
+    for player in pool:
+        key = (player.name.casefold(), player.team)
+        by_name_team[key] = player if key not in by_name_team else None
     out: dict[str, Projection] = {}
     for row in rows:
         if not isinstance(row, dict):
@@ -35,17 +61,20 @@ def load_projection_snapshot(path: str | Path, players: Iterable[DKPlayer], spor
         p = by_id.get(pid)
         if p is None:
             key = (str(row.get("name") or "").casefold(), str(row.get("team") or "").upper())
+            if key in by_name_team and by_name_team[key] is None:
+                raise ValueError(f"DFS_PROJECTION_PLAYER_AMBIGUOUS:{key[0]}:{key[1]}")
             p = by_name_team.get(key)
         if p is None:
             continue
+        if p.player_id in out:
+            raise ValueError(f"DFS_PROJECTION_DUPLICATE_PLAYER:{p.player_id}")
         if isinstance(row.get("samples"), list):
-            own = row.get("ownership")
             proj = projection_from_samples(
                 p,
                 sport,
                 row["samples"],
                 source=str(row.get("source") or "SPORTSEDGE_DISTRIBUTION"),
-                ownership=float(own) if own is not None else None,
+                ownership=_ownership(row.get("ownership"), p.player_id),
             )
             out[p.player_id] = Projection(
                 **{**proj.__dict__, "updated_at": _dt(row.get("updated_at")) or snapshot_updated_at}
@@ -57,23 +86,35 @@ def load_projection_snapshot(path: str | Path, players: Iterable[DKPlayer], spor
                 **{**proj.__dict__, "updated_at": _dt(row.get("updated_at")) or snapshot_updated_at}
             )
             continue
-        mean = float(row.get("mean") or row.get("projection") or 0.0)
+        mean = _finite_number(row.get("mean") if row.get("mean") is not None
+                              else row.get("projection", 0.0), "mean", p.player_id)
+        if mean < 0:
+            raise ValueError(f"DFS_PROJECTION_MEAN_NEGATIVE:{p.player_id}")
         if mean <= 0:
             continue
-        std = float(row.get("stddev") or 0.0) or None
-        ceiling = float(row.get("ceiling") or 0.0) or mean + (1.65 * std if std else max(4.0, mean * 0.45))
-        floor = float(row.get("floor") or 0.0) or max(0.0, mean - (1.15 * std if std else max(3.0, mean * 0.35)))
-        own = row.get("ownership")
+        std = _finite_number(row.get("stddev") or 0.0, "stddev", p.player_id) or None
+        if std is not None and std < 0:
+            raise ValueError(f"DFS_PROJECTION_STDDEV_NEGATIVE:{p.player_id}")
+        ceiling = (_finite_number(row["ceiling"], "ceiling", p.player_id)
+                   if row.get("ceiling") is not None else mean + (1.65 * std if std else max(4.0, mean * 0.45)))
+        floor = (_finite_number(row["floor"], "floor", p.player_id)
+                 if row.get("floor") is not None else max(0.0, mean - (1.15 * std if std else max(3.0, mean * 0.35))))
+        if ceiling < mean or not 0.0 <= floor <= mean:
+            raise ValueError(f"DFS_PROJECTION_QUANTILES_INVALID:{p.player_id}")
+        components = row.get("components") or {}
+        if not isinstance(components, dict):
+            raise ValueError(f"DFS_PROJECTION_COMPONENTS_INVALID:{p.player_id}")
         out[p.player_id] = Projection(
             player_id=p.player_id,
             mean=mean,
             ceiling=max(mean, ceiling),
             floor=max(0.0, min(mean, floor)),
             stddev=std,
-            ownership=float(own) if own is not None else None,
+            ownership=_ownership(row.get("ownership"), p.player_id),
             source=str(row.get("source") or payload.get("source") if isinstance(payload, dict) else "SNAPSHOT"),
             updated_at=_dt(row.get("updated_at")) or snapshot_updated_at,
-            components={str(k): float(v) for k, v in (row.get("components") or {}).items() if isinstance(v, (int, float))},
+            components={str(k): _finite_number(v, f"component:{k}", p.player_id)
+                        for k, v in components.items()},
         )
     return out
 
