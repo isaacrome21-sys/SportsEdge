@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -71,7 +71,10 @@ def test_promotion_refuses_pair_older_than_150_seconds_apart():
     within = "2026-10-04T20:02:30+00:00"
     beyond = "2026-10-04T20:02:31+00:00"
     for under_time, expected in ((within, 1), (beyond, 0)):
-        units, drops = R.select_units([_payload(beyond, [
+        # The archive cannot precede the last quote receipt. At 151s
+        # the older side fails the stricter archive-relative freshness
+        # check before a paired observation can be assembled.
+        units, drops = R.select_units([_payload(under_time, [
             _quote("OVER", -110, captured=over_time),
             _quote("UNDER", -115, captured=under_time),
         ])])
@@ -79,7 +82,32 @@ def test_promotion_refuses_pair_older_than_150_seconds_apart():
         if expected:
             assert units[0]["paired_quote_capture_span_seconds"] == 150.0
         else:
-            assert drops["paired_quote_capture_span_over_150s"] == 1
+            assert drops["research_only_quote_age_151_to_300s"] == 1
+
+
+@pytest.mark.parametrize("age_seconds,expected_count,reason", [
+    (0, 1, None),
+    (150, 1, None),
+    (151, 0, "research_only_quote_age_151_to_300s"),
+    (300, 0, "research_only_quote_age_151_to_300s"),
+    (301, 0, "refused_quote_age_over_300s"),
+    (3600, 0, "refused_quote_age_over_300s"),
+])
+def test_two_same_instant_receipts_cannot_hide_stale_archive_age(age_seconds, expected_count, reason):
+    observed = datetime(2026, 10, 4, 20, 0, tzinfo=timezone.utc)
+    receipt = observed.isoformat()
+    archived = (observed + timedelta(seconds=age_seconds)).isoformat()
+    units, drops = R.select_units([_payload(archived, [
+        _quote("OVER", -110, captured=receipt),
+        _quote("UNDER", -115, captured=receipt),
+    ])])
+    assert len(units) == expected_count
+    if reason:
+        assert drops[reason] == 2
+        assert drops["selected_units"] == 0
+    else:
+        assert drops["selected_units"] == 1
+        assert units[0]["paired_quote_capture_span_seconds"] == 0.0
 
 
 def test_promotion_blocks_future_quote_and_archive_after_first_pitch():
