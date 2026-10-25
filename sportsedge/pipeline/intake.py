@@ -310,7 +310,9 @@ class Envelope:
 def parse_envelope(body: str, sport: str, *, title: str | None = None) -> Envelope:
     """Strip ``<!-- -->`` notes, read the board ``Captured:`` line, find the header.
 
-    Same Captured rules as ``parse_issue``: offset required, one per scope.
+    Offset required. An envelope carries exactly one capture instant, so a
+    second ``Captured:`` line anywhere in the body (before or after a header)
+    fails closed instead of silently keeping the first value.
     The returned ``text`` keeps every market line for the sport's own grammar.
     """
     sport = adapter_for(sport).sport
@@ -319,19 +321,17 @@ def parse_envelope(body: str, sport: str, *, title: str | None = None) -> Envelo
     captured: str | None = None
     header: tuple[str, str] | None = None
     warnings: list[str] = []
-    seen_header = False
     for raw in text.splitlines():
         line = raw.strip().strip("`").strip()
         match = _CAPTURED.match(line)
         if match:
             value = parse_captured_at(match.group(1), line, sport)
-            if captured is not None and not seen_header:
-                raise SharedIntakeError(f"{sport}_INTAKE_CAPTURED_AT_DUPLICATE:board")
-            captured = captured or value
+            if captured is not None:
+                raise SharedIntakeError(f"{sport}_INTAKE_CAPTURED_AT_DUPLICATE:envelope")
+            captured = value
             continue
         if header is None and line:
             header = parse_header(line)
-            seen_header = header is not None
         kept.append(raw)
     if header is None and title:
         header = parse_header(title)
