@@ -87,3 +87,9 @@ def test_default_does_not_fetch_or_write(
     assert main(["--output-dir", str(tmp_path)]) == 0
     assert "DISABLED_REQUIRES_LIVE" in capsys.readouterr().out
     assert not list(tmp_path.iterdir())
+
+
+def test_non_utc_offset_rejects_before_writing(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="RECEIPT_TIMESTAMP_NOT_UTC"):
+        archive_station_list(tmp_path, _station_text(), "2026-10-25T00:00:01-05:00")
+    assert not list(tmp_path.iterdir())
