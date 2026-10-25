@@ -5,7 +5,13 @@ Entry quote: the pick's own [MLB LINES] issue body (the pregame quote the card
 priced). The posted card price must equal that quote's price for the selected
 side, or the pick is NO_ENTRY_QUOTE (never guessed).
 
-Close quote: the last *other* [MLB LINES] issue for the same game whose
+Snapshot mode (preferred, ``snapshots=`` given): Muse edits ONE lines issue
+hourly, so entry/close come from the append-only store
+(``sportsedge.line_snapshots``): entry = first pre-start snapshot listing the
+pick, close = last snapshot with Captured before first pitch. No pre-start
+snapshot -> NO_PRESTART_SNAPSHOT (fail closed).
+
+Legacy close quote: the last *other* [MLB LINES] issue for the same game whose
 ``Captured: <ISO>`` line is strictly before first pitch and after the entry
 capture, carrying the same market, line and team/subject with both sides
 priced. Issues without a Captured line are never used as a close.
@@ -25,6 +31,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
+from sportsedge.line_snapshots import entry_and_close
 from sportsedge.mlb_issue_body import IssueLinesError, extract_issue_lines
 from sportsedge.mlb_lines_intake import (
     LinesIntakeError,
@@ -192,8 +199,11 @@ def compute_clv(
     picks: Iterable[Any],  # CardRow-like: game_pk, pick, price, status
     feed: dict[str, Any],
     entry_issue: dict[str, Any],
-    other_issues: Iterable[dict[str, Any]],
+    other_issues: Iterable[dict[str, Any]] = (),
+    snapshots: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, str]]:
+    if snapshots is not None:
+        return _compute_clv_from_snapshots(issue_number, picks, feed, snapshots)
     teams = feed["gameData"]["teams"]
     names = {"away": teams["away"]["name"], "home": teams["home"]["name"]}
     start_text = str(feed.get("gameData", {}).get("datetime", {}).get("dateTime") or "")
@@ -259,6 +269,51 @@ def compute_clv(
             clv_prob=f"{close_p - entry_p:+.6f}", clv_status="CLV_TRACKED",
         )
         out.append(record)
+    return out
+
+
+def _compute_clv_from_snapshots(
+    issue_number: int, picks: Iterable[Any], feed: dict[str, Any], snapshots: list[dict[str, Any]]
+) -> list[dict[str, str]]:
+    teams = feed["gameData"]["teams"]
+    names = {"away": teams["away"]["name"], "home": teams["home"]["name"]}
+    start = str(feed.get("gameData", {}).get("datetime", {}).get("dateTime") or "") or None
+    out: list[dict[str, str]] = []
+    for pick in picks:
+        record = {field: "" for field in CLV_FIELDS}
+        record.update(issue_number=str(issue_number), game_pk=str(pick.game_pk), pick=pick.pick,
+                      status=pick.status, price=f"{pick.price:+d}")
+        out.append(record)
+        key = pick_key(pick.pick, names)
+        if key is None:
+            record["clv_status"] = "UNMAPPED_MARKET"
+            continue
+        record.update(market_type=key.market_type, line="" if key.line is None else f"{key.line:g}")
+        found = entry_and_close(snapshots, pick.pick, start)
+        if found.status == "NO_PRESTART_SNAPSHOT":
+            record["clv_status"] = "NO_PRESTART_SNAPSHOT"
+            continue
+        if found.entry is None:
+            record["clv_status"] = "NO_ENTRY_QUOTE"
+            continue
+        record["entry_captured_at"] = found.entry["captured_at"]
+        entry = find_quote(issue_quotes(found.entry["body"], found.entry.get("title")), key, names)
+        if entry is None or entry[0] != pick.price:
+            record["clv_status"] = "NO_ENTRY_QUOTE"
+            continue
+        entry_p = fair_probability(*entry)
+        record["entry_fair_p"] = f"{entry_p:.6f}"
+        close_snap = found.close
+        quote = find_quote(issue_quotes(close_snap["body"], close_snap.get("title")), key, names)
+        if quote is None:
+            record["clv_status"] = "NO_CLOSE_QUOTE"
+            continue
+        close_p = fair_probability(*quote)
+        record.update(
+            close_issue=str(close_snap["issue_number"]), close_captured_at=close_snap["captured_at"],
+            close_price=f"{quote[0]:+d}", close_fair_p=f"{close_p:.6f}",
+            clv_prob=f"{close_p - entry_p:+.6f}", clv_status="CLV_TRACKED",
+        )
     return out
 
 

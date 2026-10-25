@@ -32,6 +32,7 @@ from scripts.mlb_card_clv import (  # noqa: E402
     summarize_clv,
     upsert_clv_ledger,
 )
+from sportsedge.line_snapshots import SNAPSHOT_ROOT, load_snapshots  # noqa: E402
 
 GRADE_MARKER = "<!-- sportsedge-mlb-auto-grade:v1 issue={issue} -->"
 DEFAULT_REPO = "isaacrome21-sys/SportsEdge"
@@ -597,7 +598,8 @@ def render_comment(
         lines += [
             "",
             f"CLV tracked {tracked}/{len(clv_records)} · mean {mean_text}. "
-            "Close = last later [MLB LINES] issue with a `Captured:` time before first pitch.",
+            "Entry = first snapshot listing the pick; close = last snapshot with a "
+            "`Captured:` time before first pitch (ledger/line_snapshots).",
         ]
     lines += [
         "",
@@ -707,6 +709,7 @@ def grade_issue(
     issue: dict[str, Any] | None = None,
     line_issues: list[dict[str, Any]] | None = None,
     clv_ledger_path: Path | None = CLV_LEDGER,
+    snapshot_root: Path | None = SNAPSHOT_ROOT,
 ) -> str:
     token = token or os.environ.get("GITHUB_TOKEN")
     # CLV issue lookups go to the network only in live mode (comments fetched
@@ -767,7 +770,12 @@ def grade_issue(
             if row.status == "LEAN"
         ]
         clv_records: list[dict[str, str]] | None = None
-        if clv_ledger_path is not None:
+        snapshots = load_snapshots("mlb", issue_number, snapshot_root) if snapshot_root else []
+        if clv_ledger_path is not None and snapshots:
+            clv_records = compute_clv(issue_number=issue_number, picks=game_rows,
+                                      feed=game_feed, entry_issue={}, snapshots=snapshots)
+            upsert_clv_ledger(clv_ledger_path, issue_number, game_pk, clv_records)
+        elif clv_ledger_path is not None:
             if live and token and (issue is None or line_issues is None):
                 try:
                     issue = issue or github_issue(repo, issue_number, token)
