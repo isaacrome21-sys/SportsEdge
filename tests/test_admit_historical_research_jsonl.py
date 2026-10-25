@@ -67,3 +67,14 @@ def test_rejects_duplicate_event_decision(tmp_path):
     blocked = tmp_path / "blocked.jsonl"
     assert run(source, accepted, blocked) == {"accepted": 1, "blocked": 1}
     assert json.loads(blocked.read_text())["reason"] == "DUPLICATE_SELECTION_DECISION"
+
+
+def test_same_event_decision_different_selection_is_duplicate(tmp_path):
+    first = {**row(), "selection": "HOME"}
+    second = {**row(), "selection": "AWAY"}
+    source = tmp_path / "selection-duplicates.jsonl"
+    source.write_text(json.dumps(first) + "\n" + json.dumps(second) + "\n")
+    accepted = tmp_path / "accepted.jsonl"
+    blocked = tmp_path / "blocked.jsonl"
+    assert run(source, accepted, blocked) == {"accepted": 1, "blocked": 1}
+    assert json.loads(blocked.read_text())["reason"] == "DUPLICATE_SELECTION_DECISION"
