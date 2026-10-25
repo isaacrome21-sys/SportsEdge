@@ -23,6 +23,8 @@ def timestamp(value: object) -> datetime:
 
 def admit(row: dict) -> str | None:
     try:
+        if type(row.get("outcome")) is not int or row["outcome"] not in (0, 1):
+            return "OUTCOME_NOT_CANONICAL_BINARY"
         BinaryResearchRow.from_mapping(row)
         required = ("source_id", "source_url", "model_version", "model_run_id",
                     "feature_receipt_ts", "prediction_receipt_ts",
