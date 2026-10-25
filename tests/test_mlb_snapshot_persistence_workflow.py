@@ -14,15 +14,15 @@ Total 7.5 -110 -110
 TITLE = "[MLB LINES] TB Rays @ MIL Brewers"
 
 
-def _run(tmp_path, body):
+def _run(tmp_path, body, *, card_price=-120):
     body_file = tmp_path / "body.txt"
     card_file = tmp_path / "card.md"
     body_file.write_text(body, encoding="utf-8")
-    card_file.write_text(card(1, [("Moneyline Home", -120, "ACTIONABLE")]), encoding="utf-8")
+    card_file.write_text(card(1, [("Moneyline Home", card_price, "ACTIONABLE")]), encoding="utf-8")
     return record_snapshot([
         "--sport", "mlb", "--issue", "123456",
         "--body-file", str(body_file), "--title", TITLE,
-        "--card-md", str(card_file),
+        "--card-md", str(card_file), "--require-card-quote-match",
         "--root", str(tmp_path / "ledger"),
     ])
 
@@ -45,10 +45,15 @@ def test_new_quote_capture_appends_second_immutable_snapshot(tmp_path):
     assert _run(tmp_path, BODY) == 0
     first = (tmp_path / "ledger/mlb/123456.jsonl").read_text(encoding="utf-8")
     newer = BODY.replace("15:00:00", "16:00:00").replace("ML +100 -120", "ML +105 -125")
-    assert _run(tmp_path, newer) == 0
+    assert _run(tmp_path, newer, card_price=-125) == 0
     text = (tmp_path / "ledger/mlb/123456.jsonl").read_text(encoding="utf-8")
     assert text.startswith(first)
     assert len(load_snapshots("mlb", 123456, tmp_path / "ledger")) == 2
+
+
+def test_saved_card_price_must_match_exact_captured_pair(tmp_path):
+    assert _run(tmp_path, BODY, card_price=-125) == 2
+    assert load_snapshots("mlb", 123456, tmp_path / "ledger") == []
 
 
 def test_missing_captured_never_emits_evidence(tmp_path):
@@ -63,6 +68,7 @@ def test_workflow_writes_only_isolated_review_branch():
     assert "Preserve MLB PAPER snapshot via draft evidence PR" in workflow
     assert "--body-file issue_body.txt" in workflow
     assert "--card-md artifacts/mlb_myspari_ctx/card.md" in workflow
+    assert "--require-card-quote-match" in workflow
     assert 'branch="automation/mlb-paper-snapshots-issue-$ISSUE"' in workflow
     assert "gh pr create --draft --base main --head" in workflow
     assert 'git push origin "HEAD:refs/heads/$branch"' in workflow
