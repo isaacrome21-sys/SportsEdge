@@ -5,6 +5,8 @@ unavailable quote, score or prop statistic fails closed without invented data.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from datetime import datetime
 from pathlib import Path
@@ -131,10 +133,68 @@ def capture_nfl_issue(*, body: str, title: str, issue_number: int,
     return snap
 
 
+def _validate_snapshot(snap: dict) -> None:
+    """Re-check stored hash and re-derive its board from preserved issue text.
+
+    load_snapshots currently returns unverified JSON; no persisted quote or
+    stake evidence may rely on caller-modified board/pick fields.
+    """
+    core = {k: snap.get(k) for k in ("game", "captured_at", "board", "picks", "body")}
+    digest = hashlib.sha256(json.dumps(core, sort_keys=True, default=str).encode()).hexdigest()
+    if snap.get("content_sha256") != digest:
+        raise NflPaperError("NFL_SNAPSHOT_DIGEST_MISMATCH")
+    if snap.get("sport") != "nfl":
+        raise NflPaperError("NFL_SNAPSHOT_WRONG_SPORT")
+    tickets = parse_nfl_lines(snap.get("body", ""), title=snap.get("title"))
+    if len(tickets) != 1:
+        raise NflPaperError("NFL_SNAPSHOT_GAME_AMBIGUOUS")
+    ticket = tickets[0]
+    game = snap.get("game") or {}
+    if (game.get("away"), game.get("home")) != (ticket.away, ticket.home):
+        raise NflPaperError("NFL_SNAPSHOT_GAME_MISMATCH")
+    if _time(snap.get("captured_at")) != _time(ticket.captured_at):
+        raise NflPaperError("NFL_SNAPSHOT_CAPTURE_MISMATCH")
+    board = [
+        dict(market=m.market, line=m.line, team=m.team, player=m.player,
+             price_a=m.away_or_over_price, price_b=m.home_or_under_price)
+        for m in ticket.markets
+    ]
+    if snap.get("board") != board:
+        raise NflPaperError("NFL_SNAPSHOT_BOARD_MISMATCH")
+    for pick in snap.get("picks") or []:
+        if pick.get("status") != "PAPER":
+            raise NflPaperError("NFL_SNAPSHOT_NONPAPER_PICK")
+        matches = [r for r in board if r["market"] == pick.get("market")
+                   and r.get("player") == pick.get("player")
+                   and r.get("team") == pick.get("team")]
+        # Stored picks may use subject instead of player; price/selection must
+        # still bind to exactly one preserved two-sided quote for the market.
+        if len(matches) != 1:
+            matches = [r for r in board if r["market"] == pick.get("market")
+                       and str(r.get("player") or r.get("team") or "") == pick.get("subject", "")]
+        if len(matches) != 1:
+            raise NflPaperError("NFL_SNAPSHOT_PICK_QUOTE_AMBIGUOUS")
+        quote = matches[0]
+        side = pick.get("selection")
+        if side not in ("AWAY", "HOME", "OVER", "UNDER"):
+            raise NflPaperError("NFL_SNAPSHOT_PICK_SIDE_INVALID")
+        first = side in ("AWAY", "OVER")
+        expected = quote["price_a"] if first else quote["price_b"]
+        opposite = quote["price_b"] if first else quote["price_a"]
+        expected_line = _side_line(pick["market"], quote["line"], side)
+        if (type(pick.get("price")) is not int or pick["price"] != expected
+                or type(pick.get("opposite_price")) is not int
+                or pick["opposite_price"] != opposite
+                or pick.get("line") != expected_line):
+            raise NflPaperError("NFL_SNAPSHOT_PICK_PRICE_OR_LINE_MISMATCH")
+
+
 def grade_nfl_issue(snapshots: list[dict], final: dict) -> list[dict]:
     """Paper settlement; numeric CLV only from distinct eligible captured pairs."""
     if not snapshots:
         return []
+    for snapshot in snapshots:
+        _validate_snapshot(snapshot)
     if not (
         str(final.get("url", "")).startswith("https://")
         and re.fullmatch(r"[0-9a-fA-F]{64}", str(final.get("sha256", "")))
