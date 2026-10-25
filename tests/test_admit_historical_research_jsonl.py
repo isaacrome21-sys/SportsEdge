@@ -78,3 +78,23 @@ def test_same_event_decision_different_selection_is_duplicate(tmp_path):
     blocked = tmp_path / "blocked.jsonl"
     assert run(source, accepted, blocked) == {"accepted": 1, "blocked": 1}
     assert json.loads(blocked.read_text())["reason"] == "DUPLICATE_SELECTION_DECISION"
+
+
+def test_refuses_to_overwrite_input(tmp_path):
+    import pytest
+    source = tmp_path / "source.jsonl"
+    original = json.dumps(row()) + "\n"
+    source.write_text(original)
+    with pytest.raises(ValueError, match="INPUT_AND_OUTPUT_PATHS_MUST_BE_DISTINCT"):
+        run(source, source, tmp_path / "blocked.jsonl")
+    assert source.read_text() == original
+
+
+def test_refuses_same_output_paths(tmp_path):
+    import pytest
+    source = tmp_path / "source.jsonl"
+    source.write_text(json.dumps(row()) + "\n")
+    output = tmp_path / "both.jsonl"
+    with pytest.raises(ValueError, match="INPUT_AND_OUTPUT_PATHS_MUST_BE_DISTINCT"):
+        run(source, output, output)
+    assert not output.exists()
