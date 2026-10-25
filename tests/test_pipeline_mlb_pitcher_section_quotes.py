@@ -147,3 +147,46 @@ def test_first_inning_pair_handles_reverse_label_order_without_swapping_prices()
 def test_first_inning_pair_refuses_missing_duplicate_and_invalid_quotes(line) -> None:
     with pytest.raises(SharedIntakeError, match="PAIR_INVALID|ODDS_INVALID"):
         parse_issue(PREFIX + line, "MLB")
+
+
+def test_actual_mlb_game_market_inventory_prices_only_complete_binary_quotes() -> None:
+    # The quoted main, alternate, first-five, pitcher and two team-total rows
+    # from #2685. The HR and hit milestones have no quoted NO price.
+    body = PREFIX + "\n".join([
+        "ML -105 -115",
+        "RL -1.5 +170 / +1.5 -208",
+        "Total 7 -110 -109",
+        *[f"Alt Total {point} {a} {b}" for point, a, b in [
+            (3.5, -690, 425), (4, -630, 394), (4.5, -407, 282),
+            (5, -334, 239), (5.5, -208, 157), (6, -180, 137),
+            (6.5, -145, 111), (7.5, 117, -153), (8, 142, -186),
+            (8.5, 159, -212), (9, 216, -297), (9.5, 246, -345),
+            (10, 310, -457), (10.5, 332, -497), (11, 465, -790),
+            (11.5, 495, -860),
+        ]],
+        "Alt RL -4.5 +620 / +4.5 -1260",
+        "Alt RL -2.5 +274 / +2.5 -391",
+        "Alt RL -1 +136 / +1 -178",
+        "Alt RL +1 -165 / -1 +126",
+        "Alt RL +1.5 -234 / -1.5 +175",
+        "Alt RL +5 -2500 / -5 +870",
+        "Team Totals: MIL 3.5 +100 -130; TB 3.5 -105 -125",
+        "F5 ML -105 -125",
+        "F5 RL -0.5 +135 / +0.5 -175",
+        "F5 Total 3.5 -140 +110",
+        "YRFI +100 / NRFI -130",
+        FREDDY.rstrip("\n"),
+        ROBERT.rstrip("\n"),
+        "Batter HR 1+: Junior Caminero +350; Jake Bauers +455",
+        "Batter HR 2+: Junior Caminero +3300; Jake Bauers +5500",
+        "Batter Hits (1+ / 2+ / 3+): Jackson Chourio -246/+219/+980; Yandy Diaz -256/+216/+1000",
+    ])
+    parsed = parse_issue(body, "MLB")
+    assert len(parsed.games) == 1
+    assert len(parsed.games[0].markets) == 41
+    assert sum(m.market == "GAME_TOTAL" for m in parsed.games[0].markets) == 17
+    assert sum(m.market == "RUN_LINE" for m in parsed.games[0].markets) == 7
+    assert sum(m.market.startswith("PITCHER_") for m in parsed.games[0].markets) == 10
+    assert sum(m.market == "TEAM_TOTAL" for m in parsed.games[0].markets) == 2
+    assert any("SKIPPED_UNPAIRED_OFFER" in warning for warning in parsed.warnings)
+    assert not any(m.market.startswith("BATTER_") for m in parsed.games[0].markets)
