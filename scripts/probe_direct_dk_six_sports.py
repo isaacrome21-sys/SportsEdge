@@ -42,7 +42,7 @@ def selection_linkage(payload):
         ]) - len(ids),
     }
 
-def probe(*, fetcher=fetch_board, clock=lambda: datetime.now(timezone.utc)):
+def probe(*, fetcher=fetch_board, clock=lambda: datetime.now(timezone.utc), archive_dir=None):
     result = {"schema": "sportsedge.dk_direct_probe.v1",
               "captured_at_utc": clock().isoformat(), "sports": {}}
     for sport, key in SPORTS.items():
@@ -56,7 +56,16 @@ def probe(*, fetcher=fetch_board, clock=lambda: datetime.now(timezone.utc)):
                     or board.received_at.tzinfo is None
                     or board.received_at.utcoffset() is None):
                 raise ValueError("DK_PROBE_SOURCE_IDENTITY_INVALID")
+            raw_archive = None
+            if archive_dir is not None:
+                destination = Path(archive_dir) / (sport.lower() + "-" + hashlib.sha256(board.raw).hexdigest() + ".json")
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                if destination.exists() and destination.read_bytes() != board.raw:
+                    raise ValueError("ARCHIVE_CONFLICT")
+                destination.write_bytes(board.raw)
+                raw_archive = str(destination)
             result["sports"][sport] = {
+                "raw_archive": raw_archive,
                 "status": "FETCHED", "source_uri": board.source_uri,
                 "quote_jurisdiction": "UNVERIFIED",
                 "playable_in_user_jurisdiction": False,
@@ -79,8 +88,9 @@ def probe(*, fetcher=fetch_board, clock=lambda: datetime.now(timezone.utc)):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--output", type=Path, default=Path("artifacts/dk_direct/six_sport_probe.json"))
+    ap.add_argument("--archive-dir", type=Path, default=None)
     args = ap.parse_args()
-    report = probe()
+    report = probe(archive_dir=args.archive_dir)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     print(json.dumps(report, sort_keys=True))
