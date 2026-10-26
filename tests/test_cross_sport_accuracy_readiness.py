@@ -155,3 +155,60 @@ def test_final_candidate_registration_is_exact(tmp_path):
     _with_v2_prereg(root)
     with pytest.raises(AuditRefusal, match="UNKNOWN_CONFIG_STATUS"):
         accuracy_readiness(root=root)
+
+def _frozen_v1_and_candidate_v2(root):
+    """Two real pinned configs, copied into an isolated synthetic inventory."""
+    configs = ROOT / "sportsedge" / "forward_validation" / "configs"
+    v1 = json.loads((configs / "nba_player_points.json").read_text())
+    v2 = _v2_config()
+    target = _synthetic_root(root, {
+        "nba_player_points.json": v1,
+        "nba_player_points_v2.json": v2,
+    })
+    for cfg in (v1, v2):
+        source = ROOT / cfg["prereg"]
+        dest = target / cfg["prereg"]
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(source.read_bytes())
+    return target
+
+
+def test_frozen_v1_candidate_v2_coexist_only_with_same_contract(tmp_path):
+    root = _frozen_v1_and_candidate_v2(tmp_path)
+    report = accuracy_readiness(root=root)
+    assert report["forward_config_states"]["NBA"] == {
+        "FROZEN_NO_VERDICT_ATTACHED": 1,
+        "FINAL_CANDIDATE_NOT_FROZEN": 1,
+    }
+    assert report["validated_families_conferred"] == 0
+    rows = report["forward_family_configs"]
+    assert [r["state"] for r in rows] == [
+        "FROZEN_NO_VERDICT_ATTACHED", "FINAL_CANDIDATE_NOT_FROZEN"]
+    assert all(r["play_authority_from_config"] is False for r in rows)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("engine_id", "FORGED_ENGINE"),
+    ("model_version", "FORGED_MODEL"),
+    ("min_rows", 1),
+    ("min_events", 1),
+])
+def test_v2_contract_drift_refused_even_with_valid_pin(tmp_path, field, value):
+    root = _frozen_v1_and_candidate_v2(tmp_path)
+    candidate = (root / "sportsedge" / "forward_validation" / "configs"
+                 / "nba_player_points_v2.json")
+    cfg = json.loads(candidate.read_text())
+    cfg[field] = value
+    candidate.write_text(json.dumps(cfg), encoding="utf-8")
+    with pytest.raises(AuditRefusal, match="DUPLICATE_FORWARD_MARKET_CONFIG"):
+        accuracy_readiness(root=root)
+
+
+def test_arbitrary_cross_state_duplicate_never_replaces_frozen_v1(tmp_path):
+    root = _frozen_v1_and_candidate_v2(tmp_path)
+    configs = root / "sportsedge" / "forward_validation" / "configs"
+    (configs / "nba_player_points_v2.json").rename(
+        configs / "nba_player_points_extra.json")
+    with pytest.raises(AuditRefusal, match="DUPLICATE_FORWARD_MARKET_CONFIG"):
+        accuracy_readiness(root=root)
+
