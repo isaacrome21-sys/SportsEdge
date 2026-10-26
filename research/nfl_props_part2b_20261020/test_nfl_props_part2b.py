@@ -393,6 +393,7 @@ def test_cmd_price_model_failure_aborts_and_commits_nothing(tmp_path, monkeypatc
         load=lambda data_dir: _synthetic_data())
     monkeypatch.setattr(pricing, "load_evaluator", lambda: stub)
     monkeypatch.setattr(pricing, "check_training_pins", lambda data: {})
+    monkeypatch.setattr(pricing, "check_b8_active_runtime", lambda data, ev: {})
     monkeypatch.setattr(pricing, "train_cv", lambda ev, data, cfg: 0.30)
     data_dir = tmp_path / "data"
     data_dir.mkdir()
@@ -485,6 +486,29 @@ def test_b8_repin_spec_hashes_registry():
     for name, h in B8_FROZEN_OTHER_PINS.items():
         assert want[name] == h, name
     assert set(want) == set(B8_FROZEN_OTHER_PINS) | {B8_CORRECTED_NAME}
+
+
+def test_b8_runtime_gate_rejects_mixed_2025_and_never_loads(tmp_path, monkeypatch):
+    import types
+
+    calls = []
+    ev = types.SimpleNamespace(
+        check_hashes=lambda directory: calls.append("hash") or {},
+        load=lambda directory: calls.append("load"),
+    )
+    monkeypatch.setattr(pricing, "load_evaluator", lambda: ev)
+    monkeypatch.setattr(pricing, "check_training_pins", lambda directory: {})
+    (tmp_path / "sp_2025_played_v2.csv.gz").write_bytes(b"corrected fixture")
+    (tmp_path / "sp_2025.csv.gz").write_bytes(b"legacy fixture")
+    output = tmp_path / "should_not_exist"
+    args = types.SimpleNamespace(
+        player_data=str(tmp_path), capture=str(tmp_path / "missing.json"),
+        out_dir=str(output),
+    )
+    with pytest.raises(SystemExit, match="B8_RUNTIME_LEGACY_2025_FILE_FORBIDDEN"):
+        pricing.cmd_price(args)
+    assert calls == []
+    assert not output.exists()
 
 
 def test_b8_repin_leaves_evaluator_pin_untouched():
