@@ -92,6 +92,7 @@ def accuracy_readiness(*, root: Path = ROOT) -> dict:
         raise AuditRefusal("NO_FORWARD_MARKET_CONFIGS")
     config_rows = []
     family_by_market = {}
+    original_config_by_market = {}
     for path in files:
         row = _read_json(path)
         state = _status(row, name=path.name, root=root)
@@ -106,17 +107,36 @@ def accuracy_readiness(*, root: Path = ROOT) -> dict:
         for market in markets:
             key = (sport.upper(), market.upper())
             prior = family_by_market.get(key)
-            if prior is not None and prior[1] == state:
-                # Two configs in the SAME state claiming one market is an
-                # ambiguous registration and stays refused. A config in a
-                # different state is a distinct prereg version of the same
-                # family (e.g. a pinned candidate beside the frozen test):
-                # every config is inventoried in config_rows, and the
-                # canonical link below names the frozen config while one
-                # exists for the market.
-                raise AuditRefusal(f"DUPLICATE_FORWARD_MARKET_CONFIG:{sport}:{market}")
-            if prior is None or state == "FROZEN_NO_VERDICT_ATTACHED":
+            if prior is not None:
+                # Coexistence is only the explicitly named, pinned V2
+                # amendment of an already-frozen V1 config. Registration
+                # cannot silently substitute a different model, floor, or
+                # pricing contract for the frozen family.
+                prior_name, prior_state = prior
+                allowed_differences = {
+                    "status", "prereg", "prereg_sha256", "capture_note",
+                }
+                original = original_config_by_market[key]
+                same_contract = all(
+                    row.get(field) == original.get(field)
+                    for field in set(row) | set(original)
+                    if field not in allowed_differences
+                )
+                is_strict_additive_v2 = (
+                    prior_state == "FROZEN_NO_VERDICT_ATTACHED"
+                    and state == "FINAL_CANDIDATE_NOT_FROZEN"
+                    and path.name == f"{Path(prior_name).stem}_v2.json"
+                    and row.get("prereg") != original.get("prereg")
+                    and same_contract
+                )
+                if not is_strict_additive_v2:
+                    raise AuditRefusal(
+                        f"DUPLICATE_FORWARD_MARKET_CONFIG:{sport}:{market}")
+                # Keep V1 canonical. V2 is inventoried but cannot replace
+                # the frozen config or confer counting/play permission.
+            else:
                 family_by_market[key] = (path.name, state)
+                original_config_by_market[key] = row
         config_rows.append({
             "file": str(path.relative_to(root)), "sport": sport.upper(),
             "family": family, "markets": markets, "state": state,
