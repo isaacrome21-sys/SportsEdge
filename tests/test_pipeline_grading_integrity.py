@@ -133,3 +133,27 @@ def test_nonnumeric_occurred_conflicts_even_if_numeric_stat_present() -> None:
     with pytest.raises(GradeError, match="GRADE_OCCURRED_INVALID"):
         grade({"selection": "YES", "line": 0.5},
               FinalResult(stat=1, occurred=1), family="yes_no")
+
+
+@pytest.mark.parametrize("selection,occurred", [
+    ("YES", True),
+    ("NO", False),
+    ("OVER", True),
+    ("UNDER", False),
+])
+def test_binary_stat_without_threshold_refuses_partial_numeric_evidence(
+        selection, occurred) -> None:
+    with pytest.raises(GradeError, match="GRADE_PARTIAL_NUMERIC_EVIDENCE"):
+        grade({"selection": selection, "line": None},
+              FinalResult(stat=1, occurred=occurred), family="yes_no")
+
+
+@pytest.mark.parametrize("selection,occurred,expected", [
+    ("YES", True, "WIN"), ("NO", False, "WIN"),
+    ("YES", False, "LOSS"), ("NO", True, "LOSS"),
+])
+def test_binary_boolean_only_final_accepts_optional_display_line(
+        selection, occurred, expected) -> None:
+    assert grade({"selection": selection, "line": 0.5},
+                 FinalResult(stat=None, occurred=occurred),
+                 family="yes_no") == expected
