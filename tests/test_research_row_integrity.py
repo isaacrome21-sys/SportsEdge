@@ -22,7 +22,7 @@ def test_invalid_numbers_cannot_become_edges(field, value):
             row(**{field: value})
 
 
-@pytest.mark.parametrize('win,push', [(0, 0), (1, 0), (-.1, 0), (1.1, 0), (.8, .8), (.6, -.1), (1e-9, 0)])
+@pytest.mark.parametrize('win,push', [(0, 0), (1, 0), (-.1, 0), (1.1, 0), (.8, .8), (.6, -.1), (1, 0)])
 def test_invalid_probability_mass_is_rejected(win, push):
     with pytest.raises(ValueError, match='PROBABILITY_MASS'):
         row(win=win, push=push)
@@ -42,3 +42,20 @@ def test_valid_push_ev_and_provenance_are_preserved():
     assert result['ev_per_dollar'] == pytest.approx(.5 * (100 / 110) - .4, abs=1e-6)
     assert result['distribution_sha256'] == 'abc'
     assert result['official_authority'] is False
+
+
+@pytest.mark.parametrize('win', [1e-9, 1e-7, 0.9999999])
+def test_finite_interior_probabilities_survive_without_rounding_gate(win):
+    result = row(win=win)
+    assert result['research_only'] is True
+    assert result['official_authority'] is False
+
+
+@pytest.mark.parametrize('price,dec', [(-110, 2.0), (150, 1.5), (-110, 1.909)])
+def test_mismatched_decimal_and_american_odds_refused(price, dec):
+    with pytest.raises(ValueError, match='RESEARCH_ROW_INVALID_ODDS'):
+        row(price=price, dec=dec)
+
+
+def test_positive_american_odds_matching_decimal_accepted():
+    assert row(price=150, dec=2.5)['odds_american'] == 150
