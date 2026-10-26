@@ -1,0 +1,85 @@
+{
+  "capture_kind": "FINAL",
+  "week": 7,
+  "book": "draftkings",
+  "markets": [
+    "spreads",
+    "totals"
+  ],
+  "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+  "run_started_utc": "2026-10-26T23:49:47.010542+00:00",
+  "retrieved_at_utc": "2026-10-26T23:49:47Z",
+  "hashes": {
+    "policy_path": "config/nfl_research_search_policy_v1.json",
+    "policy_sha256": "f81e5bb1f10440adb50e0fc1e9bd0f204ab008147c31ad62d8601bf75c2529ba",
+    "config_sha256": "6295ea7ad38152644d5f775bc07de9275e300425dfbaba008334f4f0b6353cb7",
+    "script_sha256": "0f1a32f96f94840e39161e5f4b133f703d1da40b693889b6c28a181ec408c241",
+    "workflow_sha256": "f51f1b3c668f08e19681816f13efc30cee2375c2da23152f98c035c8041fb04a"
+  },
+  "run": {
+    "github_run_id": "40421897315",
+    "github_run_attempt": "1",
+    "github_sha": "d1e36800d7111a210a8c829180e25bc2dd5c2e90",
+    "github_event_name": "schedule"
+  },
+  "schedule": {
+    "source": "nflverse/nfldata data/games.csv",
+    "sha256": "8cc36a2ba4743904b18d578d0381d66bf98c2de9cd398cd7940d7af9cfd28061",
+    "matching_semantics": "KICKOFF_UTC_MULTIPLICITY",
+    "expected_kickoffs": {
+      "2026-10-27T00:15:00Z": 1
+    },
+    "expected_game_count": 1
+  },
+  "transport": {
+    "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+    "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/492",
+    "transport_host": "sportsbook-nash.draftkings.com",
+    "observed_at_utc": "2026-10-26T23:49:47.336209Z",
+    "timestamp_semantics": "SPORTSEDGE_HTTP_RESPONSE_RECEIPT_UPPER_BOUND",
+    "provider_quote_timestamp_available": false,
+    "raw_sha256": "b127cd13dcea9fb98463612dd3cded423bacf9e07c13e2dc3000d7b4189477ee",
+    "raw_relative_path": "data/nfl_2026_confirmation/captures/raw/draftkings-direct/b127cd13dcea9fb98463612dd3cded423bacf9e07c13e2dc3000d7b4189477ee.json",
+    "attempts": [
+      {
+        "attempt": 1,
+        "host": "sportsbook-nash.draftkings.com",
+        "result_class": "OK",
+        "received_at_utc": "2026-10-26T23:49:47.336209Z"
+      }
+    ],
+    "adapter_module_sha256": "76fe056b668ce71db9d1424f4049bc1be9f3e3c69d78b758353ecca141e25b1d",
+    "github_sha": "d1e36800d7111a210a8c829180e25bc2dd5c2e90"
+  },
+  "games": [
+    {
+      "event_id": "34118071",
+      "home_team": "PHI Eagles",
+      "away_team": "DAL Cowboys",
+      "commence_time": "2026-10-27T00:15:00Z",
+      "week": 7,
+      "book": "draftkings",
+      "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+      "book_last_update": null,
+      "observed_at_utc": "2026-10-26T23:49:47.336209Z",
+      "spread": {
+        "status": "OK",
+        "market_last_update": null,
+        "home_point": 4.5,
+        "home_price": -115,
+        "away_point": -4.5,
+        "away_price": -105
+      },
+      "total": {
+        "status": "OK",
+        "market_last_update": null,
+        "point": 43.5,
+        "over_price": -112,
+        "under_price": -108
+      },
+      "target_utc": "2026-10-26T23:45:00+00:00",
+      "minutes_before_kickoff": 25.21
+    }
+  ],
+  "lock_status": "MISMATCH:config_sha256"
+}
