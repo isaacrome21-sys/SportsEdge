@@ -6,7 +6,7 @@ It does not replace independent review of raw bytes or capture completeness.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from math import isfinite
 import re
 from typing import Any, Mapping, Sequence
@@ -82,6 +82,10 @@ def audit_game_line_receipt_manifest(
     """
     if game_pk is None or isinstance(game_pk, bool) or not isinstance(game_pk, int) or game_pk <= 0:
         raise MLBGameLineReceiptError("GAME_ID_INVALID")
+    try:
+        date.fromisoformat(str(official_date))
+    except ValueError as exc:
+        raise MLBGameLineReceiptError("OFFICIAL_DATE_INVALID") from exc
     if regime_for(official_date=official_date, season_type=season_type) != REGULAR:
         raise MLBGameLineReceiptError("POSTSEASON_SHAPED_SEPARATELY")
     game_start = _time(start_at_utc, "START_TIMESTAMP_INVALID")
