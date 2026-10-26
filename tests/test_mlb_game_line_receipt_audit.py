@@ -15,6 +15,7 @@ def fixture():
         "official_date": "2027-04-01",
         "season_type": "R",
         "start_at_utc": "2027-04-01T20:00:00Z",
+        "schedule_receipt": {"source": "MLB_STATSAPI_SCHEDULE", "game_pk": 123, "official_date": "2027-04-01", "season_type": "R", "start_at_utc": "2027-04-01T20:00:00Z", "captured_at_utc": "2027-04-01T18:00:00Z", "raw_sha256": "d" * 64},
         "market": "TOTALS",
         "line": 8.5,
         "entry_capture_id": "entry",
@@ -156,4 +157,26 @@ def test_run_line_forged_or_missing_side_handicaps_refused(side_lines, reason):
         if side_lines is not None:
             row["side_lines"] = side_lines
     with pytest.raises(MLBGameLineReceiptError, match=reason):
+        audit_game_line_receipt_manifest(**data)
+
+@pytest.mark.parametrize("key,value,reason", [
+    ("game_pk", 124, "SCHEDULE_RECEIPT_IDENTITY_MISMATCH"),
+    ("official_date", "2027-04-02", "SCHEDULE_RECEIPT_IDENTITY_MISMATCH"),
+    ("season_type", "P", "SCHEDULE_RECEIPT_IDENTITY_MISMATCH"),
+    ("source", "UNVERIFIED", "SCHEDULE_RECEIPT_IDENTITY_MISMATCH"),
+    ("raw_sha256", "claimed", "SCHEDULE_RECEIPT_IDENTITY_MISMATCH"),
+    ("start_at_utc", "2027-04-01T20:05:00Z", "SCHEDULE_START_NOT_PREMATCH_AUTHENTICATED"),
+    ("captured_at_utc", "2027-04-01T20:00:00Z", "SCHEDULE_START_NOT_PREMATCH_AUTHENTICATED"),
+])
+def test_schedule_manifest_cannot_mismatch_game_or_clock(key, value, reason):
+    data = fixture()
+    data["schedule_receipt"][key] = value
+    with pytest.raises(MLBGameLineReceiptError, match=reason):
+        audit_game_line_receipt_manifest(**data)
+
+
+def test_schedule_receipt_absence_refuses_manifest():
+    data = fixture()
+    data.pop("schedule_receipt")
+    with pytest.raises(MLBGameLineReceiptError, match="SCHEDULE_RECEIPT_REQUIRED"):
         audit_game_line_receipt_manifest(**data)
