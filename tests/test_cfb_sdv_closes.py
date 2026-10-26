@@ -140,3 +140,18 @@ def test_roi_convention_push_excluded_from_denominator():
     assert stats["roi_flat_minus110_assumption"] == pytest.approx(
         (100.0 / 110.0 - 1.0) / 2, abs=1e-12)
     assert stats["cover_rate"] == pytest.approx(0.5)
+
+
+def test_false_string_spread_flag_refused():
+    b = pd.DataFrame([_betting_row(1, "core_odds_api", -7.5, 48.5, avail="False")])
+    frame, _ = collect.build_season(b, pd.DataFrame([_sched_row(1)]))
+    assert not bool(frame.iloc[0].spread_scoreable)
+    assert bool(frame.iloc[0].total_scoreable)
+
+
+def test_empty_market_is_strict_json():
+    import json
+    d = pd.DataFrame(columns=["home_team_spread", "actual_margin", "am_margin"])
+    out = evaluate.score_market(d, "am_margin", "spread", 19.0, 15.5)
+    assert out["status"] == "NO_DATA" and out["model_mae"] is None
+    json.dumps(out, allow_nan=False)
