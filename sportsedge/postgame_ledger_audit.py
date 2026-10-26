@@ -8,6 +8,7 @@ from __future__ import annotations
 from collections import Counter
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+from math import isfinite
 from typing import Iterable, Mapping, Any
 
 SETTLED = frozenset({"WIN", "LOSS", "PUSH", "VOID"})
@@ -63,6 +64,9 @@ def _profit(status: str, price: Decimal, stake: Decimal) -> Decimal:
 def _quote_evidence(row: Mapping[str, Any], entry: datetime, start: datetime,
                     entry_price: Decimal) -> tuple[str, str]:
     """Assess supplied quote metadata, without treating it as authenticated proof."""
+    # Legal exclusion outranks missing/slow/invalid quote metadata.
+    if row.get("illinois_college") is True and row["sport"] in {"CFB", "CBB"}:
+        return "REFUSED", "ILLINOIS_COLLEGE_EXCLUDED"
     if str(row.get("sportsbook", "")).upper() not in {"DK", "DRAFTKINGS"}:
         return "RESEARCH", "DK_SOURCE_NOT_ATTESTED"
     if isinstance(row.get("capture_span_seconds"), bool):
@@ -77,8 +81,6 @@ def _quote_evidence(row: Mapping[str, Any], entry: datetime, start: datetime,
         return "RESEARCH", "CAPTURE_SPAN_150_TO_300_RESEARCH"
     if entry_price < -165 and str(row.get("wager_type", "STRAIGHT")).upper() == "STRAIGHT":
         return "RESEARCH", "STRAIGHT_PRICE_BELOW_MINUS_165_CAP"
-    if row.get("illinois_college") is True and row["sport"] in {"CFB", "CBB"}:
-        return "REFUSED", "ILLINOIS_COLLEGE_EXCLUDED"
     close_keys = ("close_captured_at", "close_american_odds", "close_opposite_american_odds",
                   "entry_opposite_american_odds")
     if any(row.get(k) in (None, "") for k in close_keys):
@@ -115,7 +117,8 @@ def audit(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
         # Malformed unhashable identities must not abort the entire audit.
         identity_fields = ("event_id", "market", "selection_id", "model_version")
         if any(not isinstance(row[k], (str, int)) or isinstance(row[k], bool)
-               for k in identity_fields) or not isinstance(row.get("line"), (int, float, str, type(None))):
+               for k in identity_fields) or not isinstance(row.get("line"), (int, float, str, type(None))) or (
+                   isinstance(row.get("line"), float) and not isfinite(row["line"])):
             findings.append({"row": index, "code": "INVALID_IDENTITY"})
             continue
         # Line differentiates genuine alternate markets at the same event.
