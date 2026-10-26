@@ -11,7 +11,15 @@ the amendment requires, against the acceptance criteria of record:
 1. CONTAMINATION: a mixed V1 / V2-research / undeclared / V2-counted
    row set yields a V2 verdict computed ONLY from V2 counted rows,
    with the verdict's row provenance explicit on the record; and a
-   tampered V2 document fails its hash pin closed.
+   tampered V2 document fails its hash pin closed. The toxic load is
+   exactly 130 fully-scorable rows: 60 V1 + 60 V2-research + 10
+   undeclared. Since the Oct 26 freeze-gate repair (item 4), this
+   test exercises the verdict math through the evaluator's internal
+   scoring implementation (``_score_nba_props_v2``) as a research
+   diagnostic — the public entry now refuses the counted attempt
+   outright, which is item 4's regression; every assertion about
+   the verdict math and the separation is unchanged in meaning, and
+   no authorized counted verdict is produced here.
 2. SEPARATION DEFAULTS: a V2 row without an explicit COUNTED class
    is research, never counted; a HISTORICAL V2 row is excluded from
    verdict math (no auto-activation of historical rows).
@@ -20,6 +28,13 @@ the amendment requires, against the acceptance criteria of record:
    differ from V1 only in the pin/status/boundary fields — every
    gate and threshold identical (the amendment changes the admitted
    store source, nothing else).
+4. FREEZE GATE (owner ruling, Oct 26, 2026 — the independent
+   review's Concern 1, a blocking acceptance finding): invoking the
+   public evaluator directly with 100 synthetic V2 COUNTED,
+   PROSPECTIVE, fully stamped rows while V2 is NOT FROZEN raises
+   the named refusal V2_FREEZE_NOT_AUTHORIZED before any scoring —
+   zero rows scored, no counted-row ids or verdict emitted, and the
+   framework scoring function provably never invoked.
 """
 from __future__ import annotations
 
@@ -38,11 +53,13 @@ from sportsedge.forward_validation import (  # noqa: E402
     load_nba_config,
     verify_prereg_document,
 )
+from sportsedge.forward_validation import core as fw_core  # noqa: E402
 from sportsedge.forward_validation.nba_props import (  # noqa: E402
     PREREG_ID_V1,
     PREREG_ID_V2,
     PREREG_SHA256,
     PREREG_SHA256_V2,
+    _score_nba_props_v2,
     partition_nba_rows,
 )
 
@@ -229,7 +246,15 @@ def test_mixed_row_set_verdict_counts_only_v2_counted_rows():
     und_rows, und_closes, und_outs = toxic_rows(
         "und", 10, prereg_id=None, counting_class=None)
     mixed = counted + v1_rows + res_rows + und_rows
-    rec = evaluate_nba_props_v2(
+    # DIAGNOSTIC PATH (Oct 26 freeze-gate repair): the verdict math
+    # and separation are proven against the evaluator's internal
+    # scoring implementation. The public entry refuses this same
+    # input with V2_FREEZE_NOT_AUTHORIZED while V2 is NOT FROZEN —
+    # that refusal is the freeze-gate regression below — so routing
+    # this proof through the public entry is no longer possible
+    # without producing (or attempting) an authorized counted
+    # verdict, which is exactly what must not happen pre-freeze.
+    rec = _score_nba_props_v2(
         v2_cfg(), mixed, closes + v1_closes + res_closes + und_closes,
         outcomes + v1_outs + res_outs + und_outs, slates_completed=4)
     m = rec["markets"]["player_points"]
@@ -286,3 +311,40 @@ def test_historical_v2_row_is_never_auto_counted():
     assert m["graded_rows"] == 0
     assert rec["excluded"]["historical_rows"] == ["hist"]
     assert rec["counted_row_ids"] == []
+
+
+# ---------- freeze gate: the evaluator refuses unauthorized counting
+# (owner ruling, Oct 26, 2026 — independent review Concern 1) ----------
+
+def test_counted_evaluation_refused_while_v2_not_frozen(monkeypatch):
+    # The exact probe the independent review exposed: 100 synthetic
+    # V2 COUNTED, PROSPECTIVE, fully stamped rows — otherwise
+    # eligible on their face (this same family scores BEATS_MARKET
+    # through the diagnostic path in the contamination test above).
+    rows, closes, outcomes = beats_family("fz")
+    assert len(rows) == 100
+    # Spy on the framework scoring entry the evaluator calls: if the
+    # gate ever lets a counted attempt through to scoring, the spy
+    # both records it and raises, so the test cannot pass silently.
+    scoring_calls = []
+
+    def scoring_spy(*args, **kwargs):
+        scoring_calls.append((args, kwargs))
+        raise AssertionError(
+            "core.evaluate_family invoked behind the freeze gate")
+
+    monkeypatch.setattr(fw_core, "evaluate_family", scoring_spy)
+    with pytest.raises(ForwardValidationRefusal) as ei:
+        evaluate_nba_props_v2(v2_cfg(), rows, closes, outcomes,
+                              slates_completed=4)
+    # (a) the named refusal, naming every attempted counted row
+    assert ei.value.reason == "V2_FREEZE_NOT_AUTHORIZED"
+    assert ei.value.detail["attempted_counted_rows"] == 100
+    assert set(ei.value.detail["attempted_counted_row_ids"]) == {
+        r["row_id"] for r in rows}
+    # (b)+(c) the raise IS the record: no verdict record, no counted
+    # row ids, and no verdict were emitted — the call returned
+    # nothing at all.
+    # (d) the underlying scoring function was never invoked, so zero
+    # rows were scored.
+    assert scoring_calls == []

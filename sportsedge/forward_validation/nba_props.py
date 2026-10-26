@@ -66,7 +66,13 @@ BEFORE any scoring: a V2 verdict is computed only over rows declared
 V2 + COUNTED; V1 rows, V2 research rows, and undeclared rows are
 reported in the record's separation block and never blended into a
 V2 denominator. Until the owner freezes V2, these functions prepare
-and prove the integration — they authorize no counted row.
+and prove the integration — they authorize no counted row. And
+since the Oct 26, 2026 repair (owner ruling on the independent
+review's Concern 1), the V2 entry point enforces that hold itself:
+while the V2 config state declares NOT FROZEN, a counted evaluation
+attempt raises ``V2_FREEZE_NOT_AUTHORIZED`` before any scoring —
+the authorization boundary no longer rests on upstream record
+discipline alone.
 """
 from __future__ import annotations
 
@@ -315,19 +321,82 @@ def _separation_block(parts: dict) -> dict:
             for name, rs in parts.items()}
 
 
+def _v2_freeze_authorized(cfg: FamilyConfig) -> bool:
+    """Whether the V2 state ``cfg`` carries is a FROZEN state. The
+    freeze is the owner's act on the document/config state itself —
+    the ``status`` the V2 configs declare, which
+    :func:`load_nba_config` verifies at load time. The freeze gate
+    reads only this state: nothing a caller passes per call (rows,
+    flags, environment) can stand in for the freeze, and when the
+    owner performs the freeze — changing the document/config state
+    to its frozen form — the gate opens on that state with no
+    further code change."""
+    status = (cfg.status or "").upper()
+    return "FROZEN" in status and "NOT FROZEN" not in status
+
+
 def evaluate_nba_props_v2(cfg: FamilyConfig, entry_rows: list,
                           close_rows: list, outcomes: list, *,
                           slates_completed: int | None = None) -> dict:
-    """Score one NBA prop family under the V2 source amendment
-    (FINAL-CANDIDATE — NOT FROZEN; the freeze is the owner's held
-    act, and this entry point prepares/proves the integration only).
+    """Score one NBA prop family under the V2 source amendment —
+    the ONLY public entry to a counted V2 verdict, and itself the
+    freeze gate (owner ruling, Oct 26, 2026, on the independent
+    review's Concern 1: the evaluator must refuse unauthorized
+    counting itself, not rely on upstream record discipline).
 
     ``cfg`` must come from ``load_nba_config(family, version="V2")``
     — a V1 (or any non-V2-pinned) config is refused CONFIG_INVALID,
-    so a V2 verdict can never issue under V1's pin. The mixed input
-    is partitioned by :func:`partition_nba_rows` BEFORE screening
-    and scoring: only V2 counted rows reach the framework, under the
-    same §2/§5 screens and the same core mechanics V1 uses (the
+    so a V2 verdict can never issue under V1's pin.
+
+    FREEZE GATE: while the V2 state ``cfg`` carries declares NOT
+    FROZEN (see :func:`_v2_freeze_authorized`), any input row that
+    declares V2 + COUNTED and is prospective is a counted evaluation
+    attempt, and the attempt is refused
+    ``V2_FREEZE_NOT_AUTHORIZED`` — raised after partitioning,
+    BEFORE screening or any scoring (``core.evaluate_family`` is
+    never reached; no record, verdict, or counted row id is
+    emitted). Inputs carrying no prospective counted row — research
+    diagnostics, class-less rows, and HISTORICAL counted rows (the
+    framework's unchanged historical exclusion) — still return
+    their diagnostic record. There is no caller-controlled bypass:
+    no parameter, flag, or alternate public entry reaches the
+    scorer around this gate.
+    """
+    if cfg.prereg != PREREG_PATH_V2 or cfg.prereg_sha256 != PREREG_SHA256_V2:
+        raise ForwardValidationRefusal(
+            "CONFIG_INVALID",
+            {"field": "prereg_pin", "required": PREREG_ID_V2,
+             "found": cfg.prereg, "found_sha256": cfg.prereg_sha256})
+    parts = partition_nba_rows(entry_rows)
+    attempted = [r for r in parts["v2_counted_rows"]
+                 if (r.get("label") or "PROSPECTIVE") != "HISTORICAL"]
+    if attempted and not _v2_freeze_authorized(cfg):
+        raise ForwardValidationRefusal(
+            "V2_FREEZE_NOT_AUTHORIZED",
+            {"prereg_id": PREREG_ID_V2,
+             "config_status": cfg.status,
+             "attempted_counted_rows": len(attempted),
+             "attempted_counted_row_ids": sorted(
+                 r.get("row_id") or "<no row_id>" for r in attempted),
+             "rule": "a counted V2 evaluation requires an "
+                     "owner-authorized V2 freeze; V2 is NOT FROZEN"})
+    return _score_nba_props_v2(cfg, entry_rows, close_rows, outcomes,
+                               slates_completed=slates_completed)
+
+
+def _score_nba_props_v2(cfg: FamilyConfig, entry_rows: list,
+                        close_rows: list, outcomes: list, *,
+                        slates_completed: int | None = None) -> dict:
+    """The V2 scoring implementation behind the gated entry point:
+    partition, §2/§5 screens, framework scoring, provenance record.
+    Internal on purpose — NOT exported and NOT an entry point. The
+    test suite calls it directly as a research diagnostic to prove
+    the verdict math and the §10 separation; a record produced here
+    is an authorized counted verdict ONLY when it issued through
+    :func:`evaluate_nba_props_v2` under a frozen V2 state. The mixed
+    input is partitioned by :func:`partition_nba_rows` BEFORE
+    screening and scoring: only V2 counted rows reach the framework,
+    under the same screens and the same core mechanics V1 uses (the
     amendment changes the store source, nothing else). The record
     carries the counted rows' provenance on its face —
     ``counted_row_ids`` plus a ``separation`` block naming every
