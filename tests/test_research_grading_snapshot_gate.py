@@ -3,6 +3,7 @@ from sportsedge.research_grading_snapshot_gate import audit_grading_snapshots
 
 ENTRY = {"snapshot_id": "entry-1", "captured_at": "2026-10-25T12:00:00-05:00",
          "book": "DK", "event_id": "game-1", "market": "total",
+         "contract_id": "total:full_game:44.5:OVER_UNDER",
          "offers": {"OVER": -110, "UNDER": -110}}
 CLOSE = {**ENTRY, "snapshot_id": "close-2", "captured_at": "2026-10-25T12:04:00-05:00"}
 START = "2026-10-25T12:05:00-05:00"
@@ -68,6 +69,22 @@ class SnapshotGateTests(unittest.TestCase):
         self.assertEqual(check(close={**CLOSE, "offers": {"OVER": -110, "DRAW": +150}})["reason"], "CLOSE_OFFER_SIDES_MISMATCH")
     def test_timezone_naive_refused(self):
         self.assertEqual(check(evaluated_at="2026-10-25T12:02:30")["admission"], "REFUSED")
+    def test_close_changed_line_contract_is_not_clv(self):
+        result = check(close={**CLOSE, "contract_id": "total:full_game:47.5:OVER_UNDER"})
+        self.assertFalse(result["clv_ready"])
+        self.assertEqual(result["reason"], "CROSS_CONTRACT_CLOSE")
+
+    def test_missing_entry_contract_refused(self):
+        entry = {k: v for k, v in ENTRY.items() if k != "contract_id"}
+        self.assertEqual(check(entry=entry)["admission"], "REFUSED")
+
+    def test_blank_entry_contract_refused(self):
+        self.assertEqual(check(entry={**ENTRY, "contract_id": "  "})["admission"], "REFUSED")
+
+    def test_invalid_close_contract_not_clv(self):
+        self.assertEqual(check(close={**CLOSE, "contract_id": 44.5})["reason"],
+                         "CLOSE_INCOMPLETE_OR_UNPAIRED")
+
     def test_no_ev_output(self):
         self.assertTrue(set(check()).isdisjoint({"ev", "model_probability", "clv"}))
 
