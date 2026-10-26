@@ -24,6 +24,7 @@ from typing import Any, Mapping, Sequence
 
 NHL_WEB_API_BASE = "https://api-web.nhle.com"
 BOXSCORE_ENDPOINT = NHL_WEB_API_BASE + "/v1/gamecenter/{game_id}/boxscore"
+LANDING_ENDPOINT = NHL_WEB_API_BASE + "/v1/gamecenter/{game_id}/landing"
 SOURCE_REFERENCES = (
     "pseudo-r/Public-NHL-API:docs/web-api/games.md",
     "Zmalski/NHL-API-Reference:README.md",
@@ -175,10 +176,16 @@ class NHLOfficialCompletedGame:
             (self.away_pp_goals, self.away_pp_opportunities),
             (self.home_pp_goals, self.home_pp_opportunities),
         ):
-            if (goals is None) != (opportunities is None):
-                raise ValueError("power-play goals/opportunities must be present together")
+            # Live Gamecenter payloads carry exact per-goal strength (so PP
+            # goals are known) but no opportunities figure anywhere; a receipt
+            # may therefore carry goals without opportunities. Opportunities
+            # without goals is not producible by any admitted source.
+            if goals is None and opportunities is not None:
+                raise ValueError("power-play opportunities require power-play goals")
+            if goals is not None and goals < 0:
+                raise ValueError("invalid power-play counts")
             if goals is not None and opportunities is not None:
-                if goals < 0 or opportunities < 0 or goals > opportunities:
+                if opportunities < 0 or goals > opportunities:
                     raise ValueError("invalid power-play counts")
         expected_uri = BOXSCORE_ENDPOINT.format(game_id=self.game_id)
         if self.source_uri != expected_uri:
@@ -231,6 +238,77 @@ def _regulation_goals(boxscore: Mapping[str, Any], side: str) -> int:
     return total
 
 
+def _goal_team_abbrev(goal: Mapping[str, Any]) -> str:
+    raw = goal.get("teamAbbrev")
+    if isinstance(raw, Mapping):
+        raw = raw.get("default")
+    return str(raw or "").strip().upper()
+
+
+def _landing_scoring(
+    landing: Mapping[str, Any],
+    *,
+    away_abbrev: str,
+    home_abbrev: str,
+    away_final: int,
+    home_final: int,
+    last_period_type: str,
+) -> tuple[int, int, int, int]:
+    """Regulation goals and PP goals from the Gamecenter landing payload.
+
+    The live boxscore payload carries no period scoring at all; the landing
+    payload's ``summary.scoring`` lists every goal with its period, scoring
+    team and strength — exact per-goal records, not a derivation. Completeness
+    is enforced by reconciliation: counted goals over all periods must equal
+    the final score (with the single shootout-decider allowance), else the
+    receipt fails closed. Returns (away_reg, home_reg, away_pp, home_pp).
+    """
+    summary = landing.get("summary")
+    if not isinstance(summary, Mapping):
+        raise ValueError("official landing payload missing summary")
+    scoring = summary.get("scoring")
+    if not isinstance(scoring, Sequence) or isinstance(scoring, (str, bytes, bytearray)):
+        raise ValueError("official landing payload missing summary.scoring")
+    reg = {"away": 0, "home": 0}
+    pp = {"away": 0, "home": 0}
+    counted = {"away": 0, "home": 0}
+    for row in scoring:
+        if not isinstance(row, Mapping):
+            raise ValueError("landing scoring period row must be a mapping")
+        desc = row.get("periodDescriptor") or {}
+        if not isinstance(desc, Mapping):
+            raise ValueError("landing scoring periodDescriptor must be a mapping")
+        number = int(desc.get("number") or 0)
+        period_type = str(desc.get("periodType") or "").strip().upper()
+        goals = row.get("goals")
+        if not isinstance(goals, Sequence) or isinstance(goals, (str, bytes, bytearray)):
+            raise ValueError("landing scoring goals must be a list")
+        for goal in goals:
+            if not isinstance(goal, Mapping):
+                raise ValueError("landing scoring goal must be a mapping")
+            abbrev = _goal_team_abbrev(goal)
+            if abbrev == away_abbrev:
+                side = "away"
+            elif abbrev == home_abbrev:
+                side = "home"
+            else:
+                raise ValueError(f"landing scoring goal for unknown team:{abbrev}")
+            counted[side] += 1
+            if period_type == "REG" and 1 <= number <= 3:
+                reg[side] += 1
+            if str(goal.get("strength") or "").strip().lower() == "pp":
+                pp[side] += 1
+    for side, final in (("away", away_final), ("home", home_final)):
+        if counted[side] == final:
+            continue
+        if last_period_type == "SO" and counted[side] + 1 == final:
+            continue  # shootout decider is a team goal with no goal record
+        raise ValueError(
+            f"landing scoring does not reconcile with final score ({side}: counted {counted[side]} vs final {final})"
+        )
+    return reg["away"], reg["home"], pp["away"], pp["home"]
+
+
 def _goalies(boxscore: Mapping[str, Any], side: str) -> tuple[NHLGoalieBoxscore, ...]:
     player_stats = boxscore.get("playerByGameStats")
     if not isinstance(player_stats, Mapping):
@@ -270,11 +348,22 @@ def build_official_completed_game(
     raw_sha256: str,
     source_uri: str | None = None,
     source_version: str = "nhl-web-api-v1",
+    landing_payload: Mapping[str, Any] | None = None,
 ) -> NHLOfficialCompletedGame:
     """Normalize an already-fetched official final Gamecenter boxscore.
 
     No HTTP request is performed here.  The caller supplies the real retrieval
     timestamp and SHA-256 of the exact raw response bytes.
+
+    Two payload shapes are admitted. The legacy shape carries a nested
+    ``boxscore`` object (linescore + playerByGameStats) and root-level
+    ``powerPlayConversion`` strings. The live Gamecenter shape (verified
+    against the API on 2026-10-26) has no nested object: team identity, final
+    score, SOG and ``playerByGameStats`` sit at the payload root, period
+    scoring exists only in the companion landing payload (``landing_payload``,
+    required for the live shape), and no power-play opportunities figure
+    exists in either payload — live-shape receipts therefore carry exact PP
+    goals with ``pp_opportunities=None``.
     """
     if not isinstance(payload, Mapping):
         raise ValueError("official boxscore payload must be a mapping")
@@ -299,7 +388,33 @@ def build_official_completed_game(
     away_id, away_abbrev, away_final, away_sog, away_pp = _team_identity(payload, "away")
     home_id, home_abbrev, home_final, home_sog, home_pp = _team_identity(payload, "home")
     boxscore = payload.get("boxscore")
-    if not isinstance(boxscore, Mapping):
+    if isinstance(boxscore, Mapping):
+        away_reg = _regulation_goals(boxscore, "away")
+        home_reg = _regulation_goals(boxscore, "home")
+        away_pp_goals = None if away_pp is None else away_pp[0]
+        away_pp_opps = None if away_pp is None else away_pp[1]
+        home_pp_goals = None if home_pp is None else home_pp[0]
+        home_pp_opps = None if home_pp is None else home_pp[1]
+        away_goalie_rows = _goalies(boxscore, "away")
+        home_goalie_rows = _goalies(boxscore, "home")
+    elif landing_payload is not None:
+        outcome = payload.get("gameOutcome")
+        last_period_type = ""
+        if isinstance(outcome, Mapping):
+            last_period_type = str(outcome.get("lastPeriodType") or "").strip().upper()
+        away_reg, home_reg, away_pp_goals, home_pp_goals = _landing_scoring(
+            landing_payload,
+            away_abbrev=away_abbrev,
+            home_abbrev=home_abbrev,
+            away_final=away_final,
+            home_final=home_final,
+            last_period_type=last_period_type,
+        )
+        away_pp_opps = None
+        home_pp_opps = None
+        away_goalie_rows = _goalies(payload, "away")
+        home_goalie_rows = _goalies(payload, "home")
+    else:
         raise ValueError("official boxscore object required")
 
     return NHLOfficialCompletedGame(
@@ -314,18 +429,18 @@ def build_official_completed_game(
         home_team_id=home_id,
         away_abbrev=away_abbrev,
         home_abbrev=home_abbrev,
-        away_regulation_goals=_regulation_goals(boxscore, "away"),
-        home_regulation_goals=_regulation_goals(boxscore, "home"),
+        away_regulation_goals=away_reg,
+        home_regulation_goals=home_reg,
         away_final_goals=away_final,
         home_final_goals=home_final,
         away_sog=away_sog,
         home_sog=home_sog,
-        away_pp_goals=None if away_pp is None else away_pp[0],
-        away_pp_opportunities=None if away_pp is None else away_pp[1],
-        home_pp_goals=None if home_pp is None else home_pp[0],
-        home_pp_opportunities=None if home_pp is None else home_pp[1],
-        away_goalies=_goalies(boxscore, "away"),
-        home_goalies=_goalies(boxscore, "home"),
+        away_pp_goals=away_pp_goals,
+        away_pp_opportunities=away_pp_opps,
+        home_pp_goals=home_pp_goals,
+        home_pp_opportunities=home_pp_opps,
+        away_goalies=away_goalie_rows,
+        home_goalies=home_goalie_rows,
         source_uri=uri,
         source_raw_sha256=str(raw_sha256).lower(),
         source_version=str(source_version),
@@ -353,7 +468,7 @@ def dataset_sha256(games: Sequence[NHLOfficialCompletedGame]) -> str:
 
 
 __all__ = [
-    "NHL_WEB_API_BASE", "BOXSCORE_ENDPOINT", "SOURCE_REFERENCES",
+    "NHL_WEB_API_BASE", "BOXSCORE_ENDPOINT", "LANDING_ENDPOINT", "SOURCE_REFERENCES",
     "NHLGoalieBoxscore", "NHLOfficialCompletedGame",
     "build_official_completed_game", "completed_game_from_json_dict",
     "raw_sha256", "dataset_sha256",
