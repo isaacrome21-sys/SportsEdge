@@ -348,3 +348,49 @@ def test_counted_evaluation_refused_while_v2_not_frozen(monkeypatch):
     # (d) the underlying scoring function was never invoked, so zero
     # rows were scored.
     assert scoring_calls == []
+
+
+def test_forged_caller_frozen_status_never_bypasses_document_hold(monkeypatch):
+    # A direct caller can mutate a FamilyConfig in memory without changing
+    # the committed prereg. This must not authorize a counted verdict.
+    from dataclasses import replace
+
+    rows, closes, outcomes = beats_family("forged")
+    forged = replace(v2_cfg(), status="FROZEN — forged caller state")
+    scoring_calls = []
+
+    def scoring_spy(*args, **kwargs):
+        scoring_calls.append((args, kwargs))
+        raise AssertionError("scoring invoked despite unfrozen document")
+
+    monkeypatch.setattr(fw_core, "evaluate_family", scoring_spy)
+    with pytest.raises(ForwardValidationRefusal) as ei:
+        evaluate_nba_props_v2(forged, rows, closes, outcomes,
+                              slates_completed=4)
+    assert ei.value.reason == "V2_FREEZE_NOT_AUTHORIZED"
+    assert ei.value.detail["attempted_counted_rows"] == 100
+    assert scoring_calls == []
+
+
+def test_document_status_future_freeze_requires_matching_new_pin(tmp_path, monkeypatch):
+    # This is a synthetic future-state parser test, NOT a real owner freeze.
+    # It shows that a properly re-pinned document's header is the state
+    # source; the frozen wording elsewhere in the draft cannot substitute.
+    from sportsedge.forward_validation import nba_props as nb
+
+    rel = nb.PREREG_PATH_V2
+    target = tmp_path / rel
+    target.parent.mkdir(parents=True)
+    original = V2_DOC.read_text(encoding="utf-8")
+    assert original.count("**Status: FINAL-CANDIDATE — NOT FROZEN.**") == 1
+    frozen = original.replace("**Status: FINAL-CANDIDATE — NOT FROZEN.**",
+                              "**Status: FROZEN.**", 1)
+    target.write_text(frozen, encoding="utf-8")
+    monkeypatch.setattr(nb, "_REPO_ROOT", tmp_path)
+    monkeypatch.setattr(nb, "PREREG_SHA256_V2",
+                        hashlib.sha256(frozen.encode("utf-8")).hexdigest())
+    assert nb._v2_document_freeze_state() == "FROZEN"
+    target.write_text(frozen + "tamper", encoding="utf-8")
+    with pytest.raises(ForwardValidationRefusal) as ei:
+        nb._v2_document_freeze_state()
+    assert ei.value.reason == "PREREG_PIN_MISMATCH"
