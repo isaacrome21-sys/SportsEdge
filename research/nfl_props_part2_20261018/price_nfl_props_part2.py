@@ -72,6 +72,19 @@ def check_training_pins(data: Path) -> dict:
     cal = sha256_bytes((HERE / CALIBRATION_PREREG_NAME).read_bytes())
     if cal != want[CALIBRATION_PREREG_NAME]:
         raise SystemExit("CALIBRATION_PREREG_HASH_MISMATCH")
+    # B8 takes effect only when its corrected artifact is in the registry.
+    # The frozen loader globs both ps_* and sp_*; checking a hash alone
+    # cannot prevent a second 2025 file from being loaded alongside it.
+    corrected = "sp_2025_played_v2.csv.gz"
+    if corrected in want:
+        active_2025 = sorted(
+            p.name for pattern in ("ps_2025*.csv.gz", "sp_2025*.csv.gz")
+            for p in data.glob(pattern)
+        )
+        if active_2025 != [corrected]:
+            raise SystemExit("B8_DATA_COMPOSITION_INVALID: " + repr(active_2025))
+        if sha256_bytes((data / corrected).read_bytes()) != want[corrected]:
+            raise SystemExit("B8_CORRECTED_INPUT_HASH_MISMATCH")
     pins = {}
     for name in ("ps_2018.csv.gz", "ps_2019.csv.gz"):
         f = data / name
