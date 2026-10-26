@@ -31,7 +31,7 @@ validated vs closes.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from math import exp, pi, sqrt
+from math import exp, isfinite, pi, sqrt
 from typing import Any, Mapping
 
 from artifacts.free_models import (
@@ -335,8 +335,20 @@ def finalize_research_row(*, sport: str, game: str, selection: str, market: str,
                           declared_assumptions: Mapping[str, Any] | None = None,
                           min_ev: float = 0.02) -> dict[str, Any]:
     """Build the standard research row; EV math identical for all game markets."""
-    win, push = bounded(win, 0, 1), bounded(push, 0, 1)
-    loss = bounded(1 - win - push, 0, 1)
+    # This boundary is also called directly by other market pricers. Never
+    # repair malformed model output by clipping it into a plausible edge.
+    numeric = {"win": win, "push": push, "dec": dec, "price": price,
+               "home_mean": home_mean, "away_mean": away_mean, "min_ev": min_ev}
+    if line is not None:
+        numeric["line"] = line
+    for name, value in numeric.items():
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not isfinite(value):
+            raise ValueError(f"RESEARCH_ROW_INVALID_NUMBER:{name}")
+    if not (0 < round(win, 6) < 1) or not (0 <= push < 1) or win + push > 1 + 1e-12:
+        raise ValueError("RESEARCH_ROW_INVALID_PROBABILITY_MASS")
+    if dec <= 1 or abs(price) < 100 or int(price) != price:
+        raise ValueError("RESEARCH_ROW_INVALID_ODDS")
+    loss = max(0.0, 1 - win - push)
     ev = win * (dec - 1) - loss
     breakeven = (1 - push) / dec
     status = "RESEARCH_EDGE" if ev >= min_ev and price >= -165 else "BELOW_THRESHOLD"
@@ -374,6 +386,9 @@ def finalize_research_row(*, sport: str, game: str, selection: str, market: str,
     if declared_assumptions:
         row["declared_assumptions"] = dict(declared_assumptions)
     if extra:
+        collisions = row.keys() & extra.keys()
+        if collisions:
+            raise ValueError("RESEARCH_ROW_RESERVED_FIELDS:" + ",".join(sorted(collisions)))
         row.update(dict(extra))
     return row
 
