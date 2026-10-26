@@ -348,3 +348,33 @@ def test_counted_evaluation_refused_while_v2_not_frozen(monkeypatch):
     # (d) the underlying scoring function was never invoked, so zero
     # rows were scored.
     assert scoring_calls == []
+
+def test_mutating_loaded_config_status_cannot_unlock_counting(monkeypatch):
+    """The freeze signal is authenticated from disk, never from cfg.status.
+
+    FamilyConfig is mutable. This is a direct adversarial call to the
+    public evaluator, retaining the authentic V2 prereg path and SHA.
+    It must refuse the same otherwise-eligible 100-row attempt.
+    """
+    cfg = v2_cfg()
+    assert "NOT FROZEN" in cfg.status
+    cfg.status = "FROZEN — caller-forged status"
+    rows, closes, outcomes = beats_family("spoof")
+    assert len(rows) == 100
+
+    calls = []
+
+    def scoring_spy(*args, **kwargs):
+        calls.append((args, kwargs))
+        raise AssertionError("forged freeze state reached scoring")
+
+    monkeypatch.setattr(fw_core, "evaluate_family", scoring_spy)
+    with pytest.raises(ForwardValidationRefusal) as ei:
+        evaluate_nba_props_v2(cfg, rows, closes, outcomes,
+                              slates_completed=4)
+    assert ei.value.reason == "V2_FREEZE_NOT_AUTHORIZED"
+    assert ei.value.detail["attempted_counted_rows"] == 100
+    assert set(ei.value.detail["attempted_counted_row_ids"]) == {
+        r["row_id"] for r in rows}
+    assert calls == []
+
