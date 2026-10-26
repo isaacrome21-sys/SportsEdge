@@ -165,6 +165,16 @@ def score_market(d, model_col, kind, sd_prod, sd_lane):
     d["win"] = [0 if r == 0 else (1 if (r > 0) == s else -1)
                 for r, s in zip(d.resid, side_home)]
     d.loc[d.model == d.mkt, "win"] = float("nan")
+    if d.empty:
+        # Empty seasonal/market strata are NO_DATA, never NaN-bearing metrics.
+        return dict(
+            n=0, status="NO_DATA",
+            model_mae=None, close_mae=None, model_bias=None,
+            mean_abs_model_minus_close=None, mean_signed_model_minus_close=None,
+            logloss_prod_sds=None, logloss_lane_sds=None,
+            logloss_market_only=None,
+            bands=band_stats(d, "gap", "win"),
+            calibration_prod_sds=calibration(d, "gap", "win", sd_prod))
     ll = {}
     for name, sd in (("prod", sd_prod), ("lane", sd_lane)):
         tot, n = 0.0, 0
@@ -252,7 +262,7 @@ def main(argv=None) -> int:
         "per_season": {str(s): score_stratum(pred, [s], f"season {s}")
                        for s in range(2012, 2027)},
     }
-    (data / "metrics_am_pm.json").write_text(json.dumps(results_out, indent=1))
+    (data / "metrics_am_pm.json").write_text(json.dumps(results_out, indent=1, allow_nan=False))
     for key in ("primary_2023_2025", "primary_2023_2026", "subset_2012_2022"):
         r = results_out[key]
         print(f"== {r['stratum']}")
@@ -260,6 +270,9 @@ def main(argv=None) -> int:
             for kind in ("spread", "total"):
                 m = r[model][kind]
                 b0 = m["bands"]["ge0"]
+                if m["n"] == 0:
+                    print(f"  {model} {kind}: n=0 NO_DATA")
+                    continue
                 print(f"  {model} {kind}: n={m['n']} MAE model {m['model_mae']:.2f} "
                       f"vs close {m['close_mae']:.2f} | cover(all) {b0['cover_rate']} "
                       f"ROI flat -110 ASSUMPTION "
