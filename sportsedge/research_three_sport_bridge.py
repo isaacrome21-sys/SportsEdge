@@ -391,7 +391,8 @@ def price_three_sport_research(model_rows: Sequence[Mapping], quotes: Sequence[M
                    "dk_odds": own[3], "dk_no_vig_p": round(market, 6),
                    "edge_pp": round(100 * (conditional - market), 3),
                    "ev_per_dollar": round(ev, 6),
-           "quote_status": ("STALE_QUOTE" if freshness == RESEARCH_AGED_QUOTE else freshness),
+                   "quote_status": ("STALE_QUOTE" if freshness == RESEARCH_AGED_QUOTE
+                                    else freshness),
                    "paired_quote_skew_seconds": round(pair_skew_seconds, 3),
                    "paired_quote_captured_at": [own[4].isoformat(),
                                                 other[4].isoformat()],
