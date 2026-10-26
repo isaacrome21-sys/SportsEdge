@@ -63,10 +63,28 @@ class PITReplayCLITests(unittest.TestCase):
         self.assertEqual(report["markets"][0]["blocker"], "NO_BINARY_ROWS_FOR_BRIER")
 
     def test_multiple_versions_separately_reported(self):
-        third = {**HOLD, "event_id": "G3", "selection_id": "S3", "model_version": "v2", "model_hash": "hash-v2"}
-        report = self.run_cli([BASE, HOLD, third])
+        # Each frozen (sport, market, version) needs its own settled,
+        # pre-cutoff training row. A v1 prior cannot qualify v2.
+        v2_train = {**BASE, "selection_id": "S4",
+                    "model_version": "v2", "model_hash": "hash-v2"}
+        third = {**HOLD, "event_id": "G3", "selection_id": "S3",
+                 "model_version": "v2", "model_hash": "hash-v2"}
+        report = self.run_cli([BASE, v2_train, HOLD, third])
+        self.assertEqual((report["train_n"], report["holdout_n"]), (2, 2))
         self.assertEqual(len(report["markets"]), 2)
         self.assertEqual({r["model_version"] for r in report["markets"]}, {"v1", "v2"})
+        self.assertIs(report["production_eligible"], False)
+
+    def test_missing_v2_prior_refuses_at_cli_boundary(self):
+        # Preserve the stricter gate; this is NOT a reason to weaken it.
+        import io
+        third = {**HOLD, "event_id": "G3", "selection_id": "S3",
+                 "model_version": "v2", "model_hash": "hash-v2"}
+        with patch("sys.stderr", new_callable=io.StringIO) as stderr:
+            with self.assertRaises(SystemExit) as raised:
+                self.run_cli([BASE, HOLD, third])
+        self.assertEqual(raised.exception.code, 2)
+        self.assertIn("TRAINING_GROUP_MISSING:NFL/TOTAL/v2", stderr.getvalue())
 
 
 if __name__ == "__main__": unittest.main()
