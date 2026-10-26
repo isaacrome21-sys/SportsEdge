@@ -134,4 +134,26 @@ def test_other_two_frozen_game_markets_share_same_receipt_rules(market, line, pr
         observation["market"] = market
         observation["line"] = line
         observation["prices"] = dict(prices)
+        if market == "RUN_LINE":
+            observation["side_lines"] = {"HOME": -1.5, "AWAY": 1.5}
     assert audit_game_line_receipt_manifest(**data)["counted"] is False
+
+@pytest.mark.parametrize("side_lines,reason", [
+    (None, "RUN_LINE_SIDE_HANDICAPS_REQUIRED"),
+    ({"HOME": -1.5}, "RUN_LINE_SIDE_HANDICAPS_REQUIRED"),
+    ({"HOME": -1.5, "AWAY": -1.5}, "RUN_LINE_HANDICAPS_NOT_COMPLEMENTARY"),
+    ({"HOME": 1.5, "AWAY": -1.5}, "RUN_LINE_HANDICAPS_NOT_COMPLEMENTARY"),
+    ({"HOME": -1.5, "AWAY": float("nan")}, "MARKET_LINE_INVALID"),
+])
+def test_run_line_forged_or_missing_side_handicaps_refused(side_lines, reason):
+    data = fixture()
+    data["market"] = "RUN_LINE"
+    data["line"] = -1.5
+    for row in data["observations"]:
+        row["market"] = "RUN_LINE"
+        row["line"] = -1.5
+        row["prices"] = {"HOME": 140, "AWAY": -160}
+        if side_lines is not None:
+            row["side_lines"] = side_lines
+    with pytest.raises(MLBGameLineReceiptError, match=reason):
+        audit_game_line_receipt_manifest(**data)
