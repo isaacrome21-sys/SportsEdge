@@ -8,6 +8,7 @@ scripts/backtest_cfb_matchup_blend.py project(), the AM rating math, and
 the ROI convention (push excluded from the denominator, flat -110).
 """
 import importlib.util
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -140,3 +141,55 @@ def test_roi_convention_push_excluded_from_denominator():
     assert stats["roi_flat_minus110_assumption"] == pytest.approx(
         (100.0 / 110.0 - 1.0) / 2, abs=1e-12)
     assert stats["cover_rate"] == pytest.approx(0.5)
+
+
+
+@pytest.mark.parametrize("availability", [
+    False, "False", "false", "0", "NO", None, float("nan"), 0,
+])
+def test_spread_availability_requires_strict_affirmative_flag(availability):
+    # A finite spread cannot override a source-declared unavailable flag.
+    b = pd.DataFrame([_betting_row(37, "core_odds_api", -3.5, 47.5,
+                                   avail=availability)])
+    s = pd.DataFrame([_sched_row(37)])
+    frame, summary = collect.build_season(b, s)
+    row = frame.iloc[0]
+    assert row.excl_spread == "E4_SPREAD_FLAGGED_UNAVAILABLE"
+    assert not bool(row.spread_scoreable)
+    assert bool(row.total_scoreable)  # Independently valid total is retained.
+    assert summary["spread_scoreable"] == 0
+    assert summary["total_scoreable"] == 1
+
+
+@pytest.mark.parametrize("availability", [
+    True, "True", "true", "1", 1, "yes",
+])
+def test_affirmative_spread_availability_preserved(availability):
+    b = pd.DataFrame([_betting_row(38, "core_odds_api", -3.5, 47.5,
+                                   avail=availability)])
+    s = pd.DataFrame([_sched_row(38)])
+    frame, summary = collect.build_season(b, s)
+    row = frame.iloc[0]
+    assert bool(row.spread_scoreable)
+    assert bool(row.total_scoreable)
+    assert summary["spread_scoreable"] == 1
+
+
+@pytest.mark.parametrize("kind,model_col", [
+    ("spread", "am_margin"), ("total", "am_total"),
+])
+def test_empty_scoring_stratum_emits_no_data_strict_json(kind, model_col):
+    empty = pd.DataFrame(columns=[
+        "home_team_spread", "actual_margin", "over_under",
+        "actual_total", "am_margin", "am_total",
+    ])
+    result = evaluate.score_market(empty, model_col, kind, 11.0, 11.0)
+    assert result["n"] == 0 and result["status"] == "NO_DATA"
+    for field in ("model_mae", "close_mae", "model_bias",
+                  "mean_abs_model_minus_close", "mean_signed_model_minus_close",
+                  "logloss_prod_sds", "logloss_lane_sds", "logloss_market_only"):
+        assert result[field] is None
+    assert result["bands"]["ge0"]["roi_flat_minus110_assumption"] is None
+    assert all(band["n"] == 0 for band in result["calibration_prod_sds"])
+    # Mirrors main()'s fail-closed serialization policy.
+    json.dumps(result, allow_nan=False)
