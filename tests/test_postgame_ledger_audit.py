@@ -21,6 +21,16 @@ class PostgameAuditTests(unittest.TestCase):
     def test_missing(self): self.assertEqual(audit([{"status": "WIN"}])["findings"][0][1], "MISSING_FIELDS")
     def test_plus_money(self): self.assertEqual(audit([{**BASE, "american_odds": 150}])["profit_units"], "1.5")
     def test_noninteger_odds(self): self.assertEqual(audit([{**BASE, "american_odds": -110.5}])["accepted"], 0)
+    def test_invalid_first_row_does_not_poison_later_valid_row(self):
+        invalid = {**BASE, "status": "PENDING"}
+        result = audit([invalid, BASE])
+        self.assertEqual(result["accepted"], 1)
+        self.assertEqual(result["findings"][0][1], "UNSETTLED_OR_UNKNOWN")
+
+    def test_bad_price_does_not_poison_later_valid_row(self):
+        invalid = {**BASE, "american_odds": -90}
+        self.assertEqual(audit([invalid, BASE])["accepted"], 1)
+
     def test_invalid_row(self): self.assertEqual(audit([None])["findings"][0][1], "INVALID_ROW")
 
 
