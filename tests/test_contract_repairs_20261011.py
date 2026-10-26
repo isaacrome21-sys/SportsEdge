@@ -207,8 +207,9 @@ def test_bridge_routes_through_centralized_check():
     stale = "2026-10-11T19:00:00Z"
     out = price_three_sport_research([m], [q(stale, "OVER"), q(stale, "UNDER")],
                                      as_of=asof)["rows"][0]
-    assert out["status"] == "WATCH_QUOTE_NOT_CURRENT"
-    assert out["quote_status"] == "STALE_QUOTE"
+    assert out["status"] == "NO_MODEL_OR_MARKET"
+    assert out["reason"] == "QUOTE_OVER_300S_REFUSED"
+    assert "ev_per_dollar" not in out
 
 
 # ---- Repair 4: as-of snapshots; no leakage of current-state sources. ----

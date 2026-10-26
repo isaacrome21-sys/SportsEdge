@@ -116,8 +116,10 @@ def test_stale_screenshot_watches_not_bet():
     c=full([prop(captured="2026-10-11T19:00:00Z"),
             prop(side="UNDER",odds=-114,captured="2026-10-11T19:00:00Z")])
     assert len(c["prop_candidates"])==0
-    assert len(c["prop_watchlist"])==2
-    assert all(r["status"]=="WATCH_QUOTE_NOT_CURRENT" for r in c["prop_watchlist"])
+    assert len(c["prop_watchlist"])==0
+    assert len(c["prop_unpriced"])==2
+    assert all(r["reason"]=="QUOTE_OVER_300S_REFUSED" for r in c["prop_unpriced"])
+    assert all("ev_per_dollar" not in r for r in c["prop_unpriced"])
 
 
 def test_no_probable_or_wrong_name_no_probability():

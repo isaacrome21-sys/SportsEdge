@@ -84,7 +84,9 @@ def test_opposite_side_stale_blocks_actionability_even_when_our_side_is_fresh(sp
                 quote(sport, "UNDER", "2026-10-11T20:26:10Z"))
     assert row["paired_quote_skew_seconds"] == 105.0
     assert row["status"] == "WATCH_QUOTE_NOT_CURRENT"
-    assert row["quote_status"] == "STALE_QUOTE"
+    assert row["quote_status"] == "RESEARCH_AGED_QUOTE_150_TO_300S"
+    assert row["research_only"] is True
+    assert row["staking_authority"] is False
 
 
 @pytest.mark.parametrize("sport", ["MLB", "NFL", "CFB"])
