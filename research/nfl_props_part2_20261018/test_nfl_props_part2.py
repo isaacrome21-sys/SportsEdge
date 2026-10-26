@@ -444,6 +444,7 @@ def test_cmd_price_model_failure_aborts_and_commits_nothing(tmp_path, monkeypatc
             [(1, 200.0), (2, 220.0), (3, 240.0), (4, 260.0)]))
     monkeypatch.setattr(pricing, "load_evaluator", lambda: stub)
     monkeypatch.setattr(pricing, "check_training_pins", lambda data: {})
+    monkeypatch.setattr(pricing, "check_b8_active_runtime", lambda data, ev: {})
     monkeypatch.setattr(pricing, "train_cv", lambda ev, data, cfg: 0.35)
     data_dir = tmp_path / "data"
     data_dir.mkdir()
@@ -534,6 +535,68 @@ def test_b8_repin_spec_hashes_registry():
     for name, h in B8_FROZEN_OTHER_PINS.items():
         assert want[name] == h, name
     assert set(want) == set(B8_FROZEN_OTHER_PINS) | {B8_CORRECTED_NAME}
+
+
+def test_b8_runtime_guard_refuses_mixed_or_missing_2025_before_evaluator(tmp_path):
+    import types
+
+    calls = []
+    ev = types.SimpleNamespace(check_hashes=lambda path: calls.append(path) or {"pin": "ok"})
+    corrected = tmp_path / "sp_2025_played_v2.csv.gz"
+    legacy = tmp_path / "sp_2025.csv.gz"
+    with pytest.raises(SystemExit, match="B8_RUNTIME_CORRECTED_2025_FILE_SET_REQUIRED"):
+        pricing.check_b8_active_runtime(tmp_path, ev)
+    assert calls == []
+
+    corrected.write_bytes(b"test-only corrected fixture")
+    legacy.write_bytes(b"obsolete file")
+    with pytest.raises(SystemExit, match="B8_RUNTIME_LEGACY_2025_FILE_FORBIDDEN"):
+        pricing.check_b8_active_runtime(tmp_path, ev)
+    assert calls == []
+
+    legacy.unlink()
+    extra = tmp_path / "sp_2025_copy.csv.gz"
+    extra.write_bytes(b"duplicate season file")
+    with pytest.raises(SystemExit, match="B8_RUNTIME_CORRECTED_2025_FILE_SET_REQUIRED"):
+        pricing.check_b8_active_runtime(tmp_path, ev)
+    assert calls == []
+    extra.unlink()
+    assert pricing.check_b8_active_runtime(tmp_path, ev) == {"pin": "ok"}
+    assert calls == [tmp_path]
+
+
+def test_b8_runtime_guard_propagates_full_evaluator_hash_refusal(tmp_path):
+    import types
+
+    (tmp_path / "sp_2025_played_v2.csv.gz").write_bytes(b"wrong hash")
+
+    def refuse(_path):
+        raise SystemExit("data hash mismatch sp_2025_played_v2.csv.gz")
+
+    ev = types.SimpleNamespace(check_hashes=refuse)
+    with pytest.raises(SystemExit, match="data hash mismatch sp_2025_played_v2"):
+        pricing.check_b8_active_runtime(tmp_path, ev)
+
+
+def test_b8_runtime_gate_fails_before_commit_or_model_load(tmp_path, monkeypatch):
+    import types
+
+    calls = []
+    ev = types.SimpleNamespace(
+        check_hashes=lambda directory: calls.append("hash") or {},
+        load=lambda directory: calls.append("load"),
+    )
+    monkeypatch.setattr(pricing, "load_evaluator", lambda: ev)
+    monkeypatch.setattr(pricing, "check_training_pins", lambda directory: {})
+    out = tmp_path / "uncreated"
+    args = types.SimpleNamespace(
+        player_data=str(tmp_path), capture=str(tmp_path / "missing.json"),
+        out_dir=str(out),
+    )
+    with pytest.raises(SystemExit, match="B8_RUNTIME_CORRECTED_2025_FILE_SET_REQUIRED"):
+        pricing.cmd_price(args)
+    assert calls == []
+    assert not out.exists()
 
 
 def test_b8_repin_leaves_evaluator_pin_untouched():
