@@ -165,3 +165,22 @@ def test_boolean_capture_span_refused():
     result = audit([row(capture_span_seconds=True)])
     assert result["quote_evidence_tiers"] == {"REFUSED": 1}
     assert result["findings"][0]["code"] == "CAPTURE_SPAN_OUT_OF_RANGE"
+
+
+@pytest.mark.parametrize("updates", [
+    {"sportsbook": "OTHER"},
+    {"capture_span_seconds": 301},
+    {"capture_span_seconds": 180},
+    {"close_captured_at": None},
+])
+def test_illinois_exclusion_takes_precedence_over_other_quote_errors(updates):
+    result = audit([row(sport="CBB", illinois_college=True, **updates)])
+    assert result["quote_evidence_tiers"] == {"REFUSED": 1}
+    assert result["findings"][0]["code"] == "ILLINOIS_COLLEGE_EXCLUDED"
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_nonfinite_alternate_line_cannot_create_distinct_identity(bad):
+    result = audit([row(line=bad), row()])
+    assert result["settled_rows"] == 1
+    assert result["findings"][0]["code"] == "INVALID_IDENTITY"
