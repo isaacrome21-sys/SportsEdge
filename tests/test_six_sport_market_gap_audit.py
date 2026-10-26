@@ -50,6 +50,16 @@ class MarketGapTests(unittest.TestCase):
     def test_never_claim_complete(self): self.assertFalse(audit_market_gaps(self.root)["complete_market_coverage"])
     def test_never_claim_price(self): self.assertTrue(all(not r["priced"] for r in audit_market_gaps(self.root)["market_rows"]))
     def test_never_claim_production(self): self.assertTrue(all(not r["production_eligible"] for r in audit_market_gaps(self.root)["market_rows"]))
+    def test_nonobject_sport_entry_refused(self):
+        self.write("config/run_it_surface.json", {"sports": {"NFL": None}})
+        with self.assertRaisesRegex(ValueError, "RUN_IT_SPORT_ENTRY_NOT_OBJECT:NFL"):
+            audit_market_gaps(self.root)
+
+    def test_nonliteral_nhl_key_refused(self):
+        self.write_text("sportsedge/sports/nhl/market_capabilities.py", "_CAPABILITIES = {dynamic_key: object()}\\n".replace("\\n", "\n"))
+        with self.assertRaisesRegex(ValueError, "NHL_CAPABILITY_KEYS_INVALID"):
+            audit_market_gaps(self.root)
+
     def test_missing_football_catalog_refused(self):
         (self.root / "config/football_market_surface.json").unlink()
         with self.assertRaisesRegex(ValueError, "SOURCE_MISSING_OR_INVALID"):
