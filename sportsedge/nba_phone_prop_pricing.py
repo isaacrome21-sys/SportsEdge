@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import csv
 import glob
+import math
 import os
 import re
 import unicodedata
@@ -171,7 +172,7 @@ def _american_to_decimal(odds):
         value = float(str(odds).strip())
     except (TypeError, ValueError):
         return None
-    if value == 0:
+    if not math.isfinite(value) or value == 0:
         return None
     return 1.0 + (value / 100.0 if value > 0 else 100.0 / abs(value))
 
