@@ -34,5 +34,25 @@ class PostgameAuditTests(unittest.TestCase):
     def test_invalid_row(self): self.assertEqual(audit([None])["findings"][0][1], "INVALID_ROW")
 
 
+    def test_conflicting_outcomes_quarantine_both(self):
+        result = audit([BASE, {**BASE, "status": "LOSS"}])
+        self.assertEqual(result["accepted"], 0)
+        self.assertEqual(result["profit_units"], "0")
+        self.assertEqual([x[1] for x in result["findings"]], ["CONFLICTING_SETTLEMENT"] * 2)
+    def test_conflicting_prices_quarantine_both(self):
+        result = audit([BASE, {**BASE, "american_odds": 120}])
+        self.assertEqual(result["accepted"], 0)
+    def test_conflicting_stakes_quarantine_both(self):
+        self.assertEqual(audit([BASE, {**BASE, "stake": 2}])["accepted"], 0)
+    def test_conflicting_three_rows_do_not_reinstate(self):
+        self.assertEqual(audit([BASE, {**BASE, "status": "LOSS"}, BASE])["accepted"], 0)
+    def test_unhashable_identity_is_a_finding(self):
+        result = audit([{**BASE, "selection_id": ["s1"]}])
+        self.assertEqual(result["findings"][0][1], "INVALID_SELECTION_IDENTITY")
+    def test_invalid_later_row_does_not_quarantine_valid(self):
+        self.assertEqual(audit([BASE, {**BASE, "status": "PENDING"}])["accepted"], 1)
+    def test_same_identity_different_sport_quarantined(self):
+        self.assertEqual(audit([BASE, {**BASE, "sport": "NBA"}])["accepted"], 0)
+
 if __name__ == "__main__":
     unittest.main()
