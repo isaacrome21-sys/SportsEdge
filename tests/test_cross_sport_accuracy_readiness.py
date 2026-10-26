@@ -32,6 +32,24 @@ def test_word_frozen_inside_not_frozen_does_not_start_clock(tmp_path):
     assert _status(row, name="draft", root=tmp_path) == "DRAFT_NOT_FROZEN"
 
 
+def test_first_inning_sides_share_existing_draft_without_promotion():
+    report = accuracy_readiness()
+    sides = [r for r in report["canonical_markets"]
+             if r["sport"] == "MLB" and r["market"] in ("NRFI", "YRFI")]
+    assert len(sides) == 2
+    for row in sides:
+        assert row["forward_test_config"] == "mlb_first_inning_run.json"
+        assert row["readiness"] == "RESEARCH_PRICED_NOT_VALIDATED"
+        assert row["validated_accuracy_in_this_audit"] is False
+        assert row["play_authority_from_readiness"] is False
+    configs = [r for r in report["forward_family_configs"]
+               if r["family"] == "FIRST_INNING_RUN"]
+    assert len(configs) == 1
+    assert configs[0]["state"] == "DRAFT_NOT_FROZEN"
+    assert report["canonical_missing_forward_config_count"] == sum(
+        row["forward_test_config"] is None for row in report["canonical_markets"])
+
+
 def test_frozen_identity_requires_exact_prereg_sha(tmp_path):
     path = Path("frozen.md")
     original = b"frozen text with no retrospective edits\n"

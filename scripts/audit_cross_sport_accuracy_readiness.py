@@ -113,8 +113,9 @@ def accuracy_readiness(*, root: Path = ROOT) -> dict:
         key = (sport.upper(), market.upper())
         config = family_by_market.get(key)
         if key == ("MLB", "NRFI") or key == ("MLB", "YRFI"):
-            # Two sides of one frozen-boundary first-inning test family.
-            config = family_by_market.get(("MLB", "FIRST_INNING_RUN"))
+            # Two sides of one first-inning test market. This index uses
+            # market keys, not the distinct FIRST_INNING_RUN family name.
+            config = family_by_market.get(("MLB", "NRFI_YRFI"))
         canonical_rows.append({
             "sport": sport, "market": market, "pricing_path": state,
             "blocker": resolution.get("blocker"),
