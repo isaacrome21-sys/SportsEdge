@@ -229,3 +229,11 @@ class PrequoteContextWorkflowTests(unittest.TestCase):
             staged = subprocess.check_output(['git', 'diff', '--cached', '--name-only'], cwd=repo, text=True)
             self.assertIn(archived, staged)
             self.assertIn('runtime/mlb-prop-pit/props_test.json', staged)
+
+
+class ArchiveAuthorizationTests(unittest.TestCase):
+    def test_archive_mutation_requires_main_ref(self):
+        workflow = (SCRIPT.parent.parent / '.github/workflows/mlb-prop-pit-archive.yml').read_text()
+        archive_job = workflow.split('\n  archive:\n', 1)[1].split('\n  ', 1)[0]
+        self.assertIn("github.ref == 'refs/heads/main'", archive_job)
+        self.assertIn("github.event_name != 'pull_request'", archive_job)
