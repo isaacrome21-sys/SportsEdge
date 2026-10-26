@@ -31,6 +31,28 @@ def _utc(value: Any, code: str) -> datetime:
     return stamp.astimezone(timezone.utc)
 
 
+
+def _american_odds(value: Any, code: str) -> int | None:
+    """Keep exact bookmaker American prices; never coerce bool/float/zero."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise MLBCaptureLogError(code)
+    if isinstance(value, int):
+        odds = value
+    elif isinstance(value, str):
+        raw = value.strip()
+        digits = raw.lstrip("+-")
+        if not digits or not digits.isascii() or not digits.isdigit():
+            raise MLBCaptureLogError(code)
+        odds = int(raw)
+    else:
+        raise MLBCaptureLogError(code)
+    if -99 <= odds <= 99:
+        raise MLBCaptureLogError(code)
+    return odds
+
+
 @dataclass(frozen=True)
 class MLBCapturedGameRow:
     game_id: str
@@ -115,10 +137,10 @@ def record_capture(row: Mapping[str, Any]) -> MLBCapturedGameRow:
             postseason=row.get("postseason"),
         ),
         intake_line=None if row.get("intake_line", row.get("line")) is None else float(row.get("intake_line", row.get("line"))),
-        intake_american=None if row.get("intake_american", row.get("american_odds")) is None else int(row.get("intake_american", row.get("american_odds"))),
+        intake_american=_american_odds(row.get("intake_american", row.get("american_odds")), "INTAKE_AMERICAN_INVALID"),
         intake_retrieved_at=intake_at.isoformat().replace("+00:00","Z"),
         close_line=None if row.get("close_line") is None else float(row["close_line"]),
-        close_american=None if row.get("close_american") is None else int(row["close_american"]),
+        close_american=_american_odds(row.get("close_american"), "CLOSE_AMERICAN_INVALID"),
         close_retrieved_at=None if close_at is None else close_at.isoformat().replace("+00:00","Z"),
         estimate_p=estimate,
         model_reliability=rel,
