@@ -122,6 +122,8 @@ def collect_completed_games(
     for index, game_id in enumerate(game_ids, start=1):
         url = BOXSCORE_ENDPOINT.format(game_id=game_id)
         try:
+            if raw_archive_dir is None:
+                raise ValueError("NHL_RAW_ARCHIVE_REQUIRED:live_receipt")
             payload, raw, captured_at = fetcher(url)
             # The live Gamecenter boxscore carries no period scoring; the
             # companion landing payload does. Fetch it so live-shape receipts
@@ -139,8 +141,7 @@ def collect_completed_games(
                 landing_raw_sha256=raw_sha256(landing_raw),
                 landing_captured_at=landing_captured_at,
             )
-            if raw_archive_dir is not None:
-                archive_pair(raw_archive_dir, receipt, raw, landing_raw)
+            archive_pair(raw_archive_dir, receipt, raw, landing_raw)
             games.append(receipt)
         except Exception as exc:  # retain explicit per-game failure evidence
             failures.append((game_id, f"{type(exc).__name__}: {exc}"))

@@ -252,7 +252,7 @@ def test_live_shape_bad_landing_receipt_refused(changes, reason):
         _live_receipt(**changes)
 
 
-def test_collector_binds_exact_companion_bytes_and_capture_timestamp():
+def test_collector_binds_exact_companion_bytes_and_capture_timestamp(tmp_path):
     from scripts.collect_nhl_official_boxscores import collect_completed_games
     boxscore, landing = _live_payloads()
     box_bytes = json.dumps(boxscore, separators=(",", ":")).encode()
@@ -267,7 +267,8 @@ def test_collector_binds_exact_companion_bytes_and_capture_timestamp():
             return landing, landing_bytes, "2026-10-26T15:00:01Z"
         raise AssertionError(url)
 
-    games, failures = collect_completed_games(("2026020168",), fetcher=fetcher, sleep_seconds=0)
+    games, failures = collect_completed_games(("2026020168",), fetcher=fetcher,
+                                              sleep_seconds=0, raw_archive_dir=tmp_path)
     assert failures == [] and len(games) == 1
     assert seen == [BOXSCORE_ENDPOINT.format(game_id="2026020168"), LANDING_ENDPOINT.format(game_id="2026020168")]
     assert games[0].source_raw_sha256 == raw_sha256(box_bytes)
@@ -275,7 +276,25 @@ def test_collector_binds_exact_companion_bytes_and_capture_timestamp():
     assert games[0].landing_captured_at == "2026-10-26T15:00:01Z"
 
 
-def test_collector_quarantines_cross_game_landing():
+
+def test_live_collector_without_archive_refuses_before_fetch():
+    from scripts.collect_nhl_official_boxscores import collect_completed_games
+    calls = []
+
+    def fetcher(url):
+        calls.append(url)
+        raise AssertionError("network must not be called without raw archive")
+
+    games, failures = collect_completed_games(("2026020168",), fetcher=fetcher,
+                                              sleep_seconds=0)
+    assert games == []
+    assert len(failures) == 1
+    assert failures[0][0] == "2026020168"
+    assert "NHL_RAW_ARCHIVE_REQUIRED:live_receipt" in failures[0][1]
+    assert calls == []
+
+
+def test_collector_quarantines_cross_game_landing(tmp_path):
     from scripts.collect_nhl_official_boxscores import collect_completed_games
     boxscore, landing = _live_payloads()
     landing["id"] = 2026029999
@@ -284,6 +303,7 @@ def test_collector_quarantines_cross_game_landing():
         data = boxscore if url.endswith("/boxscore") else landing
         return data, json.dumps(data).encode(), "2026-10-26T15:00:00Z"
 
-    games, failures = collect_completed_games(("2026020168",), fetcher=fetcher, sleep_seconds=0)
+    games, failures = collect_completed_games(("2026020168",), fetcher=fetcher,
+                                              sleep_seconds=0, raw_archive_dir=tmp_path)
     assert games == [] and len(failures) == 1
     assert "landing/boxscore game identity mismatch:id" in failures[0][1]
