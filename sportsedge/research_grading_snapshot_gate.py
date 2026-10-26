@@ -75,4 +75,6 @@ def audit_grading_snapshots(*, entry, close, selection, evaluated_at, event_star
         return {**result, "reason": "INVALID_CLOSE_TIME"}
     if closing_time <= capture or closing_time >= start:
         return {**result, "reason": "CLOSE_NOT_DISTINCT_LATER_PRESTART"}
+    if admission != "ELIGIBLE_QUOTE":
+        return {**result, "reason": "RESEARCH_AGED_QUOTE_NOT_FORWARD_ELIGIBLE"}
     return {**result, "clv_ready": True, "reason": "SEPARATE_PREGAME_CLOSE_CONFIRMED"}
