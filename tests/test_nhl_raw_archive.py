@@ -104,3 +104,13 @@ def test_collector_quarantines_failed_archive_without_receipt(tmp_path: Path, mo
                                                         sleep_seconds=0, raw_archive_dir=tmp_path)
     assert games == [] and len(failures) == 1
     assert "archive unavailable" in failures[0][1]
+
+
+def test_live_collector_without_raw_archive_refuses_before_fetch():
+    from scripts.collect_nhl_official_boxscores import collect_completed_games
+
+    def forbidden_fetch(_url):
+        raise AssertionError("collector should refuse before any HTTP fetch")
+
+    with pytest.raises(ValueError, match="NHL_RAW_ARCHIVE_DIR_REQUIRED"):
+        collect_completed_games(("2026020168",), fetcher=forbidden_fetch, sleep_seconds=0)
