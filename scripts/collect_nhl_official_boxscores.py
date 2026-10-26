@@ -117,6 +117,11 @@ def collect_completed_games(
     sleep_seconds: float = 0.05,
     raw_archive_dir: Path | None = None,
 ) -> tuple[list[NHLOfficialCompletedGame], list[tuple[str, str]]]:
+    # Configuration is a slate-level prerequisite, not a per-game source fault.
+    # Without it, a direct library caller could admit live2 receipts whose
+    # exact original source bytes were never archived.
+    if raw_archive_dir is None:
+        raise ValueError("NHL_RAW_ARCHIVE_DIR_REQUIRED")
     games: list[NHLOfficialCompletedGame] = []
     failures: list[tuple[str, str]] = []
     for index, game_id in enumerate(game_ids, start=1):
@@ -139,8 +144,7 @@ def collect_completed_games(
                 landing_raw_sha256=raw_sha256(landing_raw),
                 landing_captured_at=landing_captured_at,
             )
-            if raw_archive_dir is not None:
-                archive_pair(raw_archive_dir, receipt, raw, landing_raw)
+            archive_pair(raw_archive_dir, receipt, raw, landing_raw)
             games.append(receipt)
         except Exception as exc:  # retain explicit per-game failure evidence
             failures.append((game_id, f"{type(exc).__name__}: {exc}"))
