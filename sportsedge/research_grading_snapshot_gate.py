@@ -24,12 +24,16 @@ def _valid_snapshot(snapshot, selection):
     # The source contract ID must encode period, selection pair and exact line.
     if not isinstance(snapshot["contract_id"], str) or not snapshot["contract_id"].strip():
         return False
+    # Non-string market values must not bypass family-specific side validation.
+    market = snapshot["market"]
+    if not isinstance(market, str) or not market.strip():
+        return False
     offers = snapshot["offers"]
     if not isinstance(offers, dict) or len(offers) != 2 or selection not in offers:
         return False
     # A two-sided total is specifically OVER vs UNDER; two arbitrary labels
     # must not satisfy the paired-quote or CLV gate.
-    if snapshot["market"] == "total" and set(offers) != {"OVER", "UNDER"}:
+    if "TOTAL" in market.strip().upper() and set(offers) != {"OVER", "UNDER"}:
         return False
     for value in offers.values():
         try:

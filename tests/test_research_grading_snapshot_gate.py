@@ -98,6 +98,29 @@ class SnapshotGateTests(unittest.TestCase):
         close = {**entry, "snapshot_id": "close-2", "captured_at": "2026-10-25T12:04:00-05:00"}
         self.assertTrue(check(entry=entry, close=close, selection="HOME")["clv_ready"])
 
+    def test_uppercase_total_wrong_entry_pair_refused(self):
+        bad = {**ENTRY, "market": "TOTAL", "offers": {"OVER": -110, "DRAW": +150}}
+        self.assertEqual(check(entry=bad, close={**CLOSE, "market": "TOTAL", "offers": bad["offers"]})["admission"], "REFUSED")
+
+    def test_team_total_wrong_pair_refused(self):
+        bad = {**ENTRY, "market": "Team_Total", "offers": {"OVER": -110, "DRAW": +150}}
+        self.assertEqual(check(entry=bad, close={**CLOSE, "market": "Team_Total", "offers": bad["offers"]})["admission"], "REFUSED")
+
+    def test_period_total_wrong_pair_refused(self):
+        bad = {**ENTRY, "market": "first_half_total", "offers": {"OVER": -110, "DRAW": +150}}
+        self.assertEqual(check(entry=bad, close={**CLOSE, "market": "first_half_total", "offers": bad["offers"]})["admission"], "REFUSED")
+
+    def test_uppercase_total_valid_pair_still_eligible(self):
+        self.assertTrue(check(entry={**ENTRY, "market": "TOTAL"}, close={**CLOSE, "market": "TOTAL"})["clv_ready"])
+
+    def test_spread_pair_unaffected_by_total_guard(self):
+        entry = {**ENTRY, "market": "spread", "offers": {"HOME": -110, "AWAY": -110}}
+        close = {**CLOSE, "market": "spread", "offers": entry["offers"]}
+        self.assertTrue(check(entry=entry, close=close, selection="HOME")["clv_ready"])
+
+    def test_nonstring_market_refused(self):
+        self.assertEqual(check(entry={**ENTRY, "market": {"name": "total"}})["admission"], "REFUSED")
+
     def test_no_ev_output(self):
         self.assertTrue(set(check()).isdisjoint({"ev", "model_probability", "clv"}))
 
