@@ -99,6 +99,20 @@ def check_training_pins(data: Path) -> dict:
     return pins
 
 
+def check_b8_active_runtime(data: Path, evaluator) -> dict:
+    """Require a single corrected 2025 input in the active pricing directory.
+
+    This runs before evaluator.load: a legacy 2025 file alongside B8 would
+    otherwise be silently double-loaded by the evaluator's sp_* glob.
+    """
+    if (data / "sp_2025.csv.gz").exists():
+        raise SystemExit("B8_RUNTIME_LEGACY_2025_FILE_FORBIDDEN")
+    season_files = sorted(path.name for path in data.glob("sp_2025*.csv.gz"))
+    if season_files != ["sp_2025_played_v2.csv.gz"]:
+        raise SystemExit("B8_RUNTIME_CORRECTED_2025_FILE_SET_REQUIRED")
+    return evaluator.check_hashes(data)
+
+
 def train_cv(ev, data_by_season: dict, cfg: dict) -> float:
     """Per-market pooled CV from the training seasons — the evaluator's own
     arithmetic (the training block of evaluate() in the Part 1 evaluator),
@@ -444,6 +458,7 @@ def cmd_price(args) -> int:
     ev = load_evaluator()
     data_dir = Path(args.player_data)
     pins = check_training_pins(data_dir)
+    check_b8_active_runtime(data_dir, ev)
     data_by_season = ev.load(data_dir)
     capture = json.loads(Path(args.capture).read_text())
     season = int(capture["season"])
