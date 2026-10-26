@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import inspect
 import json
 import math
 import tempfile
@@ -87,6 +88,8 @@ class CfbConvergedViabilityTests(unittest.TestCase):
         self.assertLess(projections[-1].iterations, candidate.ITERATIONS)
 
     def test_proposed_market_cap_is_not_a_screen_input(self):
+        self.assertEqual(list(inspect.signature(candidate.proposed_market_anchor).parameters),
+                         ["raw", "observed_entry_line"])
         self.assertEqual(candidate.proposed_market_anchor(20, 0), 4)
         self.assertEqual(candidate.proposed_market_anchor(-20, 0), -4)
         with self.assertRaisesRegex(ValueError, "NONFINITE_ANCHOR"):

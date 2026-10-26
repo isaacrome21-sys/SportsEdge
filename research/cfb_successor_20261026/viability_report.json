@@ -47,8 +47,8 @@
     }
   },
   "code_sha256": {
-    "converged_successor.py": "2bf69bd70ebc15cb1a5d64a3443b61393c2008e3031c07ff8323d3e127dbc031",
-    "evaluate_cfb_converged_viability.py": "357c50c3cb0198efca3caddfefc6143811c7d05559481770fecf4a87db61f46e"
+    "converged_successor.py": "08d6f3891330d481b94cf80d478b863616c52806669118a7022693832b2d107c",
+    "evaluate_cfb_converged_viability.py": "e98fab5356bd270d2b97969a6ef2b34a55825512f0e3d5bbd75f209ad69b01f6"
   },
   "source_population": {
     "completed_result_rows": 11352,
@@ -57,6 +57,10 @@
     "published_close_rows": 2835,
     "published_scoreable_spread_rows": 2781,
     "published_scoreable_total_rows": 2781,
+    "missing_home_division": 54,
+    "missing_away_division": 161,
+    "missing_either_division": 210,
+    "non_fbs_fbs_with_known_divisions": 8744,
     "fbs_fbs_before_week5": 739,
     "fbs_fbs_week5_plus": 1659,
     "week5_plus_insufficient_prior_history": 58

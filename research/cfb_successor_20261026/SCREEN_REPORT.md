@@ -18,8 +18,10 @@ point cap. Only FBS-vs-FBS completed games with kickoff +24h embargo
 Week 5 with at least three qualifying prior games for each team.
 
 The raw predictions use **no market line**. A separate proposed post-freeze
-market anchor has a hard 4-point disagreement limit, but is **not used** in
-the viability screen and carries no pricing authority. Historical point-in-time
+market anchor has a hard 4-point disagreement limit and would require an
+independently timestamped current entry quote (never the hindsight close),
+but is **not used** in the viability screen and carries no pricing authority.
+Historical point-in-time
 backup-QB change receipts were unavailable: that signal is NOT EVALUATED;
 no invented replacement-QB adjustments were entered.
 
@@ -55,6 +57,11 @@ was manufactured. The stacked SDV integrity repairs are applied.
 This is a selected, Week-5+ FBS/FBS population, **not** a 2,781-game full-slate
 headline. Partial 2026 and biased historical 2012–2022 odds strata do not
 enter the design screen.
+
+Of 8,954 excluded non-FBS/FBS result rows, 210 lacked at least one division
+label (54 missing home, 161 missing away, with 5 overlapping); the other
+8,744 carry known FCS/II/III divisional labels. None of the source's
+2,781 scoreable published-close rows has a missing division label.
 
 ## Measured result against the published close
 

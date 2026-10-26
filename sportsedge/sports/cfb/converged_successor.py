@@ -160,12 +160,17 @@ def project_season(games: Iterable[Game]) -> list[Projection]:
     return projections
 
 
-def proposed_market_anchor(raw: float, close: float) -> float:
+def proposed_market_anchor(raw: float, observed_entry_line: float) -> float:
     """Mathematical proposal only. Never called by the raw viability screen.
 
     Actual issuance is separately forbidden until a future freeze/forward
-    evaluation authorizes a versioned market pricer.
+    evaluation authorizes a versioned market pricer. A future caller would
+    require an independently timestamped *current entry quote*, never an
+    ex-post historical closing line.
     """
-    if not math.isfinite(raw) or not math.isfinite(close):
+    if not math.isfinite(raw) or not math.isfinite(observed_entry_line):
         raise ValueError("CFB_SUCCESSOR_NONFINITE_ANCHOR")
-    return close + max(-MAX_MARKET_DISAGREEMENT, min(MAX_MARKET_DISAGREEMENT, raw - close))
+    return observed_entry_line + max(
+        -MAX_MARKET_DISAGREEMENT,
+        min(MAX_MARKET_DISAGREEMENT, raw - observed_entry_line),
+    )

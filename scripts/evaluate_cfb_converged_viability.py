@@ -165,6 +165,14 @@ def evaluate(data_dir: Path) -> tuple[dict, list[dict]]:
         "published_scoreable_spread_rows": int(sum(_bool(x) for x in closes.spread_scoreable)),
         "published_scoreable_total_rows": int(sum(_bool(x) for x in closes.total_scoreable)),
     }
+    home_missing = results.home_division.isna()
+    away_missing = results.away_division.isna()
+    missing = home_missing | away_missing
+    source_counts["missing_home_division"] = int(home_missing.sum())
+    source_counts["missing_away_division"] = int(away_missing.sum())
+    source_counts["missing_either_division"] = int(missing.sum())
+    source_counts["non_fbs_fbs_with_known_divisions"] = (
+        source_counts["result_non_fbs_fbs_excluded"] - int(missing.sum()))
     source_counts["fbs_fbs_before_week5"] = int((
         (results.home_division == "fbs") & (results.away_division == "fbs")
         & (results.week < FIRST_ELIGIBLE_WEEK)
