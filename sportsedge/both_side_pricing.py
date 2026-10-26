@@ -8,6 +8,7 @@ unpriced.
 """
 from __future__ import annotations
 
+from math import isfinite
 from typing import Any, Mapping
 
 
@@ -16,9 +17,9 @@ def _number(value: Any) -> float | None:
         return None
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
-    if number != number:
+    if not isfinite(number):
         return None
     return number
 
@@ -26,6 +27,8 @@ def _number(value: Any) -> float | None:
 def _half_line(value: Any) -> bool:
     number = _number(value)
     if number is None:
+        return False
+    if not isfinite(number * 2.0):
         return False
     doubled = round(number * 2.0)
     return abs(number * 2.0 - doubled) < 1e-9 and int(doubled) % 2 == 1
@@ -117,7 +120,9 @@ def attach_sibling_quotes(rows, *, group_key, side_of):
             if other is row or group_key(other) != key:
                 continue
             other_side = side_of(other)
-            if not other_side or other_side == side or other.get("american_odds") is None:
+            if not _opposing_sides(str(side).upper(), str(other_side).upper()):
+                continue
+            if not _valid_quote_odds(other.get("american_odds")):
                 continue
             matches.append(other)
         if len(matches) != 1:
@@ -131,3 +136,19 @@ def attach_sibling_quotes(rows, *, group_key, side_of):
         if row.get("count_pmf") is None and sibling.get("count_pmf") is not None:
             row["count_pmf"] = sibling.get("count_pmf")
     return material
+
+
+def _opposing_sides(first: str, second: str) -> bool:
+    return {first, second} in ({"OVER", "UNDER"}, {"HOME", "AWAY"}, {"YES", "NO"}, {"YES", "FIELD"})
+
+
+def _valid_quote_odds(value: Any) -> bool:
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return abs(value) >= 100
+    if isinstance(value, str):
+        text = value.strip()
+        if text.lstrip("+-").isdigit():
+            return abs(int(text)) >= 100
+    return False

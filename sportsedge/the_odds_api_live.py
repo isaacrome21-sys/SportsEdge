@@ -7,8 +7,10 @@ authority until a separately validated live engine exists.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import json
+import re
+from datetime import datetime, timezone
+from math import isfinite
 from typing import Any, Callable, Iterable, Mapping
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -158,12 +160,22 @@ def normalize_event(
                 selection = str(outcome.get("name") or "").strip()
                 if not selection:
                     continue
-                try:
-                    price = int(outcome.get("price"))
-                except (TypeError, ValueError) as exc:
-                    raise TheOddsApiError("AMERICAN_ODDS_INVALID") from exc
+                price_raw = outcome.get("price")
+                if type(price_raw) is int:
+                    price = price_raw
+                elif isinstance(price_raw, str) and re.fullmatch(r"[+-]?\d+", price_raw.strip()):
+                    price = int(price_raw.strip())
+                else:
+                    raise TheOddsApiError("AMERICAN_ODDS_INVALID")
+                if abs(price) < 100:
+                    raise TheOddsApiError("AMERICAN_ODDS_INVALID")
                 point_raw = outcome.get("point")
-                point = None if point_raw is None else float(point_raw)
+                try:
+                    point = None if point_raw is None else float(point_raw)
+                except (TypeError, ValueError, OverflowError) as exc:
+                    raise TheOddsApiError("POINT_INVALID") from exc
+                if point is not None and not isfinite(point):
+                    raise TheOddsApiError("POINT_INVALID")
                 quotes.append(
                     MarketQuote(
                         provider="THE_ODDS_API",
