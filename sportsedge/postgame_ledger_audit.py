@@ -122,8 +122,12 @@ def audit(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
             findings.append({"row": index, "code": "INVALID_IDENTITY"})
             continue
         # Line differentiates genuine alternate markets at the same event.
+        line = None if row.get("line") is None else Decimal(str(row["line"]))
+        if line is not None and (not line.is_finite() or abs(line) > 10000):
+            findings.append({"row": index, "code": "INVALID_IDENTITY"})
+            continue
         key = (row["sport"], row["event_id"], row["market"],
-               row["selection_id"], row["model_version"], row.get("line"))
+               row["selection_id"], row["model_version"], line)
         if key in seen:
             findings.append({"row": index, "code": "DUPLICATE_SELECTION"})
             continue
