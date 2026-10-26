@@ -22,6 +22,6 @@
  "capture_scope": "IN_SPEC",
  "capture_note": "Capture Spec V1 NBA scope: game lines + PTS/REB/AST + common combos, entry and close, from the twice-daily DraftKings capture jobs live since Oct 19, 2026. V2 boundary (V2 prereg sec. 10): counting starts at zero at the V2 freeze; the first countable slate is the first slate priced after the freeze with a per-slate store passing S1-S6; every row before the freeze is research, never counted, and is never backfilled. PRA counts only on slates where combo lines were actually captured (prereg sec. 2): a PRA row without a captured two-sided combo quote is not an entry -- at entry the paired-quote admission refuses it, and at close a one-sided combo quote yields CLOSE_SINGLE_SIDED.",
  "prereg": "research/nba_props_forward_20261020/PREREG_NBA_PROPS_FORWARD_V2.md",
- "prereg_sha256": "237e7836e5025a5241a9ae5a381cb0f264b1ada065403f6215f190946f3ce0e6",
+ "prereg_sha256": "9a20c19193095ebb9f93b12fae3877465b81f91682427ba2770e60ebe5b3b944",
  "picked_beats_passed_required": true
 }

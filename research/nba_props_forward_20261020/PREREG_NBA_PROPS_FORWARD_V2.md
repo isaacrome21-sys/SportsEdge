@@ -477,9 +477,11 @@ counting, which the held freeze forbids.
   receipt `NBA_PROP_STORE_LOADED`, **0 store-blocked**; Run A (Oct 21
   board) counts identical to §9.1's S1 (1,130 / 12); Run B (Oct 25
   PM) 554 / 28 vs 556 / 26 — a proof-driver name-resolution
-  difference only (two capture names resolve solely via players
-  whose only store presence was an Oct 25 game, absent from a
-  history-truncated store by construction).
+  difference only, reproduced and bounded in §9.3: exactly two
+  side rows differ — the OVER/UNDER rows of one capture entry,
+  token 'Black' (ORL@NYK points), resolving solely via a player
+  whose only store presence is the slate-date game itself,
+  absent from a history-truncated store by construction.
 - **Prospective slate (2026-10-26, pricing time 2026-10-26T12:00
   −05:00):** full history Oct 20–25 built from the live asset
   (43 games, 1,191 rows — the asset had ingested Oct 25 natively;
@@ -495,7 +497,67 @@ counting, which the held freeze forbids.
   earlier pull, as §4 anticipates). The summary-supplement fetch
   path did not trigger in either build (the asset covered every
   in-range game); the supplement transform is the same code that
-  produced the S5-verified Oct 25 supplement in §3.
+  produced the S5-verified Oct 25 supplement in §3. The
+  unexercised path is covered by a deterministic fixture
+  regression, and the machinery's supplement failure handling was
+  completed, in §9.3.
+
+### 9.3 Review-checklist closure (owner's disposition, 2026-10-26)
+
+Two items from the independent-review checklist, closed with
+evidence on branch `feat/nba-props-v2-evaluator-20261026`
+(tests: `tests/test_nba_props_v2_review_items_20261026.py` in the
+repo; the machinery-local copies live beside `slate_build.py` in
+its `test_slate_build.py`):
+
+1. **Run B two-row discrepancy — reproduced and bounded.** Both
+   count pairs reproduce from the saved artifacts under one
+   parameterized code path (Run A identical on both stores:
+   1,130 / 12; both Run B runs emit 582 outputs for 582 inputs).
+   A row-by-row diff of the two Run B outputs differs in
+   EXACTLY two rows: the OVER and UNDER rows of the single
+   ORL@NYK points entry for capture token 'Black' (line 8.5). In
+   the full store the token resolves to Anthony Black
+   (PLAYER_ID 4712849, ORL), whose sole store presence is game
+   401909863 on 2026-10-25 — the slate game itself — with 0 prior
+   games strictly before that date (engine probe: refusal with
+   `n_prior = 0`). In the truncated store he is absent by
+   construction. (The other store Black, Leaky Black of SAC, is
+   team-filtered out of this fixture in both stores and plays no
+   part.) Consequences, each test-pinned: (a) **counted
+   eligibility cannot change** — pricing the two rows four ways
+   (raw token vs the truncated store; force-resolved name vs the
+   truncated store; vs the full store; vs a store whose history
+   includes the slate game) refuses them every time
+   (`PLAYER_NOT_IN_STORE` or `INSUFFICIENT_PRIOR_GAMES` with
+   `n_prior = 0`), because a counted build's history is
+   [season start, slate date) and a player resolvable only
+   through a slate-date game has zero priors under any
+   resolution; (b) **no silent drop** — every unresolved capture
+   name appears as explicit `PLAYER_NOT_IN_STORE` refusal rows
+   (2 per unresolved entry), and those are all the
+   not-in-store rows in each run.
+2. **Supplement fetch path — deterministic regression.** The
+   path did not trigger in either live dry run (§9.2). It is now
+   covered by recorded-fixture tests (the fixture summary is
+   SYNTHETIC, built to the transform's expected schema — no
+   recorded Oct 25 summary response survives in the workspace):
+   an asset-missing scheduled game is supplemented, its raw
+   bytes archived with a manifest entry (URL, fetched_at, bytes,
+   sha256) like every other fetch, and its rows enter the store
+   with the correct game/date attribution (DNP rows zeroed).
+   Machinery change (minimal, in `slate_build.py`): a supplement
+   that could not be fetched or parsed previously aborted the
+   build; it now fails closed per game — the failure is recorded
+   in the manifest (`supplement_failures`), any partially added
+   rows are rolled back, fetched bytes stay archived marked
+   `UNPARSEABLE_SUPPLEMENT`, and the missing game fails S2,
+   which fails the positions gate and classifies the build
+   RESEARCH_ONLY. Tests pin all three failure shapes (missing,
+   malformed JSON, structurally broken) plus the verification
+   leg: supplement archive bytes tampered after the build fail
+   `verify_slate_build` closed (`RAW_HASH_MISMATCH` /
+   `RAW_SIZE_MISMATCH` → RESEARCH_ONLY).
 
 ---
 
@@ -589,7 +651,10 @@ row, **all four** must hold:
    *Mechanism (PREPARED + PROVEN 2026-10-26):* `slate_build.py`
    (§4) archives every fetch's raw bytes with its manifest entry,
    and `verify_slate_build` fails any defective build closed to
-   RESEARCH_ONLY (§9.2 dry runs). *Status: machinery proven;
+   RESEARCH_ONLY (§9.2 dry runs). The supplement fetch path —
+   unexercised in the live dry runs — is covered by a
+   deterministic fixture regression with fail-closed supplement
+   handling (§9.3). *Status: machinery proven;
    satisfied per slate at that slate's counted build, from the
    first counted slate forward. The Oct 26 research build's missing
    raw bytes (§9.1, S6) are historical and unrepairable — one more
