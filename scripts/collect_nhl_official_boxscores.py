@@ -28,6 +28,8 @@ from sportsedge.sports.nhl.official_boxscore_source import (
     raw_sha256,
 )
 
+from sportsedge.sports.nhl.raw_archive import archive_pair, verify_archive
+
 SCORE_ENDPOINT = "https://api-web.nhle.com/v1/score/{date}"
 USER_AGENT = "SportsEdge-NHL-Research/1.0 (+https://github.com/isaacrome21-sys/SportsEdge)"
 
@@ -113,6 +115,7 @@ def discover_completed_game_ids(
 def collect_completed_games(
     game_ids: tuple[str, ...], *, fetcher: Callable[[str], tuple[Mapping[str, Any], bytes, str]] = fetch_json,
     sleep_seconds: float = 0.05,
+    raw_archive_dir: Path | None = None,
 ) -> tuple[list[NHLOfficialCompletedGame], list[tuple[str, str]]]:
     games: list[NHLOfficialCompletedGame] = []
     failures: list[tuple[str, str]] = []
@@ -125,7 +128,7 @@ def collect_completed_games(
             # can be built; a landing failure fails this game closed.
             landing_url = LANDING_ENDPOINT.format(game_id=game_id)
             landing_payload, landing_raw, landing_captured_at = fetcher(landing_url)
-            games.append(build_official_completed_game(
+            receipt = build_official_completed_game(
                 payload=payload,
                 captured_at=captured_at,
                 raw_sha256=raw_sha256(raw),
@@ -135,7 +138,10 @@ def collect_completed_games(
                 landing_source_uri=landing_url,
                 landing_raw_sha256=raw_sha256(landing_raw),
                 landing_captured_at=landing_captured_at,
-            ))
+            )
+            if raw_archive_dir is not None:
+                archive_pair(raw_archive_dir, receipt, raw, landing_raw)
+            games.append(receipt)
         except Exception as exc:  # retain explicit per-game failure evidence
             failures.append((game_id, f"{type(exc).__name__}: {exc}"))
         if sleep_seconds > 0 and index < len(game_ids):
@@ -173,6 +179,8 @@ def main() -> int:
     parser.add_argument("--start-date", required=True, type=_parse_date)
     parser.add_argument("--end-date", required=True, type=_parse_date)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--raw-archive-dir", type=Path, default=None,
+                        help="Exact raw HTTP bytes archive (default: OUTPUT.raw/); never reconstruct historical bytes")
     parser.add_argument("--game-type", action="append", type=int, dest="game_types", help="Allowed NHL game type; repeatable (default: 2,3)")
     parser.add_argument("--sleep-seconds", type=float, default=0.05)
     parser.add_argument("--allow-partial", action="store_true", help="Exit 0 even when some boxscores fail; failures are still emitted")
@@ -182,6 +190,11 @@ def main() -> int:
     allowed = set(args.game_types or (2, 3))
     discovered = discover_completed_game_ids(args.start_date, args.end_date, allowed_game_types=allowed)
     existing = _load_existing(args.output)
+    raw_archive_dir = args.raw_archive_dir or args.output.with_name(args.output.name + ".raw")
+    # Never skip a prior live receipt whose original source bodies are missing.
+    for prior in existing.values():
+        if prior.source_version == "nhl-web-api-v1-live2":
+            verify_archive(raw_archive_dir, prior)
     pending = tuple(game_id for game_id in discovered if game_id not in existing)
     if args.max_games is not None:
         if args.max_games < 0:
@@ -189,7 +202,8 @@ def main() -> int:
         pending = pending[:args.max_games]
 
     print(f"discovered={len(discovered)} existing={len(existing)} pending={len(pending)}", file=sys.stderr)
-    collected, failures = collect_completed_games(pending, sleep_seconds=max(0.0, args.sleep_seconds))
+    collected, failures = collect_completed_games(
+        pending, sleep_seconds=max(0.0, args.sleep_seconds), raw_archive_dir=raw_archive_dir)
     for game in collected:
         existing[game.game_id] = game
     _write_jsonl(args.output, existing)
