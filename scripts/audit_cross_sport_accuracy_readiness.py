@@ -61,6 +61,16 @@ def _status(row: dict, *, name: str, root: Path) -> str:
         if row.get("prereg") or row.get("prereg_sha256"):
             raise AuditRefusal(f"DRAFT_CLAIMS_FROZEN_PIN:{name}")
         return "DRAFT_NOT_FROZEN"
+    if text.startswith("FINAL-CANDIDATE") and "NOT FROZEN" in text:
+        # A pinned final candidate is still NOT a freeze or a verdict.
+        # Unlike an unpinned draft, its exact document bytes are verified.
+        prereg, sha = row.get("prereg"), row.get("prereg_sha256")
+        if not isinstance(prereg, str) or not prereg:
+            raise AuditRefusal(f"FINAL_CANDIDATE_PREREG_MISSING:{name}")
+        if not isinstance(sha, str) or len(sha) != 64:
+            raise AuditRefusal(f"FINAL_CANDIDATE_SHA_MISSING:{name}")
+        _prereg(Path(prereg), root=root, expected_sha=sha)
+        return "FINAL_CANDIDATE_NOT_FROZEN"
     if text.startswith("FROZEN"):
         prereg, sha = row.get("prereg"), row.get("prereg_sha256")
         if not isinstance(prereg, str) or not prereg:
@@ -80,6 +90,7 @@ def accuracy_readiness(*, root: Path = ROOT) -> dict:
         raise AuditRefusal("NO_FORWARD_MARKET_CONFIGS")
     config_rows = []
     family_by_market = {}
+    first_config_by_market = {}
     for path in files:
         row = _read_json(path)
         state = _status(row, name=path.name, root=root)
@@ -94,8 +105,33 @@ def accuracy_readiness(*, root: Path = ROOT) -> dict:
         for market in markets:
             key = (sport.upper(), market.upper())
             if key in family_by_market:
-                raise AuditRefusal(f"DUPLICATE_FORWARD_MARKET_CONFIG:{sport}:{market}")
-            family_by_market[key] = path.name
+                # V2 is an explicitly pinned, additive source amendment to V1.
+                # Retain V1 as the canonical registration; never silently
+                # replace it or allow a second, drifted pricing contract.
+                prior, prior_state = first_config_by_market[key]
+                permitted_difference = {
+                    "status", "prereg", "prereg_sha256", "capture_note",
+                }
+                identical_terms = all(
+                    row.get(field) == prior.get(field)
+                    for field in set(row) | set(prior)
+                    if field not in permitted_difference
+                )
+                is_additive_v2 = (
+                    path.name == f"{Path(family_by_market[key]).stem}_v2.json"
+                    and prior_state == "FROZEN_NO_VERDICT_ATTACHED"
+                    and state in {
+                        "FINAL_CANDIDATE_NOT_FROZEN",
+                        "FROZEN_NO_VERDICT_ATTACHED",
+                    }
+                    and row.get("prereg") != prior.get("prereg")
+                    and identical_terms
+                )
+                if not is_additive_v2:
+                    raise AuditRefusal(f"DUPLICATE_FORWARD_MARKET_CONFIG:{sport}:{market}")
+            else:
+                family_by_market[key] = path.name
+                first_config_by_market[key] = (row, state)
         config_rows.append({
             "file": str(path.relative_to(root)), "sport": sport.upper(),
             "family": family, "markets": markets, "state": state,
