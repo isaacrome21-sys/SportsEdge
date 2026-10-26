@@ -42,7 +42,7 @@ def _american_odds(value: Any, code: str) -> int | None:
         odds = value
     elif isinstance(value, str):
         raw = value.strip()
-        digits = raw.lstrip("+-")
+        digits = raw[1:] if raw[:1] in ("+", "-") else raw
         if not digits or not digits.isascii() or not digits.isdigit():
             raise MLBCaptureLogError(code)
         odds = int(raw)
