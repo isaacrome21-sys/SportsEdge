@@ -69,21 +69,26 @@ def test_recent_two_sided_quote_remains_research_only():
 
 def test_mixed_aged_pair_cannot_be_fresh_or_staked():
     row = priced((149, 151))
-    assert row["quote_status"] == RESEARCH_AGED_QUOTE
+    assert row["quote_status"] == "STALE_QUOTE"
+    assert row["quote_age_class"] == RESEARCH_AGED_QUOTE
     assert row["status"] == "WATCH_QUOTE_NOT_CURRENT"
     assert row["staking_authority"] is False
 
 
 def test_aged_pair_at_300_is_research_watch_only():
     row = priced((300, 300))
-    assert row["quote_status"] == RESEARCH_AGED_QUOTE
+    assert row["quote_status"] == "STALE_QUOTE"
+    assert row["quote_age_class"] == RESEARCH_AGED_QUOTE
     assert row["status"] == "WATCH_QUOTE_NOT_CURRENT"
     assert row["staking_authority"] is False
 
 
 def test_over_300_pair_refuses_pricing_before_ev():
     row = priced((300.001, 300.001))
-    assert row["status"] == "NO_MODEL_OR_MARKET"
+    assert row["status"] == "WATCH_QUOTE_NOT_CURRENT"
+    assert row["quote_status"] == "STALE_QUOTE"
+    assert row["quote_age_class"] == "QUOTE_OVER_300S_REFUSED"
+    assert row["quote_refused"] is True
     assert "QUOTE_OVER_300S_REFUSED" in row["reason"]
     assert "ev_per_dollar" not in row
     assert row["staking_authority"] is False
@@ -91,3 +96,32 @@ def test_over_300_pair_refuses_pricing_before_ev():
 
 def test_missing_quote_clock_cannot_be_current():
     assert _bridge_quote_status(None, now=NOW) == "UNVERIFIED_QUOTE_FRESHNESS"
+
+
+def test_aged_single_side_validated_prop_retains_legacy_watch_with_age_flag():
+    prop = {**model(), "market": "PLAYER_RECEIVING_YARDS",
+            "player_id": "synthetic-player", "line": 49.5}
+    quote = {**paired((151,))[0], "market": "PLAYER_RECEIVING_YARDS",
+             "player_id": "synthetic-player", "line": 49.5}
+    row = price_three_sport_research(
+        [prop], [quote], as_of=NOW.isoformat(),
+        validation_resolver=lambda *_: {"validation_status": "VALIDATED"})["rows"][0]
+    assert row["status"] == "WATCH_QUOTE_NOT_CURRENT"
+    assert row["quote_status"] == "STALE_QUOTE"
+    assert row["quote_age_class"] == RESEARCH_AGED_QUOTE
+    assert row["staking_authority"] is False
+
+
+def test_over_300_single_side_refused_without_model_ev():
+    prop = {**model(), "market": "PLAYER_RECEIVING_YARDS",
+            "player_id": "synthetic-player", "line": 49.5}
+    quote = {**paired((301,))[0], "market": "PLAYER_RECEIVING_YARDS",
+             "player_id": "synthetic-player", "line": 49.5}
+    row = price_three_sport_research(
+        [prop], [quote], as_of=NOW.isoformat(),
+        validation_resolver=lambda *_: {"validation_status": "VALIDATED"})["rows"][0]
+    assert row["status"] == "WATCH_QUOTE_NOT_CURRENT"
+    assert row["quote_refused"] is True
+    assert row["quote_age_class"] == "QUOTE_OVER_300S_REFUSED"
+    assert "ev_per_dollar" not in row
+    assert "model_probability" not in row
