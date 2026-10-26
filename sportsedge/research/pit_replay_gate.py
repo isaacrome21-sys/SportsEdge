@@ -111,6 +111,17 @@ def partition_chronological_replay(
         raise PITReplayError("NO_CHRONOLOGICAL_TRAIN_ROWS")
     if not holdout:
         raise PITReplayError("NO_CHRONOLOGICAL_HOLDOUT_ROWS")
+    # A global train count cannot qualify an unrelated sport, market or
+    # frozen model version as a chronological holdout. Require prior
+    # settled rows in the exact cohort evaluated by the research CLI.
+    train_groups = {(r["sport"].strip().upper(), r["market"].strip().upper(),
+                     r["model_version"].strip()) for r in train}
+    holdout_groups = {(r["sport"].strip().upper(), r["market"].strip().upper(),
+                       r["model_version"].strip()) for r in holdout}
+    missing = sorted(holdout_groups - train_groups)
+    if missing:
+        sport, market, version = missing[0]
+        raise PITReplayError(f"TRAINING_GROUP_MISSING:{sport}/{market}/{version}")
     return {
         "train": train, "holdout": holdout,
         "train_n": len(train), "holdout_n": len(holdout),

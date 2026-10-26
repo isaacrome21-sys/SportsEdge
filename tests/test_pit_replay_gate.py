@@ -36,6 +36,21 @@ class PITReplayTests(unittest.TestCase):
     def test_no_training(self):
         with self.assertRaisesRegex(PITReplayError, "NO_CHRONOLOGICAL_TRAIN_ROWS"):
             self.partition(HOLD)
+    def test_other_market_training_cannot_qualify_holdout(self):
+        self.refuses({**HOLD, "market": "SPREAD"}, "TRAINING_GROUP_MISSING:NFL/SPREAD/v1")
+
+    def test_other_sport_training_cannot_qualify_holdout(self):
+        self.refuses({**HOLD, "sport": "NBA"}, "TRAINING_GROUP_MISSING:NBA/TOTAL/v1")
+
+    def test_other_frozen_version_training_cannot_qualify_holdout(self):
+        self.refuses({**HOLD, "model_version": "v2"}, "TRAINING_GROUP_MISSING:NFL/TOTAL/v2")
+
+    def test_each_holdout_group_with_own_prior_rows_passes(self):
+        spread_train = {**BASE, "market": "SPREAD", "selection_id": "S3"}
+        spread_holdout = {**HOLD, "market": "SPREAD", "selection_id": "S4"}
+        out = self.partition(BASE, spread_train, HOLD, spread_holdout)
+        self.assertEqual((out["train_n"], out["holdout_n"]), (2, 2))
+
     def test_missing_receipt(self): self.refuses({k:v for k,v in HOLD.items() if k != "source_receipt_id"}, "source_receipt_id:MISSING")
     def test_missing_model_hash(self): self.refuses({**HOLD, "model_hash": ""}, "model_hash:NONBLANK")
     def test_poststart_decision(self): self.refuses({**HOLD, "decision_ts": HOLD["event_start_ts"]}, "FEATURE_DECISION_EVENT_SETTLEMENT_ORDER")
