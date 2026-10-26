@@ -49,6 +49,7 @@ def test_finite_interior_probabilities_survive_without_rounding_gate(win):
     result = row(win=win)
     assert result['research_only'] is True
     assert result['official_authority'] is False
+    assert 0 < result['estimate_p'] < 1
 
 
 @pytest.mark.parametrize('price,dec', [(-110, 2.0), (150, 1.5), (-110, 1.909)])
@@ -59,3 +60,15 @@ def test_mismatched_decimal_and_american_odds_refused(price, dec):
 
 def test_positive_american_odds_matching_decimal_accepted():
     assert row(price=150, dec=2.5)['odds_american'] == 150
+
+
+@pytest.mark.parametrize('min_ev', [-1, -1e-9, .1500001, 1])
+def test_finalizer_refuses_unsupported_ev_thresholds(min_ev):
+    with pytest.raises(ValueError, match='RESEARCH_ROW_INVALID_MIN_EV'):
+        row(win=.4, min_ev=min_ev)
+
+
+def test_direct_finalizer_cannot_label_negative_ev_as_edge():
+    result = row(win=.4, min_ev=0)
+    assert result['ev_per_dollar'] < 0
+    assert result['status'] == 'BELOW_THRESHOLD'
