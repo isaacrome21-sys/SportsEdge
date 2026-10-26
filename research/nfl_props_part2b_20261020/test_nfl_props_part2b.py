@@ -349,3 +349,89 @@ def test_duplicate_row_refused_first_kept():
     assert [r["status"] for r in rows] == ["PRICED", "REFUSED"]
     assert rows[1]["reason"] == "DUPLICATE_ROW"
     assert rows[0]["row_id"] == rows[1]["row_id"]
+
+
+# ---------- (h) owner acceptance repair: model failures abort, input faults isolate ----------
+
+def test_model_build_failure_aborts_not_refused(monkeypatch):
+    # PR #2759 acceptance finding: an evaluator build failure is a
+    # systemic failure, not a malformed capture. It must propagate out
+    # of price_rows — never become a REFUSED row on a "completed" run.
+    def boom(data_by_season, cfg):
+        raise RuntimeError("evaluator build exploded")
+    monkeypatch.setattr(EV, "build", boom)
+    cap = _capture([dict(PASS_ATT, line=33.5)])
+    with pytest.raises(RuntimeError, match="evaluator build exploded"):
+        pricing.price_rows(EV, _synthetic_data(), cap, CVS)
+
+
+def test_scoring_stage_failure_aborts_not_refused(monkeypatch):
+    # A failure after the build (here mu_for, the probability stage)
+    # aborts the same way — the abort is not specific to ev.build.
+    def boom(prior_values, pool):
+        raise RuntimeError("mu_for exploded")
+    monkeypatch.setattr(EV, "mu_for", boom)
+    cap = _capture([dict(PASS_ATT, line=33.5)])
+    with pytest.raises(RuntimeError, match="mu_for exploded"):
+        pricing.price_rows(EV, _synthetic_data(), cap, CVS)
+
+
+def test_cmd_price_model_failure_aborts_and_commits_nothing(tmp_path, monkeypatch):
+    # End to end through cmd_price with the evaluator stubbed so the
+    # build fails inside the row loop (train_cv is stubbed to succeed):
+    # the run aborts and no run_record / priced_rows / pools is written.
+    import types
+
+    def boom(data_by_season, cfg):
+        raise RuntimeError("evaluator build exploded")
+
+    stub = types.SimpleNamespace(
+        MARKETS=EV.MARKETS, K=EV.K, TRAIN=EV.TRAIN,
+        GRID_LO=EV.GRID_LO, GRID_HI=EV.GRID_HI,
+        build=boom, league_pool=EV.league_pool, mu_for=EV.mu_for,
+        candidate_cdf=EV.candidate_cdf,
+        load=lambda data_dir: _synthetic_data())
+    monkeypatch.setattr(pricing, "load_evaluator", lambda: stub)
+    monkeypatch.setattr(pricing, "check_training_pins", lambda data: {})
+    monkeypatch.setattr(pricing, "train_cv", lambda ev, data, cfg: 0.30)
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "sp_2026.csv.gz").write_bytes(b"placeholder")
+    capture = {"season": 2026, "week": 5, "rows": [
+        {"game_id": "G1", "player_id": "QB1", "player_name": "QB One",
+         "market": "PASS_ATTEMPTS", "line": 33.5, "over_price": -110,
+         "under_price": -110, "captured_at": CAP_AT, "kickoff": KO}]}
+    cap_path = tmp_path / "capture.json"
+    cap_path.write_text(json.dumps(capture))
+    out_dir = tmp_path / "out"
+    args = types.SimpleNamespace(player_data=str(data_dir),
+                                 capture=str(cap_path),
+                                 out_dir=str(out_dir))
+    with pytest.raises(RuntimeError, match="evaluator build exploded"):
+        pricing.cmd_price(args)
+    assert not (out_dir / "run_record.json").exists()
+    assert not (out_dir / "priced_rows.json").exists()
+    assert not (out_dir / "pools.json").exists()
+
+
+def test_malformed_row_between_valid_rows_still_isolated():
+    # The other half of the distinction: a malformed capture row between
+    # two valid rows is still refused per-row and the slate still prices.
+    good = {"game_id": "G1", "player_id": "QB1", "market": "PASS_ATTEMPTS",
+            "over_price": -110, "under_price": -110,
+            "captured_at": CAP_AT, "kickoff": KO}
+    bad = {"game_id": "G1", "player_id": "QB1", "market": "PASS_ATTEMPTS",
+           "line": 34.5, "over_price": -110, "under_price": -110,
+           "captured_at": CAP_AT}  # no kickoff: malformed capture input
+    capture = {"season": 2026, "week": 5, "rows": [
+        dict(good, line=33.5), bad, dict(good, line=35.5)]}
+    rows, _ = pricing.price_rows(EV, _synthetic_data(), capture, CVS)
+    assert [r["status"] for r in rows] == ["PRICED", "REFUSED", "PRICED"]
+    assert rows[1]["reason"] == "MISSING_FIELD_KICKOFF"
+
+
+def test_nonstring_market_refused_not_crash():
+    rows, _ = pricing.price_rows(EV, _synthetic_data(), _capture([
+        {"player_id": "RB1", "market": ["RUSH_ATTEMPTS"], "line": 12.5}]), CVS)
+    assert rows[0]["status"] == "REFUSED"
+    assert rows[0]["reason"] == "INVALID_MARKET"

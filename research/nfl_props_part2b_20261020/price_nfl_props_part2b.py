@@ -169,6 +169,19 @@ def _parse_ts(s: str) -> datetime:
 # prices and commits. Slate-level failures (hash pins, missing data files,
 # and this package's fail-closed MARKET_OUT_OF_SCOPE_2B guard) still fail
 # closed exactly as before.
+#
+# --- owner acceptance repair (PR #2759 review): fault-class separation ---
+# Per-row isolation covers malformed CAPTURE INPUT only, and every such
+# fault is an explicit deterministic check: _validate_capture_row below
+# plus the named in-body refusals (LINE_ABOVE_GRID,
+# NON_FINITE_STAT_INPUT). Model/config/build failures — anything raised
+# by the evaluator (ev.build, ev.league_pool, mu_for, candidate_cdf), by
+# qualification over the season data, or by an incompatible
+# season/training data schema — are NOT capture faults: they propagate
+# out of price_rows and abort the run before cmd_price writes any
+# record, so a systemic failure can never commit as a completed run of
+# REFUSED rows. The MARKET_OUT_OF_SCOPE_2B SystemExit guard is unchanged:
+# a BaseException, it never was and still is not caught per-row.
 REQUIRED_ROW_FIELDS = ("game_id", "player_id", "market", "line",
                        "over_price", "under_price", "captured_at", "kickoff")
 
@@ -202,7 +215,11 @@ def _refused_row(ev, raw: dict, reason: str) -> dict:
     verbatim offending value is named by the reason code, and no NaN/Inf
     is ever serialized into a committed record."""
     line = _as_finite_float(raw.get("line"))
-    cfg = ev.MARKETS.get(raw.get("market")) or {}
+    market = raw.get("market")
+    # A non-string market is refused as INVALID_MARKET by validation;
+    # never let it reach the MARKETS lookup here (an unhashable value
+    # would raise inside the refusal path itself).
+    cfg = (ev.MARKETS.get(market) or {}) if isinstance(market, str) else {}
     return {
         "row_id": _row_id_for(raw),
         "game_id": raw.get("game_id"), "player_id": raw.get("player_id"),
@@ -244,6 +261,15 @@ def _validate_capture_row(raw) -> str | None:
         if ts.tzinfo is None or ts.tzinfo.utcoffset(ts) is None:
             # Never silently assume a timezone for a naive timestamp.
             return f"NAIVE_TIMESTAMP_{field.upper()}"
+    # Type contract for the two fields the pricing body uses as dict
+    # keys/members (market scope, player lookup): a non-string value is
+    # malformed capture input, refused here deterministically instead of
+    # surfacing as a TypeError deep inside the pricing body. Checked last
+    # so every pre-existing refusal above keeps its exact precedence.
+    if not isinstance(raw["market"], str):
+        return "INVALID_MARKET"
+    if not isinstance(raw["player_id"], str):
+        return "INVALID_PLAYER_ID"
     return None
 
 
@@ -280,11 +306,12 @@ def qualification(ev, cfg: dict, priors: list) -> tuple[bool, str]:
 def _price_one_row(ev, data_by_season: dict, season: int, week: int,
                    raw: dict, cvs: dict, grid, built: dict, pools: dict) -> dict:
     """Price a single capture row (the original per-row body, unchanged
-    for well-formed rows). Contract refusals return a REFUSED row;
-    callers isolate any remaining exception per-row. The 2B scope guard
-    below still raises SystemExit (a BaseException, never caught by the
-    per-row isolation) — that fail-closed slate-level behavior is this
-    package's frozen design, asserted by its test suite."""
+    for well-formed rows). Contract refusals return a REFUSED row. Any
+    other exception — an evaluator/model/build failure or a season data
+    schema failure — propagates to the caller and aborts the run; it is
+    never converted into a per-row refusal. The 2B scope guard below
+    still raises SystemExit — that fail-closed slate-level behavior is
+    this package's frozen design, asserted by its test suite."""
     market = raw["market"]
     if market not in ev.MARKETS:
         # 2B §1: INTERCEPTIONS is OUT entirely; anything else is not a
@@ -385,11 +412,16 @@ def price_rows(ev, data_by_season: dict, capture: dict, cvs: dict) -> tuple[list
             rows.append(_refused_row(ev, raw, reason) if isinstance(raw, dict)
                         else _refused_row(ev, {}, reason))
             continue
-        try:
-            rows.append(_price_one_row(ev, data_by_season, season, week,
-                                       raw, cvs, grid, built, pools))
-        except Exception as exc:  # per-row fault isolation: never lose the slate
-            rows.append(_refused_row(ev, raw, f"UNEXPECTED_{type(exc).__name__}: {exc}"))
+        # No catch-all here (owner acceptance repair, PR #2759):
+        # malformed capture input is fully handled by the explicit
+        # checks above and the named refusals inside _price_one_row, so
+        # anything that raises past this point is a model/config/build
+        # failure. Let it propagate and abort the run — cmd_price writes
+        # its records only after this loop returns, so an abort commits
+        # nothing. (The scope guard's SystemExit propagates exactly as
+        # before.)
+        rows.append(_price_one_row(ev, data_by_season, season, week,
+                                   raw, cvs, grid, built, pools))
     # Final output assertion (B6): no committed PRICED row may contain
     # NaN/Inf anywhere. Any offender is downgraded to REFUSED, never
     # committed as PRICED, and the assertion then verifies the invariant.
