@@ -74,3 +74,22 @@ Current candidate PR #2757 head as observed on Oct 26: `15b96d30fe084df4413b726f
 5. Keep NHL paused until #2763/#2765 review, merge, and raw-byte audit complete.
 
 **Bankroll / authorization: six sports PAPER, 0u; verified bets 0.**
+
+
+## 6. Current-main registry-key reconciliation (2026-10-26, `b4b30a627`)
+
+The exact *operational registry/surface* check is narrower than the Oct 20 research-family map. The two must not be added together as if they counted the same thing.
+
+| Source | Exact enumerated scope | Operational declaration, not a validation verdict |
+| --- | --- | --- |
+| `config/mlb_market_catalog.json` | **38 canonical MLB v1 market keys** | Four main game-line keys included; canonical price-path capability is not an admissible new construction. A separate MLB v2 `PITCHER_PITCHES` is research-only/previously failed. |
+| `config/football_market_surface.json` | **51 football provider-market keys** | NFL: three main ML/spread/total keys tagged `IMPLEMENTED`, 48 `NO_ENGINE` at this shared surface. CFB: four tagged `IMPLEMENTED` incl. team total, 47 `NO_ENGINE`; CFB team total remains `BLOCKED` in the *family* registry. Standalone frozen NFL props tests must be inventoried separately. |
+| `sportsedge/family_market_registry.py` | CFB three main families registered RESEARCH_ONLY; 11 player families BLOCKED | The 11: QB pass yards/TD/attempts/completions/thrown INT, rushing yards/attempts, receiving yards/receptions, rush+rec, pass+rush. Generic `PLAYER_INTERCEPTIONS` is intentionally ambiguous/unbound; use the distinct QB-thrown family. |
+| NBA family registry | Four PTS/REB/AST/PRA families research registered | All other NBA/CBB families remain BLOCKED there; this is not the same as the Oct 20 map's 19 NBA *readiness rows*. |
+| `sportsedge/sports/nhl/market_capabilities.py` | **15 NHL capability keys** | All 15 still `REQUIRES_ENGINE`, even when research simulation helpers exist. No approved live capture/verified market. |
+
+The 51 football keys are grouped as 16 game/situational line variants, 8 situational exotics, 8 QB props, 11 skill props, 3 kicking and 5 defense. This is an exact *provider surface* census, not 51 validated or independent model families. Current CBB canonical inventory outside three named main markets is still unspecified; do not invent a total.
+
+**G1 capture evidence gap:** `scripts/capture_mlb_direct_paired_ml.py` records only MONEYLINE snapshots (`h2h`) and SHA text; `sportsedge/direct_web_capture_source.py::acquire_board` hashes original `board.raw` but returns only parsed payload, so saved receipts alone cannot reproduce exact sportsbook bytes. `draftkings_game_market_source.normalize_board` can represent ML/run line/total, not team totals on that path. Full-game G1 validation therefore requires (a) content-addressed exact DK response byte archive linked to each row, (b) canonical MLB gamePk↔DK event binding, (c) complete three-family book capture and a separately versioned team-total source/contract, and (d) later independent pre-start closes. Merely passing a SHA-shaped manifest in a fixture is not proof of archived raw bytes or verified CLV. A separate draft #2775 explores 2027 forward-clock repair; reconcile its source contract before any G1 implementation.
+
+**Post-merge B8 state update:** PR #2756 subsequently merged to `main` at `b4b30a627`; that fact does **not** establish the external live NFL player-data directory's composition. Keep post-merge B8 counted rows under operational HOLD until the exact corrected-file hash, old-file absence and active evaluator data-dir usage are independently attested. No backfill.
