@@ -1,0 +1,27 @@
+{
+ "status": "FINAL-CANDIDATE -- NOT FROZEN -- PREREG_NBA_PROPS_FORWARD_V2 source amendment (prepared 2026-10-26; freeze HELD by owner)",
+ "sport": "NBA",
+ "family": "player_pra",
+ "markets": [
+  "player_pra"
+ ],
+ "engine_id": "NBA_PROP_EMPIRICAL_V1",
+ "model_version": "NBA_PROP_EMPIRICAL_V1",
+ "market_form": "TWO_SIDED",
+ "sides": [
+  "OVER",
+  "UNDER"
+ ],
+ "over_side": "OVER",
+ "min_rows": 100,
+ "min_events": 40,
+ "min_slates": 4,
+ "max_clv_missing_share": 0.2,
+ "clv_beats_threshold": 0.0,
+ "close_max_age_minutes": 60,
+ "capture_scope": "IN_SPEC",
+ "capture_note": "Capture Spec V1 NBA scope: game lines + PTS/REB/AST + common combos, entry and close, from the twice-daily DraftKings capture jobs live since Oct 19, 2026. V2 boundary (V2 prereg sec. 10): counting starts at zero at the V2 freeze; the first countable slate is the first slate priced after the freeze with a per-slate store passing S1-S6; every row before the freeze is research, never counted, and is never backfilled. PRA counts only on slates where combo lines were actually captured (prereg sec. 2): a PRA row without a captured two-sided combo quote is not an entry -- at entry the paired-quote admission refuses it, and at close a one-sided combo quote yields CLOSE_SINGLE_SIDED.",
+ "prereg": "research/nba_props_forward_20261020/PREREG_NBA_PROPS_FORWARD_V2.md",
+ "prereg_sha256": "237e7836e5025a5241a9ae5a381cb0f264b1ada065403f6215f190946f3ce0e6",
+ "picked_beats_passed_required": true
+}
