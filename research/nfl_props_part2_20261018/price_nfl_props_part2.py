@@ -132,12 +132,111 @@ def p_over_for(ev, mu: float, cv: float, count: bool, line: float, grid) -> floa
     Counts: 1 - CDF at floor(line) (P(Y > line) for a discrete stat)."""
     cdf = ev.candidate_cdf(mu, cv, count, grid)
     if count:
-        return 1.0 - float(cdf[int(math.floor(line)) - ev.GRID_LO])
+        # Clamp the index into the grid (capture-contract repair B2): a
+        # below-grid count line must not wrap the array via a negative
+        # index. The clamp is exact, not approximate — count outcomes are
+        # >= 0, so CDF(GRID_LO) = CDF(-60) = 0 and a line below the grid
+        # prices at p_over = 1.0, its true value. Above-grid lines are
+        # refused per-row (LINE_ABOVE_GRID) before ever reaching here;
+        # the upper clamp is defense-in-depth only.
+        idx = min(max(int(math.floor(line)) - ev.GRID_LO, 0), len(cdf) - 1)
+        return 1.0 - float(cdf[idx])
     return 1.0 - float(np.interp(line, grid, cdf))
 
 
 def _parse_ts(s: str) -> datetime:
     return datetime.fromisoformat(s.replace("Z", "+00:00"))
+
+
+# --- capture-contract repair (B1/B3-B7, E1/E2): per-row fault isolation ---
+# A malformed capture row is emitted as a REFUSED row (status="REFUSED",
+# verbatim reason code, row_id preserved) and the rest of the slate still
+# prices and commits. Slate-level failures (hash pins, missing data files)
+# still fail closed exactly as before.
+REQUIRED_ROW_FIELDS = ("game_id", "player_id", "market", "line",
+                       "over_price", "under_price", "captured_at", "kickoff")
+
+
+def _as_finite_float(value) -> float | None:
+    """float(value) if it is a real, finite number, else None.
+    Booleans and non-numeric values are not numbers for this contract."""
+    if isinstance(value, bool):
+        return None
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return None
+    return out if math.isfinite(out) else None
+
+
+def _row_id_for(raw: dict) -> str:
+    """The canonical row_id when the row is well-formed enough to build
+    one; otherwise a deterministic id from the raw fields, so a REFUSED
+    row still carries the identity of the capture row it came from."""
+    line = _as_finite_float(raw.get("line"))
+    if line is not None and raw.get("game_id") is not None \
+            and raw.get("player_id") is not None and raw.get("market") is not None:
+        return f"{raw['game_id']}|{raw['player_id']}|{raw['market']}|{line}"
+    return f"{raw.get('game_id')}|{raw.get('player_id')}|{raw.get('market')}|{raw.get('line')}"
+
+
+def _refused_row(raw: dict, reason: str) -> dict:
+    """A REFUSED row in the committed record's shape (scorers skip any
+    status != PRICED). Non-finite line/prices are recorded as None — the
+    verbatim offending value is named by the reason code, and no NaN/Inf
+    is ever serialized into a committed record."""
+    line = _as_finite_float(raw.get("line"))
+    return {
+        "row_id": _row_id_for(raw),
+        "game_id": raw.get("game_id"), "player_id": raw.get("player_id"),
+        "player_name": raw.get("player_name"),
+        "market": raw.get("market"), "line": line,
+        "over_price": _as_finite_float(raw.get("over_price")),
+        "under_price": _as_finite_float(raw.get("under_price")),
+        "captured_at": raw.get("captured_at"), "kickoff": raw.get("kickoff"),
+        "status": "REFUSED", "reason": reason,
+        "close_status": "AWAITING_CLOSE",
+        "close_over_price": None, "close_under_price": None,
+        "close_captured_at": None, "close_novig_p_over": None,
+        "close_novig_p_under": None,
+    }
+
+
+def _validate_capture_row(raw) -> str | None:
+    """Static per-row contract checks that need no market config.
+    Returns a verbatim refusal reason, or None if the row may proceed."""
+    if not isinstance(raw, dict):
+        return "ROW_NOT_AN_OBJECT"
+    for field in REQUIRED_ROW_FIELDS:
+        if field not in raw or raw[field] is None:
+            return f"MISSING_FIELD_{field.upper()}"
+    if _as_finite_float(raw["line"]) is None:
+        return "NON_FINITE_LINE" if isinstance(raw["line"], float) else "INVALID_LINE"
+    for field in ("over_price", "under_price"):
+        price = _as_finite_float(raw[field])
+        if price is None:
+            return f"NON_FINITE_PRICE_{field.upper()}"
+        if price == 0:
+            return f"ZERO_PRICE_{field.upper()}"
+    for field in ("captured_at", "kickoff"):
+        try:
+            ts = _parse_ts(raw[field])
+        except (TypeError, ValueError, AttributeError):
+            return f"INVALID_TIMESTAMP_{field.upper()}"
+        if ts.tzinfo is None or ts.tzinfo.utcoffset(ts) is None:
+            # Never silently assume a timezone for a naive timestamp.
+            return f"NAIVE_TIMESTAMP_{field.upper()}"
+    return None
+
+
+def _row_values_finite(value) -> bool:
+    if isinstance(value, float):
+        return math.isfinite(value)
+    if isinstance(value, dict):
+        return all(_row_values_finite(v) for v in value.values())
+    if isinstance(value, (list, tuple)):
+        return all(_row_values_finite(v) for v in value)
+    return True
 
 
 def player_priors(data_by_season: dict, season: int, week: int, pid: str):
@@ -160,74 +259,128 @@ def qualification(ev, cfg: dict, priors: list) -> tuple[bool, str]:
     return True, "QUALIFIED"
 
 
+def _price_one_row(ev, data_by_season: dict, season: int, week: int,
+                   raw: dict, cvs: dict, grid, built: dict, pools: dict) -> dict:
+    """Price a single capture row (the original per-row body, unchanged
+    for well-formed rows). Scope/contract refusals return a REFUSED row;
+    callers isolate any remaining exception per-row."""
+    market = raw["market"]
+    if market not in ev.MARKETS:
+        # Market scope guard (B4), mirroring Part 2B's check — but as a
+        # per-row REFUSED row, not a slate-aborting raise, per the
+        # capture-contract repair's root pattern.
+        return _refused_row(raw, "MARKET_OUT_OF_SCOPE")
+    cfg = ev.MARKETS[market]
+    line = float(raw["line"])
+    if cfg["count"] and int(math.floor(line)) > ev.GRID_HI:
+        return _refused_row(raw, "LINE_ABOVE_GRID")
+    if not cfg["count"] and line < 0:
+        # E1: a negative yardage line prices degenerate (p_over = 1.0,
+        # fair price None). Refuse it — books do not post negative
+        # yardage lines, and a certain-probability row must not enter
+        # the committed record. (Negative COUNT lines are exact via the
+        # clamped CDF and still price; see p_over_for.)
+        return _refused_row(raw, "NEGATIVE_LINE")
+    if market not in built:
+        built[market] = ev.build(data_by_season, cfg)
+        pools[market] = [float(y) for y in ev.league_pool(built[market], season, week)]
+    pid = raw["player_id"]
+    row = {
+        "row_id": f"{raw['game_id']}|{pid}|{market}|{float(raw['line'])}",
+        "game_id": raw["game_id"], "player_id": pid,
+        "player_name": raw.get("player_name"),
+        "market": market, "line": float(raw["line"]),
+        "over_price": raw["over_price"], "under_price": raw["under_price"],
+        "captured_at": raw["captured_at"], "kickoff": raw["kickoff"],
+        "close_status": "AWAITING_CLOSE",
+        "close_over_price": None, "close_under_price": None,
+        "close_captured_at": None, "close_novig_p_over": None,
+        "close_novig_p_under": None,
+    }
+    if _parse_ts(raw["captured_at"]) >= _parse_ts(raw["kickoff"]):
+        row.update(status="EXCLUDED_LATE_CAPTURE",
+                   reason="CAPTURED_AT_OR_AFTER_KICKOFF")
+        return row
+    priors = player_priors(data_by_season, season, week, pid)
+    if any(not math.isfinite(float(g[2][cfg["stat"]]))
+           or not math.isfinite(float(g[2][cfg["role"]])) for g in priors):
+        return _refused_row(raw, "NON_FINITE_STAT_INPUT")
+    ok, why = qualification(ev, cfg, priors)
+    if not ok:
+        row.update(status="NOT_QUALIFIED", reason=why,
+                   games_logged=len(priors))
+        return row
+    prior_values = [float(g[2][cfg["stat"]]) for g in priors]
+    pool = pools[market]
+    if not pool:
+        row.update(status="NOT_PRICED", reason="EMPTY_LEAGUE_POOL",
+                   games_logged=len(priors))
+        return row
+    if any(not math.isfinite(float(y)) for y in pool):
+        return _refused_row(raw, "NON_FINITE_STAT_INPUT")
+    mu = float(ev.mu_for(prior_values, pool))
+    cv = float(cvs[market])
+    if not (math.isfinite(mu) and math.isfinite(cv)):
+        return _refused_row(raw, "NON_FINITE_STAT_INPUT")
+    p_over = float(p_over_for(ev, mu, cv, cfg["count"], row["line"], grid))
+    p_under = 1.0 - p_over
+    ev_over = p_over * american_to_decimal(raw["over_price"]) - 1.0
+    ev_under = p_under * american_to_decimal(raw["under_price"]) - 1.0
+    nv_over, nv_under = devig_pair(raw["over_price"], raw["under_price"])
+    if abs(ev_over - ev_under) < 1e-12:
+        selected = "TIE"
+    else:
+        selected = "OVER" if ev_over > ev_under else "UNDER"
+    row.update(
+        status="PRICED", reason="QUALIFIED",
+        mu=mu, cv=cv, cv_source=CV_SOURCE,
+        games_logged=len(priors), shrink_weight=float(ev.K / (len(priors) + ev.K)),
+        pool_mean=float(np.mean(pool)), prior_values=prior_values,
+        p_over=p_over, p_under=p_under,
+        fair_over_american=fair_american(p_over),
+        fair_under_american=fair_american(p_under),
+        ev_over=float(ev_over), ev_under=float(ev_under),
+        selected_side=selected,
+        entry_novig_p_over=float(nv_over), entry_novig_p_under=float(nv_under),
+    )
+    return row
+
+
 def price_rows(ev, data_by_season: dict, capture: dict, cvs: dict) -> tuple[list, dict]:
     season, week = int(capture["season"]), int(capture["week"])
     grid = np.arange(ev.GRID_LO, ev.GRID_HI + 1, dtype=float)
     built: dict = {}
     pools: dict = {}
     rows: list = []
+    seen_row_ids: set = set()
     for raw in capture["rows"]:
-        market = raw["market"]
-        cfg = ev.MARKETS[market]
-        if market not in built:
-            built[market] = ev.build(data_by_season, cfg)
-            pools[market] = [float(y) for y in ev.league_pool(built[market], season, week)]
-        pid = raw["player_id"]
-        row = {
-            "row_id": f"{raw['game_id']}|{pid}|{market}|{float(raw['line'])}",
-            "game_id": raw["game_id"], "player_id": pid,
-            "player_name": raw.get("player_name"),
-            "market": market, "line": float(raw["line"]),
-            "over_price": raw["over_price"], "under_price": raw["under_price"],
-            "captured_at": raw["captured_at"], "kickoff": raw["kickoff"],
-            "close_status": "AWAITING_CLOSE",
-            "close_over_price": None, "close_under_price": None,
-            "close_captured_at": None, "close_novig_p_over": None,
-            "close_novig_p_under": None,
-        }
-        if _parse_ts(raw["captured_at"]) >= _parse_ts(raw["kickoff"]):
-            row.update(status="EXCLUDED_LATE_CAPTURE",
-                       reason="CAPTURED_AT_OR_AFTER_KICKOFF")
-            rows.append(row)
+        if isinstance(raw, dict):
+            # E2: an identical row_id priced twice double-counts
+            # downstream. Keep the first, refuse subsequent duplicates.
+            row_id = _row_id_for(raw)
+            if row_id in seen_row_ids:
+                rows.append(_refused_row(raw, "DUPLICATE_ROW"))
+                continue
+            seen_row_ids.add(row_id)
+        reason = _validate_capture_row(raw)
+        if reason is not None:
+            rows.append(_refused_row(raw, reason) if isinstance(raw, dict)
+                        else _refused_row({}, reason))
             continue
-        priors = player_priors(data_by_season, season, week, pid)
-        ok, why = qualification(ev, cfg, priors)
-        if not ok:
-            row.update(status="NOT_QUALIFIED", reason=why,
-                       games_logged=len(priors))
-            rows.append(row)
-            continue
-        prior_values = [float(g[2][cfg["stat"]]) for g in priors]
-        pool = pools[market]
-        if not pool:
-            row.update(status="NOT_PRICED", reason="EMPTY_LEAGUE_POOL",
-                       games_logged=len(priors))
-            rows.append(row)
-            continue
-        mu = float(ev.mu_for(prior_values, pool))
-        cv = float(cvs[market])
-        p_over = float(p_over_for(ev, mu, cv, cfg["count"], row["line"], grid))
-        p_under = 1.0 - p_over
-        ev_over = p_over * american_to_decimal(raw["over_price"]) - 1.0
-        ev_under = p_under * american_to_decimal(raw["under_price"]) - 1.0
-        nv_over, nv_under = devig_pair(raw["over_price"], raw["under_price"])
-        if abs(ev_over - ev_under) < 1e-12:
-            selected = "TIE"
-        else:
-            selected = "OVER" if ev_over > ev_under else "UNDER"
-        row.update(
-            status="PRICED", reason="QUALIFIED",
-            mu=mu, cv=cv, cv_source=CV_SOURCE,
-            games_logged=len(priors), shrink_weight=float(ev.K / (len(priors) + ev.K)),
-            pool_mean=float(np.mean(pool)), prior_values=prior_values,
-            p_over=p_over, p_under=p_under,
-            fair_over_american=fair_american(p_over),
-            fair_under_american=fair_american(p_under),
-            ev_over=float(ev_over), ev_under=float(ev_under),
-            selected_side=selected,
-            entry_novig_p_over=float(nv_over), entry_novig_p_under=float(nv_under),
-        )
-        rows.append(row)
+        try:
+            rows.append(_price_one_row(ev, data_by_season, season, week,
+                                       raw, cvs, grid, built, pools))
+        except Exception as exc:  # per-row fault isolation: never lose the slate
+            rows.append(_refused_row(raw, f"UNEXPECTED_{type(exc).__name__}: {exc}"))
+    # Final output assertion (B6): no committed PRICED row may contain
+    # NaN/Inf anywhere. Any offender is downgraded to REFUSED, never
+    # committed as PRICED, and the assertion then verifies the invariant.
+    for row in rows:
+        if row.get("status") == "PRICED" and not _row_values_finite(row):
+            refused = _refused_row(row, "NON_FINITE_OUTPUT")
+            row.clear()
+            row.update(refused)
+    assert all(_row_values_finite(r) for r in rows if r.get("status") == "PRICED")
     return rows, pools
 
 

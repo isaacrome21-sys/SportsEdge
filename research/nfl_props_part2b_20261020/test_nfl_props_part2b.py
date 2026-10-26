@@ -290,3 +290,62 @@ def test_frozen_prereg_terms_present():
                  "SHADOW-ONLY", "INTERCEPTIONS", "INSUFFICIENT_SAMPLE",
                  "40 distinct games", "100 rows"):
         assert term in text, term
+
+
+# ---------- (g) capture-contract repair: per-row fault isolation ----------
+
+RUSH_ATT = {"player_id": "RB1", "market": "RUSH_ATTEMPTS"}
+PASS_ATT = {"player_id": "QB1", "market": "PASS_ATTEMPTS"}
+
+
+def test_count_line_above_grid_refused_not_crash():
+    rows, _ = pricing.price_rows(EV, _synthetic_data(), _capture([
+        dict(RUSH_ATT, line=705.5)]), CVS)
+    assert rows[0]["status"] == "REFUSED" and rows[0]["reason"] == "LINE_ABOVE_GRID"
+    assert rows[0]["row_id"] == "G1|RB1|RUSH_ATTEMPTS|705.5"
+
+
+def test_count_line_below_grid_prices_exactly_one():
+    # B2: the negative-index wrap priced this 0.0; the true P(over) is 1.0.
+    rows, _ = pricing.price_rows(EV, _synthetic_data(), _capture([
+        dict(RUSH_ATT, line=-61.5)]), CVS)
+    assert rows[0]["status"] == "PRICED" and rows[0]["p_over"] == 1.0
+
+
+def test_zero_price_row_refused_and_slate_survives():
+    rows, _ = pricing.price_rows(EV, _synthetic_data(), _capture([
+        dict(PASS_ATT, line=33.5), dict(PASS_ATT, line=34.5, over_price=0),
+        dict(PASS_ATT, line=35.5)]), CVS)
+    assert [r["status"] for r in rows] == ["PRICED", "REFUSED", "PRICED"]
+    assert rows[1]["reason"] == "ZERO_PRICE_OVER_PRICE"
+
+
+def test_naive_timestamp_refused_not_assumed():
+    cap = _capture([dict(PASS_ATT, line=33.5)])
+    cap["rows"][0]["captured_at"] = "2026-10-22T18:00:00"  # no offset
+    rows, _ = pricing.price_rows(EV, _synthetic_data(), cap, CVS)
+    assert rows[0]["status"] == "REFUSED"
+    assert rows[0]["reason"] == "NAIVE_TIMESTAMP_CAPTURED_AT"
+
+
+def test_nan_line_refused_and_no_nan_committed():
+    rows, _ = pricing.price_rows(EV, _synthetic_data(), _capture([
+        dict(PASS_ATT, line=float("nan"))]), CVS)
+    assert rows[0]["status"] == "REFUSED" and rows[0]["reason"] == "NON_FINITE_LINE"
+    assert json.loads(json.dumps({"rows": rows}, allow_nan=False))  # strict JSON
+
+
+def test_missing_kickoff_refused():
+    cap = _capture([dict(PASS_ATT, line=33.5)])
+    del cap["rows"][0]["kickoff"]
+    rows, _ = pricing.price_rows(EV, _synthetic_data(), cap, CVS)
+    assert rows[0]["status"] == "REFUSED"
+    assert rows[0]["reason"] == "MISSING_FIELD_KICKOFF"
+
+
+def test_duplicate_row_refused_first_kept():
+    rows, _ = pricing.price_rows(EV, _synthetic_data(), _capture([
+        dict(PASS_ATT, line=33.5), dict(PASS_ATT, line=33.5)]), CVS)
+    assert [r["status"] for r in rows] == ["PRICED", "REFUSED"]
+    assert rows[1]["reason"] == "DUPLICATE_ROW"
+    assert rows[0]["row_id"] == rows[1]["row_id"]
