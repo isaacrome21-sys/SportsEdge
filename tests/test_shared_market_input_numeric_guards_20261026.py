@@ -54,7 +54,7 @@ def _provider_payload(price, point=42.5):
     }]
 
 
-@pytest.mark.parametrize("price", [-110.5, -110.0, True, "-110.9", 5, None])
+@pytest.mark.parametrize("price", [-110.5, -110.0, True, "-110.9", 5, None, "-" + "9" * 5000])
 def test_provider_cannot_silently_truncate_american_odds(price):
     with pytest.raises(TheOddsApiError, match="AMERICAN_ODDS_INVALID"):
         normalize_response(_provider_payload(price), sport_key="americanfootball_nfl", captured_at=NOW)
@@ -79,7 +79,7 @@ def test_complement_nonfinite_or_overflowed_line_blocks_instead_of_crashing(bad_
     assert complement_model_p({"model_p": 0.55, "line": bad_line}, market="TOTALS") is None
 
 
-@pytest.mark.parametrize("odds", [float("inf"), float("nan"), -110.5, -90, True, "garbage"])
+@pytest.mark.parametrize("odds", [float("inf"), float("nan"), -110.5, -90, True, "garbage", "--110", "+-110", "++110", "9" * 5000])
 def test_sibling_quotes_never_copy_invalid_prices(odds):
     rows = [
         {"market": "TOTALS", "side": "OVER", "american_odds": -110},

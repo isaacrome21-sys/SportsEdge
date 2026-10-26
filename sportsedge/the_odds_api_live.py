@@ -163,8 +163,11 @@ def normalize_event(
                 price_raw = outcome.get("price")
                 if type(price_raw) is int:
                     price = price_raw
-                elif isinstance(price_raw, str) and re.fullmatch(r"[+-]?\d+", price_raw.strip()):
-                    price = int(price_raw.strip())
+                elif isinstance(price_raw, str) and re.fullmatch(r"[+-]?[0-9]+", price_raw.strip()):
+                    try:
+                        price = int(price_raw.strip())
+                    except ValueError as exc:
+                        raise TheOddsApiError("AMERICAN_ODDS_INVALID") from exc
                 else:
                     raise TheOddsApiError("AMERICAN_ODDS_INVALID")
                 if abs(price) < 100:

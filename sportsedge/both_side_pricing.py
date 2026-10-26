@@ -8,6 +8,7 @@ unpriced.
 """
 from __future__ import annotations
 
+import re
 from math import isfinite
 from typing import Any, Mapping
 
@@ -149,6 +150,9 @@ def _valid_quote_odds(value: Any) -> bool:
         return abs(value) >= 100
     if isinstance(value, str):
         text = value.strip()
-        if text.lstrip("+-").isdigit():
-            return abs(int(text)) >= 100
+        if re.fullmatch(r"[+-]?[0-9]+", text):
+            try:
+                return abs(int(text)) >= 100
+            except ValueError:  # oversized numeric strings must not crash a board
+                return False
     return False
