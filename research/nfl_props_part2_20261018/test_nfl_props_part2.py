@@ -305,3 +305,185 @@ def test_under_rate_stratification_buckets():
     assert table["by_shrink_weight"]["w>=0.43"]["n"] == 1  # only n=3 -> w=0.50
     assert table["by_shrink_weight"]["0.25<=w<0.43"]["n"] == 2  # n=5 -> .375, n=9 -> .25
     assert table["by_shrink_weight"]["w<0.25"]["n"] == 1  # n=12 -> .20
+
+
+# ---------- (g) capture-contract repair: per-row fault isolation ----------
+
+CAP2 = "2026-10-22T18:00:00-05:00"
+KO2 = "2026-10-22T19:20:00-05:00"
+
+
+def _wr_season():
+    def row(tgt, rec):
+        return {"attempts": 0.0, "passing_yards": 0.0, "carries": 0.0,
+                "rushing_yards": 0.0, "targets": tgt, "receptions": rec,
+                "receiving_yards": rec * 10.0}
+    return {2026: {"WR1": [(w, "WR", row(t, r)) for w, t, r in
+                           [(1, 6.0, 5.0), (2, 7.0, 6.0), (3, 6.0, 5.0), (4, 8.0, 6.0)]]}}
+
+
+def _cap2(rows):
+    base = {"game_id": "G1", "captured_at": CAP2, "kickoff": KO2,
+            "over_price": -110, "under_price": -110}
+    return {"season": 2026, "week": 5, "rows": [dict(base, **r) for r in rows]}
+
+
+CVS2 = {m: 0.35 for m in EV.MARKETS}
+REC = {"player_id": "WR1", "market": "RECEPTIONS"}
+
+
+def test_count_line_above_grid_refused_not_crash():
+    rows, _ = pricing.price_rows(EV, _wr_season(), _cap2([dict(REC, line=705.5)]), CVS2)
+    assert rows[0]["status"] == "REFUSED" and rows[0]["reason"] == "LINE_ABOVE_GRID"
+    assert rows[0]["row_id"] == "G1|WR1|RECEPTIONS|705.5"
+
+
+def test_count_line_below_grid_prices_exactly_one():
+    # B2: the negative-index wrap priced this 0.0; the true P(over) is 1.0.
+    rows, _ = pricing.price_rows(EV, _wr_season(), _cap2([dict(REC, line=-61.5)]), CVS2)
+    assert rows[0]["status"] == "PRICED" and rows[0]["p_over"] == 1.0
+
+
+def test_zero_price_row_refused_and_slate_survives():
+    qb = {"player_id": "QB1", "market": "PASS_YDS"}
+    data = _synthetic_season([(1, 200.0), (2, 220.0), (3, 240.0), (4, 260.0)])
+    cap = _cap2([dict(qb, line=232.5), dict(qb, line=240.5, over_price=0),
+                 dict(qb, line=250.5)])
+    rows, _ = pricing.price_rows(EV, data, cap, CVS2)
+    assert [r["status"] for r in rows] == ["PRICED", "REFUSED", "PRICED"]
+    assert rows[1]["reason"] == "ZERO_PRICE_OVER_PRICE"
+
+
+def test_foreign_market_refused_per_row():
+    rows, _ = pricing.price_rows(EV, _wr_season(), _cap2([
+        {"player_id": "WR1", "market": "PASS_TDS", "line": 1.5}]), CVS2)
+    assert rows[0]["status"] == "REFUSED"
+    assert rows[0]["reason"] == "MARKET_OUT_OF_SCOPE"
+
+
+def test_naive_timestamp_refused_not_assumed():
+    rows, _ = pricing.price_rows(EV, _wr_season(), _cap2([
+        dict(REC, line=5.5, captured_at="2026-10-22T18:00:00")]), CVS2)
+    assert rows[0]["status"] == "REFUSED"
+    assert rows[0]["reason"] == "NAIVE_TIMESTAMP_CAPTURED_AT"
+
+
+def test_nan_line_refused_and_no_nan_committed():
+    rows, _ = pricing.price_rows(EV, _wr_season(), _cap2([
+        dict(REC, line=float("nan"))]), CVS2)
+    assert rows[0]["status"] == "REFUSED" and rows[0]["reason"] == "NON_FINITE_LINE"
+    assert json.loads(json.dumps({"rows": rows}, allow_nan=False))  # strict JSON
+
+
+def test_missing_kickoff_refused():
+    cap = {"season": 2026, "week": 5, "rows": [
+        {"game_id": "G1", "player_id": "WR1", "market": "RECEPTIONS", "line": 5.5,
+         "over_price": -110, "under_price": -110, "captured_at": CAP2}]}
+    rows, _ = pricing.price_rows(EV, _wr_season(), cap, CVS2)
+    assert rows[0]["status"] == "REFUSED"
+    assert rows[0]["reason"] == "MISSING_FIELD_KICKOFF"
+
+
+def test_negative_yardage_line_refused():
+    data = _synthetic_season([(1, 200.0), (2, 220.0), (3, 240.0), (4, 260.0)])
+    rows, _ = pricing.price_rows(EV, data, _cap2([
+        {"player_id": "QB1", "market": "PASS_YDS", "line": -3.5}]), CVS2)
+    assert rows[0]["status"] == "REFUSED" and rows[0]["reason"] == "NEGATIVE_LINE"
+
+
+def test_duplicate_row_refused_first_kept():
+    rows, _ = pricing.price_rows(EV, _wr_season(), _cap2([
+        dict(REC, line=5.5), dict(REC, line=5.5)]), CVS2)
+    assert [r["status"] for r in rows] == ["PRICED", "REFUSED"]
+    assert rows[1]["reason"] == "DUPLICATE_ROW"
+    assert rows[0]["row_id"] == rows[1]["row_id"]
+
+
+# ---------- (h) owner acceptance repair: model failures abort, input faults isolate ----------
+
+def test_model_build_failure_aborts_not_refused(monkeypatch):
+    # PR #2759 acceptance finding: an evaluator build failure is a
+    # systemic failure, not a malformed capture. It must propagate out
+    # of price_rows — never become a REFUSED row on a "completed" run.
+    def boom(data_by_season, cfg):
+        raise RuntimeError("evaluator build exploded")
+    monkeypatch.setattr(EV, "build", boom)
+    data = _synthetic_season([(1, 200.0), (2, 220.0), (3, 240.0), (4, 260.0)])
+    cap = _cap2([{"player_id": "QB1", "market": "PASS_YDS", "line": 232.5}])
+    with pytest.raises(RuntimeError, match="evaluator build exploded"):
+        pricing.price_rows(EV, data, cap, CVS2)
+
+
+def test_scoring_stage_failure_aborts_not_refused(monkeypatch):
+    # A failure after the build (here mu_for, the probability stage)
+    # aborts the same way — the abort is not specific to ev.build.
+    def boom(prior_values, pool):
+        raise RuntimeError("mu_for exploded")
+    monkeypatch.setattr(EV, "mu_for", boom)
+    data = _synthetic_season([(1, 200.0), (2, 220.0), (3, 240.0), (4, 260.0)])
+    cap = _cap2([{"player_id": "QB1", "market": "PASS_YDS", "line": 232.5}])
+    with pytest.raises(RuntimeError, match="mu_for exploded"):
+        pricing.price_rows(EV, data, cap, CVS2)
+
+
+def test_cmd_price_model_failure_aborts_and_commits_nothing(tmp_path, monkeypatch):
+    # End to end through cmd_price with the evaluator stubbed so the
+    # build fails inside the row loop (train_cv is stubbed to succeed):
+    # the run aborts and no run_record / priced_rows / pools is written.
+    import types
+
+    def boom(data_by_season, cfg):
+        raise RuntimeError("evaluator build exploded")
+
+    stub = types.SimpleNamespace(
+        MARKETS=EV.MARKETS, K=EV.K, TRAIN=EV.TRAIN,
+        GRID_LO=EV.GRID_LO, GRID_HI=EV.GRID_HI,
+        build=boom, league_pool=EV.league_pool, mu_for=EV.mu_for,
+        candidate_cdf=EV.candidate_cdf,
+        load=lambda data_dir: _synthetic_season(
+            [(1, 200.0), (2, 220.0), (3, 240.0), (4, 260.0)]))
+    monkeypatch.setattr(pricing, "load_evaluator", lambda: stub)
+    monkeypatch.setattr(pricing, "check_training_pins", lambda data: {})
+    monkeypatch.setattr(pricing, "train_cv", lambda ev, data, cfg: 0.35)
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "sp_2026.csv.gz").write_bytes(b"placeholder")
+    capture = {"season": 2026, "week": 5, "rows": [
+        {"game_id": "G1", "player_id": "QB1", "player_name": "QB One",
+         "market": "PASS_YDS", "line": 232.5, "over_price": -112,
+         "under_price": -108, "captured_at": CAP2, "kickoff": KO2}]}
+    cap_path = tmp_path / "capture.json"
+    cap_path.write_text(json.dumps(capture))
+    out_dir = tmp_path / "out"
+    args = types.SimpleNamespace(player_data=str(data_dir),
+                                 capture=str(cap_path),
+                                 out_dir=str(out_dir))
+    with pytest.raises(RuntimeError, match="evaluator build exploded"):
+        pricing.cmd_price(args)
+    assert not (out_dir / "run_record.json").exists()
+    assert not (out_dir / "priced_rows.json").exists()
+    assert not (out_dir / "pools.json").exists()
+
+
+def test_malformed_row_between_valid_rows_still_isolated():
+    # The other half of the distinction: a malformed capture row between
+    # two valid rows is still refused per-row and the slate still prices.
+    data = _synthetic_season([(1, 200.0), (2, 220.0), (3, 240.0), (4, 260.0)])
+    good = {"game_id": "G1", "player_id": "QB1", "market": "PASS_YDS",
+            "over_price": -110, "under_price": -110,
+            "captured_at": CAP2, "kickoff": KO2}
+    bad = {"game_id": "G1", "player_id": "QB1", "market": "PASS_YDS",
+           "line": 240.5, "over_price": -110, "under_price": -110,
+           "captured_at": CAP2}  # no kickoff: malformed capture input
+    capture = {"season": 2026, "week": 5, "rows": [
+        dict(good, line=232.5), bad, dict(good, line=250.5)]}
+    rows, _ = pricing.price_rows(EV, data, capture, CVS2)
+    assert [r["status"] for r in rows] == ["PRICED", "REFUSED", "PRICED"]
+    assert rows[1]["reason"] == "MISSING_FIELD_KICKOFF"
+
+
+def test_nonstring_market_refused_not_crash():
+    rows, _ = pricing.price_rows(EV, _wr_season(), _cap2([
+        {"player_id": "WR1", "market": ["RECEPTIONS"], "line": 5.5}]), CVS2)
+    assert rows[0]["status"] == "REFUSED"
+    assert rows[0]["reason"] == "INVALID_MARKET"
