@@ -52,14 +52,19 @@ class MLBCapturedGameRow:
 
 
 def regime_for(*, official_date: str, season_type: str | None = None, postseason: bool | None = None) -> str:
-    if postseason is True or str(season_type or "").upper() in {"P","PS","POST","POSTSEASON","PLAYOFFS"}:
+    code = str(season_type or "").strip().upper()
+    if postseason is True or code in {"P", "PS", "POST", "POSTSEASON", "PLAYOFFS"}:
         return POSTSEASON
-    if postseason is False:
+    if postseason is False or code in {"R", "REG", "REGULAR", "REGULAR_SEASON"}:
         return REGULAR
-    # Dates after the locked 2026 regular-season holdout remain postseason until 2027.
-    day=str(official_date)
-    if day >= "2026-10-01":
+    # 2026 postseason shorthand is legacy evidence only, never a standing
+    # rule for every future season. Future late-season rows need an explicit
+    # source season type, since October may contain regular or playoff games.
+    day = str(official_date)
+    if "2026-10-01" <= day < "2027-01-01":
         return POSTSEASON
+    if day >= "2027-10-01":
+        raise MLBCaptureLogError("FUTURE_LATE_SEASON_TYPE_REQUIRED")
     return REGULAR
 
 
@@ -72,8 +77,12 @@ def record_capture(row: Mapping[str, Any]) -> MLBCapturedGameRow:
     intake_at=_utc(row.get("intake_retrieved_at") or row.get("retrieved_at"), "INTAKE_RETRIEVED_AT_REQUIRED")
     close_raw=row.get("close_retrieved_at")
     close_at=None if close_raw in (None, "") else _utc(close_raw, "CLOSE_RETRIEVED_AT_INVALID")
-    if close_at is not None and close_at < intake_at:
-        raise MLBCaptureLogError("CLOSE_BEFORE_INTAKE")
+    if close_at is not None and close_at <= intake_at:
+        raise MLBCaptureLogError("CLOSE_NOT_AFTER_INTAKE")
+    if close_at is not None and row.get("close_american") is None:
+        raise MLBCaptureLogError("CLOSE_PRICE_MISSING")
+    if close_at is None and (row.get("close_american") is not None or row.get("close_line") is not None):
+        raise MLBCaptureLogError("CLOSE_TIMESTAMP_MISSING")
     rel=float(row.get("model_reliability") if row.get("model_reliability") is not None else 0.0)
     if rel != 0.0 and not (0.0 < rel <= 1.0):
         raise MLBCaptureLogError("MODEL_RELIABILITY_OUT_OF_RANGE")
