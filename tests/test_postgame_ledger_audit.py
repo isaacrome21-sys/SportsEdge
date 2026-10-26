@@ -184,3 +184,16 @@ def test_nonfinite_alternate_line_cannot_create_distinct_identity(bad):
     result = audit([row(line=bad), row()])
     assert result["settled_rows"] == 1
     assert result["findings"][0]["code"] == "INVALID_IDENTITY"
+
+
+@pytest.mark.parametrize('bad_line', ['NaN', 'Infinity', '-Infinity', '1e10000', True])
+def test_invalid_line_identity_refused(bad_line):
+    result = audit([row(line=bad_line)])
+    assert result['settled_rows'] == 0
+    assert result['findings'][0]['code'] == 'INVALID_IDENTITY'
+
+
+def test_equivalent_line_encodings_are_duplicate_selections():
+    result = audit([row(line=3.5), row(line='3.50'), row(line='3.5')])
+    assert result['settled_rows'] == 1
+    assert [f['code'] for f in result['findings']].count('DUPLICATE_SELECTION') == 2
