@@ -38,7 +38,6 @@ def audit(rows):
         if identity in seen:
             findings.append((index, "DUPLICATE_SELECTION", identity))
             continue
-        seen.add(identity)
         status = str(row["status"]).upper()
         if status not in SETTLED:
             findings.append((index, "UNSETTLED_OR_UNKNOWN", status))
@@ -55,6 +54,7 @@ def audit(rows):
         except (ValueError, TypeError, InvalidOperation, OverflowError):
             findings.append((index, "INVALID_PRICE_OR_TIME", identity))
             continue
+        seen.add(identity)
         counts[status] += 1
         profit += pnl
     return {"counts": dict(counts), "profit_units": str(profit),
