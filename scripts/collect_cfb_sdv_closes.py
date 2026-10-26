@@ -173,8 +173,13 @@ def main(argv=None) -> int:
         frames.append(frame)
         done = schedule[as_bool(schedule["completed"])
                         & schedule.home_points.notna() & schedule.away_points.notna()]
-        results_frames.append(done[["game_id", "season", "start_date", "home_id",
-                                    "away_id", "home_points", "away_points"]])
+        # A replacement model must know the historical venue and division at
+        # its prediction cutoff.  Do not silently turn unknown neutral-site
+        # values into home games or admit FBS/FCS mismatches to its fit.
+        results_frames.append(done[["game_id", "season", "week", "start_date",
+                                    "neutral_site", "home_id", "away_id",
+                                    "home_division", "away_division",
+                                    "home_points", "away_points"]])
         validation[str(season)] = summary
         print(f"season={season} rows={summary['betting_rows']} "
               f"spread_scoreable={summary['spread_scoreable']} "
