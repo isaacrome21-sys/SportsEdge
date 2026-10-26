@@ -121,6 +121,15 @@ def audit_game_line_receipt_manifest(
             raise MLBGameLineReceiptError("TWO_SIDED_QUOTE_MISSING")
         for price in prices.values():
             _observed_price(price)
+        if market == "RUN_LINE":
+            # A single scalar plus two prices cannot prove opposite handicaps.
+            side_lines = row.get("side_lines")
+            if not isinstance(side_lines, Mapping) or set(side_lines) != {"HOME", "AWAY"}:
+                raise MLBGameLineReceiptError("RUN_LINE_SIDE_HANDICAPS_REQUIRED")
+            home = _line(side_lines["HOME"], market)
+            away = _line(side_lines["AWAY"], market)
+            if home != canonical_line or home != -away or home == 0:
+                raise MLBGameLineReceiptError("RUN_LINE_HANDICAPS_NOT_COMPLEMENTARY")
         captured = _time(row.get("captured_at_utc"), "QUOTE_TIMESTAMP_INVALID")
         if captured > sealed:
             raise MLBGameLineReceiptError("ARCHIVE_SEALED_BEFORE_QUOTE")
