@@ -290,3 +290,176 @@ def test_frozen_prereg_terms_present():
                  "SHADOW-ONLY", "INTERCEPTIONS", "INSUFFICIENT_SAMPLE",
                  "40 distinct games", "100 rows"):
         assert term in text, term
+
+
+# ---------- (e) B8 re-pin: sp_2025 played-game correction ----------
+# AMENDMENT_B8_SP2025_REPIN_20261026.md. Same drift, same corrected
+# artifact, same pin as Part 2: the as-published sp_2025.csv.gz carries
+# zero-usage roster rows the frozen loader counts as played games. The
+# re-pin replaces that one SPEC_HASHES line; no code, evaluator or other
+# pin changes. The generator lives in the Part 2 package (the artifact is
+# shared, as the original file and its pin were).
+
+import importlib.util as _ilu  # noqa: E402
+
+_b8_spec = _ilu.spec_from_file_location(
+    "build_sp_2025_played_v2",
+    HERE.parent / "nfl_props_part2_20261018" / "build_sp_2025_played_v2.py")
+b8gen = _ilu.module_from_spec(_b8_spec)
+_b8_spec.loader.exec_module(b8gen)
+
+B8_ORIGINAL_SP_2025_SHA256 = "c7401e321bdb369443f3280b9acd74ba6e16d82e710383bf1c01acabfebeac0b"
+B8_CORRECTED_NAME = "sp_2025_played_v2.csv.gz"
+B8_CORRECTED_SHA256 = "f2768ac1c71e5ed616307106df32ef8ad4fc7d548bb96600f6a616fb631f7b48"
+B8_FROZEN_OTHER_PINS = {
+    "PREREG_NFL_PROPS_PART2B_FORWARD_V1.md":
+        "55e11a818329d91d379dad88604c6e9fb66b61a57903ed98bc88ded5dcaebb2e",
+    "ps_2018.csv.gz": "15730d75271ec10affc412b50b22fc8e3d6ce8f442d377936f65bc0044ef15bf",
+    "ps_2019.csv.gz": "d143b91c62380bed1587fe390e594d0e5555e8ebac81fcc7212ad7224115caf2",
+    "ps_2020.csv.gz": "e23a81d6ed3c94bd2dd14a5ee3ed94584a69e67fdb985c1ba0de4ccbc5a2bdcc",
+    "ps_2021.csv.gz": "a2fb266576a1bde5d7978005a5f6ccf83e3c023234da500d38cf6a14f40a01c8",
+    "ps_2022.csv.gz": "2b7dca6814993b9fd6ad3d4fdc56131663311bbe83281126e1ac441620d824ba",
+    "ps_2023.csv.gz": "b7590543f3c81dceb17d7577a1dce7b8ff1a9aacf0f562e3d7bbc7e60f37bc9b",
+    "ps_2024.csv.gz": "629b77e0c88d361f8b5c4a850e7866013aa670b7a5a94b7f1d0c591adf18f971",
+}
+
+
+def _spec_hashes() -> dict:
+    want = {}
+    for line in (HERE / "SPEC_HASHES.txt").read_text().splitlines():
+        h, name = line.split()
+        want[name] = h
+    return want
+
+
+def test_b8_repin_spec_hashes_registry():
+    want = _spec_hashes()
+    assert "sp_2025.csv.gz" not in want
+    assert want[B8_CORRECTED_NAME] == B8_CORRECTED_SHA256
+    assert B8_CORRECTED_SHA256 != B8_ORIGINAL_SP_2025_SHA256
+    for name, h in B8_FROZEN_OTHER_PINS.items():
+        assert want[name] == h, name
+    assert set(want) == set(B8_FROZEN_OTHER_PINS) | {B8_CORRECTED_NAME}
+
+
+def test_b8_repin_leaves_evaluator_pin_untouched():
+    digest = hashlib.sha256((HERE / pricing.EVALUATOR_NAME).read_bytes()).hexdigest()
+    assert digest == pricing.EVALUATOR_SHA256 == \
+        "a941164e10a66dd079daaed1593387987035a59a92a8b15d94d0366fa3e82417"
+
+
+_B8_HEADER = ["player_id", "player_name", "position", "season", "week",
+              "season_type", "attempts", "passing_yards", "passing_tds",
+              "completions", "carries", "rushing_yards", "targets",
+              "receptions", "receiving_yards"]
+
+
+def _b8_row(pid, pos, week, st="REG", att=0, py=0, ptd=0, comp=0, car=0,
+            ry=0, tar=0, rec=0, recy=0):
+    return [pid, pid, pos, 2025, week, st, att, py, ptd, comp, car, ry,
+            tar, rec, recy]
+
+
+def _b8_write_gz(path, rows):
+    import csv
+    import gzip
+    import io
+    buf = io.StringIO()
+    w = csv.writer(buf, lineterminator="\n")
+    w.writerow(_B8_HEADER)
+    w.writerows(rows)
+    path.write_bytes(gzip.compress(buf.getvalue().encode(), mtime=0))
+
+
+def test_b8_played_filter_excludes_phantom_weeks(tmp_path):
+    rows = [_b8_row("00-QB-POOL", "QB", w, att=33, py=250, ptd=2, comp=22)
+            for w in range(1, 7)]
+    rows += [_b8_row("00-QB-PHANTOM", "QB", w) for w in (1, 2, 3)]
+    rows += [_b8_row("00-QB-PHANTOM", "QB", 4, att=42, py=290, ptd=3, comp=27),
+             _b8_row("00-QB-PHANTOM", "QB", 5, att=44, py=301, ptd=2, comp=29),
+             _b8_row("00-QB-PHANTOM", "QB", 6, att=40, py=262, ptd=2, comp=25),
+             _b8_row("00-QB-PHANTOM", "QB", 19, st="POST")]
+    rows += [_b8_row("00-K-REAL", "K", w) for w in (1, 2, 3)]
+    rows += [_b8_row("00-LB-REAL", "LB", w) for w in (1, 2)]
+    src = tmp_path / "sp_2025.csv.gz"
+    _b8_write_gz(src, rows)
+    payload, counts = b8gen.build_corrected(src)
+    assert counts["source_rows"] == 18
+    assert counts["removed_by_type"] == {"REG": 3, "POST": 1, "other": 0}
+    assert counts["kept_rows"] == 14
+    payload2, _ = b8gen.build_corrected(src)
+    assert payload2 == payload
+
+    corr_dir = tmp_path / "corr"
+    corr_dir.mkdir()
+    (corr_dir / B8_CORRECTED_NAME).write_bytes(payload)
+    orig_dir = tmp_path / "orig"
+    orig_dir.mkdir()
+    (orig_dir / "sp_2025.csv.gz").write_bytes(src.read_bytes())
+
+    corr = EV.load(corr_dir)[2025]
+    orig = EV.load(orig_dir)[2025]
+    assert [g[0] for g in corr["00-QB-PHANTOM"]] == [4, 5, 6]
+    assert [g[0] for g in orig["00-QB-PHANTOM"]] == [1, 2, 3, 4, 5, 6]
+    assert [g[0] for g in corr["00-K-REAL"]] == [1, 2, 3]
+    assert [g[0] for g in corr["00-LB-REAL"]] == [1, 2]
+
+    # PASS_ATTEMPTS at week 7: prices in both worlds, but under the
+    # corrected artifact the priors are the 3 played games only (pool is
+    # the pool QB's [33, 33, 33] in both runs)
+    capture = {"season": 2025, "week": 7, "rows": [
+        {"game_id": "G1", "player_id": "00-QB-PHANTOM", "market": "PASS_ATTEMPTS",
+         "line": 31.5, "over_price": -110, "under_price": -110,
+         "captured_at": "2025-10-20T18:00:00-05:00",
+         "kickoff": "2025-10-20T19:20:00-05:00"}]}
+    cvs = {m: 0.35 for m in EV.MARKETS}
+    rows_o, _ = pricing.price_rows(EV, EV.load(orig_dir), capture, cvs)
+    rows_c, _ = pricing.price_rows(EV, EV.load(corr_dir), capture, cvs)
+    assert rows_o[0]["status"] == rows_c[0]["status"] == "PRICED"
+    assert rows_o[0]["games_logged"] == 6
+    assert rows_o[0]["prior_values"] == [0.0, 0.0, 0.0, 42.0, 44.0, 40.0]
+    assert rows_o[0]["mu"] == pytest.approx((126.0 + 99.0) / 9.0)
+    assert rows_c[0]["games_logged"] == 3
+    assert rows_c[0]["prior_values"] == [42.0, 44.0, 40.0]
+    assert rows_c[0]["mu"] == pytest.approx((126.0 + 99.0) / 6.0)
+
+    cap4 = dict(capture, week=4)
+    rows_o4, _ = pricing.price_rows(EV, EV.load(orig_dir), cap4, cvs)
+    rows_c4, _ = pricing.price_rows(EV, EV.load(corr_dir), cap4, cvs)
+    assert rows_o4[0]["status"] == "NOT_QUALIFIED"
+    assert rows_o4[0]["reason"].startswith("ROLE_MEAN")
+    assert rows_o4[0]["games_logged"] == 3
+    assert rows_c4[0]["status"] == "NOT_QUALIFIED"
+    assert rows_c4[0]["reason"] == "ONLY_0_PRIOR_GAMES"
+    assert rows_c4[0]["games_logged"] == 0
+
+
+def test_b8_staged_artifact_matches_pin():
+    """Skip-if-absent mirror of the Part 2 staged-artifact test, under
+    the 2B evaluator's own loader and hash check."""
+    import os
+    data_dir = Path(os.environ.get(
+        "NFL_PROPS_DATA_DIR",
+        Path.home() / "workspace/sportsedge/nfl_player_data_repin_20261026"))
+    artifact = data_dir / B8_CORRECTED_NAME
+    if not artifact.exists():
+        pytest.skip("re-pin staging data dir not present on this machine")
+    assert not (data_dir / "sp_2025.csv.gz").exists()  # never both files
+    digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    assert digest == _spec_hashes()[B8_CORRECTED_NAME] == B8_CORRECTED_SHA256
+    EV.check_hashes(data_dir)  # raises SystemExit on any pin mismatch
+    season = EV.load(data_dir)[2025]
+    affected = 0
+    for pid, games in season.items():
+        for w, pos, row in games:
+            usage = row["attempts"] + row["carries"] + row["targets"]
+            assert not (pos in b8gen.SKILL_POSITIONS and usage == 0.0), pid
+        if games[-1][1] not in b8gen.SKILL_POSITIONS:
+            continue
+        for i in range(len(games)):
+            priors = games[:i]
+            played = [g for g in priors
+                      if g[2]["attempts"] + g[2]["carries"] + g[2]["targets"] > 0]
+            if len(priors) >= 3 and len(played) < 3:
+                affected += 1
+    assert affected == 0
