@@ -61,6 +61,18 @@ def _status(row: dict, *, name: str, root: Path) -> str:
         if row.get("prereg") or row.get("prereg_sha256"):
             raise AuditRefusal(f"DRAFT_CLAIMS_FROZEN_PIN:{name}")
         return "DRAFT_NOT_FROZEN"
+    if text.startswith("FINAL-CANDIDATE") and "NOT FROZEN" in text:
+        # A pinned candidate: the document hash is registered and verified
+        # exactly as for a frozen prereg, but the status itself declares
+        # NOT FROZEN — recognition in this inventory confers no freeze,
+        # no verdict and no play authority.
+        prereg, sha = row.get("prereg"), row.get("prereg_sha256")
+        if not isinstance(prereg, str) or not prereg:
+            raise AuditRefusal(f"CANDIDATE_PREREG_MISSING:{name}")
+        if not isinstance(sha, str) or len(sha) != 64:
+            raise AuditRefusal(f"CANDIDATE_PREREG_SHA_MISSING:{name}")
+        _prereg(Path(prereg), root=root, expected_sha=sha)
+        return "FINAL_CANDIDATE_NOT_FROZEN"
     if text.startswith("FROZEN"):
         prereg, sha = row.get("prereg"), row.get("prereg_sha256")
         if not isinstance(prereg, str) or not prereg:
@@ -93,9 +105,18 @@ def accuracy_readiness(*, root: Path = ROOT) -> dict:
             raise AuditRefusal(f"CONFIG_IDENTITY_INVALID:{path.name}")
         for market in markets:
             key = (sport.upper(), market.upper())
-            if key in family_by_market:
+            prior = family_by_market.get(key)
+            if prior is not None and prior[1] == state:
+                # Two configs in the SAME state claiming one market is an
+                # ambiguous registration and stays refused. A config in a
+                # different state is a distinct prereg version of the same
+                # family (e.g. a pinned candidate beside the frozen test):
+                # every config is inventoried in config_rows, and the
+                # canonical link below names the frozen config while one
+                # exists for the market.
                 raise AuditRefusal(f"DUPLICATE_FORWARD_MARKET_CONFIG:{sport}:{market}")
-            family_by_market[key] = path.name
+            if prior is None or state == "FROZEN_NO_VERDICT_ATTACHED":
+                family_by_market[key] = (path.name, state)
         config_rows.append({
             "file": str(path.relative_to(root)), "sport": sport.upper(),
             "family": family, "markets": markets, "state": state,
@@ -111,10 +132,12 @@ def accuracy_readiness(*, root: Path = ROOT) -> dict:
     for (sport, market), resolution in sorted(MARKET_RESOLUTIONS.items()):
         state = resolution["state"]
         key = (sport.upper(), market.upper())
-        config = family_by_market.get(key)
+        entry = family_by_market.get(key)
+        config = entry[0] if entry is not None else None
         if key == ("MLB", "NRFI") or key == ("MLB", "YRFI"):
             # Two sides of one frozen-boundary first-inning test family.
-            config = family_by_market.get(("MLB", "FIRST_INNING_RUN"))
+            entry = family_by_market.get(("MLB", "FIRST_INNING_RUN"))
+            config = entry[0] if entry is not None else None
         canonical_rows.append({
             "sport": sport, "market": market, "pricing_path": state,
             "blocker": resolution.get("blocker"),
