@@ -89,6 +89,10 @@ def grade(pick: PickRecord | Mapping, result: FinalResult, *, family: str) -> st
             raise GradeError(f"GRADE_SELECTION_INVALID:{sel}")
         if result.occurred is not None and not isinstance(result.occurred, bool):
             raise GradeError("GRADE_OCCURRED_INVALID")
+        if result.stat is not None and line is None:
+            # A numeric final cannot be reconciled without its threshold.
+            # Do not silently select the boolean while ignoring that stat.
+            raise GradeError("GRADE_PARTIAL_NUMERIC_EVIDENCE")
         if line is not None and result.stat is not None:
             value = _real(result.stat, "STAT")
             threshold = _real(line, "LINE")
@@ -103,6 +107,8 @@ def grade(pick: PickRecord | Mapping, result: FinalResult, *, family: str) -> st
             return _cmp(value, threshold, direction)
         if result.occurred is None:
             raise GradeError("GRADE_OCCURRED_MISSING")
+        # Boolean-only final evidence is valid with or without a listed
+        # display line (e.g. anytime-TD YES 0.5 with no numeric stat).
         return WIN if result.occurred == (sel in {"YES", "OVER"}) else LOSS
     raise GradeError(f"GRADE_FAMILY_UNKNOWN:{family}")
 
