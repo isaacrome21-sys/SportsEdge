@@ -74,6 +74,7 @@ def audit_game_line_receipt_manifest(
     observations: Sequence[Mapping[str, Any]],
     archive_sealed_at_utc: str,
     final: Mapping[str, Any],
+    schedule_receipt: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Require a complete-shaped immutable quote/final *manifest* for review.
 
@@ -89,6 +90,18 @@ def audit_game_line_receipt_manifest(
     if regime_for(official_date=official_date, season_type=season_type) != REGULAR:
         raise MLBGameLineReceiptError("POSTSEASON_SHAPED_SEPARATELY")
     game_start = _time(start_at_utc, "START_TIMESTAMP_INVALID")
+    if not isinstance(schedule_receipt, Mapping):
+        raise MLBGameLineReceiptError("SCHEDULE_RECEIPT_REQUIRED")
+    if (schedule_receipt.get("source") != "MLB_STATSAPI_SCHEDULE"
+            or schedule_receipt.get("game_pk") != game_pk
+            or schedule_receipt.get("official_date") != official_date
+            or schedule_receipt.get("season_type") != season_type
+            or not _sha(schedule_receipt.get("raw_sha256"))):
+        raise MLBGameLineReceiptError("SCHEDULE_RECEIPT_IDENTITY_MISMATCH")
+    schedule_start = _time(schedule_receipt.get("start_at_utc"), "SCHEDULE_START_INVALID")
+    schedule_observed = _time(schedule_receipt.get("captured_at_utc"), "SCHEDULE_CAPTURE_INVALID")
+    if schedule_start != game_start or schedule_observed >= game_start:
+        raise MLBGameLineReceiptError("SCHEDULE_START_NOT_PREMATCH_AUTHENTICATED")
     sealed = _time(archive_sealed_at_utc, "ARCHIVE_SEAL_TIMESTAMP_INVALID")
     if sealed < game_start:
         raise MLBGameLineReceiptError("ARCHIVE_NOT_SEALED_AFTER_START")
@@ -173,6 +186,8 @@ def audit_game_line_receipt_manifest(
         "close_capture_id": close_capture_id,
         "last_archived_pregame_quote": True,
         "final_receipt_present": True,
+        "schedule_receipt_shaped": True,
+        "schedule_source_independently_verified": False,
         "actual_last_book_quote_proven": False,
         "archive_completeness_independently_verified": False,
         "counted": False,
