@@ -23,9 +23,8 @@ def american_profit(odds, stake):
 
 
 def audit(rows):
-    """Audit supplied rows only; never infer outcomes, prices or timestamps."""
-    findings, seen, counts = [], set(), Counter()
-    profit = Decimal(0)
+    """Audit supplied rows only; conflicting settlements quarantine both rows."""
+    findings, candidates, conflicts = [], {}, set()
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
             findings.append((index, "INVALID_ROW", None))
@@ -35,8 +34,8 @@ def audit(rows):
             findings.append((index, "MISSING_FIELDS", missing))
             continue
         identity = (row["selection_id"], row["event_id"], row["model_version"])
-        if identity in seen:
-            findings.append((index, "DUPLICATE_SELECTION", identity))
+        if any(not isinstance(value, str) or not value.strip() for value in identity):
+            findings.append((index, "INVALID_SELECTION_IDENTITY", None))
             continue
         status = str(row["status"]).upper()
         if status not in SETTLED:
@@ -54,8 +53,22 @@ def audit(rows):
         except (ValueError, TypeError, InvalidOperation, OverflowError):
             findings.append((index, "INVALID_PRICE_OR_TIME", identity))
             continue
-        seen.add(identity)
-        counts[status] += 1
-        profit += pnl
+        fingerprint = (row["sport"], row["market"], captured, start, status, odds, stake)
+        if identity in conflicts:
+            findings.append((index, "CONFLICTING_SETTLEMENT", identity))
+            continue
+        if identity in candidates:
+            prior_index, _, _, prior_fingerprint = candidates[identity]
+            if fingerprint == prior_fingerprint:
+                findings.append((index, "DUPLICATE_SELECTION", identity))
+            else:
+                findings.append((prior_index, "CONFLICTING_SETTLEMENT", identity))
+                findings.append((index, "CONFLICTING_SETTLEMENT", identity))
+                del candidates[identity]
+                conflicts.add(identity)
+            continue
+        candidates[identity] = (index, status, pnl, fingerprint)
+    counts = Counter(candidate[1] for candidate in candidates.values())
+    profit = sum((candidate[2] for candidate in candidates.values()), Decimal(0))
     return {"counts": dict(counts), "profit_units": str(profit),
             "findings": findings, "accepted": sum(counts.values())}
