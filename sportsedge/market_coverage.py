@@ -346,6 +346,8 @@ def finalize_research_row(*, sport: str, game: str, selection: str, market: str,
             raise ValueError(f"RESEARCH_ROW_INVALID_NUMBER:{name}")
     if not (0 < win < 1) or not (0 <= push < 1) or win + push > 1:
         raise ValueError("RESEARCH_ROW_INVALID_PROBABILITY_MASS")
+    if not (0 <= min_ev <= 0.15):
+        raise ValueError("RESEARCH_ROW_INVALID_MIN_EV")
     if dec <= 1 or abs(price) < 100 or int(price) != price:
         raise ValueError("RESEARCH_ROW_INVALID_ODDS")
     expected_dec = 1 + (100 / abs(price) if price < 0 else price / 100)
@@ -367,9 +369,9 @@ def finalize_research_row(*, sport: str, game: str, selection: str, market: str,
         "odds_american": int(price),
         "line": line,
         "kickoff_utc": kickoff_iso,
-        "estimate_p": round(win, 6),
+        "estimate_p": round(win, 6) if 0 < round(win, 6) < 1 else win,
         "push_p": round(push, 6),
-        "loss_p": round(loss, 6),
+        "loss_p": round(loss, 6) if 0 < round(loss, 6) < 1 else loss,
         "book_break_even_p": round(breakeven, 6),
         "edge_over_break_even_pp": round(100 * (win - breakeven), 3),
         "ev_per_dollar": round(ev, 6),
