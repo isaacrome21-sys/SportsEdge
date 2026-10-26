@@ -322,17 +322,28 @@ def _separation_block(parts: dict) -> dict:
 
 
 def _v2_freeze_authorized(cfg: FamilyConfig) -> bool:
-    """Whether the V2 state ``cfg`` carries is a FROZEN state. The
-    freeze is the owner's act on the document/config state itself —
-    the ``status`` the V2 configs declare, which
-    :func:`load_nba_config` verifies at load time. The freeze gate
-    reads only this state: nothing a caller passes per call (rows,
-    flags, environment) can stand in for the freeze, and when the
-    owner performs the freeze — changing the document/config state
-    to its frozen form — the gate opens on that state with no
-    further code change."""
-    status = (cfg.status or "").upper()
-    return "FROZEN" in status and "NOT FROZEN" not in status
+    """Refuse unless the independently loaded, pinned V2 state is frozen.
+
+    A FamilyConfig is a mutable dataclass. Its ``status`` argument is
+    therefore NOT authority: a caller could change it after loading.
+    Re-read the registered V2 config and verify its pinned prereg text on
+    every counted invocation. Any loader refusal or drift between the
+    supplied and registered configs leaves the freeze closed.
+
+    The currently pinned V2 document and registered configs explicitly
+    say NOT FROZEN, so no counted run can pass. A future owner freeze
+    requires its own authenticated frozen record, corresponding pins,
+    and governed loader acceptance; changing a caller's field never
+    substitutes for that act.
+    """
+    try:
+        registered = load_nba_config(cfg.family, version="V2")
+    except (ForwardValidationRefusal, OSError, ValueError):
+        return False
+    if cfg != registered:
+        return False
+    status = (registered.status or "").upper()
+    return status.startswith("FROZEN") and "NOT FROZEN" not in status
 
 
 def evaluate_nba_props_v2(cfg: FamilyConfig, entry_rows: list,
