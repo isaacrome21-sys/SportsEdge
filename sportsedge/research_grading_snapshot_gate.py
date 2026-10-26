@@ -27,6 +27,10 @@ def _valid_snapshot(snapshot, selection):
     offers = snapshot["offers"]
     if not isinstance(offers, dict) or len(offers) != 2 or selection not in offers:
         return False
+    # A two-sided total is specifically OVER vs UNDER; two arbitrary labels
+    # must not satisfy the paired-quote or CLV gate.
+    if snapshot["market"] == "total" and set(offers) != {"OVER", "UNDER"}:
+        return False
     for value in offers.values():
         try:
             odds = Decimal(str(value))
