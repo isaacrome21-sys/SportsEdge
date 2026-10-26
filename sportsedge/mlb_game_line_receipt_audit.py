@@ -129,9 +129,11 @@ def audit_game_line_receipt_manifest(
         raise MLBGameLineReceiptError("ENTRY_CLOSE_ORDER_INVALID")
     if (game_start - close_at).total_seconds() > 60 * 60:
         raise MLBGameLineReceiptError("CLOSE_OUTSIDE_PRESTART_WINDOW")
-    last_archived = max((stamp, identity) for identity, (stamp, _) in snapshots.items() if stamp < game_start)
-    if last_archived[1] != close_capture_id:
-        raise MLBGameLineReceiptError("CLOSE_NOT_LAST_ARCHIVED_PREGAME_QUOTE")
+    pregame = [(stamp, identity) for identity, (stamp, _) in snapshots.items() if stamp < game_start]
+    last_time = max(stamp for stamp, _ in pregame)
+    last_ids = [identity for stamp, identity in pregame if stamp == last_time]
+    if last_ids != [close_capture_id]:
+        raise MLBGameLineReceiptError("CLOSE_NOT_UNIQUELY_LAST_ARCHIVED_QUOTE")
 
     if not isinstance(final, Mapping) or final.get("game_pk") != game_pk:
         raise MLBGameLineReceiptError("FINAL_GAME_ID_MISMATCH")
