@@ -53,6 +53,7 @@ def test_complete_shaped_manifest_does_not_grant_verification_or_count():
     ("close_capture_id", "missing", "ENTRY_OR_CLOSE_NOT_ARCHIVED"),
     ("archive_sealed_at_utc", "2027-04-01T19:59:00Z", "ARCHIVE_NOT_SEALED_AFTER_START"),
     ("market", "TEAM_TOTALS", "GAME_LINE_MARKET_NOT_FROZEN"),
+    ("official_date", "not-a-date", "OFFICIAL_DATE_INVALID"),
 ])
 def test_structural_refusals(field, value, reason):
     data = fixture()
