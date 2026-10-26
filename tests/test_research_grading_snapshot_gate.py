@@ -66,7 +66,7 @@ class SnapshotGateTests(unittest.TestCase):
     def test_malformed_odds_refused(self):
         self.assertEqual(check(entry={**ENTRY, "offers": {"OVER": "NaN", "UNDER": -110}})["admission"], "REFUSED")
     def test_close_sides_mismatch(self):
-        self.assertEqual(check(close={**CLOSE, "offers": {"OVER": -110, "DRAW": +150}})["reason"], "CLOSE_OFFER_SIDES_MISMATCH")
+        self.assertEqual(check(close={**CLOSE, "offers": {"OVER": -110, "DRAW": +150}})["reason"], "CLOSE_INCOMPLETE_OR_UNPAIRED")
     def test_timezone_naive_refused(self):
         self.assertEqual(check(evaluated_at="2026-10-25T12:02:30")["admission"], "REFUSED")
     def test_close_changed_line_contract_is_not_clv(self):
@@ -84,6 +84,19 @@ class SnapshotGateTests(unittest.TestCase):
     def test_invalid_close_contract_not_clv(self):
         self.assertEqual(check(close={**CLOSE, "contract_id": 44.5})["reason"],
                          "CLOSE_INCOMPLETE_OR_UNPAIRED")
+
+    def test_total_wrong_entry_side_pair_refused(self):
+        bad = {**ENTRY, "offers": {"OVER": -110, "DRAW": +150}}
+        self.assertEqual(check(entry=bad, close={**CLOSE, "offers": bad["offers"]})["admission"], "REFUSED")
+
+    def test_total_wrong_close_side_pair_not_clv(self):
+        self.assertFalse(check(close={**CLOSE, "offers": {"OVER": -110, "DRAW": +150}})["clv_ready"])
+
+    def test_other_market_two_sides_not_restricted(self):
+        entry = {**ENTRY, "market": "spread", "contract_id": "spread:full_game:-3.5:HOME_AWAY",
+                 "offers": {"HOME": -110, "AWAY": -110}}
+        close = {**entry, "snapshot_id": "close-2", "captured_at": "2026-10-25T12:04:00-05:00"}
+        self.assertTrue(check(entry=entry, close=close, selection="HOME")["clv_ready"])
 
     def test_no_ev_output(self):
         self.assertTrue(set(check()).isdisjoint({"ev", "model_probability", "clv"}))
