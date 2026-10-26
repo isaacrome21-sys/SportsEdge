@@ -50,6 +50,16 @@ class SnapshotGateTests(unittest.TestCase):
         self.assertFalse(check(close={**CLOSE, "offers": {"OVER": -110}})["clv_ready"])
     def test_close_at_start_no_clv(self):
         self.assertFalse(check(close={**CLOSE, "captured_at": START})["clv_ready"])
+    def test_close_at_evaluation_is_not_forward_clv(self):
+        result = check(close={**CLOSE, "captured_at": "2026-10-25T12:02:30-05:00"})
+        self.assertFalse(result["clv_ready"])
+        self.assertEqual(result["reason"], "CLOSE_NOT_LATER_THAN_EVALUATION")
+
+    def test_close_before_evaluation_is_not_forward_clv(self):
+        result = check(close={**CLOSE, "captured_at": "2026-10-25T12:01:00-05:00"})
+        self.assertFalse(result["clv_ready"])
+        self.assertEqual(result["reason"], "CLOSE_NOT_LATER_THAN_EVALUATION")
+
     def test_close_before_entry_no_clv(self):
         self.assertFalse(check(close={**CLOSE, "captured_at": "2026-10-25T11:59:00-05:00"})["clv_ready"])
     def test_malformed_odds_refused(self):
