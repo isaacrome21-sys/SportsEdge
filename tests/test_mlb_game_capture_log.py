@@ -93,3 +93,39 @@ def test_unknown_explicit_season_type_is_refused(season_type):
 def test_nonboolean_postseason_flags_are_refused(postseason):
     with pytest.raises(MLBCaptureLogError, match="POSTSEASON_FLAG_INVALID"):
         regime_for(official_date="2027-04-01", postseason=postseason)
+
+
+@pytest.mark.parametrize("field", ["intake_american", "close_american"])
+@pytest.mark.parametrize("bad", [
+    0, 99, -99, True, False, -115.9, 110.0, "-110.5",
+    "nan", "++110", "--110", "+-110", "110foo", "", [], {},
+])
+def test_malformed_american_odds_never_become_priced_receipts(field, bad):
+    payload = {
+        "game_id": "g", "market": "MONEYLINE", "selection": "HOME",
+        "official_date": "2027-04-01", "season_type": "R",
+        "intake_retrieved_at": "2027-04-01T16:00:00Z",
+        "intake_american": -110,
+        "close_retrieved_at": "2027-04-01T16:05:00Z",
+        "close_american": -115,
+    }
+    payload[field] = bad
+    code = "INTAKE_AMERICAN_INVALID" if field == "intake_american" else "CLOSE_AMERICAN_INVALID"
+    with pytest.raises(MLBCaptureLogError, match=code):
+        record_capture(payload)
+
+
+@pytest.mark.parametrize("intake,close", [
+    ("-110", "+100"), ("+125", "-105"), (-110, 120),
+])
+def test_valid_integral_american_odds_are_preserved_without_rounding(intake, close):
+    row = record_capture({
+        "game_id": "g", "market": "MONEYLINE", "selection": "HOME",
+        "official_date": "2027-04-01", "season_type": "R",
+        "intake_retrieved_at": "2027-04-01T16:00:00Z",
+        "intake_american": intake,
+        "close_retrieved_at": "2027-04-01T16:05:00Z",
+        "close_american": close,
+    })
+    assert row.intake_american == int(intake)
+    assert row.close_american == int(close)
