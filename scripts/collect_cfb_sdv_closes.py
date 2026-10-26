@@ -108,7 +108,7 @@ def apply_exclusions(merged: pd.DataFrame) -> pd.DataFrame:
     m.loc[default, ["excl_spread", "excl_total"]] = "E1_PLACEHOLDER_DEFAULT_SOURCE"
     m.loc[(m.excl_spread == "") & m.home_team_spread.isna(), "excl_spread"] = "E2_NO_SPREAD_VALUE"
     m.loc[(m.excl_total == "") & m.over_under.isna(), "excl_total"] = "E3_NO_TOTAL_VALUE"
-    m.loc[(m.excl_spread == "") & (m.game_spread_available == False), "excl_spread"] = \
+    m.loc[(m.excl_spread == "") & (~as_bool(m.game_spread_available)), "excl_spread"] = \
         "E4_SPREAD_FLAGGED_UNAVAILABLE"  # noqa: E501 - reason string kept whole
     notdone = (~m.completed) | m.home_points.isna() | m.away_points.isna()
     for col in ("excl_spread", "excl_total"):
