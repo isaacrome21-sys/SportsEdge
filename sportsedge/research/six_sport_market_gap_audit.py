@@ -39,7 +39,10 @@ def _nhl_keys(root: Path) -> list[str]:
         if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "_CAPABILITIES" for t in node.targets):
             if not isinstance(node.value, ast.Dict):
                 break
-            keys = [ast.literal_eval(k) for k in node.value.keys]
+            try:
+                keys = [ast.literal_eval(k) for k in node.value.keys]
+            except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError) as exc:
+                raise ValueError("NHL_CAPABILITY_KEYS_INVALID") from exc
             if keys and all(isinstance(k, str) and k for k in keys):
                 return sorted(set(keys))
     raise ValueError("NHL_CAPABILITY_KEYS_UNAVAILABLE")
@@ -63,6 +66,8 @@ def audit_market_gaps(root: Path) -> dict:
         if sport not in surface:
             add(sport, "__AUTOMATIC_LANE__", "MISSING_LANE",
                 "RUN_IT_SURFACE_MISSING_SPORT", "config/run_it_surface.json")
+        elif not isinstance(surface[sport], dict):
+            raise ValueError(f"RUN_IT_SPORT_ENTRY_NOT_OBJECT:{sport}")
         elif not surface[sport].get("automatic_command"):
             add(sport, "__AUTOMATIC_LANE__", "NO_AUTOMATIC_CAPTURE",
                 str(surface[sport].get("blocker") or "AUTOMATIC_CAPTURE_NOT_WIRED"),
