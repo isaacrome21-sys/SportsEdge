@@ -293,6 +293,7 @@ def test_live_collector_without_archive_refuses_before_fetch():
     assert "NHL_RAW_ARCHIVE_REQUIRED:live_receipt" in failures[0][1]
     assert calls == []
 
+
 def test_collector_quarantines_cross_game_landing(tmp_path):
     from scripts.collect_nhl_official_boxscores import collect_completed_games
     boxscore, landing = _live_payloads()
