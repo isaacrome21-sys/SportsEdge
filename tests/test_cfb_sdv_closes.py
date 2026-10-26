@@ -8,6 +8,7 @@ scripts/backtest_cfb_matchup_blend.py project(), the AM rating math, and
 the ROI convention (push excluded from the denominator, flat -110).
 """
 import importlib.util
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -214,3 +215,18 @@ def test_explicitly_affirmative_spread_flags_remain_scoreable(flag):
     frame, summary = collect.build_season(b, s)
     assert bool(frame.iloc[0].spread_scoreable)
     assert summary["spread_scoreable"] == 1
+
+
+def test_empty_market_stratum_uses_strict_json_no_data():
+    # A legitimate zero-row season/band must not serialize non-standard NaN
+    # or masquerade as a measured zero-error model.
+    empty = pd.DataFrame(columns=["home_team_spread", "actual_margin", "pm_margin"])
+    scored = evaluate.score_market(empty, "pm_margin", "spread",
+                                   evaluate.SD_MARGIN_PROD, evaluate.SD_MARGIN_LANE)
+    assert scored["status"] == "NO_DATA"
+    assert scored["n"] == 0
+    assert scored["model_mae"] is None and scored["close_mae"] is None
+    assert scored["bands"]["ge0"]["bets"] == 0
+    assert scored["bands"]["ge0"]["roi_flat_minus110_assumption"] is None
+    assert scored["calibration_prod_sds"][0]["n"] == 0
+    assert "NaN" not in json.dumps(scored, allow_nan=False)
