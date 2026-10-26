@@ -344,9 +344,12 @@ def finalize_research_row(*, sport: str, game: str, selection: str, market: str,
     for name, value in numeric.items():
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not isfinite(value):
             raise ValueError(f"RESEARCH_ROW_INVALID_NUMBER:{name}")
-    if not (0 < round(win, 6) < 1) or not (0 <= push < 1) or win + push > 1 + 1e-12:
+    if not (0 < win < 1) or not (0 <= push < 1) or win + push > 1:
         raise ValueError("RESEARCH_ROW_INVALID_PROBABILITY_MASS")
     if dec <= 1 or abs(price) < 100 or int(price) != price:
+        raise ValueError("RESEARCH_ROW_INVALID_ODDS")
+    expected_dec = 1 + (100 / abs(price) if price < 0 else price / 100)
+    if abs(dec - expected_dec) > 1e-9:
         raise ValueError("RESEARCH_ROW_INVALID_ODDS")
     loss = max(0.0, 1 - win - push)
     ev = win * (dec - 1) - loss
