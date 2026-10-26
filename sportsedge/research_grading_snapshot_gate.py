@@ -6,7 +6,7 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 
-REQUIRED_SNAPSHOT = ("snapshot_id", "captured_at", "book", "event_id", "market", "offers")
+REQUIRED_SNAPSHOT = ("snapshot_id", "captured_at", "book", "event_id", "market", "contract_id", "offers")
 
 
 def _time(value):
@@ -20,6 +20,9 @@ def _time(value):
 
 def _valid_snapshot(snapshot, selection):
     if not isinstance(snapshot, dict) or any(not snapshot.get(k) for k in REQUIRED_SNAPSHOT):
+        return False
+    # The source contract ID must encode period, selection pair and exact line.
+    if not isinstance(snapshot["contract_id"], str) or not snapshot["contract_id"].strip():
         return False
     offers = snapshot["offers"]
     if not isinstance(offers, dict) or len(offers) != 2 or selection not in offers:
@@ -67,6 +70,8 @@ def audit_grading_snapshots(*, entry, close, selection, evaluated_at, event_star
     for field in ("book", "event_id", "market"):
         if entry[field] != close[field]:
             return {**result, "reason": "CROSS_SOURCE_OR_MARKET_CLOSE"}
+    if entry["contract_id"] != close["contract_id"]:
+        return {**result, "reason": "CROSS_CONTRACT_CLOSE"}
     if set(entry["offers"]) != set(close["offers"]):
         return {**result, "reason": "CLOSE_OFFER_SIDES_MISMATCH"}
     try:
