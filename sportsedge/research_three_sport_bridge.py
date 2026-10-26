@@ -82,7 +82,8 @@ def _bridge_quote_status(captured_at, *, now):
             raise ResearchQuoteError("QUOTE_OVER_300S_REFUSED")
         return RESEARCH_AGED_QUOTE
     if code == QUOTE_FUTURE:
-        return "STALE_QUOTE"
+        # Future-dated captures are not observed prices: refuse before EV.
+        raise ResearchQuoteError("QUOTE_TIMESTAMP_IN_FUTURE_REFUSED")
     if code in (QUOTE_UNVERIFIED, QUOTE_INVALID):
         return "UNVERIFIED_QUOTE_FRESHNESS"
     raise ResearchQuoteError("QUOTE_FRESHNESS_CODE_UNRECOGNIZED:" + code)
@@ -410,15 +411,15 @@ def price_three_sport_research(model_rows: Sequence[Mapping], quotes: Sequence[M
                 row["status"] = "RESEARCH_CANDIDATE_NOT_VALIDATED"
             rows.append(row)
         except (ValueError, KeyError, TypeError) as exc:
-            if str(exc) == "QUOTE_OVER_300S_REFUSED":
+            if str(exc) in {"QUOTE_OVER_300S_REFUSED", "QUOTE_TIMESTAMP_IN_FUTURE_REFUSED"}:
                 # Preserve downstream WATCH indexing without presenting a
                 # refused old quote as a priced research candidate. No EV,
                 # probability, or no-vig fields are emitted for this row.
                 rows.append({**identity, "status": "WATCH_QUOTE_NOT_CURRENT",
                              "quote_status": "STALE_QUOTE",
-                             "quote_age_class": "QUOTE_OVER_300S_REFUSED",
+                             "quote_age_class": str(exc),
                              "quote_refused": True,
-                             "reason": "QUOTE_OVER_300S_REFUSED",
+                             "reason": str(exc),
                              "research_only": True, "official_authority": False,
                              "model_p_authority": False, "staking_authority": False})
             else:

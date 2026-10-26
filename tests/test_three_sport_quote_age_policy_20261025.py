@@ -125,3 +125,36 @@ def test_over_300_single_side_refused_without_model_ev():
     assert row["quote_age_class"] == "QUOTE_OVER_300S_REFUSED"
     assert "ev_per_dollar" not in row
     assert "model_probability" not in row
+
+
+@pytest.mark.parametrize("future_seconds", [0.001, 1, 120])
+def test_future_dated_quote_refused_before_research_ev(future_seconds):
+    with pytest.raises(ResearchQuoteError, match="QUOTE_TIMESTAMP_IN_FUTURE_REFUSED"):
+        _bridge_quote_status(stamp(-future_seconds), now=NOW)
+
+
+def test_one_future_side_refuses_entire_paired_quote_without_ev():
+    row = priced((0, -0.001))
+    assert row["status"] == "WATCH_QUOTE_NOT_CURRENT"
+    assert row["quote_status"] == "STALE_QUOTE"
+    assert row["quote_age_class"] == "QUOTE_TIMESTAMP_IN_FUTURE_REFUSED"
+    assert row["quote_refused"] is True
+    assert row["staking_authority"] is False
+    for field in ("ev_per_dollar", "model_probability", "dk_no_vig_p", "edge_pp"):
+        assert field not in row
+
+
+def test_future_single_side_prop_refuses_even_with_validated_family():
+    prop = {**model(), "market": "PLAYER_RECEIVING_YARDS",
+            "player_id": "synthetic-player", "line": 49.5}
+    quote = {**paired((-0.001,))[0], "market": "PLAYER_RECEIVING_YARDS",
+             "player_id": "synthetic-player", "line": 49.5}
+    row = price_three_sport_research(
+        [prop], [quote], as_of=NOW.isoformat(),
+        validation_resolver=lambda *_: {"validation_status": "VALIDATED"})["rows"][0]
+    assert row["status"] == "WATCH_QUOTE_NOT_CURRENT"
+    assert row["quote_refused"] is True
+    assert row["quote_age_class"] == "QUOTE_TIMESTAMP_IN_FUTURE_REFUSED"
+    assert row["staking_authority"] is False
+    for field in ("ev_per_dollar", "model_probability", "dk_no_vig_p", "edge_pp"):
+        assert field not in row
