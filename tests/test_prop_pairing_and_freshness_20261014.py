@@ -277,8 +277,9 @@ def test_prop_freshness_stale_when_as_of_is_one_hour_after_capture():
             if r.get("market") == "PITCHER_OUTS"]
     assert len(rows) == 2
     for row in rows:
-        assert row["status"] == "WATCH_QUOTE_NOT_CURRENT"
-        assert row["quote_status"] == "STALE_QUOTE"
+        assert row["status"] == "NO_MODEL_OR_MARKET"
+        assert row["reason"] == "QUOTE_OVER_300S_REFUSED"
+        assert "ev_per_dollar" not in row
 
 
 def test_capture_timestamps_never_rewritten_by_the_run():
@@ -310,5 +311,6 @@ def test_declared_as_of_governs_even_when_now_also_supplied():
             if r.get("market") == "PITCHER_OUTS"]
     assert len(rows) == 2
     for row in rows:
-        assert row["quote_status"] == "STALE_QUOTE"
-        assert row["status"] == "WATCH_QUOTE_NOT_CURRENT"
+        assert row["status"] == "NO_MODEL_OR_MARKET"
+        assert row["reason"] == "QUOTE_OVER_300S_REFUSED"
+        assert "ev_per_dollar" not in row

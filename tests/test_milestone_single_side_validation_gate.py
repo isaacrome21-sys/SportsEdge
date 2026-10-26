@@ -117,7 +117,9 @@ def test_one_sided_validated_family_prices_without_devig_fields():
 def test_one_sided_validated_family_status_ladder_mirrors_paired_path():
     stale = one([model()], [quote(captured="2026-10-11T19:00:00Z")],
                 validation_resolver=validated_resolver)
-    assert stale["status"] == "WATCH_QUOTE_NOT_CURRENT"
+    assert stale["status"] == "NO_MODEL_OR_MARKET"
+    assert stale["reason"] == "QUOTE_OVER_300S_REFUSED"
+    assert "ev_per_dollar" not in stale
     assert "dk_no_vig_p" not in stale
     capped = one([model()], [quote(odds=-170)],
                  validation_resolver=validated_resolver)

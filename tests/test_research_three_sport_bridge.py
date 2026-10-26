@@ -79,7 +79,9 @@ def test_unverified_odd_capture_does_not_become_playable_research_candidate():
     assert "dk_no_vig_p" not in row
     old = "2026-10-11T19:00:00Z"
     row2 = run(o=quote(captured=old), u=quote(selection="UNDER", captured=old))
-    assert row2["status"] == "WATCH_QUOTE_NOT_CURRENT"
+    assert row2["status"] == "NO_MODEL_OR_MARKET"
+    assert row2["reason"] == "QUOTE_OVER_300S_REFUSED"
+    assert "ev_per_dollar" not in row2
 
 
 def test_opposite_quote_timestamps_within_two_minutes_pair():

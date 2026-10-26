@@ -190,8 +190,10 @@ def test_missing_paired_quote_and_stale_quote_not_actionable():
     stale=run(rows=[quote("OVER",-110,quote_captured_at="2026-10-11T18:00:00Z"),
                     quote("UNDER",-110,quote_captured_at="2026-10-11T18:00:00Z")])
     assert len(stale["prop_candidates"])==0
-    assert len(stale["prop_watchlist"])==2
-    assert all(r["status"]=="WATCH_QUOTE_NOT_CURRENT" for r in stale["prop_watchlist"])
+    assert len(stale["prop_watchlist"])==0
+    assert len(stale["prop_unpriced"])==2
+    assert all(r["reason"]=="QUOTE_OVER_300S_REFUSED" for r in stale["prop_unpriced"])
+    assert all("ev_per_dollar" not in r for r in stale["prop_unpriced"])
 
 
 def test_game_in_progress_never_reuses_prior_history_model():

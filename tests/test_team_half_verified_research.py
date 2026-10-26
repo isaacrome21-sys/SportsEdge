@@ -112,7 +112,9 @@ def test_mlb_f5_ratio_five_ninths_and_stale_quotes():
             quote_captured_at="2026-10-11T19:00:00Z",side="UNDER")]
     out=priced(qs)
     assert all(x["score_period_fraction"]==5/9 for x in out)
-    assert all(x["status"]=="WATCH_QUOTE_NOT_CURRENT" for x in out)
+    assert all(x["status"]=="NO_MODEL_OR_MARKET" for x in out)
+    assert all(x["reason"]=="QUOTE_OVER_300S_REFUSED" for x in out)
+    assert all("ev_per_dollar" not in x for x in out)
 
 
 def test_player_owned_screenshot_features_never_flow_to_scoring():
