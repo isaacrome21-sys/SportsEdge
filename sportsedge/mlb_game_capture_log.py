@@ -5,7 +5,7 @@ regular-season calibration. This is a pipeline, not promotion evidence.
 """
 from __future__ import annotations
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Mapping
 
 
@@ -60,10 +60,13 @@ def regime_for(*, official_date: str, season_type: str | None = None, postseason
     # 2026 postseason shorthand is legacy evidence only, never a standing
     # rule for every future season. Future late-season rows need an explicit
     # source season type, since October may contain regular or playoff games.
-    day = str(official_date)
-    if "2026-10-01" <= day < "2027-01-01":
+    try:
+        day = date.fromisoformat(str(official_date))
+    except ValueError as exc:
+        raise MLBCaptureLogError("OFFICIAL_DATE_INVALID") from exc
+    if day.year == 2026 and day.month >= 10:
         return POSTSEASON
-    if day >= "2027-10-01":
+    if day.year >= 2027 and day.month >= 10:
         raise MLBCaptureLogError("FUTURE_LATE_SEASON_TYPE_REQUIRED")
     return REGULAR
 
