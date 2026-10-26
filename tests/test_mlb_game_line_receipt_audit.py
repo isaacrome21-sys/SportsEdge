@@ -64,7 +64,7 @@ def test_structural_refusals(field, value, reason):
 @pytest.mark.parametrize("key,value,reason", [
     ("captured_at_utc", "2027-04-01T18:40:00Z", "ENTRY_CLOSE_ORDER_INVALID"),
     ("captured_at_utc", "2027-04-01T20:00:00Z", "ENTRY_CLOSE_ORDER_INVALID"),
-    ("captured_at_utc", "2027-04-01T18:59:00Z", "ENTRY_CLOSE_ORDER_INVALID"),
+    ("captured_at_utc", "2027-04-01T18:59:00Z", "CLOSE_OUTSIDE_PRESTART_WINDOW"),
     ("game_pk", 124, "CAPTURE_CONTRACT_MISMATCH"),
     ("book", "Pinnacle", "CAPTURE_BOOK_MISMATCH"),
     ("line", 7.5, "CAPTURE_CONTRACT_MISMATCH"),
