@@ -72,3 +72,11 @@ def test_direct_finalizer_cannot_label_negative_ev_as_edge():
     result = row(win=.4, min_ev=0)
     assert result['ev_per_dollar'] < 0
     assert result['status'] == 'BELOW_THRESHOLD'
+
+
+def test_interior_push_near_one_not_exported_as_certain_push():
+    result = row(win=1e-9, push=.9999999)
+    assert 0 < result['estimate_p'] < 1
+    assert 0 < result['push_p'] < 1
+    assert 0 < result['loss_p'] < 1
+    assert result['estimate_p'] + result['push_p'] + result['loss_p'] <= 1 + 1e-6
