@@ -22,6 +22,10 @@ class SnapshotGateTests(unittest.TestCase):
         self.assertEqual(check(evaluated_at="2026-10-25T12:02:31-05:00")["admission"], "RESEARCH_AGED_QUOTE")
     def test_at_kickoff_refused(self):
         self.assertEqual(check(evaluated_at="2026-10-25T12:05:00-05:00")["admission"], "REFUSED")
+    def test_research_age_never_clv_ready(self):
+        result = check(evaluated_at="2026-10-25T12:02:31-05:00")
+        self.assertFalse(result["clv_ready"])
+        self.assertEqual(result["reason"], "RESEARCH_AGED_QUOTE_NOT_FORWARD_ELIGIBLE")
     def test_300_before_kickoff_research(self):
         self.assertEqual(check(event_start="2026-10-25T12:06:00-05:00", evaluated_at="2026-10-25T12:05:00-05:00")["admission"], "RESEARCH_AGED_QUOTE")
     def test_301_refused(self):
