@@ -52,18 +52,27 @@ class MLBCapturedGameRow:
 
 
 def regime_for(*, official_date: str, season_type: str | None = None, postseason: bool | None = None) -> str:
+    # Validate the official identity before allowing any season flag to decide.
+    try:
+        day = date.fromisoformat(str(official_date))
+    except (TypeError, ValueError) as exc:
+        raise MLBCaptureLogError("OFFICIAL_DATE_INVALID") from exc
+    if not isinstance(postseason, (bool, type(None))):
+        raise MLBCaptureLogError("POSTSEASON_FLAG_INVALID")
     code = str(season_type or "").strip().upper()
-    if postseason is True or code in {"P", "PS", "POST", "POSTSEASON", "PLAYOFFS"}:
+    post_codes = {"P", "PS", "POST", "POSTSEASON", "PLAYOFFS"}
+    regular_codes = {"R", "REG", "REGULAR", "REGULAR_SEASON"}
+    if code and code not in post_codes | regular_codes:
+        raise MLBCaptureLogError("SEASON_TYPE_UNKNOWN")
+    if code and postseason is not None and (code in post_codes) != postseason:
+        raise MLBCaptureLogError("SEASON_FLAGS_CONFLICT")
+    if postseason is True or code in post_codes:
         return POSTSEASON
-    if postseason is False or code in {"R", "REG", "REGULAR", "REGULAR_SEASON"}:
+    if postseason is False or code in regular_codes:
         return REGULAR
     # 2026 postseason shorthand is legacy evidence only, never a standing
     # rule for every future season. Future late-season rows need an explicit
     # source season type, since October may contain regular or playoff games.
-    try:
-        day = date.fromisoformat(str(official_date))
-    except ValueError as exc:
-        raise MLBCaptureLogError("OFFICIAL_DATE_INVALID") from exc
     if day.year == 2026 and day.month >= 10:
         return POSTSEASON
     if day.year >= 2027 and day.month >= 10:
