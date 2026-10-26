@@ -90,6 +90,10 @@ jobs:
             tests.test_mlb_moneyline_fresh_runtime \
             tests.test_mlb_moneyline_deployment_transition_gate \
             -v
+      - name: Audit MLB 2027 game capture clock
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python -m pytest -q tests/test_mlb_game_capture_log.py
       - name: Assert no provider secrets are required
         shell: bash
         run: |
