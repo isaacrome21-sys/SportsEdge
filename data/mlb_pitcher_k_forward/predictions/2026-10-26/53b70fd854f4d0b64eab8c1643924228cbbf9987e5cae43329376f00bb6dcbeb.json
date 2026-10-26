@@ -1,0 +1,47 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "candidate_p_over": 0.6194470833717562,
+  "candidate_p_push": 0.0,
+  "candidate_p_under": 0.38055291662824364,
+  "context_proof": {
+    "confirmed_lineup": "ABSENT",
+    "max_age_seconds": 1200,
+    "path": "runtime/mlb-context/runs/40395335664/2026-10-26/game_849804.json",
+    "plate_umpire": "PRESENT",
+    "retrieved_at": "2026-10-26T20:25:02.351503+00:00"
+  },
+  "entity_name": "Robert Gasser",
+  "evaluation_run_id": 37603403636,
+  "first_pitch_at_utc": "2026-10-27T00:00:00+00:00",
+  "fit_sha256": "70a31ff9b995a2d54df87feb2d51e2518fa9cd8593bf6c047970e08557b6ecea",
+  "game_pk": 849804,
+  "line": 3.5,
+  "market": "PITCHER_K",
+  "market_fair_p_over": 0.466082886082079,
+  "observed_at_utc": "2026-10-26T20:32:33.706167+00:00",
+  "over_odds": 102,
+  "pitcher_id": 688107,
+  "pitcher_team_id": 158,
+  "predicted_k_per_batter_faced": 0.1936230471237993,
+  "projected_batters_faced": 22,
+  "provider_event_id": "34893091",
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-26/props_20261026T203234.830601Z.json",
+  "receipt_sha256": "53b70fd854f4d0b64eab8c1643924228cbbf9987e5cae43329376f00bb6dcbeb",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_PREDICTION_V1",
+  "statcast_proof": {
+    "head_sha": "988a2242b26c40e9343a1605b9ce767e4ad45e51",
+    "manifest_path": "runtime/statcast/runs/40396391368/2026-10-26/manifest.json",
+    "pitcher_row_sha256": "e8d2142b2f01b967e3f960beb44ee635b44a8ea620de9f4f46292576d3cad704",
+    "pitchers_path": "runtime/statcast/runs/40396391368/2026-10-26/pitchers.json",
+    "provenance_path": "runtime/statcast/runs/40396391368/2026-10-26/provenance.json",
+    "retrieved_at": "2026-10-26T20:32:28.518223+00:00",
+    "run_id": "40396391368"
+  },
+  "status": "CAPTURED_PROSPECTIVE",
+  "under_odds": -131
+}
