@@ -190,3 +190,27 @@ def test_unique_close_game_ids_map_without_mutation():
     lookup = evaluate.close_lookup(closes)
     assert set(lookup) == {401, 402}
     assert lookup[402].over_under == pytest.approx(44.5)
+
+
+@pytest.mark.parametrize("flag", [False, "False", "FALSE", "0", 0, None, float("nan"), "", "unknown"])
+def test_spread_flag_must_be_explicitly_affirmative(flag):
+    # SDV CSV/object values can be strings or missing; == False silently
+    # misses them. A valid numeric spread alone cannot confer availability.
+    b = pd.DataFrame([_betting_row(501, "core_odds_api", -3.5, 51.5, avail=flag)])
+    s = pd.DataFrame([_sched_row(501)])
+    frame, summary = collect.build_season(b, s)
+    row = frame.iloc[0]
+    assert row.excl_spread == "E4_SPREAD_FLAGGED_UNAVAILABLE"
+    assert not bool(row.spread_scoreable)
+    assert summary["spread_scoreable"] == 0
+    # The flag applies only to spreads; a separately valid total remains.
+    assert bool(row.total_scoreable)
+
+
+@pytest.mark.parametrize("flag", [True, "TRUE", "true", "1", 1])
+def test_explicitly_affirmative_spread_flags_remain_scoreable(flag):
+    b = pd.DataFrame([_betting_row(502, "core_odds_api", -3.5, 51.5, avail=flag)])
+    s = pd.DataFrame([_sched_row(502)])
+    frame, summary = collect.build_season(b, s)
+    assert bool(frame.iloc[0].spread_scoreable)
+    assert summary["spread_scoreable"] == 1
