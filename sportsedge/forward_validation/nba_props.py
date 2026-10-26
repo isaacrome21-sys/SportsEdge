@@ -160,10 +160,9 @@ def load_nba_config(family: str, version: str = "V1") -> FamilyConfig:
     frozen header names, and declare the §9 picked/passed mode. Any
     drift refuses CONFIG_INVALID — a config that no longer matches
     its document is a different test and must not score under this
-    one's name. For V2 the config must additionally declare its
-    FINAL-CANDIDATE — NOT FROZEN status (a V2 config claiming frozen
-    is itself drift: the freeze is the owner's held act), and the V2
-    document on disk must verify against its pin
+    one's name. For V2 the config's NOT FROZEN or FROZEN state must match the
+    actual status header of the pinned on-disk V2 document; the owner
+    freeze is the documented change of both pins/statuses, not a caller flag
     (PREREG_PIN_MISMATCH, fail closed)."""
     if version == "V1":
         files, path_c, sha_c = CONFIG_FILES, PREREG_PATH, PREREG_SHA256
@@ -188,9 +187,16 @@ def load_nba_config(family: str, version: str = "V1") -> FamilyConfig:
     if cfg.prereg != path_c or cfg.prereg_sha256 != sha_c:
         problems["prereg_pin"] = {"prereg": cfg.prereg,
                                   "prereg_sha256": cfg.prereg_sha256}
-    if version == "V2" and "NOT FROZEN" not in cfg.status:
-        problems["status"] = {"status": cfg.status,
-                              "required": "FINAL-CANDIDATE — NOT FROZEN"}
+    if version == "V2":
+        # The pinned document is authoritative; the config cannot manufacture
+        # an independent freeze.
+        doc_state = _v2_document_freeze_state()
+        status = (cfg.status or "").upper()
+        cfg_state = ("NOT_FROZEN" if "NOT FROZEN" in status else
+                     "FROZEN" if "FROZEN" in status else "INVALID")
+        if cfg_state != doc_state:
+            problems["status"] = {"status": cfg.status,
+                                  "document_state": doc_state}
     if not cfg.picked_beats_passed_required:
         problems["picked_beats_passed_required"] = False
     if problems:
@@ -321,18 +327,32 @@ def _separation_block(parts: dict) -> dict:
             for name, rs in parts.items()}
 
 
-def _v2_freeze_authorized(cfg: FamilyConfig) -> bool:
-    """Whether the V2 state ``cfg`` carries is a FROZEN state. The
-    freeze is the owner's act on the document/config state itself —
-    the ``status`` the V2 configs declare, which
-    :func:`load_nba_config` verifies at load time. The freeze gate
-    reads only this state: nothing a caller passes per call (rows,
-    flags, environment) can stand in for the freeze, and when the
-    owner performs the freeze — changing the document/config state
-    to its frozen form — the gate opens on that state with no
-    further code change."""
-    status = (cfg.status or "").upper()
-    return "FROZEN" in status and "NOT FROZEN" not in status
+def _v2_document_freeze_state() -> str:
+    """Read held/frozen state from the exact pinned preregistration bytes.
+
+    Only the unique status header counts; later mentions of the phrase
+    NOT FROZEN elsewhere in the document are explanatory, not state.
+    """
+    verify_prereg_document("V2")
+    lines = (_REPO_ROOT / PREREG_PATH_V2).read_text(encoding="utf-8").splitlines()
+    headers = [line for line in lines[:12] if line.startswith("**Status: ")]
+    if len(headers) != 1:
+        raise ForwardValidationRefusal(
+            "CONFIG_INVALID", {"field": "v2_document_status_header"})
+    status = headers[0].upper()
+    if "NOT FROZEN" in status:
+        return "NOT_FROZEN"
+    if "FROZEN" in status:
+        return "FROZEN"
+    raise ForwardValidationRefusal(
+        "CONFIG_INVALID", {"field": "v2_document_status", "value": headers[0]})
+
+
+def _v2_freeze_authorized(authentic_cfg: FamilyConfig) -> bool:
+    """Authorize only the pinned document + on-disk config freeze state."""
+    status = (authentic_cfg.status or "").upper()
+    return (_v2_document_freeze_state() == "FROZEN"
+            and "FROZEN" in status and "NOT FROZEN" not in status)
 
 
 def evaluate_nba_props_v2(cfg: FamilyConfig, entry_rows: list,
@@ -348,7 +368,7 @@ def evaluate_nba_props_v2(cfg: FamilyConfig, entry_rows: list,
     — a V1 (or any non-V2-pinned) config is refused CONFIG_INVALID,
     so a V2 verdict can never issue under V1's pin.
 
-    FREEZE GATE: while the V2 state ``cfg`` carries declares NOT
+    FREEZE GATE: while the pinned document/config state remains NOT
     FROZEN (see :func:`_v2_freeze_authorized`), any input row that
     declares V2 + COUNTED and is prospective is a counted evaluation
     attempt, and the attempt is refused
@@ -362,24 +382,31 @@ def evaluate_nba_props_v2(cfg: FamilyConfig, entry_rows: list,
     no parameter, flag, or alternate public entry reaches the
     scorer around this gate.
     """
-    if cfg.prereg != PREREG_PATH_V2 or cfg.prereg_sha256 != PREREG_SHA256_V2:
+    # Re-load the genuine committed config and verify its pinned document
+    # for every counted evaluation; caller cfg objects cannot grant a freeze.
+    if len(cfg.markets) != 1 or cfg.markets[0] not in CONFIG_FILES_V2:
         raise ForwardValidationRefusal(
-            "CONFIG_INVALID",
-            {"field": "prereg_pin", "required": PREREG_ID_V2,
-             "found": cfg.prereg, "found_sha256": cfg.prereg_sha256})
+            "CONFIG_INVALID", {"field": "v2_family", "markets": cfg.markets})
+    authentic_cfg = load_nba_config(cfg.markets[0], version="V2")
     parts = partition_nba_rows(entry_rows)
     attempted = [r for r in parts["v2_counted_rows"]
                  if (r.get("label") or "PROSPECTIVE") != "HISTORICAL"]
-    if attempted and not _v2_freeze_authorized(cfg):
+    if attempted and not _v2_freeze_authorized(authentic_cfg):
         raise ForwardValidationRefusal(
             "V2_FREEZE_NOT_AUTHORIZED",
             {"prereg_id": PREREG_ID_V2,
-             "config_status": cfg.status,
+             "config_status": authentic_cfg.status,
              "attempted_counted_rows": len(attempted),
              "attempted_counted_row_ids": sorted(
                  r.get("row_id") or "<no row_id>" for r in attempted),
-             "rule": "a counted V2 evaluation requires an "
-                     "owner-authorized V2 freeze; V2 is NOT FROZEN"})
+             "rule": "counted V2 evaluation requires the owner's pinned "
+                     "document/config freeze; V2 is NOT FROZEN"})
+    if cfg != authentic_cfg:
+        raise ForwardValidationRefusal(
+            "CONFIG_INVALID",
+            {"field": "v2_caller_config_mismatch",
+             "required_sha256": authentic_cfg.sha256,
+             "caller_sha256": cfg.sha256})
     return _score_nba_props_v2(cfg, entry_rows, close_rows, outcomes,
                                slates_completed=slates_completed)
 
