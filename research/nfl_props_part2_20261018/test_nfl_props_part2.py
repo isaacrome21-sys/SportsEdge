@@ -487,3 +487,194 @@ def test_nonstring_market_refused_not_crash():
         {"player_id": "WR1", "market": ["RECEPTIONS"], "line": 5.5}]), CVS2)
     assert rows[0]["status"] == "REFUSED"
     assert rows[0]["reason"] == "INVALID_MARKET"
+
+
+# ---------- (e) B8 re-pin: sp_2025 played-game correction ----------
+# AMENDMENT_B8_SP2025_REPIN_20261026.md. The as-published sp_2025.csv.gz
+# carries zero-usage roster rows for players who did not play; the frozen
+# loader counts each as a played game (434 skill-player-weeks in 2025 reach
+# "3 prior games" with fewer than 3 played). The re-pin replaces that one
+# pin with the played-game-filtered artifact; no code, evaluator or other
+# pin changes.
+
+import build_sp_2025_played_v2 as b8gen  # noqa: E402
+
+B8_ORIGINAL_SP_2025_SHA256 = "c7401e321bdb369443f3280b9acd74ba6e16d82e710383bf1c01acabfebeac0b"
+B8_CORRECTED_NAME = "sp_2025_played_v2.csv.gz"
+B8_CORRECTED_SHA256 = "f2768ac1c71e5ed616307106df32ef8ad4fc7d548bb96600f6a616fb631f7b48"
+B8_FROZEN_OTHER_PINS = {
+    "PREREG_NFL_PROPS_CALIBRATION_V1.md":
+        "bef8d74ee1bfd3f1a753872c3e5fe428fbd00b6b98b5b911b4f8324ac1a7a148",
+    "ps_2018.csv.gz": "15730d75271ec10affc412b50b22fc8e3d6ce8f442d377936f65bc0044ef15bf",
+    "ps_2019.csv.gz": "d143b91c62380bed1587fe390e594d0e5555e8ebac81fcc7212ad7224115caf2",
+    "ps_2020.csv.gz": "e23a81d6ed3c94bd2dd14a5ee3ed94584a69e67fdb985c1ba0de4ccbc5a2bdcc",
+    "ps_2021.csv.gz": "a2fb266576a1bde5d7978005a5f6ccf83e3c023234da500d38cf6a14f40a01c8",
+    "ps_2022.csv.gz": "2b7dca6814993b9fd6ad3d4fdc56131663311bbe83281126e1ac441620d824ba",
+    "ps_2023.csv.gz": "b7590543f3c81dceb17d7577a1dce7b8ff1a9aacf0f562e3d7bbc7e60f37bc9b",
+    "ps_2024.csv.gz": "629b77e0c88d361f8b5c4a850e7866013aa670b7a5a94b7f1d0c591adf18f971",
+}
+
+
+def _spec_hashes() -> dict:
+    want = {}
+    for line in (HERE / "SPEC_HASHES.txt").read_text().splitlines():
+        h, name = line.split()
+        want[name] = h
+    return want
+
+
+def test_b8_repin_spec_hashes_registry():
+    want = _spec_hashes()
+    # the drifted artifact's pin is REPLACED, not supplemented: a data dir
+    # must never carry both files (the loader globs sp_*.csv.gz)
+    assert "sp_2025.csv.gz" not in want
+    assert want[B8_CORRECTED_NAME] == B8_CORRECTED_SHA256
+    assert B8_CORRECTED_SHA256 != B8_ORIGINAL_SP_2025_SHA256
+    # every other pin is the frozen original, byte for byte
+    for name, h in B8_FROZEN_OTHER_PINS.items():
+        assert want[name] == h, name
+    assert set(want) == set(B8_FROZEN_OTHER_PINS) | {B8_CORRECTED_NAME}
+
+
+def test_b8_repin_leaves_evaluator_pin_untouched():
+    # lockstep is via SPEC_HASHES (the registry both the evaluator's
+    # check_hashes and this pricer's check_training_pins read); the
+    # evaluator file itself — and therefore its prereg pin — is unchanged
+    digest = hashlib.sha256((HERE / pricing.EVALUATOR_NAME).read_bytes()).hexdigest()
+    assert digest == pricing.EVALUATOR_SHA256 == \
+        "66de56155e3c36f90c1f39c648b24e724328ec86056dee0e9adbed57281bc25b"
+
+
+_B8_HEADER = ["player_id", "player_name", "position", "season", "week",
+              "season_type", "attempts", "passing_yards", "passing_tds",
+              "completions", "carries", "rushing_yards", "targets",
+              "receptions", "receiving_yards"]
+
+
+def _b8_row(pid, pos, week, st="REG", att=0, py=0, ptd=0, comp=0, car=0,
+            ry=0, tar=0, rec=0, recy=0):
+    return [pid, pid, pos, 2025, week, st, att, py, ptd, comp, car, ry,
+            tar, rec, recy]
+
+
+def _b8_synthetic_rows():
+    rows = [_b8_row("00-WR-POOL", "WR", w, att=0, tar=10, rec=7, recy=90)
+            for w in range(1, 7)]
+    rows += [_b8_row("00-WR-PHANTOM", "WR", w) for w in (1, 2, 3)]
+    rows += [_b8_row("00-WR-PHANTOM", "WR", 4, tar=9, rec=6, recy=72),
+             _b8_row("00-WR-PHANTOM", "WR", 5, tar=9, rec=7, recy=81),
+             _b8_row("00-WR-PHANTOM", "WR", 6, tar=9, rec=5, recy=64),
+             _b8_row("00-WR-PHANTOM", "WR", 19, st="POST")]
+    rows += [_b8_row("00-RB-REAL", "RB", 1, car=12, ry=55, tar=2, rec=2, recy=14),
+             _b8_row("00-RB-REAL", "RB", 2, car=14, ry=63, tar=3, rec=3, recy=19),
+             _b8_row("00-RB-REAL", "RB", 3, car=11, ry=47, tar=1, rec=1, recy=8)]
+    rows += [_b8_row("00-K-REAL", "K", w) for w in (1, 2, 3)]
+    rows += [_b8_row("00-LB-REAL", "LB", w) for w in (1, 2)]
+    return rows
+
+
+def _b8_write_gz(path, rows):
+    import csv
+    import gzip
+    import io
+    buf = io.StringIO()
+    w = csv.writer(buf, lineterminator="\n")
+    w.writerow(_B8_HEADER)
+    w.writerows(rows)
+    path.write_bytes(gzip.compress(buf.getvalue().encode(), mtime=0))
+
+
+def test_b8_played_filter_excludes_phantom_weeks(tmp_path):
+    src = tmp_path / "sp_2025.csv.gz"
+    _b8_write_gz(src, _b8_synthetic_rows())
+    payload, counts = b8gen.build_corrected(src)
+    # 21 rows in; exactly the WR's 3 REG + 1 POST phantom rows removed;
+    # the kicker's and linebacker's zero-offensive-usage rows are NOT
+    # this correction's to delete and survive untouched
+    assert counts["source_rows"] == 21
+    assert counts["removed_by_type"] == {"REG": 3, "POST": 1, "other": 0}
+    assert counts["kept_rows"] == 17
+    # deterministic: rebuilding from the same source is byte-identical
+    payload2, _ = b8gen.build_corrected(src)
+    assert payload2 == payload
+
+    corr_dir = tmp_path / "corr"
+    corr_dir.mkdir()
+    (corr_dir / B8_CORRECTED_NAME).write_bytes(payload)
+    orig_dir = tmp_path / "orig"
+    orig_dir.mkdir()
+    (orig_dir / "sp_2025.csv.gz").write_bytes(src.read_bytes())
+
+    corr = EV.load(corr_dir)[2025]
+    orig = EV.load(orig_dir)[2025]
+    assert [g[0] for g in corr["00-WR-PHANTOM"]] == [4, 5, 6]
+    assert [g[0] for g in orig["00-WR-PHANTOM"]] == [1, 2, 3, 4, 5, 6]
+    assert [g[0] for g in corr["00-K-REAL"]] == [1, 2, 3]
+    assert [g[0] for g in corr["00-LB-REAL"]] == [1, 2]
+    assert corr["00-RB-REAL"] == orig["00-RB-REAL"]
+
+    # the pricing consequence: at week 7 the phantom WR still prices, but
+    # from his 3 played games only — no phantom 0.0s in the priors, and
+    # games_logged stops inflating (mu is no longer dragged by 0.0 rows:
+    # pool is the pool WR's [90, 90, 90] in both runs)
+    capture = {"season": 2025, "week": 7, "rows": [
+        {"game_id": "G1", "player_id": "00-WR-PHANTOM", "market": "REC_YDS",
+         "line": 55.5, "over_price": -110, "under_price": -110,
+         "captured_at": "2025-10-20T18:00:00-05:00",
+         "kickoff": "2025-10-20T19:20:00-05:00"}]}
+    cvs = {m: 0.35 for m in EV.MARKETS}
+    rows_o, _ = pricing.price_rows(EV, EV.load(orig_dir), capture, cvs)
+    rows_c, _ = pricing.price_rows(EV, EV.load(corr_dir), capture, cvs)
+    assert rows_o[0]["status"] == rows_c[0]["status"] == "PRICED"
+    assert rows_o[0]["games_logged"] == 6
+    assert rows_o[0]["prior_values"] == [0.0, 0.0, 0.0, 72.0, 81.0, 64.0]
+    assert rows_o[0]["mu"] == pytest.approx((217.0 + 270.0) / 9.0)
+    assert rows_c[0]["games_logged"] == 3
+    assert rows_c[0]["prior_values"] == [72.0, 81.0, 64.0]
+    assert rows_c[0]["mu"] == pytest.approx((217.0 + 270.0) / 6.0)
+
+    # and the 434-pattern itself: at week 4 the phantom WR previously
+    # reached the 3-prior-game minimum on zero played games (failing only
+    # at the role gate); under the corrected artifact he has no priors
+    cap4 = dict(capture, week=4)
+    rows_o4, _ = pricing.price_rows(EV, EV.load(orig_dir), cap4, cvs)
+    rows_c4, _ = pricing.price_rows(EV, EV.load(corr_dir), cap4, cvs)
+    assert rows_o4[0]["status"] == "NOT_QUALIFIED"
+    assert rows_o4[0]["reason"].startswith("ROLE_MEAN")
+    assert rows_o4[0]["games_logged"] == 3
+    assert rows_c4[0]["status"] == "NOT_QUALIFIED"
+    assert rows_c4[0]["reason"] == "ONLY_0_PRIOR_GAMES"
+    assert rows_c4[0]["games_logged"] == 0
+
+
+def test_b8_staged_artifact_matches_pin():
+    """Skip-if-absent: when the re-pin staging data dir is present, the
+    artifact on disk must be the pinned one, the evaluator's hash check
+    must pass on that dir, and its loaded 2025 season must be phantom-free
+    (the S12 affected-weeks measure of the Oct 24 sweep reads 0)."""
+    import os
+    data_dir = Path(os.environ.get(
+        "NFL_PROPS_DATA_DIR",
+        Path.home() / "workspace/sportsedge/nfl_player_data_repin_20261026"))
+    artifact = data_dir / B8_CORRECTED_NAME
+    if not artifact.exists():
+        pytest.skip("re-pin staging data dir not present on this machine")
+    assert not (data_dir / "sp_2025.csv.gz").exists()  # never both files
+    digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    assert digest == _spec_hashes()[B8_CORRECTED_NAME] == B8_CORRECTED_SHA256
+    EV.check_hashes(data_dir)  # raises SystemExit on any pin mismatch
+    season = EV.load(data_dir)[2025]
+    affected = 0
+    for pid, games in season.items():
+        for w, pos, row in games:
+            usage = row["attempts"] + row["carries"] + row["targets"]
+            assert not (pos in b8gen.SKILL_POSITIONS and usage == 0.0), pid
+        if games[-1][1] not in b8gen.SKILL_POSITIONS:
+            continue  # the sweep's measure is over skill players only
+        for i in range(len(games)):
+            priors = games[:i]
+            played = [g for g in priors
+                      if g[2]["attempts"] + g[2]["carries"] + g[2]["targets"] > 0]
+            if len(priors) >= 3 and len(played) < 3:
+                affected += 1
+    assert affected == 0
