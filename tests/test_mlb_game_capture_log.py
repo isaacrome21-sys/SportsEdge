@@ -69,3 +69,27 @@ def test_2027_valid_two_capture_record_stays_research_only():
     assert row.regime == "REGULAR"
     assert row.intake_retrieved_at < row.close_retrieved_at
     assert row.authority_footer == "NOT Model_P / NOT Truth Gate / NOT OFFICIAL"
+
+@pytest.mark.parametrize("official_date", ["", "not-a-date", "2027-02-30"])
+@pytest.mark.parametrize("flags", [{"season_type": "R"}, {"season_type": "P"}, {"postseason": True}, {"postseason": False}])
+def test_explicit_flags_cannot_bypass_official_date_validation(official_date, flags):
+    with pytest.raises(MLBCaptureLogError, match="OFFICIAL_DATE_INVALID"):
+        regime_for(official_date=official_date, **flags)
+
+
+@pytest.mark.parametrize("season_type,postseason", [("R", True), ("P", False), ("REGULAR", True), ("POSTSEASON", False)])
+def test_conflicting_season_provenance_is_refused(season_type, postseason):
+    with pytest.raises(MLBCaptureLogError, match="SEASON_FLAGS_CONFLICT"):
+        regime_for(official_date="2027-04-01", season_type=season_type, postseason=postseason)
+
+
+@pytest.mark.parametrize("season_type", ["X", "UNKNOWN", "S"])
+def test_unknown_explicit_season_type_is_refused(season_type):
+    with pytest.raises(MLBCaptureLogError, match="SEASON_TYPE_UNKNOWN"):
+        regime_for(official_date="2027-04-01", season_type=season_type)
+
+
+@pytest.mark.parametrize("postseason", ["False", 0, 1, "True"])
+def test_nonboolean_postseason_flags_are_refused(postseason):
+    with pytest.raises(MLBCaptureLogError, match="POSTSEASON_FLAG_INVALID"):
+        regime_for(official_date="2027-04-01", postseason=postseason)
