@@ -267,7 +267,8 @@ def _single_side_row(*, identity, model, key, win, push, conditional, fair,
            "model_conditional_p": round(conditional, 6),
            "model_push_p": round(push, 6), "fair_american": fair,
            "dk_odds": own[3],
-           "ev_per_dollar": round(ev, 6), "quote_status": freshness,
+           "ev_per_dollar": round(ev, 6),
+           "quote_status": ("STALE_QUOTE" if freshness == RESEARCH_AGED_QUOTE else freshness),
            "quote_form": "SINGLE_SIDE",
            "ev_basis": "MODEL_PROBABILITY_VS_SINGLE_QUOTED_PRICE_NO_DEVIG",
            "family_validation_status": validation_state,
@@ -275,6 +276,8 @@ def _single_side_row(*, identity, model, key, win, push, conditional, fair,
            "quote_captured_at": own[4].isoformat(),
            "research_only": True, "official_authority": False,
            "model_p_authority": False, "staking_authority": False}
+    if freshness == RESEARCH_AGED_QUOTE:
+        row["quote_age_class"] = RESEARCH_AGED_QUOTE
     if freshness != "RECENT_CAPTURED_QUOTE":
         row["status"] = "WATCH_QUOTE_NOT_CURRENT"
     elif own[3] < ODDS_CAP:
@@ -387,12 +390,15 @@ def price_three_sport_research(model_rows: Sequence[Mapping], quotes: Sequence[M
                    "model_push_p": round(push, 6), "fair_american": fair,
                    "dk_odds": own[3], "dk_no_vig_p": round(market, 6),
                    "edge_pp": round(100 * (conditional - market), 3),
-                   "ev_per_dollar": round(ev, 6), "quote_status": freshness,
+                   "ev_per_dollar": round(ev, 6),
+           "quote_status": ("STALE_QUOTE" if freshness == RESEARCH_AGED_QUOTE else freshness),
                    "paired_quote_skew_seconds": round(pair_skew_seconds, 3),
                    "paired_quote_captured_at": [own[4].isoformat(),
                                                 other[4].isoformat()],
                    "research_only": True, "official_authority": False,
                    "model_p_authority": False, "staking_authority": False}
+            if freshness == RESEARCH_AGED_QUOTE:
+                row["quote_age_class"] = RESEARCH_AGED_QUOTE
             if freshness != "RECENT_CAPTURED_QUOTE":
                 row["status"] = "WATCH_QUOTE_NOT_CURRENT"
             elif own[3] < ODDS_CAP:
@@ -403,9 +409,21 @@ def price_three_sport_research(model_rows: Sequence[Mapping], quotes: Sequence[M
                 row["status"] = "RESEARCH_CANDIDATE_NOT_VALIDATED"
             rows.append(row)
         except (ValueError, KeyError, TypeError) as exc:
-            rows.append({**identity, "status": "NO_MODEL_OR_MARKET",
-                         "reason": str(exc)[:150], "research_only": True,
-                         "official_authority": False, "staking_authority": False})
+            if str(exc) == "QUOTE_OVER_300S_REFUSED":
+                # Preserve downstream WATCH indexing without presenting a
+                # refused old quote as a priced research candidate. No EV,
+                # probability, or no-vig fields are emitted for this row.
+                rows.append({**identity, "status": "WATCH_QUOTE_NOT_CURRENT",
+                             "quote_status": "STALE_QUOTE",
+                             "quote_age_class": "QUOTE_OVER_300S_REFUSED",
+                             "quote_refused": True,
+                             "reason": "QUOTE_OVER_300S_REFUSED",
+                             "research_only": True, "official_authority": False,
+                             "model_p_authority": False, "staking_authority": False})
+            else:
+                rows.append({**identity, "status": "NO_MODEL_OR_MARKET",
+                             "reason": str(exc)[:150], "research_only": True,
+                             "official_authority": False, "staking_authority": False})
     rows.sort(key=lambda r: (r["status"] != "RESEARCH_CANDIDATE_NOT_VALIDATED",
                              -r.get("ev_per_dollar", -1e6), str(r.get("game_id"))))
     return {"schema": "SPORTSEDGE_THREE_SPORT_GAMES_PROPS_RESEARCH_V1",
