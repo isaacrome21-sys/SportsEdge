@@ -114,6 +114,26 @@ def check_b8_active_runtime(data: Path, evaluator) -> dict:
     )
     if season_files != ["sp_2025_played_v2.csv.gz"]:
         raise SystemExit("B8_RUNTIME_CORRECTED_2025_FILE_SET_REQUIRED")
+    # The frozen evaluator loads *every* ps_*.csv.gz/sp_*.csv.gz file.
+    # A correct 2025 pin alone does not stop a malicious extra season file
+    # from entering its fitted pool (e.g. sp_extra.csv.gz). Admit only the
+    # exact filename set listed in the existing frozen SPEC_HASHES registry.
+    pinned_player_files = []
+    for line in (HERE / "SPEC_HASHES.txt").read_text().splitlines():
+        fields = line.split()
+        if len(fields) != 2:
+            raise SystemExit("B8_RUNTIME_PIN_REGISTRY_INVALID")
+        name = fields[1]
+        if name.startswith(("ps_", "sp_")) and name.endswith(".csv.gz"):
+            pinned_player_files.append(name)
+    loader_visible_files = sorted(
+        path.name
+        for pattern in ("ps_*.csv.gz", "sp_*.csv.gz")
+        for path in data.glob(pattern)
+    )
+    if (not pinned_player_files or len(pinned_player_files) != len(set(pinned_player_files))
+            or loader_visible_files != sorted(pinned_player_files)):
+        raise SystemExit("B8_RUNTIME_UNPINNED_PLAYER_FILE_SET")
     return evaluator.check_hashes(data)
 
 
