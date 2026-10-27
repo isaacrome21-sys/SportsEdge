@@ -169,5 +169,49 @@ class LedgerTests(unittest.TestCase):
                 self.assertNotIn("card_delivery", ledger._seen)
 
 
+    def test_constructor_receipt_failure_closes_open_fd(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            real_close = os.close
+            closed = []
+
+            def tracking_close(fd):
+                closed.append(fd)
+                return real_close(fd)
+
+            with patch("scripts.capture_attempt_ledger.os.close",
+                       side_effect=tracking_close):
+                with patch("scripts.capture_attempt_ledger.os.fsync",
+                           side_effect=OSError("disk failure")):
+                    with self.assertRaises(OSError):
+                        AttemptLedger(tmp, game_id="g", capture_kind="TEST",
+                                      due_utc="2026-01-01T00:00:00Z")
+            self.assertEqual(len(closed), 1)
+
+    def test_explicit_close_failure_still_releases_fd(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ledger = AttemptLedger(tmp, game_id="g", capture_kind="TEST",
+                                   due_utc="2026-01-01T00:00:00Z")
+            fd = ledger._fd
+            with patch("scripts.capture_attempt_ledger.os.write",
+                       side_effect=OSError("disk failure")):
+                with self.assertRaises(OSError):
+                    ledger.close()
+            with self.assertRaises(OSError):
+                os.fstat(fd)
+
+    def test_context_exit_failure_still_releases_fd(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ledger = AttemptLedger(tmp, game_id="g", capture_kind="TEST",
+                                   due_utc="2026-01-01T00:00:00Z")
+            fd = ledger._fd
+            with patch("scripts.capture_attempt_ledger.os.write",
+                       side_effect=OSError("disk failure")):
+                with self.assertRaises(OSError):
+                    ledger.__exit__(None, None, None)
+            with self.assertRaises(OSError):
+                os.fstat(fd)
+
+
+
 if __name__ == "__main__":
     unittest.main()
