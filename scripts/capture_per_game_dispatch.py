@@ -95,6 +95,7 @@ async def dispatch_due_games_async(
     *,
     max_workers: int = 12,
     now: Callable[[], datetime] = _utc_now,
+    failure_timeout_s: float = 2.0,
 ) -> list[DeliveryResult]:
     """Issue each eligible game independently; never await a hung sibling.
 
@@ -115,6 +116,9 @@ async def dispatch_due_games_async(
         raise ValueError("due games must be nonempty with unique event IDs")
     if type(max_workers) is not int or max_workers < 1:
         raise ValueError("max_workers must be a positive integer")
+    if (type(failure_timeout_s) not in (int, float)
+            or not 0 < failure_timeout_s <= 30):
+        raise ValueError("failure journal timeout must be bounded and positive")
     if not all(inspect.iscoroutinefunction(fn) for fn in
                (capture_one, deliver_one, record_failure)):
         raise ValueError("P0_CALLBACKS_MUST_BE_ASYNC")
@@ -132,10 +136,20 @@ async def dispatch_due_games_async(
 
     async def fail(game_id: str, reason: str) -> DeliveryResult:
         result = DeliveryResult(game_id, False, error=reason)
-        try:
-            await record_failure(game_id, reason)
-        except Exception as exc:
-            ledger_errors.append((game_id, f"FAILURE_LEDGER_WRITE_FAILED:{type(exc).__name__}"))
+        # A hung or cancellation-resistant journal must never block healthy
+        # siblings. Its missing durable receipt is a fatal aggregate error.
+        journal = asyncio.create_task(record_failure(game_id, reason))
+        done, _ = await asyncio.wait({journal}, timeout=failure_timeout_s)
+        if not done:
+            journal.cancel()
+            ledger_errors.append((game_id, "FAILURE_LEDGER_TIMEOUT"))
+        else:
+            try:
+                journal.result()
+            except asyncio.CancelledError:
+                ledger_errors.append((game_id, "FAILURE_LEDGER_CANCELLED"))
+            except Exception as exc:
+                ledger_errors.append((game_id, f"FAILURE_LEDGER_WRITE_FAILED:{type(exc).__name__}"))
         return result
 
     async def run_one(game: DueGame) -> DeliveryResult:
@@ -153,6 +167,8 @@ async def dispatch_due_games_async(
                 return await fail(game.game_id, "LATE_CAPTURE")
             try:
                 captured = capture.result()
+            except asyncio.CancelledError:
+                return await fail(game.game_id, "CAPTURE_CANCELLED")
             except Exception as exc:
                 return await fail(game.game_id, f"CAPTURE_FAILED:{type(exc).__name__}")
             if now() >= game.cutoff_utc:
@@ -170,6 +186,8 @@ async def dispatch_due_games_async(
                 return await fail(game.game_id, "DELIVERY_WINDOW_EXPIRED")
             try:
                 delivery.result()
+            except asyncio.CancelledError:
+                return await fail(game.game_id, "DELIVERY_CANCELLED")
             except Exception as exc:
                 return await fail(game.game_id, f"DELIVERY_FAILED:{type(exc).__name__}")
             if now() >= game.cutoff_utc:
