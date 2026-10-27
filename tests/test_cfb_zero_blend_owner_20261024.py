@@ -50,6 +50,7 @@ def test_cfb_lane_b_never_emits_market_ev(market, side, line, odds, opposite):
     assert retired["lane"] == "LANE_B_ANCHORED"
     assert retired["status"] == "LANE_B_UNAVAILABLE"
     assert retired["reason"] == "CFB_LANE_B_RETIRED_UNVALIDATED"
+    assert retired["anchor"]["status"] == "RETIRED_NO_OUT_OF_SAMPLE_WIN"
     assert retired["anchor"]["weight"] == 0.0
     for key in ("estimate_p", "ev_per_dollar", "fair_american",
                 "push_p", "fair_total", "fair_home_margin", "market_no_vig_p"):
