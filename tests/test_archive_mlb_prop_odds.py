@@ -196,3 +196,44 @@ class ArchiveMLBPropOddsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PrequoteContextWorkflowTests(unittest.TestCase):
+    def test_context_is_captured_before_quotes_and_persisted_with_them(self):
+        # Exercise the workflow's persistence shell in a temporary git repository.
+        # This guards against capturing context but leaving it invisible to the
+        # downstream reader, which reads only origin/data immutable run paths.
+        workflow = (SCRIPT.parent.parent / '.github/workflows/mlb-prop-pit-archive.yml').read_text()
+        self.assertLess(workflow.index('run: bash scripts/run_mlb_context_diagnostic.sh'),
+                        workflow.index('python scripts/archive_mlb_prop_odds.py |'))
+        start = workflow.index('          # Persist the preceding context')
+        end = workflow.index('          if git diff --cached --quiet', start)
+        shell = '\n'.join(line[10:] for line in workflow[start:end].splitlines())
+        import os
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ctx = root / 'artifacts/mlb-context/2026-10-26'
+            ctx.mkdir(parents=True)
+            payload = '{"game_id":"123","retrieved_at":"2026-10-26T20:00:00Z"}\n'
+            (ctx / 'game_123.json').write_text(payload)
+            repo = root / '.data-branch'
+            repo.mkdir()
+            subprocess.run(['git', 'init', '-q', str(repo)], check=True)
+            quotes = repo / 'runtime/mlb-prop-pit'
+            quotes.mkdir(parents=True)
+            (quotes / 'props_test.json').write_text('{}')
+            subprocess.run(['bash', '-eu', '-c', shell], cwd=root, check=True,
+                           env={**os.environ, 'GITHUB_RUN_ID': '1234', 'GITHUB_RUN_ATTEMPT': '2'})
+            archived = 'runtime/mlb-context/runs/1234_2_prop_prequote/2026-10-26/game_123.json'
+            self.assertEqual((repo / archived).read_text(), payload)
+            staged = subprocess.check_output(['git', 'diff', '--cached', '--name-only'], cwd=repo, text=True)
+            self.assertIn(archived, staged)
+            self.assertIn('runtime/mlb-prop-pit/props_test.json', staged)
+
+
+class ArchiveAuthorizationTests(unittest.TestCase):
+    def test_archive_mutation_requires_main_ref(self):
+        workflow = (SCRIPT.parent.parent / '.github/workflows/mlb-prop-pit-archive.yml').read_text()
+        archive_job = workflow.split('\n  archive:\n', 1)[1].split('\n  ', 1)[0]
+        self.assertIn("github.ref == 'refs/heads/main'", archive_job)
+        self.assertIn("github.event_name != 'pull_request'", archive_job)
