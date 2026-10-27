@@ -18,7 +18,10 @@ def main() -> int:
     out = Path("artifacts/mlb-context") / slate_date
     out.mkdir(parents=True, exist_ok=True)
     summary = {
-        "retrieved_at": now.isoformat(),
+        # The slate date is fixed at the start, but evidence may arrive much
+        # later. Never present the start clock as the source observation time.
+        "started_at": now.isoformat(),
+        "retrieved_at": None,
         "slate_date_ct": slate_date,
         "games": 0,
         "games_scheduled": 0,
@@ -33,10 +36,13 @@ def main() -> int:
         "failures": [],
     }
     try:
-        schedule = fetch_schedule(slate_date, now=now)
+        # The source adapter stamps after the HTTP response when `now` is
+        # omitted. Passing the pre-request clock would backdate a slow reply.
+        schedule = fetch_schedule(slate_date)
     except Exception as exc:
         summary["status"] = "ERROR"
         summary["failures"].append({"stage": "SCHEDULE", "reason": f"{type(exc).__name__}:{exc}"})
+        summary["retrieved_at"] = datetime.now(timezone.utc).isoformat()
         (out / "manifest.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 3
@@ -44,7 +50,7 @@ def main() -> int:
     summary["games_scheduled"] = len(schedule)
     for game in schedule:
         try:
-            snap = fetch_game_context(game.game_pk, now=now)
+            snap = fetch_game_context(game.game_pk)
             payload = {
                 "game_id": snap.game_id,
                 "retrieved_at": snap.retrieved_at,
@@ -73,6 +79,7 @@ def main() -> int:
         summary["status"] = "PASS"
     else:
         summary["status"] = "INCOMPLETE"
+    summary["retrieved_at"] = datetime.now(timezone.utc).isoformat()
     (out / "manifest.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 0 if summary["status"] in {"PASS", "NO_GAMES"} else 3

@@ -245,8 +245,12 @@ def determine_due(cfg: Mapping[str, Any], now: datetime, snapshot: Any, out_dir:
     return opener, final_expected
 
 
-def next_final_window(cfg: Mapping[str, Any], now: datetime, snapshot: Any, *, horizon_minutes: int = 35) -> tuple[datetime, datetime] | None:
-    """Return the earliest uncaptured FINAL window opening within the arm horizon."""
+def next_final_window(cfg: Mapping[str, Any], now: datetime, snapshot: Any, *, horizon_minutes: int = 50) -> tuple[datetime, datetime] | None:
+    """Return the earliest uncaptured FINAL window opening within the arm horizon.
+
+    Pre-arm long enough for a 45-minute early runner to survive a missing later
+    cron dispatch. Actual quote admission remains inside the frozen FINAL window.
+    """
     now = now.astimezone(timezone.utc)
     lead = timedelta(minutes=int(cfg["final_minutes_before_kickoff"]))
     width = timedelta(minutes=int(cfg["final_window_minutes"]))
@@ -448,6 +452,15 @@ def run(*, force: bool, as_of: datetime | None = None, write_missed_markers: boo
 
     try:
         board, date_header = fetch_once()
+        # now is the request START, not the observed quote time. A response
+        # completing after the frozen FINAL window must never be saved as close.
+        if final_expected:
+            at_receipt = final_expected_due_kickoffs(dict(cfg), board.received_at, snapshot)
+            if at_receipt != final_expected:
+                raise Blocked(
+                    "FINAL_RECEIPT_WINDOW_MISMATCH",
+                    f"request_started={iso_z(now)}; actual_receipt={iso_z(board.received_at)}",
+                )
         transport = board_transport(board)
         rows = game_rows_direct(transport, week_of=lambda dt: week_of(dt, cfg))
     except (Blocked, DirectCaptureError, ValueError) as exc:

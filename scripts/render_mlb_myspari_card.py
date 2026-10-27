@@ -27,6 +27,56 @@ from sportsedge.mlb_quote_move_guard import apply_quote_move_guard  # noqa: E402
 
 
 PRE_CONTEXT_STATUS = "PRE-CONTEXT · NOT FINAL"
+# The manual issue/fast-card renderer has no signed model-promotion authority.
+# A valid edge calculation is not evidence that a model has passed the owner\'s
+# forward validation and release gates. Never publish a bet label from here.
+NO_RELEASE_AUTHORITY_REASON = "RESEARCH_ONLY_NO_MODEL_PROMOTION_AUTHORITY"
+# Publication is fail-closed: only these explicitly non-betting outcomes may
+# pass through unchanged. Unicode zero-width/confusable bet labels and future
+# unknown status tokens must never preserve high-star promotional output.
+_NONBET_PUBLICATION_STATUSES = frozenset({
+    "LEAN", "NEEDS_CONFIRM", "PASS", "REVIEW", "NO_MODEL", "NO_ENGINE", "NO_DATA",
+    "UNPRICED", "REFUSED", "BLOCKED", "RESEARCH_ONLY", "NO_PRICE",
+})
+
+
+def withhold_unverified_actionable(rows: list[dict]) -> list[dict]:
+    """Demote presentation bets without changing predictions or other refusals.
+
+    Every entry point publishing this renderer (issue, manual snapshot and fast
+    card) uses this fail-closed boundary. A future promotion requires an
+    independently reviewed release gate, not an engine-supplied status flag.
+    """
+    safe_rows = []
+    for original in rows:
+        row = dict(original)
+        # Upstream issue text can carry harmless surrounding whitespace.
+        # It must not turn an unpromoted PLAY/ACTIONABLE claim into a bypass.
+        scored_status = str(row.get("scored_status") or "").strip().upper()
+        status = str(row.get("status") or "").strip().upper()
+        # This renderer has no signed model-promotion authority. Even a
+        # syntactically valid non-bet LEAN/PASS/REVIEW row cannot carry
+        # an upstream five-star badge into public JSON or the phone card.
+        row["star_rating"] = 0
+        if scored_status not in _NONBET_PUBLICATION_STATUSES or status not in _NONBET_PUBLICATION_STATUSES:
+            # Keep an existing independent refusal (e.g. NEEDS_CONFIRM/PASS)
+            # instead of accidentally weakening it to a lean.
+            safe_status = next((s for s in (scored_status, status)
+                                if s in _NONBET_PUBLICATION_STATUSES), "LEAN")
+            row["status"] = safe_status
+            row["scored_status"] = safe_status
+            row["star_rating"] = 0
+            raw_reasons = row.get("presentation_reason_codes") or ()
+            if isinstance(raw_reasons, str):
+                reasons = (raw_reasons,)
+            elif isinstance(raw_reasons, (tuple, list)):
+                reasons = tuple(raw_reasons)
+            else:
+                reasons = ()
+            if NO_RELEASE_AUTHORITY_REASON not in reasons:
+                row["presentation_reason_codes"] = reasons + (NO_RELEASE_AUTHORITY_REASON,)
+        safe_rows.append(row)
+    return safe_rows
 
 
 def _observed_at(payload: dict) -> datetime | None:
@@ -189,6 +239,9 @@ def main() -> int:
 
     rows = myspari_rows(payload, quote_age_seconds=age, names=names, team_sides=team_sides)
     rows = apply_quote_move_guard(rows, _prior_rows(args.snapshot, args.prior_snapshot))
+    # Do this after existing input/quote refusals and before BOTH output formats.
+    # The companion fast-market printer consumes card.json, not card.md.
+    rows = withhold_unverified_actionable(rows)
     games = payload.get("games") or ([{"resolved_game": payload.get("resolved_game")}] if payload.get("resolved_game") else [])
     notes = []
     for g in games:
@@ -216,6 +269,7 @@ def main() -> int:
         elif timestamp_sources:
             notes.append(f"Timestamp provenance: {', '.join(timestamp_sources)}.")
     notes.append("Rows rank by EV/$, highest first; missing evaluations remain marked.")
+    notes.append("RESEARCH ONLY: this card has no verified model-promotion authority. Calculated EV is not a betting recommendation; all would-be ACTIONABLE rows are LEAN.")
 
     if any("QUOTE_MOVE_NEEDS_CONFIRM" in (r.get("presentation_reason_codes") or ()) for r in rows):
         notes.append("NEEDS_CONFIRM: a price moved past the frozen screenshot-misread thresholds vs an earlier same-game board. Recheck the price before using this card.")
