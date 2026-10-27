@@ -194,6 +194,90 @@ class HardDeadlineDispatchTests(unittest.TestCase):
             ))
         self.assertIn("FAILURE_LEDGER_WRITE_FAILED", str(caught.exception))
 
+
+    def test_self_cancelled_capture_persists_failure_and_preserves_sibling(self):
+        async def scenario():
+            failures = []
+            delivered = []
+
+            async def capture(game_id, _):
+                if game_id == "cancel":
+                    raise asyncio.CancelledError()
+                return game_id
+
+            async def deliver(row, cutoff):
+                delivered.append(row.game_id)
+
+            async def failure(game_id, reason):
+                failures.append((game_id, reason))
+
+            rows = await dispatch_due_games_async(
+                [self.game("cancel"), self.game("healthy")],
+                capture, deliver, failure, max_workers=2)
+            return rows, failures, delivered
+
+        rows, failures, delivered = asyncio.run(scenario())
+        self.assertIn(("cancel", "CAPTURE_CANCELLED"), failures)
+        self.assertEqual(delivered, ["healthy"])
+        self.assertEqual([(r.game_id, r.succeeded) for r in rows],
+                         [("cancel", False), ("healthy", True)])
+
+    def test_self_cancelled_delivery_persists_failure_and_preserves_sibling(self):
+        async def scenario():
+            failures = []
+
+            async def capture(game_id, _):
+                return game_id
+
+            async def deliver(row, cutoff):
+                if row.game_id == "cancel":
+                    raise asyncio.CancelledError()
+
+            async def failure(game_id, reason):
+                failures.append((game_id, reason))
+
+            rows = await dispatch_due_games_async(
+                [self.game("cancel"), self.game("healthy")],
+                capture, deliver, failure, max_workers=2)
+            return rows, failures
+
+        rows, failures = asyncio.run(scenario())
+        self.assertIn(("cancel", "DELIVERY_CANCELLED"), failures)
+        self.assertFalse(rows[0].succeeded)
+        self.assertTrue(rows[1].succeeded)
+
+    def test_hung_failure_journal_is_fatal_but_bounded(self):
+        async def scenario():
+            async def capture(game_id, _):
+                raise RuntimeError("source missing")
+
+            async def deliver(row, cutoff):
+                pass
+
+            async def failure(game_id, reason):
+                await asyncio.Event().wait()
+
+            await asyncio.wait_for(dispatch_due_games_async(
+                [self.game("bad")], capture, deliver, failure,
+                failure_timeout_s=0.03), timeout=0.5)
+
+        with self.assertRaisesRegex(DeliveryFailures, "FAILURE_LEDGER_TIMEOUT"):
+            asyncio.run(scenario())
+
+    def test_failure_journal_self_cancel_is_fatal(self):
+        async def capture(game_id, _):
+            raise RuntimeError("source missing")
+
+        async def deliver(row, cutoff):
+            pass
+
+        async def failure(game_id, reason):
+            raise asyncio.CancelledError()
+
+        with self.assertRaisesRegex(DeliveryFailures, "FAILURE_LEDGER_CANCELLED"):
+            asyncio.run(dispatch_due_games_async(
+                [self.game("bad")], capture, deliver, failure))
+
     def test_refuses_sync_callbacks_before_dispatch(self):
         async def capture(game_id, _):
             return game_id
