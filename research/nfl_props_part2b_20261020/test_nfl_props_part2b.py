@@ -511,6 +511,29 @@ def test_b8_runtime_gate_rejects_mixed_2025_and_never_loads(tmp_path, monkeypatc
     assert not output.exists()
 
 
+def test_b8_runtime_gate_rejects_unpinned_ps_2025_before_load_or_output(tmp_path, monkeypatch):
+    import types
+
+    calls = []
+    ev = types.SimpleNamespace(
+        check_hashes=lambda directory: calls.append("hash") or {},
+        load=lambda directory: calls.append("load"),
+    )
+    monkeypatch.setattr(pricing, "load_evaluator", lambda: ev)
+    monkeypatch.setattr(pricing, "check_training_pins", lambda directory: {})
+    (tmp_path / "sp_2025_played_v2.csv.gz").write_bytes(b"corrected fixture")
+    (tmp_path / "ps_2025.csv.gz").write_bytes(b"unpinned duplicate")
+    output = tmp_path / "should_not_exist"
+    args = types.SimpleNamespace(
+        player_data=str(tmp_path), capture=str(tmp_path / "missing.json"),
+        out_dir=str(output),
+    )
+    with pytest.raises(SystemExit, match="B8_RUNTIME_CORRECTED_2025_FILE_SET_REQUIRED"):
+        pricing.cmd_price(args)
+    assert calls == []
+    assert not output.exists()
+
+
 def test_b8_repin_leaves_evaluator_pin_untouched():
     digest = hashlib.sha256((HERE / pricing.EVALUATOR_NAME).read_bytes()).hexdigest()
     assert digest == pricing.EVALUATOR_SHA256 == \
