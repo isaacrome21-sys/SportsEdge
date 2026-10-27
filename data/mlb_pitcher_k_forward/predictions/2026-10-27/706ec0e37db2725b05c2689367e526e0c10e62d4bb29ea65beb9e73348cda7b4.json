@@ -1,0 +1,47 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "candidate_p_over": 0.5488818999340994,
+  "candidate_p_push": 0.0,
+  "candidate_p_under": 0.45111810006590053,
+  "context_proof": {
+    "confirmed_lineup": "PRESENT",
+    "max_age_seconds": 1200,
+    "path": "runtime/mlb-context/runs/40598811012_1_prop_prequote/2026-10-27/game_849803.json",
+    "plate_umpire": "PRESENT",
+    "retrieved_at": "2026-10-27T22:59:19.251180+00:00"
+  },
+  "entity_name": "Dustin May",
+  "evaluation_run_id": 37603403636,
+  "first_pitch_at_utc": "2026-10-28T00:00:00+00:00",
+  "fit_sha256": "70a31ff9b995a2d54df87feb2d51e2518fa9cd8593bf6c047970e08557b6ecea",
+  "game_pk": 849803,
+  "line": 2.5,
+  "market": "PITCHER_K",
+  "market_fair_p_over": 0.4326243579578752,
+  "observed_at_utc": "2026-10-27T22:59:20.796192+00:00",
+  "over_odds": 118,
+  "pitcher_id": 669160,
+  "pitcher_team_id": 158,
+  "predicted_k_per_batter_faced": 0.17804469941490259,
+  "projected_batters_faced": 16,
+  "provider_event_id": "34905151",
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-27/props_20261027T225922.184510Z.json",
+  "receipt_sha256": "706ec0e37db2725b05c2689367e526e0c10e62d4bb29ea65beb9e73348cda7b4",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_PREDICTION_V1",
+  "statcast_proof": {
+    "head_sha": "a1b8587b97506f90bc92543ad1e4fb426712703f",
+    "manifest_path": "runtime/statcast/runs/40575062054/2026-10-27/manifest.json",
+    "pitcher_row_sha256": "7e46c5155bff8e1607d6dc63fecdc14b55a7fcc7232fdc5f3566e7ff79b2b4a1",
+    "pitchers_path": "runtime/statcast/runs/40575062054/2026-10-27/pitchers.json",
+    "provenance_path": "runtime/statcast/runs/40575062054/2026-10-27/provenance.json",
+    "retrieved_at": "2026-10-27T20:07:49.157293+00:00",
+    "run_id": "40575062054"
+  },
+  "status": "CAPTURED_PROSPECTIVE",
+  "under_odds": -151
+}

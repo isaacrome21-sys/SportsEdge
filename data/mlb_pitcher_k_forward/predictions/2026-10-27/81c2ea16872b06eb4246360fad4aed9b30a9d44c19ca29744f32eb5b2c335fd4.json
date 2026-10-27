@@ -1,0 +1,47 @@
+{
+  "authority": {
+    "forward_validation_evidence_only": true,
+    "official": false,
+    "production_activation": false,
+    "promotion": false
+  },
+  "candidate_p_over": 0.5997052578760393,
+  "candidate_p_push": 0.0,
+  "candidate_p_under": 0.40029474212396055,
+  "context_proof": {
+    "confirmed_lineup": "PRESENT",
+    "max_age_seconds": 1200,
+    "path": "runtime/mlb-context/runs/40598811012_1_prop_prequote/2026-10-27/game_849803.json",
+    "plate_umpire": "PRESENT",
+    "retrieved_at": "2026-10-27T22:59:19.251180+00:00"
+  },
+  "entity_name": "Griffin Jax",
+  "evaluation_run_id": 37603403636,
+  "first_pitch_at_utc": "2026-10-28T00:00:00+00:00",
+  "fit_sha256": "70a31ff9b995a2d54df87feb2d51e2518fa9cd8593bf6c047970e08557b6ecea",
+  "game_pk": 849803,
+  "line": 3.5,
+  "market": "PITCHER_K",
+  "market_fair_p_over": 0.5062344139650873,
+  "observed_at_utc": "2026-10-27T22:59:20.796192+00:00",
+  "over_odds": -116,
+  "pitcher_id": 643377,
+  "pitcher_team_id": 139,
+  "predicted_k_per_batter_faced": 0.2169409713077283,
+  "projected_batters_faced": 19,
+  "provider_event_id": "34905151",
+  "quote_archive_path": "runtime/mlb-prop-pit/2026-10-27/props_20261027T225922.184510Z.json",
+  "receipt_sha256": "81c2ea16872b06eb4246360fad4aed9b30a9d44c19ca29744f32eb5b2c335fd4",
+  "schema": "SPORTSEDGE_MLB_PITCHER_K_FORWARD_PREDICTION_V1",
+  "statcast_proof": {
+    "head_sha": "a1b8587b97506f90bc92543ad1e4fb426712703f",
+    "manifest_path": "runtime/statcast/runs/40575062054/2026-10-27/manifest.json",
+    "pitcher_row_sha256": "e5e9ecd004da531570c82bf3ecc6827a86bae083c28fcca4b1c1cb134c8308da",
+    "pitchers_path": "runtime/statcast/runs/40575062054/2026-10-27/pitchers.json",
+    "provenance_path": "runtime/statcast/runs/40575062054/2026-10-27/provenance.json",
+    "retrieved_at": "2026-10-27T20:07:49.157293+00:00",
+    "run_id": "40575062054"
+  },
+  "status": "CAPTURED_PROSPECTIVE",
+  "under_odds": -110
+}
