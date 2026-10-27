@@ -314,7 +314,7 @@ def build_archive_payload(
 ) -> dict[str, Any]:
     captured = (now or _utcnow()).astimezone(timezone.utc)
     slate = captured.astimezone(CT).date().isoformat()
-    full_schedule = fetch_schedule(slate, opener=opener, now=captured)
+    full_schedule = fetch_schedule(slate, opener=opener)  # retrieved_at = post-fetch receipt clock; caller time is not a receipt claim
     eligible = _eligible_games(captured, full_schedule)
 
     if not eligible:

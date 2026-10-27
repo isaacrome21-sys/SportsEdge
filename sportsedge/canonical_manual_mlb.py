@@ -47,7 +47,7 @@ def _schedule_date_for_quote(row: ManualQuote) -> str:
     return row.first_pitch_at.astimezone(CHICAGO_TZ).date().isoformat()
 
 def _resolve_game(row: ManualQuote, opener=urlopen, schedule: Iterable[GameSnapshot] | None = None):
-    rows = list(schedule) if schedule is not None else fetch_schedule(_schedule_date_for_quote(row), opener=opener, now=row.observed_at)
+    rows = list(schedule) if schedule is not None else fetch_schedule(_schedule_date_for_quote(row), opener=opener)  # retrieved_at = post-fetch receipt clock; run as-of time is not a receipt claim
     game_key = str(row.game_id).strip()
     matches = [g for g in rows if str(g.game_pk) == game_key]
     if not matches and "@" in game_key:
