@@ -138,3 +138,25 @@ def test_asserted_frozen_header_cannot_lift_public_counted_quarantine():
     with pytest.raises(ForwardValidationRefusal) as refusal:
         nb.evaluate_nba_props_v2(cfg, [row], [], [])
     assert refusal.value.reason == "V2_FREEZE_NOT_AUTHORIZED"
+
+
+def test_invalid_asserted_freeze_cannot_score_a_full_prospective_batch(monkeypatch):
+    """A syntactically valid FROZEN header is not owner authorization."""
+    cfg = nb.load_nba_config("player_points", "V2")
+    scorer_calls = []
+
+    def forbidden_score(*args, **kwargs):
+        scorer_calls.append((args, kwargs))
+        raise AssertionError("public V2 gate reached core scoring")
+
+    monkeypatch.setattr(nb.core, "evaluate_family", forbidden_score)
+    rows = [
+        {"row_id": f"quarantine-{index:03d}",
+         "prereg_id": nb.PREREG_ID_V2,
+         "counting_class": "COUNTED", "label": "PROSPECTIVE"}
+        for index in range(100)
+    ]
+    with pytest.raises(ForwardValidationRefusal) as refusal:
+        nb.evaluate_nba_props_v2(cfg, rows, [], [])
+    assert refusal.value.reason == "V2_FREEZE_NOT_AUTHORIZED"
+    assert scorer_calls == []
