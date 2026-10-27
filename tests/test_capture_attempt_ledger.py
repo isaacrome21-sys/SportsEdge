@@ -213,5 +213,36 @@ class LedgerTests(unittest.TestCase):
 
 
 
+    def test_explicit_close_in_context_is_idempotent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch("scripts.capture_attempt_ledger.os.close", wraps=os.close) as close_spy:
+                with AttemptLedger(tmp, game_id="g", capture_kind="TEST",
+                                   due_utc="2026-01-01T00:00:00Z") as ledger:
+                    ledger.close()
+                    ledger.close()
+                    with self.assertRaisesRegex(ValueError, "CAPTURE_LEDGER_CLOSED"):
+                        ledger.record("dispatch")
+                ledger.__exit__(None, None, None)
+                self.assertEqual(close_spy.call_count, 1)
+
+    def test_close_syscall_error_does_not_retry_fd_release(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ledger = AttemptLedger(tmp, game_id="g", capture_kind="TEST",
+                                   due_utc="2026-01-01T00:00:00Z")
+            fd = ledger._fd
+            with patch("scripts.capture_attempt_ledger.os.close",
+                       side_effect=OSError("simulated close failure")) as close_spy:
+                with self.assertRaises(OSError):
+                    ledger.close()
+                ledger.close()
+                ledger.__exit__(None, None, None)
+                self.assertEqual(close_spy.call_count, 1)
+            # The mock simulated failure before closing the real descriptor.
+            os.close(fd)
+
+
+
+
+
 if __name__ == "__main__":
     unittest.main()

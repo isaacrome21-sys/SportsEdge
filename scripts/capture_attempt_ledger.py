@@ -67,20 +67,31 @@ class AttemptLedger:
         self._seen: set[str] = set()
         self._terminal = False
         self._fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        self._closed = False
         try:
             # A target due time is a schedule assertion, not an observed event.
             # This write's observed clock must be the actual recording time.
             self.record("scheduled_due")
         except BaseException:
             # Constructor failures have no live instance for callers to close.
-            os.close(self._fd)
+            self._release_fd()
             raise
+
+    def _release_fd(self):
+        # Consume the descriptor once before the syscall: even if close()
+        # raises, finalizers cannot retry and close a reused numeric fd.
+        if self._closed:
+            return
+        self._closed = True
+        os.close(self._fd)
 
     def record(
         self, stage: str, *,
         source_timestamp_utc: str | None = None, raw: bytes | None = None,
         receipt_locator: str | None = None, detail: str | None = None,
     ) -> dict:
+        if self._closed:
+            raise ValueError("CAPTURE_LEDGER_CLOSED")
         if stage not in STAGES or self._terminal or stage in self._seen:
             raise ValueError("invalid, duplicate, or post-terminal stage")
         # No public observed-time injection: it would allow an after-cutoff
@@ -141,7 +152,7 @@ class AttemptLedger:
             if not self._terminal:
                 self.record("failure", detail="ATTEMPT_ENDED_WITHOUT_DELIVERY")
         finally:
-            os.close(self._fd)
+            self._release_fd()
 
     def __enter__(self):
         return self
@@ -152,5 +163,5 @@ class AttemptLedger:
                 self.record("failure", detail=f"UNHANDLED:{exc_type.__name__}" if exc_type
                             else "ATTEMPT_ENDED_WITHOUT_DELIVERY")
         finally:
-            os.close(self._fd)
+            self._release_fd()
         return False
