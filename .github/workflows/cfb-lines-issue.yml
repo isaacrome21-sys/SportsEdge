@@ -1,10 +1,8 @@
 name: cfb-lines-issue
 
-# Phone -> CFB card: open an issue titled "[CFB LINES] ..." whose body has
-#   season: 2026
-#   week: 6
-# and a ```json fenced board (same format as cfb-sdv-card). The card is posted
-# back as an issue comment. Owner only.
+# The former CFB SDV card is retired after failing market-close validation.
+# Keep this phone issue entry point fail-closed: acknowledge the submission,
+# but never invoke the retired pricer or publish its 0.25u probation output.
 on:
   issues:
     types: [opened, edited]
@@ -18,102 +16,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  card:
+  retired-card-refusal:
     if: github.actor == github.repository_owner && startsWith(github.event.issue.title, '[CFB LINES]')
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
     env:
-      PYTHONPATH: .
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       ISSUE: ${{ github.event.issue.number }}
+      # Preserve the existing secret-fallback contract; no provider call is made.
       CFBD_API_KEY: ${{ secrets.SPORTSEDGE_CFBD_API_KEY || secrets.CFBD_API_KEY }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        with:
-          python-version-file: '.python-version'
-      - run: python -m pip install --disable-pip-version-check -r requirements-test.txt
-      - name: Read issue body
-        id: intake
-        env:
-          BODY: ${{ github.event.issue.body }}
+      - name: Publish fail-closed retired-model status
         run: |
-          python - <<'PY'
-          import os, re, json
-          body = os.environ["BODY"]
-          season = re.search(r"season:\s*(\d{4})", body, re.I)
-          week = re.search(r"week:\s*(\d+)", body, re.I)
-          fence = re.search(r"```(?:json)?\s*(.*?)```", body, re.S)
-          if not (season and week and fence):
-              raise SystemExit("CFB_ISSUE_NEEDS_season_week_and_fenced_board")
-          board = json.loads(fence.group(1))
-          open("board.json", "w").write(json.dumps(board))
-          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-              f.write(f"season={season.group(1)}\nweek={week.group(1)}\n")
-          PY
-      - name: Run card
-        run: |
-          set -o pipefail
-          python scripts/run_cfb_sdv_card_v2.py --board-json "$(cat board.json)" \
-            --season "${{ steps.intake.outputs.season }}" --week "${{ steps.intake.outputs.week }}" \
-            > card.txt 2>&1
-      - name: Post card
-        if: always()
-        run: |
-          python - <<'PY'
-          import json, os
-          from pathlib import Path
-          lines = ["# SportsEdge CFB card", ""]
-          p = Path("artifacts/run_it/cfb_sdv_card.json")
-          if p.exists():
-              card = json.loads(p.read_text())
-              rows = list(card.get("results") or [])
-              def fmt_prob(p, *, signed=False):
-                  if p is None:
-                      return "MISSING"
-                  return f"{float(p)*100:+.1f}%" if signed else f"{float(p)*100:.1f}%"
-              def fmt(r):
-                  line = r.get("line")
-                  ln = "" if line is None or line == "" else (
-                      f" {float(line):+g}" if r.get("market") == "SPREAD" else f" {float(line):g}")
-                  odds = r.get("american_odds")
-                  price = f"{float(odds):+.0f}" if odds is not None else "MISSING"
-                  return (f"| {r.get('matchup') or r.get('game_id') or 'MISSING'} | "
-                          f"{str(r.get('market') or 'MISSING').title()} {str(r.get('side') or 'MISSING').title()}{ln} | "
-                          f"{price} | {fmt_prob(r.get('model_p'))} | "
-                          f"{fmt_prob(r.get('market_p'))} | {fmt_prob(r.get('edge'), signed=True)} | "
-                          f"{r.get('bet_status') or 'TRACK'} |")
-              hdr = ["| Game | Pick | Odds | Model | Market | Edge | Status |", "|---|---|---|---|---|---|---|"]
-              bets = [r for r in rows if r["bet_status"] == "BET"]
-              lines += [f"**{len(bets)} bets** (edge >= {card['edge_floor']*100:.0f}% vs no-vig; same-game guard keeps one team-outcome and one total). Both sides of every prop, side, and total are listed below.", ""]
-              lines += hdr + [fmt(r) for r in bets] + [""]
-              lines += ["<details><summary>All priced rows</summary>", ""] + hdr + [fmt(r) for r in rows] + ["", "</details>"]
-              proj = {}
-              for r in rows:
-                  proj[r["matchup"]] = (r["away_mean"], r["home_mean"])
-              lines += ["", "**Projected scores (away-home):** " + "; ".join(f"{k} {a:.1f}-{h:.1f}" for k, (a, h) in proj.items())]
-              board = card.get("full_board") or {}
-              summary = board.get("summary") or {}
-              quoted = [r for r in board.get("rows") or [] if r.get("reason") != "NO_QUOTE_OR_ENGINE_ROW"]
-              missing = sorted({str(r.get("market") or "") for r in board.get("rows") or [] if r.get("reason") == "NO_QUOTE_OR_ENGINE_ROW"})
-              lines += ["", "All props, sides, and totals",
-                        f"both_sides={card.get('both_sides')} catalog_complete={card.get('catalog_complete')} sides={summary.get('side_rows')} totals={summary.get('total_rows')} props={summary.get('prop_rows')}",
-                        "Quoted markets list both sides. MISSING probability or EV is never imputed. A missing opposite quote is not priced.",
-                        "",
-                        "| game | market | side | line | odds | note |",
-                        "| --- | --- | --- | --- | --- | --- |"]
-              for r in quoted:
-                  lines.append(f"| {r.get('game_id') or ''} | {r.get('market') or ''} | {r.get('selection') or r.get('side') or ''} | {'' if r.get('line') is None else r.get('line')} | {'' if r.get('american_odds') is None else r.get('american_odds')} | TRACK ONLY |")
-              if not quoted:
-                  lines.append("| | | | | | No quoted props, sides, or totals |")
-              if missing:
-                  lines += ["", "Unquoted catalog families (both sides BLOCKED, not omitted): " + ", ".join(missing)]
-          log = Path("card.txt").read_text() if Path("card.txt").exists() else ""
-          skipped = [l for l in log.splitlines() if l.startswith("SKIPPED") or "CFB_SDV_" in l]
-          if skipped:
-              lines += ["", "**Not priced:**", "```"] + skipped + ["```"]
-          if not p.exists():
-              lines += ["", "Run failed:", "```", log[-3000:], "```"]
-          Path("comment.md").write_text("\n".join(lines))
-          PY
-          gh issue comment "$ISSUE" --body-file comment.md
+          gh issue comment "$ISSUE" --body '**CFB_INCUMBENT_RETIRED_NO_OOS_WIN**
+
+          This CFB SDV construction failed out-of-sample market testing and is retired. Its prior BET/LEAN/probation outputs have no betting authority. No card was priced, no 0.25u probation play was issued, and no historical entry is counted.
+
+          **PAPER / 0u**. A successor needs a passing design-data viability screen, an independently reviewed preregistration, an owner freeze, and forward timestamped DraftKings entry/close evidence before any verdict.'

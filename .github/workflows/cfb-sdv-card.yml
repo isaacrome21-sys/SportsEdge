@@ -31,7 +31,6 @@ on:
         type: string
   pull_request:
     paths:
-      - scripts/run_cfb_sdv_card_v2.py
       - tests/test_cfb_sdv_card_v2.py
       - .github/workflows/cfb-sdv-card.yml
 
@@ -63,47 +62,11 @@ jobs:
           else
             echo "CFB_SDV_PUBLIC_INPUTS_FAILED; canonical CFBD fallback remains enabled"
           fi
-      - name: Price board
-        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
-        env:
-          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
-          GH_TOKEN: ${{ github.token }}  # gh api reads/writes CFBD issue cache
-          BOARD_JSON: ${{ inputs.board_json }}
-          INPUT_SEASON: ${{ inputs.season }}
-          INPUT_WEEK: ${{ inputs.week }}
-          INPUT_ASOF: ${{ inputs.asof }}
-          CFB_SDV_MAX_RETRY_SLEEP_SECONDS: "45"
-          CFB_SDV_PUBLIC_LIVE_DIR: ${{ runner.temp }}/cfb-sdv-live
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ "$GITHUB_EVENT_NAME" = "push" ] || [ "$BOARD_JSON" = "USE_COMMITTED" ]; then
-            # Prefer the committed Saturday board when requested or on push.
-            BOARD_JSON="$(cat config/cfb_saturday_2026_10_10_board.json)"
-            INPUT_SEASON=2026
-            INPUT_WEEK=6
-            INPUT_ASOF=""
-          fi
-          args=(--board-json "$BOARD_JSON" --season "$INPUT_SEASON" --week "$INPUT_WEEK")
-          [ -z "$INPUT_ASOF" ] || args+=(--asof "$INPUT_ASOF")
-          python scripts/run_cfb_sdv_card_v2.py "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: Audit directional total disagreement
+      - name: Refuse retired CFB model scoring
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         run: |
-          python -m unittest tests.test_cfb_sdv_total_bias_audit -v
-          python scripts/audit_cfb_sdv_total_bias.py --card artifacts/run_it/cfb_sdv_card.json --output artifacts/run_it/cfb_sdv_total_bias_audit.json | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: Independently compare target DK price to external books (research only)
-        if: github.event_name == 'workflow_dispatch' && inputs.reference_books_json != ''
-        env:
-          REFERENCE_BOOKS_JSON: ${{ inputs.reference_books_json }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          printf '%s' "$REFERENCE_BOOKS_JSON" > "$RUNNER_TEMP/cfb_reference_books.json"
-          python scripts/research_cfb_independent_consensus.py \
-            --card artifacts/run_it/cfb_sdv_card.json \
-            --reference-books "$RUNNER_TEMP/cfb_reference_books.json" \
-            --output artifacts/run_it/cfb_sdv_independent_consensus.json | tee -a "$GITHUB_STEP_SUMMARY"
+          echo 'CFB_INCUMBENT_RETIRED_NO_OOS_WIN — PAPER / 0u' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The former SDV card is retired. Public input collection is research only; no probabilities, EV, probation staking, card, or forward count is issued.' >> "$GITHUB_STEP_SUMMARY"
       - name: Upload captured public source evidence
         if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -112,14 +75,3 @@ jobs:
           path: ${{ runner.temp }}/cfb-sdv-live/
           if-no-files-found: warn
           retention-days: 7
-      - name: Upload card
-        if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: cfb-sdv-card
-          path: |
-            artifacts/run_it/cfb_sdv_card.json
-            artifacts/run_it/cfb_sdv_total_bias_audit.json
-            artifacts/run_it/cfb_sdv_independent_consensus.json
-          if-no-files-found: warn
-          retention-days: 14
