@@ -42,10 +42,18 @@ class FinalResult:
     occurred: bool | None = None       # yes/no markets (e.g. first HR, anytime TD)
 
 
+def _finite_derived(value: float, name: str) -> float:
+    """Reject overflow from individually finite settlement inputs."""
+    if not isfinite(value):
+        raise GradeError(f"GRADE_{name}_INVALID")
+    return value
+
+
 def _cmp(value: float, line: float, positive: str) -> str:
     if positive not in {"OVER", "UNDER"}:
         raise GradeError(f"GRADE_SELECTION_INVALID:{positive}")
-    if abs(value - line) < _EPS:
+    delta = _finite_derived(value - line, "DELTA")
+    if abs(delta) < _EPS:
         return PUSH
     return WIN if (value > line) == (positive == "OVER") else LOSS
 
@@ -70,7 +78,8 @@ def grade(pick: PickRecord | Mapping, result: FinalResult, *, family: str) -> st
             if line is None:
                 raise GradeError("GRADE_LINE_MISSING")
             handicap = _real(line, "LINE")  # line is the SELECTED side's handicap
-        margin = mine + handicap - theirs
+        subtotal = _finite_derived(mine + handicap, "MARGIN")
+        margin = _finite_derived(subtotal - theirs, "MARGIN")
         if abs(margin) < _EPS:
             return PUSH
         return WIN if margin > 0 else LOSS
@@ -79,7 +88,8 @@ def grade(pick: PickRecord | Mapping, result: FinalResult, *, family: str) -> st
             raise GradeError("GRADE_SCORE_OR_LINE_MISSING")
         away = _real(result.away_score, "AWAY_SCORE", nonnegative=True)
         home = _real(result.home_score, "HOME_SCORE", nonnegative=True)
-        return _cmp(away + home, _real(line, "LINE"), sel)
+        total = _finite_derived(away + home, "TOTAL")
+        return _cmp(total, _real(line, "LINE"), sel)
     if family in {"team_total", "prop"}:
         if result.stat is None or line is None:
             raise GradeError("GRADE_STAT_OR_LINE_MISSING")
@@ -121,9 +131,9 @@ def units(outcome: str, dk_price: int, stake: float = 1.0) -> float:
     if outcome not in (WIN, LOSS, PUSH):
         raise GradeError(f"GRADE_OUTCOME_INVALID:{outcome}")
     stake = _real(stake, "STAKE", nonnegative=True)
-    american_to_decimal(dk_price)
+    decimal = _finite_derived(american_to_decimal(dk_price), "PAYOUT")
     if outcome == WIN:
-        return stake * (american_to_decimal(dk_price) - 1)
+        return _finite_derived(stake * (decimal - 1), "PAYOUT")
     if outcome == LOSS:
         return -stake
     return 0.0
