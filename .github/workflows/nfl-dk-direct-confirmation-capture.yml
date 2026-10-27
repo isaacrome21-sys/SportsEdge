@@ -20,13 +20,15 @@ permissions:
   contents: write
 
 concurrency:
-  group: nfl-dk-direct-confirmation
+  # PR unit tests must never occupy the live capture lock while --armed waits.
+  # All schedule/dispatch jobs retain the same serialized capture group.
+  group: nfl-dk-direct-confirmation-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'capture' }}
   cancel-in-progress: false
 
 jobs:
   capture:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 80
     env:
       PYTHONPATH: ${{ github.workspace }}
     steps:
