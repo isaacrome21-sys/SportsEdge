@@ -84,7 +84,7 @@ def run_auto_mlb_native_odds(
     current = current.astimezone(timezone.utc)
     slate_date_ct = current.astimezone(CHICAGO_TZ).date().isoformat()
 
-    schedule = fetch_schedule(slate_date_ct, opener=opener, now=current)
+    schedule = fetch_schedule(slate_date_ct, opener=opener)  # retrieved_at = post-fetch receipt clock; run as-of time is not a receipt claim
     roster_names: dict[int, list[tuple[int, str]]] = {}
     roster_failures: list[dict[str, Any]] = []
     for game in schedule:
