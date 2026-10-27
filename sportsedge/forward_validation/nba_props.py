@@ -348,7 +348,7 @@ def _v2_document_freeze_state() -> str:
         raise ForwardValidationRefusal(
             "CONFIG_INVALID", {"field": "v2_document_status_header"})
     # Parse only the emphasized status field, never substrings in prose.
-    match = re.match(r"^\*\*Status: ([^*]+)\*\*(?:\s|$)", headers[0])
+    match = re.fullmatch(r"\*\*Status: ([^*]+)\*\*\s*", headers[0])
     if not match:
         raise ForwardValidationRefusal(
             "CONFIG_INVALID", {"field": "v2_document_status_header"})
