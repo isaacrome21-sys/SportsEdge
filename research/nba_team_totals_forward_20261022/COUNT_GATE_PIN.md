@@ -1,14 +1,15 @@
-# COUNT GATE PIN — NBA Team Totals Forward Test V1 (2026-10-26)
+# COUNT GATE PIN — NBA Team Totals Forward Test V1.1 (2026-10-27)
 
-New file. No frozen text is edited. The evaluator pin
+Security repair of the V1 publication gate after the Oct 27 #2504 landing.
+No frozen text is edited. The evaluator pin
 (`EVALUATOR_PIN.md`) is unchanged: the evaluator's bytes remain the
 pinned ones, and count admission lives here, outside the evaluator.
 
-- **Gate version:** `NBA_TT_COUNT_GATE_V1`
+- **Gate version:** `NBA_TT_COUNT_GATE_V1_1`
 - **Path:** `research/nba_team_totals_forward_20261022/count_gate_nba_team_totals_v1.py`
-- **Gate module sha256:** `46a979fc33163fe0af29ccba519cb09a813453114c9bbddeab9a76f48243f40c`
+- **Gate module sha256:** `723cc220aa2817916d7aa62321518c6a85203d4fba374c43e05f0572f4cca3b6`
 - **Gate tests:** `research/nba_team_totals_forward_20261022/test_count_gate_nba_team_totals_v1.py`
-  sha256 `98be034f50743a62d52ccdc4ea0c886b147415778eeaab1fac37fba14ce86a88`
+  sha256 `40e1def77d8f9537e7963b8a20f3f318f281b5a484d81a667a4f4f7b8b87e014`
 - **Admits evaluator:** `eval_nba_team_totals_v1.py` sha256
   `63db53129556de7a2d007020aebda9b1a5ed2ede7e4a5a0053ba6aaa2b761be9`
   (pin commit `37b541745154fb73985e761f7b21a7ba7a8b2381`), verified by
@@ -43,3 +44,30 @@ attester and attestation source); (2) sets the gate module's
 `RECEIPT_SHA256` to that file's sha256; (3) updates this pin's gate
 module sha256. Until then the forward clock remains on HOLD:
 no counted rows, no metrics, no verdict. PAPER / 0u.
+
+
+## V1.1 security correction (2026-10-27; no freeze act)
+
+The V1 publication gate merged at `e432b3573515bccaeb526ccf2480156c7348c5fa`
+with module sha256 `46a979fc33163fe0af29ccba519cb09a813453114c9bbddeab9a76f48243f40c`.
+Its public `publish_counted` parameters `receipt_path` and
+`receipt_sha256` let a caller supply BOTH a forged backdated receipt and
+the matching caller-computed digest, bypassing the intended absence of any
+installed trusted pin-push receipt.
+
+V1.1 retains the legacy keywords **only to reject them by name** with
+`CALLER_RECEIPT_OVERRIDE_FORBIDDEN`, before evaluator invocation or ledger
+writes. The sole receipt lookup is the module's internally configured
+`RECEIPT_PATH` and `RECEIPT_SHA256`; the latter remains `None` so
+all real counted publication attempts still fail closed with
+`TRUSTED_PIN_PUSH_RECEIPT_UNAVAILABLE`. Tests use a synthetic in-process
+module-constant fixture to probe *future* governed receipt logic; this is
+not an installed production receipt or owner freeze authorization.
+The adversarial test sends a multi-slate synthetic fully stamped cohort with a forged
+early receipt and its **matching self-hash** through the public function,
+asserting named refusal, zero calls to the scoring function and no ledger.
+
+The original evaluator remains pinned byte-for-byte as in EVALUATOR_PIN.md;
+this amendment
+changes only publication admission and its dedicated test pin. No k, seed,
+resamples, clock identities, historical results, or first counted slate change.

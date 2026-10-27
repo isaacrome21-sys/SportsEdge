@@ -49,7 +49,7 @@ import eval_nba_team_totals_v1 as ev
 
 HERE = Path(__file__).resolve().parent
 
-GATE_VERSION = "NBA_TT_COUNT_GATE_V1"
+GATE_VERSION = "NBA_TT_COUNT_GATE_V1_1"
 
 # The evaluator identity this gate admits: the sha256 attested in
 # EVALUATOR_PIN.md for the evaluator pinned at commit PIN_COMMIT.
@@ -197,15 +197,18 @@ def publish_counted(rows, entry_quotes, close_quotes, results, slates,
                     receipt_sha256=None):
     """The mandatory counted-publication boundary for this forward test.
 
-    Verifies the trusted pin-push receipt, the pinned evaluator bytes,
+    Refuses caller-supplied receipt locations/digests by name before scoring.
+    Verifies the internally pinned pin-push receipt, the pinned evaluator bytes,
     the frozen config, and per-row post-pin provenance; only then runs
     the pinned evaluator and appends one publication record to the
     forward ledger. Any failure raises CountAdmissionRefused before the
     evaluator is invoked and writes nothing.
     """
-    receipt = _load_receipt(
-        RECEIPT_PATH if receipt_path is None else receipt_path,
-        RECEIPT_SHA256 if receipt_sha256 is None else receipt_sha256)
+    # Explicit caller overrides are never receipt authority. The arguments
+    # remain only so legacy callers get a named refusal before any scoring.
+    if receipt_path is not None or receipt_sha256 is not None:
+        raise CountAdmissionRefused("CALLER_RECEIPT_OVERRIDE_FORBIDDEN")
+    receipt = _load_receipt(RECEIPT_PATH, RECEIPT_SHA256)
     evaluator_sha = hashlib.sha256(
         Path(ev.__file__).read_bytes()).hexdigest()
     if evaluator_sha != PINNED_EVALUATOR_SHA256:
