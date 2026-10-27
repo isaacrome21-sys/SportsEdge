@@ -561,6 +561,12 @@ def test_b8_runtime_guard_refuses_mixed_or_missing_2025_before_evaluator(tmp_pat
         pricing.check_b8_active_runtime(tmp_path, ev)
     assert calls == []
     extra.unlink()
+    ps_duplicate = tmp_path / "ps_2025.csv.gz"
+    ps_duplicate.write_bytes(b"second 2025 source family")
+    with pytest.raises(SystemExit, match="B8_RUNTIME_CORRECTED_2025_FILE_SET_REQUIRED"):
+        pricing.check_b8_active_runtime(tmp_path, ev)
+    assert calls == []
+    ps_duplicate.unlink()
     assert pricing.check_b8_active_runtime(tmp_path, ev) == {"pin": "ok"}
     assert calls == [tmp_path]
 
@@ -588,6 +594,29 @@ def test_b8_runtime_gate_fails_before_commit_or_model_load(tmp_path, monkeypatch
     )
     monkeypatch.setattr(pricing, "load_evaluator", lambda: ev)
     monkeypatch.setattr(pricing, "check_training_pins", lambda directory: {})
+    out = tmp_path / "uncreated"
+    args = types.SimpleNamespace(
+        player_data=str(tmp_path), capture=str(tmp_path / "missing.json"),
+        out_dir=str(out),
+    )
+    with pytest.raises(SystemExit, match="B8_RUNTIME_CORRECTED_2025_FILE_SET_REQUIRED"):
+        pricing.cmd_price(args)
+    assert calls == []
+    assert not out.exists()
+
+
+def test_b8_runtime_gate_rejects_unpinned_ps_2025_before_load_or_output(tmp_path, monkeypatch):
+    import types
+
+    calls = []
+    ev = types.SimpleNamespace(
+        check_hashes=lambda directory: calls.append("hash") or {},
+        load=lambda directory: calls.append("load"),
+    )
+    monkeypatch.setattr(pricing, "load_evaluator", lambda: ev)
+    monkeypatch.setattr(pricing, "check_training_pins", lambda directory: {})
+    (tmp_path / "sp_2025_played_v2.csv.gz").write_bytes(b"corrected fixture")
+    (tmp_path / "ps_2025.csv.gz").write_bytes(b"unpinned duplicate")
     out = tmp_path / "uncreated"
     args = types.SimpleNamespace(
         player_data=str(tmp_path), capture=str(tmp_path / "missing.json"),
