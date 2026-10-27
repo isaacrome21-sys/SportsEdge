@@ -5,10 +5,12 @@ must never be consumed as predictive Model_P features.
 """
 from __future__ import annotations
 
+import json
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
-import json
+from math import isfinite
 from typing import Any, Mapping
 
 
@@ -25,6 +27,10 @@ def require_aware_utc(value: datetime, *, field: str) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise MarketDataContractError(f"{field}_TIMEZONE_REQUIRED")
     return value.astimezone(timezone.utc)
+
+
+def _valid_payload_hash(value: Any) -> bool:
+    return isinstance(value, str) and re.fullmatch(r"[0-9a-fA-F]{64}", value) is not None
 
 
 @dataclass(frozen=True)
@@ -49,13 +55,23 @@ class MarketQuote:
         for field_name in ("provider", "book", "sport_key", "provider_event_id", "market", "selection"):
             if not str(getattr(self, field_name)).strip():
                 raise MarketDataContractError(f"{field_name.upper()}_REQUIRED")
-        if int(self.american_odds) == 0:
+        if (type(self.american_odds) is not int or abs(self.american_odds) < 100):
             raise MarketDataContractError("AMERICAN_ODDS_INVALID")
+        if self.point is not None:
+            if isinstance(self.point, bool):
+                raise MarketDataContractError("POINT_INVALID")
+            try:
+                point = float(self.point)
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise MarketDataContractError("POINT_INVALID") from exc
+            if not isfinite(point):
+                raise MarketDataContractError("POINT_INVALID")
+            object.__setattr__(self, "point", point)
         object.__setattr__(self, "captured_at", require_aware_utc(self.captured_at, field="CAPTURED_AT"))
         object.__setattr__(self, "provider_updated_at", require_aware_utc(self.provider_updated_at, field="PROVIDER_UPDATED_AT"))
         if self.commence_time is not None:
             object.__setattr__(self, "commence_time", require_aware_utc(self.commence_time, field="COMMENCE_TIME"))
-        if len(self.raw_payload_sha256) != 64:
+        if not _valid_payload_hash(self.raw_payload_sha256):
             raise MarketDataContractError("RAW_PAYLOAD_SHA256_INVALID")
 
     def as_dict(self) -> dict[str, Any]:
@@ -106,7 +122,7 @@ class PublicBettingSplit:
                 raise MarketDataContractError(f"{name.upper()}_OUT_OF_RANGE")
         if self.ticket_percent is None and self.money_percent is None:
             raise MarketDataContractError("PUBLIC_BETTING_SPLIT_EMPTY")
-        if self.raw_payload_sha256 is not None and len(self.raw_payload_sha256) != 64:
+        if self.raw_payload_sha256 is not None and not _valid_payload_hash(self.raw_payload_sha256):
             raise MarketDataContractError("RAW_PAYLOAD_SHA256_INVALID")
 
     @property
