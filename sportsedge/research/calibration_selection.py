@@ -14,7 +14,7 @@ from typing import Any, Iterable, Mapping, Sequence
 from .multi_market_backtest import BinaryResearchRow, ResearchBacktestError, canonicalize_rows
 
 EPS = 1e-9
-CALIBRATION_SELECTOR_VERSION = "chronological_calibration_selector_v1"
+CALIBRATION_SELECTOR_VERSION = "chronological_calibration_selector_v2"
 
 
 def _clip(p: float) -> float:
@@ -159,11 +159,28 @@ def select_calibrator(
     fraction = float(fit_fraction)
     if not 0.5 <= fraction <= 0.85:
         raise ResearchBacktestError("CALIBRATION_FIT_FRACTION_OUT_OF_RANGE")
+    # Repeated decisions for an event are correlated observations, not separate
+    # chronological experiments. A conflicting event clock cannot be repaired by
+    # sorting: refuse it rather than letting the event cross the split.
+    event_clocks = {}
+    for row in data:
+        previous = event_clocks.setdefault(row.event_id, row.event_start_ts)
+        if previous != row.event_start_ts:
+            raise ResearchBacktestError("CALIBRATION_EVENT_CLOCK_CONFLICT")
     split = int(len(data) * fraction)
+    # Keep the entire boundary kickoff cohort on the selection side. This also
+    # keeps all snapshots of the same event together, independent of ID order.
+    boundary = data[split].event_start_ts
+    while split > 0 and data[split - 1].event_start_ts == boundary:
+        split -= 1
     if split < 20 or len(data) - split < 20:
         raise ResearchBacktestError("CALIBRATION_INTERNAL_SPLIT_TOO_SMALL")
     fit_rows = data[:split]
     selection_rows = data[split:]
+    if max(row.event_start_ts for row in fit_rows) >= min(row.decision_ts for row in selection_rows):
+        raise ResearchBacktestError("CALIBRATION_FIT_EVENT_NOT_BEFORE_SELECTION_DECISION")
+    # This clock check is necessary but does not prove label availability.
+    # Authenticated settlement timestamps remain an upstream PIT requirement.
     fit_pairs = _pairs(fit_rows)
     selection_pairs = _pairs(selection_rows)
 

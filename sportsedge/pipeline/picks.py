@@ -22,9 +22,8 @@ def _finite_real(value: Any) -> bool:
 
 
 def american_to_decimal(price: int) -> float:
-    if isinstance(price, bool):
+    if type(price) is not int:
         raise PickRecordError(f"PICK_PRICE_INVALID:{price}")
-    price = int(price)
     if -100 < price < 100:
         raise PickRecordError(f"PICK_PRICE_INVALID:{price}")
     return 1 + (price / 100 if price > 0 else 100 / -price)
@@ -50,9 +49,26 @@ class PickRecord:
     game: str = ""            # "Away @ Home"
     subject: str | None = None
     opposite_price: int | None = None   # paired side at capture (for no-vig CLV)
+    span_seconds: float | None = None
+    capture_method: str | None = None
+    span_tier: str | None = None
     schema: str = SCHEMA
 
     def __post_init__(self) -> None:
+        if self.capture_method is not None and self.capture_method not in ("PRIMARY_BROWSER", "FALLBACK"):
+            raise PickRecordError("PICK_CAPTURE_METHOD_INVALID")
+        if self.span_seconds is None:
+            if self.span_tier is not None:
+                raise PickRecordError("PICK_SPAN_REQUIRED")
+        else:
+            if not _finite_real(self.span_seconds) or not 0 <= self.span_seconds <= 300:
+                raise PickRecordError("PICK_SPAN_INVALID")
+            tier = "FULL" if self.span_seconds <= 150 else "RESEARCH"
+            if self.span_tier is not None and self.span_tier != tier:
+                raise PickRecordError("PICK_SPAN_TIER_MISMATCH")
+            object.__setattr__(self, "span_tier", tier)
+            if tier == "RESEARCH" and self.ladder_status != "PAPER":
+                raise PickRecordError("PICK_RESEARCH_SPAN_REQUIRES_PAPER")
         if self.sport not in SPORTS:
             raise PickRecordError(f"PICK_SPORT_INVALID:{self.sport}")
         if not self.market or not self.selection:
@@ -89,11 +105,14 @@ class PickRecord:
 def make_pick(*, sport: str, market: str, selection: str, line: float | None, dk_price: int,
               captured_at: str, model_p: float, engine: str, ladder_status: str | None = None,
               game: str = "", subject: str | None = None, opposite_price: int | None = None,
-              ladder: Mapping[str, Any] | None = None) -> PickRecord:
+              ladder: Mapping[str, Any] | None = None,
+              span_seconds: float | None = None, capture_method: str | None = None,
+              span_tier: str | None = None) -> PickRecord:
     """Build a pick; ``ladder_status`` defaults to the market's own ladder entry."""
     if ladder_status is None:
         from .ladder import status_for
         ladder_status = status_for(sport, market, ladder=ladder)
-    return PickRecord(sport.upper(), market, str(selection).upper(), line, int(dk_price),
+    return PickRecord(sport.upper(), market, str(selection).upper(), line, dk_price,
                       captured_at, float(model_p), engine, expected_value(model_p, dk_price),
-                      ladder_status, game=game, subject=subject, opposite_price=opposite_price)
+                      ladder_status, game=game, subject=subject, opposite_price=opposite_price,
+                      span_seconds=span_seconds, capture_method=capture_method, span_tier=span_tier)
