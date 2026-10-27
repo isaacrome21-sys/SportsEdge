@@ -82,8 +82,8 @@ def test_complement_nonfinite_or_overflowed_line_blocks_instead_of_crashing(bad_
 @pytest.mark.parametrize("odds", [float("inf"), float("nan"), -110.5, -90, True, "garbage", "--110", "+-110", "++110", "9" * 5000])
 def test_sibling_quotes_never_copy_invalid_prices(odds):
     rows = [
-        {"market": "TOTALS", "side": "OVER", "line": 42.5, "american_odds": -110},
-        {"market": "TOTALS", "side": "UNDER", "line": 42.5, "american_odds": odds},
+        {"market": "TOTALS", "event_id": "e1", "side": "OVER", "line": 42.5, "american_odds": -110},
+        {"market": "TOTALS", "event_id": "e1", "side": "UNDER", "line": 42.5, "american_odds": odds},
     ]
     paired = attach_sibling_quotes(rows, group_key=lambda r: r["market"], side_of=lambda r: r["side"])
     assert paired[0].get("opposite_odds") is None
@@ -91,8 +91,8 @@ def test_sibling_quotes_never_copy_invalid_prices(odds):
 
 def test_sibling_quotes_require_opposing_market_selections():
     rows = [
-        {"market": "TOTALS", "side": "OVER", "line": 42.5, "american_odds": -110},
-        {"market": "TOTALS", "side": "HOME", "line": 42.5, "american_odds": -115},
+        {"market": "TOTALS", "event_id": "e1", "side": "OVER", "line": 42.5, "american_odds": -110},
+        {"market": "TOTALS", "event_id": "e1", "side": "HOME", "line": 42.5, "american_odds": -115},
     ]
     paired = attach_sibling_quotes(rows, group_key=lambda r: r["market"], side_of=lambda r: r["side"])
     assert all(r.get("opposite_odds") is None for r in paired)
@@ -100,8 +100,8 @@ def test_sibling_quotes_require_opposing_market_selections():
 
 def test_sibling_quotes_copy_only_unique_valid_complement():
     rows = [
-        {"market": "TOTALS", "side": "OVER", "line": 42.5, "american_odds": -110, "model_p": 0.55},
-        {"market": "TOTALS", "side": "UNDER", "line": 42.5, "american_odds": -105, "model_p": 0.45},
+        {"market": "TOTALS", "event_id": "e1", "side": "OVER", "line": 42.5, "american_odds": -110, "model_p": 0.55},
+        {"market": "TOTALS", "event_id": "e1", "side": "UNDER", "line": 42.5, "american_odds": -105, "model_p": 0.45},
     ]
     paired = attach_sibling_quotes(rows, group_key=lambda r: r["market"], side_of=lambda r: r["side"])
     assert paired[0]["opposite_odds"] == -105
@@ -131,12 +131,42 @@ def test_sibling_quotes_refuse_different_identity_even_with_weak_group_key(diffe
 
 def test_sibling_quotes_allow_opposite_spread_handicaps():
     rows = [
-        {"market": "SPREAD", "side": "HOME", "line": -3.5, "american_odds": -110},
-        {"market": "SPREAD", "side": "AWAY", "line": 3.5, "american_odds": -105},
+        {"market": "SPREAD", "event_id": "e1", "team_side": "HOME", "side": "HOME", "line": -3.5, "american_odds": -110},
+        {"market": "SPREAD", "event_id": "e1", "team_side": "AWAY", "side": "AWAY", "line": 3.5, "american_odds": -105},
     ]
     paired = attach_sibling_quotes(rows, group_key=lambda row: row["market"], side_of=lambda row: row["side"])
     assert paired[0]["opposite_odds"] == -105
     assert paired[1]["opposite_odds"] == -110
+
+
+@pytest.mark.parametrize("different_field", ["book", "captured_at", "price_captured_at"])
+def test_siblings_refuse_different_books_or_capture_clocks(different_field):
+    rows = [
+        {"market": "TOTALS", "event_id": "e1", "side": "OVER", "line": 42.5,
+         "american_odds": -110, different_field: "a"},
+        {"market": "TOTALS", "event_id": "e1", "side": "UNDER", "line": 42.5,
+         "american_odds": -105, different_field: "b"},
+    ]
+    paired = attach_sibling_quotes(rows, group_key=lambda row: row["market"], side_of=lambda row: row["side"])
+    assert all(row.get("opposite_odds") is None for row in paired)
+
+
+def test_siblings_refuse_missing_event_even_when_market_line_match():
+    rows = [
+        {"market": "TOTALS", "side": "OVER", "line": 42.5, "american_odds": -110},
+        {"market": "TOTALS", "side": "UNDER", "line": 42.5, "american_odds": -105},
+    ]
+    paired = attach_sibling_quotes(rows, group_key=lambda row: row["market"], side_of=lambda row: row["side"])
+    assert all(row.get("opposite_odds") is None for row in paired)
+
+
+def test_siblings_refuse_invalid_candidate_own_price():
+    rows = [
+        {"market": "TOTALS", "event_id": "e1", "side": "OVER", "line": 42.5, "american_odds": float("nan")},
+        {"market": "TOTALS", "event_id": "e1", "side": "UNDER", "line": 42.5, "american_odds": -105},
+    ]
+    paired = attach_sibling_quotes(rows, group_key=lambda row: row["market"], side_of=lambda row: row["side"])
+    assert all(row.get("opposite_odds") is None for row in paired)
 
 
 def test_public_context_receipt_must_be_sha256_hex():

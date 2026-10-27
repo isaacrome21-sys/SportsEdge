@@ -114,6 +114,10 @@ def attach_sibling_quotes(rows, *, group_key, side_of):
     for row in material:
         if row.get("opposite_odds") is not None:
             continue
+        # A supplied malformed own price is not an absent price.  Do not
+        # rehabilitate it using a different selection's valid quote.
+        if row.get("american_odds") is not None and not _valid_quote_odds(row.get("american_odds")):
+            continue
         key = group_key(row)
         side = side_of(row)
         matches = []
@@ -154,13 +158,24 @@ def _same_quoted_contract(first: Mapping[str, Any], second: Mapping[str, Any], s
     """
     identity = (
         "market", "engine_market", "provider_market", "game_id", "event_id",
-        "entity_id", "player_id", "subject", "participant", "team_side",
-        "provider", "bookmaker", "bookmaker_key",
+        "event_key", "matchup", "entity_id", "player_id", "subject", "participant",
+        "provider", "book", "bookmaker", "bookmaker_key", "sportsbook", "source",
+        "captured_at", "price_captured_at", "quote_time", "observed_at", "retrieved_at",
     )
+    # Without an identifiable event, a market-only group key can accidentally
+    # pair unrelated games that happen to have the same total and price.
+    event_ids = ("game_id", "event_id", "event_key", "matchup")
+    if not any(first.get(field) is not None and first.get(field) == second.get(field) for field in event_ids):
+        return False
     for field in identity:
         left, right = first.get(field), second.get(field)
         if (left is not None or right is not None) and left != right:
             return False
+
+    if {side, other_side} == {"OVER", "UNDER"}:
+        for field in ("team_side", "team_id"):
+            if first.get(field) != second.get(field):
+                return False
 
     first_line = first.get("line", first.get("point"))
     second_line = second.get("line", second.get("point"))
