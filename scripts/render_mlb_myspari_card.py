@@ -44,8 +44,10 @@ def withhold_unverified_actionable(rows: list[dict]) -> list[dict]:
     safe_rows = []
     for original in rows:
         row = dict(original)
-        scored_status = str(row.get("scored_status") or "").upper()
-        status = str(row.get("status") or "").upper()
+        # Normalize surrounding whitespace before the release decision:
+        # an upstream " ACTIONABLE" or "PLAY " is still a bet claim.
+        scored_status = str(row.get("scored_status") or "").strip().upper()
+        status = str(row.get("status") or "").strip().upper()
         if scored_status in _BETLIKE_STATUSES or status in _BETLIKE_STATUSES:
             # Keep an existing independent refusal (e.g. NEEDS_CONFIRM/PASS)
             # instead of accidentally weakening it to a lean.
@@ -54,7 +56,17 @@ def withhold_unverified_actionable(rows: list[dict]) -> list[dict]:
             row["status"] = safe_status
             row["scored_status"] = safe_status
             row["star_rating"] = 0
-            reasons = tuple(row.get("presentation_reason_codes") or ())
+            raw_reasons = row.get("presentation_reason_codes")
+            if isinstance(raw_reasons, str):
+                # A scalar reason is one audit code, not an iterable of
+                # individual characters.
+                reasons = (raw_reasons,) if raw_reasons else ()
+            elif isinstance(raw_reasons, (tuple, list, set)):
+                reasons = tuple(raw_reasons)
+            elif raw_reasons is None:
+                reasons = ()
+            else:
+                reasons = (str(raw_reasons),)
             if NO_RELEASE_AUTHORITY_REASON not in reasons:
                 row["presentation_reason_codes"] = reasons + (NO_RELEASE_AUTHORITY_REASON,)
         safe_rows.append(row)

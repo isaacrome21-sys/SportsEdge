@@ -4,6 +4,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 from scripts import render_mlb_myspari_card as renderer
 from scripts.print_mlb_fast_game_markets import actionable_game_rows
 
@@ -43,11 +45,38 @@ def test_release_guard_cannot_be_bypassed_by_engine_bet_claim_or_prior_refusal()
     assert renderer.withhold_unverified_actionable(safe) == safe  # repeat-safe
 
 
-def test_issue_card_and_json_and_fast_bets_are_all_research_only(tmp_path: Path, monkeypatch):
+@pytest.mark.parametrize("claim", [
+    "ACTIONABLE ", " ACTIONABLE", "  BET  ", " PLAY", "VERIFIED\t",
+    "\nOFFICIAL_BET ", " actionable ",
+])
+@pytest.mark.parametrize("field", ["scored_status", "status"])
+def test_whitespace_or_case_cannot_bypass_unverified_bet_guard(claim, field):
+    candidate = _candidate(status="NO_MODEL")
+    candidate[field] = claim
+    safe = renderer.withhold_unverified_actionable([candidate])[0]
+    assert safe["scored_status"] == safe["status"] == "NO_MODEL"
+    assert safe["star_rating"] == 0
+    assert renderer.NO_RELEASE_AUTHORITY_REASON in safe["presentation_reason_codes"]
+    assert actionable_game_rows({"rows": [safe]}) == []
+
+
+def test_existing_whitespace_refusal_and_scalar_reason_are_preserved():
+    candidate = _candidate(status=" ACTIONABLE ")
+    candidate["scored_status"] = " NEEDS_CONFIRM "
+    candidate["presentation_reason_codes"] = "QUOTE_MOVE_NEEDS_CONFIRM"
+    safe = renderer.withhold_unverified_actionable([candidate])[0]
+    assert safe["status"] == safe["scored_status"] == "NEEDS_CONFIRM"
+    assert safe["presentation_reason_codes"] == (
+        "QUOTE_MOVE_NEEDS_CONFIRM", renderer.NO_RELEASE_AUTHORITY_REASON)
+    assert renderer.withhold_unverified_actionable([safe])[0] == safe
+
+
+@pytest.mark.parametrize("claim", ["ACTIONABLE", " PLAY "])
+def test_issue_card_and_json_and_fast_bets_are_all_research_only(tmp_path: Path, monkeypatch, claim):
     engine = tmp_path / "engine.json"
     engine.write_text(json.dumps({"observed_at_utc": "2026-10-26T22:19:00+00:00", "results": []}))
     out = tmp_path / "out"
-    monkeypatch.setattr(renderer, "myspari_rows", lambda *args, **kwargs: [_candidate()])
+    monkeypatch.setattr(renderer, "myspari_rows", lambda *args, **kwargs: [_candidate(status=claim)])
     monkeypatch.setattr(renderer, "both_side_board_section", lambda payload: "")
     monkeypatch.setattr(sys, "argv", ["render_mlb_myspari_card.py", "--engine-output", str(engine),
                                     "--out-dir", str(out), "--as-of", "2026-10-26T22:19:30+00:00"])
