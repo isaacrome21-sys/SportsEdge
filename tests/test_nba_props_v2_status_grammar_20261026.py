@@ -88,7 +88,7 @@ def test_second_emphasized_status_outside_first_twelve_lines_refuses(
         tmp_path, monkeypatch):
     target = _synthetic_repin(tmp_path, monkeypatch, "FROZEN.")
     content = target.read_text(encoding="utf-8")
-    content += "\\n**Status: FINAL-CANDIDATE — NOT FROZEN.**\\n"
+    content += "\n**Status: FINAL-CANDIDATE — NOT FROZEN.**\n"
     target.write_text(content, encoding="utf-8")
     monkeypatch.setattr(nb, "PREREG_SHA256_V2",
                         sha256(content.encode()).hexdigest())
