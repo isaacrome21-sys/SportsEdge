@@ -80,3 +80,20 @@ def test_interior_push_near_one_not_exported_as_certain_push():
     assert 0 < result['push_p'] < 1
     assert 0 < result['loss_p'] < 1
     assert result['estimate_p'] + result['push_p'] + result['loss_p'] <= 1 + 1e-6
+
+
+@pytest.mark.parametrize('field', ['win', 'push', 'dec', 'price', 'line',
+                                   'home_mean', 'away_mean', 'min_ev'])
+@pytest.mark.parametrize('value', [10 ** 400, -(10 ** 400)])
+def test_oversized_python_integers_fail_closed_without_overflow(field, value):
+    # math.isfinite attempts an int -> float conversion and raises OverflowError
+    # for values this large. Public finalizer must issue the named refusal.
+    with pytest.raises(ValueError, match=f'^RESEARCH_ROW_INVALID_NUMBER:{field}$'):
+        row(**{field: value})
+
+
+def test_ordinary_research_pricing_survives_large_int_refusal():
+    valid = row(win=.6, price=-110, dec=1 + 100 / 110)
+    assert valid['status'] == 'RESEARCH_EDGE'
+    assert valid['research_only'] is True
+    assert valid['staking_authority'] is False
