@@ -317,41 +317,25 @@ def test_historical_v2_row_is_never_auto_counted():
 # ---------- freeze gate: the evaluator refuses unauthorized counting
 # (owner ruling, Oct 26, 2026 — independent review Concern 1) ----------
 
-def test_counted_evaluation_proceeds_once_v2_is_frozen(monkeypatch):
-    # Post-freeze symmetric form of the freeze-gate regression: the
-    # exact probe the independent review exposed — 100 synthetic V2
-    # COUNTED, PROSPECTIVE, fully stamped rows — now reaches scoring
-    # through the public entry, because the pinned document/config
-    # state is FROZEN (the owner's freeze act). The authorization the
-    # gate checks is the committed state, and it now authorizes.
+def test_counted_evaluation_is_quarantined_despite_frozen_status(monkeypatch):
+    # Incident regression on the PUBLIC function, not an internal diagnostic:
+    # #2757's FROZEN header cannot override a pre-review freeze timestamp.
     rows, closes, outcomes = beats_family("fz")
     assert len(rows) == 100
-    # Spy through to the framework scoring entry the evaluator calls:
-    # the counted attempt must reach scoring exactly once, with
-    # exactly the counted rows the partition admitted.
-    real_evaluate_family = fw_core.evaluate_family
     scoring_calls = []
 
     def scoring_spy(*args, **kwargs):
         scoring_calls.append((args, kwargs))
-        return real_evaluate_family(*args, **kwargs)
+        raise AssertionError("SCORING_PATH_REACHED")
 
     monkeypatch.setattr(fw_core, "evaluate_family", scoring_spy)
-    rec = evaluate_nba_props_v2(v2_cfg(), rows, closes, outcomes,
-                                slates_completed=4)
-    # (a) scoring was invoked exactly once — the gate no longer
-    # refuses a counted attempt under the frozen state.
-    assert len(scoring_calls) == 1
-    # (b) the verdict is the clean counted family's verdict, over
-    # exactly the 100 attempted counted rows and no others.
-    m = rec["markets"]["player_points"]
-    assert m["verdict"] == "BEATS_MARKET"
-    assert m["verdict_sample_rows"] == 100
-    assert m["picked_rows"] == 50 and m["passed_rows"] == 50
-    assert set(rec["counted_row_ids"]) == {r["row_id"] for r in rows}
-    assert rec["separation"]["v2_counted_rows"]["count"] == 100
-    assert rec["prereg_id"] == PREREG_ID_V2
-    assert rec["prereg_sha256"] == PREREG_SHA256_V2
+    with pytest.raises(ForwardValidationRefusal) as ei:
+        evaluate_nba_props_v2(v2_cfg(), rows, closes, outcomes,
+                              slates_completed=4)
+    assert ei.value.reason == "V2_FREEZE_NOT_AUTHORIZED"
+    assert ei.value.detail["attempted_counted_rows"] == 100
+    assert len(ei.value.detail["attempted_counted_row_ids"]) == 100
+    assert scoring_calls == []  # no metrics, count IDs, or verdict published
 
 
 def test_forged_caller_status_never_bypasses_document_state(monkeypatch):
@@ -376,8 +360,8 @@ def test_forged_caller_status_never_bypasses_document_state(monkeypatch):
     with pytest.raises(ForwardValidationRefusal) as ei:
         evaluate_nba_props_v2(forged, rows, closes, outcomes,
                               slates_completed=4)
-    assert ei.value.reason == "CONFIG_INVALID"
-    assert ei.value.detail["field"] == "v2_caller_config_mismatch"
+    assert ei.value.reason == "V2_FREEZE_NOT_AUTHORIZED"
+    assert ei.value.detail["attempted_counted_rows"] == 100
     assert scoring_calls == []
 
 
