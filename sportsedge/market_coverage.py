@@ -31,7 +31,7 @@ validated vs closes.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from math import exp, pi, sqrt
+from math import exp, isfinite, pi, sqrt
 from typing import Any, Mapping
 
 from artifacts.free_models import (
@@ -335,8 +335,33 @@ def finalize_research_row(*, sport: str, game: str, selection: str, market: str,
                           declared_assumptions: Mapping[str, Any] | None = None,
                           min_ev: float = 0.02) -> dict[str, Any]:
     """Build the standard research row; EV math identical for all game markets."""
-    win, push = bounded(win, 0, 1), bounded(push, 0, 1)
-    loss = bounded(1 - win - push, 0, 1)
+    # This boundary is also called directly by other market pricers. Never
+    # repair malformed model output by clipping it into a plausible edge.
+    numeric = {"win": win, "push": push, "dec": dec, "price": price,
+               "home_mean": home_mean, "away_mean": away_mean, "min_ev": min_ev}
+    if line is not None:
+        numeric["line"] = line
+    for name, value in numeric.items():
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(f"RESEARCH_ROW_INVALID_NUMBER:{name}")
+        try:
+            finite = isfinite(value)
+        except (OverflowError, ValueError, TypeError):
+            # Python converts arbitrary-size ints to float for isfinite();
+            # oversized inputs must take the same named fail-closed path.
+            raise ValueError(f"RESEARCH_ROW_INVALID_NUMBER:{name}") from None
+        if not finite:
+            raise ValueError(f"RESEARCH_ROW_INVALID_NUMBER:{name}")
+    if not (0 < win < 1) or not (0 <= push < 1) or win + push > 1:
+        raise ValueError("RESEARCH_ROW_INVALID_PROBABILITY_MASS")
+    if not (0 <= min_ev <= 0.15):
+        raise ValueError("RESEARCH_ROW_INVALID_MIN_EV")
+    if dec <= 1 or abs(price) < 100 or int(price) != price:
+        raise ValueError("RESEARCH_ROW_INVALID_ODDS")
+    expected_dec = 1 + (100 / abs(price) if price < 0 else price / 100)
+    if abs(dec - expected_dec) > 1e-9:
+        raise ValueError("RESEARCH_ROW_INVALID_ODDS")
+    loss = max(0.0, 1 - win - push)
     ev = win * (dec - 1) - loss
     breakeven = (1 - push) / dec
     status = "RESEARCH_EDGE" if ev >= min_ev and price >= -165 else "BELOW_THRESHOLD"
@@ -352,9 +377,9 @@ def finalize_research_row(*, sport: str, game: str, selection: str, market: str,
         "odds_american": int(price),
         "line": line,
         "kickoff_utc": kickoff_iso,
-        "estimate_p": round(win, 6),
-        "push_p": round(push, 6),
-        "loss_p": round(loss, 6),
+        "estimate_p": round(win, 6) if 0 < round(win, 6) < 1 else win,
+        "push_p": round(push, 6) if push == 0 or 0 < round(push, 6) < 1 else push,
+        "loss_p": round(loss, 6) if 0 < round(loss, 6) < 1 else loss,
         "book_break_even_p": round(breakeven, 6),
         "edge_over_break_even_pp": round(100 * (win - breakeven), 3),
         "ev_per_dollar": round(ev, 6),
@@ -374,6 +399,9 @@ def finalize_research_row(*, sport: str, game: str, selection: str, market: str,
     if declared_assumptions:
         row["declared_assumptions"] = dict(declared_assumptions)
     if extra:
+        collisions = row.keys() & extra.keys()
+        if collisions:
+            raise ValueError("RESEARCH_ROW_RESERVED_FIELDS:" + ",".join(sorted(collisions)))
         row.update(dict(extra))
     return row
 
