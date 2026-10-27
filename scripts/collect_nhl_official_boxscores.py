@@ -21,6 +21,7 @@ from urllib.request import Request, urlopen
 
 from sportsedge.sports.nhl.official_boxscore_source import (
     BOXSCORE_ENDPOINT,
+    LANDING_ENDPOINT,
     NHLOfficialCompletedGame,
     build_official_completed_game,
     completed_game_from_json_dict,
@@ -119,12 +120,17 @@ def collect_completed_games(
         url = BOXSCORE_ENDPOINT.format(game_id=game_id)
         try:
             payload, raw, captured_at = fetcher(url)
+            # The live Gamecenter boxscore carries no period scoring; the
+            # companion landing payload does. Fetch it so live-shape receipts
+            # can be built; a landing failure fails this game closed.
+            landing_payload, _, _ = fetcher(LANDING_ENDPOINT.format(game_id=game_id))
             games.append(build_official_completed_game(
                 payload=payload,
                 captured_at=captured_at,
                 raw_sha256=raw_sha256(raw),
                 source_uri=url,
-                source_version="nhl-web-api-v1",
+                source_version="nhl-web-api-v1-live2",
+                landing_payload=landing_payload,
             ))
         except Exception as exc:  # retain explicit per-game failure evidence
             failures.append((game_id, f"{type(exc).__name__}: {exc}"))

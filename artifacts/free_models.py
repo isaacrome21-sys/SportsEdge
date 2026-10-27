@@ -1299,7 +1299,10 @@ def calculate(row, provider, now, *, auto_context=True, min_ev=0.02,
               "hypothesis": "UNVALIDATED_OUT_OF_SAMPLE_REQUIRED"}
     b_home_mean, b_away_mean = home_mean, away_mean
     lane_b_blocked = None
-    if market == "TOTAL":
+    if sport == "CFB":
+        lane_b_blocked = "CFB_LANE_B_RETIRED_UNVALIDATED"
+        anchor["status"] = "RETIRED_NO_OUT_OF_SAMPLE_WIN"
+    elif market == "TOTAL":
         anchored_total = line + anchor_weight * (raw_total - line)
         shift = (anchored_total - raw_total) / 2
         b_home_mean += shift
