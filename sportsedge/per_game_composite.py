@@ -471,12 +471,24 @@ def run_composite(
         + [(key, pair) for key, plist in pairs_by_game.items()
            for pair in plist])
 
-    game_cards: list[tuple[tuple, list[dict], datetime, dict]] = []
+    # Preflight every game before invoking any pricing runner. A late invalid
+    # game must not allow earlier games to produce partial side effects.
+    from sportsedge.quote_freshness import check_quote_freshness, is_fresh
+    preflight: dict[tuple, datetime] = {}
     for key, game_rows in groups:
         stamps: list[Any] = [r.get("quote_captured_at") for r in game_rows]
         stamps += [p.get("captured_at") for p in pairs_by_game.get(key, [])]
         operative = operative_instant_for(
             stamps, override=overrides.get(key), game_label="|".join(key))
+        for stamp in stamps:
+            freshness = check_quote_freshness(stamp, now=wall, max_age_seconds=1800)
+            if not is_fresh(freshness):
+                raise CompositeRefusal("COMPOSITE_WALL_QUOTE_NOT_CURRENT:" + freshness["code"])
+        preflight[key] = operative
+
+    game_cards: list[tuple[tuple, list[dict], datetime, dict]] = []
+    for key, game_rows in groups:
+        operative = preflight[key]
         sub_payload: dict[str, Any] = {"lines": [dict(r) for r in game_rows]}
         if default_sport:
             sub_payload["sport"] = default_sport
