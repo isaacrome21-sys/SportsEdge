@@ -67,9 +67,14 @@ class AttemptLedger:
         self._seen: set[str] = set()
         self._terminal = False
         self._fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-        # A target due time is a schedule assertion, not an observed event.
-        # This write's observed clock must be the actual recording time.
-        self.record("scheduled_due")
+        try:
+            # A target due time is a schedule assertion, not an observed event.
+            # This write's observed clock must be the actual recording time.
+            self.record("scheduled_due")
+        except BaseException:
+            # Constructor failures have no live instance for callers to close.
+            os.close(self._fd)
+            raise
 
     def record(
         self, stage: str, *,
@@ -132,16 +137,20 @@ class AttemptLedger:
         return event
 
     def close(self):
-        if not self._terminal:
-            self.record("failure", detail="ATTEMPT_ENDED_WITHOUT_DELIVERY")
-        os.close(self._fd)
+        try:
+            if not self._terminal:
+                self.record("failure", detail="ATTEMPT_ENDED_WITHOUT_DELIVERY")
+        finally:
+            os.close(self._fd)
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc, tb):
-        if not self._terminal:
-            self.record("failure", detail=f"UNHANDLED:{exc_type.__name__}" if exc_type
-                        else "ATTEMPT_ENDED_WITHOUT_DELIVERY")
-        os.close(self._fd)
+        try:
+            if not self._terminal:
+                self.record("failure", detail=f"UNHANDLED:{exc_type.__name__}" if exc_type
+                            else "ATTEMPT_ENDED_WITHOUT_DELIVERY")
+        finally:
+            os.close(self._fd)
         return False
