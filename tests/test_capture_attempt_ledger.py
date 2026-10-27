@@ -11,8 +11,10 @@ from scripts.capture_attempt_ledger import AttemptLedger
 class LedgerTests(unittest.TestCase):
     def test_success_has_six_distinct_durable_stages(self):
         with tempfile.TemporaryDirectory() as tmp:
+            before = datetime.now(timezone.utc)
             with AttemptLedger(tmp, game_id="g1", capture_kind="FINAL",
-                               due_utc="2026-10-26T19:00:00Z") as ledger:
+                               due_utc="2026-10-26T19:00:00Z",
+                               window_end_utc=(before + timedelta(minutes=30)).isoformat()) as ledger:
                 ledger.record("dispatch")
                 with self.assertRaisesRegex(ValueError, "authenticated source"):
                     ledger.record("source_capture")
@@ -29,6 +31,11 @@ class LedgerTests(unittest.TestCase):
             ])
             self.assertEqual(len({e["attempt_id"] for e in events}), 1)
             self.assertEqual(len(events[2]["sha256"]), 64)
+            self.assertTrue(all(e["scheduled_due_utc"] == "2026-10-26T19:00:00.000000Z"
+                                for e in events))
+            recorded = datetime.fromisoformat(events[0]["observed_at_utc"].replace("Z", "+00:00"))
+            self.assertGreaterEqual(recorded, before)
+            self.assertNotEqual(events[0]["observed_at_utc"], events[0]["scheduled_due_utc"])
 
     def test_failed_attempt_remains_on_disk(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -97,7 +104,7 @@ class LedgerTests(unittest.TestCase):
 
     def test_after_window_delivery_fails_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
-            cutoff = datetime.now(timezone.utc) + timedelta(seconds=1)
+            cutoff = datetime.now(timezone.utc) - timedelta(seconds=1)
             due = cutoff - timedelta(minutes=10)
             with AttemptLedger(tmp, game_id="g", capture_kind="FINAL",
                                due_utc=due.isoformat(),
@@ -108,16 +115,29 @@ class LedgerTests(unittest.TestCase):
                 ledger.record("ingestion")
                 ledger.record("durable_write", receipt_locator="data/receipt")
                 with self.assertRaisesRegex(ValueError, "LATE_CAPTURE"):
-                    ledger.record("card_delivery", receipt_locator="issue/7",
-                                  at=cutoff)
+                    ledger.record("card_delivery", receipt_locator="issue/7")
                 self.assertNotIn("card_delivery", ledger._seen)
 
-    def test_naive_direct_record_time_is_refused(self):
+    def test_direct_observed_time_override_is_not_in_public_api(self):
         with tempfile.TemporaryDirectory() as tmp:
             with AttemptLedger(tmp, game_id="g", capture_kind="FINAL",
                                due_utc="2026-10-26T19:00:00Z") as ledger:
-                with self.assertRaisesRegex(ValueError, "timezone-aware"):
+                with self.assertRaises(TypeError):
                     ledger.record("dispatch", at=datetime(2026, 10, 26))
+                self.assertNotIn("dispatch", ledger._seen)
+
+    def test_delivery_requires_a_frozen_write_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with AttemptLedger(tmp, game_id="g", capture_kind="FINAL",
+                               due_utc="2026-10-26T19:00:00Z") as ledger:
+                ledger.record("dispatch")
+                ledger.record("source_capture", raw=b"quoted bytes",
+                              source_timestamp_utc="2026-10-26T19:00:01Z")
+                ledger.record("ingestion")
+                ledger.record("durable_write", receipt_locator="data/receipt")
+                with self.assertRaisesRegex(ValueError, "CAPTURE_WINDOW_REQUIRED"):
+                    ledger.record("card_delivery", receipt_locator="issue/9")
+                self.assertNotIn("card_delivery", ledger._seen)
 
 
 if __name__ == "__main__":
