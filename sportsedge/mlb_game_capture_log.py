@@ -5,6 +5,7 @@ regular-season calibration. This is a pipeline, not promotion evidence.
 """
 from __future__ import annotations
 from dataclasses import asdict, dataclass
+import math
 from datetime import date, datetime, timezone
 from typing import Any, Mapping
 
@@ -51,6 +52,24 @@ def _american_odds(value: Any, code: str) -> int | None:
     if -99 <= odds <= 99:
         raise MLBCaptureLogError(code)
     return odds
+
+
+
+def _quote_line(value: Any, code: str, *, required: bool = False) -> float | None:
+    """Refuse false, non-finite or missing numeric market thresholds."""
+    if value is None:
+        if required:
+            raise MLBCaptureLogError(code)
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        raise MLBCaptureLogError(code)
+    try:
+        line = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise MLBCaptureLogError(code) from exc
+    if not math.isfinite(line):
+        raise MLBCaptureLogError(code)
+    return line
 
 
 @dataclass(frozen=True)
@@ -127,6 +146,12 @@ def record_capture(row: Mapping[str, Any]) -> MLBCapturedGameRow:
         estimate=float(estimate)
         if not 0.0 < estimate < 1.0:
             raise MLBCaptureLogError("ESTIMATE_P_OUT_OF_RANGE")
+    # Binary winner moneylines have no threshold; every other market does.
+    line_required = market not in {"MONEYLINE", "ML", "H2H"}
+    intake_line = _quote_line(row.get("intake_line", row.get("line")),
+                              "INTAKE_LINE_INVALID", required=line_required)
+    close_line = _quote_line(row.get("close_line"), "CLOSE_LINE_INVALID",
+                             required=line_required and close_at is not None)
     return MLBCapturedGameRow(
         game_id=game_id,
         market=market,
@@ -136,10 +161,10 @@ def record_capture(row: Mapping[str, Any]) -> MLBCapturedGameRow:
             season_type=row.get("season_type"),
             postseason=row.get("postseason"),
         ),
-        intake_line=None if row.get("intake_line", row.get("line")) is None else float(row.get("intake_line", row.get("line"))),
+        intake_line=intake_line,
         intake_american=_american_odds(row.get("intake_american", row.get("american_odds")), "INTAKE_AMERICAN_INVALID"),
         intake_retrieved_at=intake_at.isoformat().replace("+00:00","Z"),
-        close_line=None if row.get("close_line") is None else float(row["close_line"]),
+        close_line=close_line,
         close_american=_american_odds(row.get("close_american"), "CLOSE_AMERICAN_INVALID"),
         close_retrieved_at=None if close_at is None else close_at.isoformat().replace("+00:00","Z"),
         estimate_p=estimate,
