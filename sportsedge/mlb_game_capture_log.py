@@ -169,6 +169,12 @@ def record_capture(row: Mapping[str, Any]) -> MLBCapturedGameRow:
     if not line_required and (intake_line is not None or close_line is not None):
         # H2H/ML winner quotes are prices only, never handicaps.
         raise MLBCaptureLogError("MONEYLINE_THRESHOLD_FORBIDDEN")
+    intake_price = _american_odds(
+        row.get("intake_american", row.get("american_odds")),
+        "INTAKE_AMERICAN_INVALID",
+    )
+    if intake_price is None:
+        raise MLBCaptureLogError("INTAKE_PRICE_MISSING")
     return MLBCapturedGameRow(
         game_id=game_id,
         market=market,
@@ -179,7 +185,7 @@ def record_capture(row: Mapping[str, Any]) -> MLBCapturedGameRow:
             postseason=row.get("postseason"),
         ),
         intake_line=intake_line,
-        intake_american=_american_odds(row.get("intake_american", row.get("american_odds")), "INTAKE_AMERICAN_INVALID"),
+        intake_american=intake_price,
         intake_retrieved_at=intake_at.isoformat().replace("+00:00","Z"),
         close_line=close_line,
         close_american=_american_odds(row.get("close_american"), "CLOSE_AMERICAN_INVALID"),
