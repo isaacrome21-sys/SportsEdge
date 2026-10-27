@@ -31,7 +31,13 @@ PRE_CONTEXT_STATUS = "PRE-CONTEXT · NOT FINAL"
 # A valid edge calculation is not evidence that a model has passed the owner\'s
 # forward validation and release gates. Never publish a bet label from here.
 NO_RELEASE_AUTHORITY_REASON = "RESEARCH_ONLY_NO_MODEL_PROMOTION_AUTHORITY"
-_BETLIKE_STATUSES = frozenset({"ACTIONABLE", "BET", "OFFICIAL_BET", "PLAY", "VERIFIED"})
+# Publication is fail-closed: only these explicitly non-betting outcomes may
+# pass through unchanged. Unicode zero-width/confusable bet labels and future
+# unknown status tokens must never preserve high-star promotional output.
+_NONBET_PUBLICATION_STATUSES = frozenset({
+    "LEAN", "NEEDS_CONFIRM", "PASS", "NO_MODEL", "NO_ENGINE", "NO_DATA",
+    "UNPRICED", "REFUSED", "BLOCKED", "RESEARCH_ONLY", "NO_PRICE",
+})
 
 
 def withhold_unverified_actionable(rows: list[dict]) -> list[dict]:
@@ -44,17 +50,25 @@ def withhold_unverified_actionable(rows: list[dict]) -> list[dict]:
     safe_rows = []
     for original in rows:
         row = dict(original)
-        scored_status = str(row.get("scored_status") or "").upper()
-        status = str(row.get("status") or "").upper()
-        if scored_status in _BETLIKE_STATUSES or status in _BETLIKE_STATUSES:
+        # Upstream issue text can carry harmless surrounding whitespace.
+        # It must not turn an unpromoted PLAY/ACTIONABLE claim into a bypass.
+        scored_status = str(row.get("scored_status") or "").strip().upper()
+        status = str(row.get("status") or "").strip().upper()
+        if scored_status not in _NONBET_PUBLICATION_STATUSES or status not in _NONBET_PUBLICATION_STATUSES:
             # Keep an existing independent refusal (e.g. NEEDS_CONFIRM/PASS)
             # instead of accidentally weakening it to a lean.
             safe_status = next((s for s in (scored_status, status)
-                                if s and s not in _BETLIKE_STATUSES), "LEAN")
+                                if s in _NONBET_PUBLICATION_STATUSES), "LEAN")
             row["status"] = safe_status
             row["scored_status"] = safe_status
             row["star_rating"] = 0
-            reasons = tuple(row.get("presentation_reason_codes") or ())
+            raw_reasons = row.get("presentation_reason_codes") or ()
+            if isinstance(raw_reasons, str):
+                reasons = (raw_reasons,)
+            elif isinstance(raw_reasons, (tuple, list)):
+                reasons = tuple(raw_reasons)
+            else:
+                reasons = ()
             if NO_RELEASE_AUTHORITY_REASON not in reasons:
                 row["presentation_reason_codes"] = reasons + (NO_RELEASE_AUTHORITY_REASON,)
         safe_rows.append(row)

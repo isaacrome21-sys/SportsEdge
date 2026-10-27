@@ -4,6 +4,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 from scripts import render_mlb_myspari_card as renderer
 from scripts.print_mlb_fast_game_markets import actionable_game_rows
 
@@ -30,6 +32,30 @@ def test_release_guard_demotes_candidate_preserving_model_and_price():
     for unchanged in ("model_p", "model_p_raw", "edge", "ev_per_dollar", "american_odds", "confidence_score", "engine_status"):
         assert result[unchanged] == raw[unchanged]
     assert raw["scored_status"] == "ACTIONABLE"  # no mutation of audit input
+
+
+@pytest.mark.parametrize("status", ["ACTIONABLE ", " ACTIONABLE", " Play  ", " verified ", " BET "])
+def test_release_guard_rejects_spaced_or_mixed_case_bet_labels(status):
+    raw = _candidate(status=status)
+    raw["presentation_reason_codes"] = "UPSTREAM_WARNING"
+    safe = renderer.withhold_unverified_actionable([raw])[0]
+    assert safe["scored_status"] == safe["status"] == "LEAN"
+    assert safe["star_rating"] == 0
+    assert safe["presentation_reason_codes"] == (
+        "UPSTREAM_WARNING", renderer.NO_RELEASE_AUTHORITY_REASON,
+    )
+
+
+@pytest.mark.parametrize("status", [
+    "ACTIONABLE\u200b", "PLAY\u200b", "P\u200dLAY", "ＡＣＴＩＯＮＡＢＬＥ", "UNKNOWN_ACTION",
+])
+def test_release_guard_refuses_unicode_disguised_or_unknown_status(status):
+    raw = _candidate(status=status)
+    safe = renderer.withhold_unverified_actionable([raw])[0]
+    assert safe["status"] == safe["scored_status"] == "LEAN"
+    assert safe["star_rating"] == 0
+    assert renderer.NO_RELEASE_AUTHORITY_REASON in safe["presentation_reason_codes"]
+    assert raw["status"] == status  # no audit-input mutation
 
 
 def test_release_guard_cannot_be_bypassed_by_engine_bet_claim_or_prior_refusal():
