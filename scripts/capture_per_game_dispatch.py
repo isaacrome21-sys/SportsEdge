@@ -20,6 +20,14 @@ class DeliveryResult:
     error: str | None = None
 
 
+class DeliveryFailures(RuntimeError):
+    """One or more delivery calls failed; all completed games were attempted."""
+
+    def __init__(self, errors: list[tuple[str, str]]):
+        self.errors = errors
+        super().__init__(f"delivery failed for {len(errors)} game(s): {errors}")
+
+
 def dispatch_due_games(
     due_games: Iterable[tuple[str, T]],
     capture_one: Callable[[str, T], R],
@@ -39,6 +47,7 @@ def dispatch_due_games(
     if max_workers < 1:
         raise ValueError("max_workers must be positive")
     delivered = []
+    delivery_errors = []
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {pool.submit(capture_one, game_id, payload): game_id
                    for game_id, payload in games}
@@ -49,6 +58,12 @@ def dispatch_due_games(
             except Exception as exc:
                 result = DeliveryResult(game_id, False,
                                         error=f"{type(exc).__name__}: {exc}")
-            deliver_one(result)
-            delivered.append(result)
+            try:
+                deliver_one(result)
+            except Exception as exc:
+                delivery_errors.append((game_id, f"{type(exc).__name__}: {exc}"))
+            else:
+                delivered.append(result)
+    if delivery_errors:
+        raise DeliveryFailures(delivery_errors)
     return delivered
