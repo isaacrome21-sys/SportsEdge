@@ -21,7 +21,7 @@ class AnchoredRatingsResearchTests(unittest.TestCase):
         path = root / "games.csv"
         fields = ["game_type","game_id","gameday","home_team","away_team",
                   "home_score","away_score","spread_line","total_line",
-                  "home_qb_delta","away_qb_delta","weather_total_delta","neutral_site"]
+                  "home_qb_delta","away_qb_delta","weather_total_delta","neutral_site","location"]
         with path.open("w",newline="",encoding="utf-8") as fh:
             writer = csv.DictWriter(fh,fieldnames=fields)
             writer.writeheader()
@@ -73,6 +73,14 @@ class AnchoredRatingsResearchTests(unittest.TestCase):
         self.assertEqual(hfa,0.0)
         self.assertGreater(level,0)
         self.assertIn("A",ratings)
+
+    def test_nflverse_location_neutral_field_disables_home_advantage(self):
+        with tempfile.TemporaryDirectory() as d:
+            row={"game_id":"g1","gameday":"2024-09-01","home_team":"KC","away_team":"BUF",
+                 "home_score":24,"away_score":21,"spread_line":3,"total_line":45,
+                 "location":"Neutral"}
+            games=a.read_games(self._write_csv(Path(d),[row]))
+            self.assertTrue(games[0].neutral)
 
     def test_missing_data_cannot_pass_viability(self):
         result=a.screen([],design_years=frozenset({2024}))
