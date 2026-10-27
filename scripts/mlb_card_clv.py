@@ -11,6 +11,12 @@ hourly, so entry/close come from the append-only store
 pick, close = last snapshot with Captured before first pitch. No pre-start
 snapshot -> NO_PRESTART_SNAPSHOT (fail closed).
 
+Entry capture policy (owner ruling 2026-10-25): entry requires an
+offset-aware ``Captured:`` time before first pitch -- issue ``created_at`` is
+never used as a capture time (``NO_ENTRY_CAPTURE``). Missing, naive or
+malformed first pitch -> ``NO_FIRST_PITCH``. A close whose Captured time is in
+the future is ignored. Entry and close must be distinct captures.
+
 Legacy close quote: the last *other* [MLB LINES] issue for the same game whose
 ``Captured: <ISO>`` line is strictly before first pitch and after the entry
 capture, carrying the same market, line and team/subject with both sides
@@ -27,7 +33,7 @@ import csv
 import re
 import unicodedata
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -201,18 +207,22 @@ def compute_clv(
     entry_issue: dict[str, Any],
     other_issues: Iterable[dict[str, Any]] = (),
     snapshots: list[dict[str, Any]] | None = None,
+    now: datetime | None = None,
 ) -> list[dict[str, str]]:
+    picks = list(picks)
+    first_pitch = first_pitch_time(feed)
+    if first_pitch is None:
+        return [_status_only(issue_number, pick, "NO_FIRST_PITCH") for pick in picks]
     if snapshots is not None:
         return _compute_clv_from_snapshots(issue_number, picks, feed, snapshots)
+    now = now or datetime.now(timezone.utc)
     teams = feed["gameData"]["teams"]
     names = {"away": teams["away"]["name"], "home": teams["home"]["name"]}
-    start_text = str(feed.get("gameData", {}).get("datetime", {}).get("dateTime") or "")
-    first_pitch = datetime.fromisoformat(start_text.replace("Z", "+00:00")) if start_text else None
     entry_body = str(entry_issue.get("body") or "")
     entry_rows = issue_quotes(entry_body, entry_issue.get("title"))
-    entry_at = parse_captured_at(entry_body)
-    if entry_at is None and entry_issue.get("created_at"):
-        entry_at = datetime.fromisoformat(str(entry_issue["created_at"]).replace("Z", "+00:00"))
+    entry_at = parse_captured_at(entry_body)  # never issue created_at
+    if entry_at is None or entry_at >= first_pitch or entry_at > now:
+        return [_status_only(issue_number, pick, "NO_ENTRY_CAPTURE") for pick in picks]
 
     closes: list[tuple[datetime, int, list[ParsedRow]]] = []
     for other in other_issues:
@@ -221,9 +231,9 @@ def compute_clv(
             continue
         body = str(other.get("body") or "")
         captured = parse_captured_at(body)
-        if captured is None or first_pitch is None or captured >= first_pitch:
+        if captured is None or captured >= first_pitch or captured > now:
             continue
-        if entry_at is not None and captured <= entry_at:
+        if captured <= entry_at:
             continue
         rows = [r for r in issue_quotes(body, other.get("title")) if _same_game(r, names)]
         if rows:
@@ -272,6 +282,24 @@ def compute_clv(
     return out
 
 
+def first_pitch_time(feed: dict[str, Any]) -> datetime | None:
+    text = str(feed.get("gameData", {}).get("datetime", {}).get("dateTime") or "")
+    if not text:
+        return None
+    try:
+        value = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return value if value.tzinfo else None
+
+
+def _status_only(issue_number: int, pick: Any, status: str) -> dict[str, str]:
+    record = {field: "" for field in CLV_FIELDS}
+    record.update(issue_number=str(issue_number), game_pk=str(pick.game_pk), pick=pick.pick,
+                  status=pick.status, price=f"{pick.price:+d}", clv_status=status)
+    return record
+
+
 def _compute_clv_from_snapshots(
     issue_number: int, picks: Iterable[Any], feed: dict[str, Any], snapshots: list[dict[str, Any]]
 ) -> list[dict[str, str]]:
@@ -292,6 +320,9 @@ def _compute_clv_from_snapshots(
         found = entry_and_close(snapshots, pick.pick, start)
         if found.status == "NO_PRESTART_SNAPSHOT":
             record["clv_status"] = "NO_PRESTART_SNAPSHOT"
+            continue
+        if found.status == "NO_DISTINCT_CLOSE":
+            record["clv_status"] = "NO_CLOSE_QUOTE"
             continue
         if found.entry is None:
             record["clv_status"] = "NO_ENTRY_QUOTE"

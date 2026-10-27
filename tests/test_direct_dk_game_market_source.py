@@ -51,6 +51,45 @@ class DirectDKSourceTests(unittest.TestCase):
         with self.assertRaisesRegex(DraftKingsGameMarketError,'UNSUPPORTED'):
             board_url('unknown')
 
+    def test_blank_team_label_does_not_create_a_home_price(self):
+        p=fixture()
+        for s in p['selections']:
+            if s['marketId']=='m1' and s['label']=='Home Team':
+                s['label']=''
+        rows=normalize_board(self.board(p))
+        self.assertFalse(any(r['market']=='h2h' for r in rows))
+        self.assertEqual(len(rows),4)
+
+    def test_shared_team_token_does_not_create_a_home_price(self):
+        p=fixture()
+        for s in p['selections']:
+            if s['marketId']=='m1' and s['label']=='Home Team':
+                s['label']='Team'
+        rows=normalize_board(self.board(p))
+        self.assertFalse(any(r['market']=='h2h' for r in rows))
+        self.assertEqual(len(rows),4)
+
+    def test_two_explicit_team_names_on_one_quote_are_ambiguous(self):
+        p=fixture()
+        for s in p['selections']:
+            if s['marketId']=='m1' and s['label']=='Home Team':
+                s['label']='Away Team / Home Team'
+        rows=normalize_board(self.board(p))
+        self.assertFalse(any(r['market']=='h2h' for r in rows))
+        self.assertEqual(len(rows),4)
+
+    def test_unique_nicknames_and_full_spread_labels_are_valid(self):
+        p=fixture()
+        p['events'][0]['name']='Away Dragons @ Home Sharks'
+        for s in p['selections']:
+            if s['marketId']=='m1':
+                s['label']='Dragons' if s['label']=='Away Team' else 'Sharks'
+            elif s['marketId']=='m2':
+                s['label']='Away Dragons +3.5' if s['label'].startswith('Away') else 'Home Sharks -3.5'
+        rows=normalize_board(self.board(p))
+        self.assertEqual(len(rows),6)
+        self.assertEqual({r['outcome'] for r in rows if r['market']=='h2h'}, {'Away Dragons','Home Sharks'})
+
     def test_metadata_only_board_never_synthesizes_quotes(self):
         payload={'events':[],'markets':[],'selections':[],'categories':[{'id':999,'name':'Metadata Only'}]}
         self.assertEqual(normalize_board(self.board(payload)),[])

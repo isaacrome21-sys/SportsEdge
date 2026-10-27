@@ -394,6 +394,8 @@ def apply_market_sanity_guard(rows: list[dict[str, Any]]) -> list[dict[str, Any]
             continue
         row["status"] = "REVIEW"
         row["scored_status"] = "REVIEW"
+        # A refused disagreement cannot retain promotional star authority.
+        row["star_rating"] = 0
         codes = tuple(row.get("presentation_reason_codes") or ())
         if EXTREME_MARKET_DISAGREEMENT_REASON not in codes:
             row["presentation_reason_codes"] = codes + (EXTREME_MARKET_DISAGREEMENT_REASON,)
