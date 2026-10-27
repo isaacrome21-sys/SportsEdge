@@ -183,3 +183,10 @@ def test_finite_inputs_cannot_overflow_into_fabricated_grade(family, pick, resul
 def test_finite_stake_cannot_overflow_into_infinite_units():
     with pytest.raises(GradeError, match="GRADE_PAYOUT_INVALID"):
         units("WIN", +10000, stake=1e308)
+
+
+@pytest.mark.parametrize("family", ["yes_no", "moneyline"])
+def test_missing_mapping_selection_is_classified(family) -> None:
+    with pytest.raises(GradeError, match="GRADE_SELECTION_INVALID"):
+        grade({"line": 0.5}, FinalResult(away_score=2, home_score=1, occurred=True),
+              family=family)
