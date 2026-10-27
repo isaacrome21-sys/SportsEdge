@@ -26,9 +26,10 @@ import count_gate_nba_team_totals_v1 as gate  # noqa: E402
 import eval_nba_team_totals_v1 as ev  # noqa: E402
 import test_eval_nba_team_totals_v1 as t  # noqa: E402
 
-# Fixture receipt: synthetic governance fixture for tests only. It is
-# written to a tmp path and pinned by hash through the gate's explicit
-# receipt arguments; it is NOT an installed production receipt.
+# Fixture receipt: synthetic governance fixture for tests only. The public
+# publisher must NEVER accept a caller-supplied receipt path or matching hash.
+# Positive and post-pin tests simulate a future reviewed pin only by modifying
+# in-process module constants with monkeypatch, never via the public API.
 FIXTURE_RECEIPT = {
     "receipt": "NBA_TT_PIN_PUSH_RECEIPT_V1",
     "evaluator_sha256": gate.PINNED_EVALUATOR_SHA256,
@@ -44,6 +45,12 @@ def _install_receipt(tmp_path):
     p = tmp_path / "PIN_PUSH_RECEIPT.json"
     p.write_bytes(json.dumps(FIXTURE_RECEIPT, indent=1).encode())
     return p, hashlib.sha256(p.read_bytes()).hexdigest()
+
+
+def _simulate_reviewed_pin(monkeypatch, receipt_path, digest):
+    """Synthetic reviewed pin FOR TESTS ONLY; production receipt is absent."""
+    monkeypatch.setattr(gate, "RECEIPT_PATH", receipt_path)
+    monkeypatch.setattr(gate, "RECEIPT_SHA256", digest)
 
 
 def _forbid_scoring(monkeypatch):
@@ -71,24 +78,31 @@ def test_count_gate_no_receipt_refuses_before_scoring(monkeypatch,
     assert not ledger.exists()
 
 
-# A caller-written receipt (here claiming an early September pin time)
-# whose bytes do not match the pinned receipt hash -> refused.
-def test_count_gate_forged_receipt_refused(monkeypatch, tmp_path):
-    _forbid_scoring(monkeypatch)
-    _, genuine_sha = _install_receipt(tmp_path)
+# An attacker can forge a receipt with an EARLY pin time and matching self-hash;
+# no installed receipt exists. The public API must refuse BEFORE the scorer.
+def test_count_gate_matching_forged_receipt_refused(monkeypatch, tmp_path):
+    _install_receipt(tmp_path)
     forged = dict(FIXTURE_RECEIPT,
                   pin_push_time_utc="2026-09-01T00:00:00+00:00",
                   first_counted_slate="2026-09-01")
     p = tmp_path / "forged_receipt.json"
     p.write_bytes(json.dumps(forged, indent=1).encode())
-    rows, ents, cls, res = _one_post_pin_game()
+    forged_sha = hashlib.sha256(p.read_bytes()).hexdigest()
+    rows, ents, cls, res, dates = t._big(
+        8, 12, mean_fn=lambda i: 113.0 if i % 2 else 108.0,
+        final_fn=lambda i: 113.0 if i % 2 else 108.0)
+    _forbid_scoring(monkeypatch)
     ledger = tmp_path / "ledger.jsonl"
-    with pytest.raises(gate.CountAdmissionRefused) as ei:
-        gate.publish_counted(rows, ents, cls, res,
-                             t.full_slates(["2026-11-01"]), [],
-                             ledger_path=ledger, receipt_path=p,
-                             receipt_sha256=genuine_sha)
-    assert ei.value.code == "PIN_PUSH_RECEIPT_HASH_MISMATCH"
+    for supplied in (
+        {"receipt_path": p, "receipt_sha256": forged_sha},
+        {"receipt_path": p},
+        {"receipt_sha256": forged_sha},
+    ):
+        with pytest.raises(gate.CountAdmissionRefused) as ei:
+            gate.publish_counted(rows, ents, cls, res,
+                                 t.full_slates(dates), [],
+                                 ledger_path=ledger, **supplied)
+        assert ei.value.code == "CALLER_RECEIPT_OVERRIDE_FORBIDDEN"
     assert not ledger.exists()
 
 
@@ -97,6 +111,7 @@ def test_count_gate_forged_receipt_refused(monkeypatch, tmp_path):
 def test_count_gate_pre_pin_rows_refused(monkeypatch, tmp_path):
     _forbid_scoring(monkeypatch)
     rp, sha = _install_receipt(tmp_path)
+    _simulate_reviewed_pin(monkeypatch, rp, sha)
     tip = datetime(2026, 10, 2, 0, 0, tzinfo=timezone.utc)
     et = datetime(2026, 10, 1, 19, 0, tzinfo=timezone.utc)
     rows = [t.priced("gpre", "Tgpre", 115, slate="2026-10-01", tip=tip,
@@ -105,8 +120,7 @@ def test_count_gate_pre_pin_rows_refused(monkeypatch, tmp_path):
     ledger = tmp_path / "ledger.jsonl"
     with pytest.raises(gate.CountAdmissionRefused) as ei:
         gate.publish_counted(rows, ents, [], {}, {}, [],
-                             ledger_path=ledger, receipt_path=rp,
-                             receipt_sha256=sha)
+                             ledger_path=ledger)
     assert ei.value.code == "COUNTED_ROW_PRE_PIN"
     assert not ledger.exists()
 
@@ -117,6 +131,7 @@ def test_count_gate_pre_pin_rows_refused(monkeypatch, tmp_path):
 def test_count_gate_forged_config_refused(monkeypatch, tmp_path):
     _forbid_scoring(monkeypatch)
     rp, sha = _install_receipt(tmp_path)
+    _simulate_reviewed_pin(monkeypatch, rp, sha)
     rows, ents, cls, res = _one_post_pin_game()
     ledger = tmp_path / "ledger.jsonl"
     overrides = [
@@ -132,8 +147,7 @@ def test_count_gate_forged_config_refused(monkeypatch, tmp_path):
             gate.publish_counted(rows, ents, cls, res,
                                  t.full_slates(["2026-11-01"]), [],
                                  caller_config=override,
-                                 ledger_path=ledger, receipt_path=rp,
-                                 receipt_sha256=sha)
+                                 ledger_path=ledger)
         assert ei.value.code == "FROZEN_EVALUATION_CONFIG_UNAUTHORIZED"
     assert not ledger.exists()
 
@@ -141,16 +155,16 @@ def test_count_gate_forged_config_refused(monkeypatch, tmp_path):
 # Genuine receipt + canonical gate-derived config + fully stamped
 # post-pin rows: the counted path runs the pinned evaluator and the
 # forward ledger gains exactly one publication record with metrics.
-def test_count_gate_genuine_post_pin_publishes(tmp_path):
+def test_count_gate_synthetic_reviewed_pin_positive_path(monkeypatch, tmp_path):
     rp, sha = _install_receipt(tmp_path)
+    _simulate_reviewed_pin(monkeypatch, rp, sha)
     rows, ents, cls, res, dates = t._big(
         8, 12, mean_fn=lambda i: 113.0 if i % 2 else 108.0,
         final_fn=lambda i: 113.0 if i % 2 else 108.0)
     ledger = tmp_path / "ledger.jsonl"
     pub = gate.publish_counted(rows, ents, cls, res,
                                t.full_slates(dates), [],
-                               ledger_path=ledger, receipt_path=rp,
-                               receipt_sha256=sha)
+                               ledger_path=ledger)
     out = pub["evaluation"]
     assert out["binding"] is True
     assert out["review_slate"] == dates[6]
