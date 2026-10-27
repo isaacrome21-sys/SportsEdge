@@ -44,12 +44,11 @@ import json
 import math
 import numbers
 import sys
-
-import numpy as np
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 BETTING_URL = ("https://github.com/sportsdataverse/sportsdataverse-data/"
