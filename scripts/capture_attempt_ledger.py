@@ -56,6 +56,7 @@ class AttemptLedger:
         cutoff = _parse_utc(window_end_utc) if window_end_utc is not None else None
         if cutoff is not None and cutoff <= due:
             raise ValueError("capture write cutoff must follow scheduled due")
+        self.due_utc = due
         self.attempt_id = attempt_id or uuid.uuid4().hex
         if not self.attempt_id.isalnum():
             raise ValueError("invalid attempt id")
@@ -66,19 +67,20 @@ class AttemptLedger:
         self._seen: set[str] = set()
         self._terminal = False
         self._fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-        self.record("scheduled_due", at=due)
+        # A target due time is a schedule assertion, not an observed event.
+        # This write's observed clock must be the actual recording time.
+        self.record("scheduled_due")
 
     def record(
-        self, stage: str, *, at: datetime | None = None,
+        self, stage: str, *,
         source_timestamp_utc: str | None = None, raw: bytes | None = None,
         receipt_locator: str | None = None, detail: str | None = None,
     ) -> dict:
         if stage not in STAGES or self._terminal or stage in self._seen:
             raise ValueError("invalid, duplicate, or post-terminal stage")
-        observed = at or datetime.now(timezone.utc)
-        if observed.tzinfo is None or observed.utcoffset() is None:
-            raise ValueError("timezone-aware event timestamp required")
-        observed = observed.astimezone(timezone.utc)
+        # No public observed-time injection: it would allow an after-cutoff
+        # delivery to fabricate an earlier stage timestamp.
+        observed = datetime.now(timezone.utc)
         if stage == "source_capture":
             if not isinstance(raw, bytes) or not raw or not source_timestamp_utc:
                 raise ValueError("authenticated source bytes and quote timestamp required")
@@ -91,8 +93,11 @@ class AttemptLedger:
             raise ValueError("cannot claim delivery before durable write")
         if stage == "card_delivery" and not receipt_locator:
             raise ValueError("card delivery requires authenticated issue locator")
-        if stage == "card_delivery" and self.window_end_utc is not None and observed >= self.window_end_utc:
-            raise ValueError("LATE_CAPTURE_NO_AUTHENTICATED_CLOSE")
+        if stage == "card_delivery":
+            if self.window_end_utc is None:
+                raise ValueError("CAPTURE_WINDOW_REQUIRED")
+            if observed >= self.window_end_utc:
+                raise ValueError("LATE_CAPTURE_NO_AUTHENTICATED_CLOSE")
         if stage == "failure" and not detail:
             raise ValueError("failure reason required")
         if stage != "failure" and stage != "scheduled_due":
@@ -103,6 +108,7 @@ class AttemptLedger:
             "attempt_id": self.attempt_id, "game_id": self.game_id,
             "capture_kind": self.capture_kind, "stage": stage,
             "observed_at_utc": utc_stamp(observed),
+            "scheduled_due_utc": utc_stamp(self.due_utc),
             "source_timestamp_utc": source_timestamp_utc,
             "sha256": hashlib.sha256(raw).hexdigest() if raw is not None else None,
             "receipt_locator": receipt_locator, "detail": detail,
