@@ -1,6 +1,6 @@
 import threading
 import unittest
-from scripts.capture_per_game_dispatch import dispatch_due_games
+from scripts.capture_per_game_dispatch import dispatch_due_games, DeliveryFailures
 
 
 class DispatchTests(unittest.TestCase):
@@ -38,6 +38,19 @@ class DispatchTests(unittest.TestCase):
         dispatch_due_games([("g", None)], capture, seen.append)
         self.assertFalse(seen[0].succeeded)
         self.assertIn("source unavailable", seen[0].error)
+
+    def test_one_delivery_failure_does_not_suppress_other_game(self):
+        seen = []
+        def deliver(result):
+            seen.append(result.game_id)
+            if result.game_id == "bad":
+                raise OSError("issue API unavailable")
+        with self.assertRaises(DeliveryFailures) as caught:
+            dispatch_due_games([("bad", 1), ("good", 2)],
+                               lambda game_id, payload: payload,
+                               deliver, max_workers=1)
+        self.assertEqual(seen, ["bad", "good"])
+        self.assertEqual(caught.exception.errors[0][0], "bad")
 
     def test_duplicate_game_refused_before_dispatch(self):
         with self.assertRaises(ValueError):
