@@ -342,7 +342,15 @@ def finalize_research_row(*, sport: str, game: str, selection: str, market: str,
     if line is not None:
         numeric["line"] = line
     for name, value in numeric.items():
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not isfinite(value):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(f"RESEARCH_ROW_INVALID_NUMBER:{name}")
+        try:
+            finite = isfinite(value)
+        except (OverflowError, ValueError, TypeError):
+            # Python converts arbitrary-size ints to float for isfinite();
+            # oversized inputs must take the same named fail-closed path.
+            raise ValueError(f"RESEARCH_ROW_INVALID_NUMBER:{name}") from None
+        if not finite:
             raise ValueError(f"RESEARCH_ROW_INVALID_NUMBER:{name}")
     if not (0 < win < 1) or not (0 <= push < 1) or win + push > 1:
         raise ValueError("RESEARCH_ROW_INVALID_PROBABILITY_MASS")
