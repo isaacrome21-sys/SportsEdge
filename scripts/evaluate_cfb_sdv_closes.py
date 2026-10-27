@@ -11,9 +11,12 @@ Constructions (reproduced exactly; no tuning anywhere in this file):
       by tests/test_cfb_sdv_closes.py): last-5 opponent-adjusted off/def,
       3-game shrinkage toward 28, HFA 2.5; requires >=3 prior games per team.
 
-Protocol: within-season walk-forward; games grouped by exact kickoff
-instant; projections use only games at strictly earlier instants of the same
-season. Features are prior scores only (injuries/weather are zeroed, as in
+Protocol: within-season walk-forward; projections use only games whose
+kickoffs were at least 24 hours earlier. This is a CONSERVATIVE RESEARCH
+PROXY for final-score availability, NOT verified point-in-time evidence:
+the SDV data has no final-publication timestamps, and unusually long or
+suspended games could violate the proxy. No forward betting authorization.
+Features are prior scores only (injuries/weather are zeroed, as in
 the Oct 24, 2026 SBR replay: the live providers serve them as-of today only).
 
 Labeling rules (owner, Oct 26, 2026): the SDV file carries no prices and no
@@ -32,7 +35,7 @@ import argparse
 import json
 import math
 import sys
-from collections import defaultdict
+from collections import defaultdict, deque
 from pathlib import Path
 
 import pandas as pd
@@ -86,20 +89,26 @@ def project_season(games):
         m = sum(x[0] - x[1] for x in h) / len(h)
         return max(-3.0, min(3.0, m * 0.12))
 
-    pending, cur = [], None
+    pending = deque()
+    last_instant = None
 
-    def flush():
-        for g in pending:
-            nh = len(hist[g["away_id"]])
-            na = len(hist[g["home_id"]])
-            hist[g["home_id"]].append((g["home_points"], g["away_points"], g["away_id"], nh))
-            hist[g["away_id"]].append((g["away_points"], g["home_points"], g["home_id"], na))
-        pending.clear()
+    def release_eligible(cutoff):
+        # No historical final-publication clock exists in SDV. A 24h embargo
+        # blocks same-day overlap leakage but is only a RESEARCH proxy, never
+        # proof of authentic as-of availability or verified CLV.
+        while pending and pd.to_datetime(pending[0]["instant"], utc=True) + pd.Timedelta(hours=24) <= cutoff:
+            prior = pending.popleft()
+            nh = len(hist[prior["away_id"]])
+            na = len(hist[prior["home_id"]])
+            hist[prior["home_id"]].append((prior["home_points"], prior["away_points"], prior["away_id"], nh))
+            hist[prior["away_id"]].append((prior["away_points"], prior["home_points"], prior["home_id"], na))
 
     for g in games:
-        if cur is not None and g["instant"] != cur:
-            flush()
-        cur = g["instant"]
+        instant = pd.to_datetime(g["instant"], utc=True)
+        if last_instant is not None and instant < last_instant:
+            raise ValueError("CFB_SDV_GAMES_NOT_CHRONOLOGICAL")
+        last_instant = instant
+        release_eligible(instant)
         am_m = am_t = pm_m = pm_t = None
         rh, ra = am_rating(g["home_id"]), am_rating(g["away_id"])
         if rh is not None and ra is not None:
@@ -112,7 +121,6 @@ def project_season(games):
             pm_m, pm_t = hp - ap, hp + ap
         yield g, am_m, am_t, pm_m, pm_t
         pending.append(g)
-    flush()
 
 
 def band_stats(d, gap, win):
@@ -205,6 +213,15 @@ def score_stratum(pred, seasons, label, both_fbs_only=False):
     return out
 
 
+def close_lookup(closes):
+    """Never let duplicate game IDs overwrite one another in the close map."""
+    duplicated = closes.loc[closes.game_id.duplicated(keep=False), "game_id"]
+    if not duplicated.empty:
+        ids = ",".join(sorted({str(v) for v in duplicated})[:20])
+        raise ValueError(f"CFB_SDV_DUPLICATE_CLOSE_GAME_ID:{ids}")
+    return {int(r.game_id): r for r in closes.itertuples()}
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-dir", default="output/cfb_sdv_closes")
@@ -214,7 +231,9 @@ def main(argv=None) -> int:
     results = pd.read_csv(data / "sdv_cfb_results_all.csv")
     results["instant"] = pd.to_datetime(results.start_date, utc=True, format="ISO8601")
     results = results.sort_values(["season", "instant", "game_id"])
-    cmap = {int(r.game_id): r for r in closes.itertuples()}
+    if results.game_id.duplicated().any():
+        raise ValueError("CFB_SDV_DUPLICATE_RESULT_GAME_ID")
+    cmap = close_lookup(closes)
     rows = []
     for season, gdf in results.groupby("season"):
         games = [dict(game_id=int(r.game_id), instant=r.instant,
@@ -238,6 +257,13 @@ def main(argv=None) -> int:
     pred = pd.DataFrame(rows)
     pred.to_csv(data / "predictions_am_pm.csv", index=False)
     results_out = {
+        "evidence_authority": {
+            "result_availability": "KICKOFF_PLUS_24H_RESEARCH_PROXY_UNVERIFIED",
+            "verified_point_in_time": False,
+            "verified_clv": False,
+            "production_eligible": False,
+            "cfb_production_weight": 0,
+        },
         "primary_2023_2025": score_stratum(pred, [2023, 2024, 2025],
                                            "PRIMARY complete seasons 2023-2025"),
         "primary_2023_2026": score_stratum(pred, [2023, 2024, 2025, 2026],
