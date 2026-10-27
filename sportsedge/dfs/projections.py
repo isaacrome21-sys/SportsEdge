@@ -108,7 +108,10 @@ def load_projection_snapshot(path: str | Path, players: Iterable[DKPlayer], spor
             raise ValueError(f"DFS_PROJECTION_MEAN_NEGATIVE:{p.player_id}")
         if mean <= 0:
             continue
-        std = _finite_number(row.get("stddev") or 0.0, "stddev", p.player_id) or None
+        raw_std = row.get("stddev")
+        std_value = (_finite_number(raw_std, "stddev", p.player_id)
+                     if raw_std is not None else 0.0)
+        std = std_value or None
         if std is not None and std < 0:
             raise ValueError(f"DFS_PROJECTION_STDDEV_NEGATIVE:{p.player_id}")
         ceiling = (_finite_number(row["ceiling"], "ceiling", p.player_id)
@@ -117,7 +120,8 @@ def load_projection_snapshot(path: str | Path, players: Iterable[DKPlayer], spor
                  if row.get("floor") is not None else max(0.0, mean - (1.15 * std if std else max(3.0, mean * 0.35))))
         if ceiling < mean or not 0.0 <= floor <= mean:
             raise ValueError(f"DFS_PROJECTION_QUANTILES_INVALID:{p.player_id}")
-        components = row.get("components") or {}
+        raw_components = row.get("components")
+        components = {} if raw_components is None else raw_components
         if not isinstance(components, dict):
             raise ValueError(f"DFS_PROJECTION_COMPONENTS_INVALID:{p.player_id}")
         out[p.player_id] = _validate_projection(Projection(
