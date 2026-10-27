@@ -166,3 +166,20 @@ def test_boolean_only_binary_final_rejects_malformed_supplied_line(
     with pytest.raises(GradeError, match="GRADE_LINE_INVALID"):
         grade({"selection": selection, "line": malformed_line},
               FinalResult(stat=None, occurred=occurred), family="yes_no")
+
+@pytest.mark.parametrize("family,pick,result", [
+    ("total", {"selection": "OVER", "line": 40.5},
+     FinalResult(away_score=1e308, home_score=1e308)),
+    ("spread", {"selection": "HOME", "line": 1e308},
+     FinalResult(away_score=1e308, home_score=1e308)),
+    ("prop", {"selection": "OVER", "line": -1e308},
+     FinalResult(stat=1e308)),
+])
+def test_finite_inputs_cannot_overflow_into_fabricated_grade(family, pick, result):
+    with pytest.raises(GradeError, match="GRADE_(TOTAL|MARGIN|DELTA)_INVALID"):
+        grade(pick, result, family=family)
+
+
+def test_finite_stake_cannot_overflow_into_infinite_units():
+    with pytest.raises(GradeError, match="GRADE_PAYOUT_INVALID"):
+        units("WIN", +10000, stake=1e308)
