@@ -64,6 +64,51 @@ def test_second_status_header_is_ambiguous_even_with_matching_pin(tmp_path, monk
     assert refusal.value.reason == "CONFIG_INVALID"
 
 
+
+@pytest.mark.parametrize("extra_status", [
+    " **Status: FINAL-CANDIDATE — NOT FROZEN.**",
+    " **Status: UNFROZEN.**",
+    " **Status: FROZEN.**",
+])
+def test_second_emphasized_status_on_same_line_refuses(
+        tmp_path, monkeypatch, extra_status):
+    target = _synthetic_repin(tmp_path, monkeypatch, "FROZEN.")
+    content = target.read_text(encoding="utf-8")
+    content = content.replace("**Status: FROZEN.**",
+                              "**Status: FROZEN.**" + extra_status, 1)
+    target.write_text(content, encoding="utf-8")
+    monkeypatch.setattr(nb, "PREREG_SHA256_V2",
+                        sha256(content.encode()).hexdigest())
+    with pytest.raises(ForwardValidationRefusal) as refusal:
+        nb._v2_document_freeze_state()
+    assert refusal.value.reason == "CONFIG_INVALID"
+
+
+def test_second_emphasized_status_outside_first_twelve_lines_refuses(
+        tmp_path, monkeypatch):
+    target = _synthetic_repin(tmp_path, monkeypatch, "FROZEN.")
+    content = target.read_text(encoding="utf-8")
+    content += "\\n**Status: FINAL-CANDIDATE — NOT FROZEN.**\\n"
+    target.write_text(content, encoding="utf-8")
+    monkeypatch.setattr(nb, "PREREG_SHA256_V2",
+                        sha256(content.encode()).hexdigest())
+    with pytest.raises(ForwardValidationRefusal) as refusal:
+        nb._v2_document_freeze_state()
+    assert refusal.value.reason == "CONFIG_INVALID"
+
+
+def test_unterminated_emphasized_status_refuses(tmp_path, monkeypatch):
+    target = _synthetic_repin(tmp_path, monkeypatch, "FROZEN.")
+    content = target.read_text(encoding="utf-8").replace(
+        "**Status: FROZEN.**", "**Status: FROZEN.**suffix", 1)
+    target.write_text(content, encoding="utf-8")
+    monkeypatch.setattr(nb, "PREREG_SHA256_V2",
+                        sha256(content.encode()).hexdigest())
+    with pytest.raises(ForwardValidationRefusal) as refusal:
+        nb._v2_document_freeze_state()
+    assert refusal.value.reason == "CONFIG_INVALID"
+
+
 @pytest.mark.parametrize("status", [
     "UNFROZEN", "NOT REALLY FROZEN", "SOMETHING FROZEN UNAUTH",
     "FROZEN -- UNKNOWN", "NOT FROZEN", "", None,
