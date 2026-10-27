@@ -85,6 +85,11 @@ def load_projection_snapshot(path: str | Path, players: Iterable[DKPlayer], spor
         if p.player_id in out:
             raise ValueError(f"DFS_PROJECTION_DUPLICATE_PLAYER:{p.player_id}")
         if isinstance(row.get("samples"), list):
+            for sample in row["samples"]:
+                if isinstance(sample, dict):
+                    for field, value in sample.items():
+                        if isinstance(value, bool):
+                            _finite_number(value, f"sample:{field}", p.player_id)
             proj = projection_from_samples(
                 p,
                 sport,
@@ -97,7 +102,20 @@ def load_projection_snapshot(path: str | Path, players: Iterable[DKPlayer], spor
             ))
             continue
         if isinstance(row.get("stats"), dict):
+            stats = row["stats"]
+            for field, value in stats.items():
+                if isinstance(value, bool):
+                    _finite_number(value, f"stat:{field}", p.player_id)
             proj = projection_from_stats(p, sport, row["stats"], source=str(row.get("source") or "SPORTSEDGE_STATS"))
+            if stats.get("dk_stddev") is not None:
+                if _finite_number(stats["dk_stddev"], "stddev", p.player_id) < 0:
+                    raise ValueError(f"DFS_PROJECTION_STDDEV_NEGATIVE:{p.player_id}")
+            for field in ("dk_floor", "dk_ceiling"):
+                if stats.get(field) is not None:
+                    value = _finite_number(stats[field], field, p.player_id)
+                    if ((field == "dk_floor" and not 0 <= value <= proj.mean)
+                            or (field == "dk_ceiling" and value < proj.mean)):
+                        raise ValueError(f"DFS_PROJECTION_QUANTILES_INVALID:{p.player_id}")
             out[p.player_id] = _validate_projection(Projection(
                 **{**proj.__dict__, "updated_at": _dt(row.get("updated_at")) or snapshot_updated_at}
             ))

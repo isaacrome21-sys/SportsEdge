@@ -29,6 +29,18 @@ def test_valid_exact_id_and_ownership(tmp_path):
     assert projections["42"].ownership == 0.117
 
 
+@pytest.mark.parametrize("extra,error", [
+    ({"stats": {"receptions": True}}, "NUMBER_INVALID"),
+    ({"samples": [{"dk_points": True}] * 1000}, "NUMBER_INVALID"),
+    ({"stats": {"receptions": 5, "dk_floor": 20}}, "QUANTILES_INVALID"),
+    ({"stats": {"receptions": 5, "dk_ceiling": 1}}, "QUANTILES_INVALID"),
+    ({"stats": {"receptions": 5, "dk_stddev": -1}}, "STDDEV_NEGATIVE"),
+])
+def test_raw_inputs_refused_before_scoring_coercion(tmp_path, extra, error):
+    with pytest.raises(ValueError, match=f"DFS_PROJECTION_{error}"):
+        read(tmp_path, [{"player_id": "42", **extra}])
+
+
 @pytest.mark.parametrize("bad,field", [
     (float("nan"), "mean"), (float("inf"), "mean"),
     ("nan", "mean"), (True, "mean"),

@@ -226,6 +226,13 @@ def _install_fake_pw(monkeypatch, log, final_url=None):
     import sys, types
     mod = types.ModuleType("playwright.sync_api")
     mod.sync_playwright = lambda: _FakePW(log, final_url)
+    # Fake browser launches must not depend on host-installed Chrome symlinks.
+    # Preserve resolution for other paths; the hostile-symlink test explicitly
+    # replaces this mapping and still exercises the production allowlist.
+    realpath = os.path.realpath
+    monkeypatch.setattr(os.path, "realpath", lambda p, *a, **k:
+                        "/opt/google/chrome/chrome" if p in f.ALLOWED_BROWSER_PATHS
+                        else realpath(p, *a, **k))
     monkeypatch.setitem(sys.modules, "playwright", types.ModuleType("playwright"))
     monkeypatch.setitem(sys.modules, "playwright.sync_api", mod)
 
