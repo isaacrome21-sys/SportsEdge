@@ -67,13 +67,29 @@ def test_preserve_producer_extreme_disagreement_review_veto():
                     market_disagreement_supported=False)
     producer = apply_market_sanity_guard([original])[0]
     assert producer["status"] == producer["scored_status"] == "REVIEW"
+    assert producer["star_rating"] == 0  # producer refusal never retains 5-star promotion
     assert EXTREME_MARKET_DISAGREEMENT_REASON in producer["presentation_reason_codes"]
     safe = renderer.withhold_unverified_actionable([producer])[0]
     assert safe["status"] == safe["scored_status"] == "REVIEW"
+    assert safe["star_rating"] == 0
     assert EXTREME_MARKET_DISAGREEMENT_REASON in safe["presentation_reason_codes"]
     assert renderer.NO_RELEASE_AUTHORITY_REASON not in safe["presentation_reason_codes"]
     assert safe["model_p"] == original["model_p"]
     assert safe["american_odds"] == original["american_odds"]
+    assert renderer.withhold_unverified_actionable([safe])[0] == safe
+
+
+def test_caller_claimed_five_star_review_loses_promotion_in_public_card():
+    raw = _candidate(status="REVIEW")
+    raw["presentation_reason_codes"] = (EXTREME_MARKET_DISAGREEMENT_REASON,)
+    safe = renderer.withhold_unverified_actionable([raw])[0]
+    assert raw["star_rating"] == 5  # preserve original audit input
+    assert safe["star_rating"] == 0
+    assert safe["status"] == safe["scored_status"] == "REVIEW"
+    assert safe["presentation_reason_codes"] == raw["presentation_reason_codes"]
+    assert safe["model_p"] == raw["model_p"]
+    assert safe["american_odds"] == raw["american_odds"]
+    assert renderer.withhold_unverified_actionable([safe])[0] == safe
 
 
 def test_release_guard_cannot_be_bypassed_by_engine_bet_claim_or_prior_refusal():
