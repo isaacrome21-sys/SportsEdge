@@ -1,0 +1,17 @@
+{
+  "catchers_absent": 1,
+  "catchers_present": 0,
+  "failures": [],
+  "games": 1,
+  "games_scheduled": 1,
+  "lineups_absent": 1,
+  "lineups_present": 0,
+  "retrieved_at": "2026-10-27T13:16:46.778167+00:00",
+  "slate_date_ct": "2026-10-27",
+  "started_at": "2026-10-27T13:16:46.616652+00:00",
+  "status": "PASS",
+  "umpires_absent": 1,
+  "umpires_present": 0,
+  "weather_absent": 1,
+  "weather_present": 0
+}
