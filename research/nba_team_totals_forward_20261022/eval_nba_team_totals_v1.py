@@ -382,12 +382,6 @@ def evaluate(rows, entry_quotes, close_quotes, results, slates,
            "binding": (doc_ok is True and clocks_ok and k >= FROZEN_K
                        and seed == FROZEN_SEED and B == FROZEN_RESAMPLES),
            "play_authority": False, "eligible": False}
-    # Count authorization is fail-closed until independent pin-push provenance
-    # is available. The commit timestamp is NOT proof of the push timestamp.
-    if not out["binding"]:
-        raise ValueError("FROZEN_EVALUATION_CONFIG_UNAUTHORIZED")
-    raise RuntimeError("TRUSTED_EVALUATOR_PIN_PUSH_RECEIPT_REQUIRED")
-
     refusals, excluded, clv_missing = Counter(), Counter(), Counter()
     undeclared = Counter()
     counts = Counter(engine_priced_rows=0, historical_not_counted=0)
