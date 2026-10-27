@@ -122,7 +122,7 @@ NO_MODEL_TEXT = {
 RESIDUAL_ERROR_TEXT = {
     "QUOTE_TIMESTAMP:INVALID": "capture-time line missing (add 'Captured <ISO time with offset>' under the game)",
     "QUOTE_TIMESTAMP:AWARE_REQUIRED": "capture time has no timezone offset",
-    "QUOTE_STALE": "lines older than 180 seconds when the card ran",
+    "QUOTE_STALE": "lines older than 30 minutes when the card ran",
     "QUOTE_CLOCK_SKEW": "capture time is in the future",
     "ANCHOR_QUOTE_TIME_SKEW": "spread and total captured at different times",
     "KICKOFF:INVALID": "no kickoff time from the independent schedule",

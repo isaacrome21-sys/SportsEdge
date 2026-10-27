@@ -14,7 +14,7 @@
   "forward_track_min_abs_adjustment_points": 0.5,
   "min_edge_probability_points": 0.02,
   "min_ev_per_dollar": 0.02,
-  "max_quote_age_seconds": 180,
+  "max_quote_age_seconds": 1800,
   "max_skew_seconds": 30,
   "validated_markets": [],
   "evidence_role": "RESEARCH_ONLY_UNFITTED_PRIOR",
