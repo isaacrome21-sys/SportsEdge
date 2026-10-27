@@ -139,7 +139,20 @@ async def dispatch_due_games_async(
         # A hung or cancellation-resistant journal must never block healthy
         # siblings. Its missing durable receipt is a fatal aggregate error.
         journal = asyncio.create_task(record_failure(game_id, reason))
-        done, _ = await asyncio.wait({journal}, timeout=failure_timeout_s)
+        cancelled = False
+        try:
+            done, _ = await asyncio.wait({journal}, timeout=failure_timeout_s)
+        except asyncio.CancelledError:
+            # A parent cancellation must not abandon an in-progress durable
+            # failure write. Give this journal one further bounded chance to
+            # finish before propagating cancellation to the caller.
+            cancelled = True
+            try:
+                done, _ = await asyncio.wait({journal}, timeout=failure_timeout_s)
+            except asyncio.CancelledError:
+                journal.cancel()
+                ledger_errors.append((game_id, "FAILURE_LEDGER_INTERRUPTED"))
+                raise
         if not done:
             journal.cancel()
             ledger_errors.append((game_id, "FAILURE_LEDGER_TIMEOUT"))
@@ -150,49 +163,72 @@ async def dispatch_due_games_async(
                 ledger_errors.append((game_id, "FAILURE_LEDGER_CANCELLED"))
             except Exception as exc:
                 ledger_errors.append((game_id, f"FAILURE_LEDGER_WRITE_FAILED:{type(exc).__name__}"))
+        if cancelled:
+            raise asyncio.CancelledError()
         return result
 
     async def run_one(game: DueGame) -> DeliveryResult:
-        async with sem:
-            remaining = (game.cutoff_utc - now()).total_seconds()
-            if remaining <= 0:
-                return await fail(game.game_id, "SCHEDULER_SKIPPED")
+        active_child: asyncio.Task | None = None
+        failure_started = False
 
-            # asyncio.wait does not wait for a cancellation-resistant task
-            # after timeout. The result of a late capture is never consumed.
-            capture = asyncio.create_task(capture_one(game.game_id, game.payload))
-            done, _ = await asyncio.wait({capture}, timeout=remaining)
-            if not done:
-                capture.cancel()
-                return await fail(game.game_id, "LATE_CAPTURE")
-            try:
-                captured = capture.result()
-            except asyncio.CancelledError:
-                return await fail(game.game_id, "CAPTURE_CANCELLED")
-            except Exception as exc:
-                return await fail(game.game_id, f"CAPTURE_FAILED:{type(exc).__name__}")
-            if now() >= game.cutoff_utc:
-                return await fail(game.game_id, "LATE_CAPTURE")
+        async def terminal_failure(reason: str) -> DeliveryResult:
+            nonlocal failure_started
+            failure_started = True
+            return await fail(game.game_id, reason)
 
-            # Delivery runs inside the *same per-game task*, so a slow post
-            # for one event cannot create a batch barrier for other games.
-            result = DeliveryResult(game.game_id, True, value=captured)
-            delivery = asyncio.create_task(deliver_one(result, game.cutoff_utc))
-            done, _ = await asyncio.wait(
-                {delivery}, timeout=max(0, (game.cutoff_utc - now()).total_seconds()),
-            )
-            if not done:
-                delivery.cancel()
-                return await fail(game.game_id, "DELIVERY_WINDOW_EXPIRED")
-            try:
-                delivery.result()
-            except asyncio.CancelledError:
-                return await fail(game.game_id, "DELIVERY_CANCELLED")
-            except Exception as exc:
-                return await fail(game.game_id, f"DELIVERY_FAILED:{type(exc).__name__}")
-            if now() >= game.cutoff_utc:
-                return await fail(game.game_id, "DELIVERY_WINDOW_EXPIRED")
-            return result
+        try:
+            async with sem:
+                remaining = (game.cutoff_utc - now()).total_seconds()
+                if remaining <= 0:
+                    return await terminal_failure("SCHEDULER_SKIPPED")
+
+                # asyncio.wait does not wait for a cancellation-resistant task
+                # after timeout. The result of a late capture is never consumed.
+                capture = asyncio.create_task(capture_one(game.game_id, game.payload))
+                active_child = capture
+                done, _ = await asyncio.wait({capture}, timeout=remaining)
+                if not done:
+                    capture.cancel()
+                    return await terminal_failure("LATE_CAPTURE")
+                try:
+                    captured = capture.result()
+                except asyncio.CancelledError:
+                    return await terminal_failure("CAPTURE_CANCELLED")
+                except Exception as exc:
+                    return await terminal_failure(f"CAPTURE_FAILED:{type(exc).__name__}")
+                if now() >= game.cutoff_utc:
+                    return await terminal_failure("LATE_CAPTURE")
+
+                # Delivery runs inside the *same per-game task*, so a slow post
+                # for one event cannot create a batch barrier for other games.
+                result = DeliveryResult(game.game_id, True, value=captured)
+                delivery = asyncio.create_task(deliver_one(result, game.cutoff_utc))
+                active_child = delivery
+                done, _ = await asyncio.wait(
+                    {delivery}, timeout=max(0, (game.cutoff_utc - now()).total_seconds()),
+                )
+                if not done:
+                    delivery.cancel()
+                    return await terminal_failure("DELIVERY_WINDOW_EXPIRED")
+                try:
+                    delivery.result()
+                except asyncio.CancelledError:
+                    return await terminal_failure("DELIVERY_CANCELLED")
+                except Exception as exc:
+                    return await terminal_failure(f"DELIVERY_FAILED:{type(exc).__name__}")
+                if now() >= game.cutoff_utc:
+                    return await terminal_failure("DELIVERY_WINDOW_EXPIRED")
+                return result
+
+        except asyncio.CancelledError:
+            # Parent/gather cancellation also reaches tasks waiting for sem.
+            # Never leave a queued/capture/delivery attempt without a named
+            # terminal failure attempt, and never consume late child output.
+            if active_child is not None and not active_child.done():
+                active_child.cancel()
+            if not failure_started:
+                await fail(game.game_id, "DISPATCH_CANCELLED")
+            raise
 
     outcomes = await asyncio.gather(*(run_one(g) for g in games))
     if ledger_errors:
