@@ -343,12 +343,19 @@ def _v2_document_freeze_state() -> str:
     """
     verify_prereg_document("V2")
     lines = (_REPO_ROOT / PREREG_PATH_V2).read_text(encoding="utf-8").splitlines()
-    headers = [line for line in lines[:12] if line.startswith("**Status: ")]
-    if len(headers) != 1:
+    # Count every emphasized Status field, including duplicates on the SAME
+    # line and duplicates outside the header block. A pinned document with
+    # competing declarations must never authorize prospective counting.
+    status_lines = [line for line in lines if "**Status:" in line]
+    if (sum(line.count("**Status:") for line in status_lines) != 1
+            or not status_lines[0].startswith("**Status: ")
+            or status_lines[0] not in lines[:12]):
         raise ForwardValidationRefusal(
             "CONFIG_INVALID", {"field": "v2_document_status_header"})
-    # Parse only the emphasized status field, never substrings in prose.
-    match = re.fullmatch(r"\*\*Status: ([^*]+)\*\*\s*", headers[0])
+    # The genuine pinned header has ordinary trailing "Prepared ..." prose.
+    # Parse exactly ONE emphasized field; do not interpret trailing prose as
+    # part of the status, and do not accept a second emphasized Status field.
+    match = re.match(r"^\*\*Status: ([^*]+)\*\*(?=\s|$)", status_lines[0])
     if not match:
         raise ForwardValidationRefusal(
             "CONFIG_INVALID", {"field": "v2_document_status_header"})
@@ -358,7 +365,7 @@ def _v2_document_freeze_state() -> str:
     if status == "FROZEN.":
         return "FROZEN"
     raise ForwardValidationRefusal(
-        "CONFIG_INVALID", {"field": "v2_document_status", "value": headers[0]})
+        "CONFIG_INVALID", {"field": "v2_document_status", "value": status_lines[0]})
 
 
 def _v2_config_freeze_state(status: str | None) -> str:
