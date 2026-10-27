@@ -87,7 +87,8 @@ def read_games(path: Path) -> list[Game]:
                 return None if r.get(field) in ("", None) else finite(r[field], field)
             out.append(Game(day, game_id, home, away, int(hs), int(aas),
                             close("spread_line"), close("total_line"),
-                            str(r.get("neutral_site") or "").lower() in ("1", "true", "yes"),
+                            (str(r.get("neutral_site") or "").lower() in ("1", "true", "yes")
+                             or str(r.get("location") or "").strip().lower() == "neutral"),
                             qbh, qba, weather))
     return sorted(out, key=lambda g: (g.day, g.game_id))
 
