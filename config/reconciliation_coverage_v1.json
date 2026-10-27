@@ -150,6 +150,7 @@
         "sportsedge/sports/cfb/candidate_bakeoff_v3.py",
         "sportsedge/sports/cfb/candidate_model_v2.py",
         "sportsedge/sports/cfb/chronological_spread_eval.py",
+        "sportsedge/sports/cfb/converged_successor.py",
         "sportsedge/sports/cfb/dispersion_only_evaluator.py",
         "sportsedge/sports/cfb/joint_model_v2_challenger.py",
         "sportsedge/sports/cfb/market_anchored_spread.py",

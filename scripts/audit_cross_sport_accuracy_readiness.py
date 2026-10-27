@@ -61,6 +61,18 @@ def _status(row: dict, *, name: str, root: Path) -> str:
         if row.get("prereg") or row.get("prereg_sha256"):
             raise AuditRefusal(f"DRAFT_CLAIMS_FROZEN_PIN:{name}")
         return "DRAFT_NOT_FROZEN"
+    if text.startswith("FINAL-CANDIDATE") and "NOT FROZEN" in text:
+        # A pinned candidate: the document hash is registered and verified
+        # exactly as for a frozen prereg, but the status itself declares
+        # NOT FROZEN — recognition in this inventory confers no freeze,
+        # no verdict and no play authority.
+        prereg, sha = row.get("prereg"), row.get("prereg_sha256")
+        if not isinstance(prereg, str) or not prereg:
+            raise AuditRefusal(f"CANDIDATE_PREREG_MISSING:{name}")
+        if not isinstance(sha, str) or len(sha) != 64:
+            raise AuditRefusal(f"CANDIDATE_PREREG_SHA_MISSING:{name}")
+        _prereg(Path(prereg), root=root, expected_sha=sha)
+        return "FINAL_CANDIDATE_NOT_FROZEN"
     if text.startswith("FROZEN"):
         prereg, sha = row.get("prereg"), row.get("prereg_sha256")
         if not isinstance(prereg, str) or not prereg:
@@ -80,6 +92,7 @@ def accuracy_readiness(*, root: Path = ROOT) -> dict:
         raise AuditRefusal("NO_FORWARD_MARKET_CONFIGS")
     config_rows = []
     family_by_market = {}
+    first_config_by_market = {}
     for path in files:
         row = _read_json(path)
         state = _status(row, name=path.name, root=root)
@@ -93,9 +106,41 @@ def accuracy_readiness(*, root: Path = ROOT) -> dict:
             raise AuditRefusal(f"CONFIG_IDENTITY_INVALID:{path.name}")
         for market in markets:
             key = (sport.upper(), market.upper())
-            if key in family_by_market:
-                raise AuditRefusal(f"DUPLICATE_FORWARD_MARKET_CONFIG:{sport}:{market}")
-            family_by_market[key] = path.name
+            prior = first_config_by_market.get(key)
+            if prior is not None:
+                prior_name, prior_row, prior_state = prior
+                allowed_differences = {
+                    "status", "prereg", "prereg_sha256", "capture_note",
+                }
+                same_contract = all(
+                    row.get(field) == prior_row.get(field)
+                    for field in set(row) | set(prior_row)
+                    if field not in allowed_differences
+                )
+                # The NBA V2 source amendment is the ONLY authorized
+                # overlapping registration. No different engine, model,
+                # market, gate or threshold can hide behind a status change.
+                is_additive_v2 = (
+                    sport.upper() == "NBA"
+                    and market.upper() in {
+                        "PLAYER_POINTS", "PLAYER_REBOUNDS",
+                        "PLAYER_ASSISTS", "PLAYER_PRA",
+                    }
+                    and path.name == f"{Path(prior_name).stem}_v2.json"
+                    and prior_state == "FROZEN_NO_VERDICT_ATTACHED"
+                    and state in {
+                        "FINAL_CANDIDATE_NOT_FROZEN",
+                        "FROZEN_NO_VERDICT_ATTACHED",
+                    }
+                    and row.get("prereg") != prior_row.get("prereg")
+                    and row.get("prereg_sha256") != prior_row.get("prereg_sha256")
+                    and same_contract
+                )
+                if not is_additive_v2:
+                    raise AuditRefusal(f"DUPLICATE_FORWARD_MARKET_CONFIG:{sport}:{market}")
+            else:
+                first_config_by_market[key] = (path.name, row, state)
+                family_by_market[key] = (path.name, state)
         config_rows.append({
             "file": str(path.relative_to(root)), "sport": sport.upper(),
             "family": family, "markets": markets, "state": state,
@@ -111,10 +156,12 @@ def accuracy_readiness(*, root: Path = ROOT) -> dict:
     for (sport, market), resolution in sorted(MARKET_RESOLUTIONS.items()):
         state = resolution["state"]
         key = (sport.upper(), market.upper())
-        config = family_by_market.get(key)
+        entry = family_by_market.get(key)
+        config = entry[0] if entry is not None else None
         if key == ("MLB", "NRFI") or key == ("MLB", "YRFI"):
             # Two sides of one frozen-boundary first-inning test family.
-            config = family_by_market.get(("MLB", "FIRST_INNING_RUN"))
+            entry = family_by_market.get(("MLB", "FIRST_INNING_RUN"))
+            config = entry[0] if entry is not None else None
         canonical_rows.append({
             "sport": sport, "market": market, "pricing_path": state,
             "blocker": resolution.get("blocker"),
