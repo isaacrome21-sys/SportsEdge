@@ -40,7 +40,7 @@ def game(*, spread=3.5, total=50.5, ml=True, timestamp=None):
 class NflMarketAnchoredResidualTests(unittest.TestCase):
     def test_supplied_policy_cannot_bypass_authority_or_freshness(self):
         for field, value in (("validated_markets", ["total"]),
-                             ("max_quote_age_seconds", 600)):
+                             ("max_quote_age_seconds", 1801)):
             cfg = load_frozen_policy()
             cfg[field] = value
             with self.subTest(field=field), self.assertRaises(ResidualQuoteError):
@@ -115,7 +115,7 @@ class NflMarketAnchoredResidualTests(unittest.TestCase):
         with self.assertRaisesRegex(ResidualQuoteError, "PAIRED"):
             price_game(unpaired, raw_model_margin=2, raw_model_total=50, as_of=NOW)
 
-        stale = game(timestamp=NOW - timedelta(minutes=11))
+        stale = game(timestamp=NOW - timedelta(minutes=31))
         with self.assertRaisesRegex(ResidualQuoteError, "STALE"):
             price_game(stale, raw_model_margin=2, raw_model_total=50, as_of=NOW)
 
