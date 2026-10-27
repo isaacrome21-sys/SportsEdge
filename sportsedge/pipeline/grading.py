@@ -87,6 +87,10 @@ def grade(pick: PickRecord | Mapping, result: FinalResult, *, family: str) -> st
     if family == "yes_no":
         if sel not in {"YES", "NO", "OVER", "UNDER"}:
             raise GradeError(f"GRADE_SELECTION_INVALID:{sel}")
+        if line is not None:
+            # A supplied threshold is evidence even when the final is boolean-only.
+            # Do not silently grade malformed display lines from raw Mapping callers.
+            _real(line, "LINE")
         if result.occurred is not None and not isinstance(result.occurred, bool):
             raise GradeError("GRADE_OCCURRED_INVALID")
         if result.stat is not None and line is None:
