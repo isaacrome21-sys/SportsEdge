@@ -35,7 +35,7 @@ NO_RELEASE_AUTHORITY_REASON = "RESEARCH_ONLY_NO_MODEL_PROMOTION_AUTHORITY"
 # pass through unchanged. Unicode zero-width/confusable bet labels and future
 # unknown status tokens must never preserve high-star promotional output.
 _NONBET_PUBLICATION_STATUSES = frozenset({
-    "LEAN", "NEEDS_CONFIRM", "PASS", "NO_MODEL", "NO_ENGINE", "NO_DATA",
+    "LEAN", "NEEDS_CONFIRM", "PASS", "REVIEW", "NO_MODEL", "NO_ENGINE", "NO_DATA",
     "UNPRICED", "REFUSED", "BLOCKED", "RESEARCH_ONLY", "NO_PRICE",
 })
 
@@ -54,6 +54,9 @@ def withhold_unverified_actionable(rows: list[dict]) -> list[dict]:
         # It must not turn an unpromoted PLAY/ACTIONABLE claim into a bypass.
         scored_status = str(row.get("scored_status") or "").strip().upper()
         status = str(row.get("status") or "").strip().upper()
+        if "REVIEW" in (scored_status, status):
+            # REVIEW is a refusal, including in JSON/phone downstream views.
+            row["star_rating"] = 0
         if scored_status not in _NONBET_PUBLICATION_STATUSES or status not in _NONBET_PUBLICATION_STATUSES:
             # Keep an existing independent refusal (e.g. NEEDS_CONFIRM/PASS)
             # instead of accidentally weakening it to a lean.
