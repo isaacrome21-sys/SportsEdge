@@ -44,8 +44,10 @@ def withhold_unverified_actionable(rows: list[dict]) -> list[dict]:
     safe_rows = []
     for original in rows:
         row = dict(original)
-        scored_status = str(row.get("scored_status") or "").upper()
-        status = str(row.get("status") or "").upper()
+        # Upstream issue text can carry harmless surrounding whitespace.
+        # It must not turn an unpromoted PLAY/ACTIONABLE claim into a bypass.
+        scored_status = str(row.get("scored_status") or "").strip().upper()
+        status = str(row.get("status") or "").strip().upper()
         if scored_status in _BETLIKE_STATUSES or status in _BETLIKE_STATUSES:
             # Keep an existing independent refusal (e.g. NEEDS_CONFIRM/PASS)
             # instead of accidentally weakening it to a lean.
@@ -54,7 +56,13 @@ def withhold_unverified_actionable(rows: list[dict]) -> list[dict]:
             row["status"] = safe_status
             row["scored_status"] = safe_status
             row["star_rating"] = 0
-            reasons = tuple(row.get("presentation_reason_codes") or ())
+            raw_reasons = row.get("presentation_reason_codes") or ()
+            if isinstance(raw_reasons, str):
+                reasons = (raw_reasons,)
+            elif isinstance(raw_reasons, (tuple, list)):
+                reasons = tuple(raw_reasons)
+            else:
+                reasons = ()
             if NO_RELEASE_AUTHORITY_REASON not in reasons:
                 row["presentation_reason_codes"] = reasons + (NO_RELEASE_AUTHORITY_REASON,)
         safe_rows.append(row)
