@@ -13,7 +13,7 @@ from sportsedge.forward_validation import ForwardValidationRefusal
 from sportsedge.forward_validation import nba_props as nb
 
 
-CURRENT_STATUS = "**Status: FINAL-CANDIDATE — NOT FROZEN.**"
+CURRENT_STATUS = "**Status: FROZEN.**"
 
 
 def _synthetic_repin(tmp_path, monkeypatch, status: str):
@@ -46,11 +46,13 @@ def test_unknown_re_pinned_document_states_fail_closed(tmp_path, monkeypatch, st
     assert refusal.value.reason == "CONFIG_INVALID"
 
 
-def test_unique_exact_held_and_frozen_headers_are_recognized(tmp_path, monkeypatch):
-    assert nb._v2_document_freeze_state() == "NOT_FROZEN"
-    _synthetic_repin(tmp_path, monkeypatch, "FROZEN.")
-    # This proves future exact-state parsing only, NOT a real freeze.
+def test_exact_asserted_frozen_and_synthetic_held_headers_are_recognized(
+        tmp_path, monkeypatch):
+    # The asserted FROZEN header is NOT a valid owner freeze act: #2811
+    # separately quarantines every prospective COUNTED evaluation.
     assert nb._v2_document_freeze_state() == "FROZEN"
+    _synthetic_repin(tmp_path, monkeypatch, "FINAL-CANDIDATE — NOT FROZEN.")
+    assert nb._v2_document_freeze_state() == "NOT_FROZEN"
 
 
 def test_second_status_header_is_ambiguous_even_with_matching_pin(tmp_path, monkeypatch):
@@ -127,3 +129,12 @@ def test_config_contract_recognizes_only_exact_future_frozen_token():
     assert nb._v2_config_freeze_state(nb.V2_HELD_CONFIG_STATUS) == "NOT_FROZEN"
     assert nb._v2_config_freeze_state(nb.V2_FROZEN_CONFIG_STATUS) == "FROZEN"
     assert nb.verify_prereg_document("V1")["sha256"] == nb.PREREG_SHA256
+
+
+def test_asserted_frozen_header_cannot_lift_public_counted_quarantine():
+    cfg = nb.load_nba_config("player_points", "V2")
+    row = {"row_id": "quarantine-probe", "prereg_id": nb.PREREG_ID_V2,
+           "counting_class": "COUNTED", "label": "PROSPECTIVE"}
+    with pytest.raises(ForwardValidationRefusal) as refusal:
+        nb.evaluate_nba_props_v2(cfg, [row], [], [])
+    assert refusal.value.reason == "V2_FREEZE_NOT_AUTHORIZED"
