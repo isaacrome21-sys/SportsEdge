@@ -18,9 +18,7 @@ from .core import (  # noqa: F401
 )
 from .nba_props import (  # noqa: F401
     evaluate_nba_props,
-    evaluate_nba_props_v2,
     load_nba_config,
-    verify_prereg_document,
 )
 
 __all__ = [
@@ -31,8 +29,6 @@ __all__ = [
     "config_from_dict",
     "evaluate_family",
     "evaluate_nba_props",
-    "evaluate_nba_props_v2",
     "load_config",
     "load_nba_config",
-    "verify_prereg_document",
 ]
