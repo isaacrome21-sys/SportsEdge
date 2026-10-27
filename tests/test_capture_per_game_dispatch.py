@@ -291,5 +291,91 @@ class HardDeadlineDispatchTests(unittest.TestCase):
             ))
 
 
+    def test_parent_cancellation_records_active_and_queued_attempts(self):
+        async def scenario(phase):
+            entered = asyncio.Event()
+            failures = []
+            cancelled_children = []
+
+            async def capture(game_id, _):
+                if phase in ("capture", "queued"):
+                    entered.set()
+                    try:
+                        await asyncio.Event().wait()
+                    except asyncio.CancelledError:
+                        cancelled_children.append(("capture", game_id))
+                        raise
+                return game_id
+
+            async def deliver(row, cutoff):
+                if phase == "delivery":
+                    entered.set()
+                    try:
+                        await asyncio.Event().wait()
+                    except asyncio.CancelledError:
+                        cancelled_children.append(("delivery", row.game_id))
+                        raise
+
+            async def failure(game_id, reason):
+                await asyncio.sleep(0)
+                failures.append((game_id, reason))
+
+            games = [self.game("active", seconds=2)]
+            if phase == "queued":
+                games.append(self.game("queued", seconds=2))
+            parent = asyncio.create_task(dispatch_due_games_async(
+                games, capture, deliver, failure, max_workers=1,
+            ))
+            await asyncio.wait_for(entered.wait(), timeout=1)
+            await asyncio.sleep(0)  # allow the second game to queue at the semaphore
+            parent.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await asyncio.wait_for(parent, timeout=1)
+            await asyncio.sleep(0)
+            return failures, cancelled_children
+
+        for phase in ("capture", "delivery", "queued"):
+            with self.subTest(phase=phase):
+                failures, cancelled = asyncio.run(scenario(phase))
+                self.assertIn(("active", "DISPATCH_CANCELLED"), failures)
+                self.assertIn((phase if phase != "queued" else "capture", "active"),
+                              cancelled)
+                if phase == "queued":
+                    self.assertIn(("queued", "DISPATCH_CANCELLED"), failures)
+
+    def test_cancellation_waits_for_bounded_failure_journal_completion(self):
+        async def scenario():
+            entered = asyncio.Event()
+            release = asyncio.Event()
+            persisted = []
+
+            async def capture(game_id, _):
+                raise RuntimeError("source failed")
+
+            async def deliver(row, cutoff):
+                pass
+
+            async def failure(game_id, reason):
+                entered.set()
+                await release.wait()
+                persisted.append((game_id, reason))
+
+            parent = asyncio.create_task(dispatch_due_games_async(
+                [self.game("bad", seconds=2)], capture, deliver, failure,
+                failure_timeout_s=0.5,
+            ))
+            await asyncio.wait_for(entered.wait(), timeout=1)
+            parent.cancel()
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            self.assertFalse(parent.done(), "parent abandoned its failure journal")
+            release.set()
+            with self.assertRaises(asyncio.CancelledError):
+                await asyncio.wait_for(parent, timeout=1)
+            return persisted
+
+        self.assertIn(("bad", "CAPTURE_FAILED:RuntimeError"), asyncio.run(scenario()))
+
+
 if __name__ == "__main__":
     unittest.main()
