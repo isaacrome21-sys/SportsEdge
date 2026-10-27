@@ -150,6 +150,7 @@
         "sportsedge/sports/cfb/candidate_bakeoff_v3.py",
         "sportsedge/sports/cfb/candidate_model_v2.py",
         "sportsedge/sports/cfb/chronological_spread_eval.py",
+        "sportsedge/sports/cfb/converged_successor.py",
         "sportsedge/sports/cfb/dispersion_only_evaluator.py",
         "sportsedge/sports/cfb/joint_model_v2_challenger.py",
         "sportsedge/sports/cfb/market_anchored_spread.py",
@@ -408,6 +409,7 @@
     "docs/research/nhl_phone_card_prereg.md": "NHL_ZERO_AUTHORITY_FUTURE_SPECIFICATION_NO_FROZEN_OWNER_NO_MODEL",
     "scripts/capture_mlb_moneyline_model_p.py": "PROSPECTIVE_MLB_MONEYLINE_MODEL_P_CAPTURE_ONLY_NO_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
     "scripts/capture_mlb_moneyline_paper_decisions.py": "PROSPECTIVE_MLB_MONEYLINE_PAPER_DECISION_FREEZE_ONLY_NO_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
+    "scripts/watch_mlb_moneyline_t30.py": "PROSPECTIVE_MLB_MONEYLINE_T30_PAPER_CAPTURE_WATCH_ONLY_NO_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
     "scripts/audit_cross_sport_accuracy_readiness.py": "CROSS_SPORT_STRUCTURAL_ACCURACY_EVIDENCE_AUDIT_ONLY_NO_ACTIVE_BUNDLE_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "scripts/check_active_evidence_windows.py": "ACTIVE_EVIDENCE_WINDOW_GOVERNANCE_GUARD_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "scripts/diagnose_odds_api_auth.py": "AUTH_DIAGNOSTIC_ONLY_NO_ACTIVE_BUNDLE",
@@ -546,6 +548,8 @@
     ".github/workflows/nfl-location-symmetric-g1-readout.yml": "NFL_LOCATION_SYMMETRIC_G1_EXACT_MAIN_DEVELOPMENT_READOUT_WORKFLOW_ZERO_BETTING_AUTHORITY",
     "tests/test_nfl_location_symmetric_g1_readout_workflow.py": "TEST_ONLY_NFL_LOCATION_SYMMETRIC_G1_READOUT_BOUNDARY_NO_RUNTIME_AUTHORITY",
     "scripts/collect_auto_dk_four_sports.py": "PROSPECTIVE_DRAFTKINGS_AND_REFERENCE_BOOK_QUOTE_CAPTURE_ONLY_NO_PREDICTIVE_MODEL_TRUTH_GATE_PROMOTION_STAKING_VALIDATION_OR_EVIDENCE_CLOCK_AUTHORITY",
+    "scripts/collect_oddspapi_live_multibook.py": "OPT_IN_BUDGET_GUARDED_PROSPECTIVE_ODDSPAPI_QUOTES_AND_RAW_RESEARCH_ARCHIVE_ONLY_NO_MODEL_TRUTH_GATE_PROMOTION_STAKING_VALIDATION_OFFICIAL_OR_FORWARD_CLOCK_AUTHORITY",
+    "scripts/collect_statcast_research.py": "OPT_IN_SCOPED_BASEBALL_SAVANT_STATCAST_PITCH_LEVEL_RESEARCH_ARCHIVE_ONLY_NO_MODEL_TRUTH_GATE_PROMOTION_STAKING_VALIDATION_OFFICIAL_OR_FORWARD_CLOCK_AUTHORITY",
     "tests/test_cfb_family_evaluation_scope.py": "TEST_ONLY_CFB_FAMILY_EVALUATION_SCOPE_CONTRACT_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "sportsedge/registry_gate.py": "RESEARCH_FAMILY_REGISTRY_PUBLICATION_REFUSAL_ONLY_NO_PREDICTIVE_FIT_OR_PROMOTION_AUTHORITY",
     "tests/test_t132_family_registry_bypass_probes.py": "TEST_ONLY_FAMILY_REGISTRY_RUNTIME_REFUSAL_NO_MODEL_OR_PROMOTION_AUTHORITY",
@@ -553,7 +557,9 @@
     "tests/test_family_gate_pricing_field_leaks.py": "TEST_ONLY_FAMILY_GATE_PRODUCTION_PRICING_FIELDS_REFUSAL_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "tests/test_nfl_interception_coverage_aliases.py": "TEST_ONLY_NFL_INTERCEPTION_ALIAS_COLLISION_REGRESSION_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "tests/test_cfb_registry_complete_coverage_20261014.py": "TEST_ONLY_CFB_FAMILY_REGISTRY_COVERAGE_CONTRACT_NO_MODEL_OR_PROMOTION_AUTHORITY",
-    "tests/test_source_fact_hostname_hardening_t153.py": "TEST_ONLY_RESEARCH_X_HOSTNAME_HARDENING_NO_PRICING_AUTHORITY"
+    "tests/test_source_fact_hostname_hardening_t153.py": "TEST_ONLY_RESEARCH_X_HOSTNAME_HARDENING_NO_PRICING_AUTHORITY",
+    ".github/workflows/cfb-evidence-jobs.yml": "CFB_PIT_EVIDENCE_CAPTURE_AND_GRADE_WORKFLOW_REVIEW_PR_ONLY_NO_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
+    "scripts/cfb_evidence_jobs.py": "CFB_PRESTART_CLOSE_AND_FINAL_SCORE_EVIDENCE_ONLY_NO_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY"
   },
   "inventory_completion_claim": {
     "status": "HOSTED_AUDIT_ZERO_UNMAPPED",

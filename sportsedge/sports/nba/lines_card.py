@@ -101,6 +101,26 @@ class Game:
     home: str
     header: str
     markets: list[Market] = field(default_factory=list)
+    # Sportsbook capture instant from the issue's ``Captured:`` line (issue-level,
+    # or a per-game override after the header). Never the GitHub issue time.
+    captured_at: str | None = None
+
+
+_CAPTURED_RE = re.compile(r"^captured\b\s*:?\s*(.*?)\s*$", re.I)
+
+
+def parse_captured_at(token: str, raw: str) -> str:
+    """ISO-8601 instant with explicit offset -> normalized isoformat; else NBALinesError."""
+    from datetime import datetime
+    if not token or " " in token or "T" not in token.upper():
+        raise NBALinesError(f"NBA_CAPTURED_AT_INVALID:{raw}")
+    try:
+        value = datetime.fromisoformat(token.replace("Z", "+00:00").replace("z", "+00:00"))
+    except ValueError as exc:
+        raise NBALinesError(f"NBA_CAPTURED_AT_INVALID:{raw}") from exc
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise NBALinesError(f"NBA_CAPTURED_AT_TZ_REQUIRED:{raw}")
+    return value.isoformat()
 
 
 def _american(tok: str, raw: str) -> int:
@@ -134,55 +154,19 @@ def _line(tok: str, raw: str) -> float:
 _PRICE_RE = re.compile(r"(?<![\w.])[+\-−–]?\d{3,4}(?![\w.])|\beven\b", re.I)
 
 
-def parse_lines(body: str) -> list[Game]:
+def parse_lines(body: str, *, title: str | None = None) -> list[Game]:
+    """Thin adapter over the shared parser (``sportsedge.pipeline.intake``)."""
+    from sportsedge.pipeline.intake import SharedIntakeError, parse_issue
     try:
-        body = extract_issue_lines(body, sport="NBA")
-    except IssueLinesError as exc:
+        board = parse_issue(body, "NBA", title=title, strict_unknown=True)
+    except SharedIntakeError as exc:
         raise NBALinesError(str(exc)) from exc
-    games: list[Game] = []
-    cur: Game | None = None
-    for raw in body.splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#") or line.startswith("<!--"):
-            continue
-        if "@" in line and not re.match(r"^(ml|moneyline|spread|sp|total|ou|o/u)\b", line, re.I):
-            a, h = [p.strip() for p in line.split("@", 1)]
-            away, home = team_abbr(a), team_abbr(h)
-            if away == home:
-                raise NBALinesError(f"NBA_TEAMS_IDENTICAL:{line}")
-            cur = Game(away, home, line)
-            games.append(cur)
-            continue
-        if cur is None:
-            if not _PRICE_RE.search(line):
-                continue  # leading free-text note
-            raise NBALinesError(f"NBA_MARKET_BEFORE_GAME:{line}")
-        parts = line.replace(",", " ").split()
-        kind = parts[0].lower()
-        if kind in ("ml", "moneyline"):
-            if len(parts) != 3:
-                raise NBALinesError(f"NBA_ONE_SIDED_OR_MALFORMED:{line}")
-            cur.markets.append(Market("MONEYLINE", None, _american(parts[1], line), _american(parts[2], line), line))
-        elif kind in ("spread", "sp", "ps"):
-            if len(parts) != 4:
-                raise NBALinesError(f"NBA_ONE_SIDED_OR_MALFORMED:{line}")
-            cur.markets.append(Market("SPREAD", _line(parts[1], line), _american(parts[2], line), _american(parts[3], line), line))
-        elif kind in ("total", "ou", "o/u"):
-            if len(parts) != 4:
-                raise NBALinesError(f"NBA_ONE_SIDED_OR_MALFORMED:{line}")
-            cur.markets.append(Market("TOTAL", _line(parts[1], line), _american(parts[2], line), _american(parts[3], line), line))
-        elif not _PRICE_RE.search(line):
-            # Free-text note (no American price on the line) -- e.g. "Smoke test only."
-            # Market lines always carry prices, so a mistyped market still fails closed.
-            continue
-        else:
-            raise NBALinesError(f"NBA_UNRECOGNIZED:{line}")
-    if not games:
-        raise NBALinesError("NBA_NO_GAMES")
-    for g in games:
-        if not g.markets:
-            raise NBALinesError(f"NBA_GAME_WITHOUT_MARKETS:{g.header}")
-    return games
+    return [
+        Game(g.away, g.home, g.header,
+             markets=[Market(m.market, m.line, m.price_a, m.price_b, m.raw) for m in g.markets],
+             captured_at=g.captured_at)
+        for g in board.games
+    ]
 
 
 def dec(a: int) -> float:

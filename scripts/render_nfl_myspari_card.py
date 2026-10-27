@@ -118,8 +118,38 @@ NO_MODEL_TEXT = {
 }
 
 
-def _plain_reason(code: str) -> str:
-    return NO_MODEL_TEXT.get(str(code), str(code))
+# Specific refusal behind NO_MODEL:RESIDUAL_QUOTES_OR_HISTORY_UNAVAILABLE.
+RESIDUAL_ERROR_TEXT = {
+    "QUOTE_TIMESTAMP:INVALID": "capture-time line missing (add 'Captured <ISO time with offset>' under the game)",
+    "QUOTE_TIMESTAMP:AWARE_REQUIRED": "capture time has no timezone offset",
+    "QUOTE_STALE": "lines older than 30 minutes when the card ran",
+    "QUOTE_CLOCK_SKEW": "capture time is in the future",
+    "ANCHOR_QUOTE_TIME_SKEW": "spread and total captured at different times",
+    "KICKOFF:INVALID": "no kickoff time from the independent schedule",
+    "KICKOFF_STARTED": "game already kicked off",
+    "SCHEDULE_KICKOFF:NO_MATCH": "game not found on the ESPN schedule",
+    "SCHEDULE_KICKOFF:AMBIGUOUS": "more than one ESPN schedule match",
+    "SCHEDULE_KICKOFF:UNAVAILABLE": "ESPN schedule unavailable",
+    "SCHEDULE_KICKOFF:INVALID": "ESPN schedule kickoff unreadable",
+    "MARKET_SPREAD_TOTAL_REQUIRED": "both a spread and a total are required",
+    "NO_MODEL:INSUFFICIENT_PRIOR_GAMES": "not enough prior games",
+}
+
+# No market is validated, so every engine BET/LEAN displays as WATCH.
+VALIDATED_PICK_STATUSES: frozenset[str] = frozenset()
+
+
+def display_status(row: dict) -> str:
+    """WATCH unless the row's engine_status is a validated pick status (none exist)."""
+    status = str(row.get("engine_status") or "").upper()
+    return status if status in VALIDATED_PICK_STATUSES else "WATCH"
+
+
+def _plain_reason(code: str, detail: object = None) -> str:
+    text = NO_MODEL_TEXT.get(str(code), str(code))
+    if code == "NO_MODEL:RESIDUAL_QUOTES_OR_HISTORY_UNAVAILABLE" and detail:
+        return "no research price: " + RESIDUAL_ERROR_TEXT.get(str(detail), str(detail))
+    return text
 
 
 def _market_label(row: dict, away: str, home: str) -> str:
@@ -178,11 +208,11 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
     lines = [f"**NFL card** — {title or 'no games'}", ""]
     if not any(g.get("picks") for g in games) and engine.get("empty_reason"):
         lines += [str(engine["empty_reason"]), ""]
+    ranked: list[tuple[float, str]] = []
+    unpriced: list[str] = []
+    per_game: list[tuple[dict, list[str], list[str]]] = []
     for game in games:
         away, home = str(game.get("away")), str(game.get("home"))
-        lines.append(f"### {away} @ {home}")
-        picks_out: list[str] = []
-        other: list[str] = []
         team_totals: list[str] = []
         props: list[str] = []
         for row in game.get("markets") or []:
@@ -196,29 +226,41 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
                 continue
             reason = row.get("no_model") if row.get("residual_mode") else (row.get("no_model") or market_eligibility(row.get("market"), row.get("line")))
             if reason:
-                other.append(f"- {label}: {_plain_reason(reason)}")
+                unpriced.append(f"- {label}: {_plain_reason(reason, row.get('residual_research_error'))}")
                 continue
-            pick = row.get("pick")
-            lean = row.get("lean")
-            if pick:
-                picks_out.append(
-                    f"- **BET** {pick['selection']} {pick.get('line', '')} @ {fmt_price(pick['price_american'])}"
-                    f" · EV {pick.get('ev_per_dollar', 0) * 100:+.1f}%"
-                    f" · edge {pick.get('edge_probability_points', 0) * 100:+.1f} pts vs no-vig"
-                )
-            elif lean:
-                picks_out.append(
-                    f"- LEAN (no proven edge, not a bet): {lean['selection']} {lean.get('line', '')} @ {fmt_price(lean['price_american'])}"
-                    f" · residual research EV {lean.get('ev_per_dollar', 0) * 100:+.1f}%"
-                    f" · edge {lean.get('edge_probability_points', 0) * 100:+.1f} pts vs paired no-vig"
-                )
-            elif row.get("lean_block") == "NO_LEAN:THIN_CALIBRATION":
-                other.append(f"- {label}: no lean (model too far from the line; too few past games to price it)")
-            elif row.get("lean_block") == "NO_LEAN:PROJECTION_DISAGREES":
-                other.append(f"- {label}: no lean (price-only edge; the model total points the other way)")
+            chosen = row.get("pick") or row.get("lean")
+            choices = list(row.get("residual_research_prices") or [])
+            best = chosen or (max(choices, key=lambda x: float(x.get("ev_per_dollar") or 0)) if choices else None)
+            if best is None:
+                unpriced.append(f"- {label}: {_plain_reason('NO_MODEL:PAIRED_RESIDUAL_PRICE_UNAVAILABLE')}")
+                continue
+            ev = float(best.get("ev_per_dollar") or 0)
+            status = display_status({**row, **best})
+            if chosen:
+                text = (f"- **{status}** {label}: {best['selection']} {best.get('line', '')} @ {fmt_price(best['price_american'])}"
+                        f" · research EV {ev * 100:+.1f}%"
+                        f" · edge {float(best.get('edge_probability_points') or 0) * 100:+.1f} pts vs paired no-vig"
+                        " (NOT proven, not a bet)")
             else:
-                other.append(f"- {label}: no lean (model edge under 2% EV)")
-        lines += picks_out + other
+                if row.get("lean_block") == "NO_LEAN:THIN_CALIBRATION":
+                    why = "model too far from the line; too few past games to price it"
+                elif row.get("lean_block") == "NO_LEAN:PROJECTION_DISAGREES":
+                    why = "price-only edge; the model total points the other way"
+                else:
+                    why = "under the research EV/edge floors"
+                text = (f"- **{status}** {label}: best side {best.get('selection')} research EV {ev * 100:+.1f}%"
+                        f" · no lean ({why})")
+            ranked.append((ev, text))
+        per_game.append((game, team_totals, props))
+    if ranked or unpriced:
+        lines.append("Ranked by research EV per $ (all games; WATCH only, not bets):")
+        lines += [text for _, text in sorted(ranked, key=lambda x: -x[0])]
+        if unpriced:
+            lines += ["", "Not priced:"] + unpriced
+        lines.append("")
+    for game, team_totals, props in per_game:
+        away, home = str(game.get("away")), str(game.get("home"))
+        lines.append(f"### {away} @ {home}")
         lines += movement_lines(first_card, engine, away, home)
         lines += game_info_lines(game)
         if team_totals:
@@ -244,7 +286,7 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
                      "frozen joint-score grid, paired POWER_V1 no-vig. "
                      "No historical residual validation or positive forward CLV; track only.")
     if engine.get("residual_research_policy"):
-        lines.append("Residual adjustments are NOT proven Model_P, OFFICIAL selections, or staking authority.")
+        lines.append("Residual adjustments are research-only: not validated, no picks, no staking.")
     lines.append(both_side_section(engine))
     lines.append(snapshot_marker(engine, observed_at))
     return "\n".join(lines) + "\n"

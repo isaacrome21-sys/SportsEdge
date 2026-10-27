@@ -32,8 +32,8 @@ from sportsedge.nfl_scoring_composition_artifact import load_prior_file
 from sportsedge.sports.nfl.auto_slate import discover_nfl_auto_games
 from sportsedge.sports.nfl.context_autopull import NFLContextError
 from sportsedge.sports.nfl.full_auto import fetch_nflverse_depth_charts
-from sportsedge.sports.nfl.injury_report_source import fetch_nflverse_injuries
-from sportsedge.sports.nfl.live_role_source import fetch_nflverse_player_stats
+from sportsedge.sports.nfl.injury_report_source import fetch_nflverse_injuries, load_injury_snapshot
+from sportsedge.sports.nfl.nflverse_stats_schema_adapter import fetch_player_stats_2025_schema
 
 
 def _read(path: str):
@@ -125,6 +125,7 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=21)
     ap.add_argument("--horizon-days", type=int, default=10)
     ap.add_argument("--scoring-prior")
+    ap.add_argument("--injury-snapshot", help="pre-quote nflverse injury snapshot JSON (hash + retrieval bound)")
     args = ap.parse_args()
 
     ticket = _read(args.input)
@@ -174,15 +175,20 @@ def main() -> int:
 
             stat_seasons = sorted({season for s in seasons for season in (s - 1, s)})
             try:
-                player_rows, _receipts = fetch_nflverse_player_stats(seasons=stat_seasons)
+                player_rows, _receipts = fetch_player_stats_2025_schema(seasons=stat_seasons)
                 source_status["player_stats"] = "AVAILABLE"
             except NFLContextError as exc:
                 source_status["player_stats"] = f"MISSING:{exc}"
 
             injury_ok = True
+            snapshot = _read(args.injury_snapshot) if args.injury_snapshot else None
             for season in seasons:
                 try:
-                    rows, _uri, _digest = fetch_nflverse_injuries(season=season)
+                    if snapshot is not None:
+                        rows, _uri, _digest = load_injury_snapshot(
+                            snapshot, season=season, observed_at=observed_at)
+                    else:
+                        rows, _uri, _digest = fetch_nflverse_injuries(season=season)
                     injury_rows.extend(rows)
                 except NFLContextError as exc:
                     injury_ok = False

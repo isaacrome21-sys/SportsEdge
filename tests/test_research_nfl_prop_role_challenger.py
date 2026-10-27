@@ -47,6 +47,28 @@ class NFLPropRoleChallengerTests(unittest.TestCase):
         self.assertGreater(role.pass_attempt_mean, 20)
         self.assertLess(role.pass_attempt_mean, 34)
 
+    def test_sparse_nonempty_history_is_disclosed_as_blended_not_pure_prior(self):
+        role = stabilize_role(
+            entity_id="p1", history=[{"rush_attempts": 0}],
+            projected_role={"rush_attempts": 10}, min_history_games=3,
+        )
+        self.assertEqual(role.history_games, 1)
+        self.assertAlmostEqual(role.rush_attempt_mean, 8.0)
+        self.assertEqual(role.source, "SPARSE_HISTORY_BLEND")
+        tags = diagnostic_tags(role=role)
+        self.assertIn("SPARSE_HISTORY_BLEND", tags)
+        self.assertIn("LOW_TRAILING_SAMPLE", tags)
+        self.assertNotIn("PROJECTED_ROLE", tags)
+
+    def test_zero_history_is_pure_projected_role_even_at_zero_minimum(self):
+        role = stabilize_role(
+            entity_id="p1", history=[], projected_role=self.prior,
+            min_history_games=0,
+        )
+        self.assertEqual(role.source, "PROJECTED_ROLE")
+        self.assertEqual(role.history_games, 0)
+        self.assertAlmostEqual(role.rush_attempt_mean, self.prior["rush_attempts"])
+
     def test_probability_lane_rejects_market_inputs_recursively(self):
         with self.assertRaisesRegex(PropChallengerError, "MARKET_INPUT_FORBIDDEN"):
             stabilize_role(

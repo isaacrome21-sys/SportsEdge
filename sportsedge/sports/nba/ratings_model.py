@@ -15,8 +15,22 @@ market is a bet only if the out-of-sample backtest in
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Iterable, Mapping
+
+# Highest team score in NBA history is 186 (Detroit, 1983-12-13, 3OT). The cap
+# leaves headroom above every real final while rejecting impossible ones.
+MAX_TEAM_SCORE = 200.0
+
+
+def _checked_score(name: str, value: float) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"NBARatings.update: {name} must be a real number, got {value!r}")
+    v = float(value)
+    if not math.isfinite(v) or v < 0.0 or v > MAX_TEAM_SCORE:
+        raise ValueError(f"NBARatings.update: {name}={value!r} is not a plausible NBA final score")
+    return v
 
 
 @dataclass
@@ -65,6 +79,14 @@ class NBARatings:
         return hp - ap, hp + ap
 
     def update(self, home: str, away: str, home_pts: float, away_pts: float, *, neutral: bool = False) -> None:
+        # Finals are the model's only input, and the state is carried across
+        # cards via checkpoints: one malformed final (NaN/inf from a bad parse,
+        # a negative or self-game row) would otherwise poison every rating
+        # permanently and silently. Refuse implausible finals loudly instead.
+        if home == away:
+            raise ValueError(f"NBARatings.update: home and away teams must differ, got {home!r} twice")
+        home_pts = _checked_score("home_pts", home_pts)
+        away_pts = _checked_score("away_pts", away_pts)
         p = self.params
         hp, ap = self.predict(home, away, neutral=neutral)
         eh, ea = home_pts - hp, away_pts - ap

@@ -49,6 +49,11 @@ jobs:
         if: steps.runtime.outputs.cache-hit != 'true'
         run: python -m pip install --disable-pip-version-check --target .runtime-deps numpy==2.5.3
 
+      - name: Test MLB lines intake regression
+        run: |
+          python -m pip install --disable-pip-version-check pytest==9.1.1
+          PYTHONPATH=.runtime-deps:. python -m pytest -q tests/test_mlb_lines_issue2578.py tests/test_mlb_actionable_release_guard.py tests/test_render_quote_move_guard.py
+
       - name: Slate date
         id: day
         run: echo "date=$(TZ=America/Chicago date +%F)" >> "$GITHUB_OUTPUT"
@@ -75,6 +80,18 @@ jobs:
               echo; echo "Edit the issue to fix them and it will rerun."; } > comment.md
             gh issue comment "$ISSUE" --body-file comment.md
             exit 1
+          fi
+
+      - name: Report skipped MLB lines on the issue
+        if: steps.intake.outcome == 'success'
+        run: |
+          if [ -s intake_warnings.txt ]; then
+            {
+              echo "MLB intake skipped these informational or unparseable lines (no rows created):"
+              echo
+              cat intake_warnings.txt
+            } > intake_warning_comment.md
+            gh issue comment "$ISSUE" --body-file intake_warning_comment.md
           fi
 
       - name: Run SportsEdge engines
