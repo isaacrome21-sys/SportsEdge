@@ -11,6 +11,8 @@ from scripts.print_mlb_fast_game_markets import actionable_game_rows
 from sportsedge.mlb_myspari_own_model import (
     EXTREME_MARKET_DISAGREEMENT_REASON, apply_market_sanity_guard,
 )
+from sportsedge.mlb_edge_score import MLB_EDGE_SCORE_PROVENANCE
+from sportsedge.mlb_scored_card import build_mlb_scored_card
 
 
 def _candidate(*, status="ACTIONABLE", engine_status="MODEL_CANDIDATE"):
@@ -90,6 +92,32 @@ def test_caller_claimed_five_star_review_loses_promotion_in_public_card():
     assert safe["model_p"] == raw["model_p"]
     assert safe["american_odds"] == raw["american_odds"]
     assert renderer.withhold_unverified_actionable([safe])[0] == safe
+
+
+def test_verified_review_cannot_reinflate_five_stars_during_scored_rebuild():
+    """Exact producer -> rebuilt scored card -> public JSON boundary contract."""
+    raw = _candidate()
+    raw.update(model_p=0.58, market_p=0.50, edge=0.08,
+               estimate_p=0.99, market_disagreement_supported=False,
+               confidence_provenance=MLB_EDGE_SCORE_PROVENANCE,
+               reason_codes=("POWER_V1_NO_VIG",))
+    original = build_mlb_scored_card([raw])[0]
+    assert original["confidence_verified"] is True
+    assert original["scored_status"] == "ACTIONABLE"
+    assert original["star_rating"] == 5  # guard is needed; fixture is a real threat
+    refused = apply_market_sanity_guard([original])[0]
+    assert refused["status"] == refused["scored_status"] == "REVIEW"
+    rebuilt = build_mlb_scored_card([refused])[0]
+    assert rebuilt["confidence_verified"] is True
+    assert rebuilt["status"] == rebuilt["scored_status"] == "REVIEW"
+    assert rebuilt["star_rating"] == 0
+    public = renderer.withhold_unverified_actionable([rebuilt])[0]
+    assert public["status"] == public["scored_status"] == "REVIEW"
+    assert public["star_rating"] == 0
+    assert EXTREME_MARKET_DISAGREEMENT_REASON in public["presentation_reason_codes"]
+    assert public["model_p"] == raw["model_p"]
+    assert public["american_odds"] == raw["american_odds"]
+    assert renderer.withhold_unverified_actionable([public])[0] == public
 
 
 def test_release_guard_cannot_be_bypassed_by_engine_bet_claim_or_prior_refusal():
