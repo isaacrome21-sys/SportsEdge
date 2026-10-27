@@ -92,6 +92,7 @@ def accuracy_readiness(*, root: Path = ROOT) -> dict:
         raise AuditRefusal("NO_FORWARD_MARKET_CONFIGS")
     config_rows = []
     family_by_market = {}
+    first_config_by_market = {}
     for path in files:
         row = _read_json(path)
         state = _status(row, name=path.name, root=root)
@@ -105,17 +106,40 @@ def accuracy_readiness(*, root: Path = ROOT) -> dict:
             raise AuditRefusal(f"CONFIG_IDENTITY_INVALID:{path.name}")
         for market in markets:
             key = (sport.upper(), market.upper())
-            prior = family_by_market.get(key)
-            if prior is not None and prior[1] == state:
-                # Two configs in the SAME state claiming one market is an
-                # ambiguous registration and stays refused. A config in a
-                # different state is a distinct prereg version of the same
-                # family (e.g. a pinned candidate beside the frozen test):
-                # every config is inventoried in config_rows, and the
-                # canonical link below names the frozen config while one
-                # exists for the market.
-                raise AuditRefusal(f"DUPLICATE_FORWARD_MARKET_CONFIG:{sport}:{market}")
-            if prior is None or state == "FROZEN_NO_VERDICT_ATTACHED":
+            prior = first_config_by_market.get(key)
+            if prior is not None:
+                prior_name, prior_row, prior_state = prior
+                allowed_differences = {
+                    "status", "prereg", "prereg_sha256", "capture_note",
+                }
+                same_contract = all(
+                    row.get(field) == prior_row.get(field)
+                    for field in set(row) | set(prior_row)
+                    if field not in allowed_differences
+                )
+                # The NBA V2 source amendment is the ONLY authorized
+                # overlapping registration. No different engine, model,
+                # market, gate or threshold can hide behind a status change.
+                is_additive_v2 = (
+                    sport.upper() == "NBA"
+                    and market.upper() in {
+                        "PLAYER_POINTS", "PLAYER_REBOUNDS",
+                        "PLAYER_ASSISTS", "PLAYER_PRA",
+                    }
+                    and path.name == f"{Path(prior_name).stem}_v2.json"
+                    and prior_state == "FROZEN_NO_VERDICT_ATTACHED"
+                    and state in {
+                        "FINAL_CANDIDATE_NOT_FROZEN",
+                        "FROZEN_NO_VERDICT_ATTACHED",
+                    }
+                    and row.get("prereg") != prior_row.get("prereg")
+                    and row.get("prereg_sha256") != prior_row.get("prereg_sha256")
+                    and same_contract
+                )
+                if not is_additive_v2:
+                    raise AuditRefusal(f"DUPLICATE_FORWARD_MARKET_CONFIG:{sport}:{market}")
+            else:
+                first_config_by_market[key] = (path.name, row, state)
                 family_by_market[key] = (path.name, state)
         config_rows.append({
             "file": str(path.relative_to(root)), "sport": sport.upper(),
