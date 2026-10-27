@@ -152,6 +152,9 @@ def record_capture(row: Mapping[str, Any]) -> MLBCapturedGameRow:
                               "INTAKE_LINE_INVALID", required=line_required)
     close_line = _quote_line(row.get("close_line"), "CLOSE_LINE_INVALID",
                              required=line_required and close_at is not None)
+    if not line_required and (intake_line is not None or close_line is not None):
+        # H2H/ML winner quotes are prices only, never handicaps.
+        raise MLBCaptureLogError("MONEYLINE_THRESHOLD_FORBIDDEN")
     return MLBCapturedGameRow(
         game_id=game_id,
         market=market,
