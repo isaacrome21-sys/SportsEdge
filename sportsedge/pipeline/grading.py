@@ -59,7 +59,7 @@ def _cmp(value: float, line: float, positive: str) -> str:
 
 
 def grade(pick: PickRecord | Mapping, result: FinalResult, *, family: str) -> str:
-    selection = pick.selection if isinstance(pick, PickRecord) else pick["selection"]
+    selection = pick.selection if isinstance(pick, PickRecord) else pick.get("selection")
     if not isinstance(selection, str) or not selection.strip():
         raise GradeError("GRADE_SELECTION_INVALID")
     sel = selection.upper()
