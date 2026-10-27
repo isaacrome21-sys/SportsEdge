@@ -173,6 +173,8 @@ def normalize_event(
                 if abs(price) < 100:
                     raise TheOddsApiError("AMERICAN_ODDS_INVALID")
                 point_raw = outcome.get("point")
+                if isinstance(point_raw, bool):
+                    raise TheOddsApiError("POINT_INVALID")
                 try:
                     point = None if point_raw is None else float(point_raw)
                 except (TypeError, ValueError, OverflowError) as exc:

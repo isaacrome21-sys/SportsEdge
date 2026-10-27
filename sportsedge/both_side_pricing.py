@@ -123,6 +123,8 @@ def attach_sibling_quotes(rows, *, group_key, side_of):
             other_side = side_of(other)
             if not _opposing_sides(str(side).upper(), str(other_side).upper()):
                 continue
+            if not _same_quoted_contract(row, other, str(side).upper(), str(other_side).upper()):
+                continue
             if not _valid_quote_odds(other.get("american_odds")):
                 continue
             matches.append(other)
@@ -141,6 +143,39 @@ def attach_sibling_quotes(rows, *, group_key, side_of):
 
 def _opposing_sides(first: str, second: str) -> bool:
     return {first, second} in ({"OVER", "UNDER"}, {"HOME", "AWAY"}, {"YES", "NO"}, {"YES", "FIELD"})
+
+
+def _same_quoted_contract(first: Mapping[str, Any], second: Mapping[str, Any], side: str, other_side: str) -> bool:
+    """Refuse a sibling whose event, selection subject or threshold is different.
+
+    A caller's group key is useful for indexing, but is not proof that two
+    quoted lines describe the same contract. HOME/AWAY spread lines use
+    opposite signs; OVER/UNDER thresholds must be exactly equal.
+    """
+    identity = (
+        "market", "engine_market", "provider_market", "game_id", "event_id",
+        "entity_id", "player_id", "subject", "participant", "team_side",
+        "provider", "bookmaker", "bookmaker_key",
+    )
+    for field in identity:
+        left, right = first.get(field), second.get(field)
+        if (left is not None or right is not None) and left != right:
+            return False
+
+    first_line = first.get("line", first.get("point"))
+    second_line = second.get("line", second.get("point"))
+    if {side, other_side} == {"OVER", "UNDER"}:
+        # A missing threshold cannot be an authenticated totals/props pair.
+        a, b = _number(first_line), _number(second_line)
+        return a is not None and b is not None and a == b
+    if first_line is None and second_line is None:
+        return True  # Moneyline, yes/no and other push-free binary markets.
+    a, b = _number(first_line), _number(second_line)
+    if a is None or b is None:
+        return False
+    if {side, other_side} == {"HOME", "AWAY"}:
+        return a == -b  # Spread quotes express opposite team handicaps.
+    return a == b
 
 
 def _valid_quote_odds(value: Any) -> bool:
