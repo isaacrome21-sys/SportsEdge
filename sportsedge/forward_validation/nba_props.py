@@ -107,8 +107,8 @@ PREREG_PATH_V2 = ("research/nba_props_forward_20261020/"
 # NBA_PROPS_PREREG_V2_SOURCE_AMENDMENT_DRAFT_20261026.md). At the
 # owner's freeze, the frozen text must hash to this value or the pin
 # is re-struck on the frozen bytes — never silently.
-PREREG_SHA256_V2 = ("9a20c19193095ebb9f93b12fae3877465b81f91682427ba2"
-                    "770e60ebe5b3b944")
+PREREG_SHA256_V2 = ("069cbf661e6ca733e9bda54ee3bc8a02163b20a5"
+                    "df7fcbbc89b10d9419a6aa02")
 
 CONFIG_FILES_V2 = {
     "player_points": "nba_player_points_v2.json",
@@ -117,14 +117,17 @@ CONFIG_FILES_V2 = {
     "player_pra": "nba_player_pra_v2.json",
 }
 
-# Explicit recognized V2 states. The owner's future freeze changes the
-# pinned document header and the registered status to the exact FROZEN token,
-# with a new document SHA; it never depends on a caller-supplied substring.
+# Recognize exact on-disk held/asserted-frozen config states only. Syntax
+# recognition does NOT validate the disputed freeze or lift #2811's
+# unconditional prospective COUNTED quarantine.
 V2_HELD_CONFIG_STATUS = (
     "FINAL-CANDIDATE -- NOT FROZEN -- PREREG_NBA_PROPS_FORWARD_V2 "
     "source amendment (prepared 2026-10-26; freeze HELD by owner)"
 )
-V2_FROZEN_CONFIG_STATUS = "FROZEN"
+V2_FROZEN_CONFIG_STATUS = (
+    "FROZEN -- PREREG_NBA_PROPS_FORWARD_V2 source amendment "
+    "(frozen 2026-10-26; see FREEZE_RECORD_NBA_PROPS_FORWARD_V2.md)"
+)
 
 _CONFIG_DIR = Path(__file__).resolve().parent / "configs"
 _REPO_ROOT = Path(__file__).resolve().parents[2]
