@@ -203,3 +203,45 @@ def test_valid_market_threshold_preserved_without_rounding():
         "close_retrieved_at": "2027-04-01T16:05:00Z",
     })
     assert row.intake_line == -1.5 and row.close_line == -1.5
+
+
+
+@pytest.mark.parametrize("field,invalid,reason", [
+    ("model_reliability", True, "MODEL_RELIABILITY_OUT_OF_RANGE"),
+    ("model_reliability", False, "MODEL_RELIABILITY_OUT_OF_RANGE"),
+    ("model_reliability", float("nan"), "MODEL_RELIABILITY_OUT_OF_RANGE"),
+    ("model_reliability", float("inf"), "MODEL_RELIABILITY_OUT_OF_RANGE"),
+    ("model_reliability", "not-a-number", "MODEL_RELIABILITY_OUT_OF_RANGE"),
+    ("model_reliability", [], "MODEL_RELIABILITY_OUT_OF_RANGE"),
+    ("estimate_p", True, "ESTIMATE_P_OUT_OF_RANGE"),
+    ("estimate_p", False, "ESTIMATE_P_OUT_OF_RANGE"),
+    ("estimate_p", float("nan"), "ESTIMATE_P_OUT_OF_RANGE"),
+    ("estimate_p", float("-inf"), "ESTIMATE_P_OUT_OF_RANGE"),
+    ("estimate_p", "not-a-number", "ESTIMATE_P_OUT_OF_RANGE"),
+    ("estimate_p", {}, "ESTIMATE_P_OUT_OF_RANGE"),
+])
+def test_research_probabilities_fail_closed_with_named_refusal(field, invalid, reason):
+    payload = {
+        "game_id": "g-2027", "market": "MONEYLINE", "selection": "HOME",
+        "official_date": "2027-04-01", "season_type": "R",
+        "intake_retrieved_at": "2027-04-01T16:00:00Z",
+        "intake_american": -110,
+        "model_reliability": 0.0, "estimate_p": 0.55,
+    }
+    payload[field] = invalid
+    with pytest.raises(MLBCaptureLogError, match=reason):
+        record_capture(payload)
+
+
+@pytest.mark.parametrize("reliability", [0, 0.5, 1.0, "0.75"])
+def test_valid_research_reliability_preserves_value_without_promotion(reliability):
+    row = record_capture({
+        "game_id": "g-2027", "market": "MONEYLINE", "selection": "HOME",
+        "official_date": "2027-04-01", "season_type": "R",
+        "intake_retrieved_at": "2027-04-01T16:00:00Z",
+        "intake_american": -110, "model_reliability": reliability,
+        "estimate_p": 0.55,
+    })
+    assert row.model_reliability == float(reliability)
+    assert row.estimate_p == 0.55
+    assert row.authority_footer == "NOT Model_P / NOT Truth Gate / NOT OFFICIAL"

@@ -72,6 +72,21 @@ def _quote_line(value: Any, code: str, *, required: bool = False) -> float | Non
     return line
 
 
+def _probability(value: Any, code: str, *, allow_zero: bool = False) -> float:
+    """Refuse boolean, nonfinite and malformed research-only probability inputs."""
+    if isinstance(value, bool):
+        raise MLBCaptureLogError(code)
+    try:
+        probability = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise MLBCaptureLogError(code) from exc
+    if not math.isfinite(probability):
+        raise MLBCaptureLogError(code)
+    if not (0.0 <= probability <= 1.0 if allow_zero else 0.0 < probability < 1.0):
+        raise MLBCaptureLogError(code)
+    return probability
+
+
 @dataclass(frozen=True)
 class MLBCapturedGameRow:
     game_id: str
@@ -136,16 +151,15 @@ def record_capture(row: Mapping[str, Any]) -> MLBCapturedGameRow:
         raise MLBCaptureLogError("CLOSE_PRICE_MISSING")
     if close_at is None and (row.get("close_american") is not None or row.get("close_line") is not None):
         raise MLBCaptureLogError("CLOSE_TIMESTAMP_MISSING")
-    rel=float(row.get("model_reliability") if row.get("model_reliability") is not None else 0.0)
-    if rel != 0.0 and not (0.0 < rel <= 1.0):
-        raise MLBCaptureLogError("MODEL_RELIABILITY_OUT_OF_RANGE")
-    estimate=row.get("estimate_p")
+    rel = _probability(
+        row.get("model_reliability") if row.get("model_reliability") is not None else 0.0,
+        "MODEL_RELIABILITY_OUT_OF_RANGE", allow_zero=True,
+    )
+    estimate = row.get("estimate_p")
     if "model_p" in row and estimate is None:
         raise MLBCaptureLogError("MODEL_P_FIELD_FORBIDDEN_USE_ESTIMATE_P")
     if estimate is not None:
-        estimate=float(estimate)
-        if not 0.0 < estimate < 1.0:
-            raise MLBCaptureLogError("ESTIMATE_P_OUT_OF_RANGE")
+        estimate = _probability(estimate, "ESTIMATE_P_OUT_OF_RANGE")
     # Binary winner moneylines have no threshold; every other market does.
     line_required = market not in {"MONEYLINE", "ML", "H2H"}
     intake_line = _quote_line(row.get("intake_line", row.get("line")),
