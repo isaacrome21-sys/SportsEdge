@@ -1,5 +1,5 @@
 {
- "status": "FINAL-CANDIDATE -- NOT FROZEN -- PREREG_NBA_PROPS_FORWARD_V2 source amendment (prepared 2026-10-26; freeze HELD by owner)",
+ "status": "FROZEN -- PREREG_NBA_PROPS_FORWARD_V2 source amendment (frozen 2026-10-26; see FREEZE_RECORD_NBA_PROPS_FORWARD_V2.md)",
  "sport": "NBA",
  "family": "player_rebounds",
  "markets": [
@@ -22,6 +22,6 @@
  "capture_scope": "IN_SPEC",
  "capture_note": "Capture Spec V1 NBA scope: game lines + PTS/REB/AST + common combos, entry and close, from the twice-daily DraftKings capture jobs live since Oct 19, 2026. V2 boundary (V2 prereg sec. 10): counting starts at zero at the V2 freeze; the first countable slate is the first slate priced after the freeze with a per-slate store passing S1-S6; every row before the freeze is research, never counted, and is never backfilled.",
  "prereg": "research/nba_props_forward_20261020/PREREG_NBA_PROPS_FORWARD_V2.md",
- "prereg_sha256": "9a20c19193095ebb9f93b12fae3877465b81f91682427ba2770e60ebe5b3b944",
+ "prereg_sha256": "069cbf661e6ca733e9bda54ee3bc8a02163b20a5df7fcbbc89b10d9419a6aa02",
  "picked_beats_passed_required": true
 }

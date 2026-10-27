@@ -84,6 +84,45 @@ def check_training_pins(data: Path) -> dict:
     return pins
 
 
+def check_b8_active_runtime(data: Path, evaluator) -> dict:
+    """Verify the actual pricing directory before loading any NFL player rows.
+
+    B8 replaces the old 2025 file.  The evaluator's frozen hash contract
+    covers the corrected 2025 bytes and all other pinned player data; merely
+    checking the 2018/2019 training files permits a silent double-load.
+    """
+    if (data / "sp_2025.csv.gz").exists():
+        raise SystemExit("B8_RUNTIME_LEGACY_2025_FILE_FORBIDDEN")
+    season_files = sorted(
+        path.name
+        for pattern in ("ps_2025*.csv.gz", "sp_2025*.csv.gz")
+        for path in data.glob(pattern)
+    )
+    if season_files != ["sp_2025_played_v2.csv.gz"]:
+        raise SystemExit("B8_RUNTIME_CORRECTED_2025_FILE_SET_REQUIRED")
+    # The frozen evaluator loads *every* ps_*.csv.gz/sp_*.csv.gz file.
+    # A correct 2025 pin alone does not stop a malicious extra season file
+    # from entering its fitted pool (e.g. sp_extra.csv.gz). Admit only the
+    # exact filename set listed in the existing frozen SPEC_HASHES registry.
+    pinned_player_files = []
+    for line in (HERE / "SPEC_HASHES.txt").read_text().splitlines():
+        fields = line.split()
+        if len(fields) != 2:
+            raise SystemExit("B8_RUNTIME_PIN_REGISTRY_INVALID")
+        name = fields[1]
+        if name.startswith(("ps_", "sp_")) and name.endswith(".csv.gz"):
+            pinned_player_files.append(name)
+    loader_visible_files = sorted(
+        path.name
+        for pattern in ("ps_*.csv.gz", "sp_*.csv.gz")
+        for path in data.glob(pattern)
+    )
+    if (not pinned_player_files or len(pinned_player_files) != len(set(pinned_player_files))
+            or loader_visible_files != sorted(pinned_player_files)):
+        raise SystemExit("B8_RUNTIME_UNPINNED_PLAYER_FILE_SET")
+    return evaluator.check_hashes(data)
+
+
 def train_cv(ev, data_by_season: dict, cfg: dict) -> float:
     """Per-market pooled CV from the training seasons — the evaluator's own
     arithmetic (the training block of evaluate() in the Part 1 evaluator),
@@ -421,6 +460,7 @@ def cmd_price(args) -> int:
     ev = load_evaluator()
     data_dir = Path(args.player_data)
     pins = check_training_pins(data_dir)
+    check_b8_active_runtime(data_dir, ev)
     data_by_season = ev.load(data_dir)
     capture = json.loads(Path(args.capture).read_text())
     season = int(capture["season"])

@@ -60,14 +60,14 @@ def test_unknown_status_cannot_be_called_a_validated_model(tmp_path):
         _status({"status": "BEATS_MARKET"}, name="invented", root=tmp_path)
 
 
-def test_v2_configs_register_as_final_candidate_not_frozen():
+def test_v2_configs_register_as_frozen_no_verdict():
     report = accuracy_readiness()
     states = report["forward_config_states"]["NBA"]
-    assert states["FINAL_CANDIDATE_NOT_FROZEN"] == 4
+    assert states.get("FINAL_CANDIDATE_NOT_FROZEN", 0) == 0
     rows = [r for r in report["forward_family_configs"]
             if r["file"].endswith("_v2.json")]
     assert len(rows) == 4
-    assert all(r["state"] == "FINAL_CANDIDATE_NOT_FROZEN" for r in rows)
+    assert all(r["state"] == "FROZEN_NO_VERDICT_ATTACHED" for r in rows)
     # recognition in this inventory confers nothing: no family becomes
     # validated and no registered config grants play authority
     assert report["validated_families_conferred"] == 0
@@ -119,16 +119,16 @@ def test_same_state_duplicate_market_still_refused(tmp_path):
         accuracy_readiness(root=root)
 
 
-def test_final_candidate_registration_is_exact(tmp_path):
+def test_frozen_registration_is_exact(tmp_path):
     config = _v2_config()
-    # intact candidate: the real V2 config and its pinned document
-    # register under their true state — candidate, not frozen
+    # intact frozen config: the real V2 config and its pinned
+    # document register under their true state — frozen, no verdict
     root = _synthetic_root(tmp_path / "intact",
                            {"nba_player_points_v2.json": config})
     _with_v2_prereg(root)
     report = accuracy_readiness(root=root)
     (row,) = report["forward_family_configs"]
-    assert row["state"] == "FINAL_CANDIDATE_NOT_FROZEN"
+    assert row["state"] == "FROZEN_NO_VERDICT_ATTACHED"
 
     # registration entry removed (the document pin): fails closed
     unpinned = dict(config)
@@ -136,7 +136,7 @@ def test_final_candidate_registration_is_exact(tmp_path):
     root = _synthetic_root(tmp_path / "unpinned",
                            {"nba_player_points_v2.json": unpinned})
     _with_v2_prereg(root)
-    with pytest.raises(AuditRefusal, match="CANDIDATE_PREREG_SHA_MISSING"):
+    with pytest.raises(AuditRefusal, match="FROZEN_PREREG_SHA_MISSING"):
         accuracy_readiness(root=root)
 
     # a pin that does not match the document: fails closed

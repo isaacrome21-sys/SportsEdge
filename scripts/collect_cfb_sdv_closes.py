@@ -23,7 +23,7 @@ Exclusion rules (per game; reason recorded, never repaired or guessed):
   E2_NO_SPREAD_VALUE             home_team_spread is NaN (every
       summary_pickcenter row in 2012-2023 carries NaN values in this file)
   E3_NO_TOTAL_VALUE              over_under is NaN
-  E4_SPREAD_FLAGGED_UNAVAILABLE  game_spread_available is False
+  E4_SPREAD_FLAGGED_UNAVAILABLE  game_spread_available not explicitly true
   E5_NOT_COMPLETED               schedule row not completed / scores missing
 
 Usage:
@@ -108,7 +108,9 @@ def apply_exclusions(merged: pd.DataFrame) -> pd.DataFrame:
     m.loc[default, ["excl_spread", "excl_total"]] = "E1_PLACEHOLDER_DEFAULT_SOURCE"
     m.loc[(m.excl_spread == "") & m.home_team_spread.isna(), "excl_spread"] = "E2_NO_SPREAD_VALUE"
     m.loc[(m.excl_total == "") & m.over_under.isna(), "excl_total"] = "E3_NO_TOTAL_VALUE"
-    m.loc[(m.excl_spread == "") & (m.game_spread_available == False), "excl_spread"] = \
+    # CSV/object flags such as "False", "0" or NaN must not slip through
+    # Python False comparison; require an explicitly affirmative source flag.
+    m.loc[(m.excl_spread == "") & ~as_bool(m.game_spread_available), "excl_spread"] = \
         "E4_SPREAD_FLAGGED_UNAVAILABLE"  # noqa: E501 - reason string kept whole
     notdone = (~m.completed) | m.home_points.isna() | m.away_points.isna()
     for col in ("excl_spread", "excl_total"):
@@ -171,8 +173,13 @@ def main(argv=None) -> int:
         frames.append(frame)
         done = schedule[as_bool(schedule["completed"])
                         & schedule.home_points.notna() & schedule.away_points.notna()]
-        results_frames.append(done[["game_id", "season", "start_date", "home_id",
-                                    "away_id", "home_points", "away_points"]])
+        # A replacement model must know the historical venue and division at
+        # its prediction cutoff.  Do not silently turn unknown neutral-site
+        # values into home games or admit FBS/FCS mismatches to its fit.
+        results_frames.append(done[["game_id", "season", "week", "start_date",
+                                    "neutral_site", "home_id", "away_id",
+                                    "home_division", "away_division",
+                                    "home_points", "away_points"]])
         validation[str(season)] = summary
         print(f"season={season} rows={summary['betting_rows']} "
               f"spread_scoreable={summary['spread_scoreable']} "

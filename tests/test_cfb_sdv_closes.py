@@ -140,3 +140,77 @@ def test_roi_convention_push_excluded_from_denominator():
     assert stats["roi_flat_minus110_assumption"] == pytest.approx(
         (100.0 / 110.0 - 1.0) / 2, abs=1e-12)
     assert stats["cover_rate"] == pytest.approx(0.5)
+
+
+def test_research_replay_embargoes_overlapping_or_same_day_finals():
+    # Final score for game 1 is present in the historical CSV, but it is
+    # NOT admissible as a feature for game 2 one hour after kickoff.
+    games = [
+        dict(game_id=201, instant="2024-09-01T16:00:00Z", home_id=1, away_id=2,
+             home_points=48, away_points=0),
+        dict(game_id=202, instant="2024-09-01T17:00:00Z", home_id=1, away_id=2,
+             home_points=14, away_points=14),
+        dict(game_id=203, instant="2024-09-02T16:00:00Z", home_id=1, away_id=2,
+             home_points=21, away_points=20),
+    ]
+    rows = list(evaluate.project_season(games))
+    assert rows[0][1] is None and rows[0][3] is None
+    assert rows[1][1] is None and rows[1][3] is None
+    # At +24h, game 1 becomes available under the RESEARCH-ONLY proxy;
+    # game 2 (+23h) remains unavailable, so only game 1 informs AM.
+    assert rows[2][1] == pytest.approx(2.5 + 3.0 - (-3.0))
+    assert rows[2][3] is None
+
+
+def test_research_replay_requires_chronological_games():
+    games = [
+        dict(game_id=1, instant="2024-09-02T16:00:00Z", home_id=1, away_id=2,
+             home_points=10, away_points=7),
+        dict(game_id=2, instant="2024-09-01T16:00:00Z", home_id=1, away_id=2,
+             home_points=20, away_points=14),
+    ]
+    with pytest.raises(ValueError, match="CFB_SDV_GAMES_NOT_CHRONOLOGICAL"):
+        list(evaluate.project_season(games))
+
+
+def test_duplicate_close_game_ids_fail_closed_instead_of_last_row_wins():
+    closes = pd.DataFrame([
+        dict(game_id=401, home_team_spread=-3.5, over_under=50.5),
+        dict(game_id=401, home_team_spread=-7.5, over_under=44.5),
+    ])
+    with pytest.raises(ValueError, match="CFB_SDV_DUPLICATE_CLOSE_GAME_ID:401"):
+        evaluate.close_lookup(closes)
+
+
+def test_unique_close_game_ids_map_without_mutation():
+    closes = pd.DataFrame([
+        dict(game_id=401, home_team_spread=-3.5, over_under=50.5),
+        dict(game_id=402, home_team_spread=-7.5, over_under=44.5),
+    ])
+    lookup = evaluate.close_lookup(closes)
+    assert set(lookup) == {401, 402}
+    assert lookup[402].over_under == pytest.approx(44.5)
+
+
+@pytest.mark.parametrize("flag", [False, "False", "FALSE", "0", 0, None, float("nan"), "", "unknown"])
+def test_spread_flag_must_be_explicitly_affirmative(flag):
+    # SDV CSV/object values can be strings or missing; == False silently
+    # misses them. A valid numeric spread alone cannot confer availability.
+    b = pd.DataFrame([_betting_row(501, "core_odds_api", -3.5, 51.5, avail=flag)])
+    s = pd.DataFrame([_sched_row(501)])
+    frame, summary = collect.build_season(b, s)
+    row = frame.iloc[0]
+    assert row.excl_spread == "E4_SPREAD_FLAGGED_UNAVAILABLE"
+    assert not bool(row.spread_scoreable)
+    assert summary["spread_scoreable"] == 0
+    # The flag applies only to spreads; a separately valid total remains.
+    assert bool(row.total_scoreable)
+
+
+@pytest.mark.parametrize("flag", [True, "TRUE", "true", "1", 1])
+def test_explicitly_affirmative_spread_flags_remain_scoreable(flag):
+    b = pd.DataFrame([_betting_row(502, "core_odds_api", -3.5, 51.5, avail=flag)])
+    s = pd.DataFrame([_sched_row(502)])
+    frame, summary = collect.build_season(b, s)
+    assert bool(frame.iloc[0].spread_scoreable)
+    assert summary["spread_scoreable"] == 1
