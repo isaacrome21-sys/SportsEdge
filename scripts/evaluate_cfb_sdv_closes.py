@@ -36,11 +36,10 @@ import json
 import math
 import numbers
 import sys
-
-import numpy as np
 from collections import defaultdict, deque
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 BASE, HFA = 28.0, 2.5
