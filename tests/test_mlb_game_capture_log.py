@@ -163,6 +163,36 @@ def test_moneyline_remains_lineless_and_pending_close_is_allowed():
     assert row.close_retrieved_at is None
 
 
+@pytest.mark.parametrize("market", ["MONEYLINE", "ML", "H2H"])
+@pytest.mark.parametrize("field", ["intake_line", "close_line", "line"])
+def test_winner_moneyline_never_preserves_numeric_handicap(market, field):
+    payload = {
+        "game_id": "g-2027", "market": market, "selection": "HOME",
+        "official_date": "2027-04-01", "season_type": "R",
+        "intake_retrieved_at": "2027-04-01T16:00:00Z",
+        "intake_american": -110,
+        "close_retrieved_at": "2027-04-01T16:05:00Z",
+        "close_american": -115,
+    }
+    payload[field] = 1.5
+    with pytest.raises(MLBCaptureLogError, match="MONEYLINE_THRESHOLD_FORBIDDEN"):
+        record_capture(payload)
+
+
+@pytest.mark.parametrize("market", ["MONEYLINE", "ML", "H2H"])
+def test_winner_moneyline_aliases_accept_two_priced_capture_times_without_lines(market):
+    row = record_capture({
+        "game_id": "g-2027", "market": market, "selection": "HOME",
+        "official_date": "2027-04-01", "season_type": "R",
+        "intake_retrieved_at": "2027-04-01T16:00:00Z",
+        "intake_american": -110,
+        "close_retrieved_at": "2027-04-01T16:05:00Z",
+        "close_american": -115,
+    })
+    assert row.intake_line is None and row.close_line is None
+    assert row.regime == "REGULAR"
+
+
 def test_valid_market_threshold_preserved_without_rounding():
     row = record_capture({
         "game_id": "g-2027", "market": "RUN_LINE", "selection": "HOME",
