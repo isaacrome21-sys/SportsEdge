@@ -31,7 +31,10 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import numbers
 import sys
+
+import numpy as np
 from collections import defaultdict
 from pathlib import Path
 
@@ -151,6 +154,18 @@ def calibration(d, gap, win, sd):
 
 def score_market(d, model_col, kind, sd_prod, sd_lane):
     d = d.copy()
+    # Collector eligibility is necessary but not sufficient: reject malformed
+    # direct evaluator inputs before arithmetic/aggregation can score them.
+    required = (["home_team_spread", "actual_margin", model_col]
+                if kind == "spread" else
+                ["over_under", "actual_total", model_col])
+    for field in required:
+        valid = d[field].map(lambda v: (
+            isinstance(v, (numbers.Real, np.integer, np.floating))
+            and not isinstance(v, (bool, np.bool_))
+            and math.isfinite(float(v))))
+        if not bool(valid.all()):
+            raise ValueError(f"NONFINITE_CFB_SCORING_INPUT: {field}")
     if kind == "spread":
         d["mkt"] = -d.home_team_spread
         d["act"] = d.actual_margin
