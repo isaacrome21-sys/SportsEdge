@@ -157,3 +157,12 @@ def test_binary_boolean_only_final_accepts_optional_display_line(
     assert grade({"selection": selection, "line": 0.5},
                  FinalResult(stat=None, occurred=occurred),
                  family="yes_no") == expected
+
+
+@pytest.mark.parametrize("malformed_line", [math.nan, math.inf, -math.inf, True, "0.5"])
+@pytest.mark.parametrize("selection,occurred", [("YES", True), ("NO", False)])
+def test_boolean_only_binary_final_rejects_malformed_supplied_line(
+        malformed_line, selection, occurred) -> None:
+    with pytest.raises(GradeError, match="GRADE_LINE_INVALID"):
+        grade({"selection": selection, "line": malformed_line},
+              FinalResult(stat=None, occurred=occurred), family="yes_no")
