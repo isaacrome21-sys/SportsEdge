@@ -65,6 +65,7 @@ jobs:
           fi
           python -m json.tool "${RUNNER_TEMP}/nfl_anchored_screen.json" >/dev/null
           python -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["counted_rows"] == 0 and not d["verified_clv"] and not d["promotion_authority"] and d["paper_units"] == 0; assert d["design_years"] == [2020,2021,2022,2023,2024,2025]; assert d["status"] in ("FAILED_SCREEN","PASS_DESIGN_SCREEN"); print("HISTORICAL_SCREEN_VERDICT="+d["status"])' "${RUNNER_TEMP}/nfl_anchored_screen.json"
+          python -c 'import json,sys; d=json.load(open(sys.argv[1])); summary={"status":d["status"],"design_years":d["design_years"],"skipped":d["skipped"],"markets":{k:{"n":v["n"],"anchored_mae":v.get("anchored_mae"),"consensus_close_mae":v.get("consensus_close_mae"),"failures":v["failures"],"bands":v.get("bands")} for k,v in d["screens"].items()}}; print("NUMERIC_DESIGN_SCREEN="+json.dumps(summary,sort_keys=True,allow_nan=False))' "${RUNNER_TEMP}/nfl_anchored_screen.json"
           printf '%s\n' "exit_code=${result}" >>"${RUNNER_TEMP}/nfl_anchored_screen_provenance.txt"
           # A measured FAILED_SCREEN is an honest research result, not a CI error.
           # It MUST NOT authorize preregistration or any player-card publication.
