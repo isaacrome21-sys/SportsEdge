@@ -27,9 +27,9 @@ def body(captured, ml):
     return "\n".join(["TB Rays @ MIL Brewers", f"Captured: {captured}", f"ML {ml}", "Total 6.5 -108 -111"])
 
 
-def snap(captured, ml, picks, root):
+def snap(captured, ml, picks, root, recorded=None):
     rec = build_snapshot(sport="mlb", issue_number=100, body=body(captured, ml), title=TITLE,
-                         game={"game_pk": 1}, board=[], picks=picks, recorded_at="x")
+                         game={"game_pk": 1}, board=[], picks=picks, recorded_at=recorded or captured)
     return append_snapshot(rec, root)
 
 
@@ -49,10 +49,10 @@ def test_append_only_and_idempotent(tmp_path):
 def test_missing_or_naive_captured_refused(tmp_path):
     with pytest.raises(SnapshotError):
         build_snapshot(sport="mlb", issue_number=1, body="A @ B\nML +100 -120", title=None,
-                       game={}, board=[], picks=[], recorded_at="x")
+                       game={}, board=[], picks=[], recorded_at="2026-10-24T23:00:00Z")
     with pytest.raises(SnapshotError):
         build_snapshot(sport="mlb", issue_number=1, body="A @ B\nCaptured: 2026-10-24T17:00:00",
-                       title=None, game={}, board=[], picks=[], recorded_at="x")
+                       title=None, game={}, board=[], picks=[], recorded_at="2026-10-24T23:00:00Z")
     with pytest.raises(SnapshotError):
         snapshot_path("xfl", 1, tmp_path)
 
@@ -120,6 +120,6 @@ def test_record_cli(tmp_path):
                         "--root", str(tmp_path / "s")]) == 2
     pj = tmp_path / "p.json"
     pj.write_text(json.dumps([{"pick": "KC -3", "price": -110}]))
-    nf.write_text("KC @ BUF\nCaptured: 2026-10-26T19:00:00-04:00\nSpread KC -3 -110 / BUF +3 -110")
+    nf.write_text("KC @ BUF\nCaptured: 2026-10-24T19:00:00-04:00\nSpread KC -3 -110 / BUF +3 -110")
     assert record_main(["--sport", "nfl", "--issue", "5", "--body-file", str(nf),
                         "--picks-json", str(pj), "--root", str(tmp_path / "s")]) == 0
