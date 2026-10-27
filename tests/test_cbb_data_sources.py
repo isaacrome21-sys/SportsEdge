@@ -147,5 +147,109 @@ def test_empty_and_garbage_bodies_are_refused(tmp_path):
     assert not (tmp_path / "torvik_team_ratings" / "2027.manifest.json").exists()
 
 
+@pytest.mark.parametrize(
+    ("source", "season", "payload"),
+    [
+        ("espn_mbb_pbp", 2026, ESPN_CSV),
+        ("ncaa_mbb_pbp", 2026, NCAA_CSV_GZ),
+        ("torvik_team_ratings", 2027, TORVIK_CSV),
+    ],
+)
+def test_repeated_collection_never_calls_transport_or_replaces_original(
+    tmp_path, source, season, payload,
+):
+    first = collect(source, season, tmp_path, transport=fake_transport(payload))
+    folder = tmp_path / source
+    data_path = folder / first["stored_file"]
+    manifest_path = folder / f"{season}.manifest.json"
+    original_data = data_path.read_bytes()
+    original_manifest = manifest_path.read_bytes()
+
+    def forbidden_transport(url):
+        raise AssertionError("duplicate collection must refuse before fetching")
+
+    with pytest.raises(CBBDataSourceError, match="ARCHIVE_ALREADY_EXISTS"):
+        collect(source, season, tmp_path, transport=forbidden_transport)
+    assert data_path.read_bytes() == original_data
+    assert manifest_path.read_bytes() == original_manifest
+    assert verify_manifest(tmp_path, source, season) is True
+    assert not list(folder.glob("*.part"))
+
+
+@pytest.mark.parametrize("existing", ["data", "manifest"])
+def test_orphaned_archive_evidence_is_immutable(tmp_path, existing):
+    folder = tmp_path / "torvik_team_ratings"
+    folder.mkdir()
+    path = folder / ("2027.csv" if existing == "data" else "2027.manifest.json")
+    original = b"previous archive evidence"
+    path.write_bytes(original)
+    with pytest.raises(CBBDataSourceError, match="ARCHIVE_ALREADY_EXISTS"):
+        collect("torvik_team_ratings", 2027, tmp_path, transport=fake_transport(TORVIK_CSV))
+    assert path.read_bytes() == original
+
+
+def test_publish_race_does_not_clobber_other_writer(tmp_path, monkeypatch):
+    from sportsedge import cbb_data_sources as module
+
+    original_link = module.os.link
+    competitor_bytes = b"preexisting concurrent archive"
+
+    def competing_writer(src, dst):
+        if str(dst).endswith("/2027.csv"):
+            # Between our preflight and atomic publication a different
+            # writer commits the canonical pathname. Our os.link must refuse.
+            dst.write_bytes(competitor_bytes)
+        return original_link(src, dst)
+
+    monkeypatch.setattr(module.os, "link", competing_writer)
+    with pytest.raises(CBBDataSourceError, match="ARCHIVE_ALREADY_EXISTS"):
+        collect("torvik_team_ratings", 2027, tmp_path, transport=fake_transport(TORVIK_CSV))
+    folder = tmp_path / "torvik_team_ratings"
+    assert (folder / "2027.csv").read_bytes() == competitor_bytes
+    assert not (folder / "2027.manifest.json").exists()
+    assert not list(folder.glob("*.part"))
+
+
+def test_manifest_publication_race_preserves_competitor_manifest(tmp_path, monkeypatch):
+    from sportsedge import cbb_data_sources as module
+
+    original_link = module.os.link
+    competitor_manifest = b"another writer's immutable manifest"
+
+    def competing_manifest(src, dst):
+        if str(dst).endswith("/2027.manifest.json"):
+            dst.write_bytes(competitor_manifest)
+        return original_link(src, dst)
+
+    monkeypatch.setattr(module.os, "link", competing_manifest)
+    with pytest.raises(CBBDataSourceError, match="ARCHIVE_ALREADY_EXISTS"):
+        collect("torvik_team_ratings", 2027, tmp_path, transport=fake_transport(TORVIK_CSV))
+    folder = tmp_path / "torvik_team_ratings"
+    assert (folder / "2027.manifest.json").read_bytes() == competitor_manifest
+    assert not (folder / "2027.csv").exists()
+    assert not list(folder.glob("*.part"))
+
+
+def test_failed_retry_never_destroys_original_manifest_or_bytes(tmp_path):
+    first = collect(
+        "torvik_team_ratings", 2027, tmp_path,
+        transport=fake_transport(TORVIK_CSV), retrieved_at=WHEN,
+    )
+    folder = tmp_path / "torvik_team_ratings"
+    saved_data = (folder / "2027.csv").read_bytes()
+    saved_manifest = (folder / "2027.manifest.json").read_bytes()
+
+    def broken_transport(url):
+        yield TORVIK_CSV[:8]
+        raise ConnectionError("retry transport failed")
+
+    with pytest.raises(CBBDataSourceError, match="ARCHIVE_ALREADY_EXISTS"):
+        collect("torvik_team_ratings", 2027, tmp_path, transport=broken_transport)
+    assert (folder / "2027.csv").read_bytes() == saved_data
+    assert (folder / "2027.manifest.json").read_bytes() == saved_manifest
+    assert verify_manifest(tmp_path, "torvik_team_ratings", 2027)
+    assert first["stored_sha256"] == hashlib.sha256(saved_data).hexdigest()
+
+
 def test_registry_covers_the_three_probed_sources():
     assert set(SOURCES) == {"espn_mbb_pbp", "ncaa_mbb_pbp", "torvik_team_ratings"}
