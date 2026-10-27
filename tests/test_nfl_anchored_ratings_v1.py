@@ -21,12 +21,14 @@ class AnchoredRatingsResearchTests(unittest.TestCase):
         path = root / "games.csv"
         fields = ["game_type","game_id","gameday","home_team","away_team",
                   "home_score","away_score","spread_line","total_line",
-                  "home_qb_delta","away_qb_delta","weather_total_delta","neutral_site","location"]
+                  "home_qb_delta","away_qb_delta","weather_total_delta","neutral_site","location","season"]
         with path.open("w",newline="",encoding="utf-8") as fh:
             writer = csv.DictWriter(fh,fieldnames=fields)
             writer.writeheader()
             for row in rows:
-                writer.writerow({"game_type":"REG",**row})
+                writer.writerow({"game_type":"REG",
+                                 "season":row.get("season", int(row["gameday"][:4])),
+                                 **row})
         return path
 
     def test_nonfinite_consensus_close_is_refused(self):
@@ -81,6 +83,51 @@ class AnchoredRatingsResearchTests(unittest.TestCase):
                  "location":"Neutral"}
             games=a.read_games(self._write_csv(Path(d),[row]))
             self.assertTrue(games[0].neutral)
+
+    def test_nfl_regular_season_is_source_field_not_january_calendar_year(self):
+        # January Week 18 of the 2025 NFL season belongs to season 2025.
+        with tempfile.TemporaryDirectory() as d:
+            row = {"game_id":"2025_18_KC_BUF", "gameday":"2026-01-04",
+                   "season":2025, "home_team":"KC","away_team":"BUF",
+                   "home_score":28,"away_score":21,
+                   "spread_line":3.0,"total_line":47.0}
+            games = a.read_games(self._write_csv(Path(d), [row]))
+            self.assertEqual(games[0].season, 2025)
+            self.assertEqual(games[0].day, "2026-01-04")
+
+    def test_season_absent_or_inconsistent_fails_closed(self):
+        base = {"game_id":"g1","gameday":"2026-01-04",
+                "home_team":"KC","away_team":"BUF","home_score":24,
+                "away_score":21,"spread_line":3,"total_line":45}
+        for season, code in (("", "NFL_SEASON_REQUIRED"),
+                             ("not-a-season", "NFL_SEASON_REQUIRED"),
+                             (2023, "NFL_SEASON_DATE_MISMATCH")):
+            with self.subTest(season=season), tempfile.TemporaryDirectory() as d:
+                path = self._write_csv(Path(d), [{**base,"season":season}])
+                with self.assertRaisesRegex(ValueError, code):
+                    a.read_games(path)
+
+    def test_january_week18_screen_admitted_only_to_prior_nfl_season(self):
+        # Genuine historical screens use nflverse's explicit season field.
+        # Forty 2024 games establish previous-day/team history, while the
+        # target plays Jan 2026 yet belongs to season 2025.
+        start = date(2024, 9, 1)
+        history = [
+            a.Game((start + timedelta(days=i)).isoformat(),
+                   f"prior{i}", "A", "B", 24, 20, 3, 43, season=2024)
+            for i in range(40)
+        ]
+        target = a.Game("2026-01-04","2025_week18","A","B",
+                        30,10,0,35,season=2025)
+        rows = history + [target]
+        in_2025 = a.screen(rows, design_years=frozenset({2025}))
+        in_2026 = a.screen(rows, design_years=frozenset({2026}))
+        self.assertGreater(in_2025["screens"]["spread"]["n"], 0)
+        self.assertGreater(in_2025["screens"]["total"]["n"], 0)
+        self.assertEqual(in_2026["screens"]["spread"]["n"], 0)
+        self.assertEqual(in_2026["screens"]["total"]["n"], 0)
+        self.assertEqual(in_2025["counted_rows"], 0)
+        self.assertFalse(in_2025["promotion_authority"])
 
     def test_missing_data_cannot_pass_viability(self):
         result=a.screen([],design_years=frozenset({2024}))
