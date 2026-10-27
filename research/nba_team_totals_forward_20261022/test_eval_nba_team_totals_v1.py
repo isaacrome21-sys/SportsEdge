@@ -627,3 +627,29 @@ def test_a2_straddling_last_capture_not_rescued():
          + close_quotes("g1", "Tg1", 110.5, t=TIP0 + timedelta(minutes=2),
                         cap="C3"))
     assert _close_reason(q) == "CLOSE_NOT_PRETIP"
+
+
+# Security regression: the counted evaluator must never emit metrics or
+# call the scoring path before a trusted, externally verified pin-push clock.
+def test_guard_pre_pin_rows_fail_closed_before_scoring(monkeypatch):
+    rows, ents, cls, res = one_game("prepin", 115, 110.5, 112)
+    rows[0]["slate_date"] = "2026-10-01"
+    def forbidden(*args, **kwargs):
+        raise AssertionError("SCORING_PATH_REACHED")
+    monkeypatch.setattr(ev, "_row_check", forbidden)
+    with pytest.raises(RuntimeError, match="TRUSTED_EVALUATOR_PIN_PUSH_RECEIPT_REQUIRED"):
+        _ev(rows, ents, cls, res, first_counted_slate="2026-10-01",
+            resamples=ev.FROZEN_RESAMPLES)
+
+
+@pytest.mark.parametrize("override", [
+    {"k": 8}, {"seed": 7}, {"resamples": 400},
+    {"clock_ids": ["CLOCK_0"]},
+])
+def test_guard_nonfrozen_configuration_fails_before_scoring(monkeypatch, override):
+    rows, ents, cls, res = one_game("invalid_config", 115, 110.5, 112)
+    def forbidden(*args, **kwargs):
+        raise AssertionError("SCORING_PATH_REACHED")
+    monkeypatch.setattr(ev, "_row_check", forbidden)
+    with pytest.raises(ValueError, match="FROZEN_EVALUATION_CONFIG_UNAUTHORIZED"):
+        _ev(rows, ents, cls, res, **override)
