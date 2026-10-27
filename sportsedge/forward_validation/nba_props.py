@@ -391,7 +391,13 @@ def evaluate_nba_props_v2(cfg: FamilyConfig, entry_rows: list,
     parts = partition_nba_rows(entry_rows)
     attempted = [r for r in parts["v2_counted_rows"]
                  if (r.get("label") or "PROSPECTIVE") != "HISTORICAL"]
-    if attempted and not _v2_freeze_authorized(authentic_cfg):
+    # POST-MERGE INCIDENT HOLD (2026-10-27): #2757 was merged although its
+    # exact head had a blocking independent review, and the recorded freeze
+    # time predates reviewer clearance. A FROZEN header is not a valid
+    # pre-freeze authorization receipt. Until a separately reviewed owner
+    # reconciliation lands, ALL prospective V2 counted calls refuse here.
+    # No caller flag, pinned-status edit or synthetic source row lifts HOLD.
+    if attempted:
         raise ForwardValidationRefusal(
             "V2_FREEZE_NOT_AUTHORIZED",
             {"prereg_id": PREREG_ID_V2,
@@ -399,8 +405,9 @@ def evaluate_nba_props_v2(cfg: FamilyConfig, entry_rows: list,
              "attempted_counted_rows": len(attempted),
              "attempted_counted_row_ids": sorted(
                  r.get("row_id") or "<no row_id>" for r in attempted),
-             "rule": "counted V2 evaluation requires the owner's pinned "
-                     "document/config freeze; V2 is NOT FROZEN"})
+             "rule": "V2 count quarantined: asserted freeze preceded "
+                     "independent exact-head clearance; status alone is "
+                     "not owner freeze authorization"})
     if cfg != authentic_cfg:
         raise ForwardValidationRefusal(
             "CONFIG_INVALID",
