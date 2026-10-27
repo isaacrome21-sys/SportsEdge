@@ -107,7 +107,11 @@ def check_b8_active_runtime(data: Path, evaluator) -> dict:
     """
     if (data / "sp_2025.csv.gz").exists():
         raise SystemExit("B8_RUNTIME_LEGACY_2025_FILE_FORBIDDEN")
-    season_files = sorted(path.name for path in data.glob("sp_2025*.csv.gz"))
+    season_files = sorted(
+        path.name
+        for pattern in ("ps_2025*.csv.gz", "sp_2025*.csv.gz")
+        for path in data.glob(pattern)
+    )
     if season_files != ["sp_2025_played_v2.csv.gz"]:
         raise SystemExit("B8_RUNTIME_CORRECTED_2025_FILE_SET_REQUIRED")
     return evaluator.check_hashes(data)
