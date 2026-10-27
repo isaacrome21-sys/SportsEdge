@@ -129,3 +129,47 @@ def test_valid_integral_american_odds_are_preserved_without_rounding(intake, clo
     })
     assert row.intake_american == int(intake)
     assert row.close_american == int(close)
+
+
+@pytest.mark.parametrize("field", ["intake_line", "close_line"])
+@pytest.mark.parametrize("bad", [None, True, False, float("nan"), float("inf"),
+                                  float("-inf"), "nan", "Infinity", "bad", [], {}])
+def test_market_threshold_capture_refuses_nonfinite_boolean_or_missing_lines(field, bad):
+    payload = {
+        "game_id": "g-2027", "market": "TOTAL", "selection": "OVER",
+        "official_date": "2027-04-01", "season_type": "R",
+        "intake_line": 8.5, "intake_american": -110,
+        "intake_retrieved_at": "2027-04-01T16:00:00Z",
+        "close_line": 8.5, "close_american": -115,
+        "close_retrieved_at": "2027-04-01T16:05:00Z",
+    }
+    payload[field] = bad
+    reason = "INTAKE_LINE_INVALID" if field == "intake_line" else "CLOSE_LINE_INVALID"
+    with pytest.raises(MLBCaptureLogError, match=reason):
+        record_capture(payload)
+
+
+def test_moneyline_remains_lineless_and_pending_close_is_allowed():
+    basic = {
+        "game_id": "g-2027", "market": "MONEYLINE", "selection": "HOME",
+        "official_date": "2027-04-01", "season_type": "R",
+        "intake_retrieved_at": "2027-04-01T16:00:00Z",
+        "intake_american": "-110",
+    }
+    row = record_capture(basic)
+    assert row.intake_line is None
+    assert row.close_line is None
+    assert row.close_american is None
+    assert row.close_retrieved_at is None
+
+
+def test_valid_market_threshold_preserved_without_rounding():
+    row = record_capture({
+        "game_id": "g-2027", "market": "RUN_LINE", "selection": "HOME",
+        "official_date": "2027-04-01", "season_type": "R",
+        "intake_line": "-1.5", "intake_american": "+120",
+        "intake_retrieved_at": "2027-04-01T16:00:00Z",
+        "close_line": "-1.5", "close_american": "+125",
+        "close_retrieved_at": "2027-04-01T16:05:00Z",
+    })
+    assert row.intake_line == -1.5 and row.close_line == -1.5
