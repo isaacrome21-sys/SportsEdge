@@ -60,11 +60,31 @@ def test_additive_pinned_unfrozen_v2_keeps_v1_canonical(tmp_path):
                for row in report["forward_family_configs"])
 
 
-def test_current_repo_has_four_uncounted_pinned_v2_configs():
+def test_current_repo_has_four_frozen_pinned_v2_configs():
+    # Post-freeze form: the four V2 configs register in the frozen
+    # state (FROZEN_NO_VERDICT_ATTACHED), exactly 4 of them, with
+    # zero candidate-state registrations anywhere in the NBA states,
+    # and each config's pin present and matching the frozen document.
     report = accuracy_readiness()
-    assert report["forward_config_states"]["NBA"]["FINAL_CANDIDATE_NOT_FROZEN"] == 4
+    states = report["forward_config_states"]["NBA"]
+    assert states.get("FINAL_CANDIDATE_NOT_FROZEN", 0) == 0
+    rows = [r for r in report["forward_family_configs"]
+            if r["file"].endswith("_v2.json")]
+    assert len(rows) == 4
+    assert all(r["state"] == "FROZEN_NO_VERDICT_ATTACHED" for r in rows)
     assert report["validated_families_conferred"] == 0
     assert report["play_authority_conferred"] is False
+    # pin present and matching, checked independently of the audit:
+    # every V2 config carries a 64-char prereg_sha256 equal to the
+    # sha256 of the frozen document it names.
+    root = Path(__file__).resolve().parents[1]
+    config_dir = root / "sportsedge" / "forward_validation" / "configs"
+    for path in sorted(config_dir.glob("nba_player_*_v2.json")):
+        config = json.loads(path.read_text(encoding="utf-8"))
+        sha = config.get("prereg_sha256")
+        assert isinstance(sha, str) and len(sha) == 64
+        doc = (root / config["prereg"]).read_bytes()
+        assert hashlib.sha256(doc).hexdigest() == sha
 
 
 @pytest.mark.parametrize("field,value", [

@@ -1,6 +1,6 @@
 # PREREGISTRATION — NBA Player Props Forward Test V2 (Source Amendment)
 
-**Status: FINAL-CANDIDATE — NOT FROZEN.** Prepared 2026-10-26 under
+**Status: FROZEN.** Frozen 2026-10-26 by the owner's freeze act — see FREEZE_RECORD_NBA_PROPS_FORWARD_V2.md (this directory) for the §4.1 asset pin, the first prospective counted slate, the builder pin, and the records location. Prepared 2026-10-26 under
 owner ruling (Isaac, Oct 26, 2026): *"NBA props — approve the source
 amendment. Admit the replacement source prospectively, provided its
 provenance, timestamps, schema, coverage, and reproducibility are

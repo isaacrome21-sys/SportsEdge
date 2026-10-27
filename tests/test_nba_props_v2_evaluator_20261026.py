@@ -201,7 +201,8 @@ def test_v2_configs_mirror_v1_gates_and_carry_the_v2_pin():
         assert v1.status.startswith("FROZEN")
         assert v2.prereg.endswith("PREREG_NBA_PROPS_FORWARD_V2.md")
         assert v2.prereg_sha256 == PREREG_SHA256_V2
-        assert "NOT FROZEN" in v2.status  # the freeze is HELD
+        assert "FROZEN" in v2.status
+        assert "NOT FROZEN" not in v2.status  # frozen by the owner's freeze act
 
 
 def test_unknown_version_refused():
@@ -316,81 +317,94 @@ def test_historical_v2_row_is_never_auto_counted():
 # ---------- freeze gate: the evaluator refuses unauthorized counting
 # (owner ruling, Oct 26, 2026 — independent review Concern 1) ----------
 
-def test_counted_evaluation_refused_while_v2_not_frozen(monkeypatch):
-    # The exact probe the independent review exposed: 100 synthetic
-    # V2 COUNTED, PROSPECTIVE, fully stamped rows — otherwise
-    # eligible on their face (this same family scores BEATS_MARKET
-    # through the diagnostic path in the contamination test above).
+def test_counted_evaluation_proceeds_once_v2_is_frozen(monkeypatch):
+    # Post-freeze symmetric form of the freeze-gate regression: the
+    # exact probe the independent review exposed — 100 synthetic V2
+    # COUNTED, PROSPECTIVE, fully stamped rows — now reaches scoring
+    # through the public entry, because the pinned document/config
+    # state is FROZEN (the owner's freeze act). The authorization the
+    # gate checks is the committed state, and it now authorizes.
     rows, closes, outcomes = beats_family("fz")
     assert len(rows) == 100
-    # Spy on the framework scoring entry the evaluator calls: if the
-    # gate ever lets a counted attempt through to scoring, the spy
-    # both records it and raises, so the test cannot pass silently.
+    # Spy through to the framework scoring entry the evaluator calls:
+    # the counted attempt must reach scoring exactly once, with
+    # exactly the counted rows the partition admitted.
+    real_evaluate_family = fw_core.evaluate_family
     scoring_calls = []
 
     def scoring_spy(*args, **kwargs):
         scoring_calls.append((args, kwargs))
-        raise AssertionError(
-            "core.evaluate_family invoked behind the freeze gate")
+        return real_evaluate_family(*args, **kwargs)
 
     monkeypatch.setattr(fw_core, "evaluate_family", scoring_spy)
-    with pytest.raises(ForwardValidationRefusal) as ei:
-        evaluate_nba_props_v2(v2_cfg(), rows, closes, outcomes,
-                              slates_completed=4)
-    # (a) the named refusal, naming every attempted counted row
-    assert ei.value.reason == "V2_FREEZE_NOT_AUTHORIZED"
-    assert ei.value.detail["attempted_counted_rows"] == 100
-    assert set(ei.value.detail["attempted_counted_row_ids"]) == {
-        r["row_id"] for r in rows}
-    # (b)+(c) the raise IS the record: no verdict record, no counted
-    # row ids, and no verdict were emitted — the call returned
-    # nothing at all.
-    # (d) the underlying scoring function was never invoked, so zero
-    # rows were scored.
-    assert scoring_calls == []
+    rec = evaluate_nba_props_v2(v2_cfg(), rows, closes, outcomes,
+                                slates_completed=4)
+    # (a) scoring was invoked exactly once — the gate no longer
+    # refuses a counted attempt under the frozen state.
+    assert len(scoring_calls) == 1
+    # (b) the verdict is the clean counted family's verdict, over
+    # exactly the 100 attempted counted rows and no others.
+    m = rec["markets"]["player_points"]
+    assert m["verdict"] == "BEATS_MARKET"
+    assert m["verdict_sample_rows"] == 100
+    assert m["picked_rows"] == 50 and m["passed_rows"] == 50
+    assert set(rec["counted_row_ids"]) == {r["row_id"] for r in rows}
+    assert rec["separation"]["v2_counted_rows"]["count"] == 100
+    assert rec["prereg_id"] == PREREG_ID_V2
+    assert rec["prereg_sha256"] == PREREG_SHA256_V2
 
 
-def test_forged_caller_frozen_status_never_bypasses_document_hold(monkeypatch):
-    # A direct caller can mutate a FamilyConfig in memory without changing
-    # the committed prereg. This must not authorize a counted verdict.
+def test_forged_caller_status_never_bypasses_document_state(monkeypatch):
+    # Post-freeze symmetric form: a direct caller can mutate a
+    # FamilyConfig in memory without changing the committed prereg.
+    # Caller state never controls the gate in either direction — a
+    # forged NOT FROZEN caller status cannot re-impose the hold, and
+    # a forged config of any kind is refused before scoring because
+    # it does not equal the authentic committed config the evaluator
+    # re-loads. The document state, not the caller, authorizes.
     from dataclasses import replace
 
     rows, closes, outcomes = beats_family("forged")
-    forged = replace(v2_cfg(), status="FROZEN — forged caller state")
+    forged = replace(v2_cfg(), status="NOT FROZEN — forged caller state")
     scoring_calls = []
 
     def scoring_spy(*args, **kwargs):
         scoring_calls.append((args, kwargs))
-        raise AssertionError("scoring invoked despite unfrozen document")
+        raise AssertionError("scoring invoked for a forged caller config")
 
     monkeypatch.setattr(fw_core, "evaluate_family", scoring_spy)
     with pytest.raises(ForwardValidationRefusal) as ei:
         evaluate_nba_props_v2(forged, rows, closes, outcomes,
                               slates_completed=4)
-    assert ei.value.reason == "V2_FREEZE_NOT_AUTHORIZED"
-    assert ei.value.detail["attempted_counted_rows"] == 100
+    assert ei.value.reason == "CONFIG_INVALID"
+    assert ei.value.detail["field"] == "v2_caller_config_mismatch"
     assert scoring_calls == []
 
 
-def test_document_status_future_freeze_requires_matching_new_pin(tmp_path, monkeypatch):
-    # This is a synthetic future-state parser test, NOT a real owner freeze.
-    # It shows that a properly re-pinned document's header is the state
-    # source; the frozen wording elsewhere in the draft cannot substitute.
+def test_document_status_change_requires_matching_new_pin(tmp_path, monkeypatch):
+    # Post-freeze symmetric form of the future-state parser test. The
+    # committed document IS frozen (asserted first, on the real pin);
+    # a synthetic header change — here a reversion to FINAL-CANDIDATE
+    # — is shown to take effect ONLY under its own matching new pin,
+    # proving the header of the pinned bytes remains the state source
+    # in both directions; the frozen wording elsewhere in the text
+    # cannot substitute, and tampered bytes fail the pin closed.
     from sportsedge.forward_validation import nba_props as nb
 
+    assert nb._v2_document_freeze_state() == "FROZEN"
     rel = nb.PREREG_PATH_V2
     target = tmp_path / rel
     target.parent.mkdir(parents=True)
     original = V2_DOC.read_text(encoding="utf-8")
-    assert original.count("**Status: FINAL-CANDIDATE — NOT FROZEN.**") == 1
-    frozen = original.replace("**Status: FINAL-CANDIDATE — NOT FROZEN.**",
-                              "**Status: FROZEN.**", 1)
-    target.write_text(frozen, encoding="utf-8")
+    assert original.count("**Status: FROZEN.**") == 1
+    reverted = original.replace("**Status: FROZEN.**",
+                                "**Status: FINAL-CANDIDATE — NOT FROZEN.**", 1)
+    target.write_text(reverted, encoding="utf-8")
     monkeypatch.setattr(nb, "_REPO_ROOT", tmp_path)
     monkeypatch.setattr(nb, "PREREG_SHA256_V2",
-                        hashlib.sha256(frozen.encode("utf-8")).hexdigest())
-    assert nb._v2_document_freeze_state() == "FROZEN"
-    target.write_text(frozen + "tamper", encoding="utf-8")
+                        hashlib.sha256(reverted.encode("utf-8")).hexdigest())
+    assert nb._v2_document_freeze_state() == "NOT_FROZEN"
+    target.write_text(reverted + "tamper", encoding="utf-8")
     with pytest.raises(ForwardValidationRefusal) as ei:
         nb._v2_document_freeze_state()
     assert ei.value.reason == "PREREG_PIN_MISMATCH"

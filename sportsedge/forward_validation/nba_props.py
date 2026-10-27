@@ -106,8 +106,8 @@ PREREG_PATH_V2 = ("research/nba_props_forward_20261020/"
 # NBA_PROPS_PREREG_V2_SOURCE_AMENDMENT_DRAFT_20261026.md). At the
 # owner's freeze, the frozen text must hash to this value or the pin
 # is re-struck on the frozen bytes — never silently.
-PREREG_SHA256_V2 = ("9a20c19193095ebb9f93b12fae3877465b81f91682427ba2"
-                    "770e60ebe5b3b944")
+PREREG_SHA256_V2 = ("069cbf661e6ca733e9bda54ee3bc8a02163b20a5"
+                    "df7fcbbc89b10d9419a6aa02")
 
 CONFIG_FILES_V2 = {
     "player_points": "nba_player_points_v2.json",
