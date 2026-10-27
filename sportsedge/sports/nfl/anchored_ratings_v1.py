@@ -41,6 +41,9 @@ class Game:
     home_qb_delta: float = 0.0
     away_qb_delta: float = 0.0
     weather_total_delta: float = 0.0
+    # Explicit league season: January regular games belong to prior fall.
+    # None is allowed for manual diagnostic fixtures, never for scoring.
+    season: int | None = None
 
 
 def finite(raw: object, field: str) -> float:
@@ -67,7 +70,17 @@ def read_games(path: Path) -> list[Game]:
             if not game_id or game_id in ids or not day or not home or not away or home == away:
                 raise ValueError(f"BAD_OR_DUPLICATE_GAME_ID:{game_id}")
             ids.add(game_id)
-            date.fromisoformat(day)
+            game_date = date.fromisoformat(day)
+            season_text = str(r.get("season") or "").strip()
+            if not season_text.isascii() or not season_text.isdecimal():
+                raise ValueError("NFL_SEASON_REQUIRED")
+            season = int(season_text)
+            # Only the schedule-supplied season can identify a fall/winter
+            # cohort; a January REG game must not be grouped by gameday year.
+            if season not in (game_date.year, game_date.year - 1) or (
+                season == game_date.year - 1 and game_date.month not in (1, 2)
+            ):
+                raise ValueError("NFL_SEASON_DATE_MISMATCH")
             hs, aas = finite(r["home_score"], "HOME_SCORE"), finite(r["away_score"], "AWAY_SCORE")
             if hs < 0 or aas < 0 or not hs.is_integer() or not aas.is_integer():
                 raise ValueError("BAD_FINAL_SCORE")
@@ -89,7 +102,7 @@ def read_games(path: Path) -> list[Game]:
                             close("spread_line"), close("total_line"),
                             (str(r.get("neutral_site") or "").lower() in ("1", "true", "yes")
                              or str(r.get("location") or "").strip().lower() == "neutral"),
-                            qbh, qba, weather))
+                            qbh, qba, weather, season))
     return sorted(out, key=lambda g: (g.day, g.game_id))
 
 
@@ -208,7 +221,10 @@ def screen(games: Iterable[Game], *, design_years: frozenset[int]) -> dict:
                              "total":g.home_score+g.away_score}
             for k in raw_values:
                 new_errors[k].append(raw_values[k]-actual_values[k])
-            if int(day[:4]) not in design_years:
+            if g.season is None:
+                skipped["NFL_SEASON_UNAVAILABLE"] += 1
+                continue
+            if g.season not in design_years:
                 continue
             for k,close in (("spread",g.spread_close),("total",g.total_close)):
                 if close is None:
