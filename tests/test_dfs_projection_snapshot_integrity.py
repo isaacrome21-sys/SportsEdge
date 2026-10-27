@@ -55,6 +55,27 @@ def test_malformed_external_projection_refused(tmp_path, change, error):
         read(tmp_path, [{"player_id": "42", "mean": 15.0, **change}])
 
 
+
+@pytest.mark.parametrize("bad", [False, [], {}, ""])
+def test_falsy_supplied_stddev_is_not_treated_as_missing(tmp_path, bad):
+    with pytest.raises(ValueError, match="DFS_PROJECTION_NUMBER_INVALID:42:stddev"):
+        read(tmp_path, [{"player_id": "42", "mean": 15, "stddev": bad}])
+
+
+@pytest.mark.parametrize("bad", [False, [], ""])
+def test_falsy_malformed_components_are_not_treated_as_missing(tmp_path, bad):
+    with pytest.raises(ValueError, match="DFS_PROJECTION_COMPONENTS_INVALID:42"):
+        read(tmp_path, [{"player_id": "42", "mean": 15, "components": bad}])
+
+
+def test_valid_zero_stddev_and_empty_components_remain_accepted(tmp_path):
+    projections = read(tmp_path, [{
+        "player_id": "42", "mean": 15, "stddev": 0.0, "components": {},
+    }])
+    assert projections["42"].stddev is None
+    assert projections["42"].components == {}
+
+
 def test_duplicate_player_row_refused_instead_of_last_write_wins(tmp_path):
     with pytest.raises(ValueError, match="DFS_PROJECTION_DUPLICATE_PLAYER:42"):
         read(tmp_path, [
