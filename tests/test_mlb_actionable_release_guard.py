@@ -46,6 +46,18 @@ def test_release_guard_rejects_spaced_or_mixed_case_bet_labels(status):
     )
 
 
+@pytest.mark.parametrize("status", [
+    "ACTIONABLE\u200b", "PLAY\u200b", "P\u200dLAY", "ＡＣＴＩＯＮＡＢＬＥ", "UNKNOWN_ACTION",
+])
+def test_release_guard_refuses_unicode_disguised_or_unknown_status(status):
+    raw = _candidate(status=status)
+    safe = renderer.withhold_unverified_actionable([raw])[0]
+    assert safe["status"] == safe["scored_status"] == "LEAN"
+    assert safe["star_rating"] == 0
+    assert renderer.NO_RELEASE_AUTHORITY_REASON in safe["presentation_reason_codes"]
+    assert raw["status"] == status  # no audit-input mutation
+
+
 def test_release_guard_cannot_be_bypassed_by_engine_bet_claim_or_prior_refusal():
     mixed = _candidate(status="ACTIONABLE")
     mixed["scored_status"] = "NEEDS_CONFIRM"
