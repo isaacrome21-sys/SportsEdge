@@ -28,6 +28,27 @@ def _candidate(*, status="ACTIONABLE", engine_status="MODEL_CANDIDATE"):
     }
 
 
+@pytest.mark.parametrize("status", [
+    "LEAN", "PASS", "NEEDS_CONFIRM", "REVIEW", "NO_MODEL",
+    "NO_ENGINE", "NO_DATA", "UNPRICED", "REFUSED",
+    "BLOCKED", "RESEARCH_ONLY", "NO_PRICE",
+])
+def test_public_nonbet_status_cannot_retain_forged_five_stars(status):
+    # The manual/issue renderer has ZERO release authority, even where a
+    # literal non-bet status is valid and so does not need reclassification.
+    raw = _candidate(status=status)
+    raw["presentation_reason_codes"] = ("INDEPENDENT_SOURCE_REFUSAL",)
+    safe = renderer.withhold_unverified_actionable([raw])[0]
+    assert safe["status"] == safe["scored_status"] == status
+    assert safe["star_rating"] == 0
+    assert raw["star_rating"] == 5  # immutable audit input
+    assert safe["presentation_reason_codes"] == raw["presentation_reason_codes"]
+    assert safe["model_p"] == raw["model_p"]
+    assert safe["american_odds"] == raw["american_odds"]
+    assert renderer.NO_RELEASE_AUTHORITY_REASON not in safe["presentation_reason_codes"]
+    assert renderer.withhold_unverified_actionable([safe])[0] == safe
+
+
 def test_release_guard_demotes_candidate_preserving_model_and_price():
     raw = _candidate()
     result = renderer.withhold_unverified_actionable([raw])[0]
