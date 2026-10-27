@@ -245,3 +245,27 @@ def test_valid_research_reliability_preserves_value_without_promotion(reliabilit
     assert row.model_reliability == float(reliability)
     assert row.estimate_p == 0.55
     assert row.authority_footer == "NOT Model_P / NOT Truth Gate / NOT OFFICIAL"
+
+
+@pytest.mark.parametrize("explicit_null", [False, True])
+def test_intake_capture_without_a_bookmaker_price_refuses(explicit_null):
+    payload = {
+        "game_id": "g-2027", "market": "MONEYLINE", "selection": "HOME",
+        "official_date": "2027-04-01", "season_type": "R",
+        "intake_retrieved_at": "2027-04-01T16:00:00Z",
+    }
+    if explicit_null:
+        payload["intake_american"] = None
+    with pytest.raises(MLBCaptureLogError, match="INTAKE_PRICE_MISSING"):
+        record_capture(payload)
+
+
+def test_legacy_american_odds_alias_remains_a_priced_intake():
+    row = record_capture({
+        "game_id": "g-2027", "market": "MONEYLINE", "selection": "HOME",
+        "official_date": "2027-04-01", "season_type": "R",
+        "intake_retrieved_at": "2027-04-01T16:00:00Z",
+        "american_odds": -110,
+    })
+    assert row.intake_american == -110
+    assert row.close_american is None
