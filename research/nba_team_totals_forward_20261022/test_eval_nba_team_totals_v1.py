@@ -639,6 +639,7 @@ def test_guard_pre_pin_rows_fail_closed_before_scoring(monkeypatch):
     monkeypatch.setattr(ev, "_row_check", forbidden)
     with pytest.raises(RuntimeError, match="TRUSTED_EVALUATOR_PIN_PUSH_RECEIPT_REQUIRED"):
         _ev(rows, ents, cls, res, first_counted_slate="2026-10-01",
+            clock_ids=[f"CLOCK_{i}" for i in range(ev.FROZEN_K)],
             resamples=ev.FROZEN_RESAMPLES)
 
 
