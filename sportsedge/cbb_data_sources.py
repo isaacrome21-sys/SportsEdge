@@ -40,9 +40,11 @@ archive; the exclusion binds any future pricing use, not the archive.
 Fail-closed rules:
   * a season outside a source's probed range raises CBBDataSourceError
     before any network call;
+  * an existing season file or manifest is immutable; repeated collection
+    refuses without making another request;
   * transport failure, an empty body, or a body whose first row is not a
     plausible CSV header raises CBBDataSourceError -- no manifest is
-    written and the partial stored file is removed;
+    written and only the new temporary download is removed;
   * every archived file carries both the as-downloaded sha256 and the
     stored-bytes sha256 in its manifest, so archive integrity is
     re-verifiable offline.
@@ -59,6 +61,8 @@ import csv
 import gzip
 import hashlib
 import json
+import os
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Optional
@@ -176,14 +180,31 @@ def collect(
     dest_dir.mkdir(parents=True, exist_ok=True)
     stored = dest_dir / f"{season}.{spec['stored_extension']}"
     manifest_path = dest_dir / f"{season}.manifest.json"
+    # Prior evidence may have an independently published manifest, or a
+    # surviving data file from an interrupted publication. Neither may be
+    # silently replaced by a retry, even if the new provider bytes differ.
+    if stored.exists() or manifest_path.exists():
+        raise CBBDataSourceError(
+            f"ARCHIVE_ALREADY_EXISTS: {source_id}/{season}"
+        )
     fetch = transport or _default_transport
 
     downloaded_sha = hashlib.sha256()
     stored_sha = hashlib.sha256()
     downloaded_bytes = 0
     compress = spec["stored_extension"].endswith("gz") and not spec["download_gzipped"]
+    temp_stored: Optional[Path] = None
+    temp_manifest: Optional[Path] = None
+    published_stored = False
     try:
-        with open(stored, "wb") as raw_out:
+        # Write and validate privately before publishing either canonical
+        # path. The temporary file lives on the same filesystem so hard-link
+        # publication is atomic and refuses to overwrite a racing writer.
+        with tempfile.NamedTemporaryFile(
+            mode="wb", dir=dest_dir, prefix=f".{season}.", suffix=".part",
+            delete=False,
+        ) as raw_out:
+            temp_stored = Path(raw_out.name)
             gz_out = (
                 gzip.GzipFile(filename="", mode="wb", fileobj=raw_out, mtime=0)
                 if compress
@@ -200,57 +221,82 @@ def collect(
             finally:
                 if gz_out is not None:
                     gz_out.close()
+
+        if downloaded_bytes == 0:
+            raise CBBDataSourceError(f"empty body from {url}")
+
+        # Hash and inspect the unpublished download. For compressed sources
+        # this hash differs from the original provider payload by design.
+        with temp_stored.open("rb") as fh:
+            for block in iter(lambda: fh.read(_CHUNK), b""):
+                stored_sha.update(block)
+        try:
+            rows, header = _count_rows_and_header(
+                temp_stored, spec["stored_extension"]
+            )
+        except Exception as exc:
+            raise CBBDataSourceError(
+                f"stored file is not readable CSV: {exc}"
+            ) from exc
+        if rows == 0 or len(header) < 3:
+            raise CBBDataSourceError(
+                f"body from {url} does not look like a season CSV "
+                f"(rows={rows}, header_cols={len(header)})"
+            )
+
+        manifest: dict[str, Any] = {
+            "schema_version": SCHEMA_VERSION,
+            "research_only": True,
+            "validation_status": "NOT_VALIDATED",
+            "pricing_impact": "NONE",
+            "staking_allowed": False,
+            "source": source_id,
+            "source_label": spec["label"],
+            "season": season,
+            "source_url": url,
+            "retrieved_at": when.isoformat(),
+            "rows": rows,
+            "schema_columns": header,
+            "downloaded_bytes": downloaded_bytes,
+            "downloaded_sha256": downloaded_sha.hexdigest(),
+            "stored_file": stored.name,
+            "stored_bytes": temp_stored.stat().st_size,
+            "stored_sha256": stored_sha.hexdigest(),
+            "scope_note": ILLINOIS_COLLEGE_SCOPE_NOTE,
+        }
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=dest_dir,
+            prefix=f".{season}.", suffix=".manifest.part", delete=False,
+        ) as manifest_out:
+            temp_manifest = Path(manifest_out.name)
+            manifest_out.write(json.dumps(manifest, indent=1) + "\n")
+
+        # os.link is create-if-absent (EEXIST if a concurrent retry won).
+        # Unlike replace/rename, it never destroys a previously archived
+        # season. Publish the manifest only after data publication succeeds.
+        os.link(temp_stored, stored)
+        published_stored = True
+        os.link(temp_manifest, manifest_path)
+        return manifest
     except CBBDataSourceError:
-        stored.unlink(missing_ok=True)
+        if published_stored:
+            stored.unlink(missing_ok=True)
         raise
-    except Exception as exc:  # transport / IO failure: fail closed
-        stored.unlink(missing_ok=True)
-        raise CBBDataSourceError(f"download failed for {url}: {exc}") from exc
-
-    if downloaded_bytes == 0:
-        stored.unlink(missing_ok=True)
-        raise CBBDataSourceError(f"empty body from {url}")
-
-    # Stored-bytes hash (for the gzip case this differs from the download
-    # hash by construction; for passthrough files they are identical).
-    with open(stored, "rb") as fh:
-        for block in iter(lambda: fh.read(_CHUNK), b""):
-            stored_sha.update(block)
-
-    try:
-        rows, header = _count_rows_and_header(stored, spec["stored_extension"])
-    except Exception as exc:
-        stored.unlink(missing_ok=True)
-        raise CBBDataSourceError(f"stored file is not readable CSV: {exc}") from exc
-    if rows == 0 or len(header) < 3:
-        stored.unlink(missing_ok=True)
+    except FileExistsError as exc:
+        if published_stored:
+            stored.unlink(missing_ok=True)
         raise CBBDataSourceError(
-            f"body from {url} does not look like a season CSV "
-            f"(rows={rows}, header_cols={len(header)})"
-        )
-
-    manifest: dict[str, Any] = {
-        "schema_version": SCHEMA_VERSION,
-        "research_only": True,
-        "validation_status": "NOT_VALIDATED",
-        "pricing_impact": "NONE",
-        "staking_allowed": False,
-        "source": source_id,
-        "source_label": spec["label"],
-        "season": season,
-        "source_url": url,
-        "retrieved_at": when.isoformat(),
-        "rows": rows,
-        "schema_columns": header,
-        "downloaded_bytes": downloaded_bytes,
-        "downloaded_sha256": downloaded_sha.hexdigest(),
-        "stored_file": stored.name,
-        "stored_bytes": stored.stat().st_size,
-        "stored_sha256": stored_sha.hexdigest(),
-        "scope_note": ILLINOIS_COLLEGE_SCOPE_NOTE,
-    }
-    manifest_path.write_text(json.dumps(manifest, indent=1) + "\n", encoding="utf-8")
-    return manifest
+            f"ARCHIVE_ALREADY_EXISTS: {source_id}/{season}"
+        ) from exc
+    except Exception as exc:  # transport / IO failure: fail closed
+        if published_stored:
+            stored.unlink(missing_ok=True)
+        raise CBBDataSourceError(f"collection failed for {url}: {exc}") from exc
+    finally:
+        if temp_stored is not None:
+            temp_stored.unlink(missing_ok=True)
+        if temp_manifest is not None:
+            temp_manifest.unlink(missing_ok=True)
 
 
 def verify_manifest(archive_dir: Path, source_id: str, season: int) -> bool:
