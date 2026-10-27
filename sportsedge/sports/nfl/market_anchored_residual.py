@@ -95,7 +95,9 @@ def validate_policy(cfg: Mapping[str, Any]) -> dict[str, Any]:
         raise ResidualQuoteError("RESIDUAL_EDGE_FLOOR_LOWERED")
     if _finite(cfg.get("min_ev_per_dollar"), "ev_floor") < 0.02:
         raise ResidualQuoteError("RESIDUAL_EV_FLOOR_LOWERED")
-    if not 0 < _finite(cfg.get("max_quote_age_seconds"), "quote_ttl") <= 180:
+    # Owner ruling (Isaac, 2026-10-25): an NFL card may price a DK capture up to
+    # 30 minutes old. Anything looser is refused.
+    if not 0 < _finite(cfg.get("max_quote_age_seconds"), "quote_ttl") <= 1800:
         raise ResidualQuoteError("RESIDUAL_TTL_LOOSENED")
     if not 0 <= _finite(cfg.get("max_skew_seconds"), "quote_skew") <= 30:
         raise ResidualQuoteError("RESIDUAL_SKEW_LOOSENED")
