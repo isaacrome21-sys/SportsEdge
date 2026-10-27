@@ -8,6 +8,8 @@ unpriced.
 """
 from __future__ import annotations
 
+import re
+from math import isfinite
 from typing import Any, Mapping
 
 
@@ -16,9 +18,9 @@ def _number(value: Any) -> float | None:
         return None
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
-    if number != number:
+    if not isfinite(number):
         return None
     return number
 
@@ -26,6 +28,8 @@ def _number(value: Any) -> float | None:
 def _half_line(value: Any) -> bool:
     number = _number(value)
     if number is None:
+        return False
+    if not isfinite(number * 2.0):
         return False
     doubled = round(number * 2.0)
     return abs(number * 2.0 - doubled) < 1e-9 and int(doubled) % 2 == 1
@@ -110,6 +114,10 @@ def attach_sibling_quotes(rows, *, group_key, side_of):
     for row in material:
         if row.get("opposite_odds") is not None:
             continue
+        # A supplied malformed own price is not an absent price.  Do not
+        # rehabilitate it using a different selection's valid quote.
+        if row.get("american_odds") is not None and not _valid_quote_odds(row.get("american_odds")):
+            continue
         key = group_key(row)
         side = side_of(row)
         matches = []
@@ -117,7 +125,11 @@ def attach_sibling_quotes(rows, *, group_key, side_of):
             if other is row or group_key(other) != key:
                 continue
             other_side = side_of(other)
-            if not other_side or other_side == side or other.get("american_odds") is None:
+            if not _opposing_sides(str(side).upper(), str(other_side).upper()):
+                continue
+            if not _same_quoted_contract(row, other, str(side).upper(), str(other_side).upper()):
+                continue
+            if not _valid_quote_odds(other.get("american_odds")):
                 continue
             matches.append(other)
         if len(matches) != 1:
@@ -131,3 +143,66 @@ def attach_sibling_quotes(rows, *, group_key, side_of):
         if row.get("count_pmf") is None and sibling.get("count_pmf") is not None:
             row["count_pmf"] = sibling.get("count_pmf")
     return material
+
+
+def _opposing_sides(first: str, second: str) -> bool:
+    return {first, second} in ({"OVER", "UNDER"}, {"HOME", "AWAY"}, {"YES", "NO"}, {"YES", "FIELD"})
+
+
+def _same_quoted_contract(first: Mapping[str, Any], second: Mapping[str, Any], side: str, other_side: str) -> bool:
+    """Refuse a sibling whose event, selection subject or threshold is different.
+
+    A caller's group key is useful for indexing, but is not proof that two
+    quoted lines describe the same contract. HOME/AWAY spread lines use
+    opposite signs; OVER/UNDER thresholds must be exactly equal.
+    """
+    identity = (
+        "market", "engine_market", "provider_market", "game_id", "event_id",
+        "event_key", "matchup", "entity_id", "player_id", "subject", "participant",
+        "provider", "book", "bookmaker", "bookmaker_key", "sportsbook", "source",
+        "captured_at", "price_captured_at", "quote_time", "observed_at", "retrieved_at",
+    )
+    # Without an identifiable event, a market-only group key can accidentally
+    # pair unrelated games that happen to have the same total and price.
+    event_ids = ("game_id", "event_id", "event_key", "matchup")
+    if not any(first.get(field) is not None and first.get(field) == second.get(field) for field in event_ids):
+        return False
+    for field in identity:
+        left, right = first.get(field), second.get(field)
+        if (left is not None or right is not None) and left != right:
+            return False
+
+    if {side, other_side} == {"OVER", "UNDER"}:
+        for field in ("team_side", "team_id"):
+            if first.get(field) != second.get(field):
+                return False
+
+    first_line = first.get("line", first.get("point"))
+    second_line = second.get("line", second.get("point"))
+    if {side, other_side} == {"OVER", "UNDER"}:
+        # A missing threshold cannot be an authenticated totals/props pair.
+        a, b = _number(first_line), _number(second_line)
+        return a is not None and b is not None and a == b
+    if first_line is None and second_line is None:
+        return True  # Moneyline, yes/no and other push-free binary markets.
+    a, b = _number(first_line), _number(second_line)
+    if a is None or b is None:
+        return False
+    if {side, other_side} == {"HOME", "AWAY"}:
+        return a == -b  # Spread quotes express opposite team handicaps.
+    return a == b
+
+
+def _valid_quote_odds(value: Any) -> bool:
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return abs(value) >= 100
+    if isinstance(value, str):
+        text = value.strip()
+        if re.fullmatch(r"[+-]?[0-9]+", text):
+            try:
+                return abs(int(text)) >= 100
+            except ValueError:  # oversized numeric strings must not crash a board
+                return False
+    return False
