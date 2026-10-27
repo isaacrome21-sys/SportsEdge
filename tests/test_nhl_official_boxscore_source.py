@@ -116,3 +116,64 @@ def test_wrong_source_uri_or_bad_hash_fails_closed():
             payload=_payload(), captured_at="2026-10-09T02:00:00Z",
             raw_sha256="not-a-hash",
         )
+
+
+# --- Live Gamecenter shape (recorded 2026-10-26, game 2026020168 ANA @ PHI) ---
+# The live boxscore payload has NO nested "boxscore" object and no
+# powerPlayConversion; period scoring lives only in the landing payload.
+# Fixtures are the verbatim API responses, not synthetic reconstructions.
+
+import json
+from pathlib import Path
+
+_FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def _live_payloads():
+    boxscore = json.loads((_FIXTURES / "nhl_gamecenter_2026020168_boxscore.json").read_text())
+    landing = json.loads((_FIXTURES / "nhl_gamecenter_2026020168_landing.json").read_text())
+    return boxscore, landing
+
+
+def test_live_shape_parses_with_landing_payload():
+    boxscore, landing = _live_payloads()
+    assert "boxscore" not in boxscore  # the shape that broke the old parser
+    game = build_official_completed_game(
+        payload=boxscore,
+        captured_at="2026-10-26T15:00:00Z",
+        raw_sha256="e" * 64,
+        source_version="nhl-web-api-v1-live2",
+        landing_payload=landing,
+    )
+    assert game.game_id == "2026020168"
+    assert (game.away_abbrev, game.home_abbrev) == ("ANA", "PHI")
+    assert (game.away_final_goals, game.home_final_goals) == (5, 4)
+    assert (game.away_regulation_goals, game.home_regulation_goals) == (5, 4)
+    assert (game.away_sog, game.home_sog) == (26, 32)
+    # Exact PP goals from per-goal strength; opportunities exist in no live
+    # payload, so they stay None (receipt invariant allows goals-only).
+    assert game.away_pp_goals == 1 and game.away_pp_opportunities is None
+    assert game.home_pp_goals == 2 and game.home_pp_opportunities is None
+    assert any(g.player_id == "8480843" and g.goals_against == 4 for g in game.away_goalies)
+
+
+def test_live_shape_without_landing_fails_closed():
+    boxscore, _ = _live_payloads()
+    with pytest.raises(ValueError, match="official boxscore object required"):
+        build_official_completed_game(
+            payload=boxscore,
+            captured_at="2026-10-26T15:00:00Z",
+            raw_sha256="f" * 64,
+        )
+
+
+def test_live_shape_scoring_mismatch_fails_closed():
+    boxscore, landing = _live_payloads()
+    landing["summary"]["scoring"][0]["goals"] = []
+    with pytest.raises(ValueError, match="does not reconcile"):
+        build_official_completed_game(
+            payload=boxscore,
+            captured_at="2026-10-26T15:00:00Z",
+            raw_sha256="a" * 64,
+            landing_payload=landing,
+        )
