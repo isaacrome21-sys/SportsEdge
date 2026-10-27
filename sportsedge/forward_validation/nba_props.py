@@ -77,6 +77,7 @@ discipline alone.
 from __future__ import annotations
 
 import hashlib
+import re
 from pathlib import Path
 
 from . import core
@@ -115,6 +116,15 @@ CONFIG_FILES_V2 = {
     "player_assists": "nba_player_assists_v2.json",
     "player_pra": "nba_player_pra_v2.json",
 }
+
+# Explicit recognized V2 states. The owner's future freeze changes the
+# pinned document header and the registered status to the exact FROZEN token,
+# with a new document SHA; it never depends on a caller-supplied substring.
+V2_HELD_CONFIG_STATUS = (
+    "FINAL-CANDIDATE -- NOT FROZEN -- PREREG_NBA_PROPS_FORWARD_V2 "
+    "source amendment (prepared 2026-10-26; freeze HELD by owner)"
+)
+V2_FROZEN_CONFIG_STATUS = "FROZEN"
 
 _CONFIG_DIR = Path(__file__).resolve().parent / "configs"
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -191,9 +201,7 @@ def load_nba_config(family: str, version: str = "V1") -> FamilyConfig:
         # The pinned document is authoritative; the config cannot manufacture
         # an independent freeze.
         doc_state = _v2_document_freeze_state()
-        status = (cfg.status or "").upper()
-        cfg_state = ("NOT_FROZEN" if "NOT FROZEN" in status else
-                     "FROZEN" if "FROZEN" in status else "INVALID")
+        cfg_state = _v2_config_freeze_state(cfg.status)
         if cfg_state != doc_state:
             problems["status"] = {"status": cfg.status,
                                   "document_state": doc_state}
@@ -339,20 +347,32 @@ def _v2_document_freeze_state() -> str:
     if len(headers) != 1:
         raise ForwardValidationRefusal(
             "CONFIG_INVALID", {"field": "v2_document_status_header"})
-    status = headers[0].upper()
-    if "NOT FROZEN" in status:
+    # Parse only the emphasized status field, never substrings in prose.
+    match = re.match(r"^\*\*Status: ([^*]+)\*\*(?:\s|$)", headers[0])
+    if not match:
+        raise ForwardValidationRefusal(
+            "CONFIG_INVALID", {"field": "v2_document_status_header"})
+    status = match.group(1).strip()
+    if status == "FINAL-CANDIDATE — NOT FROZEN.":
         return "NOT_FROZEN"
-    if "FROZEN" in status:
+    if status == "FROZEN.":
         return "FROZEN"
     raise ForwardValidationRefusal(
         "CONFIG_INVALID", {"field": "v2_document_status", "value": headers[0]})
 
 
+def _v2_config_freeze_state(status: str | None) -> str:
+    if status == V2_HELD_CONFIG_STATUS:
+        return "NOT_FROZEN"
+    if status == V2_FROZEN_CONFIG_STATUS:
+        return "FROZEN"
+    return "INVALID"
+
+
 def _v2_freeze_authorized(authentic_cfg: FamilyConfig) -> bool:
     """Authorize only the pinned document + on-disk config freeze state."""
-    status = (authentic_cfg.status or "").upper()
     return (_v2_document_freeze_state() == "FROZEN"
-            and "FROZEN" in status and "NOT FROZEN" not in status)
+            and _v2_config_freeze_state(authentic_cfg.status) == "FROZEN")
 
 
 def evaluate_nba_props_v2(cfg: FamilyConfig, entry_rows: list,
