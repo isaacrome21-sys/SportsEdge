@@ -34,7 +34,10 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import numbers
 import sys
+
+import numpy as np
 from collections import defaultdict, deque
 from pathlib import Path
 
@@ -159,6 +162,17 @@ def calibration(d, gap, win, sd):
 
 def score_market(d, model_col, kind, sd_prod, sd_lane):
     d = d.copy()
+    # Direct evaluator calls also fail closed; don't trust caller eligibility.
+    required = (["home_team_spread", "actual_margin", model_col]
+                if kind == "spread" else
+                ["over_under", "actual_total", model_col])
+    for field in required:
+        valid = d[field].map(lambda value: (
+            isinstance(value, (numbers.Real, np.integer, np.floating))
+            and not isinstance(value, (bool, np.bool_))
+            and math.isfinite(float(value))))
+        if not bool(valid.all()):
+            raise ValueError(f"NONFINITE_CFB_SCORING_INPUT: {field}")
     if kind == "spread":
         d["mkt"] = -d.home_team_spread
         d["act"] = d.actual_margin
@@ -173,6 +187,14 @@ def score_market(d, model_col, kind, sd_prod, sd_lane):
     d["win"] = [0 if r == 0 else (1 if (r > 0) == s else -1)
                 for r, s in zip(d.resid, side_home)]
     d.loc[d.model == d.mkt, "win"] = float("nan")
+    if d.empty:
+        return dict(
+            n=0, status="NO_DATA", model_mae=None, close_mae=None,
+            model_bias=None, mean_abs_model_minus_close=None,
+            mean_signed_model_minus_close=None,
+            logloss_prod_sds=None, logloss_lane_sds=None,
+            logloss_market_only=None, bands=band_stats(d, "gap", "win"),
+            calibration_prod_sds=calibration(d, "gap", "win", sd_prod))
     ll = {}
     for name, sd in (("prod", sd_prod), ("lane", sd_lane)):
         tot, n = 0.0, 0
@@ -229,6 +251,11 @@ def main(argv=None) -> int:
     data = Path(args.data_dir)
     closes = pd.read_csv(data / "sdv_cfb_closes_all.csv")
     results = pd.read_csv(data / "sdv_cfb_results_all.csv")
+    # Never train from a nonfinite result even if a stale CSV escaped intake.
+    for field in ("home_points", "away_points"):
+        vals = pd.to_numeric(results[field], errors="coerce")
+        if not bool(vals.map(lambda v: pd.notna(v) and math.isfinite(float(v))).all()):
+            raise ValueError(f"NONFINITE_CFB_RESULT_INPUT: {field}")
     results["instant"] = pd.to_datetime(results.start_date, utc=True, format="ISO8601")
     results = results.sort_values(["season", "instant", "game_id"])
     if results.game_id.duplicated().any():
@@ -278,7 +305,7 @@ def main(argv=None) -> int:
         "per_season": {str(s): score_stratum(pred, [s], f"season {s}")
                        for s in range(2012, 2027)},
     }
-    (data / "metrics_am_pm.json").write_text(json.dumps(results_out, indent=1))
+    (data / "metrics_am_pm.json").write_text(json.dumps(results_out, indent=1, allow_nan=False))
     for key in ("primary_2023_2025", "primary_2023_2026", "subset_2012_2022"):
         r = results_out[key]
         print(f"== {r['stratum']}")
@@ -286,6 +313,9 @@ def main(argv=None) -> int:
             for kind in ("spread", "total"):
                 m = r[model][kind]
                 b0 = m["bands"]["ge0"]
+                if m["n"] == 0:
+                    print(f"  {model} {kind}: NO_DATA n=0")
+                    continue
                 print(f"  {model} {kind}: n={m['n']} MAE model {m['model_mae']:.2f} "
                       f"vs close {m['close_mae']:.2f} | cover(all) {b0['cover_rate']} "
                       f"ROI flat -110 ASSUMPTION "
