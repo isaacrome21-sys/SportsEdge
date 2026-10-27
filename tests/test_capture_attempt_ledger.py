@@ -1,5 +1,7 @@
 """Fail-closed contracts for append-only capture-stage receipts."""
 import json
+import os
+from unittest.mock import patch
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -9,6 +11,33 @@ from scripts.capture_attempt_ledger import AttemptLedger
 
 
 class LedgerTests(unittest.TestCase):
+    def test_short_writes_complete_json_record_before_credit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with AttemptLedger(tmp, game_id="g", capture_kind="TEST",
+                               due_utc="2026-01-01T00:00:00Z") as ledger:
+                real_write = os.write
+                with patch("scripts.capture_attempt_ledger.os.write",
+                           side_effect=lambda fd, data: real_write(fd, data[:8])):
+                    ledger.record("dispatch")
+                rows = [json.loads(line) for line in ledger.path.read_text().splitlines()]
+                self.assertEqual(rows[-1]["stage"], "dispatch")
+                self.assertIn("dispatch", ledger._seen)
+
+    def test_failed_writes_poison_attempt_without_stage_credit(self):
+        for failure in ("zero", "error", "fsync"):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
+                with AttemptLedger(tmp, game_id="g", capture_kind="TEST",
+                                   due_utc="2026-01-01T00:00:00Z") as ledger:
+                    target = "os.fsync" if failure == "fsync" else "os.write"
+                    kwargs = ({"return_value": 0} if failure == "zero" else
+                              {"side_effect": OSError("disk failure")})
+                    with patch("scripts.capture_attempt_ledger." + target, **kwargs):
+                        with self.assertRaises(OSError):
+                            ledger.record("dispatch")
+                    self.assertNotIn("dispatch", ledger._seen)
+                    with self.assertRaises(ValueError):
+                        ledger.record("failure", detail="cannot append to damaged attempt")
+
     def test_success_has_six_distinct_durable_stages(self):
         with tempfile.TemporaryDirectory() as tmp:
             before = datetime.now(timezone.utc)

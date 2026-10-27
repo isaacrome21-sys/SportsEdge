@@ -113,8 +113,20 @@ class AttemptLedger:
             "sha256": hashlib.sha256(raw).hexdigest() if raw is not None else None,
             "receipt_locator": receipt_locator, "detail": detail,
         }
-        os.write(self._fd, (json.dumps(event, sort_keys=True) + "\n").encode("utf-8"))
-        os.fsync(self._fd)
+        payload = (json.dumps(event, sort_keys=True) + "\n").encode("utf-8")
+        remaining = memoryview(payload)
+        try:
+            while remaining:
+                written = os.write(self._fd, remaining)
+                if written <= 0:
+                    raise OSError("CAPTURE_RECEIPT_WRITE_NO_PROGRESS")
+                remaining = remaining[written:]
+            os.fsync(self._fd)
+        except OSError:
+            # A partial record cannot safely accept any subsequent stage.
+            # Preserve the damaged attempt for diagnosis, never credit it.
+            self._terminal = True
+            raise
         self._seen.add(stage)
         self._terminal = stage in TERMINAL
         return event
