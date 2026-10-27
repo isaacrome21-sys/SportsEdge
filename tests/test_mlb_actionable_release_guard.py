@@ -8,6 +8,9 @@ import pytest
 
 from scripts import render_mlb_myspari_card as renderer
 from scripts.print_mlb_fast_game_markets import actionable_game_rows
+from sportsedge.mlb_myspari_own_model import (
+    EXTREME_MARKET_DISAGREEMENT_REASON, apply_market_sanity_guard,
+)
 
 
 def _candidate(*, status="ACTIONABLE", engine_status="MODEL_CANDIDATE"):
@@ -56,6 +59,21 @@ def test_release_guard_refuses_unicode_disguised_or_unknown_status(status):
     assert safe["star_rating"] == 0
     assert renderer.NO_RELEASE_AUTHORITY_REASON in safe["presentation_reason_codes"]
     assert raw["status"] == status  # no audit-input mutation
+
+
+def test_preserve_producer_extreme_disagreement_review_veto():
+    original = _candidate()
+    original.update(estimate_p=0.99, market_p=0.10,
+                    market_disagreement_supported=False)
+    producer = apply_market_sanity_guard([original])[0]
+    assert producer["status"] == producer["scored_status"] == "REVIEW"
+    assert EXTREME_MARKET_DISAGREEMENT_REASON in producer["presentation_reason_codes"]
+    safe = renderer.withhold_unverified_actionable([producer])[0]
+    assert safe["status"] == safe["scored_status"] == "REVIEW"
+    assert EXTREME_MARKET_DISAGREEMENT_REASON in safe["presentation_reason_codes"]
+    assert renderer.NO_RELEASE_AUTHORITY_REASON not in safe["presentation_reason_codes"]
+    assert safe["model_p"] == original["model_p"]
+    assert safe["american_odds"] == original["american_odds"]
 
 
 def test_release_guard_cannot_be_bypassed_by_engine_bet_claim_or_prior_refusal():

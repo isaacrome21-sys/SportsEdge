@@ -35,7 +35,7 @@ NO_RELEASE_AUTHORITY_REASON = "RESEARCH_ONLY_NO_MODEL_PROMOTION_AUTHORITY"
 # pass through unchanged. Unicode zero-width/confusable bet labels and future
 # unknown status tokens must never preserve high-star promotional output.
 _NONBET_PUBLICATION_STATUSES = frozenset({
-    "LEAN", "NEEDS_CONFIRM", "PASS", "NO_MODEL", "NO_ENGINE", "NO_DATA",
+    "LEAN", "NEEDS_CONFIRM", "PASS", "REVIEW", "NO_MODEL", "NO_ENGINE", "NO_DATA",
     "UNPRICED", "REFUSED", "BLOCKED", "RESEARCH_ONLY", "NO_PRICE",
 })
 
