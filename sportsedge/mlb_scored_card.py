@@ -68,9 +68,10 @@ def _star_rating(*, score: int, status: str, verified: bool) -> int:
 
     Score B remains qualification-only; this function is presentation only.
     88+ = 5 stars, 82-87 = 4 stars, and any verified score <=81 = 3 stars.
-    Blocked, no-model, or unverified rows always receive 0 stars.
+    Only verified ACTIONABLE rows receive stars. Every refusal, review,
+    passed-over or research-only status receives zero promotional stars.
     """
-    if status in {"LEAN", "BLOCKED", "NO_MODEL"} or not verified:
+    if status != "ACTIONABLE" or not verified:
         return 0
     if score >= 88:
         return 5

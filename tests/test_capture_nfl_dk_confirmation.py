@@ -112,6 +112,7 @@ class WriterReaderIntegrationTests(unittest.TestCase):
                  patch.object(cap, "load_cfg", return_value=cfg), \
                  patch.object(cap, "load_snapshot", return_value=Snapshot()), \
                  patch.object(cap, "determine_due", return_value=(None, expected)), \
+                 patch.object(cap, "final_expected_due_kickoffs", return_value=expected), \
                  patch.object(cap, "current_hashes", return_value={"script_sha256":"a"*64}), \
                  patch.object(cap, "fetch_once", return_value=(board, None)):
                 report = cap.run(force=False, as_of=now)
@@ -150,6 +151,26 @@ class WindowSemanticsTests(unittest.TestCase):
         self.assertEqual(report["status"], "MISSED_OR_BLOCKED")
         self.assertEqual(report["missed_files"], ["missed.json"])
         mark.assert_called_once()
+
+
+    def test_fetch_completed_after_final_window_is_not_persisted(self):
+        from dataclasses import replace
+        started = datetime(2026, 9, 24, 23, 59, 59, tzinfo=timezone.utc)
+        expired = datetime(2026, 9, 25, 0, 0, 1, tzinfo=timezone.utc)
+        expected = Counter({"2026-09-25T00:15:00Z": 1})
+        late_board = replace(fixture_board(), received_at=expired)
+        with patch.object(cap, "load_snapshot", return_value=Snapshot()), \
+             patch.object(cap, "determine_due", return_value=(None, expected)), \
+             patch.object(cap, "fetch_once", return_value=(late_board, None)), \
+             patch.object(cap, "final_expected_due_kickoffs", return_value=Counter()), \
+             patch.object(cap, "game_rows_direct") as parse, \
+             patch.object(cap, "persist_raw") as write, \
+             patch.object(cap, "mark_due_missed", return_value=["missed.json"]):
+            report = cap.run(force=False, as_of=started)
+        self.assertEqual(report["status"], "MISSED_OR_BLOCKED")
+        self.assertEqual(report["reason"], "FINAL_RECEIPT_WINDOW_MISMATCH")
+        parse.assert_not_called()
+        write.assert_not_called()
 
 
 class ArmedWindowTests(unittest.TestCase):
@@ -264,14 +285,27 @@ class ArmedWindowTests(unittest.TestCase):
         }
         # nflverse gametime is ET: 13:00 ET = 17:00 UTC, FINAL opens 16:30.
         with patch("sportsedge.nfl_confirmation_schedule.captured_final_kickoffs", return_value=Counter()):
-            self.assertIsNone(cap.next_final_window(cfg, datetime(2026, 9, 27, 15, 54, tzinfo=timezone.utc), RealSnapshot()))
-            start, end = cap.next_final_window(cfg, datetime(2026, 9, 27, 15, 55, tzinfo=timezone.utc), RealSnapshot())
+            self.assertIsNone(cap.next_final_window(cfg, datetime(2026, 9, 27, 15, 39, tzinfo=timezone.utc), RealSnapshot()))
+            start, end = cap.next_final_window(cfg, datetime(2026, 9, 27, 15, 40, tzinfo=timezone.utc), RealSnapshot())
+            # Old 35m horizon missed a 7:16 runner for an 8:00 window.
+            prearmed = cap.next_final_window(cfg, datetime(2026, 9, 27, 15, 46, tzinfo=timezone.utc), RealSnapshot())
+            self.assertEqual(prearmed, (start, end))
         self.assertEqual(start, datetime(2026, 9, 27, 16, 30, tzinfo=timezone.utc))
         self.assertEqual(end, datetime(2026, 9, 27, 16, 45, tzinfo=timezone.utc))
         with patch("sportsedge.nfl_confirmation_schedule.captured_final_kickoffs", return_value=Counter({"2026-09-27T17:00:00Z": 1})):
             start2, end2 = cap.next_final_window(cfg, datetime(2026, 9, 27, 16, 15, tzinfo=timezone.utc), RealSnapshot())
         self.assertEqual(start2, datetime(2026, 9, 27, 16, 50, tzinfo=timezone.utc))
         self.assertEqual(end2, datetime(2026, 9, 27, 17, 5, tzinfo=timezone.utc))
+
+
+class WorkflowConcurrencyContractTests(unittest.TestCase):
+    def test_pr_checks_cannot_occupy_serialized_live_capture_lock(self):
+        path = cap.ROOT / ".github/workflows/nfl-dk-direct-confirmation-capture.yml"
+        workflow = path.read_text(encoding="utf-8")
+        self.assertIn("github.event_name == 'pull_request'", workflow)
+        self.assertIn("format('pr-{0}', github.event.pull_request.number)", workflow)
+        self.assertIn("|| 'capture'", workflow)
+        self.assertIn("cancel-in-progress: false", workflow)
 
 
 class FetchBlockedTests(unittest.TestCase):
