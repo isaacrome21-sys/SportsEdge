@@ -1,0 +1,36 @@
+{
+  "record_type": "NFL_ATD_V1_1_PROSPECTIVE_PRECHECK_SCHEDULE_V1",
+  "status": "PENDING_NOT_EXECUTED",
+  "created_date_ct": "2026-10-26",
+  "authority": "Isaac A. Rome standing owner delegation, Oct 26 2026",
+  "frozen_records_head_before": "5ba400ef2c2b3b9c88bf4d33d81aa4eabc8383cc",
+  "frozen_pin_path": "nfl_atd_v1_1/FREEZE.json",
+  "frozen_pin_blob_sha": "09da4e852d5cc90369a1080ccef56f54a24a2243",
+  "frozen_code_commit": "c2fd86dcc995e34af2b315319d3a184f8b5178cf",
+  "prechecks": [
+    {
+      "name": "THURSDAY_CHECK",
+      "time_ct": "2026-10-29T09:30:00-05:00",
+      "time_utc": "2026-10-29T14:30:00Z",
+      "status": "PENDING_NOT_EXECUTED"
+    },
+    {
+      "name": "SUNDAY_CHECK",
+      "time_ct": "2026-11-01T09:30:00-06:00",
+      "time_utc": "2026-11-01T15:30:00Z",
+      "status": "PENDING_NOT_EXECUTED"
+    }
+  ],
+  "hard_guards": {
+    "october_25_2026_slate": "PERMANENTLY_EXCLUDED_NO_BACKFILL",
+    "observed_future_rows_only": true,
+    "freeze_document_unchanged": true,
+    "code_pins_unchanged": true,
+    "model_promotion": false,
+    "play_allowed": false,
+    "stake_units": 0,
+    "clv_unverified_until_separate_pregame_quotes": true
+  },
+  "execution_status": "PRECHECK_RUNNER_NOT_INVOKED; task automation request rejected due to 5/5 slots; no timer established by this record",
+  "precheck_acceptance": "At the due time independently verify exact active pinned engine and sources, authentic timestamped future data with DK paired prices and no pre-freeze rows, and separately record success/failure; never treat this schedule as executed evidence."
+}
