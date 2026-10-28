@@ -102,6 +102,29 @@ class MarketSurfaceStage0Tests(unittest.TestCase):
         self.assertEqual(rows[0].acquisition_status, "PROVIDER_UNSUPPORTED")
         self.assertEqual(rows[0].engine_status, "NO_ENGINE")
 
+    def test_one_shot_specs_cover_every_game_and_market(self):
+        games = (("777", FIRST_PITCH), ("888", FIRST_PITCH + timedelta(hours=1)))
+        markets = (item for item in (spec("HITS"), spec("TOTAL_BASES")))
+
+        rows = build_market_grid(
+            games=games,
+            specs=markets,
+            quotes=(),
+            engine_capable_markets=frozenset({"HITS", "TOTAL_BASES"}),
+            now=NOW,
+        )
+
+        self.assertEqual(
+            [(row.game_id, row.market) for row in rows],
+            [
+                ("777", "HITS"),
+                ("777", "TOTAL_BASES"),
+                ("888", "HITS"),
+                ("888", "TOTAL_BASES"),
+            ],
+        )
+        self.assertTrue(all(row.acquisition_status == "ACQUISITION_MISSING" for row in rows))
+
 
 if __name__ == "__main__":
     unittest.main()
