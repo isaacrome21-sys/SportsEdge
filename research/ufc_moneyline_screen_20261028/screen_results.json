@@ -1,0 +1,1022 @@
+{
+  "construction": "UFC_ML_PIT_RATING_V1 (existing engine: sportsedge.ufc_training logistic over FEATURES; features rebuilt point-in-time by sportsedge.ufc_history)",
+  "family": "UFC / MONEYLINE_H2H",
+  "flat_bet_roi_test": {
+    "n_bets": 1291,
+    "profit_units": -28.09640657951391,
+    "provenance_label": "RECORDED_PRICE_NOT_DK_CLOSE",
+    "roi": -0.021763289372202874,
+    "rule": "1u flat on the model's argmax side at the recorded price",
+    "wins": 803
+  },
+  "gates": {
+    "contract_terms_reported_not_gated_here": {
+      "closing_market_provenance_required": {
+        "contract_value": true,
+        "reading": "Leg 1 is scored against RECORDED_PRICE_NOT_DK_CLOSE by the design's own section 3/6 terms; genuine closing-market provenance remains required for Leg 2 / promotion."
+      },
+      "short_notice_slice_required": {
+        "contract_value": true,
+        "reading": "Neither pinned source records booking changes, so the short-notice slice is NOT_IDENTIFIABLE historically; reported here as required and not gated, per draft section 6 Leg 1.",
+        "slice_status": "NOT_IDENTIFIABLE_FROM_PINNED_SOURCES"
+      },
+      "training_data_max_age_days": {
+        "contract_max": 45,
+        "observed_gap_days_newest_calibration_bout_to_test_start": 15,
+        "reading": "Within the limit under the Leg 1 reading; the term binds the forward promotion act (Leg 2) in the draft."
+      }
+    },
+    "criteria": {
+      "brier_delta_vs_market_max": {
+        "observed": 0.024662624656036775,
+        "pass": false,
+        "required": "<= 0.0"
+      },
+      "calibration_error_max": {
+        "observed": 0.04051584597940808,
+        "pass": true,
+        "required": "<= 0.05"
+      },
+      "debut_slice_n_min": {
+        "observed": 231,
+        "pass": true,
+        "required": ">= 100"
+      },
+      "log_loss_delta_vs_market_max": {
+        "observed": 0.05559076729069368,
+        "pass": false,
+        "required": "<= 0.0"
+      },
+      "log_loss_strictly_better_than_elo_only": {
+        "observed": {
+          "elo_only": 0.6820680330647501,
+          "model": 0.6443404193869365
+        },
+        "pass": true,
+        "required": "model log loss < Elo-only log loss"
+      },
+      "test_n_min": {
+        "observed": 1291,
+        "pass": true,
+        "required": ">= 500"
+      }
+    },
+    "promotion_note": "SCREEN_PASSED means the draft's Leg 1 screen passed (ARMED). It is not a promotion: promotion remains a separate act and Leg 2 (the forward DraftKings leg) is still required.",
+    "screen_verdict": "FAILED_SCREEN"
+  },
+  "join": {
+    "joined_priced": 6571,
+    "outcome_agree": 6569,
+    "outcome_disagree": 2,
+    "training_rows": 7556,
+    "unjoined": 985
+  },
+  "pins_file": "PINS.json",
+  "pit_audit_section5": {
+    "avg_sig_str_landed_unit_classification": {
+      "ambiguous": 0,
+      "neither": 1135,
+      "per_fight": 4378,
+      "per_minute": 3354
+    },
+    "construction_note": "The construction uses rebuilt features only (sportsedge.ufc_history), so the screen proceeds on rebuilt features either way, exactly as design draft section 5 prescribes for a failed audit.",
+    "distinct_fighters_checked": 1960,
+    "mixed_units_detected": true,
+    "population_row_sides_checked": 12170,
+    "shipped_aggregates_verdict": "DISCARDED_WHOLESALE_NOT_POINT_IN_TIME_CONSISTENT",
+    "sig_str_pct_within_0_03_rate": 0.6941659819227609,
+    "td_pct_within_0_03_rate": 0.46154478225143797,
+    "wins_losses_draws_exact_match": 9607,
+    "wins_losses_draws_exact_rate": 0.7894001643385374,
+    "wins_losses_draws_mismatch_examples": [
+      {
+        "date": "2026-03-28",
+        "fighter": "Joe Pyfer",
+        "rebuilt_w_l_d": [
+          6,
+          1,
+          0
+        ],
+        "shipped_w_l_d": [
+          7.0,
+          2.0,
+          0.0
+        ]
+      },
+      {
+        "date": "2026-03-28",
+        "fighter": "Maycee Barber",
+        "rebuilt_w_l_d": [
+          10,
+          2,
+          0
+        ],
+        "shipped_w_l_d": [
+          11.0,
+          2.0,
+          0.0
+        ]
+      },
+      {
+        "date": "2026-03-28",
+        "fighter": "Julian Erosa",
+        "rebuilt_w_l_d": [
+          9,
+          8,
+          0
+        ],
+        "shipped_w_l_d": [
+          10.0,
+          8.0,
+          0.0
+        ]
+      },
+      {
+        "date": "2026-03-28",
+        "fighter": "Mansur Abdul-Malik",
+        "rebuilt_w_l_d": [
+          3,
+          0,
+          1
+        ],
+        "shipped_w_l_d": [
+          4.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "date": "2026-03-28",
+        "fighter": "Yousri Belgaroui",
+        "rebuilt_w_l_d": [
+          1,
+          0,
+          0
+        ],
+        "shipped_w_l_d": [
+          2.0,
+          1.0,
+          0.0
+        ]
+      },
+      {
+        "date": "2026-03-28",
+        "fighter": "Terrance McKinney",
+        "rebuilt_w_l_d": [
+          7,
+          5,
+          0
+        ],
+        "shipped_w_l_d": [
+          7.0,
+          6.0,
+          0.0
+        ]
+      },
+      {
+        "date": "2026-03-28",
+        "fighter": "Ignacio Bahamondes",
+        "rebuilt_w_l_d": [
+          6,
+          3,
+          0
+        ],
+        "shipped_w_l_d": [
+          7.0,
+          3.0,
+          0.0
+        ]
+      },
+      {
+        "date": "2026-03-28",
+        "fighter": "Chase Hooper",
+        "rebuilt_w_l_d": [
+          8,
+          4,
+          0
+        ],
+        "shipped_w_l_d": [
+          9.0,
+          4.0,
+          0.0
+        ]
+      },
+      {
+        "date": "2026-03-28",
+        "fighter": "Navajo Stirling",
+        "rebuilt_w_l_d": [
+          3,
+          0,
+          0
+        ],
+        "shipped_w_l_d": [
+          4.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "date": "2026-03-28",
+        "fighter": "Bruno Lopes",
+        "rebuilt_w_l_d": [
+          1,
+          1,
+          0
+        ],
+        "shipped_w_l_d": [
+          2.0,
+          2.0,
+          0.0
+        ]
+      }
+    ]
+  },
+  "protocol": {
+    "calibration_window": "2020-01-01..2022-12-31 (Platt only)",
+    "features": "sportsedge.ufc_training.FEATURES",
+    "fit_window": "<= 2019-12-31",
+    "learner": "sportsedge.ufc_training.fit_logistic (defaults) + fit_platt (defaults)",
+    "market_baseline": "mdabbert recorded prices, de-vigged, RECORDED_PRICE_NOT_DK_CLOSE",
+    "reference_baseline": "Elo-only logistic artifact (Elo expectation), Platt-calibrated on the same validation window",
+    "test_window": "2023-01-01..2025-12-31"
+  },
+  "provenance_label": "RECORDED_PRICE_NOT_DK_CLOSE",
+  "schema_version": 1,
+  "slices": {
+    "all_test": {
+      "elo_only": {
+        "accuracy": 0.5677769171185127,
+        "brier": 0.2445353394563223,
+        "calibration_error": 0.03158957991521911,
+        "log_loss": 0.6820680330647501,
+        "n": 1291
+      },
+      "market_recorded_price_no_vig": {
+        "accuracy": 0.6948102246320682,
+        "brier": 0.2016179297368776,
+        "calibration_error": 0.027856162949376963,
+        "log_loss": 0.5887496520962429,
+        "n": 1291
+      },
+      "model": {
+        "accuracy": 0.6219984508133231,
+        "brier": 0.22628055439291436,
+        "calibration_error": 0.04051584597940808,
+        "log_loss": 0.6443404193869365,
+        "n": 1291
+      },
+      "n": 1291
+    },
+    "female": {
+      "elo_only": {
+        "accuracy": 0.5612244897959183,
+        "brier": 0.24643714812920497,
+        "calibration_error": 0.06090822536197357,
+        "log_loss": 0.6859912477577084,
+        "n": 196
+      },
+      "market_recorded_price_no_vig": {
+        "accuracy": 0.7295918367346939,
+        "brier": 0.1940588020395508,
+        "calibration_error": 0.06523931527528928,
+        "log_loss": 0.5737348653890226,
+        "n": 196
+      },
+      "model": {
+        "accuracy": 0.6581632653061225,
+        "brier": 0.22321624814769364,
+        "calibration_error": 0.05516864990774057,
+        "log_loss": 0.6370799691043396,
+        "n": 196
+      },
+      "n": 196
+    },
+    "five_round": {
+      "elo_only": {
+        "accuracy": 0.5602836879432624,
+        "brier": 0.2489515823154912,
+        "calibration_error": 0.08027403670658999,
+        "log_loss": 0.6907540027867769,
+        "n": 141
+      },
+      "market_recorded_price_no_vig": {
+        "accuracy": 0.6524822695035462,
+        "brier": 0.21647222761437546,
+        "calibration_error": 0.08803390195836713,
+        "log_loss": 0.6206626809595199,
+        "n": 141
+      },
+      "model": {
+        "accuracy": 0.6028368794326241,
+        "brier": 0.22729643694453336,
+        "calibration_error": 0.0591608962378477,
+        "log_loss": 0.6462313109352451,
+        "n": 141
+      },
+      "n": 141
+    },
+    "male": {
+      "elo_only": {
+        "accuracy": 0.5689497716894977,
+        "brier": 0.24419492438793416,
+        "calibration_error": 0.026341676255343414,
+        "log_loss": 0.6813657955489328,
+        "n": 1095
+      },
+      "market_recorded_price_no_vig": {
+        "accuracy": 0.6885844748858447,
+        "brier": 0.20297097907813424,
+        "calibration_error": 0.024551555050065923,
+        "log_loss": 0.5914372303561654,
+        "n": 1095
+      },
+      "model": {
+        "accuracy": 0.6155251141552511,
+        "brier": 0.2268290512185429,
+        "calibration_error": 0.039228095292406964,
+        "log_loss": 0.6456400068347804,
+        "n": 1095
+      },
+      "n": 1095
+    },
+    "three_round": {
+      "elo_only": {
+        "accuracy": 0.568695652173913,
+        "brier": 0.24399386967967637,
+        "calibration_error": 0.027810837859223485,
+        "log_loss": 0.6810030576466581,
+        "n": 1150
+      },
+      "market_recorded_price_no_vig": {
+        "accuracy": 0.7,
+        "brier": 0.19979666364928872,
+        "calibration_error": 0.03136641029999179,
+        "log_loss": 0.5848368372530063,
+        "n": 1150
+      },
+      "model": {
+        "accuracy": 0.6243478260869565,
+        "brier": 0.22615599835832456,
+        "calibration_error": 0.039546160817801344,
+        "log_loss": 0.6441085796405788,
+        "n": 1150
+      },
+      "n": 1150
+    },
+    "ufc_debut_any": {
+      "elo_only": {
+        "accuracy": 0.5757575757575758,
+        "brier": 0.23826870764936162,
+        "calibration_error": 0.05897553479312865,
+        "log_loss": 0.6690641670380256,
+        "n": 231
+      },
+      "market_recorded_price_no_vig": {
+        "accuracy": 0.696969696969697,
+        "brier": 0.19633201884706913,
+        "calibration_error": 0.060082006481661156,
+        "log_loss": 0.5751944660880431,
+        "n": 231
+      },
+      "model": {
+        "accuracy": 0.6233766233766234,
+        "brier": 0.23405084528811743,
+        "calibration_error": 0.0995686706765157,
+        "log_loss": 0.6650094027365279,
+        "n": 231
+      },
+      "n": 231
+    },
+    "weight_class": {
+      "Bantamweight": {
+        "elo_only": {
+          "accuracy": 0.564625850340136,
+          "brier": 0.24198403037595573,
+          "calibration_error": 0.04576208908207066,
+          "log_loss": 0.6768812585122432,
+          "n": 147
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 0.7210884353741497,
+          "brier": 0.21128085764417187,
+          "calibration_error": 0.11425050915784438,
+          "log_loss": 0.6135718151220879,
+          "n": 147
+        },
+        "model": {
+          "accuracy": 0.5850340136054422,
+          "brier": 0.2190926878705368,
+          "calibration_error": 0.11011586577760163,
+          "log_loss": 0.6272362075465162,
+          "n": 147
+        },
+        "n": 147
+      },
+      "Catch Weight": {
+        "elo_only": {
+          "accuracy": 0.5714285714285714,
+          "brier": 0.23064335364153707,
+          "calibration_error": 0.04608653609518801,
+          "log_loss": 0.6540270700661557,
+          "n": 21
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 0.6666666666666666,
+          "brier": 0.18844233402934332,
+          "calibration_error": 0.28002078020939297,
+          "log_loss": 0.5571271086812128,
+          "n": 21
+        },
+        "model": {
+          "accuracy": 0.6190476190476191,
+          "brier": 0.259062243885134,
+          "calibration_error": 0.12743360150955393,
+          "log_loss": 0.7287312674648944,
+          "n": 21
+        },
+        "n": 21
+      },
+      "Featherweight": {
+        "elo_only": {
+          "accuracy": 0.5125,
+          "brier": 0.2534039867924161,
+          "calibration_error": 0.09802812327880289,
+          "log_loss": 0.6997169772019796,
+          "n": 160
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 0.63125,
+          "brier": 0.21691078893790297,
+          "calibration_error": 0.06047276875445047,
+          "log_loss": 0.6186023869349913,
+          "n": 160
+        },
+        "model": {
+          "accuracy": 0.60625,
+          "brier": 0.23945028168872914,
+          "calibration_error": 0.08275172310207646,
+          "log_loss": 0.6787820786013538,
+          "n": 160
+        },
+        "n": 160
+      },
+      "Flyweight": {
+        "elo_only": {
+          "accuracy": 0.6041666666666666,
+          "brier": 0.23155173154928188,
+          "calibration_error": 0.08932858810714212,
+          "log_loss": 0.6552056800911037,
+          "n": 96
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 0.75,
+          "brier": 0.18826527878873192,
+          "calibration_error": 0.09237425143916639,
+          "log_loss": 0.5592193825152705,
+          "n": 96
+        },
+        "model": {
+          "accuracy": 0.71875,
+          "brier": 0.211837754670814,
+          "calibration_error": 0.11529733626502846,
+          "log_loss": 0.6117825075293394,
+          "n": 96
+        },
+        "n": 96
+      },
+      "Heavyweight": {
+        "elo_only": {
+          "accuracy": 0.6976744186046512,
+          "brier": 0.2134441261380725,
+          "calibration_error": 0.10690084647649463,
+          "log_loss": 0.6182413129544189,
+          "n": 86
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 0.7209302325581395,
+          "brier": 0.1779952635065525,
+          "calibration_error": 0.15644020380845813,
+          "log_loss": 0.5356754195460551,
+          "n": 86
+        },
+        "model": {
+          "accuracy": 0.6744186046511628,
+          "brier": 0.20475660109072624,
+          "calibration_error": 0.09955293743673066,
+          "log_loss": 0.5951769380193987,
+          "n": 86
+        },
+        "n": 86
+      },
+      "Interim Featherweight": {
+        "elo_only": {
+          "accuracy": 1.0,
+          "brier": 0.20162698148195068,
+          "calibration_error": 0.449028931675845,
+          "log_loss": 0.5960729787864598,
+          "n": 1
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 1.0,
+          "brier": 0.14355792946984275,
+          "calibration_error": 0.37889039242219213,
+          "log_loss": 0.4762477108876566,
+          "n": 1
+        },
+        "model": {
+          "accuracy": 1.0,
+          "brier": 0.10176615583267357,
+          "calibration_error": 0.3190080811400764,
+          "log_loss": 0.3842048394817062,
+          "n": 1
+        },
+        "n": 1
+      },
+      "Interim Heavyweight": {
+        "elo_only": {
+          "accuracy": 0.5,
+          "brier": 0.2889310262356456,
+          "calibration_error": 0.04806046322933866,
+          "log_loss": 0.7718928070410316,
+          "n": 2
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 1.0,
+          "brier": 0.1323791299378826,
+          "calibration_error": 0.3466057587061898,
+          "log_loss": 0.4401235197354064,
+          "n": 2
+        },
+        "model": {
+          "accuracy": 0.5,
+          "brier": 0.3168192331054809,
+          "calibration_error": 0.5562596268620885,
+          "log_loss": 0.831653950973336,
+          "n": 2
+        },
+        "n": 2
+      },
+      "Light Heavyweight": {
+        "elo_only": {
+          "accuracy": 0.6136363636363636,
+          "brier": 0.2399669789458268,
+          "calibration_error": 0.08025416409181588,
+          "log_loss": 0.6729588645706928,
+          "n": 88
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 0.6022727272727273,
+          "brier": 0.22734933400856064,
+          "calibration_error": 0.08503418336800503,
+          "log_loss": 0.646867631365019,
+          "n": 88
+        },
+        "model": {
+          "accuracy": 0.5340909090909091,
+          "brier": 0.2458914067492218,
+          "calibration_error": 0.08114433607199005,
+          "log_loss": 0.6846234801827029,
+          "n": 88
+        },
+        "n": 88
+      },
+      "Lightweight": {
+        "elo_only": {
+          "accuracy": 0.6171428571428571,
+          "brier": 0.2393821215941653,
+          "calibration_error": 0.04879960502366988,
+          "log_loss": 0.671717761131625,
+          "n": 175
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 0.7028571428571428,
+          "brier": 0.20613731121781262,
+          "calibration_error": 0.05163807971652067,
+          "log_loss": 0.5982744753454173,
+          "n": 175
+        },
+        "model": {
+          "accuracy": 0.64,
+          "brier": 0.22044952623868105,
+          "calibration_error": 0.060819386308007053,
+          "log_loss": 0.6289850196141097,
+          "n": 175
+        },
+        "n": 175
+      },
+      "Middleweight": {
+        "elo_only": {
+          "accuracy": 0.546583850931677,
+          "brier": 0.25210311227168836,
+          "calibration_error": 0.052391637367335764,
+          "log_loss": 0.6977036945452513,
+          "n": 161
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 0.7329192546583851,
+          "brier": 0.18498326973725382,
+          "calibration_error": 0.0701004395101372,
+          "log_loss": 0.5508453251472027,
+          "n": 161
+        },
+        "model": {
+          "accuracy": 0.6149068322981367,
+          "brier": 0.2266642919501241,
+          "calibration_error": 0.0925417333209794,
+          "log_loss": 0.6439756787959506,
+          "n": 161
+        },
+        "n": 161
+      },
+      "Road To UFC 1 Bantamweight Tournament": {
+        "elo_only": {
+          "accuracy": 0.0,
+          "brier": 0.3245523757842241,
+          "calibration_error": 0.5696949848684154,
+          "log_loss": 0.8432609842401645,
+          "n": 1
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 1.0,
+          "brier": 0.030625000000000006,
+          "calibration_error": 0.17500000000000002,
+          "log_loss": 0.19237189264745613,
+          "n": 1
+        },
+        "model": {
+          "accuracy": 0.0,
+          "brier": 0.387730652695352,
+          "calibration_error": 0.6226802170419035,
+          "log_loss": 0.9746622204203667,
+          "n": 1
+        },
+        "n": 1
+      },
+      "Road To UFC 1 Featherweight Tournament": {
+        "elo_only": {
+          "accuracy": 1.0,
+          "brier": 0.18516240604739323,
+          "calibration_error": 0.4303050151315846,
+          "log_loss": 0.5626541756442146,
+          "n": 1
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 1.0,
+          "brier": 0.11528138395170726,
+          "calibration_error": 0.33953112368633787,
+          "log_loss": 0.4148052775324849,
+          "n": 1
+        },
+        "model": {
+          "accuracy": 1.0,
+          "brier": 0.1781365001567745,
+          "calibration_error": 0.42206219939337675,
+          "log_loss": 0.5482890275075087,
+          "n": 1
+        },
+        "n": 1
+      },
+      "Road To UFC 1 Lightweight Tournament": {
+        "elo_only": {
+          "accuracy": 0.0,
+          "brier": 0.3245523757842241,
+          "calibration_error": 0.5696949848684154,
+          "log_loss": 0.8432609842401645,
+          "n": 1
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 0.0,
+          "brier": 0.3459928231127259,
+          "calibration_error": 0.5882115462252725,
+          "log_loss": 0.8872455232110428,
+          "n": 1
+        },
+        "model": {
+          "accuracy": 0.0,
+          "brier": 0.3514442407411081,
+          "calibration_error": 0.5928273279304085,
+          "log_loss": 0.8985179278113029,
+          "n": 1
+        },
+        "n": 1
+      },
+      "Road to UFC 1 Flyweight Tournament": {
+        "elo_only": {
+          "accuracy": 0.0,
+          "brier": 0.3245523757842241,
+          "calibration_error": 0.5696949848684154,
+          "log_loss": 0.8432609842401645,
+          "n": 1
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 1.0,
+          "brier": 0.1152813839517073,
+          "calibration_error": 0.3395311236863379,
+          "log_loss": 0.4148052775324849,
+          "n": 1
+        },
+        "model": {
+          "accuracy": 0.0,
+          "brier": 0.3429961267134712,
+          "calibration_error": 0.5856587118053237,
+          "log_loss": 0.8810652771411916,
+          "n": 1
+        },
+        "n": 1
+      },
+      "Road to UFC 3 Bantamweight Tournament TitleBout": {
+        "elo_only": {
+          "accuracy": 0.0,
+          "brier": 0.3245523757842241,
+          "calibration_error": 0.5696949848684154,
+          "log_loss": 0.8432609842401645,
+          "n": 1
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 1.0,
+          "brier": 0.10955635210546386,
+          "calibration_error": 0.33099297893681046,
+          "log_loss": 0.40196072404621463,
+          "n": 1
+        },
+        "model": {
+          "accuracy": 0.0,
+          "brier": 0.39333583498807406,
+          "calibration_error": 0.6271649184927949,
+          "log_loss": 0.986619097842709,
+          "n": 1
+        },
+        "n": 1
+      },
+      "Road to UFC 3 Flyweight Tournament TitleBout": {
+        "elo_only": {
+          "accuracy": 0.0,
+          "brier": 0.3245523757842241,
+          "calibration_error": 0.5696949848684154,
+          "log_loss": 0.8432609842401645,
+          "n": 1
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 1.0,
+          "brier": 0.22459392466889716,
+          "calibration_error": 0.4739134147382802,
+          "log_loss": 0.6422894690275665,
+          "n": 1
+        },
+        "model": {
+          "accuracy": 0.0,
+          "brier": 0.33790594399150237,
+          "calibration_error": 0.5812967778953384,
+          "log_loss": 0.870592910489488,
+          "n": 1
+        },
+        "n": 1
+      },
+      "Road to UFC 3 Women's Strawweight Tournament TitleBout": {
+        "elo_only": {
+          "accuracy": 1.0,
+          "brier": 0.18516240604739323,
+          "calibration_error": 0.4303050151315846,
+          "log_loss": 0.5626541756442146,
+          "n": 1
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 0.0,
+          "brier": 0.6391301394141251,
+          "calibration_error": 0.7994561522773623,
+          "log_loss": 1.6067223642616175,
+          "n": 1
+        },
+        "model": {
+          "accuracy": 0.0,
+          "brier": 0.3207101321664168,
+          "calibration_error": 0.5663127511953239,
+          "log_loss": 0.8354316295306624,
+          "n": 1
+        },
+        "n": 1
+      },
+      "Ultimate Fighter 32 Featherweight Tournament": {
+        "elo_only": {
+          "accuracy": 0.0,
+          "brier": 0.3245523757842241,
+          "calibration_error": 0.5696949848684154,
+          "log_loss": 0.8432609842401645,
+          "n": 1
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 1.0,
+          "brier": 0.10204475308641973,
+          "calibration_error": 0.3194444444444444,
+          "log_loss": 0.3848458209054287,
+          "n": 1
+        },
+        "model": {
+          "accuracy": 1.0,
+          "brier": 0.18525492973869634,
+          "calibration_error": 0.43041251113170065,
+          "log_loss": 0.5628428838933329,
+          "n": 1
+        },
+        "n": 1
+      },
+      "Ultimate Fighter 32 Middleweight Tournament": {
+        "elo_only": {
+          "accuracy": 0.0,
+          "brier": 0.3245523757842241,
+          "calibration_error": 0.5696949848684154,
+          "log_loss": 0.8432609842401645,
+          "n": 1
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 0.0,
+          "brier": 0.3175233056185437,
+          "calibration_error": 0.5634920634920635,
+          "log_loss": 0.828948721719007,
+          "n": 1
+        },
+        "model": {
+          "accuracy": 0.0,
+          "brier": 0.41657807696222837,
+          "calibration_error": 0.6454285994300442,
+          "log_loss": 1.0368455412456283,
+          "n": 1
+        },
+        "n": 1
+      },
+      "Ultimate Fighter 33 Flyweight Tournament": {
+        "elo_only": {
+          "accuracy": 0.0,
+          "brier": 0.35351274794216897,
+          "calibration_error": 0.5945693802595026,
+          "log_loss": 0.9028055181161719,
+          "n": 1
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 0.0,
+          "brier": 0.642647360152995,
+          "calibration_error": 0.8016528925619835,
+          "log_loss": 1.6177367152487954,
+          "n": 1
+        },
+        "model": {
+          "accuracy": 0.0,
+          "brier": 0.44412940484647606,
+          "calibration_error": 0.666430345082272,
+          "log_loss": 1.0979035751117168,
+          "n": 1
+        },
+        "n": 1
+      },
+      "Ultimate Fighter 33 Welterweight Tournament": {
+        "elo_only": {
+          "accuracy": 0.0,
+          "brier": 0.3245523757842241,
+          "calibration_error": 0.5696949848684154,
+          "log_loss": 0.8432609842401645,
+          "n": 1
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 1.0,
+          "brier": 0.1250203674675514,
+          "calibration_error": 0.35358219336888475,
+          "log_loss": 0.4363092247674286,
+          "n": 1
+        },
+        "model": {
+          "accuracy": 0.0,
+          "brier": 0.28748838970150425,
+          "calibration_error": 0.5361794379697008,
+          "log_loss": 0.7682575213135391,
+          "n": 1
+        },
+        "n": 1
+      },
+      "Welterweight": {
+        "elo_only": {
+          "accuracy": 0.5067567567567568,
+          "brier": 0.25902926117221736,
+          "calibration_error": 0.09073779949884903,
+          "log_loss": 0.7120508705112077,
+          "n": 148
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 0.6418918918918919,
+          "brier": 0.20777635959372456,
+          "calibration_error": 0.0949856834952109,
+          "log_loss": 0.6021163306179572,
+          "n": 148
+        },
+        "model": {
+          "accuracy": 0.6013513513513513,
+          "brier": 0.22772212852095275,
+          "calibration_error": 0.11247944999585864,
+          "log_loss": 0.6505055452052846,
+          "n": 148
+        },
+        "n": 148
+      },
+      "Women's Bantamweight": {
+        "elo_only": {
+          "accuracy": 0.5217391304347826,
+          "brier": 0.25133207688313103,
+          "calibration_error": 0.10944776705476941,
+          "log_loss": 0.6957917322105807,
+          "n": 46
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 0.6956521739130435,
+          "brier": 0.20314945240447432,
+          "calibration_error": 0.07650318922198111,
+          "log_loss": 0.5901421166804975,
+          "n": 46
+        },
+        "model": {
+          "accuracy": 0.6521739130434783,
+          "brier": 0.22626486401183799,
+          "calibration_error": 0.1517087948041019,
+          "log_loss": 0.6473691201585157,
+          "n": 46
+        },
+        "n": 46
+      },
+      "Women's Featherweight": {
+        "elo_only": {
+          "accuracy": 0.75,
+          "brier": 0.20528457195191946,
+          "calibration_error": 0.14144247886362266,
+          "log_loss": 0.6010554245440249,
+          "n": 4
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 0.75,
+          "brier": 0.19536726921444708,
+          "calibration_error": 0.17616246746237024,
+          "log_loss": 0.5697651450792895,
+          "n": 4
+        },
+        "model": {
+          "accuracy": 0.75,
+          "brier": 0.19984375540302932,
+          "calibration_error": 0.23183589331379634,
+          "log_loss": 0.5764998446024185,
+          "n": 4
+        },
+        "n": 4
+      },
+      "Women's Flyweight": {
+        "elo_only": {
+          "accuracy": 0.5806451612903226,
+          "brier": 0.24546759860564643,
+          "calibration_error": 0.07705686951438845,
+          "log_loss": 0.6845713357011189,
+          "n": 62
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 0.7096774193548387,
+          "brier": 0.19863388103056284,
+          "calibration_error": 0.05647976592406635,
+          "log_loss": 0.5861118486479328,
+          "n": 62
+        },
+        "model": {
+          "accuracy": 0.6290322580645161,
+          "brier": 0.23107280148379197,
+          "calibration_error": 0.07886296698400051,
+          "log_loss": 0.6537593851791823,
+          "n": 62
+        },
+        "n": 62
+      },
+      "Women's Strawweight": {
+        "elo_only": {
+          "accuracy": 0.5542168674698795,
+          "brier": 0.2471700444493373,
+          "calibration_error": 0.06703168092146493,
+          "log_loss": 0.6871995926690898,
+          "n": 83
+        },
+        "market_recorded_price_no_vig": {
+          "accuracy": 0.7710843373493976,
+          "brier": 0.1801777174575823,
+          "calibration_error": 0.10141657374865291,
+          "log_loss": 0.5431419119059631,
+          "n": 83
+        },
+        "model": {
+          "accuracy": 0.6867469879518072,
+          "brier": 0.21560966321240688,
+          "calibration_error": 0.07079618479133906,
+          "log_loss": 0.6194479702181832,
+          "n": 83
+        },
+        "n": 83
+      }
+    }
+  },
+  "window_counts": {
+    "calibration": 1355,
+    "fit": 3809,
+    "test": 1291
+  }
+}
