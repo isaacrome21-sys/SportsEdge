@@ -2857,10 +2857,16 @@
       "merge_sha": "de9fb32ebf65ce2b6cb6ef86f2af337bd36e7dd8",
       "pr": 1953,
       "note": "Verified first-parent main advance after registered b1308caf boundary. Source: CFB: probation policy v2 (8/slate, 5/market) + spread-lane diagnosis (#1953). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_F5441ED9_PR_2719",
+      "merge_sha": "f5441ed98bcf8fed27a04d96bc9f99ae9e5ebc4b",
+      "pr": 2719,
+      "note": "DRIFT_CONFIRMED / REVOKED reconciliation-only bridge: #2719 altered exactly sportsedge/dfs/projections.py and tests/test_dfs_projection_snapshot_integrity.py under MLB_DFS_EVIDENCE_FREEZE_V1 governed coverage. Temporary anchor advancement solely permits subsequent exact-byte restoration and final re-anchor. Bundle remains REVOKED; no freeze, model, forward-clock, promotion, staking, official, production, or betting authority; no backfill."
     }
   ],
   "inventory_block_reason": "Current main through merge dca09063 / PR #1668 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "de9fb32ebf65ce2b6cb6ef86f2af337bd36e7dd8",
+  "reconciled_through_sha": "f5441ed98bcf8fed27a04d96bc9f99ae9e5ebc4b",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
