@@ -153,9 +153,6 @@ def test_malformed_ev_claim_fails_closed_without_fake_extreme_label(malformed):
         "estimate_p": float("nan"), "ev_per_dollar": 0.04}}},
     {"pricing_lanes": {"lane_b_anchored": {
         "estimate_p": True, "ev_per_dollar": 0.04}}},
-    {"independent_projection": {
-        "estimate_p": float("inf"), "ev_per_dollar": 0.04,
-        "paired_market_status": "EXACT_DK_TWO_SIDED_NO_VIG_RESEARCH"}},
 ])
 def test_impossible_hidden_probability_never_becomes_value_screen(hidden):
     # An invalid Lane B p must not be displayed as 150% probability or
@@ -172,3 +169,15 @@ def test_impossible_hidden_probability_never_becomes_value_screen(hidden):
     assert screens["unverified_model_value_screens"] == []
     assert screens["exclusions"]["PROP_PROBABILITY_CLAIM_INVALID"] == 1
     assert card["evaluated_rows"][0]["ev_per_dollar"] == 0.04
+
+
+def test_invalid_independent_probability_is_blocked_not_lean():
+    card = _card(probability=0.52, reported_ev=0.04, price=100)
+    card["evaluated_rows"][0]["independent_projection"] = {
+        "estimate_p": float("inf"), "ev_per_dollar": 0.04,
+        "paired_market_status": "EXACT_DK_TWO_SIDED_NO_VIG_RESEARCH",
+    }
+    selection = build_phone_card(card)["selections"][0]
+    assert selection["status"] in {"BLOCKED", "QUARANTINED"}
+    assert selection["probability"] is None
+    assert build_current_value_screens(card, now=NOW)["unverified_model_value_screens"] == []
