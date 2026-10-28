@@ -1,0 +1,75 @@
+{
+ "toy": true,
+ "note": "INVENTED toy slate -- computability check only, not a verdict and not evidence",
+ "seed": 20261028,
+ "reps": 10000,
+ "k_at_package_time": 12,
+ "thresholds": {
+  "spread": 2.2,
+  "total": 3.5,
+  "team": 2.1
+ },
+ "efficiency": {
+  "rows_priced": 24,
+  "picked_rows": 10,
+  "roi_on_picked": 0.43636363636363634,
+  "mean_clv_picked_same_line": 0.0017998433491391297,
+  "clv_rows": 6,
+  "missing_close_rows": 2,
+  "missing_close_share": 0.08333333333333333,
+  "insufficient_close_data": false,
+  "moved_picked_directions": [
+   "ADVERSE",
+   "FAVORABLE"
+  ],
+  "moved_sign_test_p": 0.75,
+  "moved_rule1_triggered": false,
+  "moved_rule2_triggered": false,
+  "market_leg_pass_point_estimates": true,
+  "accuracy_spread": {
+   "point": -0.2250000000000001,
+   "ci_lower": -1.7333333333333332,
+   "ci_upper": 1.3666666666666665,
+   "level": 0.9958333333333333,
+   "reps": 10000,
+   "seed": 20261028,
+   "accuracy_leg_pass": false
+  },
+  "accuracy_total": {
+   "point": -1.5833333333333333,
+   "ci_lower": -2.7916666666666665,
+   "ci_upper": 0.2916666666666667,
+   "level": 0.9958333333333333,
+   "reps": 10000,
+   "seed": 20261028,
+   "accuracy_leg_pass": false
+  }
+ },
+ "team_totals": {
+  "rows_priced": 24,
+  "picked_rows": 7,
+  "roi_on_picked": 0.23376623376623376,
+  "mean_clv_picked_same_line": 0.014358523595812652,
+  "clv_rows": 6,
+  "missing_close_rows": 1,
+  "missing_close_share": 0.041666666666666664,
+  "insufficient_close_data": false,
+  "moved_picked_directions": [
+   "FAVORABLE"
+  ],
+  "moved_sign_test_p": 1.0,
+  "moved_rule1_triggered": false,
+  "moved_rule2_triggered": false,
+  "market_leg_pass_point_estimates": true,
+  "accuracy_team_points": {
+   "point": -0.4624999999999992,
+   "ci_lower": -1.495833333333333,
+   "ci_upper": 0.6250000000000012,
+   "level": 0.9958333333333333,
+   "reps": 10000,
+   "seed": 20261028,
+   "accuracy_leg_pass": false
+  }
+ },
+ "all_leg_quantities_computed": true
+}
