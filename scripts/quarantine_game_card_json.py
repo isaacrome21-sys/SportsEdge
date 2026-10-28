@@ -45,6 +45,12 @@ def sanitize_card(card):
     original_by_index = {}
     for row in originals:
         idx = _index(row, "GAME_EVALUATED_ROW")
+        # An index alone cannot authenticate the original fixture/selection.
+        # Do not let a detached display row supply identity missing in evidence.
+        for key in ("game", "selection"):
+            value = row.get(key)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError("GAME_EVALUATED_IDENTITY_INVALID:" + key)
         if idx in original_by_index:
             raise ValueError("GAME_EVALUATED_INPUT_INDEX_DUPLICATE")
         original_by_index[idx] = row
