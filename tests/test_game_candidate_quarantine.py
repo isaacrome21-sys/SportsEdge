@@ -97,5 +97,30 @@ class GameQuarantineTests(unittest.TestCase):
             self.assertEqual(bool(filtered["edges"]), not should_hold)
 
 
+    def test_one_extreme_copy_quarantines_all_surfaces_by_index(self):
+        # A clean-looking earlier list must not escape a later bad claim.
+        for first, second in (("edges", "lane_b_watchlist"),
+                              ("lane_b_watchlist", "edges")):
+            with self.subTest(first=first):
+                clean = self.row(.04, input_index=17)
+                extreme = self.row(2.818, input_index=17)
+                filtered, ledger = quarantine_game_surfaces({
+                    first: [deepcopy(clean)], second: [deepcopy(extreme)]
+                })
+                self.assertEqual(filtered[first], [])
+                self.assertEqual(filtered[second], [])
+                self.assertEqual(len(ledger), 1)
+                self.assertEqual(set(ledger[0]["source_surfaces"]),
+                                 {first, second})
+                self.assertEqual(ledger[0]["max_finite_claimed_ev"], 2.818)
+
+    def test_duplicate_clean_surface_index_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "DUPLICATE_INPUT_INDEX"):
+            quarantine_game_surfaces({"edges": [
+                self.row(.04, input_index=1), self.row(.03, input_index=1)
+            ]})
+
+
+
 if __name__ == "__main__":
     unittest.main()
