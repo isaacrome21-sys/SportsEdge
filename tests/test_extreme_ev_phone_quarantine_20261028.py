@@ -100,3 +100,24 @@ def test_below_quarantine_threshold_keeps_research_only_lean():
     selection = build_phone_card(card)["selections"][0]
     assert selection["status"] == "LEAN"
     assert selection["estimated_ev"] == pytest.approx(0.399)
+
+
+@pytest.mark.parametrize("hidden", [
+    {"raw_ev_per_dollar": 2.818},
+    {"reported_ev_per_dollar": 0.40},
+    {"pricing_lanes": {"lane_a_independent": {
+        "ev_per_dollar": 0.04, "reported_ev_per_dollar": 0.41}}},
+    {"independent_projection": {
+        "estimate_p": 0.52, "ev_per_dollar": 0.04,
+        "raw_ev_per_dollar": 2.818,
+        "paired_market_status": "EXACT_DK_TWO_SIDED_NO_VIG_RESEARCH"}},
+])
+def test_hidden_raw_or_reported_ev_alias_cannot_bypass_phone_quarantine(hidden):
+    # Synthetic adversarial input; no claim of real DK source provenance.
+    card = _card(probability=0.52, reported_ev=0.04, price=100)
+    card["evaluated_rows"][0].update(hidden)
+    assert build_phone_card(card)["selections"][0]["status"] == "QUARANTINED"
+    assert card["evaluated_rows"][0]["ev_per_dollar"] == 0.04
+    screens = build_current_value_screens(card, now=NOW)
+    assert screens["unverified_model_value_screens"] == []
+    assert screens["exclusions"]["EXTREME_CLAIMED_EV_QUARANTINE"] == 1
