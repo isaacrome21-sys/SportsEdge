@@ -420,6 +420,7 @@ def phone_nba_prop_rows(rows, *, now=None, store=None, store_dir=None,
             if target != start_local_date:
                 outputs.append(_blocked(row, family, TARGET_DATE_CONFLICT))
                 continue
+            date_conflict = False
             for date_key in ("game_date", "date"):
                 raw_date = row.get(date_key)
                 if raw_date is None or raw_date == "":
@@ -434,11 +435,10 @@ def phone_nba_prop_rows(rows, *, now=None, store=None, store_dir=None,
                     stated_date = (stated_instant.astimezone(_SLATE_TZ).date()
                                    if stated_instant is not None else None)
                 if stated_date != start_local_date:
-                    outputs.append(_blocked(row, family, TARGET_DATE_CONFLICT))
+                    date_conflict = True
                     break
-            else:
-                pass
-            if outputs and outputs[-1].get("blocker") == TARGET_DATE_CONFLICT:
+            if date_conflict:
+                outputs.append(_blocked(row, family, TARGET_DATE_CONFLICT))
                 continue
         # A caller-supplied book is only a research assertion, never provider
         # authentication. Never manufacture DraftKings attribution from absence.
