@@ -12,7 +12,7 @@ import pytest
 from sportsedge.nba_phone_prop_pricing import (
     QUOTE_PRICE_INVALID, QUOTE_PRICE_MISSING,
     QUOTE_TIMESTAMP_INVALID, QUOTE_TIMESTAMP_MISSING,
-    LINE_MISSING, _american_to_decimal, phone_nba_prop_rows,
+    LINE_MISSING, BOOK_UNVERIFIED, _american_to_decimal, phone_nba_prop_rows,
 )
 
 NOW = datetime(2026, 10, 28, 6, 0, tzinfo=timezone.utc)
@@ -51,7 +51,7 @@ def _row(**updates):
     row = {
         "sport": "NBA", "market": "PLAYER_POINTS",
         "player_name": "Test Guard", "side": "OVER",
-        "line": 19.5, "odds": -110,
+        "line": 19.5, "odds": -110, "book": "draftkings",
         "tipoff": "2026-11-01T20:00:00-05:00",
         "quote_captured_at": "2026-10-28T05:59:00+00:00",
     }
@@ -114,6 +114,35 @@ def test_nonfinite_or_boolean_line_refused_before_pricing(line):
     (out,), _ = phone_nba_prop_rows([_row(line=line)], now=NOW, store=store)
     assert out["blocker"] == LINE_MISSING
     assert store.price_calls == 0
+
+
+@pytest.mark.parametrize("line", [-1.5, -0.5, -1, "-100", float("-inf")])
+def test_negative_stat_lines_refused_before_model_price(line):
+    store = _Store()
+    (out,), _ = phone_nba_prop_rows([_row(line=line)], now=NOW, store=store)
+    assert out["status"] == "NO_MODEL_OR_MARKET"
+    assert out["blocker"] == LINE_MISSING
+    assert "model_p" not in out and "ev_per_dollar" not in out
+    assert store.price_calls == 0
+
+
+@pytest.mark.parametrize("book", [None, "", "   ", 0, False, [], {}])
+def test_missing_or_invalid_book_cannot_be_labeled_draftkings(book):
+    store = _Store()
+    (out,), _ = phone_nba_prop_rows([_row(book=book)], now=NOW, store=store)
+    assert out["status"] == "NO_MODEL_OR_MARKET"
+    assert out["blocker"] == BOOK_UNVERIFIED
+    assert "model_p" not in out and "ev_per_dollar" not in out
+    assert store.price_calls == 0
+
+
+def test_explicit_book_is_caller_assertion_not_provider_authentication():
+    store = _Store()
+    (out,), _ = phone_nba_prop_rows([_row(book=" FanDuel ")], now=NOW, store=store)
+    assert store.price_calls == 1
+    assert out["book"] == "FanDuel"
+    assert out["book_provenance"] == "CALLER_ASSERTED_NOT_AUTHENTICATED"
+    assert out["eligible"] is False and out["official_authority"] is False
 
 
 @pytest.mark.parametrize("odds", ["+110", -110, 100, "-100", " +105 "])
