@@ -1,0 +1,364 @@
+{
+ "screen": "CBB team totals \u2014 third leg of the CBB_TORVIK_EFFICIENCY_V1 design screen",
+ "design_reference": "PR #2843 CBB_TEAM_TOTALS_1H_DESIGN.md section 1; CBB_SIDES_TOTALS_DESIGN_AND_PREREG_DRAFT.md sections 1-3",
+ "evidence_class": "DESIGN EVIDENCE ONLY \u2014 not validation",
+ "family": "CBB team totals",
+ "verdict": "NOT_EXECUTABLE",
+ "refusal": {
+  "code": "AS_OF_PREMISE_FAILURE",
+  "detail": "The PR #2832 pinned Torvik archive files are end-of-day, not morning-of: the file for D already reflects games played on D, contradicting design section 1 and the admission's as-of rule 2. The team-totals leg reads the same expected team points from the same files, so the failure is identical for this family. No fitting or scoring was performed. Governed unblocks: a design amendment declaring the input convention (admission rule 4) with its own review, or an admitted genuinely morning-of source.",
+  "declared_witnesses": [
+   {
+    "case": "Duke record in the 2014-11-14 archive file",
+    "expected_if_morning_of": "0-0",
+    "observed": "1-0"
+   },
+   {
+    "case": "Kentucky record in the 2014-11-14 archive file",
+    "expected_if_morning_of": "0-0",
+    "observed": "1-0"
+   },
+   {
+    "case": "Wisconsin record in the 2014-11-14 archive file",
+    "expected_if_morning_of": "0-0",
+    "observed": "1-0"
+   },
+   {
+    "case": "Kansas record in the 2014-11-14 archive file",
+    "expected_if_morning_of": "0-0",
+    "observed": "1-0"
+   },
+   {
+    "case": "Michigan St. record in the 2014-11-14 archive file",
+    "expected_if_morning_of": "0-0",
+    "observed": "1-0"
+   },
+   {
+    "case": "North Carolina record in the 2014-11-14 archive file",
+    "expected_if_morning_of": "0-0",
+    "observed": "1-0"
+   },
+   {
+    "case": "UCLA record in the 2014-11-14 archive file",
+    "expected_if_morning_of": "0-0",
+    "observed": "1-0"
+   },
+   {
+    "case": "Purdue record in the 2023-03-12 archive file",
+    "expected_if_morning_of": "28-5",
+    "observed": "29-5"
+   },
+   {
+    "case": "Connecticut record in the 2023-04-03 archive file",
+    "expected_if_morning_of": "30-8",
+    "observed": "31-8"
+   },
+   {
+    "case": "San Diego St. record in the 2023-04-03 archive file",
+    "expected_if_morning_of": "32-6",
+    "observed": "32-7"
+   }
+  ],
+  "opening_day_audit": [
+   {
+    "season": "2014-15",
+    "opening_date": "2014-11-14",
+    "record_column": "record",
+    "teams_in_file": 351,
+    "teams_not_0_0": 226,
+    "examples": [
+     {
+      "team": "Air Force",
+      "record": "0-1"
+     },
+     {
+      "team": "Akron",
+      "record": "1-0"
+     },
+     {
+      "team": "Alabama",
+      "record": "1-0"
+     },
+     {
+      "team": "Alabama A&M",
+      "record": "0-1"
+     },
+     {
+      "team": "Alcorn St.",
+      "record": "0-1"
+     }
+    ],
+    "expected_if_morning_of": 0
+   },
+   {
+    "season": "2015-16",
+    "opening_date": "2015-11-13",
+    "record_column": "record",
+    "teams_in_file": 351,
+    "teams_not_0_0": 228,
+    "examples": [
+     {
+      "team": "Air Force",
+      "record": "0-1"
+     },
+     {
+      "team": "Alabama",
+      "record": "1-0"
+     },
+     {
+      "team": "Alabama A&M",
+      "record": "1-0"
+     },
+     {
+      "team": "Albany",
+      "record": "0-1"
+     },
+     {
+      "team": "American",
+      "record": "0-1"
+     }
+    ],
+    "expected_if_morning_of": 0
+   },
+   {
+    "season": "2016-17",
+    "opening_date": "2016-11-11",
+    "record_column": "record",
+    "teams_in_file": 351,
+    "teams_not_0_0": 226,
+    "examples": [
+     {
+      "team": "Alabama",
+      "record": "1-0"
+     },
+     {
+      "team": "Alabama A&M",
+      "record": "0-1"
+     },
+     {
+      "team": "Albany",
+      "record": "1-0"
+     },
+     {
+      "team": "Alcorn St.",
+      "record": "0-1"
+     },
+     {
+      "team": "American",
+      "record": "0-1"
+     }
+    ],
+    "expected_if_morning_of": 0
+   },
+   {
+    "season": "2017-18",
+    "opening_date": "2017-11-10",
+    "record_column": "record",
+    "teams_in_file": 351,
+    "teams_not_0_0": 230,
+    "examples": [
+     {
+      "team": "Alabama",
+      "record": "1-0"
+     },
+     {
+      "team": "Alabama St.",
+      "record": "0-1"
+     },
+     {
+      "team": "Albany",
+      "record": "1-0"
+     },
+     {
+      "team": "Alcorn St.",
+      "record": "0-1"
+     },
+     {
+      "team": "American",
+      "record": "0-1"
+     }
+    ],
+    "expected_if_morning_of": 0
+   },
+   {
+    "season": "2018-19",
+    "opening_date": "2018-11-06",
+    "record_column": "record",
+    "teams_in_file": 353,
+    "teams_not_0_0": 188,
+    "examples": [
+     {
+      "team": "Alabama",
+      "record": "1-0"
+     },
+     {
+      "team": "Alabama A&M",
+      "record": "0-1"
+     },
+     {
+      "team": "Alabama St.",
+      "record": "0-1"
+     },
+     {
+      "team": "Alcorn St.",
+      "record": "0-1"
+     },
+     {
+      "team": "Arizona St.",
+      "record": "1-0"
+     }
+    ],
+    "expected_if_morning_of": 0
+   },
+   {
+    "season": "2019-20",
+    "opening_date": "2019-11-05",
+    "record_column": "record",
+    "teams_in_file": 353,
+    "teams_not_0_0": 236,
+    "examples": [
+     {
+      "team": "Abilene Christian",
+      "record": "1-0"
+     },
+     {
+      "team": "Akron",
+      "record": "1-0"
+     },
+     {
+      "team": "Alabama",
+      "record": "0-1"
+     },
+     {
+      "team": "Alabama A&M",
+      "record": "0-1"
+     },
+     {
+      "team": "Alabama St.",
+      "record": "0-1"
+     }
+    ],
+    "expected_if_morning_of": 0
+   },
+   {
+    "season": "2020-21",
+    "opening_date": "2020-11-25",
+    "record_column": "record",
+    "teams_in_file": 347,
+    "teams_not_0_0": 186,
+    "examples": [
+     {
+      "team": "Abilene Christian",
+      "record": "1-0"
+     },
+     {
+      "team": "Alabama",
+      "record": "1-0"
+     },
+     {
+      "team": "Alcorn St.",
+      "record": "0-1"
+     },
+     {
+      "team": "Appalachian St.",
+      "record": "1-0"
+     },
+     {
+      "team": "Arizona St.",
+      "record": "1-0"
+     }
+    ],
+    "expected_if_morning_of": 0
+   },
+   {
+    "season": "2021-22",
+    "opening_date": "2021-11-09",
+    "record_column": "record",
+    "teams_in_file": 358,
+    "teams_not_0_0": 304,
+    "examples": [
+     {
+      "team": "Abilene Christian",
+      "record": "0-1"
+     },
+     {
+      "team": "Akron",
+      "record": "0-1"
+     },
+     {
+      "team": "Alabama",
+      "record": "1-0"
+     },
+     {
+      "team": "Alabama A&M",
+      "record": "1-0"
+     },
+     {
+      "team": "Alabama St.",
+      "record": "0-1"
+     }
+    ],
+    "expected_if_morning_of": 0
+   },
+   {
+    "season": "2022-23",
+    "opening_date": "2022-11-07",
+    "record_column": "rec",
+    "teams_in_file": 363,
+    "teams_not_0_0": 326,
+    "examples": [
+     {
+      "team": "Gonzaga",
+      "record": "1-0"
+     },
+     {
+      "team": "Baylor",
+      "record": "1-0"
+     },
+     {
+      "team": "Duke",
+      "record": "1-0"
+     },
+     {
+      "team": "Tennessee",
+      "record": "1-0"
+     },
+     {
+      "team": "Houston",
+      "record": "1-0"
+     }
+    ],
+    "expected_if_morning_of": 0
+   }
+  ]
+ },
+ "pins": {
+  "torvik": "PR #2832 pinned commit 46d1036443ca452fdd1c6cf25cf5dff50de68337 (admission samples re-verified byte-identical before use)",
+  "hoopr": "PR #2867 successor manifest (18/18 assets hash-verified before use)",
+  "cbr": "PR #2871 successor manifest (6/6 files hash + size + git-blob verified before use; admitted scopes only)"
+ },
+ "pin_verification_counts": {
+  "hoopr_assets_verified": 18,
+  "cbr_files_verified": 6,
+  "torvik_admission_samples_verified": 2
+ },
+ "criteria": {
+  "team_points_vs_naive_team_mean": {
+   "result": "NOT_RUN",
+   "reason": "AS_OF_PREMISE_FAILURE \u2014 scoring refused before any fitting"
+  },
+  "team_points_vs_simple_ratings_baseline": {
+   "result": "NOT_RUN",
+   "reason": "AS_OF_PREMISE_FAILURE \u2014 scoring refused before any fitting"
+  }
+ },
+ "first_half": {
+  "family": "CBB first-half lines (1H spread / 1H total)",
+  "verdict": "NOT_EXECUTABLE",
+  "refusal": {
+   "code": "PBP_PREREQUISITE_MISSING",
+   "detail": "CBB_TEAM_TOTALS_1H_DESIGN.md section 2 names the prerequisite: hoopR play-by-play release assets (load_mbb_pbp family) pinned by the full-tuple rule of draft PR #2835 WITH schema verification. No such manifest exists in the repo (scan of research/**/*manifest*.json samples: no PBP asset pinned). Until it lands, the first-half share cannot be fitted and 1H is not screenable. No share is borrowed from the NBA fit, from a rule of thumb, or from halving final scores."
+  }
+ },
+ "market_baseline_note": "The design names no market baseline for this family's design screen; the market leg (CLV/ROI vs forward DK captures) is a forward term gated on a freeze that does not exist."
+}
