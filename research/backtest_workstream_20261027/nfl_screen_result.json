@@ -1,0 +1,119 @@
+{
+ "hfa_fitted": 1.4863709246392303,
+ "beta_rest_fitted": 0.20319242086599587,
+ "qb_delta_home": {
+  "BACKUP_WITH_PRIOR_STARTS": -3.7970910842765777,
+  "BACKUP_NO_PRIOR_STARTS": 0.5291990471587891
+ },
+ "qb_delta_away_margin_coef": {
+  "BACKUP_WITH_PRIOR_STARTS": 3.8736522339831216,
+  "BACKUP_NO_PRIOR_STARTS": 4.0
+ },
+ "weather": {
+  "wind_ge_15": -4.635495381276739,
+  "temp_le_32": 0.7985121063986937
+ },
+ "n_predictions": 1517,
+ "seasons": [
+  2020,
+  2021,
+  2022,
+  2023,
+  2024,
+  2025
+ ],
+ "markets": {
+  "spread": {
+   "n": 1517,
+   "sigma_fitted": 12.686955731859774,
+   "mae_close": 9.796967699406723,
+   "mae_raw": 10.703733354136013,
+   "mae_anchored": 9.822231684826347,
+   "bands": [
+    {
+     "band": "0-1",
+     "n": 277,
+     "n_graded": 269,
+     "mean_stated": 0.502292937663969,
+     "realized_cover": 0.4684014869888476,
+     "overstate_pp": 3.389145067512139
+    },
+    {
+     "band": "1-2",
+     "n": 234,
+     "n_graded": 229,
+     "mean_stated": 0.5071459063183431,
+     "realized_cover": 0.5283842794759825,
+     "overstate_pp": -2.1238373157639434
+    },
+    {
+     "band": "2-3",
+     "n": 203,
+     "n_graded": 195,
+     "mean_stated": 0.5117794639636415,
+     "realized_cover": 0.4256410256410256,
+     "overstate_pp": 8.613843832261587
+    },
+    {
+     "band": "3-4",
+     "n": 803,
+     "n_graded": 791,
+     "mean_stated": 0.5182958646678921,
+     "realized_cover": 0.4829329962073325,
+     "overstate_pp": 3.5362868460559636
+    }
+   ],
+   "screen1_mae_pass": false,
+   "screen2_calibration_pass": false,
+   "screen3_rising_cover_pass": false,
+   "screen3_note": "all 4 bands populated n>=20",
+   "verdict": "FAILED_SCREEN"
+  },
+  "total": {
+   "n": 1517,
+   "sigma_fitted": 13.102846233674684,
+   "mae_close": 10.298286090969018,
+   "mae_raw": 10.966243468791754,
+   "mae_anchored": 10.30234027225713,
+   "bands": [
+    {
+     "band": "0-1",
+     "n": 268,
+     "n_graded": 267,
+     "mean_stated": 0.5024582490710937,
+     "realized_cover": 0.5393258426966292,
+     "overstate_pp": -3.686759362553549
+    },
+    {
+     "band": "1-2",
+     "n": 269,
+     "n_graded": 264,
+     "mean_stated": 0.5067762694849807,
+     "realized_cover": 0.4393939393939394,
+     "overstate_pp": 6.738233009104127
+    },
+    {
+     "band": "2-3",
+     "n": 251,
+     "n_graded": 251,
+     "mean_stated": 0.5114175817379183,
+     "realized_cover": 0.49800796812749004,
+     "overstate_pp": 1.340961361042825
+    },
+    {
+     "band": "3-4",
+     "n": 729,
+     "n_graded": 719,
+     "mean_stated": 0.517707189169398,
+     "realized_cover": 0.5118219749652295,
+     "overstate_pp": 0.5885214204168432
+    }
+   ],
+   "screen1_mae_pass": false,
+   "screen2_calibration_pass": true,
+   "screen3_rising_cover_pass": false,
+   "screen3_note": "all 4 bands populated n>=20",
+   "verdict": "FAILED_SCREEN"
+  }
+ }
+}
