@@ -1,0 +1,137 @@
+{
+  "check": "LANDING_CHECK \u2014 NON_COUNTED, BUILD_STAGE",
+  "construction_id": "NHL_ATTEMPT2_V1",
+  "counted": false,
+  "frozen": false,
+  "frozen_path": "NHL_ATTEMPT2_NOT_FROZEN",
+  "pin_verification": [
+    {
+      "status": "PIN_MATCH",
+      "stored_as": "season_skaters_2026.zip"
+    },
+    {
+      "status": "PIN_MATCH",
+      "stored_as": "season_skaters_2025.zip"
+    },
+    {
+      "status": "PIN_MATCH",
+      "stored_as": "season_goalies_2026.zip"
+    },
+    {
+      "status": "PIN_MATCH",
+      "stored_as": "season_goalies_2025.zip"
+    },
+    {
+      "status": "PIN_MATCH",
+      "stored_as": "all_teams.csv"
+    },
+    {
+      "status": "PIN_MATCH",
+      "stored_as": "MoneyPuckDataDictionaryForPlayers.csv"
+    }
+  ],
+  "play_eligible": false,
+  "slate_20261026": {
+    "feature_window": "regular season, gameDate >= 20261008, strictly before 20261026",
+    "games": [
+      {
+        "away_games_used": 9,
+        "counted": false,
+        "degraded_goalie_blend": true,
+        "frozen": false,
+        "home_games_used": 7,
+        "matchup": "TOR @ CGY",
+        "mu_away": 3.2824,
+        "mu_home": 3.0208,
+        "p_away_ml": 0.5407,
+        "p_away_puck_line_plus15": 0.7636,
+        "p_away_reg_win": 0.4599,
+        "p_home_ml": 0.4593,
+        "p_home_puck_line_minus15": 0.2364,
+        "p_home_reg_win": 0.3785,
+        "p_reg_tie": 0.1616,
+        "total_5_5": {
+          "over": 0.6017,
+          "under": 0.3983
+        },
+        "total_6_5": {
+          "over": 0.4671,
+          "under": 0.5329
+        }
+      },
+      {
+        "away_games_used": 8,
+        "counted": false,
+        "degraded_goalie_blend": true,
+        "frozen": false,
+        "home_games_used": 7,
+        "matchup": "DET @ EDM",
+        "mu_away": 3.2347,
+        "mu_home": 2.9702,
+        "p_away_ml": 0.5414,
+        "p_away_puck_line_plus15": 0.7657,
+        "p_away_reg_win": 0.4599,
+        "p_home_ml": 0.4586,
+        "p_home_puck_line_minus15": 0.2343,
+        "p_home_reg_win": 0.3772,
+        "p_reg_tie": 0.1629,
+        "total_5_5": {
+          "over": 0.5866,
+          "under": 0.4134
+        },
+        "total_6_5": {
+          "over": 0.4514,
+          "under": 0.5486
+        }
+      },
+      {
+        "away_games_used": 6,
+        "counted": false,
+        "degraded_goalie_blend": true,
+        "frozen": false,
+        "home_games_used": 8,
+        "matchup": "LAK @ NYR",
+        "mu_away": 3.1972,
+        "mu_home": 2.8457,
+        "p_away_ml": 0.5557,
+        "p_away_puck_line_plus15": 0.7796,
+        "p_away_reg_win": 0.4734,
+        "p_home_ml": 0.4443,
+        "p_home_puck_line_minus15": 0.2204,
+        "p_home_reg_win": 0.3621,
+        "p_reg_tie": 0.1645,
+        "total_5_5": {
+          "over": 0.5612,
+          "under": 0.4388
+        },
+        "total_6_5": {
+          "over": 0.4254,
+          "under": 0.5746
+        }
+      }
+    ],
+    "parameters": "BUILD-STAGE ILLUSTRATIVE \u2014 half_life 20 games, shrinkage K 10 games, goalie K 5 games, phi = build fit, OT shares = neutral placeholders; NOT FROZEN, NOT THE PRICING PATH"
+  },
+  "strictly_prior_parity_ANA_20261020": {
+    "admission_demonstration": {
+      "games_used": 8,
+      "max_gameDate_used": 20261019,
+      "xGoalsAgainst_sum": 27.884,
+      "xGoalsFor_sum": 25.708
+    },
+    "games_used": 8,
+    "match": true,
+    "max_gameDate_used": 20261019,
+    "xGoalsAgainst_sum": 27.884,
+    "xGoalsFor_sum": 25.708
+  },
+  "validation_credit": false,
+  "verdict": "LANDING CHECK COMPLETE \u2014 machinery runs end-to-end on pinned data; nothing counted",
+  "vintage_enforcement": {
+    "declared_treatment": {
+      "rows_used": 368,
+      "vintage_excluded_rows": 2788
+    },
+    "no_treatment": "XG_VINTAGE_POOLING_REFUSED"
+  }
+}
