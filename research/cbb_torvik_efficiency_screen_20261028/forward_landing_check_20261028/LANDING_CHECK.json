@@ -1,0 +1,124 @@
+{
+ "family": "CBB_TORVIK_EFFICIENCY_V1",
+ "check": "NON_COUNTED forward landing check (F-1)",
+ "assertions": [
+  {
+   "name": "vintage league means equal archive parse (2023-02-25)",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "no refusals on the landing slate (2023-02-25)",
+   "ok": true,
+   "detail": "[]"
+  },
+  {
+   "name": "2 records per game (2023-02-25)",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "every record NON_COUNTED (2023-02-25)",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "Illinois game excluded",
+   "ok": true,
+   "detail": "[{'espn_event_id': 'landing-il-demo', 'market': None, 'reason': 'ILLINOIS_COLLEGE_EXCLUDED'}]"
+  },
+  {
+   "name": "vintage league means equal archive parse (2023-03-12)",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "no refusals on the landing slate (2023-03-12)",
+   "ok": true,
+   "detail": "[]"
+  },
+  {
+   "name": "2 records per game (2023-03-12)",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "every record NON_COUNTED (2023-03-12)",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "construction equivalence: expected points exact on every game",
+   "ok": true,
+   "detail": "{'games': 12, 'points_exact': 12, 'totals_exact': 12, 'margins_exact_forward_hc': 12}"
+  },
+  {
+   "name": "construction equivalence: totals exact on every game",
+   "ok": true,
+   "detail": "{'games': 12, 'points_exact': 12, 'totals_exact': 12, 'margins_exact_forward_hc': 12}"
+  },
+  {
+   "name": "construction equivalence: margins exact under the forward home-court constant",
+   "ok": true,
+   "detail": "{'games': 12, 'points_exact': 12, 'totals_exact': 12, 'margins_exact_forward_hc': 12}"
+  },
+  {
+   "name": "baseline fixed constant equals the published screen value",
+   "ok": true,
+   "detail": "3.3756023216238145"
+  },
+  {
+   "name": "counted refusal: price_slate counted=True",
+   "ok": true,
+   "detail": "CBB_EFFICIENCY_FORWARD_NOT_FROZEN"
+  },
+  {
+   "name": "counted refusal: run_forward_test",
+   "ok": true,
+   "detail": "CBB_EFFICIENCY_FORWARD_NOT_FROZEN"
+  },
+  {
+   "name": "R-1 missing vintage refuses (real store)",
+   "ok": true,
+   "detail": "TORVIK_VINTAGE_MISSING"
+  },
+  {
+   "name": "R-1 positive control: the real 2026-10-28 morning-of vintage loads",
+   "ok": true,
+   "detail": "365"
+  },
+  {
+   "name": "R-1 late-pull vintage refuses",
+   "ok": true,
+   "detail": "TORVIK_VINTAGE_LATE_PULL"
+  },
+  {
+   "name": "re-run reproduces the committed sample byte-identically",
+   "ok": true,
+   "detail": ""
+  }
+ ],
+ "pins_verified": {
+  "construction_of_record_sha256": "75479ea14b2ab4ef954bd4cde629a2d00e24efea173ac61c695482890dd4c45e",
+  "design_sha256": "cacbee09e1ea53c68888e5b7be3c2d61cd99def6eaba9980c0236e89daccb2fd",
+  "amendment_1_sha256": "c3ef6f8235cf7f996f8daf7199fe4f89a78a4ec39bfe26719e644b50d54230c0",
+  "crosswalk_sha256": "6cf6b033e5bc208d4bb65e52064aa1afa4468b12386e5dc7f547f7ebcfaf9096",
+  "capture_scope_sha256": "22c8f6773a6357e2b3282ff310b8f83d9ce79017e6adbda76d629302e9b23753",
+  "prereg_final_sha256": "9481d7d75699241223b0ebce1966d497820d2d05ce1ada74825b06905af3a2ac",
+  "shared_construction_module_sha256": "44fc65926991631d45ce96f1b8dee260e223654d0f1f1c129d36c8385b3d7fec",
+  "runner_sha256": "3bc52916cc70380994b7a34d405c952f9fa0fbae753c82573275e00db5f8f859"
+ },
+ "equivalence": {
+  "games": 12,
+  "points_exact": 12,
+  "totals_exact": 12,
+  "margins_exact_forward_hc": 12
+ },
+ "home_court_forward": 3.260655725219634,
+ "home_court_forward_provenance": "walk-forward mean of (actual margin - neutral candidate margin) over the agreed non-neutral fixtures of all admitted archive seasons 2014-15..2022-23 (26,553 agreed fixtures); candidate term fit on strictly-prior seasons per design section 3; baseline constant is the same estimator over the 2014-15 window only, carried forward unchanged from the screen of record",
+ "home_court_2023_published": 3.2501022398177666,
+ "records_file_state": "preexisting_identical",
+ "records_written": 24,
+ "records_file": "entry_records_sample.jsonl",
+ "verdict": "LANDING CHECK PASS (NON_COUNTED)"
+}
