@@ -1,0 +1,255 @@
+{
+ "source_id": "CBR_SCHEDULE_MIRROR_MATTWAITE_V1",
+ "sport": "CBB",
+ "status": "SAMPLE_VERIFIED_ADMISSION_PROPOSED_DESIGN_ONLY",
+ "design_only": true,
+ "validation_credit": false,
+ "forward_clock_credit": false,
+ "play_eligible": false,
+ "retrieved_at_utc": "2026-10-28T11:27:11Z",
+ "successor_to": "research/cbb_hoopr_mbb_schedule_successor_20261028/successor_manifest.json (PR #2867), whose cbr_leg recorded the College Basketball Reference leg as REFUSED_HTTP_403_NOT_PINNED; this manifest is the successor record that pins that leg from a lawful mirror, as PR #2867 section 5 anticipated ('a later, separate record once a lawful pull succeeds')",
+ "provider": {
+  "repo": "mattwaite/mattwaite.github.io",
+  "default_branch": "master",
+  "commit_sha": "48e22e1c5f39b47425aa64f8fc98112974b5a8c0",
+  "license": "NONE ASSERTED \u2014 no LICENSE file in the repo and no Sports Reference authorization is claimed by the mirror or by this record. Consumption here is factual game data only (dates, opponents, final scores \u2014 facts, not creative expression), read-only, for internal verification; the bytes are never redistributed (this repo stores hashes, manifests and code only).",
+  "provenance_chain": "College Basketball Reference (sports-reference.com/cbb) team game-log tables -> LogScraperScript.R (the repo's own 'CBB team game log scraper', documented in the same repo's sports-data-catalog.html with source sports-reference.com/cbb, method 'HTML table scraping') -> per-season logs{year}.csv committed in this repo under sportsdatafiles/. In-data provenance: every per-season row carries CBR's own school-page URL (/cbb/schools/<slug>/men/<year>.html) and CBR's signature SRS/SOS columns.",
+  "pull_route": "raw.githubusercontent.com at the pinned commit SHA (commit-addressed, not branch-addressed)"
+ },
+ "pin_rule": "repo + commit SHA + path + git blob SHA + asset size + SHA-256 of the pulled bytes, recorded in this manifest together with the pull timestamp (retrieved_at_utc). Unlike the PR #2867 rolling release, this pin is COMMIT-ANCHORED: the raw URLs are addressed by the full commit SHA, so upstream bytes cannot drift under the pin without the commit changing; the committed pull script re-downloads at the pinned commit and refuses any size/hash/blob drift as SOURCE_CHANGED_AFTER_SNAPSHOT. Scope discipline: logs1520.csv is admitted for 2014-15 -> 2017-18 ONLY (see its excluded_rows_in_file); the merged cbblogs1521.csv / cbblogs1522.csv composites are NOT admitted (rejected_sources).",
+ "samples": [
+  {
+   "file_name": "logs1520.csv",
+   "path": "sportsdatafiles/logs1520.csv",
+   "admitted_seasons": [
+    2015,
+    2016,
+    2017,
+    2018
+   ],
+   "admitted_season_labels": [
+    "2014-15",
+    "2015-16",
+    "2016-17",
+    "2017-18"
+   ],
+   "team_rows_by_season": {
+    "2014-2015": {
+     "team_rows": 11431,
+     "date_min": "2014-11-14",
+     "date_max": "2015-04-06"
+    },
+    "2015-2016": {
+     "team_rows": 11468,
+     "date_min": "2015-11-13",
+     "date_max": "2016-04-04"
+    },
+    "2016-2017": {
+     "team_rows": 11511,
+     "date_min": "2016-11-11",
+     "date_max": "2017-04-03"
+    },
+    "2017-2018": {
+     "team_rows": 11544,
+     "date_min": "2017-11-10",
+     "date_max": "2018-04-02"
+    }
+   },
+   "team_rows_total_file": 68617,
+   "excluded_rows_in_file": {
+    "2018-2019": {
+     "team_rows": 11566,
+     "date_min": "2018-11-06",
+     "date_max": "2019-03-24"
+    },
+    "2019-2020": {
+     "team_rows": 11097,
+     "date_min": "2019-11-05",
+     "date_max": "2020-03-11"
+    },
+    "exclusion_reason": "2018-19 rows are INCOMPLETE (stop 2019-03-24, late tournament missing) and 2019-20 rows duplicate the logs20.csv season (whose count differs by 2 rows: 11,095 vs 11,097 here); both seasons are admitted from their per-season files instead. Reading logs1520.csv outside its admitted seasons is off-pin."
+   },
+   "schema_note": "Merged-era schema: Team carries the full mascot name (e.g. 'Kentucky Wildcats'), Opponent the short school form (e.g. 'UNC'); season column is lowercase 'season' with 'YYYY-YYYY' values; no URL column.",
+   "repo": "mattwaite/mattwaite.github.io",
+   "commit_sha": "48e22e1c5f39b47425aa64f8fc98112974b5a8c0",
+   "url": "https://raw.githubusercontent.com/mattwaite/mattwaite.github.io/48e22e1c5f39b47425aa64f8fc98112974b5a8c0/sportsdatafiles/logs1520.csv",
+   "evidence_state": "verified-by-pull",
+   "pin_status": "PINNED",
+   "content_check": "verified-by-pull: sha256 + git blob SHA + size all reproduce the source-hunt report values exactly (6/6 PIN_MATCH at successor pull); season row counts and date ranges as recorded in team_rows_by_season",
+   "sha256": "17d2e61d32880005238c55bdd6dfcf3807950195844f25bb094d2872d302b3f9",
+   "git_blob_sha": "97bffa2570c18163488bde0306acfa737210befe",
+   "bytes": 12681623,
+   "last_touch_commit": "c1e6fb8569f9 (2020-12-28)"
+  },
+  {
+   "file_name": "logs19.csv",
+   "path": "sportsdatafiles/logs19.csv",
+   "admitted_seasons": [
+    2019
+   ],
+   "admitted_season_labels": [
+    "2018-19"
+   ],
+   "team_rows_by_season": {
+    "2018-2019": {
+     "team_rows": 11652,
+     "date_min": "2018-11-06",
+     "date_max": "2019-04-08"
+    }
+   },
+   "team_rows_total_file": 11652,
+   "schema_note": "Per-season schema: Team is the school name, TeamFull the mascot name, URL carries the CBR school slug (/cbb/schools/<slug>/men/<year>.html); Opponent uses school names with display variants (e.g. 'UNC', 'UConn').",
+   "repo": "mattwaite/mattwaite.github.io",
+   "commit_sha": "48e22e1c5f39b47425aa64f8fc98112974b5a8c0",
+   "url": "https://raw.githubusercontent.com/mattwaite/mattwaite.github.io/48e22e1c5f39b47425aa64f8fc98112974b5a8c0/sportsdatafiles/logs19.csv",
+   "evidence_state": "verified-by-pull",
+   "pin_status": "PINNED",
+   "content_check": "verified-by-pull: sha256 + git blob SHA + size all reproduce the source-hunt report values exactly (6/6 PIN_MATCH at successor pull); season row counts and date ranges as recorded in team_rows_by_season",
+   "sha256": "d5035f37789d4a0b556cdb6824efa344db296ebc0e1248936ebf5cc5010ca4ff",
+   "git_blob_sha": "ba46cdd5c3c38ca793f8413dc6d6f387128af8ca",
+   "bytes": 2914156,
+   "last_touch_commit": "f9b754fea0a5 (2024-04-10)"
+  },
+  {
+   "file_name": "logs20.csv",
+   "path": "sportsdatafiles/logs20.csv",
+   "admitted_seasons": [
+    2020
+   ],
+   "admitted_season_labels": [
+    "2019-20"
+   ],
+   "team_rows_by_season": {
+    "2019-2020": {
+     "team_rows": 11095,
+     "date_min": "2019-11-05",
+     "date_max": "2020-03-11"
+    }
+   },
+   "team_rows_total_file": 11095,
+   "schema_note": "Per-season schema: Team is the school name, TeamFull the mascot name, URL carries the CBR school slug (/cbb/schools/<slug>/men/<year>.html); Opponent uses school names with display variants (e.g. 'UNC', 'UConn').",
+   "repo": "mattwaite/mattwaite.github.io",
+   "commit_sha": "48e22e1c5f39b47425aa64f8fc98112974b5a8c0",
+   "url": "https://raw.githubusercontent.com/mattwaite/mattwaite.github.io/48e22e1c5f39b47425aa64f8fc98112974b5a8c0/sportsdatafiles/logs20.csv",
+   "evidence_state": "verified-by-pull",
+   "pin_status": "PINNED",
+   "content_check": "verified-by-pull: sha256 + git blob SHA + size all reproduce the source-hunt report values exactly (6/6 PIN_MATCH at successor pull); season row counts and date ranges as recorded in team_rows_by_season",
+   "sha256": "42ae4ab716aff6e04279c4b6f9ba9fba6fc681fa65694f6c8b1ce7868bfba4ff",
+   "git_blob_sha": "66bf0d6bf2dfdf71117a793d52bcb8f2649e7a84",
+   "bytes": 2770086,
+   "last_touch_commit": "5ee4aaadf321 (2024-04-10)"
+  },
+  {
+   "file_name": "logs21.csv",
+   "path": "sportsdatafiles/logs21.csv",
+   "admitted_seasons": [
+    2021
+   ],
+   "admitted_season_labels": [
+    "2020-21"
+   ],
+   "team_rows_by_season": {
+    "2020-2021": {
+     "team_rows": 8229,
+     "date_min": "2020-11-25",
+     "date_max": "2021-04-05"
+    }
+   },
+   "team_rows_total_file": 8229,
+   "schema_note": "Per-season schema: Team is the school name, TeamFull the mascot name, URL carries the CBR school slug (/cbb/schools/<slug>/men/<year>.html); Opponent uses school names with display variants (e.g. 'UNC', 'UConn').",
+   "repo": "mattwaite/mattwaite.github.io",
+   "commit_sha": "48e22e1c5f39b47425aa64f8fc98112974b5a8c0",
+   "url": "https://raw.githubusercontent.com/mattwaite/mattwaite.github.io/48e22e1c5f39b47425aa64f8fc98112974b5a8c0/sportsdatafiles/logs21.csv",
+   "evidence_state": "verified-by-pull",
+   "pin_status": "PINNED",
+   "content_check": "verified-by-pull: sha256 + git blob SHA + size all reproduce the source-hunt report values exactly (6/6 PIN_MATCH at successor pull); season row counts and date ranges as recorded in team_rows_by_season",
+   "sha256": "5cf27d1db16aa35d5ab42e268ebe3c6ec3610ae8970fa42e7d096c24724321d0",
+   "git_blob_sha": "38adba0fa6980b03c46600d8a88d844357a0e691",
+   "bytes": 2031033,
+   "last_touch_commit": "08c3fe1c15bb (2021-08-30)"
+  },
+  {
+   "file_name": "logs22.csv",
+   "path": "sportsdatafiles/logs22.csv",
+   "admitted_seasons": [
+    2022
+   ],
+   "admitted_season_labels": [
+    "2021-22"
+   ],
+   "team_rows_by_season": {
+    "2021-2022": {
+     "team_rows": 11443,
+     "date_min": "2021-11-09",
+     "date_max": "2022-04-04"
+    }
+   },
+   "team_rows_total_file": 11443,
+   "schema_note": "Per-season schema: Team is the school name, TeamFull the mascot name, URL carries the CBR school slug (/cbb/schools/<slug>/men/<year>.html); Opponent uses school names with display variants (e.g. 'UNC', 'UConn').",
+   "repo": "mattwaite/mattwaite.github.io",
+   "commit_sha": "48e22e1c5f39b47425aa64f8fc98112974b5a8c0",
+   "url": "https://raw.githubusercontent.com/mattwaite/mattwaite.github.io/48e22e1c5f39b47425aa64f8fc98112974b5a8c0/sportsdatafiles/logs22.csv",
+   "evidence_state": "verified-by-pull",
+   "pin_status": "PINNED",
+   "content_check": "verified-by-pull: sha256 + git blob SHA + size all reproduce the source-hunt report values exactly (6/6 PIN_MATCH at successor pull); season row counts and date ranges as recorded in team_rows_by_season",
+   "sha256": "1117fe9f97989e9c7012edc9083bdfa1746f94f63f29437e1c095768010c8108",
+   "git_blob_sha": "200094f671d73a4d393803cd2fd6147018ecdc66",
+   "bytes": 2854222,
+   "last_touch_commit": "29dc45bb4542 (2024-04-10)"
+  },
+  {
+   "file_name": "logs23.csv",
+   "path": "sportsdatafiles/logs23.csv",
+   "admitted_seasons": [
+    2023
+   ],
+   "admitted_season_labels": [
+    "2022-23"
+   ],
+   "team_rows_by_season": {
+    "2022-2023": {
+     "team_rows": 11995,
+     "date_min": "2022-11-07",
+     "date_max": "2023-04-03"
+    }
+   },
+   "team_rows_total_file": 11995,
+   "schema_note": "Per-season schema: Team is the school name, TeamFull the mascot name, URL carries the CBR school slug (/cbb/schools/<slug>/men/<year>.html); Opponent uses school names with display variants (e.g. 'UNC', 'UConn').",
+   "repo": "mattwaite/mattwaite.github.io",
+   "commit_sha": "48e22e1c5f39b47425aa64f8fc98112974b5a8c0",
+   "url": "https://raw.githubusercontent.com/mattwaite/mattwaite.github.io/48e22e1c5f39b47425aa64f8fc98112974b5a8c0/sportsdatafiles/logs23.csv",
+   "evidence_state": "verified-by-pull",
+   "pin_status": "PINNED",
+   "content_check": "verified-by-pull: sha256 + git blob SHA + size all reproduce the source-hunt report values exactly (6/6 PIN_MATCH at successor pull); season row counts and date ranges as recorded in team_rows_by_season",
+   "sha256": "eb1d2cac051d21b52068441313ddc6506135c6086e57079b95132f2b7f141aa6",
+   "git_blob_sha": "a3e25cecb6726b5c9422f7b35ccef808eb2cb682",
+   "bytes": 3008747,
+   "last_touch_commit": "08cffb54e196 (2023-08-03)"
+  }
+ ],
+ "rejected_sources": [
+  {
+   "file_name": "cbblogs1521.csv / cbblogs1522.csv (same repo)",
+   "status": "NOT_ADMITTED",
+   "reason": "Inconsistent composites (source hunt, verified against the repo's own BasketballLogsMerge.Rmd description): their 2014-15 -> 2017-18 portions hold only ~9,058-9,168 team-rows per season vs ~11.4-11.5k in logs1520.csv, and cbblogs1522's 2021-22 portion ends 2022-03-06, before the conference tournaments. Useful only as a cross-check of the merges' existence."
+  },
+  {
+   "file_name": "sports-reference.com season schedule pages",
+   "status": "REFUSED_HTTP_403_NOT_PINNED",
+   "reason": "Direct pull refused under Sports Reference bot policy (PR #2867 cbr_leg, 2026-10-28T10:43:44Z). No circumvention attempted or proposed; the mirror above is the lawful route this record takes instead. No request to sports-reference.com was made for this admission."
+  }
+ ],
+ "satisfies": {
+  "pr_2866_precondition_c_cbr_leg": "YES \u2014 on merge of this PR. The CBR season-schedule leg of the design section 2 three-way fixture agreement is pinned here by full tuple from a lawful, provenance-documented mirror, so precondition (c) of the CBB_TORVIK_EFFICIENCY_V1 design screen (PR #2843 section 3; records PR #2866 and PR #2870) is SATISFIABLE and the section 3 screen may run exactly as designed, reading the CBR leg from these pinned bytes under source_id CBR_SCHEDULE_MIRROR_MATTWAITE_V1 with the design's SCHEDULE_DISCREPANCY logging unchanged.",
+  "three_way_proof": "derive_three_way_proof.py + three_way_proof_result.json in this packet: fixtures derived from the pinned CBR bytes (mirror-deduped) agree three ways on a declared 27-fixture sample (every season: championship game + early/mid probe-date fixtures; 2019-20 substitutes a late-probe fixture \u2014 no championship game exists, COVID-19 cancellation). Result at admission (verified-by-pull): 27/27 AGREE, 0 SCHEDULE_DISCREPANCY; the derivation paired 48,155 fixtures across the nine seasons with 0 mirror-inconsistent pairs; every input byte stream was hash-verified against its pin (this manifest for CBR, PR #2867's for hoopR) before use, and each Torvik morning-of file sits at the PR #2832 pinned commit."
+ },
+ "crosswalk_status": "OPEN_NOT_ADMITTED",
+ "identity_note": "Unchanged from PR #2835 / PR #2867: the ESPN/Torvik/NCAA identity crosswalk is OPEN and NOT admitted. This manifest pins CBR-mirror bytes only. The design screen's own audited, design-evidence-only name-join (PR #2843 section 2) remains the only expedient; the proof's normalization (CBR school slugs + the published NORMALIZATION_OVERRIDES table + published mirror-inference resolutions) is part of that expedient and admits no identity mapping.",
+ "known_limitations": [
+  "ROW UNIT: each CBR file logs one row per team per game (~2 rows per D1-vs-D1 fixture, 1 row when the opponent is non-D1). Fixtures must be derived by mirror dedupe before any agreement check; raw counts are team-rows, not games.",
+  "NAME VARIANTS exist inside CBR itself ('UNC' vs 'North Carolina', 'Connecticut' vs hoopR's 'UConn') and logs1520.csv uses full mascot names in its Team column where the per-season files use school names. The proof's normalization is explicit and table-driven (NORMALIZATION_OVERRIDES in derive_three_way_proof.py, ~40 entries, published in three_way_proof_result.json); surfaces resolved by mirror inference are published per season in the same result file.",
+  "AUTHORIZATION: the mirror asserts no license and no Sports Reference authorization; it is a university professor's long-standing public teaching dataset (last-touch commits 2020-12-28 -> 2024-04-10). This record's posture: factual game data (dates, teams, scores), read-only, internal verification only, hash-pinned, never redistributed.",
+  "SCORE-MISSING ROWS: the pinned bytes contain rows with non-numeric scores (2 in the 2014-15 scope of logs1520.csv, 58 in logs23.csv) \u2014 unplayed/postponed entries in CBR's logs. The derivation counts and excludes them; they can form no fixture and are never silently resolved.",
+  "2019-20 HAS NO CHAMPIONSHIP GAME (COVID-19 cancellation; CBR logs end 2020-03-11). The proof's sample for that season is three regular-season fixtures, declared as such."
+ ]
+}
