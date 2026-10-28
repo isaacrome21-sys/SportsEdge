@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
+import math
 import re
 from typing import Mapping
 
@@ -165,6 +166,14 @@ def _no_duplicate_keys(pairs: list[tuple[str, object]]) -> dict:
     return out
 
 
+def _finite_json_float(raw: str) -> float:
+    """Reject exponent overflow; json.loads' parse_constant omits 1e999."""
+    value = float(raw)
+    if not math.isfinite(value):
+        _fail("JSON_NONFINITE")
+    return value
+
+
 def parse_cbb_scope_issue(body: str, *, received_at_utc: str) -> dict:
     """Exact grammar: one CBB_CAPTURE_V1 header and one JSON code fence."""
     if not isinstance(body, str) or body.count("### CBB_CAPTURE_V1") != 1:
@@ -177,6 +186,7 @@ def parse_cbb_scope_issue(body: str, *, received_at_utc: str) -> dict:
         manifest = json.loads(
             match.group(1), object_pairs_hook=_no_duplicate_keys,
             parse_constant=lambda _: _fail("JSON_NONFINITE"),
+            parse_float=_finite_json_float,
         )
     except (json.JSONDecodeError, TypeError) as exc:
         raise CbbCaptureScopeError("CBB_SCOPE_JSON_INVALID") from exc
