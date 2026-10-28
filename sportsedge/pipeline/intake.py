@@ -7,6 +7,9 @@ Issue format (Muse format)::
     <!-- notes, ignored (may span lines) -->
     ML +125 -145                      <- one market per line, BOTH sides
     Spread +3.5 -110 -110             <- away line, away price, home price
+    PL -1.5 +164 +1.5 -198            <- spread family only: explicit both-lines
+                                         form (away line+price, home line+price);
+                                         the two lines must be exact mirrors
     Total 47.5 -108 -112              <- line, over price, under price
     Ravens TT 24.5 -110 -110          <- subject + market + line + over/under
     Lamar Jackson Pass Yards 245.5 -110 -110
@@ -184,7 +187,7 @@ def _parse_market(line: str, game: SharedGame, adapter: SportAdapter, warnings: 
     sport = adapter.sport
     toks = _tokens(line, sport)
     tail: list[str] = []
-    while toks and _numeric(toks[-1]) and len(tail) < 3:
+    while toks and _numeric(toks[-1]) and len(tail) < 4:
         tail.insert(0, toks.pop())
     if not tail:
         warnings.append(f"line {n}: SKIPPED_NOTE '{line[:120]}'")
@@ -196,23 +199,41 @@ def _parse_market(line: str, game: SharedGame, adapter: SportAdapter, warnings: 
         return _unknown(line, n, sport, warnings, strict)
     spec, subject = found
     want = 3 if spec.needs_line else 2
-    if len(tail) != want:
+    # Both-lines spread form: (away line, away price, home line, home price).
+    # The lines lane posts NHL puck lines this way; the pair is accepted only
+    # when the two lines are exact mirrors, and the canonical market keeps
+    # side A's line, exactly as the 3-numeric form does.
+    both_lines = (spec.family == "spread" and spec.needs_line
+                  and subject is None and len(tail) == 4)
+    if len(tail) != want and not both_lines:
         raise SharedIntakeError(f"{sport}_INTAKE_ONE_SIDED_OR_MALFORMED:{line}")
-    number = tail[0] if spec.needs_line else None
-    prices = tail[-2:]
     if spec.subject is None and subject:
         return _unknown(line, n, sport, warnings, strict)
     if spec.subject is not None and not subject:
         raise SharedIntakeError(f"{sport}_INTAKE_SUBJECT_MISSING:{line}")
-    first = american(prices[0], line, sport)
-    second = american(prices[1], line, sport)
-    if spec.swap:
-        first, second = second, first
     team = None
     if spec.subject == "team" and subject:
         team = adapter.team(subject) if resolve_teams else subject
         if resolve_teams and team not in {game.away, game.home}:
             raise SharedIntakeError(f"{sport}_INTAKE_TEAM_NOT_IN_GAME:{subject}")
+    if both_lines:
+        line_a = _number(tail[0], line, sport)
+        line_b = _number(tail[2], line, sport)
+        if line_b != -line_a:
+            raise SharedIntakeError(f"{sport}_INTAKE_SPREAD_LINES_NOT_MIRRORED:{line}")
+        first = american(tail[1], line, sport)
+        second = american(tail[3], line, sport)
+        if spec.swap:
+            first, second = second, first
+            line_a = line_b
+        return SharedMarket(spec.market, spec.family, line_a, spec.sides[0], first,
+                            spec.sides[1], second, line, subject=subject, team=team)
+    number = tail[0] if spec.needs_line else None
+    prices = tail[-2:]
+    first = american(prices[0], line, sport)
+    second = american(prices[1], line, sport)
+    if spec.swap:
+        first, second = second, first
     line_value = _number(number, line, sport) if number is not None else spec.fixed_line
     return SharedMarket(spec.market, spec.family, line_value, spec.sides[0], first,
                         spec.sides[1], second, line, subject=subject, team=team)
