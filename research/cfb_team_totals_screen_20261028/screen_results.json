@@ -1,0 +1,98 @@
+{
+ "engine": "CFB_TEAM_TOTAL_POSSESSION_V1",
+ "pooled": {
+  "games": 1586,
+  "rows": 3172,
+  "beta": -0.027366629686652322,
+  "mae_m": 9.45307937799248,
+  "mae_bmkt": 8.708070617906683,
+  "mae_b1": 10.505465710029076,
+  "mae_b2": 10.463111853291343,
+  "crps_m": 6.682714466680528,
+  "coverage80": 0.8266078184110971,
+  "delta_mae_m_minus_bmkt": 0.7450087600857973,
+  "delta_mae_ci95": [
+   0.6076449606894182,
+   0.8839943243931015
+  ],
+  "beta_ci95": [
+   -0.11421992693461408,
+   0.06126628922021565
+  ],
+  "qb_stratum": {
+   "rows": 847,
+   "beta": -0.056785190821193855,
+   "mae_m": 9.588094867272861,
+   "mae_bmkt": 8.842089728453365
+  }
+ },
+ "per_season": {
+  "2023": {
+   "games": 512,
+   "rows": 1024,
+   "beta": -0.06862797583165543,
+   "mae_m": 9.566278020003212,
+   "mae_bmkt": 8.78564453125,
+   "mae_b1": 10.627637837964986,
+   "mae_b2": 10.646248212385231,
+   "crps_m": 6.7357954472383295,
+   "coverage80": 0.8212890625
+  },
+  "2024": {
+   "games": 532,
+   "rows": 1064,
+   "beta": -0.0278595908377869,
+   "mae_m": 9.607451954407024,
+   "mae_bmkt": 8.944548872180452,
+   "mae_b1": 10.52508166436738,
+   "mae_b2": 10.437781011408019,
+   "crps_m": 6.784154035030608,
+   "coverage80": 0.8280075187969925
+  },
+  "2025": {
+   "games": 542,
+   "rows": 1084,
+   "beta": -0.01370592327447572,
+   "mae_m": 9.194621969575449,
+   "mae_bmkt": 8.402675276752767,
+   "mae_b1": 10.370801840635789,
+   "mae_b2": 10.314975676217276,
+   "crps_m": 6.533003558178985,
+   "coverage80": 0.8302583025830258
+  }
+ },
+ "criteria": {
+  "leg1_beta_ge_0.10": false,
+  "leg2_beta_pos_2of3": false,
+  "leg3_mae": false,
+  "leg4_100_games_per_season": true,
+  "leg5_coverage_band": true
+ },
+ "verdict": "SCREEN_FAIL",
+ "exclusions": {
+  "published_betting_rows_eval_seasons": 2835,
+  "excl_by_code_eval_seasons": {
+   "E2_NO_SPREAD_VALUE": 29,
+   "E1_PLACEHOLDER_DEFAULT_SOURCE": 25
+  },
+  "scoreable_closes_eval_seasons": 2781,
+  "completed_schedule_rows_all_div": 17521,
+  "fbs_vs_fbs_results": 3945,
+  "illinois_college_games": 171,
+  "fbs_before_week5_after_il": 1180,
+  "cohort_rows_before_close_filter": 3176,
+  "rows_dropped_no_close": 4,
+  "cohort_games": 1586,
+  "cohort_rows": 3172
+ },
+ "dispersion": {
+  "2023": 5.059620393865768,
+  "2024": 4.868124921738014,
+  "2025": 4.888058152666364
+ },
+ "dispersion_fit_rows": {
+  "2023": 1212,
+  "2024": 2444,
+  "2025": 3682
+ }
+}
