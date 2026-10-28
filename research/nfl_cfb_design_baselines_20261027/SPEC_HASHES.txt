@@ -1,0 +1,1 @@
+82b05d7096b3f59acd127da8762b1e2260f4af70b49e5548ce4cd3ade92a49a5  nflverse_games.csv.gz
