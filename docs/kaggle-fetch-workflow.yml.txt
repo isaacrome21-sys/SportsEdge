@@ -1,0 +1,159 @@
+# PLACEMENT (owner, one-time): copy this file VERBATIM to
+#   .github/workflows/kaggle-design-baseline-fetch.yml
+# on branch rocky/kaggle-nba-design-baseline-20261027 (web UI upload works;
+# the API/OAuth route refuses workflow files without the workflow scope),
+# then run: gh workflow run kaggle-design-baseline-fetch.yml \
+#   --ref rocky/kaggle-nba-design-baseline-20261027 \
+#   -f dataset=cviaxmiwnptr/nba-betting-data
+# The run commits archive/nba-kaggle-odds/{seasons}/games.csv,
+# manifest.json, fetch_status.json and PIN_RECORD.md back to the branch.
+# These comment lines are inert YAML comments; the copy may keep them.
+#
+name: kaggle-design-baseline-fetch
+
+on:
+  # Manual dispatch only. Fetches a REGISTERED Kaggle dataset with the
+  # repo secrets (SPORTSEDGE_KAGGLE_USERNAME / SPORTSEDGE_KAGGLE_KEY),
+  # normalizes it via scripts/archive_kaggle_nba_odds.py, and commits the
+  # archive + PIN record back to the dispatched branch. The data is a
+  # DESIGN-ONLY segmented baseline: never validation evidence, and
+  # comparisons against it must NEVER be labeled verified CLV.
+  workflow_dispatch:
+    inputs:
+      dataset:
+        description: 'Registered Kaggle dataset (owner/slug)'
+        required: true
+        default: 'cviaxmiwnptr/nba-betting-data'
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: kaggle-design-baseline-fetch
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 1
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12.13'
+
+      - name: Archiver self-test (no network, no secrets)
+        run: python -I scripts/archive_kaggle_nba_odds.py --self-test
+
+      - name: Fetch + normalize the Kaggle design baseline
+        env:
+          SPORTSEDGE_KAGGLE_USERNAME: ${{ secrets.SPORTSEDGE_KAGGLE_USERNAME }}
+          SPORTSEDGE_KAGGLE_KEY: ${{ secrets.SPORTSEDGE_KAGGLE_KEY }}
+          DATASET: ${{ inputs.dataset }}
+        run: |
+          set -euo pipefail
+          python -I scripts/archive_kaggle_nba_odds.py \
+            --dataset "$DATASET" \
+            --out-dir . \
+            --status-out archive/nba-kaggle-odds/fetch_status.json
+
+      - name: Generate PIN record + print pin summary
+        env:
+          DATASET: ${{ inputs.dataset }}
+        run: |
+          set -euo pipefail
+          python - <<'PYEOF'
+          import csv, hashlib, json
+          from pathlib import Path
+
+          root = Path("archive/nba-kaggle-odds")
+          manifest = json.loads((root / "manifest.json").read_text())
+          dataset = manifest["dataset"]
+          lines = []
+          lines.append("# PIN RECORD — Kaggle NBA DESIGN baseline")
+          lines.append("")
+          lines.append("**DESIGN ONLY — segmented design baseline. NOT validation")
+          lines.append("evidence. Comparisons against this baseline must NEVER be")
+          lines.append("labeled verified CLV. This archive does not cure gap G2:")
+          lines.append("it has no per-quote timestamps and no timestamp-authenticated")
+          lines.append("baseline exists in it.**")
+          lines.append("")
+          lines.append(f"- Dataset: `{dataset}`")
+          lines.append(f"- Kaggle page: https://www.kaggle.com/datasets/{dataset}")
+          lines.append(f"- Retrieved (UTC): {manifest['archived_at_utc']}")
+          lines.append(f"- Archiver schema: {manifest['schema_version']}")
+          lines.append("- License: CC0 — as recorded for this dataset in "
+                       "scripts/archive_kaggle_nba_odds.py (DATASET_REGISTRY) and "
+                       "sportsedge/backtest/kaggle_nba_baseline.py; the Kaggle "
+                       "dataset page's license field was not machine-verified in "
+                       "this run.")
+          lines.append(f"- Raw member: `{manifest['dataset_member']}`")
+          lines.append(f"- Raw rows: {manifest['raw_rows']}")
+          lines.append(f"- Raw CSV sha256: `{manifest['raw_sha256']}`")
+          lines.append(f"- Raw header: `{manifest['raw_header']}`")
+          lines.append(f"- Spread orientation audit: "
+                       f"{json.dumps(manifest['spread_orientation_audit'], sort_keys=True)}")
+          lines.append(f"- Normalization stats: "
+                       f"{json.dumps(manifest['normalization_stats'], sort_keys=True)}")
+          lines.append("")
+          lines.append("## Provenance segments (labeled; screen separately)")
+          lines.append("")
+          lines.append("- 2007-10-30 to 2023-01-16: Sportsbook Reviews Online "
+                       "consensus close (spread/total/ML + scores).")
+          lines.append("- 2023-01-17 to 2025-06-22: ESPN — spread/total only; "
+                       "moneylines and 2H odds ABSENT in this segment.")
+          lines.append("- From 2025-10-21: Sportsbook Review MEDIAN odds.")
+          lines.append("- All segments are date-only: no per-quote timestamps. "
+                       "Post-2023 rows are consensus/median, NOT per-book.")
+          lines.append("")
+          lines.append("## Pinned files (normalized canonical schema)")
+          lines.append("")
+          lines.append("| Season | File | Rows | sha256 (file bytes) |")
+          lines.append("|---|---|---|---|")
+          total_rows = 0
+          for season in manifest["seasons"]:
+              fpath = None
+              for cand in root.rglob("games.csv"):
+                  if cand.parent.name == str(season["season"]):
+                      fpath = cand
+                      break
+              data = fpath.read_bytes()
+              digest = hashlib.sha256(data).hexdigest()
+              with fpath.open(newline="", encoding="utf-8") as fh:
+                  rows = sum(1 for _ in csv.reader(fh)) - 1
+              total_rows += rows
+              rel = str(fpath)
+              lines.append(f"| {season['season']} | `{rel}` | {rows} | `{digest}` |")
+              print(f"{rel} rows={rows} sha256={digest}")
+          lines.append("")
+          lines.append(f"Total normalized rows: {total_rows}")
+          lines.append("")
+          lines.append("Manifest payload hashes (per-season JSON payload sha256) "
+                       "are in manifest.json alongside this record.")
+          lines.append("")
+          (root / "PIN_RECORD.md").write_text("\n".join(lines) + "\n",
+                                              encoding="utf-8")
+          print(f"dataset={dataset} raw_rows={manifest['raw_rows']} "
+                f"raw_sha256={manifest['raw_sha256']} total_rows={total_rows}")
+          PYEOF
+
+      - name: Commit archive + PIN record back to this branch
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          DATASET: ${{ inputs.dataset }}
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain -- archive/nba-kaggle-odds)" ]; then
+            echo "No archive changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add archive/nba-kaggle-odds
+          git commit -m "data: pin Kaggle NBA DESIGN baseline ($DATASET) — hash-pinned, DESIGN ONLY, never verified CLV"
+          git push origin "HEAD:$REF_NAME"
