@@ -1,0 +1,486 @@
+{
+ "record": "NBA_PERIOD_FORWARD_LANDING_CHECK",
+ "state": "NON_COUNTED",
+ "freeze_state": "DRAFT_NOT_IN_FORCE",
+ "counted": false,
+ "validation_credit": false,
+ "forward_clock_credit": false,
+ "play_eligible": false,
+ "slate_date": "2015-04-15",
+ "season_engine": 2014,
+ "entries_file_sha256": "3e1eb1f1e41a123d2def93438b051a3d6b780780b7d92505ff808751b23b2a23",
+ "entries_pulled": 212,
+ "pull_refusals": [],
+ "form_gate_refusals": [],
+ "pinned_sample_cross_check": {
+  "event": "400579520",
+  "home_quarters_match": true,
+  "away_quarters_match": true,
+  "finals_match": true,
+  "passed": true
+ },
+ "history_games": 198,
+ "history_team_game_priors_min": 11,
+ "slate_games": 14,
+ "games_priced_and_graded": 14,
+ "price_refusals": {},
+ "aggregate_mae": {
+  "TEAM_QUARTER_TOTAL": 4.248244451834986,
+  "GAME_QUARTER_TOTAL": 6.10240992212961,
+  "TEAM_HALF_TOTAL": 6.632298764006147,
+  "GAME_HALF_TOTAL": 9.039579135318935
+ },
+ "mae_n": {
+  "TEAM_QUARTER_TOTAL": 112,
+  "GAME_QUARTER_TOTAL": 56,
+  "TEAM_HALF_TOTAL": 56,
+  "GAME_HALF_TOTAL": 28
+ },
+ "capture_grammar_exercise": {
+  "game_id": "400579520",
+  "census": {
+   "TEAM_QUARTER_TOTAL": "MIXED",
+   "GAME_QUARTER_TOTAL": "MIXED",
+   "TEAM_HALF_TOTAL": "PRICED",
+   "GAME_HALF_TOTAL": "PRICED"
+  },
+  "quotes_recorded": 18,
+  "not_offered_recorded": 3,
+  "lines_are_synthetic": true,
+  "settlements": [
+   {
+    "subfamily": "TEAM_QUARTER_TOTAL",
+    "window": "Q1",
+    "team": "CHA",
+    "line": 18.5,
+    "model": 23.412457600853514,
+    "actual": 20,
+    "result": "WIN",
+    "counted": false
+   },
+   {
+    "subfamily": "TEAM_QUARTER_TOTAL",
+    "window": "Q1",
+    "team": "TOR",
+    "line": 23.5,
+    "model": 25.70533152762924,
+    "actual": 25,
+    "result": "WIN",
+    "counted": false
+   },
+   {
+    "subfamily": "TEAM_QUARTER_TOTAL",
+    "window": "Q2",
+    "team": "CHA",
+    "line": 22.5,
+    "model": 23.935046544373222,
+    "actual": 24,
+    "result": "WIN",
+    "counted": false
+   },
+   {
+    "subfamily": "TEAM_QUARTER_TOTAL",
+    "window": "Q2",
+    "team": "TOR",
+    "line": 28.5,
+    "model": 26.27909965888932,
+    "actual": 30,
+    "result": "LOSS",
+    "counted": false
+   },
+   {
+    "subfamily": "TEAM_QUARTER_TOTAL",
+    "window": "Q4",
+    "team": "CHA",
+    "line": 18.5,
+    "model": 22.91587987171714,
+    "actual": 20,
+    "result": "WIN",
+    "counted": false
+   },
+   {
+    "subfamily": "TEAM_QUARTER_TOTAL",
+    "window": "Q4",
+    "team": "TOR",
+    "line": 12.5,
+    "model": 25.16012199113776,
+    "actual": 14,
+    "result": "WIN",
+    "counted": false
+   },
+   {
+    "subfamily": "GAME_QUARTER_TOTAL",
+    "window": "Q1",
+    "team": null,
+    "line": 42.5,
+    "model": 49.117789128482755,
+    "actual": 45,
+    "result": "WIN",
+    "counted": false
+   },
+   {
+    "subfamily": "GAME_QUARTER_TOTAL",
+    "window": "Q2",
+    "team": null,
+    "line": 51.5,
+    "model": 50.214146203262544,
+    "actual": 54,
+    "result": "LOSS",
+    "counted": false
+   },
+   {
+    "subfamily": "GAME_QUARTER_TOTAL",
+    "window": "Q4",
+    "team": null,
+    "line": 31.5,
+    "model": 48.0760018628549,
+    "actual": 34,
+    "result": "WIN",
+    "counted": false
+   },
+   {
+    "subfamily": "TEAM_HALF_TOTAL",
+    "window": "1H",
+    "team": "CHA",
+    "line": 42.5,
+    "model": 47.34750414522674,
+    "actual": 44,
+    "result": "WIN",
+    "counted": false
+   },
+   {
+    "subfamily": "TEAM_HALF_TOTAL",
+    "window": "1H",
+    "team": "TOR",
+    "line": 53.5,
+    "model": 51.98443118651856,
+    "actual": 55,
+    "result": "LOSS",
+    "counted": false
+   },
+   {
+    "subfamily": "TEAM_HALF_TOTAL",
+    "window": "2H",
+    "team": "CHA",
+    "line": 41.5,
+    "model": 46.22902192674338,
+    "actual": 43,
+    "result": "WIN",
+    "counted": false
+   },
+   {
+    "subfamily": "TEAM_HALF_TOTAL",
+    "window": "2H",
+    "team": "TOR",
+    "line": 35.5,
+    "model": 50.75641161146871,
+    "actual": 37,
+    "result": "WIN",
+    "counted": false
+   },
+   {
+    "subfamily": "GAME_HALF_TOTAL",
+    "window": "1H",
+    "team": null,
+    "line": 96.5,
+    "model": 99.33193533174531,
+    "actual": 99,
+    "result": "WIN",
+    "counted": false
+   },
+   {
+    "subfamily": "GAME_HALF_TOTAL",
+    "window": "2H",
+    "team": null,
+    "line": 77.5,
+    "model": 96.98543353821208,
+    "actual": 80,
+    "result": "WIN",
+    "counted": false
+   }
+  ]
+ },
+ "games": [
+  {
+   "game_id": "400579509",
+   "away": "ATL",
+   "home": "CHI",
+   "priors": {
+    "home_team_games": 12,
+    "away_team_games": 13,
+    "league_team_games": 396
+   },
+   "price_status": "PRICED",
+   "periods_status": "PRICED",
+   "counted": false,
+   "grade_status": "GRADED",
+   "mae": {
+    "TEAM_QUARTER_TOTAL": 4.138419574895272,
+    "GAME_QUARTER_TOTAL": 7.008215647002229,
+    "TEAM_HALF_TOTAL": 6.0292601572774025,
+    "GAME_HALF_TOTAL": 12.058520314554812
+   }
+  },
+  {
+   "game_id": "400579510",
+   "away": "POR",
+   "home": "DAL",
+   "priors": {
+    "home_team_games": 12,
+    "away_team_games": 15,
+    "league_team_games": 396
+   },
+   "price_status": "PRICED",
+   "periods_status": "PRICED",
+   "counted": false,
+   "grade_status": "GRADED",
+   "mae": {
+    "TEAM_QUARTER_TOTAL": 4.0000548582211675,
+    "GAME_QUARTER_TOTAL": 3.9818025736827387,
+    "TEAM_HALF_TOTAL": 3.9180790797642686,
+    "GAME_HALF_TOTAL": 0.5674717138663965
+   }
+  },
+  {
+   "game_id": "400579511",
+   "away": "UTA",
+   "home": "HOU",
+   "priors": {
+    "home_team_games": 13,
+    "away_team_games": 13,
+    "league_team_games": 396
+   },
+   "price_status": "PRICED",
+   "periods_status": "PRICED",
+   "counted": false,
+   "grade_status": "GRADED",
+   "mae": {
+    "TEAM_QUARTER_TOTAL": 4.883576653155783,
+    "GAME_QUARTER_TOTAL": 2.912841436273217,
+    "TEAM_HALF_TOTAL": 9.25991127885278,
+    "GAME_HALF_TOTAL": 5.203344818732759
+   }
+  },
+  {
+   "game_id": "400579512",
+   "away": "IND",
+   "home": "MEM",
+   "priors": {
+    "home_team_games": 13,
+    "away_team_games": 14,
+    "league_team_games": 396
+   },
+   "price_status": "PRICED",
+   "periods_status": "PRICED",
+   "counted": false,
+   "grade_status": "GRADED",
+   "mae": {
+    "TEAM_QUARTER_TOTAL": 3.9009680952558847,
+    "GAME_QUARTER_TOTAL": 4.5375622328401075,
+    "TEAM_HALF_TOTAL": 6.3443750914115,
+    "GAME_HALF_TOTAL": 9.075124465680219
+   }
+  },
+  {
+   "game_id": "400579513",
+   "away": "BOS",
+   "home": "MIL",
+   "priors": {
+    "home_team_games": 13,
+    "away_team_games": 14,
+    "league_team_games": 396
+   },
+   "price_status": "PRICED",
+   "periods_status": "PRICED",
+   "counted": false,
+   "grade_status": "GRADED",
+   "mae": {
+    "TEAM_QUARTER_TOTAL": 3.007919087303667,
+    "GAME_QUARTER_TOTAL": 4.848238064340263,
+    "TEAM_HALF_TOTAL": 4.8482380643402685,
+    "GAME_HALF_TOTAL": 9.69647612868053
+   }
+  },
+  {
+   "game_id": "400579514",
+   "away": "OKC",
+   "home": "MIN",
+   "priors": {
+    "home_team_games": 13,
+    "away_team_games": 13,
+    "league_team_games": 396
+   },
+   "price_status": "PRICED",
+   "periods_status": "PRICED",
+   "counted": false,
+   "grade_status": "GRADED",
+   "mae": {
+    "TEAM_QUARTER_TOTAL": 5.641056310608342,
+    "GAME_QUARTER_TOTAL": 10.535787617249724,
+    "TEAM_HALF_TOTAL": 10.53578761724972,
+    "GAME_HALF_TOTAL": 21.07157523449945
+   }
+  },
+  {
+   "game_id": "400579515",
+   "away": "SAS",
+   "home": "NOP",
+   "priors": {
+    "home_team_games": 13,
+    "away_team_games": 14,
+    "league_team_games": 396
+   },
+   "price_status": "PRICED",
+   "periods_status": "PRICED",
+   "counted": false,
+   "grade_status": "GRADED",
+   "mae": {
+    "TEAM_QUARTER_TOTAL": 4.795732336854405,
+    "GAME_QUARTER_TOTAL": 6.515959212159263,
+    "TEAM_HALF_TOTAL": 6.761537025037747,
+    "GAME_HALF_TOTAL": 6.9051678572428585
+   }
+  },
+  {
+   "game_id": "400579516",
+   "away": "ORL",
+   "home": "BKN",
+   "priors": {
+    "home_team_games": 15,
+    "away_team_games": 11,
+    "league_team_games": 396
+   },
+   "price_status": "PRICED",
+   "periods_status": "PRICED",
+   "counted": false,
+   "grade_status": "GRADED",
+   "mae": {
+    "TEAM_QUARTER_TOTAL": 2.971162822775563,
+    "GAME_QUARTER_TOTAL": 3.492214660894435,
+    "TEAM_HALF_TOTAL": 5.2613104383741245,
+    "GAME_HALF_TOTAL": 6.548015859144755
+   }
+  },
+  {
+   "game_id": "400579517",
+   "away": "WAS",
+   "home": "CLE",
+   "priors": {
+    "home_team_games": 11,
+    "away_team_games": 13,
+    "league_team_games": 396
+   },
+   "price_status": "PRICED",
+   "periods_status": "PRICED",
+   "counted": false,
+   "grade_status": "GRADED",
+   "mae": {
+    "TEAM_QUARTER_TOTAL": 3.5893042481677653,
+    "GAME_QUARTER_TOTAL": 4.433922847693372,
+    "TEAM_HALF_TOTAL": 3.4102925841314082,
+    "GAME_HALF_TOTAL": 6.820585168262824
+   }
+  },
+  {
+   "game_id": "400579518",
+   "away": "DET",
+   "home": "NYK",
+   "priors": {
+    "home_team_games": 13,
+    "away_team_games": 13,
+    "league_team_games": 396
+   },
+   "price_status": "PRICED",
+   "periods_status": "PRICED",
+   "counted": false,
+   "grade_status": "GRADED",
+   "mae": {
+    "TEAM_QUARTER_TOTAL": 3.7304314130138945,
+    "GAME_QUARTER_TOTAL": 5.565645677227861,
+    "TEAM_HALF_TOTAL": 4.866695848566081,
+    "GAME_HALF_TOTAL": 2.969947738182526
+   }
+  },
+  {
+   "game_id": "400579519",
+   "away": "MIA",
+   "home": "PHI",
+   "priors": {
+    "home_team_games": 13,
+    "away_team_games": 14,
+    "league_team_games": 396
+   },
+   "price_status": "PRICED",
+   "periods_status": "PRICED",
+   "counted": false,
+   "grade_status": "GRADED",
+   "mae": {
+    "TEAM_QUARTER_TOTAL": 5.536300112653409,
+    "GAME_QUARTER_TOTAL": 8.791135298388062,
+    "TEAM_HALF_TOTAL": 8.006176198857403,
+    "GAME_HALF_TOTAL": 5.822735532222367
+   }
+  },
+  {
+   "game_id": "400579520",
+   "away": "CHA",
+   "home": "TOR",
+   "priors": {
+    "home_team_games": 13,
+    "away_team_games": 15,
+    "league_team_games": 396
+   },
+   "price_status": "PRICED",
+   "periods_status": "PRICED",
+   "counted": false,
+   "grade_status": "GRADED",
+   "mae": {
+    "TEAM_QUARTER_TOTAL": 3.111134557929038,
+    "GAME_QUARTER_TOTAL": 6.222269115858074,
+    "TEAM_HALF_TOTAL": 5.837126624230066,
+    "GAME_HALF_TOTAL": 8.658684434978696
+   }
+  },
+  {
+   "game_id": "400579521",
+   "away": "DEN",
+   "home": "GSW",
+   "priors": {
+    "home_team_games": 14,
+    "away_team_games": 12,
+    "league_team_games": 396
+   },
+   "price_status": "PRICED",
+   "periods_status": "PRICED",
+   "counted": false,
+   "grade_status": "GRADED",
+   "mae": {
+    "TEAM_QUARTER_TOTAL": 6.348667272460231,
+    "GAME_QUARTER_TOTAL": 11.391967560227794,
+    "TEAM_HALF_TOTAL": 11.39196756022779,
+    "GAME_HALF_TOTAL": 22.78393512045558
+   }
+  },
+  {
+   "game_id": "400579522",
+   "away": "SAC",
+   "home": "LAL",
+   "priors": {
+    "home_team_games": 14,
+    "away_team_games": 14,
+    "league_team_games": 396
+   },
+   "price_status": "PRICED",
+   "periods_status": "PRICED",
+   "counted": false,
+   "grade_status": "GRADED",
+   "mae": {
+    "TEAM_QUARTER_TOTAL": 3.8206949823953757,
+    "GAME_QUARTER_TOTAL": 5.196176965977397,
+    "TEAM_HALF_TOTAL": 6.381425127765496,
+    "GAME_HALF_TOTAL": 8.372523507961319
+   }
+  }
+ ],
+ "note": "NON_COUNTED wiring evidence only. The synthetic capture lines are constructed from finals to exercise the \u00a74.2 grammar and settlement path; they are not market data. No screen, verdict, clock or counted row is produced."
+}
