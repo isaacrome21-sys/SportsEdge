@@ -1,0 +1,1235 @@
+{
+ "probe": "PRIOR-SNAPSHOT convention witness verification",
+ "amendment": "research/nba_cbb_activation_20261028/AMENDMENT_1.md",
+ "convention": "for games on date D, the Torvik input is the archive file dated D-1",
+ "torvik_route": "PR #2832 pinned commit 46d1036443ca452fdd1c6cf25cf5dff50de68337",
+ "torvik_anchor_check": "2023-03-12 pull reproduces PR #2832 sample sha256 9524481d69c7b690200299387690654091565ef1d3df774ca858749e5e1cc01c",
+ "hoopr_inputs": "PR #2867 manifest pins verified before use",
+ "resolver": "PR #2871 build_resolver (published overrides + CBR surface tables) + declared surface identification (printed per use)",
+ "torvik_files": {
+  "2023-03-12": {
+   "sha256": "9524481d69c7b690200299387690654091565ef1d3df774ca858749e5e1cc01c",
+   "bytes": 60010,
+   "team_rows": 363,
+   "layout": "standard",
+   "total_games": 11709,
+   "surface_identifications": {
+    "penn-state": "Penn St."
+   }
+  },
+  "2014-11-13": {
+   "sha256": "fbc17db49f4fad47630dd27c6adb2086bb0e39e0d33fe8a1b47233c720856c0a",
+   "bytes": 50077,
+   "team_rows": 351,
+   "layout": "standard",
+   "total_games": 0
+  },
+  "2014-11-14": {
+   "sha256": "9834b0d5027c15edce637cd84034c4eaa7704989aefec2f1d254fd03a9bff7ac",
+   "bytes": 55016,
+   "team_rows": 351,
+   "layout": "standard",
+   "total_games": 226,
+   "surface_identifications": {
+    "morehead-state": "Morehead St.",
+    "ball-state": "Ball St.",
+    "south-carolina-state": "South Carolina St.",
+    "washington-state": "Washington St.",
+    "alcorn-state": "Alcorn St.",
+    "arizona-state": "Arizona St.",
+    "chicago-state": "Chicago St.",
+    "illinois-chicago": "Illinois Chicago",
+    "fresno-state": "Fresno St.",
+    "idaho-state": "Idaho St.",
+    "michigan-state": "Michigan St.",
+    "utah-state": "Utah St.",
+    "weber-state": "Weber St.",
+    "wichita-state": "Wichita St.",
+    "new-mexico-state": "New Mexico St.",
+    "sacramento-state": "Sacramento St.",
+    "southeast-missouri-state": "Southeast Missouri St.",
+    "kansas-state": "Kansas St.",
+    "north-dakota-state": "North Dakota St.",
+    "east-tennessee-state": "East Tennessee St.",
+    "missouri-state": "Missouri St.",
+    "iowa-state": "Iowa St.",
+    "northwestern-state": "Northwestern St.",
+    "murray-state": "Murray St.",
+    "indiana-state": "Indiana St.",
+    "south-dakota-state": "South Dakota St.",
+    "kennesaw-state": "Kennesaw St.",
+    "savannah-state": "Savannah St.",
+    "wright-state": "Wright St.",
+    "penn-state": "Penn St.",
+    "morgan-state": "Morgan St.",
+    "mississippi-valley-state": "Mississippi Valley St.",
+    "jacksonville-state": "Jacksonville St.",
+    "north-carolina-state": "North Carolina St.",
+    "jackson-state": "Jackson St.",
+    "maryland-eastern-shore": "Maryland Eastern Shore",
+    "long-beach-state": "Long Beach St.",
+    "mississippi-state": "Mississippi St.",
+    "boise-state": "Boise St."
+   }
+  },
+  "2014-11-15": {
+   "sha256": "e9343f959e7747100e20af02623950dabe09c0037d2818905f15033ee058e90a",
+   "bytes": 55907,
+   "team_rows": 351,
+   "layout": "standard",
+   "total_games": 282
+  },
+  "2015-11-12": {
+   "sha256": "af0edab68439c458697909930eaa5a427d41b086be130ed94aa024a31ac97781",
+   "bytes": 50128,
+   "team_rows": 351,
+   "layout": "standard",
+   "total_games": 0
+  },
+  "2015-11-13": {
+   "sha256": "f09be86b1b82415484fd2cce622fefb79dd6c546b41c97bb2433c9d6d977164e",
+   "bytes": 55125,
+   "team_rows": 351,
+   "layout": "standard",
+   "total_games": 228,
+   "surface_identifications": {
+    "jackson-state": "Jackson St.",
+    "fresno-state": "Fresno St.",
+    "illinois-state": "Illinois St.",
+    "gardner-webb": "Gardner Webb",
+    "mississippi-state": "Mississippi St.",
+    "new-mexico-state": "New Mexico St.",
+    "portland-state": "Portland St.",
+    "boise-state": "Boise St.",
+    "arkansas-state": "Arkansas St.",
+    "weber-state": "Weber St.",
+    "utah-state": "Utah St.",
+    "north-dakota-state": "North Dakota St.",
+    "kennesaw-state": "Kennesaw St.",
+    "washington-state": "Washington St.",
+    "wichita-state": "Wichita St.",
+    "delaware-state": "Delaware St.",
+    "kansas-state": "Kansas St.",
+    "maryland-eastern-shore": "Maryland Eastern Shore",
+    "illinois-chicago": "Illinois Chicago",
+    "north-carolina-state": "North Carolina St.",
+    "missouri-state": "Missouri St.",
+    "ball-state": "Ball St.",
+    "arizona-state": "Arizona St.",
+    "sacramento-state": "Sacramento St.",
+    "morgan-state": "Morgan St.",
+    "michigan-state": "Michigan St.",
+    "indiana-state": "Indiana St.",
+    "coppin-state": "Coppin St.",
+    "southeast-missouri-state": "Southeast Missouri St.",
+    "wright-state": "Wright St.",
+    "iowa-state": "Iowa St.",
+    "northwestern-state": "Northwestern St.",
+    "jacksonville-state": "Jacksonville St."
+   }
+  },
+  "2015-11-14": {
+   "sha256": "77c1ba55853a5a1819cff7763a8166373af4296d7350a70cd60578c799ad4953",
+   "bytes": 56252,
+   "team_rows": 351,
+   "layout": "standard",
+   "total_games": 292
+  },
+  "2016-11-10": {
+   "sha256": "697ce512486c85285bc88350270b8d39839d2686b7ebecaa38d1a79840ca083a",
+   "bytes": 51930,
+   "team_rows": 351,
+   "layout": "standard",
+   "total_games": 0
+  },
+  "2016-11-11": {
+   "sha256": "fef7f484e5ea2934d128c30d1f5842f3a4e02e37b0ab120e2125258baec115ac",
+   "bytes": 56630,
+   "team_rows": 351,
+   "layout": "standard",
+   "total_games": 226,
+   "surface_identifications": {
+    "illinois-chicago": "Illinois Chicago",
+    "fresno-state": "Fresno St.",
+    "utah-state": "Utah St.",
+    "idaho-state": "Idaho St.",
+    "south-dakota-state": "South Dakota St.",
+    "wichita-state": "Wichita St.",
+    "south-carolina-state": "South Carolina St.",
+    "kennesaw-state": "Kennesaw St.",
+    "southeast-missouri-state": "Southeast Missouri St.",
+    "kansas-state": "Kansas St.",
+    "arizona-state": "Arizona St.",
+    "portland-state": "Portland St.",
+    "sacramento-state": "Sacramento St.",
+    "ohio-state": "Ohio St.",
+    "northwestern-state": "Northwestern St.",
+    "missouri-state": "Missouri St.",
+    "iowa-state": "Iowa St.",
+    "savannah-state": "Savannah St.",
+    "arkansas-pine-bluff": "Arkansas Pine Bluff",
+    "wright-state": "Wright St.",
+    "murray-state": "Murray St.",
+    "illinois-state": "Illinois St.",
+    "indiana-state": "Indiana St.",
+    "ball-state": "Ball St.",
+    "morgan-state": "Morgan St.",
+    "gardner-webb": "Gardner Webb",
+    "jacksonville-state": "Jacksonville St.",
+    "oklahoma-state": "Oklahoma St.",
+    "north-dakota-state": "North Dakota St.",
+    "arkansas-state": "Arkansas St.",
+    "mississippi-valley-state": "Mississippi Valley St.",
+    "louisiana-lafayette": "Louisiana Lafayette",
+    "mississippi-state": "Mississippi St.",
+    "norfolk-state": "Norfolk St.",
+    "tennessee-state": "Tennessee St.",
+    "michigan-state": "Michigan St.",
+    "coppin-state": "Coppin St.",
+    "maryland-eastern-shore": "Maryland Eastern Shore",
+    "east-tennessee-state": "East Tennessee St.",
+    "washington-state": "Washington St.",
+    "montana-state": "Montana St.",
+    "north-carolina-state": "North Carolina St.",
+    "penn-state": "Penn St."
+   }
+  },
+  "2016-11-12": {
+   "sha256": "7145944f9d546086a345f94685e9f09ec3a5f89778ba302acb24fcf377df0e98",
+   "bytes": 57521,
+   "team_rows": 351,
+   "layout": "standard",
+   "total_games": 270
+  },
+  "2017-11-09": {
+   "sha256": "a36f4411cf0ad5a21a1867bf3b7eb0250e647f524bedd8f00f54a10f1616bda6",
+   "bytes": 51906,
+   "team_rows": 351,
+   "layout": "standard",
+   "total_games": 0
+  },
+  "2017-11-10": {
+   "sha256": "db3ef19cbca7f56a6ec113341661697057439e53817ed43d58c2af0b86d94882",
+   "bytes": 56601,
+   "team_rows": 351,
+   "layout": "standard",
+   "total_games": 230,
+   "surface_identifications": {
+    "coppin-state": "Coppin St.",
+    "long-beach-state": "Long Beach St.",
+    "arizona-state": "Arizona St.",
+    "idaho-state": "Idaho St.",
+    "colorado-state": "Colorado St.",
+    "sacramento-state": "Sacramento St.",
+    "south-dakota-state": "South Dakota St.",
+    "chicago-state": "Chicago St.",
+    "tennessee-state": "Tennessee St.",
+    "weber-state": "Weber St.",
+    "utah-state": "Utah St.",
+    "kansas-state": "Kansas St.",
+    "iowa-state": "Iowa St.",
+    "oklahoma-state": "Oklahoma St.",
+    "northwestern-state": "Northwestern St.",
+    "michigan-state": "Michigan St.",
+    "wichita-state": "Wichita St.",
+    "illinois-chicago": "Illinois Chicago",
+    "missouri-state": "Missouri St.",
+    "arkansas-state": "Arkansas St.",
+    "montana-state": "Montana St.",
+    "norfolk-state": "Norfolk St.",
+    "alcorn-state": "Alcorn St.",
+    "louisiana-lafayette": "Louisiana Lafayette",
+    "morehead-state": "Morehead St.",
+    "morgan-state": "Morgan St.",
+    "ball-state": "Ball St.",
+    "east-tennessee-state": "East Tennessee St.",
+    "kennesaw-state": "Kennesaw St.",
+    "south-carolina-state": "South Carolina St.",
+    "ohio-state": "Ohio St.",
+    "indiana-state": "Indiana St.",
+    "north-carolina-state": "North Carolina St.",
+    "mississippi-state": "Mississippi St.",
+    "alabama-state": "Alabama St.",
+    "penn-state": "Penn St.",
+    "savannah-state": "Savannah St."
+   }
+  },
+  "2017-11-11": {
+   "sha256": "b4d391dbafc01c2f2804a94282dead03880adbd8d054a6fc0814b9016e37d779",
+   "bytes": 57570,
+   "team_rows": 351,
+   "layout": "standard",
+   "total_games": 278
+  },
+  "2018-11-05": {
+   "sha256": "6a60cb43da5207af8ed495d948ecf64b3f3348de71e4ddb5e06c9351dfb23fd6",
+   "bytes": 52232,
+   "team_rows": 353,
+   "layout": "standard",
+   "total_games": 0
+  },
+  "2018-11-06": {
+   "sha256": "68b7f514e6a19200f2630a83908cfd430443698fa429e0d3c71f635f988b5bce",
+   "bytes": 56435,
+   "team_rows": 353,
+   "layout": "standard",
+   "total_games": 188,
+   "surface_identifications": {
+    "portland-state": "Portland St.",
+    "arkansas-pine-bluff": "Arkansas Pine Bluff",
+    "weber-state": "Weber St.",
+    "new-mexico-state": "New Mexico St.",
+    "north-dakota-state": "North Dakota St.",
+    "idaho-state": "Idaho St.",
+    "florida-state": "Florida St.",
+    "montana-state": "Montana St.",
+    "utah-state": "Utah St.",
+    "norfolk-state": "Norfolk St.",
+    "maryland-eastern-shore": "Maryland Eastern Shore",
+    "missouri-state": "Missouri St.",
+    "arizona-state": "Arizona St.",
+    "south-dakota-state": "South Dakota St.",
+    "southeast-missouri-state": "Southeast Missouri St.",
+    "wichita-state": "Wichita St.",
+    "alcorn-state": "Alcorn St.",
+    "iowa-state": "Iowa St.",
+    "alabama-state": "Alabama St.",
+    "coppin-state": "Coppin St.",
+    "mississippi-valley-state": "Mississippi Valley St.",
+    "delaware-state": "Delaware St.",
+    "michigan-state": "Michigan St.",
+    "morgan-state": "Morgan St.",
+    "georgia-state": "Georgia St.",
+    "east-tennessee-state": "East Tennessee St.",
+    "illinois-state": "Illinois St.",
+    "ball-state": "Ball St.",
+    "indiana-state": "Indiana St.",
+    "gardner-webb": "Gardner Webb",
+    "north-carolina-state": "North Carolina St.",
+    "illinois-chicago": "Illinois Chicago",
+    "chicago-state": "Chicago St."
+   }
+  },
+  "2018-11-07": {
+   "sha256": "a0ce00ebba93a4cdd60a6d04f802d77c6c3bf9394f3d9893f776ab9a3156d04b",
+   "bytes": 57097,
+   "team_rows": 353,
+   "layout": "standard",
+   "total_games": 212
+  },
+  "2019-11-04": {
+   "sha256": "6d0ca4ecbadd5abb40b3a2efb0a2f835f6c7ea13b567ddaadd7d3124735f726a",
+   "bytes": 52158,
+   "team_rows": 353,
+   "layout": "standard",
+   "total_games": 0
+  },
+  "2019-11-05": {
+   "sha256": "0516a16ff959f4ae1371695ec8ca235709722f8b8f50255293fe717576e5a562",
+   "bytes": 56280,
+   "team_rows": 353,
+   "layout": "standard",
+   "total_games": 236,
+   "surface_identifications": {
+    "utah-state": "Utah St.",
+    "montana-state": "Montana St.",
+    "jackson-state": "Jackson St.",
+    "michigan-state": "Michigan St.",
+    "fresno-state": "Fresno St.",
+    "colorado-state": "Colorado St.",
+    "kennesaw-state": "Kennesaw St.",
+    "alcorn-state": "Alcorn St.",
+    "idaho-state": "Idaho St.",
+    "north-carolina-state": "North Carolina St.",
+    "alabama-state": "Alabama St.",
+    "south-carolina-state": "South Carolina St.",
+    "tennessee-state": "Tennessee St.",
+    "missouri-state": "Missouri St.",
+    "wichita-state": "Wichita St.",
+    "arkansas-pine-bluff": "Arkansas Pine Bluff",
+    "jacksonville-state": "Jacksonville St.",
+    "mississippi-state": "Mississippi St.",
+    "kansas-state": "Kansas St.",
+    "north-dakota-state": "North Dakota St.",
+    "iowa-state": "Iowa St.",
+    "mississippi-valley-state": "Mississippi Valley St.",
+    "morehead-state": "Morehead St.",
+    "coppin-state": "Coppin St.",
+    "gardner-webb": "Gardner Webb",
+    "penn-state": "Penn St.",
+    "maryland-eastern-shore": "Maryland Eastern Shore",
+    "appalachian-state": "Appalachian St."
+   }
+  },
+  "2019-11-06": {
+   "sha256": "7a7480fa7b375b7cdf3f97a4cb5b2e7db5f5d257988ed1510c02f9a1e124982c",
+   "bytes": 57334,
+   "team_rows": 353,
+   "layout": "standard",
+   "total_games": 300
+  },
+  "2020-11-24": {
+   "sha256": "9aa00b934d23173c28dd2f3a658b2e1749def4afee1fbe8ba118e76ca56e1cac",
+   "bytes": 51123,
+   "team_rows": 347,
+   "layout": "standard",
+   "total_games": 0
+  },
+  "2020-11-25": {
+   "sha256": "7616fe168d1878483ee3427e152633540c0dc21bb61827996de3097cd00b70d7",
+   "bytes": 54378,
+   "team_rows": 347,
+   "layout": "standard",
+   "total_games": 186,
+   "surface_identifications": {
+    "washington-state": "Washington St.",
+    "arkansas-pine-bluff": "Arkansas Pine Bluff",
+    "utah-state": "Utah St.",
+    "montana-state": "Montana St.",
+    "georgia-state": "Georgia St.",
+    "mississippi-state": "Mississippi St.",
+    "north-carolina-state": "North Carolina St.",
+    "sam-houston-state": "Sam Houston St.",
+    "jacksonville-state": "Jacksonville St.",
+    "mississippi-valley-state": "Mississippi Valley St.",
+    "northwestern-state": "Northwestern St.",
+    "south-dakota-state": "South Dakota St.",
+    "arizona-state": "Arizona St.",
+    "idaho-state": "Idaho St.",
+    "illinois-chicago": "Illinois Chicago",
+    "morehead-state": "Morehead St.",
+    "michigan-state": "Michigan St.",
+    "ball-state": "Ball St.",
+    "chicago-state": "Chicago St.",
+    "delaware-state": "Delaware St.",
+    "oklahoma-state": "Oklahoma St.",
+    "alcorn-state": "Alcorn St.",
+    "north-dakota-state": "North Dakota St.",
+    "ohio-state": "Ohio St.",
+    "illinois-state": "Illinois St.",
+    "south-carolina-state": "South Carolina St.",
+    "appalachian-state": "Appalachian St.",
+    "kansas-state": "Kansas St.",
+    "morgan-state": "Morgan St.",
+    "east-tennessee-state": "East Tennessee St."
+   }
+  },
+  "2020-11-26": {
+   "sha256": "7cf6fa4827fd6816ea3416e3a91a0076635f8176ef697d69ad7066674d462713",
+   "bytes": 54547,
+   "team_rows": 347,
+   "layout": "standard",
+   "total_games": 236
+  },
+  "2021-11-08": {
+   "sha256": "7877c51c6420a357e1a494379779906125e3baa3ae868c9d0b71228a59a15061",
+   "bytes": 52915,
+   "team_rows": 358,
+   "layout": "standard",
+   "total_games": 0
+  },
+  "2021-11-09": {
+   "sha256": "e7fbe6db95451540d7d7aa7bb09b8bafafe0ab797634c120c0b4a1f65bd3887a",
+   "bytes": 58117,
+   "team_rows": 358,
+   "layout": "standard",
+   "total_games": 304,
+   "surface_identifications": {
+    "portland-state": "Portland St.",
+    "montana-state": "Montana St.",
+    "utah-state": "Utah St.",
+    "colorado-state": "Colorado St.",
+    "south-dakota-state": "South Dakota St.",
+    "dixie-state": "Dixie St.",
+    "new-mexico-state": "New Mexico St.",
+    "boise-state": "Boise St.",
+    "jackson-state": "Jackson St.",
+    "morehead-state": "Morehead St.",
+    "tennessee-state": "Tennessee St.",
+    "alabama-state": "Alabama St.",
+    "missouri-state": "Missouri St.",
+    "southeast-missouri-state": "Southeast Missouri St.",
+    "oklahoma-state": "Oklahoma St.",
+    "indiana-state": "Indiana St.",
+    "illinois-state": "Illinois St.",
+    "arkansas-pine-bluff": "Arkansas Pine Bluff",
+    "maryland-eastern-shore": "Maryland Eastern Shore",
+    "northwestern-state": "Northwestern St.",
+    "north-carolina-state": "North Carolina St.",
+    "wichita-state": "Wichita St.",
+    "jacksonville-state": "Jacksonville St.",
+    "iowa-state": "Iowa St.",
+    "kennesaw-state": "Kennesaw St.",
+    "michigan-state": "Michigan St.",
+    "south-carolina-state": "South Carolina St.",
+    "arizona-state": "Arizona St.",
+    "illinois-chicago": "Illinois Chicago",
+    "appalachian-state": "Appalachian St.",
+    "ball-state": "Ball St.",
+    "ohio-state": "Ohio St.",
+    "bethune-cookman": "Bethune Cookman",
+    "washington-state": "Washington St.",
+    "alcorn-state": "Alcorn St."
+   }
+  },
+  "2021-11-10": {
+   "sha256": "ea61cfea3532ea2c9af6b62862a7ede5e5b1ff7df91b30e213f57cce0f7546cf",
+   "bytes": 58749,
+   "team_rows": 358,
+   "layout": "standard",
+   "total_games": 352
+  },
+  "2022-11-06": {
+   "sha256": "0ad2ceaafbd14665131a1ef1a6a695f76227aeeb9906e85a40405c6b7f080d3b",
+   "bytes": 35629,
+   "team_rows": 363,
+   "layout": "drift_rec",
+   "total_games": 0
+  },
+  "2022-11-07": {
+   "sha256": "e182abbb1bd2506a582b12ea62ec1f971a3980a77fdd63d29d8d0ab7d8e6af07",
+   "bytes": 35803,
+   "team_rows": 363,
+   "layout": "drift_rec",
+   "total_games": 326,
+   "surface_identifications": {
+    "sacramento-state": "Sacramento St.",
+    "weber-state": "Weber St.",
+    "long-beach-state": "Long Beach St.",
+    "northwestern-state": "Northwestern St.",
+    "montana-state": "Montana St.",
+    "oklahoma-state": "Oklahoma St.",
+    "idaho-state": "Idaho St.",
+    "utah-state": "Utah St.",
+    "colorado-state": "Colorado St.",
+    "gardner-webb": "Gardner Webb",
+    "alcorn-state": "Alcorn St.",
+    "delaware-state": "Delaware St.",
+    "north-dakota-state": "North Dakota St.",
+    "arkansas-pine-bluff": "Arkansas Pine Bluff",
+    "jackson-state": "Jackson St.",
+    "illinois-state": "Illinois St.",
+    "southeast-missouri-state": "Southeast Missouri St.",
+    "murray-state": "Murray St.",
+    "wichita-state": "Wichita St.",
+    "chicago-state": "Chicago St.",
+    "sam-houston-state": "Sam Houston St.",
+    "iowa-state": "Iowa St.",
+    "north-carolina-state": "North Carolina St.",
+    "morgan-state": "Morgan St.",
+    "washington-state": "Washington St.",
+    "mississippi-state": "Mississippi St.",
+    "alabama-state": "Alabama St.",
+    "morehead-state": "Morehead St.",
+    "south-dakota-state": "South Dakota St.",
+    "indiana-state": "Indiana St.",
+    "maryland-eastern-shore": "Maryland Eastern Shore",
+    "kent-state": "Kent St.",
+    "michigan-state": "Michigan St.",
+    "arizona-state": "Arizona St.",
+    "tarleton-state": "Tarleton St.",
+    "penn-state": "Penn St.",
+    "ohio-state": "Ohio St.",
+    "bethune-cookman": "Bethune Cookman",
+    "florida-state": "Florida St.",
+    "coppin-state": "Coppin St.",
+    "mississippi-valley-state": "Mississippi Valley St."
+   }
+  },
+  "2022-11-08": {
+   "sha256": "c4010b13d79ed21521d480f5ce94b7ed495337743b0799f2087a99d9a44a5c3c",
+   "bytes": 35809,
+   "team_rows": 363,
+   "layout": "drift_rec",
+   "total_games": 343
+  },
+  "2015-04-05": {
+   "sha256": "78eda7539874ef4f3ea0719f281245bd0fd8d903a3a630707853a2acfdc91cfe",
+   "bytes": 55527,
+   "team_rows": 351,
+   "layout": "standard",
+   "total_games": 10996
+  },
+  "2015-04-06": {
+   "sha256": "0241b2caa215643c61efa2af9ff36f63f998fcfa8cf92f8b15379cfbe3350d40",
+   "bytes": 55539,
+   "team_rows": 351,
+   "layout": "standard",
+   "total_games": 10998
+  },
+  "2016-04-03": {
+   "sha256": "328a88eb504f9d59e39404a08cc4a900adf2a13f489a277d4d419c4387d98806",
+   "bytes": 55479,
+   "team_rows": 351,
+   "layout": "standard",
+   "total_games": 11030
+  },
+  "2016-04-04": {
+   "sha256": "034fee73cf19e8eb219c85c1fcf4f56e2a49743347d5134f33d10628259696ce",
+   "bytes": 55495,
+   "team_rows": 351,
+   "layout": "standard",
+   "total_games": 11032
+  },
+  "2017-04-02": {
+   "sha256": "b0cec6afb3e43d512f0d36423995bb520753e8bba7be918c9769cbc5d5ad1f77",
+   "bytes": 55548,
+   "team_rows": 351,
+   "layout": "standard",
+   "total_games": 11068
+  },
+  "2017-04-03": {
+   "sha256": "c7cf26750923b3b8d29adb11bea30d673efd5f952f4461406c10c7bace25be3d",
+   "bytes": 55523,
+   "team_rows": 351,
+   "layout": "standard",
+   "total_games": 11070
+  },
+  "2018-04-01": {
+   "sha256": "df6069b17da7a55812827e0a89ea5c3d7aa4028abea287ad418adc83c46237d6",
+   "bytes": 55548,
+   "team_rows": 351,
+   "layout": "standard",
+   "total_games": 11078
+  },
+  "2018-04-02": {
+   "sha256": "69e87ce85baef0bbb127121e21048906402620013c8caa24904651f759b95878",
+   "bytes": 55546,
+   "team_rows": 351,
+   "layout": "standard",
+   "total_games": 11080
+  },
+  "2019-04-07": {
+   "sha256": "dfa529b5913c8ba5d736a8cc366d3564628b4cbc07365770d59ad2990e3aa185",
+   "bytes": 55842,
+   "team_rows": 353,
+   "layout": "standard",
+   "total_games": 11204
+  },
+  "2019-04-08": {
+   "sha256": "11c8d75666bafd768a6b10715218c0394d56d52f453423cecd7912e5865e4309",
+   "bytes": 55889,
+   "team_rows": 353,
+   "layout": "standard",
+   "total_games": 11206
+  },
+  "2021-04-04": {
+   "sha256": "e39aacb0f88082241de50e045d5036a4dba52a2640e649779c8f546c49252afa",
+   "bytes": 54561,
+   "team_rows": 347,
+   "layout": "standard",
+   "total_games": 8227
+  },
+  "2021-04-05": {
+   "sha256": "df2bf8c47ba1de8123b5e67a2ac85d7ec8da43676aa3eb318ec59e5fca4724db",
+   "bytes": 54544,
+   "team_rows": 347,
+   "layout": "standard",
+   "total_games": 8229
+  },
+  "2022-04-03": {
+   "sha256": "2d7c62c46e8838be070f9df6c8a711b0f603aa2830bfc530d3d1c901b8550763",
+   "bytes": 56643,
+   "team_rows": 358,
+   "layout": "standard",
+   "total_games": 11440
+  },
+  "2022-04-04": {
+   "sha256": "3bb00a668a72d75fc57fa8daf899c391d398ec90a1769dbf8166e2e1f984ce34",
+   "bytes": 56639,
+   "team_rows": 358,
+   "layout": "standard",
+   "total_games": 11442
+  },
+  "2023-04-02": {
+   "sha256": "d1149f3011bb7a2819cc26bd6bb0c5e2ec82ba66a19501c1c03c301d8d9b226a",
+   "bytes": 59603,
+   "team_rows": 363,
+   "layout": "standard",
+   "total_games": 11933
+  },
+  "2023-04-03": {
+   "sha256": "e07a10fa433a060247202202102e8b99cef1656f936d04c93708201066063ef3",
+   "bytes": 59587,
+   "team_rows": 363,
+   "layout": "standard",
+   "total_games": 11935
+  },
+  "2023-03-11": {
+   "sha256": "ee056bcd620619c151af0d4f9fdc8f41102331cbefc8b79a24e3dfd351e3e0bc",
+   "bytes": 59614,
+   "team_rows": 363,
+   "layout": "standard",
+   "total_games": 11699,
+   "surface_identifications": {
+    "penn-state": "Penn St."
+   }
+  },
+  "2020-03-10": {
+   "sha256": "61e317af75a35a6bc1ac3afdf7abb237144c4e769011d7e67a5ee9f5b02646dc",
+   "bytes": 56431,
+   "team_rows": 353,
+   "layout": "standard",
+   "total_games": 11022,
+   "surface_identifications": {
+    "washington-state": "Washington St.",
+    "kansas-state": "Kansas St.",
+    "appalachian-state": "Appalachian St.",
+    "georgia-state": "Georgia St.",
+    "oklahoma-state": "Oklahoma St.",
+    "iowa-state": "Iowa St.",
+    "northwestern-state": "Northwestern St.",
+    "delaware-state": "Delaware St.",
+    "idaho-state": "Idaho St.",
+    "north-carolina-state": "North Carolina St.",
+    "weber-state": "Weber St.",
+    "sacramento-state": "Sacramento St."
+   }
+  },
+  "2020-03-11": {
+   "sha256": "e2304ecda9b9a2a353aa685454dfb25fcb5277a46a65506b3b6a4f61b4c63901",
+   "bytes": 56382,
+   "team_rows": 353,
+   "layout": "standard",
+   "total_games": 11090,
+   "surface_identifications": {
+    "washington-state": "Washington St.",
+    "kansas-state": "Kansas St.",
+    "appalachian-state": "Appalachian St.",
+    "georgia-state": "Georgia St.",
+    "oklahoma-state": "Oklahoma St.",
+    "iowa-state": "Iowa St.",
+    "northwestern-state": "Northwestern St.",
+    "delaware-state": "Delaware St.",
+    "idaho-state": "Idaho St.",
+    "north-carolina-state": "North Carolina St.",
+    "weber-state": "Weber St.",
+    "sacramento-state": "Sacramento St."
+   }
+  }
+ },
+ "torvik_files_missing": [],
+ "probes": [
+  {
+   "probe": "W1",
+   "season": "2014-15",
+   "game_date": "2014-11-14",
+   "prior_file": "2014-11-13",
+   "games_on_date": 154,
+   "prior_file_total_games": 0,
+   "file_D_both_resolved_games_checked": 93,
+   "file_D_spotcheck_violations": 0,
+   "classified_dating_edges": [],
+   "hard_violations": [],
+   "unresolvable_games": 61,
+   "witness_detail": {
+    "duke": {
+     "slug": "duke",
+     "identified_via": "slug",
+     "entering_substrate_all_games": "0-0",
+     "file_D-1": "0-0",
+     "file_D": "1-0",
+     "delta_gate": "PASS",
+     "equality_gate": "PASS",
+     "deviation": null,
+     "verdict": "PASS"
+    },
+    "kentucky": {
+     "slug": "kentucky",
+     "identified_via": "slug",
+     "entering_substrate_all_games": "0-0",
+     "file_D-1": "0-0",
+     "file_D": "1-0",
+     "delta_gate": "PASS",
+     "equality_gate": "PASS",
+     "deviation": null,
+     "verdict": "PASS"
+    },
+    "wisconsin": {
+     "slug": "wisconsin",
+     "identified_via": "slug",
+     "entering_substrate_all_games": "0-0",
+     "file_D-1": "0-0",
+     "file_D": "1-0",
+     "delta_gate": "PASS",
+     "equality_gate": "PASS",
+     "deviation": null,
+     "verdict": "PASS"
+    },
+    "attempt3_fingerprints": {
+     "wisconsin_adj_d_D-1_D": [
+      90.405,
+      89.118
+     ],
+     "kentucky_adj_o_D-1_D": [
+      117.724,
+      117.434
+     ],
+     "expected_from_attempt3": {
+      "wisconsin_adj_d": [
+       90.405,
+       89.118
+      ],
+      "kentucky_adj_o": [
+       117.724,
+       117.434
+      ]
+     },
+     "reproduce": true
+    }
+   },
+   "verdict": "PASS"
+  },
+  {
+   "probe": "F1",
+   "season": "2015-16",
+   "game_date": "2015-11-13",
+   "prior_file": "2015-11-12",
+   "games_on_date": 154,
+   "prior_file_total_games": 0,
+   "file_D_both_resolved_games_checked": 97,
+   "file_D_spotcheck_violations": 0,
+   "classified_dating_edges": [],
+   "hard_violations": [],
+   "unresolvable_games": 57,
+   "verdict": "PASS"
+  },
+  {
+   "probe": "F1",
+   "season": "2016-17",
+   "game_date": "2016-11-11",
+   "prior_file": "2016-11-10",
+   "games_on_date": 162,
+   "prior_file_total_games": 0,
+   "file_D_both_resolved_games_checked": 101,
+   "file_D_spotcheck_violations": 1,
+   "classified_dating_edges": [
+    {
+     "game": "Harvard 70 @ Stanford 80",
+     "class": "DATING_EDGE_LATE_INCLUSION",
+     "filed_under": "2016-11-12"
+    }
+   ],
+   "hard_violations": [],
+   "unresolvable_games": 61,
+   "verdict": "PASS"
+  },
+  {
+   "probe": "F1",
+   "season": "2017-18",
+   "game_date": "2017-11-10",
+   "prior_file": "2017-11-09",
+   "games_on_date": 162,
+   "prior_file_total_games": 0,
+   "file_D_both_resolved_games_checked": 97,
+   "file_D_spotcheck_violations": 0,
+   "classified_dating_edges": [],
+   "hard_violations": [],
+   "unresolvable_games": 65,
+   "verdict": "PASS"
+  },
+  {
+   "probe": "F1",
+   "season": "2018-19",
+   "game_date": "2018-11-06",
+   "prior_file": "2018-11-05",
+   "games_on_date": 146,
+   "prior_file_total_games": 0,
+   "file_D_both_resolved_games_checked": 84,
+   "file_D_spotcheck_violations": 0,
+   "classified_dating_edges": [],
+   "hard_violations": [],
+   "unresolvable_games": 62,
+   "verdict": "PASS"
+  },
+  {
+   "probe": "F1",
+   "season": "2019-20",
+   "game_date": "2019-11-05",
+   "prior_file": "2019-11-04",
+   "games_on_date": 148,
+   "prior_file_total_games": 0,
+   "file_D_both_resolved_games_checked": 74,
+   "file_D_spotcheck_violations": 0,
+   "classified_dating_edges": [],
+   "hard_violations": [],
+   "unresolvable_games": 74,
+   "verdict": "PASS"
+  },
+  {
+   "probe": "F1",
+   "season": "2020-21",
+   "game_date": "2020-11-25",
+   "prior_file": "2020-11-24",
+   "games_on_date": 107,
+   "prior_file_total_games": 0,
+   "file_D_both_resolved_games_checked": 66,
+   "file_D_spotcheck_violations": 0,
+   "classified_dating_edges": [],
+   "hard_violations": [],
+   "unresolvable_games": 41,
+   "verdict": "PASS"
+  },
+  {
+   "probe": "F1",
+   "season": "2021-22",
+   "game_date": "2021-11-09",
+   "prior_file": "2021-11-08",
+   "games_on_date": 184,
+   "prior_file_total_games": 0,
+   "file_D_both_resolved_games_checked": 98,
+   "file_D_spotcheck_violations": 0,
+   "classified_dating_edges": [],
+   "hard_violations": [],
+   "unresolvable_games": 86,
+   "verdict": "PASS"
+  },
+  {
+   "probe": "F1",
+   "season": "2022-23",
+   "game_date": "2022-11-07",
+   "prior_file": "2022-11-06",
+   "games_on_date": 200,
+   "prior_file_total_games": 0,
+   "file_D_both_resolved_games_checked": 105,
+   "file_D_spotcheck_violations": 0,
+   "classified_dating_edges": [],
+   "hard_violations": [],
+   "unresolvable_games": 95,
+   "verdict": "PASS"
+  },
+  {
+   "probe": "T1",
+   "season": "2014-15",
+   "game_date": "2015-04-06",
+   "games_on_date": 1,
+   "declared_pair_agrees_with_substrate": true,
+   "teams": [
+    {
+     "slug": "duke",
+     "identified_via": "slug",
+     "entering_substrate_all_games": "34-4",
+     "file_D-1": "34-4",
+     "file_D": "35-4",
+     "delta_gate": "PASS",
+     "equality_gate": "PASS",
+     "deviation": null,
+     "verdict": "PASS"
+    },
+    {
+     "slug": "wisconsin",
+     "identified_via": "slug",
+     "entering_substrate_all_games": "36-3",
+     "file_D-1": "36-3",
+     "file_D": "36-4",
+     "delta_gate": "PASS",
+     "equality_gate": "PASS",
+     "deviation": null,
+     "verdict": "PASS"
+    }
+   ],
+   "verdict": "PASS"
+  },
+  {
+   "probe": "T1",
+   "season": "2015-16",
+   "game_date": "2016-04-04",
+   "games_on_date": 1,
+   "declared_pair_agrees_with_substrate": true,
+   "teams": [
+    {
+     "slug": "north-carolina",
+     "identified_via": "slug",
+     "entering_substrate_all_games": "33-6",
+     "file_D-1": "33-6",
+     "file_D": "33-7",
+     "delta_gate": "PASS",
+     "equality_gate": "PASS",
+     "deviation": null,
+     "verdict": "PASS"
+    },
+    {
+     "slug": "villanova",
+     "identified_via": "slug",
+     "entering_substrate_all_games": "33-5",
+     "file_D-1": "34-5",
+     "file_D": "35-5",
+     "delta_gate": "PASS",
+     "deviation": {
+      "class": "EXPLAINED_SUBSTRATE_OMISSION",
+      "games": [
+       {
+        "date": "2015-11-20",
+        "opponent": "east-tennessee-state",
+        "won": true
+       }
+      ]
+     },
+     "equality_gate": "PASS_EXPLAINED",
+     "verdict": "PASS"
+    }
+   ],
+   "verdict": "PASS"
+  },
+  {
+   "probe": "T1",
+   "season": "2016-17",
+   "game_date": "2017-04-03",
+   "games_on_date": 1,
+   "declared_pair_agrees_with_substrate": true,
+   "teams": [
+    {
+     "slug": "gonzaga",
+     "identified_via": "slug",
+     "entering_substrate_all_games": "37-1",
+     "file_D-1": "37-1",
+     "file_D": "37-2",
+     "delta_gate": "PASS",
+     "equality_gate": "PASS",
+     "deviation": null,
+     "verdict": "PASS"
+    },
+    {
+     "slug": "north-carolina",
+     "identified_via": "slug",
+     "entering_substrate_all_games": "32-7",
+     "file_D-1": "31-7",
+     "file_D": "32-7",
+     "delta_gate": "PASS",
+     "deviation": {
+      "class": "EXPLAINED_NON_UNIVERSE_OPPONENT",
+      "games": [
+       {
+        "date": "2016-11-21",
+        "opponent_surface": "Chaminade",
+        "result": "W"
+       }
+      ]
+     },
+     "equality_gate": "PASS_EXPLAINED",
+     "verdict": "PASS"
+    }
+   ],
+   "verdict": "PASS"
+  },
+  {
+   "probe": "T1",
+   "season": "2017-18",
+   "game_date": "2018-04-02",
+   "games_on_date": 1,
+   "declared_pair_agrees_with_substrate": true,
+   "teams": [
+    {
+     "slug": "michigan",
+     "identified_via": "slug",
+     "entering_substrate_all_games": "33-7",
+     "file_D-1": "32-7",
+     "file_D": "32-8",
+     "delta_gate": "PASS",
+     "deviation": {
+      "class": "EXPLAINED_NON_UNIVERSE_OPPONENT",
+      "games": [
+       {
+        "date": "2017-11-21",
+        "opponent_surface": "Chaminade",
+        "result": "W"
+       }
+      ]
+     },
+     "equality_gate": "PASS_EXPLAINED",
+     "verdict": "PASS"
+    },
+    {
+     "slug": "villanova",
+     "identified_via": "slug",
+     "entering_substrate_all_games": "35-4",
+     "file_D-1": "35-4",
+     "file_D": "36-4",
+     "delta_gate": "PASS",
+     "equality_gate": "PASS",
+     "deviation": null,
+     "verdict": "PASS"
+    }
+   ],
+   "verdict": "PASS"
+  },
+  {
+   "probe": "T1",
+   "season": "2018-19",
+   "game_date": "2019-04-08",
+   "games_on_date": 1,
+   "declared_pair_agrees_with_substrate": true,
+   "teams": [
+    {
+     "slug": "texas-tech",
+     "identified_via": "slug",
+     "entering_substrate_all_games": "31-6",
+     "file_D-1": "31-6",
+     "file_D": "31-7",
+     "delta_gate": "PASS",
+     "equality_gate": "PASS",
+     "deviation": null,
+     "verdict": "PASS"
+    },
+    {
+     "slug": "virginia",
+     "identified_via": "slug",
+     "entering_substrate_all_games": "34-3",
+     "file_D-1": "34-3",
+     "file_D": "35-3",
+     "delta_gate": "PASS",
+     "equality_gate": "PASS",
+     "deviation": null,
+     "verdict": "PASS"
+    }
+   ],
+   "verdict": "PASS"
+  },
+  {
+   "probe": "T1",
+   "season": "2020-21",
+   "game_date": "2021-04-05",
+   "games_on_date": 1,
+   "declared_pair_agrees_with_substrate": true,
+   "teams": [
+    {
+     "slug": "baylor",
+     "identified_via": "slug",
+     "entering_substrate_all_games": "27-2",
+     "file_D-1": "27-2",
+     "file_D": "28-2",
+     "delta_gate": "PASS",
+     "equality_gate": "PASS",
+     "deviation": null,
+     "verdict": "PASS"
+    },
+    {
+     "slug": "gonzaga",
+     "identified_via": "slug",
+     "entering_substrate_all_games": "31-0",
+     "file_D-1": "31-0",
+     "file_D": "31-1",
+     "delta_gate": "PASS",
+     "equality_gate": "PASS",
+     "deviation": null,
+     "verdict": "PASS"
+    }
+   ],
+   "verdict": "PASS"
+  },
+  {
+   "probe": "T1",
+   "season": "2021-22",
+   "game_date": "2022-04-04",
+   "games_on_date": 1,
+   "declared_pair_agrees_with_substrate": true,
+   "teams": [
+    {
+     "slug": "kansas",
+     "identified_via": "slug",
+     "entering_substrate_all_games": "33-6",
+     "file_D-1": "33-6",
+     "file_D": "34-6",
+     "delta_gate": "PASS",
+     "equality_gate": "PASS",
+     "deviation": null,
+     "verdict": "PASS"
+    },
+    {
+     "slug": "north-carolina",
+     "identified_via": "slug",
+     "entering_substrate_all_games": "29-9",
+     "file_D-1": "29-9",
+     "file_D": "29-10",
+     "delta_gate": "PASS",
+     "equality_gate": "PASS",
+     "deviation": null,
+     "verdict": "PASS"
+    }
+   ],
+   "verdict": "PASS"
+  },
+  {
+   "probe": "T1",
+   "season": "2022-23",
+   "game_date": "2023-04-03",
+   "games_on_date": 1,
+   "declared_pair_agrees_with_substrate": true,
+   "teams": [
+    {
+     "slug": "connecticut",
+     "identified_via": "slug",
+     "entering_substrate_all_games": "30-8",
+     "file_D-1": "30-8",
+     "file_D": "31-8",
+     "delta_gate": "PASS",
+     "equality_gate": "PASS",
+     "deviation": null,
+     "verdict": "PASS"
+    },
+    {
+     "slug": "san-diego-state",
+     "identified_via": "slug",
+     "entering_substrate_all_games": "32-6",
+     "file_D-1": "32-6",
+     "file_D": "32-7",
+     "delta_gate": "PASS",
+     "equality_gate": "PASS",
+     "deviation": null,
+     "verdict": "PASS"
+    }
+   ],
+   "verdict": "PASS"
+  },
+  {
+   "probe": "W2",
+   "season": "2022-23",
+   "game_date": "2023-03-12",
+   "game": "Penn State 65 @ Purdue 67",
+   "teams": [
+    {
+     "slug": "purdue",
+     "identified_via": "slug",
+     "entering_substrate_all_games": "28-5",
+     "file_D-1": "28-5",
+     "file_D": "29-5",
+     "delta_gate": "PASS",
+     "equality_gate": "PASS",
+     "deviation": null,
+     "verdict": "PASS"
+    },
+    {
+     "slug": "penn-state",
+     "identified_via": "surface:Penn St.",
+     "entering_substrate_all_games": "22-12",
+     "file_D-1": "22-12",
+     "file_D": "22-13",
+     "delta_gate": "PASS",
+     "equality_gate": "PASS",
+     "deviation": null,
+     "verdict": "PASS"
+    }
+   ],
+   "verdict": "PASS"
+  },
+  {
+   "probe": "L1",
+   "season": "2019-20",
+   "game_date": "2020-03-11",
+   "substitute_for": "championship probe \u2014 no 2020 championship game exists (tournament cancelled)",
+   "games_on_date": 34,
+   "team_slots": 68,
+   "resolved_slots": 63,
+   "coverage": 0.9265,
+   "teams_checked": 63,
+   "failures": [],
+   "verdict": "PASS"
+  }
+ ],
+ "summary": {
+  "probes": 19,
+  "pass": 19,
+  "fail": 0,
+  "verdict": "PRIOR_SNAPSHOT_VERIFIED"
+ }
+}
