@@ -1,0 +1,156 @@
+{
+ "screen": "CBB_FIRST_HALF_DESIGN_SCREEN_ATTEMPT_1",
+ "family": "CBB first-half lines (1H spread / 1H total)",
+ "design_reference": "research/nba_cbb_activation_20261028/CBB_TEAM_TOTALS_1H_DESIGN.md section 2 (PR #2843); parent construction/protocol: CBB_SIDES_TOTALS_DESIGN_AND_PREREG_DRAFT.md sections 1-3",
+ "prerequisite_reference": "research/cbb_hoopr_pbp_admission_20261028/ (PR #2901, ADMITTED \u2014 design-screen use for the CBB 1H family only)",
+ "input_convention": "Torvik prior-snapshot (Amendment 1, PR #2883) governs any candidate full-game expectation, as executed in PRs #2891/#2892 \u2014 NOT REACHED: no expectation was computed.",
+ "evidence_class": "DESIGN",
+ "run_date": "2026-10-28",
+ "verdict": "NOT_EXECUTABLE",
+ "refusal": {
+  "code": "SCREEN_SPEC_INCOMPLETE_1H",
+  "detail": "The 1H design's section 2 is a screen SHAPE, not a runnable spec: it names the metrics (1H-total MAE, 1H-margin MAE) and one baseline by name, but supplies no verdict rule, no baseline construction, no share estimator, no scored-season set, no inference procedure, and no fixture-universe composition. Running the screen would require the runner to invent all six. Per standing law the screen records NOT_EXECUTABLE with the gaps named; no criterion was edited and no substitute term was adopted. The Oct 28 PBP admission (PR #2901) cleared the design's named data prerequisite \u2014 the blocker is now the spec, not the data."
+ },
+ "gaps": [
+  {
+   "id": "G-1H-1",
+   "name": "verdict_rule_pass_bar",
+   "detail": "No CI test, threshold, or DESIGN_PASS condition is stated for either 1H leg. The parent section 3 bar is written for the spread/total legs and is not imported by section 2 (contrast section 1, which imports the section 3 protocol and its CI for team totals explicitly)."
+  },
+  {
+   "id": "G-1H-2",
+   "name": "baseline_construction",
+   "detail": "'Naive half-share climatology' is named but never constructed: what full-game expectation it scales and how its share is estimated are both unstated."
+  },
+  {
+   "id": "G-1H-3",
+   "name": "share_estimator",
+   "detail": "The candidate's 'one share for team points' has no estimator: mean of per-game ratios vs ratio of sums, league-wide vs per-team, overtime treatment, and fitting universe (final-gated PBP vs all PBP games) are unstated."
+  },
+  {
+   "id": "G-1H-4",
+   "name": "scored_seasons",
+   "detail": "Section 2 names no scored-season span. Pinned PBP begins 2014-15; under the strictly-prior fitting rule the first season's status (scored vs fit-only) is undecided in the text."
+  },
+  {
+   "id": "G-1H-5",
+   "name": "inference_procedure",
+   "detail": "No bootstrap design, resample count, or seed is declared for the 1H legs."
+  },
+  {
+   "id": "G-1H-6",
+   "name": "fixture_universe_composition",
+   "detail": "The scored universe composition is unstated: parent three-way-agreed universe (26,553 fixtures in PRs #2891/#2892) intersected with the admission's final-agreement PBP gate, vs schedule universe under the PBP gate alone."
+  }
+ ],
+ "criteria": {
+  "1h_total_mae_vs_naive_half_share_climatology": "NOT RUN \u2014 no verdict rule or baseline construction exists to run it against (G-1H-1, G-1H-2)",
+  "1h_margin_mae_vs_naive_half_share_climatology": "NOT RUN \u2014 no verdict rule or baseline construction exists to run it against (G-1H-1, G-1H-2)"
+ },
+ "prerequisite": {
+  "status": "SATISFIED",
+  "detail": "HoopR PBP pinned full-tuple with schema verification (PR #2901). Method A (running score at end of period 1) is the admitted halftime derivation (33/33 vs ESPN published linescores); Method B (summing score_value) is REFUSED and was not used. Binding consumer gate: a fixture's halftime may be consumed only when its Method-A derived final equals the admitted schedule final. This screen reached no fixture consumption \u2014 the gate is recorded for the future executable run.",
+  "seasons_pinned": [
+   "2015",
+   "2016",
+   "2017",
+   "2018",
+   "2019",
+   "2020",
+   "2021",
+   "2022",
+   "2023"
+  ]
+ },
+ "fixture_universe": {
+  "source": "PR #2901 admission manifest coverage block (research/cbb_hoopr_pbp_admission_20261028/pbp_manifest.json), recomputed by audit_screen_spec.py",
+  "schedule_games_in_span": 52126,
+  "pbp_games": 48623,
+  "excluded_no_pbp_no_data": 3503,
+  "method_a_final_agreement_gated": 47903,
+  "parent_three_way_agreed_universe_reference": 26553,
+  "illinois_excluded_within_1h_universe": "NOT COMPUTED \u2014 the composition it would be computed on is itself undefined (G-1H-6); the Illinois exclusion binds any future executable run identically to the parent screens",
+  "scored": 0,
+  "scored_note": "No fixture was fitted, priced, or scored. 'Scored: 0' is the honest count for a NOT_EXECUTABLE screen, not a data failure."
+ },
+ "spec_audit": [
+  {
+   "element": "data_prerequisite_pinned_pbp_with_schema",
+   "state": "PRESENT",
+   "evidence": "PR #2901 admission manifest: 9 season files full-tuple pinned, schema verified; manifest 'satisfies' block clears PBP_PREREQUISITE_MISSING for design-screen use of CBB 1H only.",
+   "seasons_pinned": [
+    "2015",
+    "2016",
+    "2017",
+    "2018",
+    "2019",
+    "2020",
+    "2021",
+    "2022",
+    "2023"
+   ],
+   "universe_from_manifest": {
+    "schedule_games": 52126,
+    "pbp_games": 48623,
+    "no_pbp_no_data": 3503,
+    "method_a_final_agreement_gated": 47903
+   }
+  },
+  {
+   "element": "metrics_named",
+   "state": "PRESENT",
+   "evidence": "Section 2 names '1H-total MAE and 1H-margin MAE'.",
+   "gap": null
+  },
+  {
+   "element": "outcome_derivation",
+   "state": "PRESENT",
+   "evidence": "Section 2: '1H outcomes are derived from the pinned PBP itself'; admission record binds Method A (running score) with the final-agreement consumer gate; Method B refused.",
+   "gap": null
+  },
+  {
+   "element": "share_fitting_window",
+   "state": "PRESENT",
+   "evidence": "Section 2: 'the share is fitted on seasons strictly before each scored season' (walk-forward window stated).",
+   "gap": null
+  },
+  {
+   "element": "verdict_rule_pass_bar",
+   "state": "ABSENT",
+   "evidence": "Section 2 contains no CI test, threshold, or pass condition (probe: False). The parent section 3 bar ('CI upper bound < 0 against both baselines on both legs') is written for the spread/total legs only (scoped probe: True) and section 2 does not import it \u2014 unlike section 1 for team totals, which imports the section 3 protocol and its CI explicitly (probe: True).",
+   "gap": "G-1H-1"
+  },
+  {
+   "element": "baseline_construction",
+   "state": "ABSENT",
+   "evidence": "Baseline named (probe: True) but never constructed (probe: False): the text does not state what full-game expectation the climatology scales, nor how the baseline's own share is estimated.",
+   "gap": "G-1H-2"
+  },
+  {
+   "element": "share_estimator",
+   "state": "ABSENT",
+   "evidence": "Section 2 fixes 'one share for team points, applied to margin and total alike' but never defines the estimator (probe: False): mean of per-game ratios vs ratio of sums, league-wide vs per-team, treatment of overtime games, and the fitting universe (final-gated PBP vs all PBP games) are all unstated.",
+   "gap": "G-1H-3"
+  },
+  {
+   "element": "scored_seasons",
+   "state": "ABSENT",
+   "evidence": "Section 2 names no season span (probe: False). The pinned PBP begins 2014-15, so the walk-forward rule leaves the first season's status undecided in the text: scored with an undefined share, or fit-only.",
+   "gap": "G-1H-4"
+  },
+  {
+   "element": "inference_procedure",
+   "state": "ABSENT",
+   "evidence": "Section 2 declares no bootstrap design, resample count, or seed (probe: False). The parent section 3 season-block bootstrap is written for the spread/total legs; the executed sibling screens' 10,000 reps / seed 20261028 come from those families' own governing texts, not from anything written for 1H.",
+   "gap": "G-1H-5"
+  },
+  {
+   "element": "fixture_universe_composition",
+   "state": "ABSENT",
+   "evidence": "Section 2 does not state the scored fixture universe (probe: False): whether candidate expectations are computed on the parent screens' three-way-agreed universe intersected with the admission's final-agreement PBP gate, or on the schedule universe under the PBP gate alone, is a composition choice the text never makes.",
+   "gap": "G-1H-6"
+  }
+ ],
+ "what_would_unblock": "A design amendment for the 1H family \u2014 the same instrument that closed the sibling families' G-1/G-2/G-3 (Amendment 2, PR #2906) \u2014 supplying: (1) the verdict rule for both legs; (2) the climatology baseline's construction; (3) the share estimator; (4) the scored-season set and the first season's status; (5) the inference procedure (resamples, seed); (6) the fixture-universe composition. Adoption of such an amendment is the owner's recorded act; this packet proposes none of the six terms.",
+ "non_effects": "No construction was fitted or run; no share was estimated; no criterion, threshold, or leg of any design was edited; the PR #2892 first-half record (NOT_EXECUTABLE \u2014 PBP_PREREQUISITE_MISSING) stands as executed at its run time and is superseded only as to its stated reason: the prerequisite it named has since been satisfied, and the screen remains NOT_EXECUTABLE on the new reason recorded here."
+}
