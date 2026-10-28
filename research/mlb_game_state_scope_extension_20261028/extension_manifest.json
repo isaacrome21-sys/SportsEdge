@@ -1,0 +1,130 @@
+{
+ "construction": "MLB_GAME_STATE_V1",
+ "coverage": {
+  "game_count_crosscheck": "2022-2024 game total 7,289 equals the game count the PR #2856 derivation parsed from the same zips",
+  "games": {
+   "2022": 2430,
+   "2023": 2430,
+   "2024": 2429,
+   "2025": 2430,
+   "total": 9719
+  },
+  "plate_appearances": {
+   "2022": 182466,
+   "2023": 184506,
+   "2024": 182903,
+   "2025": 183385,
+   "total": 733260
+  },
+  "slot_transitions_checked": 713822,
+  "slot_violations": 0,
+  "start_records_per_game": 20,
+  "unresolved_batter_total": 0,
+  "unresolved_pitcher_total": 0
+ },
+ "crosscheck": {
+  "games": [
+   "HOU202303300",
+   "LAN202403280",
+   "ANA202504040"
+  ],
+  "result": "3 of 3 games: final score and per-team plate-appearance totals reproduced exactly",
+  "source": "MLB StatsAPI (free, no key): schedule + live feed linescore and play-by-play"
+ },
+ "design_only": true,
+ "design_ref": "research/mlb_game_lines_successor_20261028/DESIGN.md (PR #2887), section 3 input 1 and section 6 step A",
+ "escape_hatch": {
+  "declared_in": "DESIGN.md section 7 collapse condition: if the pinned Retrosheet bytes cannot support lineup reconstruction at PA level, the verdict collapses to NO_VIABLE_SUCCESSOR until a PA-level source is admitted, with the 2027 clock plan reverting to capture-only accrual",
+  "triggered": false
+ },
+ "forward_clock_credit": false,
+ "known_anomalies": [
+  "one 2025 roster record (cortc001, Carlos Cortes, ATH, OF) carries throws = 'B'; he never appears at fielding position 1 in the 2025 files, so the anomaly touches no plate appearance; a build that consumes pitcher handedness should still refuse or declare a treatment for a non-L/R throws value",
+  "2024 contains 2,429 games, not 2,430 (one regular-season game not played); this is the same count the PR #2856 derivation parsed"
+ ],
+ "packet": "mlb_game_state_scope_extension_20261028",
+ "parsing_rules": [
+  "play records with event exactly 'NP' are substitution markers, not plays: skip (no plate appearance occurs)",
+  "a play record completes the batter's PA unless every segment of its primary event is baserunning-only (POCS/CS/SB/PO/PB/WP/BK/DI/OA/NP/FLE with digit or H base designators; error parentheticals may be truncated by the '/' modifier split)",
+  "pitcher of record for a PA = the fielding team's current position-1 player under start/sub defensive state",
+  "switch hitter (ROS bats = B) bats from the side opposite the pitcher of record's throwing hand"
+ ],
+ "play_eligible": false,
+ "prior_pin_ref": "research/retrosheet_park_factor_pin_20261027/PIN_RECORD.md (PR #2856)",
+ "schema": {
+  "handedness_fields": "roster .ROS records: player_id, last, first, bats (L/R/B), throws (L/R), team, position. Switch hitters carry bats = B and are resolved per PA to the side opposite the pitcher of record's throwing hand (declared convention)",
+  "lineup_fields": "start/sub records: player_id, name, team (0=visitor, 1=home), batting slot (1-9; 0 = pitcher under the DH), fielding position (1 = pitcher, 10 = DH)",
+  "pa_fields": "play records: inning, batting team, batter player_id, balls-strikes count, pitch sequence, event string. The pitcher is not a play-record field: he is the fielding team's player at position 1 under start/sub defensive state (the standard Chadwick derivation)",
+  "per_season_contents": "61 files per zip: 30 event files ({season}{TEAM}.EVA/.EVN, e.g. 2025ANA.EVA), 30 roster files ({TEAM}{season}.ROS, e.g. ANA2025.ROS), 1 TEAM{season} file; identical inventory 2022-2025",
+  "record_type_note": "2025 adds 4 padj records (pitching adjustment) in 2,430 games; no record type is lost or changed in any season",
+  "record_types_all_seasons": [
+   "id",
+   "version",
+   "info",
+   "start",
+   "play",
+   "sub",
+   "com",
+   "data",
+   "badj",
+   "radj"
+  ],
+  "umpire_field": "info,umphome,<retrosheet_person_id> in every game's info block (ump1b/ump2b/ump3b also present)"
+ },
+ "screen_only": true,
+ "source": {
+  "access": "free public download from retrosheet.org; no account, no payment",
+  "license_note": "Retrosheet data used free of charge; attribution per Retrosheet's notice. Data bytes are not committed to the repo; hashes + URLs are the reproducible pointer.",
+  "publisher": "Retrosheet"
+ },
+ "sport": "MLB",
+ "umpire_input": {
+  "distinct_home_plate_umpire_ids": {
+   "2022": 96,
+   "2023": 94,
+   "2024": 90,
+   "2025": 92
+  },
+  "field": "info,umphome",
+  "missing_or_none": 0,
+  "present_games": 9719,
+  "total_games": 9719,
+  "verdict": "PRESENT_IN_PINNED_BYTES \u2014 the design's step-A byte verification for the umpire class passes; the pre-declared umpire descope is not triggered at the data step (the class still must earn its place by the design's ablation at screen time)"
+ },
+ "validation_credit": false,
+ "verdict": "SCOPE_EXTENSION_ADMITTED",
+ "zips": [
+  {
+   "bytes": 2497692,
+   "file": "2022eve.zip",
+   "pin_origin": "PR #2856 (re-verified byte-identical in this packet)",
+   "season": 2022,
+   "sha256": "cce73b21bed02283eb70f95e18575f4c8b60b968c75f926530b43f35c85f4c61",
+   "url": "https://www.retrosheet.org/events/2022eve.zip"
+  },
+  {
+   "bytes": 2532820,
+   "file": "2023eve.zip",
+   "pin_origin": "PR #2856 (re-verified byte-identical in this packet)",
+   "season": 2023,
+   "sha256": "301e6d36afd58f3c2f9b3dfa546cb7953b24c90a4de57a69565ccc2f2a5eb8d1",
+   "url": "https://www.retrosheet.org/events/2023eve.zip"
+  },
+  {
+   "bytes": 2674738,
+   "file": "2024eve.zip",
+   "pin_origin": "PR #2856 (re-verified byte-identical in this packet)",
+   "season": 2024,
+   "sha256": "5dfd9ed678c9c619f6a216322922c99234c067d0ec15b12790546f620ced2fa4",
+   "url": "https://www.retrosheet.org/events/2024eve.zip"
+  },
+  {
+   "bytes": 2527926,
+   "file": "2025eve.zip",
+   "pin_origin": "this packet (new pin, by the PR #2856 pattern)",
+   "season": 2025,
+   "sha256": "5ece2be6c8ec5b47b9d8d90f2ca533ceca7eee915c7e0997f9bd6d64b879303c",
+   "url": "https://www.retrosheet.org/events/2025eve.zip"
+  }
+ ]
+}
