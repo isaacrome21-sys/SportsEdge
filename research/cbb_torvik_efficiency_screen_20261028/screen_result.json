@@ -1,0 +1,66 @@
+{
+  "family": "CBB sides/totals (spread, moneyline, game total)",
+  "construction": "CBB_TORVIK_EFFICIENCY_V1",
+  "screen": "Design screen, historical (design doc section 3) \u2014 DESIGN EVIDENCE ONLY, never validation",
+  "verdict": "NOT_EXECUTABLE",
+  "verdict_reason": "Design section 3 requires data pins (a), (b), (c) BEFORE any run. Pin (b) \u2014 the successor full-tuple manifest for historical schedule/results assets \u2014 does not exist. Design section 6 states the screen cannot run until it lands.",
+  "design_source": "research/nba_cbb_activation_20261028/CBB_SIDES_TOTALS_DESIGN_AND_PREREG_DRAFT.md (PR #2843)",
+  "criteria": {
+    "spread MAE: candidate CI upper bound < 0 vs naive league-mean baseline": "NOT_RUN \u2014 precondition (b) unmet",
+    "spread MAE: candidate CI upper bound < 0 vs simple ratings baseline (section 1)": "NOT_RUN \u2014 precondition (b) unmet",
+    "total MAE: candidate CI upper bound < 0 vs naive league-mean baseline": "NOT_RUN \u2014 precondition (b) unmet",
+    "total MAE: candidate CI upper bound < 0 vs simple ratings baseline (section 1)": "NOT_RUN \u2014 precondition (b) unmet"
+  },
+  "n": {
+    "per_season": null,
+    "pooled": null,
+    "note": "No fixtures were scored; no fitting was performed."
+  },
+  "precondition_a_torvik_archive": {
+    "met": true,
+    "admission_samples_reverified": {
+      "20220113": {
+        "sha256": "4de4761caf3f581c56d9587ac9deeb954556ee5a8529948d8ef5206f9dfe14ad",
+        "bytes": 58716,
+        "team_rows": 358,
+        "match": true
+      },
+      "20230312": {
+        "sha256": "9524481d69c7b690200299387690654091565ef1d3df774ca858749e5e1cc01c",
+        "bytes": 60010,
+        "team_rows": 363,
+        "match": true
+      }
+    },
+    "season_probes_ok": 26,
+    "season_probes_total": 26
+  },
+  "precondition_b_historical_schedule_full_tuple_pin": {
+    "met": false,
+    "pr_2835_manifest_assets": [
+      "mbb_schedule_2027.parquet",
+      "mbb_schedule_2027.csv",
+      "player_box_2026.parquet",
+      "mbb_schedule_crosswalk_2026.csv",
+      "mbb_team_crosswalk_2026.csv"
+    ],
+    "historical_assets_in_pr_2835_manifest": [],
+    "repo_wide_manifest_hits": []
+  },
+  "precondition_c_three_way_agreement": {
+    "met": false,
+    "reason": "Not applicable until (b) provides a pinned fixture universe; College Basketball Reference is documented-only in the design (no bytes pulled, no pin)."
+  },
+  "screen_verdict": "NOT_EXECUTABLE",
+  "missing_piece": "Successor full-tuple manifest (PR #2835 pin rule) pinning the historical sportsdataverse-data schedule/results assets mbb_schedule_2015..mbb_schedule_2023 (CSV or parquet, each pinned independently) for seasons 2014-15 -> 2022-23.",
+  "provenance": {
+    "repo": "isaacrome21-sys/SportsEdge",
+    "base_main_head": "e9d0c197a16717273cc6f57176dbc5b8a3340a0b",
+    "torvik_mirror_pinned_commit": "46d1036443ca452fdd1c6cf25cf5dff50de68337",
+    "torvik_admission": "research/cbb_barttorvik_admission_20261027/ (PR #2832)",
+    "substrate_admission": "research/cbb_hoopr_mbb_data_admission_20261027/ (PR #2835)",
+    "as_of_rule": "Morning-of archive file per game date (PR #2832 section 2) \u2014 honored by construction: the screen never ran, so no rating was ever consumed out of rule.",
+    "illinois_exclusion": "Applied first per design section 2 (conservative name/conference over-exclusion) \u2014 vacuous here: no fixture universe exists to exclude from.",
+    "reproduction": "python3 verify_preconditions.py (this directory) re-runs every check and prints the same verdict."
+  }
+}
