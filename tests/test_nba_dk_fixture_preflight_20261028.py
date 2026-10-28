@@ -142,3 +142,19 @@ def test_no_post_tip_or_missing_provider_can_pass():
         screen(observed_at="2026-10-27T22:11:00-05:00")
     with pytest.raises(NBADataError):
         screen(source=source(rosters={}), away_name="Unknown Team")
+
+def test_espn_team_id_and_name_cannot_be_crosswired():
+    # A plausible team name on the wrong *valid* ESPN team ID is a
+    # registry mismatch, not proof of fixture team identity.
+    fixture = copy.deepcopy(FIXTURE)
+    fixture["competitions"][0]["competitors"][0]["team"]["id"] = "29"
+    with pytest.raises(NBADataError, match="NBA_DK_FIXTURE_TEAM_REGISTRY_MISMATCH"):
+        screen(source=source(fixture=fixture))
+
+
+def test_identical_player_name_across_both_rosters_refuses_ambiguity():
+    both = copy.deepcopy(ROSTERS)
+    both["22"].append({"athlete": {"id": "other-person", "displayName": "Luka Doncic"}})
+    result = screen(source=source(rosters=both))
+    assert result["screened"] == []
+    assert result["rejected"][0]["reason"] == "NBA_DK_ROW_PLAYER_OR_TIMESTAMP_UNVERIFIED"
