@@ -69,9 +69,12 @@ QUOTE_PRICE_MISSING = "NBA_PROP_QUOTE_PRICE_MISSING"
 QUOTE_PRICE_INVALID = "NBA_PROP_QUOTE_PRICE_INVALID"
 QUOTE_TIMESTAMP_MISSING = "NBA_PROP_QUOTE_TIMESTAMP_MISSING"
 QUOTE_TIMESTAMP_INVALID = "NBA_PROP_QUOTE_TIMESTAMP_INVALID"
+QUOTE_TIMESTAMP_CONFLICT = "NBA_PROP_QUOTE_TIMESTAMP_CONFLICT"
 BOOK_UNVERIFIED = "NBA_PROP_BOOK_UNVERIFIED"
 QUOTE_NOT_PRE_EVENT = "NBA_PROP_QUOTE_NOT_PRE_EVENT"
 TARGET_START_INVALID = "NBA_PROP_TARGET_START_INVALID"
+TARGET_START_CONFLICT = "NBA_PROP_TARGET_START_CONFLICT"
+TARGET_DATE_CONFLICT = "NBA_PROP_TARGET_DATE_CONFLICT"
 
 
 def nba_prop_family_for_market(market):
@@ -375,14 +378,22 @@ def phone_nba_prop_rows(rows, *, now=None, store=None, store_dir=None,
                       else QUOTE_PRICE_INVALID)
             outputs.append(_blocked(row, family, reason))
             continue
-        raw_quote_ts = row.get("quote_captured_at") or row.get("captured_at")
-        if not raw_quote_ts:
+        # Both aliases may be present in archived/phone rows. Refuse a
+        # disagreement rather than silently selecting one clock for EV.
+        quote_values = [row[key] for key in ("quote_captured_at", "captured_at")
+                        if key in row and row[key] is not None
+                        and row[key] != ""]
+        if not quote_values:
             outputs.append(_blocked(row, family, QUOTE_TIMESTAMP_MISSING))
             continue
-        quote_ts = _parse_instant(raw_quote_ts)
-        if quote_ts is None:
+        parsed_quotes = [_parse_instant(value) for value in quote_values]
+        if any(value is None for value in parsed_quotes):
             outputs.append(_blocked(row, family, QUOTE_TIMESTAMP_INVALID))
             continue
+        if any(value != parsed_quotes[0] for value in parsed_quotes[1:]):
+            outputs.append(_blocked(row, family, QUOTE_TIMESTAMP_CONFLICT))
+            continue
+        quote_ts = parsed_quotes[0]
         # A syntactically fresh quote can still be post-tip. Compare against
         # the asserted aware fixture start before any empirical model call.
         # This does not authenticate the fixture or the quote source.
@@ -396,8 +407,38 @@ def phone_nba_prop_rows(rows, *, now=None, store=None, store_dir=None,
             if any(start is None for start in parsed_starts):
                 outputs.append(_blocked(row, family, TARGET_START_INVALID))
                 continue
-            if any(quote_ts >= start for start in parsed_starts):
+            if any(start != parsed_starts[0] for start in parsed_starts[1:]):
+                outputs.append(_blocked(row, family, TARGET_START_CONFLICT))
+                continue
+            if quote_ts >= parsed_starts[0]:
                 outputs.append(_blocked(row, family, QUOTE_NOT_PRE_EVENT))
+                continue
+            # The model's history slice must use the SAME local date as the
+            # asserted start. A conflicting date silently changes the PIT
+            # sample even when both clock values are individually pre-tip.
+            start_local_date = parsed_starts[0].astimezone(_SLATE_TZ).date()
+            if target != start_local_date:
+                outputs.append(_blocked(row, family, TARGET_DATE_CONFLICT))
+                continue
+            for date_key in ("game_date", "date"):
+                raw_date = row.get(date_key)
+                if raw_date is None or raw_date == "":
+                    continue
+                if isinstance(raw_date, str) and _BARE_DATE_RE.fullmatch(raw_date.strip()):
+                    try:
+                        stated_date = date.fromisoformat(raw_date.strip())
+                    except ValueError:
+                        stated_date = None
+                else:
+                    stated_instant = _parse_instant(raw_date)
+                    stated_date = (stated_instant.astimezone(_SLATE_TZ).date()
+                                   if stated_instant is not None else None)
+                if stated_date != start_local_date:
+                    outputs.append(_blocked(row, family, TARGET_DATE_CONFLICT))
+                    break
+            else:
+                pass
+            if outputs and outputs[-1].get("blocker") == TARGET_DATE_CONFLICT:
                 continue
         # A caller-supplied book is only a research assertion, never provider
         # authentication. Never manufacture DraftKings attribution from absence.
