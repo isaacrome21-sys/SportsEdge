@@ -111,3 +111,30 @@ def test_runner_canonical_output_is_wired_through_same_partition():
               "artifacts" / "run_it_full.py").read_text(encoding="utf-8")
     assert "partition_prop_surfaces(modeled_props)" in source
     assert 'card["prop_candidates"], card["prop_watchlist"], card["prop_quarantined"]' in source
+
+
+@pytest.mark.parametrize("hidden", [
+    {"independent_projection": {"ev_per_dollar": 0.04,
+                                "raw_ev_per_dollar": 2.818}},
+    {"independent_projection": {"ev_per_dollar": 0.04,
+                                "reported_ev_per_dollar": 0.40}},
+    {"pricing_lanes": {"lane_a_independent": {
+        "ev_per_dollar": 0.04, "raw_ev_per_dollar": 2.818}}},
+    {"pricing_lanes": {"lane_b_anchored": {
+        "ev_per_dollar": 0.04, "reported_ev_per_dollar": 0.41}}},
+])
+def test_nested_ev_alias_cannot_mask_extreme_from_raw_output(hidden):
+    candidates, watch, held = partition_prop_surfaces([row(0.04, **hidden)])
+    assert not candidates and not watch
+    assert held[0]["reason"] == "EXTREME_CLAIMED_EV_QUARANTINE"
+
+
+@pytest.mark.parametrize("hidden", [
+    {"independent_projection": {"raw_ev_per_dollar": "nan"}},
+    {"pricing_lanes": {"lane_a_independent": {
+        "reported_ev_per_dollar": float("inf")}}},
+])
+def test_malformed_nested_alias_fails_closed_from_raw_output(hidden):
+    candidates, watch, held = partition_prop_surfaces([row(0.04, **hidden)])
+    assert not candidates and not watch
+    assert held[0]["reason"] == "PROP_EV_CLAIM_INVALID"
