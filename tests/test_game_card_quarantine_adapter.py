@@ -136,8 +136,9 @@ class GameCardAdapterTests(unittest.TestCase):
             for bad in (None, "", "   ", 42, True):
                 with self.subTest(key=key, bad=bad):
                     card = self.card()
+                    detached = deepcopy(card["edges"][1])
                     card["evaluated_rows"][1][key] = bad
-                    card["edges"] = [deepcopy(card["edges"][1])]
+                    card["edges"] = [detached]
                     with self.assertRaisesRegex(
                         ValueError, "GAME_EVALUATED_IDENTITY_INVALID:" + key
                     ):
