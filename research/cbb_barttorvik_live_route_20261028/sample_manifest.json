@@ -1,0 +1,171 @@
+{
+  "admitted_route": {
+    "evidence_state": "verified-by-pull",
+    "name": "barttorvik.com live season file ({year}_team_results.csv) \u2014 the exact file hoopR::torvik_ratings() reads (verified in hoopR source: .torvik_text(paste0(\"/\", year, \"_team_results.csv\"))); no API key",
+    "pinning": "Per-pull SHA-256 snapshot. The route is a LIVING file that barttorvik.com regenerates in-season; the pin is the pull (timestamped bytes), not a commit. The morning pull for an America/Chicago date is that date's only admitted vintage.",
+    "url_pattern": "https://barttorvik.com/{year}_team_results.csv"
+  },
+  "columns_observed": [
+    "rank",
+    "team",
+    "conf",
+    "record",
+    "adjoe",
+    "oe Rank",
+    "adjde",
+    "de Rank",
+    "barthag",
+    "rank",
+    "proj. W",
+    "Proj. L",
+    "Pro Con W",
+    "Pro Con L",
+    "Con Rec.",
+    "sos",
+    "ncsos",
+    "consos",
+    "Proj. SOS",
+    "Proj. Noncon SOS",
+    "Proj. Con SOS",
+    "elite SOS",
+    "elite noncon SOS",
+    "Opp OE",
+    "Opp DE",
+    "Opp Proj. OE",
+    "Opp Proj DE",
+    "Con Adj OE",
+    "Con Adj DE",
+    "Qual O",
+    "Qual D",
+    "Qual Barthag",
+    "Qual Games",
+    "FUN",
+    "ConPF",
+    "ConPA",
+    "ConPoss",
+    "ConOE",
+    "ConDE",
+    "ConSOSRemain",
+    "Conf Win%",
+    "WAB",
+    "WAB Rk",
+    "Fun Rk",
+    "adjt"
+  ],
+  "coverage_probes": [
+    {
+      "evidence_state": "verified-by-pull",
+      "result": "HTTP 200 \u2014 365 team rows, all records 0-0 (preseason vintage; season starts 2026-11-01/02), regenerated 2026-10-28 (Last-Modified 00:14:35Z on first probe, 04:14:01Z on scripted pulls)",
+      "season_year": 2027
+    },
+    {
+      "evidence_state": "verified-by-pull",
+      "result": "HTTP 200 \u2014 365 team rows (prior-season file still served)",
+      "season_year": 2026
+    },
+    {
+      "evidence_state": "verified-by-pull",
+      "result": "HTTP 200 with EMPTY body \u2014 refused by puller as SCHEMA_INVALID; hoopR documents coverage from 2008",
+      "season_year": 2007
+    }
+  ],
+  "design_only": true,
+  "drift_summary": {
+    "comparison": "Independent probe pull 2026-10-28T04:07Z vs scripted pull 2026-10-28T04:14Z (same URL, ~7 minutes apart)",
+    "evidence_state": "verified-by-pull",
+    "finding": "The living file is NOT byte-stable across the day. Two pulls 2 seconds apart were byte-identical (same SHA-256 and ETag); pulls ~7 minutes apart differed: barthag changed for all 365 teams (max |delta| 0.01074), adjoe max |delta| 0.37927, adjde max |delta| 0.02942, and 19 teams changed rank. Consequence: the provider promises no intra-day vintage; SportsEdge's pinned morning pull IS the vintage of record, and consumers must read the pinned snapshot, never re-fetch intraday.",
+    "rank_changes": 19,
+    "teams_compared": 365
+  },
+  "forward_clock_credit": false,
+  "known_limitations": [
+    "Living file: values drift slightly between regenerations even in preseason (see drift_summary). Hash-pinning fixes OUR snapshot; it does not make the provider's file immutable. A re-pull with a different hash is a different vintage and is refused as a substitute (SOURCE_CHANGED_AFTER_SNAPSHOT).",
+    "Preseason vintage: at sample time the 2026-27 season has not started (first games 2026-11-01/02); every record is 0-0 and the ratings are Torvik's projections, not results-based ratings. The route will carry results-based ratings as the season progresses, under the same morning-pull discipline.",
+    "Team identity is name-based in this source (team, conf strings; no ESPN/NCAA IDs). Joins to the hoopR substrate require the admitted crosswalk, which does not yet exist; name-only joins are refused (same limitation as the historical admission, PR #2832).",
+    "barttorvik.com carries no machine-readable license grant for the CSV; T-Rank data remains Bart Torvik's. This repo stores hashes, manifests and retrieval code only \u2014 no sample data files \u2014 per PR #2832's precedent.",
+    "The R route (hoopR/toRvik) was verified by source inspection, not executed: no R runtime exists in the SportsEdge environment. hoopR::torvik_ratings reads this same file, so the R route offers no additional data path. toRvik::bart_archive reads the dead toRvik-data mirror (historical only, PR #2832)."
+  ],
+  "play_eligible": false,
+  "retrieved_at_utc": "2026-10-28T04:14:05Z",
+  "routes_examined": [
+    {
+      "evidence_state": "verified-by-pull",
+      "name": "Route 1 \u2014 api.cbbstat.com (ratings + ratings/archive)",
+      "verdict": "FAILED from this runtime, again: TLS handshake completes (valid cert, TLS 1.3) but the server closes the connection without any HTTP response \u2014 curl (52) Empty reply from server on HTTP/2 and HTTP/1.1, Python urllib RemoteDisconnected, and the alternate fetcher could not resolve/fetch the URL at all. NOT ADMITTED."
+    },
+    {
+      "evidence_state": "documented-only",
+      "name": "Route 2 \u2014 cbbdata API (cbbdata.aweatherman.com docs; API host is api.cbbstat.com)",
+      "verdict": "Free account unlocks an API key: cbd_create_account(username, email, password) registers and the key is emailed. The API would add dated ratings/archive endpoints. BUT its host is the same api.cbbstat.com that closes connections from this runtime, so the key alone does not establish a working route from here. Owner-decision item; NOT a dependency of the admitted route."
+    },
+    {
+      "evidence_state": "verified-by-pull",
+      "name": "Route 3 \u2014 barttorvik.com/{year}_team_results.csv (the site's own season file)",
+      "verdict": "WORKS. HTTP 200 for year=2027 with current-season (2026-27) ratings, 365 teams, file regenerated on 2026-10-28. This is the admitted route."
+    },
+    {
+      "evidence_state": "documented-only",
+      "name": "Route 4 \u2014 hoopR::torvik_ratings / toRvik from R",
+      "verdict": "No R runtime in this environment (not installed); not executed. Source-verified instead: hoopR::torvik_ratings fetches /{year}_team_results.csv from barttorvik.com \u2014 identical to Route 3, no extra data path. toRvik::bart_archive reads the toRvik-data GitHub mirror (dead since 2023-06-20; historical admission PR #2832)."
+    },
+    {
+      "evidence_state": "verified-by-pull",
+      "name": "Route 5 \u2014 GitHub mirrors of current Torvik data",
+      "verdict": "No living ratings mirror exists. GitHub search (barttorvik / torvik / trank, sorted by updated) returns apps and projects, not a maintained data mirror; the one repo with dated Torvik snapshots (tdub29/Bart) holds irregular Bart-vs-Kalshi extracts (Feb 2025 / Feb 2026), not a pinnable ratings feed. The toRvik-data mirror was last pushed 2023-06-20. Direct-from-source (Route 3) is strictly better: no middleman."
+    }
+  ],
+  "routes_not_admitted": [
+    {
+      "evidence_state": "verified-by-pull",
+      "name": "api.cbbstat.com (cbbdata API host)",
+      "probe_result": "FAILED from the SportsEdge runtime on 2026-10-28 (reproduced): connection closed without HTTP response after a completed TLS handshake \u2014 curl exit 52 on /ratings, /ratings/archive?date=2025-03-01, and / over HTTP/2 and HTTP/1.1; Python urllib RemoteDisconnected. NOT ADMITTED."
+    },
+    {
+      "evidence_state": "not-a-source",
+      "name": "KenPom",
+      "probe_result": "NOT ADMITTED. Paid subscription source; excluded by owner ruling. No KenPom data may enter CBB design or validation through this record."
+    }
+  ],
+  "samples": [
+    {
+      "bytes": 146564,
+      "etag": "\"23c84-65edb72b55b6a\"",
+      "evidence_state": "verified-by-pull",
+      "games_played_total": 0,
+      "pulled_at_utc": "2026-10-28T04:07:31Z",
+      "season_year": 2027,
+      "sha256": "eb0711df82e82e88933ae1e6efc38aad883c31b006847467c6727da70ade4cdc",
+      "site_last_modified_utc": "Wed, 28 Oct 2026 00:14:35 GMT",
+      "team_rows": 365,
+      "url": "https://barttorvik.com/2027_team_results.csv"
+    },
+    {
+      "bytes": 146616,
+      "etag": "\"23cb8-65edecafd249a\"",
+      "evidence_state": "verified-by-pull",
+      "games_played_total": 0,
+      "pulled_at_utc": "2026-10-28T04:14:03Z",
+      "season_year": 2027,
+      "sha256": "2d7c3b61431f4a7be7cd85a768a3f51bc90624541d70545b6b53e668f5e9b8a4",
+      "site_last_modified_utc": "Wed, 28 Oct 2026 04:14:01 GMT",
+      "team_rows": 365,
+      "url": "https://barttorvik.com/2027_team_results.csv"
+    },
+    {
+      "bytes": 146616,
+      "etag": "\"23cb8-65edecafd249a\"",
+      "evidence_state": "verified-by-pull",
+      "games_played_total": 0,
+      "pulled_at_utc": "2026-10-28T04:14:05Z",
+      "season_year": 2027,
+      "sha256": "2d7c3b61431f4a7be7cd85a768a3f51bc90624541d70545b6b53e668f5e9b8a4",
+      "site_last_modified_utc": "Wed, 28 Oct 2026 04:14:01 GMT",
+      "team_rows": 365,
+      "url": "https://barttorvik.com/2027_team_results.csv"
+    }
+  ],
+  "source_id": "BARTTORVIK_TRANK_LIVE",
+  "sport": "CBB",
+  "status": "SAMPLE_VERIFIED_ADMISSION_PROPOSED_DESIGN_ONLY",
+  "validation_credit": false
+}
