@@ -1,0 +1,370 @@
+{
+ "cbr_leg": {
+  "attempted_at_utc": "2026-10-28T10:43:44Z",
+  "consequence": "The College Basketball Reference season-schedule leg remains documented-only and UNPINNED. Precondition (c) of the CBB_TORVIK_EFFICIENCY_V1 design screen (three-way fixture agreement) therefore cannot claim its CBR leg from this manifest; no three-way agreement may be asserted until CBR bytes are lawfully pulled and pinned by a successor record.",
+  "entries": [
+   {
+    "asset_name": "cbr_men_schedule_2015.html",
+    "http_status": 403,
+    "pin_status": "REFUSED_HTTP",
+    "season_label": "2014-15",
+    "url": "https://www.sports-reference.com/cbb/seasons/men/2015-schedule.html"
+   },
+   {
+    "asset_name": "cbr_men_schedule_2016.html",
+    "pin_status": "NOT_ATTEMPTED_AFTER_REFUSAL",
+    "season_label": "2015-16",
+    "url": "https://www.sports-reference.com/cbb/seasons/men/2016-schedule.html"
+   },
+   {
+    "asset_name": "cbr_men_schedule_2017.html",
+    "pin_status": "NOT_ATTEMPTED_AFTER_REFUSAL",
+    "season_label": "2016-17",
+    "url": "https://www.sports-reference.com/cbb/seasons/men/2017-schedule.html"
+   },
+   {
+    "asset_name": "cbr_men_schedule_2018.html",
+    "pin_status": "NOT_ATTEMPTED_AFTER_REFUSAL",
+    "season_label": "2017-18",
+    "url": "https://www.sports-reference.com/cbb/seasons/men/2018-schedule.html"
+   },
+   {
+    "asset_name": "cbr_men_schedule_2019.html",
+    "pin_status": "NOT_ATTEMPTED_AFTER_REFUSAL",
+    "season_label": "2018-19",
+    "url": "https://www.sports-reference.com/cbb/seasons/men/2019-schedule.html"
+   },
+   {
+    "asset_name": "cbr_men_schedule_2020.html",
+    "pin_status": "NOT_ATTEMPTED_AFTER_REFUSAL",
+    "season_label": "2019-20",
+    "url": "https://www.sports-reference.com/cbb/seasons/men/2020-schedule.html"
+   },
+   {
+    "asset_name": "cbr_men_schedule_2021.html",
+    "pin_status": "NOT_ATTEMPTED_AFTER_REFUSAL",
+    "season_label": "2020-21",
+    "url": "https://www.sports-reference.com/cbb/seasons/men/2021-schedule.html"
+   },
+   {
+    "asset_name": "cbr_men_schedule_2022.html",
+    "pin_status": "NOT_ATTEMPTED_AFTER_REFUSAL",
+    "season_label": "2021-22",
+    "url": "https://www.sports-reference.com/cbb/seasons/men/2022-schedule.html"
+   },
+   {
+    "asset_name": "cbr_men_schedule_2023.html",
+    "pin_status": "NOT_ATTEMPTED_AFTER_REFUSAL",
+    "season_label": "2022-23",
+    "url": "https://www.sports-reference.com/cbb/seasons/men/2023-schedule.html"
+   }
+  ],
+  "method": "serial GET of https://www.sports-reference.com/cbb/seasons/men/<ending-year>-schedule.html for ending years 2015..2023 (seasons 2014-15 .. 2022-23), honest User-Agent, >=5s spacing. First request (2015) returned HTTP 403; Sports Reference bot policy is fail-closed (403/429 = stop), so the remaining seasons were not attempted. No circumvention was attempted.",
+  "status": "REFUSED_HTTP_403_NOT_PINNED"
+ },
+ "crosswalk_status": "OPEN_NOT_ADMITTED",
+ "design_only": true,
+ "forward_clock_credit": false,
+ "identity_note": "Unchanged from PR #2835: the ESPN/Torvik/NCAA identity crosswalk is OPEN and NOT admitted; this manifest pins schedule bytes only and admits no identity mapping. Name-only joins remain refused outside the design screen's own audited, design-evidence-only expedient (PR #2843 S2).",
+ "known_limitations": [
+  "RELEASE TAGS ARE ROLLING, NOT IMMUTABLE (PR #2835, verified-by-pull): assets are replaced in place under the stable tag espn_mens_college_basketball_schedules. This pin attests the bytes as pulled at retrieved_at_utc; stability is NOT claimed. The historical-season assets carried updated_at values in 2023 at pull time, but that is an observation, not a guarantee.",
+  "Formats are pinned independently; one format's pin never vouches for another. The .rds twin of each season exists upstream and is NOT pinned here: it is not a consumed route in this repo (same treatment as PR #2835, which pinned no .rds asset).",
+  "parquet samples are admitted on bytes + hash; row content is cross-verified through each season's CSV twin (no working parquet reader in the SportsEdge runtime at admission time).",
+  "CSV schema differs by season: the 2023 file carries additional columns (broadcast, current-rank, linescores, records blocks) and is ~2x the bytes of earlier seasons. Consumers must not assume one schema across seasons.",
+  "Season 2020 ends 2020-03-11 and season 2021 is short (4,285 rows, starting 2020-11-25): both are the true historical record (COVID-19 cancellation / shortened season), not missing data. Season 2023 flags status_type_completed on 6,228/6,261 rows while both final scores are populated on all 6,261 rows; the design screen's fixture-agreement step is where such rows are adjudicated.",
+  "The College Basketball Reference leg is UNPINNED (HTTP 403 refusal recorded in cbr_leg). The three-way agreement of design S2/S3(c) cannot be completed from this manifest.",
+  "This repo commits hashes, manifests and retrieval code only \u2014 no data files."
+ ],
+ "pin_rule": "tag + release ID + asset ID + asset size + asset updated_at + SHA-256 of the downloaded bytes, all recorded in this manifest at pull time, together with the pull timestamp (retrieved_at_utc). The release is ROLLING (assets replaced in place under a stable tag), so the pin attests the bytes as pulled at retrieved_at_utc \u2014 the strongest attestation this source supports; it does NOT attest that upstream bytes are stable or immutable. Any later byte drift against this manifest is SOURCE_CHANGED_AFTER_SNAPSHOT (refusal), never silent acceptance.",
+ "play_eligible": false,
+ "provider_repos": [
+  {
+   "license": "MIT (GitHub API, verified-by-pull)",
+   "name": "sportsdataverse/sportsdataverse-data",
+   "role": "canonical downloadable substrate: GitHub release assets consumed by hoopR loaders"
+  },
+  {
+   "license": "CC BY 4.0 (LICENSE.md in repo, verified-by-pull)",
+   "name": "sportsdataverse/hoopR-mbb-data",
+   "role": "pipeline/docs repository; NOT the pinned download route in this record"
+  },
+  {
+   "license": "not asserted (documented-only)",
+   "name": "Sports Reference \u2014 College Basketball Reference (sports-reference.com/cbb)",
+   "role": "third cross-check leg of the CBB design (PR #2843 S2): season schedule pages. Pull REFUSED (HTTP 403) from the SportsEdge runtime; NOT PINNED in this manifest \u2014 see cbr_leg."
+  }
+ ],
+ "retrieved_at_utc": "2026-10-28T10:42:46Z",
+ "samples": [
+  {
+   "asset_id": 103081996,
+   "asset_name": "mbb_schedule_2015.csv",
+   "asset_updated_at": "2023-04-10T21:20:31Z",
+   "bytes": 4396911,
+   "content_check": "verified-by-pull: 5,932 rows; game_date range 2014-11-14 to 2015-04-06; both team scores populated on 5,932/5,932 rows; status_type_completed on 5,932/5,932 rows; ESPN identifiers present (game id, home_id, away_id, neutral_site)",
+   "evidence_state": "verified-by-pull",
+   "game_date_max": "2015-04-06",
+   "game_date_min": "2014-11-14",
+   "release_id": 97399224,
+   "release_tag": "espn_mens_college_basketball_schedules",
+   "rows": 5932,
+   "season": 2015,
+   "sha256": "6ae65bd03ea48c147815bcd8806597787ad6a098cbe1be1da5425c3d8901edd8",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_schedules/mbb_schedule_2015.csv"
+  },
+  {
+   "asset_id": 103082002,
+   "asset_name": "mbb_schedule_2015.parquet",
+   "asset_updated_at": "2023-04-10T21:20:32Z",
+   "bytes": 618686,
+   "content_check": "bytes and hash verified-by-pull; row content cross-verified through the CSV twin of the same release and season, whose bytes differ by format; no working parquet reader in the SportsEdge runtime (see known_limitations)",
+   "evidence_state": "verified-by-pull",
+   "release_id": 97399224,
+   "release_tag": "espn_mens_college_basketball_schedules",
+   "season": 2015,
+   "sha256": "3c7aa3002e0417aa74d15533cd7a1dbdcf4f599297c3997116cdb30f07905cab",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_schedules/mbb_schedule_2015.parquet"
+  },
+  {
+   "asset_id": 103082656,
+   "asset_name": "mbb_schedule_2016.csv",
+   "asset_updated_at": "2023-04-10T21:26:44Z",
+   "bytes": 4370181,
+   "content_check": "verified-by-pull: 5,893 rows; game_date range 2015-11-13 to 2016-04-04; both team scores populated on 5,893/5,893 rows; status_type_completed on 5,893/5,893 rows; ESPN identifiers present (game id, home_id, away_id, neutral_site)",
+   "evidence_state": "verified-by-pull",
+   "game_date_max": "2016-04-04",
+   "game_date_min": "2015-11-13",
+   "release_id": 97399224,
+   "release_tag": "espn_mens_college_basketball_schedules",
+   "rows": 5893,
+   "season": 2016,
+   "sha256": "dab89af97fc3db78e53487f35bdd6eb145fe04fe50e994bb28f15198050b2e46",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_schedules/mbb_schedule_2016.csv"
+  },
+  {
+   "asset_id": 103082660,
+   "asset_name": "mbb_schedule_2016.parquet",
+   "asset_updated_at": "2023-04-10T21:26:45Z",
+   "bytes": 617730,
+   "content_check": "bytes and hash verified-by-pull; row content cross-verified through the CSV twin of the same release and season, whose bytes differ by format; no working parquet reader in the SportsEdge runtime (see known_limitations)",
+   "evidence_state": "verified-by-pull",
+   "release_id": 97399224,
+   "release_tag": "espn_mens_college_basketball_schedules",
+   "season": 2016,
+   "sha256": "9b401f9905bd97e032b99ba5899cd65ff3b4e6b44edab1f36618908a3b0152ff",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_schedules/mbb_schedule_2016.parquet"
+  },
+  {
+   "asset_id": 103104001,
+   "asset_name": "mbb_schedule_2017.csv",
+   "asset_updated_at": "2023-04-11T01:13:33Z",
+   "bytes": 4403551,
+   "content_check": "verified-by-pull: 5,960 rows; game_date range 2016-11-11 to 2017-04-03; both team scores populated on 5,960/5,960 rows; status_type_completed on 5,960/5,960 rows; ESPN identifiers present (game id, home_id, away_id, neutral_site)",
+   "evidence_state": "verified-by-pull",
+   "game_date_max": "2017-04-03",
+   "game_date_min": "2016-11-11",
+   "release_id": 97399224,
+   "release_tag": "espn_mens_college_basketball_schedules",
+   "rows": 5960,
+   "season": 2017,
+   "sha256": "350c92cd159f547e6956fd7390530df2daee63b0f2eaccc41b39085d4ad5e7e6",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_schedules/mbb_schedule_2017.csv"
+  },
+  {
+   "asset_id": 103104006,
+   "asset_name": "mbb_schedule_2017.parquet",
+   "asset_updated_at": "2023-04-11T01:13:34Z",
+   "bytes": 593064,
+   "content_check": "bytes and hash verified-by-pull; row content cross-verified through the CSV twin of the same release and season, whose bytes differ by format; no working parquet reader in the SportsEdge runtime (see known_limitations)",
+   "evidence_state": "verified-by-pull",
+   "release_id": 97399224,
+   "release_tag": "espn_mens_college_basketball_schedules",
+   "season": 2017,
+   "sha256": "ce90db03f344f6a12c44155f2f70534a7df9e9f56f5c5bb38e6c292149388802",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_schedules/mbb_schedule_2017.parquet"
+  },
+  {
+   "asset_id": 103093328,
+   "asset_name": "mbb_schedule_2018.csv",
+   "asset_updated_at": "2023-04-10T23:17:32Z",
+   "bytes": 4457335,
+   "content_check": "verified-by-pull: 6,003 rows; game_date range 2017-11-10 to 2018-04-02; both team scores populated on 6,003/6,003 rows; status_type_completed on 6,003/6,003 rows; ESPN identifiers present (game id, home_id, away_id, neutral_site)",
+   "evidence_state": "verified-by-pull",
+   "game_date_max": "2018-04-02",
+   "game_date_min": "2017-11-10",
+   "release_id": 97399224,
+   "release_tag": "espn_mens_college_basketball_schedules",
+   "rows": 6003,
+   "season": 2018,
+   "sha256": "6732b013871de9979b59b92084190adc849c131dc265d6fbd7ff295a7b7fdfc1",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_schedules/mbb_schedule_2018.csv"
+  },
+  {
+   "asset_id": 103093330,
+   "asset_name": "mbb_schedule_2018.parquet",
+   "asset_updated_at": "2023-04-10T23:17:34Z",
+   "bytes": 623847,
+   "content_check": "bytes and hash verified-by-pull; row content cross-verified through the CSV twin of the same release and season, whose bytes differ by format; no working parquet reader in the SportsEdge runtime (see known_limitations)",
+   "evidence_state": "verified-by-pull",
+   "release_id": 97399224,
+   "release_tag": "espn_mens_college_basketball_schedules",
+   "season": 2018,
+   "sha256": "2ec927051e55807a7d02d5f176576cf7a29a5ee2b7471817e2ced43a38aa0aa5",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_schedules/mbb_schedule_2018.parquet"
+  },
+  {
+   "asset_id": 103094377,
+   "asset_name": "mbb_schedule_2019.csv",
+   "asset_updated_at": "2023-04-10T23:35:36Z",
+   "bytes": 4492283,
+   "content_check": "verified-by-pull: 6,049 rows; game_date range 2018-11-06 to 2019-04-08; both team scores populated on 6,049/6,049 rows; status_type_completed on 6,049/6,049 rows; ESPN identifiers present (game id, home_id, away_id, neutral_site)",
+   "evidence_state": "verified-by-pull",
+   "game_date_max": "2019-04-08",
+   "game_date_min": "2018-11-06",
+   "release_id": 97399224,
+   "release_tag": "espn_mens_college_basketball_schedules",
+   "rows": 6049,
+   "season": 2019,
+   "sha256": "745d214e1bd6d1352bab71506aa56e9fd47392b049f23fb3a79e89e51759ce79",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_schedules/mbb_schedule_2019.csv"
+  },
+  {
+   "asset_id": 103094378,
+   "asset_name": "mbb_schedule_2019.parquet",
+   "asset_updated_at": "2023-04-10T23:35:37Z",
+   "bytes": 627071,
+   "content_check": "bytes and hash verified-by-pull; row content cross-verified through the CSV twin of the same release and season, whose bytes differ by format; no working parquet reader in the SportsEdge runtime (see known_limitations)",
+   "evidence_state": "verified-by-pull",
+   "release_id": 97399224,
+   "release_tag": "espn_mens_college_basketball_schedules",
+   "season": 2019,
+   "sha256": "c285df779882719857048b1478c15d21868f4fdbe7d7d75d2ecb4f4ab970fb71",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_schedules/mbb_schedule_2019.parquet"
+  },
+  {
+   "asset_id": 103093091,
+   "asset_name": "mbb_schedule_2020.csv",
+   "asset_updated_at": "2023-04-10T23:13:51Z",
+   "bytes": 4271530,
+   "content_check": "verified-by-pull: 5,767 rows; game_date range 2019-11-05 to 2020-03-11; both team scores populated on 5,767/5,767 rows; status_type_completed on 5,767/5,767 rows; ESPN identifiers present (game id, home_id, away_id, neutral_site)",
+   "evidence_state": "verified-by-pull",
+   "game_date_max": "2020-03-11",
+   "game_date_min": "2019-11-05",
+   "release_id": 97399224,
+   "release_tag": "espn_mens_college_basketball_schedules",
+   "rows": 5767,
+   "season": 2020,
+   "sha256": "2e41af0af1ed0f5347f2a259ec9ed635d5d9a3b30daad4b69b924591f87319e0",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_schedules/mbb_schedule_2020.csv"
+  },
+  {
+   "asset_id": 103093093,
+   "asset_name": "mbb_schedule_2020.parquet",
+   "asset_updated_at": "2023-04-10T23:13:52Z",
+   "bytes": 598411,
+   "content_check": "bytes and hash verified-by-pull; row content cross-verified through the CSV twin of the same release and season, whose bytes differ by format; no working parquet reader in the SportsEdge runtime (see known_limitations)",
+   "evidence_state": "verified-by-pull",
+   "release_id": 97399224,
+   "release_tag": "espn_mens_college_basketball_schedules",
+   "season": 2020,
+   "sha256": "f87d7a04d905c95221b1201a4fd43bdf9bad3bfae7b3f880800e9eb8ae1cfa3a",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_schedules/mbb_schedule_2020.parquet"
+  },
+  {
+   "asset_id": 103093435,
+   "asset_name": "mbb_schedule_2021.csv",
+   "asset_updated_at": "2023-04-10T23:18:57Z",
+   "bytes": 3185330,
+   "content_check": "verified-by-pull: 4,285 rows; game_date range 2020-11-25 to 2021-04-05; both team scores populated on 4,285/4,285 rows; status_type_completed on 4,285/4,285 rows; ESPN identifiers present (game id, home_id, away_id, neutral_site)",
+   "evidence_state": "verified-by-pull",
+   "game_date_max": "2021-04-05",
+   "game_date_min": "2020-11-25",
+   "release_id": 97399224,
+   "release_tag": "espn_mens_college_basketball_schedules",
+   "rows": 4285,
+   "season": 2021,
+   "sha256": "37dfdddcbe2ef3ac43926e4b35f01672703e09a3da3efcc7944634fcf1fec3ec",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_schedules/mbb_schedule_2021.csv"
+  },
+  {
+   "asset_id": 103093437,
+   "asset_name": "mbb_schedule_2021.parquet",
+   "asset_updated_at": "2023-04-10T23:18:59Z",
+   "bytes": 465503,
+   "content_check": "bytes and hash verified-by-pull; row content cross-verified through the CSV twin of the same release and season, whose bytes differ by format; no working parquet reader in the SportsEdge runtime (see known_limitations)",
+   "evidence_state": "verified-by-pull",
+   "release_id": 97399224,
+   "release_tag": "espn_mens_college_basketball_schedules",
+   "season": 2021,
+   "sha256": "26b26e9fd035a567ca66e65fadd8a3df9482e25e4a1c63ff40466e0d99c9cc76",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_schedules/mbb_schedule_2021.parquet"
+  },
+  {
+   "asset_id": 103094601,
+   "asset_name": "mbb_schedule_2022.csv",
+   "asset_updated_at": "2023-04-10T23:39:10Z",
+   "bytes": 4426306,
+   "content_check": "verified-by-pull: 5,976 rows; game_date range 2021-11-09 to 2022-04-04; both team scores populated on 5,976/5,976 rows; status_type_completed on 5,976/5,976 rows; ESPN identifiers present (game id, home_id, away_id, neutral_site)",
+   "evidence_state": "verified-by-pull",
+   "game_date_max": "2022-04-04",
+   "game_date_min": "2021-11-09",
+   "release_id": 97399224,
+   "release_tag": "espn_mens_college_basketball_schedules",
+   "rows": 5976,
+   "season": 2022,
+   "sha256": "70a341f448e197e0443ab6a8bd4a168c0a419db78d91abb842f4e6802cf2db7d",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_schedules/mbb_schedule_2022.csv"
+  },
+  {
+   "asset_id": 103094603,
+   "asset_name": "mbb_schedule_2022.parquet",
+   "asset_updated_at": "2023-04-10T23:39:11Z",
+   "bytes": 621024,
+   "content_check": "bytes and hash verified-by-pull; row content cross-verified through the CSV twin of the same release and season, whose bytes differ by format; no working parquet reader in the SportsEdge runtime (see known_limitations)",
+   "evidence_state": "verified-by-pull",
+   "release_id": 97399224,
+   "release_tag": "espn_mens_college_basketball_schedules",
+   "season": 2022,
+   "sha256": "75a702d5c8db85bfd7ad30bc046a801742b88ac3f7a900d7e05450a6a4c10276",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_schedules/mbb_schedule_2022.parquet"
+  },
+  {
+   "asset_id": 136828032,
+   "asset_name": "mbb_schedule_2023.csv",
+   "asset_updated_at": "2023-11-22T03:45:55Z",
+   "bytes": 9150417,
+   "content_check": "verified-by-pull: 6,261 rows; game_date range 2022-11-07 to 2023-04-03; both team scores populated on 6,261/6,261 rows; status_type_completed on 6,228/6,261 rows; ESPN identifiers present (game id, home_id, away_id, neutral_site)",
+   "evidence_state": "verified-by-pull",
+   "game_date_max": "2023-04-03",
+   "game_date_min": "2022-11-07",
+   "release_id": 97399224,
+   "release_tag": "espn_mens_college_basketball_schedules",
+   "rows": 6261,
+   "season": 2023,
+   "sha256": "41991919d7b39032be40c4b259aedbad8f404f9993fc6139361d0af69b9a89a2",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_schedules/mbb_schedule_2023.csv"
+  },
+  {
+   "asset_id": 136828039,
+   "asset_name": "mbb_schedule_2023.parquet",
+   "asset_updated_at": "2023-11-22T03:45:58Z",
+   "bytes": 1039184,
+   "content_check": "bytes and hash verified-by-pull; row content cross-verified through the CSV twin of the same release and season, whose bytes differ by format; no working parquet reader in the SportsEdge runtime (see known_limitations)",
+   "evidence_state": "verified-by-pull",
+   "release_id": 97399224,
+   "release_tag": "espn_mens_college_basketball_schedules",
+   "season": 2023,
+   "sha256": "1a75500bd669a2e0f01b39623a1aa28d8d4cc1b8658f8adbabfc5319c73c496c",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_schedules/mbb_schedule_2023.parquet"
+  }
+ ],
+ "satisfies": {
+  "pr_2866_precondition_b": "YES \u2014 on merge of this PR. Design S3(b) (PR #2843) requires historical schedule/results assets from the sportsdataverse-data releases pinned by the full-tuple rule of PR #2835 under a successor manifest; this manifest pins mbb_schedule_2015..2023 (CSV + parquet) by that rule.",
+  "pr_2866_precondition_c_cbr_leg": "NO \u2014 the CBR leg was refused upstream (HTTP 403) and remains unpinned; see cbr_leg. Preconditions (a) (Torvik archive, PR #2832) was already MET per PR #2866 and is not affected by this manifest."
+ },
+ "source_id": "HOOPR_MBB_SCHEDULE_SUCCESSOR_SPORTSDATAVERSE_RELEASES",
+ "sport": "CBB",
+ "status": "SAMPLE_VERIFIED_ADMISSION_PROPOSED_DESIGN_ONLY",
+ "successor_to": "research/cbb_hoopr_mbb_data_admission_20261027/sample_manifest.json (PR #2835)",
+ "validation_credit": false
+}
