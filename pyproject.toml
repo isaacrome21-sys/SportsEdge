@@ -20,4 +20,5 @@ dev = [
   "pandas==2.2.3",
   "scipy==1.17.0",
   "ruff==0.17.1",
+  "pybaseball==2.2.7",
 ]
