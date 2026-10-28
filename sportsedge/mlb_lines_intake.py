@@ -196,15 +196,42 @@ def parse_lines_with_warnings(text: str, *, title: str | None = None) -> tuple[l
     warnings: list[str] = []
     player_stats = _aliases_pattern(_PLAYER_STATS)
     either_stats = _aliases_pattern(_EITHER_PITCHER_STATS)
+    # One snapshot carries one quote per market: track (game instance, market,
+    # subject, team) so a second competing transcription fails closed instead
+    # of silently emitting two rows for downstream to pick between. The game
+    # instance advances on every header, so a doubleheader's second game
+    # (same teams, new header) is a distinct instance.
+    game_seq = 0
+    seen_rows: set[tuple[int, str, str, str]] = set()
+    cur_line = ""
+    cur_n = 0
+
+    def emit(row: ParsedRow) -> None:
+        key = (game_seq, row.market_type,
+               " ".join((row.subject_name or "").split()).casefold(),
+               " ".join((row.team or "").split()).casefold())
+        if key in seen_rows:
+            errors.append(f"line {cur_n}: DUPLICATE_MARKET: '{cur_line}'")
+            return
+        seen_rows.add(key)
+        rows.append(row)
 
     for n, raw in enumerate(str(text or "").splitlines(), 1):
         line = raw.strip().strip("`").strip()
+        cur_line, cur_n = line, n
         if not line or line.startswith("#") or line.startswith("_"):
+            continue
+
+        # Prices and lines are ASCII transcriptions: a non-ASCII digit would
+        # otherwise be silently coerced by the \d patterns and int()/float().
+        if any(ch.isdigit() and not ch.isascii() for ch in line):
+            errors.append(f"line {n}: BAD_PRICE: non-ASCII digit in '{line}'")
             continue
 
         header = _parse_header(line)
         if header:
             game = header
+            game_seq += 1
             subject = None
             continue
         if game is None:
@@ -234,7 +261,7 @@ def parse_lines_with_warnings(text: str, *, title: str | None = None) -> tuple[l
             for part in match[2].split(";"):
                 seg = re.fullmatch(rf"\s*(.+?)\s+{_NUM}\s+{_PRICE}\s+{_PRICE}\s*", part, flags=re.I)
                 if seg:
-                    rows.append(ParsedRow(away, home, market, "OVER", float(seg[2]), _price(seg[3]), "UNDER", _price(seg[4]), team=seg[1].strip()))
+                    emit(ParsedRow(away, home, market, "OVER", float(seg[2]), _price(seg[3]), "UNDER", _price(seg[4]), team=seg[1].strip()))
                 else:
                     warnings.append(f"line {n}: skipped team-total piece '{part.strip()}'")
             continue
@@ -255,31 +282,31 @@ def parse_lines_with_warnings(text: str, *, title: str | None = None) -> tuple[l
                 warnings.append(f"line {n}: skipped run line with mismatched sides '{line}'")
                 continue
             market = "FIRST_FIVE_RUN_LINE" if match[1] else "RUN_LINE"
-            rows.append(ParsedRow(away, home, market, "AWAY", float(match[2]), _price(match[3]), "HOME", _price(match[5])))
+            emit(ParsedRow(away, home, market, "AWAY", float(match[2]), _price(match[3]), "HOME", _price(match[5])))
             continue
 
         match = re.fullmatch(rf"YRFI\s+{_PRICE}\s*/\s*NRFI\s+{_PRICE}", line, flags=re.I)
         if match:
-            rows.append(ParsedRow(away, home, "FIRST_INNING_TOTAL", "OVER", 0.5, _price(match[1]), "UNDER", _price(match[2])))
+            emit(ParsedRow(away, home, "FIRST_INNING_TOTAL", "OVER", 0.5, _price(match[1]), "UNDER", _price(match[2])))
             continue
         match = re.fullmatch(rf"NRFI\s+{_PRICE}\s*/\s*YRFI\s+{_PRICE}", line, flags=re.I)
         if match:
-            rows.append(ParsedRow(away, home, "FIRST_INNING_TOTAL", "OVER", 0.5, _price(match[2]), "UNDER", _price(match[1])))
+            emit(ParsedRow(away, home, "FIRST_INNING_TOTAL", "OVER", 0.5, _price(match[2]), "UNDER", _price(match[1])))
             continue
 
         match = re.fullmatch(rf"(?:ML|moneyline)\s+{_PRICE}\s+{_PRICE}", line, flags=re.I)
         if match:
-            rows.append(ParsedRow(away, home, "MONEYLINE", "AWAY", 0.0, _price(match[1]), "HOME", _price(match[2])))
+            emit(ParsedRow(away, home, "MONEYLINE", "AWAY", 0.0, _price(match[1]), "HOME", _price(match[2])))
             continue
 
         match = re.fullmatch(rf"(?:RL|run ?line)\s+{_SIGNED_NUM}\s+{_PRICE}\s+{_PRICE}", line, flags=re.I)
         if match:
-            rows.append(ParsedRow(away, home, "RUN_LINE", "AWAY", float(match[1]), _price(match[2]), "HOME", _price(match[3])))
+            emit(ParsedRow(away, home, "RUN_LINE", "AWAY", float(match[1]), _price(match[2]), "HOME", _price(match[3])))
             continue
 
         match = re.fullmatch(rf"(?:total|o/?u|game total)\s+{_NUM}\s+{_PRICE}\s+{_PRICE}", line, flags=re.I)
         if match:
-            rows.append(ParsedRow(away, home, "GAME_TOTAL", "OVER", float(match[1]), _price(match[2]), "UNDER", _price(match[3])))
+            emit(ParsedRow(away, home, "GAME_TOTAL", "OVER", float(match[1]), _price(match[2]), "UNDER", _price(match[3])))
             continue
 
         match = re.fullmatch(rf"(YRFI|NRFI)\s+{_PRICE}\s+{_PRICE}", line, flags=re.I)
@@ -288,53 +315,53 @@ def parse_lines_with_warnings(text: str, *, title: str | None = None) -> tuple[l
             # Canonical orientation is YRFI: YES=OVER / NO=UNDER. For an NRFI
             # quote, NRFI YES is therefore the canonical YRFI NO price.
             yes, no = (first, second) if match[1].upper() == "YRFI" else (second, first)
-            rows.append(ParsedRow(away, home, "FIRST_INNING_TOTAL", "OVER", 0.5, yes, "UNDER", no))
+            emit(ParsedRow(away, home, "FIRST_INNING_TOTAL", "OVER", 0.5, yes, "UNDER", no))
             continue
 
         match = re.fullmatch(rf"(?:F5|first ?5|first five)\s+(?:ML|moneyline)\s+{_PRICE}\s+{_PRICE}", line, flags=re.I)
         if match:
-            rows.append(ParsedRow(away, home, "FIRST_FIVE_MONEYLINE", "AWAY", 0.0, _price(match[1]), "HOME", _price(match[2])))
+            emit(ParsedRow(away, home, "FIRST_FIVE_MONEYLINE", "AWAY", 0.0, _price(match[1]), "HOME", _price(match[2])))
             continue
 
         match = re.fullmatch(rf"(?:F5|first ?5|first five)\s+(?:RL|run ?line)\s+{_SIGNED_NUM}\s+{_PRICE}\s+{_PRICE}", line, flags=re.I)
         if match:
-            rows.append(ParsedRow(away, home, "FIRST_FIVE_RUN_LINE", "AWAY", float(match[1]), _price(match[2]), "HOME", _price(match[3])))
+            emit(ParsedRow(away, home, "FIRST_FIVE_RUN_LINE", "AWAY", float(match[1]), _price(match[2]), "HOME", _price(match[3])))
             continue
 
         match = re.fullmatch(rf"(?:F5|first ?5|first five)\s+(?:total|o/?u)\s+{_NUM}\s+{_PRICE}\s+{_PRICE}", line, flags=re.I)
         if match:
-            rows.append(ParsedRow(away, home, "FIRST_FIVE_TOTAL", "OVER", float(match[1]), _price(match[2]), "UNDER", _price(match[3])))
+            emit(ParsedRow(away, home, "FIRST_FIVE_TOTAL", "OVER", float(match[1]), _price(match[2]), "UNDER", _price(match[3])))
             continue
 
         match = re.fullmatch(rf"(.+?)\s+(?:F5|first ?5|first five)\s+(?:TT|team total)\s+{_NUM}\s+{_PRICE}\s+{_PRICE}", line, flags=re.I)
         if match:
-            rows.append(ParsedRow(away, home, "FIRST_FIVE_TEAM_TOTAL", "OVER", float(match[2]), _price(match[3]), "UNDER", _price(match[4]), team=match[1].strip()))
+            emit(ParsedRow(away, home, "FIRST_FIVE_TEAM_TOTAL", "OVER", float(match[2]), _price(match[3]), "UNDER", _price(match[4]), team=match[1].strip()))
             continue
 
         match = re.fullmatch(rf"(.+?)\s+(?:TT|team total)\s+{_NUM}\s+{_PRICE}\s+{_PRICE}", line, flags=re.I)
         if match:
-            rows.append(ParsedRow(away, home, "TEAM_TOTAL", "OVER", float(match[2]), _price(match[3]), "UNDER", _price(match[4]), team=match[1].strip()))
+            emit(ParsedRow(away, home, "TEAM_TOTAL", "OVER", float(match[2]), _price(match[3]), "UNDER", _price(match[4]), team=match[1].strip()))
             continue
 
         match = re.fullmatch(rf"(.+?)\s+(?:pitcher\s+)?(?:win|record win)\s+{_PRICE}\s+{_PRICE}", line, flags=re.I)
         if match:
-            rows.append(ParsedRow(away, home, "PITCHER_RECORD_WIN", "YES", 0.0, _price(match[2]), "NO", _price(match[3]), subject_name=match[1].strip()))
+            emit(ParsedRow(away, home, "PITCHER_RECORD_WIN", "YES", 0.0, _price(match[2]), "NO", _price(match[3]), subject_name=match[1].strip()))
             continue
 
         match = re.fullmatch(rf"(.+?)\s+first\s+(?:hr|home run)\s+{_PRICE}\s+{_PRICE}", line, flags=re.I)
         if match:
-            rows.append(ParsedRow(away, home, "FIRST_HOME_RUN", "YES", 0.0, _price(match[2]), "NO", _price(match[3]), subject_name=match[1].strip()))
+            emit(ParsedRow(away, home, "FIRST_HOME_RUN", "YES", 0.0, _price(match[2]), "NO", _price(match[3]), subject_name=match[1].strip()))
             continue
 
         match = re.fullmatch(rf"either\s+pitcher\s+({either_stats})\s+{_NUM}\s+{_PRICE}\s+{_PRICE}", line, flags=re.I)
         if match:
-            rows.append(ParsedRow(away, home, _EITHER_PITCHER_STATS[match[1].lower()], "OVER", float(match[2]), _price(match[3]), "UNDER", _price(match[4])))
+            emit(ParsedRow(away, home, _EITHER_PITCHER_STATS[match[1].lower()], "OVER", float(match[2]), _price(match[3]), "UNDER", _price(match[4])))
             continue
 
         match = re.fullmatch(rf"(.+?)\s+({player_stats})\s+{_NUM}\s+{_PRICE}\s+{_PRICE}", line, flags=re.I)
         if match:
             alias = match[2].lower()
-            rows.append(ParsedRow(away, home, _PLAYER_STATS[alias], "OVER", float(match[3]), _price(match[4]), "UNDER", _price(match[5]), subject_name=match[1].strip()))
+            emit(ParsedRow(away, home, _PLAYER_STATS[alias], "OVER", float(match[3]), _price(match[4]), "UNDER", _price(match[5]), subject_name=match[1].strip()))
             continue
 
         match = re.fullmatch(rf"either\s+pitcher\s+({either_stats})\s+{_NUM}\s+{_PRICE}$", line, flags=re.I)
@@ -361,6 +388,23 @@ def parse_lines_with_warnings(text: str, *, title: str | None = None) -> tuple[l
         if match:
             errors.append(
                 f"line {n}: BLOCKED_PRICING_METHOD: '{line}' (needs both prices)"
+            )
+            continue
+
+        # A line that opens with a recognised core market, or carries a known
+        # player stat plus a line value and further digits, but matched no
+        # pattern above is a malformed quote (e.g. a 6-digit or in-band
+        # price), not an informational note: fail closed instead of silently
+        # dropping a priced line with only a warning.
+        if re.match(r"(?:(?:F5|first ?5|first five)\s+)?(?:ML|moneyline|RL|run ?line|total|o/?u|game total|YRFI|NRFI)\b",
+                    line, flags=re.I) and re.search(r"[0-9]", line):
+            errors.append(
+                f"line {n}: BLOCKED_PRICING_METHOD: '{line}' (malformed price or line)"
+            )
+            continue
+        if re.search(rf"\b(?:{player_stats})\s+{_NUM}\s+.*[0-9]", line, flags=re.I):
+            errors.append(
+                f"line {n}: BLOCKED_PRICING_METHOD: '{line}' (malformed price or line)"
             )
             continue
 
