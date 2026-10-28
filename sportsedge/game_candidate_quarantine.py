@@ -71,39 +71,65 @@ def game_claim_hold(row):
 
 
 def quarantine_game_surfaces(surfaces):
-    """Partition four ranked lists, leaving original rows and order untouched.
+    """Quarantine an input index across ALL ranked surfaces if ANY claim fails.
 
-    Returns (filtered lists, append-only-ready quarantine references). Repeated
-    references to the same input_index appear once in the quarantine ledger.
-    Never substitute this ledger for the original evaluated_rows.
+    Research-only output partition; original rows are never changed. This
+    helper has no independent evaluated_rows and cannot authenticate evidence.
     """
-    filtered = {}
-    quarantined = {}
+    if not isinstance(surfaces, dict):
+        raise ValueError("GAME_SURFACES_NOT_OBJECT")
+    rows_by_surface = {}
+    holds = {}
+    priority = ("GAME_PROBABILITY_CLAIM_INVALID", "GAME_EV_CLAIM_INVALID",
+                "EXTREME_CLAIMED_EV_QUARANTINE")
     for name in GAME_SURFACES:
-        kept = []
-        for row in surfaces.get(name, ()):
+        rows = surfaces.get(name, ())
+        if not isinstance(rows, (list, tuple)):
+            raise ValueError("GAME_SURFACE_NOT_LIST:" + name)
+        rows_by_surface[name] = rows
+        seen = set()
+        for row in rows:
             if not isinstance(row, dict):
                 raise ValueError("GAME_SURFACE_ROW_NOT_OBJECT")
+            idx = row.get("input_index")
+            if type(idx) is not int or idx < 0:
+                raise ValueError("GAME_SURFACE_INPUT_INDEX_INVALID")
+            if idx in seen:
+                raise ValueError("GAME_SURFACE_DUPLICATE_INPUT_INDEX")
+            seen.add(idx)
             reason, max_ev = game_claim_hold(row)
             if reason is None:
+                continue
+            if idx not in holds:
+                holds[idx] = {"reason": reason, "max_ev": max_ev,
+                              "source_status": row.get("status")}
+            else:
+                old = holds[idx]
+                old["reason"] = next(r for r in priority
+                                     if r in (old["reason"], reason))
+                vals = [v for v in (old["max_ev"], max_ev) if v is not None]
+                old["max_ev"] = max(vals) if vals else None
+    filtered = {}
+    quarantined = {}
+    for name, rows in rows_by_surface.items():
+        kept = []
+        for row in rows:
+            idx = row["input_index"]
+            hold = holds.get(idx)
+            if hold is None:
                 kept.append(row)
                 continue
-            idx = row.get("input_index")
-            if isinstance(idx, bool) or not isinstance(idx, int) or idx < 0:
-                raise ValueError("GAME_SURFACE_INPUT_INDEX_INVALID")
             if idx not in quarantined:
                 quarantined[idx] = {
                     "input_index": idx,
                     "source_surfaces": [],
-                    "source_status": row.get("status"),
-                    "reason": reason,
-                    "max_finite_claimed_ev": max_ev,
+                    "source_status": hold["source_status"],
+                    "reason": hold["reason"],
+                    "max_finite_claimed_ev": hold["max_ev"],
                     "research_only": True,
                     "eligible_for_headline": False,
                     "eligible_for_forward_clock": False,
                 }
-            elif quarantined[idx]["reason"] != reason:
-                raise ValueError("GAME_SURFACE_QUARANTINE_CONFLICT")
             quarantined[idx]["source_surfaces"].append(name)
         filtered[name] = kept
     return filtered, list(quarantined.values())
