@@ -56,8 +56,11 @@ def sanitize_card(card):
         original_by_index[idx] = row
 
     result = deepcopy(card)
-    filtered = {}
-    quarantined_by_index = {}
+    # Phase one: validate every displayed row and collect holds globally by
+    # original input_index. A bad claim in ONE surface must suppress the same
+    # candidate from ALL other ranked surfaces, regardless of list order.
+    rows_by_surface = {}
+    holds_by_index = {}
     original_holds = {idx: game_claim_hold(row) for idx, row in original_by_index.items()}
     pre_counts = {}
     for name in GAME_SURFACES:
@@ -65,11 +68,15 @@ def sanitize_card(card):
         if not isinstance(rows, list):
             raise ValueError("GAME_SURFACE_NOT_LIST:" + name)
         pre_counts[name] = len(rows)
-        kept = []
+        rows_by_surface[name] = rows
+        seen = set()
         for row in rows:
             if not isinstance(row, dict):
                 raise ValueError("GAME_SURFACE_ROW_NOT_OBJECT:" + name)
             idx = _index(row, "GAME_SURFACE_ROW")
+            if idx in seen:
+                raise ValueError("GAME_SURFACE_DUPLICATE_INPUT_INDEX:" + name)
+            seen.add(idx)
             original = original_by_index.get(idx)
             if original is None:
                 raise ValueError("GAME_SURFACE_REFERENCE_NOT_IN_EVIDENCE")
@@ -83,29 +90,46 @@ def sanitize_card(card):
             original_reason, original_max_ev = original_holds[idx]
             reasons = [r for r in (display_reason, original_reason) if r is not None]
             if not reasons:
-                kept.append(row)
                 continue
             reason = next(r for r in _REASON_PRIORITY if r in reasons)
             finite_maxes = [v for v in (display_max_ev, original_max_ev) if v is not None]
             max_ev = max(finite_maxes) if finite_maxes else None
+            hold = holds_by_index.get(idx)
+            if hold is None:
+                holds_by_index[idx] = {"reason": reason, "max_ev": max_ev}
+            else:
+                hold["reason"] = next(r for r in _REASON_PRIORITY
+                                      if r in (hold["reason"], reason))
+                vals = [v for v in (hold["max_ev"], max_ev) if v is not None]
+                hold["max_ev"] = max(vals) if vals else None
+
+    # Phase two: remove EVERY occurrence of a held index, including earlier
+    # clean-looking copies. Keep the original evaluated_rows untouched.
+    filtered = {}
+    quarantined_by_index = {}
+    for name, rows in rows_by_surface.items():
+        kept = []
+        for row in rows:
+            idx = row["input_index"]
+            hold = holds_by_index.get(idx)
+            if hold is None:
+                kept.append(row)
+                continue
             existing = quarantined_by_index.get(idx)
             if existing is None:
-                quarantined_by_index[idx] = {
+                existing = {
                     "input_index": idx,
-                    "source_surfaces": [name],
-                    "source_status": original.get("status"),
-                    "reason": reason,
-                    "max_finite_claimed_ev": max_ev,
+                    "source_surfaces": [],
+                    "source_status": original_by_index[idx].get("status"),
+                    "reason": hold["reason"],
+                    "max_finite_claimed_ev": hold["max_ev"],
                     "evidence_bound": True,
                     "research_only": True,
                     "eligible_for_headline": False,
                     "eligible_for_forward_clock": False,
                 }
-            else:
-                existing["source_surfaces"].append(name)
-                existing["reason"] = next(r for r in _REASON_PRIORITY if r in (existing["reason"], reason))
-                vals = [v for v in (existing["max_finite_claimed_ev"], max_ev) if v is not None]
-                existing["max_finite_claimed_ev"] = max(vals) if vals else None
+                quarantined_by_index[idx] = existing
+            existing["source_surfaces"].append(name)
         filtered[name] = kept
 
     for key in GAME_SURFACES:
