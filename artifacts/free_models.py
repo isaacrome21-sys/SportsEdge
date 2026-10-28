@@ -1806,6 +1806,20 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
     edges = [r for r in all_rows
              if r["status"] == POSITIVE_EV_STATUS and is_play_eligible(r)]
     edges.sort(key=lambda r: (-r["ev_per_dollar"], r["game"], r["selection"]))
+    # Existing owner >=+40% EV quarantine at the RAW game JSON boundary.
+    # Filter every ranked game list, not only phone cards or prop lists.
+    # Preserve all_rows byte-for-byte for grading; no model math changes.
+    from sportsedge.game_candidate_quarantine import quarantine_game_surfaces
+    game_lists, game_quarantined = quarantine_game_surfaces({
+        "edges": edges,
+        "independent_candidates": independent,
+        "independent_watchlist": watchlist,
+        "lane_b_watchlist": lane_b_watchlist,
+    })
+    edges = game_lists["edges"]
+    independent = game_lists["independent_candidates"]
+    watchlist = game_lists["independent_watchlist"]
+    lane_b_watchlist = game_lists["lane_b_watchlist"]
     # Concentration is diagnosed over apparent positive-gap model
     # research signals, NOT independent profitable positions. The
     # already-failed NBA game markets never enter recommendation/PLAY.
@@ -1866,6 +1880,7 @@ def run(payload, *, now=None, as_of=None, historical=False, getter=None,
                 "undetermined_provenance": "FAIL_CLOSED",
                 "availability_unverified_max_surface": "RESEARCH_ONLY",
             },
+            "game_quarantined": game_quarantined,
             "independent_candidates": independent,
             "independent_watchlist": watchlist,
             "research_projection_note": "Unvalidated independent league-score heuristic; DK is a paired same-book no-vig benchmark, not sharp market verification.",
