@@ -182,6 +182,14 @@ class CaptureScopeTests(unittest.TestCase):
         with self.assertRaisesRegex(CbbCaptureScopeError, "DUPLICATE_JSON_KEY"):
             parse_cbb_scope_issue(body, received_at_utc=NOW)
 
+    def test_numeric_exponent_overflow_rejected_in_extra_json_field(self):
+        # Python json parses 1e999 into +inf; parse_constant is NOT called.
+        row = json.dumps(fixture())
+        overflow = row[:-1] + ', "untrusted_extra": 1e999}'
+        body = "### CBB_CAPTURE_V1\n" + FENCE + "json\n" + overflow + "\n" + FENCE
+        with self.assertRaisesRegex(CbbCaptureScopeError, "JSON_NONFINITE"):
+            parse_cbb_scope_issue(body, received_at_utc=NOW)
+
     def test_extra_fence_or_unclosed_fence_refused(self):
         body = "### CBB_CAPTURE_V1\n" + FENCE + "json\n{}\n" + FENCE + "\nnotes"
         with self.assertRaisesRegex(CbbCaptureScopeError, "ISSUE_FENCE_INVALID"):
