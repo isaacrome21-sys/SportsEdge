@@ -46,7 +46,8 @@ def _claims(row):
     independent = row.get("independent_projection")
     if independent is not None:
         if isinstance(independent, dict):
-            add(independent, ("ev_per_dollar",))
+            add(independent, ("ev_per_dollar", "raw_ev_per_dollar",
+                              "reported_ev_per_dollar"))
         else:
             invalid = True
     lanes = row.get("pricing_lanes")
@@ -58,7 +59,8 @@ def _claims(row):
                 lane = lanes.get(name)
                 if lane is not None:
                     if isinstance(lane, dict):
-                        add(lane, ("ev_per_dollar",))
+                        add(lane, ("ev_per_dollar", "raw_ev_per_dollar",
+                                   "reported_ev_per_dollar"))
                     else:
                         invalid = True
     return values, invalid
