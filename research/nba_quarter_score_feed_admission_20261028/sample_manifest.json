@@ -1,0 +1,578 @@
+{
+ "source_id": "ESPN_SUMMARY_API",
+ "sport": "NBA",
+ "admission_role": "DESIGN_SCREEN_AND_FORWARD_OUTCOMES",
+ "admitted_scope": [
+  "DESIGN_SCREEN",
+  "FORWARD_GRADING_OUTCOMES",
+  "IN_SEASON_PRIOR_BASELINES"
+ ],
+ "not_admitted_scope": [
+  "PREGAME_PRICING_INPUT",
+  "IN_PLAY_FEED",
+  "MARKET_DATA",
+  "NBA_CDN_ANY_ROLE"
+ ],
+ "validation_credit": false,
+ "forward_clock_credit": false,
+ "play_eligible": false,
+ "generated_at_utc": "2026-10-28T12:05:46.051992+00:00",
+ "generated_by": "pull_espn_period_scores.py pull (samples); probe battery 2026-10-28 (candidates)",
+ "pin_rule": "Payload pins attest the exact bytes as pulled at pulled_at_utc. The ESPN summary document is a fat document whose non-linescore sections drift at serialization level between pulls (verified 2026-10-28: in the dissected case all 19 top-level sections were byte-identical across two pulls while whole-payload bytes differed). The ADMITTED DATA is therefore the extracted content \u2014 event identity, tipoff, per-period linescores, finals \u2014 and re-pull validation is content-level: any linescore, final, or identity differing from the pinned sample is refused SOURCE_CHANGED_AFTER_SNAPSHOT. The puller's --expect-sha256 strict byte check remains available but is not the admission's validation rule.",
+ "samples": [
+  {
+   "espn_event_id": "400579520",
+   "game_id_namespace": "ESPN_EVENT_ID",
+   "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=400579520",
+   "http_status": 200,
+   "pulled_at_utc": "2026-10-28T12:04:50.518296+00:00",
+   "bytes": 294472,
+   "sha256": "9078aa34be12869d53d91dbcb60021c7437da68bb5fa067a5b20c071271bfc5c",
+   "stored_as": "espn_summary_400579520.json",
+   "date_utc": "2015-04-15T23:00Z",
+   "season_year_espn": 2015,
+   "engine_season": 2014,
+   "season_type": 2,
+   "home_team": "TOR",
+   "away_team": "CHA",
+   "home_linescores": [
+    25,
+    30,
+    23,
+    14
+   ],
+   "away_linescores": [
+    20,
+    24,
+    23,
+    20
+   ],
+   "home_quarters_regulation": [
+    25,
+    30,
+    23,
+    14
+   ],
+   "away_quarters_regulation": [
+    20,
+    24,
+    23,
+    20
+   ],
+   "home_ot_periods": [],
+   "away_ot_periods": [],
+   "home_half_scores": [
+    55,
+    37
+   ],
+   "away_half_scores": [
+    44,
+    43
+   ],
+   "home_final": 92,
+   "away_final": 87,
+   "checks": {
+    "identity_match": true,
+    "status_final": true,
+    "linescore_sums_match_finals": true
+   },
+   "observation": {
+    "game_id": "400579520",
+    "tipoff": "2015-04-15T23:00:00+00:00",
+    "observed_at": "2026-10-28T12:04:50.518296+00:00",
+    "home_quarters": [
+     25,
+     30,
+     23,
+     14
+    ],
+    "away_quarters": [
+     20,
+     24,
+     23,
+     20
+    ],
+    "source": "ESPN_SUMMARY_API",
+    "source_version": "espn-summary-v1:20261028"
+   },
+   "evidence_state": "verified-by-pull"
+  },
+  {
+   "espn_event_id": "400579521",
+   "game_id_namespace": "ESPN_EVENT_ID",
+   "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=400579521",
+   "http_status": 200,
+   "pulled_at_utc": "2026-10-28T12:04:52.375133+00:00",
+   "bytes": 371143,
+   "sha256": "b59f7399a238f850c08e7644b66d44d07fbf0a98e7c15744856d1387f2458afc",
+   "stored_as": "espn_summary_400579521.json",
+   "date_utc": "2015-04-16T02:30Z",
+   "season_year_espn": 2015,
+   "engine_season": 2014,
+   "season_type": 2,
+   "home_team": "GS",
+   "away_team": "DEN",
+   "home_linescores": [
+    35,
+    36,
+    29,
+    33
+   ],
+   "away_linescores": [
+    23,
+    44,
+    33,
+    26
+   ],
+   "home_quarters_regulation": [
+    35,
+    36,
+    29,
+    33
+   ],
+   "away_quarters_regulation": [
+    23,
+    44,
+    33,
+    26
+   ],
+   "home_ot_periods": [],
+   "away_ot_periods": [],
+   "home_half_scores": [
+    71,
+    62
+   ],
+   "away_half_scores": [
+    67,
+    59
+   ],
+   "home_final": 133,
+   "away_final": 126,
+   "checks": {
+    "identity_match": true,
+    "status_final": true,
+    "linescore_sums_match_finals": true
+   },
+   "observation": {
+    "game_id": "400579521",
+    "tipoff": "2015-04-16T02:30:00+00:00",
+    "observed_at": "2026-10-28T12:04:52.375133+00:00",
+    "home_quarters": [
+     35,
+     36,
+     29,
+     33
+    ],
+    "away_quarters": [
+     23,
+     44,
+     33,
+     26
+    ],
+    "source": "ESPN_SUMMARY_API",
+    "source_version": "espn-summary-v1:20261028"
+   },
+   "evidence_state": "verified-by-pull"
+  },
+  {
+   "espn_event_id": "401267340",
+   "game_id_namespace": "ESPN_EVENT_ID",
+   "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401267340",
+   "http_status": 200,
+   "pulled_at_utc": "2026-10-28T12:04:47.979379+00:00",
+   "bytes": 385560,
+   "sha256": "616e4a2fdef98521dd04411eb2e092e27f0d7c28dbce8bbfd821e5858066e6f9",
+   "stored_as": "espn_summary_401267340.json",
+   "date_utc": "2021-01-16T00:30Z",
+   "season_year_espn": 2021,
+   "engine_season": 2020,
+   "season_type": 2,
+   "home_team": "BOS",
+   "away_team": "ORL",
+   "home_linescores": [
+    34,
+    26,
+    28,
+    36
+   ],
+   "away_linescores": [
+    28,
+    20,
+    24,
+    25
+   ],
+   "home_quarters_regulation": [
+    34,
+    26,
+    28,
+    36
+   ],
+   "away_quarters_regulation": [
+    28,
+    20,
+    24,
+    25
+   ],
+   "home_ot_periods": [],
+   "away_ot_periods": [],
+   "home_half_scores": [
+    60,
+    64
+   ],
+   "away_half_scores": [
+    48,
+    49
+   ],
+   "home_final": 124,
+   "away_final": 97,
+   "checks": {
+    "identity_match": true,
+    "status_final": true,
+    "linescore_sums_match_finals": true
+   },
+   "observation": {
+    "game_id": "401267340",
+    "tipoff": "2021-01-16T00:30:00+00:00",
+    "observed_at": "2026-10-28T12:04:47.979379+00:00",
+    "home_quarters": [
+     34,
+     26,
+     28,
+     36
+    ],
+    "away_quarters": [
+     28,
+     20,
+     24,
+     25
+    ],
+    "source": "ESPN_SUMMARY_API",
+    "source_version": "espn-summary-v1:20261028"
+   },
+   "evidence_state": "verified-by-pull"
+  },
+  {
+   "espn_event_id": "401859964",
+   "game_id_namespace": "ESPN_EVENT_ID",
+   "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401859964",
+   "http_status": 200,
+   "pulled_at_utc": "2026-10-28T12:04:46.101698+00:00",
+   "bytes": 426985,
+   "sha256": "ff316b57a75f4a389adef7fda0b7ea0e0d49f05f39a858bcb3da3d3cd73ee8f0",
+   "stored_as": "espn_summary_401859964.json",
+   "date_utc": "2026-06-06T00:30Z",
+   "season_year_espn": 2026,
+   "engine_season": 2025,
+   "season_type": 3,
+   "home_team": "SA",
+   "away_team": "NY",
+   "home_linescores": [
+    34,
+    18,
+    23,
+    29
+   ],
+   "away_linescores": [
+    25,
+    31,
+    28,
+    21
+   ],
+   "home_quarters_regulation": [
+    34,
+    18,
+    23,
+    29
+   ],
+   "away_quarters_regulation": [
+    25,
+    31,
+    28,
+    21
+   ],
+   "home_ot_periods": [],
+   "away_ot_periods": [],
+   "home_half_scores": [
+    52,
+    52
+   ],
+   "away_half_scores": [
+    56,
+    49
+   ],
+   "home_final": 104,
+   "away_final": 105,
+   "checks": {
+    "identity_match": true,
+    "status_final": true,
+    "linescore_sums_match_finals": true
+   },
+   "observation": {
+    "game_id": "401859964",
+    "tipoff": "2026-06-06T00:30:00+00:00",
+    "observed_at": "2026-10-28T12:04:46.101698+00:00",
+    "home_quarters": [
+     34,
+     18,
+     23,
+     29
+    ],
+    "away_quarters": [
+     25,
+     31,
+     28,
+     21
+    ],
+    "source": "ESPN_SUMMARY_API",
+    "source_version": "espn-summary-v1:20261028"
+   },
+   "evidence_state": "verified-by-pull"
+  },
+  {
+   "espn_event_id": "401909877",
+   "game_id_namespace": "ESPN_EVENT_ID",
+   "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401909877",
+   "http_status": 200,
+   "pulled_at_utc": "2026-10-28T12:04:43.868167+00:00",
+   "bytes": 510492,
+   "sha256": "5827cafead5538eae9b418c8c60565ae857efc86ffb2012eb07e1eae33b09fac",
+   "stored_as": "espn_summary_401909877.json",
+   "date_utc": "2026-10-27T23:30Z",
+   "season_year_espn": 2027,
+   "engine_season": 2026,
+   "season_type": 2,
+   "home_team": "BOS",
+   "away_team": "BKN",
+   "home_linescores": [
+    26,
+    30,
+    30,
+    31,
+    8
+   ],
+   "away_linescores": [
+    31,
+    30,
+    21,
+    35,
+    7
+   ],
+   "home_quarters_regulation": [
+    26,
+    30,
+    30,
+    31
+   ],
+   "away_quarters_regulation": [
+    31,
+    30,
+    21,
+    35
+   ],
+   "home_ot_periods": [
+    8
+   ],
+   "away_ot_periods": [
+    7
+   ],
+   "home_half_scores": [
+    56,
+    61
+   ],
+   "away_half_scores": [
+    61,
+    56
+   ],
+   "home_final": 125,
+   "away_final": 124,
+   "checks": {
+    "identity_match": true,
+    "status_final": true,
+    "linescore_sums_match_finals": true
+   },
+   "observation": {
+    "game_id": "401909877",
+    "tipoff": "2026-10-27T23:30:00+00:00",
+    "observed_at": "2026-10-28T12:04:43.868167+00:00",
+    "home_quarters": [
+     26,
+     30,
+     30,
+     31
+    ],
+    "away_quarters": [
+     31,
+     30,
+     21,
+     35
+    ],
+    "source": "ESPN_SUMMARY_API",
+    "source_version": "espn-summary-v1:20261028"
+   },
+   "evidence_state": "verified-by-pull"
+  }
+ ],
+ "candidate_probes": {
+  "espn_scoreboard_discovery": [
+   {
+    "label": "espn_sb_20261027",
+    "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261027",
+    "http_status": 200,
+    "note": "Discovery/identity surface only (not the admitted feed): 4 events, incl. 401909877 BKN@BOS 124-125 Final/OT.",
+    "evidence_state": "verified-by-pull",
+    "bytes": 98082,
+    "sha256": "46662c6869697be4b4b1207f77bf7b21dcff0da211857c10556503df755bc0e8",
+    "pulled_at_utc": "2026-10-28T11:59:53.306820+00:00"
+   },
+   {
+    "label": "espn_sb_20150415",
+    "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20150415",
+    "http_status": 200,
+    "note": "Full 14-game slate for the 2014-15 regular-season finale \u2014 archive depth at the frozen fit span.",
+    "evidence_state": "verified-by-pull",
+    "bytes": 176913,
+    "sha256": "7557ab3082e3ff4ec6fa82e7fa7bf21fae14ad0325cf229cf54fb36394e1a851",
+    "pulled_at_utc": "2026-10-28T11:59:55.044569+00:00"
+   },
+   {
+    "label": "espn_sb_20210115",
+    "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20210115",
+    "http_status": 200,
+    "note": "2020-21 slate; WSH@DET shows 0-0 (COVID postponement) \u2014 a postponed game can never produce an observation (NOT_FINAL).",
+    "evidence_state": "verified-by-pull",
+    "bytes": 114926,
+    "sha256": "ea5ba9b98be2aedaf5c6c994d6d7956445744e760b42b7b9969bd270033e150a",
+    "pulled_at_utc": "2026-10-28T12:01:05.197232+00:00"
+   },
+   {
+    "label": "espn_sb_20260605",
+    "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20260605",
+    "http_status": 200,
+    "note": "Postseason discovery: event 401859964 NY@SA, season type 3.",
+    "evidence_state": "verified-by-pull",
+    "bytes": 19512,
+    "sha256": "7494a6277e506f06fcfefe185331169d0c43b983b0bd2a4a9d0c04326dc8eba0",
+    "pulled_at_utc": "2026-10-28T12:00:18.762742+00:00"
+   }
+  ],
+  "nba_cdn": {
+   "verdict": "NOT_ADMITTED",
+   "probes": [
+    {
+     "label": "nba_cdn_scoreboard",
+     "url": "https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json",
+     "http_status": 403,
+     "note": "Akamai HTTP 403 from the SportsEdge runtime.",
+     "evidence_state": "verified-by-pull",
+     "bytes": 443,
+     "sha256": "1f6266915437d46a908506d2953580841c50988a0832834ea5ca5fb61a9ec13f",
+     "pulled_at_utc": "2026-10-28T11:59:55.716828+00:00"
+    },
+    {
+     "label": "nba_cdn_boxscore",
+     "url": "https://cdn.nba.com/static/json/liveData/boxscore/boxscore_0022600001.json",
+     "http_status": 403,
+     "note": "Akamai HTTP 403 \u2014 the Candidate A surface itself, refused again.",
+     "evidence_state": "verified-by-pull",
+     "bytes": 443,
+     "sha256": "d0e4d542cd5e90d1ac0dbbe3e5aa666519ecebbedb2c8142f85e252b3bd8e354",
+     "pulled_at_utc": "2026-10-28T12:01:05.787386+00:00"
+    }
+   ],
+   "note": "Reproduces the 2026-10-22 Candidate A admission battery failure; consistent with PREREG_NBA_PROPS_FORWARD_V2.md S2.5, which records the NBA.com CDN box-score feed as not admitted. No circumvention attempted."
+  },
+  "stats_nba_com": {
+   "verdict": "NOT_ADMITTED",
+   "probes": [
+    {
+     "label": "stats_nba_box",
+     "url": "https://stats.nba.com/stats/boxscoretraditionalv3?GameID=0022600001",
+     "http_status": null,
+     "error": "TimeoutError: read operation timed out",
+     "evidence_state": "verified-by-pull",
+     "note": "No response from the SportsEdge runtime within 45s."
+    }
+   ]
+  },
+  "basketball_reference": {
+   "verdict": "NOT_ADMITTED",
+   "probes": [
+    {
+     "label": "bref_box_bos",
+     "url": "https://www.basketball-reference.com/boxscores/202610270BOS.html",
+     "http_status": 404,
+     "note": "Current-season (2026-27) game: HTTP 404 at probe time.",
+     "evidence_state": "verified-by-pull",
+     "bytes": 93757,
+     "sha256": "0217a8c892ae08bf5ca8f623760a0218899aae1877bbbd0013317d396be44d56",
+     "pulled_at_utc": "2026-10-28T11:59:56.743217+00:00"
+    },
+    {
+     "label": "bref_box_lal",
+     "url": "https://www.basketball-reference.com/boxscores/202610270LAL.html",
+     "http_status": 404,
+     "note": "Second current-season game: HTTP 404 \u2014 the 2026-27 coverage gap is not a one-game slug error.",
+     "evidence_state": "verified-by-pull",
+     "bytes": 93757,
+     "sha256": "0217a8c892ae08bf5ca8f623760a0218899aae1877bbbd0013317d396be44d56",
+     "pulled_at_utc": "2026-10-28T12:02:53.766765+00:00"
+    },
+    {
+     "label": "bref_box_gsw2015",
+     "url": "https://www.basketball-reference.com/boxscores/201504150GSW.html",
+     "http_status": 200,
+     "note": "Historical box score serves with a full line-score table (see cross_checks).",
+     "evidence_state": "verified-by-pull",
+     "bytes": 478179,
+     "sha256": "c191f948625968afebee990d5477377629d08451117622bcaa0ce8c2a0bb4b2d",
+     "pulled_at_utc": "2026-10-28T12:00:22.705569+00:00"
+    },
+    {
+     "label": "bref_box_sas_finals",
+     "url": "https://www.basketball-reference.com/boxscores/202606050SAS.html",
+     "http_status": 200,
+     "note": "2026 Finals game serves \u2014 BRef coverage in this environment ends with the 2025-26 season.",
+     "evidence_state": "verified-by-pull",
+     "bytes": 472911,
+     "sha256": "dd3fed5ac2147a61df5e81dbefcbe1df31fd19c6fdf24d3f3192695804f4a53a",
+     "pulled_at_utc": "2026-10-28T12:02:54.360569+00:00"
+    }
+   ],
+   "note": "Fails the coverage bar for this role: the design's population is the 2026-27 forward season, which BRef does not serve here. Four polite single probes total; no rate pressure, no circumvention; a 403/429 would have been fail-closed under Sports Reference bot policy."
+  },
+  "sportsdataverse_schedule_corroboration": {
+   "file": "nba_schedule_2027.csv",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_schedules/nba_schedule_2027.csv",
+   "bytes": 2381342,
+   "sha256": "f1194bd8149eb6490caa5fcd4818fe00172a381bbf9c2424ae980283fe64eb55",
+   "note": "Rolling release asset, pulled 2026-10-28 ~12:03Z; pin attests bytes as pulled. NOT admitted by this record \u2014 cited as identity evidence only (see cross_checks)."
+  }
+ },
+ "cross_checks": [
+  {
+   "check": "identity_namespace",
+   "detail": "sportsdataverse nba_schedule_2027.csv row for the 2026-10-27 BKN@BOS game carries game_id 401909877 \u2014 the ESPN event id \u2014 with home_score 125, away_score 124, STATUS_FINAL. The maintained path's game_id IS the ESPN event id, so this feed joins the engine's rows with no crosswalk.",
+   "evidence_state": "verified-by-pull"
+  },
+  {
+   "check": "maintained_mirror_linescore_agreement",
+   "detail": "The same schedule row's home_linescores begin 26/30/30 (BOS Q1-Q3) \u2014 identical to the direct ESPN summary extraction for 401909877.",
+   "evidence_state": "verified-by-pull"
+  },
+  {
+   "check": "independent_source_agreement_bref",
+   "detail": "DEN@GSW 2015-04-15: Basketball-Reference line_score table DEN 23/44/33/26 (126), GSW 35/36/29/33 (133) vs ESPN summary 400579521 DEN 23/44/33/26 (126), GS 35/36/29/33 (133) \u2014 8 of 8 quarter values and both finals agree across two independent sources.",
+   "evidence_state": "verified-by-pull"
+  },
+  {
+   "check": "two_pull_split_stability",
+   "detail": "All five samples were pulled twice (probe battery + committed puller). Extracted linescores, finals, and identities were identical in 5 of 5; whole-payload bytes differed in 4 of 5 (serialization-level drift in the fat summary document \u2014 see pin_rule).",
+   "evidence_state": "verified-by-pull"
+  },
+  {
+   "check": "card_record_agreement",
+   "detail": "Sample 401909877's final (BOS 125, BKN 124, OT) matches the program's own two-source-verified grade record for the Oct 27, 2026 slate.",
+   "evidence_state": "verified-by-pull"
+  }
+ ]
+}
