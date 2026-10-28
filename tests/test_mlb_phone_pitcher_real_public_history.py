@@ -79,7 +79,10 @@ def test_priced_paired_pitcher_rows_reach_true_shared_research_bridge():
     card=full([prop(),prop(side="UNDER",odds=-114)])
     assert card["schema"]=="SPORTSEDGE_FREE_RESEARCH_CARD_V1"
     assert len(card["evaluated_rows"])==2
-    assert len(card["prop_candidates"])+len(card["prop_watchlist"])==2
+    assert (len(card["prop_candidates"]) + len(card["prop_watchlist"])
+            + len(card["prop_quarantined"])) == 2
+    assert all(held["reason"] == "EXTREME_CLAIMED_EV_QUARANTINE"
+               for held in card["prop_quarantined"])
     assert not card["prop_unpriced"]
     assert len(card["source_receipts"])==1
     for r in card["evaluated_rows"]:
@@ -116,8 +119,11 @@ def test_stale_screenshot_watches_not_bet():
     c=full([prop(captured="2026-10-11T19:00:00Z"),
             prop(side="UNDER",odds=-114,captured="2026-10-11T19:00:00Z")])
     assert len(c["prop_candidates"])==0
-    assert len(c["prop_watchlist"])==2
-    assert all(r["status"]=="WATCH_QUOTE_NOT_CURRENT" for r in c["prop_watchlist"])
+    assert len(c["prop_watchlist"]) + len(c["prop_quarantined"]) == 2
+    assert all(r["status"] == "WATCH_QUOTE_NOT_CURRENT"
+               for r in c["evaluated_rows"])
+    assert all(held["reason"] == "EXTREME_CLAIMED_EV_QUARANTINE"
+               for held in c["prop_quarantined"])
 
 
 def test_no_probable_or_wrong_name_no_probability():
