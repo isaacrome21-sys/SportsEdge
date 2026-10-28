@@ -16,6 +16,9 @@ from sportsedge.handicap_explanations import handicap_explanation
 CANDIDATE_STATUSES = frozenset({
     "RESEARCH_POSITIVE_EV_UNVALIDATED", "RESEARCH_CANDIDATE_NOT_VALIDATED",
 })
+# Existing owner +40% claimed-EV quarantine. This is a presentation
+# exclusion, NOT a calibration change or permission to omit grading.
+EXTREME_CLAIMED_EV_QUARANTINE = 0.40
 INTAKE_FIELDS = ("sport", "away", "home", "market", "side", "selection",
                  "player_name", "line", "period", "phase", "alternate",
                  "settlement_type", "kickoff", "commence_time", "book")
@@ -36,6 +39,25 @@ def _number(value):
     except (TypeError, ValueError, OverflowError):
         return None
     return value if isfinite(value) else None
+
+
+def _extreme_claim(row, *computed_evs):
+    """True if ANY stored or current-quote EV claim enters the owner hold.
+
+    Do not let a lower market-blended view mask an extreme raw-model claim.
+    Underlying evaluated rows remain in the immutable card for grading.
+    """
+    claims = list(computed_evs)
+    lanes = row.get("pricing_lanes")
+    lanes = lanes if isinstance(lanes, dict) else {}
+    for candidate in (row, row.get("independent_projection"),
+                      lanes.get("lane_a_independent"),
+                      lanes.get("lane_b_anchored")):
+        if isinstance(candidate, dict):
+            claims.append(candidate.get("ev_per_dollar"))
+    return any((number is not None
+                and number >= EXTREME_CLAIMED_EV_QUARANTINE)
+               for number in (_number(value) for value in claims))
 
 
 def _metrics(row):
@@ -193,6 +215,14 @@ def build_phone_card(card):
             f"{source['away']} @ {source['home']}" if source.get("away") and source.get("home") else "Event unavailable")
         sport = str(source.get("sport") or row.get("sport") or "UNKNOWN").upper()
         market = str(row.get("market") or source.get("market") or "UNKNOWN").upper()
+        # Owner quarantine is an output-boundary invariant. Never render an
+        # extreme raw/repriced/blended claim as LEAN, stale ranked, or headline.
+        # The original evaluated row remains unchanged for append-only grading.
+        blend = _blended(row, sport)
+        if bucket in {"priced", "stale"} and _extreme_claim(
+                row, ev, blend.get("ev") if blend else None):
+            label, bucket, reason = (
+                "QUARANTINED", "rejected", "EXTREME_CLAIMED_EV_QUARANTINE")
         # Keep unknown dimensions unknown: absence does not prove full-game,
         # pregame, a standard line, or any settlement convention.
         dimension = (sport, market, str(source.get("period") or "UNSPECIFIED"),
@@ -274,6 +304,9 @@ def build_current_value_screens(card, *, max_rows=20, now=None):
     results, exclusions = [], Counter()
     raw_rows = card["evaluated_rows"]
     for source, row in zip(view["selections"], raw_rows):
+        if source.get("status") == "QUARANTINED":
+            exclusions["EXTREME_CLAIMED_EV_QUARANTINE"] += 1
+            continue
         status = str(row.get("status") or "MISSING_STATUS")
         if (status.startswith("BLOCKED") or status in
                 {"NO_MODEL_OR_MARKET", "NO_ENGINE", "NO_QUOTE", "MISSING_STATUS"}):
@@ -338,6 +371,9 @@ def build_current_value_screens(card, *, max_rows=20, now=None):
         # A model's stored EV can refer to an earlier bookmaker price.
         # Reprice from the actual current quote on *every* card render.
         ev = p * decimal_odds - 1
+        if _extreme_claim(row, ev, reported_ev):
+            exclusions["EXTREME_CLAIMED_EV_QUARANTINE"] += 1
+            continue
         if ev <= 0:
             exclusions["NO_POSITIVE_ESTIMATED_EV"] += 1
             continue
@@ -351,6 +387,9 @@ def build_current_value_screens(card, *, max_rows=20, now=None):
                 exclusions[source["sport"] + "_BLENDED_EV_UNAVAILABLE"] += 1
                 continue
             blended_ev = blend["probability"] * decimal_odds - 1
+            if _extreme_claim(row, blended_ev):
+                exclusions["EXTREME_CLAIMED_EV_QUARANTINE"] += 1
+                continue
             if blended_ev <= 0:
                 exclusions["NO_POSITIVE_BLENDED_EV"] += 1
                 continue
