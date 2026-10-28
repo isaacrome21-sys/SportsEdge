@@ -1,0 +1,686 @@
+{
+ "screen": "CBB_TORVIK_EFFICIENCY_V1 design screen \u2014 ATTEMPT 4",
+ "design_reference": "PR #2843 CBB_SIDES_TOTALS_DESIGN_AND_PREREG_DRAFT.md sections 1-3, as amended by AMENDMENT_1.md (PR #2883) \u2014 prior-snapshot convention",
+ "evidence_class": "DESIGN EVIDENCE ONLY \u2014 not validation",
+ "pins": {
+  "torvik": "PR #2832 pinned commit 46d1036443ca452fdd1c6cf25cf5dff50de68337 (admission samples re-verified byte-identical before use; read under the Amendment 1 prior-snapshot convention)",
+  "hoopr": "PR #2867 successor manifest (18/18 assets hash-verified before use)",
+  "cbr": "PR #2871 successor manifest (6/6 files hash + size + git-blob verified before use; admitted scopes only)"
+ },
+ "torvik_fetch_log": {
+  "convention": "PRIOR_SNAPSHOT (Amendment 1): Torvik input for game date D is the archive file dated D-1",
+  "game_dates_needing_input": 1243,
+  "prior_snapshot_files_needed": 1243,
+  "files_fetched_or_cached": 1239,
+  "files_missing_404": 0,
+  "files_schema_invalid": 4
+ },
+ "prior_snapshot_probe": {
+  "passed": true,
+  "witnesses": [
+   {
+    "case": "Duke record in the 2014-11-13 archive file (the D-1 prior snapshot for games on 2014-11-14)",
+    "expected_if_prior_snapshot": "0-0",
+    "observed": "0-0"
+   },
+   {
+    "case": "Kentucky record in the 2014-11-13 archive file (the D-1 prior snapshot for games on 2014-11-14)",
+    "expected_if_prior_snapshot": "0-0",
+    "observed": "0-0"
+   },
+   {
+    "case": "Wisconsin record in the 2014-11-13 archive file (the D-1 prior snapshot for games on 2014-11-14)",
+    "expected_if_prior_snapshot": "0-0",
+    "observed": "0-0"
+   },
+   {
+    "case": "Purdue record in the 2023-03-11 archive file (the D-1 prior snapshot for games on 2023-03-12)",
+    "expected_if_prior_snapshot": "28-5",
+    "observed": "28-5"
+   }
+  ],
+  "amendment_suite": "AMENDMENT_1.md probe suite: 19/19 PASS \u2014 PRIOR_SNAPSHOT_VERIFIED (PR #2883)"
+ },
+ "fixture_universe_by_season": {
+  "2014-15": {
+   "season": "2014-15",
+   "cbr_derivation": {
+    "team_rows_admitted_scope": 11431,
+    "team_slug_unresolved_rows": 0,
+    "score_missing_rows": 2,
+    "opponent_unresolved_rows": 429,
+    "fixtures_derived": 5499,
+    "rows_in_fixtures": 10998,
+    "single_or_unpaired_rows": 431,
+    "mirror_inconsistent_pairs": 0,
+    "conflicted_fixture_keys": 0
+   },
+   "hoopr_rows_total": 5932,
+   "illinois_excluded_team_surfaces": [
+    "Bradley",
+    "Chicago State",
+    "DePaul",
+    "Eastern Illinois",
+    "Illinois",
+    "Illinois State",
+    "Illinois-Springfield",
+    "Northern Illinois",
+    "Northwestern",
+    "SIU Edwardsville",
+    "Southern Illinois",
+    "St. Francis Illinois",
+    "UIC",
+    "Western Illinois"
+   ],
+   "agreement_counts_before_torvik": {
+    "SCHEDULE_DISCREPANCY:NAME_UNRESOLVED": 966,
+    "illinois_excluded": 362,
+    "SCHEDULE_DISCREPANCY:CBR_FIXTURE_NOT_FOUND": 7,
+    "SCHEDULE_DISCREPANCY:SCORE_MISMATCH_CBR_VS_HOOPR": 11
+   },
+   "fixtures_passing_cbr_leg": 4586,
+   "agreement_counts_torvik_leg": {
+    "SCHEDULE_DISCREPANCY:TORVIK_TEAM_NOT_CARRIED": 1597
+   },
+   "fixtures_agreed_three_way": 2989
+  },
+  "2015-16": {
+   "season": "2015-16",
+   "cbr_derivation": {
+    "team_rows_admitted_scope": 11468,
+    "team_slug_unresolved_rows": 0,
+    "score_missing_rows": 0,
+    "opponent_unresolved_rows": 435,
+    "fixtures_derived": 5516,
+    "rows_in_fixtures": 11032,
+    "single_or_unpaired_rows": 436,
+    "mirror_inconsistent_pairs": 0,
+    "conflicted_fixture_keys": 0
+   },
+   "hoopr_rows_total": 5893,
+   "illinois_excluded_team_surfaces": [
+    "Bradley",
+    "Chicago State",
+    "DePaul",
+    "Eastern Illinois",
+    "Illinois",
+    "Illinois State",
+    "Illinois Tech",
+    "Illinois-Springfield",
+    "Northern Illinois",
+    "Northwestern",
+    "SIU Edwardsville",
+    "Southern Illinois",
+    "UIC",
+    "Western Illinois"
+   ],
+   "agreement_counts_before_torvik": {
+    "SCHEDULE_DISCREPANCY:SCORE_MISMATCH_CBR_VS_HOOPR": 8,
+    "illinois_excluded": 348,
+    "SCHEDULE_DISCREPANCY:NAME_UNRESOLVED": 939,
+    "SCHEDULE_DISCREPANCY:CBR_FIXTURE_NOT_FOUND": 4
+   },
+   "fixtures_passing_cbr_leg": 4594,
+   "agreement_counts_torvik_leg": {
+    "SCHEDULE_DISCREPANCY:TORVIK_TEAM_NOT_CARRIED": 1558
+   },
+   "fixtures_agreed_three_way": 3036
+  },
+  "2016-17": {
+   "season": "2016-17",
+   "cbr_derivation": {
+    "team_rows_admitted_scope": 11511,
+    "team_slug_unresolved_rows": 0,
+    "score_missing_rows": 0,
+    "opponent_unresolved_rows": 441,
+    "fixtures_derived": 5535,
+    "rows_in_fixtures": 11070,
+    "single_or_unpaired_rows": 441,
+    "mirror_inconsistent_pairs": 0,
+    "conflicted_fixture_keys": 0
+   },
+   "hoopr_rows_total": 5960,
+   "illinois_excluded_team_surfaces": [
+    "Bradley",
+    "Chicago State",
+    "DePaul",
+    "Eastern Illinois",
+    "Illinois",
+    "Illinois State",
+    "Illinois Tech",
+    "Illinois-Springfield",
+    "Northern Illinois",
+    "Northwestern",
+    "SIU Edwardsville",
+    "Southern Illinois",
+    "St. Francis Illinois",
+    "UIC",
+    "Western Illinois"
+   ],
+   "agreement_counts_before_torvik": {
+    "illinois_excluded": 367,
+    "SCHEDULE_DISCREPANCY:NAME_UNRESOLVED": 959,
+    "SCHEDULE_DISCREPANCY:SCORE_MISMATCH_CBR_VS_HOOPR": 9,
+    "SCHEDULE_DISCREPANCY:CBR_FIXTURE_NOT_FOUND": 3
+   },
+   "fixtures_passing_cbr_leg": 4622,
+   "agreement_counts_torvik_leg": {
+    "SCHEDULE_DISCREPANCY:TORVIK_TEAM_NOT_CARRIED": 1531
+   },
+   "fixtures_agreed_three_way": 3091
+  },
+  "2017-18": {
+   "season": "2017-18",
+   "cbr_derivation": {
+    "team_rows_admitted_scope": 11544,
+    "team_slug_unresolved_rows": 0,
+    "score_missing_rows": 0,
+    "opponent_unresolved_rows": 464,
+    "fixtures_derived": 5540,
+    "rows_in_fixtures": 11080,
+    "single_or_unpaired_rows": 464,
+    "mirror_inconsistent_pairs": 0,
+    "conflicted_fixture_keys": 0
+   },
+   "hoopr_rows_total": 6003,
+   "illinois_excluded_team_surfaces": [
+    "Bradley",
+    "Chicago State",
+    "DePaul",
+    "Eastern Illinois",
+    "Illinois",
+    "Illinois State",
+    "Illinois-Springfield",
+    "Northern Illinois",
+    "Northwestern",
+    "SIU Edwardsville",
+    "Southern Illinois",
+    "St. Francis Illinois",
+    "UIC",
+    "Western Illinois"
+   ],
+   "agreement_counts_before_torvik": {
+    "SCHEDULE_DISCREPANCY:NAME_UNRESOLVED": 976,
+    "illinois_excluded": 359,
+    "SCHEDULE_DISCREPANCY:SCORE_MISMATCH_CBR_VS_HOOPR": 3,
+    "SCHEDULE_DISCREPANCY:CBR_FIXTURE_NOT_FOUND": 3
+   },
+   "fixtures_passing_cbr_leg": 4662,
+   "agreement_counts_torvik_leg": {
+    "SCHEDULE_DISCREPANCY:TORVIK_TEAM_NOT_CARRIED": 1579
+   },
+   "fixtures_agreed_three_way": 3083
+  },
+  "2018-19": {
+   "season": "2018-19",
+   "cbr_derivation": {
+    "team_rows_admitted_scope": 11652,
+    "team_slug_unresolved_rows": 0,
+    "score_missing_rows": 0,
+    "opponent_unresolved_rows": 442,
+    "fixtures_derived": 5603,
+    "rows_in_fixtures": 11206,
+    "single_or_unpaired_rows": 446,
+    "mirror_inconsistent_pairs": 0,
+    "conflicted_fixture_keys": 0
+   },
+   "hoopr_rows_total": 6049,
+   "illinois_excluded_team_surfaces": [
+    "Bradley",
+    "Chicago State",
+    "Concordia Illinois",
+    "DePaul",
+    "Eastern Illinois",
+    "Illinois",
+    "Illinois State",
+    "Illinois Tech",
+    "Northern Illinois",
+    "Northwestern",
+    "SIU Edwardsville",
+    "Southern Illinois",
+    "St. Francis Illinois",
+    "UIC",
+    "Western Illinois"
+   ],
+   "agreement_counts_before_torvik": {
+    "illinois_excluded": 367,
+    "SCHEDULE_DISCREPANCY:NAME_UNRESOLVED": 979,
+    "SCHEDULE_DISCREPANCY:CBR_FIXTURE_NOT_FOUND": 2
+   },
+   "fixtures_passing_cbr_leg": 4701,
+   "agreement_counts_torvik_leg": {
+    "SCHEDULE_DISCREPANCY:TORVIK_TEAM_NOT_CARRIED": 1589
+   },
+   "fixtures_agreed_three_way": 3112
+  },
+  "2019-20": {
+   "season": "2019-20",
+   "cbr_derivation": {
+    "team_rows_admitted_scope": 11095,
+    "team_slug_unresolved_rows": 0,
+    "score_missing_rows": 0,
+    "opponent_unresolved_rows": 438,
+    "fixtures_derived": 5328,
+    "rows_in_fixtures": 10656,
+    "single_or_unpaired_rows": 439,
+    "mirror_inconsistent_pairs": 0,
+    "conflicted_fixture_keys": 0
+   },
+   "hoopr_rows_total": 5767,
+   "illinois_excluded_team_surfaces": [
+    "Bradley",
+    "Chicago State",
+    "Concordia Illinois",
+    "DePaul",
+    "Eastern Illinois",
+    "Illinois",
+    "Illinois State",
+    "Illinois Wesleyan",
+    "Illinois-Springfield",
+    "Northern Illinois",
+    "Northwestern",
+    "SIU Edwardsville",
+    "Southern Illinois",
+    "St. Francis Illinois",
+    "UIC",
+    "Western Illinois"
+   ],
+   "agreement_counts_before_torvik": {
+    "illinois_excluded": 355,
+    "SCHEDULE_DISCREPANCY:NAME_UNRESOLVED": 942,
+    "SCHEDULE_DISCREPANCY:CBR_FIXTURE_NOT_FOUND": 1
+   },
+   "fixtures_passing_cbr_leg": 4469,
+   "agreement_counts_torvik_leg": {
+    "SCHEDULE_DISCREPANCY:TORVIK_TEAM_NOT_CARRIED": 1500
+   },
+   "fixtures_agreed_three_way": 2969
+  },
+  "2020-21": {
+   "season": "2020-21",
+   "cbr_derivation": {
+    "team_rows_admitted_scope": 8229,
+    "team_slug_unresolved_rows": 0,
+    "score_missing_rows": 0,
+    "opponent_unresolved_rows": 338,
+    "fixtures_derived": 3944,
+    "rows_in_fixtures": 7888,
+    "single_or_unpaired_rows": 341,
+    "mirror_inconsistent_pairs": 0,
+    "conflicted_fixture_keys": 0
+   },
+   "hoopr_rows_total": 4285,
+   "illinois_excluded_team_surfaces": [
+    "Bradley",
+    "Chicago State",
+    "DePaul",
+    "Eastern Illinois",
+    "Illinois",
+    "Illinois State",
+    "Northern Illinois",
+    "Northwestern",
+    "SIU Edwardsville",
+    "Southern Illinois",
+    "St. Francis Illinois",
+    "UIC",
+    "Western Illinois"
+   ],
+   "agreement_counts_before_torvik": {
+    "SCHEDULE_DISCREPANCY:NAME_UNRESOLVED": 733,
+    "illinois_excluded": 260
+   },
+   "fixtures_passing_cbr_leg": 3292,
+   "agreement_counts_torvik_leg": {
+    "SCHEDULE_DISCREPANCY:TORVIK_TEAM_NOT_CARRIED": 1110
+   },
+   "fixtures_agreed_three_way": 2182
+  },
+  "2021-22": {
+   "season": "2021-22",
+   "cbr_derivation": {
+    "team_rows_admitted_scope": 11443,
+    "team_slug_unresolved_rows": 0,
+    "score_missing_rows": 0,
+    "opponent_unresolved_rows": 491,
+    "fixtures_derived": 5475,
+    "rows_in_fixtures": 10950,
+    "single_or_unpaired_rows": 493,
+    "mirror_inconsistent_pairs": 0,
+    "conflicted_fixture_keys": 0
+   },
+   "hoopr_rows_total": 5976,
+   "illinois_excluded_team_surfaces": [
+    "Bradley",
+    "Chicago State",
+    "DePaul",
+    "Eastern Illinois",
+    "Illinois",
+    "Illinois State",
+    "Illinois-Springfield",
+    "Northern Illinois",
+    "Northwestern",
+    "SIU Edwardsville",
+    "Southern Illinois",
+    "UIC",
+    "Western Illinois"
+   ],
+   "agreement_counts_before_torvik": {
+    "SCHEDULE_DISCREPANCY:NAME_UNRESOLVED": 1042,
+    "illinois_excluded": 357,
+    "SCHEDULE_DISCREPANCY:CBR_FIXTURE_NOT_FOUND": 11
+   },
+   "fixtures_passing_cbr_leg": 4566,
+   "agreement_counts_torvik_leg": {
+    "SCHEDULE_DISCREPANCY:TORVIK_TEAM_NOT_CARRIED": 1526
+   },
+   "fixtures_agreed_three_way": 3040
+  },
+  "2022-23": {
+   "season": "2022-23",
+   "cbr_derivation": {
+    "team_rows_admitted_scope": 11995,
+    "team_slug_unresolved_rows": 0,
+    "score_missing_rows": 58,
+    "opponent_unresolved_rows": 507,
+    "fixtures_derived": 5715,
+    "rows_in_fixtures": 11430,
+    "single_or_unpaired_rows": 507,
+    "mirror_inconsistent_pairs": 0,
+    "conflicted_fixture_keys": 0
+   },
+   "hoopr_rows_total": 6261,
+   "illinois_excluded_team_surfaces": [
+    "Bradley",
+    "Chicago State",
+    "DePaul",
+    "Eastern Illinois",
+    "Illinois",
+    "Illinois State",
+    "Illinois Tech",
+    "Illinois-Springfield",
+    "Northern Illinois",
+    "Northwestern",
+    "SIU Edwardsville",
+    "Southern Illinois",
+    "UIC",
+    "Western Illinois"
+   ],
+   "agreement_counts_before_torvik": {
+    "SCHEDULE_DISCREPANCY:NAME_UNRESOLVED": 1102,
+    "illinois_excluded": 363,
+    "SCHEDULE_DISCREPANCY:CBR_FIXTURE_NOT_FOUND": 33
+   },
+   "fixtures_passing_cbr_leg": 4763,
+   "agreement_counts_torvik_leg": {
+    "SCHEDULE_DISCREPANCY:TORVIK_TEAM_NOT_CARRIED": 1560,
+    "SCHEDULE_DISCREPANCY:TORVIK_PRIOR_SNAPSHOT_NO_DATA": 152
+   },
+   "fixtures_agreed_three_way": 3051
+  }
+ },
+ "fitted_parameters_by_scored_season": {
+  "2015-16": {
+   "home_court_term_candidate": 3.3756023216238145,
+   "home_court_constant_simple_baseline_fixed": 3.3756023216238145,
+   "naive_margin_mean": 4.828370692539311,
+   "naive_total_mean": 134.08497825359652,
+   "ml_map_intercept": 0.012796489856946798,
+   "ml_map_slope": 0.17131551597658232,
+   "fit_window_fixtures": 2989
+  },
+  "2016-17": {
+   "home_court_term_candidate": 3.3598216814564505,
+   "home_court_constant_simple_baseline_fixed": 3.3756023216238145,
+   "naive_margin_mean": 4.885477178423237,
+   "naive_total_mean": 140.08414937759335,
+   "ml_map_intercept": 0.03144156607910091,
+   "ml_map_slope": 0.15772375586565054,
+   "fit_window_fixtures": 6025
+  },
+  "2017-18": {
+   "home_court_term_candidate": 3.3279553912456197,
+   "home_court_constant_simple_baseline_fixed": 3.3756023216238145,
+   "naive_margin_mean": 4.84093900833699,
+   "naive_total_mean": 141.66761737604213,
+   "ml_map_intercept": 0.02028805781770797,
+   "ml_map_slope": 0.1580752201055569,
+   "fit_window_fixtures": 9116
+  },
+  "2018-19": {
+   "home_court_term_candidate": 3.352581769500403,
+   "home_court_constant_simple_baseline_fixed": 3.3756023216238145,
+   "naive_margin_mean": 4.88605623411755,
+   "naive_total_mean": 142.7878514632347,
+   "ml_map_intercept": 0.03175057724609966,
+   "ml_map_slope": 0.1576044429489284,
+   "fit_window_fixtures": 12199
+  },
+  "2019-20": {
+   "home_court_term_candidate": 3.286981912772692,
+   "home_court_constant_simple_baseline_fixed": 3.3756023216238145,
+   "naive_margin_mean": 4.821696819280256,
+   "naive_total_mean": 142.8021030631572,
+   "ml_map_intercept": 0.02271853019967687,
+   "ml_map_slope": 0.1580487588903294,
+   "fit_window_fixtures": 15311
+  },
+  "2020-21": {
+   "home_court_term_candidate": 3.3125024568601593,
+   "home_court_constant_simple_baseline_fixed": 3.3756023216238145,
+   "naive_margin_mean": 4.7951859956236325,
+   "naive_total_mean": 142.2960612691466,
+   "ml_map_intercept": 0.01866471072326186,
+   "ml_map_slope": 0.15660456215727303,
+   "fit_window_fixtures": 18280
+  },
+  "2021-22": {
+   "home_court_term_candidate": 3.246397790655618,
+   "home_court_constant_simple_baseline_fixed": 3.3756023216238145,
+   "naive_margin_mean": 4.707506597595543,
+   "naive_total_mean": 142.16943602775876,
+   "ml_map_intercept": 0.015352859342802588,
+   "ml_map_slope": 0.15665432233189622,
+   "fit_window_fixtures": 20462
+  },
+  "2022-23": {
+   "home_court_term_candidate": 3.2501022398177666,
+   "home_court_constant_simple_baseline_fixed": 3.3756023216238145,
+   "naive_margin_mean": 4.657944004765552,
+   "naive_total_mean": 141.8535018296315,
+   "ml_map_intercept": 0.010690963785954959,
+   "ml_map_slope": 0.15726461721132146,
+   "fit_window_fixtures": 23502
+  }
+ },
+ "per_season_mae": {
+  "2015-16": {
+   "fixtures_scored": 3036,
+   "mae": {
+    "candidate": {
+     "spread": 8.823344783290851,
+     "total": 14.138710333459922
+    },
+    "naive": {
+     "spread": 11.203291405332948,
+     "total": 18.09454484184654
+    },
+    "simple": {
+     "spread": 8.829362687011356,
+     "total": 15.158914044298578
+    }
+   }
+  },
+  "2016-17": {
+   "fixtures_scored": 3091,
+   "mae": {
+    "candidate": {
+     "spread": 8.707180595757709,
+     "total": 13.911962117778511
+    },
+    "naive": {
+     "spread": 11.24715013873768,
+     "total": 16.24734510981554
+    },
+    "simple": {
+     "spread": 8.701226363579478,
+     "total": 15.268345443257543
+    }
+   }
+  },
+  "2017-18": {
+   "fixtures_scored": 3083,
+   "mae": {
+    "candidate": {
+     "spread": 8.700238577818114,
+     "total": 14.205851451914102
+    },
+    "naive": {
+     "spread": 10.890416838109369,
+     "total": 16.132213740740493
+    },
+    "simple": {
+     "spread": 8.701740541821632,
+     "total": 15.146862444010063
+    }
+   }
+  },
+  "2018-19": {
+   "fixtures_scored": 3112,
+   "mae": {
+    "candidate": {
+     "spread": 8.968530363531126,
+     "total": 14.33333754490769
+    },
+    "naive": {
+     "spread": 11.148539504797371,
+     "total": 15.691438634082484
+    },
+    "simple": {
+     "spread": 8.978760202506528,
+     "total": 15.20130393047586
+    }
+   }
+  },
+  "2019-20": {
+   "fixtures_scored": 2969,
+   "mae": {
+    "candidate": {
+     "spread": 9.027852044301653,
+     "total": 13.729829131865532
+    },
+    "naive": {
+     "spread": 10.8768256680801,
+     "total": 15.355597680065836
+    },
+    "simple": {
+     "spread": 9.036728936380763,
+     "total": 14.486740458010175
+    }
+   }
+  },
+  "2020-21": {
+   "fixtures_scored": 2182,
+   "mae": {
+    "candidate": {
+     "spread": 9.225973792093017,
+     "total": 13.425368019658016
+    },
+    "naive": {
+     "spread": 11.071952337305225,
+     "total": 14.517940499852584
+    },
+    "simple": {
+     "spread": 9.232890874327772,
+     "total": 14.205041717682082
+    }
+   }
+  },
+  "2021-22": {
+   "fixtures_scored": 3040,
+   "mae": {
+    "candidate": {
+     "spread": 8.804151680958562,
+     "total": 13.275378632632163
+    },
+    "naive": {
+     "spread": 11.070264746204774,
+     "total": 14.4086445542186
+    },
+    "simple": {
+     "spread": 8.808689700605502,
+     "total": 13.885054613131647
+    }
+   }
+  },
+  "2022-23": {
+   "fixtures_scored": 3051,
+   "mae": {
+    "candidate": {
+     "spread": 9.035733940491475,
+     "total": 13.344904267535624
+    },
+    "naive": {
+     "spread": 10.849600406400695,
+     "total": 14.697904173570336
+    },
+    "simple": {
+     "spread": 9.042053010185544,
+     "total": 14.157768766385981
+    }
+   }
+  }
+ },
+ "pooled_mae": {
+  "candidate_spread_mae": 8.899248213661192,
+  "candidate_total_mae": 13.811723630083904,
+  "naive_spread_mae": 11.044626333100087,
+  "naive_total_mae": 15.686532618716475,
+  "simple_spread_mae": 8.903952646920793,
+  "simple_total_mae": 14.71030408793506,
+  "fixtures_scored_total": 23564
+ },
+ "criteria": {
+  "spread_vs_naive_league_mean": {
+   "mean_paired_diff": -2.145378119438896,
+   "ci95_lower": -2.3165085528013867,
+   "ci95_upper": -1.9718662165985184,
+   "reps": 10000,
+   "seed": 20261028,
+   "blocks": 8,
+   "criterion": "CI upper bound < 0",
+   "pass": true
+  },
+  "spread_vs_simple_ratings_baseline": {
+   "mean_paired_diff": -0.0047044332596013734,
+   "ci95_lower": -0.007712998450241818,
+   "ci95_upper": -0.00094233870109911,
+   "reps": 10000,
+   "seed": 20261028,
+   "blocks": 8,
+   "criterion": "CI upper bound < 0",
+   "pass": true
+  },
+  "total_vs_naive_league_mean": {
+   "mean_paired_diff": -1.874808988632571,
+   "ci95_lower": -2.5606297430518628,
+   "ci95_upper": -1.353225850073975,
+   "reps": 10000,
+   "seed": 20261028,
+   "blocks": 8,
+   "criterion": "CI upper bound < 0",
+   "pass": true
+  },
+  "total_vs_simple_ratings_baseline": {
+   "mean_paired_diff": -0.8985804578511571,
+   "ci95_lower": -1.0621067812057476,
+   "ci95_upper": -0.7641964530571089,
+   "reps": 10000,
+   "seed": 20261028,
+   "blocks": 8,
+   "criterion": "CI upper bound < 0",
+   "pass": true
+  }
+ },
+ "verdict": "DESIGN_PASS",
+ "verdict_rule": "Design pass = CI upper bound < 0 against BOTH baselines on BOTH legs (all four criteria); any failure is recorded FAILED_SCREEN (the design's DESIGN_FAIL)."
+}

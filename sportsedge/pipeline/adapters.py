@@ -110,10 +110,39 @@ CFB = SportAdapter("CFB", _table({
     "teamtotal|tt": _ou("TEAM_TOTAL", "team"),
 }))
 
+def _period_total(name: str) -> MarketSpec:
+    return MarketSpec(name, "period_total", ("OVER", "UNDER"), True)
+
+
+def _period_team_total(name: str) -> MarketSpec:
+    return MarketSpec(name, "team_period_total", ("OVER", "UNDER"), True,
+                      subject="team")
+
+
+# NBA period totals (prereg draft PR #2843 §2/§4.2): game and team totals
+# for the four quarters and two halves. The canonical names encode the
+# window, following the FIRST_FIVE_* precedent; the prereg subfamily of
+# each name is derived in sportsedge/nba_period_lines_intake.py.
+_NBA_PERIODS = {
+    "q1total": _period_total("Q1_TOTAL"),
+    "q2total": _period_total("Q2_TOTAL"),
+    "q3total": _period_total("Q3_TOTAL"),
+    "q4total": _period_total("Q4_TOTAL"),
+    "1htotal|firsthalftotal": _period_total("FIRST_HALF_TOTAL"),
+    "2htotal|secondhalftotal": _period_total("SECOND_HALF_TOTAL"),
+    "q1tt|q1teamtotal": _period_team_total("Q1_TEAM_TOTAL"),
+    "q2tt|q2teamtotal": _period_team_total("Q2_TEAM_TOTAL"),
+    "q3tt|q3teamtotal": _period_team_total("Q3_TEAM_TOTAL"),
+    "q4tt|q4teamtotal": _period_team_total("Q4_TEAM_TOTAL"),
+    "1htt|1hteamtotal|firsthalfteamtotal": _period_team_total("FIRST_HALF_TEAM_TOTAL"),
+    "2htt|2hteamtotal|secondhalfteamtotal": _period_team_total("SECOND_HALF_TEAM_TOTAL"),
+}
+
 NBA = SportAdapter("NBA", _table({
     "ml|moneyline": _spec("MONEYLINE", ML),
     "spread|sp|ps": _spec("SPREAD", SPREAD),
     "total|ou|o/u": _spec("TOTAL", TOTAL),
+    **_NBA_PERIODS,
 }), _nba_team)
 
 NHL = SportAdapter("NHL", _table({

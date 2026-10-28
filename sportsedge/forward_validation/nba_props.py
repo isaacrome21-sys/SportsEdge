@@ -225,10 +225,15 @@ def _provenance_problems(cfg: FamilyConfig, row: dict) -> list:
     if stamp.get("sufficiency_met") is not True:
         problems.append("SUFFICIENCY_NOT_MET")
     n_prior = stamp.get("n_prior")
-    try:
-        sufficient = n_prior is not None and float(n_prior) >= MIN_PRIOR_GAMES
-    except (TypeError, ValueError):
-        sufficient = False
+    # Strict type discipline (hardening, 2026-10-28): the §7.4 stamp is
+    # a count of prior played games — a real int, bool excluded. The
+    # pre-hardening code coerced through float(), so "12", "1e2", 12.0
+    # and inf all satisfied the >= 10 comparison; a coerced value is
+    # not the stamp the engine declared and is refused here with the
+    # same named problem as a missing/below-gate count.
+    sufficient = (isinstance(n_prior, int)
+                  and not isinstance(n_prior, bool)
+                  and n_prior >= MIN_PRIOR_GAMES)
     if not sufficient:
         problems.append("N_PRIOR_MISSING_OR_BELOW_10")
     if not stamp.get("pool_source"):
@@ -241,13 +246,26 @@ def _provenance_problems(cfg: FamilyConfig, row: dict) -> list:
     return problems
 
 
+def _require_mapping_row(row, index: int) -> None:
+    """Input-boundary type discipline (hardening, 2026-10-28): a row
+    that is not a mapping cannot declare scope, provenance, prereg
+    identity, or counting class, and the pre-hardening boundary read
+    it with ``.get`` — a raw AttributeError crash, not a refusal.
+    Refuse by name, fail closed, before any field is read."""
+    if not isinstance(row, dict):
+        raise ForwardValidationRefusal(
+            "ROW_NOT_A_MAPPING",
+            {"index": index, "found_type": type(row).__name__})
+
+
 def screen_nba_rows(cfg: FamilyConfig, rows: list) -> tuple[list, dict]:
     """Apply the prereg's §2 scope refusal and §5 provenance screen.
     Returns (admissible_rows, exclusions); the framework's admission
     refusals (version, timestamps, duplicates, post-start) apply to
     the survivors unchanged."""
     kept, out_of_scope, no_provenance = [], [], []
-    for row in rows:
+    for index, row in enumerate(rows):
+        _require_mapping_row(row, index)
         row_id = row.get("row_id") or "<no row_id>"
         if row.get("sport") not in (None, "NBA") \
                 or row.get("market") not in cfg.markets:
@@ -306,7 +324,8 @@ def partition_nba_rows(rows: list) -> dict:
     absence of a declaration is never read as permission to count."""
     parts = {"v1_rows": [], "v2_counted_rows": [], "v2_research_rows": [],
              "undeclared_rows": []}
-    for row in rows:
+    for index, row in enumerate(rows):
+        _require_mapping_row(row, index)
         pid = row.get("prereg_id")
         if pid == PREREG_ID_V1:
             parts["v1_rows"].append(row)

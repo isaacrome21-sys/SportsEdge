@@ -1,0 +1,64 @@
+{
+ "evidence_state": "DESIGN ONLY \u2014 build-stage fit on pooled 2020-2025 design data; zero validation credit; the freeze fit governs (PREREG_DRAFT \u00a73/\u00a77.4)",
+ "n_eligible_rows": 1327,
+ "per_season": {
+  "2020": 208,
+  "2021": 224,
+  "2022": 223,
+  "2023": 224,
+  "2024": 224,
+  "2025": 224
+ },
+ "pins": {
+  "games_csv_gz_sha256": "82b05d7096b3f59acd127da8762b1e2260f4af70b49e5548ce4cd3ade92a49a5",
+  "weekly_parquets": "sha256-verified against PINS.json before use (ensure_parquets)"
+ },
+ "core_fit": {
+  "SPREAD": {
+   "intercept": 1.815740331071083,
+   "epa_margin": 0.25732346527512767,
+   "form_divergence": -0.03423383579171986
+  },
+  "TOTAL": {
+   "intercept": 45.7744180510264,
+   "epa_total": 0.11994016396891266,
+   "form_divergence": 0.05602314211235785
+  }
+ },
+ "residual_fit": {
+  "SPREAD": {
+   "intercept": 0.3209959989876865,
+   "form_divergence": -0.0019959586730060367,
+   "qb_home": -0.015127771241296412,
+   "qb_away": -0.007256052362978923,
+   "rest": 0.046685837155063276
+  },
+  "TOTAL": {
+   "intercept": 1.0645555882323183,
+   "form_divergence": 0.04772094528587417,
+   "pace_deviation": -0.00044526821542872376,
+   "wind": 0.34157472359635094,
+   "cold": 1.8271630676898325
+  }
+ },
+ "sigma_raw": {
+  "SPREAD": 14.034734387117979,
+  "TOTAL": 13.736836529512287
+ },
+ "sigma_fit": {
+  "SPREAD": 14.034734387117979,
+  "TOTAL": 13.736836529512287
+ },
+ "fireability": {
+  "SPREAD": {
+   "sigma": 14.034734387117979,
+   "Phi(3/sigma)": 0.5846310893596811,
+   "Phi(5/sigma)": 0.6391766828773574
+  },
+  "TOTAL": {
+   "sigma": 13.736836529512287,
+   "Phi(3/sigma)": 0.586437719777764,
+   "Phi(5/sigma)": 0.6420653283166827
+  }
+ }
+}
