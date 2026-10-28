@@ -68,8 +68,11 @@ def screen_nba_dk_player_rows(
     away_id = str(away_team.get("id") or "").strip()
     if not home_id or not away_id or home_id == away_id:
         raise NBADataError("NBA_DK_FIXTURE_TEAM_IDS_UNVERIFIED")
-    team_by_id(home_id)
-    team_by_id(away_id)
+    registered_home = team_by_id(home_id)
+    registered_away = team_by_id(away_id)
+    if (_norm_name(registered_home["displayName"]) != _norm_name(home_name)
+            or _norm_name(registered_away["displayName"]) != _norm_name(away_name)):
+        raise NBADataError("NBA_DK_FIXTURE_TEAM_REGISTRY_MISMATCH")
     if (_norm_name(home_team.get("displayName")) != _norm_name(home_name)
             or _norm_name(away_team.get("displayName")) != _norm_name(away_name)):
         raise NBADataError("NBA_DK_FIXTURE_TEAM_NAMES_MISMATCH")
