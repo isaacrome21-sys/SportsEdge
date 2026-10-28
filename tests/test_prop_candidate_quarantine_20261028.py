@@ -138,3 +138,42 @@ def test_malformed_nested_alias_fails_closed_from_raw_output(hidden):
     candidates, watch, held = partition_prop_surfaces([row(0.04, **hidden)])
     assert not candidates and not watch
     assert held[0]["reason"] == "PROP_EV_CLAIM_INVALID"
+
+@pytest.mark.parametrize("hidden", [
+    {"estimate_p": 1.5},
+    {"model_probability": -0.01},
+    {"estimate_p": float("nan")},
+    {"model_probability": float("inf")},
+    {"estimate_p": True},
+    {"independent_projection": {"estimate_p": 1.2, "ev_per_dollar": 0.04}},
+    {"independent_projection": {"model_probability": "nan"}},
+    {"pricing_lanes": {"lane_a_independent": {
+        "model_probability": -0.1, "ev_per_dollar": 0.04}}},
+    {"pricing_lanes": {"lane_b_anchored": {
+        "estimate_p": False, "ev_per_dollar": 0.04}}},
+])
+def test_impossible_explicit_probability_never_reaches_raw_candidate(hidden):
+    original = row(0.04, index=17, **hidden)
+    before = deepcopy(original)
+    candidates, watch, held = partition_prop_surfaces([original])
+    assert candidates == watch == []
+    assert len(held) == 1
+    assert held[0]["reason"] == "PROP_PROBABILITY_CLAIM_INVALID"
+    assert held[0]["input_index"] == 17
+    assert held[0]["eligible_for_headline"] is False
+    assert original == before  # Retain original evidence for grading.
+
+
+def test_impossible_probability_in_watchlist_is_also_held():
+    original = row(0.04, status="WATCH_QUOTE_NOT_CURRENT", estimate_p=1.5)
+    candidates, watch, held = partition_prop_surfaces([original])
+    assert not candidates and not watch
+    assert held[0]["reason"] == "PROP_PROBABILITY_CLAIM_INVALID"
+
+
+@pytest.mark.parametrize("p", [0, 0.5, 1, "0.25"])
+def test_valid_explicit_probability_does_not_create_false_hold(p):
+    original = row(0.04, estimate_p=p)
+    candidates, watch, held = partition_prop_surfaces([original])
+    assert candidates == [original]
+    assert not watch and not held
