@@ -77,11 +77,23 @@ def _line_key(quote: Mapping[str, Any]) -> float:
         raw = quote["line"]
     except Exception as exc:
         raise DevigError("paired quote line invalid") from exc
-    # A line is a JSON number in every quote record: bools and numeric
-    # strings are type drift, not values to coerce through float().
-    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+    # The binding layer's canonical line is a string (CandidateKey.line
+    # is str by design), so a numeric string is a value, not drift: it is
+    # accepted when float() parses it to a finite number. Bools (which
+    # float() would silently read as 1.0/0.0), non-numeric strings,
+    # non-finite results ("nan", "inf", "1e999"), and every other type
+    # are refused by name.
+    if isinstance(raw, bool):
         raise DevigError("paired quote line invalid")
-    line = float(raw)
+    if isinstance(raw, (int, float)):
+        line = float(raw)
+    elif isinstance(raw, str):
+        try:
+            line = float(raw)
+        except ValueError as exc:
+            raise DevigError("paired quote line invalid") from exc
+    else:
+        raise DevigError("paired quote line invalid")
     if not isfinite(line):
         raise DevigError("paired quote line must be finite")
     market = str(quote.get("market", ""))

@@ -74,7 +74,7 @@ def test_find_paired_quote_non_mapping_candidate_refused_by_name():
         find_paired_quote("junk", [_q("UNDER", -110)])
 
 
-@pytest.mark.parametrize("bad_line", [True, "47.5", None, [47.5]])
+@pytest.mark.parametrize("bad_line", [True, False, None, [47.5], {"line": 1}])
 def test_line_wrong_type_refused(bad_line):
     with pytest.raises(DevigError, match="paired quote line invalid"):
         validate_pair(_q("OVER", -110, line=bad_line), _q("UNDER", -110))
@@ -83,3 +83,29 @@ def test_line_wrong_type_refused(bad_line):
 def test_numeric_line_forms_still_pair():
     validate_pair(_q("OVER", -110, line=47.5), _q("UNDER", -110, line=47.5))
     validate_pair(_q("OVER", -110, line=47), _q("UNDER", -110, line=47.0))
+
+
+# Rocky ruling on PR #2838 (Oct 28, 2026): the binding layer's canonical
+# line is a string (CandidateKey.line is str), so _line_key accepts a
+# numeric string that parses to a finite number; every genuinely hostile
+# form stays refused by name.
+
+def test_numeric_string_line_pairs():
+    validate_pair(_q("OVER", -110, line="8.5"), _q("UNDER", -110, line="8.5"))
+    validate_pair(_q("OVER", -110, line="47.5"), _q("UNDER", -110, line=47.5))
+    found = find_paired_quote(_q("OVER", -110, line="8.5"),
+                              [_q("UNDER", -110, line=8.5)])
+    assert found["side"] == "UNDER"
+
+
+@pytest.mark.parametrize("bad_line", ["abc", "", "eight", None, True, False])
+def test_line_non_numeric_forms_refused(bad_line):
+    with pytest.raises(DevigError, match="paired quote line invalid"):
+        validate_pair(_q("OVER", -110, line=bad_line), _q("UNDER", -110))
+
+
+@pytest.mark.parametrize("bad_line", ["nan", "inf", "-inf", "1e999",
+                                      float("nan"), float("inf")])
+def test_line_non_finite_forms_refused(bad_line):
+    with pytest.raises(DevigError, match="paired quote line must be finite"):
+        validate_pair(_q("OVER", -110, line=bad_line), _q("UNDER", -110))
