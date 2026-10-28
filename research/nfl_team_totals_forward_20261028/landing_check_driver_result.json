@@ -1,0 +1,38 @@
+{
+ "check": "NFL_TEAM_TOTAL_DRIVER_LANDING_CHECK_V1",
+ "counted": false,
+ "dispositions": {
+  "ATL": "CLOSE_STALE",
+  "SF": "CLOSE_STALE"
+ },
+ "final_team_points": {
+  "ATL": 29,
+  "SF": 20
+ },
+ "game_id": "2026_07_SF_ATL",
+ "history_games": 7061,
+ "history_snapshot_sha256": "e263e4e0c82e779e6e5b2205c07e94964080e697968f3186ec306f30bd3a31de",
+ "label": "NON_COUNTED",
+ "lane_a_team_mean": {
+  "ATL": 22.75,
+  "SF": 21.25
+ },
+ "metrics_computed": false,
+ "mu": {
+  "ATL": 21.189131460590005,
+  "SF": 27.424254287081904
+ },
+ "picks": {
+  "ATL": "PICKED_UNDER",
+  "SF": "PASSED"
+ },
+ "pins_verified": {
+  "config": "4c5d7afbfe97d0c5f48644b7fe36c2f7666fba6caf10421f16e3a516485aa3d7",
+  "engine": "50c5d9ff068b3bf629a725d5713a956d3149565c2f29c59ac8af3fc6461dcc27",
+  "games_file": "82b05d7096b3f59acd127da8762b1e2260f4af70b49e5548ce4cd3ade92a49a5",
+  "prereg": "83f25f0e92c3ea39c8b18e194ce5743ceff6b595dc7dcb342175a57e46743581",
+  "runner": "076da740f5ac0517bbe2f52b28decf77d9923226c51a8228ff5e57b4b14f323e"
+ },
+ "rows_priced": 2,
+ "slate_date": "2026-10-25"
+}

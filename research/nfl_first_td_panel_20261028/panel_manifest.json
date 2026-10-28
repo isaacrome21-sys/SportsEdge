@@ -1,0 +1,270 @@
+{
+ "coverage": {
+  "2019": {
+   "admitted": 267,
+   "exclusions": {},
+   "games_in_schedules": 267
+  },
+  "2020": {
+   "admitted": 269,
+   "exclusions": {},
+   "games_in_schedules": 269
+  },
+  "2021": {
+   "admitted": 285,
+   "exclusions": {},
+   "games_in_schedules": 285
+  },
+  "2022": {
+   "admitted": 284,
+   "exclusions": {},
+   "games_in_schedules": 284
+  },
+  "2023": {
+   "admitted": 285,
+   "exclusions": {},
+   "games_in_schedules": 285
+  },
+  "2024": {
+   "admitted": 285,
+   "exclusions": {},
+   "games_in_schedules": 285
+  },
+  "2025": {
+   "admitted": 285,
+   "exclusions": {},
+   "games_in_schedules": 285
+  }
+ },
+ "derivation_version": "NFL_FIRST_TD_PANEL_DERIVATION_V1",
+ "evidence_module": "sportsedge/nfl_first_td_pbp_evidence.py",
+ "exclusions_total": {},
+ "inputs": {
+  "games.csv.gz": {
+   "asset_id": 684975992,
+   "asset_name": "games.csv.gz",
+   "asset_size": 515852,
+   "asset_updated_at": "2026-10-28T12:46:30Z",
+   "pulled_sha256": "84354cb61320f3d784cab3ab65ed9c3488b8bb363bb478752c7a7b3b80b6904a",
+   "pulled_size": 515852,
+   "release_id": 251386473,
+   "release_tag": "schedules",
+   "size_match": true
+  },
+  "play_by_play_2019.csv.gz": {
+   "asset_id": 278181051,
+   "asset_name": "play_by_play_2019.csv.gz",
+   "asset_size": 17992849,
+   "asset_updated_at": "2025-07-31T18:17:18Z",
+   "pulled_sha256": "b764668137052be23745953cbc33fa17e537a70c81e9b73785a19a15e7288216",
+   "pulled_size": 17992849,
+   "release_id": 58152862,
+   "release_tag": "pbp",
+   "size_match": true
+  },
+  "play_by_play_2020.csv.gz": {
+   "asset_id": 530452137,
+   "asset_name": "play_by_play_2020.csv.gz",
+   "asset_size": 18143553,
+   "asset_updated_at": "2026-08-26T07:33:10Z",
+   "pulled_sha256": "bc954b5780e325df4faa255fac092585c981a4de5d2f553a8a4e0a3c8b3a3cf2",
+   "pulled_size": 18143553,
+   "release_id": 58152862,
+   "release_tag": "pbp",
+   "size_match": true
+  },
+  "play_by_play_2021.csv.gz": {
+   "asset_id": 337880454,
+   "asset_name": "play_by_play_2021.csv.gz",
+   "asset_size": 19022201,
+   "asset_updated_at": "2026-01-08T13:13:13Z",
+   "pulled_sha256": "e8743a568f99667a8bdcd29ba12224ee1782ad2b7916bee78ee335c099383739",
+   "pulled_size": 19022201,
+   "release_id": 58152862,
+   "release_tag": "pbp",
+   "size_match": true
+  },
+  "play_by_play_2022.csv.gz": {
+   "asset_id": 354728863,
+   "asset_name": "play_by_play_2022.csv.gz",
+   "asset_size": 19093961,
+   "asset_updated_at": "2026-02-12T10:25:24Z",
+   "pulled_sha256": "0c69a71eb39498956c7b1d5c1ca52ce7fe679934a95d1af249facb5ea9829ea4",
+   "pulled_size": 19093961,
+   "release_id": 58152862,
+   "release_tag": "pbp",
+   "size_match": true
+  },
+  "play_by_play_2023.csv.gz": {
+   "asset_id": 354728691,
+   "asset_name": "play_by_play_2023.csv.gz",
+   "asset_size": 19169807,
+   "asset_updated_at": "2026-02-12T10:24:52Z",
+   "pulled_sha256": "4649804ee0f0a40b41e51ec75a1ce921949d7fab5459213488656b92f78560e8",
+   "pulled_size": 19169807,
+   "release_id": 58152862,
+   "release_tag": "pbp",
+   "size_match": true
+  },
+  "play_by_play_2024.csv.gz": {
+   "asset_id": 512957856,
+   "asset_name": "play_by_play_2024.csv.gz",
+   "asset_size": 19362351,
+   "asset_updated_at": "2026-08-13T12:26:27Z",
+   "pulled_sha256": "23370d5d10f8104d80d46a1fc5e61f4f6f5a3263fe96fe2dd629913cfcb08c06",
+   "pulled_size": 19362351,
+   "release_id": 58152862,
+   "release_tag": "pbp",
+   "size_match": true
+  },
+  "play_by_play_2025.csv.gz": {
+   "asset_id": 512957609,
+   "asset_name": "play_by_play_2025.csv.gz",
+   "asset_size": 19105296,
+   "asset_updated_at": "2026-08-13T12:26:09Z",
+   "pulled_sha256": "2f135887790a013fd004e609e37096bb4816d5cc80b9f19122e1bad478961978",
+   "pulled_size": 19105296,
+   "release_id": 58152862,
+   "release_tag": "pbp",
+   "size_match": true
+  },
+  "players.csv": {
+   "asset_id": 681915686,
+   "asset_name": "players.csv",
+   "asset_size": 7306094,
+   "asset_updated_at": "2026-10-27T14:56:46Z",
+   "pulled_sha256": "14f38ca91d3b88a6d31f7d3b0cf7a75d341f139d1aca39cfbedfc9c13ae29ab6",
+   "pulled_size": 7306094,
+   "release_id": 69785162,
+   "release_tag": "players",
+   "size_match": true
+  },
+  "roster_weekly_2019.csv": {
+   "asset_id": 125774450,
+   "asset_name": "roster_weekly_2019.csv",
+   "asset_size": 16588230,
+   "asset_updated_at": "2023-09-13T00:59:14Z",
+   "pulled_sha256": "af6aa7b8aa7850c47fe307d548d66fa7c1cac88fe11e5951c781974cb6909e03",
+   "pulled_size": 16588230,
+   "release_id": 73313637,
+   "release_tag": "weekly_rosters",
+   "size_match": true
+  },
+  "roster_weekly_2020.csv": {
+   "asset_id": 125775442,
+   "asset_name": "roster_weekly_2020.csv",
+   "asset_size": 14333971,
+   "asset_updated_at": "2023-09-13T01:04:29Z",
+   "pulled_sha256": "0b948cca8735a2417cbda14464f4532aeee58d871e2fcd8464a23e969e45789e",
+   "pulled_size": 14333971,
+   "release_id": 73313637,
+   "release_tag": "weekly_rosters",
+   "size_match": true
+  },
+  "roster_weekly_2021.csv": {
+   "asset_id": 125775945,
+   "asset_name": "roster_weekly_2021.csv",
+   "asset_size": 15242660,
+   "asset_updated_at": "2023-09-13T01:10:08Z",
+   "pulled_sha256": "88adfe0fba5cbedd260d7928ad373476d4fb168d0213cb52ef1163ed5d3056b7",
+   "pulled_size": 15242660,
+   "release_id": 73313637,
+   "release_tag": "weekly_rosters",
+   "size_match": true
+  },
+  "roster_weekly_2022.csv": {
+   "asset_id": 125776507,
+   "asset_name": "roster_weekly_2022.csv",
+   "asset_size": 14790824,
+   "asset_updated_at": "2023-09-13T01:15:42Z",
+   "pulled_sha256": "bd6a50de334473c10f8058afa948fd0c6adc8a8b081da41c500cc0aa069c5312",
+   "pulled_size": 14790824,
+   "release_id": 73313637,
+   "release_tag": "weekly_rosters",
+   "size_match": true
+  },
+  "roster_weekly_2023.csv": {
+   "asset_id": 156614676,
+   "asset_name": "roster_weekly_2023.csv",
+   "asset_size": 14612235,
+   "asset_updated_at": "2024-03-14T07:17:48Z",
+   "pulled_sha256": "1433f1f239784dde7fcb35349d211a9b83abfc0156337b72ec4f923abf715bd3",
+   "pulled_size": 14612235,
+   "release_id": 73313637,
+   "release_tag": "weekly_rosters",
+   "size_match": true
+  },
+  "roster_weekly_2024.csv": {
+   "asset_id": 237398162,
+   "asset_name": "roster_weekly_2024.csv",
+   "asset_size": 14926918,
+   "asset_updated_at": "2025-03-14T07:16:07Z",
+   "pulled_sha256": "074ecaeb9325de943c11f7bbc941425626985090ef8386f90cd837fa5cb5d4b3",
+   "pulled_size": 14926918,
+   "release_id": 73313637,
+   "release_tag": "weekly_rosters",
+   "size_match": true
+  },
+  "roster_weekly_2025.csv": {
+   "asset_id": 373640795,
+   "asset_name": "roster_weekly_2025.csv",
+   "asset_size": 15385661,
+   "asset_updated_at": "2026-03-14T07:33:06Z",
+   "pulled_sha256": "c2f7a1ffebe06058400af1989d1cd2900cc5c9659f084623708a06d4e28de35b",
+   "pulled_size": 15385661,
+   "release_id": 73313637,
+   "release_tag": "weekly_rosters",
+   "size_match": true
+  }
+ },
+ "outcome_counts": {
+  "2019": {
+   "NO_TD": 1,
+   "PLAYER_TD": 266
+  },
+  "2020": {
+   "PLAYER_TD": 269
+  },
+  "2021": {
+   "NO_TD": 2,
+   "PLAYER_TD": 283
+  },
+  "2022": {
+   "NO_TD": 2,
+   "PLAYER_TD": 282
+  },
+  "2023": {
+   "NO_TD": 3,
+   "PLAYER_TD": 282
+  },
+  "2024": {
+   "NO_TD": 2,
+   "PLAYER_TD": 283
+  },
+  "2025": {
+   "NO_TD": 1,
+   "PLAYER_TD": 284
+  }
+ },
+ "outputs": {
+  "first_td_panel_2019_2025.csv": {
+   "rows": 1960,
+   "sha256": "11867ac3be6ee75c086e6069e2c914fd13aa01da529d1359b638874efdc24cd4"
+  },
+  "player_td_game_2019_2025.csv": {
+   "rows": 10118,
+   "sha256": "5a0e96c8383d081624ae7f279e12f93c2415ba4fb894680743d97a5295cc2ed2"
+  }
+ },
+ "panel_seasons": [
+  2020,
+  2021,
+  2022,
+  2023,
+  2024,
+  2025
+ ],
+ "prior_only_seasons": [
+  2019
+ ]
+}
