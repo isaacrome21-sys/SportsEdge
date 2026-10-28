@@ -1,0 +1,45 @@
+{
+ "2023": {
+  "team_games_with_pass_att": 1822,
+  "first_passer_present_pct": 99.12,
+  "first_ne_primary_pct": 7.75,
+  "first_att_lt5_pct": 3.27,
+  "first_att_lt10_pct": 6.31,
+  "primary_att_lt20_pct": 19.1,
+  "excl_union_proxy_pct": 9.88,
+  "primary_changed_vs_prev_pct": 19.27,
+  "flag_qb_coverage_pct": 0.0,
+  "flag_multi_qb_pct_of_flagged": null
+ },
+ "2024": {
+  "team_games_with_pass_att": 1930,
+  "first_passer_present_pct": 98.03,
+  "first_ne_primary_pct": 5.66,
+  "first_att_lt5_pct": 2.22,
+  "first_att_lt10_pct": 5.5,
+  "primary_att_lt20_pct": 18.5,
+  "excl_union_proxy_pct": 8.81,
+  "primary_changed_vs_prev_pct": 16.0,
+  "flag_qb_coverage_pct": 0.0,
+  "flag_multi_qb_pct_of_flagged": null
+ },
+ "2025": {
+  "team_games_with_pass_att": 1914,
+  "first_passer_present_pct": 99.79,
+  "first_ne_primary_pct": 5.55,
+  "first_att_lt5_pct": 2.09,
+  "first_att_lt10_pct": 5.18,
+  "primary_att_lt20_pct": 18.03,
+  "excl_union_proxy_pct": 7.37,
+  "primary_changed_vs_prev_pct": 15.02,
+  "flag_qb_coverage_pct": 41.85,
+  "flag_multi_qb_pct_of_flagged": 7.12,
+  "flag_ne_primary_pct": 6.99,
+  "flag_ne_first_pct": 3.0,
+  "first_eq_flag_given_both_pct": 97.0,
+  "flag_att_lt5_pct": 3.87,
+  "flag_att_lt10_pct": 7.24,
+  "flag_changed_vs_prev_pct": 15.86,
+  "excl_union_flag_pct": 8.74
+ }
+}
