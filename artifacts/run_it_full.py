@@ -33,6 +33,7 @@ from sportsedge.milestone_ladder_intake import (
 from sportsedge.team_half_pricing import DERIVATIVES, price_team_half_rows
 from sportsedge.pricing_provenance import (
     apply_play_gate, determine_provenance)
+from sportsedge.prop_candidate_quarantine import partition_prop_surfaces
 from sportsedge.canonical_coverage import (
     NFL_ANYTIME_TD_MARKETS, NFL_DERIVATIVE_MARKETS, NFL_FIRST_TD_MARKETS,
     blocked_row_for as coverage_blocked_row, coverage_summary,
@@ -1536,12 +1537,11 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
     card["summary"]["rows"] = len(rows)
     card["summary"]["status_counts"] = dict(sorted(Counter(
         r.get("status") or "MISSING_STATUS" for r in evaluated).items()))
-    card["prop_candidates"] = sorted(
-        [r for r in modeled_props if r.get("status")=="RESEARCH_CANDIDATE_NOT_VALIDATED"],
-        key=lambda r:-r["ev_per_dollar"])
-    card["prop_watchlist"] = sorted(
-        [r for r in modeled_props if r.get("status","").startswith("WATCH_")],
-        key=lambda r:-r.get("ev_per_dollar",-1))
+    # Owner's existing >=+40% claimed-EV quarantine applies at the raw
+    # machine-readable output boundary, not just phone presentation.
+    # Never delete or rewrite evaluated_rows: those are grading evidence.
+    card["prop_candidates"], card["prop_watchlist"], card["prop_quarantined"] = (
+        partition_prop_surfaces(modeled_props))
     card["prop_unpriced"] = [r for r in modeled_props if r.get("status")=="NO_MODEL_OR_MARKET"]
     card["source_receipts"] = (list(card.get("source_receipts") or [])
                               + pitcher_receipts + batter_receipts
