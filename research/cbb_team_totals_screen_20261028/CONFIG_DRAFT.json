@@ -1,0 +1,25 @@
+{
+ "status": "DRAFT \u2014 NOT FROZEN",
+ "sport": "CBB",
+ "family": "TEAM_TOTAL",
+ "markets": [
+  "TEAM_TOTAL"
+ ],
+ "engine_id": "CBB_TORVIK_EFFICIENCY_V1",
+ "model_version": "cbb_torvik_efficiency_v1_team_totals@sha256:ac01327a4ed3bb9a37f03e7a9391d2a0918d4f022c86de42bb841a9f15044989",
+ "market_form": "TWO_SIDED",
+ "sides": [
+  "OVER",
+  "UNDER"
+ ],
+ "over_side": "OVER",
+ "min_rows": 40,
+ "min_events": 40,
+ "min_slates": null,
+ "max_clv_missing_share": 0.2,
+ "clv_beats_threshold": 0.0,
+ "close_max_age_minutes": 60,
+ "capture_scope": "IN_SCOPE",
+ "capture_note": "IN_SCOPE capture: CBB team totals are captured under the merged CBB capture scope (PR #2862 clean extraction; sections TEAM_TOTAL_AWAY / TEAM_TOTAL_HOME), entry = the lines lane's T-1H write, close = the FINAL write, under #2792 five-stage receipts. The verdict is the preregistration's two-leg test (research/cbb_team_totals_screen_20261028/PREREG_FINAL.md: team-points accuracy vs the forward-recomputed simple ratings baseline; market CLV/ROI vs the closing line), NOT the framework's CLV-only default. engine_id is the parent construction CBB_TORVIK_EFFICIENCY_V1 because this family IS that construction's team-points readout (CBB_TEAM_TOTALS_1H_DESIGN.md section 1 \u2014 no second model); the family, market, verdict and clock are its own, and a family verdict is never inherited from a sibling leg. min_events=40 carries the inherited preregistration verdict gate (>= 40 distinct graded games \u2014 games, not team-games); min_rows=40 is set to the same floor solely because the framework requires a positive value and carries no independent preregistration force; min_slates is unset (none named). max_clv_missing_share and close_max_age_minutes are framework defaults carried expressly: the preregistration states no missing-close rule and no close-age limit (blocking gap G-3 in PREREG_FINAL section 8) and they have no preregistration force until the design amendment fixes the family's own rule. model_version pins the construction of record at package time (cbb_team_totals.py); no built forward runner exists yet (finding F-1) and the freeze act re-pins model_version to the built runner, logged as a pin change in the freeze record. REGISTRY: probed on current main \u2014 no CBB config exists in sportsedge/forward_validation/configs/; (CBB, TEAM_TOTAL) is unclaimed, so installation raises no DUPLICATE_FORWARD_MARKET_CONFIG refusal. The market key uses the singular TEAM_TOTAL form of the frozen NFL registration. PLACEMENT: this draft ships inside the research package only and registers nothing until the freeze act installs it. At the act, prereg_draft becomes prereg + prereg_sha256 and status flips to FROZEN; every gate/threshold value stays byte-identical.",
+ "prereg_draft": "research/cbb_team_totals_screen_20261028/PREREG_FINAL.md"
+}
