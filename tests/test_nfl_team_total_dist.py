@@ -267,7 +267,11 @@ def test_config_loads_and_pin_matches_engine_file():
     cfg = load_config(cfg_path)
     assert cfg.sport == "NFL" and cfg.family == "TEAM_TOTAL"
     assert cfg.engine_id == eng.ENGINE_ID
-    assert cfg.status.startswith("DRAFT")
+    # Freeze act: the config froze with the preregistration; the freeze
+    # takes effect only at the freeze-act merge (see FREEZE_RECORD.md).
+    assert cfg.status.startswith("FROZEN")
+    assert cfg.prereg_sha256 == hashlib.sha256(
+        (REPO_ROOT / cfg.prereg).read_bytes()).hexdigest()
     assert cfg.min_rows == 150 and cfg.min_events == 40
     assert cfg.min_slates == 4
     engine_sha = hashlib.sha256(

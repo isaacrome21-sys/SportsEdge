@@ -1,5 +1,5 @@
 {
- "status": "DRAFT \u2014 NOT FROZEN",
+ "status": "FROZEN — PREREG_NFL_TEAM_TOTALS_FORWARD_V1 (recorded at merge of the freeze-act PR; see research/nfl_team_totals_forward_20261028/FREEZE_RECORD.md)",
  "sport": "NFL",
  "family": "TEAM_TOTAL",
  "markets": [
@@ -20,7 +20,8 @@
  "clv_beats_threshold": 0.0,
  "close_max_age_minutes": 60,
  "capture_scope": "IN_SCOPE",
- "capture_note": "TeamTotal lines are priced body lines in the NFL intake grammar and inside Capture Spec V1's per-game subset (entry and close) \u2014 no capture expansion required. Verdict test is the four-leg test in the preregistration (accuracy vs close, accuracy vs Lane A, CLV picked>passed, hit rate), not the framework's CLV-only default.",
- "prereg_draft": "research/nfl_team_totals_forward_20261028/PREREG_NFL_TEAM_TOTALS_FORWARD_V1_DRAFT.md",
+ "capture_note": "TeamTotal lines are priced body lines in the NFL intake grammar and inside Capture Spec V1's per-game subset (entry and close) — no capture expansion required. Verdict test is the four-leg test in the preregistration (accuracy vs close, accuracy vs Lane A, CLV picked>passed, hit rate), not the framework's CLV-only default.",
+ "prereg": "research/nfl_team_totals_forward_20261028/PREREG_NFL_TEAM_TOTALS_FORWARD_V1.md",
+ "prereg_sha256": "83f25f0e92c3ea39c8b18e194ce5743ceff6b595dc7dcb342175a57e46743581",
  "picked_beats_passed_required": true
 }
