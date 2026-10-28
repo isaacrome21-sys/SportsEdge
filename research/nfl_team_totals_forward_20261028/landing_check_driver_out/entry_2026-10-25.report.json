@@ -1,0 +1,25 @@
+{
+ "captures_sha256": "e732a5e5ca8db37e131d9b19046dfce3a99105bea049cb746eefa5661a4c8c73",
+ "command": "price",
+ "driver": "NFL_TEAM_TOTAL_DRIVER_V1",
+ "driver_refusals": [],
+ "games_built": 1,
+ "games_sha256": "82b05d7096b3f59acd127da8762b1e2260f4af70b49e5548ce4cd3ade92a49a5",
+ "history_games": 7061,
+ "history_snapshot_sha256": "e263e4e0c82e779e6e5b2205c07e94964080e697968f3186ec306f30bd3a31de",
+ "lane_a_mode": "manual",
+ "metrics_computed": false,
+ "notes": [
+  {
+   "capture_game_id": "2026_08_SF_ATL",
+   "event_id": "34118095",
+   "note": "CAPTURE_GAME_ID_DIFFERS_FROM_SCHEDULES",
+   "schedules_game_id": "2026_07_SF_ATL"
+  }
+ ],
+ "priced_at": "2026-10-25T10:54:25-05:00",
+ "records_file": "/home/hatch/workspace/nfl_tt_driver_20261028/repo/research/nfl_team_totals_forward_20261028/landing_check_driver_out/entry_2026-10-25.jsonl",
+ "records_written": 2,
+ "runner_refusals": [],
+ "slate_date": "2026-10-25"
+}
