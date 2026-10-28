@@ -1,0 +1,26 @@
+{
+ "status": "DRAFT \u2014 NOT FROZEN",
+ "sport": "NFL",
+ "family": "TEAM_TOTAL",
+ "markets": [
+  "TEAM_TOTAL"
+ ],
+ "engine_id": "NFL_TEAM_TOTAL_DIST_V1",
+ "model_version": "nfl_team_total_dist_v1@sha256:50c5d9ff068b3bf629a725d5713a956d3149565c2f29c59ac8af3fc6461dcc27",
+ "market_form": "TWO_SIDED",
+ "sides": [
+  "OVER",
+  "UNDER"
+ ],
+ "over_side": "OVER",
+ "min_rows": 150,
+ "min_events": 40,
+ "min_slates": 4,
+ "max_clv_missing_share": 0.2,
+ "clv_beats_threshold": 0.0,
+ "close_max_age_minutes": 60,
+ "capture_scope": "IN_SCOPE",
+ "capture_note": "TeamTotal lines are priced body lines in the NFL intake grammar and inside Capture Spec V1's per-game subset (entry and close) \u2014 no capture expansion required. Verdict test is the four-leg test in the preregistration (accuracy vs close, accuracy vs Lane A, CLV picked>passed, hit rate), not the framework's CLV-only default.",
+ "prereg_draft": "research/nfl_team_totals_forward_20261028/PREREG_NFL_TEAM_TOTALS_FORWARD_V1_DRAFT.md",
+ "picked_beats_passed_required": true
+}

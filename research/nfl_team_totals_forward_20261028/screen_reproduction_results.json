@@ -1,0 +1,208 @@
+{
+ "kind": "DESIGN_SCREEN_REPRODUCTION_WITH_BUILT_ENGINE",
+ "generated_at": "2026-10-28T04:47:46.552373+00:00",
+ "engine": "sportsedge/nfl_team_total_dist.py (NFL_TEAM_TOTAL_DIST_V1)",
+ "inputs_sha256": {
+  "games_csv_gz": "1b4ca0c70eea4236bf35eda85a04746ce031cafbafa962dfc7cc9572166535ec"
+ },
+ "design_input_sha256": "1b4ca0c70eea4236bf35eda85a04746ce031cafbafa962dfc7cc9572166535ec",
+ "input_matches_design_pull": true,
+ "pooled_cv_c": 0.46438741207903494,
+ "design_pooled_cv_c": 0.46438741207903494,
+ "pooled_cv_c_delta": 0.0,
+ "spread_sign_empirical": {
+  "corr_spread_vs_home_margin": 0.45000457732055404,
+  "sign_applied": 1.0
+ },
+ "pooled": {
+  "n": 3230,
+  "mae_mu": 7.749113786523484,
+  "mae_b1": 7.8306328320802,
+  "mae_b2": 7.923677939538549,
+  "n_implied": 3230,
+  "mae_implied": 7.25030959752322,
+  "crps_mu": 5.5278237174780305,
+  "crps_b1": 5.589926248372108,
+  "crps_b2": 5.624577288547983,
+  "pit_mean": 0.5370384869539376,
+  "inside90_share": 0.9102167182662538
+ },
+ "per_season": {
+  "2020": {
+   "n": 512,
+   "mae_mu": 7.83788697109026,
+   "mae_b1": 7.891003999255952,
+   "mae_b2": 7.9317017532092935,
+   "n_implied": 512,
+   "mae_implied": 7.2841796875,
+   "crps_mu": 5.636672251401706,
+   "crps_b1": 5.709606617695158,
+   "crps_b2": 5.662589306199828,
+   "pit_mean": 0.5573680017954791,
+   "inside90_share": 0.9296875
+  },
+  "2021": {
+   "n": 544,
+   "mae_mu": 8.204631451572338,
+   "mae_b1": 8.211397058823529,
+   "mae_b2": 8.438108416909511,
+   "n_implied": 544,
+   "mae_implied": 7.662683823529412,
+   "crps_mu": 5.826237485670972,
+   "crps_b1": 5.833072610047189,
+   "crps_b2": 5.9041257812433585,
+   "pit_mean": 0.5247125429695835,
+   "inside90_share": 0.8915441176470589
+  },
+  "2022": {
+   "n": 542,
+   "mae_mu": 7.252592879207201,
+   "mae_b1": 7.427121771217712,
+   "mae_b2": 7.43397308754351,
+   "n_implied": 542,
+   "mae_implied": 6.915129151291513,
+   "crps_mu": 5.1826353863889585,
+   "crps_b1": 5.267797978611826,
+   "crps_b2": 5.283102655519932,
+   "pit_mean": 0.5227512737345144,
+   "inside90_share": 0.9206642066420664
+  },
+  "2023": {
+   "n": 544,
+   "mae_mu": 7.748759501386972,
+   "mae_b1": 7.824908088235294,
+   "mae_b2": 7.9182155444185085,
+   "n_implied": 544,
+   "mae_implied": 7.318014705882353,
+   "crps_mu": 5.536895117796412,
+   "crps_b1": 5.605783217086933,
+   "crps_b2": 5.624479539281098,
+   "pit_mean": 0.5355252641129526,
+   "inside90_share": 0.8970588235294118
+  },
+  "2024": {
+   "n": 544,
+   "mae_mu": 7.78686552971111,
+   "mae_b1": 7.766544117647059,
+   "mae_b2": 7.864370183021898,
+   "n_implied": 544,
+   "mae_implied": 7.075367647058823,
+   "crps_mu": 5.490104085491558,
+   "crps_b1": 5.5071890595222746,
+   "crps_b2": 5.5833575865034355,
+   "pit_mean": 0.5495086053264778,
+   "inside90_share": 0.9099264705882353
+  },
+  "2025": {
+   "n": 544,
+   "mae_mu": 7.667342893694173,
+   "mae_b1": 7.864889705882353,
+   "mae_b2": 7.954370255682748,
+   "n_implied": 544,
+   "mae_implied": 7.247242647058823,
+   "crps_mu": 5.499531758308609,
+   "crps_b1": 5.621963733884739,
+   "crps_b2": 5.690789442133636,
+   "pit_mean": 0.5335085610796377,
+   "inside90_share": 0.9136029411764706
+  }
+ },
+ "screen_pass": true,
+ "design_screen_pass": true,
+ "deltas_vs_design": {
+  "pooled": {
+   "n": 0,
+   "mae_mu": 0.0,
+   "mae_b1": 0.0,
+   "mae_b2": 0.0,
+   "n_implied": 0,
+   "mae_implied": 0.0,
+   "crps_mu": 0.0,
+   "crps_b1": 0.0,
+   "crps_b2": 0.0,
+   "pit_mean": 0.0,
+   "inside90_share": 0.0
+  },
+  "per_season": {
+   "2020": {
+    "n": 0,
+    "mae_mu": 0.0,
+    "mae_b1": 0.0,
+    "mae_b2": 0.0,
+    "n_implied": 0,
+    "mae_implied": 0.0,
+    "crps_mu": 0.0,
+    "crps_b1": 0.0,
+    "crps_b2": 0.0,
+    "pit_mean": 0.0,
+    "inside90_share": 0.0
+   },
+   "2021": {
+    "n": 0,
+    "mae_mu": 0.0,
+    "mae_b1": 0.0,
+    "mae_b2": 0.0,
+    "n_implied": 0,
+    "mae_implied": 0.0,
+    "crps_mu": 0.0,
+    "crps_b1": 0.0,
+    "crps_b2": 0.0,
+    "pit_mean": 0.0,
+    "inside90_share": 0.0
+   },
+   "2022": {
+    "n": 0,
+    "mae_mu": 0.0,
+    "mae_b1": 0.0,
+    "mae_b2": 0.0,
+    "n_implied": 0,
+    "mae_implied": 0.0,
+    "crps_mu": 0.0,
+    "crps_b1": 0.0,
+    "crps_b2": 0.0,
+    "pit_mean": 0.0,
+    "inside90_share": 0.0
+   },
+   "2023": {
+    "n": 0,
+    "mae_mu": 0.0,
+    "mae_b1": 0.0,
+    "mae_b2": 0.0,
+    "n_implied": 0,
+    "mae_implied": 0.0,
+    "crps_mu": 0.0,
+    "crps_b1": 0.0,
+    "crps_b2": 0.0,
+    "pit_mean": 0.0,
+    "inside90_share": 0.0
+   },
+   "2024": {
+    "n": 0,
+    "mae_mu": 0.0,
+    "mae_b1": 0.0,
+    "mae_b2": 0.0,
+    "n_implied": 0,
+    "mae_implied": 0.0,
+    "crps_mu": 0.0,
+    "crps_b1": 0.0,
+    "crps_b2": 0.0,
+    "pit_mean": 0.0,
+    "inside90_share": 0.0
+   },
+   "2025": {
+    "n": 0,
+    "mae_mu": 0.0,
+    "mae_b1": 0.0,
+    "mae_b2": 0.0,
+    "n_implied": 0,
+    "mae_implied": 0.0,
+    "crps_mu": 0.0,
+    "crps_b1": 0.0,
+    "crps_b2": 0.0,
+    "pit_mean": 0.0,
+    "inside90_share": 0.0
+   }
+  }
+ },
+ "note": "Reproduction of a DESIGN screen on seen seasons; an entry ticket, never validation. The implied split is an untimestamped design diagnostic (gap G7), reproduced only to carry the design's disclosure forward verbatim."
+}
