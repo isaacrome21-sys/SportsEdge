@@ -369,7 +369,8 @@ def make_store(n=12):
 def quote_row(**kw):
     row = {"sport": "NBA", "market": "PLAYER_POINTS",
            "player_name": "Test Guard", "side": "OVER", "line": 19.5,
-           "odds": -110, "commence_time": "2026-11-05T00:00:00+00:00",
+           "odds": -110, "book": "draftkings",
+           "commence_time": "2026-11-05T00:00:00+00:00",
            "quote_captured_at": "2026-10-20T12:00:00+00:00"}
     row.update(kw)
     return row
@@ -477,6 +478,7 @@ def _nba_line(**kw):
            "player_name": "Test Guard",
            "away": "Boston Celtics", "home": "Detroit Pistons",
            "side": "OVER", "line": 19.5, "odds": -110,
+           "book": "draftkings",
            "commence_time": "2026-11-05T00:00:00+00:00",
            "quote_captured_at": NOW.isoformat()}
     row.update(kw)
@@ -634,7 +636,8 @@ def test_evening_tip_excludes_same_day_finals_from_all_slices():
     store = GameLogStore(records)
     row = {"sport": "NBA", "market": "PLAYER_POINTS",
            "player_name": "Test Guard", "side": "OVER", "line": 19.5,
-           "odds": -110, "tipoff": "2026-10-21T21:00:00-05:00",
+           "odds": -110, "book": "draftkings",
+           "tipoff": "2026-10-21T21:00:00-05:00",
            "quote_captured_at": "2026-10-22T01:59:00+00:00"}
     now = datetime(2026, 10, 22, 1, 59, 30, tzinfo=timezone.utc)
     outputs, _ = phone_nba_prop_rows([row], now=now, store=store)
