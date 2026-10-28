@@ -1,0 +1,5462 @@
+{
+ "pga-tour/1/2020": {
+  "bytes": 391085,
+  "file": "pga_1_2020.html",
+  "http": 200,
+  "sha256": "60b0446b24e27846acf6e848631169b4ff8930b892a27b176fd5e4a4ff5e026e",
+  "url": "https://datagolf.com/past-results/pga-tour/1/2020"
+ },
+ "pga-tour/1/2021": {
+  "bytes": 391085,
+  "file": "pga_1_2021.html",
+  "http": 200,
+  "sha256": "cafe5a640319f7461ae108f9805361d9fc417f33bf1f209200ed3f048ba107a4",
+  "url": "https://datagolf.com/past-results/pga-tour/1/2021"
+ },
+ "pga-tour/1/2022": {
+  "bytes": 391085,
+  "file": "pga_1_2022.html",
+  "http": 200,
+  "sha256": "1ed88e1101abf9ffa553347469582dd7eef6b12e4af1910b2ac23e873f49c1c8",
+  "url": "https://datagolf.com/past-results/pga-tour/1/2022"
+ },
+ "pga-tour/1/2023": {
+  "bytes": 391085,
+  "file": "pga_1_2023.html",
+  "http": 200,
+  "sha256": "b7bc0c35a262e313eb39d324dcfe3b5e48ca63d63384bee558f40360e4254fb2",
+  "url": "https://datagolf.com/past-results/pga-tour/1/2023"
+ },
+ "pga-tour/1/2024": {
+  "bytes": 391085,
+  "file": "pga_1_2024.html",
+  "http": 200,
+  "sha256": "d23080c9fde7d130ead17baa587064388e1151945b23d8564932b2e4647ccae1",
+  "url": "https://datagolf.com/past-results/pga-tour/1/2024"
+ },
+ "pga-tour/1/2025": {
+  "bytes": 391085,
+  "file": "pga_1_2025.html",
+  "http": 200,
+  "sha256": "fbb2fc6001cb7b250285db918e90b3c5e9fedb32769e3fb82c3f024231735e54",
+  "url": "https://datagolf.com/past-results/pga-tour/1/2025"
+ },
+ "pga-tour/10/2020": {
+  "bytes": 418131,
+  "file": "pga_10_2020.html",
+  "http": 200,
+  "sha256": "330d8ebe3ce561c16d7e1ed0acd4d6bb72d7a75715afda6b30d82f7589676442",
+  "url": "https://datagolf.com/past-results/pga-tour/10/2020"
+ },
+ "pga-tour/10/2021": {
+  "bytes": 417489,
+  "file": "pga_10_2021.html",
+  "http": 200,
+  "sha256": "bec4561e05d0d8752c35bd6cf4f8e64b7aad0b620980963d947853b9255862b2",
+  "url": "https://datagolf.com/past-results/pga-tour/10/2021"
+ },
+ "pga-tour/10/2022": {
+  "bytes": 420203,
+  "file": "pga_10_2022.html",
+  "http": 200,
+  "sha256": "403523067e30868a892d1ddb8654ddda6c5afdab5c9ad18e9a19e8fc9b5ec062",
+  "url": "https://datagolf.com/past-results/pga-tour/10/2022"
+ },
+ "pga-tour/10/2023": {
+  "bytes": 420899,
+  "file": "pga_10_2023.html",
+  "http": 200,
+  "sha256": "2efaeddc08dd123eca762d7866fb2cbaf8da890313655b455b61886fb852aa48",
+  "url": "https://datagolf.com/past-results/pga-tour/10/2023"
+ },
+ "pga-tour/10/2024": {
+  "bytes": 419642,
+  "file": "pga_10_2024.html",
+  "http": 200,
+  "sha256": "4ec20d1535a70b4212b1e66ccbbd747cdf5d1b830e26fb896758350e596ea7bd",
+  "url": "https://datagolf.com/past-results/pga-tour/10/2024"
+ },
+ "pga-tour/10/2025": {
+  "bytes": 420172,
+  "file": "pga_10_2025.html",
+  "http": 200,
+  "sha256": "2e2607251a482c761bd3bb7186fe81e4834763811eb2e2a07ab866b779c222a8",
+  "url": "https://datagolf.com/past-results/pga-tour/10/2025"
+ },
+ "pga-tour/100/2020": {
+  "bytes": 434758,
+  "file": "pga_100_2020.html",
+  "http": 200,
+  "sha256": "a9129daa291d9ad36d0d19ec6fd159cff64bf95726c257880f7512f11e7a0e8b",
+  "url": "https://datagolf.com/past-results/pga-tour/100/2020"
+ },
+ "pga-tour/100/2021": {
+  "bytes": 436844,
+  "file": "pga_100_2021.html",
+  "http": 200,
+  "sha256": "39910cc7a41925cf889e60846fe81aae66cd1467094c940bf3455606f709b101",
+  "url": "https://datagolf.com/past-results/pga-tour/100/2021"
+ },
+ "pga-tour/100/2022": {
+  "bytes": 435127,
+  "file": "pga_100_2022.html",
+  "http": 200,
+  "sha256": "4c8498f41d5f226b20fea6e0a6cf7580a67545c628d2146cccd94080920378a6",
+  "url": "https://datagolf.com/past-results/pga-tour/100/2022"
+ },
+ "pga-tour/100/2023": {
+  "bytes": 434448,
+  "file": "pga_100_2023.html",
+  "http": 200,
+  "sha256": "b8439bf71218cf9f88498ec79e8693ecacbabe46ab08f0117e33e6b1414ca3d1",
+  "url": "https://datagolf.com/past-results/pga-tour/100/2023"
+ },
+ "pga-tour/100/2024": {
+  "bytes": 434779,
+  "file": "pga_100_2024.html",
+  "http": 200,
+  "sha256": "4c334b6ce6167dc222ea4e1ec060f84c40fa394fe65a6ee435a63afd1b234abd",
+  "url": "https://datagolf.com/past-results/pga-tour/100/2024"
+ },
+ "pga-tour/100/2025": {
+  "bytes": 433614,
+  "file": "pga_100_2025.html",
+  "http": 200,
+  "sha256": "d9abd79d26a7d500030c87ee7f8e9d22b5ec7fba76a3e48073fa0453f3f6bfda",
+  "url": "https://datagolf.com/past-results/pga-tour/100/2025"
+ },
+ "pga-tour/101/2020": {
+  "bytes": 391089,
+  "file": "pga_101_2020.html",
+  "http": 200,
+  "sha256": "fd4e77f69aa8651688ff86d8f40f8a029a549757f4a1f9b2f399a5065e3b8b7e",
+  "url": "https://datagolf.com/past-results/pga-tour/101/2020"
+ },
+ "pga-tour/101/2021": {
+  "bytes": 391089,
+  "file": "pga_101_2021.html",
+  "http": 200,
+  "sha256": "33d0ba133e78f5d9ec1ecfb390051c36b7c193a4aa97354aaa4b73c5b7d18bca",
+  "url": "https://datagolf.com/past-results/pga-tour/101/2021"
+ },
+ "pga-tour/101/2022": {
+  "bytes": 391089,
+  "file": "pga_101_2022.html",
+  "http": 200,
+  "sha256": "7338ebb79cfe32d722e02d6c9bcbe611882a444ceba821d36010f2a9f4ff7553",
+  "url": "https://datagolf.com/past-results/pga-tour/101/2022"
+ },
+ "pga-tour/101/2023": {
+  "bytes": 391089,
+  "file": "pga_101_2023.html",
+  "http": 200,
+  "sha256": "6dd71a6c3d0c67aa8aaeff2f16c7a3fe8220f49479a4d6ed9c112594c2496576",
+  "url": "https://datagolf.com/past-results/pga-tour/101/2023"
+ },
+ "pga-tour/101/2024": {
+  "bytes": 391089,
+  "file": "pga_101_2024.html",
+  "http": 200,
+  "sha256": "903a67fd2024d88f6fa1cd2509cee0a124a842c693418a79202eca2dbb85053b",
+  "url": "https://datagolf.com/past-results/pga-tour/101/2024"
+ },
+ "pga-tour/101/2025": {
+  "bytes": 391089,
+  "file": "pga_101_2025.html",
+  "http": 200,
+  "sha256": "dfc8671c33864ea1862a024662a4e6d11d05faa220b895413112993f64f21b39",
+  "url": "https://datagolf.com/past-results/pga-tour/101/2025"
+ },
+ "pga-tour/102/2020": {
+  "bytes": 391089,
+  "file": "pga_102_2020.html",
+  "http": 200,
+  "sha256": "6dc61a6d79bde3855b7ee90a6b012038f40de2d75571f524e4834386959fc22b",
+  "url": "https://datagolf.com/past-results/pga-tour/102/2020"
+ },
+ "pga-tour/102/2021": {
+  "bytes": 391089,
+  "file": "pga_102_2021.html",
+  "http": 200,
+  "sha256": "4024d1b515d7431ec611978e3c5f3c117c4ea47bed4bc92538a402a54fdf4dee",
+  "url": "https://datagolf.com/past-results/pga-tour/102/2021"
+ },
+ "pga-tour/102/2022": {
+  "bytes": 391089,
+  "file": "pga_102_2022.html",
+  "http": 200,
+  "sha256": "41d0f8589bbaccadb73da7645b09b6ee84f1f93d01467b705661881d0c6009f4",
+  "url": "https://datagolf.com/past-results/pga-tour/102/2022"
+ },
+ "pga-tour/102/2023": {
+  "bytes": 391089,
+  "file": "pga_102_2023.html",
+  "http": 200,
+  "sha256": "74b433215173de99f9a467538c944b1ae5428b310bd4d5e02ea2198de01f03b4",
+  "url": "https://datagolf.com/past-results/pga-tour/102/2023"
+ },
+ "pga-tour/102/2024": {
+  "bytes": 391089,
+  "file": "pga_102_2024.html",
+  "http": 200,
+  "sha256": "65392f7c35fb06b58c5aa7dd026ec36ba9a1199fede96e74625d7268e9c09216",
+  "url": "https://datagolf.com/past-results/pga-tour/102/2024"
+ },
+ "pga-tour/102/2025": {
+  "bytes": 391089,
+  "file": "pga_102_2025.html",
+  "http": 200,
+  "sha256": "1a9d8055c6c4a553c77f0c003157f615dab0132c3de11e85a10b2a71c800c933",
+  "url": "https://datagolf.com/past-results/pga-tour/102/2025"
+ },
+ "pga-tour/103/2020": {
+  "bytes": 391089,
+  "file": "pga_103_2020.html",
+  "http": 200,
+  "sha256": "5e2c75d2d6465132d97572bf7e4cd3392e82c009a7608e61adf3d51c456c8cde",
+  "url": "https://datagolf.com/past-results/pga-tour/103/2020"
+ },
+ "pga-tour/103/2021": {
+  "bytes": 391089,
+  "file": "pga_103_2021.html",
+  "http": 200,
+  "sha256": "dd8465d4b1fa443dd67034b3e81fbba54f0aab42372601f36873f1a8ef8840f4",
+  "url": "https://datagolf.com/past-results/pga-tour/103/2021"
+ },
+ "pga-tour/103/2022": {
+  "bytes": 391089,
+  "file": "pga_103_2022.html",
+  "http": 200,
+  "sha256": "ac4c3bc35232ccce7ba0965ff5c2bbdec0d3fbcf67c9f63417ee56fee1ed691b",
+  "url": "https://datagolf.com/past-results/pga-tour/103/2022"
+ },
+ "pga-tour/103/2023": {
+  "bytes": 391089,
+  "file": "pga_103_2023.html",
+  "http": 200,
+  "sha256": "5928a61852660268bf97bf686b6b3feedbca040288d385478290f37c3752cc74",
+  "url": "https://datagolf.com/past-results/pga-tour/103/2023"
+ },
+ "pga-tour/103/2024": {
+  "bytes": 391089,
+  "file": "pga_103_2024.html",
+  "http": 200,
+  "sha256": "8359ee82e03a71a310d51888dd9ad01c74296a248826fb2c23c3f5f15a253d6b",
+  "url": "https://datagolf.com/past-results/pga-tour/103/2024"
+ },
+ "pga-tour/103/2025": {
+  "bytes": 391089,
+  "file": "pga_103_2025.html",
+  "http": 200,
+  "sha256": "6c07aa50aeb4f0ef3dfb2e1e013b10a93164ee4b8acb056d54e4f2d5690db1ff",
+  "url": "https://datagolf.com/past-results/pga-tour/103/2025"
+ },
+ "pga-tour/104/2020": {
+  "bytes": 391089,
+  "file": "pga_104_2020.html",
+  "http": 200,
+  "sha256": "d3ed9c12bd786d3b454cd6b77dfe5eb93dd96a1d2e5a345335fdd711b8a404c0",
+  "url": "https://datagolf.com/past-results/pga-tour/104/2020"
+ },
+ "pga-tour/104/2021": {
+  "bytes": 391089,
+  "file": "pga_104_2021.html",
+  "http": 200,
+  "sha256": "be80061a08f5363f4f3ce1ccb376785d8817acc48f641a8e537a7717933e8b74",
+  "url": "https://datagolf.com/past-results/pga-tour/104/2021"
+ },
+ "pga-tour/104/2022": {
+  "bytes": 391089,
+  "file": "pga_104_2022.html",
+  "http": 200,
+  "sha256": "fb7416488235f3f3b670c64f39797ca407e6c47b12197f6d5e9b0094d67ad682",
+  "url": "https://datagolf.com/past-results/pga-tour/104/2022"
+ },
+ "pga-tour/104/2023": {
+  "bytes": 391089,
+  "file": "pga_104_2023.html",
+  "http": 200,
+  "sha256": "3e36b857d6d8b50c9a2bf1cdde52aedd912939984b78435109e743f18bb024b6",
+  "url": "https://datagolf.com/past-results/pga-tour/104/2023"
+ },
+ "pga-tour/104/2024": {
+  "bytes": 391089,
+  "file": "pga_104_2024.html",
+  "http": 200,
+  "sha256": "cb8d35bc70d01bf085c7c905b26680622681e48ab754710f7b1e68bcbebdf4ff",
+  "url": "https://datagolf.com/past-results/pga-tour/104/2024"
+ },
+ "pga-tour/104/2025": {
+  "bytes": 391089,
+  "file": "pga_104_2025.html",
+  "http": 200,
+  "sha256": "9cca0aeecce22253c50b27dba58f605be4036d06f560eabe6a75222ce0743dd3",
+  "url": "https://datagolf.com/past-results/pga-tour/104/2025"
+ },
+ "pga-tour/105/2020": {
+  "bytes": 391089,
+  "file": "pga_105_2020.html",
+  "http": 200,
+  "sha256": "5feabadad9aa61fb8e0945eb475baaa8b1c81dad3f2252ef8a1fef7eb6688583",
+  "url": "https://datagolf.com/past-results/pga-tour/105/2020"
+ },
+ "pga-tour/105/2021": {
+  "bytes": 391089,
+  "file": "pga_105_2021.html",
+  "http": 200,
+  "sha256": "c653a76606a155a1a3f04e5fb359a4c5a96a33c928025e2385c61bff2716857f",
+  "url": "https://datagolf.com/past-results/pga-tour/105/2021"
+ },
+ "pga-tour/105/2022": {
+  "bytes": 391089,
+  "file": "pga_105_2022.html",
+  "http": 200,
+  "sha256": "56f06b7f6e5c30b5cad4e3d4bc948c8eaab339f4d3dc0b24fe6bd4b785902734",
+  "url": "https://datagolf.com/past-results/pga-tour/105/2022"
+ },
+ "pga-tour/105/2023": {
+  "bytes": 391089,
+  "file": "pga_105_2023.html",
+  "http": 200,
+  "sha256": "7d1945995a321d329d2a4936ea473ea9f3a20186507a6e3c85ab4b424a28c3c0",
+  "url": "https://datagolf.com/past-results/pga-tour/105/2023"
+ },
+ "pga-tour/105/2024": {
+  "bytes": 391089,
+  "file": "pga_105_2024.html",
+  "http": 200,
+  "sha256": "9a9ff43ffe7de7e329272885ed198a4a4bd1d29b05fd3240d621a8a1db7cf9aa",
+  "url": "https://datagolf.com/past-results/pga-tour/105/2024"
+ },
+ "pga-tour/105/2025": {
+  "bytes": 391089,
+  "file": "pga_105_2025.html",
+  "http": 200,
+  "sha256": "31b40f88d8ba1ccbbb7a86ed6e465d7f25e9bb75a837d8ad28d09fe9331f4e4d",
+  "url": "https://datagolf.com/past-results/pga-tour/105/2025"
+ },
+ "pga-tour/106/2020": {
+  "bytes": 391089,
+  "file": "pga_106_2020.html",
+  "http": 200,
+  "sha256": "21281a117d8913527538ae8258bceb3fd53f1b2c7e5a615cf70808ebf8497377",
+  "url": "https://datagolf.com/past-results/pga-tour/106/2020"
+ },
+ "pga-tour/106/2021": {
+  "bytes": 391089,
+  "file": "pga_106_2021.html",
+  "http": 200,
+  "sha256": "17594b0f69297505c84820af9bef295b824e31fe1e401fdc4f00cda8677ddf87",
+  "url": "https://datagolf.com/past-results/pga-tour/106/2021"
+ },
+ "pga-tour/106/2022": {
+  "bytes": 391089,
+  "file": "pga_106_2022.html",
+  "http": 200,
+  "sha256": "3dae4f256747974ada81df51160b2305c9f0bb126992b0f1a14df625848ecece",
+  "url": "https://datagolf.com/past-results/pga-tour/106/2022"
+ },
+ "pga-tour/106/2023": {
+  "bytes": 391089,
+  "file": "pga_106_2023.html",
+  "http": 200,
+  "sha256": "1b7eb090281beb3eed60f08a0e09328fb1733e1eab6e9a7bebd797d88da387c4",
+  "url": "https://datagolf.com/past-results/pga-tour/106/2023"
+ },
+ "pga-tour/106/2024": {
+  "bytes": 391089,
+  "file": "pga_106_2024.html",
+  "http": 200,
+  "sha256": "28415a85e1b6c1821d1e333424adafcfa3e64abd25419eb11a20e8a96ace4376",
+  "url": "https://datagolf.com/past-results/pga-tour/106/2024"
+ },
+ "pga-tour/106/2025": {
+  "bytes": 391089,
+  "file": "pga_106_2025.html",
+  "http": 200,
+  "sha256": "6f31c03ad853f610f11abb3f997960513276916e8ad04db0cbdaf774e53715a8",
+  "url": "https://datagolf.com/past-results/pga-tour/106/2025"
+ },
+ "pga-tour/107/2020": {
+  "bytes": 391089,
+  "file": "pga_107_2020.html",
+  "http": 200,
+  "sha256": "8fd5883eec14d760f90de1047aa43f32879f725285f3b1bc081a6612856270fb",
+  "url": "https://datagolf.com/past-results/pga-tour/107/2020"
+ },
+ "pga-tour/107/2021": {
+  "bytes": 391089,
+  "file": "pga_107_2021.html",
+  "http": 200,
+  "sha256": "2d8f3cc5b47d3044e6c1991d669e0b15b7515d80718ad3758bcc6821bb3c70f2",
+  "url": "https://datagolf.com/past-results/pga-tour/107/2021"
+ },
+ "pga-tour/107/2022": {
+  "bytes": 391089,
+  "file": "pga_107_2022.html",
+  "http": 200,
+  "sha256": "71f637387d1a077dbca8a319bbb98ffd31d93c3d6c4614314c886e61f6d0cf66",
+  "url": "https://datagolf.com/past-results/pga-tour/107/2022"
+ },
+ "pga-tour/107/2023": {
+  "bytes": 391089,
+  "file": "pga_107_2023.html",
+  "http": 200,
+  "sha256": "3c768e6247dae04e6f01b34b87dcfc1c7c153b61f55c9c281df75ef29300e598",
+  "url": "https://datagolf.com/past-results/pga-tour/107/2023"
+ },
+ "pga-tour/107/2024": {
+  "bytes": 391089,
+  "file": "pga_107_2024.html",
+  "http": 200,
+  "sha256": "4fb66f0ad7c0b5d481f46ceaba4107d13b0671a89785dc34085cf99e1baa059a",
+  "url": "https://datagolf.com/past-results/pga-tour/107/2024"
+ },
+ "pga-tour/107/2025": {
+  "bytes": 391089,
+  "file": "pga_107_2025.html",
+  "http": 200,
+  "sha256": "0e796e40f8d6f4fbdcf9fae15c8aa6fa712cbfb302d20cdc188689a44f32f405",
+  "url": "https://datagolf.com/past-results/pga-tour/107/2025"
+ },
+ "pga-tour/108/2020": {
+  "bytes": 391089,
+  "file": "pga_108_2020.html",
+  "http": 200,
+  "sha256": "4f6ab8772f02a9d544d935a3e08628ea2afd48f7fc94689d7e7801a3c6df42cf",
+  "url": "https://datagolf.com/past-results/pga-tour/108/2020"
+ },
+ "pga-tour/108/2021": {
+  "bytes": 391089,
+  "file": "pga_108_2021.html",
+  "http": 200,
+  "sha256": "f20c61c4b4c7e4fbc6d91a7f0303a740617ecf789a34c95c1bf9dc4f953bbc15",
+  "url": "https://datagolf.com/past-results/pga-tour/108/2021"
+ },
+ "pga-tour/108/2022": {
+  "bytes": 391089,
+  "file": "pga_108_2022.html",
+  "http": 200,
+  "sha256": "0f092ed4d920e7172797c11fe1ca44f9beff4edccd0b72cf9586a13f4544df3f",
+  "url": "https://datagolf.com/past-results/pga-tour/108/2022"
+ },
+ "pga-tour/108/2023": {
+  "bytes": 391089,
+  "file": "pga_108_2023.html",
+  "http": 200,
+  "sha256": "c6bde00f31c4f60c63ac7c29de68f386c51cbc0f675cd9302400813cdd8d07a2",
+  "url": "https://datagolf.com/past-results/pga-tour/108/2023"
+ },
+ "pga-tour/108/2024": {
+  "bytes": 391089,
+  "file": "pga_108_2024.html",
+  "http": 200,
+  "sha256": "46f9b7fad330670a965d9a123d54bfd49dd080bac52233c0a305ec65bbbfede8",
+  "url": "https://datagolf.com/past-results/pga-tour/108/2024"
+ },
+ "pga-tour/108/2025": {
+  "bytes": 391089,
+  "file": "pga_108_2025.html",
+  "http": 200,
+  "sha256": "e5fabd0937047248586b50f956b9adde1f77e7a4fc6d39592943dcad66035c9e",
+  "url": "https://datagolf.com/past-results/pga-tour/108/2025"
+ },
+ "pga-tour/109/2020": {
+  "bytes": 391089,
+  "file": "pga_109_2020.html",
+  "http": 200,
+  "sha256": "56828044eebad049d2adb68598a5627d5c7f51d529217de31c89f00b09275e6b",
+  "url": "https://datagolf.com/past-results/pga-tour/109/2020"
+ },
+ "pga-tour/109/2021": {
+  "bytes": 391089,
+  "file": "pga_109_2021.html",
+  "http": 200,
+  "sha256": "d3644f3a4654c7460e0397aa68e52e0626a0a7ed556b427e1c5545487c49d59b",
+  "url": "https://datagolf.com/past-results/pga-tour/109/2021"
+ },
+ "pga-tour/109/2022": {
+  "bytes": 391089,
+  "file": "pga_109_2022.html",
+  "http": 200,
+  "sha256": "d4ef4223d4586fb045907768d50510a481dad7c39828e0fbd8d16f4d8498e586",
+  "url": "https://datagolf.com/past-results/pga-tour/109/2022"
+ },
+ "pga-tour/109/2023": {
+  "bytes": 391089,
+  "file": "pga_109_2023.html",
+  "http": 200,
+  "sha256": "48ef8e249c21c2d12036ddb2f9a5b5cf562c23e88acec47b617500af42b76fa1",
+  "url": "https://datagolf.com/past-results/pga-tour/109/2023"
+ },
+ "pga-tour/109/2024": {
+  "bytes": 391089,
+  "file": "pga_109_2024.html",
+  "http": 200,
+  "sha256": "680c4dd44fa0122dbc37967a8c3dbe154fbc64ca628740df29d45f9ac69a18b3",
+  "url": "https://datagolf.com/past-results/pga-tour/109/2024"
+ },
+ "pga-tour/109/2025": {
+  "bytes": 391089,
+  "file": "pga_109_2025.html",
+  "http": 200,
+  "sha256": "aecad0f1e620e9020be5a7aed1f665b06a67e765e46bae1c68eb10004957928c",
+  "url": "https://datagolf.com/past-results/pga-tour/109/2025"
+ },
+ "pga-tour/11/2020": {
+  "bytes": 415852,
+  "file": "pga_11_2020.html",
+  "http": 200,
+  "sha256": "ca172067f610f6dbdad35dc6c906011aedbdaca5d81e26c4492f3edaba349288",
+  "url": "https://datagolf.com/past-results/pga-tour/11/2020"
+ },
+ "pga-tour/11/2021": {
+  "bytes": 434834,
+  "file": "pga_11_2021.html",
+  "http": 200,
+  "sha256": "f22d8c270228f504f151c13ee06d43e22479e35f2d1544728f4420d288527985",
+  "url": "https://datagolf.com/past-results/pga-tour/11/2021"
+ },
+ "pga-tour/11/2022": {
+  "bytes": 428610,
+  "file": "pga_11_2022.html",
+  "http": 200,
+  "sha256": "6aa02af16812796de194e0d3f0b241591389e405e5cd8d1c9d8266426a7dbaf9",
+  "url": "https://datagolf.com/past-results/pga-tour/11/2022"
+ },
+ "pga-tour/11/2023": {
+  "bytes": 429292,
+  "file": "pga_11_2023.html",
+  "http": 200,
+  "sha256": "86f074a211db8af09bdf76f2e59d7382609753802cf901d37626a4a80dd87477",
+  "url": "https://datagolf.com/past-results/pga-tour/11/2023"
+ },
+ "pga-tour/11/2024": {
+  "bytes": 428625,
+  "file": "pga_11_2024.html",
+  "http": 200,
+  "sha256": "4b8556513a2b8f38eb0b2bdb783b18662ad9d289518092571f7594599fc59905",
+  "url": "https://datagolf.com/past-results/pga-tour/11/2024"
+ },
+ "pga-tour/11/2025": {
+  "bytes": 428971,
+  "file": "pga_11_2025.html",
+  "http": 200,
+  "sha256": "2f7a3a8592d93e0afb9806ebd4f88caa37393a32ebb5df91c2d50f08724f1ef4",
+  "url": "https://datagolf.com/past-results/pga-tour/11/2025"
+ },
+ "pga-tour/110/2020": {
+  "bytes": 391089,
+  "file": "pga_110_2020.html",
+  "http": 200,
+  "sha256": "324fec458241b55c3650b0aa042a171f66dfc62ee51b9d832122a66967ea87c7",
+  "url": "https://datagolf.com/past-results/pga-tour/110/2020"
+ },
+ "pga-tour/110/2021": {
+  "bytes": 391089,
+  "file": "pga_110_2021.html",
+  "http": 200,
+  "sha256": "a3b5857f3d0a42bd0c2f86148d5030feb2d346052e30dccede9315f1f2465daf",
+  "url": "https://datagolf.com/past-results/pga-tour/110/2021"
+ },
+ "pga-tour/110/2022": {
+  "bytes": 391089,
+  "file": "pga_110_2022.html",
+  "http": 200,
+  "sha256": "766a74776cda50640d6d06c7fa0f37966ccd206acc53534d73dd1b3f47594c3c",
+  "url": "https://datagolf.com/past-results/pga-tour/110/2022"
+ },
+ "pga-tour/110/2023": {
+  "bytes": 391089,
+  "file": "pga_110_2023.html",
+  "http": 200,
+  "sha256": "c70ea3e97d1f10a8403d967ed2fc7020a6632f087ab8ce19c8649234d045506b",
+  "url": "https://datagolf.com/past-results/pga-tour/110/2023"
+ },
+ "pga-tour/110/2024": {
+  "bytes": 391089,
+  "file": "pga_110_2024.html",
+  "http": 200,
+  "sha256": "9ffe869db50b46377aaad88d7b19c71e0e4c03c23040f5770c2eb9d00cd79b7e",
+  "url": "https://datagolf.com/past-results/pga-tour/110/2024"
+ },
+ "pga-tour/110/2025": {
+  "bytes": 391089,
+  "file": "pga_110_2025.html",
+  "http": 200,
+  "sha256": "a763f156d88f400f0619b58c61cdc57dce42451085ef9b0641ec4d68e078bd38",
+  "url": "https://datagolf.com/past-results/pga-tour/110/2025"
+ },
+ "pga-tour/111/2020": {
+  "bytes": 391089,
+  "file": "pga_111_2020.html",
+  "http": 200,
+  "sha256": "984a8636a2e74447f37e72bf0471db06a32ccd87f07aab3f4f84b09df5bf5f13",
+  "url": "https://datagolf.com/past-results/pga-tour/111/2020"
+ },
+ "pga-tour/111/2021": {
+  "bytes": 391089,
+  "file": "pga_111_2021.html",
+  "http": 200,
+  "sha256": "5bdb5cd3c4facc43b53504d1d1dca9e7bd10c50dab62ce4f33b9b17abc938bed",
+  "url": "https://datagolf.com/past-results/pga-tour/111/2021"
+ },
+ "pga-tour/111/2022": {
+  "bytes": 391089,
+  "file": "pga_111_2022.html",
+  "http": 200,
+  "sha256": "a268c3966cba5ef694164faef28c49cb146fdab400a962147592961ac4d95988",
+  "url": "https://datagolf.com/past-results/pga-tour/111/2022"
+ },
+ "pga-tour/111/2023": {
+  "bytes": 391089,
+  "file": "pga_111_2023.html",
+  "http": 200,
+  "sha256": "a2afe5c40dd0911c2c12d7f6805793e4377c3cc0acd5d2c37db384eac716209a",
+  "url": "https://datagolf.com/past-results/pga-tour/111/2023"
+ },
+ "pga-tour/111/2024": {
+  "bytes": 391089,
+  "file": "pga_111_2024.html",
+  "http": 200,
+  "sha256": "bc77526043d5f5d34ce1e2c5c7c97c873a912e0934751f6e563d7262034fe8fa",
+  "url": "https://datagolf.com/past-results/pga-tour/111/2024"
+ },
+ "pga-tour/111/2025": {
+  "bytes": 391089,
+  "file": "pga_111_2025.html",
+  "http": 200,
+  "sha256": "e46c9ea5c67b5a8c33f1667c273183d829d0b2bd1d44e1cc3447b997fcea0d4c",
+  "url": "https://datagolf.com/past-results/pga-tour/111/2025"
+ },
+ "pga-tour/112/2020": {
+  "bytes": 391089,
+  "file": "pga_112_2020.html",
+  "http": 200,
+  "sha256": "4e27e5b688e58fc87b9bfad479de0fe7caff9d8261b742dbb6e1bcb6507c26df",
+  "url": "https://datagolf.com/past-results/pga-tour/112/2020"
+ },
+ "pga-tour/112/2021": {
+  "bytes": 391089,
+  "file": "pga_112_2021.html",
+  "http": 200,
+  "sha256": "705ec851fc98542b4d1f61674f31f06ca0985c25196ad6cf217e71b190a26b2e",
+  "url": "https://datagolf.com/past-results/pga-tour/112/2021"
+ },
+ "pga-tour/112/2022": {
+  "bytes": 391089,
+  "file": "pga_112_2022.html",
+  "http": 200,
+  "sha256": "6f8f9fd4cd0606638e904152ac440697dc2b3861677b564e2c7b4c4208aa449c",
+  "url": "https://datagolf.com/past-results/pga-tour/112/2022"
+ },
+ "pga-tour/112/2023": {
+  "bytes": 391089,
+  "file": "pga_112_2023.html",
+  "http": 200,
+  "sha256": "d9051d525904430feb2bbdbcf2038c0279ee6b4b6543923e9365c07452035b0c",
+  "url": "https://datagolf.com/past-results/pga-tour/112/2023"
+ },
+ "pga-tour/112/2024": {
+  "bytes": 391089,
+  "file": "pga_112_2024.html",
+  "http": 200,
+  "sha256": "15bd70eb468a996dddd08c7c9773f42b628f3bfa4965c1d1423d32e985bde0bd",
+  "url": "https://datagolf.com/past-results/pga-tour/112/2024"
+ },
+ "pga-tour/112/2025": {
+  "bytes": 391089,
+  "file": "pga_112_2025.html",
+  "http": 200,
+  "sha256": "9502980c1a50e8de1bef6f0a70926dd443dc397fe82fa176dbd8b3784ad08460",
+  "url": "https://datagolf.com/past-results/pga-tour/112/2025"
+ },
+ "pga-tour/113/2020": {
+  "bytes": 391089,
+  "file": "pga_113_2020.html",
+  "http": 200,
+  "sha256": "e7f44c4dfaf17e319ff575dcb8262c31b60ea312cf098efa7447a8bf535193cb",
+  "url": "https://datagolf.com/past-results/pga-tour/113/2020"
+ },
+ "pga-tour/113/2021": {
+  "bytes": 391089,
+  "file": "pga_113_2021.html",
+  "http": 200,
+  "sha256": "fbcce38249ddb93b96de6273091a3141023dd0e0ecbbc1fc411e11c44da570b0",
+  "url": "https://datagolf.com/past-results/pga-tour/113/2021"
+ },
+ "pga-tour/113/2022": {
+  "bytes": 391089,
+  "file": "pga_113_2022.html",
+  "http": 200,
+  "sha256": "161152e6972d54bb457d2f220cc090b0980a7d620f0593070633aef0ef70f153",
+  "url": "https://datagolf.com/past-results/pga-tour/113/2022"
+ },
+ "pga-tour/113/2023": {
+  "bytes": 391089,
+  "file": "pga_113_2023.html",
+  "http": 200,
+  "sha256": "66c9c0c18d45028fa0715239e844aedfc250963daa585d428559f202e8404e9a",
+  "url": "https://datagolf.com/past-results/pga-tour/113/2023"
+ },
+ "pga-tour/113/2024": {
+  "bytes": 391089,
+  "file": "pga_113_2024.html",
+  "http": 200,
+  "sha256": "74df6ffc76533ba7cc50953acda62dc7d2ea273c03377c7ff71a6a48de1f981c",
+  "url": "https://datagolf.com/past-results/pga-tour/113/2024"
+ },
+ "pga-tour/113/2025": {
+  "bytes": 391089,
+  "file": "pga_113_2025.html",
+  "http": 200,
+  "sha256": "351ff65f2d1cda1c358ad1abe0db613272cab9545f0ec765a55e366b9a4ae9e8",
+  "url": "https://datagolf.com/past-results/pga-tour/113/2025"
+ },
+ "pga-tour/114/2020": {
+  "bytes": 391089,
+  "file": "pga_114_2020.html",
+  "http": 200,
+  "sha256": "a54226bd0516ae81f02d81d762515dcc0abc75979b3026eea0fd7efa18a7729a",
+  "url": "https://datagolf.com/past-results/pga-tour/114/2020"
+ },
+ "pga-tour/114/2021": {
+  "bytes": 391089,
+  "file": "pga_114_2021.html",
+  "http": 200,
+  "sha256": "27b7e61c56b5d80adc0522955590b36b6986cf6cc0d6d50525f8b24432eb02d4",
+  "url": "https://datagolf.com/past-results/pga-tour/114/2021"
+ },
+ "pga-tour/114/2022": {
+  "bytes": 391089,
+  "file": "pga_114_2022.html",
+  "http": 200,
+  "sha256": "f89f76f54fcbbe1ccbc652521a13fa889740776c02827f7c04ff05a1477fa2ba",
+  "url": "https://datagolf.com/past-results/pga-tour/114/2022"
+ },
+ "pga-tour/114/2023": {
+  "bytes": 391089,
+  "file": "pga_114_2023.html",
+  "http": 200,
+  "sha256": "b961fcf639615cf9729792d18f45a00138e2a3f250d0f30a6df0acef8cfae98b",
+  "url": "https://datagolf.com/past-results/pga-tour/114/2023"
+ },
+ "pga-tour/114/2024": {
+  "bytes": 391089,
+  "file": "pga_114_2024.html",
+  "http": 200,
+  "sha256": "ce47711403923f885ade46abfbbcce018d23c0423bce03a3342ea94816c7c45b",
+  "url": "https://datagolf.com/past-results/pga-tour/114/2024"
+ },
+ "pga-tour/114/2025": {
+  "bytes": 391089,
+  "file": "pga_114_2025.html",
+  "http": 200,
+  "sha256": "150a6003e7a1cb43cc4f9901784761da77d055007dcac9f8f244372101db66d9",
+  "url": "https://datagolf.com/past-results/pga-tour/114/2025"
+ },
+ "pga-tour/115/2020": {
+  "bytes": 391089,
+  "file": "pga_115_2020.html",
+  "http": 200,
+  "sha256": "5bcdc44dd97dd4b4388000fb36c060ac7b1fdcaead67800fb092314736cc3f3c",
+  "url": "https://datagolf.com/past-results/pga-tour/115/2020"
+ },
+ "pga-tour/115/2021": {
+  "bytes": 391089,
+  "file": "pga_115_2021.html",
+  "http": 200,
+  "sha256": "11eb6aac74da7d546e7faecec8fe764b5b0591709225bf6fe33dcc4d902d9e99",
+  "url": "https://datagolf.com/past-results/pga-tour/115/2021"
+ },
+ "pga-tour/115/2022": {
+  "bytes": 391089,
+  "file": "pga_115_2022.html",
+  "http": 200,
+  "sha256": "d46fa46eb499a8b33a8b203d2c4cc45b91a2e5580d65e03706b2401745ad28f0",
+  "url": "https://datagolf.com/past-results/pga-tour/115/2022"
+ },
+ "pga-tour/115/2023": {
+  "bytes": 391089,
+  "file": "pga_115_2023.html",
+  "http": 200,
+  "sha256": "530cadc83ed401e78f385afcad8e5989ff5c78bfe747d5e86f6859b0926e90eb",
+  "url": "https://datagolf.com/past-results/pga-tour/115/2023"
+ },
+ "pga-tour/115/2024": {
+  "bytes": 391089,
+  "file": "pga_115_2024.html",
+  "http": 200,
+  "sha256": "b4f104ffa006514f73f85b564c5bfb56dfe6302739de20aaf109cce057a2e035",
+  "url": "https://datagolf.com/past-results/pga-tour/115/2024"
+ },
+ "pga-tour/115/2025": {
+  "bytes": 391089,
+  "file": "pga_115_2025.html",
+  "http": 200,
+  "sha256": "7706a9926a4b8096a94ac21ba2443eb02a47ef3894aa5dbad31d617d320fd22d",
+  "url": "https://datagolf.com/past-results/pga-tour/115/2025"
+ },
+ "pga-tour/116/2020": {
+  "bytes": 391089,
+  "file": "pga_116_2020.html",
+  "http": 200,
+  "sha256": "45480a3bf3e033e3b34616f48c3f55f212e481202741695b44d92655f705f42c",
+  "url": "https://datagolf.com/past-results/pga-tour/116/2020"
+ },
+ "pga-tour/116/2021": {
+  "bytes": 391089,
+  "file": "pga_116_2021.html",
+  "http": 200,
+  "sha256": "202a55c5e74b68f0727cf9d30e03a78ccc0f129fee778c813f62a54cf55035d2",
+  "url": "https://datagolf.com/past-results/pga-tour/116/2021"
+ },
+ "pga-tour/116/2022": {
+  "bytes": 391089,
+  "file": "pga_116_2022.html",
+  "http": 200,
+  "sha256": "f45da36bc2627f8cca8f29c677cecf1c65f58b46d1e100ef513f02abd334c7e8",
+  "url": "https://datagolf.com/past-results/pga-tour/116/2022"
+ },
+ "pga-tour/116/2023": {
+  "bytes": 391089,
+  "file": "pga_116_2023.html",
+  "http": 200,
+  "sha256": "30fd5a5c739b6d4adce5e969b4c6276001140e37e2ab251f3185bb1d3d6d2470",
+  "url": "https://datagolf.com/past-results/pga-tour/116/2023"
+ },
+ "pga-tour/116/2024": {
+  "bytes": 391089,
+  "file": "pga_116_2024.html",
+  "http": 200,
+  "sha256": "8b92266b03725f185a731703eb2662a221098622e996b4d6ffa9070184c449c5",
+  "url": "https://datagolf.com/past-results/pga-tour/116/2024"
+ },
+ "pga-tour/116/2025": {
+  "bytes": 391089,
+  "file": "pga_116_2025.html",
+  "http": 200,
+  "sha256": "9293cbcf6e613c9f9e6e743d98a7de16bb4164b04d7942bfebcbe6d88a37a893",
+  "url": "https://datagolf.com/past-results/pga-tour/116/2025"
+ },
+ "pga-tour/117/2020": {
+  "bytes": 391089,
+  "file": "pga_117_2020.html",
+  "http": 200,
+  "sha256": "dc28cd52797ba83081c703a1153f09b650482797c51d2bcc16c8151da00138f7",
+  "url": "https://datagolf.com/past-results/pga-tour/117/2020"
+ },
+ "pga-tour/117/2021": {
+  "bytes": 391089,
+  "file": "pga_117_2021.html",
+  "http": 200,
+  "sha256": "a416f058c93cd56a71a1e197cc3833dcc71d53b9bfc2eeb4ce4de109980c8893",
+  "url": "https://datagolf.com/past-results/pga-tour/117/2021"
+ },
+ "pga-tour/117/2022": {
+  "bytes": 391089,
+  "file": "pga_117_2022.html",
+  "http": 200,
+  "sha256": "7751936e7578605f52a99646f3f418e905cdb0fe19ad4a0b6a565097be8c8c65",
+  "url": "https://datagolf.com/past-results/pga-tour/117/2022"
+ },
+ "pga-tour/117/2023": {
+  "bytes": 391089,
+  "file": "pga_117_2023.html",
+  "http": 200,
+  "sha256": "3d119c5f3f09b0b78ba147d3bb6a48c07ffb3b4288eb74a8520beee322e564f6",
+  "url": "https://datagolf.com/past-results/pga-tour/117/2023"
+ },
+ "pga-tour/117/2024": {
+  "bytes": 391089,
+  "file": "pga_117_2024.html",
+  "http": 200,
+  "sha256": "6f3058f087721d6c68ebf370f955053306c86194202dfb5fdc75f1e9c691db01",
+  "url": "https://datagolf.com/past-results/pga-tour/117/2024"
+ },
+ "pga-tour/117/2025": {
+  "bytes": 391089,
+  "file": "pga_117_2025.html",
+  "http": 200,
+  "sha256": "21dc6946d46df5c9594f96bd73b37dff1dfa6f0f7e286142a6f448412fe2fdb0",
+  "url": "https://datagolf.com/past-results/pga-tour/117/2025"
+ },
+ "pga-tour/118/2020": {
+  "bytes": 391089,
+  "file": "pga_118_2020.html",
+  "http": 200,
+  "sha256": "c35a4158f2e9a57812200af62a02d4abd035b724f3320d7d24d4aca07479d317",
+  "url": "https://datagolf.com/past-results/pga-tour/118/2020"
+ },
+ "pga-tour/118/2021": {
+  "bytes": 391089,
+  "file": "pga_118_2021.html",
+  "http": 200,
+  "sha256": "a182d33a5e01cf874605808f60bce4801822a5aa4e4cb1155b3dfc7a2c4e05e2",
+  "url": "https://datagolf.com/past-results/pga-tour/118/2021"
+ },
+ "pga-tour/118/2022": {
+  "bytes": 391089,
+  "file": "pga_118_2022.html",
+  "http": 200,
+  "sha256": "9bdde4b1de5a9563c5dc731c7af3235676e35c8a0044baa17ad8e639c2a207f3",
+  "url": "https://datagolf.com/past-results/pga-tour/118/2022"
+ },
+ "pga-tour/118/2023": {
+  "bytes": 391089,
+  "file": "pga_118_2023.html",
+  "http": 200,
+  "sha256": "b0895970ef6ce95d7e8e759c49084882985542b8d232db8b564151353b676296",
+  "url": "https://datagolf.com/past-results/pga-tour/118/2023"
+ },
+ "pga-tour/118/2024": {
+  "bytes": 391089,
+  "file": "pga_118_2024.html",
+  "http": 200,
+  "sha256": "047f7bc843b122113df8ac0bdb5742d42c0db0fe24f0cf0a62260110241c6752",
+  "url": "https://datagolf.com/past-results/pga-tour/118/2024"
+ },
+ "pga-tour/118/2025": {
+  "bytes": 391089,
+  "file": "pga_118_2025.html",
+  "http": 200,
+  "sha256": "38118da40691f707d337703eb451ff7b9ddeb43607582fc8e30672e8ef226d91",
+  "url": "https://datagolf.com/past-results/pga-tour/118/2025"
+ },
+ "pga-tour/119/2020": {
+  "bytes": 391089,
+  "file": "pga_119_2020.html",
+  "http": 200,
+  "sha256": "18ed7fa6bd220b558bb9831d578ddf2c4c9526e39a0c10e9ef153b6433aa3786",
+  "url": "https://datagolf.com/past-results/pga-tour/119/2020"
+ },
+ "pga-tour/119/2021": {
+  "bytes": 391089,
+  "file": "pga_119_2021.html",
+  "http": 200,
+  "sha256": "cf505a654056da1e7872aeaf2eba8af1e219c54e97a9b624514a15160b0bfa02",
+  "url": "https://datagolf.com/past-results/pga-tour/119/2021"
+ },
+ "pga-tour/119/2022": {
+  "bytes": 391089,
+  "file": "pga_119_2022.html",
+  "http": 200,
+  "sha256": "bd42f44129b21a671e527f98661ffcd19e9a590c5ed429537807927f60ba7af7",
+  "url": "https://datagolf.com/past-results/pga-tour/119/2022"
+ },
+ "pga-tour/119/2023": {
+  "bytes": 391089,
+  "file": "pga_119_2023.html",
+  "http": 200,
+  "sha256": "411f51fae09b58ba8aa697dc7991eb29fb5b2ec91f13eba1b880f347bea01dad",
+  "url": "https://datagolf.com/past-results/pga-tour/119/2023"
+ },
+ "pga-tour/119/2024": {
+  "bytes": 391089,
+  "file": "pga_119_2024.html",
+  "http": 200,
+  "sha256": "37a0b98f8c61b4ac252136d1afa7d0f73c9cf104e577f1a70d11ac5ad65254e7",
+  "url": "https://datagolf.com/past-results/pga-tour/119/2024"
+ },
+ "pga-tour/119/2025": {
+  "bytes": 391089,
+  "file": "pga_119_2025.html",
+  "http": 200,
+  "sha256": "543b85c38c48ca01c8b9e095be7113d3a08ac031686bef99485d453251802fe2",
+  "url": "https://datagolf.com/past-results/pga-tour/119/2025"
+ },
+ "pga-tour/12/2020": {
+  "bytes": 422906,
+  "file": "pga_12_2020.html",
+  "http": 200,
+  "sha256": "02d7b4a400b405a6ed2ea156c56cfa5539bc2fb2c0e574da7253b302d27f6a76",
+  "url": "https://datagolf.com/past-results/pga-tour/12/2020"
+ },
+ "pga-tour/12/2021": {
+  "bytes": 411685,
+  "file": "pga_12_2021.html",
+  "http": 200,
+  "sha256": "71165601cea60055d75c2bb0cadd467a1c4f38baa75d83d4fe9cf46f11021ced",
+  "url": "https://datagolf.com/past-results/pga-tour/12/2021"
+ },
+ "pga-tour/12/2022": {
+  "bytes": 411337,
+  "file": "pga_12_2022.html",
+  "http": 200,
+  "sha256": "556c86ec5bed22a633177f2215d0686e0ec75c072718114fab8b19a7f3af8120",
+  "url": "https://datagolf.com/past-results/pga-tour/12/2022"
+ },
+ "pga-tour/12/2023": {
+  "bytes": 418220,
+  "file": "pga_12_2023.html",
+  "http": 200,
+  "sha256": "5a49207cd3d9ec80fd8f19ac66947d48713740d46e9a9ae831c0840230fa24c1",
+  "url": "https://datagolf.com/past-results/pga-tour/12/2023"
+ },
+ "pga-tour/12/2024": {
+  "bytes": 373032,
+  "file": "pga_12_2024.html",
+  "http": 200,
+  "sha256": "96e0f30b8ed207119ef1bb8e3ecc669752bb7b4acc23d637632337ff8701c197",
+  "url": "https://datagolf.com/past-results/pga-tour/12/2024"
+ },
+ "pga-tour/12/2025": {
+  "bytes": 375156,
+  "file": "pga_12_2025.html",
+  "http": 200,
+  "sha256": "d4d0db500a5fb33e08f39220f942aa706c8c925c89e5a97f3b797f3f875ddc00",
+  "url": "https://datagolf.com/past-results/pga-tour/12/2025"
+ },
+ "pga-tour/120/2020": {
+  "bytes": 391089,
+  "file": "pga_120_2020.html",
+  "http": 200,
+  "sha256": "156728819f06185b01f8a40483b7b1d39878b97c5243f58ece1265e98cee5ac2",
+  "url": "https://datagolf.com/past-results/pga-tour/120/2020"
+ },
+ "pga-tour/120/2021": {
+  "bytes": 391089,
+  "file": "pga_120_2021.html",
+  "http": 200,
+  "sha256": "5f93e789a3ee8bc14e8fbee9bdd757e11daa6a6dcd40de373f41030d3dd7b1fd",
+  "url": "https://datagolf.com/past-results/pga-tour/120/2021"
+ },
+ "pga-tour/120/2022": {
+  "bytes": 391089,
+  "file": "pga_120_2022.html",
+  "http": 200,
+  "sha256": "1b5a4df9a556989fdc838230dc478c314770cead2268d415d34edaf169a147a0",
+  "url": "https://datagolf.com/past-results/pga-tour/120/2022"
+ },
+ "pga-tour/120/2023": {
+  "bytes": 391089,
+  "file": "pga_120_2023.html",
+  "http": 200,
+  "sha256": "41e741995aa4f8632e92f64d6da1ec7fb7012b685b9df78cb4a2eb8d61cf18a4",
+  "url": "https://datagolf.com/past-results/pga-tour/120/2023"
+ },
+ "pga-tour/120/2024": {
+  "bytes": 391089,
+  "file": "pga_120_2024.html",
+  "http": 200,
+  "sha256": "c754f0f49cf240f32090aa2fe44ae30498451460a93be878cc9c6778b9c1d3c7",
+  "url": "https://datagolf.com/past-results/pga-tour/120/2024"
+ },
+ "pga-tour/120/2025": {
+  "bytes": 391089,
+  "file": "pga_120_2025.html",
+  "http": 200,
+  "sha256": "17a43786ace5dc8467e8258d68fcf9801266b99b9d3f8c16364a91d8ee6d0a15",
+  "url": "https://datagolf.com/past-results/pga-tour/120/2025"
+ },
+ "pga-tour/121/2020": {
+  "bytes": 391089,
+  "file": "pga_121_2020.html",
+  "http": 200,
+  "sha256": "cefccb658731625148dd299af68eb1589f1bee8512a942c850b289563e7b0a12",
+  "url": "https://datagolf.com/past-results/pga-tour/121/2020"
+ },
+ "pga-tour/121/2021": {
+  "bytes": 391089,
+  "file": "pga_121_2021.html",
+  "http": 200,
+  "sha256": "26259ac14b402c35dae7d1be78350df534e6d0d6d144415d7900ea350baafe67",
+  "url": "https://datagolf.com/past-results/pga-tour/121/2021"
+ },
+ "pga-tour/121/2022": {
+  "bytes": 391089,
+  "file": "pga_121_2022.html",
+  "http": 200,
+  "sha256": "5ea9a416ecd2483a94455d7433fc32bf58b1dc5ea352342bcde1b82824ea56b2",
+  "url": "https://datagolf.com/past-results/pga-tour/121/2022"
+ },
+ "pga-tour/121/2023": {
+  "bytes": 391089,
+  "file": "pga_121_2023.html",
+  "http": 200,
+  "sha256": "000683cd099da28157e5a9914922ff0ac370a7bcafee80e8acde6ff2d607084f",
+  "url": "https://datagolf.com/past-results/pga-tour/121/2023"
+ },
+ "pga-tour/121/2024": {
+  "bytes": 391089,
+  "file": "pga_121_2024.html",
+  "http": 200,
+  "sha256": "1cbf4b56e79743a05d90de7aa101a4be4fc956762cacad43a5ab7d7246bfb38c",
+  "url": "https://datagolf.com/past-results/pga-tour/121/2024"
+ },
+ "pga-tour/121/2025": {
+  "bytes": 391089,
+  "file": "pga_121_2025.html",
+  "http": 200,
+  "sha256": "24a4acbbe6fd4b244a964786669fd4dea391b4455ea091b6a3c4613c4eb3544c",
+  "url": "https://datagolf.com/past-results/pga-tour/121/2025"
+ },
+ "pga-tour/122/2020": {
+  "bytes": 391089,
+  "file": "pga_122_2020.html",
+  "http": 200,
+  "sha256": "8c7bfa815aff4965fb8e5ed3428f9a21f0b5dda2d7a0bfb0d3dbf6cc7a6e2500",
+  "url": "https://datagolf.com/past-results/pga-tour/122/2020"
+ },
+ "pga-tour/122/2021": {
+  "bytes": 391089,
+  "file": "pga_122_2021.html",
+  "http": 200,
+  "sha256": "ba119366b95eb1b669189db9b213ad5f10e33d16270e509715a1b57083609cf0",
+  "url": "https://datagolf.com/past-results/pga-tour/122/2021"
+ },
+ "pga-tour/122/2022": {
+  "bytes": 391089,
+  "file": "pga_122_2022.html",
+  "http": 200,
+  "sha256": "84f22d3d335d9595290417c5ea6c9cdd27b90e24b91e02ee739dbd6db7867dce",
+  "url": "https://datagolf.com/past-results/pga-tour/122/2022"
+ },
+ "pga-tour/122/2023": {
+  "bytes": 391089,
+  "file": "pga_122_2023.html",
+  "http": 200,
+  "sha256": "0936c59060e09f5c57b56ec871389922e0c264cf315f66c37aa4bfbf90abcf62",
+  "url": "https://datagolf.com/past-results/pga-tour/122/2023"
+ },
+ "pga-tour/122/2024": {
+  "bytes": 391089,
+  "file": "pga_122_2024.html",
+  "http": 200,
+  "sha256": "c74db524fc629d00a3ae94bf1f3534d14fb9a1cf29e653754fcf1b1a800f753b",
+  "url": "https://datagolf.com/past-results/pga-tour/122/2024"
+ },
+ "pga-tour/122/2025": {
+  "bytes": 391089,
+  "file": "pga_122_2025.html",
+  "http": 200,
+  "sha256": "7655ad86023f8bdb7774576b628f07d09752b7e3d5d65edc82db2caffb11de4a",
+  "url": "https://datagolf.com/past-results/pga-tour/122/2025"
+ },
+ "pga-tour/123/2020": {
+  "bytes": 391089,
+  "file": "pga_123_2020.html",
+  "http": 200,
+  "sha256": "f5ae5df4eaca2f877713afcd6687419c96b899ead4543af63b848e3062de53de",
+  "url": "https://datagolf.com/past-results/pga-tour/123/2020"
+ },
+ "pga-tour/123/2021": {
+  "bytes": 391089,
+  "file": "pga_123_2021.html",
+  "http": 200,
+  "sha256": "db0d0f5d246e9a078b101414c8c2f69b2c48bb3c681aa180bc409f735b76d34a",
+  "url": "https://datagolf.com/past-results/pga-tour/123/2021"
+ },
+ "pga-tour/123/2022": {
+  "bytes": 391089,
+  "file": "pga_123_2022.html",
+  "http": 200,
+  "sha256": "9fa6a0f4f65be63381cc30dee21891c4fcd0fe58f2b4003ec8039fb803513617",
+  "url": "https://datagolf.com/past-results/pga-tour/123/2022"
+ },
+ "pga-tour/123/2023": {
+  "bytes": 391089,
+  "file": "pga_123_2023.html",
+  "http": 200,
+  "sha256": "59356a759d77294c6e9dfa8e88f01a0c618aa48bd225ba27ec0ea2dd13a0e4cd",
+  "url": "https://datagolf.com/past-results/pga-tour/123/2023"
+ },
+ "pga-tour/123/2024": {
+  "bytes": 391089,
+  "file": "pga_123_2024.html",
+  "http": 200,
+  "sha256": "5737b92bdc5ce9358edf1b6ee899da3e111885083af67a79b4d6b52e0ee1eed1",
+  "url": "https://datagolf.com/past-results/pga-tour/123/2024"
+ },
+ "pga-tour/123/2025": {
+  "bytes": 391089,
+  "file": "pga_123_2025.html",
+  "http": 200,
+  "sha256": "aa93c12e6a023fe3374052a3eae0849e282d869b3e5b8a706fde6f15a6be0a58",
+  "url": "https://datagolf.com/past-results/pga-tour/123/2025"
+ },
+ "pga-tour/124/2020": {
+  "bytes": 391089,
+  "file": "pga_124_2020.html",
+  "http": 200,
+  "sha256": "cbb0efb2d754d97ddc71fd80613f13b15579a5aaec609dae31712f4c8b3b9abd",
+  "url": "https://datagolf.com/past-results/pga-tour/124/2020"
+ },
+ "pga-tour/124/2021": {
+  "bytes": 391089,
+  "file": "pga_124_2021.html",
+  "http": 200,
+  "sha256": "9d78240fff448ab2d51757f1f4ea921ec597fcf650ba3f5b517e31a3507e40f2",
+  "url": "https://datagolf.com/past-results/pga-tour/124/2021"
+ },
+ "pga-tour/124/2022": {
+  "bytes": 391089,
+  "file": "pga_124_2022.html",
+  "http": 200,
+  "sha256": "5e4dc170804325c293654eb83ceb5254255694384ea550117d98891ceb89e7fa",
+  "url": "https://datagolf.com/past-results/pga-tour/124/2022"
+ },
+ "pga-tour/124/2023": {
+  "bytes": 391089,
+  "file": "pga_124_2023.html",
+  "http": 200,
+  "sha256": "df3bfb4a48d57888af23b0585630a9385e5765dd6f451c462241ee6eb60eb015",
+  "url": "https://datagolf.com/past-results/pga-tour/124/2023"
+ },
+ "pga-tour/124/2024": {
+  "bytes": 391089,
+  "file": "pga_124_2024.html",
+  "http": 200,
+  "sha256": "4423488b7279bcf60a65ab50f8a7b0ee94889b2e76df8c4e4980d774f89d378c",
+  "url": "https://datagolf.com/past-results/pga-tour/124/2024"
+ },
+ "pga-tour/124/2025": {
+  "bytes": 391089,
+  "file": "pga_124_2025.html",
+  "http": 200,
+  "sha256": "0b36ab1de0694b0eafed7fe9c9962cfadf05f521a2714ef4bba50f66d445faa1",
+  "url": "https://datagolf.com/past-results/pga-tour/124/2025"
+ },
+ "pga-tour/125/2020": {
+  "bytes": 391089,
+  "file": "pga_125_2020.html",
+  "http": 200,
+  "sha256": "5353e459cc8e17fc3364cb8eb276a093e1c8059601a77a6b47adae49b557fb07",
+  "url": "https://datagolf.com/past-results/pga-tour/125/2020"
+ },
+ "pga-tour/125/2021": {
+  "bytes": 391089,
+  "file": "pga_125_2021.html",
+  "http": 200,
+  "sha256": "a637c77d0bb025fc1bda48af231063b8e6836408836d8bb5bb63ac6074c56787",
+  "url": "https://datagolf.com/past-results/pga-tour/125/2021"
+ },
+ "pga-tour/125/2022": {
+  "bytes": 391089,
+  "file": "pga_125_2022.html",
+  "http": 200,
+  "sha256": "c0d02fdc25e857e9ff72cd8b8b3a2788780e38e9bd031bfb9e4c99205d17bcfc",
+  "url": "https://datagolf.com/past-results/pga-tour/125/2022"
+ },
+ "pga-tour/125/2023": {
+  "bytes": 391089,
+  "file": "pga_125_2023.html",
+  "http": 200,
+  "sha256": "2f4a33d0e84542f9d1cdc8aeab67352310780b580814e9d274ccd97d74cb3179",
+  "url": "https://datagolf.com/past-results/pga-tour/125/2023"
+ },
+ "pga-tour/125/2024": {
+  "bytes": 391089,
+  "file": "pga_125_2024.html",
+  "http": 200,
+  "sha256": "5a778c1c08340b81e5b2c9240273a8fe22a485eb5d902af94acaf22f03197b3f",
+  "url": "https://datagolf.com/past-results/pga-tour/125/2024"
+ },
+ "pga-tour/125/2025": {
+  "bytes": 391089,
+  "file": "pga_125_2025.html",
+  "http": 200,
+  "sha256": "bab96dc5f0be5d2f55d3ddc35da0c5b0cc065475adb553b0f1a77c95123c3c9b",
+  "url": "https://datagolf.com/past-results/pga-tour/125/2025"
+ },
+ "pga-tour/126/2020": {
+  "bytes": 391089,
+  "file": "pga_126_2020.html",
+  "http": 200,
+  "sha256": "a1c92eb83bd82b91e7a70baf051ac5bdc947dc3ebce793c953a4e582f7bc780a",
+  "url": "https://datagolf.com/past-results/pga-tour/126/2020"
+ },
+ "pga-tour/126/2021": {
+  "bytes": 391089,
+  "file": "pga_126_2021.html",
+  "http": 200,
+  "sha256": "8eb4af1262402fe22a4d75c986c6ae0e0db205dba5a01df63f3846088ba2c45d",
+  "url": "https://datagolf.com/past-results/pga-tour/126/2021"
+ },
+ "pga-tour/126/2022": {
+  "bytes": 391089,
+  "file": "pga_126_2022.html",
+  "http": 200,
+  "sha256": "9a4c553c25f9bb3e193445b0d062098812fe65e3065982356ffdeb04afbdf006",
+  "url": "https://datagolf.com/past-results/pga-tour/126/2022"
+ },
+ "pga-tour/126/2023": {
+  "bytes": 391089,
+  "file": "pga_126_2023.html",
+  "http": 200,
+  "sha256": "e6eb6fe778515bd118975e46900c7800fab36ecab01450cbdabdf4672ad7ccc9",
+  "url": "https://datagolf.com/past-results/pga-tour/126/2023"
+ },
+ "pga-tour/126/2024": {
+  "bytes": 391089,
+  "file": "pga_126_2024.html",
+  "http": 200,
+  "sha256": "e91ea6e4df3a2233bfade1b08763d3ac6d85c92e982b9f0929e2d4f6b7f45fa9",
+  "url": "https://datagolf.com/past-results/pga-tour/126/2024"
+ },
+ "pga-tour/126/2025": {
+  "bytes": 391089,
+  "file": "pga_126_2025.html",
+  "http": 200,
+  "sha256": "008c4e77ba5a2c694f229c9888cb9c5f90f4fe14d47ec39c6d14446f2595a0f3",
+  "url": "https://datagolf.com/past-results/pga-tour/126/2025"
+ },
+ "pga-tour/127/2020": {
+  "bytes": 391089,
+  "file": "pga_127_2020.html",
+  "http": 200,
+  "sha256": "4b44ee10a1df4e3f9cbcc87da12d9560e5400cd1a05ce6acbf29a56bf3ba569d",
+  "url": "https://datagolf.com/past-results/pga-tour/127/2020"
+ },
+ "pga-tour/127/2021": {
+  "bytes": 391089,
+  "file": "pga_127_2021.html",
+  "http": 200,
+  "sha256": "7de661abc70060b642304bae1ba3b803cdc32610235b821163eabccd40742206",
+  "url": "https://datagolf.com/past-results/pga-tour/127/2021"
+ },
+ "pga-tour/127/2022": {
+  "bytes": 391089,
+  "file": "pga_127_2022.html",
+  "http": 200,
+  "sha256": "f4b283ffbb96905c407d82cb1e7f675631985b8dd118d47cb7f84982e613e340",
+  "url": "https://datagolf.com/past-results/pga-tour/127/2022"
+ },
+ "pga-tour/127/2023": {
+  "bytes": 391089,
+  "file": "pga_127_2023.html",
+  "http": 200,
+  "sha256": "a2375bc1a0a946fd55958913f3b64e4714493d5f8f04be5cc6477bc0d8da74ba",
+  "url": "https://datagolf.com/past-results/pga-tour/127/2023"
+ },
+ "pga-tour/127/2024": {
+  "bytes": 391089,
+  "file": "pga_127_2024.html",
+  "http": 200,
+  "sha256": "6befabb44a467ff038fdd5704c430d77e665edae5aa1cefbda23c0d012563748",
+  "url": "https://datagolf.com/past-results/pga-tour/127/2024"
+ },
+ "pga-tour/127/2025": {
+  "bytes": 391089,
+  "file": "pga_127_2025.html",
+  "http": 200,
+  "sha256": "d690ffd13a2119577350950f9fe7c26398f0ed0c165a488f704c6b3c710f15a8",
+  "url": "https://datagolf.com/past-results/pga-tour/127/2025"
+ },
+ "pga-tour/128/2020": {
+  "bytes": 391089,
+  "file": "pga_128_2020.html",
+  "http": 200,
+  "sha256": "6e72d5d42492ad318d909477e83d031ce3208d5ee7356bfefa7b64930e8b6765",
+  "url": "https://datagolf.com/past-results/pga-tour/128/2020"
+ },
+ "pga-tour/128/2021": {
+  "bytes": 391089,
+  "file": "pga_128_2021.html",
+  "http": 200,
+  "sha256": "f6ce71915db50d29deef8d07ee6ab2880066b8beb16a1e38ad0babd4c70092f3",
+  "url": "https://datagolf.com/past-results/pga-tour/128/2021"
+ },
+ "pga-tour/128/2022": {
+  "bytes": 391089,
+  "file": "pga_128_2022.html",
+  "http": 200,
+  "sha256": "6ce96ed3c294544f905dfb22a1254bd5ac1dde3d360d1f678e3171c58d624c74",
+  "url": "https://datagolf.com/past-results/pga-tour/128/2022"
+ },
+ "pga-tour/128/2023": {
+  "bytes": 391089,
+  "file": "pga_128_2023.html",
+  "http": 200,
+  "sha256": "5326b83da17add410f25b87f2e3a15e3d9425a34ecc4aea69727b0e7fe4b40b2",
+  "url": "https://datagolf.com/past-results/pga-tour/128/2023"
+ },
+ "pga-tour/128/2024": {
+  "bytes": 391089,
+  "file": "pga_128_2024.html",
+  "http": 200,
+  "sha256": "56147d6e0dd6e942a6fb5e9bc613ad66980223cc2dbd6614437439ab231bb26d",
+  "url": "https://datagolf.com/past-results/pga-tour/128/2024"
+ },
+ "pga-tour/128/2025": {
+  "bytes": 391089,
+  "file": "pga_128_2025.html",
+  "http": 200,
+  "sha256": "c5421b28a6e381fba0988853190cc8b4fd7de37b2a5a67e21e2a087d22d7ec19",
+  "url": "https://datagolf.com/past-results/pga-tour/128/2025"
+ },
+ "pga-tour/129/2020": {
+  "bytes": 391089,
+  "file": "pga_129_2020.html",
+  "http": 200,
+  "sha256": "953918ee4bc82875a80b4970384279e2552a50789c0a6e488c77c39786760cdb",
+  "url": "https://datagolf.com/past-results/pga-tour/129/2020"
+ },
+ "pga-tour/129/2021": {
+  "bytes": 391089,
+  "file": "pga_129_2021.html",
+  "http": 200,
+  "sha256": "5bb009a69984a289449b5441dfa81d3fe55c5417573fee3b409a9195dd5a304a",
+  "url": "https://datagolf.com/past-results/pga-tour/129/2021"
+ },
+ "pga-tour/129/2022": {
+  "bytes": 391089,
+  "file": "pga_129_2022.html",
+  "http": 200,
+  "sha256": "9b857fd362dc19951296b8ddfb08da3510922c19ab9c559ff4e2fe80db51b30f",
+  "url": "https://datagolf.com/past-results/pga-tour/129/2022"
+ },
+ "pga-tour/129/2023": {
+  "bytes": 391089,
+  "file": "pga_129_2023.html",
+  "http": 200,
+  "sha256": "17f51303bf67a3a45cc6b31f413c522ebbafc62f119c73bc2c2d1164e5ef57f1",
+  "url": "https://datagolf.com/past-results/pga-tour/129/2023"
+ },
+ "pga-tour/129/2024": {
+  "bytes": 391089,
+  "file": "pga_129_2024.html",
+  "http": 200,
+  "sha256": "60f3b9c25224f4c6fd7d4f0745a2b6ad6935abddc56fbcac8137f96243e482ed",
+  "url": "https://datagolf.com/past-results/pga-tour/129/2024"
+ },
+ "pga-tour/129/2025": {
+  "bytes": 391089,
+  "file": "pga_129_2025.html",
+  "http": 200,
+  "sha256": "c86c852a1c9b7e2c1489aa24448ed9b9964eb4d857538f36b7107e230ec7fc6e",
+  "url": "https://datagolf.com/past-results/pga-tour/129/2025"
+ },
+ "pga-tour/13/2020": {
+  "bytes": 426822,
+  "file": "pga_13_2020.html",
+  "http": 200,
+  "sha256": "ea83d1f7613017355256b4a3ade35c94adf0b470e74e193d0edcea6e53025bb2",
+  "url": "https://datagolf.com/past-results/pga-tour/13/2020"
+ },
+ "pga-tour/13/2021": {
+  "bytes": 429279,
+  "file": "pga_13_2021.html",
+  "http": 200,
+  "sha256": "ba500ca92c2a98f2126ec71e01049a41d345e2223c62f6462841dca8883fbf6e",
+  "url": "https://datagolf.com/past-results/pga-tour/13/2021"
+ },
+ "pga-tour/13/2022": {
+  "bytes": 428818,
+  "file": "pga_13_2022.html",
+  "http": 200,
+  "sha256": "fa145f2b06b3d3d4c399bf748d53f989a9a5e588bace9848fec339f153150a5a",
+  "url": "https://datagolf.com/past-results/pga-tour/13/2022"
+ },
+ "pga-tour/13/2023": {
+  "bytes": 427678,
+  "file": "pga_13_2023.html",
+  "http": 200,
+  "sha256": "e14fc9cb4bac010b0af9a26fb99669bd330860b9fdd5e5e929004234614766a2",
+  "url": "https://datagolf.com/past-results/pga-tour/13/2023"
+ },
+ "pga-tour/13/2024": {
+  "bytes": 426949,
+  "file": "pga_13_2024.html",
+  "http": 200,
+  "sha256": "cdf16f1f7c77067d1c8d60e78ffb973cf8f6aac36b4d266e0f08d309711c7b98",
+  "url": "https://datagolf.com/past-results/pga-tour/13/2024"
+ },
+ "pga-tour/13/2025": {
+  "bytes": 427217,
+  "file": "pga_13_2025.html",
+  "http": 200,
+  "sha256": "324e21dc4bf35519e645258b2aa343e64c7a1684ffcfb07406178c026bc1d2b3",
+  "url": "https://datagolf.com/past-results/pga-tour/13/2025"
+ },
+ "pga-tour/130/2020": {
+  "bytes": 391089,
+  "file": "pga_130_2020.html",
+  "http": 200,
+  "sha256": "e81ce53d14c49d708f1ead9e3614b4a4afe28da1d8335e456ff3e43e6fc6cbbf",
+  "url": "https://datagolf.com/past-results/pga-tour/130/2020"
+ },
+ "pga-tour/130/2021": {
+  "bytes": 391089,
+  "file": "pga_130_2021.html",
+  "http": 200,
+  "sha256": "d8a190f07b969b802313b1cf191372b58e9065a09d2fc9a5300792f2ef08e8ec",
+  "url": "https://datagolf.com/past-results/pga-tour/130/2021"
+ },
+ "pga-tour/130/2022": {
+  "bytes": 391089,
+  "file": "pga_130_2022.html",
+  "http": 200,
+  "sha256": "5cb5bb484834c726bc7d30056a4621fa48c9153242bd5b089406d8c40f40bc75",
+  "url": "https://datagolf.com/past-results/pga-tour/130/2022"
+ },
+ "pga-tour/130/2023": {
+  "bytes": 391089,
+  "file": "pga_130_2023.html",
+  "http": 200,
+  "sha256": "df9dba70b6f4c3b781d2e7b914159a9217284b98a1f3b2f6f906b5fd3a94a17c",
+  "url": "https://datagolf.com/past-results/pga-tour/130/2023"
+ },
+ "pga-tour/130/2024": {
+  "bytes": 391089,
+  "file": "pga_130_2024.html",
+  "http": 200,
+  "sha256": "c8476692ff4da033ce779220935f5be9bdcb0e469d1305ff124e7b302e2400ea",
+  "url": "https://datagolf.com/past-results/pga-tour/130/2024"
+ },
+ "pga-tour/130/2025": {
+  "bytes": 391089,
+  "file": "pga_130_2025.html",
+  "http": 200,
+  "sha256": "5d5b039a0a1b66451ea84ee8f0affc80170be29821b662a55786f0444e335acf",
+  "url": "https://datagolf.com/past-results/pga-tour/130/2025"
+ },
+ "pga-tour/14/2020": {
+  "bytes": 393885,
+  "file": "pga_14_2020.html",
+  "http": 200,
+  "sha256": "f436853537e8fd355889c00d13e4ab974f10d4c1d3f13f132aea235b2eb2140b",
+  "url": "https://datagolf.com/past-results/pga-tour/14/2020"
+ },
+ "pga-tour/14/2021": {
+  "bytes": 390623,
+  "file": "pga_14_2021.html",
+  "http": 200,
+  "sha256": "98857ad735423c2587bf0b3548c3670768d549f99400c65733cf926b13500dac",
+  "url": "https://datagolf.com/past-results/pga-tour/14/2021"
+ },
+ "pga-tour/14/2022": {
+  "bytes": 391879,
+  "file": "pga_14_2022.html",
+  "http": 200,
+  "sha256": "33241cb9205d4fc29fc3bc466f6b153e2445d3377a07c68ed61556ea1dc7b7a0",
+  "url": "https://datagolf.com/past-results/pga-tour/14/2022"
+ },
+ "pga-tour/14/2023": {
+  "bytes": 389310,
+  "file": "pga_14_2023.html",
+  "http": 200,
+  "sha256": "7040f3b70146244ca9cf1e7cf0772657e70d5f553b1129fe0464ddb0a1c45fbf",
+  "url": "https://datagolf.com/past-results/pga-tour/14/2023"
+ },
+ "pga-tour/14/2024": {
+  "bytes": 392346,
+  "file": "pga_14_2024.html",
+  "http": 200,
+  "sha256": "08c736eaa3d914f5932af4144bbacd57bf30f49ae71f517f3e7baee0377247c4",
+  "url": "https://datagolf.com/past-results/pga-tour/14/2024"
+ },
+ "pga-tour/14/2025": {
+  "bytes": 395485,
+  "file": "pga_14_2025.html",
+  "http": 200,
+  "sha256": "b94d4db9652a0ee755d34cef6b842bf341e8fe7a342b077cdd82e990def86d47",
+  "url": "https://datagolf.com/past-results/pga-tour/14/2025"
+ },
+ "pga-tour/15/2020": {
+  "bytes": 391087,
+  "file": "pga_15_2020.html",
+  "http": 200,
+  "sha256": "b5ff371a73473d6e604aeb3b248fd2f526496d4f5f2a1b8ce6a90b61dcb2410c",
+  "url": "https://datagolf.com/past-results/pga-tour/15/2020"
+ },
+ "pga-tour/15/2021": {
+  "bytes": 391087,
+  "file": "pga_15_2021.html",
+  "http": 200,
+  "sha256": "ee0a2678a38824c7edd0da2f783f2424909acb9f042684caef41837463a2529f",
+  "url": "https://datagolf.com/past-results/pga-tour/15/2021"
+ },
+ "pga-tour/15/2022": {
+  "bytes": 391087,
+  "file": "pga_15_2022.html",
+  "http": 200,
+  "sha256": "a477c10f8f55e7f6eff9fb1c9c707d4d33389fb83ed2e4dc534890c8ee79aea7",
+  "url": "https://datagolf.com/past-results/pga-tour/15/2022"
+ },
+ "pga-tour/15/2023": {
+  "bytes": 391087,
+  "file": "pga_15_2023.html",
+  "http": 200,
+  "sha256": "07509507593fbddf4f2c02cd04a1ee19796a537fc3862ea9517bf749b80f1ace",
+  "url": "https://datagolf.com/past-results/pga-tour/15/2023"
+ },
+ "pga-tour/15/2024": {
+  "bytes": 391087,
+  "file": "pga_15_2024.html",
+  "http": 200,
+  "sha256": "f3ff1bb6a9fc172165adf970820cd55ed42620a2cf19a62b42ebc8515f2d2f1b",
+  "url": "https://datagolf.com/past-results/pga-tour/15/2024"
+ },
+ "pga-tour/15/2025": {
+  "bytes": 391087,
+  "file": "pga_15_2025.html",
+  "http": 200,
+  "sha256": "7469e0c80a819e0e17a33f7a8570050e3be717a71010fd4150b208a4a925bea6",
+  "url": "https://datagolf.com/past-results/pga-tour/15/2025"
+ },
+ "pga-tour/16/2020": {
+  "bytes": 347897,
+  "file": "pga_16_2020.html",
+  "http": 200,
+  "sha256": "9d69f4e8e88190467d089a1c40fa04d0fe8f9af8340325045c027d6b481aeb2d",
+  "url": "https://datagolf.com/past-results/pga-tour/16/2020"
+ },
+ "pga-tour/16/2021": {
+  "bytes": 353725,
+  "file": "pga_16_2021.html",
+  "http": 200,
+  "sha256": "17e9f89de3394e91a5b6b1719350110d01721a0a4fe5cd0f3b7b6b53ca8b999c",
+  "url": "https://datagolf.com/past-results/pga-tour/16/2021"
+ },
+ "pga-tour/16/2022": {
+  "bytes": 350986,
+  "file": "pga_16_2022.html",
+  "http": 200,
+  "sha256": "68332371dca4f8351cdd87e11094821f148811ede63c2bc7c9dc7dcfd22f8e36",
+  "url": "https://datagolf.com/past-results/pga-tour/16/2022"
+ },
+ "pga-tour/16/2023": {
+  "bytes": 351479,
+  "file": "pga_16_2023.html",
+  "http": 200,
+  "sha256": "98f1e0af6ab25ba2876770431602497548b275af1dad58eb3005c9cc950778b4",
+  "url": "https://datagolf.com/past-results/pga-tour/16/2023"
+ },
+ "pga-tour/16/2024": {
+  "bytes": 366045,
+  "file": "pga_16_2024.html",
+  "http": 200,
+  "sha256": "c1f6383ce43c212dbb924786eab11cf484c82228636746a65d4495738ccf7437",
+  "url": "https://datagolf.com/past-results/pga-tour/16/2024"
+ },
+ "pga-tour/16/2025": {
+  "bytes": 365682,
+  "file": "pga_16_2025.html",
+  "http": 200,
+  "sha256": "1d9b69fa60859d91c275256706e3fd2aa8beba6280cdf12536b2ddb0f6dd199e",
+  "url": "https://datagolf.com/past-results/pga-tour/16/2025"
+ },
+ "pga-tour/17/2020": {
+  "bytes": 391087,
+  "file": "pga_17_2020.html",
+  "http": 200,
+  "sha256": "b53f1c02501449aaea5a2272ee4f2cb34b8a745d0a15012a574ee5729284ce6b",
+  "url": "https://datagolf.com/past-results/pga-tour/17/2020"
+ },
+ "pga-tour/17/2021": {
+  "bytes": 391087,
+  "file": "pga_17_2021.html",
+  "http": 200,
+  "sha256": "9ae9a4fef9b1420899b202d24cead9100cdc0168d6444f1adfd265660eddd81b",
+  "url": "https://datagolf.com/past-results/pga-tour/17/2021"
+ },
+ "pga-tour/17/2022": {
+  "bytes": 391087,
+  "file": "pga_17_2022.html",
+  "http": 200,
+  "sha256": "b03d995b7764a1642140b5314fd135b0efd910c4a6dcabf8d4d22057d30d436c",
+  "url": "https://datagolf.com/past-results/pga-tour/17/2022"
+ },
+ "pga-tour/17/2023": {
+  "bytes": 391087,
+  "file": "pga_17_2023.html",
+  "http": 200,
+  "sha256": "1618344d2146d85d940e74380450ed40d9e76e6e9dcb70c0b3b85870656f1895",
+  "url": "https://datagolf.com/past-results/pga-tour/17/2023"
+ },
+ "pga-tour/17/2024": {
+  "bytes": 391087,
+  "file": "pga_17_2024.html",
+  "http": 200,
+  "sha256": "729cc9c20decdb670106973dd7c6010b6784ad7518e28baec0de75303ee5bfbe",
+  "url": "https://datagolf.com/past-results/pga-tour/17/2024"
+ },
+ "pga-tour/17/2025": {
+  "bytes": 391087,
+  "file": "pga_17_2025.html",
+  "http": 200,
+  "sha256": "a671a2033aa499189e41be64feab8592c4dd79881a7686946305268690736bdf",
+  "url": "https://datagolf.com/past-results/pga-tour/17/2025"
+ },
+ "pga-tour/18/2020": {
+  "bytes": 391087,
+  "file": "pga_18_2020.html",
+  "http": 200,
+  "sha256": "5ef97c50a78a28c6ceff7eef0689a2dfbacc8406e4ca057396e6c0a2aa6cafa0",
+  "url": "https://datagolf.com/past-results/pga-tour/18/2020"
+ },
+ "pga-tour/18/2021": {
+  "bytes": 391087,
+  "file": "pga_18_2021.html",
+  "http": 200,
+  "sha256": "38d3f251006e27b3c40bb8644e77b49b22a44b22ca7ea9be1db1aa149e1b04f8",
+  "url": "https://datagolf.com/past-results/pga-tour/18/2021"
+ },
+ "pga-tour/18/2022": {
+  "bytes": 391087,
+  "file": "pga_18_2022.html",
+  "http": 200,
+  "sha256": "4a248c8d93575da226fdf145854247ad32cd512fad14b159367d91b6d39311f8",
+  "url": "https://datagolf.com/past-results/pga-tour/18/2022"
+ },
+ "pga-tour/18/2023": {
+  "bytes": 391087,
+  "file": "pga_18_2023.html",
+  "http": 200,
+  "sha256": "a31ca359cf1415b32920b8477ca3bb8bbd25a68ff0aa0a6e2340407e42db1aee",
+  "url": "https://datagolf.com/past-results/pga-tour/18/2023"
+ },
+ "pga-tour/18/2024": {
+  "bytes": 391087,
+  "file": "pga_18_2024.html",
+  "http": 200,
+  "sha256": "09d451790a489d028dd721f3eae75f84d4ab9f66d9ba76db570be24c775b177e",
+  "url": "https://datagolf.com/past-results/pga-tour/18/2024"
+ },
+ "pga-tour/18/2025": {
+  "bytes": 391087,
+  "file": "pga_18_2025.html",
+  "http": 200,
+  "sha256": "27cc8e561a2f8306611598d2e863b189e8e69766a70902f94863c6d850b4037e",
+  "url": "https://datagolf.com/past-results/pga-tour/18/2025"
+ },
+ "pga-tour/19/2020": {
+  "bytes": 421383,
+  "file": "pga_19_2020.html",
+  "http": 200,
+  "sha256": "ecde2eece837a8bcf8d32ac7535730a7407bfdd728a88e9b09ee15a9679b6a2a",
+  "url": "https://datagolf.com/past-results/pga-tour/19/2020"
+ },
+ "pga-tour/19/2021": {
+  "bytes": 428658,
+  "file": "pga_19_2021.html",
+  "http": 200,
+  "sha256": "464bcf74600dad4d038ab2fae9653e198d5fea0927a13c696dc2b823a5560c8c",
+  "url": "https://datagolf.com/past-results/pga-tour/19/2021"
+ },
+ "pga-tour/19/2022": {
+  "bytes": 429177,
+  "file": "pga_19_2022.html",
+  "http": 200,
+  "sha256": "498a0cec21eb53538a49dabf58c11555372d7c0d3e58ea98565b7ea8a5bc750d",
+  "url": "https://datagolf.com/past-results/pga-tour/19/2022"
+ },
+ "pga-tour/19/2023": {
+  "bytes": 428388,
+  "file": "pga_19_2023.html",
+  "http": 200,
+  "sha256": "1ba7fda32a8dced474b739e6310a55005387742eadce404bbdfb7413c52e9721",
+  "url": "https://datagolf.com/past-results/pga-tour/19/2023"
+ },
+ "pga-tour/19/2024": {
+  "bytes": 426992,
+  "file": "pga_19_2024.html",
+  "http": 200,
+  "sha256": "1520609182424f3f0c987582af5303fd11b8d8efe1f278a96730c00280b6e188",
+  "url": "https://datagolf.com/past-results/pga-tour/19/2024"
+ },
+ "pga-tour/19/2025": {
+  "bytes": 427234,
+  "file": "pga_19_2025.html",
+  "http": 200,
+  "sha256": "40c348365eb13a12f5a84a54c125161aa3e31be0c0246092d7783f20f404e3e7",
+  "url": "https://datagolf.com/past-results/pga-tour/19/2025"
+ },
+ "pga-tour/2/2020": {
+  "bytes": 490275,
+  "file": "pga_2_2020.html",
+  "http": 200,
+  "sha256": "7055b2292ef5ef2a8dbbfb19eb9674eee19f360550b7ee7b456b590741c74d91",
+  "url": "https://datagolf.com/past-results/pga-tour/2/2020"
+ },
+ "pga-tour/2/2021": {
+  "bytes": 453101,
+  "file": "pga_2_2021.html",
+  "http": 200,
+  "sha256": "47228d2f1c6e79a027805bcb23b53d3ec41920c6d94021230009ecf382ddd5d9",
+  "url": "https://datagolf.com/past-results/pga-tour/2/2021"
+ },
+ "pga-tour/2/2022": {
+  "bytes": 492645,
+  "file": "pga_2_2022.html",
+  "http": 200,
+  "sha256": "9707d9ad6d38688834ae76548ce7072391d560bd578991f70e28e49953784ab4",
+  "url": "https://datagolf.com/past-results/pga-tour/2/2022"
+ },
+ "pga-tour/2/2023": {
+  "bytes": 492264,
+  "file": "pga_2_2023.html",
+  "http": 200,
+  "sha256": "0023713af8ffcf107c0a63451eda50e7f863d07bea9c78142772630a7356a8e9",
+  "url": "https://datagolf.com/past-results/pga-tour/2/2023"
+ },
+ "pga-tour/2/2024": {
+  "bytes": 492737,
+  "file": "pga_2_2024.html",
+  "http": 200,
+  "sha256": "add815f912c1584a6ea904ee4986c0123203ed995dcfaf6e2d69eb2d7dd91cdc",
+  "url": "https://datagolf.com/past-results/pga-tour/2/2024"
+ },
+ "pga-tour/2/2025": {
+  "bytes": 492560,
+  "file": "pga_2_2025.html",
+  "http": 200,
+  "sha256": "e0a1ec57f797d2e36fd60f85810526e10e71846e428fec97267b46b902949028",
+  "url": "https://datagolf.com/past-results/pga-tour/2/2025"
+ },
+ "pga-tour/20/2020": {
+  "bytes": 418001,
+  "file": "pga_20_2020.html",
+  "http": 200,
+  "sha256": "b1407489d6652325344495db185431b658d9b21b2d65187aefb8b828eb93a351",
+  "url": "https://datagolf.com/past-results/pga-tour/20/2020"
+ },
+ "pga-tour/20/2021": {
+  "bytes": 410433,
+  "file": "pga_20_2021.html",
+  "http": 200,
+  "sha256": "65f3794c9a03f8365126c200e81c7512ccdba8172e5d67a5087f90b87ba33454",
+  "url": "https://datagolf.com/past-results/pga-tour/20/2021"
+ },
+ "pga-tour/20/2022": {
+  "bytes": 412131,
+  "file": "pga_20_2022.html",
+  "http": 200,
+  "sha256": "53c5dd6e6542671ae5b97a39747cd4e18fd7fcda03e2866d93c3815fa42b7c48",
+  "url": "https://datagolf.com/past-results/pga-tour/20/2022"
+ },
+ "pga-tour/20/2023": {
+  "bytes": 411319,
+  "file": "pga_20_2023.html",
+  "http": 200,
+  "sha256": "e865f160fef9c5450683dc870432886d413ad3d7def9bad9c098588b2538470d",
+  "url": "https://datagolf.com/past-results/pga-tour/20/2023"
+ },
+ "pga-tour/20/2024": {
+  "bytes": 420819,
+  "file": "pga_20_2024.html",
+  "http": 200,
+  "sha256": "6ee746a763a6b4024d35d668a70ec84ac0458431bf5102f208546bdb66ba4795",
+  "url": "https://datagolf.com/past-results/pga-tour/20/2024"
+ },
+ "pga-tour/20/2025": {
+  "bytes": 425019,
+  "file": "pga_20_2025.html",
+  "http": 200,
+  "sha256": "f9633b3b1c58573335b8a57f35cc65682cb9bf4692a90b39392f93fbcf3fec5e",
+  "url": "https://datagolf.com/past-results/pga-tour/20/2025"
+ },
+ "pga-tour/21/2020": {
+  "bytes": 419783,
+  "file": "pga_21_2020.html",
+  "http": 200,
+  "sha256": "2e9b9e4ecbebe339875fa054c7445f8a93d46f87d66b9a88416e0e7b29eda0c4",
+  "url": "https://datagolf.com/past-results/pga-tour/21/2020"
+ },
+ "pga-tour/21/2021": {
+  "bytes": 406436,
+  "file": "pga_21_2021.html",
+  "http": 200,
+  "sha256": "acb79970b06d486fb9a7b9211902f70e937acad145b6291aafcef34f2b9b8be0",
+  "url": "https://datagolf.com/past-results/pga-tour/21/2021"
+ },
+ "pga-tour/21/2022": {
+  "bytes": 404322,
+  "file": "pga_21_2022.html",
+  "http": 200,
+  "sha256": "ebe394ab0dc22d18dec6f321f9bb90aad7fbf23b9aeca76df34088e5d3719f1e",
+  "url": "https://datagolf.com/past-results/pga-tour/21/2022"
+ },
+ "pga-tour/21/2023": {
+  "bytes": 404674,
+  "file": "pga_21_2023.html",
+  "http": 200,
+  "sha256": "b98119e2d64fe27ed0f3323ccf691628a02fbbdbeb27a6e346667d467833851e",
+  "url": "https://datagolf.com/past-results/pga-tour/21/2023"
+ },
+ "pga-tour/21/2024": {
+  "bytes": 411480,
+  "file": "pga_21_2024.html",
+  "http": 200,
+  "sha256": "66a6efe1bb77280cd156aa77b5b9c623a00ee44c867c6ad30d44c5756919c20c",
+  "url": "https://datagolf.com/past-results/pga-tour/21/2024"
+ },
+ "pga-tour/21/2025": {
+  "bytes": 413521,
+  "file": "pga_21_2025.html",
+  "http": 200,
+  "sha256": "db56b6b03ef0516e4474325ef03a32978340414858bfada2a8d7b32a2291804c",
+  "url": "https://datagolf.com/past-results/pga-tour/21/2025"
+ },
+ "pga-tour/22/2020": {
+  "bytes": 391087,
+  "file": "pga_22_2020.html",
+  "http": 200,
+  "sha256": "41b7697b962a8cccede7db13db345693f6ea004c94fcdd8046d1018717b84b04",
+  "url": "https://datagolf.com/past-results/pga-tour/22/2020"
+ },
+ "pga-tour/22/2021": {
+  "bytes": 391087,
+  "file": "pga_22_2021.html",
+  "http": 200,
+  "sha256": "76e64c3a3aa8ade40bfc72a305aba9cb9e549df8a9a634eb4e6571a976b8ebed",
+  "url": "https://datagolf.com/past-results/pga-tour/22/2021"
+ },
+ "pga-tour/22/2022": {
+  "bytes": 391087,
+  "file": "pga_22_2022.html",
+  "http": 200,
+  "sha256": "a8b54611e9499b411855074599c77952acb0a7fe8e049df64cd8bd41df0b29cc",
+  "url": "https://datagolf.com/past-results/pga-tour/22/2022"
+ },
+ "pga-tour/22/2023": {
+  "bytes": 391087,
+  "file": "pga_22_2023.html",
+  "http": 200,
+  "sha256": "a007fd6e4aa607b7dbd4ea079222b97ea30908c9b741c249c764eaed2102d5c3",
+  "url": "https://datagolf.com/past-results/pga-tour/22/2023"
+ },
+ "pga-tour/22/2024": {
+  "bytes": 391087,
+  "file": "pga_22_2024.html",
+  "http": 200,
+  "sha256": "30ee73602aa784db2a406cf8cdc3ee540c79097493423f8a1578dc519ed5857b",
+  "url": "https://datagolf.com/past-results/pga-tour/22/2024"
+ },
+ "pga-tour/22/2025": {
+  "bytes": 391087,
+  "file": "pga_22_2025.html",
+  "http": 200,
+  "sha256": "848ec44a6b801df2ee4e49f15ab44abbbf16bd7bbf81a8c6e7b10b1f03792677",
+  "url": "https://datagolf.com/past-results/pga-tour/22/2025"
+ },
+ "pga-tour/23/2020": {
+  "bytes": 409859,
+  "file": "pga_23_2020.html",
+  "http": 200,
+  "sha256": "fa474cb8c066b5d5d950ef6fa90e0ffbb5ff0689b817aa10814502b437833673",
+  "url": "https://datagolf.com/past-results/pga-tour/23/2020"
+ },
+ "pga-tour/23/2021": {
+  "bytes": 404848,
+  "file": "pga_23_2021.html",
+  "http": 200,
+  "sha256": "634a39fbe75c95beeb58455c4689eda230578dbfa64e7966f5d29319f2341336",
+  "url": "https://datagolf.com/past-results/pga-tour/23/2021"
+ },
+ "pga-tour/23/2022": {
+  "bytes": 403624,
+  "file": "pga_23_2022.html",
+  "http": 200,
+  "sha256": "2c54074771217b7d73f5b29222c701f1684b13606ff0fb601216d47d870420e2",
+  "url": "https://datagolf.com/past-results/pga-tour/23/2022"
+ },
+ "pga-tour/23/2023": {
+  "bytes": 403058,
+  "file": "pga_23_2023.html",
+  "http": 200,
+  "sha256": "6bf30632c018e02537f532ba8d9a440c9f508af6962f406074327835fca13285",
+  "url": "https://datagolf.com/past-results/pga-tour/23/2023"
+ },
+ "pga-tour/23/2024": {
+  "bytes": 373348,
+  "file": "pga_23_2024.html",
+  "http": 200,
+  "sha256": "31bb0a53b9cc32d6556f1680a3fc27a80a7bf4f39e9ad220202cdc244f2501f3",
+  "url": "https://datagolf.com/past-results/pga-tour/23/2024"
+ },
+ "pga-tour/23/2025": {
+  "bytes": 373311,
+  "file": "pga_23_2025.html",
+  "http": 200,
+  "sha256": "695b994150effe7ef2e4b1b9c7ad6cf12d38dc9cb15e22199d87e56eb28e452f",
+  "url": "https://datagolf.com/past-results/pga-tour/23/2025"
+ },
+ "pga-tour/24/2020": {
+  "bytes": 391087,
+  "file": "pga_24_2020.html",
+  "http": 200,
+  "sha256": "d10fcb762a2b7fefd53801ef43efefad4ab0409f5aea2921fa6cc2b9a54dc75a",
+  "url": "https://datagolf.com/past-results/pga-tour/24/2020"
+ },
+ "pga-tour/24/2021": {
+  "bytes": 391087,
+  "file": "pga_24_2021.html",
+  "http": 200,
+  "sha256": "1260f1c1b63415dba47c674fce0648398bfdaf026c7821a756743fce953e1237",
+  "url": "https://datagolf.com/past-results/pga-tour/24/2021"
+ },
+ "pga-tour/24/2022": {
+  "bytes": 391087,
+  "file": "pga_24_2022.html",
+  "http": 200,
+  "sha256": "7ca5352f85f8321b277cf9208dd3985218fafa1137ed38061b7a582c4869fa1c",
+  "url": "https://datagolf.com/past-results/pga-tour/24/2022"
+ },
+ "pga-tour/24/2023": {
+  "bytes": 391087,
+  "file": "pga_24_2023.html",
+  "http": 200,
+  "sha256": "1cece1ca44d8f3aff3788fcce5503be253ab554c99953ea8a364737c98695e9b",
+  "url": "https://datagolf.com/past-results/pga-tour/24/2023"
+ },
+ "pga-tour/24/2024": {
+  "bytes": 391087,
+  "file": "pga_24_2024.html",
+  "http": 200,
+  "sha256": "6030bbd73f81709571df36483a0f5ea2d673eb7b1c39aae7423d4ee7a622fef1",
+  "url": "https://datagolf.com/past-results/pga-tour/24/2024"
+ },
+ "pga-tour/24/2025": {
+  "bytes": 391087,
+  "file": "pga_24_2025.html",
+  "http": 200,
+  "sha256": "496db2d2a233bcdbda463eedd47ad1b5b348adae43b30638217267639e786b34",
+  "url": "https://datagolf.com/past-results/pga-tour/24/2025"
+ },
+ "pga-tour/25/2020": {
+  "bytes": 422497,
+  "file": "pga_25_2020.html",
+  "http": 200,
+  "sha256": "2b38b6b9752bcab894efdfcdb0086ad1e3fe23c3590e8f0d33a23ab6382c05d0",
+  "url": "https://datagolf.com/past-results/pga-tour/25/2020"
+ },
+ "pga-tour/25/2021": {
+  "bytes": 422497,
+  "file": "pga_25_2021.html",
+  "http": 200,
+  "sha256": "6835d94f638f670a4c507efde449343efb61f00fc3b717997653e906009678cc",
+  "url": "https://datagolf.com/past-results/pga-tour/25/2021"
+ },
+ "pga-tour/25/2022": {
+  "bytes": 422497,
+  "file": "pga_25_2022.html",
+  "http": 200,
+  "sha256": "94e1d8749c5cf79eed596b26f3112078d1f14a8407e38fd3fb385ff11b1ddcf7",
+  "url": "https://datagolf.com/past-results/pga-tour/25/2022"
+ },
+ "pga-tour/25/2023": {
+  "bytes": 422497,
+  "file": "pga_25_2023.html",
+  "http": 200,
+  "sha256": "1a929aed65225fba34d2e30fae74c9762ad1ced5e2d97b9ba69748a0764df26e",
+  "url": "https://datagolf.com/past-results/pga-tour/25/2023"
+ },
+ "pga-tour/25/2024": {
+  "bytes": 422497,
+  "file": "pga_25_2024.html",
+  "http": 200,
+  "sha256": "29fee2ba5efc2069f63f6eff4cb47298fd6868b710dc3db5ecb33a3319fe3e64",
+  "url": "https://datagolf.com/past-results/pga-tour/25/2024"
+ },
+ "pga-tour/25/2025": {
+  "bytes": 422497,
+  "file": "pga_25_2025.html",
+  "http": 200,
+  "sha256": "6c2cd572bffcb246bc189e345fee6aba94f21ec353c17807389a3ca00c232015",
+  "url": "https://datagolf.com/past-results/pga-tour/25/2025"
+ },
+ "pga-tour/26/2020": {
+  "bytes": 425917,
+  "file": "pga_26_2020.html",
+  "http": 200,
+  "sha256": "550f63bfe04b612ef5330b0f0c26bd9da6919f5b715e982e98563f504c139f80",
+  "url": "https://datagolf.com/past-results/pga-tour/26/2020"
+ },
+ "pga-tour/26/2021": {
+  "bytes": 436303,
+  "file": "pga_26_2021.html",
+  "http": 200,
+  "sha256": "94d03f7a0d9efd896468ccb44d712902bb5c83e44a2b7c6b625330afa3c7733c",
+  "url": "https://datagolf.com/past-results/pga-tour/26/2021"
+ },
+ "pga-tour/26/2022": {
+  "bytes": 432881,
+  "file": "pga_26_2022.html",
+  "http": 200,
+  "sha256": "15568293cf51d218323a717cbcb1827097578b30894130529416167bf65cc162",
+  "url": "https://datagolf.com/past-results/pga-tour/26/2022"
+ },
+ "pga-tour/26/2023": {
+  "bytes": 433138,
+  "file": "pga_26_2023.html",
+  "http": 200,
+  "sha256": "ae9139db4459f4a7df8b12391a8935221b6561345e008c07aa0b0e5c78f3b92e",
+  "url": "https://datagolf.com/past-results/pga-tour/26/2023"
+ },
+ "pga-tour/26/2024": {
+  "bytes": 434436,
+  "file": "pga_26_2024.html",
+  "http": 200,
+  "sha256": "139e9c140c5c2c0612700abff17ccc2c492f9c342662c5f35e474ff49d1ce025",
+  "url": "https://datagolf.com/past-results/pga-tour/26/2024"
+ },
+ "pga-tour/26/2025": {
+  "bytes": 433746,
+  "file": "pga_26_2025.html",
+  "http": 200,
+  "sha256": "7a26cd745f5ecfa7e7f97672d331bc3d95033df62158d80c498475e7e7f568be",
+  "url": "https://datagolf.com/past-results/pga-tour/26/2025"
+ },
+ "pga-tour/27/2020": {
+  "bytes": 405705,
+  "file": "pga_27_2020.html",
+  "http": 200,
+  "sha256": "e4a9211aeb3d63cd80d4389069bfb630c014e8be3a41c4ff19d69ed2ec8d170f",
+  "url": "https://datagolf.com/past-results/pga-tour/27/2020"
+ },
+ "pga-tour/27/2021": {
+  "bytes": 409016,
+  "file": "pga_27_2021.html",
+  "http": 200,
+  "sha256": "ea7d00647691b62fb323ff03fe0e778ff77d6362feee1cc6e264eee80b25a396",
+  "url": "https://datagolf.com/past-results/pga-tour/27/2021"
+ },
+ "pga-tour/27/2022": {
+  "bytes": 404230,
+  "file": "pga_27_2022.html",
+  "http": 200,
+  "sha256": "433d2c108dbc422311552b97cff589d3ae78a01f5d9d967fa7442f57c1b87393",
+  "url": "https://datagolf.com/past-results/pga-tour/27/2022"
+ },
+ "pga-tour/27/2023": {
+  "bytes": 373832,
+  "file": "pga_27_2023.html",
+  "http": 200,
+  "sha256": "08672ce2bef56f6951706890ad5fdbdcd36bb5110541f16b068f5e8b5f45debf",
+  "url": "https://datagolf.com/past-results/pga-tour/27/2023"
+ },
+ "pga-tour/27/2024": {
+  "bytes": 374101,
+  "file": "pga_27_2024.html",
+  "http": 200,
+  "sha256": "f0ef9a1ed66ef1c86cf52e461ec27e5b150ca736e0fd12d3ddc86a0b5e366676",
+  "url": "https://datagolf.com/past-results/pga-tour/27/2024"
+ },
+ "pga-tour/27/2025": {
+  "bytes": 373370,
+  "file": "pga_27_2025.html",
+  "http": 200,
+  "sha256": "55cf0be6dfd17d0c52cda5f9021ed97c1b5bfdb97df40e77d476c91b8945a3ba",
+  "url": "https://datagolf.com/past-results/pga-tour/27/2025"
+ },
+ "pga-tour/28/2020": {
+  "bytes": 372954,
+  "file": "pga_28_2020.html",
+  "http": 200,
+  "sha256": "a2d8c01deb944f24cf2c999e3f32ec79f6a2f9a6bf24c546ba81a10a0d1bb1ba",
+  "url": "https://datagolf.com/past-results/pga-tour/28/2020"
+ },
+ "pga-tour/28/2021": {
+  "bytes": 374716,
+  "file": "pga_28_2021.html",
+  "http": 200,
+  "sha256": "ed7478a6812ccdb489383e05568679e8766611f74b2dfaa240aca1e8785ef754",
+  "url": "https://datagolf.com/past-results/pga-tour/28/2021"
+ },
+ "pga-tour/28/2022": {
+  "bytes": 372408,
+  "file": "pga_28_2022.html",
+  "http": 200,
+  "sha256": "d67fa1ec26471e16df6c3885be87987f52e34400545eb3664c8e3a7263c73101",
+  "url": "https://datagolf.com/past-results/pga-tour/28/2022"
+ },
+ "pga-tour/28/2023": {
+  "bytes": 359462,
+  "file": "pga_28_2023.html",
+  "http": 200,
+  "sha256": "f46c3e1f69aac722bc28a36bb8de2967943af7f246929fb6c1c201e2d508f80d",
+  "url": "https://datagolf.com/past-results/pga-tour/28/2023"
+ },
+ "pga-tour/28/2024": {
+  "bytes": 359377,
+  "file": "pga_28_2024.html",
+  "http": 200,
+  "sha256": "a6835f2013a57aa8d87a738bc6889d8bb57563d0ae7a804ba236e0b78655641a",
+  "url": "https://datagolf.com/past-results/pga-tour/28/2024"
+ },
+ "pga-tour/28/2025": {
+  "bytes": 358800,
+  "file": "pga_28_2025.html",
+  "http": 200,
+  "sha256": "851c095f80b2ea6f0830dac19f0c04c5fedcee4468fc7bfc8e29f8eec9a4ab10",
+  "url": "https://datagolf.com/past-results/pga-tour/28/2025"
+ },
+ "pga-tour/29/2020": {
+  "bytes": 391087,
+  "file": "pga_29_2020.html",
+  "http": 200,
+  "sha256": "8fb79376fcb96f6c67bc77ec53e4e5c1bedd21c91be494d81619e992a919bf28",
+  "url": "https://datagolf.com/past-results/pga-tour/29/2020"
+ },
+ "pga-tour/29/2021": {
+  "bytes": 391087,
+  "file": "pga_29_2021.html",
+  "http": 200,
+  "sha256": "4ba05bf356ac4e5a5a99a0e804b46b149dcf3df70ce9da3d2f968fe44d71e454",
+  "url": "https://datagolf.com/past-results/pga-tour/29/2021"
+ },
+ "pga-tour/29/2022": {
+  "bytes": 391087,
+  "file": "pga_29_2022.html",
+  "http": 200,
+  "sha256": "cab27132f6767bfd85cebffb93cb857bbaae2923e50c744702d07957d1e7135f",
+  "url": "https://datagolf.com/past-results/pga-tour/29/2022"
+ },
+ "pga-tour/29/2023": {
+  "bytes": 391087,
+  "file": "pga_29_2023.html",
+  "http": 200,
+  "sha256": "411dcc9e84ff2263193b0500153f6d91c9c141c666225e5451c2973ba7b1df1b",
+  "url": "https://datagolf.com/past-results/pga-tour/29/2023"
+ },
+ "pga-tour/29/2024": {
+  "bytes": 391087,
+  "file": "pga_29_2024.html",
+  "http": 200,
+  "sha256": "f39c5e52efc44b46385f6084567516f31df3bfc3028b55bd54c7ecf7faceb1af",
+  "url": "https://datagolf.com/past-results/pga-tour/29/2024"
+ },
+ "pga-tour/29/2025": {
+  "bytes": 391087,
+  "file": "pga_29_2025.html",
+  "http": 200,
+  "sha256": "4c6049046634dabf1aa4d95dfb79f0c3b7bc968f2baf5f21fb9869ff743f4ca9",
+  "url": "https://datagolf.com/past-results/pga-tour/29/2025"
+ },
+ "pga-tour/3/2020": {
+  "bytes": 411015,
+  "file": "pga_3_2020.html",
+  "http": 200,
+  "sha256": "e938198fe58c5d320b5859ba7a0679343e0cfa85399effbce518bc2460f3a8b9",
+  "url": "https://datagolf.com/past-results/pga-tour/3/2020"
+ },
+ "pga-tour/3/2021": {
+  "bytes": 411471,
+  "file": "pga_3_2021.html",
+  "http": 200,
+  "sha256": "69fd11f4d77dc2e2a2251f4766778d12aea983b74d1974c170ebea728794d000",
+  "url": "https://datagolf.com/past-results/pga-tour/3/2021"
+ },
+ "pga-tour/3/2022": {
+  "bytes": 412169,
+  "file": "pga_3_2022.html",
+  "http": 200,
+  "sha256": "0cfb013f16d83e72efcdaeded4002e78287177171ae6209a9bfaa18e4c359b40",
+  "url": "https://datagolf.com/past-results/pga-tour/3/2022"
+ },
+ "pga-tour/3/2023": {
+  "bytes": 412961,
+  "file": "pga_3_2023.html",
+  "http": 200,
+  "sha256": "6a478626791af74505dfdbae39090e662938428baaed41009224b80ccb5b7254",
+  "url": "https://datagolf.com/past-results/pga-tour/3/2023"
+ },
+ "pga-tour/3/2024": {
+  "bytes": 412707,
+  "file": "pga_3_2024.html",
+  "http": 200,
+  "sha256": "132e63b5d8984816b649f037f4be2e11e38999dd9e29d0ba20044945809c75d5",
+  "url": "https://datagolf.com/past-results/pga-tour/3/2024"
+ },
+ "pga-tour/3/2025": {
+  "bytes": 413360,
+  "file": "pga_3_2025.html",
+  "http": 200,
+  "sha256": "a7f03186ebc7c9629652fa3a0f5b15bb6a3f2c405eaef3b92ce5862cbf4c235a",
+  "url": "https://datagolf.com/past-results/pga-tour/3/2025"
+ },
+ "pga-tour/30/2020": {
+  "bytes": 420448,
+  "file": "pga_30_2020.html",
+  "http": 200,
+  "sha256": "55fbd469190e78e97106fbbcbaf4ffaa98a0d5ae2ea7854ac22e99ec3a0cd9f2",
+  "url": "https://datagolf.com/past-results/pga-tour/30/2020"
+ },
+ "pga-tour/30/2021": {
+  "bytes": 426408,
+  "file": "pga_30_2021.html",
+  "http": 200,
+  "sha256": "5489f63a87abb6dee67ce9b47cdfee432b28803c1f6eebec2378e54645198389",
+  "url": "https://datagolf.com/past-results/pga-tour/30/2021"
+ },
+ "pga-tour/30/2022": {
+  "bytes": 425751,
+  "file": "pga_30_2022.html",
+  "http": 200,
+  "sha256": "5914e1f425e19726b0b86b957cd89afbc577cb332e62f424c4b4579a0d83c4dc",
+  "url": "https://datagolf.com/past-results/pga-tour/30/2022"
+ },
+ "pga-tour/30/2023": {
+  "bytes": 426116,
+  "file": "pga_30_2023.html",
+  "http": 200,
+  "sha256": "7489e0e1dbb067ee900df16be1503068b832bf26d37976423dfb6a2a3e43dcb2",
+  "url": "https://datagolf.com/past-results/pga-tour/30/2023"
+ },
+ "pga-tour/30/2024": {
+  "bytes": 427604,
+  "file": "pga_30_2024.html",
+  "http": 200,
+  "sha256": "69bcdc94a21b90c2e989c074e65fdd0e605d7b179d17565dfa0a699c4004d859",
+  "url": "https://datagolf.com/past-results/pga-tour/30/2024"
+ },
+ "pga-tour/30/2025": {
+  "bytes": 425839,
+  "file": "pga_30_2025.html",
+  "http": 200,
+  "sha256": "d779e2321a3ee5f0776a4c8056f21aae2462118e79192c970bdf61ee6f5881c7",
+  "url": "https://datagolf.com/past-results/pga-tour/30/2025"
+ },
+ "pga-tour/31/2020": {
+  "bytes": 391087,
+  "file": "pga_31_2020.html",
+  "http": 200,
+  "sha256": "97a934ca5521b0744e294c3a184a7634a6061848dffae04615a45ec9efda8ce9",
+  "url": "https://datagolf.com/past-results/pga-tour/31/2020"
+ },
+ "pga-tour/31/2021": {
+  "bytes": 391087,
+  "file": "pga_31_2021.html",
+  "http": 200,
+  "sha256": "439e13e336f7d8913c1ed0a5796ad23d04ace205b5c374663ba98364401e686c",
+  "url": "https://datagolf.com/past-results/pga-tour/31/2021"
+ },
+ "pga-tour/31/2022": {
+  "bytes": 391087,
+  "file": "pga_31_2022.html",
+  "http": 200,
+  "sha256": "b3b504a0010861922e9c7c99d7fe17ed2885117059965529709231633f18a369",
+  "url": "https://datagolf.com/past-results/pga-tour/31/2022"
+ },
+ "pga-tour/31/2023": {
+  "bytes": 391087,
+  "file": "pga_31_2023.html",
+  "http": 200,
+  "sha256": "456b5c65f8112a15e0e584865188c03feed15166906731799f620e1ce6b24058",
+  "url": "https://datagolf.com/past-results/pga-tour/31/2023"
+ },
+ "pga-tour/31/2024": {
+  "bytes": 391087,
+  "file": "pga_31_2024.html",
+  "http": 200,
+  "sha256": "acb2cda4102e058a25bc6c6c454c702b4d98be1bac0ca175f8081f0938c65911",
+  "url": "https://datagolf.com/past-results/pga-tour/31/2024"
+ },
+ "pga-tour/31/2025": {
+  "bytes": 391087,
+  "file": "pga_31_2025.html",
+  "http": 200,
+  "sha256": "bc5e89ba282ce103ebc34dfcfb6748771d9ec83c809fe2a722c7af65e0262d20",
+  "url": "https://datagolf.com/past-results/pga-tour/31/2025"
+ },
+ "pga-tour/32/2020": {
+  "bytes": 420100,
+  "file": "pga_32_2020.html",
+  "http": 200,
+  "sha256": "70d865b71a3d23413f94cbcf4064233482e52cefe6e3b8f5ec795b5756f1aae8",
+  "url": "https://datagolf.com/past-results/pga-tour/32/2020"
+ },
+ "pga-tour/32/2021": {
+  "bytes": 420100,
+  "file": "pga_32_2021.html",
+  "http": 200,
+  "sha256": "1ecb4761d27aaf4ead99eee1245ecf4cf051890b76e465837b291eacefde8db2",
+  "url": "https://datagolf.com/past-results/pga-tour/32/2021"
+ },
+ "pga-tour/32/2022": {
+  "bytes": 423439,
+  "file": "pga_32_2022.html",
+  "http": 200,
+  "sha256": "42bb4f15a3abc6d9901004b13ba2bb7945c4f6e3d542b6cfd7d3ec2edd5dee48",
+  "url": "https://datagolf.com/past-results/pga-tour/32/2022"
+ },
+ "pga-tour/32/2023": {
+  "bytes": 426120,
+  "file": "pga_32_2023.html",
+  "http": 200,
+  "sha256": "a05f7b688ed5d3965f929385bc347e53c8dfadc7a32d2508dfbd7b6423796665",
+  "url": "https://datagolf.com/past-results/pga-tour/32/2023"
+ },
+ "pga-tour/32/2024": {
+  "bytes": 425251,
+  "file": "pga_32_2024.html",
+  "http": 200,
+  "sha256": "c6d3d9881a5ebd57960277e10832660176de36700c14b25cb4e44f78ab6c11b7",
+  "url": "https://datagolf.com/past-results/pga-tour/32/2024"
+ },
+ "pga-tour/32/2025": {
+  "bytes": 424625,
+  "file": "pga_32_2025.html",
+  "http": 200,
+  "sha256": "b54fdf9ae73f4520e15fa197b89df96b9de86b42250a0782294845906d0ba3f3",
+  "url": "https://datagolf.com/past-results/pga-tour/32/2025"
+ },
+ "pga-tour/33/2020": {
+  "bytes": 434191,
+  "file": "pga_33_2020.html",
+  "http": 200,
+  "sha256": "ce2fac059508ce5f369cb9dcfb8b9df3a28de678a016c5b3264c0f83d0ee50bc",
+  "url": "https://datagolf.com/past-results/pga-tour/33/2020"
+ },
+ "pga-tour/33/2021": {
+  "bytes": 436184,
+  "file": "pga_33_2021.html",
+  "http": 200,
+  "sha256": "298efa1bcb048a318e9df70d81738e8ce332d71412c228e8b09e86c33ec25a4e",
+  "url": "https://datagolf.com/past-results/pga-tour/33/2021"
+ },
+ "pga-tour/33/2022": {
+  "bytes": 434208,
+  "file": "pga_33_2022.html",
+  "http": 200,
+  "sha256": "1d997443f5e8d3ab1d86f578025353f2eac2537a069078334247c14fd526d3eb",
+  "url": "https://datagolf.com/past-results/pga-tour/33/2022"
+ },
+ "pga-tour/33/2023": {
+  "bytes": 434181,
+  "file": "pga_33_2023.html",
+  "http": 200,
+  "sha256": "8c75eeebacf74c31a5e69adfbe31834ec4f421d2b225a5966291694690cd53cf",
+  "url": "https://datagolf.com/past-results/pga-tour/33/2023"
+ },
+ "pga-tour/33/2024": {
+  "bytes": 434476,
+  "file": "pga_33_2024.html",
+  "http": 200,
+  "sha256": "d0df03bac1843b17cb087ce768445a6362f11d8a6e26dc78b4fd6d33b6c4a3fa",
+  "url": "https://datagolf.com/past-results/pga-tour/33/2024"
+ },
+ "pga-tour/33/2025": {
+  "bytes": 434179,
+  "file": "pga_33_2025.html",
+  "http": 200,
+  "sha256": "05c933f9919a206b32205174a4db4bb5ec98867b4796792c15211c05f08f577f",
+  "url": "https://datagolf.com/past-results/pga-tour/33/2025"
+ },
+ "pga-tour/34/2020": {
+  "bytes": 425929,
+  "file": "pga_34_2020.html",
+  "http": 200,
+  "sha256": "52b26894665848e0f36f502e9a63dc2425cb5fd0bd3e046f924ece470fdce048",
+  "url": "https://datagolf.com/past-results/pga-tour/34/2020"
+ },
+ "pga-tour/34/2021": {
+  "bytes": 429273,
+  "file": "pga_34_2021.html",
+  "http": 200,
+  "sha256": "5fdf9dd317de779cee83c4458e5f1918274a15b0a62f5664a97b7e95fc7c914b",
+  "url": "https://datagolf.com/past-results/pga-tour/34/2021"
+ },
+ "pga-tour/34/2022": {
+  "bytes": 426854,
+  "file": "pga_34_2022.html",
+  "http": 200,
+  "sha256": "d1489e817c01be68d086d5a88d9a8ea34e2a9a0ad1cc4065c5144070d2e8f5a3",
+  "url": "https://datagolf.com/past-results/pga-tour/34/2022"
+ },
+ "pga-tour/34/2023": {
+  "bytes": 426773,
+  "file": "pga_34_2023.html",
+  "http": 200,
+  "sha256": "94151b8ea98de6a7be5f120ef448a4c90cfd61503cfae73cda678ea03dfe9507",
+  "url": "https://datagolf.com/past-results/pga-tour/34/2023"
+ },
+ "pga-tour/34/2024": {
+  "bytes": 374076,
+  "file": "pga_34_2024.html",
+  "http": 200,
+  "sha256": "be776616fdd432827b1f836ad9012e1f369e0884da72a7fa3945105f605aba5f",
+  "url": "https://datagolf.com/past-results/pga-tour/34/2024"
+ },
+ "pga-tour/34/2025": {
+  "bytes": 374217,
+  "file": "pga_34_2025.html",
+  "http": 200,
+  "sha256": "7a39fdc8125d494cc4a0448ddbe11edc0d4b19d08746db0aa8bcd367d6724483",
+  "url": "https://datagolf.com/past-results/pga-tour/34/2025"
+ },
+ "pga-tour/35/2020": {
+  "bytes": 391087,
+  "file": "pga_35_2020.html",
+  "http": 200,
+  "sha256": "26007387daea1f108744fb37fbf66010a1d669c7260b717641d5a6ef82ebdacf",
+  "url": "https://datagolf.com/past-results/pga-tour/35/2020"
+ },
+ "pga-tour/35/2021": {
+  "bytes": 391087,
+  "file": "pga_35_2021.html",
+  "http": 200,
+  "sha256": "0743336c97ae4da7190cbf6b80143a8804dab53baa0cb326f06b1e8ba0403b4a",
+  "url": "https://datagolf.com/past-results/pga-tour/35/2021"
+ },
+ "pga-tour/35/2022": {
+  "bytes": 391087,
+  "file": "pga_35_2022.html",
+  "http": 200,
+  "sha256": "ee3b3b234542397a2ffd3039fd437f64f13382851883028c3a435e4a356d8ac3",
+  "url": "https://datagolf.com/past-results/pga-tour/35/2022"
+ },
+ "pga-tour/35/2023": {
+  "bytes": 391087,
+  "file": "pga_35_2023.html",
+  "http": 200,
+  "sha256": "b145e8bb66ec7d622ea79cd554f1573692c40a69c8be1be7c16d473db67bb3e8",
+  "url": "https://datagolf.com/past-results/pga-tour/35/2023"
+ },
+ "pga-tour/35/2024": {
+  "bytes": 391087,
+  "file": "pga_35_2024.html",
+  "http": 200,
+  "sha256": "4c8dcc077a080513ef68475b0884b4d5b5bdf37679617f13c887fc3375a5f1f5",
+  "url": "https://datagolf.com/past-results/pga-tour/35/2024"
+ },
+ "pga-tour/35/2025": {
+  "bytes": 391087,
+  "file": "pga_35_2025.html",
+  "http": 200,
+  "sha256": "915b57dfb717d0e41c50809f9a67aab57634befaf1b1d9befc1987c3f928cb3d",
+  "url": "https://datagolf.com/past-results/pga-tour/35/2025"
+ },
+ "pga-tour/36/2020": {
+  "bytes": 391087,
+  "file": "pga_36_2020.html",
+  "http": 200,
+  "sha256": "8c0465db3d99d5421544ae90670341114190bf8477deb205bd661aaa949976fd",
+  "url": "https://datagolf.com/past-results/pga-tour/36/2020"
+ },
+ "pga-tour/36/2021": {
+  "bytes": 391087,
+  "file": "pga_36_2021.html",
+  "http": 200,
+  "sha256": "056db86f547ac642d9a55513d42331332b8a51e8b439fdafa6505ea76ebf6111",
+  "url": "https://datagolf.com/past-results/pga-tour/36/2021"
+ },
+ "pga-tour/36/2022": {
+  "bytes": 391087,
+  "file": "pga_36_2022.html",
+  "http": 200,
+  "sha256": "9fbcd5b505e440322111522da5fd6bf626fa03c870aff051e8751a74f18079de",
+  "url": "https://datagolf.com/past-results/pga-tour/36/2022"
+ },
+ "pga-tour/36/2023": {
+  "bytes": 391087,
+  "file": "pga_36_2023.html",
+  "http": 200,
+  "sha256": "7d59401da702fa15c0dcd08c7b181007802eace9917a16a8d16db2296c1dd815",
+  "url": "https://datagolf.com/past-results/pga-tour/36/2023"
+ },
+ "pga-tour/36/2024": {
+  "bytes": 391087,
+  "file": "pga_36_2024.html",
+  "http": 200,
+  "sha256": "a29d984ee5d76bc694789fb39e9cda20aebdb1db7255365beab5bda2284615da",
+  "url": "https://datagolf.com/past-results/pga-tour/36/2024"
+ },
+ "pga-tour/36/2025": {
+  "bytes": 391087,
+  "file": "pga_36_2025.html",
+  "http": 200,
+  "sha256": "f2a4da7ae7fd284c78f10e7cce2e3ac81c38c1f1a9da354a41920ae1f8967955",
+  "url": "https://datagolf.com/past-results/pga-tour/36/2025"
+ },
+ "pga-tour/37/2020": {
+  "bytes": 391087,
+  "file": "pga_37_2020.html",
+  "http": 200,
+  "sha256": "842e215c77eba83fb451f5e2835fdf4cd419f68602e56cbe418f115dbd20fd0c",
+  "url": "https://datagolf.com/past-results/pga-tour/37/2020"
+ },
+ "pga-tour/37/2021": {
+  "bytes": 391087,
+  "file": "pga_37_2021.html",
+  "http": 200,
+  "sha256": "6b8c841f53a83554f86910c2a513e3e97b13b224cdb3a9ab00c0c5c684f0f0b8",
+  "url": "https://datagolf.com/past-results/pga-tour/37/2021"
+ },
+ "pga-tour/37/2022": {
+  "bytes": 391087,
+  "file": "pga_37_2022.html",
+  "http": 200,
+  "sha256": "eb770fda8ad3f72afe83f3a47f692803a4712ffb9e2204cad0c8a73e17541af6",
+  "url": "https://datagolf.com/past-results/pga-tour/37/2022"
+ },
+ "pga-tour/37/2023": {
+  "bytes": 391087,
+  "file": "pga_37_2023.html",
+  "http": 200,
+  "sha256": "bf0c51263ea0314071aac2529901b7d6afd34be5e04971a20c9a22965be6b416",
+  "url": "https://datagolf.com/past-results/pga-tour/37/2023"
+ },
+ "pga-tour/37/2024": {
+  "bytes": 391087,
+  "file": "pga_37_2024.html",
+  "http": 200,
+  "sha256": "e05be357c07af0003811e6dd0701b3757ebb512ec5f09fd4b8fc182bf30fe890",
+  "url": "https://datagolf.com/past-results/pga-tour/37/2024"
+ },
+ "pga-tour/37/2025": {
+  "bytes": 391087,
+  "file": "pga_37_2025.html",
+  "http": 200,
+  "sha256": "62b58b05495215ef7e6a5116347f9db18b8196a861fac82c0c544fd78dbefcd4",
+  "url": "https://datagolf.com/past-results/pga-tour/37/2025"
+ },
+ "pga-tour/38/2020": {
+  "bytes": 391087,
+  "file": "pga_38_2020.html",
+  "http": 200,
+  "sha256": "05ca6a2a5fb464979d54275fff91df2a20d80441a7f539331759c75851985ab5",
+  "url": "https://datagolf.com/past-results/pga-tour/38/2020"
+ },
+ "pga-tour/38/2021": {
+  "bytes": 391087,
+  "file": "pga_38_2021.html",
+  "http": 200,
+  "sha256": "2442c735c92770943784a842f510f44c1d0b1a1a5b90d7d12d92a932aec8474e",
+  "url": "https://datagolf.com/past-results/pga-tour/38/2021"
+ },
+ "pga-tour/38/2022": {
+  "bytes": 391087,
+  "file": "pga_38_2022.html",
+  "http": 200,
+  "sha256": "e118af9d0ef795c6b360aee4b12782bbdf3dd333df4d3872d8deb40629d6d30d",
+  "url": "https://datagolf.com/past-results/pga-tour/38/2022"
+ },
+ "pga-tour/38/2023": {
+  "bytes": 391087,
+  "file": "pga_38_2023.html",
+  "http": 200,
+  "sha256": "a51c6babfefc28bc7daa63a099f465c50496f6291cf09988ffc639648219ea50",
+  "url": "https://datagolf.com/past-results/pga-tour/38/2023"
+ },
+ "pga-tour/38/2024": {
+  "bytes": 391087,
+  "file": "pga_38_2024.html",
+  "http": 200,
+  "sha256": "4cd6f434fb62d0271effcabe6b3ff7f071a8d22bbead53f533418d9ceaf2baaa",
+  "url": "https://datagolf.com/past-results/pga-tour/38/2024"
+ },
+ "pga-tour/38/2025": {
+  "bytes": 391087,
+  "file": "pga_38_2025.html",
+  "http": 200,
+  "sha256": "53ff1ca6887f7a1eb37b153d22de129feefa1c121d0adbf57218c7d49bf8855a",
+  "url": "https://datagolf.com/past-results/pga-tour/38/2025"
+ },
+ "pga-tour/39/2020": {
+  "bytes": 391087,
+  "file": "pga_39_2020.html",
+  "http": 200,
+  "sha256": "3ae559ad5dbc214199b0baf9f244b74ec5bc60a6aa37fdc5b77958e4d2ee8188",
+  "url": "https://datagolf.com/past-results/pga-tour/39/2020"
+ },
+ "pga-tour/39/2021": {
+  "bytes": 391087,
+  "file": "pga_39_2021.html",
+  "http": 200,
+  "sha256": "222bf2b4886c524353632c1089f493ca0dc2ab23daec3ed9a2a07ebf179d7347",
+  "url": "https://datagolf.com/past-results/pga-tour/39/2021"
+ },
+ "pga-tour/39/2022": {
+  "bytes": 391087,
+  "file": "pga_39_2022.html",
+  "http": 200,
+  "sha256": "90b524f924ab757d2066ca226e6872c2bc94264be6658aefd16945bfeeaa0172",
+  "url": "https://datagolf.com/past-results/pga-tour/39/2022"
+ },
+ "pga-tour/39/2023": {
+  "bytes": 391087,
+  "file": "pga_39_2023.html",
+  "http": 200,
+  "sha256": "e1c14baaa9a542adbdf04757b6396eef76d753005282f87346a72de3f90d8328",
+  "url": "https://datagolf.com/past-results/pga-tour/39/2023"
+ },
+ "pga-tour/39/2024": {
+  "bytes": 391087,
+  "file": "pga_39_2024.html",
+  "http": 200,
+  "sha256": "4d856aa77d566240d6861b2239bf4303a36eb25e059d3d28c5e78515d0d403dd",
+  "url": "https://datagolf.com/past-results/pga-tour/39/2024"
+ },
+ "pga-tour/39/2025": {
+  "bytes": 391087,
+  "file": "pga_39_2025.html",
+  "http": 200,
+  "sha256": "9784cb74f9f2c4498a50ae53a9bbe2b0752235b17133775683ce882f47a57ff9",
+  "url": "https://datagolf.com/past-results/pga-tour/39/2025"
+ },
+ "pga-tour/4/2020": {
+  "bytes": 453003,
+  "file": "pga_4_2020.html",
+  "http": 200,
+  "sha256": "eab8e26f5c44075d4601fa1e7bb795693d15721749b71f691b042cae0e49062d",
+  "url": "https://datagolf.com/past-results/pga-tour/4/2020"
+ },
+ "pga-tour/4/2021": {
+  "bytes": 452799,
+  "file": "pga_4_2021.html",
+  "http": 200,
+  "sha256": "48c25aa5a09a1cb3e4bb625e849b83eb3872ebd43fc3f93b9b2c405ea552413f",
+  "url": "https://datagolf.com/past-results/pga-tour/4/2021"
+ },
+ "pga-tour/4/2022": {
+  "bytes": 454739,
+  "file": "pga_4_2022.html",
+  "http": 200,
+  "sha256": "4847fa7e139b42ff3778ed76f54b662b01166232f8f495a2137be3a63cce7ebd",
+  "url": "https://datagolf.com/past-results/pga-tour/4/2022"
+ },
+ "pga-tour/4/2023": {
+  "bytes": 453909,
+  "file": "pga_4_2023.html",
+  "http": 200,
+  "sha256": "31f9e78b6cd2e12fb5e88cefdc67c4eebd7ad450fb5d68c88a8562ee603fe33e",
+  "url": "https://datagolf.com/past-results/pga-tour/4/2023"
+ },
+ "pga-tour/4/2024": {
+  "bytes": 454721,
+  "file": "pga_4_2024.html",
+  "http": 200,
+  "sha256": "0e0349e426f4db5fc2689285301caccdb5cdabc15467cac7f32450ea7e28e81b",
+  "url": "https://datagolf.com/past-results/pga-tour/4/2024"
+ },
+ "pga-tour/4/2025": {
+  "bytes": 450708,
+  "file": "pga_4_2025.html",
+  "http": 200,
+  "sha256": "050ed54b5f4a201eb323620ffabbc73ae6e5766b55d29c0397af6ae167939021",
+  "url": "https://datagolf.com/past-results/pga-tour/4/2025"
+ },
+ "pga-tour/40/2020": {
+  "bytes": 391087,
+  "file": "pga_40_2020.html",
+  "http": 200,
+  "sha256": "1b999d399eb7ebcf686ccf0ee8c8200e9b4b41ec80636518a1db66dc4c090472",
+  "url": "https://datagolf.com/past-results/pga-tour/40/2020"
+ },
+ "pga-tour/40/2021": {
+  "bytes": 391087,
+  "file": "pga_40_2021.html",
+  "http": 200,
+  "sha256": "1967bc07ecf6154bc723d72c4157169c437fa5a72262ae77117299aeb886c55a",
+  "url": "https://datagolf.com/past-results/pga-tour/40/2021"
+ },
+ "pga-tour/40/2022": {
+  "bytes": 391087,
+  "file": "pga_40_2022.html",
+  "http": 200,
+  "sha256": "27d40678fe8ff6e441c4a9b24eb595d4da63556d226ffa2195a0cd9e3c152d3d",
+  "url": "https://datagolf.com/past-results/pga-tour/40/2022"
+ },
+ "pga-tour/40/2023": {
+  "bytes": 391087,
+  "file": "pga_40_2023.html",
+  "http": 200,
+  "sha256": "6cf2b434da072a3a2d01a9f5e073534397c2056cd40eb1d396410e6aae667f45",
+  "url": "https://datagolf.com/past-results/pga-tour/40/2023"
+ },
+ "pga-tour/40/2024": {
+  "bytes": 391087,
+  "file": "pga_40_2024.html",
+  "http": 200,
+  "sha256": "ea162ba2259a520c0b2091bce4efe1cc6b2b41dcf485f5bc3b3dbc724a4eaea8",
+  "url": "https://datagolf.com/past-results/pga-tour/40/2024"
+ },
+ "pga-tour/40/2025": {
+  "bytes": 391087,
+  "file": "pga_40_2025.html",
+  "http": 200,
+  "sha256": "aba23e9242b1b5ec3ef2c9e9ba5a3d27eec0ff70056c7adaf0625d023533dcae",
+  "url": "https://datagolf.com/past-results/pga-tour/40/2025"
+ },
+ "pga-tour/41/2020": {
+  "bytes": 411670,
+  "file": "pga_41_2020.html",
+  "http": 200,
+  "sha256": "8388f636b40c1c722d640e195d5eb45217a2400f9563a6356859315a54bf5790",
+  "url": "https://datagolf.com/past-results/pga-tour/41/2020"
+ },
+ "pga-tour/41/2021": {
+  "bytes": 418760,
+  "file": "pga_41_2021.html",
+  "http": 200,
+  "sha256": "269af4c51ff342498128529a5cdd14dbae5854cdde15c3228b428d3a5c11e0b9",
+  "url": "https://datagolf.com/past-results/pga-tour/41/2021"
+ },
+ "pga-tour/41/2022": {
+  "bytes": 418641,
+  "file": "pga_41_2022.html",
+  "http": 200,
+  "sha256": "98dbb1036ed0df4aed861e0fbed82cc3b657d32625e8f694cde33da95a754d4c",
+  "url": "https://datagolf.com/past-results/pga-tour/41/2022"
+ },
+ "pga-tour/41/2023": {
+  "bytes": 418522,
+  "file": "pga_41_2023.html",
+  "http": 200,
+  "sha256": "62b4aae607eb6ce8403aafe7dd4fa7d26240e90973fda6a2a5aa985511c25f30",
+  "url": "https://datagolf.com/past-results/pga-tour/41/2023"
+ },
+ "pga-tour/41/2024": {
+  "bytes": 427407,
+  "file": "pga_41_2024.html",
+  "http": 200,
+  "sha256": "4ec129c63875e18ddbab2df71ca32167e5c558cf41d984f56b57fdb798c55b54",
+  "url": "https://datagolf.com/past-results/pga-tour/41/2024"
+ },
+ "pga-tour/41/2025": {
+  "bytes": 418406,
+  "file": "pga_41_2025.html",
+  "http": 200,
+  "sha256": "a160e9e8d2e3b0dd78be7cbd6833770a98e8c58ba30a84d8e04b5cb38ac9b1a4",
+  "url": "https://datagolf.com/past-results/pga-tour/41/2025"
+ },
+ "pga-tour/42/2020": {
+  "bytes": 391087,
+  "file": "pga_42_2020.html",
+  "http": 200,
+  "sha256": "5ab18235b1843ff66e42512bb1f71346523d7a4d753c18342793cd6646b5900b",
+  "url": "https://datagolf.com/past-results/pga-tour/42/2020"
+ },
+ "pga-tour/42/2021": {
+  "bytes": 391087,
+  "file": "pga_42_2021.html",
+  "http": 200,
+  "sha256": "b949016f03395122c1b13d0e49c3b50fdca5986ef570de1f4e62cb78351df1c7",
+  "url": "https://datagolf.com/past-results/pga-tour/42/2021"
+ },
+ "pga-tour/42/2022": {
+  "bytes": 391087,
+  "file": "pga_42_2022.html",
+  "http": 200,
+  "sha256": "3881503935f0f150e5f41b781d1cc98746dc4a5761c547540a8ee54655bf9680",
+  "url": "https://datagolf.com/past-results/pga-tour/42/2022"
+ },
+ "pga-tour/42/2023": {
+  "bytes": 391087,
+  "file": "pga_42_2023.html",
+  "http": 200,
+  "sha256": "c22e7937b4d339d30f8ac9106411d0b2956233d1df9a1f51effb4b18d2deec40",
+  "url": "https://datagolf.com/past-results/pga-tour/42/2023"
+ },
+ "pga-tour/42/2024": {
+  "bytes": 391087,
+  "file": "pga_42_2024.html",
+  "http": 200,
+  "sha256": "a2eba547f65a4f63c1ed48739ca4c46ed1c114dd188ca93a6da8f8f7b82e736b",
+  "url": "https://datagolf.com/past-results/pga-tour/42/2024"
+ },
+ "pga-tour/42/2025": {
+  "bytes": 391087,
+  "file": "pga_42_2025.html",
+  "http": 200,
+  "sha256": "aeb5729a98e189db7ac526378de54b18080eef1a0a9114b2051916b4e53a645a",
+  "url": "https://datagolf.com/past-results/pga-tour/42/2025"
+ },
+ "pga-tour/43/2020": {
+  "bytes": 391087,
+  "file": "pga_43_2020.html",
+  "http": 200,
+  "sha256": "7ff55a6758e477fbddbff0522513b31624c3a9b74bce8deaab6d98a948ef3ea5",
+  "url": "https://datagolf.com/past-results/pga-tour/43/2020"
+ },
+ "pga-tour/43/2021": {
+  "bytes": 391087,
+  "file": "pga_43_2021.html",
+  "http": 200,
+  "sha256": "7ddf6e768aeb8b8ab2b0ac0c5b5023642601a98e716767d8c039cdba25934faf",
+  "url": "https://datagolf.com/past-results/pga-tour/43/2021"
+ },
+ "pga-tour/43/2022": {
+  "bytes": 391087,
+  "file": "pga_43_2022.html",
+  "http": 200,
+  "sha256": "3113b0c46a4c7d78d4c0955367cae813b3a6aa206c232c5dff6ff9b08dfe4715",
+  "url": "https://datagolf.com/past-results/pga-tour/43/2022"
+ },
+ "pga-tour/43/2023": {
+  "bytes": 391087,
+  "file": "pga_43_2023.html",
+  "http": 200,
+  "sha256": "742f5d85bc558eae9b3a2fd4e2c093eb81329d09fce69f8a78fc803888b37807",
+  "url": "https://datagolf.com/past-results/pga-tour/43/2023"
+ },
+ "pga-tour/43/2024": {
+  "bytes": 391087,
+  "file": "pga_43_2024.html",
+  "http": 200,
+  "sha256": "85bb8a6f000defbbfc3bbabd1ccce20c38e83e456c8860bf9c73f56a2ea2d310",
+  "url": "https://datagolf.com/past-results/pga-tour/43/2024"
+ },
+ "pga-tour/43/2025": {
+  "bytes": 391087,
+  "file": "pga_43_2025.html",
+  "http": 200,
+  "sha256": "5ad32a5ae007bc32f9c5d66004426f5d898576069af0da6a5de6c5d371846d1c",
+  "url": "https://datagolf.com/past-results/pga-tour/43/2025"
+ },
+ "pga-tour/44/2020": {
+  "bytes": 391087,
+  "file": "pga_44_2020.html",
+  "http": 200,
+  "sha256": "221e6d491d7dcf0457dece5fc8313cd3867a6ce3a521e7423122b16e97d95c45",
+  "url": "https://datagolf.com/past-results/pga-tour/44/2020"
+ },
+ "pga-tour/44/2021": {
+  "bytes": 391087,
+  "file": "pga_44_2021.html",
+  "http": 200,
+  "sha256": "2d2286a353ebba17f7052c0b867bac06f3f303ad5a2b6fff4a147e00e42d3115",
+  "url": "https://datagolf.com/past-results/pga-tour/44/2021"
+ },
+ "pga-tour/44/2022": {
+  "bytes": 391087,
+  "file": "pga_44_2022.html",
+  "http": 200,
+  "sha256": "0c81f7ee73f5f4c7c848171fa2ac2fdbc7063b265a20e0b0c3e3442c27aaee00",
+  "url": "https://datagolf.com/past-results/pga-tour/44/2022"
+ },
+ "pga-tour/44/2023": {
+  "bytes": 391087,
+  "file": "pga_44_2023.html",
+  "http": 200,
+  "sha256": "fc4679c74b3e50b390acc840dd3d6b386f9d8a54d3a4118a5615d452698b2d1d",
+  "url": "https://datagolf.com/past-results/pga-tour/44/2023"
+ },
+ "pga-tour/44/2024": {
+  "bytes": 391087,
+  "file": "pga_44_2024.html",
+  "http": 200,
+  "sha256": "e5031f0279162c6585ca6f60b1dd314e037c0f4d6a169c6fa768e3e2122a6d7f",
+  "url": "https://datagolf.com/past-results/pga-tour/44/2024"
+ },
+ "pga-tour/44/2025": {
+  "bytes": 391087,
+  "file": "pga_44_2025.html",
+  "http": 200,
+  "sha256": "99afb9673d55441d1880ea9bd7b40bad5a6e898f7329ad95cfaa5b2a1c78d5b6",
+  "url": "https://datagolf.com/past-results/pga-tour/44/2025"
+ },
+ "pga-tour/45/2020": {
+  "bytes": 391087,
+  "file": "pga_45_2020.html",
+  "http": 200,
+  "sha256": "5e103504d3bc6bb9b6b97c1e26891d3da728f1d1d22351bb7fd6e7835ec341e8",
+  "url": "https://datagolf.com/past-results/pga-tour/45/2020"
+ },
+ "pga-tour/45/2021": {
+  "bytes": 391087,
+  "file": "pga_45_2021.html",
+  "http": 200,
+  "sha256": "112f624a5628b6aabd050f51241375af772cf282b0df394d4426fbc76c99dc12",
+  "url": "https://datagolf.com/past-results/pga-tour/45/2021"
+ },
+ "pga-tour/45/2022": {
+  "bytes": 391087,
+  "file": "pga_45_2022.html",
+  "http": 200,
+  "sha256": "2e7557603103268531d01140830edb6b009f187b874f4f38adc4090815203780",
+  "url": "https://datagolf.com/past-results/pga-tour/45/2022"
+ },
+ "pga-tour/45/2023": {
+  "bytes": 391087,
+  "file": "pga_45_2023.html",
+  "http": 200,
+  "sha256": "90c45acf9dd6c9a215260069cdb2961101e774d050045e332ee65d0e8ab94072",
+  "url": "https://datagolf.com/past-results/pga-tour/45/2023"
+ },
+ "pga-tour/45/2024": {
+  "bytes": 391087,
+  "file": "pga_45_2024.html",
+  "http": 200,
+  "sha256": "ea26fd9cef9687a001a7f3b442b0b5eeb3543905f6fc76fee5b136ed9e3eab98",
+  "url": "https://datagolf.com/past-results/pga-tour/45/2024"
+ },
+ "pga-tour/45/2025": {
+  "bytes": 391087,
+  "file": "pga_45_2025.html",
+  "http": 200,
+  "sha256": "0fde233bc28300fe202ab9b4cbb7728813fe46d623632ccc09825e83fc983c98",
+  "url": "https://datagolf.com/past-results/pga-tour/45/2025"
+ },
+ "pga-tour/46/2020": {
+  "bytes": 391087,
+  "file": "pga_46_2020.html",
+  "http": 200,
+  "sha256": "a9718b1b0fadc5db222b6e85314cb6758a78a53afa6b65554060c701fff1d8fa",
+  "url": "https://datagolf.com/past-results/pga-tour/46/2020"
+ },
+ "pga-tour/46/2021": {
+  "bytes": 391087,
+  "file": "pga_46_2021.html",
+  "http": 200,
+  "sha256": "76fa7ed5d78d50118f01d3439c537582dd59babc8a32cff6284175bc617c5c4e",
+  "url": "https://datagolf.com/past-results/pga-tour/46/2021"
+ },
+ "pga-tour/46/2022": {
+  "bytes": 391087,
+  "file": "pga_46_2022.html",
+  "http": 200,
+  "sha256": "9bfd3283f20bedff7573097ddfa35a7b2c0104a3e7087f38ca0d1245df9cc8b9",
+  "url": "https://datagolf.com/past-results/pga-tour/46/2022"
+ },
+ "pga-tour/46/2023": {
+  "bytes": 391087,
+  "file": "pga_46_2023.html",
+  "http": 200,
+  "sha256": "4003512a3240ab5b1c4f88c6aa878ac1f90bbb0eb25c12fae09908e1021896d1",
+  "url": "https://datagolf.com/past-results/pga-tour/46/2023"
+ },
+ "pga-tour/46/2024": {
+  "bytes": 391087,
+  "file": "pga_46_2024.html",
+  "http": 200,
+  "sha256": "f914553ce3e3f86b969523b6230f76f6fb60640e51c24388a626ab11413afbfb",
+  "url": "https://datagolf.com/past-results/pga-tour/46/2024"
+ },
+ "pga-tour/46/2025": {
+  "bytes": 391087,
+  "file": "pga_46_2025.html",
+  "http": 200,
+  "sha256": "2bcd3b327550e48ced11a4a8528f82ab36caf69aabc3d1dc188397bcc30528b9",
+  "url": "https://datagolf.com/past-results/pga-tour/46/2025"
+ },
+ "pga-tour/47/2020": {
+  "bytes": 418801,
+  "file": "pga_47_2020.html",
+  "http": 200,
+  "sha256": "1480c4f8e1bf43078cd866571fc404982070a5358c1688802ba8db2d3850774f",
+  "url": "https://datagolf.com/past-results/pga-tour/47/2020"
+ },
+ "pga-tour/47/2021": {
+  "bytes": 417665,
+  "file": "pga_47_2021.html",
+  "http": 200,
+  "sha256": "6cf8241a9dfa502fcf00e4d0400229bf19ca3dcdc513da26c28654460f6adfbd",
+  "url": "https://datagolf.com/past-results/pga-tour/47/2021"
+ },
+ "pga-tour/47/2022": {
+  "bytes": 420801,
+  "file": "pga_47_2022.html",
+  "http": 200,
+  "sha256": "f2eacb015a0f7e26b1cc73feace3dd00c60359807ec70bc6dc3692480d67d322",
+  "url": "https://datagolf.com/past-results/pga-tour/47/2022"
+ },
+ "pga-tour/47/2023": {
+  "bytes": 419472,
+  "file": "pga_47_2023.html",
+  "http": 200,
+  "sha256": "c979ce880275c90d6aef08f73b6e48b754cafd738be850405a3c2bd8423f56e8",
+  "url": "https://datagolf.com/past-results/pga-tour/47/2023"
+ },
+ "pga-tour/47/2024": {
+  "bytes": 410855,
+  "file": "pga_47_2024.html",
+  "http": 200,
+  "sha256": "e8152476476aaf0ea92ca51b0c09488c8c2af7e41a687c64f91dbf39d5848328",
+  "url": "https://datagolf.com/past-results/pga-tour/47/2024"
+ },
+ "pga-tour/47/2025": {
+  "bytes": 410994,
+  "file": "pga_47_2025.html",
+  "http": 200,
+  "sha256": "c018ad20613bc18cd9a3628bd598191778d9f4fbddfd9dd9f491a908b5aa7f00",
+  "url": "https://datagolf.com/past-results/pga-tour/47/2025"
+ },
+ "pga-tour/48/2020": {
+  "bytes": 391087,
+  "file": "pga_48_2020.html",
+  "http": 200,
+  "sha256": "ac8cc35cb0c42314662a20678e6f3289ac5754d48b4debdb5236abd548aad8d9",
+  "url": "https://datagolf.com/past-results/pga-tour/48/2020"
+ },
+ "pga-tour/48/2021": {
+  "bytes": 391087,
+  "file": "pga_48_2021.html",
+  "http": 200,
+  "sha256": "a63687433d2a6bc88a59689c2282b27c09750cc4032acc324a39cb8449eed763",
+  "url": "https://datagolf.com/past-results/pga-tour/48/2021"
+ },
+ "pga-tour/48/2022": {
+  "bytes": 391087,
+  "file": "pga_48_2022.html",
+  "http": 200,
+  "sha256": "fdb7e61a098ba00f8800459f2572694807e3a69dc751c6e1c39862814fa1099f",
+  "url": "https://datagolf.com/past-results/pga-tour/48/2022"
+ },
+ "pga-tour/48/2023": {
+  "bytes": 391087,
+  "file": "pga_48_2023.html",
+  "http": 200,
+  "sha256": "3d8ed331b59b0165a4ce1b40fe8ec4118a8b02abbacd11b007f34280332c3d42",
+  "url": "https://datagolf.com/past-results/pga-tour/48/2023"
+ },
+ "pga-tour/48/2024": {
+  "bytes": 391087,
+  "file": "pga_48_2024.html",
+  "http": 200,
+  "sha256": "e33a5ac46d5c0fb054f9818be67ed7388013dc049ca1a6921701521a0b77b263",
+  "url": "https://datagolf.com/past-results/pga-tour/48/2024"
+ },
+ "pga-tour/48/2025": {
+  "bytes": 391087,
+  "file": "pga_48_2025.html",
+  "http": 200,
+  "sha256": "6ba8256c00501e21bd92dcd4a20a26dd09d934133cfadbc9c76e04c99dca7608",
+  "url": "https://datagolf.com/past-results/pga-tour/48/2025"
+ },
+ "pga-tour/49/2020": {
+  "bytes": 391087,
+  "file": "pga_49_2020.html",
+  "http": 200,
+  "sha256": "d84da2fe2e06368950eec3480857cb3269bdc398849f94c8db7964e1a24d0e81",
+  "url": "https://datagolf.com/past-results/pga-tour/49/2020"
+ },
+ "pga-tour/49/2021": {
+  "bytes": 391087,
+  "file": "pga_49_2021.html",
+  "http": 200,
+  "sha256": "7bcdf4f82fa13c17841587cd3ddc00a572d887573bce1bf5d7561a67b2cb5e15",
+  "url": "https://datagolf.com/past-results/pga-tour/49/2021"
+ },
+ "pga-tour/49/2022": {
+  "bytes": 391087,
+  "file": "pga_49_2022.html",
+  "http": 200,
+  "sha256": "157e5e59672f73eea009678afbdcbbdc0a57527bd6dfe6749289b699f5aa6381",
+  "url": "https://datagolf.com/past-results/pga-tour/49/2022"
+ },
+ "pga-tour/49/2023": {
+  "bytes": 391087,
+  "file": "pga_49_2023.html",
+  "http": 200,
+  "sha256": "ea3e2b16f5373c41153d5b4108242a5f464af0f3e09c63f5e099e6275568252d",
+  "url": "https://datagolf.com/past-results/pga-tour/49/2023"
+ },
+ "pga-tour/49/2024": {
+  "bytes": 391087,
+  "file": "pga_49_2024.html",
+  "http": 200,
+  "sha256": "311013ad62ab07176bcc8c077a7264ad2f311880dfb42380823db9b1c2c156f7",
+  "url": "https://datagolf.com/past-results/pga-tour/49/2024"
+ },
+ "pga-tour/49/2025": {
+  "bytes": 391087,
+  "file": "pga_49_2025.html",
+  "http": 200,
+  "sha256": "54bb2afab7c15bbbac05cc40885e24baafc6b595d8130fd6727fc58ce90931e1",
+  "url": "https://datagolf.com/past-results/pga-tour/49/2025"
+ },
+ "pga-tour/5/2020": {
+  "bytes": 489564,
+  "file": "pga_5_2020.html",
+  "http": 200,
+  "sha256": "ed3be322fe6ef0dc6c1691e8964b7700f73696b935ed99ece3c53b252bb2462f",
+  "url": "https://datagolf.com/past-results/pga-tour/5/2020"
+ },
+ "pga-tour/5/2021": {
+  "bytes": 451301,
+  "file": "pga_5_2021.html",
+  "http": 200,
+  "sha256": "d69f932ebe668405cfae1aa97d304c0c4b03976964422257c1bb2c1782ca7b35",
+  "url": "https://datagolf.com/past-results/pga-tour/5/2021"
+ },
+ "pga-tour/5/2022": {
+  "bytes": 489745,
+  "file": "pga_5_2022.html",
+  "http": 200,
+  "sha256": "d3e21fcbbd555172c4d95d58c740783e34318923a779178f86e4bd2ff9423ab9",
+  "url": "https://datagolf.com/past-results/pga-tour/5/2022"
+ },
+ "pga-tour/5/2023": {
+  "bytes": 487732,
+  "file": "pga_5_2023.html",
+  "http": 200,
+  "sha256": "bfb56af915865429adb551e3bcdaad7c477dd0cc017aec2279fb2f4f88f24c1e",
+  "url": "https://datagolf.com/past-results/pga-tour/5/2023"
+ },
+ "pga-tour/5/2024": {
+  "bytes": 390779,
+  "file": "pga_5_2024.html",
+  "http": 200,
+  "sha256": "4f7e0b7a7b659c7eb706e6225d768f8f2dba920a3675e0d93aca32dd91fcb17c",
+  "url": "https://datagolf.com/past-results/pga-tour/5/2024"
+ },
+ "pga-tour/5/2025": {
+  "bytes": 400429,
+  "file": "pga_5_2025.html",
+  "http": 200,
+  "sha256": "bbf43b0e311d0f78a686af9aadd457b0d96444dd7c48fba03d8fe9785a416d8a",
+  "url": "https://datagolf.com/past-results/pga-tour/5/2025"
+ },
+ "pga-tour/50/2020": {
+  "bytes": 391087,
+  "file": "pga_50_2020.html",
+  "http": 200,
+  "sha256": "01a013e9d6efd5da5f7b96369b1ee2733145edd546fd852fc97af7a22373efdf",
+  "url": "https://datagolf.com/past-results/pga-tour/50/2020"
+ },
+ "pga-tour/50/2021": {
+  "bytes": 391087,
+  "file": "pga_50_2021.html",
+  "http": 200,
+  "sha256": "715d93f2555c66d8f9fb915034958a0f723b54ca2c723f6814585ff20c25fbe3",
+  "url": "https://datagolf.com/past-results/pga-tour/50/2021"
+ },
+ "pga-tour/50/2022": {
+  "bytes": 391087,
+  "file": "pga_50_2022.html",
+  "http": 200,
+  "sha256": "8191a6b413e86a8f57d4ba55c4f76a897f505235d1911e00ef31fc349e1c1f8a",
+  "url": "https://datagolf.com/past-results/pga-tour/50/2022"
+ },
+ "pga-tour/50/2023": {
+  "bytes": 391087,
+  "file": "pga_50_2023.html",
+  "http": 200,
+  "sha256": "436cf31c129098c297407a993a447b6ea63ff890c5542a0520728f89e3dc3337",
+  "url": "https://datagolf.com/past-results/pga-tour/50/2023"
+ },
+ "pga-tour/50/2024": {
+  "bytes": 391087,
+  "file": "pga_50_2024.html",
+  "http": 200,
+  "sha256": "d69e88f5fc29cae25187485a23e89d6a8d14aaaaee64356c708e6121e57f31ab",
+  "url": "https://datagolf.com/past-results/pga-tour/50/2024"
+ },
+ "pga-tour/50/2025": {
+  "bytes": 391087,
+  "file": "pga_50_2025.html",
+  "http": 200,
+  "sha256": "d35b3fc932fb84984af12affd83fd8feea40e5085caa07566f3835ce932987ca",
+  "url": "https://datagolf.com/past-results/pga-tour/50/2025"
+ },
+ "pga-tour/51/2020": {
+  "bytes": 391087,
+  "file": "pga_51_2020.html",
+  "http": 200,
+  "sha256": "70aaa5c3b0aad21c7215d139676fd895569598dbb0f941c51c5c1591341468d6",
+  "url": "https://datagolf.com/past-results/pga-tour/51/2020"
+ },
+ "pga-tour/51/2021": {
+  "bytes": 391087,
+  "file": "pga_51_2021.html",
+  "http": 200,
+  "sha256": "2b921a91c0bcbd180b2e6e9926847c64634c0474e4d1b682e58b10b1d23a678c",
+  "url": "https://datagolf.com/past-results/pga-tour/51/2021"
+ },
+ "pga-tour/51/2022": {
+  "bytes": 391087,
+  "file": "pga_51_2022.html",
+  "http": 200,
+  "sha256": "5d46d9be3e9ca27f46ab2c07662286d784a9968b2f3096fff2bbaaeacad9ee8a",
+  "url": "https://datagolf.com/past-results/pga-tour/51/2022"
+ },
+ "pga-tour/51/2023": {
+  "bytes": 391087,
+  "file": "pga_51_2023.html",
+  "http": 200,
+  "sha256": "9cce2ac4f0ec30b025286d6e64c2e92e770beee968b80eff3a0c3bb1086464a2",
+  "url": "https://datagolf.com/past-results/pga-tour/51/2023"
+ },
+ "pga-tour/51/2024": {
+  "bytes": 391087,
+  "file": "pga_51_2024.html",
+  "http": 200,
+  "sha256": "7fb49cd47f7f8d96d1922962b3bc825fe1fd2ef58339b8a73b2078cd01e215a0",
+  "url": "https://datagolf.com/past-results/pga-tour/51/2024"
+ },
+ "pga-tour/51/2025": {
+  "bytes": 391087,
+  "file": "pga_51_2025.html",
+  "http": 200,
+  "sha256": "2826209b3d8ee31d9bfaac6159f652516b50fc08d903e2d40e249e16713905ab",
+  "url": "https://datagolf.com/past-results/pga-tour/51/2025"
+ },
+ "pga-tour/52/2020": {
+  "bytes": 391087,
+  "file": "pga_52_2020.html",
+  "http": 200,
+  "sha256": "cbf96146c8dc6a019752ba14c96f1fd562ca624e83a74e8a9ee27d1accef21d4",
+  "url": "https://datagolf.com/past-results/pga-tour/52/2020"
+ },
+ "pga-tour/52/2021": {
+  "bytes": 391087,
+  "file": "pga_52_2021.html",
+  "http": 200,
+  "sha256": "1cf77a26e429481658b7b073cf250ac5065cb4799267035a8d731a1aa3646642",
+  "url": "https://datagolf.com/past-results/pga-tour/52/2021"
+ },
+ "pga-tour/52/2022": {
+  "bytes": 391087,
+  "file": "pga_52_2022.html",
+  "http": 200,
+  "sha256": "01504650e4c78614a916c57e9482a5755dc039aab599a2d1b5ac17aba03de7b3",
+  "url": "https://datagolf.com/past-results/pga-tour/52/2022"
+ },
+ "pga-tour/52/2023": {
+  "bytes": 391087,
+  "file": "pga_52_2023.html",
+  "http": 200,
+  "sha256": "a5d9358b49820d30c2f879df81308419eb47533830098fde35a47b131d75accf",
+  "url": "https://datagolf.com/past-results/pga-tour/52/2023"
+ },
+ "pga-tour/52/2024": {
+  "bytes": 391087,
+  "file": "pga_52_2024.html",
+  "http": 200,
+  "sha256": "f529d9d791ca8df530900de0f6cae71de13620953e5475e7c9fb1393d67b8d43",
+  "url": "https://datagolf.com/past-results/pga-tour/52/2024"
+ },
+ "pga-tour/52/2025": {
+  "bytes": 391087,
+  "file": "pga_52_2025.html",
+  "http": 200,
+  "sha256": "eaa9c58aa36f54668a905302c520df9126cf97d5deb2d76f642657c92bc98f59",
+  "url": "https://datagolf.com/past-results/pga-tour/52/2025"
+ },
+ "pga-tour/53/2020": {
+  "bytes": 391087,
+  "file": "pga_53_2020.html",
+  "http": 200,
+  "sha256": "f4b618659eb9979ad0223a7463dfe99f80aff26baa6933dfa28fb9ca6f06eb64",
+  "url": "https://datagolf.com/past-results/pga-tour/53/2020"
+ },
+ "pga-tour/53/2021": {
+  "bytes": 391087,
+  "file": "pga_53_2021.html",
+  "http": 200,
+  "sha256": "77f41740ed6416489c465b52aa17c8e10f5c71faa1d9e33e0f5b4dcdf642a85c",
+  "url": "https://datagolf.com/past-results/pga-tour/53/2021"
+ },
+ "pga-tour/53/2022": {
+  "bytes": 391087,
+  "file": "pga_53_2022.html",
+  "http": 200,
+  "sha256": "ab76a1dd857a584f844e602a1280239629106f36efee8639a011ebed186cb1be",
+  "url": "https://datagolf.com/past-results/pga-tour/53/2022"
+ },
+ "pga-tour/53/2023": {
+  "bytes": 391087,
+  "file": "pga_53_2023.html",
+  "http": 200,
+  "sha256": "de2553f94fb3527f62615ac42b6f2ecad2add9ff67f1a80e10733bbb19d83952",
+  "url": "https://datagolf.com/past-results/pga-tour/53/2023"
+ },
+ "pga-tour/53/2024": {
+  "bytes": 391087,
+  "file": "pga_53_2024.html",
+  "http": 200,
+  "sha256": "f5a41f30b8a37aa60b50eeb2d16db7ea50b87460f25c547fbb55ad802f5f8a86",
+  "url": "https://datagolf.com/past-results/pga-tour/53/2024"
+ },
+ "pga-tour/53/2025": {
+  "bytes": 391087,
+  "file": "pga_53_2025.html",
+  "http": 200,
+  "sha256": "574c3bf5a8faf7f6532bbc05f4699e607c8f8f7f9970a44c99c8893f2c6e229c",
+  "url": "https://datagolf.com/past-results/pga-tour/53/2025"
+ },
+ "pga-tour/54/2020": {
+  "bytes": 424945,
+  "file": "pga_54_2020.html",
+  "http": 200,
+  "sha256": "d3d9693714535a432a4c22b5122f9d43f38bdd835dc31ced249e962118d61f01",
+  "url": "https://datagolf.com/past-results/pga-tour/54/2020"
+ },
+ "pga-tour/54/2021": {
+  "bytes": 417228,
+  "file": "pga_54_2021.html",
+  "http": 200,
+  "sha256": "3267d70f26ebad1076a33f483431f967361b8ea1aea8b426302032e572631de2",
+  "url": "https://datagolf.com/past-results/pga-tour/54/2021"
+ },
+ "pga-tour/54/2022": {
+  "bytes": 420536,
+  "file": "pga_54_2022.html",
+  "http": 200,
+  "sha256": "bc00a39553ac8efd65a02e63f606bc0a51608abf0a48e6245092450d53f20097",
+  "url": "https://datagolf.com/past-results/pga-tour/54/2022"
+ },
+ "pga-tour/54/2023": {
+  "bytes": 419359,
+  "file": "pga_54_2023.html",
+  "http": 200,
+  "sha256": "401b6fc53478b563b17a64e13e79d2780e730c71de6617b029f35dbf32a7ae0b",
+  "url": "https://datagolf.com/past-results/pga-tour/54/2023"
+ },
+ "pga-tour/54/2024": {
+  "bytes": 410413,
+  "file": "pga_54_2024.html",
+  "http": 200,
+  "sha256": "e918e5fe9336508cdf406f9188788f07fe63ecd18c6662f935e42826dc945595",
+  "url": "https://datagolf.com/past-results/pga-tour/54/2024"
+ },
+ "pga-tour/54/2025": {
+  "bytes": 411324,
+  "file": "pga_54_2025.html",
+  "http": 200,
+  "sha256": "7169072c48e5b73a9ce6cd5eb0d14d53a81bbc1f5fcad376d4b9d46f8e31b2e7",
+  "url": "https://datagolf.com/past-results/pga-tour/54/2025"
+ },
+ "pga-tour/55/2020": {
+  "bytes": 391087,
+  "file": "pga_55_2020.html",
+  "http": 200,
+  "sha256": "f2f28188a9482f5b588bc533faa886d83b592640defff40146764eb03044594d",
+  "url": "https://datagolf.com/past-results/pga-tour/55/2020"
+ },
+ "pga-tour/55/2021": {
+  "bytes": 391087,
+  "file": "pga_55_2021.html",
+  "http": 200,
+  "sha256": "6446e95452a138e30ef3ebec66284fa6a2c85ea18dbd17d729560ac203a0e3b2",
+  "url": "https://datagolf.com/past-results/pga-tour/55/2021"
+ },
+ "pga-tour/55/2022": {
+  "bytes": 391087,
+  "file": "pga_55_2022.html",
+  "http": 200,
+  "sha256": "8683fce82a1f9012f73d3ee6916d461d2e62fad491b5755c3ac022991a03b3c6",
+  "url": "https://datagolf.com/past-results/pga-tour/55/2022"
+ },
+ "pga-tour/55/2023": {
+  "bytes": 391087,
+  "file": "pga_55_2023.html",
+  "http": 200,
+  "sha256": "199a1460c00ce0f4cf4d962cd0f7068341d167ff4b29dca50a099e545fc55dc1",
+  "url": "https://datagolf.com/past-results/pga-tour/55/2023"
+ },
+ "pga-tour/55/2024": {
+  "bytes": 391087,
+  "file": "pga_55_2024.html",
+  "http": 200,
+  "sha256": "e02053d8d0e9c889252738292cc63789d0582171974df1b45e5b206cbeb29811",
+  "url": "https://datagolf.com/past-results/pga-tour/55/2024"
+ },
+ "pga-tour/55/2025": {
+  "bytes": 391087,
+  "file": "pga_55_2025.html",
+  "http": 200,
+  "sha256": "136ca898f67eaf8c233f199af33bea939ab7da8d1c36df97ca72903d59ee671e",
+  "url": "https://datagolf.com/past-results/pga-tour/55/2025"
+ },
+ "pga-tour/56/2020": {
+  "bytes": 391087,
+  "file": "pga_56_2020.html",
+  "http": 200,
+  "sha256": "8a28a3920ed1ce7ba43259af6576bffe676ba54b24726e9eb1da131015df6a6f",
+  "url": "https://datagolf.com/past-results/pga-tour/56/2020"
+ },
+ "pga-tour/56/2021": {
+  "bytes": 391087,
+  "file": "pga_56_2021.html",
+  "http": 200,
+  "sha256": "22bae1b3588c046892a1cf155fa68c4df650cce519be7516bbc1f3bbcf95062e",
+  "url": "https://datagolf.com/past-results/pga-tour/56/2021"
+ },
+ "pga-tour/56/2022": {
+  "bytes": 391087,
+  "file": "pga_56_2022.html",
+  "http": 200,
+  "sha256": "b9ddee101ba79576fcc733a004b5bca3320cbb0b656c0cfc70103c0c821cbbfa",
+  "url": "https://datagolf.com/past-results/pga-tour/56/2022"
+ },
+ "pga-tour/56/2023": {
+  "bytes": 391087,
+  "file": "pga_56_2023.html",
+  "http": 200,
+  "sha256": "f93c38819c4e26c24d1d6e531663488849351edff78834651f33035a7ced69e8",
+  "url": "https://datagolf.com/past-results/pga-tour/56/2023"
+ },
+ "pga-tour/56/2024": {
+  "bytes": 391087,
+  "file": "pga_56_2024.html",
+  "http": 200,
+  "sha256": "1dab33186bbc207b441c1a015f1049d0a9675b177ea617c02bdda8abe5c2c2b6",
+  "url": "https://datagolf.com/past-results/pga-tour/56/2024"
+ },
+ "pga-tour/56/2025": {
+  "bytes": 391087,
+  "file": "pga_56_2025.html",
+  "http": 200,
+  "sha256": "0a329890d3cd370e1679c6f8d6d7869b8e93b10371e82dbde75ea310cd660326",
+  "url": "https://datagolf.com/past-results/pga-tour/56/2025"
+ },
+ "pga-tour/57/2020": {
+  "bytes": 391087,
+  "file": "pga_57_2020.html",
+  "http": 200,
+  "sha256": "256808e6b68d50fda15bd4bad1fc06ee1fa7ee28191db8ff6b2a2350f63c05fd",
+  "url": "https://datagolf.com/past-results/pga-tour/57/2020"
+ },
+ "pga-tour/57/2021": {
+  "bytes": 391087,
+  "file": "pga_57_2021.html",
+  "http": 200,
+  "sha256": "694afb5e17453d17914bdad1c574ec9521f49c712bcf891a7e652034812667d5",
+  "url": "https://datagolf.com/past-results/pga-tour/57/2021"
+ },
+ "pga-tour/57/2022": {
+  "bytes": 391087,
+  "file": "pga_57_2022.html",
+  "http": 200,
+  "sha256": "0fd55948a778be6a39f0ca99b0d7b8ad37be617f50c1975c0578154a1cae35bd",
+  "url": "https://datagolf.com/past-results/pga-tour/57/2022"
+ },
+ "pga-tour/57/2023": {
+  "bytes": 391087,
+  "file": "pga_57_2023.html",
+  "http": 200,
+  "sha256": "81d7ed1713292d03b99361ffc35c2693fd659bee0916704ae1fed7fb2a3aec54",
+  "url": "https://datagolf.com/past-results/pga-tour/57/2023"
+ },
+ "pga-tour/57/2024": {
+  "bytes": 391087,
+  "file": "pga_57_2024.html",
+  "http": 200,
+  "sha256": "17ee1e065dc83671c34dbf071f435d269e0595237da7c720583afb8707c2620a",
+  "url": "https://datagolf.com/past-results/pga-tour/57/2024"
+ },
+ "pga-tour/57/2025": {
+  "bytes": 391087,
+  "file": "pga_57_2025.html",
+  "http": 200,
+  "sha256": "2ace1ff83810cda57e7ac1c45fde1c01016656e4a495ffb320a040bd44464b4f",
+  "url": "https://datagolf.com/past-results/pga-tour/57/2025"
+ },
+ "pga-tour/58/2020": {
+  "bytes": 391087,
+  "file": "pga_58_2020.html",
+  "http": 200,
+  "sha256": "a5e47e3bf0db7f1872a8ac43fc69e8050402c1281157b12947099282a0b142c7",
+  "url": "https://datagolf.com/past-results/pga-tour/58/2020"
+ },
+ "pga-tour/58/2021": {
+  "bytes": 391087,
+  "file": "pga_58_2021.html",
+  "http": 200,
+  "sha256": "8b46802a77dd0df82d10918675728f8c93e6a55d6dca88ed5991ff8ca7449b33",
+  "url": "https://datagolf.com/past-results/pga-tour/58/2021"
+ },
+ "pga-tour/58/2022": {
+  "bytes": 391087,
+  "file": "pga_58_2022.html",
+  "http": 200,
+  "sha256": "c71b4423a85e80d845adfed70819c4276ff49f468ac860f142ab1f29b8b77b27",
+  "url": "https://datagolf.com/past-results/pga-tour/58/2022"
+ },
+ "pga-tour/58/2023": {
+  "bytes": 391087,
+  "file": "pga_58_2023.html",
+  "http": 200,
+  "sha256": "db7e6fd20ea35606538b63e25d3ef2bd9f9c79e343a9f62a9a6cca41178ac30a",
+  "url": "https://datagolf.com/past-results/pga-tour/58/2023"
+ },
+ "pga-tour/58/2024": {
+  "bytes": 391087,
+  "file": "pga_58_2024.html",
+  "http": 200,
+  "sha256": "2a45c04e04937ae602aacb2d67a0c6b0219021d0dee83c5820501bfd1036a979",
+  "url": "https://datagolf.com/past-results/pga-tour/58/2024"
+ },
+ "pga-tour/58/2025": {
+  "bytes": 391087,
+  "file": "pga_58_2025.html",
+  "http": 200,
+  "sha256": "a74faeb9cf15f6626f78e89ae0f11a5a958cf7728bc50d999b2d06a8a9a327cc",
+  "url": "https://datagolf.com/past-results/pga-tour/58/2025"
+ },
+ "pga-tour/59/2020": {
+  "bytes": 391087,
+  "file": "pga_59_2020.html",
+  "http": 200,
+  "sha256": "a26d7a49bd1cac7437b16ae5f3d215ed0b60009575763e160eee31a02f502e1c",
+  "url": "https://datagolf.com/past-results/pga-tour/59/2020"
+ },
+ "pga-tour/59/2021": {
+  "bytes": 391087,
+  "file": "pga_59_2021.html",
+  "http": 200,
+  "sha256": "792965ffb09be31c335ca19bfb4730b9f874c485505474c9f6c43963e4a553c0",
+  "url": "https://datagolf.com/past-results/pga-tour/59/2021"
+ },
+ "pga-tour/59/2022": {
+  "bytes": 391087,
+  "file": "pga_59_2022.html",
+  "http": 200,
+  "sha256": "f2af190ecefefa2579dfc70af2665d6fee9230bca0795a9d329c9a2830f3e012",
+  "url": "https://datagolf.com/past-results/pga-tour/59/2022"
+ },
+ "pga-tour/59/2023": {
+  "bytes": 391087,
+  "file": "pga_59_2023.html",
+  "http": 200,
+  "sha256": "876cb6b36c948ffafc596bf38b8d6941a987fe28c65388d0df2f22e55e831046",
+  "url": "https://datagolf.com/past-results/pga-tour/59/2023"
+ },
+ "pga-tour/59/2024": {
+  "bytes": 391087,
+  "file": "pga_59_2024.html",
+  "http": 200,
+  "sha256": "fa722ff63a130ba6cd5dcc17e73ae0628f7a6739aa189da298330e81d1f6fd82",
+  "url": "https://datagolf.com/past-results/pga-tour/59/2024"
+ },
+ "pga-tour/59/2025": {
+  "bytes": 391087,
+  "file": "pga_59_2025.html",
+  "http": 200,
+  "sha256": "850d6cc528edac64af300e5774774e5632240005edf6c1a709f587ad2a2ae0b6",
+  "url": "https://datagolf.com/past-results/pga-tour/59/2025"
+ },
+ "pga-tour/6/2020": {
+  "bytes": 416771,
+  "file": "pga_6_2020.html",
+  "http": 200,
+  "sha256": "190bece7981354ad386b49f0c24818edfd5832fcd69a19701acbfc8c624c4bbb",
+  "url": "https://datagolf.com/past-results/pga-tour/6/2020"
+ },
+ "pga-tour/6/2021": {
+  "bytes": 417856,
+  "file": "pga_6_2021.html",
+  "http": 200,
+  "sha256": "1a24cdef8b89002a0d076fd51f4b22ea6890b0c109edc533fe04b5c762cca2f3",
+  "url": "https://datagolf.com/past-results/pga-tour/6/2021"
+ },
+ "pga-tour/6/2022": {
+  "bytes": 418098,
+  "file": "pga_6_2022.html",
+  "http": 200,
+  "sha256": "1b20c640708ff39f1f6b2cbc37a3b9376747be10026710af50cbaf7e2d7f1588",
+  "url": "https://datagolf.com/past-results/pga-tour/6/2022"
+ },
+ "pga-tour/6/2023": {
+  "bytes": 419257,
+  "file": "pga_6_2023.html",
+  "http": 200,
+  "sha256": "999afee04461705250c6e56250c1bdc65514784482d1345554736333c6db7609",
+  "url": "https://datagolf.com/past-results/pga-tour/6/2023"
+ },
+ "pga-tour/6/2024": {
+  "bytes": 419870,
+  "file": "pga_6_2024.html",
+  "http": 200,
+  "sha256": "8b4f65ace2d2257a349c58fdfc0e46b124605ccec6daf01622dfee072f3ec433",
+  "url": "https://datagolf.com/past-results/pga-tour/6/2024"
+ },
+ "pga-tour/6/2025": {
+  "bytes": 418624,
+  "file": "pga_6_2025.html",
+  "http": 200,
+  "sha256": "ed78aa35d3992dd6f06a68705125cf825ccdd263f4c8f0f0d66d2fa0b69210b5",
+  "url": "https://datagolf.com/past-results/pga-tour/6/2025"
+ },
+ "pga-tour/60/2020": {
+  "bytes": 348397,
+  "file": "pga_60_2020.html",
+  "http": 200,
+  "sha256": "c0e9a597ac95caa7ad3483dbe358808133252186ca604308d41875ceb0810e85",
+  "url": "https://datagolf.com/past-results/pga-tour/60/2020"
+ },
+ "pga-tour/60/2021": {
+  "bytes": 348901,
+  "file": "pga_60_2021.html",
+  "http": 200,
+  "sha256": "14c09bf33ff787b41e4f713d099b659e91c560094801d41ef17b871030e53a17",
+  "url": "https://datagolf.com/past-results/pga-tour/60/2021"
+ },
+ "pga-tour/60/2022": {
+  "bytes": 347769,
+  "file": "pga_60_2022.html",
+  "http": 200,
+  "sha256": "37bdec44fbaad09fc7e775f850b81f9c4c63c714f1b18516a21178c978733f7d",
+  "url": "https://datagolf.com/past-results/pga-tour/60/2022"
+ },
+ "pga-tour/60/2023": {
+  "bytes": 348457,
+  "file": "pga_60_2023.html",
+  "http": 200,
+  "sha256": "000ede4fa0e9a79f20bb93f79ca182326337d1d54f6f1877137e8d4b42116c69",
+  "url": "https://datagolf.com/past-results/pga-tour/60/2023"
+ },
+ "pga-tour/60/2024": {
+  "bytes": 348632,
+  "file": "pga_60_2024.html",
+  "http": 200,
+  "sha256": "18b995e3351450804f81b4832b35cbf4eecf9c53d908ba23af9f811cfd3de736",
+  "url": "https://datagolf.com/past-results/pga-tour/60/2024"
+ },
+ "pga-tour/60/2025": {
+  "bytes": 345468,
+  "file": "pga_60_2025.html",
+  "http": 200,
+  "sha256": "d316fd9969315ea2bc43a039e2d530c9bdc13fe046a33fd72155613b1407b4c5",
+  "url": "https://datagolf.com/past-results/pga-tour/60/2025"
+ },
+ "pga-tour/61/2020": {
+  "bytes": 391087,
+  "file": "pga_61_2020.html",
+  "http": 200,
+  "sha256": "4b5640252eb31e10ca0025bf9f1c804c7010c51155fafca455cd00e04e9fbf0f",
+  "url": "https://datagolf.com/past-results/pga-tour/61/2020"
+ },
+ "pga-tour/61/2021": {
+  "bytes": 391087,
+  "file": "pga_61_2021.html",
+  "http": 200,
+  "sha256": "183371fc43fe8ff0acdbee396c547e5fb6bf76d9013c0085c9725354bf15af3f",
+  "url": "https://datagolf.com/past-results/pga-tour/61/2021"
+ },
+ "pga-tour/61/2022": {
+  "bytes": 391087,
+  "file": "pga_61_2022.html",
+  "http": 200,
+  "sha256": "d5138b794b7b3cc1b7464ec0def6e173efd1afb46e0eeee13cb9fca2895c0e55",
+  "url": "https://datagolf.com/past-results/pga-tour/61/2022"
+ },
+ "pga-tour/61/2023": {
+  "bytes": 391087,
+  "file": "pga_61_2023.html",
+  "http": 200,
+  "sha256": "b767a7329e709e5e8d3252a09d2f8ac9f0fccd509b7296d027c769f92e637f46",
+  "url": "https://datagolf.com/past-results/pga-tour/61/2023"
+ },
+ "pga-tour/61/2024": {
+  "bytes": 391087,
+  "file": "pga_61_2024.html",
+  "http": 200,
+  "sha256": "6eaa7c079b2354dc8d6f86ab464e545c1a4dd2696c1ef725dbfe6b6d6d91f069",
+  "url": "https://datagolf.com/past-results/pga-tour/61/2024"
+ },
+ "pga-tour/61/2025": {
+  "bytes": 391087,
+  "file": "pga_61_2025.html",
+  "http": 200,
+  "sha256": "066b16a0a861a6a0b2f201d49149646016d7413270ca3b9bc32e19c8cb3b7720",
+  "url": "https://datagolf.com/past-results/pga-tour/61/2025"
+ },
+ "pga-tour/62/2020": {
+  "bytes": 391087,
+  "file": "pga_62_2020.html",
+  "http": 200,
+  "sha256": "11f445858a5b28037de62315d31157aa5ea9973fdcc97539ffe15ab277e610e9",
+  "url": "https://datagolf.com/past-results/pga-tour/62/2020"
+ },
+ "pga-tour/62/2021": {
+  "bytes": 391087,
+  "file": "pga_62_2021.html",
+  "http": 200,
+  "sha256": "e972c946cd1d3d64880d414b148c4f36b32e4cc904d4b9f804f7c4b9e146f096",
+  "url": "https://datagolf.com/past-results/pga-tour/62/2021"
+ },
+ "pga-tour/62/2022": {
+  "bytes": 391087,
+  "file": "pga_62_2022.html",
+  "http": 200,
+  "sha256": "6b1a0629a26128f2de3d30c9dc8c9672b7023c642b4fe56c9a972b2ccf6e13ae",
+  "url": "https://datagolf.com/past-results/pga-tour/62/2022"
+ },
+ "pga-tour/62/2023": {
+  "bytes": 391087,
+  "file": "pga_62_2023.html",
+  "http": 200,
+  "sha256": "19a2baccd0cc7c8cccbf96e96c677c175afcfd33370225b80f2d5d465b2be2c1",
+  "url": "https://datagolf.com/past-results/pga-tour/62/2023"
+ },
+ "pga-tour/62/2024": {
+  "bytes": 391087,
+  "file": "pga_62_2024.html",
+  "http": 200,
+  "sha256": "d856baf79203e1076a488926c23affaaf22c18c3d034c1e19391acfef93b8209",
+  "url": "https://datagolf.com/past-results/pga-tour/62/2024"
+ },
+ "pga-tour/62/2025": {
+  "bytes": 391087,
+  "file": "pga_62_2025.html",
+  "http": 200,
+  "sha256": "bb24c8d988f059fd39c06954cde65742f169b4ff7ddcc33134430b1fb12bb92f",
+  "url": "https://datagolf.com/past-results/pga-tour/62/2025"
+ },
+ "pga-tour/63/2020": {
+  "bytes": 391087,
+  "file": "pga_63_2020.html",
+  "http": 200,
+  "sha256": "5c28d8729682b3efc9abe85fbd165fc90bd292cf1afa85503ba3852d7bab3db3",
+  "url": "https://datagolf.com/past-results/pga-tour/63/2020"
+ },
+ "pga-tour/63/2021": {
+  "bytes": 391087,
+  "file": "pga_63_2021.html",
+  "http": 200,
+  "sha256": "50353654346716a7965ef1e1354e23fe93cedc98799dff2c9a84e294326ea8a1",
+  "url": "https://datagolf.com/past-results/pga-tour/63/2021"
+ },
+ "pga-tour/63/2022": {
+  "bytes": 391087,
+  "file": "pga_63_2022.html",
+  "http": 200,
+  "sha256": "fed863dc759079632451f1e7cc41e451919a0e9e34dcddaa4d55ce155338507b",
+  "url": "https://datagolf.com/past-results/pga-tour/63/2022"
+ },
+ "pga-tour/63/2023": {
+  "bytes": 391087,
+  "file": "pga_63_2023.html",
+  "http": 200,
+  "sha256": "accfbeeb66bcf9f17e0e27366b6c6bad23e21f436934c077c38567f5de760b2a",
+  "url": "https://datagolf.com/past-results/pga-tour/63/2023"
+ },
+ "pga-tour/63/2024": {
+  "bytes": 391087,
+  "file": "pga_63_2024.html",
+  "http": 200,
+  "sha256": "d6f4f20dbb9495130303e64e00d439b4357758569687d139a69ed8262c2c8a92",
+  "url": "https://datagolf.com/past-results/pga-tour/63/2024"
+ },
+ "pga-tour/63/2025": {
+  "bytes": 391087,
+  "file": "pga_63_2025.html",
+  "http": 200,
+  "sha256": "a9817c48185c2ed8d68733df4d9fcda99ee2c761462d709e1768b3e235292c73",
+  "url": "https://datagolf.com/past-results/pga-tour/63/2025"
+ },
+ "pga-tour/64/2020": {
+  "bytes": 391087,
+  "file": "pga_64_2020.html",
+  "http": 200,
+  "sha256": "8d13caff500b4be1802c9ac0be138b48b8a78efe33fdecd1d88d2212bf0cb746",
+  "url": "https://datagolf.com/past-results/pga-tour/64/2020"
+ },
+ "pga-tour/64/2021": {
+  "bytes": 391087,
+  "file": "pga_64_2021.html",
+  "http": 200,
+  "sha256": "d09162348cd9f4e709a557e668a6b3e0a9db5a888af98870bb9f715f8ce86ae4",
+  "url": "https://datagolf.com/past-results/pga-tour/64/2021"
+ },
+ "pga-tour/64/2022": {
+  "bytes": 391087,
+  "file": "pga_64_2022.html",
+  "http": 200,
+  "sha256": "944e5bafd733c80fd5c177cce017c2216f19681cfe7b517a21ace8aaad938d34",
+  "url": "https://datagolf.com/past-results/pga-tour/64/2022"
+ },
+ "pga-tour/64/2023": {
+  "bytes": 391087,
+  "file": "pga_64_2023.html",
+  "http": 200,
+  "sha256": "7c2bfaecbc4953a570aa997f6117a2f889deac039606c70cf83173caf1bac778",
+  "url": "https://datagolf.com/past-results/pga-tour/64/2023"
+ },
+ "pga-tour/64/2024": {
+  "bytes": 391087,
+  "file": "pga_64_2024.html",
+  "http": 200,
+  "sha256": "d9916cc5f04039a846a3bd5cb6fa0fc789b45cdbc8f0f68e48ae27f589215ea1",
+  "url": "https://datagolf.com/past-results/pga-tour/64/2024"
+ },
+ "pga-tour/64/2025": {
+  "bytes": 391087,
+  "file": "pga_64_2025.html",
+  "http": 200,
+  "sha256": "07cfda5599c1935c04291b7622f06c529c23af2cda472ab6d33baf9e66cbbcb4",
+  "url": "https://datagolf.com/past-results/pga-tour/64/2025"
+ },
+ "pga-tour/65/2020": {
+  "bytes": 391087,
+  "file": "pga_65_2020.html",
+  "http": 200,
+  "sha256": "5d3d51298a7c17c5436d265ade8d1e919101a2a0a57745cfde2e84857146009c",
+  "url": "https://datagolf.com/past-results/pga-tour/65/2020"
+ },
+ "pga-tour/65/2021": {
+  "bytes": 391087,
+  "file": "pga_65_2021.html",
+  "http": 200,
+  "sha256": "75c924881c9b1f15add0ff9269759b2085f884673f8356f7efadf0418d1ec3c1",
+  "url": "https://datagolf.com/past-results/pga-tour/65/2021"
+ },
+ "pga-tour/65/2022": {
+  "bytes": 391087,
+  "file": "pga_65_2022.html",
+  "http": 200,
+  "sha256": "21bce4fb15745b24ea2dc30647896612747296e4d60a09b89899af3c71c8e8c3",
+  "url": "https://datagolf.com/past-results/pga-tour/65/2022"
+ },
+ "pga-tour/65/2023": {
+  "bytes": 391087,
+  "file": "pga_65_2023.html",
+  "http": 200,
+  "sha256": "23d39c00d78e07296a06d1867a66cf7e70efa3dd347ddda3b9302109a0e282dc",
+  "url": "https://datagolf.com/past-results/pga-tour/65/2023"
+ },
+ "pga-tour/65/2024": {
+  "bytes": 391087,
+  "file": "pga_65_2024.html",
+  "http": 200,
+  "sha256": "ef9d26f00e8bd8125a6d45cf6b34aad6b86e15a425c1fd1e3b08e2adca28a400",
+  "url": "https://datagolf.com/past-results/pga-tour/65/2024"
+ },
+ "pga-tour/65/2025": {
+  "bytes": 391087,
+  "file": "pga_65_2025.html",
+  "http": 200,
+  "sha256": "a8fff0df72a6ff88f1cd27fbfd0f0051e59399a73e682eee3f34cde8238da874",
+  "url": "https://datagolf.com/past-results/pga-tour/65/2025"
+ },
+ "pga-tour/66/2020": {
+  "bytes": 391087,
+  "file": "pga_66_2020.html",
+  "http": 200,
+  "sha256": "7317e2778147019d7ceea7544e34489375f7c07943019a78e4b63dad1a5c7755",
+  "url": "https://datagolf.com/past-results/pga-tour/66/2020"
+ },
+ "pga-tour/66/2021": {
+  "bytes": 391087,
+  "file": "pga_66_2021.html",
+  "http": 200,
+  "sha256": "411e99f842b69c99880cdb18d668ee0e5aa3247af19125753ce390ebaf6d97f8",
+  "url": "https://datagolf.com/past-results/pga-tour/66/2021"
+ },
+ "pga-tour/66/2022": {
+  "bytes": 391087,
+  "file": "pga_66_2022.html",
+  "http": 200,
+  "sha256": "45d177f40d3fda7c9596fd2cc8d9cea674e0b64251a5d918f6cb92d91e29d4e4",
+  "url": "https://datagolf.com/past-results/pga-tour/66/2022"
+ },
+ "pga-tour/66/2023": {
+  "bytes": 391087,
+  "file": "pga_66_2023.html",
+  "http": 200,
+  "sha256": "be29911e8088386fddc883deba26ca9fb0bc1f4c64ce2b256ef54bfd734979f0",
+  "url": "https://datagolf.com/past-results/pga-tour/66/2023"
+ },
+ "pga-tour/66/2024": {
+  "bytes": 391087,
+  "file": "pga_66_2024.html",
+  "http": 200,
+  "sha256": "c35c62b10211df414ff7ca586a0e3e607c7830ab86165996ba516aaa94c451f1",
+  "url": "https://datagolf.com/past-results/pga-tour/66/2024"
+ },
+ "pga-tour/66/2025": {
+  "bytes": 391087,
+  "file": "pga_66_2025.html",
+  "http": 200,
+  "sha256": "0a7703b901b12ce72781217db49e438438065df5b23599258545eb7a76da332d",
+  "url": "https://datagolf.com/past-results/pga-tour/66/2025"
+ },
+ "pga-tour/67/2020": {
+  "bytes": 391087,
+  "file": "pga_67_2020.html",
+  "http": 200,
+  "sha256": "529353431a5573b564010adb66b4095aad07ec35e4344a3b85e8040497112de3",
+  "url": "https://datagolf.com/past-results/pga-tour/67/2020"
+ },
+ "pga-tour/67/2021": {
+  "bytes": 391087,
+  "file": "pga_67_2021.html",
+  "http": 200,
+  "sha256": "67a46710039211d441f982ee22d0a2d2a8a97ad4dcdaddea72129293a290281d",
+  "url": "https://datagolf.com/past-results/pga-tour/67/2021"
+ },
+ "pga-tour/67/2022": {
+  "bytes": 391087,
+  "file": "pga_67_2022.html",
+  "http": 200,
+  "sha256": "6e3a5010225d7f2dcd0cef7a4ddb1c74230a29fc1e0ab582b85620826b0c8acd",
+  "url": "https://datagolf.com/past-results/pga-tour/67/2022"
+ },
+ "pga-tour/67/2023": {
+  "bytes": 391087,
+  "file": "pga_67_2023.html",
+  "http": 200,
+  "sha256": "ca85fbf7c3f62f21713a3531cf81617e17d3841a93a0fa0a03f08d72af920626",
+  "url": "https://datagolf.com/past-results/pga-tour/67/2023"
+ },
+ "pga-tour/67/2024": {
+  "bytes": 391087,
+  "file": "pga_67_2024.html",
+  "http": 200,
+  "sha256": "dc2e938a1c6f92aeb574454a00d1d49c95e2f08ec163efc5741a912733442402",
+  "url": "https://datagolf.com/past-results/pga-tour/67/2024"
+ },
+ "pga-tour/67/2025": {
+  "bytes": 391087,
+  "file": "pga_67_2025.html",
+  "http": 200,
+  "sha256": "2179c7360dc080eebd22f2b01916497441872d39e96a5a9484ef158717c524ed",
+  "url": "https://datagolf.com/past-results/pga-tour/67/2025"
+ },
+ "pga-tour/68/2020": {
+  "bytes": 391087,
+  "file": "pga_68_2020.html",
+  "http": 200,
+  "sha256": "4559cd6f1081e73b6c63b1a9585d441e55664136b6dd6f417d59be0ce3e7dc48",
+  "url": "https://datagolf.com/past-results/pga-tour/68/2020"
+ },
+ "pga-tour/68/2021": {
+  "bytes": 391087,
+  "file": "pga_68_2021.html",
+  "http": 200,
+  "sha256": "2fe1bcc9604cf46af62dff9b35c8dd9949324a4e3c2e9620a92315830c9d8c51",
+  "url": "https://datagolf.com/past-results/pga-tour/68/2021"
+ },
+ "pga-tour/68/2022": {
+  "bytes": 391087,
+  "file": "pga_68_2022.html",
+  "http": 200,
+  "sha256": "75da8fdb1df83bb1cedc485e9fe46d5a359aedd64f10c91ddccaa222459602e3",
+  "url": "https://datagolf.com/past-results/pga-tour/68/2022"
+ },
+ "pga-tour/68/2023": {
+  "bytes": 391087,
+  "file": "pga_68_2023.html",
+  "http": 200,
+  "sha256": "a0c5505d7522b5f12ac954630c17ef7df2023a0aae7d06fd1bae3740d785dcfd",
+  "url": "https://datagolf.com/past-results/pga-tour/68/2023"
+ },
+ "pga-tour/68/2024": {
+  "bytes": 391087,
+  "file": "pga_68_2024.html",
+  "http": 200,
+  "sha256": "06d51a4fa209f1d4da1ed64850823621107ef2478452e5a3204b0b41711477b3",
+  "url": "https://datagolf.com/past-results/pga-tour/68/2024"
+ },
+ "pga-tour/68/2025": {
+  "bytes": 391087,
+  "file": "pga_68_2025.html",
+  "http": 200,
+  "sha256": "1052c2091e649036b923df22db65411e221a05a5b6087c8f322dba5ef12b4ada",
+  "url": "https://datagolf.com/past-results/pga-tour/68/2025"
+ },
+ "pga-tour/69/2020": {
+  "bytes": 391087,
+  "file": "pga_69_2020.html",
+  "http": 200,
+  "sha256": "8a3ffc0ee534829f7525cb203912a87aa106651c6b81a3dc648caddfce71e4ca",
+  "url": "https://datagolf.com/past-results/pga-tour/69/2020"
+ },
+ "pga-tour/69/2021": {
+  "bytes": 391087,
+  "file": "pga_69_2021.html",
+  "http": 200,
+  "sha256": "c679004059ddb2f9bc5e8fa36bd8ba3a9f76f5b90b41924cfdfb1ecee0123c35",
+  "url": "https://datagolf.com/past-results/pga-tour/69/2021"
+ },
+ "pga-tour/69/2022": {
+  "bytes": 391087,
+  "file": "pga_69_2022.html",
+  "http": 200,
+  "sha256": "0317bdeee4f966f318546bf85e53a50ebf490b682ad35e16f5e7445a989eaf8d",
+  "url": "https://datagolf.com/past-results/pga-tour/69/2022"
+ },
+ "pga-tour/69/2023": {
+  "bytes": 391087,
+  "file": "pga_69_2023.html",
+  "http": 200,
+  "sha256": "b2e611e358eb53d0dc9b2248df2f76ca5d68eeacaac9186baea3a1a754af6939",
+  "url": "https://datagolf.com/past-results/pga-tour/69/2023"
+ },
+ "pga-tour/69/2024": {
+  "bytes": 391087,
+  "file": "pga_69_2024.html",
+  "http": 200,
+  "sha256": "f13a384203a2161e156819804d1208e80bb289b7ae85daf8905a3ef271d4fb14",
+  "url": "https://datagolf.com/past-results/pga-tour/69/2024"
+ },
+ "pga-tour/69/2025": {
+  "bytes": 391087,
+  "file": "pga_69_2025.html",
+  "http": 200,
+  "sha256": "4af73f6856f00c3a23ebdbe22fbf468b9646d3372081e1604f7af60f4b63af53",
+  "url": "https://datagolf.com/past-results/pga-tour/69/2025"
+ },
+ "pga-tour/7/2020": {
+  "bytes": 403657,
+  "file": "pga_7_2020.html",
+  "http": 200,
+  "sha256": "5d6b0893db784fdc0d856bc1f809200d2481be4a1794e587952948bd04cca910",
+  "url": "https://datagolf.com/past-results/pga-tour/7/2020"
+ },
+ "pga-tour/7/2021": {
+  "bytes": 403707,
+  "file": "pga_7_2021.html",
+  "http": 200,
+  "sha256": "72ad46b04a56305a4971bffe146762a59662b027aafb641be59d73f08186ce5c",
+  "url": "https://datagolf.com/past-results/pga-tour/7/2021"
+ },
+ "pga-tour/7/2022": {
+  "bytes": 405049,
+  "file": "pga_7_2022.html",
+  "http": 200,
+  "sha256": "e3b4ce9ffaf49ce43df3694c210587aeec8b0fc999cd82241e15c53f116cc5d3",
+  "url": "https://datagolf.com/past-results/pga-tour/7/2022"
+ },
+ "pga-tour/7/2023": {
+  "bytes": 409917,
+  "file": "pga_7_2023.html",
+  "http": 200,
+  "sha256": "f8887a06b53b14b9fd104f1877e1dad366ff76d749e0f1b1cf154413640c0336",
+  "url": "https://datagolf.com/past-results/pga-tour/7/2023"
+ },
+ "pga-tour/7/2024": {
+  "bytes": 371886,
+  "file": "pga_7_2024.html",
+  "http": 200,
+  "sha256": "547bda9472feb8e64902d7673d54087415924d99cfe0e154e3da8c1358418f0f",
+  "url": "https://datagolf.com/past-results/pga-tour/7/2024"
+ },
+ "pga-tour/7/2025": {
+  "bytes": 373291,
+  "file": "pga_7_2025.html",
+  "http": 200,
+  "sha256": "c58df82dfc6315b9e458703848bd3b81216ccf8fe4f110d7af75b313e3fc8b90",
+  "url": "https://datagolf.com/past-results/pga-tour/7/2025"
+ },
+ "pga-tour/70/2020": {
+  "bytes": 391087,
+  "file": "pga_70_2020.html",
+  "http": 200,
+  "sha256": "66b6c1a2e36fd95db9c3941e36f53dcf7b324581e0dbfa7dfa7d5f12335af451",
+  "url": "https://datagolf.com/past-results/pga-tour/70/2020"
+ },
+ "pga-tour/70/2021": {
+  "bytes": 391087,
+  "file": "pga_70_2021.html",
+  "http": 200,
+  "sha256": "83e328d5090699000853778457b77bf418e54989e0cbaeab7e82b4f8a58ddab6",
+  "url": "https://datagolf.com/past-results/pga-tour/70/2021"
+ },
+ "pga-tour/70/2022": {
+  "bytes": 391087,
+  "file": "pga_70_2022.html",
+  "http": 200,
+  "sha256": "3d360529d32d648374f58007139ed1d6c759efe8f71e9d0b127da7d39d9abc39",
+  "url": "https://datagolf.com/past-results/pga-tour/70/2022"
+ },
+ "pga-tour/70/2023": {
+  "bytes": 391087,
+  "file": "pga_70_2023.html",
+  "http": 200,
+  "sha256": "67bed3b9ec1a2c5effa671002f05974c5689778007591069f19352578e87f1ba",
+  "url": "https://datagolf.com/past-results/pga-tour/70/2023"
+ },
+ "pga-tour/70/2024": {
+  "bytes": 391087,
+  "file": "pga_70_2024.html",
+  "http": 200,
+  "sha256": "44f5eb77c4c4a42bb68306d7f82e1e6c0665b452eb4da7c013fa69d234957c6b",
+  "url": "https://datagolf.com/past-results/pga-tour/70/2024"
+ },
+ "pga-tour/70/2025": {
+  "bytes": 391087,
+  "file": "pga_70_2025.html",
+  "http": 200,
+  "sha256": "8d7c2bc0416eb539c2eebdaa921ce2e0a25888c24e76dd1ee416f1067f13f8d4",
+  "url": "https://datagolf.com/past-results/pga-tour/70/2025"
+ },
+ "pga-tour/71/2020": {
+  "bytes": 391087,
+  "file": "pga_71_2020.html",
+  "http": 200,
+  "sha256": "9a431158e4ca649855e49d93bbae2e253f5c17f9870a774196f83e0dcbea4762",
+  "url": "https://datagolf.com/past-results/pga-tour/71/2020"
+ },
+ "pga-tour/71/2021": {
+  "bytes": 391087,
+  "file": "pga_71_2021.html",
+  "http": 200,
+  "sha256": "27ee078ccdf4026d894c86f03d6c9d46ab694e9cdb93986312b495337618fddb",
+  "url": "https://datagolf.com/past-results/pga-tour/71/2021"
+ },
+ "pga-tour/71/2022": {
+  "bytes": 391087,
+  "file": "pga_71_2022.html",
+  "http": 200,
+  "sha256": "d1ce434d945d9c97cf8f91cc3840936e165eb1f296777f77301e4e27ce5177ca",
+  "url": "https://datagolf.com/past-results/pga-tour/71/2022"
+ },
+ "pga-tour/71/2023": {
+  "bytes": 391087,
+  "file": "pga_71_2023.html",
+  "http": 200,
+  "sha256": "53750d5267fdfe0147ba8fad9d75c74f4968289c3fd5c0ce89a935adfea986f5",
+  "url": "https://datagolf.com/past-results/pga-tour/71/2023"
+ },
+ "pga-tour/71/2024": {
+  "bytes": 391087,
+  "file": "pga_71_2024.html",
+  "http": 200,
+  "sha256": "128e161993df8b0acc75734984b171e39ce3aa062ce0bc0ecabf09c8ae7617fe",
+  "url": "https://datagolf.com/past-results/pga-tour/71/2024"
+ },
+ "pga-tour/71/2025": {
+  "bytes": 391087,
+  "file": "pga_71_2025.html",
+  "http": 200,
+  "sha256": "3ed251d89f0b5e71c3a83d3aa5afbd806eceebfdd743ad50e9ddba07b1f682b5",
+  "url": "https://datagolf.com/past-results/pga-tour/71/2025"
+ },
+ "pga-tour/72/2020": {
+  "bytes": 391087,
+  "file": "pga_72_2020.html",
+  "http": 200,
+  "sha256": "3b704c5079265087dd26b27cf09e86ff7724dec50329d7ba804a62ccd809769e",
+  "url": "https://datagolf.com/past-results/pga-tour/72/2020"
+ },
+ "pga-tour/72/2021": {
+  "bytes": 391087,
+  "file": "pga_72_2021.html",
+  "http": 200,
+  "sha256": "6b5af0ee65304356da63bdd002e2840f99679a3cc6f3bdf8d7b314648bf1e078",
+  "url": "https://datagolf.com/past-results/pga-tour/72/2021"
+ },
+ "pga-tour/72/2022": {
+  "bytes": 391087,
+  "file": "pga_72_2022.html",
+  "http": 200,
+  "sha256": "66f1e1b78e9430053d36cf38290e3fbeaa6554aadf41fdfced3db1695c3e0cce",
+  "url": "https://datagolf.com/past-results/pga-tour/72/2022"
+ },
+ "pga-tour/72/2023": {
+  "bytes": 391087,
+  "file": "pga_72_2023.html",
+  "http": 200,
+  "sha256": "221ec9f786f009138ef4def3a61d7310e433111fa8d87ff2d81db6cafac95791",
+  "url": "https://datagolf.com/past-results/pga-tour/72/2023"
+ },
+ "pga-tour/72/2024": {
+  "bytes": 391087,
+  "file": "pga_72_2024.html",
+  "http": 200,
+  "sha256": "e6334bfcdf5b4d82da1847c7219264615ce09714d394abcf9fb3f37c234b6d37",
+  "url": "https://datagolf.com/past-results/pga-tour/72/2024"
+ },
+ "pga-tour/72/2025": {
+  "bytes": 391087,
+  "file": "pga_72_2025.html",
+  "http": 200,
+  "sha256": "1f2d01c75f695d8c82a35e50de6abb6c25ee64d5dfb5d2db0664b71c7878d862",
+  "url": "https://datagolf.com/past-results/pga-tour/72/2025"
+ },
+ "pga-tour/73/2020": {
+  "bytes": 391087,
+  "file": "pga_73_2020.html",
+  "http": 200,
+  "sha256": "ac1dd01bba52ea631c800bbb1625f6349bb6862a7fb136f209d14c5af4f8b310",
+  "url": "https://datagolf.com/past-results/pga-tour/73/2020"
+ },
+ "pga-tour/73/2021": {
+  "bytes": 391087,
+  "file": "pga_73_2021.html",
+  "http": 200,
+  "sha256": "87b5b90e4055a924053fe102608f99d77d7fe18dee66b8c54b8fcbc1a761acb5",
+  "url": "https://datagolf.com/past-results/pga-tour/73/2021"
+ },
+ "pga-tour/73/2022": {
+  "bytes": 391087,
+  "file": "pga_73_2022.html",
+  "http": 200,
+  "sha256": "ca807ee3bfd69be8c5737ff79d0b368765767cdbe25ec659a456b770f90097c6",
+  "url": "https://datagolf.com/past-results/pga-tour/73/2022"
+ },
+ "pga-tour/73/2023": {
+  "bytes": 391087,
+  "file": "pga_73_2023.html",
+  "http": 200,
+  "sha256": "9bfdb67bb2c14d63f99ed5aa9bf6189cb83bfd259a39d7221d949e28f822b9c3",
+  "url": "https://datagolf.com/past-results/pga-tour/73/2023"
+ },
+ "pga-tour/73/2024": {
+  "bytes": 391087,
+  "file": "pga_73_2024.html",
+  "http": 200,
+  "sha256": "22aa351074ac1135b41764f3b0e02910c89c0717be82f2d5a11e77097f11f253",
+  "url": "https://datagolf.com/past-results/pga-tour/73/2024"
+ },
+ "pga-tour/73/2025": {
+  "bytes": 391087,
+  "file": "pga_73_2025.html",
+  "http": 200,
+  "sha256": "3ec31fb36a8ee97dbf9016d0ffd93a3bca720f6c178e70cb01be9c00312ee1db",
+  "url": "https://datagolf.com/past-results/pga-tour/73/2025"
+ },
+ "pga-tour/74/2020": {
+  "bytes": 391087,
+  "file": "pga_74_2020.html",
+  "http": 200,
+  "sha256": "38f6ea42a681ded4f44ed5d85561dc7bf7db24763e04fae992e9a19227d2d26d",
+  "url": "https://datagolf.com/past-results/pga-tour/74/2020"
+ },
+ "pga-tour/74/2021": {
+  "bytes": 391087,
+  "file": "pga_74_2021.html",
+  "http": 200,
+  "sha256": "33ba44d9319a5e7d2e04c9b38aa1c812f1929dac38b0ee3aae1cf12b2f857c44",
+  "url": "https://datagolf.com/past-results/pga-tour/74/2021"
+ },
+ "pga-tour/74/2022": {
+  "bytes": 391087,
+  "file": "pga_74_2022.html",
+  "http": 200,
+  "sha256": "e0ae2cb31e5bedd56b9b6ab5f6836266c08feb02aaea9fbf981d8c211a913768",
+  "url": "https://datagolf.com/past-results/pga-tour/74/2022"
+ },
+ "pga-tour/74/2023": {
+  "bytes": 391087,
+  "file": "pga_74_2023.html",
+  "http": 200,
+  "sha256": "dc748d3ca3bce4a9ef3144cb1b37429eb68142bcf0035a1061d2522b77421028",
+  "url": "https://datagolf.com/past-results/pga-tour/74/2023"
+ },
+ "pga-tour/74/2024": {
+  "bytes": 391087,
+  "file": "pga_74_2024.html",
+  "http": 200,
+  "sha256": "4be342865800bf979c15849701ef3b5d94fe29296b53d8f262deb8682826ac6b",
+  "url": "https://datagolf.com/past-results/pga-tour/74/2024"
+ },
+ "pga-tour/74/2025": {
+  "bytes": 391087,
+  "file": "pga_74_2025.html",
+  "http": 200,
+  "sha256": "a2ee1f4e351055693a453f6b71ddbfab72a925bb83b56368028a5158be35bdd7",
+  "url": "https://datagolf.com/past-results/pga-tour/74/2025"
+ },
+ "pga-tour/75/2020": {
+  "bytes": 391087,
+  "file": "pga_75_2020.html",
+  "http": 200,
+  "sha256": "be7f829b049d28573e557fe9f95c3d3fcb4b0decf51ae7a29a05a21a6795bac1",
+  "url": "https://datagolf.com/past-results/pga-tour/75/2020"
+ },
+ "pga-tour/75/2021": {
+  "bytes": 391087,
+  "file": "pga_75_2021.html",
+  "http": 200,
+  "sha256": "653fee66529c6d2315150b3a5200cf67334f0ffae004063acc0b543c075caba7",
+  "url": "https://datagolf.com/past-results/pga-tour/75/2021"
+ },
+ "pga-tour/75/2022": {
+  "bytes": 391087,
+  "file": "pga_75_2022.html",
+  "http": 200,
+  "sha256": "9d15a53ab9e5146e5e8f49b6b0922c25dfac06f0ddc05f60d0d3679f907ef13e",
+  "url": "https://datagolf.com/past-results/pga-tour/75/2022"
+ },
+ "pga-tour/75/2023": {
+  "bytes": 391087,
+  "file": "pga_75_2023.html",
+  "http": 200,
+  "sha256": "6e913f59d96cf8da005c8943e888fedfc8e58a9fa2aa7fca8b5646a4b504b934",
+  "url": "https://datagolf.com/past-results/pga-tour/75/2023"
+ },
+ "pga-tour/75/2024": {
+  "bytes": 391087,
+  "file": "pga_75_2024.html",
+  "http": 200,
+  "sha256": "075fdecea43b927c25dd138d6e30f6b454832837bacad47d21f35dd50d859bab",
+  "url": "https://datagolf.com/past-results/pga-tour/75/2024"
+ },
+ "pga-tour/75/2025": {
+  "bytes": 391087,
+  "file": "pga_75_2025.html",
+  "http": 200,
+  "sha256": "7331b1e4b7dc89544fa69182d987b6e77576883707400d337a73da806f7a0009",
+  "url": "https://datagolf.com/past-results/pga-tour/75/2025"
+ },
+ "pga-tour/76/2020": {
+  "bytes": 391087,
+  "file": "pga_76_2020.html",
+  "http": 200,
+  "sha256": "e3a9f6623888d94e22a2346e5742c2b8ba5deef368a8d6f7aab8e414b8e02b1a",
+  "url": "https://datagolf.com/past-results/pga-tour/76/2020"
+ },
+ "pga-tour/76/2021": {
+  "bytes": 391087,
+  "file": "pga_76_2021.html",
+  "http": 200,
+  "sha256": "13f1defe10f7468843c37faea12cbef3595c79d01c5d36ae64fe2cc2370e1c09",
+  "url": "https://datagolf.com/past-results/pga-tour/76/2021"
+ },
+ "pga-tour/76/2022": {
+  "bytes": 391087,
+  "file": "pga_76_2022.html",
+  "http": 200,
+  "sha256": "ac03ea59366ac47116eb4e73dbfb86c5dbb318ced93694af530ebec9ec7874bf",
+  "url": "https://datagolf.com/past-results/pga-tour/76/2022"
+ },
+ "pga-tour/76/2023": {
+  "bytes": 391087,
+  "file": "pga_76_2023.html",
+  "http": 200,
+  "sha256": "84028e0b69db1f4fff3212fa67331ca6a97891bd395fd4bf398f7c4536c4c1c5",
+  "url": "https://datagolf.com/past-results/pga-tour/76/2023"
+ },
+ "pga-tour/76/2024": {
+  "bytes": 391087,
+  "file": "pga_76_2024.html",
+  "http": 200,
+  "sha256": "beb1f02c4c1499f36ee8ae4c5d48118b39d586547fa56a3eae51354dc0f12197",
+  "url": "https://datagolf.com/past-results/pga-tour/76/2024"
+ },
+ "pga-tour/76/2025": {
+  "bytes": 391087,
+  "file": "pga_76_2025.html",
+  "http": 200,
+  "sha256": "f025c43195dd461724d1078caacd6fdf2f32811f94aa515e35da544767a08ed8",
+  "url": "https://datagolf.com/past-results/pga-tour/76/2025"
+ },
+ "pga-tour/77/2020": {
+  "bytes": 391087,
+  "file": "pga_77_2020.html",
+  "http": 200,
+  "sha256": "8871e83bec6eb61a6fa77e77e76e63f4735bef587d7d6eac532c873efec72942",
+  "url": "https://datagolf.com/past-results/pga-tour/77/2020"
+ },
+ "pga-tour/77/2021": {
+  "bytes": 391087,
+  "file": "pga_77_2021.html",
+  "http": 200,
+  "sha256": "8fc23282560d48552cb04dda0f3a248496e17be2b7bc58c85d89f1e4db95c5a0",
+  "url": "https://datagolf.com/past-results/pga-tour/77/2021"
+ },
+ "pga-tour/77/2022": {
+  "bytes": 391087,
+  "file": "pga_77_2022.html",
+  "http": 200,
+  "sha256": "f3799cecc6fc5ddaa905da847a565c2a11e7b8bdfb526cb704478c896041123a",
+  "url": "https://datagolf.com/past-results/pga-tour/77/2022"
+ },
+ "pga-tour/77/2023": {
+  "bytes": 391087,
+  "file": "pga_77_2023.html",
+  "http": 200,
+  "sha256": "5573ccbd727b4f0062f51cb538f75bd7c34b8cf1bbb6250d255e0557dee808a5",
+  "url": "https://datagolf.com/past-results/pga-tour/77/2023"
+ },
+ "pga-tour/77/2024": {
+  "bytes": 391087,
+  "file": "pga_77_2024.html",
+  "http": 200,
+  "sha256": "f2dcd95a8d60af16216866ff879ff0bd70e318643b27fb309d0ca27f4c34c7cf",
+  "url": "https://datagolf.com/past-results/pga-tour/77/2024"
+ },
+ "pga-tour/77/2025": {
+  "bytes": 391087,
+  "file": "pga_77_2025.html",
+  "http": 200,
+  "sha256": "e660e244c15e92c7da5ee42c62a9314c60c401c4402c01e3fb82290ca9fddb63",
+  "url": "https://datagolf.com/past-results/pga-tour/77/2025"
+ },
+ "pga-tour/78/2020": {
+  "bytes": 391087,
+  "file": "pga_78_2020.html",
+  "http": 200,
+  "sha256": "cdf603148aff703f05322da3c6246ad830d71887e1432a68a7a881b2f2484edc",
+  "url": "https://datagolf.com/past-results/pga-tour/78/2020"
+ },
+ "pga-tour/78/2021": {
+  "bytes": 391087,
+  "file": "pga_78_2021.html",
+  "http": 200,
+  "sha256": "0c0acc7e42f184eab95cb1cd9a31970c3f2cd3da5863168037f8760b09960962",
+  "url": "https://datagolf.com/past-results/pga-tour/78/2021"
+ },
+ "pga-tour/78/2022": {
+  "bytes": 391087,
+  "file": "pga_78_2022.html",
+  "http": 200,
+  "sha256": "96dfd7a36e254b440cd66046fdb9ac741c27627ed685814ffffc2a82e84ac144",
+  "url": "https://datagolf.com/past-results/pga-tour/78/2022"
+ },
+ "pga-tour/78/2023": {
+  "bytes": 391087,
+  "file": "pga_78_2023.html",
+  "http": 200,
+  "sha256": "db6f324e3cb24b5fda984f1b19fb511acfcdeaf3e63899903c1eef3b186591c4",
+  "url": "https://datagolf.com/past-results/pga-tour/78/2023"
+ },
+ "pga-tour/78/2024": {
+  "bytes": 391087,
+  "file": "pga_78_2024.html",
+  "http": 200,
+  "sha256": "198e8277e8b48ba976626577bf093af967b6adf0080d621aefee510e591a8627",
+  "url": "https://datagolf.com/past-results/pga-tour/78/2024"
+ },
+ "pga-tour/78/2025": {
+  "bytes": 391087,
+  "file": "pga_78_2025.html",
+  "http": 200,
+  "sha256": "e758eefd8a94659fae4112b3f8d6b1d7bdf691f6a1fc91c6987c2603d192cc7c",
+  "url": "https://datagolf.com/past-results/pga-tour/78/2025"
+ },
+ "pga-tour/79/2020": {
+  "bytes": 391087,
+  "file": "pga_79_2020.html",
+  "http": 200,
+  "sha256": "e966f083fa721d59a5b760c18f80d045abaeac30b406ae5201bf6a8104a07d59",
+  "url": "https://datagolf.com/past-results/pga-tour/79/2020"
+ },
+ "pga-tour/79/2021": {
+  "bytes": 391087,
+  "file": "pga_79_2021.html",
+  "http": 200,
+  "sha256": "d902db1a1bba65cff5a8b3b6d863f2248938a3ac7d3f1833be410af53e5738e8",
+  "url": "https://datagolf.com/past-results/pga-tour/79/2021"
+ },
+ "pga-tour/79/2022": {
+  "bytes": 391087,
+  "file": "pga_79_2022.html",
+  "http": 200,
+  "sha256": "f47681413b47d52bc4a8db7df0b25c1e3e52ff8794d12a48fad8839975521918",
+  "url": "https://datagolf.com/past-results/pga-tour/79/2022"
+ },
+ "pga-tour/79/2023": {
+  "bytes": 391087,
+  "file": "pga_79_2023.html",
+  "http": 200,
+  "sha256": "a75714c6845f86839fda28affe320809a0b0731a91529cd1c39d58f6687a0208",
+  "url": "https://datagolf.com/past-results/pga-tour/79/2023"
+ },
+ "pga-tour/79/2024": {
+  "bytes": 391087,
+  "file": "pga_79_2024.html",
+  "http": 200,
+  "sha256": "1f604d152b6ab6efe69a502f07f733e22b228f770377320f7692356c93578b1a",
+  "url": "https://datagolf.com/past-results/pga-tour/79/2024"
+ },
+ "pga-tour/79/2025": {
+  "bytes": 391087,
+  "file": "pga_79_2025.html",
+  "http": 200,
+  "sha256": "6f148503fd45502302fab5cd053034a9c4fc3f6c601f70154fbf5e02e1af6de8",
+  "url": "https://datagolf.com/past-results/pga-tour/79/2025"
+ },
+ "pga-tour/8/2020": {
+  "bytes": 391085,
+  "file": "pga_8_2020.html",
+  "http": 200,
+  "sha256": "0d3a87da6bb9d8fcc91fa0c6b74b70c477902ff512c4579d585f297e9199ce5f",
+  "url": "https://datagolf.com/past-results/pga-tour/8/2020"
+ },
+ "pga-tour/8/2021": {
+  "bytes": 391085,
+  "file": "pga_8_2021.html",
+  "http": 200,
+  "sha256": "ff64617a4a28c9ff918e903adfe94dbee150b313f215b74d249452c6fdb6b1c2",
+  "url": "https://datagolf.com/past-results/pga-tour/8/2021"
+ },
+ "pga-tour/8/2022": {
+  "bytes": 391085,
+  "file": "pga_8_2022.html",
+  "http": 200,
+  "sha256": "d68ab61291916bcb5918bbf07c5086728ed754dc616ded130f0e95f2b1686764",
+  "url": "https://datagolf.com/past-results/pga-tour/8/2022"
+ },
+ "pga-tour/8/2023": {
+  "bytes": 391085,
+  "file": "pga_8_2023.html",
+  "http": 200,
+  "sha256": "bf6e89f8fa062da8e6eca664619e825f3449bf2699d8f90a97424afb30ee245b",
+  "url": "https://datagolf.com/past-results/pga-tour/8/2023"
+ },
+ "pga-tour/8/2024": {
+  "bytes": 391085,
+  "file": "pga_8_2024.html",
+  "http": 200,
+  "sha256": "44d9c3bc52a38671affcd06e7b7bc78b9f562efccd01079af74e2629a8c5b046",
+  "url": "https://datagolf.com/past-results/pga-tour/8/2024"
+ },
+ "pga-tour/8/2025": {
+  "bytes": 391085,
+  "file": "pga_8_2025.html",
+  "http": 200,
+  "sha256": "bcc45795dbb05cc3554da2b800889f42453d7df11f122ac9c31a0aba45624fd6",
+  "url": "https://datagolf.com/past-results/pga-tour/8/2025"
+ },
+ "pga-tour/80/2020": {
+  "bytes": 391087,
+  "file": "pga_80_2020.html",
+  "http": 200,
+  "sha256": "8ea13377ea5c58f9cb3d26a8ed4125865f0a15ec02cbb5ab312afbc91e6d8ccf",
+  "url": "https://datagolf.com/past-results/pga-tour/80/2020"
+ },
+ "pga-tour/80/2021": {
+  "bytes": 391087,
+  "file": "pga_80_2021.html",
+  "http": 200,
+  "sha256": "8274e543ad17b23c0745a3931fd4adf429af93edf49b396492dba9fd2182bee7",
+  "url": "https://datagolf.com/past-results/pga-tour/80/2021"
+ },
+ "pga-tour/80/2022": {
+  "bytes": 391087,
+  "file": "pga_80_2022.html",
+  "http": 200,
+  "sha256": "1b57beaaad5cffb6fe1bc188b185cc06c87bb3b06784d1f329a927df3ecceffc",
+  "url": "https://datagolf.com/past-results/pga-tour/80/2022"
+ },
+ "pga-tour/80/2023": {
+  "bytes": 391087,
+  "file": "pga_80_2023.html",
+  "http": 200,
+  "sha256": "21b71d41ac6778b8828b7620070ee35761a999cb97b5244e95c7c37a22a821a4",
+  "url": "https://datagolf.com/past-results/pga-tour/80/2023"
+ },
+ "pga-tour/80/2024": {
+  "bytes": 391087,
+  "file": "pga_80_2024.html",
+  "http": 200,
+  "sha256": "f8b27f4e2d16224b9ac8826d81f3b27577eba6ae6eb4581199aefbd16d062b60",
+  "url": "https://datagolf.com/past-results/pga-tour/80/2024"
+ },
+ "pga-tour/80/2025": {
+  "bytes": 391087,
+  "file": "pga_80_2025.html",
+  "http": 200,
+  "sha256": "9be8ace01306b5b5ed8a42315674191df5ee1084944a077f58ede8d7196c594c",
+  "url": "https://datagolf.com/past-results/pga-tour/80/2025"
+ },
+ "pga-tour/81/2020": {
+  "bytes": 391087,
+  "file": "pga_81_2020.html",
+  "http": 200,
+  "sha256": "f4788d0931b102e167f13f302381eba52852e28a448a5e4b79fe9de7a8843c04",
+  "url": "https://datagolf.com/past-results/pga-tour/81/2020"
+ },
+ "pga-tour/81/2021": {
+  "bytes": 391087,
+  "file": "pga_81_2021.html",
+  "http": 200,
+  "sha256": "2d3447af1edbb69e415af48c5aff1d9ba13d70f4c2909ba71781b748d8ab3fa5",
+  "url": "https://datagolf.com/past-results/pga-tour/81/2021"
+ },
+ "pga-tour/81/2022": {
+  "bytes": 391087,
+  "file": "pga_81_2022.html",
+  "http": 200,
+  "sha256": "38fa1c1b1c22f0244d88b4a4fad78f0800cb5b6a0b225878fe3ad669bb1883da",
+  "url": "https://datagolf.com/past-results/pga-tour/81/2022"
+ },
+ "pga-tour/81/2023": {
+  "bytes": 391087,
+  "file": "pga_81_2023.html",
+  "http": 200,
+  "sha256": "18587bddc806538dc6185ebcfe5261bf31363c164d322d08127b79108be7351f",
+  "url": "https://datagolf.com/past-results/pga-tour/81/2023"
+ },
+ "pga-tour/81/2024": {
+  "bytes": 391087,
+  "file": "pga_81_2024.html",
+  "http": 200,
+  "sha256": "a4d8ab349f4271559bbf5f3a56fa3d6ab1c18312e5636202ae46d04f54f45014",
+  "url": "https://datagolf.com/past-results/pga-tour/81/2024"
+ },
+ "pga-tour/81/2025": {
+  "bytes": 391087,
+  "file": "pga_81_2025.html",
+  "http": 200,
+  "sha256": "15262558f252e7643be4dcd1edf9091c778bea5eb115b542a6f8876dc3de1d11",
+  "url": "https://datagolf.com/past-results/pga-tour/81/2025"
+ },
+ "pga-tour/82/2020": {
+  "bytes": 391087,
+  "file": "pga_82_2020.html",
+  "http": 200,
+  "sha256": "ef1eb8d87c4e203bd9d41dfad48a97b9253d898d8a9cd077b12022d25472d33c",
+  "url": "https://datagolf.com/past-results/pga-tour/82/2020"
+ },
+ "pga-tour/82/2021": {
+  "bytes": 391087,
+  "file": "pga_82_2021.html",
+  "http": 200,
+  "sha256": "65b94e8364b1bc73c1cefe86b915a2634666d1be6c101a7f7554f6a74e013d0f",
+  "url": "https://datagolf.com/past-results/pga-tour/82/2021"
+ },
+ "pga-tour/82/2022": {
+  "bytes": 391087,
+  "file": "pga_82_2022.html",
+  "http": 200,
+  "sha256": "3d774516eefc130ecbce1708bd541fe413929fab894d14df037b69d46bbc18fb",
+  "url": "https://datagolf.com/past-results/pga-tour/82/2022"
+ },
+ "pga-tour/82/2023": {
+  "bytes": 391087,
+  "file": "pga_82_2023.html",
+  "http": 200,
+  "sha256": "fc83f90717f0573abe57af03ac0f1a0c50ae8db0610fd4dc15afdff3f0fd47cb",
+  "url": "https://datagolf.com/past-results/pga-tour/82/2023"
+ },
+ "pga-tour/82/2024": {
+  "bytes": 391087,
+  "file": "pga_82_2024.html",
+  "http": 200,
+  "sha256": "b6734d5969d5dc4a512257514146c636e5fc2e9612c288138ee532cc19615388",
+  "url": "https://datagolf.com/past-results/pga-tour/82/2024"
+ },
+ "pga-tour/82/2025": {
+  "bytes": 391087,
+  "file": "pga_82_2025.html",
+  "http": 200,
+  "sha256": "39ce595e6843910cd5597be148293181ec067c7d5abd1d1fa1caf5ba80ddba27",
+  "url": "https://datagolf.com/past-results/pga-tour/82/2025"
+ },
+ "pga-tour/83/2020": {
+  "bytes": 391087,
+  "file": "pga_83_2020.html",
+  "http": 200,
+  "sha256": "1d67f381b6aec6f2955a4f16d4fbd8efaae16153ea1591602ce74255fc112899",
+  "url": "https://datagolf.com/past-results/pga-tour/83/2020"
+ },
+ "pga-tour/83/2021": {
+  "bytes": 391087,
+  "file": "pga_83_2021.html",
+  "http": 200,
+  "sha256": "7220e734a7a8038efa4ea18c17ca7192e2f811dfce8a2fc446b952d82620fff9",
+  "url": "https://datagolf.com/past-results/pga-tour/83/2021"
+ },
+ "pga-tour/83/2022": {
+  "bytes": 391087,
+  "file": "pga_83_2022.html",
+  "http": 200,
+  "sha256": "28472e1b331be877f0228986b9cec298bf378cade9467b3078ebb82c87244338",
+  "url": "https://datagolf.com/past-results/pga-tour/83/2022"
+ },
+ "pga-tour/83/2023": {
+  "bytes": 391087,
+  "file": "pga_83_2023.html",
+  "http": 200,
+  "sha256": "8c9f5a80b86b055833e79e5046c9e80cb47002b352f5241ec24da4a0df136c15",
+  "url": "https://datagolf.com/past-results/pga-tour/83/2023"
+ },
+ "pga-tour/83/2024": {
+  "bytes": 391087,
+  "file": "pga_83_2024.html",
+  "http": 200,
+  "sha256": "eab07739c4fadcde59d92c6477c70d426ccf44476759dd2e73dda8edd74d05ea",
+  "url": "https://datagolf.com/past-results/pga-tour/83/2024"
+ },
+ "pga-tour/83/2025": {
+  "bytes": 391087,
+  "file": "pga_83_2025.html",
+  "http": 200,
+  "sha256": "262acbd990089857952318d81a530f4818988af8a62dcdc81a1214e6d48abb52",
+  "url": "https://datagolf.com/past-results/pga-tour/83/2025"
+ },
+ "pga-tour/84/2020": {
+  "bytes": 391087,
+  "file": "pga_84_2020.html",
+  "http": 200,
+  "sha256": "a6221e0e1262d9d5bc40271d919fb24e2f92d55f74fc1c5e74c8f003b63cb8eb",
+  "url": "https://datagolf.com/past-results/pga-tour/84/2020"
+ },
+ "pga-tour/84/2021": {
+  "bytes": 391087,
+  "file": "pga_84_2021.html",
+  "http": 200,
+  "sha256": "c4dc29891cb8976b80894ccf951b82bdd95e0abe81fa8726df9b3a91de3b3e3c",
+  "url": "https://datagolf.com/past-results/pga-tour/84/2021"
+ },
+ "pga-tour/84/2022": {
+  "bytes": 391087,
+  "file": "pga_84_2022.html",
+  "http": 200,
+  "sha256": "1e75364f98c22250dbcc96478640ee575d5a61e76c03538d5061e970643ddb97",
+  "url": "https://datagolf.com/past-results/pga-tour/84/2022"
+ },
+ "pga-tour/84/2023": {
+  "bytes": 391087,
+  "file": "pga_84_2023.html",
+  "http": 200,
+  "sha256": "113a937b9d8d5c366228478336735fa8b68a2ca4d1257cf64a3b53571d9b2dce",
+  "url": "https://datagolf.com/past-results/pga-tour/84/2023"
+ },
+ "pga-tour/84/2024": {
+  "bytes": 391087,
+  "file": "pga_84_2024.html",
+  "http": 200,
+  "sha256": "e77981c1e0c112f0aaf22c5e623371957b0bebea9a0634f5508f2a849c5b1d4c",
+  "url": "https://datagolf.com/past-results/pga-tour/84/2024"
+ },
+ "pga-tour/84/2025": {
+  "bytes": 391087,
+  "file": "pga_84_2025.html",
+  "http": 200,
+  "sha256": "c03064f39ebf0bdb36ea207976b1539d36e578da58619896198a45de0c344334",
+  "url": "https://datagolf.com/past-results/pga-tour/84/2025"
+ },
+ "pga-tour/85/2020": {
+  "bytes": 391087,
+  "file": "pga_85_2020.html",
+  "http": 200,
+  "sha256": "557bd249e6c1113dbbef25ccb4e461e405f2bc67b69fd3f86ddf580510b0bd2b",
+  "url": "https://datagolf.com/past-results/pga-tour/85/2020"
+ },
+ "pga-tour/85/2021": {
+  "bytes": 391087,
+  "file": "pga_85_2021.html",
+  "http": 200,
+  "sha256": "721f4d9d5f1a5bb0476dd5de3d12e791ff0bbc51e58aef2a2272c1e50dd77264",
+  "url": "https://datagolf.com/past-results/pga-tour/85/2021"
+ },
+ "pga-tour/85/2022": {
+  "bytes": 391087,
+  "file": "pga_85_2022.html",
+  "http": 200,
+  "sha256": "7e522229baa59ab6dbde6ba1dfb00ba1be440670203a6df3f013225494bc19c6",
+  "url": "https://datagolf.com/past-results/pga-tour/85/2022"
+ },
+ "pga-tour/85/2023": {
+  "bytes": 391087,
+  "file": "pga_85_2023.html",
+  "http": 200,
+  "sha256": "612ac42bdb07284d1a7773fc10c4cf6b9fb9e1d4600ee5b9477dfee79073dd03",
+  "url": "https://datagolf.com/past-results/pga-tour/85/2023"
+ },
+ "pga-tour/85/2024": {
+  "bytes": 391087,
+  "file": "pga_85_2024.html",
+  "http": 200,
+  "sha256": "85fa59cebf217baeb91c20d5805bae4a1b332c543a7cd114fe843ef8ee0e8d73",
+  "url": "https://datagolf.com/past-results/pga-tour/85/2024"
+ },
+ "pga-tour/85/2025": {
+  "bytes": 391087,
+  "file": "pga_85_2025.html",
+  "http": 200,
+  "sha256": "033b2923e534ec1108970c82f10e3538b27ac3d3ba643a018e117a57bcbd37f7",
+  "url": "https://datagolf.com/past-results/pga-tour/85/2025"
+ },
+ "pga-tour/86/2020": {
+  "bytes": 391087,
+  "file": "pga_86_2020.html",
+  "http": 200,
+  "sha256": "a331fa35db13e2e0ea46da4de2d010c60c2aa6c12a4a21c9abdf75938c8dd30d",
+  "url": "https://datagolf.com/past-results/pga-tour/86/2020"
+ },
+ "pga-tour/86/2021": {
+  "bytes": 391087,
+  "file": "pga_86_2021.html",
+  "http": 200,
+  "sha256": "092f87554aa15c1111aa0302a70d551df667e08f4fb89eea20cc637650b9f573",
+  "url": "https://datagolf.com/past-results/pga-tour/86/2021"
+ },
+ "pga-tour/86/2022": {
+  "bytes": 391087,
+  "file": "pga_86_2022.html",
+  "http": 200,
+  "sha256": "330679ef50884221e98fbf555810822e90a042f3fba9c58b13df6527fabd2613",
+  "url": "https://datagolf.com/past-results/pga-tour/86/2022"
+ },
+ "pga-tour/86/2023": {
+  "bytes": 391087,
+  "file": "pga_86_2023.html",
+  "http": 200,
+  "sha256": "81089ad090760d0574a9671d07ff2d12810544c6b13d6653bbf3798fd4641dd9",
+  "url": "https://datagolf.com/past-results/pga-tour/86/2023"
+ },
+ "pga-tour/86/2024": {
+  "bytes": 391087,
+  "file": "pga_86_2024.html",
+  "http": 200,
+  "sha256": "08d2e1fc07d41d9fb20cb40bfbb7752551c8bde950ad46481c8b2f53dbcff76b",
+  "url": "https://datagolf.com/past-results/pga-tour/86/2024"
+ },
+ "pga-tour/86/2025": {
+  "bytes": 391087,
+  "file": "pga_86_2025.html",
+  "http": 200,
+  "sha256": "13fd6290d4a731effe5f4aa9a2417ddcc8a0c2003148a6c8213be36892b7245c",
+  "url": "https://datagolf.com/past-results/pga-tour/86/2025"
+ },
+ "pga-tour/87/2020": {
+  "bytes": 391087,
+  "file": "pga_87_2020.html",
+  "http": 200,
+  "sha256": "283975d0a7222eac6a0eaf7ed583735a75f9f4bdebee8e1f385a07a877d09e7f",
+  "url": "https://datagolf.com/past-results/pga-tour/87/2020"
+ },
+ "pga-tour/87/2021": {
+  "bytes": 391087,
+  "file": "pga_87_2021.html",
+  "http": 200,
+  "sha256": "9df6c3732bd51eee5e667b232a9ff2f3987a904fc8faefada39f23218849a815",
+  "url": "https://datagolf.com/past-results/pga-tour/87/2021"
+ },
+ "pga-tour/87/2022": {
+  "bytes": 391087,
+  "file": "pga_87_2022.html",
+  "http": 200,
+  "sha256": "7e5650609c02c5cee6be924b067bb0776000ef5090998ddae6c8859ae5c2bb36",
+  "url": "https://datagolf.com/past-results/pga-tour/87/2022"
+ },
+ "pga-tour/87/2023": {
+  "bytes": 391087,
+  "file": "pga_87_2023.html",
+  "http": 200,
+  "sha256": "ed2df0844375ca6f8d99f644f8bc084876da10d596bc112afbd9d377089e9f68",
+  "url": "https://datagolf.com/past-results/pga-tour/87/2023"
+ },
+ "pga-tour/87/2024": {
+  "bytes": 391087,
+  "file": "pga_87_2024.html",
+  "http": 200,
+  "sha256": "29a96ef9945d8a0cb8e31dcc6e54691e4bd1b64dc701233f13dd680362d27fe6",
+  "url": "https://datagolf.com/past-results/pga-tour/87/2024"
+ },
+ "pga-tour/87/2025": {
+  "bytes": 391087,
+  "file": "pga_87_2025.html",
+  "http": 200,
+  "sha256": "8c75b9f204ac36859d134b6d8ae2e536cf28cb36245806ea5f84db8f36d43fe1",
+  "url": "https://datagolf.com/past-results/pga-tour/87/2025"
+ },
+ "pga-tour/88/2020": {
+  "bytes": 425601,
+  "file": "pga_88_2020.html",
+  "http": 200,
+  "sha256": "406e6b73dbe73b7acaa1ef41077c0e11f88fd83b8f0566aaebc4b65d9ace122b",
+  "url": "https://datagolf.com/past-results/pga-tour/88/2020"
+ },
+ "pga-tour/88/2021": {
+  "bytes": 425601,
+  "file": "pga_88_2021.html",
+  "http": 200,
+  "sha256": "dc9c57bac5962a9abece66abca5c229320764d73496b35c25e07100250986ff8",
+  "url": "https://datagolf.com/past-results/pga-tour/88/2021"
+ },
+ "pga-tour/88/2022": {
+  "bytes": 425601,
+  "file": "pga_88_2022.html",
+  "http": 200,
+  "sha256": "8cded44163bc4d34131188442e13bfa0fd688d651454f402ffd06d60ecb1bd85",
+  "url": "https://datagolf.com/past-results/pga-tour/88/2022"
+ },
+ "pga-tour/88/2023": {
+  "bytes": 417839,
+  "file": "pga_88_2023.html",
+  "http": 200,
+  "sha256": "742631f12e8a0995ddd44dcc5272d83c2018c78123adbefee615068be8df4f89",
+  "url": "https://datagolf.com/past-results/pga-tour/88/2023"
+ },
+ "pga-tour/88/2024": {
+  "bytes": 422236,
+  "file": "pga_88_2024.html",
+  "http": 200,
+  "sha256": "f2b419cff2b4e9cf8cf6cd1a647d491c51baa57801083b4af9a34ac7d74193f7",
+  "url": "https://datagolf.com/past-results/pga-tour/88/2024"
+ },
+ "pga-tour/88/2025": {
+  "bytes": 425462,
+  "file": "pga_88_2025.html",
+  "http": 200,
+  "sha256": "ba10a5047e1ee94f640c5e9bad4eb840c77d350a303ae6efb387c77f8772327c",
+  "url": "https://datagolf.com/past-results/pga-tour/88/2025"
+ },
+ "pga-tour/89/2020": {
+  "bytes": 391087,
+  "file": "pga_89_2020.html",
+  "http": 200,
+  "sha256": "790e3bd4a2d08322554ef91332a734343c6ef3742a217094b62e39de350e3001",
+  "url": "https://datagolf.com/past-results/pga-tour/89/2020"
+ },
+ "pga-tour/89/2021": {
+  "bytes": 391087,
+  "file": "pga_89_2021.html",
+  "http": 200,
+  "sha256": "151ea20b5f1ee1306ea5db32a1f1d9dbb11f010ebd383137dbd991c467fb0a5e",
+  "url": "https://datagolf.com/past-results/pga-tour/89/2021"
+ },
+ "pga-tour/89/2022": {
+  "bytes": 391087,
+  "file": "pga_89_2022.html",
+  "http": 200,
+  "sha256": "2a8b64093365f4a9293edcda9f43c1d79bdc3243b814abdd1f1d2a17c7f38bf6",
+  "url": "https://datagolf.com/past-results/pga-tour/89/2022"
+ },
+ "pga-tour/89/2023": {
+  "bytes": 391087,
+  "file": "pga_89_2023.html",
+  "http": 200,
+  "sha256": "30fa382877de467311c0534bd72d8b491119fecdaa26102701ee84463ce870ba",
+  "url": "https://datagolf.com/past-results/pga-tour/89/2023"
+ },
+ "pga-tour/89/2024": {
+  "bytes": 391087,
+  "file": "pga_89_2024.html",
+  "http": 200,
+  "sha256": "05465cdc94ce4c077d10d3b3aeaed18f08c674846bd58faa8cc1da3814cc922c",
+  "url": "https://datagolf.com/past-results/pga-tour/89/2024"
+ },
+ "pga-tour/89/2025": {
+  "bytes": 391087,
+  "file": "pga_89_2025.html",
+  "http": 200,
+  "sha256": "30b8ea4d15fa1140462f5d17891095dc932d0fec6139b930674fad26f010e289",
+  "url": "https://datagolf.com/past-results/pga-tour/89/2025"
+ },
+ "pga-tour/9/2020": {
+  "bytes": 403179,
+  "file": "pga_9_2020.html",
+  "http": 200,
+  "sha256": "c3b63f885fa8b13b1742a65c34186f9cecdd1b7f31f38b50a7c25603a35e05ad",
+  "url": "https://datagolf.com/past-results/pga-tour/9/2020"
+ },
+ "pga-tour/9/2021": {
+  "bytes": 404780,
+  "file": "pga_9_2021.html",
+  "http": 200,
+  "sha256": "c955355799119594c233ae93a2e21267ca9f4cfaa451334243b6ddd1edd433ee",
+  "url": "https://datagolf.com/past-results/pga-tour/9/2021"
+ },
+ "pga-tour/9/2022": {
+  "bytes": 404410,
+  "file": "pga_9_2022.html",
+  "http": 200,
+  "sha256": "6c16efa8bead81d1004619c05eb8bd0977d4ecb3bf4478b152ac215ab2e009f0",
+  "url": "https://datagolf.com/past-results/pga-tour/9/2022"
+ },
+ "pga-tour/9/2023": {
+  "bytes": 404010,
+  "file": "pga_9_2023.html",
+  "http": 200,
+  "sha256": "21e1a26692c723d86d38c03eaa429cc7b3cd0255d95b8952b58ee4c67ae825bb",
+  "url": "https://datagolf.com/past-results/pga-tour/9/2023"
+ },
+ "pga-tour/9/2024": {
+  "bytes": 371427,
+  "file": "pga_9_2024.html",
+  "http": 200,
+  "sha256": "ecd7d18fe474ed1777d5223152cf546f14dd46612a0c7433656d73c4c5c93f73",
+  "url": "https://datagolf.com/past-results/pga-tour/9/2024"
+ },
+ "pga-tour/9/2025": {
+  "bytes": 372558,
+  "file": "pga_9_2025.html",
+  "http": 200,
+  "sha256": "3201afba32f4abe762c603e275a22c2f2537da9b3d9bd6410e4b4f1a05f6cde9",
+  "url": "https://datagolf.com/past-results/pga-tour/9/2025"
+ },
+ "pga-tour/90/2020": {
+  "bytes": 391087,
+  "file": "pga_90_2020.html",
+  "http": 200,
+  "sha256": "374c2c3bcd1c13698fe2993f2e1569723ceb0f9b4d765e5e637d1982e4034090",
+  "url": "https://datagolf.com/past-results/pga-tour/90/2020"
+ },
+ "pga-tour/90/2021": {
+  "bytes": 391087,
+  "file": "pga_90_2021.html",
+  "http": 200,
+  "sha256": "e249906b1b711ac3f3bdff6df6a47424e93e090947a36e21ddce149aed46ebb1",
+  "url": "https://datagolf.com/past-results/pga-tour/90/2021"
+ },
+ "pga-tour/90/2022": {
+  "bytes": 391087,
+  "file": "pga_90_2022.html",
+  "http": 200,
+  "sha256": "44550ae7233cc37abd8e7fb08477b96b7bf0ad89178b4062677ea667f06b121d",
+  "url": "https://datagolf.com/past-results/pga-tour/90/2022"
+ },
+ "pga-tour/90/2023": {
+  "bytes": 391087,
+  "file": "pga_90_2023.html",
+  "http": 200,
+  "sha256": "62295f03850208569e9a340a7094b6d5355ed2dc41c839e97e42f0da2756a74d",
+  "url": "https://datagolf.com/past-results/pga-tour/90/2023"
+ },
+ "pga-tour/90/2024": {
+  "bytes": 391087,
+  "file": "pga_90_2024.html",
+  "http": 200,
+  "sha256": "b3d0c6d11e7f17f2788ca7f37edc1a67943348abd0c0aaad20776266a76ea12d",
+  "url": "https://datagolf.com/past-results/pga-tour/90/2024"
+ },
+ "pga-tour/90/2025": {
+  "bytes": 391087,
+  "file": "pga_90_2025.html",
+  "http": 200,
+  "sha256": "665a0335545c4959110c79983d2d5d500f2a2f110a0ebf9625066b0eafecc9fe",
+  "url": "https://datagolf.com/past-results/pga-tour/90/2025"
+ },
+ "pga-tour/91/2020": {
+  "bytes": 391087,
+  "file": "pga_91_2020.html",
+  "http": 200,
+  "sha256": "57d6995dd331a0cf6c9c269d915d68686d471fcf2b66472671c5ac32ddbb6185",
+  "url": "https://datagolf.com/past-results/pga-tour/91/2020"
+ },
+ "pga-tour/91/2021": {
+  "bytes": 391087,
+  "file": "pga_91_2021.html",
+  "http": 200,
+  "sha256": "5eca75c4d67696977b8fec363e7f498c6418231744c2f0a03cac564af5b47592",
+  "url": "https://datagolf.com/past-results/pga-tour/91/2021"
+ },
+ "pga-tour/91/2022": {
+  "bytes": 391087,
+  "file": "pga_91_2022.html",
+  "http": 200,
+  "sha256": "7e8ae28ed016f3261572a78a2af83b5736a4bdecd39ec8b6c9a4329dbc8e3738",
+  "url": "https://datagolf.com/past-results/pga-tour/91/2022"
+ },
+ "pga-tour/91/2023": {
+  "bytes": 391087,
+  "file": "pga_91_2023.html",
+  "http": 200,
+  "sha256": "32eed35c7b4d12a7ec5aa0c9e49acf9e0b64a2c945ef0c505e752b9ae8a79259",
+  "url": "https://datagolf.com/past-results/pga-tour/91/2023"
+ },
+ "pga-tour/91/2024": {
+  "bytes": 391087,
+  "file": "pga_91_2024.html",
+  "http": 200,
+  "sha256": "3cfc7c3189362a8331d389db835f91ade862a351b6581c914049862277f9a8b9",
+  "url": "https://datagolf.com/past-results/pga-tour/91/2024"
+ },
+ "pga-tour/91/2025": {
+  "bytes": 391087,
+  "file": "pga_91_2025.html",
+  "http": 200,
+  "sha256": "3842fff253cc1d1136ee204945a5621673b35bef988df5aa9a55b04f5af7e4db",
+  "url": "https://datagolf.com/past-results/pga-tour/91/2025"
+ },
+ "pga-tour/92/2020": {
+  "bytes": 391087,
+  "file": "pga_92_2020.html",
+  "http": 200,
+  "sha256": "03c1e80c0f7920afc3510c0da91fec3b630b24b6839a0580042886d1da416384",
+  "url": "https://datagolf.com/past-results/pga-tour/92/2020"
+ },
+ "pga-tour/92/2021": {
+  "bytes": 391087,
+  "file": "pga_92_2021.html",
+  "http": 200,
+  "sha256": "8fbf2d1ac84bcc0101e87b9bfee68f825e2c4b60408776f889b8d88a7bebf455",
+  "url": "https://datagolf.com/past-results/pga-tour/92/2021"
+ },
+ "pga-tour/92/2022": {
+  "bytes": 391087,
+  "file": "pga_92_2022.html",
+  "http": 200,
+  "sha256": "a2525ac85dcab2df3c60950a6a00e211a8d2a0fa3f5fe84927f9517828053692",
+  "url": "https://datagolf.com/past-results/pga-tour/92/2022"
+ },
+ "pga-tour/92/2023": {
+  "bytes": 391087,
+  "file": "pga_92_2023.html",
+  "http": 200,
+  "sha256": "bd205fd2e27745c725d0eaf3c9515361c334ed2da8ed0cea1a68cb9c0d276d94",
+  "url": "https://datagolf.com/past-results/pga-tour/92/2023"
+ },
+ "pga-tour/92/2024": {
+  "bytes": 391087,
+  "file": "pga_92_2024.html",
+  "http": 200,
+  "sha256": "a1d2cc640b5020802bce1c189058b2963b4718eb14b7339a6652829fe4ad461d",
+  "url": "https://datagolf.com/past-results/pga-tour/92/2024"
+ },
+ "pga-tour/92/2025": {
+  "bytes": 391087,
+  "file": "pga_92_2025.html",
+  "http": 200,
+  "sha256": "bc071cbb0acb6beb7d6920079a315a21f9ae1d28737c88204785a9c663714dbb",
+  "url": "https://datagolf.com/past-results/pga-tour/92/2025"
+ },
+ "pga-tour/93/2020": {
+  "bytes": 391087,
+  "file": "pga_93_2020.html",
+  "http": 200,
+  "sha256": "99a0999b12559c2e7ec112f7ecaa9a3372b091623b7ad3eb918c651aa8b34509",
+  "url": "https://datagolf.com/past-results/pga-tour/93/2020"
+ },
+ "pga-tour/93/2021": {
+  "bytes": 391087,
+  "file": "pga_93_2021.html",
+  "http": 200,
+  "sha256": "d08c84f39aed6ddde0b75394ff2b09fea623109b1b5f6e1176a8e71c6a8aa784",
+  "url": "https://datagolf.com/past-results/pga-tour/93/2021"
+ },
+ "pga-tour/93/2022": {
+  "bytes": 391087,
+  "file": "pga_93_2022.html",
+  "http": 200,
+  "sha256": "567d3c324b0ec03596d256ae885e6c0f14bdf780d57ee6e4fea97d837578d59b",
+  "url": "https://datagolf.com/past-results/pga-tour/93/2022"
+ },
+ "pga-tour/93/2023": {
+  "bytes": 391087,
+  "file": "pga_93_2023.html",
+  "http": 200,
+  "sha256": "a4f739271a822a903452f2e99411e6dc1ef5c90bc83cd11113886f9656d7059d",
+  "url": "https://datagolf.com/past-results/pga-tour/93/2023"
+ },
+ "pga-tour/93/2024": {
+  "bytes": 391087,
+  "file": "pga_93_2024.html",
+  "http": 200,
+  "sha256": "fab3e1c44ed896b42c2ddaa238b1801ffb2059bd38bd81599a9b31a10b288c2c",
+  "url": "https://datagolf.com/past-results/pga-tour/93/2024"
+ },
+ "pga-tour/93/2025": {
+  "bytes": 391087,
+  "file": "pga_93_2025.html",
+  "http": 200,
+  "sha256": "9350f593632f343cbb62678a2fd511843caf90a327c3c40661e65740d6d752f7",
+  "url": "https://datagolf.com/past-results/pga-tour/93/2025"
+ },
+ "pga-tour/94/2020": {
+  "bytes": 391087,
+  "file": "pga_94_2020.html",
+  "http": 200,
+  "sha256": "d7c59f7f7e2379b32de7a031352e8a52d31e58575748c4fcb553247e4b436cab",
+  "url": "https://datagolf.com/past-results/pga-tour/94/2020"
+ },
+ "pga-tour/94/2021": {
+  "bytes": 391087,
+  "file": "pga_94_2021.html",
+  "http": 200,
+  "sha256": "2efcf8e9508184dd06b6531864cb0d88c05fbdf137dde9331c9c79bee2125405",
+  "url": "https://datagolf.com/past-results/pga-tour/94/2021"
+ },
+ "pga-tour/94/2022": {
+  "bytes": 391087,
+  "file": "pga_94_2022.html",
+  "http": 200,
+  "sha256": "0d30eb3b36e113ae9f80d4ad04b8741381a3385a66bc88dea35639b8ed1bf071",
+  "url": "https://datagolf.com/past-results/pga-tour/94/2022"
+ },
+ "pga-tour/94/2023": {
+  "bytes": 391087,
+  "file": "pga_94_2023.html",
+  "http": 200,
+  "sha256": "ab6e1a92ae56c9b8b81a757fb903525d5f6d204dc5c52bb8354857cb65e28f66",
+  "url": "https://datagolf.com/past-results/pga-tour/94/2023"
+ },
+ "pga-tour/94/2024": {
+  "bytes": 391087,
+  "file": "pga_94_2024.html",
+  "http": 200,
+  "sha256": "8d7e8118cf97e28905586fae121a38792b463fc2d90b53df7a6e2095e27b7518",
+  "url": "https://datagolf.com/past-results/pga-tour/94/2024"
+ },
+ "pga-tour/94/2025": {
+  "bytes": 391087,
+  "file": "pga_94_2025.html",
+  "http": 200,
+  "sha256": "54ba63f796fc2351465e57e122e8f60fe6039544375337956be26e0e18dd82d8",
+  "url": "https://datagolf.com/past-results/pga-tour/94/2025"
+ },
+ "pga-tour/95/2020": {
+  "bytes": 391087,
+  "file": "pga_95_2020.html",
+  "http": 200,
+  "sha256": "f8242c160d6d87b6aa4f4dfdb5440b3f642761a32205356bdaacbdbc7b9c84e5",
+  "url": "https://datagolf.com/past-results/pga-tour/95/2020"
+ },
+ "pga-tour/95/2021": {
+  "bytes": 391087,
+  "file": "pga_95_2021.html",
+  "http": 200,
+  "sha256": "51a98031be1cdf79f5313391981b5fd6c008654f1d16535efc2046c2cdd46158",
+  "url": "https://datagolf.com/past-results/pga-tour/95/2021"
+ },
+ "pga-tour/95/2022": {
+  "bytes": 391087,
+  "file": "pga_95_2022.html",
+  "http": 200,
+  "sha256": "0458312aae26c4bd34a3357f5655bf6a9b633d7a1c345a7aea21bf6d5d554434",
+  "url": "https://datagolf.com/past-results/pga-tour/95/2022"
+ },
+ "pga-tour/95/2023": {
+  "bytes": 391087,
+  "file": "pga_95_2023.html",
+  "http": 200,
+  "sha256": "8daba5bde9d925f339dc24cda5a2142387eb6392e49bb3b0926fa5bdb7782eac",
+  "url": "https://datagolf.com/past-results/pga-tour/95/2023"
+ },
+ "pga-tour/95/2024": {
+  "bytes": 391087,
+  "file": "pga_95_2024.html",
+  "http": 200,
+  "sha256": "515fce7701eeace53ac017f0035bc88e75b987ceed04c7eff8ed21dbaa0079d6",
+  "url": "https://datagolf.com/past-results/pga-tour/95/2024"
+ },
+ "pga-tour/95/2025": {
+  "bytes": 391087,
+  "file": "pga_95_2025.html",
+  "http": 200,
+  "sha256": "ff8051b37d5d9e736f9970094fb3fb8a59f012acd74cb6ca40d9e150629b541d",
+  "url": "https://datagolf.com/past-results/pga-tour/95/2025"
+ },
+ "pga-tour/96/2020": {
+  "bytes": 391087,
+  "file": "pga_96_2020.html",
+  "http": 200,
+  "sha256": "97d1381286f04fa41bb3633c9ff7ed83876ff2b08d51d6024ebfd91c129efcc4",
+  "url": "https://datagolf.com/past-results/pga-tour/96/2020"
+ },
+ "pga-tour/96/2021": {
+  "bytes": 391087,
+  "file": "pga_96_2021.html",
+  "http": 200,
+  "sha256": "083a75b7726069eb5687aa263d8e43db63a775939c7f13aa8d074bed8126e6a0",
+  "url": "https://datagolf.com/past-results/pga-tour/96/2021"
+ },
+ "pga-tour/96/2022": {
+  "bytes": 391087,
+  "file": "pga_96_2022.html",
+  "http": 200,
+  "sha256": "46d58544ef90400fc3d2dc3670e32d2b5209fde85b69d381029cdba21ac907df",
+  "url": "https://datagolf.com/past-results/pga-tour/96/2022"
+ },
+ "pga-tour/96/2023": {
+  "bytes": 391087,
+  "file": "pga_96_2023.html",
+  "http": 200,
+  "sha256": "a956d43dacf55b8489ab5251d7ec4431818820ee58c17651157b71ec017bd649",
+  "url": "https://datagolf.com/past-results/pga-tour/96/2023"
+ },
+ "pga-tour/96/2024": {
+  "bytes": 391087,
+  "file": "pga_96_2024.html",
+  "http": 200,
+  "sha256": "3ec24c4b1c5d83fd5cc5a27d46a3cd27f7adab9271ae15bf6f3eba599370494e",
+  "url": "https://datagolf.com/past-results/pga-tour/96/2024"
+ },
+ "pga-tour/96/2025": {
+  "bytes": 391087,
+  "file": "pga_96_2025.html",
+  "http": 200,
+  "sha256": "168ebe6cb6d30680d1afb6774a4a709051b79302d7860bbbbbd6ebe1b883ae16",
+  "url": "https://datagolf.com/past-results/pga-tour/96/2025"
+ },
+ "pga-tour/97/2020": {
+  "bytes": 391087,
+  "file": "pga_97_2020.html",
+  "http": 200,
+  "sha256": "c4f0e0fd5740c857e467a1e83b7ea100e08909e42459505b3bea1348a5de15d8",
+  "url": "https://datagolf.com/past-results/pga-tour/97/2020"
+ },
+ "pga-tour/97/2021": {
+  "bytes": 391087,
+  "file": "pga_97_2021.html",
+  "http": 200,
+  "sha256": "92292d85a534f63c6d62bd57785c8e36352fec3b37360fe066bfda0e52561bfc",
+  "url": "https://datagolf.com/past-results/pga-tour/97/2021"
+ },
+ "pga-tour/97/2022": {
+  "bytes": 391087,
+  "file": "pga_97_2022.html",
+  "http": 200,
+  "sha256": "6050beb3aacd9357d16af2ff3dfa9679c65af34a9c0d6362a31032534750e09f",
+  "url": "https://datagolf.com/past-results/pga-tour/97/2022"
+ },
+ "pga-tour/97/2023": {
+  "bytes": 391087,
+  "file": "pga_97_2023.html",
+  "http": 200,
+  "sha256": "21e57b1fd011a4943107aa1ac79fec24724a0595a8fde3ad59cffa198bbe2cc3",
+  "url": "https://datagolf.com/past-results/pga-tour/97/2023"
+ },
+ "pga-tour/97/2024": {
+  "bytes": 391087,
+  "file": "pga_97_2024.html",
+  "http": 200,
+  "sha256": "17dcb18080861a440350f7da878c2279421efcc1a44afc63c22a1b26383aa4e6",
+  "url": "https://datagolf.com/past-results/pga-tour/97/2024"
+ },
+ "pga-tour/97/2025": {
+  "bytes": 391087,
+  "file": "pga_97_2025.html",
+  "http": 200,
+  "sha256": "12f992d4ed024d9a50ac7c17a6d2c731a386ced66f72b53b569216bc692a5f38",
+  "url": "https://datagolf.com/past-results/pga-tour/97/2025"
+ },
+ "pga-tour/98/2020": {
+  "bytes": 391087,
+  "file": "pga_98_2020.html",
+  "http": 200,
+  "sha256": "437b947cc121971d26358e891dea5a4141936d056c6df0e91d90d9778629c64e",
+  "url": "https://datagolf.com/past-results/pga-tour/98/2020"
+ },
+ "pga-tour/98/2021": {
+  "bytes": 391087,
+  "file": "pga_98_2021.html",
+  "http": 200,
+  "sha256": "6fcd6a19d4ccd1acfdd598b239e246124598e9928f0eea5f0ea3723ea4bb0104",
+  "url": "https://datagolf.com/past-results/pga-tour/98/2021"
+ },
+ "pga-tour/98/2022": {
+  "bytes": 391087,
+  "file": "pga_98_2022.html",
+  "http": 200,
+  "sha256": "3f78a2d920b9172353ebce0df435b1c062a42043a460971886355cf406dc5510",
+  "url": "https://datagolf.com/past-results/pga-tour/98/2022"
+ },
+ "pga-tour/98/2023": {
+  "bytes": 391087,
+  "file": "pga_98_2023.html",
+  "http": 200,
+  "sha256": "f7d1d0bc3565d8f7476eadf1e6586abad84bb8d4f2065d57e4bf0e9ac51bca2c",
+  "url": "https://datagolf.com/past-results/pga-tour/98/2023"
+ },
+ "pga-tour/98/2024": {
+  "bytes": 391087,
+  "file": "pga_98_2024.html",
+  "http": 200,
+  "sha256": "4edbbb892af4339118bb77f377e77cc7620ad142426c58ab17bc5d7f15b35263",
+  "url": "https://datagolf.com/past-results/pga-tour/98/2024"
+ },
+ "pga-tour/98/2025": {
+  "bytes": 391087,
+  "file": "pga_98_2025.html",
+  "http": 200,
+  "sha256": "67246ccd25d5b9be20a150f6d461b0fe609bf3f990521f1dc001de50706a0d86",
+  "url": "https://datagolf.com/past-results/pga-tour/98/2025"
+ },
+ "pga-tour/99/2020": {
+  "bytes": 391087,
+  "file": "pga_99_2020.html",
+  "http": 200,
+  "sha256": "6abd0f59ada693466d4913f5de7ce99ccfc76454426cbf4c27816cafa409a2a8",
+  "url": "https://datagolf.com/past-results/pga-tour/99/2020"
+ },
+ "pga-tour/99/2021": {
+  "bytes": 391087,
+  "file": "pga_99_2021.html",
+  "http": 200,
+  "sha256": "1332be3c259e95c037426083ead147fdb9009d439bef8c0640198c7c617acadf",
+  "url": "https://datagolf.com/past-results/pga-tour/99/2021"
+ },
+ "pga-tour/99/2022": {
+  "bytes": 391087,
+  "file": "pga_99_2022.html",
+  "http": 200,
+  "sha256": "b3a1b2a54f93129deb83d08c3743d3c6aea229bf4cb94edadb5d111378fdc1b3",
+  "url": "https://datagolf.com/past-results/pga-tour/99/2022"
+ },
+ "pga-tour/99/2023": {
+  "bytes": 391087,
+  "file": "pga_99_2023.html",
+  "http": 200,
+  "sha256": "700b8ad49c2ea6cf0e14da9bca6bbdc320e2f801104f0873a9f692a7ac5229a2",
+  "url": "https://datagolf.com/past-results/pga-tour/99/2023"
+ },
+ "pga-tour/99/2024": {
+  "bytes": 391087,
+  "file": "pga_99_2024.html",
+  "http": 200,
+  "sha256": "096dfedbc26f69002af1f9b95341498d99d62adf6b3b61d2577709f0a1b0921a",
+  "url": "https://datagolf.com/past-results/pga-tour/99/2024"
+ },
+ "pga-tour/99/2025": {
+  "bytes": 391087,
+  "file": "pga_99_2025.html",
+  "http": 200,
+  "sha256": "ba9aab3e04880e4c4727825ceb540fa6c50eaf12f15e4971812b65e025663e78",
+  "url": "https://datagolf.com/past-results/pga-tour/99/2025"
+ }
+}

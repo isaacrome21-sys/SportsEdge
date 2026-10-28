@@ -1,0 +1,267 @@
+{
+ "seed": 20261028,
+ "resamples": 10000,
+ "games_scored": 1682,
+ "out_of_space": [],
+ "zero_prob_realized": {
+  "v1": {
+   "count": 5,
+   "games": [
+    {
+     "game_id": "2021_09_BUF_JAX",
+     "season": 2021,
+     "week": 9,
+     "realized": "NO_TD"
+    },
+    {
+     "game_id": "2022_05_IND_DEN",
+     "season": 2022,
+     "week": 5,
+     "realized": "NO_TD"
+    },
+    {
+     "game_id": "2023_13_LAC_NE",
+     "season": 2023,
+     "week": 13,
+     "realized": "NO_TD"
+    },
+    {
+     "game_id": "2024_15_LA_SF",
+     "season": 2024,
+     "week": 15,
+     "realized": "NO_TD"
+    },
+    {
+     "game_id": "2025_18_KC_LV",
+     "season": 2025,
+     "week": 18,
+     "realized": "NO_TD"
+    }
+   ]
+  },
+  "b1": {
+   "count": 5,
+   "games": [
+    {
+     "game_id": "2021_09_BUF_JAX",
+     "season": 2021,
+     "week": 9,
+     "realized": "NO_TD"
+    },
+    {
+     "game_id": "2022_05_IND_DEN",
+     "season": 2022,
+     "week": 5,
+     "realized": "NO_TD"
+    },
+    {
+     "game_id": "2023_13_LAC_NE",
+     "season": 2023,
+     "week": 13,
+     "realized": "NO_TD"
+    },
+    {
+     "game_id": "2024_15_LA_SF",
+     "season": 2024,
+     "week": 15,
+     "realized": "NO_TD"
+    },
+    {
+     "game_id": "2025_18_KC_LV",
+     "season": 2025,
+     "week": 18,
+     "realized": "NO_TD"
+    }
+   ]
+  },
+  "b2": {
+   "count": 11,
+   "games": [
+    {
+     "game_id": "2021_09_BUF_JAX",
+     "season": 2021,
+     "week": 9,
+     "realized": "NO_TD"
+    },
+    {
+     "game_id": "2021_10_JAX_IND",
+     "season": 2021,
+     "week": 10,
+     "realized": "P:00-0034987"
+    },
+    {
+     "game_id": "2022_05_IND_DEN",
+     "season": 2022,
+     "week": 5,
+     "realized": "NO_TD"
+    },
+    {
+     "game_id": "2022_13_BUF_NE",
+     "season": 2022,
+     "week": 13,
+     "realized": "P:00-0037253"
+    },
+    {
+     "game_id": "2023_13_LAC_NE",
+     "season": 2023,
+     "week": 13,
+     "realized": "NO_TD"
+    },
+    {
+     "game_id": "2024_04_NE_SF",
+     "season": 2024,
+     "week": 4,
+     "realized": "DEFST:SF"
+    },
+    {
+     "game_id": "2024_04_NO_ATL",
+     "season": 2024,
+     "week": 4,
+     "realized": "DEFST:ATL"
+    },
+    {
+     "game_id": "2024_15_LA_SF",
+     "season": 2024,
+     "week": 15,
+     "realized": "NO_TD"
+    },
+    {
+     "game_id": "2024_15_NE_ARI",
+     "season": 2024,
+     "week": 15,
+     "realized": "P:00-0035629"
+    },
+    {
+     "game_id": "2025_04_PHI_TB",
+     "season": 2025,
+     "week": 4,
+     "realized": "P:00-0039002"
+    },
+    {
+     "game_id": "2025_18_KC_LV",
+     "season": 2025,
+     "week": 18,
+     "realized": "NO_TD"
+    }
+   ]
+  }
+ },
+ "mean_log_loss": {
+  "v1": 3.366642955490531,
+  "b1": 3.1992443435290747,
+  "b2": 3.382460556047637
+ },
+ "delta_vs_b1": {
+  "mean": 0.16739861196145536,
+  "ci95": [
+   0.13972343585598798,
+   0.19516191965962526
+  ],
+  "criterion_pass": false
+ },
+ "delta_vs_b2": {
+  "mean": -0.0158176005571066,
+  "ci95": [
+   -0.06796531804884233,
+   0.037705360094895224
+  ],
+  "criterion_pass": false
+ },
+ "deciles": [
+  {
+   "decile": 1,
+   "mean_stated": 0.07817542019730488,
+   "realized_rate": 0.059823452224740545,
+   "n": 16766
+  },
+  {
+   "decile": 2,
+   "mean_stated": 0.016402791332116903,
+   "realized_rate": 0.026242023021411105,
+   "n": 16767
+  },
+  {
+   "decile": 3,
+   "mean_stated": 0.004682497831253447,
+   "realized_rate": 0.012942088626468659,
+   "n": 16767
+  },
+  {
+   "decile": 4,
+   "mean_stated": 0.0008305732147409839,
+   "realized_rate": 0.0010735373054213634,
+   "n": 16767
+  },
+  {
+   "decile": 5,
+   "mean_stated": 0.0003634510260995388,
+   "realized_rate": 0.00023856384564919185,
+   "n": 16767
+  },
+  {
+   "decile": 6,
+   "mean_stated": 0.0001996746901939761,
+   "realized_rate": 0.0,
+   "n": 16767
+  },
+  {
+   "decile": 7,
+   "mean_stated": 0.00012949522322595146,
+   "realized_rate": 5.964096141229796e-05,
+   "n": 16767
+  },
+  {
+   "decile": 8,
+   "mean_stated": 9.285210749461049e-05,
+   "realized_rate": 0.00023856384564919185,
+   "n": 16767
+  },
+  {
+   "decile": 9,
+   "mean_stated": 6.518132256848199e-05,
+   "realized_rate": 5.964096141229796e-05,
+   "n": 16767
+  },
+  {
+   "decile": 10,
+   "mean_stated": 3.487318324104877e-05,
+   "realized_rate": 0.00029820480706148984,
+   "n": 16767
+  }
+ ],
+ "top_decile": {
+  "decile": 1,
+  "mean_stated": 0.07817542019730488,
+  "realized_rate": 0.059823452224740545,
+  "n": 16766,
+  "overstatement": 0.01835196797256433,
+  "criterion_pass": true
+ },
+ "per_season_delta": {
+  "2020": {
+   "b1": 0.11759633465894921,
+   "b2": -0.11952301114585549
+  },
+  "2021": {
+   "b1": 0.18949993340195562,
+   "b2": 0.01005334551041803
+  },
+  "2022": {
+   "b1": 0.24466899805788098,
+   "b2": 0.17826635816901662
+  },
+  "2023": {
+   "b1": 0.13374445518809924,
+   "b2": -0.06410427112241793
+  },
+  "2024": {
+   "b1": 0.1562942995827724,
+   "b2": -0.07042546265189692
+  },
+  "2025": {
+   "b1": 0.1604374177903023,
+   "b2": -0.03383235306706515
+  }
+ },
+ "verdict": "FAILED_SCREEN"
+}
