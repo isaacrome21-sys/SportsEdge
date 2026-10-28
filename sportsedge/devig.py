@@ -74,9 +74,26 @@ def _identity(quote: Mapping[str, Any]) -> tuple[str, str, str, str, str, bool]:
 
 def _line_key(quote: Mapping[str, Any]) -> float:
     try:
-        line = float(quote["line"])
+        raw = quote["line"]
     except Exception as exc:
         raise DevigError("paired quote line invalid") from exc
+    # The binding layer's canonical line is a string (CandidateKey.line
+    # is str by design), so a numeric string is a value, not drift: it is
+    # accepted when float() parses it to a finite number. Bools (which
+    # float() would silently read as 1.0/0.0), non-numeric strings,
+    # non-finite results ("nan", "inf", "1e999"), and every other type
+    # are refused by name.
+    if isinstance(raw, bool):
+        raise DevigError("paired quote line invalid")
+    if isinstance(raw, (int, float)):
+        line = float(raw)
+    elif isinstance(raw, str):
+        try:
+            line = float(raw)
+        except ValueError as exc:
+            raise DevigError("paired quote line invalid") from exc
+    else:
+        raise DevigError("paired quote line invalid")
     if not isfinite(line):
         raise DevigError("paired quote line must be finite")
     market = str(quote.get("market", ""))
@@ -103,8 +120,15 @@ def validate_pair(candidate: Mapping[str, Any], opposite: Mapping[str, Any]) -> 
 
 
 def find_paired_quote(candidate: Mapping[str, Any], quotes: Iterable[Mapping[str, Any]]) -> Mapping[str, Any]:
+    if not isinstance(candidate, Mapping):
+        raise DevigError("paired quote identity incomplete")
     matches: list[Mapping[str, Any]] = []
     for quote in quotes:
+        # The quote list is a data boundary: junk entries (non-mappings)
+        # are not quotes and are skipped, never a raw TypeError/ValueError
+        # from dict() coercion crashing the pairing scan.
+        if not isinstance(quote, Mapping):
+            continue
         if quote is candidate or dict(quote) == dict(candidate):
             continue
         try:

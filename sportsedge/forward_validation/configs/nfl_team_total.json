@@ -1,1 +1,27 @@
-{"capture_note":"TeamTotal lines are priced body lines in the NFL intake grammar and inside Capture Spec V1's per-game subset (entry and close) — no capture expansion required. Verdict test is the four-leg test in the prereg draft (accuracy vs close, accuracy vs Lane A, CLV picked>passed, hit rate), not the framework's CLV-only default.","capture_scope":"IN_SCOPE","close_max_age_minutes":60,"clv_beats_threshold":0.0,"engine_id":"NFL_TEAM_TOTAL_DIST_V1","family":"TEAM_TOTAL","market_form":"TWO_SIDED","markets":["TEAM_TOTAL"],"max_clv_missing_share":0.2,"min_events":40,"min_rows":150,"min_slates":4,"model_version":"nfl_team_total_dist_v1@UNPINNED","over_side":"OVER","prereg_draft":"research/nfl_activation_20261027/PREREG_NFL_TEAM_TOTALS_FORWARD_V1_DRAFT.md","sides":["OVER","UNDER"],"sport":"NFL","status":"DRAFT — NOT FROZEN"}
+{
+ "status": "FROZEN — PREREG_NFL_TEAM_TOTALS_FORWARD_V1 (recorded at merge of the freeze-act PR; see research/nfl_team_totals_forward_20261028/FREEZE_RECORD.md)",
+ "sport": "NFL",
+ "family": "TEAM_TOTAL",
+ "markets": [
+  "TEAM_TOTAL"
+ ],
+ "engine_id": "NFL_TEAM_TOTAL_DIST_V1",
+ "model_version": "nfl_team_total_dist_v1@sha256:50c5d9ff068b3bf629a725d5713a956d3149565c2f29c59ac8af3fc6461dcc27",
+ "market_form": "TWO_SIDED",
+ "sides": [
+  "OVER",
+  "UNDER"
+ ],
+ "over_side": "OVER",
+ "min_rows": 150,
+ "min_events": 40,
+ "min_slates": 4,
+ "max_clv_missing_share": 0.2,
+ "clv_beats_threshold": 0.0,
+ "close_max_age_minutes": 60,
+ "capture_scope": "IN_SCOPE",
+ "capture_note": "TeamTotal lines are priced body lines in the NFL intake grammar and inside Capture Spec V1's per-game subset (entry and close) — no capture expansion required. Verdict test is the four-leg test in the preregistration (accuracy vs close, accuracy vs Lane A, CLV picked>passed, hit rate), not the framework's CLV-only default.",
+ "prereg": "research/nfl_team_totals_forward_20261028/PREREG_NFL_TEAM_TOTALS_FORWARD_V1.md",
+ "prereg_sha256": "83f25f0e92c3ea39c8b18e194ce5743ceff6b595dc7dcb342175a57e46743581",
+ "picked_beats_passed_required": true
+}
