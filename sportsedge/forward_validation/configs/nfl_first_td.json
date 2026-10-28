@@ -1,0 +1,24 @@
+{
+  "capture_note": "EXPANSION_REQUIRED \u2014 the first-TD Yes board is comment-only material today; it joins Capture Spec V1's per-game subset (entry and close) before this test can open. The anytime-TD board's capture and the frozen ATD v1.1 test are untouched. model_version is the UNPINNED sentinel until the construction is pinned after its calibration screen on the admitted first-scoring attribution panel (the family's NO_DATA blocker of record: NO_VERIFIED_FIRST_SCORING_ATTRIBUTION). min_rows counts graded PICKED rows (YES_ONLY verdict sample, per the locked anytime-TD form).",
+  "capture_scope": "EXPANSION_REQUIRED",
+  "close_max_age_minutes": 60,
+  "clv_beats_threshold": 0.0,
+  "engine_id": "NFL_FIRST_TD_V1",
+  "family": "FIRST_TD",
+  "market_form": "YES_ONLY",
+  "markets": [
+    "FIRST_TD"
+  ],
+  "max_clv_missing_share": 0.2,
+  "min_events": 40,
+  "min_rows": 100,
+  "min_slates": 4,
+  "model_version": "UNPINNED",
+  "over_side": "YES",
+  "prereg_draft": "research/nfl_activation_20261027/PREREG_NFL_FIRST_TD_FORWARD_V1_DRAFT.md",
+  "sides": [
+    "YES"
+  ],
+  "sport": "NFL",
+  "status": "DRAFT \u2014 NOT FROZEN"
+}
