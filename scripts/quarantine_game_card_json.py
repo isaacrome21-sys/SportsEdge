@@ -44,7 +44,7 @@ def sanitize_card(card):
     result["game_quarantined"] = quarantined
     result["game_quarantine_adapter"] = {
         "status": "RESEARCH_ONLY_NOT_PRODUCTION_WIRED",
-        "frozen_engine_unchanged": True,
+        "frozen_engine_modified_by_adapter": False,
         "original_evaluated_rows_preserved": True,
         "forward_clock_authority": False,
         "model_verification_authority": False,
