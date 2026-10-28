@@ -1,4 +1,4 @@
-"""Lane A vNext probability-recalibration layer (UNVALIDATED, NOT ADOPTED).
+"""Lane A vNext probability-recalibration layer (UNVALIDATED, ADOPTED).
 
 Basis: the EV-band calibration diagnostic of 2026-10-28
 (``calibration_diagnostic_20261028`` in the operative records). On the
@@ -20,13 +20,20 @@ positive k. That consequence is the point of the diagnostic.
 
 Status and limits:
 
-- This layer is UNVALIDATED and NOT ADOPTED. Adoption is an owner
-  decision that is still pending. Nothing in card production imports or
-  calls this module.
-- ``RECALIBRATION_ENABLED`` defaults to False. With the flag off,
+- This layer is UNVALIDATED and ADOPTED. Adoption was an
+  owner-delegated decision: Isaac presented the adoption question with
+  the >=6-point disagreement guard and answered "Do what you think is
+  best" (Oct 28, 2026, ~15:44 CT); Rocky adopted both, recorded in
+  ``research/lane_a_recalibration_20261028/ADOPTION_RECORD.md``. Card
+  production applies the layer through
+  ``sportsedge.lane_a_card_gates`` (which passes ``enabled=True``
+  explicitly); adoption changes placement of Lane A research rows
+  only — it validates nothing.
+- ``RECALIBRATION_ENABLED`` defaults to True since the adoption. With
+  the flag off (callers may still pass ``enabled=False``),
   :func:`apply_recalibration` returns its input object unchanged (same
   object, no keys added, no mutation), so pricing output is
-  byte-identical to today.
+  byte-identical to the pre-layer engine.
 - The layer wraps Lane A OUTPUT (the priced-result dicts produced by
   ``artifacts/free_models.calculate`` / ``run``). It deliberately does
   not edit ``artifacts/free_models.py``: the frozen NFL team-totals
@@ -62,11 +69,11 @@ LOGGER = logging.getLogger("sportsedge.lane_a_recalibration")
 
 LAYER_NAME = "LANE_A_VNEXT_PROBABILITY_RECALIBRATION"
 
-# Config flag. Defaults to FALSE and is enabled nowhere in production:
-# adoption is an owner decision that is still pending. The apply
-# functions take ``enabled`` explicitly so tests (and a future adopter)
-# never need to mutate this constant.
-RECALIBRATION_ENABLED = False
+# Config flag. Defaults to TRUE since the owner-delegated adoption of
+# Oct 28, 2026 (see ADOPTION_RECORD.md). The apply functions take
+# ``enabled`` explicitly so tests never need to mutate this constant,
+# and the card gates pass it explicitly regardless of this default.
+RECALIBRATION_ENABLED = True
 
 # Diagnostic sufficiency (2026-10-28 report, sections 4 and 6): a
 # shrink-k refit needs ~180 decided selection legs carrying a printed
@@ -379,9 +386,9 @@ def apply_recalibration(
 ) -> dict[str, Any]:
     """Apply the layer to one Lane A priced-result dict.
 
-    Flag off (the default everywhere): returns ``result`` itself --
+    Flag off (``enabled=False``): returns ``result`` itself --
     the same object, unmutated, no keys added -- so downstream pricing
-    output is byte-identical to today.
+    output is byte-identical to the pre-layer engine.
 
     Flag on: returns a deep copy carrying a ``recalibration`` block
     with p_used and the p_used-derived EV alongside the raw model
@@ -409,7 +416,7 @@ def apply_recalibration(
             "layer": LAYER_NAME,
             "status": "NOT_APPLIED_INPUT_MISSING",
             "validation_status": "UNVALIDATED",
-            "adoption_status": "NOT_ADOPTED_OWNER_DECISION_PENDING",
+            "adoption_status": "ADOPTED_OWNER_DELEGATED_20261028",
             "k": estimate.k_used,
             "k_reason": estimate.reason,
         }
@@ -427,7 +434,7 @@ def apply_recalibration(
         "layer": LAYER_NAME,
         "status": "APPLIED",
         "validation_status": "UNVALIDATED",
-        "adoption_status": "NOT_ADOPTED_OWNER_DECISION_PENDING",
+        "adoption_status": "ADOPTED_OWNER_DELEGATED_20261028",
         "k": estimate.k_used,
         "k_raw": estimate.k_raw,
         "k_reason": estimate.reason,

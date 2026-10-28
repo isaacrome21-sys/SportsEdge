@@ -1,4 +1,4 @@
-"""Lane A vNext probability-recalibration layer (UNVALIDATED, NOT ADOPTED).
+"""Lane A vNext probability-recalibration layer (UNVALIDATED, ADOPTED).
 
 The layer implements the one adjustment supported by the 2026-10-28
 EV-band calibration diagnostic: p_used = implied + k*(model_p - implied)
@@ -8,7 +8,8 @@ model p) the fit is k = -0.461, i.e. floored to 0 today.
 
 These tests pin the safety properties, not a validation:
 
-- the config flag defaults to FALSE;
+- the config flag defaults to TRUE since the owner-delegated adoption
+  of Oct 28, 2026 (it defaulted to FALSE before the adoption);
 - with the flag off, Lane A pricing output is BYTE-IDENTICAL to the
   pre-layer engine (golden sha256 over a fixed offline fixture, plus
   object-identity at the apply seam);
@@ -19,8 +20,11 @@ These tests pin the safety properties, not a validation:
 - when applied, both the raw model_p and p_used are exposed on the row
   and logged, and the raw engine values are never mutated or hidden.
 
-All fixtures are offline; no network, no betting authority. This layer
-is not wired into card production and these tests adopt nothing.
+All fixtures are offline; no network, no betting authority. The layer
+was adopted on Oct 28, 2026 by owner-delegated decision (see
+research/lane_a_recalibration_20261028/ADOPTION_RECORD.md) and is
+wired into card production via sportsedge.lane_a_card_gates; it
+remains UNVALIDATED.
 """
 import copy
 import hashlib
@@ -135,8 +139,12 @@ def _lane_a_result(model_p=0.62, implied_p=0.52, push_p=0.0, odds=-110):
 
 # ------------------------------------------------------------ flag default
 
-def test_flag_defaults_to_false():
-    assert rc.RECALIBRATION_ENABLED is False
+def test_flag_defaults_to_true_since_adoption():
+    # Owner-delegated adoption, Oct 28, 2026: the layer is the card
+    # gates' probability basis, so the module default is now True.
+    # Flag-off behavior remains available (and pinned below) through
+    # explicit enabled=False calls.
+    assert rc.RECALIBRATION_ENABLED is True
 
 
 # ------------------------------------------------- flag-off byte identity
@@ -152,11 +160,11 @@ def test_flag_off_engine_output_byte_identical_to_golden():
 def test_flag_off_apply_returns_the_same_object():
     result = _lane_a_result()
     estimate = rc.estimate_k_from_summary(DIAGNOSTIC_SUMMARY)
-    out = rc.apply_recalibration(result, estimate)  # default: flag off
+    out = rc.apply_recalibration(result, estimate, enabled=False)
     assert out is result
     assert "recalibration" not in out
     rows = [result]
-    out_rows = rc.apply_recalibration_to_rows(rows, estimate)
+    out_rows = rc.apply_recalibration_to_rows(rows, estimate, enabled=False)
     assert out_rows is rows
 
 
