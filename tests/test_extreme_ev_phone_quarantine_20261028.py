@@ -121,3 +121,24 @@ def test_hidden_raw_or_reported_ev_alias_cannot_bypass_phone_quarantine(hidden):
     screens = build_current_value_screens(card, now=NOW)
     assert screens["unverified_model_value_screens"] == []
     assert screens["exclusions"]["EXTREME_CLAIMED_EV_QUARANTINE"] == 1
+
+
+@pytest.mark.parametrize("malformed", [
+    {"raw_ev_per_dollar": "nan"},
+    {"reported_ev_per_dollar": float("inf")},
+    {"pricing_lanes": {"lane_b_anchored": {"ev_per_dollar": True}}},
+    {"independent_projection": {
+        "estimate_p": 0.52, "ev_per_dollar": 0.04,
+        "reported_ev_per_dollar": "281.8%",
+        "paired_market_status": "EXACT_DK_TWO_SIDED_NO_VIG_RESEARCH"}},
+])
+def test_malformed_ev_claim_fails_closed_without_fake_extreme_label(malformed):
+    card = _card(probability=0.52, reported_ev=0.04, price=100)
+    card["evaluated_rows"][0].update(malformed)
+    selection = build_phone_card(card)["selections"][0]
+    assert selection["status"] == "QUARANTINED"
+    assert selection["reason"] == "PROP_EV_CLAIM_INVALID"
+    assert selection["estimated_ev"] is None
+    screens = build_current_value_screens(card, now=NOW)
+    assert screens["unverified_model_value_screens"] == []
+    assert screens["exclusions"]["PROP_EV_CLAIM_INVALID"] == 1
