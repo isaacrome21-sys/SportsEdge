@@ -54,7 +54,11 @@ def _extreme_claim(row, *computed_evs):
                       lanes.get("lane_a_independent"),
                       lanes.get("lane_b_anchored")):
         if isinstance(candidate, dict):
-            claims.append(candidate.get("ev_per_dollar"))
+            # Mirror the raw JSON output boundary: a small blended/current
+            # EV must not mask a >=40% raw or previously reported claim.
+            for key in ("ev_per_dollar", "raw_ev_per_dollar",
+                        "reported_ev_per_dollar"):
+                claims.append(candidate.get(key))
     return any((number is not None
                 and number >= EXTREME_CLAIMED_EV_QUARANTINE)
                for number in (_number(value) for value in claims))
