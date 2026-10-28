@@ -34,13 +34,24 @@ refused, never partially scored, when:
     admitted as prospective, and a HISTORICAL-labeled one is excluded
     from all verdict math, only counted);
   - RECORD_MISSING_TIMESTAMP: a prospective row lacks entry_captured_at,
-    event_start or recorded_at;
+    event_start or recorded_at — or carries a zoneless (offset-free)
+    timestamp, which is not an instant and is refused, never compared;
   - CLOSE_RECORD_MISSING_TIMESTAMP: a close record lacks captured_at;
   - DUPLICATE_PROSPECTIVE_ROW: two prospective rows share the identity
     (event, subject, market, line, model version);
+  - ROW_RECORD_INVALID / ROW_LINE_INVALID: a prospective row is not a
+    record, lacks event_id / market, or its line is not a real finite
+    number (a string line previously evaded the duplicate check and
+    scored as a second sample row; a NaN line silently scored as a push);
   - MODEL_PROBABILITY_INVALID / PRICE_INVALID: a priced row's model
     probabilities or entry prices are missing, out of range, or (for
-    two-sided markets) do not sum to 1.
+    two-sided markets) do not sum to 1. Probabilities and prices are
+    strict numbers: bools, strings, NaN and in-band prices (-50) are
+    refused, never coerced through float();
+  - CLOSE_RECORD_INVALID / CLOSE_DUPLICATE: a close record is malformed
+    (not a record, missing event_id / market, non-numeric line), or two
+    close records share one (event, subject, market, line) key — one key
+    carries one close, never a silent last-in-list overwrite;
   - OUTCOME_RECORD_INVALID / OUTCOME_VALUE_INVALID / OUTCOME_DUPLICATE:
     a realized-outcome record is malformed (missing event_id / market /
     value), its value is not a real finite number (bool, string, NaN,
@@ -75,6 +86,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -103,11 +115,33 @@ def _parse_ts(value, *, row_id: str, field_name: str) -> datetime:
         raise ForwardValidationRefusal(
             "RECORD_MISSING_TIMESTAMP", {"row_id": row_id, "field": field_name})
     try:
-        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
         raise ForwardValidationRefusal(
             "RECORD_MISSING_TIMESTAMP",
             {"row_id": row_id, "field": field_name, "value": value})
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        # A zoneless timestamp is not an instant: comparing it against the
+        # offset-carrying timestamps of the record contract crashed with a
+        # raw TypeError (or silently ordered within an all-naive file).
+        raise ForwardValidationRefusal(
+            "RECORD_MISSING_TIMESTAMP",
+            {"row_id": row_id, "field": field_name, "value": value,
+             "problem": "TIMEZONE_REQUIRED"})
+    return parsed
+
+
+def _strict_number(value) -> float | None:
+    """A real finite number (bool, string, NaN, +/-inf, None refused,
+    never coerced) — the same discipline _index_outcomes applies to
+    realized values, applied to entry-side fields."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    try:
+        number = float(value)
+    except OverflowError:
+        return None
+    return number if math.isfinite(number) else None
 
 
 @dataclass
@@ -196,6 +230,9 @@ def _admit_rows(cfg: FamilyConfig, rows: list) -> tuple[list, dict]:
     late_entries = []
     seen: dict = {}
     for row in rows:
+        if not isinstance(row, dict):
+            raise ForwardValidationRefusal(
+                "ROW_RECORD_INVALID", {"row": repr(row)[:200]})
         row_id = row.get("row_id") or "<no row_id>"
         label = row.get("label") or "PROSPECTIVE"
         event_start = _parse_ts(row.get("event_start"), row_id=row_id,
@@ -219,6 +256,20 @@ def _admit_rows(cfg: FamilyConfig, rows: list) -> tuple[list, dict]:
                 "MODEL_VERSION_MISMATCH",
                 {"row_id": row_id, "found": row.get("model_version"),
                  "frozen": cfg.model_version})
+        for field_name in ("event_id", "market"):
+            if row.get(field_name) is None:
+                raise ForwardValidationRefusal(
+                    "ROW_RECORD_INVALID",
+                    {"row_id": row_id, "field": field_name})
+        if _strict_number(row.get("line")) is None:
+            # The duplicate key and every later comparison read the line as
+            # a number: a string line ("24.5") evaded DUPLICATE_PROSPECTIVE_ROW
+            # (raw-value key) and then scored as a second sample row, a NaN
+            # line silently scored as a PUSH, and a missing/garbage line
+            # crashed mid-run at float(). Refuse by name at admission.
+            raise ForwardValidationRefusal(
+                "ROW_LINE_INVALID",
+                {"row_id": row_id, "line": repr(row.get("line"))})
         key = (row.get("event_id"), row.get("subject_id"), row.get("market"),
                row.get("line"), row.get("model_version"))
         if key in seen:
@@ -237,36 +288,59 @@ def _admit_rows(cfg: FamilyConfig, rows: list) -> tuple[list, dict]:
 
 def _check_probabilities_and_prices(cfg: FamilyConfig, row: dict) -> None:
     row_id = row.get("row_id") or "<no row_id>"
-    mp = row.get("model_p") or {}
-    prices = row.get("entry_prices") or {}
+    mp = row.get("model_p")
+    if mp is None:
+        mp = {}
+    if not isinstance(mp, Mapping):
+        raise ForwardValidationRefusal(
+            "MODEL_PROBABILITY_INVALID", {"row_id": row_id, "model_p": repr(mp)[:200]})
+    prices = row.get("entry_prices")
+    if prices is None:
+        prices = {}
+    if not isinstance(prices, Mapping):
+        raise ForwardValidationRefusal(
+            "PRICE_INVALID", {"row_id": row_id, "entry_prices": repr(prices)[:200]})
+
+    def _price(side: str) -> None:
+        price = prices.get(side)
+        number = _strict_number(price)
+        # The verbatim stats helper coerces: "-110" strings, True (-> 1.01)
+        # and in-band prices like -50 (-> 3.0) all converted without error,
+        # so the band/type discipline must be enforced here, by name.
+        if number is None or -100 < number < 100:
+            raise ForwardValidationRefusal(
+                "PRICE_INVALID", {"row_id": row_id, "side": side,
+                                  "price": price})
+        try:
+            stats.american_to_decimal(number)
+        except (TypeError, ValueError):
+            raise ForwardValidationRefusal(
+                "PRICE_INVALID", {"row_id": row_id, "side": side,
+                                  "price": price})
+
     if cfg.market_form == "YES_ONLY":
-        p = mp.get("YES")
-        if p is None or not (0.0 < float(p) < 1.0):
+        p = _strict_number(mp.get("YES"))
+        if p is None or not (0.0 < p < 1.0):
             raise ForwardValidationRefusal(
                 "MODEL_PROBABILITY_INVALID", {"row_id": row_id, "model_p": mp})
         if prices.get("YES") is None:
             raise ForwardValidationRefusal(
                 "PRICE_INVALID", {"row_id": row_id, "entry_prices": prices})
+        _price("YES")
         return
     total = 0.0
     for side in cfg.sides:
-        p = mp.get(side)
-        if p is None or not (0.0 <= float(p) <= 1.0):
+        p = _strict_number(mp.get(side))
+        if p is None or not (0.0 <= p <= 1.0):
             raise ForwardValidationRefusal(
                 "MODEL_PROBABILITY_INVALID",
                 {"row_id": row_id, "side": side, "model_p": mp})
-        total += float(p)
-        price = prices.get(side)
-        if price is None:
+        total += p
+        if prices.get(side) is None:
             raise ForwardValidationRefusal(
                 "PRICE_INVALID", {"row_id": row_id, "side": side,
                                   "entry_prices": prices})
-        try:
-            stats.american_to_decimal(price)
-        except (TypeError, ValueError):
-            raise ForwardValidationRefusal(
-                "PRICE_INVALID", {"row_id": row_id, "side": side,
-                                  "price": price})
+        _price(side)
     if abs(total - 1.0) > 1e-6:
         raise ForwardValidationRefusal(
             "MODEL_PROBABILITY_INVALID",
@@ -314,13 +388,30 @@ def _attach_close(cfg: FamilyConfig, row: dict, close_index: dict,
 def _index_closes(close_rows: list) -> tuple[dict, set]:
     by_key, seen = {}, set()
     for raw in close_rows:
+        if not isinstance(raw, dict):
+            raise ForwardValidationRefusal(
+                "CLOSE_RECORD_INVALID", {"close_row": repr(raw)[:200]})
         if raw.get("captured_at") is None:
             raise ForwardValidationRefusal(
                 "CLOSE_RECORD_MISSING_TIMESTAMP",
                 {"close_row": {k: raw.get(k) for k in
                                 ("event_id", "subject_id", "market", "line")}})
-        key = (raw["event_id"], raw.get("subject_id"), raw["market"],
-               float(raw["line"]))
+        line = _strict_number(raw.get("line"))
+        if raw.get("event_id") is None or raw.get("market") is None \
+                or line is None:
+            raise ForwardValidationRefusal(
+                "CLOSE_RECORD_INVALID",
+                {"close_row": {k: raw.get(k) for k in
+                                ("event_id", "subject_id", "market", "line")}})
+        key = (raw["event_id"], raw.get("subject_id"), raw["market"], line)
+        if key in by_key:
+            # One key carries one close (the last capture before event
+            # start). A second record for the key silently overwrote the
+            # first in list order, so a stale capture listed last became
+            # "the close" and CLV was computed from it. Refuse, exactly
+            # as duplicate outcomes are refused (OUTCOME_DUPLICATE).
+            raise ForwardValidationRefusal(
+                "CLOSE_DUPLICATE", {"key": str(key)})
         by_key[key] = raw
         seen.add((raw["event_id"], raw.get("subject_id"), raw["market"]))
     return by_key, seen
