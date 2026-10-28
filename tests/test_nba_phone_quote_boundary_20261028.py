@@ -13,7 +13,8 @@ from sportsedge.nba_phone_prop_pricing import (
     QUOTE_PRICE_INVALID, QUOTE_PRICE_MISSING,
     QUOTE_TIMESTAMP_INVALID, QUOTE_TIMESTAMP_MISSING,
     LINE_MISSING, BOOK_UNVERIFIED, QUOTE_NOT_PRE_EVENT,
-    TARGET_START_INVALID, _american_to_decimal, phone_nba_prop_rows,
+    TARGET_START_INVALID, TARGET_START_CONFLICT, TARGET_DATE_CONFLICT,
+    QUOTE_TIMESTAMP_CONFLICT, _american_to_decimal, phone_nba_prop_rows,
 )
 
 NOW = datetime(2026, 10, 28, 6, 0, tzinfo=timezone.utc)
@@ -198,7 +199,7 @@ def test_conflicting_asserted_start_fields_fail_closed():
         [_row(tipoff="2026-11-01T20:00:00-05:00",
               commence_time="2026-10-28T05:58:00+00:00")],
         now=NOW, store=store)
-    assert out["blocker"] == QUOTE_NOT_PRE_EVENT
+    assert out["blocker"] == TARGET_START_CONFLICT
     assert store.price_calls == 0
 
 
@@ -210,3 +211,69 @@ def test_pre_tip_aware_start_stays_research_only():
     assert store.price_calls == 1
     assert out["status"] in {"PRICED_RESEARCH", "RESEARCH_CANDIDATE_NOT_VALIDATED"}
     assert out["eligible"] is False and out["official_authority"] is False
+
+
+def test_conflicting_pre_tip_start_instants_refused():
+    store = _Store()
+    (out,), _ = phone_nba_prop_rows(
+        [_row(commence_time="2026-11-01T21:00:00-05:00")],
+        now=NOW, store=store)
+    assert out["blocker"] == TARGET_START_CONFLICT
+    assert store.price_calls == 0
+
+
+def test_conflicting_quote_timestamp_aliases_refused():
+    store = _Store()
+    (out,), _ = phone_nba_prop_rows(
+        [_row(captured_at="2026-10-28T05:58:00Z")],
+        now=NOW, store=store)
+    assert out["blocker"] == QUOTE_TIMESTAMP_CONFLICT
+    assert "model_p" not in out and "ev_per_dollar" not in out
+    assert store.price_calls == 0
+
+
+def test_identical_quote_timestamp_aliases_with_different_offsets_allowed():
+    store = _Store()
+    (out,), _ = phone_nba_prop_rows(
+        [_row(captured_at="2026-10-28T00:59:00-05:00")],
+        now=NOW, store=store)
+    assert store.price_calls == 1
+    assert out["research_only"] is True and out["eligible"] is False
+
+
+def test_disagreeing_game_date_and_tipoff_refused_before_model():
+    store = _Store()
+    (out,), _ = phone_nba_prop_rows(
+        [_row(game_date="2026-10-31")], now=NOW, store=store)
+    assert out["blocker"] == TARGET_DATE_CONFLICT
+    assert store.price_calls == 0
+
+
+def test_two_date_aliases_cannot_disagree_even_when_target_date_matches():
+    store = _Store()
+    (out,), _ = phone_nba_prop_rows(
+        [_row(game_date="2026-11-01", date="2026-11-02")],
+        now=NOW, store=store)
+    assert out["blocker"] == TARGET_DATE_CONFLICT
+    assert store.price_calls == 0
+
+
+def test_valid_row_after_conflicting_date_row_is_not_poisoned():
+    store = _Store()
+    outs, _ = phone_nba_prop_rows(
+        [_row(game_date="2026-10-31"), _row()],
+        now=NOW, store=store)
+    assert outs[0]["blocker"] == TARGET_DATE_CONFLICT
+    assert outs[1]["status"] in {
+        "PRICED_RESEARCH", "RESEARCH_CANDIDATE_NOT_VALIDATED"}
+    assert store.price_calls == 1
+
+
+def test_same_start_instant_two_offsets_remains_research_only():
+    store = _Store()
+    (out,), _ = phone_nba_prop_rows(
+        [_row(commence_time="2026-11-02T01:00:00Z",
+              game_date="2026-11-01")],
+        now=NOW, store=store)
+    assert store.price_calls == 1
+    assert out["research_only"] is True and out["eligible"] is False
