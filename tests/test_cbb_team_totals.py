@@ -302,11 +302,20 @@ def test_cbr_derivation_pairs_mirrors_and_drops_conflicts(tmp_path,
 
 # ------------------------------------------------------------- 1H gate
 
-def test_first_half_prerequisite_absent_on_main():
-    assert runner.find_pbp_manifest(ROOT) == []
+def test_first_half_prerequisite_present_after_pbp_admission():
+    # State transition recorded with the hoopR PBP admission packet
+    # (research/cbb_hoopr_pbp_admission_20261028/): before that packet
+    # this test asserted find_pbp_manifest(ROOT) == [] and the
+    # PBP_PREREQUISITE_MISSING refusal. The admission supplies exactly
+    # one PBP manifest; the scan must find exactly it, and the block
+    # must report the prerequisite present (the 1H screen itself is a
+    # separate act and is still not run by this packet).
+    assert runner.find_pbp_manifest(ROOT) == [
+        "research/cbb_hoopr_pbp_admission_20261028/pbp_manifest.json"]
     block = runner.first_half_block(ROOT)
-    assert block["verdict"] == "NOT_EXECUTABLE"
-    assert block["refusal"]["code"] == "PBP_PREREQUISITE_MISSING"
+    assert block["verdict"] == "PREREQUISITE_PRESENT — NOT RUN BY THIS PACKET"
+    assert block["pbp_manifests_found"] == [
+        "research/cbb_hoopr_pbp_admission_20261028/pbp_manifest.json"]
 
 
 # ------------------------------------------------- committed record

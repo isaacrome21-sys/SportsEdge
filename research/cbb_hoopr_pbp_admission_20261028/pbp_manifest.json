@@ -1,0 +1,3817 @@
+{
+ "cbr_leg_status": "NOT_A_HALF_SCORE_SOURCE (finals only; see record section 6)",
+ "coverage": {
+  "2015": {
+   "ab_agreement_final": 4838,
+   "ab_agreement_halftime": 4896,
+   "content_check": "verified-by-pull: 1,737,302 play rows over 5,280 games; ESPN game IDs a strict subset of the admitted schedule universe (0 extra); Method-A derived finals reproduce admitted schedule finals on 5,185/5,280 joined games",
+   "final_agreement_running_score": 5185,
+   "final_agreement_scoring_sum": 4757,
+   "final_disagreement_examples": [
+    {
+     "game_id": "400596491",
+     "pbp_A": [
+      60,
+      68
+     ],
+     "pbp_B": [
+      60,
+      68
+     ],
+     "sched": [
+      62,
+      68
+     ]
+    },
+    {
+     "game_id": "400591431",
+     "pbp_A": [
+      66,
+      57
+     ],
+     "pbp_B": [
+      68,
+      56
+     ],
+     "sched": [
+      66,
+      57
+     ]
+    },
+    {
+     "game_id": "400595989",
+     "pbp_A": [
+      65,
+      57
+     ],
+     "pbp_B": [
+      99,
+      95
+     ],
+     "sched": [
+      65,
+      57
+     ]
+    },
+    {
+     "game_id": "400597359",
+     "pbp_A": [
+      73,
+      79
+     ],
+     "pbp_B": [
+      80,
+      83
+     ],
+     "sched": [
+      73,
+      79
+     ]
+    },
+    {
+     "game_id": "400765247",
+     "pbp_A": [
+      64,
+      89
+     ],
+     "pbp_B": [
+      105,
+      131
+     ],
+     "sched": [
+      64,
+      89
+     ]
+    },
+    {
+     "game_id": "400589378",
+     "pbp_A": [
+      80,
+      93
+     ],
+     "pbp_B": [
+      167,
+      219
+     ],
+     "sched": [
+      80,
+      93
+     ]
+    },
+    {
+     "game_id": "400591719",
+     "pbp_A": [
+      70,
+      54
+     ],
+     "pbp_B": [
+      79,
+      56
+     ],
+     "sched": [
+      70,
+      54
+     ]
+    },
+    {
+     "game_id": "400589186",
+     "pbp_A": [
+      72,
+      78
+     ],
+     "pbp_B": [
+      86,
+      91
+     ],
+     "sched": [
+      72,
+      78
+     ]
+    },
+    {
+     "game_id": "400786171",
+     "pbp_A": [
+      82,
+      59
+     ],
+     "pbp_B": [
+      87,
+      68
+     ],
+     "sched": [
+      82,
+      59
+     ]
+    },
+    {
+     "game_id": "400595949",
+     "pbp_A": [
+      50,
+      45
+     ],
+     "pbp_B": [
+      90,
+      74
+     ],
+     "sched": [
+      50,
+      45
+     ]
+    },
+    {
+     "game_id": "400591768",
+     "pbp_A": [
+      79,
+      83
+     ],
+     "pbp_B": [
+      79,
+      85
+     ],
+     "sched": [
+      79,
+      83
+     ]
+    },
+    {
+     "game_id": "400591536",
+     "pbp_A": [
+      60,
+      63
+     ],
+     "pbp_B": [
+      86,
+      101
+     ],
+     "sched": [
+      60,
+      63
+     ]
+    }
+   ],
+   "games_in_both": 5280,
+   "missing_rate_vs_schedule": 0.1099,
+   "pbp_extra_vs_schedule": 0,
+   "pbp_games": 5280,
+   "pbp_missing_vs_schedule": 652,
+   "pbp_rows": 1737302,
+   "schedule_games": 5932
+  },
+  "2016": {
+   "ab_agreement_final": 5317,
+   "ab_agreement_halftime": 5355,
+   "content_check": "verified-by-pull: 1,803,531 play rows over 5,390 games; ESPN game IDs a strict subset of the admitted schedule universe (0 extra); Method-A derived finals reproduce admitted schedule finals on 5,300/5,390 joined games",
+   "final_agreement_running_score": 5300,
+   "final_agreement_scoring_sum": 5231,
+   "final_disagreement_examples": [
+    {
+     "game_id": "400827755",
+     "pbp_A": [
+      72,
+      96
+     ],
+     "pbp_B": [
+      72,
+      98
+     ],
+     "sched": [
+      72,
+      96
+     ]
+    },
+    {
+     "game_id": "400847391",
+     "pbp_A": [
+      65,
+      44
+     ],
+     "pbp_B": [
+      65,
+      44
+     ],
+     "sched": [
+      69,
+      46
+     ]
+    },
+    {
+     "game_id": "400843610",
+     "pbp_A": [
+      57,
+      67
+     ],
+     "pbp_B": [
+      54,
+      67
+     ],
+     "sched": [
+      57,
+      67
+     ]
+    },
+    {
+     "game_id": "400842018",
+     "pbp_A": [
+      74,
+      67
+     ],
+     "pbp_B": [
+      74,
+      67
+     ],
+     "sched": [
+      75,
+      67
+     ]
+    },
+    {
+     "game_id": "400847268",
+     "pbp_A": [
+      48,
+      84
+     ],
+     "pbp_B": [
+      48,
+      87
+     ],
+     "sched": [
+      48,
+      84
+     ]
+    },
+    {
+     "game_id": "400830589",
+     "pbp_A": [
+      47,
+      90
+     ],
+     "pbp_B": [
+      47,
+      92
+     ],
+     "sched": [
+      47,
+      90
+     ]
+    },
+    {
+     "game_id": "400823443",
+     "pbp_A": [
+      72,
+      86
+     ],
+     "pbp_B": [
+      72,
+      86
+     ],
+     "sched": [
+      72,
+      88
+     ]
+    },
+    {
+     "game_id": "400833377",
+     "pbp_A": [
+      79,
+      72
+     ],
+     "pbp_B": [
+      78,
+      67
+     ],
+     "sched": [
+      79,
+      72
+     ]
+    },
+    {
+     "game_id": "400841961",
+     "pbp_A": [
+      78,
+      84
+     ],
+     "pbp_B": [
+      78,
+      84
+     ],
+     "sched": [
+      78,
+      85
+     ]
+    },
+    {
+     "game_id": "400845517",
+     "pbp_A": [
+      64,
+      61
+     ],
+     "pbp_B": [
+      64,
+      61
+     ],
+     "sched": [
+      66,
+      61
+     ]
+    },
+    {
+     "game_id": "400840879",
+     "pbp_A": [
+      72,
+      73
+     ],
+     "pbp_B": [
+      72,
+      73
+     ],
+     "sched": [
+      74,
+      73
+     ]
+    },
+    {
+     "game_id": "400817520",
+     "pbp_A": [
+      78,
+      70
+     ],
+     "pbp_B": [
+      80,
+      70
+     ],
+     "sched": [
+      78,
+      70
+     ]
+    }
+   ],
+   "games_in_both": 5390,
+   "missing_rate_vs_schedule": 0.0854,
+   "pbp_extra_vs_schedule": 0,
+   "pbp_games": 5390,
+   "pbp_missing_vs_schedule": 503,
+   "pbp_rows": 1803531,
+   "schedule_games": 5893
+  },
+  "2017": {
+   "ab_agreement_final": 5399,
+   "ab_agreement_halftime": 5438,
+   "content_check": "verified-by-pull: 1,818,853 play rows over 5,479 games; ESPN game IDs a strict subset of the admitted schedule universe (0 extra); Method-A derived finals reproduce admitted schedule finals on 5,400/5,479 joined games",
+   "final_agreement_running_score": 5400,
+   "final_agreement_scoring_sum": 5324,
+   "final_disagreement_examples": [
+    {
+     "game_id": "400945495",
+     "pbp_A": [
+      60,
+      61
+     ],
+     "pbp_B": [
+      60,
+      61
+     ],
+     "sched": [
+      60,
+      63
+     ]
+    },
+    {
+     "game_id": "400915954",
+     "pbp_A": [
+      94,
+      75
+     ],
+     "pbp_B": [
+      88,
+      66
+     ],
+     "sched": [
+      94,
+      75
+     ]
+    },
+    {
+     "game_id": "400918058",
+     "pbp_A": [
+      58,
+      63
+     ],
+     "pbp_B": [
+      57,
+      63
+     ],
+     "sched": [
+      58,
+      63
+     ]
+    },
+    {
+     "game_id": "400919565",
+     "pbp_A": [
+      57,
+      62
+     ],
+     "pbp_B": [
+      59,
+      62
+     ],
+     "sched": [
+      57,
+      62
+     ]
+    },
+    {
+     "game_id": "400915801",
+     "pbp_A": [
+      50,
+      47
+     ],
+     "pbp_B": [
+      50,
+      47
+     ],
+     "sched": [
+      80,
+      77
+     ]
+    },
+    {
+     "game_id": "400945333",
+     "pbp_A": [
+      65,
+      70
+     ],
+     "pbp_B": [
+      65,
+      68
+     ],
+     "sched": [
+      65,
+      70
+     ]
+    },
+    {
+     "game_id": "400915952",
+     "pbp_A": [
+      44,
+      75
+     ],
+     "pbp_B": [
+      31,
+      56
+     ],
+     "sched": [
+      44,
+      75
+     ]
+    },
+    {
+     "game_id": "400917517",
+     "pbp_A": [
+      69,
+      71
+     ],
+     "pbp_B": [
+      72,
+      71
+     ],
+     "sched": [
+      69,
+      71
+     ]
+    },
+    {
+     "game_id": "400918551",
+     "pbp_A": [
+      84,
+      68
+     ],
+     "pbp_B": [
+      84,
+      68
+     ],
+     "sched": [
+      84,
+      71
+     ]
+    },
+    {
+     "game_id": "400917824",
+     "pbp_A": [
+      71,
+      60
+     ],
+     "pbp_B": [
+      68,
+      56
+     ],
+     "sched": [
+      79,
+      66
+     ]
+    },
+    {
+     "game_id": "400918919",
+     "pbp_A": [
+      53,
+      77
+     ],
+     "pbp_B": [
+      53,
+      77
+     ],
+     "sched": [
+      55,
+      77
+     ]
+    },
+    {
+     "game_id": "400918289",
+     "pbp_A": [
+      77,
+      87
+     ],
+     "pbp_B": [
+      77,
+      86
+     ],
+     "sched": [
+      77,
+      87
+     ]
+    }
+   ],
+   "games_in_both": 5479,
+   "missing_rate_vs_schedule": 0.0807,
+   "pbp_extra_vs_schedule": 0,
+   "pbp_games": 5479,
+   "pbp_missing_vs_schedule": 481,
+   "pbp_rows": 1818853,
+   "schedule_games": 5960
+  },
+  "2018": {
+   "ab_agreement_final": 5419,
+   "ab_agreement_halftime": 5465,
+   "content_check": "verified-by-pull: 1,827,395 play rows over 5,645 games; ESPN game IDs a strict subset of the admitted schedule universe (0 extra); Method-A derived finals reproduce admitted schedule finals on 5,576/5,645 joined games",
+   "final_agreement_running_score": 5576,
+   "final_agreement_scoring_sum": 5361,
+   "final_disagreement_examples": [
+    {
+     "game_id": "400988374",
+     "pbp_A": [
+      75,
+      64
+     ],
+     "pbp_B": [
+      42,
+      39
+     ],
+     "sched": [
+      75,
+      64
+     ]
+    },
+    {
+     "game_id": "400987378",
+     "pbp_A": [
+      80,
+      81
+     ],
+     "pbp_B": [
+      80,
+      78
+     ],
+     "sched": [
+      80,
+      81
+     ]
+    },
+    {
+     "game_id": "400988411",
+     "pbp_A": [
+      44,
+      101
+     ],
+     "pbp_B": [
+      44,
+      101
+     ],
+     "sched": [
+      49,
+      101
+     ]
+    },
+    {
+     "game_id": "400991872",
+     "pbp_A": [
+      90,
+      87
+     ],
+     "pbp_B": [
+      16,
+      21
+     ],
+     "sched": [
+      90,
+      87
+     ]
+    },
+    {
+     "game_id": "400989896",
+     "pbp_A": [
+      79,
+      76
+     ],
+     "pbp_B": [
+      19,
+      20
+     ],
+     "sched": [
+      79,
+      76
+     ]
+    },
+    {
+     "game_id": "400989776",
+     "pbp_A": [
+      59,
+      108
+     ],
+     "pbp_B": [
+      59,
+      108
+     ],
+     "sched": [
+      62,
+      110
+     ]
+    },
+    {
+     "game_id": "400989740",
+     "pbp_A": [
+      76,
+      90
+     ],
+     "pbp_B": [
+      74,
+      86
+     ],
+     "sched": [
+      76,
+      90
+     ]
+    },
+    {
+     "game_id": "400992339",
+     "pbp_A": [
+      62,
+      69
+     ],
+     "pbp_B": [
+      55,
+      66
+     ],
+     "sched": [
+      62,
+      69
+     ]
+    },
+    {
+     "game_id": "400991347",
+     "pbp_A": [
+      77,
+      79
+     ],
+     "pbp_B": [
+      17,
+      13
+     ],
+     "sched": [
+      77,
+      79
+     ]
+    },
+    {
+     "game_id": "400989091",
+     "pbp_A": [
+      62,
+      97
+     ],
+     "pbp_B": [
+      16,
+      16
+     ],
+     "sched": [
+      62,
+      97
+     ]
+    },
+    {
+     "game_id": "400991166",
+     "pbp_A": [
+      85,
+      91
+     ],
+     "pbp_B": [
+      85,
+      91
+     ],
+     "sched": [
+      85,
+      92
+     ]
+    },
+    {
+     "game_id": "400986376",
+     "pbp_A": [
+      57,
+      100
+     ],
+     "pbp_B": [
+      59,
+      100
+     ],
+     "sched": [
+      57,
+      100
+     ]
+    }
+   ],
+   "games_in_both": 5645,
+   "missing_rate_vs_schedule": 0.0596,
+   "pbp_extra_vs_schedule": 0,
+   "pbp_games": 5645,
+   "pbp_missing_vs_schedule": 358,
+   "pbp_rows": 1827395,
+   "schedule_games": 6003
+  },
+  "2019": {
+   "ab_agreement_final": 4812,
+   "ab_agreement_halftime": 5004,
+   "content_check": "verified-by-pull: 1,787,332 play rows over 5,474 games; ESPN game IDs a strict subset of the admitted schedule universe (0 extra); Method-A derived finals reproduce admitted schedule finals on 5,386/5,474 joined games",
+   "final_agreement_running_score": 5386,
+   "final_agreement_scoring_sum": 4743,
+   "final_disagreement_examples": [
+    {
+     "game_id": "401083255",
+     "pbp_A": [
+      52,
+      70
+     ],
+     "pbp_B": [
+      50,
+      70
+     ],
+     "sched": [
+      52,
+      70
+     ]
+    },
+    {
+     "game_id": "401086245",
+     "pbp_A": [
+      70,
+      52
+     ],
+     "pbp_B": [
+      64,
+      50
+     ],
+     "sched": [
+      70,
+      52
+     ]
+    },
+    {
+     "game_id": "401083944",
+     "pbp_A": [
+      65,
+      97
+     ],
+     "pbp_B": [
+      65,
+      95
+     ],
+     "sched": [
+      65,
+      97
+     ]
+    },
+    {
+     "game_id": "401089920",
+     "pbp_A": [
+      63,
+      74
+     ],
+     "pbp_B": [
+      63,
+      72
+     ],
+     "sched": [
+      63,
+      74
+     ]
+    },
+    {
+     "game_id": "401086030",
+     "pbp_A": [
+      50,
+      69
+     ],
+     "pbp_B": [
+      50,
+      65
+     ],
+     "sched": [
+      50,
+      69
+     ]
+    },
+    {
+     "game_id": "401090104",
+     "pbp_A": [
+      83,
+      78
+     ],
+     "pbp_B": [
+      83,
+      78
+     ],
+     "sched": [
+      84,
+      78
+     ]
+    },
+    {
+     "game_id": "401087792",
+     "pbp_A": [
+      75,
+      104
+     ],
+     "pbp_B": [
+      75,
+      102
+     ],
+     "sched": [
+      75,
+      104
+     ]
+    },
+    {
+     "game_id": "401086163",
+     "pbp_A": [
+      81,
+      74
+     ],
+     "pbp_B": [
+      79,
+      72
+     ],
+     "sched": [
+      81,
+      74
+     ]
+    },
+    {
+     "game_id": "401086192",
+     "pbp_A": [
+      36,
+      78
+     ],
+     "pbp_B": [
+      36,
+      74
+     ],
+     "sched": [
+      39,
+      83
+     ]
+    },
+    {
+     "game_id": "401087018",
+     "pbp_A": [
+      72,
+      72
+     ],
+     "pbp_B": [
+      72,
+      72
+     ],
+     "sched": [
+      81,
+      84
+     ]
+    },
+    {
+     "game_id": "401087130",
+     "pbp_A": [
+      81,
+      72
+     ],
+     "pbp_B": [
+      75,
+      72
+     ],
+     "sched": [
+      81,
+      72
+     ]
+    },
+    {
+     "game_id": "401086143",
+     "pbp_A": [
+      77,
+      88
+     ],
+     "pbp_B": [
+      75,
+      76
+     ],
+     "sched": [
+      77,
+      88
+     ]
+    }
+   ],
+   "games_in_both": 5474,
+   "missing_rate_vs_schedule": 0.0951,
+   "pbp_extra_vs_schedule": 0,
+   "pbp_games": 5474,
+   "pbp_missing_vs_schedule": 575,
+   "pbp_rows": 1787332,
+   "schedule_games": 6049
+  },
+  "2020": {
+   "ab_agreement_final": 4654,
+   "ab_agreement_halftime": 4873,
+   "content_check": "verified-by-pull: 1,746,980 play rows over 5,394 games; ESPN game IDs a strict subset of the admitted schedule universe (0 extra); Method-A derived finals reproduce admitted schedule finals on 5,293/5,394 joined games",
+   "final_agreement_running_score": 5293,
+   "final_agreement_scoring_sum": 4575,
+   "final_disagreement_examples": [
+    {
+     "game_id": "401173516",
+     "pbp_A": [
+      73,
+      78
+     ],
+     "pbp_B": [
+      71,
+      72
+     ],
+     "sched": [
+      73,
+      78
+     ]
+    },
+    {
+     "game_id": "401170153",
+     "pbp_A": [
+      45,
+      66
+     ],
+     "pbp_B": [
+      45,
+      64
+     ],
+     "sched": [
+      45,
+      66
+     ]
+    },
+    {
+     "game_id": "401169777",
+     "pbp_A": [
+      63,
+      79
+     ],
+     "pbp_B": [
+      57,
+      79
+     ],
+     "sched": [
+      63,
+      79
+     ]
+    },
+    {
+     "game_id": "401168181",
+     "pbp_A": [
+      57,
+      80
+     ],
+     "pbp_B": [
+      57,
+      78
+     ],
+     "sched": [
+      57,
+      80
+     ]
+    },
+    {
+     "game_id": "401175641",
+     "pbp_A": [
+      60,
+      81
+     ],
+     "pbp_B": [
+      58,
+      81
+     ],
+     "sched": [
+      60,
+      81
+     ]
+    },
+    {
+     "game_id": "401171501",
+     "pbp_A": [
+      70,
+      68
+     ],
+     "pbp_B": [
+      66,
+      68
+     ],
+     "sched": [
+      70,
+      68
+     ]
+    },
+    {
+     "game_id": "401186182",
+     "pbp_A": [
+      65,
+      45
+     ],
+     "pbp_B": [
+      63,
+      45
+     ],
+     "sched": [
+      65,
+      45
+     ]
+    },
+    {
+     "game_id": "401168572",
+     "pbp_A": [
+      71,
+      87
+     ],
+     "pbp_B": [
+      67,
+      87
+     ],
+     "sched": [
+      71,
+      87
+     ]
+    },
+    {
+     "game_id": "401171601",
+     "pbp_A": [
+      61,
+      91
+     ],
+     "pbp_B": [
+      59,
+      79
+     ],
+     "sched": [
+      61,
+      91
+     ]
+    },
+    {
+     "game_id": "401170667",
+     "pbp_A": [
+      56,
+      88
+     ],
+     "pbp_B": [
+      54,
+      86
+     ],
+     "sched": [
+      56,
+      88
+     ]
+    },
+    {
+     "game_id": "401175154",
+     "pbp_A": [
+      70,
+      93
+     ],
+     "pbp_B": [
+      66,
+      89
+     ],
+     "sched": [
+      70,
+      93
+     ]
+    },
+    {
+     "game_id": "401171498",
+     "pbp_A": [
+      74,
+      67
+     ],
+     "pbp_B": [
+      72,
+      67
+     ],
+     "sched": [
+      74,
+      67
+     ]
+    }
+   ],
+   "games_in_both": 5394,
+   "missing_rate_vs_schedule": 0.0647,
+   "pbp_extra_vs_schedule": 0,
+   "pbp_games": 5394,
+   "pbp_missing_vs_schedule": 373,
+   "pbp_rows": 1746980,
+   "schedule_games": 5767
+  },
+  "2021": {
+   "ab_agreement_final": 3317,
+   "ab_agreement_halftime": 3544,
+   "content_check": "verified-by-pull: 1,296,252 play rows over 4,015 games; ESPN game IDs a strict subset of the admitted schedule universe (0 extra); Method-A derived finals reproduce admitted schedule finals on 3,957/4,015 joined games",
+   "final_agreement_running_score": 3957,
+   "final_agreement_scoring_sum": 3268,
+   "final_disagreement_examples": [
+    {
+     "game_id": "401265653",
+     "pbp_A": [
+      63,
+      99
+     ],
+     "pbp_B": [
+      63,
+      97
+     ],
+     "sched": [
+      63,
+      99
+     ]
+    },
+    {
+     "game_id": "401253913",
+     "pbp_A": [
+      82,
+      89
+     ],
+     "pbp_B": [
+      82,
+      87
+     ],
+     "sched": [
+      82,
+      89
+     ]
+    },
+    {
+     "game_id": "401257573",
+     "pbp_A": [
+      60,
+      71
+     ],
+     "pbp_B": [
+      60,
+      71
+     ],
+     "sched": [
+      64,
+      73
+     ]
+    },
+    {
+     "game_id": "401258493",
+     "pbp_A": [
+      82,
+      88
+     ],
+     "pbp_B": [
+      74,
+      88
+     ],
+     "sched": [
+      82,
+      88
+     ]
+    },
+    {
+     "game_id": "401257966",
+     "pbp_A": [
+      65,
+      76
+     ],
+     "pbp_B": [
+      65,
+      74
+     ],
+     "sched": [
+      65,
+      76
+     ]
+    },
+    {
+     "game_id": "401260307",
+     "pbp_A": [
+      46,
+      84
+     ],
+     "pbp_B": [
+      46,
+      82
+     ],
+     "sched": [
+      46,
+      84
+     ]
+    },
+    {
+     "game_id": "401265375",
+     "pbp_A": [
+      68,
+      95
+     ],
+     "pbp_B": [
+      68,
+      85
+     ],
+     "sched": [
+      68,
+      95
+     ]
+    },
+    {
+     "game_id": "401295933",
+     "pbp_A": [
+      61,
+      39
+     ],
+     "pbp_B": [
+      61,
+      37
+     ],
+     "sched": [
+      61,
+      39
+     ]
+    },
+    {
+     "game_id": "401253427",
+     "pbp_A": [
+      77,
+      59
+     ],
+     "pbp_B": [
+      71,
+      59
+     ],
+     "sched": [
+      77,
+      59
+     ]
+    },
+    {
+     "game_id": "401262991",
+     "pbp_A": [
+      71,
+      77
+     ],
+     "pbp_B": [
+      69,
+      75
+     ],
+     "sched": [
+      71,
+      77
+     ]
+    },
+    {
+     "game_id": "401258464",
+     "pbp_A": [
+      85,
+      72
+     ],
+     "pbp_B": [
+      81,
+      72
+     ],
+     "sched": [
+      85,
+      72
+     ]
+    },
+    {
+     "game_id": "401307273",
+     "pbp_A": [
+      51,
+      74
+     ],
+     "pbp_B": [
+      49,
+      68
+     ],
+     "sched": [
+      51,
+      74
+     ]
+    }
+   ],
+   "games_in_both": 4015,
+   "missing_rate_vs_schedule": 0.063,
+   "pbp_extra_vs_schedule": 0,
+   "pbp_games": 4015,
+   "pbp_missing_vs_schedule": 270,
+   "pbp_rows": 1296252,
+   "schedule_games": 4285
+  },
+  "2022": {
+   "ab_agreement_final": 4713,
+   "ab_agreement_halftime": 5024,
+   "content_check": "verified-by-pull: 1,860,561 play rows over 5,830 games; ESPN game IDs a strict subset of the admitted schedule universe (0 extra); Method-A derived finals reproduce admitted schedule finals on 5,765/5,830 joined games",
+   "final_agreement_running_score": 5765,
+   "final_agreement_scoring_sum": 4661,
+   "final_disagreement_examples": [
+    {
+     "game_id": "401369943",
+     "pbp_A": [
+      67,
+      83
+     ],
+     "pbp_B": [
+      67,
+      77
+     ],
+     "sched": [
+      67,
+      83
+     ]
+    },
+    {
+     "game_id": "401415691",
+     "pbp_A": [
+      79,
+      90
+     ],
+     "pbp_B": [
+      79,
+      88
+     ],
+     "sched": [
+      79,
+      90
+     ]
+    },
+    {
+     "game_id": "401372583",
+     "pbp_A": [
+      67,
+      68
+     ],
+     "pbp_B": [
+      65,
+      64
+     ],
+     "sched": [
+      67,
+      68
+     ]
+    },
+    {
+     "game_id": "401402045",
+     "pbp_A": [
+      64,
+      90
+     ],
+     "pbp_B": [
+      60,
+      80
+     ],
+     "sched": [
+      64,
+      90
+     ]
+    },
+    {
+     "game_id": "401371787",
+     "pbp_A": [
+      60,
+      77
+     ],
+     "pbp_B": [
+      54,
+      75
+     ],
+     "sched": [
+      60,
+      77
+     ]
+    },
+    {
+     "game_id": "401385631",
+     "pbp_A": [
+      41,
+      107
+     ],
+     "pbp_B": [
+      41,
+      101
+     ],
+     "sched": [
+      41,
+      107
+     ]
+    },
+    {
+     "game_id": "401373182",
+     "pbp_A": [
+      67,
+      68
+     ],
+     "pbp_B": [
+      63,
+      68
+     ],
+     "sched": [
+      67,
+      68
+     ]
+    },
+    {
+     "game_id": "401365165",
+     "pbp_A": [
+      75,
+      70
+     ],
+     "pbp_B": [
+      75,
+      66
+     ],
+     "sched": [
+      75,
+      70
+     ]
+    },
+    {
+     "game_id": "401368272",
+     "pbp_A": [
+      64,
+      74
+     ],
+     "pbp_B": [
+      58,
+      72
+     ],
+     "sched": [
+      64,
+      74
+     ]
+    },
+    {
+     "game_id": "401377447",
+     "pbp_A": [
+      68,
+      64
+     ],
+     "pbp_B": [
+      66,
+      62
+     ],
+     "sched": [
+      68,
+      64
+     ]
+    },
+    {
+     "game_id": "401367500",
+     "pbp_A": [
+      54,
+      73
+     ],
+     "pbp_B": [
+      54,
+      73
+     ],
+     "sched": [
+      58,
+      79
+     ]
+    },
+    {
+     "game_id": "401370828",
+     "pbp_A": [
+      65,
+      46
+     ],
+     "pbp_B": [
+      63,
+      46
+     ],
+     "sched": [
+      65,
+      46
+     ]
+    }
+   ],
+   "games_in_both": 5830,
+   "missing_rate_vs_schedule": 0.0244,
+   "pbp_extra_vs_schedule": 0,
+   "pbp_games": 5830,
+   "pbp_missing_vs_schedule": 146,
+   "pbp_rows": 1860561,
+   "schedule_games": 5976
+  },
+  "2023": {
+   "ab_agreement_final": 4996,
+   "ab_agreement_halftime": 5332,
+   "content_check": "verified-by-pull: 1,957,375 play rows over 6,116 games; ESPN game IDs a strict subset of the admitted schedule universe (0 extra); Method-A derived finals reproduce admitted schedule finals on 6,041/6,116 joined games",
+   "final_agreement_running_score": 6041,
+   "final_agreement_scoring_sum": 4934,
+   "final_disagreement_examples": [
+    {
+     "game_id": "401489114",
+     "pbp_A": [
+      66,
+      68
+     ],
+     "pbp_B": [
+      64,
+      68
+     ],
+     "sched": [
+      66,
+      68
+     ]
+    },
+    {
+     "game_id": "401484913",
+     "pbp_A": [
+      78,
+      63
+     ],
+     "pbp_B": [
+      78,
+      61
+     ],
+     "sched": [
+      78,
+      63
+     ]
+    },
+    {
+     "game_id": "401484518",
+     "pbp_A": [
+      67,
+      83
+     ],
+     "pbp_B": [
+      65,
+      83
+     ],
+     "sched": [
+      67,
+      83
+     ]
+    },
+    {
+     "game_id": "401487354",
+     "pbp_A": [
+      84,
+      63
+     ],
+     "pbp_B": [
+      78,
+      57
+     ],
+     "sched": [
+      84,
+      63
+     ]
+    },
+    {
+     "game_id": "401486464",
+     "pbp_A": [
+      59,
+      61
+     ],
+     "pbp_B": [
+      55,
+      61
+     ],
+     "sched": [
+      59,
+      61
+     ]
+    },
+    {
+     "game_id": "401488402",
+     "pbp_A": [
+      65,
+      70
+     ],
+     "pbp_B": [
+      63,
+      68
+     ],
+     "sched": [
+      65,
+      70
+     ]
+    },
+    {
+     "game_id": "401469971",
+     "pbp_A": [
+      57,
+      53
+     ],
+     "pbp_B": [
+      53,
+      51
+     ],
+     "sched": [
+      57,
+      53
+     ]
+    },
+    {
+     "game_id": "401492297",
+     "pbp_A": [
+      66,
+      69
+     ],
+     "pbp_B": [
+      66,
+      65
+     ],
+     "sched": [
+      66,
+      69
+     ]
+    },
+    {
+     "game_id": "401486308",
+     "pbp_A": [
+      86,
+      61
+     ],
+     "pbp_B": [
+      86,
+      59
+     ],
+     "sched": [
+      86,
+      61
+     ]
+    },
+    {
+     "game_id": "401483315",
+     "pbp_A": [
+      81,
+      87
+     ],
+     "pbp_B": [
+      79,
+      87
+     ],
+     "sched": [
+      81,
+      87
+     ]
+    },
+    {
+     "game_id": "401483218",
+     "pbp_A": [
+      53,
+      68
+     ],
+     "pbp_B": [
+      53,
+      66
+     ],
+     "sched": [
+      53,
+      68
+     ]
+    },
+    {
+     "game_id": "401487650",
+     "pbp_A": [
+      69,
+      64
+     ],
+     "pbp_B": [
+      65,
+      64
+     ],
+     "sched": [
+      69,
+      64
+     ]
+    }
+   ],
+   "games_in_both": 6116,
+   "missing_rate_vs_schedule": 0.0232,
+   "pbp_extra_vs_schedule": 0,
+   "pbp_games": 6116,
+   "pbp_missing_vs_schedule": 145,
+   "pbp_rows": 1957375,
+   "schedule_games": 6261
+  }
+ },
+ "crosswalk_status": "NOT_ADMITTED_BY_THIS_RECORD",
+ "design_only": true,
+ "forward_clock_credit": false,
+ "known_limitations": [
+  "Coverage: 2.3%-11.0% of admitted-schedule games per season have no play-by-play in the pinned assets (worst in 2015); those fixtures are NO_DATA for any 1H purpose.",
+  "Integrity gate (mandatory): Method-A derived finals disagree with the admitted schedule finals on 1.1%-1.9% of joined games per season; adjudication (9/9 sampled) sides with the schedule - the class is PBP-feed defects. A fixture's halftime may be consumed only when its derived final equals the schedule final.",
+  "Method B (summing score_value over scoring_play-flagged rows) is NOT a valid derivation in any era and is refused: the scoring_play flag is unreliable (unflagged made baskets, score updates on non-play rows) and isolated early-era feeds contain duplicated segments that inflate sums.",
+  "Halftime cross-check source is ESPN's own published linescores - a different artifact and endpoint, but the same provider as the PBP; no independent-provenance halftime source exists in the program (the CBR logs carry finals only).",
+  "Rolling release: all 27 in-window assets carried updated_at 2026-10-18 at pull time; pins attest the bytes as pulled, nothing more."
+ ],
+ "pin_rule": "tag + release ID + asset ID + asset size + asset updated_at + SHA-256 of the downloaded bytes, all recorded in this manifest at pull time, together with the pull timestamp (retrieved_at_utc). The release is ROLLING (assets replaced in place under a stable tag), so the pin attests the bytes as pulled at retrieved_at_utc - the strongest attestation this source supports; it does NOT attest that upstream bytes are stable or immutable. Any later byte drift against this manifest is SOURCE_CHANGED_AFTER_SNAPSHOT (refusal), never silent acceptance.",
+ "play_eligible": false,
+ "retrieved_at_utc": "2026-10-28T15:55:33Z",
+ "reverification": "second read (re-hash of pulled bytes) 9/9 match; fresh full re-download of play_by_play_2021.csv reproduced its pin exactly (2026-10-28T16:01Z)",
+ "sample_checks": {
+  "check_source": "ESPN summary API linescores (first linescore entry = first-half points)",
+  "check_source_disclosure": "ESPN's published linescores are a different artifact and endpoint from the play-by-play feed, but the same provider (ESPN) that originates the PBP; agreement proves the derivation is faithful to ESPN's published half scores, not an independent-provenance verification. The College Basketball Reference logs admitted by PR #2871 carry finals only and cannot check halves.",
+  "final_disagreement_adjudication": "For one Method-A final-disagreement game per season (9 games), ESPN's published final from the summary document sided with the admitted schedule in 9/9 cases: the disagreement class is PBP-feed defects (truncated or corrupted feeds), and the final-agreement gate in the record removes exactly that class.",
+  "games": [
+   {
+    "espn_final": [
+     82,
+     93
+    ],
+    "espn_first_half": [
+     38,
+     45
+    ],
+    "game_id": "400585667",
+    "kind": "opener",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     82,
+     93
+    ],
+    "pbp_first_half_method_a": [
+     38,
+     45
+    ],
+    "pbp_first_half_method_b": [
+     38,
+     45
+    ],
+    "season": 2015
+   },
+   {
+    "espn_final": [
+     70,
+     83
+    ],
+    "espn_first_half": [
+     27,
+     38
+    ],
+    "game_id": "400593227",
+    "kind": "mid_1",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     70,
+     83
+    ],
+    "pbp_first_half_method_a": [
+     27,
+     38
+    ],
+    "pbp_first_half_method_b": [
+     27,
+     38
+    ],
+    "season": 2015
+   },
+   {
+    "espn_final": [
+     100,
+     105
+    ],
+    "espn_first_half": [
+     39,
+     41
+    ],
+    "game_id": "400586277",
+    "kind": "mid_2",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     100,
+     105
+    ],
+    "pbp_first_half_method_a": [
+     39,
+     41
+    ],
+    "pbp_first_half_method_b": [
+     39,
+     41
+    ],
+    "season": 2015
+   },
+   {
+    "espn_final": [
+     63,
+     68
+    ],
+    "espn_first_half": [
+     31,
+     31
+    ],
+    "game_id": "400788981",
+    "kind": "finale",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     63,
+     68
+    ],
+    "pbp_first_half_method_a": [
+     31,
+     31
+    ],
+    "pbp_first_half_method_b": [
+     31,
+     31
+    ],
+    "season": 2015
+   },
+   {
+    "espn_final": [
+     64,
+     67
+    ],
+    "espn_first_half": [
+     33,
+     25
+    ],
+    "game_id": "400840066",
+    "kind": "mid_1",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     64,
+     67
+    ],
+    "pbp_first_half_method_a": [
+     33,
+     25
+    ],
+    "pbp_first_half_method_b": [
+     33,
+     25
+    ],
+    "season": 2016
+   },
+   {
+    "espn_final": [
+     67,
+     70
+    ],
+    "espn_first_half": [
+     38,
+     28
+    ],
+    "game_id": "400817134",
+    "kind": "mid_2",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     67,
+     70
+    ],
+    "pbp_first_half_method_a": [
+     38,
+     28
+    ],
+    "pbp_first_half_method_b": [
+     38,
+     28
+    ],
+    "season": 2016
+   },
+   {
+    "espn_final": [
+     77,
+     74
+    ],
+    "espn_first_half": [
+     34,
+     39
+    ],
+    "game_id": "400873651",
+    "kind": "finale",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     77,
+     74
+    ],
+    "pbp_first_half_method_a": [
+     34,
+     39
+    ],
+    "pbp_first_half_method_b": [
+     34,
+     39
+    ],
+    "season": 2016
+   },
+   {
+    "espn_final": [
+     53,
+     70
+    ],
+    "espn_first_half": [
+     33,
+     27
+    ],
+    "game_id": "400910540",
+    "kind": "opener",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     53,
+     70
+    ],
+    "pbp_first_half_method_a": [
+     33,
+     27
+    ],
+    "pbp_first_half_method_b": [
+     33,
+     27
+    ],
+    "season": 2017
+   },
+   {
+    "espn_final": [
+     74,
+     82
+    ],
+    "espn_first_half": [
+     45,
+     48
+    ],
+    "game_id": "400917081",
+    "kind": "mid_1",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     74,
+     82
+    ],
+    "pbp_first_half_method_a": [
+     45,
+     48
+    ],
+    "pbp_first_half_method_b": [
+     45,
+     48
+    ],
+    "season": 2017
+   },
+   {
+    "espn_final": [
+     58,
+     65
+    ],
+    "espn_first_half": [
+     37,
+     38
+    ],
+    "game_id": "400918572",
+    "kind": "mid_2",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     58,
+     65
+    ],
+    "pbp_first_half_method_a": [
+     37,
+     38
+    ],
+    "pbp_first_half_method_b": [
+     37,
+     38
+    ],
+    "season": 2017
+   },
+   {
+    "espn_final": [
+     65,
+     71
+    ],
+    "espn_first_half": [
+     35,
+     32
+    ],
+    "game_id": "400949246",
+    "kind": "finale",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     65,
+     71
+    ],
+    "pbp_first_half_method_a": [
+     35,
+     32
+    ],
+    "pbp_first_half_method_b": [
+     35,
+     32
+    ],
+    "season": 2017
+   },
+   {
+    "espn_final": [
+     69,
+     86
+    ],
+    "espn_first_half": [
+     31,
+     45
+    ],
+    "game_id": "400986021",
+    "kind": "opener",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     69,
+     86
+    ],
+    "pbp_first_half_method_a": [
+     31,
+     45
+    ],
+    "pbp_first_half_method_b": [
+     31,
+     45
+    ],
+    "season": 2018
+   },
+   {
+    "espn_final": [
+     62,
+     68
+    ],
+    "espn_first_half": [
+     27,
+     30
+    ],
+    "game_id": "400990092",
+    "kind": "mid_1",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     62,
+     68
+    ],
+    "pbp_first_half_method_a": [
+     27,
+     30
+    ],
+    "pbp_first_half_method_b": [
+     27,
+     30
+    ],
+    "season": 2018
+   },
+   {
+    "espn_final": [
+     57,
+     85
+    ],
+    "espn_first_half": [
+     24,
+     38
+    ],
+    "game_id": "400988088",
+    "kind": "mid_2",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     57,
+     85
+    ],
+    "pbp_first_half_method_a": [
+     24,
+     38
+    ],
+    "pbp_first_half_method_b": [
+     24,
+     38
+    ],
+    "season": 2018
+   },
+   {
+    "espn_final": [
+     62,
+     79
+    ],
+    "espn_first_half": [
+     28,
+     37
+    ],
+    "game_id": "401025888",
+    "kind": "finale",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     62,
+     79
+    ],
+    "pbp_first_half_method_a": [
+     28,
+     37
+    ],
+    "pbp_first_half_method_b": [
+     28,
+     37
+    ],
+    "season": 2018
+   },
+   {
+    "espn_final": [
+     66,
+     79
+    ],
+    "espn_first_half": [
+     32,
+     40
+    ],
+    "game_id": "401089246",
+    "kind": "mid_1",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     66,
+     79
+    ],
+    "pbp_first_half_method_a": [
+     32,
+     40
+    ],
+    "pbp_first_half_method_b": [
+     32,
+     40
+    ],
+    "season": 2019
+   },
+   {
+    "espn_final": [
+     75,
+     81
+    ],
+    "espn_first_half": [
+     42,
+     30
+    ],
+    "game_id": "401087973",
+    "kind": "mid_2",
+    "method_a_agrees": true,
+    "method_b_agrees": false,
+    "pbp_final": [
+     75,
+     81
+    ],
+    "pbp_first_half_method_a": [
+     42,
+     30
+    ],
+    "pbp_first_half_method_b": [
+     38,
+     30
+    ],
+    "season": 2019
+   },
+   {
+    "espn_final": [
+     77,
+     85
+    ],
+    "espn_first_half": [
+     29,
+     32
+    ],
+    "game_id": "401123374",
+    "kind": "finale",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     77,
+     85
+    ],
+    "pbp_first_half_method_a": [
+     29,
+     32
+    ],
+    "pbp_first_half_method_b": [
+     29,
+     32
+    ],
+    "season": 2019
+   },
+   {
+    "espn_final": [
+     71,
+     79
+    ],
+    "espn_first_half": [
+     25,
+     46
+    ],
+    "game_id": "401166015",
+    "kind": "opener",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     71,
+     79
+    ],
+    "pbp_first_half_method_a": [
+     25,
+     46
+    ],
+    "pbp_first_half_method_b": [
+     25,
+     46
+    ],
+    "season": 2020
+   },
+   {
+    "espn_final": [
+     62,
+     69
+    ],
+    "espn_first_half": [
+     33,
+     31
+    ],
+    "game_id": "401173696",
+    "kind": "mid_1",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     62,
+     69
+    ],
+    "pbp_first_half_method_a": [
+     33,
+     31
+    ],
+    "pbp_first_half_method_b": [
+     33,
+     31
+    ],
+    "season": 2020
+   },
+   {
+    "espn_final": [
+     85,
+     57
+    ],
+    "espn_first_half": [
+     48,
+     25
+    ],
+    "game_id": "401173759",
+    "kind": "mid_2",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     85,
+     57
+    ],
+    "pbp_first_half_method_a": [
+     48,
+     25
+    ],
+    "pbp_first_half_method_b": [
+     48,
+     25
+    ],
+    "season": 2020
+   },
+   {
+    "espn_final": [
+     64,
+     61
+    ],
+    "espn_first_half": [
+     29,
+     33
+    ],
+    "game_id": "401211660",
+    "kind": "finale",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     64,
+     61
+    ],
+    "pbp_first_half_method_a": [
+     29,
+     33
+    ],
+    "pbp_first_half_method_b": [
+     29,
+     33
+    ],
+    "season": 2020
+   },
+   {
+    "espn_final": [
+     60,
+     79
+    ],
+    "espn_first_half": [
+     32,
+     39
+    ],
+    "game_id": "401252794",
+    "kind": "opener",
+    "method_a_agrees": true,
+    "method_b_agrees": false,
+    "pbp_final": [
+     60,
+     79
+    ],
+    "pbp_first_half_method_a": [
+     32,
+     39
+    ],
+    "pbp_first_half_method_b": [
+     32,
+     37
+    ],
+    "season": 2021
+   },
+   {
+    "espn_final": [
+     70,
+     62
+    ],
+    "espn_first_half": [
+     34,
+     34
+    ],
+    "game_id": "401257088",
+    "kind": "mid_1",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     70,
+     62
+    ],
+    "pbp_first_half_method_a": [
+     34,
+     34
+    ],
+    "pbp_first_half_method_b": [
+     34,
+     34
+    ],
+    "season": 2021
+   },
+   {
+    "espn_final": [
+     86,
+     70
+    ],
+    "espn_first_half": [
+     47,
+     37
+    ],
+    "game_id": "401310865",
+    "kind": "finale",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     86,
+     70
+    ],
+    "pbp_first_half_method_a": [
+     47,
+     37
+    ],
+    "pbp_first_half_method_b": [
+     47,
+     37
+    ],
+    "season": 2021
+   },
+   {
+    "espn_final": [
+     69,
+     61
+    ],
+    "espn_first_half": [
+     35,
+     33
+    ],
+    "game_id": "401364990",
+    "kind": "opener",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     69,
+     61
+    ],
+    "pbp_first_half_method_a": [
+     35,
+     33
+    ],
+    "pbp_first_half_method_b": [
+     35,
+     33
+    ],
+    "season": 2022
+   },
+   {
+    "espn_final": [
+     47,
+     67
+    ],
+    "espn_first_half": [
+     18,
+     31
+    ],
+    "game_id": "401371424",
+    "kind": "mid_1",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     47,
+     67
+    ],
+    "pbp_first_half_method_a": [
+     18,
+     31
+    ],
+    "pbp_first_half_method_b": [
+     18,
+     31
+    ],
+    "season": 2022
+   },
+   {
+    "espn_final": [
+     78,
+     91
+    ],
+    "espn_first_half": [
+     40,
+     44
+    ],
+    "game_id": "401372797",
+    "kind": "mid_2",
+    "method_a_agrees": true,
+    "method_b_agrees": false,
+    "pbp_final": [
+     78,
+     91
+    ],
+    "pbp_first_half_method_a": [
+     40,
+     44
+    ],
+    "pbp_first_half_method_b": [
+     38,
+     42
+    ],
+    "season": 2022
+   },
+   {
+    "espn_final": [
+     69,
+     72
+    ],
+    "espn_first_half": [
+     40,
+     25
+    ],
+    "game_id": "401408636",
+    "kind": "finale",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     69,
+     72
+    ],
+    "pbp_first_half_method_a": [
+     40,
+     25
+    ],
+    "pbp_first_half_method_b": [
+     40,
+     25
+    ],
+    "season": 2022
+   },
+   {
+    "espn_final": [
+     77,
+     79
+    ],
+    "espn_first_half": [
+     41,
+     43
+    ],
+    "game_id": "401482889",
+    "kind": "opener",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     77,
+     79
+    ],
+    "pbp_first_half_method_a": [
+     41,
+     43
+    ],
+    "pbp_first_half_method_b": [
+     41,
+     43
+    ],
+    "season": 2023
+   },
+   {
+    "espn_final": [
+     70,
+     84
+    ],
+    "espn_first_half": [
+     28,
+     42
+    ],
+    "game_id": "401483222",
+    "kind": "mid_1",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     70,
+     84
+    ],
+    "pbp_first_half_method_a": [
+     28,
+     42
+    ],
+    "pbp_first_half_method_b": [
+     28,
+     42
+    ],
+    "season": 2023
+   },
+   {
+    "espn_final": [
+     67,
+     84
+    ],
+    "espn_first_half": [
+     28,
+     42
+    ],
+    "game_id": "401485237",
+    "kind": "mid_2",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     67,
+     84
+    ],
+    "pbp_first_half_method_a": [
+     28,
+     42
+    ],
+    "pbp_first_half_method_b": [
+     28,
+     42
+    ],
+    "season": 2023
+   },
+   {
+    "espn_final": [
+     59,
+     76
+    ],
+    "espn_first_half": [
+     24,
+     36
+    ],
+    "game_id": "401522202",
+    "kind": "finale",
+    "method_a_agrees": true,
+    "method_b_agrees": true,
+    "pbp_final": [
+     59,
+     76
+    ],
+    "pbp_first_half_method_a": [
+     24,
+     36
+    ],
+    "pbp_first_half_method_b": [
+     24,
+     36
+    ],
+    "season": 2023
+   }
+  ],
+  "games_not_in_pbp": [
+   {
+    "game_id": "400809216",
+    "kind": "opener",
+    "season": 2016
+   },
+   {
+    "game_id": "401082362",
+    "kind": "opener",
+    "season": 2019
+   },
+   {
+    "game_id": "401269640",
+    "kind": "mid_2",
+    "season": 2021
+   }
+  ],
+  "halftime_agreements": 33,
+  "halftime_checked": 33,
+  "method_b_halftime_agreements": 30,
+  "sample_design": "36 games chosen deterministically from the admitted schedules before any PBP content was read: per season the earliest game, the latest game (the championship game in tournament seasons), and the games at the one-third and two-thirds positions of the date-sorted schedule"
+ },
+ "samples": [
+  {
+   "asset_id": 653499288,
+   "asset_name": "play_by_play_2015.csv",
+   "asset_updated_at": "2026-10-18T12:59:30Z",
+   "bytes": 721559218,
+   "content_check": "verified-by-pull: 1,737,302 play rows over 5,280 games; ESPN game IDs a strict subset of the admitted schedule universe (0 extra); Method-A derived finals reproduce admitted schedule finals on 5,185/5,280 joined games",
+   "evidence_state": "verified-by-pull",
+   "games": 5280,
+   "pulled_at_utc": "2026-10-28T15:15:29Z",
+   "release_id": 97399228,
+   "release_tag": "espn_mens_college_basketball_pbp",
+   "rows": 1737302,
+   "season": 2015,
+   "sha256": "4d7c5e4b65e95b7f02648e564d4ecd1c2ccb53c909c5921c32493aac43c8c4b9",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_pbp/play_by_play_2015.csv"
+  },
+  {
+   "asset_id": 653524040,
+   "asset_name": "play_by_play_2016.csv",
+   "asset_updated_at": "2026-10-18T13:13:11Z",
+   "bytes": 751120016,
+   "content_check": "verified-by-pull: 1,803,531 play rows over 5,390 games; ESPN game IDs a strict subset of the admitted schedule universe (0 extra); Method-A derived finals reproduce admitted schedule finals on 5,300/5,390 joined games",
+   "evidence_state": "verified-by-pull",
+   "games": 5390,
+   "pulled_at_utc": "2026-10-28T15:20:42Z",
+   "release_id": 97399228,
+   "release_tag": "espn_mens_college_basketball_pbp",
+   "rows": 1803531,
+   "season": 2016,
+   "sha256": "b7e594b21db3aec68a3d711d2bc4e673b911f4455231419ea3f6d061c00eec7c",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_pbp/play_by_play_2016.csv"
+  },
+  {
+   "asset_id": 653546124,
+   "asset_name": "play_by_play_2017.csv",
+   "asset_updated_at": "2026-10-18T13:26:01Z",
+   "bytes": 757422149,
+   "content_check": "verified-by-pull: 1,818,853 play rows over 5,479 games; ESPN game IDs a strict subset of the admitted schedule universe (0 extra); Method-A derived finals reproduce admitted schedule finals on 5,400/5,479 joined games",
+   "evidence_state": "verified-by-pull",
+   "games": 5479,
+   "pulled_at_utc": "2026-10-28T15:25:48Z",
+   "release_id": 97399228,
+   "release_tag": "espn_mens_college_basketball_pbp",
+   "rows": 1818853,
+   "season": 2017,
+   "sha256": "7362330277ddcde867ecc4fdc0b0b2a907948e639f8d834d467090ac18974e02",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_pbp/play_by_play_2017.csv"
+  },
+  {
+   "asset_id": 653571487,
+   "asset_name": "play_by_play_2018.csv",
+   "asset_updated_at": "2026-10-18T13:37:20Z",
+   "bytes": 762239275,
+   "content_check": "verified-by-pull: 1,827,395 play rows over 5,645 games; ESPN game IDs a strict subset of the admitted schedule universe (0 extra); Method-A derived finals reproduce admitted schedule finals on 5,576/5,645 joined games",
+   "evidence_state": "verified-by-pull",
+   "games": 5645,
+   "pulled_at_utc": "2026-10-28T15:30:56Z",
+   "release_id": 97399228,
+   "release_tag": "espn_mens_college_basketball_pbp",
+   "rows": 1827395,
+   "season": 2018,
+   "sha256": "ff162739d5dbc4a8b403fc04c1898b95c570b2cee78d992481ebf3bc8069fe51",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_pbp/play_by_play_2018.csv"
+  },
+  {
+   "asset_id": 653594244,
+   "asset_name": "play_by_play_2019.csv",
+   "asset_updated_at": "2026-10-18T13:48:20Z",
+   "bytes": 745159233,
+   "content_check": "verified-by-pull: 1,787,332 play rows over 5,474 games; ESPN game IDs a strict subset of the admitted schedule universe (0 extra); Method-A derived finals reproduce admitted schedule finals on 5,386/5,474 joined games",
+   "evidence_state": "verified-by-pull",
+   "games": 5474,
+   "pulled_at_utc": "2026-10-28T15:36:08Z",
+   "release_id": 97399228,
+   "release_tag": "espn_mens_college_basketball_pbp",
+   "rows": 1787332,
+   "season": 2019,
+   "sha256": "d0dbc3df71bfed7b4a348d21e0807fa6a8c8473e9552468f3071b861f37c9acf",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_pbp/play_by_play_2019.csv"
+  },
+  {
+   "asset_id": 653614708,
+   "asset_name": "play_by_play_2020.csv",
+   "asset_updated_at": "2026-10-18T13:59:53Z",
+   "bytes": 725431155,
+   "content_check": "verified-by-pull: 1,746,980 play rows over 5,394 games; ESPN game IDs a strict subset of the admitted schedule universe (0 extra); Method-A derived finals reproduce admitted schedule finals on 5,293/5,394 joined games",
+   "evidence_state": "verified-by-pull",
+   "games": 5394,
+   "pulled_at_utc": "2026-10-28T15:41:00Z",
+   "release_id": 97399228,
+   "release_tag": "espn_mens_college_basketball_pbp",
+   "rows": 1746980,
+   "season": 2020,
+   "sha256": "affcf51e38990dfc0f83a7fc28621272c78fddfdf50093cacc48240b6542b1a9",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_pbp/play_by_play_2020.csv"
+  },
+  {
+   "asset_id": 653633324,
+   "asset_name": "play_by_play_2021.csv",
+   "asset_updated_at": "2026-10-18T14:09:09Z",
+   "bytes": 549267055,
+   "content_check": "verified-by-pull: 1,296,252 play rows over 4,015 games; ESPN game IDs a strict subset of the admitted schedule universe (0 extra); Method-A derived finals reproduce admitted schedule finals on 3,957/4,015 joined games",
+   "evidence_state": "verified-by-pull",
+   "games": 4015,
+   "pulled_at_utc": "2026-10-28T15:44:37Z",
+   "release_id": 97399228,
+   "release_tag": "espn_mens_college_basketball_pbp",
+   "rows": 1296252,
+   "season": 2021,
+   "sha256": "c62b878cb915410f2c364a590bd1b3e01fea26acc79e2e6f4c8e242bcd7f7368",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_pbp/play_by_play_2021.csv"
+  },
+  {
+   "asset_id": 653654167,
+   "asset_name": "play_by_play_2022.csv",
+   "asset_updated_at": "2026-10-18T14:19:40Z",
+   "bytes": 807391148,
+   "content_check": "verified-by-pull: 1,860,561 play rows over 5,830 games; ESPN game IDs a strict subset of the admitted schedule universe (0 extra); Method-A derived finals reproduce admitted schedule finals on 5,765/5,830 joined games",
+   "evidence_state": "verified-by-pull",
+   "games": 5830,
+   "pulled_at_utc": "2026-10-28T15:49:58Z",
+   "release_id": 97399228,
+   "release_tag": "espn_mens_college_basketball_pbp",
+   "rows": 1860561,
+   "season": 2022,
+   "sha256": "93e3e9aade48b93f42ba3f6233655a201f0924a375979bbb00f00e35fcb2c8d8",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_pbp/play_by_play_2022.csv"
+  },
+  {
+   "asset_id": 653675374,
+   "asset_name": "play_by_play_2023.csv",
+   "asset_updated_at": "2026-10-18T14:30:28Z",
+   "bytes": 842514558,
+   "content_check": "verified-by-pull: 1,957,375 play rows over 6,116 games; ESPN game IDs a strict subset of the admitted schedule universe (0 extra); Method-A derived finals reproduce admitted schedule finals on 6,041/6,116 joined games",
+   "evidence_state": "verified-by-pull",
+   "games": 6116,
+   "pulled_at_utc": "2026-10-28T15:55:33Z",
+   "release_id": 97399228,
+   "release_tag": "espn_mens_college_basketball_pbp",
+   "rows": 1957375,
+   "season": 2023,
+   "sha256": "4ed30b0b62e87d8951f7e956fcd42b1099e85f5a38960adbdb008eeaef9dcf43",
+   "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_mens_college_basketball_pbp/play_by_play_2023.csv"
+  }
+ ],
+ "satisfies": {
+  "cbb_team_totals_1h_design_prerequisite": "YES - hoopR play-by-play release assets pinned by the full-tuple rule with schema verification, per research/nba_cbb_activation_20261028/CBB_TEAM_TOTALS_1H_DESIGN.md section 2 (on merge, after independent review)",
+  "pbp_prerequisite_missing_code": "CLEARED for design-screen use of CBB 1H only"
+ },
+ "schema_verification": {
+  "core_fields": [
+   "game_id",
+   "period_number",
+   "period_display_value",
+   "clock_display_value",
+   "scoring_play",
+   "score_value",
+   "team_id",
+   "home_team_id",
+   "away_team_id",
+   "away_score",
+   "home_score",
+   "season"
+  ],
+  "derivation": {
+   "column_order_note": "Column ORDER differs between seasons (e.g. 2015 vs 2017+); the column SET differs only as listed in era_diffs. Consumers must read by field name, never by position.",
+   "method_a_running_score": "A team's first-half points are its running score (away_score/home_score) at the end of period 1 - the maximum of its running score over period_number == 1 rows. Finals likewise over all rows. This is the admitted derivation.",
+   "method_b_scoring_sum_status": "REFUSED - summing score_value over rows with scoring_play == 'true' grouped by team_id is not a valid derivation in any era: the flag is unreliable in the feed (made baskets with scoring_play false; score increments landing on End Period / foul rows in later seasons) and isolated early-era game feeds contain duplicated segments that inflate the sum. Recorded as a negative schema finding.",
+   "period_values_observed": "period_number 1-2 are the halves; 3+ are overtime periods (observed maximum 6 in 2015-2018, 2020, 2022, 2023; 5 in 2019 and 2021)"
+  },
+  "era_diffs": {
+   "2021": {
+    "vs_2015_extra": [
+     "wallclock"
+    ],
+    "vs_2015_missing": [
+     "media_id"
+    ]
+   },
+   "2022": {
+    "vs_2015_extra": [
+     "wallclock"
+    ],
+    "vs_2015_missing": [
+     "media_id"
+    ]
+   },
+   "2023": {
+    "vs_2015_extra": [
+     "away_timeout_called",
+     "end_period_seconds_remaining",
+     "home_timeout_called",
+     "lag_half",
+     "lag_period",
+     "lead_half",
+     "lead_period",
+     "start_period_seconds_remaining",
+     "wallclock"
+    ],
+    "vs_2015_missing": [
+     "end_half_seconds_remaining",
+     "end_quarter_seconds_remaining",
+     "game_half",
+     "lag_game_half",
+     "lag_qtr",
+     "lead_game_half",
+     "lead_qtr",
+     "period",
+     "qtr",
+     "start_half_seconds_remaining",
+     "start_quarter_seconds_remaining"
+    ]
+   }
+  },
+  "per_season": {
+   "2015": {
+    "columns": 64,
+    "core_fields_present": {
+     "away_score": true,
+     "away_team_id": true,
+     "clock_display_value": true,
+     "game_id": true,
+     "home_score": true,
+     "home_team_id": true,
+     "period_display_value": true,
+     "period_number": true,
+     "score_value": true,
+     "scoring_play": true,
+     "season": true,
+     "team_id": true
+    },
+    "header": [
+     "id",
+     "sequence_number",
+     "type_id",
+     "type_text",
+     "text",
+     "away_score",
+     "home_score",
+     "period_number",
+     "period_display_value",
+     "clock_display_value",
+     "scoring_play",
+     "score_value",
+     "team_id",
+     "shooting_play",
+     "athlete_id_1",
+     "athlete_id_2",
+     "season",
+     "season_type",
+     "away_team_id",
+     "away_team_name",
+     "away_team_mascot",
+     "away_team_abbrev",
+     "away_team_name_alt",
+     "home_team_id",
+     "home_team_name",
+     "home_team_mascot",
+     "home_team_abbrev",
+     "home_team_name_alt",
+     "home_team_spread",
+     "game_spread",
+     "home_favorite",
+     "game_spread_available",
+     "game_id",
+     "qtr",
+     "time",
+     "clock_minutes",
+     "clock_seconds",
+     "half",
+     "game_half",
+     "lag_qtr",
+     "lead_qtr",
+     "lag_game_half",
+     "lead_game_half",
+     "start_quarter_seconds_remaining",
+     "start_half_seconds_remaining",
+     "start_game_seconds_remaining",
+     "game_play_number",
+     "end_quarter_seconds_remaining",
+     "end_half_seconds_remaining",
+     "end_game_seconds_remaining",
+     "period",
+     "game_date",
+     "game_date_time",
+     "coordinate_x",
+     "coordinate_y",
+     "coordinate_x_raw",
+     "coordinate_y_raw",
+     "score_source",
+     "athlete_name_1",
+     "athlete_name_2",
+     "athlete_name_3",
+     "media_id",
+     "pregame_home_prob",
+     "home_win_prob"
+    ]
+   },
+   "2016": {
+    "columns": 64,
+    "core_fields_present": {
+     "away_score": true,
+     "away_team_id": true,
+     "clock_display_value": true,
+     "game_id": true,
+     "home_score": true,
+     "home_team_id": true,
+     "period_display_value": true,
+     "period_number": true,
+     "score_value": true,
+     "scoring_play": true,
+     "season": true,
+     "team_id": true
+    },
+    "header": [
+     "id",
+     "sequence_number",
+     "type_id",
+     "type_text",
+     "text",
+     "away_score",
+     "home_score",
+     "period_number",
+     "period_display_value",
+     "clock_display_value",
+     "scoring_play",
+     "score_value",
+     "team_id",
+     "shooting_play",
+     "coordinate_x_raw",
+     "coordinate_y_raw",
+     "athlete_id_1",
+     "athlete_id_2",
+     "season",
+     "season_type",
+     "away_team_id",
+     "away_team_name",
+     "away_team_mascot",
+     "away_team_abbrev",
+     "away_team_name_alt",
+     "home_team_id",
+     "home_team_name",
+     "home_team_mascot",
+     "home_team_abbrev",
+     "home_team_name_alt",
+     "home_team_spread",
+     "game_spread",
+     "home_favorite",
+     "game_spread_available",
+     "game_id",
+     "qtr",
+     "time",
+     "clock_minutes",
+     "clock_seconds",
+     "half",
+     "game_half",
+     "lag_qtr",
+     "lead_qtr",
+     "lag_game_half",
+     "lead_game_half",
+     "start_quarter_seconds_remaining",
+     "start_half_seconds_remaining",
+     "start_game_seconds_remaining",
+     "game_play_number",
+     "end_quarter_seconds_remaining",
+     "end_half_seconds_remaining",
+     "end_game_seconds_remaining",
+     "period",
+     "coordinate_x",
+     "coordinate_y",
+     "game_date",
+     "game_date_time",
+     "score_source",
+     "athlete_name_1",
+     "athlete_name_2",
+     "athlete_name_3",
+     "media_id",
+     "pregame_home_prob",
+     "home_win_prob"
+    ]
+   },
+   "2017": {
+    "columns": 64,
+    "core_fields_present": {
+     "away_score": true,
+     "away_team_id": true,
+     "clock_display_value": true,
+     "game_id": true,
+     "home_score": true,
+     "home_team_id": true,
+     "period_display_value": true,
+     "period_number": true,
+     "score_value": true,
+     "scoring_play": true,
+     "season": true,
+     "team_id": true
+    },
+    "header": [
+     "id",
+     "sequence_number",
+     "type_id",
+     "type_text",
+     "text",
+     "away_score",
+     "home_score",
+     "period_number",
+     "period_display_value",
+     "clock_display_value",
+     "scoring_play",
+     "score_value",
+     "team_id",
+     "shooting_play",
+     "coordinate_x_raw",
+     "coordinate_y_raw",
+     "athlete_id_1",
+     "athlete_id_2",
+     "media_id",
+     "season",
+     "season_type",
+     "away_team_id",
+     "away_team_name",
+     "away_team_mascot",
+     "away_team_abbrev",
+     "away_team_name_alt",
+     "home_team_id",
+     "home_team_name",
+     "home_team_mascot",
+     "home_team_abbrev",
+     "home_team_name_alt",
+     "home_team_spread",
+     "game_spread",
+     "home_favorite",
+     "game_spread_available",
+     "game_id",
+     "qtr",
+     "time",
+     "clock_minutes",
+     "clock_seconds",
+     "half",
+     "game_half",
+     "lag_qtr",
+     "lead_qtr",
+     "lag_game_half",
+     "lead_game_half",
+     "start_quarter_seconds_remaining",
+     "start_half_seconds_remaining",
+     "start_game_seconds_remaining",
+     "game_play_number",
+     "end_quarter_seconds_remaining",
+     "end_half_seconds_remaining",
+     "end_game_seconds_remaining",
+     "period",
+     "coordinate_x",
+     "coordinate_y",
+     "game_date",
+     "game_date_time",
+     "score_source",
+     "athlete_name_1",
+     "athlete_name_2",
+     "athlete_name_3",
+     "pregame_home_prob",
+     "home_win_prob"
+    ]
+   },
+   "2018": {
+    "columns": 64,
+    "core_fields_present": {
+     "away_score": true,
+     "away_team_id": true,
+     "clock_display_value": true,
+     "game_id": true,
+     "home_score": true,
+     "home_team_id": true,
+     "period_display_value": true,
+     "period_number": true,
+     "score_value": true,
+     "scoring_play": true,
+     "season": true,
+     "team_id": true
+    },
+    "header": [
+     "id",
+     "sequence_number",
+     "type_id",
+     "type_text",
+     "text",
+     "away_score",
+     "home_score",
+     "period_number",
+     "period_display_value",
+     "clock_display_value",
+     "scoring_play",
+     "score_value",
+     "team_id",
+     "shooting_play",
+     "coordinate_x_raw",
+     "coordinate_y_raw",
+     "athlete_id_1",
+     "athlete_id_2",
+     "media_id",
+     "season",
+     "season_type",
+     "away_team_id",
+     "away_team_name",
+     "away_team_mascot",
+     "away_team_abbrev",
+     "away_team_name_alt",
+     "home_team_id",
+     "home_team_name",
+     "home_team_mascot",
+     "home_team_abbrev",
+     "home_team_name_alt",
+     "home_team_spread",
+     "game_spread",
+     "home_favorite",
+     "game_spread_available",
+     "game_id",
+     "qtr",
+     "time",
+     "clock_minutes",
+     "clock_seconds",
+     "half",
+     "game_half",
+     "lag_qtr",
+     "lead_qtr",
+     "lag_game_half",
+     "lead_game_half",
+     "start_quarter_seconds_remaining",
+     "start_half_seconds_remaining",
+     "start_game_seconds_remaining",
+     "game_play_number",
+     "end_quarter_seconds_remaining",
+     "end_half_seconds_remaining",
+     "end_game_seconds_remaining",
+     "period",
+     "coordinate_x",
+     "coordinate_y",
+     "game_date",
+     "game_date_time",
+     "score_source",
+     "athlete_name_1",
+     "athlete_name_2",
+     "athlete_name_3",
+     "pregame_home_prob",
+     "home_win_prob"
+    ]
+   },
+   "2019": {
+    "columns": 64,
+    "core_fields_present": {
+     "away_score": true,
+     "away_team_id": true,
+     "clock_display_value": true,
+     "game_id": true,
+     "home_score": true,
+     "home_team_id": true,
+     "period_display_value": true,
+     "period_number": true,
+     "score_value": true,
+     "scoring_play": true,
+     "season": true,
+     "team_id": true
+    },
+    "header": [
+     "id",
+     "sequence_number",
+     "type_id",
+     "type_text",
+     "text",
+     "away_score",
+     "home_score",
+     "period_number",
+     "period_display_value",
+     "clock_display_value",
+     "scoring_play",
+     "score_value",
+     "team_id",
+     "shooting_play",
+     "coordinate_x_raw",
+     "coordinate_y_raw",
+     "athlete_id_1",
+     "athlete_id_2",
+     "media_id",
+     "season",
+     "season_type",
+     "away_team_id",
+     "away_team_name",
+     "away_team_mascot",
+     "away_team_abbrev",
+     "away_team_name_alt",
+     "home_team_id",
+     "home_team_name",
+     "home_team_mascot",
+     "home_team_abbrev",
+     "home_team_name_alt",
+     "home_team_spread",
+     "game_spread",
+     "home_favorite",
+     "game_spread_available",
+     "game_id",
+     "qtr",
+     "time",
+     "clock_minutes",
+     "clock_seconds",
+     "half",
+     "game_half",
+     "lag_qtr",
+     "lead_qtr",
+     "lag_game_half",
+     "lead_game_half",
+     "start_quarter_seconds_remaining",
+     "start_half_seconds_remaining",
+     "start_game_seconds_remaining",
+     "game_play_number",
+     "end_quarter_seconds_remaining",
+     "end_half_seconds_remaining",
+     "end_game_seconds_remaining",
+     "period",
+     "coordinate_x",
+     "coordinate_y",
+     "game_date",
+     "game_date_time",
+     "score_source",
+     "athlete_name_1",
+     "athlete_name_2",
+     "athlete_name_3",
+     "pregame_home_prob",
+     "home_win_prob"
+    ]
+   },
+   "2020": {
+    "columns": 64,
+    "core_fields_present": {
+     "away_score": true,
+     "away_team_id": true,
+     "clock_display_value": true,
+     "game_id": true,
+     "home_score": true,
+     "home_team_id": true,
+     "period_display_value": true,
+     "period_number": true,
+     "score_value": true,
+     "scoring_play": true,
+     "season": true,
+     "team_id": true
+    },
+    "header": [
+     "id",
+     "sequence_number",
+     "type_id",
+     "type_text",
+     "text",
+     "away_score",
+     "home_score",
+     "period_number",
+     "period_display_value",
+     "clock_display_value",
+     "scoring_play",
+     "score_value",
+     "team_id",
+     "shooting_play",
+     "coordinate_x_raw",
+     "coordinate_y_raw",
+     "athlete_id_1",
+     "athlete_id_2",
+     "season",
+     "season_type",
+     "away_team_id",
+     "away_team_name",
+     "away_team_mascot",
+     "away_team_abbrev",
+     "away_team_name_alt",
+     "home_team_id",
+     "home_team_name",
+     "home_team_mascot",
+     "home_team_abbrev",
+     "home_team_name_alt",
+     "home_team_spread",
+     "game_spread",
+     "home_favorite",
+     "game_spread_available",
+     "game_id",
+     "qtr",
+     "time",
+     "clock_minutes",
+     "clock_seconds",
+     "half",
+     "game_half",
+     "lag_qtr",
+     "lead_qtr",
+     "lag_game_half",
+     "lead_game_half",
+     "start_quarter_seconds_remaining",
+     "start_half_seconds_remaining",
+     "start_game_seconds_remaining",
+     "game_play_number",
+     "end_quarter_seconds_remaining",
+     "end_half_seconds_remaining",
+     "end_game_seconds_remaining",
+     "period",
+     "coordinate_x",
+     "coordinate_y",
+     "game_date",
+     "game_date_time",
+     "score_source",
+     "athlete_name_1",
+     "athlete_name_2",
+     "athlete_name_3",
+     "media_id",
+     "pregame_home_prob",
+     "home_win_prob"
+    ]
+   },
+   "2021": {
+    "columns": 64,
+    "core_fields_present": {
+     "away_score": true,
+     "away_team_id": true,
+     "clock_display_value": true,
+     "game_id": true,
+     "home_score": true,
+     "home_team_id": true,
+     "period_display_value": true,
+     "period_number": true,
+     "score_value": true,
+     "scoring_play": true,
+     "season": true,
+     "team_id": true
+    },
+    "header": [
+     "id",
+     "sequence_number",
+     "type_id",
+     "type_text",
+     "text",
+     "away_score",
+     "home_score",
+     "period_number",
+     "period_display_value",
+     "clock_display_value",
+     "scoring_play",
+     "score_value",
+     "team_id",
+     "shooting_play",
+     "coordinate_x_raw",
+     "coordinate_y_raw",
+     "athlete_id_1",
+     "athlete_id_2",
+     "season",
+     "season_type",
+     "away_team_id",
+     "away_team_name",
+     "away_team_mascot",
+     "away_team_abbrev",
+     "away_team_name_alt",
+     "home_team_id",
+     "home_team_name",
+     "home_team_mascot",
+     "home_team_abbrev",
+     "home_team_name_alt",
+     "home_team_spread",
+     "game_spread",
+     "home_favorite",
+     "game_spread_available",
+     "game_id",
+     "qtr",
+     "time",
+     "clock_minutes",
+     "clock_seconds",
+     "half",
+     "game_half",
+     "lag_qtr",
+     "lead_qtr",
+     "lag_game_half",
+     "lead_game_half",
+     "start_quarter_seconds_remaining",
+     "start_half_seconds_remaining",
+     "start_game_seconds_remaining",
+     "game_play_number",
+     "end_quarter_seconds_remaining",
+     "end_half_seconds_remaining",
+     "end_game_seconds_remaining",
+     "period",
+     "coordinate_x",
+     "coordinate_y",
+     "game_date",
+     "game_date_time",
+     "score_source",
+     "athlete_name_1",
+     "athlete_name_2",
+     "athlete_name_3",
+     "wallclock",
+     "pregame_home_prob",
+     "home_win_prob"
+    ]
+   },
+   "2022": {
+    "columns": 64,
+    "core_fields_present": {
+     "away_score": true,
+     "away_team_id": true,
+     "clock_display_value": true,
+     "game_id": true,
+     "home_score": true,
+     "home_team_id": true,
+     "period_display_value": true,
+     "period_number": true,
+     "score_value": true,
+     "scoring_play": true,
+     "season": true,
+     "team_id": true
+    },
+    "header": [
+     "id",
+     "sequence_number",
+     "type_id",
+     "type_text",
+     "text",
+     "away_score",
+     "home_score",
+     "period_number",
+     "period_display_value",
+     "clock_display_value",
+     "scoring_play",
+     "score_value",
+     "team_id",
+     "wallclock",
+     "shooting_play",
+     "coordinate_x_raw",
+     "coordinate_y_raw",
+     "athlete_id_1",
+     "athlete_id_2",
+     "season",
+     "season_type",
+     "away_team_id",
+     "away_team_name",
+     "away_team_mascot",
+     "away_team_abbrev",
+     "away_team_name_alt",
+     "home_team_id",
+     "home_team_name",
+     "home_team_mascot",
+     "home_team_abbrev",
+     "home_team_name_alt",
+     "home_team_spread",
+     "game_spread",
+     "home_favorite",
+     "game_spread_available",
+     "game_id",
+     "qtr",
+     "time",
+     "clock_minutes",
+     "clock_seconds",
+     "half",
+     "game_half",
+     "lag_qtr",
+     "lead_qtr",
+     "lag_game_half",
+     "lead_game_half",
+     "start_quarter_seconds_remaining",
+     "start_half_seconds_remaining",
+     "start_game_seconds_remaining",
+     "game_play_number",
+     "end_quarter_seconds_remaining",
+     "end_half_seconds_remaining",
+     "end_game_seconds_remaining",
+     "period",
+     "coordinate_x",
+     "coordinate_y",
+     "game_date",
+     "game_date_time",
+     "score_source",
+     "athlete_name_1",
+     "athlete_name_2",
+     "athlete_name_3",
+     "pregame_home_prob",
+     "home_win_prob"
+    ]
+   },
+   "2023": {
+    "columns": 62,
+    "core_fields_present": {
+     "away_score": true,
+     "away_team_id": true,
+     "clock_display_value": true,
+     "game_id": true,
+     "home_score": true,
+     "home_team_id": true,
+     "period_display_value": true,
+     "period_number": true,
+     "score_value": true,
+     "scoring_play": true,
+     "season": true,
+     "team_id": true
+    },
+    "header": [
+     "game_play_number",
+     "id",
+     "sequence_number",
+     "type_id",
+     "type_text",
+     "text",
+     "away_score",
+     "home_score",
+     "period_number",
+     "period_display_value",
+     "clock_display_value",
+     "scoring_play",
+     "score_value",
+     "team_id",
+     "athlete_id_1",
+     "wallclock",
+     "shooting_play",
+     "athlete_id_2",
+     "game_id",
+     "season",
+     "season_type",
+     "home_team_id",
+     "home_team_name",
+     "home_team_mascot",
+     "home_team_abbrev",
+     "home_team_name_alt",
+     "away_team_id",
+     "away_team_name",
+     "away_team_mascot",
+     "away_team_abbrev",
+     "away_team_name_alt",
+     "game_spread",
+     "home_favorite",
+     "game_spread_available",
+     "home_team_spread",
+     "half",
+     "time",
+     "clock_minutes",
+     "clock_seconds",
+     "home_timeout_called",
+     "away_timeout_called",
+     "lag_period",
+     "lead_period",
+     "lag_half",
+     "lead_half",
+     "start_period_seconds_remaining",
+     "start_game_seconds_remaining",
+     "end_period_seconds_remaining",
+     "end_game_seconds_remaining",
+     "game_date",
+     "game_date_time",
+     "coordinate_x",
+     "coordinate_y",
+     "coordinate_x_raw",
+     "coordinate_y_raw",
+     "score_source",
+     "athlete_name_1",
+     "athlete_name_2",
+     "athlete_name_3",
+     "media_id",
+     "pregame_home_prob",
+     "home_win_prob"
+    ]
+   }
+  }
+ },
+ "screen_scope": "CBB first-half (1H) lines design screen only",
+ "source_id": "sportsdataverse-data/espn_mens_college_basketball_pbp (hoopR load_mbb_pbp family)",
+ "sport": "CBB",
+ "status": "SAMPLE-VERIFIED / ADMISSION PROPOSED",
+ "unpinned_twin_formats": [
+  {
+   "asset_id": 653499904,
+   "asset_name": "play_by_play_2015.parquet",
+   "asset_updated_at": "2026-10-18T12:59:33Z",
+   "bytes": 44950302,
+   "pin_status": "NOT_PINNED",
+   "season": 2015
+  },
+  {
+   "asset_id": 653499147,
+   "asset_name": "play_by_play_2015.rds",
+   "asset_updated_at": "2026-10-18T12:59:07Z",
+   "bytes": 45677158,
+   "pin_status": "NOT_PINNED",
+   "season": 2015
+  },
+  {
+   "asset_id": 653524719,
+   "asset_name": "play_by_play_2016.parquet",
+   "asset_updated_at": "2026-10-18T13:13:14Z",
+   "bytes": 47285007,
+   "pin_status": "NOT_PINNED",
+   "season": 2016
+  },
+  {
+   "asset_id": 653523820,
+   "asset_name": "play_by_play_2016.rds",
+   "asset_updated_at": "2026-10-18T13:12:43Z",
+   "bytes": 46864703,
+   "pin_status": "NOT_PINNED",
+   "season": 2016
+  },
+  {
+   "asset_id": 653548737,
+   "asset_name": "play_by_play_2017.parquet",
+   "asset_updated_at": "2026-10-18T13:26:04Z",
+   "bytes": 47196463,
+   "pin_status": "NOT_PINNED",
+   "season": 2017
+  },
+  {
+   "asset_id": 653545689,
+   "asset_name": "play_by_play_2017.rds",
+   "asset_updated_at": "2026-10-18T13:24:46Z",
+   "bytes": 47800101,
+   "pin_status": "NOT_PINNED",
+   "season": 2017
+  },
+  {
+   "asset_id": 653572305,
+   "asset_name": "play_by_play_2018.parquet",
+   "asset_updated_at": "2026-10-18T13:37:24Z",
+   "bytes": 47552987,
+   "pin_status": "NOT_PINNED",
+   "season": 2018
+  },
+  {
+   "asset_id": 653571339,
+   "asset_name": "play_by_play_2018.rds",
+   "asset_updated_at": "2026-10-18T13:36:59Z",
+   "bytes": 48323304,
+   "pin_status": "NOT_PINNED",
+   "season": 2018
+  },
+  {
+   "asset_id": 653595093,
+   "asset_name": "play_by_play_2019.parquet",
+   "asset_updated_at": "2026-10-18T13:48:24Z",
+   "bytes": 46542977,
+   "pin_status": "NOT_PINNED",
+   "season": 2019
+  },
+  {
+   "asset_id": 653593972,
+   "asset_name": "play_by_play_2019.rds",
+   "asset_updated_at": "2026-10-18T13:47:49Z",
+   "bytes": 47044295,
+   "pin_status": "NOT_PINNED",
+   "season": 2019
+  },
+  {
+   "asset_id": 653615398,
+   "asset_name": "play_by_play_2020.parquet",
+   "asset_updated_at": "2026-10-18T13:59:55Z",
+   "bytes": 45352641,
+   "pin_status": "NOT_PINNED",
+   "season": 2020
+  },
+  {
+   "asset_id": 653614538,
+   "asset_name": "play_by_play_2020.rds",
+   "asset_updated_at": "2026-10-18T13:59:28Z",
+   "bytes": 47217947,
+   "pin_status": "NOT_PINNED",
+   "season": 2020
+  },
+  {
+   "asset_id": 653634088,
+   "asset_name": "play_by_play_2021.parquet",
+   "asset_updated_at": "2026-10-18T14:09:12Z",
+   "bytes": 35845273,
+   "pin_status": "NOT_PINNED",
+   "season": 2021
+  },
+  {
+   "asset_id": 653633171,
+   "asset_name": "play_by_play_2021.rds",
+   "asset_updated_at": "2026-10-18T14:08:40Z",
+   "bytes": 36327440,
+   "pin_status": "NOT_PINNED",
+   "season": 2021
+  },
+  {
+   "asset_id": 653654857,
+   "asset_name": "play_by_play_2022.parquet",
+   "asset_updated_at": "2026-10-18T14:19:45Z",
+   "bytes": 53943041,
+   "pin_status": "NOT_PINNED",
+   "season": 2022
+  },
+  {
+   "asset_id": 653654039,
+   "asset_name": "play_by_play_2022.rds",
+   "asset_updated_at": "2026-10-18T14:19:18Z",
+   "bytes": 53951381,
+   "pin_status": "NOT_PINNED",
+   "season": 2022
+  },
+  {
+   "asset_id": 653676352,
+   "asset_name": "play_by_play_2023.parquet",
+   "asset_updated_at": "2026-10-18T14:30:31Z",
+   "bytes": 53097235,
+   "pin_status": "NOT_PINNED",
+   "season": 2023
+  },
+  {
+   "asset_id": 653675163,
+   "asset_name": "play_by_play_2023.rds",
+   "asset_updated_at": "2026-10-18T14:30:02Z",
+   "bytes": 53305825,
+   "pin_status": "NOT_PINNED",
+   "season": 2023
+  }
+ ],
+ "validation_credit": false,
+ "verdict": "ADMITTED - DESIGN/SCREEN ONLY, CBB first-half family only, subject to the final-agreement gate in the record"
+}
