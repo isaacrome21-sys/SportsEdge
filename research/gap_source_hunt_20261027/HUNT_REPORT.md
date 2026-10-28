@@ -183,9 +183,15 @@ screenable historical baseline. G1 for the other sports does not move.
   hold, and no signup was performed. Listed here as a free route awaiting an owner
   account act — not an admission.
 - **PropLine Hugging Face sample** (`propline/graded-player-props-sample`, pulled and
-  parsed): 14-day graded sample, opening/closing line per player-market — but **no book
-  column and no price timestamps** in the sample file. REJECTED as data (it is a sales
-  sample; the full archive is paid → §7).
+  parsed): a 14-day graded NFL sample (Sep 2026) that **does** carry bookmaker identity
+  and `opening_at` / `closing_at` price timestamps, with opening/closing points and
+  prices per player-market (200k+ rows read). REJECTED as a G1 baseline anyway:
+  (a) 14 days is a sample, not the multi-season archive G1 requires; (b) the sampled
+  book mix is prediction-market/DFS-heavy (e.g. `polymarket_us` in the head rows) with
+  DraftKings/FanDuel representation unverified; (c) the full archive is paid → §7.
+  (Correction, Oct 28: an earlier draft of this section misstated the sample's schema
+  as lacking book/timestamp fields; the fields exist — the depth and book-mix grounds
+  above are the operative ones.)
 - **Action Network** advertises graded DraftKings/FanDuel props since 2023-24 inside its
   consumer product — not an exportable dataset. Not a source.
 - **BetWatch** (blog) describes a private 2026-playoff prop archive built from DFS apps
