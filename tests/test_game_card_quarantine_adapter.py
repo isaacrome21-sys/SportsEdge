@@ -9,11 +9,13 @@ class GameCardAdapterTests(unittest.TestCase):
     def card(self):
         extreme = {
             "input_index": 0, "status": "RESEARCH_POSITIVE_EV_UNVALIDATED",
+            "game": "A@B", "selection": "A",
             "ev_per_dollar": .03, "estimate_p": .55,
             "independent_projection": {"raw_ev_per_dollar": 2.818},
         }
         ordinary = {
             "input_index": 1, "status": "RESEARCH_POSITIVE_EV_UNVALIDATED",
+            "game": "A@B", "selection": "B",
             "ev_per_dollar": .03, "estimate_p": .55,
         }
         return {
@@ -80,6 +82,69 @@ class GameCardAdapterTests(unittest.TestCase):
         del card["evaluated_rows"]
         with self.assertRaisesRegex(ValueError, "EVALUATED_ROWS_REQUIRED"):
             sanitize_card(card)
+
+
+    def test_detached_low_ev_surface_cannot_hide_original_extreme(self):
+        card = self.card()
+        for name in ("edges", "independent_candidates", "independent_watchlist", "lane_b_watchlist"):
+            card[name] = [deepcopy(r) for r in card[name]]
+            for r in card[name]:
+                r.pop("independent_projection", None)
+        result = sanitize_card(card)
+        self.assertEqual([len(result[k]) for k in ("edges", "independent_candidates", "independent_watchlist", "lane_b_watchlist")], [1, 1, 0, 1])
+        self.assertEqual(result["game_quarantined"][0]["max_finite_claimed_ev"], 2.818)
+        self.assertTrue(result["game_quarantined"][0]["evidence_bound"])
+
+    def test_clean_surface_with_missing_original_fails_closed(self):
+        card = self.card()
+        card["edges"] = [{"input_index": 999, "ev_per_dollar": .04}]
+        with self.assertRaisesRegex(ValueError, "REFERENCE_NOT_IN_EVIDENCE"):
+            sanitize_card(card)
+
+    def test_duplicate_original_index_refuses(self):
+        card = self.card()
+        card["evaluated_rows"].append(deepcopy(card["evaluated_rows"][1]))
+        with self.assertRaisesRegex(ValueError, "INPUT_INDEX_DUPLICATE"):
+            sanitize_card(card)
+
+    def test_bool_negative_fractional_indices_refuse(self):
+        for source in ("evaluated_rows", "edges"):
+            for invalid in (True, -1, "1", 1.0, None):
+                with self.subTest(source=source, invalid=invalid):
+                    card = self.card()
+                    card[source][0] = dict(card[source][0], input_index=invalid)
+                    with self.assertRaisesRegex(ValueError, "INPUT_INDEX_INVALID"):
+                        sanitize_card(card)
+
+    def test_identity_mismatch_refuses_even_with_low_ev(self):
+        card = self.card()
+        card["edges"] = [dict(card["evaluated_rows"][1], selection="Other")]
+        with self.assertRaisesRegex(ValueError, "IDENTITY_CONFLICT:selection"):
+            sanitize_card(card)
+
+    def test_missing_fixture_identity_refuses(self):
+        card = self.card()
+        card["edges"] = [deepcopy(card["evaluated_rows"][1])]
+        del card["edges"][0]["selection"]
+        with self.assertRaisesRegex(ValueError, "IDENTITY_MISSING:selection"):
+            sanitize_card(card)
+
+    def test_original_probability_invalid_even_if_surface_sanitized(self):
+        card = self.card()
+        card["evaluated_rows"][1]["estimate_p"] = 1.5
+        card["edges"] = [deepcopy(card["evaluated_rows"][1])]
+        card["edges"][0]["estimate_p"] = .55
+        result = sanitize_card(card)
+        self.assertEqual(len(result["edges"]), 0)
+        self.assertEqual(result["game_quarantined"][0]["reason"], "GAME_PROBABILITY_CLAIM_INVALID")
+
+    def test_surface_claim_invalid_even_if_original_clean(self):
+        card = self.card()
+        card["evaluated_rows"][0]["independent_projection"]["raw_ev_per_dollar"] = .04
+        card["edges"] = [dict(card["evaluated_rows"][1], estimate_p=float("nan"))]
+        result = sanitize_card(card)
+        self.assertEqual(len(result["edges"]), 0)
+        self.assertEqual(result["game_quarantined"][0]["reason"], "GAME_PROBABILITY_CLAIM_INVALID")
 
 
 if __name__ == "__main__":
