@@ -93,8 +93,15 @@ def test_anchored_lane_never_displays_independent_ev_as_its_own():
     row = result(pricing_lane="LANE_B_ANCHORED",
                  independent_projection={"estimate_p": .9, "ev_per_dollar": .8})
     public = build_phone_card(card(row))["selections"][0]
-    assert public["status"] == "WATCH"
+    assert public["status"] == "QUARANTINED"
+    assert public["reason"] == "EXTREME_CLAIMED_EV_QUARANTINE"
     assert public["probability"] is None and public["estimated_ev"] is None
+    # Keep the original anchored-lane attribution check on a non-extreme row.
+    ordinary = result(pricing_lane="LANE_B_ANCHORED",
+                      independent_projection={"estimate_p": .6, "ev_per_dollar": .2})
+    displayed = build_phone_card(card(ordinary))["selections"][0]
+    assert displayed["status"] == "WATCH"
+    assert displayed["probability"] is None and displayed["estimated_ev"] is None
 
 
 @pytest.mark.parametrize("freshness", [
@@ -207,7 +214,12 @@ def test_canonical_pitcher_family_routes_are_exercised_without_network():
     assert len(c["evaluated_rows"]) == 12
     assert all(r.get("model_probability") is not None for r in c["evaluated_rows"])
     assert c["phone_card"]["coverage"]["distinct_market_families"] == 6
-    assert sum(r["priced"] for r in c["phone_card"]["coverage"]["families"]) == 12
+    family_counts = c["phone_card"]["coverage"]["families"]
+    assert sum(r["priced"] + r["rejected"] for r in family_counts) == 12
+    # Extreme synthetic EV is quarantined, not lost or counted as priced.
+    assert sum(r["rejected"] for r in family_counts) == 5
+    assert sum(row["status"] == "QUARANTINED"
+               for row in c["phone_card"]["selections"]) == 5
 
 
 def test_no_fetch_league_prior_cannot_be_a_lean():
