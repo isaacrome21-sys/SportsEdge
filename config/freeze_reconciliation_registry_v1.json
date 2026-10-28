@@ -1650,7 +1650,7 @@
       "delta_id": "MAIN_ADVANCE_242C9CD7_PR_1510",
       "merge_sha": "242c9cd71f3a6264712f7fe8918be40b93b3668e",
       "pr": 1510,
-      "note": "NBA: v2 rest/back-to-back backtest (pre-registered) — no market validated (#1510). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+      "note": "NBA: v2 rest/back-to-back backtest (pre-registered) \u2014 no market validated (#1510). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
     },
     {
       "delta_id": "MAIN_ADVANCE_CE310364_PR_1476",
@@ -2100,7 +2100,7 @@
       "delta_id": "MAIN_ADVANCE_E4365A3B_DIRECT",
       "merge_sha": "e4365a3bd1020ffcb9d9643c6bb5ede9014c7016",
       "pr": 0,
-      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: Run MLB SportsEdge — Yankees at Rays 2026-10-05. This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
+      "note": "First-parent main advance registered during reconciliation catch-up. Source commit: Run MLB SportsEdge \u2014 Yankees at Rays 2026-10-05. This registry record creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, untouched-readout, or bettor-facing authority."
     },
     {
       "delta_id": "MAIN_ADVANCE_A247793D_PR_1723",
@@ -2472,7 +2472,7 @@
       "delta_id": "MAIN_ADVANCE_09F545A9_PR_1851",
       "merge_sha": "09f545a97efc6daaa9e6fdf081adbfa5d76bf987",
       "pr": 1851,
-      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB: audit actual 2023–2025 postseason starter workload vs PIT regular-season predictions (#1851). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
+      "note": "Verified first-parent main advance after registered 4d57d581 boundary. Source: MLB: audit actual 2023\u20132025 postseason starter workload vs PIT regular-season predictions (#1851). Records provenance only; no forward evidence backfill, model selection, promotion, staking, or official betting authority."
     },
     {
       "delta_id": "MAIN_ADVANCE_4C821F35_PR_1851",
@@ -2863,10 +2863,16 @@
       "merge_sha": "f5441ed98bcf8fed27a04d96bc9f99ae9e5ebc4b",
       "pr": 2719,
       "note": "DRIFT_CONFIRMED / REVOKED reconciliation-only bridge: #2719 altered exactly sportsedge/dfs/projections.py and tests/test_dfs_projection_snapshot_integrity.py under MLB_DFS_EVIDENCE_FREEZE_V1 governed coverage. Temporary anchor advancement solely permits subsequent exact-byte restoration and final re-anchor. Bundle remains REVOKED; no freeze, model, forward-clock, promotion, staking, official, production, or betting authority; no backfill."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_444A8800_PR_2821",
+      "merge_sha": "444a8800ef05e3dd91ce64ae82a166830216f9bd",
+      "pr": 2821,
+      "note": "Restoration closure of the governed sequence (owner-authorized A->B->C, Oct 27, 2026): PR #2821 restored the original MLB_DFS_EVIDENCE_FREEZE_V1 governed bytes (sportsedge/dfs/projections.py back to blob 529d9229d; tests/test_dfs_projection_snapshot_integrity.py removed). This row closes the temporary bridge opened by MAIN_ADVANCE_F5441ED9_PR_2719 and re-anchors the registry at the restoration merge. The DFS bundle remains REVOKED (2026-09-27); the drifted #2719 bytes were never accepted as the boundary. No counting, production, model, promotion, staking, or official authority."
     }
   ],
   "inventory_block_reason": "Current main through merge dca09063 / PR #1668 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "f5441ed98bcf8fed27a04d96bc9f99ae9e5ebc4b",
+  "reconciled_through_sha": "444a8800ef05e3dd91ce64ae82a166830216f9bd",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
