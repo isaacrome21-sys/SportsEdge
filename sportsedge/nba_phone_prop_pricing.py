@@ -69,6 +69,7 @@ QUOTE_PRICE_MISSING = "NBA_PROP_QUOTE_PRICE_MISSING"
 QUOTE_PRICE_INVALID = "NBA_PROP_QUOTE_PRICE_INVALID"
 QUOTE_TIMESTAMP_MISSING = "NBA_PROP_QUOTE_TIMESTAMP_MISSING"
 QUOTE_TIMESTAMP_INVALID = "NBA_PROP_QUOTE_TIMESTAMP_INVALID"
+BOOK_UNVERIFIED = "NBA_PROP_BOOK_UNVERIFIED"
 
 
 def nba_prop_family_for_market(market):
@@ -356,8 +357,8 @@ def phone_nba_prop_rows(rows, *, now=None, store=None, store_dir=None,
             if isinstance(raw_line, bool):
                 raise ValueError("boolean line")
             line = float(raw_line)
-            if not math.isfinite(line):
-                raise ValueError("nonfinite line")
+            if not math.isfinite(line) or line < 0:
+                raise ValueError("nonfinite or negative stat line")
         except (KeyError, TypeError, ValueError, OverflowError):
             outputs.append(_blocked(row, family, LINE_MISSING))
             continue
@@ -380,6 +381,13 @@ def phone_nba_prop_rows(rows, *, now=None, store=None, store_dir=None,
         if quote_ts is None:
             outputs.append(_blocked(row, family, QUOTE_TIMESTAMP_INVALID))
             continue
+        # A caller-supplied book is only a research assertion, never provider
+        # authentication. Never manufacture DraftKings attribution from absence.
+        raw_book = row.get("book")
+        if not isinstance(raw_book, str) or not raw_book.strip():
+            outputs.append(_blocked(row, family, BOOK_UNVERIFIED))
+            continue
+        book = raw_book.strip()
         priced = resolved_store.price(
             player_id, FAMILY_TO_STAT[family], line, target)
         if priced.get("status") != "PRICED":
@@ -409,7 +417,8 @@ def phone_nba_prop_rows(rows, *, now=None, store=None, store_dir=None,
             "player_id": player_id,
             "line": line,
             "odds": row.get("odds", row.get("price")),
-            "book": row.get("book") or "draftkings",
+            "book": book,
+            "book_provenance": "CALLER_ASSERTED_NOT_AUTHENTICATED",
             "quote_captured_at": row.get("quote_captured_at")
                                  or row.get("captured_at"),
             "quote_freshness": freshness,
