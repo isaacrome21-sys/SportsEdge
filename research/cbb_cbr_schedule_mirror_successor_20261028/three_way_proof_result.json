@@ -1,0 +1,851 @@
+{
+ "proof": "CBR mirror fixture derivation + three-way agreement sample",
+ "design_reference": "PR #2843 section 2 (three-way fixture agreement)",
+ "cbr_manifest": "successor_manifest.json (this packet)",
+ "hoopr_manifest": "research/cbb_hoopr_mbb_schedule_successor_20261028/successor_manifest.json (PR #2867)",
+ "torvik_route": "PR #2832 pinned commit 46d1036443ca452fdd1c6cf25cf5dff50de68337",
+ "normalization_overrides": {
+  "Albany": "albany-ny",
+  "American University": "american",
+  "BYU": "brigham-young",
+  "Central Connecticut": "central-connecticut-state",
+  "Cleveland St.": "cleveland-state",
+  "Detroit": "detroit-mercy",
+  "ETSU": "east-tennessee-state",
+  "Fort Wayne": "ipfw",
+  "Fort Wayne Mastodons": "ipfw",
+  "LIU": "long-island-university",
+  "LIU-Brooklyn": "long-island-university",
+  "LIU-Brooklyn Blackbirds": "long-island-university",
+  "LSU": "louisiana-state",
+  "Nebraska Omaha": "nebraska-omaha",
+  "Ole Miss": "mississippi",
+  "Oregon St.": "oregon-state",
+  "Penn": "pennsylvania",
+  "Pitt": "pittsburgh",
+  "Saint Mary's": "saint-marys-ca",
+  "San Diego St.": "san-diego-state",
+  "SIU-Edwardsville": "southern-illinois-edwardsville",
+  "SMU": "southern-methodist",
+  "Southern Miss": "southern-mississippi",
+  "St. Joseph's": "saint-josephs",
+  "St. Peter's": "saint-peters",
+  "Texas St.": "texas-state",
+  "UAlbany": "albany-ny",
+  "UConn": "connecticut",
+  "UIC": "illinois-chicago",
+  "UMass": "massachusetts",
+  "UMass-Lowell": "massachusetts-lowell",
+  "UMBC": "maryland-baltimore-county",
+  "UMKC": "missouri-kansas-city",
+  "UNC": "north-carolina",
+  "UNLV": "nevada-las-vegas",
+  "USC": "southern-california",
+  "USC Upstate": "south-carolina-upstate",
+  "UCSB": "california-santa-barbara",
+  "UT-Martin": "tennessee-martin",
+  "VCU": "virginia-commonwealth",
+  "Youngstown St.": "youngstown-state"
+ },
+ "derivation_by_season": {
+  "2014-2015": {
+   "team_rows_admitted_scope": 11431,
+   "team_slug_unresolved_rows": 0,
+   "score_missing_rows": 2,
+   "fixtures_derived": 5499,
+   "rows_in_fixtures": 10998,
+   "single_or_unresolved_rows": 431,
+   "mirror_inconsistent_pairs": 0,
+   "mirror_resolved_variants": {}
+  },
+  "2015-2016": {
+   "team_rows_admitted_scope": 11468,
+   "team_slug_unresolved_rows": 0,
+   "score_missing_rows": 0,
+   "fixtures_derived": 5516,
+   "rows_in_fixtures": 11032,
+   "single_or_unresolved_rows": 436,
+   "mirror_inconsistent_pairs": 0,
+   "mirror_resolved_variants": {}
+  },
+  "2016-2017": {
+   "team_rows_admitted_scope": 11511,
+   "team_slug_unresolved_rows": 0,
+   "score_missing_rows": 0,
+   "fixtures_derived": 5535,
+   "rows_in_fixtures": 11070,
+   "single_or_unresolved_rows": 441,
+   "mirror_inconsistent_pairs": 0,
+   "mirror_resolved_variants": {}
+  },
+  "2017-2018": {
+   "team_rows_admitted_scope": 11544,
+   "team_slug_unresolved_rows": 0,
+   "score_missing_rows": 0,
+   "fixtures_derived": 5540,
+   "rows_in_fixtures": 11080,
+   "single_or_unresolved_rows": 464,
+   "mirror_inconsistent_pairs": 0,
+   "mirror_resolved_variants": {}
+  },
+  "2018-2019": {
+   "team_rows_admitted_scope": 11652,
+   "team_slug_unresolved_rows": 0,
+   "score_missing_rows": 0,
+   "fixtures_derived": 5603,
+   "rows_in_fixtures": 11206,
+   "single_or_unresolved_rows": 446,
+   "mirror_inconsistent_pairs": 0,
+   "mirror_resolved_variants": {}
+  },
+  "2019-2020": {
+   "team_rows_admitted_scope": 11095,
+   "team_slug_unresolved_rows": 0,
+   "score_missing_rows": 0,
+   "fixtures_derived": 5328,
+   "rows_in_fixtures": 10656,
+   "single_or_unresolved_rows": 439,
+   "mirror_inconsistent_pairs": 0,
+   "mirror_resolved_variants": {}
+  },
+  "2020-2021": {
+   "team_rows_admitted_scope": 8229,
+   "team_slug_unresolved_rows": 0,
+   "score_missing_rows": 0,
+   "fixtures_derived": 3944,
+   "rows_in_fixtures": 7888,
+   "single_or_unresolved_rows": 341,
+   "mirror_inconsistent_pairs": 0,
+   "mirror_resolved_variants": {}
+  },
+  "2021-2022": {
+   "team_rows_admitted_scope": 11443,
+   "team_slug_unresolved_rows": 0,
+   "score_missing_rows": 0,
+   "fixtures_derived": 5475,
+   "rows_in_fixtures": 10950,
+   "single_or_unresolved_rows": 493,
+   "mirror_inconsistent_pairs": 0,
+   "mirror_resolved_variants": {}
+  },
+  "2022-2023": {
+   "team_rows_admitted_scope": 11995,
+   "team_slug_unresolved_rows": 0,
+   "score_missing_rows": 58,
+   "fixtures_derived": 5715,
+   "rows_in_fixtures": 11430,
+   "single_or_unresolved_rows": 507,
+   "mirror_inconsistent_pairs": 0,
+   "mirror_resolved_variants": {}
+  }
+ },
+ "sample": [
+  {
+   "season": "2014-2015",
+   "slot": "CHAMPIONSHIP",
+   "date": "2015-04-06",
+   "pair": [
+    "duke",
+    "wisconsin"
+   ],
+   "cbr_scores": {
+    "duke": 68,
+    "wisconsin": 63
+   },
+   "hoopr": {
+    "game_id": "400788981",
+    "scores": {
+     "duke": 68,
+     "wisconsin": 63
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20150406.csv",
+    "team_rows": 351,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2014-2015",
+   "slot": "EARLY_PROBE_DATE",
+   "date": "2014-11-15",
+   "pair": [
+    "air-force",
+    "citadel"
+   ],
+   "cbr_scores": {
+    "air-force": 68,
+    "citadel": 55
+   },
+   "hoopr": {
+    "game_id": "400607368",
+    "scores": {
+     "air-force": 68,
+     "citadel": 55
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20141115.csv",
+    "team_rows": 351,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2014-2015",
+   "slot": "MID_PROBE_DATE",
+   "date": "2015-01-15",
+   "pair": [
+    "alabama-birmingham",
+    "louisiana-tech"
+   ],
+   "cbr_scores": {
+    "alabama-birmingham": 71,
+    "louisiana-tech": 74
+   },
+   "hoopr": {
+    "game_id": "400591449",
+    "scores": {
+     "louisiana-tech": 74,
+     "alabama-birmingham": 71
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20150115.csv",
+    "team_rows": 351,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2015-2016",
+   "slot": "CHAMPIONSHIP",
+   "date": "2016-04-04",
+   "pair": [
+    "north-carolina",
+    "villanova"
+   ],
+   "cbr_scores": {
+    "north-carolina": 74,
+    "villanova": 77
+   },
+   "hoopr": {
+    "game_id": "400873651",
+    "scores": {
+     "north-carolina": 74,
+     "villanova": 77
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20160404.csv",
+    "team_rows": 351,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2015-2016",
+   "slot": "EARLY_PROBE_DATE",
+   "date": "2015-11-14",
+   "pair": [
+    "akron",
+    "cleveland-state"
+   ],
+   "cbr_scores": {
+    "akron": 65,
+    "cleveland-state": 53
+   },
+   "hoopr": {
+    "game_id": "400841827",
+    "scores": {
+     "akron": 65,
+     "cleveland-state": 53
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20151114.csv",
+    "team_rows": 351,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2015-2016",
+   "slot": "MID_PROBE_DATE",
+   "date": "2016-01-15",
+   "pair": [
+    "akron",
+    "toledo"
+   ],
+   "cbr_scores": {
+    "akron": 64,
+    "toledo": 78
+   },
+   "hoopr": {
+    "game_id": "400841836",
+    "scores": {
+     "toledo": 78,
+     "akron": 64
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20160115.csv",
+    "team_rows": 351,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2016-2017",
+   "slot": "CHAMPIONSHIP",
+   "date": "2017-04-03",
+   "pair": [
+    "gonzaga",
+    "north-carolina"
+   ],
+   "cbr_scores": {
+    "gonzaga": 65,
+    "north-carolina": 71
+   },
+   "hoopr": {
+    "game_id": "400949246",
+    "scores": {
+     "north-carolina": 71,
+     "gonzaga": 65
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20170403.csv",
+    "team_rows": 351,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2016-2017",
+   "slot": "EARLY_PROBE_DATE",
+   "date": "2016-11-12",
+   "pair": [
+    "akron",
+    "youngstown-state"
+   ],
+   "cbr_scores": {
+    "akron": 82,
+    "youngstown-state": 90
+   },
+   "hoopr": {
+    "game_id": "400917000",
+    "scores": {
+     "youngstown-state": 90,
+     "akron": 82
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20161112.csv",
+    "team_rows": 351,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2016-2017",
+   "slot": "MID_PROBE_DATE",
+   "date": "2017-01-15",
+   "pair": [
+    "cincinnati",
+    "east-carolina"
+   ],
+   "cbr_scores": {
+    "cincinnati": 55,
+    "east-carolina": 46
+   },
+   "hoopr": {
+    "game_id": "400916585",
+    "scores": {
+     "east-carolina": 46,
+     "cincinnati": 55
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20170115.csv",
+    "team_rows": 351,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2017-2018",
+   "slot": "CHAMPIONSHIP",
+   "date": "2018-04-02",
+   "pair": [
+    "michigan",
+    "villanova"
+   ],
+   "cbr_scores": {
+    "michigan": 62,
+    "villanova": 79
+   },
+   "hoopr": {
+    "game_id": "401025888",
+    "scores": {
+     "villanova": 79,
+     "michigan": 62
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20180402.csv",
+    "team_rows": 351,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2017-2018",
+   "slot": "EARLY_PROBE_DATE",
+   "date": "2017-11-11",
+   "pair": [
+    "akron",
+    "cleveland-state"
+   ],
+   "cbr_scores": {
+    "akron": 67,
+    "cleveland-state": 57
+   },
+   "hoopr": {
+    "game_id": "400990111",
+    "scores": {
+     "akron": 67,
+     "cleveland-state": 57
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20171111.csv",
+    "team_rows": 351,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2017-2018",
+   "slot": "MID_PROBE_DATE",
+   "date": "2018-01-14",
+   "pair": [
+    "american",
+    "lehigh"
+   ],
+   "cbr_scores": {
+    "american": 66,
+    "lehigh": 76
+   },
+   "hoopr": {
+    "game_id": "400991965",
+    "scores": {
+     "lehigh": 76,
+     "american": 66
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20180114.csv",
+    "team_rows": 351,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2018-2019",
+   "slot": "CHAMPIONSHIP",
+   "date": "2019-04-08",
+   "pair": [
+    "texas-tech",
+    "virginia"
+   ],
+   "cbr_scores": {
+    "texas-tech": 77,
+    "virginia": 85
+   },
+   "hoopr": {
+    "game_id": "401123374",
+    "scores": {
+     "virginia": 85,
+     "texas-tech": 77
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20190408.csv",
+    "team_rows": 353,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2018-2019",
+   "slot": "EARLY_PROBE_DATE",
+   "date": "2018-11-10",
+   "pair": [
+    "akron",
+    "youngstown-state"
+   ],
+   "cbr_scores": {
+    "akron": 98,
+    "youngstown-state": 69
+   },
+   "hoopr": {
+    "game_id": "401083994",
+    "scores": {
+     "akron": 98,
+     "youngstown-state": 69
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20181110.csv",
+    "team_rows": 353,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2018-2019",
+   "slot": "MID_PROBE_DATE",
+   "date": "2019-01-13",
+   "pair": [
+    "butler",
+    "xavier"
+   ],
+   "cbr_scores": {
+    "butler": 69,
+    "xavier": 70
+   },
+   "hoopr": {
+    "game_id": "401083204",
+    "scores": {
+     "xavier": 70,
+     "butler": 69
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20190113.csv",
+    "team_rows": 353,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2019-2020",
+   "slot": "LATE_PROBE_SUBSTITUTE_NO_CHAMPIONSHIP_COVID",
+   "date": "2020-03-08",
+   "pair": [
+    "boston-university",
+    "bucknell"
+   ],
+   "cbr_scores": {
+    "boston-university": 64,
+    "bucknell": 61
+   },
+   "hoopr": {
+    "game_id": "401211659",
+    "scores": {
+     "boston-university": 64,
+     "bucknell": 61
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20200308.csv",
+    "team_rows": 353,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2019-2020",
+   "slot": "EARLY_PROBE_DATE",
+   "date": "2019-11-09",
+   "pair": [
+    "air-force",
+    "texas-state"
+   ],
+   "cbr_scores": {
+    "air-force": 78,
+    "texas-state": 71
+   },
+   "hoopr": {
+    "game_id": "401173650",
+    "scores": {
+     "air-force": 78,
+     "texas-state": 71
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20191109.csv",
+    "team_rows": 353,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2019-2020",
+   "slot": "MID_PROBE_DATE",
+   "date": "2020-01-12",
+   "pair": [
+    "arizona",
+    "oregon-state"
+   ],
+   "cbr_scores": {
+    "arizona": 65,
+    "oregon-state": 82
+   },
+   "hoopr": {
+    "game_id": "401170663",
+    "scores": {
+     "oregon-state": 82,
+     "arizona": 65
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20200112.csv",
+    "team_rows": 353,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2020-2021",
+   "slot": "CHAMPIONSHIP",
+   "date": "2021-04-05",
+   "pair": [
+    "baylor",
+    "gonzaga"
+   ],
+   "cbr_scores": {
+    "baylor": 86,
+    "gonzaga": 70
+   },
+   "hoopr": {
+    "game_id": "401310865",
+    "scores": {
+     "gonzaga": 70,
+     "baylor": 86
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20210405.csv",
+    "team_rows": 347,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2020-2021",
+   "slot": "EARLY_PROBE_DATE",
+   "date": "2020-11-28",
+   "pair": [
+    "abilene-christian",
+    "nebraska-omaha"
+   ],
+   "cbr_scores": {
+    "abilene-christian": 70,
+    "nebraska-omaha": 58
+   },
+   "hoopr": {
+    "game_id": "401259998",
+    "scores": {
+     "nebraska-omaha": 58,
+     "abilene-christian": 70
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20201128.csv",
+    "team_rows": 347,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2020-2021",
+   "slot": "MID_PROBE_DATE",
+   "date": "2021-01-17",
+   "pair": [
+    "albany-ny",
+    "njit"
+   ],
+   "cbr_scores": {
+    "albany-ny": 83,
+    "njit": 71
+   },
+   "hoopr": {
+    "game_id": "401256988",
+    "scores": {
+     "albany-ny": 83,
+     "njit": 71
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20210117.csv",
+    "team_rows": 347,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2021-2022",
+   "slot": "CHAMPIONSHIP",
+   "date": "2022-04-04",
+   "pair": [
+    "kansas",
+    "north-carolina"
+   ],
+   "cbr_scores": {
+    "kansas": 72,
+    "north-carolina": 69
+   },
+   "hoopr": {
+    "game_id": "401408636",
+    "scores": {
+     "kansas": 72,
+     "north-carolina": 69
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20220404.csv",
+    "team_rows": 358,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2021-2022",
+   "slot": "EARLY_PROBE_DATE",
+   "date": "2021-11-13",
+   "pair": [
+    "air-force",
+    "tulsa"
+   ],
+   "cbr_scores": {
+    "air-force": 59,
+    "tulsa": 58
+   },
+   "hoopr": {
+    "game_id": "401371933",
+    "scores": {
+     "tulsa": 58,
+     "air-force": 59
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20211113.csv",
+    "team_rows": 358,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2021-2022",
+   "slot": "MID_PROBE_DATE",
+   "date": "2022-01-16",
+   "pair": [
+    "american",
+    "bucknell"
+   ],
+   "cbr_scores": {
+    "american": 63,
+    "bucknell": 55
+   },
+   "hoopr": {
+    "game_id": "401373341",
+    "scores": {
+     "american": 63,
+     "bucknell": 55
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20220116.csv",
+    "team_rows": 358,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2022-2023",
+   "slot": "CHAMPIONSHIP",
+   "date": "2023-04-03",
+   "pair": [
+    "connecticut",
+    "san-diego-state"
+   ],
+   "cbr_scores": {
+    "connecticut": 76,
+    "san-diego-state": 59
+   },
+   "hoopr": {
+    "game_id": "401522202",
+    "scores": {
+     "connecticut": 76,
+     "san-diego-state": 59
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20230403.csv",
+    "team_rows": 363,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2022-2023",
+   "slot": "EARLY_PROBE_DATE",
+   "date": "2022-11-12",
+   "pair": [
+    "albany-ny",
+    "siena"
+   ],
+   "cbr_scores": {
+    "albany-ny": 62,
+    "siena": 75
+   },
+   "hoopr": {
+    "game_id": "401489622",
+    "scores": {
+     "siena": 75,
+     "albany-ny": 62
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20221112.csv",
+    "team_rows": 363,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  },
+  {
+   "season": "2022-2023",
+   "slot": "MID_PROBE_DATE",
+   "date": "2023-01-15",
+   "pair": [
+    "canisius",
+    "siena"
+   ],
+   "cbr_scores": {
+    "canisius": 66,
+    "siena": 62
+   },
+   "hoopr": {
+    "game_id": "401486990",
+    "scores": {
+     "canisius": 66,
+     "siena": 62
+    }
+   },
+   "torvik_morning_of": {
+    "file": "ratings_archive_20230115.csv",
+    "team_rows": 363,
+    "both_teams_present": true
+   },
+   "verdict": "AGREE"
+  }
+ ],
+ "summary": {
+  "fixtures_sampled": 27,
+  "agree": 27,
+  "schedule_discrepancy": 0
+ }
+}
