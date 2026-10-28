@@ -1,6 +1,6 @@
 # SportsEdge — Tested Ideas Ledger
 
-**What this is:** the single reconciled record of every measured SportsEdge framework in scope — its recorded verdict, its numbers against the model baseline and against the market baseline (shown separately), and its current status. **As of October 19, 2026.** **Rule: a new challenger must be checked against this ledger before it is built — if the construction, or a close variant of it, already has a verdict here, that verdict governs until new evidence on new data says otherwise.**
+**What this is:** the single reconciled record of every measured SportsEdge framework in scope — its recorded verdict, its numbers against the model baseline and against the market baseline (shown separately), and its current status. **As of October 20, 2026.** **Rule: a new challenger must be checked against this ledger before it is built — if the construction, or a close variant of it, already has a verdict here, that verdict governs until new evidence on new data says otherwise.**
 
 How to read it: verdict labels are preserved **exactly as recorded** (DOES_NOT_BEAT_*, SCREEN, PASS, etc. — never paraphrased into something stronger). "Model baseline" = the existing model or statistical baseline the test itself used. "Market baseline" = real book/closing prices. Where a test never faced prices, that is stated outright — a calibration result is not a market result. Every figure names its record source. Nothing in this ledger is a validated play; validated families remain **zero**.
 
@@ -16,6 +16,7 @@ How to read it: verdict labels are preserved **exactly as recorded** (DOES_NOT_B
 - **Vs model baseline:** not applicable — Lane A *was* the card model; it survives as the **measured floor** any challenger must first beat.
 - **Current status: RETIRED as card-source engine** (owner ruling, Oct 15). It unlocks nothing; the canonical runner still prices game rows via the Lane A heuristic under an unvalidated label.
 - **Sources:** `~/MEMORY.md` (Oct 13 Lane A evaluation; Oct 15 rulings); `backtest_program_20261017/MATRIX.md` rows M1, M2.
+- **Oct 20 addendum:** the owner authorized a one-off Lane A run for the 2026 World Series, labeled retired-construction research on its face with this section's record attached (§§20–21). The retirement stands; the one-off changes no status, no eligibility, and no verdict in this section.
 
 ## 2. Elo C1 and Elo C2 — the Lane A challengers (Oct 14)
 
@@ -176,7 +177,97 @@ How to read it: verdict labels are preserved **exactly as recorded** (DOES_NOT_B
 - **Capture status (Oct 19):** points, rebounds, assists and PRA are in this week's capture scope. The first board is `dk_line_archive/nba/2026-10-19/1154_ct.json` (manual, owner-directed; Oct 20–21 games), and it has no close capture yet. Other combos, threes, steals, blocks, turnovers and double-double are out of scope this week (#2406), so they have no captures.
 - **Current status:** no model, no verdict, no card path.
 - **Sources:** #2409 Claude lane item 2; `records/audit_artifacts_20261018/dk_line_archive/INDEX.md` on `records/audit-artifacts-20261018` @ 997cbbd33.
+- **Oct 20 update:** PTS/REB/AST/PRA now have a merged engine (#2419) and a **FROZEN** forward preregistration with a merged evaluator (§15) — the forward test this section required. The "market never measured" record above stands for history; prospective measurement starts with the Oct 21, 2026 slate. The other combos remain as recorded here.
+## 12. Oct 11 NBA harness — fresh re-score (Oct 20)
 
+- **Recorded outcome: MEASURED, INCONCLUSIVE.** Fresh re-score of the Oct 11 harness on Oct 20: Δ Brier **−0.0094**, 95% CI **[−0.0205, +0.0017]** — the interval includes zero, so no directional claim is supported. Usable sample: **181 distinct games of 653 appearances** after point-in-time eligibility rules were applied.
+- The earlier **CONDITIONAL_PASS** label is **unsupported** by this re-score and does not govern.
+- **Vs market baseline:** the harness comparison only (prices untimestamped — the same caveat class as §§9–10).
+- **Current status:** closed as inconclusive. Nothing is wired or claimed on the strength of it.
+- **Sources:** `~/MEMORY.md` (Oct 20 fresh re-score).
+
+## 13. NFL anytime-TD engine v1 — calibration verdict + determinism audit
+
+- **Recorded verdict: BEATS_BASELINE** (calibration) — vs the point-in-time position-pool baseline: Δ log loss **−0.0248 [−0.0270, −0.0227]**; vs the raw unshrunk player rate: Δ **−0.1670**. Calibration 2020–2025, n = **29,114 player-games**; mean predicted **0.2122** vs realized **0.2126**. Recorded caveat: the top two deciles mildly under-predict (0.393 vs 0.438).
+- **Vs market baseline: NOT MEASURED.** The market leg is the locked forward test (#2399 rules), first slate **Thu Oct 22, 2026** (Patriots @ Bears).
+- **Determinism audit (Oct 20): PASS** — 8/8 nflverse pins match, byte-identical rerun, results sha256 `8d45de85…`.
+- **Current status: REGISTERED_RESEARCH_ONLY / NOT_VALIDATED**, eligible/promotable **false**. Branch `feat/nfl-atd-engine-v1-20261018` @ `cae825534`, **not merged**.
+- **Sources:** `~/MEMORY.md` (Oct 18 build; Oct 20 determinism audit).
+
+## 14. Engine build wave — merged to main (Oct 20)
+
+- **Merged:** **#2417** NFL prop engines (10 engines; recorded screens: pass_plus_rush, rush_plus_rec, targets **CALIBRATED_CANDIDATE**; two_plus_td **DOES_NOT_BEAT_BASELINE**; 6 families **SCREEN_NOT_RUNNABLE_SANCTIONED_VINTAGE**); **#2418** forward-validation program (framework + family configs and draft preregistrations, all **DRAFT — NOT FROZEN**); **#2419** NBA prop engines (parity gate passed: CRPS PTS 3.565315154399988 / REB 1.4413305624741377 / AST 1.0054994421144787 / PRA 4.708175069261127); **#2420** CFB runner wiring; **#2422** NBA team/period engines (team totals + quarter totals **CALIBRATED_CANDIDATE**, parity max diff = 0; period spreads/ML and player period props **NOT BUILT** — §17); **#2421** MLB plate-appearance engine (PLATE_APPEARANCE_RESULT **CALIBRATED_CANDIDATE**, Δ −0.01007; ON_BASE **DOES_NOT_BEAT_BASELINE**; GROUPED_RESULT **NO_DATA**); **#2411** cleanup.
+- **Composed-main smoke on the merged main: PASS** — 181 tests, 0 failed across 8 files; `run_it_full.py` imports clean.
+- **Governance:** merging changed no family's registration or validation state — those stand as recorded elsewhere in this ledger. Known wiring state: the runner references the CFB gate and the NBA prop lane directly; the NFL prop engines and the NBA team/period engines are **not** imported by the runner by module name.
+- **Sources:** `~/MEMORY.md` (Oct 20 merge wave).
+
+## 15. NBA props forward test — preregistration FROZEN, evaluator merged (Oct 20)
+
+- **Preregistration FROZEN + merged (#2424**, merge `ae95881987`): `research/nba_props_forward_20261020/PREREG_NBA_PROPS_FORWARD_V1.md`, sha256 `54363908b1e2332a57af9b9263ac2f398438c81b2d366442b80667086657bc79`. Terms byte-identical to the #2419 draft (§§1–11). Markets PTS / REB / AST / PRA; gates: 4 full slates AND ≥50 rows AND exactly 40 distinct games per market; CLV primary; **BEATS_MARKET** requires the game-clustered 95% CI lower bound > 0 AND picked-beats-passed.
+- **Counting starts with the Wed Oct 21, 2026 slate.** Oct 20 and earlier are historical record only and can never become prospective entries.
+- **The preregistration's §12 gap is CLOSED:** the evaluator it required was built, independently verified (including hostile boundary probes), and merged (**#2429**, merge `7a189b001` = main at entry time). The forward-test system — frozen rules + evaluator + clean captures (§19) — is complete; Wednesday's captures are scoreable under §9.
+- **Relation to §11:** for PTS/REB/AST/PRA this supersedes §11's "market never measured" as the going-forward state — measurement is now prospective under the frozen terms, not a historical rerun. §11's historical record stands.
+- **Current status: FROZEN, clock starts Oct 21.** No verdict exists, and none can issue before the frozen gates are met.
+- **Sources:** `~/MEMORY.md` (Oct 20 freeze + evaluator merge).
+
+## 16. NBA game-lines forward preregistration — merged AS DRAFT (Oct 20)
+
+- **Merged as a draft (#2425**, merge `94eb7b425`): `research/nba_game_lines_forward_20261020/PREREG_NBA_GAME_LINES_FORWARD_V1_DRAFT.md`, sha256 `d2083ee18509fdc18f6b80b9f4781370b1bc9f8e87e5acf9b117831e887298bb`. Status on its face: **DRAFT — NOT FROZEN — NO GAMES COUNT.**
+- **Entry precondition:** a one-shot preregistered historical accuracy screen vs the close. No current construction passes it — the incumbent's recorded gap (§9: ML Brier diff **+0.0116638 [+0.008653, +0.014651]**) fails the draft's bar, so **no forward clock exists for NBA game lines**. The draft's §12 states the null outcome plainly: if nothing passes the screen, the families stay **FAILED_VALIDATION** with no clock — the correct state, not a lowered bar.
+- **Current status:** draft on main; NBA game lines remain **FAILED_VALIDATION** (§17). Freezing is an owner act and has not happened.
+- **Sources:** `~/MEMORY.md` (Oct 20 draft merge + verification).
+
+## 17. Canonical coverage — true registry states surfaced (Oct 20)
+
+- **Merged (#2428**, merge `c6db2d1ea`): `canonical_coverage.resolve_market` now surfaces true states instead of a uniform BLOCKED — CFB moneyline/spread/total **REGISTERED_RESEARCH_ONLY** (owner Option B; condition FORM2_IDENTITY_SATISFIED_BOTH_TEAMS); NBA PTS/REB/AST/PRA **REGISTERED_RESEARCH_ONLY** (engine `NBA_PROP_EMPIRICAL_V1`, condition ENGINE_SUFFICIENCY_MET); NBA game lines **FAILED_VALIDATION** with the accuracy-gap metrics in the detail, explicitly **not** research-pricing-eligible.
+- **Surfaced defect of record:** NBA team totals + period totals were **never registered** — the engine exists (#2422, `NBA_TEAM_PERIOD_RATINGS_V1`) with `registration_state: UNREGISTERED`, surfaced as BLOCKED / NO_VALIDATION / NO_MARKET_TEST. Registering them research-only is an **open owner ruling**, not assumed.
+- **Governance:** no eligible/promotable flag changed anywhere; `registry_gate` untouched (phone-lane behavior unchanged by construction).
+- **Sources:** `~/MEMORY.md` (Oct 20 registry-surfacing fix).
+
+## 18. Grok audit PRs #2426 / #2427 / #2430 — independently VERIFIED (Oct 20)
+
+- **#2426 (intake / Elo / CI guard):** the shared numeric fence is verified — NaN and infinite lines, silently-rounded fractional prices, and identical-opponent games (including via alias) fail closed with named errors across the NBA/NFL/NHL parsers; the source-note parse failure behind issue #2423 is fixed. Elo persistence repaired (the `Mapping` annotation defect plus real aliasing/validation defects). A Ruff correctness guard (`E9, F821, F822, F823, F811`; `ruff==0.17.1`) is pinned in **both** dependency manifests — on the base tree it produces exactly one hit, the Elo defect.
+- **#2427 (MLB schema):** the frozen MLB V8 run-it schema is **broken JSON** (two `if` blocks each missing a closing brace, lines 165/175). The repair is filed as a **versioned syntax-only proposal** — semantically identical except `$id` and `$comment` — and the frozen original is **byte-preserved**, not edited. Nothing adopts the proposal.
+- **#2430 (clean-tree guard):** the guard compared only `git status` flags, so content changes and staged-index changes with unchanged flags passed silently; fixed with content/mode fingerprints plus an index digest, and old-format baselines fail closed.
+- **Current status: all three VERIFIED** by independent agents reproducing the base defects and the fixed behavior from primary evidence. **Merge under protocol was in flight at ledger time — as of this entry they are NOT merged** and must not be cited as merged until the merges land on main.
+- **Status update (Oct 22):** all three have since MERGED — #2426 `2ed6ed711`, #2427 `d722da64c`, #2430 `4d4a07cc9` (fetch-verified on main). See §22.
+- **Sources:** `~/MEMORY.md` (Oct 20 audit verifications).
+
+## 19. Capture-record integrity scan — Oct 19–20 files CLEAN (Oct 20)
+
+- Every Oct 19–20 capture file (local archive and records-branch copies, byte-identical by sha256) was scanned value-by-value: **zero** NaN, **zero** Inf, **zero** fractional or malformed prices.
+- The numeric defects verified in §18 lived in the **intake parsers only**; no capture record is contaminated. Wednesday Oct 21 counting (§15) starts from clean records.
+- Legitimate nulls, recorded so they are not later misread as defects: `line: null` on moneyline rows; `team_totals: null` throughout the Oct 19 1154 file (team totals were not recorded there).
+- **Sources:** `~/MEMORY.md` (Oct 20 contamination scan).
+
+## 20. Owner rulings (Oct 20, 2026)
+
+- **Merge authority** granted to Rocky under protocol: update branch vs main + fresh all-green hosted CI on the updated head required; merge commits only; evidence-dependent HOLDs are **not** waived by this authority.
+- **CFB Option B** registration confirmed (REGISTERED_RESEARCH_ONLY for CFB moneyline/spread/total; §17). **Part 2B §6 = option (a)** — no 2B-specific row floor beyond §4.
+- **Illinois exclusion clarified: COLLEGE teams only.** Illinois pro teams (Bulls, Bears, Cubs, White Sox, Blackhawks) are fully in scope.
+- **Card score /100 adopted as standing** on every RUN IT card: it grades the strength of the unvalidated estimate only (50 = break-even); it never replaces the "unvalidated estimate" label, and BLOCKED/PARKED rows carry no score.
+- **Lane A one-off authorized:** a single Lane A run for the 2026 World Series (Game 1 + series), labeled **retired-construction research** on its face with its losing record attached (§1). Lane A remains **RETIRED** as a card source — this is one research read, no eligibility or status change. The market side binds to a paired DraftKings capture on Fri Oct 23 pregame; the Oct 20 public reads are provisional.
+- **Sources:** `~/MEMORY.md` (Oct 20 rulings).
+
+## 21. Sample-ceiling directive — historical market-baseline lane (Oct 20)
+
+- **Owner directive (Oct 20 evening):** pursue the best option to raise validation sample sizes — "Do what the best choice to do it."
+- **What does NOT change:** the FROZEN forward tests stay frozen exactly as-is; changing terms mid-clock voids them.
+- **What is added:** a historical market-baseline lane beside them. (1) **OddsPapi** as the baseline source, gated on a **provenance admission test** — spot-checks against our own DK captures and the SBR archive, timestamp semantics, book coverage — before any of its lines count as evidence. (2) The **uncapped MLB props download** (`max_rows=0`) dispatch attempted from Rocky's side; benchmark v2 is preregistered to score **once** on the first uncapped file reaching a records branch.
+- **Market-baseline ruling (Oct 20, ~8:49 PM CT — Isaac delegated the ruling to Rocky; ruled and on record):** OddsPapi is **DESIGNATED** the market-baseline source (alternative-source search closed). Admission is **automatic upon proof** under the admission protocol's pre-set bars, per sport/market — pass admits that market with no further ruling; fail rejects it for that round. If admitted: evaluation-side baseline for historical SCREENs only (chronological out-of-sample, version-scored, clustered, labeled SCREEN); never a pricing input; a screen can kill a construction or earn it a forward clock, never promote one; the frozen forward tests remain the sole path to validated. Ruled separately: for MLB props, the **uncapped download file is the baseline of record** (its `ts` already verified as real quote times), and benchmark v2 executes as preregistered on the first qualifying file.
+- **Standing limits:** historical screens on any new baseline are labeled **SCREEN**, version-scored, and never rewrite frozen forward verdicts.
+- **Current status:** evaluation in flight at ledger time. No OddsPapi line is evidence yet.
+- **Sources:** `~/MEMORY.md` (Oct 20 sample-ceiling directive).
+
+## 22. Oct 21–22 — admission verdict, store gap, challenger failures, audit wave merged
+
+- **OddsPapi admission run EXECUTED (Oct 21) — ZERO cells admitted** (closes §21's open evaluation). Checks A–E all failed at their pre-set bars: game-line pairing 88.3% vs the 95% bar; the provider's historical payloads contain **no DraftKings player-prop markets at all** (0/120); the SBR corpora carry no book identity and the provider archive starts January 2026, so it cannot speak to 2011–2022; §5.4 hygiene failed (112 same-timestamp conflicting-price groups in 4.52M entries). **NOT ADMITTED:** NBA ML/spread/total, NBA props PTS/REB/AST/PRA, NBA team totals, MLB ML/run-line/total. **NO_DATA:** NFL/CFB game lines, MLB pitcher Ks, NBA combo props. Historical screens continue on our own DK captures + labeled indicative archives; a redesigned contemporaneous-only protocol would need a new ruling.
+- **NBA props V1 history store can never populate this season:** the full sportsdataverse release inventory (every family) tops out at the 2026 season key, last updated 2026-10-01 — no 2026-27 box scores, game logs, or rosters exist in the sanctioned source. V1 keeps failing closed (`NBA_PROP_HISTORY_STORE_UNAVAILABLE`); the frozen prereg is untouched. Any replacement source is a **new construction** under prereg §10 — the V2 source-admission plan (PR #2474) is verified and awaits the owner's Option B ruling; V2 go-live would be a separate ruling.
+- **NBA totals challengers both FAILED:** V2 (#2462) paired ΔMSE **+34.28** vs the indicative market — own verdict `FAILED_INDICATIVE_REFERENCE_NOT_A_CARD_SOURCE`; V3 (#2469) worse than V2 in all 7 seasons — `EXPLORATORY_NOT_BETTER_THAN_V2`. The family remains FAILED_VALIDATION and totals stay **unscored diagnostics** (owner directive, Oct 21).
+- **NBA sides Elo V2 (#2463, merged `e39a040f775f`):** lost to the indicative market (margin RMSE 13.4522 vs 12.7511; ML Brier 0.21755 vs 0.20670) — **HOLD AS RESEARCH ONLY, no promotion.**
+- **Audit/instrument wave — verified and MERGED:** capture-to-ledger conservation audit #2467 (`1d423cb7c89a`); paired-quote validator hardening #2475 (`a60c6f29a2`) — closed a verified fail-open: NaN/infinite odds were **accepted as PAIRED_QUOTE_READY** at base and malformed inputs crashed the validator; N-way futures research contract #2476 (`b19356790a`); NBA live-state refusal gate #2477 (`606e86c1d1be`, inventory-only, no production importer); score-withhold for failed-validation families #2468; ledger join + UTC/CT alignment #2470/#2466; MLB total-bases intake fix #2472 (the dataset's "player bases" label had silently dropped that market from every download) and settled-month targeting #2473, landed via #2478 (`d1da28296f9b`).
+- **Held / blocked, NOT merged:** #2471 (verified; held for a one-line hash-citation fix in its audit doc), #2462 (held behind an unreproducible exploratory figure; its merge gates #2469), #2464 (blocked: coverage-config merge conflict — union resolution diagnosed on the PR — plus 3 unannounced post-pin commits requiring delta verification), #2465 (two minor defects: CLI PYTHONPATH bootstrap, CFB readiness items omit event_id).
+- **Sources:** `~/MEMORY.md` + `~/memory/2026-10-22.md` (Oct 21–22 verifications and merges, every merge fetch-verified from origin).
 ---
 
 ## How to check a new idea against this ledger
