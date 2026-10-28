@@ -70,6 +70,8 @@ QUOTE_PRICE_INVALID = "NBA_PROP_QUOTE_PRICE_INVALID"
 QUOTE_TIMESTAMP_MISSING = "NBA_PROP_QUOTE_TIMESTAMP_MISSING"
 QUOTE_TIMESTAMP_INVALID = "NBA_PROP_QUOTE_TIMESTAMP_INVALID"
 BOOK_UNVERIFIED = "NBA_PROP_BOOK_UNVERIFIED"
+QUOTE_NOT_PRE_EVENT = "NBA_PROP_QUOTE_NOT_PRE_EVENT"
+TARGET_START_INVALID = "NBA_PROP_TARGET_START_INVALID"
 
 
 def nba_prop_family_for_market(market):
@@ -381,6 +383,22 @@ def phone_nba_prop_rows(rows, *, now=None, store=None, store_dir=None,
         if quote_ts is None:
             outputs.append(_blocked(row, family, QUOTE_TIMESTAMP_INVALID))
             continue
+        # A syntactically fresh quote can still be post-tip. Compare against
+        # the asserted aware fixture start before any empirical model call.
+        # This does not authenticate the fixture or the quote source.
+        start_keys = ("kickoff", "commence_time", "start_time",
+                      "game_start", "tipoff")
+        supplied_starts = [row[key] for key in start_keys
+                           if key in row and row[key] is not None
+                           and row[key] != ""]
+        if supplied_starts:
+            parsed_starts = [_parse_instant(value) for value in supplied_starts]
+            if any(start is None for start in parsed_starts):
+                outputs.append(_blocked(row, family, TARGET_START_INVALID))
+                continue
+            if any(quote_ts >= start for start in parsed_starts):
+                outputs.append(_blocked(row, family, QUOTE_NOT_PRE_EVENT))
+                continue
         # A caller-supplied book is only a research assertion, never provider
         # authentication. Never manufacture DraftKings attribution from absence.
         raw_book = row.get("book")
