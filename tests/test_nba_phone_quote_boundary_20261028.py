@@ -12,7 +12,8 @@ import pytest
 from sportsedge.nba_phone_prop_pricing import (
     QUOTE_PRICE_INVALID, QUOTE_PRICE_MISSING,
     QUOTE_TIMESTAMP_INVALID, QUOTE_TIMESTAMP_MISSING,
-    LINE_MISSING, BOOK_UNVERIFIED, _american_to_decimal, phone_nba_prop_rows,
+    LINE_MISSING, BOOK_UNVERIFIED, QUOTE_NOT_PRE_EVENT,
+    TARGET_START_INVALID, _american_to_decimal, phone_nba_prop_rows,
 )
 
 NOW = datetime(2026, 10, 28, 6, 0, tzinfo=timezone.utc)
@@ -167,3 +168,45 @@ def test_legacy_captured_at_fallback_is_syntactic_not_provider_authentication():
     assert out["official_authority"] is False
     assert out["model_p_authority"] is False
     assert out["staking_authority"] is False
+
+@pytest.mark.parametrize("start", [
+    "2026-10-28T05:59:00+00:00",  # quote exactly at tip
+    "2026-10-28T05:58:00+00:00",  # quote one minute after tip
+    "2026-10-27T23:58:00-06:00",  # same instant, different offset
+])
+def test_post_tip_quote_refused_before_model_price(start):
+    store = _Store()
+    (out,), _ = phone_nba_prop_rows([_row(tipoff=start)], now=NOW, store=store)
+    assert out["status"] == "NO_MODEL_OR_MARKET"
+    assert out["blocker"] == QUOTE_NOT_PRE_EVENT
+    assert "model_p" not in out and "ev_per_dollar" not in out
+    assert store.price_calls == 0
+
+
+def test_malformed_asserted_start_refused_before_model_price():
+    store = _Store()
+    (out,), _ = phone_nba_prop_rows(
+        [_row(tipoff="2026-10-28", date="2026-10-28")],
+        now=NOW, store=store)
+    assert out["blocker"] == TARGET_START_INVALID
+    assert store.price_calls == 0
+
+
+def test_conflicting_asserted_start_fields_fail_closed():
+    store = _Store()
+    (out,), _ = phone_nba_prop_rows(
+        [_row(tipoff="2026-11-01T20:00:00-05:00",
+              commence_time="2026-10-28T05:58:00+00:00")],
+        now=NOW, store=store)
+    assert out["blocker"] == QUOTE_NOT_PRE_EVENT
+    assert store.price_calls == 0
+
+
+def test_pre_tip_aware_start_stays_research_only():
+    store = _Store()
+    (out,), _ = phone_nba_prop_rows(
+        [_row(tipoff="2026-10-28T06:01:00+00:00")],
+        now=NOW, store=store)
+    assert store.price_calls == 1
+    assert out["status"] in {"PRICED_RESEARCH", "RESEARCH_CANDIDATE_NOT_VALIDATED"}
+    assert out["eligible"] is False and out["official_authority"] is False
