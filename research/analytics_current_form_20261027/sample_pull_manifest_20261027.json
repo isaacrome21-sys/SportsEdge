@@ -1,0 +1,168 @@
+{
+  "manifest": "current-form analytics sample pulls, one manual pull per source, evening of 2026-10-27 America/Chicago",
+  "retrieved": "2026-10-27 (America/Chicago)",
+  "rule": "Hashes pin what was actually served at pull time. Live endpoints change; a hash mismatch on a later pull is expected drift, not an error -- the receipt stamped on each fetcher output is the citable record for that pull.",
+  "entries": [
+    {
+      "file": "bbm.html",
+      "source_url": "https://basketballmonster.com/playerrankings.aspx",
+      "bytes": 530491,
+      "sha256": "5b587a5a8058a2ae9917b393c57fefd5be5d628f614159929c1cfb1f3b38b5d5",
+      "note": "Basketball Monster rankings page: HTML shell, no server-rendered data table (1 tr element)"
+    },
+    {
+      "file": "espn_nba_scoreboard.json",
+      "source_url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard",
+      "bytes": 87484,
+      "sha256": "01b55e13c0e8799991fd4b4554a7fb18dfd27ec56c797089b9bd3ab3ac5bc403",
+      "note": "ESPN public JSON NBA scoreboard"
+    },
+    {
+      "file": "kenpom_home.html",
+      "source_url": "https://kenpom.com/",
+      "bytes": 361567,
+      "sha256": "67ac82702985e571a24686c4e212f374056c93d88e5fadb05195e04a0cce876a",
+      "note": "KenPom free homepage: full current Pomeroy ratings table (361 team links) + archive-year ratings pages; deeper surfaces subscription"
+    },
+    {
+      "file": "ngs_passing_all.csv.gz",
+      "source_url": "https://github.com/nflverse/nflverse-data/releases/download/nextgen_stats/ngs_passing.csv.gz",
+      "bytes": 607893,
+      "sha256": "6341543f68fb196baca61dbac145468901be607e2d9c50f588c22b99d8a96c54",
+      "note": "NGS consolidated passing; seasons through 2026; 2026 REG max week 7"
+    },
+    {
+      "file": "ngs_receiving_all.csv.gz",
+      "source_url": "https://github.com/nflverse/nflverse-data/releases/download/nextgen_stats/ngs_receiving.csv.gz",
+      "bytes": 1024117,
+      "sha256": "df4200282d0bf62b054dc2fafd7ec96c7a02209775fb9481721e9001dcda28d6",
+      "note": "NGS consolidated receiving"
+    },
+    {
+      "file": "ngs_rushing_all.csv.gz",
+      "source_url": "https://github.com/nflverse/nflverse-data/releases/download/nextgen_stats/ngs_rushing.csv.gz",
+      "bytes": 339145,
+      "sha256": "5a7b7af2c4b9e3ceb2329df876e331505a006dd17abecf0b194381ae89315eb5",
+      "note": "NGS consolidated rushing"
+    },
+    {
+      "file": "pbp_2026.csv.gz",
+      "source_url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2026.csv.gz",
+      "bytes": 7359431,
+      "sha256": "30f31f1faf184be5a3014395c6830ed81ac5f60a03790e3e4a849dc020a70396",
+      "note": "nflverse play-by-play 2026; max week 7"
+    },
+    {
+      "file": "savant_expected_batter_2026.csv",
+      "source_url": "https://baseballsavant.mlb.com/leaderboard/expected_statistics?type=batter&year=2026&position=&team=&min=q&csv=true",
+      "bytes": 35059,
+      "sha256": "6e261fb91d7c5656b5805f6fcea3052e6894b2fdba13e787999c39f403532803",
+      "note": "Savant expected statistics, batters, 2026 qualified"
+    },
+    {
+      "file": "savant_expected_pitcher_2026.csv",
+      "source_url": "https://baseballsavant.mlb.com/leaderboard/expected_statistics?type=pitcher&year=2026&position=&team=&min=q&csv=true",
+      "bytes": 55763,
+      "sha256": "cf503494a1559ea058df78d5f30120028c993d4af5d2ab964213f9b76e106232",
+      "note": "Savant expected statistics, pitchers, 2026 qualified"
+    },
+    {
+      "file": "savant_xwoba.csv",
+      "source_url": "https://baseballsavant.mlb.com/leaderboard/custom?year=2026&type=batter&csv=true",
+      "bytes": 3961,
+      "sha256": "29bd051e12d5aa9472d01f531529246e9d0731c2d7942f570a2baae5a20566b5",
+      "note": "Savant custom leaderboard base pattern (default columns)"
+    },
+    {
+      "file": "snap_counts_2026.csv",
+      "source_url": "https://github.com/nflverse/nflverse-data/releases/download/snap_counts/snap_counts_2026.csv",
+      "bytes": 895438,
+      "sha256": "0994bd2c1126e06fdae2e130f379736e311c12c7dd0300c5958d6b2d86cd4098",
+      "note": "nflverse snap counts 2026"
+    },
+    {
+      "file": "statmuse.html",
+      "source_url": "https://www.statmuse.com/nba/ask/luka-doncic-ppg-last-10-games",
+      "bytes": 348965,
+      "sha256": "8ebc8aa1629e905e76f5bb6cd2e4464853b4d111b4b28615e317cc91add9b33b",
+      "note": "StatMuse public ask page; answer sentence carried in og:description meta"
+    },
+    {
+      "file": "stats_player_week_2026.csv",
+      "source_url": "https://github.com/nflverse/nflverse-data/releases/download/stats_player/stats_player_week_2026.csv",
+      "bytes": 3315437,
+      "sha256": "c5b3b92a9e4258a48f84a78ade8b1d7f69b543367bba6bc0205e9d268ab11174",
+      "note": "nflverse weekly player stats 2026 (targets, EPA)"
+    },
+    {
+      "file": "torvik_advstats_2027.csv",
+      "source_url": "https://barttorvik.com/getadvstats.php?year=2027&csv=1",
+      "bytes": 999434,
+      "sha256": "53f43e89a12708c4f2310ebce4a7dfbc843ce85693cb3328ec371700677ffccd",
+      "note": "Torvik player advanced stats, season label 2027; 3231 rows; preseason pull serves prior-season performance rows"
+    },
+    {
+      "file": "bbr_2027_pergame.html",
+      "source_url": "https://www.basketball-reference.com/leagues/NBA_2027_per_game.html",
+      "bytes": 1061985,
+      "sha256": "4664a1d50660e8e7d8062313f4da5a0a5a69f7bc6207ac7c14b755d5e62b0c34",
+      "note": "BBR 2026-27 per-game player table (per_game_stats) server-rendered"
+    },
+    {
+      "file": "databallr_home.html",
+      "source_url": "https://databallr.com/",
+      "bytes": 14103,
+      "sha256": "734ec9511f9f3888e817db2931ad5163a32cbf088996fec5d868c3b55536ef9d",
+      "note": "Databallr home: SPA shell (#root); DARKO app is client-side"
+    },
+    {
+      "file": "dt_epm2.html",
+      "source_url": "https://dunksandthrees.com/epm",
+      "bytes": 1471193,
+      "sha256": "8448a4cb9403c53ef6fe99138c2ead896d1df1a77352375dce8acd4c11ab0eb1",
+      "note": "Dunks & Threes EPM leaderboard page (correct path /epm; /epm-leaderboard is 404); leaderboard content in page payload"
+    },
+    {
+      "file": "nba_cdn_scoreboard.json",
+      "source_url": "https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json",
+      "bytes": 445,
+      "sha256": "9b86df2fc684f2e63634a24fbd60ed4287da748a9c0039e27fc67531dac7a291",
+      "note": "NBA CDN static JSON: HTTP 403 from this environment"
+    },
+    {
+      "file": "nbarapm_home.html",
+      "source_url": "https://nbarapm.com/",
+      "bytes": 313521,
+      "sha256": "abef3919932299970ea6d80eed2bf1525d481bbd05b5f975a3fb8648970cf5bd",
+      "note": "NBARAPM home: Next.js app; RAPM values in client payload; no stable CSV/endpoint verified"
+    },
+    {
+      "file": "nflsavant_home.html",
+      "source_url": "https://nflsavant.com/",
+      "bytes": 3832,
+      "sha256": "0b471a3b8ed3d792e21015ed7c3e4615a96de3e3393bade3e523391438f35463",
+      "note": "NFL Savant home: JS shell (3,832 bytes); data underneath is nflverse PBP per owner note"
+    },
+    {
+      "file": "pfr_2026.html",
+      "source_url": "https://www.pro-football-reference.com/years/2026/",
+      "bytes": 534802,
+      "sha256": "73fe6f5c3c90f41889d9990d03896cb04b9ab3aa47080f02117b6a6a69d1008e",
+      "note": "PFR 2026 season page; 11 server-rendered tables incl. team_stats"
+    },
+    {
+      "file": "sharp_stats.html",
+      "source_url": "https://www.sharpfootballanalysis.com/stats-nfl/",
+      "bytes": 131115,
+      "sha256": "7635d06a771c2bdc83e74d698c2c2f57c5b73c3640e41bbe51028f63acfc5568",
+      "note": "Sharp Football Analysis free NFL stats hub; tool pages are interactive web surfaces"
+    },
+    {
+      "file": "spotrac_nba.html",
+      "source_url": "https://www.spotrac.com/nba/",
+      "bytes": 3591,
+      "sha256": "ea46fe6807b599650168541d2feabaf3c917f919f0c6881bae66ed053ec1e596",
+      "note": "Spotrac NBA: HTTP 403 (bot protection) from this environment; browse-only for owner"
+    }
+  ]
+}
