@@ -15,7 +15,13 @@ Pipeline per dataset:
      row count, sha256) in the manifest.
   3. Normalize raw columns -> canonical schema via an explicit alias
      registry. Unrecognized columns fail closed with the observed header
-     in the error (column names are not secrets; safe to log).
+     in the error (column names are not secrets; safe to log). The
+     current Kaggle file ships the spread as an unsigned magnitude plus
+     a whos_favored indicator (documented on the dataset page); the
+     magnitude is signed to home perspective from that indicator, rows
+     whose indicator cannot be resolved drop their spread leg (counted
+     in the manifest), and a file whose indicators mostly fail to
+     resolve fails closed (KAGGLE_NBA_FAVORED_UNRESOLVED).
   4. Spread-orientation check: the raw spread's team perspective is
      verified empirically — on rows carrying both a spread and moneylines,
      the spread favorite must agree with the moneyline favorite on >=95%
@@ -98,10 +104,16 @@ class KaggleCredentialsMissing(KaggleArchiveError):
 DATASET_REGISTRY = {
     "cviaxmiwnptr/nba-betting-data": {
         "archive_subdir": "nba-kaggle-odds",
-        "notes": ("CC0. NBA Oct 2007-Jun 2026. SportsbookReviewsOnline "
-                  "consensus close: ML/spread/total + scores. Soft "
-                  "consensus-close ceiling — harness verdict stays "
-                  "CONDITIONAL per spec."),
+        "notes": ("CC0. NBA Oct 2007-Jun 2026. DESIGN ONLY segmented "
+                  "baseline — provenance changes mid-file: "
+                  "SportsbookReviewsOnline through Jan 16, 2023; ESPN "
+                  "Jan 17, 2023-Jun 22, 2025 (no moneylines, no 2H); "
+                  "Sportsbook Review median from Oct 21, 2025. Date-only, "
+                  "no per-quote timestamps; post-2023 rows are "
+                  "consensus/median, NOT per-book. Soft consensus-close "
+                  "ceiling — harness verdict stays CONDITIONAL per spec. "
+                  "Comparisons against this baseline must NEVER be "
+                  "labeled verified CLV."),
         "spread_home_perspective": None,  # verified empirically at normalize
         "aliases": {
             "game_date": ["Date", "date", "game_date", "GAME_DATE",
@@ -111,9 +123,17 @@ DATASET_REGISTRY = {
             "away_team": ["Away Team", "away_team", "AwayTeam", "away",
                           "AWAY_TEAM", "Away", "Visitor", "visitor"],
             "home_score": ["Home Score", "home_score", "PTS_home",
-                           "home_pts", "HomeScore", "Home Pts"],
+                           "home_pts", "HomeScore", "Home Pts", "score_home"],
             "away_score": ["Away Score", "away_score", "PTS_away",
-                           "away_pts", "AwayScore", "Away Pts"],
+                           "away_pts", "AwayScore", "Away Pts", "score_away"],
+            # Non-canonical: the current Kaggle file ships the spread as
+            # an UNSIGNED magnitude ("always a positive number") plus this
+            # favorite indicator. normalize_rows converts the magnitude
+            # to a signed home-perspective spread from it — the
+            # conversion is documented on the dataset page, and the
+            # empirical orientation audit still verifies the result.
+            "whos_favored": ["whos_favored", "Whos Favored",
+                             "Who's Favored", "favored", "Favored"],
             "closing_spread_home": ["Spread", "spread", "spread_home",
                                     "home_spread", "closing_spread",
                                     "Close Spread"],
@@ -270,10 +290,18 @@ def normalize_rows(raw_header: list[str], rows: list[dict],
         raise KaggleArchiveError(
             "KAGGLE_NBA_RAW_SCHEMA_UNRECOGNIZED:missing=%r observed=%r"
             % (missing, raw_header))
+    favored_col = None
+    for alias in aliases.get("whos_favored", []):
+        if alias in raw_header:
+            favored_col = alias
+            break
     out: list[dict] = []
     stats = {"rows_read": 0, "rows_accepted": 0, "rows_skipped": 0,
              "skipped_no_date": 0, "skipped_offseason": 0,
-             "skipped_no_teams": 0}
+             "skipped_no_teams": 0,
+             "spread_signed_from_favored": 0,
+             "spread_dropped_favored_unresolved": 0,
+             "spread_rows_bearing": 0}
     for row in rows:
         stats["rows_read"] += 1
         game_date = _parse_date(_first_present(row, aliases["game_date"]))
@@ -297,6 +325,27 @@ def normalize_rows(raw_header: list[str], rows: list[dict],
             raw_col = resolved.get(canonical)
             return _num(row.get(raw_col)) if raw_col else None
 
+        spread = get("closing_spread_home")
+        if favored_col is not None and spread is not None:
+            # Raw spread is an unsigned magnitude; sign it from the
+            # documented favorite indicator. Never guess: an
+            # unresolvable indicator drops this row's spread leg
+            # (counted loudly) instead of inventing a sign.
+            if spread == 0:
+                pass  # pick'em: sign carries no information
+            else:
+                stats["spread_rows_bearing"] += 1
+                favored = str(row.get(favored_col) or "").strip().lower()
+                if favored in ("home", home.lower()):
+                    spread = -abs(spread)
+                    stats["spread_signed_from_favored"] += 1
+                elif favored in ("away", away.lower()):
+                    spread = abs(spread)
+                    stats["spread_signed_from_favored"] += 1
+                else:
+                    spread = None
+                    stats["spread_dropped_favored_unresolved"] += 1
+
         out.append({
             "game_date": game_date,
             "season_label": season,
@@ -304,7 +353,7 @@ def normalize_rows(raw_header: list[str], rows: list[dict],
             "away_team": away,
             "home_score": get("home_score"),
             "away_score": get("away_score"),
-            "closing_spread_home": get("closing_spread_home"),
+            "closing_spread_home": spread,
             "spread_home_juice": get("spread_home_juice"),
             "spread_away_juice": get("spread_away_juice"),
             "closing_total": get("closing_total"),
@@ -314,6 +363,15 @@ def normalize_rows(raw_header: list[str], rows: list[dict],
             "closing_ml_away": get("closing_ml_away"),
         })
         stats["rows_accepted"] += 1
+    if favored_col is not None and stats["spread_rows_bearing"]:
+        signed_rate = (stats["spread_signed_from_favored"]
+                       / stats["spread_rows_bearing"])
+        if signed_rate < 0.95:
+            raise KaggleArchiveError(
+                "KAGGLE_NBA_FAVORED_UNRESOLVED: signed %.3f of %d "
+                "spread-bearing rows via %r — refusing to archive a "
+                "baseline whose spread signs are mostly unresolvable"
+                % (signed_rate, stats["spread_rows_bearing"], favored_col))
     return out, stats
 
 

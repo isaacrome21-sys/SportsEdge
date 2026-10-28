@@ -198,3 +198,66 @@ def test_end_to_end_with_stubbed_download(tmp_path, monkeypatch):
         .read_text())
     assert manifest["spread_home_perspective"] is True
     assert manifest["raw_header"] == RAW_HEADER
+
+
+# ---------------------------------------------------------------------------
+# Current Kaggle file schema (nba_2008-2026.csv): lowercase headers, scores
+# as score_home/score_away, spread as UNSIGNED magnitude + whos_favored.
+# ---------------------------------------------------------------------------
+
+CURRENT_HEADER = ["season", "date", "regular", "playoffs", "away", "home",
+                  "score_away", "score_home", "whos_favored", "spread",
+                  "total", "moneyline_away", "moneyline_home"]
+CURRENT_ROWS = [
+    {"season": "2026", "date": "2025-11-05", "regular": "True",
+     "playoffs": "False", "away": "phi", "home": "bos",
+     "score_away": "100", "score_home": "108", "whos_favored": "home",
+     "spread": "5.5", "total": "224.5", "moneyline_away": "180",
+     "moneyline_home": "-220"},
+    {"season": "2026", "date": "2026-01-12", "regular": "True",
+     "playoffs": "False", "away": "den", "home": "lal",
+     "score_away": "121", "score_home": "114", "whos_favored": "away",
+     "spread": "3.0", "total": "231.0", "moneyline_away": "-160",
+     "moneyline_home": "140"},
+]
+
+
+def test_current_schema_scores_and_signed_spread():
+    rows, stats = mod.normalize_rows(CURRENT_HEADER, CURRENT_ROWS, CONFIG)
+    assert stats["rows_accepted"] == 2
+    first, second = rows
+    assert first["home_score"] == pytest.approx(108.0)
+    assert first["away_score"] == pytest.approx(100.0)
+    # Unsigned magnitude 5.5, home favored -> home-perspective -5.5.
+    assert first["closing_spread_home"] == pytest.approx(-5.5)
+    # Away favored -> home is the underdog -> +3.0.
+    assert second["closing_spread_home"] == pytest.approx(3.0)
+    assert stats["spread_signed_from_favored"] == 2
+    assert stats["spread_dropped_favored_unresolved"] == 0
+    # The empirical audit must confirm the signed result.
+    home_perspective, audit = mod.verify_spread_orientation(rows, None)
+    assert home_perspective is True
+    assert audit["home_agreement_rate"] == pytest.approx(1.0)
+
+
+def test_current_schema_favored_by_team_code():
+    rows_in = [dict(CURRENT_ROWS[0], whos_favored="bos")]
+    rows, stats = mod.normalize_rows(CURRENT_HEADER, rows_in, CONFIG)
+    assert rows[0]["closing_spread_home"] == pytest.approx(-5.5)
+    assert stats["spread_signed_from_favored"] == 1
+
+
+def test_favored_unresolved_drops_spread_leg_but_keeps_row():
+    bad = dict(CURRENT_ROWS[0], whos_favored="")
+    good = [dict(r) for r in CURRENT_ROWS[1:]] * 20
+    rows, stats = mod.normalize_rows(CURRENT_HEADER, [bad] + good, CONFIG)
+    assert rows[0]["closing_spread_home"] is None
+    assert rows[0]["closing_total"] == pytest.approx(224.5)
+    assert stats["spread_dropped_favored_unresolved"] == 1
+
+
+def test_favored_mostly_unresolved_fails_closed():
+    rows_in = [dict(r, whos_favored="???") for r in CURRENT_ROWS]
+    with pytest.raises(mod.KaggleArchiveError) as excinfo:
+        mod.normalize_rows(CURRENT_HEADER, rows_in, CONFIG)
+    assert "KAGGLE_NBA_FAVORED_UNRESOLVED" in str(excinfo.value)
