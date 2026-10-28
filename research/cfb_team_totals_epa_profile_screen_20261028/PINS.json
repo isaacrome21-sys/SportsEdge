@@ -1,0 +1,92 @@
+[
+ {
+  "file": "betting_2021.csv.gz",
+  "bytes": 4164,
+  "sha256": "2ca5b9b5c32ecc3081d5cd1d4ac398942f188abaaf4d20802ee8895408b9b57b",
+  "source": "sportsdataverse-data release espn_cfb_betting"
+ },
+ {
+  "file": "betting_2022.csv.gz",
+  "bytes": 4207,
+  "sha256": "90c99f31111504975f2bc7d5e0e342a8acca3bd53526b3d88c3a07411c642568",
+  "source": "sportsdataverse-data release espn_cfb_betting"
+ },
+ {
+  "file": "betting_2023.csv.gz",
+  "bytes": 7351,
+  "sha256": "fc5b9a9fc2a9f7f3fe24b3781ccc20f6e37c6d09d2574617f031d7b7efab2389",
+  "source": "sportsdataverse-data release espn_cfb_betting"
+ },
+ {
+  "file": "betting_2024.csv.gz",
+  "bytes": 7915,
+  "sha256": "d48959767c3f42f3671d3c9ad13d57b5f79769bf650ea9c8250a1a65849b2a83",
+  "source": "sportsdataverse-data release espn_cfb_betting"
+ },
+ {
+  "file": "betting_2025.csv.gz",
+  "bytes": 7811,
+  "sha256": "e6d1854d2a7efca2b6368d1bb39a529c3673aeebe3c761f30df196017fb3a7f6",
+  "source": "sportsdataverse-data release espn_cfb_betting"
+ },
+ {
+  "file": "cfb_schedules_2021.csv.gz",
+  "bytes": 64278,
+  "sha256": "933747ab408c89e31f46376a06c33b27fc739e776feeba6b5abf7b5f4c2e958e",
+  "source": "sportsdataverse-data release cfb_schedules"
+ },
+ {
+  "file": "cfb_schedules_2022.csv.gz",
+  "bytes": 99843,
+  "sha256": "05fe546e76ed8b8386a33f471a81a96fed4f1e3bde13082c45968721d1aa5b21",
+  "source": "sportsdataverse-data release cfb_schedules"
+ },
+ {
+  "file": "cfb_schedules_2023.csv.gz",
+  "bytes": 99978,
+  "sha256": "068147a76f874567d69fc2bb012144df8b8085cf5ca46a4fc1c7b7a6206b232d",
+  "source": "sportsdataverse-data release cfb_schedules"
+ },
+ {
+  "file": "cfb_schedules_2024.csv.gz",
+  "bytes": 102646,
+  "sha256": "b491661b7e82f603dbecf117ede9dd438d9c7939576087a549ddbb1711d7f74c",
+  "source": "sportsdataverse-data release cfb_schedules"
+ },
+ {
+  "file": "cfb_schedules_2025.csv.gz",
+  "bytes": 99817,
+  "sha256": "79af3981d8015c7d463308fee8efcf5a8718325ea8f8c61bebabe2347a956ad9",
+  "source": "sportsdataverse-data release cfb_schedules"
+ },
+ {
+  "file": "play_by_play_2021.parquet",
+  "bytes": 51811006,
+  "sha256": "3b8069efb2b0d0a22c5e5d5ac0af935e5b8b24f980958487f649ae83cb0e7e39",
+  "source": "cfbfastR-data git tree pbp/parquet/play_by_play_2021.parquet (raw at main; release route 404 lineage per PR #2861)"
+ },
+ {
+  "file": "play_by_play_2022.parquet",
+  "bytes": 108827884,
+  "sha256": "c1b3041e55fb3896d4ef9de7a68522415c326c7efcbf7a2c6b704461f3a7bb87",
+  "source": "sportsdataverse-data release cfbfastR_cfb_pbp (mirror of cfbfastR-data release pbp)"
+ },
+ {
+  "file": "play_by_play_2023.parquet",
+  "bytes": 110666583,
+  "sha256": "167889e635679d2a745a0f73690bf51afcb28236d3bbaed32aeabb154b726be9",
+  "source": "sportsdataverse-data release cfbfastR_cfb_pbp (mirror of cfbfastR-data release pbp)"
+ },
+ {
+  "file": "play_by_play_2024.parquet",
+  "bytes": 120791523,
+  "sha256": "60489da0c61c56b86698ee14be65cb521010f707e9a2f4ded8d561e9ef592bd4",
+  "source": "sportsdataverse-data release cfbfastR_cfb_pbp (mirror of cfbfastR-data release pbp)"
+ },
+ {
+  "file": "play_by_play_2025.parquet",
+  "bytes": 131185522,
+  "sha256": "2290311f156083730b6b9d9e6662d121dc86953d71e11aafc9da4c0753819369",
+  "source": "sportsdataverse-data release cfbfastR_cfb_pbp (mirror of cfbfastR-data release pbp)"
+ }
+]
