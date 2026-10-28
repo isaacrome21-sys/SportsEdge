@@ -22,6 +22,15 @@ US_STATES = frozenset("AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME 
 _SHA = re.compile(r"[0-9a-f]{64}\Z")
 _POSITIVE_ID = re.compile(r"[1-9][0-9]*\Z")
 _STATE = re.compile(r"[A-Z]{2}\Z")
+# Negative-only 2027 safety census: ESPN IDs manually reconciled against the
+# NCAA 2026-27 Division I men's-basketball IL school directory (13 schools).
+# NCAA official API: /directory/api/directory/memberList?type=12&division=I&state=IL&sportCode=MBB
+# Observed response SHA256 d165d46ff5d7f3f4bb89e4d24c984bf1ca56e7075aa9b6f09a44e37f9d133293.
+# Denial does NOT positively verify a crosswalk or authenticate a DK capture.
+_ILLINOIS_ESPN_MBB_2027_DENYLIST = frozenset({
+    "71", "77", "79", "82", "305", "356", "2130", "2197", "2287",
+    "2350", "2459", "2565", "2710",
+})
 _F = chr(96) * 3
 _FENCE = re.compile(r"^" + re.escape(_F + "json") + r"\s*\n(.*?)\n" +
                     re.escape(_F) + r"\s*\Z", re.DOTALL)
@@ -83,7 +92,7 @@ def _team(raw: object, role: str) -> str:
     state = _required_string(obj, "institution_state")
     if not _STATE.fullmatch(state) or state not in US_STATES:
         _fail("INSTITUTION_STATE_INVALID:" + role)
-    if state == "IL":
+    if state == "IL" or espn_id in _ILLINOIS_ESPN_MBB_2027_DENYLIST:
         _fail("ILLINOIS_COLLEGE_EXCLUDED:" + role)
     if type(obj.get("crosswalk_season")) is not int or obj["crosswalk_season"] != 2027:
         _fail("2027_CROSSWALK_REQUIRED:" + role)
