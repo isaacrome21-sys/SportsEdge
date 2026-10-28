@@ -124,7 +124,10 @@ def main_matches_reconciliation_boundary(
     reconciliation record cannot name the commit that lands that record. The
     registered SHA is an ancestry anchor. Governed content is the identity.
     """
-    if any(bool(value) for value in (policy.get("authority") or {}).values()):
+    authority = policy.get("authority") or {}
+    if not isinstance(authority, Mapping) \
+            or any(bool(value) for value in authority.values()):
+        # A malformed authority block is not zero authority: fail closed.
         return False
     matched, _ = boundary_matches(
         repo,
@@ -185,6 +188,27 @@ def reconcile_delta_bundle(
     delta: Mapping[str, Any],
     bundle: Mapping[str, Any],
 ) -> MatrixRow:
+    # Defense in depth: build_reconciliation_report validates the registry
+    # before dispatch, but a direct caller must meet the same boundary —
+    # a malformed delta/bundle refuses by name, never a raw KeyError /
+    # ValueError from int() coercion.
+    pr = delta.get("pr") if isinstance(delta, Mapping) else None
+    if not isinstance(delta, Mapping) or not delta.get("delta_id") \
+            or not delta.get("merge_sha") \
+            or not isinstance(pr, int) or isinstance(pr, bool):
+        raise FreezeReconciliationError(
+            "FREEZE_RECONCILIATION_DELTA_INVALID:"
+            f"{delta.get('delta_id') if isinstance(delta, Mapping) else repr(delta)[:80]}"
+        )
+    if not isinstance(bundle, Mapping) or not bundle.get("bundle_id"):
+        raise FreezeReconciliationError(
+            "FREEZE_RECONCILIATION_BUNDLE_ID_MISSING:"
+            f"{bundle.get('bundle_id') if isinstance(bundle, Mapping) else repr(bundle)[:80]}"
+        )
+    if not bundle.get("freeze_sha"):
+        raise FreezeReconciliationError(
+            f"FREEZE_RECONCILIATION_BUNDLE_FREEZE_SHA_MISSING:{bundle.get('bundle_id')}"
+        )
     delta_id = str(delta["delta_id"])
     pr = int(delta["pr"])
     merge_sha = resolve_sha(repo, str(delta["merge_sha"]))
@@ -433,6 +457,10 @@ def reconcile_freeze_to_baseline(
 
 
 def _validate_registry(policy: Mapping[str, Any], registry: Mapping[str, Any]) -> None:
+    if not isinstance(policy, Mapping):
+        raise FreezeReconciliationError("FREEZE_RECONCILIATION_POLICY_SCHEMA_INVALID")
+    if not isinstance(registry, Mapping):
+        raise FreezeReconciliationError("FREEZE_RECONCILIATION_REGISTRY_SCHEMA_INVALID")
     if policy.get("schema") != "SPORTSEDGE_FREEZE_RECONCILIATION_POLICY_V1":
         raise FreezeReconciliationError("FREEZE_RECONCILIATION_POLICY_SCHEMA_INVALID")
     if registry.get("schema") != "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1":
@@ -441,6 +469,12 @@ def _validate_registry(policy: Mapping[str, Any], registry: Mapping[str, Any]) -
         raise FreezeReconciliationError("FREEZE_MAIN_HOLD_MUST_BE_UNCONDITIONAL")
     if policy.get("status") not in {"ACTIVE_BLOCKED", "RESOLVED"}:
         raise FreezeReconciliationError("FREEZE_POLICY_STATUS_INVALID")
+    authority = policy.get("authority")
+    if authority is not None and not isinstance(authority, Mapping):
+        raise FreezeReconciliationError("FREEZE_POLICY_AUTHORITY_INVALID")
+    issue = policy.get("issue")
+    if not isinstance(issue, int) or isinstance(issue, bool):
+        raise FreezeReconciliationError("FREEZE_POLICY_ISSUE_INVALID")
     if not registry.get("baseline_main_sha"):
         raise FreezeReconciliationError("FREEZE_RECONCILIATION_BASELINE_MAIN_SHA_MISSING")
     deltas = registry.get("deltas")
@@ -449,9 +483,27 @@ def _validate_registry(policy: Mapping[str, Any], registry: Mapping[str, Any]) -
         raise FreezeReconciliationError("FREEZE_RECONCILIATION_DELTAS_EMPTY")
     if not isinstance(bundles, list) or not bundles:
         raise FreezeReconciliationError("FREEZE_RECONCILIATION_BUNDLES_EMPTY")
+    for row in deltas:
+        pr = row.get("pr") if isinstance(row, Mapping) else None
+        if not isinstance(row, Mapping) or not row.get("delta_id") \
+                or not row.get("merge_sha") \
+                or not isinstance(pr, int) or isinstance(pr, bool):
+            # A malformed delta row crashed downstream (KeyError on
+            # delta_id / merge_sha, raw ValueError on int(pr)) instead of
+            # refusing here, at the validation boundary.
+            raise FreezeReconciliationError(
+                "FREEZE_RECONCILIATION_DELTA_INVALID:"
+                f"{row.get('delta_id') if isinstance(row, Mapping) else repr(row)[:80]}"
+            )
     delta_ids = [str(row.get("delta_id")) for row in deltas]
     if len(delta_ids) != len(set(delta_ids)):
         raise FreezeReconciliationError("FREEZE_RECONCILIATION_DELTA_ID_DUPLICATE")
+    for bundle in bundles:
+        if not isinstance(bundle, Mapping) or not bundle.get("bundle_id"):
+            raise FreezeReconciliationError(
+                "FREEZE_RECONCILIATION_BUNDLE_ID_MISSING:"
+                f"{bundle.get('bundle_id') if isinstance(bundle, Mapping) else repr(bundle)[:80]}"
+            )
     bundle_ids = [str(row.get("bundle_id")) for row in bundles]
     if len(bundle_ids) != len(set(bundle_ids)):
         raise FreezeReconciliationError("FREEZE_RECONCILIATION_BUNDLE_ID_DUPLICATE")
@@ -465,6 +517,10 @@ def _validate_registry(policy: Mapping[str, Any], registry: Mapping[str, Any]) -
                 f"FREEZE_RECONCILIATION_BUNDLE_COVERAGE_EMPTY:{bundle.get('bundle_id')}"
             )
         disposition = bundle.get("disposition")
+        if disposition is not None and not isinstance(disposition, Mapping):
+            raise FreezeReconciliationError(
+                f"FREEZE_RECONCILIATION_DISPOSITION_INVALID:{bundle.get('bundle_id')}"
+            )
         if disposition is not None and disposition.get("state") not in DRIFT_DISPOSITIONS:
             raise FreezeReconciliationError(
                 f"FREEZE_RECONCILIATION_DISPOSITION_INVALID:{bundle.get('bundle_id')}"
