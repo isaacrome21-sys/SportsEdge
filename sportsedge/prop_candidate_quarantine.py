@@ -30,9 +30,18 @@ def _claims(row):
     """
     values = []
     invalid = False
+    invalid_probability = False
 
     def add(source, fields):
-        nonlocal invalid
+        nonlocal invalid, invalid_probability
+        # Explicit impossible probabilities must not reach the raw candidate
+        # surface merely because the visible EV is small. Missing fields are
+        # not synthesized: this output guard is not a model validator.
+        for key in ("estimate_p", "model_probability"):
+            if key in source and source[key] is not None:
+                probability = _finite_ev(source[key])
+                if probability is None or not 0 <= probability <= 1:
+                    invalid_probability = True
         for field in fields:
             if field not in source or source[field] is None:
                 continue
@@ -63,7 +72,7 @@ def _claims(row):
                                    "reported_ev_per_dollar"))
                     else:
                         invalid = True
-    return values, invalid
+    return values, invalid, invalid_probability
 
 
 def partition_prop_surfaces(modeled_props):
@@ -81,11 +90,12 @@ def partition_prop_surfaces(modeled_props):
         if not (candidate or watch):
             continue
 
-        values, invalid = _claims(row)
+        values, invalid, invalid_probability = _claims(row)
         visible = _finite_ev(row.get("ev_per_dollar"))
         if candidate and visible is None:
             invalid = True
-        reason = ("PROP_EV_CLAIM_INVALID" if invalid else
+        reason = ("PROP_PROBABILITY_CLAIM_INVALID" if invalid_probability else
+                  "PROP_EV_CLAIM_INVALID" if invalid else
                   "EXTREME_CLAIMED_EV_QUARANTINE" if any(
                       value >= EXTREME_CLAIMED_EV_QUARANTINE for value in values
                   ) else None)
