@@ -1,0 +1,126 @@
+{
+  "check": "BUILD VERIFICATION ONLY \u2014 NOT A SCREEN, NOT COUNTED",
+  "rates_provenance": "STAND-IN fixture rates; no parent rate artifact exists on main; nothing fitted",
+  "pmf_sums": {
+    "away/regulation": 0.9999999999998955,
+    "away/incl_ot": 0.9999999999998954,
+    "home/regulation": 0.9999999999999587,
+    "home/incl_ot": 0.9999999999999587
+  },
+  "priced_rows": [
+    {
+      "team": "ANA",
+      "side": "away",
+      "line": 2.5,
+      "settlement_basis": "regulation",
+      "prob_over": 0.5540368014428194,
+      "prob_under": 0.4459631985571806,
+      "prob_push": 0.0
+    },
+    {
+      "team": "ANA",
+      "side": "away",
+      "line": 3.0,
+      "settlement_basis": "regulation",
+      "prob_over": 0.3303765824502001,
+      "prob_under": 0.4459631985571806,
+      "prob_push": 0.22366021899261931
+    },
+    {
+      "team": "ANA",
+      "side": "away",
+      "line": 3.5,
+      "settlement_basis": "regulation",
+      "prob_over": 0.3303765824502001,
+      "prob_under": 0.6696234175497999,
+      "prob_push": 0.0
+    },
+    {
+      "team": "ANA",
+      "side": "away",
+      "line": 2.5,
+      "settlement_basis": "incl_ot",
+      "prob_over": 0.5745608584367793,
+      "prob_under": 0.4254391415632207,
+      "prob_push": 0.0
+    },
+    {
+      "team": "ANA",
+      "side": "away",
+      "line": 3.0,
+      "settlement_basis": "incl_ot",
+      "prob_over": 0.35260526808532633,
+      "prob_under": 0.4254391415632207,
+      "prob_push": 0.22195559035145296
+    },
+    {
+      "team": "ANA",
+      "side": "away",
+      "line": 3.5,
+      "settlement_basis": "incl_ot",
+      "prob_over": 0.35260526808532633,
+      "prob_under": 0.6473947319146737,
+      "prob_push": 0.0
+    },
+    {
+      "team": "EDM",
+      "side": "home",
+      "line": 2.5,
+      "settlement_basis": "regulation",
+      "prob_over": 0.6564658285248088,
+      "prob_under": 0.3435341714751911,
+      "prob_push": 0.0
+    },
+    {
+      "team": "EDM",
+      "side": "home",
+      "line": 3.0,
+      "settlement_basis": "regulation",
+      "prob_over": 0.44040939319075745,
+      "prob_under": 0.3435341714751911,
+      "prob_push": 0.21605643533405144
+    },
+    {
+      "team": "EDM",
+      "side": "home",
+      "line": 3.5,
+      "settlement_basis": "regulation",
+      "prob_over": 0.44040939319075745,
+      "prob_under": 0.5595906068092426,
+      "prob_push": 0.0
+    },
+    {
+      "team": "EDM",
+      "side": "home",
+      "line": 2.5,
+      "settlement_basis": "incl_ot",
+      "prob_over": 0.6805592867351096,
+      "prob_under": 0.31944071326489043,
+      "prob_push": 0.0
+    },
+    {
+      "team": "EDM",
+      "side": "home",
+      "line": 3.0,
+      "settlement_basis": "incl_ot",
+      "prob_over": 0.46650393719720995,
+      "prob_under": 0.31944071326489043,
+      "prob_push": 0.21405534953789962
+    },
+    {
+      "team": "EDM",
+      "side": "home",
+      "line": 3.5,
+      "settlement_basis": "incl_ot",
+      "prob_over": 0.46650393719720995,
+      "prob_under": 0.53349606280279,
+      "prob_push": 0.0
+    }
+  ],
+  "refusals": {
+    "missing_basis": "SETTLEMENT_BASIS_UNRECORDED",
+    "same_day_input": "LOOKAHEAD_RISK",
+    "cross_vintage_untreated": "CROSS_VINTAGE_UNTREATED",
+    "invalid_mean": "RATES_INVALID"
+  }
+}

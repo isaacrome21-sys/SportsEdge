@@ -1,0 +1,26 @@
+{
+  "construction_id": "NHL_ATTEMPT2_V1",
+  "design_basis": "NHL_SIDES_TOTALS_DESIGN.md section 2: dispersion parameter fit on design data",
+  "design_set": {
+    "gameDate_min": 20261008,
+    "games": 132,
+    "mu_g_pairs": 528,
+    "playoffGame": 0,
+    "season": 2026,
+    "sha256": "3ac5ed95fbf072166ea59d2cf4e44a37e337e8c2122ba5f2fa55e56ec3cef1ab",
+    "situation": "all",
+    "source": "MoneyPuck all_teams.csv (hash-pinned sample pull)",
+    "team_rows": 264,
+    "xg_model_vintage": "rebuilt_2026_27"
+  },
+  "dispersion_method": "method of moments, Var = phi * mean, phi = sum((g-mu)^2)/sum(mu), floored at 1.0; mu = MoneyPuck xGoals (for/against), g = actual goals (for/against)",
+  "dispersion_phi": 1.0,
+  "dispersion_phi_raw_unfloored": 0.820834098768834,
+  "dispersion_reading": "The raw estimate lands BELOW the Poisson floor (0.8208) on this design set: each game's own xG already absorbs game-level variation that a rate-based mean would leave in the residuals. The floored value phi = 1.0 (pure Poisson) is the build-stage constant. A residuals-around-strictly-prior-rates dispersion fit is the alternative reading; the freeze package adjudicates. Recorded, not smoothed over.",
+  "fit_stage": "BUILD_STAGE \u2014 NOT FROZEN; the freeze fit governs",
+  "observables_for_the_record": {
+    "margin0_share_of_team_rows": 0.10606060606060606,
+    "margin0_team_rows": 28,
+    "note": "margin-0 finals are shootout games in shot-derived data (the SO-deciding goal is not a shot). The OT-vs-SO split of regulation ties and the OT/SO winner split are NOT identifiable from this surface: a one-goal final conflates regulation and OT decisions. See BUILD_RECORD.md, readings."
+  }
+}
