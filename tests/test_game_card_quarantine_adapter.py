@@ -162,5 +162,40 @@ class GameCardAdapterTests(unittest.TestCase):
         self.assertEqual(result["game_quarantined"][0]["reason"], "GAME_PROBABILITY_CLAIM_INVALID")
 
 
+    def test_extreme_in_one_surface_quarantines_clean_copy_in_all(self):
+        card = self.card()
+        # Make original evidence ordinary, so ONLY the displayed watchlist
+        # carries the extreme claim. Earlier clean edges must still be held.
+        card["evaluated_rows"][0]["independent_projection"] = {
+            "raw_ev_per_dollar": .04
+        }
+        for name in ("edges", "independent_candidates",
+                     "independent_watchlist", "lane_b_watchlist"):
+            card[name] = [deepcopy(row) for row in card[name]]
+            for row in card[name]:
+                row.pop("independent_projection", None)
+        card["lane_b_watchlist"][0]["raw_ev_per_dollar"] = 2.818
+        before = deepcopy(card)
+        result = sanitize_card(card)
+        self.assertEqual(card, before)
+        self.assertEqual(result["evaluated_rows"], before["evaluated_rows"])
+        self.assertEqual([len(result[k]) for k in (
+            "edges", "independent_candidates", "independent_watchlist",
+            "lane_b_watchlist")], [1, 1, 0, 1])
+        self.assertEqual(len(result["game_quarantined"]), 1)
+        self.assertEqual(set(result["game_quarantined"][0]["source_surfaces"]),
+                         {"edges", "independent_candidates",
+                          "independent_watchlist", "lane_b_watchlist"})
+        self.assertEqual(result["game_quarantined"][0]["max_finite_claimed_ev"],
+                         2.818)
+
+    def test_duplicate_clean_display_index_refuses(self):
+        card = self.card()
+        card["edges"].append(deepcopy(card["edges"][1]))
+        with self.assertRaisesRegex(ValueError, "DUPLICATE_INPUT_INDEX"):
+            sanitize_card(card)
+
+
+
 if __name__ == "__main__":
     unittest.main()
