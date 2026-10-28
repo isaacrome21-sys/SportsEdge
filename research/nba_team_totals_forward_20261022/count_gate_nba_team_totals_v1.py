@@ -36,6 +36,16 @@ On any refusal the gate raises `CountAdmissionRefused` with a named
 `code`, the evaluator is never invoked, and zero counted rows/metrics
 are emitted (nothing is written to the ledger). Research-only;
 play_allowed=false; PAPER / 0u.
+
+Boundary typing is strict (V1.2 type-guard correction): a slate identity
+must be an ISO `YYYY-MM-DD` string and is compared as a parsed date —
+never coerced with `str()` and never compared lexicographically across
+shapes; caller config values must match the frozen record in type as
+well as value (a float twin of a frozen int, a bool, or a numeric string
+is a deviation); and every record/collection the gate consumes or
+forwards to the evaluator must carry its contracted type. A wrong-typed
+input refuses by name (`GATE_TYPE_INVALID`) before scoring — it never
+coerces, and it never escapes as a raw AttributeError/TypeError.
 """
 from __future__ import annotations
 
@@ -49,7 +59,7 @@ import eval_nba_team_totals_v1 as ev
 
 HERE = Path(__file__).resolve().parent
 
-GATE_VERSION = "NBA_TT_COUNT_GATE_V1_1"
+GATE_VERSION = "NBA_TT_COUNT_GATE_V1_2"
 
 # The evaluator identity this gate admits: the sha256 attested in
 # EVALUATOR_PIN.md for the evaluator pinned at commit PIN_COMMIT.
@@ -102,6 +112,20 @@ def _aware(t):
     return dt if dt.tzinfo is not None else None
 
 
+def _parse_slate_date(value):
+    """Strict ISO calendar date -> `date`, else None. No coercion: a
+    non-string, a differently-shaped string, or a non-canonical padding
+    never parses, so a slate identity cannot be smuggled past the
+    pre-pin comparison by its type or shape (V1.2)."""
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+    return parsed if parsed.isoformat() == value else None
+
+
 def _load_receipt(receipt_path, receipt_sha256):
     """Return the validated receipt dict, or raise a named refusal."""
     if receipt_sha256 is None:
@@ -119,6 +143,9 @@ def _load_receipt(receipt_path, receipt_sha256):
         receipt = json.loads(raw.decode("utf-8"))
     except (ValueError, UnicodeDecodeError):
         raise CountAdmissionRefused("PIN_PUSH_RECEIPT_MALFORMED")
+    if not isinstance(receipt, dict):
+        raise CountAdmissionRefused("PIN_PUSH_RECEIPT_MALFORMED",
+                                    "receipt is not a JSON object")
     if receipt.get("evaluator_sha256") != PINNED_EVALUATOR_SHA256:
         raise CountAdmissionRefused("PIN_PUSH_RECEIPT_CONTENT_MISMATCH",
                                     "evaluator_sha256")
@@ -129,13 +156,12 @@ def _load_receipt(receipt_path, receipt_sha256):
     if pin_time is None:
         raise CountAdmissionRefused("PIN_PUSH_RECEIPT_CONTENT_MISMATCH",
                                     "pin_push_time_utc")
-    first = str(receipt.get("first_counted_slate") or "")
-    try:
-        datetime.strptime(first, "%Y-%m-%d")
-    except ValueError:
+    first_date = _parse_slate_date(receipt.get("first_counted_slate"))
+    if first_date is None:
         raise CountAdmissionRefused("PIN_PUSH_RECEIPT_CONTENT_MISMATCH",
                                     "first_counted_slate")
     receipt["_pin_time"] = pin_time
+    receipt["_first_slate"] = first_date
     receipt["_sha256"] = digest
     return receipt
 
@@ -154,18 +180,71 @@ def _check_caller_config(caller_config, canonical):
         raise CountAdmissionRefused("FROZEN_EVALUATION_CONFIG_UNAUTHORIZED",
                                     "config is not a mapping")
     for key, value in caller_config.items():
-        if key not in _CONFIG_KEYS or value != canonical.get(key):
+        if key not in _CONFIG_KEYS:
+            raise CountAdmissionRefused(
+                "FROZEN_EVALUATION_CONFIG_UNAUTHORIZED",
+                f"caller config key {key!r} deviates from the frozen "
+                "record / receipt")
+        canon = canonical[key]
+        # Exact-type match (V1.2): equality alone admits float twins of
+        # the frozen ints (9.0 == 9) that the evaluator would then
+        # int()-coerce; a bool or a numeric string is likewise a
+        # deviation from the frozen record, never a repeat of it.
+        if key == "clock_ids":
+            ok = (isinstance(value, list)
+                  and all(isinstance(c, str) for c in value)
+                  and value == canon)
+        else:
+            ok = type(value) is type(canon) and value == canon
+        if not ok:
             raise CountAdmissionRefused(
                 "FROZEN_EVALUATION_CONFIG_UNAUTHORIZED",
                 f"caller config key {key!r} deviates from the frozen "
                 "record / receipt")
 
 
+def _check_input_types(rows, entry_quotes, close_quotes, results, slates,
+                       missing_offers):
+    """Boundary type contract for everything the gate consumes or
+    forwards to the pinned evaluator (V1.2). A wrong-typed container or
+    record refuses by name here instead of escaping as a raw
+    AttributeError/TypeError inside this module's provenance pass or
+    inside the evaluator."""
+    for name, seq in (("rows", rows), ("entry_quotes", entry_quotes),
+                      ("close_quotes", close_quotes)):
+        if not isinstance(seq, (list, tuple)) or \
+                any(not isinstance(x, dict) for x in seq):
+            raise CountAdmissionRefused(
+                "GATE_TYPE_INVALID",
+                f"{name} must be a sequence of mappings")
+    if not isinstance(missing_offers, (list, tuple)):
+        raise CountAdmissionRefused(
+            "GATE_TYPE_INVALID", "missing_offers must be a sequence")
+    if not isinstance(results, dict) or \
+            any(v is not None and not isinstance(v, dict)
+                for v in results.values()):
+        raise CountAdmissionRefused(
+            "GATE_TYPE_INVALID",
+            "results must be a mapping of mappings")
+    if not isinstance(slates, dict) or \
+            any(not isinstance(v, dict) for v in slates.values()):
+        raise CountAdmissionRefused(
+            "GATE_TYPE_INVALID",
+            "slates must be a mapping of mappings")
+
+
 def _check_provenance(rows, entry_quotes, receipt):
     pin_time = receipt["_pin_time"]
     first = receipt["first_counted_slate"]
+    first_date = receipt["_first_slate"]
     for r in rows:
-        if str(r.get("slate_date")) < first:
+        slate = _parse_slate_date(r.get("slate_date"))
+        if slate is None:
+            raise CountAdmissionRefused(
+                "GATE_TYPE_INVALID",
+                f"row slate_date {r.get('slate_date')!r} is not an ISO "
+                "YYYY-MM-DD date string")
+        if slate < first_date:
             raise CountAdmissionRefused(
                 "COUNTED_ROW_PRE_PIN",
                 f"slate {r.get('slate_date')} before first counted "
@@ -216,6 +295,8 @@ def publish_counted(rows, entry_quotes, close_quotes, results, slates,
                                     f"evaluator sha256 {evaluator_sha}")
     config = _canonical_config(receipt)
     _check_caller_config(caller_config, config)
+    _check_input_types(rows, entry_quotes, close_quotes, results, slates,
+                       missing_offers)
     _check_provenance(rows, entry_quotes, receipt)
     out = ev.evaluate(rows, entry_quotes, close_quotes, results, slates,
                       missing_offers, config)
