@@ -1,0 +1,3710 @@
+{
+ "provenance": "Verbatim excerpts of real MLB StatsAPI responses fetched 2026-10-27. schedule 2026-10-19 contained exactly one game (849815) and is complete; schedule 2026-10-20 contained no games; schedule 2026-09-04 is trimmed to the two doubleheader games; the boxscore is trimmed to Steven Kwan's verbatim player entry; the gameLog is trimmed to splits dated 2026-08-20 or later (the prior-30 window for the 2026-10-19 fixture is fully inside that range). No value was altered.",
+ "schedule_2026-10-19": {
+  "dates": [
+   {
+    "date": "2026-10-19",
+    "games": [
+     {
+      "gamePk": 849815,
+      "gameGuid": "e165ab73-3918-48db-8d2e-c4ce9e1b58ae",
+      "link": "/api/v1.1/game/849815/feed/live",
+      "gameType": "L",
+      "season": "2026",
+      "gameDate": "2026-10-20T00:08:00Z",
+      "officialDate": "2026-10-19",
+      "status": {
+       "abstractGameState": "Final",
+       "codedGameState": "F",
+       "detailedState": "Final",
+       "statusCode": "F",
+       "startTimeTBD": false,
+       "abstractGameCode": "F"
+      },
+      "teams": {
+       "away": {
+        "team": {
+         "id": 114,
+         "name": "Cleveland Guardians",
+         "link": "/api/v1/teams/114"
+        },
+        "leagueRecord": {
+         "wins": 2,
+         "losses": 4,
+         "ties": 0,
+         "pct": ".333"
+        },
+        "score": 3,
+        "isWinner": false,
+        "splitSquad": false,
+        "seriesNumber": 1
+       },
+       "home": {
+        "team": {
+         "id": 139,
+         "name": "Tampa Bay Rays",
+         "link": "/api/v1/teams/139"
+        },
+        "leagueRecord": {
+         "wins": 4,
+         "losses": 2,
+         "ties": 0,
+         "pct": ".667"
+        },
+        "score": 7,
+        "isWinner": true,
+        "splitSquad": false,
+        "seriesNumber": 1
+       }
+      },
+      "venue": {
+       "id": 12,
+       "name": "Tropicana Field",
+       "link": "/api/v1/venues/12"
+      },
+      "content": {
+       "link": "/api/v1/game/849815/content"
+      },
+      "isTie": false,
+      "gameNumber": 1,
+      "publicFacing": true,
+      "doubleHeader": "N",
+      "gamedayType": "P",
+      "tiebreaker": "N",
+      "calendarEventID": "14-849815-2026-10-19",
+      "seasonDisplay": "2026",
+      "dayNight": "night",
+      "description": "ALCS Game 6",
+      "scheduledInnings": 9,
+      "reverseHomeAwayStatus": false,
+      "inningBreakLength": 175,
+      "gamesInSeries": 7,
+      "seriesGameNumber": 6,
+      "seriesDescription": "AL Championship Series",
+      "recordSource": "S",
+      "ifNecessary": "N",
+      "ifNecessaryDescription": "Normal Game"
+     }
+    ]
+   }
+  ]
+ },
+ "schedule_2026-10-20": {
+  "dates": []
+ },
+ "schedule_2026-09-04": {
+  "dates": [
+   {
+    "date": "2026-09-04",
+    "games": [
+     {
+      "gamePk": 824424,
+      "gameGuid": "e5580cef-fe4d-4906-869a-2ea583dfe604",
+      "link": "/api/v1.1/game/824424/feed/live",
+      "gameType": "R",
+      "season": "2026",
+      "gameDate": "2026-09-04T18:10:00Z",
+      "officialDate": "2026-09-04",
+      "rescheduledFrom": "2026-06-14T17:40:00Z",
+      "rescheduledFromDate": "2026-06-14",
+      "status": {
+       "abstractGameState": "Final",
+       "codedGameState": "F",
+       "detailedState": "Final",
+       "statusCode": "F",
+       "startTimeTBD": false,
+       "abstractGameCode": "F"
+      },
+      "teams": {
+       "away": {
+        "team": {
+         "id": 116,
+         "name": "Detroit Tigers",
+         "link": "/api/v1/teams/116"
+        },
+        "leagueRecord": {
+         "wins": 64,
+         "losses": 76,
+         "ties": 0,
+         "pct": ".457"
+        },
+        "score": 6,
+        "isWinner": false,
+        "splitSquad": false,
+        "seriesNumber": 46
+       },
+       "home": {
+        "team": {
+         "id": 114,
+         "name": "Cleveland Guardians",
+         "link": "/api/v1/teams/114"
+        },
+        "leagueRecord": {
+         "wins": 71,
+         "losses": 70,
+         "ties": 0,
+         "pct": ".504"
+        },
+        "score": 7,
+        "isWinner": true,
+        "splitSquad": false,
+        "seriesNumber": 46
+       }
+      },
+      "venue": {
+       "id": 5,
+       "name": "Progressive Field",
+       "link": "/api/v1/venues/5"
+      },
+      "content": {
+       "link": "/api/v1/game/824424/content"
+      },
+      "isTie": false,
+      "gameNumber": 1,
+      "publicFacing": true,
+      "doubleHeader": "S",
+      "gamedayType": "P",
+      "tiebreaker": "N",
+      "calendarEventID": "14-824424-2026-09-04",
+      "seasonDisplay": "2026",
+      "dayNight": "day",
+      "description": "Makeup of 6/14 PPD",
+      "scheduledInnings": 9,
+      "reverseHomeAwayStatus": false,
+      "inningBreakLength": 120,
+      "gamesInSeries": 4,
+      "seriesGameNumber": 1,
+      "seriesDescription": "Regular Season",
+      "recordSource": "S",
+      "ifNecessary": "N",
+      "ifNecessaryDescription": "Normal Game"
+     },
+     {
+      "gamePk": 824387,
+      "gameGuid": "dafa79b0-b019-417c-8060-62bf3de4ee81",
+      "link": "/api/v1.1/game/824387/feed/live",
+      "gameType": "R",
+      "season": "2026",
+      "gameDate": "2026-09-04T23:15:00Z",
+      "officialDate": "2026-09-04",
+      "status": {
+       "abstractGameState": "Final",
+       "codedGameState": "F",
+       "detailedState": "Final",
+       "statusCode": "F",
+       "startTimeTBD": false,
+       "abstractGameCode": "F"
+      },
+      "teams": {
+       "away": {
+        "team": {
+         "id": 116,
+         "name": "Detroit Tigers",
+         "link": "/api/v1/teams/116"
+        },
+        "leagueRecord": {
+         "wins": 64,
+         "losses": 77,
+         "ties": 0,
+         "pct": ".454"
+        },
+        "score": 3,
+        "isWinner": false,
+        "splitSquad": false,
+        "seriesNumber": 46
+       },
+       "home": {
+        "team": {
+         "id": 114,
+         "name": "Cleveland Guardians",
+         "link": "/api/v1/teams/114"
+        },
+        "leagueRecord": {
+         "wins": 72,
+         "losses": 70,
+         "ties": 0,
+         "pct": ".507"
+        },
+        "score": 4,
+        "isWinner": true,
+        "splitSquad": false,
+        "seriesNumber": 46
+       }
+      },
+      "venue": {
+       "id": 5,
+       "name": "Progressive Field",
+       "link": "/api/v1/venues/5"
+      },
+      "content": {
+       "link": "/api/v1/game/824387/content"
+      },
+      "isTie": false,
+      "gameNumber": 2,
+      "publicFacing": true,
+      "doubleHeader": "S",
+      "gamedayType": "P",
+      "tiebreaker": "N",
+      "calendarEventID": "14-824387-2026-09-04",
+      "seasonDisplay": "2026",
+      "dayNight": "night",
+      "scheduledInnings": 9,
+      "reverseHomeAwayStatus": false,
+      "inningBreakLength": 145,
+      "gamesInSeries": 4,
+      "seriesGameNumber": 2,
+      "seriesDescription": "Regular Season",
+      "recordSource": "S",
+      "ifNecessary": "N",
+      "ifNecessaryDescription": "Normal Game"
+     }
+    ]
+   }
+  ]
+ },
+ "boxscore_849815": {
+  "teams": {
+   "away": {
+    "players": {
+     "ID680757": {
+      "person": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757",
+       "boxscoreName": "Kwan"
+      },
+      "jerseyNumber": "38",
+      "position": {
+       "code": "8",
+       "name": "Outfielder",
+       "type": "Outfielder",
+       "abbreviation": "CF"
+      },
+      "status": {
+       "code": "A",
+       "description": "Active"
+      },
+      "parentTeamId": 114,
+      "battingOrder": "100",
+      "stats": {
+       "batting": {
+        "summary": "1-4 | BB",
+        "gamesPlayed": 1,
+        "flyOuts": 0,
+        "groundOuts": 2,
+        "airOuts": 1,
+        "runs": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "strikeOuts": 0,
+        "baseOnBalls": 1,
+        "intentionalWalks": 0,
+        "hits": 1,
+        "hitByPitch": 0,
+        "atBats": 4,
+        "caughtStealing": 0,
+        "stolenBases": 0,
+        "stolenBasePercentage": ".---",
+        "groundIntoDoublePlay": 0,
+        "groundIntoTriplePlay": 0,
+        "plateAppearances": 5,
+        "totalBases": 1,
+        "rbi": 0,
+        "leftOnBase": 1,
+        "sacBunts": 0,
+        "sacFlies": 0,
+        "catchersInterference": 0,
+        "pickoffs": 0,
+        "atBatsPerHomeRun": "-.--",
+        "popOuts": 0,
+        "lineOuts": 1
+       },
+       "pitching": {},
+       "fielding": {
+        "gamesStarted": 1,
+        "caughtStealing": 0,
+        "stolenBases": 0,
+        "stolenBasePercentage": ".---",
+        "caughtStealingPercentage": ".---",
+        "assists": 0,
+        "putOuts": 4,
+        "errors": 0,
+        "chances": 4,
+        "fielding": ".000",
+        "passedBall": 0,
+        "pickoffs": 0
+       }
+      },
+      "seasonStats": {
+       "batting": {
+        "gamesPlayed": 11,
+        "flyOuts": 6,
+        "groundOuts": 15,
+        "airOuts": 15,
+        "runs": 7,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "strikeOuts": 4,
+        "baseOnBalls": 5,
+        "intentionalWalks": 0,
+        "hits": 11,
+        "hitByPitch": 0,
+        "avg": ".244",
+        "atBats": 45,
+        "obp": ".320",
+        "slg": ".244",
+        "ops": ".564",
+        "caughtStealing": 0,
+        "stolenBases": 0,
+        "stolenBasePercentage": ".---",
+        "caughtStealingPercentage": ".---",
+        "groundIntoDoublePlay": 1,
+        "groundIntoTriplePlay": 0,
+        "plateAppearances": 50,
+        "totalBases": 11,
+        "rbi": 1,
+        "leftOnBase": 12,
+        "sacBunts": 0,
+        "sacFlies": 0,
+        "babip": ".268",
+        "groundOutsToAirouts": "1.00",
+        "catchersInterference": 0,
+        "pickoffs": 0,
+        "atBatsPerHomeRun": "-.--",
+        "popOuts": 2,
+        "lineOuts": 7
+       },
+       "pitching": {
+        "gamesPlayed": 0,
+        "gamesStarted": 0,
+        "flyOuts": 0,
+        "groundOuts": 0,
+        "airOuts": 0,
+        "runs": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "strikeOuts": 0,
+        "baseOnBalls": 0,
+        "intentionalWalks": 0,
+        "hits": 0,
+        "hitByPitch": 0,
+        "atBats": 0,
+        "obp": ".000",
+        "caughtStealing": 0,
+        "stolenBases": 0,
+        "stolenBasePercentage": ".---",
+        "caughtStealingPercentage": ".---",
+        "numberOfPitches": 0,
+        "era": "-.--",
+        "inningsPitched": "0.0",
+        "wins": 0,
+        "losses": 0,
+        "saves": 0,
+        "saveOpportunities": 0,
+        "holds": 0,
+        "blownSaves": 0,
+        "earnedRuns": 0,
+        "whip": "-",
+        "battersFaced": 0,
+        "outs": 0,
+        "gamesPitched": 0,
+        "completeGames": 0,
+        "shutouts": 0,
+        "balls": 0,
+        "strikes": 0,
+        "strikePercentage": "-.--",
+        "hitBatsmen": 0,
+        "balks": 0,
+        "wildPitches": 0,
+        "pickoffs": 0,
+        "groundOutsToAirouts": "-.--",
+        "rbi": 0,
+        "winPercentage": ".---",
+        "pitchesPerInning": "-.--",
+        "gamesFinished": 0,
+        "strikeoutWalkRatio": "-.--",
+        "strikeoutsPer9Inn": "-.--",
+        "walksPer9Inn": "-.--",
+        "hitsPer9Inn": "-.--",
+        "runsScoredPer9": "-.--",
+        "homeRunsPer9": "-.--",
+        "inheritedRunners": 0,
+        "inheritedRunnersScored": 0,
+        "catchersInterference": 0,
+        "sacBunts": 0,
+        "sacFlies": 0,
+        "passedBall": 0,
+        "popOuts": 0,
+        "lineOuts": 0
+       },
+       "fielding": {
+        "gamesStarted": 1,
+        "caughtStealing": 0,
+        "stolenBases": 0,
+        "stolenBasePercentage": ".---",
+        "caughtStealingPercentage": ".---",
+        "assists": 1,
+        "putOuts": 18,
+        "errors": 0,
+        "chances": 19,
+        "fielding": "1.000",
+        "passedBall": 0,
+        "pickoffs": 0
+       }
+      },
+      "gameStatus": {
+       "isCurrentBatter": false,
+       "isCurrentPitcher": false,
+       "isOnBench": false,
+       "isSubstitute": false
+      },
+      "allPositions": [
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       },
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       }
+      ]
+     }
+    }
+   },
+   "home": {
+    "players": {}
+   }
+  }
+ },
+ "gamelog_680757": {
+  "stats": [
+   {
+    "splits": [
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "1-2 | 3 BB, RBI, R",
+       "gamesPlayed": 1,
+       "flyOuts": 0,
+       "groundOuts": 1,
+       "airOuts": 0,
+       "runs": 1,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 3,
+       "intentionalWalks": 0,
+       "hits": 1,
+       "hitByPitch": 0,
+       "avg": ".265",
+       "atBats": 2,
+       "obp": ".372",
+       "slg": ".327",
+       "ops": ".699",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 26,
+       "plateAppearances": 5,
+       "totalBases": 1,
+       "rbi": 1,
+       "leftOnBase": 1,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".500",
+       "groundOutsToAirouts": "1.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 137,
+       "name": "San Francisco Giants",
+       "link": "/api/v1/teams/137"
+      },
+      "date": "2026-08-20",
+      "gameType": "R",
+      "isHome": true,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 824395,
+       "link": "/api/v1.1/game/824395/feed/live",
+       "content": {
+        "link": "/api/v1/game/824395/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "1-4 | 2 BB, RBI, R",
+       "gamesPlayed": 1,
+       "flyOuts": 0,
+       "groundOuts": 2,
+       "airOuts": 1,
+       "runs": 1,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 2,
+       "intentionalWalks": 0,
+       "hits": 1,
+       "hitByPitch": 0,
+       "avg": ".265",
+       "atBats": 4,
+       "obp": ".374",
+       "slg": ".326",
+       "ops": ".700",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 22,
+       "plateAppearances": 6,
+       "totalBases": 1,
+       "rbi": 1,
+       "leftOnBase": 3,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".250",
+       "groundOutsToAirouts": "2.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 115,
+       "name": "Colorado Rockies",
+       "link": "/api/v1/teams/115"
+      },
+      "date": "2026-08-21",
+      "gameType": "R",
+      "isHome": false,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 824317,
+       "link": "/api/v1.1/game/824317/feed/live",
+       "content": {
+        "link": "/api/v1/game/824317/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "0-5",
+       "gamesPlayed": 1,
+       "flyOuts": 2,
+       "groundOuts": 3,
+       "airOuts": 2,
+       "runs": 0,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 0,
+       "intentionalWalks": 0,
+       "hits": 0,
+       "hitByPitch": 0,
+       "avg": ".262",
+       "atBats": 5,
+       "obp": ".370",
+       "slg": ".322",
+       "ops": ".692",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 19,
+       "plateAppearances": 5,
+       "totalBases": 0,
+       "rbi": 0,
+       "leftOnBase": 1,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".000",
+       "groundOutsToAirouts": "1.50",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 115,
+       "name": "Colorado Rockies",
+       "link": "/api/v1/teams/115"
+      },
+      "date": "2026-08-22",
+      "gameType": "R",
+      "isHome": false,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 824316,
+       "link": "/api/v1.1/game/824316/feed/live",
+       "content": {
+        "link": "/api/v1/game/824316/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "2-5 | K, 2 R",
+       "gamesPlayed": 1,
+       "flyOuts": 1,
+       "groundOuts": 1,
+       "airOuts": 1,
+       "runs": 2,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 1,
+       "baseOnBalls": 0,
+       "intentionalWalks": 0,
+       "hits": 2,
+       "hitByPitch": 0,
+       "avg": ".264",
+       "atBats": 5,
+       "obp": ".370",
+       "slg": ".323",
+       "ops": ".693",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 25,
+       "plateAppearances": 5,
+       "totalBases": 2,
+       "rbi": 0,
+       "leftOnBase": 1,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".500",
+       "groundOutsToAirouts": "1.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 115,
+       "name": "Colorado Rockies",
+       "link": "/api/v1/teams/115"
+      },
+      "date": "2026-08-23",
+      "gameType": "R",
+      "isHome": false,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       },
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 824315,
+       "link": "/api/v1.1/game/824315/feed/live",
+       "content": {
+        "link": "/api/v1/game/824315/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "2-5 | R, CS",
+       "gamesPlayed": 1,
+       "flyOuts": 2,
+       "groundOuts": 0,
+       "airOuts": 3,
+       "runs": 1,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 0,
+       "intentionalWalks": 0,
+       "hits": 2,
+       "hitByPitch": 0,
+       "avg": ".265",
+       "atBats": 5,
+       "obp": ".371",
+       "slg": ".324",
+       "ops": ".695",
+       "caughtStealing": 1,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".000",
+       "caughtStealingPercentage": "1.000",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 18,
+       "plateAppearances": 5,
+       "totalBases": 2,
+       "rbi": 0,
+       "leftOnBase": 1,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".400",
+       "groundOutsToAirouts": "0.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 108,
+       "name": "Los Angeles Angels",
+       "link": "/api/v1/teams/108"
+      },
+      "date": "2026-08-24",
+      "gameType": "R",
+      "isHome": false,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 823992,
+       "link": "/api/v1.1/game/823992/feed/live",
+       "content": {
+        "link": "/api/v1/game/823992/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "5-5 | BB, RBI, 3 R",
+       "gamesPlayed": 1,
+       "flyOuts": 0,
+       "groundOuts": 0,
+       "airOuts": 0,
+       "runs": 3,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 1,
+       "intentionalWalks": 0,
+       "hits": 5,
+       "hitByPitch": 0,
+       "avg": ".274",
+       "atBats": 5,
+       "obp": ".378",
+       "slg": ".332",
+       "ops": ".710",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 29,
+       "plateAppearances": 6,
+       "totalBases": 5,
+       "rbi": 1,
+       "leftOnBase": 0,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": "1.000",
+       "groundOutsToAirouts": "-.--",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 108,
+       "name": "Los Angeles Angels",
+       "link": "/api/v1/teams/108"
+      },
+      "date": "2026-08-25",
+      "gameType": "R",
+      "isHome": false,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "10",
+        "name": "Designated Hitter",
+        "type": "Hitter",
+        "abbreviation": "DH"
+       },
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       }
+      ],
+      "game": {
+       "gamePk": 823989,
+       "link": "/api/v1.1/game/823989/feed/live",
+       "content": {
+        "link": "/api/v1/game/823989/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "2-5 | 2B, K, RBI",
+       "gamesPlayed": 1,
+       "flyOuts": 0,
+       "groundOuts": 2,
+       "airOuts": 0,
+       "runs": 0,
+       "doubles": 1,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 1,
+       "baseOnBalls": 0,
+       "intentionalWalks": 0,
+       "hits": 2,
+       "hitByPitch": 0,
+       "avg": ".275",
+       "atBats": 5,
+       "obp": ".378",
+       "slg": ".335",
+       "ops": ".713",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 25,
+       "plateAppearances": 5,
+       "totalBases": 3,
+       "rbi": 1,
+       "leftOnBase": 1,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".500",
+       "groundOutsToAirouts": "2.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 108,
+       "name": "Los Angeles Angels",
+       "link": "/api/v1/teams/108"
+      },
+      "date": "2026-08-26",
+      "gameType": "R",
+      "isHome": false,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       },
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       },
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       },
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 823988,
+       "link": "/api/v1.1/game/823988/feed/live",
+       "content": {
+        "link": "/api/v1/game/823988/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "0-4 | K",
+       "gamesPlayed": 1,
+       "flyOuts": 1,
+       "groundOuts": 2,
+       "airOuts": 1,
+       "runs": 0,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 1,
+       "baseOnBalls": 0,
+       "intentionalWalks": 0,
+       "hits": 0,
+       "hitByPitch": 0,
+       "avg": ".273",
+       "atBats": 4,
+       "obp": ".375",
+       "slg": ".332",
+       "ops": ".707",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 16,
+       "plateAppearances": 4,
+       "totalBases": 0,
+       "rbi": 0,
+       "leftOnBase": 3,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".000",
+       "groundOutsToAirouts": "2.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 118,
+       "name": "Kansas City Royals",
+       "link": "/api/v1/teams/118"
+      },
+      "date": "2026-08-28",
+      "gameType": "R",
+      "isHome": true,
+      "isWin": false,
+      "positionsPlayed": [
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 824396,
+       "link": "/api/v1.1/game/824396/feed/live",
+       "content": {
+        "link": "/api/v1/game/824396/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "1-4 | K",
+       "gamesPlayed": 1,
+       "flyOuts": 0,
+       "groundOuts": 1,
+       "airOuts": 1,
+       "runs": 0,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 1,
+       "baseOnBalls": 0,
+       "intentionalWalks": 0,
+       "hits": 1,
+       "hitByPitch": 0,
+       "avg": ".273",
+       "atBats": 4,
+       "obp": ".374",
+       "slg": ".331",
+       "ops": ".705",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 13,
+       "plateAppearances": 4,
+       "totalBases": 1,
+       "rbi": 0,
+       "leftOnBase": 0,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".333",
+       "groundOutsToAirouts": "1.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 118,
+       "name": "Kansas City Royals",
+       "link": "/api/v1/teams/118"
+      },
+      "date": "2026-08-29",
+      "gameType": "R",
+      "isHome": true,
+      "isWin": false,
+      "positionsPlayed": [
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       }
+      ],
+      "game": {
+       "gamePk": 824392,
+       "link": "/api/v1.1/game/824392/feed/live",
+       "content": {
+        "link": "/api/v1/game/824392/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "2-3 | 2B, BB, 3 R",
+       "gamesPlayed": 1,
+       "flyOuts": 1,
+       "groundOuts": 0,
+       "airOuts": 1,
+       "runs": 3,
+       "doubles": 1,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 1,
+       "intentionalWalks": 0,
+       "hits": 2,
+       "hitByPitch": 0,
+       "avg": ".275",
+       "atBats": 3,
+       "obp": ".377",
+       "slg": ".336",
+       "ops": ".713",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 14,
+       "plateAppearances": 4,
+       "totalBases": 3,
+       "rbi": 0,
+       "leftOnBase": 0,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".667",
+       "groundOutsToAirouts": "0.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 118,
+       "name": "Kansas City Royals",
+       "link": "/api/v1/teams/118"
+      },
+      "date": "2026-08-30",
+      "gameType": "R",
+      "isHome": true,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       }
+      ],
+      "game": {
+       "gamePk": 824393,
+       "link": "/api/v1.1/game/824393/feed/live",
+       "content": {
+        "link": "/api/v1/game/824393/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "1-4",
+       "gamesPlayed": 1,
+       "flyOuts": 0,
+       "groundOuts": 2,
+       "airOuts": 1,
+       "runs": 0,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 0,
+       "intentionalWalks": 0,
+       "hits": 1,
+       "hitByPitch": 0,
+       "avg": ".275",
+       "atBats": 4,
+       "obp": ".376",
+       "slg": ".335",
+       "ops": ".711",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 17,
+       "plateAppearances": 4,
+       "totalBases": 1,
+       "rbi": 0,
+       "leftOnBase": 0,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".250",
+       "groundOutsToAirouts": "2.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 141,
+       "name": "Toronto Blue Jays",
+       "link": "/api/v1/teams/141"
+      },
+      "date": "2026-09-01",
+      "gameType": "R",
+      "isHome": true,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       },
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 824391,
+       "link": "/api/v1.1/game/824391/feed/live",
+       "content": {
+        "link": "/api/v1/game/824391/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "0-3",
+       "gamesPlayed": 1,
+       "flyOuts": 0,
+       "groundOuts": 1,
+       "airOuts": 2,
+       "runs": 0,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 0,
+       "intentionalWalks": 0,
+       "hits": 0,
+       "hitByPitch": 0,
+       "avg": ".273",
+       "atBats": 3,
+       "obp": ".374",
+       "slg": ".333",
+       "ops": ".707",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 1,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 11,
+       "plateAppearances": 3,
+       "totalBases": 0,
+       "rbi": 0,
+       "leftOnBase": 1,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".000",
+       "groundOutsToAirouts": "0.50",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 141,
+       "name": "Toronto Blue Jays",
+       "link": "/api/v1/teams/141"
+      },
+      "date": "2026-09-02",
+      "gameType": "R",
+      "isHome": true,
+      "isWin": false,
+      "positionsPlayed": [
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       }
+      ],
+      "game": {
+       "gamePk": 824390,
+       "link": "/api/v1.1/game/824390/feed/live",
+       "content": {
+        "link": "/api/v1/game/824390/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "2-5",
+       "gamesPlayed": 1,
+       "flyOuts": 0,
+       "groundOuts": 1,
+       "airOuts": 2,
+       "runs": 0,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 0,
+       "intentionalWalks": 0,
+       "hits": 2,
+       "hitByPitch": 0,
+       "avg": ".275",
+       "atBats": 5,
+       "obp": ".374",
+       "slg": ".333",
+       "ops": ".707",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 26,
+       "plateAppearances": 5,
+       "totalBases": 2,
+       "rbi": 0,
+       "leftOnBase": 3,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".400",
+       "groundOutsToAirouts": "0.50",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 141,
+       "name": "Toronto Blue Jays",
+       "link": "/api/v1/teams/141"
+      },
+      "date": "2026-09-03",
+      "gameType": "R",
+      "isHome": true,
+      "isWin": false,
+      "positionsPlayed": [
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       }
+      ],
+      "game": {
+       "gamePk": 824388,
+       "link": "/api/v1.1/game/824388/feed/live",
+       "content": {
+        "link": "/api/v1/game/824388/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "0-4 | 2 K",
+       "gamesPlayed": 1,
+       "flyOuts": 0,
+       "groundOuts": 2,
+       "airOuts": 0,
+       "runs": 0,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 2,
+       "baseOnBalls": 0,
+       "intentionalWalks": 0,
+       "hits": 0,
+       "hitByPitch": 0,
+       "avg": ".272",
+       "atBats": 4,
+       "obp": ".372",
+       "slg": ".330",
+       "ops": ".702",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 18,
+       "plateAppearances": 4,
+       "totalBases": 0,
+       "rbi": 0,
+       "leftOnBase": 0,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".000",
+       "groundOutsToAirouts": "2.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 116,
+       "name": "Detroit Tigers",
+       "link": "/api/v1/teams/116"
+      },
+      "date": "2026-09-04",
+      "gameType": "R",
+      "isHome": true,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       }
+      ],
+      "game": {
+       "gamePk": 824424,
+       "link": "/api/v1.1/game/824424/feed/live",
+       "content": {
+        "link": "/api/v1/game/824424/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "1-3 | 2 BB, R",
+       "gamesPlayed": 1,
+       "flyOuts": 1,
+       "groundOuts": 0,
+       "airOuts": 2,
+       "runs": 1,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 2,
+       "intentionalWalks": 0,
+       "hits": 1,
+       "hitByPitch": 0,
+       "avg": ".273",
+       "atBats": 3,
+       "obp": ".374",
+       "slg": ".330",
+       "ops": ".704",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 26,
+       "plateAppearances": 5,
+       "totalBases": 1,
+       "rbi": 0,
+       "leftOnBase": 2,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".333",
+       "groundOutsToAirouts": "0.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 116,
+       "name": "Detroit Tigers",
+       "link": "/api/v1/teams/116"
+      },
+      "date": "2026-09-04",
+      "gameType": "R",
+      "isHome": true,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       }
+      ],
+      "game": {
+       "gamePk": 824387,
+       "link": "/api/v1.1/game/824387/feed/live",
+       "content": {
+        "link": "/api/v1/game/824387/content"
+       },
+       "gameNumber": 2,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "0-4",
+       "gamesPlayed": 1,
+       "flyOuts": 1,
+       "groundOuts": 3,
+       "airOuts": 1,
+       "runs": 0,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 0,
+       "intentionalWalks": 0,
+       "hits": 0,
+       "hitByPitch": 0,
+       "avg": ".270",
+       "atBats": 4,
+       "obp": ".371",
+       "slg": ".328",
+       "ops": ".699",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 15,
+       "plateAppearances": 4,
+       "totalBases": 0,
+       "rbi": 0,
+       "leftOnBase": 0,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".000",
+       "groundOutsToAirouts": "3.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 116,
+       "name": "Detroit Tigers",
+       "link": "/api/v1/teams/116"
+      },
+      "date": "2026-09-05",
+      "gameType": "R",
+      "isHome": true,
+      "isWin": false,
+      "positionsPlayed": [
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 824389,
+       "link": "/api/v1.1/game/824389/feed/live",
+       "content": {
+        "link": "/api/v1/game/824389/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "2-4 | 2 2B, K, R",
+       "gamesPlayed": 1,
+       "flyOuts": 1,
+       "groundOuts": 0,
+       "airOuts": 1,
+       "runs": 1,
+       "doubles": 2,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 1,
+       "baseOnBalls": 0,
+       "intentionalWalks": 0,
+       "hits": 2,
+       "hitByPitch": 0,
+       "avg": ".272",
+       "atBats": 4,
+       "obp": ".372",
+       "slg": ".333",
+       "ops": ".705",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 17,
+       "plateAppearances": 4,
+       "totalBases": 4,
+       "rbi": 0,
+       "leftOnBase": 0,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".667",
+       "groundOutsToAirouts": "0.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 116,
+       "name": "Detroit Tigers",
+       "link": "/api/v1/teams/116"
+      },
+      "date": "2026-09-06",
+      "gameType": "R",
+      "isHome": true,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "10",
+        "name": "Designated Hitter",
+        "type": "Hitter",
+        "abbreviation": "DH"
+       }
+      ],
+      "game": {
+       "gamePk": 824385,
+       "link": "/api/v1.1/game/824385/feed/live",
+       "content": {
+        "link": "/api/v1/game/824385/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "2-4",
+       "gamesPlayed": 1,
+       "flyOuts": 0,
+       "groundOuts": 1,
+       "airOuts": 1,
+       "runs": 0,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 0,
+       "intentionalWalks": 0,
+       "hits": 2,
+       "hitByPitch": 0,
+       "avg": ".274",
+       "atBats": 4,
+       "obp": ".373",
+       "slg": ".335",
+       "ops": ".708",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 15,
+       "plateAppearances": 4,
+       "totalBases": 2,
+       "rbi": 0,
+       "leftOnBase": 1,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".500",
+       "groundOutsToAirouts": "1.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 110,
+       "name": "Baltimore Orioles",
+       "link": "/api/v1/teams/110"
+      },
+      "date": "2026-09-07",
+      "gameType": "R",
+      "isHome": false,
+      "isWin": false,
+      "positionsPlayed": [
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 824793,
+       "link": "/api/v1.1/game/824793/feed/live",
+       "content": {
+        "link": "/api/v1/game/824793/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "1-5 | 2B, 2 R",
+       "gamesPlayed": 1,
+       "flyOuts": 0,
+       "groundOuts": 3,
+       "airOuts": 1,
+       "runs": 2,
+       "doubles": 1,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 0,
+       "intentionalWalks": 0,
+       "hits": 1,
+       "hitByPitch": 0,
+       "avg": ".273",
+       "atBats": 5,
+       "obp": ".371",
+       "slg": ".335",
+       "ops": ".706",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 1,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 22,
+       "plateAppearances": 5,
+       "totalBases": 2,
+       "rbi": 0,
+       "leftOnBase": 5,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".200",
+       "groundOutsToAirouts": "3.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 110,
+       "name": "Baltimore Orioles",
+       "link": "/api/v1/teams/110"
+      },
+      "date": "2026-09-08",
+      "gameType": "R",
+      "isHome": false,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 824792,
+       "link": "/api/v1.1/game/824792/feed/live",
+       "content": {
+        "link": "/api/v1/game/824792/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "2-5 | K, R",
+       "gamesPlayed": 1,
+       "flyOuts": 1,
+       "groundOuts": 1,
+       "airOuts": 1,
+       "runs": 1,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 1,
+       "baseOnBalls": 0,
+       "intentionalWalks": 0,
+       "hits": 2,
+       "hitByPitch": 0,
+       "avg": ".275",
+       "atBats": 5,
+       "obp": ".371",
+       "slg": ".336",
+       "ops": ".707",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 17,
+       "plateAppearances": 5,
+       "totalBases": 2,
+       "rbi": 0,
+       "leftOnBase": 0,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".500",
+       "groundOutsToAirouts": "1.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 110,
+       "name": "Baltimore Orioles",
+       "link": "/api/v1/teams/110"
+      },
+      "date": "2026-09-09",
+      "gameType": "R",
+      "isHome": false,
+      "isWin": false,
+      "positionsPlayed": [
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       }
+      ],
+      "game": {
+       "gamePk": 824791,
+       "link": "/api/v1.1/game/824791/feed/live",
+       "content": {
+        "link": "/api/v1/game/824791/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "1-4 | BB, K, SB",
+       "gamesPlayed": 1,
+       "flyOuts": 0,
+       "groundOuts": 1,
+       "airOuts": 1,
+       "runs": 0,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 1,
+       "baseOnBalls": 1,
+       "intentionalWalks": 0,
+       "hits": 1,
+       "hitByPitch": 0,
+       "avg": ".274",
+       "atBats": 4,
+       "obp": ".372",
+       "slg": ".335",
+       "ops": ".707",
+       "caughtStealing": 0,
+       "stolenBases": 1,
+       "stolenBasePercentage": "1.000",
+       "caughtStealingPercentage": ".000",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 18,
+       "plateAppearances": 5,
+       "totalBases": 1,
+       "rbi": 0,
+       "leftOnBase": 2,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".333",
+       "groundOutsToAirouts": "1.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 142,
+       "name": "Minnesota Twins",
+       "link": "/api/v1/teams/142"
+      },
+      "date": "2026-09-11",
+      "gameType": "R",
+      "isHome": false,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 823659,
+       "link": "/api/v1.1/game/823659/feed/live",
+       "content": {
+        "link": "/api/v1/game/823659/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "1-4 | K, RBI",
+       "gamesPlayed": 1,
+       "flyOuts": 1,
+       "groundOuts": 0,
+       "airOuts": 2,
+       "runs": 0,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 1,
+       "baseOnBalls": 0,
+       "intentionalWalks": 0,
+       "hits": 1,
+       "hitByPitch": 0,
+       "avg": ".274",
+       "atBats": 4,
+       "obp": ".371",
+       "slg": ".335",
+       "ops": ".706",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 16,
+       "plateAppearances": 4,
+       "totalBases": 1,
+       "rbi": 1,
+       "leftOnBase": 2,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".333",
+       "groundOutsToAirouts": "0.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 142,
+       "name": "Minnesota Twins",
+       "link": "/api/v1/teams/142"
+      },
+      "date": "2026-09-12",
+      "gameType": "R",
+      "isHome": false,
+      "isWin": false,
+      "positionsPlayed": [
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       }
+      ],
+      "game": {
+       "gamePk": 823657,
+       "link": "/api/v1.1/game/823657/feed/live",
+       "content": {
+        "link": "/api/v1/game/823657/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "3-4 | HR, 2B, BB",
+       "gamesPlayed": 1,
+       "flyOuts": 0,
+       "groundOuts": 1,
+       "airOuts": 0,
+       "runs": 2,
+       "doubles": 1,
+       "triples": 0,
+       "homeRuns": 1,
+       "strikeOuts": 0,
+       "baseOnBalls": 1,
+       "intentionalWalks": 0,
+       "hits": 3,
+       "hitByPitch": 0,
+       "avg": ".278",
+       "atBats": 4,
+       "obp": ".375",
+       "slg": ".346",
+       "ops": ".721",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 16,
+       "plateAppearances": 5,
+       "totalBases": 7,
+       "rbi": 2,
+       "leftOnBase": 0,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".667",
+       "groundOutsToAirouts": "1.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "4.00"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 142,
+       "name": "Minnesota Twins",
+       "link": "/api/v1/teams/142"
+      },
+      "date": "2026-09-13",
+      "gameType": "R",
+      "isHome": false,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       },
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 823658,
+       "link": "/api/v1.1/game/823658/feed/live",
+       "content": {
+        "link": "/api/v1/game/823658/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "1-3 | BB",
+       "gamesPlayed": 1,
+       "flyOuts": 1,
+       "groundOuts": 1,
+       "airOuts": 1,
+       "runs": 0,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 1,
+       "intentionalWalks": 0,
+       "hits": 1,
+       "hitByPitch": 0,
+       "avg": ".278",
+       "atBats": 3,
+       "obp": ".375",
+       "slg": ".346",
+       "ops": ".721",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 22,
+       "plateAppearances": 4,
+       "totalBases": 1,
+       "rbi": 0,
+       "leftOnBase": 1,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".333",
+       "groundOutsToAirouts": "1.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 145,
+       "name": "Chicago White Sox",
+       "link": "/api/v1/teams/145"
+      },
+      "date": "2026-09-14",
+      "gameType": "R",
+      "isHome": true,
+      "isWin": false,
+      "positionsPlayed": [
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       },
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 824386,
+       "link": "/api/v1.1/game/824386/feed/live",
+       "content": {
+        "link": "/api/v1/game/824386/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "1-3 | BB, R",
+       "gamesPlayed": 1,
+       "flyOuts": 1,
+       "groundOuts": 1,
+       "airOuts": 1,
+       "runs": 1,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 1,
+       "intentionalWalks": 0,
+       "hits": 1,
+       "hitByPitch": 0,
+       "avg": ".279",
+       "atBats": 3,
+       "obp": ".376",
+       "slg": ".346",
+       "ops": ".722",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 21,
+       "plateAppearances": 4,
+       "totalBases": 1,
+       "rbi": 0,
+       "leftOnBase": 1,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".333",
+       "groundOutsToAirouts": "1.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 145,
+       "name": "Chicago White Sox",
+       "link": "/api/v1/teams/145"
+      },
+      "date": "2026-09-15",
+      "gameType": "R",
+      "isHome": true,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 824384,
+       "link": "/api/v1.1/game/824384/feed/live",
+       "content": {
+        "link": "/api/v1/game/824384/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "0-3 | BB, R",
+       "gamesPlayed": 1,
+       "flyOuts": 1,
+       "groundOuts": 1,
+       "airOuts": 2,
+       "runs": 1,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 1,
+       "intentionalWalks": 0,
+       "hits": 0,
+       "hitByPitch": 0,
+       "avg": ".277",
+       "atBats": 3,
+       "obp": ".375",
+       "slg": ".344",
+       "ops": ".719",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 15,
+       "plateAppearances": 4,
+       "totalBases": 0,
+       "rbi": 0,
+       "leftOnBase": 1,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".000",
+       "groundOutsToAirouts": "0.50",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 145,
+       "name": "Chicago White Sox",
+       "link": "/api/v1/teams/145"
+      },
+      "date": "2026-09-16",
+      "gameType": "R",
+      "isHome": true,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 824382,
+       "link": "/api/v1.1/game/824382/feed/live",
+       "content": {
+        "link": "/api/v1/game/824382/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "0-3 | 2 BB, K",
+       "gamesPlayed": 1,
+       "flyOuts": 1,
+       "groundOuts": 1,
+       "airOuts": 1,
+       "runs": 0,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 1,
+       "baseOnBalls": 2,
+       "intentionalWalks": 0,
+       "hits": 0,
+       "hitByPitch": 0,
+       "avg": ".275",
+       "atBats": 3,
+       "obp": ".376",
+       "slg": ".342",
+       "ops": ".718",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 25,
+       "plateAppearances": 5,
+       "totalBases": 0,
+       "rbi": 0,
+       "leftOnBase": 1,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".000",
+       "groundOutsToAirouts": "1.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 133,
+       "name": "Athletics",
+       "link": "/api/v1/teams/133"
+      },
+      "date": "2026-09-18",
+      "gameType": "R",
+      "isHome": true,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 824383,
+       "link": "/api/v1.1/game/824383/feed/live",
+       "content": {
+        "link": "/api/v1/game/824383/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "2-5 | RBI, R",
+       "gamesPlayed": 1,
+       "flyOuts": 2,
+       "groundOuts": 1,
+       "airOuts": 2,
+       "runs": 1,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 0,
+       "intentionalWalks": 0,
+       "hits": 2,
+       "hitByPitch": 0,
+       "avg": ".277",
+       "atBats": 5,
+       "obp": ".376",
+       "slg": ".342",
+       "ops": ".718",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 18,
+       "plateAppearances": 5,
+       "totalBases": 2,
+       "rbi": 1,
+       "leftOnBase": 0,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".400",
+       "groundOutsToAirouts": "0.50",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 133,
+       "name": "Athletics",
+       "link": "/api/v1/teams/133"
+      },
+      "date": "2026-09-19",
+      "gameType": "R",
+      "isHome": true,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       },
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 824380,
+       "link": "/api/v1.1/game/824380/feed/live",
+       "content": {
+        "link": "/api/v1/game/824380/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "3-4",
+       "gamesPlayed": 1,
+       "flyOuts": 0,
+       "groundOuts": 0,
+       "airOuts": 1,
+       "runs": 0,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 0,
+       "intentionalWalks": 0,
+       "hits": 3,
+       "hitByPitch": 0,
+       "avg": ".280",
+       "atBats": 4,
+       "obp": ".378",
+       "slg": ".345",
+       "ops": ".723",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 20,
+       "plateAppearances": 4,
+       "totalBases": 3,
+       "rbi": 0,
+       "leftOnBase": 0,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".750",
+       "groundOutsToAirouts": "0.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 133,
+       "name": "Athletics",
+       "link": "/api/v1/teams/133"
+      },
+      "date": "2026-09-20",
+      "gameType": "R",
+      "isHome": true,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       },
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 824381,
+       "link": "/api/v1.1/game/824381/feed/live",
+       "content": {
+        "link": "/api/v1/game/824381/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "1-4 | BB, 2 K",
+       "gamesPlayed": 1,
+       "flyOuts": 1,
+       "groundOuts": 0,
+       "airOuts": 1,
+       "runs": 0,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 2,
+       "baseOnBalls": 1,
+       "intentionalWalks": 0,
+       "hits": 1,
+       "hitByPitch": 0,
+       "avg": ".280",
+       "atBats": 4,
+       "obp": ".378",
+       "slg": ".345",
+       "ops": ".723",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 19,
+       "plateAppearances": 5,
+       "totalBases": 1,
+       "rbi": 0,
+       "leftOnBase": 2,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".500",
+       "groundOutsToAirouts": "0.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 111,
+       "name": "Boston Red Sox",
+       "link": "/api/v1/teams/111"
+      },
+      "date": "2026-09-22",
+      "gameType": "R",
+      "isHome": false,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       },
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       },
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 824709,
+       "link": "/api/v1.1/game/824709/feed/live",
+       "content": {
+        "link": "/api/v1/game/824709/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "2-4",
+       "gamesPlayed": 1,
+       "flyOuts": 1,
+       "groundOuts": 0,
+       "airOuts": 2,
+       "runs": 0,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 0,
+       "intentionalWalks": 0,
+       "hits": 2,
+       "hitByPitch": 0,
+       "avg": ".282",
+       "atBats": 4,
+       "obp": ".379",
+       "slg": ".346",
+       "ops": ".725",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 17,
+       "plateAppearances": 4,
+       "totalBases": 2,
+       "rbi": 0,
+       "leftOnBase": 1,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".500",
+       "groundOutsToAirouts": "0.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 111,
+       "name": "Boston Red Sox",
+       "link": "/api/v1/teams/111"
+      },
+      "date": "2026-09-23",
+      "gameType": "R",
+      "isHome": false,
+      "isWin": false,
+      "positionsPlayed": [
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 824710,
+       "link": "/api/v1.1/game/824710/feed/live",
+       "content": {
+        "link": "/api/v1/game/824710/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "0-3 | BB",
+       "gamesPlayed": 1,
+       "flyOuts": 0,
+       "groundOuts": 3,
+       "airOuts": 0,
+       "runs": 0,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 1,
+       "intentionalWalks": 0,
+       "hits": 0,
+       "hitByPitch": 0,
+       "avg": ".280",
+       "atBats": 3,
+       "obp": ".378",
+       "slg": ".344",
+       "ops": ".722",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 17,
+       "plateAppearances": 4,
+       "totalBases": 0,
+       "rbi": 0,
+       "leftOnBase": 0,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".000",
+       "groundOutsToAirouts": "3.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 111,
+       "name": "Boston Red Sox",
+       "link": "/api/v1/teams/111"
+      },
+      "date": "2026-09-24",
+      "gameType": "R",
+      "isHome": false,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       },
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 824707,
+       "link": "/api/v1.1/game/824707/feed/live",
+       "content": {
+        "link": "/api/v1/game/824707/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "0-3 | 2 BB, 2 R",
+       "gamesPlayed": 1,
+       "flyOuts": 1,
+       "groundOuts": 3,
+       "airOuts": 1,
+       "runs": 2,
+       "doubles": 0,
+       "triples": 0,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 2,
+       "intentionalWalks": 0,
+       "hits": 0,
+       "hitByPitch": 0,
+       "avg": ".279",
+       "atBats": 3,
+       "obp": ".379",
+       "slg": ".342",
+       "ops": ".721",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 26,
+       "plateAppearances": 6,
+       "totalBases": 0,
+       "rbi": 0,
+       "leftOnBase": 4,
+       "sacBunts": 1,
+       "sacFlies": 0,
+       "babip": ".000",
+       "groundOutsToAirouts": "3.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 118,
+       "name": "Kansas City Royals",
+       "link": "/api/v1/teams/118"
+      },
+      "date": "2026-09-25",
+      "gameType": "R",
+      "isHome": false,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       },
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 824058,
+       "link": "/api/v1.1/game/824058/feed/live",
+       "content": {
+        "link": "/api/v1/game/824058/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     },
+     {
+      "season": "2026",
+      "stat": {
+       "summary": "3-4 | 3B, BB, RBI",
+       "gamesPlayed": 1,
+       "flyOuts": 0,
+       "groundOuts": 0,
+       "airOuts": 1,
+       "runs": 0,
+       "doubles": 0,
+       "triples": 1,
+       "homeRuns": 0,
+       "strikeOuts": 0,
+       "baseOnBalls": 1,
+       "intentionalWalks": 0,
+       "hits": 3,
+       "hitByPitch": 0,
+       "avg": ".282",
+       "atBats": 4,
+       "obp": ".382",
+       "slg": ".349",
+       "ops": ".731",
+       "caughtStealing": 0,
+       "stolenBases": 0,
+       "stolenBasePercentage": ".---",
+       "caughtStealingPercentage": ".---",
+       "groundIntoDoublePlay": 0,
+       "groundIntoTriplePlay": 0,
+       "numberOfPitches": 26,
+       "plateAppearances": 5,
+       "totalBases": 5,
+       "rbi": 1,
+       "leftOnBase": 0,
+       "sacBunts": 0,
+       "sacFlies": 0,
+       "babip": ".750",
+       "groundOutsToAirouts": "0.00",
+       "catchersInterference": 0,
+       "atBatsPerHomeRun": "-.--"
+      },
+      "team": {
+       "id": 114,
+       "name": "Cleveland Guardians",
+       "link": "/api/v1/teams/114"
+      },
+      "player": {
+       "id": 680757,
+       "fullName": "Steven Kwan",
+       "link": "/api/v1/people/680757"
+      },
+      "league": {
+       "id": 103,
+       "name": "American League",
+       "link": "/api/v1/league/103"
+      },
+      "sport": {
+       "id": 1,
+       "link": "/api/v1/sports/1",
+       "abbreviation": "MLB"
+      },
+      "opponent": {
+       "id": 118,
+       "name": "Kansas City Royals",
+       "link": "/api/v1/teams/118"
+      },
+      "date": "2026-09-26",
+      "gameType": "R",
+      "isHome": false,
+      "isWin": true,
+      "positionsPlayed": [
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       },
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       },
+       {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
+       },
+       {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+       }
+      ],
+      "game": {
+       "gamePk": 824057,
+       "link": "/api/v1.1/game/824057/feed/live",
+       "content": {
+        "link": "/api/v1/game/824057/content"
+       },
+       "gameNumber": 1,
+       "dayNight": "day"
+      }
+     }
+    ]
+   }
+  ]
+ }
+}
