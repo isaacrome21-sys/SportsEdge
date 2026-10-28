@@ -1,0 +1,24 @@
+{
+  "capture_note": "EXPANSION_REQUIRED \u2014 there is no SGP board; quotes exist only for built combinations. This family prices ONLY the fixed combination menu enumerated in its frozen preregistration (off-menu quotes are never captured or graded), read from the DK SGP builder at the T-1H entry mark and the FINAL close mark with the five #2792 receipts. LEG DEPENDENCY (fail-closed): a combination is priced only if every leg's family carries a committed engine with a pinned model_version; if a leg family records FAILED_SCREEN or DOES_NOT_BEAT_MARKET for a leg market in use, combinations using it are suspended until that family returns under a new version. min_rows counts graded PICKED rows. model_version stays the UNPINNED sentinel until the joint engine is pinned after its calibration screen and capture pilot.",
+  "capture_scope": "EXPANSION_REQUIRED",
+  "close_max_age_minutes": 60,
+  "clv_beats_threshold": 0.0,
+  "engine_id": "NFL_SGP_JOINT_V1",
+  "family": "SGP",
+  "market_form": "YES_ONLY",
+  "markets": [
+    "SGP"
+  ],
+  "max_clv_missing_share": 0.2,
+  "min_events": 40,
+  "min_rows": 100,
+  "min_slates": 4,
+  "model_version": "UNPINNED",
+  "over_side": "YES",
+  "prereg_draft": "research/nfl_activation_20261027/PREREG_NFL_SGP_FORWARD_V1_DRAFT.md",
+  "sides": [
+    "YES"
+  ],
+  "sport": "NFL",
+  "status": "DRAFT \u2014 NOT FROZEN"
+}
