@@ -107,6 +107,22 @@ class CaptureScopeTests(unittest.TestCase):
         with self.assertRaisesRegex(CbbCaptureScopeError, "ILLINOIS_COLLEGE_EXCLUDED"):
             validate(row)
 
+    def test_illinois_ids_refused_even_when_institution_state_is_forged(self):
+        # Primary NCAA 2026-27 MBB IL directory returns exactly these 13
+        # institutional matches. A caller cannot relabel an Illinois ESPN ID.
+        il_espn_ids = (
+            "71", "77", "79", "82", "305", "356", "2130",
+            "2197", "2287", "2350", "2459", "2565", "2710",
+        )
+        for espn_team_id in il_espn_ids:
+            with self.subTest(espn_team_id=espn_team_id):
+                row = fixture()
+                row["away"]["espn_team_id"] = espn_team_id
+                row["away"]["institution_state"] = "TX"
+                row["away"]["dk_name"] = "Disguised Out of State"
+                with self.assertRaisesRegex(CbbCaptureScopeError, "ILLINOIS_COLLEGE_EXCLUDED"):
+                    validate(row)
+
     def test_unknown_state_and_pro_team_refuse(self):
         row = fixture()
         row["away"]["institution_state"] = "UNKNOWN"
