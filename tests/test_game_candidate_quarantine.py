@@ -80,5 +80,22 @@ class GameQuarantineTests(unittest.TestCase):
                                ev_per_dollar=.4)]})
 
 
+    def test_deterministic_randomized_no_extreme_escape(self):
+        # Fixed seed: every claimed EV alias is exercised independently.
+        import random
+        rng = random.Random(20261028)
+        for index in range(1000):
+            values = [rng.uniform(-.3, 2.9) for _ in range(3)]
+            row = self.row(values[0], input_index=index,
+                           independent_projection={
+                               "raw_ev_per_dollar": values[1]},
+                           pricing_lanes={"lane_b_anchored": {
+                               "reported_ev_per_dollar": values[2]}})
+            filtered, ledger = quarantine_game_surfaces({"edges": [row]})
+            should_hold = max(values) >= .4
+            self.assertEqual(bool(ledger), should_hold)
+            self.assertEqual(bool(filtered["edges"]), not should_hold)
+
+
 if __name__ == "__main__":
     unittest.main()
