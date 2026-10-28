@@ -142,3 +142,33 @@ def test_malformed_ev_claim_fails_closed_without_fake_extreme_label(malformed):
     screens = build_current_value_screens(card, now=NOW)
     assert screens["unverified_model_value_screens"] == []
     assert screens["exclusions"]["PROP_EV_CLAIM_INVALID"] == 1
+
+
+@pytest.mark.parametrize("hidden", [
+    {"pricing_lanes": {"lane_b_anchored": {
+        "estimate_p": 1.5, "ev_per_dollar": 0.04}}},
+    {"pricing_lanes": {"lane_a_independent": {
+        "model_probability": -0.01, "ev_per_dollar": 0.04}}},
+    {"pricing_lanes": {"lane_b_anchored": {
+        "estimate_p": float("nan"), "ev_per_dollar": 0.04}}},
+    {"pricing_lanes": {"lane_b_anchored": {
+        "estimate_p": True, "ev_per_dollar": 0.04}}},
+    {"independent_projection": {
+        "estimate_p": float("inf"), "ev_per_dollar": 0.04,
+        "paired_market_status": "EXACT_DK_TWO_SIDED_NO_VIG_RESEARCH"}},
+])
+def test_impossible_hidden_probability_never_becomes_value_screen(hidden):
+    # An invalid Lane B p must not be displayed as 150% probability or
+    # silently fall back to a small blended EV while preserving LEAN.
+    card = _card(sport="CFB", probability=0.52, reported_ev=0.04,
+                 price=100, blend=(0.52, 0.04))
+    card["evaluated_rows"][0].update(hidden)
+    selection = build_phone_card(card)["selections"][0]
+    assert selection["status"] == "QUARANTINED"
+    assert selection["reason"] == "PROP_PROBABILITY_CLAIM_INVALID"
+    assert selection["blended"] is None
+    assert selection["estimated_ev"] is None
+    screens = build_current_value_screens(card, now=NOW)
+    assert screens["unverified_model_value_screens"] == []
+    assert screens["exclusions"]["PROP_PROBABILITY_CLAIM_INVALID"] == 1
+    assert card["evaluated_rows"][0]["ev_per_dollar"] == 0.04
