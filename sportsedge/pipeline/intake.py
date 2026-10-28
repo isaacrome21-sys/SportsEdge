@@ -21,6 +21,12 @@ Rules (identical for every sport):
   without it parses, but ``captured_at`` is None and a warning is recorded.
 * A line with exactly one price fails closed (no side is ever invented). A
   recognised market with the wrong shape fails closed.
+* Prices and lines are plain ASCII decimal transcriptions: scientific
+  notation, underscore separators and non-ASCII digits are malformed and
+  fail closed, never coerced. (An integral ".0" tail on a price stays
+  accepted under the existing tested contract.)
+* One snapshot carries one quote per market: a second line for the same
+  market (same subject/team) in the same game fails closed as a duplicate.
 * A line whose market label the sport adapter does not know is skipped with a
   warning (``SKIPPED_UNKNOWN``), never guessed.
 * Prices are transcribed only. Nothing here creates a probability.
@@ -82,6 +88,14 @@ _COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 _CAPTURED = re.compile(r"^captured\b\s*:?\s*(.*?)\s*$", re.IGNORECASE)
 _SPORT_TAG = re.compile(r"^\[[A-Z]{2,4} LINES\]\s*", re.IGNORECASE)
 _DROP_WORDS = {"prop", "player", "o/u"}
+# Transcribed prices and lines are plain ASCII decimal text. Anything else
+# (scientific notation, underscore separators, non-ASCII digits) is a
+# malformed transcription, never a value to coerce: Decimal()/float() would
+# otherwise silently accept all of those. An integral decimal tail on a
+# price ("-110.0") stays accepted: it is the repo's tested contract.
+_ODDS_TOKEN = re.compile(r"^[+-]?[0-9]+(?:\.0+)?$")
+_LINE_TOKEN = re.compile(r"^[+-]?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)$")
+_BARE_NUMBER = re.compile(r"^[+-]?[0-9]+(?:\.[0-9]+)?$")
 
 
 def _norm_dash(text: str) -> str:
@@ -106,6 +120,8 @@ def american(token: str, raw: str, sport: str) -> int:
     text = token.strip()
     if text.lower() in {"even", "ev"}:
         return 100
+    if not _ODDS_TOKEN.match(text):
+        raise SharedIntakeError(f"{sport}_INTAKE_ODDS_INVALID:{raw}")
     try:
         number = Decimal(text)
     except InvalidOperation as exc:
@@ -120,6 +136,8 @@ def _number(token: str, raw: str, sport: str) -> float:
     text = token.strip().lstrip("oOuU")
     if text.lower() in {"pk", "pick"}:
         return 0.0
+    if not _LINE_TOKEN.match(text):
+        raise SharedIntakeError(f"{sport}_INTAKE_LINE_INVALID:{raw}")
     try:
         value = float(text)
     except ValueError as exc:
@@ -134,6 +152,13 @@ def parse_header(line: str) -> tuple[str, str] | None:
     text = _SPORT_TAG.sub("", _norm_dash(line.strip()))
     head = re.split(r"\s+—\s+|\s*[(,|]|\s+-\s+|:\s", text, maxsplit=1)[0].strip()
     if "@" not in head or re.search(r"(?<![\w.])[+-]?\d{3,5}(?![\w.])", head):
+        return None
+    # A bare number anywhere but the head's final token (e.g. a trailing
+    # "Game 7") means this is a note line that happens to contain '@'
+    # ("Mahomes @ 50 percent health"), not a matchup: never let it open a
+    # phantom game that steals the real game's following market lines.
+    tokens = head.split()
+    if any(_BARE_NUMBER.match(tok) for tok in tokens[:-1]):
         return None
     away, home = (part.strip() for part in head.split("@", 1))
     if not away or not home or "@" in home:
@@ -261,6 +286,7 @@ def parse_issue(body: str, sport: str, *, title: str | None = None,
     current: SharedGame | None = None
     board_captured: str | None = None
     own_capture: set[int] = set()
+    seen_markets: dict[int, set[tuple[str, str, str]]] = {}
 
     def _new_game(away: str, home: str, header: str) -> SharedGame:
         if resolve_teams:
@@ -303,6 +329,16 @@ def parse_issue(body: str, sport: str, *, title: str | None = None,
                 raise SharedIntakeError(f"{sport}_INTAKE_MARKET_BEFORE_GAME:{line}")
         market = _parse_market(line, current, adapter, warnings, n, resolve_teams, strict_unknown)
         if market is not None:
+            # One snapshot carries one quote per market: a second line for the
+            # same market (same subject/team) in the same game is a competing
+            # record, never a silent first/last-wins pick. Fail closed.
+            key = (market.market,
+                   " ".join((market.subject or "").split()).casefold(),
+                   " ".join((market.team or "").split()).casefold())
+            seen = seen_markets.setdefault(id(current), set())
+            if key in seen:
+                raise SharedIntakeError(f"{sport}_INTAKE_DUPLICATE_MARKET:{line}")
+            seen.add(key)
             current.markets.append(market)
 
     if not games:
