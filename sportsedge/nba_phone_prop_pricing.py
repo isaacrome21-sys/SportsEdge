@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import csv
 import glob
+import math
 import os
 import re
 import unicodedata
@@ -65,6 +66,9 @@ TARGET_DATE_UNVERIFIED = "NBA_PROP_TARGET_DATE_UNVERIFIED"
 LINE_MISSING = "NBA_PROP_LINE_MISSING"
 SIDE_UNVERIFIED = "NBA_PROP_SIDE_UNVERIFIED"
 QUOTE_PRICE_MISSING = "NBA_PROP_QUOTE_PRICE_MISSING"
+QUOTE_PRICE_INVALID = "NBA_PROP_QUOTE_PRICE_INVALID"
+QUOTE_TIMESTAMP_MISSING = "NBA_PROP_QUOTE_TIMESTAMP_MISSING"
+QUOTE_TIMESTAMP_INVALID = "NBA_PROP_QUOTE_TIMESTAMP_INVALID"
 
 
 def nba_prop_family_for_market(market):
@@ -167,13 +171,28 @@ def _target_date(row):
 
 
 def _american_to_decimal(odds):
+    """Parse integer American odds only; never coerce NaN, inf, bool or decimals.
+
+    This is syntax validation, NOT an authenticated DraftKings quote.
+    """
+    if isinstance(odds, bool) or odds is None:
+        return None
+    if isinstance(odds, int):
+        value = odds
+    elif isinstance(odds, str) and re.fullmatch(r"[+-]?[0-9]+", odds.strip()):
+        try:
+            value = int(odds.strip())
+        except ValueError:
+            return None
+    else:
+        return None
+    if abs(value) < 100:
+        return None
     try:
-        value = float(str(odds).strip())
-    except (TypeError, ValueError):
+        decimal = 1.0 + (value / 100.0 if value > 0 else 100.0 / abs(value))
+    except OverflowError:
         return None
-    if value == 0:
-        return None
-    return 1.0 + (value / 100.0 if value > 0 else 100.0 / abs(value))
+    return decimal if math.isfinite(decimal) and decimal > 1.0 else None
 
 
 def _fair_american(p_win: float, p_lose: float):
@@ -333,17 +352,33 @@ def phone_nba_prop_rows(rows, *, now=None, store=None, store_dir=None,
             outputs.append(_blocked(row, family, TARGET_DATE_UNVERIFIED))
             continue
         try:
-            line = float(row["line"])
-        except (KeyError, TypeError, ValueError):
+            raw_line = row["line"]
+            if isinstance(raw_line, bool):
+                raise ValueError("boolean line")
+            line = float(raw_line)
+            if not math.isfinite(line):
+                raise ValueError("nonfinite line")
+        except (KeyError, TypeError, ValueError, OverflowError):
             outputs.append(_blocked(row, family, LINE_MISSING))
             continue
         side = str(row.get("side") or row.get("selection") or "").upper()
         if side not in {"OVER", "UNDER"}:
             outputs.append(_blocked(row, family, SIDE_UNVERIFIED))
             continue
-        decimal = _american_to_decimal(row.get("odds", row.get("price")))
+        raw_odds = row.get("odds", row.get("price"))
+        decimal = _american_to_decimal(raw_odds)
         if decimal is None:
-            outputs.append(_blocked(row, family, QUOTE_PRICE_MISSING))
+            reason = (QUOTE_PRICE_MISSING if raw_odds is None or raw_odds == ""
+                      else QUOTE_PRICE_INVALID)
+            outputs.append(_blocked(row, family, reason))
+            continue
+        raw_quote_ts = row.get("quote_captured_at") or row.get("captured_at")
+        if not raw_quote_ts:
+            outputs.append(_blocked(row, family, QUOTE_TIMESTAMP_MISSING))
+            continue
+        quote_ts = _parse_instant(raw_quote_ts)
+        if quote_ts is None:
+            outputs.append(_blocked(row, family, QUOTE_TIMESTAMP_INVALID))
             continue
         priced = resolved_store.price(
             player_id, FAMILY_TO_STAT[family], line, target)
@@ -353,15 +388,9 @@ def phone_nba_prop_rows(rows, *, now=None, store=None, store_dir=None,
         p_win = priced["p_over"] if side == "OVER" else priced["p_under"]
         p_lose = priced["p_under"] if side == "OVER" else priced["p_over"]
         ev = p_win * (decimal - 1.0) - p_lose
-        quote_ts = _parse_instant(
-            row.get("quote_captured_at") or row.get("captured_at"))
-        if quote_ts is None:
-            freshness = "NO_TIMESTAMP_ON_ROW"
-            stale = False
-        else:
-            age = (now - quote_ts).total_seconds()
-            stale = age > QUOTE_FRESH_SECONDS or age < 0
-            freshness = "STALE_OR_FUTURE" if stale else "CURRENT"
+        age = (now - quote_ts).total_seconds()
+        stale = age > QUOTE_FRESH_SECONDS or age < 0
+        freshness = "STALE_OR_FUTURE" if stale else "CURRENT"
         if stale:
             status = "WATCH_QUOTE_NOT_CURRENT"
         elif ev >= min_ev:
