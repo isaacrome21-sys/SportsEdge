@@ -110,6 +110,22 @@ CFB = SportAdapter("CFB", _table({
     "teamtotal|tt": _ou("TEAM_TOTAL", "team"),
 }))
 
+# CBB mirrors the CFB table exactly: the canonical names (MONEYLINE /
+# SPREAD / TOTAL / TEAM_TOTAL) are the ones the CBB forward runners
+# consume from the shared parser's output (games_from_board). Team
+# names use the default resolver — DK display names pass through
+# whitespace-normalized. There is deliberately NO DK-name alias table:
+# the admitted crosswalk (PR #2898) does not map DK names, and identity
+# is fixture-supplied, never name-derived. The intake wrapper that
+# enforces the CBB-specific rules (strict unknown labels, comment
+# event ids, the Illinois exclusion) is sportsedge/cbb_lines_intake.py.
+CBB = SportAdapter("CBB", _table({
+    "ml|moneyline": _spec("MONEYLINE", ML),
+    "spread|sp|line": _spec("SPREAD", SPREAD),
+    "total|ou": _spec("TOTAL", TOTAL),
+    "teamtotal|tt": _ou("TEAM_TOTAL", "team"),
+}))
+
 def _period_total(name: str) -> MarketSpec:
     return MarketSpec(name, "period_total", ("OVER", "UNDER"), True)
 
@@ -167,7 +183,7 @@ MLB = SportAdapter("MLB", _table({
     "tb|totalbases": _ou("BATTER_TOTAL_BASES", "player"),
 }))
 
-ADAPTERS = {a.sport: a for a in (MLB, NFL, CFB, NBA, NHL)}
+ADAPTERS = {a.sport: a for a in (MLB, NFL, CFB, NBA, NHL, CBB)}
 
 
 def adapter_for(sport: str) -> SportAdapter:
