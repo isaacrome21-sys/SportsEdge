@@ -129,6 +129,20 @@ class GameCardAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "IDENTITY_MISSING:selection"):
             sanitize_card(card)
 
+    def test_original_fixture_identity_cannot_be_forged_by_display(self):
+        # The ranked row can claim a valid game/selection, but the original
+        # evidence must independently carry that identity.
+        for key in ("game", "selection"):
+            for bad in (None, "", "   ", 42, True):
+                with self.subTest(key=key, bad=bad):
+                    card = self.card()
+                    card["evaluated_rows"][1][key] = bad
+                    card["edges"] = [deepcopy(card["edges"][1])]
+                    with self.assertRaisesRegex(
+                        ValueError, "GAME_EVALUATED_IDENTITY_INVALID:" + key
+                    ):
+                        sanitize_card(card)
+
     def test_original_probability_invalid_even_if_surface_sanitized(self):
         card = self.card()
         card["evaluated_rows"][1]["estimate_p"] = 1.5
