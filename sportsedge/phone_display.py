@@ -41,28 +41,48 @@ def _number(value):
     return value if isfinite(value) else None
 
 
-def _extreme_claim(row, *computed_evs):
-    """True if ANY stored or current-quote EV claim enters the owner hold.
+def _ev_claim_hold_reason(row, *computed_evs):
+    """Fail closed on malformed EV or any >=40% stored/repriced claim.
 
-    Do not let a lower market-blended view mask an extreme raw-model claim.
-    Underlying evaluated rows remain in the immutable card for grading.
+    Do not let blended/current EV conceal extreme raw or reported EV.
+    This is a display hold only; original evaluated rows remain unchanged.
     """
-    claims = list(computed_evs)
+    values = []
+    invalid = False
+
+    def collect(value):
+        nonlocal invalid
+        if value is None:
+            return
+        number = _number(value)
+        if number is None:
+            invalid = True
+        else:
+            values.append(number)
+
+    for value in computed_evs:
+        collect(value)
     lanes = row.get("pricing_lanes")
+    if lanes is not None and not isinstance(lanes, dict):
+        invalid = True
     lanes = lanes if isinstance(lanes, dict) else {}
     for candidate in (row, row.get("independent_projection"),
                       lanes.get("lane_a_independent"),
                       lanes.get("lane_b_anchored")):
-        if isinstance(candidate, dict):
-            # Mirror the raw JSON output boundary: a small blended/current
-            # EV must not mask a >=40% raw or previously reported claim.
-            for key in ("ev_per_dollar", "raw_ev_per_dollar",
-                        "reported_ev_per_dollar"):
-                claims.append(candidate.get(key))
-    return any((number is not None
-                and number >= EXTREME_CLAIMED_EV_QUARANTINE)
-               for number in (_number(value) for value in claims))
-
+        if candidate is None:
+            continue
+        if not isinstance(candidate, dict):
+            invalid = True
+            continue
+        for key in ("ev_per_dollar", "raw_ev_per_dollar",
+                    "reported_ev_per_dollar"):
+            if key in candidate:
+                collect(candidate[key])
+    if invalid:
+        return "PROP_EV_CLAIM_INVALID"
+    if any(value >= EXTREME_CLAIMED_EV_QUARANTINE for value in values):
+        return "EXTREME_CLAIMED_EV_QUARANTINE"
+    return None
 
 def _metrics(row):
     # Never substitute the independent projection for a row priced in Lane B:
@@ -223,10 +243,11 @@ def build_phone_card(card):
         # extreme raw/repriced/blended claim as LEAN, stale ranked, or headline.
         # The original evaluated row remains unchanged for append-only grading.
         blend = _blended(row, sport)
-        if bucket in {"priced", "stale"} and _extreme_claim(
-                row, ev, blend.get("ev") if blend else None):
-            label, bucket, reason = (
-                "QUARANTINED", "rejected", "EXTREME_CLAIMED_EV_QUARANTINE")
+        hold_reason = (_ev_claim_hold_reason(
+            row, ev, blend.get("ev") if blend else None)
+            if bucket in {"priced", "stale"} else None)
+        if hold_reason:
+            label, bucket, reason = ("QUARANTINED", "rejected", hold_reason)
         # Keep unknown dimensions unknown: absence does not prove full-game,
         # pregame, a standard line, or any settlement convention.
         dimension = (sport, market, str(source.get("period") or "UNSPECIFIED"),
@@ -309,7 +330,7 @@ def build_current_value_screens(card, *, max_rows=20, now=None):
     raw_rows = card["evaluated_rows"]
     for source, row in zip(view["selections"], raw_rows):
         if source.get("status") == "QUARANTINED":
-            exclusions["EXTREME_CLAIMED_EV_QUARANTINE"] += 1
+            exclusions[source.get("reason") or "EXTREME_CLAIMED_EV_QUARANTINE"] += 1
             continue
         status = str(row.get("status") or "MISSING_STATUS")
         if (status.startswith("BLOCKED") or status in
@@ -375,8 +396,9 @@ def build_current_value_screens(card, *, max_rows=20, now=None):
         # A model's stored EV can refer to an earlier bookmaker price.
         # Reprice from the actual current quote on *every* card render.
         ev = p * decimal_odds - 1
-        if _extreme_claim(row, ev, reported_ev):
-            exclusions["EXTREME_CLAIMED_EV_QUARANTINE"] += 1
+        hold_reason = _ev_claim_hold_reason(row, ev, reported_ev)
+        if hold_reason:
+            exclusions[hold_reason] += 1
             continue
         if ev <= 0:
             exclusions["NO_POSITIVE_ESTIMATED_EV"] += 1
@@ -391,8 +413,9 @@ def build_current_value_screens(card, *, max_rows=20, now=None):
                 exclusions[source["sport"] + "_BLENDED_EV_UNAVAILABLE"] += 1
                 continue
             blended_ev = blend["probability"] * decimal_odds - 1
-            if _extreme_claim(row, blended_ev):
-                exclusions["EXTREME_CLAIMED_EV_QUARANTINE"] += 1
+            hold_reason = _ev_claim_hold_reason(row, blended_ev)
+            if hold_reason:
+                exclusions[hold_reason] += 1
                 continue
             if blended_ev <= 0:
                 exclusions["NO_POSITIVE_BLENDED_EV"] += 1
