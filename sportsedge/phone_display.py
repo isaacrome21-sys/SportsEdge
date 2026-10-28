@@ -49,6 +49,7 @@ def _ev_claim_hold_reason(row, *computed_evs):
     """
     values = []
     invalid = False
+    invalid_probability = False
 
     def collect(value):
         nonlocal invalid
@@ -78,6 +79,13 @@ def _ev_claim_hold_reason(row, *computed_evs):
                     "reported_ev_per_dollar"):
             if key in candidate:
                 collect(candidate[key])
+        for key in ("estimate_p", "model_probability"):
+            if key in candidate and candidate[key] is not None:
+                p = _number(candidate[key])
+                if p is None or not 0 <= p <= 1:
+                    invalid_probability = True
+    if invalid_probability:
+        return "PROP_PROBABILITY_CLAIM_INVALID"
     if invalid:
         return "PROP_EV_CLAIM_INVALID"
     if any(value >= EXTREME_CLAIMED_EV_QUARANTINE for value in values):
@@ -123,7 +131,7 @@ def _blended(row, sport):
         return None
     p = _number(lane_b.get("estimate_p"))
     ev = _number(lane_b.get("ev_per_dollar"))
-    if p is None or ev is None:
+    if p is None or not 0 <= p <= 1 or ev is None:
         return None
     return {"probability": p, "ev": ev,
             "fair_odds": _number(lane_b.get("fair_american")),
