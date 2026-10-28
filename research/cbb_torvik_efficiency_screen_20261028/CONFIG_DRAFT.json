@@ -1,0 +1,26 @@
+{
+ "status": "DRAFT \u2014 NOT FROZEN",
+ "sport": "CBB",
+ "family": "TORVIK_EFFICIENCY_V1",
+ "markets": [
+  "SPREAD",
+  "TOTAL"
+ ],
+ "engine_id": "CBB_TORVIK_EFFICIENCY_V1",
+ "model_version": "cbb_torvik_efficiency_v1@sha256:75479ea14b2ab4ef954bd4cde629a2d00e24efea173ac61c695482890dd4c45e",
+ "market_form": "TWO_SIDED",
+ "sides": [
+  "OVER",
+  "UNDER"
+ ],
+ "over_side": "OVER",
+ "min_rows": 40,
+ "min_events": 40,
+ "min_slates": null,
+ "max_clv_missing_share": 0.2,
+ "clv_beats_threshold": 0.0,
+ "close_max_age_minutes": 60,
+ "capture_scope": "IN_SCOPE",
+ "capture_note": "IN_SCOPE capture: CBB spread and game-total lines are priced body lines under the merged CBB capture scope (PR #2862 clean extraction; #2820 sections), entry = the lines lane's T-1H write, close = the FINAL write, under #2792 five-stage receipts. The verdict is the preregistration's two-leg test (research/cbb_torvik_efficiency_screen_20261028/PREREG_FINAL.md: accuracy vs the forward-recomputed simple ratings baseline; market CLV/ROI vs the closing line), NOT the framework's CLV-only default. Moneyline is named in the design's family header but carries NO forward leg in the design's section 5 terms and is deliberately NOT registered here (PREREG_FINAL reading A-1). min_events=40 carries the preregistration's only verdict gate (>= 40 distinct graded games); min_rows=40 is set to the same floor solely because the framework requires a positive value and carries no independent preregistration force; min_slates is unset (the preregistration names none). max_clv_missing_share and close_max_age_minutes are framework defaults carried expressly: the preregistration states no missing-close rule and no close-age limit (blocking gap G-3 in PREREG_FINAL section 8) and they have no preregistration force until the design amendment fixes the family's own rule. model_version pins the construction of record at package time (the attempt-4 screen runner implementing design section 1); no built forward runner exists yet (finding F-1) and the freeze act re-pins model_version to the built runner, logged as a pin change in the freeze record. REGISTRY: probed on current main \u2014 no CBB config exists in sportsedge/forward_validation/configs/; (CBB, SPREAD) and (CBB, TOTAL) are unclaimed, so installation raises no DUPLICATE_FORWARD_MARKET_CONFIG refusal (contrast the EFV2 package's (NFL, SPREAD) collision). PLACEMENT: this draft ships inside the research package only and registers nothing until the freeze act installs it. At the act, prereg_draft becomes prereg + prereg_sha256 and status flips to FROZEN; every gate/threshold value stays byte-identical.",
+ "prereg_draft": "research/cbb_torvik_efficiency_screen_20261028/PREREG_FINAL.md"
+}
