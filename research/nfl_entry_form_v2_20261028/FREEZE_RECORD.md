@@ -260,9 +260,22 @@ reading is left ambiguous in the interim — the preregistration's
 - **Config binding test:** none added. No config binding test
   exists for this family to update (the family suites carry no
   config references — verified at preparation), and the checklist
-  requires one only if the act adds one. The registry audit and
-  its two suites are the act's enforcement surface for the flip
-  (readiness audit, PR body).
+  requires one only if the act adds one.
+- **Audit-suite census scope (act readiness fix):** the two
+  readiness-audit suites
+  (`tests/test_cross_sport_accuracy_readiness.py`,
+  `tests/test_nba_v2_accuracy_readiness_bridge_20261026.py`) each
+  carry a census asserting exactly four `*_v2.json` configs
+  program-wide — written when the only such files were the four
+  NBA props V2 configs. Installing this family's config
+  (`nfl_entry_form_v2.json`, also `*_v2.json`) made the count 5
+  and failed both suites on the act head (verified: both pass on
+  the act's base, both failed on the act head before this fix).
+  The act scopes each census to its intended subject — the NBA
+  V2 family (`sport == "NBA"`, matching the bridge suite's own
+  `nba_player_*_v2.json` pin loop) — changing no assertion's
+  subject, count, or strength: a fifth NBA `*_v2.json` config
+  would still fail the census. No other test content changed.
 - **Statistical terms:** no difference from the package — any
   statistical difference would stop the act.
 

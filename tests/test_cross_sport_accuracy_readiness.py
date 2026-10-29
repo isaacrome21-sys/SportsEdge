@@ -65,7 +65,7 @@ def test_v2_configs_register_as_frozen_no_verdict():
     states = report["forward_config_states"]["NBA"]
     assert states.get("FINAL_CANDIDATE_NOT_FROZEN", 0) == 0
     rows = [r for r in report["forward_family_configs"]
-            if r["file"].endswith("_v2.json")]
+            if r["file"].endswith("_v2.json") and r["sport"] == "NBA"]
     assert len(rows) == 4
     assert all(r["state"] == "FROZEN_NO_VERDICT_ATTACHED" for r in rows)
     # recognition in this inventory confers nothing: no family becomes
