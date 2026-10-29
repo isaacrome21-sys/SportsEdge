@@ -1,0 +1,284 @@
+{
+ "binding": false,
+ "mode": "NON_COUNTED_DRY_RUN",
+ "board": {
+  "rows_extracted": 29,
+  "rows_resolved": 23,
+  "resolved": [
+   {
+    "player_name": "Javonte Williams",
+    "player_id": "00-0036997",
+    "yes_price": -160
+   },
+   {
+    "player_name": "Saquon Barkley",
+    "player_id": "00-0034844",
+    "yes_price": 115
+   },
+   {
+    "player_name": "CeeDee Lamb",
+    "player_id": "00-0036358",
+    "yes_price": 135
+   },
+   {
+    "player_name": "George Pickens",
+    "player_id": "00-0037247",
+    "yes_price": 175
+   },
+   {
+    "player_name": "Dallas Goedert",
+    "player_id": "00-0034351",
+    "yes_price": 190
+   },
+   {
+    "player_name": "Jake Ferguson",
+    "player_id": "00-0038041",
+    "yes_price": 275
+   },
+   {
+    "player_name": "Darius Cooper",
+    "player_id": "00-0040024",
+    "yes_price": 280
+   },
+   {
+    "player_name": "Makai Lemon",
+    "player_id": "00-0040867",
+    "yes_price": 320
+   },
+   {
+    "player_name": "Ryan Flournoy",
+    "player_id": "00-0039410",
+    "yes_price": 380
+   },
+   {
+    "player_name": "Dameon Pierce",
+    "player_id": "00-0037258",
+    "yes_price": 550
+   },
+   {
+    "player_name": "Dak Prescott",
+    "player_id": "00-0033077",
+    "yes_price": 600
+   },
+   {
+    "player_name": "Brevyn Spann-Ford",
+    "player_id": "00-0039530",
+    "yes_price": 650
+   },
+   {
+    "player_name": "Tanner McKee",
+    "player_id": "00-0038400",
+    "yes_price": 850
+   },
+   {
+    "player_name": "Marquise Brown",
+    "player_id": "00-0035662",
+    "yes_price": 1000
+   },
+   {
+    "player_name": "Grant Calcaterra",
+    "player_id": "00-0037086",
+    "yes_price": 1000
+   },
+   {
+    "player_name": "Tyler Goodson",
+    "player_id": "00-0037120",
+    "yes_price": 1100
+   },
+   {
+    "player_name": "Jonathan Mingo",
+    "player_id": "00-0039062",
+    "yes_price": 1100
+   },
+   {
+    "player_name": "Elijah Moore",
+    "player_id": "00-0036980",
+    "yes_price": 1200
+   },
+   {
+    "player_name": "Hunter Luepke",
+    "player_id": "00-0038738",
+    "yes_price": 1200
+   },
+   {
+    "player_name": "Luke Schoonmaker",
+    "player_id": "00-0038547",
+    "yes_price": 1400
+   },
+   {
+    "player_name": "Emari Demercado",
+    "player_id": "00-0038705",
+    "yes_price": 1400
+   },
+   {
+    "player_name": "Johnny Mundt",
+    "player_id": "00-0033246",
+    "yes_price": 1900
+   },
+   {
+    "player_name": "Britain Covey",
+    "player_id": "00-0037132",
+    "yes_price": 2000
+   }
+  ],
+  "refusals": [
+   {
+    "player_name": "Eli Stowers",
+    "code": "NAME_UNRESOLVED",
+    "reason": "NO_MATCH"
+   },
+   {
+    "player_name": "Camden Brown",
+    "code": "NAME_UNRESOLVED",
+    "reason": "NO_MATCH"
+   },
+   {
+    "player_name": "Elijah Mitchell",
+    "code": "NAME_UNRESOLVED",
+    "reason": "TEAM_MISMATCH"
+   }
+  ],
+  "exclusions": [
+   {
+    "player_name": "DAL Cowboys D/ST",
+    "code": "NOT_A_PLAYER_ROW"
+   },
+   {
+    "player_name": "PHI Eagles D/ST",
+    "code": "NOT_A_PLAYER_ROW"
+   },
+   {
+    "player_name": "No Touchdown Scorer",
+    "code": "NOT_A_PLAYER_ROW"
+   }
+  ],
+  "warnings": [
+   "CAPTURE_OUTSIDE_T1H_BAND"
+  ],
+  "path": "nfl_atd_v1_1/boards/2026-W7/d72f736d6ef89578ee73fc24cb2456bf474376f00531507298c0f8071521ac6a.json",
+  "sha256": "d72f736d6ef89578ee73fc24cb2456bf474376f00531507298c0f8071521ac6a",
+  "slate_id": "ASM-2026W07-DAL-PHI"
+ },
+ "close": {
+  "source_capture": "record_only_dal_phi_20261026_1851.json (transcribed)",
+  "minutes_before_kickoff": 5.9,
+  "entries": [
+   {
+    "player_id": "00-0036997",
+    "yes_price": -150,
+    "captured_at": "2026-10-27T00:09:08Z"
+   },
+   {
+    "player_id": "00-0034844",
+    "yes_price": 110,
+    "captured_at": "2026-10-27T00:09:08Z"
+   },
+   {
+    "player_id": "00-0036358",
+    "yes_price": 125,
+    "captured_at": "2026-10-27T00:09:08Z"
+   },
+   {
+    "player_id": "00-0037247",
+    "yes_price": 175,
+    "captured_at": "2026-10-27T00:09:08Z"
+   },
+   {
+    "player_id": "00-0034351",
+    "yes_price": 180,
+    "captured_at": "2026-10-27T00:09:08Z"
+   },
+   {
+    "player_id": "00-0038041",
+    "yes_price": 270,
+    "captured_at": "2026-10-27T00:09:08Z"
+   }
+  ],
+  "path": "nfl_atd_v1_1/closes/2026-W7/e594809f11a3bbb0fead9c46cacb4e5a02d7fa0f11f6473d3abb56cbef63062e.json",
+  "sha256": "e594809f11a3bbb0fead9c46cacb4e5a02d7fa0f11f6473d3abb56cbef63062e"
+ },
+ "pricer": {
+  "priced_rows": 23,
+  "picks": [
+   "00-0039410",
+   "00-0037258",
+   "00-0035662",
+   "00-0037120",
+   "00-0039062",
+   "00-0036980",
+   "00-0038738",
+   "00-0038547",
+   "00-0038705",
+   "00-0033246",
+   "00-0037132"
+  ],
+  "passes": [
+   "00-0036997",
+   "00-0034844",
+   "00-0036358",
+   "00-0037247",
+   "00-0034351",
+   "00-0038041",
+   "00-0040024",
+   "00-0040867",
+   "00-0033077",
+   "00-0039530",
+   "00-0038400"
+  ],
+  "refusals": [
+   "00-0037086"
+  ]
+ },
+ "load_slate_status": "COUNTS",
+ "load_slate_reasons": [],
+ "load_slate_rows": 23,
+ "load_closes": {
+  "proven_captures": [
+   [
+    "2026_07_DAL_PHI",
+    "00-0036997",
+    -150
+   ],
+   [
+    "2026_07_DAL_PHI",
+    "00-0034844",
+    110
+   ],
+   [
+    "2026_07_DAL_PHI",
+    "00-0036358",
+    125
+   ],
+   [
+    "2026_07_DAL_PHI",
+    "00-0037247",
+    175
+   ],
+   [
+    "2026_07_DAL_PHI",
+    "00-0034351",
+    180
+   ],
+   [
+    "2026_07_DAL_PHI",
+    "00-0038041",
+    270
+   ]
+  ],
+  "unproven_records": []
+ },
+ "scored_rows": null,
+ "frozen_family_defect": {
+  "site": "score_nfl_atd_forward.score_slate_rows -> _games",
+  "error": "KeyError: 'week'",
+  "cause": "real pricer rows carry no 'week'; scorer requires row['week']; frozen tests miss it (scorer tests use the fake pricer, whose rows carry 'week'; replay tests never call score_slate_rows)",
+  "independent_reproduction": "frozen synthetic_world + real pricer + publish + close: load_slate COUNTS, score_slate_rows KeyError 'week'",
+  "also_blocks": "the scorer CLI's review() dies with the same KeyError in _games (score_nfl_atd_forward.py:271) in ATD_TEST_FAKE_STATE non-binding mode \u2014 no verdict can be produced for any real-priced slate until the frozen family is amended by a new version; the freeze itself must not be edited"
+ },
+ "scorer_cli": {
+  "returncode": 1,
+  "stdout_tail": "",
+  "stderr_tail": " File \"/home/hatch/workspace/atd-preflight-20261028/frozen/research/nfl_atd_engine_v1_20261018/score_nfl_atd_forward.py\", line 370, in review\n    games = _games(loaded)\n            ^^^^^^^^^^^^^^\n  File \"/home/hatch/workspace/atd-preflight-20261028/frozen/research/nfl_atd_engine_v1_20261018/score_nfl_atd_forward.py\", line 271, in _games\n    \"week\": r[\"week\"]}\n            ~^^^^^^^^\nKeyError: 'week'"
+ }
+}
+DRY RUN: ACCEPTED (NON-BINDING)
