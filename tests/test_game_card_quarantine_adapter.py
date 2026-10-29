@@ -197,5 +197,94 @@ class GameCardAdapterTests(unittest.TestCase):
 
 
 
+    def test_detached_pit_settlement_quote_and_authority_conflicts_refuse(self):
+        # These are untrusted copies, not authenticated DK observations.
+        claims = {
+            "kickoff_utc": ("2026-10-28T23:00:00Z", "2026-10-29T23:00:00Z"),
+            "team_totals_team": ("A", "B"),
+            "period": ("FULL_GAME", "FIRST_HALF"),
+            "settlement_type": ("REGULATION", "INCLUDING_OVERTIME"),
+            "event_id": ("event-1", "event-2"),
+            "dk_event_id": ("dk-1", "dk-2"),
+            "odds_american": (-110, 120),
+            "pricing_provenance": ({"lane": "LANE_A_INDEPENDENT"},
+                                   {"lane": "LANE_B_ANCHORED"}),
+            "quote_freshness": ({"status": "FRESH"}, {"status": "STALE"}),
+            "quote_captured_at": ("2026-10-28T22:00:00Z",
+                                  "2026-10-28T22:30:00Z"),
+            "book": ("draftkings", "other"),
+            "status": ("RESEARCH_POSITIVE_EV_UNVALIDATED", "OFFICIAL"),
+            "research_only": (True, False),
+            "model_p_authority": (False, True),
+        }
+        for key, (original_value, forged_value) in claims.items():
+            with self.subTest(field=key):
+                card = self.card()
+                original = card["evaluated_rows"][1]
+                original[key] = deepcopy(original_value)
+                detached = deepcopy(original)
+                detached[key] = deepcopy(forged_value)
+                card["edges"] = [detached]
+                with self.assertRaisesRegex(ValueError,
+                                            "GAME_SURFACE_IDENTITY_CONFLICT:" + key):
+                    sanitize_card(card)
+
+    def test_detached_original_known_field_cannot_be_silently_omitted(self):
+        for key, value in (
+            ("kickoff_utc", "2026-10-28T23:00:00Z"),
+            ("team_totals_team", "A"),
+            ("period", "FULL_GAME"),
+            ("quote_freshness", {"status": "FRESH"}),
+            ("odds_american", -110),
+            ("model_p_authority", False),
+        ):
+            with self.subTest(field=key):
+                card = self.card()
+                original = card["evaluated_rows"][1]
+                original[key] = deepcopy(value)
+                detached = deepcopy(original)
+                del detached[key]
+                card["edges"] = [detached]
+                with self.assertRaisesRegex(ValueError,
+                                            "GAME_SURFACE_IDENTITY_MISSING:" + key):
+                    sanitize_card(card)
+
+    def test_detached_identity_not_in_original_cannot_be_invented(self):
+        for key, forged_value in (
+            ("kickoff_utc", "2026-10-28T23:00:00Z"),
+            ("team_totals_team", "B"),
+            ("period", "FIRST_HALF"),
+            ("event_id", "invented"),
+            ("quote_captured_at", "2026-10-28T22:00:00Z"),
+            ("book", "draftkings"),
+            ("model_p_authority", True),
+        ):
+            with self.subTest(field=key):
+                card = self.card()
+                detached = deepcopy(card["evaluated_rows"][1])
+                detached[key] = forged_value
+                card["edges"] = [detached]
+                with self.assertRaisesRegex(ValueError,
+                                            "GAME_SURFACE_IDENTITY_UNATTESTED:" + key):
+                    sanitize_card(card)
+
+    def test_matching_detached_pit_and_settlement_fields_stay_research_only(self):
+        card = self.card()
+        ordinary = card["evaluated_rows"][1]
+        ordinary.update({
+            "kickoff_utc": "2026-10-28T23:00:00Z",
+            "team_totals_team": "A",
+            "period": "FULL_GAME",
+            "quote_freshness": {"status": "FRESH"},
+            "model_p_authority": False,
+        })
+        card["edges"] = [deepcopy(ordinary)]
+        result = sanitize_card(card)
+        self.assertEqual(len(result["edges"]), 1)
+        self.assertEqual(result["edges"][0]["input_index"], 1)
+        self.assertFalse(result["game_quarantine_adapter"]["forward_clock_authority"])
+        self.assertEqual(result["evaluated_rows"], card["evaluated_rows"])
+
+
 if __name__ == "__main__":
     unittest.main()
