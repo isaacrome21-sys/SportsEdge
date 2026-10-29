@@ -1,0 +1,23 @@
+[
+  {
+    "sport": "NHL",
+    "slate": "2026-10-29",
+    "issue": "2928",
+    "away": "Utah Mammoth",
+    "home": "Pittsburgh Penguins",
+    "market": "PUCK_LINE",
+    "line": 1.5,
+    "side": "AWAY +1.5",
+    "price": -154,
+    "captured_at": "2026-10-29T17:05:42-05:00",
+    "model_p": 0.73852,
+    "push_p": 0.0,
+    "no_vig_p": 0.579178,
+    "ev": 0.218079,
+    "tag": "LEAN",
+    "owner": "nhl_rate_v1",
+    "result": null,
+    "close_price": null,
+    "clv": null
+  }
+]
