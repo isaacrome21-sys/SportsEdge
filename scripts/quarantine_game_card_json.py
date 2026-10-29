@@ -16,6 +16,7 @@ import sys
 # Allow invocation from any working directory.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sportsedge.game_candidate_quarantine import GAME_SURFACES, game_claim_hold
+from sportsedge.quote_freshness import MAX_QUOTE_AGE_SECONDS
 
 
 # Source-binding is intentionally stricter than a display's convenience fields.
@@ -43,11 +44,47 @@ _RESEARCH_AUTHORITY = {
     "truth_gate": False, "staking": False, "validated_profitability": False,
 }
 
+# These declarations are projected from the frozen engine's research contract.
+# The quote-age bound is imported, never caller-configured or relaxed.
+_RESEARCH_PLAY_GATE = {
+    "rule": "INDEPENDENT_PROBABILITY_REQUIRED_FOR_PLAY",
+    "anchored_max_surface": "WATCH",
+    "anchored_ev_in_edges_lists": "SUPPRESSED",
+    "undetermined_provenance": "FAIL_CLOSED",
+    "availability_unverified_max_surface": "RESEARCH_ONLY",
+}
+_RESEARCH_QUOTE_POLICY = {
+    "max_age_seconds": MAX_QUOTE_AGE_SECONDS,
+    "stale_quotes_are_watch_only": True,
+}
+_TOP_LEVEL_AUTHORITY_ALIASES = frozenset({
+    "official", "staking", "model_p", "truth_gate", "forward_clock",
+    "verified", "play", "no_play", "model_verified",
+    "official_authority", "staking_authority", "model_p_authority",
+    "validated_profitability", "research_only",
+})
+
+
+def _check_research_policy(card, key, expected):
+    if key not in card:
+        return
+    policy = card[key]
+    if not isinstance(policy, dict):
+        raise ValueError("GAME_CARD_POLICY_NOT_OBJECT:" + key)
+    for field, value in policy.items():
+        if field not in expected or type(value) is not type(expected[field]) or value != expected[field]:
+            raise ValueError("GAME_CARD_POLICY_CONFLICT:" + key + ":" + str(field))
+
 
 def _validate_card_contract(card):
     """Reject contradictory claims instead of silently laundering them."""
     if card.get("schema") != "SPORTSEDGE_FREE_RESEARCH_CARD_V1":
         raise ValueError("GAME_CARD_SCHEMA_UNSUPPORTED")
+    for key in _TOP_LEVEL_AUTHORITY_ALIASES:
+        if key in card:
+            raise ValueError("GAME_CARD_TOP_LEVEL_AUTHORITY_ALIAS:" + key)
+    _check_research_policy(card, "play_gate", _RESEARCH_PLAY_GATE)
+    _check_research_policy(card, "quote_freshness_policy", _RESEARCH_QUOTE_POLICY)
     if "authority" in card:
         authority = card["authority"]
         if not isinstance(authority, dict):
@@ -93,6 +130,8 @@ def sanitize_card(card):
     result = deepcopy(card)
     # Complete missing research declarations without accepting any escalation.
     result["authority"] = dict(_RESEARCH_AUTHORITY)
+    result["play_gate"] = dict(_RESEARCH_PLAY_GATE)
+    result["quote_freshness_policy"] = dict(_RESEARCH_QUOTE_POLICY)
     result["lane_b_edges"] = []
     # Phase one: validate every displayed row and collect holds globally by
     # original input_index. A bad claim in ONE surface must suppress the same
