@@ -591,8 +591,11 @@ def _replay_check(api, rec, rows, run_t, sch, sd, out):
         if _t(bp["pushed_at"]) >= run_t:
             out["reasons"].append("INPUT_PUSH_NOT_BEFORE_RUN_PUSH")
         board = json.loads(bp["content"])
-        if any(str(board.get(k)) != str(rec.get(k))
-               for k in ("slate_id", "season", "week", "captured_at")):
+        # Do not let Python int-coercion or stringification disguise a
+        # board week whose type differs from the exact run/schedule week.
+        if type(board.get("week")) is not int or board["week"] != rec["week"] \
+                or any(str(board.get(k)) != str(rec.get(k))
+                       for k in ("slate_id", "season", "week", "captured_at")):
             out["reasons"].append("RUN_BOARD_MISMATCH")
         out["board_proof"] = {k: v for k, v in bp.items() if k != "content"}
     except ProvenanceFailed as e:
