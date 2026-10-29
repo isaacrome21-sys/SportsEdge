@@ -259,6 +259,18 @@ def parse_lines_with_warnings(text: str, *, title: str | None = None) -> tuple[l
             rows.append(ParsedRow(away, home, market, "AWAY", float(match[2]), _price(match[3]), "HOME", _price(match[5])))
             continue
 
+        # A slash-form RL/F5 RL/Alt RL must have two handicaps and prices.
+        # Do not silently drop a truncated counterpart when other markets
+        # on the same board are valid.
+        if "/" in line and re.match(
+            r"^(?:(?:F5|first ?5|first five)\s+)?(?:alt(?:ernate)?\s+)?(?:RL|run ?line)\b",
+            line, flags=re.I,
+        ):
+            errors.append(
+                f"line {n}: BLOCKED_PRICING_METHOD: malformed explicit paired run line '{line}'"
+            )
+            continue
+
         match = re.fullmatch(rf"YRFI\s+{_PRICE}\s*/\s*NRFI\s+{_PRICE}", line, flags=re.I)
         if match:
             rows.append(ParsedRow(away, home, "FIRST_INNING_TOTAL", "OVER", 0.5, _price(match[1]), "UNDER", _price(match[2])))
