@@ -1,0 +1,89 @@
+{
+ "check": "LANDING_CHECK_WIRING_ONLY",
+ "corpus": {
+  "corpus_sha256": "cef59544a3f9f813db90154eed0715ccd2d4cd09acb486dbe12ae7585eec96d6",
+  "events": 157,
+  "manifest_status": "DRAFT \u2014 NOT ADMITTED",
+  "pins_verified_by_loader": true,
+  "rows": 19630
+ },
+ "criteria": "NOT RUN \u2014 no verdict is produced by a landing check",
+ "executor_version": "PGA_H2H_EXECUTOR_V1",
+ "plumbing_config": {
+  "cut_size": 65,
+  "day_draw_sd": 0.35,
+  "label": "PLUMBING_ONLY \u2014 not design values",
+  "n_sims": 200,
+  "seed": 20261028,
+  "shrinkage_prior_rounds": 20.0
+ },
+ "pricing_wiring": {
+  "2023": {
+   "events": 27,
+   "floor_met_by_wiring_count": true,
+   "priced_pairs_criterion4_shaped": 121156,
+   "priced_player_events": 2448,
+   "volume_floor": 1500
+  },
+  "2024": {
+   "events": 30,
+   "floor_met_by_wiring_count": true,
+   "priced_pairs_criterion4_shaped": 112679,
+   "priced_player_events": 2510,
+   "volume_floor": 1500
+  },
+  "2025": {
+   "events": 29,
+   "floor_met_by_wiring_count": true,
+   "priced_pairs_criterion4_shaped": 112189,
+   "priced_player_events": 2470,
+   "volume_floor": 1500
+  }
+ },
+ "ref_b_prime_accumulation": {
+  "2023": {
+   "amendment_headroom": 161012,
+   "fit_window_decided_pairs": 343598,
+   "headroom_reproduced": true,
+   "test_event_both_valid_rank_pairs": 161012,
+   "test_event_decided_pairs_both_valid": 123444
+  },
+  "2024": {
+   "amendment_headroom": 170476,
+   "fit_window_decided_pairs": 467042,
+   "headroom_reproduced": true,
+   "test_event_both_valid_rank_pairs": 170476,
+   "test_event_decided_pairs_both_valid": 132530
+  },
+  "2025": {
+   "amendment_headroom": 167977,
+   "fit_window_decided_pairs": 599572,
+   "headroom_reproduced": true,
+   "test_event_both_valid_rank_pairs": 167977,
+   "test_event_decided_pairs_both_valid": 127714
+  }
+ },
+ "screen_verdict": "NOT_EXECUTABLE",
+ "simulation_wiring": {
+  "event": "14_2025-04-13 (Masters Tournament)",
+  "field_rows": 95,
+  "n_sims": 200,
+  "pairs_with_decided_simulations": 2346,
+  "priced_players": 69,
+  "probabilities": "computed and discarded \u2014 wiring only, not a screen result"
+ },
+ "stamps": [
+  "PRE_ADOPTION_CHECK"
+ ],
+ "verdict": null,
+ "verdict_path_refusal": {
+  "reasons": [
+   "AMENDMENT_1_NOT_ADOPTED",
+   "CONTENT_PIN_NOT_ADMITTED"
+  ],
+  "stamps": [
+   "PRE_ADOPTION_CHECK"
+  ],
+  "verdict": "NOT_EXECUTABLE"
+ }
+}
