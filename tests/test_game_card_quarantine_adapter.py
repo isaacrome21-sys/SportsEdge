@@ -393,6 +393,77 @@ class GameCardAdapterTests(unittest.TestCase):
                     sanitize_card(card)
 
 
+    def test_top_level_authority_aliases_refuse_even_false(self):
+        for key, value in (("official", True), ("official", False),
+                           ("staking", True), ("model_p", True),
+                           ("forward_clock", True), ("research_only", True),
+                           ("verified", True), ("model_verified", True)):
+            with self.subTest(key=key):
+                card = self.card()
+                card[key] = value
+                before = deepcopy(card)
+                with self.assertRaisesRegex(ValueError, "GAME_CARD_TOP_LEVEL_AUTHORITY_ALIAS"):
+                    sanitize_card(card)
+                self.assertEqual(card, before)
+
+    def test_conflicting_play_gate_and_quote_age_refuse(self):
+        cases = (
+            ("play_gate", {"rule": "ALLOW_STAKING"}),
+            ("play_gate", {"anchored_max_surface": "PLAY"}),
+            ("play_gate", {"unexpected_authority": True}),
+            ("quote_freshness_policy", {"max_age_seconds": 999999999}),
+            ("quote_freshness_policy", {"max_age_seconds": 180.0}),
+            ("quote_freshness_policy", {"max_age_seconds": True}),
+            ("quote_freshness_policy", {"stale_quotes_are_watch_only": False}),
+            ("quote_freshness_policy", {"unexpected_policy": "ALLOW"}),
+        )
+        for key, policy in cases:
+            with self.subTest(key=key, policy=policy):
+                card = self.card()
+                card[key] = policy
+                before = deepcopy(card)
+                with self.assertRaisesRegex(ValueError, "GAME_CARD_POLICY_CONFLICT"):
+                    sanitize_card(card)
+                self.assertEqual(card, before)
+
+    def test_malformed_policy_objects_refuse(self):
+        for key in ("play_gate", "quote_freshness_policy"):
+            for value in (None, [], False, "ALLOW_STAKING"):
+                with self.subTest(key=key, value=value):
+                    card = self.card()
+                    card[key] = value
+                    with self.assertRaisesRegex(ValueError, "GAME_CARD_POLICY_NOT_OBJECT"):
+                        sanitize_card(card)
+
+    def test_canonical_policy_projected_without_claiming_quote_authentication(self):
+        card = self.card()
+        result = sanitize_card(card)
+        self.assertEqual(result["play_gate"], {
+            "rule": "INDEPENDENT_PROBABILITY_REQUIRED_FOR_PLAY",
+            "anchored_max_surface": "WATCH",
+            "anchored_ev_in_edges_lists": "SUPPRESSED",
+            "undetermined_provenance": "FAIL_CLOSED",
+            "availability_unverified_max_surface": "RESEARCH_ONLY",
+        })
+        self.assertEqual(result["quote_freshness_policy"], {
+            "max_age_seconds": 180, "stale_quotes_are_watch_only": True,
+        })
+        self.assertFalse(result["authority"]["staking"])
+        self.assertFalse(result["game_quarantine_adapter"]["forward_clock_authority"])
+
+    def test_frozen_engine_policy_control_unchanged(self):
+        def no_network(*args, **kwargs):
+            self.fail("offline policy control must not fetch sources")
+        card = run_frozen_engine(
+            [None], now=datetime(2026, 10, 29, tzinfo=timezone.utc),
+            auto_context=False, getter=no_network,
+        )
+        result = sanitize_card(card)
+        self.assertEqual(result["play_gate"], card["play_gate"])
+        self.assertEqual(result["quote_freshness_policy"], card["quote_freshness_policy"])
+        self.assertEqual(result["evaluated_rows"], card["evaluated_rows"])
+
+
 if __name__ == "__main__":
     unittest.main()
 
