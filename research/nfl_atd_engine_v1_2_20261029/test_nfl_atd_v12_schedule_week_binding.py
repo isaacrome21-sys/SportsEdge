@@ -23,9 +23,11 @@ class TestScheduleWeekBinding(unittest.TestCase):
         self.world = fk.synthetic_world().__enter__()
         self.addCleanup(self.world.__exit__)
 
-    def _load(self, *, board_week=8, run_week=8, schedule_week=8, all_unpriced=False):
+    def _load(self, *, board_week=8, run_week=8, schedule_week=8, all_unpriced=False,
+              board_season=2026, run_season=2026):
         w = self.world
         w.board["week"] = board_week
+        w.board["season"] = board_season
         if all_unpriced:
             # Genuine pricer, but no recognized player can receive a price.
             w.board["rows"] = [{"player_id": "ZZ", "player_name": "Nobody",
@@ -81,7 +83,7 @@ class TestScheduleWeekBinding(unittest.TestCase):
         gid = next((r.get("game_id") for r in rows if r.get("game_id")), None)
         self.assertIsNotNone(gid)
         record = {
-            "slate_id": "W1", "captured_at": w.CAP, "season": 2026,
+            "slate_id": "W1", "captured_at": w.CAP, "season": run_season,
             "week": run_week, "first_kickoff": w.KO,
             "game_teams": {gid: ["KC", "LV"]},
             "schedule_kickoffs": {gid: w.KO},
@@ -147,6 +149,32 @@ class TestScheduleWeekBinding(unittest.TestCase):
         result = self._load(run_week="8")
         self.assertEqual(result["status"], "SCREEN")
         self.assertIn("RUN_RECORD_MALFORMED", result["reasons"])
+
+
+    def test_run_season_numeric_string_refuses_without_coercion(self):
+        result = self._load(run_season="2026")
+        self.assertEqual(result["status"], "SCREEN")
+        self.assertIn("RUN_RECORD_MALFORMED", result["reasons"])
+
+    def test_run_season_float_refuses_without_coercion(self):
+        result = self._load(run_season=2026.0)
+        self.assertEqual(result["status"], "SCREEN")
+        self.assertIn("RUN_RECORD_MALFORMED", result["reasons"])
+
+    def test_run_season_bool_refuses_without_coercion(self):
+        result = self._load(run_season=True)
+        self.assertEqual(result["status"], "SCREEN")
+        self.assertIn("RUN_RECORD_MALFORMED", result["reasons"])
+
+    def test_board_season_numeric_string_refuses_even_if_pricer_coerces(self):
+        result = self._load(board_season="2026")
+        self.assertEqual(result["status"], "SCREEN")
+        self.assertIn("RUN_BOARD_MISMATCH", result["reasons"])
+
+    def test_board_season_float_refuses_even_if_pricer_coerces(self):
+        result = self._load(board_season=2026.0)
+        self.assertEqual(result["status"], "SCREEN")
+        self.assertIn("RUN_BOARD_MISMATCH", result["reasons"])
 
 
 if __name__ == "__main__":
