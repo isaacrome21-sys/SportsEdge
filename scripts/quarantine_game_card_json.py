@@ -15,7 +15,7 @@ import sys
 
 # Allow invocation from any working directory.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sportsedge.game_candidate_quarantine import GAME_SURFACES, game_claim_hold
+from sportsedge.game_candidate_quarantine import GAME_SURFACES, EV_KEYS, P_KEYS, game_claim_hold
 from sportsedge.quote_freshness import MAX_QUOTE_AGE_SECONDS
 
 
@@ -156,6 +156,46 @@ def _validate_card_contract(card):
             raise ValueError("GAME_LEGACY_EDGE_COUNT_MUST_BE_ZERO")
 
 
+
+def _numeric_claims(row):
+    """Map each displayed numeric-claim path to its untrusted raw value.
+
+    Presence is path-specific: a market-anchored lane cannot impersonate an
+    independent projection. Omitted original fields remain permissible for
+    compact watchlists; new non-extreme numeric claims are not.
+    """
+    claims = {}
+    def collect(source, prefix):
+        if not isinstance(source, dict):
+            return
+        for key in EV_KEYS + P_KEYS:
+            if key in source and source[key] is not None:
+                claims[prefix + key] = source[key]
+    collect(row, "")
+    collect(row.get("independent_projection"), "independent_projection.")
+    lanes = row.get("pricing_lanes")
+    if isinstance(lanes, dict):
+        for lane in ("lane_a_independent", "lane_b_anchored"):
+            collect(lanes.get(lane), "pricing_lanes." + lane + ".")
+    return claims
+
+
+def _bind_ordinary_numeric_claims(original, display):
+    """Fail closed on any altered, added or type-coerced ordinary EV/P claim.
+
+    An invalid or >=40% claim is handled separately by the global quarantine
+    phase, including across earlier surfaces; this binding never turns that
+    quarantine into a ranked candidate.
+    """
+    original_claims = _numeric_claims(original)
+    for path, value in _numeric_claims(display).items():
+        if path not in original_claims:
+            raise ValueError("GAME_SURFACE_NUMERIC_CLAIM_UNATTESTED:" + path)
+        attested = original_claims[path]
+        if type(value) is not type(attested) or value != attested:
+            raise ValueError("GAME_SURFACE_NUMERIC_CLAIM_CONFLICT:" + path)
+
+
 def _index(row, label):
     idx = row.get("input_index")
     if type(idx) is not int or idx < 0:
@@ -229,6 +269,11 @@ def sanitize_card(card):
                     raise ValueError("GAME_SURFACE_IDENTITY_CONFLICT:" + key)
             display_reason, display_max_ev = game_claim_hold(row)
             original_reason, original_max_ev = original_holds[idx]
+            # Quarantine extreme/invalid claims globally first. Ordinary
+            # displayed EV/P claims must exactly bind to evaluated evidence;
+            # a plausible sub-40% forged edge is not a valid research row.
+            if display_reason is None and original_reason is None:
+                _bind_ordinary_numeric_claims(original, row)
             reasons = [r for r in (display_reason, original_reason) if r is not None]
             if not reasons:
                 continue
