@@ -243,7 +243,8 @@ def _appearances(path):
             except (TypeError, ValueError, KeyError):
                 continue
             yield (pid, (row.get("player_display_name") or "").strip(),
-                   season, week, (row.get("recent_team") or "").strip(),
+                   season, week,
+                   (row.get("recent_team") or row.get("team") or "").strip(),
                    (row.get("game_id") or "").strip())
 
 

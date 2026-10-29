@@ -305,6 +305,25 @@ class TestInputs(AssemblerCase):
             A.parse_detailed_read_text(text, "mini.txt")
         self.assertEqual(ctx.exception.code, "CAPTURE_TD_TABLE_MISSING")
 
+    def test_team_column_fallback(self):
+        # Current nflverse extracts carry `team`, not `recent_team`; the
+        # frozen reader falls back recent_team -> team, and so must we.
+        root = Path(self.tmp.name) / "data_team_only"
+        root.mkdir()
+        pins = {}
+        for i, fname in enumerate(A.REQUIRED_FILES):
+            lines = ["player_id,player_display_name,season,season_type,"
+                     "week,team,game_id"]
+            if i == 0:
+                lines += ["00-002,Saquon Barkley,2025,REG,10,PHI,"
+                          "2025_10_PHI_DAL"]
+            with gzip.open(root / fname, "wt", newline="") as fh:
+                fh.write("\n".join(lines) + "\n")
+            pins[fname] = hashlib.sha256((root / fname).read_bytes()).hexdigest()
+        index, _ = A.load_pinned_index(root, pins=pins)
+        pid, reason = index.resolve("Saquon Barkley", ["DAL", "PHI"])
+        self.assertEqual((pid, reason), ("00-002", None))
+
     def test_house_timestamp_format(self):
         dt = A.parse_timestamp("2026-10-26 6:15 PM CT")
         self.assertEqual(A.zulu(dt), "2026-10-26T23:15:00Z")
