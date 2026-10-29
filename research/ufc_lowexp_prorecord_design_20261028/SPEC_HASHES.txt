@@ -29,3 +29,9 @@ b8aa6604539d5981bba561cb65da26133567732145ca48efbec2d9423b081937  ufc-master.csv
 b20cde586d139f9a23fe37648b0acde88ff78f9cbd4cfabfb8034ffb17a13aec  ufc_fight_results.csv  (2,110,761 B; Greco1899 @ 5d6622ff)
 252b22f636a129f7117074313b055d1c277ea1af8785b16b48efd5a538320455  ufc_fight_stats.csv  (7,683,173 B; Greco1899 @ 5d6622ff)
 3296e67941f984cd5484488226e5a5d94de3249c63fe289fbc66d98546311ea1  ufc_fighter_tott.csv  (508,399 B; Greco1899 @ 5d6622ff)
+
+# --- Freeze-act package (Oct 29, 2026) ---
+77926a934ab16fb7ad0843d8ebdaad68793611ae3a2ff504d89193a92224daa7  research/ufc_lowexp_prorecord_design_20261028/PREREG_UFC_ML_LOWEXP_PRORECORD_V1.md  (frozen form)
+00263b29cde509bda41e540ba343accfd07e083304a5c3cfc2e8ac9c4f671429  research/ufc_lowexp_prorecord_design_20261028/PREREG_UFC_ML_LOWEXP_PRORECORD_V1_DRAFT.md  (superseded draft, retained)
+7ff8daa825d249ef12097d41a850deaa03459178e2f29e6112ca864ca8f5fd0a  research/ufc_lowexp_prorecord_design_20261028/BUILD_SEQUENCE.md
+32fea81f5a6a4a156843d055c9c19fb47fe10db8125cb71ef49be391b27252d4  research/ufc_lowexp_prorecord_design_20261028/FREEZE_RECORD.md
