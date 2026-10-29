@@ -1,7 +1,9 @@
 """Non-frozen research adapter regression: frozen game engine is untouched."""
 from copy import deepcopy
+from datetime import datetime, timezone
 import unittest
 
+from artifacts.free_models import run as run_frozen_engine
 from scripts.quarantine_game_card_json import sanitize_card
 
 
@@ -286,5 +288,111 @@ class GameCardAdapterTests(unittest.TestCase):
         self.assertEqual(result["evaluated_rows"], card["evaluated_rows"])
 
 
+    def test_contradictory_top_level_authority_refuses(self):
+        for key, value in (("research_only", False), ("official", True),
+                           ("model_p", True), ("truth_gate", True),
+                           ("staking", True), ("validated_profitability", True),
+                           ("forward_clock", True), ("official", 0),
+                           ("research_only", 1)):
+            with self.subTest(key=key, value=value):
+                card = self.card()
+                card["authority"] = {key: value}
+                before = deepcopy(card)
+                with self.assertRaisesRegex(ValueError, "GAME_CARD_AUTHORITY"):
+                    sanitize_card(card)
+                self.assertEqual(card, before)
+
+    def test_malformed_top_level_authority_refuses(self):
+        for value in (None, [], "RESEARCH_ONLY", False):
+            with self.subTest(value=value):
+                card = self.card()
+                card["authority"] = value
+                with self.assertRaisesRegex(ValueError, "GAME_CARD_AUTHORITY"):
+                    sanitize_card(card)
+
+    def test_missing_or_partial_authority_emits_complete_research_contract(self):
+        expected = {"research_only": True, "official": False, "model_p": False,
+                    "truth_gate": False, "staking": False,
+                    "validated_profitability": False}
+        for authority in (None, {}, {"official": False}):
+            with self.subTest(authority=authority):
+                card = self.card()
+                if authority is not None:
+                    card["authority"] = authority
+                result = sanitize_card(card)
+                self.assertEqual(result["authority"], expected)
+                self.assertEqual(result["lane_b_edges"], [])
+
+    def test_nonempty_or_malformed_legacy_edge_surface_refuses(self):
+        for value in ([{"ev_per_dollar": 2.818}], [self.card()["edges"][1]],
+                      None, {}, "", False):
+            with self.subTest(value=value):
+                card = self.card()
+                card["lane_b_edges"] = value
+                before = deepcopy(card)
+                with self.assertRaisesRegex(ValueError, "GAME_LEGACY_EDGES"):
+                    sanitize_card(card)
+                self.assertEqual(card, before)
+
+    def test_contradictory_legacy_edge_count_refuses(self):
+        for count in (1, -1, False, "0", None):
+            with self.subTest(count=count):
+                card = self.card()
+                card["lane_b_edges"] = []
+                card["summary"]["lane_b_edges"] = count
+                with self.assertRaisesRegex(ValueError, "GAME_LEGACY_EDGE_COUNT"):
+                    sanitize_card(card)
+
+    def test_real_frozen_engine_blocked_evidence_is_retained(self):
+        def no_network(*args, **kwargs):
+            self.fail("offline compatibility regression must not fetch sources")
+
+        card = run_frozen_engine(
+            [None, {}], now=datetime(2026, 10, 29, tzinfo=timezone.utc),
+            auto_context=False, getter=no_network,
+        )
+        before = deepcopy(card)
+        self.assertTrue(all(r["status"] == "BLOCKED_INVALID"
+                            for r in card["evaluated_rows"]))
+        result = sanitize_card(card)
+        self.assertEqual(card, before)
+        for key in ("evaluated_rows", "diagnostics", "summary", "authority",
+                    "source_receipts", "input_snapshot"):
+            self.assertEqual(result[key], before[key])
+        self.assertEqual(result["game_quarantined"], [])
+
+    def test_unranked_blocked_row_does_not_discard_valid_candidates(self):
+        card = self.card()
+        blocked = {"input_index": 2, "status": "BLOCKED_INVALID",
+                   "reason": "LINE_MUST_BE_OBJECT"}
+        card["evaluated_rows"].append(blocked)
+        card["diagnostics"] = [deepcopy(blocked)]
+        result = sanitize_card(card)
+        self.assertEqual([r["input_index"] for r in result["edges"]], [1])
+        self.assertEqual(result["evaluated_rows"], card["evaluated_rows"])
+        self.assertEqual(result["diagnostics"], card["diagnostics"])
+
+    def test_blocked_evidence_cannot_be_ranked_even_with_identity(self):
+        for has_identity in (False, True):
+            with self.subTest(has_identity=has_identity):
+                card = self.card()
+                blocked = {"input_index": 2, "status": "BLOCKED_INVALID"}
+                if has_identity:
+                    blocked.update(game="A@B", selection="A", ev_per_dollar=.04)
+                card["evaluated_rows"].append(blocked)
+                card["edges"].append(deepcopy(blocked))
+                with self.assertRaisesRegex(ValueError, "GAME_SURFACE_BLOCKED_EVIDENCE"):
+                    sanitize_card(card)
+
+    def test_unknown_card_schema_refuses(self):
+        for schema in (None, "OTHER_CARD", 1):
+            with self.subTest(schema=schema):
+                card = self.card()
+                card["schema"] = schema
+                with self.assertRaisesRegex(ValueError, "GAME_CARD_SCHEMA"):
+                    sanitize_card(card)
+
+
 if __name__ == "__main__":
     unittest.main()
+

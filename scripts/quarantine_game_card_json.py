@@ -38,6 +38,32 @@ _REASON_PRIORITY = (
     "GAME_EV_CLAIM_INVALID",
     "EXTREME_CLAIMED_EV_QUARANTINE",
 )
+_RESEARCH_AUTHORITY = {
+    "research_only": True, "official": False, "model_p": False,
+    "truth_gate": False, "staking": False, "validated_profitability": False,
+}
+
+
+def _validate_card_contract(card):
+    """Reject contradictory claims instead of silently laundering them."""
+    if card.get("schema") != "SPORTSEDGE_FREE_RESEARCH_CARD_V1":
+        raise ValueError("GAME_CARD_SCHEMA_UNSUPPORTED")
+    if "authority" in card:
+        authority = card["authority"]
+        if not isinstance(authority, dict):
+            raise ValueError("GAME_CARD_AUTHORITY_NOT_OBJECT")
+        for key, value in authority.items():
+            # Identity comparison deliberately refuses 0/1 and text booleans.
+            if key not in _RESEARCH_AUTHORITY or value is not _RESEARCH_AUTHORITY[key]:
+                raise ValueError("GAME_CARD_AUTHORITY_CONFLICT:" + str(key))
+    legacy_edges = card.get("lane_b_edges", [])
+    if not isinstance(legacy_edges, list) or legacy_edges:
+        raise ValueError("GAME_LEGACY_EDGES_MUST_BE_EMPTY")
+    summary = card.get("summary")
+    if isinstance(summary, dict) and "lane_b_edges" in summary:
+        count = summary["lane_b_edges"]
+        if type(count) is not int or count != 0:
+            raise ValueError("GAME_LEGACY_EDGE_COUNT_MUST_BE_ZERO")
 
 
 def _index(row, label):
@@ -53,23 +79,21 @@ def sanitize_card(card):
         raise ValueError("GAME_CARD_NOT_OBJECT")
     if "game_quarantined" in card:
         raise ValueError("GAME_CARD_ALREADY_PARTITIONED")
+    _validate_card_contract(card)
     originals = card.get("evaluated_rows")
     if not isinstance(originals, list) or any(not isinstance(r, dict) for r in originals):
         raise ValueError("GAME_EVALUATED_ROWS_REQUIRED")
     original_by_index = {}
     for row in originals:
         idx = _index(row, "GAME_EVALUATED_ROW")
-        # An index alone cannot authenticate the original fixture/selection.
-        # Do not let a detached display row supply identity missing in evidence.
-        for key in ("game", "selection"):
-            value = row.get(key)
-            if not isinstance(value, str) or not value.strip():
-                raise ValueError("GAME_EVALUATED_IDENTITY_INVALID:" + key)
         if idx in original_by_index:
             raise ValueError("GAME_EVALUATED_INPUT_INDEX_DUPLICATE")
         original_by_index[idx] = row
 
     result = deepcopy(card)
+    # Complete missing research declarations without accepting any escalation.
+    result["authority"] = dict(_RESEARCH_AUTHORITY)
+    result["lane_b_edges"] = []
     # Phase one: validate every displayed row and collect holds globally by
     # original input_index. A bad claim in ONE surface must suppress the same
     # candidate from ALL other ranked surfaces, regardless of list order.
@@ -94,6 +118,15 @@ def sanitize_card(card):
             original = original_by_index.get(idx)
             if original is None:
                 raise ValueError("GAME_SURFACE_REFERENCE_NOT_IN_EVIDENCE")
+            if original.get("status") == "BLOCKED_INVALID":
+                raise ValueError("GAME_SURFACE_BLOCKED_EVIDENCE")
+            # Identity is mandatory for every ranked reference. Unranked
+            # error evidence from the frozen engine may lack these fields
+            # and must remain intact for diagnostics, never become a pick.
+            for key in ("game", "selection"):
+                value = original.get(key)
+                if not isinstance(value, str) or not value.strip():
+                    raise ValueError("GAME_EVALUATED_IDENTITY_INVALID:" + key)
             for key in _IDENTITY_FIELDS:
                 if key in original and key not in row:
                     raise ValueError("GAME_SURFACE_IDENTITY_MISSING:" + key)
@@ -185,3 +218,4 @@ def main(argv=None):
 
 if __name__ == "__main__":
     main()
+
