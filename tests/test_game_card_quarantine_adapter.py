@@ -464,6 +464,105 @@ class GameCardAdapterTests(unittest.TestCase):
         self.assertEqual(result["evaluated_rows"], card["evaluated_rows"])
 
 
+    def test_frozen_nba_integrity_is_preserved_without_promotion(self):
+        def no_network(*args, **kwargs):
+            self.fail("NBA integrity contract must not fetch sources")
+        original = run_frozen_engine(
+            [None], now=datetime(2026, 10, 29, tzinfo=timezone.utc),
+            auto_context=False, getter=no_network,
+        )
+        card = self.card()
+        card["nba_game_card_integrity"] = deepcopy(original["nba_game_card_integrity"])
+        result = sanitize_card(card)
+        self.assertEqual(result["nba_game_card_integrity"],
+                         original["nba_game_card_integrity"])
+        self.assertFalse(result["nba_game_card_integrity"]["positive_ev_candidate_authority"])
+        self.assertFalse(result["nba_game_card_integrity"]["numeric_quality_scores_allowed"])
+        self.assertFalse(result["authority"]["staking"])
+
+    def test_nested_nba_authority_forgery_refuses_without_mutation(self):
+        def no_network(*args, **kwargs):
+            self.fail("offline integrity test must not fetch sources")
+        original = run_frozen_engine(
+            [None], now=datetime(2026, 10, 29, tzinfo=timezone.utc),
+            auto_context=False, getter=no_network,
+        )["nba_game_card_integrity"]
+        cases = (
+            ("family_validation", "VERIFIED"),
+            ("positive_ev_candidate_authority", True),
+            ("numeric_quality_scores_allowed", True),
+            ("score_policy", "ALLOW_PLAY"),
+            ("research_only", False),
+            ("game_families", ["ML", "SPREAD", "TOTAL", "PROP"]),
+            ("interpretation", "VERIFIED profitable model"),
+            ("positive_ev_candidate_authority", 0),
+        )
+        for key, value in cases:
+            with self.subTest(key=key, value=value):
+                card = self.card()
+                card["nba_game_card_integrity"] = deepcopy(original)
+                card["nba_game_card_integrity"][key] = value
+                before = deepcopy(card)
+                with self.assertRaisesRegex(ValueError, "GAME_NBA_INTEGRITY_POLICY_CONFLICT"):
+                    sanitize_card(card)
+                self.assertEqual(card, before)
+
+    def test_nested_nba_malformed_and_missing_fields_refuse(self):
+        def no_network(*args, **kwargs):
+            self.fail("offline integrity test must not fetch sources")
+        original = run_frozen_engine(
+            [None], now=datetime(2026, 10, 29, tzinfo=timezone.utc),
+            auto_context=False, getter=no_network,
+        )["nba_game_card_integrity"]
+        for bad in (None, False, [], "VERIFIED"):
+            with self.subTest(bad=bad):
+                card = self.card()
+                card["nba_game_card_integrity"] = bad
+                with self.assertRaisesRegex(ValueError, "GAME_NBA_INTEGRITY_NOT_OBJECT"):
+                    sanitize_card(card)
+        for variant in ("missing", "extra"):
+            with self.subTest(variant=variant):
+                card = self.card()
+                card["nba_game_card_integrity"] = deepcopy(original)
+                if variant == "missing":
+                    del card["nba_game_card_integrity"]["score_policy"]
+                else:
+                    card["nba_game_card_integrity"]["allow_play"] = True
+                with self.assertRaisesRegex(ValueError, "GAME_NBA_INTEGRITY_FIELDS_MISMATCH"):
+                    sanitize_card(card)
+
+    def test_nested_nba_counter_and_concentration_forgery_refuses(self):
+        def no_network(*args, **kwargs):
+            self.fail("offline integrity test must not fetch sources")
+        original = run_frozen_engine(
+            [None], now=datetime(2026, 10, 29, tzinfo=timezone.utc),
+            auto_context=False, getter=no_network,
+        )["nba_game_card_integrity"]
+        cases = (
+            ("game_rows", True, "COUNT_INVALID"),
+            ("game_rows", -1, "COUNT_INVALID"),
+            ("under_rows", 1.5, "COUNT_INVALID"),
+            ("apparent_positive_gap_total_rows", 1, "COUNTS_INCONSISTENT"),
+            ("distinct_games", 1, "COUNTS_INCONSISTENT"),
+            ("same_direction_concentration", True, "CONCENTRATION_CONFLICT"),
+            ("same_direction_concentration", 0, "CONCENTRATION_CONFLICT"),
+        )
+        for key, value, error in cases:
+            with self.subTest(key=key, value=value):
+                card = self.card()
+                card["nba_game_card_integrity"] = deepcopy(original)
+                card["nba_game_card_integrity"][key] = value
+                with self.assertRaisesRegex(ValueError, "GAME_NBA_INTEGRITY_" + error):
+                    sanitize_card(card)
+        card = self.card()
+        valid = deepcopy(original)
+        valid.update(game_rows=4, apparent_positive_gap_total_rows=3,
+                     under_rows=3, over_rows=0, distinct_games=2,
+                     same_direction_concentration=True)
+        card["nba_game_card_integrity"] = valid
+        self.assertEqual(sanitize_card(card)["nba_game_card_integrity"], valid)
+
+
 if __name__ == "__main__":
     unittest.main()
 
