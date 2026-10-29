@@ -130,11 +130,15 @@ def _event_index(
 def _native_pair_key(quote: Mapping[str, Any]) -> tuple[Any, ...] | None:
     """Key only an exact provider-native two-sided quote, not canonical identity."""
     event_id = str(quote.get("provider_event_id") or "").strip()
+    offer_raw = quote.get("provider_offer_id")
+    if isinstance(offer_raw, bool):
+        return None
+    offer_id = str(offer_raw or "").strip()
     market = str(quote.get("market") or "").strip().upper()
     entity = str(quote.get("entity_name_normalized") or "").strip()
     book = str(quote.get("book_key") or "").strip()
     retrieved = _parse_iso(quote.get("quote_retrieved_at"))
-    if not (event_id and market and entity and book and retrieved):
+    if not (event_id and offer_id and market and entity and book and retrieved):
         return None
     raw_line = quote.get("line")
     raw_odds = quote.get("american_odds")
@@ -148,7 +152,7 @@ def _native_pair_key(quote: Mapping[str, Any]) -> tuple[Any, ...] | None:
     if not (math.isfinite(line) and line >= 0 and math.isfinite(odds)
             and odds.is_integer() and abs(odds) >= 100):
         return None
-    return (event_id, market, entity, line, book, retrieved, quote.get("is_alternate"))
+    return (event_id, offer_id, market, entity, line, book, retrieved, quote.get("is_alternate"))
 
 
 def _annotate_native_pairs(quotes: list[dict[str, Any]]) -> int:

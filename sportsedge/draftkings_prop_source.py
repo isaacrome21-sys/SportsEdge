@@ -241,6 +241,8 @@ def _quote(
         side = "UNDER"
     return {
         "provider_event_id": _event_id(selection, market, event_id),
+        # v1 market ID / v5 offer ID; do not infer an offer from player or label.
+        "provider_offer_id": str(market.get("id") or market.get("marketId") or market.get("providerMarketId") or market.get("providerOfferId") or "").strip() or None,
         "market": canonical,
         "entity_name": participant,
         "entity_name_normalized": normalize_name(participant),
