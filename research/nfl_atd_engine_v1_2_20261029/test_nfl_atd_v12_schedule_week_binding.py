@@ -116,6 +116,13 @@ class TestScheduleWeekBinding(unittest.TestCase):
         self.assertEqual(result["status"], "SCREEN")
         self.assertIn("RUN_NO_PRICED_ROWS", result["reasons"])
 
+    def test_numeric_string_board_week_cannot_replay_as_integer_week(self):
+        # board_record_path and the real pricer both coerce "8" to int 8;
+        # replay equality alone is not proof of exact metadata identity.
+        result = self._load(board_week="8", run_week=8, schedule_week=8)
+        self.assertEqual(result["status"], "SCREEN")
+        self.assertIn("RUN_BOARD_MISMATCH", result["reasons"])
+
     def test_matching_board_run_but_wrong_schedule_week_refuses(self):
         result = self._load(board_week=9, run_week=9, schedule_week=8)
         self.assertEqual(result["status"], "SCREEN")
