@@ -435,6 +435,9 @@ def load_slate(api, slate_id, now=None) -> dict:
         stored = rec.get("fetch_provenance") or {}
         rows = rec["rows"]
         season = int(rec["season"])
+        run_week = rec["week"]
+        if type(run_week) is not int or run_week < 1:
+            raise ValueError("run week must be a positive integer (not bool)")
         teams = rec["game_teams"]
         if rec.get("slate_id") != slate_id or not isinstance(rows, list) \
                 or not isinstance(teams, dict):
@@ -474,7 +477,12 @@ def load_slate(api, slate_id, now=None) -> dict:
             for r in priced:
                 try:
                     k = rf.schedule_kickoff(fh.name, season, teams.get(r["game_id"]), r["kickoff"])
-                    if "week" in r and int(k["week"]) != int(r["week"]):
+                    # A real priced row omits week. Bind the independently
+                    # pinned schedule week to the run/board metadata anyway;
+                    # replay alone only proves the latter two agree.
+                    if type(k["week"]) is not int or k["week"] != run_week:
+                        raise rf.RefreshFailed("KICKOFF_SCHEDULE_MISMATCH", r["game_id"])
+                    if "week" in r and (type(r["week"]) is not int or r["week"] != k["week"]):
                         raise rf.RefreshFailed("KICKOFF_SCHEDULE_MISMATCH", r["game_id"])
                     if k["game_id"] != r["game_id"]:
                         out["reasons"].append("ROW_GAME_ID_MISMATCH")
