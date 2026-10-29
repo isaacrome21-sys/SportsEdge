@@ -18,7 +18,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sportsedge.game_candidate_quarantine import GAME_SURFACES, game_claim_hold
 
 
-_IDENTITY_FIELDS = ("game", "selection", "market", "line", "event_id", "sport")
+# Source-binding is intentionally stricter than a display's convenience fields.
+# A detached ranked row must not forge, omit, or change any available
+# fixture, settlement, quote, provenance, or eligibility identity. This is
+# equality against original evaluated evidence, NOT provider authentication.
+_IDENTITY_FIELDS = (
+    "game", "selection", "market", "line", "sport",
+    "kickoff_utc", "team_totals_team", "event_id", "dk_event_id",
+    "period", "phase", "alternate", "settlement_type",
+    "odds_american", "book", "sportsbook",
+    "quote_captured_at", "captured_at", "source_quote_at",
+    "quote_freshness", "pricing_lane", "pricing_provenance",
+    "status", "reason", "availability_status", "model_validation",
+    "research_only", "model_p_authority", "official_authority",
+    "staking_authority", "validated_profitability",
+)
 _REASON_PRIORITY = (
     "GAME_PROBABILITY_CLAIM_INVALID",
     "GAME_EV_CLAIM_INVALID",
@@ -80,11 +94,12 @@ def sanitize_card(card):
             original = original_by_index.get(idx)
             if original is None:
                 raise ValueError("GAME_SURFACE_REFERENCE_NOT_IN_EVIDENCE")
-            for key in ("game", "selection"):
+            for key in _IDENTITY_FIELDS:
                 if key in original and key not in row:
                     raise ValueError("GAME_SURFACE_IDENTITY_MISSING:" + key)
-            for key in _IDENTITY_FIELDS:
-                if key in original and key in row and original[key] != row[key]:
+                if key in row and key not in original:
+                    raise ValueError("GAME_SURFACE_IDENTITY_UNATTESTED:" + key)
+                if key in original and original[key] != row[key]:
                     raise ValueError("GAME_SURFACE_IDENTITY_CONFLICT:" + key)
             display_reason, display_max_ev = game_claim_hold(row)
             original_reason, original_max_ev = original_holds[idx]
