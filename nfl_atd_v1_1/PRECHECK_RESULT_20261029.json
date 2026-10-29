@@ -1,0 +1,64 @@
+{
+  "record_type": "NFL_ATD_V1_1_PROSPECTIVE_PRECHECK_RESULT_V1",
+  "check_name": "THURSDAY_CHECK",
+  "scheduled_ct": "2026-10-29T09:30:00-05:00",
+  "scheduled_utc": "2026-10-29T14:30:00Z",
+  "audited_at_ct": "2026-10-29T09:31:05-05:00",
+  "disposition": "FAIL_CLOSED_NO_AUTHENTICATED_PROSPECTIVE_CAPTURE",
+  "checks": {
+    "records_head_advanced": {
+      "result": "PASS",
+      "base_sha": "5ba400ef2c2b3b9c88bf4d33d81aa4eabc8383cc",
+      "observed_sha": "cfca0bce06ad96e88cd4013897d08ce457f10bab",
+      "ahead_by": 1,
+      "behind_by": 0
+    },
+    "freeze_integrity": {
+      "result": "PASS",
+      "freeze_blob_sha": "09da4e852d5cc90369a1080ccef56f54a24a2243",
+      "pinned_code_commit": "c2fd86dcc995e34af2b315319d3a184f8b5178cf",
+      "no_freeze_edit": true
+    },
+    "actual_precheck_receipt": {
+      "result": "FAIL_NOT_EVIDENCED",
+      "reason": "The records branch tree contains FREEZE.json, README.md, and the PENDING_NOT_EXECUTED schedule only; no independently authenticated Thu Oct 29 source/dispatch/ingestion/archive/card receipt or precheck outcome was present in the inspected records. A scheduled timestamp is not execution."
+    },
+    "authentic_dk_prospective_quote": {
+      "result": "FAIL_NOT_EVIDENCED",
+      "reason": "P0 #2792 remains open; independent DK event/market/selection quote source time, raw-byte hash/locator, durable write and delivery clock were not established. Operator reports and GitHub issue timestamps are not authenticated source receipts."
+    },
+    "frozen_v1_1_scorer": {
+      "result": "FAIL_DEFECT_CONFIRMED",
+      "reason": "Pinned scorer _games indexes r['week']; real pricer rows omit week. Rocky's v1.2 draft #2926 independently reproduced KeyError. Separate v1.2 fixes #2926/#2927 are DRAFT, not frozen or adopted."
+    },
+    "oct25_exclusion": {
+      "result": "PASS_POLICY_PRESERVED",
+      "retroactive_rows_admitted": 0
+    },
+    "prospective_counting": {
+      "result": "HOLD",
+      "new_counted_rows": 0,
+      "units": 0
+    }
+  },
+  "next": "2026-11-01T09:30:00-06:00 ATD precheck; v1.2 Nov 1 is NON_COUNTED rehearsal, not an automatic freeze. CBB authentic capture landing check is separately due Nov 1; CBB construction HOLD until source/receipt success.",
+  "source_urls": [
+    "https://github.com/isaacrome21-sys/SportsEdge/compare/5ba400ef2c2b3b9c88bf4d33d81aa4eabc8383cc...cfca0bce06ad96e88cd4013897d08ce457f10bab",
+    "https://github.com/isaacrome21-sys/SportsEdge/blob/records/nfl-atd-v1-1/nfl_atd_v1_1/PRECHECK_SCHEDULE_20261026.json",
+    "https://github.com/isaacrome21-sys/SportsEdge/blob/records/nfl-atd-v1-1/nfl_atd_v1_1/FREEZE.json",
+    "https://github.com/isaacrome21-sys/SportsEdge/blob/c2fd86dcc995e34af2b315319d3a184f8b5178cf/research/nfl_atd_engine_v1_20261018/score_nfl_atd_forward.py",
+    "https://github.com/isaacrome21-sys/SportsEdge/pull/2926",
+    "https://github.com/isaacrome21-sys/SportsEdge/pull/2927",
+    "https://github.com/isaacrome21-sys/SportsEdge/issues/2792",
+    "https://github.com/isaacrome21-sys/SportsEdge/issues/2447#issuecomment-6493712187"
+  ],
+  "constraints": {
+    "paper_only": true,
+    "units": 0,
+    "oct25_permanently_excluded": true,
+    "no_backfill": true,
+    "nhl_paused": true,
+    "cfb_score_only_closed": true,
+    "no_merge_or_freeze_performed": true
+  }
+}
