@@ -587,6 +587,88 @@ class GameCardAdapterTests(unittest.TestCase):
                 self.assertEqual(card, before)
 
 
+    def test_detached_ordinary_ev_probability_claims_require_exact_evidence(self):
+        # Reproduce the prior +3%/.55 -> +39%/.99 laundering gap.
+        for field, forged in (("ev_per_dollar", .39), ("estimate_p", .99),
+                              ("ev_per_dollar", .03 + 1e-8),
+                              ("estimate_p", ".55"), ("ev_per_dollar", True)):
+            with self.subTest(field=field, forged=forged):
+                card = self.card()
+                card["evaluated_rows"][0]["independent_projection"] = {
+                    "raw_ev_per_dollar": .04
+                }
+                card["edges"] = [deepcopy(card["evaluated_rows"][1])]
+                card["edges"][0][field] = forged
+                before = deepcopy(card)
+                with self.assertRaisesRegex(ValueError,
+                                            "GAME_SURFACE_NUMERIC_CLAIM_CONFLICT:" + field):
+                    sanitize_card(card)
+                self.assertEqual(card, before)
+
+    def test_detached_nested_and_unattested_ordinary_claims_refuse(self):
+        for location, field, value in (
+            ("independent_projection", "raw_ev_per_dollar", .39),
+            ("independent_projection", "model_probability", .99),
+            ("lane_a_independent", "ev_per_dollar", .39),
+            ("lane_b_anchored", "estimate_p", .99),
+        ):
+            with self.subTest(location=location, field=field):
+                card = self.card()
+                card["evaluated_rows"][0]["independent_projection"] = {
+                    "raw_ev_per_dollar": .04
+                }
+                original = card["evaluated_rows"][1]
+                if location in ("lane_a_independent", "lane_b_anchored"):
+                    original["pricing_lanes"] = {location: {field: .03}}
+                    prefix = "pricing_lanes." + location + "."
+                else:
+                    original[location] = {field: .03}
+                    prefix = location + "."
+                card["edges"] = [deepcopy(original)]
+                if location in ("lane_a_independent", "lane_b_anchored"):
+                    card["edges"][0]["pricing_lanes"][location][field] = value
+                else:
+                    card["edges"][0][location][field] = value
+                with self.assertRaisesRegex(ValueError,
+                                            "GAME_SURFACE_NUMERIC_CLAIM_CONFLICT:" + prefix + field):
+                    sanitize_card(card)
+
+        card = self.card()
+        card["evaluated_rows"][0]["independent_projection"] = {
+            "raw_ev_per_dollar": .04
+        }
+        card["edges"] = [deepcopy(card["evaluated_rows"][1])]
+        card["edges"][0]["reported_ev_per_dollar"] = .39
+        with self.assertRaisesRegex(ValueError,
+                                    "GAME_SURFACE_NUMERIC_CLAIM_UNATTESTED:reported_ev_per_dollar"):
+            sanitize_card(card)
+
+    def test_extreme_or_invalid_detached_claim_still_quarantines_all_surfaces(self):
+        for field, forged, reason in (
+            ("ev_per_dollar", .40, "EXTREME_CLAIMED_EV_QUARANTINE"),
+            ("estimate_p", 1.5, "GAME_PROBABILITY_CLAIM_INVALID"),
+        ):
+            with self.subTest(field=field):
+                card = self.card()
+                card["evaluated_rows"][0]["independent_projection"] = {
+                    "raw_ev_per_dollar": .04
+                }
+                for surface in ("edges", "independent_candidates",
+                                "independent_watchlist", "lane_b_watchlist"):
+                    card[surface] = [deepcopy(r) for r in card[surface]]
+                card["lane_b_watchlist"][1][field] = forged
+                before = deepcopy(card)
+                result = sanitize_card(card)
+                self.assertEqual(card, before)
+                self.assertEqual(result["game_quarantined"][0]["input_index"], 1)
+                self.assertEqual(result["game_quarantined"][0]["reason"], reason)
+                self.assertTrue(all(
+                    not any(r["input_index"] == 1 for r in result[surface])
+                    for surface in ("edges", "independent_candidates",
+                                    "independent_watchlist", "lane_b_watchlist")
+                ))
+
+
 if __name__ == "__main__":
     unittest.main()
 
