@@ -224,7 +224,8 @@ def sanitize_card(card):
                     raise ValueError("GAME_SURFACE_IDENTITY_MISSING:" + key)
                 if key in row and key not in original:
                     raise ValueError("GAME_SURFACE_IDENTITY_UNATTESTED:" + key)
-                if key in original and original[key] != row[key]:
+                if key in original and (type(original[key]) is not type(row[key])
+                                        or original[key] != row[key]):
                     raise ValueError("GAME_SURFACE_IDENTITY_CONFLICT:" + key)
             display_reason, display_max_ev = game_claim_hold(row)
             original_reason, original_max_ev = original_holds[idx]
