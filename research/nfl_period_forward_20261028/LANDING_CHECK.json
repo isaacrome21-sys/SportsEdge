@@ -1,0 +1,189 @@
+{
+  "all_ok": true,
+  "checks": [
+    {
+      "detail": "engine pin 16593a877998...",
+      "name": "pins_verified_at_construction",
+      "ok": true
+    },
+    {
+      "detail": "7e93de7336b1",
+      "name": "history_snapshot_hashed",
+      "ok": true
+    },
+    {
+      "detail": "{\"n_team_games\": 1632, \"exact_share\": 0.9699754901960784, \"ot_only_share\": 0.03002450980392157}",
+      "name": "panel_integrity_rerun",
+      "ok": true
+    },
+    {
+      "detail": "14 games",
+      "name": "slate_is_2024_week_10_14_games",
+      "ok": true
+    },
+    {
+      "detail": "NFL_PERIOD_FORWARD_NOT_FROZEN",
+      "name": "counted_refusal:price_counted_slate",
+      "ok": true
+    },
+    {
+      "detail": "NFL_PERIOD_FORWARD_NOT_FROZEN",
+      "name": "counted_refusal:run_forward_test",
+      "ok": true
+    },
+    {
+      "detail": "350 rows",
+      "name": "all_rows_non_counted",
+      "ok": true
+    },
+    {
+      "detail": "2024_10_CIN_BAL,2024_10_NYG_CAR,2024_10_ATL_NO,...",
+      "name": "game_index_order_committed",
+      "ok": true
+    },
+    {
+      "detail": "350 rows / 350 quotes",
+      "name": "one_row_per_entry_quote",
+      "ok": true
+    },
+    {
+      "detail": "12.2585",
+      "name": "tnf_total_1q_mean_float_exact",
+      "ok": true
+    },
+    {
+      "detail": "6.6102",
+      "name": "tnf_team_total_1q_mean_float_exact",
+      "ok": true
+    },
+    {
+      "detail": "0.4489",
+      "name": "tnf_ml_1q_prob_float_exact",
+      "ok": true
+    },
+    {
+      "detail": "11.809169223773527",
+      "name": "tnf_total_1q_b0_float_exact",
+      "ok": true
+    },
+    {
+      "detail": "1.1129362233090738",
+      "name": "tnf_spread_1q_b0_float_exact",
+      "ok": true
+    },
+    {
+      "detail": "33.662355026584216",
+      "name": "tnf_sibling_mu_float_exact",
+      "ok": true
+    },
+    {
+      "detail": "no 1H emission supplied; none invented",
+      "name": "1h_baseline_emissions_absent_stamped",
+      "ok": true
+    },
+    {
+      "detail": "350 graded",
+      "name": "all_slate_rows_graded",
+      "ok": true
+    },
+    {
+      "detail": "FAVORABLE",
+      "name": "engineered_moved_close",
+      "ok": true
+    },
+    {
+      "detail": "",
+      "name": "engineered_missing_close",
+      "ok": true
+    },
+    {
+      "detail": "",
+      "name": "engineered_single_sided_close",
+      "ok": true
+    },
+    {
+      "detail": "",
+      "name": "engineered_stale_close",
+      "ok": true
+    },
+    {
+      "detail": "",
+      "name": "engineered_not_prekickoff_close",
+      "ok": true
+    },
+    {
+      "detail": "",
+      "name": "settlement_non_counted",
+      "ok": true
+    },
+    {
+      "detail": "/home/hatch/workspace/nfl-period-runner-20261028/repo/research/nfl_period_forward_20261028/entry_records_sample.jsonl",
+      "name": "entry_records_written_create_only",
+      "ok": true
+    }
+  ],
+  "construction_pin": "nfl_period_drive_state_v2@sha256:16593a8779986f653705c481eaf0e079387933975123e386f8efd7e865b4658c",
+  "fixture": "SYNTHETIC_LANDING_FIXTURE",
+  "freeze_state": "DRAFT_NOT_IN_FORCE",
+  "history_snapshot_sha256": "7e93de7336b112c6a04692543b6ce72b13ace10627ac1e8c1597c244f0e42a0c",
+  "input_hashes": {
+    "games_csv_gz": "e335a852da158eb98f3d2a6f7d753604fba39cee15340b4592af4e81a885a61b",
+    "pbp_2022": "931121d8897779d7944e2a293e92ed8799c8e5cceef84096ac42339003fedc09",
+    "pbp_2023": "bd3484731408def6b0ec93225bba2bd7b2c65769ca707a2b9444d891abdc6776",
+    "pbp_2024": "3fd2896bc0b911b615142d2f1fabae54a4bbba5ab7b73b28187b118ef8af6a3b",
+    "pbp_2025": "c6ecedd6d678cc37ed316b23ef84ee1ec6abb69c514bb11868a7ebd5a367df29"
+  },
+  "kind": "LANDING_CHECK",
+  "run": {
+    "counted_rows": 0,
+    "game_index_order": [
+      "2024_10_CIN_BAL",
+      "2024_10_NYG_CAR",
+      "2024_10_ATL_NO",
+      "2024_10_BUF_IND",
+      "2024_10_DEN_KC",
+      "2024_10_MIN_JAX",
+      "2024_10_NE_CHI",
+      "2024_10_PIT_WAS",
+      "2024_10_SF_TB",
+      "2024_10_TEN_LAC",
+      "2024_10_NYJ_ARI",
+      "2024_10_PHI_DAL",
+      "2024_10_DET_HOU",
+      "2024_10_MIA_LA"
+    ],
+    "master_seed": 20261028,
+    "n_refusals": 0,
+    "n_rows": 350
+  },
+  "settlement_summary": {
+    "graded": 350,
+    "mean_clv_valid_rows": 0.0,
+    "n_clv_valid_rows": 345,
+    "n_rows": 350,
+    "push": 34,
+    "result_unavailable": 0,
+    "void": 0
+  },
+  "slate": {
+    "games": [
+      "2024_10_CIN_BAL",
+      "2024_10_NYG_CAR",
+      "2024_10_ATL_NO",
+      "2024_10_BUF_IND",
+      "2024_10_DEN_KC",
+      "2024_10_MIN_JAX",
+      "2024_10_NE_CHI",
+      "2024_10_PIT_WAS",
+      "2024_10_SF_TB",
+      "2024_10_TEN_LAC",
+      "2024_10_NYJ_ARI",
+      "2024_10_PHI_DAL",
+      "2024_10_DET_HOU",
+      "2024_10_MIA_LA"
+    ],
+    "season": 2024,
+    "week": 10
+  },
+  "state": "NON_COUNTED"
+}
