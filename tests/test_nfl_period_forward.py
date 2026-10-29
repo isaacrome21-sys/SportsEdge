@@ -363,7 +363,7 @@ def _synthetic_history():
                 "s23t": "2023-10-08"}
     games = pd.DataFrame([{
         "game_id": gid, "season": season, "week": week,
-        "gameday": gamedays[gid], "gametime": "1:00PM",
+        "gameday": gamedays[gid], "gametime": "13:00",
         "game_type": "REG", "home_team": home, "away_team": away,
         "home_score": 24, "away_score": 17,
     } for gid, season, week, home, away in specs])

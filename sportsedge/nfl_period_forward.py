@@ -617,10 +617,16 @@ class PeriodHistory:
     def kickoff_of(self, game_id: str) -> datetime:
         row = self.schedules_by_id[game_id]
         gametime = row.get("gametime")
+        clock = None
         if isinstance(gametime, str) and gametime.strip():
-            clock = datetime.strptime(gametime.strip(), "%I:%M%p").time()
-        else:
-            clock = datetime.strptime("1:00PM", "%I:%M%p").time()
+            for fmt in ("%H:%M", "%I:%M%p"):
+                try:
+                    clock = datetime.strptime(gametime.strip(), fmt).time()
+                    break
+                except ValueError:
+                    continue
+        if clock is None:
+            clock = datetime.strptime("13:00", "%H:%M").time()
         day = datetime.fromisoformat(row["gameday"]).date()
         return datetime.combine(day, clock, tzinfo=GAME_TZ)
 
