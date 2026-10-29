@@ -434,7 +434,9 @@ def load_slate(api, slate_id, now=None) -> dict:
         shas = {"stats": rec["stats_sha256"], "schedule": rec["schedule_sha256"]}
         stored = rec.get("fetch_provenance") or {}
         rows = rec["rows"]
-        season = int(rec["season"])
+        season = rec["season"]
+        if type(season) is not int or season < 1:
+            raise ValueError("run season must be a positive integer (not bool)")
         run_week = rec["week"]
         if type(run_week) is not int or run_week < 1:
             raise ValueError("run week must be a positive integer (not bool)")
@@ -593,9 +595,10 @@ def _replay_check(api, rec, rows, run_t, sch, sd, out):
         board = json.loads(bp["content"])
         # Do not let Python int-coercion or stringification disguise a
         # board week whose type differs from the exact run/schedule week.
-        if type(board.get("week")) is not int or board["week"] != rec["week"] \
+        if type(board.get("season")) is not int or board["season"] != rec["season"] \
+                or type(board.get("week")) is not int or board["week"] != rec["week"] \
                 or any(str(board.get(k)) != str(rec.get(k))
-                       for k in ("slate_id", "season", "week", "captured_at")):
+                       for k in ("slate_id", "captured_at")):
             out["reasons"].append("RUN_BOARD_MISMATCH")
         out["board_proof"] = {k: v for k, v in bp.items() if k != "content"}
     except ProvenanceFailed as e:
