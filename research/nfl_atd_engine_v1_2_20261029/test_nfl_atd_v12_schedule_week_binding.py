@@ -23,9 +23,13 @@ class TestScheduleWeekBinding(unittest.TestCase):
         self.world = fk.synthetic_world().__enter__()
         self.addCleanup(self.world.__exit__)
 
-    def _load(self, *, board_week=8, run_week=8, schedule_week=8):
+    def _load(self, *, board_week=8, run_week=8, schedule_week=8, all_unpriced=False):
         w = self.world
         w.board["week"] = board_week
+        if all_unpriced:
+            # Genuine pricer, but no recognized player can receive a price.
+            w.board["rows"] = [{"player_id": "ZZ", "player_name": "Nobody",
+                                "yes_price": 300}]
         if schedule_week != 8:
             lines = w.schedule.decode().splitlines()
             changed = 0
@@ -44,7 +48,11 @@ class TestScheduleWeekBinding(unittest.TestCase):
             inputs, now=datetime(2026, 10, 25, 16, 30, tzinfo=timezone.utc),
             fetched_at={"stats": "2026-10-25T15:00:00Z",
                         "schedule": "2026-10-25T15:01:00Z"})
-        self.assertTrue(any(r.get("status") == "PRICED" for r in rows))
+        self.assertTrue(rows)
+        if all_unpriced:
+            self.assertTrue(all(r.get("status") == "UNPRICED" for r in rows))
+        else:
+            self.assertTrue(any(r.get("status") == "PRICED" for r in rows))
         self.assertTrue(all("week" not in r for r in rows))
 
         api = fk.FakeGitHub()
@@ -70,7 +78,8 @@ class TestScheduleWeekBinding(unittest.TestCase):
                           br, pv.fetch_record_path(sha))[0])
             for sha in (st, sc)
         }
-        gid = next(r["game_id"] for r in rows if r.get("status") == "PRICED")
+        gid = next((r.get("game_id") for r in rows if r.get("game_id")), None)
+        self.assertIsNotNone(gid)
         record = {
             "slate_id": "W1", "captured_at": w.CAP, "season": 2026,
             "week": run_week, "first_kickoff": w.KO,
@@ -95,6 +104,17 @@ class TestScheduleWeekBinding(unittest.TestCase):
     def test_valid_real_pricer_week_counts(self):
         result = self._load()
         self.assertEqual(result["status"], "COUNTS", result["reasons"])
+
+    def test_all_unpriced_valid_week_cannot_count(self):
+        result = self._load(all_unpriced=True)
+        self.assertEqual(result["status"], "SCREEN")
+        self.assertIn("RUN_NO_PRICED_ROWS", result["reasons"])
+
+    def test_all_unpriced_wrong_week_cannot_bypass_binding(self):
+        result = self._load(board_week=9, run_week=9, schedule_week=8,
+                            all_unpriced=True)
+        self.assertEqual(result["status"], "SCREEN")
+        self.assertIn("RUN_NO_PRICED_ROWS", result["reasons"])
 
     def test_matching_board_run_but_wrong_schedule_week_refuses(self):
         result = self._load(board_week=9, run_week=9, schedule_week=8)
