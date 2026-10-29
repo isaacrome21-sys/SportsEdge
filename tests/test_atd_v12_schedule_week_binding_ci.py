@@ -1,7 +1,7 @@
 """CI discovery bridge for the dependent, UNFROZEN ATD v1.2 draft.
 
 The hosted full-discovery job runs `python -m pytest -q tests`, which does not
-discover tests under research/. This bridge executes the nine genuine-pricer
+discover tests under research/. This bridge executes all fourteen genuine-pricer
 schedule-week regressions as a subprocess and fails if any case is skipped,
 renamed, missing, or unsuccessful. No provider quotes or counting authority.
 """
@@ -21,6 +21,11 @@ _REQUIRED = (
     "test_run_week_bool_refuses_without_numeric_coercion",
     "test_run_week_float_refuses_without_numeric_coercion",
     "test_run_week_numeric_string_refuses_without_coercion",
+    "test_run_season_numeric_string_refuses_without_coercion",
+    "test_run_season_float_refuses_without_coercion",
+    "test_run_season_bool_refuses_without_coercion",
+    "test_board_season_numeric_string_refuses_even_if_pricer_coerces",
+    "test_board_season_float_refuses_even_if_pricer_coerces",
 )
 
 
