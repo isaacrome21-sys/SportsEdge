@@ -16,8 +16,9 @@ Rules (identical for every sport):
   first market it applies to the whole board; after a header it applies to that
   game. Duplicates in the same scope and malformed values fail closed. A body
   without it parses, but ``captured_at`` is None and a warning is recorded.
-* A line with exactly one price fails closed (no side is ever invented). A
-  recognised market with the wrong shape fails closed.
+* A recognised binary market with exactly one price fails closed (no side is
+  ever invented). Unsupported one-sided offers are skipped with an explicit
+  warning in the default mode and refused in strict mode.
 * A line whose market label the sport adapter does not know is skipped with a
   warning (``SKIPPED_UNKNOWN``), never guessed.
 * Prices are transcribed only. Nothing here creates a probability.
@@ -26,7 +27,7 @@ from __future__ import annotations
 
 import re
 import shlex
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from math import isfinite
@@ -79,6 +80,15 @@ _COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 _CAPTURED = re.compile(r"^captured\b\s*:?\s*(.*?)\s*$", re.IGNORECASE)
 _SPORT_TAG = re.compile(r"^\[[A-Z]{2,4} LINES\]\s*", re.IGNORECASE)
 _DROP_WORDS = {"prop", "player", "o/u"}
+_MLB_PITCHER_SECTION = re.compile(
+    r"^pitcher\s+props?\s*[—–:-]\s*(?P<name>.+?)\s*"
+    r"(?:\([^()]*\))?\s*:\s*$", re.IGNORECASE,
+)
+_MLB_FIRST_INNING_PAIR = re.compile(
+    r"^(?P<first>YRFI|NRFI)\s+(?P<first_price>\S+)\s*/\s*"
+    r"(?P<second>YRFI|NRFI)\s+(?P<second_price>\S+)\s*$",
+    re.IGNORECASE,
+)
 
 
 def _norm_dash(text: str) -> str:
@@ -180,7 +190,8 @@ def _unknown(line: str, n: int, sport: str, warnings: list[str], strict: bool) -
 
 
 def _parse_market(line: str, game: SharedGame, adapter: SportAdapter, warnings: list[str],
-                  n: int, resolve_teams: bool, strict: bool) -> SharedMarket | None:
+                  n: int, resolve_teams: bool, strict: bool,
+                  player_subject: str | None = None) -> SharedMarket | None:
     sport = adapter.sport
     toks = _tokens(line, sport)
     tail: list[str] = []
@@ -195,9 +206,19 @@ def _parse_market(line: str, game: SharedGame, adapter: SportAdapter, warnings: 
     found = _match_spec(toks, adapter) if toks else None
     if found is None:
         if len(tail) == 1:
-            raise SharedIntakeError(f"{sport}_INTAKE_ONE_SIDED_OR_MALFORMED:{line}")
+            # Distinguish a one-sided *unknown* offer (e.g. MLB Batter HR
+            # 1+ +350) from a malformed known binary market (ML +125).
+            # Default intake skips this market explicitly without inventing
+            # a NO price, so paired MLB pitcher/game rows can still parse.
+            if strict:
+                raise SharedIntakeError(f"{sport}_INTAKE_ONE_SIDED_OR_MALFORMED:{line}")
+            warnings.append(f"line {n}: SKIPPED_UNPAIRED_OFFER '{line[:120]}'")
+            return None
         return _unknown(line, n, sport, warnings, strict)
     spec, subject = found
+    if (spec.subject == "player" and spec.market.startswith("PITCHER_")
+            and not subject and player_subject):
+        subject = player_subject
     explicit_opposite = spec.family == "spread" and len(tail) == 4
     want = 3 if spec.needs_line else 2
     if len(tail) != want and not explicit_opposite:
@@ -223,7 +244,14 @@ def _parse_market(line: str, game: SharedGame, adapter: SportAdapter, warnings: 
     if spec.subject == "team" and subject:
         team = adapter.team(subject) if resolve_teams else subject
         if resolve_teams and team not in {game.away, game.home}:
-            raise SharedIntakeError(f"{sport}_INTAKE_TEAM_NOT_IN_GAME:{subject}")
+            # MLB DK issue header may say `MIL Brewers @ TB Rays` while its
+            # two team totals say `MIL` and `TB`. Match *only* a unique exact
+            # fixture prefix; a generic/ambiguous city is not enough.
+            candidates = [name for name in (game.away, game.home)
+                          if sport == "MLB" and name.split()[0].casefold() == subject.casefold()]
+            if len(candidates) != 1:
+                raise SharedIntakeError(f"{sport}_INTAKE_TEAM_NOT_IN_GAME:{subject}")
+            team = candidates[0]
     line_value = _number(number, line, sport) if number is not None else spec.fixed_line
     return SharedMarket(spec.market, spec.family, line_value, spec.sides[0], first,
                         spec.sides[1], second, line, subject=subject, team=team)
@@ -251,6 +279,7 @@ def parse_issue(body: str, sport: str, *, title: str | None = None,
     current: SharedGame | None = None
     board_captured: str | None = None
     own_capture: set[int] = set()
+    pitcher_subject: str | None = None
 
     def _new_game(away: str, home: str, header: str) -> SharedGame:
         if resolve_teams:
@@ -281,6 +310,60 @@ def parse_issue(body: str, sport: str, *, title: str | None = None,
         header = parse_header(line)
         if header:
             current = _new_game(header[0], header[1], line)
+            pitcher_subject = None  # never carry a player between games
+            continue
+        if sport == "MLB" and line.casefold().startswith("pitcher props"):
+            # Real DK full-board issues group paired K/outs/hits/ER/BB lines
+            # under a pitcher heading; a one-line subject is not repeated.
+            # Capture text is only identity text: downstream still verifies
+            # actual starter, roster and independently timed paired quotes.
+            match = _MLB_PITCHER_SECTION.fullmatch(line)
+            if not match or not match.group("name").strip():
+                raise SharedIntakeError(f"MLB_INTAKE_PITCHER_SECTION_INVALID:{line}")
+            if current is None:
+                raise SharedIntakeError(f"MLB_INTAKE_PITCHER_SECTION_BEFORE_GAME:{line}")
+            pitcher_subject = " ".join(match.group("name").split())
+            continue
+        if sport == "MLB" and line.casefold().startswith("batter "):
+            pitcher_subject = None  # batter ladder must bind its own subjects
+        if sport == "MLB" and re.match(r"^(YRFI|NRFI)\b", line, re.IGNORECASE):
+            pair = _MLB_FIRST_INNING_PAIR.fullmatch(line)
+            if pair is not None:
+                if current is None:
+                    raise SharedIntakeError(f"MLB_INTAKE_MARKET_BEFORE_GAME:{line}")
+                first, second = pair.group("first").upper(), pair.group("second").upper()
+                if {first, second} != {"YRFI", "NRFI"}:
+                    raise SharedIntakeError(f"MLB_INTAKE_FIRST_INNING_PAIR_INVALID:{line}")
+                quoted = {
+                    first: american(pair.group("first_price"), line, sport),
+                    second: american(pair.group("second_price"), line, sport),
+                }
+                current.markets.append(SharedMarket(
+                    "FIRST_INNING_TOTAL", "yes_no", 0.5, "OVER", quoted["YRFI"],
+                    "UNDER", quoted["NRFI"], line,
+                ))
+                continue
+            if "/" in line and re.search(r"\b(?:YRFI|NRFI)\b", line.split("/", 1)[1], re.IGNORECASE):
+                # A displayed YRFI/NRFI pair must provide *both* exact odds.
+                raise SharedIntakeError(f"MLB_INTAKE_FIRST_INNING_PAIR_INVALID:{line}")
+        if sport == "MLB" and line.casefold().startswith("team totals:"):
+            # Source format: `Team Totals: MIL 3.5 +100 -130; TB 3.5 -105 -125`.
+            # Split only these explicitly paired offers; never infer a price.
+            if current is None:
+                raise SharedIntakeError(f"MLB_INTAKE_TEAM_TOTAL_BEFORE_GAME:{line}")
+            sections = [part.strip() for part in line.split(":", 1)[1].split(";")]
+            if len(sections) != 2 or not all(sections):
+                raise SharedIntakeError(f"MLB_INTAKE_TEAM_TOTAL_PAIR_INVALID:{line}")
+            parsed = [
+                _parse_market("TT " + part, current, adapter, warnings, n,
+                              resolve_teams, strict_unknown)
+                for part in sections
+            ]
+            if any(m is None or m.family != "team_total" for m in parsed):
+                raise SharedIntakeError(f"MLB_INTAKE_TEAM_TOTAL_PAIR_INVALID:{line}")
+            if resolve_teams and {m.team for m in parsed} != {current.away, current.home}:
+                raise SharedIntakeError(f"MLB_INTAKE_TEAM_TOTAL_TEAMS_MISMATCH:{line}")
+            current.markets.extend(replace(m, raw=line) for m in parsed)
             continue
         if current is None:
             title_header = parse_header(title or "")
@@ -291,7 +374,8 @@ def parse_issue(body: str, sport: str, *, title: str | None = None,
                 continue
             else:
                 raise SharedIntakeError(f"{sport}_INTAKE_MARKET_BEFORE_GAME:{line}")
-        market = _parse_market(line, current, adapter, warnings, n, resolve_teams, strict_unknown)
+        market = _parse_market(line, current, adapter, warnings, n, resolve_teams,
+                               strict_unknown, pitcher_subject)
         if market is not None:
             current.markets.append(market)
 

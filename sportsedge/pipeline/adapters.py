@@ -124,8 +124,8 @@ NHL = SportAdapter("NHL", _table({
 
 MLB = SportAdapter("MLB", _table({
     "ml|moneyline": _spec("MONEYLINE", ML),
-    "rl|runline|spread": _spec("RUN_LINE", SPREAD),
-    "total|ou|gametotal": _spec("GAME_TOTAL", TOTAL),
+    "rl|runline|spread|altrl|altrunline": _spec("RUN_LINE", SPREAD),
+    "total|ou|gametotal|alttotal": _spec("GAME_TOTAL", TOTAL),
     "f5ml|first5ml|f5moneyline": _spec("FIRST_FIVE_MONEYLINE", ML),
     "f5rl|first5rl|f5runline": _spec("FIRST_FIVE_RUN_LINE", SPREAD),
     "f5total|first5total": _spec("FIRST_FIVE_TOTAL", TOTAL),
@@ -134,6 +134,9 @@ MLB = SportAdapter("MLB", _table({
     "nrfi": MarketSpec("FIRST_INNING_TOTAL", "yes_no", ("OVER", "UNDER"), False, swap=True, fixed_line=0.5),
     "k|ks|strikeouts": _ou("PITCHER_STRIKEOUTS", "player"),
     "outs": _ou("PITCHER_OUTS", "player"),
+    "hitsallowed|pitcherhitsallowed": _ou("PITCHER_HITS_ALLOWED", "player"),
+    "erallowed|earnedrunsallowed|pitcherearnedruns": _ou("PITCHER_ER", "player"),
+    "walksallowed|bballowed|pitcherwalks": _ou("PITCHER_BB", "player"),
     "hits": _ou("BATTER_HITS", "player"),
     "tb|totalbases": _ou("BATTER_TOTAL_BASES", "player"),
 }))
