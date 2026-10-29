@@ -104,12 +104,12 @@ scoping session, `research/new_sports_scoping_20261027/`).
     the dataset does not document the book or whether prices are
     openers or closes.
   - Workspace persistence note (*verified this session*): the pulled
-    CSV copies used by the Oct 28 screen were kept in a scratch data
-    dir; they were not locatable in the workspace at this session's
-    verification (checked the screen lane's clone, the lane intakes,
-    and the scratch trees). Any future run re-pulls from the pinned
-    commits and re-verifies sha256 against PINS.json before use —
-    the pin, not a local copy, is the record.
+    CSV copies used by the Oct 28 screen persist at
+    `~/workspace/ufc-screen-20261028/data/` (all five files), and this
+    session re-verified every file's sha256 against PINS.json —
+    **5/5 match**, byte sizes included. The pin remains the record:
+    any future run re-verifies hashes before use and re-pulls from
+    the pinned commits if a copy is missing or mismatched.
 - **Card/config artifacts** (*read firsthand*): `config/ufc_330_current.json`
   (a hand-built Aug 15, 2026 card override) and
   `config/ufc_run_request_2026-08-25.json` — evidence the old lineage
