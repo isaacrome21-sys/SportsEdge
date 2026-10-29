@@ -443,6 +443,10 @@ def load_slate(api, slate_id, now=None) -> dict:
                 or not isinstance(teams, dict):
             raise ValueError("slate_id/rows/game_teams")
         priced = [r for r in rows if r.get("status") == "PRICED"]
+        # A zero-priced slate has no independently schedule-bound candidate.
+        # It must not start a counted clock merely because replay matches.
+        if not priced:
+            out["reasons"].append("RUN_NO_PRICED_ROWS")
         for r in priced:
             _t(r["kickoff"]), r["game_id"]
         # the run-record field schedule_kickoffs is informational only
