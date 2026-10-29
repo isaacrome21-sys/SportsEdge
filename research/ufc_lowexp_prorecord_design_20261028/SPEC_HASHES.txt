@@ -1,0 +1,31 @@
+# SPEC_HASHES — UFC_ML_LOWEXP_PRORECORD_V1 preregistration draft package
+# Prepared Oct 28, 2026. Every hash below was recomputed by the drafter
+# from the bytes as read (repo files on main eb2e6d391, the PR #2923
+# branch file at its head e6b9e53ec, and the workspace copies of the
+# PINS.json data files). One pin per line: sha256  path  (note).
+
+# --- The design this draft formalizes, and its independent review ---
+41f6332bcf81d8328bd54970d09e246a390d37b38e60cb3aaf985823b1cc3109  research/ufc_successor_design_20261028/DESIGN_EXPLORATION_UFC_ML_SUCCESSOR.md  (exploration memo; bytes as read from DRAFT PR #2923 branch rocky/ufc-successor-design-20261028 @ e6b9e53ec — that PR is unmerged, so the path exists on that branch, not yet on main)
+70ac7da45a6b125416d8ce08df0a537e12720055f0fcc4a598d9d3ed645cfc85  ~/workspace/ufc-successor-review-20261028/REVIEW.md  (independent review, verdict SOUND-WITH-FLAGS; workspace record, pinned here by hash + path — flags F-1..F-6 are discharged in the draft at the sections its header names)
+
+# --- V1's record (the review's figures source; merged, PR #2876) ---
+df0a1b1f31618fbf09d7d7e66c46d48477537eec8811d6d372fbedc23e838da9  research/ufc_moneyline_screen_20261028/screen_results.json  (source of every V1 figure the review verified: headline deltas, debut slice, per-class slices, window counts)
+75a60285f27c933fc071dcbda566b358bdd17a6d0dd0016cdc457d0108814e50  research/ufc_moneyline_screen_20261028/SCREEN_REPORT.md
+ecbf19c047dddf267af86fe17550ce19bd0a707f5f34a4673747bfd40be8d944  research/ufc_moneyline_screen_20261028/PINS.json  (the data-pin record itself; the five data files it pins are listed below)
+819762e90dbd4e3b14f226f7a686cca08d549d48fb93f0f57391043e776185ce  research/new_sports_designs_20261027/UFC_MONEYLINE_DESIGN_PREREG_DRAFT.md  (V1 design + prereg draft — the frozen-form conventions this draft follows)
+12bc19b48cc3a5e8c96b00599149452c2de6a0fa11e045bb80c64d6dd016b9aa  config/ufc_promotion_contract_v1.json  (promotion contract; Leg B adapts its gates at segment scale per draft section 9)
+
+# --- Implementation references adopted by the draft (section 4.2 / section 5) ---
+ea48134824648e924fc4f75e466788776436b9e2808dca56411600ee755ce290  sportsedge/ufc_training.py  (FEATURES vector; fit_logistic / fit_platt constants; update_elo K=32.0; evaluate = ECE-10 metric definitions)
+21184783441a95ba48be71bab71bfc7133b1dc07db026a0a02d60fd9c30c31ab  sportsedge/ufc_history.py  (snapshot builder; initial Elo 1500.0; strictly-before reconstruction; TrainingRow orientation convention)
+70eecdc71eb126b0be48a1a69d7060e525f1334c42504dcb7bb898045f7b70bb  research/ufc_moneyline_screen_20261028/run_screen.py  (devig_pair proportional de-vig; probability_metrics one-implementation-for-all-legs precedent; join_key_norm identity normalization)
+
+# --- Data files pinned by PINS.json (bytes live outside the repo; hashes
+# --- re-verified 5/5 against the workspace copies at
+# --- ~/workspace/ufc-screen-20261028/data/ on Oct 28, 2026; any run
+# --- re-verifies before use and re-pulls from the pinned commits) ---
+b8aa6604539d5981bba561cb65da26133567732145ca48efbec2d9423b081937  ufc-master.csv  (3,190,849 B; mdabbert recorded prices via shortlikeafox mirror @ 31d29415; RECORDED_PRICE_NOT_DK_CLOSE; design data only in this preregistration)
+818420d6c7cdac420dcb963a57586ecca0a6e5343e07801e13cac0478a59c883  ufc_event_details.csv  (102,912 B; Greco1899/scrape_ufc_stats @ 5d6622ff)
+b20cde586d139f9a23fe37648b0acde88ff78f9cbd4cfabfb8034ffb17a13aec  ufc_fight_results.csv  (2,110,761 B; Greco1899 @ 5d6622ff)
+252b22f636a129f7117074313b055d1c277ea1af8785b16b48efd5a538320455  ufc_fight_stats.csv  (7,683,173 B; Greco1899 @ 5d6622ff)
+3296e67941f984cd5484488226e5a5d94de3249c63fe289fbc66d98546311ea1  ufc_fighter_tott.csv  (508,399 B; Greco1899 @ 5d6622ff)
