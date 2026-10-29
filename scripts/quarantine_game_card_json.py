@@ -65,6 +65,58 @@ _TOP_LEVEL_AUTHORITY_ALIASES = frozenset({
 })
 
 
+# This diagnostic is emitted by the governed engine for FAILED NBA game
+# families. Preserve its observed counts, but never trust caller-supplied
+# validation, candidate, score, or staking authority inside the object.
+_NBA_INTEGRITY_POLICY = {
+    "family_validation": "FAILED_VALIDATION",
+    "game_families": ["ML", "SPREAD", "TOTAL"],
+    "positive_ev_candidate_authority": False,
+    "numeric_quality_scores_allowed": False,
+    "score_policy": "WITHHELD_FAILED_NBA_GAME_VALIDATION",
+    "research_only": True,
+    "interpretation": (
+        "TOTAL rows share a failed model family: same-direction "
+        "quotes are one systematic model-level diagnostic, never "
+        "independent market edges. Full rows remain auditable."
+    ),
+}
+_NBA_INTEGRITY_COUNTS = (
+    "game_rows", "apparent_positive_gap_total_rows", "under_rows",
+    "over_rows", "distinct_games",
+)
+
+
+def _validate_nba_integrity(card):
+    if "nba_game_card_integrity" not in card:
+        return
+    obj = card["nba_game_card_integrity"]
+    if not isinstance(obj, dict):
+        raise ValueError("GAME_NBA_INTEGRITY_NOT_OBJECT")
+    expected_keys = set(_NBA_INTEGRITY_POLICY) | set(_NBA_INTEGRITY_COUNTS) | {
+        "same_direction_concentration"
+    }
+    if set(obj) != expected_keys:
+        raise ValueError("GAME_NBA_INTEGRITY_FIELDS_MISMATCH")
+    for key, expected in _NBA_INTEGRITY_POLICY.items():
+        if type(obj[key]) is not type(expected) or obj[key] != expected:
+            raise ValueError("GAME_NBA_INTEGRITY_POLICY_CONFLICT:" + key)
+    for key in _NBA_INTEGRITY_COUNTS:
+        value = obj[key]
+        if type(value) is not int or value < 0:
+            raise ValueError("GAME_NBA_INTEGRITY_COUNT_INVALID:" + key)
+    total = obj["apparent_positive_gap_total_rows"]
+    under = obj["under_rows"]
+    over = obj["over_rows"]
+    if (under + over != total or total > obj["game_rows"]
+            or obj["distinct_games"] > total):
+        raise ValueError("GAME_NBA_INTEGRITY_COUNTS_INCONSISTENT")
+    concentrated = total >= 3 and (under == 0 or over == 0)
+    if (type(obj["same_direction_concentration"]) is not bool
+            or obj["same_direction_concentration"] is not concentrated):
+        raise ValueError("GAME_NBA_INTEGRITY_CONCENTRATION_CONFLICT")
+
+
 def _check_research_policy(card, key, expected):
     if key not in card:
         return
@@ -85,6 +137,7 @@ def _validate_card_contract(card):
             raise ValueError("GAME_CARD_TOP_LEVEL_AUTHORITY_ALIAS:" + key)
     _check_research_policy(card, "play_gate", _RESEARCH_PLAY_GATE)
     _check_research_policy(card, "quote_freshness_policy", _RESEARCH_QUOTE_POLICY)
+    _validate_nba_integrity(card)
     if "authority" in card:
         authority = card["authority"]
         if not isinstance(authority, dict):
