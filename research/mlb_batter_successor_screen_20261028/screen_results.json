@@ -1,0 +1,315 @@
+{
+ "construction": "MLB_BATTER_RATES_V1",
+ "design": "research/mlb_batter_successor_screen_20261028/DESIGN.md",
+ "source": {
+  "dataset": "SmartStake/mlb-player-props (Hugging Face)",
+  "revision": "7cedfd3fe29f2de4f675039410a48160739323fc",
+  "admission": "PR #2888 \u2014 ADMITTED DESIGN/SCREEN ONLY",
+  "labels": "vs-close (timestamped, per book); no validation credit, no clock credit, no play eligibility",
+  "attribution": "CC BY 4.0 \u2014 SmartStake"
+ },
+ "pins_verified": [
+  {
+   "path": "mon=2026-03/part-000.parquet",
+   "sha256": "c1058237807fbd39306a3b5091460cf4c02e63948e457e3c0a2a3b1aa4e0fba3",
+   "pin_status": "PIN_MATCH"
+  },
+  {
+   "path": "mon=2026-04/part-000.parquet",
+   "sha256": "d3eb5e15fa0309ea5b1e698daf40d32d9f6376b0600eb60a07451a12668ceebd",
+   "pin_status": "PIN_MATCH"
+  },
+  {
+   "path": "mon=2026-04/part-001.parquet",
+   "sha256": "af9938e78c3bf9ee5cda96cd646da7671e547bfbf1763f3c14c8ef53bdd97aad",
+   "pin_status": "PIN_MATCH"
+  },
+  {
+   "path": "mon=2026-04/part-002.parquet",
+   "sha256": "aab964eb77b573a3f1552ae89b0e9447fd9bb8b342370d2578f51c3ebabfa2b4",
+   "pin_status": "PIN_MATCH"
+  },
+  {
+   "path": "mon=2026-04/part-003.parquet",
+   "sha256": "e96441885d057603d4b88ede94e676a3d4cbe56e720b370a3d094e59327f4b92",
+   "pin_status": "PIN_MATCH"
+  },
+  {
+   "path": "mon=2026-04/part-004.parquet",
+   "sha256": "69b645f171c5824ae8f2f5cc6a24b652a7436d7d6a805b0b0b70310080c33188",
+   "pin_status": "PIN_MATCH"
+  },
+  {
+   "path": "mon=2026-05/part-000.parquet",
+   "sha256": "89ae9088c8e9b4c5c836dea3c7b974bb88c09b88448d69273f2aa28dcbaaa24f",
+   "pin_status": "PIN_MATCH"
+  },
+  {
+   "path": "mon=2026-05/part-001.parquet",
+   "sha256": "f501494c33f392d741a249a9b2343a9541fd2670ecd9856612d92586ab5c8dce",
+   "pin_status": "PIN_MATCH"
+  },
+  {
+   "path": "mon=2026-05/part-002.parquet",
+   "sha256": "e30429626ff7a67de411747e1aa71a1831ed2f6b00cebdf187a339d6fdc4cdd1",
+   "pin_status": "PIN_MATCH"
+  },
+  {
+   "path": "mon=2026-05/part-003.parquet",
+   "sha256": "cf3d3e6d53bff65265e81463cb9d5d57a27017d691ded4fe285bdc3896dd8dd1",
+   "pin_status": "PIN_MATCH"
+  },
+  {
+   "path": "mon=2026-05/part-004.parquet",
+   "sha256": "1e977f189be9d0e3c1cc080db71fb21d259d2f67376d864302ef7c8aef33a5bf",
+   "pin_status": "PIN_MATCH"
+  },
+  {
+   "path": "mon=2026-05/part-005.parquet",
+   "sha256": "76b125153f7fa69bdcabd454d7160dc1df0fcd8f239aabc76e9160c081e41949",
+   "pin_status": "PIN_MATCH"
+  },
+  {
+   "path": "mon=2026-05/part-006.parquet",
+   "sha256": "a4e6015c7eb73b6e55120d5d3ed4ed99743ca217b4d81b72c5503c09b7dcf016",
+   "pin_status": "PIN_MATCH"
+  },
+  {
+   "path": "mon=2026-06/part-000.parquet",
+   "sha256": "616dccd4e06c3138942236eed2531ade8db7d13c93f5f6babca504be40aba7d6",
+   "pin_status": "PIN_MATCH"
+  },
+  {
+   "path": "mon=2026-06/part-001.parquet",
+   "sha256": "dc9c09351caf0976bbc46990713a8c37c62ed14a42fdea71202fb9ada827bb74",
+   "pin_status": "PIN_MATCH"
+  },
+  {
+   "path": "mon=2026-06/part-002.parquet",
+   "sha256": "1b5db24a71e7a237f2f76bab0bbb619602b0693cac801766b13e2ac90562c37c",
+   "pin_status": "PIN_MATCH"
+  },
+  {
+   "path": "mon=2026-06/part-003.parquet",
+   "sha256": "c9e1138e9b4776fbe635b4bde94fa6bf01ea09e3a35f553fa706b2e3d545ebd1",
+   "pin_status": "PIN_MATCH"
+  },
+  {
+   "path": "mon=2026-07/part-000.parquet",
+   "sha256": "b8c28cbd0f4cc37597772dfff99d9cbd0a59a6fa2e6fd1cfef49c399ed6d0ada",
+   "pin_status": "PIN_MATCH"
+  }
+ ],
+ "config": {
+  "shrinkage_k": 20.0,
+  "phi_cap": 2.5,
+  "min_n": 300,
+  "calibration_bound": 0.04,
+  "bootstrap_reps": 2000,
+  "seed": 20261028,
+  "fit_window": [
+   "2026-03-21",
+   "2026-06-01"
+  ],
+  "validation_window": [
+   "2026-06-01",
+   "2026-07-06"
+  ],
+  "close_book": "draftkings"
+ },
+ "data_used": {
+  "draftkings_rows_scanned": 44368757,
+  "appearances_graded_total": 89716,
+  "validation_selections_scored": 13471,
+  "validation_graded_without_two_sided_close": 5486,
+  "validation_pushes_excluded": 0,
+  "validation_distinct_games": 213
+ },
+ "markets": [
+  {
+   "market": "player bases",
+   "n": 2077,
+   "fit": {
+    "mu": 1.3351999425658698,
+    "phi": 2.111128629260377,
+    "fit_n": 13929
+   },
+   "strikeouts_population": "batter",
+   "observed_over_rate": 0.4015406836783823,
+   "mean_p_model": 0.3746387513570055,
+   "calibration_diff": -0.02690193232137683,
+   "logloss_model": 0.6768542115394008,
+   "logloss_market_close": 0.6709957769098805,
+   "logloss_simple": 0.6838680199480255,
+   "brier_model": 0.24172658942771755,
+   "brier_market_close": 0.23905354261412806,
+   "brier_simple": 0.24494731139639855,
+   "delta_logloss_vs_market": 0.005858434629520267,
+   "delta_logloss_vs_market_ci": [
+    -0.0013315563297400048,
+    0.013211310524301285
+   ],
+   "delta_logloss_vs_simple": -0.007013808408624711,
+   "delta_logloss_vs_simple_ci": [
+    -0.012880651689845115,
+    -0.0013873344896459757
+   ],
+   "distinct_games": 213,
+   "c1_min_n_pass": true,
+   "c2_vs_market_pass": false,
+   "c3_vs_simple_pass": true,
+   "c4_calibration_pass": true
+  },
+  {
+   "market": "player hits",
+   "n": 3736,
+   "fit": {
+    "mu": 0.824858351861149,
+    "phi": 1.0,
+    "fit_n": 13943
+   },
+   "strikeouts_population": "batter",
+   "observed_over_rate": 0.5655781584582441,
+   "mean_p_model": 0.5299855122083463,
+   "calibration_diff": -0.035592646249897775,
+   "logloss_model": 0.6730932056512439,
+   "logloss_market_close": 0.6667789618768678,
+   "logloss_simple": 0.6786195323854634,
+   "brier_model": 0.23976135392262396,
+   "brier_market_close": 0.23698118782188954,
+   "brier_simple": 0.24206619580892963,
+   "delta_logloss_vs_market": 0.006314243774376009,
+   "delta_logloss_vs_market_ci": [
+    0.0018643593896460827,
+    0.011104164098073976
+   ],
+   "delta_logloss_vs_simple": -0.005526326734219472,
+   "delta_logloss_vs_simple_ci": [
+    -0.008904684716664339,
+    -0.001978331728024312
+   ],
+   "distinct_games": 213,
+   "c1_min_n_pass": true,
+   "c2_vs_market_pass": false,
+   "c3_vs_simple_pass": true,
+   "c4_calibration_pass": true
+  },
+  {
+   "market": "player rbis",
+   "n": 3724,
+   "fit": {
+    "mu": 0.42824339839265213,
+    "phi": 1.551760712076656,
+    "fit_n": 13936
+   },
+   "strikeouts_population": "batter",
+   "observed_over_rate": 0.3010204081632653,
+   "mean_p_model": 0.2956807880426856,
+   "calibration_diff": -0.005339620120579702,
+   "logloss_model": 0.6107651986654916,
+   "logloss_market_close": 0.6059349738592152,
+   "logloss_simple": 0.6120774664466703,
+   "brier_model": 0.21009422253274407,
+   "brier_market_close": 0.20802584083670425,
+   "brier_simple": 0.21055254781785782,
+   "delta_logloss_vs_market": 0.004830224806276485,
+   "delta_logloss_vs_market_ci": [
+    0.00037376126897794773,
+    0.009414439620835323
+   ],
+   "delta_logloss_vs_simple": -0.0013122677811785459,
+   "delta_logloss_vs_simple_ci": [
+    -0.005479216383767341,
+    0.002903549541094701
+   ],
+   "distinct_games": 213,
+   "c1_min_n_pass": true,
+   "c2_vs_market_pass": false,
+   "c3_vs_simple_pass": false,
+   "c4_calibration_pass": true
+  },
+  {
+   "market": "player home runs",
+   "n": 0,
+   "fit": {
+    "mu": 0.108903077695674,
+    "phi": 1.0031583498614514,
+    "fit_n": 13939
+   },
+   "strikeouts_population": "batter",
+   "c1_min_n_pass": false,
+   "c2_vs_market_pass": false,
+   "c3_vs_simple_pass": false,
+   "c4_calibration_pass": false
+  },
+  {
+   "market": "player strikeouts",
+   "n": 295,
+   "fit": {
+    "mu": 4.9053876478318,
+    "phi": 1.1736047156929519,
+    "fit_n": 1522
+   },
+   "strikeouts_population": "pitcher (DraftKings posts this market on pitchers; DESIGN \u00a72)",
+   "observed_over_rate": 0.5016949152542373,
+   "mean_p_model": 0.48001896805221766,
+   "calibration_diff": -0.021675947202019596,
+   "logloss_model": 0.7117547230902735,
+   "logloss_market_close": 0.6915434358807004,
+   "logloss_simple": 0.7302992001835463,
+   "brier_model": 0.25860941057534403,
+   "brier_market_close": 0.24917965921208884,
+   "brier_simple": 0.2659130652891265,
+   "delta_logloss_vs_market": 0.02021128720957301,
+   "delta_logloss_vs_market_ci": [
+    -0.006886621913211116,
+    0.047645490111820135
+   ],
+   "delta_logloss_vs_simple": -0.018544477093272886,
+   "delta_logloss_vs_simple_ci": [
+    -0.03588550246116949,
+    -0.0021796450779179403
+   ],
+   "distinct_games": 169,
+   "c1_min_n_pass": false,
+   "c2_vs_market_pass": false,
+   "c3_vs_simple_pass": true,
+   "c4_calibration_pass": true
+  },
+  {
+   "market": "player batting walks",
+   "n": 3639,
+   "fit": {
+    "mu": 0.3657524091919941,
+    "phi": 1.0068394541959347,
+    "fit_n": 13490
+   },
+   "strikeouts_population": "batter",
+   "observed_over_rate": 0.28634240175872494,
+   "mean_p_model": 0.306006577469948,
+   "calibration_diff": 0.019664175711223086,
+   "logloss_model": 0.5898222186562136,
+   "logloss_market_close": 0.5841429236959489,
+   "logloss_simple": 0.5997957162502581,
+   "brier_model": 0.20072452762835827,
+   "brier_market_close": 0.1981125959590184,
+   "brier_simple": 0.20474975383454902,
+   "delta_logloss_vs_market": 0.005679294960264715,
+   "delta_logloss_vs_market_ci": [
+    0.00090377737105519,
+    0.0103473596057669
+   ],
+   "delta_logloss_vs_simple": -0.009973497594044534,
+   "delta_logloss_vs_simple_ci": [
+    -0.014626377508580115,
+    -0.005158484530121795
+   ],
+   "distinct_games": 213,
+   "c1_min_n_pass": true,
+   "c2_vs_market_pass": false,
+   "c3_vs_simple_pass": true,
+   "c4_calibration_pass": true
+  }
+ ],
+ "verdict": "FAILED_SCREEN"
+}
