@@ -563,6 +563,30 @@ class GameCardAdapterTests(unittest.TestCase):
         self.assertEqual(sanitize_card(card)["nba_game_card_integrity"], valid)
 
 
+    def test_detached_ranked_identity_rejects_bool_numeric_equivalence(self):
+        # Python considers True == 1 and 1.0 == 1. Display identity must
+        # match the original evidence in both value and exact JSON type.
+        for field, original_value, forged_value in (
+            ("line", 1, True),
+            ("line", 1, 1.0),
+            ("dk_event_id", 1, True),
+            ("event_id", 1, 1.0),
+        ):
+            with self.subTest(field=field, forged_value=forged_value):
+                card = self.card()
+                original = card["evaluated_rows"][1]
+                original[field] = original_value
+                card["edges"] = [deepcopy(original)]
+                card["edges"][0][field] = forged_value
+                # Other ranked surfaces still refer to the same original;
+                # the detached forged row must never be admitted.
+                before = deepcopy(card)
+                with self.assertRaisesRegex(ValueError,
+                                            "GAME_SURFACE_IDENTITY_CONFLICT:" + field):
+                    sanitize_card(card)
+                self.assertEqual(card, before)
+
+
 if __name__ == "__main__":
     unittest.main()
 
