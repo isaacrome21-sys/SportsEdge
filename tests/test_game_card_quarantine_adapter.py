@@ -591,7 +591,7 @@ class GameCardAdapterTests(unittest.TestCase):
         # Reproduce the prior +3%/.55 -> +39%/.99 laundering gap.
         for field, forged in (("ev_per_dollar", .39), ("estimate_p", .99),
                               ("ev_per_dollar", .03 + 1e-8),
-                              ("estimate_p", ".55"), ("ev_per_dollar", True)):
+                              ("estimate_p", ".55")):
             with self.subTest(field=field, forged=forged):
                 card = self.card()
                 card["evaluated_rows"][0]["independent_projection"] = {
@@ -647,6 +647,7 @@ class GameCardAdapterTests(unittest.TestCase):
         for field, forged, reason in (
             ("ev_per_dollar", .40, "EXTREME_CLAIMED_EV_QUARANTINE"),
             ("estimate_p", 1.5, "GAME_PROBABILITY_CLAIM_INVALID"),
+            ("ev_per_dollar", True, "GAME_EV_CLAIM_INVALID"),
         ):
             with self.subTest(field=field):
                 card = self.card()
