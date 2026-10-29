@@ -1,0 +1,13 @@
+# sha256 pins for the NFL_PERIOD_DRIVE_STATE_V2 forward-runner
+# build package (2026-10-28). The construction-of-record pin and
+# the eight pins inherited from PR #2914's SPEC_HASHES are verified
+# by sportsedge/nfl_period_forward.py at runner construction
+# (EXPECTED_PINS); the hashes below pin THIS build's own files.
+de0f5acdb91c41e0c56acef374cd775bdc048b70aa583d4431b9f6770beab79c  sportsedge/nfl_period_forward.py
+b85fa23d5a1aecc9658e41590a0f875c4d5672dd9163a9096c9d31ea9dc7511b  tests/test_nfl_period_forward.py
+e5f0c0c22ddaa66c8e2199b719dae2224753d97fd48d9482f5619a2e3d2f224a  research/nfl_period_forward_20261028/run_landing_check.py
+7df5b5d42fa42ee3930bce867084d2d71ef371a3df983b87d960709167cfe362  research/nfl_period_forward_20261028/LANDING_CHECK.json
+a6914b386d249f6155674571c7fd1d062e899d8a998d9eeb9bb0067880b9bdad  research/nfl_period_forward_20261028/entry_records_sample.jsonl
+70e95decfea4dbb01c7048b4860432109dcdf4361a1ac09098ddbfd89bd8804c  research/nfl_period_forward_20261028/BUILD_RECORD.md
+# Construction of record (verified on main, not part of this build):
+16593a8779986f653705c481eaf0e079387933975123e386f8efd7e865b4658c  research/nfl_period_drive_state_screen_20261028/screen_nfl_period_drive_state_v2.py
