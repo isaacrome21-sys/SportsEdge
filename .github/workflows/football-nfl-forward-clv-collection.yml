@@ -108,6 +108,12 @@ jobs:
             '{state:"MODEL_RELEASE_AVAILABLE",model_code_git_sha:$sha,model_artifact_sha256:$hash,workflow_run_id:$run}' \
             > artifacts/football/forward-run/release-status.json
 
+      - name: Refuse green collection when release is unavailable
+        if: steps.release.outputs.available != 'true'
+        run: |
+          python3 scripts/require_nfl_forward_release.py \
+            --status-file artifacts/football/forward-run/release-status.json
+
       - name: Checkout exact model-release implementation
         if: steps.release.outputs.available == 'true'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
