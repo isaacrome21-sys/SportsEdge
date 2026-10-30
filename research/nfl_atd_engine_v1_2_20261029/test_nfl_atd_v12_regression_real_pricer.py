@@ -36,6 +36,7 @@ Run: python3 -m pytest test_nfl_atd_v12_regression_real_pricer.py
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -347,6 +348,10 @@ class TestDalPhiFixtureRealPricer(unittest.TestCase):
         # The exact CLI path that died with KeyError under v1.1: it must
         # now run the review and emit the gates-not-met JSON line.
         work = Path(tempfile.mkdtemp(prefix="atd_v12_cli_"))
+        # The fake-state file written below is ~136 MB; without cleanup
+        # this dir leaked into /tmp on every run (it filled /tmp during
+        # the v1.2 draft review). Test-side teardown only.
+        self.addCleanup(shutil.rmtree, work, True)
         state = work / "fake_state.json"
         state.write_text(self.api.to_json())
         wt = fk.records_worktree()
