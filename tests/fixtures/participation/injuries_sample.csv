@@ -1,0 +1,42 @@
+season,game_type,team,week,gsis_id,position,full_name,first_name,last_name,report_primary_injury,report_secondary_injury,report_status,practice_primary_injury,practice_secondary_injury,practice_status,date_modified
+2023,REG,ARI,1,00-0034473,LB,Dennis Gardeck,Dennis,Gardeck,,,,Knee,,Full Participation in Practice,2023-09-08T18:49:43Z
+2023,REG,ARI,1,00-0029316,T,Kelvin Beachum,Kelvin,Beachum,Hand,,Out,Hand,,Did Not Participate In Practice,2023-09-08T18:50:25Z
+2023,REG,ARI,1,00-0035662,WR,Marquise Brown,Marquise,Brown,Hamstring,,Questionable,Hamstring,,Limited Participation in Practice,2023-09-08T18:50:02Z
+2023,REG,ARI,1,00-0030061,TE,Zach Ertz,Zach,Ertz,Knee,,Questionable,Knee,,Limited Participation in Practice,2023-09-08T18:50:02Z
+2023,REG,DET,1,00-0035219,DT,Isaiah Buggs,Isaiah,Buggs,,,,Illness,,Full Participation in Practice,2023-09-06T20:47:39Z
+2023,REG,DET,1,00-0036993,S,Ifeatu Melifonwu,Ifeatu,Melifonwu,,,,Hamstring,,Full Participation in Practice,2023-09-06T20:47:39Z
+2023,REG,DET,1,00-0034345,C,Frank Ragnow,Frank,Ragnow,,,,Toe,Not injury related - resting p,Full Participation in Practice,2023-09-06T20:48:34Z
+2023,REG,DET,1,00-0034096,CB,Emmanuel Moseley,Emmanuel,Moseley,Knee,,Out,Knee,,Limited Participation in Practice,2023-09-06T20:49:21Z
+2023,REG,KC,1,00-0035149,G,Nick Allegretti,Nick,Allegretti,,,,Pectoral,,Full Participation in Practice,2023-09-06T19:49:55Z
+2023,REG,KC,1,00-0034286,WR,Richie James,Richie,James,,,,Knee,,Full Participation in Practice,2023-09-06T19:49:55Z
+2023,REG,KC,1,00-0038986,CB,Nic Jones,Nic,Jones,,,,Hand,,Full Participation in Practice,2023-09-06T19:49:55Z
+2023,REG,KC,1,00-0036374,CB,L'Jarius Sneed,L'Jarius,Sneed,,,,Knee,,Full Participation in Practice,2023-09-06T19:50:11Z
+2023,REG,KC,1,00-0038983,DE,B.J. Thompson,B.J.,Thompson,,,,Hamstring,,Full Participation in Practice,2023-09-06T19:49:55Z
+2023,REG,KC,1,00-0036913,WR,Kadarius Toney,Kadarius,Toney,,,,Knee,,Full Participation in Practice,2023-09-06T19:50:17Z
+2023,REG,KC,1,00-0035890,DT,Tershawn Wharton,Tershawn,Wharton,,,,Knee,,Full Participation in Practice,2023-09-06T19:49:55Z
+2023,REG,KC,1,00-0030506,TE,Travis Kelce,Travis,Kelce,Knee,,Questionable,Knee,,Did Not Participate In Practice,2023-09-06T19:50:22Z
+2023,REG,WAS,1,00-0036671,WR,Dax Milne,Dax,Milne,,,,Groin,,Did Not Participate In Practice,2023-09-07T19:33:51Z
+2023,REG,WAS,1,00-0035659,WR,Terry McLaurin,Terry,McLaurin,,,,Toe,,Full Participation in Practice,2023-09-08T17:15:41Z
+2023,REG,WAS,1,00-0036625,CB,Benjamin St-Juste,Benjamin,St-Juste,,,,Ankle,,Full Participation in Practice,2023-09-08T17:15:41Z
+2023,REG,WAS,1,00-0036351,DE,James Smith-Williams,James,Smith-Williams,Oblique,,Questionable,Oblique,,Limited Participation in Practice,2023-09-08T17:16:07Z
+2023,REG,WAS,1,00-0036321,DE,Chase Young,Chase,Young,Neck,,Questionable,Neck,,Limited Participation in Practice,2023-09-08T17:16:07Z
+2023,REG,ARI,2,00-0033553,RB,James Conner,James,Conner,,,,Calf,,Full Participation in Practice,2023-09-15T19:53:46Z
+2023,REG,ARI,2,00-0035636,DE,L.J. Collier,L.J.,Collier,Biceps,,Out,Biceps,,Did Not Participate In Practice,2023-09-15T19:55:48Z
+2023,REG,ARI,2,00-0034801,LB,Josh Woods,Josh,Woods,Ankle,,Out,Ankle,,Did Not Participate In Practice,2023-09-15T19:55:40Z
+2023,REG,ARI,2,00-0033890,S,Budda Baker,Budda,Baker,Hamstring,,Questionable,Hamstring,,Limited Participation in Practice,2023-09-15T19:54:13Z
+2023,REG,ARI,2,00-0029316,T,Kelvin Beachum,Kelvin,Beachum,Hand,,Questionable,Hand,,Limited Participation in Practice,2023-09-15T19:54:13Z
+2023,REG,ARI,2,00-0036371,DT,Leki Fotu,Leki,Fotu,Shoulder,,Questionable,Shoulder,,Limited Participation in Practice,2023-09-15T19:54:13Z
+2023,REG,DET,2,00-0034345,C,Frank Ragnow,Frank,Ragnow,,,,Toe,Not injury related - resting p,Did Not Participate In Practice,2023-09-15T19:53:42Z
+2023,REG,DET,2,00-0036124,CB,Khalil Dorsey,Khalil,Dorsey,Illness,,Out,Illness,,Did Not Participate In Practice,2023-09-15T19:56:42Z
+2023,REG,DET,2,00-0034096,CB,Emmanuel Moseley,Emmanuel,Moseley,Knee,Hamstring,Out,Knee,Hamstring,Did Not Participate In Practice,2023-09-15T19:56:47Z
+2023,REG,DET,2,00-0038096,DE,Josh Paschal,Josh,Paschal,Knee,,Out,Knee,,Did Not Participate In Practice,2023-09-15T19:53:54Z
+2023,REG,DET,2,00-0032381,T,Taylor Decker,Taylor,Decker,Ankle,,Doubtful,Ankle,,Did Not Participate In Practice,2023-09-15T19:53:58Z
+2023,REG,KC,2,00-0036621,LB,Nick Bolton,Nick,Bolton,,,,Not injury related - personal matter,,Did Not Participate In Practice,2023-09-15T19:07:32Z
+2023,REG,KC,2,00-0034286,WR,Richie James,Richie,James,,,,Knee,,Full Participation in Practice,2023-09-15T19:06:40Z
+2023,REG,KC,2,00-0038986,CB,Nic Jones,Nic,Jones,,,,Hand,,Full Participation in Practice,2023-09-15T19:06:40Z
+2023,REG,KC,2,00-0036913,WR,Kadarius Toney,Kadarius,Toney,,,,Knee,,Full Participation in Practice,2023-09-15T19:06:40Z
+2023,REG,KC,2,00-0035890,DT,Tershawn Wharton,Tershawn,Wharton,,,,Knee,,Full Participation in Practice,2023-09-15T19:06:40Z
+2023,REG,KC,2,00-0032762,DT,Chris Jones,Chris,Jones,,,,Not injury related - resting player,,Limited Participation in Practice,2023-09-15T19:06:40Z
+2023,REG,KC,2,00-0036374,CB,L'Jarius Sneed,L'Jarius,Sneed,,,,Knee,,Limited Participation in Practice,2023-09-15T19:06:40Z
+2023,REG,KC,2,00-0036360,RB,Clyde Edwards-Helaire,Clyde,Edwards-Helaire,Illness,,Questionable,Illness,,Did Not Participate In Practice,2023-09-15T19:08:03Z
+2023,REG,ARI,1,,LB,Dennis Gardeck,Dennis,Gardeck,,,,Knee,,Full Participation in Practice,2023-09-08T18:49:43Z
