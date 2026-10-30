@@ -236,7 +236,10 @@ def test_pitcher_family_pairs_price_end_to_end(market, line):
     card = full([prow(market, "OVER", line),
                  prow(market, "UNDER", line, odds=-114)], pitcher_getter)
     assert not card["prop_unpriced"]
-    assert len(card["prop_candidates"]) + len(card["prop_watchlist"]) == 2
+    assert (len(card["prop_candidates"]) + len(card["prop_watchlist"])
+            + len(card["prop_quarantined"])) == 2
+    assert all(held["reason"] == "EXTREME_CLAIMED_EV_QUARANTINE"
+               for held in card["prop_quarantined"])
     for row in card["evaluated_rows"]:
         assert row["model_source"].startswith("mlb_pitcher_joint:")
         assert row["source"] == "FREE_MLB_STATSAPI_GAMELOG"
@@ -334,7 +337,10 @@ def test_batter_family_pairs_price_end_to_end(market):
     card = full([brow(market, "OVER", 0.5),
                  brow(market, "UNDER", 0.5, odds=-114)], batter_getter)
     assert not card["prop_unpriced"], card["prop_unpriced"]
-    assert len(card["prop_candidates"]) + len(card["prop_watchlist"]) == 2
+    assert (len(card["prop_candidates"]) + len(card["prop_watchlist"])
+            + len(card["prop_quarantined"])) == 2
+    assert all(held["reason"] == "EXTREME_CLAIMED_EV_QUARANTINE"
+               for held in card["prop_quarantined"])
     for row in card["evaluated_rows"]:
         assert row["model_source"] == "mlb_batter_empirical_game_log_v1"
         assert row["lineup_status"] == "PUBLIC_BOXSCORE_STARTER_VERIFIED"
