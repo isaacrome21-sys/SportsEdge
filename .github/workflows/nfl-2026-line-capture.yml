@@ -31,9 +31,20 @@ on:
       - 'config/nfl_2026_provider_budget_v1.json'
       - 'docs/nfl_direct_capture_source_contract_v1.md'
       - '.github/workflows/nfl-2026-line-capture.yml'
+  # Frozen confirmation evidence is independent of the forward-CLV collector.
+  # Ten-minute polling is gated against the free nflverse schedule. Direct
+  # DraftKings web JSON is primary; the paid provider is whole-source fallback.
+  # Split cron entries preserve scheduler-delay-safe hourly health identity.
+  schedule:
+    - cron: '3 * * * *'
+    - cron: '13 * * * *'
+    - cron: '23 * * * *'
+    - cron: '33 * * * *'
+    - cron: '43 * * * *'
+    - cron: '53 * * * *'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: sportsedge-paid-odds-api
@@ -41,7 +52,6 @@ concurrency:
 
 jobs:
   capture:
-    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
