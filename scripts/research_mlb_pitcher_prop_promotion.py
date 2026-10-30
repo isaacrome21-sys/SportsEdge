@@ -11,7 +11,7 @@ from collections import Counter, defaultdict
 from datetime import date, datetime, timezone
 import hashlib
 import json
-from math import floor, log
+from math import floor, isfinite, log
 from pathlib import Path
 import random
 import re
@@ -117,10 +117,25 @@ def _event_has_team(event_name: str, team_name: str) -> bool:
     return any(v in event for v in _team_variants(team_name))
 
 
-def american_to_decimal(odds: int) -> float:
-    o = int(odds)
-    if o == 0 or -100 < o < 100:
+def _strict_american(odds: object) -> int:
+    """Prevent bools, fractional prices, and malformed archive text from truncating."""
+    if isinstance(odds, bool):
         raise ValueError("invalid American odds")
+    if isinstance(odds, int):
+        o = odds
+    elif isinstance(odds, float) and isfinite(odds) and odds.is_integer():
+        o = int(odds)
+    elif isinstance(odds, str) and re.fullmatch(r"[+-]?\d+", odds.strip()):
+        o = int(odds.strip())
+    else:
+        raise ValueError("invalid American odds")
+    if abs(o) < 100:
+        raise ValueError("invalid American odds")
+    return o
+
+
+def american_to_decimal(odds: int) -> float:
+    o = _strict_american(odds)
     return 1.0 + (o / 100.0 if o > 0 else 100.0 / abs(o))
 
 
@@ -137,8 +152,13 @@ def is_half_line(value: float) -> bool:
 
 
 def _unique_price(rows: list[dict], side: str) -> int | None:
-    prices = {int(r["american_odds"]) for r in rows if str(r.get("side", "")).upper() == side}
-    return next(iter(prices)) if len(prices) == 1 else None
+    matches = [r for r in rows if str(r.get("side", "")).upper() == side]
+    if len(matches) != 1:
+        return None
+    try:
+        return _strict_american(matches[0].get("american_odds"))
+    except ValueError:
+        return None
 
 
 def select_units(payloads, *, cutoff: datetime | None = None) -> tuple[list[dict], dict[str, int]]:
@@ -149,6 +169,11 @@ def select_units(payloads, *, cutoff: datetime | None = None) -> tuple[list[dict
         if payload.get("archive_type") != "MLB_PROP_PIT_QUOTES":
             continue
         if payload.get("provider") != "DRAFTKINGS_WEB_RESEARCH":
+            continue
+        try:
+            archive_captured = _parse_iso(payload.get("captured_at"))
+        except Exception:
+            drops["archive_capture_time_invalid"] += 1
             continue
         grouped: dict[tuple[str, str, str], dict[float, list[dict]]] = defaultdict(lambda: defaultdict(list))
         for raw in payload.get("quotes") or []:
@@ -166,10 +191,12 @@ def select_units(payloads, *, cutoff: datetime | None = None) -> tuple[list[dict
             except Exception:
                 drops["invalid_timestamp_or_line"] += 1
                 continue
-            if not is_half_line(line):
+            if not isfinite(line) or not is_half_line(line):
                 drops["integer_or_non_half_line"] += 1
                 continue
-            if retrieved >= first_pitch or (cutoff is not None and first_pitch > cutoff):
+            if (retrieved >= first_pitch or retrieved > archive_captured
+                    or archive_captured >= first_pitch
+                    or (cutoff is not None and first_pitch > cutoff)):
                 drops["not_eligible_time"] += 1
                 continue
             event_id = str(raw.get("provider_event_id") or "").strip()
@@ -185,9 +212,19 @@ def select_units(payloads, *, cutoff: datetime | None = None) -> tuple[list[dict
                 over = _unique_price(rows, "OVER")
                 under = _unique_price(rows, "UNDER")
                 if over is None or under is None:
+                    drops["not_exactly_one_valid_quote_each_side"] += 1
+                    continue
+                first_pitches = {_parse_iso(r.get("first_pitch_at")) for r in rows}
+                if len(first_pitches) != 1:
+                    drops["first_pitch_disagreement"] += 1
+                    continue
+                receipt_times = [_parse_iso(r.get("quote_retrieved_at") or r.get("retrieved_at")) for r in rows]
+                span_seconds = (max(receipt_times) - min(receipt_times)).total_seconds()
+                if span_seconds > 150:
+                    drops["paired_quote_capture_span_over_150s"] += 1
                     continue
                 exemplar = rows[0]
-                observed = max(_parse_iso(r.get("quote_retrieved_at") or r.get("retrieved_at")) for r in rows)
+                observed = max(receipt_times)
                 valid.append({
                     "provider_event_id": key[0],
                     "entity_name_normalized": key[1],
@@ -197,6 +234,7 @@ def select_units(payloads, *, cutoff: datetime | None = None) -> tuple[list[dict
                     "over_odds": over,
                     "under_odds": under,
                     "observed_at": observed.isoformat(),
+                    "paired_quote_capture_span_seconds": span_seconds,
                     "first_pitch_at": _parse_iso(exemplar.get("first_pitch_at")).isoformat(),
                     "event_name": str(exemplar.get("event_name") or ""),
                     "archive_captured_at": str(exemplar.get("archive_captured_at") or payload.get("captured_at") or ""),
