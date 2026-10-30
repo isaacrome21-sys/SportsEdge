@@ -1,0 +1,30 @@
+name: hr-research-ci
+
+on:
+  push:
+    branches:
+      - 'research/hr-surge-haircut-v02'
+    paths:
+      - 'sportsedge/research/home_runs_*.py'
+      - 'tests/test_research_home_runs_*.py'
+      - '.github/workflows/hr-research-ci.yml'
+  pull_request:
+    paths:
+      - 'sportsedge/research/home_runs_*.py'
+      - 'tests/test_research_home_runs_*.py'
+      - '.github/workflows/hr-research-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12.13'
+      - name: HR research challenger and PIT/ablation tests
+        run: python -m unittest discover -s tests -p 'test_research_home_runs_*.py' -v
