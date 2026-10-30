@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import csv
 import glob
+import math
 import os
 import re
 import unicodedata
@@ -65,6 +66,15 @@ TARGET_DATE_UNVERIFIED = "NBA_PROP_TARGET_DATE_UNVERIFIED"
 LINE_MISSING = "NBA_PROP_LINE_MISSING"
 SIDE_UNVERIFIED = "NBA_PROP_SIDE_UNVERIFIED"
 QUOTE_PRICE_MISSING = "NBA_PROP_QUOTE_PRICE_MISSING"
+QUOTE_PRICE_INVALID = "NBA_PROP_QUOTE_PRICE_INVALID"
+QUOTE_TIMESTAMP_MISSING = "NBA_PROP_QUOTE_TIMESTAMP_MISSING"
+QUOTE_TIMESTAMP_INVALID = "NBA_PROP_QUOTE_TIMESTAMP_INVALID"
+QUOTE_TIMESTAMP_CONFLICT = "NBA_PROP_QUOTE_TIMESTAMP_CONFLICT"
+BOOK_UNVERIFIED = "NBA_PROP_BOOK_UNVERIFIED"
+QUOTE_NOT_PRE_EVENT = "NBA_PROP_QUOTE_NOT_PRE_EVENT"
+TARGET_START_INVALID = "NBA_PROP_TARGET_START_INVALID"
+TARGET_START_CONFLICT = "NBA_PROP_TARGET_START_CONFLICT"
+TARGET_DATE_CONFLICT = "NBA_PROP_TARGET_DATE_CONFLICT"
 
 
 def nba_prop_family_for_market(market):
@@ -167,13 +177,28 @@ def _target_date(row):
 
 
 def _american_to_decimal(odds):
+    """Parse integer American odds only; never coerce NaN, inf, bool or decimals.
+
+    This is syntax validation, NOT an authenticated DraftKings quote.
+    """
+    if isinstance(odds, bool) or odds is None:
+        return None
+    if isinstance(odds, int):
+        value = odds
+    elif isinstance(odds, str) and re.fullmatch(r"[+-]?[0-9]+", odds.strip()):
+        try:
+            value = int(odds.strip())
+        except ValueError:
+            return None
+    else:
+        return None
+    if abs(value) < 100:
+        return None
     try:
-        value = float(str(odds).strip())
-    except (TypeError, ValueError):
+        decimal = 1.0 + (value / 100.0 if value > 0 else 100.0 / abs(value))
+    except OverflowError:
         return None
-    if value == 0:
-        return None
-    return 1.0 + (value / 100.0 if value > 0 else 100.0 / abs(value))
+    return decimal if math.isfinite(decimal) and decimal > 1.0 else None
 
 
 def _fair_american(p_win: float, p_lose: float):
@@ -333,18 +358,95 @@ def phone_nba_prop_rows(rows, *, now=None, store=None, store_dir=None,
             outputs.append(_blocked(row, family, TARGET_DATE_UNVERIFIED))
             continue
         try:
-            line = float(row["line"])
-        except (KeyError, TypeError, ValueError):
+            raw_line = row["line"]
+            if isinstance(raw_line, bool):
+                raise ValueError("boolean line")
+            line = float(raw_line)
+            if not math.isfinite(line) or line < 0:
+                raise ValueError("nonfinite or negative stat line")
+        except (KeyError, TypeError, ValueError, OverflowError):
             outputs.append(_blocked(row, family, LINE_MISSING))
             continue
         side = str(row.get("side") or row.get("selection") or "").upper()
         if side not in {"OVER", "UNDER"}:
             outputs.append(_blocked(row, family, SIDE_UNVERIFIED))
             continue
-        decimal = _american_to_decimal(row.get("odds", row.get("price")))
+        raw_odds = row.get("odds", row.get("price"))
+        decimal = _american_to_decimal(raw_odds)
         if decimal is None:
-            outputs.append(_blocked(row, family, QUOTE_PRICE_MISSING))
+            reason = (QUOTE_PRICE_MISSING if raw_odds is None or raw_odds == ""
+                      else QUOTE_PRICE_INVALID)
+            outputs.append(_blocked(row, family, reason))
             continue
+        # Both aliases may be present in archived/phone rows. Refuse a
+        # disagreement rather than silently selecting one clock for EV.
+        quote_values = [row[key] for key in ("quote_captured_at", "captured_at")
+                        if key in row and row[key] is not None
+                        and row[key] != ""]
+        if not quote_values:
+            outputs.append(_blocked(row, family, QUOTE_TIMESTAMP_MISSING))
+            continue
+        parsed_quotes = [_parse_instant(value) for value in quote_values]
+        if any(value is None for value in parsed_quotes):
+            outputs.append(_blocked(row, family, QUOTE_TIMESTAMP_INVALID))
+            continue
+        if any(value != parsed_quotes[0] for value in parsed_quotes[1:]):
+            outputs.append(_blocked(row, family, QUOTE_TIMESTAMP_CONFLICT))
+            continue
+        quote_ts = parsed_quotes[0]
+        # A syntactically fresh quote can still be post-tip. Compare against
+        # the asserted aware fixture start before any empirical model call.
+        # This does not authenticate the fixture or the quote source.
+        start_keys = ("kickoff", "commence_time", "start_time",
+                      "game_start", "tipoff")
+        supplied_starts = [row[key] for key in start_keys
+                           if key in row and row[key] is not None
+                           and row[key] != ""]
+        if supplied_starts:
+            parsed_starts = [_parse_instant(value) for value in supplied_starts]
+            if any(start is None for start in parsed_starts):
+                outputs.append(_blocked(row, family, TARGET_START_INVALID))
+                continue
+            if any(start != parsed_starts[0] for start in parsed_starts[1:]):
+                outputs.append(_blocked(row, family, TARGET_START_CONFLICT))
+                continue
+            if quote_ts >= parsed_starts[0]:
+                outputs.append(_blocked(row, family, QUOTE_NOT_PRE_EVENT))
+                continue
+            # The model's history slice must use the SAME local date as the
+            # asserted start. A conflicting date silently changes the PIT
+            # sample even when both clock values are individually pre-tip.
+            start_local_date = parsed_starts[0].astimezone(_SLATE_TZ).date()
+            if target != start_local_date:
+                outputs.append(_blocked(row, family, TARGET_DATE_CONFLICT))
+                continue
+            date_conflict = False
+            for date_key in ("game_date", "date"):
+                raw_date = row.get(date_key)
+                if raw_date is None or raw_date == "":
+                    continue
+                if isinstance(raw_date, str) and _BARE_DATE_RE.fullmatch(raw_date.strip()):
+                    try:
+                        stated_date = date.fromisoformat(raw_date.strip())
+                    except ValueError:
+                        stated_date = None
+                else:
+                    stated_instant = _parse_instant(raw_date)
+                    stated_date = (stated_instant.astimezone(_SLATE_TZ).date()
+                                   if stated_instant is not None else None)
+                if stated_date != start_local_date:
+                    date_conflict = True
+                    break
+            if date_conflict:
+                outputs.append(_blocked(row, family, TARGET_DATE_CONFLICT))
+                continue
+        # A caller-supplied book is only a research assertion, never provider
+        # authentication. Never manufacture DraftKings attribution from absence.
+        raw_book = row.get("book")
+        if not isinstance(raw_book, str) or not raw_book.strip():
+            outputs.append(_blocked(row, family, BOOK_UNVERIFIED))
+            continue
+        book = raw_book.strip()
         priced = resolved_store.price(
             player_id, FAMILY_TO_STAT[family], line, target)
         if priced.get("status") != "PRICED":
@@ -353,15 +455,9 @@ def phone_nba_prop_rows(rows, *, now=None, store=None, store_dir=None,
         p_win = priced["p_over"] if side == "OVER" else priced["p_under"]
         p_lose = priced["p_under"] if side == "OVER" else priced["p_over"]
         ev = p_win * (decimal - 1.0) - p_lose
-        quote_ts = _parse_instant(
-            row.get("quote_captured_at") or row.get("captured_at"))
-        if quote_ts is None:
-            freshness = "NO_TIMESTAMP_ON_ROW"
-            stale = False
-        else:
-            age = (now - quote_ts).total_seconds()
-            stale = age > QUOTE_FRESH_SECONDS or age < 0
-            freshness = "STALE_OR_FUTURE" if stale else "CURRENT"
+        age = (now - quote_ts).total_seconds()
+        stale = age > QUOTE_FRESH_SECONDS or age < 0
+        freshness = "STALE_OR_FUTURE" if stale else "CURRENT"
         if stale:
             status = "WATCH_QUOTE_NOT_CURRENT"
         elif ev >= min_ev:
@@ -380,7 +476,8 @@ def phone_nba_prop_rows(rows, *, now=None, store=None, store_dir=None,
             "player_id": player_id,
             "line": line,
             "odds": row.get("odds", row.get("price")),
-            "book": row.get("book") or "draftkings",
+            "book": book,
+            "book_provenance": "CALLER_ASSERTED_NOT_AUTHENTICATED",
             "quote_captured_at": row.get("quote_captured_at")
                                  or row.get("captured_at"),
             "quote_freshness": freshness,
