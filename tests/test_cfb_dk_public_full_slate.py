@@ -49,7 +49,8 @@ class FullSlateCaptureTest(unittest.TestCase):
 
     def test_fail_closed_for_unpaired_total(self):
         text = PAGE.replace("<div>Under 47.5</div>", "<div>Under 48.5</div>")
-        result = compile_full_slate({1: text}, min_eligible_paired=0)
+        result = compile_full_slate({1: text}, captured_at_utc="2026-10-10T02:00:00Z",
+                                    min_eligible_paired=0)
         self.assertEqual(len(result["board"]), 0)
         self.assertEqual(next(x["status"] for x in result["inventory"]
                               if x["away"] == "Indiana"), "MISSING_PAIRED_SPREAD_OR_TOTAL")
