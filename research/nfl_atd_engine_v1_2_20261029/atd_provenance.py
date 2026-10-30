@@ -432,8 +432,16 @@ def load_slate(api, slate_id, now=None) -> dict:
         rec = json.loads(rp["content"])
         cap, ko = _t(rec["captured_at"]), _t(rec["first_kickoff"])
         shas = {"stats": rec["stats_sha256"], "schedule": rec["schedule_sha256"]}
-        stored = rec.get("fetch_provenance") or {}
+        stored = rec.get("fetch_provenance")
+        if stored is None:
+            stored = {}
+        if not isinstance(stored, dict) or any(
+                name in stored and not isinstance(stored[name], dict)
+                for name in ("stats", "schedule", "freeze", "board")):
+            raise ValueError("fetch_provenance entries must be objects")
         rows = rec["rows"]
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            raise ValueError("run rows must be an array of objects")
         season = rec["season"]
         if type(season) is not int or season < 1:
             raise ValueError("run season must be a positive integer (not bool)")
