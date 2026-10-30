@@ -1,5 +1,24 @@
 # ADMISSION RECORD — DRAFT
 
+> **SUPERSEDING ADMISSION HOLD — 2026-10-28.** This draft is **NOT ADMITTED**
+> for design, screen, model training, retrospective close comparison, or forward
+> validation. The 20-partition and observed-schema assertions below are
+> unverified against canonical SmartStake revision
+> `049dd4caeb562010a5806207c413e9f9bc012825` (18 Parquet objects).
+> Three of four sample pins conflict with upstream Git-LFS OIDs, including
+> `mon=2026-05/part-002.parquet` pinned to SHA-256 of empty bytes rather than
+> the 46,574,006-byte upstream object. README fields `ts/start_time` do not
+> establish the reported alternate Parquet schema. The claimed observed
+> `segment` values and close semantics are **NOT SOURCE-RECONCILED**.
+> A future independent admission requires full-byte rehash of **every** file
+> at a pinned revision, observed Parquet footer/schema, segment and market
+> semantics, event/player/book identity, strict quote-before-start PIT checks,
+> a chronological preregistered split, and independent review. Upstream LFS
+> OIDs alone are not a substitute for local byte verification. This hold
+> supersedes all conditional admission language below; the historical draft
+> remains unchanged as an audit trail. See separate PR #2865 (PINS.md).
+
+
 ## SmartStake MLB Player Prop Odds and Results (2026) — Hugging Face
 
 **Status:** DRAFT for owner/lane review. Nothing in this record admits the source by

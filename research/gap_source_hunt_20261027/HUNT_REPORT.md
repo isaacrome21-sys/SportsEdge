@@ -1,5 +1,24 @@
 # GAP SOURCE HUNT — G1 / G2 / G4 / G5 (Phase 2)
 
+> **SUPERSEDING SOURCE-INTEGRITY HOLD — 2026-10-28 (G1 SMARTSTAKE ONLY).**
+> The G1 verdict `FOUND-ADMISSIBLE candidate` and §3.1 claims below are a
+> historical discovery report, **NOT a current admission or safe modeling input**.
+> Independent audit of canonical SmartStake revision
+> `049dd4caeb562010a5806207c413e9f9bc012825` found **18** Parquet files,
+> not the 20 claimed here. Three of four recorded sample hashes conflict with
+> upstream Git-LFS OIDs: May part-002 is the empty-byte SHA-256 despite a
+> 46,574,006-byte upstream object; June part-000 and part-003 also differ.
+> The README's `ts/start_time` schema is not reconciled with the reported
+> `snap_ts/tick_ts/start_ts/close_ts/is_close/outcome_known/segment` columns.
+> The upstream OIDs are publisher assertions, not independently downloaded and
+> rehashed full-file evidence. **G1 status: SOURCE_PIN_CONFLICT / NO ADMISSION**.
+> No historical SmartStake screen, training, comparison-to-close or validation
+> may rely on these claims until exact-revision complete-byte pins, Parquet
+> footer/schema, bookmaker/game identity, PIT chronology, and preregistered
+> split are independently verified. Preserve the original report below as
+> historical evidence; see PR #2865 for the separate PINS.md correction.
+
+
 Executed Oct 27–28, 2026 (America/Chicago), under the owner's directive: anything we are
 missing, check **all** available sources including GitHub repos. Companion to
 `VERIFIED_MODELS_GAP_FILL_PLAN_20261027.md` (§2 gaps, §3 Phase-1 verdicts). G3 was excluded
