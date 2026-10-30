@@ -1,5 +1,36 @@
 # PINS — Gap Source Hunt (Oct 27–28, 2026)
 
+## PIN INCIDENT — 2026-10-28 (HOLD: NO SOURCE ADMISSION)
+
+**This section supersedes any suggestion below that the four listed sample hashes
+collectively authenticate the canonical SmartStake dataset.** Historical rows may
+be considered for DESIGN/SCREEN **only after** independent full-byte pin and schema
+verification; no forward clock, verified CLV, or betting authority is granted.
+
+Canonical immutable upstream [Git-LFS commit](https://huggingface.co/datasets/SmartStake/mlb-player-props/commit/049dd4caeb562010a5806207c413e9f9bc012825)
+enumerates **18 Parquet files** (Mar 1, Apr 5, May 7, Jun 4, Jul 1), not the
+20 claimed in HUNT_REPORT/ADMISSION_DRAFT. Upstream README documents columns
+`game_id,start_time,player,market,line,side,book,ts,odds,result,won`;
+the hunt's purported observed alternate columns `snap_ts,tick_ts,start_ts,
+close_ts,is_close,outcome_known,segment` are **not source-version-reconciled**.
+
+| Path | Recorded hash | Upstream LFS OID | Verdict |
+|---|---|---|---|
+| `mon=2026-03/part-000.parquet` | `c1058237…` | `c1058237…` | Upstream hash matches; local full-byte re-verification still recommended |
+| `mon=2026-05/part-002.parquet` | `e3b0c442…` (SHA-256 of empty bytes) | `e3042962…` (46,574,006 bytes) | **INVALID PIN** |
+| `mon=2026-06/part-000.parquet` | `4562a833…` | `616dccd4…` (54,796,614 bytes) | **MISMATCH** |
+| `mon=2026-06/part-003.parquet` | `8ed057db…` | `c9e1138e…` (50,073,582 bytes) | **MISMATCH** |
+
+The upstream OIDs above are **publisher-declared** Git-LFS content hashes,
+not independently measured local file hashes during this incident audit.
+Do **not** silently replace historical recorded hashes with upstream declarations.
+No modeling, crosswalks, backtests, CLV calculations, source admission or forward
+validation may rely on the three conflicting pins. Re-pull using the exact
+revision, hash the actual complete bytes, inspect Parquet footer/schema and game
+identity, reconcile the observed-schema discrepancy, then preregister any split
+before using the rows. Incident reported on merged PR #2850.
+
+
 All hashes measured locally from the actual downloaded bytes during the hunt.
 A pin identifies the exact bytes inspected; it is not a redistribution license.
 
