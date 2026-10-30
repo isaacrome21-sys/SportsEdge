@@ -11,9 +11,14 @@ import argparse
 import csv
 import hashlib
 import json
+import sys
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Iterable
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from sportsedge.research_diagnostics import population_stability_index
 from sportsedge.sports.nfl.research_play_level import build_lagged_team_game_features
