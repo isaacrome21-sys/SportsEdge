@@ -54,6 +54,7 @@ import json
 import re
 import sys
 from datetime import datetime, timezone
+from math import isfinite
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -105,6 +106,11 @@ REFUSAL_CODES = (
     "SOURCE_CHANGED_AFTER_SNAPSHOT",
 )
 
+SECTION3_INTEGRITY_CODES = (
+    "SCHEMA_INVALID", "GAME_ID_AMBIGUOUS", "PLAYER_ID_UNVERIFIED",
+    "POSITION_UNKNOWN", "GAME_DATE_UNKNOWN", "DUPLICATE", "NOT_FINAL",
+)
+
 
 def norm_name(value) -> str:
     return " ".join(re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).split())
@@ -127,17 +133,59 @@ def parse_minutes(value):
         return 0.0
     m = re.fullmatch(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?", text)
     if m:
+        if not any(group is not None for group in m.groups()):
+            return None
         hours = int(m.group(1) or 0)
         mins = int(m.group(2) or 0)
-        secs = float(m.group(3) or 0)
-        return hours * 60.0 + mins + secs / 60.0
+        try:
+            secs = float(m.group(3) or 0)
+        except ValueError:
+            return None
+        if not isfinite(secs) or not 0 <= secs < 60:
+            return None
+        parsed = hours * 60.0 + mins + secs / 60.0
+        return parsed if isfinite(parsed) and parsed >= 0 else None
     m = re.fullmatch(r"(\d+):(\d{2})", text)
     if m:
-        return int(m.group(1)) + int(m.group(2)) / 60.0
+        seconds = int(m.group(2))
+        if seconds >= 60:
+            return None
+        return int(m.group(1)) + seconds / 60.0
     try:
-        return float(text)
+        parsed = float(text)
     except ValueError:
         return None
+    return parsed if isfinite(parsed) and parsed >= 0 else None
+
+
+def parse_played_flag(value):
+    """Return a strict CDN played boolean; malformed states are not DNPs."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int) and value in (0, 1):
+        return bool(value)
+    if isinstance(value, str) and value.strip() in {"0", "1"}:
+        return value.strip() == "1"
+    return None
+
+
+def is_timezone_aware_utc(value) -> bool:
+    """Require an ISO timestamp with an explicit zero UTC offset."""
+    if not isinstance(value, str) or not value.strip():
+        return False
+    text = value.strip()
+    try:
+        parsed = datetime.fromisoformat(text[:-1] + "+00:00" if text.endswith("Z") else text)
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None and parsed.utcoffset() == timezone.utc.utcoffset(parsed)
+
+
+def section3_integrity_pass(games_verified: int, refusals: dict[str, int]) -> bool:
+    """All declared Section 3 integrity refusals are admission-blocking."""
+    return games_verified > 0 and all(
+        int(refusals.get(code, 0)) == 0 for code in SECTION3_INTEGRITY_CODES
+    )
 
 
 def is_int_stat(value) -> bool:
@@ -274,8 +322,8 @@ def parse_boxscore(payload, expected_game_id: str):
         issues.append(("NOT_FINAL", f"gameStatus={game.get('gameStatus')!r}"))
         return None, issues
     start_utc = game.get("gameTimeUTC")
-    if not start_utc or "T" not in str(start_utc):
-        issues.append(("GAME_DATE_UNKNOWN", "gameTimeUTC missing or timezone-less"))
+    if not is_timezone_aware_utc(start_utc):
+        issues.append(("GAME_DATE_UNKNOWN", "gameTimeUTC missing, invalid, timezone-less, or not UTC"))
     record = {
         "game_id": gid,
         "game_time_utc": start_utc,
@@ -312,15 +360,33 @@ def parse_boxscore(payload, expected_game_id: str):
                 issues.append(("DUPLICATE", f"duplicate player-game row {key}"))
                 continue
             seen_players.add(key)
+            stats = player.get("statistics") or {}
+            if not isinstance(stats, dict):
+                issues.append(("SCHEMA_INVALID",
+                               f"{tricode} personId {person_id} statistics not an object"))
+                continue
+            minutes = parse_minutes(stats.get("minutes"))
+            played = parse_played_flag(player.get("played"))
+            if played is None:
+                issues.append(("SCHEMA_INVALID",
+                               f"{tricode} personId {person_id} played flag invalid: "
+                               f"{player.get('played')!r}"))
+                continue
+            if minutes is None:
+                issues.append(("SCHEMA_INVALID",
+                               f"{tricode} personId {person_id} minutes invalid: "
+                               f"{stats.get('minutes')!r}"))
+                continue
+            if not played and minutes > 0:
+                issues.append(("SCHEMA_INVALID",
+                               f"{tricode} personId {person_id} played=0 with positive minutes"))
+                continue
+            if not played or minutes == 0:
+                record["dnp_count"] += 1
+                continue
             if not player.get("position"):
                 issues.append(("POSITION_UNKNOWN",
                                f"{tricode} personId {person_id} has no position"))
-            stats = player.get("statistics") or {}
-            minutes = parse_minutes(stats.get("minutes"))
-            played = str(player.get("played") or "") == "1"
-            if not played or minutes is None or minutes <= 0:
-                record["dnp_count"] += 1
-                continue
             pts, reb, ast = stats.get("points"), stats.get("reboundsTotal"), stats.get("assists")
             if not (is_int_stat(pts) and is_int_stat(reb) and is_int_stat(ast)):
                 issues.append(("SCHEMA_INVALID",
@@ -490,16 +556,13 @@ def main() -> int:
     }
 
     # --- Section 3: integrity summary ---------------------------------------
-    integrity_codes = ("SCHEMA_INVALID", "GAME_ID_AMBIGUOUS", "PLAYER_ID_UNVERIFIED",
-                       "POSITION_UNKNOWN", "GAME_DATE_UNKNOWN", "DUPLICATE", "NOT_FINAL")
     verdict["section3_integrity"] = {
         "games_verified": len(games),
         "player_rows_total": player_rows_total,
         "eligible_observations": len(observations),
         "dnp_excluded": dnp_total,
-        "violation_counts": {c: refusals.get(c, 0) for c in integrity_codes},
-        "pass": len(games) > 0 and all(refusals.get(c, 0) == 0 for c in
-                                       ("SCHEMA_INVALID", "GAME_ID_AMBIGUOUS", "DUPLICATE", "NOT_FINAL")),
+        "violation_counts": {c: refusals.get(c, 0) for c in SECTION3_INTEGRITY_CODES},
+        "pass": section3_integrity_pass(len(games), refusals),
     }
 
     # --- Section 4: ESPN identity cross-check --------------------------------
