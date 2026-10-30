@@ -442,6 +442,11 @@ def load_slate(api, slate_id, now=None) -> dict:
         rows = rec["rows"]
         if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
             raise ValueError("run rows must be an array of objects")
+        for row in rows:
+            if row.get("status") == "UNPRICED":
+                reason = row.get("reason")
+                if not isinstance(reason, str) or not reason.strip():
+                    raise ValueError("unpriced refusal reason must be a nonempty string")
         season = rec["season"]
         if type(season) is not int or season < 1:
             raise ValueError("run season must be a positive integer (not bool)")
