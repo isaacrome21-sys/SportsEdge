@@ -12,6 +12,13 @@ from sportsedge.nfl_score_td_composition import (
 
 def test_every_composition_reconstructs_score_and_td_extras_do_not_exceed_tds():
     for score in range(0, 61):
+        if score == 1:
+            # 1 is the unique infeasible football score in 0..60: no scoring
+            # play (TD 6/7/8, FG 3, safety 2) or combination sums to 1, so
+            # the enumerator fails closed instead of returning rows.
+            with pytest.raises(NflScoreTdCompositionError, match="NO_FEASIBLE_SCORING_COMPOSITION"):
+                feasible_scoring_compositions(score)
+            continue
         rows = feasible_scoring_compositions(score)
         assert rows
         for td, pat, two, fg, safety in rows:
