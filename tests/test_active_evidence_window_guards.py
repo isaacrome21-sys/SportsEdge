@@ -47,6 +47,7 @@ class ActiveEvidenceWindowGuardTests(unittest.TestCase):
                     {
                         "id": "CLOSED",
                         "status": "CLOSED_FAILED_NONACCRUAL",
+                        "terminal_disposition": "FAILED_NONACCRUAL_ZERO_DURABLE_EVIDENCE_CLOSED_UNUSABLE",
                         "acquisition_authority": ".github/workflows/does-not-exist.yml",
                     },
                 ],
@@ -102,6 +103,37 @@ class ActiveEvidenceWindowGuardTests(unittest.TestCase):
             path.write_text(json.dumps(registry), encoding="utf-8")
             failures = MOD.mutation_failures(root, path)
             self.assertIn("ACTIVE_WINDOW_LIVENESS_CONTRACT_MISSING:ACTIVE:workflow_run:", failures)
+
+    def test_mutation_guard_refuses_unrecognized_or_undispositioned_status(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            path = root / "registry.json"
+            for status, disposition, should_fail in (
+                ("DISABLED", None, True),
+                ("PAUSED", "claimed pause", True),
+                ("CLOSED_FAILED_NONACCRUAL", None, True),
+                ("CLOSED_FAILED_NONACCRUAL", "", True),
+                ("CLOSED_FAILED_NONACCRUAL", 7, True),
+                ("CLOSED_FAILED_NONACCRUAL", "RECORDED_FAILED_NONACCRUAL", False),
+            ):
+                with self.subTest(status=status, disposition=disposition):
+                    window = {
+                        "id": "WINDOW",
+                        "status": status,
+                        "acquisition_authority": ".github/workflows/missing.yml",
+                    }
+                    if disposition is not None:
+                        window["terminal_disposition"] = disposition
+                    path.write_text(json.dumps({
+                        "schema": "SPORTSEDGE_ACTIVE_EVIDENCE_WINDOWS_V1",
+                        "windows": [window],
+                    }), encoding="utf-8")
+                    failures = MOD.mutation_failures(root, path)
+                    marker = "ACTIVE_WINDOW_TERMINAL_DISPOSITION_INVALID:WINDOW"
+                    if should_fail:
+                        self.assertIn(marker, failures)
+                    else:
+                        self.assertEqual(failures, [])
 
     def _write_capture_config(self, root: Path) -> Path:
         cfg = {
