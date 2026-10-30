@@ -11,6 +11,7 @@ data path exists and is unit-tested, but neither is applied to pricing until
 it passes the backtest harness. The factor audit discloses this.
 """
 from __future__ import annotations
+from .phone_quote_identity import same_event_start
 
 import math
 
@@ -246,6 +247,8 @@ def phone_first_inning_rows(rows, *, now=None, getter=None):
         }
         quotes = []
         for another in rows:
+            if not same_event_start(row, another):
+                continue
             if (str(another.get("market") or "").upper() != market
                     or another.get("line") != row.get("line")
                     or _team_side(another) != _team_side(row)

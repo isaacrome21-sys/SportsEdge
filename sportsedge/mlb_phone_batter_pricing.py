@@ -5,6 +5,7 @@ This module resolves identity and prior game logs solely via free MLB StatsAPI.
 Research only. Stale quotes produce WATCH status. Lineup is not confirmed.
 """
 from __future__ import annotations
+from .phone_quote_identity import same_event_start
 from datetime import datetime, timezone
 
 from .mlb_public_batter_history import MLBBatterPublicSource, MissingMLBBatterHistory
@@ -84,6 +85,8 @@ def phone_batter_rows(rows, *, now=None, getter=None):
             continue
         quotes = []
         for another in rows:
+            if not same_event_start(row, another):
+                continue
             if (str(another.get("away")) != away or
                 str(another.get("home")) != home or
                 str(another.get("player_name") or another.get("label") or "").strip() != name or
