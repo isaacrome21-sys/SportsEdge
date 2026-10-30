@@ -424,6 +424,24 @@ def price_coverage_row(row: Mapping[str, Any], *, now: datetime,
             # see the quarter dispatch below), not this gate.
             return _nfl_period_block(row)
         return blocked(row, "COVERAGE_MARKET_FAILED_VALIDATION_NOT_WIRED")
+    if sport == "MLB" and market == "MARGIN_BAND":
+        # MLB WINNING_MARGIN is present in the inspected DK exotic menu.
+        # Normalization aliases it to the football margin family, but the
+        # MLB offering lacks its own verified full-game joint/readout/binder.
+        # Do not misreport an offered market as NOT_OFFERED or price it from
+        # the football normal-margin approximation.
+        return blocked(
+            row,
+            "NO_ENGINE: FULL_GAME_DERIVED_READOUT_UNBUILT",
+            blocker="NO_ENGINE",
+            blocker_detail=(
+                "MLB Winning Margin requires a coherent full-game "
+                "(away, home) score-joint margin readout plus verified "
+                "selection/quote binding; football MARGIN_BAND does not "
+                "supply an MLB engine."
+            ),
+            coverage_market="WINNING_MARGIN",
+        )
     if sport == "MLB" and market != "ML_3WAY":
         return blocked(row, "COVERAGE_MARKET_NOT_OFFERED_FOR_MLB:" + market)
     if sport in QUARTER_SPORTS and market == "ML_3WAY":
