@@ -1,0 +1,23 @@
+[
+  {
+    "sport": "NHL",
+    "slate": "2026-10-30",
+    "issue": "2950",
+    "away": "NJ Devils",
+    "home": "VGK Golden Knights",
+    "market": "TOTAL",
+    "line": 6.5,
+    "side": "UNDER",
+    "price": -135,
+    "captured_at": "2026-10-30T16:55:40-05:00",
+    "model_p": 0.639643,
+    "push_p": 0.0,
+    "no_vig_p": 0.551441,
+    "ev": 0.113453,
+    "tag": "LEAN",
+    "owner": "nhl_rate_v1",
+    "result": null,
+    "close_price": null,
+    "clv": null
+  }
+]
