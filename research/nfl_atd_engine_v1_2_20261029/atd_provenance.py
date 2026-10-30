@@ -432,14 +432,36 @@ def load_slate(api, slate_id, now=None) -> dict:
         rec = json.loads(rp["content"])
         cap, ko = _t(rec["captured_at"]), _t(rec["first_kickoff"])
         shas = {"stats": rec["stats_sha256"], "schedule": rec["schedule_sha256"]}
-        stored = rec.get("fetch_provenance") or {}
+        stored = rec.get("fetch_provenance")
+        if stored is None:
+            stored = {}
+        if not isinstance(stored, dict) or any(
+                name in stored and not isinstance(stored[name], dict)
+                for name in ("stats", "schedule", "freeze", "board")):
+            raise ValueError("fetch_provenance entries must be objects")
         rows = rec["rows"]
-        season = int(rec["season"])
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            raise ValueError("run rows must be an array of objects")
+        for row in rows:
+            if row.get("status") == "UNPRICED":
+                reason = row.get("reason")
+                if not isinstance(reason, str) or not reason.strip():
+                    raise ValueError("unpriced refusal reason must be a nonempty string")
+        season = rec["season"]
+        if type(season) is not int or season < 1:
+            raise ValueError("run season must be a positive integer (not bool)")
+        run_week = rec["week"]
+        if type(run_week) is not int or run_week < 1:
+            raise ValueError("run week must be a positive integer (not bool)")
         teams = rec["game_teams"]
         if rec.get("slate_id") != slate_id or not isinstance(rows, list) \
                 or not isinstance(teams, dict):
             raise ValueError("slate_id/rows/game_teams")
         priced = [r for r in rows if r.get("status") == "PRICED"]
+        # A zero-priced slate has no independently schedule-bound candidate.
+        # It must not start a counted clock merely because replay matches.
+        if not priced:
+            out["reasons"].append("RUN_NO_PRICED_ROWS")
         for r in priced:
             _t(r["kickoff"]), r["game_id"]
         # the run-record field schedule_kickoffs is informational only
@@ -474,7 +496,12 @@ def load_slate(api, slate_id, now=None) -> dict:
             for r in priced:
                 try:
                     k = rf.schedule_kickoff(fh.name, season, teams.get(r["game_id"]), r["kickoff"])
-                    if "week" in r and int(k["week"]) != int(r["week"]):
+                    # A real priced row omits week. Bind the independently
+                    # pinned schedule week to the run/board metadata anyway;
+                    # replay alone only proves the latter two agree.
+                    if type(k["week"]) is not int or k["week"] != run_week:
+                        raise rf.RefreshFailed("KICKOFF_SCHEDULE_MISMATCH", r["game_id"])
+                    if "week" in r and (type(r["week"]) is not int or r["week"] != k["week"]):
                         raise rf.RefreshFailed("KICKOFF_SCHEDULE_MISMATCH", r["game_id"])
                     if k["game_id"] != r["game_id"]:
                         out["reasons"].append("ROW_GAME_ID_MISMATCH")
@@ -579,8 +606,12 @@ def _replay_check(api, rec, rows, run_t, sch, sd, out):
         if _t(bp["pushed_at"]) >= run_t:
             out["reasons"].append("INPUT_PUSH_NOT_BEFORE_RUN_PUSH")
         board = json.loads(bp["content"])
-        if any(str(board.get(k)) != str(rec.get(k))
-               for k in ("slate_id", "season", "week", "captured_at")):
+        # Do not let Python int-coercion or stringification disguise a
+        # board week whose type differs from the exact run/schedule week.
+        if type(board.get("season")) is not int or board["season"] != rec["season"] \
+                or type(board.get("week")) is not int or board["week"] != rec["week"] \
+                or any(str(board.get(k)) != str(rec.get(k))
+                       for k in ("slate_id", "captured_at")):
             out["reasons"].append("RUN_BOARD_MISMATCH")
         out["board_proof"] = {k: v for k, v in bp.items() if k != "content"}
     except ProvenanceFailed as e:

@@ -183,10 +183,13 @@ class TestFetchAndSlateC(unittest.TestCase):
             pv.verify_fetch(self.api, "d" * 64, CAP)
         self.assertEqual(cm.exception.code, "FETCH_RECORD_HASH_MISMATCH")
 
-    def test_counts(self):
+    def test_empty_slate_preserves_provenance_but_cannot_count(self):
         self.run_rec(self.api)
         st = pv.load_slate(self.api, "S1")
-        self.assertEqual(st["status"], "COUNTS", st["reasons"])
+        self.assertEqual(st["status"], "SCREEN")
+        self.assertEqual(st["reasons"], ["RUN_NO_PRICED_ROWS"])
+        for name in ("stats", "schedule"):
+            self.assertEqual(st[f"{name}_fetch_proof"]["proof_source"], "live_activity")
         self.assertEqual(st["run_proof"]["pushed_at"], "2026-10-25T16:30:00+00:00")
 
     def test_run_push_before_capture_is_screen(self):
@@ -209,7 +212,7 @@ class TestFetchAndSlateC(unittest.TestCase):
         publish_data(self.api2, SCHED_BODY, "2026-10-25T15:01:00Z")
         self.api2.commit(BR, {pv.data_record_path(self.st, "csv.gz"): STATS_BODY},
                          "2026-10-25T15:02:00Z")
-        rec = {"slate_id": "S1", "captured_at": "2026-10-25T16:00:00Z", "season": 2026,
+        rec = {"slate_id": "S1", "captured_at": "2026-10-25T16:00:00Z", "season": 2026, "week": 8,
                "schedule_kickoffs": {}, "game_teams": {},
                "first_kickoff": "2026-10-25T18:00:00Z", "stats_sha256": self.st,
                "schedule_sha256": self.sc, "fetch_provenance": {}, "rows": []}
@@ -217,6 +220,10 @@ class TestFetchAndSlateC(unittest.TestCase):
         fetch(self.api2, self.st, "2026-10-25T16:40:00Z")
         st = pv.load_slate(self.api2, "S1")
         self.assertEqual(st["status"], "SCREEN")
+        # This deliberately minimal record lacks replay inputs; assert the
+        # independent fetch chronology check is reached despite that refusal.
+        self.assertEqual(st["stats_fetch_proof"]["pushed_at"],
+                         "2026-10-25T16:40:00+00:00")
         self.assertIn("FETCH_PUSH_NOT_BEFORE_RUN_PUSH", st["reasons"])
 
     def test_run_record_edited_screen(self):
@@ -237,7 +244,11 @@ class TestFetchAndSlateC(unittest.TestCase):
                 if e["after"] == self.api.file_commits(BR, pv.run_record_path("S1"))[0]]
         self.api.events[:] = keep                      # fetch events aged out
         st = pv.load_slate(self.api, "S1")
-        self.assertEqual(st["status"], "COUNTS", st["reasons"])
+        self.assertEqual(st["status"], "SCREEN")
+        self.assertEqual(st["reasons"], ["RUN_NO_PRICED_ROWS"])
+        for name in ("stats", "schedule"):
+            self.assertEqual(st[f"{name}_fetch_proof"]["proof_source"],
+                             "stored_event_commit_checked")
 
 
 class TestReviewB_DE(unittest.TestCase):
@@ -321,3 +332,4 @@ setUpModule, tearDownModule = _mf(guard=True)
 
 if __name__ == "__main__":
     unittest.main()
+

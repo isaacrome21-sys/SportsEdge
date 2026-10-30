@@ -49,10 +49,16 @@ class TestDeclaredLists(unittest.TestCase):
             self.assertEqual(st["status"], "COUNTS", (code, st["reasons"]))
 
     def test_undeclared_code_refused(self):
-        for code in ("MADE_UP", None, "unpriced_invalid_price"):
+        for code in ("MADE_UP", "unpriced_invalid_price"):
             st = slate_with_reason(code)
             self.assertEqual(st["status"], "SCREEN")
             self.assertIn("RUN_REFUSAL_CODE_UNDECLARED", st["reasons"])
+
+    def test_null_reason_is_malformed_not_undeclared(self):
+        # The v1.2 schema gate must refuse invalid types before code lookup.
+        st = slate_with_reason(None)
+        self.assertEqual(st["status"], "SCREEN")
+        self.assertIn("RUN_RECORD_MALFORMED", st["reasons"])
 
 # port (re-audit 8d86e7a9): the fake pricer is patched in by fixture, never
 # registered on import.
