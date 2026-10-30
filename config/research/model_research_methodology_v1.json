@@ -1,0 +1,56 @@
+{
+  "schema": "SPORTSEDGE_MODEL_RESEARCH_METHODOLOGY_V1",
+  "status": "RESEARCH_ONLY_ADOPTED",
+  "created_date": "2026-09-12",
+  "sports": ["NFL", "MLB", "CFB"],
+  "purpose": "Adopt stronger open-source modeling practices without weakening SportsEdge governance or creating promotion authority.",
+  "feature_ablation": {
+    "required": true,
+    "families": ["baseline_strength", "recent_efficiency", "starter_or_lineup", "injury_or_availability", "rest_travel", "weather_venue", "pace_style", "play_level_efficiency", "market_context_benchmark_only"],
+    "method": "Remove or add one frozen feature family at a time on development/validation data and report delta in proper scoring rule, calibration, and prediction error.",
+    "market_context_rule": "Market prices may be benchmark/context only and may not create Model_P or enter an independent-model feature set unless a separately governed market-informed lane is explicitly preregistered."
+  },
+  "calibration_selection": {
+    "required": true,
+    "candidate_methods": ["identity", "platt", "isotonic", "temperature"],
+    "selection_data": "validation-only within the preregistered research generation",
+    "selection_metrics": ["log_loss", "brier", "ece", "calibration_slope", "calibration_intercept"],
+    "rule": "Calibrator family and fitting procedure must be frozen before any untouched final evidence is read."
+  },
+  "structural_diversity": {
+    "required_when_ensemble_tested": true,
+    "minimum_distinct_error_families": 2,
+    "examples": ["regularized_linear_or_logistic", "gradient_boosted_trees", "count_distribution_model", "hierarchical_or_partial_pooling_model"],
+    "rule": "Do not count cosmetic hyperparameter variants of one family as structural diversity."
+  },
+  "drift_monitoring": {
+    "mode": "SHADOW_ONLY",
+    "signals": ["feature_psi", "prediction_psi", "missingness_shift", "calibration_residual_shift", "team_or_player_identity_coverage_shift"],
+    "actions": ["NONE", "WARN", "BLOCK_NEW_OFFICIAL_IF_EXISTING_GOVERNANCE_REQUIRES"],
+    "automatic_retraining": false,
+    "automatic_promotion": false
+  },
+  "sport_specific": {
+    "NFL": {
+      "priority": ["lagged_play_level_epa_cpoe", "feature_family_ablation", "calibrator_selection", "drift_shadow_monitor"],
+      "fresh_final_holdout_available_now": false
+    },
+    "MLB": {
+      "priority": ["poisson_vs_negative_binomial_run_distribution", "canonical_shared_research_dataset", "feature_family_ablation", "calibrator_selection"]
+    },
+    "CFB": {
+      "priority": ["feature_family_ablation", "team_strength_partial_pooling", "opener_current_close_decomposition_as_context_benchmark", "calibrator_selection"]
+    }
+  },
+  "hard_governance": {
+    "research_only": true,
+    "promotion_changed": false,
+    "truth_gate_changed": false,
+    "edge_floor_changed": false,
+    "eligible_changed": false,
+    "model_p_created": false,
+    "capture_backfill_allowed": false,
+    "market_price_may_substitute_for_model_p": false,
+    "football_prop_engine_state_must_remain": "NO_ENGINE_UNTIL_INDEPENDENTLY_VALIDATED"
+  }
+}
