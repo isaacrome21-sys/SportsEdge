@@ -8,6 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+import math
 import re
 from typing import Any, Callable, Iterable, Mapping
 from urllib.parse import urlparse
@@ -122,26 +123,50 @@ def _discover(home_html: str) -> tuple[str, int]:
 
 
 def _american_from_decimal(value: Any) -> int:
+    if isinstance(value, bool):
+        raise DraftKingsPropSourceError("DK_ODDS_INVALID")
     try:
         dec = float(value)
     except Exception as exc:
         raise DraftKingsPropSourceError("DK_ODDS_INVALID") from exc
-    if dec <= 1.0:
+    if not math.isfinite(dec) or dec <= 1.0:
         raise DraftKingsPropSourceError("DK_ODDS_INVALID")
-    return int(round((dec - 1.0) * 100.0)) if dec >= 2.0 else int(round(-100.0 / (dec - 1.0)))
+    price = int(round((dec - 1.0) * 100.0)) if dec >= 2.0 else int(round(-100.0 / (dec - 1.0)))
+    if -100 < price < 100:
+        raise DraftKingsPropSourceError("DK_ODDS_INVALID")
+    return price
+
+
+def _validate_american(value: Any) -> int:
+    """Accept only quoted whole American odds, never truncated floats/bools."""
+    if isinstance(value, bool):
+        raise DraftKingsPropSourceError("DK_ODDS_INVALID")
+    if isinstance(value, str):
+        token = value.strip().replace("−", "-")
+        if not re.fullmatch(r"[+-]?\d+", token):
+            raise DraftKingsPropSourceError("DK_ODDS_INVALID")
+        number = int(token)
+    elif isinstance(value, int):
+        number = value
+    elif isinstance(value, float) and math.isfinite(value) and value.is_integer():
+        number = int(value)
+    else:
+        raise DraftKingsPropSourceError("DK_ODDS_INVALID")
+    if -100 < number < 100:
+        raise DraftKingsPropSourceError("DK_ODDS_INVALID")
+    return number
 
 
 def _selection_price(row: Mapping[str, Any]) -> int:
     for key in ("displayOdds", "oddsAmerican", "americanOdds"):
         value = row.get(key)
         if isinstance(value, Mapping):
-            value = value.get("american") or value.get("americanOdds") or value.get("display")
+            value = next((value[name] for name in ("american", "americanOdds", "display")
+                          if name in value and value[name] is not None), None)
         if isinstance(value, str):
-            text = value.strip().replace("−", "-")
-            if re.fullmatch(r"[+-]?\d+", text):
-                return int(text)
+            return _validate_american(value)
         elif isinstance(value, (int, float)):
-            return int(value)
+            return _validate_american(value)
     for key in ("trueOdds", "oddsDecimal"):
         if row.get(key) is not None:
             return _american_from_decimal(row[key])
@@ -213,7 +238,16 @@ def _event_id(selection: Mapping[str, Any], market: Mapping[str, Any], fallback:
 def _line(selection: Mapping[str, Any], side: str) -> float:
     for key in ("points", "line"):
         if selection.get(key) is not None:
-            return float(selection[key])
+            raw = selection[key]
+            if isinstance(raw, bool):
+                raise DraftKingsPropSourceError("DK_LINE_INVALID")
+            try:
+                number = float(raw)
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise DraftKingsPropSourceError("DK_LINE_INVALID") from exc
+            if not math.isfinite(number) or number < 0:
+                raise DraftKingsPropSourceError("DK_LINE_INVALID")
+            return number
     if side in {"YES", "NO"}:
         return 0.5
     raise DraftKingsPropSourceError("DK_LINE_MISSING")
