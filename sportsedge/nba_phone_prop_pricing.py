@@ -47,7 +47,7 @@ from .nba_prop_empirical import (
 FAMILY_TO_STAT = {"player_points": "points", "player_rebounds": "rebounds",
                   "player_assists": "assists", "player_pra": "pra"}
 STORE_ENV_VAR = "SPORTSEDGE_NBA_PROP_STORE_DIR"
-QUOTE_FRESH_SECONDS = 180
+QUOTE_FRESH_SECONDS = 1800  # Owner all-sports quote-age ruling, 2026-10-25 (#2447).
 
 # The capture pipeline's slate timezone: the DK archive and slate
 # dates are CT-anchored, so a UTC tipoff instant is reduced to its
