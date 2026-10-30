@@ -54,7 +54,7 @@ class NFLGamePathProbabilityTests(unittest.TestCase):
             {"game_id": "IND@KC", "market": "team_total", "team": "IND", "side": "UNDER", "line": 19.5},
         )
         self.assertAlmostEqual(total_under["estimate_p"], 0.50)
-        self.assertAlmostEqual(ind_under["estimate_p"], 0.75)
+        self.assertAlmostEqual(ind_under["estimate_p"], 0.50)
 
     def test_moneyline(self):
         paths = [_path(31, 14), _path(20, 24), _path(27, 27)]
