@@ -202,9 +202,18 @@ def _ev_row(*, index: int, line: dict[str, Any], state_summary: str,
     selection = (line.get("side_raw") or "")
     status = ("LIVE_RESEARCH_CANDIDATE_NOT_VALIDATED"
               if ev >= min_ev else "LIVE_BELOW_THRESHOLD")
+    hold_reason = None
+    if (str(line.get("sport") or "").upper() == "NFL"
+            and reprice.market in ("ML", "SPREAD")):
+        # #2384 hold (Lane 1 audit): NFL sides failed the holdout bar vs
+        # closing lines, so live NFL ML/SPREAD rows are diagnostic WATCH and
+        # never reach live_candidates, whatever their EV.
+        status = "LIVE_WATCH_NFL_SIDE_UNVALIDATED"
+        hold_reason = "NFL_SIDE_MODEL_UNVALIDATED:FAILED_HOLDOUT_VS_CLOSE:ISSUE_2384"
     return {
         "input_index": index,
         "status": status,
+        **({"reason": hold_reason} if hold_reason else {}),
         "sport": line["sport"],
         "market": reprice.market,
         "side": reprice.side,
@@ -245,7 +254,7 @@ def _ev_row(*, index: int, line: dict[str, Any], state_summary: str,
 def _live_factor_audit(result: dict[str, Any]) -> dict[str, Any]:
     status = result.get("status") or ""
     priced = status in ("LIVE_RESEARCH_CANDIDATE_NOT_VALIDATED",
-                        "LIVE_BELOW_THRESHOLD")
+                        "LIVE_BELOW_THRESHOLD", "LIVE_WATCH_NFL_SIDE_UNVALIDATED")
     if not priced:
         return {
             "live_state": {"status": "NOT_PRICED",
@@ -400,12 +409,14 @@ def run_live_full(payload: Mapping[str, Any] | list,
              if r.get("status") == "LIVE_RESEARCH_CANDIDATE_NOT_VALIDATED"],
             key=lambda r: -r["ev_per_dollar"]),
         "live_watchlist": sorted(
-            [r for r in evaluated if r.get("status") == "LIVE_BELOW_THRESHOLD"],
+            [r for r in evaluated if r.get("status") in (
+                "LIVE_BELOW_THRESHOLD", "LIVE_WATCH_NFL_SIDE_UNVALIDATED")],
             key=lambda r: -r.get("ev_per_dollar", -1)),
         "live_unpriced": [r for r in evaluated
                           if r.get("status") not in (
                               "LIVE_RESEARCH_CANDIDATE_NOT_VALIDATED",
-                              "LIVE_BELOW_THRESHOLD")],
+                              "LIVE_BELOW_THRESHOLD",
+                              "LIVE_WATCH_NFL_SIDE_UNVALIDATED")],
         "summary": {"rows": len(rows), "edges": 0, "status_counts": counts},
         "factor_coverage": {
             "schema": "SPORTSEDGE_LIVE_FACTOR_COVERAGE_V1",

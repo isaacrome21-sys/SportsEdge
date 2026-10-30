@@ -91,6 +91,10 @@ def _model_version(row, sport):
     version is graded separately.
     """
     if sport == "NFL":
+        notes = row.get("context_notes") or []
+        if not isinstance(notes, str) and any(
+                str(n) == "NFL_SIDE_MARGIN_KEYNUM_V1_DECOMPRESSED" for n in notes):
+            return "NFL_SIDE_MARGIN_KEYNUM_V1"
         return "NFL_SIDES_PRIOR_COMPRESSED_2384"
     if sport != "CFB":
         return None

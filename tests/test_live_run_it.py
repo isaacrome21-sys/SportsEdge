@@ -271,8 +271,11 @@ def test_nfl_live_card_priced_with_clean_participation():
     card = run_live_full({"lines": [nfl_line()]}, now=NFL_NOW,
                          getter=nfl_canned_getter(_clean_injuries()))
     row = card["evaluated_rows"][0]
-    assert row["status"] in ("LIVE_RESEARCH_CANDIDATE_NOT_VALIDATED",
-                             "LIVE_BELOW_THRESHOLD"), row
+    # Priced, but held as WATCH under #2384 (Lane 1 audit): NFL live sides
+    # never reach live_candidates.
+    assert row["status"] == "LIVE_WATCH_NFL_SIDE_UNVALIDATED", row
+    assert row["ev_per_dollar"] is not None
+    assert card["live_candidates"] == []
     assert row["participation"]["check"] == "PARTICIPATION_OK"
     audit = card["factor_coverage"]["by_input_index"][0]["factors"]
     assert audit["participation"]["status"] == "VERIFIED_NO_MIDGAME_QB_CHANGE"

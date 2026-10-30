@@ -92,8 +92,11 @@ def _scoring(sport, home, away, kickoff, now, provider):
     if not any(flag in joined for flag in ("WEATHER:INDOOR_VERIFIED", "WEATHER:HEURISTIC_FORECAST")):
         raise ValueError("PUBLIC_VENUE_ENVIRONMENT_UNVERIFIED")
     base, sd_total, sd_margin, hfa = engine.PRIORS[sport]
-    hm = base + hfa/2 + ctx["home_rating"]
-    am = base - hfa/2 + ctx["away_rating"]
+    # Lane 1 (#2384): the decompressed NFL side rating was backtested only
+    # for full-game ML/SPREAD. Team totals and 1H derivatives keep the
+    # pre-Lane-1 per-team ratings exactly (no unbacktested price change).
+    hm = base + hfa/2 + ctx.get("home_rating_pre_nfl_side_v1", ctx["home_rating"])
+    am = base - hfa/2 + ctx.get("away_rating_pre_nfl_side_v1", ctx["away_rating"])
     # These factor observations remain in the PIT context for audit but
     # are explicitly DISABLED in prices: MLB unvalidated pitcher adjustment,
     # and NFL/CFB recent-form. Keep separately verified football injuries.
