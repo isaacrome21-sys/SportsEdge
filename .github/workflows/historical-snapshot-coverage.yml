@@ -1,0 +1,29 @@
+name: Historical snapshot coverage audit
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/inventory_historical_line_snapshots.py'
+      - 'tests/test_inventory_historical_line_snapshots.py'
+      - '.github/workflows/historical-snapshot-coverage.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Inventory archived snapshots
+        run: |
+          PYTHONPATH=. python scripts/inventory_historical_line_snapshots.py --root ledger/line_snapshots --output artifacts/historical_snapshot_coverage.json
+      - name: Upload source coverage report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: historical-snapshot-coverage
+          path: artifacts/historical_snapshot_coverage.json
