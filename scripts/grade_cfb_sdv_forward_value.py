@@ -21,6 +21,54 @@ EDGE_CAP = 0.12
 STRAIGHT_MIN_ODDS = -165
 
 
+def _norm(value):
+    # Same normalization as artifacts.free_models.PublicContext.key.
+    return " ".join("".join(c.lower() if c.isalnum() else " "
+                            for c in str(value or "")).split())
+
+
+_FORMS_CACHE = None
+
+
+def _illinois_forms():
+    """Name forms of the frozen Illinois-college registry (PR #2148).
+
+    Derived from artifacts/free_models -- IL_COLLEGE_NAMES plus the
+    normalized display labels of IL_COLLEGE_ESPN_IDS -- never re-listed
+    here, so this script cannot drift from the single registry. The
+    substring test this replaced ("illinois" in matchup) missed
+    Northwestern, Chicago State (ESPN id 2130), UIC, SIU Edwardsville,
+    DePaul, Loyola Chicago, and Bradley (issue #2151).
+    """
+    global _FORMS_CACHE
+    if _FORMS_CACHE is None:
+        import sys
+        from pathlib import Path
+        root = str(Path(__file__).resolve().parents[1])
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        from artifacts.free_models import IL_COLLEGE_ESPN_IDS, IL_COLLEGE_NAMES
+        forms = set(IL_COLLEGE_NAMES)
+        forms.update(_norm(name) for name in IL_COLLEGE_ESPN_IDS.values())
+        _FORMS_CACHE = frozenset(forms)
+    return _FORMS_CACHE
+
+
+def _illinois_excluded(matchup):
+    import re
+    name = _norm(matchup)
+    if not name:
+        return False
+    for form in _illinois_forms():
+        pattern = r"\b" + re.escape(form) + r"\b"
+        if form == "northwestern":
+            # Northwestern (IL) must not swallow Northwestern State (LA).
+            pattern += r"(?!\s+state\b)"
+        if re.search(pattern, name):
+            return True
+    return False
+
+
 def _time(value, field):
     try:
         out = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
@@ -73,7 +121,7 @@ def _pair_valid(quote, quotes):
 def _select_pre_result(game):
     """Decide hypothetical positions using only originally captured fields."""
     # Illinois college selections are excluded from straight-bet research cards.
-    if "illinois" in str(game.get("matchup") or "").lower():
+    if _illinois_excluded(game.get("matchup")):
         return []
     quotes = game.get("quoted_selections") or []
     if not isinstance(quotes, list):

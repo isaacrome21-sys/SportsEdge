@@ -40,11 +40,56 @@ DEFAULT_RESERVE = 76
 FOOTBALL_PRIORITY_BUFFER = 2 * len(MARKETS)
 SPORT_PRIORITY = ("NFL", "CFB", "MLB", "NBA")
 CREDIT_COST = len(MARKETS)  # One group of <=10 named bookmakers.
-IL_TEAMS = (
-    "illinois fighting", "illinois state", "southern illinois",
-    "northern illinois", "western illinois", "eastern illinois",
-    "northwestern wildcats", "loyola chicago", "uic flames",
-)
+def _norm(value):
+    # Same normalization as artifacts.free_models.PublicContext.key.
+    return " ".join("".join(c.lower() if c.isalnum() else " "
+                            for c in str(value or "")).split())
+
+
+_FORMS_CACHE = None
+
+
+def _illinois_forms():
+    """Name forms of the frozen Illinois-college registry (PR #2148).
+
+    Derived from artifacts/free_models -- IL_COLLEGE_NAMES plus the
+    normalized display labels of IL_COLLEGE_ESPN_IDS -- never re-listed
+    here, so this script cannot drift from the single registry. The
+    hand-maintained phrase tuple this replaced missed Chicago State
+    (ESPN id 2130), DePaul, Bradley, and SIU Edwardsville, and its
+    startswith/full-phrase construction also missed the plain forms
+    "Illinois" and "Northwestern" (issue #2151).
+    """
+    global _FORMS_CACHE
+    if _FORMS_CACHE is None:
+        import sys
+        root = str(Path(__file__).resolve().parents[1])
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        from artifacts.free_models import IL_COLLEGE_ESPN_IDS, IL_COLLEGE_NAMES
+        forms = set(IL_COLLEGE_NAMES)
+        forms.update(_norm(name) for name in IL_COLLEGE_ESPN_IDS.values())
+        _FORMS_CACHE = frozenset(forms)
+    return _FORMS_CACHE
+
+
+def _is_illinois_team(name):
+    school = _norm(name)
+    if not school:
+        return False
+    if "illinois" in school:
+        return True
+    for form in _illinois_forms():
+        if school == form:
+            return True
+        if school.startswith(form + " "):
+            # Northwestern (IL) must not swallow Northwestern State (LA).
+            if form == "northwestern" and (
+                    school == "northwestern state"
+                    or school.startswith("northwestern state ")):
+                continue
+            return True
+    return False
 # Account and bookmaker coverage are provider-dependent; do not assume a plan.
 
 
@@ -190,7 +235,7 @@ def events_to_board(sport, events, now):
         away,home=ev.get("away_team"),ev.get("home_team")
         if not isinstance(away,str) or not isinstance(home,str) or away==home:
             continue
-        if sport=="CFB" and any(str(t).lower().startswith(IL_TEAMS) for t in (away,home)):
+        if sport=="CFB" and any(_is_illinois_team(t) for t in (away,home)):
             continue
         books={str(b.get("key") or ""):b for b in ev.get("bookmakers") or [] if isinstance(b,dict)}
         if "draftkings" not in books:
