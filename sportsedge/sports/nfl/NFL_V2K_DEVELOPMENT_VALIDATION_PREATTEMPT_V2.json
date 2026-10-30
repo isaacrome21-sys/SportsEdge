@@ -115,7 +115,7 @@
     "core_path": "sportsedge/sports/nfl/v2k_drive_core_v2.py",
     "validation_path": "sportsedge/sports/nfl/v2k_attempt2_validation.py",
     "core_git_blob_sha1": "cf9daf707f2cbf8412c357c592e2a0a18bcc8499",
-    "validation_git_blob_sha1": "f21dbeae99183ecc7418b163c592ac5205178a17",
+    "validation_git_blob_sha1": "b3d52c48e7d18a374b7002fbd126da7f9f412466",
     "canonical_main_anchor_sha": "4307c46bb5f2e19fd6fb5afb6315bf9c9bf4b59f"
   },
   "blocker_codes": [],
@@ -144,7 +144,8 @@
     "joint_final_score_histogram_preserved": true,
     "joint_score_marginals_must_reproduce_margin_and_total_histograms": true,
     "score_derived_moneyline_diagnostics_frozen_before_readout": true,
-    "team_total_continuous_diagnostics_frozen_before_readout": true
+    "team_total_continuous_diagnostics_frozen_before_readout": true,
+    "source_hashes_resolved_from_canonical_source_freeze": true
   },
   "attempt2_issue_binding": {
     "issue": 1539,
@@ -235,5 +236,16 @@
     "literal": "SportsEdge|NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G2|ATTEMPT_2|ROOT_SEED_V1",
     "sha256": "bd2e3dc0e337e79ec17e22deffe3f0b406fe5a4745ef20d75b9d1e5a8f38c085",
     "root_seed": 13631901020752177054
+  },
+  "execution_incident_receipt": {
+    "run_ids": [37238130956, 37238300790],
+    "primary_run_id": 37238130956,
+    "head_sha": "7d4ce8e4adde7450196d811e00e218e4ad02fd75",
+    "failure_code": "SOURCE_BINDING_SCHEMA_ADAPTER_MISMATCH",
+    "failure_point": "BEFORE_DRIVE_LOADING_AND_BEFORE_SIMULATION",
+    "simulated_paths": 0,
+    "evaluation_readout_exposed": false,
+    "consumes_development_attempt": false,
+    "correction_scope": "SOURCE_VERIFICATION_PLUMBING_ONLY"
   }
 }
