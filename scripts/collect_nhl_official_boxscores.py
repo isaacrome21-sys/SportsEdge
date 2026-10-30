@@ -123,7 +123,8 @@ def collect_completed_games(
             # The live Gamecenter boxscore carries no period scoring; the
             # companion landing payload does. Fetch it so live-shape receipts
             # can be built; a landing failure fails this game closed.
-            landing_payload, _, _ = fetcher(LANDING_ENDPOINT.format(game_id=game_id))
+            landing_url = LANDING_ENDPOINT.format(game_id=game_id)
+            landing_payload, landing_raw, landing_captured_at = fetcher(landing_url)
             games.append(build_official_completed_game(
                 payload=payload,
                 captured_at=captured_at,
@@ -131,6 +132,9 @@ def collect_completed_games(
                 source_uri=url,
                 source_version="nhl-web-api-v1-live2",
                 landing_payload=landing_payload,
+                landing_source_uri=landing_url,
+                landing_raw_sha256=raw_sha256(landing_raw),
+                landing_captured_at=landing_captured_at,
             ))
         except Exception as exc:  # retain explicit per-game failure evidence
             failures.append((game_id, f"{type(exc).__name__}: {exc}"))

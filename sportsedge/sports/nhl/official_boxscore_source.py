@@ -149,6 +149,9 @@ class NHLOfficialCompletedGame:
     source_uri: str
     source_raw_sha256: str
     source_version: str
+    landing_source_uri: str | None = None
+    landing_raw_sha256: str | None = None
+    landing_captured_at: str | None = None
 
     def __post_init__(self) -> None:
         if not self.game_id or not self.season or not self.source_version:
@@ -192,11 +195,25 @@ class NHLOfficialCompletedGame:
             raise ValueError("official NHL Gamecenter boxscore URI required")
         if not _SHA256.fullmatch(self.source_raw_sha256.lower()):
             raise ValueError("valid raw boxscore SHA-256 required")
+        landing_fields = (self.landing_source_uri, self.landing_raw_sha256, self.landing_captured_at)
+        if self.source_version == "nhl-web-api-v1-live2" or any(v is not None for v in landing_fields):
+            if any(v is None for v in landing_fields):
+                raise ValueError("live NHL landing provenance requires URI, raw SHA-256 and captured_at")
+            if self.landing_source_uri != LANDING_ENDPOINT.format(game_id=self.game_id):
+                raise ValueError("official NHL Gamecenter landing URI required")
+            if not _SHA256.fullmatch(self.landing_raw_sha256.lower()):
+                raise ValueError("valid raw landing SHA-256 required")
+            if _utc(self.landing_captured_at, "landing_captured_at") <= start:
+                raise ValueError("landing capture must be after puck drop")
 
     def as_json_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["away_goalies"] = [asdict(g) for g in self.away_goalies]
         payload["home_goalies"] = [asdict(g) for g in self.home_goalies]
+        # Preserve legacy receipt serialization/dataset hashes exactly.
+        for key in ("landing_source_uri", "landing_raw_sha256", "landing_captured_at"):
+            if payload[key] is None:
+                del payload[key]
         return payload
 
 
@@ -243,6 +260,21 @@ def _goal_team_abbrev(goal: Mapping[str, Any]) -> str:
     if isinstance(raw, Mapping):
         raw = raw.get("default")
     return str(raw or "").strip().upper()
+
+
+def _validate_landing_identity(boxscore: Mapping[str, Any], landing: Mapping[str, Any]) -> None:
+    """Reject a companion response belonging to a different game or fixture."""
+    for key in ("id", "season", "gameType", "gameDate", "startTimeUTC", "gameState"):
+        if key not in landing or str(landing[key]) != str(boxscore.get(key)):
+            raise ValueError(f"landing/boxscore game identity mismatch:{key}")
+    for side in ("away", "home"):
+        left = boxscore.get(f"{side}Team")
+        right = landing.get(f"{side}Team")
+        if not isinstance(left, Mapping) or not isinstance(right, Mapping):
+            raise ValueError(f"landing/boxscore game identity mismatch:{side}Team")
+        for key in ("id", "abbrev", "score"):
+            if key not in right or str(right[key]) != str(left.get(key)):
+                raise ValueError(f"landing/boxscore game identity mismatch:{side}Team.{key}")
 
 
 def _landing_scoring(
@@ -349,6 +381,9 @@ def build_official_completed_game(
     source_uri: str | None = None,
     source_version: str = "nhl-web-api-v1",
     landing_payload: Mapping[str, Any] | None = None,
+    landing_source_uri: str | None = None,
+    landing_raw_sha256: str | None = None,
+    landing_captured_at: str | None = None,
 ) -> NHLOfficialCompletedGame:
     """Normalize an already-fetched official final Gamecenter boxscore.
 
@@ -398,6 +433,11 @@ def build_official_completed_game(
         away_goalie_rows = _goalies(boxscore, "away")
         home_goalie_rows = _goalies(boxscore, "home")
     elif landing_payload is not None:
+        if not isinstance(landing_payload, Mapping):
+            raise ValueError("official landing payload must be a mapping")
+        if not all((landing_source_uri, landing_raw_sha256, landing_captured_at)):
+            raise ValueError("live NHL landing provenance requires URI, raw SHA-256 and captured_at")
+        _validate_landing_identity(payload, landing_payload)
         outcome = payload.get("gameOutcome")
         last_period_type = ""
         if isinstance(outcome, Mapping):
@@ -444,6 +484,9 @@ def build_official_completed_game(
         source_uri=uri,
         source_raw_sha256=str(raw_sha256).lower(),
         source_version=str(source_version),
+        landing_source_uri=landing_source_uri if not isinstance(boxscore, Mapping) else None,
+        landing_raw_sha256=landing_raw_sha256 if not isinstance(boxscore, Mapping) else None,
+        landing_captured_at=landing_captured_at if not isinstance(boxscore, Mapping) else None,
     )
 
 
