@@ -286,8 +286,9 @@ def nfl_market_price_radar(root: Path, now: datetime):
                 if quote_price != float(price_num) or quote_price < -165 or not 0 < p < 1:
                     continue
                 ev = p * dec - 1.0
-                # Outliers frequently mean a stale or mismatched offer. Fail closed.
-                if not 0.02 <= ev < 0.05:
+                # Show every positive price-only discrepancy; large outliers
+                # still fail closed as potential stale or mismatched offers.
+                if not 0 < ev < 0.05:
                     continue
                 if key == "totals":
                     selection = f"{side.title()} {float(quote['line']):g}"
