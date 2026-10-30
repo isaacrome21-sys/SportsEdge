@@ -13,7 +13,7 @@ def _q(selection, price, **kw):
 
 def test_td_row_gets_fair_price_ev_and_score():
     p = price_anytime_td(player="A Player", game_id="g1", estimate_p=.50, yes_quote=_q("YES", 150), no_quote=_q("NO", -180), as_of=NOW)
-    assert p.fair_american == 100
+    assert p.fair_american == -100
     assert p.ev_per_dollar == pytest.approx(.25)
     assert p.score_0_100 == 100
     assert p.score_label == "SPORTSEDGE_TRANSPARENT_EV_SCORE_V1"
