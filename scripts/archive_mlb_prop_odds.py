@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 from pathlib import Path
 import sys
 from typing import Any, Mapping
@@ -126,6 +127,55 @@ def _event_index(
     return index, failures
 
 
+def _native_pair_key(quote: Mapping[str, Any]) -> tuple[Any, ...] | None:
+    """Key only an exact provider-native two-sided quote, not canonical identity."""
+    event_id = str(quote.get("provider_event_id") or "").strip()
+    market = str(quote.get("market") or "").strip().upper()
+    entity = str(quote.get("entity_name_normalized") or "").strip()
+    book = str(quote.get("book_key") or "").strip()
+    retrieved = _parse_iso(quote.get("quote_retrieved_at"))
+    if not (event_id and market and entity and book and retrieved):
+        return None
+    raw_line = quote.get("line")
+    raw_odds = quote.get("american_odds")
+    if isinstance(raw_line, bool) or isinstance(raw_odds, bool):
+        return None
+    try:
+        line = float(raw_line)
+        odds = float(raw_odds)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not (math.isfinite(line) and line >= 0 and math.isfinite(odds)
+            and odds.is_integer() and abs(odds) >= 100):
+        return None
+    return (event_id, market, entity, line, book, retrieved, quote.get("is_alternate"))
+
+
+def _annotate_native_pairs(quotes: list[dict[str, Any]]) -> int:
+    """Never infer an opposite from a different line, capture, or participant.
+
+    This is an archive diagnostics field, not sportsbook corroboration or
+    eligibility for verified model pricing or real-money recommendations.
+    """
+    groups: dict[tuple[Any, ...], list[int]] = {}
+    for index, quote in enumerate(quotes):
+        quote["native_quote_pair_state"] = "UNPAIRED_OR_AMBIGUOUS"
+        key = _native_pair_key(quote)
+        if key is not None:
+            groups.setdefault(key, []).append(index)
+
+    count = 0
+    for indices in groups.values():
+        if len(indices) != 2:
+            continue
+        if {str(quotes[i].get("side") or "").upper() for i in indices} != {"OVER", "UNDER"}:
+            continue
+        for i in indices:
+            quotes[i]["native_quote_pair_state"] = "PAIRED_PROVIDER_NATIVE_ONLY"
+        count += 1
+    return count
+
+
 def build_archive_payload(*, now: datetime | None = None) -> dict[str, Any]:
     started_at = now or _utcnow()
     if started_at.tzinfo is None or started_at.utcoffset() is None:
@@ -212,6 +262,8 @@ def build_archive_payload(*, now: datetime | None = None) -> dict[str, Any]:
         target_rows.append(row)
         market_counts[market] += 1
 
+    native_pair_count = _annotate_native_pairs(target_rows)
+
     payload: dict[str, Any] = {
         "schema_version": 2,
         "archive_type": "MLB_PROP_PIT_QUOTES",
@@ -221,6 +273,8 @@ def build_archive_payload(*, now: datetime | None = None) -> dict[str, Any]:
         "target_markets": sorted(TARGET_MARKETS),
         "provider_quote_count": len(provider_rows),
         "pit_target_quote_count": len(target_rows),
+        "native_two_sided_pair_count": native_pair_count,
+        "native_paired_quote_row_count": 2 * native_pair_count,
         "market_counts": market_counts,
         "provider_failure_count": len(snap.failures),
         "event_failure_count": len(event_failures),
@@ -262,6 +316,8 @@ def persist_payload(
             "captured_at": captured.isoformat(),
             "payload_sha256": payload.get("payload_sha256"),
             "pit_target_quote_count": payload.get("pit_target_quote_count"),
+            "native_two_sided_pair_count": payload.get("native_two_sided_pair_count", 0),
+            "native_paired_quote_row_count": payload.get("native_paired_quote_row_count", 0),
             "market_counts": payload.get("market_counts"),
             "immutable_file": str(immutable),
         },
@@ -317,6 +373,8 @@ def main() -> int:
                 {
                     "status": status,
                     "pit_target_quote_count": payload["pit_target_quote_count"],
+                    "native_two_sided_pair_count": payload["native_two_sided_pair_count"],
+                    "native_paired_quote_row_count": payload["native_paired_quote_row_count"],
                     "target_market_count": len(payload["target_markets"]),
                     "market_counts": payload["market_counts"],
                     "provider_quote_count": payload["provider_quote_count"],

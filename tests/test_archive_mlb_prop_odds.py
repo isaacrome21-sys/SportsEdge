@@ -1,5 +1,6 @@
 import importlib.util
 import json
+from copy import deepcopy
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -109,6 +110,8 @@ class ArchiveMLBPropOddsTests(unittest.TestCase):
             "captured_at": "2026-08-24T00:00:00+00:00",
             "payload_sha256": "a" * 64,
             "pit_target_quote_count": 1,
+            "native_two_sided_pair_count": 0,
+            "native_paired_quote_row_count": 0,
             "market_counts": {market: 0 for market in sorted(mod.TARGET_MARKETS)},
         }
         with tempfile.TemporaryDirectory() as td:
@@ -117,6 +120,9 @@ class ArchiveMLBPropOddsTests(unittest.TestCase):
             self.assertTrue(latest.exists())
             self.assertNotEqual(immutable, latest)
             self.assertIn("2026-08-24", str(immutable))
+            pointer = json.loads(latest.read_text(encoding="utf-8"))
+            self.assertEqual(pointer["native_two_sided_pair_count"], 0)
+            self.assertEqual(pointer["native_paired_quote_row_count"], 0)
 
     def test_build_archive_accepts_strictly_pregame_quote_and_preserves_identity_raw_material(self):
         snap = _snapshot(retrieved_at="2026-08-24T00:00:00Z", market="HITS")
@@ -132,9 +138,12 @@ class ArchiveMLBPropOddsTests(unittest.TestCase):
         self.assertEqual(payload["evidence_class"], "LIVE_PROVIDER_QUOTE_ARCHIVE")
         self.assertEqual(payload["pit_target_quote_count"], 1)
         self.assertEqual(payload["market_counts"]["HITS"], 1)
+        self.assertEqual(payload["native_two_sided_pair_count"], 0)
+        self.assertEqual(payload["native_paired_quote_row_count"], 0)
         self.assertEqual(payload["rejected_target_count"], 0)
         row = payload["quotes"][0]
         self.assertTrue(row["pit_eligible"])
+        self.assertEqual(row["native_quote_pair_state"], "UNPAIRED_OR_AMBIGUOUS")
         self.assertEqual(row["quote_retrieved_at"], "2026-08-24T00:00:00+00:00")
         self.assertEqual(row["first_pitch_at"], "2026-08-24T00:10:00+00:00")
         self.assertEqual(row["identity_state"], "PROVIDER_NATIVE_UNRESOLVED")
@@ -192,6 +201,55 @@ class ArchiveMLBPropOddsTests(unittest.TestCase):
         self.assertNotIn("settlement", row)
         self.assertFalse(payload["identity_policy"]["provider_event_is_canonical_game_id"])
         self.assertFalse(payload["identity_policy"]["participant_name_is_canonical_player_id"])
+
+    def test_archive_native_pair_requires_exact_two_opposites_and_keeps_identity_unresolved(self):
+        base = _snapshot(retrieved_at="2026-08-24T00:00:00Z", market="PITCHER_OUTS")
+        over = deepcopy(base.quotes[0])
+        under = dict(over, side="UNDER", selection="Under", american_odds=-115)
+        snap = SimpleNamespace(**{**vars(base), "quotes": (over, under)})
+        with patch.object(mod, "fetch_mlb_prop_quotes", return_value=snap), patch.object(
+            mod, "_event_index", return_value=({"123": _event()}, [])
+        ):
+            payload = mod.build_archive_payload(now=datetime(2026, 8, 24, 0, 1, tzinfo=timezone.utc))
+
+        self.assertEqual(payload["native_two_sided_pair_count"], 1)
+        self.assertEqual(payload["native_paired_quote_row_count"], 2)
+        self.assertEqual(payload["pit_target_quote_count"], 2)
+        self.assertTrue(all(row["native_quote_pair_state"] == "PAIRED_PROVIDER_NATIVE_ONLY" for row in payload["quotes"]))
+        self.assertTrue(all(row["canonical_entity_id"] is None for row in payload["quotes"]))
+        self.assertTrue(all(row["identity_state"] == "PROVIDER_NATIVE_UNRESOLVED" for row in payload["quotes"]))
+
+    def test_native_pair_refuses_cross_identity_market_line_book_and_capture(self):
+        base = dict(_snapshot(retrieved_at="2026-08-24T00:00:00Z").quotes[0])
+        base["quote_retrieved_at"] = "2026-08-24T00:00:00+00:00"
+        changes = (
+            {"side": "OVER"},
+            {"provider_event_id": "another-event"},
+            {"market": "PITCHER_K"},
+            {"entity_name_normalized": "another-pitcher"},
+            {"line": 18.5},
+            {"book_key": "another_book"},
+            {"quote_retrieved_at": "2026-08-24T00:00:01+00:00"},
+            {"is_alternate": True},
+            {"american_odds": float("nan")},
+            {"american_odds": 0},
+            {"line": float("inf")},
+            {"line": -1},
+        )
+        for change in changes:
+            with self.subTest(change=change):
+                over = dict(base)
+                under = dict(base, side="UNDER", **change) if "side" not in change else dict(base, **change)
+                rows = [over, under]
+                self.assertEqual(mod._annotate_native_pairs(rows), 0)
+                self.assertTrue(all(r["native_quote_pair_state"] == "UNPAIRED_OR_AMBIGUOUS" for r in rows))
+
+    def test_native_pair_refuses_ambiguous_duplicate_side(self):
+        base = dict(_snapshot(retrieved_at="2026-08-24T00:00:00Z").quotes[0])
+        base["quote_retrieved_at"] = "2026-08-24T00:00:00+00:00"
+        rows = [dict(base), dict(base), dict(base, side="UNDER", american_odds=-112)]
+        self.assertEqual(mod._annotate_native_pairs(rows), 0)
+        self.assertTrue(all(r["native_quote_pair_state"] == "UNPAIRED_OR_AMBIGUOUS" for r in rows))
 
 
 if __name__ == "__main__":
