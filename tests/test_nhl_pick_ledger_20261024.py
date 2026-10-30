@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+from datetime import datetime
 
 import pytest
 
@@ -39,7 +40,7 @@ def test_captured_requires_offset_instant(bad):
 
 
 def test_rows_have_price_capture_and_stay_lean():
-    rows = card.ledger_rows(_ticket(BOARD))
+    rows = card.ledger_rows(_ticket(BOARD), as_of=datetime.fromisoformat('2026-10-24T18:30:00-05:00'))
     assert rows, "+300 both sides of a 5.5 total must clear the floor"
     assert [r["ev"] for r in rows] == sorted((r["ev"] for r in rows), reverse=True)
     for r in rows:
@@ -56,3 +57,50 @@ def test_no_captured_line_logs_nothing():
 
 def test_unknown_team_logs_nothing():
     assert card.ledger_rows(_ticket("Captured: 2026-10-24T18:00:00-05:00\nFoo @ Bar\nTotal 5.5 +300 +300")) == []
+
+
+def test_nhl_capture_30_minute_boundary_is_inclusive():
+    ticket = _ticket(BOARD)
+    exact = datetime.fromisoformat("2026-10-24T18:30:00-05:00")
+    late = datetime.fromisoformat("2026-10-24T18:30:01-05:00")
+    assert card.QUOTE_MAX_AGE_SECONDS == 1800
+    assert card.quote_refusal(ticket["games"][0]["captured_at"], as_of=exact) is None
+    assert card.ledger_rows(ticket, as_of=exact)
+    assert card.quote_refusal(ticket["games"][0]["captured_at"], as_of=late) == "QUOTE_STALE_OVER_1800S"
+    assert card.ledger_rows(ticket, as_of=late) == []
+    lines = "\n".join(card.render_lines(ticket, as_of=late))
+    assert "QUOTE_STALE_OVER_1800S" in lines
+    market_rows = [line for line in lines.splitlines() if line.startswith("- ")]
+    assert market_rows
+    assert all(" LEAN" not in row and " BET" not in row for row in market_rows)
+
+
+@pytest.mark.parametrize(
+    ("capture", "instant", "reason"),
+    [
+        ("2026-10-24T18:00:01-05:00", "2026-10-24T18:00:00-05:00", "QUOTE_TIMESTAMP_IN_FUTURE"),
+        (None, "2026-10-24T18:00:00-05:00", "QUOTE_FRESHNESS_UNVERIFIED"),
+        ("2026-10-24T18:00:00", "2026-10-24T18:00:00-05:00", "QUOTE_TIMESTAMP_INVALID"),
+        ("garbage", "2026-10-24T18:00:00-05:00", "QUOTE_TIMESTAMP_INVALID"),
+    ],
+)
+def test_missing_future_and_invalid_capture_never_prices_or_logs(capture, instant, reason):
+    ticket = _ticket(BOARD)
+    ticket["games"][0]["captured_at"] = capture
+    as_of = datetime.fromisoformat(instant)
+    assert card.quote_refusal(capture, as_of=as_of) == reason
+    assert card.ledger_rows(ticket, as_of=as_of) == []
+    lines = "\n".join(card.render_lines(ticket, as_of=as_of))
+    assert reason in lines
+    market_rows = [line for line in lines.splitlines() if line.startswith("- ")]
+    assert market_rows
+    assert all(" LEAN" not in row and " BET" not in row for row in market_rows)
+
+
+def test_timestamp_from_issue_edit_never_refreshes_stale_dk_quote():
+    ticket = _ticket(BOARD)
+    ticket["observed_at"] = "2026-10-24T18:29:59-05:00"
+    ticket["games"][0]["captured_at"] = "2026-10-24T17:50:00-05:00"
+    as_of = datetime.fromisoformat("2026-10-24T18:30:00-05:00")
+    assert card.ledger_rows(ticket, as_of=as_of) == []
+    assert "QUOTE_STALE_OVER_1800S" in "\n".join(card.render_lines(ticket, as_of=as_of))
