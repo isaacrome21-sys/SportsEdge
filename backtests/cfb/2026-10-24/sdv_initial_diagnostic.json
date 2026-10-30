@@ -1,0 +1,205 @@
+{
+  "attempt": 1,
+  "chronological_training_check": "PASS",
+  "code_sha256": "f7a235663483401adad2cb7e0d216d249fb9e0168c199102573515c6f28fde09",
+  "current_week_metadata_violations": 0,
+  "holdout_season": 2025,
+  "input_sha256": "32f520c693ad7567667d3dc6a8c281f8a61ae410f1bdf6c9c35d5e07fd18a579",
+  "leakage_check": "NOT_CLEARED_HISTORICAL_WEATHER_AVAILABILITY_UNPROVEN",
+  "markets": {
+    "MONEYLINE": {
+      "bets_ev_ge_2pct": null,
+      "brier_vs_close": null,
+      "calibration_intercept": null,
+      "calibration_slope": null,
+      "ece": null,
+      "log_loss_vs_close": null,
+      "mean_clv": null,
+      "paired_n": 0,
+      "reason": "NO_PAIRED_HISTORICAL_CLOSES_OR_ENTRY_QUOTES; PIT_NOT_CLEARED",
+      "roi_at_logged_price": null,
+      "verdict": "INSUFFICIENT_DATA"
+    },
+    "SPREAD": {
+      "bets_ev_ge_2pct": null,
+      "brier_vs_close": null,
+      "calibration_intercept": null,
+      "calibration_slope": null,
+      "ece": null,
+      "log_loss_vs_close": null,
+      "mean_clv": null,
+      "paired_n": 0,
+      "reason": "NO_PAIRED_HISTORICAL_CLOSES_OR_ENTRY_QUOTES; PIT_NOT_CLEARED",
+      "roi_at_logged_price": null,
+      "verdict": "INSUFFICIENT_DATA"
+    },
+    "TOTAL": {
+      "bets_ev_ge_2pct": null,
+      "brier_vs_close": null,
+      "calibration_intercept": null,
+      "calibration_slope": null,
+      "ece": null,
+      "log_loss_vs_close": null,
+      "mean_clv": null,
+      "paired_n": 0,
+      "reason": "NO_PAIRED_HISTORICAL_CLOSES_OR_ENTRY_QUOTES; PIT_NOT_CLEARED",
+      "roi_at_logged_price": null,
+      "verdict": "INSUFFICIENT_DATA"
+    }
+  },
+  "model": "SDV_PRIOR_CURRENT_BLEND",
+  "model_code_sha256": "3aa336076c89b8a8bc0e5999866568e43870589f0a63f43c6d9d6d420e7b1d65",
+  "numpy_version": "2.3.5",
+  "promotion_changed": false,
+  "row_count": 6620,
+  "season_diagnostics": [
+    {
+      "holdout": false,
+      "margin_mae": 13.910920682876252,
+      "season": 2017,
+      "test_n": 677,
+      "total_bias_predicted_minus_actual": 2.3009979986760856,
+      "total_mae": 14.55255390024791,
+      "train_n": 678,
+      "train_seasons": [
+        2016
+      ]
+    },
+    {
+      "holdout": false,
+      "margin_mae": 13.66581956789786,
+      "season": 2018,
+      "test_n": 685,
+      "total_bias_predicted_minus_actual": 0.9122581134130598,
+      "total_mae": 14.024996007782303,
+      "train_n": 1355,
+      "train_seasons": [
+        2016,
+        2017
+      ]
+    },
+    {
+      "holdout": false,
+      "margin_mae": 13.850504881081719,
+      "season": 2019,
+      "test_n": 700,
+      "total_bias_predicted_minus_actual": 1.739666519831344,
+      "total_mae": 13.33362643351984,
+      "train_n": 2040,
+      "train_seasons": [
+        2016,
+        2017,
+        2018
+      ]
+    },
+    {
+      "holdout": false,
+      "margin_mae": 13.977302207960136,
+      "season": 2020,
+      "test_n": 427,
+      "total_bias_predicted_minus_actual": -0.17679257372387627,
+      "total_mae": 14.060986791908963,
+      "train_n": 2740,
+      "train_seasons": [
+        2016,
+        2017,
+        2018,
+        2019
+      ]
+    },
+    {
+      "holdout": false,
+      "margin_mae": 14.187739952384531,
+      "season": 2021,
+      "test_n": 661,
+      "total_bias_predicted_minus_actual": 2.6359719736048186,
+      "total_mae": 13.298286973622517,
+      "train_n": 3167,
+      "train_seasons": [
+        2016,
+        2017,
+        2018,
+        2019,
+        2020
+      ]
+    },
+    {
+      "holdout": false,
+      "margin_mae": 13.409708702757776,
+      "season": 2022,
+      "test_n": 691,
+      "total_bias_predicted_minus_actual": 1.8320432752561575,
+      "total_mae": 13.01041266985175,
+      "train_n": 3828,
+      "train_seasons": [
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021
+      ]
+    },
+    {
+      "holdout": false,
+      "margin_mae": 13.487597651861305,
+      "season": 2023,
+      "test_n": 698,
+      "total_bias_predicted_minus_actual": 1.690372558960343,
+      "total_mae": 13.524494836787136,
+      "train_n": 4519,
+      "train_seasons": [
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022
+      ]
+    },
+    {
+      "holdout": false,
+      "margin_mae": 13.621139881317102,
+      "season": 2024,
+      "test_n": 697,
+      "total_bias_predicted_minus_actual": 1.4268183539208243,
+      "total_mae": 13.268958454076634,
+      "train_n": 5217,
+      "train_seasons": [
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "holdout": true,
+      "margin_mae": 13.533978979496455,
+      "season": 2025,
+      "test_n": 706,
+      "total_bias_predicted_minus_actual": 4.10090405368728,
+      "total_mae": 13.205827231140393,
+      "train_n": 5914,
+      "train_seasons": [
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024
+      ]
+    }
+  ],
+  "source_provenance": {
+    "RECONSTRUCTED_HISTORICAL_NOT_PIT": 6620
+  },
+  "status": "RECONSTRUCTED_SCORE_DIAGNOSTIC_NOT_PIT_VALIDATION"
+}
