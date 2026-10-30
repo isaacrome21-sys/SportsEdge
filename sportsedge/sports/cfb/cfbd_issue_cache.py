@@ -32,7 +32,7 @@ from typing import Any, Callable
 ROOT = Path(__file__).resolve().parents[3]
 CACHE_ISSUE_FILE = ROOT / "config" / "cfb_history_cache_issue.json"
 MARKER = "CFBCACHE"
-_ITEM_RE = re.compile(rf"^{MARKER} ([a-z_]+_\d{{4}}) ([A-Za-z0-9+/=]+)\s*$", re.M)
+_ITEM_RE = re.compile(rf"^{MARKER} ([a-z_]+_\d{{4}}(?:_w\d+)?) ([A-Za-z0-9+/=]+)\s*$", re.M)
 TRUSTED_AUTHORS = {"github-actions[bot]", "isaacrome21-sys"}
 PROVIDER_ORDER = ("consensus", "Bovada", "DraftKings", "ESPN Bet", "William Hill (New Jersey)", "teamrankings", "numberfire")
 
