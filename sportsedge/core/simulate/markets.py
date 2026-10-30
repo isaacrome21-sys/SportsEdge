@@ -189,3 +189,43 @@ def derive_game_markets(
             markets["first_half_total"] = fh["total"]
 
     return markets
+
+
+def derive_sequence_markets(
+    paths: Iterable[Any],
+    *,
+    race_points: Iterable[int] = (),
+) -> dict[str, Any]:
+    """Derive ordered scoring-event markets from the parent path, never a side sim.
+
+    These are EXPERIMENTAL read-outs. Settlement eligibility still belongs to the
+    frozen sportsbook-family policy.
+    """
+    materialized=list(paths)
+    if not materialized:
+        raise ValueError("SIMULATION_PATHS_EMPTY")
+    game_ids={p.game_id for p in materialized}
+    if len(game_ids)!=1:
+        raise ValueError("SEQUENCE_MARKET_GAME_ID_MISMATCH")
+    teams={(p.home_team,p.away_team) for p in materialized}
+    if len(teams)!=1:
+        raise ValueError("SEQUENCE_MARKET_TEAM_IDENTITY_MISMATCH")
+    home,away=next(iter(teams)); n=float(len(materialized))
+    first={home:0,away:0,"none":0}
+    race={int(x):{home:0,away:0,"none":0} for x in race_points}
+    if any(x<=0 for x in race): raise ValueError("RACE_POINTS_MUST_BE_POSITIVE")
+    for path in materialized:
+        events=list(path.events)
+        if events: first[events[0].team]+=1
+        else: first["none"]+=1
+        for target,bucket in race.items():
+            score={home:0,away:0}; winner=None
+            for event in events:
+                score[event.team]+=event.points
+                if score[event.team]>=target:
+                    winner=event.team; break
+            bucket[winner or "none"]+=1
+    return {
+      "first_score":{k:v/n for k,v in first.items()},
+      "race_to_n_points":{t:{k:v/n for k,v in b.items()} for t,b in race.items()},
+    }
