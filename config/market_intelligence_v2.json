@@ -1,0 +1,103 @@
+{
+  "schema_version": "SPORTSEDGE_MARKET_INTELLIGENCE_V2",
+  "scope": ["CFB", "NFL", "MLB"],
+  "authority": {
+    "creates_model_p": false,
+    "truth_gate_authority": false,
+    "promotion_authority": false,
+    "eligibility_authority": false,
+    "official_bet_authority": false,
+    "capper_vote_weight": 0
+  },
+  "run_it_required_checks": [
+    "breaking_news",
+    "credible_x_team_reporter_updates",
+    "injury_availability_depth_lineup",
+    "weather",
+    "current_sportsbook_prices",
+    "opening_and_line_history",
+    "ticket_percent",
+    "money_handle_percent",
+    "market_maker_comparison",
+    "steam_and_rlm",
+    "promotions",
+    "price_deterioration"
+  ],
+  "public_gate": {
+    "tickets_pct_min": 70,
+    "tickets_pct_min_without_handle": 75,
+    "tickets_pct_preferred_without_handle": 80,
+    "ticket_percentage_alone_is_sharp": false
+  },
+  "divergence": {
+    "notable_gap_points": 20,
+    "strong_gap_points": 30,
+    "extreme_gap_points": 35
+  },
+  "movement": {
+    "strong": {
+      "spread_points": 2.0,
+      "spread_key_numbers": [3, 7],
+      "total_points": 1.5,
+      "moneyline_cents": 15
+    },
+    "secondary": {
+      "spread_points_min": 1.0,
+      "spread_points_max": 1.5,
+      "moneyline_cents_min": 8,
+      "moneyline_cents_max": 14,
+      "requires_divergence_gap_points_min": 30,
+      "requires_independent_confirmation": true,
+      "standalone_sharp_signal": false
+    }
+  },
+  "verification": {
+    "independent_sources_min": 2,
+    "duplicate_origin_feeds_count_as_one": true,
+    "untimestamped_or_stale_splits_downgraded": true,
+    "market_maker_lead_has_higher_evidentiary_weight": true,
+    "soft_book_only_move_discounted": true,
+    "leader_follower_requires_timestamp_evidence": true
+  },
+  "timing": {
+    "capture_open_previous_current_close": true,
+    "distinguish_gradual_drift_from_coordinated_steam": true,
+    "late_move_automatically_sharp": false
+  },
+  "news": {
+    "identified_information_move_tag": "NEWS_REACTION",
+    "news_reaction_automatically_sharp": false,
+    "check_if_price_already_absorbed": true
+  },
+  "classifications": [
+    "PUBLIC_IMBALANCE",
+    "DIVERGENCE_WATCH",
+    "MATERIAL_MOVE",
+    "RLM_CANDIDATE",
+    "COORDINATED_STEAM",
+    "SHARP_CONFIRMED",
+    "NEWS_REACTION",
+    "SOFT_BOOK_ONLY",
+    "PRICE_EATEN",
+    "UNKNOWN"
+  ],
+  "sharp_confirmed_requires": {
+    "public_gate": true,
+    "meaningful_divergence_or_qualifying_rlm": true,
+    "movement_or_coordinated_steam": true,
+    "independent_confirmation": true,
+    "book_and_timing_evidence": true
+  },
+  "excluded_from_sharp_confirmation": [
+    "capper_commentary",
+    "single_stale_split_page",
+    "ticket_lean_without_movement",
+    "situational_narratives_without_market_evidence"
+  ],
+  "model_separation": {
+    "market_intelligence_may_create_model_p": false,
+    "market_intelligence_may_substitute_for_model_p": false,
+    "market_intelligence_may_contextualize_or_veto_executable_price": true,
+    "official_requires_model_p_and_truth_gate": true
+  }
+}
