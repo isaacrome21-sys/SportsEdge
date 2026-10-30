@@ -24,7 +24,8 @@ class TestScheduleWeekBinding(unittest.TestCase):
         self.addCleanup(self.world.__exit__)
 
     def _load(self, *, board_week=8, run_week=8, schedule_week=8, all_unpriced=False,
-              board_season=2026, run_season=2026, record_mutator=None):
+              board_season=2026, run_season=2026, record_mutator=None,
+              mixed_unpriced=False):
         w = self.world
         w.board["week"] = board_week
         w.board["season"] = board_season
@@ -32,6 +33,11 @@ class TestScheduleWeekBinding(unittest.TestCase):
             # Genuine pricer, but no recognized player can receive a price.
             w.board["rows"] = [{"player_id": "ZZ", "player_name": "Nobody",
                                 "yes_price": 300}]
+        elif mixed_unpriced:
+            # Keep the real priced player and add a genuinely unpriced row
+            # through the real pricer, so replay remains canonical.
+            w.board["rows"].append({"player_id": "ZZ", "player_name": "Nobody",
+                                    "yes_price": 300})
         if schedule_week != 8:
             lines = w.schedule.decode().splitlines()
             changed = 0
@@ -55,6 +61,8 @@ class TestScheduleWeekBinding(unittest.TestCase):
             self.assertTrue(all(r.get("status") == "UNPRICED" for r in rows))
         else:
             self.assertTrue(any(r.get("status") == "PRICED" for r in rows))
+        if mixed_unpriced:
+            self.assertTrue(any(r.get("status") == "UNPRICED" for r in rows))
         self.assertTrue(all("week" not in r for r in rows))
 
         api = fk.FakeGitHub()
@@ -208,6 +216,29 @@ class TestScheduleWeekBinding(unittest.TestCase):
                                     rec.__setitem__("fetch_provenance", v))
                 self.assertEqual(result["status"], "SCREEN")
                 self.assertIn("RUN_RECORD_MALFORMED", result["reasons"])
+
+
+    def test_real_pricer_valid_mixed_rows_count_and_tally(self):
+        result = self._load(mixed_unpriced=True)
+        self.assertEqual(result["status"], "COUNTS", result["reasons"])
+        self.assertTrue(result["refusals"])
+        self.assertTrue(all(isinstance(key, str) and key for key in result["refusals"]))
+
+    def test_nonstring_unpriced_refusal_reason_fails_closed(self):
+        def corrupt(rec, value):
+            unpriced = next(row for row in rec["rows"]
+                            if row.get("status") == "UNPRICED")
+            unpriced["reason"] = value
+
+        for bad_reason in (["NO_PLAYER"], {"code": "NO_PLAYER"}, None,
+                           True, 7, "", " "):
+            with self.subTest(bad_reason=repr(bad_reason)):
+                result = self._load(mixed_unpriced=True,
+                                    record_mutator=lambda rec, value=bad_reason:
+                                    corrupt(rec, value))
+                self.assertEqual(result["status"], "SCREEN")
+                self.assertIn("RUN_RECORD_MALFORMED", result["reasons"])
+                self.assertIn("run_proof", result)
 
 
 
