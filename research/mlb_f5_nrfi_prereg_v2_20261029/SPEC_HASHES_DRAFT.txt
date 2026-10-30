@@ -1,0 +1,5 @@
+# DRAFT. Not a freeze. Recomputed at the freeze act (T7); implementation entries added then.
+4311d8020ba247f36bea733119159b02e51614ebed9495376f36ae4a6c77497d  research/mlb_f5_nrfi_prereg_v2_20261029/COMMON_V2_TERMS.md
+8fb603a35d5a840b77ebcbd2d244a5601605fdda69566e43e5cdee363a9939ba  research/mlb_f5_nrfi_prereg_v2_20261029/PREREG_MLB_F5_INNING_EXPOSURE_NB_V2.md
+5188f312eddc29bea7aa642ec0f044c9bba86e4cedab7fd1e0d2587d7f6ea93a  research/mlb_f5_nrfi_prereg_v2_20261029/PREREG_MLB_NRFI_FIRST_INNING_STARTER_V2.md
+# OWNER_PIN_REQUIRED: implementation files (candidate code, grader, adapter) not yet written/pinned
