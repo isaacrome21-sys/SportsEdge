@@ -24,7 +24,7 @@ class TestScheduleWeekBinding(unittest.TestCase):
         self.addCleanup(self.world.__exit__)
 
     def _load(self, *, board_week=8, run_week=8, schedule_week=8, all_unpriced=False,
-              board_season=2026, run_season=2026):
+              board_season=2026, run_season=2026, record_mutator=None):
         w = self.world
         w.board["week"] = board_week
         w.board["season"] = board_season
@@ -98,6 +98,8 @@ class TestScheduleWeekBinding(unittest.TestCase):
                 "schedule": {"event": events[sc]}},
             "rows": rows,
         }
+        if record_mutator is not None:
+            record_mutator(record)
         api.commit(br, {pv.run_record_path("W1"):
                         json.dumps(record, sort_keys=True)},
                    "2026-10-25T16:30:00Z")
@@ -175,6 +177,38 @@ class TestScheduleWeekBinding(unittest.TestCase):
         result = self._load(board_season=2026.0)
         self.assertEqual(result["status"], "SCREEN")
         self.assertIn("RUN_BOARD_MISMATCH", result["reasons"])
+
+    def test_malformed_run_rows_fail_closed_without_exception(self):
+        # The run is immutable on fake GitHub; the malformed JSON is its
+        # original pushed content, not an edited branch record.
+        for bad_rows in (None, 7, "bad", {}, [None], [7], ["bad"],
+                         [{"status": "PRICED", "game_id": "fake",
+                           "kickoff": "2026-10-25T17:00:00Z"}, None]):
+            with self.subTest(bad_rows=repr(bad_rows)):
+                result = self._load(record_mutator=lambda rec, bad=bad_rows:
+                                    rec.__setitem__("rows", bad))
+                self.assertEqual(result["status"], "SCREEN")
+                self.assertIn("RUN_RECORD_MALFORMED", result["reasons"])
+                self.assertIn("run_proof", result)
+
+    def test_nonobject_fetch_provenance_entries_fail_closed(self):
+        for key in ("stats", "schedule", "freeze", "board"):
+            for bad in (7, "bad", [], None):
+                with self.subTest(key=key, bad=repr(bad)):
+                    result = self._load(record_mutator=lambda rec, k=key, v=bad:
+                                        rec["fetch_provenance"].__setitem__(k, v))
+                    self.assertEqual(result["status"], "SCREEN")
+                    self.assertIn("RUN_RECORD_MALFORMED", result["reasons"])
+                    self.assertIn("run_proof", result)
+
+    def test_nonobject_fetch_provenance_root_fails_closed(self):
+        for bad in (7, "bad", []):
+            with self.subTest(bad=repr(bad)):
+                result = self._load(record_mutator=lambda rec, v=bad:
+                                    rec.__setitem__("fetch_provenance", v))
+                self.assertEqual(result["status"], "SCREEN")
+                self.assertIn("RUN_RECORD_MALFORMED", result["reasons"])
+
 
 
 if __name__ == "__main__":
