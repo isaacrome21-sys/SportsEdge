@@ -129,9 +129,38 @@ def test_priced_example_sane_bounds(family, line):
     out = eng.price_nfl_prop(family, "P0", line, data, 2024, 6)
     assert out["status"] == "PRICED", out
     assert 0.0 < out["p_over"] < 1.0
-    assert out["p_over"] + out["p_under"] == pytest.approx(1.0)
+    assert out["p_push"] == 0.0
+    assert out["p_over"] + out["p_under"] + out["p_push"] == \
+        pytest.approx(1.0)
+    assert out["fair_probability_basis"] == "CONDITIONAL_ON_NON_PUSH"
     assert out["games_logged"] == 5
     assert 0.0 < out["shrink_weight"] < 1.0
+
+
+def test_integer_count_line_preserves_push_instead_of_assigning_it_under():
+    players = {f"P{i}": ("WR", [HEALTHY] * 8) for i in range(6)}
+    data = {2024: season_of(players)}
+    out = eng.price_nfl_prop("targets", "P0", 9.0, data, 2024, 6)
+    assert out["status"] == "PRICED"
+    assert out["p_push"] > 0.0
+    assert out["p_under"] < 1.0 - out["p_over"]
+    assert out["p_over"] + out["p_push"] + out["p_under"] == \
+        pytest.approx(1.0)
+    nonpush = out["p_over"] + out["p_under"]
+    assert out["fair_over_american"] == pytest.approx(
+        eng.fair_american(out["p_over"] / nonpush))
+    assert out["fair_under_american"] == pytest.approx(
+        eng.fair_american(out["p_under"] / nonpush))
+
+
+def test_integer_continuous_yardage_line_has_no_artificial_push():
+    players = {f"P{i}": ("QB", [HEALTHY] * 8) for i in range(6)}
+    data = {2024: season_of(players)}
+    out = eng.price_nfl_prop(
+        "pass_plus_rush_yards", "P0", 310.0, data, 2024, 6)
+    assert out["status"] == "PRICED"
+    assert out["p_push"] == 0.0
+    assert out["p_over"] + out["p_under"] == pytest.approx(1.0)
 
 
 def test_two_plus_td_yes_only_contract():
