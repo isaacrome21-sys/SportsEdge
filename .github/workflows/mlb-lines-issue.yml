@@ -8,8 +8,9 @@ on:
     types: [opened, edited]
 
 permissions:
-  contents: read
+  contents: write
   issues: write
+  pull-requests: write
 
 # GitHub treats issue-triggered workflows as low-trust and defaults their cache
 # token to read-only. Only the repository owner is allowed to run this job. The
@@ -18,7 +19,7 @@ cache-mode: write
 
 concurrency:
   group: mlb-lines-issue-${{ github.event.issue.number }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   card:
@@ -31,7 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          fetch-depth: 1
+          fetch-depth: 0
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
@@ -126,6 +127,56 @@ jobs:
             --context-dir artifacts/mlb_context \
             --out-dir artifacts/mlb_myspari_ctx
           gh issue comment "$ISSUE" --body-file artifacts/mlb_myspari_ctx/card.md
+
+      # Issue edits replace the visible quote board. Save each actual pregame
+      # Captured receipt on a review branch; never write to protected main.
+      # This step runs AFTER the final card so the snapshot includes paper picks.
+      - name: Preserve MLB PAPER snapshot via draft evidence PR
+        if: steps.intake.outcome == 'success'
+        env:
+          TITLE: ${{ github.event.issue.title }}
+        run: |
+          set -euo pipefail
+          branch="automation/mlb-paper-snapshots-issue-$ISSUE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            git fetch origin "$branch"
+            git checkout -B "$branch" "origin/$branch"
+            git merge --no-edit origin/main
+          else
+            git checkout -b "$branch" origin/main
+          fi
+          if ! PYTHONPATH=.runtime-deps:. python scripts/record_line_snapshot.py \
+               --sport mlb --issue "$ISSUE" \
+               --body-file issue_body.txt --title "$TITLE" \
+               --card-md artifacts/mlb_myspari_ctx/card.md \
+               --require-card-quote-match \
+               --bound-input-json "${{ steps.intake.outputs.path }}" \
+               --max-capture-lag-seconds 180 \
+               --root ledger/line_snapshots 2>mlb_snapshot_refusal.txt; then
+            reason="$(tail -n 1 mlb_snapshot_refusal.txt | tr -cd '[:alnum:] _:+.-' | cut -c1-180)"
+            gh issue comment "$ISSUE" --body "MLB PAPER SNAPSHOT REFUSED: ${reason:-reason unavailable}. No eligible entry/close or CLV recorded. See run logs."
+            exit 0
+          fi
+          path="ledger/line_snapshots/mlb/$ISSUE.jsonl"
+          git add -- "$path"
+          if git diff --cached --quiet; then
+            echo "MLB snapshot unchanged; no evidence commit necessary."
+            exit 0
+          fi
+          git commit -m "evidence: append MLB paper snapshot for issue #$ISSUE"
+          if ! git push origin "HEAD:refs/heads/$branch"; then
+            gh issue comment "$ISSUE" --body "MLB PAPER SNAPSHOT PUSH BLOCKED: conflicting evidence branch update. This capture was not saved; rerun the issue capture workflow after resolving the branch conflict. No eligible CLV recorded."
+            exit 1
+          fi
+          existing="$(gh pr list --state open --head "$branch" --json number --jq '.[0].number // empty')"
+          if [ -z "$existing" ]; then
+            gh pr create --draft --base main --head "$branch" \
+              --title "MLB PAPER snapshots for lines issue #$ISSUE" \
+              --body "Append-only MLB DK issue capture evidence, pregame chronology evaluated at grade time. PAPER only. Independent receipt review required; no promotion."
+          fi
 
       - name: Report engine failure on the issue
         if: failure() && steps.intake.outcome == 'success'
