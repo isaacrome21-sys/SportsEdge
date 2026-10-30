@@ -1,0 +1,915 @@
+{
+ "n_samples": 28,
+ "n_equal": 28,
+ "mismatches": 0,
+ "samples": [
+  {
+   "n": 1,
+   "gamePk": 822942,
+   "season": 2026,
+   "date": "2026-08-14",
+   "batter_id": 680700,
+   "batter_name": "Richie Palacios",
+   "away": "Baltimore Orioles",
+   "home": "Tampa Bay Rays",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 2,
+   "gamePk": 824436,
+   "season": 2026,
+   "date": "2026-05-17",
+   "batter_id": 680574,
+   "batter_name": "Matt McLain",
+   "away": "Cincinnati Reds",
+   "home": "Cleveland Guardians",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 3,
+   "gamePk": 823465,
+   "season": 2026,
+   "date": "2026-05-18",
+   "batter_id": 592663,
+   "batter_name": "J.T. Realmuto",
+   "away": "Cincinnati Reds",
+   "home": "Philadelphia Phillies",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 28,
+   "evaluator_pool_games": 28,
+   "pools_equal": true
+  },
+  {
+   "n": 4,
+   "gamePk": 823022,
+   "season": 2026,
+   "date": "2026-07-29",
+   "batter_id": 608324,
+   "batter_name": "Alex Bregman",
+   "away": "Chicago Cubs",
+   "home": "St. Louis Cardinals",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 5,
+   "gamePk": 824720,
+   "season": 2026,
+   "date": "2026-08-23",
+   "batter_id": 655316,
+   "batter_name": "Andruw Monasterio",
+   "away": "San Francisco Giants",
+   "home": "Boston Red Sox",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 6,
+   "gamePk": 825016,
+   "season": 2026,
+   "date": "2026-04-30",
+   "batter_id": 672580,
+   "batter_name": "Maikel Garcia",
+   "away": "Kansas City Royals",
+   "home": "Athletics",
+   "dh_pool": true,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 28,
+   "evaluator_pool_games": 28,
+   "pools_equal": true
+  },
+  {
+   "n": 7,
+   "gamePk": 823789,
+   "season": 2026,
+   "date": "2026-05-14",
+   "batter_id": 686217,
+   "batter_name": "Sal Frelick",
+   "away": "San Diego Padres",
+   "home": "Milwaukee Brewers",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 8,
+   "gamePk": 824066,
+   "season": 2026,
+   "date": "2026-09-05",
+   "batter_id": 686555,
+   "batter_name": "Isaac Collins",
+   "away": "Toronto Blue Jays",
+   "home": "Kansas City Royals",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 9,
+   "gamePk": 822892,
+   "season": 2026,
+   "date": "2026-06-05",
+   "batter_id": 677649,
+   "batter_name": "Ezequiel Duran",
+   "away": "Cleveland Guardians",
+   "home": "Texas Rangers",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 10,
+   "gamePk": 823582,
+   "season": 2026,
+   "date": "2026-08-29",
+   "batter_id": 669397,
+   "batter_name": "Nick Allen",
+   "away": "Houston Astros",
+   "home": "New York Mets",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 11,
+   "gamePk": 822761,
+   "season": 2026,
+   "date": "2026-09-27",
+   "batter_id": 543807,
+   "batter_name": "George Springer",
+   "away": "Cincinnati Reds",
+   "home": "Toronto Blue Jays",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 12,
+   "gamePk": 822960,
+   "season": 2026,
+   "date": "2026-06-27",
+   "batter_id": 691406,
+   "batter_name": "Junior Caminero",
+   "away": "Arizona Diamondbacks",
+   "home": "Tampa Bay Rays",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 13,
+   "gamePk": 823482,
+   "season": 2026,
+   "date": "2026-04-10",
+   "batter_id": 672695,
+   "batter_name": "Geraldo Perdomo",
+   "away": "Arizona Diamondbacks",
+   "home": "Philadelphia Phillies",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 13,
+   "evaluator_pool_games": 13,
+   "pools_equal": true
+  },
+  {
+   "n": 14,
+   "gamePk": 824044,
+   "season": 2026,
+   "date": "2026-04-22",
+   "batter_id": 672724,
+   "batter_name": "Oswald Peraza",
+   "away": "Toronto Blue Jays",
+   "home": "Los Angeles Angels",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 21,
+   "evaluator_pool_games": 21,
+   "pools_equal": true
+  },
+  {
+   "n": 15,
+   "gamePk": 824806,
+   "season": 2026,
+   "date": "2026-08-05",
+   "batter_id": 691723,
+   "batter_name": "Coby Mayo",
+   "away": "Los Angeles Angels",
+   "home": "Baltimore Orioles",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 16,
+   "gamePk": 824331,
+   "season": 2026,
+   "date": "2026-07-18",
+   "batter_id": 681198,
+   "batter_name": "TJ Rumfield",
+   "away": "Cincinnati Reds",
+   "home": "Colorado Rockies",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 17,
+   "gamePk": 823427,
+   "season": 2026,
+   "date": "2026-08-17",
+   "batter_id": 682663,
+   "batter_name": "Agust\u00edn Ram\u00edrez",
+   "away": "Miami Marlins",
+   "home": "Philadelphia Phillies",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 18,
+   "gamePk": 824315,
+   "season": 2026,
+   "date": "2026-08-23",
+   "batter_id": 663993,
+   "batter_name": "Nathaniel Lowe",
+   "away": "Cleveland Guardians",
+   "home": "Colorado Rockies",
+   "dh_pool": true,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 19,
+   "gamePk": 823275,
+   "season": 2026,
+   "date": "2026-07-28",
+   "batter_id": 678662,
+   "batter_name": "Ezequiel Tovar",
+   "away": "Colorado Rockies",
+   "home": "San Diego Padres",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 20,
+   "gamePk": 823007,
+   "season": 2026,
+   "date": "2026-09-15",
+   "batter_id": 676475,
+   "batter_name": "Alec Burleson",
+   "away": "San Francisco Giants",
+   "home": "St. Louis Cardinals",
+   "dh_pool": true,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 21,
+   "gamePk": 824351,
+   "season": 2026,
+   "date": "2026-06-06",
+   "batter_id": 592885,
+   "batter_name": "Christian Yelich",
+   "away": "Milwaukee Brewers",
+   "home": "Colorado Rockies",
+   "dh_pool": true,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 22,
+   "gamePk": 823312,
+   "season": 2026,
+   "date": "2026-04-29",
+   "batter_id": 609280,
+   "batter_name": "Miguel Andujar",
+   "away": "Chicago Cubs",
+   "home": "San Diego Padres",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 19,
+   "evaluator_pool_games": 19,
+   "pools_equal": true
+  },
+  {
+   "n": 23,
+   "gamePk": 824510,
+   "season": 2026,
+   "date": "2026-06-01",
+   "batter_id": 686681,
+   "batter_name": "Michael Massey",
+   "away": "Kansas City Royals",
+   "home": "Cincinnati Reds",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 24,
+   "gamePk": 823786,
+   "season": 2026,
+   "date": "2026-05-24",
+   "batter_id": 694192,
+   "batter_name": "Jackson Chourio",
+   "away": "Los Angeles Dodgers",
+   "home": "Milwaukee Brewers",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 16,
+   "evaluator_pool_games": 16,
+   "pools_equal": true
+  },
+  {
+   "n": 25,
+   "gamePk": 822869,
+   "season": 2026,
+   "date": "2026-07-25",
+   "batter_id": 663728,
+   "batter_name": "Cal Raleigh",
+   "away": "Seattle Mariners",
+   "home": "Texas Rangers",
+   "dh_pool": false,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 26,
+   "gamePk": 824883,
+   "season": 2026,
+   "date": "2026-08-12",
+   "batter_id": 643289,
+   "batter_name": "Mauricio Dub\u00f3n",
+   "away": "New York Mets",
+   "home": "Atlanta Braves",
+   "dh_pool": true,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 27,
+   "gamePk": 823220,
+   "season": 2026,
+   "date": "2026-05-24",
+   "batter_id": 650333,
+   "batter_name": "Luis Arraez",
+   "away": "Chicago White Sox",
+   "home": "San Francisco Giants",
+   "dh_pool": true,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  },
+  {
+   "n": 28,
+   "gamePk": 823031,
+   "season": 2026,
+   "date": "2026-07-24",
+   "batter_id": 671056,
+   "batter_name": "Iv\u00e1n Herrera",
+   "away": "Cincinnati Reds",
+   "home": "St. Louis Cardinals",
+   "dh_pool": true,
+   "production_error": null,
+   "evaluator_reason": null,
+   "production_pool_games": 30,
+   "evaluator_pool_games": 30,
+   "pools_equal": true
+  }
+ ],
+ "live_fetches": [
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-14",
+   "fetched_at_utc": "2026-10-15T03:13:23.589562+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-13",
+   "fetched_at_utc": "2026-10-15T03:13:24.427462+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/822942/boxscore",
+   "fetched_at_utc": "2026-10-15T03:13:24.886416+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-16",
+   "fetched_at_utc": "2026-10-15T03:13:25.577861+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-17",
+   "fetched_at_utc": "2026-10-15T03:13:26.024937+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/824436/boxscore",
+   "fetched_at_utc": "2026-10-15T03:13:26.519452+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-17",
+   "fetched_at_utc": "2026-10-15T03:13:26.965445+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-18",
+   "fetched_at_utc": "2026-10-15T03:13:27.606886+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/823465/boxscore",
+   "fetched_at_utc": "2026-10-15T03:13:28.173898+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-28",
+   "fetched_at_utc": "2026-10-15T03:13:28.657027+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-29",
+   "fetched_at_utc": "2026-10-15T03:13:29.093542+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/823022/boxscore",
+   "fetched_at_utc": "2026-10-15T03:13:29.579828+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-23",
+   "fetched_at_utc": "2026-10-15T03:13:30.125813+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-22",
+   "fetched_at_utc": "2026-10-15T03:13:30.822191+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/824720/boxscore",
+   "fetched_at_utc": "2026-10-15T03:13:31.299141+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-29",
+   "fetched_at_utc": "2026-10-15T03:13:32.012561+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-30",
+   "fetched_at_utc": "2026-10-15T03:13:32.488647+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/825016/boxscore",
+   "fetched_at_utc": "2026-10-15T03:13:32.943648+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-04",
+   "fetched_at_utc": "2026-10-15T03:13:33.520092+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-13",
+   "fetched_at_utc": "2026-10-15T03:13:34.228602+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-14",
+   "fetched_at_utc": "2026-10-15T03:13:34.731441+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/823789/boxscore",
+   "fetched_at_utc": "2026-10-15T03:13:35.198689+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-04",
+   "fetched_at_utc": "2026-10-15T03:13:35.627806+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-05",
+   "fetched_at_utc": "2026-10-15T03:13:36.158703+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/824066/boxscore",
+   "fetched_at_utc": "2026-10-15T03:13:36.596089+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-06",
+   "fetched_at_utc": "2026-10-15T03:13:37.235319+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-05",
+   "fetched_at_utc": "2026-10-15T03:13:37.745983+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/822892/boxscore",
+   "fetched_at_utc": "2026-10-15T03:13:38.221108+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-28",
+   "fetched_at_utc": "2026-10-15T03:13:39.027327+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-29",
+   "fetched_at_utc": "2026-10-15T03:13:39.550054+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/823582/boxscore",
+   "fetched_at_utc": "2026-10-15T03:13:40.316596+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-26",
+   "fetched_at_utc": "2026-10-15T03:13:41.093565+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-27",
+   "fetched_at_utc": "2026-10-15T03:13:41.644286+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/822761/boxscore",
+   "fetched_at_utc": "2026-10-15T03:13:42.226920+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-26",
+   "fetched_at_utc": "2026-10-15T03:13:42.712048+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-27",
+   "fetched_at_utc": "2026-10-15T03:13:43.160448+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/822960/boxscore",
+   "fetched_at_utc": "2026-10-15T03:13:43.629060+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-09",
+   "fetched_at_utc": "2026-10-15T03:13:44.264739+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-10",
+   "fetched_at_utc": "2026-10-15T03:13:44.576157+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/823482/boxscore",
+   "fetched_at_utc": "2026-10-15T03:13:45.174149+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-22",
+   "fetched_at_utc": "2026-10-15T03:13:45.797388+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-21",
+   "fetched_at_utc": "2026-10-15T03:13:46.562059+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/824044/boxscore",
+   "fetched_at_utc": "2026-10-15T03:13:47.175587+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-05",
+   "fetched_at_utc": "2026-10-15T03:13:47.632086+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-04",
+   "fetched_at_utc": "2026-10-15T03:13:48.239054+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/824806/boxscore",
+   "fetched_at_utc": "2026-10-15T03:13:48.707587+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-18",
+   "fetched_at_utc": "2026-10-15T03:13:49.111544+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-17",
+   "fetched_at_utc": "2026-10-15T03:13:49.846907+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/824331/boxscore",
+   "fetched_at_utc": "2026-10-15T03:13:50.331006+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-16",
+   "fetched_at_utc": "2026-10-15T03:13:50.955927+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-17",
+   "fetched_at_utc": "2026-10-15T03:13:51.418580+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/823427/boxscore",
+   "fetched_at_utc": "2026-10-15T03:13:52.018743+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-23",
+   "fetched_at_utc": "2026-10-15T03:13:52.743106+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-22",
+   "fetched_at_utc": "2026-10-15T03:13:53.055929+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/824315/boxscore",
+   "fetched_at_utc": "2026-10-15T03:13:53.566913+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-28",
+   "fetched_at_utc": "2026-10-15T03:13:54.217589+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-28",
+   "fetched_at_utc": "2026-10-15T03:13:55.241993+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-29",
+   "fetched_at_utc": "2026-10-15T03:13:55.931106+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/823275/boxscore",
+   "fetched_at_utc": "2026-10-15T03:13:56.538069+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-14",
+   "fetched_at_utc": "2026-10-15T03:13:57.114979+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-09-15",
+   "fetched_at_utc": "2026-10-15T03:13:57.680919+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/823007/boxscore",
+   "fetched_at_utc": "2026-10-15T03:13:58.322807+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-17",
+   "fetched_at_utc": "2026-10-15T03:13:58.978735+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-07",
+   "fetched_at_utc": "2026-10-15T03:13:59.420442+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-06",
+   "fetched_at_utc": "2026-10-15T03:14:00.056568+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/824351/boxscore",
+   "fetched_at_utc": "2026-10-15T03:14:00.448005+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-04",
+   "fetched_at_utc": "2026-10-15T03:14:01.049234+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-29",
+   "fetched_at_utc": "2026-10-15T03:14:01.518322+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-28",
+   "fetched_at_utc": "2026-10-15T03:14:01.930039+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/823312/boxscore",
+   "fetched_at_utc": "2026-10-15T03:14:02.452144+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-31",
+   "fetched_at_utc": "2026-10-15T03:14:03.045434+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-06-01",
+   "fetched_at_utc": "2026-10-15T03:14:03.626050+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/824510/boxscore",
+   "fetched_at_utc": "2026-10-15T03:14:04.182477+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-24",
+   "fetched_at_utc": "2026-10-15T03:14:04.715358+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-23",
+   "fetched_at_utc": "2026-10-15T03:14:05.238363+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/823786/boxscore",
+   "fetched_at_utc": "2026-10-15T03:14:05.740748+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-25",
+   "fetched_at_utc": "2026-10-15T03:14:06.441098+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-24",
+   "fetched_at_utc": "2026-10-15T03:14:07.054734+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/822869/boxscore",
+   "fetched_at_utc": "2026-10-15T03:14:07.696165+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-11",
+   "fetched_at_utc": "2026-10-15T03:14:08.425484+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-08-12",
+   "fetched_at_utc": "2026-10-15T03:14:08.999264+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/824883/boxscore",
+   "fetched_at_utc": "2026-10-15T03:14:09.521537+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-29",
+   "fetched_at_utc": "2026-10-15T03:14:10.036300+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-24",
+   "fetched_at_utc": "2026-10-15T03:14:10.443613+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-05-23",
+   "fetched_at_utc": "2026-10-15T03:14:10.775173+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/823220/boxscore",
+   "fetched_at_utc": "2026-10-15T03:14:11.213205+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-04-30",
+   "fetched_at_utc": "2026-10-15T03:14:11.726161+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-25",
+   "fetched_at_utc": "2026-10-15T03:14:12.277718+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-24",
+   "fetched_at_utc": "2026-10-15T03:14:12.612567+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/game/823031/boxscore",
+   "fetched_at_utc": "2026-10-15T03:14:13.135831+00:00",
+   "purpose": "parity_fixture_resolution"
+  },
+  {
+   "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-07-07",
+   "fetched_at_utc": "2026-10-15T03:14:13.899734+00:00",
+   "purpose": "parity_fixture_resolution"
+  }
+ ],
+ "comparison_scope": "evaluator pool (production collector semantics, prereg section 2) vs production MLBBatterPublicSource.prior_games pa_history, exact list-of-dicts equality. Sealed window declared not applicable to 2026 (prereg section 4).",
+ "gamelog_cache_misses": 0,
+ "passed": true
+}

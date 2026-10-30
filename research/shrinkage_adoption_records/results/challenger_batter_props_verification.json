@@ -1,0 +1,29 @@
+{
+ "parity_passed": true,
+ "parity_n": 28,
+ "parity_equal": 28,
+ "unit_checks": {
+  "pmf_sums_to_1": {
+   "trials": 300,
+   "max_abs_dev": 1.1102230246251565e-16,
+   "tol": 1e-12,
+   "passed": true
+  },
+  "k_to_0_reduces_to_uncapped_empirical": {
+   "trials": 300,
+   "max_abs_dev": 0.0,
+   "passed": true
+  },
+  "crps_pmf_matches_crps_counter_on_empirical": {
+   "trials": 300,
+   "max_abs_dev": 4.440892098500626e-16,
+   "passed": true
+  },
+  "n_zero_cannot_occur": {
+   "note": "fixture eligibility requires the production pool gates (>=10 games, >=20 PA) on the <=30-game pool; the uncapped history H is a superset, so n >= 10 for every scored fixture; asserted again in the scoring loop.",
+   "passed": true
+  },
+  "all_passed": true
+ },
+ "verified_at_utc": "2026-10-15T03:14:18.553351+00:00"
+}
