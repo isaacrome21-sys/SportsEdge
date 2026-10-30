@@ -87,7 +87,17 @@ def mutation_failures(repo_root: Path, registry_path: Path) -> list[str]:
             failures.append(f"ACTIVE_WINDOW_ID_DUPLICATE:{window_id}")
             continue
         ids.add(window_id)
-        if raw.get("status") != "ACTIVE":
+        status = raw.get("status")
+        if status != "ACTIVE":
+            # Non-ACTIVE must be a recorded, recognized terminal disposition.
+            # Arbitrary status changes must not bypass ACTIVE acquisition checks.
+            terminal = raw.get("terminal_disposition")
+            if (
+                status != "CLOSED_FAILED_NONACCRUAL"
+                or not isinstance(terminal, str)
+                or not terminal.strip()
+            ):
+                failures.append(f"ACTIVE_WINDOW_TERMINAL_DISPOSITION_INVALID:{window_id}")
             continue
 
         authority = str(raw.get("acquisition_authority") or "").strip()
