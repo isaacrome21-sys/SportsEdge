@@ -28,7 +28,7 @@ The bot's decision was **SHIP** on both lanes. Its own caveat reads: "A SHIP res
 - Decision: "SHIP SEPARATELY".
 
 **Flags. These are observations, not findings of error:**
-- (a) In the #1581 table, F5 O4.5 Brier and NRFI Brier are identical for both models (0.2523 production, 0.2503 m30), to four decimals. These are different targets, so the identity could be a coincidence or a reporting/copy defect in the research script. Before anyone cites the Brier rows, check `scripts/research_mlb_f5_nrfi_production_parity.py` read-only. The decisive NLL and log-loss rows are not affected.
+- (a) In the #1581 table, F5 O4.5 Brier and NRFI Brier are identical for both models to four decimals (0.2523 / 0.2503). **Resolved in §5: this is a rounding coincidence, not a bug.**
 - (b) Neither study committed a result file. The issue comments are the only record, and both issues are still OPEN.
 - (c) Neither study has a market leg. Under the Oct 27 law they establish model improvement only. **Neither F5 nor NRFI is VERIFIED.** The ladder lists every F5/first-inning family as PAPER with 0 graded picks.
 
@@ -107,3 +107,27 @@ Checked directly against the admitted, pinned 2025 file. `2025eve.zip` was re-do
 4. Reconcile the starter-capture stack to main as its own PR, with an exact-head independent review and owner activation before 2027 opening day. Without it, the 2027 window is empty.
 5. Confirm that F5/NRFI DK capture actually produces rows before any freeze. The freeze act (SPEC_HASHES + review + owner merge) must happen before 2027-03-01.
 6. The first-inning K and batters-to-the-plate screen stays INSUFFICIENT_DATA / NO_MARKET_TEST unless the owner rules on a StatsAPI crosswalk or a spec amendment for the identifiers and UTC times.
+
+## 5. Addendum: the identical Brier values are a coincidence, not a reporting bug
+
+I checked this read-only. Nothing was rerun.
+
+**Code path** (`scripts/research_mlb_f5_nrfi_production_parity.py` at `fa56de609`, its only commit):
+- F5 `total45_brier` comes from `R.f5_metrics` (`scripts/research_mlb_f5_nrfi_tightening.py`). That function computes `(total45["over"] - int(ar_obs+hr_obs > 4.5))**2` from the joint F5 score grid.
+- NRFI `brier` comes from `evaluate()`. That function computes `(p - y)**2` with `p = R.direct_nrfi(...)` and `y` = no run in either first-inning half.
+- The two values are computed independently, stored under different keys (`f5_rows[...]["total45_brier"]` and `nrfi_rows[...]["brier"]`), and averaged separately by `_mean`. The report formatter reads `f5[...]["total45_brier"]` and `nrfi[...]["brier"]`. No variable is shared or reused.
+
+**Full-precision values:**
+- Source: the run's own artifact. Workflow run 37256988744 (`mlb-lines-issue`, issue #1581, head `fa56de609`) produced artifact 11323540134 `mlb-lines-issue-1581` (zip sha256 `68fdaf81…01d2`, expires 2027-01-02 CT).
+- File: `artifacts/mlb_research_f5_nrfi_production_parity/result.json`, sha256 `b4fa6bcd…8d14`.
+
+| | F5 O4.5 Brier | NRFI Brier | difference |
+|---|---:|---:|---:|
+| production | 0.25228794667029 | 0.2523037901685473 | 1.6e-5 |
+| m30 | 0.2503376275447622 | 0.25029155349866283 | 4.6e-5 |
+
+The values differ in the fifth decimal and round to the same four decimals. Both targets are near-coin-flip binaries (Brier ≈ 0.25 = p(1−p) near 0.5), so close values are expected.
+
+**Other values in that artifact** match the posted comment: n = 2429; F5 NLL 5.41911 / 4.19272; NRFI log loss 0.69787 / 0.69373; ECE 0.04351 / 0.01886. The #1581 comment numbers stand.
+
+**Note:** the artifact will expire on 2027-01-02. Recommendation 2 (commit a results record) should copy `result.json` into the repo before then.
