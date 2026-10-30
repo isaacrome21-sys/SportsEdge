@@ -41,6 +41,25 @@
       "blocker": "NBA_AUTOMATIC_PRICED_CAPTURE_NOT_WIRED;NBA_GAME_AND_PROP_FAMILIES_NOT_VALIDATED",
       "notes": "Explicit NBA scope must report its blocker, never RUN_IT_SCOPE_UNKNOWN or an empty success. NBA prop research models do not have official Model_P/PLAY authority. Supplied lines may be evaluated on the canonical --lines research route without changing this hold."
     },
+    "NHL": {
+      "lane": "PREGAME_GAME_AND_PLAYER_RESEARCH",
+      "automatic_command": null,
+      "library_entrypoint": "sportsedge.sports.nhl.run_it:run_it_row",
+      "market_surface": "sportsedge/sports/nhl/market_capabilities.py",
+      "automatic_completeness": "RESEARCH_ONLY_NO_AUTOMATIC_CAPTURE",
+      "blocker": "NHL_AUTOMATIC_DK_SIX_SPORT_CAPTURE_NOT_WIRED;NHL_MODEL_PROBABILITY_AND_MARKET_VALIDATION_REQUIRED",
+      "notes": "NHL quote-binding/pricing and market capabilities have a library route, but autonomous DK slate capture, independent probability evidence and qualified CLV/ROI are not established by this control lane. NHL ML remains on its separate home-ice validation hold; no PLAY authority."
+    },
+    "CBB": {
+      "lane": "PREGAME_RESEARCH_BLOCKED",
+      "automatic_command": null,
+      "library_entrypoint": null,
+      "market_surface": "sportsedge/family_market_registry.py",
+      "governance_source": "sportsedge/registry_gate.py",
+      "automatic_completeness": "RESEARCH_ONLY_NO_AUTOMATIC_ENGINE",
+      "blocker": "CBB_FAMILY_REGISTRY_BLOCKED;CBB_AUTOMATIC_DK_CAPTURE_AND_MODEL_PRICER_NOT_WIRED",
+      "notes": "The CBB market family registry explicitly blocks all families. Do not borrow NBA prices, fabricate Model_P, silently omit CBB from ALL, or include Illinois college teams in eligible bettor cards."
+    },
     "PGA": {
       "lane": "PREGAME_AND_LIVE_MODEL",
       "automatic_command": null,
