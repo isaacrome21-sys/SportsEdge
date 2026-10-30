@@ -193,7 +193,13 @@ class NflResidualEntrypointTests(unittest.TestCase):
             game_id="2026_06_KC_BAL", home_team="BAL", away_team="KC",
             raw_margin=13.5, raw_total=65.5, paired_game_quotes=quotes,
             game_start_ts=(NOW + timedelta(hours=3)).isoformat(),
-            as_of=NOW.isoformat(), n_sims=120, seed=11)
+            as_of=NOW.isoformat(), n_sims=120, seed=11,
+            ask_sims_questions=[{"question": "KC wins by 7+", "price_american": 180}])
+        self.assertEqual(len(out["asked_sims"]), 1)
+        self.assertEqual(out["asked_sims"][0]["sample_count"], 120)
+        self.assertEqual(out["asked_sims"][0]["quote_status"], "USER_SUPPLIED_UNVERIFIED")
+        self.assertEqual(out["asked_sims"][0]["status"], "RESEARCH_ONLY_NOT_VALIDATED")
+        self.assertFalse(out["asked_sims"][0]["eligible_as_bet"])
         fair_margin = 3.5 + 0.15 * (13.5 - 3.5)
         fair_total = 50.5 + 0.15 * (65.5 - 50.5)
         self.assertAlmostEqual(out["score_means"]["mean_home"], (fair_total + fair_margin) / 2)
