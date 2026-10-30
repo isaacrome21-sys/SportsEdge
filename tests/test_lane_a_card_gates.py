@@ -20,7 +20,13 @@ ADOPTION_RECORD.md). These tests pin:
 - fail-closed paths: recalibration not applied -> BLOCKED; guard not
   evaluable in a guard-scope sport -> BLOCKED;
 - MLB rows are recalibrated but outside the guard's scope;
-- inputs are never mutated.
+- inputs are never mutated;
+- gate V3 (Oct 29, 2026): on a paired market the guard fires only on
+  the model-favored side (positive raw model edge); the mirror side
+  classifies on its own merits instead of being bucketed by the
+  pair's shared disagreement (the Oct 29 both-sides totals defect).
+  Unpaired rows keep the pair-blind guard; a frozen-policy
+  sensitivity-blocked pair still blocks both sides.
 """
 import copy
 
@@ -137,8 +143,18 @@ def test_wizards_spread_guard_fires_at_735_points():
     assert gate["guard_triggered"] is True
     assert gate["bucket"] == "OVERCONFIDENCE"
     assert gate["reason"] == gates.REASON_GUARD_MARGIN
-    # The other side of the same pair carries the same disagreement.
-    assert out["Cleveland Cavaliers -10.5"]["card_gate"]["guard_triggered"] is True
+    # Gate V3: the mirror side of the pair carries the same measured
+    # disagreement but does NOT trip the guard — Cleveland's raw
+    # model edge is negative (0.2782 vs the -112 break-even), so the
+    # row is suppressed as the mirror and classifies on its own
+    # merits: EXCLUDED below threshold at k = 0.
+    mirror = out["Cleveland Cavaliers -10.5"]["card_gate"]
+    assert mirror["disagreement_points"] == pytest.approx(7.35)
+    assert mirror["guard_triggered"] is False
+    assert mirror["guard_mirror_suppressed"] is True
+    assert mirror["guard_model_edge"] < 0
+    assert mirror["bucket"] == "EXCLUDED"
+    assert mirror["reason"] == gates.REASON_BELOW_THRESHOLD
 
 
 def test_wizards_ml_uses_the_games_market_margin():
@@ -345,3 +361,126 @@ def test_unpaired_row_keeps_break_even_anchor_stamped():
     assert base["fair_p"] is None
     # Break-even anchor at k = 0: effective EV stays exactly ~0.
     assert out[0]["card_gate"]["effective_ev"] == pytest.approx(0.0, abs=5e-6)
+
+
+# --------------------------------- guard favored side (gate V3)
+
+def test_paired_total_guard_buckets_favored_side_only():
+    # The Oct 29, 2026 SAC@NOP shape: the model projects 221.68
+    # against a 235.5 market total (13.82 points of disagreement).
+    # The model's claim is the UNDER (raw edge +0.238); the OVER is
+    # the mirror image of the same disagreement, not a second claim.
+    g = "Sacramento Kings @ New Orleans Pelicans"
+    rows = [
+        _row("NBA", g, "TOTAL", "OVER 235.5", 235.5, -108,
+             0.2335, 108 / 208, 6.0, 221.68, 107.84, 113.84),
+        _row("NBA", g, "TOTAL", "UNDER 235.5", 235.5, -112,
+             0.7665, 112 / 212, 6.0, 221.68, 107.84, 113.84),
+    ]
+    out = _by_selection(gates.apply_card_gates(rows, _diagnostic_estimate()))
+    under = out["UNDER 235.5"]["card_gate"]
+    assert under["disagreement_points"] == pytest.approx(13.82)
+    assert under["guard_paired"] is True
+    assert under["guard_model_edge"] > 0
+    assert under["guard_triggered"] is True
+    assert under["guard_mirror_suppressed"] is False
+    assert under["bucket"] == "OVERCONFIDENCE"
+    assert under["reason"] == gates.REASON_GUARD_TOTAL
+    over = out["OVER 235.5"]["card_gate"]
+    # The disagreement is still measured and stamped on the mirror;
+    # only the trigger is side-aware.
+    assert over["disagreement_points"] == pytest.approx(13.82)
+    assert over["guard_model_edge"] < 0
+    assert over["guard_triggered"] is False
+    assert over["guard_mirror_suppressed"] is True
+    # On its own merits at k = 0 the mirror is below threshold.
+    assert over["bucket"] == "EXCLUDED"
+    assert over["reason"] == gates.REASON_BELOW_THRESHOLD
+
+
+def test_paired_ml_and_spread_guard_buckets_favored_side_only():
+    # The Oct 29, 2026 FAU@UNT shape (projected home margin +6.336
+    # vs the market's +14, 7.664 points), with ML prices inside the
+    # frozen policy's longshot gate so the guard — not the
+    # sensitivity BLOCK — is what decides the ML pair.
+    g = "Florida Atlantic Owls @ North Texas Mean Green"
+    m, t, am, hm = 6.336, 74.336, 34.0, 40.336
+    rows = [
+        _row("CFB", g, "SPREAD", "Florida Atlantic Owls +14", 14.0, -108,
+             0.6469, 108 / 208, m, t, am, hm),
+        _row("CFB", g, "SPREAD", "North Texas Mean Green -14", -14.0, -112,
+             0.3337, 112 / 212, m, t, am, hm),
+        _row("CFB", g, "ML", "Florida Atlantic Owls ML", None, 240,
+             0.3694, 100 / 340, m, t, am, hm),
+        _row("CFB", g, "ML", "North Texas Mean Green ML", None, -280,
+             0.6306, 280 / 380, m, t, am, hm),
+    ]
+    out = _by_selection(gates.apply_card_gates(rows, _diagnostic_estimate()))
+    for sel in ("Florida Atlantic Owls +14", "Florida Atlantic Owls ML"):
+        gate = out[sel]["card_gate"]
+        assert gate["disagreement_points"] == pytest.approx(7.664)
+        assert gate["guard_triggered"] is True
+        assert gate["bucket"] == "OVERCONFIDENCE"
+        assert gate["reason"] == gates.REASON_GUARD_MARGIN
+    spread_mirror = out["North Texas Mean Green -14"]["card_gate"]
+    assert spread_mirror["guard_triggered"] is False
+    assert spread_mirror["guard_mirror_suppressed"] is True
+    assert spread_mirror["bucket"] == "EXCLUDED"
+    assert spread_mirror["reason"] == gates.REASON_BELOW_THRESHOLD
+    # The ML mirror classifies on its own merits: -280 trips the
+    # price cap, a normal-path exclusion, not a guard bucket.
+    ml_mirror = out["North Texas Mean Green ML"]["card_gate"]
+    assert ml_mirror["guard_triggered"] is False
+    assert ml_mirror["guard_mirror_suppressed"] is True
+    assert ml_mirror["bucket"] == "EXCLUDED"
+    assert ml_mirror["reason"] == gates.REASON_PRICE_CAP
+
+
+def test_unpaired_spread_row_guard_unchanged():
+    # A lone spread row has no mirror in the set, so the favored-side
+    # rule has nothing to reason about: the guard fires pair-blind,
+    # even on a row whose raw model edge is negative.
+    g = "Alpha @ Beta"
+    rows = [
+        _row("NBA", g, "SPREAD", "Alpha +10.5", 10.5, -108,
+             0.40, 108 / 208, 3.15, 224.69, 110.77, 113.92),
+    ]
+    out = gates.apply_card_gates(rows, _diagnostic_estimate())
+    gate = out[0]["card_gate"]
+    assert gate["guard_paired"] is False
+    assert gate["guard_model_edge"] < 0
+    assert gate["disagreement_points"] == pytest.approx(7.35)
+    assert gate["guard_triggered"] is True
+    assert gate["guard_mirror_suppressed"] is False
+    assert gate["bucket"] == "OVERCONFIDENCE"
+    assert gate["reason"] == gates.REASON_GUARD_MARGIN
+
+
+def test_sensitivity_blocked_pair_blocks_both_even_when_guard_evaluable():
+    # The spread pair is present, so the ML guard IS evaluable and
+    # the disagreement is 33.5 points; Troy's raw ML edge is even
+    # positive. The frozen policy's sensitivity BLOCK is a different
+    # mechanism (no trustworthy baseline for either side) and still
+    # governs: both ML rows BLOCKED, neither re-routed by the
+    # favored-side rule.
+    g = "Troy Trojans @ James Madison Dukes"
+    m, t, am, hm = -14.0, 51.0, 32.5, 18.5
+    rows = [
+        _row("CFB", g, "SPREAD", "Troy Trojans +19.5", 19.5, -110,
+             0.3000, 110 / 210, m, t, am, hm),
+        _row("CFB", g, "SPREAD", "James Madison Dukes -19.5", -19.5, -110,
+             0.7000, 110 / 210, m, t, am, hm),
+        _row("CFB", g, "ML", "Troy Trojans ML", None, 750,
+             0.3000, 100 / 850, m, t, am, hm),
+        _row("CFB", g, "ML", "James Madison Dukes ML", None, -1200,
+             0.7000, 1200 / 1300, m, t, am, hm),
+    ]
+    out = _by_selection(gates.apply_card_gates(rows, _diagnostic_estimate()))
+    troy = out["Troy Trojans ML"]["card_gate"]
+    assert troy["disagreement_points"] == pytest.approx(33.5)
+    assert troy["guard_model_edge"] > 0
+    assert troy["bucket"] == "BLOCKED"
+    assert troy["reason"] == gates.REASON_DEVIG_SENSITIVITY_BLOCKED
+    jmu = out["James Madison Dukes ML"]["card_gate"]
+    assert jmu["bucket"] == "BLOCKED"
+    assert jmu["reason"] == gates.REASON_DEVIG_SENSITIVITY_BLOCKED

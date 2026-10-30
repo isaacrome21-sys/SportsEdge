@@ -34,6 +34,21 @@ priced row:
    handicap, not a market margin estimate); recalibration still
    applies to MLB rows.
 
+   Gate V3 (Oct 29, 2026) makes the guard side-aware. A paired
+   market's disagreement is ONE model claim, not two: the guard
+   fires only on the side the model actually favors — the side
+   whose raw model edge (the Lane A view's model probability minus
+   the engine's break-even probability for that row's own price)
+   is positive. The mirror side's disagreement is the same number
+   read backwards; it does not trip the guard and classifies on
+   its own merits through the normal gates below. Under the
+   pair-blind V2 guard, both sides of all three totals pairs on
+   the Oct 29, 2026 card were bucketed — a guaranteed 1-1 in legs
+   that could only bleed the vig spread (see GRADE_RUNIT.md in
+   operative_run_20261029_runit). An unpaired row has no mirror
+   to reason about and keeps the pair-blind behavior, as does a
+   paired row whose raw model edge cannot be read (fail-closed).
+
 3. EXISTING CARD GATES, unchanged and applied on effective EV:
    >= +40% effective EV -> overconfidence bucket; price shorter than
    -165 -> excluded; >= +3% effective EV -> headline; otherwise
@@ -104,12 +119,19 @@ from sportsedge.edge_floors import (
     require_frozen_devig_policy,
 )
 
+# V3 (Oct 29, 2026): the disagreement guard is side-aware — on a
+# paired market it fires only on the model-favored side (positive
+# raw model edge); the mirror side classifies on its own merits
+# (module docstring, item 2). V2's pair-blind guard bucketed both
+# sides of the Oct 29 totals pairs, a guaranteed 1-1 that could
+# only bleed the vig. V2 cards stand as recorded; V3 applies
+# prospectively only.
 # V2 (Oct 29, 2026): the recalibration market baseline for paired rows
 # is the frozen-policy POWER_V1 fair probability (module docstring,
 # item 4). V1 cards (LANE_A_CARD_GATES_V1_ADOPTED_20261028) stand as
 # recorded; the version bump keeps the basis change visible on every
 # stamped row instead of silently re-basing under the V1 stamp.
-GATE_VERSION = "LANE_A_CARD_GATES_V2_DEVIG_POWER_V1_20261029"
+GATE_VERSION = "LANE_A_CARD_GATES_V3_GUARD_FAVORED_SIDE_20261029"
 
 GUARD_THRESHOLD_POINTS = 6.0
 HEADLINE_FLOOR_EV = 0.03
@@ -294,9 +316,17 @@ def _quote(row: Mapping[str, Any], key: tuple, side: str) -> dict[str, Any]:
     }
 
 
-def _market_baselines(rows: list[dict[str, Any]]) -> list[_Baseline]:
-    """One baseline per row, aligned by index (module docstring, 4)."""
-    out = [_Baseline(BASELINE_NONE) for _ in rows]
+def _pair_partners(rows: list[dict[str, Any]]) -> list[Optional[int]]:
+    """Partner index per row under the in-set pairing (see _pair_key).
+
+    The partner is the row in the same set with the same pair key
+    and the opposite side, recorded only when BOTH sides of the pair
+    are present exactly once; otherwise None (the row is unpaired —
+    no complement, a duplicated side, or no readable pair key). The
+    de-vig baseline adapter and the disagreement guard's
+    favored-side rule (gate V3) reason over these same pairs, so
+    the two mechanisms can never pair a market differently.
+    """
     slots: dict[tuple[tuple, str], list[int]] = {}
     keyed: dict[int, tuple[tuple, str]] = {}
     for idx, row in enumerate(rows):
@@ -306,21 +336,39 @@ def _market_baselines(rows: list[dict[str, Any]]) -> list[_Baseline]:
         key, side = found
         keyed[idx] = (key, side)
         slots.setdefault((key, side), []).append(idx)
+    partners: list[Optional[int]] = [None] * len(rows)
+    for idx, (key, side) in keyed.items():
+        if key[1] in ("ML", "SPREAD", "RL"):
+            complement = "home" if side == "away" else "away"
+        else:
+            complement = "UNDER" if side == "OVER" else "OVER"
+        others = slots.get((key, complement), [])
+        if len(others) == 1 and len(slots.get((key, side), [])) == 1:
+            partners[idx] = others[0]
+    return partners
+
+
+def _market_baselines(
+    rows: list[dict[str, Any]], partners: list[Optional[int]]
+) -> list[_Baseline]:
+    """One baseline per row, aligned by index (module docstring, 4)."""
+    out = [_Baseline(BASELINE_NONE) for _ in rows]
+    keyed: dict[int, tuple[tuple, str]] = {}
+    for idx, row in enumerate(rows):
+        found = _pair_key(row)
+        if found is None:
+            continue
+        keyed[idx] = found
     policy: Optional[FrozenDevigPolicy] = None
     resolved: set[int] = set()
     for idx, (key, side) in keyed.items():
         if idx in resolved:
             continue
-        if key[1] in ("ML", "SPREAD", "RL"):
-            complement = "home" if side == "away" else "away"
-        else:
-            complement = "UNDER" if side == "OVER" else "OVER"
-        partners = slots.get((key, complement), [])
-        if len(partners) != 1 or len(slots.get((key, side), [])) != 1:
+        other = partners[idx]
+        if other is None:
             out[idx] = _Baseline(BASELINE_BREAK_EVEN_UNPAIRED)
             resolved.add(idx)
             continue
-        other = partners[0]
         resolved.add(idx)
         resolved.add(other)
         if policy is None:
@@ -442,6 +490,31 @@ def _selection_side(row: Mapping[str, Any]) -> Optional[str]:
     return matches[0][0]
 
 
+def _raw_model_edge(row: Mapping[str, Any]) -> Optional[float]:
+    """The model's raw probability edge on one row, or None.
+
+    Model probability minus the engine's break-even probability for
+    the row's own price, both read from the row's Lane A view as the
+    engine wrote it (row-level fields as fallback) — pre-gates
+    values, never the POWER_V1-overridden anchor the recalibration
+    consumes. Positive means the model's disagreement with the
+    market supports THIS side of its market; that sign is what the
+    guard's favored-side rule (gate V3) reads.
+    """
+    view = _lane_a_view(row)
+    model_p = _num(view.get("estimate_p")) if view is not None else None
+    break_even = (
+        _num(view.get("book_break_even_p")) if view is not None else None
+    )
+    if model_p is None:
+        model_p = _num(row.get("estimate_p"))
+    if break_even is None:
+        break_even = _num(row.get("book_break_even_p"))
+    if model_p is None or break_even is None:
+        return None
+    return model_p - break_even
+
+
 def market_home_margins(
     rows: Iterable[Mapping[str, Any]],
 ) -> dict[str, Optional[float]]:
@@ -525,7 +598,8 @@ def apply_card_gates(
         if not isinstance(row, Mapping):
             raise ValueError("CARD_GATE_ROW_NOT_OBJECT")
     margins = market_home_margins(rows)
-    baselines = _market_baselines(rows)
+    partners = _pair_partners(rows)
+    baselines = _market_baselines(rows, partners)
     # Paired rows are re-anchored on the frozen-policy POWER_V1 fair
     # probability: the recalibration layer reads its implied_p from
     # the Lane A view's book_break_even_p, so the override is written
@@ -567,12 +641,29 @@ def apply_card_gates(
         disagreement, kind, evaluable = row_disagreement(
             row, margins.get(str(row.get("game") or ""))
         )
-        guard_triggered = bool(
+        over_threshold = bool(
             in_guard_scope
             and evaluable
             and disagreement is not None
             and disagreement >= guard_threshold
         )
+        # Gate V3 favored-side rule (module docstring, item 2): on a
+        # paired market only the side whose raw model edge is
+        # positive asserts the disagreement. The mirror side is
+        # suppressed here and classifies on its own merits below.
+        # Unpaired rows, and paired rows whose edge cannot be read,
+        # keep the pair-blind trigger (fail-closed). The edge is
+        # read from the ORIGINAL row: the recalibrated copy's view
+        # may carry the POWER_V1 anchor in place of the engine's
+        # break-even, and the raw edge is defined on engine values.
+        model_edge = _raw_model_edge(rows[idx])
+        mirror_suppressed = bool(
+            over_threshold
+            and partners[idx] is not None
+            and model_edge is not None
+            and model_edge <= 0.0
+        )
+        guard_triggered = over_threshold and not mirror_suppressed
         block = row.get("recalibration")
         recal_applied = (
             isinstance(block, Mapping) and block.get("status") == "APPLIED"
@@ -613,6 +704,11 @@ def apply_card_gates(
             "disagreement_kind": kind,
             "guard_threshold_points": guard_threshold,
             "guard_triggered": guard_triggered,
+            "guard_paired": partners[idx] is not None,
+            "guard_model_edge": (
+                round(model_edge, 6) if model_edge is not None else None
+            ),
+            "guard_mirror_suppressed": mirror_suppressed,
             "market_baseline": {
                 "source": baseline_source,
                 "method": base.method,
