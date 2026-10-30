@@ -41,6 +41,39 @@ priced row:
    injury-blindness rule) remain a card-build step applied after
    these gates, exactly as before.
 
+4. MARKET BASELINE — POWER_V1 DE-VIG (owner ruling, Oct 29, 2026;
+   Isaac delegated the conformance-audit fix — "Just do what you
+   would suggest" — and the ruling was issued on relay #2447,
+   comment 6513411240; audit gap A2: three de-vig regimes coexisted
+   and every family evaluator hand-rolled proportional de-vig while
+   the frozen platform policy selects POWER_V1): the market
+   probability the recalibration anchors on — the ``implied_p`` in
+   ``p_used = implied + k * (model_p - implied)`` — is, for every row
+   whose complementary side is present in the same row set, the
+   POWER_V1 fair probability from the frozen platform implementation
+   (``sportsedge.devig.devig_with_policy`` under
+   ``EDGE_FLOOR_DEVIG_V1``, stable and longshot estimator both
+   POWER_V1, haircut 0). The model side and the recalibration formula
+   are untouched; only the anchor's source changes, from the engine's
+   raw break-even probability of the row's own price to the pair's
+   de-vigged fair probability. Basis is stamped on every row's
+   ``card_gate.market_baseline`` block. Two fail-closed edges:
+
+   - a pair the frozen policy's longshot sensitivity gate BLOCKs
+     (a side >= +400 and the three methods spread > 1.0pp) cannot
+     anchor any row: both rows of the pair are BLOCKED with
+     ``DEVIG_SENSITIVITY_BLOCKED_POLICY`` — the platform policy's
+     BLOCK is a refusal to name a market probability, and a card
+     gate must not quietly fall back to a softer baseline for
+     exactly the longshots the policy is protecting against;
+   - a row with NO complementary side in the row set has no pair to
+     de-vig (``sportsedge.devig`` itself refuses unpaired quotes).
+     It keeps the engine's break-even anchor, stamped
+     ``BREAK_EVEN_UNPAIRED`` so the mixed basis is on the record,
+     never silent. Guard-scope placement rules for such rows are
+     unchanged (an ML row without a spread pair still cannot
+     headline).
+
 Fail-closed rules: a row the recalibration layer cannot apply to
 (missing Lane A view) is BLOCKED, never headlined on raw numbers; a
 SPREAD/ML row in a guard-scope sport whose market margin cannot be
@@ -57,12 +90,26 @@ construction, evaluator, or pin is touched.
 
 from __future__ import annotations
 
+import copy
 import math
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Iterable, Mapping, Optional
 
 from sportsedge import lane_a_recalibration as rc
+from sportsedge.devig import DevigError, devig_with_policy
+from sportsedge.edge_floors import (
+    FrozenDevigPolicy,
+    load_edge_floor_config,
+    require_frozen_devig_policy,
+)
 
-GATE_VERSION = "LANE_A_CARD_GATES_V1_ADOPTED_20261028"
+# V2 (Oct 29, 2026): the recalibration market baseline for paired rows
+# is the frozen-policy POWER_V1 fair probability (module docstring,
+# item 4). V1 cards (LANE_A_CARD_GATES_V1_ADOPTED_20261028) stand as
+# recorded; the version bump keeps the basis change visible on every
+# stamped row instead of silently re-basing under the V1 stamp.
+GATE_VERSION = "LANE_A_CARD_GATES_V2_DEVIG_POWER_V1_20261029"
 
 GUARD_THRESHOLD_POINTS = 6.0
 HEADLINE_FLOOR_EV = 0.03
@@ -81,6 +128,13 @@ REASON_PRICE_CAP = "PRICE_CAP"
 REASON_BELOW_THRESHOLD = "BELOW_THRESHOLD_EFFECTIVE_EV_LT_3PCT"
 REASON_GUARD_NOT_EVALUABLE = "GUARD_NOT_EVALUABLE_NO_MARKET_MARGIN"
 REASON_RECALIBRATION_NOT_APPLIED = "RECALIBRATION_NOT_APPLIED"
+REASON_DEVIG_SENSITIVITY_BLOCKED = "DEVIG_SENSITIVITY_BLOCKED_POLICY"
+
+# Market-baseline sources stamped on every row (module docstring, 4).
+BASELINE_POLICY_POWER_V1 = "POLICY_POWER_V1"
+BASELINE_BREAK_EVEN_UNPAIRED = "BREAK_EVEN_UNPAIRED"
+BASELINE_DEVIG_SENSITIVITY_BLOCKED = "DEVIG_SENSITIVITY_BLOCKED"
+BASELINE_NONE = "NONE"
 
 # The adoption-time k estimate: the 2026-10-28 calibration diagnostic's
 # published pooled fit (183 decided legs with a printed model p,
@@ -101,6 +155,207 @@ ADOPTION_DIAGNOSTIC_SUMMARY = {
 def current_estimate() -> rc.KEstimate:
     """The k estimate card builds use until the refit rule fires."""
     return rc.estimate_k_from_summary(ADOPTION_DIAGNOSTIC_SUMMARY)
+
+
+# ------------------------------------------------------- de-vig baseline
+#
+# The thinnest adapter between the card row set and the frozen
+# platform de-vig (sportsedge.devig): devig speaks in paired quote
+# mappings, the gates speak in priced card rows, so the adapter pairs
+# rows within the set, builds the two quote mappings per pair, and
+# asks the frozen policy (EDGE_FLOOR_DEVIG_V1) for the POWER_V1 fair
+# probability of each side. Nothing else about the gates changes.
+
+_FLOOR_CONFIG_PATH = (
+    Path(__file__).resolve().parents[1] / "config" / "truth_gate_floors.json"
+)
+_POLICY: Optional[FrozenDevigPolicy] = None
+
+_DEVIG_MARKET = {
+    "ML": "MONEYLINE",
+    "SPREAD": "SPREAD",
+    "RL": "RUN_LINE",
+    "TOTAL": "GAME_TOTAL",
+    "TEAM_TOTALS": "TEAM_TOTAL",
+}
+_DEVIG_TEAM_SIDE = {
+    ("ML", "away"): "AWAY_ML",
+    ("ML", "home"): "HOME_ML",
+    ("SPREAD", "away"): "AWAY",
+    ("SPREAD", "home"): "HOME",
+    ("RL", "away"): "AWAY_RL",
+    ("RL", "home"): "HOME_RL",
+}
+_SENSITIVITY_BLOCK_PREFIX = "LONGSHOT_DEVIG_SENSITIVITY_EXCEEDS_LIMIT"
+
+
+def _devig_policy() -> FrozenDevigPolicy:
+    """The frozen EDGE_FLOOR_DEVIG_V1 policy, loaded once, lazily.
+
+    A load failure propagates (EdgeFloorError): a card build that
+    cannot read the frozen policy must fail loudly, never fall back
+    to an un-policy baseline in silence.
+    """
+    global _POLICY
+    if _POLICY is None:
+        _POLICY = require_frozen_devig_policy(
+            config=load_edge_floor_config(str(_FLOOR_CONFIG_PATH))
+        )
+    return _POLICY
+
+
+@dataclass(frozen=True)
+class _Baseline:
+    source: str
+    fair_p: Optional[float] = None
+    method: Optional[str] = None
+    longshot_triggered: bool = False
+    sensitivity_spread: Optional[float] = None
+
+
+def _over_under_side(row: Mapping[str, Any]) -> Optional[str]:
+    selection = row.get("selection")
+    if not isinstance(selection, str):
+        return None
+    tokens = selection.upper().split()
+    if "OVER" in tokens:
+        return "OVER"
+    if "UNDER" in tokens:
+        return "UNDER"
+    return None
+
+
+def _ou_prefix(row: Mapping[str, Any]) -> str:
+    """Selection minus its OVER/UNDER token and printed line — the
+    team identity of a team-total row ("" for a game total)."""
+    selection = row.get("selection")
+    if not isinstance(selection, str):
+        return ""
+    line = _num(row.get("line"))
+    kept = []
+    for token in selection.split():
+        if token.upper() in ("OVER", "UNDER"):
+            continue
+        try:
+            value: Optional[float] = float(token.lstrip("+"))
+        except ValueError:
+            value = None
+        if value is not None and line is not None and abs(value) == abs(line):
+            continue
+        kept.append(token)
+    return " ".join(kept).strip().upper()
+
+
+def _pair_key(row: Mapping[str, Any]) -> Optional[tuple[tuple, str]]:
+    """(pair_key, side) locating a row's two-sided market, or None.
+
+    side is "away"/"home" for team markets and "OVER"/"UNDER" for
+    totals. The complement is the row in the same set with the same
+    key and the opposite side. Lines are canonicalized (absolute
+    value for team handicaps) so the two sides of one market key
+    identically even though their printed lines carry opposite signs.
+    """
+    game = row.get("game")
+    market = str(row.get("market") or "").upper()
+    if not isinstance(game, str) or _num(row.get("odds_american")) is None:
+        return None
+    if market in ("ML", "SPREAD", "RL"):
+        side = _selection_side(row)
+        if side is None:
+            return None
+        line = _num(row.get("line"))
+        canonical = abs(line) if line is not None else 0.0
+        return (game, market, canonical), side
+    if market in ("TOTAL", "TEAM_TOTALS"):
+        side = _over_under_side(row)
+        line = _num(row.get("line"))
+        if side is None or line is None:
+            return None
+        return (game, market, line, _ou_prefix(row)), side
+    return None
+
+
+def _quote(row: Mapping[str, Any], key: tuple, side: str) -> dict[str, Any]:
+    market = str(key[1])
+    if market in ("TOTAL", "TEAM_TOTALS"):
+        devig_side = side
+    else:
+        devig_side = _DEVIG_TEAM_SIDE[(market, side)]
+    return {
+        "game_id": str(key[0]),
+        "period": "FG",
+        "market": _DEVIG_MARKET[market],
+        "entity_id": "|".join(str(part) for part in key),
+        "book_key": "",
+        "is_alternate": False,
+        "line": key[2],
+        "side": devig_side,
+        "american_odds": row.get("odds_american"),
+    }
+
+
+def _market_baselines(rows: list[dict[str, Any]]) -> list[_Baseline]:
+    """One baseline per row, aligned by index (module docstring, 4)."""
+    out = [_Baseline(BASELINE_NONE) for _ in rows]
+    slots: dict[tuple[tuple, str], list[int]] = {}
+    keyed: dict[int, tuple[tuple, str]] = {}
+    for idx, row in enumerate(rows):
+        found = _pair_key(row)
+        if found is None:
+            continue
+        key, side = found
+        keyed[idx] = (key, side)
+        slots.setdefault((key, side), []).append(idx)
+    policy: Optional[FrozenDevigPolicy] = None
+    resolved: set[int] = set()
+    for idx, (key, side) in keyed.items():
+        if idx in resolved:
+            continue
+        if key[1] in ("ML", "SPREAD", "RL"):
+            complement = "home" if side == "away" else "away"
+        else:
+            complement = "UNDER" if side == "OVER" else "OVER"
+        partners = slots.get((key, complement), [])
+        if len(partners) != 1 or len(slots.get((key, side), [])) != 1:
+            out[idx] = _Baseline(BASELINE_BREAK_EVEN_UNPAIRED)
+            resolved.add(idx)
+            continue
+        other = partners[0]
+        resolved.add(idx)
+        resolved.add(other)
+        if policy is None:
+            policy = _devig_policy()
+        results: dict[int, Any] = {}
+        blocked = False
+        for cand_idx, opp_idx in ((idx, other), (other, idx)):
+            cand_key, cand_side = keyed[cand_idx]
+            _, opp_side = keyed[opp_idx]
+            try:
+                results[cand_idx] = devig_with_policy(
+                    _quote(rows[cand_idx], cand_key, cand_side),
+                    _quote(rows[opp_idx], cand_key, opp_side),
+                    policy=policy,
+                )
+            except DevigError as exc:
+                if str(exc).startswith(_SENSITIVITY_BLOCK_PREFIX):
+                    blocked = True
+                    break
+                raise
+        if blocked:
+            out[idx] = _Baseline(BASELINE_DEVIG_SENSITIVITY_BLOCKED)
+            out[other] = _Baseline(BASELINE_DEVIG_SENSITIVITY_BLOCKED)
+            continue
+        for row_idx, result in results.items():
+            out[row_idx] = _Baseline(
+                BASELINE_POLICY_POWER_V1,
+                fair_p=result.selected.candidate_fair_probability,
+                method=result.selected.method,
+                longshot_triggered=result.longshot_triggered,
+                sensitivity_spread=(
+                    result.sensitivity_spread_probability_points
+                ),
+            )
+    return out
 
 
 def _num(value: Any) -> Optional[float]:
@@ -270,9 +525,43 @@ def apply_card_gates(
         if not isinstance(row, Mapping):
             raise ValueError("CARD_GATE_ROW_NOT_OBJECT")
     margins = market_home_margins(rows)
-    recalibrated = rc.apply_recalibration_to_rows(rows, estimate, enabled=True)
+    baselines = _market_baselines(rows)
+    # Paired rows are re-anchored on the frozen-policy POWER_V1 fair
+    # probability: the recalibration layer reads its implied_p from
+    # the Lane A view's book_break_even_p, so the override is written
+    # there, on a copy (inputs never mutated), and the engine's own
+    # break-even value is preserved in the card_gate stamp. The
+    # recalibration formula and the model side are untouched.
+    prepared: list[dict[str, Any]] = []
+    baseline_applied: list[bool] = []
+    for row, base in zip(rows, baselines):
+        applied = False
+        if base.source == BASELINE_POLICY_POWER_V1 and base.fair_p is not None:
+            clone = copy.deepcopy(row)
+            view = _lane_a_view(clone)
+            if isinstance(view, dict):
+                view["book_break_even_p"] = base.fair_p
+                applied = True
+                prepared.append(clone)
+            else:
+                prepared.append(row)
+        else:
+            prepared.append(row)
+        baseline_applied.append(applied)
+    recalibrated = rc.apply_recalibration_to_rows(prepared, estimate, enabled=True)
     out: list[dict[str, Any]] = []
-    for row in recalibrated:
+    for idx, row in enumerate(recalibrated):
+        base = baselines[idx]
+        baseline_source = (
+            base.source if baseline_applied[idx] or base.source != BASELINE_POLICY_POWER_V1
+            else BASELINE_NONE
+        )
+        engine_view = _lane_a_view(rows[idx])
+        engine_break_even = (
+            _num(engine_view.get("book_break_even_p"))
+            if engine_view is not None
+            else None
+        )
         sport = str(row.get("sport") or "").upper()
         in_guard_scope = sport in GUARD_SPORTS
         disagreement, kind, evaluable = row_disagreement(
@@ -293,6 +582,8 @@ def apply_card_gates(
 
         if not recal_applied:
             bucket, reason = "BLOCKED", REASON_RECALIBRATION_NOT_APPLIED
+        elif base.source == BASELINE_DEVIG_SENSITIVITY_BLOCKED:
+            bucket, reason = "BLOCKED", REASON_DEVIG_SENSITIVITY_BLOCKED
         elif guard_triggered:
             bucket = "OVERCONFIDENCE"
             reason = REASON_GUARD_MARGIN if kind == "MARGIN" else REASON_GUARD_TOTAL
@@ -322,6 +613,26 @@ def apply_card_gates(
             "disagreement_kind": kind,
             "guard_threshold_points": guard_threshold,
             "guard_triggered": guard_triggered,
+            "market_baseline": {
+                "source": baseline_source,
+                "method": base.method,
+                "policy_id": (
+                    "EDGE_FLOOR_DEVIG_V1"
+                    if baseline_source
+                    in (BASELINE_POLICY_POWER_V1, BASELINE_DEVIG_SENSITIVITY_BLOCKED)
+                    else None
+                ),
+                "fair_p": (
+                    round(base.fair_p, 6) if base.fair_p is not None else None
+                ),
+                "engine_book_break_even_p": engine_break_even,
+                "longshot_triggered": base.longshot_triggered,
+                "sensitivity_spread_probability_points": (
+                    base.sensitivity_spread
+                    if baseline_source == BASELINE_POLICY_POWER_V1
+                    else None
+                ),
+            },
             "bucket": bucket,
             "reason": reason,
         }
