@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
-from datetime import date
+from datetime import date, datetime
+from math import isfinite
+from numbers import Real
 from pathlib import Path
 import json
 import os
@@ -42,6 +44,22 @@ def fmt_price(price: object) -> str:
     except (TypeError, ValueError):
         return str(price)
     return f"+{value}" if value > 0 else str(value)
+
+
+def _display_ev(choice: object) -> float | None:
+    """Validate economics before display; malformed candidates never break a card."""
+    if not isinstance(choice, dict):
+        return None
+    value = choice.get("ev_per_dollar")
+    price = choice.get("price_american")
+    if (isinstance(value, bool) or not isinstance(value, Real)
+            or type(price) is not int or -100 < price < 100):
+        return None
+    try:
+        ev = float(value)
+    except (ValueError, TypeError, OverflowError):
+        return None
+    return ev if isfinite(ev) else None
 
 
 def _track_note(row: dict) -> str | None:
@@ -230,11 +248,15 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
                 continue
             chosen = row.get("pick") or row.get("lean")
             choices = list(row.get("residual_research_prices") or [])
-            best = chosen or (max(choices, key=lambda x: float(x.get("ev_per_dollar") or 0)) if choices else None)
+            valid_choices = [choice for choice in choices if _display_ev(choice) is not None]
+            best = chosen or (max(valid_choices, key=_display_ev) if valid_choices else None)
             if best is None:
                 unpriced.append(f"- {label}: {_plain_reason('NO_MODEL:PAIRED_RESIDUAL_PRICE_UNAVAILABLE')}")
                 continue
-            ev = float(best.get("ev_per_dollar") or 0)
+            ev = _display_ev(best)
+            if ev is None:
+                unpriced.append(f"- {label}: invalid estimated EV or selected price")
+                continue
             status = display_status({**row, **best})
             if chosen:
                 text = (f"- **{status}** {label}: {best['selection']} {best.get('line', '')} @ {fmt_price(best['price_american'])}"
@@ -248,8 +270,24 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
                     why = "price-only edge; the model total points the other way"
                 else:
                     why = "under the research EV/edge floors"
-                text = (f"- **{status}** {label}: best side {best.get('selection')} research EV {ev * 100:+.1f}%"
-                        f" · no lean ({why})")
+                if ev > 0:
+                    captured = row.get("quote_retrieved_at")
+                    try:
+                        stamp = datetime.fromisoformat(str(captured).replace("Z", "+00:00"))
+                        valid_capture = stamp.tzinfo is not None
+                    except (ValueError, TypeError):
+                        valid_capture = False
+                    if not valid_capture:
+                        unpriced.append(f"- {label}: positive estimate withheld: offset-aware quote capture time required")
+                        continue
+                    text = (f"- **POSITIVE EV — PAPER** {label}: {best.get('selection')}"
+                            f" @ {fmt_price(best.get('price_american'))}"
+                            f" · estimated EV {ev * 100:+.4g}%"
+                            f" · Captured: {row.get('quote_retrieved_at') or 'unavailable'}"
+                            f" · model warning: {why} (NOT proven, not a bet)")
+                else:
+                    text = (f"- **{status}** {label}: best side {best.get('selection')} research EV {ev * 100:+.1f}%"
+                            f" · no lean ({why})")
             ranked.append((ev, text))
         per_game.append((game, team_totals, props))
     if ranked or unpriced:
