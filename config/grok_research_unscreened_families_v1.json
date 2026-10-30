@@ -1,0 +1,18 @@
+{
+  "schema_version": "grok_research_unscreened_families_v1",
+  "authority": "Grok lane research proposal only; NOT an owner registration. Owner registry files (nfl_family_registry_v2.json etc.) are untouched. Registration, freeze and clock remain owner rulings.",
+  "families": [
+    {
+      "sport": "NFL",
+      "family": "longest_fg_made",
+      "dk_market_key": "LONGEST_FG_MADE",
+      "engine": "sportsedge.nfl_longest_fg_empirical:NFL_LONGEST_FG_EMPIRICAL",
+      "data_source": "nflverse play-by-play via NFL_KICKING_EMPIRICAL inputs (already used on main)",
+      "state": "RESEARCH_UNSCREENED",
+      "validation_status": "NOT_VALIDATED",
+      "eligible": false,
+      "play_allowed": false,
+      "open_items": ["DK settlement of no-made-FG case unverified", "no historical screen run", "no prereg/freeze", "canonical_coverage stays BLOCKED"]
+    }
+  ]
+}
