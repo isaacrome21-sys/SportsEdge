@@ -85,9 +85,25 @@ def make_tsa(d: Path, name: str, policy: str, *, ca_from: dict | None = None,
         shutil.copy(ca_from["dir"] / "ca.key", d / "ca.key")
     _o("req", "-newkey", "rsa:2048", "-nodes", "-keyout", "tsa.key", "-out", "tsa.csr",
        "-subj", f"/CN=SportsEdge TEST TSA {name}", "-config", str(cnf), cwd=d)
-    validity = (["-not_before", not_before, "-not_after", not_after] if not_before else ["-days", "2"])
-    _o("x509", "-req", "-in", "tsa.csr", "-CA", "ca.pem", "-CAkey", "ca.key", "-CAcreateserial",
-       "-out", "tsa.pem", *validity, "-extfile", str(cnf), "-extensions", "v3_tsa", cwd=d)
+    if not_before:
+        # `openssl x509 -req` accepts -not_before/-not_after only from
+        # OpenSSL 3.2; issue the deliberately-dated cert via `openssl ca`
+        # (-startdate/-enddate), which OpenSSL 3.0 supports.
+        (d / "index.txt").write_text("")
+        (d / "ca_serial").write_text("01\n")
+        (d / "ca.cnf").write_text(
+            "[ ca ]\ndefault_ca = CA_default\n[ CA_default ]\n"
+            f"dir = {d}\ndatabase = {d}/index.txt\nnew_certs_dir = {d}\n"
+            f"serial = {d}/ca_serial\nprivate_key = {d}/ca.key\n"
+            f"certificate = {d}/ca.pem\ndefault_md = sha256\n"
+            "policy = policy_any\n[ policy_any ]\ncommonName = supplied\n")
+        _o("ca", "-batch", "-config", str(d / "ca.cnf"), "-in", "tsa.csr",
+           "-out", "tsa.pem", "-notext", "-startdate", not_before,
+           "-enddate", not_after, "-extfile", str(cnf), "-extensions",
+           "v3_tsa", cwd=d)
+    else:
+        _o("x509", "-req", "-in", "tsa.csr", "-CA", "ca.pem", "-CAkey", "ca.key", "-CAcreateserial",
+           "-out", "tsa.pem", "-days", "2", "-extfile", str(cnf), "-extensions", "v3_tsa", cwd=d)
     der = _o("x509", "-in", "tsa.pem", "-outform", "DER", cwd=d)
     return {"dir": d, "ca": (d / "ca.pem").read_bytes(), "pin": hashlib.sha256(der).hexdigest(),
             "policy": policy}
