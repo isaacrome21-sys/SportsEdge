@@ -1,0 +1,23 @@
+GAME: Delaware @ Middle Tennessee | Today 6:00 PM
+SPREAD: Delaware -1.5 (-102) | Middle Tennessee +1.5 (-118)
+TOTAL: O 47.5 (-115) | U 47.5 (-105)
+ML: Delaware (-118) | Middle Tennessee (-102)
+TEAM_PROP: Delaware | TEAM_TOTAL | 23.5 | O (-135) | U (+100)
+TEAM_PROP: Middle Tennessee | TEAM_TOTAL | 23.5 | O (-120) | U (-105)
+TEAM_PROP: Delaware | SPREAD_1H | -0.5 | +105
+TEAM_PROP: Middle Tennessee | SPREAD_1H | +0.5 | -125
+TEAM_PROP: Game | TOTAL_1H | 23.5 | O (-118) | U (-102)
+TEAM_PROP: Delaware | ML_1H | -115
+TEAM_PROP: Middle Tennessee | ML_1H | -105
+GAME: FIU @ Jacksonville State | Today 7:00 PM
+SPREAD: FIU +3 (-115) | Jacksonville State -3 (-105)
+TOTAL: O 43.5 (-112) | U 43.5 (-108)
+ML: FIU (+120) | Jacksonville State (-142)
+TEAM_PROP: FIU | TEAM_TOTAL | 20.5 | O (-115) | U (-110)
+TEAM_PROP: Jacksonville State | TEAM_TOTAL | 22.5 | O (-120) | U (-110)
+TEAM_PROP: FIU | SPREAD_1H | +1.5 | -110
+TEAM_PROP: Jacksonville State | SPREAD_1H | -1.5 | -110
+TEAM_PROP: Game | TOTAL_1H | 21.5 | O (-122) | U (+102)
+TEAM_PROP: FIU | ML_1H | +124
+TEAM_PROP: Jacksonville State | ML_1H | -148
+QUOTE_TIME: 2026-10-13 5:08 AM CDT (America/Chicago)
