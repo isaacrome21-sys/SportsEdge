@@ -17,7 +17,8 @@ def test_repository_results_pull_is_truthfully_blocked_by_missing_chronology():
     assert report["status"] == "INPUT_CONTRACT_INCOMPLETE"
     assert report["historical_screen_can_run"] is False
     assert report["missing_fields"] == [
-        "game_date", "tipoff", "observed_at", "source_ref", "position"
+        "game_date", "tipoff", "observed_at", "source_ref", "event_state",
+        "result_state", "finalized_at", "role_source_ref", "role_observed_at", "position"
     ]
     assert report["play_authority"] is False
 
@@ -55,6 +56,16 @@ def test_cli_writes_machine_readable_blocker_and_digest(tmp_path):
     assert report["input_name"] == source.name
     assert len(report["input_sha256"]) == 64
     assert report["missing_fields"] == [
-        "game_date", "tipoff", "observed_at", "source_ref", "position"
+        "game_date", "tipoff", "observed_at", "source_ref", "event_state",
+        "result_state", "finalized_at", "role_source_ref", "role_observed_at", "position"
     ]
     assert report["timestamp_policy"].startswith("NEVER_INFER")
+
+
+def test_preflight_requires_engine_final_and_role_witnesses():
+    witnesses = {"event_state", "result_state", "finalized_at",
+                 "role_source_ref", "role_observed_at"}
+    for missing in witnesses:
+        report = audit_columns([f for f in REQUIRED_FIELDS if f != missing])
+        assert report["historical_screen_can_run"] is False
+        assert missing in report["missing_fields"]
