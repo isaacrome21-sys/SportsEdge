@@ -55,3 +55,27 @@ def test_atd_v12_schedule_week_binding_real_pricer_regressions():
     assert completed.returncode == 0 and re.search(r"(?m)^OK$", log), (
         f"ATD v1.2 focused suite failed closed (exit {completed.returncode}).\n{log}"
     )
+
+
+def test_atd_v12_full_package_regressions():
+    """Keep legacy provenance/scorer regressions inside hosted discovery."""
+    package = (Path(__file__).resolve().parents[1]
+               / "research" / "nfl_atd_engine_v1_2_20261029")
+    completed = subprocess.run(
+        [sys.executable, "-m", "unittest", "discover", "-v"],
+        cwd=str(package), capture_output=True, text=True,
+        timeout=180, check=False,
+    )
+    log = completed.stdout + "\n" + completed.stderr
+    match = re.search(r"Ran (\d+) tests? in", log)
+    assert match is not None and int(match.group(1)) >= 278, log
+    # Only the five optional external Oct26 fixture cases may skip.
+    skips = [line for line in log.splitlines() if " ... skipped " in line]
+    assert len(skips) <= 5 and all(
+        "TestDalPhiFixtureRealPricer." in line
+        and "Oct 26 fixture inputs not present" in line for line in skips
+    ), log
+    assert completed.returncode == 0 and re.search(
+        r"(?m)^OK(?: \(skipped=\d+\))?$", log
+    ), f"ATD v1.2 full package failed (exit {completed.returncode}).\n{log}"
+
