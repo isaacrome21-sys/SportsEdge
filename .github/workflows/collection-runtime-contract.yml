@@ -6,6 +6,7 @@ on:
       - 'scripts/archive_mlb_prop_odds.py'
       - 'scripts/capture_cfb_weather_pit.py'
       - 'scripts/probe_public_weather_forecast.py'
+      - 'scripts/probe_draftkings_schema.py'
       - 'sportsedge/public_weather_forecast.py'
       - 'sportsedge/props_market_binding_stage7.py'
       - 'tests/test_archive_mlb_prop_odds.py'
@@ -43,10 +44,14 @@ jobs:
           tests/test_props_validation_authority_contract.py
       - name: Verify public forecast transport and units
         run: python scripts/probe_public_weather_forecast.py
+      - name: Inspect live DraftKings event and category schema
+        run: python scripts/probe_draftkings_schema.py
       - name: Preserve transport evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: public-weather-probe-${{ github.run_id }}
-          path: artifacts/public-weather-probe/
+          path: |
+            artifacts/public-weather-probe/
+            artifacts/draftkings-schema-probe/
           if-no-files-found: warn
