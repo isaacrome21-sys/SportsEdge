@@ -527,7 +527,11 @@ def market_home_margins(
     spread rows disagree or cannot be sided maps to None (guard not
     evaluable for that game), never to a guessed margin.
     """
-    margins: dict[str, set[float]] = {}
+    # The ML guard requires a *complete* two-sided spread contract.
+    # A lone side can state a number but cannot independently establish
+    # that the opposing side of the same market agrees. The spread-row
+    # guard itself still uses each row's own line (row_disagreement).
+    margins: dict[str, dict[str, list[float]]] = {}
     for row in rows:
         if not isinstance(row, Mapping):
             continue
@@ -539,10 +543,14 @@ def market_home_margins(
         if not isinstance(game, str) or line is None or side is None:
             continue
         market_home = -line if side == "home" else line
-        margins.setdefault(game, set()).add(round(market_home, 6))
+        by_side = margins.setdefault(game, {"away": [], "home": []})
+        by_side[side].append(round(market_home, 6))
     out: dict[str, Optional[float]] = {}
-    for game, values in margins.items():
-        out[game] = values.pop() if len(values) == 1 else None
+    for game, by_side in margins.items():
+        away, home = by_side["away"], by_side["home"]
+        # Missing/duplicate/conflicting complements are not an ML margin.
+        out[game] = (away[0] if len(away) == len(home) == 1
+                     and away[0] == home[0] else None)
     return out
 
 
