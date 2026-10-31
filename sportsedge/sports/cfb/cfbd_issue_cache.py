@@ -213,8 +213,8 @@ def ensure(names, key: str, cache: dict | None = None, *, budget: int = 12, paus
             # Do not expose a successful-looking in-memory research cache
             # after the source evidence failed its GitHub issue write.
             cache.pop(name, None)
-            print(f"CFB_ML_RESEARCH_NOT_DURABLE {name}")
-            continue
+            print(f"CFB_ML_RESEARCH_NOT_DURABLE {name} -- stopping to preserve quota")
+            break
     return cache
 
 
