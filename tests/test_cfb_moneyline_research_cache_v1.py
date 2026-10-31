@@ -184,6 +184,14 @@ class CFBMoneylineResearchCacheTests(unittest.TestCase):
                          "EMPTY_NO_SOURCE_OBSERVATIONS")
         with self.assertRaisesRegex(ValueError, "ROW_SCHEMA"):
             summarize_raw_coverage({"1": {"schema": "FAKE"}})
+        forged = json.loads(json.dumps(records))
+        forged["3"]["market_admitted"] = True
+        with self.assertRaisesRegex(ValueError, "UNVERIFIED_ONLY"):
+            summarize_raw_coverage(forged)
+        forged = json.loads(json.dumps(records))
+        forged["3"]["pairs"][0]["home_american"] = float("nan")
+        with self.assertRaisesRegex(ValueError, "PAIR_INVALID"):
+            summarize_raw_coverage(forged)
 
 
 if __name__ == "__main__":
