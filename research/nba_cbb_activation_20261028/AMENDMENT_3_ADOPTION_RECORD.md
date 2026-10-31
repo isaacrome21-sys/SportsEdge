@@ -126,8 +126,12 @@ quantities (first halves).
   exactly (11 = 11) on the base head; this act touches
   neither manifest.
 - Consumption: nothing in the repo consumes adoption records
-  programmatically — no registry, index, or code path
-  references `AMENDMENT_2_ADOPTION_RECORD.md` (verified by
-  full-tree search at this act's base head). Adoption is
+  functionally — no registry or index lists them, and no
+  code loads or parses one's contents (verified by full-tree
+  search at this act's base head: the only references to
+  `AMENDMENT_2_ADOPTION_RECORD.md` outside the record itself
+  are prose citations — the Gate 1 build record's narrative
+  and the machinery module's docstring, which pins the
+  amendment *text's* sha256, not the record's). Adoption is
   effective by the recorded act and its merge, exactly as
   Amendment 2's was; no companion file changes are required.
