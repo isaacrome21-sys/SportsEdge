@@ -24,11 +24,16 @@ Terms inherited and honored here (the package's own readings):
     forward, even though the screen carried one.
   * Forward input is reading R-1, identical to the parent: the
     morning-of live-route Torvik vintage for the slate date.
-  * The recorded gaps are stamped, never filled: G-1 (no pick rule
-    -> classification="PICK_RULE_UNDEFINED", pick=None), G-2 (no
-    forward interval -> no verdict machinery), G-3 (no
-    close-validity rule -> closes recorded AS REPORTED under
-    close_rule="CLOSE_RULE_UNDEFINED_GAP_G3").
+  * The recorded gaps were supplied by Amendment 2 (adopted
+    Oct 30, 2026; pinned below and verified at construction) and
+    are implemented in sportsedge.cbb_amendment2_machinery: G-1
+    (gap, designated side, and pick classification under
+    AMENDMENT_2_S1_PICK_RULE at the TEAM_TOTAL threshold 2.1),
+    G-2 (the section 2 interval construction, named on the
+    record; verdict machinery wired to run_forward_test behind
+    FREEZE_STATE), G-3 (closes recorded AS REPORTED on the
+    settlement path under AMENDMENT_2_S3_CLOSE_VALIDITY; close
+    validity is judged only inside the verdict machinery).
   * Illinois colleges are excluded exactly as the capture scope
     excludes them; identity resolves through the admitted crosswalk.
 
@@ -43,6 +48,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
+from sportsedge import cbb_amendment2_machinery as amendment2
 from sportsedge import cbb_torvik_efficiency_v1 as core
 from sportsedge.cbb_torvik_efficiency_v1 import (
     CbbForwardError,
@@ -69,9 +75,9 @@ REFUSAL_NOT_FROZEN = "CBB_TEAM_TOTAL_FORWARD_NOT_FROZEN"
 MARKET = "TEAM_TOTAL"
 SECTIONS = ("TEAM_TOTAL_AWAY", "TEAM_TOTAL_HOME")
 
-GAP_PICK_RULE = "PICK_RULE_UNDEFINED"
-GAP_INTERVAL = "INTERVAL_CONSTRUCTION_UNDEFINED_GAP_G2"
-GAP_CLOSE_RULE = "CLOSE_RULE_UNDEFINED_GAP_G3"
+PICK_RULE_ID = amendment2.PICK_RULE_ID
+INTERVAL_CONSTRUCTION_ID = amendment2.INTERVAL_CONSTRUCTION_ID
+CLOSE_RULE_ID = amendment2.CLOSE_RULE_ID
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _PACKAGE_DIR = _REPO_ROOT / "research" / "cbb_team_totals_screen_20261028"
@@ -93,6 +99,10 @@ EXPECTED_PINS = {
         _REPO_ROOT / "research" / "nba_cbb_activation_20261028"
         / "AMENDMENT_1.md",
         "c3ef6f8235cf7f996f8daf7199fe4f89a78a4ec39bfe26719e644b50d54230c0"),
+    "amendment_2_sha256": (
+        _REPO_ROOT / "research" / "nba_cbb_activation_20261028"
+        / "AMENDMENT_2_DRAFT.md",
+        amendment2.AMENDMENT_2_SHA256),
     "crosswalk_sha256": (
         _REPO_ROOT / "research" / "cbb_identity_crosswalk_20261028"
         / "crosswalk.json",
@@ -129,6 +139,10 @@ class CbbTeamTotalForwardRunner:
                 root / "research" / "nba_cbb_activation_20261028"
                 / "AMENDMENT_1.md",
                 EXPECTED_PINS["amendment_1_sha256"][1]),
+            "amendment_2_sha256": (
+                root / "research" / "nba_cbb_activation_20261028"
+                / "AMENDMENT_2_DRAFT.md",
+                EXPECTED_PINS["amendment_2_sha256"][1]),
             "crosswalk_sha256": (
                 root / "research" / "cbb_identity_crosswalk_20261028"
                 / "crosswalk.json",
@@ -167,12 +181,35 @@ class CbbTeamTotalForwardRunner:
             "the freeze act has not happened; counted pricing is "
             "refused (this build prices NON_COUNTED only)")
 
-    def run_forward_test(self, *args, **kwargs):
-        raise CbbForwardError(
-            REFUSAL_NOT_FROZEN,
-            "no forward test can run before the freeze act; the "
-            "verdict machinery additionally awaits the G-2 interval "
-            "act (INTERVAL_CONSTRUCTION_UNDEFINED_GAP_G2)")
+    def run_forward_test(self, records=None, finals=None,
+                         closes=None, *, k_at_verdict=None,
+                         k_at_freeze=None,
+                         review_already_recorded=False,
+                         missing_offer=None):
+        """The family's single verdict review (Amendment 2
+        machinery, sportsedge.cbb_amendment2_machinery).
+
+        Refuses NOT_FROZEN while FREEZE_STATE is not FROZEN: the
+        machinery is built and wired, but no review may run --
+        and no row may count -- before the freeze act.
+        """
+        if FREEZE_STATE != "FROZEN":
+            raise CbbForwardError(
+                REFUSAL_NOT_FROZEN,
+                "no forward test can run before the freeze act; "
+                "the Amendment 2 verdict machinery is built and "
+                "wired but the family is not frozen")
+        if records is None or finals is None or closes is None \
+                or k_at_verdict is None:
+            raise CbbForwardError(
+                "FORM_INVALID",
+                "run_forward_test requires records, finals, closes "
+                "and k_at_verdict")
+        return amendment2.evaluate_forward_test(
+            records, finals, closes, family_id=FAMILY_ID,
+            k_at_freeze=k_at_freeze, k_at_verdict=k_at_verdict,
+            review_already_recorded=review_already_recorded,
+            missing_offer=missing_offer)
 
     # --------------------------------------------------------------
     # NON_COUNTED pricing
@@ -295,6 +332,11 @@ class CbbTeamTotalForwardRunner:
                 vintage, now, row_id, game_teams) -> dict:
         prob_over, prob_under = no_vig_pair(pair.side_a_price,
                                             pair.side_b_price)
+        # Amendment 2 section 1: gap = model team points minus
+        # the entry line; designation is computed at pricing
+        # time, before tip, and committed on the record (1.5).
+        designation = amendment2.designate_pick(
+            MARKET, model_pts, float(pair.line))
         return {
             "schema": FORWARD_SCHEMA,
             "row_id": row_id,
@@ -339,11 +381,16 @@ class CbbTeamTotalForwardRunner:
                 "home_court_term_candidate"],
             "home_court_constant_baseline_simple": outputs[
                 "home_court_constant_baseline_simple"],
-            "classification": GAP_PICK_RULE,
-            "pick": None,
-            "pick_rule": GAP_PICK_RULE,
-            "interval_construction": GAP_INTERVAL,
-            "close_rule": GAP_CLOSE_RULE,
+            "gap": designation["gap"],
+            "designated_side": designation["designated_side"],
+            "classification": designation["classification"],
+            "pick": (designation["designated_side"]
+                     if designation["classification"] == "PICKED"
+                     else None),
+            "pick_threshold": designation["threshold"],
+            "pick_rule": PICK_RULE_ID,
+            "interval_construction": INTERVAL_CONSTRUCTION_ID,
+            "close_rule": CLOSE_RULE_ID,
             "seed": core.SEED,
             "priced_at": now.astimezone(timezone.utc).isoformat(),
             "torvik_vintage_date": vintage.slate_date,
@@ -374,7 +421,7 @@ class CbbTeamTotalForwardRunner:
                 "espn_event_id": record["espn_event_id"],
                 "market": MARKET,
                 "team": record["team"],
-                "close_rule": GAP_CLOSE_RULE,
+                "close_rule": CLOSE_RULE_ID,
             }
             close = closes.get(record["row_id"])
             out["close"] = close
@@ -456,16 +503,16 @@ def games_from_board(board: dict, fixtures: dict) -> list[CbbSlateGame]:
 
 
 __all__ = [
+    "CLOSE_RULE_ID",
     "CbbForwardError",
     "CbbSlateGame",
     "CbbTeamTotalForwardRunner",
     "ENGINE_ID",
     "FAMILY_ID",
     "FREEZE_STATE",
-    "GAP_CLOSE_RULE",
-    "GAP_INTERVAL",
-    "GAP_PICK_RULE",
+    "INTERVAL_CONSTRUCTION_ID",
     "MARKET",
+    "PICK_RULE_ID",
     "PairedQuote",
     "REFUSAL_NOT_FROZEN",
     "games_from_board",

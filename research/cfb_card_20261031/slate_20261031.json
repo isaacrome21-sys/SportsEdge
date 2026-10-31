@@ -1,0 +1,367 @@
+{
+ "run": "operative_run_20261031_cfb",
+ "slate_date": "2026-10-31",
+ "source": "lane registry ~/workspace/sportsedge/lane_intakes/registry.json (F-6 discovery-reconciled)",
+ "games": [
+  {
+   "dk_event_id": 34876709,
+   "sport": "CFB",
+   "away": "Arizona",
+   "home": "Texas Tech",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876679,
+   "sport": "CFB",
+   "away": "Boston College",
+   "home": "Duke",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876678,
+   "sport": "CFB",
+   "away": "Bowling Green",
+   "home": "Western Michigan",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876652,
+   "sport": "CFB",
+   "away": "California",
+   "home": "NC State",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876697,
+   "sport": "CFB",
+   "away": "Notre Dame",
+   "home": "Navy",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876677,
+   "sport": "CFB",
+   "away": "SMU",
+   "home": "Syracuse",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876675,
+   "sport": "CFB",
+   "away": "UAB",
+   "home": "South Florida",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876671,
+   "sport": "CFB",
+   "away": "Wisconsin",
+   "home": "Iowa",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876670,
+   "sport": "CFB",
+   "away": "Michigan",
+   "home": "Rutgers",
+   "start_ct": "2026-10-31T11:30:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876688,
+   "sport": "CFB",
+   "away": "Auburn",
+   "home": "Ole Miss",
+   "start_ct": "2026-10-31T11:45:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876650,
+   "sport": "CFB",
+   "away": "Marshall",
+   "home": "Old Dominion",
+   "start_ct": "2026-10-31T12:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876704,
+   "sport": "CFB",
+   "away": "Coastal Carolina",
+   "home": "Georgia State",
+   "start_ct": "2026-10-31T13:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876701,
+   "sport": "CFB",
+   "away": "Kansas State",
+   "home": "Colorado",
+   "start_ct": "2026-10-31T13:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876707,
+   "sport": "CFB",
+   "away": "Louisiana Tech",
+   "home": "South Alabama",
+   "start_ct": "2026-10-31T14:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876660,
+   "sport": "CFB",
+   "away": "Temple",
+   "home": "East Carolina",
+   "start_ct": "2026-10-31T14:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876703,
+   "sport": "CFB",
+   "away": "UConn",
+   "home": "Air Force",
+   "start_ct": "2026-10-31T14:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876664,
+   "sport": "CFB",
+   "away": "Stanford",
+   "home": "Louisville",
+   "start_ct": "2026-10-31T14:15:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876705,
+   "sport": "CFB",
+   "away": "Arizona State",
+   "home": "BYU",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876666,
+   "sport": "CFB",
+   "away": "Colorado State",
+   "home": "Utah State",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876669,
+   "sport": "CFB",
+   "away": "FIU",
+   "home": "Liberty",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34226169,
+   "sport": "CFB",
+   "away": "Florida",
+   "home": "Georgia",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876706,
+   "sport": "CFB",
+   "away": "Kansas",
+   "home": "TCU",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876693,
+   "sport": "CFB",
+   "away": "Minnesota",
+   "home": "Indiana",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876673,
+   "sport": "CFB",
+   "away": "Southern Miss",
+   "home": "ULM",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876676,
+   "sport": "CFB",
+   "away": "UTEP",
+   "home": "North Dakota State",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876655,
+   "sport": "CFB",
+   "away": "Utah",
+   "home": "Cincinnati",
+   "start_ct": "2026-10-31T14:45:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876681,
+   "sport": "CFB",
+   "away": "Virginia",
+   "home": "Wake Forest",
+   "start_ct": "2026-10-31T14:45:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876700,
+   "sport": "CFB",
+   "away": "New Mexico",
+   "home": "San Jose State",
+   "start_ct": "2026-10-31T15:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876696,
+   "sport": "CFB",
+   "away": "Nevada",
+   "home": "UCLA",
+   "start_ct": "2026-10-31T15:15:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876695,
+   "sport": "CFB",
+   "away": "Purdue",
+   "home": "Penn State",
+   "start_ct": "2026-10-31T15:15:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876698,
+   "sport": "CFB",
+   "away": "South Carolina",
+   "home": "Oklahoma",
+   "start_ct": "2026-10-31T15:15:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876672,
+   "sport": "CFB",
+   "away": "Appalachian State",
+   "home": "Georgia Southern",
+   "start_ct": "2026-10-31T17:30:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34226170,
+   "sport": "CFB",
+   "away": "Clemson",
+   "home": "Florida State",
+   "start_ct": "2026-10-31T18:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876708,
+   "sport": "CFB",
+   "away": "Oklahoma State",
+   "home": "Iowa State",
+   "start_ct": "2026-10-31T18:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876665,
+   "sport": "CFB",
+   "away": "Washington State",
+   "home": "San Diego State",
+   "start_ct": "2026-10-31T18:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876667,
+   "sport": "CFB",
+   "away": "Georgia Tech",
+   "home": "Pittsburgh",
+   "start_ct": "2026-10-31T18:30:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876674,
+   "sport": "CFB",
+   "away": "Miami FL",
+   "home": "North Carolina",
+   "start_ct": "2026-10-31T18:30:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876687,
+   "sport": "CFB",
+   "away": "Mississippi State",
+   "home": "Texas",
+   "start_ct": "2026-10-31T18:30:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34226171,
+   "sport": "CFB",
+   "away": "Ohio State",
+   "home": "USC",
+   "start_ct": "2026-10-31T18:30:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876702,
+   "sport": "CFB",
+   "away": "Missouri",
+   "home": "Arkansas",
+   "start_ct": "2026-10-31T18:45:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876649,
+   "sport": "CFB",
+   "away": "Army",
+   "home": "Memphis",
+   "start_ct": "2026-10-31T19:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876680,
+   "sport": "CFB",
+   "away": "Washington",
+   "home": "Nebraska",
+   "start_ct": "2026-10-31T19:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876654,
+   "sport": "CFB",
+   "away": "Texas State",
+   "home": "Boise State",
+   "start_ct": "2026-10-31T21:00:00-05:00",
+   "registry_status": "discovered"
+  },
+  {
+   "dk_event_id": 34876694,
+   "sport": "CFB",
+   "away": "Oregon State",
+   "home": "Fresno State",
+   "start_ct": "2026-10-31T22:00:00-05:00",
+   "registry_status": "discovered"
+  }
+ ],
+ "exclusions_applied": [
+  "Tennessee Volunteers: no Saturday game in registry slate - nothing to exclude",
+  "Hawai'i @ Northern Illinois: not on Saturday slate - nothing to exclude",
+  "Illinois college teams: none in registry slate. NOTE: Illinois @ Maryland is a real Sat Oct 31 game (seen on a public odds board) missing from the registry - EXCLUDED by owner rule regardless, do not add."
+ ],
+ "not_on_slate": [
+  "Registry CFB entries 34827180 (North Dakota State @ New Mexico) and 34226167 (Houston @ Utah) carry commence_ct=null - not verifiable as Saturday games, left off the slate."
+ ]
+}

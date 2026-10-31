@@ -48,6 +48,21 @@
    "detail": "CBB_TEAM_TOTAL_FORWARD_NOT_FROZEN"
   },
   {
+   "name": "amendment 2 gate shut below 40 graded games",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "amendment 2 quantities deterministic (pinned seed)",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "amendment 2 quantities cover every priced row",
+   "ok": true,
+   "detail": ""
+  },
+  {
    "name": "re-run reproduces the committed sample byte-identically",
    "ok": true,
    "detail": ""
@@ -58,16 +73,31 @@
   "design_sha256": "d206e74a203d50778cc461b4476b2f9f31d4826c3e989ec44b9bb212c486aaac",
   "parent_design_sha256": "cacbee09e1ea53c68888e5b7be3c2d61cd99def6eaba9980c0236e89daccb2fd",
   "amendment_1_sha256": "c3ef6f8235cf7f996f8daf7199fe4f89a78a4ec39bfe26719e644b50d54230c0",
+  "amendment_2_sha256": "25be46029ca1933e1a2eb7d7aa6a858928f3879a254285e90a0b9bf1270d926a",
   "crosswalk_sha256": "6cf6b033e5bc208d4bb65e52064aa1afa4468b12386e5dc7f547f7ebcfaf9096",
   "capture_scope_sha256": "22c8f6773a6357e2b3282ff310b8f83d9ce79017e6adbda76d629302e9b23753",
   "prereg_final_sha256": "1a632bff440aefdf1af9777f01d6079a797653bffd4be35a25228ff064c0c7a6",
   "shared_construction_module_sha256": "44fc65926991631d45ce96f1b8dee260e223654d0f1f1c129d36c8385b3d7fec",
-  "runner_sha256": "f87c0672475c3bec29fe9155a1794dc788c50a1eb8d61e564236c5f740edee19"
+  "runner_sha256": "31cd9e901c692dc6afdf0c5911e5f35b6b32f3a1f4b8023476c552fcde14f64d"
  },
  "equivalence": {
   "games": 12,
   "candidate_points_exact": 24,
   "baseline_points_exact": 24
+ },
+ "amendment2_machinery_exercise": {
+  "closes": "SYNTHETIC_SAME_LINE_FIXTURE_EXERCISE",
+  "review_status": "REVIEW_NOT_DUE",
+  "graded_games": 12,
+  "dispositions": {
+   "VALID_SAME_LINE": 24
+  },
+  "picked_rows": 0,
+  "roi_on_picked": null,
+  "mean_clv_picked_same_line": null,
+  "accuracy_point_estimates": {
+   "TEAM_TOTAL": 0.7766602949953395
+  }
  },
  "records_file_state": "preexisting_identical",
  "records_written": 24,

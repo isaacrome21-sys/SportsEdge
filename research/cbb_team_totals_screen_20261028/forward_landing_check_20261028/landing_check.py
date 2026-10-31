@@ -44,8 +44,10 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO))
 
+from sportsedge import cbb_amendment2_machinery as amendment2  # noqa: E402
 from sportsedge import cbb_torvik_efficiency_v1 as core  # noqa: E402
 from sportsedge.cbb_team_total_forward import (  # noqa: E402
+    FAMILY_ID as TEAM_TOTAL_FAMILY_ID,
     CbbTeamTotalForwardRunner,
 )
 from sportsedge.cbb_torvik_efficiency_v1 import (  # noqa: E402
@@ -249,6 +251,17 @@ def main():
             assert rec["label"] == "NON_COUNTED"
             assert rec["forward_baselines"] == ["SIMPLE_RATINGS"]
             assert not any("naive" in k for k in rec)
+            # Amendment 2 section 1: designation carried and
+            # self-consistent (pick set exactly on PICKED rows).
+            assert rec["classification"] in (
+                "PICKED", "PASSED", "GAP_ZERO")
+            assert (rec["pick"] is not None) == (
+                rec["classification"] == "PICKED")
+            assert rec["pick"] is None or \
+                rec["pick"] == rec["designated_side"]
+            assert rec["pick_rule"] == amendment2.PICK_RULE_ID
+            assert rec["close_rule"] == amendment2.CLOSE_RULE_ID
+            assert rec["pick_threshold"] == 2.1
         all_records.extend(out["records"])
 
         if slate_date == "2023-02-25":
@@ -291,6 +304,56 @@ def main():
             check(f"counted refusal: {name}",
                   exc.reason == "CBB_TEAM_TOTAL_FORWARD_NOT_FROZEN",
                   exc.reason)
+
+    # -- Amendment 2 verdict machinery exercise on the priced
+    # historical team rows (fixtures' finals + SYNTHETIC same-line
+    # closes; computability only, never family evidence).
+    finals_map, synthetic_closes = {}, {}
+    for slate_date, fixtures in fixtures_by_date.items():
+        for fx in fixtures:
+            finals_map[fx["espn_game_id"]] = {
+                "home_points": fx["home_score"],
+                "away_points": fx["away_score"]}
+    for r in all_records:
+        tip = datetime.strptime(r["tip_utc"], "%Y-%m-%dT%H:%M:%SZ")
+        synthetic_closes[r["row_id"]] = {
+            "line": r["line"], "side_a_price": r["side_a_price"],
+            "side_b_price": r["side_b_price"],
+            "captured_at": (tip - timedelta(minutes=30)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ")}
+    gated = amendment2.evaluate_forward_test(
+        all_records, finals_map, synthetic_closes,
+        family_id=TEAM_TOTAL_FAMILY_ID, k_at_verdict=12)
+    quantities_a = amendment2.compute_review_quantities(
+        all_records, finals_map, synthetic_closes, k=12)
+    quantities_b = amendment2.compute_review_quantities(
+        all_records, finals_map, synthetic_closes, k=12)
+    check("amendment 2 gate shut below 40 graded games",
+          gated["review_status"] == "REVIEW_NOT_DUE"
+          and gated["verdict"] is None
+          and "accuracy" not in gated and "market_leg" not in gated)
+    check("amendment 2 quantities deterministic (pinned seed)",
+          quantities_a == quantities_b)
+    check("amendment 2 quantities cover every priced row",
+          sum(quantities_a["dispositions"].values())
+          == len(all_records)
+          and quantities_a["market_leg"]["picked_rows"]
+          + quantities_a["passed_rows"]
+          + quantities_a["gap_zero_rows"] == len(all_records))
+    results["amendment2_machinery_exercise"] = {
+        "closes": "SYNTHETIC_SAME_LINE_FIXTURE_EXERCISE",
+        "review_status": gated["review_status"],
+        "graded_games": gated["graded_games"],
+        "dispositions": quantities_a["dispositions"],
+        "picked_rows": quantities_a["market_leg"]["picked_rows"],
+        "roi_on_picked": quantities_a["market_leg"][
+            "roi_on_picked"],
+        "mean_clv_picked_same_line": quantities_a["market_leg"][
+            "mean_clv_picked_same_line"],
+        "accuracy_point_estimates": {
+            market: block["mean_paired_difference"]
+            for market, block in quantities_a["accuracy"].items()},
+    }
 
     sample_path = OUT_DIR / "entry_records_sample.jsonl"
     try:
