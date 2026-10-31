@@ -16,6 +16,22 @@ _spec.loader.exec_module(L)
 
 NOW = datetime(2026, 10, 10, 10, 0, tzinfo=timezone.utc)
 
+RECEIPT_SHA = "a" * 64  # Synthetic verifier fixture, NOT provider evidence.
+
+
+def verified_close(**overrides):
+    item = {
+        "game_id": "1", "away": "UCF", "home": "Oklahoma State",
+        "start_ts": "2026-10-10T16:00:00Z",
+        "captured_at_utc": "2026-10-10T15:55:00Z",
+        "authorized_close_cutoff_utc": "2026-10-10T15:59:00Z",
+        "provider": "DraftKings", "source_type": "rendered_browser",
+        "source_sha256": "b" * 64, "receipt_sha256": RECEIPT_SHA,
+    }
+    item.update(overrides)
+    return item
+
+
 
 def card(rows):
     return {"schema": "CFB_SDV_CARD_V2", "scored_at_utc": NOW.isoformat(),
@@ -80,8 +96,9 @@ class GradeTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "s.csv.gz"
             schedule(path, [("UCF", "Oklahoma State", 20, 27, "true")])
-            close = [{"away": "UCF", "home": "Oklahoma State", "total": [53.5, -105, -115]}]
-            L.grade(led, L.load_final_scores(path), close)
+            close = [verified_close(total=[53.5, -105, -115])]
+            L.grade(led, L.load_final_scores(path), close,
+                    verified_receipt_shas=frozenset({RECEIPT_SHA}))
         p = led["plays"][0]
         self.assertEqual(p["result"], "WIN")
         self.assertAlmostEqual(p["units"], round(0.25 * 100 / 108, 4))
@@ -90,10 +107,11 @@ class GradeTest(unittest.TestCase):
 
     def test_line_move_makes_clv_unavailable_not_repriced(self):
         led = L.record(card([row()]), card_sha256="b" * 64, recorded_at=NOW)
-        L.grade(led, {}, [{"away": "UCF", "home": "Oklahoma State", "total": [52.5, -110, -110]}])
+        L.grade(led, {}, [verified_close(total=[52.5, -110, -110])],
+                verified_receipt_shas=frozenset({RECEIPT_SHA}))
         p = led["plays"][0]
         self.assertIsNone(p["result"])
-        self.assertEqual(p["clv_status"], "UNAVAILABLE_LINE_MOVED_OR_MISSING")
+        self.assertEqual(p["clv_status"], "UNAVAILABLE_UNVERIFIED_OR_MISMATCHED_CLOSE")
         self.assertIsNone(p["clv_novig_pp"])
 
     def test_unfinished_game_stays_pending(self):
@@ -118,11 +136,66 @@ class GradeTest(unittest.TestCase):
 
     def test_spread_close_handles_flipped_board(self):
         led = L.record(card([row(market="SPREAD", side="AWAY", line=10.5)]), card_sha256="b" * 64, recorded_at=NOW)
-        close = [{"away": "Oklahoma State", "home": "UCF", "spread": [-10.5, -120, 100]}]
-        L.grade(led, {}, close)
+        close = [verified_close(away="Oklahoma State", home="UCF", spread=[-10.5, -120, 100])]
+        L.grade(led, {}, close, verified_receipt_shas=frozenset({RECEIPT_SHA}))
         p = led["plays"][0]
         self.assertEqual(p["clv_status"], "EXACT_CONTRACT")
         self.assertEqual((p["close_odds"], p["close_opposite_odds"]), (100.0, -120.0))
+
+
+    def test_legacy_name_only_close_never_authenticates(self):
+        led = L.record(card([row()]), card_sha256="b" * 64, recorded_at=NOW)
+        L.grade(led, {}, [{"away": "UCF", "home": "Oklahoma State",
+                           "total": [53.5, -105, -115], "authenticated": True}])
+        p = led["plays"][0]
+        self.assertEqual(p["clv_status"], "UNAVAILABLE_UNVERIFIED_OR_MISMATCHED_CLOSE")
+        self.assertIsNone(p["clv_novig_pp"])
+
+    def test_untrusted_row_flag_and_sha_do_not_substitute_for_verifier(self):
+        led = L.record(card([row()]), card_sha256="b" * 64, recorded_at=NOW)
+        L.grade(led, {}, [verified_close(total=[53.5, -105, -115], authenticated=True)])
+        self.assertIsNone(led["plays"][0]["clv_novig_pp"])
+
+    def test_wrong_game_clock_or_provider_refused(self):
+        for change in (
+            {"game_id": "UNRELATED_GAME"},
+            {"start_ts": "2026-10-11T16:00:00Z"},
+            {"captured_at_utc": "2026-10-10T16:01:00Z"},
+            {"captured_at_utc": "NOT_A_TIME"},
+            {"provider": "OTHER_BOOK"},
+            {"source_type": "direct_json"},
+            {"receipt_sha256": "not-a-sha"},
+            {"source_sha256": "bogus"},
+        ):
+            with self.subTest(change=change):
+                led = L.record(card([row()]), card_sha256="b" * 64, recorded_at=NOW)
+                L.grade(led, {}, [verified_close(total=[53.5, -105, -115], **change)],
+                        verified_receipt_shas=frozenset({RECEIPT_SHA}))
+                self.assertIsNone(led["plays"][0]["clv_novig_pp"])
+
+    def test_moved_line_before_valid_same_event_does_not_block(self):
+        led = L.record(card([row()]), card_sha256="b" * 64, recorded_at=NOW)
+        board = [verified_close(total=[52.5, -110, -110]),
+                 verified_close(total=[53.5, -105, -115])]
+        L.grade(led, {}, board, verified_receipt_shas=frozenset({RECEIPT_SHA}))
+        self.assertEqual(led["plays"][0]["clv_status"], "EXACT_CONTRACT")
+
+    def test_duplicate_or_conflicting_exact_closes_refused(self):
+        for prices in ((-105, -115), (-110, -110)):
+            with self.subTest(prices=prices):
+                led = L.record(card([row()]), card_sha256="b" * 64, recorded_at=NOW)
+                board = [verified_close(total=[53.5, -105, -115]),
+                         verified_close(total=[53.5, *prices])]
+                L.grade(led, {}, board, verified_receipt_shas=frozenset({RECEIPT_SHA}))
+                self.assertIsNone(led["plays"][0]["clv_novig_pp"])
+
+    def test_invalid_american_prices_fail_closed(self):
+        for price in (float("nan"), float("inf"), 0, -99, True, "bad"):
+            with self.subTest(price=price):
+                led = L.record(card([row()]), card_sha256="b" * 64, recorded_at=NOW)
+                L.grade(led, {}, [verified_close(total=[53.5, price, -110])],
+                        verified_receipt_shas=frozenset({RECEIPT_SHA}))
+                self.assertIsNone(led["plays"][0]["clv_novig_pp"])
 
 
 class CliSafetyTest(unittest.TestCase):
